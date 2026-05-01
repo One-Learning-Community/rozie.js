@@ -1,2 +1,13 @@
 .planning/
 .idea/
+
+# Node + monorepo
+node_modules/
+dist/
+.turbo/
+*.log
+.DS_Store
+coverage/
+
+# Per RESEARCH.md Open Question 2 — peggy generated file regenerates on prepare
+packages/core/src/modifier-grammar/generated.js
