@@ -1,0 +1,12 @@
+{
+  "type": "SlotDecl",
+  "name": "header",
+  "defaultContent": null,
+  "params": [],
+  "presence": "always",
+  "nestedSlots": [],
+  "sourceLoc": {
+    "start": 100,
+    "end": 200
+  }
+}
