@@ -1,0 +1,1025 @@
+{
+  "props": {
+    "placeholder": {
+      "name": "placeholder",
+      "decl": {
+        "type": "ObjectProperty",
+        "start": 523,
+        "end": 573,
+        "loc": {
+          "start": {
+            "line": 19,
+            "column": 2,
+            "index": 523
+          },
+          "end": {
+            "line": 19,
+            "column": 52,
+            "index": 573
+          },
+          "filename": "SearchInput.rozie"
+        },
+        "method": false,
+        "key": {
+          "type": "Identifier",
+          "start": 523,
+          "end": 534,
+          "loc": {
+            "end": {
+              "line": 19,
+              "column": 13,
+              "index": 534
+            },
+            "filename": "SearchInput.rozie",
+            "identifierName": "placeholder"
+          },
+          "name": "placeholder"
+        },
+        "computed": false,
+        "shorthand": false,
+        "value": {
+          "type": "ObjectExpression",
+          "start": 536,
+          "end": 573,
+          "loc": {
+            "start": {
+              "line": 19,
+              "column": 15,
+              "index": 536
+            },
+            "filename": "SearchInput.rozie"
+          },
+          "properties": [
+            {
+              "type": "ObjectProperty",
+              "start": 538,
+              "end": 550,
+              "loc": {
+                "start": {
+                  "line": 19,
+                  "column": 17,
+                  "index": 538
+                },
+                "end": {
+                  "line": 19,
+                  "column": 29,
+                  "index": 550
+                },
+                "filename": "SearchInput.rozie"
+              },
+              "method": false,
+              "key": {
+                "type": "Identifier",
+                "start": 538,
+                "end": 542,
+                "loc": {
+                  "end": {
+                    "line": 19,
+                    "column": 21,
+                    "index": 542
+                  },
+                  "filename": "SearchInput.rozie",
+                  "identifierName": "type"
+                },
+                "name": "type"
+              },
+              "computed": false,
+              "shorthand": false,
+              "value": {
+                "type": "Identifier",
+                "start": 544,
+                "end": 550,
+                "loc": {
+                  "start": {
+                    "line": 19,
+                    "column": 23,
+                    "index": 544
+                  },
+                  "filename": "SearchInput.rozie",
+                  "identifierName": "String"
+                },
+                "name": "String"
+              }
+            },
+            {
+              "type": "ObjectProperty",
+              "start": 553,
+              "end": 571,
+              "loc": {
+                "start": {
+                  "line": 19,
+                  "column": 32,
+                  "index": 553
+                },
+                "end": {
+                  "line": 19,
+                  "column": 50,
+                  "index": 571
+                },
+                "filename": "SearchInput.rozie"
+              },
+              "method": false,
+              "key": {
+                "type": "Identifier",
+                "start": 553,
+                "end": 560,
+                "loc": {
+                  "end": {
+                    "line": 19,
+                    "column": 39,
+                    "index": 560
+                  },
+                  "filename": "SearchInput.rozie",
+                  "identifierName": "default"
+                },
+                "name": "default"
+              },
+              "computed": false,
+              "shorthand": false,
+              "value": {
+                "type": "StringLiteral",
+                "start": 562,
+                "end": 571,
+                "loc": {
+                  "start": {
+                    "line": 19,
+                    "column": 41,
+                    "index": 562
+                  },
+                  "filename": "SearchInput.rozie"
+                },
+                "value": "Search…"
+              }
+            }
+          ]
+        }
+      },
+      "typeIdentifier": "String",
+      "isModel": false,
+      "sourceLoc": {
+        "start": 523,
+        "end": 573
+      }
+    },
+    "minLength": {
+      "name": "minLength",
+      "decl": {
+        "type": "ObjectProperty",
+        "start": 577,
+        "end": 619,
+        "loc": {
+          "start": {
+            "line": 20,
+            "column": 2,
+            "index": 577
+          },
+          "end": {
+            "line": 20,
+            "column": 44,
+            "index": 619
+          },
+          "filename": "SearchInput.rozie"
+        },
+        "method": false,
+        "key": {
+          "type": "Identifier",
+          "start": 577,
+          "end": 586,
+          "loc": {
+            "end": {
+              "line": 20,
+              "column": 11,
+              "index": 586
+            },
+            "filename": "SearchInput.rozie",
+            "identifierName": "minLength"
+          },
+          "name": "minLength"
+        },
+        "computed": false,
+        "shorthand": false,
+        "value": {
+          "type": "ObjectExpression",
+          "start": 590,
+          "end": 619,
+          "loc": {
+            "start": {
+              "line": 20,
+              "column": 15,
+              "index": 590
+            },
+            "filename": "SearchInput.rozie"
+          },
+          "properties": [
+            {
+              "type": "ObjectProperty",
+              "start": 592,
+              "end": 604,
+              "loc": {
+                "start": {
+                  "line": 20,
+                  "column": 17,
+                  "index": 592
+                },
+                "end": {
+                  "line": 20,
+                  "column": 29,
+                  "index": 604
+                },
+                "filename": "SearchInput.rozie"
+              },
+              "method": false,
+              "key": {
+                "type": "Identifier",
+                "start": 592,
+                "end": 596,
+                "loc": {
+                  "end": {
+                    "line": 20,
+                    "column": 21,
+                    "index": 596
+                  },
+                  "filename": "SearchInput.rozie",
+                  "identifierName": "type"
+                },
+                "name": "type"
+              },
+              "computed": false,
+              "shorthand": false,
+              "value": {
+                "type": "Identifier",
+                "start": 598,
+                "end": 604,
+                "loc": {
+                  "start": {
+                    "line": 20,
+                    "column": 23,
+                    "index": 598
+                  },
+                  "filename": "SearchInput.rozie",
+                  "identifierName": "Number"
+                },
+                "name": "Number"
+              }
+            },
+            {
+              "type": "ObjectProperty",
+              "start": 607,
+              "end": 617,
+              "loc": {
+                "start": {
+                  "line": 20,
+                  "column": 32,
+                  "index": 607
+                },
+                "end": {
+                  "line": 20,
+                  "column": 42,
+                  "index": 617
+                },
+                "filename": "SearchInput.rozie"
+              },
+              "method": false,
+              "key": {
+                "type": "Identifier",
+                "start": 607,
+                "end": 614,
+                "loc": {
+                  "end": {
+                    "line": 20,
+                    "column": 39,
+                    "index": 614
+                  },
+                  "filename": "SearchInput.rozie",
+                  "identifierName": "default"
+                },
+                "name": "default"
+              },
+              "computed": false,
+              "shorthand": false,
+              "value": {
+                "type": "NumericLiteral",
+                "start": 616,
+                "end": 617,
+                "loc": {
+                  "start": {
+                    "line": 20,
+                    "column": 41,
+                    "index": 616
+                  },
+                  "filename": "SearchInput.rozie"
+                },
+                "value": 2
+              }
+            }
+          ]
+        }
+      },
+      "typeIdentifier": "Number",
+      "isModel": false,
+      "sourceLoc": {
+        "start": 577,
+        "end": 619
+      }
+    },
+    "autofocus": {
+      "name": "autofocus",
+      "decl": {
+        "type": "ObjectProperty",
+        "start": 623,
+        "end": 669,
+        "loc": {
+          "start": {
+            "line": 21,
+            "column": 2,
+            "index": 623
+          },
+          "end": {
+            "line": 21,
+            "column": 48,
+            "index": 669
+          },
+          "filename": "SearchInput.rozie"
+        },
+        "method": false,
+        "key": {
+          "type": "Identifier",
+          "start": 623,
+          "end": 632,
+          "loc": {
+            "end": {
+              "line": 21,
+              "column": 11,
+              "index": 632
+            },
+            "filename": "SearchInput.rozie",
+            "identifierName": "autofocus"
+          },
+          "name": "autofocus"
+        },
+        "computed": false,
+        "shorthand": false,
+        "value": {
+          "type": "ObjectExpression",
+          "start": 636,
+          "end": 669,
+          "loc": {
+            "start": {
+              "line": 21,
+              "column": 15,
+              "index": 636
+            },
+            "filename": "SearchInput.rozie"
+          },
+          "properties": [
+            {
+              "type": "ObjectProperty",
+              "start": 638,
+              "end": 651,
+              "loc": {
+                "start": {
+                  "line": 21,
+                  "column": 17,
+                  "index": 638
+                },
+                "end": {
+                  "line": 21,
+                  "column": 30,
+                  "index": 651
+                },
+                "filename": "SearchInput.rozie"
+              },
+              "method": false,
+              "key": {
+                "type": "Identifier",
+                "start": 638,
+                "end": 642,
+                "loc": {
+                  "end": {
+                    "line": 21,
+                    "column": 21,
+                    "index": 642
+                  },
+                  "filename": "SearchInput.rozie",
+                  "identifierName": "type"
+                },
+                "name": "type"
+              },
+              "computed": false,
+              "shorthand": false,
+              "value": {
+                "type": "Identifier",
+                "start": 644,
+                "end": 651,
+                "loc": {
+                  "start": {
+                    "line": 21,
+                    "column": 23,
+                    "index": 644
+                  },
+                  "filename": "SearchInput.rozie",
+                  "identifierName": "Boolean"
+                },
+                "name": "Boolean"
+              }
+            },
+            {
+              "type": "ObjectProperty",
+              "start": 653,
+              "end": 667,
+              "loc": {
+                "start": {
+                  "line": 21,
+                  "column": 32,
+                  "index": 653
+                },
+                "end": {
+                  "line": 21,
+                  "column": 46,
+                  "index": 667
+                },
+                "filename": "SearchInput.rozie"
+              },
+              "method": false,
+              "key": {
+                "type": "Identifier",
+                "start": 653,
+                "end": 660,
+                "loc": {
+                  "end": {
+                    "line": 21,
+                    "column": 39,
+                    "index": 660
+                  },
+                  "filename": "SearchInput.rozie",
+                  "identifierName": "default"
+                },
+                "name": "default"
+              },
+              "computed": false,
+              "shorthand": false,
+              "value": {
+                "type": "BooleanLiteral",
+                "start": 662,
+                "end": 667,
+                "loc": {
+                  "start": {
+                    "line": 21,
+                    "column": 41,
+                    "index": 662
+                  },
+                  "filename": "SearchInput.rozie"
+                },
+                "value": false
+              }
+            }
+          ]
+        }
+      },
+      "typeIdentifier": "Boolean",
+      "isModel": false,
+      "sourceLoc": {
+        "start": 623,
+        "end": 669
+      }
+    }
+  },
+  "data": {
+    "query": {
+      "name": "query",
+      "decl": {
+        "type": "ObjectProperty",
+        "start": 694,
+        "end": 703,
+        "loc": {
+          "start": {
+            "line": 27,
+            "column": 2,
+            "index": 694
+          },
+          "end": {
+            "line": 27,
+            "column": 11,
+            "index": 703
+          },
+          "filename": "SearchInput.rozie"
+        },
+        "method": false,
+        "key": {
+          "type": "Identifier",
+          "start": 694,
+          "end": 699,
+          "loc": {
+            "end": {
+              "line": 27,
+              "column": 7,
+              "index": 699
+            },
+            "filename": "SearchInput.rozie",
+            "identifierName": "query"
+          },
+          "name": "query"
+        },
+        "computed": false,
+        "shorthand": false,
+        "value": {
+          "type": "StringLiteral",
+          "start": 701,
+          "end": 703,
+          "loc": {
+            "start": {
+              "line": 27,
+              "column": 9,
+              "index": 701
+            },
+            "filename": "SearchInput.rozie"
+          },
+          "value": ""
+        }
+      },
+      "sourceLoc": {
+        "start": 694,
+        "end": 703
+      }
+    }
+  },
+  "refs": {
+    "inputEl": {
+      "name": "inputEl",
+      "elementTag": "input",
+      "sourceLoc": {
+        "start": 1550,
+        "end": 1563
+      }
+    }
+  },
+  "slots": {},
+  "computeds": {
+    "isValid": {
+      "name": "isValid",
+      "callback": {
+        "type": "ArrowFunctionExpression",
+        "start": 751,
+        "end": 795,
+        "loc": {
+          "start": {
+            "line": 32,
+            "column": 26,
+            "index": 751
+          },
+          "end": {
+            "line": 32,
+            "column": 70,
+            "index": 795
+          },
+          "filename": "SearchInput.rozie"
+        },
+        "id": null,
+        "generator": false,
+        "async": false,
+        "params": [],
+        "body": {
+          "type": "BinaryExpression",
+          "start": 757,
+          "end": 795,
+          "loc": {
+            "start": {
+              "line": 32,
+              "column": 32,
+              "index": 757
+            },
+            "filename": "SearchInput.rozie"
+          },
+          "left": {
+            "type": "MemberExpression",
+            "start": 757,
+            "end": 775,
+            "loc": {
+              "end": {
+                "line": 32,
+                "column": 50,
+                "index": 775
+              },
+              "filename": "SearchInput.rozie"
+            },
+            "object": {
+              "type": "MemberExpression",
+              "start": 757,
+              "end": 768,
+              "loc": {
+                "end": {
+                  "line": 32,
+                  "column": 43,
+                  "index": 768
+                },
+                "filename": "SearchInput.rozie"
+              },
+              "object": {
+                "type": "Identifier",
+                "start": 757,
+                "end": 762,
+                "loc": {
+                  "end": {
+                    "line": 32,
+                    "column": 37,
+                    "index": 762
+                  },
+                  "filename": "SearchInput.rozie",
+                  "identifierName": "$data"
+                },
+                "name": "$data"
+              },
+              "computed": false,
+              "property": {
+                "type": "Identifier",
+                "start": 763,
+                "end": 768,
+                "loc": {
+                  "start": {
+                    "line": 32,
+                    "column": 38,
+                    "index": 763
+                  },
+                  "filename": "SearchInput.rozie",
+                  "identifierName": "query"
+                },
+                "name": "query"
+              }
+            },
+            "computed": false,
+            "property": {
+              "type": "Identifier",
+              "start": 769,
+              "end": 775,
+              "loc": {
+                "start": {
+                  "line": 32,
+                  "column": 44,
+                  "index": 769
+                },
+                "filename": "SearchInput.rozie",
+                "identifierName": "length"
+              },
+              "name": "length"
+            }
+          },
+          "operator": ">=",
+          "right": {
+            "type": "MemberExpression",
+            "start": 779,
+            "end": 795,
+            "loc": {
+              "start": {
+                "line": 32,
+                "column": 54,
+                "index": 779
+              },
+              "filename": "SearchInput.rozie"
+            },
+            "object": {
+              "type": "Identifier",
+              "start": 779,
+              "end": 785,
+              "loc": {
+                "end": {
+                  "line": 32,
+                  "column": 60,
+                  "index": 785
+                },
+                "filename": "SearchInput.rozie",
+                "identifierName": "$props"
+              },
+              "name": "$props"
+            },
+            "computed": false,
+            "property": {
+              "type": "Identifier",
+              "start": 786,
+              "end": 795,
+              "loc": {
+                "start": {
+                  "line": 32,
+                  "column": 61,
+                  "index": 786
+                },
+                "filename": "SearchInput.rozie",
+                "identifierName": "minLength"
+              },
+              "name": "minLength"
+            }
+          }
+        }
+      },
+      "sourceLoc": {
+        "start": 731,
+        "end": 796
+      }
+    }
+  },
+  "emits": [
+    "clear",
+    "search"
+  ],
+  "lifecycle": [
+    {
+      "phase": "mount",
+      "callback": {
+        "type": "ArrowFunctionExpression",
+        "start": 940,
+        "end": 1242,
+        "loc": {
+          "start": {
+            "line": 43,
+            "column": 9,
+            "index": 940
+          },
+          "end": {
+            "line": 51,
+            "column": 1,
+            "index": 1242
+          },
+          "filename": "SearchInput.rozie"
+        },
+        "id": null,
+        "generator": false,
+        "async": false,
+        "params": [],
+        "body": {
+          "type": "BlockStatement",
+          "start": 946,
+          "end": 1242,
+          "loc": {
+            "start": {
+              "line": 43,
+              "column": 15,
+              "index": 946
+            },
+            "filename": "SearchInput.rozie"
+          },
+          "body": [
+            {
+              "type": "IfStatement",
+              "start": 950,
+              "end": 994,
+              "loc": {
+                "start": {
+                  "line": 44,
+                  "column": 2,
+                  "index": 950
+                },
+                "end": {
+                  "line": 44,
+                  "column": 46,
+                  "index": 994
+                },
+                "filename": "SearchInput.rozie"
+              },
+              "test": {
+                "type": "MemberExpression",
+                "start": 954,
+                "end": 970,
+                "loc": {
+                  "start": {
+                    "line": 44,
+                    "column": 6,
+                    "index": 954
+                  },
+                  "end": {
+                    "line": 44,
+                    "column": 22,
+                    "index": 970
+                  },
+                  "filename": "SearchInput.rozie"
+                },
+                "object": {
+                  "type": "Identifier",
+                  "start": 954,
+                  "end": 960,
+                  "loc": {
+                    "end": {
+                      "line": 44,
+                      "column": 12,
+                      "index": 960
+                    },
+                    "filename": "SearchInput.rozie",
+                    "identifierName": "$props"
+                  },
+                  "name": "$props"
+                },
+                "computed": false,
+                "property": {
+                  "type": "Identifier",
+                  "start": 961,
+                  "end": 970,
+                  "loc": {
+                    "start": {
+                      "line": 44,
+                      "column": 13,
+                      "index": 961
+                    },
+                    "filename": "SearchInput.rozie",
+                    "identifierName": "autofocus"
+                  },
+                  "name": "autofocus"
+                }
+              },
+              "consequent": {
+                "type": "ExpressionStatement",
+                "start": 972,
+                "end": 994,
+                "loc": {
+                  "start": {
+                    "line": 44,
+                    "column": 24,
+                    "index": 972
+                  },
+                  "filename": "SearchInput.rozie"
+                },
+                "expression": {
+                  "type": "OptionalCallExpression",
+                  "start": 972,
+                  "end": 994,
+                  "loc": {
+                    "filename": "SearchInput.rozie"
+                  },
+                  "callee": {
+                    "type": "OptionalMemberExpression",
+                    "start": 972,
+                    "end": 992,
+                    "loc": {
+                      "end": {
+                        "line": 44,
+                        "column": 44,
+                        "index": 992
+                      },
+                      "filename": "SearchInput.rozie"
+                    },
+                    "object": {
+                      "type": "MemberExpression",
+                      "start": 972,
+                      "end": 985,
+                      "loc": {
+                        "end": {
+                          "line": 44,
+                          "column": 37,
+                          "index": 985
+                        },
+                        "filename": "SearchInput.rozie"
+                      },
+                      "object": {
+                        "type": "Identifier",
+                        "start": 972,
+                        "end": 977,
+                        "loc": {
+                          "end": {
+                            "line": 44,
+                            "column": 29,
+                            "index": 977
+                          },
+                          "filename": "SearchInput.rozie",
+                          "identifierName": "$refs"
+                        },
+                        "name": "$refs"
+                      },
+                      "computed": false,
+                      "property": {
+                        "type": "Identifier",
+                        "start": 978,
+                        "end": 985,
+                        "loc": {
+                          "start": {
+                            "line": 44,
+                            "column": 30,
+                            "index": 978
+                          },
+                          "filename": "SearchInput.rozie",
+                          "identifierName": "inputEl"
+                        },
+                        "name": "inputEl"
+                      }
+                    },
+                    "computed": false,
+                    "property": {
+                      "type": "Identifier",
+                      "start": 987,
+                      "end": 992,
+                      "loc": {
+                        "start": {
+                          "line": 44,
+                          "column": 39,
+                          "index": 987
+                        },
+                        "filename": "SearchInput.rozie",
+                        "identifierName": "focus"
+                      },
+                      "name": "focus"
+                    },
+                    "optional": true
+                  },
+                  "optional": false,
+                  "arguments": []
+                }
+              },
+              "alternate": null,
+              "trailingComments": [
+                {
+                  "type": "CommentLine",
+                  "value": " Returning a function from $onMount registers a teardown — equivalent to",
+                  "start": 998,
+                  "end": 1072,
+                  "loc": {
+                    "start": {
+                      "line": 46,
+                      "column": 2,
+                      "index": 998
+                    },
+                    "end": {
+                      "line": 46,
+                      "column": 76,
+                      "index": 1072
+                    },
+                    "filename": "SearchInput.rozie"
+                  }
+                },
+                {
+                  "type": "CommentLine",
+                  "value": " a separate $onUnmount, useful when setup and teardown logic belong together.",
+                  "start": 1075,
+                  "end": 1154,
+                  "loc": {
+                    "start": {
+                      "line": 47,
+                      "column": 2,
+                      "index": 1075
+                    },
+                    "end": {
+                      "line": 47,
+                      "column": 81,
+                      "index": 1154
+                    },
+                    "filename": "SearchInput.rozie"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "ReturnStatement",
+              "start": 1157,
+              "end": 1240,
+              "loc": {
+                "start": {
+                  "line": 48,
+                  "column": 2,
+                  "index": 1157
+                },
+                "end": {
+                  "line": 50,
+                  "column": 3,
+                  "index": 1240
+                },
+                "filename": "SearchInput.rozie"
+              },
+              "argument": {
+                "type": "ArrowFunctionExpression",
+                "start": 1164,
+                "end": 1240,
+                "loc": {
+                  "start": {
+                    "line": 48,
+                    "column": 9,
+                    "index": 1164
+                  },
+                  "filename": "SearchInput.rozie"
+                },
+                "id": null,
+                "generator": false,
+                "async": false,
+                "params": [],
+                "body": {
+                  "type": "BlockStatement",
+                  "start": 1170,
+                  "end": 1240,
+                  "loc": {
+                    "start": {
+                      "line": 48,
+                      "column": 15,
+                      "index": 1170
+                    },
+                    "filename": "SearchInput.rozie"
+                  },
+                  "body": [],
+                  "directives": []
+                }
+              }
+            }
+          ],
+          "directives": []
+        }
+      },
+      "sourceLoc": {
+        "start": 931,
+        "end": 1243
+      }
+    }
+  ]
+}
