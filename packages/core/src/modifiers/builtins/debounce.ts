@@ -30,7 +30,7 @@ export const debounce: ModifierImpl = {
       ];
       return { entries: [], diagnostics };
     }
-    const [arg] = args;
+    const arg = args[0]!;
     if (arg.kind !== 'literal' || typeof arg.value !== 'number') {
       const diagnostics: Diagnostic[] = [
         {
