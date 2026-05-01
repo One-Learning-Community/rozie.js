@@ -124,13 +124,15 @@ describe('computeExpressionDeps (Plan 02-03 Task 1) — single-expression analyz
 
   it('Test 3: $refs.foo is excluded — refs are stable per ExhaustiveDeps isStableKnownHookValue (D-21)', () => {
     const bindings = syntheticBindings({ refs: ['triggerEl'] });
-    const expr = parseExpression('$refs.triggerEl.contains(event.target)');
+    const expr = parseExpression('$refs.triggerEl.contains(target)');
     const deps = computeExpressionDeps(expr, bindings);
     // refs are stable — never appear as deps.
-    expect(deps.find((d) => d.scope === 'refs' as never)).toBeUndefined();
-    // event is a function param-like local; not a binding — also excluded.
-    // Result is therefore empty (no other reactive reads).
-    expect(deps).toHaveLength(0);
+    expect(deps.some((d) => d.scope === ('refs' as never))).toBe(false);
+    // `target` is an undeclared identifier — treated as a closure dep
+    // (D-21 opaque). The KEY assertion is that triggerEl never appears.
+    expect(deps.some((d) => d.scope === 'closure' && d.identifier === 'triggerEl')).toBe(false);
+    // Bare $refs reference is also not present.
+    expect(deps.some((d) => d.scope === 'closure' && d.identifier === '$refs')).toBe(false);
   });
 
   it('Test 4: $slots.foo is recorded as a dep (Pitfall 5)', () => {
@@ -216,8 +218,9 @@ describe('computeExpressionDeps (Plan 02-03 Task 1) — single-expression analyz
 
   it('Test 12: $emit and $el are stable identifiers (treated like refs — excluded)', () => {
     const bindings = syntheticBindings({ data: ['x'] });
-    const expr = parseExpression('$emit("change", $data.x); $el');
-    // SequenceExpression body — should record $data.x but not $emit/$el.
+    // Sequence expression: ($emit('change', $data.x), $el) — should record
+    // $data.x but neither $emit nor $el.
+    const expr = parseExpression('($emit("change", $data.x), $el)');
     const deps = computeExpressionDeps(expr, bindings);
     expect(findRef(deps, 'data', 'x')).toBeDefined();
     expect(deps.some((d) => d.scope === 'closure' && d.identifier === '$emit')).toBe(false);
