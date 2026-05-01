@@ -1,0 +1,65 @@
+{
+  "diagnostics": [],
+  "rozie": {
+    "name": "Dropdown",
+    "loc": {
+      "start": 587,
+      "end": 2831
+    }
+  },
+  "props": {
+    "content": "\n{\n  open:                { type: Boolean, default: false, model: true },\n  closeOnOutsideClick: { type: Boolean, default: true },\n  closeOnEscape:       { type: Boolean, default: true },\n}\n",
+    "contentLoc": {
+      "start": 619,
+      "end": 809
+    },
+    "loc": {
+      "start": 612,
+      "end": 817
+    }
+  },
+  "script": {
+    "content": "\nconst toggle = () => { $props.open = !$props.open }\nconst close  = () => { $props.open = false }\n\nconst reposition = () => {\n  if (!$refs.panelEl || !$refs.triggerEl) return\n  const rect = $refs.triggerEl.getBoundingClientRect()\n  Object.assign($refs.panelEl.style, {\n    top:  `${rect.bottom}px`,\n    left: `${rect.left}px`,\n  })\n}\n\n// Multiple $onMount calls run in source order. Useful for colocating setup\n// with the logic it serves.\n$onMount(() => {\n  reposition()\n})\n\n$onMount(() => {\n  // Example of integrating a vanilla JS library — $refs gives direct DOM access.\n  // new Popper($refs.triggerEl, $refs.panelEl, { placement: 'bottom-start' })\n})\n",
+    "contentLoc": {
+      "start": 827,
+      "end": 1484
+    },
+    "loc": {
+      "start": 819,
+      "end": 1493
+    }
+  },
+  "listeners": {
+    "content": "\n{\n  // .outside takes ref args; fires only when the click target is outside ALL listed refs.\n  // Compiler emits the per-target wiring (Vue watchEffect, React useEffect with auto-deps,\n  // Svelte $effect, Angular effect + Renderer2.listen + DestroyRef cleanup).\n  \"document:click.outside($refs.triggerEl, $refs.panelEl)\": {\n    when:    \"$props.open && $props.closeOnOutsideClick\",\n    handler: close,\n  },\n  \"document:keydown.escape\": {\n    when:    \"$props.open && $props.closeOnEscape\",\n    handler: close,\n  },\n  \"window:resize.throttle(100).passive\": {\n    when:    \"$props.open\",\n    handler: reposition,\n  },\n}\n",
+    "contentLoc": {
+      "start": 1506,
+      "end": 2126
+    },
+    "loc": {
+      "start": 1495,
+      "end": 2138
+    }
+  },
+  "template": {
+    "content": "\n<div class=\"dropdown\">\n  <div ref=\"triggerEl\" @click=\"toggle\">\n    <slot name=\"trigger\" :open=\"$props.open\" :toggle=\"toggle\" />\n  </div>\n\n  <div r-if=\"$props.open\" ref=\"panelEl\" class=\"dropdown-panel\" role=\"menu\">\n    <slot :close=\"close\" />\n  </div>\n</div>\n",
+    "contentLoc": {
+      "start": 2150,
+      "end": 2409
+    },
+    "loc": {
+      "start": 2140,
+      "end": 2420
+    }
+  },
+  "style": {
+    "content": "\n.dropdown { position: relative; display: inline-block; }\n.dropdown-panel {\n  position: fixed;\n  z-index: var(--rozie-dropdown-z, 1000);\n  background: white;\n  border: 1px solid rgba(0, 0, 0, 0.1);\n  border-radius: 6px;\n  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);\n}\n\n/* Unscoped escape hatch — anything inside :root { } is emitted globally. */\n:root {\n  --rozie-dropdown-z: 1000;\n}\n",
+    "contentLoc": {
+      "start": 2429,
+      "end": 2813
+    },
+    "loc": {
+      "start": 2422,
+      "end": 2821
+    }
+  }
+}

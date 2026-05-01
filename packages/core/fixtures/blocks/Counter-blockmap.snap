@@ -1,0 +1,65 @@
+{
+  "diagnostics": [],
+  "rozie": {
+    "name": "Counter",
+    "loc": {
+      "start": 375,
+      "end": 1695
+    }
+  },
+  "props": {
+    "content": "\n{\n  value: { type: Number, default: 0,  model: true },\n  step:  { type: Number, default: 1 },\n  min:   { type: Number, default: -Infinity },\n  max:   { type: Number, default: Infinity },\n}\n",
+    "contentLoc": {
+      "start": 406,
+      "end": 596
+    },
+    "loc": {
+      "start": 399,
+      "end": 604
+    }
+  },
+  "data": {
+    "content": "\n{\n  hovering: false,\n}\n",
+    "contentLoc": {
+      "start": 612,
+      "end": 636
+    },
+    "loc": {
+      "start": 606,
+      "end": 643
+    }
+  },
+  "script": {
+    "content": "\nconst canIncrement = $computed(() => $props.value + $props.step <= $props.max)\nconst canDecrement = $computed(() => $props.value - $props.step >= $props.min)\n\nconst increment = () => { if (canIncrement) $props.value += $props.step }\nconst decrement = () => { if (canDecrement) $props.value -= $props.step }\n",
+    "contentLoc": {
+      "start": 653,
+      "end": 961
+    },
+    "loc": {
+      "start": 645,
+      "end": 970
+    }
+  },
+  "template": {
+    "content": "\n<div\n  class=\"counter\"\n  :class=\"{ hovering: $data.hovering }\"\n  @mouseenter=\"$data.hovering = true\"\n  @mouseleave=\"$data.hovering = false\"\n>\n  <button :disabled=\"!canDecrement\" @click=\"decrement\" aria-label=\"Decrement\">−</button>\n  <span class=\"value\">{{ $props.value }}</span>\n  <button :disabled=\"!canIncrement\" @click=\"increment\" aria-label=\"Increment\">+</button>\n</div>\n",
+    "contentLoc": {
+      "start": 982,
+      "end": 1358
+    },
+    "loc": {
+      "start": 972,
+      "end": 1369
+    }
+  },
+  "style": {
+    "content": "\n.counter { display: inline-flex; gap: 0.5rem; align-items: center; }\n.counter.hovering { background: rgba(0, 0, 0, 0.04); }\n.value { font-variant-numeric: tabular-nums; min-width: 3ch; text-align: center; }\nbutton { padding: 0.25rem 0.5rem; }\nbutton:disabled { opacity: 0.4; cursor: not-allowed; }\n",
+    "contentLoc": {
+      "start": 1378,
+      "end": 1677
+    },
+    "loc": {
+      "start": 1371,
+      "end": 1685
+    }
+  }
+}

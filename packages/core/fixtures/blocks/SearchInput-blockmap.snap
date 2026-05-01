@@ -1,0 +1,65 @@
+{
+  "diagnostics": [],
+  "rozie": {
+    "name": "SearchInput",
+    "loc": {
+      "start": 483,
+      "end": 2218
+    }
+  },
+  "props": {
+    "content": "\n{\n  placeholder: { type: String,  default: 'Search…' },\n  minLength:   { type: Number,  default: 2 },\n  autofocus:   { type: Boolean, default: false },\n}\n",
+    "contentLoc": {
+      "start": 518,
+      "end": 673
+    },
+    "loc": {
+      "start": 511,
+      "end": 681
+    }
+  },
+  "data": {
+    "content": "\n{\n  query: '',\n}\n",
+    "contentLoc": {
+      "start": 689,
+      "end": 707
+    },
+    "loc": {
+      "start": 683,
+      "end": 714
+    }
+  },
+  "script": {
+    "content": "\nconst isValid = $computed(() => $data.query.length >= $props.minLength)\n\nconst onSearch = () => {\n  if (isValid) $emit('search', $data.query)\n}\n\nconst clear = () => {\n  $data.query = ''\n  $emit('clear')\n}\n\n$onMount(() => {\n  if ($props.autofocus) $refs.inputEl?.focus()\n\n  // Returning a function from $onMount registers a teardown — equivalent to\n  // a separate $onUnmount, useful when setup and teardown logic belong together.\n  return () => {\n    // e.g., abort an in-flight request initialized in this hook\n  }\n})\n",
+    "contentLoc": {
+      "start": 724,
+      "end": 1244
+    },
+    "loc": {
+      "start": 716,
+      "end": 1253
+    }
+  },
+  "template": {
+    "content": "\n<div class=\"search-input\">\n  <!--\n    Modifier on a template event, same grammar as the <listeners> block:\n    - .debounce(300) waits 300ms after the last keystroke before firing\n    - .enter triggers immediately on Enter even if the debounce window hasn't elapsed\n  -->\n  <input\n    ref=\"inputEl\"\n    type=\"search\"\n    :placeholder=\"$props.placeholder\"\n    r-model=\"$data.query\"\n    @input.debounce(300)=\"onSearch\"\n    @keydown.enter=\"onSearch\"\n    @keydown.escape=\"clear\"\n  />\n\n  <button r-if=\"$data.query.length > 0\" class=\"clear-btn\" @click=\"clear\" aria-label=\"Clear\">\n    ×\n  </button>\n  <span r-else class=\"hint\">{{ $props.minLength }}+ chars</span>\n</div>\n",
+    "contentLoc": {
+      "start": 1265,
+      "end": 1929
+    },
+    "loc": {
+      "start": 1255,
+      "end": 1940
+    }
+  },
+  "style": {
+    "content": "\n.search-input { display: inline-flex; align-items: center; gap: 0.25rem; }\ninput { padding: 0.25rem 0.5rem; }\n.clear-btn { background: none; border: none; cursor: pointer; font-size: 1.25rem; }\n.hint { color: rgba(0, 0, 0, 0.4); font-size: 0.85em; }\n",
+    "contentLoc": {
+      "start": 1949,
+      "end": 2200
+    },
+    "loc": {
+      "start": 1942,
+      "end": 2208
+    }
+  }
+}

@@ -1,0 +1,65 @@
+{
+  "diagnostics": [],
+  "rozie": {
+    "name": "Modal",
+    "loc": {
+      "start": 753,
+      "end": 3814
+    }
+  },
+  "props": {
+    "content": "\n{\n  open:           { type: Boolean, default: false, model: true },\n  closeOnEscape:  { type: Boolean, default: true },\n  closeOnBackdrop:{ type: Boolean, default: true },\n  lockBodyScroll: { type: Boolean, default: true },\n  title:          { type: String,  default: '' },\n}\n",
+    "contentLoc": {
+      "start": 782,
+      "end": 1059
+    },
+    "loc": {
+      "start": 775,
+      "end": 1067
+    }
+  },
+  "script": {
+    "content": "\nconst close = () => { $props.open = false; $emit('close') }\n\n// Body-scroll-lock state lives outside reactive data because it tracks DOM\n// rather than UI; managed entirely via lifecycle and listeners.\nlet savedBodyOverflow = ''\n\nconst lockScroll = () => {\n  if (!$props.lockBodyScroll) return\n  savedBodyOverflow = document.body.style.overflow\n  document.body.style.overflow = 'hidden'\n}\n\nconst unlockScroll = () => {\n  if (!$props.lockBodyScroll) return\n  document.body.style.overflow = savedBodyOverflow\n}\n\n// Colocated lifecycle pair — runs in source order alongside other hooks.\n$onMount(lockScroll)\n$onUnmount(unlockScroll)\n\n// Colocated focus management — separate hook, separate concern.\n$onMount(() => {\n  $refs.dialogEl?.focus()\n})\n",
+    "contentLoc": {
+      "start": 1077,
+      "end": 1820
+    },
+    "loc": {
+      "start": 1069,
+      "end": 1829
+    }
+  },
+  "listeners": {
+    "content": "\n{\n  // Backdrop click. .self ensures we only close when the click target IS the\n  // backdrop element itself, not a child (the dialog panel) that bubbled up.\n  // Bound to a template ref via the implicit `target:` form — see notes below.\n  \"document:keydown.escape\": {\n    when:    \"$props.open && $props.closeOnEscape\",\n    handler: close,\n  },\n}\n",
+    "contentLoc": {
+      "start": 1842,
+      "end": 2191
+    },
+    "loc": {
+      "start": 1831,
+      "end": 2203
+    }
+  },
+  "template": {
+    "content": "\n<div r-if=\"$props.open\" class=\"modal-backdrop\" ref=\"backdropEl\" @click.self=\"$props.closeOnBackdrop && close()\">\n  <div\n    ref=\"dialogEl\"\n    class=\"modal-dialog\"\n    role=\"dialog\"\n    aria-modal=\"true\"\n    :aria-label=\"$props.title || undefined\"\n    tabindex=\"-1\"\n  >\n    <header r-if=\"$props.title || $slots.header\">\n      <slot name=\"header\" :close=\"close\">\n        <h2>{{ $props.title }}</h2>\n      </slot>\n      <button class=\"close-btn\" @click=\"close\" aria-label=\"Close\">×</button>\n    </header>\n\n    <div class=\"modal-body\">\n      <slot :close=\"close\" />\n    </div>\n\n    <footer r-if=\"$slots.footer\">\n      <slot name=\"footer\" :close=\"close\" />\n    </footer>\n  </div>\n</div>\n",
+    "contentLoc": {
+      "start": 2215,
+      "end": 2899
+    },
+    "loc": {
+      "start": 2205,
+      "end": 2910
+    }
+  },
+  "style": {
+    "content": "\n.modal-backdrop {\n  position: fixed; inset: 0;\n  background: rgba(0, 0, 0, 0.4);\n  display: flex; align-items: center; justify-content: center;\n  z-index: var(--rozie-modal-z, 2000);\n}\n.modal-dialog {\n  background: white;\n  border-radius: 8px;\n  min-width: 20rem;\n  max-width: min(90vw, 40rem);\n  max-height: 90vh;\n  display: flex; flex-direction: column;\n  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);\n  outline: none;\n}\nheader, footer { padding: 1rem; display: flex; align-items: center; gap: 0.5rem; }\nheader { border-bottom: 1px solid rgba(0, 0, 0, 0.08); }\nheader h2 { flex: 1; margin: 0; font-size: 1.1rem; }\nfooter { border-top: 1px solid rgba(0, 0, 0, 0.08); justify-content: flex-end; }\n.modal-body { padding: 1rem; overflow: auto; }\n.close-btn { background: none; border: none; cursor: pointer; font-size: 1.5rem; line-height: 1; }\n\n:root {\n  --rozie-modal-z: 2000;\n}\n",
+    "contentLoc": {
+      "start": 2919,
+      "end": 3796
+    },
+    "loc": {
+      "start": 2912,
+      "end": 3804
+    }
+  }
+}
