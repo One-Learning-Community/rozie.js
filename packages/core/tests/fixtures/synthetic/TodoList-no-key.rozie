@@ -1,0 +1,79 @@
+<!--
+  TodoList-no-key.rozie — Plan 02-02 SEM-03 / ROZ300 negative fixture.
+
+  Synthetic mutation of examples/TodoList.rozie: the <li r-for=...> on the
+  list rendering removes the :key="item.id" attribute. This MUST emit
+  exactly one ROZ300 warning located on the <li>'s opening tag.
+-->
+
+<rozie name="TodoList">
+
+<props>
+{
+  items: { type: Array, default: () => [], model: true },
+  title: { type: String, default: 'Todo' },
+}
+</props>
+
+<data>
+{
+  draft: '',
+}
+</data>
+
+<script>
+const remaining = $computed(() => $props.items.filter(i => !i.done).length)
+
+const add = () => {
+  const text = $data.draft.trim()
+  if (!text) return
+  $props.items = [...$props.items, { id: crypto.randomUUID(), text, done: false }]
+  $data.draft = ''
+  $emit('add', text)
+}
+
+const toggle = (id) => {
+  $props.items = $props.items.map(i =>
+    i.id === id ? { ...i, done: !i.done } : i
+  )
+  $emit('toggle', id)
+}
+
+const remove = (id) => {
+  $props.items = $props.items.filter(i => i.id !== id)
+  $emit('remove', id)
+}
+</script>
+
+<template>
+<div class="todo-list">
+  <header>
+    <slot name="header" :remaining="remaining" :total="$props.items.length">
+      <h3>{{ $props.title }} ({{ remaining }} remaining)</h3>
+    </slot>
+  </header>
+
+  <form @submit.prevent="add">
+    <input r-model="$data.draft" placeholder="What needs doing?" />
+    <button type="submit" :disabled="!$data.draft.trim()">Add</button>
+  </form>
+
+  <ul r-if="$props.items.length > 0">
+    <li r-for="item in $props.items" :class="{ done: item.done }">
+      <slot :item="item" :toggle="() => toggle(item.id)" :remove="() => remove(item.id)">
+        <label>
+          <input type="checkbox" :checked="item.done" @change="toggle(item.id)" />
+          <span>{{ item.text }}</span>
+        </label>
+        <button @click="remove(item.id)" aria-label="Remove">×</button>
+      </slot>
+    </li>
+  </ul>
+
+  <p r-else class="empty">
+    <slot name="empty">Nothing to do.</slot>
+  </p>
+</div>
+</template>
+
+</rozie>
