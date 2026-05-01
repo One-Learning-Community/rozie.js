@@ -221,3 +221,96 @@ describe('end-to-end diagnostics via parse() (D-08)', () => {
     }
   });
 });
+
+describe('Phase 2 ROZ100..ROZ303 codes (D-23 sub-range allocation)', () => {
+  it('ROZ100 — UNKNOWN_PROPS_REF string-stability lock', () => {
+    expect(RozieErrorCode.UNKNOWN_PROPS_REF).toBe('ROZ100');
+  });
+
+  it('ROZ200 — WRITE_TO_NON_MODEL_PROP string-stability lock (Phase 2 success criterion 2)', () => {
+    expect(RozieErrorCode.WRITE_TO_NON_MODEL_PROP).toBe('ROZ200');
+  });
+
+  it('ROZ300/ROZ301 — RFOR_MISSING_KEY + RFOR_KEY_IS_LOOP_VARIABLE string-stability lock', () => {
+    expect(RozieErrorCode.RFOR_MISSING_KEY).toBe('ROZ300');
+    expect(RozieErrorCode.RFOR_KEY_IS_LOOP_VARIABLE).toBe('ROZ301');
+  });
+
+  it('all 19 new ROZ100..ROZ303 codes have unique string values (no collisions)', () => {
+    const phase2Codes = [
+      RozieErrorCode.UNKNOWN_PROPS_REF,
+      RozieErrorCode.UNKNOWN_DATA_REF,
+      RozieErrorCode.UNKNOWN_REFS_REF,
+      RozieErrorCode.UNKNOWN_SLOTS_REF,
+      RozieErrorCode.LIFECYCLE_OUTSIDE_SCRIPT,
+      RozieErrorCode.ASYNC_ONMOUNT_RETURN,
+      RozieErrorCode.COMPUTED_MAGIC_ACCESS,
+      RozieErrorCode.UNKNOWN_MODIFIER,
+      RozieErrorCode.MODIFIER_ARITY_MISMATCH,
+      RozieErrorCode.MODIFIER_ARG_SHAPE,
+      RozieErrorCode.WRITE_TO_NON_MODEL_PROP,
+      RozieErrorCode.WRITE_TO_REF,
+      RozieErrorCode.RESERVED_IDENTIFIER_COLLISION,
+      RozieErrorCode.RFOR_MISSING_KEY,
+      RozieErrorCode.RFOR_KEY_IS_LOOP_VARIABLE,
+      RozieErrorCode.RFOR_KEY_IS_NON_PRIMITIVE,
+      RozieErrorCode.RIF_ACCESSIBILITY_PLACEHOLDER,
+    ];
+    const unique = new Set(phase2Codes);
+    expect(unique.size).toBe(phase2Codes.length);
+    // Sanity: at least 17 codes present (the listed entries above).
+    expect(phase2Codes.length).toBeGreaterThanOrEqual(17);
+  });
+
+  it('all new codes are within ROZ100..ROZ399 range', () => {
+    const phase2Codes = [
+      RozieErrorCode.UNKNOWN_PROPS_REF,
+      RozieErrorCode.UNKNOWN_DATA_REF,
+      RozieErrorCode.UNKNOWN_REFS_REF,
+      RozieErrorCode.UNKNOWN_SLOTS_REF,
+      RozieErrorCode.LIFECYCLE_OUTSIDE_SCRIPT,
+      RozieErrorCode.ASYNC_ONMOUNT_RETURN,
+      RozieErrorCode.COMPUTED_MAGIC_ACCESS,
+      RozieErrorCode.UNKNOWN_MODIFIER,
+      RozieErrorCode.MODIFIER_ARITY_MISMATCH,
+      RozieErrorCode.MODIFIER_ARG_SHAPE,
+      RozieErrorCode.WRITE_TO_NON_MODEL_PROP,
+      RozieErrorCode.WRITE_TO_REF,
+      RozieErrorCode.RESERVED_IDENTIFIER_COLLISION,
+      RozieErrorCode.RFOR_MISSING_KEY,
+      RozieErrorCode.RFOR_KEY_IS_LOOP_VARIABLE,
+      RozieErrorCode.RFOR_KEY_IS_NON_PRIMITIVE,
+      RozieErrorCode.RIF_ACCESSIBILITY_PLACEHOLDER,
+    ];
+    for (const code of phase2Codes) {
+      expect(code).toMatch(/^ROZ[123]\d{2}$/);
+      const num = Number.parseInt(code.slice(3), 10);
+      expect(num).toBeGreaterThanOrEqual(100);
+      expect(num).toBeLessThanOrEqual(399);
+    }
+  });
+
+  it('renderDiagnostic routes a new ROZ100 code through the Phase 1 frame.ts infrastructure (DX-02)', () => {
+    const source = '<rozie name="X"><script>$props.bogus</script></rozie>';
+    const offset = source.indexOf('$props.bogus');
+    const diag: Diagnostic = {
+      code: RozieErrorCode.UNKNOWN_PROPS_REF,
+      severity: 'error',
+      message: "Unknown $props reference 'bogus'",
+      loc: { start: offset, end: offset + '$props.bogus'.length },
+    };
+    const rendered = renderDiagnostic(diag, source);
+    expect(rendered).toContain('ROZ100');
+    expect(rendered).toContain("Unknown $props reference 'bogus'");
+    // Code-frame caret marker present.
+    expect(rendered).toContain('^');
+  });
+
+  it('reserves ROZ303 placeholder per CONTEXT.md A7 (deferred accessibility lint)', () => {
+    expect(RozieErrorCode.RIF_ACCESSIBILITY_PLACEHOLDER).toBe('ROZ303');
+    // Within 300..399 sub-range
+    const num = Number.parseInt(RozieErrorCode.RIF_ACCESSIBILITY_PLACEHOLDER.slice(3), 10);
+    expect(num).toBeGreaterThanOrEqual(300);
+    expect(num).toBeLessThanOrEqual(399);
+  });
+});
