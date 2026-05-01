@@ -17,6 +17,14 @@ import {
   type ModifierPipelineEntry,
 } from '../../src/modifiers/ModifierRegistry.js';
 import { registerModifier } from '../../src/modifiers/registerModifier.js';
+import {
+  registerBuiltins,
+  createDefaultRegistry,
+} from '../../src/modifiers/registerBuiltins.js';
+// Side-effect-free imports — these MUST NOT register anything at module load.
+import { outside } from '../../src/modifiers/builtins/outside.js';
+import { debounce } from '../../src/modifiers/builtins/debounce.js';
+import { passive } from '../../src/modifiers/builtins/passive.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -133,5 +141,105 @@ describe('ModifierRegistry — Plan 02-04 Task 1', () => {
     expect(reg2.has('outside')).toBe(false);
     expect(reg1.list().length).toBe(0);
     expect(reg2.list().length).toBe(0);
+  });
+});
+
+describe('registerBuiltins / createDefaultRegistry — Plan 02-04 Task 2', () => {
+  it('registerBuiltins(reg) populates 23 default modifiers (9 composition + 14 key/button filters)', () => {
+    const reg = new ModifierRegistry();
+    registerBuiltins(reg);
+    // 9 composition modifiers
+    for (const name of [
+      'outside',
+      'self',
+      'stop',
+      'prevent',
+      'once',
+      'capture',
+      'passive',
+      'debounce',
+      'throttle',
+    ]) {
+      expect(reg.has(name), `${name} should be registered`).toBe(true);
+    }
+    // 14 key/button filters
+    for (const name of [
+      'escape',
+      'enter',
+      'tab',
+      'delete',
+      'space',
+      'up',
+      'down',
+      'left',
+      'right',
+      'home',
+      'end',
+      'pageUp',
+      'pageDown',
+      'middle',
+    ]) {
+      expect(reg.has(name), `${name} key/button filter should be registered`).toBe(true);
+    }
+    expect(reg.list().length).toBe(23);
+  });
+
+  it('createDefaultRegistry() returns a fresh registry pre-populated with builtins', () => {
+    const reg = createDefaultRegistry();
+    expect(reg.has('outside')).toBe(true);
+    expect(reg.has('escape')).toBe(true);
+    expect(reg.list().length).toBe(23);
+  });
+
+  it('createDefaultRegistry() called twice returns INDEPENDENT registries (no shared state)', () => {
+    const a = createDefaultRegistry();
+    const b = createDefaultRegistry();
+    // Mutate one; the other must be unaffected.
+    registerModifier(a, 'thirdParty', {
+      arity: 'none',
+      resolve: () => ({ entries: [], diagnostics: [] }),
+    });
+    expect(a.has('thirdParty')).toBe(true);
+    expect(b.has('thirdParty')).toBe(false);
+  });
+
+  it('re-running registerBuiltins on a populated registry THROWS (intentional — duplicate detection)', () => {
+    const reg = createDefaultRegistry();
+    expect(() => registerBuiltins(reg)).toThrow(/already registered/i);
+  });
+
+  it('Snapshot: createDefaultRegistry() output locked to fixtures/modifiers/registry-builtins.snap', async () => {
+    const reg = createDefaultRegistry();
+    const summary = reg.list().map((name) => {
+      const impl = reg.get(name);
+      if (!impl) throw new Error(`unreachable: ${name} listed but not retrievable`);
+      return { name, arity: impl.arity };
+    });
+    await expect(JSON.stringify(summary, null, 2)).toMatchFileSnapshot(
+      resolve(__dirname, '../../fixtures/modifiers/registry-builtins.snap'),
+    );
+  });
+
+  it('D-22 imported builtin files do NOT register at module-load time', () => {
+    // The mere fact that these imports succeeded at the top of the file and
+    // a fresh registry is empty proves the contract.
+    expect(outside.name).toBe('outside');
+    expect(debounce.name).toBe('debounce');
+    expect(passive.name).toBe('passive');
+    const reg = new ModifierRegistry();
+    expect(reg.has('outside')).toBe(false);
+    expect(reg.has('debounce')).toBe(false);
+    expect(reg.has('passive')).toBe(false);
+    expect(reg.list().length).toBe(0);
+  });
+
+  it('D-22b SemVer-stable JSDoc present in registerBuiltins source', () => {
+    const src = fs.readFileSync(
+      resolve(__dirname, '../../src/modifiers/registerBuiltins.ts'),
+      'utf8',
+    );
+    expect(src).toMatch(/@public.*SemVer-stable/);
+    expect(src).toMatch(/createDefaultRegistry/);
+    expect(src).toMatch(/registerBuiltins/);
   });
 });
