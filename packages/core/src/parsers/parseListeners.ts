@@ -148,6 +148,9 @@ export function parseListeners(
       event,
       modifierChainText,
       modifierChainBaseOffset,
+      // chain is populated by buildRozieAST (Plan 04 / D-15 stage 2). Empty
+      // array at construction so the field is always present.
+      chain: [],
       value: objProp.value as Expression,
       loc: babelLocToRozieLoc(prop),
     });

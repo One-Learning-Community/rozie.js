@@ -16,6 +16,7 @@
         "event": "click",
         "modifierChainText": ".outside($refs.triggerEl, $refs.panelEl)",
         "modifierChainBaseOffset": 1787,
+        "chain": [],
         "value": {
           "type": "ObjectExpression",
           "start": 1830,
@@ -152,6 +153,7 @@
         "event": "keydown",
         "modifierChainText": ".escape",
         "modifierChainBaseOffset": 1934,
+        "chain": [],
         "value": {
           "type": "ObjectExpression",
           "start": 1944,
@@ -288,6 +290,7 @@
         "event": "resize",
         "modifierChainText": ".throttle(100).passive",
         "modifierChainBaseOffset": 2039,
+        "chain": [],
         "value": {
           "type": "ObjectExpression",
           "start": 2064,

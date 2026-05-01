@@ -24,6 +24,7 @@
             "name": "class",
             "modifierChainText": "",
             "modifierChainBaseOffset": 1245,
+            "chain": [],
             "value": "todo-list",
             "valueLoc": {
               "start": 1247,
@@ -67,6 +68,7 @@
                     "name": "name",
                     "modifierChainText": "",
                     "modifierChainBaseOffset": 1284,
+                    "chain": [],
                     "value": "header",
                     "valueLoc": {
                       "start": 1286,
@@ -83,6 +85,7 @@
                     "name": "remaining",
                     "modifierChainText": "",
                     "modifierChainBaseOffset": 1304,
+                    "chain": [],
                     "value": "remaining",
                     "valueLoc": {
                       "start": 1306,
@@ -99,6 +102,7 @@
                     "name": "total",
                     "modifierChainText": "",
                     "modifierChainBaseOffset": 1323,
+                    "chain": [],
                     "value": "$props.items.length",
                     "valueLoc": {
                       "start": 1325,
@@ -219,6 +223,7 @@
                 "name": "submit",
                 "modifierChainText": ".prevent",
                 "modifierChainBaseOffset": 1517,
+                "chain": [],
                 "value": "add",
                 "valueLoc": {
                   "start": 1527,
@@ -249,6 +254,7 @@
                     "name": "model",
                     "modifierChainText": "",
                     "modifierChainBaseOffset": 1551,
+                    "chain": [],
                     "value": "$data.draft",
                     "valueLoc": {
                       "start": 1553,
@@ -265,6 +271,7 @@
                     "name": "placeholder",
                     "modifierChainText": "",
                     "modifierChainBaseOffset": 1577,
+                    "chain": [],
                     "value": "What needs doing?",
                     "valueLoc": {
                       "start": 1579,
@@ -301,6 +308,7 @@
                     "name": "type",
                     "modifierChainText": "",
                     "modifierChainBaseOffset": 1617,
+                    "chain": [],
                     "value": "submit",
                     "valueLoc": {
                       "start": 1619,
@@ -317,6 +325,7 @@
                     "name": "disabled",
                     "modifierChainText": "",
                     "modifierChainBaseOffset": 1636,
+                    "chain": [],
                     "value": "!$data.draft.trim()",
                     "valueLoc": {
                       "start": 1638,
@@ -377,6 +386,7 @@
                 "name": "if",
                 "modifierChainText": "",
                 "modifierChainBaseOffset": 1693,
+                "chain": [],
                 "value": "$props.items.length > 0",
                 "valueLoc": {
                   "start": 1695,
@@ -407,6 +417,7 @@
                     "name": "for",
                     "modifierChainText": "",
                     "modifierChainBaseOffset": 1734,
+                    "chain": [],
                     "value": "item in $props.items",
                     "valueLoc": {
                       "start": 1736,
@@ -423,6 +434,7 @@
                     "name": "key",
                     "modifierChainText": "",
                     "modifierChainBaseOffset": 1762,
+                    "chain": [],
                     "value": "item.id",
                     "valueLoc": {
                       "start": 1764,
@@ -439,6 +451,7 @@
                     "name": "class",
                     "modifierChainText": "",
                     "modifierChainBaseOffset": 1779,
+                    "chain": [],
                     "value": "{ done: item.done }",
                     "valueLoc": {
                       "start": 1781,
@@ -477,6 +490,7 @@
                         "name": "item",
                         "modifierChainText": "",
                         "modifierChainBaseOffset": 2037,
+                        "chain": [],
                         "value": "item",
                         "valueLoc": {
                           "start": 2039,
@@ -493,6 +507,7 @@
                         "name": "toggle",
                         "modifierChainText": "",
                         "modifierChainBaseOffset": 2052,
+                        "chain": [],
                         "value": "() => toggle(item.id)",
                         "valueLoc": {
                           "start": 2054,
@@ -509,6 +524,7 @@
                         "name": "remove",
                         "modifierChainText": "",
                         "modifierChainBaseOffset": 2084,
+                        "chain": [],
                         "value": "() => remove(item.id)",
                         "valueLoc": {
                           "start": 2086,
@@ -552,6 +568,7 @@
                                 "name": "type",
                                 "modifierChainText": "",
                                 "modifierChainBaseOffset": 2147,
+                                "chain": [],
                                 "value": "checkbox",
                                 "valueLoc": {
                                   "start": 2149,
@@ -568,6 +585,7 @@
                                 "name": "checked",
                                 "modifierChainText": "",
                                 "modifierChainBaseOffset": 2167,
+                                "chain": [],
                                 "value": "item.done",
                                 "valueLoc": {
                                   "start": 2169,
@@ -584,6 +602,7 @@
                                 "name": "change",
                                 "modifierChainText": "",
                                 "modifierChainBaseOffset": 2187,
+                                "chain": [],
                                 "value": "toggle(item.id)",
                                 "valueLoc": {
                                   "start": 2189,
@@ -663,6 +682,7 @@
                             "name": "click",
                             "modifierChainText": "",
                             "modifierChainBaseOffset": 2287,
+                            "chain": [],
                             "value": "remove(item.id)",
                             "valueLoc": {
                               "start": 2289,
@@ -679,6 +699,7 @@
                             "name": "aria-label",
                             "modifierChainText": "",
                             "modifierChainBaseOffset": 2316,
+                            "chain": [],
                             "value": "Remove",
                             "valueLoc": {
                               "start": 2318,
@@ -769,6 +790,7 @@
                 "name": "else",
                 "modifierChainText": "",
                 "modifierChainBaseOffset": 2381,
+                "chain": [],
                 "value": null,
                 "valueLoc": null,
                 "loc": {
@@ -782,6 +804,7 @@
                 "name": "class",
                 "modifierChainText": "",
                 "modifierChainBaseOffset": 2387,
+                "chain": [],
                 "value": "empty",
                 "valueLoc": {
                   "start": 2389,
@@ -812,6 +835,7 @@
                     "name": "name",
                     "modifierChainText": "",
                     "modifierChainBaseOffset": 2411,
+                    "chain": [],
                     "value": "empty",
                     "valueLoc": {
                       "start": 2413,

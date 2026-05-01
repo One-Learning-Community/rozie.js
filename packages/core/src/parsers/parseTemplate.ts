@@ -135,6 +135,9 @@ export function parseTemplate(
       name,
       modifierChainText,
       modifierChainBaseOffset,
+      // chain is populated by buildRozieAST (Plan 04). Empty array at
+      // construction so the field is always present even on non-event attrs.
+      chain: [],
       value,
       valueLoc,
       loc: { start: a.nameStart, end: quoteEndIndex },

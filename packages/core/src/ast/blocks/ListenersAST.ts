@@ -7,6 +7,7 @@
  */
 import type { Expression } from '@babel/types';
 import type { SourceLoc } from '../types.js';
+import type { ModifierChain } from '../../modifier-grammar/parseModifierChain.js';
 
 export interface ListenerEntry {
   /** Original key text (e.g., "document:click.outside($refs.triggerEl, $refs.panelEl)"). */
@@ -25,6 +26,14 @@ export interface ListenerEntry {
   modifierChainText: string;
   /** Absolute byte offset in the .rozie file where modifierChainText begins. */
   modifierChainBaseOffset: number;
+  /**
+   * Parsed modifier chain (populated by buildRozieAST in Plan 04 / D-15 stage 2).
+   * Empty array when modifierChainText === ''. Never null — always present.
+   * parseListeners (Plan 03) sets this to [] at construction time; the AST
+   * normalizer re-parses modifierChainText through the peggy grammar and
+   * replaces with the structured chain.
+   */
+  chain: ModifierChain[];
   /** AST of the value (right-hand side) — Babel Expression node. */
   value: Expression;
   /** Loc of the full ObjectProperty in the .rozie file. */

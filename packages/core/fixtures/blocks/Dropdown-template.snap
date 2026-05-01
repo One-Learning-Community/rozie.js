@@ -24,6 +24,7 @@
             "name": "class",
             "modifierChainText": "",
             "modifierChainBaseOffset": 2161,
+            "chain": [],
             "value": "dropdown",
             "valueLoc": {
               "start": 2163,
@@ -54,6 +55,7 @@
                 "name": "ref",
                 "modifierChainText": "",
                 "modifierChainBaseOffset": 2184,
+                "chain": [],
                 "value": "triggerEl",
                 "valueLoc": {
                   "start": 2186,
@@ -70,6 +72,7 @@
                 "name": "click",
                 "modifierChainText": "",
                 "modifierChainBaseOffset": 2203,
+                "chain": [],
                 "value": "toggle",
                 "valueLoc": {
                   "start": 2205,
@@ -100,6 +103,7 @@
                     "name": "name",
                     "modifierChainText": "",
                     "modifierChainBaseOffset": 2228,
+                    "chain": [],
                     "value": "trigger",
                     "valueLoc": {
                       "start": 2230,
@@ -116,6 +120,7 @@
                     "name": "open",
                     "modifierChainText": "",
                     "modifierChainBaseOffset": 2244,
+                    "chain": [],
                     "value": "$props.open",
                     "valueLoc": {
                       "start": 2246,
@@ -132,6 +137,7 @@
                     "name": "toggle",
                     "modifierChainText": "",
                     "modifierChainBaseOffset": 2266,
+                    "chain": [],
                     "value": "toggle",
                     "valueLoc": {
                       "start": 2268,
@@ -183,6 +189,7 @@
                 "name": "if",
                 "modifierChainText": "",
                 "modifierChainBaseOffset": 2300,
+                "chain": [],
                 "value": "$props.open",
                 "valueLoc": {
                   "start": 2302,
@@ -199,6 +206,7 @@
                 "name": "ref",
                 "modifierChainText": "",
                 "modifierChainBaseOffset": 2318,
+                "chain": [],
                 "value": "panelEl",
                 "valueLoc": {
                   "start": 2320,
@@ -215,6 +223,7 @@
                 "name": "class",
                 "modifierChainText": "",
                 "modifierChainBaseOffset": 2334,
+                "chain": [],
                 "value": "dropdown-panel",
                 "valueLoc": {
                   "start": 2336,
@@ -231,6 +240,7 @@
                 "name": "role",
                 "modifierChainText": "",
                 "modifierChainBaseOffset": 2356,
+                "chain": [],
                 "value": "menu",
                 "valueLoc": {
                   "start": 2358,
@@ -261,6 +271,7 @@
                     "name": "close",
                     "modifierChainText": "",
                     "modifierChainBaseOffset": 2381,
+                    "chain": [],
                     "value": "close",
                     "valueLoc": {
                       "start": 2383,

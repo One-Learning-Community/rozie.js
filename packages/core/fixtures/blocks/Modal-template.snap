@@ -24,6 +24,7 @@
             "name": "if",
             "modifierChainText": "",
             "modifierChainBaseOffset": 2225,
+            "chain": [],
             "value": "$props.open",
             "valueLoc": {
               "start": 2227,
@@ -40,6 +41,7 @@
             "name": "class",
             "modifierChainText": "",
             "modifierChainBaseOffset": 2245,
+            "chain": [],
             "value": "modal-backdrop",
             "valueLoc": {
               "start": 2247,
@@ -56,6 +58,7 @@
             "name": "ref",
             "modifierChainText": "",
             "modifierChainBaseOffset": 2266,
+            "chain": [],
             "value": "backdropEl",
             "valueLoc": {
               "start": 2268,
@@ -72,6 +75,7 @@
             "name": "click",
             "modifierChainText": ".self",
             "modifierChainBaseOffset": 2286,
+            "chain": [],
             "value": "$props.closeOnBackdrop && close()",
             "valueLoc": {
               "start": 2293,
@@ -102,6 +106,7 @@
                 "name": "ref",
                 "modifierChainText": "",
                 "modifierChainBaseOffset": 2343,
+                "chain": [],
                 "value": "dialogEl",
                 "valueLoc": {
                   "start": 2345,
@@ -118,6 +123,7 @@
                 "name": "class",
                 "modifierChainText": "",
                 "modifierChainBaseOffset": 2364,
+                "chain": [],
                 "value": "modal-dialog",
                 "valueLoc": {
                   "start": 2366,
@@ -134,6 +140,7 @@
                 "name": "role",
                 "modifierChainText": "",
                 "modifierChainBaseOffset": 2388,
+                "chain": [],
                 "value": "dialog",
                 "valueLoc": {
                   "start": 2390,
@@ -150,6 +157,7 @@
                 "name": "aria-modal",
                 "modifierChainText": "",
                 "modifierChainBaseOffset": 2412,
+                "chain": [],
                 "value": "true",
                 "valueLoc": {
                   "start": 2414,
@@ -166,6 +174,7 @@
                 "name": "aria-label",
                 "modifierChainText": "",
                 "modifierChainBaseOffset": 2435,
+                "chain": [],
                 "value": "$props.title || undefined",
                 "valueLoc": {
                   "start": 2437,
@@ -182,6 +191,7 @@
                 "name": "tabindex",
                 "modifierChainText": "",
                 "modifierChainBaseOffset": 2476,
+                "chain": [],
                 "value": "-1",
                 "valueLoc": {
                   "start": 2478,
@@ -212,6 +222,7 @@
                     "name": "if",
                     "modifierChainText": "",
                     "modifierChainBaseOffset": 2502,
+                    "chain": [],
                     "value": "$props.title || $slots.header",
                     "valueLoc": {
                       "start": 2504,
@@ -242,6 +253,7 @@
                         "name": "name",
                         "modifierChainText": "",
                         "modifierChainBaseOffset": 2552,
+                        "chain": [],
                         "value": "header",
                         "valueLoc": {
                           "start": 2554,
@@ -258,6 +270,7 @@
                         "name": "close",
                         "modifierChainText": "",
                         "modifierChainBaseOffset": 2568,
+                        "chain": [],
                         "value": "close",
                         "valueLoc": {
                           "start": 2570,
@@ -331,6 +344,7 @@
                         "name": "class",
                         "modifierChainText": "",
                         "modifierChainBaseOffset": 2647,
+                        "chain": [],
                         "value": "close-btn",
                         "valueLoc": {
                           "start": 2649,
@@ -347,6 +361,7 @@
                         "name": "click",
                         "modifierChainText": "",
                         "modifierChainBaseOffset": 2666,
+                        "chain": [],
                         "value": "close",
                         "valueLoc": {
                           "start": 2668,
@@ -363,6 +378,7 @@
                         "name": "aria-label",
                         "modifierChainText": "",
                         "modifierChainBaseOffset": 2685,
+                        "chain": [],
                         "value": "Close",
                         "valueLoc": {
                           "start": 2687,
@@ -423,6 +439,7 @@
                     "name": "class",
                     "modifierChainText": "",
                     "modifierChainBaseOffset": 2734,
+                    "chain": [],
                     "value": "modal-body",
                     "valueLoc": {
                       "start": 2736,
@@ -453,6 +470,7 @@
                         "name": "close",
                         "modifierChainText": "",
                         "modifierChainBaseOffset": 2767,
+                        "chain": [],
                         "value": "close",
                         "valueLoc": {
                           "start": 2769,
@@ -504,6 +522,7 @@
                     "name": "if",
                     "modifierChainText": "",
                     "modifierChainBaseOffset": 2807,
+                    "chain": [],
                     "value": "$slots.footer",
                     "valueLoc": {
                       "start": 2809,
@@ -534,6 +553,7 @@
                         "name": "name",
                         "modifierChainText": "",
                         "modifierChainBaseOffset": 2841,
+                        "chain": [],
                         "value": "footer",
                         "valueLoc": {
                           "start": 2843,
@@ -550,6 +570,7 @@
                         "name": "close",
                         "modifierChainText": "",
                         "modifierChainBaseOffset": 2857,
+                        "chain": [],
                         "value": "close",
                         "valueLoc": {
                           "start": 2859,

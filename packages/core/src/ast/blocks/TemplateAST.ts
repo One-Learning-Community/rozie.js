@@ -13,6 +13,7 @@
  * @experimental — shape may change before v1.0
  */
 import type { SourceLoc } from '../types.js';
+import type { ModifierChain } from '../../modifier-grammar/parseModifierChain.js';
 
 export type TemplateNode =
   | TemplateElement
@@ -38,6 +39,15 @@ export interface TemplateAttr {
   modifierChainText: string;
   /** Absolute byte offset in source where modifierChainText begins (or attribute end if no modifiers). */
   modifierChainBaseOffset: number;
+  /**
+   * Parsed modifier chain (populated by buildRozieAST in Plan 04). Only
+   * meaningful when kind === 'event'; for other kinds, this is always [].
+   * Never null — always present for consistent downstream consumption.
+   * parseTemplate (Plan 03) sets this to [] at construction time; the AST
+   * normalizer re-parses modifierChainText through the peggy grammar and
+   * replaces with the structured chain.
+   */
+  chain: ModifierChain[];
   /** Raw attribute value (string between quotes), or null for boolean attributes. */
   value: string | null;
   /** Loc of the value text (between quotes), null when value === null. */

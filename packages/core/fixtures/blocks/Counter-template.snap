@@ -24,6 +24,7 @@
             "name": "class",
             "modifierChainText": "",
             "modifierChainBaseOffset": 995,
+            "chain": [],
             "value": "counter",
             "valueLoc": {
               "start": 997,
@@ -40,6 +41,7 @@
             "name": "class",
             "modifierChainText": "",
             "modifierChainBaseOffset": 1014,
+            "chain": [],
             "value": "{ hovering: $data.hovering }",
             "valueLoc": {
               "start": 1016,
@@ -56,6 +58,7 @@
             "name": "mouseenter",
             "modifierChainText": "",
             "modifierChainBaseOffset": 1059,
+            "chain": [],
             "value": "$data.hovering = true",
             "valueLoc": {
               "start": 1061,
@@ -72,6 +75,7 @@
             "name": "mouseleave",
             "modifierChainText": "",
             "modifierChainBaseOffset": 1097,
+            "chain": [],
             "value": "$data.hovering = false",
             "valueLoc": {
               "start": 1099,
@@ -102,6 +106,7 @@
                 "name": "disabled",
                 "modifierChainText": "",
                 "modifierChainBaseOffset": 1144,
+                "chain": [],
                 "value": "!canDecrement",
                 "valueLoc": {
                   "start": 1146,
@@ -118,6 +123,7 @@
                 "name": "click",
                 "modifierChainText": "",
                 "modifierChainBaseOffset": 1167,
+                "chain": [],
                 "value": "decrement",
                 "valueLoc": {
                   "start": 1169,
@@ -134,6 +140,7 @@
                 "name": "aria-label",
                 "modifierChainText": "",
                 "modifierChainBaseOffset": 1190,
+                "chain": [],
                 "value": "Decrement",
                 "valueLoc": {
                   "start": 1192,
@@ -179,6 +186,7 @@
                 "name": "class",
                 "modifierChainText": "",
                 "modifierChainBaseOffset": 1227,
+                "chain": [],
                 "value": "value",
                 "valueLoc": {
                   "start": 1229,
@@ -224,6 +232,7 @@
                 "name": "disabled",
                 "modifierChainText": "",
                 "modifierChainBaseOffset": 1281,
+                "chain": [],
                 "value": "!canIncrement",
                 "valueLoc": {
                   "start": 1283,
@@ -240,6 +249,7 @@
                 "name": "click",
                 "modifierChainText": "",
                 "modifierChainBaseOffset": 1304,
+                "chain": [],
                 "value": "increment",
                 "valueLoc": {
                   "start": 1306,
@@ -256,6 +266,7 @@
                 "name": "aria-label",
                 "modifierChainText": "",
                 "modifierChainBaseOffset": 1327,
+                "chain": [],
                 "value": "Increment",
                 "valueLoc": {
                   "start": 1329,

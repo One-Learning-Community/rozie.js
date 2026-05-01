@@ -16,6 +16,7 @@
         "event": "keydown",
         "modifierChainText": ".escape",
         "modifierChainBaseOffset": 2100,
+        "chain": [],
         "value": {
           "type": "ObjectExpression",
           "start": 2110,

@@ -24,6 +24,7 @@
             "name": "class",
             "modifierChainText": "",
             "modifierChainBaseOffset": 1276,
+            "chain": [],
             "value": "search-input",
             "valueLoc": {
               "start": 1278,
@@ -62,6 +63,7 @@
                 "name": "ref",
                 "modifierChainText": "",
                 "modifierChainBaseOffset": 1553,
+                "chain": [],
                 "value": "inputEl",
                 "valueLoc": {
                   "start": 1555,
@@ -78,6 +80,7 @@
                 "name": "type",
                 "modifierChainText": "",
                 "modifierChainBaseOffset": 1572,
+                "chain": [],
                 "value": "search",
                 "valueLoc": {
                   "start": 1574,
@@ -94,6 +97,7 @@
                 "name": "placeholder",
                 "modifierChainText": "",
                 "modifierChainBaseOffset": 1598,
+                "chain": [],
                 "value": "$props.placeholder",
                 "valueLoc": {
                   "start": 1600,
@@ -110,6 +114,7 @@
                 "name": "model",
                 "modifierChainText": "",
                 "modifierChainBaseOffset": 1631,
+                "chain": [],
                 "value": "$data.query",
                 "valueLoc": {
                   "start": 1633,
@@ -126,6 +131,7 @@
                 "name": "input",
                 "modifierChainText": ".debounce(300)",
                 "modifierChainBaseOffset": 1656,
+                "chain": [],
                 "value": "onSearch",
                 "valueLoc": {
                   "start": 1672,
@@ -142,6 +148,7 @@
                 "name": "keydown",
                 "modifierChainText": ".enter",
                 "modifierChainBaseOffset": 1694,
+                "chain": [],
                 "value": "onSearch",
                 "valueLoc": {
                   "start": 1702,
@@ -158,6 +165,7 @@
                 "name": "keydown",
                 "modifierChainText": ".escape",
                 "modifierChainBaseOffset": 1724,
+                "chain": [],
                 "value": "clear",
                 "valueLoc": {
                   "start": 1733,
@@ -194,6 +202,7 @@
                 "name": "if",
                 "modifierChainText": "",
                 "modifierChainBaseOffset": 1760,
+                "chain": [],
                 "value": "$data.query.length > 0",
                 "valueLoc": {
                   "start": 1762,
@@ -210,6 +219,7 @@
                 "name": "class",
                 "modifierChainText": "",
                 "modifierChainBaseOffset": 1791,
+                "chain": [],
                 "value": "clear-btn",
                 "valueLoc": {
                   "start": 1793,
@@ -226,6 +236,7 @@
                 "name": "click",
                 "modifierChainText": "",
                 "modifierChainBaseOffset": 1810,
+                "chain": [],
                 "value": "clear",
                 "valueLoc": {
                   "start": 1812,
@@ -242,6 +253,7 @@
                 "name": "aria-label",
                 "modifierChainText": "",
                 "modifierChainBaseOffset": 1829,
+                "chain": [],
                 "value": "Clear",
                 "valueLoc": {
                   "start": 1831,
@@ -287,6 +299,7 @@
                 "name": "else",
                 "modifierChainText": "",
                 "modifierChainBaseOffset": 1871,
+                "chain": [],
                 "value": null,
                 "valueLoc": null,
                 "loc": {
@@ -300,6 +313,7 @@
                 "name": "class",
                 "modifierChainText": "",
                 "modifierChainBaseOffset": 1877,
+                "chain": [],
                 "value": "hint",
                 "valueLoc": {
                   "start": 1879,
