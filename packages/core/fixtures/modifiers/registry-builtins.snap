@@ -1,0 +1,94 @@
+[
+  {
+    "name": "capture",
+    "arity": "none"
+  },
+  {
+    "name": "debounce",
+    "arity": "one"
+  },
+  {
+    "name": "delete",
+    "arity": "none"
+  },
+  {
+    "name": "down",
+    "arity": "none"
+  },
+  {
+    "name": "end",
+    "arity": "none"
+  },
+  {
+    "name": "enter",
+    "arity": "none"
+  },
+  {
+    "name": "escape",
+    "arity": "none"
+  },
+  {
+    "name": "home",
+    "arity": "none"
+  },
+  {
+    "name": "left",
+    "arity": "none"
+  },
+  {
+    "name": "middle",
+    "arity": "none"
+  },
+  {
+    "name": "once",
+    "arity": "none"
+  },
+  {
+    "name": "outside",
+    "arity": "one-or-more"
+  },
+  {
+    "name": "pageDown",
+    "arity": "none"
+  },
+  {
+    "name": "pageUp",
+    "arity": "none"
+  },
+  {
+    "name": "passive",
+    "arity": "none"
+  },
+  {
+    "name": "prevent",
+    "arity": "none"
+  },
+  {
+    "name": "right",
+    "arity": "none"
+  },
+  {
+    "name": "self",
+    "arity": "none"
+  },
+  {
+    "name": "space",
+    "arity": "none"
+  },
+  {
+    "name": "stop",
+    "arity": "none"
+  },
+  {
+    "name": "tab",
+    "arity": "none"
+  },
+  {
+    "name": "throttle",
+    "arity": "one"
+  },
+  {
+    "name": "up",
+    "arity": "none"
+  }
+]
