@@ -83,6 +83,7 @@ export function splitBlocks(source: string, filename?: string): SplitBlocksResul
   let inRozieOpenTag = false;
   let pendingAttribName = '';
   let pendingAttribValueChunks: string[] = [];
+  let savedNameChunks: string[] = []; // holds chunks for the 'name' attr once onattribend fires
   let collectingAttribValue = false;
   let unknownTagStart = -1; // tracks <` position of an unknown top-level block, -1 = none
 
@@ -104,6 +105,7 @@ export function splitBlocks(source: string, filename?: string): SplitBlocksResul
         inRozieOpenTag = depth === 0 && name === 'rozie';
         pendingAttribName = '';
         pendingAttribValueChunks = [];
+        savedNameChunks = [];
         collectingAttribValue = false;
       },
 
@@ -123,10 +125,10 @@ export function splitBlocks(source: string, filename?: string): SplitBlocksResul
       onattribend(_quote, _endIndex) {
         if (!inRozieOpenTag) return;
         if (pendingAttribName === 'name') {
-          // Defer commit to onopentagend; just mark that we've captured a name.
-          // We store in result.rozie at onopentagend time so loc covers full <rozie ...> tag.
+          // Save the chunks for the 'name' attribute now, before the next onattribname
+          // clears pendingAttribValueChunks. onopentagend reads from savedNameChunks.
+          savedNameChunks = [...pendingAttribValueChunks];
         }
-        // Keep the buffered chunks until onopentagend reads them.
         collectingAttribValue = false;
       },
 
@@ -145,7 +147,8 @@ export function splitBlocks(source: string, filename?: string): SplitBlocksResul
                 ...(filename !== undefined ? { filename } : {}),
               });
             } else {
-              const nameValue = pendingAttribValueChunks.join('') || 'Anonymous';
+              const nameValue = savedNameChunks.join('') || 'Anonymous';
+              savedNameChunks = [];
               rozieTagStart = lastOpenTagStart;
               result.rozie = {
                 name: nameValue,

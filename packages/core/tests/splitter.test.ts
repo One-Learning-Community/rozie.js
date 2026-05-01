@@ -112,6 +112,16 @@ describe('splitBlocks (PARSE-01)', () => {
     expect(result.props?.contentLoc.start).toBe(result.props?.contentLoc.end);
   });
 
+  it('WR-01 regression: name attribute is correct when <rozie> has multiple attributes', () => {
+    // Bug: pendingAttribValueChunks was reset on every onattribname, so onopentagend
+    // read the LAST attribute's value instead of 'name'. With <rozie name="Counter" lang="ts">
+    // the old code would produce name === "ts" instead of "Counter".
+    const src = '<rozie name="Counter" lang="ts"><props>{}</props></rozie>';
+    const result = splitBlocks(src, 'Counter.rozie');
+    expect(result.diagnostics).toEqual([]);
+    expect(result.rozie?.name).toBe('Counter'); // must NOT be "ts"
+  });
+
   it('emits ROZ001 when <rozie> envelope is missing (collected, not thrown)', () => {
     // Per D-08: function does NOT throw on malformed input.
     const result = splitBlocks('<props>{}</props>');
