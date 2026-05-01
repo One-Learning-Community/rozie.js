@@ -200,6 +200,24 @@ describe('Negative tests by ROZ-code range (at least one per range)', () => {
 });
 
 describe('end-to-end diagnostics via parse() (D-08)', () => {
-  // Unskipped in Task 4 once parse() is exported.
-  it.todo('multi-error parse() collects ALL diagnostics without throwing — at least 3 distinct codes');
+  it('multi-error parse() collects ALL diagnostics without throwing — ≥3 distinct codes', async () => {
+    const { parse } = await import('../src/parse.js');
+    const source = `<rozie name="Bad">
+  <refs></refs>
+  <props>{ ??? }</props>
+  <style>:root, .foo { color: red; }</style>
+</rozie>`;
+    expect(() => parse(source)).not.toThrow();
+    const result = parse(source);
+    const codes = result.diagnostics.map((d) => d.code);
+    expect(codes).toContain('ROZ003'); // <refs> unknown block
+    expect(codes).toContain('ROZ081'); // mixed :root selector
+    expect(result.diagnostics.length).toBeGreaterThanOrEqual(3);
+
+    // Each diagnostic renders cleanly via renderDiagnostic with its code.
+    for (const d of result.diagnostics) {
+      const rendered = renderDiagnostic(d, source);
+      expect(rendered).toContain(d.code);
+    }
+  });
 });

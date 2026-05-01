@@ -1,0 +1,2186 @@
+{
+  "ast": {
+    "type": "RozieAST",
+    "name": "Counter",
+    "loc": {
+      "start": 375,
+      "end": 1695
+    },
+    "props": {
+      "type": "PropsAST",
+      "loc": {
+        "start": 406,
+        "end": 596
+      },
+      "expression": {
+        "type": "ObjectExpression",
+        "start": 407,
+        "end": 595,
+        "loc": {
+          "start": {
+            "line": 17,
+            "column": 0,
+            "index": 407
+          },
+          "end": {
+            "line": 22,
+            "column": 1,
+            "index": 595
+          },
+          "filename": "Counter.rozie"
+        },
+        "properties": [
+          {
+            "type": "ObjectProperty",
+            "start": 411,
+            "end": 460,
+            "loc": {
+              "start": {
+                "line": 18,
+                "column": 2,
+                "index": 411
+              },
+              "end": {
+                "line": 18,
+                "column": 51,
+                "index": 460
+              },
+              "filename": "Counter.rozie"
+            },
+            "method": false,
+            "key": {
+              "type": "Identifier",
+              "start": 411,
+              "end": 416,
+              "loc": {
+                "end": {
+                  "line": 18,
+                  "column": 7,
+                  "index": 416
+                },
+                "filename": "Counter.rozie",
+                "identifierName": "value"
+              },
+              "name": "value"
+            },
+            "computed": false,
+            "shorthand": false,
+            "value": {
+              "type": "ObjectExpression",
+              "start": 418,
+              "end": 460,
+              "loc": {
+                "start": {
+                  "line": 18,
+                  "column": 9,
+                  "index": 418
+                },
+                "filename": "Counter.rozie"
+              },
+              "properties": [
+                {
+                  "type": "ObjectProperty",
+                  "start": 420,
+                  "end": 432,
+                  "loc": {
+                    "start": {
+                      "line": 18,
+                      "column": 11,
+                      "index": 420
+                    },
+                    "end": {
+                      "line": 18,
+                      "column": 23,
+                      "index": 432
+                    },
+                    "filename": "Counter.rozie"
+                  },
+                  "method": false,
+                  "key": {
+                    "type": "Identifier",
+                    "start": 420,
+                    "end": 424,
+                    "loc": {
+                      "end": {
+                        "line": 18,
+                        "column": 15,
+                        "index": 424
+                      },
+                      "filename": "Counter.rozie",
+                      "identifierName": "type"
+                    },
+                    "name": "type"
+                  },
+                  "computed": false,
+                  "shorthand": false,
+                  "value": {
+                    "type": "Identifier",
+                    "start": 426,
+                    "end": 432,
+                    "loc": {
+                      "start": {
+                        "line": 18,
+                        "column": 17,
+                        "index": 426
+                      },
+                      "filename": "Counter.rozie",
+                      "identifierName": "Number"
+                    },
+                    "name": "Number"
+                  }
+                },
+                {
+                  "type": "ObjectProperty",
+                  "start": 434,
+                  "end": 444,
+                  "loc": {
+                    "start": {
+                      "line": 18,
+                      "column": 25,
+                      "index": 434
+                    },
+                    "end": {
+                      "line": 18,
+                      "column": 35,
+                      "index": 444
+                    },
+                    "filename": "Counter.rozie"
+                  },
+                  "method": false,
+                  "key": {
+                    "type": "Identifier",
+                    "start": 434,
+                    "end": 441,
+                    "loc": {
+                      "end": {
+                        "line": 18,
+                        "column": 32,
+                        "index": 441
+                      },
+                      "filename": "Counter.rozie",
+                      "identifierName": "default"
+                    },
+                    "name": "default"
+                  },
+                  "computed": false,
+                  "shorthand": false,
+                  "value": {
+                    "type": "NumericLiteral",
+                    "start": 443,
+                    "end": 444,
+                    "loc": {
+                      "start": {
+                        "line": 18,
+                        "column": 34,
+                        "index": 443
+                      },
+                      "filename": "Counter.rozie"
+                    },
+                    "value": 0
+                  }
+                },
+                {
+                  "type": "ObjectProperty",
+                  "start": 447,
+                  "end": 458,
+                  "loc": {
+                    "start": {
+                      "line": 18,
+                      "column": 38,
+                      "index": 447
+                    },
+                    "end": {
+                      "line": 18,
+                      "column": 49,
+                      "index": 458
+                    },
+                    "filename": "Counter.rozie"
+                  },
+                  "method": false,
+                  "key": {
+                    "type": "Identifier",
+                    "start": 447,
+                    "end": 452,
+                    "loc": {
+                      "end": {
+                        "line": 18,
+                        "column": 43,
+                        "index": 452
+                      },
+                      "filename": "Counter.rozie",
+                      "identifierName": "model"
+                    },
+                    "name": "model"
+                  },
+                  "computed": false,
+                  "shorthand": false,
+                  "value": {
+                    "type": "BooleanLiteral",
+                    "start": 454,
+                    "end": 458,
+                    "loc": {
+                      "start": {
+                        "line": 18,
+                        "column": 45,
+                        "index": 454
+                      },
+                      "filename": "Counter.rozie"
+                    },
+                    "value": true
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "type": "ObjectProperty",
+            "start": 464,
+            "end": 499,
+            "loc": {
+              "start": {
+                "line": 19,
+                "column": 2,
+                "index": 464
+              },
+              "end": {
+                "line": 19,
+                "column": 37,
+                "index": 499
+              },
+              "filename": "Counter.rozie"
+            },
+            "method": false,
+            "key": {
+              "type": "Identifier",
+              "start": 464,
+              "end": 468,
+              "loc": {
+                "end": {
+                  "line": 19,
+                  "column": 6,
+                  "index": 468
+                },
+                "filename": "Counter.rozie",
+                "identifierName": "step"
+              },
+              "name": "step"
+            },
+            "computed": false,
+            "shorthand": false,
+            "value": {
+              "type": "ObjectExpression",
+              "start": 471,
+              "end": 499,
+              "loc": {
+                "start": {
+                  "line": 19,
+                  "column": 9,
+                  "index": 471
+                },
+                "filename": "Counter.rozie"
+              },
+              "properties": [
+                {
+                  "type": "ObjectProperty",
+                  "start": 473,
+                  "end": 485,
+                  "loc": {
+                    "start": {
+                      "line": 19,
+                      "column": 11,
+                      "index": 473
+                    },
+                    "end": {
+                      "line": 19,
+                      "column": 23,
+                      "index": 485
+                    },
+                    "filename": "Counter.rozie"
+                  },
+                  "method": false,
+                  "key": {
+                    "type": "Identifier",
+                    "start": 473,
+                    "end": 477,
+                    "loc": {
+                      "end": {
+                        "line": 19,
+                        "column": 15,
+                        "index": 477
+                      },
+                      "filename": "Counter.rozie",
+                      "identifierName": "type"
+                    },
+                    "name": "type"
+                  },
+                  "computed": false,
+                  "shorthand": false,
+                  "value": {
+                    "type": "Identifier",
+                    "start": 479,
+                    "end": 485,
+                    "loc": {
+                      "start": {
+                        "line": 19,
+                        "column": 17,
+                        "index": 479
+                      },
+                      "filename": "Counter.rozie",
+                      "identifierName": "Number"
+                    },
+                    "name": "Number"
+                  }
+                },
+                {
+                  "type": "ObjectProperty",
+                  "start": 487,
+                  "end": 497,
+                  "loc": {
+                    "start": {
+                      "line": 19,
+                      "column": 25,
+                      "index": 487
+                    },
+                    "end": {
+                      "line": 19,
+                      "column": 35,
+                      "index": 497
+                    },
+                    "filename": "Counter.rozie"
+                  },
+                  "method": false,
+                  "key": {
+                    "type": "Identifier",
+                    "start": 487,
+                    "end": 494,
+                    "loc": {
+                      "end": {
+                        "line": 19,
+                        "column": 32,
+                        "index": 494
+                      },
+                      "filename": "Counter.rozie",
+                      "identifierName": "default"
+                    },
+                    "name": "default"
+                  },
+                  "computed": false,
+                  "shorthand": false,
+                  "value": {
+                    "type": "NumericLiteral",
+                    "start": 496,
+                    "end": 497,
+                    "loc": {
+                      "start": {
+                        "line": 19,
+                        "column": 34,
+                        "index": 496
+                      },
+                      "filename": "Counter.rozie"
+                    },
+                    "value": 1
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "type": "ObjectProperty",
+            "start": 503,
+            "end": 546,
+            "loc": {
+              "start": {
+                "line": 20,
+                "column": 2,
+                "index": 503
+              },
+              "end": {
+                "line": 20,
+                "column": 45,
+                "index": 546
+              },
+              "filename": "Counter.rozie"
+            },
+            "method": false,
+            "key": {
+              "type": "Identifier",
+              "start": 503,
+              "end": 506,
+              "loc": {
+                "end": {
+                  "line": 20,
+                  "column": 5,
+                  "index": 506
+                },
+                "filename": "Counter.rozie",
+                "identifierName": "min"
+              },
+              "name": "min"
+            },
+            "computed": false,
+            "shorthand": false,
+            "value": {
+              "type": "ObjectExpression",
+              "start": 510,
+              "end": 546,
+              "loc": {
+                "start": {
+                  "line": 20,
+                  "column": 9,
+                  "index": 510
+                },
+                "filename": "Counter.rozie"
+              },
+              "properties": [
+                {
+                  "type": "ObjectProperty",
+                  "start": 512,
+                  "end": 524,
+                  "loc": {
+                    "start": {
+                      "line": 20,
+                      "column": 11,
+                      "index": 512
+                    },
+                    "end": {
+                      "line": 20,
+                      "column": 23,
+                      "index": 524
+                    },
+                    "filename": "Counter.rozie"
+                  },
+                  "method": false,
+                  "key": {
+                    "type": "Identifier",
+                    "start": 512,
+                    "end": 516,
+                    "loc": {
+                      "end": {
+                        "line": 20,
+                        "column": 15,
+                        "index": 516
+                      },
+                      "filename": "Counter.rozie",
+                      "identifierName": "type"
+                    },
+                    "name": "type"
+                  },
+                  "computed": false,
+                  "shorthand": false,
+                  "value": {
+                    "type": "Identifier",
+                    "start": 518,
+                    "end": 524,
+                    "loc": {
+                      "start": {
+                        "line": 20,
+                        "column": 17,
+                        "index": 518
+                      },
+                      "filename": "Counter.rozie",
+                      "identifierName": "Number"
+                    },
+                    "name": "Number"
+                  }
+                },
+                {
+                  "type": "ObjectProperty",
+                  "start": 526,
+                  "end": 544,
+                  "loc": {
+                    "start": {
+                      "line": 20,
+                      "column": 25,
+                      "index": 526
+                    },
+                    "end": {
+                      "line": 20,
+                      "column": 43,
+                      "index": 544
+                    },
+                    "filename": "Counter.rozie"
+                  },
+                  "method": false,
+                  "key": {
+                    "type": "Identifier",
+                    "start": 526,
+                    "end": 533,
+                    "loc": {
+                      "end": {
+                        "line": 20,
+                        "column": 32,
+                        "index": 533
+                      },
+                      "filename": "Counter.rozie",
+                      "identifierName": "default"
+                    },
+                    "name": "default"
+                  },
+                  "computed": false,
+                  "shorthand": false,
+                  "value": {
+                    "type": "UnaryExpression",
+                    "start": 535,
+                    "end": 544,
+                    "loc": {
+                      "start": {
+                        "line": 20,
+                        "column": 34,
+                        "index": 535
+                      },
+                      "filename": "Counter.rozie"
+                    },
+                    "operator": "-",
+                    "prefix": true,
+                    "argument": {
+                      "type": "Identifier",
+                      "start": 536,
+                      "end": 544,
+                      "loc": {
+                        "start": {
+                          "line": 20,
+                          "column": 35,
+                          "index": 536
+                        },
+                        "filename": "Counter.rozie",
+                        "identifierName": "Infinity"
+                      },
+                      "name": "Infinity"
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "type": "ObjectProperty",
+            "start": 550,
+            "end": 592,
+            "loc": {
+              "start": {
+                "line": 21,
+                "column": 2,
+                "index": 550
+              },
+              "end": {
+                "line": 21,
+                "column": 44,
+                "index": 592
+              },
+              "filename": "Counter.rozie"
+            },
+            "method": false,
+            "key": {
+              "type": "Identifier",
+              "start": 550,
+              "end": 553,
+              "loc": {
+                "end": {
+                  "line": 21,
+                  "column": 5,
+                  "index": 553
+                },
+                "filename": "Counter.rozie",
+                "identifierName": "max"
+              },
+              "name": "max"
+            },
+            "computed": false,
+            "shorthand": false,
+            "value": {
+              "type": "ObjectExpression",
+              "start": 557,
+              "end": 592,
+              "loc": {
+                "start": {
+                  "line": 21,
+                  "column": 9,
+                  "index": 557
+                },
+                "filename": "Counter.rozie"
+              },
+              "properties": [
+                {
+                  "type": "ObjectProperty",
+                  "start": 559,
+                  "end": 571,
+                  "loc": {
+                    "start": {
+                      "line": 21,
+                      "column": 11,
+                      "index": 559
+                    },
+                    "end": {
+                      "line": 21,
+                      "column": 23,
+                      "index": 571
+                    },
+                    "filename": "Counter.rozie"
+                  },
+                  "method": false,
+                  "key": {
+                    "type": "Identifier",
+                    "start": 559,
+                    "end": 563,
+                    "loc": {
+                      "end": {
+                        "line": 21,
+                        "column": 15,
+                        "index": 563
+                      },
+                      "filename": "Counter.rozie",
+                      "identifierName": "type"
+                    },
+                    "name": "type"
+                  },
+                  "computed": false,
+                  "shorthand": false,
+                  "value": {
+                    "type": "Identifier",
+                    "start": 565,
+                    "end": 571,
+                    "loc": {
+                      "start": {
+                        "line": 21,
+                        "column": 17,
+                        "index": 565
+                      },
+                      "filename": "Counter.rozie",
+                      "identifierName": "Number"
+                    },
+                    "name": "Number"
+                  }
+                },
+                {
+                  "type": "ObjectProperty",
+                  "start": 573,
+                  "end": 590,
+                  "loc": {
+                    "start": {
+                      "line": 21,
+                      "column": 25,
+                      "index": 573
+                    },
+                    "end": {
+                      "line": 21,
+                      "column": 42,
+                      "index": 590
+                    },
+                    "filename": "Counter.rozie"
+                  },
+                  "method": false,
+                  "key": {
+                    "type": "Identifier",
+                    "start": 573,
+                    "end": 580,
+                    "loc": {
+                      "end": {
+                        "line": 21,
+                        "column": 32,
+                        "index": 580
+                      },
+                      "filename": "Counter.rozie",
+                      "identifierName": "default"
+                    },
+                    "name": "default"
+                  },
+                  "computed": false,
+                  "shorthand": false,
+                  "value": {
+                    "type": "Identifier",
+                    "start": 582,
+                    "end": 590,
+                    "loc": {
+                      "start": {
+                        "line": 21,
+                        "column": 34,
+                        "index": 582
+                      },
+                      "filename": "Counter.rozie",
+                      "identifierName": "Infinity"
+                    },
+                    "name": "Infinity"
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "comments": []
+      }
+    },
+    "data": {
+      "type": "DataAST",
+      "loc": {
+        "start": 612,
+        "end": 636
+      },
+      "expression": {
+        "type": "ObjectExpression",
+        "start": 613,
+        "end": 635,
+        "loc": {
+          "start": {
+            "line": 26,
+            "column": 0,
+            "index": 613
+          },
+          "end": {
+            "line": 28,
+            "column": 1,
+            "index": 635
+          },
+          "filename": "Counter.rozie"
+        },
+        "properties": [
+          {
+            "type": "ObjectProperty",
+            "start": 617,
+            "end": 632,
+            "loc": {
+              "start": {
+                "line": 27,
+                "column": 2,
+                "index": 617
+              },
+              "end": {
+                "line": 27,
+                "column": 17,
+                "index": 632
+              },
+              "filename": "Counter.rozie"
+            },
+            "method": false,
+            "key": {
+              "type": "Identifier",
+              "start": 617,
+              "end": 625,
+              "loc": {
+                "end": {
+                  "line": 27,
+                  "column": 10,
+                  "index": 625
+                },
+                "filename": "Counter.rozie",
+                "identifierName": "hovering"
+              },
+              "name": "hovering"
+            },
+            "computed": false,
+            "shorthand": false,
+            "value": {
+              "type": "BooleanLiteral",
+              "start": 627,
+              "end": 632,
+              "loc": {
+                "start": {
+                  "line": 27,
+                  "column": 12,
+                  "index": 627
+                },
+                "filename": "Counter.rozie"
+              },
+              "value": false
+            }
+          }
+        ],
+        "comments": []
+      }
+    },
+    "script": {
+      "type": "ScriptAST",
+      "loc": {
+        "start": 653,
+        "end": 961
+      },
+      "program": {
+        "type": "File",
+        "start": 653,
+        "end": 961,
+        "loc": {
+          "start": {
+            "line": 31,
+            "column": 8,
+            "index": 653
+          },
+          "end": {
+            "line": 37,
+            "column": 0,
+            "index": 961
+          },
+          "filename": "Counter.rozie"
+        },
+        "program": {
+          "type": "Program",
+          "start": 653,
+          "end": 961,
+          "loc": {
+            "filename": "Counter.rozie"
+          },
+          "sourceType": "module",
+          "interpreter": null,
+          "body": [
+            {
+              "type": "VariableDeclaration",
+              "start": 654,
+              "end": 732,
+              "loc": {
+                "start": {
+                  "line": 32,
+                  "column": 0,
+                  "index": 654
+                },
+                "end": {
+                  "line": 32,
+                  "column": 78,
+                  "index": 732
+                },
+                "filename": "Counter.rozie"
+              },
+              "declarations": [
+                {
+                  "type": "VariableDeclarator",
+                  "start": 660,
+                  "end": 732,
+                  "loc": {
+                    "start": {
+                      "line": 32,
+                      "column": 6,
+                      "index": 660
+                    },
+                    "filename": "Counter.rozie"
+                  },
+                  "id": {
+                    "type": "Identifier",
+                    "start": 660,
+                    "end": 672,
+                    "loc": {
+                      "end": {
+                        "line": 32,
+                        "column": 18,
+                        "index": 672
+                      },
+                      "filename": "Counter.rozie",
+                      "identifierName": "canIncrement"
+                    },
+                    "name": "canIncrement"
+                  },
+                  "init": {
+                    "type": "CallExpression",
+                    "start": 675,
+                    "end": 732,
+                    "loc": {
+                      "start": {
+                        "line": 32,
+                        "column": 21,
+                        "index": 675
+                      },
+                      "filename": "Counter.rozie"
+                    },
+                    "callee": {
+                      "type": "Identifier",
+                      "start": 675,
+                      "end": 684,
+                      "loc": {
+                        "end": {
+                          "line": 32,
+                          "column": 30,
+                          "index": 684
+                        },
+                        "filename": "Counter.rozie",
+                        "identifierName": "$computed"
+                      },
+                      "name": "$computed"
+                    },
+                    "arguments": [
+                      {
+                        "type": "ArrowFunctionExpression",
+                        "start": 685,
+                        "end": 731,
+                        "loc": {
+                          "start": {
+                            "line": 32,
+                            "column": 31,
+                            "index": 685
+                          },
+                          "end": {
+                            "line": 32,
+                            "column": 77,
+                            "index": 731
+                          },
+                          "filename": "Counter.rozie"
+                        },
+                        "id": null,
+                        "generator": false,
+                        "async": false,
+                        "params": [],
+                        "body": {
+                          "type": "BinaryExpression",
+                          "start": 691,
+                          "end": 731,
+                          "loc": {
+                            "start": {
+                              "line": 32,
+                              "column": 37,
+                              "index": 691
+                            },
+                            "filename": "Counter.rozie"
+                          },
+                          "left": {
+                            "type": "BinaryExpression",
+                            "start": 691,
+                            "end": 717,
+                            "loc": {
+                              "end": {
+                                "line": 32,
+                                "column": 63,
+                                "index": 717
+                              },
+                              "filename": "Counter.rozie"
+                            },
+                            "left": {
+                              "type": "MemberExpression",
+                              "start": 691,
+                              "end": 703,
+                              "loc": {
+                                "end": {
+                                  "line": 32,
+                                  "column": 49,
+                                  "index": 703
+                                },
+                                "filename": "Counter.rozie"
+                              },
+                              "object": {
+                                "type": "Identifier",
+                                "start": 691,
+                                "end": 697,
+                                "loc": {
+                                  "end": {
+                                    "line": 32,
+                                    "column": 43,
+                                    "index": 697
+                                  },
+                                  "filename": "Counter.rozie",
+                                  "identifierName": "$props"
+                                },
+                                "name": "$props"
+                              },
+                              "computed": false,
+                              "property": {
+                                "type": "Identifier",
+                                "start": 698,
+                                "end": 703,
+                                "loc": {
+                                  "start": {
+                                    "line": 32,
+                                    "column": 44,
+                                    "index": 698
+                                  },
+                                  "filename": "Counter.rozie",
+                                  "identifierName": "value"
+                                },
+                                "name": "value"
+                              }
+                            },
+                            "operator": "+",
+                            "right": {
+                              "type": "MemberExpression",
+                              "start": 706,
+                              "end": 717,
+                              "loc": {
+                                "start": {
+                                  "line": 32,
+                                  "column": 52,
+                                  "index": 706
+                                },
+                                "filename": "Counter.rozie"
+                              },
+                              "object": {
+                                "type": "Identifier",
+                                "start": 706,
+                                "end": 712,
+                                "loc": {
+                                  "end": {
+                                    "line": 32,
+                                    "column": 58,
+                                    "index": 712
+                                  },
+                                  "filename": "Counter.rozie",
+                                  "identifierName": "$props"
+                                },
+                                "name": "$props"
+                              },
+                              "computed": false,
+                              "property": {
+                                "type": "Identifier",
+                                "start": 713,
+                                "end": 717,
+                                "loc": {
+                                  "start": {
+                                    "line": 32,
+                                    "column": 59,
+                                    "index": 713
+                                  },
+                                  "filename": "Counter.rozie",
+                                  "identifierName": "step"
+                                },
+                                "name": "step"
+                              }
+                            }
+                          },
+                          "operator": "<=",
+                          "right": {
+                            "type": "MemberExpression",
+                            "start": 721,
+                            "end": 731,
+                            "loc": {
+                              "start": {
+                                "line": 32,
+                                "column": 67,
+                                "index": 721
+                              },
+                              "filename": "Counter.rozie"
+                            },
+                            "object": {
+                              "type": "Identifier",
+                              "start": 721,
+                              "end": 727,
+                              "loc": {
+                                "end": {
+                                  "line": 32,
+                                  "column": 73,
+                                  "index": 727
+                                },
+                                "filename": "Counter.rozie",
+                                "identifierName": "$props"
+                              },
+                              "name": "$props"
+                            },
+                            "computed": false,
+                            "property": {
+                              "type": "Identifier",
+                              "start": 728,
+                              "end": 731,
+                              "loc": {
+                                "start": {
+                                  "line": 32,
+                                  "column": 74,
+                                  "index": 728
+                                },
+                                "filename": "Counter.rozie",
+                                "identifierName": "max"
+                              },
+                              "name": "max"
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              ],
+              "kind": "const"
+            },
+            {
+              "type": "VariableDeclaration",
+              "start": 733,
+              "end": 811,
+              "loc": {
+                "start": {
+                  "line": 33,
+                  "column": 0,
+                  "index": 733
+                },
+                "end": {
+                  "line": 33,
+                  "column": 78,
+                  "index": 811
+                },
+                "filename": "Counter.rozie"
+              },
+              "declarations": [
+                {
+                  "type": "VariableDeclarator",
+                  "start": 739,
+                  "end": 811,
+                  "loc": {
+                    "start": {
+                      "line": 33,
+                      "column": 6,
+                      "index": 739
+                    },
+                    "filename": "Counter.rozie"
+                  },
+                  "id": {
+                    "type": "Identifier",
+                    "start": 739,
+                    "end": 751,
+                    "loc": {
+                      "end": {
+                        "line": 33,
+                        "column": 18,
+                        "index": 751
+                      },
+                      "filename": "Counter.rozie",
+                      "identifierName": "canDecrement"
+                    },
+                    "name": "canDecrement"
+                  },
+                  "init": {
+                    "type": "CallExpression",
+                    "start": 754,
+                    "end": 811,
+                    "loc": {
+                      "start": {
+                        "line": 33,
+                        "column": 21,
+                        "index": 754
+                      },
+                      "filename": "Counter.rozie"
+                    },
+                    "callee": {
+                      "type": "Identifier",
+                      "start": 754,
+                      "end": 763,
+                      "loc": {
+                        "end": {
+                          "line": 33,
+                          "column": 30,
+                          "index": 763
+                        },
+                        "filename": "Counter.rozie",
+                        "identifierName": "$computed"
+                      },
+                      "name": "$computed"
+                    },
+                    "arguments": [
+                      {
+                        "type": "ArrowFunctionExpression",
+                        "start": 764,
+                        "end": 810,
+                        "loc": {
+                          "start": {
+                            "line": 33,
+                            "column": 31,
+                            "index": 764
+                          },
+                          "end": {
+                            "line": 33,
+                            "column": 77,
+                            "index": 810
+                          },
+                          "filename": "Counter.rozie"
+                        },
+                        "id": null,
+                        "generator": false,
+                        "async": false,
+                        "params": [],
+                        "body": {
+                          "type": "BinaryExpression",
+                          "start": 770,
+                          "end": 810,
+                          "loc": {
+                            "start": {
+                              "line": 33,
+                              "column": 37,
+                              "index": 770
+                            },
+                            "filename": "Counter.rozie"
+                          },
+                          "left": {
+                            "type": "BinaryExpression",
+                            "start": 770,
+                            "end": 796,
+                            "loc": {
+                              "end": {
+                                "line": 33,
+                                "column": 63,
+                                "index": 796
+                              },
+                              "filename": "Counter.rozie"
+                            },
+                            "left": {
+                              "type": "MemberExpression",
+                              "start": 770,
+                              "end": 782,
+                              "loc": {
+                                "end": {
+                                  "line": 33,
+                                  "column": 49,
+                                  "index": 782
+                                },
+                                "filename": "Counter.rozie"
+                              },
+                              "object": {
+                                "type": "Identifier",
+                                "start": 770,
+                                "end": 776,
+                                "loc": {
+                                  "end": {
+                                    "line": 33,
+                                    "column": 43,
+                                    "index": 776
+                                  },
+                                  "filename": "Counter.rozie",
+                                  "identifierName": "$props"
+                                },
+                                "name": "$props"
+                              },
+                              "computed": false,
+                              "property": {
+                                "type": "Identifier",
+                                "start": 777,
+                                "end": 782,
+                                "loc": {
+                                  "start": {
+                                    "line": 33,
+                                    "column": 44,
+                                    "index": 777
+                                  },
+                                  "filename": "Counter.rozie",
+                                  "identifierName": "value"
+                                },
+                                "name": "value"
+                              }
+                            },
+                            "operator": "-",
+                            "right": {
+                              "type": "MemberExpression",
+                              "start": 785,
+                              "end": 796,
+                              "loc": {
+                                "start": {
+                                  "line": 33,
+                                  "column": 52,
+                                  "index": 785
+                                },
+                                "filename": "Counter.rozie"
+                              },
+                              "object": {
+                                "type": "Identifier",
+                                "start": 785,
+                                "end": 791,
+                                "loc": {
+                                  "end": {
+                                    "line": 33,
+                                    "column": 58,
+                                    "index": 791
+                                  },
+                                  "filename": "Counter.rozie",
+                                  "identifierName": "$props"
+                                },
+                                "name": "$props"
+                              },
+                              "computed": false,
+                              "property": {
+                                "type": "Identifier",
+                                "start": 792,
+                                "end": 796,
+                                "loc": {
+                                  "start": {
+                                    "line": 33,
+                                    "column": 59,
+                                    "index": 792
+                                  },
+                                  "filename": "Counter.rozie",
+                                  "identifierName": "step"
+                                },
+                                "name": "step"
+                              }
+                            }
+                          },
+                          "operator": ">=",
+                          "right": {
+                            "type": "MemberExpression",
+                            "start": 800,
+                            "end": 810,
+                            "loc": {
+                              "start": {
+                                "line": 33,
+                                "column": 67,
+                                "index": 800
+                              },
+                              "filename": "Counter.rozie"
+                            },
+                            "object": {
+                              "type": "Identifier",
+                              "start": 800,
+                              "end": 806,
+                              "loc": {
+                                "end": {
+                                  "line": 33,
+                                  "column": 73,
+                                  "index": 806
+                                },
+                                "filename": "Counter.rozie",
+                                "identifierName": "$props"
+                              },
+                              "name": "$props"
+                            },
+                            "computed": false,
+                            "property": {
+                              "type": "Identifier",
+                              "start": 807,
+                              "end": 810,
+                              "loc": {
+                                "start": {
+                                  "line": 33,
+                                  "column": 74,
+                                  "index": 807
+                                },
+                                "filename": "Counter.rozie",
+                                "identifierName": "min"
+                              },
+                              "name": "min"
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              ],
+              "kind": "const"
+            },
+            {
+              "type": "VariableDeclaration",
+              "start": 813,
+              "end": 886,
+              "loc": {
+                "start": {
+                  "line": 35,
+                  "column": 0,
+                  "index": 813
+                },
+                "end": {
+                  "line": 35,
+                  "column": 73,
+                  "index": 886
+                },
+                "filename": "Counter.rozie"
+              },
+              "declarations": [
+                {
+                  "type": "VariableDeclarator",
+                  "start": 819,
+                  "end": 886,
+                  "loc": {
+                    "start": {
+                      "line": 35,
+                      "column": 6,
+                      "index": 819
+                    },
+                    "filename": "Counter.rozie"
+                  },
+                  "id": {
+                    "type": "Identifier",
+                    "start": 819,
+                    "end": 828,
+                    "loc": {
+                      "end": {
+                        "line": 35,
+                        "column": 15,
+                        "index": 828
+                      },
+                      "filename": "Counter.rozie",
+                      "identifierName": "increment"
+                    },
+                    "name": "increment"
+                  },
+                  "init": {
+                    "type": "ArrowFunctionExpression",
+                    "start": 831,
+                    "end": 886,
+                    "loc": {
+                      "start": {
+                        "line": 35,
+                        "column": 18,
+                        "index": 831
+                      },
+                      "filename": "Counter.rozie"
+                    },
+                    "id": null,
+                    "generator": false,
+                    "async": false,
+                    "params": [],
+                    "body": {
+                      "type": "BlockStatement",
+                      "start": 837,
+                      "end": 886,
+                      "loc": {
+                        "start": {
+                          "line": 35,
+                          "column": 24,
+                          "index": 837
+                        },
+                        "filename": "Counter.rozie"
+                      },
+                      "body": [
+                        {
+                          "type": "IfStatement",
+                          "start": 839,
+                          "end": 884,
+                          "loc": {
+                            "start": {
+                              "line": 35,
+                              "column": 26,
+                              "index": 839
+                            },
+                            "end": {
+                              "line": 35,
+                              "column": 71,
+                              "index": 884
+                            },
+                            "filename": "Counter.rozie"
+                          },
+                          "test": {
+                            "type": "Identifier",
+                            "start": 843,
+                            "end": 855,
+                            "loc": {
+                              "start": {
+                                "line": 35,
+                                "column": 30,
+                                "index": 843
+                              },
+                              "end": {
+                                "line": 35,
+                                "column": 42,
+                                "index": 855
+                              },
+                              "filename": "Counter.rozie",
+                              "identifierName": "canIncrement"
+                            },
+                            "name": "canIncrement"
+                          },
+                          "consequent": {
+                            "type": "ExpressionStatement",
+                            "start": 857,
+                            "end": 884,
+                            "loc": {
+                              "start": {
+                                "line": 35,
+                                "column": 44,
+                                "index": 857
+                              },
+                              "filename": "Counter.rozie"
+                            },
+                            "expression": {
+                              "type": "AssignmentExpression",
+                              "start": 857,
+                              "end": 884,
+                              "loc": {
+                                "filename": "Counter.rozie"
+                              },
+                              "operator": "+=",
+                              "left": {
+                                "type": "MemberExpression",
+                                "start": 857,
+                                "end": 869,
+                                "loc": {
+                                  "end": {
+                                    "line": 35,
+                                    "column": 56,
+                                    "index": 869
+                                  },
+                                  "filename": "Counter.rozie"
+                                },
+                                "object": {
+                                  "type": "Identifier",
+                                  "start": 857,
+                                  "end": 863,
+                                  "loc": {
+                                    "end": {
+                                      "line": 35,
+                                      "column": 50,
+                                      "index": 863
+                                    },
+                                    "filename": "Counter.rozie",
+                                    "identifierName": "$props"
+                                  },
+                                  "name": "$props"
+                                },
+                                "computed": false,
+                                "property": {
+                                  "type": "Identifier",
+                                  "start": 864,
+                                  "end": 869,
+                                  "loc": {
+                                    "start": {
+                                      "line": 35,
+                                      "column": 51,
+                                      "index": 864
+                                    },
+                                    "filename": "Counter.rozie",
+                                    "identifierName": "value"
+                                  },
+                                  "name": "value"
+                                }
+                              },
+                              "right": {
+                                "type": "MemberExpression",
+                                "start": 873,
+                                "end": 884,
+                                "loc": {
+                                  "start": {
+                                    "line": 35,
+                                    "column": 60,
+                                    "index": 873
+                                  },
+                                  "filename": "Counter.rozie"
+                                },
+                                "object": {
+                                  "type": "Identifier",
+                                  "start": 873,
+                                  "end": 879,
+                                  "loc": {
+                                    "end": {
+                                      "line": 35,
+                                      "column": 66,
+                                      "index": 879
+                                    },
+                                    "filename": "Counter.rozie",
+                                    "identifierName": "$props"
+                                  },
+                                  "name": "$props"
+                                },
+                                "computed": false,
+                                "property": {
+                                  "type": "Identifier",
+                                  "start": 880,
+                                  "end": 884,
+                                  "loc": {
+                                    "start": {
+                                      "line": 35,
+                                      "column": 67,
+                                      "index": 880
+                                    },
+                                    "filename": "Counter.rozie",
+                                    "identifierName": "step"
+                                  },
+                                  "name": "step"
+                                }
+                              }
+                            }
+                          },
+                          "alternate": null
+                        }
+                      ],
+                      "directives": []
+                    }
+                  }
+                }
+              ],
+              "kind": "const"
+            },
+            {
+              "type": "VariableDeclaration",
+              "start": 887,
+              "end": 960,
+              "loc": {
+                "start": {
+                  "line": 36,
+                  "column": 0,
+                  "index": 887
+                },
+                "end": {
+                  "line": 36,
+                  "column": 73,
+                  "index": 960
+                },
+                "filename": "Counter.rozie"
+              },
+              "declarations": [
+                {
+                  "type": "VariableDeclarator",
+                  "start": 893,
+                  "end": 960,
+                  "loc": {
+                    "start": {
+                      "line": 36,
+                      "column": 6,
+                      "index": 893
+                    },
+                    "filename": "Counter.rozie"
+                  },
+                  "id": {
+                    "type": "Identifier",
+                    "start": 893,
+                    "end": 902,
+                    "loc": {
+                      "end": {
+                        "line": 36,
+                        "column": 15,
+                        "index": 902
+                      },
+                      "filename": "Counter.rozie",
+                      "identifierName": "decrement"
+                    },
+                    "name": "decrement"
+                  },
+                  "init": {
+                    "type": "ArrowFunctionExpression",
+                    "start": 905,
+                    "end": 960,
+                    "loc": {
+                      "start": {
+                        "line": 36,
+                        "column": 18,
+                        "index": 905
+                      },
+                      "filename": "Counter.rozie"
+                    },
+                    "id": null,
+                    "generator": false,
+                    "async": false,
+                    "params": [],
+                    "body": {
+                      "type": "BlockStatement",
+                      "start": 911,
+                      "end": 960,
+                      "loc": {
+                        "start": {
+                          "line": 36,
+                          "column": 24,
+                          "index": 911
+                        },
+                        "filename": "Counter.rozie"
+                      },
+                      "body": [
+                        {
+                          "type": "IfStatement",
+                          "start": 913,
+                          "end": 958,
+                          "loc": {
+                            "start": {
+                              "line": 36,
+                              "column": 26,
+                              "index": 913
+                            },
+                            "end": {
+                              "line": 36,
+                              "column": 71,
+                              "index": 958
+                            },
+                            "filename": "Counter.rozie"
+                          },
+                          "test": {
+                            "type": "Identifier",
+                            "start": 917,
+                            "end": 929,
+                            "loc": {
+                              "start": {
+                                "line": 36,
+                                "column": 30,
+                                "index": 917
+                              },
+                              "end": {
+                                "line": 36,
+                                "column": 42,
+                                "index": 929
+                              },
+                              "filename": "Counter.rozie",
+                              "identifierName": "canDecrement"
+                            },
+                            "name": "canDecrement"
+                          },
+                          "consequent": {
+                            "type": "ExpressionStatement",
+                            "start": 931,
+                            "end": 958,
+                            "loc": {
+                              "start": {
+                                "line": 36,
+                                "column": 44,
+                                "index": 931
+                              },
+                              "filename": "Counter.rozie"
+                            },
+                            "expression": {
+                              "type": "AssignmentExpression",
+                              "start": 931,
+                              "end": 958,
+                              "loc": {
+                                "filename": "Counter.rozie"
+                              },
+                              "operator": "-=",
+                              "left": {
+                                "type": "MemberExpression",
+                                "start": 931,
+                                "end": 943,
+                                "loc": {
+                                  "end": {
+                                    "line": 36,
+                                    "column": 56,
+                                    "index": 943
+                                  },
+                                  "filename": "Counter.rozie"
+                                },
+                                "object": {
+                                  "type": "Identifier",
+                                  "start": 931,
+                                  "end": 937,
+                                  "loc": {
+                                    "end": {
+                                      "line": 36,
+                                      "column": 50,
+                                      "index": 937
+                                    },
+                                    "filename": "Counter.rozie",
+                                    "identifierName": "$props"
+                                  },
+                                  "name": "$props"
+                                },
+                                "computed": false,
+                                "property": {
+                                  "type": "Identifier",
+                                  "start": 938,
+                                  "end": 943,
+                                  "loc": {
+                                    "start": {
+                                      "line": 36,
+                                      "column": 51,
+                                      "index": 938
+                                    },
+                                    "filename": "Counter.rozie",
+                                    "identifierName": "value"
+                                  },
+                                  "name": "value"
+                                }
+                              },
+                              "right": {
+                                "type": "MemberExpression",
+                                "start": 947,
+                                "end": 958,
+                                "loc": {
+                                  "start": {
+                                    "line": 36,
+                                    "column": 60,
+                                    "index": 947
+                                  },
+                                  "filename": "Counter.rozie"
+                                },
+                                "object": {
+                                  "type": "Identifier",
+                                  "start": 947,
+                                  "end": 953,
+                                  "loc": {
+                                    "end": {
+                                      "line": 36,
+                                      "column": 66,
+                                      "index": 953
+                                    },
+                                    "filename": "Counter.rozie",
+                                    "identifierName": "$props"
+                                  },
+                                  "name": "$props"
+                                },
+                                "computed": false,
+                                "property": {
+                                  "type": "Identifier",
+                                  "start": 954,
+                                  "end": 958,
+                                  "loc": {
+                                    "start": {
+                                      "line": 36,
+                                      "column": 67,
+                                      "index": 954
+                                    },
+                                    "filename": "Counter.rozie",
+                                    "identifierName": "step"
+                                  },
+                                  "name": "step"
+                                }
+                              }
+                            }
+                          },
+                          "alternate": null
+                        }
+                      ],
+                      "directives": []
+                    }
+                  }
+                }
+              ],
+              "kind": "const"
+            }
+          ],
+          "directives": []
+        },
+        "comments": []
+      }
+    },
+    "listeners": null,
+    "template": {
+      "type": "TemplateAST",
+      "loc": {
+        "start": 982,
+        "end": 1358
+      },
+      "children": [
+        {
+          "type": "TemplateText",
+          "text": "\n",
+          "loc": {
+            "start": 982,
+            "end": 983
+          }
+        },
+        {
+          "type": "TemplateElement",
+          "tagName": "div",
+          "attributes": [
+            {
+              "kind": "static",
+              "rawName": "class",
+              "name": "class",
+              "modifierChainText": "",
+              "modifierChainBaseOffset": 995,
+              "chain": [],
+              "value": "counter",
+              "valueLoc": {
+                "start": 997,
+                "end": 1004
+              },
+              "loc": {
+                "start": 990,
+                "end": 1005
+              }
+            },
+            {
+              "kind": "binding",
+              "rawName": ":class",
+              "name": "class",
+              "modifierChainText": "",
+              "modifierChainBaseOffset": 1014,
+              "chain": [],
+              "value": "{ hovering: $data.hovering }",
+              "valueLoc": {
+                "start": 1016,
+                "end": 1044
+              },
+              "loc": {
+                "start": 1008,
+                "end": 1045
+              }
+            },
+            {
+              "kind": "event",
+              "rawName": "@mouseenter",
+              "name": "mouseenter",
+              "modifierChainText": "",
+              "modifierChainBaseOffset": 1059,
+              "chain": [],
+              "value": "$data.hovering = true",
+              "valueLoc": {
+                "start": 1061,
+                "end": 1082
+              },
+              "loc": {
+                "start": 1048,
+                "end": 1083
+              }
+            },
+            {
+              "kind": "event",
+              "rawName": "@mouseleave",
+              "name": "mouseleave",
+              "modifierChainText": "",
+              "modifierChainBaseOffset": 1097,
+              "chain": [],
+              "value": "$data.hovering = false",
+              "valueLoc": {
+                "start": 1099,
+                "end": 1121
+              },
+              "loc": {
+                "start": 1086,
+                "end": 1122
+              }
+            }
+          ],
+          "children": [
+            {
+              "type": "TemplateText",
+              "text": "\n  ",
+              "loc": {
+                "start": 1124,
+                "end": 1127
+              }
+            },
+            {
+              "type": "TemplateElement",
+              "tagName": "button",
+              "attributes": [
+                {
+                  "kind": "binding",
+                  "rawName": ":disabled",
+                  "name": "disabled",
+                  "modifierChainText": "",
+                  "modifierChainBaseOffset": 1144,
+                  "chain": [],
+                  "value": "!canDecrement",
+                  "valueLoc": {
+                    "start": 1146,
+                    "end": 1159
+                  },
+                  "loc": {
+                    "start": 1135,
+                    "end": 1160
+                  }
+                },
+                {
+                  "kind": "event",
+                  "rawName": "@click",
+                  "name": "click",
+                  "modifierChainText": "",
+                  "modifierChainBaseOffset": 1167,
+                  "chain": [],
+                  "value": "decrement",
+                  "valueLoc": {
+                    "start": 1169,
+                    "end": 1178
+                  },
+                  "loc": {
+                    "start": 1161,
+                    "end": 1179
+                  }
+                },
+                {
+                  "kind": "static",
+                  "rawName": "aria-label",
+                  "name": "aria-label",
+                  "modifierChainText": "",
+                  "modifierChainBaseOffset": 1190,
+                  "chain": [],
+                  "value": "Decrement",
+                  "valueLoc": {
+                    "start": 1192,
+                    "end": 1201
+                  },
+                  "loc": {
+                    "start": 1180,
+                    "end": 1202
+                  }
+                }
+              ],
+              "children": [
+                {
+                  "type": "TemplateText",
+                  "text": "−",
+                  "loc": {
+                    "start": 1203,
+                    "end": 1204
+                  }
+                }
+              ],
+              "selfClosing": false,
+              "loc": {
+                "start": 1127,
+                "end": 1213
+              }
+            },
+            {
+              "type": "TemplateText",
+              "text": "\n  ",
+              "loc": {
+                "start": 1213,
+                "end": 1216
+              }
+            },
+            {
+              "type": "TemplateElement",
+              "tagName": "span",
+              "attributes": [
+                {
+                  "kind": "static",
+                  "rawName": "class",
+                  "name": "class",
+                  "modifierChainText": "",
+                  "modifierChainBaseOffset": 1227,
+                  "chain": [],
+                  "value": "value",
+                  "valueLoc": {
+                    "start": 1229,
+                    "end": 1234
+                  },
+                  "loc": {
+                    "start": 1222,
+                    "end": 1235
+                  }
+                }
+              ],
+              "children": [
+                {
+                  "type": "TemplateInterpolation",
+                  "rawExpr": " $props.value ",
+                  "loc": {
+                    "start": 1236,
+                    "end": 1254
+                  }
+                }
+              ],
+              "selfClosing": false,
+              "loc": {
+                "start": 1216,
+                "end": 1261
+              }
+            },
+            {
+              "type": "TemplateText",
+              "text": "\n  ",
+              "loc": {
+                "start": 1261,
+                "end": 1264
+              }
+            },
+            {
+              "type": "TemplateElement",
+              "tagName": "button",
+              "attributes": [
+                {
+                  "kind": "binding",
+                  "rawName": ":disabled",
+                  "name": "disabled",
+                  "modifierChainText": "",
+                  "modifierChainBaseOffset": 1281,
+                  "chain": [],
+                  "value": "!canIncrement",
+                  "valueLoc": {
+                    "start": 1283,
+                    "end": 1296
+                  },
+                  "loc": {
+                    "start": 1272,
+                    "end": 1297
+                  }
+                },
+                {
+                  "kind": "event",
+                  "rawName": "@click",
+                  "name": "click",
+                  "modifierChainText": "",
+                  "modifierChainBaseOffset": 1304,
+                  "chain": [],
+                  "value": "increment",
+                  "valueLoc": {
+                    "start": 1306,
+                    "end": 1315
+                  },
+                  "loc": {
+                    "start": 1298,
+                    "end": 1316
+                  }
+                },
+                {
+                  "kind": "static",
+                  "rawName": "aria-label",
+                  "name": "aria-label",
+                  "modifierChainText": "",
+                  "modifierChainBaseOffset": 1327,
+                  "chain": [],
+                  "value": "Increment",
+                  "valueLoc": {
+                    "start": 1329,
+                    "end": 1338
+                  },
+                  "loc": {
+                    "start": 1317,
+                    "end": 1339
+                  }
+                }
+              ],
+              "children": [
+                {
+                  "type": "TemplateText",
+                  "text": "+",
+                  "loc": {
+                    "start": 1340,
+                    "end": 1341
+                  }
+                }
+              ],
+              "selfClosing": false,
+              "loc": {
+                "start": 1264,
+                "end": 1350
+              }
+            },
+            {
+              "type": "TemplateText",
+              "text": "\n",
+              "loc": {
+                "start": 1350,
+                "end": 1351
+              }
+            }
+          ],
+          "selfClosing": false,
+          "loc": {
+            "start": 983,
+            "end": 1357
+          }
+        },
+        {
+          "type": "TemplateText",
+          "text": "\n",
+          "loc": {
+            "start": 1357,
+            "end": 1358
+          }
+        }
+      ]
+    },
+    "style": {
+      "type": "StyleAST",
+      "loc": {
+        "start": 1378,
+        "end": 1677
+      },
+      "cssText": "\n.counter { display: inline-flex; gap: 0.5rem; align-items: center; }\n.counter.hovering { background: rgba(0, 0, 0, 0.04); }\n.value { font-variant-numeric: tabular-nums; min-width: 3ch; text-align: center; }\nbutton { padding: 0.25rem 0.5rem; }\nbutton:disabled { opacity: 0.4; cursor: not-allowed; }\n",
+      "rules": [
+        {
+          "selector": ".counter",
+          "loc": {
+            "start": 1379,
+            "end": 1447
+          },
+          "isRootEscape": false
+        },
+        {
+          "selector": ".counter.hovering",
+          "loc": {
+            "start": 1448,
+            "end": 1502
+          },
+          "isRootEscape": false
+        },
+        {
+          "selector": ".value",
+          "loc": {
+            "start": 1503,
+            "end": 1585
+          },
+          "isRootEscape": false
+        },
+        {
+          "selector": "button",
+          "loc": {
+            "start": 1586,
+            "end": 1621
+          },
+          "isRootEscape": false
+        },
+        {
+          "selector": "button:disabled",
+          "loc": {
+            "start": 1622,
+            "end": 1676
+          },
+          "isRootEscape": false
+        }
+      ]
+    }
+  },
+  "diagnostics": []
+}

@@ -1,0 +1,3262 @@
+{
+  "ast": {
+    "type": "RozieAST",
+    "name": "Modal",
+    "loc": {
+      "start": 753,
+      "end": 3814
+    },
+    "props": {
+      "type": "PropsAST",
+      "loc": {
+        "start": 782,
+        "end": 1059
+      },
+      "expression": {
+        "type": "ObjectExpression",
+        "start": 783,
+        "end": 1058,
+        "loc": {
+          "start": {
+            "line": 20,
+            "column": 0,
+            "index": 783
+          },
+          "end": {
+            "line": 26,
+            "column": 1,
+            "index": 1058
+          },
+          "filename": "Modal.rozie"
+        },
+        "properties": [
+          {
+            "type": "ObjectProperty",
+            "start": 787,
+            "end": 849,
+            "loc": {
+              "start": {
+                "line": 21,
+                "column": 2,
+                "index": 787
+              },
+              "end": {
+                "line": 21,
+                "column": 64,
+                "index": 849
+              },
+              "filename": "Modal.rozie"
+            },
+            "method": false,
+            "key": {
+              "type": "Identifier",
+              "start": 787,
+              "end": 791,
+              "loc": {
+                "end": {
+                  "line": 21,
+                  "column": 6,
+                  "index": 791
+                },
+                "filename": "Modal.rozie",
+                "identifierName": "open"
+              },
+              "name": "open"
+            },
+            "computed": false,
+            "shorthand": false,
+            "value": {
+              "type": "ObjectExpression",
+              "start": 803,
+              "end": 849,
+              "loc": {
+                "start": {
+                  "line": 21,
+                  "column": 18,
+                  "index": 803
+                },
+                "filename": "Modal.rozie"
+              },
+              "properties": [
+                {
+                  "type": "ObjectProperty",
+                  "start": 805,
+                  "end": 818,
+                  "loc": {
+                    "start": {
+                      "line": 21,
+                      "column": 20,
+                      "index": 805
+                    },
+                    "end": {
+                      "line": 21,
+                      "column": 33,
+                      "index": 818
+                    },
+                    "filename": "Modal.rozie"
+                  },
+                  "method": false,
+                  "key": {
+                    "type": "Identifier",
+                    "start": 805,
+                    "end": 809,
+                    "loc": {
+                      "end": {
+                        "line": 21,
+                        "column": 24,
+                        "index": 809
+                      },
+                      "filename": "Modal.rozie",
+                      "identifierName": "type"
+                    },
+                    "name": "type"
+                  },
+                  "computed": false,
+                  "shorthand": false,
+                  "value": {
+                    "type": "Identifier",
+                    "start": 811,
+                    "end": 818,
+                    "loc": {
+                      "start": {
+                        "line": 21,
+                        "column": 26,
+                        "index": 811
+                      },
+                      "filename": "Modal.rozie",
+                      "identifierName": "Boolean"
+                    },
+                    "name": "Boolean"
+                  }
+                },
+                {
+                  "type": "ObjectProperty",
+                  "start": 820,
+                  "end": 834,
+                  "loc": {
+                    "start": {
+                      "line": 21,
+                      "column": 35,
+                      "index": 820
+                    },
+                    "end": {
+                      "line": 21,
+                      "column": 49,
+                      "index": 834
+                    },
+                    "filename": "Modal.rozie"
+                  },
+                  "method": false,
+                  "key": {
+                    "type": "Identifier",
+                    "start": 820,
+                    "end": 827,
+                    "loc": {
+                      "end": {
+                        "line": 21,
+                        "column": 42,
+                        "index": 827
+                      },
+                      "filename": "Modal.rozie",
+                      "identifierName": "default"
+                    },
+                    "name": "default"
+                  },
+                  "computed": false,
+                  "shorthand": false,
+                  "value": {
+                    "type": "BooleanLiteral",
+                    "start": 829,
+                    "end": 834,
+                    "loc": {
+                      "start": {
+                        "line": 21,
+                        "column": 44,
+                        "index": 829
+                      },
+                      "filename": "Modal.rozie"
+                    },
+                    "value": false
+                  }
+                },
+                {
+                  "type": "ObjectProperty",
+                  "start": 836,
+                  "end": 847,
+                  "loc": {
+                    "start": {
+                      "line": 21,
+                      "column": 51,
+                      "index": 836
+                    },
+                    "end": {
+                      "line": 21,
+                      "column": 62,
+                      "index": 847
+                    },
+                    "filename": "Modal.rozie"
+                  },
+                  "method": false,
+                  "key": {
+                    "type": "Identifier",
+                    "start": 836,
+                    "end": 841,
+                    "loc": {
+                      "end": {
+                        "line": 21,
+                        "column": 56,
+                        "index": 841
+                      },
+                      "filename": "Modal.rozie",
+                      "identifierName": "model"
+                    },
+                    "name": "model"
+                  },
+                  "computed": false,
+                  "shorthand": false,
+                  "value": {
+                    "type": "BooleanLiteral",
+                    "start": 843,
+                    "end": 847,
+                    "loc": {
+                      "start": {
+                        "line": 21,
+                        "column": 58,
+                        "index": 843
+                      },
+                      "filename": "Modal.rozie"
+                    },
+                    "value": true
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "type": "ObjectProperty",
+            "start": 853,
+            "end": 901,
+            "loc": {
+              "start": {
+                "line": 22,
+                "column": 2,
+                "index": 853
+              },
+              "end": {
+                "line": 22,
+                "column": 50,
+                "index": 901
+              },
+              "filename": "Modal.rozie"
+            },
+            "method": false,
+            "key": {
+              "type": "Identifier",
+              "start": 853,
+              "end": 866,
+              "loc": {
+                "end": {
+                  "line": 22,
+                  "column": 15,
+                  "index": 866
+                },
+                "filename": "Modal.rozie",
+                "identifierName": "closeOnEscape"
+              },
+              "name": "closeOnEscape"
+            },
+            "computed": false,
+            "shorthand": false,
+            "value": {
+              "type": "ObjectExpression",
+              "start": 869,
+              "end": 901,
+              "loc": {
+                "start": {
+                  "line": 22,
+                  "column": 18,
+                  "index": 869
+                },
+                "filename": "Modal.rozie"
+              },
+              "properties": [
+                {
+                  "type": "ObjectProperty",
+                  "start": 871,
+                  "end": 884,
+                  "loc": {
+                    "start": {
+                      "line": 22,
+                      "column": 20,
+                      "index": 871
+                    },
+                    "end": {
+                      "line": 22,
+                      "column": 33,
+                      "index": 884
+                    },
+                    "filename": "Modal.rozie"
+                  },
+                  "method": false,
+                  "key": {
+                    "type": "Identifier",
+                    "start": 871,
+                    "end": 875,
+                    "loc": {
+                      "end": {
+                        "line": 22,
+                        "column": 24,
+                        "index": 875
+                      },
+                      "filename": "Modal.rozie",
+                      "identifierName": "type"
+                    },
+                    "name": "type"
+                  },
+                  "computed": false,
+                  "shorthand": false,
+                  "value": {
+                    "type": "Identifier",
+                    "start": 877,
+                    "end": 884,
+                    "loc": {
+                      "start": {
+                        "line": 22,
+                        "column": 26,
+                        "index": 877
+                      },
+                      "filename": "Modal.rozie",
+                      "identifierName": "Boolean"
+                    },
+                    "name": "Boolean"
+                  }
+                },
+                {
+                  "type": "ObjectProperty",
+                  "start": 886,
+                  "end": 899,
+                  "loc": {
+                    "start": {
+                      "line": 22,
+                      "column": 35,
+                      "index": 886
+                    },
+                    "end": {
+                      "line": 22,
+                      "column": 48,
+                      "index": 899
+                    },
+                    "filename": "Modal.rozie"
+                  },
+                  "method": false,
+                  "key": {
+                    "type": "Identifier",
+                    "start": 886,
+                    "end": 893,
+                    "loc": {
+                      "end": {
+                        "line": 22,
+                        "column": 42,
+                        "index": 893
+                      },
+                      "filename": "Modal.rozie",
+                      "identifierName": "default"
+                    },
+                    "name": "default"
+                  },
+                  "computed": false,
+                  "shorthand": false,
+                  "value": {
+                    "type": "BooleanLiteral",
+                    "start": 895,
+                    "end": 899,
+                    "loc": {
+                      "start": {
+                        "line": 22,
+                        "column": 44,
+                        "index": 895
+                      },
+                      "filename": "Modal.rozie"
+                    },
+                    "value": true
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "type": "ObjectProperty",
+            "start": 905,
+            "end": 953,
+            "loc": {
+              "start": {
+                "line": 23,
+                "column": 2,
+                "index": 905
+              },
+              "end": {
+                "line": 23,
+                "column": 50,
+                "index": 953
+              },
+              "filename": "Modal.rozie"
+            },
+            "method": false,
+            "key": {
+              "type": "Identifier",
+              "start": 905,
+              "end": 920,
+              "loc": {
+                "end": {
+                  "line": 23,
+                  "column": 17,
+                  "index": 920
+                },
+                "filename": "Modal.rozie",
+                "identifierName": "closeOnBackdrop"
+              },
+              "name": "closeOnBackdrop"
+            },
+            "computed": false,
+            "shorthand": false,
+            "value": {
+              "type": "ObjectExpression",
+              "start": 921,
+              "end": 953,
+              "loc": {
+                "start": {
+                  "line": 23,
+                  "column": 18,
+                  "index": 921
+                },
+                "filename": "Modal.rozie"
+              },
+              "properties": [
+                {
+                  "type": "ObjectProperty",
+                  "start": 923,
+                  "end": 936,
+                  "loc": {
+                    "start": {
+                      "line": 23,
+                      "column": 20,
+                      "index": 923
+                    },
+                    "end": {
+                      "line": 23,
+                      "column": 33,
+                      "index": 936
+                    },
+                    "filename": "Modal.rozie"
+                  },
+                  "method": false,
+                  "key": {
+                    "type": "Identifier",
+                    "start": 923,
+                    "end": 927,
+                    "loc": {
+                      "end": {
+                        "line": 23,
+                        "column": 24,
+                        "index": 927
+                      },
+                      "filename": "Modal.rozie",
+                      "identifierName": "type"
+                    },
+                    "name": "type"
+                  },
+                  "computed": false,
+                  "shorthand": false,
+                  "value": {
+                    "type": "Identifier",
+                    "start": 929,
+                    "end": 936,
+                    "loc": {
+                      "start": {
+                        "line": 23,
+                        "column": 26,
+                        "index": 929
+                      },
+                      "filename": "Modal.rozie",
+                      "identifierName": "Boolean"
+                    },
+                    "name": "Boolean"
+                  }
+                },
+                {
+                  "type": "ObjectProperty",
+                  "start": 938,
+                  "end": 951,
+                  "loc": {
+                    "start": {
+                      "line": 23,
+                      "column": 35,
+                      "index": 938
+                    },
+                    "end": {
+                      "line": 23,
+                      "column": 48,
+                      "index": 951
+                    },
+                    "filename": "Modal.rozie"
+                  },
+                  "method": false,
+                  "key": {
+                    "type": "Identifier",
+                    "start": 938,
+                    "end": 945,
+                    "loc": {
+                      "end": {
+                        "line": 23,
+                        "column": 42,
+                        "index": 945
+                      },
+                      "filename": "Modal.rozie",
+                      "identifierName": "default"
+                    },
+                    "name": "default"
+                  },
+                  "computed": false,
+                  "shorthand": false,
+                  "value": {
+                    "type": "BooleanLiteral",
+                    "start": 947,
+                    "end": 951,
+                    "loc": {
+                      "start": {
+                        "line": 23,
+                        "column": 44,
+                        "index": 947
+                      },
+                      "filename": "Modal.rozie"
+                    },
+                    "value": true
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "type": "ObjectProperty",
+            "start": 957,
+            "end": 1005,
+            "loc": {
+              "start": {
+                "line": 24,
+                "column": 2,
+                "index": 957
+              },
+              "end": {
+                "line": 24,
+                "column": 50,
+                "index": 1005
+              },
+              "filename": "Modal.rozie"
+            },
+            "method": false,
+            "key": {
+              "type": "Identifier",
+              "start": 957,
+              "end": 971,
+              "loc": {
+                "end": {
+                  "line": 24,
+                  "column": 16,
+                  "index": 971
+                },
+                "filename": "Modal.rozie",
+                "identifierName": "lockBodyScroll"
+              },
+              "name": "lockBodyScroll"
+            },
+            "computed": false,
+            "shorthand": false,
+            "value": {
+              "type": "ObjectExpression",
+              "start": 973,
+              "end": 1005,
+              "loc": {
+                "start": {
+                  "line": 24,
+                  "column": 18,
+                  "index": 973
+                },
+                "filename": "Modal.rozie"
+              },
+              "properties": [
+                {
+                  "type": "ObjectProperty",
+                  "start": 975,
+                  "end": 988,
+                  "loc": {
+                    "start": {
+                      "line": 24,
+                      "column": 20,
+                      "index": 975
+                    },
+                    "end": {
+                      "line": 24,
+                      "column": 33,
+                      "index": 988
+                    },
+                    "filename": "Modal.rozie"
+                  },
+                  "method": false,
+                  "key": {
+                    "type": "Identifier",
+                    "start": 975,
+                    "end": 979,
+                    "loc": {
+                      "end": {
+                        "line": 24,
+                        "column": 24,
+                        "index": 979
+                      },
+                      "filename": "Modal.rozie",
+                      "identifierName": "type"
+                    },
+                    "name": "type"
+                  },
+                  "computed": false,
+                  "shorthand": false,
+                  "value": {
+                    "type": "Identifier",
+                    "start": 981,
+                    "end": 988,
+                    "loc": {
+                      "start": {
+                        "line": 24,
+                        "column": 26,
+                        "index": 981
+                      },
+                      "filename": "Modal.rozie",
+                      "identifierName": "Boolean"
+                    },
+                    "name": "Boolean"
+                  }
+                },
+                {
+                  "type": "ObjectProperty",
+                  "start": 990,
+                  "end": 1003,
+                  "loc": {
+                    "start": {
+                      "line": 24,
+                      "column": 35,
+                      "index": 990
+                    },
+                    "end": {
+                      "line": 24,
+                      "column": 48,
+                      "index": 1003
+                    },
+                    "filename": "Modal.rozie"
+                  },
+                  "method": false,
+                  "key": {
+                    "type": "Identifier",
+                    "start": 990,
+                    "end": 997,
+                    "loc": {
+                      "end": {
+                        "line": 24,
+                        "column": 42,
+                        "index": 997
+                      },
+                      "filename": "Modal.rozie",
+                      "identifierName": "default"
+                    },
+                    "name": "default"
+                  },
+                  "computed": false,
+                  "shorthand": false,
+                  "value": {
+                    "type": "BooleanLiteral",
+                    "start": 999,
+                    "end": 1003,
+                    "loc": {
+                      "start": {
+                        "line": 24,
+                        "column": 44,
+                        "index": 999
+                      },
+                      "filename": "Modal.rozie"
+                    },
+                    "value": true
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "type": "ObjectProperty",
+            "start": 1009,
+            "end": 1055,
+            "loc": {
+              "start": {
+                "line": 25,
+                "column": 2,
+                "index": 1009
+              },
+              "end": {
+                "line": 25,
+                "column": 48,
+                "index": 1055
+              },
+              "filename": "Modal.rozie"
+            },
+            "method": false,
+            "key": {
+              "type": "Identifier",
+              "start": 1009,
+              "end": 1014,
+              "loc": {
+                "end": {
+                  "line": 25,
+                  "column": 7,
+                  "index": 1014
+                },
+                "filename": "Modal.rozie",
+                "identifierName": "title"
+              },
+              "name": "title"
+            },
+            "computed": false,
+            "shorthand": false,
+            "value": {
+              "type": "ObjectExpression",
+              "start": 1025,
+              "end": 1055,
+              "loc": {
+                "start": {
+                  "line": 25,
+                  "column": 18,
+                  "index": 1025
+                },
+                "filename": "Modal.rozie"
+              },
+              "properties": [
+                {
+                  "type": "ObjectProperty",
+                  "start": 1027,
+                  "end": 1039,
+                  "loc": {
+                    "start": {
+                      "line": 25,
+                      "column": 20,
+                      "index": 1027
+                    },
+                    "end": {
+                      "line": 25,
+                      "column": 32,
+                      "index": 1039
+                    },
+                    "filename": "Modal.rozie"
+                  },
+                  "method": false,
+                  "key": {
+                    "type": "Identifier",
+                    "start": 1027,
+                    "end": 1031,
+                    "loc": {
+                      "end": {
+                        "line": 25,
+                        "column": 24,
+                        "index": 1031
+                      },
+                      "filename": "Modal.rozie",
+                      "identifierName": "type"
+                    },
+                    "name": "type"
+                  },
+                  "computed": false,
+                  "shorthand": false,
+                  "value": {
+                    "type": "Identifier",
+                    "start": 1033,
+                    "end": 1039,
+                    "loc": {
+                      "start": {
+                        "line": 25,
+                        "column": 26,
+                        "index": 1033
+                      },
+                      "filename": "Modal.rozie",
+                      "identifierName": "String"
+                    },
+                    "name": "String"
+                  }
+                },
+                {
+                  "type": "ObjectProperty",
+                  "start": 1042,
+                  "end": 1053,
+                  "loc": {
+                    "start": {
+                      "line": 25,
+                      "column": 35,
+                      "index": 1042
+                    },
+                    "end": {
+                      "line": 25,
+                      "column": 46,
+                      "index": 1053
+                    },
+                    "filename": "Modal.rozie"
+                  },
+                  "method": false,
+                  "key": {
+                    "type": "Identifier",
+                    "start": 1042,
+                    "end": 1049,
+                    "loc": {
+                      "end": {
+                        "line": 25,
+                        "column": 42,
+                        "index": 1049
+                      },
+                      "filename": "Modal.rozie",
+                      "identifierName": "default"
+                    },
+                    "name": "default"
+                  },
+                  "computed": false,
+                  "shorthand": false,
+                  "value": {
+                    "type": "StringLiteral",
+                    "start": 1051,
+                    "end": 1053,
+                    "loc": {
+                      "start": {
+                        "line": 25,
+                        "column": 44,
+                        "index": 1051
+                      },
+                      "filename": "Modal.rozie"
+                    },
+                    "value": ""
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "comments": []
+      }
+    },
+    "data": null,
+    "script": {
+      "type": "ScriptAST",
+      "loc": {
+        "start": 1077,
+        "end": 1820
+      },
+      "program": {
+        "type": "File",
+        "start": 1077,
+        "end": 1820,
+        "loc": {
+          "start": {
+            "line": 29,
+            "column": 8,
+            "index": 1077
+          },
+          "end": {
+            "line": 55,
+            "column": 0,
+            "index": 1820
+          },
+          "filename": "Modal.rozie"
+        },
+        "program": {
+          "type": "Program",
+          "start": 1077,
+          "end": 1820,
+          "loc": {
+            "filename": "Modal.rozie"
+          },
+          "sourceType": "module",
+          "interpreter": null,
+          "body": [
+            {
+              "type": "VariableDeclaration",
+              "start": 1078,
+              "end": 1137,
+              "loc": {
+                "start": {
+                  "line": 30,
+                  "column": 0,
+                  "index": 1078
+                },
+                "end": {
+                  "line": 30,
+                  "column": 59,
+                  "index": 1137
+                },
+                "filename": "Modal.rozie"
+              },
+              "declarations": [
+                {
+                  "type": "VariableDeclarator",
+                  "start": 1084,
+                  "end": 1137,
+                  "loc": {
+                    "start": {
+                      "line": 30,
+                      "column": 6,
+                      "index": 1084
+                    },
+                    "filename": "Modal.rozie"
+                  },
+                  "id": {
+                    "type": "Identifier",
+                    "start": 1084,
+                    "end": 1089,
+                    "loc": {
+                      "end": {
+                        "line": 30,
+                        "column": 11,
+                        "index": 1089
+                      },
+                      "filename": "Modal.rozie",
+                      "identifierName": "close"
+                    },
+                    "name": "close"
+                  },
+                  "init": {
+                    "type": "ArrowFunctionExpression",
+                    "start": 1092,
+                    "end": 1137,
+                    "loc": {
+                      "start": {
+                        "line": 30,
+                        "column": 14,
+                        "index": 1092
+                      },
+                      "filename": "Modal.rozie"
+                    },
+                    "id": null,
+                    "generator": false,
+                    "async": false,
+                    "params": [],
+                    "body": {
+                      "type": "BlockStatement",
+                      "start": 1098,
+                      "end": 1137,
+                      "loc": {
+                        "start": {
+                          "line": 30,
+                          "column": 20,
+                          "index": 1098
+                        },
+                        "filename": "Modal.rozie"
+                      },
+                      "body": [
+                        {
+                          "type": "ExpressionStatement",
+                          "start": 1100,
+                          "end": 1120,
+                          "loc": {
+                            "start": {
+                              "line": 30,
+                              "column": 22,
+                              "index": 1100
+                            },
+                            "end": {
+                              "line": 30,
+                              "column": 42,
+                              "index": 1120
+                            },
+                            "filename": "Modal.rozie"
+                          },
+                          "expression": {
+                            "type": "AssignmentExpression",
+                            "start": 1100,
+                            "end": 1119,
+                            "loc": {
+                              "end": {
+                                "line": 30,
+                                "column": 41,
+                                "index": 1119
+                              },
+                              "filename": "Modal.rozie"
+                            },
+                            "operator": "=",
+                            "left": {
+                              "type": "MemberExpression",
+                              "start": 1100,
+                              "end": 1111,
+                              "loc": {
+                                "end": {
+                                  "line": 30,
+                                  "column": 33,
+                                  "index": 1111
+                                },
+                                "filename": "Modal.rozie"
+                              },
+                              "object": {
+                                "type": "Identifier",
+                                "start": 1100,
+                                "end": 1106,
+                                "loc": {
+                                  "end": {
+                                    "line": 30,
+                                    "column": 28,
+                                    "index": 1106
+                                  },
+                                  "filename": "Modal.rozie",
+                                  "identifierName": "$props"
+                                },
+                                "name": "$props"
+                              },
+                              "computed": false,
+                              "property": {
+                                "type": "Identifier",
+                                "start": 1107,
+                                "end": 1111,
+                                "loc": {
+                                  "start": {
+                                    "line": 30,
+                                    "column": 29,
+                                    "index": 1107
+                                  },
+                                  "filename": "Modal.rozie",
+                                  "identifierName": "open"
+                                },
+                                "name": "open"
+                              }
+                            },
+                            "right": {
+                              "type": "BooleanLiteral",
+                              "start": 1114,
+                              "end": 1119,
+                              "loc": {
+                                "start": {
+                                  "line": 30,
+                                  "column": 36,
+                                  "index": 1114
+                                },
+                                "filename": "Modal.rozie"
+                              },
+                              "value": false
+                            }
+                          }
+                        },
+                        {
+                          "type": "ExpressionStatement",
+                          "start": 1121,
+                          "end": 1135,
+                          "loc": {
+                            "start": {
+                              "line": 30,
+                              "column": 43,
+                              "index": 1121
+                            },
+                            "end": {
+                              "line": 30,
+                              "column": 57,
+                              "index": 1135
+                            },
+                            "filename": "Modal.rozie"
+                          },
+                          "expression": {
+                            "type": "CallExpression",
+                            "start": 1121,
+                            "end": 1135,
+                            "loc": {
+                              "filename": "Modal.rozie"
+                            },
+                            "callee": {
+                              "type": "Identifier",
+                              "start": 1121,
+                              "end": 1126,
+                              "loc": {
+                                "end": {
+                                  "line": 30,
+                                  "column": 48,
+                                  "index": 1126
+                                },
+                                "filename": "Modal.rozie",
+                                "identifierName": "$emit"
+                              },
+                              "name": "$emit"
+                            },
+                            "arguments": [
+                              {
+                                "type": "StringLiteral",
+                                "start": 1127,
+                                "end": 1134,
+                                "loc": {
+                                  "start": {
+                                    "line": 30,
+                                    "column": 49,
+                                    "index": 1127
+                                  },
+                                  "end": {
+                                    "line": 30,
+                                    "column": 56,
+                                    "index": 1134
+                                  },
+                                  "filename": "Modal.rozie"
+                                },
+                                "value": "close"
+                              }
+                            ]
+                          }
+                        }
+                      ],
+                      "directives": []
+                    }
+                  }
+                }
+              ],
+              "kind": "const",
+              "trailingComments": [
+                {
+                  "type": "CommentLine",
+                  "value": " Body-scroll-lock state lives outside reactive data because it tracks DOM",
+                  "start": 1139,
+                  "end": 1214,
+                  "loc": {
+                    "start": {
+                      "line": 32,
+                      "column": 0,
+                      "index": 1139
+                    },
+                    "end": {
+                      "line": 32,
+                      "column": 75,
+                      "index": 1214
+                    },
+                    "filename": "Modal.rozie"
+                  }
+                },
+                {
+                  "type": "CommentLine",
+                  "value": " rather than UI; managed entirely via lifecycle and listeners.",
+                  "start": 1215,
+                  "end": 1279,
+                  "loc": {
+                    "start": {
+                      "line": 33,
+                      "column": 0,
+                      "index": 1215
+                    },
+                    "end": {
+                      "line": 33,
+                      "column": 64,
+                      "index": 1279
+                    },
+                    "filename": "Modal.rozie"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "VariableDeclaration",
+              "start": 1280,
+              "end": 1306,
+              "loc": {
+                "start": {
+                  "line": 34,
+                  "column": 0,
+                  "index": 1280
+                },
+                "end": {
+                  "line": 34,
+                  "column": 26,
+                  "index": 1306
+                },
+                "filename": "Modal.rozie"
+              },
+              "declarations": [
+                {
+                  "type": "VariableDeclarator",
+                  "start": 1284,
+                  "end": 1306,
+                  "loc": {
+                    "start": {
+                      "line": 34,
+                      "column": 4,
+                      "index": 1284
+                    },
+                    "filename": "Modal.rozie"
+                  },
+                  "id": {
+                    "type": "Identifier",
+                    "start": 1284,
+                    "end": 1301,
+                    "loc": {
+                      "end": {
+                        "line": 34,
+                        "column": 21,
+                        "index": 1301
+                      },
+                      "filename": "Modal.rozie",
+                      "identifierName": "savedBodyOverflow"
+                    },
+                    "name": "savedBodyOverflow"
+                  },
+                  "init": {
+                    "type": "StringLiteral",
+                    "start": 1304,
+                    "end": 1306,
+                    "loc": {
+                      "start": {
+                        "line": 34,
+                        "column": 24,
+                        "index": 1304
+                      },
+                      "filename": "Modal.rozie"
+                    },
+                    "value": ""
+                  }
+                }
+              ],
+              "kind": "let"
+            },
+            {
+              "type": "VariableDeclaration",
+              "start": 1308,
+              "end": 1466,
+              "loc": {
+                "start": {
+                  "line": 36,
+                  "column": 0,
+                  "index": 1308
+                },
+                "end": {
+                  "line": 40,
+                  "column": 1,
+                  "index": 1466
+                },
+                "filename": "Modal.rozie"
+              },
+              "declarations": [
+                {
+                  "type": "VariableDeclarator",
+                  "start": 1314,
+                  "end": 1466,
+                  "loc": {
+                    "start": {
+                      "line": 36,
+                      "column": 6,
+                      "index": 1314
+                    },
+                    "filename": "Modal.rozie"
+                  },
+                  "id": {
+                    "type": "Identifier",
+                    "start": 1314,
+                    "end": 1324,
+                    "loc": {
+                      "end": {
+                        "line": 36,
+                        "column": 16,
+                        "index": 1324
+                      },
+                      "filename": "Modal.rozie",
+                      "identifierName": "lockScroll"
+                    },
+                    "name": "lockScroll"
+                  },
+                  "init": {
+                    "type": "ArrowFunctionExpression",
+                    "start": 1327,
+                    "end": 1466,
+                    "loc": {
+                      "start": {
+                        "line": 36,
+                        "column": 19,
+                        "index": 1327
+                      },
+                      "filename": "Modal.rozie"
+                    },
+                    "id": null,
+                    "generator": false,
+                    "async": false,
+                    "params": [],
+                    "body": {
+                      "type": "BlockStatement",
+                      "start": 1333,
+                      "end": 1466,
+                      "loc": {
+                        "start": {
+                          "line": 36,
+                          "column": 25,
+                          "index": 1333
+                        },
+                        "filename": "Modal.rozie"
+                      },
+                      "body": [
+                        {
+                          "type": "IfStatement",
+                          "start": 1337,
+                          "end": 1371,
+                          "loc": {
+                            "start": {
+                              "line": 37,
+                              "column": 2,
+                              "index": 1337
+                            },
+                            "end": {
+                              "line": 37,
+                              "column": 36,
+                              "index": 1371
+                            },
+                            "filename": "Modal.rozie"
+                          },
+                          "test": {
+                            "type": "UnaryExpression",
+                            "start": 1341,
+                            "end": 1363,
+                            "loc": {
+                              "start": {
+                                "line": 37,
+                                "column": 6,
+                                "index": 1341
+                              },
+                              "end": {
+                                "line": 37,
+                                "column": 28,
+                                "index": 1363
+                              },
+                              "filename": "Modal.rozie"
+                            },
+                            "operator": "!",
+                            "prefix": true,
+                            "argument": {
+                              "type": "MemberExpression",
+                              "start": 1342,
+                              "end": 1363,
+                              "loc": {
+                                "start": {
+                                  "line": 37,
+                                  "column": 7,
+                                  "index": 1342
+                                },
+                                "filename": "Modal.rozie"
+                              },
+                              "object": {
+                                "type": "Identifier",
+                                "start": 1342,
+                                "end": 1348,
+                                "loc": {
+                                  "end": {
+                                    "line": 37,
+                                    "column": 13,
+                                    "index": 1348
+                                  },
+                                  "filename": "Modal.rozie",
+                                  "identifierName": "$props"
+                                },
+                                "name": "$props"
+                              },
+                              "computed": false,
+                              "property": {
+                                "type": "Identifier",
+                                "start": 1349,
+                                "end": 1363,
+                                "loc": {
+                                  "start": {
+                                    "line": 37,
+                                    "column": 14,
+                                    "index": 1349
+                                  },
+                                  "filename": "Modal.rozie",
+                                  "identifierName": "lockBodyScroll"
+                                },
+                                "name": "lockBodyScroll"
+                              }
+                            }
+                          },
+                          "consequent": {
+                            "type": "ReturnStatement",
+                            "start": 1365,
+                            "end": 1371,
+                            "loc": {
+                              "start": {
+                                "line": 37,
+                                "column": 30,
+                                "index": 1365
+                              },
+                              "filename": "Modal.rozie"
+                            },
+                            "argument": null
+                          },
+                          "alternate": null
+                        },
+                        {
+                          "type": "ExpressionStatement",
+                          "start": 1374,
+                          "end": 1422,
+                          "loc": {
+                            "start": {
+                              "line": 38,
+                              "column": 2,
+                              "index": 1374
+                            },
+                            "end": {
+                              "line": 38,
+                              "column": 50,
+                              "index": 1422
+                            },
+                            "filename": "Modal.rozie"
+                          },
+                          "expression": {
+                            "type": "AssignmentExpression",
+                            "start": 1374,
+                            "end": 1422,
+                            "loc": {
+                              "filename": "Modal.rozie"
+                            },
+                            "operator": "=",
+                            "left": {
+                              "type": "Identifier",
+                              "start": 1374,
+                              "end": 1391,
+                              "loc": {
+                                "end": {
+                                  "line": 38,
+                                  "column": 19,
+                                  "index": 1391
+                                },
+                                "filename": "Modal.rozie",
+                                "identifierName": "savedBodyOverflow"
+                              },
+                              "name": "savedBodyOverflow"
+                            },
+                            "right": {
+                              "type": "MemberExpression",
+                              "start": 1394,
+                              "end": 1422,
+                              "loc": {
+                                "start": {
+                                  "line": 38,
+                                  "column": 22,
+                                  "index": 1394
+                                },
+                                "filename": "Modal.rozie"
+                              },
+                              "object": {
+                                "type": "MemberExpression",
+                                "start": 1394,
+                                "end": 1413,
+                                "loc": {
+                                  "end": {
+                                    "line": 38,
+                                    "column": 41,
+                                    "index": 1413
+                                  },
+                                  "filename": "Modal.rozie"
+                                },
+                                "object": {
+                                  "type": "MemberExpression",
+                                  "start": 1394,
+                                  "end": 1407,
+                                  "loc": {
+                                    "end": {
+                                      "line": 38,
+                                      "column": 35,
+                                      "index": 1407
+                                    },
+                                    "filename": "Modal.rozie"
+                                  },
+                                  "object": {
+                                    "type": "Identifier",
+                                    "start": 1394,
+                                    "end": 1402,
+                                    "loc": {
+                                      "end": {
+                                        "line": 38,
+                                        "column": 30,
+                                        "index": 1402
+                                      },
+                                      "filename": "Modal.rozie",
+                                      "identifierName": "document"
+                                    },
+                                    "name": "document"
+                                  },
+                                  "computed": false,
+                                  "property": {
+                                    "type": "Identifier",
+                                    "start": 1403,
+                                    "end": 1407,
+                                    "loc": {
+                                      "start": {
+                                        "line": 38,
+                                        "column": 31,
+                                        "index": 1403
+                                      },
+                                      "filename": "Modal.rozie",
+                                      "identifierName": "body"
+                                    },
+                                    "name": "body"
+                                  }
+                                },
+                                "computed": false,
+                                "property": {
+                                  "type": "Identifier",
+                                  "start": 1408,
+                                  "end": 1413,
+                                  "loc": {
+                                    "start": {
+                                      "line": 38,
+                                      "column": 36,
+                                      "index": 1408
+                                    },
+                                    "filename": "Modal.rozie",
+                                    "identifierName": "style"
+                                  },
+                                  "name": "style"
+                                }
+                              },
+                              "computed": false,
+                              "property": {
+                                "type": "Identifier",
+                                "start": 1414,
+                                "end": 1422,
+                                "loc": {
+                                  "start": {
+                                    "line": 38,
+                                    "column": 42,
+                                    "index": 1414
+                                  },
+                                  "filename": "Modal.rozie",
+                                  "identifierName": "overflow"
+                                },
+                                "name": "overflow"
+                              }
+                            }
+                          }
+                        },
+                        {
+                          "type": "ExpressionStatement",
+                          "start": 1425,
+                          "end": 1464,
+                          "loc": {
+                            "start": {
+                              "line": 39,
+                              "column": 2,
+                              "index": 1425
+                            },
+                            "end": {
+                              "line": 39,
+                              "column": 41,
+                              "index": 1464
+                            },
+                            "filename": "Modal.rozie"
+                          },
+                          "expression": {
+                            "type": "AssignmentExpression",
+                            "start": 1425,
+                            "end": 1464,
+                            "loc": {
+                              "filename": "Modal.rozie"
+                            },
+                            "operator": "=",
+                            "left": {
+                              "type": "MemberExpression",
+                              "start": 1425,
+                              "end": 1453,
+                              "loc": {
+                                "end": {
+                                  "line": 39,
+                                  "column": 30,
+                                  "index": 1453
+                                },
+                                "filename": "Modal.rozie"
+                              },
+                              "object": {
+                                "type": "MemberExpression",
+                                "start": 1425,
+                                "end": 1444,
+                                "loc": {
+                                  "end": {
+                                    "line": 39,
+                                    "column": 21,
+                                    "index": 1444
+                                  },
+                                  "filename": "Modal.rozie"
+                                },
+                                "object": {
+                                  "type": "MemberExpression",
+                                  "start": 1425,
+                                  "end": 1438,
+                                  "loc": {
+                                    "end": {
+                                      "line": 39,
+                                      "column": 15,
+                                      "index": 1438
+                                    },
+                                    "filename": "Modal.rozie"
+                                  },
+                                  "object": {
+                                    "type": "Identifier",
+                                    "start": 1425,
+                                    "end": 1433,
+                                    "loc": {
+                                      "end": {
+                                        "line": 39,
+                                        "column": 10,
+                                        "index": 1433
+                                      },
+                                      "filename": "Modal.rozie",
+                                      "identifierName": "document"
+                                    },
+                                    "name": "document"
+                                  },
+                                  "computed": false,
+                                  "property": {
+                                    "type": "Identifier",
+                                    "start": 1434,
+                                    "end": 1438,
+                                    "loc": {
+                                      "start": {
+                                        "line": 39,
+                                        "column": 11,
+                                        "index": 1434
+                                      },
+                                      "filename": "Modal.rozie",
+                                      "identifierName": "body"
+                                    },
+                                    "name": "body"
+                                  }
+                                },
+                                "computed": false,
+                                "property": {
+                                  "type": "Identifier",
+                                  "start": 1439,
+                                  "end": 1444,
+                                  "loc": {
+                                    "start": {
+                                      "line": 39,
+                                      "column": 16,
+                                      "index": 1439
+                                    },
+                                    "filename": "Modal.rozie",
+                                    "identifierName": "style"
+                                  },
+                                  "name": "style"
+                                }
+                              },
+                              "computed": false,
+                              "property": {
+                                "type": "Identifier",
+                                "start": 1445,
+                                "end": 1453,
+                                "loc": {
+                                  "start": {
+                                    "line": 39,
+                                    "column": 22,
+                                    "index": 1445
+                                  },
+                                  "filename": "Modal.rozie",
+                                  "identifierName": "overflow"
+                                },
+                                "name": "overflow"
+                              }
+                            },
+                            "right": {
+                              "type": "StringLiteral",
+                              "start": 1456,
+                              "end": 1464,
+                              "loc": {
+                                "start": {
+                                  "line": 39,
+                                  "column": 33,
+                                  "index": 1456
+                                },
+                                "filename": "Modal.rozie"
+                              },
+                              "value": "hidden"
+                            }
+                          }
+                        }
+                      ],
+                      "directives": []
+                    }
+                  }
+                }
+              ],
+              "kind": "const"
+            },
+            {
+              "type": "VariableDeclaration",
+              "start": 1468,
+              "end": 1586,
+              "loc": {
+                "start": {
+                  "line": 42,
+                  "column": 0,
+                  "index": 1468
+                },
+                "end": {
+                  "line": 45,
+                  "column": 1,
+                  "index": 1586
+                },
+                "filename": "Modal.rozie"
+              },
+              "declarations": [
+                {
+                  "type": "VariableDeclarator",
+                  "start": 1474,
+                  "end": 1586,
+                  "loc": {
+                    "start": {
+                      "line": 42,
+                      "column": 6,
+                      "index": 1474
+                    },
+                    "filename": "Modal.rozie"
+                  },
+                  "id": {
+                    "type": "Identifier",
+                    "start": 1474,
+                    "end": 1486,
+                    "loc": {
+                      "end": {
+                        "line": 42,
+                        "column": 18,
+                        "index": 1486
+                      },
+                      "filename": "Modal.rozie",
+                      "identifierName": "unlockScroll"
+                    },
+                    "name": "unlockScroll"
+                  },
+                  "init": {
+                    "type": "ArrowFunctionExpression",
+                    "start": 1489,
+                    "end": 1586,
+                    "loc": {
+                      "start": {
+                        "line": 42,
+                        "column": 21,
+                        "index": 1489
+                      },
+                      "filename": "Modal.rozie"
+                    },
+                    "id": null,
+                    "generator": false,
+                    "async": false,
+                    "params": [],
+                    "body": {
+                      "type": "BlockStatement",
+                      "start": 1495,
+                      "end": 1586,
+                      "loc": {
+                        "start": {
+                          "line": 42,
+                          "column": 27,
+                          "index": 1495
+                        },
+                        "filename": "Modal.rozie"
+                      },
+                      "body": [
+                        {
+                          "type": "IfStatement",
+                          "start": 1499,
+                          "end": 1533,
+                          "loc": {
+                            "start": {
+                              "line": 43,
+                              "column": 2,
+                              "index": 1499
+                            },
+                            "end": {
+                              "line": 43,
+                              "column": 36,
+                              "index": 1533
+                            },
+                            "filename": "Modal.rozie"
+                          },
+                          "test": {
+                            "type": "UnaryExpression",
+                            "start": 1503,
+                            "end": 1525,
+                            "loc": {
+                              "start": {
+                                "line": 43,
+                                "column": 6,
+                                "index": 1503
+                              },
+                              "end": {
+                                "line": 43,
+                                "column": 28,
+                                "index": 1525
+                              },
+                              "filename": "Modal.rozie"
+                            },
+                            "operator": "!",
+                            "prefix": true,
+                            "argument": {
+                              "type": "MemberExpression",
+                              "start": 1504,
+                              "end": 1525,
+                              "loc": {
+                                "start": {
+                                  "line": 43,
+                                  "column": 7,
+                                  "index": 1504
+                                },
+                                "filename": "Modal.rozie"
+                              },
+                              "object": {
+                                "type": "Identifier",
+                                "start": 1504,
+                                "end": 1510,
+                                "loc": {
+                                  "end": {
+                                    "line": 43,
+                                    "column": 13,
+                                    "index": 1510
+                                  },
+                                  "filename": "Modal.rozie",
+                                  "identifierName": "$props"
+                                },
+                                "name": "$props"
+                              },
+                              "computed": false,
+                              "property": {
+                                "type": "Identifier",
+                                "start": 1511,
+                                "end": 1525,
+                                "loc": {
+                                  "start": {
+                                    "line": 43,
+                                    "column": 14,
+                                    "index": 1511
+                                  },
+                                  "filename": "Modal.rozie",
+                                  "identifierName": "lockBodyScroll"
+                                },
+                                "name": "lockBodyScroll"
+                              }
+                            }
+                          },
+                          "consequent": {
+                            "type": "ReturnStatement",
+                            "start": 1527,
+                            "end": 1533,
+                            "loc": {
+                              "start": {
+                                "line": 43,
+                                "column": 30,
+                                "index": 1527
+                              },
+                              "filename": "Modal.rozie"
+                            },
+                            "argument": null
+                          },
+                          "alternate": null
+                        },
+                        {
+                          "type": "ExpressionStatement",
+                          "start": 1536,
+                          "end": 1584,
+                          "loc": {
+                            "start": {
+                              "line": 44,
+                              "column": 2,
+                              "index": 1536
+                            },
+                            "end": {
+                              "line": 44,
+                              "column": 50,
+                              "index": 1584
+                            },
+                            "filename": "Modal.rozie"
+                          },
+                          "expression": {
+                            "type": "AssignmentExpression",
+                            "start": 1536,
+                            "end": 1584,
+                            "loc": {
+                              "filename": "Modal.rozie"
+                            },
+                            "operator": "=",
+                            "left": {
+                              "type": "MemberExpression",
+                              "start": 1536,
+                              "end": 1564,
+                              "loc": {
+                                "end": {
+                                  "line": 44,
+                                  "column": 30,
+                                  "index": 1564
+                                },
+                                "filename": "Modal.rozie"
+                              },
+                              "object": {
+                                "type": "MemberExpression",
+                                "start": 1536,
+                                "end": 1555,
+                                "loc": {
+                                  "end": {
+                                    "line": 44,
+                                    "column": 21,
+                                    "index": 1555
+                                  },
+                                  "filename": "Modal.rozie"
+                                },
+                                "object": {
+                                  "type": "MemberExpression",
+                                  "start": 1536,
+                                  "end": 1549,
+                                  "loc": {
+                                    "end": {
+                                      "line": 44,
+                                      "column": 15,
+                                      "index": 1549
+                                    },
+                                    "filename": "Modal.rozie"
+                                  },
+                                  "object": {
+                                    "type": "Identifier",
+                                    "start": 1536,
+                                    "end": 1544,
+                                    "loc": {
+                                      "end": {
+                                        "line": 44,
+                                        "column": 10,
+                                        "index": 1544
+                                      },
+                                      "filename": "Modal.rozie",
+                                      "identifierName": "document"
+                                    },
+                                    "name": "document"
+                                  },
+                                  "computed": false,
+                                  "property": {
+                                    "type": "Identifier",
+                                    "start": 1545,
+                                    "end": 1549,
+                                    "loc": {
+                                      "start": {
+                                        "line": 44,
+                                        "column": 11,
+                                        "index": 1545
+                                      },
+                                      "filename": "Modal.rozie",
+                                      "identifierName": "body"
+                                    },
+                                    "name": "body"
+                                  }
+                                },
+                                "computed": false,
+                                "property": {
+                                  "type": "Identifier",
+                                  "start": 1550,
+                                  "end": 1555,
+                                  "loc": {
+                                    "start": {
+                                      "line": 44,
+                                      "column": 16,
+                                      "index": 1550
+                                    },
+                                    "filename": "Modal.rozie",
+                                    "identifierName": "style"
+                                  },
+                                  "name": "style"
+                                }
+                              },
+                              "computed": false,
+                              "property": {
+                                "type": "Identifier",
+                                "start": 1556,
+                                "end": 1564,
+                                "loc": {
+                                  "start": {
+                                    "line": 44,
+                                    "column": 22,
+                                    "index": 1556
+                                  },
+                                  "filename": "Modal.rozie",
+                                  "identifierName": "overflow"
+                                },
+                                "name": "overflow"
+                              }
+                            },
+                            "right": {
+                              "type": "Identifier",
+                              "start": 1567,
+                              "end": 1584,
+                              "loc": {
+                                "start": {
+                                  "line": 44,
+                                  "column": 33,
+                                  "index": 1567
+                                },
+                                "filename": "Modal.rozie",
+                                "identifierName": "savedBodyOverflow"
+                              },
+                              "name": "savedBodyOverflow"
+                            }
+                          }
+                        }
+                      ],
+                      "directives": []
+                    }
+                  }
+                }
+              ],
+              "kind": "const",
+              "trailingComments": [
+                {
+                  "type": "CommentLine",
+                  "value": " Colocated lifecycle pair — runs in source order alongside other hooks.",
+                  "start": 1588,
+                  "end": 1661,
+                  "loc": {
+                    "start": {
+                      "line": 47,
+                      "column": 0,
+                      "index": 1588
+                    },
+                    "end": {
+                      "line": 47,
+                      "column": 73,
+                      "index": 1661
+                    },
+                    "filename": "Modal.rozie"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "ExpressionStatement",
+              "start": 1662,
+              "end": 1682,
+              "loc": {
+                "start": {
+                  "line": 48,
+                  "column": 0,
+                  "index": 1662
+                },
+                "end": {
+                  "line": 48,
+                  "column": 20,
+                  "index": 1682
+                },
+                "filename": "Modal.rozie"
+              },
+              "expression": {
+                "type": "CallExpression",
+                "start": 1662,
+                "end": 1682,
+                "loc": {
+                  "filename": "Modal.rozie"
+                },
+                "callee": {
+                  "type": "Identifier",
+                  "start": 1662,
+                  "end": 1670,
+                  "loc": {
+                    "end": {
+                      "line": 48,
+                      "column": 8,
+                      "index": 1670
+                    },
+                    "filename": "Modal.rozie",
+                    "identifierName": "$onMount"
+                  },
+                  "name": "$onMount"
+                },
+                "arguments": [
+                  {
+                    "type": "Identifier",
+                    "start": 1671,
+                    "end": 1681,
+                    "loc": {
+                      "start": {
+                        "line": 48,
+                        "column": 9,
+                        "index": 1671
+                      },
+                      "end": {
+                        "line": 48,
+                        "column": 19,
+                        "index": 1681
+                      },
+                      "filename": "Modal.rozie",
+                      "identifierName": "lockScroll"
+                    },
+                    "name": "lockScroll"
+                  }
+                ]
+              }
+            },
+            {
+              "type": "ExpressionStatement",
+              "start": 1683,
+              "end": 1707,
+              "loc": {
+                "start": {
+                  "line": 49,
+                  "column": 0,
+                  "index": 1683
+                },
+                "end": {
+                  "line": 49,
+                  "column": 24,
+                  "index": 1707
+                },
+                "filename": "Modal.rozie"
+              },
+              "expression": {
+                "type": "CallExpression",
+                "start": 1683,
+                "end": 1707,
+                "loc": {
+                  "filename": "Modal.rozie"
+                },
+                "callee": {
+                  "type": "Identifier",
+                  "start": 1683,
+                  "end": 1693,
+                  "loc": {
+                    "end": {
+                      "line": 49,
+                      "column": 10,
+                      "index": 1693
+                    },
+                    "filename": "Modal.rozie",
+                    "identifierName": "$onUnmount"
+                  },
+                  "name": "$onUnmount"
+                },
+                "arguments": [
+                  {
+                    "type": "Identifier",
+                    "start": 1694,
+                    "end": 1706,
+                    "loc": {
+                      "start": {
+                        "line": 49,
+                        "column": 11,
+                        "index": 1694
+                      },
+                      "end": {
+                        "line": 49,
+                        "column": 23,
+                        "index": 1706
+                      },
+                      "filename": "Modal.rozie",
+                      "identifierName": "unlockScroll"
+                    },
+                    "name": "unlockScroll"
+                  }
+                ]
+              },
+              "trailingComments": [
+                {
+                  "type": "CommentLine",
+                  "value": " Colocated focus management — separate hook, separate concern.",
+                  "start": 1709,
+                  "end": 1773,
+                  "loc": {
+                    "start": {
+                      "line": 51,
+                      "column": 0,
+                      "index": 1709
+                    },
+                    "end": {
+                      "line": 51,
+                      "column": 64,
+                      "index": 1773
+                    },
+                    "filename": "Modal.rozie"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "ExpressionStatement",
+              "start": 1774,
+              "end": 1819,
+              "loc": {
+                "start": {
+                  "line": 52,
+                  "column": 0,
+                  "index": 1774
+                },
+                "end": {
+                  "line": 54,
+                  "column": 2,
+                  "index": 1819
+                },
+                "filename": "Modal.rozie"
+              },
+              "expression": {
+                "type": "CallExpression",
+                "start": 1774,
+                "end": 1819,
+                "loc": {
+                  "filename": "Modal.rozie"
+                },
+                "callee": {
+                  "type": "Identifier",
+                  "start": 1774,
+                  "end": 1782,
+                  "loc": {
+                    "end": {
+                      "line": 52,
+                      "column": 8,
+                      "index": 1782
+                    },
+                    "filename": "Modal.rozie",
+                    "identifierName": "$onMount"
+                  },
+                  "name": "$onMount"
+                },
+                "arguments": [
+                  {
+                    "type": "ArrowFunctionExpression",
+                    "start": 1783,
+                    "end": 1818,
+                    "loc": {
+                      "start": {
+                        "line": 52,
+                        "column": 9,
+                        "index": 1783
+                      },
+                      "end": {
+                        "line": 54,
+                        "column": 1,
+                        "index": 1818
+                      },
+                      "filename": "Modal.rozie"
+                    },
+                    "id": null,
+                    "generator": false,
+                    "async": false,
+                    "params": [],
+                    "body": {
+                      "type": "BlockStatement",
+                      "start": 1789,
+                      "end": 1818,
+                      "loc": {
+                        "start": {
+                          "line": 52,
+                          "column": 15,
+                          "index": 1789
+                        },
+                        "filename": "Modal.rozie"
+                      },
+                      "body": [
+                        {
+                          "type": "ExpressionStatement",
+                          "start": 1793,
+                          "end": 1816,
+                          "loc": {
+                            "start": {
+                              "line": 53,
+                              "column": 2,
+                              "index": 1793
+                            },
+                            "end": {
+                              "line": 53,
+                              "column": 25,
+                              "index": 1816
+                            },
+                            "filename": "Modal.rozie"
+                          },
+                          "expression": {
+                            "type": "OptionalCallExpression",
+                            "start": 1793,
+                            "end": 1816,
+                            "loc": {
+                              "filename": "Modal.rozie"
+                            },
+                            "callee": {
+                              "type": "OptionalMemberExpression",
+                              "start": 1793,
+                              "end": 1814,
+                              "loc": {
+                                "end": {
+                                  "line": 53,
+                                  "column": 23,
+                                  "index": 1814
+                                },
+                                "filename": "Modal.rozie"
+                              },
+                              "object": {
+                                "type": "MemberExpression",
+                                "start": 1793,
+                                "end": 1807,
+                                "loc": {
+                                  "end": {
+                                    "line": 53,
+                                    "column": 16,
+                                    "index": 1807
+                                  },
+                                  "filename": "Modal.rozie"
+                                },
+                                "object": {
+                                  "type": "Identifier",
+                                  "start": 1793,
+                                  "end": 1798,
+                                  "loc": {
+                                    "end": {
+                                      "line": 53,
+                                      "column": 7,
+                                      "index": 1798
+                                    },
+                                    "filename": "Modal.rozie",
+                                    "identifierName": "$refs"
+                                  },
+                                  "name": "$refs"
+                                },
+                                "computed": false,
+                                "property": {
+                                  "type": "Identifier",
+                                  "start": 1799,
+                                  "end": 1807,
+                                  "loc": {
+                                    "start": {
+                                      "line": 53,
+                                      "column": 8,
+                                      "index": 1799
+                                    },
+                                    "filename": "Modal.rozie",
+                                    "identifierName": "dialogEl"
+                                  },
+                                  "name": "dialogEl"
+                                }
+                              },
+                              "computed": false,
+                              "property": {
+                                "type": "Identifier",
+                                "start": 1809,
+                                "end": 1814,
+                                "loc": {
+                                  "start": {
+                                    "line": 53,
+                                    "column": 18,
+                                    "index": 1809
+                                  },
+                                  "filename": "Modal.rozie",
+                                  "identifierName": "focus"
+                                },
+                                "name": "focus"
+                              },
+                              "optional": true
+                            },
+                            "optional": false,
+                            "arguments": []
+                          }
+                        }
+                      ],
+                      "directives": []
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "directives": []
+        },
+        "comments": [
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    "listeners": {
+      "type": "ListenersAST",
+      "loc": {
+        "start": 1842,
+        "end": 2191
+      },
+      "entries": [
+        {
+          "rawKey": "document:keydown.escape",
+          "rawKeyLoc": {
+            "start": 2084,
+            "end": 2107
+          },
+          "target": "document",
+          "event": "keydown",
+          "modifierChainText": ".escape",
+          "modifierChainBaseOffset": 2100,
+          "chain": [
+            {
+              "name": "escape",
+              "args": [],
+              "loc": {
+                "start": 2100,
+                "end": 2107
+              }
+            }
+          ],
+          "value": {
+            "type": "ObjectExpression",
+            "start": 2110,
+            "end": 2187,
+            "loc": {
+              "start": {
+                "line": 62,
+                "column": 29,
+                "index": 2110
+              },
+              "end": {
+                "line": 65,
+                "column": 3,
+                "index": 2187
+              },
+              "filename": "Modal.rozie"
+            },
+            "properties": [
+              {
+                "type": "ObjectProperty",
+                "start": 2116,
+                "end": 2162,
+                "loc": {
+                  "start": {
+                    "line": 63,
+                    "column": 4,
+                    "index": 2116
+                  },
+                  "end": {
+                    "line": 63,
+                    "column": 50,
+                    "index": 2162
+                  },
+                  "filename": "Modal.rozie"
+                },
+                "method": false,
+                "key": {
+                  "type": "Identifier",
+                  "start": 2116,
+                  "end": 2120,
+                  "loc": {
+                    "end": {
+                      "line": 63,
+                      "column": 8,
+                      "index": 2120
+                    },
+                    "filename": "Modal.rozie",
+                    "identifierName": "when"
+                  },
+                  "name": "when"
+                },
+                "computed": false,
+                "shorthand": false,
+                "value": {
+                  "type": "StringLiteral",
+                  "start": 2125,
+                  "end": 2162,
+                  "loc": {
+                    "start": {
+                      "line": 63,
+                      "column": 13,
+                      "index": 2125
+                    },
+                    "filename": "Modal.rozie"
+                  },
+                  "value": "$props.open && $props.closeOnEscape"
+                }
+              },
+              {
+                "type": "ObjectProperty",
+                "start": 2168,
+                "end": 2182,
+                "loc": {
+                  "start": {
+                    "line": 64,
+                    "column": 4,
+                    "index": 2168
+                  },
+                  "end": {
+                    "line": 64,
+                    "column": 18,
+                    "index": 2182
+                  },
+                  "filename": "Modal.rozie"
+                },
+                "method": false,
+                "key": {
+                  "type": "Identifier",
+                  "start": 2168,
+                  "end": 2175,
+                  "loc": {
+                    "end": {
+                      "line": 64,
+                      "column": 11,
+                      "index": 2175
+                    },
+                    "filename": "Modal.rozie",
+                    "identifierName": "handler"
+                  },
+                  "name": "handler"
+                },
+                "computed": false,
+                "shorthand": false,
+                "value": {
+                  "type": "Identifier",
+                  "start": 2177,
+                  "end": 2182,
+                  "loc": {
+                    "start": {
+                      "line": 64,
+                      "column": 13,
+                      "index": 2177
+                    },
+                    "filename": "Modal.rozie",
+                    "identifierName": "close"
+                  },
+                  "name": "close"
+                }
+              }
+            ]
+          },
+          "loc": {
+            "start": 2083,
+            "end": 2187
+          }
+        }
+      ]
+    },
+    "template": {
+      "type": "TemplateAST",
+      "loc": {
+        "start": 2215,
+        "end": 2899
+      },
+      "children": [
+        {
+          "type": "TemplateText",
+          "text": "\n",
+          "loc": {
+            "start": 2215,
+            "end": 2216
+          }
+        },
+        {
+          "type": "TemplateElement",
+          "tagName": "div",
+          "attributes": [
+            {
+              "kind": "directive",
+              "rawName": "r-if",
+              "name": "if",
+              "modifierChainText": "",
+              "modifierChainBaseOffset": 2225,
+              "chain": [],
+              "value": "$props.open",
+              "valueLoc": {
+                "start": 2227,
+                "end": 2238
+              },
+              "loc": {
+                "start": 2221,
+                "end": 2239
+              }
+            },
+            {
+              "kind": "static",
+              "rawName": "class",
+              "name": "class",
+              "modifierChainText": "",
+              "modifierChainBaseOffset": 2245,
+              "chain": [],
+              "value": "modal-backdrop",
+              "valueLoc": {
+                "start": 2247,
+                "end": 2261
+              },
+              "loc": {
+                "start": 2240,
+                "end": 2262
+              }
+            },
+            {
+              "kind": "static",
+              "rawName": "ref",
+              "name": "ref",
+              "modifierChainText": "",
+              "modifierChainBaseOffset": 2266,
+              "chain": [],
+              "value": "backdropEl",
+              "valueLoc": {
+                "start": 2268,
+                "end": 2278
+              },
+              "loc": {
+                "start": 2263,
+                "end": 2279
+              }
+            },
+            {
+              "kind": "event",
+              "rawName": "@click.self",
+              "name": "click",
+              "modifierChainText": ".self",
+              "modifierChainBaseOffset": 2286,
+              "chain": [
+                {
+                  "name": "self",
+                  "args": [],
+                  "loc": {
+                    "start": 2286,
+                    "end": 2291
+                  }
+                }
+              ],
+              "value": "$props.closeOnBackdrop && close()",
+              "valueLoc": {
+                "start": 2293,
+                "end": 2326
+              },
+              "loc": {
+                "start": 2280,
+                "end": 2327
+              }
+            }
+          ],
+          "children": [
+            {
+              "type": "TemplateText",
+              "text": "\n  ",
+              "loc": {
+                "start": 2328,
+                "end": 2331
+              }
+            },
+            {
+              "type": "TemplateElement",
+              "tagName": "div",
+              "attributes": [
+                {
+                  "kind": "static",
+                  "rawName": "ref",
+                  "name": "ref",
+                  "modifierChainText": "",
+                  "modifierChainBaseOffset": 2343,
+                  "chain": [],
+                  "value": "dialogEl",
+                  "valueLoc": {
+                    "start": 2345,
+                    "end": 2353
+                  },
+                  "loc": {
+                    "start": 2340,
+                    "end": 2354
+                  }
+                },
+                {
+                  "kind": "static",
+                  "rawName": "class",
+                  "name": "class",
+                  "modifierChainText": "",
+                  "modifierChainBaseOffset": 2364,
+                  "chain": [],
+                  "value": "modal-dialog",
+                  "valueLoc": {
+                    "start": 2366,
+                    "end": 2378
+                  },
+                  "loc": {
+                    "start": 2359,
+                    "end": 2379
+                  }
+                },
+                {
+                  "kind": "static",
+                  "rawName": "role",
+                  "name": "role",
+                  "modifierChainText": "",
+                  "modifierChainBaseOffset": 2388,
+                  "chain": [],
+                  "value": "dialog",
+                  "valueLoc": {
+                    "start": 2390,
+                    "end": 2396
+                  },
+                  "loc": {
+                    "start": 2384,
+                    "end": 2397
+                  }
+                },
+                {
+                  "kind": "static",
+                  "rawName": "aria-modal",
+                  "name": "aria-modal",
+                  "modifierChainText": "",
+                  "modifierChainBaseOffset": 2412,
+                  "chain": [],
+                  "value": "true",
+                  "valueLoc": {
+                    "start": 2414,
+                    "end": 2418
+                  },
+                  "loc": {
+                    "start": 2402,
+                    "end": 2419
+                  }
+                },
+                {
+                  "kind": "binding",
+                  "rawName": ":aria-label",
+                  "name": "aria-label",
+                  "modifierChainText": "",
+                  "modifierChainBaseOffset": 2435,
+                  "chain": [],
+                  "value": "$props.title || undefined",
+                  "valueLoc": {
+                    "start": 2437,
+                    "end": 2462
+                  },
+                  "loc": {
+                    "start": 2424,
+                    "end": 2463
+                  }
+                },
+                {
+                  "kind": "static",
+                  "rawName": "tabindex",
+                  "name": "tabindex",
+                  "modifierChainText": "",
+                  "modifierChainBaseOffset": 2476,
+                  "chain": [],
+                  "value": "-1",
+                  "valueLoc": {
+                    "start": 2478,
+                    "end": 2480
+                  },
+                  "loc": {
+                    "start": 2468,
+                    "end": 2481
+                  }
+                }
+              ],
+              "children": [
+                {
+                  "type": "TemplateText",
+                  "text": "\n    ",
+                  "loc": {
+                    "start": 2485,
+                    "end": 2490
+                  }
+                },
+                {
+                  "type": "TemplateElement",
+                  "tagName": "header",
+                  "attributes": [
+                    {
+                      "kind": "directive",
+                      "rawName": "r-if",
+                      "name": "if",
+                      "modifierChainText": "",
+                      "modifierChainBaseOffset": 2502,
+                      "chain": [],
+                      "value": "$props.title || $slots.header",
+                      "valueLoc": {
+                        "start": 2504,
+                        "end": 2533
+                      },
+                      "loc": {
+                        "start": 2498,
+                        "end": 2534
+                      }
+                    }
+                  ],
+                  "children": [
+                    {
+                      "type": "TemplateText",
+                      "text": "\n      ",
+                      "loc": {
+                        "start": 2535,
+                        "end": 2542
+                      }
+                    },
+                    {
+                      "type": "TemplateElement",
+                      "tagName": "slot",
+                      "attributes": [
+                        {
+                          "kind": "static",
+                          "rawName": "name",
+                          "name": "name",
+                          "modifierChainText": "",
+                          "modifierChainBaseOffset": 2552,
+                          "chain": [],
+                          "value": "header",
+                          "valueLoc": {
+                            "start": 2554,
+                            "end": 2560
+                          },
+                          "loc": {
+                            "start": 2548,
+                            "end": 2561
+                          }
+                        },
+                        {
+                          "kind": "binding",
+                          "rawName": ":close",
+                          "name": "close",
+                          "modifierChainText": "",
+                          "modifierChainBaseOffset": 2568,
+                          "chain": [],
+                          "value": "close",
+                          "valueLoc": {
+                            "start": 2570,
+                            "end": 2575
+                          },
+                          "loc": {
+                            "start": 2562,
+                            "end": 2576
+                          }
+                        }
+                      ],
+                      "children": [
+                        {
+                          "type": "TemplateText",
+                          "text": "\n        ",
+                          "loc": {
+                            "start": 2577,
+                            "end": 2586
+                          }
+                        },
+                        {
+                          "type": "TemplateElement",
+                          "tagName": "h2",
+                          "attributes": [],
+                          "children": [
+                            {
+                              "type": "TemplateInterpolation",
+                              "rawExpr": " $props.title ",
+                              "loc": {
+                                "start": 2590,
+                                "end": 2608
+                              }
+                            }
+                          ],
+                          "selfClosing": false,
+                          "loc": {
+                            "start": 2586,
+                            "end": 2613
+                          }
+                        },
+                        {
+                          "type": "TemplateText",
+                          "text": "\n      ",
+                          "loc": {
+                            "start": 2613,
+                            "end": 2620
+                          }
+                        }
+                      ],
+                      "selfClosing": false,
+                      "loc": {
+                        "start": 2542,
+                        "end": 2627
+                      }
+                    },
+                    {
+                      "type": "TemplateText",
+                      "text": "\n      ",
+                      "loc": {
+                        "start": 2627,
+                        "end": 2634
+                      }
+                    },
+                    {
+                      "type": "TemplateElement",
+                      "tagName": "button",
+                      "attributes": [
+                        {
+                          "kind": "static",
+                          "rawName": "class",
+                          "name": "class",
+                          "modifierChainText": "",
+                          "modifierChainBaseOffset": 2647,
+                          "chain": [],
+                          "value": "close-btn",
+                          "valueLoc": {
+                            "start": 2649,
+                            "end": 2658
+                          },
+                          "loc": {
+                            "start": 2642,
+                            "end": 2659
+                          }
+                        },
+                        {
+                          "kind": "event",
+                          "rawName": "@click",
+                          "name": "click",
+                          "modifierChainText": "",
+                          "modifierChainBaseOffset": 2666,
+                          "chain": [],
+                          "value": "close",
+                          "valueLoc": {
+                            "start": 2668,
+                            "end": 2673
+                          },
+                          "loc": {
+                            "start": 2660,
+                            "end": 2674
+                          }
+                        },
+                        {
+                          "kind": "static",
+                          "rawName": "aria-label",
+                          "name": "aria-label",
+                          "modifierChainText": "",
+                          "modifierChainBaseOffset": 2685,
+                          "chain": [],
+                          "value": "Close",
+                          "valueLoc": {
+                            "start": 2687,
+                            "end": 2692
+                          },
+                          "loc": {
+                            "start": 2675,
+                            "end": 2693
+                          }
+                        }
+                      ],
+                      "children": [
+                        {
+                          "type": "TemplateText",
+                          "text": "×",
+                          "loc": {
+                            "start": 2694,
+                            "end": 2695
+                          }
+                        }
+                      ],
+                      "selfClosing": false,
+                      "loc": {
+                        "start": 2634,
+                        "end": 2704
+                      }
+                    },
+                    {
+                      "type": "TemplateText",
+                      "text": "\n    ",
+                      "loc": {
+                        "start": 2704,
+                        "end": 2709
+                      }
+                    }
+                  ],
+                  "selfClosing": false,
+                  "loc": {
+                    "start": 2490,
+                    "end": 2718
+                  }
+                },
+                {
+                  "type": "TemplateText",
+                  "text": "\n\n    ",
+                  "loc": {
+                    "start": 2718,
+                    "end": 2724
+                  }
+                },
+                {
+                  "type": "TemplateElement",
+                  "tagName": "div",
+                  "attributes": [
+                    {
+                      "kind": "static",
+                      "rawName": "class",
+                      "name": "class",
+                      "modifierChainText": "",
+                      "modifierChainBaseOffset": 2734,
+                      "chain": [],
+                      "value": "modal-body",
+                      "valueLoc": {
+                        "start": 2736,
+                        "end": 2746
+                      },
+                      "loc": {
+                        "start": 2729,
+                        "end": 2747
+                      }
+                    }
+                  ],
+                  "children": [
+                    {
+                      "type": "TemplateText",
+                      "text": "\n      ",
+                      "loc": {
+                        "start": 2748,
+                        "end": 2755
+                      }
+                    },
+                    {
+                      "type": "TemplateElement",
+                      "tagName": "slot",
+                      "attributes": [
+                        {
+                          "kind": "binding",
+                          "rawName": ":close",
+                          "name": "close",
+                          "modifierChainText": "",
+                          "modifierChainBaseOffset": 2767,
+                          "chain": [],
+                          "value": "close",
+                          "valueLoc": {
+                            "start": 2769,
+                            "end": 2774
+                          },
+                          "loc": {
+                            "start": 2761,
+                            "end": 2775
+                          }
+                        }
+                      ],
+                      "children": [],
+                      "selfClosing": true,
+                      "loc": {
+                        "start": 2755,
+                        "end": 2778
+                      }
+                    },
+                    {
+                      "type": "TemplateText",
+                      "text": "\n    ",
+                      "loc": {
+                        "start": 2778,
+                        "end": 2783
+                      }
+                    }
+                  ],
+                  "selfClosing": false,
+                  "loc": {
+                    "start": 2724,
+                    "end": 2789
+                  }
+                },
+                {
+                  "type": "TemplateText",
+                  "text": "\n\n    ",
+                  "loc": {
+                    "start": 2789,
+                    "end": 2795
+                  }
+                },
+                {
+                  "type": "TemplateElement",
+                  "tagName": "footer",
+                  "attributes": [
+                    {
+                      "kind": "directive",
+                      "rawName": "r-if",
+                      "name": "if",
+                      "modifierChainText": "",
+                      "modifierChainBaseOffset": 2807,
+                      "chain": [],
+                      "value": "$slots.footer",
+                      "valueLoc": {
+                        "start": 2809,
+                        "end": 2822
+                      },
+                      "loc": {
+                        "start": 2803,
+                        "end": 2823
+                      }
+                    }
+                  ],
+                  "children": [
+                    {
+                      "type": "TemplateText",
+                      "text": "\n      ",
+                      "loc": {
+                        "start": 2824,
+                        "end": 2831
+                      }
+                    },
+                    {
+                      "type": "TemplateElement",
+                      "tagName": "slot",
+                      "attributes": [
+                        {
+                          "kind": "static",
+                          "rawName": "name",
+                          "name": "name",
+                          "modifierChainText": "",
+                          "modifierChainBaseOffset": 2841,
+                          "chain": [],
+                          "value": "footer",
+                          "valueLoc": {
+                            "start": 2843,
+                            "end": 2849
+                          },
+                          "loc": {
+                            "start": 2837,
+                            "end": 2850
+                          }
+                        },
+                        {
+                          "kind": "binding",
+                          "rawName": ":close",
+                          "name": "close",
+                          "modifierChainText": "",
+                          "modifierChainBaseOffset": 2857,
+                          "chain": [],
+                          "value": "close",
+                          "valueLoc": {
+                            "start": 2859,
+                            "end": 2864
+                          },
+                          "loc": {
+                            "start": 2851,
+                            "end": 2865
+                          }
+                        }
+                      ],
+                      "children": [],
+                      "selfClosing": true,
+                      "loc": {
+                        "start": 2831,
+                        "end": 2868
+                      }
+                    },
+                    {
+                      "type": "TemplateText",
+                      "text": "\n    ",
+                      "loc": {
+                        "start": 2868,
+                        "end": 2873
+                      }
+                    }
+                  ],
+                  "selfClosing": false,
+                  "loc": {
+                    "start": 2795,
+                    "end": 2882
+                  }
+                },
+                {
+                  "type": "TemplateText",
+                  "text": "\n  ",
+                  "loc": {
+                    "start": 2882,
+                    "end": 2885
+                  }
+                }
+              ],
+              "selfClosing": false,
+              "loc": {
+                "start": 2331,
+                "end": 2891
+              }
+            },
+            {
+              "type": "TemplateText",
+              "text": "\n",
+              "loc": {
+                "start": 2891,
+                "end": 2892
+              }
+            }
+          ],
+          "selfClosing": false,
+          "loc": {
+            "start": 2216,
+            "end": 2898
+          }
+        },
+        {
+          "type": "TemplateText",
+          "text": "\n",
+          "loc": {
+            "start": 2898,
+            "end": 2899
+          }
+        }
+      ]
+    },
+    "style": {
+      "type": "StyleAST",
+      "loc": {
+        "start": 2919,
+        "end": 3796
+      },
+      "cssText": "\n.modal-backdrop {\n  position: fixed; inset: 0;\n  background: rgba(0, 0, 0, 0.4);\n  display: flex; align-items: center; justify-content: center;\n  z-index: var(--rozie-modal-z, 2000);\n}\n.modal-dialog {\n  background: white;\n  border-radius: 8px;\n  min-width: 20rem;\n  max-width: min(90vw, 40rem);\n  max-height: 90vh;\n  display: flex; flex-direction: column;\n  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);\n  outline: none;\n}\nheader, footer { padding: 1rem; display: flex; align-items: center; gap: 0.5rem; }\nheader { border-bottom: 1px solid rgba(0, 0, 0, 0.08); }\nheader h2 { flex: 1; margin: 0; font-size: 1.1rem; }\nfooter { border-top: 1px solid rgba(0, 0, 0, 0.08); justify-content: flex-end; }\n.modal-body { padding: 1rem; overflow: auto; }\n.close-btn { background: none; border: none; cursor: pointer; font-size: 1.5rem; line-height: 1; }\n\n:root {\n  --rozie-modal-z: 2000;\n}\n",
+      "rules": [
+        {
+          "selector": ".modal-backdrop",
+          "loc": {
+            "start": 2920,
+            "end": 3104
+          },
+          "isRootEscape": false
+        },
+        {
+          "selector": ".modal-dialog",
+          "loc": {
+            "start": 3105,
+            "end": 3339
+          },
+          "isRootEscape": false
+        },
+        {
+          "selector": "header, footer",
+          "loc": {
+            "start": 3340,
+            "end": 3422
+          },
+          "isRootEscape": false
+        },
+        {
+          "selector": "header",
+          "loc": {
+            "start": 3423,
+            "end": 3479
+          },
+          "isRootEscape": false
+        },
+        {
+          "selector": "header h2",
+          "loc": {
+            "start": 3480,
+            "end": 3532
+          },
+          "isRootEscape": false
+        },
+        {
+          "selector": "footer",
+          "loc": {
+            "start": 3533,
+            "end": 3613
+          },
+          "isRootEscape": false
+        },
+        {
+          "selector": ".modal-body",
+          "loc": {
+            "start": 3614,
+            "end": 3660
+          },
+          "isRootEscape": false
+        },
+        {
+          "selector": ".close-btn",
+          "loc": {
+            "start": 3661,
+            "end": 3759
+          },
+          "isRootEscape": false
+        },
+        {
+          "selector": ":root",
+          "loc": {
+            "start": 3761,
+            "end": 3795
+          },
+          "isRootEscape": true
+        }
+      ]
+    }
+  },
+  "diagnostics": []
+}
