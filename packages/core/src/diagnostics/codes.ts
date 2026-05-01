@@ -43,6 +43,32 @@ export const RozieErrorCode = {
   STYLE_MIXED_ROOT_SELECTOR: 'ROZ081',
 
   // ---- ROZ090..ROZ099 reserved for late-Phase-1 needs ----
+
+  // ---- Semantic-binding errors (Phase 2 Plan 02) — ROZ100..ROZ199 ----
+  UNKNOWN_PROPS_REF: 'ROZ100', // SEM-01: $props.foo where foo not declared
+  UNKNOWN_DATA_REF: 'ROZ101', // SEM-01: $data.foo where foo not declared
+  UNKNOWN_REFS_REF: 'ROZ102', // SEM-01: $refs.foo where no template ref="foo"
+  UNKNOWN_SLOTS_REF: 'ROZ103', // SEM-01: $slots.foo where no <slot name="foo">
+  LIFECYCLE_OUTSIDE_SCRIPT: 'ROZ104', // $onMount/$onUnmount/$onUpdate called outside <script> block / Program top level
+  ASYNC_ONMOUNT_RETURN: 'ROZ105', // D-19 edge case: $onMount(async () => …) Promise return cannot be cleanup
+  COMPUTED_MAGIC_ACCESS: 'ROZ106', // $props['foo'] — magic accessors require static keys
+  UNKNOWN_MODIFIER: 'ROZ110', // .escspe (typo) — name not registered in ModifierRegistry
+  MODIFIER_ARITY_MISMATCH: 'ROZ111', // .debounce() (missing required ms arg)
+  MODIFIER_ARG_SHAPE: 'ROZ112', // .outside('not-a-ref') — refExpr expected, got literal
+
+  // ---- Compile-time correctness errors (Phase 2 Plan 02) — ROZ200..ROZ299 ----
+  WRITE_TO_NON_MODEL_PROP: 'ROZ200', // SEM-02: $props.foo = … where foo lacks model: true (Phase 2 success criterion 2)
+  WRITE_TO_REF: 'ROZ201', // $refs.foo = … (refs are read-only DOM-element wrappers)
+  RESERVED_IDENTIFIER_COLLISION: 'ROZ202', // <data> field named $el / $props / $data / $refs / $slots / $emit
+
+  // ---- Warnings (Phase 2 Plan 02) — ROZ300..ROZ399 ----
+  RFOR_MISSING_KEY: 'ROZ300', // SEM-03: r-for without :key
+  RFOR_KEY_IS_LOOP_VARIABLE: 'ROZ301', // SEM-03: :key="index" / :key="item" (loop var)
+  RFOR_KEY_IS_NON_PRIMITIVE: 'ROZ302', // :key="someObj" (Pitfall 6 secondary case)
+  /** @deprecated placeholder — accessibility lint warnings deferred per CONTEXT.md A7. */
+  RIF_ACCESSIBILITY_PLACEHOLDER: 'ROZ303', // RESERVED — not emitted in Phase 2 (deferred per A7)
+
+  // ---- ROZ400+ reserved for Phase 3+ target emitters ----
 } as const;
 
 export type RozieErrorCode = (typeof RozieErrorCode)[keyof typeof RozieErrorCode];
