@@ -29,6 +29,7 @@ import type { SourceLoc } from '../ast/types.js';
 import type { Diagnostic } from '../diagnostics/Diagnostic.js';
 import type { ScriptAST } from '../ast/blocks/ScriptAST.js';
 import { parserPositionFor } from './parserPosition.js';
+import { RozieErrorCode } from '../diagnostics/codes.js';
 
 export interface ParseScriptResult {
   node: ScriptAST | null;
@@ -62,7 +63,7 @@ export function parseScript(
   } catch (err: unknown) {
     const e = err as { message?: string; loc?: { line: number; column: number; index?: number } };
     diagnostics.push({
-      code: 'ROZ031',
+      code: RozieErrorCode.SCRIPT_UNRECOVERABLE,
       severity: 'error',
       message: `Unrecoverable script syntax error: ${e.message ?? 'parse failed'}`,
       loc: { start: e.loc?.index ?? contentLoc.start, end: e.loc?.index ?? contentLoc.start },
@@ -78,7 +79,7 @@ export function parseScript(
       .errors ?? [];
   for (const e of errors) {
     diagnostics.push({
-      code: 'ROZ030',
+      code: RozieErrorCode.SCRIPT_PARSE_ERROR,
       severity: 'error',
       message: `Script syntax error: ${e.message ?? ''}`,
       loc: { start: e.loc?.index ?? contentLoc.start, end: e.loc?.index ?? contentLoc.start },

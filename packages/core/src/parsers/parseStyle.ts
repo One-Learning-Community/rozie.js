@@ -24,6 +24,7 @@ import type { Root, Rule } from 'postcss';
 import type { SourceLoc } from '../ast/types.js';
 import type { Diagnostic } from '../diagnostics/Diagnostic.js';
 import type { StyleAST, StyleRule } from '../ast/blocks/StyleAST.js';
+import { RozieErrorCode } from '../diagnostics/codes.js';
 
 export interface ParseStyleResult {
   node: StyleAST | null;
@@ -49,7 +50,7 @@ export function parseStyle(
   } catch (err: unknown) {
     const e = err as { message?: string };
     diagnostics.push({
-      code: 'ROZ080',
+      code: RozieErrorCode.STYLE_PARSE_ERROR,
       severity: 'error',
       message: `PostCSS parse error: ${e.message ?? 'parse failed'}`,
       loc: contentLoc,
@@ -79,7 +80,7 @@ export function parseStyle(
     const isPureRoot = parts.length === 1 && parts[0] === ':root';
     if (hasRoot && !isPureRoot) {
       diagnostics.push({
-        code: 'ROZ081',
+        code: RozieErrorCode.STYLE_MIXED_ROOT_SELECTOR,
         severity: 'error',
         message: `Mixed :root selector "${rule.selector}" is not allowed. Split :root rules into their own block.`,
         loc: ruleLoc,

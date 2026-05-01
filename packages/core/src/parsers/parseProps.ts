@@ -23,6 +23,7 @@ import type { SourceLoc } from '../ast/types.js';
 import type { Diagnostic } from '../diagnostics/Diagnostic.js';
 import type { PropsAST } from '../ast/blocks/PropsAST.js';
 import { parserPositionFor, babelLocToRozieLoc } from './parserPosition.js';
+import { RozieErrorCode } from '../diagnostics/codes.js';
 
 export interface ParsePropsResult {
   node: PropsAST | null;
@@ -48,7 +49,7 @@ export function parseProps(
   } catch (err: unknown) {
     const e = err as { message?: string; loc?: { index?: number } };
     diagnostics.push({
-      code: 'ROZ010',
+      code: RozieErrorCode.INVALID_DECLARATIVE_EXPRESSION,
       severity: 'error',
       message: `Invalid JS expression in <props>: ${e.message ?? 'parse failed'}`,
       loc: { start: e.loc?.index ?? contentLoc.start, end: e.loc?.index ?? contentLoc.start },
@@ -65,7 +66,7 @@ export function parseProps(
     (expr as unknown as { errors?: Array<{ loc?: { index?: number }; message?: string }> }).errors ?? [];
   for (const e of errors) {
     diagnostics.push({
-      code: 'ROZ010',
+      code: RozieErrorCode.INVALID_DECLARATIVE_EXPRESSION,
       severity: 'error',
       message: `Invalid JS expression in <props>: ${e.message ?? ''}`,
       loc: { start: e.loc?.index ?? contentLoc.start, end: e.loc?.index ?? contentLoc.start },
@@ -75,7 +76,7 @@ export function parseProps(
 
   if (expr.type !== 'ObjectExpression') {
     diagnostics.push({
-      code: 'ROZ011',
+      code: RozieErrorCode.NOT_OBJECT_LITERAL,
       severity: 'error',
       message: `<props> must be a JS object literal expression — found ${expr.type}.`,
       loc: babelLocToRozieLoc(expr),

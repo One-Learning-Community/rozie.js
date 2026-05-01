@@ -49,6 +49,7 @@ import type {
   TemplateText,
   TemplateInterpolation,
 } from '../ast/blocks/TemplateAST.js';
+import { RozieErrorCode } from '../diagnostics/codes.js';
 
 export interface ParseTemplateResult {
   node: TemplateAST | null;
@@ -171,7 +172,7 @@ export function parseTemplate(
       const unmatched = tail.indexOf('{{');
       if (unmatched >= 0) {
         diagnostics.push({
-          code: 'ROZ051',
+          code: RozieErrorCode.TEMPLATE_MALFORMED_MUSTACHE,
           severity: 'error',
           message: 'Unmatched `{{` in template — expected a closing `}}` in the same text run.',
           loc: { start: start + cursor + unmatched, end: start + cursor + unmatched + 2 },
@@ -292,7 +293,7 @@ export function parseTemplate(
           }
           // Mismatched — emit ROZ050 for the unclosed element.
           diagnostics.push({
-            code: 'ROZ050',
+            code: RozieErrorCode.TEMPLATE_UNCLOSED_ELEMENT,
             severity: 'error',
             message: `Unclosed template element <${popped.tagName}>.`,
             loc: { start: popped.tagOpenStart, end: popped.tagOpenStart + popped.tagName.length + 1 },
@@ -322,7 +323,7 @@ export function parseTemplate(
         while (stack.length > 0) {
           const popped = stack.pop() as PendingElement & { _node?: TemplateElement };
           diagnostics.push({
-            code: 'ROZ050',
+            code: RozieErrorCode.TEMPLATE_UNCLOSED_ELEMENT,
             severity: 'error',
             message: `Unclosed template element <${popped.tagName}>.`,
             loc: { start: popped.tagOpenStart, end: popped.tagOpenStart + popped.tagName.length + 1 },

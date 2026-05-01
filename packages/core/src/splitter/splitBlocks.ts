@@ -26,6 +26,7 @@
 import { Tokenizer } from 'htmlparser2';
 import type { BlockEntry, BlockMap } from '../ast/types.js';
 import type { Diagnostic } from '../diagnostics/Diagnostic.js';
+import { RozieErrorCode } from '../diagnostics/codes.js';
 
 /** The seven recognized top-level block tags. */
 const BLOCK_NAMES = new Set([
@@ -137,7 +138,7 @@ export function splitBlocks(source: string, filename?: string): SplitBlocksResul
             if (result.rozie) {
               // Multiple <rozie> envelopes (ROZ002).
               pushDiag({
-                code: 'ROZ002',
+                code: RozieErrorCode.MULTIPLE_ROZIE_ENVELOPES,
                 severity: 'error',
                 message: 'Multiple <rozie> envelopes found. A .rozie file must contain exactly one <rozie> root.',
                 loc: { start: lastOpenTagStart, end: endIndex + 1 },
@@ -163,7 +164,7 @@ export function splitBlocks(source: string, filename?: string): SplitBlocksResul
           if (pendingTagName === 'rozie') {
             // Nested <rozie>? Already handled above as depth==0; at depth==1 it's malformed.
             pushDiag({
-              code: 'ROZ002',
+              code: RozieErrorCode.MULTIPLE_ROZIE_ENVELOPES,
               severity: 'error',
               message: 'Nested <rozie> envelope is not permitted.',
               loc: { start: lastOpenTagStart, end: endIndex + 1 },
@@ -175,7 +176,7 @@ export function splitBlocks(source: string, filename?: string): SplitBlocksResul
             if (result[blockName] !== undefined) {
               // Duplicate block (ROZ004).
               pushDiag({
-                code: 'ROZ004',
+                code: RozieErrorCode.DUPLICATE_BLOCK,
                 severity: 'error',
                 message: `Duplicate <${blockName}> block. Each .rozie file may contain at most one <${blockName}> block.`,
                 loc: { start: lastOpenTagStart, end: endIndex + 1 },
@@ -190,7 +191,7 @@ export function splitBlocks(source: string, filename?: string): SplitBlocksResul
             // Unknown top-level block — ROZ003.
             const isRefs = pendingTagName === 'refs';
             pushDiag({
-              code: 'ROZ003',
+              code: RozieErrorCode.UNKNOWN_TOP_LEVEL_BLOCK,
               severity: 'error',
               message: `Unknown top-level block: <${pendingTagName}>. Recognized blocks are: <props>, <data>, <script>, <listeners>, <template>, <style>.`,
               loc: { start: lastOpenTagStart, end: endIndex + 1 },
@@ -266,7 +267,7 @@ export function splitBlocks(source: string, filename?: string): SplitBlocksResul
   // Post-pass: missing <rozie> envelope (ROZ001).
   if (!result.rozie) {
     pushDiag({
-      code: 'ROZ001',
+      code: RozieErrorCode.MISSING_ROZIE_ENVELOPE,
       severity: 'error',
       message: 'Missing <rozie> envelope. A .rozie file must wrap its blocks in a <rozie name="..."> root element.',
       loc: { start: 0, end: 0 },

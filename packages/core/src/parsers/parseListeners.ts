@@ -35,6 +35,7 @@ import type { SourceLoc } from '../ast/types.js';
 import type { Diagnostic } from '../diagnostics/Diagnostic.js';
 import type { ListenersAST, ListenerEntry } from '../ast/blocks/ListenersAST.js';
 import { parserPositionFor, babelLocToRozieLoc } from './parserPosition.js';
+import { RozieErrorCode } from '../diagnostics/codes.js';
 
 export interface ParseListenersResult {
   node: ListenersAST | null;
@@ -60,7 +61,7 @@ export function parseListeners(
   } catch (err: unknown) {
     const e = err as { message?: string; loc?: { index?: number } };
     diagnostics.push({
-      code: 'ROZ010',
+      code: RozieErrorCode.INVALID_DECLARATIVE_EXPRESSION,
       severity: 'error',
       message: `Invalid JS expression in <listeners>: ${e.message ?? 'parse failed'}`,
       loc: { start: e.loc?.index ?? contentLoc.start, end: e.loc?.index ?? contentLoc.start },
@@ -73,7 +74,7 @@ export function parseListeners(
     (expr as unknown as { errors?: Array<{ loc?: { index?: number }; message?: string }> }).errors ?? [];
   for (const e of recoverableErrors) {
     diagnostics.push({
-      code: 'ROZ010',
+      code: RozieErrorCode.INVALID_DECLARATIVE_EXPRESSION,
       severity: 'error',
       message: `Invalid JS expression in <listeners>: ${e.message ?? ''}`,
       loc: { start: e.loc?.index ?? contentLoc.start, end: e.loc?.index ?? contentLoc.start },
@@ -83,7 +84,7 @@ export function parseListeners(
 
   if (expr.type !== 'ObjectExpression') {
     diagnostics.push({
-      code: 'ROZ011',
+      code: RozieErrorCode.NOT_OBJECT_LITERAL,
       severity: 'error',
       message: `<listeners> must be a JS object literal — found ${expr.type}.`,
       loc: babelLocToRozieLoc(expr),
@@ -97,7 +98,7 @@ export function parseListeners(
   for (const prop of (expr as ObjectExpression).properties) {
     if (prop.type !== 'ObjectProperty') {
       diagnostics.push({
-        code: 'ROZ013',
+        code: RozieErrorCode.LISTENER_VALUE_NOT_OBJECT,
         severity: 'error',
         message: '<listeners> may only contain key:value object properties (no spreads or methods).',
         loc: babelLocToRozieLoc(prop),
@@ -108,7 +109,7 @@ export function parseListeners(
     const objProp = prop as ObjectProperty;
     if (objProp.key.type !== 'StringLiteral') {
       diagnostics.push({
-        code: 'ROZ012',
+        code: RozieErrorCode.LISTENER_KEY_NOT_STRING,
         severity: 'error',
         message: '<listeners> keys must be string literals like "document:click.outside($refs.x)".',
         loc: babelLocToRozieLoc(objProp.key),

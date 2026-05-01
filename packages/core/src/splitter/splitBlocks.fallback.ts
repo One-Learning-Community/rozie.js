@@ -34,6 +34,7 @@
 import { parse as parseSFC } from '@vue/compiler-sfc';
 import type { BlockEntry, BlockMap } from '../ast/types.js';
 import type { Diagnostic } from '../diagnostics/Diagnostic.js';
+import { RozieErrorCode } from '../diagnostics/codes.js';
 
 export type SplitBlocksResult = BlockMap & { diagnostics: Diagnostic[] };
 
@@ -57,7 +58,7 @@ export function splitBlocksFallback(source: string, filename?: string): SplitBlo
   // central registry can refine this when activation actually happens.
   for (const err of errors) {
     result.diagnostics.push({
-      code: 'ROZ001',
+      code: RozieErrorCode.MISSING_ROZIE_ENVELOPE,
       severity: 'error',
       message: `[fallback parser] ${err.message ?? String(err)}`,
       loc: { start: 0, end: 0 },
@@ -86,7 +87,7 @@ export function splitBlocksFallback(source: string, filename?: string): SplitBlo
   }
   if (descriptor.styles.length > 1) {
     result.diagnostics.push({
-      code: 'ROZ004',
+      code: RozieErrorCode.DUPLICATE_BLOCK,
       severity: 'error',
       message: `Duplicate <style> block. Each .rozie file may contain at most one <style> block.`,
       loc: { start: 0, end: 0 },
@@ -100,7 +101,7 @@ export function splitBlocksFallback(source: string, filename?: string): SplitBlo
     if (tag === 'props' || tag === 'data' || tag === 'listeners') {
       if (result[tag] !== undefined) {
         result.diagnostics.push({
-          code: 'ROZ004',
+          code: RozieErrorCode.DUPLICATE_BLOCK,
           severity: 'error',
           message: `Duplicate <${tag}> block. Each .rozie file may contain at most one <${tag}> block.`,
           loc: { start: cb.loc.start.offset, end: cb.loc.end.offset },
@@ -113,7 +114,7 @@ export function splitBlocksFallback(source: string, filename?: string): SplitBlo
     } else {
       const isRefs = tag === 'refs';
       result.diagnostics.push({
-        code: 'ROZ003',
+        code: RozieErrorCode.UNKNOWN_TOP_LEVEL_BLOCK,
         severity: 'error',
         message: `Unknown top-level block: <${tag}>. Recognized blocks are: <props>, <data>, <script>, <listeners>, <template>, <style>.`,
         loc: { start: cb.loc.start.offset, end: cb.loc.end.offset },
@@ -140,7 +141,7 @@ export function splitBlocksFallback(source: string, filename?: string): SplitBlo
     };
   } else {
     result.diagnostics.push({
-      code: 'ROZ001',
+      code: RozieErrorCode.MISSING_ROZIE_ENVELOPE,
       severity: 'error',
       message: 'Missing <rozie> envelope. A .rozie file must wrap its blocks in a <rozie name="..."> root element.',
       loc: { start: 0, end: 0 },
