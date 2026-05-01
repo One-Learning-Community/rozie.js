@@ -1,0 +1,13 @@
+{
+  "name": "@rozie/target-angular",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "main": "./src/index.ts",
+  "scripts": {
+    "build": "echo 'Phase 1: scaffold only' && exit 0",
+    "test": "echo 'Phase 1: no tests' && exit 0",
+    "lint": "biome lint src",
+    "typecheck": "tsc --noEmit"
+  }
+}
