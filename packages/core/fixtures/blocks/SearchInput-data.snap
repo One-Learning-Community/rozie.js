@@ -1,0 +1,81 @@
+{
+  "node": {
+    "type": "DataAST",
+    "loc": {
+      "start": 689,
+      "end": 707
+    },
+    "expression": {
+      "type": "ObjectExpression",
+      "start": 690,
+      "end": 706,
+      "loc": {
+        "start": {
+          "line": 26,
+          "column": 0,
+          "index": 690
+        },
+        "end": {
+          "line": 28,
+          "column": 1,
+          "index": 706
+        },
+        "filename": "SearchInput.rozie"
+      },
+      "properties": [
+        {
+          "type": "ObjectProperty",
+          "start": 694,
+          "end": 703,
+          "loc": {
+            "start": {
+              "line": 27,
+              "column": 2,
+              "index": 694
+            },
+            "end": {
+              "line": 27,
+              "column": 11,
+              "index": 703
+            },
+            "filename": "SearchInput.rozie"
+          },
+          "method": false,
+          "key": {
+            "type": "Identifier",
+            "start": 694,
+            "end": 699,
+            "loc": {
+              "end": {
+                "line": 27,
+                "column": 7,
+                "index": 699
+              },
+              "filename": "SearchInput.rozie",
+              "identifierName": "query"
+            },
+            "name": "query"
+          },
+          "computed": false,
+          "shorthand": false,
+          "value": {
+            "type": "StringLiteral",
+            "start": 701,
+            "end": 703,
+            "loc": {
+              "start": {
+                "line": 27,
+                "column": 9,
+                "index": 701
+              },
+              "filename": "SearchInput.rozie"
+            },
+            "value": ""
+          }
+        }
+      ],
+      "comments": []
+    }
+  },
+  "diagnostics": []
+}

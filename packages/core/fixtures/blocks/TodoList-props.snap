@@ -1,0 +1,402 @@
+{
+  "node": {
+    "type": "PropsAST",
+    "loc": {
+      "start": 534,
+      "end": 641
+    },
+    "expression": {
+      "type": "ObjectExpression",
+      "start": 535,
+      "end": 640,
+      "loc": {
+        "start": {
+          "line": 18,
+          "column": 0,
+          "index": 535
+        },
+        "end": {
+          "line": 21,
+          "column": 1,
+          "index": 640
+        },
+        "filename": "TodoList.rozie"
+      },
+      "properties": [
+        {
+          "type": "ObjectProperty",
+          "start": 539,
+          "end": 593,
+          "loc": {
+            "start": {
+              "line": 19,
+              "column": 2,
+              "index": 539
+            },
+            "end": {
+              "line": 19,
+              "column": 56,
+              "index": 593
+            },
+            "filename": "TodoList.rozie"
+          },
+          "method": false,
+          "key": {
+            "type": "Identifier",
+            "start": 539,
+            "end": 544,
+            "loc": {
+              "end": {
+                "line": 19,
+                "column": 7,
+                "index": 544
+              },
+              "filename": "TodoList.rozie",
+              "identifierName": "items"
+            },
+            "name": "items"
+          },
+          "computed": false,
+          "shorthand": false,
+          "value": {
+            "type": "ObjectExpression",
+            "start": 546,
+            "end": 593,
+            "loc": {
+              "start": {
+                "line": 19,
+                "column": 9,
+                "index": 546
+              },
+              "filename": "TodoList.rozie"
+            },
+            "properties": [
+              {
+                "type": "ObjectProperty",
+                "start": 548,
+                "end": 559,
+                "loc": {
+                  "start": {
+                    "line": 19,
+                    "column": 11,
+                    "index": 548
+                  },
+                  "end": {
+                    "line": 19,
+                    "column": 22,
+                    "index": 559
+                  },
+                  "filename": "TodoList.rozie"
+                },
+                "method": false,
+                "key": {
+                  "type": "Identifier",
+                  "start": 548,
+                  "end": 552,
+                  "loc": {
+                    "end": {
+                      "line": 19,
+                      "column": 15,
+                      "index": 552
+                    },
+                    "filename": "TodoList.rozie",
+                    "identifierName": "type"
+                  },
+                  "name": "type"
+                },
+                "computed": false,
+                "shorthand": false,
+                "value": {
+                  "type": "Identifier",
+                  "start": 554,
+                  "end": 559,
+                  "loc": {
+                    "start": {
+                      "line": 19,
+                      "column": 17,
+                      "index": 554
+                    },
+                    "filename": "TodoList.rozie",
+                    "identifierName": "Array"
+                  },
+                  "name": "Array"
+                }
+              },
+              {
+                "type": "ObjectProperty",
+                "start": 561,
+                "end": 578,
+                "loc": {
+                  "start": {
+                    "line": 19,
+                    "column": 24,
+                    "index": 561
+                  },
+                  "end": {
+                    "line": 19,
+                    "column": 41,
+                    "index": 578
+                  },
+                  "filename": "TodoList.rozie"
+                },
+                "method": false,
+                "key": {
+                  "type": "Identifier",
+                  "start": 561,
+                  "end": 568,
+                  "loc": {
+                    "end": {
+                      "line": 19,
+                      "column": 31,
+                      "index": 568
+                    },
+                    "filename": "TodoList.rozie",
+                    "identifierName": "default"
+                  },
+                  "name": "default"
+                },
+                "computed": false,
+                "shorthand": false,
+                "value": {
+                  "type": "ArrowFunctionExpression",
+                  "start": 570,
+                  "end": 578,
+                  "loc": {
+                    "start": {
+                      "line": 19,
+                      "column": 33,
+                      "index": 570
+                    },
+                    "filename": "TodoList.rozie"
+                  },
+                  "id": null,
+                  "generator": false,
+                  "async": false,
+                  "params": [],
+                  "body": {
+                    "type": "ArrayExpression",
+                    "start": 576,
+                    "end": 578,
+                    "loc": {
+                      "start": {
+                        "line": 19,
+                        "column": 39,
+                        "index": 576
+                      },
+                      "filename": "TodoList.rozie"
+                    },
+                    "elements": []
+                  }
+                }
+              },
+              {
+                "type": "ObjectProperty",
+                "start": 580,
+                "end": 591,
+                "loc": {
+                  "start": {
+                    "line": 19,
+                    "column": 43,
+                    "index": 580
+                  },
+                  "end": {
+                    "line": 19,
+                    "column": 54,
+                    "index": 591
+                  },
+                  "filename": "TodoList.rozie"
+                },
+                "method": false,
+                "key": {
+                  "type": "Identifier",
+                  "start": 580,
+                  "end": 585,
+                  "loc": {
+                    "end": {
+                      "line": 19,
+                      "column": 48,
+                      "index": 585
+                    },
+                    "filename": "TodoList.rozie",
+                    "identifierName": "model"
+                  },
+                  "name": "model"
+                },
+                "computed": false,
+                "shorthand": false,
+                "value": {
+                  "type": "BooleanLiteral",
+                  "start": 587,
+                  "end": 591,
+                  "loc": {
+                    "start": {
+                      "line": 19,
+                      "column": 50,
+                      "index": 587
+                    },
+                    "filename": "TodoList.rozie"
+                  },
+                  "value": true
+                }
+              }
+            ]
+          }
+        },
+        {
+          "type": "ObjectProperty",
+          "start": 597,
+          "end": 637,
+          "loc": {
+            "start": {
+              "line": 20,
+              "column": 2,
+              "index": 597
+            },
+            "end": {
+              "line": 20,
+              "column": 42,
+              "index": 637
+            },
+            "filename": "TodoList.rozie"
+          },
+          "method": false,
+          "key": {
+            "type": "Identifier",
+            "start": 597,
+            "end": 602,
+            "loc": {
+              "end": {
+                "line": 20,
+                "column": 7,
+                "index": 602
+              },
+              "filename": "TodoList.rozie",
+              "identifierName": "title"
+            },
+            "name": "title"
+          },
+          "computed": false,
+          "shorthand": false,
+          "value": {
+            "type": "ObjectExpression",
+            "start": 604,
+            "end": 637,
+            "loc": {
+              "start": {
+                "line": 20,
+                "column": 9,
+                "index": 604
+              },
+              "filename": "TodoList.rozie"
+            },
+            "properties": [
+              {
+                "type": "ObjectProperty",
+                "start": 606,
+                "end": 618,
+                "loc": {
+                  "start": {
+                    "line": 20,
+                    "column": 11,
+                    "index": 606
+                  },
+                  "end": {
+                    "line": 20,
+                    "column": 23,
+                    "index": 618
+                  },
+                  "filename": "TodoList.rozie"
+                },
+                "method": false,
+                "key": {
+                  "type": "Identifier",
+                  "start": 606,
+                  "end": 610,
+                  "loc": {
+                    "end": {
+                      "line": 20,
+                      "column": 15,
+                      "index": 610
+                    },
+                    "filename": "TodoList.rozie",
+                    "identifierName": "type"
+                  },
+                  "name": "type"
+                },
+                "computed": false,
+                "shorthand": false,
+                "value": {
+                  "type": "Identifier",
+                  "start": 612,
+                  "end": 618,
+                  "loc": {
+                    "start": {
+                      "line": 20,
+                      "column": 17,
+                      "index": 612
+                    },
+                    "filename": "TodoList.rozie",
+                    "identifierName": "String"
+                  },
+                  "name": "String"
+                }
+              },
+              {
+                "type": "ObjectProperty",
+                "start": 620,
+                "end": 635,
+                "loc": {
+                  "start": {
+                    "line": 20,
+                    "column": 25,
+                    "index": 620
+                  },
+                  "end": {
+                    "line": 20,
+                    "column": 40,
+                    "index": 635
+                  },
+                  "filename": "TodoList.rozie"
+                },
+                "method": false,
+                "key": {
+                  "type": "Identifier",
+                  "start": 620,
+                  "end": 627,
+                  "loc": {
+                    "end": {
+                      "line": 20,
+                      "column": 32,
+                      "index": 627
+                    },
+                    "filename": "TodoList.rozie",
+                    "identifierName": "default"
+                  },
+                  "name": "default"
+                },
+                "computed": false,
+                "shorthand": false,
+                "value": {
+                  "type": "StringLiteral",
+                  "start": 629,
+                  "end": 635,
+                  "loc": {
+                    "start": {
+                      "line": 20,
+                      "column": 34,
+                      "index": 629
+                    },
+                    "filename": "TodoList.rozie"
+                  },
+                  "value": "Todo"
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "comments": []
+    }
+  },
+  "diagnostics": []
+}

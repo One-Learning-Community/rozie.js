@@ -1,0 +1,364 @@
+{
+  "node": {
+    "type": "TemplateAST",
+    "loc": {
+      "start": 1265,
+      "end": 1929
+    },
+    "children": [
+      {
+        "type": "TemplateText",
+        "text": "\n",
+        "loc": {
+          "start": 1265,
+          "end": 1266
+        }
+      },
+      {
+        "type": "TemplateElement",
+        "tagName": "div",
+        "attributes": [
+          {
+            "kind": "static",
+            "rawName": "class",
+            "name": "class",
+            "modifierChainText": "",
+            "modifierChainBaseOffset": 1276,
+            "value": "search-input",
+            "valueLoc": {
+              "start": 1278,
+              "end": 1290
+            },
+            "loc": {
+              "start": 1271,
+              "end": 1291
+            }
+          }
+        ],
+        "children": [
+          {
+            "type": "TemplateText",
+            "text": "\n  ",
+            "loc": {
+              "start": 1292,
+              "end": 1295
+            }
+          },
+          {
+            "type": "TemplateText",
+            "text": "\n  ",
+            "loc": {
+              "start": 1536,
+              "end": 1539
+            }
+          },
+          {
+            "type": "TemplateElement",
+            "tagName": "input",
+            "attributes": [
+              {
+                "kind": "static",
+                "rawName": "ref",
+                "name": "ref",
+                "modifierChainText": "",
+                "modifierChainBaseOffset": 1553,
+                "value": "inputEl",
+                "valueLoc": {
+                  "start": 1555,
+                  "end": 1562
+                },
+                "loc": {
+                  "start": 1550,
+                  "end": 1563
+                }
+              },
+              {
+                "kind": "static",
+                "rawName": "type",
+                "name": "type",
+                "modifierChainText": "",
+                "modifierChainBaseOffset": 1572,
+                "value": "search",
+                "valueLoc": {
+                  "start": 1574,
+                  "end": 1580
+                },
+                "loc": {
+                  "start": 1568,
+                  "end": 1581
+                }
+              },
+              {
+                "kind": "binding",
+                "rawName": ":placeholder",
+                "name": "placeholder",
+                "modifierChainText": "",
+                "modifierChainBaseOffset": 1598,
+                "value": "$props.placeholder",
+                "valueLoc": {
+                  "start": 1600,
+                  "end": 1618
+                },
+                "loc": {
+                  "start": 1586,
+                  "end": 1619
+                }
+              },
+              {
+                "kind": "directive",
+                "rawName": "r-model",
+                "name": "model",
+                "modifierChainText": "",
+                "modifierChainBaseOffset": 1631,
+                "value": "$data.query",
+                "valueLoc": {
+                  "start": 1633,
+                  "end": 1644
+                },
+                "loc": {
+                  "start": 1624,
+                  "end": 1645
+                }
+              },
+              {
+                "kind": "event",
+                "rawName": "@input.debounce(300)",
+                "name": "input",
+                "modifierChainText": ".debounce(300)",
+                "modifierChainBaseOffset": 1656,
+                "value": "onSearch",
+                "valueLoc": {
+                  "start": 1672,
+                  "end": 1680
+                },
+                "loc": {
+                  "start": 1650,
+                  "end": 1681
+                }
+              },
+              {
+                "kind": "event",
+                "rawName": "@keydown.enter",
+                "name": "keydown",
+                "modifierChainText": ".enter",
+                "modifierChainBaseOffset": 1694,
+                "value": "onSearch",
+                "valueLoc": {
+                  "start": 1702,
+                  "end": 1710
+                },
+                "loc": {
+                  "start": 1686,
+                  "end": 1711
+                }
+              },
+              {
+                "kind": "event",
+                "rawName": "@keydown.escape",
+                "name": "keydown",
+                "modifierChainText": ".escape",
+                "modifierChainBaseOffset": 1724,
+                "value": "clear",
+                "valueLoc": {
+                  "start": 1733,
+                  "end": 1738
+                },
+                "loc": {
+                  "start": 1716,
+                  "end": 1739
+                }
+              }
+            ],
+            "children": [],
+            "selfClosing": true,
+            "loc": {
+              "start": 1539,
+              "end": 1744
+            }
+          },
+          {
+            "type": "TemplateText",
+            "text": "\n\n  ",
+            "loc": {
+              "start": 1744,
+              "end": 1748
+            }
+          },
+          {
+            "type": "TemplateElement",
+            "tagName": "button",
+            "attributes": [
+              {
+                "kind": "directive",
+                "rawName": "r-if",
+                "name": "if",
+                "modifierChainText": "",
+                "modifierChainBaseOffset": 1760,
+                "value": "$data.query.length > 0",
+                "valueLoc": {
+                  "start": 1762,
+                  "end": 1784
+                },
+                "loc": {
+                  "start": 1756,
+                  "end": 1785
+                }
+              },
+              {
+                "kind": "static",
+                "rawName": "class",
+                "name": "class",
+                "modifierChainText": "",
+                "modifierChainBaseOffset": 1791,
+                "value": "clear-btn",
+                "valueLoc": {
+                  "start": 1793,
+                  "end": 1802
+                },
+                "loc": {
+                  "start": 1786,
+                  "end": 1803
+                }
+              },
+              {
+                "kind": "event",
+                "rawName": "@click",
+                "name": "click",
+                "modifierChainText": "",
+                "modifierChainBaseOffset": 1810,
+                "value": "clear",
+                "valueLoc": {
+                  "start": 1812,
+                  "end": 1817
+                },
+                "loc": {
+                  "start": 1804,
+                  "end": 1818
+                }
+              },
+              {
+                "kind": "static",
+                "rawName": "aria-label",
+                "name": "aria-label",
+                "modifierChainText": "",
+                "modifierChainBaseOffset": 1829,
+                "value": "Clear",
+                "valueLoc": {
+                  "start": 1831,
+                  "end": 1836
+                },
+                "loc": {
+                  "start": 1819,
+                  "end": 1837
+                }
+              }
+            ],
+            "children": [
+              {
+                "type": "TemplateText",
+                "text": "\n    ×\n  ",
+                "loc": {
+                  "start": 1838,
+                  "end": 1847
+                }
+              }
+            ],
+            "selfClosing": false,
+            "loc": {
+              "start": 1748,
+              "end": 1856
+            }
+          },
+          {
+            "type": "TemplateText",
+            "text": "\n  ",
+            "loc": {
+              "start": 1856,
+              "end": 1859
+            }
+          },
+          {
+            "type": "TemplateElement",
+            "tagName": "span",
+            "attributes": [
+              {
+                "kind": "directive",
+                "rawName": "r-else",
+                "name": "else",
+                "modifierChainText": "",
+                "modifierChainBaseOffset": 1871,
+                "value": null,
+                "valueLoc": null,
+                "loc": {
+                  "start": 1865,
+                  "end": 1871
+                }
+              },
+              {
+                "kind": "static",
+                "rawName": "class",
+                "name": "class",
+                "modifierChainText": "",
+                "modifierChainBaseOffset": 1877,
+                "value": "hint",
+                "valueLoc": {
+                  "start": 1879,
+                  "end": 1883
+                },
+                "loc": {
+                  "start": 1872,
+                  "end": 1884
+                }
+              }
+            ],
+            "children": [
+              {
+                "type": "TemplateInterpolation",
+                "rawExpr": " $props.minLength ",
+                "loc": {
+                  "start": 1885,
+                  "end": 1907
+                }
+              },
+              {
+                "type": "TemplateText",
+                "text": "+ chars",
+                "loc": {
+                  "start": 1907,
+                  "end": 1914
+                }
+              }
+            ],
+            "selfClosing": false,
+            "loc": {
+              "start": 1859,
+              "end": 1921
+            }
+          },
+          {
+            "type": "TemplateText",
+            "text": "\n",
+            "loc": {
+              "start": 1921,
+              "end": 1922
+            }
+          }
+        ],
+        "selfClosing": false,
+        "loc": {
+          "start": 1266,
+          "end": 1928
+        }
+      },
+      {
+        "type": "TemplateText",
+        "text": "\n",
+        "loc": {
+          "start": 1928,
+          "end": 1929
+        }
+      }
+    ]
+  },
+  "diagnostics": []
+}

@@ -1,0 +1,312 @@
+{
+  "node": {
+    "type": "TemplateAST",
+    "loc": {
+      "start": 982,
+      "end": 1358
+    },
+    "children": [
+      {
+        "type": "TemplateText",
+        "text": "\n",
+        "loc": {
+          "start": 982,
+          "end": 983
+        }
+      },
+      {
+        "type": "TemplateElement",
+        "tagName": "div",
+        "attributes": [
+          {
+            "kind": "static",
+            "rawName": "class",
+            "name": "class",
+            "modifierChainText": "",
+            "modifierChainBaseOffset": 995,
+            "value": "counter",
+            "valueLoc": {
+              "start": 997,
+              "end": 1004
+            },
+            "loc": {
+              "start": 990,
+              "end": 1005
+            }
+          },
+          {
+            "kind": "binding",
+            "rawName": ":class",
+            "name": "class",
+            "modifierChainText": "",
+            "modifierChainBaseOffset": 1014,
+            "value": "{ hovering: $data.hovering }",
+            "valueLoc": {
+              "start": 1016,
+              "end": 1044
+            },
+            "loc": {
+              "start": 1008,
+              "end": 1045
+            }
+          },
+          {
+            "kind": "event",
+            "rawName": "@mouseenter",
+            "name": "mouseenter",
+            "modifierChainText": "",
+            "modifierChainBaseOffset": 1059,
+            "value": "$data.hovering = true",
+            "valueLoc": {
+              "start": 1061,
+              "end": 1082
+            },
+            "loc": {
+              "start": 1048,
+              "end": 1083
+            }
+          },
+          {
+            "kind": "event",
+            "rawName": "@mouseleave",
+            "name": "mouseleave",
+            "modifierChainText": "",
+            "modifierChainBaseOffset": 1097,
+            "value": "$data.hovering = false",
+            "valueLoc": {
+              "start": 1099,
+              "end": 1121
+            },
+            "loc": {
+              "start": 1086,
+              "end": 1122
+            }
+          }
+        ],
+        "children": [
+          {
+            "type": "TemplateText",
+            "text": "\n  ",
+            "loc": {
+              "start": 1124,
+              "end": 1127
+            }
+          },
+          {
+            "type": "TemplateElement",
+            "tagName": "button",
+            "attributes": [
+              {
+                "kind": "binding",
+                "rawName": ":disabled",
+                "name": "disabled",
+                "modifierChainText": "",
+                "modifierChainBaseOffset": 1144,
+                "value": "!canDecrement",
+                "valueLoc": {
+                  "start": 1146,
+                  "end": 1159
+                },
+                "loc": {
+                  "start": 1135,
+                  "end": 1160
+                }
+              },
+              {
+                "kind": "event",
+                "rawName": "@click",
+                "name": "click",
+                "modifierChainText": "",
+                "modifierChainBaseOffset": 1167,
+                "value": "decrement",
+                "valueLoc": {
+                  "start": 1169,
+                  "end": 1178
+                },
+                "loc": {
+                  "start": 1161,
+                  "end": 1179
+                }
+              },
+              {
+                "kind": "static",
+                "rawName": "aria-label",
+                "name": "aria-label",
+                "modifierChainText": "",
+                "modifierChainBaseOffset": 1190,
+                "value": "Decrement",
+                "valueLoc": {
+                  "start": 1192,
+                  "end": 1201
+                },
+                "loc": {
+                  "start": 1180,
+                  "end": 1202
+                }
+              }
+            ],
+            "children": [
+              {
+                "type": "TemplateText",
+                "text": "−",
+                "loc": {
+                  "start": 1203,
+                  "end": 1204
+                }
+              }
+            ],
+            "selfClosing": false,
+            "loc": {
+              "start": 1127,
+              "end": 1213
+            }
+          },
+          {
+            "type": "TemplateText",
+            "text": "\n  ",
+            "loc": {
+              "start": 1213,
+              "end": 1216
+            }
+          },
+          {
+            "type": "TemplateElement",
+            "tagName": "span",
+            "attributes": [
+              {
+                "kind": "static",
+                "rawName": "class",
+                "name": "class",
+                "modifierChainText": "",
+                "modifierChainBaseOffset": 1227,
+                "value": "value",
+                "valueLoc": {
+                  "start": 1229,
+                  "end": 1234
+                },
+                "loc": {
+                  "start": 1222,
+                  "end": 1235
+                }
+              }
+            ],
+            "children": [
+              {
+                "type": "TemplateInterpolation",
+                "rawExpr": " $props.value ",
+                "loc": {
+                  "start": 1236,
+                  "end": 1254
+                }
+              }
+            ],
+            "selfClosing": false,
+            "loc": {
+              "start": 1216,
+              "end": 1261
+            }
+          },
+          {
+            "type": "TemplateText",
+            "text": "\n  ",
+            "loc": {
+              "start": 1261,
+              "end": 1264
+            }
+          },
+          {
+            "type": "TemplateElement",
+            "tagName": "button",
+            "attributes": [
+              {
+                "kind": "binding",
+                "rawName": ":disabled",
+                "name": "disabled",
+                "modifierChainText": "",
+                "modifierChainBaseOffset": 1281,
+                "value": "!canIncrement",
+                "valueLoc": {
+                  "start": 1283,
+                  "end": 1296
+                },
+                "loc": {
+                  "start": 1272,
+                  "end": 1297
+                }
+              },
+              {
+                "kind": "event",
+                "rawName": "@click",
+                "name": "click",
+                "modifierChainText": "",
+                "modifierChainBaseOffset": 1304,
+                "value": "increment",
+                "valueLoc": {
+                  "start": 1306,
+                  "end": 1315
+                },
+                "loc": {
+                  "start": 1298,
+                  "end": 1316
+                }
+              },
+              {
+                "kind": "static",
+                "rawName": "aria-label",
+                "name": "aria-label",
+                "modifierChainText": "",
+                "modifierChainBaseOffset": 1327,
+                "value": "Increment",
+                "valueLoc": {
+                  "start": 1329,
+                  "end": 1338
+                },
+                "loc": {
+                  "start": 1317,
+                  "end": 1339
+                }
+              }
+            ],
+            "children": [
+              {
+                "type": "TemplateText",
+                "text": "+",
+                "loc": {
+                  "start": 1340,
+                  "end": 1341
+                }
+              }
+            ],
+            "selfClosing": false,
+            "loc": {
+              "start": 1264,
+              "end": 1350
+            }
+          },
+          {
+            "type": "TemplateText",
+            "text": "\n",
+            "loc": {
+              "start": 1350,
+              "end": 1351
+            }
+          }
+        ],
+        "selfClosing": false,
+        "loc": {
+          "start": 983,
+          "end": 1357
+        }
+      },
+      {
+        "type": "TemplateText",
+        "text": "\n",
+        "loc": {
+          "start": 1357,
+          "end": 1358
+        }
+      }
+    ]
+  },
+  "diagnostics": []
+}

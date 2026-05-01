@@ -1,0 +1,81 @@
+{
+  "node": {
+    "type": "DataAST",
+    "loc": {
+      "start": 612,
+      "end": 636
+    },
+    "expression": {
+      "type": "ObjectExpression",
+      "start": 613,
+      "end": 635,
+      "loc": {
+        "start": {
+          "line": 26,
+          "column": 0,
+          "index": 613
+        },
+        "end": {
+          "line": 28,
+          "column": 1,
+          "index": 635
+        },
+        "filename": "Counter.rozie"
+      },
+      "properties": [
+        {
+          "type": "ObjectProperty",
+          "start": 617,
+          "end": 632,
+          "loc": {
+            "start": {
+              "line": 27,
+              "column": 2,
+              "index": 617
+            },
+            "end": {
+              "line": 27,
+              "column": 17,
+              "index": 632
+            },
+            "filename": "Counter.rozie"
+          },
+          "method": false,
+          "key": {
+            "type": "Identifier",
+            "start": 617,
+            "end": 625,
+            "loc": {
+              "end": {
+                "line": 27,
+                "column": 10,
+                "index": 625
+              },
+              "filename": "Counter.rozie",
+              "identifierName": "hovering"
+            },
+            "name": "hovering"
+          },
+          "computed": false,
+          "shorthand": false,
+          "value": {
+            "type": "BooleanLiteral",
+            "start": 627,
+            "end": 632,
+            "loc": {
+              "start": {
+                "line": 27,
+                "column": 12,
+                "index": 627
+              },
+              "filename": "Counter.rozie"
+            },
+            "value": false
+          }
+        }
+      ],
+      "comments": []
+    }
+  },
+  "diagnostics": []
+}

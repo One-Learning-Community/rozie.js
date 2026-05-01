@@ -1,0 +1,81 @@
+{
+  "node": {
+    "type": "DataAST",
+    "loc": {
+      "start": 657,
+      "end": 675
+    },
+    "expression": {
+      "type": "ObjectExpression",
+      "start": 658,
+      "end": 674,
+      "loc": {
+        "start": {
+          "line": 25,
+          "column": 0,
+          "index": 658
+        },
+        "end": {
+          "line": 27,
+          "column": 1,
+          "index": 674
+        },
+        "filename": "TodoList.rozie"
+      },
+      "properties": [
+        {
+          "type": "ObjectProperty",
+          "start": 662,
+          "end": 671,
+          "loc": {
+            "start": {
+              "line": 26,
+              "column": 2,
+              "index": 662
+            },
+            "end": {
+              "line": 26,
+              "column": 11,
+              "index": 671
+            },
+            "filename": "TodoList.rozie"
+          },
+          "method": false,
+          "key": {
+            "type": "Identifier",
+            "start": 662,
+            "end": 667,
+            "loc": {
+              "end": {
+                "line": 26,
+                "column": 7,
+                "index": 667
+              },
+              "filename": "TodoList.rozie",
+              "identifierName": "draft"
+            },
+            "name": "draft"
+          },
+          "computed": false,
+          "shorthand": false,
+          "value": {
+            "type": "StringLiteral",
+            "start": 669,
+            "end": 671,
+            "loc": {
+              "start": {
+                "line": 26,
+                "column": 9,
+                "index": 669
+              },
+              "filename": "TodoList.rozie"
+            },
+            "value": ""
+          }
+        }
+      ],
+      "comments": []
+    }
+  },
+  "diagnostics": []
+}

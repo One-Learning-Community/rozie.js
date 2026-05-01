@@ -1,0 +1,883 @@
+{
+  "node": {
+    "type": "TemplateAST",
+    "loc": {
+      "start": 1234,
+      "end": 2458
+    },
+    "children": [
+      {
+        "type": "TemplateText",
+        "text": "\n",
+        "loc": {
+          "start": 1234,
+          "end": 1235
+        }
+      },
+      {
+        "type": "TemplateElement",
+        "tagName": "div",
+        "attributes": [
+          {
+            "kind": "static",
+            "rawName": "class",
+            "name": "class",
+            "modifierChainText": "",
+            "modifierChainBaseOffset": 1245,
+            "value": "todo-list",
+            "valueLoc": {
+              "start": 1247,
+              "end": 1256
+            },
+            "loc": {
+              "start": 1240,
+              "end": 1257
+            }
+          }
+        ],
+        "children": [
+          {
+            "type": "TemplateText",
+            "text": "\n  ",
+            "loc": {
+              "start": 1258,
+              "end": 1261
+            }
+          },
+          {
+            "type": "TemplateElement",
+            "tagName": "header",
+            "attributes": [],
+            "children": [
+              {
+                "type": "TemplateText",
+                "text": "\n    ",
+                "loc": {
+                  "start": 1269,
+                  "end": 1274
+                }
+              },
+              {
+                "type": "TemplateElement",
+                "tagName": "slot",
+                "attributes": [
+                  {
+                    "kind": "static",
+                    "rawName": "name",
+                    "name": "name",
+                    "modifierChainText": "",
+                    "modifierChainBaseOffset": 1284,
+                    "value": "header",
+                    "valueLoc": {
+                      "start": 1286,
+                      "end": 1292
+                    },
+                    "loc": {
+                      "start": 1280,
+                      "end": 1293
+                    }
+                  },
+                  {
+                    "kind": "binding",
+                    "rawName": ":remaining",
+                    "name": "remaining",
+                    "modifierChainText": "",
+                    "modifierChainBaseOffset": 1304,
+                    "value": "remaining",
+                    "valueLoc": {
+                      "start": 1306,
+                      "end": 1315
+                    },
+                    "loc": {
+                      "start": 1294,
+                      "end": 1316
+                    }
+                  },
+                  {
+                    "kind": "binding",
+                    "rawName": ":total",
+                    "name": "total",
+                    "modifierChainText": "",
+                    "modifierChainBaseOffset": 1323,
+                    "value": "$props.items.length",
+                    "valueLoc": {
+                      "start": 1325,
+                      "end": 1344
+                    },
+                    "loc": {
+                      "start": 1317,
+                      "end": 1345
+                    }
+                  }
+                ],
+                "children": [
+                  {
+                    "type": "TemplateText",
+                    "text": "\n      ",
+                    "loc": {
+                      "start": 1346,
+                      "end": 1353
+                    }
+                  },
+                  {
+                    "type": "TemplateText",
+                    "text": "\n      ",
+                    "loc": {
+                      "start": 1414,
+                      "end": 1421
+                    }
+                  },
+                  {
+                    "type": "TemplateElement",
+                    "tagName": "h3",
+                    "attributes": [],
+                    "children": [
+                      {
+                        "type": "TemplateInterpolation",
+                        "rawExpr": " $props.title ",
+                        "loc": {
+                          "start": 1425,
+                          "end": 1443
+                        }
+                      },
+                      {
+                        "type": "TemplateText",
+                        "text": " (",
+                        "loc": {
+                          "start": 1443,
+                          "end": 1445
+                        }
+                      },
+                      {
+                        "type": "TemplateInterpolation",
+                        "rawExpr": " remaining ",
+                        "loc": {
+                          "start": 1445,
+                          "end": 1460
+                        }
+                      },
+                      {
+                        "type": "TemplateText",
+                        "text": " remaining)",
+                        "loc": {
+                          "start": 1460,
+                          "end": 1471
+                        }
+                      }
+                    ],
+                    "selfClosing": false,
+                    "loc": {
+                      "start": 1421,
+                      "end": 1476
+                    }
+                  },
+                  {
+                    "type": "TemplateText",
+                    "text": "\n    ",
+                    "loc": {
+                      "start": 1476,
+                      "end": 1481
+                    }
+                  }
+                ],
+                "selfClosing": false,
+                "loc": {
+                  "start": 1274,
+                  "end": 1488
+                }
+              },
+              {
+                "type": "TemplateText",
+                "text": "\n  ",
+                "loc": {
+                  "start": 1488,
+                  "end": 1491
+                }
+              }
+            ],
+            "selfClosing": false,
+            "loc": {
+              "start": 1261,
+              "end": 1500
+            }
+          },
+          {
+            "type": "TemplateText",
+            "text": "\n\n  ",
+            "loc": {
+              "start": 1500,
+              "end": 1504
+            }
+          },
+          {
+            "type": "TemplateElement",
+            "tagName": "form",
+            "attributes": [
+              {
+                "kind": "event",
+                "rawName": "@submit.prevent",
+                "name": "submit",
+                "modifierChainText": ".prevent",
+                "modifierChainBaseOffset": 1517,
+                "value": "add",
+                "valueLoc": {
+                  "start": 1527,
+                  "end": 1530
+                },
+                "loc": {
+                  "start": 1510,
+                  "end": 1531
+                }
+              }
+            ],
+            "children": [
+              {
+                "type": "TemplateText",
+                "text": "\n    ",
+                "loc": {
+                  "start": 1532,
+                  "end": 1537
+                }
+              },
+              {
+                "type": "TemplateElement",
+                "tagName": "input",
+                "attributes": [
+                  {
+                    "kind": "directive",
+                    "rawName": "r-model",
+                    "name": "model",
+                    "modifierChainText": "",
+                    "modifierChainBaseOffset": 1551,
+                    "value": "$data.draft",
+                    "valueLoc": {
+                      "start": 1553,
+                      "end": 1564
+                    },
+                    "loc": {
+                      "start": 1544,
+                      "end": 1565
+                    }
+                  },
+                  {
+                    "kind": "static",
+                    "rawName": "placeholder",
+                    "name": "placeholder",
+                    "modifierChainText": "",
+                    "modifierChainBaseOffset": 1577,
+                    "value": "What needs doing?",
+                    "valueLoc": {
+                      "start": 1579,
+                      "end": 1596
+                    },
+                    "loc": {
+                      "start": 1566,
+                      "end": 1597
+                    }
+                  }
+                ],
+                "children": [],
+                "selfClosing": true,
+                "loc": {
+                  "start": 1537,
+                  "end": 1600
+                }
+              },
+              {
+                "type": "TemplateText",
+                "text": "\n    ",
+                "loc": {
+                  "start": 1600,
+                  "end": 1605
+                }
+              },
+              {
+                "type": "TemplateElement",
+                "tagName": "button",
+                "attributes": [
+                  {
+                    "kind": "static",
+                    "rawName": "type",
+                    "name": "type",
+                    "modifierChainText": "",
+                    "modifierChainBaseOffset": 1617,
+                    "value": "submit",
+                    "valueLoc": {
+                      "start": 1619,
+                      "end": 1625
+                    },
+                    "loc": {
+                      "start": 1613,
+                      "end": 1626
+                    }
+                  },
+                  {
+                    "kind": "binding",
+                    "rawName": ":disabled",
+                    "name": "disabled",
+                    "modifierChainText": "",
+                    "modifierChainBaseOffset": 1636,
+                    "value": "!$data.draft.trim()",
+                    "valueLoc": {
+                      "start": 1638,
+                      "end": 1657
+                    },
+                    "loc": {
+                      "start": 1627,
+                      "end": 1658
+                    }
+                  }
+                ],
+                "children": [
+                  {
+                    "type": "TemplateText",
+                    "text": "Add",
+                    "loc": {
+                      "start": 1659,
+                      "end": 1662
+                    }
+                  }
+                ],
+                "selfClosing": false,
+                "loc": {
+                  "start": 1605,
+                  "end": 1671
+                }
+              },
+              {
+                "type": "TemplateText",
+                "text": "\n  ",
+                "loc": {
+                  "start": 1671,
+                  "end": 1674
+                }
+              }
+            ],
+            "selfClosing": false,
+            "loc": {
+              "start": 1504,
+              "end": 1681
+            }
+          },
+          {
+            "type": "TemplateText",
+            "text": "\n\n  ",
+            "loc": {
+              "start": 1681,
+              "end": 1685
+            }
+          },
+          {
+            "type": "TemplateElement",
+            "tagName": "ul",
+            "attributes": [
+              {
+                "kind": "directive",
+                "rawName": "r-if",
+                "name": "if",
+                "modifierChainText": "",
+                "modifierChainBaseOffset": 1693,
+                "value": "$props.items.length > 0",
+                "valueLoc": {
+                  "start": 1695,
+                  "end": 1718
+                },
+                "loc": {
+                  "start": 1689,
+                  "end": 1719
+                }
+              }
+            ],
+            "children": [
+              {
+                "type": "TemplateText",
+                "text": "\n    ",
+                "loc": {
+                  "start": 1720,
+                  "end": 1725
+                }
+              },
+              {
+                "type": "TemplateElement",
+                "tagName": "li",
+                "attributes": [
+                  {
+                    "kind": "directive",
+                    "rawName": "r-for",
+                    "name": "for",
+                    "modifierChainText": "",
+                    "modifierChainBaseOffset": 1734,
+                    "value": "item in $props.items",
+                    "valueLoc": {
+                      "start": 1736,
+                      "end": 1756
+                    },
+                    "loc": {
+                      "start": 1729,
+                      "end": 1757
+                    }
+                  },
+                  {
+                    "kind": "binding",
+                    "rawName": ":key",
+                    "name": "key",
+                    "modifierChainText": "",
+                    "modifierChainBaseOffset": 1762,
+                    "value": "item.id",
+                    "valueLoc": {
+                      "start": 1764,
+                      "end": 1771
+                    },
+                    "loc": {
+                      "start": 1758,
+                      "end": 1772
+                    }
+                  },
+                  {
+                    "kind": "binding",
+                    "rawName": ":class",
+                    "name": "class",
+                    "modifierChainText": "",
+                    "modifierChainBaseOffset": 1779,
+                    "value": "{ done: item.done }",
+                    "valueLoc": {
+                      "start": 1781,
+                      "end": 1800
+                    },
+                    "loc": {
+                      "start": 1773,
+                      "end": 1801
+                    }
+                  }
+                ],
+                "children": [
+                  {
+                    "type": "TemplateText",
+                    "text": "\n      ",
+                    "loc": {
+                      "start": 1802,
+                      "end": 1809
+                    }
+                  },
+                  {
+                    "type": "TemplateText",
+                    "text": "\n      ",
+                    "loc": {
+                      "start": 2019,
+                      "end": 2026
+                    }
+                  },
+                  {
+                    "type": "TemplateElement",
+                    "tagName": "slot",
+                    "attributes": [
+                      {
+                        "kind": "binding",
+                        "rawName": ":item",
+                        "name": "item",
+                        "modifierChainText": "",
+                        "modifierChainBaseOffset": 2037,
+                        "value": "item",
+                        "valueLoc": {
+                          "start": 2039,
+                          "end": 2043
+                        },
+                        "loc": {
+                          "start": 2032,
+                          "end": 2044
+                        }
+                      },
+                      {
+                        "kind": "binding",
+                        "rawName": ":toggle",
+                        "name": "toggle",
+                        "modifierChainText": "",
+                        "modifierChainBaseOffset": 2052,
+                        "value": "() => toggle(item.id)",
+                        "valueLoc": {
+                          "start": 2054,
+                          "end": 2075
+                        },
+                        "loc": {
+                          "start": 2045,
+                          "end": 2076
+                        }
+                      },
+                      {
+                        "kind": "binding",
+                        "rawName": ":remove",
+                        "name": "remove",
+                        "modifierChainText": "",
+                        "modifierChainBaseOffset": 2084,
+                        "value": "() => remove(item.id)",
+                        "valueLoc": {
+                          "start": 2086,
+                          "end": 2107
+                        },
+                        "loc": {
+                          "start": 2077,
+                          "end": 2108
+                        }
+                      }
+                    ],
+                    "children": [
+                      {
+                        "type": "TemplateText",
+                        "text": "\n        ",
+                        "loc": {
+                          "start": 2109,
+                          "end": 2118
+                        }
+                      },
+                      {
+                        "type": "TemplateElement",
+                        "tagName": "label",
+                        "attributes": [],
+                        "children": [
+                          {
+                            "type": "TemplateText",
+                            "text": "\n          ",
+                            "loc": {
+                              "start": 2125,
+                              "end": 2136
+                            }
+                          },
+                          {
+                            "type": "TemplateElement",
+                            "tagName": "input",
+                            "attributes": [
+                              {
+                                "kind": "static",
+                                "rawName": "type",
+                                "name": "type",
+                                "modifierChainText": "",
+                                "modifierChainBaseOffset": 2147,
+                                "value": "checkbox",
+                                "valueLoc": {
+                                  "start": 2149,
+                                  "end": 2157
+                                },
+                                "loc": {
+                                  "start": 2143,
+                                  "end": 2158
+                                }
+                              },
+                              {
+                                "kind": "binding",
+                                "rawName": ":checked",
+                                "name": "checked",
+                                "modifierChainText": "",
+                                "modifierChainBaseOffset": 2167,
+                                "value": "item.done",
+                                "valueLoc": {
+                                  "start": 2169,
+                                  "end": 2178
+                                },
+                                "loc": {
+                                  "start": 2159,
+                                  "end": 2179
+                                }
+                              },
+                              {
+                                "kind": "event",
+                                "rawName": "@change",
+                                "name": "change",
+                                "modifierChainText": "",
+                                "modifierChainBaseOffset": 2187,
+                                "value": "toggle(item.id)",
+                                "valueLoc": {
+                                  "start": 2189,
+                                  "end": 2204
+                                },
+                                "loc": {
+                                  "start": 2180,
+                                  "end": 2205
+                                }
+                              }
+                            ],
+                            "children": [],
+                            "selfClosing": true,
+                            "loc": {
+                              "start": 2136,
+                              "end": 2208
+                            }
+                          },
+                          {
+                            "type": "TemplateText",
+                            "text": "\n          ",
+                            "loc": {
+                              "start": 2208,
+                              "end": 2219
+                            }
+                          },
+                          {
+                            "type": "TemplateElement",
+                            "tagName": "span",
+                            "attributes": [],
+                            "children": [
+                              {
+                                "type": "TemplateInterpolation",
+                                "rawExpr": " item.text ",
+                                "loc": {
+                                  "start": 2225,
+                                  "end": 2240
+                                }
+                              }
+                            ],
+                            "selfClosing": false,
+                            "loc": {
+                              "start": 2219,
+                              "end": 2247
+                            }
+                          },
+                          {
+                            "type": "TemplateText",
+                            "text": "\n        ",
+                            "loc": {
+                              "start": 2247,
+                              "end": 2256
+                            }
+                          }
+                        ],
+                        "selfClosing": false,
+                        "loc": {
+                          "start": 2118,
+                          "end": 2264
+                        }
+                      },
+                      {
+                        "type": "TemplateText",
+                        "text": "\n        ",
+                        "loc": {
+                          "start": 2264,
+                          "end": 2273
+                        }
+                      },
+                      {
+                        "type": "TemplateElement",
+                        "tagName": "button",
+                        "attributes": [
+                          {
+                            "kind": "event",
+                            "rawName": "@click",
+                            "name": "click",
+                            "modifierChainText": "",
+                            "modifierChainBaseOffset": 2287,
+                            "value": "remove(item.id)",
+                            "valueLoc": {
+                              "start": 2289,
+                              "end": 2304
+                            },
+                            "loc": {
+                              "start": 2281,
+                              "end": 2305
+                            }
+                          },
+                          {
+                            "kind": "static",
+                            "rawName": "aria-label",
+                            "name": "aria-label",
+                            "modifierChainText": "",
+                            "modifierChainBaseOffset": 2316,
+                            "value": "Remove",
+                            "valueLoc": {
+                              "start": 2318,
+                              "end": 2324
+                            },
+                            "loc": {
+                              "start": 2306,
+                              "end": 2325
+                            }
+                          }
+                        ],
+                        "children": [
+                          {
+                            "type": "TemplateText",
+                            "text": "×",
+                            "loc": {
+                              "start": 2326,
+                              "end": 2327
+                            }
+                          }
+                        ],
+                        "selfClosing": false,
+                        "loc": {
+                          "start": 2273,
+                          "end": 2336
+                        }
+                      },
+                      {
+                        "type": "TemplateText",
+                        "text": "\n      ",
+                        "loc": {
+                          "start": 2336,
+                          "end": 2343
+                        }
+                      }
+                    ],
+                    "selfClosing": false,
+                    "loc": {
+                      "start": 2026,
+                      "end": 2350
+                    }
+                  },
+                  {
+                    "type": "TemplateText",
+                    "text": "\n    ",
+                    "loc": {
+                      "start": 2350,
+                      "end": 2355
+                    }
+                  }
+                ],
+                "selfClosing": false,
+                "loc": {
+                  "start": 1725,
+                  "end": 2360
+                }
+              },
+              {
+                "type": "TemplateText",
+                "text": "\n  ",
+                "loc": {
+                  "start": 2360,
+                  "end": 2363
+                }
+              }
+            ],
+            "selfClosing": false,
+            "loc": {
+              "start": 1685,
+              "end": 2368
+            }
+          },
+          {
+            "type": "TemplateText",
+            "text": "\n\n  ",
+            "loc": {
+              "start": 2368,
+              "end": 2372
+            }
+          },
+          {
+            "type": "TemplateElement",
+            "tagName": "p",
+            "attributes": [
+              {
+                "kind": "directive",
+                "rawName": "r-else",
+                "name": "else",
+                "modifierChainText": "",
+                "modifierChainBaseOffset": 2381,
+                "value": null,
+                "valueLoc": null,
+                "loc": {
+                  "start": 2375,
+                  "end": 2381
+                }
+              },
+              {
+                "kind": "static",
+                "rawName": "class",
+                "name": "class",
+                "modifierChainText": "",
+                "modifierChainBaseOffset": 2387,
+                "value": "empty",
+                "valueLoc": {
+                  "start": 2389,
+                  "end": 2394
+                },
+                "loc": {
+                  "start": 2382,
+                  "end": 2395
+                }
+              }
+            ],
+            "children": [
+              {
+                "type": "TemplateText",
+                "text": "\n    ",
+                "loc": {
+                  "start": 2396,
+                  "end": 2401
+                }
+              },
+              {
+                "type": "TemplateElement",
+                "tagName": "slot",
+                "attributes": [
+                  {
+                    "kind": "static",
+                    "rawName": "name",
+                    "name": "name",
+                    "modifierChainText": "",
+                    "modifierChainBaseOffset": 2411,
+                    "value": "empty",
+                    "valueLoc": {
+                      "start": 2413,
+                      "end": 2418
+                    },
+                    "loc": {
+                      "start": 2407,
+                      "end": 2419
+                    }
+                  }
+                ],
+                "children": [
+                  {
+                    "type": "TemplateText",
+                    "text": "Nothing to do. ✨",
+                    "loc": {
+                      "start": 2420,
+                      "end": 2436
+                    }
+                  }
+                ],
+                "selfClosing": false,
+                "loc": {
+                  "start": 2401,
+                  "end": 2443
+                }
+              },
+              {
+                "type": "TemplateText",
+                "text": "\n  ",
+                "loc": {
+                  "start": 2443,
+                  "end": 2446
+                }
+              }
+            ],
+            "selfClosing": false,
+            "loc": {
+              "start": 2372,
+              "end": 2450
+            }
+          },
+          {
+            "type": "TemplateText",
+            "text": "\n",
+            "loc": {
+              "start": 2450,
+              "end": 2451
+            }
+          }
+        ],
+        "selfClosing": false,
+        "loc": {
+          "start": 1235,
+          "end": 2457
+        }
+      },
+      {
+        "type": "TemplateText",
+        "text": "\n",
+        "loc": {
+          "start": 2457,
+          "end": 2458
+        }
+      }
+    ]
+  },
+  "diagnostics": []
+}

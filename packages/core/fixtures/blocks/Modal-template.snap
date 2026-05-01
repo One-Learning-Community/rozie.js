@@ -1,0 +1,627 @@
+{
+  "node": {
+    "type": "TemplateAST",
+    "loc": {
+      "start": 2215,
+      "end": 2899
+    },
+    "children": [
+      {
+        "type": "TemplateText",
+        "text": "\n",
+        "loc": {
+          "start": 2215,
+          "end": 2216
+        }
+      },
+      {
+        "type": "TemplateElement",
+        "tagName": "div",
+        "attributes": [
+          {
+            "kind": "directive",
+            "rawName": "r-if",
+            "name": "if",
+            "modifierChainText": "",
+            "modifierChainBaseOffset": 2225,
+            "value": "$props.open",
+            "valueLoc": {
+              "start": 2227,
+              "end": 2238
+            },
+            "loc": {
+              "start": 2221,
+              "end": 2239
+            }
+          },
+          {
+            "kind": "static",
+            "rawName": "class",
+            "name": "class",
+            "modifierChainText": "",
+            "modifierChainBaseOffset": 2245,
+            "value": "modal-backdrop",
+            "valueLoc": {
+              "start": 2247,
+              "end": 2261
+            },
+            "loc": {
+              "start": 2240,
+              "end": 2262
+            }
+          },
+          {
+            "kind": "static",
+            "rawName": "ref",
+            "name": "ref",
+            "modifierChainText": "",
+            "modifierChainBaseOffset": 2266,
+            "value": "backdropEl",
+            "valueLoc": {
+              "start": 2268,
+              "end": 2278
+            },
+            "loc": {
+              "start": 2263,
+              "end": 2279
+            }
+          },
+          {
+            "kind": "event",
+            "rawName": "@click.self",
+            "name": "click",
+            "modifierChainText": ".self",
+            "modifierChainBaseOffset": 2286,
+            "value": "$props.closeOnBackdrop && close()",
+            "valueLoc": {
+              "start": 2293,
+              "end": 2326
+            },
+            "loc": {
+              "start": 2280,
+              "end": 2327
+            }
+          }
+        ],
+        "children": [
+          {
+            "type": "TemplateText",
+            "text": "\n  ",
+            "loc": {
+              "start": 2328,
+              "end": 2331
+            }
+          },
+          {
+            "type": "TemplateElement",
+            "tagName": "div",
+            "attributes": [
+              {
+                "kind": "static",
+                "rawName": "ref",
+                "name": "ref",
+                "modifierChainText": "",
+                "modifierChainBaseOffset": 2343,
+                "value": "dialogEl",
+                "valueLoc": {
+                  "start": 2345,
+                  "end": 2353
+                },
+                "loc": {
+                  "start": 2340,
+                  "end": 2354
+                }
+              },
+              {
+                "kind": "static",
+                "rawName": "class",
+                "name": "class",
+                "modifierChainText": "",
+                "modifierChainBaseOffset": 2364,
+                "value": "modal-dialog",
+                "valueLoc": {
+                  "start": 2366,
+                  "end": 2378
+                },
+                "loc": {
+                  "start": 2359,
+                  "end": 2379
+                }
+              },
+              {
+                "kind": "static",
+                "rawName": "role",
+                "name": "role",
+                "modifierChainText": "",
+                "modifierChainBaseOffset": 2388,
+                "value": "dialog",
+                "valueLoc": {
+                  "start": 2390,
+                  "end": 2396
+                },
+                "loc": {
+                  "start": 2384,
+                  "end": 2397
+                }
+              },
+              {
+                "kind": "static",
+                "rawName": "aria-modal",
+                "name": "aria-modal",
+                "modifierChainText": "",
+                "modifierChainBaseOffset": 2412,
+                "value": "true",
+                "valueLoc": {
+                  "start": 2414,
+                  "end": 2418
+                },
+                "loc": {
+                  "start": 2402,
+                  "end": 2419
+                }
+              },
+              {
+                "kind": "binding",
+                "rawName": ":aria-label",
+                "name": "aria-label",
+                "modifierChainText": "",
+                "modifierChainBaseOffset": 2435,
+                "value": "$props.title || undefined",
+                "valueLoc": {
+                  "start": 2437,
+                  "end": 2462
+                },
+                "loc": {
+                  "start": 2424,
+                  "end": 2463
+                }
+              },
+              {
+                "kind": "static",
+                "rawName": "tabindex",
+                "name": "tabindex",
+                "modifierChainText": "",
+                "modifierChainBaseOffset": 2476,
+                "value": "-1",
+                "valueLoc": {
+                  "start": 2478,
+                  "end": 2480
+                },
+                "loc": {
+                  "start": 2468,
+                  "end": 2481
+                }
+              }
+            ],
+            "children": [
+              {
+                "type": "TemplateText",
+                "text": "\n    ",
+                "loc": {
+                  "start": 2485,
+                  "end": 2490
+                }
+              },
+              {
+                "type": "TemplateElement",
+                "tagName": "header",
+                "attributes": [
+                  {
+                    "kind": "directive",
+                    "rawName": "r-if",
+                    "name": "if",
+                    "modifierChainText": "",
+                    "modifierChainBaseOffset": 2502,
+                    "value": "$props.title || $slots.header",
+                    "valueLoc": {
+                      "start": 2504,
+                      "end": 2533
+                    },
+                    "loc": {
+                      "start": 2498,
+                      "end": 2534
+                    }
+                  }
+                ],
+                "children": [
+                  {
+                    "type": "TemplateText",
+                    "text": "\n      ",
+                    "loc": {
+                      "start": 2535,
+                      "end": 2542
+                    }
+                  },
+                  {
+                    "type": "TemplateElement",
+                    "tagName": "slot",
+                    "attributes": [
+                      {
+                        "kind": "static",
+                        "rawName": "name",
+                        "name": "name",
+                        "modifierChainText": "",
+                        "modifierChainBaseOffset": 2552,
+                        "value": "header",
+                        "valueLoc": {
+                          "start": 2554,
+                          "end": 2560
+                        },
+                        "loc": {
+                          "start": 2548,
+                          "end": 2561
+                        }
+                      },
+                      {
+                        "kind": "binding",
+                        "rawName": ":close",
+                        "name": "close",
+                        "modifierChainText": "",
+                        "modifierChainBaseOffset": 2568,
+                        "value": "close",
+                        "valueLoc": {
+                          "start": 2570,
+                          "end": 2575
+                        },
+                        "loc": {
+                          "start": 2562,
+                          "end": 2576
+                        }
+                      }
+                    ],
+                    "children": [
+                      {
+                        "type": "TemplateText",
+                        "text": "\n        ",
+                        "loc": {
+                          "start": 2577,
+                          "end": 2586
+                        }
+                      },
+                      {
+                        "type": "TemplateElement",
+                        "tagName": "h2",
+                        "attributes": [],
+                        "children": [
+                          {
+                            "type": "TemplateInterpolation",
+                            "rawExpr": " $props.title ",
+                            "loc": {
+                              "start": 2590,
+                              "end": 2608
+                            }
+                          }
+                        ],
+                        "selfClosing": false,
+                        "loc": {
+                          "start": 2586,
+                          "end": 2613
+                        }
+                      },
+                      {
+                        "type": "TemplateText",
+                        "text": "\n      ",
+                        "loc": {
+                          "start": 2613,
+                          "end": 2620
+                        }
+                      }
+                    ],
+                    "selfClosing": false,
+                    "loc": {
+                      "start": 2542,
+                      "end": 2627
+                    }
+                  },
+                  {
+                    "type": "TemplateText",
+                    "text": "\n      ",
+                    "loc": {
+                      "start": 2627,
+                      "end": 2634
+                    }
+                  },
+                  {
+                    "type": "TemplateElement",
+                    "tagName": "button",
+                    "attributes": [
+                      {
+                        "kind": "static",
+                        "rawName": "class",
+                        "name": "class",
+                        "modifierChainText": "",
+                        "modifierChainBaseOffset": 2647,
+                        "value": "close-btn",
+                        "valueLoc": {
+                          "start": 2649,
+                          "end": 2658
+                        },
+                        "loc": {
+                          "start": 2642,
+                          "end": 2659
+                        }
+                      },
+                      {
+                        "kind": "event",
+                        "rawName": "@click",
+                        "name": "click",
+                        "modifierChainText": "",
+                        "modifierChainBaseOffset": 2666,
+                        "value": "close",
+                        "valueLoc": {
+                          "start": 2668,
+                          "end": 2673
+                        },
+                        "loc": {
+                          "start": 2660,
+                          "end": 2674
+                        }
+                      },
+                      {
+                        "kind": "static",
+                        "rawName": "aria-label",
+                        "name": "aria-label",
+                        "modifierChainText": "",
+                        "modifierChainBaseOffset": 2685,
+                        "value": "Close",
+                        "valueLoc": {
+                          "start": 2687,
+                          "end": 2692
+                        },
+                        "loc": {
+                          "start": 2675,
+                          "end": 2693
+                        }
+                      }
+                    ],
+                    "children": [
+                      {
+                        "type": "TemplateText",
+                        "text": "×",
+                        "loc": {
+                          "start": 2694,
+                          "end": 2695
+                        }
+                      }
+                    ],
+                    "selfClosing": false,
+                    "loc": {
+                      "start": 2634,
+                      "end": 2704
+                    }
+                  },
+                  {
+                    "type": "TemplateText",
+                    "text": "\n    ",
+                    "loc": {
+                      "start": 2704,
+                      "end": 2709
+                    }
+                  }
+                ],
+                "selfClosing": false,
+                "loc": {
+                  "start": 2490,
+                  "end": 2718
+                }
+              },
+              {
+                "type": "TemplateText",
+                "text": "\n\n    ",
+                "loc": {
+                  "start": 2718,
+                  "end": 2724
+                }
+              },
+              {
+                "type": "TemplateElement",
+                "tagName": "div",
+                "attributes": [
+                  {
+                    "kind": "static",
+                    "rawName": "class",
+                    "name": "class",
+                    "modifierChainText": "",
+                    "modifierChainBaseOffset": 2734,
+                    "value": "modal-body",
+                    "valueLoc": {
+                      "start": 2736,
+                      "end": 2746
+                    },
+                    "loc": {
+                      "start": 2729,
+                      "end": 2747
+                    }
+                  }
+                ],
+                "children": [
+                  {
+                    "type": "TemplateText",
+                    "text": "\n      ",
+                    "loc": {
+                      "start": 2748,
+                      "end": 2755
+                    }
+                  },
+                  {
+                    "type": "TemplateElement",
+                    "tagName": "slot",
+                    "attributes": [
+                      {
+                        "kind": "binding",
+                        "rawName": ":close",
+                        "name": "close",
+                        "modifierChainText": "",
+                        "modifierChainBaseOffset": 2767,
+                        "value": "close",
+                        "valueLoc": {
+                          "start": 2769,
+                          "end": 2774
+                        },
+                        "loc": {
+                          "start": 2761,
+                          "end": 2775
+                        }
+                      }
+                    ],
+                    "children": [],
+                    "selfClosing": true,
+                    "loc": {
+                      "start": 2755,
+                      "end": 2778
+                    }
+                  },
+                  {
+                    "type": "TemplateText",
+                    "text": "\n    ",
+                    "loc": {
+                      "start": 2778,
+                      "end": 2783
+                    }
+                  }
+                ],
+                "selfClosing": false,
+                "loc": {
+                  "start": 2724,
+                  "end": 2789
+                }
+              },
+              {
+                "type": "TemplateText",
+                "text": "\n\n    ",
+                "loc": {
+                  "start": 2789,
+                  "end": 2795
+                }
+              },
+              {
+                "type": "TemplateElement",
+                "tagName": "footer",
+                "attributes": [
+                  {
+                    "kind": "directive",
+                    "rawName": "r-if",
+                    "name": "if",
+                    "modifierChainText": "",
+                    "modifierChainBaseOffset": 2807,
+                    "value": "$slots.footer",
+                    "valueLoc": {
+                      "start": 2809,
+                      "end": 2822
+                    },
+                    "loc": {
+                      "start": 2803,
+                      "end": 2823
+                    }
+                  }
+                ],
+                "children": [
+                  {
+                    "type": "TemplateText",
+                    "text": "\n      ",
+                    "loc": {
+                      "start": 2824,
+                      "end": 2831
+                    }
+                  },
+                  {
+                    "type": "TemplateElement",
+                    "tagName": "slot",
+                    "attributes": [
+                      {
+                        "kind": "static",
+                        "rawName": "name",
+                        "name": "name",
+                        "modifierChainText": "",
+                        "modifierChainBaseOffset": 2841,
+                        "value": "footer",
+                        "valueLoc": {
+                          "start": 2843,
+                          "end": 2849
+                        },
+                        "loc": {
+                          "start": 2837,
+                          "end": 2850
+                        }
+                      },
+                      {
+                        "kind": "binding",
+                        "rawName": ":close",
+                        "name": "close",
+                        "modifierChainText": "",
+                        "modifierChainBaseOffset": 2857,
+                        "value": "close",
+                        "valueLoc": {
+                          "start": 2859,
+                          "end": 2864
+                        },
+                        "loc": {
+                          "start": 2851,
+                          "end": 2865
+                        }
+                      }
+                    ],
+                    "children": [],
+                    "selfClosing": true,
+                    "loc": {
+                      "start": 2831,
+                      "end": 2868
+                    }
+                  },
+                  {
+                    "type": "TemplateText",
+                    "text": "\n    ",
+                    "loc": {
+                      "start": 2868,
+                      "end": 2873
+                    }
+                  }
+                ],
+                "selfClosing": false,
+                "loc": {
+                  "start": 2795,
+                  "end": 2882
+                }
+              },
+              {
+                "type": "TemplateText",
+                "text": "\n  ",
+                "loc": {
+                  "start": 2882,
+                  "end": 2885
+                }
+              }
+            ],
+            "selfClosing": false,
+            "loc": {
+              "start": 2331,
+              "end": 2891
+            }
+          },
+          {
+            "type": "TemplateText",
+            "text": "\n",
+            "loc": {
+              "start": 2891,
+              "end": 2892
+            }
+          }
+        ],
+        "selfClosing": false,
+        "loc": {
+          "start": 2216,
+          "end": 2898
+        }
+      },
+      {
+        "type": "TemplateText",
+        "text": "\n",
+        "loc": {
+          "start": 2898,
+          "end": 2899
+        }
+      }
+    ]
+  },
+  "diagnostics": []
+}
