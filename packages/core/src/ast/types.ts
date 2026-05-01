@@ -30,10 +30,34 @@ export interface BlockMap {
   style?: BlockEntry;
 }
 
+// Plan 03 lands the concrete per-block AST shapes; we re-export them here so
+// the RozieAST wrapper resolves to the real types without circular blockers.
+export type { PropsAST } from './blocks/PropsAST.js';
+export type { DataAST } from './blocks/DataAST.js';
+export type { ScriptAST } from './blocks/ScriptAST.js';
+export type { ListenersAST, ListenerEntry } from './blocks/ListenersAST.js';
+export type {
+  TemplateAST,
+  TemplateNode,
+  TemplateElement,
+  TemplateAttr,
+  TemplateText,
+  TemplateInterpolation,
+} from './blocks/TemplateAST.js';
+export type { StyleAST, StyleRule } from './blocks/StyleAST.js';
+
+// Local references for the RozieAST wrapper field types.
+import type { PropsAST } from './blocks/PropsAST.js';
+import type { DataAST } from './blocks/DataAST.js';
+import type { ScriptAST } from './blocks/ScriptAST.js';
+import type { ListenersAST } from './blocks/ListenersAST.js';
+import type { TemplateAST } from './blocks/TemplateAST.js';
+import type { StyleAST } from './blocks/StyleAST.js';
+
 /**
  * Top-level RozieAST shape. Per-block AST shapes (PropsAST, ScriptAST, etc.)
- * are filled in by Plans 03/04. Plan 01 only locks the wrapper shape so
- * downstream plans implement against a stable container.
+ * are filled in by Plan 03; Plan 04 weaves them into a populated `RozieAST`
+ * via the central `parse()` coordinator.
  *
  * @experimental — shape may change before v1.0
  */
@@ -48,12 +72,3 @@ export interface RozieAST {
   template: TemplateAST | null;
   style: StyleAST | null;
 }
-
-// Plan 03/04 fill these in. Plan 01 declares them as opaque markers so the
-// RozieAST wrapper can be exported without circular blockers.
-export interface PropsAST { type: 'PropsAST'; loc: SourceLoc; /* TODO Plan 03 */ }
-export interface DataAST { type: 'DataAST'; loc: SourceLoc; /* TODO Plan 03 */ }
-export interface ScriptAST { type: 'ScriptAST'; loc: SourceLoc; /* TODO Plan 03 */ }
-export interface ListenersAST { type: 'ListenersAST'; loc: SourceLoc; /* TODO Plan 03/04 */ }
-export interface TemplateAST { type: 'TemplateAST'; loc: SourceLoc; /* TODO Plan 03 */ }
-export interface StyleAST { type: 'StyleAST'; loc: SourceLoc; /* TODO Plan 03 */ }
