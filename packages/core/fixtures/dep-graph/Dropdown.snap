@@ -1,0 +1,97 @@
+{
+  "lifecycle.0.setup": [
+    {
+      "scope": "closure",
+      "identifier": "reposition"
+    }
+  ],
+  "lifecycle.1.setup": [],
+  "listener.0.handler": [
+    {
+      "scope": "closure",
+      "identifier": "close"
+    }
+  ],
+  "listener.0.when": [
+    {
+      "scope": "props",
+      "path": [
+        "open"
+      ]
+    },
+    {
+      "scope": "props",
+      "path": [
+        "closeOnOutsideClick"
+      ]
+    }
+  ],
+  "listener.1.handler": [
+    {
+      "scope": "closure",
+      "identifier": "close"
+    }
+  ],
+  "listener.1.when": [
+    {
+      "scope": "props",
+      "path": [
+        "open"
+      ]
+    },
+    {
+      "scope": "props",
+      "path": [
+        "closeOnEscape"
+      ]
+    }
+  ],
+  "listener.2.handler": [
+    {
+      "scope": "closure",
+      "identifier": "reposition"
+    }
+  ],
+  "listener.2.when": [
+    {
+      "scope": "props",
+      "path": [
+        "open"
+      ]
+    }
+  ],
+  "template.attr./div-1/div-1/@click": [
+    {
+      "scope": "closure",
+      "identifier": "toggle"
+    }
+  ],
+  "template.attr./div-1/div-1/slot-1/:open": [
+    {
+      "scope": "props",
+      "path": [
+        "open"
+      ]
+    }
+  ],
+  "template.attr./div-1/div-1/slot-1/:toggle": [
+    {
+      "scope": "closure",
+      "identifier": "toggle"
+    }
+  ],
+  "template.attr./div-1/div-3/r-if": [
+    {
+      "scope": "props",
+      "path": [
+        "open"
+      ]
+    }
+  ],
+  "template.attr./div-1/div-3/slot-1/:close": [
+    {
+      "scope": "closure",
+      "identifier": "close"
+    }
+  ]
+}

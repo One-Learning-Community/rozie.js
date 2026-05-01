@@ -1,0 +1,150 @@
+{
+  "computed.remaining": [
+    {
+      "scope": "props",
+      "path": [
+        "items"
+      ]
+    }
+  ],
+  "template.attr./div-1/form-3/@submit.prevent": [
+    {
+      "scope": "closure",
+      "identifier": "add"
+    }
+  ],
+  "template.attr./div-1/form-3/button-3/:disabled": [
+    {
+      "scope": "data",
+      "path": [
+        "draft"
+      ]
+    }
+  ],
+  "template.attr./div-1/form-3/input-1/r-model": [
+    {
+      "scope": "data",
+      "path": [
+        "draft"
+      ]
+    }
+  ],
+  "template.attr./div-1/header-1/slot-1/:remaining": [
+    {
+      "scope": "computed",
+      "path": [
+        "remaining"
+      ]
+    }
+  ],
+  "template.attr./div-1/header-1/slot-1/:total": [
+    {
+      "scope": "props",
+      "path": [
+        "items"
+      ]
+    }
+  ],
+  "template.attr./div-1/ul-5/li-1/:class": [
+    {
+      "scope": "closure",
+      "identifier": "item"
+    }
+  ],
+  "template.attr./div-1/ul-5/li-1/:key": [
+    {
+      "scope": "closure",
+      "identifier": "item"
+    }
+  ],
+  "template.attr./div-1/ul-5/li-1/r-for": [
+    {
+      "scope": "props",
+      "path": [
+        "items"
+      ]
+    }
+  ],
+  "template.attr./div-1/ul-5/li-1/slot-2/:item": [
+    {
+      "scope": "closure",
+      "identifier": "item"
+    }
+  ],
+  "template.attr./div-1/ul-5/li-1/slot-2/:remove": [
+    {
+      "scope": "closure",
+      "identifier": "remove"
+    },
+    {
+      "scope": "closure",
+      "identifier": "item"
+    }
+  ],
+  "template.attr./div-1/ul-5/li-1/slot-2/:toggle": [
+    {
+      "scope": "closure",
+      "identifier": "toggle"
+    },
+    {
+      "scope": "closure",
+      "identifier": "item"
+    }
+  ],
+  "template.attr./div-1/ul-5/li-1/slot-2/button-3/@click": [
+    {
+      "scope": "closure",
+      "identifier": "remove"
+    },
+    {
+      "scope": "closure",
+      "identifier": "item"
+    }
+  ],
+  "template.attr./div-1/ul-5/li-1/slot-2/label-1/input-1/:checked": [
+    {
+      "scope": "closure",
+      "identifier": "item"
+    }
+  ],
+  "template.attr./div-1/ul-5/li-1/slot-2/label-1/input-1/@change": [
+    {
+      "scope": "closure",
+      "identifier": "toggle"
+    },
+    {
+      "scope": "closure",
+      "identifier": "item"
+    }
+  ],
+  "template.attr./div-1/ul-5/r-if": [
+    {
+      "scope": "props",
+      "path": [
+        "items"
+      ]
+    }
+  ],
+  "template.interp./div-1/header-1/slot-1/h3-2/0": [
+    {
+      "scope": "props",
+      "path": [
+        "title"
+      ]
+    }
+  ],
+  "template.interp./div-1/header-1/slot-1/h3-2/2": [
+    {
+      "scope": "computed",
+      "path": [
+        "remaining"
+      ]
+    }
+  ],
+  "template.interp./div-1/ul-5/li-1/slot-2/label-1/span-3/0": [
+    {
+      "scope": "closure",
+      "identifier": "item"
+    }
+  ]
+}

@@ -1,0 +1,102 @@
+{
+  "computed.canDecrement": [
+    {
+      "scope": "props",
+      "path": [
+        "value"
+      ]
+    },
+    {
+      "scope": "props",
+      "path": [
+        "step"
+      ]
+    },
+    {
+      "scope": "props",
+      "path": [
+        "min"
+      ]
+    }
+  ],
+  "computed.canIncrement": [
+    {
+      "scope": "props",
+      "path": [
+        "value"
+      ]
+    },
+    {
+      "scope": "props",
+      "path": [
+        "step"
+      ]
+    },
+    {
+      "scope": "props",
+      "path": [
+        "max"
+      ]
+    }
+  ],
+  "template.attr./div-1/:class": [
+    {
+      "scope": "data",
+      "path": [
+        "hovering"
+      ]
+    }
+  ],
+  "template.attr./div-1/@mouseenter": [
+    {
+      "scope": "data",
+      "path": [
+        "hovering"
+      ]
+    }
+  ],
+  "template.attr./div-1/@mouseleave": [
+    {
+      "scope": "data",
+      "path": [
+        "hovering"
+      ]
+    }
+  ],
+  "template.attr./div-1/button-1/:disabled": [
+    {
+      "scope": "computed",
+      "path": [
+        "canDecrement"
+      ]
+    }
+  ],
+  "template.attr./div-1/button-1/@click": [
+    {
+      "scope": "closure",
+      "identifier": "decrement"
+    }
+  ],
+  "template.attr./div-1/button-5/:disabled": [
+    {
+      "scope": "computed",
+      "path": [
+        "canIncrement"
+      ]
+    }
+  ],
+  "template.attr./div-1/button-5/@click": [
+    {
+      "scope": "closure",
+      "identifier": "increment"
+    }
+  ],
+  "template.interp./div-1/span-3/0": [
+    {
+      "scope": "props",
+      "path": [
+        "value"
+      ]
+    }
+  ]
+}

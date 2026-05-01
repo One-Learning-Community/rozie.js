@@ -1,0 +1,126 @@
+{
+  "lifecycle.0.setup": [
+    {
+      "scope": "closure",
+      "identifier": "lockScroll"
+    }
+  ],
+  "lifecycle.1.setup": [
+    {
+      "scope": "closure",
+      "identifier": "unlockScroll"
+    }
+  ],
+  "lifecycle.2.setup": [
+    {
+      "scope": "closure",
+      "identifier": "focus"
+    }
+  ],
+  "listener.0.handler": [
+    {
+      "scope": "closure",
+      "identifier": "close"
+    }
+  ],
+  "listener.0.when": [
+    {
+      "scope": "props",
+      "path": [
+        "open"
+      ]
+    },
+    {
+      "scope": "props",
+      "path": [
+        "closeOnEscape"
+      ]
+    }
+  ],
+  "template.attr./div-1/@click.self": [
+    {
+      "scope": "props",
+      "path": [
+        "closeOnBackdrop"
+      ]
+    },
+    {
+      "scope": "closure",
+      "identifier": "close"
+    }
+  ],
+  "template.attr./div-1/div-1/:aria-label": [
+    {
+      "scope": "props",
+      "path": [
+        "title"
+      ]
+    },
+    {
+      "scope": "closure",
+      "identifier": "undefined"
+    }
+  ],
+  "template.attr./div-1/div-1/div-3/slot-1/:close": [
+    {
+      "scope": "closure",
+      "identifier": "close"
+    }
+  ],
+  "template.attr./div-1/div-1/footer-5/r-if": [
+    {
+      "scope": "slots",
+      "path": [
+        "footer"
+      ]
+    }
+  ],
+  "template.attr./div-1/div-1/footer-5/slot-1/:close": [
+    {
+      "scope": "closure",
+      "identifier": "close"
+    }
+  ],
+  "template.attr./div-1/div-1/header-1/button-3/@click": [
+    {
+      "scope": "closure",
+      "identifier": "close"
+    }
+  ],
+  "template.attr./div-1/div-1/header-1/r-if": [
+    {
+      "scope": "props",
+      "path": [
+        "title"
+      ]
+    },
+    {
+      "scope": "slots",
+      "path": [
+        "header"
+      ]
+    }
+  ],
+  "template.attr./div-1/div-1/header-1/slot-1/:close": [
+    {
+      "scope": "closure",
+      "identifier": "close"
+    }
+  ],
+  "template.attr./div-1/r-if": [
+    {
+      "scope": "props",
+      "path": [
+        "open"
+      ]
+    }
+  ],
+  "template.interp./div-1/div-1/header-1/slot-1/h2-1/0": [
+    {
+      "scope": "props",
+      "path": [
+        "title"
+      ]
+    }
+  ]
+}

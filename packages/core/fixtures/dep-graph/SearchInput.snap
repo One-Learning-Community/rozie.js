@@ -1,0 +1,84 @@
+{
+  "computed.isValid": [
+    {
+      "scope": "data",
+      "path": [
+        "query"
+      ]
+    },
+    {
+      "scope": "props",
+      "path": [
+        "minLength"
+      ]
+    }
+  ],
+  "lifecycle.0.setup": [
+    {
+      "scope": "props",
+      "path": [
+        "autofocus"
+      ]
+    },
+    {
+      "scope": "closure",
+      "identifier": "focus"
+    }
+  ],
+  "template.attr./div-1/button-4/@click": [
+    {
+      "scope": "closure",
+      "identifier": "clear"
+    }
+  ],
+  "template.attr./div-1/button-4/r-if": [
+    {
+      "scope": "data",
+      "path": [
+        "query"
+      ]
+    }
+  ],
+  "template.attr./div-1/input-2/:placeholder": [
+    {
+      "scope": "props",
+      "path": [
+        "placeholder"
+      ]
+    }
+  ],
+  "template.attr./div-1/input-2/@input.debounce(300)": [
+    {
+      "scope": "closure",
+      "identifier": "onSearch"
+    }
+  ],
+  "template.attr./div-1/input-2/@keydown.enter": [
+    {
+      "scope": "closure",
+      "identifier": "onSearch"
+    }
+  ],
+  "template.attr./div-1/input-2/@keydown.escape": [
+    {
+      "scope": "closure",
+      "identifier": "clear"
+    }
+  ],
+  "template.attr./div-1/input-2/r-model": [
+    {
+      "scope": "data",
+      "path": [
+        "query"
+      ]
+    }
+  ],
+  "template.interp./div-1/span-6/0": [
+    {
+      "scope": "props",
+      "path": [
+        "minLength"
+      ]
+    }
+  ]
+}
