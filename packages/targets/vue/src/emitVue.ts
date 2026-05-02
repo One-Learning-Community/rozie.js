@@ -143,27 +143,45 @@ function mergeVueImportsAndListeners(
   listenerCode: string,
   extraVueNames: readonly string[],
 ): string {
-  // 1. Splice extra Vue imports into the existing `import { ... } from 'vue';` line.
+  // 1. Splice extra Vue imports into any existing `import { ... } from 'vue'` lines.
+  // Collects ALL lines that import from 'vue' (handles multi-line imports and
+  // duplicate import lines that emitScript or babel/generator may produce),
+  // merges the names, emits a single canonical line, and removes the originals.
   let merged = script;
   if (extraVueNames.length > 0) {
     const lines = merged.split('\n');
-    const vueImportIdx = lines.findIndex((line) =>
-      /^import \{ [^}]+ \} from 'vue';$/.test(line.trim()),
-    );
-    if (vueImportIdx >= 0) {
-      const existing = lines[vueImportIdx]!;
-      const match = existing.match(/^import \{ ([^}]+) \} from 'vue';$/);
-      if (match && match[1]) {
-        const existingNames = new Set(match[1].split(',').map((n) => n.trim()));
-        for (const n of extraVueNames) existingNames.add(n);
-        const sorted = [...existingNames].sort();
-        lines[vueImportIdx] = `import { ${sorted.join(', ')} } from 'vue';`;
-        merged = lines.join('\n');
+    const collectedNames = new Set<string>(extraVueNames);
+    const vueImportIndices: number[] = [];
+
+    for (let i = 0; i < lines.length; i++) {
+      const trimmed = lines[i]!.trim();
+      // Match both single-line `import { ... } from 'vue';` and
+      // multi-line forms that start with `import {` and end with `} from 'vue';`
+      // on the same line (most common case from @babel/generator).
+      if (/from ['"]vue['"]/.test(trimmed)) {
+        vueImportIndices.push(i);
+        // Extract names: grab everything between `{` and `}` on this line.
+        const match = trimmed.match(/\{([^}]+)\}/);
+        if (match && match[1]) {
+          for (const n of match[1].split(',').map((s) => s.trim()).filter(Boolean)) {
+            collectedNames.add(n);
+          }
+        }
       }
+    }
+
+    if (vueImportIndices.length > 0) {
+      // Replace the FIRST matched line with the merged import; blank out the rest.
+      const sorted = [...collectedNames].sort();
+      lines[vueImportIndices[0]!] = `import { ${sorted.join(', ')} } from 'vue';`;
+      for (let k = 1; k < vueImportIndices.length; k++) {
+        lines[vueImportIndices[k]!] = '';
+      }
+      merged = lines.join('\n');
     } else {
-      const sorted = [...new Set(extraVueNames)].sort();
-      const newImport = `import { ${sorted.join(', ')} } from 'vue';`;
-      merged = newImport + '\n\n' + merged;
+      // No existing Vue import — prepend a new one.
+      const sorted = [...collectedNames].sort();
+      merged = `import { ${sorted.join(', ')} } from 'vue';\n\n` + merged;
     }
   }
 
