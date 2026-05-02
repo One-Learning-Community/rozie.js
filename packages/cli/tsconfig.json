@@ -5,5 +5,5 @@
     "rootDir": "./src"
   },
   "include": ["src/**/*"],
-  "exclude": ["dist", "node_modules", "tests", "fixtures"]
+  "exclude": ["dist", "node_modules", "tests", "fixtures", "src/**/__tests__"]
 }

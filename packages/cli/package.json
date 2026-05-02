@@ -3,11 +3,45 @@
   "version": "0.0.0",
   "type": "module",
   "private": true,
-  "main": "./src/index.ts",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "bin": {
+    "rozie": "./dist/bin.cjs"
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
   "scripts": {
-    "build": "echo 'Phase 1: scaffold only' && exit 0",
-    "test": "echo 'Phase 1: no tests' && exit 0",
+    "build": "tsdown",
+    "test": "vitest run --passWithNoTests",
     "lint": "biome lint src",
     "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@babel/code-frame": "^7.29.0",
+    "@babel/generator": "^7.29.1",
+    "@babel/parser": "^7.29.3",
+    "@babel/traverse": "^7.29.0",
+    "@babel/types": "^7.29.0",
+    "@rozie/core": "workspace:*",
+    "@rozie/target-vue": "workspace:*",
+    "@vue/compiler-sfc": "^3.5.33",
+    "commander": "^14.0.0",
+    "htmlparser2": "^12.0.0",
+    "magic-string": "^0.30.21",
+    "picocolors": "^1.1.0",
+    "postcss": "^8.5.13"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.5"
   }
 }
