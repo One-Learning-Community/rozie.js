@@ -1,1 +1,28 @@
-<!-- placeholder; populated by toMatchFileSnapshot in plans 02-05 -->
+
+<div class="todo-list">
+  <header>
+    <slot name="header" :remaining="remaining" :total="items.length">
+      
+      <h3>{{ props.title }} ({{ remaining }} remaining)</h3>
+    </slot>
+  </header>
+
+  <form @submit.prevent="add">
+    <input v-model="draft" placeholder="What needs doing?" />
+    <button type="submit" :disabled="!draft.trim()">Add</button>
+  </form>
+
+  <ul v-if="items.length > 0">
+    <li v-for="item in items" :key="item.id" :class="{ done: item.done }">
+      
+      <slot :item="item" :toggle="() => toggle(item.id)" :remove="() => remove(item.id)">
+        <label>
+          <input type="checkbox" :checked="item.done" @change="toggle(item.id)" />
+          <span>{{ item.text }}</span>
+        </label>
+        <button aria-label="Remove" @click="remove(item.id)">×</button>
+      </slot>
+    </li>
+  </ul><p v-else class="empty">
+    <slot name="empty">Nothing to do. ✨</slot>
+  </p></div>

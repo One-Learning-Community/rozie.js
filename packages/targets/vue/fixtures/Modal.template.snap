@@ -1,1 +1,16 @@
-<!-- placeholder; populated by toMatchFileSnapshot in plans 02-05 -->
+
+<div v-if="open" class="modal-backdrop" ref="backdropEl" @click.self="props.closeOnBackdrop && close()">
+  <div ref="dialogEl" class="modal-dialog" role="dialog" aria-modal="true" :aria-label="props.title || undefined" tabindex="-1">
+    <header v-if="props.title || $slots.header">
+      <template v-if="$slots.header"><slot name="header" :close="close">
+        <h2>{{ props.title }}</h2>
+      </slot></template>
+      <button class="close-btn" aria-label="Close" @click="close">×</button>
+    </header><div class="modal-body">
+      <slot :close="close"></slot>
+    </div>
+
+    <footer v-if="$slots.footer">
+      <template v-if="$slots.footer"><slot name="footer" :close="close"></slot></template>
+    </footer></div>
+</div>

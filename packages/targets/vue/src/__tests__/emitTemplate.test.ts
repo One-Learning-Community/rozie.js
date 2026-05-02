@@ -396,12 +396,12 @@ describe('emitTemplate — behavior tests (synthetic IR)', () => {
       sourceLoc: LOC,
     };
     const result = emitTemplateEvent(listener, { ir, registry });
-    expect(result.eventAttr).toMatch(/@input="debounced/);
-    expect(result.eventAttr).toMatch(/onSearch"$/);
+    // Wrap-name uses camelCase composition: debounce + onSearch → debouncedOnSearch.
+    expect(result.eventAttr).toMatch(/@input="debouncedOnSearch"$/);
     expect(result.scriptInjection).toBeDefined();
     expect(result.scriptInjection!.import.from).toBe('@rozie/runtime-vue');
     expect(result.scriptInjection!.import.name).toBe('debounce');
-    expect(result.scriptInjection!.decl).toMatch(/const debounced.*onSearch = debounce\(onSearch, 300\);/);
+    expect(result.scriptInjection!.decl).toMatch(/const debouncedOnSearch = debounce\(onSearch, 300\);/);
     expect(result.diagnostics).toEqual([]);
   });
 

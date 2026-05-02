@@ -101,12 +101,17 @@ describe('emitScript — behavior', () => {
     expect(script).toMatch(/dialogElRef\.value\??\.focus/);
   });
 
-  it('Counter emitVue() returns provisional SFC code with placeholder template/style', () => {
+  it('Counter emitVue() returns SFC code with real template (Plan 03) + placeholder style (Plan 05)', () => {
     const result = emitVue(lowerExample('Counter'));
     expect(result.code).toContain('<template>');
     expect(result.code).toContain('<script setup lang="ts">');
     expect(result.code).toContain('<style scoped>');
-    expect(result.code).toContain('TODO Plan 03 templates');
+    // Plan 03: real templates ARE emitted now — no more TODO Plan 03 placeholder.
+    expect(result.code).not.toContain('TODO Plan 03 templates');
+    // Counter's emitted template has the increment/decrement click handlers.
+    expect(result.code).toContain('@click="increment"');
+    expect(result.code).toContain('@click="decrement"');
+    // Plan 05 styles still placeholder.
     expect(result.code).toContain('TODO Plan 05 styles');
     expect(result.map).toBeNull();
   });
