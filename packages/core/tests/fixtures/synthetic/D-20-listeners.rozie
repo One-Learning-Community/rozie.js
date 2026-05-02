@@ -1,0 +1,18 @@
+<rozie name="D20Listeners">
+<props>{ closeOnOutsideClick: { type: Boolean, default: true } }</props>
+<script>
+const noop = () => {}
+</script>
+<listeners>
+{
+  "document:click.outside($refs.a,$refs.b).stop": {
+    when:    "true",
+    handler: noop,
+  },
+}
+</listeners>
+<template>
+  <div ref="a"></div>
+  <div ref="b"></div>
+</template>
+</rozie>

@@ -1,0 +1,11 @@
+<rozie name="D20Template">
+<props>{ closeOnOutsideClick: { type: Boolean, default: true } }</props>
+<script>
+const noop = () => {}
+</script>
+<template>
+  <div ref="a"></div>
+  <div ref="b"></div>
+  <button @click.outside($refs.a,$refs.b).stop="noop">click</button>
+</template>
+</rozie>

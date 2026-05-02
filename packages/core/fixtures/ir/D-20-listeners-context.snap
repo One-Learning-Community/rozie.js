@@ -1,0 +1,37 @@
+[
+  {
+    "kind": "wrap",
+    "modifier": "outside",
+    "args": [
+      {
+        "kind": "refExpr",
+        "ref": "a",
+        "loc": {
+          "start": 182,
+          "end": 189
+        }
+      },
+      {
+        "kind": "refExpr",
+        "ref": "b",
+        "loc": {
+          "start": 190,
+          "end": 197
+        }
+      }
+    ],
+    "sourceLoc": {
+      "start": 173,
+      "end": 198
+    }
+  },
+  {
+    "kind": "filter",
+    "modifier": "stop",
+    "args": [],
+    "sourceLoc": {
+      "start": 198,
+      "end": 203
+    }
+  }
+]
