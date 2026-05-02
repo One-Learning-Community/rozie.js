@@ -1,0 +1,75 @@
+name: Vue 3.4 + 3.5 Matrix
+
+# Phase 3 Plan 06 / D-27: verify the emitted .vue output works against both
+# the Vue 3.4 floor (the version that introduced `defineModel` — PROJECT.md
+# constraint) AND the latest Vue 3.5.x. Sequential steps rather than a real
+# matrix per RESEARCH OQ5 — over-engineering for v1.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  vue-matrix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Generated peggy file — created by core's prepare hook on install,
+      # but we re-run as a belt-and-suspenders against cache misses.
+      - name: Build core
+        run: pnpm -r --filter @rozie/core run build || echo 'core build is optional in Phase 3'
+
+      - name: Build @rozie/unplugin
+        run: pnpm --filter @rozie/unplugin run build
+
+      - name: Run unit tests (core + target-vue + runtime-vue + unplugin)
+        run: |
+          pnpm exec vitest run --root packages/core
+          pnpm exec vitest run --root packages/targets/vue
+          pnpm exec vitest run --root packages/runtime/vue
+          pnpm exec vitest run --root packages/unplugin
+
+      - name: Install Playwright Chromium
+        run: pnpm --filter vue-vite-demo exec playwright install --with-deps chromium
+
+      # ---- Vue 3.4 floor ----
+      - name: Vue 3.4 — install + typecheck + build + e2e
+        run: |
+          pnpm --filter vue-vite-demo add vue@~3.4.0 --save-exact
+          pnpm install --no-frozen-lockfile
+          pnpm --filter vue-vite-demo run typecheck
+          pnpm --filter vue-vite-demo run build
+          pnpm --filter vue-vite-demo exec playwright test
+
+      # ---- Vue 3.5 latest ----
+      - name: Vue 3.5 — install + typecheck + build + e2e
+        run: |
+          pnpm --filter vue-vite-demo add vue@~3.5.0 --save-exact
+          pnpm install --no-frozen-lockfile
+          pnpm --filter vue-vite-demo run typecheck
+          pnpm --filter vue-vite-demo run build
+          pnpm --filter vue-vite-demo exec playwright test
+
+      - name: Upload Playwright HTML report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: examples/consumers/vue-vite/playwright-report
+          retention-days: 7
