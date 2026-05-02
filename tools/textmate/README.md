@@ -13,16 +13,34 @@ Syntax highlighting for `.rozie` Single-File Component files. Consumed by JetBra
 - Special `$`-identifiers: `$props`, `$data`, `$refs`, `$emit`, `$computed`, `$onMount`, `$onUnmount`, `$watch`, `$slots`, `$el`
 - `ref="…"` template-ref attribute
 
+## Bundle layout
+
+JetBrains and VSCode both expect a VSCode-extension-shaped bundle directory:
+
+```
+tools/textmate/
+├── package.json              ← bundle manifest (contributes.languages / .grammars)
+├── language-configuration.json ← brackets, comments, auto-close pairs
+├── syntaxes/
+│   └── rozie.tmLanguage.json ← the actual grammar
+├── fixtures/                 ← demo .rozie files for visual verification
+└── README.md
+```
+
+The grammar lives at `syntaxes/rozie.tmLanguage.json`; **do not point JetBrains at the JSON file directly** — it loads the *directory* and reads `package.json` to discover the grammar.
+
 ## Install — JetBrains (PhpStorm / WebStorm / IDEA / etc.)
 
 1. Open **Settings** (⌘, on macOS, Ctrl+Alt+S elsewhere)
 2. Navigate to **Editor → TextMate Bundles**
 3. Click the **+** button
-4. Select the directory containing this README — `tools/textmate/`
+4. Select the directory containing this README — `tools/textmate/` (the directory, not the `.tmLanguage.json` file)
 5. Click **OK** to apply, then **OK** to close Settings
-6. Open any `.rozie` file — IDEs auto-associate the `.rozie` extension via the grammar's `fileTypes` field. If not, register the extension manually under **Settings → Editor → File Types → Files supported via TextMate bundles**.
+6. Open any `.rozie` file — IDEs auto-associate the `.rozie` extension via the manifest's `contributes.languages.extensions` entry. If not, register the extension manually under **Settings → Editor → File Types → Files supported via TextMate bundles**.
 
 JetBrains caches grammars; if changes don't appear after editing the JSON, **File → Invalidate Caches → Invalidate and Restart**.
+
+**Troubleshooting "Cannot read the following bundle":** This means JetBrains can't find a `package.json` (or `info.plist`) at the bundle root. Verify `tools/textmate/package.json` exists and that you selected the `tools/textmate/` directory itself, not its parent or a subdirectory.
 
 ## Install — VSCode
 

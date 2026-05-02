@@ -1,0 +1,33 @@
+{
+  "name": "rozie-textmate",
+  "displayName": "Rozie",
+  "description": "Syntax highlighting for .rozie Single-File Component files",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": ["Programming Languages"],
+  "contributes": {
+    "languages": [
+      {
+        "id": "rozie",
+        "aliases": ["Rozie", "rozie"],
+        "extensions": [".rozie"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "rozie",
+        "scopeName": "source.rozie",
+        "path": "./syntaxes/rozie.tmLanguage.json",
+        "embeddedLanguages": {
+          "meta.embedded.block.script.rozie": "javascript",
+          "meta.embedded.block.style.rozie": "css",
+          "meta.embedded.expression.rozie": "javascript"
+        }
+      }
+    ]
+  }
+}
