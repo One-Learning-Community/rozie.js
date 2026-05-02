@@ -148,7 +148,12 @@ function makeWrapName(
     baseName = `handler${counter.next}`;
   }
   const cap = baseName.charAt(0).toUpperCase() + baseName.slice(1);
-  const prefix = helperName === 'debounce' ? 'debounced' : 'throttled';
+  // Use 'L' namespace prefix (listeners-block) to prevent name collisions with
+  // template-event wraps (emitTemplateEvent uses 'debounced'/'throttled' without
+  // the suffix). Both subsystems start from counter 0 independently so without
+  // a namespace prefix a component with both sources would emit two
+  // `const debouncedOnSearch = ...` declarations, causing a compile error.
+  const prefix = helperName === 'debounce' ? 'debouncedL' : 'throttledL';
   const N = counter.next++;
   return N === 0 ? `${prefix}${cap}` : `${prefix}${cap}_${N}`;
 }

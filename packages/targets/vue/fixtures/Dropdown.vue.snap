@@ -73,11 +73,11 @@ watchEffect((onCleanup) => {
   onCleanup(() => document.removeEventListener('keydown', handler));
 });
 
-const throttledReposition = throttle(reposition, 100);
+const throttledLReposition = throttle(reposition, 100);
 watchEffect((onCleanup) => {
   if (!(open.value)) return;
-  window.addEventListener('resize', throttledReposition, { passive: true });
-  onCleanup(() => window.removeEventListener('resize', throttledReposition, { passive: true }));
+  window.addEventListener('resize', throttledLReposition, { passive: true });
+  onCleanup(() => window.removeEventListener('resize', throttledLReposition, { passive: true }));
 });
 </script>
 

@@ -93,9 +93,9 @@ describe('emitListeners — Dropdown end-to-end', () => {
 
   it('Test 3: emits throttled-handler wrap + watchEffect for resize.throttle(100).passive', () => {
     const { code } = emitListeners(dropdown.listeners, dropdown, registry);
-    expect(code).toContain('const throttledReposition = throttle(reposition, 100);');
-    expect(code).toContain("window.addEventListener('resize', throttledReposition, { passive: true });");
-    expect(code).toContain("window.removeEventListener('resize', throttledReposition");
+    expect(code).toContain('const throttledLReposition = throttle(reposition, 100);');
+    expect(code).toContain("window.addEventListener('resize', throttledLReposition, { passive: true });");
+    expect(code).toContain("window.removeEventListener('resize', throttledLReposition");
   });
 
   it('Test 4: runtimeImports include useOutsideClick + throttle, NOT debounce (only collected helpers)', () => {
