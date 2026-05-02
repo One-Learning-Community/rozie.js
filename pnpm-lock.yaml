@@ -48,6 +48,9 @@ importers:
       playwright:
         specifier: ^1
         version: 1.59.1
+      source-map-js:
+        specifier: ^1.2.1
+        version: 1.2.1
       typescript:
         specifier: ^5
         version: 5.9.3
@@ -168,6 +171,21 @@ importers:
 
   packages/unplugin:
     dependencies:
+      '@babel/code-frame':
+        specifier: ^7.29.0
+        version: 7.29.0
+      '@babel/generator':
+        specifier: ^7.29.1
+        version: 7.29.1
+      '@babel/parser':
+        specifier: ^7.29.3
+        version: 7.29.3
+      '@babel/traverse':
+        specifier: ^7.29.0
+        version: 7.29.0
+      '@babel/types':
+        specifier: ^7.29.0
+        version: 7.29.0
       '@rozie/core':
         specifier: workspace:*
         version: link:../core
@@ -177,6 +195,21 @@ importers:
       '@rozie/target-vue':
         specifier: workspace:*
         version: link:../targets/vue
+      '@vue/compiler-sfc':
+        specifier: ^3.5.33
+        version: 3.5.33
+      htmlparser2:
+        specifier: ^12.0.0
+        version: 12.0.0
+      magic-string:
+        specifier: ^0.30.21
+        version: 0.30.21
+      picocolors:
+        specifier: ^1.1.0
+        version: 1.1.1
+      postcss:
+        specifier: ^8.5.13
+        version: 8.5.13
       unplugin:
         specifier: ^3.0.0
         version: 3.0.0

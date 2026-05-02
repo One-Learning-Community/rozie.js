@@ -1,11 +1,11 @@
 <template>
 
 <div class="dropdown">
-  <div ref="triggerEl" @click="toggle">
+  <div ref="triggerElRef" @click="toggle">
     <slot name="trigger" :open="open" :toggle="toggle"></slot>
   </div>
 
-  <div v-if="open" ref="panelEl" class="dropdown-panel" role="menu">
+  <div v-if="open" ref="panelElRef" class="dropdown-panel" role="menu">
     <slot :close="close"></slot>
   </div></div>
 
@@ -31,14 +31,6 @@ defineSlots<{
 const triggerElRef = ref<HTMLElement>();
 const panelElRef = ref<HTMLElement>();
 
-onMounted(() => {
-  reposition();
-});
-onMounted(() => {
-  // Example of integrating a vanilla JS library — $refs gives direct DOM access.
-  // new Popper($refs.triggerEl, $refs.panelEl, { placement: 'bottom-start' })
-});
-
 const toggle = () => {
   open.value = !open.value;
 };
@@ -56,6 +48,14 @@ const reposition = () => {
 
 // Multiple $onMount calls run in source order. Useful for colocating setup
 // with the logic it serves.
+
+onMounted(() => {
+  reposition();
+});
+onMounted(() => {
+  // Example of integrating a vanilla JS library — $refs gives direct DOM access.
+  // new Popper($refs.triggerEl, $refs.panelEl, { placement: 'bottom-start' })
+});
 
 useOutsideClick(
   [triggerElRef, panelElRef],

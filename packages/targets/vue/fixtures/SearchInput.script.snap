@@ -19,6 +19,14 @@ const inputElRef = ref<HTMLInputElement>();
 
 const isValid = computed(() => query.value.length >= props.minLength);
 
+const onSearch = () => {
+  if (isValid.value) emit('search', query.value);
+};
+const clear = () => {
+  query.value = '';
+  emit('clear');
+};
+
 let _cleanup_0: (() => void) | undefined;
 onMounted(() => {
   if (props.autofocus) inputElRef.value?.focus();
@@ -30,11 +38,3 @@ onMounted(() => {
   };
 });
 onBeforeUnmount(() => { _cleanup_0?.(); });
-
-const onSearch = () => {
-  if (isValid.value) emit('search', query.value);
-};
-const clear = () => {
-  query.value = '';
-  emit('clear');
-};

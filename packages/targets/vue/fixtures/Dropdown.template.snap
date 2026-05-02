@@ -1,9 +1,9 @@
 
 <div class="dropdown">
-  <div ref="triggerEl" @click="toggle">
+  <div ref="triggerElRef" @click="toggle">
     <slot name="trigger" :open="open" :toggle="toggle"></slot>
   </div>
 
-  <div v-if="open" ref="panelEl" class="dropdown-panel" role="menu">
+  <div v-if="open" ref="panelElRef" class="dropdown-panel" role="menu">
     <slot :close="close"></slot>
   </div></div>

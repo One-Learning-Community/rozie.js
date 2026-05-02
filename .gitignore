@@ -11,3 +11,10 @@ coverage/
 
 # Per RESEARCH.md Open Question 2 — peggy generated file regenerates on prepare
 packages/core/src/modifier-grammar/generated.js
+
+# Playwright test artifacts
+test-results/
+playwright-report/
+
+# Vite test artifacts (left over from spike tests using __dirname-relative tmp)
+examples/consumers/*/.tmp-*/

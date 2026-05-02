@@ -20,6 +20,7 @@
     "@playwright/test": "^1",
     "@vitejs/plugin-vue": "^5",
     "playwright": "^1",
+    "source-map-js": "^1.2.1",
     "typescript": "^5",
     "vite": "^5",
     "vue-tsc": "^2"

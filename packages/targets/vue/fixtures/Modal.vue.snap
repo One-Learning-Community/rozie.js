@@ -1,7 +1,7 @@
 <template>
 
-<div v-if="open" class="modal-backdrop" ref="backdropEl" @click.self="props.closeOnBackdrop && close()">
-  <div ref="dialogEl" class="modal-dialog" role="dialog" aria-modal="true" :aria-label="props.title || undefined" tabindex="-1">
+<div v-if="open" class="modal-backdrop" ref="backdropElRef" @click.self="props.closeOnBackdrop && close()">
+  <div ref="dialogElRef" class="modal-dialog" role="dialog" aria-modal="true" :aria-label="props.title || undefined" tabindex="-1">
     <header v-if="props.title || $slots.header">
       <template v-if="$slots.header"><slot name="header" :close="close">
         <h2>{{ props.title }}</h2>
@@ -40,12 +40,6 @@ defineSlots<{
 const backdropElRef = ref<HTMLElement>();
 const dialogElRef = ref<HTMLElement>();
 
-onMounted(lockScroll);
-onBeforeUnmount(unlockScroll);
-onMounted(() => {
-  dialogElRef.value?.focus();
-});
-
 const close = () => {
   open.value = false;
   emit('close');
@@ -67,6 +61,12 @@ const unlockScroll = () => {
 };
 
 // Colocated lifecycle pair — runs in source order alongside other hooks.
+
+onMounted(lockScroll);
+onBeforeUnmount(unlockScroll);
+onMounted(() => {
+  dialogElRef.value?.focus();
+});
 
 watchEffect((onCleanup) => {
   if (!(open.value && props.closeOnEscape)) return;

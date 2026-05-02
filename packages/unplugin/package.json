@@ -3,25 +3,69 @@
   "version": "0.0.0",
   "type": "module",
   "private": true,
-  "main": "./src/index.ts",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./src/index.ts",
   "exports": {
-    ".": "./src/index.ts",
-    "./vite": "./src/vite.ts",
-    "./rollup": "./src/rollup.ts",
-    "./webpack": "./src/webpack.ts",
-    "./esbuild": "./src/esbuild.ts",
-    "./rolldown": "./src/rolldown.ts",
-    "./rspack": "./src/rspack.ts"
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    },
+    "./vite": {
+      "types": "./src/vite.ts",
+      "import": "./dist/vite.mjs",
+      "require": "./dist/vite.cjs"
+    },
+    "./rollup": {
+      "types": "./src/rollup.ts",
+      "import": "./dist/rollup.mjs",
+      "require": "./dist/rollup.cjs"
+    },
+    "./webpack": {
+      "types": "./src/webpack.ts",
+      "import": "./dist/webpack.mjs",
+      "require": "./dist/webpack.cjs"
+    },
+    "./esbuild": {
+      "types": "./src/esbuild.ts",
+      "import": "./dist/esbuild.mjs",
+      "require": "./dist/esbuild.cjs"
+    },
+    "./rolldown": {
+      "types": "./src/rolldown.ts",
+      "import": "./dist/rolldown.mjs",
+      "require": "./dist/rolldown.cjs"
+    },
+    "./rspack": {
+      "types": "./src/rspack.ts",
+      "import": "./dist/rspack.mjs",
+      "require": "./dist/rspack.cjs"
+    }
   },
+  "files": [
+    "dist",
+    "src"
+  ],
   "scripts": {
-    "build": "echo 'Phase 3 Plan 06: source distribution' && exit 0",
+    "build": "tsdown",
     "test": "vitest run --passWithNoTests",
     "lint": "biome lint src",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@babel/code-frame": "^7.29.0",
+    "@babel/generator": "^7.29.1",
+    "@babel/parser": "^7.29.3",
+    "@babel/traverse": "^7.29.0",
+    "@babel/types": "^7.29.0",
     "@rozie/core": "workspace:*",
     "@rozie/target-vue": "workspace:*",
+    "@vue/compiler-sfc": "^3.5.33",
+    "htmlparser2": "^12.0.0",
+    "magic-string": "^0.30.21",
+    "picocolors": "^1.1.0",
+    "postcss": "^8.5.13",
     "unplugin": "^3.0.0"
   },
   "peerDependencies": {

@@ -12,8 +12,15 @@
  *   6. const x = ref(initial)                     (per StateDecl — D-32)
  *   7. const xRef = ref<HTMLElement>()            (per RefDecl — Pitfall 4)
  *   8. const c = computed(() => body)             (per ComputedDecl — D-34)
- *   9. onMounted/onBeforeUnmount/onUpdated calls  (D-33 + Pitfall 5/10)
- *  10. residual script body                       (helper-fn, plain-decl, console.log)
+ *   9. residual script body                       (helper-fn, plain-decl, console.log)
+ *  10. onMounted/onBeforeUnmount/onUpdated calls  (D-33 + Pitfall 5/10)
+ *
+ * NOTE: residual-before-lifecycle ordering (since Plan 06) — earlier the doc
+ * said lifecycle came BEFORE residual, but that triggered a JS TDZ crash on
+ * `onMounted(lockScroll)` where `lockScroll` is a `const` declared in the
+ * residual body (Modal.rozie repro). Vue's lifecycle registration doesn't
+ * care which order setup executes the calls — it only cares that they fire
+ * synchronously during setup, which both orderings satisfy.
  *
  * @rozie/runtime-vue imports for non-native modifiers (.outside / .debounce
  * / .throttle) come from Plan 04 (P3) which adds the listeners-block lowering
@@ -551,8 +558,14 @@ export function emitScript(ir: IRComponent): EmitScriptResult {
   if (dataLines.length > 0) sections.push(dataLines.join('\n'));
   if (refLines.length > 0) sections.push(refLines.join('\n'));
   if (computedLines.length > 0) sections.push(computedLines.join('\n'));
-  if (lifecycleLines.length > 0) sections.push(lifecycleLines.join('\n'));
+  // Residual body BEFORE lifecycle hooks — `onMounted(lockScroll)` references
+  // `lockScroll` which is a `const` declared in the residual body. Emitting
+  // lifecycle BEFORE residual triggered a JS TDZ crash at component mount
+  // time (Modal.rozie repro). Vue's onMounted just registers the callback;
+  // it doesn't matter whether it's called before or after a `const` decl as
+  // long as the const exists by the time `onMounted`'s argument is evaluated.
   if (residual.trim().length > 0) sections.push(residual);
+  if (lifecycleLines.length > 0) sections.push(lifecycleLines.join('\n'));
 
   const script = sections.join('\n\n');
 

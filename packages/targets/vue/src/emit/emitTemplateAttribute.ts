@@ -138,6 +138,18 @@ function emitSingleAttr(attr: AttributeBinding, ir: IRComponent): string {
 
   if (attr.kind === 'static') {
     // r-* directives in static form would not appear; pass through.
+    // Special-case: `ref="panelEl"` must align with the script-side rename
+    // `panelEl → panelElRef` (Pitfall 4 suffix). Vue 3.4 `<script setup>`
+    // resolves `ref="<name>"` against a setup binding of the SAME name; if
+    // the emitter uses `panelElRef` in script we must emit `ref="panelElRef"`
+    // in the template too. Otherwise `panelElRef.value` stays undefined and
+    // useOutsideClick / panelEl-bearing logic silently breaks at runtime.
+    if (attr.name === 'ref') {
+      const refNames = new Set(ir.refs.map((r) => r.name));
+      if (refNames.has(attr.value)) {
+        return `ref="${attr.value}Ref"`;
+      }
+    }
     return `${name}="${escapeAttrValue(attr.value)}"`;
   }
 

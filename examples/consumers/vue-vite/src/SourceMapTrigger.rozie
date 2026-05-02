@@ -1,0 +1,33 @@
+<!--
+  SourceMapTrigger.rozie
+
+  Test-only fixture for the DX-01 source-maps Playwright e2e (success criterion 4).
+
+  Renders a button that, on click, calls a function that THROWS a runtime
+  error. The thrown error's stack frame should resolve via the source-map
+  chain (magic-string → vite-plugin-vue → Vite source-map composition) to
+  the line in this `.rozie` file where the throw happens.
+
+  The test verifies `pageerror`'s captured stack matches the regex
+  `/\.rozie:\d+:\d+/`.
+-->
+
+<rozie name="SourceMapTrigger">
+
+<script>
+const triggerError = () => {
+  // Throw asynchronously via setTimeout so the error escapes Vue's
+  // synchronous-handler error boundary and reaches window.onerror /
+  // Playwright's `page.on('pageerror')`. Otherwise Vue would catch the
+  // throw, log a console.error, and the test wouldn't observe a pageerror.
+  setTimeout(() => {
+    throw new Error("rozie source-map trigger");
+  }, 0);
+}
+</script>
+
+<template>
+<button class="trigger-error" @click="triggerError" aria-label="Trigger Error (test)">Trigger Error (test)</button>
+</template>
+
+</rozie>

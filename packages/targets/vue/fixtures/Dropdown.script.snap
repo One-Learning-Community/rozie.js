@@ -17,14 +17,6 @@ defineSlots<{
 const triggerElRef = ref<HTMLElement>();
 const panelElRef = ref<HTMLElement>();
 
-onMounted(() => {
-  reposition();
-});
-onMounted(() => {
-  // Example of integrating a vanilla JS library — $refs gives direct DOM access.
-  // new Popper($refs.triggerEl, $refs.panelEl, { placement: 'bottom-start' })
-});
-
 const toggle = () => {
   open.value = !open.value;
 };
@@ -42,6 +34,14 @@ const reposition = () => {
 
 // Multiple $onMount calls run in source order. Useful for colocating setup
 // with the logic it serves.
+
+onMounted(() => {
+  reposition();
+});
+onMounted(() => {
+  // Example of integrating a vanilla JS library — $refs gives direct DOM access.
+  // new Popper($refs.triggerEl, $refs.panelEl, { placement: 'bottom-start' })
+});
 
 useOutsideClick(
   [triggerElRef, panelElRef],

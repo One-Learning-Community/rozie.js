@@ -1,7 +1,7 @@
 
 <div class="search-input">
   
-  <input ref="inputEl" type="search" :placeholder="props.placeholder" v-model="query" @input="debouncedOnSearch" @keydown.enter="onSearch" @keydown.esc="clear" />
+  <input ref="inputElRef" type="search" :placeholder="props.placeholder" v-model="query" @input="debouncedOnSearch" @keydown.enter="onSearch" @keydown.esc="clear" />
 
   <button v-if="query.length > 0" class="clear-btn" aria-label="Clear" @click="clear">
     ×
