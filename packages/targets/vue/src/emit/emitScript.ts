@@ -258,13 +258,9 @@ function emitComputedDecls(
     // Per D-34: wrap the rewritten body in `computed(() => ...)` so the emitted
     // decl is a Vue Ref<T>. Read-side `.value` access is appended by
     // rewriteRozieIdentifiers' Identifier visitor in templates / scripts.
-    let bodyCode: string;
-    if (t.isBlockStatement(body)) {
-      bodyCode = `() => ${genCode(body)}`;
-    } else {
-      bodyCode = `() => ${genCode(body)}`;
-    }
-    lines.push(`const ${c.name} = computed(${bodyCode});`);
+    // genCode handles both BlockStatement (`{ return x; }`) and Expression (`x`)
+    // bodies correctly — the if/else was dead code (both branches identical).
+    lines.push(`const ${c.name} = computed(() => ${genCode(body)});`);
   }
   return lines;
 }
