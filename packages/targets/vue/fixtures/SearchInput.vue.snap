@@ -14,8 +14,6 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { debounce } from '@rozie/runtime-vue';
 
-const debouncedOnSearch = debounce(onSearch, 300);
-
 const props = withDefaults(
   defineProps<{ placeholder?: string; minLength?: number; autofocus?: boolean }>(),
   { placeholder: 'Search…', minLength: 2, autofocus: false }
@@ -51,6 +49,8 @@ onMounted(() => {
   };
 });
 onBeforeUnmount(() => { _cleanup_0?.(); });
+
+const debouncedOnSearch = debounce(onSearch, 300);
 </script>
 
 <style scoped>

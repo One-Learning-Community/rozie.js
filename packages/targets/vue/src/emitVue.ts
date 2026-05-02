@@ -69,8 +69,14 @@ export interface EmitVueResult {
  * Splice template-side scriptInjections (debounce/throttle wrappers) into the
  * <script setup> body. The scriptInjection contract is: each entry has an
  * import descriptor (deduped here) and a one-line `decl` such as
- * `const debouncedOnSearch = debounce(onSearch, 300);`. The decl is appended
- * after the existing import line(s) and before the rest of the script body.
+ * `const debouncedOnSearch = debounce(onSearch, 300);`.
+ *
+ * Placement:
+ *   - Imports go with the other imports at the top.
+ *   - Decls go at the BOTTOM of the script — they reference helper functions
+ *     declared in the residual body (e.g. `const onSearch = ...`), so wrapping
+ *     them earlier produces a TDZ error (`Cannot access 'onSearch' before
+ *     initialization`).
  */
 function mergeScriptInjections(
   script: string,
@@ -118,16 +124,18 @@ function mergeScriptInjections(
     }
   }
 
-  // Compose new script. If there were no existing imports (lastImportLine ===
-  // -1), prepend new imports + decls to the front.
+  const declTail = decls.length > 0 ? '\n\n' + decls.join('\n') : '';
+
+  // No existing imports: prepend new imports, append decls to the bottom.
   if (lastImportLine === -1) {
-    return importLines.join('\n') + '\n\n' + decls.join('\n') + '\n\n' + script;
+    return importLines.join('\n') + '\n\n' + script + declTail;
   }
 
+  // Splice imports in with the existing ones; decls go at the bottom of the
+  // script body so they observe all helper-function decls in the residual body.
   const head = lines.slice(0, lastImportLine + 1);
   const tail = lines.slice(lastImportLine + 1);
-  const newSegment = [...importLines, '', ...decls];
-  const merged = [...head, ...newSegment, ...tail].join('\n');
+  const merged = [...head, ...importLines, ...tail].join('\n') + declTail;
   return merged;
 }
 

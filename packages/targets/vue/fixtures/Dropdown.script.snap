@@ -1,7 +1,6 @@
 import { onMounted, ref, watchEffect } from 'vue';
 import { throttle, useOutsideClick } from '@rozie/runtime-vue';
 
-
 const props = withDefaults(
   defineProps<{ closeOnOutsideClick?: boolean; closeOnEscape?: boolean }>(),
   { closeOnOutsideClick: true, closeOnEscape: true }
