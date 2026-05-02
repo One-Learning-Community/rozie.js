@@ -40,6 +40,7 @@ import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js'
 import { cloneScriptProgram } from '../rewrite/cloneProgram.js';
 import { rewriteRozieIdentifiers } from '../rewrite/rewriteScript.js';
 import { VueImportCollector } from '../rewrite/collectVueImports.js';
+import { buildSlotTypeBlock } from './refineSlotTypes.js';
 
 // CJS interop normalization for @babel/generator default export.
 type GenerateFn = typeof import('@babel/generator').default;
@@ -166,18 +167,14 @@ function emitDefineEmitsCall(ir: IRComponent): string {
 }
 
 /**
- * Emit `defineSlots<...>()` if ir.slots is non-empty. v1 uses `props: any` for
- * the param type — Plan 03 (P2) refines to actual scoped-slot types when slot
- * params land.
+ * Emit `defineSlots<...>()` if ir.slots is non-empty. Plan 03 refines from the
+ * Plan 02 `props: any` stub to per-param `{ paramName: any; ... }` literals via
+ * `buildSlotTypeBlock` (refineSlotTypes.ts). Param value types remain `any` for
+ * v1 — TYPES-01 in Phase 6 will refine when the type-flow pass lands.
  */
 function emitDefineSlotsStub(ir: IRComponent): string {
   if (ir.slots.length === 0) return '';
-  const lines = ir.slots
-    .map((s) => {
-      const name = s.name === '' ? 'default' : s.name;
-      return `  ${name}(props: any): any;`;
-    })
-    .join('\n');
+  const lines = buildSlotTypeBlock(ir.slots);
   return `defineSlots<{\n${lines}\n}>();`;
 }
 

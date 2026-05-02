@@ -12,9 +12,9 @@ const emit = defineEmits<{
 }>();
 
 defineSlots<{
-  header(props: any): any;
-  default(props: any): any;
-  footer(props: any): any;
+  header(props: { close: any }): any;
+  default(props: { close: any }): any;
+  footer(props: { close: any }): any;
 }>();
 
 const backdropElRef = ref<HTMLElement>();
