@@ -565,3 +565,18 @@ describe('emitTemplate — example-specific substring assertions', () => {
     expect(template).toMatch(/\$slots\.(header|footer)/);
   });
 });
+
+describe('emitVue — script-injection merge for template @event modifier wraps', () => {
+  it('SearchInput: full SFC contains runtime-vue import + debouncedOnSearch decl', async () => {
+    // Lazy-import emitVue here so it runs through the merge layer.
+    const { emitVue } = await import('../emitVue.js');
+    const { code } = emitVue(lowerExample('SearchInput'));
+    expect(code).toContain("import { debounce } from '@rozie/runtime-vue';");
+    expect(code).toMatch(/const debouncedOnSearch = debounce\(onSearch, 300\);/);
+    // Template body has the debounced handler reference instead of inline onSearch.
+    expect(code).toContain('@input="debouncedOnSearch"');
+    // Other native modifiers passed through verbatim.
+    expect(code).toContain('@keydown.esc="clear"');
+    expect(code).toContain('@keydown.enter="onSearch"');
+  });
+});
