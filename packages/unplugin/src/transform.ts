@@ -130,13 +130,19 @@ function runRoziePipeline(
   }
   warnings.push(...result.diagnostics.filter((d) => d.severity === 'warning'));
 
-  // 4. Surface warnings via this.warn (D-28)
+  // 4. Surface warnings via this.warn (D-28).
+  // Guard against null/undefined context — tests and direct callers that invoke
+  // the hook function without a proper bundler context will have this === undefined
+  // (strict mode) or the global object (sloppy). Callers in those scenarios should
+  // inspect result.diagnostics directly.
   for (const w of warnings) {
-    const loc = formatLoc(w.loc, filePath, source);
-    this.warn({
-      message: `[${w.code}] ${w.message}`,
-      ...loc,
-    });
+    if (typeof this?.warn === 'function') {
+      const loc = formatLoc(w.loc, filePath, source);
+      this.warn({
+        message: `[${w.code}] ${w.message}`,
+        ...loc,
+      });
+    }
   }
 
   return { code: result.code, map: result.map };
