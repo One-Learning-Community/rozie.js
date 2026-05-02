@@ -63,7 +63,48 @@ importers:
 
   packages/babel-plugin: {}
 
-  packages/cli: {}
+  packages/cli:
+    dependencies:
+      '@babel/code-frame':
+        specifier: ^7.29.0
+        version: 7.29.0
+      '@babel/parser':
+        specifier: ^7.29.3
+        version: 7.29.3
+      '@babel/traverse':
+        specifier: ^7.29.0
+        version: 7.29.0
+      '@babel/types':
+        specifier: ^7.29.0
+        version: 7.29.0
+      '@rozie/core':
+        specifier: workspace:*
+        version: link:../core
+      '@rozie/target-vue':
+        specifier: workspace:*
+        version: link:../targets/vue
+      '@vue/compiler-sfc':
+        specifier: ^3.5.33
+        version: 3.5.33
+      commander:
+        specifier: ^14.0.0
+        version: 14.0.3
+      htmlparser2:
+        specifier: ^12.0.0
+        version: 12.0.0
+      magic-string:
+        specifier: ^0.30.21
+        version: 0.30.21
+      picocolors:
+        specifier: ^1.1.0
+        version: 1.1.1
+      postcss:
+        specifier: ^8.5.13
+        version: 8.5.13
+    devDependencies:
+      vitest:
+        specifier: ^4.1.5
+        version: 4.1.5(@types/node@22.19.17)(happy-dom@15.11.7)(vite@8.0.10(@types/node@22.19.17))
 
   packages/core:
     dependencies:
