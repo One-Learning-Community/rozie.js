@@ -30,7 +30,9 @@ describe('throttle — D-41 helper contract', () => {
       expect(fn).toHaveBeenCalledTimes(2);
       expect(fn).toHaveBeenLastCalledWith(3);
 
-      // Now we're outside the window — the next call fires immediately again.
+      // The trailing call reset `last` to its fire time, so we need to
+      // advance past the new window before the next immediate-fire eligibility.
+      vi.advanceTimersByTime(120);
       throttled(4);
       expect(fn).toHaveBeenCalledTimes(3);
       expect(fn).toHaveBeenLastCalledWith(4);

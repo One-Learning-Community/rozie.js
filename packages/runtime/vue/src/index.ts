@@ -1,8 +1,23 @@
-// @rozie/runtime-vue — Phase 3 Plan 01 (P0): scaffold-only placeholder.
-// Plan 04 (P3) replaces this with real exports: useOutsideClick, debounce,
-// throttle, key-filter helpers (D-41).
+// @rozie/runtime-vue — D-41 tree-shakable named exports for non-native
+// modifier helpers consumed by emitted Vue SFCs.
 //
-// Per Phase 1 D-01 placeholder convention — exporting a unique const so
-// the file isn't a TypeScript no-op (avoids `noUnusedLocals` flake on
-// fully-empty modules per Phase 1 D-01 / RESEARCH.md Pitfall 9).
-export const __rozieRuntimeVuePlaceholder: true = true;
+// Plan 01 (P0) shipped a placeholder. Plan 04 (P3) replaces it with real
+// helpers per D-40..D-45.
+export { useOutsideClick, type OutsideClickOptions } from './useOutsideClick.js';
+export { debounce } from './debounce.js';
+export { throttle } from './throttle.js';
+export {
+  isEnter,
+  isEscape,
+  isTab,
+  isSpace,
+  isDelete,
+  isUp,
+  isDown,
+  isLeft,
+  isRight,
+  isCtrl,
+  isAlt,
+  isShift,
+  isMeta,
+} from './keyFilter.js';
