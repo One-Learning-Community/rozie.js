@@ -70,7 +70,20 @@ export const RozieErrorCode = {
   /** @deprecated placeholder — accessibility lint warnings deferred per CONTEXT.md A7. */
   RIF_ACCESSIBILITY_PLACEHOLDER: 'ROZ303', // RESERVED — not emitted in Phase 2 (deferred per A7)
 
-  // ---- ROZ400+ reserved for Phase 3+ target emitters ----
+  // ---- @rozie/unplugin configuration errors (Phase 3 D-52) — ROZ400..ROZ419 ----
+  UNPLUGIN_TARGET_REQUIRED: 'ROZ400', // D-49: target option missing
+  UNPLUGIN_TARGET_UNKNOWN: 'ROZ401', // target value not in 'vue'|'react'|'svelte'|'angular'
+  UNPLUGIN_TARGET_NOT_YET_SUPPORTED: 'ROZ402', // Phase 3 only ships 'vue'; react/svelte/angular ROZ402 until later phases
+  UNPLUGIN_PEER_DEP_MISSING: 'ROZ403', // @rozie/runtime-vue or @vitejs/plugin-vue not resolvable (Pitfall 8)
+  UNPLUGIN_PLUGIN_CHAIN_MISORDER: 'ROZ404', // detected vite-plugin-vue lacking; D-25 chain broken
+
+  // ---- @rozie/target-vue lowering errors (Phase 3 D-52) — ROZ420..ROZ449 ----
+  // (Reserved as safety net per CONTEXT D-52 — none anticipated for v1.)
+  TARGET_VUE_RESERVED: 'ROZ420', // RESERVED placeholder; emitter throws this only on internal-invariant violation
+
+  // ---- Phase 3 emitter warnings — ROZ450..ROZ499 (Phase 7 hardening) ----
+
+  // ---- Phase 4+ target emitters take ROZ500+ ----
 } as const;
 
 export type RozieErrorCode = (typeof RozieErrorCode)[keyof typeof RozieErrorCode];
