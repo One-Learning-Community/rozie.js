@@ -29,6 +29,8 @@
 </data>
 
 <script>
+console.log("hello from rozie")
+
 const canIncrement = $computed(() => $props.value + $props.step <= $props.max)
 const canDecrement = $computed(() => $props.value - $props.step >= $props.min)
 

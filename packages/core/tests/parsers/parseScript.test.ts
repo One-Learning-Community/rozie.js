@@ -32,14 +32,15 @@ function isCallToIdentifier(stmt: Statement, name: string): boolean {
 }
 
 describe('parseScript (PARSE-03)', () => {
-  it('parses Counter.rozie <script> into Babel AST with 4 top-level statements', () => {
+  it('parses Counter.rozie <script> into Babel AST with 5 top-level statements', () => {
     const { source, content, contentLoc } = loadScript('Counter');
     const { node, diagnostics } = parseScript(content, contentLoc, source, 'Counter.rozie');
     expect(diagnostics).toEqual([]);
     expect(node).not.toBeNull();
     expect(node!.program.type).toBe('File');
-    // 2 const $computed declarations + increment + decrement = 4 top-level statements
-    expect(node!.program.program.body.length).toBe(4);
+    // Phase 3 Plan 02 Task 3: console.log("hello from rozie") (DX-03 anchor) +
+    // 2 const $computed declarations + increment + decrement = 5 top-level statements
+    expect(node!.program.program.body.length).toBe(5);
   });
 
   it('preserves multiple $onMount calls in Dropdown.rozie as separate AST nodes (source-order multi-lifecycle)', () => {
@@ -66,22 +67,18 @@ describe('parseScript (PARSE-03)', () => {
   });
 
   it('PARSE-03 / Risk 5 trust-erosion floor — console.log("hello from rozie") survives parsing into AST verbatim', () => {
-    // Synthesize a fresh .rozie source with console.log injected at the start of
-    // Counter.rozie's <script> block content. Re-split via splitBlocks so the
-    // contentLoc threads through correctly.
-    const orig = readFileSync(resolve(EXAMPLES_DIR, 'Counter.rozie'), 'utf8');
-    const blocks = splitBlocks(orig, 'Counter.rozie');
-    const scriptLoc = blocks.script!.contentLoc;
-    const synthetic =
-      orig.slice(0, scriptLoc.start) +
-      '\nconsole.log("hello from rozie");' +
-      orig.slice(scriptLoc.start);
-    const synthBlocks = splitBlocks(synthetic, 'synthetic.rozie');
+    // Phase 3 Plan 02 Task 3 promoted this from a synthetic injection to a
+    // real-source anchor: examples/Counter.rozie's <script> block now contains
+    // `console.log("hello from rozie")` as its first top-level statement. We
+    // assert it survives parse → AST verbatim.
+    const counterSrc = readFileSync(resolve(EXAMPLES_DIR, 'Counter.rozie'), 'utf8');
+    expect(counterSrc).toContain('console.log("hello from rozie")');
+    const blocks = splitBlocks(counterSrc, 'Counter.rozie');
     const { node, diagnostics } = parseScript(
-      synthBlocks.script!.content,
-      synthBlocks.script!.contentLoc,
-      synthetic,
-      'synthetic.rozie',
+      blocks.script!.content,
+      blocks.script!.contentLoc,
+      counterSrc,
+      'Counter.rozie',
     );
     expect(diagnostics).toEqual([]);
     const consoleCalls = node!.program.program.body.filter(s => {

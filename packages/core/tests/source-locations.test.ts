@@ -76,18 +76,21 @@ describe('Off-by-one source-location regression (D-12 / Phase 1 Success Criterio
     expect(key.loc.start.index).toBe(source.indexOf('hovering'));
   });
 
-  it('Counter.rozie — <script> first VariableDeclaration "canIncrement" loc.start byte-accurate', () => {
+  it('Counter.rozie — <script> "canIncrement" VariableDeclaration loc.start byte-accurate', () => {
     const source = loadExample('Counter');
     const { ast } = parse(source);
     const script = ast!.script!;
-    const firstStmt = script.program.program.body[0] as unknown as {
-      type: string;
-      declarations: Array<{ id: BabelIdent }>;
-    };
-    expect(firstStmt.type).toBe('VariableDeclaration');
-    const decl = firstStmt.declarations[0]!;
-    expect(decl.id.name).toBe('canIncrement');
-    expect(decl.id.loc.start.index).toBe(source.indexOf('canIncrement'));
+    // Find the VariableDeclaration whose first declarator id is `canIncrement`.
+    // Phase 3 Plan 02 Task 3 added a leading `console.log("hello from rozie")`
+    // ExpressionStatement (DX-03 trust-erosion floor anchor) so body[0] is no
+    // longer the canIncrement decl — locate by id-name instead.
+    const decl = script.program.program.body
+      .map((s) => s as unknown as { type: string; declarations?: Array<{ id: BabelIdent }> })
+      .find((s) => s.type === 'VariableDeclaration' && s.declarations?.[0]?.id.name === 'canIncrement');
+    expect(decl).toBeDefined();
+    const firstDecl = decl!.declarations![0]!;
+    expect(firstDecl.id.name).toBe('canIncrement');
+    expect(firstDecl.id.loc.start.index).toBe(source.indexOf('canIncrement'));
   });
 
   it('Counter.rozie — <template> first @mouseenter event attribute loc.start byte-accurate', () => {
