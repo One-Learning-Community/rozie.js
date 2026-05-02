@@ -38,12 +38,19 @@ import { rewriteScriptExpression } from '../rewrite/rewriteListenerExpression.js
  */
 function refArgToIdentifier(arg: ModifierArg): string {
   if (arg.kind === 'refExpr') {
+    if (!arg.ref) {
+      // Should never happen — Phase 2 validates $refs.name format.
+      // Emit a comment rather than a broken empty identifier or 'Ref' collision.
+      return '/* malformed $refs arg */';
+    }
     return arg.ref + 'Ref';
   }
   // Literal args here would be a Phase 2 validation bug — outside.ts already
   // emitted ROZ112 if a literal arg was passed. Render conservatively.
   if (arg.kind === 'literal') return JSON.stringify(arg.value);
-  return '';
+  // Unknown arg kind — emit a comment to avoid a sparse-array hole that
+  // would cause r.value to throw inside useOutsideClick.
+  return '/* unknown arg kind */';
 }
 
 /**
