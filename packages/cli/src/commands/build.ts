@@ -6,8 +6,8 @@
 // later phases. The pipeline shape mirrors @rozie/unplugin's runRoziePipeline
 // (ParseResult → LowerResult → EmitVueResult, diagnostics surfaced via
 // renderDiagnostic, errors -> exit 1, warnings -> stderr + continue).
-import { readFileSync, writeFileSync } from 'node:fs';
-import { resolve as pathResolve } from 'node:path';
+import { readFileSync, writeFileSync, statSync } from 'node:fs';
+import { resolve as pathResolve, join as pathJoin, basename as pathBasename } from 'node:path';
 import pc from 'picocolors';
 import { parse } from '../../../core/src/parse.js';
 import { lowerToIR } from '../../../core/src/ir/lower.js';
@@ -50,6 +50,13 @@ export interface RunBuildContext {
 }
 
 const VALID_TARGETS = new Set(['vue', 'react', 'svelte', 'angular']);
+
+const TARGET_EXTENSIONS: Record<string, string> = {
+  vue: '.vue',
+  react: '.jsx',
+  svelte: '.svelte',
+  angular: '.js',
+};
 
 // Map of not-yet-shipped targets -> the phase that lands them. Source of
 // truth: ROADMAP.md. Sync this map when each target's emitter ships.
@@ -154,7 +161,16 @@ export async function runBuild(
 
   // ----- Output ----------------------------------------------------------
   if (opts.out) {
-    const outPath = pathResolve(opts.out);
+    let outPath = pathResolve(opts.out);
+
+    // If --out points at an existing directory, write to <dir>/<input-basename>.<target-ext>.
+    // throwIfNoEntry: false makes a missing path a non-error — we treat it as a new file path.
+    const outStat = statSync(outPath, { throwIfNoEntry: false });
+    if (outStat?.isDirectory()) {
+      const pathExtension = TARGET_EXTENSIONS[target];
+      outPath = pathJoin(outPath, pathBasename(filePath, '.rozie') + pathExtension);
+    }
+
     writeFileSync(outPath, result.code, 'utf8');
     if (opts.sourceMap && result.map) {
       // magic-string SourceMap has a .toString() that emits canonical JSON.

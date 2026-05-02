@@ -97,6 +97,25 @@ describe('runBuild — --out writes byte-identical output', () => {
   });
 });
 
+describe('runBuild — --out directory auto-naming', () => {
+  it('appends <basename>.<target-ext> when --out is an existing directory', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'rozie-cli-dir-'));
+    const { ctx } = makeBufs();
+    await runBuild(COUNTER_PATH, { out: tmp }, ctx);
+    const written = readFileSync(join(tmp, 'Counter.vue'), 'utf8');
+    expect(written).toContain('<script setup lang="ts">');
+  });
+
+  it('treats a non-existent --out path as a file (does not require parent dir to exist as itself)', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'rozie-cli-newfile-'));
+    const newFile = join(tmp, 'Custom.vue');
+    const { ctx } = makeBufs();
+    await runBuild(COUNTER_PATH, { out: newFile }, ctx);
+    const written = readFileSync(newFile, 'utf8');
+    expect(written).toContain('<script setup lang="ts">');
+  });
+});
+
 describe('runBuild — diagnostic rendering', () => {
   it('renders a ROZ200 code-frame to stderr and exits 1 for a write to a non-model prop', async () => {
     // Synthesise a .rozie that writes to a non-model prop. `step` has no
