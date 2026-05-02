@@ -1,0 +1,406 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Rozie",
+  "scopeName": "source.rozie",
+  "fileTypes": ["rozie"],
+  "patterns": [
+    { "include": "#html-comment" },
+    { "include": "#rozie-wrapper-open" },
+    { "include": "#rozie-wrapper-close" },
+    { "include": "#block-template" },
+    { "include": "#block-script" },
+    { "include": "#block-props" },
+    { "include": "#block-data" },
+    { "include": "#block-listeners" },
+    { "include": "#block-style" }
+  ],
+  "repository": {
+    "html-comment": {
+      "name": "comment.block.html",
+      "begin": "<!--",
+      "end": "-->",
+      "beginCaptures": {
+        "0": { "name": "punctuation.definition.comment.html" }
+      },
+      "endCaptures": {
+        "0": { "name": "punctuation.definition.comment.html" }
+      }
+    },
+    "rozie-wrapper-open": {
+      "begin": "(<)(rozie)\\b",
+      "end": "(/?>)",
+      "beginCaptures": {
+        "1": { "name": "punctuation.definition.tag.begin.rozie" },
+        "2": { "name": "entity.name.tag.rozie.wrapper" }
+      },
+      "endCaptures": {
+        "1": { "name": "punctuation.definition.tag.end.rozie" }
+      },
+      "patterns": [
+        { "include": "#tag-attributes" }
+      ]
+    },
+    "rozie-wrapper-close": {
+      "match": "(</)(rozie)(>)",
+      "captures": {
+        "1": { "name": "punctuation.definition.tag.begin.rozie" },
+        "2": { "name": "entity.name.tag.rozie.wrapper" },
+        "3": { "name": "punctuation.definition.tag.end.rozie" }
+      }
+    },
+    "block-template": {
+      "begin": "(<)(template)\\b([^>]*)(>)",
+      "end": "(</)(template)(>)",
+      "beginCaptures": {
+        "1": { "name": "punctuation.definition.tag.begin.rozie" },
+        "2": { "name": "entity.name.tag.rozie.block.template" },
+        "3": {
+          "patterns": [
+            { "include": "#tag-attributes" }
+          ]
+        },
+        "4": { "name": "punctuation.definition.tag.end.rozie" }
+      },
+      "endCaptures": {
+        "1": { "name": "punctuation.definition.tag.begin.rozie" },
+        "2": { "name": "entity.name.tag.rozie.block.template" },
+        "3": { "name": "punctuation.definition.tag.end.rozie" }
+      },
+      "contentName": "meta.embedded.block.template.rozie",
+      "patterns": [
+        { "include": "#template-content" }
+      ]
+    },
+    "block-script": {
+      "begin": "(<)(script)\\b([^>]*)(>)",
+      "end": "(</)(script)(>)",
+      "beginCaptures": {
+        "1": { "name": "punctuation.definition.tag.begin.rozie" },
+        "2": { "name": "entity.name.tag.rozie.block.script" },
+        "3": {
+          "patterns": [
+            { "include": "#tag-attributes" }
+          ]
+        },
+        "4": { "name": "punctuation.definition.tag.end.rozie" }
+      },
+      "endCaptures": {
+        "1": { "name": "punctuation.definition.tag.begin.rozie" },
+        "2": { "name": "entity.name.tag.rozie.block.script" },
+        "3": { "name": "punctuation.definition.tag.end.rozie" }
+      },
+      "contentName": "meta.embedded.block.script.rozie source.js",
+      "patterns": [
+        { "include": "#magic-identifier" },
+        { "include": "source.js" }
+      ]
+    },
+    "block-props": {
+      "begin": "(<)(props)\\b([^>]*)(>)",
+      "end": "(</)(props)(>)",
+      "beginCaptures": {
+        "1": { "name": "punctuation.definition.tag.begin.rozie" },
+        "2": { "name": "entity.name.tag.rozie.block.props" },
+        "3": {
+          "patterns": [
+            { "include": "#tag-attributes" }
+          ]
+        },
+        "4": { "name": "punctuation.definition.tag.end.rozie" }
+      },
+      "endCaptures": {
+        "1": { "name": "punctuation.definition.tag.begin.rozie" },
+        "2": { "name": "entity.name.tag.rozie.block.props" },
+        "3": { "name": "punctuation.definition.tag.end.rozie" }
+      },
+      "contentName": "meta.embedded.block.props.rozie source.js",
+      "patterns": [
+        { "include": "#magic-identifier" },
+        { "include": "source.js" }
+      ]
+    },
+    "block-data": {
+      "begin": "(<)(data)\\b([^>]*)(>)",
+      "end": "(</)(data)(>)",
+      "beginCaptures": {
+        "1": { "name": "punctuation.definition.tag.begin.rozie" },
+        "2": { "name": "entity.name.tag.rozie.block.data" },
+        "3": {
+          "patterns": [
+            { "include": "#tag-attributes" }
+          ]
+        },
+        "4": { "name": "punctuation.definition.tag.end.rozie" }
+      },
+      "endCaptures": {
+        "1": { "name": "punctuation.definition.tag.begin.rozie" },
+        "2": { "name": "entity.name.tag.rozie.block.data" },
+        "3": { "name": "punctuation.definition.tag.end.rozie" }
+      },
+      "contentName": "meta.embedded.block.data.rozie source.js",
+      "patterns": [
+        { "include": "#magic-identifier" },
+        { "include": "source.js" }
+      ]
+    },
+    "block-listeners": {
+      "begin": "(<)(listeners)\\b([^>]*)(>)",
+      "end": "(</)(listeners)(>)",
+      "beginCaptures": {
+        "1": { "name": "punctuation.definition.tag.begin.rozie" },
+        "2": { "name": "entity.name.tag.rozie.block.listeners" },
+        "3": {
+          "patterns": [
+            { "include": "#tag-attributes" }
+          ]
+        },
+        "4": { "name": "punctuation.definition.tag.end.rozie" }
+      },
+      "endCaptures": {
+        "1": { "name": "punctuation.definition.tag.begin.rozie" },
+        "2": { "name": "entity.name.tag.rozie.block.listeners" },
+        "3": { "name": "punctuation.definition.tag.end.rozie" }
+      },
+      "contentName": "meta.embedded.block.listeners.rozie source.js",
+      "patterns": [
+        { "include": "#magic-identifier" },
+        { "include": "source.js" }
+      ]
+    },
+    "block-style": {
+      "begin": "(<)(style)\\b([^>]*)(>)",
+      "end": "(</)(style)(>)",
+      "beginCaptures": {
+        "1": { "name": "punctuation.definition.tag.begin.rozie" },
+        "2": { "name": "entity.name.tag.rozie.block.style" },
+        "3": {
+          "patterns": [
+            { "include": "#tag-attributes" }
+          ]
+        },
+        "4": { "name": "punctuation.definition.tag.end.rozie" }
+      },
+      "endCaptures": {
+        "1": { "name": "punctuation.definition.tag.begin.rozie" },
+        "2": { "name": "entity.name.tag.rozie.block.style" },
+        "3": { "name": "punctuation.definition.tag.end.rozie" }
+      },
+      "contentName": "meta.embedded.block.style.rozie source.css",
+      "patterns": [
+        { "include": "source.css" }
+      ]
+    },
+    "tag-attributes": {
+      "patterns": [
+        {
+          "match": "\\b(lang)(=)(\"[^\"]*\"|'[^']*')",
+          "captures": {
+            "1": { "name": "entity.other.attribute-name.lang.rozie" },
+            "2": { "name": "punctuation.separator.key-value.rozie" },
+            "3": { "name": "string.quoted.rozie" }
+          }
+        },
+        {
+          "match": "\\b(scoped)\\b",
+          "captures": {
+            "1": { "name": "entity.other.attribute-name.scoped.rozie" }
+          }
+        },
+        {
+          "match": "\\b([A-Za-z_:][\\w:.-]*)(=)(\"[^\"]*\"|'[^']*')",
+          "captures": {
+            "1": { "name": "entity.other.attribute-name.html" },
+            "2": { "name": "punctuation.separator.key-value.html" },
+            "3": { "name": "string.quoted.html" }
+          }
+        }
+      ]
+    },
+    "template-content": {
+      "patterns": [
+        { "include": "#html-comment" },
+        { "include": "#interpolation" },
+        { "include": "#rozie-tag" },
+        { "include": "text.html.basic" }
+      ]
+    },
+    "rozie-tag": {
+      "patterns": [
+        { "include": "#rozie-tag-open" },
+        { "include": "#rozie-tag-close" }
+      ]
+    },
+    "rozie-tag-open": {
+      "begin": "(<)([A-Za-z][\\w:-]*)",
+      "end": "(/?>)",
+      "beginCaptures": {
+        "1": { "name": "punctuation.definition.tag.begin.html" },
+        "2": { "name": "entity.name.tag.html" }
+      },
+      "endCaptures": {
+        "1": { "name": "punctuation.definition.tag.end.html" }
+      },
+      "patterns": [
+        { "include": "#directive-attribute" },
+        { "include": "#event-binding" },
+        { "include": "#prop-binding" },
+        { "include": "#ref-attribute" },
+        { "include": "#html-attribute" }
+      ]
+    },
+    "rozie-tag-close": {
+      "match": "(</)([A-Za-z][\\w:-]*)(>)",
+      "captures": {
+        "1": { "name": "punctuation.definition.tag.begin.html" },
+        "2": { "name": "entity.name.tag.html" },
+        "3": { "name": "punctuation.definition.tag.end.html" }
+      }
+    },
+    "directive-attribute": {
+      "begin": "\\b(r-(?:for|if|else-if|else|show|model|html|text|bind|on))(?:(=)(\"|'))?",
+      "end": "(?:(\\3)|(?<=[^=])(?=\\s|/?>))",
+      "beginCaptures": {
+        "1": { "name": "entity.other.attribute-name.directive.rozie" },
+        "2": { "name": "punctuation.separator.key-value.rozie" },
+        "3": { "name": "string.quoted.rozie punctuation.definition.string.begin.rozie" }
+      },
+      "endCaptures": {
+        "1": { "name": "string.quoted.rozie punctuation.definition.string.end.rozie" }
+      },
+      "contentName": "meta.embedded.expression.rozie",
+      "patterns": [
+        { "include": "#interpolation" },
+        { "include": "#expression" }
+      ]
+    },
+    "event-binding": {
+      "begin": "(@)([A-Za-z][\\w:-]*)((?:\\.[A-Za-z][\\w-]*(?:\\([^)]*\\))?)*)\\s*(=)\\s*(\"|')",
+      "end": "\\5",
+      "beginCaptures": {
+        "1": { "name": "punctuation.definition.event.rozie" },
+        "2": { "name": "entity.name.function.event.rozie" },
+        "3": {
+          "name": "meta.modifier-chain.rozie",
+          "patterns": [
+            { "include": "#modifier-chain" }
+          ]
+        },
+        "4": { "name": "punctuation.separator.key-value.rozie" },
+        "5": { "name": "string.quoted.rozie punctuation.definition.string.begin.rozie" }
+      },
+      "endCaptures": {
+        "0": { "name": "string.quoted.rozie punctuation.definition.string.end.rozie" }
+      },
+      "contentName": "meta.embedded.expression.rozie",
+      "patterns": [
+        { "include": "#interpolation" },
+        { "include": "#expression" }
+      ]
+    },
+    "modifier-chain": {
+      "patterns": [
+        {
+          "begin": "(\\.)([A-Za-z][\\w-]*)(\\()",
+          "end": "(\\))",
+          "beginCaptures": {
+            "1": { "name": "punctuation.separator.modifier.rozie" },
+            "2": { "name": "support.function.modifier.rozie" },
+            "3": { "name": "punctuation.section.arguments.begin.rozie" }
+          },
+          "endCaptures": {
+            "1": { "name": "punctuation.section.arguments.end.rozie" }
+          },
+          "contentName": "meta.embedded.expression.rozie",
+          "patterns": [
+            { "include": "#expression" }
+          ]
+        },
+        {
+          "match": "(\\.)([A-Za-z][\\w-]*)",
+          "captures": {
+            "1": { "name": "punctuation.separator.modifier.rozie" },
+            "2": { "name": "support.function.modifier.rozie" }
+          }
+        }
+      ]
+    },
+    "prop-binding": {
+      "begin": "(:)([A-Za-z][\\w-]*)\\s*(=)\\s*(\"|')",
+      "end": "\\4",
+      "beginCaptures": {
+        "1": { "name": "punctuation.definition.prop-binding.rozie" },
+        "2": { "name": "entity.other.attribute-name.prop-binding.rozie" },
+        "3": { "name": "punctuation.separator.key-value.rozie" },
+        "4": { "name": "string.quoted.rozie punctuation.definition.string.begin.rozie" }
+      },
+      "endCaptures": {
+        "0": { "name": "string.quoted.rozie punctuation.definition.string.end.rozie" }
+      },
+      "contentName": "meta.embedded.expression.rozie",
+      "patterns": [
+        { "include": "#interpolation" },
+        { "include": "#expression" }
+      ]
+    },
+    "ref-attribute": {
+      "match": "\\b(ref)(=)(\")([^\"]*)(\")",
+      "captures": {
+        "1": { "name": "entity.other.attribute-name.rozie-ref keyword.other.rozie" },
+        "2": { "name": "punctuation.separator.key-value.rozie" },
+        "3": { "name": "string.quoted.double.rozie punctuation.definition.string.begin.rozie" },
+        "4": { "name": "entity.name.tag.reference.rozie" },
+        "5": { "name": "string.quoted.double.rozie punctuation.definition.string.end.rozie" }
+      }
+    },
+    "html-attribute": {
+      "patterns": [
+        {
+          "begin": "\\b([A-Za-z_][\\w:.-]*)\\s*(=)\\s*(\"|')",
+          "end": "\\3",
+          "beginCaptures": {
+            "1": { "name": "entity.other.attribute-name.html" },
+            "2": { "name": "punctuation.separator.key-value.html" },
+            "3": { "name": "string.quoted.html punctuation.definition.string.begin.html" }
+          },
+          "endCaptures": {
+            "0": { "name": "string.quoted.html punctuation.definition.string.end.html" }
+          },
+          "contentName": "string.quoted.html",
+          "patterns": [
+            { "include": "#interpolation" }
+          ]
+        },
+        {
+          "match": "\\b([A-Za-z_][\\w:.-]*)\\b",
+          "captures": {
+            "1": { "name": "entity.other.attribute-name.html" }
+          }
+        }
+      ]
+    },
+    "interpolation": {
+      "begin": "\\{\\{",
+      "end": "\\}\\}",
+      "beginCaptures": {
+        "0": { "name": "punctuation.section.embedded.begin.rozie" }
+      },
+      "endCaptures": {
+        "0": { "name": "punctuation.section.embedded.end.rozie" }
+      },
+      "contentName": "meta.embedded.expression.rozie",
+      "patterns": [
+        { "include": "#expression" }
+      ]
+    },
+    "expression": {
+      "patterns": [
+        { "include": "#magic-identifier" },
+        { "include": "source.js" }
+      ]
+    },
+    "magic-identifier": {
+      "match": "\\$(props|data|refs|emit|computed|onMount|onUnmount|watch|slots|el)\\b",
+      "name": "variable.language.rozie support.variable.rozie"
+    }
+  }
+}
