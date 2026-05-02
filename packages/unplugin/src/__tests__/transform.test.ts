@@ -19,7 +19,7 @@ import { ModifierRegistry } from '../../../core/src/modifiers/ModifierRegistry.j
 import { registerBuiltins } from '../../../core/src/modifiers/registerBuiltins.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const REPO_ROOT = resolve(__dirname, '../../../../..');
+const REPO_ROOT = resolve(__dirname, '../../../..');
 const EXAMPLES = resolve(REPO_ROOT, 'examples');
 
 function loadExample(name: string): string {

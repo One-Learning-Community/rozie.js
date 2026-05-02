@@ -26,8 +26,12 @@ function spikePluginD25() {
   };
 }
 
-describe('D-25 spike — transform-only path (no virtual module)', () => {
-  it('produces a Vue component module from a .rozie id', async () => {
+describe('D-25 spike — transform-only path (no virtual module) FAILS', () => {
+  // Regression test that pins the failure mode. If a future Vite or vite-plugin-vue
+  // version changes behavior such that this no longer fails, our path-virtual
+  // workaround may be unnecessary — but we'd want to know explicitly. Until
+  // then, this test asserts the spike's negative outcome.
+  it('rejects .rozie ids returned as .vue source via transform-only path', async () => {
     const tmpRoot = resolve(tmpdir(), 'rozie-spike-d25-' + Date.now());
     mkdirSync(tmpRoot, { recursive: true });
     try {
@@ -37,27 +41,25 @@ describe('D-25 spike — transform-only path (no virtual module)', () => {
       const server = await createServer({
         root: tmpRoot,
         configFile: false,
-        logLevel: 'error',
+        logLevel: 'silent',
         plugins: [spikePluginD25(), vue()],
         server: { middlewareMode: true },
         appType: 'custom',
       });
 
+      let threw = false;
       try {
-        const mod = await server.ssrLoadModule(rozieFile);
-        expect(mod).toBeDefined();
-        expect(mod.default).toBeDefined();
-        const def = mod.default as Record<string, unknown>;
-        const hasComponentShape =
-          typeof def.render === 'function' ||
-          typeof def.setup === 'function' ||
-          '__vccOpts' in def ||
-          '__file' in def ||
-          '__name' in def;
-        expect(hasComponentShape).toBe(true);
+        await server.ssrLoadModule(rozieFile);
+      } catch (e) {
+        threw = true;
+        const msg = (e as Error).message ?? '';
+        // Accept either "Failed to parse source for import analysis" (Vite 8)
+        // or any other parse-related rejection.
+        expect(msg).toMatch(/parse|invalid|Install @vitejs\/plugin-vue/i);
       } finally {
         await server.close();
       }
+      expect(threw).toBe(true);
     } finally {
       if (existsSync(tmpRoot)) rmSync(tmpRoot, { recursive: true, force: true });
     }

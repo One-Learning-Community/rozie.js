@@ -18,7 +18,7 @@ import { fileURLToPath } from 'node:url';
 import { writeFileSync, mkdirSync, existsSync, rmSync, copyFileSync } from 'node:fs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const REPO_ROOT = resolve(__dirname, '../../../../..');
+const REPO_ROOT = resolve(__dirname, '../../../..');
 const EXAMPLES = resolve(REPO_ROOT, 'examples');
 
 describe('@rozie/unplugin/vite — end-to-end with @vitejs/plugin-vue', () => {

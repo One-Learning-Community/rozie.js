@@ -4,6 +4,15 @@
   "type": "module",
   "private": true,
   "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./vite": "./src/vite.ts",
+    "./rollup": "./src/rollup.ts",
+    "./webpack": "./src/webpack.ts",
+    "./esbuild": "./src/esbuild.ts",
+    "./rolldown": "./src/rolldown.ts",
+    "./rspack": "./src/rspack.ts"
+  },
   "scripts": {
     "build": "echo 'Phase 3 Plan 06: source distribution' && exit 0",
     "test": "vitest run --passWithNoTests",
