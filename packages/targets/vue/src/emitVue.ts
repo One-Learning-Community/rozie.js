@@ -5,14 +5,20 @@
  * scriptInjection merge logic for non-native modifier wraps (Pattern 5
  * `.debounce` / `.throttle` on template @event lower into a script-level
  * `const wrapped = debounce(orig, ms)` decl + `import { debounce } from
- * '@rozie/runtime-vue'`). Plan 04 (this file) wires emitListeners — the
+ * '@rozie/runtime-vue'`). Plan 04 wires emitListeners — the
  * `<listeners>`-block lowering — appending its emitted block code AFTER the
  * lifecycle section but BEFORE the residual script body, and merging its
  * vue + runtime-vue imports into the script's canonical import lines.
  *
- * Styles (Plan 05) and unplugin source-map threading (Plan 06) are still
- * pending — the style section remains a TODO placeholder and `map` stays
- * null.
+ * Plan 05 (this file) finalizes the SFC envelope:
+ *   - emitStyle re-stringifies the IR's StyleSection (Phase 1's `:root`
+ *     extraction is preserved) — replaces the Plan 02-04 placeholder.
+ *   - shell.ts composes the SFC envelope via `magic-string.MagicString` so
+ *     `composeSourceMap` can produce a real `SourceMap` referencing the
+ *     `.rozie` source (Pitfall 2 / DX-01).
+ *   - When `opts.filename` and `opts.source` are provided, emitVue returns
+ *     a real SourceMap; otherwise (back-compat with Plan 02-04 callers) it
+ *     returns null — Plan 06 unplugin will always pass both.
  *
  * @experimental — shape may change before v1.0
  */
@@ -20,13 +26,30 @@ import type { IRComponent } from '../../../core/src/ir/types.js';
 import type { Diagnostic } from '../../../core/src/diagnostics/Diagnostic.js';
 import type { ModifierRegistry } from '../../../core/src/modifiers/ModifierRegistry.js';
 import { createDefaultRegistry } from '../../../core/src/modifiers/registerBuiltins.js';
+import type { SourceMap } from 'magic-string';
 import { emitScript } from './emit/emitScript.js';
 import { emitTemplate } from './emit/emitTemplate.js';
 import { emitListeners } from './emit/emitListeners.js';
+import { emitStyle } from './emit/emitStyle.js';
+import { buildShell } from './emit/shell.js';
+import { composeSourceMap } from './sourcemap/compose.js';
 import type { ScriptInjection } from './emit/emitTemplateEvent.js';
 
 export interface EmitVueOptions {
+  /**
+   * Absolute or relative path to the .rozie source — when provided alongside
+   * `source`, emitVue returns a real source map referencing this filename.
+   * Required for emitStyle to slice rule bodies from the original CSS source
+   * (per Wave 0 finding: StyleSection carries StyleRule.loc but not cssText).
+   * If omitted, emitStyle still runs but returns empty scoped/global; map=null.
+   */
   filename?: string;
+  /**
+   * Original .rozie source text — required by emitStyle to slice rule bodies
+   * by absolute byte offsets, and by composeSourceMap for sourcesContent.
+   * If omitted, the style section is empty (no scoped or global block).
+   */
+  source?: string;
   /**
    * Optional ModifierRegistry — if absent, emitVue constructs a fresh
    * createDefaultRegistry() per call. Tests / unplugin layer may pass a
@@ -37,7 +60,8 @@ export interface EmitVueOptions {
 
 export interface EmitVueResult {
   code: string;
-  map: { sources: string[]; sourcesContent?: string[]; mappings: string } | null;
+  /** Real SourceMap when filename+source provided, otherwise null. */
+  map: SourceMap | null;
   diagnostics: Diagnostic[];
 }
 
@@ -47,11 +71,6 @@ export interface EmitVueResult {
  * import descriptor (deduped here) and a one-line `decl` such as
  * `const debouncedOnSearch = debounce(onSearch, 300);`. The decl is appended
  * after the existing import line(s) and before the rest of the script body.
- *
- * If multiple injections share the same import name, we add it to the import
- * line just once. The runtime-vue import line is INSERTED as a separate line
- * adjacent to the existing `import { ... } from 'vue';` line so the script's
- * canonical-order layout (Pattern 3) is preserved.
  */
 function mergeScriptInjections(
   script: string,
@@ -80,17 +99,6 @@ function mergeScriptInjections(
     importLines.push(`import { ${sorted.join(', ')} } from '${from}';`);
   }
 
-  // Splice strategy: find the last `import { ... } from '...';` line (could
-  // be the canonical Vue imports or absent altogether). Insert the new
-  // import lines immediately after it. If no imports exist, prepend.
-  // The decls land at the FIRST safe position above the first non-import
-  // section (i.e., after all imports). Simpler: append all imports at the
-  // end of the existing import block; append decls right after them.
-  //
-  // emitScript output starts with sections separated by blank lines; the
-  // first section is the import line (if any). We split on blank-line
-  // boundaries to get sections, then insert.
-
   // Detect imports at top of script. Match leading lines that start with
   // 'import' followed by ' { ... } from ...;' on a single line.
   const lines = script.split('\n');
@@ -118,8 +126,6 @@ function mergeScriptInjections(
 
   const head = lines.slice(0, lastImportLine + 1);
   const tail = lines.slice(lastImportLine + 1);
-  // Inject new imports right after the last existing import line. Then a
-  // blank line, then the decls, then a blank line, then the rest.
   const newSegment = [...importLines, '', ...decls];
   const merged = [...head, ...newSegment, ...tail].join('\n');
   return merged;
@@ -130,12 +136,7 @@ function mergeScriptInjections(
  * code is emitted by emitListeners after the lifecycle section but before
  * the residual body; in the current single-string emitScript output we
  * append the listener blocks to the end of the script body and let the
- * runtime-vue import lines flow through mergeScriptInjections (which
- * dedupes import lines per `from`).
- *
- * Plan 04 emits Vue imports (e.g., `watchEffect`) into a SEPARATE
- * VueImportCollector. We splice these into the EXISTING `import { ... }
- * from 'vue';` line if one already exists; otherwise we prepend a fresh one.
+ * runtime-vue import lines flow through mergeScriptInjections.
  */
 function mergeVueImportsAndListeners(
   script: string,
@@ -150,7 +151,6 @@ function mergeVueImportsAndListeners(
       /^import \{ [^}]+ \} from 'vue';$/.test(line.trim()),
     );
     if (vueImportIdx >= 0) {
-      // Parse the existing import line, merge the new names, re-render sorted.
       const existing = lines[vueImportIdx]!;
       const match = existing.match(/^import \{ ([^}]+) \} from 'vue';$/);
       if (match && match[1]) {
@@ -161,15 +161,13 @@ function mergeVueImportsAndListeners(
         merged = lines.join('\n');
       }
     } else {
-      // No existing vue import — prepend one.
       const sorted = [...new Set(extraVueNames)].sort();
       const newImport = `import { ${sorted.join(', ')} } from 'vue';`;
       merged = newImport + '\n\n' + merged;
     }
   }
 
-  // 2. Append the listener block code to the end of the script (before any
-  //    residual trailing whitespace).
+  // 2. Append the listener block code to the end of the script.
   if (listenerCode.length > 0) {
     merged = merged.trimEnd() + '\n\n' + listenerCode;
   }
@@ -195,11 +193,7 @@ export function emitVue(ir: IRComponent, opts: EmitVueOptions = {}): EmitVueResu
 
   // Convert listenerRuntimeImports into ScriptInjection-shaped records so
   // they flow through the same dedupe path as Plan 03's debounce/throttle
-  // template-event injections. Each listener-runtime helper imports from
-  // '@rozie/runtime-vue' but has NO decl (the listener's emitted block IS
-  // the user-side decl). We synthesize one ScriptInjection per import name
-  // with an empty decl placeholder; mergeScriptInjections dedupes on `from`
-  // and renders one consolidated import line.
+  // template-event injections.
   const listenerImportInjections: ScriptInjection[] = listenerRuntimeImports
     .names()
     .map((name) => ({
@@ -210,12 +204,9 @@ export function emitVue(ir: IRComponent, opts: EmitVueOptions = {}): EmitVueResu
 
   const allInjections = [...scriptInjections, ...listenerImportInjections];
 
-  // Splice runtime-vue imports first (mergeScriptInjections handles imports
-  // + decls).
   let enrichedScript = mergeScriptInjections(script, allInjections);
-  // Then splice extra vue imports (e.g., watchEffect) and append listener block.
   const extraVueNames = listenerVueImports.has('watchEffect')
-    ? Array.from(['watchEffect']) // currently only watchEffect is added by emitListeners
+    ? Array.from(['watchEffect'])
     : [];
   enrichedScript = mergeVueImportsAndListeners(
     enrichedScript,
@@ -223,20 +214,38 @@ export function emitVue(ir: IRComponent, opts: EmitVueOptions = {}): EmitVueResu
     extraVueNames,
   );
 
-  const code =
-    '<template>\n' +
-    template +
-    '\n</template>\n\n' +
-    '<script setup lang="ts">\n' +
-    enrichedScript +
-    '\n</script>\n\n' +
-    '<style scoped>\n' +
-    '  /* TODO Plan 05 styles */\n' +
-    '</style>\n';
+  // Plan 05 — emit styles. emitStyle requires the original .rozie source
+  // (Wave 0 finding: StyleSection has StyleRule.loc but no cssText). When
+  // opts.source is missing, skip the style emission entirely so the SFC
+  // shell has no `<style>` blocks (back-compat with Plan 02-04 callers that
+  // never invoked emitStyle).
+  const styleResult = opts.source !== undefined
+    ? emitStyle(ir.styles, opts.source)
+    : { scoped: '', global: null as string | null, diagnostics: [] };
+  const styleScoped = styleResult.scoped;
+  const styleGlobal = styleResult.global;
+  const styleDiags = styleResult.diagnostics;
+
+  // Plan 05 — compose the SFC envelope via magic-string for source-map plumbing.
+  const ms = buildShell({
+    template,
+    script: enrichedScript,
+    styleScoped,
+    styleGlobal,
+  });
+
+  const code = ms.toString();
+
+  // Plan 05 — produce a real source map when filename + source are provided.
+  // Pitfall 2 mitigation in composeSourceMap.
+  const map =
+    opts.filename !== undefined && opts.source !== undefined
+      ? composeSourceMap(ms, { filename: opts.filename, source: opts.source })
+      : null;
 
   return {
     code,
-    map: null,
-    diagnostics: [...scriptDiags, ...tmplDiags, ...listenerDiags],
+    map,
+    diagnostics: [...scriptDiags, ...tmplDiags, ...listenerDiags, ...styleDiags],
   };
 }

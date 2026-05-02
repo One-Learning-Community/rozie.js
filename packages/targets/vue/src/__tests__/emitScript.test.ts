@@ -101,18 +101,23 @@ describe('emitScript — behavior', () => {
     expect(script).toMatch(/dialogElRef\.value\??\.focus/);
   });
 
-  it('Counter emitVue() returns SFC code with real template (Plan 03) + placeholder style (Plan 05)', () => {
+  it('Counter emitVue() without opts.source returns SFC with no <style> block (Plan 05 back-compat path)', () => {
+    // Plan 05: emitStyle requires opts.source to slice rule bodies (Wave 0
+    // finding). When source is omitted (back-compat with pre-Plan-05 callers),
+    // emitStyle is skipped entirely and the shell omits both style blocks.
+    // map stays null when filename+source missing.
     const result = emitVue(lowerExample('Counter'));
     expect(result.code).toContain('<template>');
     expect(result.code).toContain('<script setup lang="ts">');
-    expect(result.code).toContain('<style scoped>');
     // Plan 03: real templates ARE emitted now — no more TODO Plan 03 placeholder.
     expect(result.code).not.toContain('TODO Plan 03 templates');
     // Counter's emitted template has the increment/decrement click handlers.
     expect(result.code).toContain('@click="increment"');
     expect(result.code).toContain('@click="decrement"');
-    // Plan 05 styles still placeholder.
-    expect(result.code).toContain('TODO Plan 05 styles');
+    // Plan 05: with no opts.source, no style block is emitted at all (vs the
+    // pre-Plan-05 `TODO Plan 05 styles` placeholder string).
+    expect(result.code).not.toContain('<style');
+    expect(result.code).not.toContain('TODO Plan 05 styles');
     expect(result.map).toBeNull();
   });
 });
