@@ -79,6 +79,8 @@ examples/
 
 ## Getting started
 
+See [`docs/QUICKSTART.md`](docs/QUICKSTART.md) for the full walkthrough — three ways to compile a `.rozie` file (CLI, live Vite demo, locked snapshots).
+
 ```bash
 pnpm install
 pnpm -r --filter '@rozie/*' build
