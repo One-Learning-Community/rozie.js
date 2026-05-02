@@ -121,17 +121,39 @@ function checkElement(el: TemplateElement, diagnostics: Diagnostic[]): void {
   const aliases = extractRForAliases(rForAttr.value ?? '');
 
   // ROZ301: bare identifier matching item/index alias.
-  if (t.isIdentifier(parsed) && aliases) {
-    if (parsed.name === aliases.index) {
-      emitLoopVariableKey(el, keyAttr, parsed.name, 'index', diagnostics);
+  if (t.isIdentifier(parsed)) {
+    if (aliases) {
+      if (parsed.name === aliases.index) {
+        emitLoopVariableKey(el, keyAttr, parsed.name, 'index', diagnostics);
+        return;
+      }
+      if (parsed.name === aliases.item) {
+        emitLoopVariableKey(el, keyAttr, parsed.name, 'item', diagnostics);
+        return;
+      }
+      // Gap A fix (WR-03): warn on the well-known sentinel identifier 'index'
+      // even when no explicit index alias was declared (single-alias r-for form
+      // like `item in items` where aliases.index === null).
+      // Using 'index' as :key with an implicit position is the canonical
+      // Pitfall 6 mistake regardless of whether the alias was spelled out.
+      // Only fire when aliases.index is null — if an explicit index alias
+      // exists but differs from 'index', treat 'index' as a script-scope var.
+      if (parsed.name === 'index' && aliases.index === null) {
+        emitLoopVariableKey(el, keyAttr, 'index', 'index', diagnostics);
+        return;
+      }
+      // Bare identifier that's not a loop alias and not the sentinel — could
+      // be a script-scope variable; defer to runtime contract.
       return;
     }
-    if (parsed.name === aliases.item) {
-      emitLoopVariableKey(el, keyAttr, parsed.name, 'item', diagnostics);
+
+    // aliases is null (r-for LHS parse failure): still catch the 'index' sentinel.
+    if (parsed.name === 'index') {
+      emitLoopVariableKey(el, keyAttr, 'index', 'index', diagnostics);
       return;
     }
-    // Bare identifier that's not a loop alias — could be a script-scope
-    // variable; defer to runtime contract.
+    // Unknown identifier with unparseable r-for — cannot determine if it's a
+    // loop alias; defer to runtime contract.
     return;
   }
 

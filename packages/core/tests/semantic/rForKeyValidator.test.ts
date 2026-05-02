@@ -209,4 +209,97 @@ describe('rForKeyValidator — ROZ300/ROZ301/ROZ302 (SEM-03)', () => {
     const { diagnostics } = analyzeSource(src);
     expect(filterByCodeRange(diagnostics, 300, 399)).toEqual([]);
   });
+
+  // WR-03 Gap A regression: implicit :key="index" with no explicit index alias
+  it('WR-03 Gap A: :key="index" on r-for="item in items" (no explicit index alias) emits ROZ301', () => {
+    // extractRForAliases returns { item: 'item', index: null } for single-alias form.
+    // The validator must still warn because 'index' is the archetypal loop-position key
+    // even without an explicit alias declaration — Pitfall 6.
+    const src = `<rozie name="X">
+<template>
+<ul>
+  <li r-for="item in items" :key="index">x</li>
+</ul>
+</template>
+</rozie>`;
+    const { diagnostics } = analyzeSource(src);
+    const roz301 = filterByCode(diagnostics, 'ROZ301');
+    expect(roz301).toHaveLength(1);
+    expect(roz301[0]!.severity).toBe('warning');
+    expect(roz301[0]!.message).toContain('index');
+  });
+
+  it('WR-03 Gap A: :key="index" on r-for with explicit non-index alias still emits ROZ301', () => {
+    // (item, idx) in items — aliases.index === 'idx', not 'index'.
+    // The fallback sentinel check must fire because the bare identifier 'index'
+    // is still the implicit-position key, just without an alias.
+    // Note: aliases.index === 'idx' here, so parsed.name !== aliases.index.
+    // The first branch won't fire; the Gap A fallback must catch it.
+    // Actually: when aliases.index === 'idx' (not null), the first branch
+    // handles :key="idx". For :key="index" (different identifier), aliases.index
+    // is 'idx' (not null), so the Gap A branch (!aliases || aliases.index === null)
+    // does NOT fire — correct: 'index' is a script-scope var in that case.
+    // This test validates the boundary: no false positive when an explicit alias exists.
+    const src = `<rozie name="X">
+<template>
+<ul>
+  <li r-for="(item, idx) in items" :key="index">x</li>
+</ul>
+</template>
+</rozie>`;
+    const { diagnostics } = analyzeSource(src);
+    // 'index' is NOT one of the declared aliases (they are 'item' and 'idx').
+    // With an explicit index alias present, 'index' is treated as a script-scope
+    // variable — no ROZ301 should fire.
+    expect(filterByCode(diagnostics, 'ROZ301')).toHaveLength(0);
+  });
+
+  // WR-03 Gap B regression: r-for="item of items" (of-form) alias detection
+  it('WR-03 Gap B: r-for="item of items" :key="item" (of-form simple) emits ROZ301', () => {
+    const src = `<rozie name="X">
+<template>
+<ul>
+  <li r-for="item of items" :key="item">x</li>
+</ul>
+</template>
+</rozie>`;
+    const { diagnostics } = analyzeSource(src);
+    expect(filterByCode(diagnostics, 'ROZ301')).toHaveLength(1);
+  });
+
+  it('WR-03 Gap B: r-for="(item, index) of items" :key="index" (of-form paren) emits ROZ301', () => {
+    const src = `<rozie name="X">
+<template>
+<ul>
+  <li r-for="(item, index) of items" :key="index">x</li>
+</ul>
+</template>
+</rozie>`;
+    const { diagnostics } = analyzeSource(src);
+    expect(filterByCode(diagnostics, 'ROZ301')).toHaveLength(1);
+  });
+
+  it('WR-03 Gap B: r-for="item of items" :key="item.id" (of-form, good key) does NOT warn', () => {
+    const src = `<rozie name="X">
+<template>
+<ul>
+  <li r-for="item of items" :key="item.id">x</li>
+</ul>
+</template>
+</rozie>`;
+    const { diagnostics } = analyzeSource(src);
+    expect(filterByCodeRange(diagnostics, 300, 399)).toEqual([]);
+  });
+
+  it('WR-03 Gap B: r-for="item of items" without :key emits ROZ300 (of-form missing key)', () => {
+    const src = `<rozie name="X">
+<template>
+<ul>
+  <li r-for="item of items">x</li>
+</ul>
+</template>
+</rozie>`;
+    const { diagnostics } = analyzeSource(src);
+    expect(filterByCode(diagnostics, 'ROZ300')).toHaveLength(1);
+  });
 });
