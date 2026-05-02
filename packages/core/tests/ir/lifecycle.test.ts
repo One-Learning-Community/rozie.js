@@ -153,4 +153,51 @@ $onMount(async () => {
       `Expected exactly 1 ROZ105 diagnostic but got ${roz105All.length}: ${JSON.stringify(roz105All)}`,
     ).toHaveLength(1);
   });
+
+  it('WR-02 regression: conditional cleanup return emits ROZ107, NOT ROZ105', () => {
+    // $onMount(() => { return condition ? cleanA : cleanB }) is a non-async
+    // cleanup-shape warning — should use CONDITIONAL_CLEANUP_RETURN (ROZ107),
+    // not ASYNC_ONMOUNT_RETURN (ROZ105).
+    const src = `<rozie name="ConditionalCleanup">
+<script>
+$onMount(() => {
+  return isOpen ? openCleanup : closeCleanup
+})
+</script>
+<template><div /></template>
+</rozie>`;
+    const result = parse(src, { filename: 'ConditionalCleanup.rozie' });
+    expect(result.ast).not.toBeNull();
+    const lowered = lowerToIR(result.ast!, { modifierRegistry: createDefaultRegistry() });
+
+    // Must NOT be tagged ROZ105 (that code is async-specific).
+    expect(lowered.diagnostics.filter((d) => d.code === 'ROZ105')).toHaveLength(0);
+    // Must carry ROZ107 (CONDITIONAL_CLEANUP_RETURN).
+    const roz107 = lowered.diagnostics.filter((d) => d.code === 'ROZ107');
+    expect(roz107).toHaveLength(1);
+    expect(roz107[0]!.severity).toBe('warning');
+  });
+
+  it('WR-02 regression: non-function cleanup return emits ROZ108, NOT ROZ105', () => {
+    // $onMount(() => { return 42 }) — returning a non-function value as cleanup
+    // should use NON_FUNCTION_CLEANUP_RETURN (ROZ108), not ASYNC_ONMOUNT_RETURN (ROZ105).
+    const src = `<rozie name="NonFnCleanup">
+<script>
+$onMount(() => {
+  return 42
+})
+</script>
+<template><div /></template>
+</rozie>`;
+    const result = parse(src, { filename: 'NonFnCleanup.rozie' });
+    expect(result.ast).not.toBeNull();
+    const lowered = lowerToIR(result.ast!, { modifierRegistry: createDefaultRegistry() });
+
+    // Must NOT be tagged ROZ105.
+    expect(lowered.diagnostics.filter((d) => d.code === 'ROZ105')).toHaveLength(0);
+    // Must carry ROZ108 (NON_FUNCTION_CLEANUP_RETURN).
+    const roz108 = lowered.diagnostics.filter((d) => d.code === 'ROZ108');
+    expect(roz108).toHaveLength(1);
+    expect(roz108[0]!.severity).toBe('warning');
+  });
 });

@@ -100,11 +100,17 @@ function pairLifecycleHooks(
           cleanup = undefined;
         }
 
-        // Conditional / non-function cleanup warnings.
+        // Conditional / non-function cleanup warnings (non-async cases).
+        // Each warning kind gets its own code so consumers can distinguish them
+        // from the async-return case (ROZ105) — WR-02 fix.
         for (const w of extraction.warnings) {
-          if (extraction.isAsync) continue; // already handled above
+          if (extraction.isAsync) continue; // already handled above as ROZ105
+          // Dispatch on message prefix to assign the correct code.
+          const code = w.message.startsWith('conditional cleanup return')
+            ? RozieErrorCode.CONDITIONAL_CLEANUP_RETURN  // ROZ107
+            : RozieErrorCode.NON_FUNCTION_CLEANUP_RETURN; // ROZ108 (non-function return)
           diagnostics.push({
-            code: RozieErrorCode.ASYNC_ONMOUNT_RETURN,
+            code,
             severity: 'warning',
             message: w.message,
             loc: entry.sourceLoc,
