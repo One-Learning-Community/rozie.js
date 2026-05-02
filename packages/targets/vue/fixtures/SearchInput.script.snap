@@ -1,1 +1,37 @@
-<!-- placeholder; populated by toMatchFileSnapshot in plans 02-05 -->
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+
+const props = withDefaults(
+  defineProps<{ placeholder?: string; minLength?: number; autofocus?: boolean }>(),
+  { placeholder: 'Search…', minLength: 2, autofocus: false }
+);
+
+const emit = defineEmits<{
+  search: [...args: any[]];
+  clear: [...args: any[]];
+}>();
+
+const query = ref('');
+
+const inputElRef = ref<HTMLInputElement>();
+
+const isValid = computed(() => query.value.length >= props.minLength);
+
+let _cleanup_0: (() => void) | undefined;
+onMounted(() => {
+  if (props.autofocus) inputElRef.value?.focus();
+
+  // Returning a function from $onMount registers a teardown — equivalent to
+  // a separate $onUnmount, useful when setup and teardown logic belong together.
+  _cleanup_0 = () => {
+    // e.g., abort an in-flight request initialized in this hook
+  };
+});
+onBeforeUnmount(() => { _cleanup_0?.(); });
+
+const onSearch = () => {
+  if (isValid.value) emit('search', query.value);
+};
+const clear = () => {
+  query.value = '';
+  emit('clear');
+};

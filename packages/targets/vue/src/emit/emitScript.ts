@@ -251,13 +251,16 @@ function emitComputedDecls(
   for (const c of computedDecls) {
     imports.use('computed');
     const body = cloneClonedComputedBodies.get(c.name) ?? c.body;
+    // Per D-34: wrap the rewritten body in `computed(() => ...)` so the emitted
+    // decl is a Vue Ref<T>. Read-side `.value` access is appended by
+    // rewriteRozieIdentifiers' Identifier visitor in templates / scripts.
     let bodyCode: string;
     if (t.isBlockStatement(body)) {
       bodyCode = `() => ${genCode(body)}`;
     } else {
       bodyCode = `() => ${genCode(body)}`;
     }
-    lines.push(`const ${c.name} = ${bodyCode};`);
+    lines.push(`const ${c.name} = computed(${bodyCode});`);
   }
   return lines;
 }

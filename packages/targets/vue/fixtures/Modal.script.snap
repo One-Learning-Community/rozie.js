@@ -1,1 +1,49 @@
-<!-- placeholder; populated by toMatchFileSnapshot in plans 02-05 -->
+import { onBeforeUnmount, onMounted, ref } from 'vue';
+
+const props = withDefaults(
+  defineProps<{ closeOnEscape?: boolean; closeOnBackdrop?: boolean; lockBodyScroll?: boolean; title?: string }>(),
+  { closeOnEscape: true, closeOnBackdrop: true, lockBodyScroll: true, title: '' }
+);
+
+const open = defineModel<boolean>('open', { default: false });
+
+const emit = defineEmits<{
+  close: [...args: any[]];
+}>();
+
+defineSlots<{
+  header(props: any): any;
+  default(props: any): any;
+  footer(props: any): any;
+}>();
+
+const backdropElRef = ref<HTMLElement>();
+const dialogElRef = ref<HTMLElement>();
+
+onMounted(lockScroll);
+onBeforeUnmount(unlockScroll);
+onMounted(() => {
+  dialogElRef.value?.focus();
+});
+
+const close = () => {
+  open.value = false;
+  emit('close');
+};
+
+// Body-scroll-lock state lives outside reactive data because it tracks DOM
+// rather than UI; managed entirely via lifecycle and listeners.
+// Body-scroll-lock state lives outside reactive data because it tracks DOM
+// rather than UI; managed entirely via lifecycle and listeners.
+let savedBodyOverflow = '';
+const lockScroll = () => {
+  if (!props.lockBodyScroll) return;
+  savedBodyOverflow = document.body.style.overflow;
+  document.body.style.overflow = 'hidden';
+};
+const unlockScroll = () => {
+  if (!props.lockBodyScroll) return;
+  document.body.style.overflow = savedBodyOverflow;
+};
+
+// Colocated lifecycle pair — runs in source order alongside other hooks.

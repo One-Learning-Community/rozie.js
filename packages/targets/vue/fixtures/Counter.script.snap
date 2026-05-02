@@ -1,1 +1,21 @@
-<!-- placeholder; populated by toMatchFileSnapshot in plans 02-05 -->
+import { computed, ref } from 'vue';
+
+const props = withDefaults(
+  defineProps<{ step?: number; min?: number; max?: number }>(),
+  { step: 1, min: -Infinity, max: Infinity }
+);
+
+const value = defineModel<number>('value', { default: 0 });
+
+const hovering = ref(false);
+
+const canIncrement = computed(() => value.value + props.step <= props.max);
+const canDecrement = computed(() => value.value - props.step >= props.min);
+
+console.log("hello from rozie");
+const increment = () => {
+  if (canIncrement.value) value.value += props.step;
+};
+const decrement = () => {
+  if (canDecrement.value) value.value -= props.step;
+};

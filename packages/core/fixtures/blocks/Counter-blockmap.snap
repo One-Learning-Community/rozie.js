@@ -4,7 +4,7 @@
     "name": "Counter",
     "loc": {
       "start": 375,
-      "end": 1695
+      "end": 1728
     }
   },
   "props": {
@@ -30,36 +30,36 @@
     }
   },
   "script": {
-    "content": "\nconst canIncrement = $computed(() => $props.value + $props.step <= $props.max)\nconst canDecrement = $computed(() => $props.value - $props.step >= $props.min)\n\nconst increment = () => { if (canIncrement) $props.value += $props.step }\nconst decrement = () => { if (canDecrement) $props.value -= $props.step }\n",
+    "content": "\nconsole.log(\"hello from rozie\")\n\nconst canIncrement = $computed(() => $props.value + $props.step <= $props.max)\nconst canDecrement = $computed(() => $props.value - $props.step >= $props.min)\n\nconst increment = () => { if (canIncrement) $props.value += $props.step }\nconst decrement = () => { if (canDecrement) $props.value -= $props.step }\n",
     "contentLoc": {
       "start": 653,
-      "end": 961
+      "end": 994
     },
     "loc": {
       "start": 645,
-      "end": 970
+      "end": 1003
     }
   },
   "template": {
     "content": "\n<div\n  class=\"counter\"\n  :class=\"{ hovering: $data.hovering }\"\n  @mouseenter=\"$data.hovering = true\"\n  @mouseleave=\"$data.hovering = false\"\n>\n  <button :disabled=\"!canDecrement\" @click=\"decrement\" aria-label=\"Decrement\">−</button>\n  <span class=\"value\">{{ $props.value }}</span>\n  <button :disabled=\"!canIncrement\" @click=\"increment\" aria-label=\"Increment\">+</button>\n</div>\n",
     "contentLoc": {
-      "start": 982,
-      "end": 1358
+      "start": 1015,
+      "end": 1391
     },
     "loc": {
-      "start": 972,
-      "end": 1369
+      "start": 1005,
+      "end": 1402
     }
   },
   "style": {
     "content": "\n.counter { display: inline-flex; gap: 0.5rem; align-items: center; }\n.counter.hovering { background: rgba(0, 0, 0, 0.04); }\n.value { font-variant-numeric: tabular-nums; min-width: 3ch; text-align: center; }\nbutton { padding: 0.25rem 0.5rem; }\nbutton:disabled { opacity: 0.4; cursor: not-allowed; }\n",
     "contentLoc": {
-      "start": 1378,
-      "end": 1677
+      "start": 1411,
+      "end": 1710
     },
     "loc": {
-      "start": 1371,
-      "end": 1685
+      "start": 1404,
+      "end": 1718
     }
   }
 }

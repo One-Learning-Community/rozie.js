@@ -2,48 +2,48 @@
   "node": {
     "type": "StyleAST",
     "loc": {
-      "start": 1378,
-      "end": 1677
+      "start": 1411,
+      "end": 1710
     },
     "cssText": "\n.counter { display: inline-flex; gap: 0.5rem; align-items: center; }\n.counter.hovering { background: rgba(0, 0, 0, 0.04); }\n.value { font-variant-numeric: tabular-nums; min-width: 3ch; text-align: center; }\nbutton { padding: 0.25rem 0.5rem; }\nbutton:disabled { opacity: 0.4; cursor: not-allowed; }\n",
     "rules": [
       {
         "selector": ".counter",
         "loc": {
-          "start": 1379,
-          "end": 1447
+          "start": 1412,
+          "end": 1480
         },
         "isRootEscape": false
       },
       {
         "selector": ".counter.hovering",
         "loc": {
-          "start": 1448,
-          "end": 1502
+          "start": 1481,
+          "end": 1535
         },
         "isRootEscape": false
       },
       {
         "selector": ".value",
         "loc": {
-          "start": 1503,
-          "end": 1585
+          "start": 1536,
+          "end": 1618
         },
         "isRootEscape": false
       },
       {
         "selector": "button",
         "loc": {
-          "start": 1586,
-          "end": 1621
+          "start": 1619,
+          "end": 1654
         },
         "isRootEscape": false
       },
       {
         "selector": "button:disabled",
         "loc": {
-          "start": 1622,
-          "end": 1676
+          "start": 1655,
+          "end": 1709
         },
         "isRootEscape": false
       }
