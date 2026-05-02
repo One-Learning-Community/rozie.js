@@ -22,6 +22,9 @@ export class VueImportCollector {
   private symbols = new Set<string>();
 
   use(name: string): void {
+    if (!/^[A-Za-z_$][\w$]*$/.test(name)) {
+      throw new Error(`[rozie] Invalid Vue import name: '${name}'`);
+    }
     this.symbols.add(name);
   }
 
@@ -62,6 +65,9 @@ export class RuntimeVueImportCollector {
   private symbols = new Set<string>();
 
   use(name: string): void {
+    if (!/^[A-Za-z_$][\w$]*$/.test(name)) {
+      throw new Error(`[rozie] Invalid runtime-vue import name: '${name}'`);
+    }
     this.symbols.add(name);
   }
 
