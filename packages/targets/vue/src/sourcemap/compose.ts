@@ -43,5 +43,13 @@ export function composeSourceMap(ms: MagicString, opts: ComposeOpts): SourceMap 
     map.sourcesContent = [opts.source];
   }
 
+  // WR-01: warn when mappings are empty (only `;` separators, no encoded segments).
+  // buildShell uses MagicString.append() on a fresh empty string, which produces
+  // no positional tracking — mappings will be decorative only. Long-term, the
+  // shell should use snip/overwrite to get real per-block source positions.
+  if (!map.mappings || /^[;,]*$/.test(map.mappings)) {
+    console.warn('[rozie] Source map generated with empty mappings for', opts.filename);
+  }
+
   return map;
 }
