@@ -206,10 +206,17 @@ function classifyListener(
     });
 
     if (descriptor.kind === 'native') {
+      // Key/button filter — push guard if this token has an associated key check.
+      // NOTE: 'stop' and 'prevent' are NOT in NATIVE_KEY_GUARDS — this lookup is
+      // intentionally a no-op for those modifiers. Only key-filter modifiers
+      // (enter, esc, tab, etc.) produce entries in NATIVE_KEY_GUARDS. Any future
+      // modifier that appears in BOTH NATIVE_KEY_GUARDS AND the explicit stop/prevent
+      // block below would produce a duplicate guard — ensure no overlap exists.
       const guard = NATIVE_KEY_GUARDS[descriptor.token] ?? NATIVE_KEY_GUARDS[entry.modifier];
       if (guard) nativeKeyGuards.push(guard);
-      // .stop / .prevent / .self in <listeners> blocks — we don't have a
-      // template @event passthrough path; emit inline guards if mapped.
+      // .stop / .prevent in <listeners> blocks — Vue's template compiler handles
+      // these as @event modifiers, but raw addEventListener has no such mechanism;
+      // emit explicit side-effect calls instead.
       if (entry.modifier === 'stop') {
         nativeKeyGuards.push('e.stopPropagation();');
       } else if (entry.modifier === 'prevent') {
