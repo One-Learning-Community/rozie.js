@@ -37,4 +37,8 @@ export const stop: ModifierImpl = {
       diagnostics: [],
     };
   },
+  vue() {
+    // D-39 native pass-through: Vue's `.stop` matches Rozie verbatim.
+    return { kind: 'native', token: 'stop' };
+  },
 };

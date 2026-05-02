@@ -37,4 +37,8 @@ export const prevent: ModifierImpl = {
       diagnostics: [],
     };
   },
+  vue() {
+    // D-39 native pass-through: Vue's `.prevent` matches Rozie verbatim.
+    return { kind: 'native', token: 'prevent' };
+  },
 };

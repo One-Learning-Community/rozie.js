@@ -70,6 +70,29 @@ export interface ModifierContext {
 }
 
 /**
+ * VueEmissionDescriptor — D-40 tagged union returned by ModifierImpl.vue?(...)
+ * for the Vue 3 target emitter (Phase 3+).
+ *
+ * - 'native' — pass through to Vue's native modifier syntax (.stop, .esc, etc.)
+ *   The `token` is what Vue expects (NOT necessarily the Rozie modifier name —
+ *   e.g. Rozie's `escape` maps to Vue's `esc` per vuejs.org event-modifiers).
+ * - 'helper' — emit an import from `@rozie/runtime-vue` and a helper call.
+ *   `listenerOnly: true` flags modifiers (only `.outside` in v1) that are
+ *   only meaningful in <listeners> blocks; emitter rejects them on template @event.
+ *
+ * @public — SemVer-stable per D-22b.
+ */
+export type VueEmissionDescriptor =
+  | { kind: 'native'; token: string }
+  | {
+      kind: 'helper';
+      importFrom: '@rozie/runtime-vue';
+      helperName: 'useOutsideClick' | 'debounce' | 'throttle';
+      args: ModifierArg[];
+      listenerOnly?: true;
+    };
+
+/**
  * ModifierImpl — what a modifier plugin author implements.
  *
  * `resolve()` validates args + emits diagnostics for malformed input
@@ -97,6 +120,12 @@ export interface ModifierImpl {
     args: ModifierArg[],
     ctx: ModifierContext,
   ): { entries: ModifierPipelineEntry[]; diagnostics: Diagnostic[] };
+  /**
+   * Phase 3 D-40 — Vue target emission descriptor. Optional for Phase 1/2
+   * compatibility; Phase 3 emitter REQUIRES every builtin to implement it.
+   * Third-party plugins MAY omit; emitter falls back to ROZ420.
+   */
+  vue?(args: ModifierArg[], ctx: ModifierContext): VueEmissionDescriptor;
 }
 
 /**

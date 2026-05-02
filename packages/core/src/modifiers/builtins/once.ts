@@ -39,4 +39,8 @@ export const once: ModifierImpl = {
       diagnostics: [],
     };
   },
+  vue() {
+    // D-39 native pass-through: Vue's `.once` matches Rozie verbatim.
+    return { kind: 'native', token: 'once' };
+  },
 };

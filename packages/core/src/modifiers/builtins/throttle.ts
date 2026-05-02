@@ -52,4 +52,14 @@ export const throttle: ModifierImpl = {
       diagnostics: [],
     };
   },
+  vue(args) {
+    // D-40: dispatched through @rozie/runtime-vue throttle. Valid in BOTH
+    // <listeners> and template @event — no listenerOnly flag.
+    return {
+      kind: 'helper',
+      importFrom: '@rozie/runtime-vue',
+      helperName: 'throttle',
+      args,
+    };
+  },
 };

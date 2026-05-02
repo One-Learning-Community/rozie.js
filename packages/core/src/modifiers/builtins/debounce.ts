@@ -54,4 +54,14 @@ export const debounce: ModifierImpl = {
       diagnostics: [],
     };
   },
+  vue(args) {
+    // D-40: dispatched through @rozie/runtime-vue debounce. Valid in BOTH
+    // <listeners> and template @event — no listenerOnly flag.
+    return {
+      kind: 'helper',
+      importFrom: '@rozie/runtime-vue',
+      helperName: 'debounce',
+      args,
+    };
+  },
 };

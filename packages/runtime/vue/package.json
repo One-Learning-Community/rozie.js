@@ -11,7 +11,7 @@
   },
   "scripts": {
     "build": "echo 'Phase 3 Plan 01: scaffold only' && exit 0",
-    "test": "vitest run",
+    "test": "vitest run --passWithNoTests",
     "lint": "biome lint src",
     "typecheck": "tsc --noEmit"
   },

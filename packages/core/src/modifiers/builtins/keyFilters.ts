@@ -43,6 +43,35 @@ export const KEY_FILTER_NAMES = [
 
 export type KeyFilterName = (typeof KEY_FILTER_NAMES)[number];
 
+/**
+ * Rozie key/button name → Vue native modifier token map (Phase 3 D-39).
+ *
+ * Most names match Vue verbatim; the divergence is `escape → esc` per
+ * `[CITED: vuejs.org/guide/essentials/event-handling#event-modifiers]` and
+ * RESEARCH.md line 583. Vue's recognized list: `.enter .tab .delete .esc
+ * .space .up .down .left .right .ctrl .alt .shift .meta`. Mouse buttons
+ * `.left .middle .right` overlap with the arrow keys by name; Vue
+ * disambiguates by event (`@click.left` vs `@keydown.left`) — the same
+ * Rozie modifier token therefore covers both interpretations and the
+ * vue token stays equal to the Rozie name.
+ */
+const VUE_KEY_TOKEN_MAP: Record<KeyFilterName, string> = {
+  escape: 'esc',
+  enter: 'enter',
+  tab: 'tab',
+  delete: 'delete',
+  space: 'space',
+  up: 'up',
+  down: 'down',
+  left: 'left',
+  right: 'right',
+  home: 'home',
+  end: 'end',
+  pageUp: 'pageUp',
+  pageDown: 'pageDown',
+  middle: 'middle',
+};
+
 function makeFilter(name: KeyFilterName): ModifierImpl {
   return {
     name,
@@ -70,6 +99,10 @@ function makeFilter(name: KeyFilterName): ModifierImpl {
         ],
         diagnostics: [],
       };
+    },
+    vue() {
+      // D-39 native pass-through with Rozie → Vue name remap (escape → esc).
+      return { kind: 'native', token: VUE_KEY_TOKEN_MAP[name] };
     },
   };
 }

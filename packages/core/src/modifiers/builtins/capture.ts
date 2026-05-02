@@ -36,4 +36,8 @@ export const capture: ModifierImpl = {
       diagnostics: [],
     };
   },
+  vue() {
+    // D-39 native pass-through: Vue's `.capture` matches Rozie verbatim.
+    return { kind: 'native', token: 'capture' };
+  },
 };

@@ -1,0 +1,101 @@
+{
+  "capture": {
+    "kind": "native",
+    "token": "capture"
+  },
+  "debounce": {
+    "kind": "helper",
+    "importFrom": "@rozie/runtime-vue",
+    "helperName": "debounce",
+    "args": []
+  },
+  "delete": {
+    "kind": "native",
+    "token": "delete"
+  },
+  "down": {
+    "kind": "native",
+    "token": "down"
+  },
+  "end": {
+    "kind": "native",
+    "token": "end"
+  },
+  "enter": {
+    "kind": "native",
+    "token": "enter"
+  },
+  "escape": {
+    "kind": "native",
+    "token": "esc"
+  },
+  "home": {
+    "kind": "native",
+    "token": "home"
+  },
+  "left": {
+    "kind": "native",
+    "token": "left"
+  },
+  "middle": {
+    "kind": "native",
+    "token": "middle"
+  },
+  "once": {
+    "kind": "native",
+    "token": "once"
+  },
+  "outside": {
+    "kind": "helper",
+    "importFrom": "@rozie/runtime-vue",
+    "helperName": "useOutsideClick",
+    "args": [],
+    "listenerOnly": true
+  },
+  "pageDown": {
+    "kind": "native",
+    "token": "pageDown"
+  },
+  "pageUp": {
+    "kind": "native",
+    "token": "pageUp"
+  },
+  "passive": {
+    "kind": "native",
+    "token": "passive"
+  },
+  "prevent": {
+    "kind": "native",
+    "token": "prevent"
+  },
+  "right": {
+    "kind": "native",
+    "token": "right"
+  },
+  "self": {
+    "kind": "native",
+    "token": "self"
+  },
+  "space": {
+    "kind": "native",
+    "token": "space"
+  },
+  "stop": {
+    "kind": "native",
+    "token": "stop"
+  },
+  "tab": {
+    "kind": "native",
+    "token": "tab"
+  },
+  "throttle": {
+    "kind": "helper",
+    "importFrom": "@rozie/runtime-vue",
+    "helperName": "throttle",
+    "args": []
+  },
+  "up": {
+    "kind": "native",
+    "token": "up"
+  }
+}

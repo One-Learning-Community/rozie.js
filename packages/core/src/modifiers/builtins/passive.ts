@@ -36,4 +36,8 @@ export const passive: ModifierImpl = {
       diagnostics: [],
     };
   },
+  vue() {
+    // D-39 native pass-through: Vue's `.passive` matches Rozie verbatim.
+    return { kind: 'native', token: 'passive' };
+  },
 };

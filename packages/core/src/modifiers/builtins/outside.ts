@@ -48,4 +48,16 @@ export const outside: ModifierImpl = {
       diagnostics: [],
     };
   },
+  vue(args) {
+    // D-40 + D-42: dispatched through @rozie/runtime-vue useOutsideClick.
+    // listenerOnly because outside-click only makes sense in <listeners>;
+    // emitter raises a diagnostic if encountered on a template @event.
+    return {
+      kind: 'helper',
+      importFrom: '@rozie/runtime-vue',
+      helperName: 'useOutsideClick',
+      args,
+      listenerOnly: true,
+    };
+  },
 };

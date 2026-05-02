@@ -38,4 +38,8 @@ export const self: ModifierImpl = {
       diagnostics: [],
     };
   },
+  vue() {
+    // D-39 native pass-through: Vue's `.self` matches Rozie verbatim.
+    return { kind: 'native', token: 'self' };
+  },
 };
