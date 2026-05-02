@@ -100,11 +100,6 @@ function renderTargetExpr(target: ListenerTarget): string {
   return `${target.refName}Ref.value?`;
 }
 
-/** Whether the target call needs optional-chaining `?.` (refs may be unmounted). */
-function targetIsOptionalChained(target: ListenerTarget): boolean {
-  return target.kind !== 'global';
-}
-
 /**
  * Build the `, { capture: true, ... }` options-object suffix from
  * collected listenerOption entries on a single listener. Returns '' when no
@@ -272,7 +267,6 @@ function renderListener(
 
   const evtType = eventTypeFor(listener.event);
   const targetExpr = renderTargetExpr(listener.target);
-  const optChain = targetIsOptionalChained(listener.target);
 
   // Build `if (!(when)) return;` guard if when is non-null.
   const whenGuard =
@@ -347,9 +341,6 @@ function renderListener(
   const handlerDecl = `  const handler = (e: ${evtType}) => {\n${guardLines}    ${handlerInvoke}\n  };`;
   const addCallNoSemi = `${targetExpr}.addEventListener('${listener.event}', handler${optsObj})`;
   const removeCallNoSemi = `${targetExpr}.removeEventListener('${listener.event}', handler${optsObj})`;
-
-  // void unused
-  void optChain;
 
   const guardLine = whenGuard ? `  ${whenGuard}\n` : '';
   return [
