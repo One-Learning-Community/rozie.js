@@ -21,6 +21,10 @@ node packages/cli/dist/bin.cjs build examples/Counter.rozie --out Counter.vue
 
 # also write source map alongside
 node packages/cli/dist/bin.cjs build examples/Counter.rozie --out Counter.vue --source-map
+
+# --out can be a directory — the CLI auto-names the file with the
+# right extension (Counter.rozie + --target vue → Counter.vue).
+node packages/cli/dist/bin.cjs build examples/Counter.rozie --out examples/output/vue/
 ```
 
 Targets other than `vue` are not yet implemented and exit with code 2:
