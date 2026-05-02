@@ -32,6 +32,8 @@ export function useOutsideClick(
   options: OutsideClickOptions = {},
 ): void {
   const refList = Array.isArray(refs) ? refs : [refs];
+  // Resolve once so both add and remove use the identical descriptor.
+  const capture = options.capture ?? true;
   const handler = (e: MouseEvent) => {
     if (whenSignal && !whenSignal()) return;
     const target = e.target as Node;
@@ -41,9 +43,9 @@ export function useOutsideClick(
     callback(e);
   };
   onMounted(() => {
-    document.addEventListener('click', handler, options.capture ?? true);
+    document.addEventListener('click', handler, capture);
   });
   onBeforeUnmount(() => {
-    document.removeEventListener('click', handler, options.capture ?? true);
+    document.removeEventListener('click', handler, capture);
   });
 }
