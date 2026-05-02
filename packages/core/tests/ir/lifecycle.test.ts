@@ -129,4 +129,28 @@ $onMount(async () => {
     expect(roz105).toBeDefined();
     expect(roz105!.severity).toBe('warning');
   });
+
+  it('WR-01 regression: $onMount(async () => { return cleanup }) emits EXACTLY ONE ROZ105 from lowerToIR (no duplicate from analyzeAST)', () => {
+    // This test guards against the double-emission bug fixed in WR-01.
+    // Previously unknownRefValidator.checkLifecycleSiting also emitted ROZ105,
+    // resulting in two diagnostics for the same source pattern.
+    // The fix removes the emission from the validator; lowerScript is the sole source.
+    const src = `<rozie name="AsyncOnce">
+<script>
+$onMount(async () => {
+  return () => { console.log('teardown') }
+})
+</script>
+<template><div /></template>
+</rozie>`;
+    const result = parse(src, { filename: 'AsyncOnce.rozie' });
+    expect(result.ast).not.toBeNull();
+    const lowered = lowerToIR(result.ast!, { modifierRegistry: createDefaultRegistry() });
+
+    const roz105All = lowered.diagnostics.filter((d) => d.code === 'ROZ105');
+    expect(
+      roz105All,
+      `Expected exactly 1 ROZ105 diagnostic but got ${roz105All.length}: ${JSON.stringify(roz105All)}`,
+    ).toHaveLength(1);
+  });
 });

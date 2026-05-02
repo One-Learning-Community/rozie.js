@@ -178,7 +178,10 @@ $onMount(() => { console.log('top-level') })
     expect(filterByCode(diagnostics, 'ROZ104')).toEqual([]);
   });
 
-  it('emits ROZ105 warning for $onMount(async () => { return cleanup })', () => {
+  it('does NOT emit ROZ105 from analyzeAST — ROZ105 is emitted exclusively by lowerToIR (single-emitter rule)', () => {
+    // WR-01 fix: ROZ105 was previously double-emitted (once here in analyzeAST via
+    // unknownRefValidator, once in lowerToIR via lowerScript.pairLifecycleHooks).
+    // The validator no longer emits ROZ105; lowerToIR is the sole authoritative source.
     const src = `<rozie name="X">
 <script>
 $onMount(async () => {
@@ -189,8 +192,7 @@ $onMount(async () => {
 </rozie>`;
     const { diagnostics } = analyzeSource(src);
     const roz105 = filterByCode(diagnostics, 'ROZ105');
-    expect(roz105.length).toBe(1);
-    expect(roz105[0]!.severity).toBe('warning');
+    expect(roz105.length).toBe(0);
   });
 
   it('emits ROZ106 for computed access $props["foo"]', () => {

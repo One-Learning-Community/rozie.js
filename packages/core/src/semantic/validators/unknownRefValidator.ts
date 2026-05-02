@@ -159,8 +159,15 @@ function checkMemberExpression(
 }
 
 /**
- * Detect lifecycle calls inside nested functions (ROZ104) and async-onMount
- * cleanup returns (ROZ105) within the script's Program.
+ * Detect lifecycle calls inside nested functions (ROZ104) within the script's
+ * Program.
+ *
+ * NOTE: ROZ105 (async $onMount cleanup-return) is intentionally NOT emitted
+ * here. `lowerScript.pairLifecycleHooks` is the single authoritative emitter
+ * for ROZ105 because it has access to `extractCleanupReturn`'s result and can
+ * correctly distinguish async-with-return from async-without-return.
+ * Emitting from both sites would produce duplicate diagnostics for the same
+ * source node.
  */
 function checkLifecycleSiting(
   callee: t.Identifier,
@@ -179,44 +186,6 @@ function checkLifecycleSiting(
       loc: locFromNode(path.node),
       hint: 'Move the lifecycle call to <script> Program top level. Lifecycle hooks register effects at component-setup time.',
     });
-  }
-
-  // ROZ105: $onMount(async () => { …; return fn })
-  if (callee.name === '$onMount') {
-    const cb = path.node.arguments[0];
-    if (
-      cb &&
-      (t.isArrowFunctionExpression(cb) || t.isFunctionExpression(cb)) &&
-      cb.async
-    ) {
-      // Check if the body's last statement returns a function-typed value.
-      let returnsFunctionLike = false;
-      if (t.isBlockStatement(cb.body)) {
-        const stmts = cb.body.body;
-        const last = stmts[stmts.length - 1];
-        if (last && t.isReturnStatement(last) && last.argument) {
-          const arg = last.argument;
-          if (
-            t.isFunctionExpression(arg) ||
-            t.isArrowFunctionExpression(arg) ||
-            t.isIdentifier(arg)
-          ) {
-            returnsFunctionLike = true;
-          }
-        }
-      } else if (t.isFunctionExpression(cb.body) || t.isArrowFunctionExpression(cb.body)) {
-        returnsFunctionLike = true;
-      }
-      if (returnsFunctionLike) {
-        ctx.diagnostics.push({
-          code: RozieErrorCode.ASYNC_ONMOUNT_RETURN,
-          severity: 'warning',
-          message: `'$onMount(async () => …)' return value cannot be a cleanup function — async callbacks return a Promise.`,
-          loc: locFromNode(cb),
-          hint: 'Either drop the async keyword, or move cleanup logic into a separate $onUnmount call.',
-        });
-      }
-    }
   }
 }
 
