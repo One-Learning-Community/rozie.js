@@ -1,0 +1,27 @@
+{
+  "name": "vue-vite-demo",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --port 4173",
+    "typecheck": "vue-tsc --noEmit",
+    "test:e2e": "playwright test",
+    "test:e2e:install": "playwright install chromium"
+  },
+  "dependencies": {
+    "@rozie/runtime-vue": "workspace:*",
+    "@rozie/unplugin": "workspace:*",
+    "vue": "^3.4.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1",
+    "@vitejs/plugin-vue": "^5",
+    "playwright": "^1",
+    "typescript": "^5",
+    "vite": "^5",
+    "vue-tsc": "^2"
+  }
+}
