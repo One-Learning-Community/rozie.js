@@ -1,1 +1,47 @@
-<!-- placeholder; populated by toMatchFileSnapshot in plans 02-05 -->
+import { computed, ref } from 'vue';
+
+const props = withDefaults(
+  defineProps<{ title?: string }>(),
+  { title: 'Todo' }
+);
+
+const items = defineModel<unknown[]>('items', { default: () => [] });
+
+const emit = defineEmits<{
+  add: [...args: any[]];
+  toggle: [...args: any[]];
+  remove: [...args: any[]];
+}>();
+
+defineSlots<{
+  header(props: { remaining: any; total: any }): any;
+  default(props: { item: any; toggle: any; remove: any }): any;
+  empty(props: {  }): any;
+}>();
+
+const draft = ref('');
+
+const remaining = computed(() => items.value.filter(i => !i.done).length);
+
+const add = () => {
+  const text = draft.value.trim();
+  if (!text) return;
+  items.value = [...items.value, {
+    id: crypto.randomUUID(),
+    text,
+    done: false
+  }];
+  draft.value = '';
+  emit('add', text);
+};
+const toggle = id => {
+  items.value = items.value.map(i => i.id === id ? {
+    ...i,
+    done: !i.done
+  } : i);
+  emit('toggle', id);
+};
+const remove = id => {
+  items.value = items.value.filter(i => i.id !== id);
+  emit('remove', id);
+};

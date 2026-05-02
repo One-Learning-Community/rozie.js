@@ -1,1 +1,67 @@
-<!-- placeholder; populated by toMatchFileSnapshot in plans 02-05 -->
+import { onMounted, ref, watchEffect } from 'vue';
+import { throttle, useOutsideClick } from '@rozie/runtime-vue';
+
+
+const props = withDefaults(
+  defineProps<{ closeOnOutsideClick?: boolean; closeOnEscape?: boolean }>(),
+  { closeOnOutsideClick: true, closeOnEscape: true }
+);
+
+const open = defineModel<boolean>('open', { default: false });
+
+defineSlots<{
+  trigger(props: { open: any; toggle: any }): any;
+  default(props: { close: any }): any;
+}>();
+
+const triggerElRef = ref<HTMLElement>();
+const panelElRef = ref<HTMLElement>();
+
+onMounted(() => {
+  reposition();
+});
+onMounted(() => {
+  // Example of integrating a vanilla JS library — $refs gives direct DOM access.
+  // new Popper($refs.triggerEl, $refs.panelEl, { placement: 'bottom-start' })
+});
+
+const toggle = () => {
+  open.value = !open.value;
+};
+const close = () => {
+  open.value = false;
+};
+const reposition = () => {
+  if (!panelElRef.value || !triggerElRef.value) return;
+  const rect = triggerElRef.value.getBoundingClientRect();
+  Object.assign(panelElRef.value.style, {
+    top: `${rect.bottom}px`,
+    left: `${rect.left}px`
+  });
+};
+
+// Multiple $onMount calls run in source order. Useful for colocating setup
+// with the logic it serves.
+
+useOutsideClick(
+  [triggerElRef, panelElRef],
+  () => close(),
+  () => open.value && props.closeOnOutsideClick,
+);
+
+watchEffect((onCleanup) => {
+  if (!(open.value && props.closeOnEscape)) return;
+  const handler = (e: KeyboardEvent) => {
+    if (e.key !== 'Escape') return;
+    close();
+  };
+  document.addEventListener('keydown', handler);
+  onCleanup(() => document.removeEventListener('keydown', handler));
+});
+
+const throttledReposition = throttle(reposition, 100);
+watchEffect((onCleanup) => {
+  if (!(open.value)) return;
+  window.addEventListener('resize', throttledReposition, { passive: true });
+  onCleanup(() => window.removeEventListener('resize', throttledReposition, { passive: true }));
+});
