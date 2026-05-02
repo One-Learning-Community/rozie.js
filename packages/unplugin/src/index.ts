@@ -56,6 +56,31 @@ export const unplugin = createUnpluginV3<Partial<RozieOptions>>((rawOptions) => 
     enforce: 'pre',
     resolveId,
     load,
+    // Vite-only: the dep-scan step (`vite:dep-scan`) runs esbuild ahead of
+    // the regular plugin pipeline. esbuild calls our resolveId, gets back
+    // `<abs>/Foo.rozie.vue`, and then tries to fs.readFile that synthetic
+    // path — load never fires. Marking `.rozie` imports `external: true`
+    // during the scan tells esbuild to skip loading; the real transform
+    // pipeline still runs at request time when Vite serves the module.
+    vite: {
+      config: () => ({
+        optimizeDeps: {
+          esbuildOptions: {
+            plugins: [
+              {
+                name: 'rozie:dep-scan-skip',
+                setup(build: { onResolve: (opts: { filter: RegExp }, cb: (args: { path: string }) => { path: string; external: true }) => void }) {
+                  build.onResolve({ filter: /\.rozie$/ }, (args) => ({
+                    path: args.path,
+                    external: true,
+                  }));
+                },
+              },
+            ],
+          },
+        },
+      }),
+    },
   };
 });
 
