@@ -25,6 +25,7 @@
     "eslint": "^9",
     "eslint-plugin-react-hooks": "^5",
     "playwright": "^1",
+    "source-map-js": "^1.2.1",
     "typescript": "^5",
     "vite": "^5"
   }
