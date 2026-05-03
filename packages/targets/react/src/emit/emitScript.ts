@@ -226,10 +226,10 @@ function pairClonedLifecycle(
       consumed.add(entry.idx);
       let setupCloned = entry.arg as t.Expression | t.BlockStatement;
       let cleanupCloned: t.Expression | null = null;
-      // If the IR LifecycleHook has cleanup, peek for paired $onUnmount.
+      // If the IR LifecycleHook has cleanup, first try to pair with an
+      // adjacent $onUnmount call (D-19 conservative pairing of two
+      // top-level Identifier args, e.g. Modal's lockScroll/unlockScroll).
       if (lh.cleanup) {
-        // Look ahead for the next lifecycle call entry that's $onUnmount with
-        // an Identifier argument (the spike's conservative pairing).
         if (cursor < lifecycleCallIndices.length) {
           const next = lifecycleCallIndices[cursor]!;
           if (next.calleeName === '$onUnmount') {
@@ -238,12 +238,19 @@ function pairClonedLifecycle(
             cursor++;
           }
         }
-      } else if (
+      }
+      // Pitfall 5 fallback: if cleanup wasn't paired with an $onUnmount,
+      // detect `return <expr>` as last stmt of the setup arrow's
+      // BlockStatement body and lift it to cleanup. Applies when:
+      //   - lh.cleanup is falsy (no Phase 2 detection — pure Pitfall 5), OR
+      //   - lh.cleanup is truthy BUT no adjacent $onUnmount existed
+      //     (cleanup originated from the setup body's return, like
+      //     SearchInput's $onMount(() => { ...; return () => {} })).
+      if (
+        cleanupCloned === null &&
         lh.phase === 'mount' &&
         (t.isArrowFunctionExpression(setupCloned) || t.isFunctionExpression(setupCloned))
       ) {
-        // Pitfall 5: arrow with cleanup-return. Detect `return <expr>` as last stmt
-        // of a BlockStatement body and lift it to cleanup.
         const fnBody = setupCloned.body;
         if (t.isBlockStatement(fnBody) && !setupCloned.async) {
           const lastStmt = fnBody.body[fnBody.body.length - 1];
