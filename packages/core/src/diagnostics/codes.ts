@@ -83,7 +83,19 @@ export const RozieErrorCode = {
 
   // ---- Phase 3 emitter warnings — ROZ450..ROZ499 (Phase 7 hardening) ----
 
-  // ---- Phase 4+ target emitters take ROZ500+ ----
+  // ---- @rozie/target-react lowering errors (Phase 4 D-63) — ROZ520..ROZ549 ----
+  // ROZ520..519 reserved for @rozie/unplugin React-branch configuration errors (Plan 04-04).
+  TARGET_REACT_RHTML_WITH_CHILDREN: 'ROZ520', // r-html with children — React's dangerouslySetInnerHTML can't coexist with children
+  TARGET_REACT_NESTED_STATE_MUTATION: 'ROZ521', // Pitfall 7 — $data.foo.bar = 'x' nested member writes; v1 warns + leaves AST unchanged
+  TARGET_REACT_MODULE_LET_AUTO_HOISTED: 'ROZ522', // Pitfall 3/8 — module-scoped `let X` referenced from LifecycleHook setup auto-hoisted to useRef
+  TARGET_REACT_MODULE_LET_UNHOISTABLE: 'ROZ523', // Pitfall 3/8 — module-scoped `let X` referenced too indirectly to safely auto-hoist; user must refactor
+
+  // ---- @rozie/runtime-react warnings (Phase 4 D-63) — ROZ550..ROZ579 ----
+  RUNTIME_REACT_CONTROLLABLE_MODE_FLIP: 'ROZ550', // D-57 — useControllableState detected parent flipping controlled/uncontrolled mid-lifecycle
+
+  // ---- ROZ580..ROZ599 reserved for Phase 7 hardening ----
+
+  // ---- Phase 5+ target emitters take ROZ600+ ----
 } as const;
 
 export type RozieErrorCode = (typeof RozieErrorCode)[keyof typeof RozieErrorCode];

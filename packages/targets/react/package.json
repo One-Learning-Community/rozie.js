@@ -5,9 +5,20 @@
   "private": true,
   "main": "./src/index.ts",
   "scripts": {
-    "build": "echo 'Phase 1: scaffold only' && exit 0",
-    "test": "echo 'Phase 1: no tests' && exit 0",
+    "build": "echo 'Phase 4: scaffold only' && exit 0",
+    "test": "vitest run --passWithNoTests",
     "lint": "biome lint src",
     "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@babel/generator": "^7.29.1",
+    "@babel/parser": "^7.29.3",
+    "@babel/traverse": "^7.29.0",
+    "@babel/types": "^7.29.0",
+    "@rozie/core": "workspace:*",
+    "magic-string": "^0.30.21"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.5"
   }
 }
