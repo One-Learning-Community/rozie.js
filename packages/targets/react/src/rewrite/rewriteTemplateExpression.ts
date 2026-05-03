@@ -73,7 +73,51 @@ export function rewriteTemplateExpression(
 
   const wrapper = t.file(t.program([t.expressionStatement(cloned)]));
 
+  // Map of compound-assignment operator → matching binary operator.
+  const COMPOUND_OP_MAP: Record<string, t.BinaryExpression['operator']> = {
+    '+=': '+', '-=': '-', '*=': '*', '/=': '/', '%=': '%', '**=': '**',
+    '<<=': '<<', '>>=': '>>', '>>>=': '>>>', '&=': '&', '|=': '|', '^=': '^',
+  };
+
+  function buildSetterCall(
+    stateName: string,
+    operator: string,
+    rhs: t.Expression,
+  ): t.CallExpression {
+    const setterName = 'set' + capitalize(stateName);
+    if (operator === '=') {
+      return t.callExpression(t.identifier(setterName), [rhs]);
+    }
+    const binOp = COMPOUND_OP_MAP[operator];
+    if (!binOp) return t.callExpression(t.identifier(setterName), [rhs]);
+    const arrow = t.arrowFunctionExpression(
+      [t.identifier('prev')],
+      t.binaryExpression(binOp, t.identifier('prev'), rhs),
+    );
+    return t.callExpression(t.identifier(setterName), [arrow]);
+  }
+
   traverse(wrapper, {
+    AssignmentExpression(path) {
+      const node = path.node;
+      const left = node.left;
+      if (!t.isMemberExpression(left)) return;
+      const obj = left.object;
+      const prop = left.property;
+      if (!t.isIdentifier(obj) || !t.isIdentifier(prop) || left.computed) return;
+
+      if (obj.name === '$data' && dataNames.has(prop.name)) {
+        const setterCall = buildSetterCall(prop.name, node.operator, node.right);
+        path.replaceWith(setterCall);
+        return;
+      }
+      if (obj.name === '$props' && modelProps.has(prop.name)) {
+        const setterCall = buildSetterCall(prop.name, node.operator, node.right);
+        path.replaceWith(setterCall);
+        return;
+      }
+    },
+
     MemberExpression(path) {
       const obj = path.node.object;
       if (!t.isIdentifier(obj)) return;
