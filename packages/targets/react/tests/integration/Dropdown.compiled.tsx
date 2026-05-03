@@ -1,9 +1,22 @@
+// Hand-copied from packages/targets/react/fixtures/Dropdown.tsx.snap with
+// the addition of a `styles` shim so the .tsx is a valid runnable module
+// (Plan 04-05 will emit a real CSS-module import; until then the integration
+// test stubs styles to an empty object).
+//
+// Per Plan 04-04 success criterion 1, this file is consumed by
+// dropdown-stale-closure.test.tsx to verify the LATEST closure wins when a
+// document.click fires after a parent re-render — the marquee D-61 anchor.
 import { useCallback, useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
-import { useControllableState, useOutsideClick, useThrottledCallback } from '@rozie/runtime-react';
+import {
+  useControllableState,
+  useOutsideClick,
+  useThrottledCallback,
+} from '@rozie/runtime-react';
+
+const styles: Record<string, string> = new Proxy({}, { get: (_t, k) => String(k) });
 
 interface TriggerCtx { open: any; toggle: any; }
-
 interface ChildrenCtx { close: any; }
 
 interface DropdownProps {
@@ -36,51 +49,48 @@ export default function Dropdown(props: DropdownProps): JSX.Element {
     const rect = triggerEl.current.getBoundingClientRect();
     Object.assign(panelEl.current.style, {
       top: `${rect.bottom}px`,
-      left: `${rect.left}px`
+      left: `${rect.left}px`,
     });
   }, []);
 
   useEffect(() => {
     reposition();
   }, [reposition]);
-  useEffect(() => {
-    
-  }, []);
 
   const _rozieThrottledLReposition = useThrottledCallback(reposition, [open, reposition], 100);
 
   useOutsideClick(
     [triggerEl, panelEl],
     close,
-    () => open && props.closeOnOutsideClick,
+    () => Boolean(open && (props.closeOnOutsideClick ?? true)),
   );
 
   useEffect(() => {
-    if (!(open && props.closeOnEscape)) return;
+    if (!(open && (props.closeOnEscape ?? true))) return;
     const _rozieHandler = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
-      close(e);
+      close();
     };
     document.addEventListener('keydown', _rozieHandler);
     return () => document.removeEventListener('keydown', _rozieHandler);
   }, [close, open, props.closeOnEscape]);
 
   useEffect(() => {
-    if (!(open)) return;
+    if (!open) return;
     window.addEventListener('resize', _rozieThrottledLReposition, { passive: true });
-    return () => window.removeEventListener('resize', _rozieThrottledLReposition, { passive: true });
-  }, [_rozieThrottledLReposition, open, reposition]);
+    return () => window.removeEventListener('resize', _rozieThrottledLReposition);
+  }, [_rozieThrottledLReposition, open]);
 
   return (
-    <>
     <div className={styles.dropdown}>
       <div ref={triggerEl} onClick={toggle}>
         {props.renderTrigger?.({ open, toggle })}
       </div>
-
-      {open && <div ref={panelEl} className={styles["dropdown-panel"]} role="menu">
-        {props.children?.({ close })}
-      </div>}</div>
-    </>
+      {open && (
+        <div ref={panelEl} className={styles['dropdown-panel']} role="menu">
+          {props.children?.({ close })}
+        </div>
+      )}
+    </div>
   );
 }

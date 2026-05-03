@@ -51,6 +51,16 @@ export interface ShellParts {
   scriptInjections?: string[];
   /** Body of the function above the `return ( <JSX> );`. */
   script: string;
+  /**
+   * Plan 04-04 — `<listeners>`-block useEffect / useOutsideClick blocks.
+   * Placed AFTER `scriptInjections` so listener wrapper consts (which live in
+   * `scriptInjections`) are in scope when the useEffect attaches them. Layout:
+   *   hookSection → userArrowsSection (`script`)
+   *     → wrapper consts (`scriptInjections`)
+   *     → listener useEffects (`listenerEffects`)
+   *     → return JSX
+   */
+  listenerEffects?: string;
   /** JSX body string (e.g., '<div>...</div>' or '(\n  <div>...</div>\n)') */
   jsx: string;
 }
@@ -139,6 +149,17 @@ export function buildShell(parts: ShellParts): MagicString {
       ms.append('\n');
     }
     if (inFn.length > 0) ms.append('\n');
+  }
+
+  // Plan 04-04 — <listeners>-block useEffect / useOutsideClick blocks.
+  // Emitted AFTER wrapper consts so the wrapper identifier is in scope.
+  if (parts.listenerEffects && parts.listenerEffects.trim().length > 0) {
+    const indented = parts.listenerEffects
+      .split('\n')
+      .map((line) => (line.length > 0 ? '  ' + line : line))
+      .join('\n');
+    ms.append(indented);
+    ms.append('\n\n');
   }
 
   // JSX body — wrap in `return ( ... );`.

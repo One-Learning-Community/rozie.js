@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { useControllableState } from '@rozie/runtime-react';
 
@@ -31,32 +31,39 @@ export default function Modal(props: ModalProps): JSX.Element {
   });
   const backdropEl = useRef<HTMLDivElement | null>(null);
   const dialogEl = useRef<HTMLDivElement | null>(null);
+
+  const { onClose: _rozieProp_onClose } = props;
+    const close = useCallback(() => {
+    setOpen(false);
+    _rozieProp_onClose && _rozieProp_onClose();
+  }, [_rozieProp_onClose, setOpen]);
+  const lockScroll = useCallback(() => {
+    if (!props.lockBodyScroll) return;
+    savedBodyOverflow.current = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+  }, [props.lockBodyScroll]);
+  const unlockScroll = useCallback(() => {
+    if (!props.lockBodyScroll) return;
+    document.body.style.overflow = savedBodyOverflow.current;
+  }, [props.lockBodyScroll]);
+
   useEffect(() => {
     lockScroll();
     return () => unlockScroll();
-  }, [lockScroll]);
+  }, [lockScroll, unlockScroll]);
   useEffect(() => {
     dialogEl.current?.focus();
   }, []);
 
-  const close = () => {
-    setOpen(false);
-    props.onClose?.();
-  };
-
-  // Body-scroll-lock state lives outside reactive data because it tracks DOM
-  // rather than UI; managed entirely via lifecycle and listeners.
-  const lockScroll = () => {
-    if (!props.lockBodyScroll) return;
-    savedBodyOverflow.current = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-  };
-  const unlockScroll = () => {
-    if (!props.lockBodyScroll) return;
-    document.body.style.overflow = savedBodyOverflow.current;
-  };
-
-  // Colocated lifecycle pair — runs in source order alongside other hooks.
+  useEffect(() => {
+    if (!(open && props.closeOnEscape)) return;
+    const _rozieHandler = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      close(e);
+    };
+    document.addEventListener('keydown', _rozieHandler);
+    return () => document.removeEventListener('keydown', _rozieHandler);
+  }, [close, open, props.closeOnEscape]);
 
   return (
     <>

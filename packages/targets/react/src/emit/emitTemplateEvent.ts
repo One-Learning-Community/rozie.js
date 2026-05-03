@@ -41,6 +41,7 @@ import {
   ReactImportCollector,
   RuntimeReactImportCollector,
 } from '../rewrite/collectReactImports.js';
+import { renderDepArray } from './renderDepArray.js';
 
 export interface EmitEventCtx {
   ir: IRComponent;
@@ -311,8 +312,12 @@ export function emitTemplateEvent(
       const originalHandlerCode = renderHandler(listener.handler, ctx.ir);
       const wrapName = makeWrapName(desc.helperName, listener.handler, ctx.injectionCounter);
       const argList = desc.args.map(renderModifierArg).join(', ');
-      // Plan 04-04 will refine the deps array; v1 emits []
-      const injection = `const ${wrapName} = ${desc.helperName}(${originalHandlerCode}, []${argList ? ', ' + argList : ''});`;
+      // Plan 04-04 — spread Listener.deps into the wrapper deps[] so
+      // exhaustive-deps lint recognizes captured identifiers (REACT-T-02
+      // marquee technical claim — Phase 2's ReactiveDepGraph populates
+      // listener.deps even for template @event bindings).
+      const depsLiteral = renderDepArray(listener.deps, ctx.ir);
+      const injection = `const ${wrapName} = ${desc.helperName}(${originalHandlerCode}, ${depsLiteral}${argList ? ', ' + argList : ''});`;
       scriptInjection = injection;
       handlerRef = wrapName;
       continue;

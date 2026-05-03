@@ -63,20 +63,24 @@ describe('emitScript — behavior', () => {
       react: new ReactImportCollector(),
       runtime: new RuntimeReactImportCollector(),
     };
-    const { hookSection } = emitScript(ir, collectors);
+    const { hookSection, lifecycleEffectsSection } = emitScript(ir, collectors);
 
-    // Module-let auto-hoisted to useRef('')
+    // Module-let auto-hoisted to useRef('') — still in hookSection
     expect(hookSection).toMatch(/const savedBodyOverflow\s*=\s*useRef\(\s*['"]['"]\s*\)/);
 
-    // ONE useEffect for the (lockScroll, unlockScroll) pair (REACT-T-06)
-    const useEffectMatches = hookSection.match(/useEffect\(/g) ?? [];
+    // Plan 04-04: lifecycle useEffects moved out of hookSection into
+    // lifecycleEffectsSection (placed AFTER user arrows by emitReact) so
+    // const-arrow / useCallback helpers from userArrowsSection are in scope
+    // when the dep array literal evaluates. Eliminates Plan 04-03 deferred
+    // TDZ limitation #1.
+    const useEffectMatches = lifecycleEffectsSection.match(/useEffect\(/g) ?? [];
     expect(useEffectMatches.length).toBeGreaterThanOrEqual(1);
     // Modal has 2 lifecycle hooks: paired (lockScroll, unlockScroll) and
     // standalone $onMount(arrow with $refs.dialogEl?.focus()).
     expect(useEffectMatches.length).toBe(2);
 
     // Cleanup is wired via `return () => unlockScroll();` inside the paired useEffect
-    expect(hookSection).toMatch(/return\s*\(\s*\)\s*=>\s*unlockScroll\(\)/);
+    expect(lifecycleEffectsSection).toMatch(/return\s*\(\s*\)\s*=>\s*unlockScroll\(\)/);
 
     expect(collectors.react.has('useRef')).toBe(true);
     expect(collectors.react.has('useEffect')).toBe(true);

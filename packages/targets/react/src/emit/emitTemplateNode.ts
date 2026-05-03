@@ -237,13 +237,29 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
 
 /**
  * Emit all template @event listeners on an element.
+ *
+ * **Plan 04-04 dispatcher-merge** (Plan 04-03 deferred limitation #2):
+ * Multiple `@event` bindings on the SAME element that resolve to the SAME
+ * JSX prop name (e.g., `@keydown.enter` + `@keydown.escape` both map to
+ * `onKeyDown`) are combined into a single dispatcher arrow:
+ *
+ *   onKeyDown={(e) => {
+ *     // Branch 1 (from @keydown.enter):
+ *     if (e.key === 'Enter') { onSearch(e); return; }
+ *     // Branch 2 (from @keydown.escape):
+ *     if (e.key === 'Escape') { clear(e); return; }
+ *   }}
+ *
+ * Without this merge, JSX silently keeps only the LAST attribute when keys
+ * collide — losing the first listener and producing surprising behavior.
  */
 function emitElementEvents(node: TemplateElementIR, ctx: EmitNodeCtx): string {
   if (node.events.length === 0) return '';
-  const out: string[] = [];
+
+  // Pass 1: emit each listener individually. Capture jsxName + handler body.
+  type EmittedAttr = { jsxName: string; body: string };
+  const emitted: EmittedAttr[] = [];
   for (const ev of node.events) {
-    // Phase 2 IR may carry null/positional placeholders for non-bound events
-    // (rare; defensive guard).
     if (ev === null || ev === undefined) continue;
     const result = emitTemplateEvent(ev, {
       ir: ctx.ir,
@@ -251,11 +267,56 @@ function emitElementEvents(node: TemplateElementIR, ctx: EmitNodeCtx): string {
       collectors: ctx.collectors,
       injectionCounter: ctx.injectionCounter,
     });
-    out.push(result.jsxAttr);
     if (result.scriptInjection !== null) {
       ctx.scriptInjections.push(result.scriptInjection);
     }
     for (const d of result.diagnostics) ctx.diagnostics.push(d);
+
+    // Parse `<jsxName>={<body>}` so we can re-group when names collide.
+    // emitTemplateEvent guarantees `${jsxName}={${handlerExpr}}`.
+    const match = result.jsxAttr.match(/^([A-Za-z][\w]*)=\{(.*)\}$/s);
+    if (!match) {
+      // Defensive — pass through unchanged if parse failed.
+      emitted.push({ jsxName: '', body: result.jsxAttr });
+      continue;
+    }
+    emitted.push({ jsxName: match[1]!, body: match[2]! });
+  }
+
+  // Pass 2: group by jsxName, preserving original order.
+  const groups = new Map<string, EmittedAttr[]>();
+  const order: string[] = [];
+  for (const e of emitted) {
+    if (!groups.has(e.jsxName)) {
+      groups.set(e.jsxName, []);
+      order.push(e.jsxName);
+    }
+    groups.get(e.jsxName)!.push(e);
+  }
+
+  const out: string[] = [];
+  for (const name of order) {
+    const items = groups.get(name)!;
+    if (items.length === 1) {
+      const it = items[0]!;
+      if (it.jsxName === '') out.push(it.body);
+      else out.push(`${it.jsxName}={${it.body}}`);
+      continue;
+    }
+    // Multi-listener merge: build a dispatcher arrow that calls each branch
+    // in source order. Each `body` is a handler expression — wrap it so the
+    // event arg `e` is forwarded.
+    const branches = items.map((it) => {
+      const body = it.body;
+      // If body is a plain identifier (e.g. `close`), call as `body(e)`.
+      // If body is an arrow `(e) => {...}`, invoke as `(body)(e)`.
+      if (/^[A-Za-z_$][\w$]*$/.test(body)) {
+        return `${body}(e);`;
+      }
+      return `(${body})(e);`;
+    });
+    const dispatcher = `(e) => { ${branches.join(' ')} }`;
+    out.push(`${name}={${dispatcher}}`);
   }
   return out.join(' ');
 }

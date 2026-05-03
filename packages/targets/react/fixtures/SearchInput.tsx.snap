@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDebouncedCallback } from '@rozie/runtime-react';
 
 interface SearchInputProps {
@@ -13,6 +13,17 @@ export default function SearchInput(props: SearchInputProps): JSX.Element {
   const [query, setQuery] = useState('');
   const inputEl = useRef<HTMLInputElement | null>(null);
   const isValid = useMemo(() => query.length >= props.minLength, [props.minLength, query]);
+
+  const { onSearch: _rozieProp_onSearch } = props;
+    const onSearch = useCallback(() => {
+    if (isValid) _rozieProp_onSearch && _rozieProp_onSearch(query);
+  }, [_rozieProp_onSearch, isValid, query]);
+  const { onClear: _rozieProp_onClear } = props;
+    const clear = useCallback(() => {
+    setQuery('');
+    _rozieProp_onClear && _rozieProp_onClear();
+  }, [_rozieProp_onClear]);
+
   useEffect(() => {
     if (props.autofocus) inputEl.current?.focus();
 
@@ -23,21 +34,13 @@ export default function SearchInput(props: SearchInputProps): JSX.Element {
     };
   }, [props.autofocus]);
 
-  const onSearch = () => {
-    if (isValid) props.onSearch?.(query);
-  };
-  const clear = () => {
-    setQuery('');
-    props.onClear?.();
-  };
-
-  const _rozieDebouncedOnSearch = useDebouncedCallback(onSearch, [], 300);
+  const _rozieDebouncedOnSearch = useDebouncedCallback(onSearch, [onSearch], 300);
 
   return (
     <>
     <div className={styles["search-input"]}>
       
-      <input ref={inputEl} type="search" placeholder={props.placeholder} value={query} onChange={e => setQuery(e.target.value)} onInput={_rozieDebouncedOnSearch} onKeyDown={(e) => { if (e.key !== 'Enter') return; onSearch(e); }} onKeyDown={(e) => { if (e.key !== 'Escape') return; clear(e); }} />
+      <input ref={inputEl} type="search" placeholder={props.placeholder} value={query} onChange={e => setQuery(e.target.value)} onInput={_rozieDebouncedOnSearch} onKeyDown={(e) => { ((e) => { if (e.key !== 'Enter') return; onSearch(e); })(e); ((e) => { if (e.key !== 'Escape') return; clear(e); })(e); }} />
 
       {query.length > 0 ? <button className={styles["clear-btn"]} aria-label="Clear" onClick={clear}>
         ×

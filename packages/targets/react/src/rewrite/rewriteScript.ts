@@ -293,10 +293,21 @@ export function rewriteRozieIdentifiers(
         .filter((a) => !t.isJSXNamespacedName(a)) as Array<
         t.Expression | t.SpreadElement | t.ArgumentPlaceholder
       >;
-      const replacement = t.optionalCallExpression(
-        t.memberExpression(t.identifier('props'), t.identifier(propName)),
-        restArgs,
-        true,
+      // Plan 04-04 lint-clean fix — `props.onClose?.()` (OptionalCallExpression
+      // of OptionalMemberExpression) confuses eslint-plugin-react-hooks v5's
+      // exhaustive-deps narrowing: the deps array entry `props.onClose` is a
+      // plain MemberExpression but the body's optional chain doesn't structurally
+      // match, so the lint rule warns "missing dependency: props". Workaround:
+      // emit a logical-AND guard `props.onClose && props.onClose(...)` which
+      // uses MemberExpression on both sides — matches deps[] entry exactly.
+      const memberExpr = t.memberExpression(
+        t.identifier('props'),
+        t.identifier(propName),
+      );
+      const replacement = t.logicalExpression(
+        '&&',
+        memberExpr,
+        t.callExpression(t.cloneNode(memberExpr), restArgs),
       );
       path.replaceWith(replacement);
     },

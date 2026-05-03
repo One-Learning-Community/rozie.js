@@ -122,6 +122,7 @@ function pairLifecycleHooks(
       }
 
       // Adjacent merge with following $onUnmount (T-2-05-05).
+      let mergedSetupDeps = setupDeps;
       if (
         entry.phase === 'mount' &&
         cleanup === undefined &&
@@ -132,6 +133,21 @@ function pairLifecycleHooks(
         if (next.phase === 'unmount') {
           cleanup = next.callback;
           consumed.add(i + 1);
+          // Plan 04-04 Rule 2 — merge cleanup deps so React useEffect dep array
+          // is exhaustive-deps lint-clean. Without this, `useEffect(() => {
+          // setup; return cleanup; }, [setup])` triggers
+          // "missing dependency: cleanup".
+          const cleanupDeps = [
+            ...depGraph.forNodeOrEmpty(`lifecycle.${i + 1}.setup`),
+          ];
+          const seen = new Set(setupDeps.map((d) => JSON.stringify(d)));
+          mergedSetupDeps = [...setupDeps];
+          for (const d of cleanupDeps) {
+            const key = JSON.stringify(d);
+            if (seen.has(key)) continue;
+            seen.add(key);
+            mergedSetupDeps.push(d);
+          }
         }
       }
 
@@ -140,7 +156,7 @@ function pairLifecycleHooks(
         phase: entry.phase,
         setup,
         ...(cleanup !== undefined ? { cleanup } : {}),
-        setupDeps,
+        setupDeps: mergedSetupDeps,
         sourceLoc: entry.sourceLoc,
       });
     } else {

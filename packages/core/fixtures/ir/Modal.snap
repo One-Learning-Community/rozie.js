@@ -361,6 +361,10 @@
         {
           "scope": "closure",
           "identifier": "lockScroll"
+        },
+        {
+          "scope": "closure",
+          "identifier": "unlockScroll"
         }
       ],
       "sourceLoc": {
@@ -642,6 +646,18 @@
         "name": "close"
       },
       "deps": [
+        {
+          "scope": "props",
+          "path": [
+            "open"
+          ]
+        },
+        {
+          "scope": "props",
+          "path": [
+            "closeOnEscape"
+          ]
+        },
         {
           "scope": "closure",
           "identifier": "close"

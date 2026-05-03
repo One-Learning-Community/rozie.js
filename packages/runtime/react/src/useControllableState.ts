@@ -65,21 +65,35 @@ export function useControllableState<T>(
 
   const currentValue = isControlled ? (value as T) : uncontrolledValue;
 
-  // setValue is stable across renders modulo its dep set so consumers can
-  // safely include it in `useEffect` dep arrays without re-firing on every
-  // render. The deps are exactly the values referenced inside the closure.
+  // **Identity-stable setValue** (REACT-T-03 floor) — consumers include
+  // `setValue` in useEffect dep arrays expecting `useState`-setter
+  // semantics: same identity across every render. We achieve this by:
+  //   1. Storing the latest `currentValue`, `isControlled`, and
+  //      `onValueChange` in refs (updated every render)
+  //   2. Building setValue via `useCallback(..., [])` so identity never changes
+  //   3. Reading from the refs inside the callback so it always sees the
+  //      LATEST value (D-61 stale-closure defense)
+  // This gives consumers a setValue that BOTH (a) has stable identity for
+  // exhaustive-deps lint and (b) always reads fresh closure values.
+  const currentValueRef = useRef(currentValue);
+  const isControlledRef = useRef(isControlled);
+  const onValueChangeRef = useRef(onValueChange);
+  currentValueRef.current = currentValue;
+  isControlledRef.current = isControlled;
+  onValueChangeRef.current = onValueChange;
+
   const setValue = useCallback(
     (next: T | ((prev: T) => T)) => {
       const resolved =
         typeof next === 'function'
-          ? (next as (prev: T) => T)(currentValue)
+          ? (next as (prev: T) => T)(currentValueRef.current)
           : next;
-      if (!isControlled) {
+      if (!isControlledRef.current) {
         setUncontrolledValue(resolved);
       }
-      onValueChange?.(resolved);
+      onValueChangeRef.current?.(resolved);
     },
-    [currentValue, isControlled, onValueChange],
+    [],
   );
 
   return [currentValue, setValue];

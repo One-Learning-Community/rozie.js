@@ -19,6 +19,7 @@ import { createDefaultRegistry } from '../../../core/src/modifiers/registerBuilt
 import { emitScript } from './emit/emitScript.js';
 import { emitPropsInterface } from './emit/emitPropsInterface.js';
 import { emitTemplate } from './emit/emitTemplate.js';
+import { emitListeners } from './emit/emitListeners.js';
 import { buildShell } from './emit/shell.js';
 import {
   ReactImportCollector,
@@ -47,13 +48,23 @@ export function emitReact(
   const runtimeImports = new RuntimeReactImportCollector();
   const registry = opts.modifierRegistry ?? createDefaultRegistry();
 
-  const { hookSection, userArrowsSection, diagnostics: scriptDiags } = emitScript(
+  const { hookSection, userArrowsSection, lifecycleEffectsSection, diagnostics: scriptDiags } = emitScript(
     ir,
     { react: reactImports, runtime: runtimeImports },
   );
 
   // Plan 04-03: emit the template-side JSX, slot-prop fields + ctx interfaces.
   const tmpl = emitTemplate(
+    ir,
+    { react: reactImports, runtime: runtimeImports },
+    registry,
+  );
+
+  // Plan 04-04: emit <listeners>-block entries (4-class A/B/C/D classifier).
+  // Returns useEffect/useOutsideClick blocks (`code`) and Class C wrapper consts
+  // (`scriptInjections`) that need to land AFTER user arrows. shell.ts already
+  // slots scriptInjections AFTER user arrows per Wave 0 spike Variant A.
+  const listeners = emitListeners(
     ir,
     { react: reactImports, runtime: runtimeImports },
     registry,
@@ -75,10 +86,22 @@ export function emitReact(
   const cssModuleImport = null;
   const globalCssImport = null;
 
-  // Plan 04-02 composition: hooks immediately followed by user arrows.
-  // Plan 04-04 will replace this with the interleaved order:
-  //   hookSection → userArrowsSection → listener wrapper consts → listener useEffects
-  const script = [hookSection, userArrowsSection].filter((s) => s.length > 0).join('\n\n');
+  // Plan 04-04 composition order (Wave 0 spike Variant A):
+  //   hookSection (state hooks)
+  //     → userArrowsSection (useCallback wraps + plain helpers + computed)
+  //     → lifecycleEffectsSection (lifecycle useEffects — moved here per
+  //        Plan 04-04 to fix Plan 04-03 deferred TDZ limitation #1)
+  //     → wrapper consts (`scriptInjections`, template + listener)
+  //     → listener useEffect blocks (`listenerEffects`)
+  //     → return JSX
+  // Wrapper consts and lifecycle effects must be in scope when their dep
+  // arrays evaluate, so all hooks-that-reference-helpers go AFTER
+  // userArrowsSection.
+  const script = [hookSection, userArrowsSection, lifecycleEffectsSection]
+    .filter((s) => s.length > 0)
+    .join('\n\n');
+
+  const allScriptInjections = [...tmpl.scriptInjections, ...listeners.scriptInjections];
 
   const ms = buildShell({
     componentName: ir.name,
@@ -89,8 +112,9 @@ export function emitReact(
     cssModuleImport,
     globalCssImport,
     ctxInterfaces: tmpl.slotCtxInterfaces,
-    scriptInjections: tmpl.scriptInjections,
+    scriptInjections: allScriptInjections,
     script,
+    listenerEffects: listeners.code,
     jsx: tmpl.jsx,
   });
 
@@ -98,6 +122,6 @@ export function emitReact(
     code: ms.toString(),
     css: '', // Plan 04-05 fills
     map: null, // Plan 04-05 wires composeSourceMap
-    diagnostics: [...scriptDiags, ...tmpl.diagnostics],
+    diagnostics: [...scriptDiags, ...tmpl.diagnostics, ...listeners.diagnostics],
   };
 }

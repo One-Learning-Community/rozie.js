@@ -88,12 +88,13 @@ describe('rewriteRozieIdentifiers (React)', () => {
     expect(code).not.toContain('$data.');
   });
 
-  it('SearchInput: $emit("search", q) → props.onSearch?.(q) optional chain', () => {
+  it('SearchInput: $emit("search", q) → props.onSearch && props.onSearch(q) (Plan 04-04 lint fix)', () => {
+    // Plan 04-04 changed $emit emission from optional chain to logical-AND
+    // guard so eslint-plugin-react-hooks v5 narrows the deps[] entry
+    // structurally (MemberExpression on both sides). See rewriteScript.ts.
     const { code } = rewriteAndGenerate('SearchInput');
-    // onSearch defined as: $emit('search', $data.query) → props.onSearch?.(query)
-    expect(code).toMatch(/props\.onSearch\?\.\(/);
-    // clear(): $emit('clear') → props.onClear?.()
-    expect(code).toMatch(/props\.onClear\?\.\(\s*\)/);
+    expect(code).toMatch(/props\.onSearch\s*&&\s*props\.onSearch\(/);
+    expect(code).toMatch(/props\.onClear\s*&&\s*props\.onClear\(\s*\)/);
     expect(code).not.toContain('$emit');
   });
 
@@ -104,9 +105,13 @@ describe('rewriteRozieIdentifiers (React)', () => {
     expect(code).not.toContain('$refs.');
   });
 
-  it('Modal: $emit("close") → props.onClose?.()', () => {
+  it('Modal: $emit("close") → props.onClose && props.onClose() (Plan 04-04 lint fix)', () => {
+    // Plan 04-04 changed $emit emission from `props.onX?.()` to
+    // `props.onX && props.onX()` to satisfy eslint-plugin-react-hooks v5
+    // exhaustive-deps narrowing (see rewriteScript.ts $emit handler).
     const { code } = rewriteAndGenerate('Modal');
-    expect(code).toMatch(/props\.onClose\?\.\(\s*\)/);
+    expect(code).toMatch(/props\.onClose\s*&&\s*props\.onClose\(\s*\)/);
+    expect(code).not.toContain('$emit');
   });
 
   it('console.log inside <script> survives verbatim (DX-03)', () => {

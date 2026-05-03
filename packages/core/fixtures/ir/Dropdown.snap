@@ -528,6 +528,18 @@
       },
       "deps": [
         {
+          "scope": "props",
+          "path": [
+            "open"
+          ]
+        },
+        {
+          "scope": "props",
+          "path": [
+            "closeOnOutsideClick"
+          ]
+        },
+        {
           "scope": "closure",
           "identifier": "close"
         }
@@ -679,6 +691,18 @@
       },
       "deps": [
         {
+          "scope": "props",
+          "path": [
+            "open"
+          ]
+        },
+        {
+          "scope": "props",
+          "path": [
+            "closeOnEscape"
+          ]
+        },
+        {
           "scope": "closure",
           "identifier": "close"
         }
@@ -792,6 +816,12 @@
         "name": "reposition"
       },
       "deps": [
+        {
+          "scope": "props",
+          "path": [
+            "open"
+          ]
+        },
         {
           "scope": "closure",
           "identifier": "reposition"

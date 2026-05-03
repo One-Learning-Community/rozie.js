@@ -155,7 +155,23 @@ export function lowerListeners(
     // parser already rejected truly malformed listener entries (ROZ013).
     const handler = handlerExpr ?? t.identifier('undefined');
 
-    const deps = [...depGraph.forNodeOrEmpty(`listener.${idx}.handler`)];
+    // Plan 04-04 Rule 2 (Bug fix): merge `when` deps into `Listener.deps`.
+    // Phase 2's buildDepGraph already computes `listener.{idx}.when` deps but
+    // lowerListeners previously only consumed the handler set. The React
+    // emitter needs the union — both `when` and the handler appear inside the
+    // useEffect closure, so exhaustive-deps requires both sets in deps[].
+    // De-dupe via a Set of stringified SignalRefs (preserves the first
+    // occurrence of structurally identical deps).
+    const handlerDeps = [...depGraph.forNodeOrEmpty(`listener.${idx}.handler`)];
+    const whenDeps = [...depGraph.forNodeOrEmpty(`listener.${idx}.when`)];
+    const seen = new Set<string>();
+    const deps = [];
+    for (const d of [...whenDeps, ...handlerDeps]) {
+      const key = JSON.stringify(d);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      deps.push(d);
+    }
 
     out.push({
       type: 'Listener',
