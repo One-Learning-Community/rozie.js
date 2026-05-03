@@ -14,5 +14,5 @@
     "types": ["react", "node"]
   },
   "include": ["src/**/*", "src/**/*.tsx"],
-  "exclude": ["dist", "node_modules", "tests", "fixtures"]
+  "exclude": ["dist", "node_modules", "tests", "fixtures", "src/__tests__"]
 }

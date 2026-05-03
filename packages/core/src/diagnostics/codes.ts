@@ -89,15 +89,15 @@ export const RozieErrorCode = {
   UNPLUGIN_REACT_PLUGIN_CHAIN_MISORDER: 'ROZ502', // detected plugin-react/swc lacking; D-58 chain broken (no enforce: 'pre' on @rozie/unplugin)
 
   // ---- @rozie/target-react lowering errors (Phase 4 D-63) — ROZ520..ROZ549 ----
-  TARGET_REACT_HTML_WITH_CHILDREN: 'ROZ520', // r-html element has children — React's dangerouslySetInnerHTML disallows (Pitfall 10)
-  TARGET_REACT_NESTED_STATE_MUTATION: 'ROZ521', // $data.foo.bar = expr — React state must be immutable (Pitfall 7)
-  TARGET_REACT_MODULE_LET_HOISTED: 'ROZ522', // module-scoped `let X` referenced from lifecycle setup — auto-hoisted to useRef per Pitfall 3 spike resolution
-  TARGET_REACT_MODULE_LET_UNHOISTABLE: 'ROZ523', // module-scoped `let X` cannot be auto-hoisted (indirect ref via helper-fn) — user must refactor
+  TARGET_REACT_RHTML_WITH_CHILDREN: 'ROZ520', // r-html with children — React's dangerouslySetInnerHTML can't coexist with children (Pitfall 10)
+  TARGET_REACT_NESTED_STATE_MUTATION: 'ROZ521', // Pitfall 7 — $data.foo.bar = 'x' nested member writes; v1 warns + leaves AST unchanged
+  TARGET_REACT_MODULE_LET_AUTO_HOISTED: 'ROZ522', // Pitfall 3/8 — module-scoped `let X` referenced from LifecycleHook setup auto-hoisted to useRef
+  TARGET_REACT_MODULE_LET_UNHOISTABLE: 'ROZ523', // Pitfall 3/8 — module-scoped `let X` referenced too indirectly to safely auto-hoist; user must refactor
 
   // ---- @rozie/runtime-react warnings (Phase 4 D-63) — ROZ550..ROZ579 ----
-  RUNTIME_REACT_USECONTROLLABLESTATE_MODE_FLIP: 'ROZ550', // useControllableState parent-flip warning per D-57
+  RUNTIME_REACT_CONTROLLABLE_MODE_FLIP: 'ROZ550', // D-57 — useControllableState detected parent flipping controlled/uncontrolled mid-lifecycle
 
-  // ---- Phase 4 emitter warnings — ROZ580..ROZ599 (Phase 7 hardening) ----
+  // ---- ROZ580..ROZ599 reserved for Phase 7 hardening ----
 
   // ---- Phase 5+ target emitters take ROZ600+ ----
 } as const;
