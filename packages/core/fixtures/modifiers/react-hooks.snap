@@ -1,0 +1,101 @@
+{
+  "capture": {
+    "kind": "native",
+    "token": "capture"
+  },
+  "debounce": {
+    "kind": "helper",
+    "importFrom": "@rozie/runtime-react",
+    "helperName": "useDebouncedCallback",
+    "args": []
+  },
+  "delete": {
+    "kind": "inlineGuard",
+    "code": "if (e.key !== 'Delete') return;"
+  },
+  "down": {
+    "kind": "inlineGuard",
+    "code": "if (e.key !== 'ArrowDown') return;"
+  },
+  "end": {
+    "kind": "inlineGuard",
+    "code": "if (e.key !== 'End') return;"
+  },
+  "enter": {
+    "kind": "inlineGuard",
+    "code": "if (e.key !== 'Enter') return;"
+  },
+  "escape": {
+    "kind": "inlineGuard",
+    "code": "if (e.key !== 'Escape') return;"
+  },
+  "home": {
+    "kind": "inlineGuard",
+    "code": "if (e.key !== 'Home') return;"
+  },
+  "left": {
+    "kind": "inlineGuard",
+    "code": "if (e.key !== 'ArrowLeft') return;"
+  },
+  "middle": {
+    "kind": "inlineGuard",
+    "code": "if (e.key !== 'Middle') return;"
+  },
+  "once": {
+    "kind": "native",
+    "token": "once"
+  },
+  "outside": {
+    "kind": "helper",
+    "importFrom": "@rozie/runtime-react",
+    "helperName": "useOutsideClick",
+    "args": [],
+    "listenerOnly": true
+  },
+  "pageDown": {
+    "kind": "inlineGuard",
+    "code": "if (e.key !== 'PageDown') return;"
+  },
+  "pageUp": {
+    "kind": "inlineGuard",
+    "code": "if (e.key !== 'PageUp') return;"
+  },
+  "passive": {
+    "kind": "native",
+    "token": "passive"
+  },
+  "prevent": {
+    "kind": "inlineGuard",
+    "code": "e.preventDefault();"
+  },
+  "right": {
+    "kind": "inlineGuard",
+    "code": "if (e.key !== 'ArrowRight') return;"
+  },
+  "self": {
+    "kind": "inlineGuard",
+    "code": "if (e.target !== e.currentTarget) return;"
+  },
+  "space": {
+    "kind": "inlineGuard",
+    "code": "if (e.key !== ' ') return;"
+  },
+  "stop": {
+    "kind": "inlineGuard",
+    "code": "e.stopPropagation();"
+  },
+  "tab": {
+    "kind": "inlineGuard",
+    "code": "if (e.key !== 'Tab') return;"
+  },
+  "throttle": {
+    "kind": "helper",
+    "importFrom": "@rozie/runtime-react",
+    "helperName": "useThrottledCallback",
+    "args": []
+  },
+  "up": {
+    "kind": "inlineGuard",
+    "code": "if (e.key !== 'ArrowUp') return;"
+  }
+}

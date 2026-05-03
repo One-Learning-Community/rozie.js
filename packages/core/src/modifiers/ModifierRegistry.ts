@@ -93,6 +93,53 @@ export type VueEmissionDescriptor =
     };
 
 /**
+ * ReactEmissionDescriptor — D-65 tagged union returned by ModifierImpl.react?(...)
+ * for the React 18+ target emitter (Phase 4+).
+ *
+ * Three discriminants (parallels VueEmissionDescriptor with one addition):
+ *
+ * - 'native' — addEventListener option flag (capture/passive/once). React has
+ *   NO native modifier syntax (no .stop, .prevent, etc. on JSX events) — the
+ *   only "native" pass-through is the addEventListener option flag set, used
+ *   when emitting `addEventListener('click', h, { capture: true })`.
+ *
+ * - 'helper' — emit an import from `@rozie/runtime-react` and a helper call.
+ *   Helpers are React hooks (useOutsideClick, useDebouncedCallback,
+ *   useThrottledCallback) — NOT bare functions like the Vue side. React-side
+ *   helpers manage their own useEffect lifecycle internally.
+ *   `listenerOnly: true` flags modifiers (only `.outside` in v1) that are only
+ *   meaningful in <listeners> blocks; emitter rejects them on template @event.
+ *
+ * - 'inlineGuard' — NEW vs Vue. Emit a code-fragment guard expression inline
+ *   in the handler body, BEFORE the user handler runs. Used for filter-style
+ *   modifiers that have no native React equivalent (.stop, .prevent, .self,
+ *   key-filters .escape/.enter/.tab/etc.). The `code` string is inserted
+ *   verbatim into the emitted .tsx; emitter MUST guarantee the surrounding
+ *   handler has `(e)` as the event-arg name (Plan 04-03 emitTemplateEvent
+ *   normalises this) so `e.stopPropagation()` / `e.key !== 'Escape'` etc.
+ *   resolve. Example:
+ *     { kind: 'inlineGuard', code: 'e.stopPropagation();' }
+ *     { kind: 'inlineGuard', code: 'if (e.target !== e.currentTarget) return;' }
+ *     { kind: 'inlineGuard', code: "if (e.key !== 'Escape') return;" }
+ *
+ * SemVer-stable v1 per D-22b. Phase 4 freezes the registry shape; third-party
+ * plugins implementing both `vue?` and `react?` is the MOD-05 acceptance via
+ * tests/plugins/swipe/.
+ *
+ * @public — SemVer-stable per D-22b.
+ */
+export type ReactEmissionDescriptor =
+  | { kind: 'native'; token: 'capture' | 'passive' | 'once' }
+  | {
+      kind: 'helper';
+      importFrom: '@rozie/runtime-react';
+      helperName: 'useOutsideClick' | 'useDebouncedCallback' | 'useThrottledCallback';
+      args: ModifierArg[];
+      listenerOnly?: true;
+    }
+  | { kind: 'inlineGuard'; code: string };
+
+/**
  * ModifierImpl — what a modifier plugin author implements.
  *
  * `resolve()` validates args + emits diagnostics for malformed input
@@ -126,6 +173,12 @@ export interface ModifierImpl {
    * Third-party plugins MAY omit; emitter falls back to ROZ420.
    */
   vue?(args: ModifierArg[], ctx: ModifierContext): VueEmissionDescriptor;
+  /**
+   * Phase 4 D-65 — React target emission descriptor. Optional for Phase 1/2/3
+   * compatibility; Phase 4 emitter REQUIRES every builtin to implement it.
+   * Third-party plugins MAY omit; emitter falls back to ROZ520-class diagnostic.
+   */
+  react?(args: ModifierArg[], ctx: ModifierContext): ReactEmissionDescriptor;
 }
 
 /**

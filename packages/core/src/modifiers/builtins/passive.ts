@@ -40,4 +40,9 @@ export const passive: ModifierImpl = {
     // D-39 native pass-through: Vue's `.passive` matches Rozie verbatim.
     return { kind: 'native', token: 'passive' };
   },
+  react() {
+    // D-65 native: addEventListener({ passive: true }) option flag — emitter
+    // switches to raw addEventListener call style when this descriptor appears.
+    return { kind: 'native', token: 'passive' };
+  },
 };

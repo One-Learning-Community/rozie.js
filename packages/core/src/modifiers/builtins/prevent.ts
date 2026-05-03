@@ -41,4 +41,9 @@ export const prevent: ModifierImpl = {
     // D-39 native pass-through: Vue's `.prevent` matches Rozie verbatim.
     return { kind: 'native', token: 'prevent' };
   },
+  react() {
+    // D-65 inlineGuard: React JSX has no native modifier syntax for prevent —
+    // emitter inserts the side-effect call before the user handler runs.
+    return { kind: 'inlineGuard', code: 'e.preventDefault();' };
+  },
 };

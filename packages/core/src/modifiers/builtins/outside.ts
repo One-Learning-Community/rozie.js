@@ -60,4 +60,17 @@ export const outside: ModifierImpl = {
       listenerOnly: true,
     };
   },
+  react(args) {
+    // D-65 marquee helper: dispatched through @rozie/runtime-react
+    // useOutsideClick. listenerOnly because outside-click only makes sense in
+    // <listeners>; React emitter raises ROZ520-class diagnostic if encountered
+    // on a template @event.
+    return {
+      kind: 'helper',
+      importFrom: '@rozie/runtime-react',
+      helperName: 'useOutsideClick',
+      args,
+      listenerOnly: true,
+    };
+  },
 };

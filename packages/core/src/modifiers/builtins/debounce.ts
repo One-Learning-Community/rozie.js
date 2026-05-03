@@ -64,4 +64,16 @@ export const debounce: ModifierImpl = {
       args,
     };
   },
+  react(args) {
+    // D-65 + RESEARCH.md Pattern 10: React uses useDebouncedCallback
+    // (callback-shape hook), NOT a bare debounce function like Vue. The
+    // additionalHooks regex in eslint.config.js makes exhaustive-deps lint
+    // this hook the same as React's built-in useCallback.
+    return {
+      kind: 'helper',
+      importFrom: '@rozie/runtime-react',
+      helperName: 'useDebouncedCallback',
+      args,
+    };
+  },
 };

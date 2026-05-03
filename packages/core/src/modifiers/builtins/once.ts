@@ -43,4 +43,11 @@ export const once: ModifierImpl = {
     // D-39 native pass-through: Vue's `.once` matches Rozie verbatim.
     return { kind: 'native', token: 'once' };
   },
+  react() {
+    // D-65 native: addEventListener({ once: true }) option flag — emitter
+    // switches to raw addEventListener call style when this descriptor appears.
+    // (React synthetic events have no native `once` option; using the option
+    // flag means the emitter falls back to a one-shot raw addEventListener.)
+    return { kind: 'native', token: 'once' };
+  },
 };

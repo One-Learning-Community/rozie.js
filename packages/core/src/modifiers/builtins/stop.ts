@@ -41,4 +41,9 @@ export const stop: ModifierImpl = {
     // D-39 native pass-through: Vue's `.stop` matches Rozie verbatim.
     return { kind: 'native', token: 'stop' };
   },
+  react() {
+    // D-65 inlineGuard: React JSX has no native modifier syntax for stop —
+    // emitter inserts the side-effect call before the user handler runs.
+    return { kind: 'inlineGuard', code: 'e.stopPropagation();' };
+  },
 };

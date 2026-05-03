@@ -40,4 +40,9 @@ export const capture: ModifierImpl = {
     // D-39 native pass-through: Vue's `.capture` matches Rozie verbatim.
     return { kind: 'native', token: 'capture' };
   },
+  react() {
+    // D-65 native: addEventListener({ capture: true }) option flag — emitter
+    // switches to raw addEventListener call style when this descriptor appears.
+    return { kind: 'native', token: 'capture' };
+  },
 };

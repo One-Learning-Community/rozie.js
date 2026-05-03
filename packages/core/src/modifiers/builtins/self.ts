@@ -42,4 +42,12 @@ export const self: ModifierImpl = {
     // D-39 native pass-through: Vue's `.self` matches Rozie verbatim.
     return { kind: 'native', token: 'self' };
   },
+  react() {
+    // D-65 inlineGuard: React JSX has no native modifier syntax for self —
+    // emitter inserts an early-return guard before the user handler runs.
+    return {
+      kind: 'inlineGuard',
+      code: 'if (e.target !== e.currentTarget) return;',
+    };
+  },
 };

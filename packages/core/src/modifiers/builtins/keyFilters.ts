@@ -72,6 +72,43 @@ const VUE_KEY_TOKEN_MAP: Record<KeyFilterName, string> = {
   middle: 'middle',
 };
 
+/**
+ * Rozie key/button name → React KeyboardEvent.key value map (Phase 4 D-65).
+ *
+ * React uses the standard DOM `KeyboardEvent.key` strings (NOT Vue's short
+ * tokens). Notable divergences:
+ *   - Rozie's `escape` → React `'Escape'` (Vue uses `'esc'`)
+ *   - Rozie's `space`  → React `' '` (literal space character per the
+ *     KeyboardEvent.key spec)
+ *   - Rozie's `up/down/left/right` → React `'ArrowUp'/'ArrowDown'/...` when
+ *     the surrounding event is a keyboard event. Mouse-button overlap on
+ *     `left/middle/right` is disambiguated by the emitter via ctx.event;
+ *     this map covers the keyboard interpretation only.
+ *   - Rozie's `pageUp/pageDown` → React `'PageUp'/'PageDown'` (Pascal-cased
+ *     vs Vue's camelCase token)
+ *
+ * `middle` has no keyboard interpretation; the Phase 4 emitter is expected
+ * to consult ctx.event and route to a mouse-button guard (e.button === 1)
+ * for click-style events. Plan 04-03 will add the disambiguation; for v1
+ * this map provides the keyboard fallback only.
+ */
+const REACT_KEY_NAME_MAP: Record<KeyFilterName, string> = {
+  escape: 'Escape',
+  enter: 'Enter',
+  tab: 'Tab',
+  delete: 'Delete',
+  space: ' ',
+  up: 'ArrowUp',
+  down: 'ArrowDown',
+  left: 'ArrowLeft',
+  right: 'ArrowRight',
+  home: 'Home',
+  end: 'End',
+  pageUp: 'PageUp',
+  pageDown: 'PageDown',
+  middle: 'Middle', // keyboard-fallback — emitter overrides for mouse events
+};
+
 function makeFilter(name: KeyFilterName): ModifierImpl {
   return {
     name,
@@ -103,6 +140,16 @@ function makeFilter(name: KeyFilterName): ModifierImpl {
     vue() {
       // D-39 native pass-through with Rozie → Vue name remap (escape → esc).
       return { kind: 'native', token: VUE_KEY_TOKEN_MAP[name] };
+    },
+    react() {
+      // D-65 inlineGuard: React JSX has no native key-filter modifiers —
+      // emitter inserts an early-return guard checking KeyboardEvent.key
+      // against the standard DOM string for this Rozie name.
+      const reactKey = REACT_KEY_NAME_MAP[name];
+      return {
+        kind: 'inlineGuard',
+        code: `if (e.key !== '${reactKey}') return;`,
+      };
     },
   };
 }

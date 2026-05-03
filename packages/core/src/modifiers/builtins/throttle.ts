@@ -62,4 +62,14 @@ export const throttle: ModifierImpl = {
       args,
     };
   },
+  react(args) {
+    // D-65 + RESEARCH.md Pattern 10: React uses useThrottledCallback
+    // (callback-shape hook), NOT a bare throttle function like Vue.
+    return {
+      kind: 'helper',
+      importFrom: '@rozie/runtime-react',
+      helperName: 'useThrottledCallback',
+      args,
+    };
+  },
 };
