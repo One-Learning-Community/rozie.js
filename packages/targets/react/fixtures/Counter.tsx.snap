@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { clsx, useControllableState } from '@rozie/runtime-react';
+import styles from './Counter.module.css';
 
 interface CounterProps {
   value?: number;

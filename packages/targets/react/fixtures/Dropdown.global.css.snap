@@ -1,1 +1,3 @@
-<!-- placeholder; populated by toMatchFileSnapshot in plans 04-02..04-05 -->
+:root {
+  --rozie-dropdown-z: 1000;
+}

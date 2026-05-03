@@ -1,1 +1,9 @@
-<!-- placeholder; populated by toMatchFileSnapshot in plans 04-02..04-05 -->
+.dropdown { position: relative; display: inline-block; }
+.dropdown-panel {
+  position: fixed;
+  z-index: var(--rozie-dropdown-z, 1000);
+  background: white;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}

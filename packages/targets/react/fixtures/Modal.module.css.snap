@@ -1,1 +1,22 @@
-<!-- placeholder; populated by toMatchFileSnapshot in plans 04-02..04-05 -->
+.modal-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex; align-items: center; justify-content: center;
+  z-index: var(--rozie-modal-z, 2000);
+}
+.modal-dialog {
+  background: white;
+  border-radius: 8px;
+  min-width: 20rem;
+  max-width: min(90vw, 40rem);
+  max-height: 90vh;
+  display: flex; flex-direction: column;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  outline: none;
+}
+header, footer { padding: 1rem; display: flex; align-items: center; gap: 0.5rem; }
+header { border-bottom: 1px solid rgba(0, 0, 0, 0.08); }
+header h2 { flex: 1; margin: 0; font-size: 1.1rem; }
+footer { border-top: 1px solid rgba(0, 0, 0, 0.08); justify-content: flex-end; }
+.modal-body { padding: 1rem; overflow: auto; }
+.close-btn { background: none; border: none; cursor: pointer; font-size: 1.5rem; line-height: 1; }

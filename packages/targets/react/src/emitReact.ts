@@ -1,13 +1,25 @@
 /**
  * emitReact — top-level React 18+ functional-component emitter.
  *
- * Plan 04-02 (this file) wires emitScript + emitPropsInterface + shell.
- * Plan 04-03 fills in real JSX template emission.
+ * Plan 04-02 wires emitScript + emitPropsInterface + shell.
+ * Plan 04-03 fills in JSX template emission.
  * Plan 04-04 layers <listeners>-block lowering + listener wrappers between
- *   hookSection and userArrowsSection.
+ *   hookSection and userArrowsSection, plus lifecycleEffectsSection placement.
  * Plan 04-05 wires emitStyle + composeSourceMap (DX-01).
  *
  * Public surface (D-67): emitReact(ir, opts) → { code, css, globalCss?, map, diagnostics }.
+ *
+ * The CSS routing per D-53 + D-54 (Plan 04-05):
+ *   - moduleCss → emitted alongside `.tsx` as a sibling `.module.css` file
+ *     by `@rozie/unplugin`'s React-branch load hook. The `.tsx` body imports
+ *     it via `import styles from './${name}.module.css';`.
+ *   - globalCss → emitted alongside `.tsx` as a sibling `.global.css` file
+ *     when the .rozie has `:root` rules. The `.tsx` body imports it for
+ *     side effect via `import './${name}.global.css';`.
+ *
+ * Class hashing happens at Vite bundle time; emitStyle outputs UN-hashed
+ * class names. The synthetic `.module.css` extension triggers Vite's
+ * CSS-Modules pipeline naturally (see 04-05-SPIKE.md Path 2).
  *
  * @experimental — shape may change before v1.0
  */
@@ -20,7 +32,9 @@ import { emitScript } from './emit/emitScript.js';
 import { emitPropsInterface } from './emit/emitPropsInterface.js';
 import { emitTemplate } from './emit/emitTemplate.js';
 import { emitListeners } from './emit/emitListeners.js';
+import { emitStyle } from './emit/emitStyle.js';
 import { buildShell } from './emit/shell.js';
+import { composeSourceMap } from './sourcemap/compose.js';
 import {
   ReactImportCollector,
   RuntimeReactImportCollector,
@@ -34,8 +48,11 @@ export interface EmitReactOptions {
 
 export interface EmitReactResult {
   code: string;
+  /** CSS body for the sibling `.module.css` file (D-53). Empty string when no scoped rules. */
   css: string;
+  /** CSS body for the sibling `.global.css` file (D-54). Undefined when no `:root` rules. */
   globalCss?: string;
+  /** magic-string SourceMap pointing emitted .tsx positions back to .rozie source. Null when filename + source not provided. */
   map: SourceMap | null;
   diagnostics: Diagnostic[];
 }
@@ -61,14 +78,23 @@ export function emitReact(
   );
 
   // Plan 04-04: emit <listeners>-block entries (4-class A/B/C/D classifier).
-  // Returns useEffect/useOutsideClick blocks (`code`) and Class C wrapper consts
-  // (`scriptInjections`) that need to land AFTER user arrows. shell.ts already
-  // slots scriptInjections AFTER user arrows per Wave 0 spike Variant A.
   const listeners = emitListeners(
     ir,
     { react: reactImports, runtime: runtimeImports },
     registry,
   );
+
+  // Plan 04-05: emit styles per D-53 + D-54. emitStyle requires the original
+  // `.rozie` source text to slice rule bodies by absolute byte offset (the
+  // IR's StyleSection only carries StyleRule.loc, not cssText). When
+  // opts.source is missing, skip style emission entirely so back-compat with
+  // older callers (Plan 04-02 tests) is preserved.
+  const styleResult = opts.source !== undefined
+    ? emitStyle(ir.styles, opts.source)
+    : { moduleCss: '', globalCss: null as string | null, diagnostics: [] };
+  const moduleCss = styleResult.moduleCss;
+  const globalCss = styleResult.globalCss;
+  const styleDiags = styleResult.diagnostics;
 
   const propsInterface = emitPropsInterface(ir, tmpl.slotPropFields);
 
@@ -82,9 +108,13 @@ export function emitReact(
     ? "import type { ReactNode } from 'react';\n"
     : '';
 
-  // Plan 04-05 will produce these:
-  const cssModuleImport = null;
-  const globalCssImport = null;
+  // Plan 04-05: synthesize CSS Module + global CSS sibling-file imports.
+  // Path 2 chosen per 04-05-SPIKE.md (synthetic `.module.css` extension that
+  // Vite's CSS-Modules pipeline detects automatically).
+  const cssModuleImport =
+    moduleCss.length > 0 ? `import styles from './${ir.name}.module.css';` : null;
+  const globalCssImport =
+    globalCss !== null ? `import './${ir.name}.global.css';` : null;
 
   // Plan 04-04 composition order (Wave 0 spike Variant A):
   //   hookSection (state hooks)
@@ -94,9 +124,6 @@ export function emitReact(
   //     → wrapper consts (`scriptInjections`, template + listener)
   //     → listener useEffect blocks (`listenerEffects`)
   //     → return JSX
-  // Wrapper consts and lifecycle effects must be in scope when their dep
-  // arrays evaluate, so all hooks-that-reference-helpers go AFTER
-  // userArrowsSection.
   const script = [hookSection, userArrowsSection, lifecycleEffectsSection]
     .filter((s) => s.length > 0)
     .join('\n\n');
@@ -118,10 +145,19 @@ export function emitReact(
     jsx: tmpl.jsx,
   });
 
+  const code = ms.toString();
+
+  // Plan 04-05: produce a real source map when filename + source are provided.
+  const map =
+    opts.filename !== undefined && opts.source !== undefined
+      ? composeSourceMap(ms, { filename: opts.filename, source: opts.source })
+      : null;
+
   return {
-    code: ms.toString(),
-    css: '', // Plan 04-05 fills
-    map: null, // Plan 04-05 wires composeSourceMap
-    diagnostics: [...scriptDiags, ...tmpl.diagnostics, ...listeners.diagnostics],
+    code,
+    css: moduleCss,
+    globalCss: globalCss ?? undefined,
+    map,
+    diagnostics: [...scriptDiags, ...tmpl.diagnostics, ...listeners.diagnostics, ...styleDiags],
   };
 }

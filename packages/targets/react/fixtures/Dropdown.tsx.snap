@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { useControllableState, useOutsideClick, useThrottledCallback } from '@rozie/runtime-react';
+import styles from './Dropdown.module.css';
+import './Dropdown.global.css';
 
 interface TriggerCtx { open: any; toggle: any; }
 

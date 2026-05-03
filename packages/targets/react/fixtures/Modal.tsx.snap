@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { useControllableState } from '@rozie/runtime-react';
+import styles from './Modal.module.css';
+import './Modal.global.css';
 
 interface HeaderCtx { close: any; }
 

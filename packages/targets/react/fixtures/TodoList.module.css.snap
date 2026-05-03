@@ -1,1 +1,6 @@
-<!-- placeholder; populated by toMatchFileSnapshot in plans 04-02..04-05 -->
+.todo-list { font-family: system-ui, sans-serif; }
+ul { list-style: none; padding: 0; }
+li { display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0; }
+li.done span { text-decoration: line-through; opacity: 0.5; }
+.empty { color: rgba(0, 0, 0, 0.4); font-style: italic; }
+form { display: flex; gap: 0.25rem; margin-block: 0.5rem; }

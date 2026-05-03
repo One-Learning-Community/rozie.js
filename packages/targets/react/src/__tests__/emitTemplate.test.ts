@@ -40,6 +40,19 @@ function lowerExample(name: string): IRComponent {
   return lowered.ir;
 }
 
+/**
+ * Plan 04-05: snapshot tests pass source through so emitStyle wires the
+ * `import styles from './X.module.css';` line at the top of each .tsx fixture.
+ */
+function lowerExampleWithSource(name: string): { ir: IRComponent; src: string } {
+  const src = readFileSync(resolve(EXAMPLES, `${name}.rozie`), 'utf8');
+  const result = parse(src, { filename: `${name}.rozie` });
+  if (!result.ast) throw new Error(`parse failed for ${name}`);
+  const lowered = lowerToIR(result.ast, { modifierRegistry: createDefaultRegistry() });
+  if (!lowered.ir) throw new Error(`lower failed for ${name}`);
+  return { ir: lowered.ir, src };
+}
+
 function emit(ir: IRComponent) {
   const collectors = {
     react: new ReactImportCollector(),
@@ -171,41 +184,53 @@ const toggle = () => {}
   });
 });
 
-describe('Whole-tsx fixture snapshots — Plan 04-03 Task 3', () => {
+describe('Whole-tsx fixture snapshots — Plan 04-03 Task 3 + Plan 04-05 CSS imports', () => {
   it('Counter.tsx snapshot', async () => {
-    const ir = lowerExample('Counter');
-    const { code } = emitReact(ir);
+    const { ir, src } = lowerExampleWithSource('Counter');
+    const { code } = emitReact(ir, { filename: 'Counter.rozie', source: src });
     expect(code).toContain('className=');
     expect(code).not.toContain('return null;');
     expect(code).toContain('return (');
+    // Plan 04-05: CSS Module sibling import emitted because Counter has scoped rules.
+    expect(code).toContain("import styles from './Counter.module.css';");
+    // Counter has NO :root → no global CSS sibling import.
+    expect(code).not.toContain("import './Counter.global.css';");
     await expect(code).toMatchFileSnapshot(resolve(FIXTURES, 'Counter.tsx.snap'));
   });
 
   it('SearchInput.tsx snapshot', async () => {
-    const ir = lowerExample('SearchInput');
-    const { code } = emitReact(ir);
+    const { ir, src } = lowerExampleWithSource('SearchInput');
+    const { code } = emitReact(ir, { filename: 'SearchInput.rozie', source: src });
     expect(code).toContain('value={query}');
     expect(code).toContain('onChange=');
+    expect(code).toContain("import styles from './SearchInput.module.css';");
     await expect(code).toMatchFileSnapshot(resolve(FIXTURES, 'SearchInput.tsx.snap'));
   });
 
   it('Dropdown.tsx snapshot — REACT-T-04 / REACT-T-07 anchor', async () => {
-    const ir = lowerExample('Dropdown');
-    const { code } = emitReact(ir);
+    const { ir, src } = lowerExampleWithSource('Dropdown');
+    const { code } = emitReact(ir, { filename: 'Dropdown.rozie', source: src });
     expect(code).toContain('renderTrigger');
+    // Plan 04-05: Dropdown has both scoped rules AND :root rules → both imports.
+    expect(code).toContain("import styles from './Dropdown.module.css';");
+    expect(code).toContain("import './Dropdown.global.css';");
     await expect(code).toMatchFileSnapshot(resolve(FIXTURES, 'Dropdown.tsx.snap'));
   });
 
   it('TodoList.tsx snapshot — items.map + slot-with-params anchor', async () => {
-    const ir = lowerExample('TodoList');
-    const { code } = emitReact(ir);
+    const { ir, src } = lowerExampleWithSource('TodoList');
+    const { code } = emitReact(ir, { filename: 'TodoList.rozie', source: src });
     expect(code).toMatch(/\.map\(/);
+    expect(code).toContain("import styles from './TodoList.module.css';");
     await expect(code).toMatchFileSnapshot(resolve(FIXTURES, 'TodoList.tsx.snap'));
   });
 
   it('Modal.tsx snapshot', async () => {
-    const ir = lowerExample('Modal');
-    const { code } = emitReact(ir);
+    const { ir, src } = lowerExampleWithSource('Modal');
+    const { code } = emitReact(ir, { filename: 'Modal.rozie', source: src });
+    // Plan 04-05: Modal has both scoped rules AND :root rules → both imports.
+    expect(code).toContain("import styles from './Modal.module.css';");
+    expect(code).toContain("import './Modal.global.css';");
     await expect(code).toMatchFileSnapshot(resolve(FIXTURES, 'Modal.tsx.snap'));
   });
 });
