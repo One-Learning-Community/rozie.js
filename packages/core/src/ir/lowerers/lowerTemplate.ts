@@ -385,13 +385,22 @@ function lowerBareElement(
     }
 
     if (attr.kind === 'directive') {
-      // r-model is preserved as a binding for the emitter to expand into a
-      // value+input pair.
-      if (attr.name === 'model' && attr.value !== null) {
+      // r-model / r-show / r-html / r-text are preserved as binding
+      // attributes (named with the `r-` prefix) for downstream emitters to
+      // expand into target-specific output. r-if/r-else/r-else-if/r-for
+      // are handled structurally at the parent walker (they wrap the
+      // element in a TemplateConditional / TemplateLoop).
+      if (
+        (attr.name === 'model' ||
+          attr.name === 'show' ||
+          attr.name === 'html' ||
+          attr.name === 'text') &&
+        attr.value !== null
+      ) {
         const expr = tryParseExpression(attr.value);
         attributes.push({
           kind: 'binding',
-          name: 'r-model',
+          name: `r-${attr.name}`,
           expression: expr ?? t.identifier('undefined'),
           deps: expr ? computeExpressionDeps(expr, bindings) : [],
           sourceLoc: attr.loc,
