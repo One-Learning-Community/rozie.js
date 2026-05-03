@@ -242,6 +242,9 @@ function emitElementEvents(node: TemplateElementIR, ctx: EmitNodeCtx): string {
   if (node.events.length === 0) return '';
   const out: string[] = [];
   for (const ev of node.events) {
+    // Phase 2 IR may carry null/positional placeholders for non-bound events
+    // (rare; defensive guard).
+    if (ev === null || ev === undefined) continue;
     const result = emitTemplateEvent(ev, {
       ir: ctx.ir,
       registry: ctx.registry,
