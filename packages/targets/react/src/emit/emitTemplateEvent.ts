@@ -59,11 +59,128 @@ export interface EmitTemplateEventResult {
 }
 
 /**
+ * Map of well-known DOM events whose React JSX prop name does not equal
+ * `on${Capitalize<eventName>}` (e.g., the source event `mouseenter` ends up
+ * as the JSX prop `onMouseEnter`, not `onMouseenter`).
+ *
+ * Source: React DOM SyntheticEvent surface — these are the camelCase forms
+ * React expects on JSX props for native DOM events that are themselves
+ * lowercase compound words.
+ */
+const EVENT_NAME_TO_JSX_PROP: Readonly<Record<string, string>> = {
+  // Mouse
+  click: 'onClick',
+  dblclick: 'onDoubleClick',
+  mousedown: 'onMouseDown',
+  mouseup: 'onMouseUp',
+  mousemove: 'onMouseMove',
+  mouseover: 'onMouseOver',
+  mouseout: 'onMouseOut',
+  mouseenter: 'onMouseEnter',
+  mouseleave: 'onMouseLeave',
+  contextmenu: 'onContextMenu',
+  // Wheel
+  wheel: 'onWheel',
+  // Keyboard
+  keydown: 'onKeyDown',
+  keyup: 'onKeyUp',
+  keypress: 'onKeyPress',
+  // Form
+  change: 'onChange',
+  input: 'onInput',
+  invalid: 'onInvalid',
+  reset: 'onReset',
+  submit: 'onSubmit',
+  // Focus
+  focus: 'onFocus',
+  blur: 'onBlur',
+  focusin: 'onFocusIn',
+  focusout: 'onFocusOut',
+  // Composition
+  compositionstart: 'onCompositionStart',
+  compositionend: 'onCompositionEnd',
+  compositionupdate: 'onCompositionUpdate',
+  // Selection / Clipboard
+  select: 'onSelect',
+  copy: 'onCopy',
+  cut: 'onCut',
+  paste: 'onPaste',
+  // Touch
+  touchstart: 'onTouchStart',
+  touchend: 'onTouchEnd',
+  touchmove: 'onTouchMove',
+  touchcancel: 'onTouchCancel',
+  // Pointer
+  pointerdown: 'onPointerDown',
+  pointerup: 'onPointerUp',
+  pointermove: 'onPointerMove',
+  pointercancel: 'onPointerCancel',
+  pointerover: 'onPointerOver',
+  pointerout: 'onPointerOut',
+  pointerenter: 'onPointerEnter',
+  pointerleave: 'onPointerLeave',
+  gotpointercapture: 'onGotPointerCapture',
+  lostpointercapture: 'onLostPointerCapture',
+  // Drag & Drop
+  drag: 'onDrag',
+  dragend: 'onDragEnd',
+  dragenter: 'onDragEnter',
+  dragexit: 'onDragExit',
+  dragleave: 'onDragLeave',
+  dragover: 'onDragOver',
+  dragstart: 'onDragStart',
+  drop: 'onDrop',
+  // UI / Scroll
+  scroll: 'onScroll',
+  resize: 'onResize',
+  load: 'onLoad',
+  error: 'onError',
+  abort: 'onAbort',
+  // Media
+  canplay: 'onCanPlay',
+  canplaythrough: 'onCanPlayThrough',
+  durationchange: 'onDurationChange',
+  emptied: 'onEmptied',
+  encrypted: 'onEncrypted',
+  ended: 'onEnded',
+  loadeddata: 'onLoadedData',
+  loadedmetadata: 'onLoadedMetadata',
+  loadstart: 'onLoadStart',
+  pause: 'onPause',
+  play: 'onPlay',
+  playing: 'onPlaying',
+  progress: 'onProgress',
+  ratechange: 'onRateChange',
+  seeked: 'onSeeked',
+  seeking: 'onSeeking',
+  stalled: 'onStalled',
+  suspend: 'onSuspend',
+  timeupdate: 'onTimeUpdate',
+  volumechange: 'onVolumeChange',
+  waiting: 'onWaiting',
+  // Animation / Transition
+  animationstart: 'onAnimationStart',
+  animationend: 'onAnimationEnd',
+  animationiteration: 'onAnimationIteration',
+  transitionend: 'onTransitionEnd',
+  // Beforeinput (form/contenteditable)
+  beforeinput: 'onBeforeInput',
+};
+
+/**
  * Convert an event name (e.g., 'click', 'mouseenter') to a JSX prop (e.g.,
  * 'onClick', 'onMouseEnter'). Capture suffix is appended later if .capture
  * modifier is detected.
+ *
+ * Strategy: look up known DOM events in EVENT_NAME_TO_JSX_PROP first; for
+ * unknown names, fall back to `on${Capitalize<eventName>}` with hyphen/
+ * underscore split. This preserves backward compatibility with custom event
+ * names while fixing native events whose lowercase form would mis-camelCase.
  */
 function eventNameToJsxProp(eventName: string): string {
+  const lower = eventName.toLowerCase();
+  const mapped = EVENT_NAME_TO_JSX_PROP[lower];
+  if (mapped) return mapped;
   // Standard Web events become onXxx where Xxx is event with first letter
   // upper-cased. Hyphenated event-names (rare in JSX) get camelCased.
   const parts = eventName.split(/[-_]/).filter(Boolean);

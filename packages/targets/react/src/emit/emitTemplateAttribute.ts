@@ -72,6 +72,84 @@ function isConsumedAttribute(name: string): boolean {
 }
 
 /**
+ * Map of HTML attribute names that React expects in non-standard casing.
+ * Covers the long-tail of DOM attrs whose JSX prop name does NOT match the
+ * lowercased HTML name 1:1 (React has historically followed JS DOM property
+ * naming for these). Aria-* and data-* attributes are preserved hyphenated
+ * and not listed here.
+ */
+const HTML_TO_JSX_ATTR: Readonly<Record<string, string>> = {
+  tabindex: 'tabIndex',
+  readonly: 'readOnly',
+  maxlength: 'maxLength',
+  minlength: 'minLength',
+  for: 'htmlFor',
+  class: 'className',
+  contenteditable: 'contentEditable',
+  spellcheck: 'spellCheck',
+  autofocus: 'autoFocus',
+  autocomplete: 'autoComplete',
+  autocapitalize: 'autoCapitalize',
+  inputmode: 'inputMode',
+  enterkeyhint: 'enterKeyHint',
+  formaction: 'formAction',
+  formenctype: 'formEnctype',
+  formmethod: 'formMethod',
+  formnovalidate: 'formNoValidate',
+  formtarget: 'formTarget',
+  novalidate: 'noValidate',
+  crossorigin: 'crossOrigin',
+  referrerpolicy: 'referrerPolicy',
+  srcset: 'srcSet',
+  usemap: 'useMap',
+  rowspan: 'rowSpan',
+  colspan: 'colSpan',
+  cellpadding: 'cellPadding',
+  cellspacing: 'cellSpacing',
+  frameborder: 'frameBorder',
+  marginheight: 'marginHeight',
+  marginwidth: 'marginWidth',
+  allowfullscreen: 'allowFullScreen',
+  acceptcharset: 'acceptCharset',
+  itemprop: 'itemProp',
+  itemscope: 'itemScope',
+  itemtype: 'itemType',
+  itemid: 'itemID',
+  itemref: 'itemRef',
+  hreflang: 'hrefLang',
+  longdesc: 'longDesc',
+  datetime: 'dateTime',
+  defaultchecked: 'defaultChecked',
+  defaultvalue: 'defaultValue',
+};
+
+/**
+ * HTML attribute names whose value should be coerced to a JSX numeric
+ * expression rather than a string literal. e.g., `tabindex="-1"` → `tabIndex={-1}`.
+ */
+const NUMERIC_HTML_ATTRS: ReadonlySet<string> = new Set([
+  'tabindex',
+  'maxlength',
+  'minlength',
+  'rowspan',
+  'colspan',
+  'size',
+  'cols',
+  'rows',
+  'span',
+  'start',
+]);
+
+/**
+ * Translate a bare DOM attribute name (lowercased) to its React JSX prop
+ * name. For non-mapped names, returns the input unchanged.
+ */
+function htmlAttrToJsxName(name: string): string {
+  const lower = name.toLowerCase();
+  return HTML_TO_JSX_ATTR[lower] ?? name;
+}
+
+/**
  * kebab-case to camelCase for JSX prop name conversion.
  *   'aria-label' → 'aria-label' (preserved — JSX accepts hyphenated DOM aria/data attrs)
  *   'on-something' → not encountered (handled by emitTemplateEvent)
@@ -79,6 +157,7 @@ function isConsumedAttribute(name: string): boolean {
  *
  * For DOM elements, hyphenated `aria-*` and `data-*` are preserved. For
  * everything else, the colon-prefixed form is converted to camelCase.
+ * Then the HTML→JSX attribute alias map is applied for special-cased names.
  */
 function colonPropToJsxName(name: string): string {
   // strip the leading ':' if present
@@ -86,8 +165,12 @@ function colonPropToJsxName(name: string): string {
   // Preserve aria-/data- hyphenated form
   if (bare.startsWith('aria-') || bare.startsWith('data-')) return bare;
   // Convert kebab to camel
-  if (!bare.includes('-')) return bare;
-  return bare.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase());
+  let out = bare;
+  if (out.includes('-')) {
+    out = out.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase());
+  }
+  // Apply HTML→JSX special-case alias (tabindex → tabIndex, etc.).
+  return htmlAttrToJsxName(out);
 }
 
 /**
@@ -452,8 +535,13 @@ function emitNonClassAttribute(
     return { jsx: `className="${escapeJsxAttrLiteral(attr.value)}"`, diagnostics };
   }
   if (attr.kind === 'static') {
-    // Standard static attribute: `name="value"` — JSX preserves hyphens in DOM attrs.
-    return { jsx: `${attr.name}="${escapeJsxAttrLiteral(attr.value)}"`, diagnostics };
+    // Apply HTML→JSX alias for special-cased names (tabindex → tabIndex, etc.)
+    const jsxName = htmlAttrToJsxName(attr.name);
+    // Coerce known-numeric DOM attrs to JSX expression form: tabindex="-1" → tabIndex={-1}
+    if (NUMERIC_HTML_ATTRS.has(attr.name.toLowerCase()) && /^-?\d+(?:\.\d+)?$/.test(attr.value)) {
+      return { jsx: `${jsxName}={${attr.value}}`, diagnostics };
+    }
+    return { jsx: `${jsxName}="${escapeJsxAttrLiteral(attr.value)}"`, diagnostics };
   }
 
   if (attr.kind === 'binding') {
