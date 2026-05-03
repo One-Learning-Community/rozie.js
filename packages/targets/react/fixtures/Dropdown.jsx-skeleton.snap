@@ -1,1 +1,10 @@
-<!-- placeholder; populated by toMatchFileSnapshot in plans 04-02..04-05 -->
+<>
+<div className={styles.dropdown}>
+  <div ref={triggerEl} onClick={toggle}>
+    {props.renderTrigger?.({ open, toggle })}
+  </div>
+
+  {open && <div ref={panelEl} className={styles["dropdown-panel"]} role="menu">
+    {props.children?.({ close })}
+  </div>}</div>
+</>

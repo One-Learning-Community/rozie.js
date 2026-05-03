@@ -1,1 +1,76 @@
-<!-- placeholder; populated by toMatchFileSnapshot in plans 04-02..04-05 -->
+import { useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
+import { clsx, useControllableState } from '@rozie/runtime-react';
+
+interface HeaderCtx { remaining: any; total: any; }
+
+interface ChildrenCtx { item: any; toggle: any; remove: any; }
+
+interface TodoListProps {
+  items?: unknown[];
+  defaultValue?: unknown[];
+  onItemsChange?: (items: unknown[]) => void;
+  title?: string;
+  onAdd?: (...args: unknown[]) => void;
+  onToggle?: (...args: unknown[]) => void;
+  onRemove?: (...args: unknown[]) => void;
+  renderHeader?: (ctx: HeaderCtx) => ReactNode;
+  children?: (ctx: ChildrenCtx) => ReactNode;
+  renderEmpty?: ReactNode;
+}
+
+export default function TodoList(props: TodoListProps): JSX.Element {
+  const [items, setItems] = useControllableState({
+    value: props.items,
+    defaultValue: props.defaultValue ?? () => [],
+    onValueChange: props.onItemsChange,
+  });
+  const [draft, setDraft] = useState('');
+  const remaining = useMemo(() => items.filter(i => !i.done).length, [items]);
+
+  const add = () => {
+    const text = draft.trim();
+    if (!text) return;
+    setItems([...items, {
+      id: crypto.randomUUID(),
+      text,
+      done: false
+    }]);
+    setDraft('');
+    props.onAdd?.(text);
+  };
+  const toggle = id => {
+    setItems(items.map(i => i.id === id ? {
+      ...i,
+      done: !i.done
+    } : i));
+    props.onToggle?.(id);
+  };
+  const remove = id => {
+    setItems(items.filter(i => i.id !== id));
+    props.onRemove?.(id);
+  };
+
+  return (
+    <>
+    <div className={styles["todo-list"]}>
+      <header>
+        {props.renderHeader?.({ remaining, total: items.length })}
+      </header>
+
+      <form onSubmit={(e) => { e.preventDefault(); add(e); }}>
+        <input placeholder="What needs doing?" value={draft} onChange={e => setDraft(e.target.value)} />
+        <button type="submit" disabled={!draft.trim()}>Add</button>
+      </form>
+
+      {items.length > 0 ? <ul>
+        {items.map((item) => <li key={item.id} className={clsx({ [styles.done]: item.done })}>
+          
+          {props.children?.({ item, toggle: () => toggle(item.id), remove: () => remove(item.id) })}
+        </li>)}
+      </ul> : <p className={styles.empty}>
+        {props.renderEmpty}
+      </p>}</div>
+    </>
+  );
+}

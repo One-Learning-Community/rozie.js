@@ -1,1 +1,20 @@
-<!-- placeholder; populated by toMatchFileSnapshot in plans 04-02..04-05 -->
+<>
+<div className={styles["todo-list"]}>
+  <header>
+    {props.renderHeader?.({ remaining, total: items.length })}
+  </header>
+
+  <form onSubmit={(e) => { e.preventDefault(); add(e); }}>
+    <input placeholder="What needs doing?" value={draft} onChange={e => setDraft(e.target.value)} />
+    <button type="submit" disabled={!draft.trim()}>Add</button>
+  </form>
+
+  {items.length > 0 ? <ul>
+    {items.map((item) => <li key={item.id} className={clsx({ [styles.done]: item.done })}>
+      
+      {props.children?.({ item, toggle: () => toggle(item.id), remove: () => remove(item.id) })}
+    </li>)}
+  </ul> : <p className={styles.empty}>
+    {props.renderEmpty}
+  </p>}</div>
+</>

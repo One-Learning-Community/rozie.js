@@ -1,1 +1,7 @@
-<!-- placeholder; populated by toMatchFileSnapshot in plans 04-02..04-05 -->
+<>
+<div className={clsx(styles.counter, { [styles.hovering]: hovering })} onMouseEnter={(e) => { setHovering(true); }} onMouseLeave={(e) => { setHovering(false); }}>
+  <button disabled={!canDecrement} aria-label="Decrement" onClick={decrement}>−</button>
+  <span className={styles.value}>{value}</span>
+  <button disabled={!canIncrement} aria-label="Increment" onClick={increment}>+</button>
+</div>
+</>
