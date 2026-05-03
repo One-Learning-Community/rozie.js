@@ -107,7 +107,27 @@ export function buildShell(parts: ShellParts): MagicString {
     `export default function ${parts.componentName}(props: ${parts.componentName}Props): JSX.Element {\n`,
   );
 
-  // In-function-body scriptInjections (hook-wraps).
+  // Script (hookSection + userArrowsSection) FIRST so user-authored arrows
+  // are in scope when the hook-wrap injections reference them. The script
+  // contract from emitScript is `hookSection ++ '\n\n' ++ userArrowsSection`
+  // — all React hooks live in hookSection at the top of the function body,
+  // satisfying rules-of-hooks (top-level, unconditional, stable order).
+  if (parts.script.trim().length > 0) {
+    // Indent each line of script by 2 spaces.
+    const indented = parts.script
+      .split('\n')
+      .map((line) => (line.length > 0 ? '  ' + line : line))
+      .join('\n');
+    ms.append(indented);
+    ms.append('\n\n');
+  }
+
+  // In-function-body scriptInjections (hook-wraps like
+  // `const _rozieDebouncedOnSearch = useDebouncedCallback(onSearch, [], 300);`).
+  // Emitted AFTER the user arrows so wrap callees are in TDZ-safe scope.
+  // These are still hooks, but they appear after non-hook const decls — that
+  // is permitted by react-hooks/rules-of-hooks (no conditionals or loops
+  // between them and the function body's top).
   if (parts.scriptInjections && parts.scriptInjections.length > 0) {
     const inFn = parts.scriptInjections.filter((s) => !s.startsWith('function '));
     for (const inj of inFn) {
@@ -119,16 +139,6 @@ export function buildShell(parts: ShellParts): MagicString {
       ms.append('\n');
     }
     if (inFn.length > 0) ms.append('\n');
-  }
-
-  if (parts.script.trim().length > 0) {
-    // Indent each line of script by 2 spaces.
-    const indented = parts.script
-      .split('\n')
-      .map((line) => (line.length > 0 ? '  ' + line : line))
-      .join('\n');
-    ms.append(indented);
-    ms.append('\n\n');
   }
 
   // JSX body — wrap in `return ( ... );`.
