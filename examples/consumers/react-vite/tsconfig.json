@@ -1,0 +1,18 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "target": "ES2022",
+    "jsx": "react-jsx",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["vite/client", "react", "react-dom"],
+    "noEmit": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "strict": true,
+    "allowImportingTsExtensions": false,
+    "resolveJsonModule": true
+  },
+  "include": ["src/**/*", "src/**/*.tsx", "tests/**/*"]
+}

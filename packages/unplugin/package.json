@@ -70,18 +70,34 @@
   },
   "peerDependencies": {
     "@rozie/runtime-vue": "workspace:*",
+    "@rozie/runtime-react": "workspace:*",
     "@vitejs/plugin-vue": "^5 || ^6",
-    "vue": "^3.4"
+    "@vitejs/plugin-react": "^4 || ^5",
+    "@vitejs/plugin-react-swc": "^3 || ^4",
+    "vue": "^3.4",
+    "react": "^18.2 || ^19"
   },
   "peerDependenciesMeta": {
     "@rozie/runtime-vue": {
       "optional": false
     },
+    "@rozie/runtime-react": {
+      "optional": true
+    },
     "@vitejs/plugin-vue": {
       "optional": false
     },
+    "@vitejs/plugin-react": {
+      "optional": true
+    },
+    "@vitejs/plugin-react-swc": {
+      "optional": true
+    },
     "vue": {
       "optional": false
+    },
+    "react": {
+      "optional": true
     }
   },
   "devDependencies": {
