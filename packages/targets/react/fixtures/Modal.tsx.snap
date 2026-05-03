@@ -1,0 +1,55 @@
+import { useEffect, useRef } from 'react';
+import { useControllableState } from '@rozie/runtime-react';
+
+interface ModalProps {
+  open?: boolean;
+  defaultValue?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  closeOnEscape?: boolean;
+  closeOnBackdrop?: boolean;
+  lockBodyScroll?: boolean;
+  title?: string;
+  onClose?: (...args: unknown[]) => void;
+  renderHeader?: (ctx: unknown) => import('react').ReactNode;
+  children?: import('react').ReactNode | ((ctx: unknown) => import('react').ReactNode);
+  renderFooter?: (ctx: unknown) => import('react').ReactNode;
+}
+
+export default function Modal(props: ModalProps): JSX.Element {
+  const savedBodyOverflow = useRef('');
+  const [open, setOpen] = useControllableState({
+    value: props.open,
+    defaultValue: props.defaultValue ?? false,
+    onValueChange: props.onOpenChange,
+  });
+  const backdropEl = useRef<HTMLDivElement | null>(null);
+  const dialogEl = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    lockScroll();
+    return () => unlockScroll();
+  }, [lockScroll]);
+  useEffect(() => {
+    dialogEl.current?.focus();
+  }, [focus]);
+
+  const close = () => {
+    setOpen(false);
+    props.onClose?.();
+  };
+
+  // Body-scroll-lock state lives outside reactive data because it tracks DOM
+  // rather than UI; managed entirely via lifecycle and listeners.
+  const lockScroll = () => {
+    if (!props.lockBodyScroll) return;
+    savedBodyOverflow.current = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+  };
+  const unlockScroll = () => {
+    if (!props.lockBodyScroll) return;
+    document.body.style.overflow = savedBodyOverflow.current;
+  };
+
+  // Colocated lifecycle pair — runs in source order alongside other hooks.
+
+  return null;
+}
