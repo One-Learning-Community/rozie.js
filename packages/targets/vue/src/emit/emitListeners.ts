@@ -225,6 +225,16 @@ function classifyListener(
       continue;
     }
 
+    if (descriptor.kind === 'inlineGuard') {
+      // Plan 04-06 SemVer-additive amendment — third-party modifier inlineGuard
+      // (MOD-05 swipe dogfood). Mirrors the React side (Plan 04-04 emitListenerNative).
+      // The guard code is inserted verbatim before the user handler invocation,
+      // alongside any native key/button guards. Phase 3 builtins do NOT emit this
+      // kind, so existing fixtures remain byte-identical.
+      nativeKeyGuards.push(descriptor.code);
+      continue;
+    }
+
     // descriptor.kind === 'helper'
     if (descriptor.helperName === 'useOutsideClick') {
       outsideArgs = descriptor.args;

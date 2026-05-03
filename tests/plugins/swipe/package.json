@@ -12,6 +12,8 @@
     "@rozie/core": "workspace:*"
   },
   "devDependencies": {
+    "@rozie/target-react": "workspace:*",
+    "@rozie/target-vue": "workspace:*",
     "vitest": "^4",
     "typescript": "^5"
   }

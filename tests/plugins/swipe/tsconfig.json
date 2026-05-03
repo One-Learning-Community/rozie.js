@@ -3,13 +3,14 @@
   "compilerOptions": {
     "outDir": "./dist",
     "rootDir": "./src",
-    "noEmit": false,
+    "noEmit": true,
     "module": "ESNext",
     "target": "ES2022",
     "moduleResolution": "bundler",
     "strict": true,
-    "verbatimModuleSyntax": true
+    "verbatimModuleSyntax": true,
+    "types": ["vitest/globals", "node"]
   },
-  "include": ["src/**/*"],
-  "exclude": ["dist", "node_modules", "tests", "fixtures"]
+  "include": ["src/**/*", "vitest.config.ts"],
+  "exclude": ["dist", "node_modules", "fixtures"]
 }

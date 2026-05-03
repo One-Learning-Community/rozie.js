@@ -78,6 +78,8 @@ export type {
   ModifierImpl,
   ModifierPipelineEntry,
   ModifierContext,
+  VueEmissionDescriptor,
+  ReactEmissionDescriptor,
 } from './modifiers/ModifierRegistry.js';
 export { registerModifier } from './modifiers/registerModifier.js';
 export { registerBuiltins, createDefaultRegistry } from './modifiers/registerBuiltins.js';

@@ -79,8 +79,20 @@ export interface ModifierContext {
  * - 'helper' — emit an import from `@rozie/runtime-vue` and a helper call.
  *   `listenerOnly: true` flags modifiers (only `.outside` in v1) that are
  *   only meaningful in <listeners> blocks; emitter rejects them on template @event.
+ * - 'inlineGuard' — Plan 04-06 SemVer-additive amendment. Emit a code fragment
+ *   inline in the synthesized handler body BEFORE the user handler runs.
+ *   Mirrors ReactEmissionDescriptor.inlineGuard (Plan 04 / D-65). Used by
+ *   third-party modifiers (MOD-05 swipe dogfood) that have no native Vue
+ *   modifier representation. The `code` string is inserted verbatim;
+ *   emitter MUST guarantee `e` is the bound event-arg name (Phase 3
+ *   emitListeners + emitTemplateEvent normalise this — see Plan 04-06
+ *   integration). NO Phase 3 builtin emits this kind, so the v1 Vue
+ *   fixtures remain byte-identical post-extension. Example:
+ *     { kind: 'inlineGuard', code: "if (e.key !== 'Tab') return;" }
  *
- * @public — SemVer-stable per D-22b.
+ * @public — SemVer-stable per D-22b. The `inlineGuard` case is additive in
+ * Plan 04-06 — third-party plugins implementing both `vue?` and `react?` is
+ * the MOD-05 acceptance via tests/plugins/swipe/.
  */
 export type VueEmissionDescriptor =
   | { kind: 'native'; token: string }
@@ -90,7 +102,8 @@ export type VueEmissionDescriptor =
       helperName: 'useOutsideClick' | 'debounce' | 'throttle';
       args: ModifierArg[];
       listenerOnly?: true;
-    };
+    }
+  | { kind: 'inlineGuard'; code: string };
 
 /**
  * ReactEmissionDescriptor — D-65 tagged union returned by ModifierImpl.react?(...)

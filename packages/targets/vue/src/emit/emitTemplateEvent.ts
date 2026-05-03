@@ -120,6 +120,13 @@ export function emitTemplateEvent(
 
   let eventName = listener.event;
   const modifierTokens: string[] = [];
+  /**
+   * Plan 04-06 SemVer-additive amendment — third-party modifier inlineGuard
+   * (MOD-05 swipe dogfood). The guard code is inserted into the synthesized
+   * arrow handler before the user handler invocation. Phase 3 builtins do NOT
+   * emit this kind, so existing fixtures remain byte-identical.
+   */
+  const inlineGuards: string[] = [];
   let scriptInjection: ScriptInjection | undefined;
   let handlerCode: string | null = null;
 
@@ -163,6 +170,14 @@ export function emitTemplateEvent(
       continue;
     }
 
+    if (descriptor.kind === 'inlineGuard') {
+      // Plan 04-06 SemVer-additive amendment — collect guard code; emitted
+      // into a synthesized arrow handler below. Phase 3 builtins do not use
+      // inlineGuard, so existing fixtures remain byte-identical.
+      inlineGuards.push(descriptor.code);
+      continue;
+    }
+
     // descriptor.kind === 'helper'
     if (descriptor.listenerOnly === true) {
       diagnostics.push({
@@ -203,6 +218,18 @@ export function emitTemplateEvent(
   // If no script-injection wrap, render the handler inline.
   if (handlerCode === null) {
     handlerCode = renderHandler(listener.handler, ctx.ir);
+  }
+
+  // Plan 04-06 inlineGuard composition — when third-party modifier guards are
+  // present, wrap the handler in a synthesized arrow `(e) => { guards; <call> }`.
+  // The handler invocation form depends on whether handlerCode is a bare
+  // Identifier (`onSearch` → `onSearch(e)`) or already a callable expression
+  // (`(e) => { ... }` → `(e)`-wrapped).
+  if (inlineGuards.length > 0) {
+    const guardLines = inlineGuards.join(' ');
+    const isIdentifier = /^[A-Za-z_$][\w$]*$/.test(handlerCode);
+    const invocation = isIdentifier ? `${handlerCode}(e)` : handlerCode;
+    handlerCode = `(e) => { ${guardLines} ${invocation}; }`;
   }
 
   // Compose: @event[.tok1.tok2...]="<handler>"
