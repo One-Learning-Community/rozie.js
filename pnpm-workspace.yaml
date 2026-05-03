@@ -3,3 +3,4 @@ packages:
   - "packages/targets/*"
   - "packages/runtime/*"
   - "examples/consumers/*"
+  - "tests/plugins/*"

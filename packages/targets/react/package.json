@@ -4,10 +4,43 @@
   "type": "module",
   "private": true,
   "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": ["src", "dist"],
+  "dependencies": {
+    "@rozie/core": "workspace:*",
+    "@babel/parser": "^7.29",
+    "@babel/traverse": "^7.29",
+    "@babel/types": "^7.29",
+    "@babel/generator": "^7.29",
+    "magic-string": "^0.30",
+    "postcss": "^8.5"
+  },
+  "peerDependencies": {
+    "@rozie/runtime-react": "workspace:*"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6",
+    "@testing-library/react": "^16",
+    "@types/babel__generator": "^7",
+    "@types/babel__traverse": "^7",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "eslint": "^9",
+    "eslint-plugin-react-hooks": "^5",
+    "happy-dom": "^15.0.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "vitest": "^4.1.0"
+  },
   "scripts": {
-    "build": "echo 'Phase 1: scaffold only' && exit 0",
-    "test": "echo 'Phase 1: no tests' && exit 0",
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest",
+    "build": "echo 'Phase 4 Plan 01: scaffold only' && exit 0",
     "lint": "biome lint src",
-    "typecheck": "tsc --noEmit"
-  }
+    "typecheck": "tsc --noEmit",
+    "lint:fixtures": "eslint fixtures/*.tsx --no-eslintrc --config eslint.config.js --rule 'react-hooks/exhaustive-deps: error' --max-warnings 0"
+  },
+  "license": "MIT"
 }

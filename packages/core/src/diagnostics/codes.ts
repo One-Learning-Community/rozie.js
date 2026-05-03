@@ -83,7 +83,23 @@ export const RozieErrorCode = {
 
   // ---- Phase 3 emitter warnings — ROZ450..ROZ499 (Phase 7 hardening) ----
 
-  // ---- Phase 4+ target emitters take ROZ500+ ----
+  // ---- @rozie/unplugin React-branch configuration errors (Phase 4 D-63) — ROZ500..ROZ519 ----
+  UNPLUGIN_REACT_PEER_DEP_MISSING: 'ROZ500', // D-59: neither @vitejs/plugin-react nor @vitejs/plugin-react-swc installed (Pitfall 9)
+  UNPLUGIN_REACT_DEP_MISSING: 'ROZ501', // react peer dep not resolvable
+  UNPLUGIN_REACT_PLUGIN_CHAIN_MISORDER: 'ROZ502', // detected plugin-react/swc lacking; D-58 chain broken (no enforce: 'pre' on @rozie/unplugin)
+
+  // ---- @rozie/target-react lowering errors (Phase 4 D-63) — ROZ520..ROZ549 ----
+  TARGET_REACT_HTML_WITH_CHILDREN: 'ROZ520', // r-html element has children — React's dangerouslySetInnerHTML disallows (Pitfall 10)
+  TARGET_REACT_NESTED_STATE_MUTATION: 'ROZ521', // $data.foo.bar = expr — React state must be immutable (Pitfall 7)
+  TARGET_REACT_MODULE_LET_HOISTED: 'ROZ522', // module-scoped `let X` referenced from lifecycle setup — auto-hoisted to useRef per Pitfall 3 spike resolution
+  TARGET_REACT_MODULE_LET_UNHOISTABLE: 'ROZ523', // module-scoped `let X` cannot be auto-hoisted (indirect ref via helper-fn) — user must refactor
+
+  // ---- @rozie/runtime-react warnings (Phase 4 D-63) — ROZ550..ROZ579 ----
+  RUNTIME_REACT_USECONTROLLABLESTATE_MODE_FLIP: 'ROZ550', // useControllableState parent-flip warning per D-57
+
+  // ---- Phase 4 emitter warnings — ROZ580..ROZ599 (Phase 7 hardening) ----
+
+  // ---- Phase 5+ target emitters take ROZ600+ ----
 } as const;
 
 export type RozieErrorCode = (typeof RozieErrorCode)[keyof typeof RozieErrorCode];

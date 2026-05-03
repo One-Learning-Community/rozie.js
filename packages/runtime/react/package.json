@@ -1,0 +1,40 @@
+{
+  "name": "@rozie/runtime-react",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "license": "MIT",
+  "author": "Rozie maintainers",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": ["src", "dist"],
+  "dependencies": {
+    "clsx": "^2"
+  },
+  "peerDependencies": {
+    "react": "^18.2 || ^19"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": false
+    }
+  },
+  "devDependencies": {
+    "@testing-library/react": "^16",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "happy-dom": "^15.0.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "vitest": "^4.1.0"
+  },
+  "scripts": {
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest",
+    "build": "echo 'Phase 4 Plan 01: scaffold only' && exit 0",
+    "lint": "biome lint src",
+    "typecheck": "tsc --noEmit"
+  }
+}
