@@ -76,7 +76,10 @@ function toPascalCase(eventName: string): string {
   return parts.map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join('');
 }
 
-export function emitPropsInterface(ir: IRComponent): string {
+export function emitPropsInterface(
+  ir: IRComponent,
+  slotPropFields?: string[],
+): string {
   const fields: string[] = [];
 
   // Props (split by isModel)
@@ -100,13 +103,21 @@ export function emitPropsInterface(ir: IRComponent): string {
     fields.push(`  on${eventPascal}?: (...args: unknown[]) => void;`);
   }
 
-  // Slots — Plan 04-03 fills in. v1 stubs as `renderX?: (ctx: unknown) => ReactNode`.
-  for (const s of ir.slots) {
-    if (s.name === '') {
-      // default slot → children
-      fields.push(`  children?: import('react').ReactNode | ((ctx: unknown) => import('react').ReactNode);`);
-    } else {
-      fields.push(`  render${capitalize(s.name)}?: (ctx: unknown) => import('react').ReactNode;`);
+  // Slots — Plan 04-03 fills slotPropFields via emitSlotDecl(ir).
+  // Backward-compat fallback: if no slotPropFields passed, fall through to the
+  // Plan 04-02 union stub.
+  if (slotPropFields !== undefined) {
+    for (const line of slotPropFields) {
+      fields.push(line);
+    }
+  } else {
+    for (const s of ir.slots) {
+      if (s.name === '') {
+        // default slot → children
+        fields.push(`  children?: import('react').ReactNode | ((ctx: unknown) => import('react').ReactNode);`);
+      } else {
+        fields.push(`  render${capitalize(s.name)}?: (ctx: unknown) => import('react').ReactNode;`);
+      }
     }
   }
 

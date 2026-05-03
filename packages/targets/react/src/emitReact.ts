@@ -15,8 +15,10 @@ import type { IRComponent } from '../../../core/src/ir/types.js';
 import type { Diagnostic } from '../../../core/src/diagnostics/Diagnostic.js';
 import type { ModifierRegistry } from '../../../core/src/modifiers/ModifierRegistry.js';
 import type { SourceMap } from 'magic-string';
+import { createDefaultRegistry } from '../../../core/src/modifiers/registerBuiltins.js';
 import { emitScript } from './emit/emitScript.js';
 import { emitPropsInterface } from './emit/emitPropsInterface.js';
+import { emitTemplate } from './emit/emitTemplate.js';
 import { buildShell } from './emit/shell.js';
 import {
   ReactImportCollector,
@@ -39,19 +41,35 @@ export interface EmitReactResult {
 
 export function emitReact(
   ir: IRComponent,
-  _opts: EmitReactOptions = {},
+  opts: EmitReactOptions = {},
 ): EmitReactResult {
   const reactImports = new ReactImportCollector();
   const runtimeImports = new RuntimeReactImportCollector();
+  const registry = opts.modifierRegistry ?? createDefaultRegistry();
 
   const { hookSection, userArrowsSection, diagnostics: scriptDiags } = emitScript(
     ir,
     { react: reactImports, runtime: runtimeImports },
   );
-  const propsInterface = emitPropsInterface(ir);
 
-  // Plan 04-03 will fill in actual JSX:
-  const jsx = 'return null;';
+  // Plan 04-03: emit the template-side JSX, slot-prop fields + ctx interfaces.
+  const tmpl = emitTemplate(
+    ir,
+    { react: reactImports, runtime: runtimeImports },
+    registry,
+  );
+
+  const propsInterface = emitPropsInterface(ir, tmpl.slotPropFields);
+
+  // Build the type-only `import type { ReactNode } from 'react';` line if
+  // the props interface or scriptInjections reference ReactNode.
+  const referencesReactNode =
+    propsInterface.includes('ReactNode') ||
+    tmpl.slotCtxInterfaces.some((s) => s.includes('ReactNode')) ||
+    tmpl.scriptInjections.some((s) => s.includes('ReactNode'));
+  const reactTypeImports = referencesReactNode
+    ? "import type { ReactNode } from 'react';\n"
+    : '';
 
   // Plan 04-05 will produce these:
   const cssModuleImport = null;
@@ -66,17 +84,20 @@ export function emitReact(
     componentName: ir.name,
     propsInterface,
     reactImports: reactImports.render(),
+    reactTypeImports,
     runtimeImports: runtimeImports.render(),
     cssModuleImport,
     globalCssImport,
+    ctxInterfaces: tmpl.slotCtxInterfaces,
+    scriptInjections: tmpl.scriptInjections,
     script,
-    jsx,
+    jsx: tmpl.jsx,
   });
 
   return {
     code: ms.toString(),
     css: '', // Plan 04-05 fills
     map: null, // Plan 04-05 wires composeSourceMap
-    diagnostics: scriptDiags,
+    diagnostics: [...scriptDiags, ...tmpl.diagnostics],
   };
 }
