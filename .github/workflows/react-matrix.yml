@@ -1,0 +1,108 @@
+name: React 18.2 + 19.x Matrix
+
+# Phase 4 Plan 06 / D-60: verify the emitted .tsx output works against both
+# the React 18.2 floor (PROJECT.md constraint — useSyncExternalStore land) AND
+# the latest React 19. Plus per D-59: exercise both @vitejs/plugin-react and
+# @vitejs/plugin-react-swc since the source-map composition path differs.
+#
+# Critical CI step: the workspace `lint:fixtures` script runs
+# react-hooks/exhaustive-deps over packages/targets/react/fixtures/*.tsx with
+# --max-warnings 0. This is the REACT-T-05 + D-62 anchor — every PR has to
+# stay clean. NO eslint-disable allowed in any compiler-emitted .tsx.
+
+on:
+  pull_request:
+    paths:
+      - 'packages/targets/react/**'
+      - 'packages/runtime/react/**'
+      - 'packages/unplugin/**'
+      - 'packages/core/**'
+      - 'examples/consumers/react-vite/**'
+      - 'tests/plugins/swipe/**'
+      - '.github/workflows/react-matrix.yml'
+  push:
+    branches: [main]
+
+jobs:
+  react-matrix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        react-version: ['18.2', '19']
+        plugin: ['plugin-react', 'plugin-react-swc']
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build core (peggy generated.js + tsdown)
+        run: pnpm -r --filter @rozie/core run build || echo 'core build is optional in Phase 4'
+
+      - name: Build @rozie/unplugin
+        run: pnpm --filter @rozie/unplugin run build
+
+      - name: Run unit tests (core + targets + runtime + unplugin + swipe MOD-05 dogfood)
+        run: |
+          pnpm exec vitest run --root packages/core
+          pnpm exec vitest run --root packages/targets/vue
+          pnpm exec vitest run --root packages/targets/react
+          pnpm exec vitest run --root packages/runtime/vue
+          pnpm exec vitest run --root packages/runtime/react
+          pnpm exec vitest run --root packages/unplugin
+          pnpm exec vitest run --root tests/plugins/swipe
+
+      # REACT-T-05 + D-62 anchor: NO compiler-emitted eslint-disable; every
+      # fixture .tsx must pass exhaustive-deps cleanly with --max-warnings 0.
+      - name: Run exhaustive-deps lint over emitted fixtures (REACT-T-05 + D-62)
+        run: pnpm --filter @rozie/target-react run lint:fixtures
+
+      - name: Override React version for the demo
+        working-directory: examples/consumers/react-vite
+        run: |
+          pnpm add react@^${{ matrix.react-version }} react-dom@^${{ matrix.react-version }}
+          pnpm add -D @types/react@^${{ matrix.react-version }} @types/react-dom@^${{ matrix.react-version }}
+
+      - name: Override Vite React plugin per D-59
+        working-directory: examples/consumers/react-vite
+        run: |
+          if [ "${{ matrix.plugin }}" = "plugin-react-swc" ]; then
+            pnpm remove @vitejs/plugin-react
+            pnpm add -D @vitejs/plugin-react-swc
+            # The vite.config.ts imports from @vitejs/plugin-react; swap the
+            # named import + module path in-place via sed (no need to maintain
+            # two configs).
+            sed -i 's|@vitejs/plugin-react|@vitejs/plugin-react-swc|g' vite.config.ts
+          fi
+
+      - name: Re-install with overrides
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Typecheck demo
+        run: pnpm --filter react-vite-demo run typecheck
+
+      - name: Build demo
+        run: pnpm --filter react-vite-demo run build
+
+      - name: Install Playwright Chromium
+        run: pnpm --filter react-vite-demo run test:e2e:install
+
+      - name: Run Playwright e2e tests
+        run: pnpm --filter react-vite-demo run test:e2e
+
+      - name: Upload Playwright HTML report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-react-${{ matrix.react-version }}-${{ matrix.plugin }}
+          path: examples/consumers/react-vite/playwright-report
+          retention-days: 7
