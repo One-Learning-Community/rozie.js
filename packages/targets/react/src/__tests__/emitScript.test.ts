@@ -102,9 +102,14 @@ describe('emitPropsInterface — behavior', () => {
 });
 
 describe('emitReact — whole-tsx fixture snapshots', () => {
+  function readExampleSource(name: string): string {
+    return readFileSync(resolve(EXAMPLES, `${name}.rozie`), 'utf8');
+  }
+
   it('Test 7: Counter.tsx — REACT-T-01 + REACT-T-03 + REACT-T-07 anchor', async () => {
     const ir = lowerExample('Counter');
-    const { code, diagnostics } = emitReact(ir);
+    const source = readExampleSource('Counter');
+    const { code, diagnostics } = emitReact(ir, { filename: 'Counter.rozie', source });
     // Sanity: NO `import React from 'react'` (D-68 automatic JSX runtime)
     expect(code).not.toContain("import React from 'react'");
     expect(code).toContain("from 'react'");
@@ -118,7 +123,8 @@ describe('emitReact — whole-tsx fixture snapshots', () => {
 
   it('Test 8: Modal.tsx — REACT-T-06 + Pitfall 3 module-let auto-hoist anchor', async () => {
     const ir = lowerExample('Modal');
-    const { code, diagnostics } = emitReact(ir);
+    const source = readExampleSource('Modal');
+    const { code, diagnostics } = emitReact(ir, { filename: 'Modal.rozie', source });
     expect(code).not.toContain("import React from 'react'");
     expect(code).toContain('savedBodyOverflow.current');
     expect(code).toContain('const savedBodyOverflow = useRef');
@@ -131,7 +137,8 @@ describe('emitReact — whole-tsx fixture snapshots', () => {
 
   it('SearchInput.tsx fixture', async () => {
     const ir = lowerExample('SearchInput');
-    const { code } = emitReact(ir);
+    const source = readExampleSource('SearchInput');
+    const { code } = emitReact(ir, { filename: 'SearchInput.rozie', source });
     expect(code).not.toContain("import React from 'react'");
     expect(code).toContain('interface SearchInputProps');
     expect(code).toContain('useState');

@@ -384,6 +384,9 @@ importers:
       '@rozie/runtime-vue':
         specifier: workspace:*
         version: link:../runtime/vue
+      '@rozie/target-react':
+        specifier: workspace:*
+        version: link:../targets/react
       '@rozie/target-vue':
         specifier: workspace:*
         version: link:../targets/vue
