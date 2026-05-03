@@ -19,6 +19,8 @@
     "magic-string": "^0.30.21"
   },
   "devDependencies": {
+    "@types/babel__generator": "^7.27.0",
+    "@types/babel__traverse": "^7.28.0",
     "vitest": "^4.1.5"
   }
 }

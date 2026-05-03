@@ -148,9 +148,14 @@ describe('rewriteRozieIdentifiers (React)', () => {
     const roz521 = diagnostics.find((d) => d.code === 'ROZ521');
     expect(roz521).toBeDefined();
     expect(roz521!.severity).toBe('warning');
-    // AST should still contain the original $data.todo.title write — leave unchanged.
+    // The WRITE itself is not converted to a setter call — that's the
+    // "leave AST unchanged" guarantee for the assignment shape (Pitfall 7).
+    // The inner read of $data.todo IS rewritten (top-level state read), so
+    // the resulting expression is `todo.title = 'x'`, NOT `setTodo(...)`.
+    // The user must refactor manually; ROZ521 advises them.
     const out = generate(program).code;
-    expect(out).toContain('$data.todo.title');
+    expect(out).not.toContain('setTodo');
+    expect(out).toMatch(/todo\.title\s*=\s*['"]x['"]/);
   });
 
   it('$emit with hyphenated event name emits a diagnostic (camelCase requirement)', () => {
