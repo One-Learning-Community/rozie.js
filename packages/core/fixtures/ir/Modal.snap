@@ -494,12 +494,7 @@
         ],
         "directives": []
       },
-      "setupDeps": [
-        {
-          "scope": "closure",
-          "identifier": "focus"
-        }
-      ],
+      "setupDeps": [],
       "sourceLoc": {
         "start": 1774,
         "end": 1819

@@ -149,8 +149,16 @@ export function computeExpressionDeps(
         const parent = path.parent;
         const node = path.node;
 
-        // Skip property keys of MemberExpression (e.g., the `foo` in obj.foo).
-        if (t.isMemberExpression(parent) && parent.property === node && !parent.computed) {
+        // Skip property keys of MemberExpression / OptionalMemberExpression
+        // (e.g., the `foo` in `obj.foo` and the `focus` in `ref?.focus`).
+        // OptionalMemberExpression must be handled here too — `inputEl.current?.focus`
+        // would otherwise classify `focus` as a closure dep, polluting the
+        // useEffect dep array (Plan 04-02 SearchInput / Modal regression).
+        if (
+          (t.isMemberExpression(parent) || t.isOptionalMemberExpression(parent)) &&
+          parent.property === node &&
+          !parent.computed
+        ) {
           return;
         }
 

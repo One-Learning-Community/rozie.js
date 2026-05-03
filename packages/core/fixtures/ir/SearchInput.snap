@@ -562,10 +562,6 @@
           "path": [
             "autofocus"
           ]
-        },
-        {
-          "scope": "closure",
-          "identifier": "focus"
         }
       ],
       "sourceLoc": {

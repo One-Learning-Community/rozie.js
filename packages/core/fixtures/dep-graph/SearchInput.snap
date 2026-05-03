@@ -19,10 +19,6 @@
       "path": [
         "autofocus"
       ]
-    },
-    {
-      "scope": "closure",
-      "identifier": "focus"
     }
   ],
   "template.attr./div-1/button-4/@click": [

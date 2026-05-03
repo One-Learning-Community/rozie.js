@@ -11,12 +11,7 @@
       "identifier": "unlockScroll"
     }
   ],
-  "lifecycle.2.setup": [
-    {
-      "scope": "closure",
-      "identifier": "focus"
-    }
-  ],
+  "lifecycle.2.setup": [],
   "listener.0.handler": [
     {
       "scope": "closure",
