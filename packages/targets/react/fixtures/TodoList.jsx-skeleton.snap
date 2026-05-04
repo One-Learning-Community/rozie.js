@@ -1,7 +1,7 @@
 <>
 <div className={styles["todo-list"]}>
   <header>
-    {props.renderHeader?.({ remaining, total: items.length })}
+    {props.renderHeader ? props.renderHeader({ remaining, total: items.length }) : <h3>{props.title} ({remaining} remaining)</h3>}
   </header>
 
   <form onSubmit={(e) => { e.preventDefault(); add(e); }}>
@@ -9,12 +9,15 @@
     <button type="submit" disabled={!draft.trim()}>Add</button>
   </form>
 
-  {items.length > 0 ? <ul>
+  {(items.length > 0) ? <ul>
     {items.map((item) => <li key={item.id} className={clsx({ [styles.done]: item.done })}>
       
-      {props.children?.({ item, toggle: () => toggle(item.id), remove: () => remove(item.id) })}
+      {props.children ? props.children({ item, toggle: () => toggle(item.id), remove: () => remove(item.id) }) : <><label>
+          <input type="checkbox" checked={item.done} onChange={(e) => { toggle(item.id); }} />
+          <span>{item.text}</span>
+        </label><button aria-label="Remove" onClick={(e) => { remove(item.id); }}>×</button></>}
     </li>)}
   </ul> : <p className={styles.empty}>
-    {props.renderEmpty}
+    {props.renderEmpty ?? "Nothing to do. ✨"}
   </p>}</div>
 </>

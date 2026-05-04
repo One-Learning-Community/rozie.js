@@ -11,7 +11,13 @@ interface CounterProps {
   max?: number;
 }
 
-export default function Counter(props: CounterProps): JSX.Element {
+export default function Counter(_props: CounterProps): JSX.Element {
+  const props: CounterProps = {
+    ..._props,
+    step: _props.step ?? 1,
+    min: _props.min ?? -Infinity,
+    max: _props.max ?? Infinity,
+  };
   const [value, setValue] = useControllableState({
     value: props.value,
     defaultValue: props.defaultValue ?? 0,

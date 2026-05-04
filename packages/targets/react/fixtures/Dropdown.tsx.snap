@@ -18,7 +18,12 @@ interface DropdownProps {
   children?: (ctx: ChildrenCtx) => ReactNode;
 }
 
-export default function Dropdown(props: DropdownProps): JSX.Element {
+export default function Dropdown(_props: DropdownProps): JSX.Element {
+  const props: DropdownProps = {
+    ..._props,
+    closeOnOutsideClick: _props.closeOnOutsideClick ?? true,
+    closeOnEscape: _props.closeOnEscape ?? true,
+  };
   const [open, setOpen] = useControllableState({
     value: props.open,
     defaultValue: props.defaultValue ?? false,
@@ -80,7 +85,7 @@ export default function Dropdown(props: DropdownProps): JSX.Element {
         {props.renderTrigger?.({ open, toggle })}
       </div>
 
-      {open && <div ref={panelEl} className={styles["dropdown-panel"]} role="menu">
+      {(open) && <div ref={panelEl} className={styles["dropdown-panel"]} role="menu">
         {props.children?.({ close })}
       </div>}</div>
     </>

@@ -42,7 +42,9 @@ describe('emitConditional — Plan 04-03 Task 1', () => {
 </rozie>
 `);
     const { jsx } = emit(ir);
-    expect(jsx).toMatch(/\{props\.open && /);
+    // The test is wrapped in parens for safe operator-precedence composition
+    // (e.g. `(A || B) && body` rather than `A || B && body`).
+    expect(jsx).toMatch(/\{\(props\.open\) && /);
   });
 
   it('Test 5: r-if + r-else → ternary', () => {
@@ -58,7 +60,7 @@ describe('emitConditional — Plan 04-03 Task 1', () => {
 </rozie>
 `);
     const { jsx } = emit(ir);
-    expect(jsx).toMatch(/props\.items\.length > 0 \?/);
+    expect(jsx).toMatch(/\(props\.items\.length > 0\) \?/);
     expect(jsx).toContain(': ');
     expect(jsx).toContain('Empty');
   });
@@ -77,9 +79,9 @@ describe('emitConditional — Plan 04-03 Task 1', () => {
 </rozie>
 `);
     const { jsx } = emit(ir);
-    // Expect: { kind === 'a' ? <span>A</span> : kind === 'b' ? <span>B</span> : <span>C</span> }
-    expect(jsx).toMatch(/kind === ['"]a['"] \?/);
-    expect(jsx).toMatch(/kind === ['"]b['"] \?/);
+    // Expect: { (kind === 'a') ? <span>A</span> : (kind === 'b') ? <span>B</span> : <span>C</span> }
+    expect(jsx).toMatch(/\(kind === ['"]a['"]\) \?/);
+    expect(jsx).toMatch(/\(kind === ['"]b['"]\) \?/);
     expect(jsx).toContain('C');
   });
 });

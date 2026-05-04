@@ -3,7 +3,7 @@
   
   <input ref={inputEl} type="search" placeholder={props.placeholder} value={query} onChange={e => setQuery(e.target.value)} onInput={_rozieDebouncedOnSearch} onKeyDown={(e) => { ((e) => { if (e.key !== 'Enter') return; onSearch(e); })(e); ((e) => { if (e.key !== 'Escape') return; clear(e); })(e); }} />
 
-  {query.length > 0 ? <button className={styles["clear-btn"]} aria-label="Clear" onClick={clear}>
+  {(query.length > 0) ? <button className={styles["clear-btn"]} aria-label="Clear" onClick={clear}>
     ×
   </button> : <span className={styles.hint}>{props.minLength}+ chars</span>}</div>
 </>

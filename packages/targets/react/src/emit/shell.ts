@@ -61,6 +61,12 @@ export interface ShellParts {
    *     → return JSX
    */
   listenerEffects?: string;
+  /**
+   * When true, the function parameter is named `_props` (instead of `props`)
+   * because the script body rebinds `props` to a defaults-merged version.
+   * emitScript sets this whenever any non-model prop has a declared default.
+   */
+  hasPropsDefaults?: boolean;
   /** JSX body string (e.g., '<div>...</div>' or '(\n  <div>...</div>\n)') */
   jsx: string;
 }
@@ -112,9 +118,12 @@ export function buildShell(parts: ShellParts): MagicString {
     }
   }
 
-  // Function declaration.
+  // Function declaration. When the script rebinds `props` from a defaults
+  // block (i.e. any non-model prop has a declared default), the parameter is
+  // named `_props` to leave the `props` identifier free for the rebinding.
+  const propsParam = parts.hasPropsDefaults ? '_props' : 'props';
   ms.append(
-    `export default function ${parts.componentName}(props: ${parts.componentName}Props): JSX.Element {\n`,
+    `export default function ${parts.componentName}(${propsParam}: ${parts.componentName}Props): JSX.Element {\n`,
   );
 
   // Script (hookSection + userArrowsSection) FIRST so user-authored arrows

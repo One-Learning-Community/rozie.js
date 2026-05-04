@@ -4,7 +4,7 @@
     {props.renderTrigger?.({ open, toggle })}
   </div>
 
-  {open && <div ref={panelEl} className={styles["dropdown-panel"]} role="menu">
+  {(open) && <div ref={panelEl} className={styles["dropdown-panel"]} role="menu">
     {props.children?.({ close })}
   </div>}</div>
 </>

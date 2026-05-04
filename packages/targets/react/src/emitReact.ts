@@ -65,10 +65,13 @@ export function emitReact(
   const runtimeImports = new RuntimeReactImportCollector();
   const registry = opts.modifierRegistry ?? createDefaultRegistry();
 
-  const { hookSection, userArrowsSection, lifecycleEffectsSection, diagnostics: scriptDiags } = emitScript(
-    ir,
-    { react: reactImports, runtime: runtimeImports },
-  );
+  const {
+    hookSection,
+    userArrowsSection,
+    lifecycleEffectsSection,
+    hasPropsDefaults,
+    diagnostics: scriptDiags,
+  } = emitScript(ir, { react: reactImports, runtime: runtimeImports });
 
   // Plan 04-03: emit the template-side JSX, slot-prop fields + ctx interfaces.
   const tmpl = emitTemplate(
@@ -142,6 +145,7 @@ export function emitReact(
     scriptInjections: allScriptInjections,
     script,
     listenerEffects: listeners.code,
+    hasPropsDefaults,
     jsx: tmpl.jsx,
   });
 

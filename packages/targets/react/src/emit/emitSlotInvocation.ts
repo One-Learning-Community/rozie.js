@@ -117,17 +117,67 @@ function liftDefaultFn(
   return `function ${fnName}(ctx: any): any {\n  ${paramExtract}return (${bodyJsx});\n}`;
 }
 
+/**
+ * Render the invocation-site fallback (TemplateSlotInvocationIR.fallback —
+ * the inline children of the <slot> element in the template) as a JSX
+ * expression. Used when SlotDecl.defaultContent is null but the invocation
+ * site provides inline children. Returns `null` when there's no fallback.
+ */
+function renderInvocationFallback(
+  fallback: TemplateSlotInvocationIR['fallback'],
+  ctx: EmitNodeCtx,
+): string {
+  // Filter out whitespace-only TemplateStaticText nodes between elements —
+  // they're an artifact of HTML formatting, not user-meaningful content.
+  const realChildren = fallback.filter(
+    (c) => !(c.type === 'TemplateStaticText' && c.text.trim() === ''),
+  );
+  if (realChildren.length === 0) return 'null';
+  const emitNodeFn = _emitTemplateNodeModule.emitNode;
+  const parts = realChildren.map((child) => emitNodeFn(child, ctx));
+  if (parts.length === 1) {
+    const single = parts[0]!;
+    // Strip a single `{...}` wrap so the result is suitable inside a JSX expr.
+    if (single.startsWith('{') && single.endsWith('}') && single.length > 2) {
+      return single.slice(1, -1);
+    }
+    // Bare text from emitStaticText needs string-literal wrap when used as a JS
+    // expression (e.g. right-hand side of `??`).
+    const trimmed = single.trim();
+    if (
+      realChildren[0]!.type === 'TemplateStaticText' &&
+      !trimmed.startsWith('<')
+    ) {
+      return JSON.stringify(trimmed);
+    }
+    return single;
+  }
+  // Multiple children — wrap in a fragment.
+  return `<>${parts.join('')}</>`;
+}
+
 export function emitSlotInvocation(
   node: TemplateSlotInvocationIR,
   ctx: EmitNodeCtx,
 ): string {
   const slotName = node.slotName;
   const slot = findSlotDecl(slotName, ctx.ir);
+  // Build the invocation-site fallback once. Used when SlotDecl.defaultContent
+  // is null but the <slot> element wraps inline fallback children.
+  const invocationFallback = renderInvocationFallback(node.fallback, ctx);
+  const hasInvocationFallback = invocationFallback !== 'null';
+
   // If no SlotDecl, fall back to a default-children lookup as best-effort.
   if (!slot) {
-    if (slotName === '') return '{props.children}';
+    if (slotName === '') {
+      return hasInvocationFallback
+        ? `{props.children ?? ${invocationFallback}}`
+        : '{props.children}';
+    }
     const fieldName = 'render' + slotName.charAt(0).toUpperCase() + slotName.slice(1);
-    return `{props.${fieldName}}`;
+    return hasInvocationFallback
+      ? `{props.${fieldName} ?? ${invocationFallback}}`
+      : `{props.${fieldName}}`;
   }
 
   const refined = refineSlotTypes(slot);
@@ -135,7 +185,7 @@ export function emitSlotInvocation(
   const hasParams = slot.params.length > 0;
   const paramObj = buildParamObj(node.args, ctx.ir);
 
-  // Lift default content if needed
+  // Lift SlotDecl.defaultContent (the slot-decl-side fallback) when present.
   if (refined.defaultLifting === 'function-const' && refined.defaultFnName !== null) {
     const fnDecl = liftDefaultFn(slot, refined.defaultFnName, ctx);
     // Avoid pushing duplicates if the slot is invoked multiple times.
@@ -144,7 +194,10 @@ export function emitSlotInvocation(
     }
   }
 
-  // Now build the JSX expression per pattern.
+  // Now build the JSX expression per pattern. Precedence:
+  //   1. SlotDecl.defaultContent (lifted via decideDefaultLifting) — when present
+  //   2. TemplateSlotInvocationIR.fallback (inline <slot> children) — when present
+  //   3. Empty fallback (renders `undefined` — no inline content provided)
   if (slotName === '' && !hasParams) {
     // Default, no params
     if (refined.defaultLifting === 'inline') {
@@ -154,6 +207,9 @@ export function emitSlotInvocation(
     if (refined.defaultLifting === 'function-const' && refined.defaultFnName !== null) {
       return `{${fieldRef} ?? ${refined.defaultFnName}({})}`;
     }
+    if (hasInvocationFallback) {
+      return `{${fieldRef} ?? ${invocationFallback}}`;
+    }
     return `{${fieldRef}}`;
   }
 
@@ -161,6 +217,12 @@ export function emitSlotInvocation(
     // Default with params
     if (refined.defaultFnName !== null) {
       return `{${fieldRef} ? ${fieldRef}(${paramObj}) : ${refined.defaultFnName}(${paramObj})}`;
+    }
+    if (hasInvocationFallback) {
+      // Fallback children may reference slot params (e.g., `item`); they're
+      // in scope via the surrounding closure for default-slot inline children
+      // because the slot is invoked from the same component body.
+      return `{${fieldRef} ? ${fieldRef}(${paramObj}) : ${invocationFallback}}`;
     }
     return `{${fieldRef}?.(${paramObj})}`;
   }
@@ -174,12 +236,18 @@ export function emitSlotInvocation(
     if (refined.defaultLifting === 'function-const' && refined.defaultFnName !== null) {
       return `{${fieldRef} ?? ${refined.defaultFnName}({})}`;
     }
+    if (hasInvocationFallback) {
+      return `{${fieldRef} ?? ${invocationFallback}}`;
+    }
     return `{${fieldRef}}`;
   }
 
   // Named with params
   if (refined.defaultFnName !== null) {
     return `{${fieldRef} ? ${fieldRef}(${paramObj}) : ${refined.defaultFnName}(${paramObj})}`;
+  }
+  if (hasInvocationFallback) {
+    return `{${fieldRef} ? ${fieldRef}(${paramObj}) : ${invocationFallback}}`;
   }
   return `{${fieldRef}?.(${paramObj})}`;
 }

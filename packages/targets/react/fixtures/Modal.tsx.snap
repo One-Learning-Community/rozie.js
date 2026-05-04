@@ -24,7 +24,14 @@ interface ModalProps {
   renderFooter?: (ctx: FooterCtx) => ReactNode;
 }
 
-export default function Modal(props: ModalProps): JSX.Element {
+export default function Modal(_props: ModalProps): JSX.Element {
+  const props: ModalProps = {
+    ..._props,
+    closeOnEscape: _props.closeOnEscape ?? true,
+    closeOnBackdrop: _props.closeOnBackdrop ?? true,
+    lockBodyScroll: _props.lockBodyScroll ?? true,
+    title: _props.title ?? '',
+  };
   const savedBodyOverflow = useRef('');
   const [open, setOpen] = useControllableState({
     value: props.open,
@@ -69,16 +76,16 @@ export default function Modal(props: ModalProps): JSX.Element {
 
   return (
     <>
-    {open && <div className={styles["modal-backdrop"]} ref={backdropEl} onClick={(e) => { if (e.target !== e.currentTarget) return; props.closeOnBackdrop && close(); }}>
+    {(open) && <div className={styles["modal-backdrop"]} ref={backdropEl} onClick={(e) => { if (e.target !== e.currentTarget) return; props.closeOnBackdrop && close(); }}>
       <div ref={dialogEl} className={styles["modal-dialog"]} role="dialog" aria-modal="true" aria-label={props.title || undefined} tabIndex={-1}>
-        {props.title || props.renderHeader && <header>
-          {props.renderHeader?.({ close })}
+        {(props.title || props.renderHeader) && <header>
+          {props.renderHeader ? props.renderHeader({ close }) : <h2>{props.title}</h2>}
           <button className={styles["close-btn"]} aria-label="Close" onClick={close}>×</button>
         </header>}<div className={styles["modal-body"]}>
           {props.children?.({ close })}
         </div>
 
-        {props.renderFooter && <footer>
+        {(props.renderFooter) && <footer>
           {props.renderFooter?.({ close })}
         </footer>}</div>
     </div>}</>

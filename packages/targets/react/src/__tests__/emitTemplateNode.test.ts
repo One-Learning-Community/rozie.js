@@ -84,7 +84,8 @@ describe('emitTemplateNode — Plan 04-03 Task 1', () => {
 </rozie>
 `);
     const { jsx } = emit(ir);
-    expect(jsx).toContain("style={{ display: props.open ? '' : 'none' }}");
+    // Test expression is parenthesized for safe operator-precedence composition.
+    expect(jsx).toContain("style={{ display: (props.open) ? '' : 'none' }}");
   });
 
   it('Test 15: r-html (no children) emits dangerouslySetInnerHTML', () => {

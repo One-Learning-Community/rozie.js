@@ -10,7 +10,13 @@ interface SearchInputProps {
   onClear?: (...args: unknown[]) => void;
 }
 
-export default function SearchInput(props: SearchInputProps): JSX.Element {
+export default function SearchInput(_props: SearchInputProps): JSX.Element {
+  const props: SearchInputProps = {
+    ..._props,
+    placeholder: _props.placeholder ?? 'Search…',
+    minLength: _props.minLength ?? 2,
+    autofocus: _props.autofocus ?? false,
+  };
   const [query, setQuery] = useState('');
   const inputEl = useRef<HTMLInputElement | null>(null);
   const isValid = useMemo(() => query.length >= props.minLength, [props.minLength, query]);
@@ -43,7 +49,7 @@ export default function SearchInput(props: SearchInputProps): JSX.Element {
       
       <input ref={inputEl} type="search" placeholder={props.placeholder} value={query} onChange={e => setQuery(e.target.value)} onInput={_rozieDebouncedOnSearch} onKeyDown={(e) => { ((e) => { if (e.key !== 'Enter') return; onSearch(e); })(e); ((e) => { if (e.key !== 'Escape') return; clear(e); })(e); }} />
 
-      {query.length > 0 ? <button className={styles["clear-btn"]} aria-label="Clear" onClick={clear}>
+      {(query.length > 0) ? <button className={styles["clear-btn"]} aria-label="Clear" onClick={clear}>
         ×
       </button> : <span className={styles.hint}>{props.minLength}+ chars</span>}</div>
     </>

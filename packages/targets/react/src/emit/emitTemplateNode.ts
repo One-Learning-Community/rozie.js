@@ -183,12 +183,14 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
     workingAttrs = workingAttrs.filter((a) => a !== rTextAttr);
   }
 
-  // r-show special-case: emit style={{ display: cond ? '' : 'none' }}
+  // r-show special-case: emit style={{ display: cond ? '' : 'none' }}.
+  // Wrap the rewritten expression in parens so any inner low-precedence
+  // operators (`||`, `??`, `&&`) bind correctly relative to the trailing `?`.
   const rShowAttr = findAttribute(workingAttrs, 'r-show');
   let rShowStyleAttr: string | null = null;
   if (rShowAttr && rShowAttr.kind === 'binding') {
     const exprCode = rewriteTemplateExpression(rShowAttr.expression, ctx.ir);
-    rShowStyleAttr = `style={{ display: ${exprCode} ? '' : 'none' }}`;
+    rShowStyleAttr = `style={{ display: (${exprCode}) ? '' : 'none' }}`;
     workingAttrs = workingAttrs.filter((a) => a !== rShowAttr);
   }
 

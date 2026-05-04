@@ -501,6 +501,12 @@ export interface EmitScriptResult {
    * reference any user helper without TDZ.
    */
   lifecycleEffectsSection: string;
+  /**
+   * True when at least one non-model prop has a declared default. The script's
+   * hookSection rebinds `props` from `_props` to merge defaults, so shell.ts
+   * needs to name the function parameter `_props` instead of `props`.
+   */
+  hasPropsDefaults: boolean;
   diagnostics: Diagnostic[];
 }
 
@@ -538,6 +544,39 @@ export function emitScript(
 
   // 5. Build hookSection.
   const hookLines: string[] = [];
+
+  // 5.0. Defaults rebind for non-model props that declare a default. We rebind
+  //     the function parameter `_props` to a new const `props` whose missing
+  //     fields are filled from declared defaults. Model:true props are handled
+  //     by useControllableState below; their defaults route through
+  //     `defaultValue` rather than this rebind. shell.ts uses the function
+  //     parameter name `_props` whenever `propsDefaultsBlock` is non-empty.
+  const defaultedNonModelProps = ir.props.filter(
+    (p) => !p.isModel && p.defaultValue !== null,
+  );
+  let propsDefaultsBlock = '';
+  if (defaultedNonModelProps.length > 0) {
+    const defaultLines = defaultedNonModelProps.map((p) => {
+      // Reuse the same arrow-factory invocation logic as the model branch:
+      // `() => []` defaults are factory-invoked to avoid shared-mutable state.
+      const raw = genCode(p.defaultValue!);
+      const isFactoryArrow =
+        t.isArrowFunctionExpression(p.defaultValue!) &&
+        (t.isArrayExpression(p.defaultValue!.body) ||
+          t.isObjectExpression(p.defaultValue!.body));
+      const dflt = isFactoryArrow ? `(${raw})()` : raw;
+      return `  ${p.name}: _props.${p.name} ?? ${dflt},`;
+    });
+    // Spread first so user-supplied values come through, then explicit
+    // `X: _props.X ?? <default>` lines override any missing/undefined values
+    // with the declared default.
+    propsDefaultsBlock =
+      `const props: ${ir.name}Props = {\n` +
+      `  ..._props,\n` +
+      `${defaultLines.join('\n')}\n` +
+      `};`;
+    hookLines.push(propsDefaultsBlock);
+  }
 
   // 5a. Hoisted useRef declarations (one per hoist instruction).
   for (const h of hoistResult.hoisted) {
@@ -805,5 +844,11 @@ export function emitScript(
   }
   const userArrowsSection = userArrowsLines.join('\n');
 
-  return { hookSection, userArrowsSection, lifecycleEffectsSection, diagnostics };
+  return {
+    hookSection,
+    userArrowsSection,
+    lifecycleEffectsSection,
+    hasPropsDefaults: defaultedNonModelProps.length > 0,
+    diagnostics,
+  };
 }

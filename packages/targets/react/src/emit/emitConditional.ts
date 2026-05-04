@@ -51,10 +51,14 @@ export function emitConditional(
     // Final r-else branch — base case (no condition wrapper)
     out = renderBranchBody(lastBranch.body, ctx, emitNodeFn);
   } else {
-    // No trailing r-else — short-circuit form `cond && body` for the last branch
+    // No trailing r-else — short-circuit form `cond && body` for the last branch.
+    // Wrap the test in parens so any inner `||` / `??` / lower-precedence
+    // operators don't bind tighter than the trailing `&&` (e.g. `A || B && C`
+    // parses as `A || (B && C)`, not `(A || B) && C` — the latter is what we
+    // need for r-if to gate the body).
     const testCode = rewriteTemplateExpression(lastBranch.test, ctx.ir);
     const bodyCode = renderBranchBody(lastBranch.body, ctx, emitNodeFn);
-    out = `${testCode} && ${bodyCode}`;
+    out = `(${testCode}) && ${bodyCode}`;
   }
 
   // Build right-to-left for any preceding branches.
@@ -65,9 +69,10 @@ export function emitConditional(
       out = renderBranchBody(branch.body, ctx, emitNodeFn);
       continue;
     }
+    // Same parenthesization rule as above for ternary tests.
     const testCode = rewriteTemplateExpression(branch.test, ctx.ir);
     const bodyCode = renderBranchBody(branch.body, ctx, emitNodeFn);
-    out = `${testCode} ? ${bodyCode} : ${out}`;
+    out = `(${testCode}) ? ${bodyCode} : ${out}`;
   }
 
   return `{${out}}`;
