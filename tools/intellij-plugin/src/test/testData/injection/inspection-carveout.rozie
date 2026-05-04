@@ -1,0 +1,13 @@
+<rozie name="InspectionCarveout">
+<data>{ open: false }</data>
+<template>
+  <button r-if="$data.open"
+          @click.stop="$data.open = false"
+          @keydown.escape="$data.open = false"
+          :class="$data.open ? 'open' : 'closed'"
+          :disabled="!$data.open"
+          ref="trigger">
+    Toggle
+  </button>
+</template>
+</rozie>

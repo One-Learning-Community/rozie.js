@@ -30,7 +30,9 @@
             language="Rozie"
             extensions="rozie"/>
 
-        <!-- Plan 02 wires: <lang.parserDefinition language="Rozie" implementationClass="js.rozie.intellij.parser.RozieParserDefinition"/> -->
+        <lang.parserDefinition
+            language="Rozie"
+            implementationClass="js.rozie.intellij.parser.RozieParserDefinition"/>
 
         <lang.syntaxHighlighterFactory
             language="Rozie"
@@ -38,6 +40,10 @@
         <colorSettingsPage
             implementation="js.rozie.intellij.highlighting.RozieColorSettingsPage"/>
 
-        <!-- Plan 04 wires: <multiHostInjector implementation="js.rozie.intellij.injection.RozieMultiHostInjector"/> -->
+        <multiHostInjector
+            implementation="js.rozie.intellij.injection.RozieMultiHostInjector"/>
+
+        <xml.xmlSuppressionProvider
+            implementation="js.rozie.intellij.inspection.RozieHtmlInspectionSuppressor"/>
     </extensions>
 </idea-plugin>
