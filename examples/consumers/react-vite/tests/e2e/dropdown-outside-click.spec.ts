@@ -22,17 +22,17 @@ test('Dropdown outside-click closes when click is outside both refs AND when:pre
 
   // Open the dropdown via the trigger slot button.
   await page.getByTestId('dropdown-trigger').click();
-  await expect(page.locator('.dropdown-panel')).toBeVisible();
+  await expect(page.getByTestId('dropdown-panel')).toBeVisible();
 
   // Click INSIDE the panel — dropdown should stay open (.outside refs include panelEl).
-  await page.locator('.dropdown-panel').click();
-  await expect(page.locator('.dropdown-panel')).toBeVisible();
+  await page.getByTestId('dropdown-panel').click();
+  await expect(page.getByTestId('dropdown-panel')).toBeVisible();
 
   // Click on the panel's child element too — should still stay open.
   await page.getByTestId('dropdown-items').click();
-  await expect(page.locator('.dropdown-panel')).toBeVisible();
+  await expect(page.getByTestId('dropdown-panel')).toBeVisible();
 
   // Click OUTSIDE both refs (top-left corner of body) — dropdown should close.
   await page.mouse.click(5, 5);
-  await expect(page.locator('.dropdown-panel')).toBeHidden();
+  await expect(page.getByTestId('dropdown-panel')).toBeHidden();
 });

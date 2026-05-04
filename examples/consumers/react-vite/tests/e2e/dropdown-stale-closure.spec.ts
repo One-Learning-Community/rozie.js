@@ -26,11 +26,11 @@ test('Dropdown observes latest open prop after parent rerender (Phase 4 SC1 / RE
   await page.getByTestId('nav-dropdown').click();
 
   // Initial state: dropdown closed (parent open=false).
-  await expect(page.locator('.dropdown-panel')).toBeHidden();
+  await expect(page.getByTestId('dropdown-panel')).toBeHidden();
 
   // Parent rerenders with forceOpen=true → Dropdown receives open=true.
   await page.getByTestId('force-open').click();
-  await expect(page.locator('.dropdown-panel')).toBeVisible();
+  await expect(page.getByTestId('dropdown-panel')).toBeVisible();
 
   // Now release force-open so the parent's local `open` state controls again,
   // BUT the panel stays visible because Dropdown's own toggle handler set
@@ -42,12 +42,12 @@ test('Dropdown observes latest open prop after parent rerender (Phase 4 SC1 / RE
 
   // Reopen via trigger so we have a known-open state.
   await page.getByTestId('dropdown-trigger').click();
-  await expect(page.locator('.dropdown-panel')).toBeVisible();
+  await expect(page.getByTestId('dropdown-panel')).toBeVisible();
 
   // Click outside both refs → close should fire with the LATEST closure value.
   // If useOutsideClick had a stale closure, the close handler would not run
   // (the original .outside listener would still see the original `open=false`
   // and short-circuit via the `when` predicate).
   await page.mouse.click(5, 5);
-  await expect(page.locator('.dropdown-panel')).toBeHidden();
+  await expect(page.getByTestId('dropdown-panel')).toBeHidden();
 });

@@ -20,9 +20,9 @@ test('Counter useControllableState — uncontrolled then controlled mode emits R
 
   // Uncontrolled mode (default): increment increments internal state; parent sees onValueChange callback.
   await expect(page.getByTestId('mode-label')).toHaveText('uncontrolled');
-  await expect(page.locator('.value')).toHaveText('0');
+  await expect(page.getByTestId('counter-value')).toHaveText('0');
   await page.getByRole('button', { name: 'Increment' }).click();
-  await expect(page.locator('.value')).toHaveText('1');
+  await expect(page.getByTestId('counter-value')).toHaveText('1');
   await expect(page.getByTestId('parent-value')).toHaveText('1');
 
   // Toggle to controlled mode — useControllableState sees props.value go from
@@ -42,6 +42,6 @@ test('Counter useControllableState — uncontrolled then controlled mode emits R
 
   // Now in controlled mode: increment should still work (parent owns state).
   await page.getByRole('button', { name: 'Increment' }).click();
-  await expect(page.locator('.value')).toHaveText('2');
+  await expect(page.getByTestId('counter-value')).toHaveText('2');
   await expect(page.getByTestId('parent-value')).toHaveText('2');
 });
