@@ -157,11 +157,14 @@ export function emitReact(
       ? composeSourceMap(ms, { filename: opts.filename, source: opts.source })
       : null;
 
-  return {
+  const result: EmitReactResult = {
     code,
     css: moduleCss,
-    globalCss: globalCss ?? undefined,
     map,
     diagnostics: [...scriptDiags, ...tmpl.diagnostics, ...listeners.diagnostics, ...styleDiags],
   };
+  if (globalCss !== null) {
+    result.globalCss = globalCss;
+  }
+  return result;
 }
