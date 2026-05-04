@@ -342,6 +342,12 @@ importers:
         specifier: ^8.5.13
         version: 8.5.13
     devDependencies:
+      '@types/babel__generator':
+        specifier: ^7
+        version: 7.27.0
+      '@types/babel__traverse':
+        specifier: ^7
+        version: 7.28.0
       '@vitejs/plugin-vue':
         specifier: ^6.0.6
         version: 6.0.6(vite@8.0.10(@types/node@22.19.17))(vue@3.5.33(typescript@5.9.3))
