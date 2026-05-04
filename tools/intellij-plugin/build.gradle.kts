@@ -91,17 +91,18 @@ sourceSets {
     }
 }
 
-// Plan 02 will create src/main/jflex/Rozie.flex and wire compileKotlin dependsOn.
-// We register the task here so A1 (parameter names) can be verified at scaffold time.
+// Plan 02 created src/main/jflex/Rozie.flex; the task generates _RozieLexer.java
+// into src/main/gen/. compileKotlin and compileJava both depend on the
+// generation step so adding/editing Rozie.flex automatically refreshes the
+// generated source.
 tasks.register<GenerateLexerTask>("generateRozieLexer") {
     sourceFile.set(file("src/main/jflex/Rozie.flex"))
     targetOutputDir.set(file("src/main/gen/js/rozie/intellij/lexer"))
     purgeOldFiles.set(true)
 }
 
-// NOTE: `tasks.named("compileKotlin") { dependsOn("generateRozieLexer") }` is deliberately
-// NOT wired here — Rozie.flex does not exist yet (Plan 02 creates it). Wiring this now
-// would fail compileKotlin. Plan 02 will add the wiring after creating the .flex file.
+tasks.named("compileKotlin") { dependsOn("generateRozieLexer") }
+tasks.named("compileJava") { dependsOn("generateRozieLexer") }
 
 // Pitfall 10 mitigation: pass the absolute path to the TextMate grammar JSON as a
 // system property so the D-07 drift check (Plan 02) can read it regardless of CWD.
