@@ -1,0 +1,11 @@
+<rozie name="EdgeMagicInRfor">
+<props>{ skipId: { type: Number, default: -1 } }</props>
+<data>{ items: [] }</data>
+<template>
+  <ul>
+    <li r-for="item in $data.items.filter(x => x.id !== $props.skipId)" :key="item.id">
+      {{ item.name }}
+    </li>
+  </ul>
+</template>
+</rozie>

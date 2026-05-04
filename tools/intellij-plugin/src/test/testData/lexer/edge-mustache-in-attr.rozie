@@ -1,0 +1,8 @@
+<rozie name="EdgeMustacheInAttr">
+<props>{ variant: { type: String, default: "primary" } }</props>
+<template>
+  <div class="card card--{{ $props.variant }}" :data-id="$props.id">
+    Variant: {{ $props.variant }}
+  </div>
+</template>
+</rozie>

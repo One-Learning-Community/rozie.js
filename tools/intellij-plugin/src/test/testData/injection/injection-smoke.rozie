@@ -1,0 +1,24 @@
+<rozie name="InjectionSmoke">
+<props>{ value: { type: Number, default: 0 } }</props>
+<data>{ count: 0 }</data>
+<script>
+const message = "hello"
+$onMount(() => {
+  console.log(message)
+})
+</script>
+<listeners>
+{
+  "window:resize": {
+    when: "true",
+    handler: "() => { $data.count++ }"
+  }
+}
+</listeners>
+<template>
+  <button @click="$data.count++">Click {{ $data.count }}</button>
+</template>
+<style>
+button { color: red; }
+</style>
+</rozie>

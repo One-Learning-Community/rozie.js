@@ -1,0 +1,15 @@
+<rozie name="EdgeMultiRefModifier">
+<data>{ open: false }</data>
+<listeners>
+{
+  "document:click.outside($refs.a, $refs.b).stop": {
+    when: "$data.open",
+    handler: "() => { $data.open = false }"
+  }
+}
+</listeners>
+<template>
+  <button ref="a" @click.stop.prevent="$data.open = !$data.open">Toggle</button>
+  <div ref="b" r-if="$data.open">Panel</div>
+</template>
+</rozie>

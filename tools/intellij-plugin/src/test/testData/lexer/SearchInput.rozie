@@ -1,0 +1,85 @@
+<!--
+  SearchInput.rozie
+
+  Demonstrates:
+    - r-model on a form input (sugar for :value + @input)
+    - $emit for custom events to the parent
+    - $computed deriving from $data
+    - $onMount with cleanup return value (Rozie supports the React-style
+      "return a teardown function from $onMount" pattern as an alternative
+      to writing a separate $onUnmount)
+    - .debounce(ms) parameterized modifier on a template event
+    - Conditional rendering with r-if / r-else
+-->
+
+<rozie name="SearchInput">
+
+<props>
+{
+  placeholder: { type: String,  default: 'Search…' },
+  minLength:   { type: Number,  default: 2 },
+  autofocus:   { type: Boolean, default: false },
+}
+</props>
+
+<data>
+{
+  query: '',
+}
+</data>
+
+<script>
+const isValid = $computed(() => $data.query.length >= $props.minLength)
+
+const onSearch = () => {
+  if (isValid) $emit('search', $data.query)
+}
+
+const clear = () => {
+  $data.query = ''
+  $emit('clear')
+}
+
+$onMount(() => {
+  if ($props.autofocus) $refs.inputEl?.focus()
+
+  // Returning a function from $onMount registers a teardown — equivalent to
+  // a separate $onUnmount, useful when setup and teardown logic belong together.
+  return () => {
+    // e.g., abort an in-flight request initialized in this hook
+  }
+})
+</script>
+
+<template>
+<div class="search-input">
+  <!--
+    Modifier on a template event, same grammar as the <listeners> block:
+    - .debounce(300) waits 300ms after the last keystroke before firing
+    - .enter triggers immediately on Enter even if the debounce window hasn't elapsed
+  -->
+  <input
+    ref="inputEl"
+    type="search"
+    :placeholder="$props.placeholder"
+    r-model="$data.query"
+    @input.debounce(300)="onSearch"
+    @keydown.enter="onSearch"
+    @keydown.escape="clear"
+  />
+
+  <button r-if="$data.query.length > 0" class="clear-btn" @click="clear" aria-label="Clear">
+    ×
+  </button>
+  <span r-else class="hint">{{ $props.minLength }}+ chars</span>
+</div>
+</template>
+
+<style>
+.search-input { display: inline-flex; align-items: center; gap: 0.25rem; }
+input { padding: 0.25rem 0.5rem; }
+.clear-btn { background: none; border: none; cursor: pointer; font-size: 1.25rem; }
+.hint { color: rgba(0, 0, 0, 0.4); font-size: 0.85em; }
+</style>
+
+</rozie>
