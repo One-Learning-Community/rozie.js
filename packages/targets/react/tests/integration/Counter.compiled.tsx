@@ -2,6 +2,11 @@
 // the addition of a `styles` shim. Used by counter-controllable.test.tsx
 // to verify the controlled / uncontrolled / parent-flip flows
 // (REACT-T-03 / Plan 04-04 success criterion 3).
+//
+// Drift detection: src/__tests__/compiled-fixtures-drift.test.ts compares the
+// surface area (component name, props interface, runtime imports) between
+// .snap and .compiled.tsx and fails if they diverge. If that test fails after
+// an emitter change, audit this file against the new .snap and update by hand.
 import { useMemo, useState } from 'react';
 import { clsx, useControllableState } from '@rozie/runtime-react';
 

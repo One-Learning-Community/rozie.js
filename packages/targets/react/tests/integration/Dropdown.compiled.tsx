@@ -6,6 +6,11 @@
 // Per Plan 04-04 success criterion 1, this file is consumed by
 // dropdown-stale-closure.test.tsx to verify the LATEST closure wins when a
 // document.click fires after a parent re-render — the marquee D-61 anchor.
+//
+// Drift detection: src/__tests__/compiled-fixtures-drift.test.ts compares the
+// surface area (component name, props interface, runtime imports) between
+// .snap and .compiled.tsx and fails if they diverge. If that test fails after
+// an emitter change, audit this file against the new .snap and update by hand.
 import { useCallback, useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import {

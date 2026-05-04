@@ -2,6 +2,11 @@
 // addition of a `styles` shim and a small `data-testid` on the backdrop.
 // Used by modal-strictmode.test.tsx + strictmode-all.test.tsx
 // (Phase 4 SC4 / REACT-T-06 / Pitfall 3 anchor).
+//
+// Drift detection: src/__tests__/compiled-fixtures-drift.test.ts compares the
+// surface area (component name, props interface, runtime imports) between
+// .snap and .compiled.tsx and fails if they diverge. If that test fails after
+// an emitter change, audit this file against the new .snap and update by hand.
 import { useCallback, useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { useControllableState } from '@rozie/runtime-react';
