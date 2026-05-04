@@ -104,6 +104,13 @@ import static js.rozie.intellij.lexer.RozieTokenTypes.*;
    * chain from IN_TEMPLATE_TAG_OPEN via `@`.
    */
   private boolean modifierExpectingEventName = false;
+
+  /**
+   * Return state for IN_HTML_COMMENT. Comments can appear at the top level
+   * (YYINITIAL) or inside <template> (IN_TEMPLATE_BODY). Set by whichever
+   * state opens the comment.
+   */
+  private int htmlCommentReturnState = YYINITIAL;
 %}
 
 // ——— Macro definitions ———
@@ -121,7 +128,7 @@ R_DIRECTIVE_RE     = "r-" ("else-if"|"else"|"if"|"show"|"for"|"model"|"html"|"te
 // YYINITIAL — between top-level blocks (default state)
 // =====================================================================
 <YYINITIAL> {
-  "<!--"                          { yybegin(IN_HTML_COMMENT); return HTML_COMMENT_OPEN; }
+  "<!--"                          { htmlCommentReturnState = YYINITIAL; yybegin(IN_HTML_COMMENT); return HTML_COMMENT_OPEN; }
 
   "<rozie"                        { pendingBodyState = YYINITIAL;        yybegin(IN_BLOCK_OPEN_TAG); return ROZIE_BLOCK_TAG; }
   "<template"                     { pendingBodyState = IN_TEMPLATE_BODY; yybegin(IN_BLOCK_OPEN_TAG); return TEMPLATE_BLOCK_TAG; }
@@ -209,10 +216,12 @@ R_DIRECTIVE_RE     = "r-" ("else-if"|"else"|"if"|"show"|"for"|"model"|"html"|"te
 }
 
 // =====================================================================
-// IN_HTML_COMMENT — inside `<!-- ... -->`
+// IN_HTML_COMMENT — inside `<!-- ... -->`. Returns to whichever state opened
+// the comment (htmlCommentReturnState set by the YYINITIAL or IN_TEMPLATE_BODY
+// open rule).
 // =====================================================================
 <IN_HTML_COMMENT> {
-  "-->"                           { yybegin(YYINITIAL); return HTML_COMMENT_CLOSE; }
+  "-->"                           { yybegin(htmlCommentReturnState); return HTML_COMMENT_CLOSE; }
   // Greedy chunk: everything up to the next `-` (which might or might not be
   // the `-->` close). JFlex prefers longest match so the literal `-->` rule
   // above always wins when applicable.
@@ -258,7 +267,7 @@ R_DIRECTIVE_RE     = "r-" ("else-if"|"else"|"if"|"show"|"for"|"model"|"html"|"te
 // =====================================================================
 <IN_TEMPLATE_BODY> {
   "</template>"                   { yybegin(YYINITIAL); return TEMPLATE_CLOSE_TAG; }
-  "<!--"                          { yybegin(IN_HTML_COMMENT); return HTML_COMMENT_OPEN; }
+  "<!--"                          { htmlCommentReturnState = IN_TEMPLATE_BODY; yybegin(IN_HTML_COMMENT); return HTML_COMMENT_OPEN; }
   "{{"                            { mustacheReturnState = IN_TEMPLATE_BODY; yybegin(IN_MUSTACHE); return MUSTACHE_OPEN; }
   "</"                            { yybegin(IN_TEMPLATE_TAG_CLOSE); return LT_SLASH; }
   "<"                             { yybegin(IN_TEMPLATE_TAG_OPEN); return TEMPLATE_BODY; }
