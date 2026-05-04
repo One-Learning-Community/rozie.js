@@ -195,14 +195,6 @@ function emitSlotInvocation(
       ? `<slot${nameAttr}${argAttrs}>${fallbackInner}</slot>`
       : `<slot${nameAttr}${argAttrs}></slot>`;
 
-  // Find the matching SlotDecl in the IR. Default-slot sentinel is ''.
-  const slotDecl = ctx.ir.slots.find(
-    (s) => s.name === (slotKey === '' ? '' : slotKey),
-  );
-  if (slotDecl && slotDecl.presence === 'conditional') {
-    const slotsKey = slotKey === '' ? 'default' : slotKey;
-    return `<template v-if="$slots.${slotsKey}">${slotEl}</template>`;
-  }
   return slotEl;
 }
 

@@ -556,13 +556,15 @@ describe('emitTemplate — example-specific substring assertions', () => {
     expect(template).toContain('<slot name="empty"');
   });
 
-  it('Modal: <template v-if="$slots.header"> wrapper for conditional-presence slot', () => {
+  it('Modal: conditional containers use $slots refs on the outer element, not on the slot itself', () => {
     const { template } = emitTemplate(lowerExample('Modal'), registry);
     // Modal has @click.self on backdrop.
     expect(template).toContain('@click.self=');
-    // Conditional-presence slot wrapping:
-    // The 'header' slot is wrapped in r-if="$props.title || $slots.header" and the conditional emit also retains the $slots.header reference.
+    // r-if="$props.title || $slots.header" on <header> → v-if on outer element.
+    // r-if="$slots.footer" on <footer> → v-if on outer element.
+    // No extra <template v-if="$slots.X"> wrapper should appear around the <slot> itself.
     expect(template).toMatch(/\$slots\.(header|footer)/);
+    expect(template).not.toMatch(/<template v-if="\$slots\.(header|footer)"/);
   });
 });
 
