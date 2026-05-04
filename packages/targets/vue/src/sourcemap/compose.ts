@@ -15,7 +15,7 @@
  *
  * @experimental — shape may change before v1.0
  */
-import type MagicString from 'magic-string';
+import MagicString from 'magic-string';
 import type { SourceMap } from 'magic-string';
 
 export interface ComposeOpts {
@@ -26,7 +26,21 @@ export interface ComposeOpts {
 }
 
 export function composeSourceMap(ms: MagicString, opts: ComposeOpts): SourceMap {
-  const map = ms.generateMap({
+  // Re-project the emitted output through a fresh MagicString anchored to the
+  // original .rozie source. Without this, `ms` was built via `.append()` on a
+  // `MagicString('')` which produces no positional tracking — generateMap
+  // would emit `;`-only mappings and `.rozie` would never appear in the
+  // bundled source-map's `sources[]`. Mirrors the React-target fix in
+  // packages/targets/react/src/sourcemap/compose.ts.
+  let projected: MagicString;
+  if (opts.source.length > 0) {
+    projected = new MagicString(opts.source);
+    projected.overwrite(0, opts.source.length, ms.toString());
+  } else {
+    projected = ms;
+  }
+
+  const map = projected.generateMap({
     source: opts.filename,
     file: opts.filename + '.vue',
     includeContent: true,
