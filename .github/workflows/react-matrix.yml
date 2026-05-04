@@ -72,32 +72,34 @@ jobs:
           pnpm add react@^${{ matrix.react-version }} react-dom@^${{ matrix.react-version }}
           pnpm add -D @types/react@^${{ matrix.react-version }} @types/react-dom@^${{ matrix.react-version }}
 
-      - name: Override Vite React plugin per D-59
-        working-directory: examples/consumers/react-vite
-        run: |
-          if [ "${{ matrix.plugin }}" = "plugin-react-swc" ]; then
-            pnpm remove @vitejs/plugin-react
-            pnpm add -D @vitejs/plugin-react-swc
-            # The vite.config.ts imports from @vitejs/plugin-react; swap the
-            # named import + module path in-place via sed (no need to maintain
-            # two configs).
-            sed -i 's|@vitejs/plugin-react|@vitejs/plugin-react-swc|g' vite.config.ts
-          fi
-
-      - name: Re-install with overrides
+      - name: Re-install with React-version overrides
         run: pnpm install --no-frozen-lockfile
 
       - name: Typecheck demo
         run: pnpm --filter react-vite-demo run typecheck
 
-      - name: Build demo
+      # D-59: the SWC matrix leg uses vite.config.swc.ts (committed sibling
+      # of vite.config.ts) so the SWC source-map composition path is exercised
+      # without `sed`-rewriting the canonical vite.config.ts. Playwright is
+      # invoked with VITE_USE_SWC=1 so its webServer.command picks `build:swc`.
+      - name: Build demo (plugin-react)
+        if: matrix.plugin == 'plugin-react'
         run: pnpm --filter react-vite-demo run build
+
+      - name: Build demo (plugin-react-swc)
+        if: matrix.plugin == 'plugin-react-swc'
+        run: pnpm --filter react-vite-demo run build:swc
 
       - name: Install Playwright Chromium
         run: pnpm --filter react-vite-demo run test:e2e:install
 
-      - name: Run Playwright e2e tests
+      - name: Run Playwright e2e tests (plugin-react)
+        if: matrix.plugin == 'plugin-react'
         run: pnpm --filter react-vite-demo run test:e2e
+
+      - name: Run Playwright e2e tests (plugin-react-swc)
+        if: matrix.plugin == 'plugin-react-swc'
+        run: pnpm --filter react-vite-demo run test:e2e:swc
 
       - name: Upload Playwright HTML report on failure
         if: failure()
