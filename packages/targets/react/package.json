@@ -44,7 +44,7 @@
     "build": "echo 'Phase 4 Plan 01: scaffold only' && exit 0",
     "lint": "biome lint src",
     "typecheck": "tsc --noEmit",
-    "lint:fixtures": "eslint fixtures/*.tsx --no-eslintrc --config eslint.config.js --rule 'react-hooks/exhaustive-deps: error' --max-warnings 0"
+    "lint:fixtures": "node scripts/lint-fixtures.mjs"
   },
   "license": "MIT"
 }
