@@ -30,7 +30,9 @@
             language="Rozie"
             extensions="rozie"/>
 
-        <!-- Plan 02 wires: <lang.parserDefinition language="Rozie" implementationClass="js.rozie.intellij.parser.RozieParserDefinition"/> -->
+        <lang.parserDefinition
+            language="Rozie"
+            implementationClass="js.rozie.intellij.parser.RozieParserDefinition"/>
 
         <lang.syntaxHighlighterFactory
             language="Rozie"
