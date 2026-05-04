@@ -107,6 +107,14 @@ pnpm test:e2e     # Playwright suite (6 specs, 5 success criteria + OQ4)
 
 Full rationale and alternatives considered in [`CLAUDE.md`](CLAUDE.md).
 
+## IDE Tooling
+
+A JetBrains IntelliJ Platform plugin (Rozie.js) provides syntax highlighting and JS/HTML/CSS language injection for `.rozie` files in IDEA Ultimate / WebStorm / PhpStorm / RubyMine / GoLand 2024.2+.
+
+See [`tools/intellij-plugin/README.md`](tools/intellij-plugin/README.md) for installation, supported IDEs, dev loop, and dogfood feedback workflow.
+
+For lightweight color-only support (no JS plugin required), the original [TextMate grammar](tools/textmate/) at `tools/textmate/` continues to work in IDEA Community, PyCharm CE, and VSCode.
+
 ## Contributing
 
 This is a planned, phase-driven build under the [GSD workflow](https://github.com/anthropics/gsd) (`/gsd-execute-phase`, `/gsd-plan-phase`, etc.). Phase artifacts live in [`.planning/phases/`](.planning/phases). Read [`CLAUDE.md`](CLAUDE.md) and [`.planning/PROJECT.md`](.planning/PROJECT.md) before opening a substantive PR.
