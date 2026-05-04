@@ -40,6 +40,7 @@
         <colorSettingsPage
             implementation="js.rozie.intellij.highlighting.RozieColorSettingsPage"/>
 
-        <!-- Plan 04 wires: <multiHostInjector implementation="js.rozie.intellij.injection.RozieMultiHostInjector"/> -->
+        <multiHostInjector
+            implementation="js.rozie.intellij.injection.RozieMultiHostInjector"/>
     </extensions>
 </idea-plugin>
