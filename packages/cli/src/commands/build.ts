@@ -7,7 +7,7 @@
 // (ParseResult → LowerResult → EmitVueResult, diagnostics surfaced via
 // renderDiagnostic, errors -> exit 1, warnings -> stderr + continue).
 import { readFileSync, writeFileSync, statSync } from 'node:fs';
-import { resolve as pathResolve, join as pathJoin, basename as pathBasename } from 'node:path';
+import { resolve as pathResolve, join as pathJoin, basename as pathBasename, dirname as pathDirname } from 'node:path';
 import pc from 'picocolors';
 import { parse } from '../../../core/src/parse.js';
 import { lowerToIR } from '../../../core/src/ir/lower.js';
@@ -15,6 +15,7 @@ import { createDefaultRegistry } from '../../../core/src/modifiers/registerBuilt
 import { renderDiagnostic } from '../../../core/src/diagnostics/frame.js';
 import type { Diagnostic } from '../../../core/src/diagnostics/Diagnostic.js';
 import { emitVue } from '../../../targets/vue/src/emitVue.js';
+import { emitReact } from '../../../targets/react/src/emitReact.js';
 
 export interface BuildOptions {
   target?: string;
@@ -53,7 +54,7 @@ const VALID_TARGETS = new Set(['vue', 'react', 'svelte', 'angular']);
 
 const TARGET_EXTENSIONS: Record<string, string> = {
   vue: '.vue',
-  react: '.jsx',
+  react: '.tsx',
   svelte: '.svelte',
   angular: '.js',
 };
@@ -61,7 +62,6 @@ const TARGET_EXTENSIONS: Record<string, string> = {
 // Map of not-yet-shipped targets -> the phase that lands them. Source of
 // truth: ROADMAP.md. Sync this map when each target's emitter ships.
 const TARGET_PHASE: Record<string, string> = {
-  react: 'Phase 4',
   svelte: 'Phase 5',
   angular: 'Phase 5',
 };
@@ -90,7 +90,7 @@ export async function runBuild(
     stderrWrite(msg);
     exit(2, msg);
   }
-  if (target !== 'vue') {
+  if (target !== 'vue' && target !== 'react') {
     const phase = TARGET_PHASE[target] ?? 'a future phase';
     const msg = pc.red(
       `rozie build: target '${target}' not yet shipped — see ROADMAP.md (${phase})\n`,
@@ -136,11 +136,14 @@ export async function runBuild(
     return;
   }
 
-  const result = emitVue(ir, {
-    filename: filePath,
-    source,
-    modifierRegistry: registry,
-  });
+  const result =
+    target === 'react'
+      ? emitReact(ir, { filename: filePath, source })
+      : emitVue(ir, {
+          filename: filePath,
+          source,
+          modifierRegistry: registry,
+        });
   const emitErrors = result.diagnostics.filter((d) => d.severity === 'error');
   if (emitErrors.length > 0) {
     const stderrBuf = renderAll(result.diagnostics, source);
@@ -175,6 +178,19 @@ export async function runBuild(
     if (opts.sourceMap && result.map) {
       // magic-string SourceMap has a .toString() that emits canonical JSON.
       writeFileSync(`${outPath}.map`, result.map.toString(), 'utf8');
+    }
+
+    // For react target, also write sibling .module.css and .global.css when present.
+    if (target === 'react') {
+      const reactResult = result as { css?: string; globalCss?: string };
+      const baseName = pathBasename(filePath, '.rozie');
+      const outDir = pathDirname(outPath);
+      if (reactResult.css && reactResult.css.length > 0) {
+        writeFileSync(pathJoin(outDir, `${baseName}.module.css`), reactResult.css, 'utf8');
+      }
+      if (reactResult.globalCss && reactResult.globalCss.length > 0) {
+        writeFileSync(pathJoin(outDir, `${baseName}.global.css`), reactResult.globalCss, 'utf8');
+      }
     }
   } else {
     stdoutWrite(result.code);

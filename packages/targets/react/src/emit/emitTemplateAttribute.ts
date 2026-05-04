@@ -56,6 +56,15 @@ export interface EmitAttrCtx {
 }
 
 /**
+ * Whether the component has a scoped <style> block. When false, `styles` is
+ * not imported in the .tsx output and class tokens must be emitted as plain
+ * string literals (not `styles.X` lookups, which would be runtime ReferenceErrors).
+ */
+function hasModuleCss(ir: IRComponent): boolean {
+  return (ir.styles?.scopedRules?.length ?? 0) > 0;
+}
+
+/**
  * Names that are CONSUMED upstream and never emitted as JSX attributes:
  *   - r-* control-flow directives (consumed by emitTemplateElement / emitConditional / emitLoop)
  *   - r-html / r-show / r-text / r-model (consumed by emitTemplateElement special-cases)
@@ -242,12 +251,21 @@ function renderObjectFormForClsx(
     }
     const valueText = renderExpr(prop.value, ir);
 
-    // Use computed-key form `[styles.<key>]: value`. For keys with hyphens,
-    // bracket-quote: `[styles['key-name']]`.
-    const stylesLookup = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(keyText)
-      ? `styles.${keyText}`
-      : `styles[${JSON.stringify(keyText)}]`;
-    propStrings.push(`[${stylesLookup}]: ${valueText}`);
+    // When a scoped <style> block exists, use computed-key form
+    // `[styles.<key>]: value`. For keys with hyphens, bracket-quote:
+    // `[styles['key-name']]`. When no scoped block exists, emit the
+    // plain key (quoted if non-identifier) without a styles lookup.
+    if (!hasModuleCss(ir)) {
+      const keyOut = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(keyText)
+        ? keyText
+        : JSON.stringify(keyText);
+      propStrings.push(`${keyOut}: ${valueText}`);
+    } else {
+      const stylesLookup = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(keyText)
+        ? `styles.${keyText}`
+        : `styles[${JSON.stringify(keyText)}]`;
+      propStrings.push(`[${stylesLookup}]: ${valueText}`);
+    }
   }
   return `{ ${propStrings.join(', ')} }`;
 }
@@ -256,7 +274,11 @@ function renderObjectFormForClsx(
  * Render a value as `styles.X` lookup (single static class) or as a
  * template literal segment for multi-static / interpolated classes.
  */
-function renderStaticClassLookup(className: string): string {
+function renderStaticClassLookup(className: string, ir: IRComponent): string {
+  // No scoped <style> block → emit plain string literal (no `styles` symbol in scope).
+  if (!hasModuleCss(ir)) {
+    return JSON.stringify(className);
+  }
   // Identifier-safe class name → `styles.X`; else bracket-quote.
   if (/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(className)) {
     return `styles.${className}`;
@@ -320,10 +342,14 @@ function composeClassName(
     const seg = segments[0]! as { kind: 'staticTokens'; tokens: string[] };
     if (seg.tokens.length === 0) return '""';
     if (seg.tokens.length === 1) {
-      return renderStaticClassLookup(seg.tokens[0]!);
+      return renderStaticClassLookup(seg.tokens[0]!, ir);
+    }
+    // No styles → emit as a single quoted string literal.
+    if (!hasModuleCss(ir)) {
+      return JSON.stringify(seg.tokens.join(' '));
     }
     // Multi static → backtick template literal
-    const parts = seg.tokens.map((tok) => '${' + renderStaticClassLookup(tok) + '}').join(' ');
+    const parts = seg.tokens.map((tok) => '${' + renderStaticClassLookup(tok, ir) + '}').join(' ');
     return '`' + parts + '`';
   }
 
@@ -357,9 +383,9 @@ function composeClassName(
   const clsxArgs: string[] = [];
   for (const s of segments) {
     if (s.kind === 'staticTokens') {
-      // Each static token becomes a styles.X arg
+      // Each static token becomes a styles.X arg (or a string literal when no <style>).
       for (const tok of s.tokens) {
-        clsxArgs.push(renderStaticClassLookup(tok));
+        clsxArgs.push(renderStaticClassLookup(tok, ir));
       }
     } else if (s.kind === 'objectBinding') {
       clsxArgs.push(renderObjectFormForClsx(s.expr, ir));
@@ -446,13 +472,15 @@ function renderInterpolatedClass(
 
   if (tokens.length === 0) return '""';
 
+  const noStyles = !hasModuleCss(ir);
+
   // Build template-literal-friendly representations
   const renderedTokens = tokens.map((tok) => {
-    // Pure-static token → styles.X lookup
+    // Pure-static token → styles.X lookup (or plain text when no <style>).
     if (tok.parts.length === 1 && tok.parts[0]!.kind === 'static') {
-      return '${' + renderStaticClassLookup(tok.parts[0]!.text) + '}';
+      return '${' + renderStaticClassLookup(tok.parts[0]!.text, ir) + '}';
     }
-    // Composite token (mix of static + binding) → styles[`<token-template>`]
+    // Composite token (mix of static + binding).
     const inner = tok.parts
       .map((p) => {
         if (p.kind === 'static') {
@@ -465,7 +493,8 @@ function renderInterpolatedClass(
         return '${' + p.code + '}';
       })
       .join('');
-    return '${styles[`' + inner + '`]}';
+    // No <style> → emit the composite token as a plain backtick segment.
+    return noStyles ? inner : '${styles[`' + inner + '`]}';
   });
 
   // Join tokens with single spaces

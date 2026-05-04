@@ -33,6 +33,7 @@
     "@babel/traverse": "^7.29.0",
     "@babel/types": "^7.29.0",
     "@rozie/core": "workspace:*",
+    "@rozie/target-react": "workspace:*",
     "@rozie/target-vue": "workspace:*",
     "@vue/compiler-sfc": "^3.5.33",
     "commander": "^14.0.0",

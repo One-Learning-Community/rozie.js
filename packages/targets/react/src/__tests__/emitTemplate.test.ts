@@ -69,6 +69,9 @@ describe('className composition — Plan 04-03 Task 1', () => {
 <template>
 <div class="counter"></div>
 </template>
+<style>
+.counter { color: red; }
+</style>
 </rozie>
 `);
     const { jsx, collectors } = emit(ir);
@@ -82,6 +85,10 @@ describe('className composition — Plan 04-03 Task 1', () => {
 <template>
 <div class="counter card"></div>
 </template>
+<style>
+.counter { color: red; }
+.card { color: blue; }
+</style>
 </rozie>
 `);
     const { jsx, collectors } = emit(ir);
@@ -96,6 +103,9 @@ describe('className composition — Plan 04-03 Task 1', () => {
 <template>
 <div :class="{ active: $data.active }"></div>
 </template>
+<style>
+.active { color: red; }
+</style>
 </rozie>
 `);
     const { jsx, collectors } = emit(ir);
@@ -110,6 +120,10 @@ describe('className composition — Plan 04-03 Task 1', () => {
 <template>
 <div class="x" :class="{ on: $data.on }"></div>
 </template>
+<style>
+.x { color: red; }
+.on { color: green; }
+</style>
 </rozie>
 `);
     const { jsx, collectors } = emit(ir);
@@ -117,6 +131,24 @@ describe('className composition — Plan 04-03 Task 1', () => {
     expect(jsx).toContain('styles.x');
     expect(jsx).toContain('[styles.on]: on');
     expect(collectors.runtime.has('clsx')).toBe(true);
+  });
+
+  it('class= without <style> block → emits plain string literal (no styles ref)', () => {
+    const ir = lowerInline(`
+<rozie name="X">
+<template>
+<button class="trigger-error">click</button>
+</template>
+</rozie>
+`);
+    const { jsx, collectors } = emit(ir);
+    // Should NOT reference `styles` (would be a ReferenceError at runtime)
+    expect(jsx).not.toMatch(/\bstyles\./);
+    expect(jsx).not.toMatch(/\bstyles\[/);
+    // Should emit the class as a plain string literal (either as a string attr
+    // or wrapped in a JSX expression — both are valid React).
+    expect(jsx).toMatch(/className=(?:"trigger-error"|\{"trigger-error"\})/);
+    expect(collectors.runtime.has('clsx')).toBe(false);
   });
 
   it('Test 17: emitted code uses className= NOT class=', () => {

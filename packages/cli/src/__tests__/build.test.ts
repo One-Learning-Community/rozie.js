@@ -52,17 +52,32 @@ describe('runBuild — happy path (Counter.rozie -> Vue SFC)', () => {
   });
 });
 
+describe('runBuild — react target (Counter.rozie -> React TSX)', () => {
+  it('emits a valid React 18 functional component with hooks + JSX + interface', async () => {
+    const { ctx, out } = makeBufs();
+    await runBuild(COUNTER_PATH, { target: 'react' }, ctx);
+    const code = out();
+    // Sanity: NOT importing React default (D-68 automatic JSX runtime)
+    expect(code).not.toContain("import React from 'react'");
+    expect(code).toContain("from 'react'");
+    expect(code).toContain('useControllableState');
+    expect(code).toContain('interface CounterProps');
+    expect(code).toContain('export default function Counter');
+    expect(code).toContain('return (');
+  });
+});
+
 describe('runBuild — target gating', () => {
-  it('exits 2 with "not yet shipped" stderr for --target react', async () => {
+  it('exits 2 with "not yet shipped" stderr for --target svelte', async () => {
     const { ctx, err } = makeBufs();
-    await expect(runBuild(COUNTER_PATH, { target: 'react' }, ctx)).rejects.toBeInstanceOf(
+    await expect(runBuild(COUNTER_PATH, { target: 'svelte' }, ctx)).rejects.toBeInstanceOf(
       BuildExit,
     );
     expect(err()).toMatch(/not yet shipped/);
-    expect(err()).toMatch(/Phase 4/);
+    expect(err()).toMatch(/Phase 5/);
     // The thrown BuildExit carries the exit code.
     try {
-      await runBuild(COUNTER_PATH, { target: 'svelte' }, makeBufs().ctx);
+      await runBuild(COUNTER_PATH, { target: 'angular' }, makeBufs().ctx);
     } catch (e) {
       expect((e as BuildExit).code).toBe(2);
     }
