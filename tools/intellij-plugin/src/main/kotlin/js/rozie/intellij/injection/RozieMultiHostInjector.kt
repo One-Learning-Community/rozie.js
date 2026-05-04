@@ -5,7 +5,6 @@ import com.intellij.lang.css.CSSLanguage
 import com.intellij.lang.html.HTMLLanguage
 import com.intellij.lang.injection.MultiHostInjector
 import com.intellij.lang.injection.MultiHostRegistrar
-import com.intellij.lang.javascript.JavascriptLanguage
 import com.intellij.openapi.util.TextRange
 import com.intellij.psi.PsiElement
 import com.intellij.psi.tree.IElementType
@@ -26,8 +25,10 @@ import js.rozie.intellij.parser.RozieRootBlock
  * RESEARCH A3 outcome: empirical javap inspection of `plugins/javascript-plugin/lib/javascript-plugin.jar`
  * showed `JavaScriptSupportLoader.JAVASCRIPT` is typed as `LanguageFileType`, not a `Language`,
  * so it cannot be passed to [MultiHostRegistrar.startInjecting]. The correct constant for
- * "vanilla JS" injection is [JavascriptLanguage.INSTANCE] (a [com.intellij.lang.javascript.JSLanguageDialect]
- * extending [Language]).
+ * "vanilla JS" injection is `Language.findLanguageByID("JavaScript")` — used instead of
+ * `JavascriptLanguage.INSTANCE` because the latter was converted to a Kotlin `object` in
+ * IU 2025.3, breaking the static-INSTANCE accessor across the 2024.2 floor (Java class) and
+ * 2025.3 current (Kotlin object). The findLanguageByID lookup is stable across both.
  *
  * RESEARCH A4 outcome: the file-as-host approach FAILED empirically — the platform's
  * injection-dispatcher does not visit `PsiFile` itself when walking for injection hosts.
@@ -69,7 +70,8 @@ class RozieMultiHostInjector : MultiHostInjector {
     // ---- per-language helpers ---------------------------------------------------
 
     private fun injectJs(registrar: MultiHostRegistrar, host: RozieRootBlock, range: TextRange) {
-        registrar.startInjecting(JavascriptLanguage.INSTANCE)
+        val js = Language.findLanguageByID("JavaScript") ?: return
+        registrar.startInjecting(js)
             .addPlace(null, null, host, range)
             .doneInjecting()
     }
