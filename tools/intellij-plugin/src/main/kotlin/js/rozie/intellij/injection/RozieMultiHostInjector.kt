@@ -11,10 +11,10 @@ import com.intellij.psi.PsiElement
 import com.intellij.psi.tree.IElementType
 import js.rozie.intellij.lexer.RozieLexerAdapter
 import js.rozie.intellij.lexer.RozieTokenTypes
-import js.rozie.intellij.parser.RozieFile
+import js.rozie.intellij.parser.RozieRootBlock
 
 /**
- * Walks every [RozieFile]'s token stream and registers JavaScript / HTML / CSS
+ * Walks every [RozieRootBlock]'s token stream and registers JavaScript / HTML / CSS
  * (or SCSS / Less) injection ranges per the D-09 / D-10 / D-11 / D-12 contracts:
  *
  *  - SCRIPT_BODY / PROPS_BODY / DATA_BODY / LISTENERS_BODY -> JavaScript (D-09, D-12)
@@ -23,25 +23,24 @@ import js.rozie.intellij.parser.RozieFile
  *  - ATTR_VALUE_JS (r-* / @event / :prop / ref values)      -> JavaScript (D-09)
  *  - MUSTACHE_BODY                                          -> NOT injected in v1 (D-09 deferral)
  *
- * RESEARCH A3: the bundled `javascript-plugin` exposes both [JavascriptLanguage] and
- * [com.intellij.lang.javascript.JavaScriptSupportLoader.JAVASCRIPT]. Empirical javap
- * inspection of `plugins/javascript-plugin/lib/javascript-plugin.jar` shows
- * `JavaScriptSupportLoader.JAVASCRIPT` is typed as `LanguageFileType`, not a `Language`,
- * so it cannot be passed to [MultiHostRegistrar.startInjecting]. The correct constant
- * for "vanilla JS" injection is [JavascriptLanguage.INSTANCE] (a [com.intellij.lang.javascript.JSLanguageDialect]
+ * RESEARCH A3 outcome: empirical javap inspection of `plugins/javascript-plugin/lib/javascript-plugin.jar`
+ * showed `JavaScriptSupportLoader.JAVASCRIPT` is typed as `LanguageFileType`, not a `Language`,
+ * so it cannot be passed to [MultiHostRegistrar.startInjecting]. The correct constant for
+ * "vanilla JS" injection is [JavascriptLanguage.INSTANCE] (a [com.intellij.lang.javascript.JSLanguageDialect]
  * extending [Language]).
  *
- * RESEARCH A4: a single [RozieFile] is the [com.intellij.psi.PsiLanguageInjectionHost] for every
- * injection range; we re-run the lexer over the host's text to find ranges (cheaper than
- * walking child nodes since A2 chose not to emit per-token PSI elements).
+ * RESEARCH A4 outcome: the file-as-host approach FAILED empirically — the platform's
+ * injection-dispatcher does not visit `PsiFile` itself when walking for injection hosts.
+ * [RozieRootBlock] (a single composite element nested under [js.rozie.intellij.parser.RozieFile])
+ * is the [com.intellij.psi.PsiLanguageInjectionHost] target instead.
  */
 class RozieMultiHostInjector : MultiHostInjector {
 
     override fun elementsToInjectIn(): List<Class<out PsiElement>> =
-        listOf(RozieFile::class.java)
+        listOf(RozieRootBlock::class.java)
 
     override fun getLanguagesToInject(registrar: MultiHostRegistrar, host: PsiElement) {
-        if (host !is RozieFile) return
+        if (host !is RozieRootBlock) return
         val tokens = scanTokens(host)
 
         for (i in tokens.indices) {
@@ -69,13 +68,13 @@ class RozieMultiHostInjector : MultiHostInjector {
 
     // ---- per-language helpers ---------------------------------------------------
 
-    private fun injectJs(registrar: MultiHostRegistrar, host: RozieFile, range: TextRange) {
+    private fun injectJs(registrar: MultiHostRegistrar, host: RozieRootBlock, range: TextRange) {
         registrar.startInjecting(JavascriptLanguage.INSTANCE)
             .addPlace(null, null, host, range)
             .doneInjecting()
     }
 
-    private fun injectHtml(registrar: MultiHostRegistrar, host: RozieFile, range: TextRange) {
+    private fun injectHtml(registrar: MultiHostRegistrar, host: RozieRootBlock, range: TextRange) {
         registrar.startInjecting(HTMLLanguage.INSTANCE)
             .addPlace(null, null, host, range)
             .doneInjecting()
@@ -91,7 +90,7 @@ class RozieMultiHostInjector : MultiHostInjector {
      */
     private fun injectStyle(
         registrar: MultiHostRegistrar,
-        host: RozieFile,
+        host: RozieRootBlock,
         range: TextRange,
         lang: String,
     ) {
@@ -126,10 +125,11 @@ class RozieMultiHostInjector : MultiHostInjector {
     }
 
     /**
-     * Scan tokens by re-running the lexer over the host file's text. Cheaper than walking
-     * the host's child nodes (which we deliberately don't emit per-token PSI for, per A2).
+     * Scan tokens by re-running the lexer over the host's text. The host text spans the
+     * entire file body since [RozieRootBlock] is a single composite under the file root,
+     * so token offsets align with file offsets.
      */
-    private fun scanTokens(host: RozieFile): List<TokenSpan> {
+    private fun scanTokens(host: RozieRootBlock): List<TokenSpan> {
         val text = host.text
         val lexer = RozieLexerAdapter().apply { start(text) }
         val out = mutableListOf<TokenSpan>()

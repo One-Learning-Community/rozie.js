@@ -42,5 +42,8 @@
 
         <multiHostInjector
             implementation="js.rozie.intellij.injection.RozieMultiHostInjector"/>
+
+        <xml.xmlSuppressionProvider
+            implementation="js.rozie.intellij.inspection.RozieHtmlInspectionSuppressor"/>
     </extensions>
 </idea-plugin>
