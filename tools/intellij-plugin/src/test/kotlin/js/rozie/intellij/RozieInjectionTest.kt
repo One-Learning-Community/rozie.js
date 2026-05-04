@@ -1,7 +1,6 @@
 package js.rozie.intellij
 
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
-import org.junit.Test
 
 /**
  * Wave 0 scaffold for `InjectedLanguageManager`-driven injection smoke tests.
@@ -13,14 +12,17 @@ import org.junit.Test
  *   - `<listeners>` body (whole object literal per D-12) -> JavaScriptLanguage injection
  *   - `<template>` body                                   -> HtmlLanguage injection
  *   - `<style>` body                                      -> CssLanguage injection
- *   - r-* / @ / : attribute values (per D-09)             -> JavaScriptLanguage injection
- *   - HTML inspections do NOT flag r-*/@/: as unknown attributes (SC-4 carve-out)
+ *   - r- / @ / : attribute values (per D-09)              -> JavaScriptLanguage injection
+ *   - HTML inspections do NOT flag r-, @ or `:` attributes as unknown (SC-4 carve-out)
+ *
+ * Note: [BasePlatformTestCase] descends from JUnit 3's `TestCase`; method names
+ * must begin with `test` to be picked up by Gradle's runner (JUnit 4 `@Test`
+ * annotations are ignored on JUnit-3-style classes — Rule 1 bug fix).
  */
 class RozieInjectionTest : BasePlatformTestCase() {
     override fun getTestDataPath(): String = "src/test/testData/injection"
 
-    @Test
-    fun `placeholder until Plan 04 injector lands`() {
+    fun testPlaceholderUntilPlan04InjectorLands() {
         // Intentionally empty — Plan 04 will populate.
         // Until then this keeps BasePlatformTestCase loadable so `./gradlew test`
         // exercises the platform-test-framework wiring end to end.

@@ -1,9 +1,9 @@
 package js.rozie.intellij
 
 import org.json.JSONObject
+import org.junit.Assert.assertNotNull
 import org.junit.Test
 import java.io.File
-import kotlin.test.assertNotNull
 
 /**
  * Wave 0 scaffold for the D-07 TextMate <-> JFlex drift check.
@@ -26,7 +26,8 @@ class TextMateGrammarParityTest {
     @Test
     fun `TM grammar file is reachable from test working directory`() {
         val tmFile = File(tmGrammarPath)
-        assertNotNull(tmFile, "tm grammar file resolves to null path")
+        // JUnit's assertNotNull is (message, value) — opposite arg order from kotlin.test
+        assertNotNull("tm grammar file resolves to null path", tmFile)
         check(tmFile.exists()) {
             "TM grammar not found at $tmGrammarPath — verify Pitfall 10 fix in build.gradle.kts"
         }

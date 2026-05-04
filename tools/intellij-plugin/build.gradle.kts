@@ -40,6 +40,11 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
     // For D-07 TM <-> JFlex drift check (Plan 02 will use it; Plan 01 only verifies path resolution)
     testImplementation("org.json:json:20240303")
+    // Required for the 2024.2 testFramework: BasePlatformTestCase initialization throws
+    // NoClassDefFoundError: org/opentest4j/AssertionFailedError without an explicit
+    // opentest4j dep. RESEARCH.md "Supporting" table flagged this for <2024.3.
+    // (Rule 3 fix — confirmed empirically by gradle test failure.)
+    testImplementation("org.opentest4j:opentest4j:1.3.0")
 }
 
 intellijPlatform {
@@ -60,6 +65,10 @@ intellijPlatform {
             Adds .rozie file type recognition with Rozie-aware syntax highlighting
             and JS/HTML/CSS language injection into block bodies.
         """.trimIndent()
+        // Explicit changeNotes (Rule 3 fix) — the changelog plugin's auto-render
+        // path expects a CHANGELOG.md with an [Unreleased] section; we set the
+        // value inline instead of carrying a CHANGELOG.md for this internal build.
+        changeNotes = "<p><strong>0.1.0</strong> — Initial internal dogfooding release.</p>"
     }
 
     pluginVerification {
