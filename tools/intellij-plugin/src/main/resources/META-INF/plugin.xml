@@ -1,5 +1,5 @@
 <idea-plugin>
-    <id>js.rozie.intellij</id>
+    <id>js.rozie</id>
     <name>Rozie.js</name>
     <vendor email="internal@rozie.js">Rozie.js</vendor>
 

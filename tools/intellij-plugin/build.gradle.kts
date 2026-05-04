@@ -54,7 +54,7 @@ dependencies {
 
 intellijPlatform {
     pluginConfiguration {
-        id = "js.rozie.intellij"
+        id = "js.rozie"
         name = "Rozie.js"
         version = project.version.toString()
         ideaVersion {
