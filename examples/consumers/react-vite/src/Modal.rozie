@@ -67,7 +67,7 @@ $onMount(() => {
 </listeners>
 
 <template>
-<div r-if="$props.open" class="modal-backdrop" ref="backdropEl" @click.self="$props.closeOnBackdrop && close()">
+<div r-if="$props.open" class="modal-backdrop" data-testid="modal-backdrop" ref="backdropEl" @click.self="$props.closeOnBackdrop && close()">
   <div
     ref="dialogEl"
     class="modal-dialog"

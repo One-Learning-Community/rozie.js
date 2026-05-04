@@ -46,7 +46,7 @@ const decrement = () => { if (canDecrement) $props.value -= $props.step }
   @mouseleave="$data.hovering = false"
 >
   <button :disabled="!canDecrement" @click="decrement" aria-label="Decrement">−</button>
-  <span class="value">{{ $props.value }}</span>
+  <span class="value" data-testid="counter-value">{{ $props.value }}</span>
   <button :disabled="!canIncrement" @click="increment" aria-label="Increment">+</button>
 </div>
 </template>

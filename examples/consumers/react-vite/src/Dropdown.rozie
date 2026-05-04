@@ -73,7 +73,7 @@ $onMount(() => {
     <slot name="trigger" :open="$props.open" :toggle="toggle" />
   </div>
 
-  <div r-if="$props.open" ref="panelEl" class="dropdown-panel" role="menu">
+  <div r-if="$props.open" ref="panelEl" class="dropdown-panel" data-testid="dropdown-panel" role="menu">
     <slot :close="close" />
   </div>
 </div>
