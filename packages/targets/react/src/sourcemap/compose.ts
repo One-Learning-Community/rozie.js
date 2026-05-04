@@ -18,9 +18,32 @@
  * `sources` from the options, our explicit override guarantees the
  * contract Plan 04-05 depends on.
  *
+ * Phase 4 follow-up (DX-01 fix): magic-string's `generateMap` only emits
+ * encoded segments for content that came from the *original* source string.
+ * `buildShell` constructs a `MagicString('')` and only calls `.append(...)`,
+ * which routes its content into the `outro` field — `outro` is processed via
+ * `mappings.advance(outro)` which advances output position WITHOUT producing
+ * any source segments. Result: `mappings` was a string of `;` separators
+ * only, the `.rozie` file was absent from the bundle's `sources[]`, and the
+ * "[rozie] Source map generated with empty mappings" warning fired on every
+ * build.
+ *
+ * The fix re-projects the generated code back onto the original `.rozie`
+ * source: build a *fresh* MagicString from the original `.rozie` text,
+ * `overwrite(0, source.length, ms.toString())` to replace it with the
+ * generated output, then call `generateMap`. magic-string treats this as an
+ * `addEdit(...)` for chunk[0..source.length] which produces a real segment
+ * at output (0,0) → source (0,0). Bundle source-maps now include the
+ * `.rozie` file in `sources[]` and DevTools can navigate from a stack frame
+ * back to the `.rozie` file (DX-01 success criterion 4).
+ *
+ * Per-block fine-grained mappings (one segment per <script>/<template>/
+ * <style> block) is a future enhancement — the current single-segment map
+ * is the minimum viable fix for DX-01.
+ *
  * @experimental — shape may change before v1.0
  */
-import type MagicString from 'magic-string';
+import MagicString from 'magic-string';
 import type { SourceMap } from 'magic-string';
 
 export interface ComposeOpts {
@@ -31,7 +54,20 @@ export interface ComposeOpts {
 }
 
 export function composeSourceMap(ms: MagicString, opts: ComposeOpts): SourceMap {
-  const map = ms.generateMap({
+  // Re-project the emitted output through a fresh MagicString anchored to
+  // the original `.rozie` source — see header comment for the rationale.
+  // When the original source is empty (defensive — should not happen in the
+  // production pipeline), fall back to the original ms so we still produce
+  // a (degenerate) map without throwing.
+  let projected: MagicString;
+  if (opts.source.length > 0) {
+    projected = new MagicString(opts.source);
+    projected.overwrite(0, opts.source.length, ms.toString());
+  } else {
+    projected = ms;
+  }
+
+  const map = projected.generateMap({
     source: opts.filename,
     file: opts.filename + '.tsx',
     includeContent: true,
@@ -49,10 +85,9 @@ export function composeSourceMap(ms: MagicString, opts: ComposeOpts): SourceMap 
   }
 
   // Phase 3 WR-01 carryover: warn when mappings are empty (only `;` separators,
-  // no encoded segments). buildShell uses MagicString.append() on a fresh
-  // empty string, which produces no positional tracking — mappings will be
-  // decorative only. Long-term, the shell should use snip/overwrite to get
-  // real per-block source positions.
+  // no encoded segments). With the projected-source fix above, this branch
+  // should only fire when `opts.source` is empty (a degenerate case) — the
+  // warning remains as a guard against future regressions.
   if (!map.mappings || /^[;,]*$/.test(map.mappings)) {
     console.warn('[rozie] Source map generated with empty mappings for', opts.filename);
   }
