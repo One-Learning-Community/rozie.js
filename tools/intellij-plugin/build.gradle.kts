@@ -1,7 +1,11 @@
 import org.jetbrains.changelog.Changelog
 import org.jetbrains.intellij.platform.gradle.IntelliJPlatformType
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
-import org.jetbrains.grammarkit.tasks.GenerateLexerTask
+// NOTE: In IntelliJ Platform Gradle Plugin 2.x the GenerateLexerTask was relocated
+// from the standalone `org.jetbrains.grammarkit.tasks` package into the bundled
+// IPGP namespace. Verified by introspecting IPGP 2.16.0's jar (Rule 3 fix —
+// RESEARCH.md A1 anticipated this drift; the actual class lives at this path).
+import org.jetbrains.intellij.platform.gradle.tasks.GenerateLexerTask
 
 plugins {
     id("org.jetbrains.kotlin.jvm") version "2.2.0"
@@ -60,8 +64,10 @@ intellijPlatform {
 
     pluginVerification {
         ides {
-            ide(IntelliJPlatformType.IntellijIdeaUltimate, "2024.2.5")
-            ide(IntelliJPlatformType.IntellijIdeaUltimate, "2025.3")
+            // IPGP 2.16 renamed `ide(...)` to `create(...)` for plugin-verifier IDE entries
+            // (verified by javap on IntelliJPlatformExtension$PluginVerification$Ides — Rule 3 fix).
+            create(IntelliJPlatformType.IntellijIdeaUltimate, "2024.2.5")
+            create(IntelliJPlatformType.IntellijIdeaUltimate, "2025.3")
         }
     }
 
