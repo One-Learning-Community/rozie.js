@@ -1,0 +1,161 @@
+name: IntelliJ Plugin
+
+# Separate CI workflow for the JetBrains plugin subproject (Phase 8 D-15).
+# The main pnpm/Vitest CI lives in react-matrix.yml + vue-matrix.yml and is
+# JS-only — no JDK/Gradle bleed. This workflow is gated to changes under
+# tools/intellij-plugin/** + this file, plus tag pushes for releases.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'tools/intellij-plugin/**'
+      - '.github/workflows/intellij-plugin.yml'
+    tags:
+      - 'intellij-plugin/v*'
+  pull_request:
+    paths:
+      - 'tools/intellij-plugin/**'
+      - '.github/workflows/intellij-plugin.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: intellij-plugin-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: tools/intellij-plugin
+
+jobs:
+  build:
+    name: Build (platform=${{ matrix.platform }})
+    runs-on: ubuntu-latest
+    strategy:
+      # Don't kill the 2024.2.5 (floor) job if 2025.3 (current) regresses, and vice versa.
+      fail-fast: false
+      matrix:
+        # D-14: 2024.2 floor + a current platform.
+        platform: ['2024.2.5', '2025.3']
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup JDK 21 (Temurin)
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v5
+
+      - name: Generate lexer (drives -PplatformVersion through to compile)
+        run: ./gradlew generateRozieLexer -PplatformVersion=${{ matrix.platform }}
+
+      - name: Build plugin
+        run: ./gradlew buildPlugin -PplatformVersion=${{ matrix.platform }}
+
+      - name: Run unit tests
+        run: ./gradlew test -PplatformVersion=${{ matrix.platform }}
+
+      - name: Verify plugin XML / structure
+        # `verifyPluginStructure` is the fast XML/manifest check.
+        run: ./gradlew verifyPluginStructure -PplatformVersion=${{ matrix.platform }}
+
+      - name: Run plugin verifier (binary compatibility — SC-5)
+        # In IPGP 2.x, `verifyPlugin` is the binary-compatibility verifier
+        # (the task previously called `runPluginVerifier` in IPGP 1.x). It
+        # downloads each IDE listed in pluginVerification.ides and runs the
+        # JetBrains Plugin Verifier CLI against them.
+        run: ./gradlew verifyPlugin -PplatformVersion=${{ matrix.platform }}
+
+      - name: Upload plugin .zip artifact (one variant only)
+        if: matrix.platform == '2024.2.5'
+        uses: actions/upload-artifact@v5
+        with:
+          name: rozie-intellij-plugin-zip
+          path: tools/intellij-plugin/build/distributions/*.zip
+          retention-days: 14
+
+  lexer-nodiff:
+    name: Lexer no-diff guard
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup JDK 21 (Temurin)
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v5
+
+      - name: Regenerate lexer
+        run: ./gradlew generateRozieLexer
+
+      - name: Assert no diff in src/main/gen/
+        # Run from the repo root so the path argument resolves correctly.
+        working-directory: ${{ github.workspace }}
+        run: |
+          if ! git diff --exit-code -- tools/intellij-plugin/src/main/gen/; then
+            echo "::error::src/main/gen/_RozieLexer.java is out of date with Rozie.flex."
+            echo "Run 'cd tools/intellij-plugin && ./gradlew generateRozieLexer' locally and commit the regenerated file."
+            exit 1
+          fi
+
+  release:
+    name: Release (tag push)
+    needs: [build, lexer-nodiff]
+    if: startsWith(github.ref, 'refs/tags/intellij-plugin/v')
+    runs-on: ubuntu-latest
+    # Pitfall 5: contents:write is scoped to this job ONLY so the default
+    # GITHUB_TOKEN remains read-only on every other job in the workflow.
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup JDK 21 (Temurin)
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v5
+
+      - name: Build plugin
+        run: ./gradlew buildPlugin
+
+      - name: Locate .zip
+        id: artifact
+        run: |
+          ZIP_PATH=$(ls build/distributions/*.zip | head -n 1)
+          echo "zip_path=$ZIP_PATH" >> "$GITHUB_OUTPUT"
+          echo "Located: $ZIP_PATH"
+
+      - name: Create GitHub Release + upload .zip
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          body: |
+            Internal Rozie.js IntelliJ plugin build.
+
+            **Install:**
+            1. Download the `.zip` below
+            2. In IDEA Ultimate / WebStorm / PhpStorm / RubyMine / GoLand 2024.2+:
+               Settings → Plugins → ⚙ → Install Plugin from Disk → select the .zip
+            3. Restart the IDE
+            4. Open any `.rozie` file — block tags, r-* directives, @event modifiers, :prop bindings, {{ }} interpolations should be highlighted; JS autocomplete should work inside `<script>`/`<props>`/`<data>`/`<listeners>`; HTML autocomplete inside `<template>`; CSS inside `<style>`.
+
+            **Not for Marketplace distribution.** Internal dogfooding build only.
+          files: tools/intellij-plugin/build/distributions/*.zip
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

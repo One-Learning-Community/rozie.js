@@ -32,7 +32,12 @@ dependencies {
     intellijPlatform {
         // For 2024.2 floor we use intellijIdeaUltimate; the 2025.3+ unified `intellijIdea`
         // helper is not used here (RESEARCH Standard Stack note).
-        intellijIdeaUltimate(providers.gradleProperty("platformVersion"))
+        //
+        // Plan 08-05: -PplatformVersion=<version> overrides the gradle.properties value
+        // (Gradle CLI -P properties shadow gradle.properties). The .orElse("2024.2.5")
+        // makes the floor explicit if both sources are absent — the CI matrix passes
+        // -PplatformVersion=2024.2.5 / 2025.3 to drive the parallel jobs.
+        intellijIdeaUltimate(providers.gradleProperty("platformVersion").orElse("2024.2.5"))
         bundledPlugin("JavaScript")
         bundledPlugin("com.intellij.css")
         testFramework(TestFrameworkType.Platform)
