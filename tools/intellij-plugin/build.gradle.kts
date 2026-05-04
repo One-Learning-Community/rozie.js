@@ -45,7 +45,7 @@ intellijPlatform {
         version = project.version.toString()
         ideaVersion {
             sinceBuild = "242"
-            // untilBuild deliberately unset (Pitfall 7 — let plugin verifier gate forward compat)
+            // upper-bound deliberately unset per Pitfall 7 — let plugin verifier gate forward compat
         }
         vendor {
             name = "Rozie.js"

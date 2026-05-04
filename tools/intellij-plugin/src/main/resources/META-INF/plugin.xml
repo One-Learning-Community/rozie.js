@@ -1,0 +1,38 @@
+<idea-plugin>
+    <id>js.rozie.intellij</id>
+    <name>Rozie.js</name>
+    <vendor email="internal@rozie.js">Rozie.js</vendor>
+
+    <description><![CDATA[
+        <p><strong>Internal dogfooding build — not for Marketplace distribution.</strong></p>
+        <p>Adds <code>.rozie</code> file type recognition with Rozie-aware syntax
+        highlighting and JS/HTML/CSS language injection into block bodies.</p>
+        <p>Required IDE: IDEA Ultimate / WebStorm / PhpStorm / RubyMine / GoLand /
+        PyCharm Pro 2024.2+. Does not work on Community edition (no JS plugin).</p>
+    ]]></description>
+
+    <change-notes><![CDATA[
+        <p><strong>0.1.0</strong> — Initial internal dogfooding release.</p>
+    ]]></change-notes>
+
+    <!-- Required modules. JavaScript + com.intellij.css gate the plugin to
+         IDEs that bundle them (IDEA Ultimate, WebStorm, PhpStorm, RubyMine,
+         GoLand, PyCharm Pro). Pitfall 1 mitigation. -->
+    <depends>com.intellij.modules.platform</depends>
+    <depends>JavaScript</depends>
+    <depends>com.intellij.css</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <fileType
+            name="Rozie"
+            implementationClass="js.rozie.intellij.RozieFileType"
+            fieldName="INSTANCE"
+            language="Rozie"
+            extensions="rozie"/>
+
+        <!-- Plan 02 wires: <lang.parserDefinition language="Rozie" implementationClass="js.rozie.intellij.parser.RozieParserDefinition"/> -->
+        <!-- Plan 03 wires: <lang.syntaxHighlighterFactory language="Rozie" implementationClass="js.rozie.intellij.highlighting.RozieSyntaxHighlighterFactory"/> -->
+        <!-- Plan 03 wires: <colorSettingsPage implementation="js.rozie.intellij.highlighting.RozieColorSettingsPage"/> -->
+        <!-- Plan 04 wires: <multiHostInjector implementation="js.rozie.intellij.injection.RozieMultiHostInjector"/> -->
+    </extensions>
+</idea-plugin>
