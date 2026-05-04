@@ -266,6 +266,7 @@ function runRoziePipeline(
   filePath: string,
   registry: ModifierRegistry,
 ): { code: string; map: EmitVueResult['map'] } {
+  this?.addWatchFile?.(filePath);
   // 1. parse
   const { ast, diagnostics: parseDiags } = parse(source, { filename: filePath });
   if (!ast || parseDiags.some((d) => d.severity === 'error')) {
@@ -307,6 +308,7 @@ function runReactPipeline(
   filePath: string,
   registry: ModifierRegistry,
 ): EmitReactResult {
+  this?.addWatchFile?.(filePath);
   // 1. parse
   const { ast, diagnostics: parseDiags } = parse(source, { filename: filePath });
   if (!ast || parseDiags.some((d) => d.severity === 'error')) {

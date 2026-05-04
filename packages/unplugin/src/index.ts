@@ -100,6 +100,27 @@ export const unplugin = createUnpluginV3<Partial<RozieOptions>>((rawOptions) => 
           },
         },
       }),
+      // When a .rozie file changes on disk, Vite's HMR lookup finds no module
+      // graph entry for it (the graph entry is the synthetic .rozie.vue/.tsx id).
+      // handleHotUpdate fires before Vite's own HMR path, so we can map the
+      // real file back to its virtual module, invalidate it, and return it so
+      // the downstream framework plugin (vite-plugin-vue / vite-plugin-react)
+      // handles the actual HMR update.
+      // biome-ignore lint/suspicious/noExplicitAny: Vite HMR context type varies by version
+      handleHotUpdate({ file, server }: { file: string; server: any }) {
+        if (!file.endsWith('.rozie')) return;
+        const candidates =
+          options.target === 'vue'
+            ? [file + '.vue']
+            : [file + '.tsx', file + '.module.css', file + '.global.css'];
+        // biome-ignore lint/suspicious/noExplicitAny: ModuleNode type from vite
+        const mods: any[] = candidates
+          .map((id: string) => server.moduleGraph.getModuleById(id))
+          .filter(Boolean);
+        if (mods.length === 0) return;
+        mods.forEach((m: any) => server.moduleGraph.invalidateModule(m));
+        return mods;
+      },
     },
   };
 });
