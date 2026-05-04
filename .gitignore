@@ -18,3 +18,9 @@ playwright-report/
 
 # Vite test artifacts (left over from spike tests using __dirname-relative tmp)
 examples/consumers/*/.tmp-*/
+
+# IntelliJ plugin subproject (Phase 8)
+tools/intellij-plugin/build/
+tools/intellij-plugin/.gradle/
+tools/intellij-plugin/*.iml
+tools/intellij-plugin/.idea/
