@@ -1,0 +1,46 @@
+
+<div class="todo-list">
+  <header>
+    @if (headerTpl) {
+<ng-container *ngTemplateOutlet="headerTpl; context: { $implicit: { remaining: remaining(), total: items().length }, remaining: remaining(), total: items().length }" />
+} @else {
+
+      
+      <h3>{{ title() }} ({{ remaining() }} remaining)</h3>
+    
+}
+  </header>
+
+  <form (submit)="_guardedAdd($event)">
+    <input [ngModel]="draft()" (ngModelChange)="draft.set($event)" placeholder="What needs doing?" />
+    <button type="submit" [disabled]="!draft().trim()">Add</button>
+  </form>
+
+  @if (items().length > 0) {
+<ul>
+    @for (item of items(); track item.id) {
+<li [class]="{ done: item.done }">
+      
+      @if (defaultTpl) {
+<ng-container *ngTemplateOutlet="defaultTpl; context: { $implicit: { item: item, toggle: () => toggle(item.id), remove: () => remove(item.id) }, item: item, toggle: () => toggle(item.id), remove: () => remove(item.id) }" />
+} @else {
+
+        <label>
+          <input type="checkbox" [checked]="item.done" (change)="toggle(item.id)" />
+          <span>{{ item.text }}</span>
+        </label>
+        <button aria-label="Remove" (click)="remove(item.id)">×</button>
+      
+}
+    </li>
+}
+  </ul>
+} @else {
+<p class="empty">
+    @if (emptyTpl) {
+<ng-container *ngTemplateOutlet="emptyTpl" />
+} @else {
+Nothing to do. ✨
+}
+  </p>
+}</div>

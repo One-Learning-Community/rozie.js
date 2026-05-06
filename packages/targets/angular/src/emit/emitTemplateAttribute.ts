@@ -1,0 +1,302 @@
+/**
+ * emitTemplateAttribute — Phase 5 Plan 05-04a Task 2.
+ *
+ * Renders an element's AttributeBinding[] as Angular-template attribute strings.
+ *
+ * Three AttributeBinding kinds:
+ *   - 'static'       — `class="counter"` (HTML-escape value)
+ *   - 'binding'      — `[prop]="expr"` (Angular property binding)
+ *   - 'interpolated' — segments[]; emit as Angular template-literal binding:
+ *                      `[class]="\`card card--${variant()}\`"`
+ *
+ * Special-case attribute names:
+ *   - `r-model` on form input  → `[(ngModel)]="formData().x"` (FormsModule
+ *     wired by emitDecorator).
+ *   - `ref="name"`             → `#name` (Angular template-ref variable).
+ *   - `r-html="expr"`          → emitted as `[innerHTML]="expr"` and ROZ721
+ *     when the same element has children. Filtered from regular attribute
+ *     emission by emitTemplateNode.
+ *
+ * @experimental — shape may change before v1.0
+ */
+import * as t from '@babel/types';
+import type {
+  IRComponent,
+  AttributeBinding,
+} from '../../../../core/src/ir/types.js';
+import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
+
+export interface EmitAttrCtx {
+  ir: IRComponent;
+  collisionRenames?: ReadonlyMap<string, string> | undefined;
+  /** Loop-local bindings in scope (e.g., `item` from r-for). */
+  loopBindings?: ReadonlySet<string> | undefined;
+}
+
+/** Minimal HTML attribute-value escape (single-quoted Angular attribute syntax). */
+function escapeAttrValue(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+}
+
+/** Render interpolated segments as the inside of a JS template literal. */
+function renderInterpolatedTemplateLiteral(
+  segments: Array<
+    | { kind: 'static'; text: string }
+    | { kind: 'binding'; expression: t.Expression; deps: unknown }
+  >,
+  ctx: EmitAttrCtx,
+): string {
+  let out = '';
+  for (const seg of segments) {
+    if (seg.kind === 'static') {
+      out += seg.text
+        .replace(/\\/g, '\\\\')
+        .replace(/`/g, '\\`')
+        .replace(/\$\{/g, '\\${');
+    } else {
+      out += '${' + rewriteTemplateExpression(seg.expression, ctx.ir, {
+        collisionRenames: ctx.collisionRenames,
+        loopBindings: ctx.loopBindings,
+      }) + '}';
+    }
+  }
+  return out;
+}
+
+/**
+ * Test whether an attribute should map to `[(ngModel)]` rather than the
+ * generic `[r-model]="..."` shape. r-model on form input/select/textarea is
+ * the v1 contract.
+ */
+function isFormInputTag(tagName: string): boolean {
+  const lc = tagName.toLowerCase();
+  return lc === 'input' || lc === 'select' || lc === 'textarea';
+}
+
+/**
+ * Emit a single attribute. Returns null when the attribute should be dropped
+ * (e.g., r-html, which gets emitted later as `[innerHTML]="..."` by the
+ * element emitter).
+ */
+export function emitSingleAttr(
+  attr: AttributeBinding,
+  ctx: EmitAttrCtx,
+  elementTagName: string,
+): string | null {
+  // r-html handled at the element level.
+  if (attr.name === 'r-html') return null;
+
+  if (attr.kind === 'static') {
+    if (attr.name === 'ref') {
+      const refNames = new Set(ctx.ir.refs.map((r) => r.name));
+      if (refNames.has(attr.value)) {
+        return `#${attr.value}`;
+      }
+    }
+    return `${attr.name}="${escapeAttrValue(attr.value)}"`;
+  }
+
+  if (attr.kind === 'binding') {
+    // r-model on form input → [ngModel]/(ngModelChange) long form because
+    // signal-typed targets require explicit `.set($event)` (Angular's
+    // `[(ngModel)]` shorthand requires an LValue, not a signal getter call).
+    // For `r-model="$data.query"`, emit:
+    //   [ngModel]="query()" (ngModelChange)="query.set($event)"
+    // For non-signal LValues (rare; user typed `r-model="someObj.field"`),
+    // fall back to the shorthand form.
+    if (attr.name === 'r-model' && isFormInputTag(elementTagName)) {
+      // Detect simple signal-target shape: $data.X or $props.X (model:true).
+      const e = attr.expression;
+      // Use `t` from babel if needed at runtime check.
+      // For v1 we string-emit by re-running rewriteTemplateExpression and
+      // inspecting the original expression structure.
+      const dataNames = new Set(ctx.ir.state.map((s) => s.name));
+      const modelProps = new Set(
+        ctx.ir.props.filter((p) => p.isModel).map((p) => p.name),
+      );
+      let signalName: string | null = null;
+      // @babel/types pattern matching for `$data.X` / `$props.X`
+      // (already-cloned by rewriteTemplateExpression — but here we work on the
+      // pre-rewrite original to detect the shape).
+      const isMember = (e as t.MemberExpression).type === 'MemberExpression';
+      if (isMember) {
+        const me = e as t.MemberExpression;
+        if (
+          !me.computed &&
+          me.property.type === 'Identifier' &&
+          me.object.type === 'Identifier'
+        ) {
+          if (
+            (me.object.name === '$data' && dataNames.has(me.property.name)) ||
+            (me.object.name === '$props' && modelProps.has(me.property.name))
+          ) {
+            signalName = me.property.name;
+          }
+        }
+      }
+
+      if (signalName !== null) {
+        return `[ngModel]="${signalName}()" (ngModelChange)="${signalName}.set($event)"`;
+      }
+      // Non-signal target — fall back to bare [(ngModel)] with rewritten expression.
+      const expr = rewriteTemplateExpression(attr.expression, ctx.ir, {
+        collisionRenames: ctx.collisionRenames,
+        loopBindings: ctx.loopBindings,
+      });
+      return `[(ngModel)]="${expr}"`;
+    }
+    const expr = rewriteTemplateExpression(attr.expression, ctx.ir, {
+      collisionRenames: ctx.collisionRenames,
+      loopBindings: ctx.loopBindings,
+    });
+    return `[${attr.name}]="${expr}"`;
+  }
+
+  // interpolated: simplify single-binding-segment to direct property binding.
+  if (attr.segments.length === 1 && attr.segments[0]!.kind === 'binding') {
+    const seg = attr.segments[0]! as { kind: 'binding'; expression: t.Expression; deps: unknown };
+    const expr = rewriteTemplateExpression(seg.expression, ctx.ir, {
+      collisionRenames: ctx.collisionRenames,
+      loopBindings: ctx.loopBindings,
+    });
+    return `[${attr.name}]="${expr}"`;
+  }
+
+  // Multi-segment — render as Angular property-binding with template literal.
+  const lit = renderInterpolatedTemplateLiteral(attr.segments, ctx);
+  return `[${attr.name}]="\`${lit}\`"`;
+}
+
+/**
+ * Convert a single AttributeBinding into a JS expression string suitable for
+ * inclusion in an array (used by class merge below).
+ */
+function attrToArraySegment(attr: AttributeBinding, ctx: EmitAttrCtx): string {
+  if (attr.kind === 'static') {
+    return JSON.stringify(attr.value);
+  }
+  if (attr.kind === 'binding') {
+    return rewriteTemplateExpression(attr.expression, ctx.ir, {
+      collisionRenames: ctx.collisionRenames,
+      loopBindings: ctx.loopBindings,
+    });
+  }
+  if (attr.segments.length === 1 && attr.segments[0]!.kind === 'binding') {
+    const seg = attr.segments[0]! as { kind: 'binding'; expression: t.Expression; deps: unknown };
+    return rewriteTemplateExpression(seg.expression, ctx.ir, {
+      collisionRenames: ctx.collisionRenames,
+      loopBindings: ctx.loopBindings,
+    });
+  }
+  return '`' + renderInterpolatedTemplateLiteral(attr.segments, ctx) + '`';
+}
+
+/**
+ * Emit ALL attributes on an element as a single space-separated string.
+ * Handles class/style merge for multi-attr cases via Angular's `[ngClass]`
+ * binding that accepts an object/array.
+ */
+export function emitAttributes(
+  attrs: AttributeBinding[],
+  ctx: EmitAttrCtx,
+  elementTagName: string,
+): string {
+  if (attrs.length === 0) return '';
+
+  // Group by name to detect class/style merges.
+  const counts = new Map<string, number>();
+  for (const a of attrs) {
+    if (a.name === 'r-html') continue;
+    counts.set(a.name, (counts.get(a.name) ?? 0) + 1);
+  }
+
+  const out: string[] = [];
+  const consumed = new WeakSet<AttributeBinding>();
+
+  for (const a of attrs) {
+    if (consumed.has(a)) continue;
+    if (a.name === 'r-html') continue;
+
+    // class= merge: multiple class attrs combine via Angular's [ngClass].
+    if (a.name === 'class' && (counts.get('class') ?? 0) > 1) {
+      const sameName = attrs.filter((x) => x.name === 'class');
+      for (const x of sameName) consumed.add(x);
+      // Static classes stay as `class="..."`; dynamic merges to `[ngClass]`.
+      const staticParts: string[] = [];
+      const dynamicParts: string[] = [];
+      for (const x of sameName) {
+        if (x.kind === 'static') {
+          staticParts.push(x.value);
+        } else {
+          dynamicParts.push(attrToArraySegment(x, ctx));
+        }
+      }
+      if (staticParts.length > 0) {
+        out.push(`class="${escapeAttrValue(staticParts.join(' '))}"`);
+      }
+      if (dynamicParts.length > 0) {
+        // Multiple dynamic class bindings — merge into ngClass array.
+        if (dynamicParts.length === 1) {
+          out.push(`[ngClass]="${dynamicParts[0]!.replace(/"/g, '&quot;')}"`);
+        } else {
+          out.push(`[ngClass]="[${dynamicParts.join(', ').replace(/"/g, '&quot;')}]"`);
+        }
+      }
+      continue;
+    }
+
+    // style= merge similarly via [ngStyle].
+    if (a.name === 'style' && (counts.get('style') ?? 0) > 1) {
+      const sameName = attrs.filter((x) => x.name === 'style');
+      for (const x of sameName) consumed.add(x);
+      const staticParts: string[] = [];
+      const dynamicParts: string[] = [];
+      for (const x of sameName) {
+        if (x.kind === 'static') {
+          staticParts.push(x.value);
+        } else {
+          dynamicParts.push(attrToArraySegment(x, ctx));
+        }
+      }
+      if (staticParts.length > 0) {
+        out.push(`style="${escapeAttrValue(staticParts.join(';'))}"`);
+      }
+      if (dynamicParts.length > 0) {
+        if (dynamicParts.length === 1) {
+          out.push(`[ngStyle]="${dynamicParts[0]!.replace(/"/g, '&quot;')}"`);
+        } else {
+          out.push(`[ngStyle]="[${dynamicParts.join(', ').replace(/"/g, '&quot;')}]"`);
+        }
+      }
+      continue;
+    }
+
+    const rendered = emitSingleAttr(a, ctx, elementTagName);
+    if (rendered !== null) out.push(rendered);
+    consumed.add(a);
+  }
+
+  return out.join(' ');
+}
+
+/** Detect r-html attribute on an element. */
+export function findRHtml(
+  attrs: AttributeBinding[],
+): { expression: t.Expression } | null {
+  for (const a of attrs) {
+    if (a.name !== 'r-html') continue;
+    if (a.kind === 'binding') return { expression: a.expression };
+  }
+  return null;
+}
+
+/** Detect r-show attribute. Returns the expression node or null. */
+export function findRShow(
+  attrs: AttributeBinding[],
+): { expression: t.Expression } | null {
+  for (const a of attrs) {
+    if (a.name !== 'r-show') continue;
+    if (a.kind === 'binding') return { expression: a.expression };
+  }
+  return null;
+}

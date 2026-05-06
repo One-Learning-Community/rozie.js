@@ -1,0 +1,28 @@
+
+@if (open()) {
+<div class="modal-backdrop" #backdropEl (click)="_guardedHandler0($event)">
+  <div #dialogEl class="modal-dialog" role="dialog" aria-modal="true" [aria-label]="title() || undefined" tabindex="-1">
+    @if (title() || headerTpl) {
+<header>
+      @if (headerTpl) {
+<ng-container *ngTemplateOutlet="headerTpl; context: { $implicit: { close: close }, close: close }" />
+} @else {
+
+        <h2>{{ title() }}</h2>
+      
+}
+      <button class="close-btn" aria-label="Close" (click)="close($event)">×</button>
+    </header>
+}<div class="modal-body">
+      <ng-container *ngTemplateOutlet="defaultTpl; context: { $implicit: { close: close }, close: close }" />
+    </div>
+
+    @if (footerTpl) {
+<footer>
+      @if (footerTpl) {
+<ng-container *ngTemplateOutlet="footerTpl; context: { $implicit: { close: close }, close: close }" />
+}
+    </footer>
+}</div>
+</div>
+}
