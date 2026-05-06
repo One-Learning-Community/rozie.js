@@ -46,7 +46,7 @@ interface EmptyCtx {}
     <li [class]="{ done: item.done }">
           
           @if (defaultTpl) {
-    <ng-container *ngTemplateOutlet="defaultTpl; context: { $implicit: { item: item, toggle: () => _toggle(item.id), remove: () => _remove(item.id) }, item: item, toggle: () => _toggle(item.id), remove: () => _remove(item.id) }" />
+    <ng-container *ngTemplateOutlet="defaultTpl; context: _defaultSlot_ctx_1(item)" />
     } @else {
 
             <label>
@@ -126,6 +126,8 @@ export class TodoList {
     e.preventDefault();
     this._add(e);
   };
+
+  private _defaultSlot_ctx_1 = (item: any) => ({ $implicit: { item: item, toggle: () => this._toggle(item.id), remove: () => this._remove(item.id) }, item: item, toggle: () => this._toggle(item.id), remove: () => this._remove(item.id) });
 }
 
 export default TodoList;

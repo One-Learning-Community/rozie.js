@@ -22,7 +22,7 @@
 <li [class]="{ done: item.done }">
       
       @if (defaultTpl) {
-<ng-container *ngTemplateOutlet="defaultTpl; context: { $implicit: { item: item, toggle: () => toggle(item.id), remove: () => remove(item.id) }, item: item, toggle: () => toggle(item.id), remove: () => remove(item.id) }" />
+<ng-container *ngTemplateOutlet="defaultTpl; context: _defaultSlot_ctx_1(item)" />
 } @else {
 
         <label>

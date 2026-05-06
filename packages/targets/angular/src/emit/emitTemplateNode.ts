@@ -332,6 +332,8 @@ export function emitNode(node: TemplateNode, ctx: EmitNodeCtx): string {
         emitChildren: (children) => children.map((c) => emitNode(c, ctx)).join(''),
         collisionRenames: ctx.collisionRenames,
         loopBindings: ctx.loopBindings,
+        scriptInjections: ctx.scriptInjections,
+        injectionCounter: ctx.injectionCounter,
       });
     case 'TemplateElement':
       return emitElement(node, ctx);
