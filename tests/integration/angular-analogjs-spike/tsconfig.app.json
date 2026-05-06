@@ -1,0 +1,4 @@
+{
+  "extends": "./tsconfig.json",
+  "include": ["synthetic.rozie.ts", "src/**/*.ts"]
+}
