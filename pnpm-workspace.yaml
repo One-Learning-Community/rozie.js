@@ -5,3 +5,4 @@ packages:
   - "examples/consumers/*"
   - "tests/plugins/*"
   - "tests/integration/*"
+  - "tests/timing"
