@@ -1,0 +1,26 @@
+interface Props {
+  value?: number;
+  step?: number;
+  min?: number;
+  max?: number;
+}
+
+let {
+  value = $bindable(0),
+  step = 1,
+  min = -Infinity,
+  max = Infinity,
+}: Props = $props();
+
+let hovering = $state(false);
+
+console.log("hello from rozie");
+const increment = () => {
+  if (canIncrement) value += step;
+};
+const decrement = () => {
+  if (canDecrement) value -= step;
+};
+
+const canIncrement = $derived(value + step <= max);
+const canDecrement = $derived(value - step >= min);

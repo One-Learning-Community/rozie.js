@@ -1,0 +1,56 @@
+import type { Snippet } from 'svelte';
+
+interface Props {
+  open?: boolean;
+  closeOnEscape?: boolean;
+  closeOnBackdrop?: boolean;
+  lockBodyScroll?: boolean;
+  title?: string;
+  header?: Snippet<[any]>;
+  children?: Snippet<[any]>;
+  footer?: Snippet<[any]>;
+}
+
+let {
+  open = $bindable(false),
+  closeOnEscape = true,
+  closeOnBackdrop = true,
+  lockBodyScroll = true,
+  title = '',
+  header,
+  children,
+  footer,
+}: Props = $props();
+
+let backdropEl = $state<HTMLElement | undefined>(undefined);
+let dialogEl = $state<HTMLElement | undefined>(undefined);
+
+const close = () => {
+  open = false;
+  onclose?.();
+};
+
+// Body-scroll-lock state lives outside reactive data because it tracks DOM
+// rather than UI; managed entirely via lifecycle and listeners.
+// Body-scroll-lock state lives outside reactive data because it tracks DOM
+// rather than UI; managed entirely via lifecycle and listeners.
+let savedBodyOverflow = '';
+const lockScroll = () => {
+  if (!lockBodyScroll) return;
+  savedBodyOverflow = document.body.style.overflow;
+  document.body.style.overflow = 'hidden';
+};
+const unlockScroll = () => {
+  if (!lockBodyScroll) return;
+  document.body.style.overflow = savedBodyOverflow;
+};
+
+// Colocated lifecycle pair — runs in source order alongside other hooks.
+
+$effect(() => {
+  lockScroll();
+  return () => unlockScroll();
+});
+$effect(() => {
+  dialogEl?.focus();
+});

@@ -1,0 +1,35 @@
+interface Props {
+  placeholder?: string;
+  minLength?: number;
+  autofocus?: boolean;
+}
+
+let {
+  placeholder = 'Search…',
+  minLength = 2,
+  autofocus = false,
+}: Props = $props();
+
+let query = $state('');
+
+let inputEl = $state<HTMLInputElement | undefined>(undefined);
+
+const onSearch = () => {
+  if (isValid) onsearch?.(query);
+};
+const clear = () => {
+  query = '';
+  onclear?.();
+};
+
+const isValid = $derived(query.length >= minLength);
+
+$effect(() => {
+  if (autofocus) inputEl?.focus();
+
+  // Returning a function from $onMount registers a teardown — equivalent to
+  // a separate $onUnmount, useful when setup and teardown logic belong together.
+  return () => {
+    // e.g., abort an in-flight request initialized in this hook
+  };
+});
