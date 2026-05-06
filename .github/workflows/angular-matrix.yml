@@ -100,3 +100,65 @@ jobs:
           name: playwright-report-angular-${{ matrix.angular-version }}-vite-${{ matrix.vite-version }}
           path: examples/consumers/angular-analogjs/playwright-report
           retention-days: 7
+
+  # Phase 5 success criterion #3 / ANGULAR-06 — analogjs CI integration.
+  #
+  # Builds tests/integration/angular-analogjs/ which is a minimal,
+  # self-contained Angular app that imports Counter.rozie via @rozie/unplugin
+  # (target:'angular') + @analogjs/vite-plugin-angular and bootstraps it via
+  # bootstrapApplication(IntegrationApp). Verifies the production AOT path
+  # works end-to-end against both Angular 17 floor and Angular 21 latest.
+  #
+  # Gated on the demo matrix completing — a regression in @rozie/unplugin
+  # surfaces on the demo first, so we don't waste CI minutes running
+  # integration when the demo's already broken.
+  integration-build:
+    name: Angular AnalogJS integration (Phase 5 success criterion #3)
+    needs: [angular-matrix]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        angular-version: ['17', '21']
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Override Angular version for the integration project
+        working-directory: tests/integration/angular-analogjs
+        run: |
+          pnpm add @angular/core@^${{ matrix.angular-version }} \
+                   @angular/common@^${{ matrix.angular-version }} \
+                   @angular/compiler@^${{ matrix.angular-version }} \
+                   @angular/forms@^${{ matrix.angular-version }} \
+                   @angular/platform-browser@^${{ matrix.angular-version }}
+          pnpm add -D @angular/compiler-cli@^${{ matrix.angular-version }}
+
+      - name: Re-install with version overrides
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Build @rozie/unplugin
+        run: pnpm --filter @rozie/unplugin run build
+
+      - name: Build integration project (Phase 5 success criterion #3)
+        run: pnpm -F rozie-angular-analogjs-integration build
+
+      - name: Verify Counter.rozie AOT-compiled output present in dist
+        working-directory: tests/integration/angular-analogjs
+        run: |
+          test -d dist
+          # Grep for AOT proof: ɵcmp static-field assignment with rozie-counter
+          # selector. If only ivy runtime helper accessors are present (e.g.,
+          # `t.ɵcmp` member accesses), the build fell back to JIT and this
+          # step fails — a regression we want CI to catch.
+          grep -o 'selectors:\[\["rozie-counter"' dist/assets/*.js | head -1
