@@ -10,6 +10,7 @@ interface Props {
   header?: Snippet<[any]>;
   children?: Snippet<[any]>;
   footer?: Snippet<[any]>;
+  onclose?: (...args: unknown[]) => void;
 }
 
 let {
@@ -21,6 +22,7 @@ let {
   header,
   children,
   footer,
+  onclose,
 }: Props = $props();
 
 let backdropEl = $state<HTMLElement | undefined>(undefined);

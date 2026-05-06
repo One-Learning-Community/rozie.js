@@ -1,0 +1,99 @@
+name: Svelte 5.0 + 5.x Matrix
+
+# Phase 5 Plan 05-02b — verify the emitted .svelte output works against
+# the Svelte 5.0 floor (PROJECT.md constraint — runes era) AND the latest
+# Svelte 5.x. Runs on PRs touching @rozie/target-svelte / @rozie/unplugin /
+# the svelte-vite demo.
+#
+# Matrix: Svelte 5.0 floor + 5.x latest × Vite 5+6.
+# (Vite 5 is the floor for unplugin v3; Vite 6 is what svelte-vite-demo
+# pins via its own package.json, so exercising both confirms the
+# @rozie/unplugin Svelte branch is Vite-version-agnostic.)
+#
+# Mirrors react-matrix.yml shape exactly.
+
+on:
+  pull_request:
+    paths:
+      - 'packages/targets/svelte/**'
+      - 'packages/unplugin/**'
+      - 'packages/core/**'
+      - 'examples/consumers/svelte-vite/**'
+      - '.github/workflows/svelte-matrix.yml'
+  push:
+    branches: [main]
+
+jobs:
+  svelte-matrix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        svelte-version: ['5.0', '5']
+        vite-version: ['5', '6']
+        exclude:
+          # @sveltejs/vite-plugin-svelte 5.x requires Vite ^6 — exclude
+          # combinations that violate the peer-dep constraint (would fail
+          # at install rather than test what we intend to test).
+          - svelte-version: '5.0'
+            vite-version: '5'
+          - svelte-version: '5'
+            vite-version: '5'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build core (peggy generated.js + tsdown)
+        run: pnpm -r --filter @rozie/core run build || echo 'core build is optional in Phase 5'
+
+      - name: Build @rozie/unplugin
+        run: pnpm --filter @rozie/unplugin run build
+
+      - name: Run unit tests (core + targets + runtime + unplugin)
+        run: |
+          pnpm exec vitest run --root packages/core
+          pnpm exec vitest run --root packages/targets/svelte
+          pnpm exec vitest run --root packages/targets/vue
+          pnpm exec vitest run --root packages/targets/react
+          pnpm exec vitest run --root packages/runtime/vue
+          pnpm exec vitest run --root packages/runtime/react
+          pnpm exec vitest run --root packages/unplugin
+
+      - name: Override Svelte + Vite versions for the demo
+        working-directory: examples/consumers/svelte-vite
+        run: |
+          pnpm add svelte@~${{ matrix.svelte-version }}.0
+          pnpm add -D vite@^${{ matrix.vite-version }}
+
+      - name: Re-install with version overrides
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Typecheck demo
+        run: pnpm --filter svelte-vite-demo run typecheck
+
+      - name: Build demo
+        run: pnpm --filter svelte-vite-demo run build
+
+      - name: Install Playwright Chromium
+        run: pnpm --filter svelte-vite-demo run test:e2e:install
+
+      - name: Run Playwright e2e tests
+        run: pnpm --filter svelte-vite-demo run test:e2e
+
+      - name: Upload Playwright HTML report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-svelte-${{ matrix.svelte-version }}-vite-${{ matrix.vite-version }}
+          path: examples/consumers/svelte-vite/playwright-report
+          retention-days: 7

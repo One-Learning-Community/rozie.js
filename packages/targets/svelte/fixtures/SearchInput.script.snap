@@ -2,12 +2,16 @@ interface Props {
   placeholder?: string;
   minLength?: number;
   autofocus?: boolean;
+  onsearch?: (...args: unknown[]) => void;
+  onclear?: (...args: unknown[]) => void;
 }
 
 let {
   placeholder = 'Search…',
   minLength = 2,
   autofocus = false,
+  onsearch,
+  onclear,
 }: Props = $props();
 
 let query = $state('');

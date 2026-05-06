@@ -132,6 +132,17 @@ function buildPropsInterfaceFields(ir: IRComponent): string[] {
   const slotLines = buildSlotTypeFields(ir.slots);
   for (const sl of slotLines) lines.push(sl);
 
+  // Emit callback-prop declarations: $emit('search', x) was rewritten to
+  // onsearch?.(x) by rewriteScript; the corresponding `onsearch?` prop must
+  // be declared and destructured. Svelte 5 callback-prop convention is
+  // ALL-LOWERCASE (e.g., `onclose`, `onsearch`) — NOT React's PascalCase
+  // `onSearch`. v1 types args as `(...args: unknown[]) => void` since IR
+  // doesn't carry per-emit arg types (Phase 6 TYPES-01 refines).
+  for (const e of ir.emits) {
+    const onName = `on${e.toLowerCase()}`;
+    lines.push(`  ${onName}?: (...args: unknown[]) => void;`);
+  }
+
   return lines;
 }
 
@@ -168,6 +179,12 @@ function buildPropsDestructureEntries(ir: IRComponent): string[] {
     entries.push(key);
   }
 
+  // Emits → bare destructure of the all-lowercase callback prop. Matches
+  // the rewriteScript output (`onsearch?.(x)`).
+  for (const e of ir.emits) {
+    entries.push(`on${e.toLowerCase()}`);
+  }
+
   return entries;
 }
 
@@ -176,7 +193,7 @@ function buildPropsDestructureEntries(ir: IRComponent): string[] {
  * there are no props AND no slots.
  */
 function emitPropsBlock(ir: IRComponent): string {
-  if (ir.props.length === 0 && ir.slots.length === 0) return '';
+  if (ir.props.length === 0 && ir.slots.length === 0 && ir.emits.length === 0) return '';
 
   const fields = buildPropsInterfaceFields(ir);
   const entries = buildPropsDestructureEntries(ir);

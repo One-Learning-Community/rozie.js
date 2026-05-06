@@ -7,6 +7,9 @@ interface Props {
   header?: Snippet<[any, any]>;
   children?: Snippet<[any, any, any]>;
   empty?: Snippet;
+  onadd?: (...args: unknown[]) => void;
+  ontoggle?: (...args: unknown[]) => void;
+  onremove?: (...args: unknown[]) => void;
 }
 
 let {
@@ -15,6 +18,9 @@ let {
   header,
   children,
   empty,
+  onadd,
+  ontoggle,
+  onremove,
 }: Props = $props();
 
 let draft = $state('');
