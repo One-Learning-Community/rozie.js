@@ -153,6 +153,58 @@ export type ReactEmissionDescriptor =
   | { kind: 'inlineGuard'; code: string };
 
 /**
+ * SvelteEmissionDescriptor — Phase 5 tagged union returned by ModifierImpl.svelte?(...).
+ *
+ * Three discriminants — DIVERGENCE FROM Vue: 'native' is ONLY valid for the
+ * `<listeners>`-block context (where addEventListener option flags
+ * capture/passive/once meet Svelte's template-event surface). Per RESEARCH.md
+ * Pitfall 4 + Pattern 4, Svelte 5 dropped both `on:click` syntax AND
+ * `|preventDefault` modifier shorthand — template @event modifiers MUST
+ * inlineGuard. Emitter rejects 'native' descriptors in template-event
+ * context (ctx.source === 'template-event') with ROZ621-class diagnostic.
+ *
+ * @public — SemVer-stable per D-22b. Phase 5 freezes the registry shape;
+ * third-party plugins implementing svelte?+angular? is the path-to-Phase-6+
+ * MOD-05 dogfood expansion (Phase 4's swipe plugin can add svelte?/angular?
+ * hooks in Phase 6 without breaking).
+ */
+export type SvelteEmissionDescriptor =
+  | { kind: 'native'; token: 'capture' | 'passive' | 'once' }
+  | {
+      kind: 'helper';
+      importFrom: '@rozie/runtime-svelte';
+      helperName: 'useOutsideClick' | 'debounce' | 'throttle';
+      args: ModifierArg[];
+      listenerOnly?: true;
+    }
+  | { kind: 'inlineGuard'; code: string };
+
+/**
+ * AngularEmissionDescriptor — Phase 5 tagged union returned by ModifierImpl.angular?(...).
+ *
+ * Mirrors ReactEmissionDescriptor structure: 'native' for addEventListener
+ * option flags in <listeners> blocks, 'helper' for @rozie/runtime-angular
+ * imports (ONLY if Plan 05-04 decides to create the runtime package — see
+ * RESEARCH.md A8: v1 default is inline emission, no runtime package), and
+ * 'inlineGuard' for filter-style modifiers (.stop, .prevent, .self, key
+ * filters). Angular's effect((onCleanup) => ...) callback supplies the
+ * cleanup binding; the emitter wires inlineGuard fragments at the top of
+ * the synthesized handler arrow.
+ *
+ * @public — SemVer-stable per D-22b.
+ */
+export type AngularEmissionDescriptor =
+  | { kind: 'native'; token: 'capture' | 'passive' | 'once' }
+  | {
+      kind: 'helper';
+      importFrom: '@rozie/runtime-angular';
+      helperName: 'outsideClick' | 'debounce' | 'throttle';
+      args: ModifierArg[];
+      listenerOnly?: true;
+    }
+  | { kind: 'inlineGuard'; code: string };
+
+/**
  * ModifierImpl — what a modifier plugin author implements.
  *
  * `resolve()` validates args + emits diagnostics for malformed input
@@ -192,6 +244,18 @@ export interface ModifierImpl {
    * Third-party plugins MAY omit; emitter falls back to ROZ520-class diagnostic.
    */
   react?(args: ModifierArg[], ctx: ModifierContext): ReactEmissionDescriptor;
+  /**
+   * Phase 5 — Svelte target emission descriptor. Optional for Phase 1-4
+   * compatibility; Phase 5 emitter REQUIRES every builtin to implement it.
+   * Third-party plugins MAY omit; emitter falls back to ROZ621-class diagnostic.
+   */
+  svelte?(args: ModifierArg[], ctx: ModifierContext): SvelteEmissionDescriptor;
+  /**
+   * Phase 5 — Angular target emission descriptor. Optional for Phase 1-4
+   * compatibility; Phase 5 emitter REQUIRES every builtin to implement it.
+   * Third-party plugins MAY omit; emitter falls back to ROZ722-class diagnostic.
+   */
+  angular?(args: ModifierArg[], ctx: ModifierContext): AngularEmissionDescriptor;
 }
 
 /**

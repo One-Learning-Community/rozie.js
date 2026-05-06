@@ -45,4 +45,15 @@ export const capture: ModifierImpl = {
     // switches to raw addEventListener call style when this descriptor appears.
     return { kind: 'native', token: 'capture' };
   },
+  svelte() {
+    // Phase 5 native: addEventListener({ capture: true }) option flag — valid
+    // ONLY for <listeners>-block context. Template @event context with
+    // ctx.source === 'template-event' is rejected via ROZ621.
+    return { kind: 'native', token: 'capture' };
+  },
+  angular() {
+    // Phase 5 native: addEventListener({ capture: true }) option flag — Angular
+    // <listeners> block emits raw addEventListener with this option set.
+    return { kind: 'native', token: 'capture' };
+  },
 };

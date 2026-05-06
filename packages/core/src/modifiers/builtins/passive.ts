@@ -45,4 +45,13 @@ export const passive: ModifierImpl = {
     // switches to raw addEventListener call style when this descriptor appears.
     return { kind: 'native', token: 'passive' };
   },
+  svelte() {
+    // Phase 5 native: addEventListener({ passive: true }) option flag — valid
+    // ONLY for <listeners>-block context.
+    return { kind: 'native', token: 'passive' };
+  },
+  angular() {
+    // Phase 5 native: addEventListener({ passive: true }) option flag.
+    return { kind: 'native', token: 'passive' };
+  },
 };

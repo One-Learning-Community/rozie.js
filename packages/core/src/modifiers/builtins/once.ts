@@ -50,4 +50,17 @@ export const once: ModifierImpl = {
     // flag means the emitter falls back to a one-shot raw addEventListener.)
     return { kind: 'native', token: 'once' };
   },
+  svelte() {
+    // Phase 5 native: addEventListener({ once: true }) option flag — valid
+    // ONLY for <listeners>-block context where addEventListener option flags
+    // make sense. Svelte 5 template @event context will have
+    // ctx.source === 'template-event' — emitter rejects via ROZ621.
+    return { kind: 'native', token: 'once' };
+  },
+  angular() {
+    // Phase 5 native: addEventListener({ once: true }) option flag — Angular
+    // emitter uses Renderer2.listen for <listeners> blocks; this flag selects
+    // a one-shot wrapper that auto-unbinds via DestroyRef.
+    return { kind: 'native', token: 'once' };
+  },
 };

@@ -73,4 +73,35 @@ export const outside: ModifierImpl = {
       listenerOnly: true,
     };
   },
+  svelte(args) {
+    // Phase 5 marquee helper: dispatched through @rozie/runtime-svelte
+    // useOutsideClick. listenerOnly because outside-click only makes sense in
+    // <listeners>; Svelte emitter raises ROZ621-class diagnostic if encountered
+    // on a template @event. NOTE: Plan 05-02 may inline emit instead of
+    // importing if no runtime package is created — descriptor stays
+    // helper-shaped, emitter handles the inlining.
+    return {
+      kind: 'helper',
+      importFrom: '@rozie/runtime-svelte',
+      helperName: 'useOutsideClick',
+      args,
+      listenerOnly: true,
+    };
+  },
+  angular(args) {
+    // Phase 5 marquee helper: dispatched through @rozie/runtime-angular
+    // outsideClick. listenerOnly because outside-click only makes sense in
+    // <listeners>; Angular emitter raises ROZ722-class diagnostic if encountered
+    // on a template @event. Per RESEARCH.md A8 the v1 default is inline
+    // emission via Renderer2.listen + DestroyRef, but the descriptor remains
+    // helper-shaped so Plan 05-04 can opt into a runtime package if duplicate
+    // outsideClick logic emerges across listeners.
+    return {
+      kind: 'helper',
+      importFrom: '@rozie/runtime-angular',
+      helperName: 'outsideClick',
+      args,
+      listenerOnly: true,
+    };
+  },
 };

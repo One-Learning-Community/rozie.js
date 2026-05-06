@@ -46,4 +46,14 @@ export const prevent: ModifierImpl = {
     // emitter inserts the side-effect call before the user handler runs.
     return { kind: 'inlineGuard', code: 'e.preventDefault();' };
   },
+  svelte() {
+    // Phase 5 inlineGuard: Svelte 5 dropped `|preventDefault` shorthand
+    // (RESEARCH.md Pitfall 4) — template @event modifiers MUST inlineGuard.
+    return { kind: 'inlineGuard', code: 'e.preventDefault();' };
+  },
+  angular() {
+    // Phase 5 inlineGuard: Angular has no template modifier sugar; inlineGuard
+    // is the path.
+    return { kind: 'inlineGuard', code: 'e.preventDefault();' };
+  },
 };

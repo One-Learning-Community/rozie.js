@@ -151,6 +151,28 @@ function makeFilter(name: KeyFilterName): ModifierImpl {
         code: `if (e.key !== '${reactKey}') return;`,
       };
     },
+    svelte() {
+      // Phase 5 inlineGuard: Svelte 5 has no key-modifier syntax (RESEARCH.md
+      // Pattern 4 — Svelte 5 dropped both `on:click|preventDefault` shorthand
+      // AND key modifiers). Emitter inserts an early-return guard checking
+      // KeyboardEvent.key — identical pattern to React side.
+      const reactKey = REACT_KEY_NAME_MAP[name];
+      return {
+        kind: 'inlineGuard',
+        code: `if (e.key !== '${reactKey}') return;`,
+      };
+    },
+    angular() {
+      // Phase 5 inlineGuard: Angular's `(keydown.escape)` syntax is legacy
+      // and incompatible with `(keydown)="h($event)"` arrow form (RESEARCH.md
+      // Pattern 9). Emitter inserts an early-return guard checking
+      // KeyboardEvent.key — identical pattern to React side.
+      const reactKey = REACT_KEY_NAME_MAP[name];
+      return {
+        kind: 'inlineGuard',
+        code: `if (e.key !== '${reactKey}') return;`,
+      };
+    },
   };
 }
 

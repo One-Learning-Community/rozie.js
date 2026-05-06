@@ -46,4 +46,15 @@ export const stop: ModifierImpl = {
     // emitter inserts the side-effect call before the user handler runs.
     return { kind: 'inlineGuard', code: 'e.stopPropagation();' };
   },
+  svelte() {
+    // Phase 5 inlineGuard: Svelte 5 dropped both `on:click` syntax AND
+    // `|preventDefault` shorthand (RESEARCH.md Pitfall 4) — template @event
+    // modifiers MUST inlineGuard.
+    return { kind: 'inlineGuard', code: 'e.stopPropagation();' };
+  },
+  angular() {
+    // Phase 5 inlineGuard: Angular has no template modifier sugar
+    // (no [(click).stop] equivalent), so inlineGuard is the path.
+    return { kind: 'inlineGuard', code: 'e.stopPropagation();' };
+  },
 };

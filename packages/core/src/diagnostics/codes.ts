@@ -99,7 +99,27 @@ export const RozieErrorCode = {
 
   // ---- ROZ580..ROZ599 reserved for Phase 7 hardening ----
 
-  // ---- Phase 5+ target emitters take ROZ600+ ----
+  // ---- @rozie/unplugin Svelte-branch + @rozie/target-svelte errors (Phase 5) — ROZ600..ROZ649 ----
+  UNPLUGIN_SVELTE_PEER_DEP_MISSING: 'ROZ600', // @sveltejs/vite-plugin-svelte not resolvable from cwd
+  UNPLUGIN_SVELTE_DEP_MISSING: 'ROZ601', // svelte itself (^5) not resolvable from cwd
+  UNPLUGIN_SVELTE_PLUGIN_CHAIN_MISORDER: 'ROZ602', // RESERVED — enforce:'pre' guarantees this; placeholder for future
+  TARGET_SVELTE_RHTML_WITH_CHILDREN: 'ROZ620', // r-html with children; mirrors Vue/React Pitfall 10
+  TARGET_SVELTE_RESERVED: 'ROZ621', // internal-invariant placeholder; mirrors TARGET_VUE_RESERVED
+
+  // ---- @rozie/runtime-svelte warnings (Phase 5) — ROZ650..ROZ699 (RESERVED for v2 helpers) ----
+
+  // ---- @rozie/unplugin Angular-branch + @rozie/target-angular errors (Phase 5 D-72) — ROZ700..ROZ749 ----
+  UNPLUGIN_ANGULAR_PEER_DEP_MISSING: 'ROZ700', // @analogjs/vite-plugin-angular not resolvable from cwd (D-72)
+  UNPLUGIN_ANGULAR_DEP_MISSING: 'ROZ701', // @angular/core (^17) not resolvable
+  UNPLUGIN_ANGULAR_VITE_VERSION_TOO_LOW: 'ROZ702', // analogjs requires Vite ^6 (RESEARCH OQ6)
+  UNPLUGIN_ANGULAR_PLUGIN_CHAIN_MISORDER: 'ROZ703', // RESERVED — enforce:'pre' guarantees this
+  TARGET_ANGULAR_RFOR_MISSING_KEY: 'ROZ720', // Angular @for REQUIRES track expression (Pitfall 3); upgrade ROZ300 warning to error for Angular target
+  TARGET_ANGULAR_RHTML_WITH_CHILDREN: 'ROZ721', // r-html via [innerHTML] cannot coexist with children
+  TARGET_ANGULAR_RESERVED: 'ROZ722', // internal-invariant placeholder
+
+  // ---- @rozie/runtime-angular warnings (Phase 5) — ROZ750..ROZ799 (RESERVED for v2 helpers) ----
+
+  // ---- Phase 6+ target emitters / type emission take ROZ800+ ----
 } as const;
 
 export type RozieErrorCode = (typeof RozieErrorCode)[keyof typeof RozieErrorCode];

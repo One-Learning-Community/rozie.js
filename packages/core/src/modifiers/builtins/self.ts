@@ -50,4 +50,20 @@ export const self: ModifierImpl = {
       code: 'if (e.target !== e.currentTarget) return;',
     };
   },
+  svelte() {
+    // Phase 5 inlineGuard: Svelte 5 dropped `|self` shorthand (RESEARCH.md
+    // Pitfall 4) — emitter inserts an early-return guard.
+    return {
+      kind: 'inlineGuard',
+      code: 'if (e.target !== e.currentTarget) return;',
+    };
+  },
+  angular() {
+    // Phase 5 inlineGuard: Angular has no template modifier sugar; emitter
+    // inserts an early-return guard.
+    return {
+      kind: 'inlineGuard',
+      code: 'if (e.target !== e.currentTarget) return;',
+    };
+  },
 };

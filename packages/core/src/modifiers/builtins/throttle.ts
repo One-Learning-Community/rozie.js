@@ -72,4 +72,24 @@ export const throttle: ModifierImpl = {
       args,
     };
   },
+  svelte(args) {
+    // Phase 5: dispatched through @rozie/runtime-svelte throttle. Valid in
+    // BOTH <listeners> and template @event — no listenerOnly flag.
+    return {
+      kind: 'helper',
+      importFrom: '@rozie/runtime-svelte',
+      helperName: 'throttle',
+      args,
+    };
+  },
+  angular(args) {
+    // Phase 5: dispatched through @rozie/runtime-angular throttle. Valid in
+    // BOTH <listeners> and template @event — no listenerOnly flag.
+    return {
+      kind: 'helper',
+      importFrom: '@rozie/runtime-angular',
+      helperName: 'throttle',
+      args,
+    };
+  },
 };

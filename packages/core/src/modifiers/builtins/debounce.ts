@@ -76,4 +76,27 @@ export const debounce: ModifierImpl = {
       args,
     };
   },
+  svelte(args) {
+    // Phase 5: dispatched through @rozie/runtime-svelte debounce. Valid in
+    // BOTH <listeners> and template @event — no listenerOnly flag. Plan 05-02
+    // may inline emit if the runtime package is not created.
+    return {
+      kind: 'helper',
+      importFrom: '@rozie/runtime-svelte',
+      helperName: 'debounce',
+      args,
+    };
+  },
+  angular(args) {
+    // Phase 5: dispatched through @rozie/runtime-angular debounce. Valid in
+    // BOTH <listeners> and template @event — no listenerOnly flag. Plan 05-04
+    // may inline emit (Renderer2.listen + setTimeout closure) if the runtime
+    // package is not created.
+    return {
+      kind: 'helper',
+      importFrom: '@rozie/runtime-angular',
+      helperName: 'debounce',
+      args,
+    };
+  },
 };
