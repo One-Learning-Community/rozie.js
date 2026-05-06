@@ -7,8 +7,10 @@
 // to type-check.
 //
 // Plan 05-04 finalises this to a more useful Type<unknown> shape via Phase 6
-// TYPES-01..03.
+// TYPES-01..03. For now we use Angular's `Type<unknown>` so the imported
+// symbol is usable in `imports: [...]` of standalone @Component metadata.
 declare module '*.rozie' {
-  const component: unknown;
+  import type { Type } from '@angular/core';
+  const component: Type<unknown>;
   export default component;
 }

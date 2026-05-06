@@ -1,0 +1,99 @@
+<!--
+  Dropdown.rozie
+
+  Demonstrates the marquee Rozie features for component-library work:
+    - <listeners> block with reactive `when` conditions
+    - .outside(...refs) modifier — eliminates hand-rolled isOutside checks
+    - .throttle(ms) parameterized modifier
+    - Template refs derived from `ref="..."` (no separate <refs> block)
+    - Multiple lifecycle hooks ($onMount used twice)
+    - Named slot with slot params (consumer uses `#name="{ data }"` shorthand)
+    - Default slot with slot params
+    - $props writes (compiles to parent-update path because `model: true`)
+-->
+
+<rozie name="Dropdown">
+
+<props>
+{
+  open:                { type: Boolean, default: false, model: true },
+  closeOnOutsideClick: { type: Boolean, default: true },
+  closeOnEscape:       { type: Boolean, default: true },
+}
+</props>
+
+<script>
+const toggle = () => { $props.open = !$props.open }
+const close  = () => { $props.open = false }
+
+const reposition = () => {
+  if (!$refs.panelEl || !$refs.triggerEl) return
+  const rect = $refs.triggerEl.getBoundingClientRect()
+  Object.assign($refs.panelEl.style, {
+    top:  `${rect.bottom}px`,
+    left: `${rect.left}px`,
+  })
+}
+
+// Multiple $onMount calls run in source order. Useful for colocating setup
+// with the logic it serves.
+$onMount(() => {
+  reposition()
+})
+
+$onMount(() => {
+  // Example of integrating a vanilla JS library — $refs gives direct DOM access.
+  // new Popper($refs.triggerEl, $refs.panelEl, { placement: 'bottom-start' })
+})
+</script>
+
+<listeners>
+{
+  // .outside takes ref args; fires only when the click target is outside ALL listed refs.
+  // Compiler emits the per-target wiring (Vue watchEffect, React useEffect with auto-deps,
+  // Svelte $effect, Angular effect + Renderer2.listen + DestroyRef cleanup).
+  "document:click.outside($refs.triggerEl, $refs.panelEl)": {
+    when:    "$props.open && $props.closeOnOutsideClick",
+    handler: close,
+  },
+  "document:keydown.escape": {
+    when:    "$props.open && $props.closeOnEscape",
+    handler: close,
+  },
+  "window:resize.throttle(100).passive": {
+    when:    "$props.open",
+    handler: reposition,
+  },
+}
+</listeners>
+
+<template>
+<div class="dropdown">
+  <div ref="triggerEl" @click="toggle">
+    <slot name="trigger" :open="$props.open" :toggle="toggle" />
+  </div>
+
+  <div r-if="$props.open" ref="panelEl" class="dropdown-panel" role="menu">
+    <slot :close="close" />
+  </div>
+</div>
+</template>
+
+<style>
+.dropdown { position: relative; display: inline-block; }
+.dropdown-panel {
+  position: fixed;
+  z-index: var(--rozie-dropdown-z, 1000);
+  background: white;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+/* Unscoped escape hatch — anything inside :root { } is emitted globally. */
+:root {
+  --rozie-dropdown-z: 1000;
+}
+</style>
+
+</rozie>

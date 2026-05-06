@@ -1,0 +1,102 @@
+name: Angular 17 + 21 Matrix
+
+# Phase 5 Plan 05-04b — verify the emitted .ts output works against the
+# Angular 17 floor (PROJECT.md constraint — signals era) AND the latest
+# Angular 21. Runs on PRs touching @rozie/target-angular / @rozie/unplugin /
+# the angular-analogjs demo.
+#
+# Matrix: Angular 17.0 floor + 21.x latest × Vite 6 (analogjs 2.5.x peerDeps
+# require vite ^6 || ^7 || ^8 per RESEARCH OQ6 RESOLVED — Vite 5 is NOT
+# supported on the Angular target).
+#
+# Mirrors svelte-matrix.yml shape (per-leg pnpm add overrides, install
+# playwright, run e2e, upload report on failure).
+
+on:
+  pull_request:
+    paths:
+      - 'packages/targets/angular/**'
+      - 'packages/unplugin/**'
+      - 'packages/core/**'
+      - 'examples/consumers/angular-analogjs/**'
+      - 'tests/integration/angular-analogjs/**'
+      - '.github/workflows/angular-matrix.yml'
+  push:
+    branches: [main]
+
+jobs:
+  angular-matrix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        angular-version: ['17', '21']
+        vite-version: ['6']
+        # Vite 5 is excluded entirely from the Angular target — analogjs
+        # 2.5.x peerDeps require vite ^6 || ^7 || ^8. ROZ702 enforces this
+        # at factory call time. CI matrix mirrors the runtime constraint.
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build core (peggy generated.js + tsdown)
+        run: pnpm -r --filter @rozie/core run build || echo 'core build is optional in Phase 5'
+
+      - name: Build @rozie/unplugin
+        run: pnpm --filter @rozie/unplugin run build
+
+      - name: Run unit tests (core + targets + runtime + unplugin)
+        run: |
+          pnpm exec vitest run --root packages/core
+          pnpm exec vitest run --root packages/targets/angular
+          pnpm exec vitest run --root packages/targets/svelte
+          pnpm exec vitest run --root packages/targets/vue
+          pnpm exec vitest run --root packages/targets/react
+          pnpm exec vitest run --root packages/runtime/vue
+          pnpm exec vitest run --root packages/runtime/react
+          pnpm exec vitest run --root packages/unplugin
+
+      - name: Override Angular + Vite versions for the demo
+        working-directory: examples/consumers/angular-analogjs
+        run: |
+          pnpm add @angular/core@^${{ matrix.angular-version }} \
+                   @angular/common@^${{ matrix.angular-version }} \
+                   @angular/compiler@^${{ matrix.angular-version }} \
+                   @angular/forms@^${{ matrix.angular-version }} \
+                   @angular/platform-browser@^${{ matrix.angular-version }} \
+                   @angular/platform-browser-dynamic@^${{ matrix.angular-version }}
+          pnpm add -D @angular/compiler-cli@^${{ matrix.angular-version }} \
+                       vite@^${{ matrix.vite-version }}
+
+      - name: Re-install with version overrides
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Typecheck demo
+        run: pnpm --filter angular-analogjs-demo run typecheck
+
+      - name: Build demo
+        run: pnpm --filter angular-analogjs-demo run build
+
+      - name: Install Playwright Chromium
+        run: pnpm --filter angular-analogjs-demo run test:e2e:install
+
+      - name: Run Playwright e2e tests
+        run: pnpm --filter angular-analogjs-demo run test:e2e
+
+      - name: Upload Playwright HTML report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-angular-${{ matrix.angular-version }}-vite-${{ matrix.vite-version }}
+          path: examples/consumers/angular-analogjs/playwright-report
+          retention-days: 7

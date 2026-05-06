@@ -79,3 +79,5 @@ export class SearchInput {
     this._guarded_clear_3(e);
   };
 }
+
+export default SearchInput;

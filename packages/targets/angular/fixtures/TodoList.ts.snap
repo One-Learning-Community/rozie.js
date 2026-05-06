@@ -127,3 +127,5 @@ export class TodoList {
     this._add(e);
   };
 }
+
+export default TodoList;

@@ -121,3 +121,5 @@ export class Dropdown {
     };
   })();
 }
+
+export default Dropdown;

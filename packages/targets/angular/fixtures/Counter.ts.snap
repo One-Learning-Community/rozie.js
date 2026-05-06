@@ -41,3 +41,5 @@ export class Counter {
     if (this.canDecrement()) this.value.set(this.value() - this.step());
   };
 }
+
+export default Counter;

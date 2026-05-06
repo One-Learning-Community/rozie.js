@@ -137,3 +137,5 @@ export class Modal {
     this.closeOnBackdrop() && this._close();
   };
 }
+
+export default Modal;
