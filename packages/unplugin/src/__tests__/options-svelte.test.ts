@@ -28,8 +28,9 @@ describe('validateOptions — Plan 05-02b svelte surface', () => {
     expect(SUPPORTED_TARGETS_PHASE_5).toContain('vue');
     expect(SUPPORTED_TARGETS_PHASE_5).toContain('react');
     expect(SUPPORTED_TARGETS_PHASE_5).toContain('svelte');
-    // angular still ROZ402 until Plan 05-04b
-    expect(SUPPORTED_TARGETS_PHASE_5).not.toContain('angular');
+    // angular added in Plan 05-04b; full canonical set is now { vue, react,
+    // svelte, angular } — see options-angular.test.ts for the angular surface.
+    expect(SUPPORTED_TARGETS_PHASE_5).toContain('angular');
   });
 });
 

@@ -33,6 +33,7 @@ import {
   validateOptions,
   assertReactPeerDeps,
   assertSveltePeerDeps,
+  assertAngularPeerDeps,
   type RozieOptions,
 } from './options.js';
 import {
@@ -64,6 +65,14 @@ export const unplugin = createUnpluginV3<Partial<RozieOptions>>((rawOptions) => 
   // time for `target: 'svelte'`. Mirrors React above.
   if (options.target === 'svelte') {
     assertSveltePeerDeps();
+  }
+
+  // Plan 05-04b: enforce Angular peer deps (ROZ700/ROZ701/ROZ702) at
+  // factory-call time for `target: 'angular'` (D-72). Per RESEARCH OQ6
+  // RESOLVED, Vite >= 6 is required because @analogjs/vite-plugin-angular
+  // 2.5.x peerDeps require vite ^6 || ^7 || ^8.
+  if (options.target === 'angular') {
+    assertAngularPeerDeps();
   }
 
   // Build a default modifier registry once per plugin instance — shared by
@@ -125,6 +134,10 @@ export const unplugin = createUnpluginV3<Partial<RozieOptions>>((rawOptions) => 
           candidates = [file + '.vue'];
         } else if (options.target === 'svelte') {
           candidates = [file + '.svelte'];
+        } else if (options.target === 'angular') {
+          // Plan 05-04b: single virtual id `.rozie.ts` per Path A (no sibling
+          // CSS — Angular emits styles inline in the @Component decorator).
+          candidates = [file + '.ts'];
         } else {
           // react
           candidates = [file + '.tsx', file + '.module.css', file + '.global.css'];

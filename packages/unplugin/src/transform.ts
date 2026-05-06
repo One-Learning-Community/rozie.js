@@ -40,6 +40,7 @@ import type { ModifierRegistry } from '../../core/src/modifiers/ModifierRegistry
 import { emitVue, type EmitVueResult } from '../../targets/vue/src/emitVue.js';
 import { emitReact, type EmitReactResult } from '../../targets/react/src/emitReact.js';
 import { emitSvelte, type EmitSvelteResult } from '../../targets/svelte/src/emitSvelte.js';
+import { emitAngular, type EmitAngularResult } from '../../targets/angular/src/emitAngular.js';
 import type { Diagnostic } from '../../core/src/diagnostics/Diagnostic.js';
 import type { TargetValue } from './options.js';
 import { formatViteError, formatLoc } from './diagnostics.js';
@@ -72,6 +73,22 @@ const VIRTUAL_SUFFIX_REACT_GLOBAL_CSS = '.rozie.global.css';
 const VIRTUAL_SUFFIX_SVELTE = '.rozie.svelte';
 
 /**
+ * Angular-target synthetic suffix (Plan 05-04b). The `.ts` carries the full
+ * standalone Angular component (class with inline template + styles array);
+ * @analogjs/vite-plugin-angular's TS_EXT_REGEX (`/\.[cm]?ts(?![a-z])/`) matches
+ * the synthesized id and feeds it through Angular's Ivy compiler — Path A
+ * per Plan 05-03 SPIKE.md (CONFIRMED — analogjs 2.5.0 transform handler
+ * consumes the upstream `code` parameter rather than reading from disk).
+ *
+ * Per RESEARCH OQ A8/A9 RESOLVED + Plan 05-04a: NO sibling style virtual
+ * ids — Angular emits styles inside the `@Component({ styles: [...] })`
+ * decorator, so a single `.ts` virtual id covers everything. The `:root`
+ * escape hatch is wrapped as `::ng-deep :root { ... }` by emitStyle (OQ A4
+ * v1; Plan 05-05 Modal CSS-vars Playwright validates necessity).
+ */
+const VIRTUAL_SUFFIX_ANGULAR = '.rozie.ts';
+
+/**
  * Phase 4 escape-hatch: query-suffix forms (`?style=module` / `?style=global`)
  * accepted as alternative routing for consumers whose pipelines clash with
  * the file-extension form. Path 1 fallback per 04-05-SPIKE.md.
@@ -92,8 +109,20 @@ export function transformIncludeRozie(id: string): boolean {
     id.endsWith(VIRTUAL_SUFFIX_REACT_GLOBAL_CSS) ||
     id.includes(VIRTUAL_SUFFIX_REACT + QUERY_STYLE_MODULE) ||
     id.includes(VIRTUAL_SUFFIX_REACT + QUERY_STYLE_GLOBAL) ||
-    id.endsWith(VIRTUAL_SUFFIX_SVELTE)
+    id.endsWith(VIRTUAL_SUFFIX_SVELTE) ||
+    isAngularVirtualId(id)
   );
+}
+
+/**
+ * `.rozie.ts` predicate that distinguishes Rozie's synthetic id from
+ * consumer-authored `.ts` modules. We check the FULL `.rozie.ts` suffix
+ * to avoid matching plain `.ts` files (which the user may import directly
+ * — `transformInclude` running on those would route them through the Rozie
+ * pipeline incorrectly).
+ */
+function isAngularVirtualId(id: string): boolean {
+  return id.endsWith(VIRTUAL_SUFFIX_ANGULAR);
 }
 
 /**
@@ -115,6 +144,20 @@ type AnyContext = any;
 export function createResolveIdHook(
   target: TargetValue = 'vue',
 ): (id: string, importer: string | undefined) => string | null {
+  if (target === 'angular') {
+    return function resolveIdAngular(id: string, importer: string | undefined): string | null {
+      // Pass-through for the synthetic id itself (load handles it). Per Plan
+      // 05-03 SPIKE Path A, analogjs's transform hook consumes the upstream
+      // `code` we return from `load`, so the synthetic id never has to
+      // resolve to an actual file on disk.
+      if (id.endsWith(VIRTUAL_SUFFIX_ANGULAR)) return id;
+      // Bare `.rozie` import → `<abs>/Foo.rozie.ts`. analogjs's TS_EXT_REGEX
+      // (/\.[cm]?ts(?![a-z])/) matches the trailing `.ts`.
+      if (!id.endsWith('.rozie')) return null;
+      const abs = absolutize(id, importer);
+      return abs + '.ts';
+    };
+  }
   if (target === 'svelte') {
     return function resolveIdSvelte(id: string, importer: string | undefined): string | null {
       // Pass-through for the synthetic id itself (load handles it).
@@ -191,6 +234,18 @@ function absolutize(id: string, importer: string | undefined): string {
  * lowering / emission failures; calls `this.warn` on non-fatal warnings.
  */
 export function createLoadHook(registry: ModifierRegistry, target: TargetValue = 'vue') {
+  if (target === 'angular') {
+    return function loadAngular(
+      this: AnyContext,
+      id: string,
+    ): { code: string; map: EmitAngularResult['map'] } | null {
+      if (!id.endsWith(VIRTUAL_SUFFIX_ANGULAR)) return null;
+      // Strip `.ts` only — leaves `.rozie`.
+      const filePath = id.slice(0, -'.ts'.length);
+      const source = readFileSync(filePath, 'utf8');
+      return runAngularPipeline.call(this, source, filePath, registry);
+    };
+  }
   if (target === 'svelte') {
     return function loadSvelte(
       this: AnyContext,
@@ -273,6 +328,15 @@ export function createLoadHook(registry: ModifierRegistry, target: TargetValue =
  * to exercise the parse/lower/emit chain without going through resolveId.
  */
 export function createTransformHook(registry: ModifierRegistry, target: TargetValue = 'vue') {
+  if (target === 'angular') {
+    return function transformAngular(
+      this: AnyContext,
+      code: string,
+      id: string,
+    ): { code: string; map: EmitAngularResult['map'] } | null {
+      return runAngularPipeline.call(this, code, id, registry);
+    };
+  }
   if (target === 'svelte') {
     return function transformSvelte(
       this: AnyContext,
@@ -418,6 +482,55 @@ function runSveltePipeline(
 
   // 3. emitSvelte
   const result = emitSvelte(ir, { filename: filePath, source, modifierRegistry: registry });
+  const emitErrors = result.diagnostics.filter((d) => d.severity === 'error');
+  if (emitErrors.length > 0) {
+    throw formatViteError(emitErrors, filePath, source);
+  }
+  warnings.push(...result.diagnostics.filter((d) => d.severity === 'warning'));
+
+  surfaceWarnings.call(this, warnings, filePath, source);
+
+  return { code: result.code, map: result.map };
+}
+
+/**
+ * Angular-target pipeline: parse → lowerToIR → emitAngular. Returns
+ * `{ code, map }` for the load/transform hooks. Mirrors runSveltePipeline
+ * (Svelte) — Angular's emitter has a single output channel (one `.ts` file
+ * containing the standalone-component class with inline template + styles
+ * array), so no CSS-side branching like React's runReactPipeline.
+ *
+ * Per Plan 05-03 SPIKE Path A: the returned `code` flows directly into
+ * @analogjs/vite-plugin-angular's transform handler via Vite's plugin chain
+ * (analogjs consumes the upstream `code` parameter rather than reading
+ * from disk).
+ */
+function runAngularPipeline(
+  this: AnyContext,
+  source: string,
+  filePath: string,
+  registry: ModifierRegistry,
+): { code: string; map: EmitAngularResult['map'] } {
+  this?.addWatchFile?.(filePath);
+  // 1. parse
+  const { ast, diagnostics: parseDiags } = parse(source, { filename: filePath });
+  if (!ast || parseDiags.some((d) => d.severity === 'error')) {
+    throw formatViteError(parseDiags, filePath, source);
+  }
+
+  // 2. lowerToIR
+  const { ir, diagnostics: irDiags } = lowerToIR(ast, { modifierRegistry: registry });
+  const warnings: Diagnostic[] = [
+    ...parseDiags.filter((d) => d.severity === 'warning'),
+    ...irDiags.filter((d) => d.severity === 'warning'),
+  ];
+  const irErrors = irDiags.filter((d) => d.severity === 'error');
+  if (!ir || irErrors.length > 0) {
+    throw formatViteError(irDiags, filePath, source);
+  }
+
+  // 3. emitAngular
+  const result = emitAngular(ir, { filename: filePath, source, modifierRegistry: registry });
   const emitErrors = result.diagnostics.filter((d) => d.severity === 'error');
   if (emitErrors.length > 0) {
     throw formatViteError(emitErrors, filePath, source);

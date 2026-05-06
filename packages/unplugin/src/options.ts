@@ -1,9 +1,9 @@
 /**
- * @rozie/unplugin options validation (D-49 / ROZ400+ / ROZ500+ / ROZ600+).
+ * @rozie/unplugin options validation (D-49 / ROZ400+ / ROZ500+ / ROZ600+ / ROZ700+).
  *
  * `target` is REQUIRED per D-49. Phase 3 shipped `vue` only; Phase 4 (Plan
- * 04-05) extends to `react`; Phase 5 Plan 05-02b extends to `svelte`. The
- * remaining target (`angular`) raises ROZ402 until Plan 05-04b lands it.
+ * 04-05) extends to `react`; Phase 5 Plan 05-02b extends to `svelte`; Plan
+ * 05-04b extends to `angular`. All four canonical targets are now shipped.
  *
  * Validation throws synchronously when `Rozie({ target: ... })` is called
  * at consumer-side, before any Vite hooks run — so config-load fails fast
@@ -21,6 +21,11 @@
  *   `@sveltejs/vite-plugin-svelte` is not resolvable from the consumer's
  *   cwd, and ROZ601 when `svelte` itself is not resolvable. Detection
  *   happens at factory-call time (mirrors React's `assertReactPeerDeps`).
+ * - `target: 'angular'` is accepted (Plan 05-04b); the factory raises
+ *   ROZ700 when `@analogjs/vite-plugin-angular` is not resolvable from the
+ *   consumer's cwd (D-72), ROZ701 when `@angular/core` is not resolvable,
+ *   and ROZ702 when the consumer's Vite version is < 6 (analogjs 2.5.x
+ *   requires vite ^6 || ^7 || ^8 per RESEARCH OQ6 RESOLVED).
  *
  * @experimental — shape may change before v1.0
  */
@@ -28,12 +33,13 @@
 import { RozieErrorCode } from '../../core/src/diagnostics/codes.js';
 import { detectReactPlugin, canResolveReact } from './react-detect.js';
 import { detectSveltePlugin, canResolveSvelte } from './svelte-detect.js';
+import { detectAnalogjs, canResolveAngularCore, detectViteMajor } from './analogjs-detect.js';
 
 export interface RozieOptions {
   /**
    * Target framework. Phase 3 shipped `vue`. Phase 4 (Plan 04-05) adds
-   * `react`. Phase 5 (Plan 05-02b) adds `svelte`. `angular` raises ROZ402
-   * until Plan 05-04b.
+   * `react`. Phase 5 Plan 05-02b adds `svelte`; Plan 05-04b adds `angular`.
+   * All four canonical targets are now fully supported.
    */
   target: 'vue' | 'react' | 'svelte' | 'angular';
 }
@@ -47,13 +53,17 @@ export const ALL_TARGETS: readonly TargetValue[] = ['vue', 'react', 'svelte', 'a
 export const SUPPORTED_TARGETS_PHASE_3: readonly TargetValue[] = ['vue'] as const;
 
 /**
- * Targets shipped through Phase 5 Plan 05-02b. (Plan 05-04b adds `angular`.)
+ * Targets shipped through Phase 5 Plan 05-04b. All four canonical targets
+ * are now supported (vue, react, svelte, angular).
  *
- * Plan 05-02b renames the previous `SUPPORTED_TARGETS_PHASE_4` to
- * `SUPPORTED_TARGETS_PHASE_5` and adds 'svelte'. The PHASE_4 export was
- * removed — no consumer outside this file referenced it.
+ * Plan 05-04b extends the prior PHASE_5 list (which Plan 05-02b set to
+ * ['vue', 'react', 'svelte']) with 'angular'. ROZ402 is no longer
+ * reachable in v1 — every value of `RozieOptions['target']` is now in
+ * SUPPORTED_TARGETS_PHASE_5. The constant is kept for diagnostic-message
+ * clarity; future phases may add new optional targets that initially
+ * raise ROZ402 again.
  */
-export const SUPPORTED_TARGETS_PHASE_5: readonly TargetValue[] = ['vue', 'react', 'svelte'] as const;
+export const SUPPORTED_TARGETS_PHASE_5: readonly TargetValue[] = ['vue', 'react', 'svelte', 'angular'] as const;
 
 interface RozieError extends Error {
   code: string;
@@ -97,7 +107,7 @@ export function validateOptions(options: Partial<RozieOptions> | undefined): Roz
   if (!SUPPORTED_TARGETS_PHASE_5.includes(target)) {
     throw rozieError(
       RozieErrorCode.UNPLUGIN_TARGET_NOT_YET_SUPPORTED,
-      `Target '${target}' is not yet supported. Phase 5 ships 'vue', 'react', 'svelte'; angular is added in Plan 05-04b.`,
+      `Target '${target}' is not yet supported. Phase 5 ships 'vue', 'react', 'svelte', 'angular'.`,
     );
   }
   return { target };
@@ -168,6 +178,57 @@ export function assertSveltePeerDeps(cwd?: string): void {
     throw rozieError(
       RozieErrorCode.UNPLUGIN_SVELTE_DEP_MISSING,
       `target: 'svelte' requires 'svelte' (^5.0.0) installed in your project. Install: pnpm add svelte`,
+    );
+  }
+}
+
+/**
+ * Plan 05-04b — runtime peer-dep assertions for `target: 'angular'` (D-72).
+ *
+ * Mirrors `assertReactPeerDeps` / `assertSveltePeerDeps`. Called from the
+ * factory after `validateOptions` succeeds when target === 'angular'.
+ *
+ * Three preconditions are checked in order:
+ *
+ *   1. ROZ700 — `@analogjs/vite-plugin-angular` resolvable from `cwd`.
+ *      Per D-72, consumers add this explicitly to their `vite.config.ts`
+ *      plugins array AFTER `Rozie({ target: 'angular' })`. Rozie does NOT
+ *      auto-detect or chain into it.
+ *   2. ROZ701 — `@angular/core` resolvable from `cwd`. Rozie's emitter
+ *      output imports from `@angular/core`; without it the consumer's
+ *      type-checker / runtime fails with cryptic errors.
+ *   3. ROZ702 — consumer's installed Vite is >= 6 (analogjs 2.5.x peerDeps
+ *      require `vite ^6 || ^7 || ^8` per RESEARCH OQ6 RESOLVED). When vite
+ *      is not resolvable at all, `detectViteMajor` returns null and we
+ *      skip this check (analogjs's own peer-dep machinery will surface
+ *      the missing-vite error first).
+ *
+ * @throws ROZ700 — `@analogjs/vite-plugin-angular` not resolvable.
+ * @throws ROZ701 — `@angular/core` not resolvable.
+ * @throws ROZ702 — consumer's Vite < 6.
+ */
+export function assertAngularPeerDeps(cwd?: string): void {
+  if (!detectAnalogjs(cwd)) {
+    throw rozieError(
+      RozieErrorCode.UNPLUGIN_ANGULAR_PEER_DEP_MISSING,
+      `target: 'angular' requires '@analogjs/vite-plugin-angular' (^2.5.0) installed in your project. ` +
+        `Install: pnpm add -D @analogjs/vite-plugin-angular @angular-devkit/build-angular and add angular() to your vite.config.ts plugins array AFTER Rozie({ target: 'angular' }).`,
+    );
+  }
+  if (!canResolveAngularCore(cwd)) {
+    throw rozieError(
+      RozieErrorCode.UNPLUGIN_ANGULAR_DEP_MISSING,
+      `target: 'angular' requires '@angular/core' (^17 || ^18 || ^19 || ^20 || ^21) installed in your project. ` +
+        `Install: pnpm add @angular/core @angular/common @angular/platform-browser`,
+    );
+  }
+  const viteMajor = detectViteMajor(cwd);
+  if (viteMajor !== null && viteMajor < 6) {
+    throw rozieError(
+      RozieErrorCode.UNPLUGIN_ANGULAR_VITE_VERSION_TOO_LOW,
+      `target: 'angular' requires Vite >= 6 (your project has Vite ${viteMajor}.x). ` +
+        `@analogjs/vite-plugin-angular@^2.5.0 peerDeps require vite ^6 || ^7 || ^8. ` +
+        `Upgrade: pnpm add -D vite@^6 (or ^7 / ^8).`,
     );
   }
 }
