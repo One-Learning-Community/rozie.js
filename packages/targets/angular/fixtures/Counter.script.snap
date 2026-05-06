@@ -1,0 +1,22 @@
+import { Component, ViewEncapsulation, computed, input, model, signal } from '@angular/core';
+
+
+value = model<number>(0);
+step = input<number>(1);
+min = input<number>(-Infinity);
+max = input<number>(Infinity);
+hovering = signal(false);
+
+constructor() {
+  console.log("hello from rozie");
+}
+
+canIncrement = computed(() => this.value() + this.step() <= this.max());
+canDecrement = computed(() => this.value() - this.step() >= this.min());
+
+increment = () => {
+  if (this.canIncrement()) this.value.set(this.value() + this.step());
+};
+decrement = () => {
+  if (this.canDecrement()) this.value.set(this.value() - this.step());
+};

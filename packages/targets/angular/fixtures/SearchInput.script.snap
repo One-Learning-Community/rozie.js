@@ -1,0 +1,30 @@
+import { Component, DestroyRef, ElementRef, ViewEncapsulation, computed, effect, inject, input, output, signal, viewChild } from '@angular/core';
+
+
+placeholder = input<string>('Search…');
+minLength = input<number>(2);
+autofocus = input<boolean>(false);
+query = signal('');
+inputEl = viewChild<ElementRef<HTMLInputElement>>('inputEl');
+search = output<unknown>();
+clear = output<unknown>();
+
+constructor() {
+  if (this.autofocus()) this.inputEl()?.nativeElement?.focus();
+
+  // Returning a function from $onMount registers a teardown — equivalent to
+  // a separate $onUnmount, useful when setup and teardown logic belong together.
+  inject(DestroyRef).onDestroy(() => {
+    // e.g., abort an in-flight request initialized in this hook
+  });
+}
+
+isValid = computed(() => this.query().length >= this.minLength());
+
+onSearch = () => {
+  if (this.isValid()) this.search.emit(this.query());
+};
+_clear = () => {
+  this.query.set('');
+  this.clear.emit();
+};

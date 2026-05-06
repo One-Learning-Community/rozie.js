@@ -1,0 +1,57 @@
+import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, effect, inject, input, model, output, viewChild } from '@angular/core';
+
+
+interface HeaderCtx {
+  $implicit: { close: any };
+  close: any;
+}
+
+interface DefaultCtx {
+  $implicit: { close: any };
+  close: any;
+}
+
+interface FooterCtx {
+  $implicit: { close: any };
+  close: any;
+}
+
+open = model<boolean>(false);
+closeOnEscape = input<boolean>(true);
+closeOnBackdrop = input<boolean>(true);
+lockBodyScroll = input<boolean>(true);
+title = input<string>('');
+backdropEl = viewChild<ElementRef<HTMLDivElement>>('backdropEl');
+dialogEl = viewChild<ElementRef<HTMLDivElement>>('dialogEl');
+close = output<unknown>();
+@ContentChild('header', { read: TemplateRef }) headerTpl?: TemplateRef<HeaderCtx>;
+@ContentChild('defaultSlot', { read: TemplateRef }) defaultTpl?: TemplateRef<DefaultCtx>;
+@ContentChild('footer', { read: TemplateRef }) footerTpl?: TemplateRef<FooterCtx>;
+
+constructor() {
+  this.lockScroll();
+  inject(DestroyRef).onDestroy(this.unlockScroll);
+  this.dialogEl()?.nativeElement?.focus();
+}
+
+_close = () => {
+  this.open.set(false);
+  this.close.emit();
+};
+savedBodyOverflow = '';
+lockScroll = () => {
+  if (!this.lockBodyScroll()) return;
+  this.savedBodyOverflow = document.body.style.overflow;
+  document.body.style.overflow = 'hidden';
+};
+unlockScroll = () => {
+  if (!this.lockBodyScroll()) return;
+  document.body.style.overflow = this.savedBodyOverflow;
+};
+
+static ngTemplateContextGuard(
+  _dir: Modal,
+  _ctx: unknown,
+): _ctx is HeaderCtx | DefaultCtx | FooterCtx {
+  return true;
+}
