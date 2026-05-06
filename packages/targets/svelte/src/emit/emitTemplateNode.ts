@@ -153,20 +153,78 @@ function emitLoop(node: TemplateLoopIR, ctx: EmitNodeCtx): string {
 /**
  * Emit element events. Each Listener returns one event-attribute string plus
  * an optional scriptInjection (debounce/throttle wrap).
+ *
+ * Multiple listeners on the SAME DOM event (e.g., `@keydown.enter="x"` AND
+ * `@keydown.escape="y"`) MUST merge into a single `onkeydown={...}` handler
+ * — Svelte rejects duplicate attribute names on the same element. We
+ * synthesize a single arrow that runs each handler's inlineGuards + body in
+ * sequence; the inlineGuards' early-returns (e.g., `if (e.key !== 'Enter')
+ * return`) naturally route the event to the correct user handler.
  */
 function emitEvents(events: Listener[], ctx: EmitNodeCtx): string {
   if (events.length === 0) return '';
-  const out: string[] = [];
+
+  // Group by lowercase event name (the Svelte attribute name).
+  const groups = new Map<string, Listener[]>();
   for (const ev of events) {
-    const result = emitTemplateEvent(ev, {
-      ir: ctx.ir,
-      registry: ctx.registry,
-      injectionCounter: ctx.injectionCounter,
-    });
-    out.push(result.eventAttr);
-    if (result.scriptInjection) ctx.scriptInjections.push(result.scriptInjection);
-    for (const d of result.diagnostics) ctx.diagnostics.push(d);
+    const key = ev.event.toLowerCase();
+    const list = groups.get(key) ?? [];
+    list.push(ev);
+    groups.set(key, list);
   }
+
+  const out: string[] = [];
+
+  for (const [eventName, group] of groups) {
+    if (group.length === 1) {
+      // Single listener — defer to emitTemplateEvent's standard emission.
+      const result = emitTemplateEvent(group[0]!, {
+        ir: ctx.ir,
+        registry: ctx.registry,
+        injectionCounter: ctx.injectionCounter,
+      });
+      out.push(result.eventAttr);
+      if (result.scriptInjection) ctx.scriptInjections.push(result.scriptInjection);
+      for (const d of result.diagnostics) ctx.diagnostics.push(d);
+      continue;
+    }
+
+    // Multiple listeners — merge into a single arrow. We synthesize each
+    // handler's body inline (inlineGuards + invocation) inside an IIFE block.
+    const handlerBodies: string[] = [];
+    for (const ev of group) {
+      const result = emitTemplateEvent(ev, {
+        ir: ctx.ir,
+        registry: ctx.registry,
+        injectionCounter: ctx.injectionCounter,
+      });
+      if (result.scriptInjection) ctx.scriptInjections.push(result.scriptInjection);
+      for (const d of result.diagnostics) ctx.diagnostics.push(d);
+      // Extract the inner arrow body. emitTemplateEvent always returns either
+      //   `onevent={handler}` (bare identifier) — we wrap as `handler(e);`
+      //   `onevent={(e) => { ...body... }}` — we lift the `...body...` out.
+      const m = result.eventAttr.match(/^on[a-z]+=\{(.*)\}$/s);
+      if (!m) continue;
+      const inner = m[1]!;
+      // Bare identifier handler:
+      if (/^[A-Za-z_$][\w$]*$/.test(inner)) {
+        handlerBodies.push(`(() => { ${inner}(e); })();`);
+        continue;
+      }
+      // Arrow shape `(e) => { body }` — extract body.
+      const arrowMatch = inner.match(/^\(e\) => \{\s*([\s\S]*?)\s*\}$/);
+      if (arrowMatch) {
+        handlerBodies.push(`(() => { ${arrowMatch[1]!} })();`);
+        continue;
+      }
+      // Fallback — wrap whatever it is in a callable IIFE.
+      handlerBodies.push(`(() => { (${inner})(e); })();`);
+    }
+
+    const merged = `on${eventName}={(e) => { ${handlerBodies.join(' ')} }}`;
+    out.push(merged);
+  }
+
   return out.join(' ');
 }
 

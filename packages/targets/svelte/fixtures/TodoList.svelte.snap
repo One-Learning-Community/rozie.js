@@ -1,0 +1,85 @@
+<script lang="ts">
+import type { Snippet } from 'svelte';
+
+interface Props {
+  items?: unknown[];
+  title?: string;
+  header?: Snippet<[any, any]>;
+  children?: Snippet<[any, any, any]>;
+  empty?: Snippet;
+}
+
+let {
+  items = $bindable(() => []),
+  title = 'Todo',
+  header,
+  children,
+  empty,
+}: Props = $props();
+
+let draft = $state('');
+
+const add = () => {
+  const text = draft.trim();
+  if (!text) return;
+  items = [...items, {
+    id: crypto.randomUUID(),
+    text,
+    done: false
+  }];
+  draft = '';
+  onadd?.(text);
+};
+const toggle = id => {
+  items = items.map(i => i.id === id ? {
+    ...i,
+    done: !i.done
+  } : i);
+  ontoggle?.(id);
+};
+const remove = id => {
+  items = items.filter(i => i.id !== id);
+  onremove?.(id);
+};
+
+const remaining = $derived(items.filter(i => !i.done).length);
+</script>
+
+
+<div class="todo-list">
+  <header>
+    {#if header}{@render header(remaining, items.length)}{:else}
+      
+      <h3>{title} ({remaining} remaining)</h3>
+    {/if}
+  </header>
+
+  <form onsubmit={(e) => { e.preventDefault(); add(e); }}>
+    <input bind:value={draft} placeholder="What needs doing?" />
+    <button type="submit" disabled={!draft.trim()}>Add</button>
+  </form>
+
+  {#if items.length > 0}<ul>
+    {#each items as item (item.id)}<li class={{ done: item.done }}>
+      
+      {#if children}{@render children(item, () => toggle(item.id), () => remove(item.id))}{:else}
+        <label>
+          <input type="checkbox" checked={item.done} onchange={(e) => { toggle(item.id); }} />
+          <span>{item.text}</span>
+        </label>
+        <button aria-label="Remove" onclick={(e) => { remove(item.id); }}>×</button>
+      {/if}
+    </li>{/each}
+  </ul>{:else}<p class="empty">
+    {#if empty}{@render empty()}{:else}Nothing to do. ✨{/if}
+  </p>{/if}</div>
+
+
+<style>
+.todo-list { font-family: system-ui, sans-serif; }
+ul { list-style: none; padding: 0; }
+li { display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0; }
+li.done span { text-decoration: line-through; opacity: 0.5; }
+.empty { color: rgba(0, 0, 0, 0.4); font-style: italic; }
+form { display: flex; gap: 0.25rem; margin-block: 0.5rem; }
+</style>
