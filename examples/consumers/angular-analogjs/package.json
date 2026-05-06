@@ -1,0 +1,33 @@
+{
+  "name": "angular-analogjs-demo",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --port 4176",
+    "typecheck": "tsc --noEmit",
+    "test:e2e": "playwright test",
+    "test:e2e:install": "playwright install chromium"
+  },
+  "dependencies": {
+    "@angular/common": "^17.0.0",
+    "@angular/compiler": "^17.0.0",
+    "@angular/core": "^17.0.0",
+    "@angular/platform-browser": "^17.0.0",
+    "@angular/platform-browser-dynamic": "^17.0.0",
+    "@rozie/unplugin": "workspace:*",
+    "rxjs": "^7.8",
+    "tslib": "^2.6",
+    "zone.js": "^0.14"
+  },
+  "devDependencies": {
+    "@analogjs/vite-plugin-angular": "^2.5.0",
+    "@angular/compiler-cli": "^17.0.0",
+    "@playwright/test": "^1",
+    "playwright": "^1",
+    "typescript": "~5.4",
+    "vite": "^6.0.0"
+  }
+}

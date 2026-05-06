@@ -4,3 +4,4 @@ packages:
   - "packages/runtime/*"
   - "examples/consumers/*"
   - "tests/plugins/*"
+  - "tests/integration/*"

@@ -1,0 +1,25 @@
+{
+  "name": "rozie-angular-analogjs-integration",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@analogjs/vite-plugin-angular": "^2.5.0",
+    "@angular/common": "^17.0.0",
+    "@angular/compiler": "^17.0.0",
+    "@angular/core": "^17.0.0",
+    "@angular/platform-browser": "^17.0.0",
+    "@rozie/unplugin": "workspace:*",
+    "rxjs": "^7.8",
+    "tslib": "^2.6",
+    "zone.js": "^0.14"
+  },
+  "devDependencies": {
+    "@angular/compiler-cli": "^17.0.0",
+    "typescript": "~5.4",
+    "vite": "^6.0.0"
+  }
+}
