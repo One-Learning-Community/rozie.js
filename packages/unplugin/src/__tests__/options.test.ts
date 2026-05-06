@@ -38,18 +38,22 @@ describe('validateOptions — D-49 / ROZ400+', () => {
     }
   });
 
-  it('throws ROZ402 when target is svelte / angular (Phase 4 ships vue + react)', () => {
-    for (const target of ['svelte', 'angular'] as const) {
+  it('throws ROZ402 when target is angular (Phase 5 Plan 05-02b ships vue + react + svelte; angular is Plan 05-04b)', () => {
+    for (const target of ['angular'] as const) {
       try {
         validateOptions({ target });
         throw new Error('expected throw for ' + target);
       } catch (e) {
         const err = e as Error & { code?: string };
         expect(err.code).toBe('ROZ402');
-        expect(err.message).toMatch(/Phase 4|not yet/i);
+        expect(err.message).toMatch(/Phase 5|not yet|05-04b/i);
         expect(err.message).toContain(target);
       }
     }
+  });
+
+  it('passes for target=svelte (Phase 5 Plan 05-02b)', () => {
+    expect(validateOptions({ target: 'svelte' })).toEqual({ target: 'svelte' });
   });
 
   it('passes for target=vue (returns the validated options)', () => {
@@ -87,9 +91,9 @@ describe('unplugin entry — .vite shape (factory wires validateOptions)', () =>
     expect(() => unplugin.vite({} as any)).toThrowError(/ROZ400/);
   });
 
-  it('throws ROZ402 when .vite called with target=svelte', () => {
+  it('throws ROZ402 when .vite called with target=angular (Plan 05-04b not yet shipped)', () => {
     try {
-      unplugin.vite({ target: 'svelte' as 'vue' });
+      unplugin.vite({ target: 'angular' as 'vue' });
       throw new Error('expected throw');
     } catch (e) {
       const err = e as Error & { code?: string };
@@ -112,6 +116,17 @@ describe('unplugin entry — .vite shape (factory wires validateOptions)', () =>
     // In our monorepo @vitejs/plugin-react and react are resolvable, so the
     // factory does NOT throw ROZ500/ROZ501.
     const plugin = unplugin.vite({ target: 'react' });
+    const p = Array.isArray(plugin) ? plugin[0] : plugin;
+    expect(p).toBeDefined();
+    expect((p as any).name).toBe('rozie');
+    expect((p as any).enforce).toBe('pre');
+  });
+
+  it('returns a Vite plugin object for target=svelte with name=rozie + enforce=pre (Plan 05-02b)', () => {
+    // In our monorepo @sveltejs/vite-plugin-svelte and svelte are resolvable
+    // via the svelte-vite-demo workspace, so the factory does NOT throw
+    // ROZ600/ROZ601.
+    const plugin = unplugin.vite({ target: 'svelte' });
     const p = Array.isArray(plugin) ? plugin[0] : plugin;
     expect(p).toBeDefined();
     expect((p as any).name).toBe('rozie');

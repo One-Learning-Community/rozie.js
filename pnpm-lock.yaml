@@ -564,6 +564,9 @@ importers:
       '@rozie/target-react':
         specifier: workspace:*
         version: link:../targets/react
+      '@rozie/target-svelte':
+        specifier: workspace:*
+        version: link:../targets/svelte
       '@rozie/target-vue':
         specifier: workspace:*
         version: link:../targets/vue

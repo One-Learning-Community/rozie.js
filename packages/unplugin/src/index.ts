@@ -29,7 +29,12 @@
 import { createUnplugin as createUnpluginV3 } from 'unplugin';
 import { ModifierRegistry } from '../../core/src/modifiers/ModifierRegistry.js';
 import { registerBuiltins } from '../../core/src/modifiers/registerBuiltins.js';
-import { validateOptions, assertReactPeerDeps, type RozieOptions } from './options.js';
+import {
+  validateOptions,
+  assertReactPeerDeps,
+  assertSveltePeerDeps,
+  type RozieOptions,
+} from './options.js';
 import {
   createLoadHook,
   createResolveIdHook,
@@ -53,6 +58,12 @@ export const unplugin = createUnpluginV3<Partial<RozieOptions>>((rawOptions) => 
   // first, then tighten to throws in Phase 7).
   if (options.target === 'react') {
     assertReactPeerDeps();
+  }
+
+  // Plan 05-02b: enforce Svelte peer deps (ROZ600/ROZ601) at factory-call
+  // time for `target: 'svelte'`. Mirrors React above.
+  if (options.target === 'svelte') {
+    assertSveltePeerDeps();
   }
 
   // Build a default modifier registry once per plugin instance — shared by
@@ -109,10 +120,15 @@ export const unplugin = createUnpluginV3<Partial<RozieOptions>>((rawOptions) => 
       // biome-ignore lint/suspicious/noExplicitAny: Vite HMR context type varies by version
       handleHotUpdate({ file, server }: { file: string; server: any }) {
         if (!file.endsWith('.rozie')) return;
-        const candidates =
-          options.target === 'vue'
-            ? [file + '.vue']
-            : [file + '.tsx', file + '.module.css', file + '.global.css'];
+        let candidates: string[];
+        if (options.target === 'vue') {
+          candidates = [file + '.vue'];
+        } else if (options.target === 'svelte') {
+          candidates = [file + '.svelte'];
+        } else {
+          // react
+          candidates = [file + '.tsx', file + '.module.css', file + '.global.css'];
+        }
         // biome-ignore lint/suspicious/noExplicitAny: ModuleNode type from vite
         const mods: any[] = candidates
           .map((id: string) => server.moduleGraph.getModuleById(id))

@@ -39,6 +39,7 @@ import { lowerToIR } from '../../core/src/ir/lower.js';
 import type { ModifierRegistry } from '../../core/src/modifiers/ModifierRegistry.js';
 import { emitVue, type EmitVueResult } from '../../targets/vue/src/emitVue.js';
 import { emitReact, type EmitReactResult } from '../../targets/react/src/emitReact.js';
+import { emitSvelte, type EmitSvelteResult } from '../../targets/svelte/src/emitSvelte.js';
 import type { Diagnostic } from '../../core/src/diagnostics/Diagnostic.js';
 import type { TargetValue } from './options.js';
 import { formatViteError, formatLoc } from './diagnostics.js';
@@ -56,6 +57,19 @@ const VIRTUAL_SUFFIX_VUE = '.rozie.vue';
 const VIRTUAL_SUFFIX_REACT = '.rozie.tsx';
 const VIRTUAL_SUFFIX_REACT_MODULE_CSS = '.rozie.module.css';
 const VIRTUAL_SUFFIX_REACT_GLOBAL_CSS = '.rozie.global.css';
+
+/**
+ * Svelte-target synthetic suffix (Plan 05-02b). The `.svelte` carries the
+ * full SFC (script + template + style); @sveltejs/vite-plugin-svelte's
+ * default `transformInclude` matches `/\.svelte$/` and processes the
+ * synthesized id naturally.
+ *
+ * Per RESEARCH OQ A8/A9 RESOLVED: NO sibling `.module.css` virtual ids —
+ * Svelte's compiler handles `<style>` block scoping internally. The
+ * `:root { ... }` escape hatch is wrapped as `:global(:root) { ... }` by
+ * the Svelte emitter, so a single .svelte virtual id covers everything.
+ */
+const VIRTUAL_SUFFIX_SVELTE = '.rozie.svelte';
 
 /**
  * Phase 4 escape-hatch: query-suffix forms (`?style=module` / `?style=global`)
@@ -77,7 +91,8 @@ export function transformIncludeRozie(id: string): boolean {
     id.endsWith(VIRTUAL_SUFFIX_REACT_MODULE_CSS) ||
     id.endsWith(VIRTUAL_SUFFIX_REACT_GLOBAL_CSS) ||
     id.includes(VIRTUAL_SUFFIX_REACT + QUERY_STYLE_MODULE) ||
-    id.includes(VIRTUAL_SUFFIX_REACT + QUERY_STYLE_GLOBAL)
+    id.includes(VIRTUAL_SUFFIX_REACT + QUERY_STYLE_GLOBAL) ||
+    id.endsWith(VIRTUAL_SUFFIX_SVELTE)
   );
 }
 
@@ -100,6 +115,16 @@ type AnyContext = any;
 export function createResolveIdHook(
   target: TargetValue = 'vue',
 ): (id: string, importer: string | undefined) => string | null {
+  if (target === 'svelte') {
+    return function resolveIdSvelte(id: string, importer: string | undefined): string | null {
+      // Pass-through for the synthetic id itself (load handles it).
+      if (id.endsWith(VIRTUAL_SUFFIX_SVELTE)) return id;
+      // Bare `.rozie` import → `<abs>/Foo.rozie.svelte`.
+      if (!id.endsWith('.rozie')) return null;
+      const abs = absolutize(id, importer);
+      return abs + '.svelte';
+    };
+  }
   if (target === 'react') {
     return function resolveIdReact(id: string, importer: string | undefined): string | null {
       // 1) Bare `.rozie` import → `<abs>/Foo.rozie.tsx`.
@@ -166,6 +191,18 @@ function absolutize(id: string, importer: string | undefined): string {
  * lowering / emission failures; calls `this.warn` on non-fatal warnings.
  */
 export function createLoadHook(registry: ModifierRegistry, target: TargetValue = 'vue') {
+  if (target === 'svelte') {
+    return function loadSvelte(
+      this: AnyContext,
+      id: string,
+    ): { code: string; map: EmitSvelteResult['map'] } | null {
+      if (!id.endsWith(VIRTUAL_SUFFIX_SVELTE)) return null;
+      // Strip `.svelte` only — leaves `.rozie`.
+      const filePath = id.slice(0, -'.svelte'.length);
+      const source = readFileSync(filePath, 'utf8');
+      return runSveltePipeline.call(this, source, filePath, registry);
+    };
+  }
   if (target === 'react') {
     return function loadReact(
       this: AnyContext,
@@ -236,6 +273,15 @@ export function createLoadHook(registry: ModifierRegistry, target: TargetValue =
  * to exercise the parse/lower/emit chain without going through resolveId.
  */
 export function createTransformHook(registry: ModifierRegistry, target: TargetValue = 'vue') {
+  if (target === 'svelte') {
+    return function transformSvelte(
+      this: AnyContext,
+      code: string,
+      id: string,
+    ): { code: string; map: EmitSvelteResult['map'] } | null {
+      return runSveltePipeline.call(this, code, id, registry);
+    };
+  }
   if (target === 'react') {
     return function transformReact(
       this: AnyContext,
@@ -337,6 +383,50 @@ function runReactPipeline(
   surfaceWarnings.call(this, warnings, filePath, source);
 
   return result;
+}
+
+/**
+ * Svelte-target pipeline: parse → lowerToIR → emitSvelte. Returns
+ * `{ code, map }` for the load/transform hooks. Mirrors runRoziePipeline
+ * (Vue) — Svelte's emitter has a single output channel (one `.svelte` file
+ * containing script + template + style), so no CSS-side branching like
+ * React's runReactPipeline.
+ */
+function runSveltePipeline(
+  this: AnyContext,
+  source: string,
+  filePath: string,
+  registry: ModifierRegistry,
+): { code: string; map: EmitSvelteResult['map'] } {
+  this?.addWatchFile?.(filePath);
+  // 1. parse
+  const { ast, diagnostics: parseDiags } = parse(source, { filename: filePath });
+  if (!ast || parseDiags.some((d) => d.severity === 'error')) {
+    throw formatViteError(parseDiags, filePath, source);
+  }
+
+  // 2. lowerToIR
+  const { ir, diagnostics: irDiags } = lowerToIR(ast, { modifierRegistry: registry });
+  const warnings: Diagnostic[] = [
+    ...parseDiags.filter((d) => d.severity === 'warning'),
+    ...irDiags.filter((d) => d.severity === 'warning'),
+  ];
+  const irErrors = irDiags.filter((d) => d.severity === 'error');
+  if (!ir || irErrors.length > 0) {
+    throw formatViteError(irDiags, filePath, source);
+  }
+
+  // 3. emitSvelte
+  const result = emitSvelte(ir, { filename: filePath, source, modifierRegistry: registry });
+  const emitErrors = result.diagnostics.filter((d) => d.severity === 'error');
+  if (emitErrors.length > 0) {
+    throw formatViteError(emitErrors, filePath, source);
+  }
+  warnings.push(...result.diagnostics.filter((d) => d.severity === 'warning'));
+
+  surfaceWarnings.call(this, warnings, filePath, source);
+
+  return { code: result.code, map: result.map };
 }
 
 /**
