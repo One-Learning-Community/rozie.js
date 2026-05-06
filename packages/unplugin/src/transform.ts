@@ -32,8 +32,8 @@
  * @experimental — shape may change before v1.0
  */
 
-import { existsSync, readFileSync } from 'node:fs';
-import { isAbsolute, resolve as pathResolve, dirname } from 'node:path';
+import { existsSync, readFileSync, writeFileSync, readdirSync, statSync } from 'node:fs';
+import { isAbsolute, resolve as pathResolve, dirname, join as pathJoin } from 'node:path';
 import { parse } from '../../core/src/parse.js';
 import { lowerToIR } from '../../core/src/ir/lower.js';
 import type { ModifierRegistry } from '../../core/src/modifiers/ModifierRegistry.js';
@@ -146,13 +146,23 @@ export function createResolveIdHook(
 ): (id: string, importer: string | undefined) => string | null {
   if (target === 'angular') {
     return function resolveIdAngular(id: string, importer: string | undefined): string | null {
-      // Pass-through for the synthetic id itself (load handles it). Per Plan
-      // 05-03 SPIKE Path A, analogjs's transform hook consumes the upstream
-      // `code` we return from `load`, so the synthetic id never has to
-      // resolve to an actual file on disk.
-      if (id.endsWith(VIRTUAL_SUFFIX_ANGULAR)) return id;
+      // D-70 disk-cache: `.rozie.ts` files are now real files on disk
+      // (written by `prebuildAngularRozieFiles` during Vite's
+      // configResolved hook). Returning the absolute path lets Vite read
+      // the file via the standard filesystem path, which means analogjs's
+      // TS Program (built from `tsconfig.app.json`'s `include` patterns)
+      // picks up the file naturally — addressing the gap where Path A's
+      // synthetic-id approach broke down because analogjs's `fileEmitter`
+      // walks the TS Program rather than consuming the upstream `code`
+      // parameter for AOT builds.
+      if (id.endsWith(VIRTUAL_SUFFIX_ANGULAR)) {
+        const abs = absolutize(id, importer);
+        return existsSync(abs) ? abs : null;
+      }
       // Bare `.rozie` import → `<abs>/Foo.rozie.ts`. analogjs's TS_EXT_REGEX
-      // (/\.[cm]?ts(?![a-z])/) matches the trailing `.ts`.
+      // (/\.[cm]?ts(?![a-z])/) matches the trailing `.ts`. The on-disk file
+      // is written by prebuildAngularRozieFiles before any transform hook
+      // runs.
       if (!id.endsWith('.rozie')) return null;
       const abs = absolutize(id, importer);
       return abs + '.ts';
@@ -240,8 +250,21 @@ export function createLoadHook(registry: ModifierRegistry, target: TargetValue =
       id: string,
     ): { code: string; map: EmitAngularResult['map'] } | null {
       if (!id.endsWith(VIRTUAL_SUFFIX_ANGULAR)) return null;
-      // Strip `.ts` only — leaves `.rozie`.
+      // D-70 disk-cache: when the .rozie.ts has been pre-written to disk by
+      // prebuildAngularRozieFiles, Vite reads the file via the standard
+      // filesystem path and analogjs's TS Program picks it up. Returning
+      // null here defers to that filesystem read.
+      //
+      // The fallback path (file NOT yet on disk — e.g. dep-scan cold-start
+      // before configResolved completes, or a unit test exercising the load
+      // hook directly) materialises the .rozie.ts on demand by running the
+      // pipeline and returning the synthesized source. This preserves the
+      // pre-D-70 Path A behavior for tests + early scans.
+      if (existsSync(id)) {
+        return null;
+      }
       const filePath = id.slice(0, -'.ts'.length);
+      if (!existsSync(filePath)) return null;
       const source = readFileSync(filePath, 'utf8');
       return runAngularPipeline.call(this, source, filePath, registry);
     };
@@ -540,6 +563,162 @@ function runAngularPipeline(
   surfaceWarnings.call(this, warnings, filePath, source);
 
   return { code: result.code, map: result.map };
+}
+
+/**
+ * D-70 disk-cache: eagerly emit each `*.rozie` file under `rootDir` to a
+ * sibling `*.rozie.ts` file on disk so analogjs's TS Program (built from
+ * `tsconfig.app.json`'s `include` patterns) picks them up.
+ *
+ * Why this is needed: Plan 05-03 SPIKE confirmed Path A works for analogjs's
+ * `transform` hook in isolation (the handler consumes the upstream `code`
+ * parameter), but the FULL AOT-emit pipeline calls `fileEmitter(id)` which
+ * reads from a `Map<id, content>` populated by `performCompilation` walking
+ * the TS Program. Synthetic non-filesystem `.rozie.ts` ids aren't on disk →
+ * not in the TS Program → fileEmitter returns empty → consumer-side
+ * `import default from './Foo.rozie'` fails at Rollup bind with `'"default"
+ * is not exported by "src/Foo.rozie.ts"'`.
+ *
+ * The fix per D-70: write the synthesized `.rozie.ts` to disk before
+ * analogjs's TS Program is constructed. This addresses the AOT-emit gap
+ * without changing the resolveId / load chain semantics for non-Angular
+ * targets.
+ *
+ * The on-disk `.rozie.ts` files are gitignored repo-wide so consumers don't
+ * have to manage them.
+ *
+ * @param rootDir  — absolute path of the project root (Vite's resolvedConfig.root)
+ * @param registry — modifier registry to feed into emitAngular
+ * @returns array of absolute `.rozie` paths that were processed
+ */
+export function prebuildAngularRozieFiles(
+  rootDir: string,
+  registry: ModifierRegistry,
+): string[] {
+  const processed: string[] = [];
+  for (const roziePath of walkRozieFiles(rootDir)) {
+    try {
+      emitRozieTsToDisk(roziePath, registry);
+      processed.push(roziePath);
+    } catch (err) {
+      // Surface as a console warning rather than aborting the whole scan —
+      // a single bad .rozie shouldn't prevent the rest of the project from
+      // building. The actual transform of THIS file will throw at
+      // request-time with a Vite-shaped error pointing at the source.
+      const msg = err instanceof Error ? err.message : String(err);
+      // biome-ignore lint/suspicious/noConsole: build-time diagnostic
+      console.warn(`[@rozie/unplugin] prebuildAngularRozieFiles: failed to emit ${roziePath} → ${msg}`);
+    }
+  }
+  return processed;
+}
+
+/**
+ * Synthesize the .rozie.ts for a single `.rozie` source file and write it
+ * to disk. Used by both `prebuildAngularRozieFiles` (eager scan at
+ * configResolved) and the HMR re-emit path (single-file update on .rozie
+ * change).
+ */
+export function emitRozieTsToDisk(
+  roziePath: string,
+  registry: ModifierRegistry,
+): string {
+  const source = readFileSync(roziePath, 'utf8');
+  const result = runAngularEmitForDisk(source, roziePath, registry);
+  const outPath = roziePath + '.ts';
+  // Avoid an unnecessary write (and consequent fs.watch event) when the
+  // emitted code is byte-identical to what's already on disk. This keeps
+  // HMR snappy and prevents loops where Vite's chokidar picks up the write
+  // and re-triggers a build.
+  if (existsSync(outPath)) {
+    const existing = readFileSync(outPath, 'utf8');
+    if (existing === result.code) {
+      return outPath;
+    }
+  }
+  writeFileSync(outPath, result.code, 'utf8');
+  return outPath;
+}
+
+/**
+ * Pipeline-runner that doesn't require a Vite plugin context. Used by the
+ * disk-cache helpers (which run during configResolved before any context
+ * exists). Throws plain Errors on diagnostic failures rather than the
+ * Vite-shaped errors used by the request-time pipeline.
+ */
+function runAngularEmitForDisk(
+  source: string,
+  filePath: string,
+  registry: ModifierRegistry,
+): { code: string } {
+  const { ast, diagnostics: parseDiags } = parse(source, { filename: filePath });
+  if (!ast || parseDiags.some((d) => d.severity === 'error')) {
+    const first = parseDiags.find((d) => d.severity === 'error');
+    throw new Error(`[${first?.code ?? 'parse'}] ${first?.message ?? 'parse error'}`);
+  }
+  const { ir, diagnostics: irDiags } = lowerToIR(ast, { modifierRegistry: registry });
+  const irError = irDiags.find((d) => d.severity === 'error');
+  if (!ir || irError) {
+    throw new Error(`[${irError?.code ?? 'lower'}] ${irError?.message ?? 'lowering error'}`);
+  }
+  const result = emitAngular(ir, { filename: filePath, source, modifierRegistry: registry });
+  const emitError = result.diagnostics.find((d) => d.severity === 'error');
+  if (emitError) {
+    throw new Error(`[${emitError.code}] ${emitError.message}`);
+  }
+  return { code: result.code };
+}
+
+/**
+ * Recursive `*.rozie` walker. Skips common irrelevant directories
+ * (node_modules, dist, .git, .turbo, .planning, test-results, etc.) so a
+ * full project scan stays cheap even on large monorepos.
+ *
+ * Yields absolute paths.
+ */
+function* walkRozieFiles(rootDir: string): Generator<string> {
+  const SKIP_DIRS = new Set([
+    'node_modules',
+    'dist',
+    '.git',
+    '.turbo',
+    '.vite',
+    '.planning',
+    '.next',
+    '.cache',
+    'test-results',
+    'playwright-report',
+    'coverage',
+  ]);
+  const stack: string[] = [rootDir];
+  while (stack.length > 0) {
+    const dir = stack.pop()!;
+    let entries: string[];
+    try {
+      entries = readdirSync(dir);
+    } catch {
+      continue;
+    }
+    for (const entry of entries) {
+      if (entry.startsWith('.') && entry !== '.') {
+        // Skip dotfiles/dotdirs except the root itself.
+        if (SKIP_DIRS.has(entry)) continue;
+      }
+      const full = pathJoin(dir, entry);
+      let st: ReturnType<typeof statSync>;
+      try {
+        st = statSync(full);
+      } catch {
+        continue;
+      }
+      if (st.isDirectory()) {
+        if (SKIP_DIRS.has(entry)) continue;
+        stack.push(full);
+      } else if (st.isFile() && entry.endsWith('.rozie')) {
+        yield full;
+      }
+    }
+  }
 }
 
 /**

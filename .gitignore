@@ -19,6 +19,14 @@ playwright-report/
 # Vite test artifacts (left over from spike tests using __dirname-relative tmp)
 examples/consumers/*/.tmp-*/
 
+# D-70 disk-cache: Angular target emits sibling `.rozie.ts` files next to
+# each `.rozie` source so analogjs's TS Program (built from
+# `tsconfig.app.json`'s `include` patterns) picks them up. These are
+# generated build artefacts — never commit. Repo-wide so consumers using
+# the Angular target via @rozie/unplugin in any subproject opt out
+# automatically.
+*.rozie.ts
+
 # IntelliJ plugin subproject (Phase 8)
 tools/intellij-plugin/build/
 tools/intellij-plugin/.gradle/

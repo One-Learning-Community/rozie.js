@@ -39,6 +39,8 @@ import {
 import {
   createLoadHook,
   createResolveIdHook,
+  emitRozieTsToDisk,
+  prebuildAngularRozieFiles,
   transformIncludeRozie,
 } from './transform.js';
 
@@ -120,6 +122,26 @@ export const unplugin = createUnpluginV3<Partial<RozieOptions>>((rawOptions) => 
           },
         },
       }),
+      // D-70 disk-cache: for the Angular target, eagerly emit each `.rozie`
+      // → `.rozie.ts` to disk during `configResolved` so analogjs's TS
+      // Program (constructed in its own `configResolved`, which fires AFTER
+      // ours because Rozie has `enforce: 'pre'`) finds the files via the
+      // standard `tsconfig.app.json` `include` patterns.
+      //
+      // Without this, analogjs's `fileEmitter` walks the TS Program for AOT
+      // and synthetic non-filesystem `.rozie.ts` ids return empty content,
+      // breaking consumer-side `import default from './Foo.rozie'` at
+      // Rollup bind time.
+      //
+      // For non-Angular targets, this hook is a no-op — Vue/React/Svelte
+      // plugins consume the upstream `code` via Vite's standard transform
+      // chain and don't need the disk-cache.
+      // biome-ignore lint/suspicious/noExplicitAny: Vite ResolvedConfig type varies by version
+      configResolved(resolvedConfig: any) {
+        if (options.target !== 'angular') return;
+        const root = resolvedConfig?.root ?? process.cwd();
+        prebuildAngularRozieFiles(root, registry);
+      },
       // When a .rozie file changes on disk, Vite's HMR lookup finds no module
       // graph entry for it (the graph entry is the synthetic .rozie.vue/.tsx id).
       // handleHotUpdate fires before Vite's own HMR path, so we can map the
@@ -129,6 +151,23 @@ export const unplugin = createUnpluginV3<Partial<RozieOptions>>((rawOptions) => 
       // biome-ignore lint/suspicious/noExplicitAny: Vite HMR context type varies by version
       handleHotUpdate({ file, server }: { file: string; server: any }) {
         if (!file.endsWith('.rozie')) return;
+        // D-70 disk-cache HMR support: when a `.rozie` source file changes,
+        // re-emit the sibling `.rozie.ts` on disk so analogjs's downstream
+        // HMR machinery (which watches the .ts file) picks up the new
+        // content. Vite's own chokidar will see the .rozie.ts write and
+        // route HMR through analogjs's transform chain naturally.
+        if (options.target === 'angular') {
+          try {
+            emitRozieTsToDisk(file, registry);
+          } catch (err) {
+            // Surface as a warning rather than aborting HMR — the next
+            // request-time transform will throw with a precise Vite-shaped
+            // error pointing at the offending source location.
+            const msg = err instanceof Error ? err.message : String(err);
+            // biome-ignore lint/suspicious/noConsole: HMR-time diagnostic
+            console.warn(`[@rozie/unplugin] HMR re-emit failed for ${file}: ${msg}`);
+          }
+        }
         let candidates: string[];
         if (options.target === 'vue') {
           candidates = [file + '.vue'];
