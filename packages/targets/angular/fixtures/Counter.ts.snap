@@ -1,0 +1,43 @@
+import { Component, ViewEncapsulation, computed, input, model, signal } from '@angular/core';
+
+@Component({
+  selector: 'rozie-counter',
+  standalone: true,
+  template: `
+
+    <div class="counter" [ngClass]="{ hovering: hovering() }" (mouseenter)="hovering.set(true)" (mouseleave)="hovering.set(false)">
+      <button [disabled]="!canDecrement()" aria-label="Decrement" (click)="decrement($event)">−</button>
+      <span class="value">{{ value() }}</span>
+      <button [disabled]="!canIncrement()" aria-label="Increment" (click)="increment($event)">+</button>
+    </div>
+
+  `,
+  styles: [`
+    .counter { display: inline-flex; gap: 0.5rem; align-items: center; }
+    .counter.hovering { background: rgba(0, 0, 0, 0.04); }
+    .value { font-variant-numeric: tabular-nums; min-width: 3ch; text-align: center; }
+    button { padding: 0.25rem 0.5rem; }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+  `],
+})
+export class Counter {
+  value = model<number>(0);
+  step = input<number>(1);
+  min = input<number>(-Infinity);
+  max = input<number>(Infinity);
+  hovering = signal(false);
+
+  constructor() {
+    console.log("hello from rozie");
+  }
+
+  canIncrement = computed(() => this.value() + this.step() <= this.max());
+  canDecrement = computed(() => this.value() - this.step() >= this.min());
+
+  increment = () => {
+    if (this.canIncrement()) this.value.set(this.value() + this.step());
+  };
+  decrement = () => {
+    if (this.canDecrement()) this.value.set(this.value() - this.step());
+  };
+}

@@ -259,50 +259,43 @@ export function emitTemplateEvent(
     // Callable but not bare identifier — invoke with $event.
     attrValue = `(${handlerRef})($event)`;
   } else {
-    // Inline guards present — synthesize a class-body wrapped method.
-    // For Angular template-event context, the cleanest approach is to inline
-    // the guards into a parenthesized $event handler chain. Angular templates
-    // don't support multi-statement bodies inline well, so we synthesize a
-    // class-body wrapper method via scriptInjection. For v1 simplicity, we
-    // splice the guards as a comma-sequence:
-    //   (event)="(<guard1>; <guard2>; handler($event))"
-    // Angular allows comma-separated statement chains in event bindings as of v17.
-    const guardChain = inlineGuards.map((g) => g.replace(/;\s*$/, '')).join('; ');
-    let invocation: string;
-    if (handlerKind === 'identifier') {
-      invocation = `${handlerRef}($event)`;
-    } else if (handlerKind === 'callable') {
-      invocation = `(${handlerRef})($event)`;
-    } else {
-      invocation = handlerRef;
-    }
-    // Angular event bindings support semicolon-separated statements when
-    // wrapped in `(...)`; the convention is `(stmt1; stmt2)`. Use chain form.
-    // To make this resilient we re-route: use a parenthesized comma form
-    // `(_ = (guard ? null : (handler($event))))` is brittle. Use a simpler
-    // approach: convert each `if (...) return;` guard to a ternary + early
-    // exit via a helper class field. v1 simplification: emit a class-body
-    // wrapper method that runs the guards then the handler.
-    // Wrapper-method approach:
+    // Inline guards present — synthesize a class-body wrapper method that
+    // runs the guards then invokes the handler. The wrapper body uses `e`
+    // as the event arg so that inlineGuard fragments like
+    // `if (e.target !== e.currentTarget) return;` resolve naturally.
+    //
+    // The body's class-member references need `this.` prefix because we're
+    // inside a class arrow field, not a template binding. We post-process
+    // the rewritten template-style handler code by adding `this.` prefix to
+    // bare class-member identifiers (signal calls + user methods + collision
+    // renames).
     const wrapperName = makeWrapperMethodName(handlerRef, counter);
-    const e = '$event';
-    const guardLines = inlineGuards.map((g) => `    ${g}`).join('\n');
-    const innerInvocation =
-      handlerKind === 'identifier'
-        ? `this.${handlerRef}(${e})`
-        : handlerKind === 'callable'
-        ? `(${handlerRef})(${e})`
-        : handlerRef;
+    const guardLines = inlineGuards.map((g) => `  ${g}`).join('\n');
+
+    // Re-render the handler with class-member-aware `this.` prefix. Use a
+    // simple post-process: any bare identifier matching a known class member
+    // gets `this.` prefix. The `handlerRef` was produced by
+    // rewriteTemplateExpression in template style.
+    const thisPrefixed = applyThisPrefixing(handlerRef, ctx.ir, ctx.collisionRenames);
+
+    let innerInvocation: string;
+    if (handlerKind === 'identifier') {
+      // handlerRef is bare like `onSearch` (or collision-renamed `_close`).
+      innerInvocation = `this.${handlerRef}(e)`;
+    } else if (handlerKind === 'callable') {
+      innerInvocation = `(${thisPrefixed})(e)`;
+    } else {
+      // statement — splice as-is with `this.` prefixing.
+      innerInvocation = thisPrefixed;
+    }
     const decl = [
-      `private ${wrapperName} = (${e}: any) => {`,
+      `private ${wrapperName} = (e: any) => {`,
       guardLines,
-      `    ${innerInvocation};`,
+      `  ${innerInvocation};`,
       `};`,
     ].join('\n');
     scriptInjection = { name: wrapperName, decl };
-    attrValue = `${wrapperName}(${e})`;
-    void invocation;
-    void guardChain;
+    attrValue = `${wrapperName}($event)`;
   }
 
   const eventAttr = `(${eventName})="${attrValue}"`;
@@ -321,4 +314,43 @@ function makeWrapperMethodName(handlerRef: string, counter: { next: number }): s
   const cap = base.charAt(0).toUpperCase() + base.slice(1);
   const N = counter.next++;
   return N === 0 ? `_guarded${cap}` : `_guarded${cap}_${N}`;
+}
+
+/**
+ * Apply `this.` prefix to bare references to class members in a string of
+ * template-rewritten code. Used when generating class-body field initializers
+ * from template expressions (e.g., the body of a guarded event wrapper).
+ *
+ * Heuristic: we look for word-boundary identifier patterns that match a
+ * known class member name AND are NOT already preceded by `.` or `this.`.
+ * This is a regex-based pass; it's not 100% precise (won't catch shadowing
+ * via let/const inside arrow bodies), but for the v1 reference examples it
+ * produces correct output.
+ */
+function applyThisPrefixing(
+  code: string,
+  ir: import('../../../../core/src/ir/types.js').IRComponent,
+  collisionRenames?: ReadonlyMap<string, string> | undefined,
+): string {
+  const memberNames = new Set<string>();
+  for (const p of ir.props) memberNames.add(p.name);
+  for (const s of ir.state) memberNames.add(s.name);
+  for (const c of ir.computed) memberNames.add(c.name);
+  for (const r of ir.refs) memberNames.add(r.name);
+  for (const e of ir.emits) memberNames.add(e);
+  // Add collision-renamed targets (e.g., _close).
+  if (collisionRenames) {
+    for (const renamed of collisionRenames.values()) memberNames.add(renamed);
+  }
+
+  if (memberNames.size === 0) return code;
+
+  // Build a regex matching any of the member names as a word-boundary token.
+  const pattern = new RegExp(
+    `(?<![\\w$.])(${Array.from(memberNames)
+      .map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+      .join('|')})\\b`,
+    'g',
+  );
+  return code.replace(pattern, 'this.$1');
 }
