@@ -1,0 +1,6 @@
+
+<div class={["counter", { hovering: hovering }]} onmouseenter={(e) => { hovering = true; }} onmouseleave={(e) => { hovering = false; }}>
+  <button disabled={!canDecrement} aria-label="Decrement" onclick={decrement}>−</button>
+  <span class="value">{value}</span>
+  <button disabled={!canIncrement} aria-label="Increment" onclick={increment}>+</button>
+</div>
