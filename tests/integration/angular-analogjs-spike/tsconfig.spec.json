@@ -1,0 +1,8 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./out-tsc/spec",
+    "types": ["vite/client", "node", "vitest/globals"]
+  },
+  "include": ["src/**/*.ts", "spike.test.ts", "vite.config.ts"]
+}
