@@ -4,10 +4,37 @@
   "type": "module",
   "private": true,
   "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "src",
+    "dist"
+  ],
+  "dependencies": {
+    "@babel/generator": "^7.29",
+    "@babel/parser": "^7.29",
+    "@babel/traverse": "^7.29",
+    "@babel/types": "^7.29",
+    "@rozie/core": "workspace:*",
+    "magic-string": "^0.30",
+    "postcss": "^8.5"
+  },
+  "devDependencies": {
+    "@types/babel__generator": "^7",
+    "@types/babel__traverse": "^7",
+    "@angular/core": "^17.0.0",
+    "@angular/common": "^17.0.0",
+    "@angular/compiler": "^17.0.0",
+    "happy-dom": "^15",
+    "vitest": "^4.1.0"
+  },
   "scripts": {
-    "build": "echo 'Phase 1: scaffold only' && exit 0",
-    "test": "echo 'Phase 1: no tests' && exit 0",
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest",
+    "build": "echo 'Phase 5: tsdown wired in Phase 6' && exit 0",
     "lint": "biome lint src",
     "typecheck": "tsc --noEmit"
-  }
+  },
+  "license": "MIT"
 }
