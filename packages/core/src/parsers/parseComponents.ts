@@ -10,9 +10,9 @@
  *
  * ROZxxx codes owned here:
  *  - ROZ010  Invalid JS expression in <components>
- *  - ROZ011  <components> top-level is not an object literal — also used as
- *            placeholder for non-`.rozie` value (Task 1); Task 4 upgrades to
- *            ROZ921 NON_ROZIE_IMPORT_PATH.
+ *  - ROZ011  <components> top-level is not an object literal
+ *  - ROZ921  <components> entry value is not a `.rozie` string literal
+ *            (NON_ROZIE_IMPORT_PATH; per-property check after Babel parse).
  *
  * @experimental — shape may change before v1.0
  */
@@ -82,9 +82,7 @@ export function parseComponents(
     return { node: null, diagnostics };
   }
 
-  // Per-property structural validation. Task 1 uses NOT_OBJECT_LITERAL as the
-  // placeholder code for non-`.rozie` values; Task 4 upgrades to ROZ921
-  // NON_ROZIE_IMPORT_PATH with a tailored hint.
+  // Per-property ROZ921 validation: every value must be a `.rozie` StringLiteral.
   // (Non-Identifier keys are deferred to lowerComponents — silent skip there.)
   for (const prop of expr.properties) {
     if (prop.type !== 'ObjectProperty') continue;
@@ -95,7 +93,7 @@ export function parseComponents(
     const value = prop.value;
     if (value.type !== 'StringLiteral') {
       diagnostics.push({
-        code: RozieErrorCode.NOT_OBJECT_LITERAL,
+        code: RozieErrorCode.NON_ROZIE_IMPORT_PATH,
         severity: 'error',
         message: `<components> entry '${keyName}' must reference a '.rozie' file string literal (got ${value.type}).`,
         loc: babelLocToRozieLoc(value),
@@ -106,7 +104,7 @@ export function parseComponents(
     }
     if (!value.value.endsWith('.rozie')) {
       diagnostics.push({
-        code: RozieErrorCode.NOT_OBJECT_LITERAL,
+        code: RozieErrorCode.NON_ROZIE_IMPORT_PATH,
         severity: 'error',
         message: `<components> entry '${keyName}' references '${value.value}', which does not end with '.rozie'.`,
         loc: babelLocToRozieLoc(value),

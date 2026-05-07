@@ -37,6 +37,8 @@ import { extractRForAliases } from '../../semantic/extractRForAliases.js';
 import { computeExpressionDeps } from '../../reactivity/computeDeps.js';
 import { resolveModifierPipeline } from './lowerListeners.js';
 import { isPascalCase } from '../utils/isPascalCase.js';
+import { didYouMean } from '../../diagnostics/didYouMean.js';
+import { RozieErrorCode } from '../../diagnostics/codes.js';
 import type {
   TemplateNode as IRTemplateNode,
   TemplateElementIR,
@@ -49,6 +51,122 @@ import type {
   ComponentDecl,
   Listener,
 } from '../types.js';
+
+/**
+ * Per-element annotation of tagKind + diagnostic emission for Phase 06.2 P1
+ * Task 3 / Task 4.
+ *
+ * Returns the resolved { tagKind, componentRef, used } triple. `used` is the
+ * declared name (outerName or components-table entry) consumed by this tag —
+ * tracked so Task 4's ROZ924 (UNUSED_COMPONENT_ENTRY) can skip referenced
+ * entries after the walk.
+ *
+ * Escape-hatch sub-codes (D-124, resolves Open Question §2):
+ *   - <Suspense>          → ROZ925 (React framework directly)
+ *   - <Teleport>          → ROZ926 (Vue framework directly)
+ *   - <ng-container>      → ROZ927 (Angular framework directly)
+ *   - <svelte:fragment>   → ROZ928 (Svelte framework directly)
+ *
+ * Per-primitive hints provide better DX than a flat ROZ920 message.
+ */
+function annotateTagKind(
+  tagName: string,
+  outerName: string,
+  componentsTable: Map<string, ComponentDecl>,
+  declaredNames: readonly string[],
+  diagnostics: Diagnostic[],
+  loc: { start: number; end: number },
+): {
+  tagKind: 'html' | 'component' | 'self';
+  componentRef?: ComponentDecl;
+  /** Declared name consumed (outerName or components-table key); null when none. */
+  used: string | null;
+} {
+  // Escape-hatch primitives FIRST — these short-circuit before PascalCase
+  // path so we can emit per-primitive ROZ925..928 sub-codes.
+  if (tagName === 'Suspense') {
+    diagnostics.push({
+      code: RozieErrorCode.ESCAPE_HATCH_REACT_SUSPENSE,
+      severity: 'error',
+      message: '<Suspense> is a React-specific primitive and is not part of Rozie.',
+      loc,
+      hint: 'For React <Suspense>, use the React framework directly. Rozie deliberately does not expose framework-specific primitives.',
+    });
+    return { tagKind: 'html', used: null };
+  }
+  if (tagName === 'Teleport') {
+    diagnostics.push({
+      code: RozieErrorCode.ESCAPE_HATCH_VUE_TELEPORT,
+      severity: 'error',
+      message: '<Teleport> is a Vue-specific primitive and is not part of Rozie.',
+      loc,
+      hint: 'For Vue <Teleport>, use the Vue framework directly. Rozie deliberately does not expose framework-specific primitives.',
+    });
+    return { tagKind: 'html', used: null };
+  }
+  if (tagName === 'ng-container') {
+    diagnostics.push({
+      code: RozieErrorCode.ESCAPE_HATCH_NG_CONTAINER,
+      severity: 'error',
+      message: '<ng-container> is an Angular-specific primitive and is not part of Rozie.',
+      loc,
+      hint: 'For Angular <ng-container>, use the Angular framework directly. Rozie deliberately does not expose framework-specific primitives.',
+    });
+    return { tagKind: 'html', used: null };
+  }
+  if (/^svelte:/i.test(tagName)) {
+    diagnostics.push({
+      code: RozieErrorCode.ESCAPE_HATCH_SVELTE_FRAGMENT,
+      severity: 'error',
+      message: `<${tagName}> is a Svelte-specific primitive and is not part of Rozie.`,
+      loc,
+      hint: 'For Svelte <svelte:fragment> / <svelte:*>, use the Svelte framework directly. Rozie deliberately does not expose framework-specific primitives.',
+    });
+    return { tagKind: 'html', used: null };
+  }
+
+  if (isPascalCase(tagName)) {
+    if (tagName === outerName) {
+      return { tagKind: 'self', used: outerName };
+    }
+    const decl = componentsTable.get(tagName);
+    if (decl !== undefined) {
+      return { tagKind: 'component', componentRef: decl, used: tagName };
+    }
+    // Unmatched PascalCase — ROZ920 with optional did-you-mean.
+    const suggestion = didYouMean(tagName, declaredNames);
+    diagnostics.push({
+      code: RozieErrorCode.UNKNOWN_COMPONENT,
+      severity: 'error',
+      message: `Unknown component <${tagName}>. PascalCase tags must be declared in <components> (or match the outer <rozie name=>).`,
+      loc,
+      ...(suggestion !== null
+        ? { hint: `Did you mean <${suggestion}>?` }
+        : {
+            hint:
+              declaredNames.length === 0
+                ? `Declare it in <components>: { ${tagName}: './${tagName}.rozie' }.`
+                : `Declared components: ${declaredNames.map((n) => `<${n}>`).join(', ')}.`,
+          }),
+    });
+    return { tagKind: 'html', used: null };
+  }
+
+  // Non-PascalCase — Task 4 ROZ922: lowercase variant of a declared PascalCase
+  // is likely a typo. Compare lowercase-insensitively against declaredNames.
+  const lowerHit = declaredNames.find((n) => n.toLowerCase() === tagName.toLowerCase());
+  if (lowerHit) {
+    diagnostics.push({
+      code: RozieErrorCode.LOWERCASE_LIKELY_TYPO,
+      severity: 'warning',
+      message: `<${tagName}> looks like the declared component <${lowerHit}> but starts with a lowercase letter; Rozie treats it as an HTML tag.`,
+      loc,
+      hint: `Use <${lowerHit}> if you meant the declared component, or rename to a kebab-case custom-element name to silence this warning.`,
+    });
+    // Non-PascalCase passes through as 'html' regardless.
+  }
+  return { tagKind: 'html', used: null };
+}
 
 export interface LowerTemplateResult {
   template: IRTemplateNode | null;
@@ -234,6 +352,8 @@ function lowerElement(
   index: number,
   outerName: string,
   componentsTable: Map<string, ComponentDecl>,
+  declaredNames: readonly string[],
+  usedNames: Set<string>,
 ): IRTemplateNode {
   const elPath = `${pathPrefix}/${el.tagName}-${index}`;
 
@@ -275,6 +395,8 @@ function lowerElement(
       elPath,
       outerName,
       componentsTable,
+      declaredNames,
+      usedNames,
     );
 
     const loop: TemplateLoopIR = {
@@ -300,6 +422,8 @@ function lowerElement(
     elPath,
     outerName,
     componentsTable,
+    declaredNames,
+    usedNames,
   );
 }
 
@@ -317,6 +441,8 @@ function lowerBareElement(
   elPath: string,
   outerName: string,
   componentsTable: Map<string, ComponentDecl>,
+  declaredNames: readonly string[],
+  usedNames: Set<string>,
 ): IRTemplateNode {
   // <slot> elements lower to TemplateSlotInvocationIR.
   if (el.tagName === 'slot') {
@@ -346,6 +472,8 @@ function lowerBareElement(
       elPath,
       outerName,
       componentsTable,
+      declaredNames,
+      usedNames,
     );
     return {
       type: 'TemplateSlotInvocation',
@@ -437,27 +565,23 @@ function lowerBareElement(
     elPath,
     outerName,
     componentsTable,
+    declaredNames,
+    usedNames,
   );
 
-  // Phase 06.2 P1 Task 3 — annotate tagKind per D-114 precedence:
-  //   outer-name match (recursion / 'self') wins
-  //   then components-table lookup ('component')
-  //   then HTML / custom-element / unmatched fallback ('html').
-  const tagName = el.tagName;
-  let tagKind: 'html' | 'component' | 'self' = 'html';
-  let componentRef: ComponentDecl | undefined;
-  if (isPascalCase(tagName)) {
-    if (tagName === outerName) {
-      tagKind = 'self';
-    } else {
-      const decl = componentsTable.get(tagName);
-      if (decl !== undefined) {
-        tagKind = 'component';
-        componentRef = decl;
-      }
-      // else: PascalCase but unmatched — falls through to 'html'.
-      // Task 4 layers ROZ920 emission here.
-    }
+  // Phase 06.2 P1 Task 3/4 — annotate tagKind + emit ROZ920..928 sub-codes
+  // per D-114 precedence (outer-name first, then components table, then
+  // HTML/custom-element fallback).
+  const annotation = annotateTagKind(
+    el.tagName,
+    outerName,
+    componentsTable,
+    declaredNames,
+    diagnostics,
+    el.loc,
+  );
+  if (annotation.used !== null) {
+    usedNames.add(annotation.used);
   }
 
   const result: TemplateElementIR = {
@@ -467,9 +591,11 @@ function lowerBareElement(
     events,
     children,
     sourceLoc: el.loc,
-    tagKind,
+    tagKind: annotation.tagKind,
     // exactOptionalPropertyTypes: spread componentRef only when defined.
-    ...(componentRef !== undefined ? { componentRef } : {}),
+    ...(annotation.componentRef !== undefined
+      ? { componentRef: annotation.componentRef }
+      : {}),
   };
   return result;
 }
@@ -488,6 +614,8 @@ function lowerNodeList(
   pathPrefix: string,
   outerName: string,
   componentsTable: Map<string, ComponentDecl>,
+  declaredNames: readonly string[],
+  usedNames: Set<string>,
 ): IRTemplateNode[] {
   const out: IRTemplateNode[] = [];
 
@@ -535,6 +663,8 @@ function lowerNodeList(
           i,
           outerName,
           componentsTable,
+          declaredNames,
+          usedNames,
         ),
       ];
       branches.push({
@@ -572,6 +702,8 @@ function lowerNodeList(
               j,
               outerName,
               componentsTable,
+              declaredNames,
+              usedNames,
             ),
           ],
           sourceLoc: sib.loc,
@@ -601,6 +733,8 @@ function lowerNodeList(
         i,
         outerName,
         componentsTable,
+        declaredNames,
+        usedNames,
       ),
     );
   }
@@ -618,6 +752,11 @@ export function lowerTemplate(
   componentsTable: Map<string, ComponentDecl>,
 ): LowerTemplateResult {
   const templateListeners: Listener[] = [];
+  // Declared names available for did-you-mean + lowercase-typo detection.
+  // Outer name precedes <components> entries (D-114 precedence).
+  const declaredNames: string[] = [outerName, ...componentsTable.keys()];
+  // Used names tracked for ROZ924 (UNUSED_COMPONENT_ENTRY).
+  const usedNames = new Set<string>();
   const children = lowerNodeList(
     template.children,
     bindings,
@@ -628,7 +767,25 @@ export function lowerTemplate(
     '',
     outerName,
     componentsTable,
+    declaredNames,
+    usedNames,
   );
+
+  // Phase 06.2 P1 Task 4 — ROZ924: warn for declared <components> entries
+  // never referenced anywhere in the template. Outer-name self-references
+  // are not subject to ROZ924 (the parent is always trivially "used" by
+  // virtue of being the file's own component).
+  for (const [name, decl] of componentsTable) {
+    if (!usedNames.has(name)) {
+      diagnostics.push({
+        code: RozieErrorCode.UNUSED_COMPONENT_ENTRY,
+        severity: 'warning',
+        message: `<components> declares '${name}' (${decl.importPath}) but it is never referenced in the template.`,
+        loc: decl.sourceLoc,
+        hint: 'Remove the unused entry, or use <' + name + '> in the template.',
+      });
+    }
+  }
 
   let templateNode: IRTemplateNode | null;
   if (children.length === 0) {

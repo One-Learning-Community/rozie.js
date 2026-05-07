@@ -151,6 +151,24 @@ export const RozieErrorCode = {
   // ROZ910..ROZ919: emit-time position-anchoring failures
   SOURCEMAP_AST_NODE_MISSING_LOC: 'ROZ910', // synthesized AST node lacks loc; falls back to nearest segment (D-104/D-106)
   SOURCEMAP_PARSER_OFFSET_INVALID: 'ROZ911', // @babel/parser startLine/startColumn validation failed
+
+  // ---- Phase 06.2 component composition (D-123 sub-allocation) — ROZ920..ROZ939 ----
+  // D-123 reserves ROZ920..ROZ939 for the <components> block + composition
+  // diagnostics. ROZ920..ROZ924 are the 5 core composition codes; ROZ925..928
+  // are per-primitive escape-hatch sub-codes resolving Open Question §2 from
+  // RESEARCH.md (per-primitive hint messages provide better DX than a flat
+  // ROZ920). ROZ929..ROZ939 reserved for future ROZ-COMP needs.
+  UNKNOWN_COMPONENT: 'ROZ920', // PascalCase tag matches neither outer name nor <components> entry
+  NON_ROZIE_IMPORT_PATH: 'ROZ921', // <components> entry value is not a `.rozie` string literal
+  LOWERCASE_LIKELY_TYPO: 'ROZ922', // warning: <counter> when Counter is declared
+  DUPLICATE_COMPONENT_IMPORT_PATH: 'ROZ923', // warning: two <components> entries point at the same .rozie path
+  UNUSED_COMPONENT_ENTRY: 'ROZ924', // warning: declared <components> entry never used in template
+  // D-124 — per-primitive escape-hatch sub-codes (4 sub-codes, framework-specific hints)
+  ESCAPE_HATCH_REACT_SUSPENSE: 'ROZ925', // <Suspense> — use React directly
+  ESCAPE_HATCH_VUE_TELEPORT: 'ROZ926', // <Teleport> — use Vue directly
+  ESCAPE_HATCH_NG_CONTAINER: 'ROZ927', // <ng-container> — use Angular directly
+  ESCAPE_HATCH_SVELTE_FRAGMENT: 'ROZ928', // <svelte:fragment> — use Svelte directly
+  // ROZ929..ROZ939 reserved for future ROZ-COMP needs
 } as const;
 
 export type RozieErrorCode = (typeof RozieErrorCode)[keyof typeof RozieErrorCode];
