@@ -108,18 +108,22 @@ export function emitScript(
   // 4. onMount/onCleanup for each LifecycleHook.
   for (const lh of ir.lifecycle) {
     if (lh.phase === 'mount') {
-      collectors.solidImports.add('onMount');
       if (lh.cleanup) {
-        // Paired mount+unmount: use createEffect + onCleanup.
-        collectors.solidImports.add('createEffect');
+        // Paired mount+cleanup: wrap in onMount, call onCleanup inside.
+        // Shape: onMount(() => { const _cleanup = setupFn(); if (_cleanup) onCleanup(_cleanup); })
+        collectors.solidImports.add('onMount');
         collectors.solidImports.add('onCleanup');
         const setupCode = genCode(lh.setup);
-        // P1: emit a stub that notes cleanup is pending.
+        const cleanupCode = genCode(lh.cleanup);
         hookLines.push(
-          `onMount(${setupCode});\n` +
-          `// TODO(P2): wire onCleanup for lifecycle cleanup (cleanup)`,
+          `onMount(() => {\n` +
+          `  const _cleanup = (${setupCode})();\n` +
+          `  if (_cleanup) onCleanup(_cleanup);\n` +
+          `  onCleanup(${cleanupCode});\n` +
+          `});`,
         );
       } else {
+        collectors.solidImports.add('onMount');
         const setupCode = genCode(lh.setup);
         hookLines.push(`onMount(${setupCode});`);
       }
@@ -127,7 +131,18 @@ export function emitScript(
       collectors.solidImports.add('onCleanup');
       const setupCode = genCode(lh.setup);
       hookLines.push(`onCleanup(${setupCode});`);
+    } else if (lh.phase === 'update') {
+      // update phase: createEffect re-runs on tracked dependency change
+      collectors.solidImports.add('createEffect');
+      const setupCode = genCode(lh.setup);
+      hookLines.push(`createEffect(${setupCode});`);
     }
+  }
+
+  // 4b. Ref variable declarations: `let fooRef: Element | null = null;`
+  // Solid uses plain let variables (not useRef objects) for DOM refs.
+  for (const ref of ir.refs) {
+    hookLines.push(`let ${ref.name}Ref: Element | null = null;`);
   }
 
   // 5. Emit user-authored top-level statements from the rewritten program.

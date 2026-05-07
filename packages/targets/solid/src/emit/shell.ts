@@ -48,6 +48,16 @@ export interface SolidShellParts {
    * Placed AFTER splitPropsCall and script body.
    */
   listenerEffects?: string;
+  /**
+   * Script-body injection lines from debounce/throttle wrappers in emitListeners.
+   * Placed AFTER listenerEffects but BEFORE the return statement.
+   */
+  scriptInjections?: string[];
+  /**
+   * Inline <style> JSX from emitStyle (Pitfall 3 — no CSS Modules for Solid).
+   * When non-empty, the JSX return is wrapped in a fragment: `<>{styleJsx}{jsx}</>`.
+   */
+  styleJsx?: string;
   /** JSX body string (e.g., '<div>...</div>' or '(\n  <div>...</div>\n)') */
   jsx: string;
   /**
@@ -158,8 +168,25 @@ export function buildShell(parts: SolidShellParts): BuildShellResult {
     moduleParts.push('\n\n');
   }
 
+  // Script injections (debounce/throttle wrappers from listener emitter).
+  if (parts.scriptInjections && parts.scriptInjections.length > 0) {
+    for (const inj of parts.scriptInjections) {
+      const indented = inj
+        .split('\n')
+        .map((line) => (line.length > 0 ? '  ' + line : line))
+        .join('\n');
+      moduleParts.push(indented);
+      moduleParts.push('\n');
+    }
+    moduleParts.push('\n');
+  }
+
   // JSX body — wrap in `return ( ... );`.
-  const jsxIndented = parts.jsx
+  // When styleJsx is present, wrap the return in a fragment.
+  const effectiveJsx = (parts.styleJsx && parts.styleJsx.length > 0)
+    ? `<>\n${parts.styleJsx}\n${parts.jsx}\n</>`
+    : parts.jsx;
+  const jsxIndented = effectiveJsx
     .split('\n')
     .map((line) => (line.length > 0 ? '    ' + line : line))
     .join('\n');
@@ -244,7 +271,22 @@ function buildShellLegacy(parts: SolidShellParts): BuildShellResult {
     ms.append('\n\n');
   }
 
-  const jsxIndented = parts.jsx
+  if (parts.scriptInjections && parts.scriptInjections.length > 0) {
+    for (const inj of parts.scriptInjections) {
+      const indented = inj
+        .split('\n')
+        .map((line) => (line.length > 0 ? '  ' + line : line))
+        .join('\n');
+      ms.append(indented);
+      ms.append('\n');
+    }
+    ms.append('\n');
+  }
+
+  const effectiveJsx = (parts.styleJsx && parts.styleJsx.length > 0)
+    ? `<>\n${parts.styleJsx}\n${parts.jsx}\n</>`
+    : parts.jsx;
+  const jsxIndented = effectiveJsx
     .split('\n')
     .map((line) => (line.length > 0 ? '    ' + line : line))
     .join('\n');

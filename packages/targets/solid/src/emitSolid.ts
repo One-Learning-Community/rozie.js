@@ -24,6 +24,7 @@ import { emitTemplate } from './emit/emitTemplate.js';
 import { emitListeners } from './emit/emitListeners.js';
 import { emitSlotDecl } from './emit/emitSlotDecl.js';
 import { emitPropsInterface } from './emit/emitPropsInterface.js';
+import { emitStyle } from './emit/emitStyle.js';
 import { buildShell } from './emit/shell.js';
 import { composeSourceMap } from './sourcemap/compose.js';
 
@@ -102,13 +103,19 @@ export function emitSolid(ir: IRComponent, opts: EmitSolidOptions = {}): EmitSol
   const scriptResult = emitScript(ir, { solidImports, runtimeImports }, registry);
   const templateResult = emitTemplate(ir, { solid: solidImports, runtime: runtimeImports }, registry);
   const listenersResult = emitListeners(ir, { solid: solidImports, runtime: runtimeImports }, registry);
+  const styleResult = emitStyle(ir.styles ?? { scopedRules: [], rootRules: [] }, opts.source ?? '');
 
   // 6. splitPropsCall — D-141 universal.
   const propNames = (ir.props ?? []).map((p) => `'${p.name}'`).join(', ');
   const splitPropsCall = `const [local, rest] = splitProps(_props, [${propNames}]);\n`;
 
   // 7. Compose shell.
-  const script = [scriptResult.hookSection, scriptResult.userArrowsSection]
+  // Merge script injections: listener debounce/throttle wrappers go after user arrows.
+  const script = [
+    scriptResult.hookSection,
+    scriptResult.userArrowsSection,
+    ...listenersResult.scriptInjections,
+  ]
     .filter((s) => s.trim().length > 0)
     .join('\n\n');
 
@@ -123,6 +130,7 @@ export function emitSolid(ir: IRComponent, opts: EmitSolidOptions = {}): EmitSol
     hasDefaultSlot,
     script,
     listenerEffects: listenersResult.code,
+    styleJsx: styleResult.styleJsx,
     jsx: templateResult.jsx,
     rozieSource: opts.source ?? '',
     blockOffsets: resolvedBlockOffsets,
@@ -148,6 +156,7 @@ export function emitSolid(ir: IRComponent, opts: EmitSolidOptions = {}): EmitSol
     ...templateResult.diagnostics,
     ...listenersResult.diagnostics,
     ...slotResult.diagnostics,
+    ...styleResult.diagnostics,
   ];
 
   return { code: shell.ms.toString(), map: finalMap, diagnostics };

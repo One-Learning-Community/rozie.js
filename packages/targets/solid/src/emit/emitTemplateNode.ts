@@ -1,16 +1,46 @@
 /**
- * emitTemplateNode — Solid target (P1 stub).
+ * emitTemplateNode — Solid target (P2 complete implementation).
  *
- * Walks a TemplateNode IR and returns a JSX string. P1 emits a minimal
- * valid JSX representation. P2 fills directive-accurate emission (<Show>, <For>, etc.).
+ * Recursive switch over the IR's TemplateNode discriminated union, producing
+ * JSX-string fragments per the Solid emission patterns:
+ *
+ *   - r-if / r-else-if / r-else → <Show when={...} fallback={...}>
+ *   - r-for → <For each={items()}>{(item, index) => ...}</For>
+ *   - Signal reads → name() (MUST use getter call form — Solid reactivity)
+ *   - ref="foo" → ref={(el) => { fooRef = el; }}
+ *   - class= → kept as class= (Solid supports class; does NOT need className)
+ *   - Events → onClick={...} (camelCase)
+ *   - Slot invocations → per D-133 patterns
+ *   - tagKind: 'component' / 'self' → PascalCase tag verbatim
  *
  * @experimental — shape may change before v1.0
  */
-import type { TemplateNode } from '../../../../core/src/ir/types.js';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
+import type {
+  TemplateNode,
+  TemplateElementIR,
+  TemplateLoopIR,
+  TemplateInterpolationIR,
+  TemplateStaticTextIR,
+  TemplateFragmentIR,
+  TemplateSlotInvocationIR,
+  AttributeBinding,
+  IRComponent,
+} from '../../../../core/src/ir/types.js';
 import type { ModifierRegistry } from '../../../../core/src/modifiers/ModifierRegistry.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import type { SolidImportCollector, RuntimeSolidImportCollector } from '../rewrite/collectSolidImports.js';
+import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
+import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
+import { emitAttributes } from './emitTemplateAttribute.js';
+import { emitConditional } from './emitConditional.js';
+import { emitTemplateEvent } from './emitTemplateEvent.js';
+import { emitRModel } from './emitRModel.js';
+import { emitSlotInvocation } from './emitSlotInvocation.js';
+
+const VOID_ELEMENTS = new Set([
+  'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta',
+  'source', 'track', 'wbr',
+]);
 
 export interface EmitNodeCtx {
   ir: IRComponent;
@@ -19,99 +49,238 @@ export interface EmitNodeCtx {
   diagnostics: Diagnostic[];
 }
 
-export function emitNode(node: TemplateNode, ctx: EmitNodeCtx): string {
-  return emitNodeInner(node, ctx);
+function emitStaticText(node: TemplateStaticTextIR, _ctx: EmitNodeCtx): string {
+  return node.text;
 }
 
-function emitNodeInner(node: TemplateNode, ctx: EmitNodeCtx): string {
-  if (node.type === 'TemplateText' || node.type === 'TemplateStaticText') {
-    // Static text node.
-    return 'text' in node ? (node as { text: string }).text : '';
+function emitInterpolation(node: TemplateInterpolationIR, ctx: EmitNodeCtx): string {
+  const code = rewriteTemplateExpression(node.expression, ctx.ir);
+  return `{${code}}`;
+}
+
+function emitFragment(node: TemplateFragmentIR, ctx: EmitNodeCtx): string {
+  if (node.children.length === 1) return emitNode(node.children[0]!, ctx);
+  const parts = node.children.map((c) => emitNode(c, ctx)).join('');
+  return `<>${parts}</>`;
+}
+
+/**
+ * Emit a TemplateLoop as `<For each={items()}>{(item, index) => ...}</For>`.
+ *
+ * Solid's <For> component uses referential identity for keying by default.
+ * The `:key` attribute from the source is informational only — <For> does NOT
+ * accept a `key` prop (it uses structural identity internally). We document
+ * this in a comment but do NOT emit key= on the <For> element.
+ *
+ * NOTE: Solid also has <Index> for keying by index; we always use <For> for
+ * r-for because r-for semantics match <For> (item-identity tracking).
+ */
+function emitLoop(node: TemplateLoopIR, ctx: EmitNodeCtx): string {
+  ctx.collectors.solid.add('For');
+
+  const iterableCode = rewriteTemplateExpression(node.iterableExpression, ctx.ir);
+
+  // Build the callback arrow signature: (item) or (item, index)
+  const aliasStr = node.indexAlias
+    ? `(${node.itemAlias}, ${node.indexAlias})`
+    : `(${node.itemAlias})`;
+
+  let bodyJsx: string;
+  if (node.body.length === 1) {
+    bodyJsx = emitNode(node.body[0]!, ctx);
+  } else {
+    const parts = node.body.map((c) => emitNode(c, ctx)).join('');
+    bodyJsx = `<>${parts}</>`;
   }
 
-  if (node.type === 'TemplateInterpolation') {
-    // {{ expr }} → {expr}
-    const expr = 'rawExpr' in node ? (node as { rawExpr: string }).rawExpr.trim() : '';
-    return `{${expr}}`;
+  return `<For each={${iterableCode}}>{${aliasStr} => ${bodyJsx}}</For>`;
+}
+
+/**
+ * Find an attribute by name.
+ */
+function findAttribute(attrs: AttributeBinding[], name: string): AttributeBinding | null {
+  for (const a of attrs) {
+    if (a.name === name) return a;
+  }
+  return null;
+}
+
+/**
+ * Emit all @event listeners on an element, merging multiple listeners that
+ * map to the same JSX prop (e.g., @keydown.enter + @keydown.escape → onKeyDown).
+ */
+function emitElementEvents(node: TemplateElementIR, ctx: EmitNodeCtx): string {
+  if (node.events.length === 0) return '';
+
+  type EmittedAttr = { jsxName: string; body: string };
+  const emitted: EmittedAttr[] = [];
+
+  for (const ev of node.events) {
+    if (ev === null || ev === undefined) continue;
+    const result = emitTemplateEvent(ev, {
+      ir: ctx.ir,
+      registry: ctx.registry,
+      collectors: ctx.collectors,
+    });
+    for (const d of result.diagnostics) ctx.diagnostics.push(d);
+
+    // Parse `<jsxName>={<body>}` so we can re-group when names collide.
+    const match = result.jsxAttr.match(/^([A-Za-z][\w]*)=\{(.*)\}$/s);
+    if (!match) {
+      emitted.push({ jsxName: '', body: result.jsxAttr });
+      continue;
+    }
+    emitted.push({ jsxName: match[1]!, body: match[2]! });
   }
 
-  if (node.type === 'TemplateElement') {
-    const tag = node.tagName;
-    const children = node.children.map((c) => emitNodeInner(c, ctx)).join('');
+  // Group by jsxName, preserving order (same as React target's dispatcher-merge).
+  const groups = new Map<string, EmittedAttr[]>();
+  const order: string[] = [];
+  for (const e of emitted) {
+    if (!groups.has(e.jsxName)) {
+      groups.set(e.jsxName, []);
+      order.push(e.jsxName);
+    }
+    groups.get(e.jsxName)!.push(e);
+  }
 
-    // Build attribute string from node.attributes.
-    const attrParts: string[] = [];
-    for (const attr of node.attributes) {
-      if (attr.kind === 'static') {
-        attrParts.push(`${attr.name}="${attr.value}"`);
-      } else if (attr.kind === 'binding') {
-        // Bound attribute: emit as JSX expression.
-        // P1: emit the raw expression text from the binding.
-        const exprText = 'expression' in attr && attr.expression
-          ? (typeof attr.expression === 'string'
-              ? attr.expression
-              : JSON.stringify(attr.expression))
-          : attr.name;
-        attrParts.push(`${attr.name}={${exprText}}`);
+  const out: string[] = [];
+  for (const name of order) {
+    const items = groups.get(name)!;
+    if (items.length === 1) {
+      const it = items[0]!;
+      if (it.jsxName === '') out.push(it.body);
+      else out.push(`${it.jsxName}={${it.body}}`);
+      continue;
+    }
+    // Multi-listener merge: build a dispatcher arrow.
+    const branches = items.map((it) => {
+      const body = it.body;
+      if (/^[A-Za-z_$][\w$]*$/.test(body)) {
+        return `${body}(e);`;
       }
-      // 'interpolated' and events: P2 handles.
+      return `(${body})(e);`;
+    });
+    const dispatcher = `(e) => { ${branches.join(' ')} }`;
+    out.push(`${name}={${dispatcher}}`);
+  }
+  return out.join(' ');
+}
+
+/**
+ * Emit a TemplateElement. Applies element-level special-cases (r-show, r-html,
+ * r-text, r-model) then falls through to standard tag/attr/children form.
+ *
+ * tagKind discrimination per D-115:
+ *   - 'html': standard HTML element, class stays as `class=` (Solid supports this)
+ *   - 'component': PascalCase tag, emit verbatim; cross-rozie imports handled by emitSolid
+ *   - 'self': self-reference, emit verbatim PascalCase (JS scope resolves it)
+ */
+function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
+  let workingAttrs: AttributeBinding[] = [...node.attributes];
+
+  // r-html special-case
+  const rHtmlAttr = findAttribute(workingAttrs, 'r-html');
+  if (rHtmlAttr && rHtmlAttr.kind === 'binding') {
+    if (node.children.length > 0) {
+      ctx.diagnostics.push({
+        code: RozieErrorCode.TARGET_REACT_RHTML_WITH_CHILDREN,
+        severity: 'warning',
+        message: `<${node.tagName}> r-html on element with children — children dropped (Pitfall 10).`,
+        loc: rHtmlAttr.sourceLoc,
+      });
     }
+    const exprCode = rewriteTemplateExpression(rHtmlAttr.expression, ctx.ir);
+    workingAttrs = workingAttrs.filter((a) => a !== rHtmlAttr);
+    const attrsResult = emitAttributes(workingAttrs, { ir: ctx.ir, collectors: ctx.collectors });
+    for (const d of attrsResult.diagnostics) ctx.diagnostics.push(d);
+    const eventsJsx = emitElementEvents(node, ctx);
+    const headParts = [attrsResult.jsx, eventsJsx, `innerHTML={${exprCode}}`].filter(Boolean);
+    const head = headParts.length > 0 ? ' ' + headParts.join(' ') : '';
+    return `<${node.tagName}${head} />`;
+  }
 
-    const attrStr = attrParts.length > 0 ? ' ' + attrParts.join(' ') : '';
-    if (node.selfClosing || children.length === 0) {
-      return `<${tag}${attrStr} />`;
+  // r-text special-case
+  const rTextAttr = findAttribute(workingAttrs, 'r-text');
+  let rTextChildren: string | null = null;
+  if (rTextAttr && rTextAttr.kind === 'binding') {
+    const exprCode = rewriteTemplateExpression(rTextAttr.expression, ctx.ir);
+    rTextChildren = `{${exprCode}}`;
+    workingAttrs = workingAttrs.filter((a) => a !== rTextAttr);
+  }
+
+  // r-show special-case: emit style={{ display: cond ? '' : 'none' }}
+  // Note: In Solid, style prop takes an object OR a string. For conditional
+  // display, emit style={{ display: (cond) ? '' : 'none' }}.
+  const rShowAttr = findAttribute(workingAttrs, 'r-show');
+  let rShowStyleAttr: string | null = null;
+  if (rShowAttr && rShowAttr.kind === 'binding') {
+    const exprCode = rewriteTemplateExpression(rShowAttr.expression, ctx.ir);
+    rShowStyleAttr = `style={{ display: (${exprCode}) ? '' : 'none' }}`;
+    workingAttrs = workingAttrs.filter((a) => a !== rShowAttr);
+  }
+
+  // r-model special-case
+  const rModelAttr = findAttribute(workingAttrs, 'r-model');
+  if (rModelAttr) {
+    const rModelResult = emitRModel(node, ctx.ir);
+    for (const d of rModelResult.diagnostics) ctx.diagnostics.push(d);
+    if (rModelResult.replacementAttributes.length > 0) {
+      workingAttrs = workingAttrs.filter((a) => a !== rModelAttr);
+      workingAttrs = [...workingAttrs, ...rModelResult.replacementAttributes];
     }
-    return `<${tag}${attrStr}>${children}</${tag}>`;
   }
 
-  if (node.type === 'TemplateConditional') {
-    // P1: emit a ternary. P2 uses <Show when={...}>.
-    const condition = 'condition' in node
-      ? (typeof (node as { condition: unknown }).condition === 'string'
-          ? (node as { condition: string }).condition
-          : 'true')
-      : 'true';
-    const consequent = 'consequent' in node && (node as { consequent: TemplateNode }).consequent
-      ? emitNodeInner((node as { consequent: TemplateNode }).consequent, ctx)
-      : 'null';
-    const alternate = 'alternate' in node && (node as { alternate: TemplateNode | null }).alternate
-      ? emitNodeInner((node as { alternate: TemplateNode }).alternate, ctx)
-      : null;
-    if (alternate !== null) {
-      return `{${condition} ? (${consequent}) : (${alternate})}`;
+  // Standard attribute emission
+  const attrsResult = emitAttributes(workingAttrs, { ir: ctx.ir, collectors: ctx.collectors });
+  for (const d of attrsResult.diagnostics) ctx.diagnostics.push(d);
+
+  const eventsJsx = emitElementEvents(node, ctx);
+
+  const headParts = [attrsResult.jsx, eventsJsx];
+  if (rShowStyleAttr) headParts.push(rShowStyleAttr);
+  const head = headParts.filter(Boolean).join(' ');
+  const headOut = head.length > 0 ? ' ' + head : '';
+
+  const isVoid = VOID_ELEMENTS.has(node.tagName.toLowerCase());
+
+  if (rTextChildren !== null) {
+    return `<${node.tagName}${headOut}>${rTextChildren}</${node.tagName}>`;
+  }
+
+  if (node.children.length === 0) {
+    if (isVoid) return `<${node.tagName}${headOut} />`;
+    return `<${node.tagName}${headOut} />`;
+  }
+
+  const inner = node.children.map((c) => emitNode(c, ctx)).join('');
+  return `<${node.tagName}${headOut}>${inner}</${node.tagName}>`;
+}
+
+/**
+ * Top-level dispatch.
+ */
+export function emitNode(node: TemplateNode, ctx: EmitNodeCtx): string {
+  switch (node.type) {
+    case 'TemplateStaticText':
+      return emitStaticText(node, ctx);
+    case 'TemplateInterpolation':
+      return emitInterpolation(node, ctx);
+    case 'TemplateFragment':
+      return emitFragment(node, ctx);
+    case 'TemplateConditional':
+      return emitConditional(node, ctx, emitNode);
+    case 'TemplateLoop':
+      return emitLoop(node, ctx);
+    case 'TemplateSlotInvocation':
+      return emitSlotInvocation(node, ctx);
+    case 'TemplateElement':
+      return emitElement(node, ctx);
+    default: {
+      const _exhaustive: never = node;
+      void _exhaustive;
+      return '';
     }
-    return `{${condition} && (${consequent})}`;
   }
-
-  if (node.type === 'TemplateLoop') {
-    // P1: emit a simple map expression. P2 uses <For>.
-    const items = 'items' in node
-      ? (typeof (node as { items: unknown }).items === 'string'
-          ? (node as { items: string }).items
-          : 'items')
-      : 'items';
-    const item = 'item' in node ? (node as { item: string }).item : 'item';
-    const body = 'children' in node && Array.isArray(node.children)
-      ? node.children.map((c) => emitNodeInner(c as TemplateNode, ctx)).join('')
-      : 'null';
-    return `{${items}.map((${item}) => (${body}))}`;
-  }
-
-  if (node.type === 'TemplateFragment') {
-    const children = 'children' in node && Array.isArray(node.children)
-      ? node.children.map((c) => emitNodeInner(c as TemplateNode, ctx)).join('')
-      : '';
-    return `<>{${children}}</>`;
-  }
-
-  if (node.type === 'TemplateSlotInvocation') {
-    const slotName = 'slotName' in node ? (node as { slotName: string }).slotName : '';
-    if (slotName === '' || slotName === 'default') {
-      return '{resolved()}';
-    }
-    return `{local.${slotName}}`;
-  }
-
-  void ctx;
-  return '';
 }

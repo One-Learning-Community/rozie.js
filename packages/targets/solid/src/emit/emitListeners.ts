@@ -1,53 +1,169 @@
 /**
- * emitListeners — Solid target (P1 minimal).
+ * emitListeners — Solid target (P2 complete implementation).
  *
- * Lowers `<listeners>`-block entries into Solid createEffect blocks.
- * P1 minimum: emit one stub createEffect block per listener entry to prove
- * solidImports.add('createEffect') wiring. Wire
- * runtimeImports.add('createOutsideClick') for any .outside-class listener.
- * P2 emits the correct attach/detach patterns.
+ * Lowers `<listeners>`-block entries (`Listener[]` with `source: 'listeners-block'`)
+ * into Solid component body code. Four classes:
+ *
+ *   - A: pure native (no .outside, no debounce/throttle) →
+ *     `createEffect(() => { const h = (...) => ...; target.addEventListener(...); onCleanup(...); })`
+ *
+ *   - B: .outside collapse → `createOutsideClick([() => ref1, ...], handler, () => when)`
+ *     NOT wrapped in createEffect — createOutsideClick manages its own lifecycle.
+ *
+ *   - C: debounced/throttled → `const _wrap = createDebouncedHandler(fn, ms);` near top,
+ *     then Class A's createEffect attaches `_wrap`.
+ *
+ *   - D: pure inlineGuard (no listenerOption flags) → same as A without options object.
+ *
+ * KEY SOLID DIFFERENCE from React:
+ *   - No dep arrays on createEffect (Solid tracks reactivity automatically).
+ *   - onCleanup() called INSIDE the createEffect callback (not returned).
+ *   - createOutsideClick takes ref ACCESSOR FUNCTIONS: `() => fooRef` — not the ref itself.
+ *   - Class C wrapper uses createDebouncedHandler/createThrottledHandler (NOT useDebouncedCallback).
  *
  * @experimental — shape may change before v1.0
  */
-import type { IRComponent } from '../../../../core/src/ir/types.js';
-import type { ModifierRegistry } from '../../../../core/src/modifiers/ModifierRegistry.js';
+import type {
+  IRComponent,
+  Listener,
+} from '../../../../core/src/ir/types.js';
+import type {
+  ModifierRegistry,
+  ModifierPipelineEntry,
+  ReactEmissionDescriptor,
+} from '../../../../core/src/modifiers/ModifierRegistry.js';
+import type { ModifierArg } from '../../../../core/src/modifier-grammar/parseModifierChain.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import type { SolidImportCollector, RuntimeSolidImportCollector } from '../rewrite/collectSolidImports.js';
+import { emitListenerOutsideClick } from './emitListenerOutsideClick.js';
+import { emitListenerNative } from './emitListenerNative.js';
+import { emitListenerWrap } from './emitListenerWrap.js';
 
 export interface EmitListenersResult {
+  /**
+   * createEffect blocks + createOutsideClick calls — placed in function body
+   * AFTER user-authored arrows.
+   */
   code: string;
+  /**
+   * Script-body injections — debounce/throttle wrapper consts. Emitted
+   * BEFORE the createEffect blocks (so wrappers are in scope).
+   */
+  scriptInjections: string[];
   diagnostics: Diagnostic[];
 }
 
+type ListenerClass =
+  | { kind: 'A'; pipeline: ModifierPipelineEntry[] }
+  | { kind: 'B'; outsideArgs: ModifierArg[]; pipeline: ModifierPipelineEntry[] }
+  | {
+      kind: 'C';
+      helperName: 'createDebouncedHandler' | 'createThrottledHandler';
+      helperArgs: ModifierArg[];
+      pipeline: ModifierPipelineEntry[];
+    }
+  | { kind: 'D'; pipeline: ModifierPipelineEntry[] };
+
+function classifyListener(
+  listener: Listener,
+  registry: ModifierRegistry,
+): ListenerClass {
+  const pipeline = listener.modifierPipeline;
+  for (const entry of pipeline) {
+    if (entry.kind !== 'wrap') continue;
+    const impl = registry.get(entry.modifier);
+    if (!impl?.react) continue;
+    const desc: ReactEmissionDescriptor = impl.react(entry.args, {
+      source: 'listeners-block',
+      event: listener.event,
+      sourceLoc: entry.sourceLoc,
+    });
+    if (desc.kind !== 'helper') continue;
+
+    // Map React helper names to Solid equivalents.
+    if (desc.helperName === 'useOutsideClick') {
+      return { kind: 'B', outsideArgs: desc.args, pipeline };
+    }
+    if (desc.helperName === 'useDebouncedCallback') {
+      return {
+        kind: 'C',
+        helperName: 'createDebouncedHandler',
+        helperArgs: desc.args,
+        pipeline,
+      };
+    }
+    if (desc.helperName === 'useThrottledCallback') {
+      return {
+        kind: 'C',
+        helperName: 'createThrottledHandler',
+        helperArgs: desc.args,
+        pipeline,
+      };
+    }
+  }
+  const hasNative = pipeline.some((e) => e.kind === 'listenerOption');
+  return hasNative
+    ? { kind: 'A', pipeline }
+    : { kind: 'D', pipeline };
+}
+
+/**
+ * Render all `<listeners>`-block entries into Solid createEffect / createOutsideClick code.
+ *
+ * Filters OUT template-event listeners (source: 'template-event').
+ */
 export function emitListeners(
   ir: IRComponent,
   collectors: { solid: SolidImportCollector; runtime: RuntimeSolidImportCollector },
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  _registry: ModifierRegistry,
+  registry: ModifierRegistry,
 ): EmitListenersResult {
   const diagnostics: Diagnostic[] = [];
-  const lines: string[] = [];
+  const codeChunks: string[] = [];
+  const scriptInjections: string[] = [];
+  const wrapCounter = { next: 0 };
 
-  for (const listener of ir.listeners) {
-    // Check if this listener has an .outside modifier.
-    const hasOutside = listener.modifiers?.some(
-      (m) => typeof m === 'object' && 'name' in m && m.name === 'outside',
-    ) ?? false;
+  const blockListeners = ir.listeners.filter((l) => l.source === 'listeners-block');
+  if (blockListeners.length === 0) {
+    return { code: '', scriptInjections, diagnostics };
+  }
 
-    if (hasOutside) {
-      collectors.runtime.add('createOutsideClick');
-      // P1 stub: will be filled in P2 with proper ref/handler resolution.
-      lines.push(`// TODO(P2): createOutsideClick for '${listener.event}' listener`);
-    } else {
-      collectors.solid.add('createEffect');
-      // P1 stub: emit a minimal createEffect block.
-      lines.push(
-        `createEffect(() => {\n` +
-        `  // TODO: attach '${listener.event}' listener (P2)\n` +
-        `});`,
-      );
+  for (const listener of blockListeners) {
+    const cls = classifyListener(listener, registry);
+    switch (cls.kind) {
+      case 'A':
+      case 'D': {
+        const result = emitListenerNative(listener, ir, collectors, registry);
+        diagnostics.push(...result.diagnostics);
+        codeChunks.push(result.code);
+        break;
+      }
+      case 'B': {
+        const result = emitListenerOutsideClick(listener, cls.outsideArgs, ir, collectors);
+        diagnostics.push(...result.diagnostics);
+        if (result.code.length > 0) codeChunks.push(result.code);
+        break;
+      }
+      case 'C': {
+        const result = emitListenerWrap(
+          listener,
+          cls.helperName,
+          cls.helperArgs,
+          ir,
+          collectors,
+          registry,
+          wrapCounter,
+        );
+        diagnostics.push(...result.diagnostics);
+        scriptInjections.push(result.scriptInjection);
+        codeChunks.push(result.createEffectCode);
+        break;
+      }
     }
   }
 
-  return { code: lines.join('\n'), diagnostics };
+  return {
+    code: codeChunks.join('\n\n'),
+    scriptInjections,
+    diagnostics,
+  };
 }

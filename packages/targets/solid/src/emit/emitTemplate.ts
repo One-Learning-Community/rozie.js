@@ -14,12 +14,10 @@ import type { ModifierRegistry } from '../../../../core/src/modifiers/ModifierRe
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import type { SolidImportCollector, RuntimeSolidImportCollector } from '../rewrite/collectSolidImports.js';
 import { emitNode, type EmitNodeCtx } from './emitTemplateNode.js';
-import { emitSlotDecl } from './emitSlotDecl.js';
 
 export interface EmitTemplateResult {
   jsx: string;
   diagnostics: Diagnostic[];
-  ctxInterfaces: string[];
 }
 
 export function emitTemplate(
@@ -28,14 +26,9 @@ export function emitTemplate(
   registry: ModifierRegistry,
 ): EmitTemplateResult {
   const diagnostics: Diagnostic[] = [];
-  const slotResult = emitSlotDecl(ir);
 
   if (ir.template === null) {
-    return {
-      jsx: 'null',
-      diagnostics: [],
-      ctxInterfaces: slotResult.ctxInterfaces,
-    };
+    return { jsx: 'null', diagnostics: [] };
   }
 
   const ctx: EmitNodeCtx = {
@@ -47,9 +40,5 @@ export function emitTemplate(
 
   const jsx = emitNode(ir.template, ctx);
 
-  return {
-    jsx,
-    diagnostics,
-    ctxInterfaces: slotResult.ctxInterfaces,
-  };
+  return { jsx, diagnostics };
 }
