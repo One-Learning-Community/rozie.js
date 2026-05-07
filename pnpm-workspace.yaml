@@ -6,3 +6,4 @@ packages:
   - "tests/plugins/*"
   - "tests/integration/*"
   - "tests/timing"
+  - "tests/dist-parity"

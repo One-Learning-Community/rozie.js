@@ -1,0 +1,47 @@
+import { useCallback, useMemo, useState } from 'react';
+import { clsx, useControllableState } from '@rozie/runtime-react';
+import styles from './Counter.module.css';
+
+interface CounterProps {
+  value?: number;
+  defaultValue?: number;
+  onValueChange?: (value: number) => void;
+  step?: number;
+  min?: number;
+  max?: number;
+}
+
+export default function Counter(_props: CounterProps): JSX.Element {
+  const props: CounterProps = {
+    ..._props,
+    step: _props.step ?? 1,
+    min: _props.min ?? -Infinity,
+    max: _props.max ?? Infinity,
+  };
+  const [value, setValue] = useControllableState({
+    value: props.value,
+    defaultValue: props.defaultValue ?? 0,
+    onValueChange: props.onValueChange,
+  });
+  const [hovering, setHovering] = useState(false);
+  const canIncrement = useMemo(() => value + props.step <= props.max, [props.max, props.step, value]);
+  const canDecrement = useMemo(() => value - props.step >= props.min, [props.min, props.step, value]);
+
+  console.log("hello from rozie");
+  const increment = useCallback(() => {
+    if (canIncrement) setValue(prev => prev + props.step);
+  }, [canIncrement, props.step, setValue]);
+  const decrement = useCallback(() => {
+    if (canDecrement) setValue(prev => prev - props.step);
+  }, [canDecrement, props.step, setValue]);
+
+  return (
+    <>
+    <div className={clsx(styles.counter, { [styles.hovering]: hovering })} onMouseEnter={(e) => { setHovering(true); }} onMouseLeave={(e) => { setHovering(false); }}>
+      <button disabled={!canDecrement} aria-label="Decrement" onClick={decrement}>−</button>
+      <span className={styles.value}>{value}</span>
+      <button disabled={!canIncrement} aria-label="Increment" onClick={increment}>+</button>
+    </div>
+    </>
+  );
+}

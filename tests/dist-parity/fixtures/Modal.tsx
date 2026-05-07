@@ -1,0 +1,93 @@
+import { useCallback, useEffect, useRef } from 'react';
+import type { ReactNode } from 'react';
+import { useControllableState } from '@rozie/runtime-react';
+import styles from './Modal.module.css';
+import './Modal.global.css';
+
+interface HeaderCtx { close: any; }
+
+interface ChildrenCtx { close: any; }
+
+interface FooterCtx { close: any; }
+
+interface ModalProps {
+  open?: boolean;
+  defaultValue?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  closeOnEscape?: boolean;
+  closeOnBackdrop?: boolean;
+  lockBodyScroll?: boolean;
+  title?: string;
+  onClose?: (...args: unknown[]) => void;
+  renderHeader?: (ctx: HeaderCtx) => ReactNode;
+  children?: (ctx: ChildrenCtx) => ReactNode;
+  renderFooter?: (ctx: FooterCtx) => ReactNode;
+}
+
+export default function Modal(_props: ModalProps): JSX.Element {
+  const props: ModalProps = {
+    ..._props,
+    closeOnEscape: _props.closeOnEscape ?? true,
+    closeOnBackdrop: _props.closeOnBackdrop ?? true,
+    lockBodyScroll: _props.lockBodyScroll ?? true,
+    title: _props.title ?? '',
+  };
+  const savedBodyOverflow = useRef('');
+  const [open, setOpen] = useControllableState({
+    value: props.open,
+    defaultValue: props.defaultValue ?? false,
+    onValueChange: props.onOpenChange,
+  });
+  const backdropEl = useRef<HTMLDivElement | null>(null);
+  const dialogEl = useRef<HTMLDivElement | null>(null);
+
+  const { onClose: _rozieProp_onClose } = props;
+    const close = useCallback(() => {
+    setOpen(false);
+    _rozieProp_onClose && _rozieProp_onClose();
+  }, [_rozieProp_onClose, setOpen]);
+  const lockScroll = useCallback(() => {
+    if (!props.lockBodyScroll) return;
+    savedBodyOverflow.current = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+  }, [props.lockBodyScroll]);
+  const unlockScroll = useCallback(() => {
+    if (!props.lockBodyScroll) return;
+    document.body.style.overflow = savedBodyOverflow.current;
+  }, [props.lockBodyScroll]);
+
+  useEffect(() => {
+    lockScroll();
+    return () => unlockScroll();
+  }, [lockScroll, unlockScroll]);
+  useEffect(() => {
+    dialogEl.current?.focus();
+  }, []);
+
+  useEffect(() => {
+    if (!(open && props.closeOnEscape)) return;
+    const _rozieHandler = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      close(e);
+    };
+    document.addEventListener('keydown', _rozieHandler);
+    return () => document.removeEventListener('keydown', _rozieHandler);
+  }, [close, open, props.closeOnEscape]);
+
+  return (
+    <>
+    {(open) && <div className={styles["modal-backdrop"]} ref={backdropEl} onClick={(e) => { if (e.target !== e.currentTarget) return; props.closeOnBackdrop && close(); }}>
+      <div ref={dialogEl} className={styles["modal-dialog"]} role="dialog" aria-modal="true" aria-label={props.title || undefined} tabIndex={-1}>
+        {(props.title || props.renderHeader) && <header>
+          {props.renderHeader ? props.renderHeader({ close }) : <h2>{props.title}</h2>}
+          <button className={styles["close-btn"]} aria-label="Close" onClick={close}>×</button>
+        </header>}<div className={styles["modal-body"]}>
+          {props.children?.({ close })}
+        </div>
+
+        {(props.renderFooter) && <footer>
+          {props.renderFooter?.({ close })}
+        </footer>}</div>
+    </div>}</>
+  );
+}

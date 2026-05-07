@@ -1,0 +1,61 @@
+<template>
+
+<div class="search-input">
+  
+  <input ref="inputElRef" type="search" :placeholder="props.placeholder" v-model="query" @input="debouncedOnSearch" @keydown.enter="onSearch" @keydown.esc="clear" />
+
+  <button v-if="query.length > 0" class="clear-btn" aria-label="Clear" @click="clear">
+    ×
+  </button><span v-else class="hint">{{ props.minLength }}+ chars</span></div>
+
+</template>
+
+<script setup lang="ts">
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { debounce } from '@rozie/runtime-vue';
+
+const props = withDefaults(
+  defineProps<{ placeholder?: string; minLength?: number; autofocus?: boolean }>(),
+  { placeholder: 'Search…', minLength: 2, autofocus: false }
+);
+
+const emit = defineEmits<{
+  search: [...args: any[]];
+  clear: [...args: any[]];
+}>();
+
+const query = ref('');
+
+const inputElRef = ref<HTMLInputElement>();
+
+const isValid = computed(() => query.value.length >= props.minLength);
+
+const onSearch = () => {
+  if (isValid.value) emit('search', query.value);
+};
+const clear = () => {
+  query.value = '';
+  emit('clear');
+};
+
+let _cleanup_0: (() => void) | undefined;
+onMounted(() => {
+  if (props.autofocus) inputElRef.value?.focus();
+
+  // Returning a function from $onMount registers a teardown — equivalent to
+  // a separate $onUnmount, useful when setup and teardown logic belong together.
+  _cleanup_0 = () => {
+    // e.g., abort an in-flight request initialized in this hook
+  };
+});
+onBeforeUnmount(() => { _cleanup_0?.(); });
+
+const debouncedOnSearch = debounce(onSearch, 300);
+</script>
+
+<style scoped>
+.search-input { display: inline-flex; align-items: center; gap: 0.25rem; }
+input { padding: 0.25rem 0.5rem; }
+.clear-btn { background: none; border: none; cursor: pointer; font-size: 1.25rem; }
+.hint { color: rgba(0, 0, 0, 0.4); font-size: 0.85em; }
+</style>

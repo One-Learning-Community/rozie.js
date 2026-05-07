@@ -1,0 +1,111 @@
+<template>
+
+<div v-if="open" class="modal-backdrop" ref="backdropElRef" @click.self="props.closeOnBackdrop && close()">
+  <div ref="dialogElRef" class="modal-dialog" role="dialog" aria-modal="true" :aria-label="props.title || undefined" tabindex="-1">
+    <header v-if="props.title || $slots.header">
+      <slot name="header" :close="close">
+        <h2>{{ props.title }}</h2>
+      </slot>
+      <button class="close-btn" aria-label="Close" @click="close">×</button>
+    </header><div class="modal-body">
+      <slot :close="close"></slot>
+    </div>
+
+    <footer v-if="$slots.footer">
+      <slot name="footer" :close="close"></slot>
+    </footer></div>
+</div>
+</template>
+
+<script setup lang="ts">
+import { onBeforeUnmount, onMounted, ref, watchEffect } from 'vue';
+
+const props = withDefaults(
+  defineProps<{ closeOnEscape?: boolean; closeOnBackdrop?: boolean; lockBodyScroll?: boolean; title?: string }>(),
+  { closeOnEscape: true, closeOnBackdrop: true, lockBodyScroll: true, title: '' }
+);
+
+const open = defineModel<boolean>('open', { default: false });
+
+const emit = defineEmits<{
+  close: [...args: any[]];
+}>();
+
+defineSlots<{
+  header(props: { close: any }): any;
+  default(props: { close: any }): any;
+  footer(props: { close: any }): any;
+}>();
+
+const backdropElRef = ref<HTMLElement>();
+const dialogElRef = ref<HTMLElement>();
+
+const close = () => {
+  open.value = false;
+  emit('close');
+};
+
+// Body-scroll-lock state lives outside reactive data because it tracks DOM
+// rather than UI; managed entirely via lifecycle and listeners.
+// Body-scroll-lock state lives outside reactive data because it tracks DOM
+// rather than UI; managed entirely via lifecycle and listeners.
+let savedBodyOverflow = '';
+const lockScroll = () => {
+  if (!props.lockBodyScroll) return;
+  savedBodyOverflow = document.body.style.overflow;
+  document.body.style.overflow = 'hidden';
+};
+const unlockScroll = () => {
+  if (!props.lockBodyScroll) return;
+  document.body.style.overflow = savedBodyOverflow;
+};
+
+// Colocated lifecycle pair — runs in source order alongside other hooks.
+
+onMounted(lockScroll);
+onBeforeUnmount(unlockScroll);
+onMounted(() => {
+  dialogElRef.value?.focus();
+});
+
+watchEffect((onCleanup) => {
+  if (!(open.value && props.closeOnEscape)) return;
+  const handler = (e: KeyboardEvent) => {
+    if (e.key !== 'Escape') return;
+    close();
+  };
+  document.addEventListener('keydown', handler);
+  onCleanup(() => document.removeEventListener('keydown', handler));
+});
+</script>
+
+<style scoped>
+.modal-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex; align-items: center; justify-content: center;
+  z-index: var(--rozie-modal-z, 2000);
+}
+.modal-dialog {
+  background: white;
+  border-radius: 8px;
+  min-width: 20rem;
+  max-width: min(90vw, 40rem);
+  max-height: 90vh;
+  display: flex; flex-direction: column;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  outline: none;
+}
+header, footer { padding: 1rem; display: flex; align-items: center; gap: 0.5rem; }
+header { border-bottom: 1px solid rgba(0, 0, 0, 0.08); }
+header h2 { flex: 1; margin: 0; font-size: 1.1rem; }
+footer { border-top: 1px solid rgba(0, 0, 0, 0.08); justify-content: flex-end; }
+.modal-body { padding: 1rem; overflow: auto; }
+.close-btn { background: none; border: none; cursor: pointer; font-size: 1.5rem; line-height: 1; }
+</style>
+
+<style>
+:root {
+  --rozie-modal-z: 2000;
+}
+</style>

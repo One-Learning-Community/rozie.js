@@ -1,0 +1,125 @@
+import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, effect, inject, input, model, viewChild } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
+
+interface TriggerCtx {
+  $implicit: { open: any; toggle: any };
+  open: any;
+  toggle: any;
+}
+
+interface DefaultCtx {
+  $implicit: { close: any };
+  close: any;
+}
+
+@Component({
+  selector: 'rozie-dropdown',
+  standalone: true,
+  imports: [NgTemplateOutlet],
+  template: `
+
+    <div class="dropdown">
+      <div #triggerEl (click)="toggle($event)">
+        <ng-container *ngTemplateOutlet="triggerTpl; context: { $implicit: { open: open(), toggle: toggle }, open: open(), toggle: toggle }" />
+      </div>
+
+      @if (open()) {
+    <div #panelEl class="dropdown-panel" role="menu">
+        <ng-container *ngTemplateOutlet="defaultTpl; context: { $implicit: { close: close }, close: close }" />
+      </div>
+    }</div>
+
+  `,
+  styles: [`
+    .dropdown { position: relative; display: inline-block; }
+    .dropdown-panel {
+      position: fixed;
+      z-index: var(--rozie-dropdown-z, 1000);
+      background: white;
+      border: 1px solid rgba(0, 0, 0, 0.1);
+      border-radius: 6px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    }
+
+    ::ng-deep :root {
+    --rozie-dropdown-z: 1000;
+    }
+  `],
+})
+export class Dropdown {
+  open = model<boolean>(false);
+  closeOnOutsideClick = input<boolean>(true);
+  closeOnEscape = input<boolean>(true);
+  triggerEl = viewChild<ElementRef<HTMLDivElement>>('triggerEl');
+  panelEl = viewChild<ElementRef<HTMLDivElement>>('panelEl');
+  @ContentChild('trigger', { read: TemplateRef }) triggerTpl?: TemplateRef<TriggerCtx>;
+  @ContentChild('defaultSlot', { read: TemplateRef }) defaultTpl?: TemplateRef<DefaultCtx>;
+
+  constructor() {
+      const renderer = inject(Renderer2);
+
+      effect((onCleanup) => {
+        if (!(this.open() && this.closeOnOutsideClick())) return;
+        const handler = (e: MouseEvent) => {
+          const target = e.target as Node;
+          if (this.triggerEl()?.nativeElement?.contains(target) || this.panelEl()?.nativeElement?.contains(target)) return;
+          this.close();
+        };
+        const unlisten = renderer.listen('document', 'click', handler);
+        onCleanup(unlisten);
+      });
+
+      effect((onCleanup) => {
+        if (!(this.open() && this.closeOnEscape())) return;
+        const handler = (e: KeyboardEvent) => {
+          if (e.key !== 'Escape') return;
+          this.close();
+        };
+        const unlisten = renderer.listen('document', 'keydown', handler);
+        onCleanup(unlisten);
+      });
+
+      effect((onCleanup) => {
+        if (!(this.open())) return;
+        const unlisten = renderer.listen('window', 'resize', this.throttledLReposition);
+        onCleanup(unlisten);
+      });
+
+    this.reposition();
+
+  }
+
+  toggle = () => {
+    this.open.set(!this.open());
+  };
+  close = () => {
+    this.open.set(false);
+  };
+  reposition = () => {
+    if (!this.panelEl()?.nativeElement || !this.triggerEl()?.nativeElement) return;
+    const rect = (this.triggerEl()?.nativeElement).getBoundingClientRect();
+    Object.assign((this.panelEl()?.nativeElement).style, {
+      top: `${rect.bottom}px`,
+      left: `${rect.left}px`
+    });
+  };
+
+  static ngTemplateContextGuard(
+    _dir: Dropdown,
+    _ctx: unknown,
+  ): _ctx is TriggerCtx | DefaultCtx {
+    return true;
+  }
+
+  private throttledLReposition = (() => {
+    let lastCall = 0;
+    return (...args: any[]) => {
+      const now = Date.now();
+      if (now - lastCall < 100) return;
+      lastCall = now;
+      (this.reposition)(...args);
+    };
+  })();
+}
+
+export default Dropdown;
