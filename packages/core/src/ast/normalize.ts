@@ -32,6 +32,7 @@ import type {
   TemplateAttr,
 } from './blocks/TemplateAST.js';
 import type { StyleAST } from './blocks/StyleAST.js';
+import type { ComponentsAST } from './blocks/ComponentsAST.js';
 import { parseModifierChain } from '../modifier-grammar/parseModifierChain.js';
 
 export interface NormalizeInput {
@@ -42,6 +43,8 @@ export interface NormalizeInput {
   listeners: ListenersAST | null;
   template: TemplateAST | null;
   style: StyleAST | null;
+  /** Phase 06.2 P1 — parsed `<components>` AST or null when block absent. */
+  components: ComponentsAST | null;
 }
 
 /**
@@ -86,6 +89,8 @@ export function buildRozieAST(input: NormalizeInput): {
     listeners: enrichedListeners,
     template: enrichedTemplate,
     style: input.style,
+    // Phase 06.2 P1: parsed <components> block (D-114/D-115). null when absent.
+    components: input.components,
     // Phase 06.1 Plan 01: thread BlockMap through so per-target buildShell()
     // implementations can anchor MagicString.overwrite() at .rozie byte
     // offsets (DX-04). The splitter's `diagnostics` field is intentionally

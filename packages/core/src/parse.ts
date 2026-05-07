@@ -15,6 +15,7 @@
 import { splitBlocks } from './splitter/splitBlocks.js';
 import { parseProps } from './parsers/parseProps.js';
 import { parseData } from './parsers/parseData.js';
+import { parseComponents } from './parsers/parseComponents.js';
 import { parseScript } from './parsers/parseScript.js';
 import { parseTemplate } from './parsers/parseTemplate.js';
 import { parseListeners } from './parsers/parseListeners.js';
@@ -68,6 +69,11 @@ export function parse(source: string, opts: { filename?: string } = {}): ParseRe
   const dataRes = blocks.data
     ? parseData(blocks.data.content, blocks.data.contentLoc, source, filename)
     : { node: null, diagnostics: [] as Diagnostic[] };
+  // Phase 06.2 P1 — parseComponents runs between parseData and parseScript per
+  // CONTEXT canonical block order (props/data/components/script/listeners/template/style).
+  const componentsRes = blocks.components
+    ? parseComponents(blocks.components.content, blocks.components.contentLoc, source, filename)
+    : { node: null, diagnostics: [] as Diagnostic[] };
   const scriptRes = blocks.script
     ? parseScript(blocks.script.content, blocks.script.contentLoc, source, filename)
     : { node: null, diagnostics: [] as Diagnostic[] };
@@ -84,6 +90,7 @@ export function parse(source: string, opts: { filename?: string } = {}): ParseRe
   diagnostics.push(
     ...propsRes.diagnostics,
     ...dataRes.diagnostics,
+    ...componentsRes.diagnostics,
     ...scriptRes.diagnostics,
     ...templateRes.diagnostics,
     ...listenersRes.diagnostics,
@@ -98,6 +105,7 @@ export function parse(source: string, opts: { filename?: string } = {}): ParseRe
     listeners: listenersRes.node,
     template: templateRes.node,
     style: styleRes.node,
+    components: componentsRes.node,
   });
   diagnostics.push(...normDiags);
 

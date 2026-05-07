@@ -28,7 +28,7 @@ import type { BlockEntry, BlockMap } from '../ast/types.js';
 import type { Diagnostic } from '../diagnostics/Diagnostic.js';
 import { RozieErrorCode } from '../diagnostics/codes.js';
 
-/** The seven recognized top-level block tags. */
+/** The eight recognized top-level block tags (Phase 06.2 P1 added 'components'). */
 const BLOCK_NAMES = new Set([
   'rozie',
   'props',
@@ -37,9 +37,17 @@ const BLOCK_NAMES = new Set([
   'listeners',
   'template',
   'style',
+  'components',
 ] as const);
 
-type BlockName = 'props' | 'data' | 'script' | 'listeners' | 'template' | 'style';
+type BlockName =
+  | 'props'
+  | 'data'
+  | 'script'
+  | 'listeners'
+  | 'template'
+  | 'style'
+  | 'components';
 
 /** Hostile-input cap (T-1-02-01 mitigation). */
 const MAX_DIAGNOSTICS = 1000;
@@ -196,7 +204,7 @@ export function splitBlocks(source: string, filename?: string): SplitBlocksResul
             pushDiag({
               code: RozieErrorCode.UNKNOWN_TOP_LEVEL_BLOCK,
               severity: 'error',
-              message: `Unknown top-level block: <${pendingTagName}>. Recognized blocks are: <props>, <data>, <script>, <listeners>, <template>, <style>.`,
+              message: `Unknown top-level block: <${pendingTagName}>. Recognized blocks are: <props>, <data>, <script>, <listeners>, <template>, <style>, <components>.`,
               loc: { start: lastOpenTagStart, end: endIndex + 1 },
               ...(isRefs
                 ? { hint: 'Refs are derived from `ref="..."` attributes inside the <template> block — there is no <refs> block.' }

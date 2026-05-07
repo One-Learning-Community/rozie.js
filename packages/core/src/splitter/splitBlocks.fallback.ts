@@ -95,10 +95,10 @@ export function splitBlocksFallback(source: string, filename?: string): SplitBlo
     });
   }
 
-  // Our first-class blocks (<props>, <data>, <listeners>) land in customBlocks.
+  // Our first-class blocks (<props>, <data>, <listeners>, <components>) land in customBlocks.
   for (const cb of descriptor.customBlocks) {
     const tag = cb.type;
-    if (tag === 'props' || tag === 'data' || tag === 'listeners') {
+    if (tag === 'props' || tag === 'data' || tag === 'listeners' || tag === 'components') {
       if (result[tag] !== undefined) {
         result.diagnostics.push({
           code: RozieErrorCode.DUPLICATE_BLOCK,
@@ -116,7 +116,7 @@ export function splitBlocksFallback(source: string, filename?: string): SplitBlo
       result.diagnostics.push({
         code: RozieErrorCode.UNKNOWN_TOP_LEVEL_BLOCK,
         severity: 'error',
-        message: `Unknown top-level block: <${tag}>. Recognized blocks are: <props>, <data>, <script>, <listeners>, <template>, <style>.`,
+        message: `Unknown top-level block: <${tag}>. Recognized blocks are: <props>, <data>, <script>, <listeners>, <template>, <style>, <components>.`,
         loc: { start: cb.loc.start.offset, end: cb.loc.end.offset },
         ...(isRefs
           ? { hint: 'Refs are derived from `ref="..."` attributes inside the <template> block — there is no <refs> block.' }
