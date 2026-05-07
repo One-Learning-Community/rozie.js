@@ -61,6 +61,12 @@ export function rewriteScriptExpression(
   const refNames = new Set(ir.refs.map((r) => r.name));
   const computedNames = new Set(ir.computed.map((c) => c.name));
 
+  // Phase 06.1 P2 (D-104/D-106): IR primitive name → entry maps so synthesized
+  // identifier nodes can carry their IR sourceLoc — same pattern as rewriteScript.
+  const stateByName = new Map(ir.state.map((s) => [s.name, s]));
+  const refByName = new Map(ir.refs.map((r) => [r.name, r]));
+  const computedByName = new Map(ir.computed.map((c) => [c.name, c]));
+
   const wrapper = t.file(t.program([t.expressionStatement(cloned)]));
 
   traverse(wrapper, {
@@ -84,13 +90,21 @@ export function rewriteScriptExpression(
       }
       if (obj.name === '$data' && dataNames.has(prop.name)) {
         // $data.hovering → hovering.value
-        path.node.object = t.identifier(prop.name);
+        // Phase 06.1 P2 D-104/D-106: anchor synth identifier loc to IR StateDecl.
+        const stateDecl = stateByName.get(prop.name);
+        const newObj = t.identifier(prop.name);
+        if (stateDecl) newObj.loc = stateDecl.sourceLoc as any;
+        path.node.object = newObj;
         path.node.property = t.identifier('value');
         return;
       }
       if (obj.name === '$refs' && refNames.has(prop.name)) {
         // $refs.dialogEl → dialogElRef.value
-        path.node.object = t.identifier(prop.name + 'Ref');
+        // Phase 06.1 P2 D-104/D-106: anchor synth identifier loc to IR RefDecl.
+        const refDecl = refByName.get(prop.name);
+        const newObj = t.identifier(prop.name + 'Ref');
+        if (refDecl) newObj.loc = refDecl.sourceLoc as any;
+        path.node.object = newObj;
         path.node.property = t.identifier('value');
         return;
       }
@@ -163,7 +177,13 @@ export function rewriteScriptExpression(
       if (t.isExportSpecifier(parent)) return;
       if (t.isLabeledStatement(parent) && parent.label === path.node) return;
 
-      path.replaceWith(t.memberExpression(t.identifier(name), t.identifier('value')));
+      // Phase 06.1 P2 D-104/D-106: anchor synth member-expression loc to IR ComputedDecl.
+      const computedDecl = computedByName.get(name);
+      const synthId = t.identifier(name);
+      if (computedDecl) synthId.loc = computedDecl.sourceLoc as any;
+      const synthMember = t.memberExpression(synthId, t.identifier('value'));
+      if (computedDecl) synthMember.loc = computedDecl.sourceLoc as any;
+      path.replaceWith(synthMember);
       path.skip();
     },
   });

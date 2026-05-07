@@ -45,6 +45,8 @@ describe('composeSourceMap — magic-string wrapper', () => {
     const map = composeSourceMap(ms, {
       filename: '/abs/Counter.rozie',
       source: '<rozie>...</rozie>',
+      scriptMap: null,
+      scriptOutputOffset: 0,
     });
     expect(map.sources).toEqual(['/abs/Counter.rozie']);
     expect(map.sourcesContent).toEqual(['<rozie>...</rozie>']);
@@ -59,6 +61,8 @@ describe('composeSourceMap — magic-string wrapper', () => {
     const map = composeSourceMap(ms, {
       filename: 'Counter.rozie',
       source: 'original-source-text',
+      scriptMap: null,
+      scriptOutputOffset: 0,
     });
     expect(map.sources[0]).toBe('Counter.rozie');
     expect(map.sourcesContent![0]).toBe('original-source-text');

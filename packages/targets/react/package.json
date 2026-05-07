@@ -18,6 +18,7 @@
     "src"
   ],
   "dependencies": {
+    "@ampproject/remapping": "^2.3.0",
     "@babel/generator": "^7.29",
     "@babel/parser": "^7.29",
     "@babel/traverse": "^7.29",

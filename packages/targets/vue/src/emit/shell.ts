@@ -23,6 +23,7 @@
  * @experimental — shape may change before v1.0
  */
 import MagicString from 'magic-string';
+import type { EncodedSourceMap } from '@ampproject/remapping';
 import type { BlockMap } from '../../../../core/src/ast/types.js';
 
 export interface ShellParts {
@@ -52,6 +53,13 @@ export interface ShellParts {
    * rather than collapsing to line 1 col 0.
    */
   blockOffsets: BlockMap;
+  /**
+   * Phase 06.1 Plan 02 (D-101): per-expression child sourcemap from emitScript
+   * (null when emitScript could not produce one — D-102 fallback). Threaded
+   * back out via BuildShellResult.scriptMap so emitVue can hand it to
+   * composeMaps() in compose.ts.
+   */
+  scriptMap?: EncodedSourceMap | null;
 }
 
 /**
@@ -65,6 +73,12 @@ export interface BuildShellResult {
   ms: MagicString;
   /** Byte offset within ms.toString() where the script body begins (after `<script setup lang="ts">\n`). */
   scriptOutputOffset: number;
+  /**
+   * Phase 06.1 P2 (D-101): pass-through of emitScript's per-expression child
+   * map. composeMaps() chains this into the shell map at scriptOutputOffset.
+   * null when no child map produced (D-102 single-segment fallback).
+   */
+  scriptMap: EncodedSourceMap | null;
 }
 
 /**
@@ -185,7 +199,7 @@ export function buildShell(parts: ShellParts): BuildShellResult {
   const scriptOutputOffset =
     scriptIdx >= 0 ? scriptIdx + scriptOpenFraming.length : 0;
 
-  return { ms, scriptOutputOffset };
+  return { ms, scriptOutputOffset, scriptMap: parts.scriptMap ?? null };
 }
 
 /**
@@ -217,5 +231,5 @@ function buildShellLegacy(parts: ShellParts): BuildShellResult {
     ms.append(parts.styleGlobal);
     ms.append('\n</style>\n');
   }
-  return { ms, scriptOutputOffset: 0 };
+  return { ms, scriptOutputOffset: 0, scriptMap: parts.scriptMap ?? null };
 }

@@ -468,6 +468,9 @@ importers:
 
   packages/targets/angular:
     dependencies:
+      '@ampproject/remapping':
+        specifier: ^2.3.0
+        version: 2.3.0
       '@babel/generator':
         specifier: ^7.29
         version: 7.29.1
@@ -517,6 +520,9 @@ importers:
 
   packages/targets/react:
     dependencies:
+      '@ampproject/remapping':
+        specifier: ^2.3.0
+        version: 2.3.0
       '@babel/generator':
         specifier: ^7.29
         version: 7.29.1
@@ -587,6 +593,9 @@ importers:
 
   packages/targets/svelte:
     dependencies:
+      '@ampproject/remapping':
+        specifier: ^2.3.0
+        version: 2.3.0
       '@babel/generator':
         specifier: ^7.29
         version: 7.29.1
@@ -630,6 +639,9 @@ importers:
 
   packages/targets/vue:
     dependencies:
+      '@ampproject/remapping':
+        specifier: ^2.3.0
+        version: 2.3.0
       '@babel/generator':
         specifier: ^7.29.1
         version: 7.29.1

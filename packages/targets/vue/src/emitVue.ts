@@ -234,11 +234,11 @@ export function emitVue(ir: IRComponent, opts: EmitVueOptions = {}): EmitVueResu
   // D-85 Vue full (Plan 06-02 Task 3): exactOptionalPropertyTypes:true
   // requires conditional spread on `genericParams` so `undefined` is never
   // forwarded as an explicit property of the emitScript options.
-  const scriptOpts =
-    opts.genericParams !== undefined
-      ? { genericParams: opts.genericParams }
-      : {};
-  const { script, diagnostics: scriptDiags } = emitScript(ir, scriptOpts);
+  // Phase 06.1 P2: thread filename for sourceFileName + capture scriptMap.
+  const scriptOpts: { genericParams?: string[]; filename?: string } = {};
+  if (opts.genericParams !== undefined) scriptOpts.genericParams = opts.genericParams;
+  if (opts.filename !== undefined) scriptOpts.filename = opts.filename;
+  const { script, scriptMap, diagnostics: scriptDiags } = emitScript(ir, scriptOpts);
   const {
     template,
     scriptInjections,
@@ -311,7 +311,7 @@ export function emitVue(ir: IRComponent, opts: EmitVueOptions = {}): EmitVueResu
     resolvedBlockOffsets = {};
   }
 
-  const { ms, scriptOutputOffset } = buildShell({
+  const { ms, scriptOutputOffset, scriptMap: shellScriptMap } = buildShell({
     template,
     script: enrichedScript,
     styleScoped,
@@ -322,18 +322,22 @@ export function emitVue(ir: IRComponent, opts: EmitVueOptions = {}): EmitVueResu
         : null,
     rozieSource: opts.source ?? '',
     blockOffsets: resolvedBlockOffsets,
+    scriptMap,
   });
-  // P1: scriptOutputOffset is computed but unused in v1 (P2 will consume it
-  // via composeMaps to anchor @babel/generator's per-expression child map).
-  void scriptOutputOffset;
 
   const code = ms.toString();
 
-  // Plan 05 — produce a real source map when filename + source are provided.
-  // Pitfall 2 mitigation in composeSourceMap.
+  // Phase 06.1 P2 (D-109): composeSourceMap is now a thin wrapper around
+  // composeMaps() — chains the shell map with emitScript's per-expression
+  // child map (when present) at scriptOutputOffset.
   const map =
     opts.filename !== undefined && opts.source !== undefined
-      ? composeSourceMap(ms, { filename: opts.filename, source: opts.source })
+      ? composeSourceMap(ms, {
+          filename: opts.filename,
+          source: opts.source,
+          scriptMap: shellScriptMap,
+          scriptOutputOffset,
+        })
       : null;
 
   return {
