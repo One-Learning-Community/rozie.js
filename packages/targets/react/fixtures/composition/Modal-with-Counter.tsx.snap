@@ -1,0 +1,13 @@
+import Counter from './Counter';
+
+interface ModalProps {}
+
+export default function Modal(props: ModalProps): JSX.Element {
+  return (
+    <>
+      <div className={"modal"}>
+        <Counter />
+      </div>
+    </>
+  );
+}

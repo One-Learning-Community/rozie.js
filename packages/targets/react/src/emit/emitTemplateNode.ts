@@ -133,6 +133,12 @@ function findAttribute(attrs: AttributeBinding[], name: string): AttributeBindin
 /**
  * Emit a TemplateElement. Applies element-level special-cases (r-show, r-html,
  * r-text, r-model) before falling through to the standard tag/attr/children form.
+ *
+ * Phase 06.2 P2: tagKind === 'component' resolves to a top-of-file
+ * `import {LocalName} from './LocalName';` (synthesized by emitReact); 'self'
+ * resolves to the enclosing named-function declaration (Pitfall 7 — function
+ * declarations are hoisted within their containing scope). Both emit the tag
+ * verbatim PascalCase below; no template AST rewrite needed.
  */
 function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
   // Capture and clear pendingKey for this element ONLY.

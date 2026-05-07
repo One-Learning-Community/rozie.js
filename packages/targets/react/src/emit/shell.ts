@@ -91,6 +91,22 @@ export interface ShellParts {
    * pass-through to BuildShellResult for composeMaps() consumption.
    */
   scriptMap?: EncodedSourceMap | null;
+  /**
+   * Phase 06.2 P2 (D-118): synthesized component-import lines for the
+   * top-of-file imports section. Each line is
+   * `import {LocalName} from '{rewrittenPath}';\n` (newline-terminated; the
+   * helper joins them with `\n` and adds a trailing `\n` so concatenation
+   * with sibling import sections stays clean).
+   *
+   * Per RESEARCH Pitfall 7, React's named-function declaration shape
+   * supports self-reference natively — the `localName === ir.name` self-entry
+   * is filtered out by emitReact BEFORE this string is built (no separate
+   * `hasSelfReference` flag needed; the function-declaration scope handles it).
+   *
+   * Empty/undefined when no `<components>` block was authored OR every
+   * entry was a self-entry that got filtered.
+   */
+  componentImportsBlock?: string;
 }
 
 /**
@@ -138,6 +154,10 @@ export function buildShell(parts: ShellParts): BuildShellResult {
   if (parts.runtimeImports.length > 0) moduleParts.push(parts.runtimeImports);
   if (parts.cssModuleImport !== null) moduleParts.push(parts.cssModuleImport + '\n');
   if (parts.globalCssImport !== null) moduleParts.push(parts.globalCssImport + '\n');
+  // Phase 06.2 P2 (D-118): user-component imports (PascalCase, ext-omitted).
+  if (parts.componentImportsBlock && parts.componentImportsBlock.length > 0) {
+    moduleParts.push(parts.componentImportsBlock);
+  }
 
   // Blank line between imports and interface (only if any imports).
   if (
@@ -145,7 +165,8 @@ export function buildShell(parts: ShellParts): BuildShellResult {
     (parts.reactTypeImports && parts.reactTypeImports.length > 0) ||
     parts.runtimeImports.length > 0 ||
     parts.cssModuleImport !== null ||
-    parts.globalCssImport !== null
+    parts.globalCssImport !== null ||
+    (parts.componentImportsBlock !== undefined && parts.componentImportsBlock.length > 0)
   ) {
     moduleParts.push('\n');
   }
@@ -258,13 +279,18 @@ function buildShellLegacy(parts: ShellParts): BuildShellResult {
   if (parts.runtimeImports.length > 0) ms.append(parts.runtimeImports);
   if (parts.cssModuleImport) ms.append(parts.cssModuleImport + '\n');
   if (parts.globalCssImport) ms.append(parts.globalCssImport + '\n');
+  // Phase 06.2 P2 (D-118): user-component imports (PascalCase, ext-omitted).
+  if (parts.componentImportsBlock && parts.componentImportsBlock.length > 0) {
+    ms.append(parts.componentImportsBlock);
+  }
 
   if (
     parts.reactImports.length > 0 ||
     (parts.reactTypeImports && parts.reactTypeImports.length > 0) ||
     parts.runtimeImports.length > 0 ||
     parts.cssModuleImport ||
-    parts.globalCssImport
+    parts.globalCssImport ||
+    (parts.componentImportsBlock !== undefined && parts.componentImportsBlock.length > 0)
   ) {
     ms.append('\n');
   }

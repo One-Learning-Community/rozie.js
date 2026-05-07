@@ -1,0 +1,12 @@
+interface TreeNodeProps {}
+
+export default function TreeNode(props: TreeNodeProps): JSX.Element {
+  return (
+    <>
+      <li>
+        <span>{$props.label}</span>
+        <TreeNode node={$props.children} />
+      </li>
+    </>
+  );
+}
