@@ -32,8 +32,8 @@
  * @experimental — shape may change before v1.0
  */
 
-import { existsSync, readFileSync, writeFileSync, readdirSync, statSync } from 'node:fs';
-import { isAbsolute, resolve as pathResolve, dirname, join as pathJoin } from 'node:path';
+import { existsSync, readFileSync, writeFileSync, readdirSync, statSync, lstatSync } from 'node:fs';
+import { isAbsolute, resolve as pathResolve, dirname, join as pathJoin, relative as pathRelative } from 'node:path';
 import { parse } from '../../core/src/parse.js';
 import { lowerToIR } from '../../core/src/ir/lower.js';
 import type { ModifierRegistry } from '../../core/src/modifiers/ModifierRegistry.js';
@@ -229,6 +229,12 @@ export function createResolveIdHook(
 }
 
 function absolutize(id: string, importer: string | undefined): string {
+  // Reject null-byte injection in module ids (defense-in-depth — closes
+  // T-05-04b-03 + WR-07). Vite's own resolveId pipeline already filters
+  // these for VFS ids, but the unplugin layer sees raw `id` strings.
+  if (id.includes('\0')) {
+    throw new Error(`@rozie/unplugin: refusing to resolve id with null byte: ${JSON.stringify(id)}`);
+  }
   // Strip any query string before path resolution; query is re-attached by
   // the caller if needed (the React load hook re-detects the query suffix).
   const queryIdx = id.indexOf('?');
@@ -598,7 +604,7 @@ export function prebuildAngularRozieFiles(
   const processed: string[] = [];
   for (const roziePath of walkRozieFiles(rootDir)) {
     try {
-      emitRozieTsToDisk(roziePath, registry);
+      emitRozieTsToDisk(roziePath, registry, rootDir);
       processed.push(roziePath);
     } catch (err) {
       // Surface as a console warning rather than aborting the whole scan —
@@ -622,7 +628,21 @@ export function prebuildAngularRozieFiles(
 export function emitRozieTsToDisk(
   roziePath: string,
   registry: ModifierRegistry,
+  rootDir?: string,
 ): string {
+  // When rootDir is supplied (configResolved + HMR paths), refuse writes that
+  // would land outside the project root. Closes T-05-04b-03 + WR-01/WR-07.
+  // The original D-70 plan assumed writes were sandboxed under
+  // node_modules/.rozie-cache; the actual implementation writes alongside
+  // the .rozie source, so this guard restores the equivalent trust posture.
+  if (rootDir) {
+    const rel = pathRelative(rootDir, roziePath);
+    if (rel.startsWith('..') || isAbsolute(rel)) {
+      throw new Error(
+        `@rozie/unplugin: refusing to emit .rozie.ts outside project root: ${roziePath} (root: ${rootDir})`,
+      );
+    }
+  }
   const source = readFileSync(roziePath, 'utf8');
   const result = runAngularEmitForDisk(source, roziePath, registry);
   const outPath = roziePath + '.ts';
@@ -707,10 +727,14 @@ function* walkRozieFiles(rootDir: string): Generator<string> {
       const full = pathJoin(dir, entry);
       let st: ReturnType<typeof statSync>;
       try {
-        st = statSync(full);
+        // lstat (NOT stat) — refuse symlinks so an adversarial symlink inside
+        // the project root cannot redirect the scan or the eventual D-70 disk
+        // write to a location outside the project. Closes T-05-04b-03 + WR-01.
+        st = lstatSync(full);
       } catch {
         continue;
       }
+      if (st.isSymbolicLink()) continue;
       if (st.isDirectory()) {
         if (SKIP_DIRS.has(entry)) continue;
         stack.push(full);

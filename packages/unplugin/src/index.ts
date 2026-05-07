@@ -158,7 +158,10 @@ export const unplugin = createUnpluginV3<Partial<RozieOptions>>((rawOptions) => 
         // route HMR through analogjs's transform chain naturally.
         if (options.target === 'angular') {
           try {
-            emitRozieTsToDisk(file, registry);
+            // Pass server.config.root as the trust boundary — refuses writes
+            // outside the Vite-declared project root (closes T-05-04b-03).
+            const hmrRoot = server?.config?.root ?? process.cwd();
+            emitRozieTsToDisk(file, registry, hmrRoot);
           } catch (err) {
             // Surface as a warning rather than aborting HMR — the next
             // request-time transform will throw with a precise Vite-shaped
