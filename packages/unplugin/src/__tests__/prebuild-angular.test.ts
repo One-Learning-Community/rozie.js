@@ -89,6 +89,24 @@ describe('D-70 disk-cache: emitRozieTsToDisk', () => {
     expect(updated).not.toBe(initial);
     expect(updated).toContain('CounterX');
   });
+
+  it('Phase 06.1 Pitfall 6: embeds merged sourcemap as base64 data-URL trailer', () => {
+    // Without this trailer, analogjs's downstream transform (which reads
+    // .rozie.ts from disk) breaks the sourcemap chain — stack traces would
+    // resolve to the synthesized .rozie.ts rather than the .rozie source.
+    // Plan 06.1-01 must_haves truth #4.
+    const roziePath = join(tmpDir, 'Counter.rozie');
+    writeFileSync(roziePath, COUNTER_ROZIE);
+    emitRozieTsToDisk(roziePath, makeRegistry());
+    const code = readFileSync(roziePath + '.ts', 'utf8');
+    // The trailer is the LAST non-empty line, matching the canonical form
+    // `^//# sourceMappingURL=data:application/json;base64,[A-Za-z0-9+/=]+$`.
+    const lines = code.split('\n').filter((l) => l.length > 0);
+    const lastLine = lines[lines.length - 1];
+    expect(lastLine).toMatch(
+      /^\/\/# sourceMappingURL=data:application\/json;base64,[A-Za-z0-9+/=]+$/,
+    );
+  });
 });
 
 describe('D-70 disk-cache: prebuildAngularRozieFiles', () => {

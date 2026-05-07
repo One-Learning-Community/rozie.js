@@ -28,6 +28,8 @@
 import type { IRComponent } from '../../../core/src/ir/types.js';
 import type { Diagnostic } from '../../../core/src/diagnostics/Diagnostic.js';
 import type { ModifierRegistry } from '../../../core/src/modifiers/ModifierRegistry.js';
+import type { BlockMap } from '../../../core/src/ast/types.js';
+import { splitBlocks } from '../../../core/src/splitter/splitBlocks.js';
 import { createDefaultRegistry } from '../../../core/src/modifiers/registerBuiltins.js';
 import type { SourceMap } from 'magic-string';
 import { emitScript } from './emit/emitScript.js';
@@ -44,6 +46,12 @@ export interface EmitAngularOptions {
   filename?: string | undefined;
   source?: string | undefined;
   modifierRegistry?: ModifierRegistry | undefined;
+  /**
+   * Phase 06.1 Plan 01 (DX-04): block byte offsets from splitBlocks() —
+   * required by buildShell() for accurate source maps. When omitted,
+   * derived from `opts.source` via splitBlocks() if available.
+   */
+  blockOffsets?: BlockMap | undefined;
 }
 
 export interface EmitAngularResult {
@@ -184,13 +192,32 @@ export function emitAngular(
   }
 
   // 8. Build the .ts shell.
-  const ms = buildShell({
+  // Phase 06.1 Plan 01 (DX-04) — anchor MagicString at .rozie source bytes via
+  // overwrite() over the <rozie> envelope's byte range. blockOffsets resolution:
+  //   1. opts.blockOffsets (caller threaded splitBlocks result through)
+  //   2. derive from opts.source via splitBlocks()
+  //   3. degenerate empty BlockMap (legacy fallback path).
+  let resolvedBlockOffsets: BlockMap;
+  if (opts.blockOffsets !== undefined) {
+    resolvedBlockOffsets = opts.blockOffsets;
+  } else if (opts.source !== undefined) {
+    resolvedBlockOffsets = splitBlocks(opts.source, opts.filename);
+  } else {
+    resolvedBlockOffsets = {};
+  }
+
+  const { ms, scriptOutputOffset } = buildShell({
     importLines: imports.render(),
     interfaceDecls: scriptResult.interfaceDecls,
     decorator,
     componentName: ir.name,
     classBody,
+    rozieSource: opts.source ?? '',
+    blockOffsets: resolvedBlockOffsets,
   });
+  // P1: scriptOutputOffset is computed but unused in v1 (P2 will consume it
+  // via composeMaps).
+  void scriptOutputOffset;
 
   const code = ms.toString();
 

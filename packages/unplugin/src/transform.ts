@@ -574,7 +574,12 @@ function runAngularPipeline(
   }
 
   // 3. emitAngular
-  const result = emitAngular(ir, { filename: filePath, source, modifierRegistry: registry });
+  const result = emitAngular(ir, {
+    filename: filePath,
+    source,
+    modifierRegistry: registry,
+    blockOffsets: ast.blocks,
+  });
   const emitErrors = result.diagnostics.filter((d) => d.severity === 'error');
   if (emitErrors.length > 0) {
     throw formatViteError(emitErrors, filePath, source);
@@ -660,6 +665,26 @@ export function emitRozieTsToDisk(
   }
   const source = readFileSync(roziePath, 'utf8');
   const result = runAngularEmitForDisk(source, roziePath, registry);
+
+  // Phase 06.1 Plan 01 Pitfall 6 mitigation: analogjs's downstream transform
+  // reads `.rozie.ts` from disk and produces its own sourcemap (it uses
+  // `@swc/core` internally). Without an embedded source map on the on-disk
+  // file, the sourcemap chain breaks at the analogjs link — stack traces
+  // resolve to the .rozie.ts (a synthesized file) rather than the .rozie
+  // source. Embedding our merged map as a `//# sourceMappingURL=data:...`
+  // base64 trailer is the standard Vite-ecosystem pattern that analogjs (and
+  // every modern build tool) reads automatically.
+  //
+  // CONTEXT D-70 + RESEARCH Pitfall 6 (Plan 06.1-01 must_haves truth #4).
+  let codeWithMap = result.code;
+  if (result.map) {
+    const mapJson = JSON.stringify(result.map);
+    const base64 = Buffer.from(mapJson, 'utf8').toString('base64');
+    codeWithMap =
+      result.code +
+      `\n//# sourceMappingURL=data:application/json;base64,${base64}\n`;
+  }
+
   const outPath = roziePath + '.ts';
   // Avoid an unnecessary write (and consequent fs.watch event) when the
   // emitted code is byte-identical to what's already on disk. This keeps
@@ -667,11 +692,11 @@ export function emitRozieTsToDisk(
   // and re-triggers a build.
   if (existsSync(outPath)) {
     const existing = readFileSync(outPath, 'utf8');
-    if (existing === result.code) {
+    if (existing === codeWithMap) {
       return outPath;
     }
   }
-  writeFileSync(outPath, result.code, 'utf8');
+  writeFileSync(outPath, codeWithMap, 'utf8');
   return outPath;
 }
 
@@ -685,7 +710,7 @@ function runAngularEmitForDisk(
   source: string,
   filePath: string,
   registry: ModifierRegistry,
-): { code: string } {
+): { code: string; map: EmitAngularResult['map'] } {
   const { ast, diagnostics: parseDiags } = parse(source, { filename: filePath });
   if (!ast || parseDiags.some((d) => d.severity === 'error')) {
     const first = parseDiags.find((d) => d.severity === 'error');
@@ -696,12 +721,17 @@ function runAngularEmitForDisk(
   if (!ir || irError) {
     throw new Error(`[${irError?.code ?? 'lower'}] ${irError?.message ?? 'lowering error'}`);
   }
-  const result = emitAngular(ir, { filename: filePath, source, modifierRegistry: registry });
+  const result = emitAngular(ir, {
+    filename: filePath,
+    source,
+    modifierRegistry: registry,
+    blockOffsets: ast.blocks,
+  });
   const emitError = result.diagnostics.find((d) => d.severity === 'error');
   if (emitError) {
     throw new Error(`[${emitError.code}] ${emitError.message}`);
   }
-  return { code: result.code };
+  return { code: result.code, map: result.map };
 }
 
 /**
