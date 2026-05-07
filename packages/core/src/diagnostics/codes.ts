@@ -83,6 +83,16 @@ export const RozieErrorCode = {
 
   // ---- Phase 3 emitter warnings — ROZ450..ROZ499 (Phase 7 hardening) ----
 
+  // ---- @rozie/unplugin Solid-branch + @rozie/target-solid errors (Phase 06.3 — D-140 amended) — ROZ810..ROZ812 ----
+  // NOTE: D-140 originally claimed ROZ800..ROZ829 but ROZ800/ROZ801 are already
+  // allocated to Phase 6 compile() errors and ROZ850 is allocated to
+  // CLI_INVALID_TARGET. Phase 06.3 codes use the unclaimed sub-range
+  // ROZ810..ROZ819 for Solid; ROZ812 reserved for runtime-solid warnings.
+  UNPLUGIN_SOLID_PEER_DEP_MISSING: 'ROZ810', // vite-plugin-solid not resolvable from cwd (D-139)
+  UNPLUGIN_SOLID_DEP_MISSING: 'ROZ811',       // solid-js (^1.8) not resolvable from cwd (D-139)
+  // ---- @rozie/runtime-solid warnings (Phase 06.3) — ROZ812 ----
+  RUNTIME_SOLID_CONTROLLABLE_MODE_FLIP: 'ROZ812', // D-135 — createControllableSignal detected parent flipping controlled/uncontrolled mid-lifecycle
+
   // ---- @rozie/unplugin React-branch configuration errors (Phase 4 D-63) — ROZ500..ROZ519 ----
   UNPLUGIN_REACT_PEER_DEP_MISSING: 'ROZ500', // D-59: neither @vitejs/plugin-react nor @vitejs/plugin-react-swc installed (Pitfall 9)
   UNPLUGIN_REACT_DEP_MISSING: 'ROZ501', // react peer dep not resolvable

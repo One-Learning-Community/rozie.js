@@ -41,6 +41,7 @@ import { emitVue, type EmitVueResult } from '../../targets/vue/src/emitVue.js';
 import { emitReact, type EmitReactResult } from '../../targets/react/src/emitReact.js';
 import { emitSvelte, type EmitSvelteResult } from '../../targets/svelte/src/emitSvelte.js';
 import { emitAngular, type EmitAngularResult } from '../../targets/angular/src/emitAngular.js';
+import { emitSolid, type EmitSolidResult } from '../../targets/solid/src/emitSolid.js';
 import type { Diagnostic } from '../../core/src/diagnostics/Diagnostic.js';
 import type { TargetValue } from './options.js';
 import { formatViteError, formatLoc } from './diagnostics.js';
@@ -89,6 +90,21 @@ const VIRTUAL_SUFFIX_SVELTE = '.rozie.svelte';
 const VIRTUAL_SUFFIX_ANGULAR = '.rozie.ts';
 
 /**
+ * Solid-target synthetic suffix (Phase 06.3 — D-139).
+ *
+ * `.rozie.tsx` — same as React because vite-plugin-solid uses Babel +
+ * babel-preset-solid which transforms `.tsx` files. The suffix is identical
+ * to VIRTUAL_SUFFIX_REACT, but the resolveId routing is target-specific
+ * (createResolveIdHook checks `target === 'solid'` vs `target === 'react'`
+ * before dispatching).
+ *
+ * Per RESEARCH Pitfall 3: NO sibling .module.css / .global.css virtual ids —
+ * Solid emits styles inline. A single .rozie.tsx virtual id covers everything
+ * (mirrors Svelte's approach, not React's).
+ */
+const VIRTUAL_SUFFIX_SOLID = '.rozie.tsx';
+
+/**
  * Phase 4 escape-hatch: query-suffix forms (`?style=module` / `?style=global`)
  * accepted as alternative routing for consumers whose pipelines clash with
  * the file-extension form. Path 1 fallback per 04-05-SPIKE.md.
@@ -104,7 +120,7 @@ const QUERY_STYLE_GLOBAL = '?style=global';
 export function transformIncludeRozie(id: string): boolean {
   return (
     id.endsWith(VIRTUAL_SUFFIX_VUE) ||
-    id.endsWith(VIRTUAL_SUFFIX_REACT) ||
+    id.endsWith(VIRTUAL_SUFFIX_REACT) || // VIRTUAL_SUFFIX_REACT === VIRTUAL_SUFFIX_SOLID by construction; both targets share the .rozie.tsx suffix.
     id.endsWith(VIRTUAL_SUFFIX_REACT_MODULE_CSS) ||
     id.endsWith(VIRTUAL_SUFFIX_REACT_GLOBAL_CSS) ||
     id.includes(VIRTUAL_SUFFIX_REACT + QUERY_STYLE_MODULE) ||
@@ -201,6 +217,25 @@ export function createResolveIdHook(
         if (existsSync(base + '.rozie')) {
           return base + VIRTUAL_SUFFIX_SVELTE;
         }
+      }
+      return null;
+    };
+  }
+  if (target === 'solid') {
+    return function resolveIdSolid(id: string, importer: string | undefined): string | null {
+      // 1) Bare `.rozie` import → `<abs>/Foo.rozie.tsx` (same shape as React).
+      if (id.endsWith('.rozie')) {
+        const abs = absolutize(id, importer);
+        return abs + '.tsx';
+      }
+      // 2) NO .module.css / .global.css routing — Solid emits styles inline (Pitfall 3).
+      // 3) Pass-through for the synthetic id itself.
+      if (id.endsWith(VIRTUAL_SUFFIX_SOLID)) return id;
+      // 4) Phase 06.2 D-118 cross-rozie composition — extensionless relative imports.
+      //    Solid emits `import Foo from './Foo'` (solid: '' in TARGET_EXT_MAP).
+      if (isExtensionlessRelative(id)) {
+        const abs = absolutize(id, importer);
+        if (existsSync(abs + '.rozie')) return abs + VIRTUAL_SUFFIX_SOLID;
       }
       return null;
     };
@@ -351,6 +386,18 @@ export function createLoadHook(registry: ModifierRegistry, target: TargetValue =
       return runSveltePipeline.call(this, source, filePath, registry);
     };
   }
+  if (target === 'solid') {
+    return function loadSolid(
+      this: AnyContext,
+      id: string,
+    ): { code: string; map: EmitSolidResult['map'] } | null {
+      if (!id.endsWith(VIRTUAL_SUFFIX_SOLID)) return null;
+      // Strip `.tsx` only — leaves `.rozie`.
+      const filePath = id.slice(0, -'.tsx'.length);
+      const source = readFileSync(filePath, 'utf8');
+      return runSolidPipeline.call(this, source, filePath, registry);
+    };
+  }
   if (target === 'react') {
     return function loadReact(
       this: AnyContext,
@@ -437,6 +484,15 @@ export function createTransformHook(registry: ModifierRegistry, target: TargetVa
       id: string,
     ): { code: string; map: EmitSvelteResult['map'] } | null {
       return runSveltePipeline.call(this, code, id, registry);
+    };
+  }
+  if (target === 'solid') {
+    return function transformSolid(
+      this: AnyContext,
+      code: string,
+      id: string,
+    ): { code: string; map: EmitSolidResult['map'] } | null {
+      return runSolidPipeline.call(this, code, id, registry);
     };
   }
   if (target === 'react') {
@@ -585,6 +641,57 @@ function runSveltePipeline(
 
   // 3. emitSvelte
   const result = emitSvelte(ir, {
+    filename: filePath,
+    source,
+    modifierRegistry: registry,
+    blockOffsets: ast.blocks,
+  });
+  const emitErrors = result.diagnostics.filter((d) => d.severity === 'error');
+  if (emitErrors.length > 0) {
+    throw formatViteError(emitErrors, filePath, source);
+  }
+  warnings.push(...result.diagnostics.filter((d) => d.severity === 'warning'));
+
+  surfaceWarnings.call(this, warnings, filePath, source);
+
+  return { code: result.code, map: result.map };
+}
+
+/**
+ * Solid-target pipeline: parse → lowerToIR → emitSolid. Returns
+ * `{ code, map }` for the load/transform hooks. Mirrors runSveltePipeline
+ * (Svelte) — Solid's emitter has a single output channel (one `.tsx` file
+ * containing the component function + inline styles), so no CSS-side
+ * branching like React's runReactPipeline.
+ *
+ * Per RESEARCH Pitfall 3: no CSS sibling virtual ids — styles go inline.
+ */
+function runSolidPipeline(
+  this: AnyContext,
+  source: string,
+  filePath: string,
+  registry: ModifierRegistry,
+): { code: string; map: EmitSolidResult['map'] } {
+  this?.addWatchFile?.(filePath);
+  // 1. parse
+  const { ast, diagnostics: parseDiags } = parse(source, { filename: filePath });
+  if (!ast || parseDiags.some((d) => d.severity === 'error')) {
+    throw formatViteError(parseDiags, filePath, source);
+  }
+
+  // 2. lowerToIR
+  const { ir, diagnostics: irDiags } = lowerToIR(ast, { modifierRegistry: registry });
+  const warnings: Diagnostic[] = [
+    ...parseDiags.filter((d) => d.severity === 'warning'),
+    ...irDiags.filter((d) => d.severity === 'warning'),
+  ];
+  const irErrors = irDiags.filter((d) => d.severity === 'error');
+  if (!ir || irErrors.length > 0) {
+    throw formatViteError(irDiags, filePath, source);
+  }
+
+  // 3. emitSolid
+  const result = emitSolid(ir, {
     filename: filePath,
     source,
     modifierRegistry: registry,

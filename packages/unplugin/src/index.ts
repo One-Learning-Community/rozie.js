@@ -35,6 +35,7 @@ import {
   assertReactPeerDeps,
   assertSveltePeerDeps,
   assertAngularPeerDeps,
+  assertSolidPeerDeps,
   type RozieOptions,
 } from './options.js';
 import {
@@ -76,6 +77,12 @@ export const unplugin = createUnpluginV3<Partial<RozieOptions>>((rawOptions) => 
   // 2.5.x peerDeps require vite ^6 || ^7 || ^8.
   if (options.target === 'angular') {
     assertAngularPeerDeps();
+  }
+
+  // Plan 06.3-01: enforce Solid peer deps (ROZ810/ROZ811) at factory-call
+  // time for `target: 'solid'` (D-139). Mirrors React/Svelte above.
+  if (options.target === 'solid') {
+    assertSolidPeerDeps();
   }
 
   // Build a default modifier registry once per plugin instance — shared by
@@ -184,6 +191,10 @@ export const unplugin = createUnpluginV3<Partial<RozieOptions>>((rawOptions) => 
           // Plan 05-04b: single virtual id `.rozie.ts` per Path A (no sibling
           // CSS — Angular emits styles inline in the @Component decorator).
           candidates = [file + '.ts'];
+        } else if (options.target === 'solid') {
+          // Plan 06.3-01: single virtual id `.rozie.tsx` (no CSS sidecar —
+          // Solid emits styles inline, Pitfall 3).
+          candidates = [file + '.tsx'];
         } else {
           // react
           candidates = [file + '.tsx', file + '.module.css', file + '.global.css'];
