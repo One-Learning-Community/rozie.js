@@ -13,10 +13,18 @@
  * those sidecars (Legs 1-3; Leg 4 doesn't surface sidecars in the same
  * shape — they're virtual ids in unplugin per D-58).
  *
- * Trailing-newline normalization (D-93): `normalize()` matches the bootstrap
- * script's write-time normalization. No other normalization at assertion
- * time — bytes ARE the contract. .map parity is deferred to v2 per
- * RESEARCH OQ4.
+ * Trailing-newline contract (D-93):
+ *   - `result.code` and `result.types` MUST already end with `\n` — the
+ *     assertion is strict raw-byte equality (no normalize() softening). If
+ *     compile() ever stops emitting a trailing newline for one of these
+ *     fields, this test fails loudly rather than papering over the regression.
+ *   - `result.css` and `result.globalCss` come from PostCSS, which does NOT
+ *     emit a trailing `\n`. The bootstrap script (D-93) appends one at write
+ *     time so committed fixtures are `\n`-terminated; here we apply the same
+ *     normalization to the live result before comparing. This is the ONLY
+ *     intentional normalize() in the test path; documented per WR-04.
+ *
+ * .map parity is deferred to v2 per RESEARCH OQ4.
  *
  * The test suite runs in-process with no child_process spawns; total runtime
  * < 5s on a warm cache.
@@ -71,8 +79,15 @@ function loadSidecarOrNull(name: string, suffix: string): string | null {
   }
 }
 
-/** Match bootstrap script's write-time normalization (D-93 trailing-LF only). */
-function normalize(s: string): string {
+/**
+ * Match bootstrap script's write-time normalization (D-93 trailing-LF only).
+ *
+ * WR-04: applied ONLY to `result.css` / `result.globalCss` — PostCSS does not
+ * emit a trailing newline, but committed fixtures do (bootstrap appends one).
+ * For `result.code` / `result.types` we assert raw bytes; both fields are
+ * required by D-93 to already end in `\n`.
+ */
+function normalizeCss(s: string): string {
   return s.endsWith('\n') ? s : `${s}\n`;
 }
 
@@ -92,19 +107,26 @@ describe('DIST-05 strict-bytes parity gate (D-93)', () => {
           sourceMap: false,
         });
         expect(result.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
-        expect(normalize(result.code)).toBe(fixture);
+        // WR-04: assert raw bytes including trailing LF — compile() is
+        // contractually required to emit `\n`-terminated `result.code`.
+        expect(result.code.endsWith('\n')).toBe(true);
+        expect(result.code).toBe(fixture);
 
         // React sidecar parity (per D-93 React adds 3 sidecars when present)
         if (target === 'react') {
           const dts = loadSidecarOrNull(name, '.d.ts');
-          if (dts !== null) expect(normalize(result.types)).toBe(dts);
+          if (dts !== null) {
+            // WR-04: same strict-LF contract for .d.ts.
+            expect(result.types.endsWith('\n')).toBe(true);
+            expect(result.types).toBe(dts);
+          }
           const moduleCss = loadSidecarOrNull(name, '.module.css');
           if (moduleCss !== null && result.css) {
-            expect(normalize(result.css)).toBe(moduleCss);
+            expect(normalizeCss(result.css)).toBe(moduleCss);
           }
           const globalCss = loadSidecarOrNull(name, '.global.css');
           if (globalCss !== null && result.globalCss) {
-            expect(normalize(result.globalCss)).toBe(globalCss);
+            expect(normalizeCss(result.globalCss)).toBe(globalCss);
           }
         }
       });
@@ -126,23 +148,26 @@ describe('DIST-05 strict-bytes parity gate (D-93)', () => {
           // D-89 layout: <outDir>/<target>/<source-rel>/<name>.<ext>
           const outPath = resolve(tmpDir, target, 'examples', `${name}${emittedExt(target)}`);
           const cliBytes = readFileSync(outPath, 'utf8');
-          expect(normalize(cliBytes)).toBe(fixture);
+          // WR-04: CLI writes result.code raw; assert strict bytes with LF.
+          expect(cliBytes.endsWith('\n')).toBe(true);
+          expect(cliBytes).toBe(fixture);
 
           if (target === 'react') {
             const dtsFix = loadSidecarOrNull(name, '.d.ts');
             if (dtsFix !== null) {
               const cliDts = readFileSync(outPath.replace(/\.tsx$/, '.d.ts'), 'utf8');
-              expect(normalize(cliDts)).toBe(dtsFix);
+              expect(cliDts.endsWith('\n')).toBe(true);
+              expect(cliDts).toBe(dtsFix);
             }
             const cssFix = loadSidecarOrNull(name, '.module.css');
             if (cssFix !== null) {
               const cliCss = readFileSync(outPath.replace(/\.tsx$/, '.module.css'), 'utf8');
-              expect(normalize(cliCss)).toBe(cssFix);
+              expect(normalizeCss(cliCss)).toBe(cssFix);
             }
             const globalFix = loadSidecarOrNull(name, '.global.css');
             if (globalFix !== null) {
               const cliGlobal = readFileSync(outPath.replace(/\.tsx$/, '.global.css'), 'utf8');
-              expect(normalize(cliGlobal)).toBe(globalFix);
+              expect(normalizeCss(cliGlobal)).toBe(globalFix);
             }
           }
         } finally {
@@ -180,23 +205,26 @@ describe('DIST-05 strict-bytes parity gate (D-93)', () => {
           expect(siblingMs).toBeGreaterThanOrEqual(testStartMs);
 
           const babelBytes = readFileSync(sibling, 'utf8');
-          expect(normalize(babelBytes)).toBe(fixture);
+          // WR-04: babel-plugin writes result.code raw; assert strict bytes with LF.
+          expect(babelBytes.endsWith('\n')).toBe(true);
+          expect(babelBytes).toBe(fixture);
 
           if (target === 'react') {
             const dtsFix = loadSidecarOrNull(name, '.d.ts');
             if (dtsFix !== null) {
               const babelDts = readFileSync(sibling.replace(/\.tsx$/, '.d.ts'), 'utf8');
-              expect(normalize(babelDts)).toBe(dtsFix);
+              expect(babelDts.endsWith('\n')).toBe(true);
+              expect(babelDts).toBe(dtsFix);
             }
             const cssFix = loadSidecarOrNull(name, '.module.css');
             if (cssFix !== null) {
               const babelCss = readFileSync(sibling.replace(/\.tsx$/, '.module.css'), 'utf8');
-              expect(normalize(babelCss)).toBe(cssFix);
+              expect(normalizeCss(babelCss)).toBe(cssFix);
             }
             const globalFix = loadSidecarOrNull(name, '.global.css');
             if (globalFix !== null) {
               const babelGlobal = readFileSync(sibling.replace(/\.tsx$/, '.global.css'), 'utf8');
-              expect(normalize(babelGlobal)).toBe(globalFix);
+              expect(normalizeCss(babelGlobal)).toBe(globalFix);
             }
           }
         } finally {
@@ -213,7 +241,10 @@ describe('DIST-05 strict-bytes parity gate (D-93)', () => {
         // (existing transform.test cases verify this).
         const result = hook.call({}, rozieSource, `${name}.rozie`);
         expect(result).not.toBeNull();
-        expect(normalize(result!.code)).toBe(fixture);
+        // WR-04: unplugin's createTransformHook returns the same compile()
+        // result.code; the trailing-LF contract applies here too.
+        expect(result!.code.endsWith('\n')).toBe(true);
+        expect(result!.code).toBe(fixture);
         // .map parity deferred to v2 per RESEARCH OQ4 — would compare JSON
         // mappings only, ignoring file/sources fields. v1 omits.
       });
