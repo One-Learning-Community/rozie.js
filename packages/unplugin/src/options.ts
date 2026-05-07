@@ -104,10 +104,16 @@ export function validateOptions(options: Partial<RozieOptions> | undefined): Roz
       `Unknown target '${options.target}'. Supported: ${ALL_TARGETS.join(', ')}.`,
     );
   }
+  // NOTE: SUPPORTED_TARGETS_PHASE_5 now equals ALL_TARGETS, so this branch
+  // is currently unreachable. It is kept as a forward-compatibility guard for
+  // future phases that may add new target strings to ALL_TARGETS before fully
+  // implementing them. The message has been updated from "not yet supported"
+  // to "unknown target" to avoid confusion if a typo slips through the
+  // ALL_TARGETS check above. Closes IN-02.
   if (!SUPPORTED_TARGETS_PHASE_5.includes(target)) {
     throw rozieError(
       RozieErrorCode.UNPLUGIN_TARGET_NOT_YET_SUPPORTED,
-      `Target '${target}' is not yet supported. Phase 5 ships 'vue', 'react', 'svelte', 'angular'.`,
+      `Unknown target '${target}'. Valid targets: ${SUPPORTED_TARGETS_PHASE_5.join(', ')}.`,
     );
   }
   return { target };
