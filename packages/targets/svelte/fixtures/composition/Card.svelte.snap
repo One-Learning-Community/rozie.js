@@ -1,0 +1,11 @@
+<script lang="ts">
+import CardHeader from './CardHeader.svelte';
+
+
+</script>
+
+
+  <div class="card">
+    <CardHeader title="Hello"></CardHeader>
+  </div>
+

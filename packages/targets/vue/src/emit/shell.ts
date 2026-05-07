@@ -60,6 +60,30 @@ export interface ShellParts {
    * composeMaps() in compose.ts.
    */
   scriptMap?: EncodedSourceMap | null;
+  /**
+   * Phase 06.2 P2 (D-118): synthesized component-import lines for the
+   * `<script setup>` body. Each line is `import {LocalName} from '{rewrittenPath}';`
+   * (newline-terminated). One per IRComponent.components entry. Emitted at
+   * the very top of `<script setup>` BEFORE the user-script body so they
+   * sit alongside other top-of-script imports.
+   *
+   * Empty/undefined when no `<components>` block was authored.
+   */
+  componentImportsBlock?: string;
+  /**
+   * Phase 06.2 P2 (RESEARCH Pitfall 2): when true, prepend a
+   * `defineOptions({ name: '<componentName>' })` macro inside the
+   * `<script setup>` body. Required for Vue self-reference to resolve
+   * reliably across path-virtual schemes (don't rely on filename auto-name).
+   *
+   * Detected by emitVue walking the template tree for `tagKind: 'self'`.
+   */
+  hasSelfReference?: boolean;
+  /**
+   * Phase 06.2 P2: PascalCase component name used in the synthesized
+   * `defineOptions({ name })` macro when `hasSelfReference` is true.
+   */
+  componentName?: string;
 }
 
 /**
@@ -92,6 +116,24 @@ export interface BuildShellResult {
  * Such callers receive a MagicString that produces an empty `code` — they
  * never relied on the old `MagicString('')` + .append() composition either.
  */
+/**
+ * Phase 06.2 P2: build the script-prelude block (component imports +
+ * optional defineOptions) for `<script setup>`. Returns '' when neither
+ * is present so non-composing examples stay byte-stable.
+ */
+function buildScriptPrelude(parts: ShellParts): string {
+  const lines: string[] = [];
+  if (parts.componentImportsBlock && parts.componentImportsBlock.length > 0) {
+    // componentImportsBlock is already newline-terminated.
+    lines.push(parts.componentImportsBlock.replace(/\n$/, ''));
+  }
+  if (parts.hasSelfReference === true && parts.componentName) {
+    lines.push(`defineOptions({ name: '${parts.componentName}' });`);
+  }
+  if (lines.length === 0) return '';
+  return lines.join('\n') + '\n\n';
+}
+
 export function buildShell(parts: ShellParts): BuildShellResult {
   const blocks = parts.blockOffsets;
 
@@ -128,10 +170,13 @@ export function buildShell(parts: ShellParts): BuildShellResult {
     `<template>\n${parts.template}\n</template>\n`,
   );
 
+  // Phase 06.2 P2: synthesize composition prelude (component imports +
+  // optional defineOptions({ name })) and prepend to the script body.
+  const scriptPrelude = buildScriptPrelude(parts);
   ms.overwrite(
     blocks.script.loc.start,
     blocks.script.loc.end,
-    `\n${scriptOpenFraming}${parts.script}${scriptCloseFraming}`,
+    `\n${scriptOpenFraming}${scriptPrelude}${parts.script}${scriptCloseFraming}`,
   );
 
   if (blocks.style) {
@@ -219,6 +264,9 @@ function buildShellLegacy(parts: ShellParts): BuildShellResult {
       ? ` generic="${scriptGeneric}"`
       : '';
   ms.append(`<script setup lang="ts"${genericAttr}>\n`);
+  // Phase 06.2 P2: composition prelude (component imports + defineOptions).
+  const scriptPrelude = buildScriptPrelude(parts);
+  if (scriptPrelude.length > 0) ms.append(scriptPrelude);
   ms.append(parts.script);
   ms.append('\n</script>\n');
   if (parts.styleScoped.length > 0) {

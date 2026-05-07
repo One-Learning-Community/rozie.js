@@ -30,6 +30,7 @@ import type { BlockMap } from '../../../core/src/ast/types.js';
 import type { SourceMap } from 'magic-string';
 import { splitBlocks } from '../../../core/src/splitter/splitBlocks.js';
 import { createDefaultRegistry } from '../../../core/src/modifiers/registerBuiltins.js';
+import { rewriteRozieImport } from '../../../core/src/codegen/rewriteRozieImport.js';
 import { emitScript } from './emit/emitScript.js';
 import { emitPropsInterface } from './emit/emitPropsInterface.js';
 import { emitTemplate } from './emit/emitTemplate.js';
@@ -164,6 +165,24 @@ export function emitReact(
     resolvedBlockOffsets = {};
   }
 
+  // Phase 06.2 P2 (D-118): synthesize user-component import lines from
+  // ir.components, SKIPPING entries whose `localName === ir.name` (Pitfall 7
+  // — React's named-function declaration handles self-reference natively;
+  // a redundant `import { TreeNode } from './TreeNode'` would shadow the
+  // enclosing function declaration in the same file).
+  // Defensive `?? []` guards pre-P1 hand-rolled IRs in legacy tests.
+  const components = ir.components ?? [];
+  const componentImportsLines: string[] = components
+    .filter((decl) => decl.localName !== ir.name) // skip redundant self-entry
+    .map((decl) => {
+      const rewritten = rewriteRozieImport(decl.importPath, 'react');
+      return `import ${decl.localName} from '${rewritten}';`;
+    });
+  const componentImportsBlock =
+    componentImportsLines.length > 0
+      ? componentImportsLines.join('\n') + '\n'
+      : '';
+
   const { ms, scriptOutputOffset, scriptMap: shellScriptMap } = buildShell({
     componentName: ir.name,
     propsInterface,
@@ -181,6 +200,7 @@ export function emitReact(
     rozieSource: opts.source ?? '',
     blockOffsets: resolvedBlockOffsets,
     scriptMap,
+    componentImportsBlock,
   });
 
   const code = ms.toString();

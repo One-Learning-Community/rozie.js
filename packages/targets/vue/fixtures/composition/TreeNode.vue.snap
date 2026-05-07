@@ -1,0 +1,15 @@
+<template>
+
+  <li>
+    <span>{{ $props.label }}</span>
+    <TreeNode :node="$props.children"></TreeNode>
+  </li>
+
+</template>
+
+<script setup lang="ts">
+import TreeNode from './TreeNode.vue';
+defineOptions({ name: 'TreeNode' });
+
+
+</script>

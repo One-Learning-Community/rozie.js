@@ -1,0 +1,11 @@
+interface CardHeaderProps {
+  title?: string;
+}
+
+export default function CardHeader(props: CardHeaderProps): JSX.Element {
+  return (
+    <>
+      <div className={"card-header"}>{props.title}</div>
+    </>
+  );
+}

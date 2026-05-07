@@ -16,7 +16,7 @@
  *
  * @experimental — shape may change before v1.0
  */
-import type { IRComponent } from '../../../../core/src/ir/types.js';
+import type { IRComponent, ComponentDecl } from '../../../../core/src/ir/types.js';
 import { AngularImportCollector } from '../rewrite/collectAngularImports.js';
 
 /** Convert `Counter` / `TodoList` / `SearchInput` → `rozie-counter` / `rozie-todo-list` / `rozie-search-input`. */
@@ -44,6 +44,23 @@ export interface EmitDecoratorOpts {
    * FormsModule import (Pitfall 10). emitTemplate returns this signal.
    */
   hasNgModel: boolean;
+  /**
+   * Phase 06.2 P2 (D-115/D-118): IR components table — non-self entries
+   * are appended to `imports: [...]` as bare class names (e.g., `CardHeader`).
+   * Self-entries (localName === componentName) are filtered here too —
+   * the self-class is referenced via `forwardRef(() => Self)` instead.
+   *
+   * Defaults to empty array.
+   */
+  componentDecls?: readonly ComponentDecl[];
+  /**
+   * Phase 06.2 P2 (Pitfall 5): when true, emit `forwardRef(() => Self)`
+   * inside `imports: [...]` for the standalone component's own class.
+   * Caller (emitAngular) MUST also have called `imports.add('forwardRef')`
+   * on the AngularImportCollector so the symbol is in the @angular/core
+   * import line.
+   */
+  selfReferenced?: boolean;
 }
 
 /**
@@ -65,12 +82,32 @@ export function registerDecoratorImports(
 
 /**
  * Build the imports[] list inside @Component decorator. Returns a string like
- * `[NgTemplateOutlet, FormsModule]` or empty string when no imports needed.
+ * `[NgTemplateOutlet, FormsModule, CardHeader, forwardRef(() => Self)]` or
+ * empty string when no imports needed.
+ *
+ * Order:
+ *   1. NgTemplateOutlet (slot support)
+ *   2. FormsModule (r-model on form-input)
+ *   3. User component classes from `<components>` (Phase 06.2 P2 D-115)
+ *   4. forwardRef(() => Self) — self-reference per Pitfall 5
  */
-function buildDecoratorImportsList(opts: { hasSlots: boolean; hasNgModel: boolean }): string {
+function buildDecoratorImportsList(opts: {
+  hasSlots: boolean;
+  hasNgModel: boolean;
+  componentDecls: readonly ComponentDecl[];
+  selfReferenced: boolean;
+  componentName: string;
+}): string {
   const items: string[] = [];
   if (opts.hasSlots) items.push('NgTemplateOutlet');
   if (opts.hasNgModel) items.push('FormsModule');
+  for (const decl of opts.componentDecls) {
+    if (decl.localName === opts.componentName) continue; // self handled below
+    items.push(decl.localName);
+  }
+  if (opts.selfReferenced) {
+    items.push(`forwardRef(() => ${opts.componentName})`);
+  }
   if (items.length === 0) return '';
   return `[${items.join(', ')}]`;
 }
@@ -87,6 +124,9 @@ export function emitDecorator(
   const importsList = buildDecoratorImportsList({
     hasSlots: opts.hasSlots,
     hasNgModel: opts.hasNgModel,
+    componentDecls: opts.componentDecls ?? [],
+    selfReferenced: opts.selfReferenced ?? false,
+    componentName: opts.componentName,
   });
 
   const lines: string[] = [];

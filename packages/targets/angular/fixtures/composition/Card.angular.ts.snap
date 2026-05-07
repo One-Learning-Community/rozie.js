@@ -1,0 +1,21 @@
+import { Component, ViewEncapsulation } from '@angular/core';
+
+import { CardHeader } from './CardHeader';
+
+@Component({
+  selector: 'rozie-card',
+  standalone: true,
+  imports: [CardHeader],
+  template: `
+
+      <div class="card">
+        <rozie-card-header title="Hello"></rozie-card-header>
+      </div>
+
+  `,
+})
+export class Card {
+
+}
+
+export default Card;

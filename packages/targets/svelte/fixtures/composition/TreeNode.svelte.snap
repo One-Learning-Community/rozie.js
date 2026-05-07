@@ -1,0 +1,12 @@
+<script lang="ts">
+import TreeNode from './TreeNode.svelte';
+
+
+</script>
+
+
+  <li>
+    <span>{$props.label}</span>
+    <TreeNode node={$props.children}></TreeNode>
+  </li>
+

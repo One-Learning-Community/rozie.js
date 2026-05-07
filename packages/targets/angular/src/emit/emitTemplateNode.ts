@@ -37,6 +37,25 @@ import { emitAttributes, findRHtml, findRShow } from './emitTemplateAttribute.js
 import { emitTemplateEvent, type AngularScriptInjection } from './emitTemplateEvent.js';
 import { emitSlotInvocation } from './emitSlotInvocation.js';
 import { emitConditional } from './emitConditional.js';
+import { toKebabCase } from './emitDecorator.js';
+
+/**
+ * Phase 06.2 P2: resolve a TemplateElement's emitted tag name. For
+ * composition (`tagKind: 'component'`) and recursion (`tagKind: 'self'`)
+ * tags, return the Angular standalone-component selector form
+ * `rozie-{kebab-case(localName)}`. Otherwise, the verbatim tagName.
+ *
+ * Mirrors the selector convention from `emitDecorator.toKebabCase` (Phase 5
+ * D-72): Counter → `rozie-counter`, TodoList → `rozie-todo-list`. Both
+ * `'component'` and `'self'` resolve through the @Component({ imports: [...] })
+ * registration (user-class for component; forwardRef(() => Self) for self).
+ */
+function resolveAngularTagName(node: TemplateElementIR): string {
+  if (node.tagKind === 'component' || node.tagKind === 'self') {
+    return `rozie-${toKebabCase(node.tagName)}`;
+  }
+  return node.tagName;
+}
 
 /** HTML void elements. */
 const VOID_ELEMENTS = new Set([
@@ -294,18 +313,24 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
       collisionRenames: ctx.collisionRenames,
       loopBindings: ctx.loopBindings,
     });
-    return `<${node.tagName}${head} [innerHTML]="${expr}"></${node.tagName}>`;
+    // Phase 06.2 P2: tagKind: 'component'/'self' → rozie-kebab selector.
+    const tagOut = resolveAngularTagName(node);
+    return `<${tagOut}${head} [innerHTML]="${expr}"></${tagOut}>`;
   }
 
+  // Phase 06.2 P2: tagKind: 'component' | 'self' resolve to the Angular
+  // standalone-component selector (rozie-{kebab-case(localName)}); 'html'
+  // emits the tag verbatim.
+  const tagOut = resolveAngularTagName(node);
   const isVoid = VOID_ELEMENTS.has(node.tagName.toLowerCase());
 
   if (node.children.length === 0) {
-    if (isVoid) return `<${node.tagName}${head} />`;
-    return `<${node.tagName}${head}></${node.tagName}>`;
+    if (isVoid) return `<${tagOut}${head} />`;
+    return `<${tagOut}${head}></${tagOut}>`;
   }
 
   const inner = node.children.map((c) => emitNode(c, ctx)).join('');
-  return `<${node.tagName}${head}>${inner}</${node.tagName}>`;
+  return `<${tagOut}${head}>${inner}</${tagOut}>`;
 }
 
 function isFormInputTag(tagName: string): boolean {

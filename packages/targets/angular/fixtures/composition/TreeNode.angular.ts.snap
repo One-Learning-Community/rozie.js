@@ -1,0 +1,20 @@
+import { Component, ViewEncapsulation, forwardRef } from '@angular/core';
+
+@Component({
+  selector: 'rozie-tree-node',
+  standalone: true,
+  imports: [forwardRef(() => TreeNode)],
+  template: `
+
+      <li>
+        <span>{{ $props.label }}</span>
+        <rozie-tree-node [node]="$props.children"></rozie-tree-node>
+      </li>
+
+  `,
+})
+export class TreeNode {
+
+}
+
+export default TreeNode;

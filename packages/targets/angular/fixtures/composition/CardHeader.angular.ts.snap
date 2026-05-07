@@ -1,0 +1,16 @@
+import { Component, ViewEncapsulation, input } from '@angular/core';
+
+@Component({
+  selector: 'rozie-card-header',
+  standalone: true,
+  template: `
+
+      <div class="card-header">{{ title() }}</div>
+
+  `,
+})
+export class CardHeader {
+  title = input.required<string>();
+}
+
+export default CardHeader;

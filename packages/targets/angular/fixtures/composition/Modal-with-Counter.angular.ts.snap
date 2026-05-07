@@ -1,0 +1,21 @@
+import { Component, ViewEncapsulation } from '@angular/core';
+
+import { Counter } from './Counter';
+
+@Component({
+  selector: 'rozie-modal',
+  standalone: true,
+  imports: [Counter],
+  template: `
+
+      <div class="modal">
+        <rozie-counter></rozie-counter>
+      </div>
+
+  `,
+})
+export class Modal {
+
+}
+
+export default Modal;

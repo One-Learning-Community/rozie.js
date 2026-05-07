@@ -232,6 +232,11 @@ function emitEvents(events: Listener[], ctx: EmitNodeCtx): string {
  * Emit a TemplateElement. Walks attributes (filtering r-html for sibling
  * emission) and events; renders children. Self-closes void elements with
  * no children.
+ *
+ * Phase 06.2 P2: tagKind === 'component' | 'self' — Svelte 5 resolves both
+ * via the top-of-script import binding (self-import idiom per D-117 update
+ * 2026-05-07; `<svelte:self>` NOT used). Both emit the verbatim PascalCase
+ * tag below; no template AST rewrite needed.
  */
 function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
   const attrText = emitAttributes(node.attributes, { ir: ctx.ir });

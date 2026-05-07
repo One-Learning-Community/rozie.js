@@ -51,6 +51,20 @@ export interface ShellParts {
    * pass-through to BuildShellResult for composeMaps() consumption.
    */
   scriptMap?: EncodedSourceMap | null;
+  /**
+   * Phase 06.2 P2 (D-118): synthesized component-import lines for the
+   * top-of-file imports section. Each line is `import { LocalName } from '{rewrittenPath}';\n`
+   * (NAMED import — Angular standalone components export the class by name).
+   *
+   * Self-references are NOT included here — emitAngular filters out
+   * `localName === ir.name` and the class is referenced via
+   * `forwardRef(() => Self)` inside `@Component({ imports: [...] })`
+   * (the class is in scope of its own decorator).
+   *
+   * Empty/undefined when no `<components>` block was authored (or every
+   * entry was the self-entry that got filtered).
+   */
+  componentImportsBlock?: string;
 }
 
 /**
@@ -89,6 +103,12 @@ export function buildShell(parts: ShellParts): BuildShellResult {
 
   if (parts.importLines.length > 0) {
     moduleParts.push(parts.importLines);
+    moduleParts.push('\n');
+  }
+
+  // Phase 06.2 P2 (D-118): user-component named imports.
+  if (parts.componentImportsBlock && parts.componentImportsBlock.length > 0) {
+    moduleParts.push(parts.componentImportsBlock);
     moduleParts.push('\n');
   }
 
@@ -150,6 +170,12 @@ function buildShellLegacy(parts: ShellParts): BuildShellResult {
 
   if (parts.importLines.length > 0) {
     ms.append(parts.importLines);
+    ms.append('\n');
+  }
+
+  // Phase 06.2 P2 (D-118): user-component named imports.
+  if (parts.componentImportsBlock && parts.componentImportsBlock.length > 0) {
+    ms.append(parts.componentImportsBlock);
     ms.append('\n');
   }
 

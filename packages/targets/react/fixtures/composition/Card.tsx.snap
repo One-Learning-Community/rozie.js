@@ -1,0 +1,13 @@
+import CardHeader from './CardHeader';
+
+interface CardProps {}
+
+export default function Card(props: CardProps): JSX.Element {
+  return (
+    <>
+      <div className={"card"}>
+        <CardHeader title="Hello" />
+      </div>
+    </>
+  );
+}

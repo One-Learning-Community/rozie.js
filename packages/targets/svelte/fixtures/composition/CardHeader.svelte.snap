@@ -1,0 +1,11 @@
+<script lang="ts">
+interface Props {
+  title?: string;
+}
+
+let { title }: Props = $props();
+</script>
+
+
+  <div class="card-header">{title}</div>
+
