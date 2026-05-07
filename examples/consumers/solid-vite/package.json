@@ -1,0 +1,27 @@
+{
+  "name": "solid-vite-demo",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --port 4177",
+    "typecheck": "tsc --noEmit",
+    "test:e2e": "playwright test",
+    "test:e2e:install": "playwright install chromium"
+  },
+  "dependencies": {
+    "@rozie/runtime-solid": "workspace:*",
+    "@rozie/unplugin": "workspace:*",
+    "solid-js": "^1.9.12"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1",
+    "playwright": "^1",
+    "source-map-js": "^1.2.1",
+    "typescript": "^5",
+    "vite": "^6",
+    "vite-plugin-solid": "^2.11.12"
+  }
+}

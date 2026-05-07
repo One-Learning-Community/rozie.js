@@ -106,6 +106,20 @@ export function emitScript(
   }
 
   // 4. onMount/onCleanup for each LifecycleHook.
+  //
+  // Rule 1 fix: when lh.setup is a BlockStatement, genCode() produces `{ ... }`
+  // which Babel's generator renders as an object literal — invalid as a function
+  // argument. Wrap BlockStatements in an arrow function; Expressions are passed
+  // directly (they're already function values from user-authored code).
+  function lifecycleArg(node: t.Node): string {
+    if (t.isBlockStatement(node)) {
+      // Wrap block in arrow: () => { stmts }
+      const code = genCode(node);
+      return `() => ${code}`;
+    }
+    return genCode(node);
+  }
+
   for (const lh of ir.lifecycle) {
     if (lh.phase === 'mount') {
       if (lh.cleanup) {
@@ -113,29 +127,34 @@ export function emitScript(
         // Shape: onMount(() => { const _cleanup = setupFn(); if (_cleanup) onCleanup(_cleanup); })
         collectors.solidImports.add('onMount');
         collectors.solidImports.add('onCleanup');
-        const setupCode = genCode(lh.setup);
+        // Rule 1 fix: when setup is a BlockStatement, wrap it in (() => { ... })
+        // before the () call to produce a valid IIFE.
+        const rawSetup = genCode(lh.setup);
+        const setupCall = t.isBlockStatement(lh.setup)
+          ? `(() => ${rawSetup})()`
+          : `(${rawSetup})()`;
         const cleanupCode = genCode(lh.cleanup);
         hookLines.push(
           `onMount(() => {\n` +
-          `  const _cleanup = (${setupCode})();\n` +
+          `  const _cleanup = ${setupCall};\n` +
           `  if (_cleanup) onCleanup(_cleanup);\n` +
           `  onCleanup(${cleanupCode});\n` +
           `});`,
         );
       } else {
         collectors.solidImports.add('onMount');
-        const setupCode = genCode(lh.setup);
-        hookLines.push(`onMount(${setupCode});`);
+        const arg = lifecycleArg(lh.setup);
+        hookLines.push(`onMount(${arg});`);
       }
     } else if (lh.phase === 'unmount') {
       collectors.solidImports.add('onCleanup');
-      const setupCode = genCode(lh.setup);
-      hookLines.push(`onCleanup(${setupCode});`);
+      const arg = lifecycleArg(lh.setup);
+      hookLines.push(`onCleanup(${arg});`);
     } else if (lh.phase === 'update') {
       // update phase: createEffect re-runs on tracked dependency change
       collectors.solidImports.add('createEffect');
-      const setupCode = genCode(lh.setup);
-      hookLines.push(`createEffect(${setupCode});`);
+      const arg = lifecycleArg(lh.setup);
+      hookLines.push(`createEffect(${arg});`);
     }
   }
 
