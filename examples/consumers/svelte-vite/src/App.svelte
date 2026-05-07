@@ -16,14 +16,28 @@
   import Dropdown from './Dropdown.rozie';
   import TodoList from './TodoList.rozie';
   import Modal from './Modal.rozie';
+  import TreeNode from './TreeNode.rozie';
+  import Card from './Card.rozie';
+  import CardHeader from './CardHeader.rozie';
 
-  type PageKey = 'counter' | 'search-input' | 'dropdown' | 'todo-list' | 'modal';
+  type PageKey =
+    | 'counter'
+    | 'search-input'
+    | 'dropdown'
+    | 'todo-list'
+    | 'modal'
+    | 'tree-node'
+    | 'card'
+    | 'card-header';
   const PAGE_KEYS: ReadonlyArray<PageKey> = [
     'counter',
     'search-input',
     'dropdown',
     'todo-list',
     'modal',
+    'tree-node',
+    'card',
+    'card-header',
   ];
 
   let current = $state<PageKey>('counter');
@@ -61,6 +75,31 @@
   const onModalClose = () => {
     modalCloseCount++;
   };
+
+  // TreeNode demo fixture (3-level tree)
+  const treeRoot = {
+    id: 'r',
+    label: 'root',
+    children: [
+      {
+        id: 'a',
+        label: 'alpha',
+        children: [
+          { id: 'a1', label: 'alpha-1', children: [] },
+          { id: 'a2', label: 'alpha-2', children: [] },
+        ],
+      },
+      {
+        id: 'b',
+        label: 'beta',
+        children: [{ id: 'b1', label: 'beta-1', children: [] }],
+      },
+    ],
+  };
+
+  // Card / CardHeader state
+  let cardCloseCount = $state(0);
+  let cardHeaderCloseCount = $state(0);
 </script>
 
 <header class="app-header">
@@ -147,6 +186,30 @@
       {#if modalCloseCount > 0}
         <p data-testid="modal-close-count">Closed {modalCloseCount} time(s)</p>
       {/if}
+    </section>
+  {:else if current === 'tree-node'}
+    <section>
+      <h2>TreeNode Demo</h2>
+      <p>Recursive component composition (D-119) — TreeNode renders itself for each child.</p>
+      <TreeNode node={treeRoot} />
+    </section>
+  {:else if current === 'card'}
+    <section>
+      <h2>Card Demo</h2>
+      <p>Wrapper composition (D-119) — Card embeds CardHeader and renders default-slot content.</p>
+      <Card title="Hello world" onClose={() => cardCloseCount++}>
+        {#snippet children()}
+          <p>This body lives in Card's default slot.</p>
+          <p>Closes: <span data-testid="card-close-count">{cardCloseCount}</span></p>
+        {/snippet}
+      </Card>
+    </section>
+  {:else if current === 'card-header'}
+    <section>
+      <h2>CardHeader Demo</h2>
+      <p>Standalone leaf component — wrapper-pair partner of Card.</p>
+      <CardHeader title="Standalone header" onClose={() => cardHeaderCloseCount++} />
+      <p>Closes: <span data-testid="card-header-close-count">{cardHeaderCloseCount}</span></p>
     </section>
   {/if}
 </main>

@@ -22,8 +22,20 @@ import SearchInput from './pages/SearchInput.vue';
 import Dropdown from './pages/Dropdown.vue';
 import TodoList from './pages/TodoList.vue';
 import Modal from './pages/Modal.vue';
+import TreeNode from './pages/TreeNode.vue';
+import Card from './pages/Card.vue';
+import CardHeader from './pages/CardHeader.vue';
 
-const pages = ['Counter', 'SearchInput', 'Dropdown', 'TodoList', 'Modal'] as const;
+const pages = [
+  'Counter',
+  'SearchInput',
+  'Dropdown',
+  'TodoList',
+  'Modal',
+  'TreeNode',
+  'Card',
+  'CardHeader',
+] as const;
 type Page = typeof pages[number];
 
 const pageComponents: Record<Page, unknown> = {
@@ -32,6 +44,9 @@ const pageComponents: Record<Page, unknown> = {
   Dropdown,
   TodoList,
   Modal,
+  TreeNode,
+  Card,
+  CardHeader,
 };
 
 const current = ref<Page>('Counter');

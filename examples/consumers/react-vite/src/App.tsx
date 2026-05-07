@@ -4,6 +4,9 @@ import SearchInputPage from './pages/SearchInputPage';
 import DropdownPage from './pages/DropdownPage';
 import TodoListPage from './pages/TodoListPage';
 import ModalPage from './pages/ModalPage';
+import TreeNodePage from './pages/TreeNodePage';
+import CardPage from './pages/CardPage';
+import CardHeaderPage from './pages/CardHeaderPage';
 
 /**
  * Page-routing shell. Each Playwright e2e test navigates by clicking
@@ -15,7 +18,15 @@ import ModalPage from './pages/ModalPage';
  * (wrapped at main.tsx) and exercise the full @rozie/target-react +
  * @rozie/runtime-react + @rozie/unplugin chain.
  */
-type PageKey = 'counter' | 'search-input' | 'dropdown' | 'todo-list' | 'modal';
+type PageKey =
+  | 'counter'
+  | 'search-input'
+  | 'dropdown'
+  | 'todo-list'
+  | 'modal'
+  | 'tree-node'
+  | 'card'
+  | 'card-header';
 
 const PAGES: Record<PageKey, () => JSX.Element> = {
   counter: CounterPage,
@@ -23,6 +34,9 @@ const PAGES: Record<PageKey, () => JSX.Element> = {
   dropdown: DropdownPage,
   'todo-list': TodoListPage,
   modal: ModalPage,
+  'tree-node': TreeNodePage,
+  card: CardPage,
+  'card-header': CardHeaderPage,
 };
 
 const PAGE_KEYS: ReadonlyArray<PageKey> = [
@@ -31,6 +45,9 @@ const PAGE_KEYS: ReadonlyArray<PageKey> = [
   'dropdown',
   'todo-list',
   'modal',
+  'tree-node',
+  'card',
+  'card-header',
 ];
 
 export default function App(): JSX.Element {

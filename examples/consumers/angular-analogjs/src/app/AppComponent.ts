@@ -16,6 +16,9 @@ import SearchInput from '../SearchInput.rozie';
 import Dropdown from '../Dropdown.rozie';
 import TodoList from '../TodoList.rozie';
 import Modal from '../Modal.rozie';
+import TreeNode from '../TreeNode.rozie';
+import Card from '../Card.rozie';
+import CardHeader from '../CardHeader.rozie';
 
 interface TodoItem {
   id: string;
@@ -23,7 +26,21 @@ interface TodoItem {
   done: boolean;
 }
 
-type PageKey = 'counter' | 'search-input' | 'dropdown' | 'todo-list' | 'modal';
+interface TreeNodeData {
+  id: string;
+  label: string;
+  children: TreeNodeData[];
+}
+
+type PageKey =
+  | 'counter'
+  | 'search-input'
+  | 'dropdown'
+  | 'todo-list'
+  | 'modal'
+  | 'tree-node'
+  | 'card'
+  | 'card-header';
 
 @Component({
   selector: 'rozie-app',
@@ -35,6 +52,9 @@ type PageKey = 'counter' | 'search-input' | 'dropdown' | 'todo-list' | 'modal';
     Dropdown,
     TodoList,
     Modal,
+    TreeNode,
+    Card,
+    CardHeader,
   ],
   template: `
     <header class="app-header">
@@ -127,6 +147,30 @@ type PageKey = 'counter' | 'search-input' | 'dropdown' | 'todo-list' | 'modal';
             <p data-testid="modal-close-count">Closed {{ modalCloseCount() }} time(s)</p>
           }
         </section>
+      } @else if (current() === 'tree-node') {
+        <section>
+          <h2>TreeNode Demo</h2>
+          <p>Recursive component composition (D-119) — TreeNode renders itself for each child.</p>
+          <rozie-tree-node [node]="treeRoot" />
+        </section>
+      } @else if (current() === 'card') {
+        <section>
+          <h2>Card Demo</h2>
+          <p>Wrapper composition (D-119) — Card embeds CardHeader and renders default-slot content.</p>
+          <rozie-card title="Hello world" [onClose]="onCardClose">
+            <ng-template #defaultSlot>
+              <p>This body lives in Card's default slot.</p>
+              <p>Closes: <span data-testid="card-close-count">{{ cardCloseCount() }}</span></p>
+            </ng-template>
+          </rozie-card>
+        </section>
+      } @else if (current() === 'card-header') {
+        <section>
+          <h2>CardHeader Demo</h2>
+          <p>Standalone leaf component — wrapper-pair partner of Card.</p>
+          <rozie-card-header title="Standalone header" [onClose]="onCardHeaderClose" />
+          <p>Closes: <span data-testid="card-header-close-count">{{ cardHeaderCloseCount() }}</span></p>
+        </section>
       }
     </main>
   `,
@@ -171,6 +215,9 @@ export class AppComponent {
     'dropdown',
     'todo-list',
     'modal',
+    'tree-node',
+    'card',
+    'card-header',
   ];
 
   current = signal<PageKey>('counter');
@@ -203,4 +250,36 @@ export class AppComponent {
   onModalClose(): void {
     this.modalCloseCount.update((n) => n + 1);
   }
+
+  // TreeNode demo fixture (3-level tree)
+  treeRoot: TreeNodeData = {
+    id: 'r',
+    label: 'root',
+    children: [
+      {
+        id: 'a',
+        label: 'alpha',
+        children: [
+          { id: 'a1', label: 'alpha-1', children: [] },
+          { id: 'a2', label: 'alpha-2', children: [] },
+        ],
+      },
+      {
+        id: 'b',
+        label: 'beta',
+        children: [{ id: 'b1', label: 'beta-1', children: [] }],
+      },
+    ],
+  };
+
+  // Card / CardHeader state
+  cardCloseCount = signal(0);
+  onCardClose = (): void => {
+    this.cardCloseCount.update((n) => n + 1);
+  };
+
+  cardHeaderCloseCount = signal(0);
+  onCardHeaderClose = (): void => {
+    this.cardHeaderCloseCount.update((n) => n + 1);
+  };
 }

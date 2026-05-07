@@ -1,0 +1,51 @@
+<!--
+  TreeNode.rozie
+
+  Demonstrates Phase 06.2 component composition + recursion (D-119):
+    - <components> block declaring a SELF-import (TreeNode → './TreeNode.rozie').
+      The explicit self-entry is redundant per CONTEXT.md <specifics>: outer-name
+      self-ref path covers it (D-114). Kept here on purpose to exercise both the
+      explicit-self-entry skip logic (React/Angular) AND the outer-name precedence.
+    - Recursive template: <TreeNode :node="child" /> inside the component itself.
+      tagKind: 'self' on the inner tag (P1 lowering); P2 emit dispatches per target:
+        Vue   → defineOptions({ name: 'TreeNode' }) + setup-scope import
+        React → named function declaration (hoisted self-ref)
+        Svelte → import TreeNode from './TreeNode.svelte' (D-117 self-import idiom)
+        Angular → forwardRef(() => TreeNode) in @Component({ imports: [...] })
+    - Test data shape: { id, label, children: TreeNode[] }; the browser-mount
+      integration test (Phase 06.2 P3 Task 2) feeds a 3-level fixture and
+      asserts all 3 labels render in DOM.
+-->
+
+<rozie name="TreeNode">
+
+<components>
+{
+  TreeNode: './TreeNode.rozie',
+}
+</components>
+
+<props>
+{
+  node: { type: Object, default: () => ({ id: '', label: '', children: [] }) },
+}
+</props>
+
+<template>
+<div class="tree-node">
+  <span class="tree-node__label">{{ $props.node.label }}</span>
+  <ul r-if="$props.node.children && $props.node.children.length > 0" class="tree-node__children">
+    <li r-for="child in $props.node.children" :key="child.id">
+      <TreeNode :node="child" />
+    </li>
+  </ul>
+</div>
+</template>
+
+<style>
+.tree-node { font-family: system-ui; padding-left: 0.5rem; }
+.tree-node__label { display: inline-block; }
+.tree-node__children { list-style: none; margin: 0.25rem 0 0 0; padding-left: 1rem; border-left: 1px dashed currentColor; }
+</style>
+
+</rozie>
