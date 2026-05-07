@@ -66,14 +66,27 @@ export function writeSiblingIfStale(
   try {
     writeFileSync(siblingPath, result.code, 'utf8');
     if (target === 'react') {
+      // WR-03: assert the canonical .tsx invariant before deriving sidecar
+      // paths. `String.prototype.replace(/\.tsx$/, …)` is a no-op on a path
+      // that doesn't end in `.tsx`, which would silently overwrite the
+      // primary `.tsx` with the .d.ts/.css text. The visitor in `index.ts`
+      // is the only known caller and feeds canonical extensions via
+      // TARGET_EXTENSIONS, so this is defense-in-depth — bailing loudly is
+      // safer than silent corruption if a future caller drifts.
+      if (!siblingPath.endsWith('.tsx')) {
+        throw new Error(
+          `[ROZ823] @rozie/babel-plugin: react sibling path must end with .tsx, got ${siblingPath}`,
+        );
+      }
+      const stem = siblingPath.slice(0, -'.tsx'.length);
       if (result.types) {
-        writeFileSync(siblingPath.replace(/\.tsx$/, '.d.ts'), result.types, 'utf8');
+        writeFileSync(`${stem}.d.ts`, result.types, 'utf8');
       }
       if (result.css) {
-        writeFileSync(siblingPath.replace(/\.tsx$/, '.module.css'), result.css, 'utf8');
+        writeFileSync(`${stem}.module.css`, result.css, 'utf8');
       }
       if (result.globalCss) {
-        writeFileSync(siblingPath.replace(/\.tsx$/, '.global.css'), result.globalCss, 'utf8');
+        writeFileSync(`${stem}.global.css`, result.globalCss, 'utf8');
       }
     }
   } catch (err) {
