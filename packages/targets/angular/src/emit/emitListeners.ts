@@ -270,7 +270,14 @@ function renderListener(
     classMembers,
     signalMembers,
   });
-  const handlerIsBareIdentifier = /^this\.[A-Za-z_$][\w$]*$/.test(userHandlerCode);
+  // Also match signal-typed members rewritten to `this.X()` by
+  // rewriteListenerExpression — without this, signal handlers fall through to
+  // the wrapping branch and produce `(this.mySignalHandler())(e)`, which is a
+  // runtime error when the signal value is void. Closes WR-04.
+  const handlerIsBareIdentifier = /^this\.[A-Za-z_$][\w$]*(\(\))?$/.test(userHandlerCode);
+  // When userHandlerCode ends with `()` (signal-typed member), strip the trailing
+  // `()` before building the invocation so we get `this.X()` not `this.X()()`.
+  const handlerRef = userHandlerCode.replace(/\(\)$/, '');
 
   const whenGuard =
     listener.when === null
@@ -295,7 +302,7 @@ function renderListener(
       : '';
 
     const invocation = handlerIsBareIdentifier
-      ? `        ${userHandlerCode}();`
+      ? `        ${handlerRef}();`
       : `        (${userHandlerCode})(e);`;
 
     return [
@@ -332,7 +339,7 @@ function renderListener(
     ? classification.nativeKeyGuards.map((g) => `        ${g}`).join('\n') + '\n'
     : '';
   const invocation = handlerIsBareIdentifier
-    ? `        ${userHandlerCode}();`
+    ? `        ${handlerRef}();`
     : `        (${userHandlerCode})(e);`;
 
   return [
