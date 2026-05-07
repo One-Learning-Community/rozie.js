@@ -196,7 +196,12 @@ export function parseTemplate(
     { xmlMode: false, decodeEntities: false },
     {
       onopentagname(start, endIndex) {
-        pendingTagName = content.slice(start, endIndex).toLowerCase();
+        // Phase 06.2 P1 — preserve original case (D-114 PascalCase detection).
+        // HTML tags are by convention lowercase in source; component tags are
+        // PascalCase. The lowering rule (lowerTemplate) does string-equality
+        // comparisons against lowercase 'slot'/'div' which authors write
+        // lowercase anyway, so no regression on existing fixtures.
+        pendingTagName = content.slice(start, endIndex);
         pendingTagOpenStart = baseOffset + start - 1; // '<' is one byte before name start
         pendingAttrs = [];
         currentAttr = null;
@@ -278,7 +283,8 @@ export function parseTemplate(
 
       onclosetag(start, endIndex) {
         // Find matching element on stack; if not found, ignore (orphan close tag).
-        const closeName = content.slice(start, endIndex).toLowerCase();
+        // Phase 06.2 P1 — preserve case (matches onopentagname change).
+        const closeName = content.slice(start, endIndex);
         // Pop until we find a matching tagName, emitting ROZ050 for each
         // unmatched element popped (they were never properly closed).
         let popped: (PendingElement & { _node?: TemplateElement }) | undefined;

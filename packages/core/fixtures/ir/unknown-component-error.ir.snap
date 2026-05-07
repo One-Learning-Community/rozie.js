@@ -1,0 +1,78 @@
+{
+  "type": "IRComponent",
+  "name": "Foo",
+  "props": [],
+  "state": [],
+  "computed": [],
+  "refs": [],
+  "slots": [],
+  "emits": [],
+  "lifecycle": [],
+  "listeners": [],
+  "setupBody": {
+    "type": "SetupBody",
+    "scriptProgram": {
+      "type": "File",
+      "program": {
+        "type": "Program",
+        "body": [],
+        "directives": [],
+        "sourceType": "module",
+        "interpreter": null
+      },
+      "comments": null
+    },
+    "annotations": []
+  },
+  "template": {
+    "type": "TemplateFragment",
+    "children": [
+      {
+        "type": "TemplateStaticText",
+        "text": "\n  ",
+        "sourceLoc": {
+          "start": 29,
+          "end": 32
+        }
+      },
+      {
+        "type": "TemplateElement",
+        "tagName": "UnknownTag",
+        "attributes": [],
+        "events": [],
+        "children": [],
+        "sourceLoc": {
+          "start": 32,
+          "end": 46
+        },
+        "tagKind": "html"
+      },
+      {
+        "type": "TemplateStaticText",
+        "text": "\n",
+        "sourceLoc": {
+          "start": 46,
+          "end": 47
+        }
+      }
+    ],
+    "sourceLoc": {
+      "start": 29,
+      "end": 47
+    }
+  },
+  "styles": {
+    "type": "StyleSection",
+    "scopedRules": [],
+    "rootRules": [],
+    "sourceLoc": {
+      "start": 0,
+      "end": 0
+    }
+  },
+  "components": [],
+  "sourceLoc": {
+    "start": 0,
+    "end": 67
+  }
+}

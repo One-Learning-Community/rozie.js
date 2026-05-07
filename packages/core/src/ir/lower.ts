@@ -35,6 +35,7 @@ import { lowerData } from './lowerers/lowerData.js';
 import { lowerScript } from './lowerers/lowerScript.js';
 import { lowerListeners } from './lowerers/lowerListeners.js';
 import { lowerTemplate } from './lowerers/lowerTemplate.js';
+import { lowerComponents } from './lowerers/lowerComponents.js';
 import { lowerSlots } from './lowerers/lowerSlots.js';
 import { lowerStyles } from './lowerers/lowerStyles.js';
 import * as t from '@babel/types';
@@ -126,8 +127,20 @@ export function lowerToIR(ast: RozieAST, opts: LowerOptions): LowerResult {
     ? lowerListeners(ast.listeners, bindings, depGraph, opts.modifierRegistry, diagnostics)
     : [];
 
+  // Phase 06.2 P1 D-115 — build the components table BEFORE template lowering
+  // so lowerTemplate can annotate tagKind in a single pass.
+  const componentsTable = lowerComponents(ast.components, diagnostics);
+
   const templateResult = ast.template
-    ? lowerTemplate(ast.template, bindings, depGraph, opts.modifierRegistry, diagnostics)
+    ? lowerTemplate(
+        ast.template,
+        bindings,
+        depGraph,
+        opts.modifierRegistry,
+        diagnostics,
+        ast.name,
+        componentsTable,
+      )
     : { template: null, templateListeners: [] };
 
   const styles = ast.style ? lowerStyles(ast.style) : emptyStyles();
@@ -146,10 +159,9 @@ export function lowerToIR(ast: RozieAST, opts: LowerOptions): LowerResult {
     setupBody: scriptResult.setupBody,
     template: templateResult.template,
     styles,
-    // Phase 06.2 P1 D-115 — Task 2 carrier-only stub. Task 3 wires the populated
-    // components Map.values() in source-order; this empty-array initial keeps
-    // each commit type-clean.
-    components: [],
+    // Phase 06.2 P1 D-115 — populated from componentsTable.values() in source-order
+    // (Map preserves insertion order per D-129).
+    components: Array.from(componentsTable.values()),
     sourceLoc: ast.loc,
   };
 

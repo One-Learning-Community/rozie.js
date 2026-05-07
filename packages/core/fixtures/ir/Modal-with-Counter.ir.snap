@@ -1,0 +1,128 @@
+{
+  "type": "IRComponent",
+  "name": "Modal",
+  "props": [],
+  "state": [],
+  "computed": [],
+  "refs": [],
+  "slots": [],
+  "emits": [],
+  "lifecycle": [],
+  "listeners": [],
+  "setupBody": {
+    "type": "SetupBody",
+    "scriptProgram": {
+      "type": "File",
+      "program": {
+        "type": "Program",
+        "body": [],
+        "directives": [],
+        "sourceType": "module",
+        "interpreter": null
+      },
+      "comments": null
+    },
+    "annotations": []
+  },
+  "template": {
+    "type": "TemplateFragment",
+    "children": [
+      {
+        "type": "TemplateStaticText",
+        "text": "\n  ",
+        "sourceLoc": {
+          "start": 87,
+          "end": 90
+        }
+      },
+      {
+        "type": "TemplateElement",
+        "tagName": "div",
+        "attributes": [
+          {
+            "kind": "static",
+            "name": "role",
+            "value": "dialog",
+            "sourceLoc": {
+              "start": 95,
+              "end": 108
+            }
+          }
+        ],
+        "events": [],
+        "children": [
+          {
+            "type": "TemplateStaticText",
+            "text": "\n    ",
+            "sourceLoc": {
+              "start": 109,
+              "end": 114
+            }
+          },
+          {
+            "type": "TemplateElement",
+            "tagName": "Counter",
+            "attributes": [],
+            "events": [],
+            "children": [],
+            "sourceLoc": {
+              "start": 114,
+              "end": 125
+            },
+            "tagKind": "component",
+            "componentRef": {
+              "type": "ComponentDecl",
+              "localName": "Counter",
+              "importPath": "./Counter.rozie",
+              "sourceLoc": {
+                "start": 35,
+                "end": 61
+              }
+            }
+          },
+          {
+            "type": "TemplateStaticText",
+            "text": "\n  ",
+            "sourceLoc": {
+              "start": 125,
+              "end": 128
+            }
+          }
+        ],
+        "sourceLoc": {
+          "start": 90,
+          "end": 134
+        },
+        "tagKind": "html"
+      },
+      {
+        "type": "TemplateStaticText",
+        "text": "\n",
+        "sourceLoc": {
+          "start": 134,
+          "end": 135
+        }
+      }
+    ],
+    "sourceLoc": {
+      "start": 87,
+      "end": 135
+    }
+  },
+  "styles": {
+    "type": "StyleSection",
+    "scopedRules": [],
+    "rootRules": [],
+    "sourceLoc": {
+      "start": 0,
+      "end": 0
+    }
+  },
+  "components": [
+    null
+  ],
+  "sourceLoc": {
+    "start": 0,
+    "end": 155
+  }
+}

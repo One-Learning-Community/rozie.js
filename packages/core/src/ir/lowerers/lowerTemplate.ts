@@ -36,6 +36,7 @@ import type {
 import { extractRForAliases } from '../../semantic/extractRForAliases.js';
 import { computeExpressionDeps } from '../../reactivity/computeDeps.js';
 import { resolveModifierPipeline } from './lowerListeners.js';
+import { isPascalCase } from '../utils/isPascalCase.js';
 import type {
   TemplateNode as IRTemplateNode,
   TemplateElementIR,
@@ -45,6 +46,7 @@ import type {
   TemplateInterpolationIR,
   TemplateStaticTextIR,
   AttributeBinding,
+  ComponentDecl,
   Listener,
 } from '../types.js';
 
@@ -230,6 +232,8 @@ function lowerElement(
   templateListeners: Listener[],
   pathPrefix: string,
   index: number,
+  outerName: string,
+  componentsTable: Map<string, ComponentDecl>,
 ): IRTemplateNode {
   const elPath = `${pathPrefix}/${el.tagName}-${index}`;
 
@@ -269,6 +273,8 @@ function lowerElement(
       diagnostics,
       templateListeners,
       elPath,
+      outerName,
+      componentsTable,
     );
 
     const loop: TemplateLoopIR = {
@@ -292,6 +298,8 @@ function lowerElement(
     diagnostics,
     templateListeners,
     elPath,
+    outerName,
+    componentsTable,
   );
 }
 
@@ -307,6 +315,8 @@ function lowerBareElement(
   diagnostics: Diagnostic[],
   templateListeners: Listener[],
   elPath: string,
+  outerName: string,
+  componentsTable: Map<string, ComponentDecl>,
 ): IRTemplateNode {
   // <slot> elements lower to TemplateSlotInvocationIR.
   if (el.tagName === 'slot') {
@@ -334,6 +344,8 @@ function lowerBareElement(
       diagnostics,
       templateListeners,
       elPath,
+      outerName,
+      componentsTable,
     );
     return {
       type: 'TemplateSlotInvocation',
@@ -423,7 +435,30 @@ function lowerBareElement(
     diagnostics,
     templateListeners,
     elPath,
+    outerName,
+    componentsTable,
   );
+
+  // Phase 06.2 P1 Task 3 — annotate tagKind per D-114 precedence:
+  //   outer-name match (recursion / 'self') wins
+  //   then components-table lookup ('component')
+  //   then HTML / custom-element / unmatched fallback ('html').
+  const tagName = el.tagName;
+  let tagKind: 'html' | 'component' | 'self' = 'html';
+  let componentRef: ComponentDecl | undefined;
+  if (isPascalCase(tagName)) {
+    if (tagName === outerName) {
+      tagKind = 'self';
+    } else {
+      const decl = componentsTable.get(tagName);
+      if (decl !== undefined) {
+        tagKind = 'component';
+        componentRef = decl;
+      }
+      // else: PascalCase but unmatched — falls through to 'html'.
+      // Task 4 layers ROZ920 emission here.
+    }
+  }
 
   const result: TemplateElementIR = {
     type: 'TemplateElement',
@@ -432,9 +467,9 @@ function lowerBareElement(
     events,
     children,
     sourceLoc: el.loc,
-    // Phase 06.2 P1 Task 2 — default 'html'; Task 3 overrides per D-114
-    // precedence (outer-name first, then components-table).
-    tagKind: 'html',
+    tagKind,
+    // exactOptionalPropertyTypes: spread componentRef only when defined.
+    ...(componentRef !== undefined ? { componentRef } : {}),
   };
   return result;
 }
@@ -451,6 +486,8 @@ function lowerNodeList(
   diagnostics: Diagnostic[],
   templateListeners: Listener[],
   pathPrefix: string,
+  outerName: string,
+  componentsTable: Map<string, ComponentDecl>,
 ): IRTemplateNode[] {
   const out: IRTemplateNode[] = [];
 
@@ -496,6 +533,8 @@ function lowerNodeList(
           templateListeners,
           pathPrefix,
           i,
+          outerName,
+          componentsTable,
         ),
       ];
       branches.push({
@@ -531,6 +570,8 @@ function lowerNodeList(
               templateListeners,
               pathPrefix,
               j,
+              outerName,
+              componentsTable,
             ),
           ],
           sourceLoc: sib.loc,
@@ -558,6 +599,8 @@ function lowerNodeList(
         templateListeners,
         pathPrefix,
         i,
+        outerName,
+        componentsTable,
       ),
     );
   }
@@ -571,6 +614,8 @@ export function lowerTemplate(
   depGraph: ReactiveDepGraph,
   registry: ModifierRegistry,
   diagnostics: Diagnostic[],
+  outerName: string,
+  componentsTable: Map<string, ComponentDecl>,
 ): LowerTemplateResult {
   const templateListeners: Listener[] = [];
   const children = lowerNodeList(
@@ -581,6 +626,8 @@ export function lowerTemplate(
     diagnostics,
     templateListeners,
     '',
+    outerName,
+    componentsTable,
   );
 
   let templateNode: IRTemplateNode | null;
