@@ -148,12 +148,14 @@ export function emitAngular(
     const rendererSetup = `    const renderer = inject(Renderer2);`;
     const listenerBlock = `    ${listenersResult.constructorBody}`;
 
-    if (/constructor\(\) \{/.test(classBody)) {
+    if (/constructor\s*\(\s*\)\s*\{/.test(classBody)) {
       // Insert renderer + listener blocks right BEFORE the existing
       // constructor body's content. Match the constructor opening, then
-      // splice content right after.
+      // splice content right after. Use a whitespace-flexible regex so a
+      // future @babel/generator formatting change (extra space, compact flag,
+      // etc.) does not silently drop the constructor injection. Closes WR-05.
       classBody = classBody.replace(
-        /constructor\(\) \{\n/,
+        /constructor\s*\(\s*\)\s*\{\n/,
         `constructor() {\n${rendererSetup}\n\n${listenerBlock}\n\n`,
       );
     } else {
