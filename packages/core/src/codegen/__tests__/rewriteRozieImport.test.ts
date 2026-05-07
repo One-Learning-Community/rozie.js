@@ -40,8 +40,14 @@ describe('rewriteRozieImport — D-118 shared helper', () => {
   });
 
   it('Test 8 (unknown target throws): surfaces typo bugs early', () => {
+    // 'solid' is now a valid target (Phase 06.3-01). Use a genuinely unknown
+    // value to exercise the defensive throw path.
     expect(() =>
-      rewriteRozieImport('./Foo.rozie', 'solid' as unknown as 'vue'),
+      rewriteRozieImport('./Foo.rozie', 'qwerty' as unknown as 'vue'),
     ).toThrow(/unknown target/);
+  });
+
+  it('Test 9 (solid omit-ext): strips .rozie, no extension appended (mirrors react/angular)', () => {
+    expect(rewriteRozieImport('./Counter.rozie', 'solid')).toBe('./Counter');
   });
 });

@@ -34,6 +34,7 @@ import { RozieErrorCode } from '../../core/src/diagnostics/codes.js';
 import { detectReactPlugin, canResolveReact } from './react-detect.js';
 import { detectSveltePlugin, canResolveSvelte } from './svelte-detect.js';
 import { detectAnalogjs, canResolveAngularCore, detectViteMajor } from './analogjs-detect.js';
+import { detectSolidPlugin, canResolveSolidJs } from './solid-detect.js';
 
 export interface RozieOptions {
   /**
@@ -41,13 +42,13 @@ export interface RozieOptions {
    * `react`. Phase 5 Plan 05-02b adds `svelte`; Plan 05-04b adds `angular`.
    * All four canonical targets are now fully supported.
    */
-  target: 'vue' | 'react' | 'svelte' | 'angular';
+  target: 'vue' | 'react' | 'svelte' | 'angular' | 'solid';
 }
 
 export type TargetValue = RozieOptions['target'];
 
 /** All targets the registry knows about (validation allowlist). */
-export const ALL_TARGETS: readonly TargetValue[] = ['vue', 'react', 'svelte', 'angular'] as const;
+export const ALL_TARGETS: readonly TargetValue[] = ['vue', 'react', 'svelte', 'angular', 'solid'] as const;
 
 /** Targets actually shipped in Phase 3. (Kept for diagnostic message clarity.) */
 export const SUPPORTED_TARGETS_PHASE_3: readonly TargetValue[] = ['vue'] as const;
@@ -57,13 +58,13 @@ export const SUPPORTED_TARGETS_PHASE_3: readonly TargetValue[] = ['vue'] as cons
  * are now supported (vue, react, svelte, angular).
  *
  * Plan 05-04b extends the prior PHASE_5 list (which Plan 05-02b set to
- * ['vue', 'react', 'svelte']) with 'angular'. ROZ402 is no longer
- * reachable in v1 — every value of `RozieOptions['target']` is now in
- * SUPPORTED_TARGETS_PHASE_5. The constant is kept for diagnostic-message
- * clarity; future phases may add new optional targets that initially
- * raise ROZ402 again.
+ * ['vue', 'react', 'svelte']) with 'angular'. Plan 06.3-01 adds 'solid'.
+ * ROZ402 is no longer reachable in v1 — every value of
+ * `RozieOptions['target']` is now in SUPPORTED_TARGETS_PHASE_5.
+ * The constant is kept for diagnostic-message clarity; future phases may
+ * add new optional targets that initially raise ROZ402 again.
  */
-export const SUPPORTED_TARGETS_PHASE_5: readonly TargetValue[] = ['vue', 'react', 'svelte', 'angular'] as const;
+export const SUPPORTED_TARGETS_PHASE_5: readonly TargetValue[] = ['vue', 'react', 'svelte', 'angular', 'solid'] as const;
 
 interface RozieError extends Error {
   code: string;
@@ -235,6 +236,35 @@ export function assertAngularPeerDeps(cwd?: string): void {
       `target: 'angular' requires Vite >= 6 (your project has Vite ${viteMajor}.x). ` +
         `@analogjs/vite-plugin-angular@^2.5.0 peerDeps require vite ^6 || ^7 || ^8. ` +
         `Upgrade: pnpm add -D vite@^6 (or ^7 / ^8).`,
+    );
+  }
+}
+
+/**
+ * Plan 06.3-01 — runtime peer-dep assertions for `target: 'solid'` (D-139).
+ *
+ * Mirrors assertReactPeerDeps / assertSveltePeerDeps. Called from the factory
+ * after `validateOptions` succeeds when target === 'solid'. Separated from
+ * `validateOptions` so:
+ *   - Pure-shape validation tests don't need to mock `require.resolve`.
+ *   - The factory can choose whether to throw or `console.warn` based on
+ *     environment (e.g., test runs vs. production builds).
+ *
+ * @throws ROZ810 — `vite-plugin-solid` is not resolvable from `cwd`.
+ * @throws ROZ811 — `solid-js` itself is not resolvable.
+ */
+export function assertSolidPeerDeps(cwd?: string): void {
+  if (!detectSolidPlugin(cwd)) {
+    throw rozieError(
+      RozieErrorCode.UNPLUGIN_SOLID_PEER_DEP_MISSING,
+      `target: 'solid' requires 'vite-plugin-solid' (^2.0) installed in your project. ` +
+        `Install: pnpm add -D vite-plugin-solid and add solidPlugin() to your vite.config.ts plugins array AFTER Rozie({ target: 'solid' }).`,
+    );
+  }
+  if (!canResolveSolidJs(cwd)) {
+    throw rozieError(
+      RozieErrorCode.UNPLUGIN_SOLID_DEP_MISSING,
+      `target: 'solid' requires 'solid-js' (^1.8) installed in your project. Install: pnpm add solid-js`,
     );
   }
 }

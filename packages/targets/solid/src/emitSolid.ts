@@ -17,16 +17,7 @@ import type { BlockMap } from '../../../core/src/ast/types.js';
 import type { SourceMap } from 'magic-string';
 import { splitBlocks } from '../../../core/src/splitter/splitBlocks.js';
 import { createDefaultRegistry } from '../../../core/src/modifiers/registerBuiltins.js';
-// NOTE: Task 3 will add 'solid' to RozieTarget + TARGET_EXT_MAP. Until then,
-// use the react target for import rewriting (both produce extensionless imports).
 import { rewriteRozieImport } from '../../../core/src/codegen/rewriteRozieImport.js';
-type RozieTargetExtended = import('../../../core/src/codegen/rewriteRozieImport.js').RozieTarget | 'solid';
-function rewriteRozieImportSolid(importPath: string): string {
-  // Solid emits extensionless imports (solid: '' in TARGET_EXT_MAP — Task 3 wires).
-  // P1: strip '.rozie' extension to produce extensionless import.
-  return importPath.replace(/\.rozie$/, '');
-}
-void rewriteRozieImport; // Suppress unused-import warning until Task 3 wires properly.
 import { SolidImportCollector, RuntimeSolidImportCollector } from './rewrite/collectSolidImports.js';
 import { emitScript } from './emit/emitScript.js';
 import { emitTemplate } from './emit/emitTemplate.js';
@@ -98,7 +89,7 @@ export function emitSolid(ir: IRComponent, opts: EmitSolidOptions = {}): EmitSol
       const importPath = 'importPath' in decl
         ? (decl as { importPath: string }).importPath
         : '';
-      const rewritten = rewriteRozieImportSolid(importPath);
+      const rewritten = rewriteRozieImport(importPath, 'solid');
       return `import ${localName} from '${rewritten}';`;
     });
   if (componentImportLines.length > 0) {

@@ -112,10 +112,10 @@ describe('parseTargets — D-87 commander comma-split parser', () => {
     expect(() => parseTargets('react,bogus')).toThrow(/\[ROZ850\] unknown target 'bogus'/);
   });
 
-  it('C2b: VALID_TARGETS exposes the four documented targets', () => {
-    const expected: Target[] = ['vue', 'react', 'svelte', 'angular'];
+  it('C2b: VALID_TARGETS exposes all five documented targets (Phase 06.3-01 added solid)', () => {
+    const expected: Target[] = ['vue', 'react', 'svelte', 'angular', 'solid'];
     for (const t of expected) expect(VALID_TARGETS.has(t)).toBe(true);
-    expect(VALID_TARGETS.size).toBe(4);
+    expect(VALID_TARGETS.size).toBe(5);
   });
 
   it('C3: --no-types commander semantics — opts.types === false when present', async () => {
