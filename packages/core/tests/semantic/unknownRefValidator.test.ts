@@ -67,6 +67,7 @@ describe('analyzeAST coordinator (Plan 02-02 Task 1)', () => {
       listeners: null,
       template: null,
       style: null,
+      blocks: { diagnostics: [] },
     };
     expect(() => analyzeAST(ast)).not.toThrow();
     const result = analyzeAST(ast);

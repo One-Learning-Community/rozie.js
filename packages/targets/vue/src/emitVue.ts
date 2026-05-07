@@ -25,6 +25,8 @@
 import type { IRComponent } from '../../../core/src/ir/types.js';
 import type { Diagnostic } from '../../../core/src/diagnostics/Diagnostic.js';
 import type { ModifierRegistry } from '../../../core/src/modifiers/ModifierRegistry.js';
+import type { BlockMap } from '../../../core/src/ast/types.js';
+import { splitBlocks } from '../../../core/src/splitter/splitBlocks.js';
 import { createDefaultRegistry } from '../../../core/src/modifiers/registerBuiltins.js';
 import type { SourceMap } from 'magic-string';
 import { emitScript } from './emit/emitScript.js';
@@ -74,6 +76,13 @@ export interface EmitVueOptions {
    * generic emission would validate at the parse boundary.
    */
   genericParams?: string[];
+  /**
+   * Phase 06.1 Plan 01 (DX-04): block byte offsets from splitBlocks() —
+   * required by buildShell() for accurate source maps. When omitted
+   * (back-compat with Plan 02-04 callers that don't carry the BlockMap
+   * through), buildShell falls back to a degenerate map anchored at offset 0.
+   */
+  blockOffsets?: BlockMap;
 }
 
 export interface EmitVueResult {
@@ -281,7 +290,28 @@ export function emitVue(ir: IRComponent, opts: EmitVueOptions = {}): EmitVueResu
   // Plan 06-02 Task 3 — thread genericParams into the `<script setup
   // generic="...">` attribute when set; null preserves the byte-identical
   // existing-shape for the 5 reference examples.
-  const ms = buildShell({
+  // Phase 06.1 Plan 01 (DX-04) — anchor MagicString at .rozie source bytes via
+  // overwrite() per block. blockOffsets resolution order:
+  //   1. opts.blockOffsets (caller threaded splitBlocks result through)
+  //   2. derive from opts.source via splitBlocks() (back-compat for tests
+  //      that pass { filename, source } without re-parsing for ast.blocks)
+  //   3. degenerate empty BlockMap (no source available — fully back-compat
+  //      with pre-Phase-06.1 callers; produces an empty MagicString).
+  let resolvedBlockOffsets: BlockMap;
+  if (opts.blockOffsets !== undefined) {
+    resolvedBlockOffsets = opts.blockOffsets;
+  } else if (opts.source !== undefined) {
+    // splitBlocks() returns BlockMap & { diagnostics: Diagnostic[] }; the
+    // diagnostics field is structurally compatible with BlockMap (extra
+    // fields are allowed). Diagnostics from the splitter are already
+    // surfaced upstream by parse() — re-emitting them here would
+    // double-count.
+    resolvedBlockOffsets = splitBlocks(opts.source, opts.filename);
+  } else {
+    resolvedBlockOffsets = {};
+  }
+
+  const { ms, scriptOutputOffset } = buildShell({
     template,
     script: enrichedScript,
     styleScoped,
@@ -290,7 +320,12 @@ export function emitVue(ir: IRComponent, opts: EmitVueOptions = {}): EmitVueResu
       opts.genericParams && opts.genericParams.length > 0
         ? opts.genericParams.join(', ')
         : null,
+    rozieSource: opts.source ?? '',
+    blockOffsets: resolvedBlockOffsets,
   });
+  // P1: scriptOutputOffset is computed but unused in v1 (P2 will consume it
+  // via composeMaps to anchor @babel/generator's per-expression child map).
+  void scriptOutputOffset;
 
   const code = ms.toString();
 

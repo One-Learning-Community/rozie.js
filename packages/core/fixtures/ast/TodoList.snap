@@ -3696,6 +3696,47 @@
           "isRootEscape": false
         }
       ]
+    },
+    "blocks": {
+      "diagnostics": [],
+      "rozie": {
+        "name": "TodoList"
+      },
+      "props": {
+        "content": "\n{\n  items: { type: Array, default: () => [], model: true },\n  title: { type: String, default: 'Todo' },\n}\n",
+        "loc": {
+          "start": 527,
+          "end": 649
+        }
+      },
+      "data": {
+        "content": "\n{\n  draft: '',\n}\n",
+        "loc": {
+          "start": 651,
+          "end": 682
+        }
+      },
+      "script": {
+        "content": "\nconst remaining = $computed(() => $props.items.filter(i => !i.done).length)\n\nconst add = () => {\n  const text = $data.draft.trim()\n  if (!text) return\n  $props.items = [...$props.items, { id: crypto.randomUUID(), text, done: false }]\n  $data.draft = ''\n  $emit('add', text)\n}\n\nconst toggle = (id) => {\n  $props.items = $props.items.map(i =>\n    i.id === id ? { ...i, done: !i.done } : i\n  )\n  $emit('toggle', id)\n}\n\nconst remove = (id) => {\n  $props.items = $props.items.filter(i => i.id !== id)\n  $emit('remove', id)\n}\n",
+        "loc": {
+          "start": 684,
+          "end": 1222
+        }
+      },
+      "template": {
+        "content": "\n<div class=\"todo-list\">\n  <header>\n    <slot name=\"header\" :remaining=\"remaining\" :total=\"$props.items.length\">\n      <!-- Fallback content if consumer doesn't provide #header -->\n      <h3>{{ $props.title }} ({{ remaining }} remaining)</h3>\n    </slot>\n  </header>\n\n  <form @submit.prevent=\"add\">\n    <input r-model=\"$data.draft\" placeholder=\"What needs doing?\" />\n    <button type=\"submit\" :disabled=\"!$data.draft.trim()\">Add</button>\n  </form>\n\n  <ul r-if=\"$props.items.length > 0\">\n    <li r-for=\"item in $props.items\" :key=\"item.id\" :class=\"{ done: item.done }\">\n      <!--\n        Default slot with per-item params. Consumer can provide a custom row\n        renderer via `#default=\"{ item, toggle, remove }\"`, or omit it entirely\n        to get the fallback row below.\n      -->\n      <slot :item=\"item\" :toggle=\"() => toggle(item.id)\" :remove=\"() => remove(item.id)\">\n        <label>\n          <input type=\"checkbox\" :checked=\"item.done\" @change=\"toggle(item.id)\" />\n          <span>{{ item.text }}</span>\n        </label>\n        <button @click=\"remove(item.id)\" aria-label=\"Remove\">×</button>\n      </slot>\n    </li>\n  </ul>\n\n  <p r-else class=\"empty\">\n    <slot name=\"empty\">Nothing to do. ✨</slot>\n  </p>\n</div>\n",
+        "loc": {
+          "start": 1224,
+          "end": 2469
+        }
+      },
+      "style": {
+        "content": "\n.todo-list { font-family: system-ui, sans-serif; }\nul { list-style: none; padding: 0; }\nli { display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0; }\nli.done span { text-decoration: line-through; opacity: 0.5; }\n.empty { color: rgba(0, 0, 0, 0.4); font-style: italic; }\nform { display: flex; gap: 0.25rem; margin-block: 0.5rem; }\n",
+        "loc": {
+          "start": 2471,
+          "end": 2831
+        }
+      }
     }
   },
   "diagnostics": []

@@ -71,4 +71,11 @@ export interface RozieAST {
   listeners: ListenersAST | null;
   template: TemplateAST | null;
   style: StyleAST | null;
+  /**
+   * Block byte offsets from splitBlocks() — required by per-target buildShell()
+   * to anchor MagicString at the original `.rozie` source text (Phase 06.1 P1).
+   * Carries the same shape returned by splitBlocks() (a BlockMap with optional
+   * per-block entries; envelope at `rozie`). Phase 06.1 Plan 01.
+   */
+  blocks: BlockMap;
 }

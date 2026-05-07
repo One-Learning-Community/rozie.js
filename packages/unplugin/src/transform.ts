@@ -422,7 +422,12 @@ function runRoziePipeline(
   }
 
   // 3. emitVue
-  const result = emitVue(ir, { filename: filePath, source, modifierRegistry: registry });
+  const result = emitVue(ir, {
+    filename: filePath,
+    source,
+    modifierRegistry: registry,
+    blockOffsets: ast.blocks,
+  });
   const emitErrors = result.diagnostics.filter((d) => d.severity === 'error');
   if (emitErrors.length > 0) {
     throw formatViteError(emitErrors, filePath, source);

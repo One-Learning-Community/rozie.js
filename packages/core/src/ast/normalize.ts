@@ -86,6 +86,11 @@ export function buildRozieAST(input: NormalizeInput): {
     listeners: enrichedListeners,
     template: enrichedTemplate,
     style: input.style,
+    // Phase 06.1 Plan 01: thread BlockMap through so per-target buildShell()
+    // implementations can anchor MagicString.overwrite() at .rozie byte
+    // offsets (DX-04). The splitter's `diagnostics` field is intentionally
+    // dropped here — diagnostics are aggregated upstream by parse().
+    blocks,
   };
 
   return { ast, diagnostics };
