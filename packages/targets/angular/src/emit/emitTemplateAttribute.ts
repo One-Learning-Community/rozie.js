@@ -236,10 +236,17 @@ export function emitAttributes(
       }
       if (dynamicParts.length > 0) {
         // Multiple dynamic class bindings — merge into ngClass array.
+        // Use JS-safe escaping (backslash-escape single quotes) rather than
+        // HTML-entity escaping (&quot;). Angular's template compiler processes
+        // binding values as JS expressions — HTML entities are NOT decoded —
+        // so &quot; would be passed literally to the expression evaluator.
+        // Closes WR-06.
+        const escapeForJsAttr = (s: string) =>
+          s.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
         if (dynamicParts.length === 1) {
-          out.push(`[ngClass]="${dynamicParts[0]!.replace(/"/g, '&quot;')}"`);
+          out.push(`[ngClass]="${escapeForJsAttr(dynamicParts[0]!)}"`);
         } else {
-          out.push(`[ngClass]="[${dynamicParts.join(', ').replace(/"/g, '&quot;')}]"`);
+          out.push(`[ngClass]="[${dynamicParts.map(escapeForJsAttr).join(', ')}]"`);
         }
       }
       continue;
@@ -262,10 +269,14 @@ export function emitAttributes(
         out.push(`style="${escapeAttrValue(staticParts.join(';'))}"`);
       }
       if (dynamicParts.length > 0) {
+        // Same JS-safe escaping as [ngClass] above — Angular template compiler
+        // does not decode HTML entities in binding values. Closes WR-06.
+        const escapeForJsAttr = (s: string) =>
+          s.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
         if (dynamicParts.length === 1) {
-          out.push(`[ngStyle]="${dynamicParts[0]!.replace(/"/g, '&quot;')}"`);
+          out.push(`[ngStyle]="${escapeForJsAttr(dynamicParts[0]!)}"`);
         } else {
-          out.push(`[ngStyle]="[${dynamicParts.join(', ').replace(/"/g, '&quot;')}]"`);
+          out.push(`[ngStyle]="[${dynamicParts.map(escapeForJsAttr).join(', ')}]"`);
         }
       }
       continue;
