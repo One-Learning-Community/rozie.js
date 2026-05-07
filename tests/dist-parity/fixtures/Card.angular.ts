@@ -12,7 +12,7 @@ interface DefaultCtx {}
   template: `
 
     <article class="card">
-      <rozie-card-header [title]="title()" [on-close]="onClose()"></rozie-card-header>
+      <rozie-card-header [title]="title()" [onClose]="onClose()"></rozie-card-header>
       <div class="card__body">
         <ng-container *ngTemplateOutlet="defaultTpl" />
       </div>

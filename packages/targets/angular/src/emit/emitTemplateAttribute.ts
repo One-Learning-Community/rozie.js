@@ -31,6 +31,25 @@ export interface EmitAttrCtx {
   collisionRenames?: ReadonlyMap<string, string> | undefined;
   /** Loop-local bindings in scope (e.g., `item` from r-for). */
   loopBindings?: ReadonlySet<string> | undefined;
+  /**
+   * Phase 06.2 — element's tagKind. When 'component' or 'self', kebab-case
+   * binding names are camelCased before emit (Angular component properties
+   * are camelCase by convention, and Angular rejects `on-` prefix bindings
+   * with NG0306 for security). HTML elements keep kebab-case so
+   * `[aria-label]`, `[data-foo]`, etc. work naturally.
+   */
+  elementTagKind?: 'html' | 'component' | 'self';
+}
+
+/**
+ * Convert kebab-case to camelCase for component property bindings.
+ * `on-close` → `onClose`. `aria-label` and `data-*` are NEVER passed to this
+ * helper because callers gate on tagKind: 'component'|'self'. HTML element
+ * bindings keep kebab-case.
+ */
+function kebabToCamel(name: string): string {
+  if (!name.includes('-')) return name;
+  return name.replace(/-([a-z])/g, (_, ch: string) => ch.toUpperCase());
 }
 
 /** Minimal HTML attribute-value escape (single-quoted Angular attribute syntax). */
@@ -153,7 +172,8 @@ export function emitSingleAttr(
       collisionRenames: ctx.collisionRenames,
       loopBindings: ctx.loopBindings,
     });
-    return `[${attr.name}]="${expr}"`;
+    const bindingName = isComponentTag(ctx) ? kebabToCamel(attr.name) : attr.name;
+    return `[${bindingName}]="${expr}"`;
   }
 
   // interpolated: simplify single-binding-segment to direct property binding.
@@ -163,12 +183,18 @@ export function emitSingleAttr(
       collisionRenames: ctx.collisionRenames,
       loopBindings: ctx.loopBindings,
     });
-    return `[${attr.name}]="${expr}"`;
+    const bindingName = isComponentTag(ctx) ? kebabToCamel(attr.name) : attr.name;
+    return `[${bindingName}]="${expr}"`;
   }
 
   // Multi-segment — render as Angular property-binding with template literal.
   const lit = renderInterpolatedTemplateLiteral(attr.segments, ctx);
-  return `[${attr.name}]="\`${lit}\`"`;
+  const bindingName = isComponentTag(ctx) ? kebabToCamel(attr.name) : attr.name;
+  return `[${bindingName}]="\`${lit}\`"`;
+}
+
+function isComponentTag(ctx: EmitAttrCtx): boolean {
+  return ctx.elementTagKind === 'component' || ctx.elementTagKind === 'self';
 }
 
 /**

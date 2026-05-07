@@ -110,4 +110,29 @@ describe('emitAngular — Phase 06.2 P2 composition + recursion', () => {
     expect(code).toMatch(/imports: \[[^\]]*Counter[^\]]*\]/);
     await expect(code).toMatchFileSnapshot(resolve(FIXTURES, 'Modal-with-Counter.angular.ts.snap'));
   });
+
+  // Phase 06.2 follow-up: Angular rejects `[on-*]` and other `on-` prefixed
+  // bindings with NG0306 for security. When the source uses Vue-style kebab-
+  // case attribute names (`:on-close="$props.onClose"`) targeting a child
+  // component, the Angular emitter MUST camelCase the binding name so it
+  // maps to the component's camelCase property and avoids the NG0306 trap.
+  // HTML elements keep kebab-case (e.g., `[aria-label]`, `[data-foo]`).
+  it('camelCases kebab-case prop bindings on component tags (NG0306 fix)', () => {
+    const src = `<rozie name="Card">
+<components>{ CardHeader: "./CardHeader.rozie" }</components>
+<props>{ title: { type: String, default: '' }, onClose: { type: Function, default: null } }</props>
+<template>
+  <article class="card" data-variant="default" aria-label="card">
+    <CardHeader :title="$props.title" :on-close="$props.onClose" />
+  </article>
+</template>
+</rozie>`;
+    const code = compileAngular(src, 'Card.rozie');
+    // Component binding camelCased.
+    expect(code).toContain('[onClose]="onClose()"');
+    expect(code).not.toContain('[on-close]=');
+    // HTML attributes (data-*, aria-*) on the host <article> stay kebab-case.
+    expect(code).toContain('data-variant="default"');
+    expect(code).toContain('aria-label="card"');
+  });
 });

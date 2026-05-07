@@ -277,6 +277,7 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
     ir: ctx.ir,
     collisionRenames: ctx.collisionRenames,
     loopBindings: ctx.loopBindings,
+    elementTagKind: node.tagKind,
   }, node.tagName);
   const eventText = emitEvents(node.events, ctx);
   const rHtml = findRHtml(node.attributes);
