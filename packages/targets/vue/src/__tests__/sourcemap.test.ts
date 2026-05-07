@@ -109,28 +109,74 @@ describe('emitVue source map integration (Pitfall 2)', () => {
     expect(result.map).toBeNull();
   });
 
-  it('Test 7: SourceMapConsumer can decode the emitted map without error', () => {
+  it('Test 7 (Phase 06.1 D-110/A1): hovering identifier resolves to its <data> line, not line 1', () => {
+    // Phase 06.1 — proves the buildShell rearchitecture (P1) + emitScript sourceMaps (P2)
+    // produce a composed map that resolves identifiers in emitted output back to their
+    // real .rozie source line, NOT line 1 col 0 (the pre-Phase-06.1 degenerate behavior).
+    //
+    // CONTEXT D-110 originally specified `count` from Counter.rozie; A1 (researcher correction):
+    // `count` is not in Counter.rozie. We substitute `hovering` — verified present in
+    // all 4 emitted Counter outputs as a bare unmangled identifier.
+    //
+    // V1 PER-BLOCK ACCURACY NOTE (P2 SUMMARY: scriptMap=null in v1):
+    // We query the SCRIPT-section `const hovering = ref(false)` identifier (not the FIRST
+    // `hovering` which appears in the template's `:class="{ hovering: hovering }"`). Per
+    // P2 SUMMARY's "Next Phase Readiness" section, v1 buildShell per-block segment fallback
+    // (D-102) maps the entire `<script>` body region to the start of the `<script>` block
+    // in source. The data-decl `hovering: false` literal line resolution requires P2's
+    // per-expression scriptMap to surface a non-null value (deferred to v2). The v1 contract
+    // is "user-authored region of source, NOT line 1 col 0" — exactly what this test asserts.
+    const filename = 'Counter.rozie';
     const { ir, src } = loadExample('Counter');
     const result = emitVue(ir, {
-      filename: 'Counter.rozie',
+      filename,
       source: src,
     });
-    // The consumer constructor throws if the map is structurally invalid.
+
+    expect(result.map).not.toBeNull();
+    const map = result.map!;
+
+    // Locate the SCRIPT-section `hovering` declaration: `const hovering = ref(false)`.
+    // The literal `const hovering` substring uniquely identifies this position; it
+    // sits inside the emitted `<script setup>` body, which buildShell maps to the
+    // `<script>` block byte range in `.rozie` source via per-block accuracy.
+    const declMatch = 'const hovering';
+    const declIdx = result.code.indexOf(declMatch);
+    expect(declIdx).toBeGreaterThan(-1);
+    const idx = declIdx + 'const '.length; // point at the bare `hovering` identifier
+
+    // Convert byte offset → (line, col) — 1-based line, 0-based column per Source Map v3.
+    const before = result.code.slice(0, idx);
+    const line = before.split('\n').length;
+    const lastNewline = before.lastIndexOf('\n');
+    const column = lastNewline === -1 ? idx : idx - (lastNewline + 1);
+
     const consumer = new SourceMapConsumer({
       version: 3,
-      sources: result.map!.sources,
-      sourcesContent: result.map!.sourcesContent ?? null,
-      names: result.map!.names ?? [],
-      mappings: result.map!.mappings,
+      sources: map.sources,
+      sourcesContent: map.sourcesContent ?? null,
+      names: map.names ?? [],
+      mappings: map.mappings,
       file: 'Counter.rozie.vue',
     } as unknown as Parameters<typeof SourceMapConsumer>[0]);
-    // originalPositionFor on (line:1, col:0) — emit's first byte should map back
-    // somewhere into the .rozie source. magic-string seeds line 1 with the
-    // first appended segment.
-    const pos = consumer.originalPositionFor({ line: 1, column: 0 });
-    // We don't assert the exact line — magic-string's mapping for `append`
-    // outputs may report null source for synthetic content. The test is just
-    // that the consumer accepts the map.
-    expect(pos).toBeDefined();
+
+    const pos = consumer.originalPositionFor({ line, column });
+
+    // Per Pitfall 10 — derive expected user-block region at runtime so the test
+    // survives unrelated edits to Counter.rozie. The v1 fallback resolves to a
+    // line within the user-authored block region (between `<data>` start and
+    // `</script>` close); v2 will tighten to the `hovering: false` literal line.
+    const dataDeclLine = src.split('\n').findIndex((l) => /\bhovering: false\b/.test(l)) + 1;
+    const scriptEndLine = src.split('\n').findIndex((l) => /<\/script>/.test(l)) + 1;
+    expect(dataDeclLine).toBeGreaterThan(0);
+    expect(scriptEndLine).toBeGreaterThan(0);
+
+    expect(pos.source).toBe(filename);
+    expect(pos.line).not.toBe(1); // explicit regression guard (D-110 wording)
+    expect(pos.line).not.toBeNull();
+    // V1 per-block accuracy: pos.line falls within the user-authored declaration
+    // region (between the `<data>` block start and the `</script>` close tag).
+    expect(pos.line!).toBeGreaterThanOrEqual(dataDeclLine);
+    expect(pos.line!).toBeLessThanOrEqual(scriptEndLine);
   });
 });
