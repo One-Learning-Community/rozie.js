@@ -82,6 +82,57 @@ function buildSetterCall(
 }
 
 /**
+ * Rewrite $props/$data/$refs in a single expression node (cloned from IR).
+ *
+ * Used by emitScript.ts to rewrite computed body expressions that live in
+ * ir.computed[i].body — these are Babel AST nodes separate from the main
+ * script body, so they need their own rewrite pass. The node is cloned first
+ * to avoid mutating the shared IR.
+ *
+ * @experimental — shape may change before v1.0
+ */
+export function rewriteRozieExpressionNode(
+  expr: t.Expression | t.BlockStatement,
+  ir: IRComponent,
+): t.Expression | t.BlockStatement {
+  // For BlockStatements, wrap body statements directly in the program.
+  // For Expressions, wrap as an ExpressionStatement.
+  let programBody: t.Statement[];
+  const isBlock = t.isBlockStatement(expr);
+  if (isBlock) {
+    programBody = t.cloneNode(expr as t.BlockStatement, true, false).body;
+  } else {
+    programBody = [t.expressionStatement(t.cloneNode(expr as t.Expression, true, false))];
+  }
+
+  // Wrap in a File/Program so traverse() has a root to walk.
+  const wrapped: File = {
+    type: 'File',
+    program: {
+      type: 'Program',
+      body: programBody,
+      directives: [],
+      sourceType: 'module',
+    },
+    comments: [],
+    errors: [],
+  };
+  const result = rewriteRozieIdentifiers(wrapped, ir);
+  const body = result.rewrittenProgram.program.body;
+
+  if (isBlock) {
+    return t.blockStatement(body);
+  }
+  // Extract the expression from the first statement.
+  const stmt = body[0];
+  if (stmt && t.isExpressionStatement(stmt)) {
+    return stmt.expression;
+  }
+  // Fallback: return original
+  return expr;
+}
+
+/**
  * Full Solid identifier rewrite pass. Replaces all $props/$data/$refs/$emit
  * references with their Solid-idiomatic equivalents.
  */

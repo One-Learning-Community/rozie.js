@@ -18,7 +18,7 @@ import type { IRComponent } from '../../../../core/src/ir/types.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import type { SolidImportCollector, RuntimeSolidImportCollector } from '../rewrite/collectSolidImports.js';
 import { cloneScriptProgram } from '../rewrite/cloneProgram.js';
-import { rewriteRozieIdentifiers } from '../rewrite/rewriteScript.js';
+import { rewriteRozieIdentifiers, rewriteRozieExpressionNode as rewriteNode } from '../rewrite/rewriteScript.js';
 
 // CJS interop normalization for @babel/generator default export.
 type GenerateFn = typeof import('@babel/generator').default;
@@ -99,9 +99,11 @@ export function emitScript(
   }
 
   // 3. createMemo for each ComputedDecl.
+  // Rule 1 fix: rewrite $props/$data/$refs in the computed body before emitting.
   for (const c of ir.computed) {
     collectors.solidImports.add('createMemo');
-    const bodyCode = genCode(c.body);
+    const rewrittenBody = rewriteNode(c.body, ir);
+    const bodyCode = genCode(rewrittenBody);
     hookLines.push(`const ${c.name} = createMemo(() => ${bodyCode});`);
   }
 
@@ -127,13 +129,14 @@ export function emitScript(
         // Shape: onMount(() => { const _cleanup = setupFn(); if (_cleanup) onCleanup(_cleanup); })
         collectors.solidImports.add('onMount');
         collectors.solidImports.add('onCleanup');
-        // Rule 1 fix: when setup is a BlockStatement, wrap it in (() => { ... })
-        // before the () call to produce a valid IIFE.
-        const rawSetup = genCode(lh.setup);
+        // Rule 1 fix: rewrite $props/$data/$refs in the setup body; wrap BlockStatement in IIFE.
+        const rewrittenSetup = rewriteNode(lh.setup, ir);
+        const rawSetup = genCode(rewrittenSetup);
         const setupCall = t.isBlockStatement(lh.setup)
           ? `(() => ${rawSetup})()`
           : `(${rawSetup})()`;
-        const cleanupCode = genCode(lh.cleanup);
+        const rewrittenCleanup = rewriteNode(lh.cleanup, ir);
+        const cleanupCode = genCode(rewrittenCleanup);
         hookLines.push(
           `onMount(() => {\n` +
           `  const _cleanup = ${setupCall};\n` +
@@ -143,17 +146,20 @@ export function emitScript(
         );
       } else {
         collectors.solidImports.add('onMount');
-        const arg = lifecycleArg(lh.setup);
+        const rewrittenSetup = rewriteNode(lh.setup, ir);
+        const arg = lifecycleArg(rewrittenSetup);
         hookLines.push(`onMount(${arg});`);
       }
     } else if (lh.phase === 'unmount') {
       collectors.solidImports.add('onCleanup');
-      const arg = lifecycleArg(lh.setup);
+      const rewrittenSetup = rewriteNode(lh.setup, ir);
+      const arg = lifecycleArg(rewrittenSetup);
       hookLines.push(`onCleanup(${arg});`);
     } else if (lh.phase === 'update') {
       // update phase: createEffect re-runs on tracked dependency change
       collectors.solidImports.add('createEffect');
-      const arg = lifecycleArg(lh.setup);
+      const rewrittenSetup = rewriteNode(lh.setup, ir);
+      const arg = lifecycleArg(rewrittenSetup);
       hookLines.push(`createEffect(${arg});`);
     }
   }

@@ -19,13 +19,10 @@ export default function Dropdown(_props: DropdownProps): JSX.Element {
   const resolved = children(() => local.children);
 
   const [open, setOpen] = createControllableSignal(_props, 'open', false);
-  onMount({
+  onMount(() => {
     reposition();
   });
-  onMount({
-    // Example of integrating a vanilla JS library — $refs gives direct DOM access.
-    // new Popper($refs.triggerEl, $refs.panelEl, { placement: 'bottom-start' })
-  });
+  onMount(() => {});
   let triggerElRef: Element | null = null;
   let panelElRef: Element | null = null;
 

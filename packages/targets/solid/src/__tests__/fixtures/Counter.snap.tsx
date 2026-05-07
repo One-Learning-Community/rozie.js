@@ -15,8 +15,8 @@ export default function Counter(_props: CounterProps): JSX.Element {
 
   const [value, setValue] = createControllableSignal(_props, 'value', 0);
   const [hovering, setHovering] = createSignal(false);
-  const canIncrement = createMemo(() => $props.value + $props.step <= $props.max);
-  const canDecrement = createMemo(() => $props.value - $props.step >= $props.min);
+  const canIncrement = createMemo(() => value() + local.step <= local.max);
+  const canDecrement = createMemo(() => value() - local.step >= local.min);
 
   console.log("hello from rozie");
   const increment = () => {

@@ -13,10 +13,10 @@ export default function SearchInput(_props: SearchInputProps): JSX.Element {
   const [local, rest] = splitProps(_props, ['placeholder', 'minLength', 'autofocus']);
 
   const [query, setQuery] = createSignal('');
-  const isValid = createMemo(() => $data.query.length >= $props.minLength);
+  const isValid = createMemo(() => query().length >= local.minLength);
   onMount(() => {
-    const _cleanup = ({
-    if ($props.autofocus) $refs.inputEl?.focus();
+    const _cleanup = (() => {
+    if (local.autofocus) inputElRef?.focus();
 
     // Returning a function from $onMount registers a teardown — equivalent to
     // a separate $onUnmount, useful when setup and teardown logic belong together.

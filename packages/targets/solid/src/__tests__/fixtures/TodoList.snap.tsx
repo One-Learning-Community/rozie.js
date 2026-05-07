@@ -23,7 +23,7 @@ export default function TodoList(_props: TodoListProps): JSX.Element {
 
   const [items, setItems] = createControllableSignal(_props, 'items', () => []);
   const [draft, setDraft] = createSignal('');
-  const remaining = createMemo(() => $props.items.filter(i => !i.done).length);
+  const remaining = createMemo(() => items().filter(i => !i.done).length);
 
   const add = () => {
     const text = draft().trim();

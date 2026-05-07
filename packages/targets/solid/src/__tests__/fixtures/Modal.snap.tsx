@@ -31,8 +31,8 @@ export default function Modal(_props: ModalProps): JSX.Element {
     if (_cleanup) onCleanup(_cleanup);
     onCleanup(unlockScroll);
   });
-  onMount({
-    $refs.dialogEl?.focus();
+  onMount(() => {
+    dialogElRef?.focus();
   });
   let backdropElRef: Element | null = null;
   let dialogElRef: Element | null = null;
