@@ -6,7 +6,7 @@
   "scripts": {
     "test": "vitest run --passWithNoTests",
     "dev": "vite",
-    "build": "vite build"
+    "build": "echo 'OQ3 spike retired post-Plan 05-04b (commit b8aa346); production validation lives in examples/consumers/angular-analogjs. `vite` script retained for hand-debugging.' && exit 0"
   },
   "dependencies": {
     "@analogjs/vite-plugin-angular": "~2.4.10",
