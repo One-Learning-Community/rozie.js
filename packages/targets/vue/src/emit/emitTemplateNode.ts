@@ -202,6 +202,11 @@ function emitSlotInvocation(
  * Emit a TemplateElement. Walks attributes (via emitMergedAttributes for
  * D-37/Pitfall 7 class merge) and events (via emitTemplateEvent), then
  * children. Self-closes void elements with no children.
+ *
+ * Phase 06.2 P2: tagKind === 'component' | 'self' — Vue resolves the
+ * verbatim PascalCase tag via setup-scope import (component) or
+ * `defineOptions({ name })` (self). No template AST rewrite needed; the
+ * existing tag-emit branch below handles all three tagKinds uniformly.
  */
 function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
   return emitElementWithExtraDirective(node, null, ctx);

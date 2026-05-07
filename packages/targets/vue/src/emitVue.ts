@@ -22,12 +22,13 @@
  *
  * @experimental — shape may change before v1.0
  */
-import type { IRComponent } from '../../../core/src/ir/types.js';
+import type { IRComponent, TemplateNode } from '../../../core/src/ir/types.js';
 import type { Diagnostic } from '../../../core/src/diagnostics/Diagnostic.js';
 import type { ModifierRegistry } from '../../../core/src/modifiers/ModifierRegistry.js';
 import type { BlockMap } from '../../../core/src/ast/types.js';
 import { splitBlocks } from '../../../core/src/splitter/splitBlocks.js';
 import { createDefaultRegistry } from '../../../core/src/modifiers/registerBuiltins.js';
+import { rewriteRozieImport } from '../../../core/src/codegen/rewriteRozieImport.js';
 import type { SourceMap } from 'magic-string';
 import { emitScript } from './emit/emitScript.js';
 import { emitTemplate } from './emit/emitTemplate.js';
@@ -36,6 +37,52 @@ import { emitStyle } from './emit/emitStyle.js';
 import { buildShell } from './emit/shell.js';
 import { composeSourceMap } from './sourcemap/compose.js';
 import type { ScriptInjection } from './emit/emitTemplateEvent.js';
+
+/**
+ * Phase 06.2 P2 — recursive walk over the IR template detecting any
+ * `tagKind: 'self'` element. O(n) over the IR tree (single visit per node);
+ * matches threat model T-06.2-P2-04 mitigation (no quadratic blowup).
+ */
+function templateContainsSelfReference(node: TemplateNode | null): boolean {
+  if (!node) return false;
+  switch (node.type) {
+    case 'TemplateElement': {
+      if (node.tagKind === 'self') return true;
+      for (const child of node.children) {
+        if (templateContainsSelfReference(child)) return true;
+      }
+      return false;
+    }
+    case 'TemplateConditional': {
+      for (const branch of node.branches) {
+        for (const child of branch.body) {
+          if (templateContainsSelfReference(child)) return true;
+        }
+      }
+      return false;
+    }
+    case 'TemplateLoop': {
+      for (const child of node.body) {
+        if (templateContainsSelfReference(child)) return true;
+      }
+      return false;
+    }
+    case 'TemplateSlotInvocation': {
+      for (const child of node.fallback) {
+        if (templateContainsSelfReference(child)) return true;
+      }
+      return false;
+    }
+    case 'TemplateFragment': {
+      for (const child of node.children) {
+        if (templateContainsSelfReference(child)) return true;
+      }
+      return false;
+    }
+    default:
+      return false;
+  }
+}
 
 export interface EmitVueOptions {
   /**
@@ -311,6 +358,22 @@ export function emitVue(ir: IRComponent, opts: EmitVueOptions = {}): EmitVueResu
     resolvedBlockOffsets = {};
   }
 
+  // Phase 06.2 P2 — synthesize component-import lines from ir.components and
+  // detect self-reference for defineOptions({ name }). Both default to no-op
+  // when ir.components is empty/missing and no tagKind:'self' appears.
+  // Defensive `?? []` guards against pre-P1 test fixtures that hand-roll
+  // minimal IRs without the `components` field.
+  const components = ir.components ?? [];
+  const componentImportsLines: string[] = components.map((decl) => {
+    const rewritten = rewriteRozieImport(decl.importPath, 'vue');
+    return `import ${decl.localName} from '${rewritten}';`;
+  });
+  const componentImportsBlock =
+    componentImportsLines.length > 0
+      ? componentImportsLines.join('\n') + '\n'
+      : '';
+  const hasSelfReference = templateContainsSelfReference(ir.template);
+
   const { ms, scriptOutputOffset, scriptMap: shellScriptMap } = buildShell({
     template,
     script: enrichedScript,
@@ -323,6 +386,9 @@ export function emitVue(ir: IRComponent, opts: EmitVueOptions = {}): EmitVueResu
     rozieSource: opts.source ?? '',
     blockOffsets: resolvedBlockOffsets,
     scriptMap,
+    componentImportsBlock,
+    hasSelfReference,
+    componentName: ir.name,
   });
 
   const code = ms.toString();
