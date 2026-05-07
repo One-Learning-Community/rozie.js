@@ -12,6 +12,7 @@
     { "include": "#block-props" },
     { "include": "#block-data" },
     { "include": "#block-listeners" },
+    { "include": "#block-components" },
     { "include": "#block-style" }
   ],
   "repository": {
@@ -162,6 +163,30 @@
         "3": { "name": "punctuation.definition.tag.end.rozie" }
       },
       "contentName": "meta.embedded.block.listeners.rozie source.js",
+      "patterns": [
+        { "include": "#magic-identifier" },
+        { "include": "source.js" }
+      ]
+    },
+    "block-components": {
+      "begin": "(<)(components)\\b([^>]*)(>)",
+      "end": "(</)(components)(>)",
+      "beginCaptures": {
+        "1": { "name": "punctuation.definition.tag.begin.rozie" },
+        "2": { "name": "entity.name.tag.rozie.block.components" },
+        "3": {
+          "patterns": [
+            { "include": "#tag-attributes" }
+          ]
+        },
+        "4": { "name": "punctuation.definition.tag.end.rozie" }
+      },
+      "endCaptures": {
+        "1": { "name": "punctuation.definition.tag.begin.rozie" },
+        "2": { "name": "entity.name.tag.rozie.block.components" },
+        "3": { "name": "punctuation.definition.tag.end.rozie" }
+      },
+      "contentName": "meta.embedded.block.components.rozie source.js",
       "patterns": [
         { "include": "#magic-identifier" },
         { "include": "source.js" }
