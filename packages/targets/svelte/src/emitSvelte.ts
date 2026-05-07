@@ -28,6 +28,8 @@
 import type { IRComponent } from '../../../core/src/ir/types.js';
 import type { Diagnostic } from '../../../core/src/diagnostics/Diagnostic.js';
 import type { ModifierRegistry } from '../../../core/src/modifiers/ModifierRegistry.js';
+import type { BlockMap } from '../../../core/src/ast/types.js';
+import { splitBlocks } from '../../../core/src/splitter/splitBlocks.js';
 import { createDefaultRegistry } from '../../../core/src/modifiers/registerBuiltins.js';
 import type { SourceMap } from 'magic-string';
 import { emitScript, type SvelteScriptInjection } from './emit/emitScript.js';
@@ -41,6 +43,12 @@ export interface EmitSvelteOptions {
   filename?: string;
   source?: string;
   modifierRegistry?: ModifierRegistry;
+  /**
+   * Phase 06.1 Plan 01 (DX-04): block byte offsets from splitBlocks() —
+   * required by buildShell() for accurate source maps. When omitted,
+   * derived from `opts.source` via splitBlocks() if available.
+   */
+  blockOffsets?: BlockMap;
 }
 
 export interface EmitSvelteResult {
@@ -128,11 +136,30 @@ export function emitSvelte(
   const finalScript = mergeScriptInjections(scriptWithListeners, allInjections);
 
   // 6. Compose the SFC envelope via magic-string.
-  const ms = buildShell({
+  // Phase 06.1 Plan 01 (DX-04) — anchor MagicString at .rozie source bytes via
+  // overwrite() per block. blockOffsets resolution order:
+  //   1. opts.blockOffsets (caller threaded splitBlocks result through)
+  //   2. derive from opts.source via splitBlocks()
+  //   3. degenerate empty BlockMap (legacy fallback path).
+  let resolvedBlockOffsets: BlockMap;
+  if (opts.blockOffsets !== undefined) {
+    resolvedBlockOffsets = opts.blockOffsets;
+  } else if (opts.source !== undefined) {
+    resolvedBlockOffsets = splitBlocks(opts.source, opts.filename);
+  } else {
+    resolvedBlockOffsets = {};
+  }
+
+  const { ms, scriptOutputOffset } = buildShell({
     script: finalScript,
     template,
     styleBlock: styleResult.block,
+    rozieSource: opts.source ?? '',
+    blockOffsets: resolvedBlockOffsets,
   });
+  // P1: scriptOutputOffset is computed but unused in v1 (P2 will consume it
+  // via composeMaps).
+  void scriptOutputOffset;
 
   const code = ms.toString();
 

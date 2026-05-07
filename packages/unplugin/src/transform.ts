@@ -520,7 +520,12 @@ function runSveltePipeline(
   }
 
   // 3. emitSvelte
-  const result = emitSvelte(ir, { filename: filePath, source, modifierRegistry: registry });
+  const result = emitSvelte(ir, {
+    filename: filePath,
+    source,
+    modifierRegistry: registry,
+    blockOffsets: ast.blocks,
+  });
   const emitErrors = result.diagnostics.filter((d) => d.severity === 'error');
   if (emitErrors.length > 0) {
     throw formatViteError(emitErrors, filePath, source);

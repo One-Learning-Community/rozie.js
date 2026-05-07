@@ -1,19 +1,28 @@
 /**
- * shell.ts — Phase 5 Plan 02a Task 3.
+ * shell.ts — Phase 5 Plan 02a Task 3; Phase 06.1 Plan 01 Task 3
+ * rearchitecture.
  *
- * Composes a Svelte 5 SFC envelope via `magic-string`'s `MagicString.append`.
+ * Composes a Svelte 5 SFC envelope by anchoring `magic-string`'s
+ * MagicString at the original `.rozie` source bytes and using
+ * `ms.overwrite(...)` per block, keyed off `splitBlocks()` byte offsets
+ * (Phase 06.1 P1, DX-04).
+ *
  * Block order: <script lang="ts">...</script> first, top-level markup second
  * (NO `<template>` wrapper — Svelte's "top-level markup" is the bare content
- * between </script> and <style>), then a single <style> block.
+ * between </script> and <style>), then a single <style> block. The .rozie
+ * source has `<script>` BEFORE `<template>` (matching Svelte's emitted
+ * order), so no `ms.move()` reordering is required.
  *
- * Empty styleBlock: emit no `<style>` block.
+ * Empty styleBlock: emit no `<style>` block — remove the source style range.
  *
- * Returning a `MagicString` (not a plain string) lets `emitSvelte` later call
- * `composeSourceMap(ms, ...)` to thread the source map (DX-01).
+ * Returning a `BuildShellResult` (not a plain MagicString) lets `emitSvelte`
+ * surface the byte-anchored map and the script-body output offset for P2's
+ * `composeMaps()` integration.
  *
  * @experimental — shape may change before v1.0
  */
 import MagicString from 'magic-string';
+import type { BlockMap } from '../../../../core/src/ast/types.js';
 
 export interface ShellParts {
   /** Body of `<script lang="ts">...</script>` — emitScript output + injections. */
@@ -22,9 +31,112 @@ export interface ShellParts {
   template: string;
   /** Body of the single `<style>...</style>` block — empty string skips block. */
   styleBlock: string;
+  /**
+   * Phase 06.1 Plan 01: original `.rozie` source text — anchors the MagicString.
+   */
+  rozieSource: string;
+  /**
+   * Phase 06.1 Plan 01: block byte offsets from splitBlocks() — keys
+   * ms.overwrite() calls so emitted output maps back to .rozie block lines
+   * rather than collapsing to line 1 col 0.
+   */
+  blockOffsets: BlockMap;
 }
 
-export function buildShell(parts: ShellParts): MagicString {
+/**
+ * Phase 06.1 Plan 01 D-101: buildShell return shape carries both the
+ * byte-anchored MagicString AND the script-body offset within the rendered
+ * shell so P2's composeMaps() can chain @babel/generator's per-expression
+ * child map at the correct output position.
+ */
+export interface BuildShellResult {
+  /** MagicString anchored to rozieSource with per-block overwrites + envelope removed. */
+  ms: MagicString;
+  /** Byte offset within ms.toString() where the script body begins (after `<script lang="ts">\n`). */
+  scriptOutputOffset: number;
+}
+
+export function buildShell(parts: ShellParts): BuildShellResult {
+  const blocks = parts.blockOffsets;
+
+  // Back-compat fallback: when rozieSource is empty (old callers without
+  // opts.source), construct the SFC body on an empty MagicString.
+  if (parts.rozieSource.length === 0 || !blocks.script || !blocks.template) {
+    return buildShellLegacy(parts);
+  }
+
+  const ms = new MagicString(parts.rozieSource);
+
+  const scriptOpenFraming = '<script lang="ts">\n';
+  const scriptCloseFraming = '\n</script>\n';
+
+  // STEP 1: per-block overwrites at .rozie byte offsets.
+  // Source layout for the 5 reference Svelte examples: <props> <data?>
+  // <script> <listeners?> <template> <style?>. The Svelte target output
+  // order matches: <script> first, bare markup second, <style> third —
+  // so per-block source-byte anchoring is direct (no ms.move() reorder).
+  ms.overwrite(
+    blocks.script.loc.start,
+    blocks.script.loc.end,
+    `${scriptOpenFraming}${parts.script}${scriptCloseFraming}`,
+  );
+
+  // Svelte's top-level markup has no `<template>` wrapper — overwrite the
+  // .rozie <template>...</template> range with the bare markup.
+  ms.overwrite(
+    blocks.template.loc.start,
+    blocks.template.loc.end,
+    `\n${parts.template}\n`,
+  );
+
+  if (blocks.style) {
+    if (parts.styleBlock.length > 0) {
+      ms.overwrite(
+        blocks.style.loc.start,
+        blocks.style.loc.end,
+        `\n<style>\n${parts.styleBlock}\n</style>\n`,
+      );
+    } else {
+      // Empty styleBlock — remove the source range entirely.
+      ms.remove(blocks.style.loc.start, blocks.style.loc.end);
+    }
+  }
+
+  // STEP 2: remove non-output regions — `<rozie>` envelope tags + non-emitted
+  // blocks (props/data/listeners are consumed by the IR; their source bytes
+  // don't appear in output) + inter-block whitespace OUTSIDE kept ranges.
+  const keptRanges: Array<[number, number]> = [];
+  keptRanges.push([blocks.script.loc.start, blocks.script.loc.end]);
+  keptRanges.push([blocks.template.loc.start, blocks.template.loc.end]);
+  if (blocks.style && parts.styleBlock.length > 0) {
+    keptRanges.push([blocks.style.loc.start, blocks.style.loc.end]);
+  }
+  keptRanges.sort((a, b) => a[0] - b[0]);
+
+  let cursor = 0;
+  for (const [start, end] of keptRanges) {
+    if (cursor < start) ms.remove(cursor, start);
+    cursor = end;
+  }
+  if (cursor < parts.rozieSource.length)
+    ms.remove(cursor, parts.rozieSource.length);
+
+  // STEP 3: compute scriptOutputOffset.
+  const fullOutput = ms.toString();
+  const scriptIdx = fullOutput.indexOf(scriptOpenFraming);
+  const scriptOutputOffset =
+    scriptIdx >= 0 ? scriptIdx + scriptOpenFraming.length : 0;
+
+  return { ms, scriptOutputOffset };
+}
+
+/**
+ * Legacy fallback path — empty rozieSource or missing blockOffsets.
+ * Constructs the SFC envelope from scratch on an empty MagicString,
+ * preserving pre-Phase-06.1 behavior so old callers (tests that don't
+ * thread opts.source through) keep working.
+ */
+function buildShellLegacy(parts: ShellParts): BuildShellResult {
   const ms = new MagicString('');
   ms.append('<script lang="ts">\n');
   ms.append(parts.script);
@@ -36,5 +148,5 @@ export function buildShell(parts: ShellParts): MagicString {
     ms.append(parts.styleBlock);
     ms.append('\n</style>\n');
   }
-  return ms;
+  return { ms, scriptOutputOffset: 0 };
 }
