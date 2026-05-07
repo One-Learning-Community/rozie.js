@@ -97,6 +97,32 @@ describe('resolveId target="react" — D-58 path-virtual', () => {
     expect(resolveHook('react', undefined)).toBeNull();
     expect(resolveHook('./App.tsx', '/abs/main.tsx')).toBeNull();
   });
+
+  // Phase 06.2 D-118 cross-rozie composition: React emitter rewrites
+  // `<components>{ Foo }</components>` to `import Foo from './Foo'`
+  // (extensionless — `rewriteRozieImport` returns ''). Vite's normal
+  // resolver tries `.tsx`/`.ts`/`.jsx`/`.js`, finds nothing on disk because
+  // the source is `Foo.rozie`, then falls through to plugin chain. Our
+  // resolveId must rewrite to the synthetic `Foo.rozie.tsx`.
+  it('rewrites ./Foo (extensionless) → <abs>/Foo.rozie.tsx when sibling Foo.rozie exists', () => {
+    const resolveHook = createResolveIdHook('react');
+    const importer = resolve(EXAMPLES, 'Modal.rozie.tsx');
+    const out = resolveHook('./Counter', importer);
+    expect(out).toBe(resolve(EXAMPLES, 'Counter.rozie.tsx'));
+  });
+
+  it('does NOT rewrite extensionless imports when no sibling .rozie exists', () => {
+    const resolveHook = createResolveIdHook('react');
+    expect(resolveHook('./SomeRandomLocalModule', '/tmp/main.tsx')).toBeNull();
+  });
+
+  it('does NOT rewrite bare module specifiers (e.g. `react`, `lodash/get`)', () => {
+    const resolveHook = createResolveIdHook('react');
+    // Bare specifiers without a leading ./ or ../ must not trigger the
+    // sibling-rozie rewrite — only relative/absolute paths can.
+    expect(resolveHook('react', '/tmp/main.tsx')).toBeNull();
+    expect(resolveHook('lodash/get', '/tmp/main.tsx')).toBeNull();
+  });
 });
 
 describe('load target="react" — happy path + style routing', () => {

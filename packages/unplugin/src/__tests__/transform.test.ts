@@ -67,6 +67,30 @@ describe('resolveId hook — path-virtual rewrite (D-25 amendment)', () => {
     const abs = resolve(EXAMPLES, 'Counter.rozie');
     expect(resolveHook(abs, undefined)).toBe(abs + '.vue');
   });
+
+  // Phase 06.2 D-118 cross-rozie composition: emitted Vue SFCs use
+  // `import Foo from './Foo.vue'`. When a sibling `Foo.rozie` exists, the
+  // resolveId hook must rewrite the request to the synthetic `Foo.rozie.vue`
+  // so the load hook generates the SFC from the .rozie source.
+  it('rewrites ./Foo.vue → <abs>/Foo.rozie.vue when sibling Foo.rozie exists', () => {
+    const resolveHook = createResolveIdHook();
+    const importer = resolve(EXAMPLES, 'Modal.rozie.vue');
+    const out = resolveHook('./Counter.vue', importer);
+    expect(out).toBe(resolve(EXAMPLES, 'Counter.rozie.vue'));
+  });
+
+  it('does NOT rewrite ./Foo.vue when no sibling Foo.rozie exists', () => {
+    const resolveHook = createResolveIdHook();
+    const importer = resolve(EXAMPLES, 'Modal.rozie.vue');
+    expect(resolveHook('./not-a-rozie-component.vue', importer)).toBeNull();
+  });
+
+  it('passes through synthetic .rozie.vue ids unchanged in the rewrite branch', () => {
+    const resolveHook = createResolveIdHook();
+    const importer = resolve(EXAMPLES, 'foo.ts');
+    // Already-synthetic id should not be re-rewritten (would double-suffix).
+    expect(resolveHook(resolve(EXAMPLES, 'Counter.rozie.vue'), importer)).toBeNull();
+  });
 });
 
 describe('load hook — Counter.rozie compiles to <template>... (Test 5)', () => {

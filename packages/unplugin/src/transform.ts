@@ -163,9 +163,23 @@ export function createResolveIdHook(
       // (/\.[cm]?ts(?![a-z])/) matches the trailing `.ts`. The on-disk file
       // is written by prebuildAngularRozieFiles before any transform hook
       // runs.
-      if (!id.endsWith('.rozie')) return null;
-      const abs = absolutize(id, importer);
-      return abs + '.ts';
+      if (id.endsWith('.rozie')) {
+        const abs = absolutize(id, importer);
+        return abs + '.ts';
+      }
+      // Phase 06.2 D-118 cross-rozie composition: per-target emitters rewrite
+      // a `<components>{ Foo }</components>` import as `import Foo from './Foo'`
+      // (extensionless for Angular per rewriteRozieImport). When a sibling
+      // `Foo.rozie` exists on disk, route the request to its disk-cache
+      // companion `Foo.rozie.ts` so the prebuild output is found.
+      if (isExtensionlessRelative(id)) {
+        const abs = absolutize(id, importer);
+        if (existsSync(abs + '.rozie')) {
+          const cached = abs + VIRTUAL_SUFFIX_ANGULAR;
+          return existsSync(cached) ? cached : null;
+        }
+      }
+      return null;
     };
   }
   if (target === 'svelte') {
@@ -173,9 +187,22 @@ export function createResolveIdHook(
       // Pass-through for the synthetic id itself (load handles it).
       if (id.endsWith(VIRTUAL_SUFFIX_SVELTE)) return id;
       // Bare `.rozie` import → `<abs>/Foo.rozie.svelte`.
-      if (!id.endsWith('.rozie')) return null;
-      const abs = absolutize(id, importer);
-      return abs + '.svelte';
+      if (id.endsWith('.rozie')) {
+        const abs = absolutize(id, importer);
+        return abs + '.svelte';
+      }
+      // Phase 06.2 D-118 cross-rozie composition: emitted Svelte SFCs use
+      // `import Foo from './Foo.svelte'` (rewriteRozieImport) AND the D-117
+      // self-import idiom does the same for recursion. When a sibling
+      // `Foo.rozie` exists, rewrite to the synthetic `Foo.rozie.svelte`.
+      if (id.endsWith('.svelte')) {
+        const abs = absolutize(id, importer);
+        const base = abs.slice(0, -'.svelte'.length);
+        if (existsSync(base + '.rozie')) {
+          return base + VIRTUAL_SUFFIX_SVELTE;
+        }
+      }
+      return null;
     };
   }
   if (target === 'react') {
@@ -217,15 +244,52 @@ export function createResolveIdHook(
       ) {
         return id;
       }
+      // 5) Phase 06.2 D-118 cross-rozie composition: emitted React modules use
+      //    `import Foo from './Foo'` (rewriteRozieImport returns '' for React).
+      //    When a sibling `Foo.rozie` exists on disk, rewrite to the synthetic
+      //    `Foo.rozie.tsx` so load() generates the JSX shell.
+      if (isExtensionlessRelative(id)) {
+        const abs = absolutize(id, importer);
+        if (existsSync(abs + '.rozie')) {
+          return abs + VIRTUAL_SUFFIX_REACT;
+        }
+      }
       return null;
     };
   }
   // Vue (default) — Phase 3 behaviour preserved verbatim.
   return function resolveIdVue(id: string, importer: string | undefined): string | null {
-    if (!id.endsWith('.rozie')) return null;
-    const abs = absolutize(id, importer);
-    return abs + '.vue';
+    if (id.endsWith('.rozie')) {
+      const abs = absolutize(id, importer);
+      return abs + '.vue';
+    }
+    // Phase 06.2 D-118 cross-rozie composition: emitted Vue SFCs use
+    // `import Foo from './Foo.vue'` (rewriteRozieImport). When a sibling
+    // `Foo.rozie` exists, rewrite to the synthetic `Foo.rozie.vue`.
+    if (id.endsWith('.vue') && !id.endsWith(VIRTUAL_SUFFIX_VUE)) {
+      const abs = absolutize(id, importer);
+      const base = abs.slice(0, -'.vue'.length);
+      if (existsSync(base + '.rozie')) {
+        return base + VIRTUAL_SUFFIX_VUE;
+      }
+    }
+    return null;
   };
+}
+
+/**
+ * D-118 cross-rozie composition helper: matches relative imports without a
+ * recognized JS/TS/asset extension. React + Angular emitters omit the
+ * extension (`rewriteRozieImport` returns ''); we detect that shape so we
+ * can resolve `import Foo from './Foo'` against a sibling `Foo.rozie`
+ * without colliding with consumer-authored extensionful imports.
+ */
+function isExtensionlessRelative(id: string): boolean {
+  if (id.includes('?') || id.includes('\0')) return false;
+  if (!(id.startsWith('./') || id.startsWith('../') || isAbsolute(id))) return false;
+  const lastSlash = id.lastIndexOf('/');
+  const basename = lastSlash === -1 ? id : id.slice(lastSlash + 1);
+  return basename.length > 0 && !basename.includes('.');
 }
 
 function absolutize(id: string, importer: string | undefined): string {

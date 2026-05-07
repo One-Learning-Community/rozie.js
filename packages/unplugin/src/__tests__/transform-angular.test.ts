@@ -94,6 +94,35 @@ describe('resolveId target="angular" — Plan 05-04b path-virtual (Path A)', () 
     // `.rozie.ts` path returns null. (The full passthrough behavior is
     // exercised end-to-end by the demo build with prebuild active.)
   });
+
+  // Phase 06.2 D-118 cross-rozie composition: Angular emitter rewrites
+  // `<components>{ Foo }</components>` to `import { Foo } from './Foo'`
+  // (extensionless — `rewriteRozieImport` returns ''). With prebuild
+  // disk-cache active, sibling `Foo.rozie` produces a `Foo.rozie.ts` on
+  // disk. resolveIdAngular routes the extensionless request to the cached
+  // file; without prebuild, returns null (fail-fast).
+  it('does NOT rewrite extensionless imports when no sibling .rozie exists', () => {
+    const resolveHook = createResolveIdHook('angular');
+    expect(resolveHook('./SomeRandomLocalModule', '/tmp/main.ts')).toBeNull();
+  });
+
+  it('returns null for extensionless sibling-.rozie request without prebuild cache', () => {
+    // examples/Counter.rozie exists, but examples/Counter.rozie.ts does NOT
+    // (no prebuild ran in test env). Per fail-fast semantics, returning null
+    // lets downstream logic surface the misconfiguration; with prebuild
+    // active in real builds the .rozie.ts file exists and the hook passes
+    // it through.
+    const resolveHook = createResolveIdHook('angular');
+    const importer = resolve(EXAMPLES, 'Modal.rozie.ts');
+    const out = resolveHook('./Counter', importer);
+    expect(out).toBeNull();
+  });
+
+  it('does NOT rewrite bare module specifiers (e.g. `@angular/core`)', () => {
+    const resolveHook = createResolveIdHook('angular');
+    expect(resolveHook('@angular/core', '/tmp/main.ts')).toBeNull();
+    expect(resolveHook('rxjs/operators', '/tmp/main.ts')).toBeNull();
+  });
 });
 
 describe('load hook target="angular" — Counter.rozie compiles to Angular standalone .ts', () => {

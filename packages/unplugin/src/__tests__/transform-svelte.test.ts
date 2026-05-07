@@ -78,6 +78,23 @@ describe('resolveId target="svelte" — Plan 05-02b path-virtual', () => {
     const synthetic = resolve(EXAMPLES, 'Counter.rozie.svelte');
     expect(resolveHook(synthetic, undefined)).toBe(synthetic);
   });
+
+  // Phase 06.2 D-118 cross-rozie composition: emitted Svelte SFCs use
+  // `import Foo from './Foo.svelte'` (and the D-117 self-import idiom does
+  // the same for recursion). When a sibling `Foo.rozie` exists on disk, the
+  // resolveId hook must rewrite to the synthetic `Foo.rozie.svelte` id.
+  it('rewrites ./Foo.svelte → <abs>/Foo.rozie.svelte when sibling Foo.rozie exists', () => {
+    const resolveHook = createResolveIdHook('svelte');
+    const importer = resolve(EXAMPLES, 'Modal.rozie.svelte');
+    const out = resolveHook('./Counter.svelte', importer);
+    expect(out).toBe(resolve(EXAMPLES, 'Counter.rozie.svelte'));
+  });
+
+  it('does NOT rewrite ./Foo.svelte when no sibling Foo.rozie exists', () => {
+    const resolveHook = createResolveIdHook('svelte');
+    const importer = resolve(EXAMPLES, 'Modal.rozie.svelte');
+    expect(resolveHook('./not-a-rozie-component.svelte', importer)).toBeNull();
+  });
 });
 
 describe('load hook target="svelte" — Counter.rozie compiles to <script lang="ts">...', () => {
