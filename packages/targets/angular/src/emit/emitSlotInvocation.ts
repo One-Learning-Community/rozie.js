@@ -33,8 +33,6 @@
  * @experimental — shape may change before v1.0
  */
 import * as t from '@babel/types';
-import _traverse from '@babel/traverse';
-import type { Expression as BabelExpression } from '@babel/types';
 import type {
   IRComponent,
   TemplateNode,
@@ -44,13 +42,6 @@ import type {
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
 import { slotFieldName } from './refineSlotTypes.js';
 import type { AngularScriptInjection } from './emitTemplateEvent.js';
-
-// CJS interop normalization for @babel/traverse default export.
-type TraverseFn = typeof import('@babel/traverse').default;
-const traverse: TraverseFn =
-  typeof _traverse === 'function'
-    ? (_traverse as TraverseFn)
-    : ((_traverse as unknown as { default: TraverseFn }).default);
 
 export interface EmitSlotInvocationCtx {
   ir: IRComponent;
@@ -72,26 +63,28 @@ export interface EmitSlotInvocationCtx {
  * Walk an IR Expression and return true iff it (or any descendant) is an
  * ArrowFunctionExpression or FunctionExpression. Angular's template parser
  * rejects both shapes inside `*ngTemplateOutlet` context bindings.
+ *
+ * Uses a simple recursive node.type check instead of a full @babel/traverse
+ * pass — avoids N separate AST traversals for N slot args and removes the
+ * @babel/traverse import from this module. Closes IN-04.
  */
-function containsFunctionExpression(expr: BabelExpression): boolean {
-  // Fast path: top-level node is itself an arrow / fn expression.
-  if (t.isArrowFunctionExpression(expr) || t.isFunctionExpression(expr)) {
-    return true;
+function containsFunctionExpression(node: t.Node): boolean {
+  if (t.isArrowFunctionExpression(node) || t.isFunctionExpression(node)) return true;
+  for (const key of Object.keys(node)) {
+    const child = (node as Record<string, unknown>)[key];
+    if (child && typeof child === 'object' && 'type' in (child as object)) {
+      if (containsFunctionExpression(child as t.Node)) return true;
+    }
+    // Also handle arrays of child nodes (e.g. arguments, params, body.body).
+    if (Array.isArray(child)) {
+      for (const item of child) {
+        if (item && typeof item === 'object' && 'type' in (item as object)) {
+          if (containsFunctionExpression(item as t.Node)) return true;
+        }
+      }
+    }
   }
-  let found = false;
-  // Wrap in an ExpressionStatement so traverse() has a Program-level entry.
-  const wrapper = t.file(
-    t.program([t.expressionStatement(t.cloneNode(expr, true, false))]),
-  );
-  traverse(wrapper, {
-    ArrowFunctionExpression() {
-      found = true;
-    },
-    FunctionExpression() {
-      found = true;
-    },
-  });
-  return found;
+  return false;
 }
 
 /**
