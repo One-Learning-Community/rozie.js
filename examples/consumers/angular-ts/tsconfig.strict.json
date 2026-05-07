@@ -1,0 +1,21 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM"],
+    "experimentalDecorators": true,
+    "useDefineForClassFields": false,
+    "emitDecoratorMetadata": true
+  },
+  "include": ["test.ts", "fixtures/**/*.ts"],
+  "exclude": [
+    "fixtures/Dropdown.ts",
+    "fixtures/Modal.ts",
+    "fixtures/SearchInput.ts",
+    "fixtures/TodoList.ts"
+  ]
+}

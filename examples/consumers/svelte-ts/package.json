@@ -1,0 +1,16 @@
+{
+  "name": "@rozie/consumer-svelte-ts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "svelte-check --tsconfig ./tsconfig.strict.json",
+    "refresh:fixtures": "node ../scripts/refresh-consumer-fixtures.mjs"
+  },
+  "devDependencies": {
+    "@tsconfig/svelte": "^5",
+    "svelte": "^5.0.0",
+    "svelte-check": "^4",
+    "typescript": "~5.4.5"
+  }
+}

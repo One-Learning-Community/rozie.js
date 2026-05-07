@@ -1,0 +1,18 @@
+{
+  "name": "@rozie/consumer-angular-ts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.strict.json",
+    "refresh:fixtures": "node ../scripts/refresh-consumer-fixtures.mjs"
+  },
+  "devDependencies": {
+    "@angular/common": "^17",
+    "@angular/core": "^17",
+    "@angular/forms": "^17",
+    "rxjs": "^7",
+    "typescript": "~5.4.5",
+    "zone.js": "~0.14"
+  }
+}
