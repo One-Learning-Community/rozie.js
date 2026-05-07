@@ -204,10 +204,9 @@ export function compile(source: string, opts: CompileOptions): CompileResult {
     }
     case 'react': {
       const r = emitReact(ir, emitOpts);
-      // D-121: thread an explicit linkedComponents:undefined to make the
-      // future wire-up trivial (the parameter is accepted-but-ignored in v1.0;
-      // this call site documents its existence).
-      const types = wantTypes ? emitReactTypes(ir, { linkedComponents: undefined }) : '';
+      // D-121: emitReactTypes accepts an optional linkedComponents map
+      // (accepted-but-ignored in v1.0). v2 wire-up will pass it through here.
+      const types = wantTypes ? emitReactTypes(ir) : '';
       const result: CompileResult = {
         code: r.code,
         map: wantSourceMap ? r.map : null,
