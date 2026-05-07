@@ -141,6 +141,16 @@ export const RozieErrorCode = {
   CLI_REACT_REQUIRES_OUT_DIR: 'ROZ855', // target=react with no --out — sidecars (.d.ts/.module.css/.global.css) cannot stream to stdout
   // ROZ856..ROZ879 reserved for future @rozie/cli needs
   // ROZ880..ROZ899 reserved for .d.ts emitter (Plan 06-02)
+
+  // ---- Phase 06.1 source-map composition (D-111) — ROZ900..ROZ919 ----
+  // ROZ900..ROZ909: composeMaps errors (malformed child map, mismatched offsets, @ampproject/remapping failures)
+  SOURCEMAP_COMPOSE_FAILED: 'ROZ900', // composeMaps() threw or returned null
+  SOURCEMAP_CHILD_MAP_MALFORMED: 'ROZ901', // child map missing required Source Map v3 fields
+  SOURCEMAP_OFFSET_OUT_OF_RANGE: 'ROZ902', // ChildMap.outputOffset exceeds shellMs output length
+  SOURCEMAP_REMAPPING_THREW: 'ROZ903', // @ampproject/remapping internal error
+  // ROZ910..ROZ919: emit-time position-anchoring failures
+  SOURCEMAP_AST_NODE_MISSING_LOC: 'ROZ910', // synthesized AST node lacks loc; falls back to nearest segment (D-104/D-106)
+  SOURCEMAP_PARSER_OFFSET_INVALID: 'ROZ911', // @babel/parser startLine/startColumn validation failed
 } as const;
 
 export type RozieErrorCode = (typeof RozieErrorCode)[keyof typeof RozieErrorCode];
