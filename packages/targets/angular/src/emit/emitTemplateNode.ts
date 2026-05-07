@@ -201,7 +201,7 @@ function emitEvents(events: Listener[], ctx: EmitNodeCtx): string {
 
       // Extract the inner attrValue from `(event)="X"` so we can splice it
       // into the merged wrapper.
-      const m = sub.eventAttr.match(/^\([a-zA-Z]+\)="(.*)"$/);
+      const m = sub.eventAttr.match(/^\([a-zA-Z]+\)="(.*)"$/s);
       if (!m) continue;
       let inner = m[1]!;
       // The handler invocation references identifiers that need `this.` prefix
