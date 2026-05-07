@@ -127,7 +127,14 @@ export const RozieErrorCode = {
   COMPILE_INVALID_TARGET: 'ROZ800', // unknown target token in opts.target
   COMPILE_INVALID_OPT_COMBO: 'ROZ801', // reserved — disallowed opts combination
   // ROZ820..ROZ849 reserved for @rozie/babel-plugin (Plan 06-04)
-  // ROZ850..ROZ879 reserved for @rozie/cli (Plan 06-03)
+  // ---- @rozie/cli argv parsing + filesystem errors (Plan 06-03) — ROZ850..ROZ879 ----
+  CLI_INVALID_TARGET: 'ROZ850', // unknown --target token (commander InvalidArgumentError)
+  CLI_MISSING_INPUT: 'ROZ851', // no .rozie files matched after expandInputs
+  CLI_OUT_REQUIRED: 'ROZ852', // --out required for multiple inputs or multiple targets
+  CLI_NULL_BYTE_INPUT: 'ROZ853', // null-byte injection in input arg (carries forward unplugin/transform.ts:235-237)
+  CLI_NON_ROZIE_INPUT: 'ROZ854', // file input that doesn't end with .rozie
+  CLI_REACT_REQUIRES_OUT_DIR: 'ROZ855', // target=react with no --out — sidecars (.d.ts/.module.css/.global.css) cannot stream to stdout
+  // ROZ856..ROZ879 reserved for future @rozie/cli needs
   // ROZ880..ROZ899 reserved for .d.ts emitter (Plan 06-02)
 } as const;
 

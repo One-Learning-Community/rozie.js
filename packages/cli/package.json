@@ -39,6 +39,7 @@
     "@rozie/target-vue": "workspace:*",
     "@vue/compiler-sfc": "^3.5.33",
     "commander": "^14.0.0",
+    "fast-glob": "^3.3.3",
     "htmlparser2": "^12.0.0",
     "magic-string": "^0.30.21",
     "picocolors": "^1.1.0",
