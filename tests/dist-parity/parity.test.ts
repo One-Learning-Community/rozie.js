@@ -1,17 +1,25 @@
 /**
- * DIST-05 strict-bytes parity gate (Plan 06-06 / D-93).
+ * DIST-05 strict-bytes parity gate (Plan 06-06 / D-93; Phase 06.2 P3 / D-126
+ * extended 5 → 8 examples).
  *
  * Asserts that ALL FOUR Rozie distribution entrypoints produce byte-identical
- * output for every (5 reference example × 4 targets) tuple:
+ * output for every (8 reference example × 4 targets) tuple:
  *   • Leg 1 — @rozie/core.compile() direct
  *   • Leg 2 — @rozie/cli runBuildMatrix (writes to disk)
  *   • Leg 3 — @rozie/babel-plugin (writes sibling via transformAsync)
  *   • Leg 4 — @rozie/unplugin createTransformHook (in-process)
  *
- * Total: 5 × 4 × 4 = 80 byte-equal assertions + React sidecar checks
+ * Total: 8 × 4 × 4 = 128 byte-equal assertions + React sidecar checks
  * (.d.ts / .module.css / .global.css) per fixture × 3 legs that surface
  * those sidecars (Legs 1-3; Leg 4 doesn't surface sidecars in the same
  * shape — they're virtual ids in unplugin per D-58).
+ *
+ * Phase 06.2 P3 D-126: EXAMPLES extended 5 → 8 (TreeNode + Card + CardHeader
+ * appended). Modal regenerates per the D-119 retrofit (additive — <components>{
+ * Counter } block + <Counter /> embed in body content area). Non-Modal
+ * existing fixtures (Counter / SearchInput / Dropdown / TodoList × 4 targets ×
+ * sidecars) MUST stay byte-identical — verified by `git diff --name-only`
+ * empty result on non-Modal paths post-bootstrap.
  *
  * Trailing-newline contract (D-93):
  *   - `result.code` and `result.types` MUST already end with `\n` — the
@@ -50,7 +58,17 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, '../..');
 const FIXTURES_DIR = resolve(HERE, 'fixtures');
 
-const EXAMPLES = ['Counter', 'SearchInput', 'Dropdown', 'TodoList', 'Modal'] as const;
+// Phase 06.2 P3 D-126: extended 5 → 8 examples.
+const EXAMPLES = [
+  'Counter',
+  'SearchInput',
+  'Dropdown',
+  'TodoList',
+  'Modal',
+  'TreeNode',
+  'Card',
+  'CardHeader',
+] as const;
 const TARGETS = ['vue', 'react', 'svelte', 'angular'] as const;
 type Target = (typeof TARGETS)[number];
 

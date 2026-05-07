@@ -1,4 +1,6 @@
 <script lang="ts">
+import Counter from './Counter.svelte';
+
 import type { Snippet } from 'svelte';
 
 interface Props {
@@ -79,6 +81,7 @@ $effect(() => {
       <button class="close-btn" aria-label="Close" onclick={close}>×</button>
     </header>{/if}<div class="modal-body">
       {@render children?.(close)}
+      <Counter></Counter>
     </div>
 
     {#if footer}<footer>

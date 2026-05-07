@@ -21,5 +21,18 @@ export default defineConfig({
     include: ['src/**/*.test.ts', 'tests/**/*.test.ts'],
     root: __dirname,
     snapshotFormat: { printBasicPrototype: false },
+    // Phase 06.2 P3 — TreeNode browser-mount test imports svelte's `mount()`
+    // API which only exists on the client export. Inline svelte so the
+    // `browser`/`svelte` resolve conditions below take effect.
+    server: {
+      deps: {
+        inline: ['svelte'],
+      },
+    },
+  },
+  // Vitest dispatches happy-dom under Node — without explicit conditions,
+  // svelte resolves to its server entry (no `mount()`). Force browser/svelte.
+  resolve: {
+    conditions: ['browser', 'svelte'],
   },
 });

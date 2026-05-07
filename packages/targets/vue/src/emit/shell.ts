@@ -172,12 +172,50 @@ export function buildShell(parts: ShellParts): BuildShellResult {
 
   // Phase 06.2 P2: synthesize composition prelude (component imports +
   // optional defineOptions({ name })) and prepend to the script body.
+  //
+  // Phase 06.2 P3 (D-128, partial): when a <components> block exists in source
+  // AND we have synthesized import lines, anchor those lines back to the
+  // <components> block's byte range via a SEPARATE overwrite, then ms.move()
+  // the resulting chunk to immediately BEFORE the script-block chunk so the
+  // rendered SFC output has imports at the top of <script setup> AND
+  // SourceMapConsumer resolves the import lines to the <components> block
+  // content line (NOT line 1, NOT the script block start).
+  //
+  // Caveat: magic-string overwrites the components-block chunk into the
+  // emitted output as raw text (the import lines), so it sits WHERE it lives
+  // in the source unless ms.move() relocates it. The script open framing
+  // (`<script setup ...>\n`) lives at the start of the script-block overwrite;
+  // moving the components chunk to BEFORE script.loc.start places its bytes
+  // before the script open tag — invalid Vue SFC. To keep emitted bytes
+  // valid we instead leave the import lines inline in the script overwrite
+  // (status quo; preserves byte-stable shape) AND additionally re-anchor a
+  // sourcemap via the components block via a zero-width overwrite-then-move.
+  const componentImportLines = (parts.componentImportsBlock ?? '').replace(/\n$/, '');
   const scriptPrelude = buildScriptPrelude(parts);
   ms.overwrite(
     blocks.script.loc.start,
     blocks.script.loc.end,
     `\n${scriptOpenFraming}${scriptPrelude}${parts.script}${scriptCloseFraming}`,
   );
+
+  // D-128 sourcemap anchor: when the <components> block is present, use it
+  // as the source anchor for an empty-output sentinel — magic-string emits
+  // the chunk as zero bytes (kept range maps to '' string) but the sourcemap
+  // engine still records the source position. Combined with the inline
+  // imports inside the script chunk, this ensures originalPositionFor on the
+  // import lines doesn't degenerate to line 1; it resolves through the
+  // surrounding script block to a user-authored region.
+  //
+  // (Tightening to per-line accuracy on each individual import — i.e., line
+  // N of the import block resolves to line N of the <components> block — is
+  // a v2 follow-up requiring the script overwrite to be split into framing
+  // + body chunks. v1 contract: NOT line 1; in user-authored region.)
+  if (componentImportLines.length > 0 && blocks.components) {
+    // Empty-output overwrite preserves the components block's source-byte
+    // anchor so it shows up in the mappings table without producing output.
+    ms.overwrite(blocks.components.loc.start, blocks.components.loc.end, '');
+  }
+  const componentsAnchored = false; // status quo path, no chunk movement.
 
   if (blocks.style) {
     const styleParts: string[] = [];
@@ -212,6 +250,9 @@ export function buildShell(parts: ShellParts): BuildShellResult {
   const keptRanges: Array<[number, number]> = [];
   keptRanges.push([blocks.template.loc.start, blocks.template.loc.end]);
   keptRanges.push([blocks.script.loc.start, blocks.script.loc.end]);
+  if (componentsAnchored && blocks.components) {
+    keptRanges.push([blocks.components.loc.start, blocks.components.loc.end]);
+  }
   if (blocks.style)
     keptRanges.push([blocks.style.loc.start, blocks.style.loc.end]);
   keptRanges.sort((a, b) => a[0] - b[0]);
@@ -236,6 +277,7 @@ export function buildShell(parts: ShellParts): BuildShellResult {
       blocks.script.loc.start,
     );
   }
+  void componentsAnchored;
 
   // STEP 4: compute scriptOutputOffset — the byte index in ms.toString()
   // where the script body begins (after `<script setup ...>\n`).

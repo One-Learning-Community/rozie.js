@@ -2,66 +2,66 @@
   "node": {
     "type": "ListenersAST",
     "loc": {
-      "start": 1842,
-      "end": 2191
+      "start": 1904,
+      "end": 2253
     },
     "entries": [
       {
         "rawKey": "document:keydown.escape",
         "rawKeyLoc": {
-          "start": 2084,
-          "end": 2107
+          "start": 2146,
+          "end": 2169
         },
         "target": "document",
         "event": "keydown",
         "modifierChainText": ".escape",
-        "modifierChainBaseOffset": 2100,
+        "modifierChainBaseOffset": 2162,
         "chain": [],
         "value": {
           "type": "ObjectExpression",
-          "start": 2110,
-          "end": 2187,
+          "start": 2172,
+          "end": 2249,
           "loc": {
             "start": {
-              "line": 62,
+              "line": 68,
               "column": 29,
-              "index": 2110
+              "index": 2172
             },
             "end": {
-              "line": 65,
+              "line": 71,
               "column": 3,
-              "index": 2187
+              "index": 2249
             },
             "filename": "Modal.rozie"
           },
           "properties": [
             {
               "type": "ObjectProperty",
-              "start": 2116,
-              "end": 2162,
+              "start": 2178,
+              "end": 2224,
               "loc": {
                 "start": {
-                  "line": 63,
+                  "line": 69,
                   "column": 4,
-                  "index": 2116
+                  "index": 2178
                 },
                 "end": {
-                  "line": 63,
+                  "line": 69,
                   "column": 50,
-                  "index": 2162
+                  "index": 2224
                 },
                 "filename": "Modal.rozie"
               },
               "method": false,
               "key": {
                 "type": "Identifier",
-                "start": 2116,
-                "end": 2120,
+                "start": 2178,
+                "end": 2182,
                 "loc": {
                   "end": {
-                    "line": 63,
+                    "line": 69,
                     "column": 8,
-                    "index": 2120
+                    "index": 2182
                   },
                   "filename": "Modal.rozie",
                   "identifierName": "when"
@@ -72,13 +72,13 @@
               "shorthand": false,
               "value": {
                 "type": "StringLiteral",
-                "start": 2125,
-                "end": 2162,
+                "start": 2187,
+                "end": 2224,
                 "loc": {
                   "start": {
-                    "line": 63,
+                    "line": 69,
                     "column": 13,
-                    "index": 2125
+                    "index": 2187
                   },
                   "filename": "Modal.rozie"
                 },
@@ -87,31 +87,31 @@
             },
             {
               "type": "ObjectProperty",
-              "start": 2168,
-              "end": 2182,
+              "start": 2230,
+              "end": 2244,
               "loc": {
                 "start": {
-                  "line": 64,
+                  "line": 70,
                   "column": 4,
-                  "index": 2168
+                  "index": 2230
                 },
                 "end": {
-                  "line": 64,
+                  "line": 70,
                   "column": 18,
-                  "index": 2182
+                  "index": 2244
                 },
                 "filename": "Modal.rozie"
               },
               "method": false,
               "key": {
                 "type": "Identifier",
-                "start": 2168,
-                "end": 2175,
+                "start": 2230,
+                "end": 2237,
                 "loc": {
                   "end": {
-                    "line": 64,
+                    "line": 70,
                     "column": 11,
-                    "index": 2175
+                    "index": 2237
                   },
                   "filename": "Modal.rozie",
                   "identifierName": "handler"
@@ -122,13 +122,13 @@
               "shorthand": false,
               "value": {
                 "type": "Identifier",
-                "start": 2177,
-                "end": 2182,
+                "start": 2239,
+                "end": 2244,
                 "loc": {
                   "start": {
-                    "line": 64,
+                    "line": 70,
                     "column": 13,
-                    "index": 2177
+                    "index": 2239
                   },
                   "filename": "Modal.rozie",
                   "identifierName": "close"
@@ -139,8 +139,8 @@
           ]
         },
         "loc": {
-          "start": 2083,
-          "end": 2187
+          "start": 2145,
+          "end": 2249
         }
       }
     ]

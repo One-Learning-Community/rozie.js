@@ -79,6 +79,24 @@ export interface CompileOptions {
 }
 
 /**
+ * Phase 06.2 P3 (D-120): metadata about a `.rozie` component declared in the
+ * source's `<components>` block. Populated in source-order from
+ * `IRComponent.components`. Empty array when the source has no
+ * `<components>` block.
+ *
+ * Consumers (CLI, IDE plugin, babel-plugin) inspect this to resolve component
+ * graphs without re-parsing the emitted `.code`.
+ *
+ * @public
+ */
+export interface ComponentDep {
+  /** PascalCase identifier from the `<components>` key (e.g., 'Modal'). */
+  localName: string;
+  /** Verbatim `.rozie` import path from the `<components>` value (e.g., './Modal.rozie'). */
+  importPath: string;
+}
+
+/**
  * Result returned by `compile()`. Always returned — never thrown (D-81).
  *
  * On fatal error: `code: ''`, `map: null`, `types: ''`, `diagnostics`
@@ -97,6 +115,12 @@ export interface CompileResult {
   css?: string;
   /** React-only: `:root`-scoped global CSS body for the sibling `.global.css` file. */
   globalCss?: string;
+  /**
+   * Phase 06.2 P3 (D-120): components declared via `<components>` block.
+   * Source-order. Empty array when no `<components>` block. Optional for
+   * forward-compat with pre-06.2 consumers.
+   */
+  componentDeps?: ComponentDep[];
   /** Collected diagnostics from parse, lower, and emit phases. */
   diagnostics: Diagnostic[];
 }
@@ -126,6 +150,10 @@ export function compile(source: string, opts: CompileOptions): CompileResult {
     code: '',
     map: null,
     types: '',
+    // Phase 06.2 P3 D-120: predictable empty array on fatal-error paths so
+    // consumers can rely on the field being present (the optional `?` is
+    // forward-compat for pre-06.2 consumers; new code can dot-into it).
+    componentDeps: [],
     diagnostics,
   });
 
@@ -154,6 +182,15 @@ export function compile(source: string, opts: CompileOptions): CompileResult {
     modifierRegistry: registry,
     ...(filename !== undefined ? { filename } : {}),
   };
+
+  // Phase 06.2 P3 D-120: project IRComponent.components (which is
+  // ComponentDecl[] from the IR) onto the public ComponentDep[] surface.
+  // Source-order preserved via the IR's Map insertion order. Empty when no
+  // <components> block — the IR exposes [] in that case (P1 contract).
+  const componentDeps: ComponentDep[] = ir.components.map((decl) => ({
+    localName: decl.localName,
+    importPath: decl.importPath,
+  }));
   switch (opts.target) {
     case 'vue': {
       const r = emitVue(ir, emitOpts);
@@ -161,17 +198,22 @@ export function compile(source: string, opts: CompileOptions): CompileResult {
         code: r.code,
         map: wantSourceMap ? r.map : null,
         types: '', // D-84 inline-typed via defineProps<T>()
+        componentDeps, // D-120
         diagnostics: [...acc, ...r.diagnostics],
       };
     }
     case 'react': {
       const r = emitReact(ir, emitOpts);
-      const types = wantTypes ? emitReactTypes(ir) : '';
+      // D-121: thread an explicit linkedComponents:undefined to make the
+      // future wire-up trivial (the parameter is accepted-but-ignored in v1.0;
+      // this call site documents its existence).
+      const types = wantTypes ? emitReactTypes(ir, { linkedComponents: undefined }) : '';
       const result: CompileResult = {
         code: r.code,
         map: wantSourceMap ? r.map : null,
         types,
         css: r.css,
+        componentDeps, // D-120
         diagnostics: [...acc, ...r.diagnostics],
       };
       if (r.globalCss !== undefined) {
@@ -185,6 +227,7 @@ export function compile(source: string, opts: CompileOptions): CompileResult {
         code: r.code,
         map: wantSourceMap ? r.map : null,
         types: '', // D-84 inline-typed via $props<T>()
+        componentDeps, // D-120
         diagnostics: [...acc, ...r.diagnostics],
       };
     }
@@ -194,6 +237,7 @@ export function compile(source: string, opts: CompileOptions): CompileResult {
         code: r.code,
         map: wantSourceMap ? r.map : null,
         types: '', // D-84 inline-typed via @Input() decorators
+        componentDeps, // D-120
         diagnostics: [...acc, ...r.diagnostics],
       };
     }

@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { useControllableState } from '@rozie/runtime-react';
 import styles from './Modal.module.css';
 import './Modal.global.css';
+import Counter from './Counter';
 
 interface HeaderCtx { close: any; }
 
@@ -83,6 +84,7 @@ export default function Modal(_props: ModalProps): JSX.Element {
           <button className={styles["close-btn"]} aria-label="Close" onClick={close}>×</button>
         </header>}<div className={styles["modal-body"]}>
           {props.children?.({ close })}
+          <Counter />
         </div>
 
         {(props.renderFooter) && <footer>

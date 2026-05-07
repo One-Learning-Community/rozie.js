@@ -1,0 +1,46 @@
+<!--
+  Card.rozie
+
+  Demonstrates Phase 06.2 wrapper composition (D-119):
+    - <components> block declaring CardHeader as a child component.
+    - Template embeds <CardHeader title="..." :on-close="..." /> at the top
+      of the body, with a default <slot /> in the body content area.
+    - tagKind: 'component' on the <CardHeader> tag (P1 lowering); P2 emit
+      synthesizes a top-of-file import per target — Vue/Svelte get the
+      target-extension form, React gets bare './CardHeader', Angular gets
+      named import + class added to @Component({ imports: [...] }) AND the
+      tag is rewritten to selector form `<rozie-card-header>`.
+
+  Wrapper-pair partner of CardHeader.rozie.
+-->
+
+<rozie name="Card">
+
+<components>
+{
+  CardHeader: './CardHeader.rozie',
+}
+</components>
+
+<props>
+{
+  title: { type: String, default: '' },
+  onClose: { type: Function, default: null },
+}
+</props>
+
+<template>
+<article class="card">
+  <CardHeader :title="$props.title" :on-close="$props.onClose" />
+  <div class="card__body">
+    <slot />
+  </div>
+</article>
+</template>
+
+<style>
+.card { border: 1px solid #ddd; border-radius: 6px; overflow: hidden; background: #fff; }
+.card__body { padding: 1rem; }
+</style>
+
+</rozie>

@@ -5,6 +5,13 @@
 //   - directory  → fast-glob `${dir}/**/*.rozie`
 //   - glob       → fast-glob direct (detected via `fg.isDynamicPattern`)
 //
+// Phase 06.2 P3 D-122: composing components emit as plain imports; downstream
+// bundlers handle transitive resolution. v1's "one input file → one output
+// unit" assumption holds — `<components>{ Foo: './Foo.rozie' }` does NOT
+// auto-include `./Foo.rozie` in the input list. Authors enumerate the full
+// component graph via the variadic args / glob pattern. v2 may add a
+// `--resolve-transitive` flag.
+//
 // Carries forward security posture from `packages/unplugin/src/transform.ts`:
 //   - Null-byte injection rejected (lines 235-237 of transform.ts)
 //   - Top-level symlink args refused; recursive glob walk skips symlinks

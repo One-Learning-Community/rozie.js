@@ -8,6 +8,7 @@
       <button class="close-btn" aria-label="Close" @click="close">×</button>
     </header><div class="modal-body">
       <slot :close="close"></slot>
+      <Counter></Counter>
     </div>
 
     <footer v-if="$slots.footer">
