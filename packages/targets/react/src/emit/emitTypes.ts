@@ -99,10 +99,20 @@ export function emitReactTypes(
   }
 
   // Emits → optional `on<EventPascal>` props.
+  // Dedupe handler names to avoid PascalCase collisions (WR-01): two distinct
+  // emit identifiers that PascalCase to the same key (e.g. `add` + `Add`, or
+  // `value-change` + `valueChange`) would otherwise produce duplicate property
+  // declarations on the props interface — invalid TypeScript or silently
+  // last-write-wins. The IR validator should already reject empty emit names;
+  // the empty-string guard here is defense-in-depth.
+  const emittedHandlers = new Set<string>();
   for (const e of ir.emits) {
     const eventPascal = toPascalCase(e);
     if (eventPascal.length === 0) continue;
-    lines.push(`  on${eventPascal}?: (...args: unknown[]) => void;`);
+    const handlerName = `on${eventPascal}`;
+    if (emittedHandlers.has(handlerName)) continue;
+    emittedHandlers.add(handlerName);
+    lines.push(`  ${handlerName}?: (...args: unknown[]) => void;`);
   }
 
   // Slots per D-84 + D-86.
