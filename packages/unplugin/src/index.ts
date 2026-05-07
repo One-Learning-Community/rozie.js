@@ -26,6 +26,7 @@
  * @experimental — shape may change before v1.0
  */
 
+import { unlinkSync } from 'node:fs';
 import { createUnplugin as createUnpluginV3 } from 'unplugin';
 import { ModifierRegistry } from '../../core/src/modifiers/ModifierRegistry.js';
 import { registerBuiltins } from '../../core/src/modifiers/registerBuiltins.js';
@@ -163,12 +164,15 @@ export const unplugin = createUnpluginV3<Partial<RozieOptions>>((rawOptions) => 
             const hmrRoot = server?.config?.root ?? process.cwd();
             emitRozieTsToDisk(file, registry, hmrRoot);
           } catch (err) {
-            // Surface as a warning rather than aborting HMR — the next
-            // request-time transform will throw with a precise Vite-shaped
-            // error pointing at the offending source location.
+            // Surface as a warning rather than aborting HMR. Closes WR-02:
+            // delete the stale .rozie.ts so Vite gets a module-not-found
+            // error (surfaced in the browser overlay) rather than silently
+            // serving stale compiled output. The next successful save will
+            // re-write the file and restore normal operation.
             const msg = err instanceof Error ? err.message : String(err);
             // biome-ignore lint/suspicious/noConsole: HMR-time diagnostic
             console.warn(`[@rozie/unplugin] HMR re-emit failed for ${file}: ${msg}`);
+            try { unlinkSync(file + '.ts'); } catch { /* already absent */ }
           }
         }
         let candidates: string[];
