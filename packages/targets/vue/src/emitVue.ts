@@ -56,6 +56,24 @@ export interface EmitVueOptions {
    * shared registry to avoid the per-call construction cost.
    */
   modifierRegistry?: ModifierRegistry;
+  /**
+   * D-85 Vue full (Plan 06-02 Task 3): generic type parameters for the
+   * component (e.g., `['T']` for a Select<T>). When provided:
+   *   - the SFC's `<script setup>` carries a `generic="T, ..."` attribute
+   *     (Vue 3.4+ stable);
+   *   - the props interface is emitted as `interface ${Name}Props<T, ...> {...}`;
+   *   - `defineProps<${Name}Props<T, ...>>()` resolves through the SFC's
+   *     generic context.
+   *
+   * The Phase 1 .rozie parser does NOT yet accept user-authored generic
+   * syntax in v1, so this option is currently set ONLY by tests and
+   * direct-callers (e.g., Plan 06-05's vue-ts consumer-fixture bootstrap).
+   *
+   * Threat note (T-06-02-03): each entry MUST be a valid TypeScript
+   * identifier. v1 has no consumer-controlled path; v2 parser-driven
+   * generic emission would validate at the parse boundary.
+   */
+  genericParams?: string[];
 }
 
 export interface EmitVueResult {
@@ -204,7 +222,14 @@ function mergeVueImportsAndListeners(
 export function emitVue(ir: IRComponent, opts: EmitVueOptions = {}): EmitVueResult {
   const registry = opts.modifierRegistry ?? createDefaultRegistry();
 
-  const { script, diagnostics: scriptDiags } = emitScript(ir);
+  // D-85 Vue full (Plan 06-02 Task 3): exactOptionalPropertyTypes:true
+  // requires conditional spread on `genericParams` so `undefined` is never
+  // forwarded as an explicit property of the emitScript options.
+  const scriptOpts =
+    opts.genericParams !== undefined
+      ? { genericParams: opts.genericParams }
+      : {};
+  const { script, diagnostics: scriptDiags } = emitScript(ir, scriptOpts);
   const {
     template,
     scriptInjections,
@@ -253,11 +278,18 @@ export function emitVue(ir: IRComponent, opts: EmitVueOptions = {}): EmitVueResu
   const styleDiags = styleResult.diagnostics;
 
   // Plan 05 — compose the SFC envelope via magic-string for source-map plumbing.
+  // Plan 06-02 Task 3 — thread genericParams into the `<script setup
+  // generic="...">` attribute when set; null preserves the byte-identical
+  // existing-shape for the 5 reference examples.
   const ms = buildShell({
     template,
     script: enrichedScript,
     styleScoped,
     styleGlobal,
+    scriptGeneric:
+      opts.genericParams && opts.genericParams.length > 0
+        ? opts.genericParams.join(', ')
+        : null,
   });
 
   const code = ms.toString();

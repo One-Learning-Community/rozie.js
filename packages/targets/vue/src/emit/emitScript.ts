@@ -114,12 +114,37 @@ function renderType(t: PropTypeAnnotation): string {
 /**
  * Emit `withDefaults(defineProps<{...}>(), { ... })` for non-model props.
  * Returns empty string when no non-model props exist.
+ *
+ * D-85 Vue full (Plan 06-02 Task 3): when `genericParams` is set, the inline
+ * type literal becomes a parameterized interface `${Name}Props<T, ...>` so
+ * that Vue's `<script setup generic="T">` attribute can resolve `T` inside
+ * the props type-arg. The interface declaration is hoisted above the
+ * `defineProps` call.
  */
-function emitPropsDecl(ir: IRComponent): string {
+function emitPropsDecl(
+  ir: IRComponent,
+  genericParams?: readonly string[],
+): string {
   const nonModel = ir.props.filter((p) => !p.isModel);
-  if (nonModel.length === 0) return '';
+  const generics =
+    genericParams && genericParams.length > 0
+      ? `<${genericParams.join(', ')}>`
+      : '';
 
-  const fields = nonModel.map((p) => `${p.name}?: ${renderType(p.typeAnnotation)}`);
+  if (nonModel.length === 0) {
+    // Generic components with NO non-model props still need a typed
+    // `defineProps<FooProps<T>>()` so consumers can pass the type argument.
+    // But if there are no model props EITHER, emitDefineModels will emit
+    // nothing too — which means the SFC has no defineProps at all and the
+    // generic attribute on <script setup> is effectively unused. This
+    // is fine for v1: the only generic fixture (Select<T>) has a model prop
+    // so defineModel<T> uses T.
+    return '';
+  }
+
+  const fields = nonModel.map(
+    (p) => `${p.name}?: ${renderType(p.typeAnnotation)}`,
+  );
 
   // Build the defaults object — only include props with non-null defaultValue.
   const defaultsEntries: string[] = [];
@@ -129,6 +154,27 @@ function emitPropsDecl(ir: IRComponent): string {
     }
   }
 
+  // Generic-mode: hoist a named interface so `defineProps<SelectProps<T>>()`
+  // resolves T against the enclosing <script setup generic="T"> attribute.
+  if (generics.length > 0) {
+    const interfaceLine = `interface ${ir.name}Props${generics} { ${fields.join('; ')} }`;
+    if (defaultsEntries.length === 0) {
+      return (
+        `${interfaceLine}\n` +
+        `const props = defineProps<${ir.name}Props${generics}>();`
+      );
+    }
+    return (
+      `${interfaceLine}\n` +
+      `const props = withDefaults(\n` +
+      `  defineProps<${ir.name}Props${generics}>(),\n` +
+      `  { ${defaultsEntries.join(', ')} }\n` +
+      `);`
+    );
+  }
+
+  // Non-generic mode (existing Phase 3 shape — byte-identical for the 5
+  // reference examples that never set genericParams).
   if (defaultsEntries.length === 0) {
     return `const props = defineProps<{ ${fields.join('; ')} }>();`;
   }
@@ -512,12 +558,32 @@ function emitResidualScriptBody(
 /**
  * @experimental — shape may change before v1.0
  */
+export interface EmitScriptOptions {
+  /**
+   * D-85 Vue full (Plan 06-02 Task 3): when set, emitPropsDecl emits a
+   * parameterized interface `${Name}Props<T, ...>` so that the surrounding
+   * `<script setup generic="T">` attribute (set by buildShell) can resolve
+   * the type parameter through the `defineProps<...>` macro.
+   *
+   * When omitted (the existing Phase 3 calling pattern), the existing
+   * inline type literal is emitted unchanged — byte-identical for the 5
+   * non-generic reference examples.
+   */
+  genericParams?: string[];
+}
+
+/**
+ * @experimental — shape may change before v1.0
+ */
 export interface EmitScriptResult {
   script: string;
   diagnostics: Diagnostic[];
 }
 
-export function emitScript(ir: IRComponent): EmitScriptResult {
+export function emitScript(
+  ir: IRComponent,
+  opts: EmitScriptOptions = {},
+): EmitScriptResult {
   const diagnostics: Diagnostic[] = [];
 
   // 1. Clone Program (NEVER mutate ir.setupBody.scriptProgram).
@@ -529,7 +595,7 @@ export function emitScript(ir: IRComponent): EmitScriptResult {
   const imports = new VueImportCollector();
 
   // 3. Emit blocks in canonical order.
-  const propsLine = emitPropsDecl(ir);
+  const propsLine = emitPropsDecl(ir, opts.genericParams);
   const modelLines = emitDefineModels(ir);
   const emitsLine = emitDefineEmitsCall(ir);
   const slotsLine = emitDefineSlotsStub(ir);

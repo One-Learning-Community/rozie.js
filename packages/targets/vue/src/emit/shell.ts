@@ -29,6 +29,14 @@ export interface ShellParts {
   styleScoped: string;
   /** Body of trailing global `<style>...</style>` (D-38 :root extraction), or null. */
   styleGlobal: string | null;
+  /**
+   * D-85 Vue full (Plan 06-02 Task 3): comma-separated list of generic type
+   * parameters for the SFC's `<script setup generic="...">` attribute (Vue
+   * 3.4+ stable). When `null` (the default for the 5 reference examples),
+   * NO `generic=` attribute is emitted, preserving byte-identical output
+   * for non-generic components.
+   */
+  scriptGeneric?: string | null;
 }
 
 export function buildShell(parts: ShellParts): MagicString {
@@ -36,7 +44,15 @@ export function buildShell(parts: ShellParts): MagicString {
   ms.append('<template>\n');
   ms.append(parts.template);
   ms.append('\n</template>\n\n');
-  ms.append('<script setup lang="ts">\n');
+  // D-85 Vue full: thread genericParams into the script-setup attribute list.
+  // When scriptGeneric is null/undefined/empty, emit the existing Phase 3
+  // form `<script setup lang="ts">` with no `generic=` attribute (back-compat).
+  const scriptGeneric = parts.scriptGeneric ?? null;
+  const genericAttr =
+    scriptGeneric !== null && scriptGeneric.length > 0
+      ? ` generic="${scriptGeneric}"`
+      : '';
+  ms.append(`<script setup lang="ts"${genericAttr}>\n`);
   ms.append(parts.script);
   ms.append('\n</script>\n');
   if (parts.styleScoped.length > 0) {
