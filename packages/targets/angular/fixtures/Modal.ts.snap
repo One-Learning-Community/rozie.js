@@ -1,6 +1,8 @@
 import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, effect, inject, input, model, output, viewChild } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 
+import { Counter } from './Counter';
+
 interface HeaderCtx {
   $implicit: { close: any };
   close: any;
@@ -19,7 +21,7 @@ interface FooterCtx {
 @Component({
   selector: 'rozie-modal',
   standalone: true,
-  imports: [NgTemplateOutlet],
+  imports: [NgTemplateOutlet, Counter],
   template: `
 
     @if (open()) {
@@ -38,6 +40,7 @@ interface FooterCtx {
         </header>
     }<div class="modal-body">
           <ng-container *ngTemplateOutlet="defaultTpl; context: { $implicit: { close: _close }, close: _close }" />
+          <rozie-counter></rozie-counter>
         </div>
 
         @if (footerTpl) {

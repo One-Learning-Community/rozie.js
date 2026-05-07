@@ -15,6 +15,7 @@
     </header>
 }<div class="modal-body">
       <ng-container *ngTemplateOutlet="defaultTpl; context: { $implicit: { close: close }, close: close }" />
+      <rozie-counter></rozie-counter>
     </div>
 
     @if (footerTpl) {
