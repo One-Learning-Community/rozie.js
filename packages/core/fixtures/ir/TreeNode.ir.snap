@@ -1,0 +1,328 @@
+{
+  "type": "IRComponent",
+  "name": "TreeNode",
+  "props": [
+    {
+      "type": "PropDecl",
+      "name": "label",
+      "typeAnnotation": {
+        "kind": "identifier",
+        "name": "String"
+      },
+      "defaultValue": null,
+      "isModel": false,
+      "sourceLoc": {
+        "start": 91,
+        "end": 114
+      }
+    },
+    {
+      "type": "PropDecl",
+      "name": "children",
+      "typeAnnotation": {
+        "kind": "identifier",
+        "name": "Array"
+      },
+      "defaultValue": {
+        "type": "ArrowFunctionExpression",
+        "start": 150,
+        "end": 158,
+        "loc": {
+          "start": {
+            "line": 3,
+            "column": 68,
+            "index": 150
+          },
+          "end": {
+            "line": 3,
+            "column": 76,
+            "index": 158
+          },
+          "filename": "TreeNode.rozie"
+        },
+        "id": null,
+        "generator": false,
+        "async": false,
+        "params": [],
+        "body": {
+          "type": "ArrayExpression",
+          "start": 156,
+          "end": 158,
+          "loc": {
+            "start": {
+              "line": 3,
+              "column": 74,
+              "index": 156
+            },
+            "filename": "TreeNode.rozie"
+          },
+          "elements": []
+        }
+      },
+      "isModel": false,
+      "sourceLoc": {
+        "start": 116,
+        "end": 160
+      }
+    }
+  ],
+  "state": [],
+  "computed": [],
+  "refs": [],
+  "slots": [],
+  "emits": [],
+  "lifecycle": [],
+  "listeners": [],
+  "setupBody": {
+    "type": "SetupBody",
+    "scriptProgram": {
+      "type": "File",
+      "program": {
+        "type": "Program",
+        "body": [],
+        "directives": [],
+        "sourceType": "module",
+        "interpreter": null
+      },
+      "comments": null
+    },
+    "annotations": []
+  },
+  "template": {
+    "type": "TemplateFragment",
+    "children": [
+      {
+        "type": "TemplateStaticText",
+        "text": "\n  ",
+        "sourceLoc": {
+          "start": 181,
+          "end": 184
+        }
+      },
+      {
+        "type": "TemplateElement",
+        "tagName": "li",
+        "attributes": [],
+        "events": [],
+        "children": [
+          {
+            "type": "TemplateStaticText",
+            "text": "\n    ",
+            "sourceLoc": {
+              "start": 188,
+              "end": 193
+            }
+          },
+          {
+            "type": "TemplateElement",
+            "tagName": "span",
+            "attributes": [],
+            "events": [],
+            "children": [
+              {
+                "type": "TemplateInterpolation",
+                "expression": {
+                  "type": "MemberExpression",
+                  "start": 1,
+                  "end": 13,
+                  "loc": {
+                    "start": {
+                      "line": 1,
+                      "column": 1,
+                      "index": 1
+                    },
+                    "end": {
+                      "line": 1,
+                      "column": 13,
+                      "index": 13
+                    }
+                  },
+                  "object": {
+                    "type": "Identifier",
+                    "start": 1,
+                    "end": 7,
+                    "loc": {
+                      "end": {
+                        "line": 1,
+                        "column": 7,
+                        "index": 7
+                      },
+                      "identifierName": "$props"
+                    },
+                    "name": "$props"
+                  },
+                  "computed": false,
+                  "property": {
+                    "type": "Identifier",
+                    "start": 8,
+                    "end": 13,
+                    "loc": {
+                      "start": {
+                        "line": 1,
+                        "column": 8,
+                        "index": 8
+                      },
+                      "identifierName": "label"
+                    },
+                    "name": "label"
+                  },
+                  "comments": []
+                },
+                "deps": [
+                  {
+                    "scope": "props",
+                    "path": [
+                      "label"
+                    ]
+                  }
+                ],
+                "sourceLoc": {
+                  "start": 199,
+                  "end": 217
+                }
+              }
+            ],
+            "sourceLoc": {
+              "start": 193,
+              "end": 224
+            },
+            "tagKind": "html"
+          },
+          {
+            "type": "TemplateStaticText",
+            "text": "\n    ",
+            "sourceLoc": {
+              "start": 224,
+              "end": 229
+            }
+          },
+          {
+            "type": "TemplateElement",
+            "tagName": "TreeNode",
+            "attributes": [
+              {
+                "kind": "binding",
+                "name": "node",
+                "expression": {
+                  "type": "MemberExpression",
+                  "start": 0,
+                  "end": 15,
+                  "loc": {
+                    "start": {
+                      "line": 1,
+                      "column": 0,
+                      "index": 0
+                    },
+                    "end": {
+                      "line": 1,
+                      "column": 15,
+                      "index": 15
+                    }
+                  },
+                  "object": {
+                    "type": "Identifier",
+                    "start": 0,
+                    "end": 6,
+                    "loc": {
+                      "end": {
+                        "line": 1,
+                        "column": 6,
+                        "index": 6
+                      },
+                      "identifierName": "$props"
+                    },
+                    "name": "$props"
+                  },
+                  "computed": false,
+                  "property": {
+                    "type": "Identifier",
+                    "start": 7,
+                    "end": 15,
+                    "loc": {
+                      "start": {
+                        "line": 1,
+                        "column": 7,
+                        "index": 7
+                      },
+                      "identifierName": "children"
+                    },
+                    "name": "children"
+                  },
+                  "comments": []
+                },
+                "deps": [
+                  {
+                    "scope": "props",
+                    "path": [
+                      "children"
+                    ]
+                  }
+                ],
+                "sourceLoc": {
+                  "start": 239,
+                  "end": 262
+                }
+              }
+            ],
+            "events": [],
+            "children": [],
+            "sourceLoc": {
+              "start": 229,
+              "end": 265
+            },
+            "tagKind": "self"
+          },
+          {
+            "type": "TemplateStaticText",
+            "text": "\n  ",
+            "sourceLoc": {
+              "start": 265,
+              "end": 268
+            }
+          }
+        ],
+        "sourceLoc": {
+          "start": 184,
+          "end": 273
+        },
+        "tagKind": "html"
+      },
+      {
+        "type": "TemplateStaticText",
+        "text": "\n",
+        "sourceLoc": {
+          "start": 273,
+          "end": 274
+        }
+      }
+    ],
+    "sourceLoc": {
+      "start": 181,
+      "end": 274
+    }
+  },
+  "styles": {
+    "type": "StyleSection",
+    "scopedRules": [],
+    "rootRules": [],
+    "sourceLoc": {
+      "start": 0,
+      "end": 0
+    }
+  },
+  "components": [
+    {
+      "type": "ComponentDecl",
+      "localName": "TreeNode",
+      "importPath": "./TreeNode.rozie",
+      "sourceLoc": {
+        "start": 38,
+        "end": 66
+      }
+    }
+  ],
+  "sourceLoc": {
+    "start": 0,
+    "end": 294
+  }
+}

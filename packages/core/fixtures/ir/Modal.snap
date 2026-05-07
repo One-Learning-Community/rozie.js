@@ -2722,7 +2722,8 @@
                                         "sourceLoc": {
                                           "start": 2586,
                                           "end": 2613
-                                        }
+                                        },
+                                        "tagKind": "html"
                                       },
                                       {
                                         "type": "TemplateStaticText",
@@ -2781,7 +2782,8 @@
                                     "sourceLoc": {
                                       "start": 2634,
                                       "end": 2704
-                                    }
+                                    },
+                                    "tagKind": "html"
                                   },
                                   {
                                     "type": "TemplateStaticText",
@@ -2795,7 +2797,8 @@
                                 "sourceLoc": {
                                   "start": 2490,
                                   "end": 2718
-                                }
+                                },
+                                "tagKind": "html"
                               }
                             ]
                           }
@@ -2873,7 +2876,8 @@
                         "sourceLoc": {
                           "start": 2724,
                           "end": 2789
-                        }
+                        },
+                        "tagKind": "html"
                       },
                       {
                         "type": "TemplateStaticText",
@@ -3005,7 +3009,8 @@
                                 "sourceLoc": {
                                   "start": 2795,
                                   "end": 2882
-                                }
+                                },
+                                "tagKind": "html"
                               }
                             ]
                           }
@@ -3015,7 +3020,8 @@
                     "sourceLoc": {
                       "start": 2331,
                       "end": 2891
-                    }
+                    },
+                    "tagKind": "html"
                   },
                   {
                     "type": "TemplateStaticText",
@@ -3029,7 +3035,8 @@
                 "sourceLoc": {
                   "start": 2216,
                   "end": 2898
-                }
+                },
+                "tagKind": "html"
               }
             ]
           }
@@ -3124,6 +3131,7 @@
       "end": 3796
     }
   },
+  "components": [],
   "sourceLoc": {
     "start": 753,
     "end": 3814

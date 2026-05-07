@@ -1693,7 +1693,8 @@
             "sourceLoc": {
               "start": 1539,
               "end": 1744
-            }
+            },
+            "tagKind": "html"
           },
           {
             "type": "TemplateStaticText",
@@ -1855,7 +1856,8 @@
                     "sourceLoc": {
                       "start": 1748,
                       "end": 1856
-                    }
+                    },
+                    "tagKind": "html"
                   }
                 ]
               },
@@ -1953,7 +1955,8 @@
                     "sourceLoc": {
                       "start": 1859,
                       "end": 1921
-                    }
+                    },
+                    "tagKind": "html"
                   }
                 ]
               }
@@ -1963,7 +1966,8 @@
         "sourceLoc": {
           "start": 1266,
           "end": 1928
-        }
+        },
+        "tagKind": "html"
       },
       {
         "type": "TemplateStaticText",
@@ -2021,6 +2025,7 @@
       "end": 2200
     }
   },
+  "components": [],
   "sourceLoc": {
     "start": 483,
     "end": 2218

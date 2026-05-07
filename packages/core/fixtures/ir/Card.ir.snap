@@ -1,0 +1,138 @@
+{
+  "type": "IRComponent",
+  "name": "Card",
+  "props": [],
+  "state": [],
+  "computed": [],
+  "refs": [],
+  "slots": [],
+  "emits": [],
+  "lifecycle": [],
+  "listeners": [],
+  "setupBody": {
+    "type": "SetupBody",
+    "scriptProgram": {
+      "type": "File",
+      "program": {
+        "type": "Program",
+        "body": [],
+        "directives": [],
+        "sourceType": "module",
+        "interpreter": null
+      },
+      "comments": null
+    },
+    "annotations": []
+  },
+  "template": {
+    "type": "TemplateFragment",
+    "children": [
+      {
+        "type": "TemplateStaticText",
+        "text": "\n  ",
+        "sourceLoc": {
+          "start": 92,
+          "end": 95
+        }
+      },
+      {
+        "type": "TemplateElement",
+        "tagName": "div",
+        "attributes": [
+          {
+            "kind": "static",
+            "name": "class",
+            "value": "card",
+            "sourceLoc": {
+              "start": 100,
+              "end": 112
+            }
+          }
+        ],
+        "events": [],
+        "children": [
+          {
+            "type": "TemplateStaticText",
+            "text": "\n    ",
+            "sourceLoc": {
+              "start": 113,
+              "end": 118
+            }
+          },
+          {
+            "type": "TemplateElement",
+            "tagName": "CardHeader",
+            "attributes": [
+              {
+                "kind": "static",
+                "name": "title",
+                "value": "Hello",
+                "sourceLoc": {
+                  "start": 130,
+                  "end": 143
+                }
+              }
+            ],
+            "events": [],
+            "children": [],
+            "sourceLoc": {
+              "start": 118,
+              "end": 146
+            },
+            "tagKind": "component",
+            "componentRef": {
+              "type": "ComponentDecl",
+              "localName": "CardHeader",
+              "importPath": "./CardHeader.rozie",
+              "sourceLoc": {
+                "start": 34,
+                "end": 66
+              }
+            }
+          },
+          {
+            "type": "TemplateStaticText",
+            "text": "\n  ",
+            "sourceLoc": {
+              "start": 146,
+              "end": 149
+            }
+          }
+        ],
+        "sourceLoc": {
+          "start": 95,
+          "end": 155
+        },
+        "tagKind": "html"
+      },
+      {
+        "type": "TemplateStaticText",
+        "text": "\n",
+        "sourceLoc": {
+          "start": 155,
+          "end": 156
+        }
+      }
+    ],
+    "sourceLoc": {
+      "start": 92,
+      "end": 156
+    }
+  },
+  "styles": {
+    "type": "StyleSection",
+    "scopedRules": [],
+    "rootRules": [],
+    "sourceLoc": {
+      "start": 0,
+      "end": 0
+    }
+  },
+  "components": [
+    null
+  ],
+  "sourceLoc": {
+    "start": 0,
+    "end": 176
+  }
+}

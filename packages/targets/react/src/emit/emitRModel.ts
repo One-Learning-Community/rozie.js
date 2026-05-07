@@ -25,6 +25,9 @@ import type {
   AttributeBinding,
 } from '../../../../core/src/ir/types.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
+// Phase 06.2 P1 D-116 — shared PascalCase predicate. Replaces the local
+// isCustomComponent fn so IR lowering and per-target emit cannot drift.
+import { isPascalCase } from '../../../../core/src/ir/utils/isPascalCase.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
 
 type GenerateFn = typeof import('@babel/generator').default;
@@ -82,15 +85,6 @@ function getStaticAttr(
     if (a.kind === 'static' && a.name === name) return a.value;
   }
   return null;
-}
-
-/**
- * Detect if a tag name is a custom component (capitalized first letter).
- */
-function isCustomComponent(tag: string): boolean {
-  if (tag.length === 0) return false;
-  const c = tag.charAt(0);
-  return c >= 'A' && c <= 'Z';
 }
 
 export interface EmitRModelResult {
@@ -168,7 +162,7 @@ export function emitRModel(
   );
 
   // Custom component (capitalized): value + onValueChange
-  if (isCustomComponent(element.tagName)) {
+  if (isPascalCase(element.tagName)) {
     return {
       replacementAttributes: [
         makeBindingAttr(':value', localId),

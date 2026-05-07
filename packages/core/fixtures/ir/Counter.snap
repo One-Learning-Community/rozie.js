@@ -1876,7 +1876,8 @@
             "sourceLoc": {
               "start": 1160,
               "end": 1246
-            }
+            },
+            "tagKind": "html"
           },
           {
             "type": "TemplateStaticText",
@@ -1968,7 +1969,8 @@
             "sourceLoc": {
               "start": 1249,
               "end": 1294
-            }
+            },
+            "tagKind": "html"
           },
           {
             "type": "TemplateStaticText",
@@ -2058,7 +2060,8 @@
             "sourceLoc": {
               "start": 1297,
               "end": 1383
-            }
+            },
+            "tagKind": "html"
           },
           {
             "type": "TemplateStaticText",
@@ -2072,7 +2075,8 @@
         "sourceLoc": {
           "start": 1016,
           "end": 1390
-        }
+        },
+        "tagKind": "html"
       },
       {
         "type": "TemplateStaticText",
@@ -2138,6 +2142,7 @@
       "end": 1710
     }
   },
+  "components": [],
   "sourceLoc": {
     "start": 375,
     "end": 1728

@@ -1,0 +1,166 @@
+{
+  "type": "IRComponent",
+  "name": "CardHeader",
+  "props": [
+    {
+      "type": "PropDecl",
+      "name": "title",
+      "typeAnnotation": {
+        "kind": "identifier",
+        "name": "String"
+      },
+      "defaultValue": null,
+      "isModel": false,
+      "sourceLoc": {
+        "start": 35,
+        "end": 58
+      }
+    }
+  ],
+  "state": [],
+  "computed": [],
+  "refs": [],
+  "slots": [],
+  "emits": [],
+  "lifecycle": [],
+  "listeners": [],
+  "setupBody": {
+    "type": "SetupBody",
+    "scriptProgram": {
+      "type": "File",
+      "program": {
+        "type": "Program",
+        "body": [],
+        "directives": [],
+        "sourceType": "module",
+        "interpreter": null
+      },
+      "comments": null
+    },
+    "annotations": []
+  },
+  "template": {
+    "type": "TemplateFragment",
+    "children": [
+      {
+        "type": "TemplateStaticText",
+        "text": "\n  ",
+        "sourceLoc": {
+          "start": 79,
+          "end": 82
+        }
+      },
+      {
+        "type": "TemplateElement",
+        "tagName": "div",
+        "attributes": [
+          {
+            "kind": "static",
+            "name": "class",
+            "value": "card-header",
+            "sourceLoc": {
+              "start": 87,
+              "end": 106
+            }
+          }
+        ],
+        "events": [],
+        "children": [
+          {
+            "type": "TemplateInterpolation",
+            "expression": {
+              "type": "MemberExpression",
+              "start": 1,
+              "end": 13,
+              "loc": {
+                "start": {
+                  "line": 1,
+                  "column": 1,
+                  "index": 1
+                },
+                "end": {
+                  "line": 1,
+                  "column": 13,
+                  "index": 13
+                }
+              },
+              "object": {
+                "type": "Identifier",
+                "start": 1,
+                "end": 7,
+                "loc": {
+                  "end": {
+                    "line": 1,
+                    "column": 7,
+                    "index": 7
+                  },
+                  "identifierName": "$props"
+                },
+                "name": "$props"
+              },
+              "computed": false,
+              "property": {
+                "type": "Identifier",
+                "start": 8,
+                "end": 13,
+                "loc": {
+                  "start": {
+                    "line": 1,
+                    "column": 8,
+                    "index": 8
+                  },
+                  "identifierName": "title"
+                },
+                "name": "title"
+              },
+              "comments": []
+            },
+            "deps": [
+              {
+                "scope": "props",
+                "path": [
+                  "title"
+                ]
+              }
+            ],
+            "sourceLoc": {
+              "start": 107,
+              "end": 125
+            }
+          }
+        ],
+        "sourceLoc": {
+          "start": 82,
+          "end": 131
+        },
+        "tagKind": "html"
+      },
+      {
+        "type": "TemplateStaticText",
+        "text": "\n",
+        "sourceLoc": {
+          "start": 131,
+          "end": 132
+        }
+      }
+    ],
+    "sourceLoc": {
+      "start": 79,
+      "end": 132
+    }
+  },
+  "styles": {
+    "type": "StyleSection",
+    "scopedRules": [],
+    "rootRules": [],
+    "sourceLoc": {
+      "start": 0,
+      "end": 0
+    }
+  },
+  "components": [],
+  "sourceLoc": {
+    "start": 0,
+    "end": 152
+  }
+}

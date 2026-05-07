@@ -2529,7 +2529,8 @@
             "sourceLoc": {
               "start": 2176,
               "end": 2287
-            }
+            },
+            "tagKind": "html"
           },
           {
             "type": "TemplateStaticText",
@@ -2685,7 +2686,8 @@
                     "sourceLoc": {
                       "start": 2291,
                       "end": 2401
-                    }
+                    },
+                    "tagKind": "html"
                   }
                 ]
               }
@@ -2695,7 +2697,8 @@
         "sourceLoc": {
           "start": 2151,
           "end": 2408
-        }
+        },
+        "tagKind": "html"
       },
       {
         "type": "TemplateStaticText",
@@ -2746,6 +2749,7 @@
       "end": 2813
     }
   },
+  "components": [],
   "sourceLoc": {
     "start": 587,
     "end": 2831
