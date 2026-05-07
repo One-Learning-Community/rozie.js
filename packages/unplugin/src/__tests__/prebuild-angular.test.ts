@@ -154,3 +154,107 @@ describe('D-70 disk-cache: prebuildAngularRozieFiles', () => {
     expect(() => prebuildAngularRozieFiles(tmpDir, makeRegistry())).not.toThrow();
   });
 });
+
+// Phase 06.2 follow-up — cross-rozie composition shim. The Angular target's
+// rewriteRozieImport produces extensionless imports for cross-rozie
+// composition (e.g. `import { Counter } from './Counter'`). Without a
+// resolvable `./Counter.ts` on disk, analogjs's NgCompiler fails AOT
+// compilation on any component that imports another rozie component and
+// falls back to runtime __decorate. Fix: prebuild also emits a tiny
+// re-export shim `Counter.ts` next to `Counter.rozie.ts` whenever a
+// `<components>` block declares a cross-rozie target.
+const MODAL_WITH_COMPONENTS = `<rozie name="Modal">
+<components>
+{
+  Counter: './Counter.rozie',
+}
+</components>
+<props>
+{ open: { type: Boolean, default: false, model: true } }
+</props>
+<template>
+<div r-if="$props.open" class="modal">
+  <Counter />
+</div>
+</template>
+</rozie>
+`;
+
+const TREE_NODE_SELF_REF = `<rozie name="TreeNode">
+<components>
+{
+  TreeNode: './TreeNode.rozie',
+}
+</components>
+<props>
+{ node: { type: Object, default: () => ({ id: '', label: '', children: [] }) } }
+</props>
+<template>
+<div class="tn">
+  <span>{{ $props.node.label }}</span>
+  <ul r-for="child in $props.node.children" :key="child.id">
+    <TreeNode :node="child" />
+  </ul>
+</div>
+</template>
+</rozie>
+`;
+
+describe('D-70 cross-rozie shim emission (Phase 06.2 follow-up)', () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'rozie-d70-shim-'));
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('emits Counter.ts re-export shim when Modal.rozie imports Counter via <components>', () => {
+    writeFileSync(join(tmpDir, 'Counter.rozie'), COUNTER_ROZIE);
+    writeFileSync(join(tmpDir, 'Modal.rozie'), MODAL_WITH_COMPONENTS);
+    emitRozieTsToDisk(join(tmpDir, 'Modal.rozie'), makeRegistry());
+    const shimPath = join(tmpDir, 'Counter.ts');
+    expect(existsSync(shimPath)).toBe(true);
+    const content = readFileSync(shimPath, 'utf8');
+    expect(content).toMatch(/^\/\/ @rozie-cross-rozie-shim/);
+    expect(content).toContain("export * from './Counter.rozie';");
+    expect(content).toContain("export { default } from './Counter.rozie';");
+  });
+
+  it('does NOT emit a shim for self-references (D-114 outer-name route)', () => {
+    writeFileSync(join(tmpDir, 'TreeNode.rozie'), TREE_NODE_SELF_REF);
+    emitRozieTsToDisk(join(tmpDir, 'TreeNode.rozie'), makeRegistry());
+    expect(existsSync(join(tmpDir, 'TreeNode.ts'))).toBe(false);
+  });
+
+  it('does NOT clobber a consumer-authored .ts file (no marker line)', () => {
+    writeFileSync(join(tmpDir, 'Counter.rozie'), COUNTER_ROZIE);
+    writeFileSync(join(tmpDir, 'Modal.rozie'), MODAL_WITH_COMPONENTS);
+    const consumerCounterTs = "// hand-written by consumer\nexport const x = 42;\n";
+    writeFileSync(join(tmpDir, 'Counter.ts'), consumerCounterTs);
+    emitRozieTsToDisk(join(tmpDir, 'Modal.rozie'), makeRegistry());
+    expect(readFileSync(join(tmpDir, 'Counter.ts'), 'utf8')).toBe(consumerCounterTs);
+  });
+
+  it('overwrites a stale shim from a prior prebuild', () => {
+    writeFileSync(join(tmpDir, 'Counter.rozie'), COUNTER_ROZIE);
+    writeFileSync(join(tmpDir, 'Modal.rozie'), MODAL_WITH_COMPONENTS);
+    // Pre-existing shim with marker but stale content (different filename).
+    const stale = "// @rozie-cross-rozie-shim\nexport * from './stale.rozie';\n";
+    writeFileSync(join(tmpDir, 'Counter.ts'), stale);
+    emitRozieTsToDisk(join(tmpDir, 'Modal.rozie'), makeRegistry());
+    const refreshed = readFileSync(join(tmpDir, 'Counter.ts'), 'utf8');
+    expect(refreshed).not.toBe(stale);
+    expect(refreshed).toContain("export * from './Counter.rozie';");
+  });
+
+  it('emits no shim when the .rozie file has no <components> block', () => {
+    writeFileSync(join(tmpDir, 'Counter.rozie'), COUNTER_ROZIE);
+    emitRozieTsToDisk(join(tmpDir, 'Counter.rozie'), makeRegistry());
+    // Counter.rozie has no <components> block — no shims should be written.
+    // (The .rozie.ts disk-cache is still emitted for Counter itself.)
+    expect(existsSync(join(tmpDir, 'Counter.ts'))).toBe(false);
+  });
+});

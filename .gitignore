@@ -27,6 +27,17 @@ examples/consumers/*/.tmp-*/
 # automatically.
 *.rozie.ts
 
+# Phase 06.2 follow-up — cross-rozie composition shims. When a `.rozie`
+# component declares a `<components>` block, the prebuild also writes a
+# tiny re-export shim `<Name>.ts` next to `<Name>.rozie.ts` so TS module
+# resolution can find `import './<Name>'` (the extensionless cross-rozie
+# convention). The shim files start with the marker `// @rozie-cross-rozie-shim`
+# and are detected/skipped if a consumer-authored same-named file exists.
+# Listed per consumer demo here because we can't gitignore the bare `.ts`
+# pattern repo-wide without sweeping legitimate consumer code.
+examples/consumers/angular-analogjs/src/Counter.ts
+examples/consumers/angular-analogjs/src/CardHeader.ts
+
 # IntelliJ plugin subproject (Phase 8)
 tools/intellij-plugin/build/
 tools/intellij-plugin/.gradle/
