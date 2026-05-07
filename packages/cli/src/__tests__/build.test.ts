@@ -46,10 +46,26 @@ describe('runBuild — happy path (Counter.rozie -> Vue SFC)', () => {
 });
 
 describe('runBuild — react target (Counter.rozie -> React TSX)', () => {
+  // Phase 6 D-89/ROZ855: react target requires --out (sidecars cannot stream to stdout).
+  // The test now uses a temp --out dir and reads the emitted Counter.tsx.
   it('emits a valid React 18 functional component with hooks + JSX + interface', async () => {
-    const { ctx, out } = makeBufs();
-    await runBuild(COUNTER_PATH, { target: 'react' }, ctx);
-    const code = out();
+    const tmp = mkdtempSync(join(tmpdir(), 'rozie-cli-react-'));
+    const { ctx } = makeBufs();
+    await runBuild(COUNTER_PATH, { target: 'react', out: tmp }, ctx);
+    const candidates = [
+      join(tmp, 'react', 'Counter.tsx'),
+      join(tmp, 'react', 'examples', 'Counter.tsx'),
+    ];
+    const found = candidates.find((p) => {
+      try {
+        readFileSync(p, 'utf8');
+        return true;
+      } catch {
+        return false;
+      }
+    });
+    expect(found).toBeDefined();
+    const code = readFileSync(found!, 'utf8');
     // Sanity: NOT importing React default (D-68 automatic JSX runtime)
     expect(code).not.toContain("import React from 'react'");
     expect(code).toContain("from 'react'");
@@ -57,6 +73,16 @@ describe('runBuild — react target (Counter.rozie -> React TSX)', () => {
     expect(code).toContain('interface CounterProps');
     expect(code).toContain('export default function Counter');
     expect(code).toContain('return (');
+  });
+
+  it('errors with ROZ855 when target=react and --out is omitted (sidecar safety)', async () => {
+    const { ctx, err } = makeBufs();
+    await expect(
+      runBuild(COUNTER_PATH, { target: 'react' }, ctx),
+    ).rejects.toBeInstanceOf(BuildExit);
+    expect(err()).toMatch(/ROZ855/);
+    expect(err()).toMatch(/react/);
+    expect(err()).toMatch(/--out|out/);
   });
 });
 
@@ -101,70 +127,100 @@ describe('runBuild — error paths', () => {
   });
 });
 
-describe('runBuild — --out writes byte-identical output', () => {
-  it('writes the same bytes that --no-out would print to stdout', async () => {
+// Phase 6 Plan 03 D-89 layout — `--out` is now always treated as the OUTPUT
+// ROOT directory; the per-tuple output path is computed by computeOutputPath
+// as `<outDir>/{target}/{source-rel}/Foo.{ext}`. The legacy "if --out is a
+// file path, write there directly" behavior is removed; tests below assert
+// the new D-89 paths.
+describe('runBuild — --out writes byte-identical output (D-89 layout)', () => {
+  it('writes the same bytes that stdout would print, at <out>/{target}/{rel}/Foo.{ext}', async () => {
     const tmp = mkdtempSync(join(tmpdir(), 'rozie-cli-test-'));
-    const outFile = join(tmp, 'Counter.vue');
 
-    // First: capture stdout output.
+    // First: capture stdout output (no --out → stdout fallthrough for non-React).
     const { ctx: stdoutCtx, out } = makeBufs();
     await runBuild(COUNTER_PATH, {}, stdoutCtx);
     const stdoutCode = out();
 
-    // Second: write to disk via --out.
+    // Second: write to disk via --out (now a directory per D-89). The output
+    // path includes a per-target subdir AND the source-rel-path from rootDir
+    // (process.cwd by default; for COUNTER_PATH = /repo/examples/Counter.rozie
+    // and rootDir=/repo, the rel-path is `examples`).
     const { ctx: fileCtx } = makeBufs();
-    await runBuild(COUNTER_PATH, { out: outFile }, fileCtx);
-    const onDisk = readFileSync(outFile, 'utf8');
-
+    await runBuild(COUNTER_PATH, { out: tmp }, fileCtx);
+    // Search for the emitted file under tmp — exact rel-path depends on cwd.
+    // We accept either `<tmp>/vue/Counter.vue` or `<tmp>/vue/<rel>/Counter.vue`.
+    const candidates = [
+      join(tmp, 'vue', 'Counter.vue'),
+      join(tmp, 'vue', 'examples', 'Counter.vue'),
+    ];
+    const found = candidates.find((p) => {
+      try {
+        readFileSync(p, 'utf8');
+        return true;
+      } catch {
+        return false;
+      }
+    });
+    expect(found).toBeDefined();
+    const onDisk = readFileSync(found!, 'utf8');
     expect(onDisk).toBe(stdoutCode);
     expect(onDisk).toContain('<script setup lang="ts">');
   });
 });
 
-describe('runBuild — --out directory auto-naming', () => {
-  it('appends <basename>.<target-ext> when --out is an existing directory', async () => {
-    const tmp = mkdtempSync(join(tmpdir(), 'rozie-cli-dir-'));
-    const { ctx } = makeBufs();
-    await runBuild(COUNTER_PATH, { out: tmp }, ctx);
-    const written = readFileSync(join(tmp, 'Counter.vue'), 'utf8');
-    expect(written).toContain('<script setup lang="ts">');
-  });
-
-  it('treats a non-existent --out path as a file (does not require parent dir to exist as itself)', async () => {
-    const tmp = mkdtempSync(join(tmpdir(), 'rozie-cli-newfile-'));
-    const newFile = join(tmp, 'Custom.vue');
-    const { ctx } = makeBufs();
-    await runBuild(COUNTER_PATH, { out: newFile }, ctx);
-    const written = readFileSync(newFile, 'utf8');
-    expect(written).toContain('<script setup lang="ts">');
-  });
-});
-
-describe('runBuildMany — multi-file batch', () => {
-  it('compiles multiple inputs into the output directory', async () => {
+describe('runBuildMany — multi-file batch (D-89 layout)', () => {
+  it('compiles multiple inputs into the output directory under {target}/ subdir', async () => {
     const tmp = mkdtempSync(join(tmpdir(), 'rozie-cli-many-'));
     const { ctx } = makeBufs();
     await runBuildMany([COUNTER_PATH, COUNTER_PATH], { out: tmp, target: 'vue' }, ctx);
-    // Both write to the same basename (Counter.vue) — second overwrites first, file must exist.
-    const written = readFileSync(join(tmp, 'Counter.vue'), 'utf8');
+    // Both write to the same target/rel/basename (Counter.vue) — second overwrites first, file must exist.
+    const candidates = [
+      join(tmp, 'vue', 'Counter.vue'),
+      join(tmp, 'vue', 'examples', 'Counter.vue'),
+    ];
+    const found = candidates.find((p) => {
+      try {
+        readFileSync(p, 'utf8');
+        return true;
+      } catch {
+        return false;
+      }
+    });
+    expect(found).toBeDefined();
+    const written = readFileSync(found!, 'utf8');
     expect(written).toContain('<script setup lang="ts">');
   });
 
-  it('creates the output directory if it does not exist', async () => {
+  it('creates the output directory tree if it does not exist (react target)', async () => {
     const tmp = mkdtempSync(join(tmpdir(), 'rozie-cli-mkdir-'));
     const newDir = join(tmp, 'nested', 'out');
     const { ctx } = makeBufs();
     await runBuildMany([COUNTER_PATH], { out: newDir, target: 'react' }, ctx);
-    const written = readFileSync(join(newDir, 'Counter.tsx'), 'utf8');
+    const candidates = [
+      join(newDir, 'react', 'Counter.tsx'),
+      join(newDir, 'react', 'examples', 'Counter.tsx'),
+    ];
+    const found = candidates.find((p) => {
+      try {
+        readFileSync(p, 'utf8');
+        return true;
+      } catch {
+        return false;
+      }
+    });
+    expect(found).toBeDefined();
+    const written = readFileSync(found!, 'utf8');
     expect(written).toContain('export default function Counter');
   });
 
-  it('exits 2 with an error when --out is omitted', async () => {
+  it('exits 2 with ROZ852 when --out is omitted for multi-input', async () => {
+    // Use two DISTINCT inputs so expandInputs's dedup doesn't collapse them.
+    const SEARCH_INPUT_PATH = resolve(__dirname, '../../../../examples/SearchInput.rozie');
     const { ctx, err } = makeBufs();
     await expect(
-      runBuildMany([COUNTER_PATH, COUNTER_PATH], {}, ctx),
+      runBuildMany([COUNTER_PATH, SEARCH_INPUT_PATH], {}, ctx),
     ).rejects.toBeInstanceOf(BuildExit);
-    expect(err()).toMatch(/--out.*required/);
+    expect(err()).toMatch(/--out.*required|ROZ852/);
   });
 
   it('continues compiling after one failure and exits 1 at the end', async () => {
@@ -193,8 +249,22 @@ describe('runBuildMany — multi-file batch', () => {
 
     expect(thrown).toBeInstanceOf(BuildExit);
     expect((thrown as BuildExit).code).toBe(1);
-    // The good file still compiled.
-    expect(readFileSync(join(outDir, 'Counter.vue'), 'utf8')).toContain('<script setup');
+    // The good file still compiled — search for it under the D-89 layout.
+    const candidates = [
+      join(outDir, 'vue', 'Counter.vue'),
+      join(outDir, 'vue', 'examples', 'Counter.vue'),
+    ];
+    const found = candidates.find((p) => {
+      try {
+        readFileSync(p, 'utf8');
+        return true;
+      } catch {
+        return false;
+      }
+    });
+    expect(found).toBeDefined();
+    const counterCode = readFileSync(found!, 'utf8');
+    expect(counterCode).toContain('<script setup');
     // Failure summary mentions the count.
     expect(err()).toMatch(/1 of 2/);
   });

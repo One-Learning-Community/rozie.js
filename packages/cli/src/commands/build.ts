@@ -1,27 +1,60 @@
-// `rozie build` subcommand — runs parse → lowerToIR → emit{Vue,React,Svelte,Angular}
-// and writes (or prints) the resulting target source.
+// `rozie build` subcommand — D-87/D-88/D-89/D-90/D-91/D-93 multi-target build.
 //
-// All four targets are shipped: vue (Phase 3), react (Phase 4), svelte +
-// angular (Phase 5). The pipeline shape mirrors @rozie/unplugin's per-target
-// pipelines (ParseResult → LowerResult → EmitResult, diagnostics surfaced
-// via renderDiagnostic, errors -> exit 1, warnings -> stderr + continue).
-import { readFileSync, writeFileSync, statSync, mkdirSync } from 'node:fs';
-import { resolve as pathResolve, join as pathJoin, basename as pathBasename, dirname as pathDirname } from 'node:path';
-import pc from 'picocolors';
-import { parse } from '../../../core/src/parse.js';
-import { lowerToIR } from '../../../core/src/ir/lower.js';
-import { createDefaultRegistry } from '../../../core/src/modifiers/registerBuiltins.js';
+// As of Phase 6 Plan 03, the canonical entrypoint is `runBuildMatrix(inputs,
+// opts)` — a single (input × target) matrix coordinator that:
+//   • Expands variadic positional args via `expandInputs` (D-88 file/dir/glob)
+//   • Validates the target list parsed by commander's `parseTargets` (D-87)
+//   • Routes every per-tuple compile through `@rozie/core.compile()` — the
+//     single source of truth shared with @rozie/unplugin and @rozie/babel-plugin
+//     (D-93 byte-identical contract; Plan 06-06 parity gate enforces drift)
+//   • Writes `dist/{target}/{source-rel}/Foo.{ext}` per D-89
+//   • Emits .d.ts sidecars by default (D-90); --no-types opts out
+//   • Suppresses .map sidecars by default (D-91); --source-map opts in
+//   • Errors with ROZ855 when target=react and --out is null (sidecars cannot
+//     stream to stdout)
+//
+// `runBuild` and `runBuildMany` are preserved as thin backward-compat wrappers
+// — they delegate to runBuildMatrix with single-target coercion. ALL CLI
+// pipelines now flow through `compile()`; the legacy parse → lowerToIR →
+// emit{Target} chain has been removed from this file.
+// Per the @rozie/unplugin pattern (transform.ts) and @rozie/core's own
+// compile.ts: use RELATIVE imports into sibling workspace packages so the
+// pipeline works whether or not dist/ has been built. tsdown inlines these
+// at bundle time for the published artifact.
+import { compile } from '../../../core/src/compile.js';
 import { renderDiagnostic } from '../../../core/src/diagnostics/frame.js';
 import type { Diagnostic } from '../../../core/src/diagnostics/Diagnostic.js';
-import { emitVue } from '../../../targets/vue/src/emitVue.js';
-import { emitReact } from '../../../targets/react/src/emitReact.js';
-import { emitSvelte } from '../../../targets/svelte/src/emitSvelte.js';
-import { emitAngular } from '../../../targets/angular/src/emitAngular.js';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname as pathDirname, resolve as pathResolve } from 'node:path';
+import pc from 'picocolors';
+import { expandInputs } from '../utils/expandInputs.js';
+import { computeOutputPath } from '../utils/outputPath.js';
+import type { Target } from '../utils/parseTargets.js';
 
+/**
+ * Legacy single-target options shape — preserved for `runBuild` /
+ * `runBuildMany` backward-compat. New code should use `BuildOptionsExt`.
+ */
 export interface BuildOptions {
   target?: string;
   out?: string;
   sourceMap?: boolean;
+}
+
+/**
+ * Phase 6 multi-target options shape consumed by `runBuildMatrix`.
+ * Commander's `parseTargets` produces `target: Target[]`; programmatic callers
+ * may pass either a single `Target` (e.g., from `runBuild`) or `Target[]`.
+ */
+export interface BuildOptionsExt {
+  target?: Target | Target[];
+  out?: string;
+  /** D-91 default false — emit .map sidecars only when explicitly opted in. */
+  sourceMap?: boolean;
+  /** D-90 default true — emit .d.ts sidecars; --no-types maps to false. */
+  types?: boolean;
+  /** Project root used for source-rel-path computation; defaults to process.cwd(). */
+  root?: string;
 }
 
 /**
@@ -51,18 +84,18 @@ export interface RunBuildContext {
   stdoutWrite?: (chunk: string) => void;
 }
 
-const VALID_TARGETS = new Set(['vue', 'react', 'svelte', 'angular']);
+const VALID_TARGETS = new Set<Target>(['vue', 'react', 'svelte', 'angular']);
 
-const TARGET_EXTENSIONS: Record<string, string> = {
-  vue: '.vue',
-  react: '.tsx',
-  svelte: '.svelte',
-  angular: '.ts',
-};
-
-export async function runBuild(
-  input: string,
-  opts: BuildOptions = {},
+/**
+ * Phase 6 D-87/D-88/D-89/D-90/D-91/D-93 — the canonical build coordinator.
+ *
+ * @param inputArgs  positional args (files, directories, or globs)
+ * @param opts       parsed options (target list, out, sourceMap, types, root)
+ * @param ctx        test-injection sinks + exit-mode toggle
+ */
+export async function runBuildMatrix(
+  inputArgs: string[],
+  opts: BuildOptionsExt = {},
   ctx: RunBuildContext = {},
 ): Promise<void> {
   const stderrWrite = ctx.stderrWrite ?? ((s) => void process.stderr.write(s));
@@ -75,168 +108,190 @@ export async function runBuild(
     process.exit(code);
   };
 
-  // ----- Target validation ----------------------------------------------
-  const target = opts.target ?? 'vue';
-  if (!VALID_TARGETS.has(target)) {
-    const msg = pc.red(
-      `rozie build: unknown target '${target}' (expected vue|react|svelte|angular)\n`,
-    );
+  // ----- Normalize the target list -------------------------------------
+  const targetsRaw: Target[] = Array.isArray(opts.target)
+    ? opts.target
+    : opts.target !== undefined
+      ? [opts.target as Target]
+      : ['vue'];
+
+  // Defensive validation — commander's parseTargets already vets these, but
+  // programmatic callers (runBuild/runBuildMany passthroughs, tests) might
+  // bypass it.
+  for (const t of targetsRaw) {
+    if (!VALID_TARGETS.has(t)) {
+      const msg = pc.red(
+        `[ROZ850] rozie build: unknown target '${t}' (expected vue|react|svelte|angular)\n`,
+      );
+      stderrWrite(msg);
+      exit(2, msg);
+      return;
+    }
+  }
+  const targets = targetsRaw;
+
+  // ----- Expand inputs --------------------------------------------------
+  let inputs: string[];
+  try {
+    inputs = await expandInputs(inputArgs);
+  } catch (err) {
+    const msg = pc.red(`${(err as Error).message}\n`);
     stderrWrite(msg);
-    exit(2, msg);
+    exit(1, msg);
+    return;
   }
 
-  // ----- Read input ------------------------------------------------------
-  const filePath = pathResolve(input);
-  let source: string;
-  try {
-    source = readFileSync(filePath, 'utf8');
-  } catch (err) {
+  if (inputs.length === 0) {
     const msg = pc.red(
-      `rozie build: cannot read '${input}': ${(err as Error).message}\n`,
+      `[ROZ851] rozie build: no .rozie files matched the given inputs\n`,
     );
     stderrWrite(msg);
     exit(1, msg);
-    return; // unreachable; satisfies ts narrowing
-  }
-
-  // ----- Pipeline: parse -> lowerToIR -> emitVue ------------------------
-  const { ast, diagnostics: parseDiags } = parse(source, { filename: filePath });
-
-  const parseErrors = parseDiags.filter((d) => d.severity === 'error');
-  if (!ast || parseErrors.length > 0) {
-    const stderrBuf = renderAll(parseDiags, source);
-    stderrWrite(stderrBuf);
-    exit(1, stderrBuf);
     return;
   }
 
-  const registry = createDefaultRegistry();
-  const { ir, diagnostics: irDiags } = lowerToIR(ast, {
-    modifierRegistry: registry,
-  });
-  const irErrors = irDiags.filter((d) => d.severity === 'error');
-  if (!ir || irErrors.length > 0) {
-    const stderrBuf = renderAll(irDiags, source);
-    stderrWrite(stderrBuf);
-    exit(1, stderrBuf);
+  // ----- D-89 --out requirement ----------------------------------------
+  // --out is required when (a) more than one input file or (b) more than one
+  // target — both cases produce multiple output files per invocation.
+  if ((inputs.length > 1 || targets.length > 1) && opts.out === undefined) {
+    const msg = pc.red(
+      `[ROZ852] rozie build: --out <dir> is required when compiling multiple files or multiple targets\n`,
+    );
+    stderrWrite(msg);
+    exit(2, msg);
     return;
   }
 
-  let result;
-  switch (target) {
-    case 'react':
-      result = emitReact(ir, { filename: filePath, source });
-      break;
-    case 'svelte':
-      result = emitSvelte(ir, { filename: filePath, source, modifierRegistry: registry });
-      break;
-    case 'angular':
-      result = emitAngular(ir, { filename: filePath, source, modifierRegistry: registry });
-      break;
-    default:
-      result = emitVue(ir, { filename: filePath, source, modifierRegistry: registry });
-  }
-  const emitErrors = result.diagnostics.filter((d) => d.severity === 'error');
-  if (emitErrors.length > 0) {
-    const stderrBuf = renderAll(result.diagnostics, source);
-    stderrWrite(stderrBuf);
-    exit(1, stderrBuf);
-    return;
-  }
+  const outDir = opts.out !== undefined ? pathResolve(opts.out) : null;
+  const rootDir = opts.root ?? process.cwd();
+  const wantTypes = opts.types !== false; // D-90 default true
+  const wantSourceMap = opts.sourceMap === true; // D-91 default false
 
-  // Surface non-fatal warnings (parse + lower + emit) to stderr but continue.
-  const allWarnings: Diagnostic[] = [
-    ...parseDiags.filter((d) => d.severity === 'warning'),
-    ...irDiags.filter((d) => d.severity === 'warning'),
-    ...result.diagnostics.filter((d) => d.severity === 'warning'),
-  ];
-  if (allWarnings.length > 0) {
-    stderrWrite(renderAll(allWarnings, source));
+  // ----- DIST-04 React-stdout sidecar guard ----------------------------
+  // React emits .d.ts + .module.css + .global.css sidecars; these CANNOT
+  // be streamed to stdout (no filename to attach to). When target=react and
+  // --out is null, error with ROZ855 BEFORE any pipeline work runs.
+  if (outDir === null) {
+    for (const t of targets) {
+      if (t === 'react') {
+        const msg = pc.red(
+          `[ROZ855] rozie build: target 'react' requires --out <dir> ` +
+            `(cannot stream sidecar files .d.ts/.module.css/.global.css to stdout). ` +
+            `Set --out <dir> to emit React components.\n`,
+        );
+        stderrWrite(msg);
+        exit(2, msg);
+        return;
+      }
+    }
   }
 
-  // ----- Output ----------------------------------------------------------
-  if (opts.out) {
-    let outPath = pathResolve(opts.out);
+  // ----- Build (input × target) tuples ---------------------------------
+  const tuples = inputs.flatMap((input) => targets.map((target) => ({ input, target })));
 
-    // If --out points at an existing directory, write to <dir>/<input-basename>.<target-ext>.
-    // throwIfNoEntry: false makes a missing path a non-error — we treat it as a new file path.
-    const outStat = statSync(outPath, { throwIfNoEntry: false });
-    if (outStat?.isDirectory()) {
-      const pathExtension = TARGET_EXTENSIONS[target];
-      outPath = pathJoin(outPath, pathBasename(filePath, '.rozie') + pathExtension);
+  // ----- Parallel compile (RESEARCH recommendation: Promise.all) -------
+  const results = await Promise.all(
+    tuples.map(async ({ input, target }) => {
+      const source = readFileSync(input, 'utf8');
+      const compileOpts = {
+        target,
+        filename: input,
+        types: wantTypes,
+        sourceMap: wantSourceMap,
+      };
+      const result = compile(source, compileOpts);
+      return { input, target, source, result };
+    }),
+  );
+
+  // ----- Write phase + diagnostic surfacing ----------------------------
+  let failed = 0;
+  for (const { input, target, source, result } of results) {
+    const errors = result.diagnostics.filter((d) => d.severity === 'error');
+    const warnings = result.diagnostics.filter((d) => d.severity === 'warning');
+
+    if (errors.length > 0) {
+      stderrWrite(renderAll(result.diagnostics, source));
+      failed++;
+      continue;
+    }
+    if (warnings.length > 0) {
+      stderrWrite(renderAll(warnings, source));
     }
 
+    if (outDir === null) {
+      // Single-target single-input non-React case routed through stdout
+      // (preserves runBuild backward-compat for vue/svelte/angular).
+      stdoutWrite(result.code);
+      continue;
+    }
+
+    const outPath = computeOutputPath(input, target, outDir, rootDir);
+    mkdirSync(pathDirname(outPath), { recursive: true });
     writeFileSync(outPath, result.code, 'utf8');
-    if (opts.sourceMap && result.map) {
-      // magic-string SourceMap has a .toString() that emits canonical JSON.
+
+    // D-90: .d.ts sibling for React (other targets emit '' per D-84)
+    if (wantTypes && target === 'react' && result.types) {
+      writeFileSync(outPath.replace(/\.tsx$/, '.d.ts'), result.types, 'utf8');
+    }
+    // React .module.css / .global.css siblings (D-53/D-54)
+    if (target === 'react') {
+      if (result.css !== undefined && result.css.length > 0) {
+        writeFileSync(outPath.replace(/\.tsx$/, '.module.css'), result.css, 'utf8');
+      }
+      if (result.globalCss !== undefined && result.globalCss.length > 0) {
+        writeFileSync(outPath.replace(/\.tsx$/, '.global.css'), result.globalCss, 'utf8');
+      }
+    }
+    // D-91: .map sibling
+    if (wantSourceMap && result.map) {
       writeFileSync(`${outPath}.map`, result.map.toString(), 'utf8');
     }
+  }
 
-    // For react target, also write sibling .module.css and .global.css when present.
-    if (target === 'react') {
-      const reactResult = result as { css?: string; globalCss?: string };
-      const baseName = pathBasename(filePath, '.rozie');
-      const outDir = pathDirname(outPath);
-      if (reactResult.css && reactResult.css.length > 0) {
-        writeFileSync(pathJoin(outDir, `${baseName}.module.css`), reactResult.css, 'utf8');
-      }
-      if (reactResult.globalCss && reactResult.globalCss.length > 0) {
-        writeFileSync(pathJoin(outDir, `${baseName}.global.css`), reactResult.globalCss, 'utf8');
-      }
-    }
-  } else {
-    stdoutWrite(result.code);
+  if (failed > 0) {
+    const msg = pc.red(`rozie build: ${failed} of ${tuples.length} compilation(s) failed\n`);
+    stderrWrite(msg);
+    exit(1, msg);
   }
 }
 
 /**
- * Compile multiple .rozie files to a directory.
- *
- * Requires opts.out to be (or become) a directory. Each input is processed
- * independently — failures are accumulated and reported at the end rather than
- * aborting the whole batch. Exits 1 if any file failed.
+ * Single-input single-target build — backward-compat thin wrapper around
+ * `runBuildMatrix`. Kept stable for the existing test suite + CLI tests
+ * predating Phase 6.
+ */
+export async function runBuild(
+  input: string,
+  opts: BuildOptions = {},
+  ctx: RunBuildContext = {},
+): Promise<void> {
+  const target = (opts.target ?? 'vue') as Target;
+  const ext: BuildOptionsExt = {
+    target,
+    ...(opts.out !== undefined ? { out: opts.out } : {}),
+    ...(opts.sourceMap === true ? { sourceMap: true } : {}),
+  };
+  return runBuildMatrix([input], ext, ctx);
+}
+
+/**
+ * Multi-input single-target build — backward-compat thin wrapper around
+ * `runBuildMatrix`. The original semantics required `--out <dir>` for
+ * multi-input invocations; runBuildMatrix preserves that via the D-89 guard.
  */
 export async function runBuildMany(
   inputs: string[],
   opts: BuildOptions = {},
   ctx: RunBuildContext = {},
 ): Promise<void> {
-  const stderrWrite = ctx.stderrWrite ?? ((s) => void process.stderr.write(s));
-
-  const exit = (code: number, stderrBuf = ''): never => {
-    if (ctx.exit === 'throw') throw new BuildExit(code, stderrBuf);
-    process.exit(code);
+  const target = (opts.target ?? 'vue') as Target;
+  const ext: BuildOptionsExt = {
+    target,
+    ...(opts.out !== undefined ? { out: opts.out } : {}),
+    ...(opts.sourceMap === true ? { sourceMap: true } : {}),
   };
-
-  if (!opts.out) {
-    const msg = pc.red('rozie build: --out <dir> is required when compiling multiple files\n');
-    stderrWrite(msg);
-    exit(2, msg);
-    return; // unreachable; satisfies ts narrowing
-  }
-
-  const outDir = pathResolve(opts.out);
-  mkdirSync(outDir, { recursive: true });
-
-  let failed = 0;
-  for (const input of inputs) {
-    try {
-      // Pass exit:'throw' so one failure doesn't abort the batch via process.exit.
-      await runBuild(input, { ...opts, out: outDir }, { ...ctx, exit: 'throw' });
-    } catch (e) {
-      if (e instanceof BuildExit) {
-        failed++;
-      } else {
-        throw e;
-      }
-    }
-  }
-
-  if (failed > 0) {
-    const msg = pc.red(`rozie build: ${failed} of ${inputs.length} file(s) failed\n`);
-    stderrWrite(msg);
-    exit(1, msg);
-  }
+  return runBuildMatrix(inputs, ext, ctx);
 }
 
 function renderAll(diagnostics: Diagnostic[], source: string): string {

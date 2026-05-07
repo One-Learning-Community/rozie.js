@@ -32,6 +32,13 @@ export const TARGET_EXTENSIONS: Record<'vue' | 'react' | 'svelte' | 'angular', s
 /**
  * D-89: compute the absolute output path for a given (input, target) tuple.
  *
+ * Layout: `<outDir>/<target>/<source-rel-from-rootDir>/<basename>.<ext>`.
+ *
+ * Path-traversal safety: when the source file lives OUTSIDE `rootDir`
+ * (`pathRelative(rootDir, sourceDir)` starts with `..`), we strip the rel
+ * component and emit `<outDir>/<target>/<basename>.<ext>` instead. This
+ * prevents `--out` from being escaped via cleverly-located inputs.
+ *
  * @param inputAbs   absolute path to the source `.rozie` file
  * @param target     one of the four supported targets
  * @param outDir     absolute path to the output root
@@ -45,7 +52,13 @@ export function computeOutputPath(
   rootDir: string,
 ): string {
   const sourceDir = pathDirname(inputAbs);
-  const sourceRel = pathRelative(rootDir, sourceDir);
+  let sourceRel = pathRelative(rootDir, sourceDir);
+  // Defense-in-depth: if the source lives outside rootDir, refuse to thread
+  // the `..` traversal through pathJoin (it would escape outDir). Flatten to
+  // basename-only when the rel-path starts with `..`.
+  if (sourceRel.startsWith('..')) {
+    sourceRel = '';
+  }
   const baseName = pathBasename(inputAbs, '.rozie');
   const ext = TARGET_EXTENSIONS[target];
   return pathJoin(outDir, target, sourceRel, baseName + ext);
