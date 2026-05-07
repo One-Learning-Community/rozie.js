@@ -26,7 +26,9 @@
 import type { IRComponent } from '../../../core/src/ir/types.js';
 import type { Diagnostic } from '../../../core/src/diagnostics/Diagnostic.js';
 import type { ModifierRegistry } from '../../../core/src/modifiers/ModifierRegistry.js';
+import type { BlockMap } from '../../../core/src/ast/types.js';
 import type { SourceMap } from 'magic-string';
+import { splitBlocks } from '../../../core/src/splitter/splitBlocks.js';
 import { createDefaultRegistry } from '../../../core/src/modifiers/registerBuiltins.js';
 import { emitScript } from './emit/emitScript.js';
 import { emitPropsInterface } from './emit/emitPropsInterface.js';
@@ -44,6 +46,13 @@ export interface EmitReactOptions {
   filename?: string;
   source?: string;
   modifierRegistry?: ModifierRegistry;
+  /**
+   * Phase 06.1 Plan 01 (DX-04): block byte offsets from splitBlocks() —
+   * required by buildShell() for accurate source maps. When omitted,
+   * derived from `opts.source` via splitBlocks() if available, otherwise
+   * the legacy fallback path is taken.
+   */
+  blockOffsets?: BlockMap;
 }
 
 export interface EmitReactResult {
@@ -133,7 +142,22 @@ export function emitReact(
 
   const allScriptInjections = [...tmpl.scriptInjections, ...listeners.scriptInjections];
 
-  const ms = buildShell({
+  // Phase 06.1 Plan 01 (DX-04) — resolve blockOffsets via:
+  //   1. opts.blockOffsets (caller threaded splitBlocks result through)
+  //   2. derive from opts.source via splitBlocks() (back-compat for tests
+  //      that pass { filename, source } without re-parsing for ast.blocks)
+  //   3. degenerate empty BlockMap (no source available — fully back-compat
+  //      with pre-Phase-06.1 callers; produces a legacy-fallback MagicString).
+  let resolvedBlockOffsets: BlockMap;
+  if (opts.blockOffsets !== undefined) {
+    resolvedBlockOffsets = opts.blockOffsets;
+  } else if (opts.source !== undefined) {
+    resolvedBlockOffsets = splitBlocks(opts.source, opts.filename);
+  } else {
+    resolvedBlockOffsets = {};
+  }
+
+  const { ms, scriptOutputOffset } = buildShell({
     componentName: ir.name,
     propsInterface,
     reactImports: reactImports.render(),
@@ -147,7 +171,12 @@ export function emitReact(
     listenerEffects: listeners.code,
     hasPropsDefaults,
     jsx: tmpl.jsx,
+    rozieSource: opts.source ?? '',
+    blockOffsets: resolvedBlockOffsets,
   });
+  // P1: scriptOutputOffset is computed but unused in v1 (P2 will consume it
+  // via composeMaps to anchor @babel/generator's per-expression child map).
+  void scriptOutputOffset;
 
   const code = ms.toString();
 

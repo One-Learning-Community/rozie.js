@@ -1,11 +1,17 @@
 /**
- * shell.ts — Plan 04-02 Task 2 (React target).
+ * shell.ts — Plan 04-02 Task 2 (React target); Phase 06.1 Plan 01 Task 2
+ * rearchitecture.
  *
- * Composes the .tsx file via `magic-string`'s `MagicString.append` per
- * RESEARCH Pattern 1 (D-30 — hybrid skeleton + per-block AST/string body).
+ * Composes the .tsx file by anchoring `magic-string`'s MagicString at the
+ * original `.rozie` source bytes and using `ms.overwrite(...)` over the
+ * `<rozie>` envelope's byte range with the entire React module body
+ * (Phase 06.1 P1, DX-04). Per-expression accuracy inside the script body
+ * lands in P2 via @babel/generator's child sourcemap chained through
+ * composeMaps().
  *
- * Returning a `MagicString` (not a plain string) lets `emitReact` later call
- * `ms.generateMap(...)` to thread the source map (DX-01 / Plan 04-05).
+ * Returning a `BuildShellResult` (not a plain MagicString) lets `emitReact`
+ * surface the byte-anchored map and the script-body output offset for P2's
+ * `composeMaps()` integration.
  *
  * NO `import React from 'react'` line is ever generated (D-68 automatic JSX
  * runtime). The function return type uses `JSX.Element` (no type-only import
@@ -14,6 +20,7 @@
  * @experimental — shape may change before v1.0
  */
 import MagicString from 'magic-string';
+import type { BlockMap } from '../../../../core/src/ast/types.js';
 
 export interface ShellParts {
   componentName: string;
@@ -69,19 +76,177 @@ export interface ShellParts {
   hasPropsDefaults?: boolean;
   /** JSX body string (e.g., '<div>...</div>' or '(\n  <div>...</div>\n)') */
   jsx: string;
+  /**
+   * Phase 06.1 Plan 01: original `.rozie` source text — anchors the MagicString.
+   */
+  rozieSource: string;
+  /**
+   * Phase 06.1 Plan 01: block byte offsets from splitBlocks() — used to
+   * anchor the React module's overwrite range at the `<rozie>` envelope.
+   */
+  blockOffsets: BlockMap;
 }
 
-export function buildShell(parts: ShellParts): MagicString {
+/**
+ * Phase 06.1 Plan 01 D-101: buildShell return shape carries both the
+ * byte-anchored MagicString AND the script-body offset within the rendered
+ * shell so P2's composeMaps() can chain @babel/generator's per-expression
+ * child map at the correct output position.
+ */
+export interface BuildShellResult {
+  /** MagicString anchored to rozieSource with whole-module overwrite + outer-region remove. */
+  ms: MagicString;
+  /** Byte offset within ms.toString() where the React function body begins. */
+  scriptOutputOffset: number;
+}
+
+export function buildShell(parts: ShellParts): BuildShellResult {
+  const blocks = parts.blockOffsets;
+
+  // Back-compat fallback: when rozieSource is empty (old callers without
+  // opts.source / opts.blockOffsets), construct the module body on an empty
+  // MagicString. This preserves pre-Phase-06.1 behavior.
+  if (parts.rozieSource.length === 0 || !blocks.rozie) {
+    return buildShellLegacy(parts);
+  }
+
+  const ms = new MagicString(parts.rozieSource);
+
+  // Compose the entire React module as a single string, then overwrite the
+  // <rozie> envelope's byte range with it. This anchors the React output at
+  // the `<rozie>` start byte; per-block accuracy inside the script body
+  // lands in P2 via @babel/generator sourceMaps:true. P1's contribution:
+  // stack traces resolve to "somewhere inside <rozie>" rather than line 1
+  // col 0.
+  const moduleParts: string[] = [];
+
+  if (parts.reactImports.length > 0) moduleParts.push(parts.reactImports);
+  if (parts.reactTypeImports && parts.reactTypeImports.length > 0)
+    moduleParts.push(parts.reactTypeImports);
+  if (parts.runtimeImports.length > 0) moduleParts.push(parts.runtimeImports);
+  if (parts.cssModuleImport !== null) moduleParts.push(parts.cssModuleImport + '\n');
+  if (parts.globalCssImport !== null) moduleParts.push(parts.globalCssImport + '\n');
+
+  // Blank line between imports and interface (only if any imports).
+  if (
+    parts.reactImports.length > 0 ||
+    (parts.reactTypeImports && parts.reactTypeImports.length > 0) ||
+    parts.runtimeImports.length > 0 ||
+    parts.cssModuleImport !== null ||
+    parts.globalCssImport !== null
+  ) {
+    moduleParts.push('\n');
+  }
+
+  // Slot-context interfaces — Plan 04-03 — BEFORE the props interface.
+  if (parts.ctxInterfaces && parts.ctxInterfaces.length > 0) {
+    for (const iface of parts.ctxInterfaces) {
+      moduleParts.push(iface);
+      moduleParts.push('\n\n');
+    }
+  }
+
+  // Props interface.
+  moduleParts.push(parts.propsInterface);
+  moduleParts.push('\n\n');
+
+  // Top-of-file scriptInjections that are NOT hooks (default-content lifts).
+  if (parts.scriptInjections && parts.scriptInjections.length > 0) {
+    const moduleTop = parts.scriptInjections.filter((s) =>
+      s.startsWith('function '),
+    );
+    for (const inj of moduleTop) {
+      moduleParts.push(inj);
+      moduleParts.push('\n\n');
+    }
+  }
+
+  // Function declaration. Record the byte offset of the first byte of the
+  // function body (after `export default function Name(...): JSX.Element {\n`)
+  // for P2 composeMaps consumption.
+  const propsParam = parts.hasPropsDefaults ? '_props' : 'props';
+  const functionSignature = `export default function ${parts.componentName}(${propsParam}: ${parts.componentName}Props): JSX.Element {\n`;
+
+  const preBodyLength = moduleParts.join('').length;
+  moduleParts.push(functionSignature);
+  const scriptOutputOffset = preBodyLength + functionSignature.length;
+
+  // Script body — indented 2 spaces per line.
+  if (parts.script.trim().length > 0) {
+    const indented = parts.script
+      .split('\n')
+      .map((line) => (line.length > 0 ? '  ' + line : line))
+      .join('\n');
+    moduleParts.push(indented);
+    moduleParts.push('\n\n');
+  }
+
+  // In-function-body scriptInjections (hook-wraps).
+  if (parts.scriptInjections && parts.scriptInjections.length > 0) {
+    const inFn = parts.scriptInjections.filter((s) => !s.startsWith('function '));
+    for (const inj of inFn) {
+      const indented = inj
+        .split('\n')
+        .map((line) => (line.length > 0 ? '  ' + line : line))
+        .join('\n');
+      moduleParts.push(indented);
+      moduleParts.push('\n');
+    }
+    if (inFn.length > 0) moduleParts.push('\n');
+  }
+
+  // Plan 04-04 — listener-block useEffect / useOutsideClick blocks.
+  if (parts.listenerEffects && parts.listenerEffects.trim().length > 0) {
+    const indented = parts.listenerEffects
+      .split('\n')
+      .map((line) => (line.length > 0 ? '  ' + line : line))
+      .join('\n');
+    moduleParts.push(indented);
+    moduleParts.push('\n\n');
+  }
+
+  // JSX body — wrap in `return ( ... );`.
+  const jsxIndented = parts.jsx
+    .split('\n')
+    .map((line) => (line.length > 0 ? '    ' + line : line))
+    .join('\n');
+  moduleParts.push('  return (\n');
+  moduleParts.push(jsxIndented);
+  moduleParts.push('\n  );\n}\n');
+
+  const moduleSource = moduleParts.join('');
+
+  // Anchor the entire React module at the `<rozie>` envelope's byte range.
+  const anchorStart = blocks.rozie.loc.start;
+  const anchorEnd = blocks.rozie.loc.end;
+  ms.overwrite(anchorStart, anchorEnd, moduleSource);
+
+  // Remove pre-envelope and post-envelope characters (e.g. leading whitespace,
+  // trailing newlines, HTML comments outside the envelope).
+  if (anchorStart > 0) ms.remove(0, anchorStart);
+  if (anchorEnd < parts.rozieSource.length)
+    ms.remove(anchorEnd, parts.rozieSource.length);
+
+  return { ms, scriptOutputOffset };
+}
+
+/**
+ * Legacy fallback path — empty rozieSource or missing blockOffsets.
+ * Constructs the React module from scratch on an empty MagicString,
+ * preserving pre-Phase-06.1 behavior so old callers (tests that don't
+ * thread opts.source through) keep working.
+ */
+function buildShellLegacy(parts: ShellParts): BuildShellResult {
   const ms = new MagicString('');
 
   // Imports section.
   if (parts.reactImports.length > 0) ms.append(parts.reactImports);
-  if (parts.reactTypeImports && parts.reactTypeImports.length > 0) ms.append(parts.reactTypeImports);
+  if (parts.reactTypeImports && parts.reactTypeImports.length > 0)
+    ms.append(parts.reactTypeImports);
   if (parts.runtimeImports.length > 0) ms.append(parts.runtimeImports);
   if (parts.cssModuleImport) ms.append(parts.cssModuleImport + '\n');
   if (parts.globalCssImport) ms.append(parts.globalCssImport + '\n');
 
-  // Blank line between imports and interface (only if any imports).
   if (
     parts.reactImports.length > 0 ||
     (parts.reactTypeImports && parts.reactTypeImports.length > 0) ||
@@ -92,7 +257,6 @@ export function buildShell(parts: ShellParts): MagicString {
     ms.append('\n');
   }
 
-  // Slot-context interfaces — Plan 04-03 — BEFORE the props interface.
   if (parts.ctxInterfaces && parts.ctxInterfaces.length > 0) {
     for (const iface of parts.ctxInterfaces) {
       ms.append(iface);
@@ -100,16 +264,9 @@ export function buildShell(parts: ShellParts): MagicString {
     }
   }
 
-  // Props interface.
   ms.append(parts.propsInterface);
   ms.append('\n\n');
 
-  // Top-of-file scriptInjections that are NOT hooks (default-content lifts).
-  // Hooks (useDebouncedCallback consts) belong inside the function body —
-  // Plan 04-03 v1 places them at module top alongside lifted defaults; Plan
-  // 04-04 refactors. For now: emit lifted-default `function __default...`
-  // declarations at the module top, and emit hook-wrap `const _rozie...`
-  // declarations inside the function body via the `script` parameter.
   if (parts.scriptInjections && parts.scriptInjections.length > 0) {
     const moduleTop = parts.scriptInjections.filter((s) => s.startsWith('function '));
     for (const inj of moduleTop) {
@@ -118,21 +275,12 @@ export function buildShell(parts: ShellParts): MagicString {
     }
   }
 
-  // Function declaration. When the script rebinds `props` from a defaults
-  // block (i.e. any non-model prop has a declared default), the parameter is
-  // named `_props` to leave the `props` identifier free for the rebinding.
   const propsParam = parts.hasPropsDefaults ? '_props' : 'props';
   ms.append(
     `export default function ${parts.componentName}(${propsParam}: ${parts.componentName}Props): JSX.Element {\n`,
   );
 
-  // Script (hookSection + userArrowsSection) FIRST so user-authored arrows
-  // are in scope when the hook-wrap injections reference them. The script
-  // contract from emitScript is `hookSection ++ '\n\n' ++ userArrowsSection`
-  // — all React hooks live in hookSection at the top of the function body,
-  // satisfying rules-of-hooks (top-level, unconditional, stable order).
   if (parts.script.trim().length > 0) {
-    // Indent each line of script by 2 spaces.
     const indented = parts.script
       .split('\n')
       .map((line) => (line.length > 0 ? '  ' + line : line))
@@ -141,12 +289,6 @@ export function buildShell(parts: ShellParts): MagicString {
     ms.append('\n\n');
   }
 
-  // In-function-body scriptInjections (hook-wraps like
-  // `const _rozieDebouncedOnSearch = useDebouncedCallback(onSearch, [], 300);`).
-  // Emitted AFTER the user arrows so wrap callees are in TDZ-safe scope.
-  // These are still hooks, but they appear after non-hook const decls — that
-  // is permitted by react-hooks/rules-of-hooks (no conditionals or loops
-  // between them and the function body's top).
   if (parts.scriptInjections && parts.scriptInjections.length > 0) {
     const inFn = parts.scriptInjections.filter((s) => !s.startsWith('function '));
     for (const inj of inFn) {
@@ -160,8 +302,6 @@ export function buildShell(parts: ShellParts): MagicString {
     if (inFn.length > 0) ms.append('\n');
   }
 
-  // Plan 04-04 — <listeners>-block useEffect / useOutsideClick blocks.
-  // Emitted AFTER wrapper consts so the wrapper identifier is in scope.
   if (parts.listenerEffects && parts.listenerEffects.trim().length > 0) {
     const indented = parts.listenerEffects
       .split('\n')
@@ -171,7 +311,6 @@ export function buildShell(parts: ShellParts): MagicString {
     ms.append('\n\n');
   }
 
-  // JSX body — wrap in `return ( ... );`.
   const jsxIndented = parts.jsx
     .split('\n')
     .map((line) => (line.length > 0 ? '    ' + line : line))
@@ -180,5 +319,5 @@ export function buildShell(parts: ShellParts): MagicString {
   ms.append(jsxIndented);
   ms.append('\n  );\n}\n');
 
-  return ms;
+  return { ms, scriptOutputOffset: 0 };
 }
