@@ -25,7 +25,21 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, '../../..');
 const FIXTURES_DIR = resolve(HERE, '../fixtures');
 
-const EXAMPLES = ['Counter', 'SearchInput', 'Dropdown', 'TodoList', 'Modal'];
+// Phase 06.2 P3 (D-126): EXAMPLES extended 5 → 8 (TreeNode, Card, CardHeader
+// added). Modal regenerates per the D-119 retrofit (additive — <components>{
+// Counter } block + <Counter /> embed in body content area). Non-Modal
+// existing fixtures (Counter / SearchInput / Dropdown / TodoList) MUST stay
+// byte-identical — the parity gate enforces that contract automatically.
+const EXAMPLES = [
+  'Counter',
+  'SearchInput',
+  'Dropdown',
+  'TodoList',
+  'Modal',
+  'TreeNode',
+  'Card',
+  'CardHeader',
+];
 const TARGETS = ['vue', 'react', 'svelte', 'angular'];
 
 /** D-93 fixture extension table. */
