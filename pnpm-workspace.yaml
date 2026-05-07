@@ -8,3 +8,4 @@ packages:
   - "tests/timing"
   - "tests/dist-parity"
   - "tests/smoke-sourcemap"
+  - "tests/solid-lint"

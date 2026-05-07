@@ -29,14 +29,17 @@ import { onCleanup } from 'solid-js';
 export function createDebouncedHandler<T extends (...args: unknown[]) => unknown>(
   fn: T,
   ms = 0,
-): (...args: Parameters<T>) => void {
+  // NOTE: The returned function accepts extra args beyond Parameters<T> so that
+  // it can safely be placed in a merged JSX event handler that passes the event
+  // object — even when the original fn is () => void. Extra args are ignored.
+): (...args: unknown[]) => void {
   let timerId: ReturnType<typeof setTimeout> | undefined;
 
-  const debounced = (...args: Parameters<T>): void => {
+  const debounced = (...args: unknown[]): void => {
     if (timerId !== undefined) clearTimeout(timerId);
     timerId = setTimeout(() => {
       timerId = undefined;
-      fn(...args);
+      fn(...(args as Parameters<T>));
     }, ms);
   };
 

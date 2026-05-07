@@ -97,6 +97,7 @@ export function rewriteTemplateExpression(
   const modelProps = new Set(ir.props.filter((p) => p.isModel).map((p) => p.name));
   const nonModelProps = new Set(ir.props.filter((p) => !p.isModel).map((p) => p.name));
   const dataNames = new Set(ir.state.map((s) => s.name));
+  const computedNames = new Set(ir.computed.map((c) => c.name));
   const refNames = new Set(ir.refs.map((r) => r.name));
   const slotNames = new Set(ir.slots.map((s) => s.name));
 
@@ -212,6 +213,27 @@ export function rewriteTemplateExpression(
         path.skip();
         return;
       }
+    },
+
+    Identifier(path) {
+      const name = path.node.name;
+      // Rewrite bare computed references to getter calls: remaining → remaining().
+      // Only when the identifier is used as a value (not as a callee — already a call,
+      // not as a property key, not in a declaration).
+      if (!computedNames.has(name)) return;
+
+      const parentPath = path.parentPath;
+      if (!parentPath) return;
+
+      // Skip: already being called → `remaining()`
+      if (parentPath.isCallExpression() && parentPath.node.callee === path.node) return;
+      // Skip: property key in member expression → `obj.remaining`
+      if (parentPath.isMemberExpression() && parentPath.node.property === path.node && !parentPath.node.computed) return;
+      // Skip: object property key
+      if (parentPath.isObjectProperty() && parentPath.node.key === path.node && !parentPath.node.computed) return;
+
+      path.replaceWith(t.callExpression(t.identifier(name), []));
+      path.skip();
     },
 
     CallExpression(path) {

@@ -219,12 +219,12 @@ function emitNonClassAttribute(
 
   // ref="name" → ref={(el) => { fooRef = el; }}
   // Solid uses a callback ref (not useRef). The variable is declared at top of
-  // component body as `let fooRef: Element | null = null;` by emitScript.
+  // component body as `let fooRef: HTMLElement | null = null;` by emitScript.
   if (attr.kind === 'static' && attr.name === 'ref') {
     const refNames = new Set(ctx.ir.refs.map((r) => r.name));
     if (refNames.has(attr.value)) {
       const varName = attr.value + 'Ref';
-      return { jsx: `ref={(el) => { ${varName} = el as Element; }}`, diagnostics };
+      return { jsx: `ref={(el) => { ${varName} = el as HTMLElement; }}`, diagnostics };
     }
     // Unknown ref — pass through as static
   }
@@ -288,18 +288,31 @@ export function emitAttributes(
     }
 
     // Solid uses `class=` not `className=`. Bucket all class attrs together.
+    // Object-form `:class="{ active: isActive }"` → `classList={{ active: isActive() }}`
+    // (Solid's classList= accepts an object; class= only accepts strings.)
     if (a.name === 'class') {
-      const classAttrs: AttributeBinding[] = [];
       const bucketAttrs = buckets.get('class') ?? [];
+      const classListAttrs: AttributeBinding[] = [];
+      const classStrAttrs: AttributeBinding[] = [];
       for (const ba of bucketAttrs) {
-        if (!consumed.has(ba)) {
-          classAttrs.push(ba);
-          consumed.add(ba);
+        if (consumed.has(ba)) continue;
+        if (ba.kind === 'binding' && t.isObjectExpression(ba.expression)) {
+          classListAttrs.push(ba);
+        } else {
+          classStrAttrs.push(ba);
         }
+        consumed.add(ba);
       }
-      if (classAttrs.length === 0) continue;
-      const classValue = composeClassValue(classAttrs, ctx.ir);
-      out.push(`class={${classValue}}`);
+      // Emit `class=` for string/interpolated attrs.
+      if (classStrAttrs.length > 0) {
+        const classValue = composeClassValue(classStrAttrs, ctx.ir);
+        out.push(`class={${classValue}}`);
+      }
+      // Emit `classList=` for each object-form `:class` binding.
+      for (const cla of classListAttrs) {
+        const exprCode = renderExpr((cla as Extract<AttributeBinding, { kind: 'binding' }>).expression, ctx.ir);
+        out.push(`classList={${exprCode}}`);
+      }
       continue;
     }
 

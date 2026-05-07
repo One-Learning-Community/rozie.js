@@ -175,6 +175,97 @@ function emitElementEvents(node: TemplateElementIR, ctx: EmitNodeCtx): string {
 }
 
 /**
+ * Parse a JSX attribute string into named props.
+ * Returns a map of { propName -> body } where body is the content inside {}.
+ * Non-event attributes (no `=`) and unrecognised patterns are left unparsed
+ * and returned in the `rest` array.
+ */
+function parseNamedProps(attrStr: string): { named: Map<string, string>; rest: string[] } {
+  const named = new Map<string, string>();
+  const rest: string[] = [];
+  if (!attrStr.trim()) return { named, rest };
+
+  // Split on top-level whitespace — but attribute values can contain balanced {} braces.
+  // Strategy: scan char-by-char, splitting on whitespace only when brace depth === 0.
+  const tokens: string[] = [];
+  let depth = 0;
+  let cur = '';
+  for (let i = 0; i < attrStr.length; i++) {
+    const ch = attrStr[i]!;
+    if (ch === '{') { depth++; cur += ch; }
+    else if (ch === '}') { depth--; cur += ch; }
+    else if ((ch === ' ' || ch === '\t' || ch === '\n') && depth === 0) {
+      if (cur.trim()) tokens.push(cur.trim());
+      cur = '';
+    } else {
+      cur += ch;
+    }
+  }
+  if (cur.trim()) tokens.push(cur.trim());
+
+  for (const tok of tokens) {
+    // Match `propName={...}` where the body starts with { and ends with }.
+    const eqIdx = tok.indexOf('=');
+    if (eqIdx > 0 && tok[eqIdx + 1] === '{' && tok[tok.length - 1] === '}') {
+      const name = tok.slice(0, eqIdx);
+      const body = tok.slice(eqIdx + 2, tok.length - 1); // strip `={` and `}`
+      if (/^[A-Za-z][A-Za-z0-9_]*$/.test(name)) {
+        named.set(name, body);
+        continue;
+      }
+    }
+    rest.push(tok);
+  }
+
+  return { named, rest };
+}
+
+/**
+ * Merge duplicate event-prop strings between the static-attrs output and the
+ * events-handler output.  When r-model and @event.modifier both generate
+ * (e.g.) `onInput={}`, merging prevents TS17001 (duplicate JSX attributes).
+ *
+ * Algorithm:
+ *  1. Parse both strings into named-prop maps.
+ *  2. For names that appear in both: build a merged dispatcher arrow.
+ *  3. Reassemble the combined attribute string.
+ */
+function mergeEventAttributes(attrsJsx: string, eventsJsx: string): string {
+  if (!attrsJsx.trim() || !eventsJsx.trim()) {
+    return [attrsJsx, eventsJsx].filter(Boolean).join(' ');
+  }
+
+  const { named: attrsNamed, rest: attrsRest } = parseNamedProps(attrsJsx);
+  const { named: eventsNamed, rest: eventsRest } = parseNamedProps(eventsJsx);
+
+  const merged: string[] = [...attrsRest, ...eventsRest];
+
+  // All names from attrsNamed — merge with eventsNamed if duplicate.
+  for (const [name, attrsBody] of attrsNamed) {
+    const eventsBody = eventsNamed.get(name);
+    if (eventsBody !== undefined) {
+      // Merge: build a dispatcher that calls both handlers with `e`.
+      const wrap = (body: string) => {
+        // If body is already a bare identifier, call it; otherwise invoke the expression.
+        if (/^[A-Za-z_$][\w$]*$/.test(body)) return `${body}(e);`;
+        return `(${body})(e);`;
+      };
+      merged.push(`${name}={(e) => { ${wrap(attrsBody)} ${wrap(eventsBody)} }}`);
+      eventsNamed.delete(name);
+    } else {
+      merged.push(`${name}={${attrsBody}}`);
+    }
+  }
+
+  // Remaining names only in eventsNamed.
+  for (const [name, body] of eventsNamed) {
+    merged.push(`${name}={${body}}`);
+  }
+
+  return merged.join(' ');
+}
+
+/**
  * Emit a TemplateElement. Applies element-level special-cases (r-show, r-html,
  * r-text, r-model) then falls through to standard tag/attr/children form.
  *
@@ -244,7 +335,10 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
 
   const eventsJsx = emitElementEvents(node, ctx);
 
-  const headParts = [attrsResult.jsx, eventsJsx];
+  // Merge duplicate event props between attrs (r-model) and events (@event.modifier).
+  // r-model generates onInput= as an attribute string; @input.debounce generates another
+  // onInput= via emitElementEvents. Merging produces a single dispatcher arrow.
+  const headParts = [mergeEventAttributes(attrsResult.jsx, eventsJsx)];
   if (rShowStyleAttr) headParts.push(rShowStyleAttr);
   const head = headParts.filter(Boolean).join(' ');
   const headOut = head.length > 0 ? ' ' + head : '';

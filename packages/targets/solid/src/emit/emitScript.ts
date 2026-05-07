@@ -82,10 +82,22 @@ export function emitScript(
     const setterName = 'set' + capitalize(p.name);
     let dflt = 'undefined';
     if (p.defaultValue !== null) {
-      dflt = genCode(p.defaultValue);
+      const raw = genCode(p.defaultValue);
+      // When the prop default is a factory arrow/function (e.g. `default: () => []`),
+      // the emitted `createControllableSignal` third arg should be the *initial value*
+      // (the result of calling the factory), not the factory itself — otherwise
+      // TypeScript infers T as the function type rather than the array/object type.
+      if (
+        t.isArrowFunctionExpression(p.defaultValue) ||
+        t.isFunctionExpression(p.defaultValue)
+      ) {
+        dflt = `(${raw})()`;
+      } else {
+        dflt = raw;
+      }
     }
     hookLines.push(
-      `const [${p.name}, ${setterName}] = createControllableSignal(_props, '${p.name}', ${dflt});`,
+      `const [${p.name}, ${setterName}] = createControllableSignal(_props as Record<string, unknown>, '${p.name}', ${dflt});`,
     );
   }
 
@@ -139,8 +151,8 @@ export function emitScript(
         const cleanupCode = genCode(rewrittenCleanup);
         hookLines.push(
           `onMount(() => {\n` +
-          `  const _cleanup = ${setupCall};\n` +
-          `  if (_cleanup) onCleanup(_cleanup);\n` +
+          `  const _cleanup = ${setupCall} as unknown;\n` +
+          `  if (_cleanup) onCleanup(_cleanup as () => void);\n` +
           `  onCleanup(${cleanupCode});\n` +
           `});`,
         );
@@ -164,10 +176,11 @@ export function emitScript(
     }
   }
 
-  // 4b. Ref variable declarations: `let fooRef: Element | null = null;`
+  // 4b. Ref variable declarations: `let fooRef: HTMLElement | null = null;`
   // Solid uses plain let variables (not useRef objects) for DOM refs.
+  // Using HTMLElement (not Element) so DOM properties like .style, .focus() are accessible.
   for (const ref of ir.refs) {
-    hookLines.push(`let ${ref.name}Ref: Element | null = null;`);
+    hookLines.push(`let ${ref.name}Ref: HTMLElement | null = null;`);
   }
 
   // 5. Emit user-authored top-level statements from the rewritten program.

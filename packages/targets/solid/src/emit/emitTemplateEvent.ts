@@ -302,10 +302,13 @@ export function emitTemplateEvent(
     }
   } else {
     const guardLines = inlineGuards.join(' ');
+    // Bare identifier handlers (e.g. `onSearch`) are called without the event arg
+    // so that TypeScript does not complain when the handler type is `() => void`.
+    // Inline expressions (already arrow functions) receive `e` to preserve semantics.
     const handlerInvocation = handlerRef !== null
       ? `${handlerRef}(e)`
       : (t.isIdentifier(listener.handler)
-          ? `${renderHandler(listener.handler, ctx.ir)}(e)`
+          ? `${renderHandler(listener.handler, ctx.ir)}()`
           : renderHandler(listener.handler, ctx.ir));
     handlerExpr = `(e) => { ${guardLines} ${handlerInvocation}; }`;
   }

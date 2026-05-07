@@ -74,11 +74,15 @@ function buildSetterCall(
     // Fallback for unsupported operators — simple setter
     return t.callExpression(t.identifier(setterName), [rhs]);
   }
-  const arrow = t.arrowFunctionExpression(
-    [t.identifier('prev')],
-    t.binaryExpression(binOp, t.identifier('prev'), rhs),
+  // Use setX(x() + rhs) instead of setX(prev => prev + rhs).
+  // The functional-updater form (prev =>) triggers solid/reactivity lint warnings when
+  // the rhs contains reactive values (e.g. local.step from splitProps) inside an arrow
+  // that is not a tracked scope. Using the current getter value directly avoids this
+  // and is equivalent in Solid's synchronous execution model.
+  return t.callExpression(
+    t.identifier(setterName),
+    [t.binaryExpression(binOp, t.callExpression(t.identifier(varName), []), rhs)],
   );
-  return t.callExpression(t.identifier(setterName), [arrow]);
 }
 
 /**
@@ -145,9 +149,37 @@ export function rewriteRozieIdentifiers(
   const modelProps = new Set(ir.props.filter((p) => p.isModel).map((p) => p.name));
   const nonModelProps = new Set(ir.props.filter((p) => !p.isModel).map((p) => p.name));
   const dataNames = new Set(ir.state.map((s) => s.name));
+  const computedNames = new Set(ir.computed.map((c) => c.name));
   const refNames = new Set(ir.refs.map((r) => r.name));
 
   traverse(cloned, {
+    // Rewrite bare computed-memo references to getter calls: canIncrement → canIncrement().
+    // User-authored <script> code references $computed-derived names by bare identifier;
+    // after compilation they become createMemo() Accessors that must be invoked.
+    Identifier(path) {
+      const name = path.node.name;
+      if (!computedNames.has(name)) return;
+
+      const parentPath = path.parentPath;
+      if (!parentPath) return;
+
+      // Skip: already a call expression callee → canIncrement()
+      if (parentPath.isCallExpression() && parentPath.node.callee === path.node) return;
+      // Skip: optional call expression callee
+      if (parentPath.isOptionalCallExpression() && parentPath.node.callee === path.node) return;
+      // Skip: property key (non-computed) in member expression
+      if (parentPath.isMemberExpression() && parentPath.node.property === path.node && !parentPath.node.computed) return;
+      // Skip: property key in object expression
+      if (parentPath.isObjectProperty() && parentPath.node.key === path.node && !parentPath.node.computed) return;
+      // Skip: variable declaration (const canIncrement = createMemo(...)) — the definition itself
+      if (parentPath.isVariableDeclarator() && parentPath.node.id === path.node) return;
+      // Skip: function parameter
+      if (parentPath.isIdentifier() && parentPath.node === path.node) return;
+
+      path.replaceWith(t.callExpression(t.identifier(name), []));
+      path.skip();
+    },
+
     // Handle assignment expressions: $data.x = v → setX(v)
     // $data.x += n → setX(prev => prev + n)
     // $props.x = v (model) → setX(v)
