@@ -92,8 +92,15 @@ export function emitReactTypes(
       lines.push(`  default${Pascal}?: ${tsType};`);
       lines.push(`  on${Pascal}Change?: (next: ${tsType}) => void;`);
     } else {
-      // Required when defaultValue === null; optional when default present.
-      const optional = prop.defaultValue !== null ? '?' : '';
+      // Required when no default present; optional when a default is set.
+      // WR-02: exclude both null AND undefined — the IR convention uses
+      // `defaultValue: null` to mean "no default", but a partial IR
+      // construction or JSON round-trip that drops the field entirely would
+      // surface as `undefined`. Treating those identically prevents silent
+      // required → optional drift if the IR shape evolves.
+      const hasDefault =
+        prop.defaultValue !== null && prop.defaultValue !== undefined;
+      const optional = hasDefault ? '?' : '';
       lines.push(`  ${prop.name}${optional}: ${tsType};`);
     }
   }
