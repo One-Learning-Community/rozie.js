@@ -284,6 +284,9 @@ importers:
       '@babel/code-frame':
         specifier: ^7.29.0
         version: 7.29.0
+      '@babel/generator':
+        specifier: ^7.29.1
+        version: 7.29.1
       '@babel/parser':
         specifier: ^7.29.3
         version: 7.29.3
@@ -299,6 +302,9 @@ importers:
       htmlparser2:
         specifier: ^12.0.0
         version: 12.0.0
+      magic-string:
+        specifier: ^0.30.21
+        version: 0.30.21
       picocolors:
         specifier: ^1.1.0
         version: 1.1.1

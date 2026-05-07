@@ -119,7 +119,16 @@ export const RozieErrorCode = {
 
   // ---- @rozie/runtime-angular warnings (Phase 5) — ROZ750..ROZ799 (RESERVED for v2 helpers) ----
 
-  // ---- Phase 6+ target emitters / type emission take ROZ800+ ----
+  // ---- Phase 6 (ROZ800..ROZ899) — D-96 sub-ranges =====
+  //   ROZ800..ROZ819 — @rozie/core compile() public-API errors
+  //   ROZ820..ROZ849 — @rozie/babel-plugin (Plan 06-04)
+  //   ROZ850..ROZ879 — @rozie/cli argv + filesystem errors (Plan 06-03)
+  //   ROZ880..ROZ899 — .d.ts emission errors (Plan 06-02)
+  COMPILE_INVALID_TARGET: 'ROZ800', // unknown target token in opts.target
+  COMPILE_INVALID_OPT_COMBO: 'ROZ801', // reserved — disallowed opts combination
+  // ROZ820..ROZ849 reserved for @rozie/babel-plugin (Plan 06-04)
+  // ROZ850..ROZ879 reserved for @rozie/cli (Plan 06-03)
+  // ROZ880..ROZ899 reserved for .d.ts emitter (Plan 06-02)
 } as const;
 
 export type RozieErrorCode = (typeof RozieErrorCode)[keyof typeof RozieErrorCode];

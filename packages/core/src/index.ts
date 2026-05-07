@@ -5,6 +5,12 @@
 export { parse } from './parse.js';
 export type { ParseResult } from './parse.js';
 
+// Phase 6 — public compile() entrypoint (DIST-01 / D-80).
+// Single source of truth for `.rozie` → per-target compilation. Consumed by
+// @rozie/unplugin, @rozie/babel-plugin, and @rozie/cli. Per D-81: never throws.
+export { compile } from './compile.js';
+export type { CompileOptions, CompileResult, CompileTarget } from './compile.js';
+
 // AST contract types (Plan 01 + Plan 03 + Plan 04 — concrete shapes).
 export type {
   SourceLoc,
