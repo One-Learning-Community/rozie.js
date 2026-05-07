@@ -7,7 +7,7 @@
  * compares across unplugin/babel/CLI entrypoints.
  */
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import * as t from '@babel/types';
@@ -18,6 +18,7 @@ import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBu
 import { compile } from '../../../../core/src/compile.js';
 import type { IRComponent } from '../../../../core/src/ir/types.js';
 import { emitReactTypes } from '../emit/emitTypes.js';
+import { makeSelectIR } from '../../../../../tests/fixtures/generics/select-ir.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '../../../../..');
@@ -320,4 +321,42 @@ describe('emitReactTypes — file snapshots for the 5 reference examples', () =>
       );
     },
   );
+});
+
+describe('emitReactTypes — D-85 React full generic preservation (Plan 06-02 Task 2)', () => {
+  it('Test G1: interface + function signature carry the type parameter', () => {
+    const ir = makeSelectIR();
+    const out = emitReactTypes(ir, { genericParams: ['T'] });
+    expect(out).toContain(`export interface SelectProps<T> {`);
+    expect(out).toContain(
+      `declare function Select<T>(props: SelectProps<T>): JSX.Element;`,
+    );
+  });
+
+  it('Test G2: model triplet propagates the T identifier', () => {
+    const ir = makeSelectIR();
+    const out = emitReactTypes(ir, { genericParams: ['T'] });
+    expect(out).toContain(`selected?: T;`);
+    expect(out).toContain(`defaultSelected?: T;`);
+    expect(out).toContain(`onSelectedChange?: (next: T) => void;`);
+  });
+
+  it('Test G3: Select.rozie fixture file exists at canonical path', () => {
+    const fixturePath = resolve(
+      __dirname,
+      '../../../../../tests/fixtures/generics/Select.rozie',
+    );
+    expect(existsSync(fixturePath)).toBe(true);
+  });
+
+  it('Test G4: makeSelectIR is importable and produces a valid IR', () => {
+    const ir = makeSelectIR();
+    expect(ir.name).toBe('Select');
+    expect(ir.props).toHaveLength(2);
+    expect(ir.props[1]?.typeAnnotation).toEqual({
+      kind: 'identifier',
+      name: 'T',
+    });
+    expect(ir.props[1]?.isModel).toBe(true);
+  });
 });

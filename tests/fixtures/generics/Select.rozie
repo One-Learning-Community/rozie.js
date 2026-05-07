@@ -1,0 +1,47 @@
+<!--
+  Select.rozie — Generic component fixture for TYPES-03 testing.
+
+  Per RESEARCH.md OQ1+OQ2 RESOLVED: the Phase 1 .rozie parser does NOT
+  yet support `<rozie name="Select" generic="T">` syntax in v1. This file
+  is the documented canon for what such a generic component looks like;
+  the IR exercised by Plan 06-02's tests is constructed manually via
+  `tests/fixtures/generics/select-ir.ts`.
+
+  Future v2 parser work would parse `generic="T"` from this file directly.
+  Until then, the .rozie source documents the design intent and the
+  IR helper exercises the type-emission code path.
+-->
+<rozie name="Select" />
+
+<props>
+{
+  items:    { type: Array, default: () => [] },
+  selected: { type: null,  default: null, model: true }
+}
+</props>
+
+<data>
+{
+  query: ''
+}
+</data>
+
+<script>
+function handleSelect(item) {
+  $props.selected = item
+}
+</script>
+
+<template>
+<div class="rozie-select">
+  <ul>
+    <li r-for="item in $props.items" :key="String(item)" @click="handleSelect(item)">
+      {{ String(item) }}
+    </li>
+  </ul>
+</div>
+</template>
+
+<style>
+.rozie-select { display: block; }
+</style>
