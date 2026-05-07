@@ -432,6 +432,9 @@ function lowerBareElement(
     events,
     children,
     sourceLoc: el.loc,
+    // Phase 06.2 P1 Task 2 — default 'html'; Task 3 overrides per D-114
+    // precedence (outer-name first, then components-table).
+    tagKind: 'html',
   };
   return result;
 }

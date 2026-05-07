@@ -60,6 +60,36 @@ export interface IRComponent {
   setupBody: SetupBody;
   template: TemplateNode | null;
   styles: StyleSection;
+  /**
+   * Phase 06.2 P1 D-115 — declared via `<components>` block. Empty array
+   * when no block is declared. Source-order via Map insertion (lowerComponents
+   * builds a Map<string, ComponentDecl> internally then exports values()).
+   */
+  components: ComponentDecl[];
+  sourceLoc: SourceLoc;
+}
+
+/**
+ * ComponentDecl — Phase 06.2 P1 D-115.
+ *
+ * One per `<components>` block entry. Records the local PascalCase identifier
+ * by which the parent template references the child component plus the
+ * verbatim `.rozie` import path (no transitive resolution per D-122).
+ *
+ * Self-references (e.g., `TreeNode` inside `<rozie name="TreeNode">`) MAY
+ * appear in `<components>`, but the lowering rule per D-114 routes the
+ * outer-name match BEFORE the components-table match — `tagKind: 'self'`
+ * wins. Redundant explicit self-imports are tolerated; they produce a
+ * ROZ924 unused-entry warning (Task 4) only when never referenced.
+ *
+ * @experimental — shape may change before v1.0
+ */
+export interface ComponentDecl {
+  type: 'ComponentDecl';
+  /** PascalCase identifier from the `<components>` key (e.g., 'Modal'). */
+  localName: string;
+  /** Verbatim `.rozie` import path (e.g., './Modal.rozie'). */
+  importPath: string;
   sourceLoc: SourceLoc;
 }
 
@@ -292,6 +322,20 @@ export interface TemplateElementIR {
   events: Listener[];
   children: TemplateNode[];
   sourceLoc: SourceLoc;
+  /**
+   * Phase 06.2 P1 D-114/D-115 — annotates how the tag was resolved at lowering:
+   *   - 'html'      — DOM tag, custom-element (kebab-case), or unmatched.
+   *   - 'component' — PascalCase tag matched in the parent's `<components>` table.
+   *   - 'self'      — PascalCase tag matched the outer `<rozie name=>` (recursion);
+   *                   checked BEFORE the components table per D-114.
+   */
+  tagKind: 'html' | 'component' | 'self';
+  /**
+   * Phase 06.2 P1 D-115 — populated when `tagKind === 'component'`; carries the
+   * resolved ComponentDecl for downstream emitters (so per-target shells can
+   * synthesize `import` statements without re-walking the table).
+   */
+  componentRef?: ComponentDecl;
 }
 
 /**

@@ -146,6 +146,10 @@ export function lowerToIR(ast: RozieAST, opts: LowerOptions): LowerResult {
     setupBody: scriptResult.setupBody,
     template: templateResult.template,
     styles,
+    // Phase 06.2 P1 D-115 — Task 2 carrier-only stub. Task 3 wires the populated
+    // components Map.values() in source-order; this empty-array initial keeps
+    // each commit type-clean.
+    components: [],
     sourceLoc: ast.loc,
   };
 
