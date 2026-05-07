@@ -58,6 +58,18 @@ export interface EmitReactTypesOptions {
    * tests and direct callers — no consumer-controlled path exists in v1.
    */
   genericParams?: string[];
+  /**
+   * Phase 06.2 P3 D-121: RESERVED — accepted-but-ignored in v1.0. Reserved
+   * for future cross-rozie type-graph features (forward-referencing prop /
+   * event types from composed `.rozie` files, e.g. emitting
+   * `import type { CardHeaderProps } from './CardHeader';` in `Card.d.ts`
+   * when CardHeader is in `<components>`). Pass an empty `Map` to be
+   * explicit; v1.0 simply discards the value.
+   *
+   * @experimental — semantics subject to change pre-1.0; see
+   * `.planning/notes/phase-6-composition-foresight.md`.
+   */
+  linkedComponents?: Map<string, IRComponent>;
 }
 
 /**
@@ -70,6 +82,13 @@ export function emitReactTypes(
   ir: IRComponent,
   opts: EmitReactTypesOptions = {},
 ): string {
+  // Phase 06.2 P3 D-121: linkedComponents is RESERVED in v1.0 — accepted
+  // but unused. The body below stays unchanged; opts.linkedComponents will
+  // drive future cross-rozie type imports (e.g. `import type { ChildProps }
+  // from './Child';`) once the type-graph resolver lands. void-ing the field
+  // suppresses unused-locals warnings without consuming it.
+  void opts.linkedComponents;
+
   const lines: string[] = [];
   lines.push(`import type { ReactNode } from 'react';`);
   lines.push('');
