@@ -58,6 +58,15 @@ export function rewriteRozieIdentifiers(
   void computedNames;
   const slotNames = new Set(ir.slots.map((s) => (s.name === '' ? 'default' : s.name)));
 
+  // Phase 06.1 P2 (D-104/D-106): name → IR-primitive lookups so synthesized
+  // identifier nodes can inherit the IR's sourceLoc. The .loc cast is `as any`
+  // because @babel/types' SourceLocation expects {line, column} while our
+  // SourceLoc is {start, end} byte offsets — runtime shape diverges; the
+  // metadata is present for v2 to refine into proper line/column.
+  const stateByName = new Map(ir.state.map((s) => [s.name, s]));
+  const refByName = new Map(ir.refs.map((r) => [r.name, r]));
+  const propByName = new Map(ir.props.map((p) => [p.name, p]));
+
   // Detect template-ref name collisions with <data>/<computed>/<props> — same
   // posture as the Vue target (ROZ420) but using ROZ621 (Svelte's reserved code).
   for (const ref of ir.refs) {
@@ -88,20 +97,32 @@ export function rewriteRozieIdentifiers(
       if (obj.name === '$props') {
         if (modelProps.has(prop.name) || nonModelProps.has(prop.name)) {
           // $props.value → value (bare local — destructured from $props())
-          path.replaceWith(t.identifier(prop.name));
+          // Phase 06.1 P2 D-104/D-106: anchor synth identifier loc to IR PropDecl.
+          const propDecl = propByName.get(prop.name);
+          const synthId = t.identifier(prop.name);
+          if (propDecl) synthId.loc = propDecl.sourceLoc as any;
+          path.replaceWith(synthId);
           path.skip();
         }
         return;
       }
       if (obj.name === '$data' && dataNames.has(prop.name)) {
         // $data.hovering → hovering (bare local — let hovering = $state(...))
-        path.replaceWith(t.identifier(prop.name));
+        // Phase 06.1 P2 D-104/D-106: anchor synth identifier loc to IR StateDecl.
+        const stateDecl = stateByName.get(prop.name);
+        const synthId = t.identifier(prop.name);
+        if (stateDecl) synthId.loc = stateDecl.sourceLoc as any;
+        path.replaceWith(synthId);
         path.skip();
         return;
       }
       if (obj.name === '$refs' && refNames.has(prop.name)) {
         // $refs.dialogEl → dialogEl (no Ref suffix in Svelte — refs are bare lets)
-        path.replaceWith(t.identifier(prop.name));
+        // Phase 06.1 P2 D-104/D-106: anchor synth identifier loc to IR RefDecl.
+        const refDecl = refByName.get(prop.name);
+        const synthId = t.identifier(prop.name);
+        if (refDecl) synthId.loc = refDecl.sourceLoc as any;
+        path.replaceWith(synthId);
         path.skip();
         return;
       }
@@ -123,18 +144,30 @@ export function rewriteRozieIdentifiers(
 
       if (obj.name === '$props') {
         if (modelProps.has(prop.name) || nonModelProps.has(prop.name)) {
-          path.replaceWith(t.identifier(prop.name));
+          // Phase 06.1 P2 D-104/D-106: anchor synth identifier loc to IR PropDecl.
+          const propDecl = propByName.get(prop.name);
+          const synthId = t.identifier(prop.name);
+          if (propDecl) synthId.loc = propDecl.sourceLoc as any;
+          path.replaceWith(synthId);
           path.skip();
         }
         return;
       }
       if (obj.name === '$data' && dataNames.has(prop.name)) {
-        path.replaceWith(t.identifier(prop.name));
+        // Phase 06.1 P2 D-104/D-106: anchor synth identifier loc to IR StateDecl.
+        const stateDecl = stateByName.get(prop.name);
+        const synthId = t.identifier(prop.name);
+        if (stateDecl) synthId.loc = stateDecl.sourceLoc as any;
+        path.replaceWith(synthId);
         path.skip();
         return;
       }
       if (obj.name === '$refs' && refNames.has(prop.name)) {
-        path.replaceWith(t.identifier(prop.name));
+        // Phase 06.1 P2 D-104/D-106: anchor synth identifier loc to IR RefDecl.
+        const refDecl = refByName.get(prop.name);
+        const synthId = t.identifier(prop.name);
+        if (refDecl) synthId.loc = refDecl.sourceLoc as any;
+        path.replaceWith(synthId);
         path.skip();
         return;
       }

@@ -94,8 +94,15 @@ export function emitSvelte(
   const registry = opts.modifierRegistry ?? createDefaultRegistry();
 
   // 1. Script-side emission.
-  const { scriptBlock, scriptInjections: scriptOwnInjections, diagnostics: scriptDiags } =
-    emitScript(ir);
+  // Phase 06.1 P2: thread filename for sourceFileName + capture scriptMap.
+  const scriptOpts: { filename?: string } = {};
+  if (opts.filename !== undefined) scriptOpts.filename = opts.filename;
+  const {
+    scriptBlock,
+    scriptInjections: scriptOwnInjections,
+    scriptMap,
+    diagnostics: scriptDiags,
+  } = emitScript(ir, scriptOpts);
 
   // 2. Template-side emission. Returns scriptInjections for any debounce/
   //    throttle wrappers needed by template @event modifiers.
@@ -150,23 +157,27 @@ export function emitSvelte(
     resolvedBlockOffsets = {};
   }
 
-  const { ms, scriptOutputOffset } = buildShell({
+  const { ms, scriptOutputOffset, scriptMap: shellScriptMap } = buildShell({
     script: finalScript,
     template,
     styleBlock: styleResult.block,
     rozieSource: opts.source ?? '',
     blockOffsets: resolvedBlockOffsets,
+    scriptMap,
   });
-  // P1: scriptOutputOffset is computed but unused in v1 (P2 will consume it
-  // via composeMaps).
-  void scriptOutputOffset;
 
   const code = ms.toString();
 
-  // 7. Source-map composition.
+  // 7. Phase 06.1 P2 (D-109): composeSourceMap chains shell map + scriptMap
+  // via composeMaps().
   const map =
     opts.filename !== undefined && opts.source !== undefined
-      ? composeSourceMap(ms, { filename: opts.filename, source: opts.source })
+      ? composeSourceMap(ms, {
+          filename: opts.filename,
+          source: opts.source,
+          scriptMap: shellScriptMap,
+          scriptOutputOffset,
+        })
       : null;
 
   return {
