@@ -8,9 +8,9 @@
 // runCli is exported separately from the bin shebang so tests can drive the
 // CLI in-process without spawning a child node.
 import { Command } from 'commander';
-import { runBuild, type BuildOptions } from './commands/build.js';
+import { runBuild, runBuildMany, type BuildOptions } from './commands/build.js';
 
-export { runBuild };
+export { runBuild, runBuildMany };
 export type { BuildOptions };
 
 /**
@@ -27,20 +27,28 @@ export async function runCli(argv: readonly string[]): Promise<void> {
     .showHelpAfterError();
 
   program
-    .command('build <input>')
-    .description('Compile a .rozie file to a target framework')
+    .command('build <inputs...>')
+    .description('Compile one or more .rozie files to a target framework')
     .option(
       '-t, --target <name>',
       'target framework (vue|react|svelte|angular)',
       'vue',
     )
-    .option('-o, --out <file>', 'write output to file instead of stdout')
+    .option(
+      '-o, --out <path>',
+      'write output to file or directory instead of stdout (required for multiple inputs)',
+    )
     .option(
       '--source-map',
       'when --out is set, also write `<out>.map` for the chosen target',
     )
-    .action(async (input: string, opts: BuildOptions) => {
-      await runBuild(input, opts);
+    .action(async (inputs: string[], opts: BuildOptions) => {
+      if (inputs.length === 1) {
+        // inputs[0] is guaranteed defined by the length guard; ! needed for noUncheckedIndexedAccess.
+        await runBuild(inputs[0]!, opts);
+      } else {
+        await runBuildMany(inputs, opts);
+      }
     });
 
   // commander 14 returns a promise from parseAsync; await so any thrown errors

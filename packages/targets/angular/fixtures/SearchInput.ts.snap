@@ -9,7 +9,7 @@ import { FormsModule } from '@angular/forms';
 
     <div class="search-input">
       
-      <input #inputEl type="search" [placeholder]="placeholder()" [ngModel]="query()" (ngModelChange)="query.set($event)" (input)="debouncedOnSearch($event)" (keydown)="_merged_keydown_1($event)" />
+      <input #inputEl type="search" [placeholder]="placeholder()" [ngModel]="query()" (ngModelChange)="query.set($event)" [ngModelOptions]="{standalone: true}" (input)="debouncedOnSearch($event)" (keydown)="_merged_keydown_1($event)" />
 
       @if (query().length > 0) {
     <button class="clear-btn" aria-label="Clear" (click)="_clear($event)">

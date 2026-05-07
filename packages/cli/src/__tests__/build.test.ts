@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest';
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { BuildExit, runBuild } from '../commands/build.js';
+import { BuildExit, runBuild, runBuildMany } from '../commands/build.js';
 
 const COUNTER_PATH = resolve(__dirname, '../../../../examples/Counter.rozie');
 
@@ -137,6 +137,66 @@ describe('runBuild — --out directory auto-naming', () => {
     await runBuild(COUNTER_PATH, { out: newFile }, ctx);
     const written = readFileSync(newFile, 'utf8');
     expect(written).toContain('<script setup lang="ts">');
+  });
+});
+
+describe('runBuildMany — multi-file batch', () => {
+  it('compiles multiple inputs into the output directory', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'rozie-cli-many-'));
+    const { ctx } = makeBufs();
+    await runBuildMany([COUNTER_PATH, COUNTER_PATH], { out: tmp, target: 'vue' }, ctx);
+    // Both write to the same basename (Counter.vue) — second overwrites first, file must exist.
+    const written = readFileSync(join(tmp, 'Counter.vue'), 'utf8');
+    expect(written).toContain('<script setup lang="ts">');
+  });
+
+  it('creates the output directory if it does not exist', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'rozie-cli-mkdir-'));
+    const newDir = join(tmp, 'nested', 'out');
+    const { ctx } = makeBufs();
+    await runBuildMany([COUNTER_PATH], { out: newDir, target: 'react' }, ctx);
+    const written = readFileSync(join(newDir, 'Counter.tsx'), 'utf8');
+    expect(written).toContain('export default function Counter');
+  });
+
+  it('exits 2 with an error when --out is omitted', async () => {
+    const { ctx, err } = makeBufs();
+    await expect(
+      runBuildMany([COUNTER_PATH, COUNTER_PATH], {}, ctx),
+    ).rejects.toBeInstanceOf(BuildExit);
+    expect(err()).toMatch(/--out.*required/);
+  });
+
+  it('continues compiling after one failure and exits 1 at the end', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'rozie-cli-partial-'));
+    const badPath = join(tmp, 'Bad.rozie');
+    writeFileSync(
+      badPath,
+      [
+        '<rozie name="Bad">',
+        '<props>{ step: { type: Number, default: 1 } }</props>',
+        '<script>$props.step = 2</script>',
+        '<template><div></div></template>',
+        '</rozie>',
+        '',
+      ].join('\n'),
+      'utf8',
+    );
+
+    const outDir = mkdtempSync(join(tmpdir(), 'rozie-cli-partial-out-'));
+    const { ctx, err } = makeBufs();
+    const thrown = await runBuildMany(
+      [COUNTER_PATH, badPath],
+      { out: outDir, target: 'vue' },
+      ctx,
+    ).catch((e) => e);
+
+    expect(thrown).toBeInstanceOf(BuildExit);
+    expect((thrown as BuildExit).code).toBe(1);
+    // The good file still compiled.
+    expect(readFileSync(join(outDir, 'Counter.vue'), 'utf8')).toContain('<script setup');
+    // Failure summary mentions the count.
+    expect(err()).toMatch(/1 of 2/);
   });
 });
 

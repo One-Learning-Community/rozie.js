@@ -136,14 +136,18 @@ export function emitSingleAttr(
       }
 
       if (signalName !== null) {
-        return `[ngModel]="${signalName}()" (ngModelChange)="${signalName}.set($event)"`;
+        // [ngModelOptions]="{standalone:true}" prevents NG01352 when this input
+        // is nested inside a <form> — Angular would otherwise require a `name`
+        // attribute to register the control with the parent FormGroup. Rozie
+        // manages state via signals, so we always opt out of the forms model.
+        return `[ngModel]="${signalName}()" (ngModelChange)="${signalName}.set($event)" [ngModelOptions]="{standalone: true}"`;
       }
       // Non-signal target — fall back to bare [(ngModel)] with rewritten expression.
       const expr = rewriteTemplateExpression(attr.expression, ctx.ir, {
         collisionRenames: ctx.collisionRenames,
         loopBindings: ctx.loopBindings,
       });
-      return `[(ngModel)]="${expr}"`;
+      return `[(ngModel)]="${expr}" [ngModelOptions]="{standalone: true}"`;
     }
     const expr = rewriteTemplateExpression(attr.expression, ctx.ir, {
       collisionRenames: ctx.collisionRenames,

@@ -5,7 +5,7 @@
 // angular (Phase 5). The pipeline shape mirrors @rozie/unplugin's per-target
 // pipelines (ParseResult → LowerResult → EmitResult, diagnostics surfaced
 // via renderDiagnostic, errors -> exit 1, warnings -> stderr + continue).
-import { readFileSync, writeFileSync, statSync } from 'node:fs';
+import { readFileSync, writeFileSync, statSync, mkdirSync } from 'node:fs';
 import { resolve as pathResolve, join as pathJoin, basename as pathBasename, dirname as pathDirname } from 'node:path';
 import pc from 'picocolors';
 import { parse } from '../../../core/src/parse.js';
@@ -186,6 +186,56 @@ export async function runBuild(
     }
   } else {
     stdoutWrite(result.code);
+  }
+}
+
+/**
+ * Compile multiple .rozie files to a directory.
+ *
+ * Requires opts.out to be (or become) a directory. Each input is processed
+ * independently — failures are accumulated and reported at the end rather than
+ * aborting the whole batch. Exits 1 if any file failed.
+ */
+export async function runBuildMany(
+  inputs: string[],
+  opts: BuildOptions = {},
+  ctx: RunBuildContext = {},
+): Promise<void> {
+  const stderrWrite = ctx.stderrWrite ?? ((s) => void process.stderr.write(s));
+
+  const exit = (code: number, stderrBuf = ''): never => {
+    if (ctx.exit === 'throw') throw new BuildExit(code, stderrBuf);
+    process.exit(code);
+  };
+
+  if (!opts.out) {
+    const msg = pc.red('rozie build: --out <dir> is required when compiling multiple files\n');
+    stderrWrite(msg);
+    exit(2, msg);
+    return; // unreachable; satisfies ts narrowing
+  }
+
+  const outDir = pathResolve(opts.out);
+  mkdirSync(outDir, { recursive: true });
+
+  let failed = 0;
+  for (const input of inputs) {
+    try {
+      // Pass exit:'throw' so one failure doesn't abort the batch via process.exit.
+      await runBuild(input, { ...opts, out: outDir }, { ...ctx, exit: 'throw' });
+    } catch (e) {
+      if (e instanceof BuildExit) {
+        failed++;
+      } else {
+        throw e;
+      }
+    }
+  }
+
+  if (failed > 0) {
+    const msg = pc.red(`rozie build: ${failed} of ${inputs.length} file(s) failed\n`);
+    stderrWrite(msg);
+    exit(1, msg);
   }
 }
 

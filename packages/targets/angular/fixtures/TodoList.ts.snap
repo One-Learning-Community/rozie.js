@@ -36,7 +36,7 @@ interface EmptyCtx {}
       </header>
 
       <form (submit)="_guarded_add($event)">
-        <input [ngModel]="draft()" (ngModelChange)="draft.set($event)" placeholder="What needs doing?" />
+        <input [ngModel]="draft()" (ngModelChange)="draft.set($event)" [ngModelOptions]="{standalone: true}" placeholder="What needs doing?" />
         <button type="submit" [disabled]="!draft().trim()">Add</button>
       </form>
 
