@@ -26,6 +26,12 @@
 }
 </props>
 
+<components>
+{
+  Counter: './Counter.rozie',
+}
+</components>
+
 <script>
 const close = () => { $props.open = false; $emit('close') }
 
@@ -85,6 +91,7 @@ $onMount(() => {
 
     <div class="modal-body">
       <slot :close="close" />
+      <Counter />
     </div>
 
     <footer r-if="$slots.footer">

@@ -1,0 +1,34 @@
+<!--
+  CardHeader.rozie
+
+  Small leaf component (~30 LOC) — the wrapper-target of Card.rozie.
+  Demonstrates that components consumed via <components> blocks don't need
+  to declare any composition themselves; this file has no <components> block
+  and no recursion.
+
+  Phase 06.2 D-119 wrapper-pair partner of Card.rozie.
+-->
+
+<rozie name="CardHeader">
+
+<props>
+{
+  title:    { type: String,  default: '' },
+  onClose:  { type: Function, default: null },
+}
+</props>
+
+<template>
+<header class="card-header">
+  <h3 class="card-header__title">{{ $props.title }}</h3>
+  <button r-if="$props.onClose" class="card-header__close" @click="$props.onClose">×</button>
+</header>
+</template>
+
+<style>
+.card-header { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1rem; border-bottom: 1px solid #eee; }
+.card-header__title { margin: 0; font-size: 1rem; font-weight: 600; }
+.card-header__close { background: none; border: 0; cursor: pointer; font-size: 1.25rem; padding: 0; line-height: 1; }
+</style>
+
+</rozie>
