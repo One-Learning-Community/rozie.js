@@ -12,7 +12,7 @@
  *   2. lowerToIR(ast, { modifierRegistry })
  *   3. switch (opts.target):
  *        case 'vue':     emitVue(ir, emitOpts)
- *        case 'react':   emitReact(ir, emitOpts) + emitReactTypes(ir) (stub — Plan 06-02 fills)
+ *        case 'react':   emitReact(ir, emitOpts) + emitReactTypes(ir) (Plan 06-02 D-84)
  *        case 'svelte':  emitSvelte(ir, emitOpts)
  *        case 'angular': emitAngular(ir, emitOpts)
  *
@@ -35,20 +35,23 @@
  * already proven by `@rozie/unplugin` — `tsdown` inlines workspace siblings
  * when bundling.
  *
- * Note on emitReactTypes: stubbed to return '' until Plan 06-02 ships the
- * IR-driven React .d.ts emitter at `packages/targets/react/src/emit/emitTypes.ts`.
+ * Note on emitReactTypes: imported from `@rozie/target-react`'s
+ * `packages/targets/react/src/emit/emitTypes.ts` (Plan 06-02 D-84). Used
+ * only for the React target — Vue/Svelte/Angular are inline-typed via
+ * defineProps<T>(), $props<T>(), and @Input() decorators respectively, so
+ * `result.types` stays `''` for those targets.
  */
 import { parse } from './parse.js';
 import { lowerToIR } from './ir/lower.js';
 import { createDefaultRegistry } from './modifiers/registerBuiltins.js';
 import type { Diagnostic } from './diagnostics/Diagnostic.js';
 import type { ModifierRegistry } from './modifiers/ModifierRegistry.js';
-import type { IRComponent } from './ir/types.js';
 import type { SourceMap } from 'magic-string';
 // Per-target imports use RELATIVE paths to avoid the `@rozie/target-*` →
 // `@rozie/core` circular dep (mirrors @rozie/unplugin's transform.ts).
 import { emitVue } from '../../targets/vue/src/emitVue.js';
 import { emitReact } from '../../targets/react/src/emitReact.js';
+import { emitReactTypes } from '../../targets/react/src/emit/emitTypes.js';
 import { emitSvelte } from '../../targets/svelte/src/emitSvelte.js';
 import { emitAngular } from '../../targets/angular/src/emitAngular.js';
 
@@ -88,7 +91,7 @@ export interface CompileResult {
   code: string;
   /** SourceMap when `sourceMap !== false` and emitter produced one; otherwise null. */
   map: SourceMap | null;
-  /** `.d.ts` text. Empty for inline-typed targets (Vue/Svelte/Angular). React-only when Plan 06-02 ships emitReactTypes. */
+  /** `.d.ts` text. Empty for inline-typed targets (Vue/Svelte/Angular). React-only per Plan 06-02 D-84. */
   types: string;
   /** React-only: scoped module CSS body for the sibling `.module.css` file. */
   css?: string;
@@ -96,16 +99,6 @@ export interface CompileResult {
   globalCss?: string;
   /** Collected diagnostics from parse, lower, and emit phases. */
   diagnostics: Diagnostic[];
-}
-
-/**
- * Stub for the React .d.ts emitter — replaced by `@rozie/target-react`'s
- * `emitReactTypes` in Plan 06-02. Keeping the stub local to `compile.ts`
- * keeps Plan 06-01's churn surface minimal and gives Plan 06-02 a single
- * import-replace step.
- */
-function emitReactTypes(_ir: IRComponent): string {
-  return '';
 }
 
 /**

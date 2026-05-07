@@ -42,9 +42,10 @@ describe('compile() — Phase 6 public API', () => {
       expect(result.types).toBe('');
     });
 
-    it('React path returns types === \'\' until Plan 06-02 ships emitReactTypes', () => {
+    it('React path returns a non-empty .d.ts containing CounterProps interface (Plan 06-02 D-84)', () => {
       const result = compile(counterSource, { target: 'react', filename: 'Counter.rozie' });
-      expect(result.types).toBe('');
+      expect(result.types).toContain('export interface CounterProps');
+      expect(result.types).toContain(`import type { ReactNode } from 'react';`);
     });
   });
 
@@ -92,9 +93,10 @@ describe('compile() — Phase 6 public API', () => {
   });
 
   describe('D-83 opts.types default behavior', () => {
-    it('types defaults true — React types is empty string until 06-02 (stub)', () => {
+    it('types defaults true — React types is non-empty .d.ts (Plan 06-02 D-84)', () => {
       const result = compile(counterSource, { target: 'react', filename: 'Counter.rozie' });
-      expect(result.types).toBe('');
+      expect(result.types.length).toBeGreaterThan(0);
+      expect(result.types).toContain('CounterProps');
     });
 
     it('types: false short-circuits React types to empty string', () => {
