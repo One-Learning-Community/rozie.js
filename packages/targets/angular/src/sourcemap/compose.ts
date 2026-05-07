@@ -1,50 +1,50 @@
 /**
- * compose.ts — Phase 5 Plan 05-04a Task 3.
+ * compose.ts — Phase 06.1 P2 D-109 cleanup of Phase 5 single-segment hack.
  *
- * Wraps `MagicString.generateMap` with the .rozie-source-reference convention
- * mirroring the React/Vue/Svelte targets. Sets `map.sources = [filename]` and
- * `map.sourcesContent = [originalRozieText]` so Vite's downstream
- * `@analogjs/vite-plugin-angular` chain reports the original `.rozie` file in
- * stack traces (DX-01).
+ * Thin wrapper around the shared `composeMaps()` helper at
+ * packages/core/src/codegen/composeMaps.ts. Pre-marshals the Angular-target
+ * filename + script child map; calls composeMaps; defensively re-asserts
+ * the .rozie sources/sourcesContent contract (Pitfall 2 carry-forward).
  *
- * Mirrors packages/targets/svelte/src/sourcemap/compose.ts and
- * packages/targets/react/src/sourcemap/compose.ts.
+ * Mirrors `packages/targets/vue/src/sourcemap/compose.ts` verbatim. The only
+ * difference is the `file` extension hint (`.ts` instead of `.vue`).
+ *
+ * Pitfall 6 carry-forward: P1 added the data-URL sourceMappingURL trailer in
+ * @rozie/unplugin's emitRozieTsToDisk so analogjs's downstream transform
+ * composes the chain back to .rozie. The map produced here is what goes into
+ * that trailer; this rewrite just sharpens the chain (per-block accuracy
+ * from buildShell + future per-expression accuracy from composeMaps merge).
  *
  * @experimental — shape may change before v1.0
  */
-import MagicString from 'magic-string';
+import type MagicString from 'magic-string';
 import type { SourceMap } from 'magic-string';
+import type { EncodedSourceMap } from '@ampproject/remapping';
+import { composeMaps } from '../../../../core/src/codegen/composeMaps.js';
 
 export interface ComposeOpts {
   filename: string;
   source: string;
+  /**
+   * Phase 06.1 P2: per-expression child map from emitScript (null if no map
+   * produced — D-102 single-segment fallback).
+   */
+  scriptMap: EncodedSourceMap | null;
+  /**
+   * Phase 06.1 P2: byte offset in shell output where the script body begins.
+   */
+  scriptOutputOffset: number;
 }
 
 export function composeSourceMap(ms: MagicString, opts: ComposeOpts): SourceMap {
-  // Re-project the emitted output through a fresh MagicString anchored to the
-  // original .rozie source — same fix as the React/Svelte targets to avoid
-  // empty mappings.
-  let projected: MagicString;
-  if (opts.source.length > 0) {
-    projected = new MagicString(opts.source);
-    projected.overwrite(0, opts.source.length, ms.toString());
-  } else {
-    projected = ms;
-  }
-
-  const map = projected.generateMap({
-    source: opts.filename,
-    file: opts.filename + '.ts',
-    includeContent: true,
-    hires: 'boundary',
+  return composeMaps({
+    filename: opts.filename,
+    source: opts.source,
+    shellMs: ms,
+    children:
+      opts.scriptMap !== null
+        ? [{ map: opts.scriptMap, outputOffset: opts.scriptOutputOffset }]
+        : [],
+    fileExt: '.ts',
   });
-
-  if (map.sources[0] !== opts.filename) {
-    map.sources = [opts.filename];
-  }
-  if (!map.sourcesContent || map.sourcesContent[0] !== opts.source) {
-    map.sourcesContent = [opts.source];
-  }
-
-  return map;
 }

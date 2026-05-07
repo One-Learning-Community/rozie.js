@@ -169,6 +169,15 @@ export function rewriteRozieIdentifiers(
   const computedNames = new Set(ir.computed.map((c) => c.name));
   const emits = new Set(ir.emits);
 
+  // Phase 06.1 P2 (D-104/D-106): name → IR-primitive lookups so synthesized
+  // identifier nodes can inherit the IR's sourceLoc. The .loc cast is `as any`
+  // because @babel/types' SourceLocation expects {line, column} while our
+  // SourceLoc is {start, end} byte offsets — runtime shape diverges; the
+  // metadata is present for v2 to refine into proper line/column.
+  const stateByName = new Map(ir.state.map((s) => [s.name, s]));
+  const refByName = new Map(ir.refs.map((r) => [r.name, r]));
+  const propByName = new Map(ir.props.map((p) => [p.name, p]));
+
   const userMethodNames = collectUserMethodNames(program);
 
   // Compute collision renames: any user method whose name matches an emit.
@@ -331,32 +340,44 @@ export function rewriteRozieIdentifiers(
       if (obj.name === '$props') {
         if (modelProps.has(prop.name) || nonModelProps.has(prop.name)) {
           // $props.value → this.value()  (signal read)
-          path.replaceWith(
-            t.callExpression(
-              t.memberExpression(t.thisExpression(), t.identifier(prop.name)),
-              [],
-            ),
+          // Phase 06.1 P2 D-104/D-106: anchor synth nodes to IR PropDecl.
+          const propDecl = propByName.get(prop.name);
+          const synthId = t.identifier(prop.name);
+          if (propDecl) synthId.loc = propDecl.sourceLoc as any;
+          const synthCall = t.callExpression(
+            t.memberExpression(t.thisExpression(), synthId),
+            [],
           );
+          if (propDecl) synthCall.loc = propDecl.sourceLoc as any;
+          path.replaceWith(synthCall);
           return;
         }
         return;
       }
       if (obj.name === '$data' && dataNames.has(prop.name)) {
         // $data.hovering → this.hovering()  (signal read)
-        path.replaceWith(
-          t.callExpression(
-            t.memberExpression(t.thisExpression(), t.identifier(prop.name)),
-            [],
-          ),
+        // Phase 06.1 P2 D-104/D-106: anchor synth nodes to IR StateDecl.
+        const stateDecl = stateByName.get(prop.name);
+        const synthId = t.identifier(prop.name);
+        if (stateDecl) synthId.loc = stateDecl.sourceLoc as any;
+        const synthCall = t.callExpression(
+          t.memberExpression(t.thisExpression(), synthId),
+          [],
         );
+        if (stateDecl) synthCall.loc = stateDecl.sourceLoc as any;
+        path.replaceWith(synthCall);
         return;
       }
       if (obj.name === '$refs' && refNames.has(prop.name)) {
         // $refs.foo → this.foo()?.nativeElement
+        // Phase 06.1 P2 D-104/D-106: anchor synth nodes to IR RefDecl.
+        const refDecl = refByName.get(prop.name);
+        const synthId = t.identifier(prop.name);
+        if (refDecl) synthId.loc = refDecl.sourceLoc as any;
         path.replaceWith(
           t.optionalMemberExpression(
             t.callExpression(
-              t.memberExpression(t.thisExpression(), t.identifier(prop.name)),
+              t.memberExpression(t.thisExpression(), synthId),
               [],
             ),
             t.identifier('nativeElement'),

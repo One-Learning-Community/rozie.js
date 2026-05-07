@@ -77,7 +77,10 @@ export function emitAngular(
   const signalMembers = previewRewrite.signalMembers;
 
   // 1. Script-side emission.
-  const scriptResult = emitScript(ir);
+  // Phase 06.1 P2: thread filename for sourceFileName + capture scriptMap.
+  const scriptOpts: { filename?: string } = {};
+  if (opts.filename !== undefined) scriptOpts.filename = opts.filename;
+  const scriptResult = emitScript(ir, scriptOpts);
 
   // 2. Template-side emission.
   const tmplResult = emitTemplate(ir, registry, { collisionRenames });
@@ -206,7 +209,7 @@ export function emitAngular(
     resolvedBlockOffsets = {};
   }
 
-  const { ms, scriptOutputOffset } = buildShell({
+  const { ms, scriptOutputOffset, scriptMap: shellScriptMap } = buildShell({
     importLines: imports.render(),
     interfaceDecls: scriptResult.interfaceDecls,
     decorator,
@@ -214,17 +217,21 @@ export function emitAngular(
     classBody,
     rozieSource: opts.source ?? '',
     blockOffsets: resolvedBlockOffsets,
+    scriptMap: scriptResult.scriptMap,
   });
-  // P1: scriptOutputOffset is computed but unused in v1 (P2 will consume it
-  // via composeMaps).
-  void scriptOutputOffset;
 
   const code = ms.toString();
 
-  // 9. Source map composition.
+  // 9. Phase 06.1 P2 (D-109): composeSourceMap chains shell map + scriptMap
+  // via composeMaps().
   const map =
     opts.filename !== undefined && opts.source !== undefined
-      ? composeSourceMap(ms, { filename: opts.filename, source: opts.source })
+      ? composeSourceMap(ms, {
+          filename: opts.filename,
+          source: opts.source,
+          scriptMap: shellScriptMap,
+          scriptOutputOffset,
+        })
       : null;
 
   return {
