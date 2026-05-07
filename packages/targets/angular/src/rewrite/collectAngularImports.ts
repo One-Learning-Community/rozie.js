@@ -43,7 +43,14 @@ export type AngularCoreImport =
   | 'DestroyRef'
   | 'Renderer2'
   | 'ContentChild'
-  | 'TemplateRef';
+  | 'TemplateRef'
+  /**
+   * Phase 06.2 P2 (RESEARCH Pitfall 5): `forwardRef` — required for the
+   * self-reference idiom `imports: [forwardRef(() => Self)]` in standalone
+   * Angular components. emitAngular adds it via `imports.add('forwardRef')`
+   * when `tagKind: 'self'` appears anywhere in the template.
+   */
+  | 'forwardRef';
 
 /** Forms-module import kind — separate import line from `@angular/forms`. */
 export type AngularFormsImport = 'FormsModule';

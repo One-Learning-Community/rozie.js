@@ -25,12 +25,59 @@
  *
  * @experimental — shape may change before v1.0
  */
-import type { IRComponent } from '../../../core/src/ir/types.js';
+import type { IRComponent, TemplateNode } from '../../../core/src/ir/types.js';
 import type { Diagnostic } from '../../../core/src/diagnostics/Diagnostic.js';
 import type { ModifierRegistry } from '../../../core/src/modifiers/ModifierRegistry.js';
 import type { BlockMap } from '../../../core/src/ast/types.js';
 import { splitBlocks } from '../../../core/src/splitter/splitBlocks.js';
 import { createDefaultRegistry } from '../../../core/src/modifiers/registerBuiltins.js';
+import { rewriteRozieImport } from '../../../core/src/codegen/rewriteRozieImport.js';
+
+/**
+ * Phase 06.2 P2 — recursive walk over the IR template detecting any
+ * `tagKind: 'self'` element. Mirror of emitVue/emitSvelte helpers; O(n)
+ * over the IR tree per threat T-06.2-P2-04 mitigation.
+ */
+function templateContainsSelfReference(node: TemplateNode | null): boolean {
+  if (!node) return false;
+  switch (node.type) {
+    case 'TemplateElement': {
+      if (node.tagKind === 'self') return true;
+      for (const child of node.children) {
+        if (templateContainsSelfReference(child)) return true;
+      }
+      return false;
+    }
+    case 'TemplateConditional': {
+      for (const branch of node.branches) {
+        for (const child of branch.body) {
+          if (templateContainsSelfReference(child)) return true;
+        }
+      }
+      return false;
+    }
+    case 'TemplateLoop': {
+      for (const child of node.body) {
+        if (templateContainsSelfReference(child)) return true;
+      }
+      return false;
+    }
+    case 'TemplateSlotInvocation': {
+      for (const child of node.fallback) {
+        if (templateContainsSelfReference(child)) return true;
+      }
+      return false;
+    }
+    case 'TemplateFragment': {
+      for (const child of node.children) {
+        if (templateContainsSelfReference(child)) return true;
+      }
+      return false;
+    }
+    default:
+      return false;
+  }
+}
 import type { SourceMap } from 'magic-string';
 import { emitScript } from './emit/emitScript.js';
 import { emitTemplate } from './emit/emitTemplate.js';
@@ -107,6 +154,15 @@ export function emitAngular(
     hasNgModel: tmplResult.hasNgModel,
   });
 
+  // Phase 06.2 P2 (Pitfall 5): when a template contains `tagKind: 'self'`,
+  // ensure `forwardRef` is in the @angular/core import line BEFORE the
+  // decorator + shell render. Defensive `?? []` guards pre-P1 hand-rolled IRs.
+  const components = ir.components ?? [];
+  const selfReferenced = templateContainsSelfReference(ir.template);
+  if (selfReferenced) {
+    imports.add('forwardRef');
+  }
+
   // 6. Build the @Component decorator.
   const decorator = emitDecorator(ir, {
     componentName: ir.name,
@@ -114,6 +170,8 @@ export function emitAngular(
     stylesArrayBody: styleResult.stylesArrayBody,
     hasSlots: ir.slots.length > 0,
     hasNgModel: tmplResult.hasNgModel,
+    componentDecls: components,
+    selfReferenced,
   });
 
   // 7. Compose the class body. Insertion order:
@@ -209,6 +267,20 @@ export function emitAngular(
     resolvedBlockOffsets = {};
   }
 
+  // Phase 06.2 P2 (D-118): synthesize NAMED top-of-file component imports
+  // (skipping self-entry — the class is in scope of its own decorator and
+  // referenced via forwardRef(() => Self) in @Component({ imports: [...] })).
+  const componentImportsLines: string[] = components
+    .filter((decl) => decl.localName !== ir.name)
+    .map((decl) => {
+      const rewritten = rewriteRozieImport(decl.importPath, 'angular');
+      return `import { ${decl.localName} } from '${rewritten}';`;
+    });
+  const componentImportsBlock =
+    componentImportsLines.length > 0
+      ? componentImportsLines.join('\n') + '\n'
+      : '';
+
   const { ms, scriptOutputOffset, scriptMap: shellScriptMap } = buildShell({
     importLines: imports.render(),
     interfaceDecls: scriptResult.interfaceDecls,
@@ -218,6 +290,7 @@ export function emitAngular(
     rozieSource: opts.source ?? '',
     blockOffsets: resolvedBlockOffsets,
     scriptMap: scriptResult.scriptMap,
+    componentImportsBlock,
   });
 
   const code = ms.toString();
