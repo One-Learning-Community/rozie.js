@@ -126,7 +126,12 @@ export const RozieErrorCode = {
   //   ROZ880..ROZ899 — .d.ts emission errors (Plan 06-02)
   COMPILE_INVALID_TARGET: 'ROZ800', // unknown target token in opts.target
   COMPILE_INVALID_OPT_COMBO: 'ROZ801', // reserved — disallowed opts combination
-  // ROZ820..ROZ849 reserved for @rozie/babel-plugin (Plan 06-04)
+  // ---- @rozie/babel-plugin (Plan 06-04) — ROZ820..ROZ849 ----
+  BABEL_PLUGIN_INVALID_TARGET: 'ROZ820', // missing or invalid `target` option (vue|react|svelte|angular required)
+  BABEL_PLUGIN_NO_FILENAME: 'ROZ821', // cannot resolve relative .rozie path without state.filename / file.opts.filename
+  BABEL_PLUGIN_COMPILE_ERROR: 'ROZ822', // compile() returned severity:'error' diagnostics during sibling write
+  BABEL_PLUGIN_SIBLING_WRITE_FAIL: 'ROZ823', // fs writeFileSync failed when emitting sibling .{ext}/.d.ts/.module.css/.global.css
+  // ROZ824..ROZ849 reserved for future @rozie/babel-plugin needs
   // ---- @rozie/cli argv parsing + filesystem errors (Plan 06-03) — ROZ850..ROZ879 ----
   CLI_INVALID_TARGET: 'ROZ850', // unknown --target token (commander InvalidArgumentError)
   CLI_MISSING_INPUT: 'ROZ851', // no .rozie files matched after expandInputs
