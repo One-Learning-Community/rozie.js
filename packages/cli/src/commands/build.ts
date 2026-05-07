@@ -1,11 +1,10 @@
-// `rozie build` subcommand — runs parse → lowerToIR → emitVue and writes (or
-// prints) the resulting .vue SFC.
+// `rozie build` subcommand — runs parse → lowerToIR → emit{Vue,React,Svelte,Angular}
+// and writes (or prints) the resulting target source.
 //
-// This is a v0 spike: vue is the only shipped target. React/Svelte/Angular
-// exit with a "not yet shipped" message until their target packages land in
-// later phases. The pipeline shape mirrors @rozie/unplugin's runRoziePipeline
-// (ParseResult → LowerResult → EmitVueResult, diagnostics surfaced via
-// renderDiagnostic, errors -> exit 1, warnings -> stderr + continue).
+// All four targets are shipped: vue (Phase 3), react (Phase 4), svelte +
+// angular (Phase 5). The pipeline shape mirrors @rozie/unplugin's per-target
+// pipelines (ParseResult → LowerResult → EmitResult, diagnostics surfaced
+// via renderDiagnostic, errors -> exit 1, warnings -> stderr + continue).
 import { readFileSync, writeFileSync, statSync } from 'node:fs';
 import { resolve as pathResolve, join as pathJoin, basename as pathBasename, dirname as pathDirname } from 'node:path';
 import pc from 'picocolors';
@@ -16,6 +15,8 @@ import { renderDiagnostic } from '../../../core/src/diagnostics/frame.js';
 import type { Diagnostic } from '../../../core/src/diagnostics/Diagnostic.js';
 import { emitVue } from '../../../targets/vue/src/emitVue.js';
 import { emitReact } from '../../../targets/react/src/emitReact.js';
+import { emitSvelte } from '../../../targets/svelte/src/emitSvelte.js';
+import { emitAngular } from '../../../targets/angular/src/emitAngular.js';
 
 export interface BuildOptions {
   target?: string;
@@ -56,14 +57,7 @@ const TARGET_EXTENSIONS: Record<string, string> = {
   vue: '.vue',
   react: '.tsx',
   svelte: '.svelte',
-  angular: '.js',
-};
-
-// Map of not-yet-shipped targets -> the phase that lands them. Source of
-// truth: ROADMAP.md. Sync this map when each target's emitter ships.
-const TARGET_PHASE: Record<string, string> = {
-  svelte: 'Phase 5',
-  angular: 'Phase 5',
+  angular: '.ts',
 };
 
 export async function runBuild(
@@ -86,14 +80,6 @@ export async function runBuild(
   if (!VALID_TARGETS.has(target)) {
     const msg = pc.red(
       `rozie build: unknown target '${target}' (expected vue|react|svelte|angular)\n`,
-    );
-    stderrWrite(msg);
-    exit(2, msg);
-  }
-  if (target !== 'vue' && target !== 'react') {
-    const phase = TARGET_PHASE[target] ?? 'a future phase';
-    const msg = pc.red(
-      `rozie build: target '${target}' not yet shipped — see ROADMAP.md (${phase})\n`,
     );
     stderrWrite(msg);
     exit(2, msg);
@@ -136,14 +122,20 @@ export async function runBuild(
     return;
   }
 
-  const result =
-    target === 'react'
-      ? emitReact(ir, { filename: filePath, source })
-      : emitVue(ir, {
-          filename: filePath,
-          source,
-          modifierRegistry: registry,
-        });
+  let result;
+  switch (target) {
+    case 'react':
+      result = emitReact(ir, { filename: filePath, source });
+      break;
+    case 'svelte':
+      result = emitSvelte(ir, { filename: filePath, source, modifierRegistry: registry });
+      break;
+    case 'angular':
+      result = emitAngular(ir, { filename: filePath, source, modifierRegistry: registry });
+      break;
+    default:
+      result = emitVue(ir, { filename: filePath, source, modifierRegistry: registry });
+  }
   const emitErrors = result.diagnostics.filter((d) => d.severity === 'error');
   if (emitErrors.length > 0) {
     const stderrBuf = renderAll(result.diagnostics, source);

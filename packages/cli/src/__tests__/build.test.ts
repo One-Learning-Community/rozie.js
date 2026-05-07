@@ -2,15 +2,8 @@
 //
 // Strategy: drive runBuild() directly with `exit: 'throw'` so we don't have
 // to spawn a child node. stdout/stderr are captured into string buffers via
-// the ctx sinks. Tests cover the four outcomes the spike has to deliver:
-//
-//  1. Counter.rozie compiles to a valid Vue 3 SFC (defineProps + defineModel
-//     + computed + script setup).
-//  2. --target react exits with code 2 and the "not yet shipped" message.
-//  3. --out writes a file whose contents are byte-identical to the stdout
-//     emission for the same input.
-//  4. A .rozie file with `$props.notDeclared = 1` triggers ROZ200, renders a
-//     code-frame to stderr, and exits 1.
+// the ctx sinks. Tests cover all four shipped targets (vue, react, svelte,
+// angular) plus the error paths (unknown target, ROZ-coded compile errors).
 import { describe, expect, it } from 'vitest';
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -67,22 +60,38 @@ describe('runBuild — react target (Counter.rozie -> React TSX)', () => {
   });
 });
 
-describe('runBuild — target gating', () => {
-  it('exits 2 with "not yet shipped" stderr for --target svelte', async () => {
-    const { ctx, err } = makeBufs();
-    await expect(runBuild(COUNTER_PATH, { target: 'svelte' }, ctx)).rejects.toBeInstanceOf(
-      BuildExit,
-    );
-    expect(err()).toMatch(/not yet shipped/);
-    expect(err()).toMatch(/Phase 5/);
-    // The thrown BuildExit carries the exit code.
-    try {
-      await runBuild(COUNTER_PATH, { target: 'angular' }, makeBufs().ctx);
-    } catch (e) {
-      expect((e as BuildExit).code).toBe(2);
-    }
+describe('runBuild — svelte target (Counter.rozie -> Svelte 5 SFC)', () => {
+  it('emits a Svelte 5 SFC with runes ($state/$derived/$bindable) and a default export', async () => {
+    const { ctx, out } = makeBufs();
+    await runBuild(COUNTER_PATH, { target: 'svelte' }, ctx);
+    const code = out();
+    expect(code).toContain('<script lang="ts">');
+    expect(code).toContain('$bindable');
+    expect(code).toContain('$state');
+    expect(code).toContain('$derived');
+    // Sanity: the Svelte template block survived.
+    expect(code).toMatch(/<button[^>]*on:click=|<button[^>]*onclick=/);
   });
+});
 
+describe('runBuild — angular target (Counter.rozie -> Angular standalone .ts)', () => {
+  it('emits an Angular 17+ standalone component with signal()/input()/model() and default export', async () => {
+    const { ctx, out } = makeBufs();
+    await runBuild(COUNTER_PATH, { target: 'angular' }, ctx);
+    const code = out();
+    expect(code).toContain("from '@angular/core'");
+    expect(code).toContain('@Component(');
+    expect(code).toContain('standalone: true');
+    expect(code).toContain('export class Counter');
+    expect(code).toContain('export default Counter');
+    // Signals API surface (not the legacy @Input/@Output decorators).
+    expect(code).toMatch(/signal\(|model\(|input\(/);
+    expect(code).not.toContain('*ngIf');
+    expect(code).not.toContain('*ngFor');
+  });
+});
+
+describe('runBuild — error paths', () => {
   it('exits 2 with "unknown target" stderr for an invalid name', async () => {
     const { ctx, err } = makeBufs();
     await expect(

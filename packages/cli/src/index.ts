@@ -1,10 +1,9 @@
 // @rozie/cli — `rozie` command surface.
 //
-// This spike ships a single subcommand: `rozie build <input>`. It runs a
-// .rozie file through @rozie/core's parse → lowerToIR pipeline and feeds the
-// IR into @rozie/target-vue's emitVue, then prints (or writes) the resulting
-// .vue SFC. Other targets (react/svelte/angular) error with a "not yet
-// shipped" message until their phases land.
+// `rozie build <input>` runs a .rozie file through @rozie/core's parse →
+// lowerToIR pipeline and dispatches to one of the four target emitters
+// (@rozie/target-{vue,react,svelte,angular}), then prints (or writes) the
+// resulting per-framework source.
 //
 // runCli is exported separately from the bin shebang so tests can drive the
 // CLI in-process without spawning a child node.
@@ -38,7 +37,7 @@ export async function runCli(argv: readonly string[]): Promise<void> {
     .option('-o, --out <file>', 'write output to file instead of stdout')
     .option(
       '--source-map',
-      'when --out is set, also write `<out>.map` (vue target only)',
+      'when --out is set, also write `<out>.map` for the chosen target',
     )
     .action(async (input: string, opts: BuildOptions) => {
       await runBuild(input, opts);

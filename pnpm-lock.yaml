@@ -221,9 +221,15 @@ importers:
       '@rozie/core':
         specifier: workspace:*
         version: link:../core
+      '@rozie/target-angular':
+        specifier: workspace:*
+        version: link:../targets/angular
       '@rozie/target-react':
         specifier: workspace:*
         version: link:../targets/react
+      '@rozie/target-svelte':
+        specifier: workspace:*
+        version: link:../targets/svelte
       '@rozie/target-vue':
         specifier: workspace:*
         version: link:../targets/vue
