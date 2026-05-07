@@ -25,12 +25,59 @@
  *
  * @experimental — shape may change before v1.0
  */
-import type { IRComponent } from '../../../core/src/ir/types.js';
+import type { IRComponent, TemplateNode } from '../../../core/src/ir/types.js';
 import type { Diagnostic } from '../../../core/src/diagnostics/Diagnostic.js';
 import type { ModifierRegistry } from '../../../core/src/modifiers/ModifierRegistry.js';
 import type { BlockMap } from '../../../core/src/ast/types.js';
 import { splitBlocks } from '../../../core/src/splitter/splitBlocks.js';
 import { createDefaultRegistry } from '../../../core/src/modifiers/registerBuiltins.js';
+import { rewriteRozieImport } from '../../../core/src/codegen/rewriteRozieImport.js';
+
+/**
+ * Phase 06.2 P2 — recursive walk over the IR template detecting any
+ * `tagKind: 'self'` element (mirror of emitVue's helper). O(n) over the
+ * IR tree; threat T-06.2-P2-04 mitigation.
+ */
+function templateContainsSelfReference(node: TemplateNode | null): boolean {
+  if (!node) return false;
+  switch (node.type) {
+    case 'TemplateElement': {
+      if (node.tagKind === 'self') return true;
+      for (const child of node.children) {
+        if (templateContainsSelfReference(child)) return true;
+      }
+      return false;
+    }
+    case 'TemplateConditional': {
+      for (const branch of node.branches) {
+        for (const child of branch.body) {
+          if (templateContainsSelfReference(child)) return true;
+        }
+      }
+      return false;
+    }
+    case 'TemplateLoop': {
+      for (const child of node.body) {
+        if (templateContainsSelfReference(child)) return true;
+      }
+      return false;
+    }
+    case 'TemplateSlotInvocation': {
+      for (const child of node.fallback) {
+        if (templateContainsSelfReference(child)) return true;
+      }
+      return false;
+    }
+    case 'TemplateFragment': {
+      for (const child of node.children) {
+        if (templateContainsSelfReference(child)) return true;
+      }
+      return false;
+    }
+    default:
+      return false;
+  }
+}
 import type { SourceMap } from 'magic-string';
 import { emitScript, type SvelteScriptInjection } from './emit/emitScript.js';
 import { emitTemplate } from './emit/emitTemplate.js';
@@ -157,6 +204,29 @@ export function emitSvelte(
     resolvedBlockOffsets = {};
   }
 
+  // Phase 06.2 P2 (D-117 updated 2026-05-07 + D-118): synthesize
+  // top-of-script component-import lines for both wrapper composition AND
+  // self-reference. Self-import idiom (NOT `<svelte:self>`).
+  // Defensive `?? []` guards pre-P1 hand-rolled IRs.
+  const components = ir.components ?? [];
+  const componentImportsLines: string[] = components.map((decl) => {
+    const rewritten = rewriteRozieImport(decl.importPath, 'svelte');
+    return `import ${decl.localName} from '${rewritten}';`;
+  });
+  const hasSelfReference = templateContainsSelfReference(ir.template);
+  // When tagKind: 'self' appears AND the outer name isn't already in the
+  // components table, synthesize the additional self-import line.
+  if (
+    hasSelfReference &&
+    !components.some((c) => c.localName === ir.name)
+  ) {
+    componentImportsLines.push(`import ${ir.name} from './${ir.name}.svelte';`);
+  }
+  const componentImportsBlock =
+    componentImportsLines.length > 0
+      ? componentImportsLines.join('\n') + '\n'
+      : '';
+
   const { ms, scriptOutputOffset, scriptMap: shellScriptMap } = buildShell({
     script: finalScript,
     template,
@@ -164,6 +234,7 @@ export function emitSvelte(
     rozieSource: opts.source ?? '',
     blockOffsets: resolvedBlockOffsets,
     scriptMap,
+    componentImportsBlock,
   });
 
   const code = ms.toString();

@@ -47,6 +47,23 @@ export interface ShellParts {
    * pass-through to BuildShellResult for composeMaps() consumption.
    */
   scriptMap?: EncodedSourceMap | null;
+  /**
+   * Phase 06.2 P2 (D-118 + updated D-117 self-import idiom): synthesized
+   * component-import lines for the `<script>` block. One line per
+   * IRComponent.components entry PLUS an additional line for the self-ref
+   * file when `tagKind: 'self'` appears in template AND the outer component
+   * name isn't already in the components table.
+   *
+   * Each line is `import {LocalName} from '{rewrittenPath}';\n`
+   * (newline-terminated; the helper joins them with `\n` and adds a final `\n`).
+   *
+   * Per CONTEXT.md D-117 (UPDATED 2026-05-07): wrapper composition AND
+   * self-reference share one code path — both emit a top-of-script import
+   * binding. NO `<svelte:self>` rewrite anywhere.
+   *
+   * Empty/undefined when neither path applies.
+   */
+  componentImportsBlock?: string;
 }
 
 /**
@@ -87,10 +104,16 @@ export function buildShell(parts: ShellParts): BuildShellResult {
   // <script> <listeners?> <template> <style?>. The Svelte target output
   // order matches: <script> first, bare markup second, <style> third —
   // so per-block source-byte anchoring is direct (no ms.move() reorder).
+  // Phase 06.2 P2 (D-117/D-118): prepend component-import lines to the
+  // script body. componentImportsBlock is already newline-terminated; we
+  // insert a trailing blank line so the imports are visually separated
+  // from the user-script body.
+  const compImports = parts.componentImportsBlock ?? '';
+  const scriptPrelude = compImports.length > 0 ? compImports + '\n' : '';
   ms.overwrite(
     blocks.script.loc.start,
     blocks.script.loc.end,
-    `${scriptOpenFraming}${parts.script}${scriptCloseFraming}`,
+    `${scriptOpenFraming}${scriptPrelude}${parts.script}${scriptCloseFraming}`,
   );
 
   // Svelte's top-level markup has no `<template>` wrapper — overwrite the
@@ -151,6 +174,12 @@ export function buildShell(parts: ShellParts): BuildShellResult {
 function buildShellLegacy(parts: ShellParts): BuildShellResult {
   const ms = new MagicString('');
   ms.append('<script lang="ts">\n');
+  // Phase 06.2 P2 (D-117/D-118): component-import lines go top-of-script.
+  const compImports = parts.componentImportsBlock ?? '';
+  if (compImports.length > 0) {
+    ms.append(compImports);
+    ms.append('\n');
+  }
   ms.append(parts.script);
   ms.append('\n</script>\n\n');
   ms.append(parts.template);
