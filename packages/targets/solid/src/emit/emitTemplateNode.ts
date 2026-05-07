@@ -47,6 +47,10 @@ export interface EmitNodeCtx {
   collectors: { solid: SolidImportCollector; runtime: RuntimeSolidImportCollector };
   registry: ModifierRegistry;
   diagnostics: Diagnostic[];
+  /** Top-of-component-body lines (e.g., debounce/throttle wrapper consts) */
+  scriptInjections: string[];
+  /** Per-component counter for stable wrap-name suffixes */
+  injectionCounter: { next: number };
 }
 
 function emitStaticText(node: TemplateStaticTextIR, _ctx: EmitNodeCtx): string {
@@ -122,6 +126,8 @@ function emitElementEvents(node: TemplateElementIR, ctx: EmitNodeCtx): string {
       ir: ctx.ir,
       registry: ctx.registry,
       collectors: ctx.collectors,
+      injectionCounter: ctx.injectionCounter,
+      scriptInjections: ctx.scriptInjections,
     });
     for (const d of result.diagnostics) ctx.diagnostics.push(d);
 

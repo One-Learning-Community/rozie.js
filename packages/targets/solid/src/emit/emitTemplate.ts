@@ -17,6 +17,11 @@ import { emitNode, type EmitNodeCtx } from './emitTemplateNode.js';
 
 export interface EmitTemplateResult {
   jsx: string;
+  /**
+   * Script-body injection lines from template @event debounce/throttle wrappers.
+   * These are merged into the component body BEFORE the return statement.
+   */
+  scriptInjections: string[];
   diagnostics: Diagnostic[];
 }
 
@@ -28,17 +33,22 @@ export function emitTemplate(
   const diagnostics: Diagnostic[] = [];
 
   if (ir.template === null) {
-    return { jsx: 'null', diagnostics: [] };
+    return { jsx: 'null', scriptInjections: [], diagnostics: [] };
   }
+
+  const scriptInjections: string[] = [];
+  const injectionCounter = { next: 0 };
 
   const ctx: EmitNodeCtx = {
     ir,
     collectors,
     registry,
     diagnostics,
+    scriptInjections,
+    injectionCounter,
   };
 
   const jsx = emitNode(ir.template, ctx);
 
-  return { jsx, diagnostics };
+  return { jsx, scriptInjections, diagnostics };
 }

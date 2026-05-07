@@ -110,10 +110,11 @@ export function emitSolid(ir: IRComponent, opts: EmitSolidOptions = {}): EmitSol
   const splitPropsCall = `const [local, rest] = splitProps(_props, [${propNames}]);\n`;
 
   // 7. Compose shell.
-  // Merge script injections: listener debounce/throttle wrappers go after user arrows.
+  // Merge script injections: template-event wraps + listener wraps go after user arrows.
   const script = [
     scriptResult.hookSection,
     scriptResult.userArrowsSection,
+    ...templateResult.scriptInjections,
     ...listenersResult.scriptInjections,
   ]
     .filter((s) => s.trim().length > 0)

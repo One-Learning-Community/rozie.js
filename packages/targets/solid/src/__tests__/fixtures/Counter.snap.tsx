@@ -1,0 +1,45 @@
+import { createMemo, createSignal, splitProps } from 'solid-js';
+import { createControllableSignal } from '@rozie/runtime-solid';
+
+interface CounterProps {
+  value?: number;
+  defaultValue?: number;
+  onValueChange?: (value: number) => void;
+  step?: number;
+  min?: number;
+  max?: number;
+}
+
+export default function Counter(_props: CounterProps): JSX.Element {
+  const [local, rest] = splitProps(_props, ['value', 'step', 'min', 'max']);
+
+  const [value, setValue] = createControllableSignal(_props, 'value', 0);
+  const [hovering, setHovering] = createSignal(false);
+  const canIncrement = createMemo(() => $props.value + $props.step <= $props.max);
+  const canDecrement = createMemo(() => $props.value - $props.step >= $props.min);
+
+  console.log("hello from rozie");
+  const increment = () => {
+    if (canIncrement) setValue(prev => prev + local.step);
+  };
+  const decrement = () => {
+    if (canDecrement) setValue(prev => prev - local.step);
+  };
+
+  return (
+    <>
+    <style>{`.counter { display: inline-flex; gap: 0.5rem; align-items: center; }
+    .counter.hovering { background: rgba(0, 0, 0, 0.04); }
+    .value { font-variant-numeric: tabular-nums; min-width: 3ch; text-align: center; }
+    button { padding: 0.25rem 0.5rem; }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }`}</style>
+    <>
+    <div class={"counter" + " " + { hovering: hovering() }} onMouseEnter={(e) => { setHovering(true); }} onMouseLeave={(e) => { setHovering(false); }}>
+      <button disabled={!canDecrement} aria-label="Decrement" onClick={decrement}>−</button>
+      <span class={"value"}>{value()}</span>
+      <button disabled={!canIncrement} aria-label="Increment" onClick={increment}>+</button>
+    </div>
+    </>
+    </>
+  );
+}

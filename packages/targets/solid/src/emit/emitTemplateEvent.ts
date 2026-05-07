@@ -13,8 +13,8 @@
  *   - 'native' kind (capture) → Solid supports `on:click` lowercase for native
  *     addEventListener; for template @event, we use the JSX prop form and
  *     ignore capture/passive (no JSX-level equivalent)
- *   - 'helper' kind (debounce/throttle) → NOT supported on template @event;
- *     emit diagnostic
+ *   - 'helper' kind (debounce/throttle) → emit `const _rozieDebounced... = createDebouncedHandler(...)`
+ *     script injection; reference wrapper name in JSX attribute
  *   - 'helper' .outside → listenerOnly; emit diagnostic
  *
  * Per D-08 collected-not-thrown: never throws; pushes diagnostics.
@@ -30,6 +30,7 @@ import type {
   ModifierRegistry,
   ReactEmissionDescriptor,
 } from '../../../../core/src/modifiers/ModifierRegistry.js';
+import type { ModifierArg } from '../../../../core/src/modifier-grammar/parseModifierChain.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
 import type { SolidImportCollector, RuntimeSolidImportCollector } from '../rewrite/collectSolidImports.js';
@@ -39,10 +40,16 @@ export interface EmitEventCtx {
   ir: IRComponent;
   registry: ModifierRegistry;
   collectors: { solid: SolidImportCollector; runtime: RuntimeSolidImportCollector };
+  /** Per-component counter for stable wrap-name suffixes. */
+  injectionCounter: { next: number };
+  /** Accumulated script injection lines (top-of-body const wrappers). */
+  scriptInjections: string[];
 }
 
 export interface EmitTemplateEventResult {
   jsxAttr: string;
+  /** Top-of-component-body line (e.g., `const _rozieDebounced... = createDebouncedHandler(...)`). */
+  scriptInjection: string | null;
   diagnostics: Diagnostic[];
 }
 
@@ -145,6 +152,33 @@ function eventNameToJsxProp(eventName: string): string {
   return 'on' + cap;
 }
 
+/**
+ * Render a ModifierArg as a JS source string for inlining into the wrap call.
+ */
+function renderModifierArg(arg: ModifierArg): string {
+  if (arg.kind === 'literal') {
+    return JSON.stringify(arg.value);
+  }
+  return arg.ref;
+}
+
+/**
+ * Compose a stable wrap-name for a debounce/throttle wrapper:
+ *   _rozieDebounced${Cap} / _rozieThrottled${Cap} / etc.
+ */
+function makeWrapName(
+  helperName: 'createDebouncedHandler' | 'createThrottledHandler',
+  handler: t.Expression,
+  counter: { next: number },
+): string {
+  const baseName = t.isIdentifier(handler) ? handler.name : `handler${counter.next}`;
+  const cap = baseName.charAt(0).toUpperCase() + baseName.slice(1);
+  const prefix =
+    helperName === 'createDebouncedHandler' ? '_rozieDebounced' : '_rozieThrottled';
+  const N = counter.next++;
+  return N === 0 ? `${prefix}${cap}` : `${prefix}${cap}_${N}`;
+}
+
 function renderHandler(handler: t.Expression, ir: IRComponent): string {
   return rewriteTemplateExpression(handler, ir);
 }
@@ -161,6 +195,8 @@ export function emitTemplateEvent(
   const jsxName = eventNameToJsxProp(eventName);
 
   const inlineGuards: string[] = [];
+  let scriptInjection: string | null = null;
+  let handlerRef: string | null = null;
 
   for (const entry of listener.modifierPipeline) {
     let modifierName: string;
@@ -173,8 +209,6 @@ export function emitTemplateEvent(
 
     const impl = ctx.registry.get(modifierName);
     if (!impl) {
-      // Try react() first (Solid shares React-compatible modifier descriptors);
-      // then fall back to solid() if available.
       diagnostics.push({
         code: RozieErrorCode.TARGET_REACT_RHTML_WITH_CHILDREN,
         severity: 'error',
@@ -204,8 +238,6 @@ export function emitTemplateEvent(
 
     if (desc.kind === 'native') {
       // Capture/passive/once — no JSX-level equivalent for Solid template @event.
-      // Solid's native event listener options require `on:event` lowercase syntax,
-      // which is a different binding form. For v1, skip with info diagnostic.
       diagnostics.push({
         code: RozieErrorCode.TARGET_REACT_RHTML_WITH_CHILDREN,
         severity: 'warning',
@@ -231,18 +263,37 @@ export function emitTemplateEvent(
       continue;
     }
 
-    // debounce/throttle on template @event — not supported in Solid template event context
+    // Debounce/throttle helper on template @event — emit a wrapper const to script injections.
+    if (desc.helperName === 'useDebouncedCallback' || desc.helperName === 'useThrottledCallback') {
+      const solidHelper =
+        desc.helperName === 'useDebouncedCallback' ? 'createDebouncedHandler' : 'createThrottledHandler';
+      ctx.collectors.runtime.add(solidHelper);
+      const originalHandlerCode = renderHandler(listener.handler, ctx.ir);
+      const wrapName = makeWrapName(solidHelper, listener.handler, ctx.injectionCounter);
+      const argList = desc.args.map(renderModifierArg).join(', ');
+      // Solid createDebouncedHandler(fn, ms) — no dep array needed (Solid auto-tracks).
+      const injection = `const ${wrapName} = ${solidHelper}(${originalHandlerCode}${argList ? ', ' + argList : ''});`;
+      scriptInjection = injection;
+      ctx.scriptInjections.push(injection);
+      handlerRef = wrapName;
+      continue;
+    }
+
+    // Unknown helper
     diagnostics.push({
       code: RozieErrorCode.TARGET_REACT_RHTML_WITH_CHILDREN,
       severity: 'error',
-      message: `Modifier helper is not supported on template @event bindings in Solid.`,
+      message: `Modifier helper '${desc.helperName}' is not supported on template @event bindings in Solid.`,
       loc: entry.sourceLoc,
     });
   }
 
   // Compose the handler expression
   let handlerExpr: string;
-  if (inlineGuards.length === 0) {
+  if (handlerRef !== null && inlineGuards.length === 0) {
+    // Pure helper-wrap: reference the wrapper name directly.
+    handlerExpr = handlerRef;
+  } else if (inlineGuards.length === 0) {
     if (t.isIdentifier(listener.handler)) {
       handlerExpr = renderHandler(listener.handler, ctx.ir);
     } else {
@@ -251,14 +302,17 @@ export function emitTemplateEvent(
     }
   } else {
     const guardLines = inlineGuards.join(' ');
-    const handlerInvocation = t.isIdentifier(listener.handler)
-      ? `${renderHandler(listener.handler, ctx.ir)}(e)`
-      : renderHandler(listener.handler, ctx.ir);
+    const handlerInvocation = handlerRef !== null
+      ? `${handlerRef}(e)`
+      : (t.isIdentifier(listener.handler)
+          ? `${renderHandler(listener.handler, ctx.ir)}(e)`
+          : renderHandler(listener.handler, ctx.ir));
     handlerExpr = `(e) => { ${guardLines} ${handlerInvocation}; }`;
   }
 
   return {
     jsxAttr: `${jsxName}={${handlerExpr}}`,
+    scriptInjection,
     diagnostics,
   };
 }
