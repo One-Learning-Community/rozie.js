@@ -20,6 +20,7 @@
  * @experimental — shape may change before v1.0
  */
 import MagicString from 'magic-string';
+import type { EncodedSourceMap } from '@ampproject/remapping';
 import type { BlockMap } from '../../../../core/src/ast/types.js';
 
 export interface ShellParts {
@@ -85,6 +86,11 @@ export interface ShellParts {
    * anchor the React module's overwrite range at the `<rozie>` envelope.
    */
   blockOffsets: BlockMap;
+  /**
+   * Phase 06.1 P2 (D-101): per-expression child sourcemap from emitScript;
+   * pass-through to BuildShellResult for composeMaps() consumption.
+   */
+  scriptMap?: EncodedSourceMap | null;
 }
 
 /**
@@ -98,6 +104,12 @@ export interface BuildShellResult {
   ms: MagicString;
   /** Byte offset within ms.toString() where the React function body begins. */
   scriptOutputOffset: number;
+  /**
+   * Phase 06.1 P2 (D-101): pass-through of emitScript's per-expression child
+   * map. composeMaps() chains this into the shell map at scriptOutputOffset.
+   * null when no child map produced (D-102 fallback).
+   */
+  scriptMap: EncodedSourceMap | null;
 }
 
 export function buildShell(parts: ShellParts): BuildShellResult {
@@ -227,7 +239,7 @@ export function buildShell(parts: ShellParts): BuildShellResult {
   if (anchorEnd < parts.rozieSource.length)
     ms.remove(anchorEnd, parts.rozieSource.length);
 
-  return { ms, scriptOutputOffset };
+  return { ms, scriptOutputOffset, scriptMap: parts.scriptMap ?? null };
 }
 
 /**
@@ -319,5 +331,5 @@ function buildShellLegacy(parts: ShellParts): BuildShellResult {
   ms.append(jsxIndented);
   ms.append('\n  );\n}\n');
 
-  return { ms, scriptOutputOffset: 0 };
+  return { ms, scriptOutputOffset: 0, scriptMap: parts.scriptMap ?? null };
 }

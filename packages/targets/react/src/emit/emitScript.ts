@@ -27,6 +27,7 @@ import * as t from '@babel/types';
 import _generate from '@babel/generator';
 import _traverse from '@babel/traverse';
 import type { GeneratorOptions } from '@babel/generator';
+import type { EncodedSourceMap } from '@ampproject/remapping';
 import type {
   IRComponent,
   PropDecl,
@@ -62,7 +63,23 @@ const traverse: TraverseFn =
     ? (_traverse as TraverseFn)
     : ((_traverse as unknown as { default: TraverseFn }).default);
 
-const GEN_OPTS: GeneratorOptions = { retainLines: false, compact: false };
+// Phase 06.1 P2: GEN_OPTS gains sourceMaps:true + sourceFileName so each
+// @babel/generator call emits a per-expression child map anchored to the
+// .rozie source. The synthesized-AST `.loc =` annotations below (D-104/D-106)
+// give those maps real positional content; non-annotated scaffolding nodes
+// fall back to nearest-segment via the surrounding shell map (D-102).
+//
+// v1 limitation: emitScript assembles its output via string concatenation
+// across multiple genCode calls (one per IR primitive). v1 surfaces
+// scriptMap=null and relies on the buildShell per-block accuracy (DX-04 P1
+// floor); the sourceMaps:true switch + .loc annotations give v2 a drop-in
+// upgrade path.
+const GEN_OPTS: GeneratorOptions = {
+  retainLines: false,
+  compact: false,
+  sourceMaps: true,
+  sourceFileName: '<rozie>',
+};
 
 function genCode(node: t.Node): string {
   return generate(node, GEN_OPTS).code;
@@ -507,6 +524,16 @@ export interface EmitScriptResult {
    * needs to name the function parameter `_props` instead of `props`.
    */
   hasPropsDefaults: boolean;
+  /**
+   * Phase 06.1 P2 (D-100/D-101): per-expression child sourcemap from
+   * @babel/generator's sourceMaps:true mode. v1: null because emitScript's
+   * helper-based string-concat assembly produces N partial maps that
+   * cannot be merged without per-section output offsets (Pitfall 4).
+   * The buildShell whole-envelope accuracy (P1 floor) covers the script body
+   * via D-102 fallback. v2 refactors emitScript to assemble one t.Program
+   * per script and surfaces a real EncodedSourceMap.
+   */
+  scriptMap: EncodedSourceMap | null;
   diagnostics: Diagnostic[];
 }
 
@@ -515,10 +542,25 @@ export interface EmitScriptCollectors {
   runtime: RuntimeReactImportCollector;
 }
 
+/**
+ * Phase 06.1 P2 emitScript options.
+ */
+export interface EmitScriptOptions {
+  /**
+   * .rozie filename surfaced as `sourceFileName` on @babel/generator's
+   * per-call output map (D-103). Defaults to '<rozie>' when omitted.
+   */
+  filename?: string;
+}
+
 export function emitScript(
   ir: IRComponent,
   collectors: EmitScriptCollectors,
+  opts: EmitScriptOptions = {},
 ): EmitScriptResult {
+  // Phase 06.1 P2 (D-103): wire opts.filename through GEN_OPTS.sourceFileName.
+  // void here keeps unused-locals quiet until v2 wires per-call emitState.
+  void opts.filename;
   const diagnostics: Diagnostic[] = [];
   const modelProps = new Set(ir.props.filter((p) => p.isModel).map((p) => p.name));
 
@@ -844,11 +886,14 @@ export function emitScript(
   }
   const userArrowsSection = userArrowsLines.join('\n');
 
+  // Phase 06.1 P2: scriptMap=null for v1 — see EmitScriptResult.scriptMap docstring.
+  const scriptMap: EncodedSourceMap | null = null;
   return {
     hookSection,
     userArrowsSection,
     lifecycleEffectsSection,
     hasPropsDefaults: defaultedNonModelProps.length > 0,
+    scriptMap,
     diagnostics,
   };
 }

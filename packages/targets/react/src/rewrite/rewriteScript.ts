@@ -151,6 +151,15 @@ export function rewriteRozieIdentifiers(
   const refNames = new Set(ir.refs.map((r) => r.name));
   const slotNames = new Set(ir.slots.map((s) => s.name));
 
+  // Phase 06.1 P2 (D-104/D-106): name → IR-primitive lookups so synthesized
+  // identifier nodes can inherit the IR's sourceLoc. The .loc cast is `as any`
+  // because @babel/types' SourceLocation expects {line, column} while our
+  // SourceLoc is {start, end} byte offsets — runtime shape diverges; the
+  // metadata is present for v2 to refine into proper line/column.
+  const stateByName = new Map(ir.state.map((s) => [s.name, s]));
+  const refByName = new Map(ir.refs.map((r) => [r.name, r]));
+  const propByName = new Map(ir.props.map((p) => [p.name, p]));
+
   traverse(program, {
     AssignmentExpression(path) {
       const node = path.node;
@@ -209,7 +218,11 @@ export function rewriteRozieIdentifiers(
       if (obj.name === '$props') {
         if (modelProps.has(prop.name)) {
           // $props.value (model) → value
-          path.replaceWith(t.identifier(prop.name));
+          // Phase 06.1 P2 D-104/D-106: anchor synth identifier loc to IR PropDecl.
+          const propDecl = propByName.get(prop.name);
+          const synthId = t.identifier(prop.name);
+          if (propDecl) synthId.loc = propDecl.sourceLoc as any;
+          path.replaceWith(synthId);
           return;
         }
         if (nonModelProps.has(prop.name)) {
@@ -221,12 +234,20 @@ export function rewriteRozieIdentifiers(
       }
       if (obj.name === '$data' && dataNames.has(prop.name)) {
         // $data.hovering → hovering (bare)
-        path.replaceWith(t.identifier(prop.name));
+        // Phase 06.1 P2 D-104/D-106: anchor synth identifier loc to IR StateDecl.
+        const stateDecl = stateByName.get(prop.name);
+        const synthId = t.identifier(prop.name);
+        if (stateDecl) synthId.loc = stateDecl.sourceLoc as any;
+        path.replaceWith(synthId);
         return;
       }
       if (obj.name === '$refs' && refNames.has(prop.name)) {
         // $refs.dialogEl → dialogEl.current
-        path.node.object = t.identifier(prop.name);
+        // Phase 06.1 P2 D-104/D-106: anchor synth identifier loc to IR RefDecl.
+        const refDecl = refByName.get(prop.name);
+        const newObj = t.identifier(prop.name);
+        if (refDecl) newObj.loc = refDecl.sourceLoc as any;
+        path.node.object = newObj;
         path.node.property = t.identifier('current');
         return;
       }
@@ -247,7 +268,11 @@ export function rewriteRozieIdentifiers(
 
       if (obj.name === '$props') {
         if (modelProps.has(prop.name)) {
-          path.replaceWith(t.identifier(prop.name));
+          // Phase 06.1 P2 D-104/D-106: anchor synth identifier loc to IR PropDecl.
+          const propDecl = propByName.get(prop.name);
+          const synthId = t.identifier(prop.name);
+          if (propDecl) synthId.loc = propDecl.sourceLoc as any;
+          path.replaceWith(synthId);
           return;
         }
         if (nonModelProps.has(prop.name)) {
@@ -257,11 +282,19 @@ export function rewriteRozieIdentifiers(
         return;
       }
       if (obj.name === '$data' && dataNames.has(prop.name)) {
-        path.replaceWith(t.identifier(prop.name));
+        // Phase 06.1 P2 D-104/D-106: anchor synth identifier loc to IR StateDecl.
+        const stateDecl = stateByName.get(prop.name);
+        const synthId = t.identifier(prop.name);
+        if (stateDecl) synthId.loc = stateDecl.sourceLoc as any;
+        path.replaceWith(synthId);
         return;
       }
       if (obj.name === '$refs' && refNames.has(prop.name)) {
-        path.node.object = t.identifier(prop.name);
+        // Phase 06.1 P2 D-104/D-106: anchor synth identifier loc to IR RefDecl.
+        const refDecl = refByName.get(prop.name);
+        const newObj = t.identifier(prop.name);
+        if (refDecl) newObj.loc = refDecl.sourceLoc as any;
+        path.node.object = newObj;
         path.node.property = t.identifier('current');
         return;
       }

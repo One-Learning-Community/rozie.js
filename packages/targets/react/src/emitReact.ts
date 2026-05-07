@@ -74,13 +74,20 @@ export function emitReact(
   const runtimeImports = new RuntimeReactImportCollector();
   const registry = opts.modifierRegistry ?? createDefaultRegistry();
 
+  const scriptOpts: { filename?: string } = {};
+  if (opts.filename !== undefined) scriptOpts.filename = opts.filename;
   const {
     hookSection,
     userArrowsSection,
     lifecycleEffectsSection,
     hasPropsDefaults,
+    scriptMap,
     diagnostics: scriptDiags,
-  } = emitScript(ir, { react: reactImports, runtime: runtimeImports });
+  } = emitScript(
+    ir,
+    { react: reactImports, runtime: runtimeImports },
+    scriptOpts,
+  );
 
   // Plan 04-03: emit the template-side JSX, slot-prop fields + ctx interfaces.
   const tmpl = emitTemplate(
@@ -157,7 +164,7 @@ export function emitReact(
     resolvedBlockOffsets = {};
   }
 
-  const { ms, scriptOutputOffset } = buildShell({
+  const { ms, scriptOutputOffset, scriptMap: shellScriptMap } = buildShell({
     componentName: ir.name,
     propsInterface,
     reactImports: reactImports.render(),
@@ -173,17 +180,22 @@ export function emitReact(
     jsx: tmpl.jsx,
     rozieSource: opts.source ?? '',
     blockOffsets: resolvedBlockOffsets,
+    scriptMap,
   });
-  // P1: scriptOutputOffset is computed but unused in v1 (P2 will consume it
-  // via composeMaps to anchor @babel/generator's per-expression child map).
-  void scriptOutputOffset;
 
   const code = ms.toString();
 
-  // Plan 04-05: produce a real source map when filename + source are provided.
+  // Phase 06.1 P2 (D-109): composeSourceMap is now a thin wrapper around
+  // composeMaps() — chains the shell map with emitScript's per-expression
+  // child map (when present) at scriptOutputOffset.
   const map =
     opts.filename !== undefined && opts.source !== undefined
-      ? composeSourceMap(ms, { filename: opts.filename, source: opts.source })
+      ? composeSourceMap(ms, {
+          filename: opts.filename,
+          source: opts.source,
+          scriptMap: shellScriptMap,
+          scriptOutputOffset,
+        })
       : null;
 
   const result: EmitReactResult = {
