@@ -1,0 +1,24 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "jsx": "preserve",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM"],
+    "types": ["vue"]
+  },
+  "include": [
+    "test.ts",
+    "SelectStringWrapper.vue",
+    "SelectMismatchWrapper.vue",
+    "fixtures/**/*.vue",
+    "fixtures/**/*.ts"
+  ],
+  "exclude": [
+    "fixtures/TodoList.vue",
+    "fixtures/Dropdown.vue"
+  ]
+}
