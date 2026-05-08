@@ -173,8 +173,8 @@ export function rewriteRozieIdentifiers(
       if (parentPath.isObjectProperty() && parentPath.node.key === path.node && !parentPath.node.computed) return;
       // Skip: variable declaration (const canIncrement = createMemo(...)) — the definition itself
       if (parentPath.isVariableDeclarator() && parentPath.node.id === path.node) return;
-      // Skip: function parameter
-      if (parentPath.isIdentifier() && parentPath.node === path.node) return;
+      // Skip: function parameter (e.g. (canIncrement) => ...)
+      if (parentPath.isFunction() && (parentPath.node as { params: unknown[] }).params.includes(path.node)) return;
 
       path.replaceWith(t.callExpression(t.identifier(name), []));
       path.skip();

@@ -9,7 +9,7 @@ interface FooterSlotCtx { close: any; }
 
 interface ModalProps {
   open?: boolean;
-  defaultValue?: boolean;
+  defaultOpen?: boolean;
   onOpenChange?: (open: boolean) => void;
   closeOnEscape?: boolean;
   closeOnBackdrop?: boolean;

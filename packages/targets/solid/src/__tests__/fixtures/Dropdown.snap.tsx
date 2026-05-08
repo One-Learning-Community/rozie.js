@@ -6,7 +6,7 @@ interface TriggerSlotCtx { open: any; toggle: any; }
 
 interface DropdownProps {
   open?: boolean;
-  defaultValue?: boolean;
+  defaultOpen?: boolean;
   onOpenChange?: (open: boolean) => void;
   closeOnOutsideClick?: boolean;
   closeOnEscape?: boolean;

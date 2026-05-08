@@ -6,7 +6,7 @@ interface HeaderSlotCtx { remaining: any; total: any; }
 
 interface TodoListProps {
   items?: unknown[];
-  defaultValue?: unknown[];
+  defaultItems?: unknown[];
   onItemsChange?: (items: unknown[]) => void;
   title?: string;
   onAdd?: (...args: unknown[]) => void;

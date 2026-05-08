@@ -69,7 +69,7 @@ export function emitPropsInterface(ir: IRComponent, slotPropFields?: string[]): 
     if (p.isModel) {
       // 3-field synthesis per D-135 Solid analog.
       fields.push(`  ${p.name}?: ${tsType};`);
-      fields.push(`  defaultValue?: ${tsType};`);
+      fields.push(`  default${capitalize(p.name)}?: ${tsType};`);
       fields.push(`  on${capitalize(p.name)}Change?: (${p.name}: ${tsType}) => void;`);
     } else {
       fields.push(`  ${p.name}?: ${tsType};`);
