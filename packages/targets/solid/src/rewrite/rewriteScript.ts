@@ -74,11 +74,66 @@ function buildSetterCall(
     // Fallback for unsupported operators — simple setter
     return t.callExpression(t.identifier(setterName), [rhs]);
   }
-  const arrow = t.arrowFunctionExpression(
-    [t.identifier('prev')],
-    t.binaryExpression(binOp, t.identifier('prev'), rhs),
+  // Use setX(x() + rhs) instead of setX(prev => prev + rhs).
+  // The functional-updater form (prev =>) triggers solid/reactivity lint warnings when
+  // the rhs contains reactive values (e.g. local.step from splitProps) inside an arrow
+  // that is not a tracked scope. Using the current getter value directly avoids this
+  // and is equivalent in Solid's synchronous execution model.
+  return t.callExpression(
+    t.identifier(setterName),
+    [t.binaryExpression(binOp, t.callExpression(t.identifier(varName), []), rhs)],
   );
-  return t.callExpression(t.identifier(setterName), [arrow]);
+}
+
+/**
+ * Rewrite $props/$data/$refs in a single expression node (cloned from IR).
+ *
+ * Used by emitScript.ts to rewrite computed body expressions that live in
+ * ir.computed[i].body — these are Babel AST nodes separate from the main
+ * script body, so they need their own rewrite pass. The node is cloned first
+ * to avoid mutating the shared IR.
+ *
+ * @experimental — shape may change before v1.0
+ */
+export function rewriteRozieExpressionNode(
+  expr: t.Expression | t.BlockStatement,
+  ir: IRComponent,
+): t.Expression | t.BlockStatement {
+  // For BlockStatements, wrap body statements directly in the program.
+  // For Expressions, wrap as an ExpressionStatement.
+  let programBody: t.Statement[];
+  const isBlock = t.isBlockStatement(expr);
+  if (isBlock) {
+    programBody = t.cloneNode(expr as t.BlockStatement, true, false).body;
+  } else {
+    programBody = [t.expressionStatement(t.cloneNode(expr as t.Expression, true, false))];
+  }
+
+  // Wrap in a File/Program so traverse() has a root to walk.
+  const wrapped: File = {
+    type: 'File',
+    program: {
+      type: 'Program',
+      body: programBody,
+      directives: [],
+      sourceType: 'module',
+    },
+    comments: [],
+    errors: [],
+  };
+  const result = rewriteRozieIdentifiers(wrapped, ir);
+  const body = result.rewrittenProgram.program.body;
+
+  if (isBlock) {
+    return t.blockStatement(body);
+  }
+  // Extract the expression from the first statement.
+  const stmt = body[0];
+  if (stmt && t.isExpressionStatement(stmt)) {
+    return stmt.expression;
+  }
+  // Fallback: return original
+  return expr;
 }
 
 /**
@@ -94,9 +149,37 @@ export function rewriteRozieIdentifiers(
   const modelProps = new Set(ir.props.filter((p) => p.isModel).map((p) => p.name));
   const nonModelProps = new Set(ir.props.filter((p) => !p.isModel).map((p) => p.name));
   const dataNames = new Set(ir.state.map((s) => s.name));
+  const computedNames = new Set(ir.computed.map((c) => c.name));
   const refNames = new Set(ir.refs.map((r) => r.name));
 
   traverse(cloned, {
+    // Rewrite bare computed-memo references to getter calls: canIncrement → canIncrement().
+    // User-authored <script> code references $computed-derived names by bare identifier;
+    // after compilation they become createMemo() Accessors that must be invoked.
+    Identifier(path) {
+      const name = path.node.name;
+      if (!computedNames.has(name)) return;
+
+      const parentPath = path.parentPath;
+      if (!parentPath) return;
+
+      // Skip: already a call expression callee → canIncrement()
+      if (parentPath.isCallExpression() && parentPath.node.callee === path.node) return;
+      // Skip: optional call expression callee
+      if (parentPath.isOptionalCallExpression() && parentPath.node.callee === path.node) return;
+      // Skip: property key (non-computed) in member expression
+      if (parentPath.isMemberExpression() && parentPath.node.property === path.node && !parentPath.node.computed) return;
+      // Skip: property key in object expression
+      if (parentPath.isObjectProperty() && parentPath.node.key === path.node && !parentPath.node.computed) return;
+      // Skip: variable declaration (const canIncrement = createMemo(...)) — the definition itself
+      if (parentPath.isVariableDeclarator() && parentPath.node.id === path.node) return;
+      // Skip: function parameter
+      if (parentPath.isIdentifier() && parentPath.node === path.node) return;
+
+      path.replaceWith(t.callExpression(t.identifier(name), []));
+      path.skip();
+    },
+
     // Handle assignment expressions: $data.x = v → setX(v)
     // $data.x += n → setX(prev => prev + n)
     // $props.x = v (model) → setX(v)

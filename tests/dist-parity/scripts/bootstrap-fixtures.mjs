@@ -40,12 +40,13 @@ const EXAMPLES = [
   'Card',
   'CardHeader',
 ];
-const TARGETS = ['vue', 'react', 'svelte', 'angular'];
+const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid'];
 
 /** D-93 fixture extension table. */
 function primaryExt(target) {
   if (target === 'angular') return '.angular.ts';
   if (target === 'react') return '.tsx';
+  if (target === 'solid') return '.solid.tsx';
   return `.${target}`;
 }
 

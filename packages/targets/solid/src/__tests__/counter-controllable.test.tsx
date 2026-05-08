@@ -47,8 +47,8 @@ describe('Counter createControllableSignal integration (SC #1)', () => {
     const code = compileCounter();
     // createControllableSignal must be imported from @rozie/runtime-solid
     expect(code).toContain("import { createControllableSignal } from '@rozie/runtime-solid'");
-    // The destructured pair follows [value, setValue] = createControllableSignal(_props, 'value', ...) pattern
-    expect(code).toContain('createControllableSignal(_props, \'value\'');
+    // The destructured pair follows [value, setValue] = createControllableSignal(_props as ..., 'value', ...) pattern
+    expect(code).toContain("createControllableSignal(_props as Record<string, unknown>, 'value'");
     // In controlled mode, onValueChange prop is wired — the props interface must declare it
     expect(code).toContain('onValueChange?:');
   });
@@ -58,15 +58,15 @@ describe('Counter createControllableSignal integration (SC #1)', () => {
     // defaultValue must appear in the props interface
     expect(code).toContain('defaultValue?:');
     // createControllableSignal third arg is the default (0 for Counter)
-    expect(code).toContain('createControllableSignal(_props, \'value\', 0)');
+    expect(code).toContain("createControllableSignal(_props as Record<string, unknown>, 'value', 0)");
   });
 
   it('SC #1c: parent-flip warning — emitter produces the call site that will trigger ROZ812 at runtime', () => {
     const code = compileCounter();
     // The ROZ812 warning fires from createControllableSignal when uncontrolled→controlled.
-    // Emitter correctness: createControllableSignal receives _props (reactive) so it can
+    // Emitter correctness: createControllableSignal receives _props (reactive, cast) so it can
     // detect the transition. Verify _props is passed (not local, not a snapshot).
-    expect(code).toContain('createControllableSignal(_props,');
+    expect(code).toContain('createControllableSignal(_props as Record<string, unknown>,');
     // splitProps is universal (D-141) — ensures props not in the owned-key list remain
     // on the reactive _props object
     expect(code).toContain('splitProps(_props,');

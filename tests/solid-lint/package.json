@@ -1,0 +1,22 @@
+{
+  "name": "@rozie/solid-lint",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "lint": "eslint . --max-warnings 0",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@rozie/core": "workspace:*",
+    "@rozie/target-solid": "workspace:*"
+  },
+  "devDependencies": {
+    "@typescript-eslint/parser": "^8.59.2",
+    "eslint": "^9",
+    "eslint-plugin-solid": "^0.14.5",
+    "solid-js": "^1.9.12",
+    "typescript": "^5",
+    "vitest": "^4"
+  }
+}

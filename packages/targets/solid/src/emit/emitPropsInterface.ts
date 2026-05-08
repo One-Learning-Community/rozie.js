@@ -28,7 +28,10 @@ function renderType(ann: PropTypeAnnotation): string {
       case 'Array':
         return 'unknown[]';
       case 'Object':
-        return 'Record<string, unknown>';
+        // Use `any` (not `unknown`) so consumers can access arbitrary properties
+        // on Object-typed props without explicit casts in emitted template code.
+        // `unknown` requires cast at every access site which the emitter doesn't produce.
+        return 'Record<string, any>';
       case 'Function':
         return '(...args: unknown[]) => unknown';
       default:
@@ -40,7 +43,7 @@ function renderType(ann: PropTypeAnnotation): string {
   }
   if (ann.kind === 'literal') {
     if (ann.value === 'array') return 'unknown[]';
-    if (ann.value === 'object') return 'Record<string, unknown>';
+    if (ann.value === 'object') return 'Record<string, any>';
     if (ann.value === 'function') return '(...args: unknown[]) => unknown';
     return ann.value;
   }

@@ -97,7 +97,9 @@ function renderTargetExpr(
 function renderOptionsSuffix(opts: Set<string>): string {
   if (opts.size === 0) return '';
   const parts = [...opts].sort().map((o) => `${o}: true`);
-  return `, { ${parts.join(', ')} }`;
+  // Cast to AddEventListenerOptions so that 'passive' and 'once' are accepted
+  // when TypeScript resolves specific-event overloads (e.g. window.addEventListener('resize', ...)).
+  return `, { ${parts.join(', ')} } as AddEventListenerOptions`;
 }
 
 /**
@@ -179,8 +181,13 @@ export function emitListenerNative(
   } else {
     const userHandlerCode = rewriteTemplateExpression(listener.handler, ir);
     const handlerIsBareIdentifier = /^[A-Za-z_$][\w$]*$/.test(userHandlerCode);
+    // Bare identifier handlers (e.g. `close`) are called without the event
+    // argument so that TypeScript does not complain when the handler type is
+    // `() => void` (TS2554: Expected 0 arguments but got 1). Inline expressions
+    // (e.g. arrow functions already declared with an `e` param) receive `e`
+    // to preserve the intended semantics.
     const invocation = handlerIsBareIdentifier
-      ? `${userHandlerCode}(e);`
+      ? `${userHandlerCode}();`
       : `(${userHandlerCode});`;
     handlerDecl = `  const ${handlerName} = (e: ${evtType}) => {\n${guardBody}    ${invocation}\n  };\n`;
     handlerRef = handlerName;

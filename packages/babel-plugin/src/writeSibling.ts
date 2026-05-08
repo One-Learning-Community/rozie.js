@@ -22,7 +22,7 @@ import { compile } from '@rozie/core';
 /** Editor atomic-save jitter window per RESEARCH Pitfall 1. */
 const MTIME_TOLERANCE_MS = 100;
 
-export type RozieBabelTarget = 'vue' | 'react' | 'svelte' | 'angular';
+export type RozieBabelTarget = 'vue' | 'react' | 'svelte' | 'angular' | 'solid';
 
 /**
  * Compile the .rozie at `roziePath` and write its sibling `siblingPath`,

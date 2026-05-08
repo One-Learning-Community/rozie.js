@@ -18,7 +18,7 @@ import type { IRComponent } from '../../../../core/src/ir/types.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import type { SolidImportCollector, RuntimeSolidImportCollector } from '../rewrite/collectSolidImports.js';
 import { cloneScriptProgram } from '../rewrite/cloneProgram.js';
-import { rewriteRozieIdentifiers } from '../rewrite/rewriteScript.js';
+import { rewriteRozieIdentifiers, rewriteRozieExpressionNode as rewriteNode } from '../rewrite/rewriteScript.js';
 
 // CJS interop normalization for @babel/generator default export.
 type GenerateFn = typeof import('@babel/generator').default;
@@ -82,10 +82,22 @@ export function emitScript(
     const setterName = 'set' + capitalize(p.name);
     let dflt = 'undefined';
     if (p.defaultValue !== null) {
-      dflt = genCode(p.defaultValue);
+      const raw = genCode(p.defaultValue);
+      // When the prop default is a factory arrow/function (e.g. `default: () => []`),
+      // the emitted `createControllableSignal` third arg should be the *initial value*
+      // (the result of calling the factory), not the factory itself — otherwise
+      // TypeScript infers T as the function type rather than the array/object type.
+      if (
+        t.isArrowFunctionExpression(p.defaultValue) ||
+        t.isFunctionExpression(p.defaultValue)
+      ) {
+        dflt = `(${raw})()`;
+      } else {
+        dflt = raw;
+      }
     }
     hookLines.push(
-      `const [${p.name}, ${setterName}] = createControllableSignal(_props, '${p.name}', ${dflt});`,
+      `const [${p.name}, ${setterName}] = createControllableSignal(_props as Record<string, unknown>, '${p.name}', ${dflt});`,
     );
   }
 
@@ -99,13 +111,29 @@ export function emitScript(
   }
 
   // 3. createMemo for each ComputedDecl.
+  // Rule 1 fix: rewrite $props/$data/$refs in the computed body before emitting.
   for (const c of ir.computed) {
     collectors.solidImports.add('createMemo');
-    const bodyCode = genCode(c.body);
+    const rewrittenBody = rewriteNode(c.body, ir);
+    const bodyCode = genCode(rewrittenBody);
     hookLines.push(`const ${c.name} = createMemo(() => ${bodyCode});`);
   }
 
   // 4. onMount/onCleanup for each LifecycleHook.
+  //
+  // Rule 1 fix: when lh.setup is a BlockStatement, genCode() produces `{ ... }`
+  // which Babel's generator renders as an object literal — invalid as a function
+  // argument. Wrap BlockStatements in an arrow function; Expressions are passed
+  // directly (they're already function values from user-authored code).
+  function lifecycleArg(node: t.Node): string {
+    if (t.isBlockStatement(node)) {
+      // Wrap block in arrow: () => { stmts }
+      const code = genCode(node);
+      return `() => ${code}`;
+    }
+    return genCode(node);
+  }
+
   for (const lh of ir.lifecycle) {
     if (lh.phase === 'mount') {
       if (lh.cleanup) {
@@ -113,36 +141,46 @@ export function emitScript(
         // Shape: onMount(() => { const _cleanup = setupFn(); if (_cleanup) onCleanup(_cleanup); })
         collectors.solidImports.add('onMount');
         collectors.solidImports.add('onCleanup');
-        const setupCode = genCode(lh.setup);
-        const cleanupCode = genCode(lh.cleanup);
+        // Rule 1 fix: rewrite $props/$data/$refs in the setup body; wrap BlockStatement in IIFE.
+        const rewrittenSetup = rewriteNode(lh.setup, ir);
+        const rawSetup = genCode(rewrittenSetup);
+        const setupCall = t.isBlockStatement(lh.setup)
+          ? `(() => ${rawSetup})()`
+          : `(${rawSetup})()`;
+        const rewrittenCleanup = rewriteNode(lh.cleanup, ir);
+        const cleanupCode = genCode(rewrittenCleanup);
         hookLines.push(
           `onMount(() => {\n` +
-          `  const _cleanup = (${setupCode})();\n` +
-          `  if (_cleanup) onCleanup(_cleanup);\n` +
+          `  const _cleanup = ${setupCall} as unknown;\n` +
+          `  if (_cleanup) onCleanup(_cleanup as () => void);\n` +
           `  onCleanup(${cleanupCode});\n` +
           `});`,
         );
       } else {
         collectors.solidImports.add('onMount');
-        const setupCode = genCode(lh.setup);
-        hookLines.push(`onMount(${setupCode});`);
+        const rewrittenSetup = rewriteNode(lh.setup, ir);
+        const arg = lifecycleArg(rewrittenSetup);
+        hookLines.push(`onMount(${arg});`);
       }
     } else if (lh.phase === 'unmount') {
       collectors.solidImports.add('onCleanup');
-      const setupCode = genCode(lh.setup);
-      hookLines.push(`onCleanup(${setupCode});`);
+      const rewrittenSetup = rewriteNode(lh.setup, ir);
+      const arg = lifecycleArg(rewrittenSetup);
+      hookLines.push(`onCleanup(${arg});`);
     } else if (lh.phase === 'update') {
       // update phase: createEffect re-runs on tracked dependency change
       collectors.solidImports.add('createEffect');
-      const setupCode = genCode(lh.setup);
-      hookLines.push(`createEffect(${setupCode});`);
+      const rewrittenSetup = rewriteNode(lh.setup, ir);
+      const arg = lifecycleArg(rewrittenSetup);
+      hookLines.push(`createEffect(${arg});`);
     }
   }
 
-  // 4b. Ref variable declarations: `let fooRef: Element | null = null;`
+  // 4b. Ref variable declarations: `let fooRef: HTMLElement | null = null;`
   // Solid uses plain let variables (not useRef objects) for DOM refs.
+  // Using HTMLElement (not Element) so DOM properties like .style, .focus() are accessible.
   for (const ref of ir.refs) {
-    hookLines.push(`let ${ref.name}Ref: Element | null = null;`);
+    hookLines.push(`let ${ref.name}Ref: HTMLElement | null = null;`);
   }
 
   // 5. Emit user-authored top-level statements from the rewritten program.

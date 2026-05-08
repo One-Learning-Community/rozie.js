@@ -30,7 +30,7 @@ import { onCleanup } from 'solid-js';
 export function createOutsideClick(
   refs: Array<() => Element | null | undefined>,
   handler: (e: MouseEvent) => void,
-  when?: () => boolean,
+  when?: () => boolean | undefined,
 ): void {
   const listener = (e: MouseEvent): void => {
     // Guard: if `when` is provided and returns false, do nothing.

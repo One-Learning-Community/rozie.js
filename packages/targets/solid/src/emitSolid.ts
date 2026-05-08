@@ -106,7 +106,13 @@ export function emitSolid(ir: IRComponent, opts: EmitSolidOptions = {}): EmitSol
   const styleResult = emitStyle(ir.styles ?? { scopedRules: [], rootRules: [] }, opts.source ?? '');
 
   // 6. splitPropsCall — D-141 universal.
-  const propNames = (ir.props ?? []).map((p) => `'${p.name}'`).join(', ');
+  // D-131: when a default slot is present, 'children' must also be split so
+  // `local.children` is valid inside the `children(() => local.children)` call.
+  const propKeys = (ir.props ?? []).map((p) => `'${p.name}'`);
+  if (hasDefaultSlot && !propKeys.includes("'children'")) {
+    propKeys.push("'children'");
+  }
+  const propNames = propKeys.join(', ');
   const splitPropsCall = `const [local, rest] = splitProps(_props, [${propNames}]);\n`;
 
   // 7. Compose shell.
@@ -120,10 +126,16 @@ export function emitSolid(ir: IRComponent, opts: EmitSolidOptions = {}): EmitSol
     .filter((s) => s.trim().length > 0)
     .join('\n\n');
 
+  // `JSX.Element` is always used in the function signature; the JSX namespace
+  // must be explicitly imported as a type-only import from solid-js.
+  const jsxTypeImport = `import type { JSX } from 'solid-js';\n`;
+  // Prepend JSX type import before the value imports (or stand alone if none).
+  const solidImportsStr = jsxTypeImport + solidImports.render();
+
   const shellParts = {
     componentName: ir.name,
     propsInterface,
-    solidImports: solidImports.render(),
+    solidImports: solidImportsStr,
     runtimeImports: runtimeImports.render(),
     componentImportsBlock,
     ctxInterfaces: slotResult.ctxInterfaces,
