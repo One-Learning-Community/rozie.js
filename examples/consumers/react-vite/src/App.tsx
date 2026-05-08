@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { JSX } from 'react';
 import CounterPage from './pages/CounterPage';
 import SearchInputPage from './pages/SearchInputPage';
 import DropdownPage from './pages/DropdownPage';

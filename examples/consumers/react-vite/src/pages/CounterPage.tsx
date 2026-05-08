@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { JSX } from 'react';
 import Counter from '../Counter.rozie';
 import SourceMapTrigger from '../SourceMapTrigger.rozie';
 

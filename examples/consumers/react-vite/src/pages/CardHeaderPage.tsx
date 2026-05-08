@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { JSX } from 'react';
 import CardHeader from '../CardHeader.rozie';
 
 export default function CardHeaderPage(): JSX.Element {

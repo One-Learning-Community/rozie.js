@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { JSX } from 'react';
 import Card from '../Card.rozie';
 
 export default function CardPage(): JSX.Element {

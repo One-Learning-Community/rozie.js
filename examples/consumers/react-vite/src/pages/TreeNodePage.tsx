@@ -1,3 +1,4 @@
+import type { JSX } from 'react';
 import TreeNode from '../TreeNode.rozie';
 
 const root = {
