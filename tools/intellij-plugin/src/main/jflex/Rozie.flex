@@ -58,6 +58,7 @@ import static js.rozie.intellij.lexer.RozieTokenTypes.*;
 %state IN_PROPS_BODY
 %state IN_DATA_BODY
 %state IN_LISTENERS_BODY
+%state IN_COMPONENTS_BODY
 %state IN_STYLE_BODY
 
 %state IN_TEMPLATE_BODY
@@ -136,6 +137,7 @@ R_DIRECTIVE_RE     = "r-" ("else-if"|"else"|"if"|"show"|"for"|"model"|"html"|"te
   "<props"                        { pendingBodyState = IN_PROPS_BODY;    yybegin(IN_BLOCK_OPEN_TAG); return PROPS_BLOCK_TAG; }
   "<data"                         { pendingBodyState = IN_DATA_BODY;     yybegin(IN_BLOCK_OPEN_TAG); return DATA_BLOCK_TAG; }
   "<listeners"                    { pendingBodyState = IN_LISTENERS_BODY;yybegin(IN_BLOCK_OPEN_TAG); return LISTENERS_BLOCK_TAG; }
+  "<components"                   { pendingBodyState = IN_COMPONENTS_BODY; yybegin(IN_BLOCK_OPEN_TAG); return COMPONENTS_BLOCK_TAG; }
   "<style"                        { pendingBodyState = IN_STYLE_BODY;    yybegin(IN_BLOCK_OPEN_TAG); return STYLE_BLOCK_TAG; }
 
   "</rozie>"                      { return ROZIE_CLOSE_TAG; }
@@ -144,6 +146,7 @@ R_DIRECTIVE_RE     = "r-" ("else-if"|"else"|"if"|"show"|"for"|"model"|"html"|"te
   "</props>"                      { return PROPS_CLOSE_TAG; }
   "</data>"                       { return DATA_CLOSE_TAG; }
   "</listeners>"                  { return LISTENERS_CLOSE_TAG; }
+  "</components>"                 { return COMPONENTS_CLOSE_TAG; }
   "</style>"                      { return STYLE_CLOSE_TAG; }
 
   {WS}                            { return WHITE_SPACE; }
@@ -254,6 +257,11 @@ R_DIRECTIVE_RE     = "r-" ("else-if"|"else"|"if"|"show"|"for"|"model"|"html"|"te
   "</listeners>"                  { yybegin(YYINITIAL); return LISTENERS_CLOSE_TAG; }
   [^<]+                           { return LISTENERS_BODY; }
   "<"                             { return LISTENERS_BODY; }
+}
+<IN_COMPONENTS_BODY> {
+  "</components>"                 { yybegin(YYINITIAL); return COMPONENTS_CLOSE_TAG; }
+  [^<]+                           { return COMPONENTS_BODY; }
+  "<"                             { return COMPONENTS_BODY; }
 }
 <IN_STYLE_BODY> {
   "</style>"                      { yybegin(YYINITIAL); return STYLE_CLOSE_TAG; }

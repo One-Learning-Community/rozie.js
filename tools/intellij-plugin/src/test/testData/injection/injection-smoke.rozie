@@ -15,6 +15,11 @@ $onMount(() => {
   }
 }
 </listeners>
+<components>
+{
+  Counter: './Counter.rozie',
+}
+</components>
 <template>
   <button @click="$data.count++">Click {{ $data.count }}</button>
 </template>

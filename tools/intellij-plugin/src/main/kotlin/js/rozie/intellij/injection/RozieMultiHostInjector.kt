@@ -51,6 +51,7 @@ class RozieMultiHostInjector : MultiHostInjector {
                 RozieTokenTypes.PROPS_BODY,
                 RozieTokenTypes.DATA_BODY,
                 RozieTokenTypes.LISTENERS_BODY,
+                RozieTokenTypes.COMPONENTS_BODY,
                 -> injectJs(registrar, host, tok.range)
 
                 RozieTokenTypes.TEMPLATE_BODY,

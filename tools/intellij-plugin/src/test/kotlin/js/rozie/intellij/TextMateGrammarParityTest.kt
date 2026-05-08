@@ -48,6 +48,7 @@ class TextMateGrammarParityTest {
         "entity.name.tag.rozie.block.props" to RozieTokenTypes.PROPS_BLOCK_TAG,
         "entity.name.tag.rozie.block.data" to RozieTokenTypes.DATA_BLOCK_TAG,
         "entity.name.tag.rozie.block.listeners" to RozieTokenTypes.LISTENERS_BLOCK_TAG,
+        "entity.name.tag.rozie.block.components" to RozieTokenTypes.COMPONENTS_BLOCK_TAG,
         "entity.name.tag.rozie.block.style" to RozieTokenTypes.STYLE_BLOCK_TAG,
 
         // --- Tag punctuation ---
@@ -122,6 +123,7 @@ class TextMateGrammarParityTest {
         "meta.embedded.block.props.rozie" to RozieTokenTypes.PROPS_BODY,
         "meta.embedded.block.data.rozie" to RozieTokenTypes.DATA_BODY,
         "meta.embedded.block.listeners.rozie" to RozieTokenTypes.LISTENERS_BODY,
+        "meta.embedded.block.components.rozie" to RozieTokenTypes.COMPONENTS_BODY,
         "meta.embedded.block.style.rozie" to RozieTokenTypes.STYLE_BODY
     )
 

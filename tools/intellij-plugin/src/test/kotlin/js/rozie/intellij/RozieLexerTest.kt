@@ -35,6 +35,7 @@ class RozieLexerTest : LexerTestCase() {
     fun testEdgeMultiRefModifier() = doFixtureTest("edge-multi-ref-modifier.rozie", null)
     fun testEdgeMustacheInAttr() = doFixtureTest("edge-mustache-in-attr.rozie", null)
     fun testEdgeMagicInRfor() = doFixtureTest("edge-magic-in-rfor.rozie", null)
+    fun testEdgeComponentsBlock() = doFixtureTest("edge-components-block.rozie", null)
 
     /**
      * Drives a single fixture: reads `<inputName>` from [getDirPath], lexes it,
@@ -79,7 +80,8 @@ class RozieLexerTest : LexerTestCase() {
     //         "TodoList.rozie", "Modal.rozie",
     //         "edge-multi-ref-modifier.rozie",
     //         "edge-mustache-in-attr.rozie",
-    //         "edge-magic-in-rfor.rozie"
+    //         "edge-magic-in-rfor.rozie",
+    //         "edge-components-block.rozie"
     //     )
     //     fixtures.forEach { name ->
     //         val input = File("${getDirPath()}/$name").readText()
