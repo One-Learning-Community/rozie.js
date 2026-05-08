@@ -34,6 +34,13 @@ export interface ComposeOpts {
    * Phase 06.1 P2: byte offset in shell output where the script body begins.
    */
   scriptOutputOffset: number;
+  /**
+   * Phase 06.1 P2: 0-indexed line offset of user-authored constructor-expression
+   * statements in the full .ts output. When provided alongside scriptMap,
+   * composeMaps prepends semicolons to shift the script map's generated lines
+   * so they align with the actual .ts output line numbers.
+   */
+  userCodeLineOffset?: number;
 }
 
 export function composeSourceMap(ms: MagicString, opts: ComposeOpts): SourceMap {
@@ -46,5 +53,6 @@ export function composeSourceMap(ms: MagicString, opts: ComposeOpts): SourceMap 
         ? [{ map: opts.scriptMap, outputOffset: opts.scriptOutputOffset }]
         : [],
     fileExt: '.ts',
+    userCodeLineOffset: opts.userCodeLineOffset,
   });
 }

@@ -52,6 +52,12 @@ export interface ShellParts {
    */
   scriptMap?: EncodedSourceMap | null;
   /**
+   * Phase 06.1 P2: number of lines in the class body BEFORE user-authored
+   * constructor-expression statements (from emitScript.preambleSectionLines).
+   * Used to compute userCodeLineOffset in BuildShellResult.
+   */
+  preambleSectionLines?: number;
+  /**
    * Phase 06.2 P2 (D-118): synthesized component-import lines for the
    * top-of-file imports section. Each line is `import { LocalName } from '{rewrittenPath}';\n`
    * (NAMED import — Angular standalone components export the class by name).
@@ -84,6 +90,14 @@ export interface BuildShellResult {
    * null when no child map produced (D-102 fallback).
    */
   scriptMap: EncodedSourceMap | null;
+  /**
+   * Phase 06.1 P2: 0-indexed line offset of the user-authored constructor-
+   * expression statements within the full .ts output. Computed as the number
+   * of newlines before the class body in the shell + preambleSectionLines
+   * from emitScript. composeMaps uses this to shift the script map so it
+   * references actual .ts output line numbers.
+   */
+  userCodeLineOffset: number;
 }
 
 export function buildShell(parts: ShellParts): BuildShellResult {
@@ -141,6 +155,17 @@ export function buildShell(parts: ShellParts): BuildShellResult {
 
   const moduleSource = moduleParts.join('');
 
+  // Compute userCodeLineOffset: number of newlines in the output before the
+  // user-authored constructor-expression statements. This is:
+  //   - newlines in the shell output up to (and including) the class opening line
+  //   - + preambleSectionLines from emitScript (field lines + blank + ctor header)
+  // The text up to preClassBodyLength includes everything from imports through
+  // `export class Name {\n`; counting its newlines gives lines before class body.
+  const preClassBodyText = moduleSource.slice(0, preClassBodyLength);
+  const linesBeforeClassBody = (preClassBodyText.match(/\n/g) ?? []).length;
+  const preambleSectionLines = parts.preambleSectionLines ?? 0;
+  const userCodeLineOffset = linesBeforeClassBody + preambleSectionLines;
+
   // Anchor the entire Angular module at the `<rozie>` envelope's byte range.
   const anchorStart = blocks.rozie.loc.start;
   const anchorEnd = blocks.rozie.loc.end;
@@ -156,6 +181,7 @@ export function buildShell(parts: ShellParts): BuildShellResult {
     ms,
     scriptOutputOffset: preClassBodyLength,
     scriptMap: parts.scriptMap ?? null,
+    userCodeLineOffset,
   };
 }
 
@@ -199,5 +225,5 @@ function buildShellLegacy(parts: ShellParts): BuildShellResult {
 
   ms.append(`\nexport default ${parts.componentName};\n`);
 
-  return { ms, scriptOutputOffset: 0, scriptMap: parts.scriptMap ?? null };
+  return { ms, scriptOutputOffset: 0, scriptMap: parts.scriptMap ?? null, userCodeLineOffset: 0 };
 }

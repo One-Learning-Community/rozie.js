@@ -281,7 +281,7 @@ export function emitAngular(
       ? componentImportsLines.join('\n') + '\n'
       : '';
 
-  const { ms, scriptOutputOffset, scriptMap: shellScriptMap } = buildShell({
+  const { ms, scriptOutputOffset, scriptMap: shellScriptMap, userCodeLineOffset } = buildShell({
     importLines: imports.render(),
     interfaceDecls: scriptResult.interfaceDecls,
     decorator,
@@ -290,13 +290,15 @@ export function emitAngular(
     rozieSource: opts.source ?? '',
     blockOffsets: resolvedBlockOffsets,
     scriptMap: scriptResult.scriptMap,
+    preambleSectionLines: scriptResult.preambleSectionLines,
     componentImportsBlock,
   });
 
   const code = ms.toString();
 
   // 9. Phase 06.1 P2 (D-109): composeSourceMap chains shell map + scriptMap
-  // via composeMaps().
+  // via composeMaps(). Pass userCodeLineOffset so the semicolon-prefix VLQ
+  // shift aligns script map generated lines with actual .ts output lines.
   const map =
     opts.filename !== undefined && opts.source !== undefined
       ? composeSourceMap(ms, {
@@ -304,6 +306,7 @@ export function emitAngular(
           source: opts.source,
           scriptMap: shellScriptMap,
           scriptOutputOffset,
+          userCodeLineOffset,
         })
       : null;
 
