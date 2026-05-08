@@ -61,7 +61,18 @@ class RozieSyntaxHighlighter : SyntaxHighlighterBase() {
                 DLHC.INVALID_STRING_ESCAPE
             )
 
+        /**
+         * PascalCase component reference tag names inside `<template>` (e.g., `<Counter />`,
+         * `<Modal />`). Fallback is DLHC.CLASS_NAME — the PascalCase=class-name visual model.
+         *
+         * External name "ROZIE_COMPONENT_REF" is STABLE API (T-8-03-01 contract) — never rename
+         * after v1 ships; renaming breaks saved user color-scheme preferences.
+         */
+        val COMPONENT_REF: TextAttributesKey =
+            TextAttributesKey.createTextAttributesKey("ROZIE_COMPONENT_REF", DLHC.CLASS_NAME)
+
         // Pre-allocated arrays returned by getTokenHighlights — avoid allocating per call.
+        private val COMPONENT_REF_KEYS = arrayOf(COMPONENT_REF)
         private val BLOCK_TAG_KEYS = arrayOf(BLOCK_TAG)
         private val R_DIRECTIVE_KEYS = arrayOf(R_DIRECTIVE)
         private val EVENT_AT_KEYS = arrayOf(EVENT_AT)
@@ -132,6 +143,9 @@ class RozieSyntaxHighlighter : SyntaxHighlighterBase() {
 
         // Errors
         RozieTokenTypes.BAD_CHARACTER -> BAD_KEYS
+
+        // Component references — PascalCase tag names inside <template>
+        RozieTokenTypes.COMPONENT_REF -> COMPONENT_REF_KEYS
 
         // Body tokens (SCRIPT_BODY, TEMPLATE_BODY, etc.) and ATTR_VALUE_*
         // — leave uncolored; Plan 04 injection will color via host language

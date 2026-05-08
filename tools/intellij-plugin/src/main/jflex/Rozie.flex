@@ -122,6 +122,7 @@ IDENT              = [A-Za-z_][A-Za-z0-9_-]*
 ATTR_IDENT         = [A-Za-z_][A-Za-z0-9_:.\-]*
 MAGIC_IDENT_RE     = "$" ("props"|"data"|"refs"|"slots"|"emit"|"el"|"onMount"|"onUnmount"|"onUpdate"|"computed"|"watch")
 R_DIRECTIVE_RE     = "r-" ("else-if"|"else"|"if"|"show"|"for"|"model"|"html"|"text"|"bind"|"on")
+PASCAL_IDENT       = [A-Z][A-Za-z0-9]*
 
 %%
 
@@ -328,6 +329,11 @@ R_DIRECTIVE_RE     = "r-" ("else-if"|"else"|"if"|"show"|"for"|"model"|"html"|"te
   // match. Plan 03 colors the post-`:` ATTR_NAME via the highlighter's awareness
   // of the immediately-preceding PROP_COLON token instead.
 
+  // PascalCase tag names (e.g., Counter, Modal, CardHeader) — MUST appear BEFORE
+  // {ATTR_IDENT} so JFlex first-declaration-order fires COMPONENT_REF for any name
+  // starting with uppercase that contains only letters and digits.
+  {PASCAL_IDENT}                  { return COMPONENT_REF; }
+
   {ATTR_IDENT}                    { return ATTR_NAME; }
 
   {WS}                            { return WHITE_SPACE; }
@@ -339,6 +345,8 @@ R_DIRECTIVE_RE     = "r-" ("else-if"|"else"|"if"|"show"|"for"|"model"|"html"|"te
 // =====================================================================
 <IN_TEMPLATE_TAG_CLOSE> {
   ">"                             { yybegin(IN_TEMPLATE_BODY); return GT; }
+  // PascalCase close-tag names (e.g., </Counter>, </Modal>) — visual symmetry with open tags.
+  {PASCAL_IDENT}                  { return COMPONENT_REF; }
   {ATTR_IDENT}                    { return ATTR_NAME; }
   {WS}                            { return WHITE_SPACE; }
   [^]                             { return BAD_CHARACTER; }

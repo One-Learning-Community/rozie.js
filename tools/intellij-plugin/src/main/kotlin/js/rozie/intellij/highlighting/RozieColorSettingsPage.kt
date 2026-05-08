@@ -53,7 +53,8 @@ class RozieColorSettingsPage : ColorSettingsPage {
         AttributesDescriptor(
             msg("rozie.color.bad.character"),
             RozieSyntaxHighlighter.BAD_CHARACTER
-        )
+        ),
+        AttributesDescriptor(msg("rozie.color.component.ref"), RozieSyntaxHighlighter.COMPONENT_REF)
     )
 
     override fun getAttributeDescriptors(): Array<AttributesDescriptor> = descriptors
@@ -109,7 +110,15 @@ class RozieColorSettingsPage : ColorSettingsPage {
         }
         </listeners>
 
+        <components>
+        {
+          Counter: './Counter.rozie',
+          Modal: './Modal.rozie',
+        }
+        </components>
+
         <template>
+          <Counter :value="42" />
           <div class="counter counter--{{ ${'$'}props.value > 0 ? 'active' : 'idle' }}"
                ref="root"
                @mouseenter="${'$'}data.hovering = true"

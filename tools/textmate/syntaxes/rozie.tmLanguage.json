@@ -245,8 +245,27 @@
       "patterns": [
         { "include": "#html-comment" },
         { "include": "#interpolation" },
+        { "include": "#component-ref" },
         { "include": "#rozie-tag" },
         { "include": "text.html.basic" }
+      ]
+    },
+    "component-ref": {
+      "begin": "(<)([A-Z][A-Za-z0-9]*)",
+      "end": "(/?>)",
+      "beginCaptures": {
+        "1": { "name": "punctuation.definition.tag.begin.html" },
+        "2": { "name": "entity.name.tag.component.rozie" }
+      },
+      "endCaptures": {
+        "1": { "name": "punctuation.definition.tag.end.html" }
+      },
+      "patterns": [
+        { "include": "#directive-attribute" },
+        { "include": "#event-binding" },
+        { "include": "#prop-binding" },
+        { "include": "#ref-attribute" },
+        { "include": "#html-attribute" }
       ]
     },
     "rozie-tag": {

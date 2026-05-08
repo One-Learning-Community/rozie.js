@@ -71,6 +71,7 @@ object RozieTokenTypes {
     @JvmField val MUSTACHE_BODY: IElementType = RozieElementType("MUSTACHE_BODY")
     @JvmField val MUSTACHE_CLOSE: IElementType = RozieElementType("MUSTACHE_CLOSE")
     @JvmField val MAGIC_IDENT: IElementType = RozieElementType("MAGIC_IDENT")
+    @JvmField val COMPONENT_REF: IElementType = RozieElementType("COMPONENT_REF")
 
     // --- Lang attribute (for <style lang="scss"> / <script lang="ts">) ---
     @JvmField val LANG_ATTR_NAME: IElementType = RozieElementType("LANG_ATTR_NAME")
