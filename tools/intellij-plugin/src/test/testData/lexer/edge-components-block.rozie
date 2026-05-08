@@ -1,0 +1,11 @@
+<rozie name="TestComponents">
+<components>
+{
+  Counter: './Counter.rozie',
+  Modal: './Modal.rozie',
+}
+</components>
+<template>
+  <div></div>
+</template>
+</rozie>

@@ -53,6 +53,10 @@ class RozieInjectionTest : BasePlatformTestCase() {
         assertInjectedLanguageAt("injection-smoke.rozie", "color: red", "CSS")
     }
 
+    fun testComponentsBodyIsJavaScriptInjected() {
+        assertInjectedLanguageAt("injection-smoke.rozie", "Counter: './Counter", "JavaScript")
+    }
+
     // === SC-4 inspection carve-out ===
 
     fun testHtmlInspectionsDoNotFlagRozieAttributes() {
