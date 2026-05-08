@@ -80,6 +80,14 @@ jobs:
                    @angular/platform-browser-dynamic@^${{ matrix.angular-version }}
           pnpm add -D @angular/compiler-cli@^${{ matrix.angular-version }} \
                        vite@^${{ matrix.vite-version }}
+          # Angular 21 ships @angular/build@21.x which breaks
+          # @analogjs/vite-plugin-angular@2.4.x (the /private subpath moved).
+          # analogjs@2.5+ explicitly peers on @angular/build@^18||^19||^20||^21.
+          if [ "${{ matrix.angular-version }}" = "21" ]; then
+            pnpm add -D "@analogjs/vite-plugin-angular@~2.5.0" \
+                         "@angular/build@^21" \
+                         "@angular-devkit/build-angular@^21"
+          fi
 
       - name: Re-install with version overrides
         run: pnpm install --no-frozen-lockfile
@@ -146,6 +154,11 @@ jobs:
                    @angular/forms@^${{ matrix.angular-version }} \
                    @angular/platform-browser@^${{ matrix.angular-version }}
           pnpm add -D @angular/compiler-cli@^${{ matrix.angular-version }}
+          if [ "${{ matrix.angular-version }}" = "21" ]; then
+            pnpm add -D "@analogjs/vite-plugin-angular@~2.5.0" \
+                         "@angular/build@^21" \
+                         "@angular-devkit/build-angular@^21"
+          fi
 
       - name: Re-install with version overrides
         run: pnpm install --no-frozen-lockfile

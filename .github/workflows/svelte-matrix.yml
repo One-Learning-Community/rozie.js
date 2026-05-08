@@ -30,13 +30,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        svelte-version: ['5.0', '5']
+        svelte-version: ['5.35', '5']
         vite-version: ['5', '6']
         exclude:
           # @sveltejs/vite-plugin-svelte 5.x requires Vite ^6 — exclude
           # combinations that violate the peer-dep constraint (would fail
           # at install rather than test what we intend to test).
-          - svelte-version: '5.0'
+          # Floor is 5.35: svelte@5.0–5.34 use esrap@^1.x which throws
+          # "Not implemented type annotation EmptyStatement" on TypeScript
+          # type/interface declarations. esrap@^2 (first in svelte@5.35)
+          # handles them correctly.
+          - svelte-version: '5.35'
             vite-version: '5'
           - svelte-version: '5'
             vite-version: '5'
@@ -75,7 +79,12 @@ jobs:
       - name: Override Svelte + Vite versions for the demo
         working-directory: examples/consumers/svelte-vite
         run: |
-          pnpm add svelte@~${{ matrix.svelte-version }}.0
+          # '5' = latest 5.x (^5); '5.35' = pinned floor (~5.35.x)
+          if [ "${{ matrix.svelte-version }}" = "5" ]; then
+            pnpm add svelte@^5
+          else
+            pnpm add svelte@~${{ matrix.svelte-version }}.0
+          fi
           pnpm add -D vite@^${{ matrix.vite-version }}
 
       - name: Re-install with version overrides
