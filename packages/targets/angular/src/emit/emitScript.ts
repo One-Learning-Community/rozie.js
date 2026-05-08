@@ -65,16 +65,18 @@ const generate: GenerateFn =
 // .rozie source. The synthesized-AST `.loc =` annotations (D-104/D-106) give
 // those maps real positional content; non-annotated scaffolding falls back
 // to nearest-segment via the surrounding shell map (D-102).
-//
-// v1 limitation: emitScript assembles its output via string concatenation;
-// scriptMap=null in v1. The buildShell whole-envelope accuracy (P1 floor)
-// covers the script-body range. v2 refactors emitScript to assemble one
-// t.Program and surfaces a real EncodedSourceMap.
 const GEN_OPTS: GeneratorOptions = {
   retainLines: false,
   compact: false,
+  sourceMaps: false,
+};
+
+// Used when generating the user-authored constructor-expression statements
+// with source maps, so devtools can resolve back to the .rozie file.
+const GEN_OPTS_MAP: GeneratorOptions = {
+  retainLines: false,
+  compact: false,
   sourceMaps: true,
-  sourceFileName: '<rozie>',
 };
 
 function genCode(node: t.Node): string {
@@ -391,14 +393,21 @@ export interface EmitScriptResult {
   /** Standalone interface declarations (slot ctx interfaces) — emitted BEFORE the class. */
   interfaceDecls: string[];
   /**
-   * Phase 06.1 P2 (D-100/D-101): per-expression child sourcemap from
-   * @babel/generator's sourceMaps:true mode. v1: null because emitScript's
-   * helper-based string-concat assembly produces N partial maps that
-   * cannot be merged without per-section output offsets (Pitfall 4).
-   * v2 refactors emitScript to assemble one t.Program and surfaces a real
-   * EncodedSourceMap.
+   * Phase 06.1 P2 (D-100/D-101): per-expression child sourcemap produced by
+   * generating the user-authored constructor-expression statements as a single
+   * t.Program with sourceMaps:true. Maps generated positions back to .rozie
+   * source lines. Null when no user residual statements exist or no filename
+   * was provided.
    */
   scriptMap: EncodedSourceMap | null;
+  /**
+   * Number of lines in the class body BEFORE the user-authored
+   * constructor-expression statements. Used by buildShell to compute the
+   * total userCodeLineOffset (lines in the full output before user code).
+   * Includes: field declaration lines + blank separator (if fields exist) +
+   * constructor header line.
+   */
+  preambleSectionLines: number;
   diagnostics: Diagnostic[];
 }
 
@@ -531,6 +540,9 @@ export function emitScript(
   //    (console.log, expression-statements) go in the constructor body.
   const classMethodLines: string[] = [];
   const constructorExpressionLines: string[] = [];
+  // Collect the raw t.Statement nodes for user residual constructor expressions
+  // so we can generate a single-program source map (for devtools line accuracy).
+  const residualStmts: t.Statement[] = [];
 
   for (let i = 0; i < cloned.program.body.length; i++) {
     if (lifecyclePairing.consumedIndices.has(i)) continue;
@@ -556,6 +568,7 @@ export function emitScript(
         if (!t.isIdentifier(d.id) || !d.init) {
           // Multi-declarator non-identifier — fall back to constructor.
           constructorExpressionLines.push(genCode(stmt));
+          residualStmts.push(stmt);
           break;
         }
         if (
@@ -595,11 +608,13 @@ export function emitScript(
       // Already filtered $onMount/$onUnmount/$onUpdate above (consumed).
       // Remaining ExpressionStatements: e.g., `console.log("hello from rozie")`.
       constructorExpressionLines.push(genCode(stmt));
+      residualStmts.push(stmt);
       continue;
     }
 
     // Fallback: emit verbatim into constructor.
     constructorExpressionLines.push(genCode(stmt));
+    residualStmts.push(stmt);
   }
 
   // 10. Assemble the constructor body.
@@ -653,7 +668,34 @@ export function emitScript(
 
   const classBody = classBodyParts.join('\n\n');
 
-  // Phase 06.1 P2: scriptMap=null for v1 — see EmitScriptResult.scriptMap docstring.
-  const scriptMap: EncodedSourceMap | null = null;
-  return { classBody, imports, interfaceDecls, scriptMap, diagnostics };
+  // Phase 06.1 P2: generate a single-program source map for the user-authored
+  // constructor-expression statements. This lets devtools resolve
+  // `console.log("hello from rozie")` back to its original .rozie line.
+  // We only generate when residualStmts is non-empty and a filename was provided.
+  let scriptMap: EncodedSourceMap | null = null;
+  if (residualStmts.length > 0 && opts.filename !== undefined) {
+    const sourceFileName = opts.filename;
+    const genResult = generate(
+      t.file(t.program(residualStmts)),
+      { ...GEN_OPTS_MAP, sourceFileName },
+    );
+    if (genResult.map) {
+      scriptMap = genResult.map as EncodedSourceMap;
+    }
+  }
+
+  // Compute the number of lines in the class body BEFORE the user-authored
+  // constructor-expression statements. This is:
+  //   - lines from field declarations (one per field entry)
+  //   - 1 blank separator line (if fields exist, from '\n\n' join)
+  //   - 1 line for `constructor() {` header
+  // buildShell will add the lines before the class body in the full output.
+  const fieldLineCount = fieldLines.length;
+  // The class body text before the constructor body content looks like:
+  //   <field1>\n<field2>\n...<fieldN>\n\nconstructor() {\n
+  // fieldLineCount lines + 1 blank (if fields > 0) + 1 for constructor header
+  const preambleSectionLines =
+    fieldLineCount + (fieldLineCount > 0 ? 1 : 0) + 1;
+
+  return { classBody, imports, interfaceDecls, scriptMap, preambleSectionLines, diagnostics };
 }
