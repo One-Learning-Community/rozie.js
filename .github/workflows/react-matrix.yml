@@ -51,6 +51,9 @@ jobs:
       - name: Build @rozie/unplugin
         run: pnpm --filter @rozie/unplugin run build
 
+      - name: Build @rozie/runtime-react
+        run: pnpm --filter @rozie/runtime-react run build
+
       - name: Run unit tests (core + targets + runtime + unplugin + swipe MOD-05 dogfood)
         run: |
           pnpm exec vitest run --root packages/core

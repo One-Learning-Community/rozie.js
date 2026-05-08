@@ -36,6 +36,9 @@ jobs:
       - name: Build @rozie/unplugin
         run: pnpm --filter @rozie/unplugin run build
 
+      - name: Build @rozie/runtime-vue
+        run: pnpm --filter @rozie/runtime-vue run build
+
       - name: Run unit tests (core + target-vue + runtime-vue + unplugin)
         run: |
           pnpm exec vitest run --root packages/core
