@@ -1,17 +1,8 @@
 /**
  * sourcemap.test.ts — Phase 06.1 D-110/A1 SourceMapConsumer unit test (Svelte target).
  *
- * Asserts that `hovering` in the emitted Counter.svelte resolves to its real
- * .rozie source line via SourceMapConsumer.originalPositionFor — NOT line 1
- * col 0 (the pre-Phase-06.1 degenerate behavior).
- *
- * V1 PER-BLOCK ACCURACY NOTE (P2 SUMMARY: scriptMap=null in v1):
- * We query the SCRIPT-section `let hovering = $state(false)` declaration. Per
- * P2 SUMMARY's "Next Phase Readiness" section, v1 buildShell per-block fallback
- * (D-102) maps the entire `<script>` body region to the `<script>` block byte
- * range; the data-decl `hovering: false` literal line resolution requires P2's
- * per-expression scriptMap (deferred to v2). The v1 contract is "user-authored
- * region of source, NOT line 1 col 0" — exactly what this test asserts.
+ * Asserts that a user-authored residual statement in the emitted Counter.svelte
+ * resolves to its exact .rozie source line via SourceMapConsumer.originalPositionFor.
  */
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -27,7 +18,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const COUNTER_PATH = resolve(__dirname, '../../../../../examples/Counter.rozie');
 
 describe('Phase 06.1 D-110/A1 — Svelte sourcemap resolves to correct .rozie line', () => {
-  it('hovering identifier resolves to its <data> declaration region, not line 1', () => {
+  it('console.log residual statement resolves to its exact .rozie source line', () => {
     const filename = 'Counter.rozie';
     const src = readFileSync(COUNTER_PATH, 'utf8');
     const parseRes = parse(src, { filename });
@@ -45,16 +36,15 @@ describe('Phase 06.1 D-110/A1 — Svelte sourcemap resolves to correct .rozie li
     expect(result.map).not.toBeNull();
     const map = result.map!;
 
-    // Locate the SCRIPT-section `hovering` declaration: `let hovering = $state(false)`.
-    const declMatch = 'let hovering';
-    const declIdx = result.code.indexOf(declMatch);
-    expect(declIdx).toBeGreaterThan(-1);
-    const idx = declIdx + 'let '.length; // point at the bare `hovering` identifier
+    // Locate the user-authored residual statement in the emitted output.
+    const stmtMatch = 'console.log("hello from rozie")';
+    const stmtIdx = result.code.indexOf(stmtMatch);
+    expect(stmtIdx).toBeGreaterThan(-1);
 
-    const before = result.code.slice(0, idx);
+    const before = result.code.slice(0, stmtIdx);
     const line = before.split('\n').length;
     const lastNewline = before.lastIndexOf('\n');
-    const column = lastNewline === -1 ? idx : idx - (lastNewline + 1);
+    const column = lastNewline === -1 ? stmtIdx : stmtIdx - (lastNewline + 1);
 
     const consumer = new SourceMapConsumer({
       version: 3,
@@ -67,15 +57,11 @@ describe('Phase 06.1 D-110/A1 — Svelte sourcemap resolves to correct .rozie li
 
     const pos = consumer.originalPositionFor({ line, column });
 
-    const dataDeclLine = src.split('\n').findIndex((l) => /\bhovering: false\b/.test(l)) + 1;
-    const styleEndLine = src.split('\n').findIndex((l) => /<\/style>/.test(l)) + 1;
-    expect(dataDeclLine).toBeGreaterThan(0);
+    // The statement is on line 32 of Counter.rozie.
+    const expectedLine = src.split('\n').findIndex((l) => l.includes(stmtMatch)) + 1;
+    expect(expectedLine).toBeGreaterThan(0);
 
     expect(pos.source).toBe(filename);
-    expect(pos.line).not.toBe(1); // explicit regression guard (D-110 wording)
-    expect(pos.line).not.toBeNull();
-    // V1 per-block accuracy: pos.line falls within the user-authored block region.
-    expect(pos.line!).toBeGreaterThan(0);
-    expect(pos.line!).toBeLessThanOrEqual(styleEndLine);
+    expect(pos.line).toBe(expectedLine);
   });
 });
