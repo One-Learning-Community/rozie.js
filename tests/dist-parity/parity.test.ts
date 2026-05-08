@@ -69,19 +69,21 @@ const EXAMPLES = [
   'Card',
   'CardHeader',
 ] as const;
-const TARGETS = ['vue', 'react', 'svelte', 'angular'] as const;
+const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid'] as const;
 type Target = (typeof TARGETS)[number];
 
 function primaryExt(target: Target): string {
   if (target === 'angular') return '.angular.ts';
   if (target === 'react') return '.tsx';
+  if (target === 'solid') return '.solid.tsx';
   return `.${target}`;
 }
 
-/** D-89 layout: CLI/babel emit `.tsx` for React; the parity fixture is `.tsx` too. */
+/** D-89 layout: CLI/babel emit by their native convention; parity fixture uses primaryExt. */
 function emittedExt(target: Target): string {
   if (target === 'angular') return '.ts';
   if (target === 'react') return '.tsx';
+  if (target === 'solid') return '.tsx';  // CLI emits .tsx; fixture named .solid.tsx for disambiguation
   return `.${target}`;
 }
 
