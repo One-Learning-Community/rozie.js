@@ -124,7 +124,10 @@ class TextMateGrammarParityTest {
         "meta.embedded.block.data.rozie" to RozieTokenTypes.DATA_BODY,
         "meta.embedded.block.listeners.rozie" to RozieTokenTypes.LISTENERS_BODY,
         "meta.embedded.block.components.rozie" to RozieTokenTypes.COMPONENTS_BODY,
-        "meta.embedded.block.style.rozie" to RozieTokenTypes.STYLE_BODY
+        "meta.embedded.block.style.rozie" to RozieTokenTypes.STYLE_BODY,
+
+        // --- Component references (PascalCase tag names inside <template>) ---
+        "entity.name.tag.component.rozie" to RozieTokenTypes.COMPONENT_REF
     )
 
     @Test
