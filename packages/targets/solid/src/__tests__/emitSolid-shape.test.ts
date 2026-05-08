@@ -57,11 +57,14 @@ describe('emitSolid — shape contract', () => {
     expect(result.code).toContain('export default function Counter');
   });
 
-  it('Test 4: applies splitProps universally — code contains splitProps(_props, ...)', () => {
+  it('Test 4: applies splitProps universally and mergeProps for non-model defaults', () => {
     const source = readFileSync(resolve(ROOT, 'examples/Counter.rozie'), 'utf8');
     const { ast } = parse(source, { filename: 'Counter.rozie' });
     const { ir } = lowerToIR(ast!, {});
     const result = emitSolid(ir!, { filename: 'Counter.rozie', source });
-    expect(result.code).toContain('splitProps(_props,');
+    // Counter has non-model defaults (step, min, max) → mergeProps is emitted.
+    expect(result.code).toContain('mergeProps(');
+    // splitProps must use _merged so local.* gets the declared defaults.
+    expect(result.code).toContain('splitProps(_merged,');
   });
 });

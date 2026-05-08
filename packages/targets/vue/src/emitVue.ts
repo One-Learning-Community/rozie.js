@@ -285,7 +285,7 @@ export function emitVue(ir: IRComponent, opts: EmitVueOptions = {}): EmitVueResu
   const scriptOpts: { genericParams?: string[]; filename?: string } = {};
   if (opts.genericParams !== undefined) scriptOpts.genericParams = opts.genericParams;
   if (opts.filename !== undefined) scriptOpts.filename = opts.filename;
-  const { script, scriptMap, diagnostics: scriptDiags } = emitScript(ir, scriptOpts);
+  const { script, scriptMap, preambleSectionLines, diagnostics: scriptDiags } = emitScript(ir, scriptOpts);
   const {
     template,
     scriptInjections,
@@ -374,7 +374,7 @@ export function emitVue(ir: IRComponent, opts: EmitVueOptions = {}): EmitVueResu
       : '';
   const hasSelfReference = templateContainsSelfReference(ir.template);
 
-  const { ms, scriptOutputOffset, scriptMap: shellScriptMap } = buildShell({
+  const { ms, scriptOutputOffset, userCodeLineOffset, scriptMap: shellScriptMap } = buildShell({
     template,
     script: enrichedScript,
     styleScoped,
@@ -386,6 +386,7 @@ export function emitVue(ir: IRComponent, opts: EmitVueOptions = {}): EmitVueResu
     rozieSource: opts.source ?? '',
     blockOffsets: resolvedBlockOffsets,
     scriptMap,
+    preambleSectionLines,
     componentImportsBlock,
     hasSelfReference,
     componentName: ir.name,
@@ -403,6 +404,7 @@ export function emitVue(ir: IRComponent, opts: EmitVueOptions = {}): EmitVueResu
           source: opts.source,
           scriptMap: shellScriptMap,
           scriptOutputOffset,
+          userCodeLineOffset,
         })
       : null;
 

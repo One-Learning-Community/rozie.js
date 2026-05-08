@@ -61,6 +61,12 @@ export interface ShellParts {
    */
   scriptMap?: EncodedSourceMap | null;
   /**
+   * Number of preamble lines in the <script setup> body before the user-authored
+   * residual statements (from emitScript.preambleSectionLines). Used to compute
+   * userCodeLineOffset so composeMaps can shift the script source map correctly.
+   */
+  preambleSectionLines?: number;
+  /**
    * Phase 06.2 P2 (D-118): synthesized component-import lines for the
    * `<script setup>` body. Each line is `import {LocalName} from '{rewrittenPath}';`
    * (newline-terminated). One per IRComponent.components entry. Emitted at
@@ -97,6 +103,14 @@ export interface BuildShellResult {
   ms: MagicString;
   /** Byte offset within ms.toString() where the script body begins (after `<script setup lang="ts">\n`). */
   scriptOutputOffset: number;
+  /**
+   * 0-indexed line offset of the user-authored statements within the .vue output.
+   * Computed right before the script body is overwritten, accounting for the
+   * template block, the script opening tag, and the preamble lines within
+   * <script setup>. Used by composeMaps to shift the @babel/generator script map
+   * so it references .vue output lines, not script-body-relative lines.
+   */
+  userCodeLineOffset: number;
   /**
    * Phase 06.1 P2 (D-101): pass-through of emitScript's per-expression child
    * map. composeMaps() chains this into the shell map at scriptOutputOffset.
@@ -281,12 +295,33 @@ export function buildShell(parts: ShellParts): BuildShellResult {
 
   // STEP 4: compute scriptOutputOffset — the byte index in ms.toString()
   // where the script body begins (after `<script setup ...>\n`).
+  // Also compute userCodeLineOffset — 0-indexed line count up to where the
+  // user-authored residual statements begin within the .vue output.
   const fullOutput = ms.toString();
   const scriptIdx = fullOutput.indexOf(scriptOpenFraming);
   const scriptOutputOffset =
     scriptIdx >= 0 ? scriptIdx + scriptOpenFraming.length : 0;
 
-  return { ms, scriptOutputOffset, scriptMap: parts.scriptMap ?? null };
+  // Lines before the script body = everything up through `<script setup ...>\n`
+  // (template block + blank line + script open tag), plus the prelude lines
+  // inside <script setup> (scriptPrelude lines from buildScriptPrelude) plus
+  // the preamble lines from emitScript (imports, defineProps, state, etc.).
+  // Each '\n' in `scriptPrelude` is a line break inside the script header.
+  const scriptPreludeNewlines = scriptPrelude.length > 0
+    ? (scriptPrelude.match(/\n/g) ?? []).length
+    : 0;
+  const preambleSectionLines = parts.preambleSectionLines ?? 0;
+
+  let userCodeLineOffset = 0;
+  if (scriptIdx >= 0) {
+    // Count newlines in output up to (but not including) the start of the
+    // script body. Then add prelude + preamble lines inside the script.
+    const textBeforeScriptBody = fullOutput.slice(0, scriptIdx + scriptOpenFraming.length);
+    const linesBeforeScriptBody = (textBeforeScriptBody.match(/\n/g) ?? []).length;
+    userCodeLineOffset = linesBeforeScriptBody + scriptPreludeNewlines + preambleSectionLines;
+  }
+
+  return { ms, scriptOutputOffset, userCodeLineOffset, scriptMap: parts.scriptMap ?? null };
 }
 
 /**
@@ -321,5 +356,5 @@ function buildShellLegacy(parts: ShellParts): BuildShellResult {
     ms.append(parts.styleGlobal);
     ms.append('\n</style>\n');
   }
-  return { ms, scriptOutputOffset: 0, scriptMap: parts.scriptMap ?? null };
+  return { ms, scriptOutputOffset: 0, userCodeLineOffset: 0, scriptMap: parts.scriptMap ?? null };
 }

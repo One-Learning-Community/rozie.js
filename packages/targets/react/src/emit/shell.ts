@@ -92,6 +92,12 @@ export interface ShellParts {
    */
   scriptMap?: EncodedSourceMap | null;
   /**
+   * Number of hook-section statement lines (from emitScript.hookSectionLines).
+   * Used to compute where userArrowsSection starts in the output so the script
+   * source map can be line-adjusted correctly.
+   */
+  hookSectionLines?: number;
+  /**
    * Phase 06.2 P2 (D-118): synthesized component-import lines for the
    * top-of-file imports section. Each line is
    * `import {LocalName} from '{rewrittenPath}';\n` (newline-terminated; the
@@ -120,6 +126,13 @@ export interface BuildShellResult {
   ms: MagicString;
   /** Byte offset within ms.toString() where the React function body begins. */
   scriptOutputOffset: number;
+  /**
+   * 0-indexed line offset of the user-authored statements within the tsx output.
+   * Computed right before the script body is appended, accounting for the
+   * module header and hookSection lines. Used by composeMaps to shift the
+   * @babel/generator script map so it references tsx output lines, not script-body lines.
+   */
+  userCodeLineOffset: number;
   /**
    * Phase 06.1 P2 (D-101): pass-through of emitScript's per-expression child
    * map. composeMaps() chains this into the shell map at scriptOutputOffset.
@@ -204,6 +217,16 @@ export function buildShell(parts: ShellParts): BuildShellResult {
   moduleParts.push(functionSignature);
   const scriptOutputOffset = preBodyLength + functionSignature.length;
 
+  // Compute where user-authored statements start in the output (0-indexed lines).
+  // This is used by composeMaps to shift the @babel/generator script map.
+  // We count newlines in everything assembled so far (after the function open brace),
+  // then add hookSection lines + 1 blank line separator (if hookSection is non-empty).
+  const preScriptNewlines = (moduleParts.join('').match(/\n/g) ?? []).length;
+  const hookSectionLines = parts.hookSectionLines ?? 0;
+  // When hookSection is non-empty, a '\n\n' separator precedes userArrowsSection,
+  // producing hookSectionLines statement lines + 1 blank line before user code.
+  const userCodeLineOffset = preScriptNewlines + (hookSectionLines > 0 ? hookSectionLines + 1 : 0);
+
   // Script body — indented 2 spaces per line.
   if (parts.script.trim().length > 0) {
     const indented = parts.script
@@ -260,7 +283,7 @@ export function buildShell(parts: ShellParts): BuildShellResult {
   if (anchorEnd < parts.rozieSource.length)
     ms.remove(anchorEnd, parts.rozieSource.length);
 
-  return { ms, scriptOutputOffset, scriptMap: parts.scriptMap ?? null };
+  return { ms, scriptOutputOffset, userCodeLineOffset, scriptMap: parts.scriptMap ?? null };
 }
 
 /**
@@ -357,5 +380,5 @@ function buildShellLegacy(parts: ShellParts): BuildShellResult {
   ms.append(jsxIndented);
   ms.append('\n  );\n}\n');
 
-  return { ms, scriptOutputOffset: 0, scriptMap: parts.scriptMap ?? null };
+  return { ms, scriptOutputOffset: 0, userCodeLineOffset: 0, scriptMap: parts.scriptMap ?? null };
 }

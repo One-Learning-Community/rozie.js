@@ -1,12 +1,17 @@
 import type { JSX } from 'solid-js';
-import { For, Show, splitProps } from 'solid-js';
+import { For, Show, mergeProps, splitProps } from 'solid-js';
 
 interface TreeNodeProps {
   node?: Record<string, any>;
 }
 
 export default function TreeNode(_props: TreeNodeProps): JSX.Element {
-  const [local, rest] = splitProps(_props, ['node']);
+  const _merged = mergeProps({ node: (() => ({
+  id: '',
+  label: '',
+  children: []
+}))() }, _props);
+  const [local, rest] = splitProps(_merged, ['node']);
 
   return (
     <>

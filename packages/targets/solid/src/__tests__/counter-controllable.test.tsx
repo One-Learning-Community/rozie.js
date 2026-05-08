@@ -67,9 +67,9 @@ describe('Counter createControllableSignal integration (SC #1)', () => {
     // Emitter correctness: createControllableSignal receives _props (reactive, cast) so it can
     // detect the transition. Verify _props is passed (not local, not a snapshot).
     expect(code).toContain('createControllableSignal(_props as Record<string, unknown>,');
-    // splitProps is universal (D-141) — ensures props not in the owned-key list remain
-    // on the reactive _props object
-    expect(code).toContain('splitProps(_props,');
+    // splitProps is universal (D-141); Counter has non-model defaults so
+    // mergeProps runs first and splitProps uses _merged (not raw _props).
+    expect(code).toContain('splitProps(_merged,');
   });
 
   it('signal getter is used in JSX — value() not bare value', () => {

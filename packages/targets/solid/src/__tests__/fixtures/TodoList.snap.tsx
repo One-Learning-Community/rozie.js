@@ -1,5 +1,5 @@
 import type { JSX } from 'solid-js';
-import { For, Show, children, createMemo, createSignal, splitProps } from 'solid-js';
+import { For, Show, children, createMemo, createSignal, mergeProps, splitProps } from 'solid-js';
 import { createControllableSignal } from '@rozie/runtime-solid';
 
 interface HeaderSlotCtx { remaining: any; total: any; }
@@ -19,7 +19,8 @@ interface TodoListProps {
 }
 
 export default function TodoList(_props: TodoListProps): JSX.Element {
-  const [local, rest] = splitProps(_props, ['items', 'title', 'children']);
+  const _merged = mergeProps({ title: 'Todo' }, _props);
+  const [local, rest] = splitProps(_merged, ['items', 'title', 'children']);
   const resolved = children(() => local.children);
 
   const [items, setItems] = createControllableSignal(_props as Record<string, unknown>, 'items', (() => [])());

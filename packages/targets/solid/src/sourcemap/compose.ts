@@ -31,6 +31,12 @@ export interface ComposeOpts {
    * Phase 06.1 P2: byte offset in shell output where the script body begins.
    */
   scriptOutputOffset: number;
+  /**
+   * 0-indexed line offset of the user-authored statements within the tsx output.
+   * When provided alongside scriptMap, composeMaps applies a semicolon-prefix
+   * shift so the script map's generated lines align with the tsx output lines.
+   */
+  userCodeLineOffset?: number;
 }
 
 export function composeSourceMap(ms: MagicString, opts: ComposeOpts): SourceMap {
@@ -43,5 +49,6 @@ export function composeSourceMap(ms: MagicString, opts: ComposeOpts): SourceMap 
         ? [{ map: opts.scriptMap, outputOffset: opts.scriptOutputOffset }]
         : [],
     fileExt: '.tsx',
+    userCodeLineOffset: opts.userCodeLineOffset,
   });
 }

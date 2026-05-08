@@ -77,6 +77,14 @@ const GEN_OPTS: GeneratorOptions = {
   sourceFileName: '<rozie>',
 };
 
+// Used only when emitting the residual (user-authored) statement block with
+// source maps — a single t.Program generate call so we get one coherent map.
+const GEN_OPTS_MAP: GeneratorOptions = {
+  retainLines: false,
+  compact: false,
+  sourceMaps: true,
+};
+
 function genCode(node: t.Node): string {
   return generate(node, GEN_OPTS).code;
 }
@@ -520,18 +528,21 @@ function emitLifecycleHooks(
 }
 
 /**
- * Emit residual top-level statements in source order — skipping computed
+ * Collect residual top-level statements in source order — skipping computed
  * VariableDeclarators (handled by emitComputedDecls) and lifecycle Expression-
  * Statements (handled by emitLifecycleHooks).
  *
  * Per CONTEXT D-30: this preserves console.log + helper function declarations
  * + plain const/let in source order.
+ *
+ * Returns both the joined code string AND the raw statement array so the
+ * caller can generate a single-program source map via GEN_OPTS_MAP.
  */
 function emitResidualScriptBody(
   clonedProgram: t.File,
   consumedLifecycleIndices: Set<number>,
-): string {
-  const out: string[] = [];
+): { code: string; stmts: t.Statement[] } {
+  const stmts: t.Statement[] = [];
   const body = clonedProgram.program.body;
 
   for (let i = 0; i < body.length; i++) {
@@ -568,10 +579,11 @@ function emitResidualScriptBody(
       }
     }
 
-    out.push(genCode(stmt));
+    stmts.push(stmt);
   }
 
-  return out.join('\n');
+  const code = stmts.map((s) => genCode(s)).join('\n');
+  return { code, stmts };
 }
 
 /**
@@ -604,15 +616,21 @@ export interface EmitScriptOptions {
 export interface EmitScriptResult {
   script: string;
   /**
-   * Phase 06.1 P2 (D-100/D-101): per-expression child sourcemap from
-   * @babel/generator's sourceMaps:true mode. v1: null because emitScript's
-   * helper-based string-concat assembly produces N partial maps that
-   * cannot be merged without per-section output offsets (Pitfall 4).
-   * The buildShell per-block accuracy (P1 floor) covers the script-body
-   * range as a single segment via D-102 fallback. v2 refactors emitScript
-   * to assemble one t.Program per script and surfaces a real EncodedSourceMap.
+   * Source map for user-authored statements (residual body), produced by
+   * @babel/generator with sourceMaps:true via a single-program generate call.
+   * Maps positions in the generated residual text back to the original .rozie
+   * source lines. The shell adjusts this map's generated line numbers by
+   * userCodeLineOffset so the final map references the correct .vue output
+   * line numbers. Null when there are no residual statements or no filename
+   * was provided.
    */
   scriptMap: EncodedSourceMap | null;
+  /**
+   * Number of lines in all sections assembled BEFORE the residual (user-code)
+   * section. Used by buildShell to compute userCodeLineOffset — the total
+   * number of output lines before the user-authored statements begin.
+   */
+  preambleSectionLines: number;
   diagnostics: Diagnostic[];
 }
 
@@ -621,12 +639,6 @@ export function emitScript(
   opts: EmitScriptOptions = {},
 ): EmitScriptResult {
   const diagnostics: Diagnostic[] = [];
-  // Phase 06.1 P2 (D-103): wire opts.filename through GEN_OPTS.sourceFileName
-  // so each genCode call emits a child map anchored to the .rozie file. The
-  // map shape is captured in result.map but unconsumed in v1 — see
-  // EmitScriptResult.scriptMap docstring.
-  // void here keeps the unused-locals rule happy until v2 wires emitState.
-  void opts.filename;
 
   // 1. Clone Program (NEVER mutate ir.setupBody.scriptProgram).
   const cloned = cloneScriptProgram(ir.setupBody.scriptProgram);
@@ -649,34 +661,59 @@ export function emitScript(
 
   const { lines: lifecycleLines, consumedIndices } = emitLifecycleHooks(cloned, imports);
 
-  const residual = emitResidualScriptBody(cloned, consumedIndices);
+  const { code: residualCode, stmts: residualStmts } = emitResidualScriptBody(cloned, consumedIndices);
 
   // 4. Assemble in canonical order with blank-line separators between sections.
-  const sections: string[] = [];
+  const preambleSections: string[] = [];
   const importLine = imports.render();
-  if (importLine) sections.push(importLine);
-  if (propsLine) sections.push(propsLine);
-  if (modelLines.length > 0) sections.push(modelLines.join('\n'));
-  if (emitsLine) sections.push(emitsLine);
-  if (slotsLine) sections.push(slotsLine);
-  if (dataLines.length > 0) sections.push(dataLines.join('\n'));
-  if (refLines.length > 0) sections.push(refLines.join('\n'));
-  if (computedLines.length > 0) sections.push(computedLines.join('\n'));
+  if (importLine) preambleSections.push(importLine);
+  if (propsLine) preambleSections.push(propsLine);
+  if (modelLines.length > 0) preambleSections.push(modelLines.join('\n'));
+  if (emitsLine) preambleSections.push(emitsLine);
+  if (slotsLine) preambleSections.push(slotsLine);
+  if (dataLines.length > 0) preambleSections.push(dataLines.join('\n'));
+  if (refLines.length > 0) preambleSections.push(refLines.join('\n'));
+  if (computedLines.length > 0) preambleSections.push(computedLines.join('\n'));
+
+  // Count lines in preamble sections so shell can compute userCodeLineOffset.
+  // Each section is joined with '\n\n' between sections; count newlines total.
+  // When there IS a residual section, `script = preambleText + '\n\n' + residualCode`.
+  // The '\n\n' separator contributes 2 newlines:
+  //   - 1st '\n' terminates the last preamble line
+  //   - 2nd '\n' creates a blank separator line
+  // So lines before residual = (newlines_in_preambleText + 1 lines) + 1 blank = N + 2.
+  const preambleText = preambleSections.join('\n\n');
+  const preambleSectionLines = preambleText.length > 0
+    ? (preambleText.match(/\n/g) ?? []).length + 2  // +2: last preamble line + blank separator
+    : 0;
+
   // Residual body BEFORE lifecycle hooks — `onMounted(lockScroll)` references
   // `lockScroll` which is a `const` declared in the residual body. Emitting
   // lifecycle BEFORE residual triggered a JS TDZ crash at component mount
   // time (Modal.rozie repro). Vue's onMounted just registers the callback;
   // it doesn't matter whether it's called before or after a `const` decl as
   // long as the const exists by the time `onMounted`'s argument is evaluated.
-  if (residual.trim().length > 0) sections.push(residual);
+  const sections = [...preambleSections];
+  if (residualCode.trim().length > 0) sections.push(residualCode);
   if (lifecycleLines.length > 0) sections.push(lifecycleLines.join('\n'));
 
   const script = sections.join('\n\n');
 
-  // Phase 06.1 P2: scriptMap=null for v1 — see EmitScriptResult.scriptMap
-  // docstring. Synthesized-node loc annotations + GEN_OPTS.sourceMaps:true
-  // are in place so v2 can refactor emitScript to assemble one t.Program
-  // and surface a real EncodedSourceMap with no further wiring changes.
-  const scriptMap: EncodedSourceMap | null = null;
-  return { script, scriptMap, diagnostics };
+  // Generate a single-program source map for the residual (user-authored) statements.
+  // These AST nodes carry correct .rozie line numbers from @babel/parser, so the
+  // map produced here maps generated-output positions → actual .rozie lines.
+  // buildShell will shift the generated lines by userCodeLineOffset so the final
+  // map references the correct .vue output line numbers.
+  let scriptMap: EncodedSourceMap | null = null;
+  if (residualStmts.length > 0 && opts.filename) {
+    const genResult = generate(
+      t.file(t.program(residualStmts)),
+      { ...GEN_OPTS_MAP, sourceFileName: opts.filename },
+    );
+    if (genResult.map) {
+      scriptMap = genResult.map as EncodedSourceMap;
+    }
+  }
+
+  return { script, scriptMap, preambleSectionLines, diagnostics };
 }

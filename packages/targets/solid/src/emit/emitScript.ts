@@ -33,6 +33,13 @@ const GEN_OPTS: GeneratorOptions = {
   sourceMaps: false,
 };
 
+// Used only when emitting the user-authored statement block with source maps.
+const GEN_OPTS_MAP: GeneratorOptions = {
+  retainLines: false,
+  compact: false,
+  sourceMaps: true,
+};
+
 function genCode(node: t.Node): string {
   return generate(node, GEN_OPTS).code;
 }
@@ -50,7 +57,23 @@ export interface EmitScriptResult {
   /** Alias for hookSection (kept for structural parity with React's EmitScriptResult). */
   userArrowsSection: string;
   /**
-   * Phase 06.1 P2: per-expression child sourcemap. null in P1.
+   * `const _merged = mergeProps({ step: 1, ... }, _props);\n` when non-model
+   * props have declared defaults. Null when no non-model defaults exist.
+   * Emitted before splitPropsCall in the shell so `local.*` gets defaults.
+   */
+  mergePropsCall: string | null;
+  /**
+   * Number of statement lines in hookSection (createSignal, createMemo, etc.).
+   * Used by buildShell to compute where userArrowsSection starts in the output
+   * so the script source map can be line-offset-adjusted correctly.
+   */
+  hookSectionLines: number;
+  /**
+   * Source map for user-authored statements, produced by @babel/generator with
+   * sourceMaps:true. Maps positions in the generated userArrowsSection text back
+   * to the original .rozie source lines. The shell adjusts this map's generated
+   * line numbers by the userCodeLineOffset before composing the final map.
+   * Null when there are no user statements or no filename was provided.
    */
   scriptMap: EncodedSourceMap | null;
   diagnostics: Diagnostic[];
@@ -59,6 +82,8 @@ export interface EmitScriptResult {
 export interface EmitScriptCollectors {
   solidImports: SolidImportCollector;
   runtimeImports: RuntimeSolidImportCollector;
+  /** .rozie filename; when provided, enables per-statement source map generation. */
+  filename?: string;
 }
 
 export function emitScript(
@@ -76,6 +101,28 @@ export function emitScript(
   diagnostics.push(...rewriteResult.diagnostics);
 
   // 1. createControllableSignal for model:true props (D-135).
+  // 1b. mergeProps call for non-model props with declared defaults.
+  //     Must be emitted in shell BEFORE splitPropsCall so `local.*` gets defaults.
+  // Exclude NullLiteral defaults (`default: null`) — `null` and `undefined` are
+  // both falsy; including `null` in mergeProps would cause TypeScript type
+  // mismatches for optional function props typed as `T | undefined`.
+  const nonModelDefaultProps = ir.props.filter(
+    (p) => !p.isModel && p.defaultValue !== null && !t.isNullLiteral(p.defaultValue),
+  );
+  let mergePropsCall: string | null = null;
+  if (nonModelDefaultProps.length > 0) {
+    collectors.solidImports.add('mergeProps');
+    const defaultEntries = nonModelDefaultProps.map((p) => {
+      const raw = genCode(p.defaultValue!);
+      const val = (
+        t.isArrowFunctionExpression(p.defaultValue!) ||
+        t.isFunctionExpression(p.defaultValue!)
+      ) ? `(${raw})()` : raw;
+      return `${p.name}: ${val}`;
+    });
+    mergePropsCall = `const _merged = mergeProps({ ${defaultEntries.join(', ')} }, _props);\n`;
+  }
+
   for (const p of ir.props) {
     if (!p.isModel) continue;
     collectors.runtimeImports.add('createControllableSignal');
@@ -185,7 +232,7 @@ export function emitScript(
 
   // 5. Emit user-authored top-level statements from the rewritten program.
   //    Skip: $computed declarators (handled above), $onMount/$onUnmount calls.
-  const userLines: string[] = [];
+  const filteredStmts: t.Statement[] = [];
   for (const stmt of rewriteResult.rewrittenProgram.program.body) {
     // Skip $computed variable declarations.
     if (t.isVariableDeclaration(stmt)) {
@@ -208,16 +255,39 @@ export function emitScript(
         continue;
       }
     }
-    userLines.push(genCode(stmt));
+    filteredStmts.push(stmt);
+  }
+
+  // Generate user statements as a single Babel program so we get one coherent
+  // source map. The AST nodes already carry correct .rozie line numbers
+  // (startLine was passed to @babel/parser in parseScript.ts), so the map
+  // produced here maps generated-output positions → actual .rozie lines.
+  // buildShell will shift the generated lines by userCodeLineOffset so the
+  // final map references the correct tsx output line numbers.
+  let userArrowsSection = '';
+  let scriptMap: EncodedSourceMap | null = null;
+
+  if (filteredStmts.length > 0) {
+    const sourceFileName = collectors.filename ?? '<rozie>';
+    const genResult = generate(
+      t.file(t.program(filteredStmts)),
+      { ...GEN_OPTS_MAP, sourceFileName },
+    );
+    userArrowsSection = genResult.code;
+    if (genResult.map) {
+      scriptMap = genResult.map as EncodedSourceMap;
+    }
   }
 
   const hookSection = hookLines.join('\n');
-  const userArrowsSection = userLines.join('\n');
+  const hookSectionLines = hookLines.length;
 
   return {
     hookSection,
     userArrowsSection,
-    scriptMap: null,
+    mergePropsCall,
+    hookSectionLines,
+    scriptMap,
     diagnostics,
   };
 }

@@ -109,23 +109,22 @@ describe('emitVue source map integration (Pitfall 2)', () => {
     expect(result.map).toBeNull();
   });
 
-  it('Test 7 (Phase 06.1 D-110/A1): hovering identifier resolves to its <data> line, not line 1', () => {
-    // Phase 06.1 — proves the buildShell rearchitecture (P1) + emitScript sourceMaps (P2)
-    // produce a composed map that resolves identifiers in emitted output back to their
-    // real .rozie source line, NOT line 1 col 0 (the pre-Phase-06.1 degenerate behavior).
+  it('Test 7 (Phase 06.1 D-110 / sourcemap-fix): console.log in <script> resolves to its exact .rozie source line', () => {
+    // Phase 06.1 + sourcemap-fix — proves the buildShell rearchitecture (P1) +
+    // emitScript single-program scriptMap (sourcemap-fix) produce a composed map
+    // that resolves user-authored residual statements back to their exact .rozie
+    // source line, NOT line 1 col 0 (the pre-Phase-06.1 degenerate behavior).
     //
-    // CONTEXT D-110 originally specified `count` from Counter.rozie; A1 (researcher correction):
-    // `count` is not in Counter.rozie. We substitute `hovering` — verified present in
-    // all 4 emitted Counter outputs as a bare unmangled identifier.
+    // We query `console.log("hello from rozie")` — a residual statement (not a
+    // preamble/generated line like `const hovering = ref(false)`). The userCodeLineOffset
+    // fix targets residual statements; generated preamble lines (defineProps, refs,
+    // computed) are mapped via the shell map fallback (per-block accuracy).
     //
-    // V1 PER-BLOCK ACCURACY NOTE (P2 SUMMARY: scriptMap=null in v1):
-    // We query the SCRIPT-section `const hovering = ref(false)` identifier (not the FIRST
-    // `hovering` which appears in the template's `:class="{ hovering: hovering }"`). Per
-    // P2 SUMMARY's "Next Phase Readiness" section, v1 buildShell per-block segment fallback
-    // (D-102) maps the entire `<script>` body region to the start of the `<script>` block
-    // in source. The data-decl `hovering: false` literal line resolution requires P2's
-    // per-expression scriptMap to surface a non-null value (deferred to v2). The v1 contract
-    // is "user-authored region of source, NOT line 1 col 0" — exactly what this test asserts.
+    // The fix: emitScript now produces a real scriptMap from residual statements via
+    // a single-program @babel/generator call. buildShell computes userCodeLineOffset
+    // (total .vue lines before user code begins). composeMaps shifts the scriptMap's
+    // VLQ mappings by userCodeLineOffset semicolons so the final map resolves
+    // `console.log` in the .vue output directly to its .rozie source line.
     const filename = 'Counter.rozie';
     const { ir, src } = loadExample('Counter');
     const result = emitVue(ir, {
@@ -136,20 +135,17 @@ describe('emitVue source map integration (Pitfall 2)', () => {
     expect(result.map).not.toBeNull();
     const map = result.map!;
 
-    // Locate the SCRIPT-section `hovering` declaration: `const hovering = ref(false)`.
-    // The literal `const hovering` substring uniquely identifies this position; it
-    // sits inside the emitted `<script setup>` body, which buildShell maps to the
-    // `<script>` block byte range in `.rozie` source via per-block accuracy.
-    const declMatch = 'const hovering';
+    // Locate `console.log("hello from rozie")` in the emitted .vue output.
+    // This is a residual statement — present verbatim in the emitted <script setup>.
+    const declMatch = 'console.log("hello from rozie")';
     const declIdx = result.code.indexOf(declMatch);
     expect(declIdx).toBeGreaterThan(-1);
-    const idx = declIdx + 'const '.length; // point at the bare `hovering` identifier
 
     // Convert byte offset → (line, col) — 1-based line, 0-based column per Source Map v3.
-    const before = result.code.slice(0, idx);
+    const before = result.code.slice(0, declIdx);
     const line = before.split('\n').length;
     const lastNewline = before.lastIndexOf('\n');
-    const column = lastNewline === -1 ? idx : idx - (lastNewline + 1);
+    const column = lastNewline === -1 ? declIdx : declIdx - (lastNewline + 1);
 
     const consumer = new SourceMapConsumer({
       version: 3,
@@ -162,21 +158,17 @@ describe('emitVue source map integration (Pitfall 2)', () => {
 
     const pos = consumer.originalPositionFor({ line, column });
 
-    // Per Pitfall 10 — derive expected user-block region at runtime so the test
-    // survives unrelated edits to Counter.rozie. The v1 fallback resolves to a
-    // line within the user-authored block region (between `<data>` start and
-    // `</script>` close); v2 will tighten to the `hovering: false` literal line.
-    const dataDeclLine = src.split('\n').findIndex((l) => /\bhovering: false\b/.test(l)) + 1;
+    // Derive the expected source line at runtime so the test survives edits.
+    // `console.log("hello from rozie")` appears on the first line of <script>.
+    const consoleLine = src.split('\n').findIndex((l) => /console\.log\("hello from rozie"\)/.test(l)) + 1;
     const scriptEndLine = src.split('\n').findIndex((l) => /<\/script>/.test(l)) + 1;
-    expect(dataDeclLine).toBeGreaterThan(0);
+    expect(consoleLine).toBeGreaterThan(0);
     expect(scriptEndLine).toBeGreaterThan(0);
 
     expect(pos.source).toBe(filename);
     expect(pos.line).not.toBe(1); // explicit regression guard (D-110 wording)
     expect(pos.line).not.toBeNull();
-    // V1 per-block accuracy: pos.line falls within the user-authored declaration
-    // region (between the `<data>` block start and the `</script>` close tag).
-    expect(pos.line!).toBeGreaterThanOrEqual(dataDeclLine);
-    expect(pos.line!).toBeLessThanOrEqual(scriptEndLine);
+    // Per-statement accuracy: pos.line resolves to exactly the console.log line.
+    expect(pos.line!).toBe(consoleLine);
   });
 });

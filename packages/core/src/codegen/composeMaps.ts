@@ -53,6 +53,14 @@ export interface ComposeMapsOpts {
   children: ChildMap[];
   /** Final emitted file extension hint for the `file` field. */
   fileExt: '.vue' | '.tsx' | '.svelte' | '.ts';
+  /**
+   * When provided alongside a children[0] script map: the 0-indexed line
+   * offset of the user-authored statements within the tsx output.
+   * Prepending this many semicolons to the map's VLQ mappings shifts every
+   * generated-line reference so it matches the actual tsx output line numbers
+   * rather than the script-body-relative line numbers from @babel/generator.
+   */
+  userCodeLineOffset?: number;
 }
 
 /**
@@ -84,7 +92,34 @@ export function composeMaps(opts: ComposeMapsOpts): MagicStringSourceMap {
     return shellMap;
   }
 
-  // 3. v1: single-child loader returns the child map for the .rozie source.
+  // 3. Direct line-offset path (used when userCodeLineOffset is known).
+  //
+  //    @ampproject/remapping expects the child map to describe how an
+  //    intermediate file was generated from the original — that contract
+  //    doesn't match our case (both the shell map and the @babel/generator
+  //    map independently reference the .rozie file as their source).
+  //
+  //    Instead we take the script map whose generated positions are 0-indexed
+  //    from the top of the emitted userArrowsSection text, and shift them into
+  //    the correct tsx output lines by prepending `userCodeLineOffset`
+  //    semicolons to the VLQ mappings string. Each ';' represents an empty
+  //    line in the source-map format, pushing every subsequent segment down
+  //    by one line. The result is a stand-alone source map that correctly
+  //    maps tsx-output-lines → .rozie-lines for user-authored statements.
+  if (opts.userCodeLineOffset !== undefined) {
+    const childMap = opts.children[0]!.map;
+    const adjusted: EncodedSourceMap = {
+      version: 3,
+      file: `${opts.filename}${opts.fileExt}`,
+      sources: [opts.filename],
+      sourcesContent: [opts.source],
+      names: childMap.names ?? [],
+      mappings: ';'.repeat(opts.userCodeLineOffset) + childMap.mappings,
+    };
+    return adjusted as unknown as MagicStringSourceMap;
+  }
+
+  // 4. v1: single-child loader returns the child map for the .rozie source.
   //    @ampproject/remapping calls the loader once per `sources` entry in the
   //    parent map; if the returned child map itself references opts.filename
   //    in its sources[], remapping calls the loader AGAIN with the same name.
@@ -109,7 +144,7 @@ export function composeMaps(opts: ComposeMapsOpts): MagicStringSourceMap {
     },
   );
 
-  // 4. Defensive re-assertion of sources/sourcesContent (Pitfall 2 carry-forward).
+  // 5. Defensive re-assertion of sources/sourcesContent (Pitfall 2 carry-forward).
   const out = merged as unknown as MagicStringSourceMap;
   if (out.sources[0] !== opts.filename) {
     out.sources = [opts.filename];

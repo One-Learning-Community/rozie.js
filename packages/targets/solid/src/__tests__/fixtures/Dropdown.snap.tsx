@@ -1,5 +1,5 @@
 import type { JSX } from 'solid-js';
-import { Show, children, createEffect, onCleanup, onMount, splitProps } from 'solid-js';
+import { Show, children, createEffect, mergeProps, onCleanup, onMount, splitProps } from 'solid-js';
 import { createControllableSignal, createOutsideClick, createThrottledHandler } from '@rozie/runtime-solid';
 
 interface TriggerSlotCtx { open: any; toggle: any; }
@@ -16,7 +16,8 @@ interface DropdownProps {
 }
 
 export default function Dropdown(_props: DropdownProps): JSX.Element {
-  const [local, rest] = splitProps(_props, ['open', 'closeOnOutsideClick', 'closeOnEscape', 'children']);
+  const _merged = mergeProps({ closeOnOutsideClick: true, closeOnEscape: true }, _props);
+  const [local, rest] = splitProps(_merged, ['open', 'closeOnOutsideClick', 'closeOnEscape', 'children']);
   const resolved = children(() => local.children);
 
   const [open, setOpen] = createControllableSignal(_props as Record<string, unknown>, 'open', false);

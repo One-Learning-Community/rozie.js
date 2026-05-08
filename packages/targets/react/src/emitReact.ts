@@ -82,11 +82,12 @@ export function emitReact(
     userArrowsSection,
     lifecycleEffectsSection,
     hasPropsDefaults,
+    hookSectionLines,
     scriptMap,
     diagnostics: scriptDiags,
   } = emitScript(
     ir,
-    { react: reactImports, runtime: runtimeImports },
+    { react: reactImports, runtime: runtimeImports, filename: opts.filename },
     scriptOpts,
   );
 
@@ -183,7 +184,7 @@ export function emitReact(
       ? componentImportsLines.join('\n') + '\n'
       : '';
 
-  const { ms, scriptOutputOffset, scriptMap: shellScriptMap } = buildShell({
+  const { ms, scriptOutputOffset, userCodeLineOffset, scriptMap: shellScriptMap } = buildShell({
     componentName: ir.name,
     propsInterface,
     reactImports: reactImports.render(),
@@ -196,6 +197,7 @@ export function emitReact(
     script,
     listenerEffects: listeners.code,
     hasPropsDefaults,
+    hookSectionLines,
     jsx: tmpl.jsx,
     rozieSource: opts.source ?? '',
     blockOffsets: resolvedBlockOffsets,
@@ -215,6 +217,7 @@ export function emitReact(
           source: opts.source,
           scriptMap: shellScriptMap,
           scriptOutputOffset,
+          userCodeLineOffset,
         })
       : null;
 

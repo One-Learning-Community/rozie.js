@@ -32,7 +32,13 @@ export interface SolidShellParts {
    */
   ctxInterfaces?: string[];
   /**
-   * The `const [local, rest] = splitProps(_props, [...]);\n` call (D-141).
+   * `const _merged = mergeProps({ step: 1, ... }, _props);\n` — present when
+   * any non-model prop has a declared default. Emitted immediately before
+   * splitPropsCall so `local.*` receives the declared defaults.
+   */
+  mergePropsCall?: string;
+  /**
+   * The `const [local, rest] = splitProps(_merged|_props, [...]);\n` call (D-141).
    * Always present — even for no-props components (emits `splitProps(_props, [])`).
    */
   splitPropsCall: string;
@@ -79,6 +85,12 @@ export interface SolidShellParts {
    * top-of-file imports section.
    */
   componentImportsBlock?: string;
+  /**
+   * Number of hook-section statement lines (from emitScript.hookSectionLines).
+   * Used to compute where userArrowsSection starts in the output so the script
+   * source map can be line-adjusted correctly.
+   */
+  hookSectionLines?: number;
 }
 
 /**
@@ -87,6 +99,13 @@ export interface SolidShellParts {
 export interface BuildShellResult {
   ms: MagicString;
   scriptOutputOffset: number;
+  /**
+   * 0-indexed line offset of the user-authored statements within the tsx output.
+   * Computed right before the script body is appended, accounting for the
+   * module header and hookSection lines. Used by composeMaps to shift the
+   * @babel/generator script map so it references tsx output lines, not script-body lines.
+   */
+  userCodeLineOffset: number;
   scriptMap: EncodedSourceMap | null;
 }
 
@@ -138,6 +157,10 @@ export function buildShell(parts: SolidShellParts): BuildShellResult {
   moduleParts.push(functionSignature);
   const scriptOutputOffset = preBodyLength + functionSignature.length;
 
+  // mergeProps for non-model defaults — must precede splitPropsCall.
+  if (parts.mergePropsCall) {
+    moduleParts.push('  ' + parts.mergePropsCall);
+  }
   // splitPropsCall immediately after function open (D-141).
   moduleParts.push('  ' + parts.splitPropsCall);
 
@@ -147,6 +170,14 @@ export function buildShell(parts: SolidShellParts): BuildShellResult {
   }
 
   moduleParts.push('\n');
+
+  // Compute where user-authored statements start in the output (0-indexed lines).
+  // This is used by composeMaps to shift the @babel/generator script map.
+  const preScriptNewlines = (moduleParts.join('').match(/\n/g) ?? []).length;
+  const hookSectionLines = parts.hookSectionLines ?? 0;
+  // When hookSection is non-empty, a '\n\n' separator precedes userArrowsSection,
+  // producing hookSectionLines statement lines + 1 blank line before user code.
+  const userCodeLineOffset = preScriptNewlines + (hookSectionLines > 0 ? hookSectionLines + 1 : 0);
 
   // Script body — indented 2 spaces per line.
   if (parts.script.trim().length > 0) {
@@ -205,7 +236,7 @@ export function buildShell(parts: SolidShellParts): BuildShellResult {
   if (anchorEnd < parts.rozieSource.length)
     ms.remove(anchorEnd, parts.rozieSource.length);
 
-  return { ms, scriptOutputOffset, scriptMap: parts.scriptMap ?? null };
+  return { ms, scriptOutputOffset, userCodeLineOffset, scriptMap: parts.scriptMap ?? null };
 }
 
 /**
@@ -243,6 +274,10 @@ function buildShellLegacy(parts: SolidShellParts): BuildShellResult {
     `export default function ${parts.componentName}(_props: ${parts.componentName}Props): JSX.Element {\n`,
   );
 
+  // mergeProps for non-model defaults — must precede splitPropsCall.
+  if (parts.mergePropsCall) {
+    ms.append('  ' + parts.mergePropsCall);
+  }
   // splitPropsCall (D-141).
   ms.append('  ' + parts.splitPropsCall);
 
@@ -294,5 +329,5 @@ function buildShellLegacy(parts: SolidShellParts): BuildShellResult {
   ms.append(jsxIndented);
   ms.append('\n  );\n}\n');
 
-  return { ms, scriptOutputOffset: 0, scriptMap: parts.scriptMap ?? null };
+  return { ms, scriptOutputOffset: 0, userCodeLineOffset: 0, scriptMap: parts.scriptMap ?? null };
 }

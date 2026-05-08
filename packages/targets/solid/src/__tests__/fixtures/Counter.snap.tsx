@@ -1,5 +1,5 @@
 import type { JSX } from 'solid-js';
-import { createMemo, createSignal, splitProps } from 'solid-js';
+import { createMemo, createSignal, mergeProps, splitProps } from 'solid-js';
 import { createControllableSignal } from '@rozie/runtime-solid';
 
 interface CounterProps {
@@ -12,7 +12,8 @@ interface CounterProps {
 }
 
 export default function Counter(_props: CounterProps): JSX.Element {
-  const [local, rest] = splitProps(_props, ['value', 'step', 'min', 'max']);
+  const _merged = mergeProps({ step: 1, min: -Infinity, max: Infinity }, _props);
+  const [local, rest] = splitProps(_merged, ['value', 'step', 'min', 'max']);
 
   const [value, setValue] = createControllableSignal(_props as Record<string, unknown>, 'value', 0);
   const [hovering, setHovering] = createSignal(false);

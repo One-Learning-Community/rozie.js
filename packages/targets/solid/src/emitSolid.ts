@@ -100,7 +100,7 @@ export function emitSolid(ir: IRComponent, opts: EmitSolidOptions = {}): EmitSol
   // 5. Per-segment emit.
   const slotResult = emitSlotDecl(ir);
   const propsInterface = emitPropsInterface(ir, slotResult.fields);
-  const scriptResult = emitScript(ir, { solidImports, runtimeImports }, registry);
+  const scriptResult = emitScript(ir, { solidImports, runtimeImports, filename: opts.filename }, registry);
   const templateResult = emitTemplate(ir, { solid: solidImports, runtime: runtimeImports }, registry);
   const listenersResult = emitListeners(ir, { solid: solidImports, runtime: runtimeImports }, registry);
   const styleResult = emitStyle(ir.styles ?? { scopedRules: [], rootRules: [] }, opts.source ?? '');
@@ -113,7 +113,10 @@ export function emitSolid(ir: IRComponent, opts: EmitSolidOptions = {}): EmitSol
     propKeys.push("'children'");
   }
   const propNames = propKeys.join(', ');
-  const splitPropsCall = `const [local, rest] = splitProps(_props, [${propNames}]);\n`;
+  // When non-model defaults exist, emitScript emits `const _merged = mergeProps({...}, _props)`.
+  // splitProps must use `_merged` so `local.*` gets the declared defaults.
+  const propsTarget = scriptResult.mergePropsCall ? '_merged' : '_props';
+  const splitPropsCall = `const [local, rest] = splitProps(${propsTarget}, [${propNames}]);\n`;
 
   // 7. Compose shell.
   // Merge script injections: template-event wraps + listener wraps go after user arrows.
@@ -139,9 +142,11 @@ export function emitSolid(ir: IRComponent, opts: EmitSolidOptions = {}): EmitSol
     runtimeImports: runtimeImports.render(),
     componentImportsBlock,
     ctxInterfaces: slotResult.ctxInterfaces,
+    mergePropsCall: scriptResult.mergePropsCall ?? undefined,
     splitPropsCall,
     hasDefaultSlot,
     script,
+    hookSectionLines: scriptResult.hookSectionLines,
     listenerEffects: listenersResult.code,
     styleJsx: styleResult.styleJsx,
     jsx: templateResult.jsx,
@@ -160,6 +165,7 @@ export function emitSolid(ir: IRComponent, opts: EmitSolidOptions = {}): EmitSol
           source: opts.source,
           scriptMap: shell.scriptMap,
           scriptOutputOffset: shell.scriptOutputOffset,
+          userCodeLineOffset: shell.userCodeLineOffset,
         })
       : null;
 

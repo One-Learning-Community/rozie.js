@@ -81,6 +81,13 @@ const GEN_OPTS: GeneratorOptions = {
   sourceFileName: '<rozie>',
 };
 
+// Used only when emitting the user-authored statement block with source maps.
+const GEN_OPTS_MAP: GeneratorOptions = {
+  retainLines: false,
+  compact: false,
+  sourceMaps: true,
+};
+
 function genCode(node: t.Node): string {
   return generate(node, GEN_OPTS).code;
 }
@@ -525,13 +532,17 @@ export interface EmitScriptResult {
    */
   hasPropsDefaults: boolean;
   /**
+   * Number of statement lines in hookSection (useRef, useControllableState,
+   * useState, useRef for template refs, useMemo). Used by buildShell to compute
+   * where userArrowsSection starts in the output so the script source map can
+   * be line-offset-adjusted correctly.
+   */
+  hookSectionLines: number;
+  /**
    * Phase 06.1 P2 (D-100/D-101): per-expression child sourcemap from
-   * @babel/generator's sourceMaps:true mode. v1: null because emitScript's
-   * helper-based string-concat assembly produces N partial maps that
-   * cannot be merged without per-section output offsets (Pitfall 4).
-   * The buildShell whole-envelope accuracy (P1 floor) covers the script body
-   * via D-102 fallback. v2 refactors emitScript to assemble one t.Program
-   * per script and surfaces a real EncodedSourceMap.
+   * @babel/generator's sourceMaps:true mode. Generated from mappable
+   * user-authored statements (those not wrapped by tryWrapEscapingHelperUseCallback).
+   * Null when no mappable statements exist or no filename was provided.
    */
   scriptMap: EncodedSourceMap | null;
   diagnostics: Diagnostic[];
@@ -540,6 +551,8 @@ export interface EmitScriptResult {
 export interface EmitScriptCollectors {
   react: ReactImportCollector;
   runtime: RuntimeReactImportCollector;
+  /** .rozie filename; when provided, enables per-statement source map generation. */
+  filename?: string;
 }
 
 /**
@@ -833,6 +846,13 @@ export function emitScript(
   }
 
   const userArrowsLines: string[] = [];
+  // Collect statements that are emitted as-is (not wrapped by
+  // tryWrapEscapingHelperUseCallback) so we can generate a unified source map
+  // from them. Wrapped statements produce string output (not AST) and have no
+  // reliable source location after the useCallback transformation, so they are
+  // excluded from the map (acceptable partial fix per brief).
+  const mappableStmts: t.Statement[] = [];
+
   for (let i = 0; i < cloned.program.body.length; i++) {
     if (lifecyclePairing.consumedIndices.has(i)) continue;
     const stmt = cloned.program.body[i]!;
@@ -872,6 +892,9 @@ export function emitScript(
     );
     if (wrapped) {
       userArrowsLines.push(wrapped);
+      // Wrapped statements are emitted as strings via genCode on the callback
+      // body; their source locations are unreliable post-transformation.
+      // Exclude from mappableStmts.
       continue;
     }
 
@@ -882,17 +905,45 @@ export function emitScript(
     // render time. Function-decl hoist eliminates the TDZ. (Per Plan 04-03
     // deferred limitation #1; see RESEARCH Pitfall 3/8.)
     const hoisted = tryHoistArrowToFunction(stmt);
-    userArrowsLines.push(genCode(hoisted ?? stmt));
+    const emitted = hoisted ?? stmt;
+    userArrowsLines.push(genCode(emitted));
+    // Only collect the ORIGINAL stmt for source-map purposes — hoisted nodes are
+    // synthetic (no .loc) and would produce empty mappings. The original stmt
+    // retains the .rozie source location from @babel/parser.
+    mappableStmts.push(stmt);
   }
   const userArrowsSection = userArrowsLines.join('\n');
 
-  // Phase 06.1 P2: scriptMap=null for v1 — see EmitScriptResult.scriptMap docstring.
-  const scriptMap: EncodedSourceMap | null = null;
+  // Generate a source map from mappable user statements. We generate ONE map
+  // from the combined program so generated-line numbers are relative to the
+  // start of userArrowsSection (line 0 = first user statement). buildShell
+  // shifts this by userCodeLineOffset so it aligns with tsx output lines.
+  let scriptMap: EncodedSourceMap | null = null;
+  const sourceFileName = collectors.filename;
+  if (mappableStmts.length > 0 && sourceFileName !== undefined) {
+    const genResult = generate(
+      t.file(t.program(mappableStmts)),
+      { ...GEN_OPTS_MAP, sourceFileName },
+    );
+    if (genResult.map) {
+      scriptMap = genResult.map as EncodedSourceMap;
+    }
+  }
+
+  // Count the actual OUTPUT lines of hookSection, not the number of entries.
+  // React hookSection entries can span multiple lines (e.g., useControllableState
+  // block with 4 sub-lines, propsDefaultsBlock with 5 sub-lines). The shell
+  // needs the actual line count to compute userCodeLineOffset correctly.
+  const hookSectionLines = hookSection.length > 0
+    ? hookSection.split('\n').length
+    : 0;
+
   return {
     hookSection,
     userArrowsSection,
     lifecycleEffectsSection,
     hasPropsDefaults: defaultedNonModelProps.length > 0,
+    hookSectionLines,
     scriptMap,
     diagnostics,
   };
