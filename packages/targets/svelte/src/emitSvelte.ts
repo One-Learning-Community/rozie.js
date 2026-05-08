@@ -141,13 +141,14 @@ export function emitSvelte(
   const registry = opts.modifierRegistry ?? createDefaultRegistry();
 
   // 1. Script-side emission.
-  // Phase 06.1 P2: thread filename for sourceFileName + capture scriptMap.
+  // Phase 06.1 P2: thread filename for sourceFileName + capture scriptMap + preambleSectionLines.
   const scriptOpts: { filename?: string } = {};
   if (opts.filename !== undefined) scriptOpts.filename = opts.filename;
   const {
     scriptBlock,
     scriptInjections: scriptOwnInjections,
     scriptMap,
+    preambleSectionLines,
     diagnostics: scriptDiags,
   } = emitScript(ir, scriptOpts);
 
@@ -227,13 +228,14 @@ export function emitSvelte(
       ? componentImportsLines.join('\n') + '\n'
       : '';
 
-  const { ms, scriptOutputOffset, scriptMap: shellScriptMap } = buildShell({
+  const { ms, scriptOutputOffset, userCodeLineOffset, scriptMap: shellScriptMap } = buildShell({
     script: finalScript,
     template,
     styleBlock: styleResult.block,
     rozieSource: opts.source ?? '',
     blockOffsets: resolvedBlockOffsets,
     scriptMap,
+    preambleSectionLines,
     componentImportsBlock,
   });
 
@@ -248,6 +250,7 @@ export function emitSvelte(
           source: opts.source,
           scriptMap: shellScriptMap,
           scriptOutputOffset,
+          userCodeLineOffset,
         })
       : null;
 

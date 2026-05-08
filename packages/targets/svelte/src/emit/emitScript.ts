@@ -58,16 +58,19 @@ const generate: GenerateFn =
 // .rozie source. The synthesized-AST `.loc =` annotations (D-104/D-106) give
 // those maps real positional content; non-annotated scaffolding falls back
 // to nearest-segment via the surrounding shell map (D-102).
-//
-// v1 limitation: emitScript assembles its output via string concatenation;
-// scriptMap=null in v1 — the buildShell per-block accuracy (P1 floor) covers
-// the script-body range. v2 refactors emitScript to assemble one t.Program
-// and surfaces a real EncodedSourceMap.
 const GEN_OPTS: GeneratorOptions = {
   retainLines: false,
   compact: false,
   sourceMaps: true,
   sourceFileName: '<rozie>',
+};
+
+// Used only when emitting the residual (user-authored) statement block with
+// source maps — a single t.Program generate call so we get one coherent map.
+const GEN_OPTS_MAP: GeneratorOptions = {
+  retainLines: false,
+  compact: false,
+  sourceMaps: true,
 };
 
 function genCode(node: t.Node): string {
@@ -461,15 +464,18 @@ function emitLifecycleHooks(
 }
 
 /**
- * Emit residual top-level statements in source order — skipping computed
+ * Collect residual top-level statements in source order — skipping computed
  * VariableDeclarators (handled by emitDerivedDecls) and lifecycle Expression-
  * Statements (handled by emitLifecycleHooks).
+ *
+ * Returns both the joined code string AND the raw statement array so the
+ * caller can generate a single-program source map via GEN_OPTS_MAP.
  */
 function emitResidualScriptBody(
   clonedProgram: t.File,
   consumedLifecycleIndices: Set<number>,
-): string {
-  const out: string[] = [];
+): { code: string; stmts: t.Statement[] } {
+  const stmts: t.Statement[] = [];
   const body = clonedProgram.program.body;
 
   for (let i = 0; i < body.length; i++) {
@@ -505,10 +511,11 @@ function emitResidualScriptBody(
       }
     }
 
-    out.push(genCode(stmt));
+    stmts.push(stmt);
   }
 
-  return out.join('\n');
+  const code = stmts.map((s) => genCode(s)).join('\n');
+  return { code, stmts };
 }
 
 /**
@@ -520,14 +527,21 @@ export interface EmitScriptResult {
   /** Pending injections — Plan 02a Task 2/3 append to this. v1 always empty. */
   scriptInjections: SvelteScriptInjection[];
   /**
-   * Phase 06.1 P2 (D-100/D-101): per-expression child sourcemap from
-   * @babel/generator's sourceMaps:true mode. v1: null because emitScript's
-   * helper-based string-concat assembly produces N partial maps that
-   * cannot be merged without per-section output offsets (Pitfall 4).
-   * v2 refactors emitScript to assemble one t.Program and surfaces a real
-   * EncodedSourceMap.
+   * Phase 06.1 P2 (D-100/D-101): source map for user-authored statements
+   * (residual body), produced by @babel/generator with sourceMaps:true via a
+   * single-program generate call. Maps positions in the generated residual
+   * text back to the original .rozie source lines. The shell adjusts this
+   * map's generated line numbers by userCodeLineOffset so the final map
+   * references the correct .svelte output line numbers. Null when there are
+   * no residual statements or no filename was provided.
    */
   scriptMap: EncodedSourceMap | null;
+  /**
+   * Number of lines in all sections assembled BEFORE the residual (user-code)
+   * section. Used by buildShell to compute userCodeLineOffset — the total
+   * number of output lines before the user-authored statements begin.
+   */
+  preambleSectionLines: number;
   diagnostics: Diagnostic[];
 }
 
@@ -546,8 +560,6 @@ export function emitScript(
   ir: IRComponent,
   opts: EmitScriptOptions = {},
 ): EmitScriptResult {
-  // Phase 06.1 P2 (D-103): wire opts.filename through GEN_OPTS.sourceFileName.
-  void opts.filename;
   const diagnostics: Diagnostic[] = [];
   const scriptInjections: SvelteScriptInjection[] = [];
 
@@ -574,24 +586,53 @@ export function emitScript(
   const derivedLines = emitDerivedDecls(ir.computed, clonedComputedBodies);
 
   const { lines: lifecycleLines, consumedIndices } = emitLifecycleHooks(cloned);
-  const residual = emitResidualScriptBody(cloned, consumedIndices);
+  const { code: residualCode, stmts: residualStmts } = emitResidualScriptBody(cloned, consumedIndices);
 
-  // 5. Assemble in canonical order with blank-line separators.
-  const sections: string[] = [];
-  if (importLines.length > 0) sections.push(importLines.join('\n'));
-  if (propsBlock) sections.push(propsBlock);
-  if (stateLines.length > 0) sections.push(stateLines.join('\n'));
-  if (refLines.length > 0) sections.push(refLines.join('\n'));
+  // 5. Assemble preamble sections (everything BEFORE the residual user code).
+  const preambleSections: string[] = [];
+  if (importLines.length > 0) preambleSections.push(importLines.join('\n'));
+  if (propsBlock) preambleSections.push(propsBlock);
+  if (stateLines.length > 0) preambleSections.push(stateLines.join('\n'));
+  if (refLines.length > 0) preambleSections.push(refLines.join('\n'));
+
+  // Count lines in preamble sections so shell can compute userCodeLineOffset.
+  // Each section is joined with '\n\n' between sections; count newlines total.
+  // When there IS a residual section, `scriptBlock = preambleText + '\n\n' + residualCode`.
+  // The '\n\n' separator contributes 2 newlines:
+  //   - 1st '\n' terminates the last preamble line
+  //   - 2nd '\n' creates a blank separator line
+  // So lines before residual = (newlines_in_preambleText + 1 lines) + 1 blank = N + 2.
+  const preambleText = preambleSections.join('\n\n');
+  const preambleSectionLines = preambleText.length > 0
+    ? (preambleText.match(/\n/g) ?? []).length + 2  // +2: last preamble line + blank separator
+    : 0;
+
+  // 6. Assemble in canonical order with blank-line separators.
   // Residual body BEFORE derived/effect — DX-03 trust-erosion: console.log
   // appears near the top of <script>; user-declared consts (e.g., handler
   // arrows) are visible to subsequent $derived / $effect references.
-  if (residual.trim().length > 0) sections.push(residual);
+  const sections = [...preambleSections];
+  if (residualCode.trim().length > 0) sections.push(residualCode);
   if (derivedLines.length > 0) sections.push(derivedLines.join('\n'));
   if (lifecycleLines.length > 0) sections.push(lifecycleLines.join('\n'));
 
   const scriptBlock = sections.join('\n\n');
 
-  // Phase 06.1 P2: scriptMap=null for v1 — see EmitScriptResult.scriptMap docstring.
-  const scriptMap: EncodedSourceMap | null = null;
-  return { scriptBlock, scriptInjections, scriptMap, diagnostics };
+  // Generate a single-program source map for the residual (user-authored) statements.
+  // These AST nodes carry correct .rozie line numbers from @babel/parser, so the
+  // map produced here maps generated-output positions → actual .rozie lines.
+  // buildShell will shift the generated lines by userCodeLineOffset so the final
+  // map references the correct .svelte output line numbers.
+  let scriptMap: EncodedSourceMap | null = null;
+  if (residualStmts.length > 0 && opts.filename) {
+    const genResult = generate(
+      t.file(t.program(residualStmts)),
+      { ...GEN_OPTS_MAP, sourceFileName: opts.filename },
+    );
+    if (genResult.map) {
+      scriptMap = genResult.map as EncodedSourceMap;
+    }
+  }
+
+  return { scriptBlock, scriptInjections, scriptMap, preambleSectionLines, diagnostics };
 }

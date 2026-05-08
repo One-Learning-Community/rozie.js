@@ -64,6 +64,13 @@ export interface ShellParts {
    * Empty/undefined when neither path applies.
    */
   componentImportsBlock?: string;
+  /**
+   * Number of preamble lines in the <script lang="ts"> body before the
+   * user-authored residual statements (from emitScript.preambleSectionLines).
+   * Used to compute userCodeLineOffset so composeMaps can shift the script
+   * source map correctly.
+   */
+  preambleSectionLines?: number;
 }
 
 /**
@@ -77,6 +84,14 @@ export interface BuildShellResult {
   ms: MagicString;
   /** Byte offset within ms.toString() where the script body begins (after `<script lang="ts">\n`). */
   scriptOutputOffset: number;
+  /**
+   * 0-indexed line offset of the user-authored statements within the .svelte output.
+   * Computed accounting for the script opening tag, component-import prelude lines,
+   * and the preamble lines within <script lang="ts">. Used by composeMaps to shift
+   * the @babel/generator script map so it references .svelte output lines, not
+   * script-body-relative lines.
+   */
+  userCodeLineOffset: number;
   /**
    * Phase 06.1 P2 (D-101): pass-through of emitScript's per-expression child
    * map. composeMaps() chains this into the shell map at scriptOutputOffset.
@@ -156,13 +171,35 @@ export function buildShell(parts: ShellParts): BuildShellResult {
   if (cursor < parts.rozieSource.length)
     ms.remove(cursor, parts.rozieSource.length);
 
-  // STEP 3: compute scriptOutputOffset.
+  // STEP 3: compute scriptOutputOffset and userCodeLineOffset.
   const fullOutput = ms.toString();
   const scriptIdx = fullOutput.indexOf(scriptOpenFraming);
   const scriptOutputOffset =
     scriptIdx >= 0 ? scriptIdx + scriptOpenFraming.length : 0;
 
-  return { ms, scriptOutputOffset, scriptMap: parts.scriptMap ?? null };
+  // userCodeLineOffset: 0-indexed line count up to where the user-authored
+  // residual statements begin within the .svelte output.
+  //
+  // Components:
+  //   1. Lines before the script body (everything up through `<script lang="ts">\n`).
+  //   2. scriptPreludeNewlines: component-import lines prepended before the script body.
+  //   3. preambleSectionLines: from emitScript (imports, interface, state, refs sections).
+  const preambleSectionLines = parts.preambleSectionLines ?? 0;
+  // scriptPrelude = compImports + optional trailing blank line (emitted as compImports + '\n')
+  const scriptPreludeNewlines = scriptPrelude.length > 0
+    ? (scriptPrelude.match(/\n/g) ?? []).length
+    : 0;
+
+  let userCodeLineOffset = 0;
+  if (scriptIdx >= 0) {
+    // Count newlines in output up to (but not including) the start of the
+    // script body. Then add prelude + preamble lines inside the script.
+    const textBeforeScriptBody = fullOutput.slice(0, scriptIdx + scriptOpenFraming.length);
+    const linesBeforeScriptBody = (textBeforeScriptBody.match(/\n/g) ?? []).length;
+    userCodeLineOffset = linesBeforeScriptBody + scriptPreludeNewlines + preambleSectionLines;
+  }
+
+  return { ms, scriptOutputOffset, userCodeLineOffset, scriptMap: parts.scriptMap ?? null };
 }
 
 /**
@@ -189,5 +226,5 @@ function buildShellLegacy(parts: ShellParts): BuildShellResult {
     ms.append(parts.styleBlock);
     ms.append('\n</style>\n');
   }
-  return { ms, scriptOutputOffset: 0, scriptMap: parts.scriptMap ?? null };
+  return { ms, scriptOutputOffset: 0, userCodeLineOffset: 0, scriptMap: parts.scriptMap ?? null };
 }
