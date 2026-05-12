@@ -39,7 +39,7 @@ export default defineConfig({
   themeConfig: {
     nav: [
       { text: 'Guide', link: '/guide/why' },
-      { text: 'Examples', link: '/examples/counter' },
+      { text: 'Examples', link: '/examples/' },
       { text: 'GitHub', link: 'https://github.com/One-Learning-Community/rozie.js' },
     ],
     sidebar: {
@@ -58,6 +58,7 @@ export default defineConfig({
         {
           text: 'Examples',
           items: [
+            { text: 'Overview', link: '/examples/' },
             { text: 'Counter', link: '/examples/counter' },
             { text: 'SearchInput', link: '/examples/search-input' },
             { text: 'Modal', link: '/examples/modal' },

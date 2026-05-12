@@ -17,7 +17,7 @@ hero:
       link: /guide/features
     - theme: alt
       text: See examples
-      link: /examples/counter
+      link: /examples/
 
 features:
   - title: One file, five frameworks

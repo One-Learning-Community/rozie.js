@@ -266,10 +266,4 @@ A grab-bag of little decisions that add up:
 
 ## Next
 
-- [Counter](/examples/counter) — `<props>` with `model: true`, `<data>`, `$computed`, template event handlers.
-- [SearchInput](/examples/search-input) — `.debounce(300)` modifier, `$emit`, `$onMount` teardown, `r-if` / `r-else`, `$refs`.
-- [Modal](/examples/modal) — `<listeners>` with side-effect handlers, `.self` modifier, multiple lifecycle hooks, slots with params, `<components>` embed.
-- [Dropdown](/examples/dropdown) — `.outside(...$refs)`, `.throttle(100).passive`, reactive `when` predicates, named slot with scoped params.
-- [TreeNode](/examples/tree-node) — self-recursion via `<components>` block; `r-for` with `:key`.
-- [Card (with CardHeader)](/examples/card) — wrapper-pair composition; the kebab/camel prop bridge across all five targets.
-- [TodoList](/examples/todo-list) — `r-for`, multiple `$emit` channels, named + default slots with per-item scoped params, fallback content, `r-if` / `r-else` empty state.
+See [Examples](/examples/) for the full gallery — seven reference components, each with byte-verbatim output across all five targets, plus a feature index for jumping straight to whichever idiom you want to see in action.
