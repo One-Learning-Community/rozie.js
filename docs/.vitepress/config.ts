@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitepress';
+import Rozie from '@rozie/unplugin/vite';
 
 const rozieGrammar = JSON.parse(
   readFileSync(
@@ -36,6 +37,13 @@ export default defineConfig({
   // resolve fine inside the repo but are dead inside the VitePress page set,
   // so exclude it from the site. The new docs/guide/quick-start.md supersedes it.
   srcExclude: ['QUICKSTART.md'],
+  // Dogfood the project: compile .rozie files inline through the unplugin so
+  // example pages can embed the *actual* components they document. Rozie
+  // emits Vue SFC text; VitePress's bundled vue plugin then takes it the
+  // rest of the way.
+  vite: {
+    plugins: [Rozie({ target: 'vue' })],
+  },
   themeConfig: {
     nav: [
       { text: 'Guide', link: '/guide/why' },

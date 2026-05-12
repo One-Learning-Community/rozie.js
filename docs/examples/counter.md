@@ -1,6 +1,23 @@
+<script setup>
+import { ref } from 'vue';
+import Counter from '../../examples/Counter.rozie';
+
+const n = ref(2);
+</script>
+
 # Counter
 
 A minimal two-way-bound counter. Demonstrates `<props>` with `model: true`, `<data>` for local reactive state, `$computed`, and `@event` handlers in `<template>`.
+
+## Live demo
+
+The Counter below is the *actual* `examples/Counter.rozie` file from the monorepo, compiled by `@rozie/unplugin/vite` at build time into a Vue SFC and rendered inline. Click the buttons; the value is two-way-bound to local state on this page.
+
+<ClientOnly>
+  <Counter v-model:value="n" :min="0" :max="10" :step="1" />
+</ClientOnly>
+
+Current value: {{ n }}
 
 ## Source — Counter.rozie
 
