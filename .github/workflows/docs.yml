@@ -5,6 +5,14 @@ on:
     branches: [main]
     paths:
       - 'docs/**'
+      # The docs site dogfoods @rozie/unplugin/vite to compile examples/*.rozie
+      # at build time, and the emitted Vue SFCs import @rozie/runtime-vue at
+      # runtime. Rebuild on any change to those packages, the example sources,
+      # or @rozie/core (transitively consumed by the unplugin).
+      - 'packages/core/**'
+      - 'packages/unplugin/**'
+      - 'packages/runtime/vue/**'
+      - 'examples/*.rozie'
       - '.github/workflows/docs.yml'
   workflow_dispatch:
 
@@ -35,6 +43,21 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      # @rozie/docs imports @rozie/unplugin/vite (compiles .rozie files at
+      # build time) and the emitted Vue SFCs reference @rozie/runtime-vue
+      # (debounce / throttle / useOutsideClick at runtime). Both packages
+      # ship from their dist/, so build them before the docs build runs.
+      # @rozie/core is bundled into the unplugin's dist via tsdown but we
+      # still build it explicitly so the peggy generated parser is in place.
+      - name: Build @rozie/core
+        run: pnpm --filter @rozie/core run build
+
+      - name: Build @rozie/unplugin
+        run: pnpm --filter @rozie/unplugin run build
+
+      - name: Build @rozie/runtime-vue
+        run: pnpm --filter @rozie/runtime-vue run build
 
       - name: Build docs
         run: pnpm --filter @rozie/docs build

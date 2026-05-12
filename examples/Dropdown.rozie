@@ -10,21 +10,6 @@
     - Named slot with slot params (consumer uses `#name="{ data }"` shorthand)
     - Default slot with slot params
     - $props writes (compiles to parent-update path because `model: true`)
-
-  SHARP EDGE — trigger click handling:
-    The wrapping <div ref="triggerEl"> below has @click="toggle". Consumers should
-    render their trigger content inside the #trigger slot WITHOUT binding a click
-    handler — the wrapper's click bubbles up from any descendant and toggles. If a
-    consumer also binds @click="toggle" on their slotted button, both fire and the
-    state immediately flips back closed.
-
-    The slot's `:toggle` parameter is exposed for OTHER uses (e.g. closing the
-    dropdown from inside the panel body), not for wiring the trigger click. The
-    five consumer demos in examples/consumers/*/ follow this convention.
-
-    Tightening this contract (e.g. dropping the wrapper @click and making
-    consumers wire toggle themselves) would be a breaking change to the API and
-    every target's fixture set — tracked as a follow-up, not fixed here.
 -->
 
 <rozie name="Dropdown">
