@@ -4,7 +4,7 @@ Demonstrates `r-model` on a form input, `$emit` for custom events, `$onMount` wi
 
 ## Source — SearchInput.rozie
 
-```vue
+```rozie
 <rozie name="SearchInput">
 
 <props>

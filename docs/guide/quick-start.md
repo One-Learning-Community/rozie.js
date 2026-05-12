@@ -6,7 +6,7 @@ The shortest path from a `.rozie` file to working framework output.
 
 Create `Counter.rozie`:
 
-```vue
+```rozie
 <rozie name="Counter">
 
 <props>

@@ -4,7 +4,7 @@ A minimal two-way-bound counter. Demonstrates `<props>` with `model: true`, `<da
 
 ## Source — Counter.rozie
 
-```vue
+```rozie
 <rozie name="Counter">
 
 <props>

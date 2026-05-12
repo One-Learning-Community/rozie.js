@@ -1,4 +1,13 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitepress';
+
+const rozieGrammar = JSON.parse(
+  readFileSync(
+    fileURLToPath(new URL('../../tools/textmate/syntaxes/rozie.tmLanguage.json', import.meta.url)),
+    'utf8',
+  ),
+);
 
 export default defineConfig({
   title: 'Rozie.js',
@@ -7,6 +16,21 @@ export default defineConfig({
   base: '/rozie.js/',
   cleanUrls: true,
   lastUpdated: true,
+  markdown: {
+    languages: [
+      {
+        ...rozieGrammar,
+        name: 'rozie',
+      },
+    ],
+    // The rozie grammar embeds `source.js` and `source.css` inside <script>,
+    // <props>, <data>, <listeners>, <components>, and <style> blocks. Shiki's
+    // strict loader rejects custom languages whose dependencies aren't already
+    // in the registry — preload them here before the markdown renderer runs.
+    async shikiSetup(highlighter) {
+      await highlighter.loadLanguage('javascript', 'css');
+    },
+  },
   // QUICKSTART.md predates this site and is linked from the repo root README.
   // Its relative links (../README, ../CLAUDE, ../.planning/ROADMAP, ../packages/…)
   // resolve fine inside the repo but are dead inside the VitePress page set,
