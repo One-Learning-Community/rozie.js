@@ -16,7 +16,11 @@ Create `Counter.rozie`:
 }
 </props>
 
-<data>{ hovering: false }</data>
+<data>
+{ 
+  hovering: false 
+}
+</data>
 
 <script>
 const canIncrement = $computed(() => $props.value + $props.step <= Infinity)
