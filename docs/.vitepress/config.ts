@@ -32,11 +32,6 @@ export default defineConfig({
       await highlighter.loadLanguage('javascript', 'css');
     },
   },
-  // QUICKSTART.md predates this site and is linked from the repo root README.
-  // Its relative links (../README, ../CLAUDE, ../.planning/ROADMAP, ../packages/…)
-  // resolve fine inside the repo but are dead inside the VitePress page set,
-  // so exclude it from the site. The new docs/guide/quick-start.md supersedes it.
-  srcExclude: ['QUICKSTART.md'],
   // Dogfood the project: compile .rozie files inline through the unplugin so
   // example pages can embed the *actual* components they document. Rozie
   // emits Vue SFC text; VitePress's bundled vue plugin then takes it the
