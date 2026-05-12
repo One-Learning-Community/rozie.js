@@ -4,6 +4,7 @@ export default defineConfig({
   title: 'Rozie.js',
   description:
     'Write components once in a Vue/Alpine-flavored syntax. Ship idiomatic React, Vue, Svelte, and Angular.',
+  base: '/rozie.js/',
   cleanUrls: true,
   lastUpdated: true,
   // QUICKSTART.md predates this site and is linked from the repo root README.
@@ -15,7 +16,7 @@ export default defineConfig({
     nav: [
       { text: 'Guide', link: '/guide/why' },
       { text: 'Examples', link: '/examples/counter' },
-      { text: 'GitHub', link: 'https://github.com/' },
+      { text: 'GitHub', link: 'https://github.com/One-Learning-Community/rozie.js' },
     ],
     sidebar: {
       '/guide/': [
