@@ -32,6 +32,9 @@ importers:
 
   docs:
     devDependencies:
+      '@rozie/runtime-vue':
+        specifier: workspace:*
+        version: link:../packages/runtime/vue
       '@rozie/unplugin':
         specifier: workspace:*
         version: link:../packages/unplugin

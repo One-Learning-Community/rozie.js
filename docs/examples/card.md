@@ -1,6 +1,27 @@
+<script setup>
+import { ref } from 'vue';
+import Card from '../../examples/Card.rozie';
+
+const closeCount = ref(0);
+function handleClose() {
+  closeCount.value++;
+}
+</script>
+
 # Card (with CardHeader)
 
 A wrapper-pair. `Card.rozie` declares `CardHeader` in its `<components>` block and renders `<CardHeader title=... :on-close=... />` at the top of its template; the rest of the body comes from a default slot.
+
+## Live demo
+
+The X button only renders because we passed an `onClose` handler — `CardHeader` does `r-if="$props.onClose"` on its close button.
+
+<ClientOnly>
+  <Card title="Hello from Rozie" :on-close="handleClose">
+    <p>This is the body. The header bar above is rendered by <code>CardHeader.rozie</code>, resolved through Card's <code>&lt;components&gt;</code> block.</p>
+    <p>Close clicked {{ closeCount }} time{{ closeCount === 1 ? '' : 's' }}.</p>
+  </Card>
+</ClientOnly>
 
 Each target picks its idiomatic import + child-tag form for the cross-component reference:
 - **Vue / Svelte** — import with the target extension (`./CardHeader.vue`, `./CardHeader.svelte`).
