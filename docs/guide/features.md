@@ -7,10 +7,21 @@ Rozie tries to be the syntax a Vue developer would design if they wanted React, 
 Every `@event` in a `<template>` (and every key in a `<listeners>` block) supports a chainable modifier suffix. Unlike Vue, modifiers can take arguments — `.debounce(300)`, `.throttle(100)`, `.outside($refs.a, $refs.b)` — and they compose:
 
 ```rozie
-<input @input.debounce(300)="onSearch" @keydown.enter="onSearch" @keydown.escape="clear" />
+<template>
+  <input 
+    @input.debounce(300)="onSearch" 
+    @keydown.enter="onSearch" 
+    @keydown.escape="clear" 
+  />
+</template>
 
-<!-- The modifier grammar handles chains of mixed args and bare modifiers: -->
-"window:resize.throttle(100).passive": { handler: reposition }
+<listeners>
+{
+  // The modifier grammar handles chains of mixed args and bare modifiers:
+  "window:resize.throttle(100).passive": { handler: reposition }
+}
+</listeners>
+
 ```
 
 The grammar is a small dedicated PEG (`packages/core/src/modifier-grammar/modifier-grammar.peggy`), so the syntax is fixed and predictable across every target. Built-ins:
@@ -28,7 +39,7 @@ The grammar is a small dedicated PEG (`packages/core/src/modifier-grammar/modifi
 | `.outside($refs.a, ...)` | Fire only when the event target is outside every listed ref |
 | `.enter` / `.escape` / `.tab` / `.space` / `.arrow{Up,Down,Left,Right}` / `.delete` | Key filters; the handler short-circuits unless the key matches |
 
-Each one compiles to the per-target idiom: Vue's `@keydown.enter`/`watchEffect`-with-cleanup, React's `useEffect`-with-removeEventListener, Svelte's `$effect` teardown, Angular's `Renderer2.listen` + `DestroyRef`, Solid's `createEffect` + `onCleanup`. **You write the modifier; Rozie writes the four-to-five framework-specific add/remove pairs.**
+Each one compiles to the per-target idiom: Vue's `@keydown.enter`/`watchEffect`-with-cleanup, React's `useEffect`-with-removeEventListener, Svelte's `$effect` teardown, Angular's `Renderer2.listen` + `DestroyRef`, Solid's `createEffect` + `onCleanup`. **You write the modifier; Rozie writes the rest.**
 
 ## `<listeners>` block with reactive `when`
 
@@ -245,7 +256,7 @@ Each target picks the right escape hatch: Vue gets a sibling unscoped `<style>` 
 A grab-bag of little decisions that add up:
 
 - **`r-*` instead of `v-*`**. Deliberately distinct from Vue so `.rozie` files are visually unambiguous. Same vocabulary (`r-if`, `r-else`, `r-for`, `r-model`, `r-show`), no aliasing confusion in mixed-framework codebases.
-- **`{{ }}` allowed inside plain attribute values**. Vue forbids `<a href="{{ url }}">` and forces `:href="url"`. Rozie's template parser handles both forms, picking the cheaper emit path automatically.
+- **<span v-pre>`{{ }}`</span> allowed inside plain attribute values**. Vue forbids <span v-pre>`<a href="{{ url }}">`</span> and forces `:href="url"`. Rozie's template parser handles both forms, picking the cheaper emit path automatically.
 - **Rich inline JS expressions in handlers**. `@click="$props.closeOnBackdrop && close()"` is fine; you're not limited to Vue's simple-expression form or method-name-only handlers.
 - **Setup-once reactivity**. Closures in `<script>` run once at component setup, not per render. This matches Vue/Svelte/Solid expectations and means a counter like `let n = 0; const incr = () => n++` works the way a non-React developer would expect — no `useCallback`/dependency-array gymnastics in the source.
 - **Per-statement source maps**. Errors thrown by emitted code map back to the original `.rozie` line, including statements inside `$computed`, `<listeners>` handlers, and embedded template expressions.
