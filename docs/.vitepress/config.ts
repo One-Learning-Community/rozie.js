@@ -6,6 +6,11 @@ export default defineConfig({
     'Write components once in a Vue/Alpine-flavored syntax. Ship idiomatic React, Vue, Svelte, and Angular.',
   cleanUrls: true,
   lastUpdated: true,
+  // QUICKSTART.md predates this site and is linked from the repo root README.
+  // Its relative links (../README, ../CLAUDE, ../.planning/ROADMAP, ../packages/…)
+  // resolve fine inside the repo but are dead inside the VitePress page set,
+  // so exclude it from the site. The new docs/guide/quick-start.md supersedes it.
+  srcExclude: ['QUICKSTART.md'],
   themeConfig: {
     nav: [
       { text: 'Guide', link: '/guide/why' },
