@@ -1,7 +1,14 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.4.13/schema.json",
   "files": {
-    "ignore": ["dist", "node_modules", "**/generated.js", "**/fixtures/**"]
+    "ignore": [
+      "dist",
+      "node_modules",
+      "**/generated.js",
+      "**/fixtures/**",
+      "docs/.vitepress/cache",
+      "docs/.vitepress/dist"
+    ]
   },
   "linter": {
     "enabled": true,
