@@ -16,8 +16,15 @@ Click the trigger to open. Then try: clicking outside the panel (closes via `.ou
 <div class="rozie-demo">
   <ClientOnly>
     <Dropdown v-model:open="dropdownOpen">
-      <template #trigger="{ open, toggle }">
-        <button @click="toggle">{{ open ? 'Close' : 'Open' }} dropdown</button>
+      <!--
+        Note: do NOT bind @click="toggle" on the trigger button. Dropdown.rozie's
+        wrapper div already calls toggle on click and the event bubbles up — adding
+        an inner @click handler would double-fire and immediately re-close. The
+        slot's `:toggle` param is exposed for programmatic use (e.g. closing from
+        a different in-panel action), not for wiring the trigger click itself.
+      -->
+      <template #trigger="{ open }">
+        <button>{{ open ? 'Close' : 'Open' }} dropdown</button>
       </template>
       <ul style="margin: 0; padding: 0.25rem; list-style: none; min-width: 12rem;">
         <li style="padding: 0.25rem 0.75rem; cursor: pointer;">First menu item</li>
