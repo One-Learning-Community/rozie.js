@@ -22,7 +22,7 @@ import vue from '@vitejs/plugin-vue';
 
 export default defineConfig({
   plugins: [
-    Rozie({ target: 'vue' }), // or 'react' | 'svelte' | 'angular'
+    Rozie({ target: 'vue' }), // or 'react' | 'svelte' | 'angular' | 'solid'
     vue(),
   ],
 });
@@ -43,7 +43,7 @@ pnpm add -D @rozie/cli
 pnpm rozie build src/Counter.rozie --target vue --out dist/Counter.vue
 ```
 
-The CLI accepts `--target vue | react | svelte | angular` and supports `--source-map` for emitting sourcemaps alongside the output file.
+The CLI accepts `--target vue | react | svelte | angular | solid` and supports `--source-map` for emitting sourcemaps alongside the output file.
 
 ## Versions
 
@@ -53,3 +53,6 @@ The CLI accepts `--target vue | react | svelte | angular` and supports `--source
 | Vue | 3.4+ |
 | Svelte | 5+ (runes mode) |
 | Angular | 17+ (signals era) |
+| Solid | 1.8+ |
+
+The Solid target additionally requires [`vite-plugin-solid`](https://www.npmjs.com/package/vite-plugin-solid) `^2.0` installed in your project — Rozie's unplugin asserts the peer dep at runtime when `target: 'solid'` is selected.

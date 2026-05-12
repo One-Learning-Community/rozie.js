@@ -1,12 +1,12 @@
 # Why Rozie?
 
-If you ship a UI library that targets React, Vue, Svelte, and Angular today, you're maintaining four near-identical wrapper layers around the same vanilla-JS core. Every prop, every event, every two-way binding, every imperative method — implemented four times, tested four times, kept in sync four times.
+If you ship a UI library that targets React, Vue, Svelte, Angular, and Solid today, you're maintaining five near-identical wrapper layers around the same vanilla-JS core. Every prop, every event, every two-way binding, every imperative method — implemented five times, tested five times, kept in sync five times.
 
-**Rozie owns the author-side API so a single component definition drops into any of the four major frameworks without per-framework wrapper boilerplate.**
+**Rozie owns the author-side API so a single component definition drops into any of the five supported frameworks without per-framework wrapper boilerplate.**
 
 ## What Rozie is
 
-A compiler. You write `.rozie` files in a Vue/Alpine-flavored block-based syntax. Rozie emits idiomatic React 18+, Vue 3.4+, Svelte 5+, and Angular 17+ components — each one using the target framework's native primitives (React's `useState`/`useMemo`, Vue's `defineModel`/`computed`, Svelte 5's runes, Angular's signals).
+A compiler. You write `.rozie` files in a Vue/Alpine-flavored block-based syntax. Rozie emits idiomatic React 18+, Vue 3.4+, Svelte 5+, Angular 17+, and Solid 1.8+ components — each one using the target framework's native primitives (React's `useState`/`useMemo`, Vue's `defineModel`/`computed`, Svelte 5's runes, Angular's signals, Solid's `createSignal`/`createMemo`/`createEffect`).
 
 ## What Rozie is not
 
@@ -14,7 +14,7 @@ A runtime framework. Rozie doesn't try to be a "better React" or own the renderi
 
 ## Who Rozie is for
 
-Component-library and design-system authors. If you're shipping React/Vue/Svelte/Angular bindings for a vanilla-JS core (date pickers, dropdown menus, modal primitives, headless behaviors), Rozie collapses that to a single source.
+Component-library and design-system authors. If you're shipping React/Vue/Svelte/Angular/Solid bindings for a vanilla-JS core (date pickers, dropdown menus, modal primitives, headless behaviors), Rozie collapses that to a single source.
 
 ## Compatibility bar
 
