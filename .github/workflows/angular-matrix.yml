@@ -37,11 +37,11 @@ jobs:
         # 2.5.x peerDeps require vite ^6 || ^7 || ^8. ROZ702 enforces this
         # at factory call time. CI matrix mirrors the runtime constraint.
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 20
           cache: pnpm
@@ -112,7 +112,7 @@ jobs:
 
       - name: Upload Playwright HTML report on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report-angular-${{ matrix.angular-version }}-vite-${{ matrix.vite-version }}
           path: examples/consumers/angular-analogjs/playwright-report
@@ -139,11 +139,11 @@ jobs:
       matrix:
         angular-version: ['17', '21']
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 20
           cache: pnpm

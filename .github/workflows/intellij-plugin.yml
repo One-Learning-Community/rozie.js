@@ -39,7 +39,7 @@ jobs:
         platform: ['2024.2.5', '2025.3']
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Setup JDK 21 (Temurin)
         uses: actions/setup-java@v5
@@ -48,7 +48,7 @@ jobs:
           java-version: '21'
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v5
+        uses: gradle/actions/setup-gradle@v6
 
       - name: Generate lexer (drives -PplatformVersion through to compile)
         run: ./gradlew generateRozieLexer -PplatformVersion=${{ matrix.platform }}
@@ -72,7 +72,7 @@ jobs:
 
       - name: Upload plugin .zip artifact (one variant only)
         if: matrix.platform == '2024.2.5'
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: rozie-intellij-plugin-zip
           path: tools/intellij-plugin/build/distributions/*.zip
@@ -83,7 +83,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Setup JDK 21 (Temurin)
         uses: actions/setup-java@v5
@@ -92,7 +92,7 @@ jobs:
           java-version: '21'
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v5
+        uses: gradle/actions/setup-gradle@v6
 
       - name: Regenerate lexer
         run: ./gradlew generateRozieLexer
@@ -118,7 +118,7 @@ jobs:
       contents: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Setup JDK 21 (Temurin)
         uses: actions/setup-java@v5
@@ -127,7 +127,7 @@ jobs:
           java-version: '21'
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v5
+        uses: gradle/actions/setup-gradle@v6
 
       - name: Build plugin
         run: ./gradlew buildPlugin
@@ -140,7 +140,7 @@ jobs:
           echo "Located: $ZIP_PATH"
 
       - name: Create GitHub Release + upload .zip
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.ref_name }}
           name: ${{ github.ref_name }}
