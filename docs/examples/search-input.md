@@ -17,15 +17,17 @@ Demonstrates `r-model` on a form input, `$emit` for custom events, `$onMount` wi
 
 Type at least 2 characters. The `.debounce(300)` modifier means `search` fires only after you stop typing for 300ms. Hit Enter to fire immediately, Escape to clear.
 
-<ClientOnly>
-  <SearchInput :min-length="2" @search="(q) => logEvent('search', q)" @clear="() => logEvent('clear', '')" />
-</ClientOnly>
+<div class="rozie-demo">
+  <ClientOnly>
+    <SearchInput :min-length="2" @search="(q) => logEvent('search', q)" @clear="() => logEvent('clear', '')" />
+  </ClientOnly>
 
-<div v-if="events.length > 0">
-  <strong>Recent events:</strong>
-  <ul>
-    <li v-for="(e, i) in events" :key="i"><code>{{ e.type }}</code> — <code>{{ JSON.stringify(e.value) }}</code> at {{ e.at }}</li>
-  </ul>
+  <div v-if="events.length > 0" style="margin-top: 0.75rem;">
+    <strong>Recent events:</strong>
+    <ul>
+      <li v-for="(e, i) in events" :key="i"><code>{{ e.type }}</code> — <code>{{ JSON.stringify(e.value) }}</code> at {{ e.at }}</li>
+    </ul>
+  </div>
 </div>
 
 ## Source — SearchInput.rozie

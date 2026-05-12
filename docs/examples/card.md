@@ -16,12 +16,14 @@ A wrapper-pair. `Card.rozie` declares `CardHeader` in its `<components>` block a
 
 The X button only renders because we passed an `onClose` handler — `CardHeader` does `r-if="$props.onClose"` on its close button.
 
-<ClientOnly>
-  <Card title="Hello from Rozie" :on-close="handleClose">
-    <p>This is the body. The header bar above is rendered by <code>CardHeader.rozie</code>, resolved through Card's <code>&lt;components&gt;</code> block.</p>
-    <p>Close clicked {{ closeCount }} time{{ closeCount === 1 ? '' : 's' }}.</p>
-  </Card>
-</ClientOnly>
+<div class="rozie-demo">
+  <ClientOnly>
+    <Card title="Hello from Rozie" :on-close="handleClose">
+      <p>This is the body. The header bar above is rendered by <code>CardHeader.rozie</code>, resolved through Card's <code>&lt;components&gt;</code> block.</p>
+      <p>Close clicked {{ closeCount }} time{{ closeCount === 1 ? '' : 's' }}.</p>
+    </Card>
+  </ClientOnly>
+</div>
 
 Each target picks its idiomatic import + child-tag form for the cross-component reference:
 - **Vue / Svelte** — import with the target extension (`./CardHeader.vue`, `./CardHeader.svelte`).

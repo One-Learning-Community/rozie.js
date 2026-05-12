@@ -33,9 +33,11 @@ A minimal recursive component. Demonstrates `<components>` block self-import and
 
 Three levels deep — Vue's `defineOptions({ name: 'TreeNode' })` lets the component reference itself by name inside its own `<template>`.
 
-<ClientOnly>
-  <TreeNode :node="tree" />
-</ClientOnly>
+<div class="rozie-demo">
+  <ClientOnly>
+    <TreeNode :node="tree" />
+  </ClientOnly>
+</div>
 
 ## Source — TreeNode.rozie
 

@@ -13,11 +13,13 @@ A minimal two-way-bound counter. Demonstrates `<props>` with `model: true`, `<da
 
 The Counter below is the *actual* `examples/Counter.rozie` file from the monorepo, compiled by `@rozie/unplugin/vite` at build time into a Vue SFC and rendered inline. Click the buttons; the value is two-way-bound to local state on this page.
 
-<ClientOnly>
-  <Counter v-model:value="n" :min="0" :max="10" :step="1" />
-</ClientOnly>
+<div class="rozie-demo">
+  <ClientOnly>
+    <Counter v-model:value="n" :min="0" :max="10" :step="1" />
+  </ClientOnly>
 
-Current value: {{ n }}
+  <p>Current value: {{ n }}</p>
+</div>
 
 ## Source — Counter.rozie
 

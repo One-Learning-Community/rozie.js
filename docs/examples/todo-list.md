@@ -19,11 +19,13 @@ This is the heaviest scoped-slots example. The React output shows the documented
 
 Two-way bound to the page's `items` ref. Add, toggle, remove — every mutation flows back through `v-model:items` to the parent state. Delete every item and the empty-state slot's fallback kicks in.
 
-<ClientOnly>
-  <TodoList v-model:items="items" title="Demo todos" />
-</ClientOnly>
+<div class="rozie-demo">
+  <ClientOnly>
+    <TodoList v-model:items="items" title="Demo todos" />
+  </ClientOnly>
 
-Items on the page-level ref: <strong>{{ items.length }}</strong> ({{ items.filter(i => !i.done).length }} remaining)
+  <p>Items on the page-level ref: <strong>{{ items.length }}</strong> ({{ items.filter(i => !i.done).length }} remaining)</p>
+</div>
 
 ## Source — TodoList.rozie
 

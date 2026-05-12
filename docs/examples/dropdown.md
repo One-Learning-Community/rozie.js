@@ -13,18 +13,20 @@ The marquee `<listeners>` example. Shows the `.outside(...$refs)` modifier elimi
 
 Click the trigger to open. Then try: clicking outside the panel (closes via `.outside($refs.triggerEl, $refs.panelEl)`), pressing Escape (closes via `document:keydown.escape`), or resizing the window with the panel open (the panel's position updates, throttled to 100ms via `.throttle(100).passive`).
 
-<ClientOnly>
-  <Dropdown v-model:open="dropdownOpen">
-    <template #trigger="{ open, toggle }">
-      <button @click="toggle">{{ open ? 'Close' : 'Open' }} dropdown</button>
-    </template>
-    <ul style="margin: 0; padding: 0.25rem; list-style: none; min-width: 12rem;">
-      <li style="padding: 0.25rem 0.75rem; cursor: pointer;">First menu item</li>
-      <li style="padding: 0.25rem 0.75rem; cursor: pointer;">Second menu item</li>
-      <li style="padding: 0.25rem 0.75rem; cursor: pointer;">Third menu item</li>
-    </ul>
-  </Dropdown>
-</ClientOnly>
+<div class="rozie-demo">
+  <ClientOnly>
+    <Dropdown v-model:open="dropdownOpen">
+      <template #trigger="{ open, toggle }">
+        <button @click="toggle">{{ open ? 'Close' : 'Open' }} dropdown</button>
+      </template>
+      <ul style="margin: 0; padding: 0.25rem; list-style: none; min-width: 12rem;">
+        <li style="padding: 0.25rem 0.75rem; cursor: pointer;">First menu item</li>
+        <li style="padding: 0.25rem 0.75rem; cursor: pointer;">Second menu item</li>
+        <li style="padding: 0.25rem 0.75rem; cursor: pointer;">Third menu item</li>
+      </ul>
+    </Dropdown>
+  </ClientOnly>
+</div>
 
 ## Source — Dropdown.rozie
 

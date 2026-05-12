@@ -1,0 +1,115 @@
+/*
+ * Styles scoped to .rozie-demo wrappers on example pages.
+ *
+ * The canonical .rozie examples assume their consuming app provides form-element
+ * styling and a white background — that's a reasonable assumption for a real
+ * component-library consumer but breaks the docs preview, where VitePress
+ * resets form elements and offers a dark theme.
+ *
+ * These overrides only affect the live demos. The byte-verbatim fixtures shown
+ * below each demo are unchanged.
+ */
+
+/* --- Form element re-styling (light + dark) --- */
+
+.vp-doc .rozie-demo button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.4rem 0.85rem;
+  border: 1px solid var(--vp-c-border);
+  background: var(--vp-c-bg-soft);
+  color: var(--vp-c-text-1);
+  border-radius: 6px;
+  cursor: pointer;
+  font: inherit;
+  line-height: 1.4;
+  transition: background-color 0.15s, border-color 0.15s;
+}
+
+.vp-doc .rozie-demo button:hover:not(:disabled) {
+  background: var(--vp-c-bg-mute);
+  border-color: var(--vp-c-brand-1);
+}
+
+.vp-doc .rozie-demo button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.vp-doc .rozie-demo input[type="text"],
+.vp-doc .rozie-demo input[type="search"] {
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--vp-c-border);
+  background: var(--vp-c-bg);
+  color: var(--vp-c-text-1);
+  border-radius: 6px;
+  font: inherit;
+  line-height: 1.4;
+}
+
+.vp-doc .rozie-demo input:focus-visible,
+.vp-doc .rozie-demo button:focus-visible {
+  outline: 2px solid var(--vp-c-brand-1);
+  outline-offset: 2px;
+}
+
+.vp-doc .rozie-demo input[type="checkbox"] {
+  accent-color: var(--vp-c-brand-1);
+  margin-right: 0.4rem;
+}
+
+.vp-doc .rozie-demo form {
+  margin-block: 0.5rem;
+}
+
+/* --- Component-specific dark-mode overrides ---
+ * The .rozie components hardcode `background: white` / `background: #fff` in
+ * their <style> blocks (correct for a "drop-in component library" mental model).
+ * Override only inside .rozie-demo so the dark-mode docs preview reads cleanly.
+ * Higher specificity than the Vue-scoped `.card[data-v-XXX]` selectors thanks
+ * to the `.dark .vp-doc .rozie-demo` chain (3 classes vs scoped 1 class + 1 attr).
+ */
+
+.dark .vp-doc .rozie-demo .modal-dialog,
+.dark .vp-doc .rozie-demo .dropdown-panel,
+.dark .vp-doc .rozie-demo .card {
+  background: var(--vp-c-bg-soft);
+  color: var(--vp-c-text-1);
+  border-color: var(--vp-c-divider);
+}
+
+.dark .vp-doc .rozie-demo .card-header {
+  border-bottom-color: var(--vp-c-divider);
+}
+
+.dark .vp-doc .rozie-demo .modal-dialog header,
+.dark .vp-doc .rozie-demo .modal-dialog footer {
+  border-color: var(--vp-c-divider);
+}
+
+.dark .vp-doc .rozie-demo .empty {
+  color: var(--vp-c-text-3);
+}
+
+.dark .vp-doc .rozie-demo .hint {
+  color: var(--vp-c-text-3);
+}
+
+.dark .vp-doc .rozie-demo .counter.hovering {
+  background: var(--vp-c-bg-mute);
+}
+
+/* --- Spacing around the live-demo block --- */
+
+.vp-doc .rozie-demo {
+  margin: 1rem 0 1.5rem;
+  padding: 1rem;
+  border: 1px dashed var(--vp-c-divider);
+  border-radius: 8px;
+  background: var(--vp-c-bg-soft);
+}
+
+.dark .vp-doc .rozie-demo {
+  background: var(--vp-c-bg);
+}
