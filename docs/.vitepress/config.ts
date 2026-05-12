@@ -50,6 +50,7 @@ export default defineConfig({
             { text: 'Why Rozie?', link: '/guide/why' },
             { text: 'Install', link: '/guide/install' },
             { text: 'Quick Start', link: '/guide/quick-start' },
+            { text: 'Features & design choices', link: '/guide/features' },
           ],
         },
       ],
@@ -59,6 +60,7 @@ export default defineConfig({
           items: [
             { text: 'Counter', link: '/examples/counter' },
             { text: 'SearchInput', link: '/examples/search-input' },
+            { text: 'Modal', link: '/examples/modal' },
           ],
         },
       ],

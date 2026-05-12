@@ -13,6 +13,9 @@ hero:
       text: Why Rozie?
       link: /guide/why
     - theme: alt
+      text: Features
+      link: /guide/features
+    - theme: alt
       text: See examples
       link: /examples/counter
 
@@ -21,6 +24,10 @@ features:
     details: Author a single .rozie file. Rozie compiles it to idiomatic React, Vue, Svelte, Angular, and Solid components — each using the target framework's native reactivity primitives.
   - title: Familiar Vue/Alpine syntax
     details: Block-based SFCs with &lt;props&gt;, &lt;data&gt;, &lt;script&gt;, &lt;template&gt;, and &lt;style&gt;. r-* directives, @event modifiers, {{ }} interpolation. No JSX-isms.
+  - title: Parameterized event modifiers
+    details: ".debounce(300), .throttle(100), .outside($refs.a, $refs.b).stop — declarative event handling that compiles to each target's idiomatic add/remove pairs. One author-side line replaces ~30 lines of per-framework boilerplate."
+    link: /guide/features
+    linkText: Tour the syntax
   - title: Not a runtime framework
     details: Rozie compiles away. The heavy lifting still happens in your target framework — React, Vue, Svelte, Angular, or Solid owns the rendering pipeline.
   - title: Built for component-library authors
