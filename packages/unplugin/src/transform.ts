@@ -150,7 +150,10 @@ export function transformIncludeRozie(id: string): boolean {
     // VIRTUAL_SUFFIX_LIT (D-LIT-20). Runtime dispatch in createResolveIdHook
     // and createLoadHook keys on the closure-captured `target` value, so the
     // suffix collision is benign — only one target can be active at a time.
-    isAngularVirtualId(id)
+    // WR-07: use the explicit isLitVirtualId predicate to document the
+    // deliberate Lit/Angular suffix collision.
+    isAngularVirtualId(id) ||
+    isLitVirtualId(id)
   );
 }
 
@@ -163,6 +166,20 @@ export function transformIncludeRozie(id: string): boolean {
  */
 function isAngularVirtualId(id: string): boolean {
   return id.endsWith(VIRTUAL_SUFFIX_ANGULAR);
+}
+
+/**
+ * WR-07: Explicit Lit virtual-id predicate.
+ *
+ * VIRTUAL_SUFFIX_LIT === VIRTUAL_SUFFIX_ANGULAR (both `.rozie.ts`). The
+ * shared suffix is intentional — only one target can be active per
+ * `Rozie({ target: '...' })` instance, so there is no runtime ambiguity.
+ * However, naming this predicate explicitly (rather than calling
+ * `isAngularVirtualId`) documents the deliberate collision and provides a
+ * clear extension point if the suffixes ever diverge.
+ */
+export function isLitVirtualId(id: string): boolean {
+  return id.endsWith(VIRTUAL_SUFFIX_LIT);
 }
 
 /**
