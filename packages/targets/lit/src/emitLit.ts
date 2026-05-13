@@ -25,7 +25,7 @@ import type { IRComponent } from '../../../core/src/ir/types.js';
 import type { Diagnostic } from '../../../core/src/diagnostics/Diagnostic.js';
 import type { ModifierRegistry } from '../../../core/src/modifiers/ModifierRegistry.js';
 import type { BlockMap } from '../../../core/src/ast/types.js';
-import type { SourceMap } from 'magic-string';
+// NOTE: SourceMap import removed (WR-08); EmitLitResult.map is null until Phase 7.
 import {
   LitImportCollector,
   LitDecoratorImportCollector,
@@ -55,11 +55,13 @@ export interface EmitLitOptions {
 export interface EmitLitResult {
   code: string;
   /**
-   * magic-string SourceMap pointing emitted .ts positions back to .rozie source.
-   * P2 returns null (sourcemap composition is P3+ territory — the shell builder
-   * works without it because the entire .ts output is assembled from strings).
+   * WR-08: Source map is always null in v1. `composeSourceMap` in
+   * `packages/targets/lit/src/sourcemap/compose.ts` is implemented but not
+   * wired — it is dead code until Phase 7 connects it here.
+   * TODO(Phase 7): wire composeSourceMap here and emit base64 sourceMappingURL
+   * trailer (matching the Angular path in emitRozieTsToDisk).
    */
-  map: SourceMap | null;
+  map: null;
   diagnostics: Diagnostic[];
 }
 
