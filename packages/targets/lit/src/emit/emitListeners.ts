@@ -189,7 +189,9 @@ function emitOneListener(
   if (cls.listenerOptions.once) optionFields.push('once: true');
   const optionsExpr = optionFields.length > 0 ? `{ ${optionFields.join(', ')} }` : 'undefined';
 
-  const handlerVar = `_h${index}`;
+  // WR-04 fix: use section-specific prefix _lh (listener handler) to avoid
+  // future collision with other emitter-generated variables in firstUpdated().
+  const handlerVar = `_lh${index}`;
 
   switch (cls.klass) {
     case 'B': {
