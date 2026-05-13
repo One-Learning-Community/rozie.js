@@ -50,6 +50,8 @@ form { display: flex; gap: 0.25rem; margin-block: 0.5rem; }
       if (slotEl !== null && slotEl !== undefined) {
         const update = () => { this._hasSlotHeader = this._slotHeaderElements.length > 0; };
         slotEl.addEventListener('slotchange', update);
+        // CR-05 fix: push cleanup so the listener is removed on disconnectedCallback.
+        this._disconnectCleanups.push(() => slotEl.removeEventListener('slotchange', update));
         update();
       }
     }
@@ -59,6 +61,8 @@ form { display: flex; gap: 0.25rem; margin-block: 0.5rem; }
       if (slotEl !== null && slotEl !== undefined) {
         const update = () => { this._hasSlotDefault = this._slotDefaultElements.length > 0; };
         slotEl.addEventListener('slotchange', update);
+        // CR-05 fix: push cleanup so the listener is removed on disconnectedCallback.
+        this._disconnectCleanups.push(() => slotEl.removeEventListener('slotchange', update));
         update();
       }
     }
@@ -68,6 +72,8 @@ form { display: flex; gap: 0.25rem; margin-block: 0.5rem; }
       if (slotEl !== null && slotEl !== undefined) {
         const update = () => { this._hasSlotEmpty = this._slotEmptyElements.length > 0; };
         slotEl.addEventListener('slotchange', update);
+        // CR-05 fix: push cleanup so the listener is removed on disconnectedCallback.
+        this._disconnectCleanups.push(() => slotEl.removeEventListener('slotchange', update));
         update();
       }
     }

@@ -78,6 +78,8 @@ function emitOneSlot(
       `  if (slotEl !== null && slotEl !== undefined) {`,
       `    const update = () => { this._hasSlot${suffix} = this._slot${suffix}Elements.length > 0; };`,
       `    slotEl.addEventListener('slotchange', update);`,
+      `    // CR-05 fix: push cleanup so the listener is removed on disconnectedCallback.`,
+      `    this._disconnectCleanups.push(() => slotEl.removeEventListener('slotchange', update));`,
       `    update();`,
       `  }`,
       `}`,
