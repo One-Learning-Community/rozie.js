@@ -33,7 +33,7 @@ import {
   RuntimeLitImportCollector,
 } from './rewrite/collectLitImports.js';
 import { emitScript } from './emit/emitScript.js';
-import { emitTemplate, REPEAT_USED } from './emit/emitTemplate.js';
+import { emitTemplate } from './emit/emitTemplate.js';
 import { emitListeners } from './emit/emitListeners.js';
 import { emitSlotDecl } from './emit/emitSlotDecl.js';
 import { emitStyle } from './emit/emitStyle.js';
@@ -156,7 +156,8 @@ export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResu
     decoratorImports.render(),
     signalsImports.render(),
     runtimeImports.render(),
-    REPEAT_USED.value ? `import { repeat } from 'lit/directives/repeat.js';\n` : '',
+    // CR-06 fix: read repeatUsed from templateResult instead of module-level singleton.
+    templateResult.repeatUsed ? `import { repeat } from 'lit/directives/repeat.js';\n` : '',
   ].filter((s) => s.length > 0).join('');
 
   const shell = buildShell({

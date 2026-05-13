@@ -44,6 +44,13 @@ export interface EmitTemplateOpts {
   lit: LitImportCollector;
   decorators: LitDecoratorImportCollector;
   runtime: RuntimeLitImportCollector;
+  /**
+   * Internal mutable state threaded through the emit call chain so recursive
+   * emitters (emitLoop) can communicate back to emitTemplate without a module-level
+   * singleton. Callers (emitTemplate) initialize this; nested callers mutate it.
+   * Not part of the public opts API — emitTemplate initialises it internally.
+   */
+  _state?: { repeatUsed: boolean };
 }
 
 export interface EmitTemplateResult {
@@ -51,6 +58,12 @@ export interface EmitTemplateResult {
   renderBody: string;
   /** Host-listener wiring strings (D-LIT-12) spliced into firstUpdated. */
   hostListenerWiring: string[];
+  /**
+   * True when `repeat()` from `lit/directives/repeat.js` was used in the template.
+   * Replaces the module-level `REPEAT_USED` singleton (CR-06 fix — thread through
+   * result instead of mutable module state to support concurrent compilation).
+   */
+  repeatUsed: boolean;
   diagnostics: Diagnostic[];
 }
 
@@ -429,9 +442,9 @@ function emitLoop(
   // simplest path is to emit a `import { repeat } from 'lit/directives/repeat.js';` later
   // in the shell. We'll signal via a side channel: emit a token that emitLit picks up.
   opts.lit.add('html'); // ensure html is in
-  // We add 'PropertyValues' as a placeholder marker — actually we'll just rely on a
-  // dedicated runtime mechanism via the import collector's side channels (see below).
-  REPEAT_USED.value = true;
+  // Signal that repeat() was used. Use opts._state to avoid the module-level
+  // singleton pattern (CR-06 fix: supports concurrent / parallel compilation).
+  if (opts._state) opts._state.repeatUsed = true;
 
   const items = rewriteTemplateExpression(node.iterableExpression, ir);
   const item = node.itemAlias;
@@ -449,11 +462,8 @@ function emitLoop(
   return `\${repeat(${items}, ${keyFn}, (${item}, ${idx}) => html\`${body}\`)}`;
 }
 
-// Module-level latch to communicate "we used repeat()" back to the orchestrator.
-// We piggyback through a singleton imported by emitLit; in v2 we should
-// thread this through opts. For now, a flag the orchestrator inspects via the
-// LitImportCollector subtype is enough.
-export const REPEAT_USED = { value: false };
+// NOTE: REPEAT_USED singleton removed in CR-06 fix. repeatUsed is now returned
+// as part of EmitTemplateResult. emitLit.ts must read templateResult.repeatUsed.
 
 function emitSlot(
   node: TemplateSlotInvocationIR,
@@ -568,19 +578,15 @@ export function emitTemplate(
 ): EmitTemplateResult {
   const diagnostics: Diagnostic[] = [];
   const hostListenerWiring: string[] = [];
-  REPEAT_USED.value = false;
+  // Initialize per-call state (CR-06 fix: replaces module-level REPEAT_USED singleton).
+  const state = { repeatUsed: false };
+  const optsWithState: EmitTemplateOpts = { ...opts, _state: state };
 
   if (!ir.template) {
-    return { renderBody: '', hostListenerWiring, diagnostics };
+    return { renderBody: '', hostListenerWiring, repeatUsed: false, diagnostics };
   }
 
-  const body = emitNode(ir.template, ir, hostListenerWiring, opts);
+  const body = emitNode(ir.template, ir, hostListenerWiring, optsWithState);
 
-  // If repeat() was used anywhere, the orchestrator needs to know to add
-  // `import { repeat } from 'lit/directives/repeat.js';`. We expose this via
-  // a flag baked into the lit collector's symbol set as 'svg' (unused otherwise)?
-  // Cleaner: emitLit imports REPEAT_USED directly and inspects it after emit.
-  // (Doing that is fine because emitTemplate is called from a single thread.)
-
-  return { renderBody: body, hostListenerWiring, diagnostics };
+  return { renderBody: body, hostListenerWiring, repeatUsed: state.repeatUsed, diagnostics };
 }
