@@ -50,6 +50,8 @@ form { display: flex; gap: 0.25rem; margin-block: 0.5rem; }
       if (slotEl !== null && slotEl !== undefined) {
         const update = () => { this._hasSlotHeader = this._slotHeaderElements.length > 0; };
         slotEl.addEventListener('slotchange', update);
+        // CR-05 fix: push cleanup so the listener is removed on disconnectedCallback.
+        this._disconnectCleanups.push(() => slotEl.removeEventListener('slotchange', update));
         update();
       }
     }
@@ -59,6 +61,8 @@ form { display: flex; gap: 0.25rem; margin-block: 0.5rem; }
       if (slotEl !== null && slotEl !== undefined) {
         const update = () => { this._hasSlotDefault = this._slotDefaultElements.length > 0; };
         slotEl.addEventListener('slotchange', update);
+        // CR-05 fix: push cleanup so the listener is removed on disconnectedCallback.
+        this._disconnectCleanups.push(() => slotEl.removeEventListener('slotchange', update));
         update();
       }
     }
@@ -68,6 +72,8 @@ form { display: flex; gap: 0.25rem; margin-block: 0.5rem; }
       if (slotEl !== null && slotEl !== undefined) {
         const update = () => { this._hasSlotEmpty = this._slotEmptyElements.length > 0; };
         slotEl.addEventListener('slotchange', update);
+        // CR-05 fix: push cleanup so the listener is removed on disconnectedCallback.
+        this._disconnectCleanups.push(() => slotEl.removeEventListener('slotchange', update));
         update();
       }
     }
@@ -88,7 +94,7 @@ form { display: flex; gap: 0.25rem; margin-block: 0.5rem; }
     return html`
 <div class="todo-list">
   <header>
-    <slot name="header" data-rozie-params=${JSON.stringify({remaining: this.remaining, total: this.items.length})}>
+    <slot name="header" data-rozie-params=${(() => { try { return JSON.stringify({remaining: this.remaining, total: this.items.length}); } catch { return '{}'; } })()}>
       
       <h3>${this.title} (${this.remaining} remaining)</h3>
     </slot>
@@ -100,9 +106,9 @@ form { display: flex; gap: 0.25rem; margin-block: 0.5rem; }
   </form>
 
   ${this.items.length > 0 ? html`<ul>
-    ${repeat(this.items, (item) => item.id, (item, _idx) => html`<li class=${({ done: item.done })} key=${item.id}>
+    ${repeat(this.items, (item) => item.id, (item, _idx) => html`<li class="${Object.entries({ done: item.done }).filter(([, v]) => v).map(([k]) => k).join(' ')}" key=${item.id}>
       
-      <slot data-rozie-params=${JSON.stringify({item: item})}>
+      <slot data-rozie-params=${(() => { try { return JSON.stringify({item: item}); } catch { return '{}'; } })()}>
         <label>
           <input type="checkbox" ?checked=${item.done} @change=${(e: Event) => { this.toggle(item.id); }} />
           <span>${item.text}</span>

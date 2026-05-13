@@ -24,6 +24,8 @@ export default class Card extends SignalWatcher(LitElement) {
       if (slotEl !== null && slotEl !== undefined) {
         const update = () => { this._hasSlotDefault = this._slotDefaultElements.length > 0; };
         slotEl.addEventListener('slotchange', update);
+        // CR-05 fix: push cleanup so the listener is removed on disconnectedCallback.
+        this._disconnectCleanups.push(() => slotEl.removeEventListener('slotchange', update));
         update();
       }
     }
@@ -38,7 +40,7 @@ export default class Card extends SignalWatcher(LitElement) {
   render() {
     return html`
 <article class="card">
-  <rozie-card-header title=${this.title} on-close=${this.onClose}></rozie-card-header>
+  <rozie-card-header .title=${this.title} .on-close=${this.onClose}></rozie-card-header>
   <div class="card__body">
     <slot></slot>
   </div>

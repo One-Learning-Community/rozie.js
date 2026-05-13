@@ -15,6 +15,15 @@
  *   - `<slot>` → `<slot name="..."></slot>` with data-rozie-params transport for scoped slots
  *   - `{{ expr }}` → `${expr}` (lit-html auto-escapes by default — T-06.4-03)
  *
+ * WR-14 fix: same-name event listeners on a single element (e.g. r-model's
+ * implicit `@input` PLUS an authored `@input.debounce(300)`, or
+ * `@keydown.enter` PLUS `@keydown.escape`) are MERGED into one `@input=${...}`
+ * / `@keydown=${...}` binding. Lit's html`` tagged-template throws
+ * "Detected duplicate attribute bindings" at runtime if the same attribute
+ * name appears twice on a single element — so we must coalesce. Listeners
+ * with `addEventListener` options (capture/passive/once) emit separately
+ * (they need their own `{ handleEvent, ...opts }` object).
+ *
  * @experimental — shape may change before v1.0
  */
 import * as bt from '@babel/types';
@@ -128,6 +137,7 @@ function emitAttribute(
   attr: AttributeBinding,
   ir: IRComponent,
   tagName: string,
+  tagKind: 'html' | 'component' | 'self' = 'html',
 ): string {
   if (attr.kind === 'static') {
     // Pass through static attribute as-is.
@@ -139,6 +149,12 @@ function emitAttribute(
     if (attributeIsRModel(attr)) return '';
 
     const expr = rewriteTemplateExpression(attr.expression, ir);
+
+    // Composition/self tags are custom elements — all prop bindings must use
+    // property-binding syntax (.prop=${expr}) so objects/arrays aren't stringified.
+    if (tagKind === 'component' || tagKind === 'self') {
+      return `.${attr.name}=\${${expr}}`;
+    }
 
     // Boolean attribute prefix.
     if (BOOLEAN_ATTRS.has(attr.name)) {
@@ -170,13 +186,25 @@ function emitAttribute(
   return '';
 }
 
-function buildRModelBindings(
+/**
+ * Structured r-model output — replaces the legacy single-string
+ * `buildRModelBindings` so the event half (`@input` / `@change`) can be
+ * merged with same-name listener events instead of emitting duplicate
+ * attribute bindings (WR-14 fix).
+ *
+ * Returns:
+ *   - `propBinding`: the property half (`.value=${…}` or `.checked=${…}`)
+ *   - `eventName`:   the event name (`input` or `change`)
+ *   - `handlerBody`: the bare arrow body (no `@event=${…}` wrapping) so
+ *                    it can be combined with other same-name handlers.
+ */
+function buildRModelParts(
   rModelAttr: AttributeBinding,
   ir: IRComponent,
   tagName: string,
   allAttrs: AttributeBinding[],
-): string {
-  if (rModelAttr.kind !== 'binding') return '';
+): { propBinding: string; eventName: string; handlerBody: string } | null {
+  if (rModelAttr.kind !== 'binding') return null;
 
   const code = rewriteTemplateExpression(rModelAttr.expression, ir);
 
@@ -185,30 +213,57 @@ function buildRModelBindings(
   const typeAttr = allAttrs.find(
     (a) => a.name === 'type' && a.kind === 'static',
   );
-  const inputType = typeAttr && typeAttr.kind === 'static' ? typeAttr.value.toLowerCase() : '';
+  const inputType =
+    typeAttr && typeAttr.kind === 'static' ? typeAttr.value.toLowerCase() : '';
 
-  if (FORM_INPUT_TAGS.has(tagName) && (inputType === 'checkbox' || inputType === 'radio')) {
-    return [
-      `.checked=\${${code}}`,
-      `@change=\${(e) => ${code} = (e.target as HTMLInputElement).checked}`,
-    ].join(' ');
+  if (
+    FORM_INPUT_TAGS.has(tagName) &&
+    (inputType === 'checkbox' || inputType === 'radio')
+  ) {
+    return {
+      propBinding: `.checked=\${${code}}`,
+      eventName: 'change',
+      handlerBody: `(e) => ${code} = (e.target as HTMLInputElement).checked`,
+    };
   }
 
-  return [
-    `.value=\${${code}}`,
-    `@input=\${(e) => ${code} = (e.target as HTMLInputElement).value}`,
-  ].join(' ');
+  return {
+    propBinding: `.value=\${${code}}`,
+    eventName: 'input',
+    handlerBody: `(e) => ${code} = (e.target as HTMLInputElement).value`,
+  };
 }
 
-function emitEventListener(listener: Listener, ir: IRComponent): string {
+/**
+ * Structured event-listener parts — replaces the legacy single-string
+ * `emitEventListener` so same-name listeners can be merged into a single
+ * `@event=${…}` binding (WR-14 fix — Lit forbids duplicate attribute names).
+ *
+ * Returns:
+ *   - `eventName`:   the event name (e.g. `'input'`, `'keydown'`, `'click'`)
+ *   - `handlerBody`: the bare handler expression (arrow / function reference)
+ *                    suitable for direct interpolation into `@event=${…}`
+ *                    or composition with another same-name handler
+ *   - `optionParts`: capture/passive/once flags as `['capture: true', ...]`.
+ *                    When non-empty the listener MUST be emitted as its own
+ *                    `@event=${{ handleEvent, ...opts }}` binding — we never
+ *                    merge option-bearing listeners with plain ones because
+ *                    the options-object form has different runtime semantics.
+ */
+function buildEventParts(
+  listener: Listener,
+  ir: IRComponent,
+): { eventName: string; handlerBody: string; optionParts: string[] } {
   const eventName = listener.event;
   const handler = rewriteTemplateExpression(listener.handler, ir);
 
   // Detect inlineGuard / native flags from the modifier pipeline.
-  let inlineGuards: string[] = [];
+  const inlineGuards: string[] = [];
   let captureOpt = false;
   let passiveOpt = false;
   let onceOpt = false;
+
+  let wrapKind: { kind: 'debounce' | 'throttle'; ms: number } | null = null;
 
   for (const entry of listener.modifierPipeline) {
     if (entry.kind === 'listenerOption') {
@@ -218,7 +273,8 @@ function emitEventListener(listener: Listener, ir: IRComponent): string {
     }
     if (entry.kind === 'filter' || entry.kind === 'wrap') {
       if (entry.modifier === 'stop') inlineGuards.push('e.stopPropagation();');
-      else if (entry.modifier === 'prevent') inlineGuards.push('e.preventDefault();');
+      else if (entry.modifier === 'prevent')
+        inlineGuards.push('e.preventDefault();');
       else if (entry.modifier === 'self')
         inlineGuards.push('if (e.target !== e.currentTarget) return;');
       else if (entry.modifier === 'enter')
@@ -227,6 +283,8 @@ function emitEventListener(listener: Listener, ir: IRComponent): string {
         inlineGuards.push("if ((e as KeyboardEvent).key !== 'Escape') return;");
       else if (entry.modifier === 'tab')
         inlineGuards.push("if ((e as KeyboardEvent).key !== 'Tab') return;");
+      // debounce/throttle on template events requires a persistent class-field
+      // wrapper (Phase 7 TODO) — inline IIFE resets on every render() call.
     }
   }
 
@@ -245,20 +303,28 @@ function emitEventListener(listener: Listener, ir: IRComponent): string {
     body = isFunctionLike ? `${handler}` : `(e: Event) => { ${handler}; }`;
   }
 
+  void wrapKind; // Phase 7: emit as class field rather than inline IIFE
+
   const optionParts: string[] = [];
   if (captureOpt) optionParts.push('capture: true');
   if (passiveOpt) optionParts.push('passive: true');
   if (onceOpt) optionParts.push('once: true');
 
-  // Lit's @event syntax doesn't support options inline — it always uses
-  // bubbling phase by default. For capture/passive/once we still use @event
-  // but pass `addEventListener` options via a tuple. Lit accepts an object
-  // `{ handleEvent, capture, passive, once }`.
-  if (optionParts.length > 0) {
-    const opts = optionParts.join(', ');
-    return `@${eventName}=\${{ handleEvent: ${body}, ${opts} }}`;
-  }
-  return `@${eventName}=\${${body}}`;
+  return { eventName, handlerBody: body, optionParts };
+}
+
+/**
+ * Combine two-or-more same-name handler bodies into a single arrow that
+ * dispatches each in declaration order. Each `handlerBody` is either a
+ * function reference (`this.onSearch`), an inline arrow (`(e) => …`), or a
+ * guard-wrapped arrow (`(e: Event) => { if (…) return; (this.fn)(e); }`).
+ * Calling the body as a function with the event argument works uniformly
+ * for all three shapes thanks to JavaScript's `(expr)(arg)` invocation.
+ */
+function mergeHandlerBodies(bodies: string[]): string {
+  if (bodies.length === 1) return bodies[0]!;
+  const invocations = bodies.map((b) => `(${b})(e);`).join(' ');
+  return `(e: Event) => { ${invocations} }`;
 }
 
 function emitElementOpenTag(
@@ -291,13 +357,12 @@ function emitElementOpenTag(
     }
   }
   if (bindingClass !== null) {
-    // Use classMap for object-bindings.
     if (
       bindingClass.kind === 'binding' &&
-      bt.isObjectExpression(bindingClass.expression) &&
-      staticClassValues.length > 0
+      bt.isObjectExpression(bindingClass.expression)
     ) {
-      // Augment the object with static keys.
+      // Object class binding — always use Object.entries so { done: true }
+      // renders as "done" not "[object Object]" (CR-01 fix).
       const obj = bindingClass.expression;
       for (const value of staticClassValues) {
         for (const cls of value.split(/\s+/)) {
@@ -307,10 +372,7 @@ function emitElementOpenTag(
           );
         }
       }
-      opts.lit; // tracked elsewhere
-      const expr = rewriteTemplateExpression(bindingClass.expression, ir);
-      // Render as a QUOTED attribute binding — lit-html requires string-concatenation
-      // interpolations to appear inside quoted attribute values (CR-01 fix).
+      const expr = rewriteTemplateExpression(obj, ir);
       parts.push(
         `class="\${Object.entries(${expr}).filter(([, v]) => v).map(([k]) => k).join(' ')}"`,
       );
@@ -336,16 +398,78 @@ function emitElementOpenTag(
       continue;
     }
     if (attributeIsRModel(attr)) continue;
-    const emitted = emitAttribute(attr, ir, node.tagName);
+    const emitted = emitAttribute(attr, ir, node.tagName, node.tagKind);
     if (emitted) parts.push(emitted);
   }
 
+  // WR-14: collect r-model's implicit event + all authored events, then
+  // group by event name and merge same-name handlers into a single
+  // `@event=${…}` binding. Listeners with capture/passive/once options
+  // stay separate (they require the `{ handleEvent, …opts }` shape).
+  const plainEvents: Array<{ eventName: string; handlerBody: string }> = [];
+  const optionEvents: Array<{
+    eventName: string;
+    handlerBody: string;
+    optionParts: string[];
+  }> = [];
+
   if (rModelAttr) {
-    parts.push(buildRModelBindings(rModelAttr, ir, node.tagName, node.attributes));
+    const modelParts = buildRModelParts(
+      rModelAttr,
+      ir,
+      node.tagName,
+      node.attributes,
+    );
+    if (modelParts) {
+      parts.push(modelParts.propBinding);
+      plainEvents.push({
+        eventName: modelParts.eventName,
+        handlerBody: modelParts.handlerBody,
+      });
+    }
   }
 
   for (const event of node.events) {
-    parts.push(emitEventListener(event, ir));
+    const parts1 = buildEventParts(event, ir);
+    if (parts1.optionParts.length > 0) {
+      optionEvents.push(parts1);
+    } else {
+      plainEvents.push({
+        eventName: parts1.eventName,
+        handlerBody: parts1.handlerBody,
+      });
+    }
+  }
+
+  // Group plain events by name and emit merged handlers. Preserve the
+  // first-occurrence order across the original event list so the rendered
+  // attribute order stays stable across compilations.
+  const groupOrder: string[] = [];
+  const groups = new Map<string, string[]>();
+  for (const ev of plainEvents) {
+    if (!groups.has(ev.eventName)) {
+      groups.set(ev.eventName, []);
+      groupOrder.push(ev.eventName);
+    }
+    groups.get(ev.eventName)!.push(ev.handlerBody);
+  }
+  for (const name of groupOrder) {
+    const bodies = groups.get(name)!;
+    const merged = mergeHandlerBodies(bodies);
+    parts.push(`@${name}=\${${merged}}`);
+  }
+
+  // Option-bearing listeners emit individually — each carries its own
+  // `{ handleEvent, capture, passive, once }` object. If the user authored
+  // two same-name option-bearing listeners that's a separate (rare) edge
+  // case we surface as an emitted duplicate today; Lit will throw at
+  // runtime and the user can deduplicate at source. (No reasonable merge
+  // semantic exists because their option flags may differ.)
+  for (const ev of optionEvents) {
+    const optsText = ev.optionParts.join(', ');
+    parts.push(
+      `@${ev.eventName}=\${{ handleEvent: ${ev.handlerBody}, ${optsText} }}`,
+    );
   }
 
   if (refAttr) parts.push(refAttr);
