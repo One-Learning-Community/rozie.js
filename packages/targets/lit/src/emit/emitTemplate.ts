@@ -439,15 +439,13 @@ function emitLoop(
   const body = node.body
     .map((c) => emitNode(c, ir, hostListenerWiring, opts))
     .join('');
+  // For the key function, pass shadowAliases so the loop alias (and idx) are
+  // not rewritten to `this.alias.value` — they are loop-scoped, not class fields.
+  // This replaces the fragile string-regex hack that CR-03 identified.
   const keyExpr = node.keyExpression
-    ? rewriteTemplateExpression(node.keyExpression, ir)
+    ? rewriteTemplateExpression(node.keyExpression, ir, { shadowAliases: [item, idx] })
     : `${item}`;
-  // The key expression is in the *child* scope (item alias) — rewrite must
-  // already have run if it references signal/state. We render the raw item alias
-  // for `(item) => item.id`.
-  const keyFn = node.keyExpression
-    ? `(${item}) => ${keyExpr.replace(/\bthis\.[\w$]+\.value\b/g, item)}`
-    : `(${item}) => ${item}`;
+  const keyFn = `(${item}) => ${keyExpr}`;
   return `\${repeat(${items}, ${keyFn}, (${item}, ${idx}) => html\`${body}\`)}`;
 }
 

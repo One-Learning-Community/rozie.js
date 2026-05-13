@@ -96,12 +96,24 @@ function collectMethodNames(ir: IRComponent): Set<string> {
   return names;
 }
 
+export interface RewriteTemplateExpressionOpts {
+  /**
+   * Names to treat as opaque — they are NOT rewritten even if they collide
+   * with data / state names. Use this for loop aliases inside `r-for` key
+   * functions so the alias is not replaced with `this._alias.value` (CR-03 fix).
+   */
+  shadowAliases?: string[];
+}
+
 export function rewriteTemplateExpression(
   expr: t.Expression,
   ir: IRComponent,
+  opts: RewriteTemplateExpressionOpts = {},
 ): string {
   const cloned = t.cloneNode(expr, true, false);
   const wrapper = t.file(t.program([t.expressionStatement(cloned)]));
+
+  const shadowSet = new Set(opts.shadowAliases ?? []);
 
   const modelProps = new Set(ir.props.filter((p) => p.isModel).map((p) => p.name));
   const nonModelProps = new Set(ir.props.filter((p) => !p.isModel).map((p) => p.name));
@@ -189,6 +201,8 @@ export function rewriteTemplateExpression(
 
     Identifier(path) {
       const name = path.node.name;
+      // Shadow aliases (e.g. loop item variables) are never rewritten (CR-03 fix).
+      if (shadowSet.has(name)) return;
       if (name === '$el') {
         path.replaceWith(t.thisExpression());
         path.skip();
