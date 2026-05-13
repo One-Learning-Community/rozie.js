@@ -10,7 +10,10 @@
     "noEmit": true,
     "skipLibCheck": true,
     "isolatedModules": true,
-    "strict": true
+    "strict": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": false,
+    "useDefineForClassFields": false
   },
   "include": ["src/**/*", "src/**/*.vue", "tests/**/*"]
 }

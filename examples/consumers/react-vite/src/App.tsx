@@ -8,6 +8,7 @@ import ModalPage from './pages/ModalPage';
 import TreeNodePage from './pages/TreeNodePage';
 import CardPage from './pages/CardPage';
 import CardHeaderPage from './pages/CardHeaderPage';
+import LitInteropPage from './pages/LitInteropPage';
 
 /**
  * Page-routing shell. Each Playwright e2e test navigates by clicking
@@ -27,7 +28,8 @@ type PageKey =
   | 'modal'
   | 'tree-node'
   | 'card'
-  | 'card-header';
+  | 'card-header'
+  | 'lit-interop';
 
 const PAGES: Record<PageKey, () => JSX.Element> = {
   counter: CounterPage,
@@ -38,6 +40,7 @@ const PAGES: Record<PageKey, () => JSX.Element> = {
   'tree-node': TreeNodePage,
   card: CardPage,
   'card-header': CardHeaderPage,
+  'lit-interop': LitInteropPage,
 };
 
 const PAGE_KEYS: ReadonlyArray<PageKey> = [
@@ -49,6 +52,7 @@ const PAGE_KEYS: ReadonlyArray<PageKey> = [
   'tree-node',
   'card',
   'card-header',
+  'lit-interop',
 ];
 
 export default function App(): JSX.Element {

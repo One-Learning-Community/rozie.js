@@ -16,7 +16,18 @@ import Rozie from '@rozie/unplugin/vite';
 export default defineConfig({
   plugins: [
     Rozie({ target: 'vue' }),
-    vue(),
+    vue({
+      // Phase 06.4 P3 — whitelist `rozie-*` tags as native custom elements
+      // for the build-time SFC compile, mirroring `app.config.compilerOptions`
+      // in src/main.ts. Required for the /lit-interop route to consume the
+      // compiled <rozie-counter> without Vue trying to resolve it as a Vue
+      // component.
+      template: {
+        compilerOptions: {
+          isCustomElement: (tag: string) => tag.startsWith('rozie-'),
+        },
+      },
+    }),
   ],
   build: {
     sourcemap: true, // DX-01 requirement — stack traces resolve to .rozie

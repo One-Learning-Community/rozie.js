@@ -19,6 +19,7 @@ import Modal from '../Modal.rozie';
 import TreeNode from '../TreeNode.rozie';
 import Card from '../Card.rozie';
 import CardHeader from '../CardHeader.rozie';
+import { LitInteropPageComponent } from './pages/lit-interop.page';
 
 interface TodoItem {
   id: string;
@@ -40,7 +41,8 @@ type PageKey =
   | 'modal'
   | 'tree-node'
   | 'card'
-  | 'card-header';
+  | 'card-header'
+  | 'lit-interop';
 
 @Component({
   selector: 'rozie-app',
@@ -55,6 +57,7 @@ type PageKey =
     TreeNode,
     Card,
     CardHeader,
+    LitInteropPageComponent,
   ],
   template: `
     <header class="app-header">
@@ -171,6 +174,8 @@ type PageKey =
           <rozie-card-header title="Standalone header" [onClose]="onCardHeaderClose" />
           <p>Closes: <span data-testid="card-header-close-count">{{ cardHeaderCloseCount() }}</span></p>
         </section>
+      } @else if (current() === 'lit-interop') {
+        <rozie-lit-interop-page />
       }
     </main>
   `,
@@ -218,6 +223,7 @@ export class AppComponent {
     'tree-node',
     'card',
     'card-header',
+    'lit-interop',
   ];
 
   current = signal<PageKey>('counter');

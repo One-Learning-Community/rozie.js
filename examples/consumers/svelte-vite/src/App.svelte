@@ -19,6 +19,7 @@
   import TreeNode from './TreeNode.rozie';
   import Card from './Card.rozie';
   import CardHeader from './CardHeader.rozie';
+  import LitInterop from './routes/lit-interop/+page.svelte';
 
   type PageKey =
     | 'counter'
@@ -28,7 +29,8 @@
     | 'modal'
     | 'tree-node'
     | 'card'
-    | 'card-header';
+    | 'card-header'
+    | 'lit-interop';
   const PAGE_KEYS: ReadonlyArray<PageKey> = [
     'counter',
     'search-input',
@@ -38,6 +40,7 @@
     'tree-node',
     'card',
     'card-header',
+    'lit-interop',
   ];
 
   let current = $state<PageKey>('counter');
@@ -211,6 +214,8 @@
       <CardHeader title="Standalone header" onClose={() => cardHeaderCloseCount++} />
       <p>Closes: <span data-testid="card-header-close-count">{cardHeaderCloseCount}</span></p>
     </section>
+  {:else if current === 'lit-interop'}
+    <LitInterop />
   {/if}
 </main>
 

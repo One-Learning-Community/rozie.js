@@ -11,6 +11,9 @@
     "skipLibCheck": true,
     "isolatedModules": true,
     "strict": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": false,
+    "useDefineForClassFields": false,
     "allowImportingTsExtensions": false,
     "resolveJsonModule": true
   },
