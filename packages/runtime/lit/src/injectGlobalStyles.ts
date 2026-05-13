@@ -29,8 +29,11 @@ export function injectGlobalStyles(id: string, css: string): void {
   // (e.g., the module loads in a Node test runner without happy-dom).
   if (typeof document === 'undefined') return;
 
+  // WR-02 fix: use CSS.escape() instead of manual quote-only escaping so
+  // CSS-syntactic characters (], \, etc.) in `id` don't break querySelector.
+  // CSS.escape is available in all target browsers (Baseline since 2016).
   const existing = document.head.querySelector(
-    `style[${STYLE_MARKER_ATTR}="${id.replace(/"/g, '\\"')}"]`,
+    `style[${STYLE_MARKER_ATTR}="${CSS.escape(id)}"]`,
   );
   if (existing !== null) {
     // Already injected — preserve idempotency, do not re-inject.
