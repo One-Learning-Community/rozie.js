@@ -9,4 +9,5 @@ packages:
   - "tests/dist-parity"
   - "tests/smoke-sourcemap"
   - "tests/solid-lint"
+  - "tests/lit-lint"
   - "docs"

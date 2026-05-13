@@ -470,6 +470,33 @@ importers:
         specifier: ^5.1.0
         version: 5.1.0
 
+  packages/runtime/lit:
+    devDependencies:
+      '@lit-labs/preact-signals':
+        specifier: ^1.0.0
+        version: 1.0.3
+      '@preact/signals-core':
+        specifier: ^1.3.0
+        version: 1.14.2
+      '@typescript-eslint/parser':
+        specifier: ^8.59.1
+        version: 8.59.2(eslint@9.39.4(jiti@1.21.7))(typescript@5.4.5)
+      eslint:
+        specifier: ^9.39.4
+        version: 9.39.4(jiti@1.21.7)
+      happy-dom:
+        specifier: ^15.0.0
+        version: 15.11.7
+      lit:
+        specifier: ^3.2.0
+        version: 3.3.2
+      tsdown:
+        specifier: ^0.21.10
+        version: 0.21.10(typescript@5.4.5)
+      vitest:
+        specifier: ^4.1.0
+        version: 4.1.5(@types/node@22.19.17)(happy-dom@15.11.7)(jsdom@25.0.1)(vite@8.0.10(@types/node@22.19.17)(jiti@1.21.7)(less@4.2.0)(sass@1.71.1)(terser@5.46.2))
+
   packages/runtime/react:
     dependencies:
       clsx:
@@ -594,6 +621,67 @@ importers:
       happy-dom:
         specifier: ^15
         version: 15.11.7
+      source-map-js:
+        specifier: ^1.2.1
+        version: 1.2.1
+      tsdown:
+        specifier: ^0.21.10
+        version: 0.21.10(typescript@5.4.5)
+      vitest:
+        specifier: ^4.1.0
+        version: 4.1.5(@types/node@22.19.17)(happy-dom@15.11.7)(jsdom@25.0.1)(vite@8.0.10(@types/node@22.19.17)(jiti@1.21.7)(less@4.2.0)(sass@1.71.1)(terser@5.46.2))
+
+  packages/targets/lit:
+    dependencies:
+      '@ampproject/remapping':
+        specifier: ^2.3.0
+        version: 2.3.0
+      '@babel/generator':
+        specifier: ^7.29
+        version: 7.29.1
+      '@babel/parser':
+        specifier: ^7.29
+        version: 7.29.3
+      '@babel/traverse':
+        specifier: ^7.29
+        version: 7.29.0
+      '@babel/types':
+        specifier: ^7.29
+        version: 7.29.0
+      '@rozie/core':
+        specifier: workspace:*
+        version: link:../../core
+      '@rozie/runtime-lit':
+        specifier: workspace:*
+        version: link:../../runtime/lit
+      magic-string:
+        specifier: ^0.30
+        version: 0.30.21
+      postcss:
+        specifier: ^8.5
+        version: 8.5.13
+    devDependencies:
+      '@lit-labs/preact-signals':
+        specifier: ^1.0.0
+        version: 1.0.3
+      '@types/babel__generator':
+        specifier: ^7
+        version: 7.27.0
+      '@types/babel__traverse':
+        specifier: ^7
+        version: 7.28.0
+      '@typescript-eslint/parser':
+        specifier: ^8.59.1
+        version: 8.59.2(eslint@9.39.4(jiti@1.21.7))(typescript@5.4.5)
+      eslint:
+        specifier: ^9
+        version: 9.39.4(jiti@1.21.7)
+      happy-dom:
+        specifier: ^15.0.0
+        version: 15.11.7
+      lit:
+        specifier: ^3.2.0
+        version: 3.3.2
       source-map-js:
         specifier: ^1.2.1
         version: 1.2.1
@@ -2751,6 +2839,15 @@ packages:
   '@leichtgewicht/ip-codec@2.0.5':
     resolution: {integrity: sha512-Vo+PSpZG2/fmgmiNzYK9qWRh8h/CHrwD0mo1h1DzL4yzHNSfWYujGTYsWGreD000gcgmZ7K4Ys6Tx9TxtsKdDw==}
 
+  '@lit-labs/preact-signals@1.0.3':
+    resolution: {integrity: sha512-aZDNZUgEpYPB+zfApIZpChSyKlLoqvILYt0nTm0KAXTU8FZsht6I6QZRvdKItD3EI8w0FHsqk9CpzIdd3gFXCA==}
+
+  '@lit-labs/ssr-dom-shim@1.5.1':
+    resolution: {integrity: sha512-Aou5UdlSpr5whQe8AA/bZG0jMj96CoJIWbGfZ91qieWu5AWUMKw8VR/pAkQkJYvBNhmCcWnZlyyk5oze8JIqYA==}
+
+  '@lit/reactive-element@2.1.2':
+    resolution: {integrity: sha512-pbCDiVMnne1lYUIaYNN5wrwQXDtHaYtg7YEFPeW+hws6U47WeFvISGUWekPGKWOP1ygrs0ef0o1VJMk1exos5A==}
+
   '@ljharb/through@2.3.14':
     resolution: {integrity: sha512-ajBvlKpWucBB17FuQYUShqpqy8GRgYEpJW0vWJbUu1CV9lWyrDCapy0lScU8T8Z6qn49sSwJB3+M+evYIdGg+A==}
     engines: {node: '>= 0.4'}
@@ -2799,6 +2896,9 @@ packages:
     resolution: {integrity: sha512-PG6q63nQg5c9rIi4/Z5lR5IVF7yU5MqmKaPOe0HSc0O2cX1fPi96sUQu5j7eo4gKCkB2AnNGoWt7y4/Xx3Kcqg==}
     engines: {node: '>=18'}
     hasBin: true
+
+  '@preact/signals-core@1.14.2':
+    resolution: {integrity: sha512-RZHdBj9ZF4n40Rp4jS052EHHjBWf96P9oNdXPfhQTovCuWY9iQn3Gq+gOTJSgBO9A/JBuPfMOWsSX/lIU9Pc/A==}
 
   '@quansync/fs@1.0.0':
     resolution: {integrity: sha512-4TJ3DFtlf1L5LDMaM6CanJ/0lckGNtJcMjQ1NAV6zDmA0tEHKZtxNKin8EgPaVX1YzljbxckyT2tJrpQKAtngQ==}
@@ -5248,6 +5348,15 @@ packages:
 
   lines-and-columns@1.2.4:
     resolution: {integrity: sha512-7ylylesZQ/PV29jhEDl3Ufjo6ZX7gCqJr5F7PKrqc93v7fzSymt1BpwEU8nAUXs8qzzvqhbjhK5QZg6Mt/HkBg==}
+
+  lit-element@4.2.2:
+    resolution: {integrity: sha512-aFKhNToWxoyhkNDmWZwEva2SlQia+jfG0fjIWV//YeTaWrVnOxD89dPKfigCUspXFmjzOEUQpOkejH5Ly6sG0w==}
+
+  lit-html@3.3.2:
+    resolution: {integrity: sha512-Qy9hU88zcmaxBXcc10ZpdK7cOLXvXpRoBxERdtqV9QOrfpMZZ6pSYP91LhpPtap3sFMUiL7Tw2RImbe0Al2/kw==}
+
+  lit@3.3.2:
+    resolution: {integrity: sha512-NF9zbsP79l4ao2SNrH3NkfmFgN/hBYSQo90saIVI1o5GpjAdCPVstVzO1MrLOakHoEhYkrtRjPK6Ob521aoYWQ==}
 
   loader-runner@4.3.2:
     resolution: {integrity: sha512-DFEqQ3ihfS9blba08cLfYf1NRAIEm+dDjic073DRDc3/JspI/8wYmtDsHwd3+4hwvdxSK7PGaElfTmm0awWJ4w==}
@@ -9065,6 +9174,17 @@ snapshots:
 
   '@leichtgewicht/ip-codec@2.0.5': {}
 
+  '@lit-labs/preact-signals@1.0.3':
+    dependencies:
+      '@preact/signals-core': 1.14.2
+      lit: 3.3.2
+
+  '@lit-labs/ssr-dom-shim@1.5.1': {}
+
+  '@lit/reactive-element@2.1.2':
+    dependencies:
+      '@lit-labs/ssr-dom-shim': 1.5.1
+
   '@ljharb/through@2.3.14':
     dependencies:
       call-bind: 1.0.9
@@ -9108,6 +9228,8 @@ snapshots:
   '@playwright/test@1.59.1':
     dependencies:
       playwright: 1.59.1
+
+  '@preact/signals-core@1.14.2': {}
 
   '@quansync/fs@1.0.0':
     dependencies:
@@ -11704,6 +11826,22 @@ snapshots:
       lightningcss-win32-x64-msvc: 1.32.0
 
   lines-and-columns@1.2.4: {}
+
+  lit-element@4.2.2:
+    dependencies:
+      '@lit-labs/ssr-dom-shim': 1.5.1
+      '@lit/reactive-element': 2.1.2
+      lit-html: 3.3.2
+
+  lit-html@3.3.2:
+    dependencies:
+      '@types/trusted-types': 2.0.7
+
+  lit@3.3.2:
+    dependencies:
+      '@lit/reactive-element': 2.1.2
+      lit-element: 4.2.2
+      lit-html: 3.3.2
 
   loader-runner@4.3.2: {}
 
