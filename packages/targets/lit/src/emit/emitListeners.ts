@@ -30,6 +30,7 @@ import type {
 } from '../rewrite/collectLitImports.js';
 import type { ModifierRegistry } from '../../../../core/src/modifiers/ModifierRegistry.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
+import * as bt from '@babel/types';
 
 export interface EmitListenersOpts {
   decorators: LitDecoratorImportCollector;
@@ -145,6 +146,20 @@ function extractNumberArg(args: unknown[] | undefined): number {
   return 0;
 }
 
+/**
+ * WR-03 fix: mirror emitTemplate.ts's AST-based isHandlerLike check.
+ * Arrow functions and function expressions passed by reference are function-like
+ * and can be called as `(handler)(e)`. Inline expressions (count++, etc.)
+ * must be emitted as statement form `handler;` without the call wrapper.
+ */
+function isHandlerLike(expr: bt.Expression): boolean {
+  if (bt.isArrowFunctionExpression(expr)) return true;
+  if (bt.isFunctionExpression(expr)) return true;
+  if (bt.isIdentifier(expr)) return true;
+  if (bt.isMemberExpression(expr)) return true; // `this.fn`
+  return false;
+}
+
 function emitOneListener(
   listener: Listener,
   ir: IRComponent,
@@ -160,7 +175,11 @@ function emitOneListener(
   if (whenExpr) guardLines.push(`if (!(${whenExpr})) return;`);
   guardLines.push(...cls.inlineGuards);
 
-  const userCall = `(${handlerExpr})(e);`;
+  // WR-03 fix: use AST-based detection to distinguish function-like handlers
+  // from inline expressions. Inline expressions (e.g. `count++`) must be
+  // emitted as statements (`count++;`) not calls (`(count++)(e)` — TypeError).
+  const isFnLike = isHandlerLike(listener.handler);
+  const userCall = isFnLike ? `(${handlerExpr})(e);` : `${handlerExpr};`;
   const handlerBody = `(e: Event) => { ${guardLines.join(' ')} ${userCall} }`;
 
   // Build options object.
