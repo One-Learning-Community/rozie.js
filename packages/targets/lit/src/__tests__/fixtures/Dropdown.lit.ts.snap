@@ -50,7 +50,7 @@ export default class Dropdown extends SignalWatcher(LitElement) {
 
     const _lh2 = (() => { let last = 0; return (e: Event) => { if (!(this.open)) return; const now = Date.now(); if (now - last < 100) return; last = now; (this.reposition)(e); }; })();
     window.addEventListener('resize', _lh2, { passive: true });
-    this._disconnectCleanups.push(() => window.removeEventListener('resize', _lh2, { passive: true }));
+    this._disconnectCleanups.push(() => window.removeEventListener('resize', _lh2, undefined));
 
     this.addEventListener('rozie-trigger-toggle', (e) => { (this.toggle)((e as CustomEvent).detail); });
 

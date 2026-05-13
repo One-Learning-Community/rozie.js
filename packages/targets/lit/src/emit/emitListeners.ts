@@ -182,12 +182,19 @@ function emitOneListener(
   const userCall = isFnLike ? `(${handlerExpr})(e);` : `${handlerExpr};`;
   const handlerBody = `(e: Event) => { ${guardLines.join(' ')} ${userCall} }`;
 
-  // Build options object.
-  const optionFields: string[] = [];
-  if (cls.listenerOptions.capture) optionFields.push('capture: true');
-  if (cls.listenerOptions.passive) optionFields.push('passive: true');
-  if (cls.listenerOptions.once) optionFields.push('once: true');
-  const optionsExpr = optionFields.length > 0 ? `{ ${optionFields.join(', ')} }` : 'undefined';
+  // Build addEventListener options object (all options are significant for the add call).
+  const addOptionFields: string[] = [];
+  if (cls.listenerOptions.capture) addOptionFields.push('capture: true');
+  if (cls.listenerOptions.passive) addOptionFields.push('passive: true');
+  if (cls.listenerOptions.once) addOptionFields.push('once: true');
+  const optionsExpr = addOptionFields.length > 0 ? `{ ${addOptionFields.join(', ')} }` : 'undefined';
+
+  // WR-11 fix: removeEventListener only uses the `capture` flag for matching;
+  // `passive` and `once` are ignored by the DOM spec in the remove call.
+  // For `once: true`-only listeners (no capture), the browser auto-removes after
+  // the first fire — no cleanup needed.
+  const removeOptionsExpr = cls.listenerOptions.capture ? '{ capture: true }' : 'undefined';
+  const skipCleanup = cls.listenerOptions.once && !cls.listenerOptions.capture;
 
   // WR-04 fix: use section-specific prefix _lh (listener handler) to avoid
   // future collision with other emitter-generated variables in firstUpdated().
@@ -218,22 +225,28 @@ function emitOneListener(
           ? `(() => { let t: ReturnType<typeof setTimeout> | undefined; return (e: Event) => { ${guardLines.join(' ')} if (t) clearTimeout(t); t = setTimeout(() => { (${handlerExpr})(e); }, ${ms}); }; })()`
           : `(() => { let last = 0; return (e: Event) => { ${guardLines.join(' ')} const now = Date.now(); if (now - last < ${ms}) return; last = now; (${handlerExpr})(e); }; })()`;
       const target = targetExpression(listener.target);
-      return [
+      const lines = [
         `const ${handlerVar} = ${wrapped};`,
         `${target}.addEventListener('${listener.event}', ${handlerVar}, ${optionsExpr});`,
-        `this._disconnectCleanups.push(() => ${target}.removeEventListener('${listener.event}', ${handlerVar}, ${optionsExpr}));`,
-      ].join('\n');
+      ];
+      if (!skipCleanup) {
+        lines.push(`this._disconnectCleanups.push(() => ${target}.removeEventListener('${listener.event}', ${handlerVar}, ${removeOptionsExpr}));`);
+      }
+      return lines.join('\n');
     }
 
     case 'A':
     case 'D':
     default: {
       const target = targetExpression(listener.target);
-      return [
+      const lines = [
         `const ${handlerVar} = ${handlerBody};`,
         `${target}.addEventListener('${listener.event}', ${handlerVar}, ${optionsExpr});`,
-        `this._disconnectCleanups.push(() => ${target}.removeEventListener('${listener.event}', ${handlerVar}, ${optionsExpr}));`,
-      ].join('\n');
+      ];
+      if (!skipCleanup) {
+        lines.push(`this._disconnectCleanups.push(() => ${target}.removeEventListener('${listener.event}', ${handlerVar}, ${removeOptionsExpr}));`);
+      }
+      return lines.join('\n');
     }
   }
 }
