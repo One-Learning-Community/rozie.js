@@ -284,16 +284,18 @@ function emitElementOpenTag(
       }
       opts.lit; // tracked elsewhere
       const expr = rewriteTemplateExpression(bindingClass.expression, ir);
-      // Render as a property binding to className via a helper expression.
+      // Render as a QUOTED attribute binding — lit-html requires string-concatenation
+      // interpolations to appear inside quoted attribute values (CR-01 fix).
       parts.push(
-        `class=\${Object.entries(${expr}).filter(([, v]) => v).map(([k]) => k).join(' ')}`,
+        `class="\${Object.entries(${expr}).filter(([, v]) => v).map(([k]) => k).join(' ')}"`,
       );
     } else if (bindingClass.kind === 'binding') {
       const expr = rewriteTemplateExpression(bindingClass.expression, ir);
       const staticPart = staticClassValues.length > 0
-        ? `'${staticClassValues.join(' ')} ' + `
+        ? `${staticClassValues.join(' ')} `
         : '';
-      parts.push(`class=\${${staticPart}(${expr})}`);
+      // Use quoted attribute — lit-html requires quotes for mixed static+dynamic values (CR-01 fix).
+      parts.push(`class="${staticPart}\${(${expr})}"`);
     } else if (bindingClass.kind === 'interpolated') {
       const emitted = emitAttribute(bindingClass, ir, node.tagName);
       if (emitted) parts.push(emitted);

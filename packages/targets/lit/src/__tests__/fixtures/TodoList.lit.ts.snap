@@ -100,7 +100,7 @@ form { display: flex; gap: 0.25rem; margin-block: 0.5rem; }
   </form>
 
   ${this.items.length > 0 ? html`<ul>
-    ${repeat(this.items, (item) => item.id, (item, _idx) => html`<li class=${({ done: item.done })} key=${item.id}>
+    ${repeat(this.items, (item) => item.id, (item, _idx) => html`<li class="${({ done: item.done })}" key=${item.id}>
       
       <slot data-rozie-params=${JSON.stringify({item: item})}>
         <label>
