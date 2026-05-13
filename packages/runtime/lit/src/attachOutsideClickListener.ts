@@ -19,6 +19,22 @@
  * @public — runtime API consumed by emitted Lit `.ts` files.
  */
 
+/**
+ * Attaches a document-level outside-click listener that fires `handler` when
+ * a click event falls OUTSIDE all the given `refs`.
+ *
+ * **`when` gate semantics (WR-01):** When `when` is provided and returns
+ * `false` at event-fire time, the entire listener body is short-circuited —
+ * including the inside/outside check. This means a click INSIDE a ref while
+ * `when` is false is also suppressed (the handler never fires). This differs
+ * from some React/Solid `useOutsideClick` implementations that gate only the
+ * *outside* dispatch (not the inside check). The behaviour is intentional:
+ * `when` acts as a "is the feature active?" guard on the whole listener
+ * rather than a post-check filter. Consumer code that needs the asymmetric
+ * behaviour should move the `when` gate inside the handler instead.
+ *
+ * @returns An unsubscribe function — push it into `this._disconnectCleanups`.
+ */
 export function attachOutsideClickListener(
   refs: Array<() => Element | null | undefined>,
   handler: (e: MouseEvent) => void,
@@ -26,6 +42,8 @@ export function attachOutsideClickListener(
 ): () => void {
   const listener = (e: MouseEvent): void => {
     // Guard: if `when` is provided and returns false, do nothing.
+    // NOTE: this gates the ENTIRE handler (including the inside-check).
+    // See JSDoc above for the deliberate semantics.
     if (when !== undefined && !when()) return;
 
     // composedPath() pierces shadow boundaries — necessary because Lit
