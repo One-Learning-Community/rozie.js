@@ -4,12 +4,14 @@
  * Returns the wiring lines for a Class-A (pure native) or Class-D (filter
  * guards) listener:
  *
- *   const _h = (e) => { guards; userHandler(e); };
- *   target.addEventListener('event', _h, options);
- *   this._disconnectCleanups.push(() => target.removeEventListener('event', _h, options));
+ *   const _lh = (e) => { guards; userHandler(e); };
+ *   target.addEventListener('event', _lh, options);
+ *   this._disconnectCleanups.push(() => target.removeEventListener('event', _lh, options));
  *
- * The orchestrator in emitListeners.ts uses this shape directly; this module
- * exposes a stand-alone helper for tests + future re-use.
+ * NOTE (WR-05): This module is NOT currently called by the emitListeners.ts
+ * orchestrator — the orchestrator inlines equivalent logic directly. This
+ * standalone helper exists for unit-testing and future Phase 7 unification.
+ * TODO(Phase 7): refactor emitListeners.ts to call emitListenerNative here.
  *
  * @experimental — shape may change before v1.0
  */

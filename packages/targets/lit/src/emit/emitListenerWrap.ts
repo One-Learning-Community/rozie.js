@@ -5,6 +5,12 @@
  * debounce or throttle semantics. No runtime export — wrap is inlined to
  * keep emitted .ts files self-contained for the common case.
  *
+ * NOTE (WR-05): This module is NOT currently called by the emitListeners.ts
+ * orchestrator — the orchestrator inlines equivalent debounce/throttle logic
+ * directly. This standalone helper exists for unit-testing and future Phase 7
+ * unification.
+ * TODO(Phase 7): refactor emitListeners.ts to call emitListenerWrap here.
+ *
  * @experimental — shape may change before v1.0
  */
 

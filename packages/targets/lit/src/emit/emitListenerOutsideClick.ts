@@ -6,6 +6,11 @@
  * correctly handle shadow-DOM-encapsulated refs. Returned unsubscribe is
  * pushed to `this._disconnectCleanups`.
  *
+ * NOTE (WR-05): This module is NOT currently called by the emitListeners.ts
+ * orchestrator — the orchestrator inlines equivalent logic directly. This
+ * standalone helper exists for unit-testing and future Phase 7 unification.
+ * TODO(Phase 7): refactor emitListeners.ts to call emitListenerOutsideClick here.
+ *
  * @experimental — shape may change before v1.0
  */
 import type { RuntimeLitImportCollector } from '../rewrite/collectLitImports.js';

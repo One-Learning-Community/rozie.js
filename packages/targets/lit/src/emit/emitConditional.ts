@@ -4,6 +4,12 @@
  * Lit-html supports inline ternary expressions inside `${...}`; pure `r-else`
  * branches with no body produce a `nothing` sentinel (imported from `lit`).
  *
+ * NOTE (WR-05 / WR-09): This module is NOT currently called by the
+ * emitTemplate.ts orchestrator — the orchestrator has its own inline
+ * emitConditional function. This standalone helper exists for unit-testing
+ * and future Phase 7 unification with the inline version.
+ * TODO(Phase 7): unify this module with the inline emitConditional in emitTemplate.ts.
+ *
  * @experimental — shape may change before v1.0
  */
 import type { TemplateConditionalIR, IRComponent, TemplateNode } from '../../../../core/src/ir/types.js';
