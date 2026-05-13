@@ -259,8 +259,11 @@ function inlineHookBody(arg: t.Expression): { body: string; cleanup: string } {
       const rendered = stmts.map((s) => generate(s, GEN_OPTS).code).join('\n');
       return { body: rendered, cleanup };
     }
-    // Concise arrow: () => expr
-    return { body: `${renderExpression(body as t.Expression)};`, cleanup: '' };
+    // Concise arrow: () => expr — the expression IS the return value.
+    // Treat it as a cleanup/unsubscribe callback rather than a side-effect body.
+    // e.g., $onMount(() => createSubscription()) — the subscription cleanup is
+    // the return value of createSubscription(). CR-04 fix: leak prevention.
+    return { body: '', cleanup: renderExpression(body as t.Expression) };
   }
   return { body: `(${renderExpression(arg)})();`, cleanup: '' };
 }
