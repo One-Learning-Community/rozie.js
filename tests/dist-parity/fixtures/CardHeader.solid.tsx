@@ -1,5 +1,5 @@
 import type { JSX } from 'solid-js';
-import { Show, splitProps } from 'solid-js';
+import { Show, mergeProps, splitProps } from 'solid-js';
 
 interface CardHeaderProps {
   title?: string;
@@ -7,7 +7,8 @@ interface CardHeaderProps {
 }
 
 export default function CardHeader(_props: CardHeaderProps): JSX.Element {
-  const [local, rest] = splitProps(_props, ['title', 'onClose']);
+  const _merged = mergeProps({ title: '' }, _props);
+  const [local, rest] = splitProps(_merged, ['title', 'onClose']);
 
   return (
     <>

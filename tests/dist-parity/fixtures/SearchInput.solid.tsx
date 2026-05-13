@@ -1,5 +1,5 @@
 import type { JSX } from 'solid-js';
-import { Show, createMemo, createSignal, onCleanup, onMount, splitProps } from 'solid-js';
+import { Show, createMemo, createSignal, mergeProps, onCleanup, onMount, splitProps } from 'solid-js';
 import { createDebouncedHandler } from '@rozie/runtime-solid';
 
 interface SearchInputProps {
@@ -11,7 +11,8 @@ interface SearchInputProps {
 }
 
 export default function SearchInput(_props: SearchInputProps): JSX.Element {
-  const [local, rest] = splitProps(_props, ['placeholder', 'minLength', 'autofocus']);
+  const _merged = mergeProps({ placeholder: 'Search…', minLength: 2, autofocus: false }, _props);
+  const [local, rest] = splitProps(_merged, ['placeholder', 'minLength', 'autofocus']);
 
   const [query, setQuery] = createSignal('');
   const isValid = createMemo(() => query().length >= local.minLength);

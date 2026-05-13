@@ -1,5 +1,5 @@
 import type { JSX } from 'solid-js';
-import { children, splitProps } from 'solid-js';
+import { children, mergeProps, splitProps } from 'solid-js';
 import CardHeader from './CardHeader';
 
 interface CardProps {
@@ -10,7 +10,8 @@ interface CardProps {
 }
 
 export default function Card(_props: CardProps): JSX.Element {
-  const [local, rest] = splitProps(_props, ['title', 'onClose', 'children']);
+  const _merged = mergeProps({ title: '' }, _props);
+  const [local, rest] = splitProps(_merged, ['title', 'onClose', 'children']);
   const resolved = children(() => local.children);
 
   return (

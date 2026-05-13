@@ -1,5 +1,5 @@
 import type { JSX } from 'solid-js';
-import { Show, children, createEffect, onCleanup, onMount, splitProps } from 'solid-js';
+import { Show, children, createEffect, mergeProps, onCleanup, onMount, splitProps } from 'solid-js';
 import { createControllableSignal } from '@rozie/runtime-solid';
 import Counter from './Counter';
 
@@ -23,7 +23,8 @@ interface ModalProps {
 }
 
 export default function Modal(_props: ModalProps): JSX.Element {
-  const [local, rest] = splitProps(_props, ['open', 'closeOnEscape', 'closeOnBackdrop', 'lockBodyScroll', 'title', 'children']);
+  const _merged = mergeProps({ closeOnEscape: true, closeOnBackdrop: true, lockBodyScroll: true, title: '' }, _props);
+  const [local, rest] = splitProps(_merged, ['open', 'closeOnEscape', 'closeOnBackdrop', 'lockBodyScroll', 'title', 'children']);
   const resolved = children(() => local.children);
 
   const [open, setOpen] = createControllableSignal(_props as Record<string, unknown>, 'open', false);
@@ -43,8 +44,6 @@ export default function Modal(_props: ModalProps): JSX.Element {
     _props.onClose?.();
   };
 
-  // Body-scroll-lock state lives outside reactive data because it tracks DOM
-  // rather than UI; managed entirely via lifecycle and listeners.
   // Body-scroll-lock state lives outside reactive data because it tracks DOM
   // rather than UI; managed entirely via lifecycle and listeners.
   let savedBodyOverflow = '';
