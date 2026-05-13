@@ -136,12 +136,21 @@ export const RozieErrorCode = {
   //   ROZ880..ROZ899 — .d.ts emission errors (Plan 06-02)
   COMPILE_INVALID_TARGET: 'ROZ800', // unknown target token in opts.target
   COMPILE_INVALID_OPT_COMBO: 'ROZ801', // reserved — disallowed opts combination
-  // ---- @rozie/babel-plugin (Plan 06-04) — ROZ820..ROZ849 ----
+  // ---- @rozie/babel-plugin (Plan 06-04) — ROZ820..ROZ829 ----
   BABEL_PLUGIN_INVALID_TARGET: 'ROZ820', // missing or invalid `target` option (vue|react|svelte|angular required)
   BABEL_PLUGIN_NO_FILENAME: 'ROZ821', // cannot resolve relative .rozie path without state.filename / file.opts.filename
   BABEL_PLUGIN_COMPILE_ERROR: 'ROZ822', // compile() returned severity:'error' diagnostics during sibling write
   BABEL_PLUGIN_SIBLING_WRITE_FAIL: 'ROZ823', // fs writeFileSync failed when emitting sibling .{ext}/.d.ts/.module.css/.global.css
-  // ROZ824..ROZ849 reserved for future @rozie/babel-plugin needs
+  // ROZ824..ROZ829 reserved for future @rozie/babel-plugin needs (ROZ830..ROZ849 reallocated to Lit per D-LIT-19)
+  // ---- @rozie/unplugin Lit-branch + @rozie/target-lit + @rozie/runtime-lit (Phase 06.4 — D-LIT-19 Option A) — ROZ830..ROZ849 ----
+  // NOTE: This block sits inside the broader ROZ820..ROZ849 babel-plugin reserved range from Phase 6.
+  // Babel-plugin currently uses ROZ820..ROZ823; ROZ824..ROZ829 stay reserved for future babel-plugin needs.
+  // ROZ830..ROZ849 is hereby reallocated for Lit. The 850-range CLI block is untouched.
+  UNPLUGIN_LIT_PEER_DEP_MISSING: 'ROZ830', // lit (^3.2) not resolvable from cwd
+  UNPLUGIN_LIT_SIGNALS_PEER_DEP_MISSING: 'ROZ831', // @lit-labs/preact-signals (^1) not resolvable from cwd
+  // ROZ832..ROZ839 reserved for future Lit-emitter diagnostics
+  RUNTIME_LIT_CONTROLLABLE_MODE_FLIP: 'ROZ840', // createLitControllableProperty parent-flip warning (D-LIT-10)
+  // ROZ841..ROZ849 reserved for future @rozie/runtime-lit warnings
   // ---- @rozie/cli argv parsing + filesystem errors (Plan 06-03) — ROZ850..ROZ879 ----
   CLI_INVALID_TARGET: 'ROZ850', // unknown --target token (commander InvalidArgumentError)
   CLI_MISSING_INPUT: 'ROZ851', // no .rozie files matched after expandInputs

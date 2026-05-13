@@ -84,7 +84,7 @@ export interface RunBuildContext {
   stdoutWrite?: (chunk: string) => void;
 }
 
-const VALID_TARGETS = new Set<Target>(['vue', 'react', 'svelte', 'angular', 'solid']);
+const VALID_TARGETS = new Set<Target>(['vue', 'react', 'svelte', 'angular', 'solid', 'lit']);
 
 /**
  * Phase 6 D-87/D-88/D-89/D-90/D-91/D-93 — the canonical build coordinator.
@@ -121,7 +121,7 @@ export async function runBuildMatrix(
   for (const t of targetsRaw) {
     if (!VALID_TARGETS.has(t)) {
       const msg = pc.red(
-        `[ROZ850] rozie build: unknown target '${t}' (expected vue|react|svelte|angular|solid)\n`,
+        `[ROZ850] rozie build: unknown target '${t}' (expected vue|react|svelte|angular|solid|lit)\n`,
       );
       stderrWrite(msg);
       exit(2, msg);

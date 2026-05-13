@@ -6,9 +6,9 @@
 // for the stable diagnostic code.
 import { InvalidArgumentError } from 'commander';
 
-export type Target = 'vue' | 'react' | 'svelte' | 'angular' | 'solid';
+export type Target = 'vue' | 'react' | 'svelte' | 'angular' | 'solid' | 'lit';
 
-export const VALID_TARGETS = new Set<Target>(['vue', 'react', 'svelte', 'angular', 'solid']);
+export const VALID_TARGETS = new Set<Target>(['vue', 'react', 'svelte', 'angular', 'solid', 'lit']);
 
 /**
  * Parse the `--target` flag value as a comma-separated list of valid targets.
@@ -23,7 +23,7 @@ export function parseTargets(value: string): Target[] {
   for (const t of tokens) {
     if (!VALID_TARGETS.has(t as Target)) {
       throw new InvalidArgumentError(
-        `[ROZ850] unknown target '${t}' (expected vue|react|svelte|angular|solid)`,
+        `[ROZ850] unknown target '${t}' (expected vue|react|svelte|angular|solid|lit)`,
       );
     }
   }

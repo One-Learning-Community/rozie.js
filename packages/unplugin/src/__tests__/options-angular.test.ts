@@ -32,14 +32,15 @@ describe('validateOptions — Plan 05-04b angular surface', () => {
     expect(validateOptions({ target: 'angular' })).toEqual({ target: 'angular' });
   });
 
-  it('SUPPORTED_TARGETS_PHASE_5 contains all canonical targets (vue, react, svelte, angular, solid)', () => {
+  it('SUPPORTED_TARGETS_PHASE_5 contains all canonical targets (vue, react, svelte, angular, solid, lit)', () => {
     expect(SUPPORTED_TARGETS_PHASE_5).toContain('vue');
     expect(SUPPORTED_TARGETS_PHASE_5).toContain('react');
     expect(SUPPORTED_TARGETS_PHASE_5).toContain('svelte');
     expect(SUPPORTED_TARGETS_PHASE_5).toContain('angular');
     expect(SUPPORTED_TARGETS_PHASE_5).toContain('solid');
-    // Phase 06.3-01 added 'solid' as the 5th canonical target.
-    expect(SUPPORTED_TARGETS_PHASE_5).toHaveLength(5);
+    expect(SUPPORTED_TARGETS_PHASE_5).toContain('lit');
+    // Phase 06.4-01 added 'lit' as the 6th canonical target.
+    expect(SUPPORTED_TARGETS_PHASE_5).toHaveLength(6);
   });
 });
 

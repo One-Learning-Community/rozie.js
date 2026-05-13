@@ -35,36 +35,37 @@ import { detectReactPlugin, canResolveReact } from './react-detect.js';
 import { detectSveltePlugin, canResolveSvelte } from './svelte-detect.js';
 import { detectAnalogjs, canResolveAngularCore, detectViteMajor } from './analogjs-detect.js';
 import { detectSolidPlugin, canResolveSolidJs } from './solid-detect.js';
+import { canResolveLit, canResolvePreactSignals } from './lit-detect.js';
 
 export interface RozieOptions {
   /**
    * Target framework. Phase 3 shipped `vue`. Phase 4 (Plan 04-05) adds
    * `react`. Phase 5 Plan 05-02b adds `svelte`; Plan 05-04b adds `angular`.
-   * All four canonical targets are now fully supported.
+   * Plan 06.3-01 adds `solid`. Plan 06.4-01 adds `lit`.
    */
-  target: 'vue' | 'react' | 'svelte' | 'angular' | 'solid';
+  target: 'vue' | 'react' | 'svelte' | 'angular' | 'solid' | 'lit';
 }
 
 export type TargetValue = RozieOptions['target'];
 
 /** All targets the registry knows about (validation allowlist). */
-export const ALL_TARGETS: readonly TargetValue[] = ['vue', 'react', 'svelte', 'angular', 'solid'] as const;
+export const ALL_TARGETS: readonly TargetValue[] = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'] as const;
 
 /** Targets actually shipped in Phase 3. (Kept for diagnostic message clarity.) */
 export const SUPPORTED_TARGETS_PHASE_3: readonly TargetValue[] = ['vue'] as const;
 
 /**
- * Targets shipped through Phase 5 Plan 05-04b. All four canonical targets
- * are now supported (vue, react, svelte, angular).
+ * Targets shipped through Phase 06.4 Plan 01. All six v1 targets are now
+ * supported (vue, react, svelte, angular, solid, lit).
  *
  * Plan 05-04b extends the prior PHASE_5 list (which Plan 05-02b set to
  * ['vue', 'react', 'svelte']) with 'angular'. Plan 06.3-01 adds 'solid'.
- * ROZ402 is no longer reachable in v1 — every value of
- * `RozieOptions['target']` is now in SUPPORTED_TARGETS_PHASE_5.
+ * Plan 06.4-01 adds 'lit'. ROZ402 is no longer reachable in v1 — every
+ * value of `RozieOptions['target']` is now in SUPPORTED_TARGETS_PHASE_5.
  * The constant is kept for diagnostic-message clarity; future phases may
  * add new optional targets that initially raise ROZ402 again.
  */
-export const SUPPORTED_TARGETS_PHASE_5: readonly TargetValue[] = ['vue', 'react', 'svelte', 'angular', 'solid'] as const;
+export const SUPPORTED_TARGETS_PHASE_5: readonly TargetValue[] = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'] as const;
 
 interface RozieError extends Error {
   code: string;
@@ -81,7 +82,7 @@ function rozieError(code: string, message: string): RozieError {
  *
  * @throws ROZ400 — `target` option missing
  * @throws ROZ401 — `target` value not in the known allowlist
- * @throws ROZ402 — `target` known but Phase 5 doesn't ship it yet (angular)
+ * @throws ROZ402 — `target` known but a phase doesn't ship it yet (currently unreachable in v1)
  *
  * @returns the same options object (narrowed) when validation passes
  *
@@ -265,6 +266,34 @@ export function assertSolidPeerDeps(cwd?: string): void {
     throw rozieError(
       RozieErrorCode.UNPLUGIN_SOLID_DEP_MISSING,
       `target: 'solid' requires 'solid-js' (^1.8) installed in your project. Install: pnpm add solid-js`,
+    );
+  }
+}
+
+/**
+ * Plan 06.4-01 — runtime peer-dep assertions for `target: 'lit'` (D-LIT-20).
+ *
+ * Mirrors assertSolidPeerDeps / assertSveltePeerDeps. Called from the factory
+ * after `validateOptions` succeeds when target === 'lit'. Lit has NO host
+ * Vite plugin — Lit components are plain ES modules emitting their own
+ * `customElements.define()` call at module load, so there is no
+ * `detectLitPlugin` analog. Only the two consumer deps (`lit` and
+ * `@lit-labs/preact-signals`) are required.
+ *
+ * @throws ROZ830 — `lit` (^3.2.0) is not resolvable from `cwd`.
+ * @throws ROZ831 — `@lit-labs/preact-signals` (^1.0.0) is not resolvable.
+ */
+export function assertLitPeerDeps(cwd?: string): void {
+  if (!canResolveLit(cwd)) {
+    throw rozieError(
+      RozieErrorCode.UNPLUGIN_LIT_PEER_DEP_MISSING,
+      `target: 'lit' requires 'lit' (^3.2.0) installed in your project. Install: pnpm add lit`,
+    );
+  }
+  if (!canResolvePreactSignals(cwd)) {
+    throw rozieError(
+      RozieErrorCode.UNPLUGIN_LIT_SIGNALS_PEER_DEP_MISSING,
+      `target: 'lit' requires '@lit-labs/preact-signals' (^1.0.0) installed in your project. Install: pnpm add @lit-labs/preact-signals`,
     );
   }
 }

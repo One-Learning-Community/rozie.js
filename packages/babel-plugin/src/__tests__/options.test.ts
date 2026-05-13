@@ -58,7 +58,7 @@ describe('rozieBabelPlugin options — validation (DIST-03)', () => {
       transformAsync('import x from "y";', {
         filename: importer,
         // @ts-expect-error — testing invalid target value (runtime path)
-        plugins: [[rozieBabelPlugin, { target: 'solid' }]],
+        plugins: [[rozieBabelPlugin, { target: 'preact' }]],
         babelrc: false,
         configFile: false,
       }),

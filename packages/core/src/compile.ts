@@ -55,8 +55,9 @@ import { emitReactTypes } from '../../targets/react/src/emit/emitTypes.js';
 import { emitSvelte } from '../../targets/svelte/src/emitSvelte.js';
 import { emitAngular } from '../../targets/angular/src/emitAngular.js';
 import { emitSolid } from '../../targets/solid/src/emitSolid.js';
+import { emitLit } from '../../targets/lit/src/emitLit.js';
 
-export type CompileTarget = 'vue' | 'react' | 'svelte' | 'angular' | 'solid';
+export type CompileTarget = 'vue' | 'react' | 'svelte' | 'angular' | 'solid' | 'lit';
 
 /**
  * Options accepted by `compile()`.
@@ -251,6 +252,16 @@ export function compile(source: string, opts: CompileOptions): CompileResult {
         diagnostics: [...acc, ...r.diagnostics],
       };
     }
+    case 'lit': {
+      const r = emitLit(ir, emitOpts);
+      return {
+        code: r.code,
+        map: wantSourceMap ? r.map : null,
+        types: '', // inline-typed via @property decorators + TypeScript inference
+        componentDeps, // D-120
+        diagnostics: [...acc, ...r.diagnostics],
+      };
+    }
     default: {
       // Exhaustiveness check — TypeScript narrows opts.target to `never` here.
       // Runtime path: emit ROZ800 if a JS caller passes an invalid target.
@@ -259,7 +270,7 @@ export function compile(source: string, opts: CompileOptions): CompileResult {
         {
           code: 'ROZ800',
           severity: 'error',
-          message: `unknown target '${target}' (expected vue|react|svelte|angular|solid)`,
+          message: `unknown target '${target}' (expected vue|react|svelte|angular|solid|lit)`,
           loc: { start: 0, end: 0 },
         },
       ]);

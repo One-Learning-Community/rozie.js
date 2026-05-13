@@ -56,7 +56,7 @@ export async function runCli(argv: readonly string[]): Promise<void> {
     // that omitted --target entirely.
     .option(
       '-t, --target <names>',
-      'target framework(s); comma-separated (vue|react|svelte|angular|solid)',
+      'target framework(s); comma-separated (vue|react|svelte|angular|solid|lit)',
       parseTargets,
       ['vue'] as Target[],
     )

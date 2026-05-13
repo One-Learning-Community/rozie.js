@@ -40,6 +40,7 @@ const TARGET_EXTENSIONS = {
   svelte: '.svelte',
   angular: '.ts',
   solid: '.tsx',
+  lit: '.ts',
 } as const satisfies Record<RozieBabelTarget, string>;
 
 const ROZIE_EXT = '.rozie';
@@ -52,7 +53,7 @@ export default declare((api, options: RozieBabelPluginOptions): PluginObj => {
     // ROZ820 — invalid target option. Thrown at plugin instantiation so
     // misconfigurations fail fast (before any visitor runs).
     throw new Error(
-      `[ROZ820] @rozie/babel-plugin: 'target' option is required and must be one of vue|react|svelte|angular|solid (got ${JSON.stringify(target)})`,
+      `[ROZ820] @rozie/babel-plugin: 'target' option is required and must be one of vue|react|svelte|angular|solid|lit (got ${JSON.stringify(target)})`,
     );
   }
   const ext = TARGET_EXTENSIONS[target];
