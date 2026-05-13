@@ -54,7 +54,10 @@ export type LitDecoratorImport =
   | 'query'
   | 'queryAsync'
   | 'queryAssignedElements'
-  | 'queryAssignedNodes'
+  // D-LIT-14 (2026-05-13 correction): queryAssignedNodes is intentionally
+  // EXCLUDED from this union — whitespace text-nodes between elements yield
+  // false-positive presence detection, breaking $slots.X presence checks.
+  // Always use queryAssignedElements with `flatten: true` instead.
   | 'eventOptions';
 
 export class LitDecoratorImportCollector {
