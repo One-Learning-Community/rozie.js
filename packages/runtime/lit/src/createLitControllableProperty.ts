@@ -5,7 +5,9 @@
  * Mirrors @rozie/runtime-react's `useControllableState` (D-56 + D-57 hybrid
  * controlled/uncontrolled) but adapted to the class-based Lit world: the
  * helper is called from a Lit element's constructor / field initializer rather
- * than a React render. State lives in a closure (NOT React `useRef`/`useState`).
+ * than a React render. State lives in a **preact Signal** (NOT React
+ * `useRef`/`useState`) so reads from inside a `SignalWatcher` render are
+ * tracked and writes trigger a re-render.
  *
  * **Controlled mode** (`opts.initialControlledValue !== undefined`):
  *   `read()` returns the value last written via `notifyAttributeChange`
@@ -14,7 +16,7 @@
  *   internal state — the parent owns the value via the attribute / property.
  *
  * **Uncontrolled mode** (`opts.initialControlledValue === undefined`):
- *   `read()` returns local closure state seeded from `opts.defaultValue`.
+ *   `read()` returns local signal state seeded from `opts.defaultValue`.
  *   Calling `write(next)` updates the local state AND dispatches the
  *   `eventName` CustomEvent on the host.
  *
@@ -28,8 +30,16 @@
  * **Functional updaters**: `write(prev => prev + 1)` works in both modes — the
  * resolver computes against the CURRENT value.
  *
+ * **Reactive tracking**: the underlying `signal()` from `@preact/signals-core`
+ * ensures `read()` participates in `SignalWatcher`'s reactive dependency
+ * tracking. Without this, the emitted `get value() { return this._x.read(); }`
+ * getter would return a plain JS variable that the watcher cannot observe,
+ * and writes would not trigger a re-render (the original bug behind Counter
+ * and Dropdown not re-rendering on internal state changes).
+ *
  * @public — runtime API consumed by emitted Lit `.ts` files.
  */
+import { signal } from '@preact/signals-core';
 
 export interface LitControllableProperty<T> {
   /** Read the current value (controlled or uncontrolled). */
@@ -68,10 +78,14 @@ export function createLitControllableProperty<T>(
   const { host, eventName, defaultValue, initialControlledValue } = opts;
 
   // Closure state — replaces React's useRef/useState (class-based environment).
+  // Backed by a preact Signal so SignalWatcher tracks read() calls from
+  // inside render() and re-renders on write().
   let wasControlled = initialControlledValue !== undefined;
-  let localValue: T = wasControlled ? (initialControlledValue as T) : defaultValue;
+  const _state = signal<T>(
+    wasControlled ? (initialControlledValue as T) : defaultValue,
+  );
 
-  const currentValue = (): T => localValue;
+  const currentValue = (): T => _state.value;
 
   const dispatchChange = (next: T): void => {
     host.dispatchEvent(
@@ -95,7 +109,7 @@ export function createLitControllableProperty<T>(
           : next;
       if (!wasControlled) {
         // Uncontrolled mode — update internal state.
-        localValue = resolved;
+        _state.value = resolved;
       }
       // Both modes — fire the change event so parent observers / two-way
       // binding helpers see the update. Controlled-mode parents typically
@@ -118,7 +132,7 @@ export function createLitControllableProperty<T>(
         wasControlled = nextIsControlled;
       }
       if (nextIsControlled) {
-        localValue = next as T;
+        _state.value = next as T;
       }
     },
   };
