@@ -77,11 +77,15 @@ function thisSignalRead(name: string): t.MemberExpression {
  */
 export function collectMethodNamesFromProgram(file: File, ir: IRComponent): Set<string> {
   const names = new Set<string>();
+  // WR-12 fix: include slot names in the reserved set to match
+  // rewriteTemplateExpression.ts's collectMethodNames. A slot named `header`
+  // must not be treated as a class method reference.
   const reserved = new Set<string>([
     ...ir.state.map((s) => s.name),
     ...ir.computed.map((c) => c.name),
     ...ir.refs.map((r) => r.name),
     ...ir.props.map((p) => p.name),
+    ...ir.slots.map((s) => (s.name === '' ? 'default' : s.name)),
   ]);
   for (const stmt of file.program.body) {
     if (t.isVariableDeclaration(stmt)) {
