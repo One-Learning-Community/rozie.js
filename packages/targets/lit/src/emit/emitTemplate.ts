@@ -174,14 +174,26 @@ function buildRModelBindings(
   rModelAttr: AttributeBinding,
   ir: IRComponent,
   tagName: string,
+  allAttrs: AttributeBinding[],
 ): string {
   if (rModelAttr.kind !== 'binding') return '';
 
   const code = rewriteTemplateExpression(rModelAttr.expression, ir);
-  // For checkbox inputs use .checked; otherwise .value.
-  // We can't statically detect input[type=checkbox] reliably; use value as
-  // the v1 default (matches React/Solid behavior). Test data inputs use text.
-  void tagName;
+
+  // WR-10 fix: detect checkbox/radio inputs via the sibling `type` attribute
+  // and use `.checked` / `@change` instead of `.value` / `@input`.
+  const typeAttr = allAttrs.find(
+    (a) => a.name === 'type' && a.kind === 'static',
+  );
+  const inputType = typeAttr && typeAttr.kind === 'static' ? typeAttr.value.toLowerCase() : '';
+
+  if (FORM_INPUT_TAGS.has(tagName) && (inputType === 'checkbox' || inputType === 'radio')) {
+    return [
+      `.checked=\${${code}}`,
+      `@change=\${(e) => ${code} = (e.target as HTMLInputElement).checked}`,
+    ].join(' ');
+  }
+
   return [
     `.value=\${${code}}`,
     `@input=\${(e) => ${code} = (e.target as HTMLInputElement).value}`,
@@ -329,7 +341,7 @@ function emitElementOpenTag(
   }
 
   if (rModelAttr) {
-    parts.push(buildRModelBindings(rModelAttr, ir, node.tagName));
+    parts.push(buildRModelBindings(rModelAttr, ir, node.tagName, node.attributes));
   }
 
   for (const event of node.events) {
