@@ -30,7 +30,9 @@ export function emitSlotInvocation(
       if (!isFnLike) dataEntries.push(`${arg.name}: ${code}`);
     }
     if (dataEntries.length > 0) {
-      dataAttrs.push(`data-rozie-params=\${JSON.stringify({${dataEntries.join(', ')}})}`);
+      // Wrap in try/catch so non-JSON-safe values (BigInt, circular, undefined)
+      // don't crash the render — CR-02 fix.
+      dataAttrs.push(`data-rozie-params=\${(() => { try { return JSON.stringify({${dataEntries.join(', ')}}); } catch { return '{}'; } })()}`);
     }
   }
   const dataStr = dataAttrs.length > 0 ? ' ' + dataAttrs.join(' ') : '';

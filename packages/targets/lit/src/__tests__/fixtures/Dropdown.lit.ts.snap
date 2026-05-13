@@ -92,7 +92,7 @@ export default class Dropdown extends SignalWatcher(LitElement) {
     return html`
 <div class="dropdown">
   <div @click=${this.toggle} data-rozie-ref="triggerEl">
-    <slot name="trigger" data-rozie-params=${JSON.stringify({open: this.open})}></slot>
+    <slot name="trigger" data-rozie-params=${(() => { try { return JSON.stringify({open: this.open}); } catch { return '{}'; } })()}></slot>
   </div>
 
   ${this.open ? html`<div class="dropdown-panel" role="menu" data-rozie-ref="panelEl">

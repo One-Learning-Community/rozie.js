@@ -88,7 +88,7 @@ form { display: flex; gap: 0.25rem; margin-block: 0.5rem; }
     return html`
 <div class="todo-list">
   <header>
-    <slot name="header" data-rozie-params=${JSON.stringify({remaining: this.remaining, total: this.items.length})}>
+    <slot name="header" data-rozie-params=${(() => { try { return JSON.stringify({remaining: this.remaining, total: this.items.length}); } catch { return '{}'; } })()}>
       
       <h3>${this.title} (${this.remaining} remaining)</h3>
     </slot>
@@ -102,7 +102,7 @@ form { display: flex; gap: 0.25rem; margin-block: 0.5rem; }
   ${this.items.length > 0 ? html`<ul>
     ${repeat(this.items, (item) => item.id, (item, _idx) => html`<li class="${({ done: item.done })}" key=${item.id}>
       
-      <slot data-rozie-params=${JSON.stringify({item: item})}>
+      <slot data-rozie-params=${(() => { try { return JSON.stringify({item: item}); } catch { return '{}'; } })()}>
         <label>
           <input type="checkbox" ?checked=${item.done} @change=${(e: Event) => { this.toggle(item.id); }} />
           <span>${item.text}</span>
