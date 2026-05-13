@@ -164,8 +164,10 @@ interface ModelPropEmit {
 function emitModelProp(prop: PropDecl, componentName: string): ModelPropEmit {
   const litType = renderType(prop.typeAnnotation);
   const tsType = renderTsType(prop.typeAnnotation);
-  const reflect = isPrimitiveType(prop.typeAnnotation);
-  const reflectField = reflect ? ', reflect: true' : '';
+  // Model props must NOT reflect — Lit echoes property→attribute which fires
+  // attributeChangedCallback→notifyAttributeChange, spuriously flipping
+  // wasControlled=false→true on init and breaking uncontrolled write().
+  const reflectField = '';
   const defaultStr = renderDefault(prop.defaultValue, prop.typeAnnotation);
   const eventName = `${toKebabCase(prop.name)}-change`;
   const attrName = toKebabCase(prop.name);

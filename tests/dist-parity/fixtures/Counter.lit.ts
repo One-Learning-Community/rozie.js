@@ -13,7 +13,7 @@ button { padding: 0.25rem 0.5rem; }
 button:disabled { opacity: 0.4; cursor: not-allowed; }
 `;
 
-  @property({ type: Number, reflect: true, attribute: 'value' }) _value_attr: number = 0;
+  @property({ type: Number, attribute: 'value' }) _value_attr: number = 0;
   private _valueControllable = createLitControllableProperty<number>({ host: this, eventName: 'value-change', defaultValue: 0, initialControlledValue: undefined });
   @property({ type: Number, reflect: true }) step: number = 1;
   @property({ type: Number, reflect: true }) min: number = -Infinity;
@@ -39,7 +39,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 
   render() {
     return html`
-<div class=${Object.entries({ "counter": true, hovering: this._hovering.value }).filter(([, v]) => v).map(([k]) => k).join(' ')} @mouseenter=${(e: Event) => { this._hovering.value = true; }} @mouseleave=${(e: Event) => { this._hovering.value = false; }}>
+<div class="${Object.entries({ "counter": true, hovering: this._hovering.value }).filter(([, v]) => v).map(([k]) => k).join(' ')}" @mouseenter=${(e: Event) => { this._hovering.value = true; }} @mouseleave=${(e: Event) => { this._hovering.value = false; }}>
   <button ?disabled=${!this.canDecrement} aria-label="Decrement" @click=${this.decrement}>−</button>
   <span class="value">${this.value}</span>
   <button ?disabled=${!this.canIncrement} aria-label="Increment" @click=${this.increment}>+</button>

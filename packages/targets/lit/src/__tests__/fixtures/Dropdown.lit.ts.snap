@@ -26,7 +26,7 @@ export default class Dropdown extends SignalWatcher(LitElement) {
 }
 `;
 
-  @property({ type: Boolean, reflect: true, attribute: 'open' }) _open_attr: boolean = false;
+  @property({ type: Boolean, attribute: 'open' }) _open_attr: boolean = false;
   private _openControllable = createLitControllableProperty<boolean>({ host: this, eventName: 'open-change', defaultValue: false, initialControlledValue: undefined });
   @property({ type: Boolean, reflect: true }) closeOnOutsideClick: boolean = true;
   @property({ type: Boolean, reflect: true }) closeOnEscape: boolean = true;

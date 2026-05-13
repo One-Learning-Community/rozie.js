@@ -43,7 +43,7 @@ footer { border-top: 1px solid rgba(0, 0, 0, 0.08); justify-content: flex-end; }
 .close-btn { background: none; border: none; cursor: pointer; font-size: 1.5rem; line-height: 1; }
 `;
 
-  @property({ type: Boolean, reflect: true, attribute: 'open' }) _open_attr: boolean = false;
+  @property({ type: Boolean, attribute: 'open' }) _open_attr: boolean = false;
   private _openControllable = createLitControllableProperty<boolean>({ host: this, eventName: 'open-change', defaultValue: false, initialControlledValue: undefined });
   @property({ type: Boolean, reflect: true }) closeOnEscape: boolean = true;
   @property({ type: Boolean, reflect: true }) closeOnBackdrop: boolean = true;

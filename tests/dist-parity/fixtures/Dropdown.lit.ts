@@ -26,7 +26,7 @@ export default class Dropdown extends SignalWatcher(LitElement) {
 }
 `;
 
-  @property({ type: Boolean, reflect: true, attribute: 'open' }) _open_attr: boolean = false;
+  @property({ type: Boolean, attribute: 'open' }) _open_attr: boolean = false;
   private _openControllable = createLitControllableProperty<boolean>({ host: this, eventName: 'open-change', defaultValue: false, initialControlledValue: undefined });
   @property({ type: Boolean, reflect: true }) closeOnOutsideClick: boolean = true;
   @property({ type: Boolean, reflect: true }) closeOnEscape: boolean = true;
@@ -44,13 +44,13 @@ export default class Dropdown extends SignalWatcher(LitElement) {
     const _u0 = attachOutsideClickListener([() => this._refTriggerEl, () => this._refPanelEl], (e) => {  (this.close)(e); }, () => (this.open && this.closeOnOutsideClick));
     this._disconnectCleanups.push(_u0);
 
-    const _h1 = (e: Event) => { if (!(this.open && this.closeOnEscape)) return; if ((e as KeyboardEvent).key !== 'Escape') return; (this.close)(e); };
-    document.addEventListener('keydown', _h1, undefined);
-    this._disconnectCleanups.push(() => document.removeEventListener('keydown', _h1, undefined));
+    const _lh1 = (e: Event) => { if (!(this.open && this.closeOnEscape)) return; if ((e as KeyboardEvent).key !== 'Escape') return; (this.close)(e); };
+    document.addEventListener('keydown', _lh1, undefined);
+    this._disconnectCleanups.push(() => document.removeEventListener('keydown', _lh1, undefined));
 
-    const _h2 = (() => { let last = 0; return (e: Event) => { if (!(this.open)) return; const now = Date.now(); if (now - last < 100) return; last = now; (this.reposition)(e); }; })();
-    window.addEventListener('resize', _h2, { passive: true });
-    this._disconnectCleanups.push(() => window.removeEventListener('resize', _h2, { passive: true }));
+    const _lh2 = (() => { let last = 0; return (e: Event) => { if (!(this.open)) return; const now = Date.now(); if (now - last < 100) return; last = now; (this.reposition)(e); }; })();
+    window.addEventListener('resize', _lh2, { passive: true });
+    this._disconnectCleanups.push(() => window.removeEventListener('resize', _lh2, undefined));
 
     this.addEventListener('rozie-trigger-toggle', (e) => { (this.toggle)((e as CustomEvent).detail); });
 
@@ -61,6 +61,8 @@ export default class Dropdown extends SignalWatcher(LitElement) {
       if (slotEl !== null && slotEl !== undefined) {
         const update = () => { this._hasSlotTrigger = this._slotTriggerElements.length > 0; };
         slotEl.addEventListener('slotchange', update);
+        // CR-05 fix: push cleanup so the listener is removed on disconnectedCallback.
+        this._disconnectCleanups.push(() => slotEl.removeEventListener('slotchange', update));
         update();
       }
     }
@@ -70,6 +72,8 @@ export default class Dropdown extends SignalWatcher(LitElement) {
       if (slotEl !== null && slotEl !== undefined) {
         const update = () => { this._hasSlotDefault = this._slotDefaultElements.length > 0; };
         slotEl.addEventListener('slotchange', update);
+        // CR-05 fix: push cleanup so the listener is removed on disconnectedCallback.
+        this._disconnectCleanups.push(() => slotEl.removeEventListener('slotchange', update));
         update();
       }
     }
@@ -92,7 +96,7 @@ export default class Dropdown extends SignalWatcher(LitElement) {
     return html`
 <div class="dropdown">
   <div @click=${this.toggle} data-rozie-ref="triggerEl">
-    <slot name="trigger" data-rozie-params=${JSON.stringify({open: this.open})}></slot>
+    <slot name="trigger" data-rozie-params=${(() => { try { return JSON.stringify({open: this.open}); } catch { return '{}'; } })()}></slot>
   </div>
 
   ${this.open ? html`<div class="dropdown-panel" role="menu" data-rozie-ref="panelEl">

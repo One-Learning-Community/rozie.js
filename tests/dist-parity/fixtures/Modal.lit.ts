@@ -43,7 +43,7 @@ footer { border-top: 1px solid rgba(0, 0, 0, 0.08); justify-content: flex-end; }
 .close-btn { background: none; border: none; cursor: pointer; font-size: 1.5rem; line-height: 1; }
 `;
 
-  @property({ type: Boolean, reflect: true, attribute: 'open' }) _open_attr: boolean = false;
+  @property({ type: Boolean, attribute: 'open' }) _open_attr: boolean = false;
   private _openControllable = createLitControllableProperty<boolean>({ host: this, eventName: 'open-change', defaultValue: false, initialControlledValue: undefined });
   @property({ type: Boolean, reflect: true }) closeOnEscape: boolean = true;
   @property({ type: Boolean, reflect: true }) closeOnBackdrop: boolean = true;
@@ -62,9 +62,9 @@ footer { border-top: 1px solid rgba(0, 0, 0, 0.08); justify-content: flex-end; }
   private _disconnectCleanups: Array<() => void> = [];
 
   firstUpdated(): void {
-    const _h0 = (e: Event) => { if (!(this.open && this.closeOnEscape)) return; if ((e as KeyboardEvent).key !== 'Escape') return; (this.close)(e); };
-    document.addEventListener('keydown', _h0, undefined);
-    this._disconnectCleanups.push(() => document.removeEventListener('keydown', _h0, undefined));
+    const _lh0 = (e: Event) => { if (!(this.open && this.closeOnEscape)) return; if ((e as KeyboardEvent).key !== 'Escape') return; (this.close)(e); };
+    document.addEventListener('keydown', _lh0, undefined);
+    this._disconnectCleanups.push(() => document.removeEventListener('keydown', _lh0, undefined));
 
     this.addEventListener('rozie-header-close', (e) => { (this.close)((e as CustomEvent).detail); });
 
@@ -77,6 +77,8 @@ footer { border-top: 1px solid rgba(0, 0, 0, 0.08); justify-content: flex-end; }
       if (slotEl !== null && slotEl !== undefined) {
         const update = () => { this._hasSlotHeader = this._slotHeaderElements.length > 0; };
         slotEl.addEventListener('slotchange', update);
+        // CR-05 fix: push cleanup so the listener is removed on disconnectedCallback.
+        this._disconnectCleanups.push(() => slotEl.removeEventListener('slotchange', update));
         update();
       }
     }
@@ -86,6 +88,8 @@ footer { border-top: 1px solid rgba(0, 0, 0, 0.08); justify-content: flex-end; }
       if (slotEl !== null && slotEl !== undefined) {
         const update = () => { this._hasSlotDefault = this._slotDefaultElements.length > 0; };
         slotEl.addEventListener('slotchange', update);
+        // CR-05 fix: push cleanup so the listener is removed on disconnectedCallback.
+        this._disconnectCleanups.push(() => slotEl.removeEventListener('slotchange', update));
         update();
       }
     }
@@ -95,6 +99,8 @@ footer { border-top: 1px solid rgba(0, 0, 0, 0.08); justify-content: flex-end; }
       if (slotEl !== null && slotEl !== undefined) {
         const update = () => { this._hasSlotFooter = this._slotFooterElements.length > 0; };
         slotEl.addEventListener('slotchange', update);
+        // CR-05 fix: push cleanup so the listener is removed on disconnectedCallback.
+        this._disconnectCleanups.push(() => slotEl.removeEventListener('slotchange', update));
         update();
       }
     }
