@@ -1,0 +1,160 @@
+import { LitElement, css, html } from 'lit';
+import { customElement, property, queryAssignedElements, state } from 'lit/decorators.js';
+import { SignalWatcher, signal } from '@lit-labs/preact-signals';
+import { createLitControllableProperty } from '@rozie/runtime-lit';
+import { repeat } from 'lit/directives/repeat.js';
+
+interface RozieHeaderSlotCtx {
+  remaining: unknown;
+  total: unknown;
+}
+
+interface RozieDefaultSlotCtx {
+  item: unknown;
+  toggle: unknown;
+  remove: unknown;
+}
+
+@customElement('rozie-todo-list')
+export default class TodoList extends SignalWatcher(LitElement) {
+  static styles = css`
+.todo-list { font-family: system-ui, sans-serif; }
+ul { list-style: none; padding: 0; }
+li { display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0; }
+li.done span { text-decoration: line-through; opacity: 0.5; }
+.empty { color: rgba(0, 0, 0, 0.4); font-style: italic; }
+form { display: flex; gap: 0.25rem; margin-block: 0.5rem; }
+`;
+
+  @property({ type: Array, attribute: 'items' }) _items_attr: unknown[] = [];
+  private _itemsControllable = createLitControllableProperty<unknown[]>({ host: this, eventName: 'items-change', defaultValue: [], initialControlledValue: undefined });
+  @property({ type: String, reflect: true }) title: string = 'Todo';
+  private _draft = signal('');
+
+  @state() private _hasSlotHeader = false;
+  @queryAssignedElements({ slot: 'header', flatten: true }) private _slotHeaderElements!: Element[];
+  @state() private _hasSlotDefault = false;
+  @queryAssignedElements({ flatten: true }) private _slotDefaultElements!: Element[];
+  @state() private _hasSlotEmpty = false;
+  @queryAssignedElements({ slot: 'empty', flatten: true }) private _slotEmptyElements!: Element[];
+
+  private _disconnectCleanups: Array<() => void> = [];
+
+  firstUpdated(): void {
+    this.addEventListener('rozie-default-toggle', (e) => { (() => this.toggle(item.id))((e as CustomEvent).detail); });
+
+    this.addEventListener('rozie-default-remove', (e) => { (() => this.remove(item.id))((e as CustomEvent).detail); });
+
+    {
+      const slotEl = this.shadowRoot?.querySelector('slot[name="header"]');
+      if (slotEl !== null && slotEl !== undefined) {
+        const update = () => { this._hasSlotHeader = this._slotHeaderElements.length > 0; };
+        slotEl.addEventListener('slotchange', update);
+        update();
+      }
+    }
+
+    {
+      const slotEl = this.shadowRoot?.querySelector('slot:not([name])');
+      if (slotEl !== null && slotEl !== undefined) {
+        const update = () => { this._hasSlotDefault = this._slotDefaultElements.length > 0; };
+        slotEl.addEventListener('slotchange', update);
+        update();
+      }
+    }
+
+    {
+      const slotEl = this.shadowRoot?.querySelector('slot[name="empty"]');
+      if (slotEl !== null && slotEl !== undefined) {
+        const update = () => { this._hasSlotEmpty = this._slotEmptyElements.length > 0; };
+        slotEl.addEventListener('slotchange', update);
+        update();
+      }
+    }
+  }
+
+  disconnectedCallback(): void {
+    super.disconnectedCallback();
+    for (const fn of this._disconnectCleanups) fn();
+    this._disconnectCleanups = [];
+  }
+
+  attributeChangedCallback(name: string, old: string | null, value: string | null): void {
+    super.attributeChangedCallback(name, old, value);
+    if (name === 'items') this._itemsControllable.notifyAttributeChange(value as unknown as unknown[]);
+  }
+
+  render() {
+    return html`
+<div class="todo-list">
+  <header>
+    <slot name="header" data-rozie-params=${JSON.stringify({remaining: this.remaining, total: this.items.length})}>
+      
+      <h3>${this.title} (${this.remaining} remaining)</h3>
+    </slot>
+  </header>
+
+  <form @submit=${(e: Event) => { e.preventDefault(); (this.add)(e); }}>
+    <input placeholder="What needs doing?" .value=${this._draft.value} @input=${(e) => this._draft.value = (e.target as HTMLInputElement).value} />
+    <button type="submit" ?disabled=${!this._draft.value.trim()}>Add</button>
+  </form>
+
+  ${this.items.length > 0 ? html`<ul>
+    ${repeat(this.items, (item) => item.id, (item, _idx) => html`<li class=${({ done: item.done })} key=${item.id}>
+      
+      <slot data-rozie-params=${JSON.stringify({item: item})}>
+        <label>
+          <input type="checkbox" ?checked=${item.done} @change=${(e: Event) => { this.toggle(item.id); }} />
+          <span>${item.text}</span>
+        </label>
+        <button aria-label="Remove" @click=${(e: Event) => { this.remove(item.id); }}>×</button>
+      </slot>
+    </li>`)}
+  </ul>` : html`<p class="empty">
+    <slot name="empty">Nothing to do. ✨</slot>
+  </p>`}</div>
+`;
+  }
+
+  get remaining() { return this.items.filter(i => !i.done).length; }
+
+  add = () => {
+  const text = this._draft.value.trim();
+  if (!text) return;
+  this.items = [...this.items, {
+    id: crypto.randomUUID(),
+    text,
+    done: false
+  }];
+  this._draft.value = '';
+  this.dispatchEvent(new CustomEvent("add", {
+    detail: text,
+    bubbles: true,
+    composed: true
+  }));
+};
+
+  toggle = id => {
+  this.items = this.items.map(i => i.id === id ? {
+    ...i,
+    done: !i.done
+  } : i);
+  this.dispatchEvent(new CustomEvent("toggle", {
+    detail: id,
+    bubbles: true,
+    composed: true
+  }));
+};
+
+  remove = id => {
+  this.items = this.items.filter(i => i.id !== id);
+  this.dispatchEvent(new CustomEvent("remove", {
+    detail: id,
+    bubbles: true,
+    composed: true
+  }));
+};
+
+  get items(): unknown[] { return this._itemsControllable.read(); }
+  set items(v: unknown[]) { this._itemsControllable.write(v); }
+}

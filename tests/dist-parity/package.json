@@ -16,6 +16,8 @@
     "@rozie/target-react": "workspace:*",
     "@rozie/target-svelte": "workspace:*",
     "@rozie/target-angular": "workspace:*",
+    "@rozie/target-solid": "workspace:*",
+    "@rozie/target-lit": "workspace:*",
     "@babel/core": "^7.29.0"
   },
   "devDependencies": {

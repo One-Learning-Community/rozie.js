@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Rozie CardHeader (Lit)</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        max-width: 720px;
+        margin: 2rem auto;
+        padding: 0 1rem;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>CardHeader</h1>
+    <p>
+      <a href="/">&larr; back</a> — standalone leaf component (wrapper-pair
+      partner of Card).
+    </p>
+    <rozie-card-header
+      id="header"
+      title="Standalone header"
+    ></rozie-card-header>
+    <p>
+      Closes:
+      <span id="closes" data-testid="card-header-close-count">0</span>
+    </p>
+    <script type="module">
+      import '../rozie/CardHeader.rozie';
+      const el = document.getElementById('header');
+      const closes = document.getElementById('closes');
+      let n = 0;
+      el.onClose = () => {
+        n++;
+        closes.textContent = String(n);
+      };
+    </script>
+  </body>
+</html>

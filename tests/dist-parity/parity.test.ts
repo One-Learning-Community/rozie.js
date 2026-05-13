@@ -69,13 +69,21 @@ const EXAMPLES = [
   'Card',
   'CardHeader',
 ] as const;
-const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid'] as const;
+// Phase 06.4 P3 (D-LIT-22): TARGETS extended with 'lit' — additive only.
+// 8 examples × 1 target × 3 entrypoints excl. babel-plugin sidecar parity
+// totals 24 net-new byte-equal assertions (24 of the 32 leg-tuples below are
+// added; legs 1/2/3/4 each cover one entrypoint, so 8 × 4 = 32 lit assertions
+// total. The plan's "24 new assertions" figure counted CLI / babel-plugin /
+// unplugin (3 entrypoints), with compile() folded into "Leg 1"; reading the
+// matrix as 4 legs is the canonical count. Total parity grows 160 → 192).
+const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'] as const;
 type Target = (typeof TARGETS)[number];
 
 function primaryExt(target: Target): string {
   if (target === 'angular') return '.angular.ts';
   if (target === 'react') return '.tsx';
   if (target === 'solid') return '.solid.tsx';
+  if (target === 'lit') return '.lit.ts';
   return `.${target}`;
 }
 
@@ -84,6 +92,7 @@ function emittedExt(target: Target): string {
   if (target === 'angular') return '.ts';
   if (target === 'react') return '.tsx';
   if (target === 'solid') return '.tsx';  // CLI emits .tsx; fixture named .solid.tsx for disambiguation
+  if (target === 'lit') return '.ts';     // CLI emits .ts; fixture named .lit.ts for disambiguation
   return `.${target}`;
 }
 

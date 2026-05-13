@@ -1,0 +1,40 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "noEmit": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    // Phase 06.4 P3 — Lit fixtures use the same strict-subset shape as the
+    // solid-ts analog (strict: false + alwaysStrict). Full `strict: true` is
+    // a v2 concern — the emitter currently leaves generic r-for loop closure
+    // types as `unknown` (TodoList: item: unknown), uses `object` rather than
+    // a typed interface for TreeNode's recursive node prop, and does not yet
+    // emit per-IR-prop TS type annotations beyond the @property({ type:
+    // Number/String/Array/Object/Boolean }) hint. These are P2 emitter-output
+    // limitations documented in 06.4-02-SUMMARY.md (the TodoList scoped-slot
+    // closure caveat) and tracked as a Phase 7 emitter-types enhancement.
+    //
+    // What this gate DOES verify:
+    //  - Decorator syntax (@customElement / @property / @state / @query /
+    //    @queryAssignedElements) parses under experimentalDecorators: true.
+    //  - useDefineForClassFields: false works (RESEARCH.md Pitfall 1 — Lit's
+    //    reactive property decorators conflict with strict useDefineForClassFields).
+    //  - emitDecoratorMetadata: false (D-LIT-05 — Lit doesn't consume metadata).
+    //  - The four import sources resolve (lit / lit/decorators.js /
+    //    @lit-labs/preact-signals / @rozie/runtime-lit).
+    //  - SignalWatcher(LitElement) typechecks as a base class.
+    //  - createLitControllableProperty<T>'s generic signature is honored.
+    //  - Side-effect cross-rozie imports (`import './Foo.rozie';`) resolve via
+    //    the ambient declaration in fixtures/rozie-shim.d.ts.
+    "strict": false,
+    "alwaysStrict": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": false,
+    "useDefineForClassFields": false
+  },
+  "include": ["lit-ts.test.ts"]
+}

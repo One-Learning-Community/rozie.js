@@ -121,6 +121,62 @@ importers:
         specifier: ~0.14
         version: 0.14.10
 
+  examples/consumers/lit-ts:
+    dependencies:
+      '@lit-labs/preact-signals':
+        specifier: ^1.0.0
+        version: 1.0.3
+      '@preact/signals-core':
+        specifier: ^1.3.0
+        version: 1.14.2
+      '@rozie/runtime-lit':
+        specifier: workspace:*
+        version: link:../../../packages/runtime/lit
+    devDependencies:
+      lit:
+        specifier: ^3.2.0
+        version: 3.3.2
+      typescript:
+        specifier: ~5.4.5
+        version: 5.4.5
+      vitest:
+        specifier: ^4
+        version: 4.1.5(@types/node@22.19.17)(happy-dom@15.11.7)(jsdom@25.0.1)(vite@8.0.10(@types/node@22.19.17)(jiti@1.21.7)(less@4.2.0)(sass@1.71.1)(terser@5.46.2))
+
+  examples/consumers/lit-vanilla-demo:
+    dependencies:
+      '@lit-labs/preact-signals':
+        specifier: ^1.0.0
+        version: 1.0.3
+      '@preact/signals-core':
+        specifier: ^1.3.0
+        version: 1.14.2
+      '@rozie/runtime-lit':
+        specifier: workspace:*
+        version: link:../../../packages/runtime/lit
+      '@rozie/unplugin':
+        specifier: workspace:*
+        version: link:../../../packages/unplugin
+      lit:
+        specifier: ^3.2.0
+        version: 3.3.2
+    devDependencies:
+      '@playwright/test':
+        specifier: ^1
+        version: 1.59.1
+      '@types/node':
+        specifier: ^20
+        version: 20.19.40
+      playwright:
+        specifier: ^1
+        version: 1.59.1
+      typescript:
+        specifier: ~5.4.5
+        version: 5.4.5
+      vite:
+        specifier: ^6
+        version: 6.4.2(@types/node@20.19.40)(jiti@1.21.7)(less@4.2.0)(lightningcss@1.32.0)(sass@1.71.1)(terser@5.46.2)
+
   examples/consumers/react-ts:
     dependencies:
       '@rozie/runtime-react':
@@ -1035,9 +1091,15 @@ importers:
       '@rozie/target-angular':
         specifier: workspace:*
         version: link:../../packages/targets/angular
+      '@rozie/target-lit':
+        specifier: workspace:*
+        version: link:../../packages/targets/lit
       '@rozie/target-react':
         specifier: workspace:*
         version: link:../../packages/targets/react
+      '@rozie/target-solid':
+        specifier: workspace:*
+        version: link:../../packages/targets/solid
       '@rozie/target-svelte':
         specifier: workspace:*
         version: link:../../packages/targets/svelte
@@ -13193,6 +13255,23 @@ snapshots:
     optionalDependencies:
       '@types/node': 22.19.17
       fsevents: 2.3.3
+      less: 4.2.0
+      lightningcss: 1.32.0
+      sass: 1.71.1
+      terser: 5.46.2
+
+  vite@6.4.2(@types/node@20.19.40)(jiti@1.21.7)(less@4.2.0)(lightningcss@1.32.0)(sass@1.71.1)(terser@5.46.2):
+    dependencies:
+      esbuild: 0.25.12
+      fdir: 6.5.0(picomatch@4.0.4)
+      picomatch: 4.0.4
+      postcss: 8.5.13
+      rollup: 4.60.2
+      tinyglobby: 0.2.16
+    optionalDependencies:
+      '@types/node': 20.19.40
+      fsevents: 2.3.3
+      jiti: 1.21.7
       less: 4.2.0
       lightningcss: 1.32.0
       sass: 1.71.1

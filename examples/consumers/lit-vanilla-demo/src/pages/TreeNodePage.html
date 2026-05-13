@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Rozie TreeNode (Lit)</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        max-width: 720px;
+        margin: 2rem auto;
+        padding: 0 1rem;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>TreeNode</h1>
+    <p>
+      <a href="/">&larr; back</a> — recursive self-reference
+      (<code>&lt;rozie-tree-node&gt;</code> inside its own render).
+    </p>
+    <rozie-tree-node id="tree"></rozie-tree-node>
+    <script type="module">
+      import '../rozie/TreeNode.rozie';
+      const el = document.getElementById('tree');
+      el.node = {
+        id: 'r',
+        label: 'root',
+        children: [
+          {
+            id: 'a',
+            label: 'alpha',
+            children: [
+              { id: 'a1', label: 'alpha-1', children: [] },
+              { id: 'a2', label: 'alpha-2', children: [] },
+            ],
+          },
+          {
+            id: 'b',
+            label: 'beta',
+            children: [{ id: 'b1', label: 'beta-1', children: [] }],
+          },
+        ],
+      };
+    </script>
+  </body>
+</html>

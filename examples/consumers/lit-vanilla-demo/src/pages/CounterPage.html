@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Rozie Counter (Lit)</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        max-width: 720px;
+        margin: 2rem auto;
+        padding: 0 1rem;
+      }
+      pre {
+        background: rgba(0, 0, 0, 0.04);
+        padding: 0.75rem;
+        border-radius: 4px;
+        max-height: 200px;
+        overflow: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Counter</h1>
+    <p>
+      <a href="/">&larr; back</a> — Lit custom element
+      <code>&lt;rozie-counter&gt;</code> with attribute reflection +
+      <code>value-change</code> CustomEvent.
+    </p>
+    <rozie-counter value="0" step="1" id="counter"></rozie-counter>
+    <p>
+      External value:
+      <span id="external" data-testid="parent-value">0</span>
+    </p>
+    <h2>Event log</h2>
+    <pre id="log" data-testid="event-log"></pre>
+    <script type="module">
+      import '../rozie/Counter.rozie';
+      const el = document.getElementById('counter');
+      const log = document.getElementById('log');
+      const external = document.getElementById('external');
+      el.addEventListener('value-change', (e) => {
+        external.textContent = String(e.detail);
+        log.textContent =
+          `value-change: ${e.detail}\n` + log.textContent;
+      });
+    </script>
+  </body>
+</html>
