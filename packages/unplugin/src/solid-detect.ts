@@ -16,6 +16,7 @@
  */
 
 import { createRequire } from 'node:module';
+import { pathToFileURL } from 'node:url';
 
 function canResolve(requireFn: NodeJS.Require, pkg: string): boolean {
   try {
@@ -34,7 +35,7 @@ function canResolve(requireFn: NodeJS.Require, pkg: string): boolean {
  */
 export function detectSolidPlugin(cwd?: string): boolean {
   const requireFn = cwd
-    ? createRequire(cwd.endsWith('/') ? cwd : cwd + '/')
+    ? createRequire(pathToFileURL(cwd + '/').href)
     : createRequire(import.meta.url);
   return canResolve(requireFn, 'vite-plugin-solid');
 }
@@ -49,7 +50,7 @@ export function detectSolidPlugin(cwd?: string): boolean {
  */
 export function canResolveSolidJs(cwd?: string): boolean {
   const requireFn = cwd
-    ? createRequire(cwd.endsWith('/') ? cwd : cwd + '/')
+    ? createRequire(pathToFileURL(cwd + '/').href)
     : createRequire(import.meta.url);
   return canResolve(requireFn, 'solid-js');
 }

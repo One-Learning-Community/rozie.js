@@ -20,6 +20,7 @@
  */
 
 import { createRequire } from 'node:module';
+import { pathToFileURL } from 'node:url';
 
 function canResolve(requireFn: NodeJS.Require, pkg: string): boolean {
   try {
@@ -37,8 +38,10 @@ function canResolve(requireFn: NodeJS.Require, pkg: string): boolean {
  *   process's cwd (so test environments and CLI invocations behave naturally).
  */
 export function canResolveLit(cwd?: string): boolean {
+  // WR-06 fix: use pathToFileURL to normalize Windows paths (backslashes)
+  // before passing to createRequire. cwd.endsWith('/') is false for C:\foo.
   const requireFn = cwd
-    ? createRequire(cwd.endsWith('/') ? cwd : cwd + '/')
+    ? createRequire(pathToFileURL(cwd + '/').href)
     : createRequire(import.meta.url);
   return canResolve(requireFn, 'lit');
 }
@@ -50,8 +53,10 @@ export function canResolveLit(cwd?: string): boolean {
  * initializers using the `signal` / `computed` / `effect` exports.
  */
 export function canResolvePreactSignals(cwd?: string): boolean {
+  // WR-06 fix: use pathToFileURL to normalize Windows paths (backslashes)
+  // before passing to createRequire. cwd.endsWith('/') is false for C:\foo.
   const requireFn = cwd
-    ? createRequire(cwd.endsWith('/') ? cwd : cwd + '/')
+    ? createRequire(pathToFileURL(cwd + '/').href)
     : createRequire(import.meta.url);
   return canResolve(requireFn, '@lit-labs/preact-signals');
 }

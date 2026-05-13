@@ -23,6 +23,7 @@
  */
 
 import { createRequire } from 'node:module';
+import { pathToFileURL } from 'node:url';
 
 export type ReactPluginChoice = 'plugin-react' | 'plugin-react-swc' | null;
 
@@ -36,7 +37,7 @@ export function detectReactPlugin(cwd?: string): ReactPluginChoice {
   // createRequire scoped to a consumer-side path. Falls back to import.meta.url
   // (this file) when cwd is omitted — enough for monorepo-internal probes.
   const requireFn = cwd
-    ? createRequire(cwd.endsWith('/') ? cwd : cwd + '/')
+    ? createRequire(pathToFileURL(cwd + '/').href)
     : createRequire(import.meta.url);
 
   // D-59 preference order: plugin-react first, then plugin-react-swc.
@@ -61,7 +62,7 @@ export function detectReactPlugin(cwd?: string): ReactPluginChoice {
  */
 export function canResolveReact(cwd?: string): boolean {
   const requireFn = cwd
-    ? createRequire(cwd.endsWith('/') ? cwd : cwd + '/')
+    ? createRequire(pathToFileURL(cwd + '/').href)
     : createRequire(import.meta.url);
   return canResolve(requireFn, 'react');
 }
