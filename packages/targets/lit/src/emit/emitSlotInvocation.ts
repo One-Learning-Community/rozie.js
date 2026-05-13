@@ -26,7 +26,10 @@ export function emitSlotInvocation(
     const dataEntries: string[] = [];
     for (const arg of node.args) {
       const code = rewriteTemplateExpression(arg.expression, ir);
-      const isFnLike = /^\s*\(?\s*\(?\s*\)?\s*=>/.test(code) || code.startsWith('this.');
+      // CR-07 fix: removed `code.startsWith('this.')` — any this.* reference (including
+      // non-function data properties) would incorrectly be classified as function-like,
+      // silently dropping data bindings. Arrow functions are already detected by the regex.
+      const isFnLike = /^\s*\(?\s*\(?\s*\)?\s*=>/.test(code);
       if (!isFnLike) dataEntries.push(`${arg.name}: ${code}`);
     }
     if (dataEntries.length > 0) {
