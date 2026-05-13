@@ -36,6 +36,12 @@ test('SC5 Vue — <rozie-counter> renders and @value-change updates parent state
   // the internal state which had not yet been set from the attribute, a v1
   // emitter quirk), the FUNDAMENTAL flow — custom element → host framework —
   // is verified by the parent updating at all.
+  //
+  // WR-13: Expected exact value: 6 (initial value=5, increment by 1 step).
+  // Weakened to >=1 because v1 attribute-prop init limitation means the
+  // internal counter may start at 0 instead of 5 before the first click.
+  // TODO(Phase 7): once D-LIT-FUTURE-03 (prop-from-attribute init) is fixed,
+  // tighten this assertion to: expect(page.getByTestId('parent-value')).toHaveText('6');
   const updated = await page.getByTestId('parent-value').textContent();
   expect(Number(updated)).toBeGreaterThanOrEqual(1);
 });
