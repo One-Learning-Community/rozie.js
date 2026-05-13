@@ -17,7 +17,7 @@
  *
  * @experimental — shape may change before v1.0
  */
-export type RozieTarget = 'vue' | 'react' | 'svelte' | 'angular' | 'solid';
+export type RozieTarget = 'vue' | 'react' | 'svelte' | 'angular' | 'solid' | 'lit';
 
 const TARGET_EXT_MAP: Record<RozieTarget, string> = {
   vue: '.vue',
@@ -25,6 +25,7 @@ const TARGET_EXT_MAP: Record<RozieTarget, string> = {
   svelte: '.svelte',
   angular: '', // TS resolver picks up `.ts`
   solid: '', // bundler/TS resolver picks up the actual `.tsx`
+  lit: '', // TS resolver picks up the actual `.ts` (same as Angular)
 };
 
 const ROZIE_EXT = '.rozie';
@@ -34,7 +35,7 @@ export function rewriteRozieImport(importPath: string, target: RozieTarget): str
   const targetExt = TARGET_EXT_MAP[target];
   if (targetExt === undefined) {
     throw new Error(
-      `rewriteRozieImport: unknown target '${target}' — expected one of vue|react|svelte|angular|solid`,
+      `rewriteRozieImport: unknown target '${target}' — expected one of vue|react|svelte|angular|solid|lit`,
     );
   }
   return importPath.slice(0, -ROZIE_EXT.length) + targetExt;

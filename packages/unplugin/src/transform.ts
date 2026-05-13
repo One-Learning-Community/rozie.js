@@ -42,6 +42,7 @@ import { emitReact, type EmitReactResult } from '../../targets/react/src/emitRea
 import { emitSvelte, type EmitSvelteResult } from '../../targets/svelte/src/emitSvelte.js';
 import { emitAngular, type EmitAngularResult } from '../../targets/angular/src/emitAngular.js';
 import { emitSolid, type EmitSolidResult } from '../../targets/solid/src/emitSolid.js';
+import { emitLit, type EmitLitResult } from '../../targets/lit/src/emitLit.js';
 import type { Diagnostic } from '../../core/src/diagnostics/Diagnostic.js';
 import type { TargetValue } from './options.js';
 import { formatViteError, formatLoc } from './diagnostics.js';
@@ -105,6 +106,25 @@ const VIRTUAL_SUFFIX_ANGULAR = '.rozie.ts';
 const VIRTUAL_SUFFIX_SOLID = '.rozie.tsx';
 
 /**
+ * Lit-target synthetic suffix (Phase 06.4 — D-LIT-20).
+ *
+ * `.rozie.ts` — the Rozie Lit emitter produces a plain TS module whose
+ * `customElements.define()` call at module load registers the custom
+ * element. The suffix string IS THE SAME as VIRTUAL_SUFFIX_ANGULAR (both
+ * `.rozie.ts`), but runtime dispatch is on the closure-captured `target`
+ * value at resolveId/load construction time, so the collision is benign —
+ * only one target can be active per `Rozie({ target: ... })` config
+ * instance.
+ *
+ * Per RESEARCH Pitfall 3: NO sibling .module.css / .global.css virtual ids —
+ * Lit emits styles via `static styles = css\`...\`` inside the class body
+ * (shadow-DOM-scoped automatically). The :root escape hatch lands via the
+ * runtime helper `injectGlobalStyles(id, css)` (D-LIT-15), not a separate
+ * CSS module.
+ */
+const VIRTUAL_SUFFIX_LIT = '.rozie.ts';
+
+/**
  * Phase 4 escape-hatch: query-suffix forms (`?style=module` / `?style=global`)
  * accepted as alternative routing for consumers whose pipelines clash with
  * the file-extension form. Path 1 fallback per 04-05-SPIKE.md.
@@ -126,6 +146,10 @@ export function transformIncludeRozie(id: string): boolean {
     id.includes(VIRTUAL_SUFFIX_REACT + QUERY_STYLE_MODULE) ||
     id.includes(VIRTUAL_SUFFIX_REACT + QUERY_STYLE_GLOBAL) ||
     id.endsWith(VIRTUAL_SUFFIX_SVELTE) ||
+    // isAngularVirtualId checks `.rozie.ts` — that suffix is shared with
+    // VIRTUAL_SUFFIX_LIT (D-LIT-20). Runtime dispatch in createResolveIdHook
+    // and createLoadHook keys on the closure-captured `target` value, so the
+    // suffix collision is benign — only one target can be active at a time.
     isAngularVirtualId(id)
   );
 }
@@ -236,6 +260,28 @@ export function createResolveIdHook(
       if (isExtensionlessRelative(id)) {
         const abs = absolutize(id, importer);
         if (existsSync(abs + '.rozie')) return abs + VIRTUAL_SUFFIX_SOLID;
+      }
+      return null;
+    };
+  }
+  if (target === 'lit') {
+    return function resolveIdLit(id: string, importer: string | undefined): string | null {
+      // 1) Pass-through for the synthetic id itself.
+      if (id.endsWith(VIRTUAL_SUFFIX_LIT)) return id;
+      // 2) Bare `.rozie` import → `<abs>/Foo.rozie.ts`.
+      if (id.endsWith('.rozie')) {
+        const abs = absolutize(id, importer);
+        return abs + '.ts';
+      }
+      // 3) D-LIT side-effect composition: emitted Lit modules emit
+      //    `import './Foo.rozie';` (no symbol bind — module load registers
+      //    the custom element via customElements.define). When a sibling
+      //    `Foo.rozie` exists, route the extensionless relative import to
+      //    the synthetic `Foo.rozie.ts`. Mirrors Angular's D-118 idiom
+      //    (lit: '' in TARGET_EXT_MAP).
+      if (isExtensionlessRelative(id)) {
+        const abs = absolutize(id, importer);
+        if (existsSync(abs + '.rozie')) return abs + VIRTUAL_SUFFIX_LIT;
       }
       return null;
     };
@@ -398,6 +444,18 @@ export function createLoadHook(registry: ModifierRegistry, target: TargetValue =
       return runSolidPipeline.call(this, source, filePath, registry);
     };
   }
+  if (target === 'lit') {
+    return function loadLit(
+      this: AnyContext,
+      id: string,
+    ): { code: string; map: EmitLitResult['map'] } | null {
+      if (!id.endsWith(VIRTUAL_SUFFIX_LIT)) return null;
+      // Strip `.ts` only — leaves `.rozie`.
+      const filePath = id.slice(0, -'.ts'.length);
+      const source = readFileSync(filePath, 'utf8');
+      return runLitPipeline.call(this, source, filePath, registry);
+    };
+  }
   if (target === 'react') {
     return function loadReact(
       this: AnyContext,
@@ -493,6 +551,15 @@ export function createTransformHook(registry: ModifierRegistry, target: TargetVa
       id: string,
     ): { code: string; map: EmitSolidResult['map'] } | null {
       return runSolidPipeline.call(this, code, id, registry);
+    };
+  }
+  if (target === 'lit') {
+    return function transformLit(
+      this: AnyContext,
+      code: string,
+      id: string,
+    ): { code: string; map: EmitLitResult['map'] } | null {
+      return runLitPipeline.call(this, code, id, registry);
     };
   }
   if (target === 'react') {
@@ -692,6 +759,56 @@ function runSolidPipeline(
 
   // 3. emitSolid
   const result = emitSolid(ir, {
+    filename: filePath,
+    source,
+    modifierRegistry: registry,
+    blockOffsets: ast.blocks,
+  });
+  const emitErrors = result.diagnostics.filter((d) => d.severity === 'error');
+  if (emitErrors.length > 0) {
+    throw formatViteError(emitErrors, filePath, source);
+  }
+  warnings.push(...result.diagnostics.filter((d) => d.severity === 'warning'));
+
+  surfaceWarnings.call(this, warnings, filePath, source);
+
+  return { code: result.code, map: result.map };
+}
+
+/**
+ * Lit-target pipeline: parse → lowerToIR → emitLit. Returns `{ code, map }`
+ * for the load/transform hooks. Mirrors runSolidPipeline (Solid) — Lit's
+ * emitter has a single output channel (one `.ts` file containing the class
+ * declaration with inline `static styles = css\`...\`` and inline
+ * `html\`...\`` render body), so no CSS-side branching like
+ * React's runReactPipeline.
+ */
+function runLitPipeline(
+  this: AnyContext,
+  source: string,
+  filePath: string,
+  registry: ModifierRegistry,
+): { code: string; map: EmitLitResult['map'] } {
+  this?.addWatchFile?.(filePath);
+  // 1. parse
+  const { ast, diagnostics: parseDiags } = parse(source, { filename: filePath });
+  if (!ast || parseDiags.some((d) => d.severity === 'error')) {
+    throw formatViteError(parseDiags, filePath, source);
+  }
+
+  // 2. lowerToIR
+  const { ir, diagnostics: irDiags } = lowerToIR(ast, { modifierRegistry: registry });
+  const warnings: Diagnostic[] = [
+    ...parseDiags.filter((d) => d.severity === 'warning'),
+    ...irDiags.filter((d) => d.severity === 'warning'),
+  ];
+  const irErrors = irDiags.filter((d) => d.severity === 'error');
+  if (!ir || irErrors.length > 0) {
+    throw formatViteError(irDiags, filePath, source);
+  }
+
+  // 3. emitLit
+  const result = emitLit(ir, {
     filename: filePath,
     source,
     modifierRegistry: registry,

@@ -22,12 +22,13 @@ import {
  * Sidecars (`.d.ts`, `.module.css`, `.global.css`, `.map`) are derived
  * from this in `runBuildMatrix`.
  */
-export const TARGET_EXTENSIONS: Record<'vue' | 'react' | 'svelte' | 'angular' | 'solid', string> = {
+export const TARGET_EXTENSIONS: Record<'vue' | 'react' | 'svelte' | 'angular' | 'solid' | 'lit', string> = {
   vue: '.vue',
   react: '.tsx',
   svelte: '.svelte',
   angular: '.ts',
   solid: '.tsx',
+  lit: '.ts',
 };
 
 /**
@@ -48,7 +49,7 @@ export const TARGET_EXTENSIONS: Record<'vue' | 'react' | 'svelte' | 'angular' | 
  */
 export function computeOutputPath(
   inputAbs: string,
-  target: 'vue' | 'react' | 'svelte' | 'angular' | 'solid',
+  target: 'vue' | 'react' | 'svelte' | 'angular' | 'solid' | 'lit',
   outDir: string,
   rootDir: string,
 ): string {
