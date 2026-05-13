@@ -1,0 +1,48 @@
+import { LitElement, css, html } from 'lit';
+import { customElement, property, queryAssignedElements, state } from 'lit/decorators.js';
+import { SignalWatcher } from '@lit-labs/preact-signals';
+import './CardHeader.rozie';
+
+@customElement('rozie-card')
+export default class Card extends SignalWatcher(LitElement) {
+  static styles = css`
+.card { border: 1px solid #ddd; border-radius: 6px; overflow: hidden; background: #fff; }
+.card__body { padding: 1rem; }
+`;
+
+  @property({ type: String, reflect: true }) title: string = '';
+  @property({ type: Function }) onClose: ((...args: unknown[]) => unknown) | null = null;
+
+  @state() private _hasSlotDefault = false;
+  @queryAssignedElements({ flatten: true }) private _slotDefaultElements!: Element[];
+
+  private _disconnectCleanups: Array<() => void> = [];
+
+  firstUpdated(): void {
+    {
+      const slotEl = this.shadowRoot?.querySelector('slot:not([name])');
+      if (slotEl !== null && slotEl !== undefined) {
+        const update = () => { this._hasSlotDefault = this._slotDefaultElements.length > 0; };
+        slotEl.addEventListener('slotchange', update);
+        update();
+      }
+    }
+  }
+
+  disconnectedCallback(): void {
+    super.disconnectedCallback();
+    for (const fn of this._disconnectCleanups) fn();
+    this._disconnectCleanups = [];
+  }
+
+  render() {
+    return html`
+<article class="card">
+  <rozie-card-header title=${this.title} on-close=${this.onClose}></rozie-card-header>
+  <div class="card__body">
+    <slot></slot>
+  </div>
+</article>
+`;
+  }
+}

@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Rozie SearchInput (Lit)</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        max-width: 720px;
+        margin: 2rem auto;
+        padding: 0 1rem;
+      }
+      pre {
+        background: rgba(0, 0, 0, 0.04);
+        padding: 0.75rem;
+        border-radius: 4px;
+        max-height: 200px;
+        overflow: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>SearchInput</h1>
+    <p>
+      <a href="/">&larr; back</a> — debounced
+      <code>search</code> CustomEvent (300ms).
+    </p>
+    <rozie-search-input
+      id="search"
+      placeholder="Type to search…"
+      min-length="2"
+    ></rozie-search-input>
+    <p>
+      Last query:
+      <span id="last-query" data-testid="last-query"></span>
+    </p>
+    <h2>Event log</h2>
+    <pre id="log" data-testid="event-log"></pre>
+    <script type="module">
+      import '../rozie/SearchInput.rozie';
+      const el = document.getElementById('search');
+      const log = document.getElementById('log');
+      const lastQuery = document.getElementById('last-query');
+      el.addEventListener('search', (e) => {
+        lastQuery.textContent = String(e.detail);
+        log.textContent = `search: ${e.detail}\n` + log.textContent;
+      });
+      el.addEventListener('clear', () => {
+        lastQuery.textContent = '';
+        log.textContent = `clear\n` + log.textContent;
+      });
+    </script>
+  </body>
+</html>

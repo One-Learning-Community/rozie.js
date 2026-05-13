@@ -5,6 +5,7 @@
       <button
         v-for="p in pages"
         :key="p"
+        :data-testid="`nav-${p}`"
         :class="{ active: current === p }"
         @click="current = p"
       >
@@ -25,6 +26,7 @@ import Modal from './pages/Modal.vue';
 import TreeNode from './pages/TreeNode.vue';
 import Card from './pages/Card.vue';
 import CardHeader from './pages/CardHeader.vue';
+import { litInteropRoute } from './router';
 
 const pages = [
   'Counter',
@@ -35,6 +37,7 @@ const pages = [
   'TreeNode',
   'Card',
   'CardHeader',
+  'lit-interop',
 ] as const;
 type Page = typeof pages[number];
 
@@ -47,6 +50,7 @@ const pageComponents: Record<Page, unknown> = {
   TreeNode,
   Card,
   CardHeader,
+  'lit-interop': litInteropRoute.component,
 };
 
 const current = ref<Page>('Counter');

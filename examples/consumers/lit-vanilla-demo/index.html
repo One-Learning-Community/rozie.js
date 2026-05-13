@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Rozie Lit Vanilla Demo</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        max-width: 720px;
+        margin: 2rem auto;
+        padding: 0 1rem;
+      }
+      h1 {
+        margin: 0 0 1rem 0;
+      }
+      ul {
+        list-style: none;
+        padding: 0;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+        gap: 0.5rem;
+      }
+      li a {
+        display: block;
+        padding: 0.5rem 0.75rem;
+        background: rgba(0, 0, 0, 0.04);
+        text-decoration: none;
+        color: inherit;
+        border-radius: 4px;
+      }
+      li a:hover {
+        background: rgba(0, 100, 200, 0.1);
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Rozie Lit Vanilla Demo</h1>
+    <p>
+      Each link loads a standalone HTML page that mounts a single
+      <code>&lt;rozie-*&gt;</code> custom element compiled by
+      <code>@rozie/unplugin</code> with <code>target: 'lit'</code>. No host
+      framework — just plain HTML + script-module imports.
+    </p>
+    <ul>
+      <li><a href="/src/pages/CounterPage.html">Counter</a></li>
+      <li><a href="/src/pages/SearchInputPage.html">SearchInput</a></li>
+      <li><a href="/src/pages/DropdownPage.html">Dropdown</a></li>
+      <li><a href="/src/pages/TodoListPage.html">TodoList</a></li>
+      <li><a href="/src/pages/ModalPage.html">Modal</a></li>
+      <li><a href="/src/pages/TreeNodePage.html">TreeNode</a></li>
+      <li><a href="/src/pages/CardPage.html">Card</a></li>
+      <li><a href="/src/pages/CardHeaderPage.html">CardHeader</a></li>
+    </ul>
+  </body>
+</html>

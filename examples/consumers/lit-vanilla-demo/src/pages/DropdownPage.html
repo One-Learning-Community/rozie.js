@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Rozie Dropdown (Lit)</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        max-width: 720px;
+        margin: 2rem auto;
+        padding: 0 1rem;
+      }
+      pre {
+        background: rgba(0, 0, 0, 0.04);
+        padding: 0.75rem;
+        border-radius: 4px;
+        max-height: 200px;
+        overflow: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Dropdown</h1>
+    <p>
+      <a href="/">&larr; back</a> — shadow-DOM-aware outside-click via
+      <code>composedPath()</code>.
+    </p>
+    <rozie-dropdown id="dropdown">
+      <button slot="trigger" id="trigger-btn" data-testid="dropdown-trigger">
+        Toggle
+      </button>
+      <ul id="items" data-testid="dropdown-items">
+        <li>Item A</li>
+        <li>Item B</li>
+        <li>Item C</li>
+      </ul>
+    </rozie-dropdown>
+    <p>
+      Open state:
+      <span id="open-state" data-testid="dropdown-open-state">false</span>
+    </p>
+    <p>
+      <button id="outside" data-testid="outside-target">outside element</button>
+    </p>
+    <h2>Event log</h2>
+    <pre id="log" data-testid="event-log"></pre>
+    <script type="module">
+      import '../rozie/Dropdown.rozie';
+      const el = document.getElementById('dropdown');
+      const log = document.getElementById('log');
+      const openState = document.getElementById('open-state');
+      el.addEventListener('open-change', (e) => {
+        openState.textContent = String(e.detail);
+        log.textContent = `open-change: ${e.detail}\n` + log.textContent;
+      });
+    </script>
+  </body>
+</html>

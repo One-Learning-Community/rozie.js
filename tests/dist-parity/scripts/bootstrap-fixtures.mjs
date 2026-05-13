@@ -40,13 +40,15 @@ const EXAMPLES = [
   'Card',
   'CardHeader',
 ];
-const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid'];
+// Phase 06.4 P3 (D-LIT-22): TARGETS extended with 'lit' — additive only.
+const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'];
 
 /** D-93 fixture extension table. */
 function primaryExt(target) {
   if (target === 'angular') return '.angular.ts';
   if (target === 'react') return '.tsx';
   if (target === 'solid') return '.solid.tsx';
+  if (target === 'lit') return '.lit.ts';
   return `.${target}`;
 }
 

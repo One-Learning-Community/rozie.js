@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Rozie TodoList (Lit)</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        max-width: 720px;
+        margin: 2rem auto;
+        padding: 0 1rem;
+      }
+      pre {
+        background: rgba(0, 0, 0, 0.04);
+        padding: 0.75rem;
+        border-radius: 4px;
+        max-height: 200px;
+        overflow: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>TodoList</h1>
+    <p>
+      <a href="/">&larr; back</a> — r-for + items model + add/toggle/remove
+      CustomEvents.
+    </p>
+    <rozie-todo-list id="todos" title="My Todos"></rozie-todo-list>
+    <h2>Event log</h2>
+    <pre id="log" data-testid="event-log"></pre>
+    <script type="module">
+      import '../rozie/TodoList.rozie';
+      const el = document.getElementById('todos');
+      const log = document.getElementById('log');
+      // Seed with initial items via property write (model:true).
+      el.items = [
+        { id: '1', text: 'Write Phase 06.4 plan', done: true },
+        { id: '2', text: 'Implement Lit emitter', done: true },
+        { id: '3', text: 'Wire vanilla-demo', done: false },
+      ];
+      for (const ev of ['items-change', 'add', 'toggle', 'remove']) {
+        el.addEventListener(ev, (e) => {
+          log.textContent =
+            `${ev}: ${JSON.stringify(e.detail)}\n` + log.textContent;
+        });
+      }
+    </script>
+  </body>
+</html>

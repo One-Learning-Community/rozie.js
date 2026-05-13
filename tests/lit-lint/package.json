@@ -1,0 +1,23 @@
+{
+  "name": "@rozie/lit-lint",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "lint": "eslint . --max-warnings 0",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@rozie/core": "workspace:*",
+    "@rozie/target-lit": "workspace:*"
+  },
+  "devDependencies": {
+    "@typescript-eslint/parser": "^8.59.2",
+    "eslint": "^9",
+    "eslint-plugin-lit": "^2.0.0",
+    "eslint-plugin-wc": "^3.0.0",
+    "lit": "^3.2.0",
+    "typescript": "^5",
+    "vitest": "^4"
+  }
+}

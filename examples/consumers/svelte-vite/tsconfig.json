@@ -10,6 +10,9 @@
     "skipLibCheck": true,
     "isolatedModules": true,
     "strict": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": false,
+    "useDefineForClassFields": false,
     "verbatimModuleSyntax": true
   },
   "include": ["src/**/*.ts", "src/**/*.svelte", "tests/**/*.ts"]

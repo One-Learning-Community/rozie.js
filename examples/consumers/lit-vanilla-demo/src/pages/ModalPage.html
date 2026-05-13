@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Rozie Modal (Lit)</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        max-width: 720px;
+        margin: 2rem auto;
+        padding: 0 1rem;
+      }
+      pre {
+        background: rgba(0, 0, 0, 0.04);
+        padding: 0.75rem;
+        border-radius: 4px;
+        max-height: 200px;
+        overflow: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Modal</h1>
+    <p>
+      <a href="/">&larr; back</a> — <code>:root</code> CSS-vars piercing via
+      <code>injectGlobalStyles</code> (D-LIT-15).
+    </p>
+    <button id="open-modal" data-testid="open-modal">Open Modal</button>
+    <rozie-modal id="modal" title="Hello from Modal.rozie">
+      <p>Modal body content. Close via Escape, backdrop click, or × button.</p>
+    </rozie-modal>
+    <p>
+      Close count:
+      <span id="close-count" data-testid="modal-close-count">0</span>
+    </p>
+    <h2>Event log</h2>
+    <pre id="log" data-testid="event-log"></pre>
+    <script type="module">
+      import '../rozie/Modal.rozie';
+      const el = document.getElementById('modal');
+      const openBtn = document.getElementById('open-modal');
+      const closeCount = document.getElementById('close-count');
+      const log = document.getElementById('log');
+      let count = 0;
+      openBtn.addEventListener('click', () => {
+        el.open = true;
+      });
+      el.addEventListener('close', () => {
+        count++;
+        closeCount.textContent = String(count);
+        log.textContent = `close (count=${count})\n` + log.textContent;
+      });
+      el.addEventListener('open-change', (e) => {
+        log.textContent = `open-change: ${e.detail}\n` + log.textContent;
+      });
+    </script>
+  </body>
+</html>

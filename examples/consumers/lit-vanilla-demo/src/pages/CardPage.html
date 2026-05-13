@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Rozie Card (Lit)</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        max-width: 720px;
+        margin: 2rem auto;
+        padding: 0 1rem;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Card</h1>
+    <p>
+      <a href="/">&larr; back</a> — wrapper composition; embeds
+      <code>&lt;rozie-card-header&gt;</code> via D-LIT side-effect import.
+    </p>
+    <rozie-card id="card" title="Hello world">
+      <p>This body lives in Card's default slot.</p>
+      <p>
+        Closes:
+        <span id="closes" data-testid="card-close-count">0</span>
+      </p>
+    </rozie-card>
+    <script type="module">
+      import '../rozie/Card.rozie';
+      const el = document.getElementById('card');
+      const closes = document.getElementById('closes');
+      let n = 0;
+      // Card.rozie's onClose prop accepts a function; assign via property.
+      el.onClose = () => {
+        n++;
+        closes.textContent = String(n);
+      };
+    </script>
+  </body>
+</html>
