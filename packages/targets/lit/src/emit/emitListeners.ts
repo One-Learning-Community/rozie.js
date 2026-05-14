@@ -181,8 +181,13 @@ function extractNumberArg(args: ModifierArg[] | undefined): number {
  * inlineGuards (e.g. `if (e.key !== 'Escape') return;`) typecheck against the
  * handler parameter without a per-guard `(e as KeyboardEvent)` cast. Mirrors
  * the Svelte target's `eventTypeFor`.
+ *
+ * Exported (Plan 07.1-03) so emitTemplate.ts's `buildEventParts` — the real
+ * template-`@event` path, now also registry-driven — can type its synthesized
+ * handler param identically, keeping inlineGuard codes cast-free across both
+ * the `<listeners>`-block and template-event Lit emission paths.
  */
-function eventTypeFor(event: string): string {
+export function eventTypeFor(event: string): string {
   if (
     event === 'click' ||
     event === 'mousedown' ||

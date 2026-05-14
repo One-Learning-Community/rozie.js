@@ -109,7 +109,7 @@ form { display: flex; gap: 0.25rem; margin-block: 0.5rem; }
     </slot>
   </header>
 
-  <form @submit=${(e: Event) => { e.preventDefault(); (this.add)(e); }}>
+  <form @submit=${(e: SubmitEvent) => { e.preventDefault(); (this.add)(e); }}>
     <input placeholder="What needs doing?" .value=${this._draft.value} @input=${(e) => this._draft.value = (e.target as HTMLInputElement).value} />
     <button type="submit" ?disabled=${!this._draft.value.trim()}>Add</button>
   </form>

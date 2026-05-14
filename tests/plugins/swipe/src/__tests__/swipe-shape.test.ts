@@ -14,6 +14,10 @@ import {
   type ModifierArg,
   type VueEmissionDescriptor,
   type ReactEmissionDescriptor,
+  type SvelteEmissionDescriptor,
+  type AngularEmissionDescriptor,
+  type SolidEmissionDescriptor,
+  type LitEmissionDescriptor,
 } from '@rozie/core';
 import { swipeModifier } from '../index.js';
 
@@ -27,6 +31,10 @@ describe('MOD-05 — swipe ModifierImpl shape (D-22b public surface)', () => {
     expect(typeof _impl.resolve).toBe('function');
     expect(typeof _impl.vue).toBe('function');
     expect(typeof _impl.react).toBe('function');
+    expect(typeof _impl.svelte).toBe('function');
+    expect(typeof _impl.angular).toBe('function');
+    expect(typeof _impl.solid).toBe('function');
+    expect(typeof _impl.lit).toBe('function');
   });
 
   it('registers cleanly via the public registry API alongside builtins', () => {
@@ -104,6 +112,74 @@ describe('MOD-05 — swipe ModifierImpl shape (D-22b public surface)', () => {
       { kind: 'literal', value: 'up', loc: { start: 0, end: 0 } },
     ];
     const desc: ReactEmissionDescriptor = swipeModifier.react!(args, ctx);
+    expect(desc.kind).toBe('inlineGuard');
+    if (desc.kind === 'inlineGuard') {
+      expect(desc.code).toMatch(/swipe up guard/);
+      expect(desc.code).toMatch(/clientY/);
+    }
+  });
+
+  it('svelte() returns kind:inlineGuard for each direction', () => {
+    const ctx: ModifierContext = {
+      source: 'template-event',
+      event: 'touchstart',
+      sourceLoc: { start: 0, end: 0 },
+    };
+    const args: ModifierArg[] = [
+      { kind: 'literal', value: 'left', loc: { start: 0, end: 0 } },
+    ];
+    const desc: SvelteEmissionDescriptor = swipeModifier.svelte!(args, ctx);
+    expect(desc.kind).toBe('inlineGuard');
+    if (desc.kind === 'inlineGuard') {
+      expect(desc.code).toMatch(/swipe left guard/);
+      expect(desc.code).toMatch(/clientX/);
+    }
+  });
+
+  it('angular() returns kind:inlineGuard for each direction', () => {
+    const ctx: ModifierContext = {
+      source: 'template-event',
+      event: 'touchstart',
+      sourceLoc: { start: 0, end: 0 },
+    };
+    const args: ModifierArg[] = [
+      { kind: 'literal', value: 'right', loc: { start: 0, end: 0 } },
+    ];
+    const desc: AngularEmissionDescriptor = swipeModifier.angular!(args, ctx);
+    expect(desc.kind).toBe('inlineGuard');
+    if (desc.kind === 'inlineGuard') {
+      expect(desc.code).toMatch(/swipe right guard/);
+      expect(desc.code).toMatch(/clientX/);
+    }
+  });
+
+  it('solid() returns kind:inlineGuard for each direction', () => {
+    const ctx: ModifierContext = {
+      source: 'template-event',
+      event: 'touchstart',
+      sourceLoc: { start: 0, end: 0 },
+    };
+    const args: ModifierArg[] = [
+      { kind: 'literal', value: 'down', loc: { start: 0, end: 0 } },
+    ];
+    const desc: SolidEmissionDescriptor = swipeModifier.solid!(args, ctx);
+    expect(desc.kind).toBe('inlineGuard');
+    if (desc.kind === 'inlineGuard') {
+      expect(desc.code).toMatch(/swipe down guard/);
+      expect(desc.code).toMatch(/clientY/);
+    }
+  });
+
+  it('lit() returns kind:inlineGuard for each direction', () => {
+    const ctx: ModifierContext = {
+      source: 'template-event',
+      event: 'touchstart',
+      sourceLoc: { start: 0, end: 0 },
+    };
+    const args: ModifierArg[] = [
+      { kind: 'literal', value: 'up', loc: { start: 0, end: 0 } },
+    ];
+    const desc: LitEmissionDescriptor = swipeModifier.lit!(args, ctx);
     expect(desc.kind).toBe('inlineGuard');
     if (desc.kind === 'inlineGuard') {
       expect(desc.code).toMatch(/swipe up guard/);

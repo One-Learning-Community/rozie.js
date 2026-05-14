@@ -54,7 +54,7 @@ input { padding: 0.25rem 0.5rem; }
     return html`
 <div class="search-input">
   
-  <input type="search" placeholder=${this.placeholder} .value=${this._query.value} @input=${(e: Event) => { ((e) => this._query.value = (e.target as HTMLInputElement).value)(e); (this._tw0)(e); }} @keydown=${(e: Event) => { ((e: Event) => { if ((e as KeyboardEvent).key !== 'Enter') return; (this.onSearch)(e); })(e); ((e: Event) => { if ((e as KeyboardEvent).key !== 'Escape') return; (this.clear)(e); })(e); }} data-rozie-ref="inputEl" />
+  <input type="search" placeholder=${this.placeholder} .value=${this._query.value} @input=${(e: Event) => { ((e) => this._query.value = (e.target as HTMLInputElement).value)(e); (this._tw0)(e); }} @keydown=${(e: Event) => { ((e: KeyboardEvent) => { if (e.key !== 'Enter') return; (this.onSearch)(e); })(e); ((e: KeyboardEvent) => { if (e.key !== 'Escape') return; (this.clear)(e); })(e); }} data-rozie-ref="inputEl" />
 
   ${this._query.value.length > 0 ? html`<button class="clear-btn" aria-label="Clear" @click=${this.clear}>
     ×
