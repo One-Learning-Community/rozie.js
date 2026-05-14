@@ -28,8 +28,8 @@ import type {
 } from '../../../../core/src/ir/types.js';
 import type {
   ModifierRegistry,
-  ReactEmissionDescriptor,
-} from '../../../../core/src/modifiers/ModifierRegistry.js';
+  SolidEmissionDescriptor,
+} from '@rozie/core';
 import type { ModifierArg } from '../../../../core/src/modifier-grammar/parseModifierChain.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
@@ -218,19 +218,19 @@ export function emitTemplateEvent(
       continue;
     }
 
-    // Resolve descriptor via react() — Solid reuses ReactEmissionDescriptor shapes
-    if (!impl.react) {
+    // Resolve descriptor via the first-class solid() hook.
+    if (!impl.solid) {
       diagnostics.push({
-        code: RozieErrorCode.TARGET_REACT_RHTML_WITH_CHILDREN,
+        code: RozieErrorCode.TARGET_SOLID_RESERVED,
         severity: 'error',
-        message: `Modifier '.${modifierName}' has no Solid/React emitter.`,
+        message: `Modifier '.${modifierName}' has no Solid emitter (missing solid() hook).`,
         loc: entry.sourceLoc,
       });
       continue;
     }
 
     const args = entry.kind === 'wrap' || entry.kind === 'filter' ? entry.args : [];
-    const desc: ReactEmissionDescriptor = impl.react(args, {
+    const desc: SolidEmissionDescriptor = impl.solid(args, {
       source: 'template-event',
       event: eventName,
       sourceLoc: entry.sourceLoc,
@@ -264,9 +264,8 @@ export function emitTemplateEvent(
     }
 
     // Debounce/throttle helper on template @event — emit a wrapper const to script injections.
-    if (desc.helperName === 'useDebouncedCallback' || desc.helperName === 'useThrottledCallback') {
-      const solidHelper =
-        desc.helperName === 'useDebouncedCallback' ? 'createDebouncedHandler' : 'createThrottledHandler';
+    if (desc.helperName === 'createDebouncedHandler' || desc.helperName === 'createThrottledHandler') {
+      const solidHelper = desc.helperName;
       ctx.collectors.runtime.add(solidHelper);
       const originalHandlerCode = renderHandler(listener.handler, ctx.ir);
       const wrapName = makeWrapName(solidHelper, listener.handler, ctx.injectionCounter);
