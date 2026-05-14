@@ -84,6 +84,13 @@ export function createLitControllableProperty<T>(
   const _state = signal<T>(
     wasControlled ? (initialControlledValue as T) : defaultValue,
   );
+  // Tracks whether the user has interacted with the component via write()
+  // since mount. The first notifyAttributeChange before any write is treated
+  // as initial attribute seeding (HTML parser populating attributes after
+  // constructor runs) — it sets the value but does NOT flip mode and does NOT
+  // emit ROZ840. Subsequent flips after user interaction are real
+  // mid-lifecycle changes and behave as before.
+  let userHasWritten = false;
 
   const currentValue = (): T => _state.value;
 
@@ -103,6 +110,7 @@ export function createLitControllableProperty<T>(
       return currentValue();
     },
     write(next: T | ((prev: T) => T)): void {
+      userHasWritten = true;
       const resolved: T =
         typeof next === 'function'
           ? (next as (prev: T) => T)(currentValue())
@@ -118,6 +126,17 @@ export function createLitControllableProperty<T>(
     },
     notifyAttributeChange(next: T | undefined): void {
       const nextIsControlled = next !== undefined;
+      // Initial-mount seeding: if no write() has happened yet, the HTML
+      // parser is populating the attribute right after construction. Treat
+      // this as seeding rather than a mode flip — set the value but keep
+      // wasControlled where the constructor left it (uncontrolled unless
+      // initialControlledValue was provided).
+      if (!userHasWritten) {
+        if (nextIsControlled) {
+          _state.value = next as T;
+        }
+        return;
+      }
       if (wasControlled !== nextIsControlled) {
         // D-LIT-10 ROZ840 — silent-follow but emit ONE console.warn so the
         // consumer can grep production logs for unexpected flips. Stable
