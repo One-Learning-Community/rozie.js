@@ -9,6 +9,7 @@
     "preview": "vite preview --port 4176",
     "typecheck": "tsc --noEmit",
     "test:e2e": "playwright test",
+    "test:e2e:hmr": "playwright test --config playwright.hmr.config.ts",
     "test:e2e:install": "playwright install chromium"
   },
   "dependencies": {
