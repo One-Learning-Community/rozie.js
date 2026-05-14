@@ -22,6 +22,16 @@ import type { Accessor, Setter } from 'solid-js';
  *   - Setter: in controlled mode calls `props["on<Key>Change"]` if present; in uncontrolled mode
  *     updates internal signal AND calls the callback.
  *
+ * @remarks
+ * **`T` must not be a function type.** The setter classifies its argument as a
+ * functional updater purely via `typeof arg === 'function'`, so a function
+ * argument is *always* treated as `(prev: T) => T` — a controllable signal whose
+ * value is itself a function (a callback or render-prop stored as state) can
+ * never be *set* to a new function. This is the same limitation the React
+ * `useControllableState` runtime carries, kept consistent across both targets.
+ * If function-valued state must be supported, an explicit updater-wrapper API is
+ * required instead.
+ *
  * @example
  * ```tsx
  * const [value, setValue] = createControllableSignal(local, 'value', 0);
