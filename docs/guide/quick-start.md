@@ -47,7 +47,7 @@ const increment = () => { if (canIncrement) $props.value += $props.step }
 Key things to notice:
 
 - `<props>` and `<data>` accept real JS expressions, not JSON. `default: () => []`, `Number`, `Infinity` — all fine.
-- `model: true` on a prop signals two-way binding. Rozie expands this to each framework's native pattern: `defineModel` (Vue), controllable-state pair (React), `$bindable` (Svelte), `model<T>()` (Angular), `createControllableSignal` (Solid).
+- `model: true` on a prop signals two-way binding. Rozie expands this to each target's native pattern: `defineModel` (Vue), controllable-state pair (React), `$bindable` (Svelte), `model<T>()` (Angular), `createControllableSignal` (Solid), a property/attribute pair with a `*-change` CustomEvent (Lit).
 - `r-*` directives mirror Vue's `v-*` but are deliberately namespaced so `.rozie` files are visually distinct.
 
 ## 2. Compile in a Vite project
@@ -72,7 +72,7 @@ const n = ref(0);
 <template><Counter v-model:value="n" /></template>
 ```
 
-Swap `target: 'vue'` for `react`, `svelte`, `angular`, or `solid` and the same `.rozie` file produces an idiomatic component in that framework.
+Swap `target: 'vue'` for `react`, `svelte`, `angular`, `solid`, or `lit` and the same `.rozie` file produces an idiomatic component for that target.
 
 ## 3. Inspect the output
 
@@ -84,12 +84,13 @@ pnpm rozie build Counter.rozie --target react
 pnpm rozie build Counter.rozie --target svelte
 pnpm rozie build Counter.rozie --target angular
 pnpm rozie build Counter.rozie --target solid
+pnpm rozie build Counter.rozie --target lit
 ```
 
 See the [Counter example](/examples/counter) for the full per-target output side by side.
 
 ## Next steps
 
-- [Examples](/examples/counter) — full source + five-target output for representative components
+- [Examples](/examples/counter) — full source + per-target output for representative components
 - [Why Rozie?](/guide/why) — the problem Rozie solves and who it's for
-- [Install](/guide/install) — supported framework versions and bundler setup
+- [Install](/guide/install) — supported target versions and bundler setup

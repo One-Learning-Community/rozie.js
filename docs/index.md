@@ -4,7 +4,7 @@ layout: home
 hero:
   name: "Rozie.js"
   text: "One source. Every framework."
-  tagline: "Write components once in a Vue/Alpine-flavored syntax. Ship idiomatic React, Vue, Svelte, Angular, and Solid — no per-framework wrappers."
+  tagline: "Write components once in a Vue/Alpine-flavored syntax. Ship idiomatic React, Vue, Svelte, Angular, Solid, and Lit web components — no per-framework wrappers."
   actions:
     - theme: brand
       text: Quick Start
@@ -20,12 +20,12 @@ hero:
       link: /examples/
 
 features:
-  - title: One file, five frameworks
-    details: Author a single .rozie file. Rozie compiles it to idiomatic React, Vue, Svelte, Angular, and Solid components — each using the target framework's native reactivity primitives.
+  - title: One file, six targets
+    details: Author a single .rozie file. Rozie compiles it to idiomatic React, Vue, Svelte, Angular, and Solid components plus Lit web components — each using the target's native reactivity primitives.
   - title: Familiar Vue/Alpine syntax
     details: Block-based SFCs with &lt;props&gt;, &lt;data&gt;, &lt;script&gt;, &lt;template&gt;, and &lt;style&gt;. r-* directives, @event modifiers, {{ }} interpolation. No JSX-isms.
   - title: Not a runtime framework
-    details: Rozie compiles away. The heavy lifting still happens in your target framework — React, Vue, Svelte, Angular, or Solid owns the rendering pipeline.
+    details: Rozie compiles away. The heavy lifting still happens in your target — React, Vue, Svelte, Angular, Solid, or the browser's native custom-element runtime owns the rendering pipeline.
   - title: Built for component-library authors
-    details: If you maintain manual cross-framework wrappers today, Rozie eliminates that work. One source of truth, five working consumer packages.
+    details: If you maintain manual cross-framework wrappers today, Rozie eliminates that work. One source of truth, six working consumer packages.
 ---

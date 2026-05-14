@@ -1,6 +1,6 @@
 # Examples
 
-Seven reference components, each shipped with byte-verbatim output across all five targets (Vue, React, Svelte, Angular, Solid). Pick whichever lines up with the feature you're trying to evaluate.
+Seven reference components, each shipped with byte-verbatim output across all six targets (Vue, React, Svelte, Angular, Solid, Lit). Pick whichever lines up with the feature you're trying to evaluate.
 
 ## By complexity
 

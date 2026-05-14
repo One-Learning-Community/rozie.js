@@ -1,6 +1,6 @@
 # Features & design choices
 
-Rozie tries to be the syntax a Vue developer would design if they wanted React, Svelte, Angular, and Solid output without losing the SFC ergonomics. A few of those choices are worth calling out, because they translate into meaningful code-saving over hand-rolled cross-framework wrappers.
+Rozie tries to be the syntax a Vue developer would design if they wanted React, Svelte, Angular, Solid, and Lit output without losing the SFC ergonomics. A few of those choices are worth calling out, because they translate into meaningful code-saving over hand-rolled cross-framework wrappers.
 
 ## Parameterized event modifiers
 
@@ -39,7 +39,7 @@ The grammar is a small dedicated PEG (`packages/core/src/modifier-grammar/modifi
 | `.outside($refs.a, ...)` | Fire only when the event target is outside every listed ref |
 | `.enter` / `.escape` / `.tab` / `.space` / `.arrow{Up,Down,Left,Right}` / `.delete` | Key filters; the handler short-circuits unless the key matches |
 
-Each one compiles to the per-target idiom: Vue's `@keydown.enter`/`watchEffect`-with-cleanup, React's `useEffect`-with-removeEventListener, Svelte's `$effect` teardown, Angular's `Renderer2.listen` + `DestroyRef`, Solid's `createEffect` + `onCleanup`. **You write the modifier; Rozie writes the rest.**
+Each one compiles to the per-target idiom: Vue's `@keydown.enter`/`watchEffect`-with-cleanup, React's `useEffect`-with-removeEventListener, Svelte's `$effect` teardown, Angular's `Renderer2.listen` + `DestroyRef`, Solid's `createEffect` + `onCleanup`, Lit's `firstUpdated` wiring + `disconnectedCallback` cleanup (with `.debounce`/`.throttle` hoisted to stable class fields). **You write the modifier; Rozie writes the rest.**
 
 ## `<listeners>` block with reactive `when`
 
@@ -64,7 +64,7 @@ Document-level and window-level listeners belong outside the markup, so Rozie gi
 </listeners>
 ```
 
-The `when` predicate is reactive — when it flips false, the listener is removed; when it flips true again, it's re-attached. No `addEventListener` / `removeEventListener` boilerplate, no missed teardown on unmount. This single block in `Dropdown.rozie` collapses roughly 30 lines of per-framework wiring that would otherwise be written four to five times.
+The `when` predicate is reactive — when it flips false, the listener is removed; when it flips true again, it's re-attached. No `addEventListener` / `removeEventListener` boilerplate, no missed teardown on unmount. This single block in `Dropdown.rozie` collapses roughly 30 lines of per-framework wiring that would otherwise be written once per target.
 
 ## `<components>` block, including self-recursion
 
@@ -109,7 +109,7 @@ Self-recursion works the same way — list the file itself, then use the tag ins
 </template>
 ```
 
-Each target gets the right import idiom: Vue's `defineOptions({ name })` + setup import, React's hoisted named function, Svelte's self-import-with-extension, Angular's `forwardRef(() => TreeNode)`, Solid's named function declaration.
+Each target gets the right import idiom: Vue's `defineOptions({ name })` + setup import, React's hoisted named function, Svelte's self-import-with-extension, Angular's `forwardRef(() => TreeNode)`, Solid's named function declaration, Lit's sibling custom-element import (the tag self-registers via `@customElement`).
 
 ## `<props>` and `<data>` accept real JS expressions
 
@@ -128,11 +128,11 @@ Most config-block DSLs stop at JSON5. Rozie's parser uses `@babel/parser.parseEx
 </props>
 ```
 
-That `default: () => []` is real, not a string template — every target's emitter unwraps it into the framework's native default-prop mechanism (`withDefaults`, `?? ...`, `$bindable(...)`, `input<T>(...)`, etc.).
+That `default: () => []` is real, not a string template — every target's emitter unwraps it into the framework's native default-prop mechanism (`withDefaults`, `?? ...`, `$bindable(...)`, `input<T>(...)`, a `@property` field initializer for Lit, etc.).
 
 ## `model: true` → idiomatic two-way binding everywhere
 
-One flag in `<props>`. Five different two-way-binding expansions, each one the framework's native pattern:
+One flag in `<props>`. Six different two-way-binding expansions, each one the target's native pattern:
 
 ```rozie
 <props>
@@ -150,6 +150,7 @@ One flag in `<props>`. Five different two-way-binding expansions, each one the f
 | Svelte 5 | `let { value = $bindable(0) }: Props = $props()` |
 | Angular | `value = model<number>(0)` |
 | Solid | `createControllableSignal(_props, 'value', 0)` from `@rozie/runtime-solid` |
+| Lit | `createLitControllableProperty({ host, eventName: 'value-change', defaultValue: 0 })` from `@rozie/runtime-lit` — a `value` property/attribute pair plus a `value-change` CustomEvent |
 
 Inside the component you just write `$props.value = newValue` — Rozie rewrites the assignment to the target's emit-or-setter form.
 
@@ -249,7 +250,7 @@ Rozie's compatibility bar is "high percentage" parity, not 100%. Slots are the a
 </style>
 ```
 
-Each target picks the right escape hatch: Vue gets a sibling unscoped `<style>` block, Svelte gets `:global(:root)`, Angular gets `::ng-deep :root`, React/Solid get a separate `.global.css` file imported next to the module CSS.
+Each target picks the right escape hatch: Vue gets a sibling unscoped `<style>` block, Svelte gets `:global(:root)`, Angular gets `::ng-deep :root`, React/Solid get a separate `.global.css` file imported next to the module CSS, and Lit — whose `static styles` are shadow-DOM-scoped by default — gets the `:root` rules injected into the document via an `injectGlobalStyles` runtime call.
 
 ## Smaller wins
 
@@ -261,9 +262,10 @@ A grab-bag of little decisions that add up:
 - **Setup-once reactivity**. Closures in `<script>` run once at component setup, not per render. This matches Vue/Svelte/Solid expectations and means a counter like `let n = 0; const incr = () => n++` works the way a non-React developer would expect — no `useCallback`/dependency-array gymnastics in the source.
 - **Per-statement source maps**. Errors thrown by emitted code map back to the original `.rozie` line, including statements inside `$computed`, `<listeners>` handlers, and embedded template expressions.
 - **Optional TypeScript**. `.rozie` source can be plain JS; emitted output is `.tsx` / `.ts` / `.vue` / `.svelte` regardless, with prop types synthesized from `<props>` shapes.
+- **Web components, same source**. The Lit target emits a standards-based custom element from the same `.rozie` file — a framework-agnostic consumer that drops into any HTML page, no build step required at the consumption site.
 - **Auto kebab/camel-case prop conversion**. `:on-close="..."` in the template lines up with `onClose` in `<props>`. Angular's selector-form tags and Vue's kebab-template idiom both fall out for free.
 - **HTML comments work everywhere**. `<!-- ... -->` inside `<template>` is preserved through the parse and stripped from emit so the comment doesn't leak into a Vue render function or a React `JSX` text node.
 
 ## Next
 
-See [Examples](/examples/) for the full gallery — seven reference components, each with byte-verbatim output across all five targets, plus a feature index for jumping straight to whichever idiom you want to see in action.
+See [Examples](/examples/) for the full gallery — seven reference components, each with byte-verbatim output across all six targets, plus a feature index for jumping straight to whichever idiom you want to see in action.

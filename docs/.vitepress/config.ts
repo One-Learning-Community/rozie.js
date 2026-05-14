@@ -13,7 +13,7 @@ const rozieGrammar = JSON.parse(
 export default defineConfig({
   title: 'Rozie.js',
   description:
-    'Write components once in a Vue/Alpine-flavored syntax. Ship idiomatic React, Vue, Svelte, and Angular.',
+    'Write components once in a Vue/Alpine-flavored syntax. Ship idiomatic React, Vue, Svelte, Angular, Solid, and Lit web components.',
   base: '/rozie.js/',
   cleanUrls: true,
   lastUpdated: true,
