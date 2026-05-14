@@ -57,9 +57,9 @@ function targetExpression(target: ListenerTarget): string {
 
 function classifyListener(listener: Listener): {
   klass: 'A' | 'B' | 'C' | 'D';
-  outsideRefs?: string[];
-  wrapper?: 'debounce' | 'throttle';
-  wrapperArgs?: number;
+  outsideRefs?: string[] | undefined;
+  wrapper?: 'debounce' | 'throttle' | undefined;
+  wrapperArgs?: number | undefined;
   inlineGuards: string[];
   listenerOptions: { capture?: boolean; passive?: boolean; once?: boolean };
 } {

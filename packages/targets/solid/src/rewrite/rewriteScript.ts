@@ -119,7 +119,6 @@ export function rewriteRozieExpressionNode(
       sourceType: 'module',
     },
     comments: [],
-    errors: [],
   };
   const result = rewriteRozieIdentifiers(wrapped, ir);
   const body = result.rewrittenProgram.program.body;

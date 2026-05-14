@@ -83,7 +83,7 @@ export interface EmitScriptCollectors {
   solidImports: SolidImportCollector;
   runtimeImports: RuntimeSolidImportCollector;
   /** .rozie filename; when provided, enables per-statement source map generation. */
-  filename?: string;
+  filename?: string | undefined;
 }
 
 export function emitScript(

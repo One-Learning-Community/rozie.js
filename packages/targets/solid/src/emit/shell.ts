@@ -36,7 +36,7 @@ export interface SolidShellParts {
    * any non-model prop has a declared default. Emitted immediately before
    * splitPropsCall so `local.*` receives the declared defaults.
    */
-  mergePropsCall?: string;
+  mergePropsCall?: string | undefined;
   /**
    * The `const [local, rest] = splitProps(_merged|_props, [...]);\n` call (D-141).
    * Always present — even for no-props components (emits `splitProps(_props, [])`).
@@ -84,7 +84,7 @@ export interface SolidShellParts {
    * Phase 06.2 P2 (D-118): synthesized component-import lines for the
    * top-of-file imports section.
    */
-  componentImportsBlock?: string;
+  componentImportsBlock?: string | undefined;
   /**
    * Number of hook-section statement lines (from emitScript.hookSectionLines).
    * Used to compute where userArrowsSection starts in the output so the script

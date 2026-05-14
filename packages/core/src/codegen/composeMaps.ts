@@ -60,7 +60,7 @@ export interface ComposeMapsOpts {
    * generated-line reference so it matches the actual tsx output line numbers
    * rather than the script-body-relative line numbers from @babel/generator.
    */
-  userCodeLineOffset?: number;
+  userCodeLineOffset?: number | undefined;
 }
 
 /**

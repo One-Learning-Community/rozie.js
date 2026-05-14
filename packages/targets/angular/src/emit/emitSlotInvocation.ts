@@ -71,7 +71,7 @@ export interface EmitSlotInvocationCtx {
 function containsFunctionExpression(node: t.Node): boolean {
   if (t.isArrowFunctionExpression(node) || t.isFunctionExpression(node)) return true;
   for (const key of Object.keys(node)) {
-    const child = (node as Record<string, unknown>)[key];
+    const child = (node as unknown as Record<string, unknown>)[key];
     if (child && typeof child === 'object' && 'type' in (child as object)) {
       if (containsFunctionExpression(child as t.Node)) return true;
     }

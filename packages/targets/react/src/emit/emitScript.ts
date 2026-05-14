@@ -552,7 +552,7 @@ export interface EmitScriptCollectors {
   react: ReactImportCollector;
   runtime: RuntimeReactImportCollector;
   /** .rozie filename; when provided, enables per-statement source map generation. */
-  filename?: string;
+  filename?: string | undefined;
 }
 
 /**
