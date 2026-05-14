@@ -87,13 +87,12 @@ test('HMR preserves Counter <data> state across a <style> edit (QA-04)', async (
   }
 });
 
-// D-SH-03 carry-forward: the style-hot-apply half of the QA-04 contract. The
-// unplugin's handleHotUpdate does not invalidate @vitejs/plugin-vue's
-// `?vue&type=style` sub-module, so the edited `gap` value is not repainted.
-// Marked fixme — Plan 07-05 fixes the unplugin (invalidate the style
-// sub-module) and un-fixmes this.
-test.fixme(
-  'HMR <style> edit hot-applies the new value (D-SH-03 — unplugin does not invalidate the vue style sub-module)',
+// D-SH-03 FIXED (Plan 07-05): the unplugin's handleHotUpdate now walks the
+// top-level virtual module's imported modules and additively invalidates
+// @vitejs/plugin-vue's `?vue&type=style` sub-module, so the edited `gap` value
+// is repainted. Un-fixmed.
+test(
+  'HMR <style> edit hot-applies the new value (D-SH-03 — unplugin invalidates the vue style sub-module)',
   async ({ page }) => {
     const original = await readFile(ROZIE_FILE, 'utf8');
     expect(original).toContain('gap: 0.5rem');

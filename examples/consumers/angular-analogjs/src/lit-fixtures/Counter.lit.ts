@@ -3,7 +3,15 @@ import { customElement, property } from 'lit/decorators.js';
 import { SignalWatcher, signal } from '@lit-labs/preact-signals';
 import { createLitControllableProperty } from '@rozie/runtime-lit';
 
-@customElement('rozie-counter')
+// Phase 7 Plan 05 — rozie-counter tag-name collision fix (07-01 carry-forward):
+// the Angular `Counter.rozie` emitter ALSO uses the selector `rozie-counter`.
+// Importing this fixture registers a global custom element under that tag, so
+// on the Angular counter page the browser rendered Angular's `<rozie-counter>`
+// host AND simultaneously upgraded it as this Lit element — a strict-mode
+// double-match in `counter.spec.ts`. Namespacing the Lit interop fixture's tag
+// to `rozie-lit-counter` removes the collision; the Angular emitter selector
+// is unchanged.
+@customElement('rozie-lit-counter')
 export default class Counter extends SignalWatcher(LitElement) {
   static styles = css`
 .counter { display: inline-flex; gap: 0.5rem; align-items: center; }

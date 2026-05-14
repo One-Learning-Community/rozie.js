@@ -102,12 +102,12 @@ test('HMR preserves Counter state across a <style> edit (QA-04)', async ({
   }
 });
 
-// D-SH-03 carry-forward: the style-hot-apply half of the QA-04 contract. The
-// unplugin's handleHotUpdate does not re-apply the edited shadow-DOM <style>
-// to the live Lit element. Marked fixme — Plan 07-05 fixes the unplugin (or the
-// Lit HMR path) and un-fixmes this.
-test.fixme(
-  'HMR <style> edit hot-applies the new value (D-SH-03 — unplugin does not re-apply the lit shadow-DOM style)',
+// D-SH-03 FIXED (Plan 07-05): the unplugin's handleHotUpdate now additively
+// invalidates the Lit `<style>` sub-module (any `type=style` / `lang.css`
+// child of the top-level virtual module) so the edited shadow-DOM <style> is
+// re-applied to the live Lit element. Un-fixmed.
+test(
+  'HMR <style> edit hot-applies the new value (D-SH-03 — unplugin invalidates the lit style sub-module)',
   async ({ page }) => {
     const original = await readFile(ROZIE_FILE, 'utf8');
     expect(original).toContain('gap: 0.5rem');

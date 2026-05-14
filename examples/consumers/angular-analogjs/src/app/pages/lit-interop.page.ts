@@ -22,15 +22,15 @@ import '../../lit-fixtures/Counter.lit';
       <h2>Lit Interop (Angular)</h2>
       <p>
         Angular consuming compiled Lit
-        <code>&lt;rozie-counter&gt;</code>.
+        <code>&lt;rozie-lit-counter&gt;</code>.
       </p>
-      <rozie-counter
+      <rozie-lit-counter
         [value]="val()"
         [step]="1"
         [min]="-10"
         [max]="10"
         (value-change)="onChange($event)"
-      ></rozie-counter>
+      ></rozie-lit-counter>
       <p>
         Parent-tracked value:
         <span data-testid="parent-value">{{ val() }}</span>

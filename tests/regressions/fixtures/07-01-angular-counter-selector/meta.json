@@ -1,0 +1,9 @@
+{
+  "id": "REG-07-005",
+  "source": "07-ANGULAR-SPIKE.md#rozie-counter-collision",
+  "sourceKind": "phase-7-loop",
+  "phase": "07",
+  "desc": "a component named Counter emits the deterministic selector rozie-counter (Angular) / @customElement('rozie-counter') (Lit) — the 07-01 collision was a demo-fixture namespace clash, fixed by namespacing the Lit interop fixture",
+  "targets": ["angular", "lit"],
+  "discoveredBy": "07-ANGULAR-SPIKE.md — rozie-counter custom-element tag-name collision"
+}

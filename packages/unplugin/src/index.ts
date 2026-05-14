@@ -204,6 +204,45 @@ export const unplugin = createUnpluginV3<Partial<RozieOptions>>((rawOptions) => 
           .map((id: string) => server.moduleGraph.getModuleById(id))
           .filter(Boolean);
         if (mods.length === 0) return;
+
+        // D-SH-03: `@vitejs/plugin-vue` and `@sveltejs/vite-plugin-svelte`
+        // split a component's `<style>` into a SEPARATE style sub-module
+        // (`...vue?type=style&index=0&lang.css`, `...svelte?type=style&lang.css`),
+        // and Lit's shadow-DOM `<style>` is likewise a distinct asset. Those
+        // sub-modules are children of the top-level virtual module in Vite's
+        // module graph — invalidating only the top-level module left the
+        // framework plugin serving STALE CSS, so a `<style>` edit never
+        // hot-applied for vue / svelte / lit. Walk the top-level module's
+        // imported modules and additively invalidate any style sub-module so
+        // the framework plugin re-transforms the CSS on the next request.
+        // (React already invalidates its `.module.css` / `.global.css`
+        // sidecars via the `candidates` list above; Solid emits styles inline
+        // in the component module, so the component-module HMR carries them.)
+        if (
+          options.target === 'vue' ||
+          options.target === 'svelte' ||
+          options.target === 'lit'
+        ) {
+          const styleMods = new Set<unknown>();
+          const isStyleSubModule = (id: string): boolean =>
+            id.includes('type=style') ||
+            id.includes('lang.css') ||
+            /[?&]vue&type=style/.test(id) ||
+            /[?&]svelte&type=style/.test(id);
+          for (const m of mods) {
+            const imported: Iterable<{ id?: string | null }> =
+              m.importedModules ?? [];
+            for (const dep of imported) {
+              if (dep?.id && isStyleSubModule(dep.id)) styleMods.add(dep);
+            }
+          }
+          for (const sm of styleMods) {
+            // biome-ignore lint/suspicious/noExplicitAny: ModuleNode from vite
+            server.moduleGraph.invalidateModule(sm as any);
+            mods.push(sm);
+          }
+        }
+
         mods.forEach((m: any) => server.moduleGraph.invalidateModule(m));
         return mods;
       },
