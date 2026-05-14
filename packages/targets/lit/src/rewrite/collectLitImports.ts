@@ -115,7 +115,9 @@ export type RuntimeLitImport =
   | 'createLitControllableProperty'
   | 'observeRozieSlotCtx'
   | 'attachOutsideClickListener'
-  | 'injectGlobalStyles';
+  | 'injectGlobalStyles'
+  | 'debounce'
+  | 'throttle';
 
 export class RuntimeLitImportCollector {
   private symbols = new Set<RuntimeLitImport>();

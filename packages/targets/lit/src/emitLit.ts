@@ -132,6 +132,7 @@ export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResu
   const classBody = composeClassBody({
     staticStylesField: styleResult.staticStylesField,
     fieldDecls: scriptResult.fieldDecls,
+    debouncedFieldDecls: templateResult.debouncedFieldDecls.join('\n'),
     slotFields: slotResult.fields,
     cleanupField: '  private _disconnectCleanups: Array<() => void> = [];',
     firstUpdatedBody: combineFirstUpdated(
@@ -201,6 +202,12 @@ function combineFirstUpdated(
 interface ComposeClassBodyParts {
   staticStylesField: string;
   fieldDecls: string;
+  /**
+   * Class-field declarations for template-event `.debounce`/`.throttle`
+   * wrappers (WR-15). Emitted alongside the other field decls so the wrapper
+   * identity is stable across render() calls.
+   */
+  debouncedFieldDecls: string;
   slotFields: string;
   cleanupField: string;
   firstUpdatedBody: string;
@@ -219,6 +226,9 @@ function composeClassBody(parts: ComposeClassBodyParts): string {
   }
   if (parts.fieldDecls.trim().length > 0) {
     sections.push(parts.fieldDecls);
+  }
+  if (parts.debouncedFieldDecls.trim().length > 0) {
+    sections.push(parts.debouncedFieldDecls);
   }
   if (parts.slotFields.trim().length > 0) {
     sections.push(parts.slotFields);

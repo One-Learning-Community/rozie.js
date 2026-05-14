@@ -58,8 +58,18 @@ export interface EmitTemplateOpts {
    * emitters (emitLoop) can communicate back to emitTemplate without a module-level
    * singleton. Callers (emitTemplate) initialize this; nested callers mutate it.
    * Not part of the public opts API — emitTemplate initialises it internally.
+   *
+   * `debouncedFieldDecls` / `debounceCleanupWiring` collect class-field
+   * declarations + disconnectedCallback cleanup pushes for template-event
+   * `.debounce`/`.throttle` modifiers (WR-15). The wrapper must live on a
+   * class field — an inline IIFE in `render()` resets its timer closure on
+   * every re-render, silently defeating the debounce.
    */
-  _state?: { repeatUsed: boolean };
+  _state?: {
+    repeatUsed: boolean;
+    debouncedFieldDecls: string[];
+    debounceCleanupWiring: string[];
+  };
 }
 
 export interface EmitTemplateResult {
@@ -73,6 +83,12 @@ export interface EmitTemplateResult {
    * result instead of mutable module state to support concurrent compilation).
    */
   repeatUsed: boolean;
+  /**
+   * Class-field declarations for template-event `.debounce`/`.throttle`
+   * wrappers (WR-15). emitLit splices these into the class body alongside the
+   * other field declarations so the wrapper identity is stable across renders.
+   */
+  debouncedFieldDecls: string[];
   diagnostics: Diagnostic[];
 }
 
@@ -152,8 +168,15 @@ function emitAttribute(
 
     // Composition/self tags are custom elements — all prop bindings must use
     // property-binding syntax (.prop=${expr}) so objects/arrays aren't stringified.
+    // Kebab attribute names (`:on-close`) must be camelized to JS identifiers
+    // (`onClose`) so the child element's `this.onClose` getter resolves; the
+    // child's `r-if="$props.onClose"` then evaluates correctly. Matches the
+    // Angular composition precedent from Phase 06.2.
     if (tagKind === 'component' || tagKind === 'self') {
-      return `.${attr.name}=\${${expr}}`;
+      const propName = attr.name.includes('-')
+        ? attr.name.replace(/-([a-z])/g, (_, ch: string) => ch.toUpperCase())
+        : attr.name;
+      return `.${propName}=\${${expr}}`;
     }
 
     // Boolean attribute prefix.
@@ -253,6 +276,7 @@ function buildRModelParts(
 function buildEventParts(
   listener: Listener,
   ir: IRComponent,
+  opts: EmitTemplateOpts,
 ): { eventName: string; handlerBody: string; optionParts: string[] } {
   const eventName = listener.event;
   const handler = rewriteTemplateExpression(listener.handler, ir);
@@ -271,6 +295,13 @@ function buildEventParts(
       if (entry.option === 'passive') passiveOpt = true;
       if (entry.option === 'once') onceOpt = true;
     }
+    if (entry.kind === 'wrap' && (entry.modifier === 'debounce' || entry.modifier === 'throttle')) {
+      // WR-15: .debounce(ms) / .throttle(ms) on a template event. The wrapper
+      // must be hoisted to a class field (see wrapKind handling below) — an
+      // inline IIFE in render() resets its timer closure every re-render.
+      wrapKind = { kind: entry.modifier, ms: extractNumberArg(entry.args) };
+      continue;
+    }
     if (entry.kind === 'filter' || entry.kind === 'wrap') {
       if (entry.modifier === 'stop') inlineGuards.push('e.stopPropagation();');
       else if (entry.modifier === 'prevent')
@@ -283,8 +314,6 @@ function buildEventParts(
         inlineGuards.push("if ((e as KeyboardEvent).key !== 'Escape') return;");
       else if (entry.modifier === 'tab')
         inlineGuards.push("if ((e as KeyboardEvent).key !== 'Tab') return;");
-      // debounce/throttle on template events requires a persistent class-field
-      // wrapper (Phase 7 TODO) — inline IIFE resets on every render() call.
     }
   }
 
@@ -303,7 +332,26 @@ function buildEventParts(
     body = isFunctionLike ? `${handler}` : `(e: Event) => { ${handler}; }`;
   }
 
-  void wrapKind; // Phase 7: emit as class field rather than inline IIFE
+  // WR-15: .debounce/.throttle wrapper must live on a class field so its timer
+  // closure survives across render() calls. Allocate a unique field, register
+  // the field declaration + disconnectedCallback cleanup with emitLit via
+  // opts._state, and reference the field as the handler body.
+  if (wrapKind && opts._state) {
+    const idx = opts._state.debouncedFieldDecls.length;
+    const fieldName = `_tw${idx}`;
+    opts.runtime.add(wrapKind.kind);
+    // The wrapped body is invoked lazily through an arrow — `body` may be a
+    // bare method reference (`this.onSearch`) whose class field is declared
+    // AFTER this wrapper field. A lazy `(e) => (body)(e)` defers the lookup
+    // to event time, when all class fields are initialized.
+    opts._state.debouncedFieldDecls.push(
+      `  private ${fieldName} = ${wrapKind.kind}((e: Event) => (${body})(e), ${wrapKind.ms});`,
+    );
+    opts._state.debounceCleanupWiring.push(
+      `this._disconnectCleanups.push(() => this.${fieldName}.cancel());`,
+    );
+    body = `this.${fieldName}`;
+  }
 
   const optionParts: string[] = [];
   if (captureOpt) optionParts.push('capture: true');
@@ -311,6 +359,26 @@ function buildEventParts(
   if (onceOpt) optionParts.push('once: true');
 
   return { eventName, handlerBody: body, optionParts };
+}
+
+/**
+ * Extract the numeric argument from a `.debounce(ms)` / `.throttle(ms)`
+ * modifier's args array. Mirrors emitListeners.ts's extractNumberArg.
+ */
+function extractNumberArg(args: unknown[] | undefined): number {
+  if (!args || args.length === 0) return 0;
+  const first = args[0];
+  if (typeof first === 'object' && first !== null) {
+    const a = first as Record<string, unknown>;
+    if (a.kind === 'literal') {
+      if (typeof a.value === 'number') return a.value;
+      if (typeof a.value === 'string') {
+        const n = Number(a.value);
+        return Number.isFinite(n) ? n : 0;
+      }
+    }
+  }
+  return 0;
 }
 
 /**
@@ -430,7 +498,7 @@ function emitElementOpenTag(
   }
 
   for (const event of node.events) {
-    const parts1 = buildEventParts(event, ir);
+    const parts1 = buildEventParts(event, ir, opts);
     if (parts1.optionParts.length > 0) {
       optionEvents.push(parts1);
     } else {
@@ -715,14 +783,34 @@ export function emitTemplate(
   const diagnostics: Diagnostic[] = [];
   const hostListenerWiring: string[] = [];
   // Initialize per-call state (CR-06 fix: replaces module-level REPEAT_USED singleton).
-  const state = { repeatUsed: false };
+  const state = {
+    repeatUsed: false,
+    debouncedFieldDecls: [] as string[],
+    debounceCleanupWiring: [] as string[],
+  };
   const optsWithState: EmitTemplateOpts = { ...opts, _state: state };
 
   if (!ir.template) {
-    return { renderBody: '', hostListenerWiring, repeatUsed: false, diagnostics };
+    return {
+      renderBody: '',
+      hostListenerWiring,
+      repeatUsed: false,
+      debouncedFieldDecls: [],
+      diagnostics,
+    };
   }
 
   const body = emitNode(ir.template, ir, hostListenerWiring, optsWithState);
 
-  return { renderBody: body, hostListenerWiring, repeatUsed: state.repeatUsed, diagnostics };
+  // WR-15: debounce/throttle cleanup pushes flow into firstUpdated via the
+  // hostListenerWiring channel (same channel host-listener wiring uses).
+  hostListenerWiring.push(...state.debounceCleanupWiring);
+
+  return {
+    renderBody: body,
+    hostListenerWiring,
+    repeatUsed: state.repeatUsed,
+    debouncedFieldDecls: state.debouncedFieldDecls,
+    diagnostics,
+  };
 }

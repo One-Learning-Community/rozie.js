@@ -1,6 +1,7 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, property, query } from 'lit/decorators.js';
 import { SignalWatcher, signal } from '@lit-labs/preact-signals';
+import { debounce } from '@rozie/runtime-lit';
 
 @customElement('rozie-search-input')
 export default class SearchInput extends SignalWatcher(LitElement) {
@@ -17,9 +18,13 @@ input { padding: 0.25rem 0.5rem; }
   private _query = signal('');
   @query('[data-rozie-ref="inputEl"]') private _refInputEl!: HTMLElement;
 
+  private _tw0 = debounce((e: Event) => (this.onSearch)(e), 300);
+
   private _disconnectCleanups: Array<() => void> = [];
 
   firstUpdated(): void {
+    this._disconnectCleanups.push(() => this._tw0.cancel());
+
     this._disconnectCleanups.push((() => {
       // e.g., abort an in-flight request initialized in this hook
     }));
@@ -40,7 +45,7 @@ input { padding: 0.25rem 0.5rem; }
     return html`
 <div class="search-input">
   
-  <input type="search" placeholder=${this.placeholder} .value=${this._query.value} @input=${(e: Event) => { ((e) => this._query.value = (e.target as HTMLInputElement).value)(e); (this.onSearch)(e); }} @keydown=${(e: Event) => { ((e: Event) => { if ((e as KeyboardEvent).key !== 'Enter') return; (this.onSearch)(e); })(e); ((e: Event) => { if ((e as KeyboardEvent).key !== 'Escape') return; (this.clear)(e); })(e); }} data-rozie-ref="inputEl" />
+  <input type="search" placeholder=${this.placeholder} .value=${this._query.value} @input=${(e: Event) => { ((e) => this._query.value = (e.target as HTMLInputElement).value)(e); (this._tw0)(e); }} @keydown=${(e: Event) => { ((e: Event) => { if ((e as KeyboardEvent).key !== 'Enter') return; (this.onSearch)(e); })(e); ((e: Event) => { if ((e as KeyboardEvent).key !== 'Escape') return; (this.clear)(e); })(e); }} data-rozie-ref="inputEl" />
 
   ${this._query.value.length > 0 ? html`<button class="clear-btn" aria-label="Clear" @click=${this.clear}>
     ×
