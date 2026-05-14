@@ -63,4 +63,15 @@ export const once: ModifierImpl = {
     // a one-shot wrapper that auto-unbinds via DestroyRef.
     return { kind: 'native', token: 'once' };
   },
+  solid() {
+    // Phase 07.1 native: addEventListener({ once: true }) option flag — the
+    // Solid emitter switches to raw addEventListener call style for this flag.
+    return { kind: 'native', token: 'once' };
+  },
+  lit() {
+    // Phase 07.1 native: addEventListener({ once: true }) option flag — valid
+    // ONLY for <listeners>-block context where addEventListener option flags
+    // make sense.
+    return { kind: 'native', token: 'once' };
+  },
 };

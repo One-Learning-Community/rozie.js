@@ -99,4 +99,24 @@ export const debounce: ModifierImpl = {
       args,
     };
   },
+  solid(args) {
+    // Phase 07.1: dispatched through @rozie/runtime-solid createDebouncedHandler.
+    // Valid in BOTH <listeners> and template @event — no listenerOnly flag.
+    return {
+      kind: 'helper',
+      importFrom: '@rozie/runtime-solid',
+      helperName: 'createDebouncedHandler',
+      args,
+    };
+  },
+  lit(args) {
+    // Phase 07.1: dispatched through @rozie/runtime-lit debounce. Valid in
+    // BOTH <listeners> and template @event — no listenerOnly flag.
+    return {
+      kind: 'helper',
+      importFrom: '@rozie/runtime-lit',
+      helperName: 'debounce',
+      args,
+    };
+  },
 };

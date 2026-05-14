@@ -54,4 +54,14 @@ export const passive: ModifierImpl = {
     // Phase 5 native: addEventListener({ passive: true }) option flag.
     return { kind: 'native', token: 'passive' };
   },
+  solid() {
+    // Phase 07.1 native: addEventListener({ passive: true }) option flag — the
+    // Solid emitter switches to raw addEventListener call style for this flag.
+    return { kind: 'native', token: 'passive' };
+  },
+  lit() {
+    // Phase 07.1 native: addEventListener({ passive: true }) option flag —
+    // valid ONLY for <listeners>-block context.
+    return { kind: 'native', token: 'passive' };
+  },
 };

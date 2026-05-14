@@ -104,4 +104,30 @@ export const outside: ModifierImpl = {
       listenerOnly: true,
     };
   },
+  solid(args) {
+    // Phase 07.1 marquee helper: dispatched through @rozie/runtime-solid
+    // createOutsideClick. listenerOnly because outside-click only makes sense
+    // in <listeners>; the Solid emitter raises a ROZ813-class diagnostic if
+    // encountered on a template @event.
+    return {
+      kind: 'helper',
+      importFrom: '@rozie/runtime-solid',
+      helperName: 'createOutsideClick',
+      args,
+      listenerOnly: true,
+    };
+  },
+  lit(args) {
+    // Phase 07.1 marquee helper: dispatched through @rozie/runtime-lit
+    // attachOutsideClickListener. listenerOnly because outside-click only makes
+    // sense in <listeners>; the Lit emitter raises a ROZ832-class diagnostic if
+    // encountered on a template @event.
+    return {
+      kind: 'helper',
+      importFrom: '@rozie/runtime-lit',
+      helperName: 'attachOutsideClickListener',
+      args,
+      listenerOnly: true,
+    };
+  },
 };

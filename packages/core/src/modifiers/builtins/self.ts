@@ -66,4 +66,20 @@ export const self: ModifierImpl = {
       code: 'if (e.target !== e.currentTarget) return;',
     };
   },
+  solid() {
+    // Phase 07.1 inlineGuard: Solid JSX has no native modifier syntax for
+    // self — emitter inserts an early-return guard before the user handler.
+    return {
+      kind: 'inlineGuard',
+      code: 'if (e.target !== e.currentTarget) return;',
+    };
+  },
+  lit() {
+    // Phase 07.1 inlineGuard: Lit has no template modifier sugar; emitter
+    // inserts an early-return guard.
+    return {
+      kind: 'inlineGuard',
+      code: 'if (e.target !== e.currentTarget) return;',
+    };
+  },
 };

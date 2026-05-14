@@ -33,4 +33,15 @@ describe('builtin: .passive — Plan 02-04', () => {
     expect(result.diagnostics).toHaveLength(1);
     expect(result.diagnostics[0]).toMatchObject({ code: 'ROZ111', severity: 'error' });
   });
+
+  // Phase 07.1 — Solid/Lit emission descriptors (parallels svelte()/angular()).
+  it('.passive solid() → native descriptor with token "passive"', () => {
+    const desc = passive.solid!([], CTX);
+    expect(desc).toEqual({ kind: 'native', token: 'passive' });
+  });
+
+  it('.passive lit() → native descriptor with token "passive"', () => {
+    const desc = passive.lit!([], CTX);
+    expect(desc).toEqual({ kind: 'native', token: 'passive' });
+  });
 });

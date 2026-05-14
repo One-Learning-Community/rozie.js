@@ -92,4 +92,24 @@ export const throttle: ModifierImpl = {
       args,
     };
   },
+  solid(args) {
+    // Phase 07.1: dispatched through @rozie/runtime-solid createThrottledHandler.
+    // Valid in BOTH <listeners> and template @event — no listenerOnly flag.
+    return {
+      kind: 'helper',
+      importFrom: '@rozie/runtime-solid',
+      helperName: 'createThrottledHandler',
+      args,
+    };
+  },
+  lit(args) {
+    // Phase 07.1: dispatched through @rozie/runtime-lit throttle. Valid in
+    // BOTH <listeners> and template @event — no listenerOnly flag.
+    return {
+      kind: 'helper',
+      importFrom: '@rozie/runtime-lit',
+      helperName: 'throttle',
+      args,
+    };
+  },
 };

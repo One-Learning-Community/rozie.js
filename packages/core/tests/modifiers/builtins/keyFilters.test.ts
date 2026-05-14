@@ -112,4 +112,33 @@ describe('builtin: key filters — Plan 02-04', () => {
     }
     expect(reg.list().length).toBe(14);
   });
+
+  // Phase 07.1 — Solid/Lit emission descriptors (parallels svelte()/angular()).
+  it('.escape solid() → inlineGuard checking KeyboardEvent.key Escape', () => {
+    const desc = findFilter('escape').solid!([], KEYDOWN_CTX);
+    expect(desc).toEqual({
+      kind: 'inlineGuard',
+      code: "if (e.key !== 'Escape') return;",
+    });
+  });
+
+  it('.escape lit() → inlineGuard checking KeyboardEvent.key Escape', () => {
+    const desc = findFilter('escape').lit!([], KEYDOWN_CTX);
+    expect(desc).toEqual({
+      kind: 'inlineGuard',
+      code: "if (e.key !== 'Escape') return;",
+    });
+  });
+
+  it('every key/button filter implements solid() and lit() returning inlineGuard', () => {
+    for (const name of KEY_FILTER_NAMES) {
+      const filter = findFilter(name);
+      const solidDesc = filter.solid!([], KEYDOWN_CTX);
+      const litDesc = filter.lit!([], KEYDOWN_CTX);
+      expect(solidDesc.kind, `${name} solid() should be inlineGuard`).toBe('inlineGuard');
+      expect(litDesc.kind, `${name} lit() should be inlineGuard`).toBe('inlineGuard');
+      // solid()/lit() inlineGuard code parallels the React/Svelte/Angular guard.
+      expect(solidDesc).toEqual(litDesc);
+    }
+  });
 });
