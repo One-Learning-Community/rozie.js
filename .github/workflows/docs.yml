@@ -5,11 +5,15 @@ on:
     branches: [main]
     paths:
       - 'docs/**'
-      # The docs site dogfoods @rozie/unplugin/vite to compile examples/*.rozie
-      # at build time, and the emitted Vue SFCs import @rozie/runtime-vue at
-      # runtime. Rebuild on any change to those packages, the example sources,
-      # or @rozie/core (transitively consumed by the unplugin).
+      # The docs site live-compiles examples/*.rozie at build time two ways:
+      #   1. @rozie/unplugin/vite renders the inline <Counter> demos (Vue), whose
+      #      emitted SFCs import @rozie/runtime-vue at runtime.
+      #   2. .vitepress/rozie-codegen.ts calls @rozie/core's compile() for ALL
+      #      six targets to fill the rozie-out code blocks. @rozie/core's dist
+      #      bundles every target emitter's source (packages/targets/**), so a
+      #      change to any emitter changes the rendered output and must redeploy.
       - 'packages/core/**'
+      - 'packages/targets/**'
       - 'packages/unplugin/**'
       - 'packages/runtime/vue/**'
       - 'examples/*.rozie'
