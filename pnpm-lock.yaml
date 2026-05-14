@@ -113,7 +113,7 @@ importers:
         version: 5.4.5
       vite:
         specifier: ^6.0.0
-        version: 6.4.2(@types/node@22.19.17)(jiti@1.21.7)(less@4.2.0)(lightningcss@1.32.0)(sass@1.71.1)(terser@5.29.1)
+        version: 6.4.2(@types/node@22.19.17)(jiti@1.21.7)(less@4.2.0)(lightningcss@1.32.0)(sass@1.71.1)(terser@5.46.2)
 
   examples/consumers/angular-ts:
     devDependencies:
@@ -466,6 +466,9 @@ importers:
       '@types/babel__core':
         specifier: ^7.20.0
         version: 7.20.5
+      '@types/babel__helper-plugin-utils':
+        specifier: ^7.10.3
+        version: 7.10.3
       tsdown:
         specifier: ^0.21.10
         version: 0.21.10(typescript@5.4.5)
@@ -1255,10 +1258,10 @@ importers:
         version: 5.4.5
       vite:
         specifier: ^6.0.0
-        version: 6.4.2(@types/node@22.19.17)(jiti@1.21.7)(less@4.2.0)(lightningcss@1.32.0)(sass@1.71.1)(terser@5.46.2)
+        version: 6.4.2(@types/node@22.19.17)(jiti@1.21.7)(less@4.2.0)(lightningcss@1.32.0)(sass@1.71.1)(terser@5.29.1)
       vitest:
         specifier: ^4.1.5
-        version: 4.1.5(@types/node@22.19.17)(happy-dom@15.11.7)(jsdom@25.0.1)(vite@6.4.2(@types/node@22.19.17)(jiti@1.21.7)(less@4.2.0)(lightningcss@1.32.0)(sass@1.71.1)(terser@5.46.2))
+        version: 4.1.5(@types/node@22.19.17)(happy-dom@15.11.7)(jsdom@25.0.1)(vite@6.4.2(@types/node@22.19.17)(jiti@1.21.7)(less@4.2.0)(lightningcss@1.32.0)(sass@1.71.1)(terser@5.29.1))
 
   tests/lit-lint:
     dependencies:
@@ -1482,6 +1485,15 @@ importers:
       '@testing-library/react':
         specifier: ^16
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      '@types/babel__core':
+        specifier: ^7.20.5
+        version: 7.20.5
+      '@types/react':
+        specifier: ^19.2.14
+        version: 19.2.14
+      '@types/react-dom':
+        specifier: ^19.2.3
+        version: 19.2.3(@types/react@19.2.14)
       '@vue/compiler-sfc':
         specifier: ^3.5.33
         version: 3.5.33
@@ -3693,6 +3705,9 @@ packages:
 
   '@types/babel__generator@7.27.0':
     resolution: {integrity: sha512-ufFd2Xi92OAVPYsy+P4n7/U7e68fex0+Ee8gSG9KX7eo084CWiQ4sdxktvdl0bOPupXtVJPY19zk6EwWqUQ8lg==}
+
+  '@types/babel__helper-plugin-utils@7.10.3':
+    resolution: {integrity: sha512-FcLBBPXInqKfULB2nvOBskQPcnSMZ0s1Y2q76u9H1NPPWaLcTeq38xBeKfF/RBUECK333qeaqRdYoPSwW7rTNQ==}
 
   '@types/babel__template@7.4.4':
     resolution: {integrity: sha512-h/NUaSyG5EyxBIp8YRxo4RMe2/qQgvyowRwVMzhYhBCONbW8PUsg4lkFMrhgZhUe5z3L3MiLDuvyJ/CaPa2A8A==}
@@ -9952,6 +9967,10 @@ snapshots:
     dependencies:
       '@babel/types': 7.29.0
 
+  '@types/babel__helper-plugin-utils@7.10.3':
+    dependencies:
+      '@types/babel__core': 7.20.5
+
   '@types/babel__template@7.4.4':
     dependencies:
       '@babel/parser': 7.29.3
@@ -10306,13 +10325,13 @@ snapshots:
       chai: 6.2.2
       tinyrainbow: 3.1.0
 
-  '@vitest/mocker@4.1.5(vite@6.4.2(@types/node@22.19.17)(jiti@1.21.7)(less@4.2.0)(lightningcss@1.32.0)(sass@1.71.1)(terser@5.46.2))':
+  '@vitest/mocker@4.1.5(vite@6.4.2(@types/node@22.19.17)(jiti@1.21.7)(less@4.2.0)(lightningcss@1.32.0)(sass@1.71.1)(terser@5.29.1))':
     dependencies:
       '@vitest/spy': 4.1.5
       estree-walker: 3.0.3
       magic-string: 0.30.21
     optionalDependencies:
-      vite: 6.4.2(@types/node@22.19.17)(jiti@1.21.7)(less@4.2.0)(lightningcss@1.32.0)(sass@1.71.1)(terser@5.46.2)
+      vite: 6.4.2(@types/node@22.19.17)(jiti@1.21.7)(less@4.2.0)(lightningcss@1.32.0)(sass@1.71.1)(terser@5.29.1)
 
   '@vitest/mocker@4.1.5(vite@8.0.10(@types/node@22.19.17)(jiti@1.21.7)(less@4.2.0)(sass@1.71.1)(terser@5.46.2))':
     dependencies:
@@ -13738,10 +13757,10 @@ snapshots:
       - typescript
       - universal-cookie
 
-  vitest@4.1.5(@types/node@22.19.17)(happy-dom@15.11.7)(jsdom@25.0.1)(vite@6.4.2(@types/node@22.19.17)(jiti@1.21.7)(less@4.2.0)(lightningcss@1.32.0)(sass@1.71.1)(terser@5.46.2)):
+  vitest@4.1.5(@types/node@22.19.17)(happy-dom@15.11.7)(jsdom@25.0.1)(vite@6.4.2(@types/node@22.19.17)(jiti@1.21.7)(less@4.2.0)(lightningcss@1.32.0)(sass@1.71.1)(terser@5.29.1)):
     dependencies:
       '@vitest/expect': 4.1.5
-      '@vitest/mocker': 4.1.5(vite@6.4.2(@types/node@22.19.17)(jiti@1.21.7)(less@4.2.0)(lightningcss@1.32.0)(sass@1.71.1)(terser@5.46.2))
+      '@vitest/mocker': 4.1.5(vite@6.4.2(@types/node@22.19.17)(jiti@1.21.7)(less@4.2.0)(lightningcss@1.32.0)(sass@1.71.1)(terser@5.29.1))
       '@vitest/pretty-format': 4.1.5
       '@vitest/runner': 4.1.5
       '@vitest/snapshot': 4.1.5
@@ -13758,7 +13777,7 @@ snapshots:
       tinyexec: 1.1.2
       tinyglobby: 0.2.16
       tinyrainbow: 3.1.0
-      vite: 6.4.2(@types/node@22.19.17)(jiti@1.21.7)(less@4.2.0)(lightningcss@1.32.0)(sass@1.71.1)(terser@5.46.2)
+      vite: 6.4.2(@types/node@22.19.17)(jiti@1.21.7)(less@4.2.0)(lightningcss@1.32.0)(sass@1.71.1)(terser@5.29.1)
       why-is-node-running: 2.3.0
     optionalDependencies:
       '@types/node': 22.19.17

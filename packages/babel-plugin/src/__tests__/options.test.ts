@@ -27,7 +27,6 @@ describe('rozieBabelPlugin options — validation (DIST-03)', () => {
     await expect(
       transformAsync('import x from "y";', {
         filename: importer,
-        // @ts-expect-error — testing missing required option (runtime path)
         plugins: [[rozieBabelPlugin, {}]],
         babelrc: false,
         configFile: false,
@@ -42,7 +41,6 @@ describe('rozieBabelPlugin options — validation (DIST-03)', () => {
     await expect(
       transformAsync('import x from "y";', {
         filename: importer,
-        // @ts-expect-error — testing missing required option (runtime path)
         plugins: [[rozieBabelPlugin, {}]],
         babelrc: false,
         configFile: false,
@@ -57,7 +55,6 @@ describe('rozieBabelPlugin options — validation (DIST-03)', () => {
     await expect(
       transformAsync('import x from "y";', {
         filename: importer,
-        // @ts-expect-error — testing invalid target value (runtime path)
         plugins: [[rozieBabelPlugin, { target: 'preact' }]],
         babelrc: false,
         configFile: false,
