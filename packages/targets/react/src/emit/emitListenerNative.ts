@@ -34,7 +34,7 @@ import type {
 import type {
   ModifierRegistry,
   ReactEmissionDescriptor,
-} from '../../../../core/src/modifiers/ModifierRegistry.js';
+} from '@rozie/core';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';

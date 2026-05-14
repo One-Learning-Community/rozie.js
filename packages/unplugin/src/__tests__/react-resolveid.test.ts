@@ -17,7 +17,7 @@ import {
   createLoadHook,
   transformIncludeRozie,
 } from '../transform.js';
-import { ModifierRegistry } from '../../../core/src/modifiers/ModifierRegistry.js';
+import { ModifierRegistry } from '@rozie/core';
 import { registerBuiltins } from '../../../core/src/modifiers/registerBuiltins.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
