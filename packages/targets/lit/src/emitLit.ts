@@ -116,10 +116,13 @@ export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResu
   diagnostics.push(...listenersResult.diagnostics);
 
   // 5. Template emission (returns html`...` body + hostListenerWiring lines).
+  //    Thread the shared modifier registry so buildEventParts can
+  //    registry-dispatch template-event modifiers (Plan 07.1-03).
   const templateResult = emitTemplate(ir, {
     lit: litImports,
     decorators: decoratorImports,
     runtime: runtimeImports,
+    modifierRegistry: registry,
   });
   diagnostics.push(...templateResult.diagnostics);
 

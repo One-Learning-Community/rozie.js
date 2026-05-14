@@ -14,6 +14,10 @@
   "devDependencies": {
     "@rozie/target-react": "workspace:*",
     "@rozie/target-vue": "workspace:*",
+    "@rozie/target-svelte": "workspace:*",
+    "@rozie/target-angular": "workspace:*",
+    "@rozie/target-solid": "workspace:*",
+    "@rozie/target-lit": "workspace:*",
     "vitest": "^4",
     "typescript": "^5"
   }

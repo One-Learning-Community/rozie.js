@@ -41,6 +41,8 @@ import type {
   Listener,
 } from '../../../../core/src/ir/types.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
+import type { ModifierRegistry, LitEmissionDescriptor } from '@rozie/core';
+import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
 import type {
   LitImportCollector,
   LitDecoratorImportCollector,
@@ -48,11 +50,22 @@ import type {
 } from '../rewrite/collectLitImports.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
 import { toKebabCase } from './emitDecorator.js';
+import { eventTypeFor } from './emitListeners.js';
 
 export interface EmitTemplateOpts {
   lit: LitImportCollector;
   decorators: LitDecoratorImportCollector;
   runtime: RuntimeLitImportCollector;
+  /**
+   * Modifier registry for registry-driven template-event modifier dispatch
+   * (Plan 07.1-03). `buildEventParts` resolves each `filter`-kind pipeline
+   * entry via `registry.get(name).lit(...)` -> `LitEmissionDescriptor` instead
+   * of a hand-rolled builtin-name `if`-ladder — so third-party modifiers
+   * (e.g. the swipe dogfood canary) emit correctly on template `@event`
+   * bindings, not just in `<listeners>` blocks. emitLit threads the shared
+   * registry; when omitted a default registry is constructed.
+   */
+  modifierRegistry?: ModifierRegistry;
   /**
    * Internal mutable state threaded through the emit call chain so recursive
    * emitters (emitLoop) can communicate back to emitTemplate without a module-level
@@ -64,11 +77,16 @@ export interface EmitTemplateOpts {
    * `.debounce`/`.throttle` modifiers (WR-15). The wrapper must live on a
    * class field — an inline IIFE in `render()` resets its timer closure on
    * every re-render, silently defeating the debounce.
+   *
+   * `diagnostics` collects errors raised during deep template-node emission
+   * (e.g. `buildEventParts` registry-dispatch failures) and is drained back
+   * into the `emitTemplate` result.
    */
   _state?: {
     repeatUsed: boolean;
     debouncedFieldDecls: string[];
     debounceCleanupWiring: string[];
+    diagnostics: Diagnostic[];
   };
 }
 
@@ -282,6 +300,16 @@ function buildEventParts(
   const handler = rewriteTemplateExpression(listener.handler, ir);
 
   // Detect inlineGuard / native flags from the modifier pipeline.
+  //
+  // Plan 07.1-03: `filter`-kind modifiers are resolved via registry dispatch
+  // (`registry.get(name).lit(...)` -> LitEmissionDescriptor) instead of a
+  // hand-rolled builtin-name `if`-ladder. This is the same dispatch contract
+  // emitListeners.ts / emitTemplateEvent.ts already use — Plan 07.1-02 missed
+  // this real template-event path, so third-party modifiers (the swipe
+  // dogfood canary) silently emitted no guard. `.debounce`/`.throttle`
+  // (`wrap`-kind) keep their bespoke class-field hoisting (WR-15) and
+  // capture/passive/once (`listenerOption`-kind) keep their option-token
+  // handling — those are not `inlineGuard` descriptors.
   const inlineGuards: string[] = [];
   let captureOpt = false;
   let passiveOpt = false;
@@ -289,11 +317,15 @@ function buildEventParts(
 
   let wrapKind: { kind: 'debounce' | 'throttle'; ms: number } | null = null;
 
+  const registry = opts.modifierRegistry;
+  const diagnostics = opts._state?.diagnostics;
+
   for (const entry of listener.modifierPipeline) {
     if (entry.kind === 'listenerOption') {
       if (entry.option === 'capture') captureOpt = true;
       if (entry.option === 'passive') passiveOpt = true;
       if (entry.option === 'once') onceOpt = true;
+      continue;
     }
     if (entry.kind === 'wrap' && (entry.modifier === 'debounce' || entry.modifier === 'throttle')) {
       // WR-15: .debounce(ms) / .throttle(ms) on a template event. The wrapper
@@ -303,30 +335,78 @@ function buildEventParts(
       continue;
     }
     if (entry.kind === 'filter' || entry.kind === 'wrap') {
-      if (entry.modifier === 'stop') inlineGuards.push('e.stopPropagation();');
-      else if (entry.modifier === 'prevent')
-        inlineGuards.push('e.preventDefault();');
-      else if (entry.modifier === 'self')
-        inlineGuards.push('if (e.target !== e.currentTarget) return;');
-      else if (entry.modifier === 'enter')
-        inlineGuards.push("if ((e as KeyboardEvent).key !== 'Enter') return;");
-      else if (entry.modifier === 'escape' || entry.modifier === 'esc')
-        inlineGuards.push("if ((e as KeyboardEvent).key !== 'Escape') return;");
-      else if (entry.modifier === 'tab')
-        inlineGuards.push("if ((e as KeyboardEvent).key !== 'Tab') return;");
+      // Registry-driven dispatch (Plan 07.1-03). Every `filter`-kind modifier —
+      // builtin (.stop/.prevent/.self/.enter/...) or third-party (.swipe) —
+      // resolves through the same `impl.lit()` -> LitEmissionDescriptor path.
+      const impl = registry?.get(entry.modifier);
+      if (!impl || !impl.lit) {
+        diagnostics?.push({
+          code: RozieErrorCode.TARGET_LIT_RESERVED,
+          severity: 'error',
+          message: `Modifier '.${entry.modifier}' has no Lit emitter (missing lit() hook).`,
+          loc: entry.sourceLoc,
+        });
+        continue;
+      }
+      const descriptor: LitEmissionDescriptor = impl.lit(entry.args, {
+        source: 'template-event',
+        event: listener.event,
+        sourceLoc: entry.sourceLoc,
+      });
+      if (descriptor.kind === 'inlineGuard') {
+        inlineGuards.push(descriptor.code);
+        continue;
+      }
+      if (descriptor.kind === 'native') {
+        // capture/passive/once option tokens are only meaningful in
+        // <listeners> blocks where they map onto addEventListener options.
+        diagnostics?.push({
+          code: RozieErrorCode.TARGET_LIT_RESERVED,
+          severity: 'error',
+          message: `Modifier '.${descriptor.token}' has no template-event equivalent in Lit — only valid in <listeners> blocks.`,
+          loc: entry.sourceLoc,
+        });
+        continue;
+      }
+      // descriptor.kind === 'helper'
+      if (descriptor.listenerOnly === true) {
+        diagnostics?.push({
+          code: RozieErrorCode.TARGET_LIT_RESERVED,
+          severity: 'error',
+          message: `Modifier '.${entry.modifier}' is listenerOnly — only valid in <listeners> blocks, not on template @event bindings.`,
+          loc: entry.sourceLoc,
+        });
+        continue;
+      }
+      // A non-debounce/throttle helper on a template @event is not supported
+      // by the template-event path (debounce/throttle are handled above via
+      // wrapKind class-field hoisting).
+      diagnostics?.push({
+        code: RozieErrorCode.TARGET_LIT_RESERVED,
+        severity: 'error',
+        message: `Modifier helper '${descriptor.helperName}' on a template @event is not supported by the Lit template-event emitter.`,
+        loc: entry.sourceLoc,
+      });
     }
   }
 
   // Wrap inline expressions (non-function-like) as arrow handlers so they
   // run at event time, not at render time. Function references and arrows
   // are passed verbatim.
+  //
+  // Plan 07.1-03: when inlineGuards are present the synthesized arrow's `e`
+  // param is typed via `eventTypeFor(eventName)` (e.g. `KeyboardEvent`,
+  // `TouchEvent`) — the registry's builtin/third-party inlineGuard codes are
+  // cast-free (`e.key`, `e.touches`), so the precise DOM event type is what
+  // keeps the emitted output typecheck-clean. Mirrors emitListeners.ts.
   const isFunctionLike = isHandlerLike(listener.handler);
+  const evtType = eventTypeFor(eventName);
   let body: string;
   if (inlineGuards.length > 0) {
     if (isFunctionLike) {
-      body = `(e: Event) => { ${inlineGuards.join(' ')} (${handler})(e); }`;
+      body = `(e: ${evtType}) => { ${inlineGuards.join(' ')} (${handler})(e); }`;
     } else {
-      body = `(e: Event) => { ${inlineGuards.join(' ')} ${handler}; }`;
+      body = `(e: ${evtType}) => { ${inlineGuards.join(' ')} ${handler}; }`;
     }
   } else {
     body = isFunctionLike ? `${handler}` : `(e: Event) => { ${handler}; }`;
@@ -787,6 +867,7 @@ export function emitTemplate(
     repeatUsed: false,
     debouncedFieldDecls: [] as string[],
     debounceCleanupWiring: [] as string[],
+    diagnostics,
   };
   const optsWithState: EmitTemplateOpts = { ...opts, _state: state };
 

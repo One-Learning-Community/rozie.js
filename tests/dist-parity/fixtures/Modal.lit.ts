@@ -134,7 +134,7 @@ footer { border-top: 1px solid rgba(0, 0, 0, 0.08); justify-content: flex-end; }
 
   render() {
     return html`
-${this.open ? html`<div class="modal-backdrop" @click=${(e: Event) => { if (e.target !== e.currentTarget) return; this.closeOnBackdrop && this.close(); }} data-rozie-ref="backdropEl">
+${this.open ? html`<div class="modal-backdrop" @click=${(e: MouseEvent) => { if (e.target !== e.currentTarget) return; this.closeOnBackdrop && this.close(); }} data-rozie-ref="backdropEl">
   <div class="modal-dialog" role="dialog" aria-modal="true" aria-label=${this.title || undefined} tabindex="-1" data-rozie-ref="dialogEl">
     ${this.title || this._hasSlotHeader ? html`<header>
       <slot name="header">

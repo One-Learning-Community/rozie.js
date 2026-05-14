@@ -9,16 +9,19 @@
  *
  * Public-API surface used (all SemVer-stable v1 per D-22b):
  *   - ModifierImpl, ModifierContext, ModifierArg
- *   - VueEmissionDescriptor, ReactEmissionDescriptor (both `inlineGuard` kind)
+ *   - VueEmissionDescriptor, ReactEmissionDescriptor, SvelteEmissionDescriptor,
+ *     AngularEmissionDescriptor, SolidEmissionDescriptor, LitEmissionDescriptor
+ *     (all six `inlineGuard` kind)
  *
  * Usage in a .rozie file:
  *   <template>
  *     <div @touchstart.swipe('left')="$data.swiped = true" />
  *   </template>
  *
- * Compiles to:
+ * Compiles to (all 6 targets via the same inlineGuard descriptor):
  *   - Vue: @touchstart="(e) => { if (!e.touches || e.touches.length === 0) return; ...; (e) => { ... swiped = true; }(e); }"
  *   - React: onTouchStart={(e) => { if (!e.touches || e.touches.length === 0) return; ...; ...; }}
+ *   - Svelte / Angular / Solid / Lit: the same inlineGuard code spliced into each target's synthesized handler.
  */
 import type {
   ModifierImpl,
@@ -26,6 +29,10 @@ import type {
   ModifierArg,
   VueEmissionDescriptor,
   ReactEmissionDescriptor,
+  SvelteEmissionDescriptor,
+  AngularEmissionDescriptor,
+  SolidEmissionDescriptor,
+  LitEmissionDescriptor,
 } from '@rozie/core';
 import type { Diagnostic } from '@rozie/core';
 
@@ -71,10 +78,11 @@ export const swipeModifier: ModifierImpl = {
       !VALID_DIRECTIONS.includes(args[0].value as SwipeDirection)
     ) {
       diagnostics.push({
-        // Reuse the generic modifier-arity error code; third-party plugins do
-        // not get their own RozieErrorCode entries (those are reserved for
-        // first-party diagnostics per D-08 surface stability). Diagnostic.code
-        // is `string` so the value need not be in the RozieErrorCode union.
+        // Reuse the generic modifier-arity error code as a bare string.
+        // Third-party plugins do NOT reach for the first-party-only diagnostic
+        // code type (those entries are reserved for first-party diagnostics
+        // per D-08 surface stability); `Diagnostic.code` is plain `string`, so
+        // a bare string literal is the canary's only error-code dependency.
         code: 'ROZ111',
         severity: 'error',
         message: `swipe modifier expects one argument: 'left' | 'right' | 'up' | 'down' (got ${JSON.stringify(args.map((a) => (a.kind === 'literal' ? a.value : `$refs.${a.ref}`)))})`,
@@ -102,6 +110,22 @@ export const swipeModifier: ModifierImpl = {
     return { kind: 'inlineGuard', code: buildGuardCode(dir) };
   },
   react(args: ModifierArg[]): ReactEmissionDescriptor {
+    const dir = (args[0] as Extract<ModifierArg, { kind: 'literal' }>).value as SwipeDirection;
+    return { kind: 'inlineGuard', code: buildGuardCode(dir) };
+  },
+  svelte(args: ModifierArg[]): SvelteEmissionDescriptor {
+    const dir = (args[0] as Extract<ModifierArg, { kind: 'literal' }>).value as SwipeDirection;
+    return { kind: 'inlineGuard', code: buildGuardCode(dir) };
+  },
+  angular(args: ModifierArg[]): AngularEmissionDescriptor {
+    const dir = (args[0] as Extract<ModifierArg, { kind: 'literal' }>).value as SwipeDirection;
+    return { kind: 'inlineGuard', code: buildGuardCode(dir) };
+  },
+  solid(args: ModifierArg[]): SolidEmissionDescriptor {
+    const dir = (args[0] as Extract<ModifierArg, { kind: 'literal' }>).value as SwipeDirection;
+    return { kind: 'inlineGuard', code: buildGuardCode(dir) };
+  },
+  lit(args: ModifierArg[]): LitEmissionDescriptor {
     const dir = (args[0] as Extract<ModifierArg, { kind: 'literal' }>).value as SwipeDirection;
     return { kind: 'inlineGuard', code: buildGuardCode(dir) };
   },

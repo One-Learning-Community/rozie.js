@@ -1300,9 +1300,21 @@ importers:
         specifier: workspace:*
         version: link:../../../packages/core
     devDependencies:
+      '@rozie/target-angular':
+        specifier: workspace:*
+        version: link:../../../packages/targets/angular
+      '@rozie/target-lit':
+        specifier: workspace:*
+        version: link:../../../packages/targets/lit
       '@rozie/target-react':
         specifier: workspace:*
         version: link:../../../packages/targets/react
+      '@rozie/target-solid':
+        specifier: workspace:*
+        version: link:../../../packages/targets/solid
+      '@rozie/target-svelte':
+        specifier: workspace:*
+        version: link:../../../packages/targets/svelte
       '@rozie/target-vue':
         specifier: workspace:*
         version: link:../../../packages/targets/vue
