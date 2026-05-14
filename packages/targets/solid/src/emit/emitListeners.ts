@@ -30,8 +30,8 @@ import type {
 import type {
   ModifierRegistry,
   ModifierPipelineEntry,
-  ReactEmissionDescriptor,
-} from '../../../../core/src/modifiers/ModifierRegistry.js';
+  SolidEmissionDescriptor,
+} from '@rozie/core';
 import type { ModifierArg } from '../../../../core/src/modifier-grammar/parseModifierChain.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import type { SolidImportCollector, RuntimeSolidImportCollector } from '../rewrite/collectSolidImports.js';
@@ -72,19 +72,19 @@ function classifyListener(
   for (const entry of pipeline) {
     if (entry.kind !== 'wrap') continue;
     const impl = registry.get(entry.modifier);
-    if (!impl?.react) continue;
-    const desc: ReactEmissionDescriptor = impl.react(entry.args, {
+    if (!impl?.solid) continue;
+    const desc: SolidEmissionDescriptor = impl.solid(entry.args, {
       source: 'listeners-block',
       event: listener.event,
       sourceLoc: entry.sourceLoc,
     });
     if (desc.kind !== 'helper') continue;
 
-    // Map React helper names to Solid equivalents.
-    if (desc.helperName === 'useOutsideClick') {
+    // Map Solid helper names to listener classes.
+    if (desc.helperName === 'createOutsideClick') {
       return { kind: 'B', outsideArgs: desc.args, pipeline };
     }
-    if (desc.helperName === 'useDebouncedCallback') {
+    if (desc.helperName === 'createDebouncedHandler') {
       return {
         kind: 'C',
         helperName: 'createDebouncedHandler',
@@ -92,7 +92,7 @@ function classifyListener(
         pipeline,
       };
     }
-    if (desc.helperName === 'useThrottledCallback') {
+    if (desc.helperName === 'createThrottledHandler') {
       return {
         kind: 'C',
         helperName: 'createThrottledHandler',

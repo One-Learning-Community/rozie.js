@@ -33,8 +33,8 @@ import type {
 } from '../../../../core/src/ir/types.js';
 import type {
   ModifierRegistry,
-  ReactEmissionDescriptor,
-} from '../../../../core/src/modifiers/ModifierRegistry.js';
+  SolidEmissionDescriptor,
+} from '@rozie/core';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
@@ -129,16 +129,16 @@ export function emitListenerNative(
       continue;
     }
     const impl = registry.get(entry.modifier);
-    if (!impl || !impl.react) {
+    if (!impl || !impl.solid) {
       diagnostics.push({
-        code: RozieErrorCode.TARGET_REACT_RHTML_WITH_CHILDREN,
+        code: RozieErrorCode.TARGET_SOLID_RESERVED,
         severity: 'error',
-        message: `Modifier '.${entry.modifier}' has no emitter.`,
+        message: `Modifier '.${entry.modifier}' has no Solid emitter (missing solid() hook).`,
         loc: entry.sourceLoc,
       });
       continue;
     }
-    const desc: ReactEmissionDescriptor = impl.react(entry.args, {
+    const desc: SolidEmissionDescriptor = impl.solid(entry.args, {
       source: 'listeners-block',
       event: listener.event,
       sourceLoc: entry.sourceLoc,

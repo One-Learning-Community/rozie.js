@@ -18,7 +18,7 @@ import {
   emitRozieTsToDisk,
   prebuildAngularRozieFiles,
 } from '../transform.js';
-import { ModifierRegistry } from '../../../core/src/modifiers/ModifierRegistry.js';
+import { ModifierRegistry } from '@rozie/core';
 import { registerBuiltins } from '../../../core/src/modifiers/registerBuiltins.js';
 
 function makeRegistry(): ModifierRegistry {

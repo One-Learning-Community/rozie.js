@@ -19,7 +19,7 @@
  * @experimental — shape may change before v1.0
  */
 import type { IRComponent } from '../../../../core/src/ir/types.js';
-import type { ModifierRegistry } from '../../../../core/src/modifiers/ModifierRegistry.js';
+import type { ModifierRegistry } from '@rozie/core';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { emitNode, type EmitNodeCtx } from './emitTemplateNode.js';
 import type { SvelteScriptInjection } from './emitScript.js';

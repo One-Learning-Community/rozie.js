@@ -36,7 +36,7 @@ import { existsSync, readFileSync, writeFileSync, readdirSync, statSync, lstatSy
 import { isAbsolute, resolve as pathResolve, dirname, join as pathJoin, relative as pathRelative } from 'node:path';
 import { parse } from '../../core/src/parse.js';
 import { lowerToIR } from '../../core/src/ir/lower.js';
-import type { ModifierRegistry } from '../../core/src/modifiers/ModifierRegistry.js';
+import type { ModifierRegistry } from '@rozie/core';
 import { emitVue, type EmitVueResult } from '../../targets/vue/src/emitVue.js';
 import { emitReact, type EmitReactResult } from '../../targets/react/src/emitReact.js';
 import { emitSvelte, type EmitSvelteResult } from '../../targets/svelte/src/emitSvelte.js';

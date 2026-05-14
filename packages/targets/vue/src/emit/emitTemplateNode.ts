@@ -23,7 +23,7 @@ import type {
   AttributeBinding,
   Listener,
 } from '../../../../core/src/ir/types.js';
-import type { ModifierRegistry } from '../../../../core/src/modifiers/ModifierRegistry.js';
+import type { ModifierRegistry } from '@rozie/core';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
 import { emitMergedAttributes } from './emitTemplateAttribute.js';

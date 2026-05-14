@@ -44,7 +44,7 @@ export default class Dropdown extends SignalWatcher(LitElement) {
     const _u0 = attachOutsideClickListener([() => this._refTriggerEl, () => this._refPanelEl], (e) => {  (this.close)(e); }, () => (this.open && this.closeOnOutsideClick));
     this._disconnectCleanups.push(_u0);
 
-    const _lh1 = (e: Event) => { if (!(this.open && this.closeOnEscape)) return; if ((e as KeyboardEvent).key !== 'Escape') return; (this.close)(e); };
+    const _lh1 = (e: KeyboardEvent) => { if (!(this.open && this.closeOnEscape)) return; if (e.key !== 'Escape') return; (this.close)(e); };
     document.addEventListener('keydown', _lh1, undefined);
     this._disconnectCleanups.push(() => document.removeEventListener('keydown', _lh1, undefined));
 

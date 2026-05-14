@@ -33,7 +33,7 @@ import type {
   IRComponent,
   AttributeBinding,
 } from '../../../../core/src/ir/types.js';
-import type { ModifierRegistry } from '../../../../core/src/modifiers/ModifierRegistry.js';
+import type { ModifierRegistry } from '@rozie/core';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
 
 export interface EmitAttrCtx {

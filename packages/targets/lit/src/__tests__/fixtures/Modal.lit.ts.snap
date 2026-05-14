@@ -62,7 +62,7 @@ footer { border-top: 1px solid rgba(0, 0, 0, 0.08); justify-content: flex-end; }
   private _disconnectCleanups: Array<() => void> = [];
 
   private _armListeners(): void {
-    const _lh0 = (e: Event) => { if (!(this.open && this.closeOnEscape)) return; if ((e as KeyboardEvent).key !== 'Escape') return; (this.close)(e); };
+    const _lh0 = (e: KeyboardEvent) => { if (!(this.open && this.closeOnEscape)) return; if (e.key !== 'Escape') return; (this.close)(e); };
     document.addEventListener('keydown', _lh0, undefined);
     this._disconnectCleanups.push(() => document.removeEventListener('keydown', _lh0, undefined));
 

@@ -23,8 +23,9 @@
  */
 import type { IRComponent } from '../../../core/src/ir/types.js';
 import type { Diagnostic } from '../../../core/src/diagnostics/Diagnostic.js';
-import type { ModifierRegistry } from '../../../core/src/modifiers/ModifierRegistry.js';
+import type { ModifierRegistry } from '@rozie/core';
 import type { BlockMap } from '../../../core/src/ast/types.js';
+import { createDefaultRegistry } from '../../../core/src/modifiers/registerBuiltins.js';
 // NOTE: SourceMap import removed (WR-08); EmitLitResult.map is null until Phase 7.
 import {
   LitImportCollector,
@@ -79,6 +80,12 @@ export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResu
 
   const diagnostics: Diagnostic[] = [];
 
+  // Modifier registry — caller may pass a shared registry (tests / unplugin
+  // layer); otherwise construct a fresh default registry per call. Mirrors
+  // emitVue's pattern. emitListeners requires a non-optional registry for
+  // its Plan 07.1-02 registry-driven modifier dispatch.
+  const registry = opts.modifierRegistry ?? createDefaultRegistry();
+
   // 1. Slot declarations — must come early because emitTemplate may reference slot fields.
   const slotResult = emitSlotDecl(ir, { decorators: decoratorImports });
   diagnostics.push(...slotResult.diagnostics);
@@ -105,7 +112,7 @@ export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResu
     decorators: decoratorImports,
     runtime: runtimeImports,
     lit: litImports,
-  }, opts.modifierRegistry);
+  }, registry);
   diagnostics.push(...listenersResult.diagnostics);
 
   // 5. Template emission (returns html`...` body + hostListenerWiring lines).

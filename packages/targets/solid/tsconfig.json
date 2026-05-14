@@ -10,7 +10,11 @@
     "verbatimModuleSyntax": true,
     "jsx": "preserve",
     "jsxImportSource": "solid-js",
-    "lib": ["ES2022", "DOM", "DOM.Iterable"]
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "baseUrl": ".",
+    "paths": {
+      "@rozie/core": ["../../core/src/index.ts"]
+    }
   },
   "include": ["src/**/*", "src/**/*.tsx"],
   "exclude": ["dist", "node_modules", "src/__tests__"]

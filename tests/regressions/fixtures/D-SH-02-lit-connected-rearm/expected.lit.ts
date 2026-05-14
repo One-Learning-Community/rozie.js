@@ -13,7 +13,7 @@ export default class ConnectedRearm extends SignalWatcher(LitElement) {
   private _disconnectCleanups: Array<() => void> = [];
 
   private _armListeners(): void {
-    const _lh0 = (e: Event) => {  (this.onKey)(e); };
+    const _lh0 = (e: KeyboardEvent) => {  (this.onKey)(e); };
     document.addEventListener('keydown', _lh0, undefined);
     this._disconnectCleanups.push(() => document.removeEventListener('keydown', _lh0, undefined));
   }
