@@ -129,18 +129,26 @@ export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResu
   //   - render(): returns html``
   //   - user methods (rewritten from <script>)
   //   - attributeChangedCallback (for model props)
+  // D-SH-02: separate the re-armable listener wiring (addEventListener,
+  // outside-click, slotchange, host listeners — all push to
+  // _disconnectCleanups, all drained on disconnect) from the user `$onMount`
+  // hook body (mount-once semantics — must NOT re-run on reconnect). The
+  // listener wiring goes into `_armListeners()`, called from `firstUpdated()`
+  // the first time AND from `connectedCallback()` on every subsequent connect;
+  // the `$onMount` body stays first-render-only in `firstUpdated()`.
+  const listenerWiring = combineListenerWiring(
+    listenersResult.firstUpdatedBody,
+    templateResult.hostListenerWiring,
+    slotResult.slotChangeWiring,
+  );
   const classBody = composeClassBody({
     staticStylesField: styleResult.staticStylesField,
     fieldDecls: scriptResult.fieldDecls,
     debouncedFieldDecls: templateResult.debouncedFieldDecls.join('\n'),
     slotFields: slotResult.fields,
     cleanupField: '  private _disconnectCleanups: Array<() => void> = [];',
-    firstUpdatedBody: combineFirstUpdated(
-      listenersResult.firstUpdatedBody,
-      templateResult.hostListenerWiring,
-      slotResult.slotChangeWiring,
-      scriptResult.mountHookBody,
-    ),
+    listenerWiringBody: listenerWiring,
+    mountHookBody: scriptResult.mountHookBody,
     disconnectedBody: scriptResult.unmountHookBody,
     updatedBody: scriptResult.updateHookBody,
     renderBody: templateResult.renderBody,
@@ -183,11 +191,17 @@ export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResu
   };
 }
 
-function combineFirstUpdated(
+/**
+ * D-SH-02: combine the re-armable listener wiring (listeners, host listeners,
+ * slotchange) — but NOT the `$onMount` hook body, which has mount-once
+ * semantics and must stay first-render-only. The combined body is emitted into
+ * a private `_armListeners()` method that both `firstUpdated()` and
+ * `connectedCallback()` (on reconnect) call.
+ */
+function combineListenerWiring(
   listenerWiring: string,
   hostListenerWiring: string[],
   slotChangeWiring: string,
-  mountHookBody: string,
 ): string {
   const parts: string[] = [];
   if (listenerWiring.trim().length > 0) parts.push(listenerWiring);
@@ -195,7 +209,6 @@ function combineFirstUpdated(
     if (wiring.trim().length > 0) parts.push(wiring);
   }
   if (slotChangeWiring.trim().length > 0) parts.push(slotChangeWiring);
-  if (mountHookBody.trim().length > 0) parts.push(mountHookBody);
   return parts.join('\n\n');
 }
 
@@ -210,7 +223,14 @@ interface ComposeClassBodyParts {
   debouncedFieldDecls: string;
   slotFields: string;
   cleanupField: string;
-  firstUpdatedBody: string;
+  /**
+   * D-SH-02: re-armable listener wiring (listeners + host listeners +
+   * slotchange). Emitted into `_armListeners()`, called from `firstUpdated()`
+   * and from `connectedCallback()` on reconnect.
+   */
+  listenerWiringBody: string;
+  /** User `$onMount` hook body — mount-once, stays in `firstUpdated()`. */
+  mountHookBody: string;
   disconnectedBody: string;
   updatedBody: string;
   renderBody: string;
@@ -235,11 +255,46 @@ function composeClassBody(parts: ComposeClassBodyParts): string {
   }
   sections.push(parts.cleanupField);
 
-  if (parts.firstUpdatedBody.trim().length > 0) {
+  const hasListenerWiring = parts.listenerWiringBody.trim().length > 0;
+  const hasMountHook = parts.mountHookBody.trim().length > 0;
+
+  // D-SH-02: re-armable listener wiring lives in `_armListeners()`, called
+  // from `firstUpdated()` (first render) AND `connectedCallback()` (reconnect).
+  // `disconnectedCallback()` already drains `_disconnectCleanups`, so a
+  // disconnect → reconnect cycle now correctly RE-ARMS every listener instead
+  // of leaving the element with zero listeners.
+  if (hasListenerWiring) {
+    sections.push(
+      [
+        '  private _armListeners(): void {',
+        indent(parts.listenerWiringBody, 4),
+        '  }',
+      ].join('\n'),
+    );
+
+    // connectedCallback re-arms on reconnect only — `this.hasUpdated` is false
+    // on the very first connect (firstUpdated has not run yet), so the first
+    // arming is owned exclusively by firstUpdated() and there is no double.
+    sections.push(
+      [
+        '  connectedCallback(): void {',
+        '    super.connectedCallback();',
+        '    if (this.hasUpdated) this._armListeners();',
+        '  }',
+      ].join('\n'),
+    );
+  }
+
+  // firstUpdated(): first-render listener arming + user $onMount hooks (the
+  // latter mount-once — never re-run on reconnect).
+  if (hasListenerWiring || hasMountHook) {
+    const firstUpdatedParts: string[] = [];
+    if (hasListenerWiring) firstUpdatedParts.push('this._armListeners();');
+    if (hasMountHook) firstUpdatedParts.push(parts.mountHookBody);
     sections.push(
       [
         '  firstUpdated(): void {',
-        indent(parts.firstUpdatedBody, 4),
+        indent(firstUpdatedParts.join('\n\n'), 4),
         '  }',
       ].join('\n'),
     );

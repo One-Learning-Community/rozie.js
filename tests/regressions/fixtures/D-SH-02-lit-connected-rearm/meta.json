@@ -1,0 +1,9 @@
+{
+  "id": "REG-07-004",
+  "source": "07-DIVERGENCES.md#D-SH-02",
+  "sourceKind": "phase-7-loop",
+  "phase": "07",
+  "desc": "the Lit emitter must emit a connectedCallback() that re-arms listeners after a disconnect → reconnect cycle — listener wiring lifted into _armListeners()",
+  "targets": ["lit"],
+  "discoveredBy": "07-DIVERGENCES.md D-SH-02 — Lit missing connectedCallback re-arm"
+}

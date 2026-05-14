@@ -22,8 +22,17 @@ input { padding: 0.25rem 0.5rem; }
 
   private _disconnectCleanups: Array<() => void> = [];
 
-  firstUpdated(): void {
+  private _armListeners(): void {
     this._disconnectCleanups.push(() => this._tw0.cancel());
+  }
+
+  connectedCallback(): void {
+    super.connectedCallback();
+    if (this.hasUpdated) this._armListeners();
+  }
+
+  firstUpdated(): void {
+    this._armListeners();
 
     this._disconnectCleanups.push((() => {
       // e.g., abort an in-flight request initialized in this hook

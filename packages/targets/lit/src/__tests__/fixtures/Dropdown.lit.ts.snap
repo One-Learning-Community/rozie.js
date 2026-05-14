@@ -40,7 +40,7 @@ export default class Dropdown extends SignalWatcher(LitElement) {
 
   private _disconnectCleanups: Array<() => void> = [];
 
-  firstUpdated(): void {
+  private _armListeners(): void {
     const _u0 = attachOutsideClickListener([() => this._refTriggerEl, () => this._refPanelEl], (e) => {  (this.close)(e); }, () => (this.open && this.closeOnOutsideClick));
     this._disconnectCleanups.push(_u0);
 
@@ -77,6 +77,15 @@ export default class Dropdown extends SignalWatcher(LitElement) {
         update();
       }
     }
+  }
+
+  connectedCallback(): void {
+    super.connectedCallback();
+    if (this.hasUpdated) this._armListeners();
+  }
+
+  firstUpdated(): void {
+    this._armListeners();
 
     this.reposition();
   }

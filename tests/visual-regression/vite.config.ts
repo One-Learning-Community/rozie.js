@@ -63,6 +63,28 @@ export default defineConfig(async () => ({
   // Sub-builds are served from dist/<target>/; the host router lives at dist root.
   base: `/${TARGET}/`,
   plugins: [Rozie({ target: TARGET }), ...(await frameworkPlugins(TARGET))],
+  // D-VR-01: the `@rozie/target-lit` emitter emits TC39-stage-3 *class-field*
+  // decorators (`@property() foo;`). esbuild — Vite's transform pipeline — does
+  // not read the workspace `tsconfig.json` for the `.rozie.ts` virtual modules
+  // `@rozie/unplugin` produces, so it defaulted to standard-decorator semantics
+  // and the Lit/preact-signals runtime threw `Unsupported decorator location:
+  // field` at class-construction time. Passing `tsconfigRaw` with
+  // `experimentalDecorators` (and `useDefineForClassFields: false`) tells
+  // esbuild to lower Lit's class-field decorators in the legacy form the Lit 3
+  // decorator runtime accepts. Scoped to the Lit sub-build only — the other
+  // five targets emit no class-field decorators.
+  ...(TARGET === 'lit'
+    ? {
+        esbuild: {
+          tsconfigRaw: {
+            compilerOptions: {
+              experimentalDecorators: true,
+              useDefineForClassFields: false,
+            },
+          },
+        },
+      }
+    : {}),
   build: {
     outDir: resolve(__dirname, 'dist', TARGET),
     // Each target build must NOT wipe sibling target builds.

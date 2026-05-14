@@ -40,7 +40,7 @@ form { display: flex; gap: 0.25rem; margin-block: 0.5rem; }
 
   private _disconnectCleanups: Array<() => void> = [];
 
-  firstUpdated(): void {
+  private _armListeners(): void {
     this.addEventListener('rozie-default-toggle', (e) => { (() => this.toggle(item.id))((e as CustomEvent).detail); });
 
     this.addEventListener('rozie-default-remove', (e) => { (() => this.remove(item.id))((e as CustomEvent).detail); });
@@ -77,6 +77,15 @@ form { display: flex; gap: 0.25rem; margin-block: 0.5rem; }
         update();
       }
     }
+  }
+
+  connectedCallback(): void {
+    super.connectedCallback();
+    if (this.hasUpdated) this._armListeners();
+  }
+
+  firstUpdated(): void {
+    this._armListeners();
   }
 
   disconnectedCallback(): void {

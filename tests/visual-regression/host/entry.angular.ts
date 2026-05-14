@@ -18,6 +18,24 @@ import { parseQuery, mountWrapper } from './main';
 
 const modules = import.meta.glob('../../../examples/*.rozie');
 
+/**
+ * Read the component's own selector tag off its compiled `ɵcmp` definition.
+ *
+ * D-VR-02: `createComponent({ hostElement })` does NOT project a standalone
+ * component's template into an arbitrary host element whose tag does not match
+ * the component's `selector`. Mounting into the bare `<div data-testid>` left
+ * the cell empty (silent no-render). The fix is to create a child element
+ * whose tag IS the component's selector (`<rozie-counter>` etc.) and mount the
+ * component into THAT — then run a full `ApplicationRef.tick()` so change
+ * detection paints the initial render.
+ */
+function selectorTag(componentType: Type<unknown>): string {
+  const cmp = (componentType as unknown as { ɵcmp?: { selectors?: unknown[][] } })
+    .ɵcmp;
+  const first = cmp?.selectors?.[0]?.[0];
+  return typeof first === 'string' && first.length > 0 ? first : 'div';
+}
+
 async function main(): Promise<void> {
   const { example } = parseQuery();
   const key = `../../../examples/${example}.rozie`;
@@ -27,12 +45,19 @@ async function main(): Promise<void> {
 
   const appRef = await createApplication();
   const wrapper = mountWrapper();
+
+  // D-VR-02: mount into a selector-matching host element, not the bare wrapper.
+  const hostEl = document.createElement(selectorTag(mod.default));
+  wrapper.appendChild(hostEl);
+
   const componentRef = createComponent(mod.default, {
     environmentInjector: appRef.injector,
-    hostElement: wrapper,
+    hostElement: hostEl,
   });
   appRef.attachView(componentRef.hostView);
-  componentRef.changeDetectorRef.detectChanges();
+  // Full application tick — `detectChanges()` alone did not paint the initial
+  // standalone-component render in the bare `createApplication()` platform.
+  appRef.tick();
 }
 
 void main();

@@ -74,13 +74,12 @@ test.describe('Lit reattach-cycle (QA-03)', () => {
     expect(pageErrors).toEqual([]);
   });
 
-  // D-SH-02 carry-forward: the re-arm half of the LIT-T-02 contract. The Lit
-  // emitter has no connectedCallback to re-run listener setup after a reconnect,
-  // so the outside-click listener is gone post-reattach and this click does NOT
-  // close the dropdown. Marked fixme — Plan 07-05 fixes the emitter (emit a
-  // connectedCallback that re-arms _disconnectCleanups) and un-fixmes this.
-  test.fixme(
-    'Dropdown: reconnect re-arms the outside-click listener (D-SH-02 — emitter has no connectedCallback re-arm)',
+  // D-SH-02 FIXED (Plan 07-05): the Lit emitter now lifts listener wiring into
+  // `_armListeners()`, called from `firstUpdated()` (first render) AND
+  // `connectedCallback()` on every reconnect (guarded by `this.hasUpdated`), so
+  // a disconnect → reconnect cycle re-arms the outside-click listener. Un-fixmed.
+  test(
+    'Dropdown: reconnect re-arms the outside-click listener (D-SH-02 — emitter connectedCallback re-arm)',
     async ({ page }) => {
       await page.goto('/src/pages/DropdownPage.html');
       const openState = page.locator('#open-state');
