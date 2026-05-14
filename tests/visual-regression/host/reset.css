@@ -19,12 +19,24 @@ body {
   background: #ffffff;
 }
 
-/* The mount wrapper is the clip target — it must add no box of its own. */
+/*
+ * The mount wrapper is the clip target — it adds no padding/margin of its own.
+ * `inline-block` shrink-wraps it to the mounted component's own box (D-10).
+ *
+ * `min-width`/`min-height` guarantee a non-zero, deterministic box even when
+ * the cell legitimately renders nothing visible in its default state — e.g.
+ * `Dropdown` (`open: false`) and `Modal` (`open: false`, `r-if`-unmounted).
+ * Without this the wrapper collapses to 0×0, Playwright reports it `hidden`,
+ * and the cell cannot be screenshotted. A consistent empty 1×1 box across all
+ * 6 targets is itself a valid pixel-equivalence assertion: every target must
+ * agree that the default-state component renders nothing.
+ */
 [data-testid='rozie-mount'] {
   margin: 0;
   padding: 0;
-  /* shrink-wrap the mounted component so the clip box == the component box */
   display: inline-block;
+  min-width: 1px;
+  min-height: 1px;
 }
 
 /* RESEARCH Pitfall 2 — kill animation/transition non-determinism at the source. */

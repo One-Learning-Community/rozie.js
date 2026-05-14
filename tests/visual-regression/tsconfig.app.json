@@ -1,0 +1,10 @@
+{
+  "comment": "Phase 7 Plan 02 — AnalogJS (@analogjs/vite-plugin-angular) defaults to resolving a sibling `tsconfig.app.json` for its AOT TS Program (the D-70 disk-cache path walks the Program's `include` patterns). Without it analogjs logs 'Unable to resolve tsconfig'. The visual-regression host imports the canonical `.rozie` files from `../../examples/`; @rozie/unplugin's Angular branch writes the `.rozie.ts` disk-cache artifacts alongside them, so the Program must include that directory.",
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "useDefineForClassFields": false
+  },
+  "include": ["host/**/*.ts", "../../examples/**/*.ts"]
+}

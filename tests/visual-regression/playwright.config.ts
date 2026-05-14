@@ -24,7 +24,12 @@ import { defineConfig, devices } from '@playwright/test';
 export default defineConfig({
   testDir: './specs',
   timeout: 30_000,
-  snapshotPathTemplate: '{testDir}/__screenshots__/{arg}{ext}',
+  // Baseline filename keyed by example ONLY ({arg} is the toHaveScreenshot
+  // name arg, e.g. `Counter.png`) — deliberately NOT suffixed with
+  // {projectName}/{testFilePath} so all 6 targets diff against the same Vue
+  // baseline (D-10). Rooted at the workspace's `__screenshots__/` dir (the
+  // path in the plan's file list), not under `specs/`.
+  snapshotPathTemplate: '__screenshots__/{arg}{ext}',
   expect: {
     toHaveScreenshot: {
       maxDiffPixels: 2,
