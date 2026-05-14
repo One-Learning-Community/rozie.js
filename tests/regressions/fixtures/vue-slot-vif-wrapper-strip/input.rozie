@@ -1,0 +1,30 @@
+<rozie name="PresenceSlotFallback">
+
+<props>
+{
+  title: { type: String, default: '' },
+}
+</props>
+
+<template>
+<section class="panel">
+  <header r-if="$slots.header || $props.title">
+    <!--
+      Vue regression: emitSlotInvocation's presence='conditional' branch wrapped
+      <slot> in an extra <template v-if="$slots.header"> guard. That hides the
+      fallback content when $props.title is truthy but no header slot is
+      provided. The slot invocation must emit bare so the fallback renders.
+    -->
+    <slot name="header">{{ $props.title }}</slot>
+  </header>
+  <div class="body">
+    <slot />
+  </div>
+</section>
+</template>
+
+<style>
+.panel { border: 1px solid rgba(0, 0, 0, 0.1); }
+</style>
+
+</rozie>

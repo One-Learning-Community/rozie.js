@@ -1,0 +1,9 @@
+{
+  "id": "REG-06.4-003",
+  "source": "commit:0a27114",
+  "sourceKind": "commit",
+  "phase": "06.4",
+  "desc": "createLitControllableProperty must treat the initial attribute as an uncontrolled seed, not a controlled-mode flip",
+  "targets": ["lit"],
+  "discoveredBy": "06.4-HUMAN-UAT.md walkthrough — Lit controllable property mode flip"
+}

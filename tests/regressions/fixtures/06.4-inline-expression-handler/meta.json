@@ -1,0 +1,9 @@
+{
+  "id": "REG-06.4-004",
+  "source": "commit:296a6ca",
+  "sourceKind": "commit",
+  "phase": "06.4",
+  "desc": "inline-expression event handlers (not bare method refs) must be lowered as inline arrows, not invoked as method names — prevents a runtime TypeError",
+  "targets": ["lit", "vue", "react", "svelte", "angular", "solid"],
+  "discoveredBy": "06.4 walkthrough WR-03"
+}

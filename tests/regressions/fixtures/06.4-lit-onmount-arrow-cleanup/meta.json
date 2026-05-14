@@ -1,0 +1,9 @@
+{
+  "id": "REG-06.4-001",
+  "source": "commit:c0f8fc3",
+  "sourceKind": "commit",
+  "phase": "06.4",
+  "desc": "concise-arrow $onMount whose body returns a teardown must register the cleanup, not leak the subscription across disconnect",
+  "targets": ["lit", "react", "solid", "svelte"],
+  "discoveredBy": "06.4 code-review CR-04"
+}

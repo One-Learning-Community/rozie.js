@@ -1,0 +1,9 @@
+{
+  "id": "REG-06.4-002",
+  "source": "commit:8ad433b",
+  "sourceKind": "commit",
+  "phase": "06.4",
+  "desc": "r-model on a checkbox/radio input must bind .checked + @change, not .value + @input",
+  "targets": ["lit", "vue", "react", "svelte", "angular", "solid"],
+  "discoveredBy": "06.4 walkthrough WR-10"
+}

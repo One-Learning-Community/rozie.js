@@ -1,0 +1,9 @@
+{
+  "id": "REG-03-001",
+  "source": "commit:0fdbfa2",
+  "sourceKind": "commit",
+  "phase": "03",
+  "desc": "presence='conditional' slot invocation must emit bare — no spurious <template v-if=\"$slots.X\"> wrapper that hides fallback content",
+  "targets": ["vue", "react", "svelte", "angular", "solid", "lit"],
+  "discoveredBy": "Vue emitter fix — spurious v-if slot wrapper"
+}

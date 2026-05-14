@@ -1,0 +1,25 @@
+<rozie name="ControllableModeFlip">
+
+<props>
+{
+  value: { type: Number, default: 0, model: true },
+}
+</props>
+
+<script>
+// 06.4 walkthrough bug: createLitControllableProperty treated the INITIAL
+// attribute parse as a controlled-mode flip. A bare-mounted Lit element with a
+// model:true prop must seed from the initial attribute as an uncontrolled
+// default — not latch into controlled mode just because the attribute exists.
+const bump = () => { $props.value += 1 }
+</script>
+
+<template>
+<button class="bump" @click="bump">{{ $props.value }}</button>
+</template>
+
+<style>
+.bump { font-variant-numeric: tabular-nums; }
+</style>
+
+</rozie>

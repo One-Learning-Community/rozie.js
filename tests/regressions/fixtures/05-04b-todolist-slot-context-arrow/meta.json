@@ -1,0 +1,9 @@
+{
+  "id": "REG-05-001",
+  "source": "commit:c303ae6",
+  "sourceKind": "commit",
+  "phase": "05",
+  "desc": "scoped-slot context closures must be pre-bound to class fields so the Angular template parser accepts the *ngTemplateOutlet context binding (no inline arrows)",
+  "targets": ["angular", "vue", "react", "svelte"],
+  "discoveredBy": "05-04b deferred follow-up — TodoList AOT compilation"
+}

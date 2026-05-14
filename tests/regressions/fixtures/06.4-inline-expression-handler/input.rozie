@@ -1,0 +1,35 @@
+<rozie name="InlineExprHandler">
+
+<props>
+{
+  closeOnBackdrop: { type: Boolean, default: true },
+}
+</props>
+
+<data>
+{
+  open: false,
+}
+</data>
+
+<script>
+const close = () => { $data.open = false }
+</script>
+
+<template>
+<div class="backdrop" @click="$props.closeOnBackdrop && close()">
+  <!--
+    WR-03 reproduction: an inline-expression handler ($props.closeOnBackdrop &&
+    close()) is not a bare method reference. Emitters that assumed every handler
+    is a method name produced a TypeError at runtime. The handler must be lowered
+    as an inline arrow wrapping the expression.
+  -->
+  <button @click="close">Close</button>
+</div>
+</template>
+
+<style>
+.backdrop { position: fixed; inset: 0; }
+</style>
+
+</rozie>

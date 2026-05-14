@@ -1,0 +1,26 @@
+<rozie name="CheckboxRModel">
+
+<props>
+{
+  checked: { type: Boolean, default: false, model: true },
+}
+</props>
+
+<template>
+<label class="toggle">
+  <!--
+    WR-10 reproduction: r-model on a checkbox input must bind to `.checked` and
+    listen on `@change`, not bind `.value` / `@input` like a text field. The Lit
+    emitter previously emitted the text-field binding shape for every r-model
+    regardless of the input `type` attribute.
+  -->
+  <input type="checkbox" r-model="$props.checked" />
+  <span>Enabled</span>
+</label>
+</template>
+
+<style>
+.toggle { display: inline-flex; gap: 0.25rem; align-items: center; }
+</style>
+
+</rozie>

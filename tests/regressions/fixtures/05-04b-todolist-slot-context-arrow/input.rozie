@@ -1,0 +1,34 @@
+<rozie name="ScopedSlotContext">
+
+<props>
+{
+  items: { type: Array, default: () => [], model: true },
+}
+</props>
+
+<script>
+const remaining = $computed(() => $props.items.filter(i => !i.done).length)
+</script>
+
+<template>
+<ul class="list">
+  <!--
+    05-04b reproduction: a scoped slot whose params are derived inline. The
+    Angular emitter must pre-bind the slot-context closure to a class field —
+    arrow functions inside *ngTemplateOutlet context bindings are rejected by
+    the Angular template parser, so TodoList failed to AOT-compile before the
+    fix.
+  -->
+  <li r-for="item in $props.items" :key="item.id">
+    <slot name="item" :item="item" :remaining="remaining">
+      {{ item.label }}
+    </slot>
+  </li>
+</ul>
+</template>
+
+<style>
+.list { list-style: none; padding: 0; }
+</style>
+
+</rozie>

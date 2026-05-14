@@ -12,4 +12,5 @@ packages:
   - "tests/lit-lint"
   - "tests/visual-regression"
   - "tests/slot-matrix"
+  - "tests/regressions"
   - "docs"
