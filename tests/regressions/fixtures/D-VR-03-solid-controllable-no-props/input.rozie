@@ -1,0 +1,27 @@
+<rozie name="ControllableNoProps">
+
+<props>
+{
+  value: { type: Number, default: 0, model: true },
+}
+</props>
+
+<script>
+// D-VR-03 reproduction: a Solid component with a defaulted model:true prop,
+// mounted with NO props passed (the visual-regression host mounts every cell
+// bare). The emitted `createControllableSignal(_props, 'value', 0)` was handed
+// `_props === undefined` and crashed with "Cannot read properties of undefined
+// (reading 'defaultValue')". The runtime helper must tolerate an absent props
+// object and fall back to the declared default.
+const bump = () => { $props.value += 1 }
+</script>
+
+<template>
+<button class="bump" @click="bump">{{ $props.value }}</button>
+</template>
+
+<style>
+.bump { font-variant-numeric: tabular-nums; }
+</style>
+
+</rozie>

@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 
 interface NestedSlotsFixtureProps {
   renderWrapper?: ReactNode;
+  renderInner?: ReactNode;
 }
 
 export default function NestedSlotsFixture(props: NestedSlotsFixtureProps): JSX.Element {

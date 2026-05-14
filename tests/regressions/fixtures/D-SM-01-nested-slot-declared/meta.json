@@ -1,0 +1,9 @@
+{
+  "id": "REG-07-003",
+  "source": "07-DIVERGENCES.md#D-SM-01",
+  "sourceKind": "phase-7-loop",
+  "phase": "07",
+  "desc": "a nested slot (a <slot> inside another slot's defaultContent) must be lifted onto the flat declared slot surface so render-function targets declare it, not just reference it",
+  "targets": ["vue", "react", "svelte", "angular", "solid", "lit"],
+  "discoveredBy": "07-DIVERGENCES.md D-SM-01 — nested-slots inner slot referenced-not-declared"
+}

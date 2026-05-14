@@ -1,0 +1,9 @@
+{
+  "id": "REG-07-002",
+  "source": "07-DIVERGENCES.md#D-VR-04",
+  "sourceKind": "phase-7-loop",
+  "phase": "07",
+  "desc": "a model:true prop whose default is a factory must have the factory INVOKED inside $bindable(...) — $bindable takes a fallback value, not a factory",
+  "targets": ["svelte"],
+  "discoveredBy": "07-DIVERGENCES.md D-VR-04 — Svelte default factory not invoked"
+}

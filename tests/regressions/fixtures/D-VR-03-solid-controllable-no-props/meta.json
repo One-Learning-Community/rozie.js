@@ -1,0 +1,9 @@
+{
+  "id": "REG-07-001",
+  "source": "07-DIVERGENCES.md#D-VR-03",
+  "sourceKind": "phase-7-loop",
+  "phase": "07",
+  "desc": "createControllableSignal must tolerate an undefined props object (Solid component mounted bare) and fall back to the declared default",
+  "targets": ["solid"],
+  "discoveredBy": "07-DIVERGENCES.md D-VR-03 — Solid props undefined on bare mount"
+}

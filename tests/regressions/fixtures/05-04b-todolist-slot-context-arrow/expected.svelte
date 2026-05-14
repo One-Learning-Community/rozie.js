@@ -6,7 +6,7 @@ interface Props {
   item?: Snippet<[any, any]>;
 }
 
-let { items = $bindable(() => []), item }: Props = $props();
+let { items = $bindable((() => [])()), item }: Props = $props();
 
 const remaining = $derived(items.filter(i => !i.done).length);
 </script>

@@ -1,0 +1,27 @@
+<rozie name="BindableFactoryDefault">
+
+<props>
+{
+  items: { type: Array, default: () => [], model: true },
+}
+</props>
+
+<script>
+// D-VR-04 reproduction: a Svelte component with a defaulted-array model:true
+// prop whose default is a factory (`() => []`). The emitter wrapped it as
+// `$bindable(() => [])` — but `$bindable(x)` takes a *fallback value*, not a
+// factory, so `items` resolved to the function itself and `items.filter(...)`
+// threw "filter is not a function" on a bare-mounted component. The factory
+// must be INVOKED — `$bindable((() => [])())`.
+const remaining = $computed(() => $props.items.filter(i => !i.done).length)
+</script>
+
+<template>
+<div class="count">{{ remaining }}</div>
+</template>
+
+<style>
+.count { font-variant-numeric: tabular-nums; }
+</style>
+
+</rozie>

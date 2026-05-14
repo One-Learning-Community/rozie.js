@@ -182,7 +182,22 @@ function buildPropsDestructureEntries(ir: IRComponent): string[] {
     const dflt = p.defaultValue !== null ? genCode(p.defaultValue) : null;
     if (p.isModel) {
       // model: true → $bindable(default) wrapper. With NO default → $bindable().
-      const inner = dflt !== null ? dflt : '';
+      //
+      // D-VR-04: `$bindable(x)` takes a *fallback value*, not a factory — so a
+      // Rozie `default: () => []` factory must be INVOKED here, not passed
+      // through verbatim. Passing the arrow through made `items` resolve to the
+      // function itself, so `items.filter(...)` threw "filter is not a
+      // function" on a bare-mounted Svelte component. Mirror the React target,
+      // which emits the invoked `(() => [])()` form. A non-function default
+      // (literal / identifier) is passed straight through.
+      let inner = dflt !== null ? dflt : '';
+      if (
+        p.defaultValue !== null &&
+        (t.isArrowFunctionExpression(p.defaultValue) ||
+          t.isFunctionExpression(p.defaultValue))
+      ) {
+        inner = `(${dflt})()`;
+      }
       entries.push(`${p.name} = $bindable(${inner})`);
     } else if (dflt !== null) {
       entries.push(`${p.name} = ${dflt}`);

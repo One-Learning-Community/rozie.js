@@ -13,7 +13,7 @@ interface Props {
 }
 
 let {
-  items = $bindable(() => []),
+  items = $bindable((() => [])()),
   title = 'Todo',
   header,
   children,

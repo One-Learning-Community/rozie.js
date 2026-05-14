@@ -1,0 +1,26 @@
+<rozie name="NestedSlotDeclared">
+
+<template>
+<div class="outer">
+  <!--
+    D-SM-01 reproduction: an outer slot whose defaultContent embeds an inner
+    <slot>. The render-function targets (React/Svelte/Angular/Solid) emitted a
+    *reference* to the inner slot in the wrapper's fallback branch but never
+    *declared* it on the component's prop/slot surface — `renderInner` /
+    `inner` / `innerTpl` / `innerSlot` was an undeclared free access. The IR
+    must lift SlotDecl.nestedSlots onto the flat declared slot surface so every
+    target both declares AND references the nested slot.
+  -->
+  <slot name="wrapper">
+    <div class="wrapper-fallback">
+      <slot name="inner" />
+    </div>
+  </slot>
+</div>
+</template>
+
+<style>
+.outer { display: block; }
+</style>
+
+</rozie>

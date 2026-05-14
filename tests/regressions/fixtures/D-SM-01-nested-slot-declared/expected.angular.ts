@@ -6,12 +6,13 @@ interface WrapperCtx {}
 interface InnerCtx {}
 
 @Component({
-  selector: 'rozie-nested-slots-fixture',
+  selector: 'rozie-nested-slot-declared',
   standalone: true,
   imports: [NgTemplateOutlet],
   template: `
 
-    <div class="nested-slots-fixture">
+    <div class="outer">
+      
       @if (wrapperTpl) {
     <ng-container *ngTemplateOutlet="wrapperTpl" />
     } @else {
@@ -24,17 +25,20 @@ interface InnerCtx {}
     </div>
 
   `,
+  styles: [`
+    .outer { display: block; }
+  `],
 })
-export class NestedSlotsFixture {
+export class NestedSlotDeclared {
   @ContentChild('wrapper', { read: TemplateRef }) wrapperTpl?: TemplateRef<WrapperCtx>;
   @ContentChild('inner', { read: TemplateRef }) innerTpl?: TemplateRef<InnerCtx>;
 
   static ngTemplateContextGuard(
-    _dir: NestedSlotsFixture,
+    _dir: NestedSlotDeclared,
     _ctx: unknown,
   ): _ctx is WrapperCtx | InnerCtx {
     return true;
   }
 }
 
-export default NestedSlotsFixture;
+export default NestedSlotDeclared;

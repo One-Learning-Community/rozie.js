@@ -1,6 +1,7 @@
 <template>
 
-<div class="nested-slots-fixture">
+<div class="outer">
+  
   <slot name="wrapper">
     <div class="wrapper-fallback">
       <slot name="inner"></slot>
@@ -16,3 +17,7 @@ defineSlots<{
   inner(props: {  }): any;
 }>();
 </script>
+
+<style scoped>
+.outer { display: block; }
+</style>

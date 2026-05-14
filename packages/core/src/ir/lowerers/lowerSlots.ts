@@ -196,8 +196,46 @@ function visit(
   }
 }
 
+/**
+ * Recursively collect a slot's nested slots into a flat list.
+ *
+ * D-SM-01: a nested slot (a `<slot>` inside another slot's defaultContent) is a
+ * real, consumer-fillable slot — it must appear on the component's declared
+ * slot surface, not only inside `SlotDecl.nestedSlots`. The native-`<slot>`
+ * targets (Vue, Lit) render it from the template tree regardless; the
+ * render-function targets (React, Svelte, Angular, Solid) build their
+ * prop/slot surface from the flat `ir.slots` list, so without flattening they
+ * emitted a *reference* to the nested slot that was never *declared*
+ * (`renderInner` / `inner` / `innerTpl` / `innerSlot` undeclared).
+ *
+ * `nestedSlots` is left populated on each SlotDecl — flattening is additive.
+ */
+function flattenNestedSlots(slot: SlotDecl, out: SlotDecl[]): void {
+  for (const nested of slot.nestedSlots) {
+    out.push(nested);
+    flattenNestedSlots(nested, out);
+  }
+}
+
 export function lowerSlots(template: TemplateAST): SlotDecl[] {
   const out: SlotDecl[] = [];
   visit(template.children, { rIfStack: [] }, out);
+
+  // D-SM-01: lift nested slots onto the flat declared slot surface. Iterate a
+  // snapshot of the top-level slots (the loop appends to `out`). De-dupe by
+  // name so a nested slot that shares a name with a top-level slot is not
+  // declared twice.
+  const topLevel = [...out];
+  const seen = new Set(out.map((s) => s.name));
+  for (const slot of topLevel) {
+    const nestedFlat: SlotDecl[] = [];
+    flattenNestedSlots(slot, nestedFlat);
+    for (const nested of nestedFlat) {
+      if (seen.has(nested.name)) continue;
+      seen.add(nested.name);
+      out.push(nested);
+    }
+  }
+
   return out;
 }

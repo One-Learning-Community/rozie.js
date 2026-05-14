@@ -1,9 +1,13 @@
-import { LitElement, html } from 'lit';
+import { LitElement, css, html } from 'lit';
 import { customElement, queryAssignedElements, state } from 'lit/decorators.js';
 import { SignalWatcher } from '@lit-labs/preact-signals';
 
-@customElement('rozie-nested-slots-fixture')
-export default class NestedSlotsFixture extends SignalWatcher(LitElement) {
+@customElement('rozie-nested-slot-declared')
+export default class NestedSlotDeclared extends SignalWatcher(LitElement) {
+  static styles = css`
+.outer { display: block; }
+`;
+
   @state() private _hasSlotWrapper = false;
   @queryAssignedElements({ slot: 'wrapper', flatten: true }) private _slotWrapperElements!: Element[];
   @state() private _hasSlotInner = false;
@@ -43,7 +47,8 @@ export default class NestedSlotsFixture extends SignalWatcher(LitElement) {
 
   render() {
     return html`
-<div class="nested-slots-fixture">
+<div class="outer">
+  
   <slot name="wrapper">
     <div class="wrapper-fallback">
       <slot name="inner"></slot>

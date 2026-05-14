@@ -10,7 +10,8 @@ let { wrapper, inner }: Props = $props();
 </script>
 
 
-<div class="nested-slots-fixture">
+<div class="outer">
+  
   {#if wrapper}{@render wrapper()}{:else}
     <div class="wrapper-fallback">
       {@render inner?.()}
@@ -18,3 +19,7 @@ let { wrapper, inner }: Props = $props();
   {/if}
 </div>
 
+
+<style>
+.outer { display: block; }
+</style>
