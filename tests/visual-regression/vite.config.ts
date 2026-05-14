@@ -88,7 +88,7 @@ export default defineConfig(async () => ({
   build: {
     outDir: resolve(__dirname, 'dist', TARGET),
     // Each target build must NOT wipe sibling target builds.
-    emptyOutDir: true,
+    emptyOutDir: false,
     sourcemap: false,
     rollupOptions: {
       input: resolve(__dirname, 'host', `entry.${TARGET}.html`),
