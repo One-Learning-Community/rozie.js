@@ -50,12 +50,11 @@ test.describe('StrictMode lifecycle-symmetry matrix (QA-03)', () => {
 
       // First mount cycle.
       await page.getByTestId(example.nav).click();
-      await expect(page.getByTestId(example.nav)).toHaveCSS(
-        // the active nav button gets a tinted background — proves the route
-        // actually switched (App.tsx sets background on `current === p`).
-        'cursor',
-        'pointer',
-      );
+      // The routed component actually mounted — `rozie-mount` is the testid the
+      // App routing shell renders around the active example. If navigation
+      // silently broke (e.g. the routed component threw on render) this would
+      // fail instead of going vacuously green.
+      await expect(page.getByTestId('rozie-mount')).toBeVisible();
       // unmount
       await page.getByTestId(awayFrom).click();
       // second mount cycle (re-mount)
