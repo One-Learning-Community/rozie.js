@@ -15,7 +15,7 @@ export default class ScopedParamsFixture extends SignalWatcher(LitElement) {
 
   private _disconnectCleanups: Array<() => void> = [];
 
-  firstUpdated(): void {
+  private _armListeners(): void {
     {
       const slotEl = this.shadowRoot?.querySelector('slot[name="item"]');
       if (slotEl !== null && slotEl !== undefined) {
@@ -26,6 +26,15 @@ export default class ScopedParamsFixture extends SignalWatcher(LitElement) {
         update();
       }
     }
+  }
+
+  connectedCallback(): void {
+    super.connectedCallback();
+    if (this.hasUpdated) this._armListeners();
+  }
+
+  firstUpdated(): void {
+    this._armListeners();
   }
 
   disconnectedCallback(): void {

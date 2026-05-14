@@ -57,7 +57,10 @@ describe('createControllableSignal', () => {
       set(9 as unknown as Parameters<typeof set>[0]);
 
       expect(warnSpy).toHaveBeenCalledOnce();
-      const warnMsg = warnSpy.mock.calls[0][0] as string;
+      // `toHaveBeenCalledOnce()` above guarantees calls[0] exists; the
+      // non-null assertion satisfies `noUncheckedIndexedAccess`-style strict
+      // tsconfig (surfaced when this file's typecheck cache invalidated).
+      const warnMsg = warnSpy.mock.calls[0]![0] as string;
       expect(warnMsg).toContain('[ROZ812]');
       expect(warnMsg.toLowerCase()).toMatch(/controlled/);
       expect(warnMsg.toLowerCase()).toMatch(/mid-lifecycle/);
