@@ -15,10 +15,10 @@ import '../lit-fixtures/Counter.lit';
  * system.
  */
 
-// Augment JSX so the compiler accepts <rozie-counter>. React's IntrinsicElements
-// is a generic Record<string, ...> in React 19 dev mode, but production types
-// require an explicit augmentation. Per-route augmentation keeps this scoped.
-declare global {
+// Augment JSX so the compiler accepts <rozie-counter>. With the `react-jsx`
+// runtime, intrinsic elements resolve against react's own `JSX` namespace —
+// not the global one — so the augmentation must target the `react` module.
+declare module 'react' {
   // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace JSX {
     interface IntrinsicElements {

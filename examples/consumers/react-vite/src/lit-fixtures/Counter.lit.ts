@@ -5,7 +5,7 @@ import { createLitControllableProperty } from '@rozie/runtime-lit';
 
 @customElement('rozie-counter')
 export default class Counter extends SignalWatcher(LitElement) {
-  static styles = css`
+  static override styles = css`
 .counter { display: inline-flex; gap: 0.5rem; align-items: center; }
 .counter.hovering { background: rgba(0, 0, 0, 0.04); }
 .value { font-variant-numeric: tabular-nums; min-width: 3ch; text-align: center; }
@@ -22,22 +22,22 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 
   private _disconnectCleanups: Array<() => void> = [];
 
-  firstUpdated(): void {
+  override firstUpdated(): void {
     console.log("hello from rozie");
   }
 
-  disconnectedCallback(): void {
+  override disconnectedCallback(): void {
     super.disconnectedCallback();
     for (const fn of this._disconnectCleanups) fn();
     this._disconnectCleanups = [];
   }
 
-  attributeChangedCallback(name: string, old: string | null, value: string | null): void {
+  override attributeChangedCallback(name: string, old: string | null, value: string | null): void {
     super.attributeChangedCallback(name, old, value);
     if (name === 'value') this._valueControllable.notifyAttributeChange(value === null ? 0 : Number(value));
   }
 
-  render() {
+  override render() {
     return html`
 <div class=${Object.entries({ "counter": true, hovering: this._hovering.value }).filter(([, v]) => v).map(([k]) => k).join(' ')} @mouseenter=${(e: Event) => { this._hovering.value = true; }} @mouseleave=${(e: Event) => { this._hovering.value = false; }}>
   <button ?disabled=${!this.canDecrement} aria-label="Decrement" @click=${this.decrement}>−</button>
