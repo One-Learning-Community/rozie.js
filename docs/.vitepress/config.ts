@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitepress';
 import Rozie from '@rozie/unplugin/vite';
+import { rozieCodegen } from './rozie-codegen';
 
 const rozieGrammar = JSON.parse(
   readFileSync(
@@ -9,6 +10,9 @@ const rozieGrammar = JSON.parse(
     'utf8',
   ),
 );
+
+// Repo-root `examples/` dir — source for the live-compiled example pages.
+const examplesDir = fileURLToPath(new URL('../../examples', import.meta.url));
 
 export default defineConfig({
   title: 'Rozie.js',
@@ -30,6 +34,12 @@ export default defineConfig({
     // in the registry — preload them here before the markdown renderer runs.
     async shikiSetup(highlighter) {
       await highlighter.loadLanguage('javascript', 'css');
+    },
+    // Live-compile the example pages: `rozie-src` / `rozie-out` fences are
+    // regenerated from the actual `.rozie` source through `@rozie/core` on
+    // every build, so the docs can never drift from the compiler.
+    config(md) {
+      rozieCodegen(md, { examplesDir });
     },
   },
   // Dogfood the project: compile .rozie files inline through the unplugin so
