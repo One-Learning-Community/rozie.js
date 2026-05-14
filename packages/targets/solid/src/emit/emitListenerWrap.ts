@@ -90,7 +90,7 @@ export function emitListenerWrap(
 
   if (helperName !== 'createDebouncedHandler' && helperName !== 'createThrottledHandler') {
     diagnostics.push({
-      code: RozieErrorCode.TARGET_REACT_RHTML_WITH_CHILDREN,
+      code: RozieErrorCode.TARGET_SOLID_RESERVED,
       severity: 'error',
       message: `emitListenerWrap called with unsupported helper '${helperName}'`,
       loc: listener.sourceLoc,

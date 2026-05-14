@@ -40,7 +40,7 @@ function refArgToAccessor(
 ): string | null {
   if (arg.kind !== 'refExpr') {
     diagnostics.push({
-      code: RozieErrorCode.TARGET_REACT_RHTML_WITH_CHILDREN,
+      code: RozieErrorCode.TARGET_SOLID_RESERVED,
       severity: 'error',
       message: `'.outside' expected a $refs.X arg, got ${arg.kind}`,
       loc: arg.loc,
@@ -50,7 +50,7 @@ function refArgToAccessor(
   const refName = arg.ref;
   if (!ir.refs.some((r) => r.name === refName)) {
     diagnostics.push({
-      code: RozieErrorCode.TARGET_REACT_RHTML_WITH_CHILDREN,
+      code: RozieErrorCode.TARGET_SOLID_RESERVED,
       severity: 'error',
       message: `'.outside($refs.${refName})' references unknown ref — declare via ref="${refName}" in <template>`,
       loc: arg.loc,
@@ -79,7 +79,7 @@ export function emitListenerOutsideClick(
 
   if (refAccessors.length === 0) {
     diagnostics.push({
-      code: RozieErrorCode.TARGET_REACT_RHTML_WITH_CHILDREN,
+      code: RozieErrorCode.TARGET_SOLID_RESERVED,
       severity: 'error',
       message: `'.outside()' (no-arg form) requires at least one ref: '.outside($refs.X)'.`,
       loc: listener.sourceLoc,

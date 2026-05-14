@@ -86,7 +86,7 @@ function renderTargetExpr(
   if (target.kind === 'ref') return `${target.refName}Ref`;
   // self / $el — not yet supported, fall back to document
   diagnostics.push({
-    code: RozieErrorCode.TARGET_REACT_RHTML_WITH_CHILDREN,
+    code: RozieErrorCode.TARGET_SOLID_RESERVED,
     severity: 'warning',
     message: `<listeners> entry with target=$el is not yet supported on the Solid target — falling back to 'document'`,
     loc,

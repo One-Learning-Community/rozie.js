@@ -282,7 +282,7 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
   if (rHtmlAttr && rHtmlAttr.kind === 'binding') {
     if (node.children.length > 0) {
       ctx.diagnostics.push({
-        code: RozieErrorCode.TARGET_REACT_RHTML_WITH_CHILDREN,
+        code: RozieErrorCode.TARGET_SOLID_RESERVED,
         severity: 'warning',
         message: `<${node.tagName}> r-html on element with children — children dropped (Pitfall 10).`,
         loc: rHtmlAttr.sourceLoc,

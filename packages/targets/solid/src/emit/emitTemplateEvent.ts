@@ -210,7 +210,7 @@ export function emitTemplateEvent(
     const impl = ctx.registry.get(modifierName);
     if (!impl) {
       diagnostics.push({
-        code: RozieErrorCode.TARGET_REACT_RHTML_WITH_CHILDREN,
+        code: RozieErrorCode.TARGET_SOLID_RESERVED,
         severity: 'error',
         message: `Modifier '.${modifierName}' has no emitter.`,
         loc: entry.sourceLoc,
@@ -239,7 +239,7 @@ export function emitTemplateEvent(
     if (desc.kind === 'native') {
       // Capture/passive/once — no JSX-level equivalent for Solid template @event.
       diagnostics.push({
-        code: RozieErrorCode.TARGET_REACT_RHTML_WITH_CHILDREN,
+        code: RozieErrorCode.TARGET_SOLID_RESERVED,
         severity: 'warning',
         message: `Modifier '.${desc.token}' has no JSX-prop equivalent in Solid. Move handler to <listeners> block to use this modifier.`,
         loc: entry.sourceLoc,
@@ -255,7 +255,7 @@ export function emitTemplateEvent(
     // helper kind
     if (desc.listenerOnly === true) {
       diagnostics.push({
-        code: RozieErrorCode.TARGET_REACT_RHTML_WITH_CHILDREN,
+        code: RozieErrorCode.TARGET_SOLID_RESERVED,
         severity: 'error',
         message: `Modifier '.${modifierName}' is listenerOnly — only valid in <listeners> blocks, not on template @event bindings.`,
         loc: entry.sourceLoc,
@@ -280,7 +280,7 @@ export function emitTemplateEvent(
 
     // Unknown helper
     diagnostics.push({
-      code: RozieErrorCode.TARGET_REACT_RHTML_WITH_CHILDREN,
+      code: RozieErrorCode.TARGET_SOLID_RESERVED,
       severity: 'error',
       message: `Modifier helper '${desc.helperName}' is not supported on template @event bindings in Solid.`,
       loc: entry.sourceLoc,
