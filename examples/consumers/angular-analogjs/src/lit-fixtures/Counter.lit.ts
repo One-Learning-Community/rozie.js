@@ -30,10 +30,6 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 
   private _disconnectCleanups: Array<() => void> = [];
 
-  firstUpdated(): void {
-    console.log("hello from rozie");
-  }
-
   disconnectedCallback(): void {
     super.disconnectedCallback();
     for (const fn of this._disconnectCleanups) fn();
