@@ -212,15 +212,18 @@ export function lowerSlots(template: TemplateAST): SlotDecl[] {
   // D-SM-01: lift nested slots onto the flat declared slot surface. Iterate a
   // snapshot of the top-level slots (the loop appends to `out`). De-dupe by
   // name so a nested slot that shares a name with a top-level slot is not
-  // declared twice.
+  // declared twice — but the empty-string default-slot name (`''`, the D-18
+  // sentinel) is the *absence* of a name, NOT a shared identity. Two distinct
+  // default-slot sites are distinct, consumer-fillable slots, so they are
+  // never collapsed against each other or against a top-level default slot.
   const topLevel = [...out];
-  const seen = new Set(out.map((s) => s.name));
+  const seen = new Set(out.filter((s) => s.name !== '').map((s) => s.name));
   for (const slot of topLevel) {
     const nestedFlat: SlotDecl[] = [];
     flattenNestedSlots(slot, nestedFlat);
     for (const nested of nestedFlat) {
-      if (seen.has(nested.name)) continue;
-      seen.add(nested.name);
+      if (nested.name !== '' && seen.has(nested.name)) continue;
+      if (nested.name !== '') seen.add(nested.name);
       out.push(nested);
     }
   }
