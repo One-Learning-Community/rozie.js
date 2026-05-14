@@ -1,0 +1,28 @@
+<!--
+  scoped-params — exercises SlotDecl.params.
+
+  A named slot that passes a param to its consumer (`:value="label"`). This is
+  the cell where the documented React render-prop compromise (REACT-T-04 —
+  slot becomes `renderItem?: (params) => ReactNode`) and the documented Lit
+  `data-rozie-params` + observeRozieSlotCtx compromise (LIT-T-04) surface. Per
+  D-05 / RESEARCH Pitfall 6 those two cells are EXPECTED-correct output, not
+  failures — the snapshot asserts the documented compromise.
+
+  Mirrors TodoList.rozie's scoped-slot shape (EX-04) as a minimal single-class
+  reproduction.
+-->
+<rozie name="ScopedParamsFixture">
+
+<props>
+{
+  label: { type: String, default: 'item' },
+}
+</props>
+
+<template>
+<div class="scoped-params-fixture">
+  <slot name="item" :value="$props.label" />
+</div>
+</template>
+
+</rozie>

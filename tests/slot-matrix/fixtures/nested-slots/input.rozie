@@ -1,0 +1,21 @@
+<!--
+  nested-slots — exercises SlotDecl.nestedSlots.
+
+  A slot whose default content itself contains another <slot>. The outer
+  `wrapper` slot's defaultContent embeds an inner `inner` slot — the IR records
+  the nesting via SlotDecl.nestedSlots (D-18). Isolates the nested-slot encoding
+  from the flat default-content-fallback case.
+-->
+<rozie name="NestedSlotsFixture">
+
+<template>
+<div class="nested-slots-fixture">
+  <slot name="wrapper">
+    <div class="wrapper-fallback">
+      <slot name="inner" />
+    </div>
+  </slot>
+</div>
+</template>
+
+</rozie>

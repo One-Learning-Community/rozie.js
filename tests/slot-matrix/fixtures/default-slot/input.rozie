@@ -1,0 +1,16 @@
+<!--
+  default-slot — exercises SlotDecl default-slot encoding.
+
+  One unnamed <slot>. The IR encodes the default slot with the empty-string
+  sentinel name ('' — D-18 / Phase 2 RESEARCH A1). No params, no fallback, no
+  presence guard, no nesting — the minimal single-class reproduction.
+-->
+<rozie name="DefaultSlotFixture">
+
+<template>
+<div class="default-slot-fixture">
+  <slot />
+</div>
+</template>
+
+</rozie>

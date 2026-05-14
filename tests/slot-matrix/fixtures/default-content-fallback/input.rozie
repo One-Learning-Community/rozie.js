@@ -1,0 +1,20 @@
+<!--
+  default-content-fallback — exercises SlotDecl.defaultContent.
+
+  A named slot with fallback content inside the <slot> tag. When the consumer
+  does not override the slot, the fallback markup renders. The IR lifts
+  `defaultContent` separately (D-18). No params, no presence guard, no nesting.
+
+  Mirrors TodoList.rozie's <slot name="empty">Nothing to do.</slot> shape.
+-->
+<rozie name="DefaultContentFallbackFixture">
+
+<template>
+<div class="default-content-fallback-fixture">
+  <slot name="status">
+    <span class="fallback">No status provided.</span>
+  </slot>
+</div>
+</template>
+
+</rozie>

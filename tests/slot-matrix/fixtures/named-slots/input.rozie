@@ -1,0 +1,22 @@
+<!--
+  named-slots — exercises SlotDecl.name.
+
+  Two named slots (header, footer) with no params, no fallback, no presence
+  guard. Isolates the named-slot encoding: each SlotDecl carries a non-empty
+  `name`. Mirrors Modal.rozie's $slots.header / $slots.footer shape (EX-05) but
+  as a minimal single-class reproduction.
+-->
+<rozie name="NamedSlotsFixture">
+
+<template>
+<div class="named-slots-fixture">
+  <header>
+    <slot name="header" />
+  </header>
+  <footer>
+    <slot name="footer" />
+  </footer>
+</div>
+</template>
+
+</rozie>

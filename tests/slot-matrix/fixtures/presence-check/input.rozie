@@ -1,0 +1,21 @@
+<!--
+  presence-check — exercises SlotDecl.presence (`conditional`).
+
+  A template that uses `r-if="$slots.aside"` to conditionally render a region.
+  The lowerSlots pass refines the slot's presence baseline from 'always' to
+  'conditional' when the <slot> sits under `r-if=$slots.<name>` (D-18 / Phase 2
+  Plan 02-01 decision). `$slots.aside` is the reactive presence boolean.
+
+  Mirrors Modal.rozie's `r-if="$slots.footer"` shape (EX-05).
+-->
+<rozie name="PresenceCheckFixture">
+
+<template>
+<div class="presence-check-fixture">
+  <aside r-if="$slots.aside">
+    <slot name="aside" />
+  </aside>
+</div>
+</template>
+
+</rozie>
