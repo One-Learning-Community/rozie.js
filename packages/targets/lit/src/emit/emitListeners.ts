@@ -1,9 +1,16 @@
 /**
- * emitListeners — Lit target (Plan 06.4-02 Task 1).
+ * emitListeners — Lit target (Plan 06.4-02 Task 1; Plan 07.1-02 registry rewrite).
  *
  * Walks IR.listeners and emits per-listener wiring inside firstUpdated() body
  * with cleanup pushed to this._disconnectCleanups (drained by orchestrator's
  * disconnectedCallback).
+ *
+ * Modifier classification is registry-driven (Plan 07.1-02): each pipeline
+ * entry is resolved via `registry.get(entry.modifier).lit(...)` into a
+ * `LitEmissionDescriptor` (native / inlineGuard / helper), mirroring the
+ * Svelte/Angular reference dispatch. The previous hand-rolled
+ * `switch (entry.modifier)` ladder is gone — this is what lets third-party
+ * modifiers target Lit.
  *
  * 4-class listener classifier (preserved from Solid):
  *   A — pure native (no .outside, no .debounce/.throttle) — addEventListener wiring.
@@ -28,7 +35,9 @@ import type {
   LitDecoratorImportCollector,
   RuntimeLitImportCollector,
 } from '../rewrite/collectLitImports.js';
-import type { ModifierRegistry } from '../../../../core/src/modifiers/ModifierRegistry.js';
+import type { ModifierRegistry, LitEmissionDescriptor } from '@rozie/core';
+import type { ModifierArg } from '../../../../core/src/modifier-grammar/parseModifierChain.js';
+import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
 import * as bt from '@babel/types';
 
@@ -55,11 +64,29 @@ function targetExpression(target: ListenerTarget): string {
   return `this._ref${target.refName.charAt(0).toUpperCase()}${target.refName.slice(1)}`;
 }
 
-function classifyListener(listener: Listener): {
+interface ClassifyOpts {
+  registry: ModifierRegistry;
+  diagnostics: Diagnostic[];
+}
+
+/**
+ * Classify a listener's modifier pipeline via registry dispatch.
+ *
+ * For each entry: resolve `impl.lit(args, ctx)` → `LitEmissionDescriptor`,
+ * then fold the descriptor into the classifier state:
+ *   - `native`     → addEventListener option flag
+ *   - `inlineGuard`→ prelude guard string
+ *   - `helper`     → `attachOutsideClickListener` selects Class B;
+ *                    `debounce` / `throttle` select Class C
+ */
+function classifyListener(
+  listener: Listener,
+  opts: ClassifyOpts,
+): {
   klass: 'A' | 'B' | 'C' | 'D';
-  outsideRefs?: string[] | undefined;
+  outsideArgs?: ModifierArg[] | undefined;
   wrapper?: 'debounce' | 'throttle' | undefined;
-  wrapperArgs?: number | undefined;
+  wrapperArgs?: ModifierArg[] | undefined;
   inlineGuards: string[];
   listenerOptions: { capture?: boolean; passive?: boolean; once?: boolean };
 } {
@@ -70,9 +97,9 @@ function classifyListener(listener: Listener): {
     once?: boolean;
   } = {};
   let klass: 'A' | 'B' | 'C' | 'D' = 'A';
-  let outsideRefs: string[] | undefined;
+  let outsideArgs: ModifierArg[] | undefined;
   let wrapper: 'debounce' | 'throttle' | undefined;
-  let wrapperArgs: number | undefined;
+  let wrapperArgs: ModifierArg[] | undefined;
 
   for (const entry of listener.modifierPipeline) {
     if (entry.kind === 'listenerOption') {
@@ -82,68 +109,113 @@ function classifyListener(listener: Listener): {
       continue;
     }
 
-    if (entry.kind === 'wrap') {
-      if (entry.modifier === 'outside') {
-        klass = 'B';
-        // Extract ref names from args. ModifierArg has shape with `.value` or expression.
-        outsideRefs = (entry.args ?? [])
-          .map((arg) => extractRefName(arg))
-          .filter((s): s is string => s !== null);
-      } else if (entry.modifier === 'debounce' || entry.modifier === 'throttle') {
-        klass = 'C';
-        wrapper = entry.modifier;
-        wrapperArgs = extractNumberArg(entry.args);
-      }
+    const impl = opts.registry.get(entry.modifier);
+    if (!impl || !impl.lit) {
+      opts.diagnostics.push({
+        code: RozieErrorCode.TARGET_LIT_RESERVED,
+        severity: 'error',
+        message: `Modifier '.${entry.modifier}' has no Lit emitter (missing lit() hook).`,
+        loc: entry.sourceLoc,
+      });
       continue;
     }
+    const descriptor: LitEmissionDescriptor = impl.lit(entry.args, {
+      source: 'listeners-block',
+      event: listener.event,
+      sourceLoc: entry.sourceLoc,
+    });
 
-    if (entry.kind === 'filter') {
+    if (descriptor.kind === 'native') {
+      if (descriptor.token === 'capture') listenerOptions.capture = true;
+      if (descriptor.token === 'passive') listenerOptions.passive = true;
+      if (descriptor.token === 'once') listenerOptions.once = true;
+      continue;
+    }
+    if (descriptor.kind === 'inlineGuard') {
       if (klass === 'A') klass = 'D';
-      // Inline filter guards
-      if (entry.modifier === 'stop') inlineGuards.push('e.stopPropagation();');
-      else if (entry.modifier === 'prevent') inlineGuards.push('e.preventDefault();');
-      else if (entry.modifier === 'self')
-        inlineGuards.push('if (e.target !== e.currentTarget) return;');
-      else if (entry.modifier === 'enter')
-        inlineGuards.push("if ((e as KeyboardEvent).key !== 'Enter') return;");
-      else if (entry.modifier === 'escape' || entry.modifier === 'esc')
-        inlineGuards.push("if ((e as KeyboardEvent).key !== 'Escape') return;");
-      else if (entry.modifier === 'tab')
-        inlineGuards.push("if ((e as KeyboardEvent).key !== 'Tab') return;");
+      inlineGuards.push(descriptor.code);
+      continue;
+    }
+    // descriptor.kind === 'helper'
+    if (descriptor.helperName === 'attachOutsideClickListener') {
+      klass = 'B';
+      outsideArgs = descriptor.args;
+      continue;
+    }
+    if (descriptor.helperName === 'debounce' || descriptor.helperName === 'throttle') {
+      klass = 'C';
+      wrapper = descriptor.helperName;
+      wrapperArgs = descriptor.args;
+      continue;
     }
   }
 
-  return { klass, outsideRefs, wrapper, wrapperArgs, inlineGuards, listenerOptions };
+  return { klass, outsideArgs, wrapper, wrapperArgs, inlineGuards, listenerOptions };
 }
 
-function extractRefName(arg: unknown): string | null {
+function extractRefName(arg: ModifierArg): string | null {
   // ModifierArg shape from packages/core/src/modifier-grammar/parseModifierChain.ts:
   //   { kind: 'refExpr', ref: string, loc: SourceLoc }
   //   { kind: 'literal', value: ..., loc: SourceLoc }
-  if (typeof arg === 'object' && arg !== null) {
-    const a = arg as Record<string, unknown>;
-    if (a.kind === 'refExpr' && typeof a.ref === 'string') {
-      return a.ref as string;
-    }
+  if (arg.kind === 'refExpr' && typeof arg.ref === 'string') {
+    return arg.ref;
   }
   return null;
 }
 
-function extractNumberArg(args: unknown[] | undefined): number {
+function extractNumberArg(args: ModifierArg[] | undefined): number {
   if (!args || args.length === 0) return 0;
   const first = args[0];
-  if (typeof first === 'object' && first !== null) {
-    const a = first as Record<string, unknown>;
-    // ModifierArg literal shape: { kind: 'literal', value: number | string | boolean }
-    if (a.kind === 'literal') {
-      if (typeof a.value === 'number') return a.value as number;
-      if (typeof a.value === 'string') {
-        const n = Number(a.value);
-        return Number.isFinite(n) ? n : 0;
-      }
+  if (first && first.kind === 'literal') {
+    if (typeof first.value === 'number') return first.value;
+    if (typeof first.value === 'string') {
+      const n = Number(first.value);
+      return Number.isFinite(n) ? n : 0;
     }
   }
   return 0;
+}
+
+/**
+ * Map a DOM event name to the matching DOM event interface so registry-driven
+ * inlineGuards (e.g. `if (e.key !== 'Escape') return;`) typecheck against the
+ * handler parameter without a per-guard `(e as KeyboardEvent)` cast. Mirrors
+ * the Svelte target's `eventTypeFor`.
+ */
+function eventTypeFor(event: string): string {
+  if (
+    event === 'click' ||
+    event === 'mousedown' ||
+    event === 'mouseup' ||
+    event === 'mousemove' ||
+    event === 'mouseenter' ||
+    event === 'mouseleave' ||
+    event === 'mouseover' ||
+    event === 'mouseout' ||
+    event === 'contextmenu'
+  )
+    return 'MouseEvent';
+  if (event === 'keydown' || event === 'keyup' || event === 'keypress')
+    return 'KeyboardEvent';
+  if (event === 'wheel') return 'WheelEvent';
+  if (
+    event === 'touchstart' ||
+    event === 'touchend' ||
+    event === 'touchmove' ||
+    event === 'touchcancel'
+  )
+    return 'TouchEvent';
+  if (
+    event === 'pointerdown' ||
+    event === 'pointerup' ||
+    event === 'pointermove' ||
+    event === 'pointercancel'
+  )
+    return 'PointerEvent';
+  if (event === 'focus' || event === 'blur') return 'FocusEvent';
+  if (event === 'input') return 'InputEvent';
+  if (event === 'submit') return 'SubmitEvent';
+  return 'Event';
 }
 
 /**
@@ -164,11 +236,14 @@ function emitOneListener(
   listener: Listener,
   ir: IRComponent,
   opts: EmitListenersOpts,
+  registry: ModifierRegistry,
+  diagnostics: Diagnostic[],
   index: number,
 ): string {
-  const cls = classifyListener(listener);
+  const cls = classifyListener(listener, { registry, diagnostics });
   const handlerExpr = rewriteTemplateExpression(listener.handler, ir);
   const whenExpr = listener.when ? rewriteTemplateExpression(listener.when, ir) : null;
+  const evtType = eventTypeFor(listener.event);
 
   // Build core handler body: maybe wrap in `when` guard + inline guards.
   const guardLines: string[] = [];
@@ -180,7 +255,7 @@ function emitOneListener(
   // emitted as statements (`count++;`) not calls (`(count++)(e)` — TypeError).
   const isFnLike = isHandlerLike(listener.handler);
   const userCall = isFnLike ? `(${handlerExpr})(e);` : `${handlerExpr};`;
-  const handlerBody = `(e: Event) => { ${guardLines.join(' ')} ${userCall} }`;
+  const handlerBody = `(e: ${evtType}) => { ${guardLines.join(' ')} ${userCall} }`;
 
   // Build addEventListener options object (all options are significant for the add call).
   const addOptionFields: string[] = [];
@@ -204,10 +279,13 @@ function emitOneListener(
     case 'B': {
       // .outside collapse → attachOutsideClickListener
       opts.runtime.add('attachOutsideClickListener');
-      const refs = (cls.outsideRefs ?? []).map(
-        (r) =>
-          `() => this._ref${r.charAt(0).toUpperCase()}${r.slice(1)}`,
-      );
+      const refs = (cls.outsideArgs ?? [])
+        .map((arg) => extractRefName(arg))
+        .filter((r): r is string => r !== null)
+        .map(
+          (r) =>
+            `() => this._ref${r.charAt(0).toUpperCase()}${r.slice(1)}`,
+        );
       const refsArr = `[${refs.join(', ')}]`;
       const whenFn = whenExpr ? `, () => (${whenExpr})` : '';
       const unsubVar = `_u${index}`;
@@ -219,7 +297,7 @@ function emitOneListener(
 
     case 'C': {
       // .debounce / .throttle → inline IIFE
-      const ms = cls.wrapperArgs ?? 100;
+      const ms = extractNumberArg(cls.wrapperArgs) || 100;
       const wrapped =
         cls.wrapper === 'debounce'
           ? `(() => { let t: ReturnType<typeof setTimeout> | undefined; return (e: Event) => { ${guardLines.join(' ')} if (t) clearTimeout(t); t = setTimeout(() => { (${handlerExpr})(e); }, ${ms}); }; })()`
@@ -254,14 +332,14 @@ function emitOneListener(
 export function emitListeners(
   ir: IRComponent,
   opts: EmitListenersOpts,
-  _modifierRegistry?: ModifierRegistry,
+  modifierRegistry: ModifierRegistry,
 ): EmitListenersResult {
   const diagnostics: Diagnostic[] = [];
   const lines: string[] = [];
   let index = 0;
   for (const listener of ir.listeners ?? []) {
     if (listener.source !== 'listeners-block') continue;
-    lines.push(emitOneListener(listener, ir, opts, index));
+    lines.push(emitOneListener(listener, ir, opts, modifierRegistry, diagnostics, index));
     index++;
   }
   return { firstUpdatedBody: lines.join('\n\n'), diagnostics };
