@@ -1,0 +1,65 @@
+name: Visual Regression Matrix
+
+# Phase 7 Plan 02 — the 48-cell (8 examples × 6 targets) cross-target visual
+# regression gate (EX-06, COMP-05).
+#
+# D-12: screenshots are deterministic ONLY inside one pinned Playwright
+# container image — fonts baked in, content-addressed by sha256 digest so the
+# tag cannot be silently re-pointed (threat T-07-05). The whole job therefore
+# runs inside `container:` keyed to that digest. Local runs are advisory; this
+# CI job is authoritative. CI fails on any diff outside the ≤2px tolerance.
+#
+# The digest matches tests/visual-regression/Dockerfile and the
+# @playwright/test 1.60.0 pin in tests/visual-regression/package.json.
+
+on:
+  pull_request:
+    paths:
+      - 'packages/**'
+      - 'examples/*.rozie'
+      - 'tests/visual-regression/**'
+      - 'turbo.json'
+      - 'pnpm-workspace.yaml'
+      - '.github/workflows/visual-regression.yml'
+  push:
+    branches: [main]
+
+jobs:
+  visual-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # D-12 — the pinned, digest-addressed Playwright container is the single
+    # authoritative screenshot environment (threat T-07-05 mitigation).
+    container:
+      image: mcr.microsoft.com/playwright:v1.60.0-jammy@sha256:e1529a04087193966ea15d4a1617345bdaa0791690a24ab2c42b65f9ce5b2cdc
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # The visual-regression host consumes the 6 targets' build outputs;
+      # `turbo run build` builds @rozie/core + all 6 target packages + unplugin.
+      - name: Build all packages (core + 6 targets + unplugin)
+        run: pnpm turbo run build
+
+      # The visual-regression workspace's webServer block runs `pnpm build &&
+      # pnpm preview` (the 6 per-target Vite sub-builds + the unified preview
+      # server); test:visual then drives Playwright against it.
+      - name: Run visual-regression matrix
+        run: pnpm --filter @rozie/visual-regression test:visual
+
+      - name: Upload Playwright HTML report on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report-visual-regression
+          path: tests/visual-regression/playwright-report
+          retention-days: 7

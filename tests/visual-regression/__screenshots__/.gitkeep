@@ -1,0 +1,7 @@
+# Phase 7 Plan 02 — committed Vue reference baseline PNGs live here (D-12).
+#
+# Placeholder so the directory is tracked before the 8 baselines are generated.
+# Per D-12 the baselines are generated ONLY inside the pinned Playwright
+# container (mcr.microsoft.com/playwright:v1.60.0-jammy) and committed; local
+# runs are advisory. The matrix spec keys screenshots by example only — every
+# target diffs against the same per-example Vue baseline (D-10).

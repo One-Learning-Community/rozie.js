@@ -9,6 +9,10 @@
       "dependsOn": ["^build"],
       "outputs": []
     },
+    "test:visual": {
+      "dependsOn": ["^build"],
+      "outputs": []
+    },
     "lint": {
       "dependsOn": []
     },
