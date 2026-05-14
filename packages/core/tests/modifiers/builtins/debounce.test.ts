@@ -46,4 +46,35 @@ describe('builtin: .debounce — Plan 02-04', () => {
     expect(result.diagnostics).toHaveLength(1);
     expect(result.diagnostics[0]).toMatchObject({ code: 'ROZ111', severity: 'error' });
   });
+
+  // Phase 07.1 — Solid/Lit emission descriptors (parallels svelte()/angular()).
+  it('.debounce solid() → helper createDebouncedHandler without listenerOnly', () => {
+    const args: ModifierArg[] = [
+      { kind: 'literal', value: 300, loc: { start: 60, end: 63 } },
+    ];
+    const desc = debounce.solid!(args, CTX);
+    expect(desc).toMatchObject({
+      kind: 'helper',
+      importFrom: '@rozie/runtime-solid',
+      helperName: 'createDebouncedHandler',
+    });
+    if (desc.kind !== 'helper') throw new Error('unreachable: kind narrowing');
+    expect(desc.args).toEqual(args);
+    expect(desc.listenerOnly).toBeUndefined();
+  });
+
+  it('.debounce lit() → helper debounce without listenerOnly', () => {
+    const args: ModifierArg[] = [
+      { kind: 'literal', value: 300, loc: { start: 60, end: 63 } },
+    ];
+    const desc = debounce.lit!(args, CTX);
+    expect(desc).toMatchObject({
+      kind: 'helper',
+      importFrom: '@rozie/runtime-lit',
+      helperName: 'debounce',
+    });
+    if (desc.kind !== 'helper') throw new Error('unreachable: kind narrowing');
+    expect(desc.args).toEqual(args);
+    expect(desc.listenerOnly).toBeUndefined();
+  });
 });

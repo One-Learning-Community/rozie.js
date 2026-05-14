@@ -34,4 +34,35 @@ describe('builtin: .throttle — Plan 02-04', () => {
     expect(result.diagnostics).toHaveLength(1);
     expect(result.diagnostics[0]).toMatchObject({ code: 'ROZ111', severity: 'error' });
   });
+
+  // Phase 07.1 — Solid/Lit emission descriptors (parallels svelte()/angular()).
+  it('.throttle solid() → helper createThrottledHandler without listenerOnly', () => {
+    const args: ModifierArg[] = [
+      { kind: 'literal', value: 100, loc: { start: 9, end: 12 } },
+    ];
+    const desc = throttle.solid!(args, CTX);
+    expect(desc).toMatchObject({
+      kind: 'helper',
+      importFrom: '@rozie/runtime-solid',
+      helperName: 'createThrottledHandler',
+    });
+    if (desc.kind !== 'helper') throw new Error('unreachable: kind narrowing');
+    expect(desc.args).toEqual(args);
+    expect(desc.listenerOnly).toBeUndefined();
+  });
+
+  it('.throttle lit() → helper throttle without listenerOnly', () => {
+    const args: ModifierArg[] = [
+      { kind: 'literal', value: 100, loc: { start: 9, end: 12 } },
+    ];
+    const desc = throttle.lit!(args, CTX);
+    expect(desc).toMatchObject({
+      kind: 'helper',
+      importFrom: '@rozie/runtime-lit',
+      helperName: 'throttle',
+    });
+    if (desc.kind !== 'helper') throw new Error('unreachable: kind narrowing');
+    expect(desc.args).toEqual(args);
+    expect(desc.listenerOnly).toBeUndefined();
+  });
 });

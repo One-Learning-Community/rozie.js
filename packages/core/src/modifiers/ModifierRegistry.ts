@@ -205,6 +205,83 @@ export type AngularEmissionDescriptor =
   | { kind: 'inlineGuard'; code: string };
 
 /**
+ * SolidEmissionDescriptor — Phase 07.1 tagged union returned by ModifierImpl.solid?(...).
+ *
+ * Mirrors ReactEmissionDescriptor's three-discriminant shape (RESEARCH A2):
+ *
+ * - 'native' — addEventListener option flag (capture/passive/once). Solid has
+ *   NO native template-modifier syntax (no `.stop`/`.prevent` on JSX events) —
+ *   the only "native" pass-through is the addEventListener option flag set,
+ *   used when emitting `addEventListener('click', h, { capture: true })`.
+ *
+ * - 'helper' — emit an import from `@rozie/runtime-solid` and a helper call.
+ *   Helpers are Solid primitives (createOutsideClick, createDebouncedHandler,
+ *   createThrottledHandler) — the union members match the verified exports of
+ *   `@rozie/runtime-solid`. `listenerOnly: true` flags modifiers (only
+ *   `.outside` in v1) that are only meaningful in <listeners> blocks; emitter
+ *   rejects them on template @event.
+ *
+ * - 'inlineGuard' — emit a code-fragment guard expression inline in the handler
+ *   body, BEFORE the user handler runs. Used for filter-style modifiers that
+ *   have no native Solid equivalent (.stop, .prevent, .self, key-filters). The
+ *   `code` string is inserted verbatim; emitter MUST guarantee the surrounding
+ *   handler has `e` as the event-arg name (the Solid emitter normalises this).
+ *   Example:
+ *     { kind: 'inlineGuard', code: 'e.stopPropagation();' }
+ *
+ * @public — SemVer-stable per D-22b. Additive in Phase 07.1; third-party
+ * plugins implementing `solid?` (and `lit?`) extends the MOD-05 swipe dogfood
+ * to the 6-target matrix. Third-party plugins MAY omit; emitter falls back to
+ * a ROZ813-class diagnostic.
+ */
+export type SolidEmissionDescriptor =
+  | { kind: 'native'; token: 'capture' | 'passive' | 'once' }
+  | {
+      kind: 'helper';
+      importFrom: '@rozie/runtime-solid';
+      helperName: 'createOutsideClick' | 'createDebouncedHandler' | 'createThrottledHandler';
+      args: ModifierArg[];
+      listenerOnly?: true;
+    }
+  | { kind: 'inlineGuard'; code: string };
+
+/**
+ * LitEmissionDescriptor — Phase 07.1 tagged union returned by ModifierImpl.lit?(...).
+ *
+ * Mirrors SvelteEmissionDescriptor/AngularEmissionDescriptor's three-discriminant
+ * shape (RESEARCH A2):
+ *
+ * - 'native' — addEventListener option flag (capture/passive/once), valid in the
+ *   <listeners>-block context where addEventListener option flags meet Lit's
+ *   event surface.
+ *
+ * - 'helper' — emit an import from `@rozie/runtime-lit` and a helper call. The
+ *   `helperName` union members match the verified exports of `@rozie/runtime-lit`
+ *   (attachOutsideClickListener, debounce, throttle). `listenerOnly: true` flags
+ *   modifiers (only `.outside` in v1) that are only meaningful in <listeners>
+ *   blocks; emitter rejects them on template @event.
+ *
+ * - 'inlineGuard' — emit a code fragment inline in the synthesized handler body
+ *   BEFORE the user handler runs. Used for filter-style modifiers (.stop,
+ *   .prevent, .self, key filters) that have no native Lit representation. The
+ *   `code` string is inserted verbatim; emitter MUST guarantee `e` is the bound
+ *   event-arg name.
+ *
+ * @public — SemVer-stable per D-22b. Third-party plugins MAY omit; emitter
+ * falls back to a ROZ832-class diagnostic.
+ */
+export type LitEmissionDescriptor =
+  | { kind: 'native'; token: 'capture' | 'passive' | 'once' }
+  | {
+      kind: 'helper';
+      importFrom: '@rozie/runtime-lit';
+      helperName: 'attachOutsideClickListener' | 'debounce' | 'throttle';
+      args: ModifierArg[];
+      listenerOnly?: true;
+    }
+  | { kind: 'inlineGuard'; code: string };
+
+/**
  * ModifierImpl — what a modifier plugin author implements.
  *
  * `resolve()` validates args + emits diagnostics for malformed input
@@ -256,6 +333,18 @@ export interface ModifierImpl {
    * Third-party plugins MAY omit; emitter falls back to ROZ722-class diagnostic.
    */
   angular?(args: ModifierArg[], ctx: ModifierContext): AngularEmissionDescriptor;
+  /**
+   * Phase 07.1 — Solid target emission descriptor. Optional for Phase 1-6
+   * compatibility; the Solid emitter REQUIRES every builtin to implement it.
+   * Third-party plugins MAY omit; emitter falls back to a ROZ813-class diagnostic.
+   */
+  solid?(args: ModifierArg[], ctx: ModifierContext): SolidEmissionDescriptor;
+  /**
+   * Phase 07.1 — Lit target emission descriptor. Optional for Phase 1-6
+   * compatibility; the Lit emitter REQUIRES every builtin to implement it.
+   * Third-party plugins MAY omit; emitter falls back to a ROZ832-class diagnostic.
+   */
+  lit?(args: ModifierArg[], ctx: ModifierContext): LitEmissionDescriptor;
 }
 
 /**

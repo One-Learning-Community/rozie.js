@@ -56,4 +56,14 @@ export const capture: ModifierImpl = {
     // <listeners> block emits raw addEventListener with this option set.
     return { kind: 'native', token: 'capture' };
   },
+  solid() {
+    // Phase 07.1 native: addEventListener({ capture: true }) option flag — the
+    // Solid emitter switches to raw addEventListener call style for this flag.
+    return { kind: 'native', token: 'capture' };
+  },
+  lit() {
+    // Phase 07.1 native: addEventListener({ capture: true }) option flag —
+    // valid ONLY for <listeners>-block context.
+    return { kind: 'native', token: 'capture' };
+  },
 };

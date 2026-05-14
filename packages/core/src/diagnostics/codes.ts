@@ -92,6 +92,8 @@ export const RozieErrorCode = {
   UNPLUGIN_SOLID_DEP_MISSING: 'ROZ811',       // solid-js (^1.8) not resolvable from cwd (D-139)
   // ---- @rozie/runtime-solid warnings (Phase 06.3) — ROZ812 ----
   RUNTIME_SOLID_CONTROLLABLE_MODE_FLIP: 'ROZ812', // D-135 — createControllableSignal detected parent flipping controlled/uncontrolled mid-lifecycle
+  // ---- @rozie/target-solid lowering errors (Phase 07.1) — ROZ813..ROZ819 ----
+  TARGET_SOLID_RESERVED: 'ROZ813', // internal-invariant placeholder; mirrors TARGET_SVELTE_RESERVED/TARGET_ANGULAR_RESERVED. Solid emitter raises this when a modifier has no solid() hook.
 
   // ---- @rozie/unplugin React-branch configuration errors (Phase 4 D-63) — ROZ500..ROZ519 ----
   UNPLUGIN_REACT_PEER_DEP_MISSING: 'ROZ500', // D-59: neither @vitejs/plugin-react nor @vitejs/plugin-react-swc installed (Pitfall 9)
@@ -148,7 +150,9 @@ export const RozieErrorCode = {
   // ROZ830..ROZ849 is hereby reallocated for Lit. The 850-range CLI block is untouched.
   UNPLUGIN_LIT_PEER_DEP_MISSING: 'ROZ830', // lit (^3.2) not resolvable from cwd
   UNPLUGIN_LIT_SIGNALS_PEER_DEP_MISSING: 'ROZ831', // @lit-labs/preact-signals (^1) not resolvable from cwd
-  // ROZ832..ROZ839 reserved for future Lit-emitter diagnostics
+  // ---- @rozie/target-lit lowering errors (Phase 07.1) — ROZ832..ROZ839 ----
+  TARGET_LIT_RESERVED: 'ROZ832', // internal-invariant placeholder; mirrors TARGET_SVELTE_RESERVED/TARGET_ANGULAR_RESERVED. Lit emitter raises this when a modifier has no lit() hook.
+  // ROZ833..ROZ839 reserved for future Lit-emitter diagnostics
   RUNTIME_LIT_CONTROLLABLE_MODE_FLIP: 'ROZ840', // createLitControllableProperty parent-flip warning (D-LIT-10)
   // ROZ841..ROZ849 reserved for future @rozie/runtime-lit warnings
   // ---- @rozie/cli argv parsing + filesystem errors (Plan 06-03) — ROZ850..ROZ879 ----

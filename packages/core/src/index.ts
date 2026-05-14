@@ -86,6 +86,16 @@ export type {
   ModifierContext,
   VueEmissionDescriptor,
   ReactEmissionDescriptor,
+  // Phase 07.1 — Solid/Lit descriptors added; Svelte/Angular backfilled.
+  // Open Question 1: the barrel was inconsistent — Phase 5 added the
+  // Svelte/Angular descriptor types to ModifierRegistry.ts but never
+  // re-exported them, so a third-party author could not
+  // `import { SvelteEmissionDescriptor } from '@rozie/core'`. Backfilled here
+  // alongside the new Solid/Lit types so the 6-target surface is consistent.
+  SvelteEmissionDescriptor,
+  AngularEmissionDescriptor,
+  SolidEmissionDescriptor,
+  LitEmissionDescriptor,
 } from './modifiers/ModifierRegistry.js';
 export { registerModifier } from './modifiers/registerModifier.js';
 export { registerBuiltins, createDefaultRegistry } from './modifiers/registerBuiltins.js';

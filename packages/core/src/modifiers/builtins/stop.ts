@@ -57,4 +57,14 @@ export const stop: ModifierImpl = {
     // (no [(click).stop] equivalent), so inlineGuard is the path.
     return { kind: 'inlineGuard', code: 'e.stopPropagation();' };
   },
+  solid() {
+    // Phase 07.1 inlineGuard: Solid JSX has no native modifier syntax for
+    // stop — emitter inserts the side-effect call before the user handler runs.
+    return { kind: 'inlineGuard', code: 'e.stopPropagation();' };
+  },
+  lit() {
+    // Phase 07.1 inlineGuard: Lit has no template modifier sugar; inlineGuard
+    // is the path.
+    return { kind: 'inlineGuard', code: 'e.stopPropagation();' };
+  },
 };

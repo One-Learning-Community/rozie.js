@@ -56,4 +56,14 @@ export const prevent: ModifierImpl = {
     // is the path.
     return { kind: 'inlineGuard', code: 'e.preventDefault();' };
   },
+  solid() {
+    // Phase 07.1 inlineGuard: Solid JSX has no native modifier syntax for
+    // prevent — emitter inserts the side-effect call before the user handler.
+    return { kind: 'inlineGuard', code: 'e.preventDefault();' };
+  },
+  lit() {
+    // Phase 07.1 inlineGuard: Lit has no template modifier sugar; inlineGuard
+    // is the path.
+    return { kind: 'inlineGuard', code: 'e.preventDefault();' };
+  },
 };

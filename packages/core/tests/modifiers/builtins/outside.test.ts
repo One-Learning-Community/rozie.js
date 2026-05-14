@@ -56,4 +56,35 @@ describe('builtin: .outside — Plan 02-04', () => {
     });
     expect(result.diagnostics[0].message).toMatch(/outside.*ref/i);
   });
+
+  // Phase 07.1 — Solid/Lit emission descriptors (parallels svelte()/angular()).
+  it('.outside solid() → helper createOutsideClick with listenerOnly: true', () => {
+    const args: ModifierArg[] = [
+      { kind: 'refExpr', ref: '$refs.triggerEl', loc: { start: 110, end: 124 } },
+    ];
+    const desc = outside.solid!(args, CTX);
+    expect(desc).toMatchObject({
+      kind: 'helper',
+      importFrom: '@rozie/runtime-solid',
+      helperName: 'createOutsideClick',
+      listenerOnly: true,
+    });
+    if (desc.kind !== 'helper') throw new Error('unreachable: kind narrowing');
+    expect(desc.args).toEqual(args);
+  });
+
+  it('.outside lit() → helper attachOutsideClickListener with listenerOnly: true', () => {
+    const args: ModifierArg[] = [
+      { kind: 'refExpr', ref: '$refs.triggerEl', loc: { start: 110, end: 124 } },
+    ];
+    const desc = outside.lit!(args, CTX);
+    expect(desc).toMatchObject({
+      kind: 'helper',
+      importFrom: '@rozie/runtime-lit',
+      helperName: 'attachOutsideClickListener',
+      listenerOnly: true,
+    });
+    if (desc.kind !== 'helper') throw new Error('unreachable: kind narrowing');
+    expect(desc.args).toEqual(args);
+  });
 });

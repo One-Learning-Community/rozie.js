@@ -34,4 +34,15 @@ describe('builtin: .prevent — Plan 02-04', () => {
     expect(result.diagnostics).toHaveLength(1);
     expect(result.diagnostics[0]).toMatchObject({ code: 'ROZ111', severity: 'error' });
   });
+
+  // Phase 07.1 — Solid/Lit emission descriptors (parallels svelte()/angular()).
+  it('.prevent solid() → inlineGuard with e.preventDefault()', () => {
+    const desc = prevent.solid!([], CTX);
+    expect(desc).toEqual({ kind: 'inlineGuard', code: 'e.preventDefault();' });
+  });
+
+  it('.prevent lit() → inlineGuard with e.preventDefault()', () => {
+    const desc = prevent.lit!([], CTX);
+    expect(desc).toEqual({ kind: 'inlineGuard', code: 'e.preventDefault();' });
+  });
 });

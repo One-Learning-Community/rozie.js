@@ -173,6 +173,26 @@ function makeFilter(name: KeyFilterName): ModifierImpl {
         code: `if (e.key !== '${reactKey}') return;`,
       };
     },
+    solid() {
+      // Phase 07.1 inlineGuard: Solid JSX has no native key-filter modifiers —
+      // emitter inserts an early-return guard checking KeyboardEvent.key
+      // against the standard DOM string for this Rozie name.
+      const reactKey = REACT_KEY_NAME_MAP[name];
+      return {
+        kind: 'inlineGuard',
+        code: `if (e.key !== '${reactKey}') return;`,
+      };
+    },
+    lit() {
+      // Phase 07.1 inlineGuard: Lit has no key-modifier syntax — emitter
+      // inserts an early-return guard checking KeyboardEvent.key against the
+      // standard DOM string for this Rozie name.
+      const reactKey = REACT_KEY_NAME_MAP[name];
+      return {
+        kind: 'inlineGuard',
+        code: `if (e.key !== '${reactKey}') return;`,
+      };
+    },
   };
 }
 
