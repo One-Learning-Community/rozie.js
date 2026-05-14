@@ -23,7 +23,6 @@
     "prepare": "peggy -o src/modifier-grammar/generated.js src/modifier-grammar/modifier-grammar.peggy"
   },
   "dependencies": {
-    "@rozie/core": "workspace:*",
     "@ampproject/remapping": "^2.3.0",
     "@babel/code-frame": "^7.29.0",
     "@babel/generator": "^7.29.1",
