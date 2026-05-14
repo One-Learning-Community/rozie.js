@@ -1,0 +1,37 @@
+/*
+ * Phase 7 Plan 02 — host-chrome reset (D-10).
+ *
+ * The visual-regression host must contribute ZERO visual chrome of its own so
+ * Playwright's `toHaveScreenshot` clip on `[data-testid="rozie-mount"]` captures
+ * only the framework runtime's rendering of the component — never host padding,
+ * margin, or default browser styling.
+ *
+ * It also disables every transition + animation at the CSS layer (RESEARCH
+ * Pitfall 2) as a belt-and-braces companion to Playwright's
+ * `animations: 'disabled'` assertion-layer option: an in-flight transition at
+ * screenshot time is the single most common cross-target pixel-diff flake.
+ */
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: #ffffff;
+}
+
+/* The mount wrapper is the clip target — it must add no box of its own. */
+[data-testid='rozie-mount'] {
+  margin: 0;
+  padding: 0;
+  /* shrink-wrap the mounted component so the clip box == the component box */
+  display: inline-block;
+}
+
+/* RESEARCH Pitfall 2 — kill animation/transition non-determinism at the source. */
+*,
+*::before,
+*::after {
+  transition: none !important;
+  animation: none !important;
+  caret-color: transparent !important;
+}

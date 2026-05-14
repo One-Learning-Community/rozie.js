@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Rozie Visual Regression Host</title>
+  </head>
+  <body>
+    <!--
+      Phase 7 Plan 02 — visual-regression host router (D-09 / D-10).
+
+      Lives at `dist/index.html` after the build. Playwright navigates here with
+      `?example=<Name>&target=<target>`; this script redirects to the matching
+      per-target sub-build's entry HTML (`/<target>/host/entry.<target>.html`),
+      preserving the query string. Each per-target entry then dynamically
+      imports and mounts the requested compiled cell into
+      `[data-testid="rozie-mount"]`.
+    -->
+    <script>
+      (function () {
+        var params = new URLSearchParams(location.search);
+        var target = params.get('target') || 'vue';
+        var valid = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'];
+        if (valid.indexOf(target) === -1) target = 'vue';
+        location.replace(
+          '/' + target + '/host/entry.' + target + '.html' + location.search,
+        );
+      })();
+    </script>
+  </body>
+</html>

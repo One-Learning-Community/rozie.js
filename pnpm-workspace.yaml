@@ -10,4 +10,5 @@ packages:
   - "tests/smoke-sourcemap"
   - "tests/solid-lint"
   - "tests/lit-lint"
+  - "tests/visual-regression"
   - "docs"
