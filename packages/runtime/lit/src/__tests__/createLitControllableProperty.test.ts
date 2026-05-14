@@ -69,7 +69,7 @@ describe('createLitControllableProperty — uncontrolled mode', () => {
     });
     cp.write(99);
     expect(handler).toHaveBeenCalledTimes(1);
-    const e = handler.mock.calls[0][0] as CustomEvent;
+    const e = handler.mock.calls[0]![0] as CustomEvent;
     expect(e.detail).toBe(99);
     expect(e.bubbles).toBe(true);
     expect(e.composed).toBe(true);
@@ -113,7 +113,7 @@ describe('createLitControllableProperty — controlled mode', () => {
     });
     cp.write(999);
     expect(handler).toHaveBeenCalledTimes(1);
-    expect((handler.mock.calls[0][0] as CustomEvent).detail).toBe(999);
+    expect((handler.mock.calls[0]![0] as CustomEvent).detail).toBe(999);
   });
 });
 
@@ -130,7 +130,7 @@ describe('createLitControllableProperty — parent-flip detection (ROZ840)', () 
     // Parent decides to stop controlling — flip to uncontrolled.
     cp.notifyAttributeChange(undefined);
     expect(warnSpy).toHaveBeenCalledTimes(1);
-    expect(warnSpy.mock.calls[0][0]).toMatch(/\[ROZ840\]/);
+    expect(warnSpy.mock.calls[0]![0]).toMatch(/\[ROZ840\]/);
   });
 
   it('emits exactly one [ROZ840] console.warn on uncontrolled→controlled flip', () => {
@@ -144,7 +144,7 @@ describe('createLitControllableProperty — parent-flip detection (ROZ840)', () 
     });
     cp.notifyAttributeChange(77);
     expect(warnSpy).toHaveBeenCalledTimes(1);
-    expect(warnSpy.mock.calls[0][0]).toMatch(/\[ROZ840\]/);
+    expect(warnSpy.mock.calls[0]![0]).toMatch(/\[ROZ840\]/);
     // After the flip, the helper follows the new value silently.
     expect(cp.read()).toBe(77);
   });

@@ -25,7 +25,7 @@ describe('observeRozieSlotCtx', () => {
     const onChange = vi.fn();
     const unsub = observeRozieSlotCtx<{ foo: number }>(slot, onChange);
     expect(onChange).toHaveBeenCalledTimes(1);
-    expect(onChange.mock.calls[0][0]).toEqual({ foo: 1 });
+    expect(onChange.mock.calls[0]![0]).toEqual({ foo: 1 });
     unsub();
   });
 
@@ -47,7 +47,7 @@ describe('observeRozieSlotCtx', () => {
     slot.setAttribute('data-rozie-params', JSON.stringify({ x: 5 }));
     await flushMutationCallbacks();
     expect(onChange).toHaveBeenCalledTimes(2);
-    expect(onChange.mock.calls[1][0]).toEqual({ x: 5 });
+    expect(onChange.mock.calls[1]![0]).toEqual({ x: 5 });
     unsub();
     slot.remove();
   });
