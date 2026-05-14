@@ -83,6 +83,42 @@ function genCode(node: t.Node): string {
   return generate(node, GEN_OPTS).code;
 }
 
+/**
+ * Bug 2: annotate any parameter that lacks a type annotation with `: any`.
+ * User `<script>` arrows/functions get lifted to class fields verbatim; under
+ * the consumer's `strict` tsconfig an un-annotated param is TS7006 (implicit
+ * any). Mutates the params in place (callers pass cloned nodes).
+ *
+ * Skips params that already carry a `typeAnnotation`. Handles Identifier,
+ * AssignmentPattern (default-valued params), RestElement, and patterns by
+ * annotating the outermost binding node.
+ */
+function annotateUntypedParams(
+  params: Array<t.Identifier | t.Pattern | t.RestElement>,
+): void {
+  const anyAnnotation = (): t.TSTypeAnnotation =>
+    t.tsTypeAnnotation(t.tsAnyKeyword());
+  for (const param of params) {
+    if (t.isIdentifier(param)) {
+      if (!param.typeAnnotation) param.typeAnnotation = anyAnnotation();
+    } else if (t.isAssignmentPattern(param)) {
+      const left = param.left;
+      if (
+        (t.isIdentifier(left) ||
+          t.isObjectPattern(left) ||
+          t.isArrayPattern(left)) &&
+        !left.typeAnnotation
+      ) {
+        left.typeAnnotation = anyAnnotation();
+      }
+    } else if (t.isRestElement(param)) {
+      if (!param.typeAnnotation) param.typeAnnotation = anyAnnotation();
+    } else if (t.isObjectPattern(param) || t.isArrayPattern(param)) {
+      if (!param.typeAnnotation) param.typeAnnotation = anyAnnotation();
+    }
+  }
+}
+
 /** Render a PropTypeAnnotation as a TS type string. */
 function renderType(ann: PropTypeAnnotation): string {
   if (ann.kind === 'identifier') {
@@ -94,9 +130,9 @@ function renderType(ann: PropTypeAnnotation): string {
       case 'Boolean':
         return 'boolean';
       case 'Array':
-        return 'unknown[]';
+        return 'any[]';
       case 'Object':
-        return 'Record<string, unknown>';
+        return 'Record<string, any>';
       case 'Function':
         return '(...args: unknown[]) => unknown';
       default:
@@ -105,12 +141,22 @@ function renderType(ann: PropTypeAnnotation): string {
   }
   if (ann.kind === 'union') return ann.members.map(renderType).join(' | ');
   if (ann.kind === 'literal') {
-    if (ann.value === 'array') return 'unknown[]';
-    if (ann.value === 'object') return 'Record<string, unknown>';
+    if (ann.value === 'array') return 'any[]';
+    if (ann.value === 'object') return 'Record<string, any>';
     if (ann.value === 'function') return '(...args: unknown[]) => unknown';
     return ann.value;
   }
   return 'unknown';
+}
+
+/**
+ * True when the prop has an explicit `default: null` in the `.rozie` source —
+ * i.e. `prop.defaultValue` is a `NullLiteral` node (NOT the `null`-the-absence
+ * sentinel, which is `prop.defaultValue === null`). When true, the emitted
+ * field type must be widened to `<T | null>` so `null` is assignable.
+ */
+function hasExplicitNullDefault(prop: PropDecl): boolean {
+  return prop.defaultValue !== null && t.isNullLiteral(prop.defaultValue);
 }
 
 /** Render the default value for an input/model field initializer. */
@@ -158,6 +204,45 @@ function findClonedComputedBodies(
     }
   }
   return out;
+}
+
+/**
+ * Bug 4: scan the cloned Program for `$emit('name', ...)` CallExpressions and
+ * return the set of event names that are passed a payload argument in at least
+ * one call. Events NOT in this set never carry a payload and should be emitted
+ * as `output<void>()` (so `.emit()` with no args typechecks).
+ *
+ * MUST run on the clone BEFORE rewriteRozieIdentifiers — the rewrite turns
+ * `$emit('name', x)` into `this.name.emit(x)`, erasing the `$emit` callee.
+ */
+function collectEmitsWithPayload(clonedProgram: t.File): Set<string> {
+  const withPayload = new Set<string>();
+  // Use a lightweight recursive walk — no need for full @babel/traverse here.
+  const visit = (node: t.Node | null | undefined): void => {
+    if (!node || typeof node !== 'object') return;
+    if (t.isCallExpression(node)) {
+      const callee = node.callee;
+      if (
+        t.isIdentifier(callee) &&
+        callee.name === '$emit' &&
+        node.arguments.length >= 1 &&
+        t.isStringLiteral(node.arguments[0]!)
+      ) {
+        const eventName = (node.arguments[0] as t.StringLiteral).value;
+        if (node.arguments.length >= 2) withPayload.add(eventName);
+      }
+    }
+    for (const key of t.VISITOR_KEYS[node.type] ?? []) {
+      const child = (node as unknown as Record<string, unknown>)[key];
+      if (Array.isArray(child)) {
+        for (const c of child) visit(c as t.Node);
+      } else {
+        visit(child as t.Node);
+      }
+    }
+  };
+  visit(clonedProgram.program);
+  return withPayload;
 }
 
 interface LifecycleClonedBody {
@@ -442,6 +527,10 @@ export function emitScript(
   //    pre-pass is here for defensive ordering.
   const lifecyclePairing = pairClonedLifecycle(cloned, ir);
 
+  // 2b. Bug 4: scan for `$emit('name', payload)` BEFORE the rewrite erases the
+  //     `$emit` callee. Events never passed a payload → `output<void>()`.
+  const emitsWithPayload = collectEmitsWithPayload(cloned);
+
   // 3. Rewrite identifiers on the clone.
   const rewriteResult = rewriteRozieIdentifiers(cloned, ir);
   diagnostics.push(...rewriteResult.diagnostics);
@@ -466,9 +555,17 @@ export function emitScript(
 
   // 6a. Props: model() vs input().
   for (const p of ir.props) {
-    const tsType = renderType(p.typeAnnotation);
+    let tsType = renderType(p.typeAnnotation);
     const defaultVal = renderDefault(p);
     const fnName = p.isModel ? 'model' : 'input';
+    // Bug 1: an explicit `default: null` produces a `null` initializer, which
+    // is not assignable to the bare prop type — widen the field type to
+    // `(T) | null` so `input<(T) | null>(null)` typechecks. The base type is
+    // parenthesized because a bare function type (`(...args) => unknown`)
+    // would otherwise bind `| null` inside its return type.
+    if (hasExplicitNullDefault(p)) {
+      tsType = `(${tsType}) | null`;
+    }
     if (defaultVal) {
       fieldLines.push(`${p.name} = ${fnName}<${tsType}>(${defaultVal});`);
     } else {
@@ -510,8 +607,12 @@ export function emitScript(
   }
 
   // 6d. Output emits.
+  //     Bug 4: events that never carry a payload emit `output<void>()` so a
+  //     payload-less `.emit()` call typechecks; payload-carrying events keep
+  //     `output<unknown>()`.
   for (const e of ir.emits) {
-    fieldLines.push(`${e} = output<unknown>();`);
+    const outputType = emitsWithPayload.has(e) ? 'unknown' : 'void';
+    fieldLines.push(`${e} = output<${outputType}>();`);
   }
 
   // 6e. @ContentChild slot tpl fields.
@@ -575,7 +676,9 @@ export function emitScript(
           t.isArrowFunctionExpression(d.init) ||
           t.isFunctionExpression(d.init)
         ) {
-          // Emit as class-level arrow field.
+          // Emit as class-level arrow field. Bug 2: annotate un-typed params
+          // with `: any` so the lifted field typechecks under `strict`.
+          annotateUntypedParams(d.init.params);
           const arrowCode = genCode(d.init);
           classMethodLines.push(`${d.id.name} = ${arrowCode};`);
         } else {
@@ -591,7 +694,10 @@ export function emitScript(
 
     // FunctionDeclaration → class method.
     if (t.isFunctionDeclaration(stmt) && stmt.id) {
-      // Convert `function foo() {...}` → arrow class field.
+      // Convert `function foo() {...}` → arrow class field. Bug 2: annotate
+      // un-typed params with `: any` so the lifted field typechecks under
+      // `strict`.
+      annotateUntypedParams(stmt.params);
       const fnCode = genCode(
         t.arrowFunctionExpression(
           stmt.params,

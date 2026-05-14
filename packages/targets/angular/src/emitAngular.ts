@@ -78,6 +78,8 @@ function templateContainsSelfReference(node: TemplateNode | null): boolean {
       return false;
   }
 }
+import * as t from '@babel/types';
+import type { File } from '@babel/types';
 import type { SourceMap } from 'magic-string';
 import { emitScript } from './emit/emitScript.js';
 import { emitTemplate } from './emit/emitTemplate.js';
@@ -88,6 +90,36 @@ import { buildShell } from './emit/shell.js';
 import { composeSourceMap } from './sourcemap/compose.js';
 import { cloneScriptProgram } from './rewrite/cloneProgram.js';
 import { rewriteRozieIdentifiers } from './rewrite/rewriteScript.js';
+
+/**
+ * Bug 5: build a handler-name → parameter-count map from the (un-rewritten)
+ * cloned script Program. Maps each top-level `const x = (a, b) => {}` arrow,
+ * `const x = function (a) {}` function-expression, and `function x(a) {}`
+ * declaration to its `params.length`. Used by emitTemplateEvent's guarded
+ * wrapper synthesis to decide whether to pass the event arg to the inner
+ * handler (`this.x(e)`) or call it bare (`this.x()`).
+ */
+function buildHandlerArityMap(program: File): Map<string, number> {
+  const arity = new Map<string, number>();
+  for (const stmt of program.program.body) {
+    if (t.isVariableDeclaration(stmt)) {
+      for (const d of stmt.declarations) {
+        if (!t.isIdentifier(d.id) || !d.init) continue;
+        if (
+          t.isArrowFunctionExpression(d.init) ||
+          t.isFunctionExpression(d.init)
+        ) {
+          arity.set(d.id.name, d.init.params.length);
+        }
+      }
+      continue;
+    }
+    if (t.isFunctionDeclaration(stmt) && stmt.id) {
+      arity.set(stmt.id.name, stmt.params.length);
+    }
+  }
+  return arity;
+}
 
 export interface EmitAngularOptions {
   filename?: string | undefined;
@@ -118,6 +150,10 @@ export function emitAngular(
   // emitScript runs the real rewrite internally. The cheapest thing to do is
   // re-run rewrite on a clone here.
   const previewClone = cloneScriptProgram(ir.setupBody.scriptProgram);
+  // Bug 5: compute the handler-arity map from the un-rewritten clone BEFORE
+  // rewriteRozieIdentifiers mutates it (the rewrite doesn't touch param lists,
+  // but compute up-front for clarity + to key by original handler names).
+  const handlerArity = buildHandlerArityMap(previewClone);
   const previewRewrite = rewriteRozieIdentifiers(previewClone, ir);
   const collisionRenames = previewRewrite.collisionRenames;
   const classMembers = previewRewrite.classMembers;
@@ -130,7 +166,10 @@ export function emitAngular(
   const scriptResult = emitScript(ir, scriptOpts);
 
   // 2. Template-side emission.
-  const tmplResult = emitTemplate(ir, registry, { collisionRenames });
+  const tmplResult = emitTemplate(ir, registry, {
+    collisionRenames,
+    handlerArity,
+  });
 
   // 3. Listeners-block emission.
   const listenersResult = emitListeners(

@@ -80,6 +80,8 @@ export interface EmitNodeCtx {
   collisionRenames?: ReadonlyMap<string, string> | undefined;
   /** Loop-local bindings (name -> presence) accumulated during recursion. */
   loopBindings?: Set<string> | undefined;
+  /** Bug 5: handler-name → param-count map for guarded-wrapper arity. */
+  handlerArity?: ReadonlyMap<string, number> | undefined;
 }
 
 function emitStaticText(node: TemplateStaticTextIR): string {
@@ -195,6 +197,7 @@ function emitEvents(events: Listener[], ctx: EmitNodeCtx): string {
         injectionCounter: ctx.injectionCounter,
         collisionRenames: ctx.collisionRenames,
         loopBindings: ctx.loopBindings,
+        handlerArity: ctx.handlerArity,
       });
       out.push(result.eventAttr);
       if (result.scriptInjection) ctx.scriptInjections.push(result.scriptInjection);
@@ -214,6 +217,7 @@ function emitEvents(events: Listener[], ctx: EmitNodeCtx): string {
         injectionCounter: ctx.injectionCounter,
         collisionRenames: ctx.collisionRenames,
         loopBindings: ctx.loopBindings,
+        handlerArity: ctx.handlerArity,
       });
       if (sub.scriptInjection) ctx.scriptInjections.push(sub.scriptInjection);
       for (const d of sub.diagnostics) ctx.diagnostics.push(d);

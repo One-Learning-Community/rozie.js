@@ -97,8 +97,8 @@ export class Dropdown {
   };
   reposition = () => {
     if (!this.panelEl()?.nativeElement || !this.triggerEl()?.nativeElement) return;
-    const rect = (this.triggerEl()?.nativeElement).getBoundingClientRect();
-    Object.assign((this.panelEl()?.nativeElement).style, {
+    const rect = this.triggerEl()!.nativeElement.getBoundingClientRect();
+    Object.assign(this.panelEl()!.nativeElement.style, {
       top: `${rect.bottom}px`,
       left: `${rect.left}px`
     });
@@ -117,7 +117,7 @@ export class Dropdown {
       const now = Date.now();
       if (now - lastCall < 100) return;
       lastCall = now;
-      (this.reposition)(...args);
+      (this.reposition as (...a: any[]) => any)(...args);
     };
   })();
 }

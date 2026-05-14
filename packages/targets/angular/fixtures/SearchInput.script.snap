@@ -7,7 +7,7 @@ autofocus = input<boolean>(false);
 query = signal('');
 inputEl = viewChild<ElementRef<HTMLInputElement>>('inputEl');
 search = output<unknown>();
-clear = output<unknown>();
+clear = output<void>();
 
 constructor() {
   if (this.autofocus()) this.inputEl()?.nativeElement?.focus();

@@ -110,8 +110,11 @@ describe('emitScript — SearchInput debounce + cleanup-return', () => {
   it('SearchInput emits output() for both `search` and `clear` events', () => {
     const ir = loadIR('SearchInput');
     const { classBody } = emitScript(ir);
+    // `search` carries a payload (`$emit('search', query)`) → output<unknown>().
     expect(classBody).toContain('search = output<unknown>()');
-    expect(classBody).toContain('clear = output<unknown>()');
+    // `clear` is payload-less (`$emit('clear')`) → output<void>() so a
+    // no-arg `.emit()` typechecks (bug 4).
+    expect(classBody).toContain('clear = output<void>()');
   });
 });
 

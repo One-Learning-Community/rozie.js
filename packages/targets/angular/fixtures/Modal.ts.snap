@@ -90,7 +90,7 @@ export class Modal {
   title = input<string>('');
   backdropEl = viewChild<ElementRef<HTMLDivElement>>('backdropEl');
   dialogEl = viewChild<ElementRef<HTMLDivElement>>('dialogEl');
-  close = output<unknown>();
+  close = output<void>();
   @ContentChild('header', { read: TemplateRef }) headerTpl?: TemplateRef<HeaderCtx>;
   @ContentChild('defaultSlot', { read: TemplateRef }) defaultTpl?: TemplateRef<DefaultCtx>;
   @ContentChild('footer', { read: TemplateRef }) footerTpl?: TemplateRef<FooterCtx>;

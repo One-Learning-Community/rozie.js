@@ -369,17 +369,39 @@ export function rewriteRozieIdentifiers(
         return;
       }
       if (obj.name === '$refs' && refNames.has(prop.name)) {
-        // $refs.foo → this.foo()?.nativeElement
+        // $refs.foo → this.foo()?.nativeElement  (default, optional)
         // Phase 06.1 P2 D-104/D-106: anchor synth nodes to IR RefDecl.
         const refDecl = refByName.get(prop.name);
         const synthId = t.identifier(prop.name);
         if (refDecl) synthId.loc = refDecl.sourceLoc as any;
+        const refCall = t.callExpression(
+          t.memberExpression(t.thisExpression(), synthId),
+          [],
+        );
+        // Bug 7: when the author wrote a NON-optional access on `$refs.X`
+        // (e.g. `$refs.triggerEl.getBoundingClientRect()` — `$refs.X` is the
+        // `object` of a non-optional MemberExpression, or the `callee` of a
+        // CallExpression), each `?.` lowering produces a fresh independent
+        // optional chain that TS cannot re-narrow across an earlier
+        // `if (!$refs.X) return` guard → TS2532. The author already opted
+        // out of optionality by not writing `?.`, so emit a non-null
+        // assertion `this.foo()!.nativeElement` instead.
+        const parent = path.parent;
+        const authoredNonOptional =
+          (t.isMemberExpression(parent) && parent.object === path.node) ||
+          (t.isCallExpression(parent) && parent.callee === path.node);
+        if (authoredNonOptional) {
+          path.replaceWith(
+            t.memberExpression(
+              t.tsNonNullExpression(refCall),
+              t.identifier('nativeElement'),
+            ),
+          );
+          return;
+        }
         path.replaceWith(
           t.optionalMemberExpression(
-            t.callExpression(
-              t.memberExpression(t.thisExpression(), synthId),
-              [],
-            ),
+            refCall,
             t.identifier('nativeElement'),
             false,
             true,

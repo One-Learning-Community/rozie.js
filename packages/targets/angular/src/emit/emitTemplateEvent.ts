@@ -48,6 +48,12 @@ export interface EmitEventCtx {
   loopBindings?: ReadonlySet<string> | undefined;
   /** Per-component counter so suffix names are stable + collision-free. */
   injectionCounter?: { next: number } | undefined;
+  /**
+   * Bug 5: handler-name → parameter-count map (from the un-rewritten script
+   * Program). Lets guarded-wrapper synthesis decide whether to forward the
+   * event arg to a zero-arg handler. Keyed by the ORIGINAL user handler name.
+   */
+  handlerArity?: ReadonlyMap<string, number> | undefined;
 }
 
 export interface EmitTemplateEventResult {
@@ -91,7 +97,7 @@ function buildDebounceIIFE(wrapName: string, origCode: string, ms: string): stri
     `  let timer: ReturnType<typeof setTimeout> | null = null;`,
     `  return (...args: any[]) => {`,
     `    if (timer !== null) clearTimeout(timer);`,
-    `    timer = setTimeout(() => (${origCode})(...args), ${ms});`,
+    `    timer = setTimeout(() => (${origCode} as (...a: any[]) => any)(...args), ${ms});`,
     `  };`,
     `})();`,
   ].join('\n');
@@ -105,7 +111,7 @@ function buildThrottleIIFE(wrapName: string, origCode: string, ms: string): stri
     `    const now = Date.now();`,
     `    if (now - lastCall < ${ms}) return;`,
     `    lastCall = now;`,
-    `    (${origCode})(...args);`,
+    `    (${origCode} as (...a: any[]) => any)(...args);`,
     `  };`,
     `})();`,
   ].join('\n');
@@ -281,7 +287,20 @@ export function emitTemplateEvent(
     let innerInvocation: string;
     if (handlerKind === 'identifier') {
       // handlerRef is bare like `onSearch` (or collision-renamed `_close`).
-      innerInvocation = `this.${handlerRef}(e)`;
+      // Bug 5: when the target handler is a zero-arg arrow/function, calling
+      // it with `e` is TS2554 (expected 0, got 1). Look up the original user
+      // handler name in the arity map and drop the arg when arity is 0.
+      // Only applies when the handler was an authored Identifier — debounce/
+      // throttle wrap names (also `handlerKind: 'identifier'`) take `...args`.
+      const originalName = t.isIdentifier(listener.handler)
+        ? listener.handler.name
+        : undefined;
+      const arity =
+        originalName !== undefined
+          ? ctx.handlerArity?.get(originalName)
+          : undefined;
+      innerInvocation =
+        arity === 0 ? `this.${handlerRef}()` : `this.${handlerRef}(e)`;
     } else if (handlerKind === 'callable') {
       innerInvocation = `(${thisPrefixed})(e)`;
     } else {

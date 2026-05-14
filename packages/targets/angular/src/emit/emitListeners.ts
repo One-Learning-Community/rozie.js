@@ -148,7 +148,7 @@ function buildDebounceIIFE(wrapName: string, origHandlerCode: string, ms: string
     `  let timer: ReturnType<typeof setTimeout> | null = null;`,
     `  return (...args: any[]) => {`,
     `    if (timer !== null) clearTimeout(timer);`,
-    `    timer = setTimeout(() => (${origHandlerCode})(...args), ${ms});`,
+    `    timer = setTimeout(() => (${origHandlerCode} as (...a: any[]) => any)(...args), ${ms});`,
     `  };`,
     `})();`,
   ].join('\n');
@@ -162,7 +162,7 @@ function buildThrottleIIFE(wrapName: string, origHandlerCode: string, ms: string
     `    const now = Date.now();`,
     `    if (now - lastCall < ${ms}) return;`,
     `    lastCall = now;`,
-    `    (${origHandlerCode})(...args);`,
+    `    (${origHandlerCode} as (...a: any[]) => any)(...args);`,
     `  };`,
     `})();`,
   ].join('\n');

@@ -26,6 +26,8 @@ import type { AngularScriptInjection } from './emitTemplateEvent.js';
 export interface EmitTemplateOpts {
   /** Collision-renames from rewriteScript (e.g., `close` → `_close`). */
   collisionRenames?: ReadonlyMap<string, string> | undefined;
+  /** Bug 5: handler-name → param-count map for guarded-wrapper arity. */
+  handlerArity?: ReadonlyMap<string, number> | undefined;
 }
 
 export interface EmitTemplateResult {
@@ -57,6 +59,7 @@ export function emitTemplate(
     hasNgModel,
     collisionRenames: opts.collisionRenames,
     loopBindings: new Set(),
+    handlerArity: opts.handlerArity,
   };
 
   const template = emitNode(ir.template, ctx);
