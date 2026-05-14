@@ -70,7 +70,12 @@ function classifyListener(
 ): ListenerClass {
   const pipeline = listener.modifierPipeline;
   for (const entry of pipeline) {
-    if (entry.kind !== 'wrap') continue;
+    // WR-01 fix: inspect EVERY non-listenerOption pipeline entry through the
+    // registry — not just `wrap`-kind. A third-party modifier is free to emit
+    // a `filter`-kind entry whose solid() hook returns a `helper` descriptor;
+    // restricting this loop to `wrap` silently routed those to Class A/D and
+    // dropped them with no diagnostic. Mirrors Lit's classifyListener.
+    if (entry.kind === 'listenerOption') continue;
     const impl = registry.get(entry.modifier);
     if (!impl?.solid) continue;
     const desc: SolidEmissionDescriptor = impl.solid(entry.args, {

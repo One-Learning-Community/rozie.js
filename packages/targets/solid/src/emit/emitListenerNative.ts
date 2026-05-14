@@ -151,7 +151,18 @@ export function emitListenerNative(
       inlineGuards.push(desc.code);
       continue;
     }
-    // helper kind: orchestrator should have routed this to Class B/C. Skip silently.
+    // helper kind: WR-01 — `classifyListener` now inspects EVERY non-listenerOption
+    // pipeline entry (not just `wrap`-kind), so any listener whose pipeline
+    // produces a `helper` descriptor — whether from a `wrap` or a `filter` entry —
+    // is routed to Class B (createOutsideClick) or Class C (createDebounced/
+    // ThrottledHandler) before this function runs. The only way a `helper`
+    // descriptor reaches the native emitter is the Class C wrap path, where
+    // emitListenerWrap re-invokes emitListenerNative (with `wrappedHandlerName`)
+    // to build the createEffect block around the already-constructed wrapper —
+    // the helper entry was therefore already consumed by the wrap path and is
+    // correctly skipped here. This is no longer the silent-drop bug WR-01
+    // describes (an UNROUTED helper vanishing): classifyListener guarantees
+    // routing first.
   }
 
   const evtType = eventTypeFor(listener.event);
