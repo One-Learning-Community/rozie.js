@@ -154,26 +154,14 @@ function visit(
       const params = collectParamsFromSlotElement(node);
       const presence = determinePresence(node, childCtx);
 
-      // defaultContent = inline children (raw — not deeply lowered here).
-      // We hold null when there are no real children (text-only whitespace
-      // is still meaningful for emit fidelity but for v1 we treat empty
-      // slot bodies as null).
-      const realChildren = node.children.filter(
-        (c) => !(c.type === 'TemplateText' && c.text.trim() === ''),
-      );
-      const defaultContent = realChildren.length > 0
-        ? // We hold a TemplateFragment-style placeholder (the raw children
-          // count as IR-level fragment); to avoid double-lowering and keep
-          // the slot snapshot lean, we represent default content by walking
-          // the children for nested slots BUT NOT lowering them to full IR
-          // here (that's lowerTemplate's job for the template tree).
-          // For SlotDecl.defaultContent we provide a stable null-or-fragment;
-          // the actual fallback rendering goes through the TemplateSlotInvocationIR
-          // that lowerTemplate produced. Setting null here is consistent with
-          // the contract that SlotDecl.defaultContent is "lifted SEPARATELY"
-          // (D-18 / RESEARCH.md SlotDecl spec).
-          null
-        : null;
+      // defaultContent is always `null` here. To avoid double-lowering and
+      // keep the slot snapshot lean, lowerSlots does NOT lower a slot's inline
+      // children into IR — that's lowerTemplate's job for the template tree,
+      // and the actual fallback rendering goes through the
+      // TemplateSlotInvocationIR that lowerTemplate produced. Holding `null`
+      // here is consistent with the contract that SlotDecl.defaultContent is
+      // "lifted SEPARATELY" (D-18 / RESEARCH.md SlotDecl spec).
+      const defaultContent = null;
 
       // Recurse for nested slots inside default content.
       const nestedSlots: SlotDecl[] = [];
