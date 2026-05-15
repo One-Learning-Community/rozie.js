@@ -91,7 +91,10 @@ export default function App(): JSX.Element {
           ))}
         </nav>
       </header>
-      <main style={{ padding: '1rem', fontFamily: 'system-ui, sans-serif' }}>
+      <main
+        data-testid="rozie-mount"
+        style={{ padding: '1rem', fontFamily: 'system-ui, sans-serif' }}
+      >
         <PageComponent />
       </main>
     </>
