@@ -62,7 +62,27 @@ async function frameworkPlugins(target: Target) {
 export default defineConfig(async () => ({
   // Sub-builds are served from dist/<target>/; the host router lives at dist root.
   base: `/${TARGET}/`,
-  plugins: [Rozie({ target: TARGET }), ...(await frameworkPlugins(TARGET))],
+  // Quick task 260515-1y4 — angular only: the Angular sub-build's
+  // `import.meta.glob('../../../examples/*.rozie')` pulls files from OUTSIDE
+  // the Vite project root (`tests/visual-regression/`). The Angular target's
+  // D-70 disk-cache prebuild only walks DOWN from the project root, so
+  // without `prebuildExtraRoots` the `<repo>/examples/*.rozie` files never
+  // get prebuilt to `.rozie.ts` siblings — cross-rozie composition imports
+  // (Card → CardHeader) then fail at Rollup bind time with "Could not
+  // resolve './CardHeader' from 'examples/Card.rozie.ts'". Symlinking
+  // examples/ into here is blocked by the T-05-04b-03 / WR-01 closure
+  // (correct and must stay), so the explicit allowlist is the real fix.
+  // Other targets do not need this option (their resolveId+load pipelines
+  // consume upstream `code` directly without an on-disk TS Program).
+  plugins: [
+    Rozie({
+      target: TARGET,
+      ...(TARGET === 'angular'
+        ? { prebuildExtraRoots: [resolve(__dirname, '..', '..', 'examples')] }
+        : {}),
+    }),
+    ...(await frameworkPlugins(TARGET)),
+  ],
   // D-VR-01: the `@rozie/target-lit` emitter emits TC39-stage-3 *class-field*
   // decorators (`@property() foo;`). esbuild — Vite's transform pipeline — does
   // not read the workspace `tsconfig.json` for the `.rozie.ts` virtual modules

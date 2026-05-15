@@ -20,18 +20,18 @@ const ROOT = resolve(HERE, '..');
 
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'];
 
-// Targets whose sub-build failure is treated as non-fatal. The Angular leg
-// currently cannot build in this monorepo: `@analogjs/vite-plugin-angular@2.4.10`
-// imports `defaultClientConditions` from `vite` (a Vite 7+ export) while the
-// workspace resolves Vite 6 — the angular-analogjs *demo* build is broken on
-// `main` for the same reason, independent of this workspace. Per the
-// 07-ANGULAR-SPIKE.md `Decision: ANGULAR IN` contract the Angular cells stay in
-// the matrix spec; the upstream toolchain breakage is logged in
-// .planning/phases/07-validation-acceptance-hardening/deferred-items.md and is
-// owned by the Angular leg (07-01 spike / 07-05 bug-fix loop), NOT this
-// test-infrastructure plan. The rig is fully functional for the other 5 targets
-// and for Vue reference-baseline generation regardless.
-const SOFT_FAIL_TARGETS = new Set(['angular']);
+// Targets whose sub-build failure is treated as non-fatal. Empty after Quick
+// task 260515-1y4: the cross-tree prebuild fix
+// (`RozieOptions.prebuildExtraRoots`) makes the Angular sub-build
+// self-sufficient — the disk-cache walker now reaches `<repo>/examples/`
+// from `tests/visual-regression/`'s vite.config.ts. The Angular sub-build is
+// hard-required.
+//
+// If a future upstream-tooling regression re-breaks the column, add 'angular'
+// back here AND open a follow-up issue. Silent re-soft-failing is forbidden —
+// the matrix should fail loudly so the regression is surfaced rather than
+// papered over. The plumbing below is preserved for that contingency.
+const SOFT_FAIL_TARGETS = new Set();
 
 const failures = [];
 

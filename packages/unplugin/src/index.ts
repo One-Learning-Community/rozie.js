@@ -148,7 +148,11 @@ export const unplugin = createUnpluginV3<Partial<RozieOptions>>((rawOptions) => 
       configResolved(resolvedConfig: any) {
         if (options.target !== 'angular') return;
         const root = resolvedConfig?.root ?? process.cwd();
-        prebuildAngularRozieFiles(root, registry);
+        // Quick task 260515-1y4 — pass through the consumer's optional
+        // `prebuildExtraRoots` allowlist so the prebuild walker covers
+        // filesystem trees outside the single Vite project root (e.g.
+        // `tests/visual-regression/` needs to walk `<repo>/examples/`).
+        prebuildAngularRozieFiles(root, registry, options.prebuildExtraRoots ?? []);
       },
       // When a .rozie file changes on disk, Vite's HMR lookup finds no module
       // graph entry for it (the graph entry is the synthetic .rozie.vue/.tsx id).
@@ -166,10 +170,14 @@ export const unplugin = createUnpluginV3<Partial<RozieOptions>>((rawOptions) => 
         // route HMR through analogjs's transform chain naturally.
         if (options.target === 'angular') {
           try {
-            // Pass server.config.root as the trust boundary — refuses writes
-            // outside the Vite-declared project root (closes T-05-04b-03).
+            // Pass the union of (server root + consumer-supplied extra roots)
+            // as the trust boundary — Quick task 260515-1y4 widens the HMR
+            // re-emit allowlist to match configResolved so an HMR edit of a
+            // .rozie file under an extra root re-emits cleanly without
+            // tripping the WR-01/T-05-04b-03 outside-root refusal.
             const hmrRoot = server?.config?.root ?? process.cwd();
-            emitRozieTsToDisk(file, registry, hmrRoot);
+            const allowed = [hmrRoot, ...(options.prebuildExtraRoots ?? [])];
+            emitRozieTsToDisk(file, registry, allowed);
           } catch (err) {
             // Surface as a warning rather than aborting HMR. Closes WR-02:
             // delete the stale .rozie.ts so Vite gets a module-not-found

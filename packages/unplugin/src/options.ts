@@ -44,6 +44,22 @@ export interface RozieOptions {
    * Plan 06.3-01 adds `solid`. Plan 06.4-01 adds `lit`.
    */
   target: 'vue' | 'react' | 'svelte' | 'angular' | 'solid' | 'lit';
+  /**
+   * Additional filesystem roots (absolute paths) to scan for `.rozie` files
+   * during the Angular target's D-70 disk-cache prebuild. Each root is walked
+   * in addition to Vite's `resolvedConfig.root`. Trust boundary: emitted
+   * `.rozie.ts` files MUST land inside one of (resolvedConfig.root |
+   * ...prebuildExtraRoots); writes outside throw the same WR-01 / T-05-04b-03
+   * refusal as before. Each extra root MUST be a real directory path —
+   * symlinks are refused (mirrors the walker's symlink refusal).
+   *
+   * No-op for non-Angular targets.
+   *
+   * Quick task 260515-1y4 — cross-tree prebuild for visual-regression rig.
+   *
+   * @experimental
+   */
+  prebuildExtraRoots?: readonly string[];
 }
 
 export type TargetValue = RozieOptions['target'];
@@ -118,7 +134,13 @@ export function validateOptions(options: Partial<RozieOptions> | undefined): Roz
       `Unknown target '${target}'. Valid targets: ${SUPPORTED_TARGETS_PHASE_5.join(', ')}.`,
     );
   }
-  return { target };
+  // Quick task 260515-1y4: preserve prebuildExtraRoots through validation.
+  // Shape is intentionally NOT validated here — runtime safety lives in
+  // emitRozieTsToDisk's trust-boundary check. Pass-through only.
+  return {
+    target,
+    ...(options.prebuildExtraRoots ? { prebuildExtraRoots: options.prebuildExtraRoots } : {}),
+  };
 }
 
 /**

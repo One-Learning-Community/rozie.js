@@ -918,27 +918,74 @@ function runAngularPipeline(
  * The on-disk `.rozie.ts` files are gitignored repo-wide so consumers don't
  * have to manage them.
  *
+ * Quick task 260515-1y4 — `extraRoots` extends the walker BEYOND the single
+ * Vite project root. Each extra root is `lstat`-checked first; symlinks are
+ * skipped with a `console.warn` (no throw). Files DISCOVERED inside any
+ * root may write their `.rozie.ts` siblings inside that root because the
+ * trust-boundary in `emitRozieTsToDisk` is widened to the full union of
+ * (rootDir + extraRoots).
+ *
  * @param rootDir  — absolute path of the project root (Vite's resolvedConfig.root)
  * @param registry — modifier registry to feed into emitAngular
+ * @param extraRoots — additional absolute paths to walk; defaults to `[]`
  * @returns array of absolute `.rozie` paths that were processed
  */
 export function prebuildAngularRozieFiles(
   rootDir: string,
   registry: ModifierRegistry,
+  extraRoots: readonly string[] = [],
 ): string[] {
   const processed: string[] = [];
-  for (const roziePath of walkRozieFiles(rootDir)) {
+  // Filter extraRoots: refuse symlinks / non-directories with a console.warn
+  // (mirrors the in-tree symlink-skip in walkRozieFiles). NEVER throw — a bad
+  // entry in the consumer's allowlist shouldn't kill the whole build.
+  const safeExtraRoots: string[] = [];
+  for (const root of extraRoots) {
+    let st: ReturnType<typeof lstatSync>;
     try {
-      emitRozieTsToDisk(roziePath, registry, rootDir);
-      processed.push(roziePath);
-    } catch (err) {
-      // Surface as a console warning rather than aborting the whole scan —
-      // a single bad .rozie shouldn't prevent the rest of the project from
-      // building. The actual transform of THIS file will throw at
-      // request-time with a Vite-shaped error pointing at the source.
-      const msg = err instanceof Error ? err.message : String(err);
+      st = lstatSync(root);
+    } catch {
       // biome-ignore lint/suspicious/noConsole: build-time diagnostic
-      console.warn(`[@rozie/unplugin] prebuildAngularRozieFiles: failed to emit ${roziePath} → ${msg}`);
+      console.warn(
+        `[@rozie/unplugin] prebuildAngularRozieFiles: skipping extra root ${root} (does not exist)`,
+      );
+      continue;
+    }
+    if (st.isSymbolicLink()) {
+      // biome-ignore lint/suspicious/noConsole: build-time diagnostic
+      console.warn(
+        `[@rozie/unplugin] prebuildAngularRozieFiles: skipping extra root ${root} (symlink — refused for trust-boundary safety)`,
+      );
+      continue;
+    }
+    if (!st.isDirectory()) {
+      // biome-ignore lint/suspicious/noConsole: build-time diagnostic
+      console.warn(
+        `[@rozie/unplugin] prebuildAngularRozieFiles: skipping extra root ${root} (not a directory)`,
+      );
+      continue;
+    }
+    safeExtraRoots.push(root);
+  }
+
+  // Trust boundary widened to the full union — a file discovered under any
+  // root may legally write its `.rozie.ts` sibling inside that root.
+  const allowedRoots: readonly string[] = [rootDir, ...safeExtraRoots];
+
+  for (const root of allowedRoots) {
+    for (const roziePath of walkRozieFiles(root)) {
+      try {
+        emitRozieTsToDisk(roziePath, registry, allowedRoots);
+        processed.push(roziePath);
+      } catch (err) {
+        // Surface as a console warning rather than aborting the whole scan —
+        // a single bad .rozie shouldn't prevent the rest of the project from
+        // building. The actual transform of THIS file will throw at
+        // request-time with a Vite-shaped error pointing at the source.
+        const msg = err instanceof Error ? err.message : String(err);
+        // biome-ignore lint/suspicious/noConsole: build-time diagnostic
+        console.warn(`[@rozie/unplugin] prebuildAngularRozieFiles: failed to emit ${roziePath} → ${msg}`);
+      }
     }
   }
   return processed;
@@ -953,19 +1000,33 @@ export function prebuildAngularRozieFiles(
 export function emitRozieTsToDisk(
   roziePath: string,
   registry: ModifierRegistry,
-  rootDir?: string,
+  rootDirOrAllowedRoots?: string | readonly string[],
 ): string {
-  // When rootDir is supplied (configResolved + HMR paths), refuse writes that
-  // would land outside the project root. Closes T-05-04b-03 + WR-01/WR-07.
-  // The original D-70 plan assumed writes were sandboxed under
+  // When the third arg is supplied (configResolved + HMR paths), refuse writes
+  // that would land outside ALL of the listed roots. Closes T-05-04b-03 +
+  // WR-01/WR-07. The original D-70 plan assumed writes were sandboxed under
   // node_modules/.rozie-cache; the actual implementation writes alongside
   // the .rozie source, so this guard restores the equivalent trust posture.
-  if (rootDir) {
-    const rel = pathRelative(rootDir, roziePath);
-    if (rel.startsWith('..') || isAbsolute(rel)) {
-      throw new Error(
-        `@rozie/unplugin: refusing to emit .rozie.ts outside project root: ${roziePath} (root: ${rootDir})`,
-      );
+  //
+  // Quick task 260515-1y4 — the third arg can now be EITHER a single string
+  // (back-compat: HMR + existing tests) OR an array of strings (cross-tree
+  // prebuild allowlist). When an array, the file is allowed iff it lives
+  // inside ANY ONE of the listed roots.
+  if (rootDirOrAllowedRoots !== undefined) {
+    const allowedRoots: readonly string[] =
+      typeof rootDirOrAllowedRoots === 'string'
+        ? [rootDirOrAllowedRoots]
+        : rootDirOrAllowedRoots;
+    if (allowedRoots.length > 0) {
+      const allowed = allowedRoots.some((root) => {
+        const rel = pathRelative(root, roziePath);
+        return !rel.startsWith('..') && !isAbsolute(rel);
+      });
+      if (!allowed) {
+        throw new Error(
+          `@rozie/unplugin: refusing to emit .rozie.ts outside any allowed root: ${roziePath} (allowed: ${allowedRoots.join(', ')})`,
+        );
+      }
     }
   }
   const source = readFileSync(roziePath, 'utf8');

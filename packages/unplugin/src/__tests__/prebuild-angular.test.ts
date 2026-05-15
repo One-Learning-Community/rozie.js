@@ -10,8 +10,8 @@
  *   - HMR re-emit semantics: re-running the helper with unchanged source
  *     skips the write (no-op when content is identical).
  */
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, writeFileSync, readFileSync, existsSync, rmSync, mkdirSync, statSync } from 'node:fs';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { mkdtempSync, writeFileSync, readFileSync, existsSync, rmSync, mkdirSync, statSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import {
@@ -256,5 +256,123 @@ describe('D-70 cross-rozie shim emission (Phase 06.2 follow-up)', () => {
     // Counter.rozie has no <components> block — no shims should be written.
     // (The .rozie.ts disk-cache is still emitted for Counter itself.)
     expect(existsSync(join(tmpDir, 'Counter.ts'))).toBe(false);
+  });
+});
+
+// Quick task 260515-1y4 — cross-tree prebuild support. The Angular target's
+// D-70 disk-cache prebuild only walked DOWN from a single Vite project root,
+// but the visual-regression rig's `tests/visual-regression/` host needs to
+// walk `<repo>/examples/` (which sits ABOVE the Vite project root). The fix:
+// `RozieOptions.prebuildExtraRoots: readonly string[]` — an explicit
+// allowlist of additional roots the prebuild walker traverses, with the
+// trust-boundary in `emitRozieTsToDisk` widened from one root to the union.
+//
+// Symlinks are still refused (T-05-04b-03 / WR-01 closure) — both for files
+// DISCOVERED inside any root (existing behavior) AND for the extra root
+// entries themselves (new, mirrors the in-tree symlink-skip).
+describe('Quick 260515-1y4: cross-tree prebuild via prebuildExtraRoots', () => {
+  let projectRoot: string;
+  let extraRoot: string;
+
+  beforeEach(() => {
+    projectRoot = mkdtempSync(join(tmpdir(), 'rozie-1y4-project-'));
+    extraRoot = mkdtempSync(join(tmpdir(), 'rozie-1y4-extra-'));
+  });
+
+  afterEach(() => {
+    rmSync(projectRoot, { recursive: true, force: true });
+    rmSync(extraRoot, { recursive: true, force: true });
+  });
+
+  it('prebuildAngularRozieFiles walks extraRoots in addition to rootDir', () => {
+    const insidePath = join(projectRoot, 'Inside.rozie');
+    writeFileSync(insidePath, COUNTER_ROZIE.replace('name="Counter"', 'name="Inside"'));
+    const outsidePath = join(extraRoot, 'Outside.rozie');
+    writeFileSync(outsidePath, COUNTER_ROZIE.replace('name="Counter"', 'name="Outside"'));
+
+    const processed = prebuildAngularRozieFiles(projectRoot, makeRegistry(), [extraRoot]);
+
+    // Both files should be processed and live in the returned array.
+    expect(processed.sort()).toEqual([insidePath, outsidePath].sort());
+    // Both .rozie.ts siblings should be on disk.
+    expect(existsSync(insidePath + '.ts')).toBe(true);
+    expect(existsSync(outsidePath + '.ts')).toBe(true);
+    // Sanity-check the emitted Angular content for the extra-root file.
+    const outsideTs = readFileSync(outsidePath + '.ts', 'utf8');
+    expect(outsideTs).toContain("from '@angular/core'");
+    expect(outsideTs).toContain('@Component');
+  });
+
+  it('emitRozieTsToDisk accepts an array of allowed roots and refuses writes outside ALL of them', () => {
+    const outsideRoot = mkdtempSync(join(tmpdir(), 'rozie-1y4-outside-'));
+    try {
+      const fooPath = join(outsideRoot, 'Foo.rozie');
+      writeFileSync(fooPath, COUNTER_ROZIE.replace('name="Counter"', 'name="Foo"'));
+      expect(() =>
+        emitRozieTsToDisk(fooPath, makeRegistry(), [projectRoot, extraRoot]),
+      ).toThrow(/refusing to emit \.rozie\.ts/);
+      // Ensure the message includes the offending path so consumers can debug.
+      expect(() =>
+        emitRozieTsToDisk(fooPath, makeRegistry(), [projectRoot, extraRoot]),
+      ).toThrow(new RegExp(fooPath.replace(/\//g, '\\/')));
+    } finally {
+      rmSync(outsideRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('emitRozieTsToDisk single-element array equivalent to string back-compat', () => {
+    const insidePath = join(projectRoot, 'Inside.rozie');
+    writeFileSync(insidePath, COUNTER_ROZIE.replace('name="Counter"', 'name="Inside"'));
+    // Both forms must succeed and produce the same on-disk file.
+    expect(() =>
+      emitRozieTsToDisk(insidePath, makeRegistry(), projectRoot),
+    ).not.toThrow();
+    const stringForm = readFileSync(insidePath + '.ts', 'utf8');
+    rmSync(insidePath + '.ts');
+    expect(() =>
+      emitRozieTsToDisk(insidePath, makeRegistry(), [projectRoot]),
+    ).not.toThrow();
+    const arrayForm = readFileSync(insidePath + '.ts', 'utf8');
+    expect(arrayForm).toBe(stringForm);
+  });
+
+  it('prebuildAngularRozieFiles refuses a symlinked extraRoot with console.warn', () => {
+    // Real extra root (B) with one .rozie file inside.
+    const realExtra = mkdtempSync(join(tmpdir(), 'rozie-1y4-real-extra-'));
+    const realRoziePath = join(realExtra, 'Real.rozie');
+    writeFileSync(realRoziePath, COUNTER_ROZIE.replace('name="Counter"', 'name="Real"'));
+
+    // Symlink pointing at realExtra. We hand THIS path to prebuildExtraRoots.
+    const symlinkContainer = mkdtempSync(join(tmpdir(), 'rozie-1y4-symlink-container-'));
+    const symlinkPath = join(symlinkContainer, 'Link');
+    try {
+      symlinkSync(realExtra, symlinkPath, 'dir');
+    } catch (err) {
+      // Some CI sandboxes refuse symlink creation entirely; skip silently.
+      if ((err as NodeJS.ErrnoException).code === 'EPERM') {
+        rmSync(realExtra, { recursive: true, force: true });
+        rmSync(symlinkContainer, { recursive: true, force: true });
+        return;
+      }
+      throw err;
+    }
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      // The walker must NOT throw — symlinks are SKIPPED (consistency with
+      // the in-tree symlink-skip behavior of the walker).
+      expect(() =>
+        prebuildAngularRozieFiles(projectRoot, makeRegistry(), [symlinkPath]),
+      ).not.toThrow();
+      // No .rozie.ts should have been emitted in the real extra directory.
+      expect(existsSync(realRoziePath + '.ts')).toBe(false);
+      // The skip should be surfaced as a console.warn with the [@rozie/unplugin] prefix.
+      const warnings = warnSpy.mock.calls.map((args) => String(args[0]));
+      expect(warnings.some((m) => m.includes('[@rozie/unplugin]') && m.includes('symlink'))).toBe(true);
+    } finally {
+      warnSpy.mockRestore();
+      rmSync(realExtra, { recursive: true, force: true });
+      rmSync(symlinkContainer, { recursive: true, force: true });
+    }
   });
 });
