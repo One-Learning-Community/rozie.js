@@ -45,10 +45,12 @@ examples/consumers/svelte-vite/src/Counter.ts
 examples/consumers/svelte-vite/src/CardHeader.ts
 # Quick task 260515-1y4: when the visual-regression rig builds the angular
 # target, `prebuildExtraRoots: [<repo>/examples]` extends the disk-cache
-# walker to the top-level `examples/` directory, which causes shims for the
-# 8 reference components to be emitted at the repo's `examples/` root.
-examples/Counter.ts
-examples/CardHeader.ts
+# walker to the top-level `examples/` directory, which causes shims for any
+# composition target to be emitted at the repo's `examples/` root. Glob
+# (non-recursive — no trailing `**`) is safe here: there are no legitimate
+# authored `.ts` files at `examples/` root, only `.rozie` source and
+# subdirectories.
+examples/*.ts
 
 # IntelliJ plugin subproject (Phase 8)
 tools/intellij-plugin/build/
