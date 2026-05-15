@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "//": "Internal timing-parity tests intentionally use Angular 17 (not the workspace-wide 19+ floor). The runtime path (babel-transformed JIT eval inside Angular's TestBed) hits an Angular 19 metadata gap (`passThroughInput` is undefined inside compiler internals when `output()`-decorated members come from runtime-transformed source). Updating emitAngular to produce Angular 19 JIT-compat metadata is its own phase. tests/timing is internal-only and not part of our public compat surface; the workspace-level pnpm.overrides.typescript was removed in May 2026, so this Angular 17 + TS 5.4 install is scoped to this workspace and does not affect others.",
+  "//": "Internal cross-framework timing-parity tests. The Angular leg babel-transforms the emitted Angular source, evals it as an ESM module, and JIT-compiles via TestBed — exercises the runtime path that consumers using AOT will not hit, but verifies the emitted source's structural shape and timing wraparound on the same axis as the other three targets.",
   "scripts": {
     "test": "vitest run --passWithNoTests",
     "typecheck": "tsc --noEmit"
@@ -18,12 +18,12 @@
     "@rozie/target-vue": "workspace:*"
   },
   "devDependencies": {
-    "@angular/common": "^17.0.0",
-    "@angular/compiler": "^17.0.0",
-    "@angular/core": "^17.0.0",
-    "@angular/forms": "^17.0.0",
-    "@angular/platform-browser": "^17.0.0",
-    "@angular/platform-browser-dynamic": "^17.0.0",
+    "@angular/common": "^21.0.0",
+    "@angular/compiler": "^21.0.0",
+    "@angular/core": "^21.0.0",
+    "@angular/forms": "^21.0.0",
+    "@angular/platform-browser": "^21.0.0",
+    "@angular/platform-browser-dynamic": "^21.0.0",
     "@babel/core": "^7.29",
     "@babel/plugin-proposal-decorators": "^7.29",
     "@babel/plugin-transform-class-properties": "^7.28",
@@ -43,9 +43,9 @@
     "rxjs": "^7.8",
     "svelte": "^5.0.0",
     "tslib": "^2.6",
-    "typescript": "~5.4",
+    "typescript": "~5.9.3",
     "vitest": "^4.1.5",
     "vue": "^3.5.33",
-    "zone.js": "^0.14"
+    "zone.js": "~0.15.0"
   }
 }

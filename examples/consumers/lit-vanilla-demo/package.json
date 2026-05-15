@@ -23,7 +23,7 @@
     "@playwright/test": "^1",
     "@types/node": "^20",
     "playwright": "^1",
-    "typescript": "^5",
+    "typescript": "^5.6",
     "vite": "^6"
   }
 }

@@ -19,6 +19,6 @@
     "@rozie/target-solid": "workspace:*",
     "@rozie/target-lit": "workspace:*",
     "vitest": "^4",
-    "typescript": "^5"
+    "typescript": "^5.6"
   }
 }
