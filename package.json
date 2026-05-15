@@ -25,7 +25,9 @@
     "packageExtensions": {
       "@analogjs/vite-plugin-angular": {
         "peerDependencies": {
-          "typescript": ">=5.5"
+          "typescript": ">=5.5",
+          "@angular/compiler": "^17 || ^18 || ^19 || ^20 || ^21",
+          "@angular/compiler-cli": "^17 || ^18 || ^19 || ^20 || ^21"
         }
       }
     }

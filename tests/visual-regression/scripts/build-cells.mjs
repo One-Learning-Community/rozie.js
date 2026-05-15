@@ -56,10 +56,19 @@ function cleanupCrossTreeAngularArtifacts() {
   for (const base of REFERENCE_BASENAMES) {
     rmSync(resolve(EXAMPLES_DIR, `${base}.rozie.ts`), { force: true });
   }
-  // Cross-rozie composition shims (only Counter + CardHeader are referenced
-  // from the 8 reference examples — Card.rozie composes them).
+  // Cross-rozie composition shims at examples/ root (referenced from the 8
+  // reference components — Counter and CardHeader by Card/Modal compositions;
+  // Dropdown by examples/demos/DropdownDemo's `../Dropdown.rozie` reference).
   rmSync(resolve(EXAMPLES_DIR, 'Counter.ts'), { force: true });
   rmSync(resolve(EXAMPLES_DIR, 'CardHeader.ts'), { force: true });
+  rmSync(resolve(EXAMPLES_DIR, 'Dropdown.ts'), { force: true });
+  // Demo-folder cross-tree artifacts. The Angular sub-build walks
+  // `examples/demos/` as part of `prebuildExtraRoots: [examplesRoot]` and
+  // emits `<DemoName>.rozie.ts` alongside the source. Leftover files break
+  // the lit/solid sub-builds the same way the top-level ones do (cross-tree
+  // imports of @angular/* from emitted Angular sources).
+  const DEMOS_DIR = resolve(EXAMPLES_DIR, 'demos');
+  rmSync(resolve(DEMOS_DIR, 'DropdownDemo.rozie.ts'), { force: true });
 }
 
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'];
@@ -90,6 +99,17 @@ for (const target of TARGETS) {
       env: { ...process.env, ROZIE_TARGET: target },
     },
   );
+  // Always clean Angular's cross-tree disk-cache leftovers between targets.
+  // Before this hook, the Angular sub-build (which succeeds now per the
+  // pnpm.packageExtensions analogjs patch) was leaving `.rozie.ts` and `.ts`
+  // shim files in `<repo>/examples/`. The next target's vite build would then
+  // glob those leftovers via `import.meta.glob('../../../examples/*.rozie')`
+  // and fail to resolve `lit`/`solid-js`/etc. from the Angular-emitted files
+  // (the Angular sources import `@angular/core`, not the next target's
+  // runtime). Cleanup-between-targets isolates each sub-build.
+  if (target === 'angular') {
+    cleanupCrossTreeAngularArtifacts();
+  }
   if (result.status !== 0) {
     if (SOFT_FAIL_TARGETS.has(target)) {
       process.stderr.write(
