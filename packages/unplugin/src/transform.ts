@@ -1232,6 +1232,19 @@ function* walkRozieFiles(rootDir: string): Generator<string> {
       if (st.isSymbolicLink()) continue;
       if (st.isDirectory()) {
         if (SKIP_DIRS.has(entry)) continue;
+        // Stop at package boundaries — when walking a cross-tree extra
+        // root (e.g. the workspace's top-level `examples/`), don't recurse
+        // into nested workspace packages (e.g. `examples/consumers/<demo>/`)
+        // and pollute their `src/` with Angular `.rozie.ts` shims they
+        // didn't ask for. Each consumer demo is its own pnpm-workspace
+        // package with its own framework target, so its .rozie files are
+        // owned by ITS own Vite plugin instance, not by the cross-tree
+        // walker initiated from a sibling rig.
+        try {
+          if (lstatSync(pathJoin(full, 'package.json')).isFile()) continue;
+        } catch {
+          // No package.json — keep walking into this directory.
+        }
         stack.push(full);
       } else if (st.isFile() && entry.endsWith('.rozie')) {
         yield full;

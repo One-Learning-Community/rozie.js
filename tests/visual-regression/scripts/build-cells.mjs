@@ -11,12 +11,56 @@
  * (vite.preview.config.ts) then serves the unified `dist/` on port 4180.
  */
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, copyFileSync } from 'node:fs';
+import { mkdirSync, copyFileSync, rmSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, '..');
+// Repo root for cross-tree disk-cache cleanup. Three levels up: scripts → rig
+// → tests → repo.
+const REPO_ROOT = resolve(HERE, '..', '..', '..');
+const EXAMPLES_DIR = resolve(REPO_ROOT, 'examples');
+const REFERENCE_BASENAMES = [
+  'Counter',
+  'SearchInput',
+  'Dropdown',
+  'TodoList',
+  'Modal',
+  'TreeNode',
+  'Card',
+  'CardHeader',
+];
+
+// Cross-tree disk-cache files emitted by the Angular sub-build into the
+// shared `<repo>/examples/` directory:
+//   - `<basename>.rozie.ts`: D-70 disk-cache (analogjs's TS Program input)
+//   - `Counter.ts`/`CardHeader.ts`: cross-rozie composition shims emitted by
+//     `writeCrossRozieShimsFor()` because Card.rozie composes them via
+//     `<components>{ Counter, CardHeader }</components>`.
+//
+// These files MUST exist during the Angular sub-build. After it completes
+// they MUST be removed — they share `examples/` with every other consumer
+// demo (vue-vite, react-vite, etc.) and TypeScript's bundler-mode module
+// resolution prefers `.ts` extensions over the `*.rozie` ambient shims those
+// demos rely on. Leaving them on disk poisons the whole workspace's `pnpm
+// typecheck` with "Cannot find module '@angular/core'" errors in non-Angular
+// consumers (the .rozie.ts files contain Angular imports).
+//
+// The `.gitignore` already filters them; this cleanup is for local
+// developer experience (so `pnpm typecheck` works after a visual-regression
+// build) and CI hygiene (workspace typecheck steps in unrelated workflows
+// don't trip on leftover artifacts from a prior visual-regression CI run
+// on the same runner cache).
+function cleanupCrossTreeAngularArtifacts() {
+  for (const base of REFERENCE_BASENAMES) {
+    rmSync(resolve(EXAMPLES_DIR, `${base}.rozie.ts`), { force: true });
+  }
+  // Cross-rozie composition shims (only Counter + CardHeader are referenced
+  // from the 8 reference examples — Card.rozie composes them).
+  rmSync(resolve(EXAMPLES_DIR, 'Counter.ts'), { force: true });
+  rmSync(resolve(EXAMPLES_DIR, 'CardHeader.ts'), { force: true });
+}
 
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'];
 
@@ -58,6 +102,11 @@ for (const target of TARGETS) {
     process.stderr.write(
       `\n[visual-regression] sub-build FAILED for target: ${target}\n`,
     );
+    // Clean up cross-tree disk-cache artifacts on failure too — leftover
+    // .rozie.ts files in <repo>/examples/ would break unrelated demos'
+    // typechecks. The user has bigger problems if we got here, but at
+    // least don't leave the workspace in a broken state.
+    cleanupCrossTreeAngularArtifacts();
     process.exit(result.status ?? 1);
   }
 }
@@ -70,6 +119,10 @@ copyFileSync(
   resolve(ROOT, 'host', 'index.html'),
   resolve(distDir, 'index.html'),
 );
+
+// Clean up cross-tree disk-cache artifacts the Angular sub-build dropped into
+// the shared `<repo>/examples/` directory — see the function comment for why.
+cleanupCrossTreeAngularArtifacts();
 
 const built = TARGETS.length - failures.length;
 process.stdout.write(
