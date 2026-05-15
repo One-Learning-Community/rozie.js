@@ -86,6 +86,25 @@ export function detectViteMajor(cwd?: string): number | null {
 }
 
 function defaultCwd(): string {
+  // process.cwd() is the consumer project root during Vite/Rollup/CLI config
+  // evaluation — that's where the consumer's @angular/core (etc.) lives in
+  // pnpm setups (workspace-direct deps are not hoisted to the monorepo root).
+  // Previously we used dirname(fileURLToPath(import.meta.url)), which walked
+  // upward from this package's own dist/ — and never crossed into the
+  // consumer workspace's node_modules. That worked accidentally when a
+  // pnpm.overrides was hoisting @angular/* to repo-root node_modules; once
+  // that override was removed (May 2026 Angular floor bump) the walk-up
+  // missed the consumer's local install and assertAngularPeerDeps raised
+  // a false-positive ROZ701. fileURLToPath(import.meta.url) is the fallback
+  // for the (rare) call-from-Node-evaluation context where process.cwd() is
+  // a synthetic path.
+  if (typeof process !== 'undefined' && typeof process.cwd === 'function') {
+    try {
+      return process.cwd();
+    } catch {
+      // Fall through to import.meta.url fallback.
+    }
+  }
   return dirname(fileURLToPath(import.meta.url));
 }
 
