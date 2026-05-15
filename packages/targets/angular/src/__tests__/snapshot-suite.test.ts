@@ -18,7 +18,12 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
-import * as ts from 'typescript';
+// Default import (not `import * as ts`) — TypeScript ≤5.4 wraps its CJS module
+// under `default` for ESM consumers, while TS ≥5.5 also exposes flat names.
+// Default import grabs the flat module on both shapes, so this stays portable
+// across the TS 5.4↔5.5 namespace-flattening boundary regardless of which TS
+// version the workspace ends up resolving.
+import ts from 'typescript';
 import { parse } from '../../../../core/src/parse.js';
 import { lowerToIR } from '../../../../core/src/ir/lower.js';
 import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
