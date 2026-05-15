@@ -93,15 +93,39 @@ jobs:
           # Demo defaults already match Angular 21 (TS ~5.9, @angular/build@21,
           # analogjs vite-plugin 2.5.x) — the v21 leg needs no extra override.
           # For the Angular 19 floor leg, @angular/compiler-cli@19 requires
-          # typescript >=5.5 <5.9, so we downgrade TS to ~5.8 (highest in
-          # range, also avoids the analogjs ts.createPrinter ESM-namespace
-          # issue which only manifests on TS <5.5). @angular/build and
-          # @angular-devkit/build-angular get the v19 line too — analogjs
+          # typescript >=5.5 <5.9, so we downgrade TS to ~5.7 (highest in
+          # range that doesn't drag in another loaded TS version into the
+          # subgraph — see workspace pnpm.overrides note below). @angular/build
+          # + @angular-devkit/build-angular get the v19 line too; analogjs
           # 2.5.x's peer-dep range (^18 || ^19 || ^20 || ^21) covers v19.
           if [ "${{ matrix.angular-version }}" = "19" ]; then
-            pnpm add -D "typescript@~5.8" \
+            pnpm add -D "typescript@~5.7" \
                          "@angular/build@^19" \
                          "@angular-devkit/build-angular@^19"
+            # CI-only workspace TS pin for the v19 leg.
+            #
+            # @analogjs/vite-plugin-angular@2.5.x does NOT declare typescript
+            # as a (peer)dependency, so its `import 'typescript'` walks up
+            # from its .pnpm/ subgraph and resolves to whichever typescript
+            # the workspace root hoists — which on this repo is ~5.9.3
+            # (tsdown's transitive dep). Meanwhile @angular/compiler-cli@19's
+            # own peer-pinned subgraph resolves typescript@5.7. Two TS
+            # versions then load in the same Vite process. analogjs uses
+            # 5.9 to parse SourceFiles; compiler-cli's 5.7 binder doesn't
+            # recognise 5.9's AST node-kind table; getContainerFlags returns
+            # 0 (None); bindContainer skipped; currentFlow undefined;
+            # NgCompiler's first getTypeChecker() crashes at checkUnreachable
+            # with "Cannot read properties of undefined (reading 'flags')".
+            #
+            # Same family of bug as the May 2026 dual-version (5.4 vs 5.9)
+            # crash documented in .planning/debug/angular-appcomponent-aot.md.
+            # Workaround: force a single TS version (~5.7, in compiler-cli@19's
+            # range) workspace-wide for THIS CI leg only via pnpm.overrides.
+            # No other matrix leg + no consumer's lockfile is affected.
+            #
+            # Real fix belongs upstream — analogjs should declare typescript
+            # as a peerDependency so pnpm dedupes it correctly.
+            node -e "const fs=require('fs');const p='../../../package.json';const j=JSON.parse(fs.readFileSync(p));j.pnpm=j.pnpm??{};j.pnpm.overrides=j.pnpm.overrides??{};j.pnpm.overrides.typescript='~5.7';fs.writeFileSync(p,JSON.stringify(j,null,2)+'\n');console.log('pinned workspace TS to ~5.7 for the v19 leg');"
           fi
 
       - name: Re-install with version overrides
@@ -171,8 +195,7 @@ jobs:
                    @angular/platform-browser@^${{ matrix.angular-version }}
           pnpm add -D @angular/compiler-cli@^${{ matrix.angular-version }}
           # Integration project pins Angular 19 + TS ~5.6 + analogjs 2.5.1 +
-          # @angular/build 19 (the floor). The v19 matrix leg matches those
-          # defaults — no override needed. The v21 matrix leg needs to bump
+          # @angular/build 19 (the floor). The v21 matrix leg needs to bump
           # TS to ~5.9 (compiler-cli@21 requires >=5.9 <6.1) and @angular/build
           # + @angular-devkit/build-angular to ^21. analogjs 2.5.1 already
           # satisfies v21's peer-dep range so it doesn't need re-pinning.
@@ -180,6 +203,17 @@ jobs:
             pnpm add -D "typescript@~5.9" \
                          "@angular/build@^21" \
                          "@angular-devkit/build-angular@^21"
+          fi
+          # CI-only workspace TS pin for the v19 leg — same upstream bug as
+          # the angular-matrix v19 leg. analogjs has no typescript dep and
+          # walks up from .pnpm/ to workspace root TS ~5.9.3, while
+          # compiler-cli@19 binds against its peer-pinned TS ~5.6/~5.7. The
+          # AST node-kind table mismatch crashes NgCompiler's first
+          # getTypeChecker() at checkUnreachable. See angular-matrix job
+          # comment above and .planning/debug/angular-appcomponent-aot.md
+          # for the longer write-up.
+          if [ "${{ matrix.angular-version }}" = "19" ]; then
+            node -e "const fs=require('fs');const p='../../../package.json';const j=JSON.parse(fs.readFileSync(p));j.pnpm=j.pnpm??{};j.pnpm.overrides=j.pnpm.overrides??{};j.pnpm.overrides.typescript='~5.7';fs.writeFileSync(p,JSON.stringify(j,null,2)+'\n');console.log('pinned workspace TS to ~5.7 for the v19 integration leg');"
           fi
 
       - name: Re-install with version overrides
