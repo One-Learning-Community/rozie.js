@@ -204,17 +204,19 @@ jobs:
                          "@angular/build@^21" \
                          "@angular-devkit/build-angular@^21"
           fi
-          # CI-only workspace TS pin for the v19 leg — same upstream bug as
-          # the angular-matrix v19 leg. analogjs has no typescript dep and
-          # walks up from .pnpm/ to workspace root TS ~5.9.3, while
-          # compiler-cli@19 binds against its peer-pinned TS ~5.6/~5.7. The
-          # AST node-kind table mismatch crashes NgCompiler's first
-          # getTypeChecker() at checkUnreachable. See angular-matrix job
-          # comment above and .planning/debug/angular-appcomponent-aot.md
-          # for the longer write-up.
-          if [ "${{ matrix.angular-version }}" = "19" ]; then
-            node -e "const fs=require('fs');const p='../../../package.json';const j=JSON.parse(fs.readFileSync(p));j.pnpm=j.pnpm??{};j.pnpm.overrides=j.pnpm.overrides??{};j.pnpm.overrides.typescript='~5.7';fs.writeFileSync(p,JSON.stringify(j,null,2)+'\n');console.log('pinned workspace TS to ~5.7 for the v19 integration leg');"
-          fi
+          # NB: no workspace TS override for the integration v19 leg —
+          # the integration project's package.json already pins
+          # `typescript: ~5.6.0` and `@angular/compiler-cli: ^19.0.0`,
+          # which resolve correctly inside its own subgraph. The matrix-
+          # demo job above DOES need a workspace override because the
+          # demo's package.json defaults are TS ~5.9 + compiler-cli ^21
+          # for the v21 leg's convenience, and analogjs's missing-peerDep
+          # walk-up bites it. The integration project carries the v19
+          # floor as its baseline, so analogjs walks up and finds the
+          # correct subgraph naturally. Adding a `~5.7` override here
+          # would force compiler-cli@21 (pulled into the workspace by the
+          # demo's v21 default) to use TS 5.7 — which it rejects (needs
+          # >=5.9), crashing analogjs at NgtscProgram construction.
 
       - name: Re-install with version overrides
         run: pnpm install --no-frozen-lockfile
