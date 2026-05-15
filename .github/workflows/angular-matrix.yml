@@ -219,8 +219,14 @@ jobs:
       - name: Re-install with version overrides
         run: pnpm install --no-frozen-lockfile
 
-      - name: Build @rozie/unplugin
-        run: pnpm --filter @rozie/unplugin run build
+      # Use turbo so the unplugin's workspace deps (@rozie/core, target
+      # packages) are built first — `pnpm --filter @rozie/unplugin run
+      # build` builds ONLY the unplugin and Vite then crashes loading
+      # dist/src-*.mjs with `Cannot find module '@rozie/core/dist/index.mjs'`
+      # because the leaf dep was never produced. Mirror the angular-matrix
+      # job above which uses `pnpm turbo run build`.
+      - name: Build @rozie/unplugin and its workspace deps
+        run: pnpm turbo run build --filter @rozie/unplugin
 
       - name: Build integration project (Phase 5 success criterion #3)
         run: pnpm -F rozie-angular-analogjs-integration build
