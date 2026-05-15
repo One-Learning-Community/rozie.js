@@ -1,6 +1,11 @@
 import { test, expect } from '@playwright/test';
 import { existsSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+// tests/visual-regression/package.json sets "type": "module", so __dirname is
+// not defined here. Synthesize it from import.meta.url.
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 /**
  * Phase 7 Plan 02 — the 48-cell cross-target visual-regression matrix (EX-06,
