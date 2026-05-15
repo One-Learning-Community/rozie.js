@@ -131,14 +131,23 @@ export default defineConfig(async () => {
   // bare-import re-resolver uses `createRequire(this config dir)` so
   // resolution happens as if the importer were a sibling of this file.
   plugins: [
-    // The cross-tree bare-import resolver applies to ALL targets — every
-    // target's `<repo>/examples/Foo.rozie.ts` (whether emitted by angular's
-    // prebuild or freshly by the load-hook for lit/solid/etc.) imports
-    // framework deps that live under `tests/visual-regression/node_modules/`.
-    // Without this, lit's `import 'lit'`, solid's `import 'solid-js'`, etc.
-    // fail to resolve at Rollup bind time when the importer is in
-    // `examples/` (cross-tree). Cheap no-op for files under `__dirname`.
-    resolveCrossTreeBareImports([examplesRoot]),
+    // Scoped to the Angular target only. The Angular sub-build's D-70
+    // disk-cache prebuild emits `<repo>/examples/Foo.rozie.ts` files that
+    // import `@angular/core` etc.; those deps live under
+    // `tests/visual-regression/node_modules/` so Node's upward walk from
+    // `<repo>/examples/` doesn't find them. createRequire-from-this-config
+    // closes that gap.
+    //
+    // CRITICAL: do NOT enable this for browser-targeted builds (Solid, Lit,
+    // …). Node's `createRequire().resolve()` walks package.json `exports`
+    // with default conditions `require`/`import`/`node` and never
+    // `browser` — so `solid-js/web` would resolve to its SSR `dist/server.js`
+    // instead of `dist/web.js`, and the runtime throws
+    // "Client-only API called on the server side" when components mount.
+    // The other targets' `.rozie.ts/.tsx` virtual modules go through Vite's
+    // own resolver, which honors `browser` via vite-plugin-solid's
+    // `configEnvironment` hook (and the equivalent for other plugins).
+    ...(TARGET === 'angular' ? [resolveCrossTreeBareImports([examplesRoot])] : []),
     Rozie({
       target: TARGET,
       ...(TARGET === 'angular' ? { prebuildExtraRoots: [examplesRoot] } : {}),
