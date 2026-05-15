@@ -45,6 +45,15 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Cache turbo build output
+        uses: actions/cache@v5
+        with:
+          path: .turbo
+          key: ${{ runner.os }}-turbo-${{ github.job }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-turbo-${{ github.job }}-
+            ${{ runner.os }}-turbo-
+
       # The visual-regression host consumes the 6 targets' build outputs;
       # `turbo run build` builds @rozie/core + all 6 target packages + unplugin.
       - name: Build all packages (core + 6 targets + unplugin)

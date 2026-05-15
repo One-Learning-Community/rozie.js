@@ -45,20 +45,25 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build core (peggy generated.js + tsdown)
-        run: pnpm -r --filter @rozie/core run build || echo 'core build is optional in Phase 4'
+      # Turbo's build cache persists across runs so unchanged packages aren't
+      # rebuilt every CI job. Key scoped per-job so different matrix workflows
+      # don't clobber each other; restore-keys allow partial reuse across
+      # commits via turbo's internal content-addressed cache.
+      - name: Cache turbo build output
+        uses: actions/cache@v5
+        with:
+          path: .turbo
+          key: ${{ runner.os }}-turbo-${{ github.job }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-turbo-${{ github.job }}-
+            ${{ runner.os }}-turbo-
 
-      - name: Build @rozie/unplugin
-        run: pnpm --filter @rozie/unplugin run build
-
-      - name: Build @rozie/runtime-react
-        run: pnpm --filter @rozie/runtime-react run build
-
-      - name: Build @rozie/target-react
-        run: pnpm --filter @rozie/target-react run build
-
-      - name: Build @rozie/target-vue
-        run: pnpm --filter @rozie/target-vue run build
+      # Build the whole workspace via turbo. The swipe canary's emit tests
+      # (Plan 07.1-03) import @rozie/target-{angular,svelte,solid,lit} and the
+      # dts-identity test reads every target's dist/index.d.mts, so all 6
+      # targets must be built before the unit-test step runs.
+      - name: Build all packages
+        run: pnpm turbo run build
 
       - name: Run unit tests (core + targets + runtime + unplugin + swipe MOD-05 dogfood)
         run: |
