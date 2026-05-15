@@ -1,0 +1,45 @@
+<!--
+  Visual-regression demo wrapper for Dropdown.
+
+  The visual-regression rig (tests/visual-regression/host/entry.<target>.ts)
+  prefers `examples/demos/<Name>.rozie` over `examples/<Name>.rozie` when
+  present — this file overrides the canonical `examples/Dropdown.rozie` for
+  screenshot purposes only. The canonical example stays untouched so its own
+  consumer demos (react-vite, vue-vite, etc.) keep their slot-driven authoring.
+
+  Why a wrapper at all: the canonical Dropdown is slot-driven (named #trigger
+  + default panel slot). Mounting it bare with `{ open: true }` shows an
+  empty 1×18 box — useless as a baseline. A wrapper that imports it and
+  fills the panel with default-slot content captures meaningful pixels.
+
+  Limitation: Rozie's IR does NOT yet support consumer-side named-slot
+  syntax (no `<template #trigger>…</template>` in component composition).
+  We fill the default slot (the panel content); the trigger area renders
+  empty in the screenshot. Real usage in consumer demos uses both slots.
+-->
+<rozie name="DropdownDemo">
+<components>
+{
+  Dropdown: '../Dropdown.rozie',
+}
+</components>
+
+<template>
+<Dropdown :open="true">
+  <div class="menu-item">Edit</div>
+  <div class="menu-item">Duplicate</div>
+  <div class="menu-item">Delete</div>
+</Dropdown>
+</template>
+
+<style>
+.menu-item {
+  padding: 0.5rem 1rem;
+  font: 14px system-ui, sans-serif;
+  cursor: pointer;
+}
+.menu-item:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+</style>
+</rozie>

@@ -14,9 +14,11 @@
 import 'zone.js';
 import { createApplication } from '@angular/platform-browser';
 import { createComponent, type Type } from '@angular/core';
-import { parseQuery, mountWrapper } from './main';
+import { parseQuery, mountWrapper, DEFAULT_PROPS } from './main';
 
-const modules = import.meta.glob('../../../examples/*.rozie');
+// Two glob roots — see entry.vue.ts for rationale; demos/ wins over root.
+const baseModules = import.meta.glob('../../../examples/*.rozie');
+const demoModules = import.meta.glob('../../../examples/demos/*.rozie');
 
 /**
  * Read the component's own selector tag off its compiled `ɵcmp` definition.
@@ -38,9 +40,14 @@ function selectorTag(componentType: Type<unknown>): string {
 
 async function main(): Promise<void> {
   const { example } = parseQuery();
-  const key = `../../../examples/${example}.rozie`;
-  const loader = modules[key];
-  if (!loader) throw new Error(`visual-regression host: no module for ${key}`);
+  const demoKey = `../../../examples/demos/${example}Demo.rozie`;
+  const baseKey = `../../../examples/${example}.rozie`;
+  const isDemo = demoKey in demoModules;
+  const loader = demoModules[demoKey] ?? baseModules[baseKey];
+  if (!loader)
+    throw new Error(
+      `visual-regression host: no module for ${example} (checked ${demoKey} and ${baseKey})`,
+    );
   const mod = (await loader()) as { default: Type<unknown> };
 
   const appRef = await createApplication();
@@ -54,6 +61,21 @@ async function main(): Promise<void> {
     environmentInjector: appRef.injector,
     hostElement: hostEl,
   });
+  // Apply DEFAULT_PROPS via Angular's setInput API (Angular 14.1+ standalone).
+  // Skip for demo wrappers — they hardcode their state inline (e.g.
+  // `<Dropdown :open="true">…</Dropdown>` in demos/Dropdown.rozie). Inputs
+  // not declared on the component are silently ignored to keep the rig
+  // tolerant of minor signature drift.
+  if (!isDemo) {
+    const props = DEFAULT_PROPS[example] as Record<string, unknown>;
+    for (const [name, value] of Object.entries(props)) {
+      try {
+        componentRef.setInput(name, value);
+      } catch {
+        // Input not declared on this component — skip silently.
+      }
+    }
+  }
   appRef.attachView(componentRef.hostView);
   // Full application tick — `detectChanges()` alone did not paint the initial
   // standalone-component render in the bare `createApplication()` platform.

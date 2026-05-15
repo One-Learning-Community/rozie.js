@@ -47,3 +47,31 @@ body {
   animation: none !important;
   caret-color: transparent !important;
 }
+
+/*
+ * Visual-regression overrides for components that use `position: fixed/absolute`
+ * inside the mount wrapper. Fixed/absolute elements are removed from their
+ * parent's layout flow, so the `[data-testid="rozie-mount"]` clip box collapses
+ * around them and Playwright captures empty space. Pull these elements back into
+ * the layout so they contribute to the wrapper's bbox.
+ *
+ * NB: Class selectors here match across all targets — Vue/Svelte scope via
+ * data-attributes but the class itself stays bare on the element, so a
+ * non-attribute-qualified `.foo` rule applies regardless of scope. The
+ * canonical `Dropdown.rozie`'s scoped `position: fixed` is overridden by the
+ * `!important` here purely for screenshot-host purposes; consumer demos that
+ * import the canonical component still get the original positioning.
+ */
+.dropdown-panel,
+.modal-backdrop {
+  position: static !important;
+}
+/* Modal's backdrop normally fills the viewport via `inset: 0`; with
+ * position:static the inset has no effect. Restore the backdrop's flex
+ * centering so the dialog's intrinsic size is what gets captured rather
+ * than a 0-sized flex container. */
+.modal-backdrop {
+  inset: auto !important;
+  width: max-content;
+  height: max-content;
+}

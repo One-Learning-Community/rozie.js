@@ -54,6 +54,36 @@ export interface HostQuery {
   target: Target;
 }
 
+export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
+  Counter: { value: 0, min: 0, max: 10 },
+  SearchInput: { placeholder: 'Search...' },
+  Dropdown: { open: true },
+  // `items` is `model: true` — passing here gives correct first-render
+  // state; the rig has no parent listener for `update:items`, so any user
+  // interaction inside the component won't persist (acceptable for a
+  // screenshot). Shape per template: { id, text, done } — `toggle/remove`
+  // look up by id, the row reads `.text`, the strikethrough class reads
+  // `.done`. Strings would silently render blank.
+  TodoList: {
+    items: [
+      { id: 't1', text: 'Buy groceries', done: false },
+      { id: 't2', text: 'Walk the dog', done: true },
+      { id: 't3', text: 'Write the report', done: false },
+    ],
+    title: 'Todo List',
+  },
+  Modal: { open: true, title: 'Modal Title' },
+  TreeNode: { node: { id: 'root', label: 'Root', children: [
+        { id: 'child1', label: 'Child 1', children: [] },
+          { id: 'child2', label: 'Child 2', children: [
+              { id: 'grandchild1', label: 'Grandchild 1', children: [] },
+                { id: 'grandchild2', label: 'Grandchild 2', children: [] },
+            ] },
+      ] } },
+  Card: { title: 'Card Title' },
+  CardHeader: { title: 'Card Header' },
+};
+
 /** Parse `?example=&target=` from the current URL, falling back to defaults. */
 export function parseQuery(): HostQuery {
   const params = new URLSearchParams(location.search);

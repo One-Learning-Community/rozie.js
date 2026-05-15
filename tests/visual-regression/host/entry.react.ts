@@ -11,19 +11,41 @@
  */
 import { createElement } from 'react';
 import { createRoot } from 'react-dom/client';
-import { parseQuery, mountWrapper } from './main';
+import { parseQuery, mountWrapper, DEFAULT_PROPS } from './main';
 
-const modules = import.meta.glob('../../../examples/*.rozie');
+// Two glob roots: `examples/*.rozie` is the canonical reference set;
+// `examples/demos/*.rozie` provides per-example wrappers that override the
+// canonical for visual-regression purposes (e.g. demos/Dropdown.rozie fills
+// the default panel slot so the screenshot captures menu items instead of
+// an empty 1×18 box). When both globs match, the demos/ entry wins.
+const baseModules = import.meta.glob('../../../examples/*.rozie');
+const demoModules = import.meta.glob('../../../examples/demos/*.rozie');
 
 async function main(): Promise<void> {
   const { example } = parseQuery();
-  const key = `../../../examples/${example}.rozie`;
-  const loader = modules[key];
-  if (!loader) throw new Error(`visual-regression host: no module for ${key}`);
+  const demoKey = `../../../examples/demos/${example}Demo.rozie`;
+  const baseKey = `../../../examples/${example}.rozie`;
+  const isDemo = demoKey in demoModules;
+  const loader = demoModules[demoKey] ?? baseModules[baseKey];
+  if (!loader)
+    throw new Error(
+      `visual-regression host: no module for ${example} (checked ${demoKey} and ${baseKey})`,
+    );
   const mod = (await loader()) as {
     default: Parameters<typeof createElement>[0];
   };
-  createRoot(mountWrapper()).render(createElement(mod.default));
+  // `createElement(component, props)` — passing DEFAULT_PROPS[example]
+  // drives the component into a visible state for the screenshot. See
+  // DEFAULT_PROPS in main.ts. Demo wrappers hardcode their state inline
+  // (e.g. `<Dropdown :open="true">…</Dropdown>` in demos/DropdownDemo.rozie),
+  // so DEFAULT_PROPS is skipped — passing them would trip React's "unknown
+  // prop on a component" warning since the wrapper has no matching props.
+  createRoot(mountWrapper()).render(
+    createElement(
+      mod.default,
+      isDemo ? null : (DEFAULT_PROPS[example] as Record<string, unknown>),
+    ),
+  );
 }
 
 void main();

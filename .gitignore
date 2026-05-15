@@ -55,3 +55,14 @@ tools/intellij-plugin/build/
 tools/intellij-plugin/.gradle/
 tools/intellij-plugin/*.iml
 tools/intellij-plugin/.idea/
+
+# Cross-tree prebuild artifacts in examples/demos/ — Angular .rozie.ts
+# disk-cache + cross-rozie composition .ts shims emitted by the
+# visual-regression rig's `prebuildExtraRoots: [<repo>/examples]` config.
+# The .rozie source files in examples/demos/ ARE tracked.
+examples/demos/*.rozie.ts
+examples/demos/*.ts
+
+# Local-only act + pnpm-store artifacts (see memory feedback-act-local-workflow-runs)
+.actrc
+.pnpm-store/
