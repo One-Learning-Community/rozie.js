@@ -1,5 +1,6 @@
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 import { resolve } from 'node:path';
+import { createRequire } from 'node:module';
 import Rozie from '@rozie/unplugin/vite';
 
 /**
@@ -20,6 +21,52 @@ import Rozie from '@rozie/unplugin/vite';
 type Target = 'vue' | 'react' | 'svelte' | 'angular' | 'solid' | 'lit';
 
 const TARGET = (process.env.ROZIE_TARGET ?? 'vue') as Target;
+
+/**
+ * Quick task 260515-1y4 follow-up. The Angular target's prebuild emits
+ * `<repo>/examples/Foo.rozie.ts` files (which import `@angular/core`, etc.)
+ * via `prebuildExtraRoots`. But Node's module resolution from those files
+ * walks UP from `<repo>/examples/` and finds NO `@angular/*` packages
+ * because `examples/` is not a workspace package and `<repo>/node_modules/`
+ * is sparse with pnpm — the angular peer-deps live under
+ * `tests/visual-regression/node_modules/`.
+ *
+ * Rather than hoist or symlink, intercept bare imports from any file under
+ * the cross-tree extra root and re-resolve them via `createRequire(<this
+ * config's dir>)` so resolution happens as if the importer were a sibling
+ * of THIS vite.config.ts. Scoped to the angular target only — the Vue,
+ * React, Svelte, Solid, Lit columns don't use cross-tree prebuild and so
+ * never emit cross-tree .ts files that could trigger this code path.
+ */
+function resolveCrossTreeBareImports(extraRoots: readonly string[]): Plugin {
+  const requireFromHere = createRequire(import.meta.url);
+  return {
+    name: 'rozie-vr:resolve-cross-tree-bare-imports',
+    enforce: 'pre',
+    resolveId(source, importer) {
+      if (!importer) return null;
+      // Only handle bare specifiers (no relative ./, ../, no absolute path).
+      if (
+        source.startsWith('./') ||
+        source.startsWith('../') ||
+        source.startsWith('/') ||
+        source.startsWith('\0')
+      ) {
+        return null;
+      }
+      // Only intercept when the importer lives under one of our extra roots.
+      const inExtraRoot = extraRoots.some((root) => importer.startsWith(root));
+      if (!inExtraRoot) return null;
+      try {
+        const resolved = requireFromHere.resolve(source);
+        return resolved;
+      } catch {
+        // Let the rest of Vite's resolver chain try.
+        return null;
+      }
+    },
+  };
+}
 
 async function frameworkPlugins(target: Target) {
   switch (target) {
@@ -59,7 +106,9 @@ async function frameworkPlugins(target: Target) {
   }
 }
 
-export default defineConfig(async () => ({
+export default defineConfig(async () => {
+  const examplesRoot = resolve(__dirname, '..', '..', 'examples');
+  return {
   // Sub-builds are served from dist/<target>/; the host router lives at dist root.
   base: `/${TARGET}/`,
   // Quick task 260515-1y4 — angular only: the Angular sub-build's
@@ -74,12 +123,25 @@ export default defineConfig(async () => ({
   // (correct and must stay), so the explicit allowlist is the real fix.
   // Other targets do not need this option (their resolveId+load pipelines
   // consume upstream `code` directly without an on-disk TS Program).
+  //
+  // The companion `resolveCrossTreeBareImports` plugin closes the second
+  // half of the cross-tree gap: prebuilt `examples/Foo.rozie.ts` files
+  // import `@angular/core` etc., but those packages live under
+  // `tests/visual-regression/node_modules/`, not under `examples/`. The
+  // bare-import re-resolver uses `createRequire(this config dir)` so
+  // resolution happens as if the importer were a sibling of this file.
   plugins: [
+    // The cross-tree bare-import resolver applies to ALL targets — every
+    // target's `<repo>/examples/Foo.rozie.ts` (whether emitted by angular's
+    // prebuild or freshly by the load-hook for lit/solid/etc.) imports
+    // framework deps that live under `tests/visual-regression/node_modules/`.
+    // Without this, lit's `import 'lit'`, solid's `import 'solid-js'`, etc.
+    // fail to resolve at Rollup bind time when the importer is in
+    // `examples/` (cross-tree). Cheap no-op for files under `__dirname`.
+    resolveCrossTreeBareImports([examplesRoot]),
     Rozie({
       target: TARGET,
-      ...(TARGET === 'angular'
-        ? { prebuildExtraRoots: [resolve(__dirname, '..', '..', 'examples')] }
-        : {}),
+      ...(TARGET === 'angular' ? { prebuildExtraRoots: [examplesRoot] } : {}),
     }),
     ...(await frameworkPlugins(TARGET)),
   ],
@@ -118,4 +180,5 @@ export default defineConfig(async () => ({
     port: 4180,
     strictPort: true,
   },
-}));
+  };
+});

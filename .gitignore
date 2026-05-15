@@ -37,6 +37,18 @@ examples/consumers/*/.tmp-*/
 # pattern repo-wide without sweeping legitimate consumer code.
 examples/consumers/angular-analogjs/src/Counter.ts
 examples/consumers/angular-analogjs/src/CardHeader.ts
+examples/consumers/lit-vanilla-demo/src/rozie/Counter.ts
+examples/consumers/lit-vanilla-demo/src/rozie/CardHeader.ts
+examples/consumers/react-vite/src/Counter.ts
+examples/consumers/react-vite/src/CardHeader.ts
+examples/consumers/svelte-vite/src/Counter.ts
+examples/consumers/svelte-vite/src/CardHeader.ts
+# Quick task 260515-1y4: when the visual-regression rig builds the angular
+# target, `prebuildExtraRoots: [<repo>/examples]` extends the disk-cache
+# walker to the top-level `examples/` directory, which causes shims for the
+# 8 reference components to be emitted at the repo's `examples/` root.
+examples/Counter.ts
+examples/CardHeader.ts
 
 # IntelliJ plugin subproject (Phase 8)
 tools/intellij-plugin/build/
