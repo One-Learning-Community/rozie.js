@@ -184,6 +184,35 @@ function renderHandler(handler: t.Expression, ir: IRComponent): string {
 }
 
 /**
+ * Classify the handler shape so we know how to assemble the synthesized arrow.
+ * Mirrors the same helper in the Svelte/Angular target emitters.
+ *
+ *   - 'identifier' — bare ref like `decrement`. Emit as a bare reference;
+ *     Solid's JSX runtime calls it with the synthetic event.
+ *   - 'callable'   — invokable expression that is NOT itself a call:
+ *     MemberExpression (`$props.onClose`, `obj.method`), ArrowFunctionExpression,
+ *     FunctionExpression. Wrap in `(e) => { (code)(e); }` so Solid still drives
+ *     it with the event. The MemberExpression case is what was broken before
+ *     this helper landed: `@click="$props.onClose"` was emitted as
+ *     `(e) => { local.onClose; }` (reads but never invokes).
+ *   - 'statement'  — already a CallExpression / AssignmentExpression / etc.
+ *     Inline verbatim inside the arrow body — the user already wrote the call
+ *     (`@click="closeOnBackdrop && close()"`).
+ */
+function classifyHandler(node: t.Expression): 'identifier' | 'callable' | 'statement' {
+  if (t.isIdentifier(node)) return 'identifier';
+  if (
+    t.isArrowFunctionExpression(node) ||
+    t.isFunctionExpression(node) ||
+    t.isMemberExpression(node) ||
+    t.isOptionalMemberExpression(node)
+  ) {
+    return 'callable';
+  }
+  return 'statement';
+}
+
+/**
  * Emit a single template @event listener as a JSX attribute for Solid.
  */
 export function emitTemplateEvent(
@@ -288,27 +317,37 @@ export function emitTemplateEvent(
   }
 
   // Compose the handler expression
+  const handlerKind = classifyHandler(listener.handler);
   let handlerExpr: string;
   if (handlerRef !== null && inlineGuards.length === 0) {
     // Pure helper-wrap: reference the wrapper name directly.
     handlerExpr = handlerRef;
   } else if (inlineGuards.length === 0) {
-    if (t.isIdentifier(listener.handler)) {
-      handlerExpr = renderHandler(listener.handler, ctx.ir);
+    const code = renderHandler(listener.handler, ctx.ir);
+    if (handlerKind === 'identifier') {
+      handlerExpr = code;
+    } else if (handlerKind === 'callable') {
+      // MemberExpression (e.g. `local.onClose`) or arrow/function expression —
+      // invoke with the event so prop callbacks fire on click.
+      handlerExpr = `(e) => { (${code})(e); }`;
     } else {
-      const code = renderHandler(listener.handler, ctx.ir);
+      // Already a call / statement expression — splice verbatim.
       handlerExpr = `(e) => { ${code}; }`;
     }
   } else {
     const guardLines = inlineGuards.join(' ');
-    // Bare identifier handlers (e.g. `onSearch`) are called without the event arg
-    // so that TypeScript does not complain when the handler type is `() => void`.
-    // Inline expressions (already arrow functions) receive `e` to preserve semantics.
-    const handlerInvocation = handlerRef !== null
-      ? `${handlerRef}(e)`
-      : (t.isIdentifier(listener.handler)
-          ? `${renderHandler(listener.handler, ctx.ir)}()`
-          : renderHandler(listener.handler, ctx.ir));
+    let handlerInvocation: string;
+    if (handlerRef !== null) {
+      handlerInvocation = `${handlerRef}(e)`;
+    } else if (handlerKind === 'identifier') {
+      // Bare identifier (e.g. `onSearch`) — call without args so handlers typed
+      // `() => void` don't complain about the synthetic event parameter.
+      handlerInvocation = `${renderHandler(listener.handler, ctx.ir)}()`;
+    } else if (handlerKind === 'callable') {
+      handlerInvocation = `(${renderHandler(listener.handler, ctx.ir)})(e)`;
+    } else {
+      handlerInvocation = renderHandler(listener.handler, ctx.ir);
+    }
     handlerExpr = `(e) => { ${guardLines} ${handlerInvocation}; }`;
   }
 

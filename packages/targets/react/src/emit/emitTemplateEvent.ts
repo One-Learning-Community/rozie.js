@@ -226,6 +226,34 @@ function renderHandler(handler: t.Expression, ir: IRComponent): string {
 }
 
 /**
+ * Classify the handler shape so we know how to assemble the synthesized arrow.
+ * Mirrors the same helper in the Svelte/Angular/Solid target emitters.
+ *
+ *   - 'identifier' — bare ref like `decrement`. Emit as a bare reference;
+ *     React's event system calls it with the SyntheticEvent.
+ *   - 'callable'   — invokable expression that is NOT itself a call:
+ *     MemberExpression (`props.onClose`, `obj.method`), ArrowFunctionExpression,
+ *     FunctionExpression. Wrap in `(e) => { (code)(e); }` so React still drives
+ *     it with the event. Without this branch `@click="$props.onClose"` lowers
+ *     to `(e) => { props.onClose; }` — reads but never invokes.
+ *   - 'statement'  — already a CallExpression / AssignmentExpression / etc.
+ *     Inline verbatim inside the arrow body — the user wrote the call
+ *     themselves (`@click="closeOnBackdrop && close()"`).
+ */
+function classifyHandler(node: t.Expression): 'identifier' | 'callable' | 'statement' {
+  if (t.isIdentifier(node)) return 'identifier';
+  if (
+    t.isArrowFunctionExpression(node) ||
+    t.isFunctionExpression(node) ||
+    t.isMemberExpression(node) ||
+    t.isOptionalMemberExpression(node)
+  ) {
+    return 'callable';
+  }
+  return 'statement';
+}
+
+/**
  * Emit a single template @event listener as a JSX attribute.
  */
 export function emitTemplateEvent(
@@ -333,27 +361,36 @@ export function emitTemplateEvent(
   }
 
   // Compose the handler expression
+  const handlerKind = classifyHandler(listener.handler);
   let handlerExpr: string;
   if (handlerRef !== null && inlineGuards.length === 0) {
     // Pure helper-wrap: just reference the wrap name.
     handlerExpr = handlerRef;
   } else if (inlineGuards.length === 0) {
-    // No modifiers — render handler directly.
-    if (t.isIdentifier(listener.handler)) {
-      handlerExpr = renderHandler(listener.handler, ctx.ir);
+    const code = renderHandler(listener.handler, ctx.ir);
+    if (handlerKind === 'identifier') {
+      handlerExpr = code;
+    } else if (handlerKind === 'callable') {
+      // MemberExpression (e.g. `props.onClose`) or arrow/function expression —
+      // invoke with the event so prop callbacks fire on click.
+      handlerExpr = `(e) => { (${code})(e); }`;
     } else {
-      // Inline expression like `$props.closeOnBackdrop && close()` — wrap in arrow.
-      const code = renderHandler(listener.handler, ctx.ir);
+      // Inline expression like `$props.closeOnBackdrop && close()` — already a call.
       handlerExpr = `(e) => { ${code}; }`;
     }
   } else {
     // Has inline guards: wrap in synthetic (e) => {...} arrow.
     const guardLines = inlineGuards.join(' ');
-    const handlerInvocation = handlerRef !== null
-      ? `${handlerRef}(e)`
-      : (t.isIdentifier(listener.handler)
-          ? `${renderHandler(listener.handler, ctx.ir)}(e)`
-          : renderHandler(listener.handler, ctx.ir));
+    let handlerInvocation: string;
+    if (handlerRef !== null) {
+      handlerInvocation = `${handlerRef}(e)`;
+    } else if (handlerKind === 'identifier') {
+      handlerInvocation = `${renderHandler(listener.handler, ctx.ir)}(e)`;
+    } else if (handlerKind === 'callable') {
+      handlerInvocation = `(${renderHandler(listener.handler, ctx.ir)})(e)`;
+    } else {
+      handlerInvocation = renderHandler(listener.handler, ctx.ir);
+    }
     handlerExpr = `(e) => { ${guardLines} ${handlerInvocation}; }`;
   }
 
