@@ -4,7 +4,8 @@
   "compilerOptions": {
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
-    "useDefineForClassFields": false
+    "useDefineForClassFields": false,
+    "noEmit": false
   },
   "include": ["host/**/*.ts", "../../examples/**/*.rozie.ts"]
 }
