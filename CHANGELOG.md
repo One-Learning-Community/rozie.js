@@ -6,6 +6,35 @@ changesets in Phase 6 (DIST distribution hardening).
 
 ## [Unreleased]
 
+### Compatibility — TypeScript floor bumped 5.4.5 → 5.6.0 (2026-05-15)
+
+**Breaking change for consumers still on TypeScript ≤5.5.** Rozie's minimum
+supported TypeScript is now `5.6.0`. Older versions may still work for some
+targets but aren't tested and aren't supported.
+
+Rationale:
+
+- TypeScript 5.4 hit Microsoft's end-of-support window in 2025. The
+  `current + previous` support policy means 5.4 has been past EOL for over
+  a year.
+- TS 5.5+ exports its CJS module flat to ESM consumers (`import * as ts from
+  'typescript'`). On TS ≤5.4, the namespace wraps everything under `default`,
+  which breaks upstream tooling like `@analogjs/vite-plugin-angular@2.5.x`
+  whose source assumes flat names (`ts.createPrinter`).
+- Angular 19's own `peerDependencies.typescript` is `>=5.5.0 <5.9.0`. Any
+  consumer building Angular 19+ with Rozie was already on TS ≥5.5 in
+  practice; we now match the same effective floor across all targets.
+- The `examples/consumers/{svelte,vue,solid,react}-ts/` floor anchors bumped
+  their pin from `~5.4.5` to `~5.6.0` to match.
+
+What this changes for you:
+
+- Consumers on TS 5.6+: no change required.
+- Consumers on TS 5.5: bump to 5.6. No emitted-code changes between these
+  two versions that affect Rozie output.
+- Consumers stuck on TS ≤5.4: bump TS. If a hard blocker prevents the bump,
+  open an issue describing the constraint.
+
 ### Phase 3 — Vue 3.4+ Target Emitter (first demoable artifact, 2026-05-02)
 
 Phase 3 ships the first end-to-end demoable artifact: a `.rozie` author can

@@ -15,7 +15,7 @@ The audience is **component-library and design-system authors** who today mainta
 
 - **Language:** Project source is JavaScript (Node) for the toolchain; emitted code is JS/TS for each target framework.
 - **Tech stack:** Vite plugin must support Vite 5+. Babel plugin must support Babel 7+. CLI must work on Node 20+.
-- **Compatibility:** Target framework versions are React 18+, Vue 3.4+, Svelte 5+, Angular 19+ (signals era). Older versions are out of scope. (Angular floor bumped from 17 → 19 in May 2026 after Angular 17 hit EOL and its TS ~5.4.5 pin became the root cause of repeated upstream-tooling breakages.)
+- **Compatibility:** Target framework versions are React 18+, Vue 3.4+, Svelte 5+, Angular 19+ (signals era). **TypeScript 5.6+** in consumer projects. Older versions are out of scope. (Angular floor bumped from 17 → 19 in May 2026 after Angular 17 hit EOL and its TS ~5.4.5 pin became the root cause of repeated upstream-tooling breakages. TS floor bumped from 5.4.5 → 5.6.0 in May 2026 — TS 5.4 hit Microsoft EOL, and TS 5.5+ exports the CJS namespace flat which sidesteps an entire class of `import * as ts from 'typescript'` resolution bugs in upstream tooling like @analogjs/vite-plugin-angular.)
 - **Compatibility bar:** "High percentage" cross-framework parity, not 100%. Documented edge cases (notably React's render-prop-flavored slot consumer experience) are acceptable.
 - **Audience constraint:** Every feature must answer "does a component-library author actually need this?" — if not, defer.
 - **Aesthetic constraint:** When designing new features, default to "what would feel natural to a Vue developer?" Push back on JSX-isms or React-isms.

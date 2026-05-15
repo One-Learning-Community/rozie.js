@@ -3,6 +3,7 @@
 ## Requirements
 
 - Node 20 or newer
+- TypeScript 5.6 or newer (if your project uses TypeScript)
 - A package manager (pnpm, npm, or yarn — examples below use pnpm)
 
 ## Inside a Vite project (recommended)
@@ -55,31 +56,14 @@ The CLI accepts `--target vue | react | svelte | angular | solid | lit` and supp
 | Angular | 19+ (signals era) |
 | Solid | 1.8+ |
 | Lit | 3.2+ |
+| TypeScript (consumer) | 5.6+ |
 
 The Solid target additionally requires [`vite-plugin-solid`](https://www.npmjs.com/package/vite-plugin-solid) `^2.0` installed in your project — Rozie's unplugin asserts the peer dep at runtime when `target: 'solid'` is selected.
 
 The Lit target has **no host Vite plugin** — Lit components are plain ES modules that self-register via `customElements.define()`, so Rozie's unplugin handles the `.rozie` → custom-element transform directly and Vite's standard `.ts` pipeline takes it from there. Emitted components depend on [`lit`](https://www.npmjs.com/package/lit) `^3.2`, [`@lit-labs/preact-signals`](https://www.npmjs.com/package/@lit-labs/preact-signals), and `@rozie/runtime-lit`.
 
-The Angular target additionally requires [`@analogjs/vite-plugin-angular`](https://www.npmjs.com/package/@analogjs/vite-plugin-angular) `^2.5` installed in your project — Rozie's unplugin asserts the peer dep at runtime when `target: 'angular'` is selected. Angular 19's own `peerDependencies.typescript` is `>=5.5.0 <5.9.0`, so any consumer building Angular 19+ has TS ≥5.5 by construction.
+The Angular target additionally requires [`@analogjs/vite-plugin-angular`](https://www.npmjs.com/package/@analogjs/vite-plugin-angular) `^2.5` installed in your project — Rozie's unplugin asserts the peer dep at runtime when `target: 'angular'` is selected. Angular 19's own `peerDependencies.typescript` is `>=5.5.0 <5.9.0`, which sits comfortably within our TS 5.6+ floor.
 
-### pnpm monorepo note: mixed TypeScript versions
+### TypeScript floor
 
-`@analogjs/vite-plugin-angular@2.5.x` doesn't declare a `typescript` peer dependency but its source uses `import * as ts from 'typescript'` and accesses flat names like `ts.createPrinter`. Pnpm resolves the import via its `.pnpm/node_modules/` hoist slot — a single shared symlink chosen from whichever TS versions exist in the workspace. If the slot lands on TypeScript ≤5.4 (whose CJS-to-ESM namespace wraps everything under `default`), the build fails at module-load time with `ts.createPrinter is not a function`.
-
-Single-app projects with one TS pin don't hit this — the resolved TS is whatever you pinned. The trap only fires in **pnpm monorepos that keep ≤5.4 around alongside ≥5.5** (e.g., a legacy app and a modern Angular app in the same workspace). The fix is a `pnpm.packageExtensions` patch in your root `package.json` that gives analogjs an explicit `typescript` peer so pnpm scopes a satisfying version into its own slot:
-
-```json
-{
-  "pnpm": {
-    "packageExtensions": {
-      "@analogjs/vite-plugin-angular": {
-        "peerDependencies": {
-          "typescript": ">=5.5"
-        }
-      }
-    }
-  }
-}
-```
-
-After re-running `pnpm install`, analogjs gets a typescript symlink in its `.pnpm/.../node_modules/typescript` slot resolved against the consumer's pin — bypassing the workspace-wide hoist gamble. This is upstream's bug to fix (track at [analogjs/analog#…](https://github.com/analogjs/analog)); we recommend the workspace patch in the interim. npm and yarn classic users are unaffected because their resolution model doesn't have the shared-hoist failure mode.
+Rozie's emitted code (`.tsx`, `.svelte`, `.vue` with `<script lang="ts">`, Angular standalone components, Solid `.tsx`, Lit class fields) resolves cleanly under TypeScript 5.6+. The floor is set by the lowest TS version we actively type-check our emitted output against. Older versions may work for some targets but aren't tested — in particular, TS ≤5.4 ships its CJS-to-ESM namespace shape (`default`-wrapped only, no flat names) that breaks upstream tooling we depend on (notably `@analogjs/vite-plugin-angular`'s phantom `import * as ts from 'typescript'`). If you're stuck on an older TS for legacy reasons, file an issue; we'll consider a deliberate compatibility bump if a real need emerges.
