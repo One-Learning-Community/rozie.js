@@ -154,27 +154,81 @@ Memory: `pnpm -r typecheck` skips `^build` and floods phantom errors. Use
 
 ---
 
-## Analogjs phantom-TypeScript trap
+## Analogjs phantom-dependency trap
 
-`@analogjs/vite-plugin-angular@2.5.x` does `import * as ts from 'typescript'`
-without declaring `typescript` as a peer dep. Pnpm resolves that to whatever
-sits in `.pnpm/node_modules/typescript`, which is a single shared symlink the
-workspace fights over. Our root `package.json` patches it with a
-`pnpm.packageExtensions` peerDep so analogjs gets a slot-local TS.
+`@analogjs/vite-plugin-angular@2.5.x` does
+`import * as ts from 'typescript'`, `import * as compilerCli from '@angular/compiler-cli'`,
+and `import * as ngCompiler from '@angular/compiler'` — none declared as
+peer deps. Pnpm resolves each from its flat-hoist slot
+(`.pnpm/node_modules/{typescript,@angular/compiler,@angular/compiler-cli}`),
+which is a single shared symlink the workspace fights over. With multiple
+Angular versions in the tree (vr's Angular 19 + the angular-analogjs demo's
+Angular 21), the higher version wins the hoist, mismatches the consumer's
+expected Angular major, and crashes during compile.
 
-### Inspect what TS each Angular package actually sees
+Our root `package.json` patches all three via `pnpm.packageExtensions`:
 
-```sh
-for p in @angular/compiler-cli @angular/build @analogjs/vite-plugin-angular; do
-  L=$(readlink "tests/visual-regression/node_modules/$p" 2>/dev/null)
-  SLOT_DIR=$(echo "$L" | sed -E 's|/[^/]+/[^/]+$||')
-  SLOT_ABS=$(cd "tests/visual-regression/node_modules/$(dirname $p)/$SLOT_DIR" 2>/dev/null && pwd) || continue
-  echo "$p => slot=$SLOT_ABS"
-  echo "       typescript=$(readlink "$SLOT_ABS/typescript" 2>/dev/null)"
-done
+```json
+{
+  "pnpm": {
+    "packageExtensions": {
+      "@analogjs/vite-plugin-angular": {
+        "peerDependencies": {
+          "typescript": ">=5.5",
+          "@angular/compiler": "^17 || ^18 || ^19 || ^20 || ^21",
+          "@angular/compiler-cli": "^17 || ^18 || ^19 || ^20 || ^21"
+        }
+      }
+    }
+  }
+}
 ```
 
+After `pnpm install`, each consumer's analogjs gets its OWN
+`.pnpm/.../node_modules/{typescript,@angular/compiler,@angular/compiler-cli}`
+slot resolved against the consumer's pin. Vr's analogjs sees Angular 19 +
+TS 5.6.3 throughout; the angular-analogjs demo's analogjs sees Angular 21 +
+TS 5.9.3 throughout. No cross-contamination.
+
+### Inspect what each Angular package actually sees in a consumer's slot
+
+```sh
+SLOT=$(readlink tests/visual-regression/node_modules/@analogjs/vite-plugin-angular | sed -E 's|/node_modules/[^/]+/[^/]+$||' | sed 's|^[./]*||')
+echo "vr's analogjs slot: node_modules/$SLOT"
+echo "  typescript -> $(readlink "node_modules/$SLOT/typescript")"
+echo "  @angular/compiler -> $(readlink "node_modules/$SLOT/@angular/compiler")"
+echo "  @angular/compiler-cli -> $(readlink "node_modules/$SLOT/@angular/compiler-cli")"
+```
+
+Each should point at the version matching the consumer (Angular 19 + TS 5.6
+for vr; Angular 21 + TS 5.9 for the angular-analogjs demo).
+
+### Symptom decoder
+
+| Error message | Root cause |
+|---|---|
+| `ts.createPrinter is not a function` | TS ≤5.4 wrapped its CJS namespace under `default`; analogjs got it via flat hoist. Fixed by adding `typescript` to `packageExtensions` (above). |
+| `Cannot read properties of undefined (reading 'kind')` in `isExternalModuleReference` | Two TS versions in the same Node process; cross-version `setExternalModuleIndicator` callback receives a node whose `SyntaxKind` enum values don't match. Fixed by also adding `@angular/compiler` + `@angular/compiler-cli` to `packageExtensions` so each Angular consumer's whole TS+Angular chain is slot-local. |
+| `Cannot find package '@angular/compiler' imported from .../@analogjs/...` | Flat-hoist symlink missing; pnpm couldn't satisfy the new peer-dep. Run `pnpm install --force` to regenerate. |
+| `JIT compiler unavailable` at runtime in a vr Angular cell | **Not** a topology problem — analogjs's compiled output for components with composition (Card → CardHeader, Modal → Counter, etc.) is falling back to JIT at mount time, and the browser bundle doesn't ship `@angular/compiler`. Separate follow-up; the simple cells (Counter, CardHeader) render fine after the topology fixes. |
+
+### Verifying the packageExtensions patch in a consumer-shaped tree
+
+Visual-regression's workspace coexists Angular 19 (TS 5.6) and Angular 21
+(TS 5.9), which is not what a real consumer tree looks like. To verify the
+patch works against a single-pin tree:
+
+```sh
+cd examples/consumers/angular-analogjs
+pnpm exec vite build   # should produce dist/ cleanly
+```
+
+That demo uses one Angular major and one TS pin throughout, which is what
+real consumers look like.
+
 ### Trace which TS files Vite actually loads during a build
+
+When you're chasing a new variant of this class, the fastest signal:
 
 ```sh
 cd tests/visual-regression
@@ -183,23 +237,92 @@ ROZIE_TARGET=angular NODE_DEBUG=module pnpm exec vite build --config vite.config
   | grep -oE "[^ ]*typescript@[0-9.]+/[^/]*/typescript/lib/typescript\.js" | sort -u
 ```
 
-Two different `typescript@*` entries = version-mismatch territory; analogjs
-will crash later in the build with `ts.createPrinter is not a function`
-(if one slot has ≤5.4) or `Cannot read properties of undefined (reading
-'kind')` (cross-version `setExternalModuleIndicator` callback).
+One entry = healthy. Two = cross-version territory; something is still
+phantom-importing through a hoist slot.
 
-### Verifying the packageExtensions patch in a consumer-shaped tree
+---
 
-Visual-regression has a self-induced mixed-TS topology (5.6.3 for Angular 19,
-5.9.3 at root) that's not representative of real consumers. To verify the
-patch works against a single-pin tree:
+## Open follow-up: visual-regression Angular column `JIT compiler unavailable`
 
-```sh
-cd examples/consumers/angular-analogjs
-pnpm exec vite build   # should produce dist/ cleanly
+After the May 2026 peer-dep + TS-floor work, the vr Angular sub-build
+completes cleanly (6/6 targets build) and the simple Angular cells —
+`Counter` and `CardHeader` — render correctly in headless chromium with
+`<rozie-counter ng-version="19.2.22">` DOM. The other six cells
+(`Card`, `Dropdown`, `Modal`, `SearchInput`, `TodoList`, `TreeNode`)
+throw at mount with:
+
+```
+JIT compiler unavailable
 ```
 
-That demo uses one TS pin throughout, which is what real consumers look like.
+This is **not** a topology problem (analogjs's `@angular/*` and TS chain
+all resolve correctly per the slot-inspection command above). The error
+fires when Angular tries to runtime-compile a component template that
+the AOT path didn't fully resolve. Likely places to look:
+
+1. **Component composition path** — Card→CardHeader, Modal→Counter,
+   TreeNode→TreeNode (recursive). The cells that DO work have no
+   composition; the cells that fail all reference other Rozie
+   components via `<components>` blocks. The lowered Angular code wires
+   composed children via `@Component({ imports: [Child] })`, but
+   `imports` for standalone components must reference fully AOT-ready
+   classes. If the child's `ɵcmp` definition isn't reachable at mount
+   time, Angular falls back to JIT.
+2. **`createComponent` + `createApplication` runtime mount** — the rig
+   uses `createComponent(mod.default, { environmentInjector,
+   hostElement })` from `@angular/core`. Inspect whether the runtime
+   needs `@angular/compiler` shipped in the bundle for components with
+   non-trivial structure.
+3. **`@analogjs/vite-plugin-angular`'s build options** — analogjs has
+   a `jit: true|false` plugin option (or similar). The rig's vite
+   config currently uses defaults; consider whether forcing AOT-only
+   would help diagnose.
+
+Reproduce:
+
+```sh
+cd tests/visual-regression
+pnpm build && (pnpm exec vite preview --config vite.preview.config.ts &) && sleep 3
+# Then in a separate terminal or headless inspector:
+# http://localhost:4180/?example=Modal&target=angular
+# pageerror: "JIT compiler unavailable"
+```
+
+Quick headless inspection (after preview is running):
+
+```sh
+cat > /tmp/jit-inspect.mjs <<'EOF'
+import { chromium } from '@playwright/test';
+const browser = await chromium.launch();
+for (const ex of ['Counter','CardHeader','Modal','Card','TreeNode']) {
+  const page = await browser.newPage();
+  let err = null;
+  page.on('pageerror', e => err ??= e.message.split('\n')[0]);
+  await page.goto(`http://localhost:4180/?example=${ex}&target=angular`, { waitUntil: 'networkidle' });
+  const html = await page.evaluate(() => document.querySelector('[data-testid="rozie-mount"]')?.innerHTML?.slice(0, 100));
+  console.log(`${ex}: ${err ? `ERR ${err}` : 'OK ' + (html?.slice(0, 60) ?? '(empty)')}`);
+  await page.close();
+}
+await browser.close();
+EOF
+cp /tmp/jit-inspect.mjs tests/visual-regression/jit-inspect.mjs
+cd tests/visual-regression && node jit-inspect.mjs && rm jit-inspect.mjs
+```
+
+Files most likely to need changes:
+
+- `packages/targets/angular/src/emit/*` — the Angular emitter. If
+  composed components need extra metadata for AOT-readiness, this is
+  where to add it.
+- `tests/visual-regression/host/entry.angular.ts` — the runtime mount.
+  May need `import '@angular/compiler';` or a different mount API.
+- `tests/visual-regression/vite.config.ts` — the analogjs plugin
+  options (`angular()`).
+
+The May 14 floor-bump commit (`4d9ab77`) noted this as a known
+follow-up; today's work moved the failure mode from
+build-time-topology-error to runtime-mount-error, which is a much
+smaller search surface to chase next session.
 
 ---
 

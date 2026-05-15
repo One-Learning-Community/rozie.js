@@ -67,3 +67,29 @@ The Angular target additionally requires [`@analogjs/vite-plugin-angular`](https
 ### TypeScript floor
 
 Rozie's emitted code (`.tsx`, `.svelte`, `.vue` with `<script lang="ts">`, Angular standalone components, Solid `.tsx`, Lit class fields) resolves cleanly under TypeScript 5.6+. The floor is set by the lowest TS version we actively type-check our emitted output against. Older versions may work for some targets but aren't tested — in particular, TS ≤5.4 ships its CJS-to-ESM namespace shape (`default`-wrapped only, no flat names) that breaks upstream tooling we depend on (notably `@analogjs/vite-plugin-angular`'s phantom `import * as ts from 'typescript'`). If you're stuck on an older TS for legacy reasons, file an issue; we'll consider a deliberate compatibility bump if a real need emerges.
+
+### pnpm monorepo: workaround for `@analogjs/vite-plugin-angular` phantom deps
+
+`@analogjs/vite-plugin-angular@2.5.x` does `import * as ts from 'typescript'`, `import * as compilerCli from '@angular/compiler-cli'`, and `import * as ngCompiler from '@angular/compiler'` — none declared as peer dependencies. In a single-app project this is harmless: there's only one version of each in your tree and pnpm's flat-hoist slot resolves correctly.
+
+It bites in **pnpm monorepos that coexist multiple Angular majors** (e.g. an Angular 19 app and an Angular 21 app in the same workspace). The hoist slot picks one version of each phantom — usually the highest — and consumers on the other major see crashes like `Cannot read properties of undefined (reading 'kind')` (cross-version SyntaxKind) or `ts.createPrinter is not a function` (CJS namespace shape mismatch).
+
+The fix is a `pnpm.packageExtensions` patch in your workspace root `package.json`:
+
+```json
+{
+  "pnpm": {
+    "packageExtensions": {
+      "@analogjs/vite-plugin-angular": {
+        "peerDependencies": {
+          "typescript": ">=5.5",
+          "@angular/compiler": "^17 || ^18 || ^19 || ^20 || ^21",
+          "@angular/compiler-cli": "^17 || ^18 || ^19 || ^20 || ^21"
+        }
+      }
+    }
+  }
+}
+```
+
+After re-running `pnpm install`, each consumer's analogjs gets its own slot-local `typescript`/`@angular/compiler`/`@angular/compiler-cli` resolved against that consumer's pin — bypassing the workspace-wide flat-hoist gamble. Real upstream fix is to add these as declared peer dependencies; until that lands, the workspace patch is the recommended workaround. npm and yarn classic users don't hit this because their resolution model doesn't have the shared-hoist failure mode.

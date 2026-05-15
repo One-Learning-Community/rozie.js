@@ -6,6 +6,26 @@ changesets in Phase 6 (DIST distribution hardening).
 
 ## [Unreleased]
 
+### Tooling — pnpm monorepo workaround for `@analogjs/vite-plugin-angular` phantom deps (2026-05-15)
+
+Workspace consumers running multiple Angular majors in one pnpm workspace
+previously hit cross-version compile crashes because
+`@analogjs/vite-plugin-angular@2.5.x` does `import * as ts from 'typescript'`,
+`import * as compilerCli from '@angular/compiler-cli'`, and `import * as
+ngCompiler from '@angular/compiler'` without declaring any of them as peer
+dependencies — pnpm's flat-hoist slot would pick one major and the wrong-
+versioned consumer would crash.
+
+Patched via `pnpm.packageExtensions` in the workspace root `package.json`,
+giving analogjs explicit peer-dep declarations for all three phantoms. Each
+consumer's analogjs slot now resolves locally to the matching Angular major
++ TS version. Real upstream fix tracked separately; the workspace patch is
+documented in `docs/guide/install.md` for consumers in mixed-Angular pnpm
+monorepos.
+
+Single-app projects with one Angular pin were not affected and need no
+action.
+
 ### Compatibility — TypeScript floor bumped 5.4.5 → 5.6.0 (2026-05-15)
 
 **Breaking change for consumers still on TypeScript ≤5.5.** Rozie's minimum
