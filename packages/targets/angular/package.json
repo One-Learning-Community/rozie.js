@@ -28,9 +28,9 @@
     "postcss": "^8.5"
   },
   "devDependencies": {
-    "@angular/common": "^17.0.0",
-    "@angular/compiler": "^17.0.0",
-    "@angular/core": "^17.0.0",
+    "@angular/common": "^19.0.0",
+    "@angular/compiler": "^19.0.0",
+    "@angular/core": "^19.0.0",
     "@types/babel__generator": "^7",
     "@types/babel__traverse": "^7",
     "happy-dom": "^15",

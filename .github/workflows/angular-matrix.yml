@@ -1,11 +1,14 @@
-name: Angular 17 + 21 Matrix
+name: Angular 19 + 21 Matrix
 
 # Phase 5 Plan 05-04b — verify the emitted .ts output works against the
-# Angular 17 floor (PROJECT.md constraint — signals era) AND the latest
-# Angular 21. Runs on PRs touching @rozie/target-angular / @rozie/unplugin /
+# Angular 19 floor (PROJECT.md constraint — signals era; floor bumped from
+# 17 to 19 in May 2026 after Angular 17 hit EOL and the TS ~5.4.5 workspace
+# pin became the root cause of @analogjs/vite-plugin-angular's
+# `ts.createPrinter is not a function` crash) AND the latest Angular 21.
+# Runs on PRs touching @rozie/target-angular / @rozie/unplugin /
 # the angular-analogjs demo.
 #
-# Matrix: Angular 17.0 floor + 21.x latest × Vite 6 (analogjs 2.5.x peerDeps
+# Matrix: Angular 19.x floor + 21.x latest × Vite 6 (analogjs 2.5.x peerDeps
 # require vite ^6 || ^7 || ^8 per RESEARCH OQ6 RESOLVED — Vite 5 is NOT
 # supported on the Angular target).
 #
@@ -31,7 +34,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        angular-version: ['17', '21']
+        angular-version: ['19', '21']
         vite-version: ['6']
         # Vite 5 is excluded entirely from the Angular target — analogjs
         # 2.5.x peerDeps require vite ^6 || ^7 || ^8. ROZ702 enforces this
@@ -87,19 +90,18 @@ jobs:
                    @angular/platform-browser-dynamic@^${{ matrix.angular-version }}
           pnpm add -D @angular/compiler-cli@^${{ matrix.angular-version }} \
                        vite@^${{ matrix.vite-version }}
-          # Angular 21 ships @angular/build@21.x which breaks
-          # @analogjs/vite-plugin-angular@2.4.x (the /private subpath moved).
-          # analogjs@2.5+ explicitly peers on @angular/build@^18||^19||^20||^21.
-          # Angular 21 / @angular/compiler-cli@21 requires typescript >=5.9 <6.0;
-          # the demo pins ~5.4.5 for the Angular 17 floor, so upgrade TS here to
-          # avoid pnpm creating a split-TypeScript-copy that makes analogjs's
-          # js-emitter.js resolve to the wrong (non-5.9) instance and crash with
-          # "ts.createPrinter is not a function".
-          if [ "${{ matrix.angular-version }}" = "21" ]; then
-            pnpm add -D "typescript@~5.9" \
-                         "@analogjs/vite-plugin-angular@~2.5.0" \
-                         "@angular/build@^21" \
-                         "@angular-devkit/build-angular@^21"
+          # Demo defaults already match Angular 21 (TS ~5.9, @angular/build@21,
+          # analogjs vite-plugin 2.5.x) — the v21 leg needs no extra override.
+          # For the Angular 19 floor leg, @angular/compiler-cli@19 requires
+          # typescript >=5.5 <5.9, so we downgrade TS to ~5.8 (highest in
+          # range, also avoids the analogjs ts.createPrinter ESM-namespace
+          # issue which only manifests on TS <5.5). @angular/build and
+          # @angular-devkit/build-angular get the v19 line too — analogjs
+          # 2.5.x's peer-dep range (^18 || ^19 || ^20 || ^21) covers v19.
+          if [ "${{ matrix.angular-version }}" = "19" ]; then
+            pnpm add -D "typescript@~5.8" \
+                         "@angular/build@^19" \
+                         "@angular-devkit/build-angular@^19"
           fi
 
       - name: Re-install with version overrides
@@ -131,7 +133,8 @@ jobs:
   # self-contained Angular app that imports Counter.rozie via @rozie/unplugin
   # (target:'angular') + @analogjs/vite-plugin-angular and bootstraps it via
   # bootstrapApplication(IntegrationApp). Verifies the production AOT path
-  # works end-to-end against both Angular 17 floor and Angular 21 latest.
+  # works end-to-end against both Angular 19 floor and Angular 21 latest.
+  # (Floor bumped from 17 to 19 in May 2026 after Angular 17 hit EOL.)
   #
   # Gated on the demo matrix completing — a regression in @rozie/unplugin
   # surfaces on the demo first, so we don't waste CI minutes running
@@ -144,7 +147,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        angular-version: ['17', '21']
+        angular-version: ['19', '21']
     steps:
       - uses: actions/checkout@v6
 
@@ -167,9 +170,14 @@ jobs:
                    @angular/forms@^${{ matrix.angular-version }} \
                    @angular/platform-browser@^${{ matrix.angular-version }}
           pnpm add -D @angular/compiler-cli@^${{ matrix.angular-version }}
+          # Integration project pins Angular 19 + TS ~5.6 + analogjs 2.5.1 +
+          # @angular/build 19 (the floor). The v19 matrix leg matches those
+          # defaults — no override needed. The v21 matrix leg needs to bump
+          # TS to ~5.9 (compiler-cli@21 requires >=5.9 <6.1) and @angular/build
+          # + @angular-devkit/build-angular to ^21. analogjs 2.5.1 already
+          # satisfies v21's peer-dep range so it doesn't need re-pinning.
           if [ "${{ matrix.angular-version }}" = "21" ]; then
             pnpm add -D "typescript@~5.9" \
-                         "@analogjs/vite-plugin-angular@~2.5.0" \
                          "@angular/build@^21" \
                          "@angular-devkit/build-angular@^21"
           fi

@@ -3,6 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "//": "Internal timing-parity tests intentionally use Angular 17 (not the workspace-wide 19+ floor). The runtime path (babel-transformed JIT eval inside Angular's TestBed) hits an Angular 19 metadata gap (`passThroughInput` is undefined inside compiler internals when `output()`-decorated members come from runtime-transformed source). Updating emitAngular to produce Angular 19 JIT-compat metadata is its own phase. tests/timing is internal-only and not part of our public compat surface; the workspace-level pnpm.overrides.typescript was removed in May 2026, so this Angular 17 + TS 5.4 install is scoped to this workspace and does not affect others.",
   "scripts": {
     "test": "vitest run --passWithNoTests",
     "typecheck": "tsc --noEmit"
