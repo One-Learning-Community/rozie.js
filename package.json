@@ -20,5 +20,14 @@
     "typescript": "~5.9.3",
     "@biomejs/biome": "^2.4.13",
     "@types/node": "^22.0.0"
+  },
+  "pnpm": {
+    "packageExtensions": {
+      "@analogjs/vite-plugin-angular": {
+        "peerDependencies": {
+          "typescript": ">=5.5"
+        }
+      }
+    }
   }
 }

@@ -154,6 +154,55 @@ Memory: `pnpm -r typecheck` skips `^build` and floods phantom errors. Use
 
 ---
 
+## Analogjs phantom-TypeScript trap
+
+`@analogjs/vite-plugin-angular@2.5.x` does `import * as ts from 'typescript'`
+without declaring `typescript` as a peer dep. Pnpm resolves that to whatever
+sits in `.pnpm/node_modules/typescript`, which is a single shared symlink the
+workspace fights over. Our root `package.json` patches it with a
+`pnpm.packageExtensions` peerDep so analogjs gets a slot-local TS.
+
+### Inspect what TS each Angular package actually sees
+
+```sh
+for p in @angular/compiler-cli @angular/build @analogjs/vite-plugin-angular; do
+  L=$(readlink "tests/visual-regression/node_modules/$p" 2>/dev/null)
+  SLOT_DIR=$(echo "$L" | sed -E 's|/[^/]+/[^/]+$||')
+  SLOT_ABS=$(cd "tests/visual-regression/node_modules/$(dirname $p)/$SLOT_DIR" 2>/dev/null && pwd) || continue
+  echo "$p => slot=$SLOT_ABS"
+  echo "       typescript=$(readlink "$SLOT_ABS/typescript" 2>/dev/null)"
+done
+```
+
+### Trace which TS files Vite actually loads during a build
+
+```sh
+cd tests/visual-regression
+rm -rf node_modules/.vite-temp
+ROZIE_TARGET=angular NODE_DEBUG=module pnpm exec vite build --config vite.config.ts 2>&1 \
+  | grep -oE "[^ ]*typescript@[0-9.]+/[^/]*/typescript/lib/typescript\.js" | sort -u
+```
+
+Two different `typescript@*` entries = version-mismatch territory; analogjs
+will crash later in the build with `ts.createPrinter is not a function`
+(if one slot has ≤5.4) or `Cannot read properties of undefined (reading
+'kind')` (cross-version `setExternalModuleIndicator` callback).
+
+### Verifying the packageExtensions patch in a consumer-shaped tree
+
+Visual-regression has a self-induced mixed-TS topology (5.6.3 for Angular 19,
+5.9.3 at root) that's not representative of real consumers. To verify the
+patch works against a single-pin tree:
+
+```sh
+cd examples/consumers/angular-analogjs
+pnpm exec vite build   # should produce dist/ cleanly
+```
+
+That demo uses one TS pin throughout, which is what real consumers look like.
+
+---
+
 ## CI legs locally with `act`
 
 ```sh
