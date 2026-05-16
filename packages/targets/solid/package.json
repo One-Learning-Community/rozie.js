@@ -22,7 +22,8 @@
     "@babel/types": "^7.29",
     "@rozie/core": "workspace:*",
     "magic-string": "^0.30",
-    "postcss": "^8.5"
+    "postcss": "^8.5",
+    "postcss-selector-parser": "^7.1"
   },
   "peerDependencies": {
     "@rozie/runtime-solid": "workspace:*"

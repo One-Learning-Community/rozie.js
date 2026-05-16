@@ -30,16 +30,16 @@ export default function Counter(_props: CounterProps): JSX.Element {
 
   return (
     <>
-    <style>{`.counter { display: inline-flex; gap: 0.5rem; align-items: center; }
-    .counter.hovering { background: rgba(0, 0, 0, 0.04); }
-    .value { font-variant-numeric: tabular-nums; min-width: 3ch; text-align: center; }
-    button { padding: 0.25rem 0.5rem; }
-    button:disabled { opacity: 0.4; cursor: not-allowed; }`}</style>
+    <style>{`.counter[data-rozie-s-c72e01d0] { display: inline-flex; gap: 0.5rem; align-items: center; }
+    .counter.hovering[data-rozie-s-c72e01d0] { background: rgba(0, 0, 0, 0.04); }
+    .value[data-rozie-s-c72e01d0] { font-variant-numeric: tabular-nums; min-width: 3ch; text-align: center; }
+    button[data-rozie-s-c72e01d0] { padding: 0.25rem 0.5rem; }
+    button[data-rozie-s-c72e01d0]:disabled { opacity: 0.4; cursor: not-allowed; }`}</style>
     <>
-    <div class={"counter"} classList={{ hovering: hovering() }} onMouseEnter={(e) => { setHovering(true); }} onMouseLeave={(e) => { setHovering(false); }}>
-      <button aria-label="Decrement" disabled={!canDecrement()} onClick={decrement}>−</button>
-      <span class={"value"}>{value()}</span>
-      <button aria-label="Increment" disabled={!canIncrement()} onClick={increment}>+</button>
+    <div class={"counter"} classList={{ hovering: hovering() }} onMouseEnter={(e) => { setHovering(true); }} onMouseLeave={(e) => { setHovering(false); }} data-rozie-s-c72e01d0="">
+      <button aria-label="Decrement" disabled={!canDecrement()} onClick={decrement} data-rozie-s-c72e01d0="">−</button>
+      <span class={"value"} data-rozie-s-c72e01d0="">{value()}</span>
+      <button aria-label="Increment" disabled={!canIncrement()} onClick={increment} data-rozie-s-c72e01d0="">+</button>
     </div>
     </>
     </>

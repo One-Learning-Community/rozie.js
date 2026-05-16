@@ -17,11 +17,11 @@ export default function InlineExprHandler(_props: InlineExprHandlerProps): JSX.E
 
   return (
     <>
-    <style>{`.backdrop { position: fixed; inset: 0; }`}</style>
+    <style>{`.backdrop[data-rozie-s-8ec7623e] { position: fixed; inset: 0; }`}</style>
     <>
-    <div class={"backdrop"} onClick={(e) => { local.closeOnBackdrop && close(); }}>
+    <div class={"backdrop"} onClick={(e) => { local.closeOnBackdrop && close(); }} data-rozie-s-8ec7623e="">
       
-      <button onClick={close}>Close</button>
+      <button onClick={close} data-rozie-s-8ec7623e="">Close</button>
     </div>
     </>
     </>

@@ -16,10 +16,10 @@ export default function CheckboxRModel(props: CheckboxRModelProps): JSX.Element 
 
   return (
     <>
-    <label className={styles.toggle}>
+    <label className={styles.toggle} data-rozie-s-5898a126="">
       
-      <input type="checkbox" checked={checked} onChange={e => setChecked(e.target.checked)} />
-      <span>Enabled</span>
+      <input type="checkbox" checked={checked} onChange={e => setChecked(e.target.checked)} data-rozie-s-5898a126="" />
+      <span data-rozie-s-5898a126="">Enabled</span>
     </label>
     </>
   );

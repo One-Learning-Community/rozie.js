@@ -80,12 +80,12 @@ export default function Dropdown(_props: DropdownProps): JSX.Element {
 
   return (
     <>
-    <div className={styles.dropdown}>
-      <div ref={triggerEl} onClick={toggle}>
+    <div className={styles.dropdown} data-rozie-s-6d6bd882="">
+      <div ref={triggerEl} onClick={toggle} data-rozie-s-6d6bd882="">
         {props.renderTrigger?.({ open, toggle })}
       </div>
 
-      {(open) && <div ref={panelEl} className={styles["dropdown-panel"]} role="menu">
+      {(open) && <div ref={panelEl} className={styles["dropdown-panel"]} role="menu" data-rozie-s-6d6bd882="">
         {typeof props.children === 'function' ? props.children({ close }) : props.children}
       </div>}</div>
     </>

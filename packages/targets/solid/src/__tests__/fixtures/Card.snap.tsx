@@ -16,12 +16,12 @@ export default function Card(_props: CardProps): JSX.Element {
 
   return (
     <>
-    <style>{`.card { border: 1px solid #ddd; border-radius: 6px; overflow: hidden; background: #fff; }
-    .card__body { padding: 1rem; }`}</style>
+    <style>{`.card[data-rozie-s-a88c221e] { border: 1px solid #ddd; border-radius: 6px; overflow: hidden; background: #fff; }
+    .card__body[data-rozie-s-a88c221e] { padding: 1rem; }`}</style>
     <>
-    <article class={"card"}>
+    <article class={"card"} data-rozie-s-a88c221e="">
       <CardHeader title={local.title} onClose={local.onClose} />
-      <div class={"card__body"}>
+      <div class={"card__body"} data-rozie-s-a88c221e="">
         {resolved()}
       </div>
     </article>

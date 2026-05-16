@@ -12,6 +12,15 @@
  *   - @event attributes → delegate to emitTemplateEvent
  *   - class/:class → composeClassName via emitTemplateAttribute (D-53/D-55)
  *
+ * Component-scope attribute injection (paired with `emitStyle`'s `scopeCss`):
+ *   When `ctx.scopeAttr` is set, every emitted HTML host element (i.e.
+ *   `tagKind === 'html'`) gets a bare attribute (e.g. `data-rozie-s-abc123`).
+ *   This matches the attribute appended to every selector by `scopeCss`, so
+ *   the component's CSS rules apply only to elements it actually renders —
+ *   mirroring Vue's `<style scoped>` data-v-* semantics. Component tags
+ *   (`tagKind === 'component'` / `'self'`) intentionally DO NOT get the
+ *   attribute: child components carry their own scope.
+ *
  * @experimental — shape may change before v1.0
  */
 import * as t from '@babel/types';
@@ -65,6 +74,14 @@ export interface EmitNodeCtx {
   injectionCounter: { next: number };
   /** Optional key expression to inject into the immediate next TemplateElement (used by r-for) */
   pendingKey?: string | null;
+  /**
+   * Component-scope attribute name (e.g. `data-rozie-s-abc12345`) to inject on
+   * every emitted HTML host element. Paired with `emitStyle`'s `scopeCss`
+   * selector rewriter so this component's CSS rules apply only to elements
+   * it actually renders. Empty string (or undefined) disables injection —
+   * back-compat for callers that don't thread a scope hash.
+   */
+  scopeAttr?: string;
 }
 
 function emitStaticText(node: TemplateStaticTextIR, _ctx: EmitNodeCtx): string {
@@ -131,6 +148,19 @@ function findAttribute(attrs: AttributeBinding[], name: string): AttributeBindin
 }
 
 /**
+ * Build the bare component-scope attribute JSX fragment (e.g.
+ * `data-rozie-s-abc12345=""`). Returns `null` when the context has no scope
+ * attr OR when the element is a child component (those carry their own scope).
+ */
+function scopeAttrForElement(node: TemplateElementIR, ctx: EmitNodeCtx): string | null {
+  if (!ctx.scopeAttr) return null;
+  if (node.tagKind !== 'html') return null;
+  // Empty-string attribute value is the canonical "boolean attribute"
+  // selector-friendly form. CSS `[data-rozie-s-xyz]` matches it.
+  return `${ctx.scopeAttr}=""`;
+}
+
+/**
  * Emit a TemplateElement. Applies element-level special-cases (r-show, r-html,
  * r-text, r-model) before falling through to the standard tag/attr/children form.
  *
@@ -147,6 +177,8 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
 
   // Build a working set of attributes — start with element's own.
   let workingAttrs: AttributeBinding[] = [...node.attributes];
+
+  const scopeAttrJsx = scopeAttrForElement(node, ctx);
 
   // Inject the loop key BEFORE emitAttributes is called. We synthesise a
   // binding-kind attr with name=':key' and a placeholder identifier whose
@@ -175,6 +207,7 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
     for (const d of attrsResult.diagnostics) ctx.diagnostics.push(d);
     const eventsJsx = emitElementEvents(node, childCtx);
     const headParts = [attrsResult.jsx, eventsJsx, `dangerouslySetInnerHTML={{ __html: ${exprCode} }}`].filter(Boolean);
+    if (scopeAttrJsx) headParts.push(scopeAttrJsx);
     if (pendingKey !== null) headParts.unshift(`key={${pendingKey}}`);
     const head = headParts.length > 0 ? ' ' + headParts.join(' ') : '';
     return `<${node.tagName}${head} />`;
@@ -223,6 +256,7 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
 
   const headParts = [attrsResult.jsx, eventsJsx];
   if (rShowStyleAttr) headParts.push(rShowStyleAttr);
+  if (scopeAttrJsx) headParts.push(scopeAttrJsx);
   if (pendingKey !== null) headParts.unshift(`key={${pendingKey}}`);
   const head = headParts.filter(Boolean).join(' ');
   const headOut = head.length > 0 ? ' ' + head : '';

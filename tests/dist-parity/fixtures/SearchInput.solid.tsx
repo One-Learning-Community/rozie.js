@@ -42,16 +42,16 @@ export default function SearchInput(_props: SearchInputProps): JSX.Element {
 
   return (
     <>
-    <style>{`.search-input { display: inline-flex; align-items: center; gap: 0.25rem; }
-    input { padding: 0.25rem 0.5rem; }
-    .clear-btn { background: none; border: none; cursor: pointer; font-size: 1.25rem; }
-    .hint { color: rgba(0, 0, 0, 0.4); font-size: 0.85em; }`}</style>
+    <style>{`.search-input[data-rozie-s-8bbc4a60] { display: inline-flex; align-items: center; gap: 0.25rem; }
+    input[data-rozie-s-8bbc4a60] { padding: 0.25rem 0.5rem; }
+    .clear-btn[data-rozie-s-8bbc4a60] { background: none; border: none; cursor: pointer; font-size: 1.25rem; }
+    .hint[data-rozie-s-8bbc4a60] { color: rgba(0, 0, 0, 0.4); font-size: 0.85em; }`}</style>
     <>
-    <div class={"search-input"}>
+    <div class={"search-input"} data-rozie-s-8bbc4a60="">
       
-      <input type="search" ref={(el) => { inputElRef = el as HTMLElement; }} placeholder={local.placeholder} value={query()} onInput={(e) => { (e => setQuery(e.currentTarget.value))(e); _rozieDebouncedOnSearch(e); }} onKeyDown={(e) => { ((e) => { if (e.key !== 'Enter') return; onSearch(); })(e); ((e) => { if (e.key !== 'Escape') return; clear(); })(e); }} />
+      <input type="search" ref={(el) => { inputElRef = el as HTMLElement; }} placeholder={local.placeholder} value={query()} onInput={(e) => { (e => setQuery(e.currentTarget.value))(e); _rozieDebouncedOnSearch(e); }} onKeyDown={(e) => { ((e) => { if (e.key !== 'Enter') return; onSearch(); })(e); ((e) => { if (e.key !== 'Escape') return; clear(); })(e); }} data-rozie-s-8bbc4a60="" />
 
-      {<Show when={query().length > 0} fallback={<span class={"hint"}>{local.minLength}+ chars</span>}><button aria-label="Clear" class={"clear-btn"} onClick={clear}>
+      {<Show when={query().length > 0} fallback={<span class={"hint"} data-rozie-s-8bbc4a60="">{local.minLength}+ chars</span>}><button aria-label="Clear" class={"clear-btn"} onClick={clear} data-rozie-s-8bbc4a60="">
         ×
       </button></Show>}</div>
     </>

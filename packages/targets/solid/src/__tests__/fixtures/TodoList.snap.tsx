@@ -52,29 +52,29 @@ export default function TodoList(_props: TodoListProps): JSX.Element {
 
   return (
     <>
-    <style>{`.todo-list { font-family: system-ui, sans-serif; }
-    ul { list-style: none; padding: 0; }
-    li { display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0; }
-    li.done span { text-decoration: line-through; opacity: 0.5; }
-    .empty { color: rgba(0, 0, 0, 0.4); font-style: italic; }
-    form { display: flex; gap: 0.25rem; margin-block: 0.5rem; }`}</style>
+    <style>{`.todo-list[data-rozie-s-52bec3de] { font-family: system-ui, sans-serif; }
+    ul[data-rozie-s-52bec3de] { list-style: none; padding: 0; }
+    li[data-rozie-s-52bec3de] { display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0; }
+    li.done[data-rozie-s-52bec3de] span[data-rozie-s-52bec3de] { text-decoration: line-through; opacity: 0.5; }
+    .empty[data-rozie-s-52bec3de] { color: rgba(0, 0, 0, 0.4); font-style: italic; }
+    form[data-rozie-s-52bec3de] { display: flex; gap: 0.25rem; margin-block: 0.5rem; }`}</style>
     <>
-    <div class={"todo-list"}>
-      <header>
-        {_props.headerSlot ? _props.headerSlot({ remaining: remaining(), total: items().length }) : <h3>{local.title} ({remaining()} remaining)</h3>}
+    <div class={"todo-list"} data-rozie-s-52bec3de="">
+      <header data-rozie-s-52bec3de="">
+        {_props.headerSlot ? _props.headerSlot({ remaining: remaining(), total: items().length }) : <h3 data-rozie-s-52bec3de="">{local.title} ({remaining()} remaining)</h3>}
       </header>
 
-      <form onSubmit={(e) => { e.preventDefault(); add(); }}>
-        <input placeholder="What needs doing?" value={draft()} onInput={e => setDraft(e.currentTarget.value)} />
-        <button type="submit" disabled={!draft().trim()}>Add</button>
+      <form onSubmit={(e) => { e.preventDefault(); add(); }} data-rozie-s-52bec3de="">
+        <input placeholder="What needs doing?" value={draft()} onInput={e => setDraft(e.currentTarget.value)} data-rozie-s-52bec3de="" />
+        <button type="submit" disabled={!draft().trim()} data-rozie-s-52bec3de="">Add</button>
       </form>
 
-      {<Show when={items().length > 0} fallback={<p class={"empty"}>
+      {<Show when={items().length > 0} fallback={<p class={"empty"} data-rozie-s-52bec3de="">
         {_props.emptySlot ?? "Nothing to do. ✨"}
-      </p>}><ul>
-        <For each={items()}>{(item) => <li classList={{ done: item.done }}>
+      </p>}><ul data-rozie-s-52bec3de="">
+        <For each={items()}>{(item) => <li classList={{ done: item.done }} data-rozie-s-52bec3de="">
           
-          {resolved() ?? <><label><input type="checkbox" checked={item.done} onChange={(e) => { toggle(item.id); }} /><span>{item.text}</span></label><button aria-label="Remove" onClick={(e) => { remove(item.id); }}>×</button></>}
+          {resolved() ?? <><label data-rozie-s-52bec3de=""><input type="checkbox" checked={item.done} onChange={(e) => { toggle(item.id); }} data-rozie-s-52bec3de="" /><span data-rozie-s-52bec3de="">{item.text}</span></label><button aria-label="Remove" onClick={(e) => { remove(item.id); }} data-rozie-s-52bec3de="">×</button></>}
         </li>}</For>
       </ul></Show>}</div>
     </>

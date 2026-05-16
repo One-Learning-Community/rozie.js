@@ -17,9 +17,9 @@ export default function Card(_props: CardProps): JSX.Element {
 
   return (
     <>
-    <article className={styles.card}>
+    <article className={styles.card} data-rozie-s-a88c221e="">
       <CardHeader title={props.title} onClose={props.onClose} />
-      <div className={styles.card__body}>
+      <div className={styles.card__body} data-rozie-s-a88c221e="">
         {props.children}
       </div>
     </article>

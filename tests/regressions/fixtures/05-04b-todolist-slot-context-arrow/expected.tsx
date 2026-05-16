@@ -22,9 +22,9 @@ export default function ScopedSlotContext(props: ScopedSlotContextProps): JSX.El
 
   return (
     <>
-    <ul className={styles.list}>
+    <ul className={styles.list} data-rozie-s-5e6c469d="">
       
-      {items.map((item) => <li key={item.id}>
+      {items.map((item) => <li key={item.id} data-rozie-s-5e6c469d="">
         {props.renderItem ? props.renderItem({ item, remaining }) : item.label}
       </li>)}
     </ul>

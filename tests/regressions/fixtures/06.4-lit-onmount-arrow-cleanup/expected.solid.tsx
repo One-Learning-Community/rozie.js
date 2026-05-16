@@ -28,9 +28,9 @@ export default function OnMountArrowCleanup(_props: OnMountArrowCleanupProps): J
 
   return (
     <>
-    <style>{`.ticker { font-variant-numeric: tabular-nums; }`}</style>
+    <style>{`.ticker[data-rozie-s-722b58d1] { font-variant-numeric: tabular-nums; }`}</style>
     <>
-    <div class={"ticker"}>{ticks()}</div>
+    <div class={"ticker"} data-rozie-s-722b58d1="">{ticks()}</div>
     </>
     </>
   );

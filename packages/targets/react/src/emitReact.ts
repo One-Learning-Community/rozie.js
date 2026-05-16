@@ -21,6 +21,13 @@
  * class names. The synthetic `.module.css` extension triggers Vite's
  * CSS-Modules pipeline naturally (see 04-05-SPIKE.md Path 2).
  *
+ * Component-scope attribute rewriting (paired with the always-scoped Vue
+ * model): every scoped CSS selector is rewritten to append
+ * `[data-rozie-s-<hash>]` and every HTML host element in the template gets
+ * the matching attribute. This gives React the same per-component CSS
+ * isolation Vue/Svelte/Angular/Lit have by default. `:root { ... }` rules
+ * bypass this pass entirely — they route to `.global.css` unchanged.
+ *
  * @experimental — shape may change before v1.0
  */
 import type { IRComponent } from '../../../core/src/ir/types.js';
@@ -38,6 +45,7 @@ import { emitListeners } from './emit/emitListeners.js';
 import { emitStyle } from './emit/emitStyle.js';
 import { buildShell } from './emit/shell.js';
 import { composeSourceMap } from './sourcemap/compose.js';
+import { computeScopeHash, scopeAttrName } from './emit/scopeHash.js';
 import {
   ReactImportCollector,
   RuntimeReactImportCollector,
@@ -75,6 +83,14 @@ export function emitReact(
   const runtimeImports = new RuntimeReactImportCollector();
   const registry = opts.modifierRegistry ?? createDefaultRegistry();
 
+  // Compute the per-component scope hash up front so emitStyle's selector
+  // rewriter and emitTemplate's host-element attribute injector use the same
+  // token. Derived from the filename when present (stable across re-emit and
+  // disambiguates same-name components in different paths); falls back to
+  // the IR's component name otherwise (covers test-only synthetic IRs).
+  const scopeHash = computeScopeHash(ir.name, opts.filename);
+  const scopeAttr = scopeAttrName(scopeHash);
+
   const scriptOpts: { filename?: string } = {};
   if (opts.filename !== undefined) scriptOpts.filename = opts.filename;
   const {
@@ -92,10 +108,14 @@ export function emitReact(
   );
 
   // Plan 04-03: emit the template-side JSX, slot-prop fields + ctx interfaces.
+  // Threads scopeAttr through to emitTemplateNode so every HTML host element
+  // emits the matching attribute. Component tags (tagKind 'component'/'self')
+  // skip the attribute — their own bundles carry their own scope.
   const tmpl = emitTemplate(
     ir,
     { react: reactImports, runtime: runtimeImports },
     registry,
+    { scopeAttr },
   );
 
   // Plan 04-04: emit <listeners>-block entries (4-class A/B/C/D classifier).
@@ -111,7 +131,7 @@ export function emitReact(
   // opts.source is missing, skip style emission entirely so back-compat with
   // older callers (Plan 04-02 tests) is preserved.
   const styleResult = opts.source !== undefined
-    ? emitStyle(ir.styles, opts.source)
+    ? emitStyle(ir.styles, opts.source, scopeHash)
     : { moduleCss: '', globalCss: null as string | null, diagnostics: [] };
   const moduleCss = styleResult.moduleCss;
   const globalCss = styleResult.globalCss;

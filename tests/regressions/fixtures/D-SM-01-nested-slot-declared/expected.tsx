@@ -9,9 +9,9 @@ interface NestedSlotDeclaredProps {
 export default function NestedSlotDeclared(props: NestedSlotDeclaredProps): JSX.Element {
   return (
     <>
-    <div className={styles.outer}>
+    <div className={styles.outer} data-rozie-s-3bc5be6c="">
       
-      {props.renderWrapper ?? <div className={styles["wrapper-fallback"]}>
+      {props.renderWrapper ?? <div className={styles["wrapper-fallback"]} data-rozie-s-3bc5be6c="">
           {props.renderInner}
         </div>}
     </div>

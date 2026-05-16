@@ -10,8 +10,8 @@ export default function DefaultContentFallbackFixture(_props: DefaultContentFall
 
   return (
     <>
-    <div class={"default-content-fallback-fixture"}>
-      {_props.statusSlot ?? <span class={"fallback"}>No status provided.</span>}
+    <div class={"default-content-fallback-fixture"} data-rozie-s-62104151="">
+      {_props.statusSlot ?? <span class={"fallback"} data-rozie-s-62104151="">No status provided.</span>}
     </div>
     </>
   );

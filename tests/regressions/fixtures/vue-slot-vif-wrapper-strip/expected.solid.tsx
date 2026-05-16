@@ -15,13 +15,13 @@ export default function PresenceSlotFallback(_props: PresenceSlotFallbackProps):
 
   return (
     <>
-    <style>{`.panel { border: 1px solid rgba(0, 0, 0, 0.1); }`}</style>
+    <style>{`.panel[data-rozie-s-224e77e7] { border: 1px solid rgba(0, 0, 0, 0.1); }`}</style>
     <>
-    <section class={"panel"}>
-      {<Show when={_props.headerSlot || local.title}><header>
+    <section class={"panel"} data-rozie-s-224e77e7="">
+      {<Show when={_props.headerSlot || local.title}><header data-rozie-s-224e77e7="">
         
         {_props.headerSlot ?? local.title}
-      </header></Show>}<div class={"body"}>
+      </header></Show>}<div class={"body"} data-rozie-s-224e77e7="">
         {resolved()}
       </div>
     </section>

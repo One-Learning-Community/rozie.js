@@ -17,5 +17,6 @@ export default defineConfig({
     '@babel/types',
     '@babel/generator',
     'postcss',
+    'postcss-selector-parser',
   ],
 });

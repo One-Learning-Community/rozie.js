@@ -5,7 +5,7 @@ interface ModalProps {}
 export default function Modal(props: ModalProps): JSX.Element {
   return (
     <>
-      <div className={"modal"}>
+      <div className={"modal"} data-rozie-s-d24f9140="">
         <Counter />
       </div>
     </>

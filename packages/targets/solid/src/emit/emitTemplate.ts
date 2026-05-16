@@ -25,10 +25,20 @@ export interface EmitTemplateResult {
   diagnostics: Diagnostic[];
 }
 
+export interface EmitTemplateOptions {
+  /**
+   * Component-scope attribute name (e.g. `data-rozie-s-abc12345`). When set,
+   * every emitted HTML host element receives this attribute so the matching
+   * `[<attr>]` selector tail injected by `scopeCss` actually matches.
+   */
+  scopeAttr?: string;
+}
+
 export function emitTemplate(
   ir: IRComponent,
   collectors: { solid: SolidImportCollector; runtime: RuntimeSolidImportCollector },
   registry: ModifierRegistry,
+  opts: EmitTemplateOptions = {},
 ): EmitTemplateResult {
   const diagnostics: Diagnostic[] = [];
 
@@ -46,6 +56,7 @@ export function emitTemplate(
     diagnostics,
     scriptInjections,
     injectionCounter,
+    ...(opts.scopeAttr !== undefined ? { scopeAttr: opts.scopeAttr } : {}),
   };
 
   const jsx = emitNode(ir.template, ctx);

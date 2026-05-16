@@ -14,7 +14,7 @@ export default function ScopedParamsFixture(_props: ScopedParamsFixtureProps): J
 
   return (
     <>
-    <div class={"scoped-params-fixture"}>
+    <div class={"scoped-params-fixture"} data-rozie-s-94f3adc8="">
       {_props.itemSlot?.({ value: local.label })}
     </div>
     </>

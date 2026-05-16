@@ -18,9 +18,9 @@ export default function InlineExprHandler(_props: InlineExprHandlerProps): JSX.E
 
   return (
     <>
-    <div className={styles.backdrop} onClick={(e) => { props.closeOnBackdrop && close(); }}>
+    <div className={styles.backdrop} onClick={(e) => { props.closeOnBackdrop && close(); }} data-rozie-s-8ec7623e="">
       
-      <button onClick={close}>Close</button>
+      <button onClick={close} data-rozie-s-8ec7623e="">Close</button>
     </div>
     </>
   );

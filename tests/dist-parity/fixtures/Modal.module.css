@@ -1,10 +1,10 @@
-.modal-backdrop {
+.modal-backdrop[data-rozie-s-fc45feb2] {
   position: fixed; inset: 0;
   background: rgba(0, 0, 0, 0.4);
   display: flex; align-items: center; justify-content: center;
   z-index: var(--rozie-modal-z, 2000);
 }
-.modal-dialog {
+.modal-dialog[data-rozie-s-fc45feb2] {
   background: white;
   border-radius: 8px;
   min-width: 20rem;
@@ -14,9 +14,9 @@
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
   outline: none;
 }
-header, footer { padding: 1rem; display: flex; align-items: center; gap: 0.5rem; }
-header { border-bottom: 1px solid rgba(0, 0, 0, 0.08); }
-header h2 { flex: 1; margin: 0; font-size: 1.1rem; }
-footer { border-top: 1px solid rgba(0, 0, 0, 0.08); justify-content: flex-end; }
-.modal-body { padding: 1rem; overflow: auto; }
-.close-btn { background: none; border: none; cursor: pointer; font-size: 1.5rem; line-height: 1; }
+header[data-rozie-s-fc45feb2], footer[data-rozie-s-fc45feb2] { padding: 1rem; display: flex; align-items: center; gap: 0.5rem; }
+header[data-rozie-s-fc45feb2] { border-bottom: 1px solid rgba(0, 0, 0, 0.08); }
+header[data-rozie-s-fc45feb2] h2[data-rozie-s-fc45feb2] { flex: 1; margin: 0; font-size: 1.1rem; }
+footer[data-rozie-s-fc45feb2] { border-top: 1px solid rgba(0, 0, 0, 0.08); justify-content: flex-end; }
+.modal-body[data-rozie-s-fc45feb2] { padding: 1rem; overflow: auto; }
+.close-btn[data-rozie-s-fc45feb2] { background: none; border: none; cursor: pointer; font-size: 1.5rem; line-height: 1; }

@@ -45,13 +45,13 @@ export default function SearchInput(_props: SearchInputProps): JSX.Element {
 
   return (
     <>
-    <div className={styles["search-input"]}>
+    <div className={styles["search-input"]} data-rozie-s-8bbc4a60="">
       
-      <input ref={inputEl} type="search" placeholder={props.placeholder} value={query} onChange={e => setQuery(e.target.value)} onInput={_rozieDebouncedOnSearch} onKeyDown={(e) => { ((e) => { if (e.key !== 'Enter') return; onSearch(e); })(e); ((e) => { if (e.key !== 'Escape') return; clear(e); })(e); }} />
+      <input ref={inputEl} type="search" placeholder={props.placeholder} value={query} onChange={e => setQuery(e.target.value)} onInput={_rozieDebouncedOnSearch} onKeyDown={(e) => { ((e) => { if (e.key !== 'Enter') return; onSearch(e); })(e); ((e) => { if (e.key !== 'Escape') return; clear(e); })(e); }} data-rozie-s-8bbc4a60="" />
 
-      {(query.length > 0) ? <button className={styles["clear-btn"]} aria-label="Clear" onClick={clear}>
+      {(query.length > 0) ? <button className={styles["clear-btn"]} aria-label="Clear" onClick={clear} data-rozie-s-8bbc4a60="">
         ×
-      </button> : <span className={styles.hint}>{props.minLength}+ chars</span>}</div>
+      </button> : <span className={styles.hint} data-rozie-s-8bbc4a60="">{props.minLength}+ chars</span>}</div>
     </>
   );
 }

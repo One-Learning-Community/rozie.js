@@ -35,10 +35,20 @@ export interface EmitTemplateResult {
   diagnostics: Diagnostic[];
 }
 
+export interface EmitTemplateOptions {
+  /**
+   * Component-scope attribute name (e.g. `data-rozie-s-abc12345`). When set,
+   * every emitted HTML host element receives this attribute so the matching
+   * `[<attr>]` selector tail injected by `scopeCss` actually matches.
+   */
+  scopeAttr?: string;
+}
+
 export function emitTemplate(
   ir: IRComponent,
   collectors: { react: ReactImportCollector; runtime: RuntimeReactImportCollector },
   registry: ModifierRegistry,
+  opts: EmitTemplateOptions = {},
 ): EmitTemplateResult {
   const slotResult = emitSlotDecl(ir);
   const diagnostics: Diagnostic[] = [];
@@ -61,6 +71,7 @@ export function emitTemplate(
     diagnostics,
     scriptInjections,
     injectionCounter: { next: 0 },
+    ...(opts.scopeAttr !== undefined ? { scopeAttr: opts.scopeAttr } : {}),
   };
 
   const jsx = emitNode(ir.template, ctx);

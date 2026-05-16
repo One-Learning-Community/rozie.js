@@ -15,7 +15,7 @@ export default function ScopedParamsFixture(_props: ScopedParamsFixtureProps): J
 
   return (
     <>
-    <div className={"scoped-params-fixture"}>
+    <div className={"scoped-params-fixture"} data-rozie-s-94f3adc8="">
       {props.renderItem?.({ value: props.label })}
     </div>
     </>

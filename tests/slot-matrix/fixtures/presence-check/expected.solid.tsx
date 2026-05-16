@@ -10,8 +10,8 @@ export default function PresenceCheckFixture(_props: PresenceCheckFixtureProps):
 
   return (
     <>
-    <div class={"presence-check-fixture"}>
-      {<Show when={_props.asideSlot}><aside>
+    <div class={"presence-check-fixture"} data-rozie-s-313bf282="">
+      {<Show when={_props.asideSlot}><aside data-rozie-s-313bf282="">
         {_props.asideSlot}
       </aside></Show>}</div>
     </>

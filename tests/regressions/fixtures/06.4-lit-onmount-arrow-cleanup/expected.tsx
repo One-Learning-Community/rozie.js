@@ -18,7 +18,7 @@ export default function OnMountArrowCleanup(props: OnMountArrowCleanupProps): JS
 
   return (
     <>
-    <div className={styles.ticker}>{ticks}</div>
+    <div className={styles.ticker} data-rozie-s-722b58d1="">{ticks}</div>
     </>
   );
 }

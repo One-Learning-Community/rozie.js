@@ -5,7 +5,7 @@ interface CardHeaderProps {
 export default function CardHeader(props: CardHeaderProps): JSX.Element {
   return (
     <>
-      <div className={"card-header"}>{props.title}</div>
+      <div className={"card-header"} data-rozie-s-f3e60f5a="">{props.title}</div>
     </>
   );
 }

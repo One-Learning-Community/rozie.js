@@ -25,9 +25,9 @@ export default function ControllableNoProps(_props: ControllableNoPropsProps): J
 
   return (
     <>
-    <style>{`.bump { font-variant-numeric: tabular-nums; }`}</style>
+    <style>{`.bump[data-rozie-s-141c4000] { font-variant-numeric: tabular-nums; }`}</style>
     <>
-    <button class={"bump"} onClick={bump}>{value()}</button>
+    <button class={"bump"} onClick={bump} data-rozie-s-141c4000="">{value()}</button>
     </>
     </>
   );

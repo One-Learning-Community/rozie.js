@@ -11,8 +11,8 @@ export default function NestedSlotsFixture(_props: NestedSlotsFixtureProps): JSX
 
   return (
     <>
-    <div class={"nested-slots-fixture"}>
-      {_props.wrapperSlot ?? <div class={"wrapper-fallback"}>
+    <div class={"nested-slots-fixture"} data-rozie-s-4d5488e4="">
+      {_props.wrapperSlot ?? <div class={"wrapper-fallback"} data-rozie-s-4d5488e4="">
           {_props.innerSlot}
         </div>}
     </div>

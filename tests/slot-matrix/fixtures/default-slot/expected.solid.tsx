@@ -12,7 +12,7 @@ export default function DefaultSlotFixture(_props: DefaultSlotFixtureProps): JSX
 
   return (
     <>
-    <div class={"default-slot-fixture"}>
+    <div class={"default-slot-fixture"} data-rozie-s-61728cb8="">
       {resolved()}
     </div>
     </>

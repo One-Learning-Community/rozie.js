@@ -10,6 +10,12 @@
  * the React target emits CSS to sibling `.module.css` and `.global.css`
  * paths that Vite's CSS-Modules pipeline picks up via file extension.
  * Class hashing happens at Vite bundle time, NOT here.
+ *
+ * Component-scope rewriter (`scopeCss`): when a `scopeHash` arg is supplied
+ * the moduleCss output has `[data-rozie-s-<hash>]` appended to every
+ * compound selector. The 5×2 fixture-snapshot grid is now generated WITH
+ * a per-component scope hash so the on-disk CSS matches what `emitReact`
+ * actually wires into the .tsx import.
  */
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -20,6 +26,7 @@ import { lowerToIR } from '../../../../core/src/ir/lower.js';
 import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
 import type { IRComponent, StyleSection } from '../../../../core/src/ir/types.js';
 import { emitStyle } from '../emit/emitStyle.js';
+import { computeScopeHash } from '../emit/scopeHash.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '../../../../..');
@@ -107,15 +114,48 @@ describe('emitStyle (React target) — Wave 0 + reference example tests', () => 
     expect(result.moduleCss).toMatch(/\.counter\s*\{/);
     expect(result.moduleCss).not.toMatch(/\.counter_[a-zA-Z0-9]/);
   });
+
+  it('Test 8: scopeHash rewrites every compound selector to include the attribute', () => {
+    const { ir, src } = loadExample('Counter');
+    const scopeHash = computeScopeHash('Counter', 'Counter.rozie');
+    const result = emitStyle(ir.styles, src, scopeHash);
+    // Bare element selectors get the scope attr appended.
+    expect(result.moduleCss).toMatch(
+      new RegExp(`button\\[data-rozie-s-${scopeHash}\\]\\s*\\{`),
+    );
+    // Pseudo-classes stay AFTER the scope attribute (CSS-spec ordering).
+    expect(result.moduleCss).toMatch(
+      new RegExp(`button\\[data-rozie-s-${scopeHash}\\]:disabled\\s*\\{`),
+    );
+    // Class selectors also get scoped.
+    expect(result.moduleCss).toMatch(
+      new RegExp(`\\.counter\\[data-rozie-s-${scopeHash}\\]`),
+    );
+    // :root rules are NOT in moduleCss (they go to globalCss separately).
+    expect(result.moduleCss).not.toContain(':root');
+  });
+
+  it('Test 9: scopeHash leaves :root rules untouched in globalCss', () => {
+    const { ir, src } = loadExample('Dropdown');
+    const scopeHash = computeScopeHash('Dropdown', 'Dropdown.rozie');
+    const result = emitStyle(ir.styles, src, scopeHash);
+    expect(result.globalCss).toBeTruthy();
+    expect(result.globalCss!).toContain(':root');
+    // The scope attribute must NOT appear in the global CSS.
+    expect(result.globalCss!).not.toContain(`data-rozie-s-${scopeHash}`);
+  });
 });
 
 describe('emitStyle (React target) — 5×2 sibling fixture snapshots', () => {
   // Per D-53 + D-54: Counter / SearchInput / TodoList have no :root → globalCss empty.
   // Dropdown + Modal have :root → both files populated.
+  // Each snapshot uses the per-component scope hash so the on-disk CSS matches
+  // what `emitReact` actually produces.
   for (const name of ['Counter', 'SearchInput', 'Dropdown', 'TodoList', 'Modal']) {
     it(`${name}.module.css.snap (scoped)`, async () => {
       const { ir, src } = loadExample(name);
-      const result = emitStyle(ir.styles, src);
+      const scopeHash = computeScopeHash(name, `${name}.rozie`);
+      const result = emitStyle(ir.styles, src, scopeHash);
       await expect(result.moduleCss).toMatchFileSnapshot(
         resolve(FIXTURES, `${name}.module.css.snap`),
       );
@@ -123,7 +163,8 @@ describe('emitStyle (React target) — 5×2 sibling fixture snapshots', () => {
 
     it(`${name}.global.css.snap (root, may be empty)`, async () => {
       const { ir, src } = loadExample(name);
-      const result = emitStyle(ir.styles, src);
+      const scopeHash = computeScopeHash(name, `${name}.rozie`);
+      const result = emitStyle(ir.styles, src, scopeHash);
       // Empty file when no :root rules — keeps the 5x2 fixture grid stable.
       const dump = result.globalCss ?? '';
       await expect(dump).toMatchFileSnapshot(resolve(FIXTURES, `${name}.global.css.snap`));

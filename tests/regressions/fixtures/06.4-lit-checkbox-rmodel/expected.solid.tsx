@@ -15,12 +15,12 @@ export default function CheckboxRModel(_props: CheckboxRModelProps): JSX.Element
 
   return (
     <>
-    <style>{`.toggle { display: inline-flex; gap: 0.25rem; align-items: center; }`}</style>
+    <style>{`.toggle[data-rozie-s-5898a126] { display: inline-flex; gap: 0.25rem; align-items: center; }`}</style>
     <>
-    <label class={"toggle"}>
+    <label class={"toggle"} data-rozie-s-5898a126="">
       
-      <input type="checkbox" checked={checked()} onChange={e => setChecked(e.currentTarget.checked)} />
-      <span>Enabled</span>
+      <input type="checkbox" checked={checked()} onChange={e => setChecked(e.currentTarget.checked)} data-rozie-s-5898a126="" />
+      <span data-rozie-s-5898a126="">Enabled</span>
     </label>
     </>
     </>

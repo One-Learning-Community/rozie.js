@@ -13,6 +13,15 @@
  *   - Slot invocations → per D-133 patterns
  *   - tagKind: 'component' / 'self' → PascalCase tag verbatim
  *
+ * Component-scope attribute injection (paired with `emitStyle`'s `scopeCss`):
+ *   When `ctx.scopeAttr` is set, every emitted HTML host element (i.e.
+ *   `tagKind === 'html'`) gets a bare attribute (e.g. `data-rozie-s-abc123`).
+ *   This matches the attribute appended to every selector by `scopeCss`, so
+ *   the component's CSS rules apply only to elements it actually renders —
+ *   mirroring Vue's `<style scoped>` data-v-* semantics. Component tags
+ *   (`tagKind === 'component'` / `'self'`) intentionally DO NOT get the
+ *   attribute: child components carry their own scope.
+ *
  * @experimental — shape may change before v1.0
  */
 import type {
@@ -51,6 +60,14 @@ export interface EmitNodeCtx {
   scriptInjections: string[];
   /** Per-component counter for stable wrap-name suffixes */
   injectionCounter: { next: number };
+  /**
+   * Component-scope attribute name (e.g. `data-rozie-s-abc12345`) to inject on
+   * every emitted HTML host element. Paired with `emitStyle`'s `scopeCss`
+   * selector rewriter so this component's CSS rules apply only to elements
+   * it actually renders. Empty string (or undefined) disables injection —
+   * back-compat for callers that don't thread a scope hash.
+   */
+  scopeAttr?: string;
 }
 
 function emitStaticText(node: TemplateStaticTextIR, _ctx: EmitNodeCtx): string {
@@ -108,6 +125,19 @@ function findAttribute(attrs: AttributeBinding[], name: string): AttributeBindin
     if (a.name === name) return a;
   }
   return null;
+}
+
+/**
+ * Build the bare component-scope attribute JSX fragment (e.g.
+ * `data-rozie-s-abc12345=""`). Returns `null` when the context has no scope
+ * attr OR when the element is a child component (those carry their own scope).
+ */
+function scopeAttrForElement(node: TemplateElementIR, ctx: EmitNodeCtx): string | null {
+  if (!ctx.scopeAttr) return null;
+  if (node.tagKind !== 'html') return null;
+  // Empty-string attribute value is the canonical "boolean attribute"
+  // selector-friendly form. CSS `[data-rozie-s-xyz]` matches it.
+  return `${ctx.scopeAttr}=""`;
 }
 
 /**
@@ -277,6 +307,8 @@ function mergeEventAttributes(attrsJsx: string, eventsJsx: string): string {
 function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
   let workingAttrs: AttributeBinding[] = [...node.attributes];
 
+  const scopeAttrJsx = scopeAttrForElement(node, ctx);
+
   // r-html special-case
   const rHtmlAttr = findAttribute(workingAttrs, 'r-html');
   if (rHtmlAttr && rHtmlAttr.kind === 'binding') {
@@ -294,6 +326,7 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
     for (const d of attrsResult.diagnostics) ctx.diagnostics.push(d);
     const eventsJsx = emitElementEvents(node, ctx);
     const headParts = [attrsResult.jsx, eventsJsx, `innerHTML={${exprCode}}`].filter(Boolean);
+    if (scopeAttrJsx) headParts.push(scopeAttrJsx);
     const head = headParts.length > 0 ? ' ' + headParts.join(' ') : '';
     return `<${node.tagName}${head} />`;
   }
@@ -340,6 +373,7 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
   // onInput= via emitElementEvents. Merging produces a single dispatcher arrow.
   const headParts = [mergeEventAttributes(attrsResult.jsx, eventsJsx)];
   if (rShowStyleAttr) headParts.push(rShowStyleAttr);
+  if (scopeAttrJsx) headParts.push(scopeAttrJsx);
   const head = headParts.filter(Boolean).join(' ');
   const headOut = head.length > 0 ? ' ' + head : '';
 

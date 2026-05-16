@@ -8,6 +8,14 @@
  *   - Solid-flavored slot field shapes (D-132/D-133) in emitSlotDecl/emitSlotInvocation.
  *   - createEffect+onCleanup for listeners (no useEffect dep arrays).
  *
+ * Component-scope attribute rewriting (paired with the always-scoped Vue
+ * model): every scoped CSS selector in the inlined `<style>` JSX is rewritten
+ * to append `[data-rozie-s-<hash>]` and every HTML host element in the
+ * template gets the matching attribute. This gives Solid the same
+ * per-component CSS isolation Vue/Svelte/Angular/Lit have by default.
+ * `:root { ... }` rules bypass this pass entirely — they emit in a
+ * separate unscoped `<style>` JSX element.
+ *
  * @experimental — shape may change before v1.0
  */
 import type { IRComponent } from '../../../core/src/ir/types.js';
@@ -27,6 +35,7 @@ import { emitPropsInterface } from './emit/emitPropsInterface.js';
 import { emitStyle } from './emit/emitStyle.js';
 import { buildShell } from './emit/shell.js';
 import { composeSourceMap } from './sourcemap/compose.js';
+import { computeScopeHash, scopeAttrName } from './emit/scopeHash.js';
 
 export interface EmitSolidOptions {
   filename?: string;
@@ -62,6 +71,14 @@ export function emitSolid(ir: IRComponent, opts: EmitSolidOptions = {}): EmitSol
   } else {
     resolvedBlockOffsets = {} as BlockMap;
   }
+
+  // Compute the per-component scope hash up front so emitStyle's selector
+  // rewriter and emitTemplate's host-element attribute injector use the same
+  // token. Derived from the filename when present (stable across re-emit and
+  // disambiguates same-name components in different paths); falls back to
+  // the IR's component name otherwise.
+  const scopeHash = computeScopeHash(ir.name, opts.filename);
+  const scopeAttr = scopeAttrName(scopeHash);
 
   // 2. Collectors.
   const solidImports = new SolidImportCollector();
@@ -101,9 +118,21 @@ export function emitSolid(ir: IRComponent, opts: EmitSolidOptions = {}): EmitSol
   const slotResult = emitSlotDecl(ir);
   const propsInterface = emitPropsInterface(ir, slotResult.fields);
   const scriptResult = emitScript(ir, { solidImports, runtimeImports, filename: opts.filename }, registry);
-  const templateResult = emitTemplate(ir, { solid: solidImports, runtime: runtimeImports }, registry);
+  // Thread scopeAttr through so every HTML host element gets the matching
+  // attribute. Component tags (tagKind 'component'/'self') skip the attribute —
+  // their own bundles carry their own scope.
+  const templateResult = emitTemplate(
+    ir,
+    { solid: solidImports, runtime: runtimeImports },
+    registry,
+    { scopeAttr },
+  );
   const listenersResult = emitListeners(ir, { solid: solidImports, runtime: runtimeImports }, registry);
-  const styleResult = emitStyle(ir.styles ?? { scopedRules: [], rootRules: [] }, opts.source ?? '');
+  const styleResult = emitStyle(
+    ir.styles ?? { scopedRules: [], rootRules: [] },
+    opts.source ?? '',
+    scopeHash,
+  );
 
   // 6. splitPropsCall — D-141 universal.
   // D-131: when a default slot is present, 'children' must also be split so

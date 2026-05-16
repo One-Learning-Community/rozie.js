@@ -72,8 +72,8 @@ export default function Dropdown(_props: DropdownProps): JSX.Element {
 
   return (
     <>
-    <style>{`.dropdown { position: relative; display: inline-block; }
-    .dropdown-panel {
+    <style>{`.dropdown[data-rozie-s-6d6bd882] { position: relative; display: inline-block; }
+    .dropdown-panel[data-rozie-s-6d6bd882] {
       position: fixed;
       z-index: var(--rozie-dropdown-z, 1000);
       background: white;
@@ -85,12 +85,12 @@ export default function Dropdown(_props: DropdownProps): JSX.Element {
       --rozie-dropdown-z: 1000;
     }`}</style>
     <>
-    <div class={"dropdown"}>
-      <div ref={(el) => { triggerElRef = el as HTMLElement; }} onClick={toggle}>
+    <div class={"dropdown"} data-rozie-s-6d6bd882="">
+      <div ref={(el) => { triggerElRef = el as HTMLElement; }} onClick={toggle} data-rozie-s-6d6bd882="">
         {_props.triggerSlot?.({ open: open(), toggle })}
       </div>
 
-      {<Show when={open()}><div ref={(el) => { panelElRef = el as HTMLElement; }} class={"dropdown-panel"} role="menu">
+      {<Show when={open()}><div ref={(el) => { panelElRef = el as HTMLElement; }} class={"dropdown-panel"} role="menu" data-rozie-s-6d6bd882="">
         {resolved()}
       </div></Show>}</div>
     </>
