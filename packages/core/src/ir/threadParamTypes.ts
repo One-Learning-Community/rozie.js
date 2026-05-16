@@ -76,6 +76,62 @@ function walkTemplate(
 }
 
 /**
+ * Phase 07.2 Plan 05 — collect re-projection sites.
+ *
+ * Walks the IR's template and gathers TemplateSlotInvocationIR nodes by
+ * context. Used by ROZ943 emission to flag fill-body slots whose name is
+ * NEVER declared at producer-side (context='declaration') in the same
+ * component's template.
+ *
+ * Returns:
+ *   - declaredNames: set of slot names that appear with context='declaration'
+ *   - reprojections: array of { slotName, loc } for slots with context='fill-body'
+ */
+function collectSlotInvocationsByContext(
+  rootTemplate: TemplateNode | null,
+): {
+  declaredNames: Set<string>;
+  reprojections: Array<{ slotName: string; loc: { start: number; end: number } }>;
+} {
+  const declaredNames = new Set<string>();
+  const reprojections: Array<{
+    slotName: string;
+    loc: { start: number; end: number };
+  }> = [];
+  walkTemplate(rootTemplate, (n) => {
+    if (n.type !== 'TemplateSlotInvocation') return;
+    if (n.context === 'declaration') {
+      declaredNames.add(n.slotName);
+    } else if (n.context === 'fill-body') {
+      reprojections.push({ slotName: n.slotName, loc: n.sourceLoc });
+    }
+  });
+  return { declaredNames, reprojections };
+}
+
+/**
+ * Phase 07.2 Plan 05 — check whether a SlotFillerDecl.body contains any
+ * re-projection (a `<slot>` invocation with context='fill-body'). Used by
+ * ROZ944 to differentiate the "pointless re-projection" case from the
+ * generic ROZ941 unknown-slot-name warning.
+ */
+function bodyContainsReprojection(body: readonly TemplateNode[]): boolean {
+  let found = false;
+  for (const child of body) {
+    walkTemplate(child, (n) => {
+      if (
+        n.type === 'TemplateSlotInvocation' &&
+        n.context === 'fill-body'
+      ) {
+        found = true;
+      }
+    });
+    if (found) return true;
+  }
+  return false;
+}
+
+/**
  * Thread producer paramTypes onto consumer SlotFillerDecl.paramTypes for every
  * component-tag fill in `ir.template`. Emits ROZ941 / ROZ945 / ROZ947 per D-08.
  *
@@ -96,6 +152,44 @@ export function threadParamTypes(
   resolver: ProducerResolver,
   diagnostics: Diagnostic[],
 ): void {
+  // Phase 07.2 Plan 05 — ROZ943 REPROJECTION_UNDECLARED_WRAPPER_SLOT.
+  //
+  // Walk the wrapper's template and check each fill-body slot invocation
+  // against ir.slots (the declared, consumer-fillable slot surface).
+  // ROZ943 fires when a fill-body `<slot name="X">` references a name that
+  // does NOT appear in ir.slots — i.e., the consumer cannot fill X because
+  // X is not a declared slot.
+  //
+  // Under current `lowerSlots` semantics, fill-body slots are lifted into
+  // ir.slots regardless of context — so the simple wrapper-with-only-fill-
+  // body-slot pattern (consumer-re-projection.fixture) does NOT fire
+  // ROZ943: the fill-body slot IS in ir.slots. This means ROZ943 is mostly
+  // reserved for typo protection in adversarial / synthetic IR cases (or
+  // future stricter lowering that excludes fill-body slots from the
+  // declared surface).
+  const declaredSlotNames = new Set(ir.slots.map((s) => s.name));
+  const { reprojections } = collectSlotInvocationsByContext(ir.template);
+  for (const reproj of reprojections) {
+    if (!declaredSlotNames.has(reproj.slotName)) {
+      diagnostics.push({
+        code: RozieErrorCode.REPROJECTION_UNDECLARED_WRAPPER_SLOT,
+        severity: 'error',
+        message: `<slot name="${
+          reproj.slotName || 'default'
+        }"> inside a fill body has no matching slot declaration in this component — the wrapper does not expose '${
+          reproj.slotName || 'default'
+        }' to its consumer, so the re-projection is unreachable.`,
+        loc: reproj.loc,
+        hint:
+          `Add a top-level <slot name="${
+            reproj.slotName || 'default'
+          }"> to expose '${
+            reproj.slotName || 'default'
+          }' to consumers, or fix the slot name to match an existing declaration.`,
+      });
+    }
+  }
+
   walkTemplate(ir.template, (node) => {
     if (node.type !== 'TemplateElement') return;
     if (node.tagKind !== 'component' && node.tagKind !== 'self') return;
@@ -147,6 +241,31 @@ export function threadParamTypes(
           }> does not match any slot declared by ${node.componentRef.importPath}.`,
           loc: filler.sourceLoc,
         });
+        // Phase 07.2 Plan 05 — ROZ944 REPROJECTION_UNDECLARED_INNER_SLOT.
+        // When the wrapper's fill body for an undeclared inner slot contains
+        // a `<slot>` re-projection, that re-projection is doubly pointless:
+        // (a) ROZ941 already warns the fill goes nowhere on the inner;
+        // (b) the re-projection wiring is wasted code.
+        if (bodyContainsReprojection(filler.body)) {
+          diagnostics.push({
+            code: RozieErrorCode.REPROJECTION_UNDECLARED_INNER_SLOT,
+            severity: 'warning',
+            message: `<template #${
+              filler.name || 'default'
+            }> contains a <slot> re-projection but ${
+              node.componentRef.importPath
+            } does not declare a '${
+              filler.name || 'default'
+            }' slot — the re-projection is pointless because the fill itself never reaches the inner producer.`,
+            loc: filler.sourceLoc,
+            hint:
+              `Either remove the <template #${
+                filler.name || 'default'
+              }> fill or add a matching <slot name="${
+                filler.name || 'default'
+              }"> declaration to ${node.componentRef.importPath}.`,
+          });
+        }
         continue;
       }
 
