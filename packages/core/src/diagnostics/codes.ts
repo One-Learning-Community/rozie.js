@@ -206,7 +206,8 @@ export const RozieErrorCode = {
   CROSS_PACKAGE_LOOKUP_FAILED: 'ROZ945',           // error — npm/relative resolution of a <components> importPath returns null
   DYNAMIC_NAME_EXPRESSION_INVALID: 'ROZ946',       // error — `<template #[expr]>` bracketed text fails to parse as a JS expression
   SCOPED_PARAM_MISMATCH: 'ROZ947',                 // error — D-09 — consumer destructures a param the producer SlotDecl.params doesn't declare
-  // ROZ948..ROZ959 reserved
+  SCOPED_PARAMS_ALL_DROPPED: 'ROZ948',             // warn  — scoped-params destructure had properties but none resolved to simple bindings (e.g. spread, computed keys, rename)
+  // ROZ949..ROZ959 reserved
 } as const;
 
 export type RozieErrorCode = (typeof RozieErrorCode)[keyof typeof RozieErrorCode];

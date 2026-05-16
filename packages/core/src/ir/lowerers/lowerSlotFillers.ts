@@ -130,13 +130,19 @@ function parseFillDirectiveName(
  *
  * Wraps the raw value in parens to coerce object-pattern context for the
  * Babel parser. Bindings that aren't simple object-properties (e.g., spreads,
- * computed keys) are silently skipped — the consumer's intent is unambiguous
- * only for the simple `{ a, b: c }` shape; threadParamTypes later validates
- * the param names against the producer SlotDecl.params for ROZ947.
+ * computed keys, renamed shorthands like `{ close: closeModal }`) are silently
+ * skipped — the consumer's intent is unambiguous only for the simple `{ a, b }`
+ * shorthand shape; threadParamTypes later validates the param names against
+ * the producer SlotDecl.params for ROZ947.
+ *
+ * When properties are present but ALL of them are non-simple (i.e. none
+ * survived the filter), ROZ948 `SCOPED_PARAMS_ALL_DROPPED` is emitted so the
+ * author gets actionable feedback rather than a silent empty-params result.
  */
 function parseScopedParams(
   rawValue: string | null,
   valueLoc: { start: number; end: number } | null,
+  diagnostics: Diagnostic[],
 ): ParamDecl[] {
   if (rawValue === null || valueLoc === null) return [];
   try {
@@ -155,6 +161,22 @@ function parseScopedParams(
         // `({ a, b }) => …` per target.
         valueExpression: t.identifier(prop.key.name),
         sourceLoc: valueLoc,
+      });
+    }
+    // ROZ948: non-empty destructure where every property was non-simple (spread,
+    // computed key, or renamed shorthand like `{ close: closeModal }`). The
+    // author wrote a params expression but will get zero bindings — warn so the
+    // failure is visible rather than silent.
+    if (expr.properties.length > 0 && params.length === 0) {
+      diagnostics.push({
+        code: RozieErrorCode.SCOPED_PARAMS_ALL_DROPPED,
+        severity: 'warning',
+        message:
+          `Scoped-slot params "${rawValue}" contains no simple shorthand bindings ` +
+          `(e.g. spreads, computed keys, or renamed properties like { close: closeModal } are not supported). ` +
+          `Only simple destructure bindings { a, b } are threaded through to emitters. ` +
+          `Rename the binding to use the slot param name directly (e.g. \`#header="{ close }"\`).`,
+        loc: valueLoc,
       });
     }
     return params;
@@ -230,7 +252,7 @@ export function extractSlotFillers(
         // synthesize a SlotFillerDecl since the name is meaningless.
         if (directive.errored) continue;
 
-        const params = parseScopedParams(fillAttr.value, fillAttr.valueLoc);
+        const params = parseScopedParams(fillAttr.value, fillAttr.valueLoc, diagnostics);
 
         // Track explicit-default vs named-duplicate per D-08:
         //   - ROZ940 — loose-children-with-explicit-default conflict
