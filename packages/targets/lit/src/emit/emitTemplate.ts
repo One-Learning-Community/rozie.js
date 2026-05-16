@@ -51,6 +51,8 @@ import type {
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
 import { toKebabCase } from './emitDecorator.js';
 import { eventTypeFor } from './emitListeners.js';
+// Phase 07.2 Plan 03 — consumer-side slot-fill emit for component-tag elements.
+import { emitSlotFiller, type EmitSlotFillerCtx } from './emitSlotFiller.js';
 
 export interface EmitTemplateOpts {
   lit: LitImportCollector;
@@ -87,6 +89,13 @@ export interface EmitTemplateOpts {
     debouncedFieldDecls: string[];
     debounceCleanupWiring: string[];
     diagnostics: Diagnostic[];
+    /**
+     * Phase 07.2 Plan 03 — class-field declarations storing captured
+     * scoped-slot fill ctx (e.g. `private _headerCtx?: { close: unknown };`).
+     * emitLit splices these alongside the other field declarations so they
+     * exist before firstUpdated() references them.
+     */
+    slotFillerClassFields: string[];
   };
 }
 
@@ -107,6 +116,13 @@ export interface EmitTemplateResult {
    * other field declarations so the wrapper identity is stable across renders.
    */
   debouncedFieldDecls: string[];
+  /**
+   * Phase 07.2 Plan 03 — class-field declarations storing captured scoped-
+   * slot fill ctx (e.g. `private _headerCtx?: { close: unknown };`).
+   * emitLit splices these into the class body so firstUpdated()'s
+   * `observeRozieSlotCtx` callback can assign into them.
+   */
+  slotFillerClassFields: string[];
   diagnostics: Diagnostic[];
 }
 
@@ -673,6 +689,40 @@ function emitElement(
   const tagName = resolveTagName(node, ir.name);
   const { open, selfClose } = emitElementOpenTag(node, ir, ir.name, opts);
   if (selfClose) return open;
+
+  // Phase 07.2 Plan 03 — Lit consumer-side slot-fill emit (R3 + R4).
+  //
+  // When this element is a component-tag with structured `slotFillers`,
+  // render each filler as a child element bearing `slot="<name>"`
+  // (shadow-DOM projection) instead of the parallel-array raw children.
+  // Scoped fills also push class-field declarations + firstUpdated()
+  // wiring for `observeRozieSlotCtx` via opts._state channels (mirrors
+  // the existing debouncedFieldDecls pattern).
+  if (node.slotFillers !== undefined && node.slotFillers.length > 0) {
+    const fillerCtx: EmitSlotFillerCtx = {
+      ir,
+      emitChildren: (children) =>
+        children.map((c) => emitNode(c, ir, hostListenerWiring, opts)).join(''),
+    };
+    const fillerChildren: string[] = [];
+    let needsObserveImport = false;
+    for (const filler of node.slotFillers) {
+      const out = emitSlotFiller(filler, fillerCtx);
+      if (out.childTemplate) fillerChildren.push(out.childTemplate);
+      for (const f of out.classFields) {
+        opts._state?.slotFillerClassFields.push(f);
+      }
+      for (const line of out.firstUpdatedLines) {
+        hostListenerWiring.push(line);
+      }
+      if (out.firstUpdatedLines.length > 0) needsObserveImport = true;
+    }
+    if (needsObserveImport) {
+      opts.runtime.add('observeRozieSlotCtx');
+    }
+    return `${open}${fillerChildren.join('')}</${tagName}>`;
+  }
+
   const children = node.children
     .map((c) => emitNode(c, ir, hostListenerWiring, opts))
     .join('');
@@ -867,6 +917,7 @@ export function emitTemplate(
     repeatUsed: false,
     debouncedFieldDecls: [] as string[],
     debounceCleanupWiring: [] as string[],
+    slotFillerClassFields: [] as string[],
     diagnostics,
   };
   const optsWithState: EmitTemplateOpts = { ...opts, _state: state };
@@ -877,6 +928,7 @@ export function emitTemplate(
       hostListenerWiring,
       repeatUsed: false,
       debouncedFieldDecls: [],
+      slotFillerClassFields: [],
       diagnostics,
     };
   }
@@ -892,6 +944,7 @@ export function emitTemplate(
     hostListenerWiring,
     repeatUsed: state.repeatUsed,
     debouncedFieldDecls: state.debouncedFieldDecls,
+    slotFillerClassFields: state.slotFillerClassFields,
     diagnostics,
   };
 }

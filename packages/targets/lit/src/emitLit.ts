@@ -155,6 +155,9 @@ export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResu
     staticStylesField: styleResult.staticStylesField,
     fieldDecls: scriptResult.fieldDecls,
     debouncedFieldDecls: templateResult.debouncedFieldDecls.join('\n'),
+    slotFillerClassFields: templateResult.slotFillerClassFields
+      .map((f) => '  ' + f)
+      .join('\n'),
     slotFields: slotResult.fields,
     cleanupField: '  private _disconnectCleanups: Array<() => void> = [];',
     listenerWiringBody: listenerWiring,
@@ -231,6 +234,13 @@ interface ComposeClassBodyParts {
    * identity is stable across render() calls.
    */
   debouncedFieldDecls: string;
+  /**
+   * Phase 07.2 Plan 03 — class-field declarations storing captured scoped-
+   * slot fill ctx (e.g. `private _headerCtx?: { close: unknown };`). Spliced
+   * in alongside the other field decls so firstUpdated()'s
+   * observeRozieSlotCtx callback can assign into them.
+   */
+  slotFillerClassFields: string;
   slotFields: string;
   cleanupField: string;
   /**
@@ -259,6 +269,9 @@ function composeClassBody(parts: ComposeClassBodyParts): string {
   }
   if (parts.debouncedFieldDecls.trim().length > 0) {
     sections.push(parts.debouncedFieldDecls);
+  }
+  if (parts.slotFillerClassFields.trim().length > 0) {
+    sections.push(parts.slotFillerClassFields);
   }
   if (parts.slotFields.trim().length > 0) {
     sections.push(parts.slotFields);
