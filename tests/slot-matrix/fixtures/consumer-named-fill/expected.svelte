@@ -1,1 +1,13 @@
-// PLACEHOLDER — SEEDED IN TASK 3 (vitest run -u). DO NOT EDIT BY HAND.
+<script lang="ts">
+import Producer from './producer.svelte';
+
+
+</script>
+
+
+<Producer>{#snippet header()}
+    <h2>Custom Header</h2>
+  {/snippet}
+  Custom body content
+</Producer>
+
