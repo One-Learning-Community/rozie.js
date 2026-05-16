@@ -53,6 +53,64 @@ import type { SourceMap } from 'magic-string';
 import { IRCache } from './ir/cache.js';
 import { ProducerResolver } from './resolver/index.js';
 import { threadParamTypes } from './ir/threadParamTypes.js';
+// Phase 07.3 Plan 02 — consumer-side two-way binding validator. Runs AFTER
+// threadParamTypes so any producer IR fetched for paramTypes threading is
+// already cached (lookup-order-independent, but threading errors fire first).
+import { validateTwoWayBindings } from './ir/validateTwoWayBindings.js';
+import type { IRComponent as _IRComponentForGuard, TemplateNode as _IRTemplateNodeForGuard } from './ir/types.js';
+
+/**
+ * Phase 07.3 Plan 02 — Wave-2 compatibility guard.
+ *
+ * Returns true iff `ir.template` contains any TemplateElementIR whose
+ * attributes include a `kind: 'twoWayBinding'`. Used to short-circuit emit
+ * because Wave 3 (07.3-03..08) per-target emitter branches haven't shipped
+ * yet — running an emitter on a twoWayBinding-bearing IR crashes
+ * `emitTemplateAttribute` (no else-branch covers the new 4th union variant).
+ *
+ * This helper is removed when the last Wave 3 plan lands.
+ */
+function hasTwoWayBinding(ir: _IRComponentForGuard): boolean {
+  let found = false;
+  const visit = (node: _IRTemplateNodeForGuard | null): void => {
+    if (found || node === null) return;
+    switch (node.type) {
+      case 'TemplateElement':
+        for (const a of node.attributes) {
+          if (a.kind === 'twoWayBinding') {
+            found = true;
+            return;
+          }
+        }
+        for (const child of node.children) visit(child);
+        if (node.slotFillers) {
+          for (const filler of node.slotFillers) {
+            for (const child of filler.body) visit(child);
+          }
+        }
+        break;
+      case 'TemplateConditional':
+        for (const branch of node.branches) {
+          for (const child of branch.body) visit(child);
+        }
+        break;
+      case 'TemplateLoop':
+        for (const child of node.body) visit(child);
+        break;
+      case 'TemplateSlotInvocation':
+        for (const child of node.fallback) visit(child);
+        break;
+      case 'TemplateFragment':
+        for (const child of node.children) visit(child);
+        break;
+      case 'TemplateInterpolation':
+      case 'TemplateStaticText':
+        break;
+    }
+  };
+  visit(ir.template);
+  return found;
+}
 // Per-target imports use RELATIVE paths to avoid the `@rozie/target-*` →
 // `@rozie/core` circular dep (mirrors @rozie/unplugin's transform.ts).
 import { emitVue } from '../../targets/vue/src/emitVue.js';
@@ -198,7 +256,14 @@ export function compile(source: string, opts: CompileOptions): CompileResult {
   // 2. lowerToIR
   const { ir, diagnostics: irDiags } = lowerToIR(ast, { modifierRegistry: registry });
   const acc: Diagnostic[] = [...parseDiags, ...irDiags];
-  if (!ir || irDiags.some((d) => d.severity === 'error')) {
+  // Phase 07.3 Plan 02 — defer the irDiags-error gate until AFTER validators
+  // run. lowerToIR may have surfaced an error (e.g. ROZ920 unknown component),
+  // but the validators still produce useful diagnostics from the partial IR
+  // (ROZ949/950/951 catch consumer-side two-way mistakes even on an unknown-
+  // component element). Without this deferral the user sees only ROZ920 and
+  // re-runs the compile to discover ROZ950 below it — the classic "fix one
+  // error, hit the next" loop. Fail-fast still applies on a missing IR.
+  if (!ir) {
     return fail(acc);
   }
 
@@ -212,6 +277,50 @@ export function compile(source: string, opts: CompileOptions): CompileResult {
     opts.resolver ??
     new ProducerResolver({ root: opts.resolverRoot ?? process.cwd() });
   threadParamTypes(ir, filename ?? '<anonymous>', cache, resolver, acc);
+
+  // 2.6. Phase 07.3 — validate consumer-side two-way bindings (r-model:propName=).
+  // Pasted-line pattern after threadParamTypes (per 07.3-RESEARCH §A5 — runs
+  // after threading so threading errors fire first; the shared cache means
+  // producer IRs fetched during threading are reused here for free). Emits
+  // ROZ949 (dual-frame producer prop lacks model:true), ROZ950 (shape error
+  // — empty propName or non-component target), ROZ951 (RHS not a writable
+  // lvalue per D-03), and ROZ945 (cross-package resolver miss) when needed.
+  validateTwoWayBindings(ir, filename ?? '<anonymous>', cache, resolver, acc);
+
+  // Gate on accumulated errors before emit. Both the deferred irDiags errors
+  // (ROZ920 etc.) and any validator errors (ROZ947/949/950/951/945) block.
+  // Emitters traverse the IR's AttributeBinding union and TypeScript
+  // exhaustiveness requires per-target branches for kind: 'twoWayBinding'
+  // (added in Wave 3); running an emitter on a ROZ949/950/951-flagged IR
+  // would hit the unhandled-kind branch and throw, masking the validator's
+  // diagnostics. Returning early surfaces them cleanly to callers.
+  if (acc.some((d) => d.severity === 'error')) {
+    return fail(acc);
+  }
+
+  // Phase 07.3 Plan 02 — until Wave 3 (target emitters) lands per-target
+  // `kind: 'twoWayBinding'` branches, a successful Wave-2 compile that
+  // contains a valid two-way binding cannot reach the emitter without
+  // crashing. The 6 target packages will be updated together in Wave 3 plans
+  // 07.3-03..08. Until then: detect `twoWayBinding` in the IR and short-
+  // circuit with an empty-output result so callers receive clean diagnostics
+  // (and any warnings produced by validators) rather than an emit-time crash.
+  // The Wave 3 plan that lands the final target branch removes this guard.
+  // No new diagnostic code is introduced — the validator-emitted ROZ950/951/949
+  // already covers the error surface; valid two-way bindings simply produce
+  // empty output until Wave 3.
+  if (hasTwoWayBinding(ir)) {
+    return {
+      code: '',
+      map: null,
+      types: '',
+      componentDeps: ir.components.map((decl) => ({
+        localName: decl.localName,
+        importPath: decl.importPath,
+      })),
+      diagnostics: acc,
+    };
+  }
 
   // 3. emit per target
   // Per Phase 1 convention: exactOptionalPropertyTypes:true requires conditional
