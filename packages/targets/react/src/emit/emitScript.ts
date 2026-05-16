@@ -868,7 +868,42 @@ export function emitScript(
   });
 
   // Quick plan 260515-u2b — emit one useEffect per WatchHook. Dep array
-  // comes from WatchHook.getterDeps (NOT the callback body's deps).
+  // unions WatchHook.getterDeps with the callback body's deps walked via
+  // computeHelperBodyDeps. WHY UNION: react-hooks/exhaustive-deps flags any
+  // identifier READ inside the useEffect callback that isn't in the deps —
+  // and the callback body typically calls helper functions like
+  // `reposition()` (closure refs) AND reads reactive values. The Vue/Svelte/
+  // Solid/Angular/Lit targets auto-track reactive reads inside their effect
+  // primitive and ignore the array entirely; React's static lint requires
+  // the union. We compute callback-body deps below (after allHelperNames is
+  // collected) — see immediately following block.
+  //
+  // Note: helper-name discovery happens AFTER this loop today, so we collect
+  // them inline here for the watcher's callback walk only. The earlier
+  // allHelperNames block (line ~929) still runs independently for the
+  // useArrows section's tryWrapEscapingHelperUseCallback path.
+  const watcherHelperNames = new Set<string>();
+  for (let i = 0; i < cloned.program.body.length; i++) {
+    if (lifecyclePairing.consumedIndices.has(i)) continue;
+    if (watcherPairing.consumedIndices.has(i)) continue;
+    const stmt = cloned.program.body[i]!;
+    if (t.isFunctionDeclaration(stmt) && stmt.id) {
+      watcherHelperNames.add(stmt.id.name);
+      continue;
+    }
+    if (t.isVariableDeclaration(stmt)) {
+      for (const d of stmt.declarations) {
+        if (
+          t.isIdentifier(d.id) &&
+          d.init &&
+          (t.isArrowFunctionExpression(d.init) || t.isFunctionExpression(d.init))
+        ) {
+          watcherHelperNames.add(d.id.name);
+        }
+      }
+    }
+  }
+
   ir.watchers.forEach((wh, idx) => {
     collectors.react.add('useEffect');
     const paired = watcherPairing.perWatcher[idx];
@@ -883,7 +918,16 @@ export function emitScript(
       // Concise arrow body — emit as an expression statement.
       cbInvocation = `${genCode(cbCloned)};`;
     }
-    const depsArr = renderDepArray(wh.getterDeps, modelProps);
+    // Union getter deps with closure refs walked over the callback body so
+    // the lint rule is satisfied without an eslint-disable (D-62 floor).
+    const cbDeps = computeHelperBodyDeps(
+      cbCloned,
+      ir,
+      watcherHelperNames,
+      '', // synthetic helper name; never collides because we don't filter on it
+    );
+    const merged = [...wh.getterDeps, ...cbDeps];
+    const depsArr = renderDepArray(merged, modelProps);
     lifecycleEffectLines.push(
       `useEffect(() => {\n  ${cbInvocation}\n}, ${depsArr});`,
     );

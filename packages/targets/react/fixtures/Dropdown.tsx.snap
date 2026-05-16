@@ -56,7 +56,7 @@ export default function Dropdown(_props: DropdownProps): JSX.Element {
   }, []);
   useEffect(() => {
     if (open) reposition();
-  }, [open]);
+  }, [open, reposition]);
 
   const _rozieThrottledLReposition = useThrottledCallback(reposition, [open, reposition], 100);
 

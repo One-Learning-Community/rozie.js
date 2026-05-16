@@ -540,16 +540,16 @@
       "name": "triggerEl",
       "elementTag": "div",
       "sourceLoc": {
-        "start": 2181,
-        "end": 2196
+        "start": 2548,
+        "end": 2563
       }
     },
     "panelEl": {
       "name": "panelEl",
       "elementTag": "div",
       "sourceLoc": {
-        "start": 2315,
-        "end": 2328
+        "start": 2682,
+        "end": 2695
       }
     }
   },
@@ -562,22 +562,22 @@
           "name": "open",
           "valueExpressionRaw": "$props.open",
           "sourceLoc": {
-            "start": 2239,
-            "end": 2258
+            "start": 2606,
+            "end": 2625
           }
         },
         {
           "name": "toggle",
           "valueExpressionRaw": "toggle",
           "sourceLoc": {
-            "start": 2259,
-            "end": 2275
+            "start": 2626,
+            "end": 2642
           }
         }
       ],
       "sourceLoc": {
-        "start": 2218,
-        "end": 2278
+        "start": 2585,
+        "end": 2645
       }
     },
     "": {
@@ -588,14 +588,14 @@
           "name": "close",
           "valueExpressionRaw": "close",
           "sourceLoc": {
-            "start": 2375,
-            "end": 2389
+            "start": 2742,
+            "end": 2756
           }
         }
       ],
       "sourceLoc": {
-        "start": 2369,
-        "end": 2392
+        "start": 2736,
+        "end": 2759
       }
     }
   },
@@ -606,18 +606,18 @@
       "phase": "mount",
       "callback": {
         "type": "ArrowFunctionExpression",
-        "start": 1276,
-        "end": 1300,
+        "start": 1561,
+        "end": 1667,
         "loc": {
           "start": {
-            "line": 40,
+            "line": 47,
             "column": 9,
-            "index": 1276
+            "index": 1561
           },
           "end": {
-            "line": 42,
+            "line": 50,
             "column": 1,
-            "index": 1300
+            "index": 1667
           },
           "filename": "Dropdown.rozie"
         },
@@ -627,84 +627,168 @@
         "params": [],
         "body": {
           "type": "BlockStatement",
-          "start": 1282,
-          "end": 1300,
+          "start": 1567,
+          "end": 1667,
           "loc": {
             "start": {
-              "line": 40,
+              "line": 47,
               "column": 15,
-              "index": 1282
+              "index": 1567
             },
             "filename": "Dropdown.rozie"
           },
           "body": [
             {
-              "type": "ExpressionStatement",
-              "start": 1286,
-              "end": 1298,
+              "type": "IfStatement",
+              "start": 1636,
+              "end": 1665,
               "loc": {
                 "start": {
-                  "line": 41,
+                  "line": 49,
                   "column": 2,
-                  "index": 1286
+                  "index": 1636
                 },
                 "end": {
-                  "line": 41,
-                  "column": 14,
-                  "index": 1298
+                  "line": 49,
+                  "column": 31,
+                  "index": 1665
                 },
                 "filename": "Dropdown.rozie"
               },
-              "expression": {
-                "type": "CallExpression",
-                "start": 1286,
-                "end": 1298,
+              "test": {
+                "type": "MemberExpression",
+                "start": 1640,
+                "end": 1651,
                 "loc": {
+                  "start": {
+                    "line": 49,
+                    "column": 6,
+                    "index": 1640
+                  },
+                  "end": {
+                    "line": 49,
+                    "column": 17,
+                    "index": 1651
+                  },
                   "filename": "Dropdown.rozie"
                 },
-                "callee": {
+                "object": {
                   "type": "Identifier",
-                  "start": 1286,
-                  "end": 1296,
+                  "start": 1640,
+                  "end": 1646,
                   "loc": {
                     "end": {
-                      "line": 41,
+                      "line": 49,
                       "column": 12,
-                      "index": 1296
+                      "index": 1646
                     },
                     "filename": "Dropdown.rozie",
-                    "identifierName": "reposition"
+                    "identifierName": "$props"
                   },
-                  "name": "reposition"
+                  "name": "$props"
                 },
-                "arguments": []
-              }
+                "computed": false,
+                "property": {
+                  "type": "Identifier",
+                  "start": 1647,
+                  "end": 1651,
+                  "loc": {
+                    "start": {
+                      "line": 49,
+                      "column": 13,
+                      "index": 1647
+                    },
+                    "filename": "Dropdown.rozie",
+                    "identifierName": "open"
+                  },
+                  "name": "open"
+                }
+              },
+              "consequent": {
+                "type": "ExpressionStatement",
+                "start": 1653,
+                "end": 1665,
+                "loc": {
+                  "start": {
+                    "line": 49,
+                    "column": 19,
+                    "index": 1653
+                  },
+                  "filename": "Dropdown.rozie"
+                },
+                "expression": {
+                  "type": "CallExpression",
+                  "start": 1653,
+                  "end": 1665,
+                  "loc": {
+                    "filename": "Dropdown.rozie"
+                  },
+                  "callee": {
+                    "type": "Identifier",
+                    "start": 1653,
+                    "end": 1663,
+                    "loc": {
+                      "end": {
+                        "line": 49,
+                        "column": 29,
+                        "index": 1663
+                      },
+                      "filename": "Dropdown.rozie",
+                      "identifierName": "reposition"
+                    },
+                    "name": "reposition"
+                  },
+                  "arguments": []
+                }
+              },
+              "alternate": null,
+              "leadingComments": [
+                {
+                  "type": "CommentLine",
+                  "value": " Initial reposition only if the panel is open at mount time.",
+                  "start": 1571,
+                  "end": 1633,
+                  "loc": {
+                    "start": {
+                      "line": 48,
+                      "column": 2,
+                      "index": 1571
+                    },
+                    "end": {
+                      "line": 48,
+                      "column": 64,
+                      "index": 1633
+                    },
+                    "filename": "Dropdown.rozie"
+                  }
+                }
+              ]
             }
           ],
           "directives": []
         }
       },
       "sourceLoc": {
-        "start": 1267,
-        "end": 1301
+        "start": 1552,
+        "end": 1668
       }
     },
     {
       "phase": "mount",
       "callback": {
         "type": "ArrowFunctionExpression",
-        "start": 1312,
-        "end": 1482,
+        "start": 1679,
+        "end": 1849,
         "loc": {
           "start": {
-            "line": 44,
+            "line": 52,
             "column": 9,
-            "index": 1312
+            "index": 1679
           },
           "end": {
-            "line": 47,
+            "line": 55,
             "column": 1,
-            "index": 1482
+            "index": 1849
           },
           "filename": "Dropdown.rozie"
         },
@@ -714,13 +798,13 @@
         "params": [],
         "body": {
           "type": "BlockStatement",
-          "start": 1318,
-          "end": 1482,
+          "start": 1685,
+          "end": 1849,
           "loc": {
             "start": {
-              "line": 44,
+              "line": 52,
               "column": 15,
-              "index": 1318
+              "index": 1685
             },
             "filename": "Dropdown.rozie"
           },
@@ -729,8 +813,8 @@
         }
       },
       "sourceLoc": {
-        "start": 1303,
-        "end": 1483
+        "start": 1670,
+        "end": 1850
       }
     }
   ]

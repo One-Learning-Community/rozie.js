@@ -86,7 +86,7 @@ describe('emitScript — behavior', () => {
     expect(collectors.react.has('useEffect')).toBe(true);
   });
 
-  it('Quick 260515-u2b — WatchHook emits useEffect(cb, [getterDeps]); deps include props.open only', () => {
+  it('Quick 260515-u2b — WatchHook emits useEffect(cb, deps); deps union getter body deps + callback closure refs to satisfy react-hooks/exhaustive-deps (D-62)', () => {
     const src = `<rozie name="WatchOne">
 <props>{ open: { type: Boolean, default: false }, closeOnEscape: { type: Boolean, default: true } }</props>
 <script>
@@ -102,16 +102,20 @@ $watch(() => $props.open, () => { if ($props.closeOnEscape) reposition() })
       runtime: new RuntimeReactImportCollector(),
     };
     const { lifecycleEffectsSection } = emitScript(ir, collectors);
-    // useEffect line with dep array that includes props.open but NOT
-    // props.closeOnEscape (the latter is referenced in the CALLBACK body, not
-    // the GETTER body).
-    expect(lifecycleEffectsSection).toMatch(/useEffect\([\s\S]*?\[props\.open\]\)/);
-    expect(lifecycleEffectsSection).not.toMatch(/\[props\.closeOnEscape\]/);
-    expect(lifecycleEffectsSection).not.toMatch(/\[props\.closeOnEscape, props\.open\]/);
+    // Dep array MUST include props.open (getter body) — that's the watch trigger.
+    // Dep array MUST also include `reposition` (closure ref read in callback body)
+    // because react-hooks/exhaustive-deps requires every identifier read inside
+    // the useEffect callback to appear in the deps. We union getterDeps with
+    // computeHelperBodyDeps(callback) — that picks up both closure helpers AND
+    // any reactive refs read in the callback body (e.g., props.closeOnEscape).
+    // The cost: we lose the "getter-only" semantic purity, but the lint gate
+    // (D-62 no-eslint-disable floor) hard-requires this union.
+    expect(lifecycleEffectsSection).toMatch(/useEffect\([\s\S]*?\bprops\.open\b/);
+    expect(lifecycleEffectsSection).toMatch(/useEffect\([\s\S]*?\breposition\b/);
     expect(collectors.react.has('useEffect')).toBe(true);
   });
 
-  it('Quick 260515-u2b — WatchHook callback body is INLINED into the useEffect callback', () => {
+  it('Quick 260515-u2b — WatchHook callback body is INLINED into the useEffect callback; deps include both fire (closure) and props.open (getter)', () => {
     const src = `<rozie name="WatchInlined">
 <props>{ open: { type: Boolean, default: false } }</props>
 <script>
@@ -127,7 +131,8 @@ $watch(() => $props.open, () => { fire() })
       runtime: new RuntimeReactImportCollector(),
     };
     const { lifecycleEffectsSection } = emitScript(ir, collectors);
-    expect(lifecycleEffectsSection).toMatch(/useEffect\(\(\) => \{[\s\S]*?fire\(\);[\s\S]*?\}, \[props\.open\]\)/);
+    // Callback body is inlined; deps array sorted alphabetically.
+    expect(lifecycleEffectsSection).toMatch(/useEffect\(\(\) => \{\s*fire\(\);\s*\}, \[fire, props\.open\]\);/);
   });
 
   it('Quick 260515-u2b — Counter (no watchers) emits no extra useEffect; existing fixtures untouched', () => {

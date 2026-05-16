@@ -2,32 +2,32 @@
   "node": {
     "type": "StyleAST",
     "loc": {
-      "start": 2429,
-      "end": 2813
+      "start": 2796,
+      "end": 3180
     },
     "cssText": "\n.dropdown { position: relative; display: inline-block; }\n.dropdown-panel {\n  position: fixed;\n  z-index: var(--rozie-dropdown-z, 1000);\n  background: white;\n  border: 1px solid rgba(0, 0, 0, 0.1);\n  border-radius: 6px;\n  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);\n}\n\n/* Unscoped escape hatch — anything inside :root { } is emitted globally. */\n:root {\n  --rozie-dropdown-z: 1000;\n}\n",
     "rules": [
       {
         "selector": ".dropdown",
         "loc": {
-          "start": 2430,
-          "end": 2486
+          "start": 2797,
+          "end": 2853
         },
         "isRootEscape": false
       },
       {
         "selector": ".dropdown-panel",
         "loc": {
-          "start": 2487,
-          "end": 2696
+          "start": 2854,
+          "end": 3063
         },
         "isRootEscape": false
       },
       {
         "selector": ":root",
         "loc": {
-          "start": 2775,
-          "end": 2812
+          "start": 3142,
+          "end": 3179
         },
         "isRootEscape": true
       }

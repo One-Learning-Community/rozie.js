@@ -40,8 +40,16 @@ export default function DropdownPage(): JSX.Element {
       <p>
         Open: <span data-testid="dropdown-open-state">{String(open)}</span>
       </p>
+      {/*
+       * `marginTop: '300px'` keeps force-open out of the path of the
+       * Dropdown's `position: fixed` panel (which renders at
+       * `trigger.bottom`, roughly y=50). Without spacing, the panel's items
+       * overlap force-open and intercept the second click in the e2e
+       * stale-closure spec — see quick plan 260515-u2b.
+       */}
       <button
         data-testid="force-open"
+        style={{ marginTop: '300px' }}
         onClick={() => setForceOpen((f) => !f)}
       >
         {forceOpen ? 'Release force-open' : 'Force open prop'}

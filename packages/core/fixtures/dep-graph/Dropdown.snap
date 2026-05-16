@@ -1,6 +1,12 @@
 {
   "lifecycle.0.setup": [
     {
+      "scope": "props",
+      "path": [
+        "open"
+      ]
+    },
+    {
       "scope": "closure",
       "identifier": "reposition"
     }
@@ -92,6 +98,14 @@
     {
       "scope": "closure",
       "identifier": "close"
+    }
+  ],
+  "watch.0.getter": [
+    {
+      "scope": "props",
+      "path": [
+        "open"
+      ]
     }
   ]
 }

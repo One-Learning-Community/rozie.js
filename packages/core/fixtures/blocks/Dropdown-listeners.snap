@@ -2,66 +2,66 @@
   "node": {
     "type": "ListenersAST",
     "loc": {
-      "start": 1506,
-      "end": 2126
+      "start": 1873,
+      "end": 2493
     },
     "entries": [
       {
         "rawKey": "document:click.outside($refs.triggerEl, $refs.panelEl)",
         "rawKeyLoc": {
-          "start": 1773,
-          "end": 1827
+          "start": 2140,
+          "end": 2194
         },
         "target": "document",
         "event": "click",
         "modifierChainText": ".outside($refs.triggerEl, $refs.panelEl)",
-        "modifierChainBaseOffset": 1787,
+        "modifierChainBaseOffset": 2154,
         "chain": [],
         "value": {
           "type": "ObjectExpression",
-          "start": 1830,
-          "end": 1913,
+          "start": 2197,
+          "end": 2280,
           "loc": {
             "start": {
-              "line": 55,
+              "line": 63,
               "column": 60,
-              "index": 1830
+              "index": 2197
             },
             "end": {
-              "line": 58,
+              "line": 66,
               "column": 3,
-              "index": 1913
+              "index": 2280
             },
             "filename": "Dropdown.rozie"
           },
           "properties": [
             {
               "type": "ObjectProperty",
-              "start": 1836,
-              "end": 1888,
+              "start": 2203,
+              "end": 2255,
               "loc": {
                 "start": {
-                  "line": 56,
+                  "line": 64,
                   "column": 4,
-                  "index": 1836
+                  "index": 2203
                 },
                 "end": {
-                  "line": 56,
+                  "line": 64,
                   "column": 56,
-                  "index": 1888
+                  "index": 2255
                 },
                 "filename": "Dropdown.rozie"
               },
               "method": false,
               "key": {
                 "type": "Identifier",
-                "start": 1836,
-                "end": 1840,
+                "start": 2203,
+                "end": 2207,
                 "loc": {
                   "end": {
-                    "line": 56,
+                    "line": 64,
                     "column": 8,
-                    "index": 1840
+                    "index": 2207
                   },
                   "filename": "Dropdown.rozie",
                   "identifierName": "when"
@@ -72,13 +72,13 @@
               "shorthand": false,
               "value": {
                 "type": "StringLiteral",
-                "start": 1845,
-                "end": 1888,
+                "start": 2212,
+                "end": 2255,
                 "loc": {
                   "start": {
-                    "line": 56,
+                    "line": 64,
                     "column": 13,
-                    "index": 1845
+                    "index": 2212
                   },
                   "filename": "Dropdown.rozie"
                 },
@@ -87,31 +87,31 @@
             },
             {
               "type": "ObjectProperty",
-              "start": 1894,
-              "end": 1908,
+              "start": 2261,
+              "end": 2275,
               "loc": {
                 "start": {
-                  "line": 57,
+                  "line": 65,
                   "column": 4,
-                  "index": 1894
+                  "index": 2261
                 },
                 "end": {
-                  "line": 57,
+                  "line": 65,
                   "column": 18,
-                  "index": 1908
+                  "index": 2275
                 },
                 "filename": "Dropdown.rozie"
               },
               "method": false,
               "key": {
                 "type": "Identifier",
-                "start": 1894,
-                "end": 1901,
+                "start": 2261,
+                "end": 2268,
                 "loc": {
                   "end": {
-                    "line": 57,
+                    "line": 65,
                     "column": 11,
-                    "index": 1901
+                    "index": 2268
                   },
                   "filename": "Dropdown.rozie",
                   "identifierName": "handler"
@@ -122,13 +122,13 @@
               "shorthand": false,
               "value": {
                 "type": "Identifier",
-                "start": 1903,
-                "end": 1908,
+                "start": 2270,
+                "end": 2275,
                 "loc": {
                   "start": {
-                    "line": 57,
+                    "line": 65,
                     "column": 13,
-                    "index": 1903
+                    "index": 2270
                   },
                   "filename": "Dropdown.rozie",
                   "identifierName": "close"
@@ -139,66 +139,66 @@
           ]
         },
         "loc": {
-          "start": 1772,
-          "end": 1913
+          "start": 2139,
+          "end": 2280
         }
       },
       {
         "rawKey": "document:keydown.escape",
         "rawKeyLoc": {
-          "start": 1918,
-          "end": 1941
+          "start": 2285,
+          "end": 2308
         },
         "target": "document",
         "event": "keydown",
         "modifierChainText": ".escape",
-        "modifierChainBaseOffset": 1934,
+        "modifierChainBaseOffset": 2301,
         "chain": [],
         "value": {
           "type": "ObjectExpression",
-          "start": 1944,
-          "end": 2021,
+          "start": 2311,
+          "end": 2388,
           "loc": {
             "start": {
-              "line": 59,
+              "line": 67,
               "column": 29,
-              "index": 1944
+              "index": 2311
             },
             "end": {
-              "line": 62,
+              "line": 70,
               "column": 3,
-              "index": 2021
+              "index": 2388
             },
             "filename": "Dropdown.rozie"
           },
           "properties": [
             {
               "type": "ObjectProperty",
-              "start": 1950,
-              "end": 1996,
+              "start": 2317,
+              "end": 2363,
               "loc": {
                 "start": {
-                  "line": 60,
+                  "line": 68,
                   "column": 4,
-                  "index": 1950
+                  "index": 2317
                 },
                 "end": {
-                  "line": 60,
+                  "line": 68,
                   "column": 50,
-                  "index": 1996
+                  "index": 2363
                 },
                 "filename": "Dropdown.rozie"
               },
               "method": false,
               "key": {
                 "type": "Identifier",
-                "start": 1950,
-                "end": 1954,
+                "start": 2317,
+                "end": 2321,
                 "loc": {
                   "end": {
-                    "line": 60,
+                    "line": 68,
                     "column": 8,
-                    "index": 1954
+                    "index": 2321
                   },
                   "filename": "Dropdown.rozie",
                   "identifierName": "when"
@@ -209,13 +209,13 @@
               "shorthand": false,
               "value": {
                 "type": "StringLiteral",
-                "start": 1959,
-                "end": 1996,
+                "start": 2326,
+                "end": 2363,
                 "loc": {
                   "start": {
-                    "line": 60,
+                    "line": 68,
                     "column": 13,
-                    "index": 1959
+                    "index": 2326
                   },
                   "filename": "Dropdown.rozie"
                 },
@@ -224,31 +224,31 @@
             },
             {
               "type": "ObjectProperty",
-              "start": 2002,
-              "end": 2016,
+              "start": 2369,
+              "end": 2383,
               "loc": {
                 "start": {
-                  "line": 61,
+                  "line": 69,
                   "column": 4,
-                  "index": 2002
+                  "index": 2369
                 },
                 "end": {
-                  "line": 61,
+                  "line": 69,
                   "column": 18,
-                  "index": 2016
+                  "index": 2383
                 },
                 "filename": "Dropdown.rozie"
               },
               "method": false,
               "key": {
                 "type": "Identifier",
-                "start": 2002,
-                "end": 2009,
+                "start": 2369,
+                "end": 2376,
                 "loc": {
                   "end": {
-                    "line": 61,
+                    "line": 69,
                     "column": 11,
-                    "index": 2009
+                    "index": 2376
                   },
                   "filename": "Dropdown.rozie",
                   "identifierName": "handler"
@@ -259,13 +259,13 @@
               "shorthand": false,
               "value": {
                 "type": "Identifier",
-                "start": 2011,
-                "end": 2016,
+                "start": 2378,
+                "end": 2383,
                 "loc": {
                   "start": {
-                    "line": 61,
+                    "line": 69,
                     "column": 13,
-                    "index": 2011
+                    "index": 2378
                   },
                   "filename": "Dropdown.rozie",
                   "identifierName": "close"
@@ -276,66 +276,66 @@
           ]
         },
         "loc": {
-          "start": 1917,
-          "end": 2021
+          "start": 2284,
+          "end": 2388
         }
       },
       {
         "rawKey": "window:resize.throttle(100).passive",
         "rawKeyLoc": {
-          "start": 2026,
-          "end": 2061
+          "start": 2393,
+          "end": 2428
         },
         "target": "window",
         "event": "resize",
         "modifierChainText": ".throttle(100).passive",
-        "modifierChainBaseOffset": 2039,
+        "modifierChainBaseOffset": 2406,
         "chain": [],
         "value": {
           "type": "ObjectExpression",
-          "start": 2064,
-          "end": 2122,
+          "start": 2431,
+          "end": 2489,
           "loc": {
             "start": {
-              "line": 63,
+              "line": 71,
               "column": 41,
-              "index": 2064
+              "index": 2431
             },
             "end": {
-              "line": 66,
+              "line": 74,
               "column": 3,
-              "index": 2122
+              "index": 2489
             },
             "filename": "Dropdown.rozie"
           },
           "properties": [
             {
               "type": "ObjectProperty",
-              "start": 2070,
-              "end": 2092,
+              "start": 2437,
+              "end": 2459,
               "loc": {
                 "start": {
-                  "line": 64,
+                  "line": 72,
                   "column": 4,
-                  "index": 2070
+                  "index": 2437
                 },
                 "end": {
-                  "line": 64,
+                  "line": 72,
                   "column": 26,
-                  "index": 2092
+                  "index": 2459
                 },
                 "filename": "Dropdown.rozie"
               },
               "method": false,
               "key": {
                 "type": "Identifier",
-                "start": 2070,
-                "end": 2074,
+                "start": 2437,
+                "end": 2441,
                 "loc": {
                   "end": {
-                    "line": 64,
+                    "line": 72,
                     "column": 8,
-                    "index": 2074
+                    "index": 2441
                   },
                   "filename": "Dropdown.rozie",
                   "identifierName": "when"
@@ -346,13 +346,13 @@
               "shorthand": false,
               "value": {
                 "type": "StringLiteral",
-                "start": 2079,
-                "end": 2092,
+                "start": 2446,
+                "end": 2459,
                 "loc": {
                   "start": {
-                    "line": 64,
+                    "line": 72,
                     "column": 13,
-                    "index": 2079
+                    "index": 2446
                   },
                   "filename": "Dropdown.rozie"
                 },
@@ -361,31 +361,31 @@
             },
             {
               "type": "ObjectProperty",
-              "start": 2098,
-              "end": 2117,
+              "start": 2465,
+              "end": 2484,
               "loc": {
                 "start": {
-                  "line": 65,
+                  "line": 73,
                   "column": 4,
-                  "index": 2098
+                  "index": 2465
                 },
                 "end": {
-                  "line": 65,
+                  "line": 73,
                   "column": 23,
-                  "index": 2117
+                  "index": 2484
                 },
                 "filename": "Dropdown.rozie"
               },
               "method": false,
               "key": {
                 "type": "Identifier",
-                "start": 2098,
-                "end": 2105,
+                "start": 2465,
+                "end": 2472,
                 "loc": {
                   "end": {
-                    "line": 65,
+                    "line": 73,
                     "column": 11,
-                    "index": 2105
+                    "index": 2472
                   },
                   "filename": "Dropdown.rozie",
                   "identifierName": "handler"
@@ -396,13 +396,13 @@
               "shorthand": false,
               "value": {
                 "type": "Identifier",
-                "start": 2107,
-                "end": 2117,
+                "start": 2474,
+                "end": 2484,
                 "loc": {
                   "start": {
-                    "line": 65,
+                    "line": 73,
                     "column": 13,
-                    "index": 2107
+                    "index": 2474
                   },
                   "filename": "Dropdown.rozie",
                   "identifierName": "reposition"
@@ -413,8 +413,8 @@
           ]
         },
         "loc": {
-          "start": 2025,
-          "end": 2122
+          "start": 2392,
+          "end": 2489
         }
       }
     ]
