@@ -48,11 +48,15 @@ export default function Dropdown(_props: DropdownProps): JSX.Element {
   }, []);
 
   useEffect(() => {
-    reposition();
-  }, [reposition]);
+    // Initial reposition only if the panel is open at mount time.
+  if (open) reposition();
+  }, [open, reposition]);
   useEffect(() => {
     
   }, []);
+  useEffect(() => {
+    if (open) reposition();
+  }, [open]);
 
   const _rozieThrottledLReposition = useThrottledCallback(reposition, [open, reposition], 100);
 

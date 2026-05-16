@@ -22,9 +22,13 @@ export default function Dropdown(_props: DropdownProps): JSX.Element {
 
   const [open, setOpen] = createControllableSignal(_props as Record<string, unknown>, 'open', false);
   onMount(() => {
-    reposition();
+    // Initial reposition only if the panel is open at mount time.
+    if (open()) reposition();
   });
   onMount(() => {});
+  createEffect(() => { (() => open())(); (() => {
+    if (open()) reposition();
+  })(); });
   let triggerElRef: HTMLElement | null = null;
   let panelElRef: HTMLElement | null = null;
 
@@ -43,8 +47,9 @@ export default function Dropdown(_props: DropdownProps): JSX.Element {
     });
   };
 
-  // Multiple $onMount calls run in source order. Useful for colocating setup
-  // with the logic it serves.
+  // Re-fire reposition() whenever the open transition flips on. The panel
+  // element is r-if-gated, so $refs.panelEl is undefined at mount time — $watch
+  // is the primitive that re-runs the effect after panel mount.
 
   const _rozieThrottleLReposition = createThrottledHandler(reposition, 100);
 

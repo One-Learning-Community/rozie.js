@@ -45,16 +45,22 @@ const reposition = () => {
   });
 };
 
-// Multiple $onMount calls run in source order. Useful for colocating setup
-// with the logic it serves.
+// Re-fire reposition() whenever the open transition flips on. The panel
+// element is r-if-gated, so $refs.panelEl is undefined at mount time — $watch
+// is the primitive that re-runs the effect after panel mount.
 
 $effect(() => {
-  reposition();
+  // Initial reposition only if the panel is open at mount time.
+  if (open) reposition();
 });
 $effect(() => {
   // Example of integrating a vanilla JS library — $refs gives direct DOM access.
   // new Popper($refs.triggerEl, $refs.panelEl, { placement: 'bottom-start' })
 });
+
+$effect(() => { (() => open)(); (() => {
+  if (open) reposition();
+})(); });
 
 $effect(() => {
   if (!(open && closeOnOutsideClick)) return;
