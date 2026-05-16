@@ -1,0 +1,18 @@
+<rozie name="Wrapper">
+
+<components>
+{
+  Inner: './inner.rozie',
+}
+</components>
+
+<template>
+<Inner>
+  <template #header>
+    <slot name="title">default title</slot>
+  </template>
+  <slot>default body</slot>
+</Inner>
+</template>
+
+</rozie>

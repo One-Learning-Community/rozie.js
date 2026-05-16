@@ -1,0 +1,15 @@
+<rozie name="Consumer">
+
+<components>
+{
+  Wrapper: './wrapper.rozie',
+}
+</components>
+
+<template>
+<Wrapper>
+  <template #title>Hello from consumer</template>
+</Wrapper>
+</template>
+
+</rozie>

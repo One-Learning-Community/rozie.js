@@ -74,6 +74,14 @@ const FIXTURE_DIRS = readdirSync(FIXTURES_DIR, { withFileTypes: true })
  * sibling producer at lowering time so threadParamTypes can flow producer
  * SlotDecl.paramTypes onto the consumer's SlotFillerDecl.paramTypes.
  *
+ * Plan 07.2-05 — 3-file fixture support (consumer + wrapper + inner).
+ * When the fixture contains a `wrapper.rozie` sibling, the runner ALSO
+ * compiles wrapper.rozie per target and snapshots its output against
+ * `expected.wrapper.<ext>`. This is the verification surface for slot
+ * re-projection (R6) — the wrapper's `<slot>` inside a `<template #...>`
+ * fill body emits the per-target re-projection shape (Svelte
+ * `{@render parent?.(ctx)}`, React `props.renderX?.(ctx)`, etc.).
+ *
  * Wave-1 only covers vue/react/svelte for the consumer-* fixtures. Cells for
  * which the corresponding `expected.<ext>` file is absent are intentionally
  * skipped — Plan 07.2-03 fills the solid/lit/angular tail and creates those
@@ -139,6 +147,47 @@ describe('QA-02 — 6-class slot acceptance matrix', () => {
         // captures the DOCUMENTED render-prop / data-rozie-params compromise
         // output (D-05) — that is expected-correct.
         await expect(result.code).toMatchFileSnapshot(expectedPath);
+      });
+
+      // Phase 07.2 Plan 05 — re-projection (R6) verification surface. When
+      // wrapper.rozie is present in the fixture (3-file: inner + wrapper +
+      // consumer), also compile the wrapper and snapshot against
+      // `expected.wrapper.<ext>`. The wrapper's `<slot>` inside a fill body
+      // emits per-target re-projection — this is the cell that proves the
+      // sticky-downward `context: 'fill-body'` flag from Plan 07.2-01 routes
+      // through the per-target emit correctly.
+      it('wrapper.rozie compiles error-free and matches re-projection snapshot', async () => {
+        const wrapperPath = join(FIXTURES_DIR, slotClass, 'wrapper.rozie');
+        if (!existsSync(wrapperPath)) return; // not a 3-file fixture
+
+        const wrapperExpectedPath = join(
+          FIXTURES_DIR,
+          slotClass,
+          `expected.wrapper${primaryExt(target)}`,
+        );
+        if (!existsSync(wrapperExpectedPath)) {
+          // eslint-disable-next-line no-console
+          console.log(
+            `[slot-matrix] skipping ${slotClass} wrapper × ${target} — expected snapshot absent.`,
+          );
+          return;
+        }
+
+        const wrapperSource = readFileSync(wrapperPath, 'utf8');
+        const wrapperResult = compile(wrapperSource, {
+          target,
+          filename: wrapperPath,
+          resolverRoot,
+          types: true,
+          sourceMap: false,
+        });
+
+        const wrapperErrors = wrapperResult.diagnostics.filter(
+          (d) => d.severity === 'error',
+        );
+        expect(wrapperErrors).toEqual([]);
+
+        await expect(wrapperResult.code).toMatchFileSnapshot(wrapperExpectedPath);
       });
     });
   });
