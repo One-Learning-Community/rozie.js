@@ -34,6 +34,8 @@ export default defineConfig({
         treeNode: resolve(__dirname, 'src/pages/TreeNodePage.html'),
         card: resolve(__dirname, 'src/pages/CardPage.html'),
         cardHeader: resolve(__dirname, 'src/pages/CardHeaderPage.html'),
+        // Phase 07.2 Plan 06 — ModalConsumer dogfood page.
+        modalConsumer: resolve(__dirname, 'src/modal-consumer.html'),
       },
     },
   },

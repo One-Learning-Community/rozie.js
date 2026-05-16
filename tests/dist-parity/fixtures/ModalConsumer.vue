@@ -17,8 +17,8 @@
     Dynamic-name demo body
   </Modal>
 
-  <WrapperModal :title="props.title"><template #title>
-      <h2>Re-projected title</h2>
+  <WrapperModal :title="props.title"><template #brand>
+      <h2>Re-projected brand</h2>
     </template><template #actions>
       <button>Wrapper action</button>
     </template>

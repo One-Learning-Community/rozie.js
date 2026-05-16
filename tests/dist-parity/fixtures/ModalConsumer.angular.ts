@@ -27,8 +27,8 @@ import { WrapperModal } from './WrapperModal';
         Dynamic-name demo body
       </ng-template><ng-container *ngTemplateOutlet="templates[slotName()]"></ng-container></rozie-modal>
 
-      <rozie-wrapper-modal [title]="title()"><ng-template #title>
-          <h2>Re-projected title</h2>
+      <rozie-wrapper-modal [title]="title()"><ng-template #brand>
+          <h2>Re-projected brand</h2>
         </ng-template><ng-template #actions>
           <button>Wrapper action</button>
         </ng-template><ng-template #defaultSlot>

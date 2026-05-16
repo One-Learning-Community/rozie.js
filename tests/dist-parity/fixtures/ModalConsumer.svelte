@@ -34,8 +34,8 @@ function onConfirm() {
       <span class="dynamic-fill">Dynamic header via slotName</span>
     {/snippet}</Modal>
 
-  <WrapperModal title={title}>{#snippet title()}
-      <h2>Re-projected title</h2>
+  <WrapperModal title={title}>{#snippet brand()}
+      <h2>Re-projected brand</h2>
     {/snippet}{#snippet actions()}
       <button>Wrapper action</button>
     {/snippet}

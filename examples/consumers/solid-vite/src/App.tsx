@@ -7,6 +7,8 @@ import ModalPage from './pages/ModalPage';
 import CardPage from './pages/CardPage';
 import CardHeaderPage from './pages/CardHeaderPage';
 import TreeNodePage from './pages/TreeNodePage';
+// Phase 07.2 Plan 06 — ModalConsumer dogfood page (Wave 2 close-out).
+import ModalConsumerPage from './pages/ModalConsumer';
 
 /**
  * Page-routing shell for the Solid Vite demo.
@@ -56,6 +58,8 @@ export function App() {
           <a href="#/card-header" data-testid="nav-card-header">CardHeader</a>
           {' | '}
           <a href="#/treenode" data-testid="nav-treenode">TreeNode</a>
+          {' | '}
+          <a href="#/modal-consumer" data-testid="nav-modal-consumer">ModalConsumer</a>
         </nav>
       </header>
       <main style={{ padding: '1rem', 'font-family': 'system-ui, sans-serif' }}>
@@ -67,6 +71,7 @@ export function App() {
         <Show when={route() === '/card'}><CardPage /></Show>
         <Show when={route() === '/card-header'}><CardHeaderPage /></Show>
         <Show when={route() === '/treenode'}><TreeNodePage /></Show>
+        <Show when={route() === '/modal-consumer'}><ModalConsumerPage /></Show>
       </main>
     </div>
   );

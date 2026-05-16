@@ -8,6 +8,8 @@ import ModalPage from './pages/ModalPage';
 import TreeNodePage from './pages/TreeNodePage';
 import CardPage from './pages/CardPage';
 import CardHeaderPage from './pages/CardHeaderPage';
+// Phase 07.2 Plan 06 — ModalConsumer dogfood page (Wave 2 close-out).
+import ModalConsumerPage from './pages/ModalConsumerPage';
 import LitInteropPage from './pages/LitInteropPage';
 
 /**
@@ -29,6 +31,7 @@ type PageKey =
   | 'tree-node'
   | 'card'
   | 'card-header'
+  | 'modal-consumer'
   | 'lit-interop';
 
 const PAGES: Record<PageKey, () => JSX.Element> = {
@@ -40,6 +43,7 @@ const PAGES: Record<PageKey, () => JSX.Element> = {
   'tree-node': TreeNodePage,
   card: CardPage,
   'card-header': CardHeaderPage,
+  'modal-consumer': ModalConsumerPage,
   'lit-interop': LitInteropPage,
 };
 
@@ -52,6 +56,7 @@ const PAGE_KEYS: ReadonlyArray<PageKey> = [
   'tree-node',
   'card',
   'card-header',
+  'modal-consumer',
   'lit-interop',
 ];
 

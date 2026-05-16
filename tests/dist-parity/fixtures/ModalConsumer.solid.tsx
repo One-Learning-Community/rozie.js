@@ -41,8 +41,8 @@ export default function ModalConsumer(_props: ModalConsumerProps): JSX.Element {
         Dynamic-name demo body
       </Modal>
 
-      <WrapperModal title={local.title} titleSlot={() => (<>
-          <h2 data-rozie-s-5d081d3a="">Re-projected title</h2>
+      <WrapperModal title={local.title} brandSlot={() => (<>
+          <h2 data-rozie-s-5d081d3a="">Re-projected brand</h2>
         </>)} actionsSlot={() => (<>
           <button data-rozie-s-5d081d3a="">Wrapper action</button>
         </>)}>

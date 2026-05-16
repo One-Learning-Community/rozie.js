@@ -19,6 +19,8 @@
   import TreeNode from './TreeNode.rozie';
   import Card from './Card.rozie';
   import CardHeader from './CardHeader.rozie';
+  // Phase 07.2 Plan 06 — ModalConsumer dogfood page (Wave 2 close-out).
+  import ModalConsumerPage from './pages/ModalConsumer.svelte';
   import LitInterop from './routes/lit-interop/+page.svelte';
 
   type PageKey =
@@ -30,6 +32,7 @@
     | 'tree-node'
     | 'card'
     | 'card-header'
+    | 'modal-consumer'
     | 'lit-interop';
   const PAGE_KEYS: ReadonlyArray<PageKey> = [
     'counter',
@@ -40,6 +43,7 @@
     'tree-node',
     'card',
     'card-header',
+    'modal-consumer',
     'lit-interop',
   ];
 
@@ -214,6 +218,8 @@
       <CardHeader title="Standalone header" onClose={() => cardHeaderCloseCount++} />
       <p>Closes: <span data-testid="card-header-close-count">{cardHeaderCloseCount}</span></p>
     </section>
+  {:else if current === 'modal-consumer'}
+    <ModalConsumerPage />
   {:else if current === 'lit-interop'}
     <LitInterop />
   {/if}

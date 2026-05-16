@@ -16,3 +16,6 @@ import './rozie/Modal.rozie';
 import './rozie/TreeNode.rozie';
 import './rozie/Card.rozie';
 import './rozie/CardHeader.rozie';
+// Phase 07.2 Plan 06 — ModalConsumer dogfood (transitively imports
+// Modal.rozie + WrapperModal.rozie via <components>).
+import './rozie/ModalConsumer.rozie';

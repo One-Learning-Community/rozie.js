@@ -94,7 +94,7 @@ export default class ModalConsumer extends SignalWatcher(LitElement) {
     Dynamic-name demo body
   </rozie-modal>
 
-  <rozie-wrapper-modal .title=${this.title}><h2 slot="title">Re-projected title</h2><button slot="actions">Wrapper action</button>
+  <rozie-wrapper-modal .title=${this.title}><h2 slot="brand">Re-projected brand</h2><button slot="actions">Wrapper action</button>
     Body via wrapper's default slot
     </rozie-wrapper-modal>
 </div>

@@ -48,6 +48,12 @@ const EXAMPLES = [
   'TreeNode',
   'Card',
   'CardHeader',
+  // Phase 07.2 Plan 06 — ModalConsumer dogfood example added to the 48-cell
+  // matrix (now 54 cells = 9 × 6). Linux-rendered baseline ModalConsumer.png
+  // is generated via the pinned Playwright Docker image per memory
+  // `feedback_vr_linux_baselines` (the matrix baseline is the Vue render at
+  // /?example=ModalConsumer&target=vue; the other 5 targets diff against it).
+  'ModalConsumer',
 ] as const;
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'] as const;
 

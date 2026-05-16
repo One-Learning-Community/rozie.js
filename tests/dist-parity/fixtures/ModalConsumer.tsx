@@ -38,8 +38,8 @@ export default function ModalConsumer(_props: ModalConsumerProps): JSX.Element {
           <span className={styles["dynamic-fill"]} data-rozie-s-5d081d3a="">Dynamic header via slotName</span>
         </>) }} />
 
-      <WrapperModal title={props.title} renderTitle={() => (<>
-          <h2 data-rozie-s-5d081d3a="">Re-projected title</h2>
+      <WrapperModal title={props.title} renderBrand={() => (<>
+          <h2 data-rozie-s-5d081d3a="">Re-projected brand</h2>
         </>)} renderActions={() => (<>
           <button data-rozie-s-5d081d3a="">Wrapper action</button>
         </>)} children={<>

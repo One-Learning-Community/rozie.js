@@ -43,6 +43,17 @@ examples/consumers/react-vite/src/Counter.ts
 examples/consumers/react-vite/src/CardHeader.ts
 examples/consumers/svelte-vite/src/Counter.ts
 examples/consumers/svelte-vite/src/CardHeader.ts
+# Phase 07.2 Plan 06 — ModalConsumer dogfood composes Modal + WrapperModal
+# via <components>; the prebuild emits Modal.ts + WrapperModal.ts shims
+# alongside their .rozie sources. Same gitignore pattern.
+examples/consumers/angular-analogjs/src/Modal.ts
+examples/consumers/angular-analogjs/src/WrapperModal.ts
+examples/consumers/lit-vanilla-demo/src/rozie/Modal.ts
+examples/consumers/lit-vanilla-demo/src/rozie/WrapperModal.ts
+examples/consumers/react-vite/src/Modal.ts
+examples/consumers/react-vite/src/WrapperModal.ts
+examples/consumers/svelte-vite/src/Modal.ts
+examples/consumers/svelte-vite/src/WrapperModal.ts
 # Quick task 260515-1y4: when the visual-regression rig builds the angular
 # target, `prebuildExtraRoots: [<repo>/examples]` extends the disk-cache
 # walker to the top-level `examples/` directory, which causes shims for any
