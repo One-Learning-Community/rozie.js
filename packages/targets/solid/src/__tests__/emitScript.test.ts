@@ -7,6 +7,9 @@
 import { describe, it, expect } from 'vitest';
 import * as t from '@babel/types';
 import type { IRComponent } from '../../../../core/src/ir/types.js';
+import { parse } from '../../../../core/src/parse.js';
+import { lowerToIR } from '../../../../core/src/ir/lower.js';
+import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
 import { SolidImportCollector, RuntimeSolidImportCollector } from '../rewrite/collectSolidImports.js';
 import { emitScript } from '../emit/emitScript.js';
 
@@ -56,5 +59,34 @@ describe('emitScript — Solid target', () => {
     // createSignal should be added to imports.
     expect(solidImports.has('createSignal')).toBe(true);
     expect(Array.isArray(result.diagnostics)).toBe(true);
+  });
+
+  it('Quick 260515-u2b — $watch lowers to createEffect(() => { (getter)(); (cb)(); }); adds createEffect import', () => {
+    const src = `<rozie name="WatchSynth">
+<props>{ open: { type: Boolean, default: false } }</props>
+<script>
+$watch(() => $props.open, () => { console.log('fired') })
+</script>
+<template><div /></template>
+</rozie>`;
+    const ir = lowerToIR(parse(src, { filename: 'WatchSynth.rozie' }).ast!, {
+      modifierRegistry: createDefaultRegistry(),
+    }).ir!;
+    const solidImports = new SolidImportCollector();
+    const runtimeImports = new RuntimeSolidImportCollector();
+    const result = emitScript(ir, { solidImports, runtimeImports });
+    // Solid: getter `() => $props.open` → `() => _props.open` after rewrite
+    //   (or just `props.open` depending on Solid's per-target identifier scheme)
+    expect(result.hookSection).toMatch(/createEffect\(\(\) => \{[\s\S]*?\(\(\) =>[\s\S]*?\)\(\);[\s\S]*?\(\(\) => \{[\s\S]*?\}\)\(\);[\s\S]*?\}\);/);
+    expect(solidImports.has('createEffect')).toBe(true);
+  });
+
+  it('Quick 260515-u2b — no $watch means no extra createEffect call', () => {
+    const ir = buildMinimalIR();
+    const solidImports = new SolidImportCollector();
+    const runtimeImports = new RuntimeSolidImportCollector();
+    const result = emitScript(ir, { solidImports, runtimeImports });
+    expect(result.hookSection).not.toContain('createEffect(');
+    expect(solidImports.has('createEffect')).toBe(false);
   });
 });

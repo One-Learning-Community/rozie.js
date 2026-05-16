@@ -335,6 +335,53 @@ function emitDerivedDecls(
 }
 
 /**
+ * Quick plan 260515-u2b — emit `$effect(() => { (() => getter)(); (() => { cb; })(); })`
+ * per top-level $watch call. Svelte 5's `$effect` auto-tracks any reactive
+ * read inside its body; we IIFE-invoke the getter and the callback so:
+ *   1. The getter's reads register the subscription on first run
+ *   2. The callback fires both on first run AND on any subsequent re-trigger
+ *      driven by getter signal changes
+ *
+ * Walks the cloned program; rewriteRozieIdentifiers already normalized
+ * `$props.x` → `x` (post-destructure) and `$data.x` → bare-let-read.
+ */
+function emitWatcherHooks(
+  clonedProgram: t.File,
+): { lines: string[]; consumedIndices: Set<number> } {
+  const lines: string[] = [];
+  const consumed = new Set<number>();
+  const body = clonedProgram.program.body;
+  for (let i = 0; i < body.length; i++) {
+    const stmt = body[i];
+    if (!stmt || !t.isExpressionStatement(stmt)) continue;
+    const expr = stmt.expression;
+    if (!t.isCallExpression(expr) || !t.isIdentifier(expr.callee)) continue;
+    if (expr.callee.name !== '$watch') continue;
+    const getterArg = expr.arguments[0];
+    const cbArg = expr.arguments[1];
+    if (
+      !getterArg ||
+      (!t.isArrowFunctionExpression(getterArg) && !t.isFunctionExpression(getterArg))
+    ) {
+      continue;
+    }
+    if (
+      !cbArg ||
+      (!t.isArrowFunctionExpression(cbArg) && !t.isFunctionExpression(cbArg))
+    ) {
+      continue;
+    }
+    consumed.add(i);
+    const getterCode = genCode(getterArg as t.Node);
+    const cbCode = genCode(cbArg as t.Node);
+    // Wrap each in parens so the genCode emits a parenthesized arrow we can
+    // immediately invoke as an IIFE inside the $effect block.
+    lines.push(`$effect(() => { (${getterCode})(); (${cbCode})(); });`);
+  }
+  return { lines, consumedIndices: consumed };
+}
+
+/**
  * Walk lifecycle hooks (D-19 paired) and emit one `$effect(() => { ... })`
  * block per hook. Returns lifecycle code lines + the SET of indices CONSUMED
  * in clonedProgram.body (so emitResidualScriptBody can skip them).
@@ -519,7 +566,9 @@ function emitResidualScriptBody(
         if (
           callee.name === '$onMount' ||
           callee.name === '$onUnmount' ||
-          callee.name === '$onUpdate'
+          callee.name === '$onUpdate' ||
+          // Quick plan 260515-u2b — $watch is consumed by emitWatcherHooks.
+          callee.name === '$watch'
         ) {
           continue;
         }
@@ -601,6 +650,10 @@ export function emitScript(
   const derivedLines = emitDerivedDecls(ir.computed, clonedComputedBodies);
 
   const { lines: lifecycleLines, consumedIndices } = emitLifecycleHooks(cloned);
+  // Quick plan 260515-u2b — $watch lowering (emits `$effect(() => {...})`).
+  const { lines: watcherLines, consumedIndices: watcherConsumed } =
+    emitWatcherHooks(cloned);
+  for (const idx of watcherConsumed) consumedIndices.add(idx);
   const { code: residualCode, stmts: residualStmts } = emitResidualScriptBody(cloned, consumedIndices);
 
   // 5. Assemble preamble sections (everything BEFORE the residual user code).
@@ -630,6 +683,8 @@ export function emitScript(
   if (residualCode.trim().length > 0) sections.push(residualCode);
   if (derivedLines.length > 0) sections.push(derivedLines.join('\n'));
   if (lifecycleLines.length > 0) sections.push(lifecycleLines.join('\n'));
+  // Quick plan 260515-u2b — watcher $effect blocks after lifecycle.
+  if (watcherLines.length > 0) sections.push(watcherLines.join('\n'));
 
   const scriptBlock = sections.join('\n\n');
 

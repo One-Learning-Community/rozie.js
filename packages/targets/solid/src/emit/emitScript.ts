@@ -223,6 +223,29 @@ export function emitScript(
     }
   }
 
+  // 4c. Quick plan 260515-u2b — $watch lowers to createEffect(() => { getter(); cb(); }).
+  // Solid's createEffect auto-tracks reads inside its callback. We IIFE-invoke
+  // both getter and callback so:
+  //   - Calling the getter performs the reactive reads → subscribes the effect
+  //   - Calling the callback fires the user code on first run + on re-trigger
+  // Both bodies need rewriteNode (post-IR rewrite) so $props.X / $data.X /
+  // $refs.X lower to the Solid-side idiom (props.X / dataX() / xRef).
+  // The getter/callback fields in the IR are bodies (BlockStatement | Expression);
+  // wrap each back into a Babel arrow expression, then run rewriteNode, then
+  // genCode.
+  for (const wh of ir.watchers) {
+    collectors.solidImports.add('createEffect');
+    const getterArrow = t.arrowFunctionExpression([], wh.getter);
+    const cbArrow = t.arrowFunctionExpression([], wh.callback);
+    const rewrittenGetter = rewriteNode(getterArrow, ir);
+    const rewrittenCb = rewriteNode(cbArrow, ir);
+    const getterCode = genCode(rewrittenGetter);
+    const cbCode = genCode(rewrittenCb);
+    hookLines.push(
+      `createEffect(() => { (${getterCode})(); (${cbCode})(); });`,
+    );
+  }
+
   // 4b. Ref variable declarations: `let fooRef: HTMLElement | null = null;`
   // Solid uses plain let variables (not useRef objects) for DOM refs.
   // Using HTMLElement (not Element) so DOM properties like .style, .focus() are accessible.
@@ -250,7 +273,11 @@ export function emitScript(
       const callee = stmt.expression.callee;
       if (
         t.isIdentifier(callee) &&
-        (callee.name === '$onMount' || callee.name === '$onUnmount' || callee.name === '$onUpdate')
+        (callee.name === '$onMount' ||
+          callee.name === '$onUnmount' ||
+          callee.name === '$onUpdate' ||
+          // Quick plan 260515-u2b — $watch is consumed by the watcher loop above.
+          callee.name === '$watch')
       ) {
         continue;
       }

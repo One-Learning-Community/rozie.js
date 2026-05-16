@@ -114,6 +114,29 @@ describe('emitScript — behavior (Plan 05-02a Task 1)', () => {
     const { scriptBlock } = emitScript(lowerExample('TodoList'));
     expect(scriptBlock).toContain("import type { Snippet } from 'svelte';");
   });
+
+  it('Quick 260515-u2b — WatchHook emits `$effect(() => { (() => open)(); (() => { ... })(); });`', () => {
+    const src = `<rozie name="WatchSynth">
+<props>{ open: { type: Boolean, default: false } }</props>
+<script>
+const reposition = () => { console.log('repos') }
+$watch(() => $props.open, () => { if ($props.open) reposition() })
+</script>
+<template><div /></template>
+</rozie>`;
+    const parsed = parse(src, { filename: 'WatchSynth.rozie' });
+    const ir = lowerToIR(parsed.ast!, { modifierRegistry: createDefaultRegistry() }).ir!;
+    const { scriptBlock } = emitScript(ir);
+    // The IIFE-invocation shape — both getter and callback wrapped in parens
+    // and immediately invoked inside the $effect body.
+    expect(scriptBlock).toMatch(/\$effect\(\(\) => \{\s*\(\(\) => open\)\(\);\s*\(\(\) => \{[\s\S]*?\}\)\(\);\s*\}\);/);
+  });
+
+  it('Quick 260515-u2b — Counter (no watchers) emits no extra $effect lines beyond lifecycle', () => {
+    const { scriptBlock } = emitScript(lowerExample('Counter'));
+    // Counter has no $watch and no $onMount, so $effect should not appear.
+    expect(scriptBlock).not.toMatch(/\$effect/);
+  });
 });
 
 describe('emitScript — per-block fixture snapshots (Plan 05-02a Task 1)', () => {
