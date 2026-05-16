@@ -147,7 +147,13 @@ function normalizeCss(s: string): string {
  *     `threadParamTypesForPipeline` helper in unplugin uses
  *     `dirname(filePath)` — so the fixture absolute path Just Works
  */
-const CONSUMER_FIXTURES = ['consumer-named-fill', 'consumer-scoped-fill'] as const;
+const CONSUMER_FIXTURES = [
+  'consumer-named-fill',
+  'consumer-scoped-fill',
+  // Phase 07.2 Plan 04 — Wave 2 dynamic-name dispatch (R5) extends the
+  // consumer-side subset by +24 cells (1 × 6 × 4). Together: 72 cells.
+  'consumer-dynamic-name',
+] as const;
 const SLOT_MATRIX_FIXTURES_DIR = resolve(HERE, '../slot-matrix/fixtures');
 
 function consumerFixturePath(fixtureClass: string): string {

@@ -64,6 +64,7 @@ import type {
 } from '@rozie/core';
 import * as t from '@babel/types';
 import _traverse from '@babel/traverse';
+import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
 // @babel/traverse ships CJS default-export; unwrap for ESM consumers.
 type TraverseFn = typeof import('@babel/traverse').default;
 const traverse: TraverseFn =
@@ -265,8 +266,40 @@ export function emitSlotFiller(
   filler: SlotFillerDecl,
   ctx: EmitSlotFillerCtx,
 ): LitFillerEmission {
+  // R5 — dynamic slot name. Per D-04 Lit row: shadow-DOM projection routes
+  // child elements to the matching `<slot name="…">` based on the runtime
+  // value of the child's `slot=` attribute. lit-html supports attribute
+  // interpolation directly via `slot=${expr}`, so we emit the body wrapped
+  // in `<div slot="${rewrittenExpr}">…</div>`. Single-root passthrough
+  // (the static-name optimization) is NOT applied here because the slot
+  // attribute is an interpolated binding rather than a literal — we always
+  // emit a synthetic `<div>` wrapper to carry the dynamic attribute.
+  //
+  // Silent fallback on runtime miss (D-05) is the native shadow-DOM
+  // behavior: when the slot attribute value doesn't match any of the
+  // producer's `<slot name="…">` elements, the projection silently no-ops
+  // and the producer's `<slot>` defaultContent renders.
+  //
+  // Scoped + dynamic combination is deferred: the IR pre-transform (used
+  // for static-name scoped) requires a stable `_<name>Ctx` field that we
+  // can't synthesise from a dynamic expression at compile time. Most
+  // consumer libraries don't mix scoped + dynamic in practice; documented
+  // in SUMMARY as a known limitation.
   if (filler.isDynamic) {
-    return { childTemplate: '', firstUpdatedLines: [], classFields: [] };
+    if (!filler.dynamicNameExpr) {
+      // ROZ946 was already emitted at lower time — emit nothing.
+      return { childTemplate: '', firstUpdatedLines: [], classFields: [] };
+    }
+    const body = ctx.emitChildren(filler.body);
+    const rewritten = rewriteTemplateExpression(filler.dynamicNameExpr, ctx.ir);
+    // The emitted lit-html template is wrapped in `html\`…\`` by emitTemplate;
+    // we emit the literal characters `${<rewritten>}` so the runtime tag
+    // function interpolates the value into the `slot` attribute. Using
+    // double-quotes around the binding to match Lit's idiomatic
+    // `slot="${expr}"` form (as used by the wrapWithSlotAttribute helper
+    // for static names).
+    const childTemplate = '<div slot="${' + rewritten + '}">' + body + '</div>';
+    return { childTemplate, firstUpdatedLines: [], classFields: [] };
   }
 
   // Phase 07.2 Plan 03 — scoped-param IR pre-transform.

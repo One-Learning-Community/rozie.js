@@ -202,6 +202,19 @@ export function emitAngular(
     imports.add('forwardRef');
   }
 
+  // Phase 07.2 Plan 04 (R5 dynamic-name): when the consumer's template emits
+  // at least one dynamic-name slot filler (`<template #[expr]>`), the
+  // dispatcher needs `ViewChild` + `TemplateRef` from @angular/core and
+  // `NgTemplateOutlet` from @angular/common (the decorator emitter already
+  // adds NgTemplateOutlet when hasSlots is true — for the consumer-side
+  // case we add it explicitly here since the IR.slots list is empty on a
+  // pure consumer with no producer-side slots of its own).
+  if (tmplResult.hasDynamicSlotFiller) {
+    imports.add('ViewChild');
+    imports.add('TemplateRef');
+    imports.addCommon('NgTemplateOutlet');
+  }
+
   // 6. Build the @Component decorator.
   const decorator = emitDecorator(ir, {
     componentName: ir.name,
@@ -209,6 +222,7 @@ export function emitAngular(
     stylesArrayBody: styleResult.stylesArrayBody,
     hasSlots: ir.slots.length > 0,
     hasNgModel: tmplResult.hasNgModel,
+    hasDynamicSlotFiller: tmplResult.hasDynamicSlotFiller,
     componentDecls: components,
     selfReferenced,
   });

@@ -45,6 +45,13 @@ export type AngularCoreImport =
   | 'ContentChild'
   | 'TemplateRef'
   /**
+   * Phase 07.2 Plan 04 (R5 dynamic-name): `ViewChild` — captures the
+   * synthetic `<ng-template #__dynSlot_<N>>` declared inside a consumer's
+   * component-tag body so the templates getter can resolve it for
+   * `*ngTemplateOutlet` dispatch.
+   */
+  | 'ViewChild'
+  /**
    * Phase 06.2 P2 (RESEARCH Pitfall 5): `forwardRef` — required for the
    * self-reference idiom `imports: [forwardRef(() => Self)]` in standalone
    * Angular components. emitAngular adds it via `imports.add('forwardRef')`
