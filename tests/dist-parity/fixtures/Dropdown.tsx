@@ -15,7 +15,7 @@ interface DropdownProps {
   closeOnOutsideClick?: boolean;
   closeOnEscape?: boolean;
   renderTrigger?: (ctx: TriggerCtx) => ReactNode;
-  children?: (ctx: ChildrenCtx) => ReactNode;
+  children?: ReactNode | ((ctx: ChildrenCtx) => ReactNode);
 }
 
 export default function Dropdown(_props: DropdownProps): JSX.Element {
@@ -86,7 +86,7 @@ export default function Dropdown(_props: DropdownProps): JSX.Element {
       </div>
 
       {(open) && <div ref={panelEl} className={styles["dropdown-panel"]} role="menu">
-        {props.children?.({ close })}
+        {typeof props.children === 'function' ? props.children({ close }) : props.children}
       </div>}</div>
     </>
   );

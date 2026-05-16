@@ -7,13 +7,29 @@
  * | Pattern                 | JSX form                                                      |
  * |-------------------------|---------------------------------------------------------------|
  * | Default, no params      | `{props.children}` (or `{props.children ?? <fallback>}`)      |
- * | Default with params     | `{props.children ? props.children(ctx) : __defaultChildren(ctx)}` |
+ * | Default with params     | `{typeof props.children === 'function' ? props.children(ctx) : (props.children ?? __defaultChildren(ctx))}` |
  * | Named, no params        | `{props.renderHeader ?? <fallback>}`                          |
  * | Named with params       | `{props.renderTrigger?.(ctx)}` or with-fallback variant       |
  * | Conditional presence    | Wrap by TemplateConditional outside this fn                   |
  *
  * paramObj is `{ key: rewriteTemplateExpression(arg.expression), ... }` per
  * the slot invocation's :paramName="expr" attribute set.
+ *
+ * Default-slot-with-params dual call shape (dropdown-react-default-slot
+ * bugfix, 2026-05-15): Vue/Svelte/Solid runtimes handle "consumer passes JSX
+ * children, definition uses :scope params" natively through their respective
+ * slot machineries — for Vue it's the SFC slot bridge, for Svelte the snippet
+ * runtime, for Solid the `children()` accessor. React has no equivalent
+ * mechanism; consumers pass `children` as a JS prop and the runtime can't
+ * silently re-shape "JSX.Element[] → (ctx) => JSX.Element" for us. We emit a
+ * `typeof === 'function'` discriminator so both call shapes work:
+ *   - Render-prop consumer (`<Dropdown>{({close}) => …}</Dropdown>`) → call with scope
+ *   - Children consumer (`<Dropdown><div/>…</Dropdown>` from DropdownDemo) →
+ *     pass through verbatim (consumer opted out of the scope).
+ * Named slots intentionally stay strict-function-only because the
+ * `renderHeader={…}` consumer pattern is unambiguous; consumers reach for a
+ * render prop deliberately. The default slot is the ambiguous case because
+ * it overlaps with React's built-in `children` prop semantics.
  *
  * Side effects:
  *   - May push a `function __defaultX(ctx) { return ...; }` into ctx.scriptInjections
@@ -214,17 +230,18 @@ export function emitSlotInvocation(
   }
 
   if (slotName === '' && hasParams) {
-    // Default with params
+    // Default with params — dual-shape: function (render-prop) OR ReactNode
+    // (raw children, consumer opted out of scope). See header comment.
     if (refined.defaultFnName !== null) {
-      return `{${fieldRef} ? ${fieldRef}(${paramObj}) : ${refined.defaultFnName}(${paramObj})}`;
+      return `{typeof ${fieldRef} === 'function' ? ${fieldRef}(${paramObj}) : (${fieldRef} ?? ${refined.defaultFnName}(${paramObj}))}`;
     }
     if (hasInvocationFallback) {
       // Fallback children may reference slot params (e.g., `item`); they're
       // in scope via the surrounding closure for default-slot inline children
       // because the slot is invoked from the same component body.
-      return `{${fieldRef} ? ${fieldRef}(${paramObj}) : ${invocationFallback}}`;
+      return `{typeof ${fieldRef} === 'function' ? ${fieldRef}(${paramObj}) : (${fieldRef} ?? ${invocationFallback})}`;
     }
-    return `{${fieldRef}?.(${paramObj})}`;
+    return `{typeof ${fieldRef} === 'function' ? ${fieldRef}(${paramObj}) : ${fieldRef}}`;
   }
 
   // Named slot
@@ -242,7 +259,8 @@ export function emitSlotInvocation(
     return `{${fieldRef}}`;
   }
 
-  // Named with params
+  // Named with params — strict render-prop shape (no dual-call; consumers
+  // explicitly opt into the function form by writing `renderTrigger={…}`).
   if (refined.defaultFnName !== null) {
     return `{${fieldRef} ? ${fieldRef}(${paramObj}) : ${refined.defaultFnName}(${paramObj})}`;
   }

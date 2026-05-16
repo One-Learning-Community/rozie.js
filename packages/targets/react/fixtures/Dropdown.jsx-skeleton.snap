@@ -5,6 +5,6 @@
   </div>
 
   {(open) && <div ref={panelEl} className={styles["dropdown-panel"]} role="menu">
-    {props.children?.({ close })}
+    {typeof props.children === 'function' ? props.children({ close }) : props.children}
   </div>}</div>
 </>

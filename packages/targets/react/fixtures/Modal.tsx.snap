@@ -21,7 +21,7 @@ interface ModalProps {
   title?: string;
   onClose?: (...args: unknown[]) => void;
   renderHeader?: (ctx: HeaderCtx) => ReactNode;
-  children?: (ctx: ChildrenCtx) => ReactNode;
+  children?: ReactNode | ((ctx: ChildrenCtx) => ReactNode);
   renderFooter?: (ctx: FooterCtx) => ReactNode;
 }
 
@@ -83,7 +83,7 @@ export default function Modal(_props: ModalProps): JSX.Element {
           {props.renderHeader ? props.renderHeader({ close }) : <h2>{props.title}</h2>}
           <button className={styles["close-btn"]} aria-label="Close" onClick={close}>×</button>
         </header>}<div className={styles["modal-body"]}>
-          {props.children?.({ close })}
+          {typeof props.children === 'function' ? props.children({ close }) : props.children}
           <Counter />
         </div>
 

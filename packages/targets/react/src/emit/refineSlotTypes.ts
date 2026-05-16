@@ -12,8 +12,19 @@
  *
  * paramTypes are `any` for v1 (Phase 6 TYPES-01 fills with real TS analysis).
  *
- * REACT-T-04 strict shape (per Claude's discretion in CONTEXT.md): default
- * slot with params uses `(ctx: ChildrenCtx) => ReactNode` STRICT — NO union.
+ * REACT-T-04 widened (dropdown-react-default-slot bugfix, 2026-05-15): the
+ * default slot with params is now declared as a UNION — ReactNode |
+ * ((ctx: ChildrenCtx) => ReactNode) — matching the public `.d.ts` shape
+ * already emitted by emitTypes.ts (D-84 / line 163). Rationale: a Rozie
+ * <slot :param="..."/> declaration says "the slot definition CAN provide a
+ * scoped param to consumers that want one." It does NOT force every consumer
+ * to provide a render-prop function. Consumers that pass ordinary JSX
+ * children (e.g. `<Dropdown :open="true"><div/>…</Dropdown>` from
+ * DropdownDemo.rozie) are legitimate — they simply opt out of the scope. The
+ * call site in emitSlotInvocation switches on `typeof children === 'function'`
+ * so both shapes work at runtime. Vue/Svelte/Solid handle this natively at
+ * their respective runtime layers; React needs the explicit emit-side
+ * accommodation.
  *
  * @experimental — shape may change before v1.0
  */
@@ -74,12 +85,14 @@ export function refineSlotTypes(slot: SlotDecl): RefinedSlotType {
         defaultFnName: lifting === 'function-const' ? '__defaultChildren' : null,
       };
     }
-    // Default slot WITH params — strict (ctx: ChildrenCtx) => ReactNode
+    // Default slot WITH params — union shape per dropdown-react-default-slot
+    // bugfix. Function-type notation in a union MUST be parenthesised
+    // (TS1385: `ReactNode | (ctx: X) => ReactNode` is a parse error).
     const paramFields = slot.params.map((p) => `${p.name}: any;`).join(' ');
     const ctxInterface = `interface ChildrenCtx { ${paramFields} }`;
     return {
       propFieldName: 'children',
-      propFieldType: '(ctx: ChildrenCtx) => ReactNode',
+      propFieldType: 'ReactNode | ((ctx: ChildrenCtx) => ReactNode)',
       ctxInterface,
       defaultLifting: lifting,
       defaultFnName: lifting === 'function-const' ? '__defaultChildren' : null,

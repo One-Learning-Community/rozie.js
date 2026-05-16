@@ -35,7 +35,11 @@ describe('refineSlotTypes — Plan 04-03 Task 2', () => {
     expect(refined.defaultLifting).toBe('none');
   });
 
-  it('default slot WITH params → strict (ctx: ChildrenCtx) => ReactNode', () => {
+  it('default slot WITH params → union ReactNode | ((ctx: ChildrenCtx) => ReactNode)', () => {
+    // dropdown-react-default-slot bugfix (2026-05-15): the default slot with
+    // params is a dual-shape union so consumers that pass ordinary JSX
+    // children (e.g. DropdownDemo.rozie) typecheck alongside render-prop
+    // consumers. The runtime call site discriminates by typeof === 'function'.
     const slot: SlotDecl = {
       type: 'SlotDecl',
       name: '',
@@ -49,7 +53,7 @@ describe('refineSlotTypes — Plan 04-03 Task 2', () => {
     };
     const refined = refineSlotTypes(slot);
     expect(refined.propFieldName).toBe('children');
-    expect(refined.propFieldType).toBe('(ctx: ChildrenCtx) => ReactNode');
+    expect(refined.propFieldType).toBe('ReactNode | ((ctx: ChildrenCtx) => ReactNode)');
     expect(refined.ctxInterface).toMatch(/interface ChildrenCtx \{ item: any; \}/);
   });
 
@@ -69,6 +73,8 @@ describe('refineSlotTypes — Plan 04-03 Task 2', () => {
   });
 
   it('named slot WITH params → renderTrigger?: (ctx: TriggerCtx) => ReactNode + interface', () => {
+    // Named slots stay strict-function-only: consumers reach for renderTrigger={…}
+    // deliberately so there's no ambiguity to bridge at the runtime call site.
     const slot: SlotDecl = {
       type: 'SlotDecl',
       name: 'trigger',

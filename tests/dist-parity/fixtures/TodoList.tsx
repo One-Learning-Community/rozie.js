@@ -16,7 +16,7 @@ interface TodoListProps {
   onToggle?: (...args: unknown[]) => void;
   onRemove?: (...args: unknown[]) => void;
   renderHeader?: (ctx: HeaderCtx) => ReactNode;
-  children?: (ctx: ChildrenCtx) => ReactNode;
+  children?: ReactNode | ((ctx: ChildrenCtx) => ReactNode);
   renderEmpty?: ReactNode;
 }
 
@@ -74,10 +74,10 @@ export default function TodoList(_props: TodoListProps): JSX.Element {
       {(items.length > 0) ? <ul>
         {items.map((item) => <li key={item.id} className={clsx({ [styles.done]: item.done })}>
           
-          {props.children ? props.children({ item, toggle: () => toggle(item.id), remove: () => remove(item.id) }) : <><label>
+          {typeof props.children === 'function' ? props.children({ item, toggle: () => toggle(item.id), remove: () => remove(item.id) }) : (props.children ?? <><label>
               <input type="checkbox" checked={item.done} onChange={(e) => { toggle(item.id); }} />
               <span>{item.text}</span>
-            </label><button aria-label="Remove" onClick={(e) => { remove(item.id); }}>×</button></>}
+            </label><button aria-label="Remove" onClick={(e) => { remove(item.id); }}>×</button></>)}
         </li>)}
       </ul> : <p className={styles.empty}>
         {props.renderEmpty ?? "Nothing to do. ✨"}
