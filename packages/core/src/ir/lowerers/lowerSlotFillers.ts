@@ -78,6 +78,23 @@ function parseFillDirectiveName(
 
   if (inner.startsWith('[') && inner.endsWith(']') && inner.length >= 2) {
     const exprText = inner.slice(1, -1);
+
+    // Explicit check for empty brackets (#[]) before calling parseExpression.
+    // parseExpression('') throws a cryptic message that manifests as:
+    //   Dynamic slot name expression "" is not a valid JS expression.
+    // — the double-empty-quotes in the error are confusing. Surface a clearer
+    // diagnostic instead.
+    if (exprText.trim().length === 0) {
+      diagnostics.push({
+        code: RozieErrorCode.DYNAMIC_NAME_EXPRESSION_INVALID,
+        severity: 'error',
+        message:
+          'Dynamic slot name expression cannot be empty — use a non-empty expression between the brackets (#[expr]).',
+        loc,
+      });
+      return { name: '__error__', isDynamic: true, errored: true };
+    }
+
     try {
       const expr = parseExpression(exprText, { sourceType: 'module' });
       return {
