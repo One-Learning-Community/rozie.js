@@ -1,11 +1,22 @@
 {
   "comment": "Phase 7 Plan 02 — AnalogJS (@analogjs/vite-plugin-angular) defaults to resolving a sibling `tsconfig.app.json` for its AOT TS Program (the D-70 disk-cache path walks the Program's `include` patterns). Without it analogjs logs 'Unable to resolve tsconfig'. The visual-regression host imports the canonical `.rozie` files from `../../examples/`; @rozie/unplugin's Angular branch writes the `.rozie.ts` disk-cache artifacts alongside them, so the Program must include that directory.",
+  "pathsComment": "The `baseUrl` + `paths` block exists because `examples/` is a SIBLING tree of `tests/visual-regression/`, and pnpm hoists @angular/* into vr's `node_modules/` only. TypeScript's default node-style module resolution from `examples/Card.rozie.ts` walks UP (`examples/node_modules`, `<repo>/node_modules`) and never reaches vr's tree, so `import { Component } from '@angular/core'` is unresolved inside @analogjs/vite-plugin-angular's NgtscProgram. NgtscProgram can still recognize the @Component decorator by AST scan, BUT when an `imports: [NgTemplateOutlet, FormsModule, ...]` array is present it must type-check every entry against the standalone-component metadata shape; unresolved symbols collapse the array to `any[]` and the analyzer SKIPS emitting `ɵcmp` for that class. The file falls through to esbuild's TS legacy-decorator transform, producing `__decorate(...)` runtime calls instead of static `ɵcmp`. At runtime Angular sees `@Component(...)` with no `ɵcmp` and falls back to JIT — but `@angular/compiler` is not in the browser bundle, so it throws `JIT compiler unavailable`. The `paths` block makes every Angular peer resolve regardless of importer location, so all `.rozie.ts` files (including those under `examples/`) get full AOT treatment.",
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
     "useDefineForClassFields": false,
-    "noEmit": false
+    "noEmit": false,
+    "baseUrl": ".",
+    "paths": {
+      "@angular/*": ["node_modules/@angular/*"],
+      "@analogjs/*": ["node_modules/@analogjs/*"],
+      "zone.js": ["node_modules/zone.js"],
+      "zone.js/*": ["node_modules/zone.js/*"],
+      "rxjs": ["node_modules/rxjs"],
+      "rxjs/*": ["node_modules/rxjs/*"],
+      "tslib": ["node_modules/tslib"]
+    }
   },
   "include": ["host/**/*.ts", "../../examples/**/*.rozie.ts"]
 }

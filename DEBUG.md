@@ -242,87 +242,25 @@ phantom-importing through a hoist slot.
 
 ---
 
-## Open follow-up: visual-regression Angular column `JIT compiler unavailable`
+## Resolved 2026-05-15: vr Angular `JIT compiler unavailable`
 
-After the May 2026 peer-dep + TS-floor work, the vr Angular sub-build
-completes cleanly (6/6 targets build) and the simple Angular cells —
-`Counter` and `CardHeader` — render correctly in headless chromium with
-`<rozie-counter ng-version="19.2.22">` DOM. The other six cells
-(`Card`, `Dropdown`, `Modal`, `SearchInput`, `TodoList`, `TreeNode`)
-throw at mount with:
+Root cause was **NOT** composition — it was that vr's `tsconfig.app.json`
+had no `baseUrl` + `paths` mappings. `@analogjs/vite-plugin-angular`'s
+NgtscProgram processes `examples/*.rozie.ts` (cross-tree via
+`prebuildExtraRoots`), and TypeScript's node-style resolution walks UP
+from `examples/` — never reaching vr's sibling `node_modules/`. Unresolved
+symbols inside `@Component({ imports: [...] })` caused NgtscProgram to
+skip emitting `ɵcmp`; the file fell back to esbuild's legacy
+`__decorate(...)` path; at mount Angular tried to JIT-compile against a
+`@angular/compiler` that's not in the browser bundle. Counter and
+CardHeader had no `imports:` array so nothing for the analyzer to bail
+on.
 
-```
-JIT compiler unavailable
-```
+Fix: added `baseUrl: "."` + `paths` for `@angular/*`, `@analogjs/*`,
+`zone.js`, `rxjs`, `tslib` to `tests/visual-regression/tsconfig.app.json`.
+All 8 cells now emit `ɵcmp` and render. `entry.angular` bundle: 268KB → 184KB.
 
-This is **not** a topology problem (analogjs's `@angular/*` and TS chain
-all resolve correctly per the slot-inspection command above). The error
-fires when Angular tries to runtime-compile a component template that
-the AOT path didn't fully resolve. Likely places to look:
-
-1. **Component composition path** — Card→CardHeader, Modal→Counter,
-   TreeNode→TreeNode (recursive). The cells that DO work have no
-   composition; the cells that fail all reference other Rozie
-   components via `<components>` blocks. The lowered Angular code wires
-   composed children via `@Component({ imports: [Child] })`, but
-   `imports` for standalone components must reference fully AOT-ready
-   classes. If the child's `ɵcmp` definition isn't reachable at mount
-   time, Angular falls back to JIT.
-2. **`createComponent` + `createApplication` runtime mount** — the rig
-   uses `createComponent(mod.default, { environmentInjector,
-   hostElement })` from `@angular/core`. Inspect whether the runtime
-   needs `@angular/compiler` shipped in the bundle for components with
-   non-trivial structure.
-3. **`@analogjs/vite-plugin-angular`'s build options** — analogjs has
-   a `jit: true|false` plugin option (or similar). The rig's vite
-   config currently uses defaults; consider whether forcing AOT-only
-   would help diagnose.
-
-Reproduce:
-
-```sh
-cd tests/visual-regression
-pnpm build && (pnpm exec vite preview --config vite.preview.config.ts &) && sleep 3
-# Then in a separate terminal or headless inspector:
-# http://localhost:4180/?example=Modal&target=angular
-# pageerror: "JIT compiler unavailable"
-```
-
-Quick headless inspection (after preview is running):
-
-```sh
-cat > /tmp/jit-inspect.mjs <<'EOF'
-import { chromium } from '@playwright/test';
-const browser = await chromium.launch();
-for (const ex of ['Counter','CardHeader','Modal','Card','TreeNode']) {
-  const page = await browser.newPage();
-  let err = null;
-  page.on('pageerror', e => err ??= e.message.split('\n')[0]);
-  await page.goto(`http://localhost:4180/?example=${ex}&target=angular`, { waitUntil: 'networkidle' });
-  const html = await page.evaluate(() => document.querySelector('[data-testid="rozie-mount"]')?.innerHTML?.slice(0, 100));
-  console.log(`${ex}: ${err ? `ERR ${err}` : 'OK ' + (html?.slice(0, 60) ?? '(empty)')}`);
-  await page.close();
-}
-await browser.close();
-EOF
-cp /tmp/jit-inspect.mjs tests/visual-regression/jit-inspect.mjs
-cd tests/visual-regression && node jit-inspect.mjs && rm jit-inspect.mjs
-```
-
-Files most likely to need changes:
-
-- `packages/targets/angular/src/emit/*` — the Angular emitter. If
-  composed components need extra metadata for AOT-readiness, this is
-  where to add it.
-- `tests/visual-regression/host/entry.angular.ts` — the runtime mount.
-  May need `import '@angular/compiler';` or a different mount API.
-- `tests/visual-regression/vite.config.ts` — the analogjs plugin
-  options (`angular()`).
-
-The May 14 floor-bump commit (`4d9ab77`) noted this as a known
-follow-up; today's work moved the failure mode from
-build-time-topology-error to runtime-mount-error, which is a much
-smaller search surface to chase next session.
+Full session log: `.planning/debug/vr-angular-jit-composed.md`.
 
 ---
 
