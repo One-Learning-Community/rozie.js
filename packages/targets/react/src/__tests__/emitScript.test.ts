@@ -85,6 +85,61 @@ describe('emitScript — behavior', () => {
     expect(collectors.react.has('useRef')).toBe(true);
     expect(collectors.react.has('useEffect')).toBe(true);
   });
+
+  it('Quick 260515-u2b — WatchHook emits useEffect(cb, [getterDeps]); deps include props.open only', () => {
+    const src = `<rozie name="WatchOne">
+<props>{ open: { type: Boolean, default: false }, closeOnEscape: { type: Boolean, default: true } }</props>
+<script>
+const reposition = () => { console.log('repos') }
+$watch(() => $props.open, () => { if ($props.closeOnEscape) reposition() })
+</script>
+<template><div /></template>
+</rozie>`;
+    const parsed = parse(src, { filename: 'WatchOne.rozie' });
+    const ir = lowerToIR(parsed.ast!, { modifierRegistry: createDefaultRegistry() }).ir!;
+    const collectors = {
+      react: new ReactImportCollector(),
+      runtime: new RuntimeReactImportCollector(),
+    };
+    const { lifecycleEffectsSection } = emitScript(ir, collectors);
+    // useEffect line with dep array that includes props.open but NOT
+    // props.closeOnEscape (the latter is referenced in the CALLBACK body, not
+    // the GETTER body).
+    expect(lifecycleEffectsSection).toMatch(/useEffect\([\s\S]*?\[props\.open\]\)/);
+    expect(lifecycleEffectsSection).not.toMatch(/\[props\.closeOnEscape\]/);
+    expect(lifecycleEffectsSection).not.toMatch(/\[props\.closeOnEscape, props\.open\]/);
+    expect(collectors.react.has('useEffect')).toBe(true);
+  });
+
+  it('Quick 260515-u2b — WatchHook callback body is INLINED into the useEffect callback', () => {
+    const src = `<rozie name="WatchInlined">
+<props>{ open: { type: Boolean, default: false } }</props>
+<script>
+const fire = () => { console.log('fired') }
+$watch(() => $props.open, () => { fire() })
+</script>
+<template><div /></template>
+</rozie>`;
+    const parsed = parse(src, { filename: 'WatchInlined.rozie' });
+    const ir = lowerToIR(parsed.ast!, { modifierRegistry: createDefaultRegistry() }).ir!;
+    const collectors = {
+      react: new ReactImportCollector(),
+      runtime: new RuntimeReactImportCollector(),
+    };
+    const { lifecycleEffectsSection } = emitScript(ir, collectors);
+    expect(lifecycleEffectsSection).toMatch(/useEffect\(\(\) => \{[\s\S]*?fire\(\);[\s\S]*?\}, \[props\.open\]\)/);
+  });
+
+  it('Quick 260515-u2b — Counter (no watchers) emits no extra useEffect; existing fixtures untouched', () => {
+    const ir = lowerExample('Counter');
+    const collectors = {
+      react: new ReactImportCollector(),
+      runtime: new RuntimeReactImportCollector(),
+    };
+    const { lifecycleEffectsSection } = emitScript(ir, collectors);
+    // Counter has zero lifecycle + zero watchers, so the section should be empty.
+    expect(lifecycleEffectsSection.trim()).toBe('');
+  });
 });
 
 describe('emitPropsInterface — behavior', () => {

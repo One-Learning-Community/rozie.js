@@ -378,6 +378,63 @@ function findClonedComputedBodies(
  * @returns lifecycle code lines + the SET of indices CONSUMED in clonedProgram.body
  *          (so emitResidualScriptBody can skip them).
  */
+/**
+ * Quick plan 260515-u2b — emit `watch(getter, cb)` per WatchHook.
+ *
+ * Vue's `watch(getterFn, cb)` is a perfect 1:1 lowering for our IR shape:
+ * the getter runs once during registration and again whenever any reactive
+ * value it READS changes; the callback fires on the resulting value
+ * transition.
+ *
+ * The WatchHook stores function BODIES (getter/callback) — we wrap each back
+ * into an ArrowFunctionExpression before genCode so we emit
+ * `watch(() => open, () => { reposition(); })`, not `watch({ ... }, { ... })`.
+ *
+ * Walks the CLONED program (lifecycle scan already consumed lifecycle
+ * indices) so $props/$data/$refs rewrites are picked up automatically.
+ * Locates each $watch call by source-order, then synthesizes the arrow
+ * wrappers around the original rewritten function-body nodes.
+ */
+function emitWatcherHooks(
+  clonedProgram: t.File,
+  imports: VueImportCollector,
+): { lines: string[]; consumedIndices: Set<number> } {
+  const lines: string[] = [];
+  const consumed = new Set<number>();
+  const body = clonedProgram.program.body;
+
+  for (let i = 0; i < body.length; i++) {
+    const stmt = body[i];
+    if (!stmt || !t.isExpressionStatement(stmt)) continue;
+    const expr = stmt.expression;
+    if (!t.isCallExpression(expr) || !t.isIdentifier(expr.callee)) continue;
+    if (expr.callee.name !== '$watch') continue;
+    const getterArg = expr.arguments[0];
+    const cbArg = expr.arguments[1];
+    if (
+      !getterArg ||
+      (!t.isArrowFunctionExpression(getterArg) && !t.isFunctionExpression(getterArg))
+    ) {
+      continue;
+    }
+    if (
+      !cbArg ||
+      (!t.isArrowFunctionExpression(cbArg) && !t.isFunctionExpression(cbArg))
+    ) {
+      continue;
+    }
+    imports.use('watch');
+    consumed.add(i);
+    // The cloned getter / callback nodes are ALREADY arrow/function expressions
+    // with their bodies rewritten in-place by rewriteRozieIdentifiers. We can
+    // emit them verbatim — no body-extraction needed.
+    const getterCode = genCode(getterArg as t.Node);
+    const cbCode = genCode(cbArg as t.Node);
+    lines.push(`watch(${getterCode}, ${cbCode});`);
+  }
+  return { lines, consumedIndices: consumed };
+}
+
 function emitLifecycleHooks(
   clonedProgram: t.File,
   imports: VueImportCollector,
@@ -572,7 +629,9 @@ function emitResidualScriptBody(
         if (
           callee.name === '$onMount' ||
           callee.name === '$onUnmount' ||
-          callee.name === '$onUpdate'
+          callee.name === '$onUpdate' ||
+          // Quick plan 260515-u2b — $watch is consumed by emitWatcherHooks.
+          callee.name === '$watch'
         ) {
           continue;
         }
@@ -661,6 +720,13 @@ export function emitScript(
 
   const { lines: lifecycleLines, consumedIndices } = emitLifecycleHooks(cloned, imports);
 
+  // Quick plan 260515-u2b — $watch emission. Walks the same cloned program
+  // and emits one `watch(getter, cb);` per top-level $watch call. Returns the
+  // additional consumed indices so emitResidualScriptBody skips them.
+  const { lines: watcherLines, consumedIndices: watcherConsumed } =
+    emitWatcherHooks(cloned, imports);
+  for (const idx of watcherConsumed) consumedIndices.add(idx);
+
   const { code: residualCode, stmts: residualStmts } = emitResidualScriptBody(cloned, consumedIndices);
 
   // 4. Assemble in canonical order with blank-line separators between sections.
@@ -696,6 +762,10 @@ export function emitScript(
   const sections = [...preambleSections];
   if (residualCode.trim().length > 0) sections.push(residualCode);
   if (lifecycleLines.length > 0) sections.push(lifecycleLines.join('\n'));
+  // Quick plan 260515-u2b — emit watch() calls AFTER lifecycle calls so any
+  // helpers referenced inside the watch callback (declared in residual body)
+  // are in scope. watch() registration order doesn't matter for correctness.
+  if (watcherLines.length > 0) sections.push(watcherLines.join('\n'));
 
   const script = sections.join('\n\n');
 

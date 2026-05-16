@@ -506,6 +506,77 @@ function pairClonedLifecycle(
   return { perHook, consumedIndices: consumed };
 }
 
+/**
+ * Quick plan 260515-u2b — locate the cloned getter/callback bodies for each
+ * WatchHook by source-order matching to top-level $watch CallExpressions in
+ * the cloned Program. After rewriteRozieIdentifiers runs on the clone,
+ * `$props.x` reads inside the cloned bodies have been rewritten to React-side
+ * identifiers; we reuse those rewritten bodies verbatim for emission.
+ */
+interface WatcherClonedBody {
+  /** Cloned getter body — used only when callback inlining needs access. */
+  getterCloned: t.Expression | t.BlockStatement;
+  /** Cloned callback body — inlined into the useEffect callback. */
+  callbackCloned: t.Expression | t.BlockStatement;
+}
+
+function pairClonedWatchers(
+  clonedProgram: t.File,
+  ir: IRComponent,
+): { perWatcher: WatcherClonedBody[]; consumedIndices: Set<number> } {
+  const perWatcher: WatcherClonedBody[] = [];
+  const consumed = new Set<number>();
+  const watcherCallIndices: Array<{
+    idx: number;
+    getter: t.ArrowFunctionExpression | t.FunctionExpression;
+    callback: t.ArrowFunctionExpression | t.FunctionExpression;
+  }> = [];
+
+  for (let i = 0; i < clonedProgram.program.body.length; i++) {
+    const stmt = clonedProgram.program.body[i]!;
+    if (!t.isExpressionStatement(stmt)) continue;
+    const expr = stmt.expression;
+    if (!t.isCallExpression(expr)) continue;
+    const callee = expr.callee;
+    if (!t.isIdentifier(callee) || callee.name !== '$watch') continue;
+    const getter = expr.arguments[0];
+    const callback = expr.arguments[1];
+    if (
+      !getter ||
+      (!t.isArrowFunctionExpression(getter) && !t.isFunctionExpression(getter))
+    ) {
+      continue;
+    }
+    if (
+      !callback ||
+      (!t.isArrowFunctionExpression(callback) && !t.isFunctionExpression(callback))
+    ) {
+      continue;
+    }
+    watcherCallIndices.push({
+      idx: i,
+      getter: getter as t.ArrowFunctionExpression | t.FunctionExpression,
+      callback: callback as t.ArrowFunctionExpression | t.FunctionExpression,
+    });
+  }
+
+  // 1:1 match — each IR WatchHook corresponds to the next $watch call in
+  // source order. ir.watchers length should match watcherCallIndices length
+  // (malformed calls were dropped by the collector + warned by the validator).
+  let cursor = 0;
+  for (let i = 0; i < ir.watchers.length; i++) {
+    if (cursor >= watcherCallIndices.length) break;
+    const entry = watcherCallIndices[cursor]!;
+    cursor++;
+    consumed.add(entry.idx);
+    perWatcher.push({
+      getterCloned: entry.getter.body,
+      callbackCloned: entry.callback.body,
+    });
+  }
+  return { perWatcher, consumedIndices: consumed };
+}
+
 export interface EmitScriptResult {
   /**
    * React state-style hook declarations: useRef hoists + useControllableState +
@@ -596,6 +667,10 @@ export function emitScript(
   //    REWRITTEN expressions in the emitted hooks.
   const clonedComputedBodies = findClonedComputedBodies(cloned);
   const lifecyclePairing = pairClonedLifecycle(cloned, ir);
+  // Quick plan 260515-u2b — locate cloned $watch call sites so we can emit
+  // useEffect with the REWRITTEN callback body and consume the source-level
+  // statements so they don't appear in userArrowsSection.
+  const watcherPairing = pairClonedWatchers(cloned, ir);
 
   // 5. Build hookSection.
   const hookLines: string[] = [];
@@ -734,6 +809,11 @@ export function emitScript(
   // separate `lifecycleEffectsSection` (placed AFTER user arrows) so const-
   // arrow + useCallback helpers from userArrowsSection are in scope when the
   // dep arrays evaluate. Eliminates Plan 04-03 deferred TDZ limitation #1.
+  //
+  // Quick plan 260515-u2b — WatchHook also lowers to useEffect, but the dep
+  // array comes from WatchHook.getterDeps (NOT the callback body's deps).
+  // Same `renderDepArray` helper applies; callback body is inlined into the
+  // useEffect callback exactly like a lifecycle setup body.
   const lifecycleEffectLines: string[] = [];
   ir.lifecycle.forEach((lh, idx) => {
     collectors.react.add('useEffect');
@@ -787,6 +867,28 @@ export function emitScript(
     );
   });
 
+  // Quick plan 260515-u2b — emit one useEffect per WatchHook. Dep array
+  // comes from WatchHook.getterDeps (NOT the callback body's deps).
+  ir.watchers.forEach((wh, idx) => {
+    collectors.react.add('useEffect');
+    const paired = watcherPairing.perWatcher[idx];
+    // `callbackCloned` is the post-rewrite callback body (BlockStatement or
+    // Expression). Inline its statements directly into the useEffect callback.
+    const cbCloned = paired?.callbackCloned ?? wh.callback;
+    let cbInvocation: string;
+    if (t.isBlockStatement(cbCloned)) {
+      const innerStmts = cbCloned.body.map((s) => genCode(s)).join('\n      ');
+      cbInvocation = innerStmts;
+    } else {
+      // Concise arrow body — emit as an expression statement.
+      cbInvocation = `${genCode(cbCloned)};`;
+    }
+    const depsArr = renderDepArray(wh.getterDeps, modelProps);
+    lifecycleEffectLines.push(
+      `useEffect(() => {\n  ${cbInvocation}\n}, ${depsArr});`,
+    );
+  });
+
   const hookSection = hookLines.join('\n');
   const lifecycleEffectsSection = lifecycleEffectLines.join('\n');
 
@@ -827,6 +929,8 @@ export function emitScript(
   const allHelperNames = new Set<string>();
   for (let i = 0; i < cloned.program.body.length; i++) {
     if (lifecyclePairing.consumedIndices.has(i)) continue;
+    // Quick plan 260515-u2b — $watch lines were emitted as useEffects.
+    if (watcherPairing.consumedIndices.has(i)) continue;
     const stmt = cloned.program.body[i]!;
     if (t.isFunctionDeclaration(stmt) && stmt.id) {
       allHelperNames.add(stmt.id.name);
@@ -855,6 +959,8 @@ export function emitScript(
 
   for (let i = 0; i < cloned.program.body.length; i++) {
     if (lifecyclePairing.consumedIndices.has(i)) continue;
+    // Quick plan 260515-u2b — $watch lines were emitted as useEffects.
+    if (watcherPairing.consumedIndices.has(i)) continue;
     const stmt = cloned.program.body[i]!;
     if (t.isVariableDeclaration(stmt)) {
       const allComputed =
@@ -874,7 +980,10 @@ export function emitScript(
         t.isIdentifier(callee) &&
         (callee.name === '$onMount' ||
           callee.name === '$onUnmount' ||
-          callee.name === '$onUpdate')
+          callee.name === '$onUpdate' ||
+          // Quick plan 260515-u2b — defensive: should already be consumed by
+          // watcherPairing, but skip here as a safety net.
+          callee.name === '$watch')
       ) {
         // Safety net — should already have been consumed by lifecyclePairing.
         continue;

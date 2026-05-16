@@ -17,6 +17,14 @@ import type { IRComponent } from '../../../../core/src/ir/types.js';
 import { emitScript } from '../emit/emitScript.js';
 import { emitVue } from '../emitVue.js';
 
+function lowerSource(src: string, filename: string): IRComponent {
+  const parsed = parse(src, { filename });
+  if (!parsed.ast) throw new Error('parse returned null');
+  const lowered = lowerToIR(parsed.ast, { modifierRegistry: createDefaultRegistry() });
+  if (!lowered.ir) throw new Error('lowerToIR returned null');
+  return lowered.ir;
+}
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '../../../../..');
 const EXAMPLES = resolve(REPO_ROOT, 'examples');
@@ -99,6 +107,45 @@ describe('emitScript — behavior', () => {
   it('Modal $refs.dialogEl in $onMount arrow rewrites to dialogElRef.value?.focus()', () => {
     const { script } = emitScript(lowerExample('Modal'));
     expect(script).toMatch(/dialogElRef\.value\??\.focus/);
+  });
+
+  it('Quick 260515-u2b — emits `watch(...)` per WatchHook and imports `watch` from vue', () => {
+    // Synthesize a tiny .rozie source with a $watch call.
+    const src = `<rozie name="WatchSynth">
+<props>{ open: { type: Boolean, default: false } }</props>
+<script>
+const reposition = () => { console.log('repos') }
+$watch(() => $props.open, () => { if ($props.open) reposition() })
+</script>
+<template><div /></template>
+</rozie>`;
+    const ir = lowerSource(src, 'WatchSynth.rozie');
+    const { script } = emitScript(ir);
+    expect(script).toMatch(/import \{[^}]*\bwatch\b[^}]*\} from 'vue'/);
+    expect(script).toMatch(/watch\(\(\) => props\.open, \(\) => \{[\s\S]*?\}\);/);
+  });
+
+  it('Quick 260515-u2b — zero watchers means no `watch(` call AND no `watch` import', () => {
+    const { script } = emitScript(lowerExample('Counter'));
+    expect(script).not.toMatch(/\bwatch\(/);
+    expect(script).not.toMatch(/import \{[^}]*\bwatch\b[^}]*\} from 'vue'/);
+  });
+
+  it('Quick 260515-u2b — two $watch calls emit two watch() lines in source order', () => {
+    const src = `<rozie name="WatchTwo">
+<props>{ open: { type: Boolean, default: false }, q: { type: String, default: '' } }</props>
+<script>
+$watch(() => $props.open, () => { console.log('A') })
+$watch(() => $props.q, () => { console.log('B') })
+</script>
+<template><div /></template>
+</rozie>`;
+    const ir = lowerSource(src, 'WatchTwo.rozie');
+    const { script } = emitScript(ir);
+    const idxA = script.indexOf("'A'");
+    const idxB = script.indexOf("'B'");
+    expect(idxA).toBeGreaterThan(0);
+    expect(idxB).toBeGreaterThan(idxA);
   });
 
   it('Counter emitVue() without opts.source returns SFC with no <style> block (Plan 05 back-compat path)', () => {
