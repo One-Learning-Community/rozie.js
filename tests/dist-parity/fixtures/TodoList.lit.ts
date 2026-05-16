@@ -118,10 +118,7 @@ form { display: flex; gap: 0.25rem; margin-block: 0.5rem; }
     ${repeat(this.items, (item) => item.id, (item, _idx) => html`<li class="${Object.entries({ done: item.done }).filter(([, v]) => v).map(([k]) => k).join(' ')}" key=${item.id}>
       
       <slot data-rozie-params=${(() => { try { return JSON.stringify({item: item}); } catch { return '{}'; } })()}>
-        <label>
-          <input type="checkbox" ?checked=${item.done} @change=${(e: Event) => { this.toggle(item.id); }} />
-          <span>${item.text}</span>
-        </label>
+        <label><input type="checkbox" ?checked=${item.done} @change=${(e: Event) => { this.toggle(item.id); }} /><span>${item.text}</span></label>
         <button aria-label="Remove" @click=${(e: Event) => { this.remove(item.id); }}>×</button>
       </slot>
     </li>`)}

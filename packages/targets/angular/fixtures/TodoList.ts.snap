@@ -49,10 +49,7 @@ interface EmptyCtx {}
     <ng-container *ngTemplateOutlet="defaultTpl; context: _defaultSlot_ctx_1(item)" />
     } @else {
 
-            <label>
-              <input type="checkbox" [checked]="item.done" (change)="_toggle(item.id)" />
-              <span>{{ item.text }}</span>
-            </label>
+            <label><input type="checkbox" [checked]="item.done" (change)="_toggle(item.id)" /><span>{{ item.text }}</span></label>
             <button aria-label="Remove" (click)="_remove(item.id)">×</button>
           
     }

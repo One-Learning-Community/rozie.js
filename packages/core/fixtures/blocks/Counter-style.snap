@@ -3,9 +3,9 @@
     "type": "StyleAST",
     "loc": {
       "start": 1411,
-      "end": 1710
+      "end": 1728
     },
-    "cssText": "\n.counter { display: inline-flex; gap: 0.5rem; align-items: center; }\n.counter.hovering { background: rgba(0, 0, 0, 0.04); }\n.value { font-variant-numeric: tabular-nums; min-width: 3ch; text-align: center; }\nbutton { padding: 0.25rem 0.5rem; }\nbutton:disabled { opacity: 0.4; cursor: not-allowed; }\n",
+    "cssText": "\n.counter { display: inline-flex; gap: 0.5rem; align-items: center; }\n.counter.hovering { background: rgba(0, 0, 0, 0.04); }\n.value { font-variant-numeric: tabular-nums; min-width: 3ch; text-align: center; }\n.counter button { padding: 0.25rem 0.5rem; }\n.counter button:disabled { opacity: 0.4; cursor: not-allowed; }\n",
     "rules": [
       {
         "selector": ".counter",
@@ -32,18 +32,18 @@
         "isRootEscape": false
       },
       {
-        "selector": "button",
+        "selector": ".counter button",
         "loc": {
           "start": 1619,
-          "end": 1654
+          "end": 1663
         },
         "isRootEscape": false
       },
       {
-        "selector": "button:disabled",
+        "selector": ".counter button:disabled",
         "loc": {
-          "start": 1655,
-          "end": 1709
+          "start": 1664,
+          "end": 1727
         },
         "isRootEscape": false
       }

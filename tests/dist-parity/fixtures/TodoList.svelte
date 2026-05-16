@@ -69,10 +69,7 @@ const remaining = $derived(items.filter(i => !i.done).length);
     {#each items as item (item.id)}<li class={{ done: item.done }}>
       
       {#if children}{@render children(item, () => toggle(item.id), () => remove(item.id))}{:else}
-        <label>
-          <input type="checkbox" checked={item.done} onchange={(e) => { toggle(item.id); }} />
-          <span>{item.text}</span>
-        </label>
+        <label><input type="checkbox" checked={item.done} onchange={(e) => { toggle(item.id); }} /><span>{item.text}</span></label>
         <button aria-label="Remove" onclick={(e) => { remove(item.id); }}>×</button>
       {/if}
     </li>{/each}

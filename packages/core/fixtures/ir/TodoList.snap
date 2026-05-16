@@ -721,7 +721,7 @@
       "nestedSlots": [],
       "sourceLoc": {
         "start": 2026,
-        "end": 2350
+        "end": 2319
       }
     },
     {
@@ -732,8 +732,8 @@
       "presence": "always",
       "nestedSlots": [],
       "sourceLoc": {
-        "start": 2401,
-        "end": 2443
+        "start": 2370,
+        "end": 2412
       }
     }
   ],
@@ -896,8 +896,8 @@
       ],
       "source": "template-event",
       "sourceLoc": {
-        "start": 2180,
-        "end": 2205
+        "start": 2169,
+        "end": 2194
       }
     },
     {
@@ -1001,8 +1001,8 @@
       ],
       "source": "template-event",
       "sourceLoc": {
-        "start": 2281,
-        "end": 2305
+        "start": 2250,
+        "end": 2274
       }
     }
   ],
@@ -4364,14 +4364,6 @@
                                     "events": [],
                                     "children": [
                                       {
-                                        "type": "TemplateStaticText",
-                                        "text": "\n          ",
-                                        "sourceLoc": {
-                                          "start": 2125,
-                                          "end": 2136
-                                        }
-                                      },
-                                      {
                                         "type": "TemplateElement",
                                         "tagName": "input",
                                         "attributes": [
@@ -4380,8 +4372,8 @@
                                             "name": "type",
                                             "value": "checkbox",
                                             "sourceLoc": {
-                                              "start": 2143,
-                                              "end": 2158
+                                              "start": 2132,
+                                              "end": 2147
                                             }
                                           },
                                           {
@@ -4441,8 +4433,8 @@
                                               }
                                             ],
                                             "sourceLoc": {
-                                              "start": 2159,
-                                              "end": 2179
+                                              "start": 2148,
+                                              "end": 2168
                                             }
                                           }
                                         ],
@@ -4451,18 +4443,10 @@
                                         ],
                                         "children": [],
                                         "sourceLoc": {
-                                          "start": 2136,
-                                          "end": 2208
+                                          "start": 2125,
+                                          "end": 2197
                                         },
                                         "tagKind": "html"
-                                      },
-                                      {
-                                        "type": "TemplateStaticText",
-                                        "text": "\n          ",
-                                        "sourceLoc": {
-                                          "start": 2208,
-                                          "end": 2219
-                                        }
                                       },
                                       {
                                         "type": "TemplateElement",
@@ -4526,29 +4510,21 @@
                                               }
                                             ],
                                             "sourceLoc": {
-                                              "start": 2225,
-                                              "end": 2240
+                                              "start": 2203,
+                                              "end": 2218
                                             }
                                           }
                                         ],
                                         "sourceLoc": {
-                                          "start": 2219,
-                                          "end": 2247
+                                          "start": 2197,
+                                          "end": 2225
                                         },
                                         "tagKind": "html"
-                                      },
-                                      {
-                                        "type": "TemplateStaticText",
-                                        "text": "\n        ",
-                                        "sourceLoc": {
-                                          "start": 2247,
-                                          "end": 2256
-                                        }
                                       }
                                     ],
                                     "sourceLoc": {
                                       "start": 2118,
-                                      "end": 2264
+                                      "end": 2233
                                     },
                                     "tagKind": "html"
                                   },
@@ -4556,8 +4532,8 @@
                                     "type": "TemplateStaticText",
                                     "text": "\n        ",
                                     "sourceLoc": {
-                                      "start": 2264,
-                                      "end": 2273
+                                      "start": 2233,
+                                      "end": 2242
                                     }
                                   },
                                   {
@@ -4569,8 +4545,8 @@
                                         "name": "aria-label",
                                         "value": "Remove",
                                         "sourceLoc": {
-                                          "start": 2306,
-                                          "end": 2325
+                                          "start": 2275,
+                                          "end": 2294
                                         }
                                       }
                                     ],
@@ -4582,14 +4558,14 @@
                                         "type": "TemplateStaticText",
                                         "text": "×",
                                         "sourceLoc": {
-                                          "start": 2326,
-                                          "end": 2327
+                                          "start": 2295,
+                                          "end": 2296
                                         }
                                       }
                                     ],
                                     "sourceLoc": {
-                                      "start": 2273,
-                                      "end": 2336
+                                      "start": 2242,
+                                      "end": 2305
                                     },
                                     "tagKind": "html"
                                   },
@@ -4597,8 +4573,8 @@
                                     "type": "TemplateStaticText",
                                     "text": "\n      ",
                                     "sourceLoc": {
-                                      "start": 2336,
-                                      "end": 2343
+                                      "start": 2305,
+                                      "end": 2312
                                     }
                                   }
                                 ]
@@ -4607,14 +4583,14 @@
                                 "type": "TemplateStaticText",
                                 "text": "\n    ",
                                 "sourceLoc": {
-                                  "start": 2350,
-                                  "end": 2355
+                                  "start": 2319,
+                                  "end": 2324
                                 }
                               }
                             ],
                             "sourceLoc": {
                               "start": 1725,
-                              "end": 2360
+                              "end": 2329
                             },
                             "tagKind": "html"
                           }
@@ -4624,14 +4600,14 @@
                         "type": "TemplateStaticText",
                         "text": "\n  ",
                         "sourceLoc": {
-                          "start": 2360,
-                          "end": 2363
+                          "start": 2329,
+                          "end": 2332
                         }
                       }
                     ],
                     "sourceLoc": {
                       "start": 1685,
-                      "end": 2368
+                      "end": 2337
                     },
                     "tagKind": "html"
                   }
@@ -4650,8 +4626,8 @@
                         "name": "class",
                         "value": "empty",
                         "sourceLoc": {
-                          "start": 2382,
-                          "end": 2395
+                          "start": 2351,
+                          "end": 2364
                         }
                       }
                     ],
@@ -4661,8 +4637,8 @@
                         "type": "TemplateStaticText",
                         "text": "\n    ",
                         "sourceLoc": {
-                          "start": 2396,
-                          "end": 2401
+                          "start": 2365,
+                          "end": 2370
                         }
                       },
                       {
@@ -4674,8 +4650,8 @@
                             "type": "TemplateStaticText",
                             "text": "Nothing to do. ✨",
                             "sourceLoc": {
-                              "start": 2420,
-                              "end": 2436
+                              "start": 2389,
+                              "end": 2405
                             }
                           }
                         ]
@@ -4684,14 +4660,14 @@
                         "type": "TemplateStaticText",
                         "text": "\n  ",
                         "sourceLoc": {
-                          "start": 2443,
-                          "end": 2446
+                          "start": 2412,
+                          "end": 2415
                         }
                       }
                     ],
                     "sourceLoc": {
-                      "start": 2372,
-                      "end": 2450
+                      "start": 2341,
+                      "end": 2419
                     },
                     "tagKind": "html"
                   }
@@ -4702,7 +4678,7 @@
         ],
         "sourceLoc": {
           "start": 1235,
-          "end": 2457
+          "end": 2426
         },
         "tagKind": "html"
       },
@@ -4710,14 +4686,14 @@
         "type": "TemplateStaticText",
         "text": "\n",
         "sourceLoc": {
-          "start": 2457,
-          "end": 2458
+          "start": 2426,
+          "end": 2427
         }
       }
     ],
     "sourceLoc": {
       "start": 1234,
-      "end": 2458
+      "end": 2427
     }
   },
   "styles": {
@@ -4726,61 +4702,61 @@
       {
         "selector": ".todo-list",
         "loc": {
-          "start": 2479,
-          "end": 2529
+          "start": 2448,
+          "end": 2498
         },
         "isRootEscape": false
       },
       {
         "selector": "ul",
         "loc": {
-          "start": 2530,
-          "end": 2566
+          "start": 2499,
+          "end": 2535
         },
         "isRootEscape": false
       },
       {
         "selector": "li",
         "loc": {
-          "start": 2567,
-          "end": 2642
+          "start": 2536,
+          "end": 2611
         },
         "isRootEscape": false
       },
       {
         "selector": "li.done span",
         "loc": {
-          "start": 2643,
-          "end": 2704
+          "start": 2612,
+          "end": 2673
         },
         "isRootEscape": false
       },
       {
         "selector": ".empty",
         "loc": {
-          "start": 2705,
-          "end": 2762
+          "start": 2674,
+          "end": 2731
         },
         "isRootEscape": false
       },
       {
         "selector": "form",
         "loc": {
-          "start": 2763,
-          "end": 2822
+          "start": 2732,
+          "end": 2791
         },
         "isRootEscape": false
       }
     ],
     "rootRules": [],
     "sourceLoc": {
-      "start": 2478,
-      "end": 2823
+      "start": 2447,
+      "end": 2792
     }
   },
   "components": [],
   "sourceLoc": {
     "start": 502,
-    "end": 2841
+    "end": 2810
   }
 }

@@ -74,10 +74,7 @@ export default function TodoList(_props: TodoListProps): JSX.Element {
       </p>}><ul>
         <For each={items()}>{(item) => <li classList={{ done: item.done }}>
           
-          {resolved() ?? <><label>
-              <input type="checkbox" checked={item.done} onChange={(e) => { toggle(item.id); }} />
-              <span>{item.text}</span>
-            </label><button aria-label="Remove" onClick={(e) => { remove(item.id); }}>×</button></>}
+          {resolved() ?? <><label><input type="checkbox" checked={item.done} onChange={(e) => { toggle(item.id); }} /><span>{item.text}</span></label><button aria-label="Remove" onClick={(e) => { remove(item.id); }}>×</button></>}
         </li>}</For>
       </ul></Show>}</div>
     </>

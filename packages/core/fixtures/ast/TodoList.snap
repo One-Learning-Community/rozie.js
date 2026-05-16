@@ -4,7 +4,7 @@
     "name": "TodoList",
     "loc": {
       "start": 502,
-      "end": 2841
+      "end": 2810
     },
     "props": {
       "type": "PropsAST",
@@ -2730,7 +2730,7 @@
       "type": "TemplateAST",
       "loc": {
         "start": 1234,
-        "end": 2458
+        "end": 2427
       },
       "children": [
         {
@@ -3287,14 +3287,6 @@
                           "attributes": [],
                           "children": [
                             {
-                              "type": "TemplateText",
-                              "text": "\n          ",
-                              "loc": {
-                                "start": 2125,
-                                "end": 2136
-                              }
-                            },
-                            {
                               "type": "TemplateElement",
                               "tagName": "input",
                               "attributes": [
@@ -3303,16 +3295,16 @@
                                   "rawName": "type",
                                   "name": "type",
                                   "modifierChainText": "",
-                                  "modifierChainBaseOffset": 2147,
+                                  "modifierChainBaseOffset": 2136,
                                   "chain": [],
                                   "value": "checkbox",
                                   "valueLoc": {
-                                    "start": 2149,
-                                    "end": 2157
+                                    "start": 2138,
+                                    "end": 2146
                                   },
                                   "loc": {
-                                    "start": 2143,
-                                    "end": 2158
+                                    "start": 2132,
+                                    "end": 2147
                                   }
                                 },
                                 {
@@ -3320,16 +3312,16 @@
                                   "rawName": ":checked",
                                   "name": "checked",
                                   "modifierChainText": "",
-                                  "modifierChainBaseOffset": 2167,
+                                  "modifierChainBaseOffset": 2156,
                                   "chain": [],
                                   "value": "item.done",
                                   "valueLoc": {
-                                    "start": 2169,
-                                    "end": 2178
+                                    "start": 2158,
+                                    "end": 2167
                                   },
                                   "loc": {
-                                    "start": 2159,
-                                    "end": 2179
+                                    "start": 2148,
+                                    "end": 2168
                                   }
                                 },
                                 {
@@ -3337,32 +3329,24 @@
                                   "rawName": "@change",
                                   "name": "change",
                                   "modifierChainText": "",
-                                  "modifierChainBaseOffset": 2187,
+                                  "modifierChainBaseOffset": 2176,
                                   "chain": [],
                                   "value": "toggle(item.id)",
                                   "valueLoc": {
-                                    "start": 2189,
-                                    "end": 2204
+                                    "start": 2178,
+                                    "end": 2193
                                   },
                                   "loc": {
-                                    "start": 2180,
-                                    "end": 2205
+                                    "start": 2169,
+                                    "end": 2194
                                   }
                                 }
                               ],
                               "children": [],
                               "selfClosing": true,
                               "loc": {
-                                "start": 2136,
-                                "end": 2208
-                              }
-                            },
-                            {
-                              "type": "TemplateText",
-                              "text": "\n          ",
-                              "loc": {
-                                "start": 2208,
-                                "end": 2219
+                                "start": 2125,
+                                "end": 2197
                               }
                             },
                             {
@@ -3374,38 +3358,30 @@
                                   "type": "TemplateInterpolation",
                                   "rawExpr": " item.text ",
                                   "loc": {
-                                    "start": 2225,
-                                    "end": 2240
+                                    "start": 2203,
+                                    "end": 2218
                                   }
                                 }
                               ],
                               "selfClosing": false,
                               "loc": {
-                                "start": 2219,
-                                "end": 2247
-                              }
-                            },
-                            {
-                              "type": "TemplateText",
-                              "text": "\n        ",
-                              "loc": {
-                                "start": 2247,
-                                "end": 2256
+                                "start": 2197,
+                                "end": 2225
                               }
                             }
                           ],
                           "selfClosing": false,
                           "loc": {
                             "start": 2118,
-                            "end": 2264
+                            "end": 2233
                           }
                         },
                         {
                           "type": "TemplateText",
                           "text": "\n        ",
                           "loc": {
-                            "start": 2264,
-                            "end": 2273
+                            "start": 2233,
+                            "end": 2242
                           }
                         },
                         {
@@ -3417,16 +3393,16 @@
                               "rawName": "@click",
                               "name": "click",
                               "modifierChainText": "",
-                              "modifierChainBaseOffset": 2287,
+                              "modifierChainBaseOffset": 2256,
                               "chain": [],
                               "value": "remove(item.id)",
                               "valueLoc": {
-                                "start": 2289,
-                                "end": 2304
+                                "start": 2258,
+                                "end": 2273
                               },
                               "loc": {
-                                "start": 2281,
-                                "end": 2305
+                                "start": 2250,
+                                "end": 2274
                               }
                             },
                             {
@@ -3434,16 +3410,16 @@
                               "rawName": "aria-label",
                               "name": "aria-label",
                               "modifierChainText": "",
-                              "modifierChainBaseOffset": 2316,
+                              "modifierChainBaseOffset": 2285,
                               "chain": [],
                               "value": "Remove",
                               "valueLoc": {
-                                "start": 2318,
-                                "end": 2324
+                                "start": 2287,
+                                "end": 2293
                               },
                               "loc": {
-                                "start": 2306,
-                                "end": 2325
+                                "start": 2275,
+                                "end": 2294
                               }
                             }
                           ],
@@ -3452,68 +3428,68 @@
                               "type": "TemplateText",
                               "text": "×",
                               "loc": {
-                                "start": 2326,
-                                "end": 2327
+                                "start": 2295,
+                                "end": 2296
                               }
                             }
                           ],
                           "selfClosing": false,
                           "loc": {
-                            "start": 2273,
-                            "end": 2336
+                            "start": 2242,
+                            "end": 2305
                           }
                         },
                         {
                           "type": "TemplateText",
                           "text": "\n      ",
                           "loc": {
-                            "start": 2336,
-                            "end": 2343
+                            "start": 2305,
+                            "end": 2312
                           }
                         }
                       ],
                       "selfClosing": false,
                       "loc": {
                         "start": 2026,
-                        "end": 2350
+                        "end": 2319
                       }
                     },
                     {
                       "type": "TemplateText",
                       "text": "\n    ",
                       "loc": {
-                        "start": 2350,
-                        "end": 2355
+                        "start": 2319,
+                        "end": 2324
                       }
                     }
                   ],
                   "selfClosing": false,
                   "loc": {
                     "start": 1725,
-                    "end": 2360
+                    "end": 2329
                   }
                 },
                 {
                   "type": "TemplateText",
                   "text": "\n  ",
                   "loc": {
-                    "start": 2360,
-                    "end": 2363
+                    "start": 2329,
+                    "end": 2332
                   }
                 }
               ],
               "selfClosing": false,
               "loc": {
                 "start": 1685,
-                "end": 2368
+                "end": 2337
               }
             },
             {
               "type": "TemplateText",
               "text": "\n\n  ",
               "loc": {
-                "start": 2368,
-                "end": 2372
+                "start": 2337,
+                "end": 2341
               }
             },
             {
@@ -3525,13 +3501,13 @@
                   "rawName": "r-else",
                   "name": "else",
                   "modifierChainText": "",
-                  "modifierChainBaseOffset": 2381,
+                  "modifierChainBaseOffset": 2350,
                   "chain": [],
                   "value": null,
                   "valueLoc": null,
                   "loc": {
-                    "start": 2375,
-                    "end": 2381
+                    "start": 2344,
+                    "end": 2350
                   }
                 },
                 {
@@ -3539,16 +3515,16 @@
                   "rawName": "class",
                   "name": "class",
                   "modifierChainText": "",
-                  "modifierChainBaseOffset": 2387,
+                  "modifierChainBaseOffset": 2356,
                   "chain": [],
                   "value": "empty",
                   "valueLoc": {
-                    "start": 2389,
-                    "end": 2394
+                    "start": 2358,
+                    "end": 2363
                   },
                   "loc": {
-                    "start": 2382,
-                    "end": 2395
+                    "start": 2351,
+                    "end": 2364
                   }
                 }
               ],
@@ -3557,8 +3533,8 @@
                   "type": "TemplateText",
                   "text": "\n    ",
                   "loc": {
-                    "start": 2396,
-                    "end": 2401
+                    "start": 2365,
+                    "end": 2370
                   }
                 },
                 {
@@ -3570,16 +3546,16 @@
                       "rawName": "name",
                       "name": "name",
                       "modifierChainText": "",
-                      "modifierChainBaseOffset": 2411,
+                      "modifierChainBaseOffset": 2380,
                       "chain": [],
                       "value": "empty",
                       "valueLoc": {
-                        "start": 2413,
-                        "end": 2418
+                        "start": 2382,
+                        "end": 2387
                       },
                       "loc": {
-                        "start": 2407,
-                        "end": 2419
+                        "start": 2376,
+                        "end": 2388
                       }
                     }
                   ],
@@ -3588,53 +3564,53 @@
                       "type": "TemplateText",
                       "text": "Nothing to do. ✨",
                       "loc": {
-                        "start": 2420,
-                        "end": 2436
+                        "start": 2389,
+                        "end": 2405
                       }
                     }
                   ],
                   "selfClosing": false,
                   "loc": {
-                    "start": 2401,
-                    "end": 2443
+                    "start": 2370,
+                    "end": 2412
                   }
                 },
                 {
                   "type": "TemplateText",
                   "text": "\n  ",
                   "loc": {
-                    "start": 2443,
-                    "end": 2446
+                    "start": 2412,
+                    "end": 2415
                   }
                 }
               ],
               "selfClosing": false,
               "loc": {
-                "start": 2372,
-                "end": 2450
+                "start": 2341,
+                "end": 2419
               }
             },
             {
               "type": "TemplateText",
               "text": "\n",
               "loc": {
-                "start": 2450,
-                "end": 2451
+                "start": 2419,
+                "end": 2420
               }
             }
           ],
           "selfClosing": false,
           "loc": {
             "start": 1235,
-            "end": 2457
+            "end": 2426
           }
         },
         {
           "type": "TemplateText",
           "text": "\n",
           "loc": {
-            "start": 2457,
-            "end": 2458
+            "start": 2426,
+            "end": 2427
           }
         }
       ]
@@ -3642,56 +3618,56 @@
     "style": {
       "type": "StyleAST",
       "loc": {
-        "start": 2478,
-        "end": 2823
+        "start": 2447,
+        "end": 2792
       },
       "cssText": "\n.todo-list { font-family: system-ui, sans-serif; }\nul { list-style: none; padding: 0; }\nli { display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0; }\nli.done span { text-decoration: line-through; opacity: 0.5; }\n.empty { color: rgba(0, 0, 0, 0.4); font-style: italic; }\nform { display: flex; gap: 0.25rem; margin-block: 0.5rem; }\n",
       "rules": [
         {
           "selector": ".todo-list",
           "loc": {
-            "start": 2479,
-            "end": 2529
+            "start": 2448,
+            "end": 2498
           },
           "isRootEscape": false
         },
         {
           "selector": "ul",
           "loc": {
-            "start": 2530,
-            "end": 2566
+            "start": 2499,
+            "end": 2535
           },
           "isRootEscape": false
         },
         {
           "selector": "li",
           "loc": {
-            "start": 2567,
-            "end": 2642
+            "start": 2536,
+            "end": 2611
           },
           "isRootEscape": false
         },
         {
           "selector": "li.done span",
           "loc": {
-            "start": 2643,
-            "end": 2704
+            "start": 2612,
+            "end": 2673
           },
           "isRootEscape": false
         },
         {
           "selector": ".empty",
           "loc": {
-            "start": 2705,
-            "end": 2762
+            "start": 2674,
+            "end": 2731
           },
           "isRootEscape": false
         },
         {
           "selector": "form",
           "loc": {
-            "start": 2763,
-            "end": 2822
+            "start": 2732,
+            "end": 2791
           },
           "isRootEscape": false
         }
@@ -3725,17 +3701,17 @@
         }
       },
       "template": {
-        "content": "\n<div class=\"todo-list\">\n  <header>\n    <slot name=\"header\" :remaining=\"remaining\" :total=\"$props.items.length\">\n      <!-- Fallback content if consumer doesn't provide #header -->\n      <h3>{{ $props.title }} ({{ remaining }} remaining)</h3>\n    </slot>\n  </header>\n\n  <form @submit.prevent=\"add\">\n    <input r-model=\"$data.draft\" placeholder=\"What needs doing?\" />\n    <button type=\"submit\" :disabled=\"!$data.draft.trim()\">Add</button>\n  </form>\n\n  <ul r-if=\"$props.items.length > 0\">\n    <li r-for=\"item in $props.items\" :key=\"item.id\" :class=\"{ done: item.done }\">\n      <!--\n        Default slot with per-item params. Consumer can provide a custom row\n        renderer via `#default=\"{ item, toggle, remove }\"`, or omit it entirely\n        to get the fallback row below.\n      -->\n      <slot :item=\"item\" :toggle=\"() => toggle(item.id)\" :remove=\"() => remove(item.id)\">\n        <label>\n          <input type=\"checkbox\" :checked=\"item.done\" @change=\"toggle(item.id)\" />\n          <span>{{ item.text }}</span>\n        </label>\n        <button @click=\"remove(item.id)\" aria-label=\"Remove\">×</button>\n      </slot>\n    </li>\n  </ul>\n\n  <p r-else class=\"empty\">\n    <slot name=\"empty\">Nothing to do. ✨</slot>\n  </p>\n</div>\n",
+        "content": "\n<div class=\"todo-list\">\n  <header>\n    <slot name=\"header\" :remaining=\"remaining\" :total=\"$props.items.length\">\n      <!-- Fallback content if consumer doesn't provide #header -->\n      <h3>{{ $props.title }} ({{ remaining }} remaining)</h3>\n    </slot>\n  </header>\n\n  <form @submit.prevent=\"add\">\n    <input r-model=\"$data.draft\" placeholder=\"What needs doing?\" />\n    <button type=\"submit\" :disabled=\"!$data.draft.trim()\">Add</button>\n  </form>\n\n  <ul r-if=\"$props.items.length > 0\">\n    <li r-for=\"item in $props.items\" :key=\"item.id\" :class=\"{ done: item.done }\">\n      <!--\n        Default slot with per-item params. Consumer can provide a custom row\n        renderer via `#default=\"{ item, toggle, remove }\"`, or omit it entirely\n        to get the fallback row below.\n      -->\n      <slot :item=\"item\" :toggle=\"() => toggle(item.id)\" :remove=\"() => remove(item.id)\">\n        <label><input type=\"checkbox\" :checked=\"item.done\" @change=\"toggle(item.id)\" /><span>{{ item.text }}</span></label>\n        <button @click=\"remove(item.id)\" aria-label=\"Remove\">×</button>\n      </slot>\n    </li>\n  </ul>\n\n  <p r-else class=\"empty\">\n    <slot name=\"empty\">Nothing to do. ✨</slot>\n  </p>\n</div>\n",
         "loc": {
           "start": 1224,
-          "end": 2469
+          "end": 2438
         }
       },
       "style": {
         "content": "\n.todo-list { font-family: system-ui, sans-serif; }\nul { list-style: none; padding: 0; }\nli { display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0; }\nli.done span { text-decoration: line-through; opacity: 0.5; }\n.empty { color: rgba(0, 0, 0, 0.4); font-style: italic; }\nform { display: flex; gap: 0.25rem; margin-block: 0.5rem; }\n",
         "loc": {
-          "start": 2471,
-          "end": 2831
+          "start": 2440,
+          "end": 2800
         }
       }
     }

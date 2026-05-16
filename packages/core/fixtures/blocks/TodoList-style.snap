@@ -2,56 +2,56 @@
   "node": {
     "type": "StyleAST",
     "loc": {
-      "start": 2478,
-      "end": 2823
+      "start": 2447,
+      "end": 2792
     },
     "cssText": "\n.todo-list { font-family: system-ui, sans-serif; }\nul { list-style: none; padding: 0; }\nli { display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0; }\nli.done span { text-decoration: line-through; opacity: 0.5; }\n.empty { color: rgba(0, 0, 0, 0.4); font-style: italic; }\nform { display: flex; gap: 0.25rem; margin-block: 0.5rem; }\n",
     "rules": [
       {
         "selector": ".todo-list",
         "loc": {
-          "start": 2479,
-          "end": 2529
+          "start": 2448,
+          "end": 2498
         },
         "isRootEscape": false
       },
       {
         "selector": "ul",
         "loc": {
-          "start": 2530,
-          "end": 2566
+          "start": 2499,
+          "end": 2535
         },
         "isRootEscape": false
       },
       {
         "selector": "li",
         "loc": {
-          "start": 2567,
-          "end": 2642
+          "start": 2536,
+          "end": 2611
         },
         "isRootEscape": false
       },
       {
         "selector": "li.done span",
         "loc": {
-          "start": 2643,
-          "end": 2704
+          "start": 2612,
+          "end": 2673
         },
         "isRootEscape": false
       },
       {
         "selector": ".empty",
         "loc": {
-          "start": 2705,
-          "end": 2762
+          "start": 2674,
+          "end": 2731
         },
         "isRootEscape": false
       },
       {
         "selector": "form",
         "loc": {
-          "start": 2763,
-          "end": 2822
+          "start": 2732,
+          "end": 2791
         },
         "isRootEscape": false
       }

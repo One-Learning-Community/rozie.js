@@ -16,10 +16,7 @@
     <li v-for="item in items" :key="item.id" :class="{ done: item.done }">
       
       <slot :item="item" :toggle="() => toggle(item.id)" :remove="() => remove(item.id)">
-        <label>
-          <input type="checkbox" :checked="item.done" @change="toggle(item.id)" />
-          <span>{{ item.text }}</span>
-        </label>
+        <label><input type="checkbox" :checked="item.done" @change="toggle(item.id)" /><span>{{ item.text }}</span></label>
         <button aria-label="Remove" @click="remove(item.id)">×</button>
       </slot>
     </li>

@@ -9,8 +9,8 @@ export default class Counter extends SignalWatcher(LitElement) {
 .counter { display: inline-flex; gap: 0.5rem; align-items: center; }
 .counter.hovering { background: rgba(0, 0, 0, 0.04); }
 .value { font-variant-numeric: tabular-nums; min-width: 3ch; text-align: center; }
-button { padding: 0.25rem 0.5rem; }
-button:disabled { opacity: 0.4; cursor: not-allowed; }
+.counter button { padding: 0.25rem 0.5rem; }
+.counter button:disabled { opacity: 0.4; cursor: not-allowed; }
 `;
 
   @property({ type: Number, attribute: 'value' }) _value_attr: number = 0;

@@ -73,10 +73,7 @@ const remove = (id) => {
         to get the fallback row below.
       -->
       <slot :item="item" :toggle="() => toggle(item.id)" :remove="() => remove(item.id)">
-        <label>
-          <input type="checkbox" :checked="item.done" @change="toggle(item.id)" />
-          <span>{{ item.text }}</span>
-        </label>
+        <label><input type="checkbox" :checked="item.done" @change="toggle(item.id)" /><span>{{ item.text }}</span></label>
         <button @click="remove(item.id)" aria-label="Remove">×</button>
       </slot>
     </li>
