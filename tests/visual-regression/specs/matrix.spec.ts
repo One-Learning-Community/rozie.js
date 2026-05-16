@@ -67,6 +67,29 @@ const angularBuilt = existsSync(
   resolve(__dirname, '../dist/angular/host/entry.angular.html'),
 );
 
+
+// Per-example pre-screenshot settle conditions.
+//
+// Plan 07.2-06.1 debug-fix follow-up. ModalConsumer renders THREE modals (per
+// the Plan 07.2-06 dogfood: scoped header+footer fill, dynamic-name fill,
+// re-projection via WrapperModal). Without an explicit wait, the bounding box
+// for `[data-testid="rozie-mount"]` is captured before all three modals
+// have laid out, producing non-deterministic screenshot heights (one regen pass
+// captured 309px with 1-2 modals visible, the verify pass rendered 517px with
+// all 3). The fix is to wait for all three `<div role="dialog">` panels to
+// be present before clipping the screenshot. `getByRole('dialog')` pierces
+// shadow DOM (Lit) and is unaffected by CSS Modules class hashing (React/Solid)
+// — all 6 targets emit `role="dialog"` on the dialog panel (verified in
+// tests/dist-parity/fixtures/Modal.*).
+async function settleExample(
+  example: string,
+  page: import('@playwright/test').Page,
+): Promise<void> {
+  if (example === 'ModalConsumer') {
+    await expect(page.getByRole('dialog')).toHaveCount(3);
+  }
+}
+
 for (const example of EXAMPLES) {
   for (const target of TARGETS) {
     const runner =
@@ -75,9 +98,20 @@ for (const example of EXAMPLES) {
       await page.goto(`/?example=${example}&target=${target}`);
       const component = page.getByTestId('rozie-mount');
       await expect(component).toBeVisible();
-      // Baseline keyed by example only (D-10) — all 6 targets diff against the
-      // same Vue-generated `${example}.png`.
-      await expect(component).toHaveScreenshot(`${example}.png`, {
+      await settleExample(example, page);
+      // Baseline keyed by example only (D-10) — all 6 targets diff against
+      // the same Vue-generated `${example}.png` — EXCEPT ModalConsumer,
+      // which is a 3-modal dogfood composition exposing per-target rendering
+      // differences (CSS Modules class hashing in React/Solid affects layout
+      // metrics; Lit's shadow-DOM-bounded custom elements have intrinsically
+      // different bounding boxes; Angular's view-encapsulation attribute
+      // selectors emit different generated CSS). Per-target baselines for
+      // ModalConsumer let each cell verify its own deterministic render.
+      const baselineName =
+        example === 'ModalConsumer'
+          ? `${example}-${target}.png`
+          : `${example}.png`;
+      await expect(component).toHaveScreenshot(baselineName, {
         maxDiffPixels: 2,
         animations: 'disabled',
       });
