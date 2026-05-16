@@ -49,6 +49,8 @@ import { emitConditional } from './emitConditional.js';
 import { emitTemplateEvent } from './emitTemplateEvent.js';
 import { emitRModel } from './emitRModel.js';
 import { emitSlotInvocation } from './emitSlotInvocation.js';
+// Phase 07.2 — consumer-side slot-fill emission for component-tag elements.
+import { emitSlotFiller, emitDynamicSlotsProp } from './emitSlotFiller.js';
 
 type GenerateFn = typeof import('@babel/generator').default;
 const generate: GenerateFn =
@@ -258,6 +260,42 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
   if (rShowStyleAttr) headParts.push(rShowStyleAttr);
   if (scopeAttrJsx) headParts.push(scopeAttrJsx);
   if (pendingKey !== null) headParts.unshift(`key={${pendingKey}}`);
+
+  // Phase 07.2 consumer-side slot-fill emit (R3 + R4 + R5).
+  //
+  // When this element is a component-tag (tagKind 'component' | 'self') and
+  // carries SlotFillerDecl[] from the lowerer (lowerSlotFillers.ts L186-310),
+  // the body content lives in node.slotFillers. The same body content is ALSO
+  // present in node.children (the lowerer doesn't strip it — extractSlotFillers
+  // walks a parallel array). To avoid double-emission we MUST emit fillers
+  // via JSX-attribute assignments and SKIP the raw children path below.
+  //
+  // Per producer-side dual-shape (emitSlotInvocation.ts L22-32), the React
+  // mapping is:
+  //   - default-shorthand → `children={…JSX…}` prop (raw ReactNode form)
+  //   - default scoped     → `children={(args) => …}` (function form)
+  //   - named static       → `render<Pascal>={() => …}`
+  //   - named scoped       → `render<Pascal>={(args) => …}`
+  //   - dynamic-name (R5)  → `slots={{ [expr]: (args) => … }}`
+  if (node.slotFillers !== undefined && node.slotFillers.length > 0) {
+    const fillerAttrs: string[] = [];
+    for (const filler of node.slotFillers) {
+      if (filler.isDynamic) continue; // merged into a single slots={…} below
+      fillerAttrs.push(emitSlotFiller(filler, childCtx));
+    }
+    const dynamicSlotsAttr = emitDynamicSlotsProp(node.slotFillers, childCtx);
+    if (dynamicSlotsAttr !== null) fillerAttrs.push(dynamicSlotsAttr);
+
+    const headWithFills = [
+      ...headParts.filter(Boolean),
+      ...fillerAttrs,
+    ].join(' ');
+    const headOutFills = headWithFills.length > 0 ? ' ' + headWithFills : '';
+    // Component tags with slot fills self-close — body content is wholly
+    // represented by the slot-prop assignments above.
+    return `<${node.tagName}${headOutFills} />`;
+  }
+
   const head = headParts.filter(Boolean).join(' ');
   const headOut = head.length > 0 ? ' ' + head : '';
 

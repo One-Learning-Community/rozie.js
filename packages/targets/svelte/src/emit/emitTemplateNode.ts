@@ -35,6 +35,11 @@ import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.
 import { emitAttributes, findRHtml } from './emitTemplateAttribute.js';
 import { emitTemplateEvent } from './emitTemplateEvent.js';
 import { emitSlotInvocation } from './emitSlotInvocation.js';
+// Phase 07.2 — consumer-side slot-fill emission for component-tag elements.
+import {
+  emitSlotFiller,
+  emitDynamicSnippetsProp,
+} from './emitSlotFiller.js';
 import type { SvelteScriptInjection } from './emitScript.js';
 
 /**
@@ -260,6 +265,41 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
     }
     const expr = rewriteTemplateExpression(rHtml.expression, ctx.ir);
     return `<${node.tagName}${head}>{@html ${expr}}</${node.tagName}>`;
+  }
+
+  // Phase 07.2 — component-tag with slot fillers: render fillers as Svelte 5
+  // snippet blocks inside the component tag instead of raw children.
+  //
+  // The parallel-array lowering invariant (lowerSlotFillers.ts L186-310)
+  // means node.children and node.slotFillers reference the SAME body content
+  // — extractSlotFillers walks parallel arrays without stripping children.
+  // To avoid double-emission, emit the structured slotFillers view only and
+  // skip the children path below.
+  if (node.slotFillers !== undefined && node.slotFillers.length > 0) {
+    const emitChildren = (children: TemplateNode[]): string =>
+      children.map((c) => emitNode(c, ctx)).join('');
+    const fillerCtx = { ir: ctx.ir, emitChildren };
+
+    const fillerParts: string[] = [];
+    for (const filler of node.slotFillers) {
+      if (filler.isDynamic) continue; // handled via the snippets prop below
+      fillerParts.push(emitSlotFiller(filler, fillerCtx));
+    }
+    const dynSnippetsProp = emitDynamicSnippetsProp(
+      node.slotFillers,
+      ctx.ir,
+      emitChildren,
+    );
+    const headWithSnippets =
+      dynSnippetsProp !== null
+        ? `${head} ${dynSnippetsProp}`
+        : head;
+
+    const inner = fillerParts.join('');
+    if (inner.length === 0) {
+      return `<${node.tagName}${headWithSnippets}></${node.tagName}>`;
+    }
+    return `<${node.tagName}${headWithSnippets}>${inner}</${node.tagName}>`;
   }
 
   const isVoid = VOID_ELEMENTS.has(node.tagName.toLowerCase());
