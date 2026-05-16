@@ -1,0 +1,26 @@
+<rozie name="Consumer">
+
+<components>
+{
+  Producer: './producer.rozie',
+  Inner: './producer.rozie',
+}
+</components>
+
+<data>
+{
+  outerOpen: true,
+  innerVal: 'hello'
+}
+</data>
+
+<template>
+<Producer r-model:open="$data.outerOpen">
+  <template #footer="{ close }">
+    <Inner r-model:open="$data.outerOpen" />
+    <button @click="close">×</button>
+  </template>
+</Producer>
+</template>
+
+</rozie>
