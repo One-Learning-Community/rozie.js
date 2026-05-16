@@ -45,6 +45,8 @@ import { emitConditional } from './emitConditional.js';
 import { emitTemplateEvent } from './emitTemplateEvent.js';
 import { emitRModel } from './emitRModel.js';
 import { emitSlotInvocation } from './emitSlotInvocation.js';
+// Phase 07.2 Plan 03 — consumer-side slot-fill emission for component-tag elements.
+import { emitSlotFiller, emitDynamicSlotsProp } from './emitSlotFiller.js';
 
 const VOID_ELEMENTS = new Set([
   'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta',
@@ -374,6 +376,46 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
   const headParts = [mergeEventAttributes(attrsResult.jsx, eventsJsx)];
   if (rShowStyleAttr) headParts.push(rShowStyleAttr);
   if (scopeAttrJsx) headParts.push(scopeAttrJsx);
+
+  // Phase 07.2 Plan 03 — Solid consumer-side slot-fill emit (R3 + R4 + R5).
+  //
+  // When this element is a component-tag (tagKind 'component' | 'self') and
+  // carries SlotFillerDecl[] from the lowerer, render the structured fillers
+  // instead of the parallel-array raw children. Each filler either becomes a
+  // JSX prop assignment (`headerSlot={({ close }) => …}`) OR bare children
+  // (default-shorthand without scope — picked up by Solid's
+  // `children(() => local.children)` accessor on the producer).
+  if (node.slotFillers !== undefined && node.slotFillers.length > 0) {
+    const fillerProps: string[] = [];
+    const childrenParts: string[] = [];
+    for (const filler of node.slotFillers) {
+      if (filler.isDynamic) continue; // merged into a single slots={…} below
+      const out = emitSlotFiller(filler, ctx);
+      if (out.kind === 'prop') {
+        fillerProps.push(out.text);
+      } else {
+        childrenParts.push(out.text);
+      }
+    }
+    const dynamicSlotsAttr = emitDynamicSlotsProp(node.slotFillers, ctx);
+    if (dynamicSlotsAttr !== null) fillerProps.push(dynamicSlotsAttr);
+
+    const headWithFills = [
+      ...headParts.filter(Boolean),
+      ...fillerProps,
+    ].join(' ');
+    const headOutFills = headWithFills.length > 0 ? ' ' + headWithFills : '';
+
+    if (childrenParts.length === 0) {
+      // No bare-children fill → self-close, body content lives wholly in
+      // JSX prop assignments.
+      return `<${node.tagName}${headOutFills} />`;
+    }
+    // Bare-children fill (default-shorthand without scope) → emit inside.
+    const innerFills = childrenParts.join('');
+    return `<${node.tagName}${headOutFills}>${innerFills}</${node.tagName}>`;
+  }
+
   const head = headParts.filter(Boolean).join(' ');
   const headOut = head.length > 0 ? ' ' + head : '';
 

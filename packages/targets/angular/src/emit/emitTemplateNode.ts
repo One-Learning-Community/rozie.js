@@ -38,6 +38,8 @@ import { emitTemplateEvent, type AngularScriptInjection } from './emitTemplateEv
 import { emitSlotInvocation } from './emitSlotInvocation.js';
 import { emitConditional } from './emitConditional.js';
 import { toKebabCase } from './emitDecorator.js';
+// Phase 07.2 Plan 03 — consumer-side slot-fill emit for component-tag elements.
+import { emitSlotFiller, type EmitSlotFillerCtx } from './emitSlotFiller.js';
 
 /**
  * Phase 06.2 P2: resolve a TemplateElement's emitted tag name. For
@@ -350,6 +352,32 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
   if (node.children.length === 0) {
     if (isVoid) return `<${tagOut}${head} />`;
     return `<${tagOut}${head}></${tagOut}>`;
+  }
+
+  // Phase 07.2 Plan 03 — Angular consumer-side slot-fill emit (R3 + R4).
+  //
+  // When this element is a component-tag with structured `slotFillers`, emit
+  // each filler as an `<ng-template #ref let-…>…</ng-template>` child of the
+  // component tag. This TAKES PRECEDENCE over the D-LIT-ANG-DEFAULT-SLOT
+  // wrap path below — when slotFillers populated, the lowerer has already
+  // captured the default-slot body as a synthetic `{ name: '' }` filler, so
+  // we own the synthesis here.
+  //
+  // The parallel-array lowering invariant (lowerSlotFillers.ts L186-310)
+  // means node.children and node.slotFillers reference the SAME body content;
+  // emitting both double-renders. We emit fillers and SKIP the children path.
+  if (node.slotFillers !== undefined && node.slotFillers.length > 0) {
+    const fillerCtx: EmitSlotFillerCtx = {
+      ir: ctx.ir,
+      emitChildren: (children) => children.map((c) => emitNode(c, ctx)).join(''),
+    };
+    const fillerParts: string[] = [];
+    for (const filler of node.slotFillers) {
+      const text = emitSlotFiller(filler, fillerCtx);
+      if (text.length > 0) fillerParts.push(text);
+    }
+    const innerFills = fillerParts.join('');
+    return `<${tagOut}${head}>${innerFills}</${tagOut}>`;
   }
 
   const inner = node.children.map((c) => emitNode(c, ctx)).join('');
