@@ -59,6 +59,12 @@ const ROOT = resolve(HERE, '../..');
 const FIXTURES_DIR = resolve(HERE, 'fixtures');
 
 // Phase 06.2 P3 D-126: extended 5 → 8 examples.
+// Phase 07.2 Plan 06 D-216: extended 8 → 9 with ModalConsumer (the dogfood
+// closing the consumer-side surface). 9 × 6 × 4 = 216 cells — the hard SPEC.md
+// ship gate. ModalConsumer references sibling Modal.rozie + WrapperModal.rozie
+// via the IR cache; each Leg below detects `name === 'ModalConsumer'` and
+// stages the sibling .rozie files alongside (or wires resolverRoot) so the
+// producer resolution flows through correctly.
 const EXAMPLES = [
   'Counter',
   'SearchInput',
@@ -68,7 +74,15 @@ const EXAMPLES = [
   'TreeNode',
   'Card',
   'CardHeader',
+  'ModalConsumer',
 ] as const;
+
+// Phase 07.2 Plan 06 — siblings ModalConsumer reaches via `<components>`.
+// Used by Leg 3 (babel-plugin sibling-copy) and Leg 2 (CLI implicit via
+// `root: ROOT`).
+const EXAMPLE_SIBLING_ROZIE: Record<string, string[]> = {
+  ModalConsumer: ['Modal.rozie', 'WrapperModal.rozie', 'Counter.rozie'],
+};
 // Phase 06.4 P3 (D-LIT-22): TARGETS extended with 'lit' — additive only.
 // 8 examples × 1 target × 3 entrypoints excl. babel-plugin sidecar parity
 // totals 24 net-new byte-equal assertions (24 of the 32 leg-tuples below are
@@ -288,7 +302,7 @@ describe('DIST-05 strict-bytes parity gate — consumer-side 96-cell subset (Pha
   });
 });
 
-describe('DIST-05 strict-bytes parity gate (D-93)', () => {
+describe('DIST-05 strict-bytes parity gate (D-93) — 9 examples × 6 targets × 4 entrypoints = 216 cells', () => {
   describe.each(EXAMPLES)('%s', (name) => {
     const rozieSourcePath = resolve(ROOT, `examples/${name}.rozie`);
     const rozieSource = readFileSync(rozieSourcePath, 'utf8');
@@ -297,9 +311,18 @@ describe('DIST-05 strict-bytes parity gate (D-93)', () => {
       const fixture = loadFixture(name, target);
 
       it('Leg 1 — compile() direct produces fixture bytes', () => {
+        // Phase 07.2 Plan 06 — multi-rozie examples (e.g., ModalConsumer
+        // composing Modal + WrapperModal) need an absolute filename + a
+        // resolverRoot so the IR cache + ProducerResolver can locate the
+        // sibling .rozie producers. For single-file examples (Counter through
+        // CardHeader), absolute-filename + resolverRoot is byte-equivalent
+        // to the relative form (verified empirically — all 192 baselines
+        // unchanged after the switch), so we use the same shape uniformly.
+        const hasSiblings = name in EXAMPLE_SIBLING_ROZIE;
         const result = compile(rozieSource, {
           target,
-          filename: `${name}.rozie`,
+          filename: hasSiblings ? rozieSourcePath : `${name}.rozie`,
+          ...(hasSiblings ? { resolverRoot: dirname(rozieSourcePath) } : {}),
           types: true,
           sourceMap: false,
         });
@@ -380,6 +403,15 @@ describe('DIST-05 strict-bytes parity gate (D-93)', () => {
           // sibling-relative to state.filename (the importer).
           const tmpRozie = join(tmpDir, `${name}.rozie`);
           writeFileSync(tmpRozie, rozieSource, 'utf8');
+          // Phase 07.2 Plan 06 — multi-rozie examples (ModalConsumer)
+          // additionally stage the sibling .rozie producers so the
+          // babel-plugin's compile() can resolve `<components>` imports
+          // through the IR cache + ProducerResolver.
+          const siblings = EXAMPLE_SIBLING_ROZIE[name] ?? [];
+          for (const sibling of siblings) {
+            const srcPath = resolve(ROOT, 'examples', sibling);
+            writeFileSync(join(tmpDir, sibling), readFileSync(srcPath, 'utf8'), 'utf8');
+          }
           const importer = join(tmpDir, 'consumer.ts');
           writeFileSync(importer, `import X from './${name}.rozie';`, 'utf8');
 
@@ -436,7 +468,14 @@ describe('DIST-05 strict-bytes parity gate (D-93)', () => {
         // Invoke with an empty `this` — the production plugin context carries
         // `addWatchFile` / `warn` / `error`; the hook tolerates their absence
         // (existing transform.test cases verify this).
-        const result = hook.call({}, rozieSource, `${name}.rozie`);
+        //
+        // Phase 07.2 Plan 06 — multi-rozie examples (ModalConsumer) need the
+        // absolute consumer path so unplugin's threadParamTypesForPipeline
+        // helper (Plan 07.2-03) computes resolverRoot = dirname(filePath)
+        // correctly and the IR cache can resolve sibling .rozie producers.
+        const hasSiblings = name in EXAMPLE_SIBLING_ROZIE;
+        const filePathForHook = hasSiblings ? rozieSourcePath : `${name}.rozie`;
+        const result = hook.call({}, rozieSource, filePathForHook);
         expect(result).not.toBeNull();
         // WR-04: unplugin's createTransformHook returns the same compile()
         // result.code; the trailing-LF contract applies here too.

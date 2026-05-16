@@ -142,6 +142,15 @@ describe('QA-02 — 6-class slot acceptance matrix', () => {
         );
         expect(errors).toEqual([]);
 
+        // Phase 07.2 Plan 06 — R8 silent-fallback acceptance: when a consumer
+        // omits fills, the producer's defaultContent (or empty) renders with
+        // ZERO diagnostics — not even warnings. This guard is dedicated to the
+        // `consumer-silent-fallback` fixture so that any future regression
+        // emitting a ROZ-coded warning on an unfilled slot trips the gate.
+        if (slotClass === 'consumer-silent-fallback') {
+          expect(result.diagnostics).toEqual([]);
+        }
+
         // (b) the emitted code matches the per-target frozen snapshot. For the
         // scoped-params × react and scoped-params × lit cells the snapshot
         // captures the DOCUMENTED render-prop / data-rozie-params compromise

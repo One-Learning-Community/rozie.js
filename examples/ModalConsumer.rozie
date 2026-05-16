@@ -1,0 +1,68 @@
+<rozie name="ModalConsumer">
+
+<components>
+{
+  Modal: './Modal.rozie',
+  WrapperModal: './WrapperModal.rozie',
+}
+</components>
+
+<props>
+{
+  title: { type: String, default: 'Confirm' },
+}
+</props>
+
+<data>
+{
+  open: true,
+  slotName: 'header',
+}
+</data>
+
+<script>
+function onConfirm() {
+  $data.open = false
+}
+</script>
+
+<template>
+<div class="modal-consumer">
+  <Modal :open="$data.open">
+    <template #header="{ close }">
+      <h2>{{ $props.title }}</h2>
+      <button class="close" @click="close">×</button>
+    </template>
+    Are you sure you want to proceed?
+    <template #footer="{ close }">
+      <button @click="close">Cancel</button>
+      <button @click="onConfirm()">OK</button>
+    </template>
+  </Modal>
+
+  <Modal :open="$data.open">
+    <template #[$data.slotName]>
+      <span class="dynamic-fill">Dynamic header via slotName</span>
+    </template>
+    Dynamic-name demo body
+  </Modal>
+
+  <WrapperModal :title="$props.title">
+    <template #title>
+      <h2>Re-projected title</h2>
+    </template>
+    Body via wrapper's default slot
+    <template #actions>
+      <button>Wrapper action</button>
+    </template>
+  </WrapperModal>
+</div>
+</template>
+
+<style>
+.modal-consumer { display: flex; flex-direction: column; gap: 1rem; }
+.close { background: none; border: none; cursor: pointer; font-size: 1.25rem; }
+.dynamic-fill { font-weight: bold; }
+</style>
+
+</rozie>

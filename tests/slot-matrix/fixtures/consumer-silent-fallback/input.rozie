@@ -1,0 +1,13 @@
+<rozie name="Consumer">
+
+<components>
+{
+  Producer: './producer.rozie',
+}
+</components>
+
+<template>
+<Producer :title="'Hello'">Body text</Producer>
+</template>
+
+</rozie>
