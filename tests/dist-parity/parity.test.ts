@@ -120,6 +120,151 @@ function normalizeCss(s: string): string {
   return s.endsWith('\n') ? s : `${s}\n`;
 }
 
+/**
+ * Phase 07.2 Plan 03 — consumer-side fixture 48-cell subset.
+ *
+ * The two consumer-side slot-matrix fixtures (`consumer-named-fill`,
+ * `consumer-scoped-fill`) ship their own per-target baselines under
+ * `tests/slot-matrix/fixtures/<class>/expected.<ext>`. This subset gates
+ * byte-equality of those baselines across all 4 entrypoints — proving
+ * Pitfall 1 (resolver-shape mismatch across entrypoints) does NOT
+ * manifest for the consumer-side scoped-fill type-flow path.
+ *
+ * 2 fixtures × 6 targets × 4 entrypoints = 48 cells (subset toward the
+ * full 216-cell gate landed in Plan 07.2-06).
+ *
+ * The slot-matrix fixtures are multi-file (consumer + sibling producer);
+ * compile() needs `resolverRoot` set to the fixture directory so the IR
+ * cache can resolve `./producer.rozie`. The 4 entrypoints derive the
+ * resolverRoot differently:
+ *
+ *   - Leg 1 (compile()): explicit `resolverRoot` arg
+ *   - Leg 2 (CLI): chdir to the fixture dir before invoking
+ *   - Leg 3 (babel-plugin): consumer's filename is in the fixture dir →
+ *     the babel-plugin's wrapper compile() uses `process.cwd()` by default,
+ *     which we set to the fixture dir
+ *   - Leg 4 (unplugin createTransformHook): the new
+ *     `threadParamTypesForPipeline` helper in unplugin uses
+ *     `dirname(filePath)` — so the fixture absolute path Just Works
+ */
+const CONSUMER_FIXTURES = ['consumer-named-fill', 'consumer-scoped-fill'] as const;
+const SLOT_MATRIX_FIXTURES_DIR = resolve(HERE, '../slot-matrix/fixtures');
+
+function consumerFixturePath(fixtureClass: string): string {
+  return join(SLOT_MATRIX_FIXTURES_DIR, fixtureClass, 'input.rozie');
+}
+
+function consumerExpectedPath(fixtureClass: string, target: Target): string {
+  return join(SLOT_MATRIX_FIXTURES_DIR, fixtureClass, `expected${primaryExt(target)}`);
+}
+
+describe('DIST-05 strict-bytes parity gate — consumer-side 48-cell subset (Phase 07.2 D-10 Wave 1)', () => {
+  describe.each(CONSUMER_FIXTURES)('%s', (fixtureClass) => {
+    const consumerPath = consumerFixturePath(fixtureClass);
+    const consumerSource = readFileSync(consumerPath, 'utf8');
+    const fixtureDir = dirname(consumerPath);
+
+    describe.each(TARGETS)('%s target', (target) => {
+      const expectedPath = consumerExpectedPath(fixtureClass, target);
+      const fixture = readFileSync(expectedPath, 'utf8');
+
+      it('Leg 1 — compile() direct produces baseline bytes', () => {
+        const result = compile(consumerSource, {
+          target,
+          filename: consumerPath,
+          resolverRoot: fixtureDir,
+          types: true,
+          sourceMap: false,
+        });
+        expect(result.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+        expect(result.code).toBe(fixture);
+      });
+
+      it('Leg 2 — CLI runBuildMatrix produces baseline bytes', async () => {
+        const tmpDir = mkdtempSync(join(tmpdir(), 'rozie-parity-consumer-cli-'));
+        try {
+          // CLI needs the fixture directory as cwd so the producer
+          // resolver finds `./producer.rozie`. runBuildMatrix doesn't
+          // accept resolverRoot directly; we chdir for the duration of
+          // the call.
+          const origCwd = process.cwd();
+          process.chdir(fixtureDir);
+          try {
+            await runBuildMatrix(
+              [consumerPath],
+              {
+                target: [target],
+                out: tmpDir,
+                types: true,
+                sourceMap: false,
+                root: fixtureDir,
+              },
+              { exit: 'throw' },
+            );
+          } finally {
+            process.chdir(origCwd);
+          }
+          // D-89 layout: <outDir>/<target>/<source-rel>/<basename>.<ext>
+          // With root=fixtureDir + consumerPath=fixtureDir/input.rozie,
+          // the source-rel is `input.rozie` (flat).
+          const outPath = resolve(tmpDir, target, `input${emittedExt(target)}`);
+          const cliBytes = readFileSync(outPath, 'utf8');
+          expect(cliBytes).toBe(fixture);
+        } finally {
+          rmSync(tmpDir, { recursive: true, force: true });
+        }
+      });
+
+      it('Leg 3 — babel-plugin produces baseline bytes via sibling write', async () => {
+        const tmpDir = mkdtempSync(join(tmpdir(), 'rozie-parity-consumer-babel-'));
+        try {
+          // Copy consumer + producer into tmpDir so the babel-plugin's
+          // sibling write doesn't pollute the fixture directory.
+          const tmpConsumer = join(tmpDir, 'input.rozie');
+          writeFileSync(tmpConsumer, consumerSource, 'utf8');
+          const producerPath = join(fixtureDir, 'producer.rozie');
+          writeFileSync(join(tmpDir, 'producer.rozie'), readFileSync(producerPath, 'utf8'), 'utf8');
+          const importer = join(tmpDir, 'consumer.ts');
+          writeFileSync(importer, `import X from './input.rozie';`, 'utf8');
+
+          // babel-plugin's compile() defaults resolverRoot to process.cwd();
+          // chdir to tmpDir so the producer resolver finds the sibling.
+          const origCwd = process.cwd();
+          process.chdir(tmpDir);
+          try {
+            await transformAsync(readFileSync(importer, 'utf8'), {
+              filename: importer,
+              plugins: [[rozieBabelPlugin, { target }]],
+              babelrc: false,
+              configFile: false,
+            });
+          } finally {
+            process.chdir(origCwd);
+          }
+
+          const sibling = join(tmpDir, `input${emittedExt(target)}`);
+          const babelBytes = readFileSync(sibling, 'utf8');
+          expect(babelBytes).toBe(fixture);
+        } finally {
+          rmSync(tmpDir, { recursive: true, force: true });
+        }
+      });
+
+      it('Leg 4 — unplugin createTransformHook produces baseline bytes', () => {
+        const registry = new ModifierRegistry();
+        registerBuiltins(registry);
+        const hook = createTransformHook(registry, target);
+        // Pass the consumer's absolute path as the file id — unplugin's
+        // threadParamTypesForPipeline helper uses dirname(filePath) as the
+        // resolverRoot, so the sibling producer.rozie resolves correctly.
+        const result = hook.call({}, consumerSource, consumerPath);
+        expect(result).not.toBeNull();
+        expect(result!.code).toBe(fixture);
+      });
+    });
+  });
+});
+
 describe('DIST-05 strict-bytes parity gate (D-93)', () => {
   describe.each(EXAMPLES)('%s', (name) => {
     const rozieSourcePath = resolve(ROOT, `examples/${name}.rozie`);

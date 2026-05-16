@@ -62,6 +62,14 @@ import type {
   IRComponent,
   IRTemplateNode as TemplateNode,
 } from '@rozie/core';
+import * as t from '@babel/types';
+import _traverse from '@babel/traverse';
+// @babel/traverse ships CJS default-export; unwrap for ESM consumers.
+type TraverseFn = typeof import('@babel/traverse').default;
+const traverse: TraverseFn =
+  typeof _traverse === 'function'
+    ? (_traverse as TraverseFn)
+    : ((_traverse as unknown as { default: TraverseFn }).default);
 
 /**
  * Per-filler emission tuple. See module docs.
@@ -85,6 +93,168 @@ export interface EmitSlotFillerCtx {
 }
 
 /**
+ * Pre-transform: walk every Expression inside the SlotFillerDecl.body and
+ * rewrite bare Identifier references to scoped-fill params into
+ * `this.<ctxField>?.<name>` MemberExpressions. The recursive emit then
+ * passes those MemberExpressions through verbatim — rewriteTemplateExpression
+ * has no special handling for `this.foo.bar`, so no double-rewrite.
+ *
+ * Mutates the IR nodes in place — callers MUST clone the body subtree first
+ * if they need to preserve the original (the consumer-side emit consumes the
+ * body exactly once per filler, so in-place mutation is safe here).
+ *
+ * Skip-conditions (mirrors rewriteTemplateExpression's Identifier visitor):
+ *   - identifier is a MemberExpression property key (non-computed)
+ *   - identifier is an ObjectProperty key (non-computed)
+ *   - identifier is a function parameter binding
+ *
+ * The traversal handles every TemplateNode shape that carries Expressions:
+ *   - TemplateElement: attributes (binding expressions), events (handler
+ *     expressions)
+ *   - TemplateInterpolation: expression
+ *   - TemplateConditional: branch test expressions + recurse body
+ *   - TemplateLoop: iterableExpression + recurse body
+ *   - TemplateSlotInvocation: args expressions + recurse fallback
+ *   - TemplateFragment: recurse children
+ *   - TemplateStaticText: no expressions
+ */
+function rewriteScopedParamRefs(
+  nodes: TemplateNode[],
+  ctxField: string,
+  params: ReadonlySet<string>,
+): void {
+  if (params.size === 0) return;
+  for (const node of nodes) {
+    rewriteScopedParamRefsInNode(node, ctxField, params);
+  }
+}
+
+function rewriteScopedParamRefsInNode(
+  node: TemplateNode,
+  ctxField: string,
+  params: ReadonlySet<string>,
+): void {
+  switch (node.type) {
+    case 'TemplateStaticText':
+      return;
+    case 'TemplateInterpolation':
+      node.expression = rewriteExpr(node.expression, ctxField, params);
+      return;
+    case 'TemplateFragment':
+      for (const c of node.children) rewriteScopedParamRefsInNode(c, ctxField, params);
+      return;
+    case 'TemplateConditional':
+      for (const b of node.branches) {
+        if (b.test) b.test = rewriteExpr(b.test, ctxField, params);
+        for (const c of b.body) rewriteScopedParamRefsInNode(c, ctxField, params);
+      }
+      return;
+    case 'TemplateLoop':
+      node.iterableExpression = rewriteExpr(node.iterableExpression, ctxField, params);
+      if (node.keyExpression) node.keyExpression = rewriteExpr(node.keyExpression, ctxField, params);
+      for (const c of node.body) rewriteScopedParamRefsInNode(c, ctxField, params);
+      return;
+    case 'TemplateSlotInvocation':
+      for (const a of node.args) a.expression = rewriteExpr(a.expression, ctxField, params);
+      for (const c of node.fallback) rewriteScopedParamRefsInNode(c, ctxField, params);
+      return;
+    case 'TemplateElement':
+      for (const a of node.attributes) {
+        if (a.kind === 'binding') {
+          a.expression = rewriteExpr(a.expression, ctxField, params);
+        } else if (a.kind === 'interpolated') {
+          for (const seg of a.segments) {
+            if (seg.kind === 'binding') {
+              seg.expression = rewriteExpr(seg.expression, ctxField, params);
+            }
+          }
+        }
+      }
+      for (const ev of node.events) {
+        if (ev !== null && ev !== undefined) {
+          ev.handler = rewriteExpr(ev.handler, ctxField, params);
+        }
+      }
+      for (const c of node.children) rewriteScopedParamRefsInNode(c, ctxField, params);
+      return;
+  }
+}
+
+/**
+ * Walk one Expression and rewrite Identifier-matches-param into
+ * `this.<ctxField>?.<name>`. Returns the (possibly-replaced) expression.
+ * Handles the root-identifier case explicitly because @babel/traverse's
+ * `replaceWith` mutates the wrapper tree but doesn't propagate back to
+ * the caller's reference.
+ */
+function rewriteExpr(
+  expr: t.Expression,
+  ctxField: string,
+  params: ReadonlySet<string>,
+): t.Expression {
+  // Root-identifier shortcut: when the entire expression is a bare
+  // Identifier matching a param, return the MemberExpression directly.
+  if (t.isIdentifier(expr) && params.has(expr.name)) {
+    return t.optionalMemberExpression(
+      t.memberExpression(t.thisExpression(), t.identifier(ctxField)),
+      t.identifier(expr.name),
+      false,
+      true,
+    );
+  }
+  // Nested-identifier path: traverse and replace in-place. Replacements
+  // happen on the wrapper's tree (e.g., `foo(close)` → `foo(this._ctx?.close)`);
+  // the caller's reference still points to the same `CallExpression`, so
+  // the mutation is visible after traverse returns.
+  const wrapper = t.file(t.program([t.expressionStatement(expr)]));
+  traverse(wrapper, {
+    Identifier(path) {
+      const name = path.node.name;
+      if (!params.has(name)) return;
+      const parentPath = path.parentPath;
+      if (parentPath) {
+        if (
+          parentPath.isMemberExpression() &&
+          parentPath.node.property === path.node &&
+          !parentPath.node.computed
+        )
+          return;
+        if (
+          parentPath.isOptionalMemberExpression() &&
+          parentPath.node.property === path.node &&
+          !parentPath.node.computed
+        )
+          return;
+        if (
+          parentPath.isObjectProperty() &&
+          parentPath.node.key === path.node &&
+          !parentPath.node.computed
+        )
+          return;
+        if (
+          (parentPath.isFunctionExpression() ||
+            parentPath.isArrowFunctionExpression() ||
+            parentPath.isFunctionDeclaration()) &&
+          (parentPath.node as t.Function).params.some((p) => p === path.node)
+        ) {
+          return;
+        }
+      }
+      path.replaceWith(
+        t.optionalMemberExpression(
+          t.memberExpression(t.thisExpression(), t.identifier(ctxField)),
+          t.identifier(name),
+          false,
+          true,
+        ),
+      );
+      path.skip();
+    },
+  });
+  return expr;
+}
+
+/**
  * Format ONE static-named filler (or default-shorthand) as a Lit
  * consumer-side emission tuple.
  *
@@ -97,6 +267,19 @@ export function emitSlotFiller(
 ): LitFillerEmission {
   if (filler.isDynamic) {
     return { childTemplate: '', firstUpdatedLines: [], classFields: [] };
+  }
+
+  // Phase 07.2 Plan 03 — scoped-param IR pre-transform.
+  // Inside a `<template #header="{ close }">…<button @click="close">×</button></template>`
+  // fill body, bare `close` rewrites to `this._headerCtx?.close` so the
+  // emitted lit-html template references the captured ctx field. Done as an
+  // IR pre-transform (vs an opt threaded through every rewriteTemplateExpression
+  // call site) so the change is isolated to this module — no per-call-site
+  // plumbing through emitTemplate.ts.
+  if (filler.params.length > 0 && filler.name !== '') {
+    const ctxField = `_${filler.name}Ctx`;
+    const paramSet = new Set(filler.params.map((p) => p.name));
+    rewriteScopedParamRefs(filler.body, ctxField, paramSet);
   }
 
   const body = ctx.emitChildren(filler.body);

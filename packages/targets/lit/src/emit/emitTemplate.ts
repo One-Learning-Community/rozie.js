@@ -132,6 +132,14 @@ function isHandlerLike(expr: bt.Expression): boolean {
   if (bt.isFunctionExpression(expr)) return true;
   if (bt.isIdentifier(expr)) return true;
   if (bt.isMemberExpression(expr)) return true; // `this.fn`
+  // Phase 07.2 Plan 03 — Lit consumer-side scoped fill rewrites bare
+  // identifier handler refs (`@click="close"`) into OptionalMemberExpressions
+  // (`this._headerCtx?.close`). These are still handler-like — lit-html's
+  // `@event=${fn}` semantics call `fn` directly with the event. Treating them
+  // as handler-like avoids the synthesized `(e: Event) => { …; }` wrap that
+  // would otherwise insert a statement-shape body for what is actually a
+  // function-reference expression.
+  if (bt.isOptionalMemberExpression(expr)) return true;
   return false;
 }
 

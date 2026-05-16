@@ -1,0 +1,18 @@
+<rozie name="Producer">
+
+<script>
+const close = () => { $emit('close') }
+</script>
+
+<template>
+<div class="producer">
+  <header>
+    <slot name="header" :close="close">default header</slot>
+  </header>
+  <main>
+    <slot>default body</slot>
+  </main>
+</div>
+</template>
+
+</rozie>
