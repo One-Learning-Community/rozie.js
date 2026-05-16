@@ -26,7 +26,7 @@ import { Component, ViewEncapsulation, forwardRef, input } from '@angular/core';
   `],
 })
 export class TreeNode {
-  node = input<Record<string, unknown>>((() => ({
+  node = input<Record<string, any>>((() => ({
     id: '',
     label: '',
     children: []

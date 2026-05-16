@@ -16,7 +16,7 @@ export default function CardHeader(_props: CardHeaderProps): JSX.Element {
     <>
     <header className={styles["card-header"]}>
       <h3 className={styles["card-header__title"]}>{props.title}</h3>
-      {(props.onClose) && <button className={styles["card-header__close"]} onClick={(e) => { props.onClose; }}>×</button>}</header>
+      {(props.onClose) && <button className={styles["card-header__close"]} onClick={(e) => { (props.onClose)(e); }}>×</button>}</header>
     </>
   );
 }

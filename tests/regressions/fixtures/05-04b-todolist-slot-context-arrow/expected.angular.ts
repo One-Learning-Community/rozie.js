@@ -34,7 +34,7 @@ interface ItemCtx {
   `],
 })
 export class ScopedSlotContext {
-  items = model<unknown[]>((() => [])());
+  items = model<any[]>((() => [])());
   @ContentChild('item', { read: TemplateRef }) itemTpl?: TemplateRef<ItemCtx>;
 
   remaining = computed(() => this.items().filter(i => !i.done).length);

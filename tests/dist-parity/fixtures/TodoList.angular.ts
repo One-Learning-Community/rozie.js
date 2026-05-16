@@ -80,7 +80,7 @@ interface EmptyCtx {}
   `],
 })
 export class TodoList {
-  items = model<unknown[]>((() => [])());
+  items = model<any[]>((() => [])());
   title = input<string>('Todo');
   draft = signal('');
   add = output<unknown>();
@@ -103,14 +103,14 @@ export class TodoList {
     this.draft.set('');
     this.add.emit(text);
   };
-  _toggle = id => {
+  _toggle = (id: any) => {
     this.items.set(this.items().map(i => i.id === id ? {
       ...i,
       done: !i.done
     } : i));
     this.toggle.emit(id);
   };
-  _remove = id => {
+  _remove = (id: any) => {
     this.items.set(this.items().filter(i => i.id !== id));
     this.remove.emit(id);
   };
@@ -124,7 +124,7 @@ export class TodoList {
 
   private _guarded_add = (e: any) => {
     e.preventDefault();
-    this._add(e);
+    this._add();
   };
 
   private _defaultSlot_ctx_1 = (item: any) => ({ $implicit: { item: item, toggle: () => this._toggle(item.id), remove: () => this._remove(item.id) }, item: item, toggle: () => this._toggle(item.id), remove: () => this._remove(item.id) });

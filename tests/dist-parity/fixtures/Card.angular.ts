@@ -26,7 +26,7 @@ interface DefaultCtx {}
 })
 export class Card {
   title = input<string>('');
-  onClose = input<(...args: unknown[]) => unknown>(null);
+  onClose = input<((...args: unknown[]) => unknown) | null>(null);
   @ContentChild('defaultSlot', { read: TemplateRef }) defaultTpl?: TemplateRef<DefaultCtx>;
 
   static ngTemplateContextGuard(

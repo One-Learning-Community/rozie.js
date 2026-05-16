@@ -20,7 +20,7 @@ import { Component, ViewEncapsulation, input } from '@angular/core';
 })
 export class CardHeader {
   title = input<string>('');
-  onClose = input<(...args: unknown[]) => unknown>(null);
+  onClose = input<((...args: unknown[]) => unknown) | null>(null);
 }
 
 export default CardHeader;
