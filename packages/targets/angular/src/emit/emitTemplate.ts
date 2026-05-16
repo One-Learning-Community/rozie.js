@@ -34,6 +34,13 @@ export interface EmitTemplateResult {
   template: string;
   scriptInjections: AngularScriptInjection[];
   hasNgModel: boolean;
+  /**
+   * Phase 07.2 Plan 04 (R5): true when the consumer emitted at least one
+   * dynamic slot-name dispatch (`<template #[expr]>`). Drives the
+   * `ViewChild`, `TemplateRef`, and `NgTemplateOutlet` imports needed for
+   * the synthetic `__dynSlot_<N>` template-ref capture + outlet dispatch.
+   */
+  hasDynamicSlotFiller: boolean;
   diagnostics: Diagnostic[];
 }
 
@@ -45,9 +52,16 @@ export function emitTemplate(
   const diagnostics: Diagnostic[] = [];
   const scriptInjections: AngularScriptInjection[] = [];
   const hasNgModel = { value: false };
+  const hasDynamicSlotFiller = { value: false };
 
   if (ir.template === null) {
-    return { template: '', scriptInjections, hasNgModel: false, diagnostics };
+    return {
+      template: '',
+      scriptInjections,
+      hasNgModel: false,
+      hasDynamicSlotFiller: false,
+      diagnostics,
+    };
   }
 
   const ctx: EmitNodeCtx = {
@@ -57,6 +71,7 @@ export function emitTemplate(
     scriptInjections,
     injectionCounter: { next: 0 },
     hasNgModel,
+    hasDynamicSlotFiller,
     collisionRenames: opts.collisionRenames,
     loopBindings: new Set(),
     handlerArity: opts.handlerArity,
@@ -68,6 +83,7 @@ export function emitTemplate(
     template,
     scriptInjections,
     hasNgModel: hasNgModel.value,
+    hasDynamicSlotFiller: hasDynamicSlotFiller.value,
     diagnostics,
   };
 }

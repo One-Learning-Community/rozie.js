@@ -39,7 +39,12 @@ import { emitSlotInvocation } from './emitSlotInvocation.js';
 import { emitConditional } from './emitConditional.js';
 import { toKebabCase } from './emitDecorator.js';
 // Phase 07.2 Plan 03 — consumer-side slot-fill emit for component-tag elements.
-import { emitSlotFiller, type EmitSlotFillerCtx } from './emitSlotFiller.js';
+// Phase 07.2 Plan 04 — R5 dynamic-name dispatch via emitDynamicSlotFiller.
+import {
+  emitSlotFiller,
+  emitDynamicSlotFiller,
+  type EmitSlotFillerCtx,
+} from './emitSlotFiller.js';
 
 /**
  * Phase 06.2 P2: resolve a TemplateElement's emitted tag name. For
@@ -73,6 +78,13 @@ export interface EmitNodeCtx {
   scriptInjections: AngularScriptInjection[];
   /** Per-component counter shared across events for stable wrap-name suffixes. */
   injectionCounter: { next: number };
+  /**
+   * Phase 07.2 Plan 04 — when the template includes at least one dynamic
+   * slot-name consumer-fill, this ref is set to `{ value: true }` so the
+   * caller adds the `ViewChild` / `TemplateRef` / `NgTemplateOutlet`
+   * imports.
+   */
+  hasDynamicSlotFiller?: { value: boolean };
   /**
    * Whether the template has produced at least one [(ngModel)] binding —
    * drives FormsModule conditional import in emitDecorator.
@@ -372,11 +384,80 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
       emitChildren: (children) => children.map((c) => emitNode(c, ctx)).join(''),
     };
     const fillerParts: string[] = [];
+    const dispatchParts: string[] = [];
+    const dynRefs: { refName: string; keyExpr: string }[] = [];
+    let dynIdx = 0;
     for (const filler of node.slotFillers) {
-      const text = emitSlotFiller(filler, fillerCtx);
-      if (text.length > 0) fillerParts.push(text);
+      if (filler.isDynamic) {
+        // R5 dynamic-name dispatch (Plan 07.2-04 D-04 Angular row):
+        // emit the body as a synthetic-named `<ng-template #__dynSlot_<N>>`
+        // PLUS an inline `<ng-container *ngTemplateOutlet="templates[<expr>]">`
+        // that resolves the dynamic key against a getter-backed templates
+        // map. The getter is class-field-injected via scriptInjections;
+        // each ViewChild captures one `__dynSlot_<N>` ref. The dispatch
+        // keys by the rewritten user expression at runtime.
+        //
+        // Silent fallback on runtime miss (D-05): when `templates[<expr>]`
+        // returns undefined, Angular's `*ngTemplateOutlet` no-ops — the
+        // producer's `@ContentChild('header') ?? defaultContent` then
+        // renders its default. Note: the producer-side runtime acceptance
+        // of the `templates` input prop is a documented Angular divergence
+        // (parallel to React render-prop). Plan 07.2-06 finalises the
+        // producer-side wiring + docs/parity.md note.
+        const dyn = emitDynamicSlotFiller(filler, fillerCtx, dynIdx);
+        if (dyn !== null) {
+          fillerParts.push(dyn.template);
+          dispatchParts.push(
+            `<ng-container *ngTemplateOutlet="templates[${dyn.keyExpr}]"></ng-container>`,
+          );
+          dynRefs.push({ refName: dyn.refName, keyExpr: dyn.keyExpr });
+          dynIdx++;
+        }
+      } else {
+        const text = emitSlotFiller(filler, fillerCtx);
+        if (text.length > 0) fillerParts.push(text);
+      }
     }
-    const innerFills = fillerParts.join('');
+    // For any dynamic-name fillers, register the consumer-side templates
+    // getter + per-ref ViewChild fields via scriptInjections. The class
+    // body composer in emitAngular appends these as class fields.
+    if (dynRefs.length > 0) {
+      if (ctx.hasDynamicSlotFiller) ctx.hasDynamicSlotFiller.value = true;
+      for (const { refName } of dynRefs) {
+        const fieldDecl = `@ViewChild('${refName}', { static: true }) ${refName}?: TemplateRef<unknown>;`;
+        // Only inject each per-ref ViewChild once per component (siblings
+        // of the same component tag share the same parent class body).
+        if (!ctx.scriptInjections.some((s) => s.name === refName)) {
+          ctx.scriptInjections.push({ name: refName, decl: fieldDecl });
+        }
+      }
+      // Append a `templates` getter that maps the user's runtime-key
+      // expression to each captured ref. Compose the map entries
+      // deterministically from the collected dynRefs (one entry per
+      // dynamic filler). The keyExpr is produced by rewriteTemplateExpression
+      // in TEMPLATE context where Angular's template scoping omits the
+      // `this.` prefix on class members; for the class-body getter we
+      // prepend `this.` to surface the same field via class-instance scope.
+      // The transform is bounded: keyExpr is a Babel-rewritten Angular
+      // template expression, never a free-floating literal; the simple
+      // prefix-add is correct for `slotName()` / `slotName.value` shapes
+      // that map to `this.slotName()` / `this.slotName.value`.
+      const classScopedEntries = dynRefs
+        .map((r) => `[this.${r.keyExpr}]: this.${r.refName}!`)
+        .join(', ');
+      const getterName = 'templates';
+      const getterDecl = `get ${getterName}(): Record<string, TemplateRef<unknown>> {\n    return { ${classScopedEntries} };\n  }`;
+      // Use a deterministic name so duplicate sibling-component dispatch
+      // collapses into a single getter. The map entries from the FIRST
+      // appearance win — sibling dynamic fillers must reuse the same
+      // getter scope. For Wave 1 (one component tag per dynamic-name
+      // fixture), this collapses cleanly; multi-sibling cases land in
+      // Plan 07.2-05/06.
+      if (!ctx.scriptInjections.some((s) => s.name === getterName)) {
+        ctx.scriptInjections.push({ name: getterName, decl: getterDecl });
+      }
+    }
+    const innerFills = [...fillerParts, ...dispatchParts].join('');
     return `<${tagOut}${head}>${innerFills}</${tagOut}>`;
   }
 

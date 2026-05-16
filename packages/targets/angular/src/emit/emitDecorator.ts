@@ -45,6 +45,13 @@ export interface EmitDecoratorOpts {
    */
   hasNgModel: boolean;
   /**
+   * Phase 07.2 Plan 04 (R5): whether the consumer's template has at least
+   * one `<template #[expr]>` dynamic-name dispatch. Drives NgTemplateOutlet
+   * inclusion in the decorator's `imports: [...]` array for the consumer-
+   * side `*ngTemplateOutlet` dispatch.
+   */
+  hasDynamicSlotFiller?: boolean;
+  /**
    * Phase 06.2 P2 (D-115/D-118): IR components table — non-self entries
    * are appended to `imports: [...]` as bare class names (e.g., `CardHeader`).
    * Self-entries (localName === componentName) are filtered here too —
@@ -94,12 +101,16 @@ export function registerDecoratorImports(
 function buildDecoratorImportsList(opts: {
   hasSlots: boolean;
   hasNgModel: boolean;
+  hasDynamicSlotFiller?: boolean;
   componentDecls: readonly ComponentDecl[];
   selfReferenced: boolean;
   componentName: string;
 }): string {
   const items: string[] = [];
-  if (opts.hasSlots) items.push('NgTemplateOutlet');
+  // Phase 07.2 Plan 04 (R5): NgTemplateOutlet is also required for the
+  // consumer-side dynamic-name dispatch via `*ngTemplateOutlet`. Folded
+  // into the same item so duplicate registrations don't surface.
+  if (opts.hasSlots || opts.hasDynamicSlotFiller) items.push('NgTemplateOutlet');
   if (opts.hasNgModel) items.push('FormsModule');
   for (const decl of opts.componentDecls) {
     if (decl.localName === opts.componentName) continue; // self handled below
@@ -124,6 +135,7 @@ export function emitDecorator(
   const importsList = buildDecoratorImportsList({
     hasSlots: opts.hasSlots,
     hasNgModel: opts.hasNgModel,
+    hasDynamicSlotFiller: opts.hasDynamicSlotFiller ?? false,
     componentDecls: opts.componentDecls ?? [],
     selfReferenced: opts.selfReferenced ?? false,
     componentName: opts.componentName,
