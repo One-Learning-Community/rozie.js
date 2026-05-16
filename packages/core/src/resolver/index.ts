@@ -89,7 +89,11 @@ export class ProducerResolver {
    *   as the `fromDir` for relative resolution + as the npm walk root.
    */
   resolveProducerPath(specifier: string, fromFile: string): string | null {
-    const fromDir = isAbsolute(fromFile) ? dirname(fromFile) : dirname(fromFile);
+    // Per JSDoc contract: fromFile must be an absolute path. All callers (CLI,
+    // unplugin, babel-plugin) derive fromFile from the compiler's file option,
+    // which is always absolute. If a relative path is ever passed, enhanced-resolve
+    // would receive a non-absolute fromDir and may resolve incorrectly.
+    const fromDir = dirname(fromFile);
 
     // 1. tsconfig paths (D-12) — try first so `@/components/Modal.rozie` maps
     //    to the configured alias before bare-spec / relative paths apply.
