@@ -358,6 +358,32 @@ export function emitSlotFiller(
   // assumes the producer is the direct child custom element of the fill
   // element — true for the consumer-scoped-fill fixture shape (Task 3).
   // The Playwright spec (this task) verifies first-paint behavior.
+  //
+  // KNOWN LIMITATIONS (WR-03 — documented for future resolution):
+  //
+  //  1. Conditional rendering: if the consumer wraps the producer in an
+  //     `r-if` block and the condition is false at `firstUpdated()` time,
+  //     the fill element with `slot="<name>"` is not yet in the DOM, so
+  //     `querySelector` returns null and the ctx observer is never wired.
+  //     The consumer then renders with undefined ctx fields for the lifetime
+  //     of the component, even after the condition becomes true.
+  //     Robust fix: use a MutationObserver on the shadow root to rewire the
+  //     observer whenever the fill element appears (deferred to a future
+  //     phase — this requires generating a MutationObserver cleanup entry).
+  //
+  //  2. Multiple producer instances: if two producer custom elements of the
+  //     same type appear in the same consumer template (each with a `#<name>`
+  //     fill), `querySelector('[slot="<name>"]')` returns only the FIRST
+  //     fill element. The second instance's ctx observer is never wired.
+  //     Robust fix: `querySelectorAll` + index-matching via element identity
+  //     or a `WeakMap<Element, Ctx>` pattern (deferred — requires emitting
+  //     per-instance observer wiring at render time rather than firstUpdated).
+  //
+  //  Both limitations are acceptable for Wave 1 / Phase 07.2 (single producer
+  //  instance, always-rendered fills is the documented supported shape).
+  //  Consumer authors who hit these edge cases should use the vanilla Lit
+  //  approach (MutationObserver or slotchange event) directly in their
+  //  component's `firstUpdated` override.
   const firstUpdatedLines = [
     `// Phase 07.2: wire ctx capture for scoped slot fill "${filler.name}".`,
     `(() => {`,
