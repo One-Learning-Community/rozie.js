@@ -183,3 +183,33 @@ describe('emitScript — per-block snapshot fixtures', () => {
     await expect(out).toMatchFileSnapshot(resolve(FIXTURES, 'Modal.script.snap'));
   });
 });
+
+describe('emitScript — Quick 260515-u2b $watch lowering', () => {
+  function lowerSrc(src: string): IRComponent {
+    const parsed = parse(src, { filename: 'Synth.rozie' });
+    return lowerToIR(parsed.ast!, { modifierRegistry: createDefaultRegistry() }).ir!;
+  }
+
+  it('emits `effect(() => { (getter)(); (cb)(); });` inside the constructor for one WatchHook', () => {
+    const src = `<rozie name="Synth">
+<props>{ open: { type: Boolean, default: false } }</props>
+<script>
+$watch(() => $props.open, () => { console.log('fired') })
+</script>
+<template><div /></template>
+</rozie>`;
+    const ir = lowerSrc(src);
+    const { classBody, imports } = emitScript(ir);
+    // Angular rewrite: $props.open → this.open (signal-style member access via this.open()).
+    // The effect() wrapper plus IIFE shape should be present.
+    expect(classBody).toMatch(/effect\(\(\) => \{ \([\s\S]+?\)\(\); \([\s\S]+?\)\(\); \}\);/);
+    expect(imports.has('effect')).toBe(true);
+  });
+
+  it('emits no effect() call AND no `effect` import when there are zero watchers AND no $onUpdate', () => {
+    // Counter has no $onUpdate and no $watch — `effect` should NOT be in imports.
+    const ir = loadIR('Counter');
+    const { imports } = emitScript(ir);
+    expect(imports.has('effect')).toBe(false);
+  });
+});

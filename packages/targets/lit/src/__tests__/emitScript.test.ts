@@ -100,4 +100,28 @@ describe('emitScript — Lit class-body assembly', () => {
     expect(code).toContain('this._disconnectCleanups.push(');
     expect(code).toContain('this.unlockScroll');
   });
+
+  it('Quick 260515-u2b — $watch emits `this._disconnectCleanups.push(effect(() => { ... }))` AND adds effect to @lit-labs/preact-signals imports', () => {
+    // Synthesize a minimal source with $watch so we hit only the watcher path.
+    const source = `<rozie name="WatchSynth">
+<props>{ open: { type: Boolean, default: false } }</props>
+<script>
+const reposition = () => { console.log('repos') }
+$watch(() => $props.open, () => { if ($props.open) reposition() })
+</script>
+<template><div /></template>
+</rozie>`;
+    const { ast } = parse(source, { filename: 'WatchSynth.rozie' });
+    const registry = createDefaultRegistry();
+    const { ir } = lowerToIR(ast!, { modifierRegistry: registry });
+    const code = emitLit(ir!, {
+      filename: 'WatchSynth.rozie',
+      source,
+      modifierRegistry: registry,
+    }).code;
+    // effect symbol pulled in from @lit-labs/preact-signals.
+    expect(code).toMatch(/import \{[^}]*\beffect\b[^}]*\} from '@lit-labs\/preact-signals'/);
+    // Cleanup-push registration via effect().
+    expect(code).toMatch(/this\._disconnectCleanups\.push\(effect\(\(\) => \{[\s\S]+?\}\)\);/);
+  });
 });

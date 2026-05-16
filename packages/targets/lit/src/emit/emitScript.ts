@@ -279,6 +279,18 @@ interface PartitionedScript {
   unmountHooks: Array<{ arg: t.Expression }>;
   /** $onUpdate calls. */
   updateHooks: Array<{ arg: t.Expression }>;
+  /**
+   * Quick plan 260515-u2b — top-level $watch calls in source order. Each
+   * entry carries both the getter and the callback as function expressions.
+   * Emitted as `this._disconnectCleanups.push(effect(() => { ... }));`
+   * inside firstUpdated so the @lit-labs/preact-signals effect subscription
+   * is set up alongside the rest of the lifecycle wiring AND torn down on
+   * disconnect.
+   */
+  watcherHooks: Array<{
+    getter: t.ArrowFunctionExpression | t.FunctionExpression;
+    callback: t.ArrowFunctionExpression | t.FunctionExpression;
+  }>;
 }
 
 function partitionScript(program: t.File): PartitionedScript {
@@ -286,6 +298,7 @@ function partitionScript(program: t.File): PartitionedScript {
   const mountHooks: PartitionedScript['mountHooks'] = [];
   const unmountHooks: PartitionedScript['unmountHooks'] = [];
   const updateHooks: PartitionedScript['updateHooks'] = [];
+  const watcherHooks: PartitionedScript['watcherHooks'] = [];
 
   for (const stmt of program.program.body) {
     const hook = isLifecycleCall(stmt);
@@ -296,10 +309,34 @@ function partitionScript(program: t.File): PartitionedScript {
       else if (hook.hookName === '$onUpdate') updateHooks.push(entry);
       continue;
     }
+    // Quick plan 260515-u2b — top-level $watch call detection.
+    if (t.isExpressionStatement(stmt)) {
+      const expr = stmt.expression;
+      if (
+        t.isCallExpression(expr) &&
+        t.isIdentifier(expr.callee) &&
+        expr.callee.name === '$watch'
+      ) {
+        const getter = expr.arguments[0];
+        const callback = expr.arguments[1];
+        if (
+          getter &&
+          callback &&
+          (t.isArrowFunctionExpression(getter) || t.isFunctionExpression(getter)) &&
+          (t.isArrowFunctionExpression(callback) || t.isFunctionExpression(callback))
+        ) {
+          watcherHooks.push({
+            getter: getter as t.ArrowFunctionExpression | t.FunctionExpression,
+            callback: callback as t.ArrowFunctionExpression | t.FunctionExpression,
+          });
+          continue;
+        }
+      }
+    }
     classLevelStmts.push(stmt);
   }
 
-  return { classLevelStmts, mountHooks, unmountHooks, updateHooks };
+  return { classLevelStmts, mountHooks, unmountHooks, updateHooks, watcherHooks };
 }
 
 /**
@@ -542,11 +579,50 @@ export function emitScript(
     }
   }
 
-  // 6. firstUpdated body: free-statement preamble + cleanup pushes + mount hooks.
-  // Free statements (e.g. console.log) run once at first paint.
+  // 5b. Quick plan 260515-u2b — emit `this._disconnectCleanups.push(effect(() => { (getter)(); (cb)(); }));`
+  // for each top-level $watch in the partition. effect() from
+  // @lit-labs/preact-signals returns an unsubscribe function; pushing it onto
+  // _disconnectCleanups means the existing disconnectedCallback drain handles
+  // teardown automatically.
+  const watcherCleanupPushes: string[] = [];
+  if (partition.watcherHooks.length > 0) {
+    opts.signals.add('effect');
+    for (const w of partition.watcherHooks) {
+      // Wrap each function expression in @babel/types in a Program so the
+      // rewrite pass can lower $props.x → this.x, $data.x → this._x.value, etc.
+      const getterWrapper = t.file(t.program([t.expressionStatement(w.getter)]));
+      const cbWrapper = t.file(t.program([t.expressionStatement(w.callback)]));
+      const getterRewritten = rewriteScript(getterWrapper, ir, {
+        methodNamesOverride: methodNames,
+      });
+      const cbRewritten = rewriteScript(cbWrapper, ir, {
+        methodNamesOverride: methodNames,
+      });
+      const getterStmt = getterRewritten.file.program.body[0]!;
+      const cbStmt = cbRewritten.file.program.body[0]!;
+      const getterCode =
+        t.isExpressionStatement(getterStmt)
+          ? generate(getterStmt.expression, GEN_OPTS).code
+          : '() => {}';
+      const cbCode =
+        t.isExpressionStatement(cbStmt)
+          ? generate(cbStmt.expression, GEN_OPTS).code
+          : '() => {}';
+      watcherCleanupPushes.push(
+        `this._disconnectCleanups.push(effect(() => { (${getterCode})(); (${cbCode})(); }));`,
+      );
+    }
+  }
+
+  // 6. firstUpdated body: free-statement preamble + cleanup pushes + mount hooks
+  //    + watcher effect registrations. Watcher registrations live alongside
+  //    cleanup pushes — they MUST fire at first paint so the @lit-labs/preact-signals
+  //    effect subscribes before any user interaction.
   const mountSegments: string[] = [];
   if (freeStatements.trim()) mountSegments.push(freeStatements);
   if (cleanupPushes.length > 0) mountSegments.push(cleanupPushes.join('\n'));
+  if (watcherCleanupPushes.length > 0)
+    mountSegments.push(watcherCleanupPushes.join('\n'));
   for (const body of mountBodies) mountSegments.push(body);
 
   return {

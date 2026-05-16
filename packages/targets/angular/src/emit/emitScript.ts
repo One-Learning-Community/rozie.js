@@ -636,6 +636,48 @@ export function emitScript(
     );
   }
 
+  // 8b. Quick plan 260515-u2b — $watch lowers to effect(() => { (getter)(); (cb)(); }).
+  // Angular signals' `effect()` is the equivalent of Svelte's $effect / Solid's
+  // createEffect — it auto-tracks signal reads inside its body. We walk the
+  // cloned Program to find top-level $watch calls; the bodies were already
+  // rewritten by rewriteRozieIdentifiers (so `$props.open` → `this.open()` etc).
+  // The `effect` symbol is already on the @angular/core import list when
+  // lifecycle.update or watchers exist.
+  const watcherConsumedIndices = new Set<number>();
+  for (let i = 0; i < cloned.program.body.length; i++) {
+    if (lifecyclePairing.consumedIndices.has(i)) continue;
+    const stmt = cloned.program.body[i];
+    if (!stmt || !t.isExpressionStatement(stmt)) continue;
+    const expr = stmt.expression;
+    if (!t.isCallExpression(expr) || !t.isIdentifier(expr.callee)) continue;
+    if (expr.callee.name !== '$watch') continue;
+    const getterArg = expr.arguments[0];
+    const cbArg = expr.arguments[1];
+    if (
+      !getterArg ||
+      (!t.isArrowFunctionExpression(getterArg) && !t.isFunctionExpression(getterArg))
+    ) {
+      continue;
+    }
+    if (
+      !cbArg ||
+      (!t.isArrowFunctionExpression(cbArg) && !t.isFunctionExpression(cbArg))
+    ) {
+      continue;
+    }
+    watcherConsumedIndices.add(i);
+    const getterCode = genCode(getterArg as t.Node);
+    const cbCode = genCode(cbArg as t.Node);
+    lifecycleConstructorLines.push(
+      `effect(() => { (${getterCode})(); (${cbCode})(); });`,
+    );
+  }
+  // Ensure `effect` is on the @angular/core import list when at least one
+  // watcher exists (covers the case where the IR has no $onUpdate hook).
+  if (ir.watchers.length > 0) {
+    imports.add('effect');
+  }
+
   // 9. Build residual user-script body — methods/arrows go at CLASS level
   //    (so they're invokable via `this.name(...)`); top-level statements
   //    (console.log, expression-statements) go in the constructor body.
@@ -647,6 +689,8 @@ export function emitScript(
 
   for (let i = 0; i < cloned.program.body.length; i++) {
     if (lifecyclePairing.consumedIndices.has(i)) continue;
+    // Quick plan 260515-u2b — $watch lines emitted into constructor above.
+    if (watcherConsumedIndices.has(i)) continue;
     const stmt = cloned.program.body[i]!;
 
     // Skip $computed VariableDeclarations (consumed above).
