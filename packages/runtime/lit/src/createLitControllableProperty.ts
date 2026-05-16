@@ -27,6 +27,18 @@
  * runtime's ROZ550 warning. Mirrors Radix's behavior — flips are programmer
  * error in production but never silently break the UI.
  *
+ * **HTML-parser-seed window**: the HTML parser populates attributes AFTER the
+ * constructor runs, so the first `attributeChangedCallback` fires after the
+ * controllable is constructed in uncontrolled mode. The emitter coerces a
+ * `null` attribute value to the prop's default for primitives, so the parser
+ * path can only deliver a DEFINED value through `notifyAttributeChange`. We
+ * therefore treat the narrow case `constructor-uncontrolled + first defined
+ * attribute before any write()` as initial seeding — set the value but do NOT
+ * flip mode and do NOT warn. The genuine flip path
+ * `constructor-controlled + notifyAttributeChange(undefined)` can ONLY come
+ * from user JS removing the controlled mirror — never the HTML parser — and
+ * still warns even before any write().
+ *
  * **Functional updaters**: `write(prev => prev + 1)` works in both modes — the
  * resolver computes against the CURRENT value.
  *
@@ -85,11 +97,8 @@ export function createLitControllableProperty<T>(
     wasControlled ? (initialControlledValue as T) : defaultValue,
   );
   // Tracks whether the user has interacted with the component via write()
-  // since mount. The first notifyAttributeChange before any write is treated
-  // as initial attribute seeding (HTML parser populating attributes after
-  // constructor runs) — it sets the value but does NOT flip mode and does NOT
-  // emit ROZ840. Subsequent flips after user interaction are real
-  // mid-lifecycle changes and behave as before.
+  // since mount. Used to gate the HTML-parser-seed window — see notify
+  // implementation below.
   let userHasWritten = false;
 
   const currentValue = (): T => _state.value;
@@ -126,15 +135,16 @@ export function createLitControllableProperty<T>(
     },
     notifyAttributeChange(next: T | undefined): void {
       const nextIsControlled = next !== undefined;
-      // Initial-mount seeding: if no write() has happened yet, the HTML
-      // parser is populating the attribute right after construction. Treat
-      // this as seeding rather than a mode flip — set the value but keep
-      // wasControlled where the constructor left it (uncontrolled unless
-      // initialControlledValue was provided).
-      if (!userHasWritten) {
-        if (nextIsControlled) {
-          _state.value = next as T;
-        }
+      // HTML-parser-seed window: only short-circuit the very specific path
+      // that the HTML parser can produce — constructor was uncontrolled AND
+      // the incoming attribute is defined AND no write() has happened yet.
+      // The emitted attributeChangedCallback coerces `null` to the prop's
+      // default for primitives, so the HTML parser / setAttribute path
+      // cannot deliver `undefined` here; an `undefined` always indicates
+      // user JS removing the controlled mirror, which is a real mode flip
+      // and must warn even before any write().
+      if (!userHasWritten && !wasControlled && nextIsControlled) {
+        _state.value = next as T;
         return;
       }
       if (wasControlled !== nextIsControlled) {

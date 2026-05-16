@@ -13,6 +13,10 @@
  *   - Parent-flip detection: notifyAttributeChange flipping
  *     controlled→uncontrolled (or vice versa) emits exactly one console.warn
  *     containing the literal `[ROZ840]` prefix and still follows the new value.
+ *   - HTML-parser-seed window: the first defined attribute after an
+ *     uncontrolled construction is treated as seeding (no warn, no mode flip)
+ *     so the HTML parser populating attributes post-constructor does not
+ *     spuriously flip a fresh element into controlled mode.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { createLitControllableProperty } from '../createLitControllableProperty.js';
@@ -128,12 +132,16 @@ describe('createLitControllableProperty — parent-flip detection (ROZ840)', () 
       initialControlledValue: 10,
     });
     // Parent decides to stop controlling — flip to uncontrolled.
+    // `notifyAttributeChange(undefined)` can ONLY come from user JS removing
+    // the controlled mirror; the HTML parser path always produces a defined
+    // coerced value (Number/Boolean/etc), so this case must warn even before
+    // any write() has happened.
     cp.notifyAttributeChange(undefined);
     expect(warnSpy).toHaveBeenCalledTimes(1);
     expect(warnSpy.mock.calls[0]![0]).toMatch(/\[ROZ840\]/);
   });
 
-  it('emits exactly one [ROZ840] console.warn on uncontrolled→controlled flip', () => {
+  it('emits exactly one [ROZ840] console.warn on uncontrolled→controlled flip AFTER a write()', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const host = document.createElement('div');
     const cp = createLitControllableProperty({
@@ -142,6 +150,9 @@ describe('createLitControllableProperty — parent-flip detection (ROZ840)', () 
       defaultValue: 0,
       initialControlledValue: undefined,
     });
+    // Uncontrolled-then-write — user has interacted, so the seeding window
+    // closes. A subsequent defined attribute notification IS a real flip.
+    cp.write(3);
     cp.notifyAttributeChange(77);
     expect(warnSpy).toHaveBeenCalledTimes(1);
     expect(warnSpy.mock.calls[0]![0]).toMatch(/\[ROZ840\]/);
@@ -164,5 +175,29 @@ describe('createLitControllableProperty — parent-flip detection (ROZ840)', () 
     cp.notifyAttributeChange(13);
     expect(warnSpy).not.toHaveBeenCalled();
     expect(cp.read()).toBe(13);
+  });
+
+  it('does NOT warn when HTML parser seeds attribute on a fresh uncontrolled element', () => {
+    // Regression — the bug behind `0a27114`. The HTML parser populates an
+    // attribute AFTER the constructor; uncontrolled-construct + first
+    // defined attribute before any write() is seeding, not a flip.
+    // `<rozie-counter value="0">` produces this exact path.
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const host = document.createElement('div');
+    const cp = createLitControllableProperty<number>({
+      host,
+      eventName: 'value-change',
+      defaultValue: 0,
+      initialControlledValue: undefined,
+    });
+    // Emitted attributeChangedCallback path: parser fires with the coerced
+    // initial attribute value before any user interaction.
+    cp.notifyAttributeChange(0);
+    expect(warnSpy).not.toHaveBeenCalled();
+    // Value mirrors the seeded attribute but mode stays uncontrolled — so a
+    // subsequent write() updates local state instead of being a no-op.
+    expect(cp.read()).toBe(0);
+    cp.write(5);
+    expect(cp.read()).toBe(5);
   });
 });
