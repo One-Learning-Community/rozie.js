@@ -36,6 +36,14 @@ import { existsSync, readFileSync, writeFileSync, readdirSync, statSync, lstatSy
 import { isAbsolute, resolve as pathResolve, dirname, join as pathJoin, relative as pathRelative } from 'node:path';
 import { parse } from '../../core/src/parse.js';
 import { lowerToIR } from '../../core/src/ir/lower.js';
+// Phase 07.2 Plan 03 — thread producer paramTypes onto consumer SlotFillerDecl.
+// Without this step, unplugin's per-target output would diverge from compile()'s
+// output for the consumer-scoped-fill case (compile() runs threadParamTypes
+// step 2.5; unplugin's pipelines previously skipped it). dist-parity Leg 4
+// would then fail on every consumer-scoped-fill cell.
+import { threadParamTypes } from '../../core/src/ir/threadParamTypes.js';
+import { IRCache } from '../../core/src/ir/cache.js';
+import { ProducerResolver } from '../../core/src/resolver/index.js';
 import type { ModifierRegistry } from '@rozie/core';
 import { emitVue, type EmitVueResult } from '../../targets/vue/src/emitVue.js';
 import { emitReact, type EmitReactResult } from '../../targets/react/src/emitReact.js';
@@ -599,6 +607,32 @@ export function createTransformHook(registry: ModifierRegistry, target: TargetVa
 }
 
 /**
+ * Phase 07.2 Plan 03 — thread producer paramTypes onto consumer
+ * SlotFillerDecl. Mirrors `compile.ts` step 2.5 — without this, the
+ * unplugin per-target pipelines would emit consumer-side scoped fills
+ * lacking the producer's paramTypes annotation, breaking dist-parity
+ * Leg 4 for every consumer-scoped-fill cell.
+ *
+ * Each pipeline call gets its own cache + resolver (short-lived; mirrors
+ * compile.ts's `opts.irCache ?? new IRCache(...)` pattern). The resolver's
+ * root defaults to `dirname(filePath)` — the consumer's directory — so
+ * sibling `./producer.rozie` imports resolve correctly. compile() uses
+ * `process.cwd()` as default; for unplugin we use the consumer's own
+ * directory because Vite's resolveId may invoke the transform from any
+ * cwd, and the sibling-file convention is the dominant case.
+ */
+function threadParamTypesForPipeline(
+  ir: import('../../core/src/ir/types.js').IRComponent,
+  filePath: string,
+  registry: ModifierRegistry,
+  acc: Diagnostic[],
+): void {
+  const cache = new IRCache({ modifierRegistry: registry });
+  const resolver = new ProducerResolver({ root: dirname(filePath) });
+  threadParamTypes(ir, filePath, cache, resolver, acc);
+}
+
+/**
  * Shared parse → lowerToIR → emitVue pipeline. Throws Vite-shaped errors on
  * fatal diagnostics; calls `this.warn` on warnings. Returns `{ code, map }`
  * suitable for Vite's transform/load return shape.
@@ -623,6 +657,20 @@ function runRoziePipeline(
   const irErrors = irDiags.filter((d) => d.severity === 'error');
   if (!ir || irErrors.length > 0) {
     throw formatViteError(irDiags, filePath, source);
+  }
+
+  // 2.5. Phase 07.2 — thread producer paramTypes onto consumer SlotFillerDecl.
+  // Mirrors compile.ts step 2.5. Skipping this would break dist-parity for
+  // every consumer-scoped-fill cell × Leg 4 (unplugin). Surface threading
+  // errors as warnings — ROZ947 mismatches should still ship the emit
+  // (with paramTypes missing → degraded type-flow) rather than blocking
+  // the build.
+  const threadDiags: Diagnostic[] = [];
+  threadParamTypesForPipeline(ir, filePath, registry, threadDiags);
+  warnings.push(...threadDiags.filter((d) => d.severity === 'warning'));
+  const threadErrors = threadDiags.filter((d) => d.severity === 'error');
+  if (threadErrors.length > 0) {
+    throw formatViteError(threadDiags, filePath, source);
   }
 
   // 3. emitVue
@@ -674,6 +722,20 @@ function runReactPipeline(
     throw formatViteError(irDiags, filePath, source);
   }
 
+  // 2.5. Phase 07.2 — thread producer paramTypes onto consumer SlotFillerDecl.
+  // Mirrors compile.ts step 2.5. Skipping this would break dist-parity for
+  // every consumer-scoped-fill cell × Leg 4 (unplugin). Surface threading
+  // errors as warnings — ROZ947 mismatches should still ship the emit
+  // (with paramTypes missing → degraded type-flow) rather than blocking
+  // the build.
+  const threadDiags: Diagnostic[] = [];
+  threadParamTypesForPipeline(ir, filePath, registry, threadDiags);
+  warnings.push(...threadDiags.filter((d) => d.severity === 'warning'));
+  const threadErrors = threadDiags.filter((d) => d.severity === 'error');
+  if (threadErrors.length > 0) {
+    throw formatViteError(threadDiags, filePath, source);
+  }
+
   // 3. emitReact
   const result = emitReact(ir, {
     filename: filePath,
@@ -721,6 +783,20 @@ function runSveltePipeline(
   const irErrors = irDiags.filter((d) => d.severity === 'error');
   if (!ir || irErrors.length > 0) {
     throw formatViteError(irDiags, filePath, source);
+  }
+
+  // 2.5. Phase 07.2 — thread producer paramTypes onto consumer SlotFillerDecl.
+  // Mirrors compile.ts step 2.5. Skipping this would break dist-parity for
+  // every consumer-scoped-fill cell × Leg 4 (unplugin). Surface threading
+  // errors as warnings — ROZ947 mismatches should still ship the emit
+  // (with paramTypes missing → degraded type-flow) rather than blocking
+  // the build.
+  const threadDiags: Diagnostic[] = [];
+  threadParamTypesForPipeline(ir, filePath, registry, threadDiags);
+  warnings.push(...threadDiags.filter((d) => d.severity === 'warning'));
+  const threadErrors = threadDiags.filter((d) => d.severity === 'error');
+  if (threadErrors.length > 0) {
+    throw formatViteError(threadDiags, filePath, source);
   }
 
   // 3. emitSvelte
@@ -774,6 +850,20 @@ function runSolidPipeline(
     throw formatViteError(irDiags, filePath, source);
   }
 
+  // 2.5. Phase 07.2 — thread producer paramTypes onto consumer SlotFillerDecl.
+  // Mirrors compile.ts step 2.5. Skipping this would break dist-parity for
+  // every consumer-scoped-fill cell × Leg 4 (unplugin). Surface threading
+  // errors as warnings — ROZ947 mismatches should still ship the emit
+  // (with paramTypes missing → degraded type-flow) rather than blocking
+  // the build.
+  const threadDiags: Diagnostic[] = [];
+  threadParamTypesForPipeline(ir, filePath, registry, threadDiags);
+  warnings.push(...threadDiags.filter((d) => d.severity === 'warning'));
+  const threadErrors = threadDiags.filter((d) => d.severity === 'error');
+  if (threadErrors.length > 0) {
+    throw formatViteError(threadDiags, filePath, source);
+  }
+
   // 3. emitSolid
   const result = emitSolid(ir, {
     filename: filePath,
@@ -822,6 +912,20 @@ function runLitPipeline(
   const irErrors = irDiags.filter((d) => d.severity === 'error');
   if (!ir || irErrors.length > 0) {
     throw formatViteError(irDiags, filePath, source);
+  }
+
+  // 2.5. Phase 07.2 — thread producer paramTypes onto consumer SlotFillerDecl.
+  // Mirrors compile.ts step 2.5. Skipping this would break dist-parity for
+  // every consumer-scoped-fill cell × Leg 4 (unplugin). Surface threading
+  // errors as warnings — ROZ947 mismatches should still ship the emit
+  // (with paramTypes missing → degraded type-flow) rather than blocking
+  // the build.
+  const threadDiags: Diagnostic[] = [];
+  threadParamTypesForPipeline(ir, filePath, registry, threadDiags);
+  warnings.push(...threadDiags.filter((d) => d.severity === 'warning'));
+  const threadErrors = threadDiags.filter((d) => d.severity === 'error');
+  if (threadErrors.length > 0) {
+    throw formatViteError(threadDiags, filePath, source);
   }
 
   // 3. emitLit
@@ -876,6 +980,20 @@ function runAngularPipeline(
   const irErrors = irDiags.filter((d) => d.severity === 'error');
   if (!ir || irErrors.length > 0) {
     throw formatViteError(irDiags, filePath, source);
+  }
+
+  // 2.5. Phase 07.2 — thread producer paramTypes onto consumer SlotFillerDecl.
+  // Mirrors compile.ts step 2.5. Skipping this would break dist-parity for
+  // every consumer-scoped-fill cell × Leg 4 (unplugin). Surface threading
+  // errors as warnings — ROZ947 mismatches should still ship the emit
+  // (with paramTypes missing → degraded type-flow) rather than blocking
+  // the build.
+  const threadDiags: Diagnostic[] = [];
+  threadParamTypesForPipeline(ir, filePath, registry, threadDiags);
+  warnings.push(...threadDiags.filter((d) => d.severity === 'warning'));
+  const threadErrors = threadDiags.filter((d) => d.severity === 'error');
+  if (threadErrors.length > 0) {
+    throw formatViteError(threadDiags, filePath, source);
   }
 
   // 3. emitAngular
@@ -1163,6 +1281,13 @@ function runAngularEmitForDisk(
   const irError = irDiags.find((d) => d.severity === 'error');
   if (!ir || irError) {
     throw new Error(`[${irError?.code ?? 'lower'}] ${irError?.message ?? 'lowering error'}`);
+  }
+  // Phase 07.2 Plan 03 — thread producer paramTypes onto consumer SlotFillerDecl.
+  const threadDiags: Diagnostic[] = [];
+  threadParamTypesForPipeline(ir, filePath, registry, threadDiags);
+  const threadError = threadDiags.find((d) => d.severity === 'error');
+  if (threadError) {
+    throw new Error(`[${threadError.code}] ${threadError.message}`);
   }
   const result = emitAngular(ir, {
     filename: filePath,
