@@ -52,25 +52,37 @@ body {
  * Visual-regression overrides for components that use `position: fixed/absolute`
  * inside the mount wrapper. Fixed/absolute elements are removed from their
  * parent's layout flow, so the `[data-testid="rozie-mount"]` clip box collapses
- * around them and Playwright captures empty space. Pull these elements back into
- * the layout so they contribute to the wrapper's bbox.
+ * around them and Playwright captures empty space. Pull these elements back
+ * into the layout so they contribute to the wrapper's bbox.
  *
- * NB: Class selectors here match across all targets — Vue/Svelte scope via
- * data-attributes but the class itself stays bare on the element, so a
- * non-attribute-qualified `.foo` rule applies regardless of scope. The
- * canonical `Dropdown.rozie`'s scoped `position: fixed` is overridden by the
- * `!important` here purely for screenshot-host purposes; consumer demos that
+ * Selectors need to cover three class-naming shapes across the six targets:
+ *  - Bare class (Vue / Svelte / Solid / Angular): `.dropdown-panel` — the
+ *    framework scopes via attribute selectors (`[data-v-*]`, `[_ngcontent-*]`,
+ *    `class.svelte-*`) layered ON TOP of the bare class, so a bare class
+ *    selector here still matches.
+ *  - CSS Modules hashed class (React): `._dropdown-panel_1yrrg_2` —
+ *    `[class*="dropdown-panel"]` catches any class containing the literal
+ *    substring, including the hash-suffixed module form.
+ *  - Lit shadow-DOM: CSS in this file can't pierce the shadow boundary.
+ *    `entry.lit.ts` adds an equivalent style tag inside each mounted custom
+ *    element's shadow root after construction.
+ *
+ * The canonical `Dropdown.rozie` / `Modal.rozie` `position: fixed` rules are
+ * overridden here purely for screenshot-host purposes; consumer demos that
  * import the canonical component still get the original positioning.
  */
 .dropdown-panel,
-.modal-backdrop {
+.modal-backdrop,
+[class*='dropdown-panel'],
+[class*='modal-backdrop'] {
   position: static !important;
 }
 /* Modal's backdrop normally fills the viewport via `inset: 0`; with
  * position:static the inset has no effect. Restore the backdrop's flex
  * centering so the dialog's intrinsic size is what gets captured rather
  * than a 0-sized flex container. */
-.modal-backdrop {
+.modal-backdrop,
+[class*='modal-backdrop'] {
   inset: auto !important;
   width: max-content;
   height: max-content;

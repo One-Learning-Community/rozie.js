@@ -45,6 +45,44 @@ async function main(): Promise<void> {
     Object.assign(el, DEFAULT_PROPS[example] as Record<string, unknown>);
   }
   mountWrapper().appendChild(el);
+  // Lit components render into shadow DOM, so the host-level reset.css
+  // cannot reach `.dropdown-panel` / `.modal-backdrop` inside them. After
+  // the entire tree (including nested rozie-* children) reaches first-render
+  // complete, inject the same position-static override into every shadow
+  // root so position:fixed content contributes to the host's bounding box
+  // for the Playwright screenshot clip.
+  await waitForRenderComplete(el);
+  applyShadowReset(el);
+}
+
+const SHADOW_RESET_CSS = `
+  .dropdown-panel, .modal-backdrop { position: static !important; }
+  .modal-backdrop { inset: auto !important; width: max-content; height: max-content; }
+`;
+
+interface MaybeLitElement extends Element {
+  updateComplete?: Promise<unknown>;
+}
+
+async function waitForRenderComplete(root: Element): Promise<void> {
+  const lit = root as MaybeLitElement;
+  if (lit.updateComplete) await lit.updateComplete;
+  if (!root.shadowRoot) return;
+  for (const child of Array.from(root.shadowRoot.querySelectorAll('*'))) {
+    await waitForRenderComplete(child);
+  }
+}
+
+function applyShadowReset(root: Element): void {
+  const shadow = root.shadowRoot;
+  if (shadow) {
+    const style = document.createElement('style');
+    style.textContent = SHADOW_RESET_CSS;
+    shadow.prepend(style);
+    for (const child of Array.from(shadow.querySelectorAll('*'))) {
+      applyShadowReset(child);
+    }
+  }
 }
 
 void main();
