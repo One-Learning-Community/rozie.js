@@ -143,7 +143,9 @@ for (const target of TARGETS) {
     // consumer's `$data.open` (no v-model wiring). So when Modal 1's scoped
     // close() flips its local open to false, ONLY Modal 1 unmounts. Modal 2 +
     // WrapperModal keep their own local open=true. Dialog count: 3 → 2.
-    // Allow up to 1 second for the rerender to settle on slower CI hardware.
-    await expect(dialogs).toHaveCount(2, { timeout: 1000 });
+    // Use Playwright's default timeout (5 s) — the prior 1 s override was
+    // fragile under resource-constrained CI runners (Linux Docker, GHA free
+    // tier) where DOM rerender can take longer after a click event.
+    await expect(dialogs).toHaveCount(2);
   });
 }
