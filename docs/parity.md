@@ -94,6 +94,45 @@ Phase 07.2 Plan 03 added a first-paint smoke check
 verifies the observed ctx is wired correctly on the first paint — no flicker,
 no `undefined` reference in the body's `this._headerCtx?.close` access.
 
+### Consumer-side two-way binding — opt-in directive pending (Phase 07.3)
+
+A producer prop declared `model: true` emits the per-target two-way machinery
+(`defineModel`, `$bindable`, `useControllableState`, `model<T>()`,
+`createControllableSignal`, Lit custom-event pair) on the **producer** side —
+that part is solved and identical across all 6 targets. But the **consumer**
+side currently has no template directive to opt into the matching two-way
+binding. Every `:prop="$data.x"` in a `.rozie` consumer template compiles to a
+**one-way** bind regardless of whether the target prop is `model: true`:
+
+| Target  | What `:open="$data.open"` emits today | What two-way would look like                    |
+| ------- | ------------------------------------- | ----------------------------------------------- |
+| Vue     | `<Modal :open="open">`                | `<Modal v-model:open="open">`                   |
+| Svelte  | `<Modal open={open}>`                 | `<Modal bind:open={open}>`                      |
+| React   | `<Modal open={open} ...>`             | `<Modal open={open} onOpenChange={setOpen}>`    |
+| Solid   | `<Modal open={open} ...>`             | controllable-state binding + setter pair        |
+| Angular | `[open]="open"`                       | `[(open)]="open"`                               |
+| Lit     | `.open=${open}`                       | `.open=${open} @open-change=${e => open = e.detail}` |
+
+The practical impact: when a Rozie consumer passes a writable expression to a
+`model: true` prop, writes to that prop from inside the producer (e.g. the
+scoped `close` callback invoked from a slot fill) do NOT propagate back to the
+consumer's reactive state in Svelte/React/Solid/Lit. Vue + Angular happen to
+close the modal anyway because their reactivity is forgiving under one-way
+binding; the other 4 are no-ops as designed by their controllable-state
+runtimes.
+
+**Workarounds available today:**
+- Listen for the explicit `@close` event the producer `$emit`s and write back
+  to local state in a handler
+- Use separate state vars per modal instance to avoid shared-state surprises
+- Wire the producer prop as fully uncontrolled by omitting the consumer-side
+  bind entirely (then the producer owns its own state)
+
+**Tracked fix:** Phase 07.3 adds the `r-model:propName="$data.x"` argument-form
+directive (parallel to existing form-input `r-model="$data.draft"` sugar). The
+4 `.fixme`'d cells of `tests/visual-regression/specs/modal-consumer-close.spec.ts`
+(Svelte/React/Solid/Lit) become the dogfood acceptance gate for that phase.
+
 ### Lit — scoped + dynamic slot names (deferred combination)
 
 The Lit static-name scoped fill IR pre-transform (`rewriteScopedParamRefs`)
@@ -159,6 +198,8 @@ demo. Angular is a first-class v1 target.
 ---
 
 These are the *complete* set of documented limitations as of v1. Everything
-else — props, `model:` two-way binding, `<data>` reactive state, `$computed`,
-`<listeners>` with modifiers, `r-for` / `r-if` / `r-model`, default + named
-slots, `$emit`, refs — behaves identically across all six targets.
+else — props, **producer-side** `model:` two-way machinery, `<data>` reactive
+state, `$computed`, `<listeners>` with modifiers, `r-for` / `r-if` /
+form-input `r-model`, default + named slots, `$emit`, refs — behaves
+identically across all six targets. Consumer-side two-way binding
+(`r-model:propName=`) is tracked as Phase 07.3.
