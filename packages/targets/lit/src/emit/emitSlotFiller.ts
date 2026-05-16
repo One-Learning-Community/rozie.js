@@ -410,12 +410,38 @@ function wrapWithSlotAttribute(
 }
 
 /**
+ * Scan forward from `start` to find the `>` that closes the current HTML tag,
+ * skipping over quoted attribute values so that `>` characters inside strings
+ * (e.g., `<button title="score > 0">`) are not treated as tag-end markers.
+ *
+ * Returns the index of the closing `>`, or -1 if not found before end-of-string.
+ */
+function findTagClose(body: string, start: number): number {
+  let inQuote: '"' | "'" | null = null;
+  for (let i = start; i < body.length; i++) {
+    const ch = body[i]!;
+    if (inQuote) {
+      if (ch === inQuote) inQuote = null;
+    } else if (ch === '"' || ch === "'") {
+      inQuote = ch as '"' | "'";
+    } else if (ch === '>') {
+      return i;
+    }
+  }
+  return -1;
+}
+
+/**
  * Conservative sibling-detection: does the trimmed body have any
  * top-level node ALONGSIDE the matched single root? When yes, the
  * single-root passthrough is unsafe — fall back to the wrapper.
  *
  * We test by counting top-level tag opens. A truly single-root body has
  * exactly one top-level opening tag. Whitespace doesn't count.
+ *
+ * Uses `findTagClose` (quote-aware) instead of `indexOf('>')` to avoid
+ * misidentifying `>` inside attribute values (e.g., `title="a > b"`) as
+ * tag-end markers, which would produce an incorrect depth count.
  */
 function hasSiblingAtTopLevel(body: string, _rootTag: string): boolean {
   // Depth-track tags; count top-level (depth 0 → 1) entries.
@@ -427,7 +453,8 @@ function hasSiblingAtTopLevel(body: string, _rootTag: string): boolean {
     if (ch === '<') {
       // Identify open/close/self-close.
       if (body[i + 1] === '/') {
-        // Closing tag: skip to '>'.
+        // Closing tag: skip to '>'. Closing tags have no attribute values,
+        // so a plain indexOf is safe here.
         const close = body.indexOf('>', i);
         if (close === -1) break;
         depth = Math.max(0, depth - 1);
@@ -441,7 +468,9 @@ function hasSiblingAtTopLevel(body: string, _rootTag: string): boolean {
         i = close + 1;
         continue;
       }
-      const close = body.indexOf('>', i);
+      // Opening tag: use quote-aware scan so `>` inside attribute values
+      // does not prematurely end the tag scan.
+      const close = findTagClose(body, i + 1);
       if (close === -1) break;
       const isSelfClose = body[close - 1] === '/';
       if (depth === 0) topLevelEntries++;
