@@ -1,0 +1,10 @@
+{
+  "type": "SlotFillerDecl",
+  "name": "header",
+  "params": [],
+  "body": [],
+  "sourceLoc": {
+    "start": 100,
+    "end": 200
+  }
+}
