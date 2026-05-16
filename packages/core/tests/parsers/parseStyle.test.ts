@@ -33,8 +33,8 @@ describe('parseStyle (PARSE-06)', () => {
       '.counter',
       '.counter.hovering',
       '.value',
-      '.counter button',
-      '.counter button:disabled',
+      'button',
+      'button:disabled',
     ]);
   });
 
@@ -112,6 +112,6 @@ describe('parseStyle (PARSE-06)', () => {
     const { source, content, contentLoc } = loadStyle('Counter');
     const { node } = parseStyle(content, contentLoc, source, 'Counter.rozie');
     const sel = node!.rules.map(r => r.selector);
-    expect(sel).toContain('.counter button:disabled');
+    expect(sel).toContain('button:disabled');
   });
 });

@@ -4,7 +4,7 @@
     "name": "Counter",
     "loc": {
       "start": 375,
-      "end": 1746
+      "end": 1728
     }
   },
   "props": {
@@ -52,14 +52,14 @@
     }
   },
   "style": {
-    "content": "\n.counter { display: inline-flex; gap: 0.5rem; align-items: center; }\n.counter.hovering { background: rgba(0, 0, 0, 0.04); }\n.value { font-variant-numeric: tabular-nums; min-width: 3ch; text-align: center; }\n.counter button { padding: 0.25rem 0.5rem; }\n.counter button:disabled { opacity: 0.4; cursor: not-allowed; }\n",
+    "content": "\n.counter { display: inline-flex; gap: 0.5rem; align-items: center; }\n.counter.hovering { background: rgba(0, 0, 0, 0.04); }\n.value { font-variant-numeric: tabular-nums; min-width: 3ch; text-align: center; }\nbutton { padding: 0.25rem 0.5rem; }\nbutton:disabled { opacity: 0.4; cursor: not-allowed; }\n",
     "contentLoc": {
       "start": 1411,
-      "end": 1728
+      "end": 1710
     },
     "loc": {
       "start": 1404,
-      "end": 1736
+      "end": 1718
     }
   }
 }
