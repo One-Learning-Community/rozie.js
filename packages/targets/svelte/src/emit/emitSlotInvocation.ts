@@ -15,6 +15,26 @@
  * Default slot (slotName === '') keys as `children` per Svelte 5 magic-prop
  * convention (RESEARCH Pattern 3).
  *
+ * Phase 07.2 Plan 05 — slot re-projection (R6 / D-06):
+ *
+ *   When `node.context === 'fill-body'` (sticky-downward flag set by the
+ *   lowerer in Plan 07.2-01 for any <slot> nested inside a SlotFillerDecl.body),
+ *   this emitter requires NO branch. The producer-side `{@render <X>?.(args)}`
+ *   shape IS the correct re-projection shape because `<X>` resolves against
+ *   the wrapper's OWN snippet props (the wrapper is being compiled as a
+ *   complete component, with its own `let { title }: Props = $props()`
+ *   destructure). When a wrapper re-projects its consumer's `title` snippet
+ *   into Inner's `header` slot via
+ *   `<Inner><template #header><slot name="title"/></template></Inner>`,
+ *   the emitted Svelte reads `{@render title?.()}` — the wrapper's OWN title
+ *   snippet prop, which is its incoming snippet from its consumer.
+ *
+ *   D-07 wrapper-only-params semantics are honored by construction: the emit
+ *   for `<slot name="title" />` references ONLY `title`, never the enclosing
+ *   fill body's scoped params (e.g., `close` from `<template #header="{ close }">`).
+ *
+ *   No parent-chain walking is needed (D-SM-01 anti-pattern avoided).
+ *
  * @experimental — shape may change before v1.0
  */
 import type {

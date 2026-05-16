@@ -1,0 +1,14 @@
+<rozie name="Inner">
+
+<template>
+<div class="inner">
+  <header>
+    <slot name="header">default header</slot>
+  </header>
+  <main>
+    <slot>default body</slot>
+  </main>
+</div>
+</template>
+
+</rozie>

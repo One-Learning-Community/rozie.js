@@ -38,7 +38,7 @@
  * < 5s on a warm cache.
  */
 import { describe, it, expect } from 'vitest';
-import { readFileSync, writeFileSync, mkdtempSync, rmSync, statSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdtempSync, rmSync, statSync, readdirSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -153,6 +153,13 @@ const CONSUMER_FIXTURES = [
   // Phase 07.2 Plan 04 — Wave 2 dynamic-name dispatch (R5) extends the
   // consumer-side subset by +24 cells (1 × 6 × 4). Together: 72 cells.
   'consumer-dynamic-name',
+  // Phase 07.2 Plan 05 — Wave 2 re-projection (R6) extends the consumer-
+  // side subset by another +24 cells (1 × 6 × 4). Together: 96 cells.
+  // The fixture is 3-file (inner + wrapper + consumer); the consumer
+  // input.rozie compiles via the IR cache resolving wrapper.rozie which
+  // in turn resolves inner.rozie — all via the same resolverRoot ==
+  // fixtureDir convention as the existing 2-file fixtures.
+  'consumer-re-projection',
 ] as const;
 const SLOT_MATRIX_FIXTURES_DIR = resolve(HERE, '../slot-matrix/fixtures');
 
@@ -164,7 +171,7 @@ function consumerExpectedPath(fixtureClass: string, target: Target): string {
   return join(SLOT_MATRIX_FIXTURES_DIR, fixtureClass, `expected${primaryExt(target)}`);
 }
 
-describe('DIST-05 strict-bytes parity gate — consumer-side 48-cell subset (Phase 07.2 D-10 Wave 1)', () => {
+describe('DIST-05 strict-bytes parity gate — consumer-side 96-cell subset (Phase 07.2 Wave 1 + Wave 2)', () => {
   describe.each(CONSUMER_FIXTURES)('%s', (fixtureClass) => {
     const consumerPath = consumerFixturePath(fixtureClass);
     const consumerSource = readFileSync(consumerPath, 'utf8');
@@ -224,12 +231,22 @@ describe('DIST-05 strict-bytes parity gate — consumer-side 48-cell subset (Pha
       it('Leg 3 — babel-plugin produces baseline bytes via sibling write', async () => {
         const tmpDir = mkdtempSync(join(tmpdir(), 'rozie-parity-consumer-babel-'));
         try {
-          // Copy consumer + producer into tmpDir so the babel-plugin's
-          // sibling write doesn't pollute the fixture directory.
+          // Copy consumer + ALL sibling .rozie files into tmpDir so the
+          // babel-plugin's sibling write doesn't pollute the fixture
+          // directory. Phase 07.2 Plan 05 — 3-file fixtures (e.g.,
+          // consumer-re-projection: inner.rozie + wrapper.rozie + input.rozie)
+          // need ALL siblings copied, not just `producer.rozie`.
           const tmpConsumer = join(tmpDir, 'input.rozie');
           writeFileSync(tmpConsumer, consumerSource, 'utf8');
-          const producerPath = join(fixtureDir, 'producer.rozie');
-          writeFileSync(join(tmpDir, 'producer.rozie'), readFileSync(producerPath, 'utf8'), 'utf8');
+          for (const sibling of readdirSync(fixtureDir)) {
+            if (sibling.endsWith('.rozie') && sibling !== 'input.rozie') {
+              writeFileSync(
+                join(tmpDir, sibling),
+                readFileSync(join(fixtureDir, sibling), 'utf8'),
+                'utf8',
+              );
+            }
+          }
           const importer = join(tmpDir, 'consumer.ts');
           writeFileSync(importer, `import X from './input.rozie';`, 'utf8');
 
