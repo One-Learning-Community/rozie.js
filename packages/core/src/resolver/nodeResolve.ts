@@ -57,11 +57,21 @@ export function getRozieResolverOptions(): {
 }
 
 /**
- * @deprecated Use `getRozieResolverOptions()` instead — the frozen-readonly
- * shape was incompatible with enhanced-resolve's mutable-options expectation.
+ * @deprecated Use `getRozieResolverOptions()` instead — this constant's
+ * frozen-readonly shape is incompatible with enhanced-resolve's
+ * mutable-options expectation; pass the result of `getRozieResolverOptions()`
+ * (which returns a fresh mutable copy) to ResolverFactory.
+ *
  * Kept as a back-compat alias for direct shape introspection from tests.
+ * Deeply frozen so accidental mutation (e.g. `.extensions.push(...)`) throws
+ * a TypeError in strict mode rather than silently corrupting future readers.
  */
-export const ROZIE_RESOLVER_OPTIONS = getRozieResolverOptions();
+export const ROZIE_RESOLVER_OPTIONS = Object.freeze({
+  ...getRozieResolverOptions(),
+  extensions: Object.freeze(['.rozie', '.ts', '.tsx', '.js', '.jsx', '.mjs']),
+  conditionNames: Object.freeze(['rozie', 'import', 'default']),
+  exportsFields: Object.freeze(['exports']),
+});
 
 /**
  * Build a fresh `enhanced-resolve` Resolver wired for `.rozie` producer
