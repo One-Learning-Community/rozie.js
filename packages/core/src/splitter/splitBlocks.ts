@@ -231,7 +231,19 @@ export function splitBlocks(source: string, filename?: string): SplitBlocksResul
         depth--;
         const tagName = source.slice(start, endIndex).toLowerCase();
 
-        if (currentBlock !== null && tagName === currentBlock) {
+        // Phase 07.2 fix: only close `currentBlock` when this close-tag returns
+        // us to envelope-top level (depth === 1 after the decrement). Without
+        // this guard, a NESTED `<template>` inside a consumer-side slot fill
+        // (e.g., `<Modal><template #default>x</template></Modal>` inside the
+        // outer `<template>` block) would prematurely close the outer block
+        // on the inner `</template>` close-tag — corrupting the template
+        // content slice and emitting spurious ROZ050 diagnostics from the
+        // downstream parseTemplate pass.
+        if (
+          currentBlock !== null &&
+          tagName === currentBlock &&
+          depth === 1
+        ) {
           // Close the active block (if first time — duplicate-block diagnostic was emitted at open).
           if (result[currentBlock] === undefined) {
             const contentLoc = {
