@@ -1,0 +1,21 @@
+<rozie name="Consumer">
+
+<data>
+{
+  slotName: 'a',
+}
+</data>
+
+<components>
+{
+  Producer: './producer.rozie',
+}
+</components>
+
+<template>
+<Producer>
+  <template #[$data.slotName]>Dynamic fill</template>
+</Producer>
+</template>
+
+</rozie>
