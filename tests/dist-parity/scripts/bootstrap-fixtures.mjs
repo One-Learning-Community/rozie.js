@@ -30,6 +30,11 @@ const FIXTURES_DIR = resolve(HERE, '../fixtures');
 // Counter } block + <Counter /> embed in body content area). Non-Modal
 // existing fixtures (Counter / SearchInput / Dropdown / TodoList) MUST stay
 // byte-identical — the parity gate enforces that contract automatically.
+// Phase 07.2 Plan 06 — EXAMPLES extended 8 → 9 with ModalConsumer (the
+// consumer-side dogfood that exercises Modal's named + scoped slots).
+// Multi-rozie examples (those referencing sibling .rozie producers via
+// <components>) get an absolute filename + resolverRoot below so the IR
+// cache + ProducerResolver can locate the sibling producers at compile time.
 const EXAMPLES = [
   'Counter',
   'SearchInput',
@@ -39,7 +44,10 @@ const EXAMPLES = [
   'TreeNode',
   'Card',
   'CardHeader',
+  'ModalConsumer',
 ];
+
+const EXAMPLES_NEEDING_RESOLVER_ROOT = new Set(['ModalConsumer']);
 // Phase 06.4 P3 (D-LIT-22): TARGETS extended with 'lit' — additive only.
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'];
 
@@ -79,9 +87,15 @@ for (const name of EXAMPLES) {
   for (const target of TARGETS) {
     // Per Plan 06-06 §<action> Step C: types: true (D-90), sourceMap: false
     // (D-91 / T-06-06-03 — no absolute paths leak into committed bytes).
+    // Phase 07.2 Plan 06 — multi-rozie examples need absolute filename +
+    // resolverRoot so the IR cache + ProducerResolver locate sibling
+    // .rozie producers (verified empirically that absolute-filename for
+    // single-file examples is byte-equal to the relative form).
+    const needsResolver = EXAMPLES_NEEDING_RESOLVER_ROOT.has(name);
     const result = compile(source, {
       target,
-      filename: `${name}.rozie`,
+      filename: needsResolver ? sourcePath : `${name}.rozie`,
+      ...(needsResolver ? { resolverRoot: resolve(ROOT, 'examples') } : {}),
       types: true,
       sourceMap: false,
     });

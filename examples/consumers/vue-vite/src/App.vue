@@ -26,6 +26,8 @@ import Modal from './pages/Modal.vue';
 import TreeNode from './pages/TreeNode.vue';
 import Card from './pages/Card.vue';
 import CardHeader from './pages/CardHeader.vue';
+// Phase 07.2 Plan 06 — ModalConsumer dogfood page (Wave 2 close-out).
+import ModalConsumer from './pages/ModalConsumer.vue';
 import { litInteropRoute } from './router';
 
 const pages = [
@@ -37,6 +39,7 @@ const pages = [
   'TreeNode',
   'Card',
   'CardHeader',
+  'ModalConsumer',
   'lit-interop',
 ] as const;
 type Page = typeof pages[number];
@@ -50,6 +53,7 @@ const pageComponents: Record<Page, unknown> = {
   TreeNode,
   Card,
   CardHeader,
+  ModalConsumer,
   'lit-interop': litInteropRoute.component,
 };
 

@@ -20,6 +20,8 @@ import TreeNode from '../TreeNode.rozie';
 import Card from '../Card.rozie';
 import CardHeader from '../CardHeader.rozie';
 import { LitInteropPageComponent } from './pages/lit-interop.page';
+// Phase 07.2 Plan 06 — ModalConsumer dogfood page (Wave 2 close-out).
+import { ModalConsumerPageComponent } from './modal-consumer/modal-consumer.component';
 
 interface TodoItem {
   id: string;
@@ -42,6 +44,7 @@ type PageKey =
   | 'tree-node'
   | 'card'
   | 'card-header'
+  | 'modal-consumer'
   | 'lit-interop';
 
 @Component({
@@ -58,6 +61,7 @@ type PageKey =
     Card,
     CardHeader,
     LitInteropPageComponent,
+    ModalConsumerPageComponent,
   ],
   template: `
     <header class="app-header">
@@ -174,6 +178,8 @@ type PageKey =
           <rozie-card-header title="Standalone header" [onClose]="onCardHeaderClose" />
           <p>Closes: <span data-testid="card-header-close-count">{{ cardHeaderCloseCount() }}</span></p>
         </section>
+      } @else if (current() === 'modal-consumer') {
+        <rozie-modal-consumer-page />
       } @else if (current() === 'lit-interop') {
         <rozie-lit-interop-page />
       }
@@ -223,6 +229,7 @@ export class AppComponent {
     'tree-node',
     'card',
     'card-header',
+    'modal-consumer',
     'lit-interop',
   ];
 

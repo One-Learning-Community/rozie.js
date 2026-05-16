@@ -30,6 +30,11 @@ const REFERENCE_BASENAMES = [
   'TreeNode',
   'Card',
   'CardHeader',
+  // Phase 07.2 Plan 06 — ModalConsumer dogfood + sibling WrapperModal.
+  // Both get cross-tree Angular `.rozie.ts` artefacts emitted during the
+  // Angular sub-build; both must be cleaned up after.
+  'ModalConsumer',
+  'WrapperModal',
 ];
 
 // Cross-tree disk-cache files emitted by the Angular sub-build into the

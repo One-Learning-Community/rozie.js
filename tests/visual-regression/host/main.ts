@@ -22,6 +22,8 @@ export const EXAMPLES = [
   'TreeNode',
   'Card',
   'CardHeader',
+  // Phase 07.2 Plan 06 — ModalConsumer dogfood mount (consumer-side fills).
+  'ModalConsumer',
 ] as const;
 
 export type Example = (typeof EXAMPLES)[number];
@@ -47,6 +49,7 @@ export const LIT_TAGS: Record<Example, string> = {
   TreeNode: 'rozie-tree-node',
   Card: 'rozie-card',
   CardHeader: 'rozie-card-header',
+  ModalConsumer: 'rozie-modal-consumer',
 };
 
 export interface HostQuery {
@@ -82,6 +85,7 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
       ] } },
   Card: { title: 'Card Title' },
   CardHeader: { title: 'Card Header' },
+  ModalConsumer: { title: 'Confirm action' },
 };
 
 /** Parse `?example=&target=` from the current URL, falling back to defaults. */

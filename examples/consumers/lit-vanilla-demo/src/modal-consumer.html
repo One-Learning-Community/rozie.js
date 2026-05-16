@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Rozie ModalConsumer (Lit)</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        max-width: 720px;
+        margin: 2rem auto;
+        padding: 0 1rem;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>ModalConsumer</h1>
+    <p>
+      <a href="/">&larr; back</a> — Phase 07.2 Plan 06 dogfood: shadow-DOM
+      slot projection for named + scoped + default + dynamic-name + wrapper
+      re-projection fills.
+    </p>
+    <div data-testid="rozie-mount">
+      <rozie-modal-consumer title="Confirm action"></rozie-modal-consumer>
+    </div>
+    <script type="module">
+      import './rozie/ModalConsumer.rozie';
+    </script>
+  </body>
+</html>

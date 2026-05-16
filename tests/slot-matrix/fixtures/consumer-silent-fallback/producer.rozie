@@ -1,0 +1,25 @@
+<rozie name="Producer">
+
+<props>
+{
+  title: { type: String, default: 'Fallback' },
+}
+</props>
+
+<template>
+<div class="producer">
+  <header>
+    <slot name="header">
+      <h2>{{ $props.title }}</h2>
+    </slot>
+  </header>
+  <main>
+    <slot>fallback body</slot>
+  </main>
+  <footer>
+    <slot name="footer" />
+  </footer>
+</div>
+</template>
+
+</rozie>
