@@ -1,0 +1,21 @@
+<rozie name="Producer">
+
+<props>
+{
+  open: { type: Boolean, default: false, model: true }
+}
+</props>
+
+<script>
+const close = () => { $props.open = false }
+</script>
+
+<template>
+<div class="producer" r-show="$props.open">
+  <header>
+    <slot name="footer" :close="close">default footer</slot>
+  </header>
+</div>
+</template>
+
+</rozie>

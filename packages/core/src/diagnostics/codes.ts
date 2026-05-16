@@ -207,7 +207,15 @@ export const RozieErrorCode = {
   DYNAMIC_NAME_EXPRESSION_INVALID: 'ROZ946',       // error — `<template #[expr]>` bracketed text fails to parse as a JS expression
   SCOPED_PARAM_MISMATCH: 'ROZ947',                 // error — D-09 — consumer destructures a param the producer SlotDecl.params doesn't declare
   SCOPED_PARAMS_ALL_DROPPED: 'ROZ948',             // warn  — scoped-params destructure had properties but none resolved to simple bindings (e.g. spread, computed keys, rename)
-  // ROZ949..ROZ959 reserved
+
+  // ---- Phase 07.3 consumer-side two-way binding — ROZ949..ROZ951 ----
+  // Per 07.3-SPEC.md §Diagnostic Code Assignments: ROZ949 is the next free
+  // code after the 07.2 cleanup that registered ROZ948 (ROADMAP working-list
+  // mentioned ROZ950 but predated that cleanup; SPEC.md is authoritative).
+  TWO_WAY_PROP_NOT_MODEL: 'ROZ949',           // error — r-model:prop= where producer prop lacks model:true (dual-frame: consumer site + producer decl)
+  TWO_WAY_ARG_OR_TARGET_INVALID: 'ROZ950',    // error — r-model: with empty arg (`r-model:=`), OR applied to non-component HTML tag (`<div r-model:foo=`)
+  TWO_WAY_LHS_NOT_WRITABLE: 'ROZ951',         // error — RHS not a writable lvalue per 07.3-CONTEXT D-03 permissive rule (literal/ternary/call/$computed)
+  // ROZ952..ROZ959 reserved
 } as const;
 
 export type RozieErrorCode = (typeof RozieErrorCode)[keyof typeof RozieErrorCode];
