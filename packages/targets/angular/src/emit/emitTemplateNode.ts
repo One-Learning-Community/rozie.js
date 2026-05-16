@@ -260,6 +260,24 @@ function emitEvents(events: Listener[], ctx: EmitNodeCtx): string {
 }
 
 /**
+ * Does a child node contribute meaningful (non-whitespace) content?
+ *
+ * Used to decide whether a Rozie-component invocation has default-slot
+ * children that need wrapping in `<ng-template #defaultSlot>` (D-LIT-ANG-DEFAULT-SLOT).
+ */
+function isMeaningfulChild(node: TemplateNode): boolean {
+  if (node.type === 'TemplateStaticText') {
+    return node.text.trim().length > 0;
+  }
+  if (node.type === 'TemplateFragment') {
+    return node.children.some(isMeaningfulChild);
+  }
+  // Elements / loops / conditionals / interpolations / slot-invocations all
+  // count as meaningful content.
+  return true;
+}
+
+/**
  * Emit a TemplateElement. Walks attributes, events; renders children.
  */
 function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
@@ -335,6 +353,28 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
   }
 
   const inner = node.children.map((c) => emitNode(c, ctx)).join('');
+
+  // D-LIT-ANG-DEFAULT-SLOT: when consuming a Rozie-component (tagKind:
+  // 'component' or 'self'), Angular's content-projection model requires the
+  // default-slot children to be wrapped in `<ng-template #defaultSlot>`. The
+  // component-side emit declares
+  //   `@ContentChild('defaultSlot', { read: TemplateRef }) defaultTpl?: ...`
+  // and renders it via `<ng-container *ngTemplateOutlet="defaultTpl">`. Raw
+  // children of `<rozie-component>` are silently DROPPED by Angular because
+  // there is no `<ng-content>` in the consumed component's view template.
+  //
+  // Vue/Svelte/Solid/React naturally route children through their own
+  // slot/`children:` mechanisms; only Angular needs the explicit ng-template
+  // wrapper at the consumer site.
+  //
+  // We only wrap when the children carry meaningful content (non-whitespace).
+  if (
+    (node.tagKind === 'component' || node.tagKind === 'self') &&
+    node.children.some(isMeaningfulChild)
+  ) {
+    return `<${tagOut}${head}><ng-template #defaultSlot>${inner}</ng-template></${tagOut}>`;
+  }
+
   return `<${tagOut}${head}>${inner}</${tagOut}>`;
 }
 
