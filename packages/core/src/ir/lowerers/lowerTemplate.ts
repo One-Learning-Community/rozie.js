@@ -481,6 +481,10 @@ function lowerBareElement(
       args,
       fallback,
       sourceLoc: el.loc,
+      // Phase 07.2 D-06 — every <slot> lowered here is in producer-declaration
+      // position by default. Task 3 adds the sticky-downward `'fill-body'`
+      // propagation when the traversal recurses into a SlotFillerDecl.body.
+      context: 'declaration',
     };
   }
 

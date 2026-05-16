@@ -2734,7 +2734,8 @@
                                           "end": 2682
                                         }
                                       }
-                                    ]
+                                    ],
+                                    "context": "declaration"
                                   },
                                   {
                                     "type": "TemplateStaticText",
@@ -2863,7 +2864,8 @@
                                 ]
                               }
                             ],
-                            "fallback": []
+                            "fallback": [],
+                            "context": "declaration"
                           },
                           {
                             "type": "TemplateStaticText",
@@ -3025,7 +3027,8 @@
                                         ]
                                       }
                                     ],
-                                    "fallback": []
+                                    "fallback": [],
+                                    "context": "declaration"
                                   },
                                   {
                                     "type": "TemplateStaticText",

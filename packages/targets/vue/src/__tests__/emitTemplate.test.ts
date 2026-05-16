@@ -231,6 +231,8 @@ describe('emitTemplate — behavior tests (synthetic IR)', () => {
       ],
       fallback: [],
       sourceLoc: LOC,
+      // Phase 07.2 D-06 — required context field; producer-declaration position.
+      context: 'declaration',
     };
     ir.template = slot;
     const { template } = emitTemplate(ir, registry);
