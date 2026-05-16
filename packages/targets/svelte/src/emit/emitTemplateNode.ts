@@ -285,17 +285,21 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
       if (filler.isDynamic) continue; // handled via the snippets prop below
       fillerParts.push(emitSlotFiller(filler, fillerCtx));
     }
-    const dynSnippetsProp = emitDynamicSnippetsProp(
+    const dyn = emitDynamicSnippetsProp(
       node.slotFillers,
       ctx.ir,
       emitChildren,
     );
+    // Dynamic-name dispatch (R5): the prop carries the `snippets={{ [expr]:
+    // __rozieDynSlot_<N> }}` map; the snippet identifier blocks live inside
+    // the component tag's body alongside the static-name snippet blocks
+    // (Svelte 5 evaluates snippet declarations in the surrounding scope and
+    // makes them referenceable by identifier).
     const headWithSnippets =
-      dynSnippetsProp !== null
-        ? `${head} ${dynSnippetsProp}`
-        : head;
+      dyn.prop !== null ? `${head} ${dyn.prop}` : head;
+    const allBodyParts = [...fillerParts, ...dyn.snippetBlocks];
 
-    const inner = fillerParts.join('');
+    const inner = allBodyParts.join('');
     if (inner.length === 0) {
       return `<${node.tagName}${headWithSnippets}></${node.tagName}>`;
     }

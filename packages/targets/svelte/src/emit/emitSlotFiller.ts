@@ -117,41 +117,61 @@ export function emitSlotFiller(
 
 /**
  * R5 dynamic-name path — collect ALL dynamic fillers on a single component
- * tag into one `snippets={{ [expr1]: snippet1, … }}` JSX prop fragment.
+ * tag into one `snippets={{ [expr]: __rozieDynSlot_<N>, … }}` prop +
+ * matching `{#snippet __rozieDynSlot_<N>(...)}…{/snippet}` body blocks.
  *
- * Returns null when no dynamic fillers are present. The producer-side Svelte
- * shell must declare a matching `snippets?: Record<string, Snippet>` prop for
- * this to wire end-to-end (RESEARCH §3.c "D-04 Svelte"); Wave 1 doesn't
- * exercise this — the symmetry is in place for Wave 2.
+ * Returns `{ prop: null, snippetBlocks: [] }` when no dynamic fillers are
+ * present. Otherwise returns:
+ *   - `prop`: the `snippets={{ … }}` attribute string for the component tag's
+ *     head (caller appends after the existing `head` text).
+ *   - `snippetBlocks`: one `{#snippet __rozieDynSlot_<N>(args)}body{/snippet}`
+ *     per dynamic filler — caller emits them inside the component tag's
+ *     children alongside the static-name snippet blocks from `emitSlotFiller`.
  *
- * For Wave 1, dynamic-name fills are NOT yet exercised by any fixture; this
- * helper is here so emitTemplateNode can dispatch symmetrically with the Vue
- * (#[expr]) and React (slots prop) paths.
+ * Per D-04 Svelte: Svelte 5's snippet primitive is declarative inside the
+ * template — you cannot synthesise an inline `(args) => snippet(args)` JS
+ * value for a `snippets={{…}}` map directly. The standard idiom is to
+ * declare a `{#snippet name(args)}body{/snippet}` block by identifier and
+ * reference that identifier in the map. We adopt that idiom here: each
+ * dynamic filler becomes a sibling snippet block keyed by a deterministic
+ * synthetic name (`__rozieDynSlot_<index>`); the snippets prop carries the
+ * `[<rewritten expression>]: __rozieDynSlot_<index>` entry.
+ *
+ * Silent fallback on runtime miss (D-05): the producer-side Svelte 5
+ * `{@render header?.(…)}` already short-circuits on undefined. When the
+ * dynamic key doesn't match any producer slot, the projection silently
+ * no-ops and the producer's defaultContent renders.
+ *
+ * Index counter is local to the per-component-tag invocation — synthesised
+ * names won't collide across siblings because each component-tag's emit
+ * runs the helper independently.
  */
 export function emitDynamicSnippetsProp(
   fillers: readonly SlotFillerDecl[],
   ir: IRComponent,
   emitChildren: (children: TemplateNode[]) => string,
-): string | null {
+): { prop: string | null; snippetBlocks: string[] } {
+  void ir; // kept in signature for future use (e.g. expression-source diagnostics)
   const dynamics = fillers.filter((f) => f.isDynamic);
-  if (dynamics.length === 0) return null;
+  if (dynamics.length === 0) return { prop: null, snippetBlocks: [] };
 
-  // Build an inline {#snippet} per dynamic entry, keyed by the bracketed
-  // expression. We collect them into a hoisted top-level snippets={…} prop
-  // string that the caller appends to the component tag's head.
-  //
-  // Note: Svelte 5's snippet primitive is declarative inside the template;
-  // we cannot synthesize an inline snippet value as a JS expression. For
-  // dynamic-name we emit each as a sibling {#snippet} block inside the
-  // component tag PLUS a `snippets={{ [expr]: <snippetIdent> }}` prop that
-  // references it by snippet identifier. This is the equivalent of React's
-  // Record<string, Snippet>; Wave 2 fixtures exercise the round-trip.
-  //
-  // For now (Wave 1 — no dynamic fixture), return null so we don't emit
-  // half-baked output that no test exercises. The full implementation
-  // lands in Wave 2 along with the consumer-dynamic-name fixture.
-  void dynamics;
-  void ir;
-  void emitChildren;
-  return null;
+  const entries: string[] = [];
+  const snippetBlocks: string[] = [];
+  let idx = 0;
+  for (const filler of dynamics) {
+    if (!filler.dynamicNameExpr) continue; // ROZ946 emitted upstream
+    const snippetName = `__rozieDynSlot_${idx}`;
+    const keyExpr = rewriteTemplateExpression(filler.dynamicNameExpr, ir);
+    const destructure = paramsDestructure(filler);
+    const argList = destructure === '' ? '()' : `(${destructure})`;
+    const body = emitChildren(filler.body);
+    snippetBlocks.push(`{#snippet ${snippetName}${argList}}${body}{/snippet}`);
+    entries.push(`[${keyExpr}]: ${snippetName}`);
+    idx++;
+  }
+  if (entries.length === 0) return { prop: null, snippetBlocks: [] };
+  return {
+    prop: `snippets={{ ${entries.join(', ')} }}`,
+    snippetBlocks,
+  };
 }
