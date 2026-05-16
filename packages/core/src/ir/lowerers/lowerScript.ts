@@ -18,6 +18,7 @@ import type { ScriptAST } from '../../ast/blocks/ScriptAST.js';
 import type {
   BindingsTable,
   LifecycleHookEntry,
+  WatchEntry,
 } from '../../semantic/types.js';
 import type { Diagnostic } from '../../diagnostics/Diagnostic.js';
 import type { ReactiveDepGraph } from '../../reactivity/ReactiveDepGraph.js';
@@ -26,6 +27,7 @@ import { RozieErrorCode } from '../../diagnostics/codes.js';
 import type {
   ComputedDecl,
   LifecycleHook,
+  WatchHook,
   SetupBody,
   SetupAnnotation,
 } from '../types.js';
@@ -33,6 +35,8 @@ import type {
 export interface LowerScriptResult {
   computed: ComputedDecl[];
   lifecycle: LifecycleHook[];
+  /** Quick plan 260515-u2b — parallel to `lifecycle`. */
+  watchers: WatchHook[];
   setupBody: SetupBody;
   emits: string[];
 }
@@ -176,6 +180,30 @@ function pairLifecycleHooks(
 }
 
 /**
+ * Quick plan 260515-u2b — build WatchHook[] from collected WatchEntry[].
+ *
+ * Each entry's getter/callback function-body is hoisted directly into the
+ * WatchHook node; getterDeps come from the depGraph at `watch.{N}.getter`.
+ * No D-19-style pairing is needed — every WatchHook is standalone.
+ */
+function buildWatchers(
+  entries: WatchEntry[],
+  depGraph: ReactiveDepGraph,
+): WatchHook[] {
+  const out: WatchHook[] = [];
+  entries.forEach((entry, idx) => {
+    out.push({
+      type: 'WatchHook',
+      getter: entry.getter.body,
+      callback: entry.callback.body,
+      getterDeps: [...depGraph.forNodeOrEmpty(`watch.${idx}.getter`)],
+      sourceLoc: entry.sourceLoc,
+    });
+  });
+  return out;
+}
+
+/**
  * Walk the Babel Program top-level body and tag each statement with a
  * SetupAnnotation describing its semantic role.
  */
@@ -211,7 +239,10 @@ function buildAnnotations(script: ScriptAST, bindings: BindingsTable): SetupAnno
         t.isIdentifier(expr.callee) &&
         (expr.callee.name === '$onMount' ||
           expr.callee.name === '$onUnmount' ||
-          expr.callee.name === '$onUpdate')
+          expr.callee.name === '$onUpdate' ||
+          // Quick plan 260515-u2b — $watch is structurally a lifecycle-class
+          // top-level call (registers an effect at setup time).
+          expr.callee.name === '$watch')
       ) {
         annotations.push({ nodeId, kind: 'lifecycle' });
         return;
@@ -252,6 +283,9 @@ export function lowerScript(
   // 2. LifecycleHook[] with D-19 pairing
   const lifecycle = pairLifecycleHooks(bindings.lifecycle, diagnostics, depGraph);
 
+  // 2b. WatchHook[] — quick plan 260515-u2b. No pairing; standalone effects.
+  const watchers = buildWatchers(bindings.watchers, depGraph);
+
   // 3. SetupBody — IR-04 referential preservation
   const setupBody: SetupBody = {
     type: 'SetupBody',
@@ -263,5 +297,5 @@ export function lowerScript(
   // discovery handled by lowerTemplate via $emit() walk).
   const emits = [...bindings.emits];
 
-  return { computed, lifecycle, setupBody, emits };
+  return { computed, lifecycle, watchers, setupBody, emits };
 }

@@ -26,6 +26,7 @@ export type {
   SlotParamDecl,
   ComputedDeclEntry,
   LifecycleHookEntry,
+  WatchEntry,
 } from './types.js';
 
 export function createEmptyBindings(): BindingsTable {
@@ -37,6 +38,7 @@ export function createEmptyBindings(): BindingsTable {
     computeds: new Map(),
     emits: new Set(),
     lifecycle: [],
+    watchers: [],
   };
 }
 

@@ -54,6 +54,12 @@ export interface IRComponent {
   emits: string[];
   /** D-19: ordered + paired. Each $onMount/$onUnmount/$onUpdate is one node. */
   lifecycle: LifecycleHook[];
+  /**
+   * Quick plan 260515-u2b — `$watch(getter, cb)` calls in source order.
+   * Parallel to `lifecycle`. Empty array when no `<script>` block exists or
+   * no `$watch` calls were collected.
+   */
+  watchers: WatchHook[];
   /** D-20: <listeners> block entries + template @event bindings, same shape. */
   listeners: Listener[];
   /** IR-04: preserved Babel Program (referential equality with ast.script.program). */
@@ -225,6 +231,33 @@ export interface LifecycleHook {
   setup: BlockStatement | Expression;
   cleanup?: Expression;
   setupDeps: SignalRef[];
+  sourceLoc: SourceLoc;
+}
+
+/**
+ * WatchHook — quick plan 260515-u2b.
+ *
+ * One node per `$watch(() => getter, () => callback)` call collected at
+ * Program top level in source order. Both `getter` and `callback` carry the
+ * function BODY (BlockStatement or Expression) — emitters wrap the body back
+ * into an arrow expression at emission time.
+ *
+ * `getterDeps` is computed by `ReactiveDepGraph` from the getter's body
+ * (NOT the callback body) — same `computeExpressionDeps` algorithm that powers
+ * `LifecycleHook.setupDeps`. React's `useEffect(cb, [...getterDeps])` consumes
+ * this; Vue/Svelte/Solid/Angular/Lit ignore it (their effect primitives
+ * auto-track reactive reads).
+ *
+ * @experimental — shape may change before v1.0
+ */
+export interface WatchHook {
+  type: 'WatchHook';
+  /** Body of the getter arrow: `() => $props.open` → the `$props.open` Expression. */
+  getter: BlockStatement | Expression;
+  /** Body of the callback arrow: `() => { reposition() }` → BlockStatement. */
+  callback: BlockStatement | Expression;
+  /** SignalRef[] computed from the getter body (NOT the callback). */
+  getterDeps: SignalRef[];
   sourceLoc: SourceLoc;
 }
 

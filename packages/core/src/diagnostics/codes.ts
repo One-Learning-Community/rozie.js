@@ -54,6 +54,7 @@ export const RozieErrorCode = {
   COMPUTED_MAGIC_ACCESS: 'ROZ106', // $props['foo'] — magic accessors require static keys
   CONDITIONAL_CLEANUP_RETURN: 'ROZ107', // $onMount(() => { return condition ? cleanA : cleanB }) — conditional cleanup shape
   NON_FUNCTION_CLEANUP_RETURN: 'ROZ108', // $onMount(() => { return nonFnValue }) — return value is not a function
+  WATCH_INVALID_ARGS: 'ROZ109', // $watch requires (getterFn, callbackFn); skipping malformed call. Plan quick-260515-u2b.
   UNKNOWN_MODIFIER: 'ROZ110', // .escspe (typo) — name not registered in ModifierRegistry
   MODIFIER_ARITY_MISMATCH: 'ROZ111', // .debounce() (missing required ms arg)
   MODIFIER_ARG_SHAPE: 'ROZ112', // .outside('not-a-ref') — refExpr expected, got literal

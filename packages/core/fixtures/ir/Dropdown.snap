@@ -369,6 +369,7 @@
       }
     }
   ],
+  "watchers": [],
   "listeners": [
     {
       "type": "Listener",

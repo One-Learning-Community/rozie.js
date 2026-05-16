@@ -48,6 +48,7 @@ function emptyIR(name: string): IRComponent {
     slots: [],
     emits: [],
     lifecycle: [],
+    watchers: [],
     listeners: [],
     setupBody: {
       type: 'SetupBody',

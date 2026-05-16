@@ -29,6 +29,7 @@ import type {
   BindingsTable,
   ComputedDeclEntry,
   LifecycleHookEntry,
+  WatchEntry,
 } from '../types.js';
 
 // Default export interop: @babel/traverse ships a CJS default export that
@@ -79,6 +80,38 @@ function extractLifecycleFromExpression(
   };
 }
 
+/**
+ * Quick plan 260515-u2b — extract a top-level `$watch(getter, cb)` call into a
+ * WatchEntry. Both args MUST be function expressions (arrow or function
+ * expression). Malformed calls are skipped silently here (collectors stay
+ * silent per Plan 02-01 contract) — the validator emits ROZ109 separately.
+ */
+function extractWatchFromExpression(expr: t.Expression): WatchEntry | null {
+  if (!t.isCallExpression(expr)) return null;
+  if (!t.isIdentifier(expr.callee)) return null;
+  if (expr.callee.name !== '$watch') return null;
+  if (expr.arguments.length < 2) return null;
+  const getter = expr.arguments[0];
+  const callback = expr.arguments[1];
+  if (
+    !getter ||
+    (!t.isArrowFunctionExpression(getter) && !t.isFunctionExpression(getter))
+  ) {
+    return null;
+  }
+  if (
+    !callback ||
+    (!t.isArrowFunctionExpression(callback) && !t.isFunctionExpression(callback))
+  ) {
+    return null;
+  }
+  return {
+    getter,
+    callback,
+    sourceLoc: { start: expr.start ?? 0, end: expr.end ?? 0 },
+  };
+}
+
 export function collectScriptDecls(script: ScriptAST, bindings: BindingsTable): void {
   const programBody = script.program.program.body;
 
@@ -96,7 +129,13 @@ export function collectScriptDecls(script: ScriptAST, bindings: BindingsTable): 
     // $onMount(...) etc. at Program top level (ExpressionStatement → CallExpression)
     if (t.isExpressionStatement(stmt)) {
       const lifecycle = extractLifecycleFromExpression(stmt.expression);
-      if (lifecycle) bindings.lifecycle.push(lifecycle);
+      if (lifecycle) {
+        bindings.lifecycle.push(lifecycle);
+        continue;
+      }
+      // Quick plan 260515-u2b: top-level $watch(getter, cb) collection.
+      const watcher = extractWatchFromExpression(stmt.expression);
+      if (watcher) bindings.watchers.push(watcher);
     }
   }
 

@@ -73,6 +73,19 @@ export function buildReactiveDepGraph(
     map.set(`lifecycle.${idx}.setup`, computeExpressionDeps(hook.callback, bindings));
   });
 
+  // Quick plan 260515-u2b — register `watch.{N}.getter` for each WatchEntry.
+  // The getter BODY (not the whole arrow) is the dep source — matches the
+  // lifecycle-hook convention above. The callback BODY is intentionally NOT
+  // registered as a separate node: React's useEffect dep array tracks the
+  // GETTER's signal reads (matching Vue/Solid/Angular/Lit's reactive-effect
+  // subscription model where the getter's reactive reads drive re-runs).
+  bindings.watchers.forEach((wh, idx) => {
+    map.set(
+      `watch.${idx}.getter`,
+      computeExpressionDeps(wh.getter.body, bindings),
+    );
+  });
+
   // <template> — attribute bindings + interpolations.
   if (ast.template) {
     walkTemplateForDeps(ast.template, bindings, map);

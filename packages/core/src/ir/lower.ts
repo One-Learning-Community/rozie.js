@@ -108,7 +108,7 @@ export function lowerToIR(ast: RozieAST, opts: LowerOptions): LowerResult {
 
   const scriptResult = ast.script
     ? lowerScript(ast.script, bindings, depGraph, diagnostics)
-    : { computed: [], lifecycle: [], setupBody: emptySetupBody(), emits: [] };
+    : { computed: [], lifecycle: [], watchers: [], setupBody: emptySetupBody(), emits: [] };
 
   // RefDecl[] sourced from BindingsTable (template-collected refs).
   const refs: RefDecl[] = [];
@@ -155,6 +155,8 @@ export function lowerToIR(ast: RozieAST, opts: LowerOptions): LowerResult {
     slots,
     emits: [...new Set(scriptResult.emits)],
     lifecycle: scriptResult.lifecycle,
+    // Quick plan 260515-u2b — populated from $watch(getter, cb) calls.
+    watchers: scriptResult.watchers,
     listeners: [...listenersFromBlock, ...templateResult.templateListeners],
     setupBody: scriptResult.setupBody,
     template: templateResult.template,

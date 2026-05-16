@@ -107,6 +107,22 @@ export interface LifecycleHookEntry {
   sourceLoc: SourceLoc;
 }
 
+/**
+ * Quick plan 260515-u2b: $watch(() => getter, () => callback) at Program top
+ * level. Both args MUST be ArrowFunctionExpression | FunctionExpression — the
+ * collector skips malformed calls silently; the validator emits ROZ109.
+ *
+ * Single-getter form ONLY for v1; array-of-getters / oldValue param /
+ * flush/immediate options are out of scope.
+ */
+export interface WatchEntry {
+  /** The raw arrow/function expression passed as the first arg to $watch. */
+  getter: ArrowFunctionExpression | FunctionExpression;
+  /** The raw arrow/function expression passed as the second arg to $watch. */
+  callback: ArrowFunctionExpression | FunctionExpression;
+  sourceLoc: SourceLoc;
+}
+
 export interface BindingsTable {
   props: Map<string, PropDeclEntry>;
   data: Map<string, DataDeclEntry>;
@@ -120,4 +136,10 @@ export interface BindingsTable {
   emits: Set<string>;
   /** Ordered (source order) per REACT-04. */
   lifecycle: LifecycleHookEntry[];
+  /**
+   * Ordered (source order) per REACT-04 — same convention as `lifecycle`.
+   * Populated by collectScriptDecls for top-level `$watch(getter, cb)` calls.
+   * Quick plan 260515-u2b.
+   */
+  watchers: WatchEntry[];
 }

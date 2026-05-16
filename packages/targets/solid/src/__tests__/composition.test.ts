@@ -26,6 +26,7 @@ function buildMinimalIR(overrides: Partial<IRComponent> = {}): IRComponent {
     emits: [],
     slots: [],
     lifecycle: [],
+    watchers: [],
     listeners: [],
     styles: { type: 'StyleSection', scopedRules: [], rootRules: [], sourceLoc: { start: 0, end: 0 } },
     components: [],

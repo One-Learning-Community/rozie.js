@@ -82,6 +82,7 @@ describe('emitSlotDecl — D-LIT-14 correction', () => {
         slots: [],
         emits: [],
         lifecycle: [],
+        watchers: [],
         listeners: [],
         setupBody: { type: 'SetupBody', scriptProgram: null as never, annotations: [] },
         template: null,

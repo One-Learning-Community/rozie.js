@@ -8,6 +8,7 @@
   "slots": [],
   "emits": [],
   "lifecycle": [],
+  "watchers": [],
   "listeners": [],
   "setupBody": {
     "type": "SetupBody",

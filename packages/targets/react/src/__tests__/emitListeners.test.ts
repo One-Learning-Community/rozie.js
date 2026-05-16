@@ -37,6 +37,7 @@ const STUB_IR: IRComponent = {
   slots: [],
   emits: [],
   lifecycle: [],
+  watchers: [],
   listeners: [],
   setupBody: { type: 'SetupBody', scriptProgram: { type: 'File', program: { type: 'Program', body: [], directives: [], sourceType: 'module' } } as any, annotations: [] },
   template: null,

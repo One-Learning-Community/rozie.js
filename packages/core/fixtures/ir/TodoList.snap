@@ -743,6 +743,7 @@
     "remove"
   ],
   "lifecycle": [],
+  "watchers": [],
   "listeners": [
     {
       "type": "Listener",

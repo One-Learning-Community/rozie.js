@@ -569,6 +569,7 @@
   "slots": [],
   "emits": [],
   "lifecycle": [],
+  "watchers": [],
   "listeners": [
     {
       "type": "Listener",

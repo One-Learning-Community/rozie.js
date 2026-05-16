@@ -61,7 +61,10 @@ const traverse: TraverseFn =
     : (_traverse as unknown as { default: TraverseFn }).default;
 
 const MAGIC_ACCESSORS = new Set(['$props', '$data', '$refs', '$slots']);
-const LIFECYCLE_NAMES = new Set(['$onMount', '$onUnmount', '$onUpdate']);
+// `$watch` is also handled by checkLifecycleSiting (must be at Program top
+// level) but uses ROZ109 for argument-shape errors instead of ROZ104.
+// Quick plan 260515-u2b.
+const LIFECYCLE_NAMES = new Set(['$onMount', '$onUnmount', '$onUpdate', '$watch']);
 
 interface ValidatorContext {
   bindings: BindingsTable;
@@ -186,6 +189,39 @@ function checkLifecycleSiting(
       loc: locFromNode(path.node),
       hint: 'Move the lifecycle call to <script> Program top level. Lifecycle hooks register effects at component-setup time.',
     });
+    return;
+  }
+  // Quick plan 260515-u2b: argument-shape validation for `$watch`. Both args
+  // MUST be ArrowFunctionExpression | FunctionExpression. Malformed calls
+  // emit ROZ109 (warning) and are skipped by the collector — execution
+  // continues so we still catch other issues in the rest of <script>.
+  if (callee.name === '$watch') {
+    const args = path.node.arguments;
+    let bad: string | null = null;
+    if (args.length === 0) {
+      bad = '$watch requires (getterFn, callbackFn); skipping malformed call.';
+    } else if (args.length === 1) {
+      bad = '$watch requires (getterFn, callbackFn); missing callback argument.';
+    } else {
+      const getter = args[0];
+      const callback = args[1];
+      const isFn = (n: t.Node | undefined): boolean =>
+        !!n && (t.isArrowFunctionExpression(n) || t.isFunctionExpression(n));
+      if (!isFn(getter as t.Node | undefined)) {
+        bad = '$watch first argument must be an arrow or function expression (the getter).';
+      } else if (!isFn(callback as t.Node | undefined)) {
+        bad = '$watch second argument must be an arrow or function expression (the callback).';
+      }
+    }
+    if (bad) {
+      ctx.diagnostics.push({
+        code: RozieErrorCode.WATCH_INVALID_ARGS,
+        severity: 'warning',
+        message: bad,
+        loc: locFromNode(path.node),
+        hint: 'Use the shape `$watch(() => $props.x, () => { /* body */ })` — single-getter form only in v1.',
+      });
+    }
   }
 }
 

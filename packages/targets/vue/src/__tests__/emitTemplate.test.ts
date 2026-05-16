@@ -59,6 +59,7 @@ function emptyIR(): IRComponent {
     slots: [],
     emits: [],
     lifecycle: [],
+    watchers: [],
     listeners: [],
     setupBody: { type: 'SetupBody', scriptProgram: t.file(t.program([])), annotations: [] },
     template: null,
