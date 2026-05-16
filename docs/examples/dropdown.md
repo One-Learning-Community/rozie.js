@@ -7,7 +7,7 @@ const dropdownOpen = ref(false);
 
 # Dropdown
 
-The marquee `<listeners>` example. Shows the `.outside(...$refs)` modifier eliminating hand-rolled outside-click detection, `.throttle(100).passive` on a window resize, reactive `when` predicates that auto-attach/detach listeners, multiple `$onMount` hooks colocated with their setup, named slots with scoped params (`#trigger="{ open, toggle }"`), and `$props` writes flowing through to each target's two-way pattern because `open` is declared `model: true`.
+The marquee `<listeners>` example. Shows the `.outside(...$refs)` modifier eliminating hand-rolled outside-click detection, `.throttle(100).passive` on a window resize, reactive `when` predicates that auto-attach/detach listeners, `$watch(() => $props.open, ...)` re-firing reposition when the panel mounts (the panel is `r-if`-gated, so `$refs.panelEl` is undefined at initial `$onMount`), multiple `$onMount` hooks colocated with their setup, named slots with scoped params (`#trigger="{ open, toggle }"`), and `$props` writes flowing through to each target's two-way pattern because `open` is declared `model: true`.
 
 ## Live demo
 

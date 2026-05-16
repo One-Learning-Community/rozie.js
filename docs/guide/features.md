@@ -179,6 +179,33 @@ $onMount(() => {
 
 Source order is preserved per-target so the framework's lifecycle ordering is predictable.
 
+## `$watch(() => getter, cb)` — react to value transitions
+
+`$watch` is the primitive for "do something whenever this value changes." The getter is what the watcher subscribes to; the callback runs whenever a reactive read inside the getter flips:
+
+```rozie
+<script>
+$watch(() => $props.open, () => {
+  if ($props.open) reposition()
+})
+</script>
+```
+
+It's the right tool when `$onMount` is too early. A common case: an element gated by `r-if` is undefined at mount time, but the consumer toggles the gate later — `$watch` fires after the transition, when the ref is finally populated.
+
+Each target compiles this to its native effect primitive:
+
+| Target | Expansion |
+| --- | --- |
+| Vue | `watch(() => open.value, () => { /* cb */ })` |
+| React | `useEffect(() => { /* cb */ }, [open, /* closure refs */])` — getter deps + callback closure refs unioned to satisfy `react-hooks/exhaustive-deps` |
+| Svelte 5 | `$effect(() => { (() => open)(); (() => { /* cb */ })(); })` — getter IIFE inside `$effect` registers the subscription via reactive read tracking |
+| Angular | `effect(() => { (() => this.open())(); (() => { /* cb */ })(); })` |
+| Solid | `createEffect(() => { (() => props.open)(); (() => { /* cb */ })(); })` |
+| Lit | `effect(() => { (() => this.open)(); (() => { /* cb */ })(); })` from `@lit-labs/preact-signals`; the unsubscribe handle is pushed onto the disconnect-cleanup drain |
+
+Single-getter form only — array-of-getters, `oldValue` callback parameter, and `flush` / `immediate` options are not in scope. Malformed calls emit a soft `ROZ109` diagnostic and are skipped rather than crashing the compiler.
+
 ## `$refs` derived from `ref="..."`
 
 No separate `<refs>` block. Any element with `ref="name"` becomes available as `$refs.name` in both `<script>` and `<template>`. Whatever type the underlying framework gives you (DOM node, component instance), `$refs.name` exposes it directly:
