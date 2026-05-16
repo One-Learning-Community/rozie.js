@@ -53,6 +53,12 @@ export type {
   ComputedDecl,
   RefDecl,
   SlotDecl,
+  // Phase 07.2 Plan 01 — consumer-side slot-fill IR shape (R2 acceptance).
+  // Re-exported via the @rozie/core barrel per Phase 07.1 / MODX-01 self-reference
+  // pattern so target packages import via the package specifier, NOT a relative
+  // ../../core/src/ir/types.js path. Failing this re-creates the .d.ts divergence
+  // bug 07.1 fixed.
+  SlotFillerDecl,
   ParamDecl,
   LifecycleHook,
   Listener,

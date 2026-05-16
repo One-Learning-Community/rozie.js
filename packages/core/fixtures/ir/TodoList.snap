@@ -3365,7 +3365,8 @@
                       "end": 1481
                     }
                   }
-                ]
+                ],
+                "context": "declaration"
               },
               {
                 "type": "TemplateStaticText",
@@ -4578,7 +4579,8 @@
                                       "end": 2312
                                     }
                                   }
-                                ]
+                                ],
+                                "context": "declaration"
                               },
                               {
                                 "type": "TemplateStaticText",
@@ -4655,7 +4657,8 @@
                               "end": 2405
                             }
                           }
-                        ]
+                        ],
+                        "context": "declaration"
                       },
                       {
                         "type": "TemplateStaticText",

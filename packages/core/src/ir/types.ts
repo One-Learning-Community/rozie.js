@@ -193,6 +193,50 @@ export interface SlotDecl {
 }
 
 /**
+ * SlotFillerDecl — Phase 07.2.
+ *
+ * Attached to `TemplateElementIR.slotFillers` when the element is
+ * `tagKind: 'component' | 'self'`. One entry per `<template #name>` directive
+ * inside the component body, plus a synthetic `{ name: '' }` entry when the
+ * component tag's non-`<template>` children form a default-slot shorthand
+ * (D-03 / R3).
+ *
+ * `name === ''` is the default-slot sentinel matching `SlotDecl`'s convention.
+ *
+ * `paramTypes` is threaded from the producer's `SlotDecl.paramTypes` via the
+ * IR cache lookup at lowering time (R4 / D-01). Empty (undefined) when the
+ * producer is unresolvable or its `SlotDecl` has no `paramTypes` annotation —
+ * type-flow degrades gracefully rather than blocking compilation.
+ *
+ * `isDynamic` + `dynamicNameExpr` cover R5 — `<template #[expr]>`. The
+ * dynamic-name expression is the parsed `@babel/parser` Expression for the
+ * bracketed text.
+ *
+ * Per Phase 07.1 / MODX-01 self-reference pattern, this shape MUST be exported
+ * from the `@rozie/core` barrel (`packages/core/src/index.ts`) so target
+ * packages import the type via the package specifier and not via a relative
+ * path — the latter re-creates the `.d.ts` divergence bug 07.1 fixed.
+ *
+ * @experimental — shape may change before v1.0
+ */
+export interface SlotFillerDecl {
+  type: 'SlotFillerDecl';
+  /** Slot name; '' (empty string) is the default-slot sentinel matching SlotDecl. */
+  name: string;
+  /** Scoped destructure params from `<template #name="{ a, b }">`; empty when no scope-arg. */
+  params: ParamDecl[];
+  /** Threaded from producer SlotDecl.paramTypes via IR cache; undefined when unresolved. */
+  paramTypes?: TSType[];
+  /** Fill body — recursive TemplateNode tree the consumer wrote inside the directive. */
+  body: TemplateNode[];
+  sourceLoc: SourceLoc;
+  /** R5 — `<template #[expr]>` dynamic-name form. */
+  isDynamic?: boolean;
+  /** Parsed JS expression for the bracketed dynamic name; only populated when isDynamic. */
+  dynamicNameExpr?: Expression;
+}
+
+/**
  * @experimental — shape may change before v1.0
  */
 export interface ParamDecl {
@@ -369,6 +413,15 @@ export interface TemplateElementIR {
    * synthesize `import` statements without re-walking the table).
    */
   componentRef?: ComponentDecl;
+  /**
+   * Phase 07.2 — consumer-side slot fills declared inside this component-tag
+   * body. Populated only when `tagKind === 'component' | 'self'`. One entry per
+   * `<template #name>` / `<template #name="{ params }">` / `<template #default>`
+   * / `<template #[expr]>` directive plus an optional synthetic
+   * `{ name: '' }` shorthand entry when non-`<template>` children form the
+   * default-slot content (R3 / D-03).
+   */
+  slotFillers?: SlotFillerDecl[];
 }
 
 /**
@@ -449,6 +502,20 @@ export interface TemplateSlotInvocationIR {
   args: Array<{ name: string; expression: Expression; deps: SignalRef[] }>;
   fallback: TemplateNode[];
   sourceLoc: SourceLoc;
+  /**
+   * Phase 07.2 D-06 — set during lowering traversal:
+   *  - `'declaration'`: `<slot>` in normal template position (default;
+   *    producer-side semantics — declares a slot the consumer can fill).
+   *  - `'fill-body'`: `<slot>` appears inside a `SlotFillerDecl.body`
+   *    (re-projection — relay the wrapper's incoming slot to the inner
+   *    component).
+   *
+   * Required field — every emit pathway reads it. The lowerer sets it via
+   * a sticky-downward `lowerInFillBody` flag on the recursion frame so
+   * arbitrarily deep `<slot>`-inside-`SlotFillerDecl.body` nesting still
+   * carries `'fill-body'` (Pitfall 5 — re-projection-in-re-projection).
+   */
+  context: 'declaration' | 'fill-body';
 }
 
 /**

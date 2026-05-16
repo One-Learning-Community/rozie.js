@@ -30,6 +30,8 @@
     "@babel/traverse": "^7.29.0",
     "@babel/types": "^7.29.0",
     "@vue/compiler-sfc": "^3.5.33",
+    "enhanced-resolve": "5.21.3",
+    "get-tsconfig": "4.14.0",
     "htmlparser2": "^12.0.0",
     "magic-string": "^0.30.21",
     "picocolors": "^1.1.0",

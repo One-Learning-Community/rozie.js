@@ -193,6 +193,20 @@ export const RozieErrorCode = {
   ESCAPE_HATCH_NG_CONTAINER: 'ROZ927', // <ng-container> — use Angular directly
   ESCAPE_HATCH_SVELTE_FRAGMENT: 'ROZ928', // <svelte:fragment> — use Svelte directly
   // ROZ929..ROZ939 reserved for future ROZ-COMP needs
+
+  // ---- Phase 07.2 consumer-side slot fills (D-08 sub-allocation) — ROZ940..ROZ959 ----
+  // ROZ940..ROZ947 are the 8 core consumer-side codes per CONTEXT.md D-08.
+  // ROZ948..ROZ959 reserved for surface-derived codes that emerge from the
+  // Wave-1/Wave-2 per-target emitters or the dogfood gate.
+  DUPLICATE_DEFAULT_FILL: 'ROZ940',                // error — locked in SPEC.md R3; loose children + explicit <template #default>
+  UNKNOWN_SLOT_NAME: 'ROZ941',                     // warn  — consumer fills a slot the producer doesn't declare (typo catch)
+  DUPLICATE_NAMED_FILL: 'ROZ942',                  // error — two sibling <template #header> directives
+  REPROJECTION_UNDECLARED_WRAPPER_SLOT: 'ROZ943',  // error — wrapper forwards a slot it doesn't itself declare
+  REPROJECTION_UNDECLARED_INNER_SLOT: 'ROZ944',    // warn  — wrapper forwards into a slot the inner producer doesn't declare
+  CROSS_PACKAGE_LOOKUP_FAILED: 'ROZ945',           // error — npm/relative resolution of a <components> importPath returns null
+  DYNAMIC_NAME_EXPRESSION_INVALID: 'ROZ946',       // error — `<template #[expr]>` bracketed text fails to parse as a JS expression
+  SCOPED_PARAM_MISMATCH: 'ROZ947',                 // error — D-09 — consumer destructures a param the producer SlotDecl.params doesn't declare
+  // ROZ948..ROZ959 reserved
 } as const;
 
 export type RozieErrorCode = (typeof RozieErrorCode)[keyof typeof RozieErrorCode];

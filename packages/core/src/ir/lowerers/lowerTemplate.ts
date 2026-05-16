@@ -39,6 +39,7 @@ import { resolveModifierPipeline } from './lowerListeners.js';
 import { isPascalCase } from '../utils/isPascalCase.js';
 import { didYouMean } from '../../diagnostics/didYouMean.js';
 import { RozieErrorCode } from '../../diagnostics/codes.js';
+import { extractSlotFillers } from './lowerSlotFillers.js';
 import type {
   TemplateNode as IRTemplateNode,
   TemplateElementIR,
@@ -50,6 +51,7 @@ import type {
   AttributeBinding,
   ComponentDecl,
   Listener,
+  SlotFillerDecl,
 } from '../types.js';
 
 /**
@@ -354,6 +356,10 @@ function lowerElement(
   componentsTable: Map<string, ComponentDecl>,
   declaredNames: readonly string[],
   usedNames: Set<string>,
+  // Phase 07.2 D-06 — sticky-downward fill-body flag. Set true when the
+  // recursion has crossed a SlotFillerDecl.body boundary; every <slot>
+  // lowered with this true gets context: 'fill-body' (Pitfall 5).
+  lowerInFillBody: boolean,
 ): IRTemplateNode {
   const elPath = `${pathPrefix}/${el.tagName}-${index}`;
 
@@ -397,6 +403,7 @@ function lowerElement(
       componentsTable,
       declaredNames,
       usedNames,
+      lowerInFillBody,
     );
 
     const loop: TemplateLoopIR = {
@@ -424,6 +431,7 @@ function lowerElement(
     componentsTable,
     declaredNames,
     usedNames,
+    lowerInFillBody,
   );
 }
 
@@ -443,6 +451,9 @@ function lowerBareElement(
   componentsTable: Map<string, ComponentDecl>,
   declaredNames: readonly string[],
   usedNames: Set<string>,
+  // Phase 07.2 D-06 — sticky-downward flag. When true, every <slot> lowered
+  // here gets context: 'fill-body'; otherwise context: 'declaration' (default).
+  lowerInFillBody: boolean,
 ): IRTemplateNode {
   // <slot> elements lower to TemplateSlotInvocationIR.
   if (el.tagName === 'slot') {
@@ -462,6 +473,9 @@ function lowerBareElement(
         }
       }
     }
+    // Sticky-downward — <slot> fallback children inherit the same flag as
+    // their parent. A <slot> inside a fill body stays 'fill-body'; outside
+    // it stays 'declaration'.
     const fallback = lowerNodeList(
       el.children,
       bindings,
@@ -474,6 +488,7 @@ function lowerBareElement(
       componentsTable,
       declaredNames,
       usedNames,
+      lowerInFillBody,
     );
     return {
       type: 'TemplateSlotInvocation',
@@ -481,6 +496,11 @@ function lowerBareElement(
       args,
       fallback,
       sourceLoc: el.loc,
+      // Phase 07.2 D-06 — the sticky-downward `lowerInFillBody` flag is set
+      // when the recursion has crossed any SlotFillerDecl.body boundary; every
+      // nested <slot> inherits 'fill-body' until the recursion exits the body
+      // (RESEARCH Pitfall 5 — re-projection-in-re-projection nesting).
+      context: lowerInFillBody ? 'fill-body' : 'declaration',
     };
   }
 
@@ -555,23 +575,13 @@ function lowerBareElement(
     if (ab) attributes.push(ab);
   }
 
-  const children = lowerNodeList(
-    el.children,
-    bindings,
-    depGraph,
-    registry,
-    diagnostics,
-    templateListeners,
-    elPath,
-    outerName,
-    componentsTable,
-    declaredNames,
-    usedNames,
-  );
-
   // Phase 06.2 P1 Task 3/4 — annotate tagKind + emit ROZ920..928 sub-codes
   // per D-114 precedence (outer-name first, then components table, then
   // HTML/custom-element fallback).
+  //
+  // Phase 07.2 D-06 — tagKind detection moves BEFORE the children-recursion so
+  // the lowerInFillBody flag flips to true for every <slot> nested inside a
+  // component-tag's fill bodies (Pitfall 5).
   const annotation = annotateTagKind(
     el.tagName,
     outerName,
@@ -584,6 +594,38 @@ function lowerBareElement(
     usedNames.add(annotation.used);
   }
 
+  // Component-tag children form fill bodies (per D-03: any non-<template>
+  // child becomes default-shorthand fill content; <template #name> children
+  // are explicit fills). Every <slot> inside any of these bodies must lower
+  // with context: 'fill-body' (re-projection semantics, D-06).
+  const childIsFillBody =
+    annotation.tagKind === 'component' || annotation.tagKind === 'self';
+  const childFillBodyFlag = childIsFillBody ? true : lowerInFillBody;
+
+  const children = lowerNodeList(
+    el.children,
+    bindings,
+    depGraph,
+    registry,
+    diagnostics,
+    templateListeners,
+    elPath,
+    outerName,
+    componentsTable,
+    declaredNames,
+    usedNames,
+    childFillBodyFlag,
+  );
+
+  // Phase 07.2 R3 — when this element is a component-tag, extract slot fillers
+  // from its children. ROZ940 / ROZ942 / ROZ946 emit here via the lowerSlotFillers
+  // diagnostic accumulator.
+  let slotFillers: SlotFillerDecl[] | undefined;
+  if (childIsFillBody) {
+    const extracted = extractSlotFillers(el.children, children, diagnostics);
+    if (extracted.length > 0) slotFillers = extracted;
+  }
+
   const result: TemplateElementIR = {
     type: 'TemplateElement',
     tagName: el.tagName,
@@ -592,10 +634,11 @@ function lowerBareElement(
     children,
     sourceLoc: el.loc,
     tagKind: annotation.tagKind,
-    // exactOptionalPropertyTypes: spread componentRef only when defined.
+    // exactOptionalPropertyTypes: spread componentRef + slotFillers only when defined.
     ...(annotation.componentRef !== undefined
       ? { componentRef: annotation.componentRef }
       : {}),
+    ...(slotFillers !== undefined ? { slotFillers } : {}),
   };
   return result;
 }
@@ -616,6 +659,8 @@ function lowerNodeList(
   componentsTable: Map<string, ComponentDecl>,
   declaredNames: readonly string[],
   usedNames: Set<string>,
+  // Phase 07.2 D-06 — sticky-downward fill-body flag inherited from caller.
+  lowerInFillBody: boolean,
 ): IRTemplateNode[] {
   const out: IRTemplateNode[] = [];
 
@@ -665,6 +710,7 @@ function lowerNodeList(
           componentsTable,
           declaredNames,
           usedNames,
+          lowerInFillBody,
         ),
       ];
       branches.push({
@@ -704,6 +750,7 @@ function lowerNodeList(
               componentsTable,
               declaredNames,
               usedNames,
+              lowerInFillBody,
             ),
           ],
           sourceLoc: sib.loc,
@@ -735,6 +782,7 @@ function lowerNodeList(
         componentsTable,
         declaredNames,
         usedNames,
+        lowerInFillBody,
       ),
     );
   }
@@ -769,6 +817,8 @@ export function lowerTemplate(
     componentsTable,
     declaredNames,
     usedNames,
+    // Phase 07.2 D-06 — root walk starts outside any fill body.
+    false,
   );
 
   // Phase 06.2 P1 Task 4 — ROZ924: warn for declared <components> entries

@@ -47,6 +47,12 @@ import { createDefaultRegistry } from './modifiers/registerBuiltins.js';
 import type { Diagnostic } from './diagnostics/Diagnostic.js';
 import type { ModifierRegistry } from './modifiers/ModifierRegistry.js';
 import type { SourceMap } from 'magic-string';
+// Phase 07.2 Plan 01 Task 3 — wire IRCache + ProducerResolver + threadParamTypes
+// into the lowerToIR → per-target-emit pipeline so consumer-side SlotFillerDecl
+// gets producer paramTypes threaded onto it before any emitter sees the IR.
+import { IRCache } from './ir/cache.js';
+import { ProducerResolver } from './resolver/index.js';
+import { threadParamTypes } from './ir/threadParamTypes.js';
 // Per-target imports use RELATIVE paths to avoid the `@rozie/target-*` →
 // `@rozie/core` circular dep (mirrors @rozie/unplugin's transform.ts).
 import { emitVue } from '../../targets/vue/src/emitVue.js';
@@ -78,6 +84,26 @@ export interface CompileOptions {
   types?: boolean;
   /** Default true. Set false to drop the SourceMap (emitter still pays the compute cost in v1 — Pitfall 6). */
   sourceMap?: boolean;
+  /**
+   * Phase 07.2 D-01 — optional pre-built per-compiler-instance IR cache. When
+   * omitted, `compile()` builds a fresh per-call instance. Pass a shared cache
+   * across multiple `compile()` calls (e.g., from `@rozie/unplugin`) to
+   * amortize producer parse + lower across the consumer set.
+   */
+  irCache?: IRCache;
+  /**
+   * Phase 07.2 D-02 / D-12 — optional pre-built producer resolver. When
+   * omitted, `compile()` builds a fresh per-call instance rooted at
+   * `opts.resolverRoot ?? process.cwd()`.
+   */
+  resolver?: ProducerResolver;
+  /**
+   * Phase 07.2 D-02 / D-12 — root directory for tsconfig discovery. Defaults
+   * to `process.cwd()`. Each entrypoint (CLI / unplugin / babel-plugin /
+   * Vite-runtime) MUST derive this consistently from a single source of
+   * truth to preserve byte-identical dist-parity (RESEARCH Pitfall 1).
+   */
+  resolverRoot?: string;
 }
 
 /**
@@ -175,6 +201,17 @@ export function compile(source: string, opts: CompileOptions): CompileResult {
   if (!ir || irDiags.some((d) => d.severity === 'error')) {
     return fail(acc);
   }
+
+  // 2.5. Phase 07.2 — thread producer paramTypes onto consumer SlotFillerDecl.
+  // The cache + resolver are per-compiler-instance (D-01). Construct per-call
+  // when callers don't pass pre-built ones. Output is a pure function of
+  // (consumerSource, producerSource), not of cache-fill order (RESEARCH
+  // Pitfall 2 — cache iteration order MUST NEVER drive emit decisions).
+  const cache = opts.irCache ?? new IRCache({ modifierRegistry: registry });
+  const resolver =
+    opts.resolver ??
+    new ProducerResolver({ root: opts.resolverRoot ?? process.cwd() });
+  threadParamTypes(ir, filename ?? '<anonymous>', cache, resolver, acc);
 
   // 3. emit per target
   // Per Phase 1 convention: exactOptionalPropertyTypes:true requires conditional
