@@ -269,7 +269,52 @@ Full session log: `.planning/debug/vr-angular-jit-composed.md`.
 ```sh
 act -W .github/workflows/visual-regression.yml --reuse
 act -W .github/workflows/angular-matrix.yml --reuse
+act -W .github/workflows/react-matrix.yml --reuse \
+    --matrix react-version:18.2 --matrix plugin:plugin-react
 ```
 
-`--reuse` keeps the container warm between runs. Image is arm64-native on the
-machine that runs this.
+`--reuse` keeps the container warm between runs. Image is arm64-native on
+the machine that runs this. The `react-matrix` workflow is matrixed
+(react-version × plugin) — pin one leg via `--matrix` flags or it'll fan
+out across all 4.
+
+---
+
+## Regenerate vr `__screenshots__/` baselines on Linux (CI image)
+
+The committed baselines must be Linux-rendered to match CI's pinned
+Playwright container. macOS-generated baselines diff against every cell
+on CI due to font binary / glyph metric differences (no amount of
+`-webkit-font-smoothing: none` fixes this).
+
+Recipe — runs the same exact image CI uses, mounts the workspace,
+regenerates Vue baselines via `-u`, then verifies all 48 cells against
+them inside the container:
+
+```sh
+docker pull mcr.microsoft.com/playwright:v1.60.0-jammy
+
+docker run --rm \
+  -v "$PWD":/workspace -w /workspace \
+  mcr.microsoft.com/playwright:v1.60.0-jammy bash -c '
+    npm i -g pnpm@10 > /dev/null 2>&1 &&
+    CI=true pnpm install --frozen-lockfile --prefer-offline &&
+    pnpm turbo run build &&
+    cd tests/visual-regression &&
+    pnpm exec playwright test --grep "· vue" -u &&
+    pnpm exec playwright test
+  '
+```
+
+Vue must run with `-u` first because the matrix is D-10 single-baseline
+(every target diffs against `${example}.png` which Vue generates). If
+all 6 targets run with `-u`, each subsequent one overwrites the prior's
+baseline.
+
+The mutated `tests/visual-regression/__screenshots__/*.png` files appear
+on the host after the container exits (OrbStack/Docker volume mount
+passes through writes). Commit and push.
+
+**Do not** set up `webServer:` workarounds — playwright.config.ts has
+`reuseExistingServer: !process.env.CI` and starts its own preview server
+when CI=true is set.
