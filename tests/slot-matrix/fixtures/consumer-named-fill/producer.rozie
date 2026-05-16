@@ -1,0 +1,14 @@
+<rozie name="Producer">
+
+<template>
+<div class="producer">
+  <header>
+    <slot name="header">default header</slot>
+  </header>
+  <main>
+    <slot>default body</slot>
+  </main>
+</div>
+</template>
+
+</rozie>

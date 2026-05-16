@@ -34,7 +34,7 @@
  * reviewed update.
  */
 import { describe, it, expect } from 'vitest';
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { compile } from '@rozie/core';
@@ -60,18 +60,70 @@ const FIXTURE_DIRS = readdirSync(FIXTURES_DIR, { withFileTypes: true })
   .map((d) => d.name)
   .sort();
 
+/**
+ * Phase 07.2 — multi-file fixture support.
+ *
+ * A fixture directory may declare ONE consumer (`input.rozie`) plus optional
+ * SIBLING producer files (`producer.rozie`, `wrapper.rozie`, …). When sibling
+ * `.rozie` files are present, the runner switches the compile() call to pass:
+ *   - filename: absolute path to the consumer's input.rozie (so the resolver
+ *     can resolve `./producer.rozie` relative to the fixture dir)
+ *   - resolverRoot: absolute path to the fixture directory
+ *
+ * The IR cache + producer resolver from Plan 07.2-01 then resolves the
+ * sibling producer at lowering time so threadParamTypes can flow producer
+ * SlotDecl.paramTypes onto the consumer's SlotFillerDecl.paramTypes.
+ *
+ * Wave-1 only covers vue/react/svelte for the consumer-* fixtures. Cells for
+ * which the corresponding `expected.<ext>` file is absent are intentionally
+ * skipped — Plan 07.2-03 fills the solid/lit/angular tail and creates those
+ * expected.* files. Skip is invisible-by-construction: it's a presence test
+ * on the snapshot file rather than a per-fixture target deny-list, so the
+ * matrix remains DRY as new fixtures are added.
+ */
+function siblingRozieFiles(slotClass: string): string[] {
+  return readdirSync(join(FIXTURES_DIR, slotClass))
+    .filter((f) => f.endsWith('.rozie') && f !== 'input.rozie')
+    .sort();
+}
+
 describe('QA-02 — 6-class slot acceptance matrix', () => {
   describe.each(FIXTURE_DIRS)('%s', (slotClass) => {
-    const source = readFileSync(
-      join(FIXTURES_DIR, slotClass, 'input.rozie'),
-      'utf8',
-    );
+    const consumerPath = join(FIXTURES_DIR, slotClass, 'input.rozie');
+    const source = readFileSync(consumerPath, 'utf8');
+    const siblings = siblingRozieFiles(slotClass);
+    const isMultiFile = siblings.length > 0;
+    const resolverRoot = join(FIXTURES_DIR, slotClass);
 
     describe.each(TARGETS)('%s target', (target) => {
       it('compiles error-free and matches the expected slot snapshot', async () => {
+        const expectedPath = join(
+          FIXTURES_DIR,
+          slotClass,
+          `expected${primaryExt(target)}`,
+        );
+
+        // Multi-file fixtures (consumer + sibling producer) intentionally
+        // ship only the Wave-1 (vue/react/svelte) `expected.*` baselines in
+        // this plan. Cells whose expected.* file is missing are skipped —
+        // Plan 07.2-03 fills the solid/lit/angular tail.
+        if (isMultiFile && !existsSync(expectedPath)) {
+          // eslint-disable-next-line no-console
+          console.log(
+            `[slot-matrix] skipping ${slotClass} × ${target} — expected snapshot absent ` +
+              `(Plan 07.2-03 will seed solid/lit/angular).`,
+          );
+          return;
+        }
+
         const result = compile(source, {
           target,
-          filename: `${slotClass}.rozie`,
+          // Multi-file fixtures need an ABSOLUTE filename so the producer
+          // resolver can resolve `./producer.rozie` siblings via the IR
+          // cache (Plan 07.2-01). Single-file fixtures keep the relative
+          // label they shipped with so source-map paths stay stable.
+          filename: isMultiFile ? consumerPath : `${slotClass}.rozie`,
+          ...(isMultiFile ? { resolverRoot } : {}),
           types: true,
           sourceMap: false,
         });
@@ -86,9 +138,7 @@ describe('QA-02 — 6-class slot acceptance matrix', () => {
         // scoped-params × react and scoped-params × lit cells the snapshot
         // captures the DOCUMENTED render-prop / data-rozie-params compromise
         // output (D-05) — that is expected-correct.
-        await expect(result.code).toMatchFileSnapshot(
-          join(FIXTURES_DIR, slotClass, `expected${primaryExt(target)}`),
-        );
+        await expect(result.code).toMatchFileSnapshot(expectedPath);
       });
     });
   });
