@@ -30,6 +30,27 @@
  *   then references `helperName(loopVarA, loopVarB, ...)` — a plain
  *   method-call expression that Angular's parser accepts.
  *
+ * Phase 07.2 Plan 05 — slot re-projection (R6 / D-06):
+ *
+ *   When `node.context === 'fill-body'` (sticky-downward flag set by the
+ *   lowerer in Plan 07.2-01 for any <slot> nested inside a SlotFillerDecl.body),
+ *   this emitter requires NO branch. The producer-side
+ *   `<ng-container *ngTemplateOutlet="<X>Tpl" />` shape IS the correct
+ *   re-projection shape because `<X>Tpl` resolves against the wrapper's
+ *   OWN `@ContentChild('<X>', { read: TemplateRef }) <X>Tpl?: ...` field —
+ *   declared by emitSlotDecl for the wrapper's own `<slot name="X">`. When
+ *   a wrapper re-projects its consumer's `title` slot into Inner's `header`
+ *   slot via `<Inner><template #header><slot name="title"/></template></Inner>`,
+ *   the emitted Angular reads `<ng-container *ngTemplateOutlet="titleTpl" />`
+ *   — the wrapper's OWN titleTpl ContentChild reference, which captures the
+ *   `<ng-template #title>` the consumer projected into the wrapper.
+ *
+ *   D-07 wrapper-only-params semantics are honored by construction: the
+ *   *ngTemplateOutlet binding references `titleTpl` only, never the
+ *   enclosing fill body's let-bindings.
+ *
+ *   No parent-chain walking is needed (D-SM-01 anti-pattern avoided).
+ *
  * @experimental — shape may change before v1.0
  */
 import * as t from '@babel/types';

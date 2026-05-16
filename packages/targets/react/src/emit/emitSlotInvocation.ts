@@ -34,6 +34,29 @@
  * Side effects:
  *   - May push a `function __defaultX(ctx) { return ...; }` into ctx.scriptInjections
  *
+ * Phase 07.2 Plan 05 — slot re-projection (R6 / D-06):
+ *
+ *   When `node.context === 'fill-body'` (sticky-downward flag set by the
+ *   lowerer in Plan 07.2-01 for any <slot> nested inside a SlotFillerDecl.body),
+ *   this emitter requires NO branch. The producer-side emission shape —
+ *   `props.render<X> ?? <fallback>` — IS the correct re-projection shape
+ *   because `props` refers to the CURRENT component's own scope (the wrapper),
+ *   not the parent component's. So when a wrapper re-projects its consumer's
+ *   `title` slot into Inner's `header` slot via
+ *   `<Inner><template #header><slot name="title"/></template></Inner>`,
+ *   the emitted React reads `props.renderTitle` — the wrapper's OWN renderTitle
+ *   prop, which is the wrapper's incoming slot from its consumer.
+ *
+ *   D-07 wrapper-only-params semantics are honored by construction: the emit
+ *   for `<slot name="title" />` references ONLY `props.renderTitle`, never the
+ *   enclosing fill body's scoped params (e.g., `close` from
+ *   `<template #header="{ close }">`) — those would only leak if the wrapper
+ *   author explicitly forwarded them via `<slot name="title" :close="close" />`.
+ *
+ *   No parent-chain walking is needed (D-SM-01 anti-pattern avoided): the
+ *   producer-side emit reads from `props` (the wrapper's scope) without
+ *   knowing or caring whether it's inside a fill body.
+ *
  * @experimental — shape may change before v1.0
  */
 import type {

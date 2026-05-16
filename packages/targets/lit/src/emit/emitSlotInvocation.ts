@@ -9,6 +9,17 @@
  * The real per-element walk is inside emitTemplate.ts; this helper renders a
  * single slot invocation for unit-test reach.
  *
+ * Phase 07.2 Plan 05 — slot re-projection (R6 / D-06):
+ *   When `node.context === 'fill-body'` (sticky-downward flag from Plan
+ *   07.2-01), this emitter requires NO branch — Lit's `<slot name="X">`
+ *   inside a fill body that emitSlotFiller.wrapWithSlotAttribute then
+ *   decorates with `slot="<filler-name>"` produces shadow-DOM-native
+ *   re-projection: the wrapper's `<slot name="title" slot="header">`
+ *   relays Inner's `header` slot through to the wrapper's `title` slot
+ *   (which receives content from the wrapper's consumer). Single-root
+ *   passthrough in wrapWithSlotAttribute naturally lands on the `<slot>`
+ *   element itself, producing the correct two-attribute form.
+ *
  * @experimental — shape may change before v1.0
  */
 import type { TemplateSlotInvocationIR, IRComponent } from '../../../../core/src/ir/types.js';

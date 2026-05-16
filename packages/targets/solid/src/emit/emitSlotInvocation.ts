@@ -16,6 +16,25 @@
  * NOTE: For the default slot, shell.ts declares `const resolved = children(() => local.children)`
  * and the body uses `{resolved()}`. This module emits that accessor reference.
  *
+ * Phase 07.2 Plan 05 — slot re-projection (R6 / D-06):
+ *
+ *   When `node.context === 'fill-body'` (sticky-downward flag set by the
+ *   lowerer in Plan 07.2-01 for any <slot> nested inside a SlotFillerDecl.body),
+ *   this emitter requires NO branch. The producer-side `{_props.<X>Slot}` /
+ *   `{_props.<X>Slot?.(ctx)}` shape IS the correct re-projection shape
+ *   because `_props` refers to the wrapper's OWN props scope. When a wrapper
+ *   re-projects its consumer's `title` slot into Inner's `header` slot via
+ *   `<Inner><template #header><slot name="title"/></template></Inner>`,
+ *   the emitted Solid reads `{_props.titleSlot ?? "default title"}` — the
+ *   wrapper's OWN titleSlot prop, which is its incoming slot from its
+ *   consumer.
+ *
+ *   D-07 wrapper-only-params semantics are honored by construction: the emit
+ *   references ONLY `_props.titleSlot`, never the enclosing fill body's
+ *   scoped params.
+ *
+ *   No parent-chain walking is needed (D-SM-01 anti-pattern avoided).
+ *
  * @experimental — shape may change before v1.0
  */
 import type {
