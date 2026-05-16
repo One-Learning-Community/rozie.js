@@ -23,7 +23,12 @@ import type {
   AttributeBinding,
   Listener,
 } from '../../../../core/src/ir/types.js';
-import type { ModifierRegistry } from '@rozie/core';
+// Phase 07.1 self-reference pattern (per Phase 07.1 type-identity fix):
+// SlotFillerDecl MUST come from the `@rozie/core` barrel, not the deep-relative
+// ../../../core/src/ir/types.js path. The deep path produces a distinct `.d.ts`
+// SlotFillerDecl identity per target package and reintroduces the cross-package
+// type-identity bug Phase 07.1 fixed.
+import type { ModifierRegistry, SlotFillerDecl } from '@rozie/core';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
 import { emitMergedAttributes } from './emitTemplateAttribute.js';
@@ -216,6 +221,15 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
  * Inner element renderer that allows the parent (loop/conditional) to inject
  * an extra directive (`v-if=...`, `v-for=...`) prepended before the element's
  * own attributes.
+ *
+ * Phase 07.2 — when `node.slotFillers` is populated (component-tag with
+ * `<template #name>` children), render those fillers as the element's body via
+ * `emitSlotFiller`. The IR's `node.children` array still holds the same
+ * children in parallel (the lowerer doesn't strip them — `extractSlotFillers`
+ * runs on the parallel pair), so we MUST emit fillers instead of children to
+ * avoid double-emission. The fillers route to native Vue scoped-slot syntax
+ * (`<template #header="{ close }">…</template>`); default-shorthand
+ * (`{ name: '' }`) emits as bare children inside the component tag.
  */
 function emitElementWithExtraDirective(
   node: TemplateElementIR,
@@ -237,6 +251,20 @@ function emitElementWithExtraDirective(
 
   const isVoid = VOID_ELEMENTS.has(node.tagName.toLowerCase());
 
+  // Phase 07.2 — component-tag with slot fillers: render fillers, not children.
+  // The parallel-array lowering invariant (lowerSlotFillers.ts L186-310) means
+  // node.children and node.slotFillers reference the SAME underlying body
+  // content; emit only the structured `slotFillers` view to avoid duplication.
+  if (node.slotFillers !== undefined && node.slotFillers.length > 0) {
+    const inner = node.slotFillers
+      .map((f) => emitSlotFiller(f, ctx))
+      .join('');
+    if (inner.length === 0) {
+      return `<${node.tagName}${head}></${node.tagName}>`;
+    }
+    return `<${node.tagName}${head}>${inner}</${node.tagName}>`;
+  }
+
   if (node.children.length === 0) {
     if (isVoid) return `<${node.tagName}${head} />`;
     return `<${node.tagName}${head}></${node.tagName}>`;
@@ -244,6 +272,56 @@ function emitElementWithExtraDirective(
 
   const inner = node.children.map((c) => emitNode(c, ctx)).join('');
   return `<${node.tagName}${head}>${inner}</${node.tagName}>`;
+}
+
+/**
+ * Emit a single consumer-side `SlotFillerDecl` as Vue scoped-slot markup.
+ *
+ * Vue is the 1:1 mapping per RESEARCH §"Pattern 3.a Vue": consumer's
+ * `<template #header="{ close }">…</template>` lowers verbatim to Vue's native
+ * scoped-slot syntax. No re-shaping required.
+ *
+ * Cases (D-03 default-shorthand, R5 dynamic-name, R4 scoped params):
+ *   - default-shorthand `{ name: '' }` → bare children inside the component
+ *     tag (Vue treats `name`-less children as default-slot content)
+ *   - named static `{ name: 'header' }` → `<template #header>…</template>`
+ *   - named scoped `{ name: 'header', params: [{name:'close'}, ...] }` →
+ *     `<template #header="{ close, ... }">…</template>`
+ *   - dynamic `{ isDynamic: true, dynamicNameExpr }` →
+ *     `<template #[<rewrittenExpr>]>…</template>` (Vue handles natively)
+ *
+ * Body recursion uses `emitNode` so magic-identifier rewrites
+ * (`$props.x` → `props.x`, `$data.x` → `x`) apply naturally via
+ * `rewriteTemplateExpression` on any `TemplateInterpolation` / attribute
+ * binding inside the fill body — no separate rewrite pass needed.
+ */
+function emitSlotFiller(filler: SlotFillerDecl, ctx: EmitNodeCtx): string {
+  const bodyText = filler.body.map((c) => emitNode(c, ctx)).join('');
+
+  // Default-shorthand: bare children, NO <template> wrapper. Vue treats
+  // children-without-`#name` as the default-slot fill.
+  if (!filler.isDynamic && filler.name === '') {
+    return bodyText;
+  }
+
+  // Scoped-param attribute string. Empty when no params.
+  const paramsAttr =
+    filler.params.length > 0
+      ? `="{ ${filler.params.map((p) => p.name).join(', ')} }"`
+      : '';
+
+  // Dynamic-name form `<template #[expr]>`. Vue's compiler-sfc handles the
+  // bracketed-name form natively (Vue 3.4+).
+  if (filler.isDynamic && filler.dynamicNameExpr) {
+    const rewritten = rewriteTemplateExpression(
+      filler.dynamicNameExpr,
+      ctx.ir,
+    );
+    return `<template #[${rewritten}]${paramsAttr}>${bodyText}</template>`;
+  }
+
+  // Named static form `<template #name>` / `<template #name="{ a, b }">`.
+  return `<template #${filler.name}${paramsAttr}>${bodyText}</template>`;
 }
 
 /**
