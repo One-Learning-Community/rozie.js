@@ -21,11 +21,11 @@ import { WrapperModal } from './WrapperModal';
         Are you sure you want to proceed?
         </ng-template></rozie-modal>
 
-      <rozie-modal [open]="open2()" (openChange)="open2.set($event)"><ng-template #__dynSlot_0>
+      <rozie-modal [open]="open2()" (openChange)="open2.set($event)" [templates]="templates"><ng-template #__dynSlot_0>
           <span class="dynamic-fill">Dynamic header via slotName</span>
         </ng-template><ng-template #defaultSlot>
         Dynamic-name demo body
-      </ng-template><ng-container *ngTemplateOutlet="templates[slotName()]"></ng-container></rozie-modal>
+      </ng-template></rozie-modal>
 
       <rozie-wrapper-modal [open]="open3()" (openChange)="open3.set($event)" [title]="title()"><ng-template #brand>
           <h2>Re-projected brand</h2>
