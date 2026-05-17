@@ -1,11 +1,21 @@
 /**
  * Smoke test for Phase 07.3.1 Blocker #3 (D-03) — verify the new emit
  * shape for consumer-side scoped slot fills:
- *   - late-binding event-handler wrap on `this._<X>Ctx?.<method>` shape
+ *   - dispatchEvent translation on EXACT-shape `this._<X>Ctx?.<method>` (D-LIT-17)
  *   - `_slotCtxWired_<name>` class field
  *   - `tryWire` + `queueMicrotask` retry in `_armListeners()`
  *   - `updated()` re-attempt body
  *   - `disconnectedCallback()` flag reset (Landmine 2)
+ *
+ * NOTE (Phase 07.3.1 D-LIT-17): the bare-identifier event-handler case
+ * `@click="<param>"` (which rewrites to `this._<X>Ctx?.<param>`) was previously
+ * emitted as a Plan 03 late-binding wrap `(e) => (this._<X>Ctx?.<param>)?.(e)`.
+ * That path was a no-op for function-typed params (JSON.stringify drops
+ * functions across `data-rozie-params`). The fix translates the exact shape
+ * to a dispatchEvent that the producer's host-listener wiring (also emitted
+ * here, see emitHostListenerWiring.ts) receives. The late-binding wrap is
+ * RETAINED as a fall-through for composite expressions and data-typed
+ * param references (e.g., `r-if="open"` reading a data-typed param).
  *
  * This file is a temporary smoke fixture — it compiles a synthetic
  * consumer-side .rozie source and asserts the emit shape. It is NOT
@@ -52,9 +62,19 @@ function compileConsumer(): string {
 }
 
 describe('Phase 07.3.1 Blocker #3 (D-03) — Lit consumer-side scoped slot fill emit', () => {
-  it('wraps scoped-ctx event handler in late-binding arrow (Race A fix)', () => {
+  it('emits dispatchEvent for exact-shape scoped-ctx handler (D-LIT-17)', () => {
+    // Phase 07.3.1 D-LIT-17 — the bare-identifier `@click="close"` rewrites
+    // to `this._headerCtx?.close` (via emitSlotFiller's rewriteScopedParamRefs),
+    // which buildEventParts now translates to a dispatchEvent that the
+    // producer's host-listener wiring receives. The Plan 03 late-binding
+    // wrap is bypassed for this exact shape — it was a no-op anyway because
+    // JSON.stringify drops the function value through data-rozie-params.
     const code = compileConsumer();
-    expect(code).toMatch(/@click=\$\{\(e\) => \(this\._headerCtx\?\.close\)\?\.\(e\)\}/);
+    expect(code).toContain(
+      "@click=${(e) => this.dispatchEvent(new CustomEvent('rozie-header-close', { detail: e, bubbles: true, composed: true }))}",
+    );
+    // The old late-binding wrap MUST NOT appear at the dispatch site.
+    expect(code).not.toMatch(/\(this\._headerCtx\?\.close\)\?\.\(e\)/);
   });
 
   it('declares per-filler _slotCtxWired_<name> class field', () => {
@@ -125,7 +145,9 @@ function handleClick() {}
     });
     // Plain handler — NOT wrapped.
     expect(code).toMatch(/@click=\$\{this\.handleClick\}/);
-    // Scoped-ctx handler — wrapped.
-    expect(code).toMatch(/@click=\$\{\(e\) => \(this\._headerCtx\?\.close\)\?\.\(e\)\}/);
+    // Scoped-ctx handler — D-LIT-17 dispatchEvent translation.
+    expect(code).toContain(
+      "@click=${(e) => this.dispatchEvent(new CustomEvent('rozie-header-close', { detail: e, bubbles: true, composed: true }))}",
+    );
   });
 });
