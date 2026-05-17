@@ -130,8 +130,17 @@ export function emitPropsInterface(
   // the consumer's dynamic-name projection. Gated on `ir.slots.length > 0`
   // so non-slotted components (Counter, SearchInput) stay byte-equivalent
   // per D-05.
+  //
+  // Phase 07.3.2 Plan 07 (CR-01 fix) — value type is `() =>` (zero args)
+  // matching the no-params named-slot invocation form at
+  // emitSlotInvocation.ts:302. Earlier Plan 01 wrote `(ctx: any) =>` (one
+  // arg) but Plan 04's `?.()` call site invokes with zero args — the
+  // mismatch crashes consumers who destructure ctx (`(ctx) => ctx.x`
+  // throws `TypeError: Cannot read properties of undefined`). Aligning the
+  // declared type with the actual call site closes the contract gap
+  // surfaced by REVIEW.md CR-01.
   if (ir.slots.length > 0) {
-    fields.push(`  slots?: Record<string, (ctx: any) => import('react').ReactNode>;`);
+    fields.push(`  slots?: Record<string, () => import('react').ReactNode>;`);
   }
 
   if (fields.length === 0) {

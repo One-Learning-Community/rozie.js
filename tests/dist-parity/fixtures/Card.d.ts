@@ -4,7 +4,7 @@ export interface CardProps {
   title?: string;
   onClose?: (...args: unknown[]) => unknown;
   children?: ReactNode;
-  slots?: Record<string, (ctx: any) => ReactNode>;
+  slots?: Record<string, () => ReactNode>;
 }
 
 declare function Card(props: CardProps): JSX.Element;

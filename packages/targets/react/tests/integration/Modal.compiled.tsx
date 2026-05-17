@@ -34,7 +34,9 @@ interface ModalProps {
   // behavior tests using this hand-tuned variant never exercise the
   // dynamic slots map, so the field exists purely to satisfy the
   // propsFields set-equality check in compiled-fixtures-drift.test.ts.
-  slots?: Record<string, (ctx: any) => ReactNode>;
+  // Phase 07.3.2 Plan 07 (CR-01) — zero-args form matches the no-params
+  // named-slot invocation form (emitSlotInvocation.ts:302 `?.()`).
+  slots?: Record<string, () => ReactNode>;
 }
 
 export default function Modal(props: ModalProps): JSX.Element | null {
