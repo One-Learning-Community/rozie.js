@@ -125,25 +125,38 @@ export function emitSlotInvocation(
   const hasParams = slot ? slot.params.length > 0 : false;
   const paramObj = slot && hasParams ? buildParamObj(node.args, ctx.ir) : null;
 
+  // Phase 07.3.2 — merge static slot prop with the consumer-side dynamic
+  // `slots?:` map (D-SV-16 cross-target port of commit 6060408,
+  // svelte/emit/emitScript.ts:266-274). Static-named consumer fill wins (D-02
+  // left-precedence); dynamic-name fill catches the runtime case from
+  // `<template #[expr]>`. Pitfall 2 / Assumption A2: the merge expression
+  // STAYS INSIDE the JSX `{...}` braces in every emit branch below — Solid's
+  // compiler wraps the JSX expression in an effect-tracking accessor, so the
+  // reactive dependency on `_props.slots` is only picked up while the merge
+  // lives inside JSX. Hoisting outside (e.g., a local `const merged = ...`
+  // declaration in the emitted output) would break reactivity-on-change.
+  const slotKey = `'${slotName}'`;
+  const merged = `(_props.${slotFieldName} ?? _props.slots?.[${slotKey}])`;
+
   // No SlotDecl found — best-effort fallback using naming convention.
   if (!slot) {
     if (hasInvocationFallback) {
-      return `{_props.${slotFieldName} ?? ${invocationFallback}}`;
+      return `{${merged} ?? ${invocationFallback}}`;
     }
-    return `{_props.${slotFieldName}}`;
+    return `{${merged}}`;
   }
 
   if (!hasParams) {
-    // Named slot WITHOUT context → `{_props.headerSlot}` (D-133 static form)
+    // Named slot WITHOUT context → `{(_props.headerSlot ?? _props.slots?.['header'])}` (D-133 static form + Phase 07.3.2 merge)
     if (hasInvocationFallback) {
-      return `{_props.${slotFieldName} ?? ${invocationFallback}}`;
+      return `{${merged} ?? ${invocationFallback}}`;
     }
-    return `{_props.${slotFieldName}}`;
+    return `{${merged}}`;
   }
 
-  // Named slot WITH context → `{_props.triggerSlot?.({ open: open() })}` (D-133 function call)
+  // Named slot WITH context → `{(_props.triggerSlot ?? _props.slots?.['trigger'])?.({ open: open() })}` (D-133 function call + Phase 07.3.2 merge)
   if (hasInvocationFallback) {
-    return `{_props.${slotFieldName} ? _props.${slotFieldName}(${paramObj!}) : ${invocationFallback}}`;
+    return `{${merged} ? ${merged}(${paramObj!}) : ${invocationFallback}}`;
   }
-  return `{_props.${slotFieldName}?.(${paramObj!})}`;
+  return `{${merged}?.(${paramObj!})}`;
 }
