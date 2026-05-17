@@ -1,0 +1,30 @@
+<rozie name="WrapperModal">
+
+<components>
+{
+  Modal: './Modal.rozie',
+}
+</components>
+
+<props>
+{
+  title: { type: String, default: 'Wrapped' },
+  open: { type: Boolean, default: false, model: true },
+}
+</props>
+
+<template>
+<Modal r-model:open="$props.open" :title="$props.title">
+  <template #header>
+    <slot name="brand">
+      <h2>{{ $props.title }}</h2>
+    </slot>
+  </template>
+  <slot />
+  <template #footer>
+    <slot name="actions" />
+  </template>
+</Modal>
+</template>
+
+</rozie>

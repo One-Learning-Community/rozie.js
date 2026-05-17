@@ -118,6 +118,24 @@ import static js.rozie.intellij.lexer.RozieTokenTypes.*;
    * state opens the comment.
    */
   private int htmlCommentReturnState = YYINITIAL;
+
+  /**
+   * Depth of nested <template> tags inside an outer <template> SFC block body.
+   * Incremented when IN_TEMPLATE_BODY matches an inner "<template" lookahead;
+   * decremented when IN_TEMPLATE_BODY matches "</template>". The
+   * "</template>" rule transitions back to YYINITIAL only when depth reaches 0;
+   * otherwise it decrements and returns TEMPLATE_BODY for the matched text.
+   *
+   * Mirrors the line-anchored fix in tools/textmate/syntaxes/rozie.tmLanguage.json:52
+   * which addresses the same problem TextMate-side via a line anchor. Also mirrors
+   * the existing modifierArgsParenDepth idiom above (paren-depth tracking for
+   * `.outside($refs.a, $refs.b)` modifier args).
+   *
+   * Reset to 0 inside the YYINITIAL "<template" rule (defense against
+   * cross-file state leak — FlexAdapter.reset() restores YYINITIAL but not
+   * user %{ %} fields). See Pitfall 3 of 08.1-RESEARCH.md.
+   */
+  private int templateNestingDepth = 0;
 %}
 
 // ——— Macro definitions ———
@@ -147,7 +165,7 @@ PASCAL_IDENT       = [A-Z][A-Za-z0-9]*
   "<!--"                          { htmlCommentReturnState = YYINITIAL; yybegin(IN_HTML_COMMENT); return HTML_COMMENT_OPEN; }
 
   "<rozie"                        { pendingBodyState = YYINITIAL;        yybegin(IN_BLOCK_OPEN_TAG); return ROZIE_BLOCK_TAG; }
-  "<template"                     { pendingBodyState = IN_TEMPLATE_BODY; yybegin(IN_BLOCK_OPEN_TAG); return TEMPLATE_BLOCK_TAG; }
+  "<template"                     { pendingBodyState = IN_TEMPLATE_BODY; templateNestingDepth = 0; yybegin(IN_BLOCK_OPEN_TAG); return TEMPLATE_BLOCK_TAG; }
   "<script"                       { pendingBodyState = IN_SCRIPT_BODY;   yybegin(IN_BLOCK_OPEN_TAG); return SCRIPT_BLOCK_TAG; }
   "<props"                        { pendingBodyState = IN_PROPS_BODY;    yybegin(IN_BLOCK_OPEN_TAG); return PROPS_BLOCK_TAG; }
   "<data"                         { pendingBodyState = IN_DATA_BODY;     yybegin(IN_BLOCK_OPEN_TAG); return DATA_BLOCK_TAG; }
@@ -289,10 +307,34 @@ PASCAL_IDENT       = [A-Z][A-Za-z0-9]*
 // Looks for HTML tags, comments, mustaches; everything else is opaque body text.
 // =====================================================================
 <IN_TEMPLATE_BODY> {
-  "</template>"                   { yybegin(YYINITIAL); return TEMPLATE_CLOSE_TAG; }
+  // Outer </template> closes the SFC block when depth==0; inner </template>
+  // tags (slot-fill `<template #foo>...</template>`) only decrement the counter
+  // and emit TEMPLATE_BODY, preserving the enclosing IN_TEMPLATE_BODY state.
+  // Mirrors the modifierArgsParenDepth decrement-and-conditional-yybegin idiom
+  // (lines 526-534). See Pitfall 3 / Example 3 of 08.1-RESEARCH.md.
+  "</template>"                   {
+                                    if (templateNestingDepth > 0) {
+                                      templateNestingDepth--;
+                                      return TEMPLATE_BODY;
+                                    }
+                                    yybegin(YYINITIAL);
+                                    return TEMPLATE_CLOSE_TAG;
+                                  }
   "<!--"                          { htmlCommentReturnState = IN_TEMPLATE_BODY; yybegin(IN_HTML_COMMENT); return HTML_COMMENT_OPEN; }
   "{{"                            { mustacheReturnState = IN_TEMPLATE_BODY; yybegin(IN_MUSTACHE); return MUSTACHE_OPEN; }
   "</"                            { yybegin(IN_TEMPLATE_TAG_CLOSE); return LT_SLASH; }
+  // Inner <template open: increment nesting depth so the matching </template>
+  // is recognised as inner-close (decrement-only) rather than outer-close
+  // (terminate the SFC block). The lookahead `/ [\s>]` ensures `<templateFoo`
+  // (a hypothetical PascalCase component) isn't mistaken for a nested template;
+  // the lookahead character is NOT consumed (JFlex lookahead semantics) and
+  // will be picked up by IN_TEMPLATE_TAG_OPEN's own rules. MUST come BEFORE
+  // the generic `"<"` rule because JFlex longest-match prefers the multi-char
+  // literal — this rule emits TEMPLATE_BODY for `<template` matching the
+  // existing convention that the leading `<` of any opening tag inside
+  // IN_TEMPLATE_BODY surfaces as TEMPLATE_BODY before transitioning to
+  // IN_TEMPLATE_TAG_OPEN for the tag-name and attributes.
+  "<template" / [\s>]             { templateNestingDepth++; yybegin(IN_TEMPLATE_TAG_OPEN); return TEMPLATE_BODY; }
   "<"                             { yybegin(IN_TEMPLATE_TAG_OPEN); return TEMPLATE_BODY; }
   // Body chunk: stop at any of the interesting starters above. JFlex prefers
   // the longer match, so the multi-char literals above win when applicable.
