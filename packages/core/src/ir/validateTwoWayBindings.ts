@@ -213,9 +213,9 @@ export function validateTwoWayBindings(
         diagnostics.push({
           code: RozieErrorCode.TWO_WAY_LHS_NOT_WRITABLE,
           severity: 'error',
-          message: `r-model:${attr.name}= requires a writable lvalue on the right-hand side — literals, ternaries, function calls, and $computed refs cannot be two-way bound.`,
+          message: `r-model:${attr.name}= requires a writable lvalue on the right-hand side — literals, ternaries, function calls, $computed refs, and deep member chains (e.g. $data.x.y) cannot be two-way bound in v1.`,
           loc: attr.sourceLoc,
-          hint: 'Bind to a $data member (e.g. $data.open) or, in a wrapper component, a $props member declared with model: true.',
+          hint: 'Bind to a top-level $data member (e.g. $data.open) or, in a wrapper component, a top-level $props member declared with model: true. Deep member chains are reserved for v2 once per-target immutable-update emit lands.',
         });
         continue;
       }

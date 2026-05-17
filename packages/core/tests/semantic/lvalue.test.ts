@@ -10,8 +10,12 @@
 //
 // Positive cases:
 //   - $data.x          → true (x declared in <data>)
-//   - $data.x.y        → true (deep member chain rooted in $data; x declared)
 //   - $props.x         → true ONLY when x has model:true in consumer's own props
+//
+// Rejected (Phase 07.3.1 D-01 — shallow-only LHS):
+//   - $data.x.y        → false (deep member chain rooted in $data)
+//   - $data.x.y.z      → false (3-level deep chain rooted in $data)
+//   - $props.x.y       → false (deep chain rooted in $props, even with model: true)
 //
 // Negative cases:
 //   - $computed(() => ...) ref → false
@@ -74,14 +78,29 @@ describe('isWritableLValue — Phase 07.3 (D-03 permissive LHS rule)', () => {
     expect(isWritableLValue(parse('$data.x'), ir)).toBe(true);
   });
 
-  it('accepts $data.x.y (deep member chain rooted in $data)', () => {
+  it('rejects $data.x.y (deep chain — shallow-only per Phase 07.3.1 D-01)', () => {
     const ir = buildIR({ state: [{ name: 'x' }] });
-    expect(isWritableLValue(parse('$data.x.y'), ir)).toBe(true);
+    expect(isWritableLValue(parse('$data.x.y'), ir)).toBe(false);
   });
 
   it('accepts $props.x when consumer prop x has model: true (forwarding pattern)', () => {
     const ir = buildIR({ props: [{ name: 'x', isModel: true }] });
     expect(isWritableLValue(parse('$props.x'), ir)).toBe(true);
+  });
+
+  it('rejects $props.x.y when consumer prop x has model: true (deep chain shallow-only per D-01)', () => {
+    const ir = buildIR({ props: [{ name: 'x', isModel: true }] });
+    expect(isWritableLValue(parse('$props.x.y'), ir)).toBe(false);
+  });
+
+  it('rejects $data.x.y.z (3-level deep chain per D-01)', () => {
+    const ir = buildIR({ state: [{ name: 'x' }] });
+    expect(isWritableLValue(parse('$data.x.y.z'), ir)).toBe(false);
+  });
+
+  it('rejects $props.x.y.z (3-level deep $props chain per D-01)', () => {
+    const ir = buildIR({ props: [{ name: 'x', isModel: true }] });
+    expect(isWritableLValue(parse('$props.x.y.z'), ir)).toBe(false);
   });
 
   it('rejects $props.x when consumer prop x lacks model: true (one-way)', () => {

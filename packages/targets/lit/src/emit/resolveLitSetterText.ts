@@ -128,8 +128,12 @@ export function resolveLitSetterText(
     return `this.${xName}`;
   }
 
+  // Phase 07.3.1 — deep chains rejected at validator (ROZ951); this branch defensive.
   // Case 3: $data.X.Y.Z deep chain. Walk to the root, rewrite ONLY the root
   // segment, then re-generate. We clone so we don't mutate the IR.
+  // As of Phase 07.3.1 D-01 the validator (lvalue.ts) gates on shallow-only
+  // LHS for both $data and $props — any non-shallow expression reaching here
+  // indicates a validator regression.
   //
   // Strategy: traverse parent-most MemberExpression down to its root. If the
   // root is `$data.X` (X in dataNames), rewrite to `this._X.value` and keep

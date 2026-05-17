@@ -9,7 +9,6 @@
  * the consumer side:
  *
  *   - `$data.x`            → true  (top-level data ref; x declared in <data>)
- *   - `$data.x.y` / deeper → true  (deep member chain rooted in $data, head x declared)
  *   - `$props.x`           → true  ONLY when the consumer's own <props> declares
  *                                  x with `model: true` (the forwarding pattern
  *                                  — parallel to Vue wrapper components)
@@ -22,6 +21,12 @@
  *   - $refs.x (refs are read-only DOM-element wrappers)
  *   - unknown $data.foo (foo not declared in <data>)
  *   - $props.x without model: true (one-way prop)
+ *   - deep member chains rooted in $data or $props (`$data.x.y`, `$data.x.y.z`,
+ *     `$props.x.y`) — rejected per Phase 07.3.1 D-01. The shallow-only contract
+ *     keeps the validator/emitter symmetric: 3 of 6 per-target emitters
+ *     (React/Solid/Lit) cannot produce correct code for deep-chain LHS
+ *     (CR-02..CR-04 of 07.3-REVIEW.md). Deep-chain emit infrastructure is
+ *     deferred to a post-v1 RFC.
  *   - identifiers that aren't magic accessors (the rule is whitelist-only —
  *     custom helper identifiers cannot be lvalues for r-model purposes
  *     because the writer side has no machinery to push values back through
@@ -45,19 +50,24 @@ import type { IRComponent } from '../ir/types.js';
  * to find the leftmost object identifier. Returns its name when the chain is
  * a simple identifier-rooted member chain with all-static keys; null otherwise.
  *
+ * Phase 07.3.1 D-01: also returns `depth` — the number of `.property` segments
+ * walked below the root identifier. Callers use `depth === 1` to enforce the
+ * shallow-only LHS contract.
+ *
  * E.g.:
- *   - `$data.x`        → '$data'
- *   - `$data.x.y.z`    → '$data'
+ *   - `$data.x`        → { rootName: '$data', firstMemberName: 'x', depth: 1 }
+ *   - `$data.x.y.z`    → { rootName: '$data', firstMemberName: 'x', depth: 3 }
  *   - `$data['x']`     → null  (computed key — magic accessor case, ROZ106 turf)
  *   - `getFoo().x`     → null  (object is not an identifier)
- *   - `$data?.x`       → '$data' (optional chain still resolves the leftmost id)
+ *   - `$data?.x`       → { rootName: '$data', firstMemberName: 'x', depth: 1 }
  */
 function getLeftmostIdentifierName(
   expr: t.Expression,
-): { rootName: string; firstMemberName: string | null } | null {
+): { rootName: string; firstMemberName: string | null; depth: number } | null {
   // Walk down through nested member expressions to the leftmost object.
   let current: t.Expression = expr;
   let firstMemberName: string | null = null;
+  let depth = 0;
   while (
     t.isMemberExpression(current) ||
     t.isOptionalMemberExpression(current)
@@ -72,10 +82,11 @@ function getLeftmostIdentifierName(
     // root identifier — i.e. the "first member" after the root. Track every
     // step so the final assignment after the loop is correct.
     firstMemberName = current.property.name;
+    depth++;
     current = current.object;
   }
   if (!t.isIdentifier(current)) return null;
-  return { rootName: current.name, firstMemberName };
+  return { rootName: current.name, firstMemberName, depth };
 }
 
 /**
@@ -101,15 +112,22 @@ export function isWritableLValue(
 
     if (head.rootName === '$data') {
       // $data.x — x must be declared in the consumer's <data> block.
-      // Deep chains ($data.x.y.z) are accepted as long as x is declared.
       if (head.firstMemberName === null) return false;
+      // Phase 07.3.1 Blocker #1 — shallow-only LHS per CONTEXT D-01.
+      // Deep chains ($data.x.y.z) are rejected at the validator because
+      // 3 of 6 per-target emitters (React/Solid/Lit) cannot produce correct
+      // code for them (CR-02..CR-04 from 07.3-REVIEW.md). Per-target deep-
+      // chain emit infrastructure is deferred to post-v1 RFC.
+      if (head.depth !== 1) return false;
       return ir.state.some((s) => s.name === head.firstMemberName);
     }
 
     if (head.rootName === '$props') {
       // $props.x — x must be a declared prop AND carry model: true.
-      // Deep chains ($props.x.y) inherit the model: true gate at the head.
       if (head.firstMemberName === null) return false;
+      // Phase 07.3.1 Blocker #1 — shallow-only LHS per CONTEXT D-01.
+      // Deep chains ($props.x.y) rejected for parity with the $data branch.
+      if (head.depth !== 1) return false;
       const prop = ir.props.find((p) => p.name === head.firstMemberName);
       return prop !== undefined && prop.isModel === true;
     }
