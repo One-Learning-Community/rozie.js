@@ -74,11 +74,29 @@ const traverse: TraverseFn =
 
 /**
  * Per-filler emission tuple. See module docs.
+ *
+ * Phase 07.3.1 Blocker #3 (D-03) — adds `updatedBodyLines` (re-attempt
+ * fragment for the producer-upgrade race) and `disconnectResetLines`
+ * (per-filler `_slotCtxWired_<name>` flag reset on disconnect, Landmine
+ * 2). Empty for non-scoped fills.
  */
 export interface LitFillerEmission {
   childTemplate: string;
   firstUpdatedLines: string[];
   classFields: string[];
+  /**
+   * Phase 07.3.1 Blocker #3 (D-03) — re-attempt wiring inside `updated()`
+   * while the per-filler `_slotCtxWired_<name>` flag is false. Closes
+   * Race B (producer-upgrade vs consumer-firstUpdated ordering).
+   */
+  updatedBodyLines: string[];
+  /**
+   * Phase 07.3.1 Blocker #3 (D-03) — per-filler flag reset lines emitted
+   * into `disconnectedCallback()` after `_disconnectCleanups` drain.
+   * Required by Landmine 2 so a reconnect cycle re-attempts wiring
+   * (without this, a re-mounted consumer would skip retry forever).
+   */
+  disconnectResetLines: string[];
 }
 
 /**
@@ -288,7 +306,13 @@ export function emitSlotFiller(
   if (filler.isDynamic) {
     if (!filler.dynamicNameExpr) {
       // ROZ946 was already emitted at lower time — emit nothing.
-      return { childTemplate: '', firstUpdatedLines: [], classFields: [] };
+      return {
+        childTemplate: '',
+        firstUpdatedLines: [],
+        classFields: [],
+        updatedBodyLines: [],
+        disconnectResetLines: [],
+      };
     }
     const body = ctx.emitChildren(filler.body);
     const rewritten = rewriteTemplateExpression(filler.dynamicNameExpr, ctx.ir);
@@ -299,7 +323,13 @@ export function emitSlotFiller(
     // `slot="${expr}"` form (as used by the wrapWithSlotAttribute helper
     // for static names).
     const childTemplate = '<div slot="${' + rewritten + '}">' + body + '</div>';
-    return { childTemplate, firstUpdatedLines: [], classFields: [] };
+    return {
+      childTemplate,
+      firstUpdatedLines: [],
+      classFields: [],
+      updatedBodyLines: [],
+      disconnectResetLines: [],
+    };
   }
 
   // Phase 07.2 Plan 03 — scoped-param IR pre-transform.
@@ -326,7 +356,13 @@ export function emitSlotFiller(
     // body verbatim; consumer authors who need scoped default-fill should
     // use a wrapper element with an explicit `slot=""` attribute (Lit's
     // unnamed-slot convention). Documented edge case.
-    return { childTemplate: body, firstUpdatedLines: [], classFields: [] };
+    return {
+      childTemplate: body,
+      firstUpdatedLines: [],
+      classFields: [],
+      updatedBodyLines: [],
+      disconnectResetLines: [],
+    };
   }
 
   // Named fill. Inject `slot="<name>"` on a single-root element, OR wrap
@@ -334,7 +370,13 @@ export function emitSlotFiller(
   const childTemplate = wrapWithSlotAttribute(body, filler.name, filler);
   const isScoped = filler.params.length > 0;
   if (!isScoped) {
-    return { childTemplate, firstUpdatedLines: [], classFields: [] };
+    return {
+      childTemplate,
+      firstUpdatedLines: [],
+      classFields: [],
+      updatedBodyLines: [],
+      disconnectResetLines: [],
+    };
   }
 
   // Scoped fill — wire observeRozieSlotCtx in firstUpdated() and declare
@@ -343,9 +385,14 @@ export function emitSlotFiller(
   // the lit rewriteTemplateExpression machinery (extended in a follow-up
   // when consumer-scoped-fill exercises it in Task 3).
   const ctxFieldName = `_${filler.name}Ctx`;
+  const wiredFieldName = `_slotCtxWired_${filler.name}`;
   const ctxTypeFields = filler.params.map((p) => `${p.name}: unknown`).join('; ');
   const classFields = [
     `private ${ctxFieldName}?: { ${ctxTypeFields} };`,
+    // Phase 07.3.1 Blocker #3 (D-03) — per-filler wired flag gates the
+    // microtask retry + updated() re-attempt so we don't double-wire and
+    // don't leak observers on every render. Reset on disconnect (Landmine 2).
+    `private ${wiredFieldName} = false;`,
   ];
   // The querySelector reads the consumer's *shadow* root for the named
   // slot. The slot element is on the producer (the child custom element),
@@ -384,19 +431,60 @@ export function emitSlotFiller(
   //  Consumer authors who hit these edge cases should use the vanilla Lit
   //  approach (MutationObserver or slotchange event) directly in their
   //  component's `firstUpdated` override.
+  // Phase 07.3.1 Blocker #3 (D-03) — wrap the lookup in `tryWire` so a
+  // microtask-scheduled retry can recover from the producer-upgrade race
+  // (Race B). The flag-set on success gates the `updated()` re-attempt
+  // body (also emitted below) so we don't double-wire.
   const firstUpdatedLines = [
     `// Phase 07.2: wire ctx capture for scoped slot fill "${filler.name}".`,
-    `(() => {`,
+    `// Phase 07.3.1 Blocker #3 (D-03) — tryWire + microtask retry for producer-upgrade race.`,
+    `{`,
+    `  const tryWire = () => {`,
+    `    const producer = this.shadowRoot?.querySelector('[slot="${filler.name}"]')?.parentElement;`,
+    `    const slotEl = producer?.shadowRoot?.querySelector('slot[name="${filler.name}"]');`,
+    `    if (slotEl) {`,
+    `      const unsubscribe = observeRozieSlotCtx(slotEl as HTMLSlotElement, (c) => { this.${ctxFieldName} = c as { ${ctxTypeFields} }; this.requestUpdate(); });`,
+    `      this._disconnectCleanups.push(unsubscribe);`,
+    `      this.${wiredFieldName} = true;`,
+    `    }`,
+    `  };`,
+    `  tryWire();`,
+    `  queueMicrotask(() => { if (!this.${wiredFieldName}) tryWire(); });`,
+    `}`,
+  ];
+
+  // Phase 07.3.1 Blocker #3 (D-03) — re-attempt wiring inside updated()
+  // while the wired flag is false. Inlined (no class-method lift) so the
+  // emit shape stays additive — every update gates on the flag, which
+  // early-returns the block once wiring succeeds.
+  const updatedBodyLines = [
+    `// Phase 07.3.1 Blocker #3 (D-03) — re-attempt wiring for "${filler.name}" on each update until producer's slot appears.`,
+    `if (!this.${wiredFieldName}) {`,
     `  const producer = this.shadowRoot?.querySelector('[slot="${filler.name}"]')?.parentElement;`,
     `  const slotEl = producer?.shadowRoot?.querySelector('slot[name="${filler.name}"]');`,
     `  if (slotEl) {`,
     `    const unsubscribe = observeRozieSlotCtx(slotEl as HTMLSlotElement, (c) => { this.${ctxFieldName} = c as { ${ctxTypeFields} }; this.requestUpdate(); });`,
     `    this._disconnectCleanups.push(unsubscribe);`,
+    `    this.${wiredFieldName} = true;`,
     `  }`,
-    `})();`,
+    `}`,
   ];
 
-  return { childTemplate, firstUpdatedLines, classFields };
+  // Phase 07.3.1 Blocker #3 (D-03, Landmine 2) — reset the wired flag on
+  // disconnect so a re-mount cycle re-attempts wiring cleanly. Without
+  // this, a re-mounted consumer would have a stale `true` flag and skip
+  // the retry forever.
+  const disconnectResetLines = [
+    `this.${wiredFieldName} = false;`,
+  ];
+
+  return {
+    childTemplate,
+    firstUpdatedLines,
+    classFields,
+    updatedBodyLines,
+    disconnectResetLines,
+  };
 }
 
 /**
@@ -416,20 +504,34 @@ function wrapWithSlotAttribute(
   _filler: SlotFillerDecl,
 ): string {
   const trimmed = body.trim();
-  // Match a single top-level <tag …>…</tag> with no sibling content.
-  const singleRootMatch = trimmed.match(
-    /^<([a-zA-Z][\w-]*)\b([^>]*)>([\s\S]*)<\/\1\s*>$/,
-  );
-  if (singleRootMatch) {
-    const tag = singleRootMatch[1]!;
-    const attrs = singleRootMatch[2]!;
-    const inner = singleRootMatch[3]!;
-    // Confirm no nested-tag-of-same-name dangling. The regex above is
-    // greedy on inner content — the closing </tag> matches the FINAL one.
-    // For balanced single-root markup this works; for adversarial
-    // multi-root we fall back via the wrapping branch below.
-    if (!hasSiblingAtTopLevel(trimmed, tag)) {
-      return `<${tag}${attrs} slot="${slotName}">${inner}</${tag}>`;
+  // Identify a single top-level <tag …>…</tag> via a quote+interpolation-
+  // aware scanner. Replaces the previous `[^>]*` regex which falsely
+  // terminated the attribute scan at `>` characters inside template-literal
+  // interpolations (e.g., `@click=${(e) => ...}` introduced by the Phase
+  // 07.3.1 Blocker #3 D-03 late-binding wrap). The scanner uses
+  // `findTagClose` which is now `${...}`-aware (Phase 07.3.1 Rule 1 fix).
+  const tagOpenMatch = trimmed.match(/^<([a-zA-Z][\w-]*)\b/);
+  if (tagOpenMatch) {
+    const tag = tagOpenMatch[1]!;
+    const tagOpenLen = tagOpenMatch[0].length;
+    const openClose = findTagClose(trimmed, tagOpenLen);
+    if (openClose !== -1) {
+      const isSelfClose = trimmed[openClose - 1] === '/';
+      // Self-closing single root — no inner content, attach slot= and return.
+      if (isSelfClose && openClose === trimmed.length - 1) {
+        const attrs = trimmed.slice(tagOpenLen, openClose - 1);
+        return `<${tag}${attrs} slot="${slotName}"/>`;
+      }
+      // Non-self-closing single root. Verify the trimmed ends with </tag>
+      // (final closing tag matches the opener) and the body is structurally
+      // single-root (no siblings at depth 0).
+      const closingTagRe = new RegExp(`</${tag}\\s*>$`);
+      if (closingTagRe.test(trimmed) && !hasSiblingAtTopLevel(trimmed, tag)) {
+        const attrs = trimmed.slice(tagOpenLen, openClose);
+        const closeStart = trimmed.lastIndexOf(`</${tag}`);
+        const inner = trimmed.slice(openClose + 1, closeStart);
+        return `<${tag}${attrs} slot="${slotName}">${inner}</${tag}>`;
+      }
     }
   }
   return `<div slot="${slotName}">${body}</div>`;
@@ -437,8 +539,15 @@ function wrapWithSlotAttribute(
 
 /**
  * Scan forward from `start` to find the `>` that closes the current HTML tag,
- * skipping over quoted attribute values so that `>` characters inside strings
- * (e.g., `<button title="score > 0">`) are not treated as tag-end markers.
+ * skipping over (a) quoted attribute values so that `>` characters inside
+ * strings (e.g., `<button title="score > 0">`) are not treated as tag-end
+ * markers, and (b) `${...}` template-literal interpolations (e.g.
+ * `<button @click=${(e) => fn(e)}>` — the `>` in `=>` MUST be ignored).
+ * The interpolation skip is brace-balanced so nested `${...}` inside the
+ * inner expression are handled. Phase 07.3.1 Blocker #3 (D-03) added the
+ * `${...}` skip — the late-binding event-handler wrap introduces `>`
+ * characters inside template-literal interpolations on consumer-side
+ * slot-filler bodies.
  *
  * Returns the index of the closing `>`, or -1 if not found before end-of-string.
  */
@@ -448,10 +557,60 @@ function findTagClose(body: string, start: number): number {
     const ch = body[i]!;
     if (inQuote) {
       if (ch === inQuote) inQuote = null;
-    } else if (ch === '"' || ch === "'") {
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
       inQuote = ch as '"' | "'";
-    } else if (ch === '>') {
+      continue;
+    }
+    // Phase 07.3.1 Blocker #3 (D-03) — skip balanced `${...}` blocks.
+    // Late-binding handler wrap produces `@click=${(e) => fn(e)}` whose
+    // `>` in the arrow MUST NOT terminate the tag-attribute scan.
+    if (ch === '$' && body[i + 1] === '{') {
+      i = skipInterpolation(body, i + 2);
+      if (i === -1) return -1;
+      continue;
+    }
+    if (ch === '>') {
       return i;
+    }
+  }
+  return -1;
+}
+
+/**
+ * Skip past a balanced `${...}` block starting at `start` (which points to
+ * the character AFTER the `${`). Tracks nested `{` / `}` so inner block
+ * expressions (object literals, arrow function bodies) are handled. Also
+ * tracks string quotes inside the interpolation so `}` inside a string
+ * literal does not prematurely close the block.
+ *
+ * Returns the index of the closing `}`, or -1 if not found.
+ */
+function skipInterpolation(body: string, start: number): number {
+  let depth = 1;
+  let inQuote: '"' | "'" | '`' | null = null;
+  for (let i = start; i < body.length; i++) {
+    const ch = body[i]!;
+    if (inQuote) {
+      if (ch === '\\') {
+        i++; // skip escaped char
+        continue;
+      }
+      if (ch === inQuote) inQuote = null;
+      continue;
+    }
+    if (ch === '"' || ch === "'" || ch === '`') {
+      inQuote = ch as '"' | "'" | '`';
+      continue;
+    }
+    if (ch === '{') {
+      depth++;
+      continue;
+    }
+    if (ch === '}') {
+      depth--;
+      if (depth === 0) return i;
     }
   }
   return -1;
@@ -476,6 +635,15 @@ function hasSiblingAtTopLevel(body: string, _rootTag: string): boolean {
   let i = 0;
   while (i < body.length) {
     const ch = body[i]!;
+    // Phase 07.3.1 Blocker #3 (D-03) — skip balanced `${...}` blocks at
+    // the text level so handler-wrap content (`(e) => fn(e)`) inside
+    // attribute interpolations does not perturb the depth counter.
+    if (ch === '$' && body[i + 1] === '{') {
+      const end = skipInterpolation(body, i + 2);
+      if (end === -1) break;
+      i = end + 1;
+      continue;
+    }
     if (ch === '<') {
       // Identify open/close/self-close.
       if (body[i + 1] === '/') {
@@ -494,8 +662,9 @@ function hasSiblingAtTopLevel(body: string, _rootTag: string): boolean {
         i = close + 1;
         continue;
       }
-      // Opening tag: use quote-aware scan so `>` inside attribute values
-      // does not prematurely end the tag scan.
+      // Opening tag: use quote+interpolation-aware scan so `>` inside
+      // attribute values OR `${...}` interpolations does not prematurely
+      // end the tag scan.
       const close = findTagClose(body, i + 1);
       if (close === -1) break;
       const isSelfClose = body[close - 1] === '/';

@@ -151,6 +151,17 @@ export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResu
     templateResult.hostListenerWiring,
     slotResult.slotChangeWiring,
   );
+  // Phase 07.3.1 Blocker #3 (D-03) — compose the consumer-side slot-filler
+  // updated() re-attempt fragment with the user $onUpdate hook body so both
+  // surface inside the single emitted `updated()` method. The slot-filler
+  // re-attempt runs FIRST so a successful retry's `requestUpdate()` is
+  // observed by user hooks on the very next update cycle.
+  const slotFillerUpdatedBody = templateResult.slotFillerUpdatedBody.join('\n');
+  const composedUpdatedBody = [
+    slotFillerUpdatedBody,
+    scriptResult.updateHookBody,
+  ].filter((s) => s.trim().length > 0).join('\n\n');
+
   const classBody = composeClassBody({
     staticStylesField: styleResult.staticStylesField,
     fieldDecls: scriptResult.fieldDecls,
@@ -163,7 +174,8 @@ export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResu
     listenerWiringBody: listenerWiring,
     mountHookBody: scriptResult.mountHookBody,
     disconnectedBody: scriptResult.unmountHookBody,
-    updatedBody: scriptResult.updateHookBody,
+    slotFillerDisconnectReset: templateResult.slotFillerDisconnectReset.join('\n'),
+    updatedBody: composedUpdatedBody,
     renderBody: templateResult.renderBody,
     userMethods: scriptResult.methodDecls,
     attributeChangedBody: scriptResult.attributeChangedBody,
@@ -252,6 +264,13 @@ interface ComposeClassBodyParts {
   /** User `$onMount` hook body — mount-once, stays in `firstUpdated()`. */
   mountHookBody: string;
   disconnectedBody: string;
+  /**
+   * Phase 07.3.1 Blocker #3 (D-03, Landmine 2) — per-filler
+   * `_slotCtxWired_<name>` flag reset lines appended to
+   * `disconnectedCallback()` AFTER the `_disconnectCleanups` drain so a
+   * re-mount cycle re-attempts wiring cleanly.
+   */
+  slotFillerDisconnectReset: string;
   updatedBody: string;
   renderBody: string;
   userMethods: string;
@@ -342,6 +361,14 @@ function composeClassBody(parts: ComposeClassBodyParts): string {
   }
   disconnectParts.push('for (const fn of this._disconnectCleanups) fn();');
   disconnectParts.push('this._disconnectCleanups = [];');
+  // Phase 07.3.1 Blocker #3 (D-03, Landmine 2) — reset per-filler
+  // `_slotCtxWired_<name>` flags after cleanup drain so a re-mount cycle
+  // re-attempts wiring. Without this, a re-mounted consumer carries the
+  // stale `true` flag and skips both the microtask retry and the
+  // `updated()` re-attempt forever.
+  if (parts.slotFillerDisconnectReset.trim().length > 0) {
+    disconnectParts.push(parts.slotFillerDisconnectReset);
+  }
   sections.push(
     [
       '  disconnectedCallback(): void {',

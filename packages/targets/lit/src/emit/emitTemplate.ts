@@ -101,6 +101,18 @@ export interface EmitTemplateOpts {
      * exist before firstUpdated() references them.
      */
     slotFillerClassFields: string[];
+    /**
+     * Phase 07.3.1 Blocker #3 (D-03) — re-attempt fragments emitted into
+     * `updated()` while the per-filler `_slotCtxWired_<name>` flag is
+     * false. Closes Race B (producer-upgrade race).
+     */
+    slotFillerUpdatedBody: string[];
+    /**
+     * Phase 07.3.1 Blocker #3 (D-03, Landmine 2) — per-filler flag reset
+     * lines emitted into `disconnectedCallback()` so re-mount cycles
+     * re-attempt wiring cleanly.
+     */
+    slotFillerDisconnectReset: string[];
   };
 }
 
@@ -128,6 +140,19 @@ export interface EmitTemplateResult {
    * `observeRozieSlotCtx` callback can assign into them.
    */
   slotFillerClassFields: string[];
+  /**
+   * Phase 07.3.1 Blocker #3 (D-03) — re-attempt fragments routed into the
+   * generated `updated()` method body. emitLit composes these with the
+   * user $onUpdate hook body at the `parts.updatedBody` site.
+   */
+  slotFillerUpdatedBody: string[];
+  /**
+   * Phase 07.3.1 Blocker #3 (D-03, Landmine 2) — per-filler
+   * `_slotCtxWired_<name>` flag reset lines routed into the generated
+   * `disconnectedCallback()` body. emitLit appends these after
+   * `_disconnectCleanups` drain so re-mounts re-attempt cleanly.
+   */
+  slotFillerDisconnectReset: string[];
   diagnostics: Diagnostic[];
 }
 
@@ -759,6 +784,17 @@ function emitElement(
         hostListenerWiring.push(line);
       }
       if (out.firstUpdatedLines.length > 0) needsObserveImport = true;
+      // Phase 07.3.1 Blocker #3 (D-03) — surface updated() re-attempt
+      // fragments and disconnect-reset lines through opts._state so emitLit
+      // can splice them into the generated `updated()` and
+      // `disconnectedCallback()` bodies (mirrors slotFillerClassFields
+      // routing pattern).
+      for (const line of out.updatedBodyLines) {
+        opts._state?.slotFillerUpdatedBody.push(line);
+      }
+      for (const line of out.disconnectResetLines) {
+        opts._state?.slotFillerDisconnectReset.push(line);
+      }
     }
     if (needsObserveImport) {
       opts.runtime.add('observeRozieSlotCtx');
@@ -961,6 +997,8 @@ export function emitTemplate(
     debouncedFieldDecls: [] as string[],
     debounceCleanupWiring: [] as string[],
     slotFillerClassFields: [] as string[],
+    slotFillerUpdatedBody: [] as string[],
+    slotFillerDisconnectReset: [] as string[],
     diagnostics,
   };
   const optsWithState: EmitTemplateOpts = { ...opts, _state: state };
@@ -972,6 +1010,8 @@ export function emitTemplate(
       repeatUsed: false,
       debouncedFieldDecls: [],
       slotFillerClassFields: [],
+      slotFillerUpdatedBody: [],
+      slotFillerDisconnectReset: [],
       diagnostics,
     };
   }
@@ -988,6 +1028,8 @@ export function emitTemplate(
     repeatUsed: state.repeatUsed,
     debouncedFieldDecls: state.debouncedFieldDecls,
     slotFillerClassFields: state.slotFillerClassFields,
+    slotFillerUpdatedBody: state.slotFillerUpdatedBody,
+    slotFillerDisconnectReset: state.slotFillerDisconnectReset,
     diagnostics,
   };
 }

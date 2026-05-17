@@ -1,0 +1,131 @@
+/**
+ * Smoke test for Phase 07.3.1 Blocker #3 (D-03) — verify the new emit
+ * shape for consumer-side scoped slot fills:
+ *   - late-binding event-handler wrap on `this._<X>Ctx?.<method>` shape
+ *   - `_slotCtxWired_<name>` class field
+ *   - `tryWire` + `queueMicrotask` retry in `_armListeners()`
+ *   - `updated()` re-attempt body
+ *   - `disconnectedCallback()` flag reset (Landmine 2)
+ *
+ * This file is a temporary smoke fixture — it compiles a synthetic
+ * consumer-side .rozie source and asserts the emit shape. It is NOT
+ * intended to lock as a snapshot fixture; the per-package snap-locked
+ * fixtures are producer-only (examples/{Modal,Dropdown,TodoList}.rozie).
+ */
+import { describe, it, expect } from 'vitest';
+import { parse } from '../../../../core/src/parse.js';
+import { lowerToIR } from '../../../../core/src/ir/lower.js';
+import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
+import { emitLit } from '../emitLit.js';
+
+const CONSUMER_SOURCE = `<rozie name="TestConsumer">
+
+<components>
+{
+  Modal: './Modal.rozie',
+}
+</components>
+
+<template>
+  <Modal>
+    <template #header="{ close }">
+      <h2>Title</h2>
+      <button @click="close">×</button>
+    </template>
+  </Modal>
+</template>
+`;
+
+function compileConsumer(): string {
+  const { ast } = parse(CONSUMER_SOURCE, { filename: 'TestConsumer.rozie' });
+  if (!ast) throw new Error('parse() returned null');
+  const registry = createDefaultRegistry();
+  const { ir } = lowerToIR(ast, { modifierRegistry: registry });
+  if (!ir) throw new Error('lowerToIR() returned null');
+  ir.name = 'TestConsumer';
+  const { code } = emitLit(ir, {
+    filename: 'TestConsumer.rozie',
+    source: CONSUMER_SOURCE,
+    modifierRegistry: registry,
+  });
+  return code;
+}
+
+describe('Phase 07.3.1 Blocker #3 (D-03) — Lit consumer-side scoped slot fill emit', () => {
+  it('wraps scoped-ctx event handler in late-binding arrow (Race A fix)', () => {
+    const code = compileConsumer();
+    expect(code).toMatch(/@click=\$\{\(e\) => \(this\._headerCtx\?\.close\)\?\.\(e\)\}/);
+  });
+
+  it('declares per-filler _slotCtxWired_<name> class field', () => {
+    const code = compileConsumer();
+    expect(code).toContain('private _slotCtxWired_header = false;');
+  });
+
+  it('emits tryWire wrapper with queueMicrotask retry in _armListeners()', () => {
+    const code = compileConsumer();
+    expect(code).toContain('const tryWire = () =>');
+    expect(code).toContain('this._slotCtxWired_header = true;');
+    expect(code).toContain('queueMicrotask(() => { if (!this._slotCtxWired_header) tryWire(); });');
+  });
+
+  it('emits updated() re-attempt body guarded by wired flag (Race B fix)', () => {
+    const code = compileConsumer();
+    expect(code).toMatch(/updated\(changedProperties: Map<string, unknown>\): void \{/);
+    expect(code).toMatch(/if \(!this\._slotCtxWired_header\) \{/);
+  });
+
+  it('emits disconnectedCallback() flag reset (Landmine 2)', () => {
+    const code = compileConsumer();
+    // The reset MUST appear inside disconnectedCallback after the
+    // _disconnectCleanups drain.
+    const disconnectMatch = code.match(/disconnectedCallback\(\): void \{[\s\S]*?\n  \}/);
+    expect(disconnectMatch).not.toBeNull();
+    expect(disconnectMatch![0]).toContain('this._slotCtxWired_header = false;');
+    // Must come AFTER `_disconnectCleanups = [];`
+    const body = disconnectMatch![0];
+    const drainIdx = body.indexOf('this._disconnectCleanups = []');
+    const resetIdx = body.indexOf('this._slotCtxWired_header = false;');
+    expect(drainIdx).toBeGreaterThan(0);
+    expect(resetIdx).toBeGreaterThan(drainIdx);
+  });
+
+  it('does NOT wrap non-scoped-ctx event handlers (Landmine 3 — no false positives)', () => {
+    // Build a small consumer that has a normal `this.someMethod` handler
+    // alongside the scoped-ctx handler. The plain method handler must
+    // remain as `@click=${this.handleSomething}` shape — NOT wrapped.
+    const src = `<rozie name="TestConsumer2">
+<script>
+function handleClick() {}
+</script>
+<components>
+{
+  Modal: './Modal.rozie',
+}
+</components>
+<template>
+  <button @click="handleClick">Plain</button>
+  <Modal>
+    <template #header="{ close }">
+      <button @click="close">×</button>
+    </template>
+  </Modal>
+</template>
+`;
+    const { ast } = parse(src, { filename: 'TestConsumer2.rozie' });
+    if (!ast) throw new Error('parse() returned null');
+    const registry = createDefaultRegistry();
+    const { ir } = lowerToIR(ast, { modifierRegistry: registry });
+    if (!ir) throw new Error('lowerToIR() returned null');
+    ir.name = 'TestConsumer2';
+    const { code } = emitLit(ir, {
+      filename: 'TestConsumer2.rozie',
+      source: src,
+      modifierRegistry: registry,
+    });
+    // Plain handler — NOT wrapped.
+    expect(code).toMatch(/@click=\$\{this\.handleClick\}/);
+    // Scoped-ctx handler — wrapped.
+    expect(code).toMatch(/@click=\$\{\(e\) => \(this\._headerCtx\?\.close\)\?\.\(e\)\}/);
+  });
+});
