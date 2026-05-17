@@ -42,6 +42,7 @@ import { lowerToIR } from '../../core/src/ir/lower.js';
 // step 2.5; unplugin's pipelines previously skipped it). dist-parity Leg 4
 // would then fail on every consumer-scoped-fill cell.
 import { threadParamTypes } from '../../core/src/ir/threadParamTypes.js';
+import { validateTwoWayBindings } from '../../core/src/ir/validateTwoWayBindings.js';
 import { IRCache } from '../../core/src/ir/cache.js';
 import { ProducerResolver } from '../../core/src/resolver/index.js';
 import type { ModifierRegistry } from '@rozie/core';
@@ -632,6 +633,22 @@ function threadParamTypesForPipeline(
   threadParamTypes(ir, filePath, cache, resolver, acc);
 }
 
+// Phase 07.3 Plan 02 — parallel mediation for the consumer-side two-way
+// validator. Mirrors threadParamTypesForPipeline so each pipeline call site
+// runs ROZ949/ROZ950/ROZ951 against the same per-call cache + resolver as
+// the type-threading pass. Silent degrade on producer lookup failure is
+// inherited from validateTwoWayBindings itself.
+function validateTwoWayBindingsForPipeline(
+  ir: import('../../core/src/ir/types.js').IRComponent,
+  filePath: string,
+  registry: ModifierRegistry,
+  acc: Diagnostic[],
+): void {
+  const cache = new IRCache({ modifierRegistry: registry });
+  const resolver = new ProducerResolver({ root: dirname(filePath) });
+  validateTwoWayBindings(ir, filePath, cache, resolver, acc);
+}
+
 /**
  * Shared parse → lowerToIR → emitVue pipeline. Throws Vite-shaped errors on
  * fatal diagnostics; calls `this.warn` on warnings. Returns `{ code, map }`
@@ -667,6 +684,7 @@ function runRoziePipeline(
   // the build.
   const threadDiags: Diagnostic[] = [];
   threadParamTypesForPipeline(ir, filePath, registry, threadDiags);
+  validateTwoWayBindingsForPipeline(ir, filePath, registry, threadDiags);
   warnings.push(...threadDiags.filter((d) => d.severity === 'warning'));
   const threadErrors = threadDiags.filter((d) => d.severity === 'error');
   if (threadErrors.length > 0) {
@@ -730,6 +748,7 @@ function runReactPipeline(
   // the build.
   const threadDiags: Diagnostic[] = [];
   threadParamTypesForPipeline(ir, filePath, registry, threadDiags);
+  validateTwoWayBindingsForPipeline(ir, filePath, registry, threadDiags);
   warnings.push(...threadDiags.filter((d) => d.severity === 'warning'));
   const threadErrors = threadDiags.filter((d) => d.severity === 'error');
   if (threadErrors.length > 0) {
@@ -793,6 +812,7 @@ function runSveltePipeline(
   // the build.
   const threadDiags: Diagnostic[] = [];
   threadParamTypesForPipeline(ir, filePath, registry, threadDiags);
+  validateTwoWayBindingsForPipeline(ir, filePath, registry, threadDiags);
   warnings.push(...threadDiags.filter((d) => d.severity === 'warning'));
   const threadErrors = threadDiags.filter((d) => d.severity === 'error');
   if (threadErrors.length > 0) {
@@ -858,6 +878,7 @@ function runSolidPipeline(
   // the build.
   const threadDiags: Diagnostic[] = [];
   threadParamTypesForPipeline(ir, filePath, registry, threadDiags);
+  validateTwoWayBindingsForPipeline(ir, filePath, registry, threadDiags);
   warnings.push(...threadDiags.filter((d) => d.severity === 'warning'));
   const threadErrors = threadDiags.filter((d) => d.severity === 'error');
   if (threadErrors.length > 0) {
@@ -922,6 +943,7 @@ function runLitPipeline(
   // the build.
   const threadDiags: Diagnostic[] = [];
   threadParamTypesForPipeline(ir, filePath, registry, threadDiags);
+  validateTwoWayBindingsForPipeline(ir, filePath, registry, threadDiags);
   warnings.push(...threadDiags.filter((d) => d.severity === 'warning'));
   const threadErrors = threadDiags.filter((d) => d.severity === 'error');
   if (threadErrors.length > 0) {
@@ -990,6 +1012,7 @@ function runAngularPipeline(
   // the build.
   const threadDiags: Diagnostic[] = [];
   threadParamTypesForPipeline(ir, filePath, registry, threadDiags);
+  validateTwoWayBindingsForPipeline(ir, filePath, registry, threadDiags);
   warnings.push(...threadDiags.filter((d) => d.severity === 'warning'));
   const threadErrors = threadDiags.filter((d) => d.severity === 'error');
   if (threadErrors.length > 0) {
@@ -1285,6 +1308,7 @@ function runAngularEmitForDisk(
   // Phase 07.2 Plan 03 — thread producer paramTypes onto consumer SlotFillerDecl.
   const threadDiags: Diagnostic[] = [];
   threadParamTypesForPipeline(ir, filePath, registry, threadDiags);
+  validateTwoWayBindingsForPipeline(ir, filePath, registry, threadDiags);
   const threadError = threadDiags.find((d) => d.severity === 'error');
   if (threadError) {
     throw new Error(`[${threadError.code}] ${threadError.message}`);
