@@ -1,8 +1,10 @@
 package js.rozie.intellij
 
 import com.intellij.lang.injection.InjectedLanguageManager
+import com.intellij.lang.javascript.psi.JSProperty
 import com.intellij.lang.javascript.psi.JSReferenceExpression
 import com.intellij.psi.util.PsiTreeUtil
+import com.intellij.psi.xml.XmlAttribute
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import js.rozie.intellij.parser.RozieRootBlock
 
@@ -72,5 +74,79 @@ class RozieReferenceTest : BasePlatformTestCase() {
                 "element.containingFile.context fallback per RESEARCH Pitfall 5.",
             host is RozieRootBlock,
         )
+    }
+
+    // === Task 1 / Behavior 1: $props.X resolves into <props> block ===
+
+    fun testPropsValueResolves() {
+        myFixture.configureByFile("counter-props-ref.rozie")
+        val ref = myFixture.file.findReferenceAt(myFixture.caretOffset)
+        assertNotNull(
+            "findReferenceAt returned null at caret on `\$props.value`; expected a " +
+                "RoziePropsReference contributed by RozieJSReferenceContributor",
+            ref,
+        )
+        val resolved = ref!!.resolve()
+        assertNotNull(
+            "RoziePropsReference.resolve() returned null for `\$props.value`; expected the " +
+                "JSProperty for `value:` inside the <props> block of the same .rozie file",
+            resolved,
+        )
+        assertTrue(
+            "Resolved target was ${resolved?.javaClass?.name} instead of JSProperty",
+            resolved is JSProperty,
+        )
+        assertEquals("value", (resolved as JSProperty).name)
+        // Confirm the resolved JSProperty's top-level file is the same .rozie host
+        // file we configured — the resolution crossed an injection boundary but
+        // stayed within one host file. Use getTopLevelFile to walk back from the
+        // injected JS PsiFile to the host RozieFile.
+        val ilm = InjectedLanguageManager.getInstance(project)
+        val resolvedTopLevelFile = ilm.getTopLevelFile(resolved.containingFile) ?: resolved.containingFile
+        assertEquals(
+            "Resolved JSProperty's top-level host file should match the test fixture",
+            myFixture.file.name,
+            resolvedTopLevelFile.name,
+        )
+    }
+
+    // === Task 1 / Behavior 2: $data.X resolves into <data> block ===
+
+    fun testDataCountResolves() {
+        myFixture.configureByFile("counter-data-ref.rozie")
+        val ref = myFixture.file.findReferenceAt(myFixture.caretOffset)
+        assertNotNull("findReferenceAt returned null at caret on `\$data.count`", ref)
+        val resolved = ref!!.resolve()
+        assertNotNull(
+            "RozieDataReference.resolve() returned null for `\$data.count`; expected the " +
+                "JSProperty for `count:` inside the <data> block",
+            resolved,
+        )
+        assertTrue(
+            "Resolved target was ${resolved?.javaClass?.name} instead of JSProperty",
+            resolved is JSProperty,
+        )
+        assertEquals("count", (resolved as JSProperty).name)
+    }
+
+    // === Task 1 / Behavior 3: $refs.X resolves into <template> ref="X" attribute ===
+
+    fun testRefsRootResolves() {
+        myFixture.configureByFile("counter-refs-ref.rozie")
+        val ref = myFixture.file.findReferenceAt(myFixture.caretOffset)
+        assertNotNull("findReferenceAt returned null at caret on `\$refs.root`", ref)
+        val resolved = ref!!.resolve()
+        assertNotNull(
+            "RozieRefsReference.resolve() returned null for `\$refs.root`; expected the " +
+                "XmlAttribute `ref=\"root\"` inside the <template> block",
+            resolved,
+        )
+        assertTrue(
+            "Resolved target was ${resolved?.javaClass?.name} instead of XmlAttribute",
+            resolved is XmlAttribute,
+        )
+        val attr = resolved as XmlAttribute
+        assertEquals("ref", attr.name)
+        assertEquals("root", attr.value)
     }
 }

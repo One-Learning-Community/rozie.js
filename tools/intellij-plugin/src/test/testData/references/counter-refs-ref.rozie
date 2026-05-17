@@ -1,0 +1,8 @@
+<rozie name="CounterRefsRef">
+<script>
+const z = $refs.ro<caret>ot;
+</script>
+<template>
+<div ref="root">hello</div>
+</template>
+</rozie>
