@@ -1,0 +1,5 @@
+<rozie name="ComponentModalRecognised">
+<template>
+  <Modal r-model:open="x">content</Modal>
+</template>
+</rozie>
