@@ -150,18 +150,50 @@ If anything renders differently between WebStorm 2024.2.5 and IDEA Ultimate 2025
 - OR
 - [ ] Differences: <list>
 
-## Issues captured (2026-XX-XX UAT re-run — to fill in)
+## Issues captured (2026-05-17 UAT re-run — partial — gap-closure required)
 
-For each "isn't quite right" finding, file:
-- Title:
-- Severity (P0 blocker / P1 fix-this-phase / P2 follow-up):
-- Steps to repro:
-- Expected vs actual:
-- Disposition (FIX-IN-PHASE-08.2 / TRIAGE-FOLLOWUP):
+**Summary:** "Vastly improved on the previous implementation." P0-UAT-01 (template body coloring) **CLOSED** via Plan 08.2-01. P0-UAT-02 (`$props.X` Go-to-Declaration) **CLOSED** via Plan 08.2-05. However, 4 new findings surfaced — all rooted in inspection noise from the injected language layers treating Rozie block bodies as plain JS/CSS/HTML with no awareness of cross-block usage. Tag cut deferred until gap closure lands.
 
-If both P0s from 2026-05-17 are closed and no new P0/P1 surfaces, append:
+### P1-UAT-03 — PascalCase component refs not painted distinctively + likely no Annotator/descriptor support for embedded `<components>`-block-defined components
+- **Severity:** P1 (visual + reference correctness regression vs the pre-pivot expectation)
+- **Steps to repro:** Open `CardHeader.rozie` (or any example with an embedded PascalCase component reference). Look at the template body.
+- **Expected:** PascalCase component refs paint distinctively (Plan 08.2-04 RozieAnnotator COMPONENT_REF intent); recognised + autocompleted whether they're stock or defined in this file's `<components>` block (Plan 08.2-03 `RozieComponentTagProvider`).
+- **Actual:** PascalCase highlighting is missing/inconsistent; components defined in the local `<components>` block likely aren't being added to the recognised set the way externally-known components are.
+- **Suspected scope:** `RozieAnnotator` Component-tag branch + `RozieComponentTagProvider` lookup. The provider currently treats any PascalCase tag as recognised at the inspection layer but probably doesn't introspect the file's own `<components>` block for the declared name set, and the Annotator coloring branch for PascalCase may have a guard mismatch.
+- **Disposition:** FIX-IN-GAP-CLOSURE-08.2.1
 
-> **2026-XX-XX UAT re-run — PASSED.** P0-UAT-01 (template body coloring) CLOSED via single-token TEMPLATE_BODY + HTML PSI injection (Plan 08.2-01). P0-UAT-02 (`$props.X` Go-to-Declaration) CLOSED via `RozieJSReferenceContributor` (Plan 08.2-05). No new P0/P1 issues surfaced across either IDE.
+### P1-UAT-04 — `<components>` / `<props>` / `<data>` block bodies show "Component/Statement expected" warnings (injected JS treats object-literal-shaped block bodies as dead-code statements)
+- **Severity:** P1 (whole-file mark-up noise — annoying enough to be a UAT halt)
+- **Steps to repro:** Open any example with `<props>` or `<data>` blocks. Observe the warnings panel for each block body — every key gets a "Statement expected" / "Component expected" warning because the body is JS-parsed.
+- **Expected:** Block bodies that are by-convention JS object literals without explicit assignment should not flag standard JS "is-this-a-statement?" warnings.
+- **Actual:** The injected JavaScript language treats `{ value: 0, step: 1, ... }` at top-level as `JSLabeledStatement` constructs that look like dead code, so every key in `<props>` / `<data>` / `<components>` gets flagged.
+- **Suspected scope:** `RozieMultiHostInjector` injection wrapping for `<props>` / `<data>` / `<components>` block bodies. Options: (a) wrap the injected text with `(` and `)` so JS parses the body as an expression instead of a statement list (canonical Vue / Svelte approach for `<script>` setup-style bodies that are object literals); (b) ship an `InspectionSuppressor` that suppresses the specific JS inspection IDs (`JSUnusedGlobalSymbols`, `JSUnusedLocalSymbols`, `JSLabelUsedOutsideOfLabeledStatement` etc.) when the host is a Rozie `<props>` / `<data>` / `<components>` block; (c) custom injection-language registration.
+- **Disposition:** FIX-IN-GAP-CLOSURE-08.2.1
+
+### P1-UAT-05 — `<script>` block: every defined function shown as unused
+- **Severity:** P1 (whole-file mark-up noise)
+- **Steps to repro:** Open `Counter.rozie` (or any example with functions in `<script>`). Each function definition gets the JS "unused" warning (greyed-out).
+- **Expected:** Functions in `<script>` are the component's behavior surface — they're consumed by `<template>` event handlers (`@click="increment"`), `<listeners>` entries, and `$emit` callbacks. The IntelliJ JS inspector should treat them as used.
+- **Actual:** The JS inspector sees the `<script>` injection in isolation and reports all top-level declarations as unused (no cross-block consumer awareness).
+- **Suspected scope:** `InspectionSuppressor` for the JS layer covering `JSUnusedGlobalSymbols` / `JSUnusedLocalSymbols` when the host is a Rozie `<script>` block. Long-term fix is a real cross-block usage tracker (analogous to Plan 08.2-05's `RozieJSReferenceContributor` but going `<template>` → `<script>`) but a clean suppressor is the right gap-closure deliverable.
+- **Disposition:** FIX-IN-GAP-CLOSURE-08.2.1
+
+### P1-UAT-06 — `<style>` block: every CSS class/selector shown as unused
+- **Severity:** P1 (whole-file mark-up noise)
+- **Steps to repro:** Open `Counter.rozie` (or any example with `<style>`). Each `.card-header__title { … }` rule gets the CSS "unused selector" warning.
+- **Expected:** Selectors in `<style>` are consumed by `class="…"` attributes in `<template>`. The CSS inspector should treat them as used.
+- **Actual:** The CSS inspector sees the `<style>` injection in isolation and reports all selectors as unused (no cross-block consumer awareness).
+- **Suspected scope:** `InspectionSuppressor` for the CSS layer covering `CssUnusedSymbol` / `CssReplaceWithShorthandSafely` etc. when the host is a Rozie `<style>` block. Same trade-off as P1-UAT-05 — long-term fix is a cross-block CSS usage tracker but suppressor is the right gap-closure deliverable for v0.2.0.
+
+- **Disposition:** FIX-IN-GAP-CLOSURE-08.2.1
+
+### Aggregate disposition
+
+User question: *"Can certain warnings/inspections be disabled?"* — yes. JetBrains' `com.intellij.lang.InspectionSuppressor` extension point is the canonical mechanism. The fix shape for P1-UAT-04 / 05 / 06 is a small set of `RozieJSInspectionSuppressor` + `RozieCssInspectionSuppressor` classes that check `RozieContextCheck.isRozieContext(element)` + the surrounding block tag name and short-circuit the listed inspection IDs.
+
+**Decision:** Phase 08.2 Task 3 (tag cut) is DEFERRED. Gap-closure plan needed before v0.2.0 ships.
+
+## Issues captured (2026-05-17 UAT halt — partial walkthrough)
 
 ## Issues captured (2026-05-17 UAT halt — partial walkthrough)
 
@@ -197,10 +229,10 @@ The lexer-heavy architecture shipped in Plans 08.1-03 / 04 / 05 (and inherited f
 
 ## Sign-off
 
-- [ ] All reference examples walked in both IDEs (Counter, Dropdown, SearchInput, TodoList, Modal, ModalConsumer, WrapperModal, Card, CardHeader, TreeNode, Table)
-- [ ] All `$onUpdate` contexts verified
-- [ ] All P0/P1 issues from 2026-05-17 closed in this phase OR retriaged
-- [ ] No new P0/P1 issues surfaced
-- [ ] `git tag -a intellij-plugin/v0.2.0 -m '...'` cut LOCALLY (Plan 08.2-07 Task 3)
-- [ ] User confirms tag push (NOT done automatically — `feedback_no_autopush` user memory)
-- [ ] CI release job green (artifact published to GitHub Releases)
+- [x] All reference examples walked in both IDEs (partial — CardHeader-level walkthrough; 4 new P1 issues surfaced before completing full matrix)
+- [ ] All `$onUpdate` contexts verified — **deferred until gap closure lands**
+- [x] All P0/P1 issues from 2026-05-17 closed in this phase OR retriaged — **P0-UAT-01 + P0-UAT-02 CLOSED; 4 new P1s (UAT-03..06) surfaced and routed to gap-closure plan 08.2.1**
+- [ ] No new P0/P1 issues surfaced — **FAILED — see UAT-03..06 above; tag cut deferred**
+- [ ] `git tag -a intellij-plugin/v0.2.0 -m '...'` cut LOCALLY (Plan 08.2-07 Task 3) — **DEFERRED until gap closure**
+- [ ] User confirms tag push (NOT done automatically — `feedback_no_autopush` user memory) — **n/a until tag is cut**
+- [ ] CI release job green (artifact published to GitHub Releases) — **n/a until tag is pushed**
