@@ -48,7 +48,8 @@ class RozieMultiHostInjector : MultiHostInjector {
         if (host !is RozieRootBlock) return
         val tokens = scanTokens(host)
 
-        for (i in tokens.indices) {
+        var i = 0
+        while (i < tokens.size) {
             val tok = tokens[i]
             when (tok.type) {
                 RozieTokenTypes.SCRIPT_BODY,
@@ -56,15 +57,37 @@ class RozieMultiHostInjector : MultiHostInjector {
                 RozieTokenTypes.DATA_BODY,
                 RozieTokenTypes.LISTENERS_BODY,
                 RozieTokenTypes.COMPONENTS_BODY,
-                -> injectJs(registrar, host, tok.range)
+                -> { injectJs(registrar, host, tok.range); i++ }
 
                 RozieTokenTypes.TEMPLATE_BODY,
-                -> injectHtml(registrar, host, tok.range)
+                -> {
+                    // Coalesce a run of consecutive TEMPLATE_BODY tokens into ONE
+                    // HTML-injected range. The Plan-01 lexer collapse emits the
+                    // template body as a run of TEMPLATE_BODY fragments (the
+                    // [^<]+ rule produces long greedy runs separated by single-
+                    // char `<` tokens). HTMLLanguage injection needs a SINGLE
+                    // contiguous range to parse the body into a real XmlTag /
+                    // XmlAttribute PSI tree — multiple per-fragment injections
+                    // produce a synthetic HTML PSI whose interior is all
+                    // XML_DATA_CHARACTERS (no recognised tags, no attributes,
+                    // so the descriptor provider has nothing to attach to).
+                    // Plan 02 SC-3 fix: walk forward over the contiguous
+                    // TEMPLATE_BODY run and start/extend a single injection.
+                    var j = i
+                    val start = tok.range.startOffset
+                    var end = tok.range.endOffset
+                    while (j + 1 < tokens.size && tokens[j + 1].type == RozieTokenTypes.TEMPLATE_BODY) {
+                        j++
+                        end = tokens[j].range.endOffset
+                    }
+                    injectHtml(registrar, host, TextRange(start, end))
+                    i = j + 1
+                }
 
                 RozieTokenTypes.STYLE_BODY,
-                -> injectStyle(registrar, host, tok.range, detectStyleLang(tokens, i))
+                -> { injectStyle(registrar, host, tok.range, detectStyleLang(tokens, i)); i++ }
 
-                else -> { /* not injected */ }
+                else -> { i++ /* not injected */ }
             }
         }
     }
