@@ -7,6 +7,7 @@ interface Props {
   header?: Snippet<[{ remaining: any; total: any }]>;
   children?: Snippet<[{ item: any; toggle: any; remove: any }]>;
   empty?: Snippet;
+  snippets?: Record<string, Snippet<[any]>>;
   onadd?: (...args: unknown[]) => void;
   ontoggle?: (...args: unknown[]) => void;
   onremove?: (...args: unknown[]) => void;
@@ -15,13 +16,18 @@ interface Props {
 let {
   items = $bindable((() => [])()),
   title = 'Todo',
-  header,
-  children,
-  empty,
+  header: __headerProp,
+  children: __childrenProp,
+  empty: __emptyProp,
+  snippets,
   onadd,
   ontoggle,
   onremove,
 }: Props = $props();
+
+const header = $derived(__headerProp ?? snippets?.header);
+const children = $derived(__childrenProp ?? snippets?.children);
+const empty = $derived(__emptyProp ?? snippets?.empty);
 
 let draft = $state('');
 
