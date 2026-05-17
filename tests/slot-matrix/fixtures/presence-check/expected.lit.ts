@@ -23,6 +23,8 @@ export default class PresenceCheckFixture extends SignalWatcher(LitElement) {
   }
 
   connectedCallback(): void {
+    // Phase 07.3.1 D-LIT-15 — pre-seed _hasSlot<X> from light DOM so first render isn't deadlocked.
+    this._hasSlotAside = Array.from(this.children).some((el) => el.getAttribute('slot') === 'aside');
     super.connectedCallback();
     if (this.hasUpdated) this._armListeners();
   }

@@ -3,9 +3,12 @@ import type { Snippet } from 'svelte';
 
 interface Props {
   children?: Snippet;
+  snippets?: Record<string, Snippet<[any]>>;
 }
 
-let { children }: Props = $props();
+let { children: __childrenProp, snippets }: Props = $props();
+
+const children = $derived(__childrenProp ?? snippets?.children);
 </script>
 
 

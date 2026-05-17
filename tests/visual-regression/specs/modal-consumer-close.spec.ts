@@ -64,28 +64,17 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'] as const;
 
-// Phase 07.3 Plan 09 — consumer-side `r-model:open=` directive wires the
-// per-target two-way emit path (bind:open, onOpenChange, [(open)],
-// v-model:open, @open-change). Vue/React/Angular/Solid now pass end-to-end.
-//
-// Svelte + Lit are excluded pending Phase 07.4 fixes for two pre-existing
-// producer-side bugs unrelated to consumer-side two-way binding:
-//   - Svelte: snippet arg shape mismatch — producer `Modal.svelte` calls
-//     `{@render header(close)}` (positional), consumer destructures
-//     `{#snippet header({ close })}` (object) → `close` is `undefined`
-//     inside the snippet body, so the × button's onclick is a no-op.
-//   - Lit: async first-paint observer wiring — producer's
-//     `observeRozieSlotCtx` registration in `firstUpdated()` populates
-//     `this._headerCtx` AFTER initial render, so `@click=${this._headerCtx?.close}`
-//     resolves to undefined on first paint.
-//
-// See `.planning/phases/07.3-.../deferred-items.md` for full diagnosis.
-// When Phase 07.4 fixes land, add 'svelte' and 'lit' back to this set.
+// Phase 07.3.1 closed Phase 07.3 deferred Blockers #2 (D-02: Svelte snippet-arg
+// object shape + producer snippets-merge for dynamic names) and #3 (D-03: Lit
+// late-binding wrap + scoped-slot ctx via dispatchEvent + slot= spread + light
+// DOM _hasSlot pre-seed) — all 6 targets now propagate close events end-to-end.
 const TARGETS_WHERE_CLOSE_PROPAGATES = new Set<(typeof TARGETS)[number]>([
   'vue',
   'react',
+  'svelte', // Phase 07.3.1 Plans 02 + 06 — D-02 + D-SV-16
   'angular',
   'solid',
+  'lit',    // Phase 07.3.1 Plans 03 + 05 + 07 + 08 — D-03 + D-LIT-15/17/18
 ]);
 
 for (const target of TARGETS) {

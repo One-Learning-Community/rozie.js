@@ -131,13 +131,9 @@ export default class ModalConsumer extends SignalWatcher(LitElement) {
   render() {
     return html`
 <div class="modal-consumer">
-  <rozie-modal .open=${this._open1.value} @open-change=${(e: CustomEvent) => { this._open1.value = e.detail; }}><div slot="header">
-      <h2>${this.title}</h2>
-      <button class="close" @click=${(e) => (this._headerCtx?.close)?.(e)}>×</button>
-    </div><div slot="footer">
-      <button @click=${(e) => (this._footerCtx?.close)?.(e)}>Cancel</button>
-      <button @click=${(e: Event) => { this.onConfirm(); }}>OK</button>
-    </div>
+  <rozie-modal .open=${this._open1.value} @open-change=${(e: CustomEvent) => { this._open1.value = e.detail; }}><h2 slot="header">${this.title}</h2>
+      <button class="close" @click=${(e) => (e.currentTarget as HTMLElement).dispatchEvent(new CustomEvent('rozie-header-close', { detail: e, bubbles: true, composed: true }))} slot="header">×</button><button @click=${(e) => (e.currentTarget as HTMLElement).dispatchEvent(new CustomEvent('rozie-footer-close', { detail: e, bubbles: true, composed: true }))} slot="footer">Cancel</button>
+      <button @click=${(e: Event) => { this.onConfirm(); }} slot="footer">OK</button>
     Are you sure you want to proceed?
     </rozie-modal>
 

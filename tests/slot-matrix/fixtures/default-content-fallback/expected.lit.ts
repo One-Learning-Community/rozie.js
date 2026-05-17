@@ -23,6 +23,8 @@ export default class DefaultContentFallbackFixture extends SignalWatcher(LitElem
   }
 
   connectedCallback(): void {
+    // Phase 07.3.1 D-LIT-15 — pre-seed _hasSlot<X> from light DOM so first render isn't deadlocked.
+    this._hasSlotStatus = Array.from(this.children).some((el) => el.getAttribute('slot') === 'status');
     super.connectedCallback();
     if (this.hasUpdated) this._armListeners();
   }

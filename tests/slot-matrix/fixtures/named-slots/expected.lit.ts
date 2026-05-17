@@ -36,6 +36,9 @@ export default class NamedSlotsFixture extends SignalWatcher(LitElement) {
   }
 
   connectedCallback(): void {
+    // Phase 07.3.1 D-LIT-15 — pre-seed _hasSlot<X> from light DOM so first render isn't deadlocked.
+    this._hasSlotHeader = Array.from(this.children).some((el) => el.getAttribute('slot') === 'header');
+    this._hasSlotFooter = Array.from(this.children).some((el) => el.getAttribute('slot') === 'footer');
     super.connectedCallback();
     if (this.hasUpdated) this._armListeners();
   }

@@ -4,9 +4,17 @@ import type { Snippet } from 'svelte';
 interface Props {
   header?: Snippet;
   footer?: Snippet;
+  snippets?: Record<string, Snippet<[any]>>;
 }
 
-let { header, footer }: Props = $props();
+let {
+  header: __headerProp,
+  footer: __footerProp,
+  snippets,
+}: Props = $props();
+
+const header = $derived(__headerProp ?? snippets?.header);
+const footer = $derived(__footerProp ?? snippets?.footer);
 </script>
 
 

@@ -3,9 +3,12 @@ import type { Snippet } from 'svelte';
 
 interface Props {
   aside?: Snippet;
+  snippets?: Record<string, Snippet<[any]>>;
 }
 
-let { aside }: Props = $props();
+let { aside: __asideProp, snippets }: Props = $props();
+
+const aside = $derived(__asideProp ?? snippets?.aside);
 </script>
 
 

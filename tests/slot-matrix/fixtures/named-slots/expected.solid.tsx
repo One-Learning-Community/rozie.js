@@ -11,11 +11,11 @@ export default function NamedSlotsFixture(_props: NamedSlotsFixtureProps): JSX.E
 
   return (
     <>
-    <div class={"named-slots-fixture"} data-rozie-s-a30182bc="">
-      <header data-rozie-s-a30182bc="">
+    <div class={"named-slots-fixture"} data-rozie-s-e2d83b2f="">
+      <header data-rozie-s-e2d83b2f="">
         {_props.headerSlot}
       </header>
-      <footer data-rozie-s-a30182bc="">
+      <footer data-rozie-s-e2d83b2f="">
         {_props.footerSlot}
       </footer>
     </div>

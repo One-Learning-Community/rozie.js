@@ -36,6 +36,9 @@ export default class NestedSlotsFixture extends SignalWatcher(LitElement) {
   }
 
   connectedCallback(): void {
+    // Phase 07.3.1 D-LIT-15 — pre-seed _hasSlot<X> from light DOM so first render isn't deadlocked.
+    this._hasSlotWrapper = Array.from(this.children).some((el) => el.getAttribute('slot') === 'wrapper');
+    this._hasSlotInner = Array.from(this.children).some((el) => el.getAttribute('slot') === 'inner');
     super.connectedCallback();
     if (this.hasUpdated) this._armListeners();
   }
