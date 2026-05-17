@@ -90,6 +90,52 @@ function compileWith(rhs: string, opts?: { scriptBlock?: string }) {
   }
 }
 
+// Phase 07.3.1 Plan 01 Task 2 — sibling helper for the deep-$props-chain case.
+// The default compileWith() builds a consumer with NO <props> block, so an
+// LHS like `$props.x.y` can't reach the validator's `prop.isModel === true`
+// gate (head identifier doesn't resolve to a prop at all → falls through
+// elsewhere). This helper takes the raw <props> block text and an LHS RHS
+// and returns the same compile result shape — used by the deep-$props
+// rejection test below.
+function compileWithProps(rhs: string, propsBlock: string) {
+  const { dir, cleanup } = makeTmpDir('lhs-props');
+  writeFileSync(join(dir, 'producer.rozie'), PRODUCER_SRC, 'utf8');
+  const consumerSrc = `<rozie name="Consumer">
+
+<components>
+{
+  Producer: './producer.rozie',
+}
+</components>
+
+${propsBlock}
+
+<data>
+{
+  x: false,
+  y: false
+}
+</data>
+
+<template>
+<Producer r-model:open="${rhs}" />
+</template>
+
+</rozie>`;
+  const consumerPath = join(dir, 'input.rozie');
+  writeFileSync(consumerPath, consumerSrc, 'utf8');
+  try {
+    const result = compile(consumerSrc, {
+      target: 'vue',
+      filename: consumerPath,
+      resolverRoot: dir,
+    });
+    return result;
+  } finally {
+    cleanup();
+  }
+}
+
 describe('ROZ951 TWO_WAY_LHS_NOT_WRITABLE — Phase 07.3 (D-03 LHS rule)', () => {
   it('emits ROZ951 when RHS is a boolean literal', () => {
     const result = compileWith('true');
@@ -97,7 +143,7 @@ describe('ROZ951 TWO_WAY_LHS_NOT_WRITABLE — Phase 07.3 (D-03 LHS rule)', () =>
     // RED: Wave 2 implements the LHS rule.
     expect(roz951).toBeDefined();
     expect(roz951!.severity).toBe('error');
-    expect(roz951!.message).toMatch(/writable|lvalue|r-model/i);
+    expect(roz951!.message).toMatch(/writable|lvalue|r-model|deep/i);
     expect(roz951!.loc).toBeDefined();
   });
 
@@ -129,5 +175,33 @@ describe('ROZ951 TWO_WAY_LHS_NOT_WRITABLE — Phase 07.3 (D-03 LHS rule)', () =>
     // RED: Wave 2 ships $computed-ref rejection (computed refs are not lvalues).
     expect(roz951).toBeDefined();
     expect(roz951!.severity).toBe('error');
+  });
+
+  it('emits ROZ951 when RHS is a deep $data chain ($data.x.y) — Phase 07.3.1 D-01', () => {
+    // Phase 07.3.1 Blocker #1: $data.x.y is rejected at the validator
+    // because 3 of 6 per-target emitters (React/Solid/Lit) cannot produce
+    // correct code for deep-chain LHS (CR-02..CR-04 of 07.3-REVIEW.md).
+    const result = compileWith('$data.x.y');
+    const roz951 = result.diagnostics.find((d) => d.code === 'ROZ951');
+    expect(roz951).toBeDefined();
+    expect(roz951!.severity).toBe('error');
+    expect(roz951!.message).toMatch(/deep/i);
+    expect(roz951!.loc).toBeDefined();
+  });
+
+  it('emits ROZ951 when RHS is a deep $props chain ($props.x, model: true) — Phase 07.3.1 D-01', () => {
+    // Phase 07.3.1 Blocker #1: even when the head prop carries model: true,
+    // the deep chain ($props.x.y) cannot be rewritten by per-target emitters.
+    const propsBlock = `<props>
+{
+  x: { type: Boolean, default: false, model: true }
+}
+</props>`;
+    const result = compileWithProps('$props.x.y', propsBlock);
+    const roz951 = result.diagnostics.find((d) => d.code === 'ROZ951');
+    expect(roz951).toBeDefined();
+    expect(roz951!.severity).toBe('error');
+    expect(roz951!.message).toMatch(/deep/i);
+    expect(roz951!.loc).toBeDefined();
   });
 });
