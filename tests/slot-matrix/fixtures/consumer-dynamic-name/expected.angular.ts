@@ -9,7 +9,7 @@ import { Producer } from './producer';
   imports: [NgTemplateOutlet, Producer],
   template: `
 
-    <rozie-producer><ng-template #__dynSlot_0>Dynamic fill</ng-template><ng-container *ngTemplateOutlet="templates[slotName()]"></ng-container></rozie-producer>
+    <rozie-producer [templates]="templates"><ng-template #__dynSlot_0>Dynamic fill</ng-template></rozie-producer>
 
   `,
 })
