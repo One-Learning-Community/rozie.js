@@ -1,0 +1,25 @@
+<rozie name="JsPropsObjectLiteral">
+<props>
+{
+  value: { type: Number, default: 0 },
+  step: { type: Number, default: 1 },
+  Label: { type: String, default: "Counter" }
+}
+</props>
+<data>
+{
+  count: 0,
+  History: [],
+  isDirty: false
+}
+</data>
+<components>
+{
+  Counter: './Counter.rozie',
+  Modal: './Modal.rozie'
+}
+</components>
+<template>
+  <div>{{ $data.count }}</div>
+</template>
+</rozie>

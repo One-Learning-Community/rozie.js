@@ -57,6 +57,13 @@
         <xml.xmlSuppressionProvider
             implementation="js.rozie.intellij.inspection.RozieHtmlInspectionSuppressor"/>
 
+        <!-- Plan 08.2-08: closes P1-UAT-05 (script unused-function) + P1-UAT-04
+             JS-side belt-and-suspenders for object-literal-key unused warnings.
+             Per-block dispatch + RozieContextCheck.isRozieContext short-circuit
+             (Pitfall 2 mitigation) confines suppression to .rozie host files. -->
+        <lang.inspectionSuppressor language="JavaScript"
+            implementationClass="js.rozie.intellij.inspection.RozieJSInspectionSuppressor"/>
+
         <xml.attributeDescriptorsProvider
             implementation="js.rozie.intellij.xml.RozieAttributeDescriptorsProvider"/>
 
