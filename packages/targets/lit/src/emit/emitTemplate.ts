@@ -53,6 +53,11 @@ import { toKebabCase } from './emitDecorator.js';
 import { eventTypeFor } from './emitListeners.js';
 // Phase 07.2 Plan 03 — consumer-side slot-fill emit for component-tag elements.
 import { emitSlotFiller, type EmitSlotFillerCtx } from './emitSlotFiller.js';
+// Phase 07.3 Plan 09 — consumer-side `r-model:propName=` two-way binding.
+// resolveLitSetterText + kebabize are shared with the standalone
+// emitTemplateAttribute branch (re-exported from emitDecorator.toKebabCase
+// to guarantee byte-equal CustomEvent name parity with the producer).
+import { resolveLitSetterText } from './resolveLitSetterText.js';
 
 export interface EmitTemplateOpts {
   lit: LitImportCollector;
@@ -200,6 +205,21 @@ function emitAttribute(
   if (attr.kind === 'static') {
     // Pass through static attribute as-is.
     return `${attr.name}="${attr.value}"`;
+  }
+
+  // Phase 07.3 Plan 09 — consumer-side `r-model:propName=` two-way binding.
+  // Producer side (`createLitControllableProperty` + dispatchEvent of
+  // `<kebab(propName)>-change`) is already locked by Phase 06.4 producer
+  // emit; this branch emits the consumer-side pair that wires INTO that
+  // contract. Landmine: the listener arg MUST be annotated `(e: CustomEvent)`
+  // — Lit's default @event arg type is `Event`, which does not expose
+  // `.detail`. The validator (ROZ951) already gated the LHS as a writable
+  // lvalue per D-03, so resolveLitSetterText can emit unconditionally.
+  if (attr.kind === 'twoWayBinding') {
+    const valueExpr = rewriteTemplateExpression(attr.expression, ir);
+    const setterText = resolveLitSetterText(attr.expression, ir);
+    const eventName = `${toKebabCase(attr.name)}-change`;
+    return `.${attr.name}=\${${valueExpr}} @${eventName}=\${(e: CustomEvent) => { ${setterText} = e.detail; }}`;
   }
 
   if (attr.kind === 'binding') {

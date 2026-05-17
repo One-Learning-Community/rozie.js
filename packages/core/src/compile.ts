@@ -57,60 +57,7 @@ import { threadParamTypes } from './ir/threadParamTypes.js';
 // threadParamTypes so any producer IR fetched for paramTypes threading is
 // already cached (lookup-order-independent, but threading errors fire first).
 import { validateTwoWayBindings } from './ir/validateTwoWayBindings.js';
-import type { IRComponent as _IRComponentForGuard, TemplateNode as _IRTemplateNodeForGuard } from './ir/types.js';
 
-/**
- * Phase 07.3 Plan 02 — Wave-2 compatibility guard.
- *
- * Returns true iff `ir.template` contains any TemplateElementIR whose
- * attributes include a `kind: 'twoWayBinding'`. Used to short-circuit emit
- * because Wave 3 (07.3-03..08) per-target emitter branches haven't shipped
- * yet — running an emitter on a twoWayBinding-bearing IR crashes
- * `emitTemplateAttribute` (no else-branch covers the new 4th union variant).
- *
- * This helper is removed when the last Wave 3 plan lands.
- */
-function hasTwoWayBinding(ir: _IRComponentForGuard): boolean {
-  let found = false;
-  const visit = (node: _IRTemplateNodeForGuard | null): void => {
-    if (found || node === null) return;
-    switch (node.type) {
-      case 'TemplateElement':
-        for (const a of node.attributes) {
-          if (a.kind === 'twoWayBinding') {
-            found = true;
-            return;
-          }
-        }
-        for (const child of node.children) visit(child);
-        if (node.slotFillers) {
-          for (const filler of node.slotFillers) {
-            for (const child of filler.body) visit(child);
-          }
-        }
-        break;
-      case 'TemplateConditional':
-        for (const branch of node.branches) {
-          for (const child of branch.body) visit(child);
-        }
-        break;
-      case 'TemplateLoop':
-        for (const child of node.body) visit(child);
-        break;
-      case 'TemplateSlotInvocation':
-        for (const child of node.fallback) visit(child);
-        break;
-      case 'TemplateFragment':
-        for (const child of node.children) visit(child);
-        break;
-      case 'TemplateInterpolation':
-      case 'TemplateStaticText':
-        break;
-    }
-  };
-  visit(ir.template);
-  return found;
-}
 // Per-target imports use RELATIVE paths to avoid the `@rozie/target-*` →
 // `@rozie/core` circular dep (mirrors @rozie/unplugin's transform.ts).
 import { emitVue } from '../../targets/vue/src/emitVue.js';
@@ -298,29 +245,14 @@ export function compile(source: string, opts: CompileOptions): CompileResult {
     return fail(acc);
   }
 
-  // Phase 07.3 Plan 02 — until Wave 3 (target emitters) lands per-target
-  // `kind: 'twoWayBinding'` branches, a successful Wave-2 compile that
-  // contains a valid two-way binding cannot reach the emitter without
-  // crashing. The 6 target packages will be updated together in Wave 3 plans
-  // 07.3-03..08. Until then: detect `twoWayBinding` in the IR and short-
-  // circuit with an empty-output result so callers receive clean diagnostics
-  // (and any warnings produced by validators) rather than an emit-time crash.
-  // The Wave 3 plan that lands the final target branch removes this guard.
-  // No new diagnostic code is introduced — the validator-emitted ROZ950/951/949
-  // already covers the error surface; valid two-way bindings simply produce
-  // empty output until Wave 3.
-  if (hasTwoWayBinding(ir)) {
-    return {
-      code: '',
-      map: null,
-      types: '',
-      componentDeps: ir.components.map((decl) => ({
-        localName: decl.localName,
-        importPath: decl.importPath,
-      })),
-      diagnostics: acc,
-    };
-  }
+  // Phase 07.3 Plan 09 — the Wave-2 `hasTwoWayBinding` short-circuit guard
+  // was removed here. All 6 target emitters (Wave 3 plans 07.3-03..08) now
+  // ship `kind: 'twoWayBinding'` branches in their `emitTemplateAttribute`,
+  // so the IR can reach the emitter directly. Keeping the guard caused
+  // silent empty-output for the dogfood combination
+  // (`model: true` prop + `r-model:open="$props.open"` forwarding pattern),
+  // because the IR contains a valid twoWayBinding and the guard returned
+  // early before any per-target branch could run.
 
   // 3. emit per target
   // Per Phase 1 convention: exactOptionalPropertyTypes:true requires conditional
