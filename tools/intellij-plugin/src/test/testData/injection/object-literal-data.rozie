@@ -1,0 +1,9 @@
+<rozie name="ObjectLiteralData">
+<data>{ open: false, items: [] }</data>
+<script>
+const x = $data.items;
+</script>
+<template>
+  <div r-if="$data.open">{{ x.length }} items</div>
+</template>
+</rozie>

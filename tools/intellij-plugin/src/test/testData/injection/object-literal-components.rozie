@@ -1,0 +1,8 @@
+<rozie name="ObjectLiteralComponents">
+<components>{ Card: './Card.rozie', Modal: './Modal.rozie' }</components>
+<template>
+  <Card>
+    <Modal />
+  </Card>
+</template>
+</rozie>
