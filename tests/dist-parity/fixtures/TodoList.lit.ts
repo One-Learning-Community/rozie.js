@@ -80,6 +80,10 @@ form { display: flex; gap: 0.25rem; margin-block: 0.5rem; }
   }
 
   connectedCallback(): void {
+    // Phase 07.3.1 D-LIT-15 — pre-seed _hasSlot<X> from light DOM so first render isn't deadlocked.
+    this._hasSlotHeader = Array.from(this.children).some((el) => el.getAttribute('slot') === 'header');
+    this._hasSlotDefault = Array.from(this.children).some((el) => !el.hasAttribute('slot') && (el.nodeType !== 3 || (el.textContent?.trim().length ?? 0) > 0));
+    this._hasSlotEmpty = Array.from(this.children).some((el) => el.getAttribute('slot') === 'empty');
     super.connectedCallback();
     if (this.hasUpdated) this._armListeners();
   }

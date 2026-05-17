@@ -2,15 +2,15 @@
 //
 // Closes the D-128 sourcemap accuracy carry-forward for the React target.
 //
-// Uses Modal.rozie (NOT Card.rozie) because Modal has BOTH a <components>{ Counter }
+// Uses ModalConsumer.rozie because it has BOTH a <components>{ Modal, WrapperModal }
 // block AND a non-trivial <script> block — the per-block sourcemap pipeline
 // (Phase 06.1 + Phase 06.2 P2 emit) only produces accurate mappings for
 // examples with a non-empty user-script body. Component-graphs without script
 // (Card.rozie style) are a v2 follow-up per VALIDATION.md "hard-to-prove".
 //
-// V1 contract: the synthesized `import Counter from './Counter'` line in the
+// V1 contract: the synthesized `import Modal from './Modal'` line in the
 // emitted .tsx resolves via SourceMapConsumer.originalPositionFor to a
-// user-authored line in Modal.rozie (NOT line 1, NOT null).
+// user-authored line in ModalConsumer.rozie (NOT line 1, NOT null).
 
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -23,21 +23,21 @@ import { createDefaultRegistry } from '../../../core/src/modifiers/registerBuilt
 import { emitReact } from '../src/emitReact.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const MODAL_ROZIE = resolve(__dirname, '../../../../examples/Modal.rozie');
+const MODAL_CONSUMER_ROZIE = resolve(__dirname, '../../../../examples/ModalConsumer.rozie');
 
-describe('Modal import-sourcemap (React) — Phase 06.2 P3 D-128', () => {
-  it('synthesized Counter import resolves to a user-authored .rozie source line', () => {
-    const src = readFileSync(MODAL_ROZIE, 'utf8');
-    const parsed = parse(src, { filename: 'Modal.rozie' });
+describe('ModalConsumer import-sourcemap (React) — Phase 06.2 P3 D-128', () => {
+  it('synthesized Modal import resolves to a user-authored .rozie source line', () => {
+    const src = readFileSync(MODAL_CONSUMER_ROZIE, 'utf8');
+    const parsed = parse(src, { filename: 'ModalConsumer.rozie' });
     if (!parsed.ast) throw new Error('parse failed');
     const lowered = lowerToIR(parsed.ast, { modifierRegistry: createDefaultRegistry() });
     if (!lowered.ir) throw new Error('lowerToIR failed');
-    const result = emitReact(lowered.ir, { filename: 'Modal.rozie', source: src });
+    const result = emitReact(lowered.ir, { filename: 'ModalConsumer.rozie', source: src });
     expect(result.map).not.toBeNull();
 
     const lines = result.code.split('\n');
     const importLineIdx = lines.findIndex((l) =>
-      l.includes("import Counter from './Counter'"),
+      l.includes("import Modal from './Modal'"),
     );
     expect(importLineIdx).toBeGreaterThanOrEqual(0);
 
@@ -48,7 +48,7 @@ describe('Modal import-sourcemap (React) — Phase 06.2 P3 D-128', () => {
       sourcesContent: (map.sourcesContent ?? null) as (string | null)[] | null,
       names: (map.names ?? []) as string[],
       mappings: map.mappings as string,
-      file: 'Modal.rozie.tsx',
+      file: 'ModalConsumer.rozie.tsx',
     } as unknown as Parameters<typeof SourceMapConsumer>[0]);
 
     const totalLines = result.code.split('\n').length;
@@ -75,7 +75,7 @@ describe('Modal import-sourcemap (React) — Phase 06.2 P3 D-128', () => {
     const orig = found.orig;
 
     expect(typeof orig.source).toBe('string');
-    expect(orig.source).toMatch(/Modal\.rozie$/);
+    expect(orig.source).toMatch(/ModalConsumer\.rozie$/);
     expect(orig.line).not.toBeNull();
     // V1 D-128 carry-forward: NOT line 1 (the pre-Phase-06.1 anti-pattern).
     expect(orig.line).toBeGreaterThan(1);

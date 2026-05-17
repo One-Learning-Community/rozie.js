@@ -85,9 +85,6 @@ describe('emitLit fixtures — Plan 06.4-02 locked snapshots', () => {
     expect(code).toContain('export default class Modal extends SignalWatcher(LitElement)');
     expect(code).toContain("injectGlobalStyles('rozie-modal-global'");
     expect(code).toContain('_disconnectCleanups');
-    // Counter is composed inside Modal via <components>.
-    expect(code).toContain("import './Counter.rozie';");
-    expect(code).toContain('<rozie-counter');
     // Slot presence
     expect(code).toContain('@queryAssignedElements');
     expect(code).not.toMatch(/unsafe-html|unsafeHTML/);

@@ -8,7 +8,6 @@
       <button class="close-btn" aria-label="Close" onclick={close}>×</button>
     </header>{/if}<div class="modal-body">
       {@render children?.({ close })}
-      <Counter></Counter>
     </div>
 
     {#if footer}<footer>

@@ -2,7 +2,6 @@ import { LitElement, css, html, nothing } from 'lit';
 import { customElement, property, query, queryAssignedElements, state } from 'lit/decorators.js';
 import { SignalWatcher } from '@lit-labs/preact-signals';
 import { createLitControllableProperty, injectGlobalStyles } from '@rozie/runtime-lit';
-import './Counter.rozie';
 
 interface RozieHeaderSlotCtx {
   close: unknown;
@@ -107,6 +106,10 @@ footer { border-top: 1px solid rgba(0, 0, 0, 0.08); justify-content: flex-end; }
   }
 
   connectedCallback(): void {
+    // Phase 07.3.1 D-LIT-15 — pre-seed _hasSlot<X> from light DOM so first render isn't deadlocked.
+    this._hasSlotHeader = Array.from(this.children).some((el) => el.getAttribute('slot') === 'header');
+    this._hasSlotDefault = Array.from(this.children).some((el) => !el.hasAttribute('slot') && (el.nodeType !== 3 || (el.textContent?.trim().length ?? 0) > 0));
+    this._hasSlotFooter = Array.from(this.children).some((el) => el.getAttribute('slot') === 'footer');
     super.connectedCallback();
     if (this.hasUpdated) this._armListeners();
   }
@@ -143,7 +146,6 @@ ${this.open ? html`<div class="modal-backdrop" @click=${(e: MouseEvent) => { if 
       <button class="close-btn" aria-label="Close" @click=${this.close}>×</button>
     </header>` : nothing}<div class="modal-body">
       <slot></slot>
-      <rozie-counter></rozie-counter>
     </div>
 
     ${this._hasSlotFooter ? html`<footer>

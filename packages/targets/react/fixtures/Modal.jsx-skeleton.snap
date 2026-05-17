@@ -6,7 +6,6 @@
       <button className={styles["close-btn"]} aria-label="Close" onClick={close}>×</button>
     </header>}<div className={styles["modal-body"]}>
       {typeof props.children === 'function' ? props.children({ close }) : props.children}
-      <Counter />
     </div>
 
     {(props.renderFooter) && <footer>

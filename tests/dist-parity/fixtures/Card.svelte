@@ -7,13 +7,17 @@ interface Props {
   title?: string;
   onClose?: (...args: any[]) => any;
   children?: Snippet;
+  snippets?: Record<string, Snippet<[any]>>;
 }
 
 let {
   title = '',
   onClose = null,
-  children,
+  children: __childrenProp,
+  snippets,
 }: Props = $props();
+
+const children = $derived(__childrenProp ?? snippets?.children);
 </script>
 
 

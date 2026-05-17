@@ -1,7 +1,6 @@
 import type { JSX } from 'solid-js';
 import { Show, children, createEffect, mergeProps, onCleanup, onMount, splitProps } from 'solid-js';
 import { createControllableSignal } from '@rozie/runtime-solid';
-import Counter from './Counter';
 
 interface HeaderSlotCtx { close: any; }
 
@@ -104,7 +103,6 @@ export default function Modal(_props: ModalProps): JSX.Element {
           <button aria-label="Close" class={"close-btn"} onClick={close} data-rozie-s-fc45feb2="">×</button>
         </header></Show>}<div class={"modal-body"} data-rozie-s-fc45feb2="">
           {resolved()}
-          <Counter />
         </div>
 
         {<Show when={_props.footerSlot}><footer data-rozie-s-fc45feb2="">

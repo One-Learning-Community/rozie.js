@@ -15,17 +15,22 @@ interface Props {
   open?: boolean;
   closeOnOutsideClick?: boolean;
   closeOnEscape?: boolean;
-  trigger?: Snippet<[any, any]>;
-  children?: Snippet<[any]>;
+  trigger?: Snippet<[{ open: any; toggle: any }]>;
+  children?: Snippet<[{ close: any }]>;
+  snippets?: Record<string, Snippet<[any]>>;
 }
 
 let {
   open = $bindable(false),
   closeOnOutsideClick = true,
   closeOnEscape = true,
-  trigger,
-  children,
+  trigger: __triggerProp,
+  children: __childrenProp,
+  snippets,
 }: Props = $props();
+
+const trigger = $derived(__triggerProp ?? snippets?.trigger);
+const children = $derived(__childrenProp ?? snippets?.children);
 
 let triggerEl = $state<HTMLElement | undefined>(undefined);
 let panelEl = $state<HTMLElement | undefined>(undefined);
@@ -93,11 +98,11 @@ $effect(() => {
 
 <div class="dropdown">
   <div bind:this={triggerEl} onclick={toggle}>
-    {@render trigger?.(open, toggle)}
+    {@render trigger?.({ open, toggle })}
   </div>
 
   {#if open}<div bind:this={panelEl} class="dropdown-panel" role="menu">
-    {@render children?.(close)}
+    {@render children?.({ close })}
   </div>{/if}</div>
 
 

@@ -41,10 +41,12 @@ describe('composition — Lit cross-component + self-reference', () => {
     expect(code).toContain('<rozie-card-header');
   });
 
-  it('Modal embeds Counter via side-effect import + <rozie-counter> tag', () => {
-    const code = compile('Modal');
-    expect(code).toContain("import './Counter.rozie';");
-    expect(code).toContain('<rozie-counter');
+  it('ModalConsumer embeds Modal + WrapperModal via side-effect imports + <rozie-modal>/<rozie-wrapper-modal> tags', () => {
+    const code = compile('ModalConsumer');
+    expect(code).toContain("import './Modal.rozie';");
+    expect(code).toContain("import './WrapperModal.rozie';");
+    expect(code).toContain('<rozie-modal');
+    expect(code).toContain('<rozie-wrapper-modal');
   });
 
   it('TreeNode emits <rozie-tree-node> for self-reference inside its own render', () => {

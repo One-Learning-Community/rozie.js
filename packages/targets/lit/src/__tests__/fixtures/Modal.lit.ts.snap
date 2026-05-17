@@ -2,7 +2,6 @@ import { LitElement, css, html, nothing } from 'lit';
 import { customElement, property, query, queryAssignedElements, state } from 'lit/decorators.js';
 import { SignalWatcher } from '@lit-labs/preact-signals';
 import { createLitControllableProperty, injectGlobalStyles } from '@rozie/runtime-lit';
-import './Counter.rozie';
 
 interface RozieHeaderSlotCtx {
   close: unknown;
@@ -147,7 +146,6 @@ ${this.open ? html`<div class="modal-backdrop" @click=${(e: MouseEvent) => { if 
       <button class="close-btn" aria-label="Close" @click=${this.close}>×</button>
     </header>` : nothing}<div class="modal-body">
       <slot></slot>
-      <rozie-counter></rozie-counter>
     </div>
 
     ${this._hasSlotFooter ? html`<footer>

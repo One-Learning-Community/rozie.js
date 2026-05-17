@@ -31,9 +31,9 @@ describe('compile() — target: solid — P1 reachability', () => {
     });
   }
 
-  it("Modal embeds Counter via cross-rozie import (extensionless per solid: '')", () => {
-    const source = readFileSync(resolve(ROOT, 'examples/Modal.rozie'), 'utf8');
-    const result = compile(source, { target: 'solid', filename: 'Modal.rozie', sourceMap: false });
-    expect(result.code).toContain("import Counter from './Counter'");
+  it("Card embeds CardHeader via cross-rozie import (extensionless per solid: '')", () => {
+    const source = readFileSync(resolve(ROOT, 'examples/Card.rozie'), 'utf8');
+    const result = compile(source, { target: 'solid', filename: 'Card.rozie', sourceMap: false });
+    expect(result.code).toContain("import CardHeader from './CardHeader'");
   });
 });

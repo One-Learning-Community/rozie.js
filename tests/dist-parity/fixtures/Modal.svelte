@@ -1,6 +1,4 @@
 <script lang="ts">
-import Counter from './Counter.svelte';
-
 import type { Snippet } from 'svelte';
 
 interface Props {
@@ -9,9 +7,10 @@ interface Props {
   closeOnBackdrop?: boolean;
   lockBodyScroll?: boolean;
   title?: string;
-  header?: Snippet<[any]>;
-  children?: Snippet<[any]>;
-  footer?: Snippet<[any]>;
+  header?: Snippet<[{ close: any }]>;
+  children?: Snippet<[{ close: any }]>;
+  footer?: Snippet<[{ close: any }]>;
+  snippets?: Record<string, Snippet<[any]>>;
   onclose?: (...args: unknown[]) => void;
 }
 
@@ -21,11 +20,16 @@ let {
   closeOnBackdrop = true,
   lockBodyScroll = true,
   title = '',
-  header,
-  children,
-  footer,
+  header: __headerProp,
+  children: __childrenProp,
+  footer: __footerProp,
+  snippets,
   onclose,
 }: Props = $props();
+
+const header = $derived(__headerProp ?? snippets?.header);
+const children = $derived(__childrenProp ?? snippets?.children);
+const footer = $derived(__footerProp ?? snippets?.footer);
 
 let backdropEl = $state<HTMLElement | undefined>(undefined);
 let dialogEl = $state<HTMLElement | undefined>(undefined);
@@ -75,17 +79,16 @@ $effect(() => {
 {#if open}<div class="modal-backdrop" bind:this={backdropEl} onclick={(e) => { if (e.target !== e.currentTarget) return; closeOnBackdrop && close(); }}>
   <div bind:this={dialogEl} class="modal-dialog" role="dialog" aria-modal="true" aria-label={title || undefined} tabindex="-1">
     {#if title || header}<header>
-      {#if header}{@render header(close)}{:else}
+      {#if header}{@render header({ close })}{:else}
         <h2>{title}</h2>
       {/if}
       <button class="close-btn" aria-label="Close" onclick={close}>×</button>
     </header>{/if}<div class="modal-body">
-      {@render children?.(close)}
-      <Counter></Counter>
+      {@render children?.({ close })}
     </div>
 
     {#if footer}<footer>
-      {#if footer}{@render footer(close)}{/if}
+      {#if footer}{@render footer({ close })}{/if}
     </footer>{/if}</div>
 </div>{/if}
 

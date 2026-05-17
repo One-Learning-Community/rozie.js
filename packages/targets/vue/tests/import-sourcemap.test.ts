@@ -21,30 +21,30 @@ import { createDefaultRegistry } from '../../../core/src/modifiers/registerBuilt
 import { emitVue } from '../src/emitVue.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const MODAL_ROZIE = resolve(__dirname, '../../../../examples/Modal.rozie');
+const MODAL_CONSUMER_ROZIE = resolve(__dirname, '../../../../examples/ModalConsumer.rozie');
 
-describe('Modal import-sourcemap (Vue) — Phase 06.2 P3 D-128', () => {
-  // Use Modal.rozie (NOT Card.rozie) — Modal has BOTH a <components>{ Counter }
-  // block AND a non-trivial <script> block, so the per-block sourcemap pipeline
-  // (Phase 06.1 P1 buildShell + P2 composeMaps + P2 emitScript scriptMap)
-  // produces mappings. Card.rozie has no <script> block → buildShell falls
-  // back to the legacy empty-source MagicString path which doesn't track
-  // sourcemap positions; per-target import-sourcemap accuracy is only
-  // verifiable on examples with non-empty <script> bodies (V1 reality;
-  // VALIDATION.md flags Card-style component-graphs as v2 follow-up).
-  it('synthesized Counter import resolves to a user-authored .rozie source line (D-128)', () => {
-    const src = readFileSync(MODAL_ROZIE, 'utf8');
-    const parsed = parse(src, { filename: 'Modal.rozie' });
+describe('ModalConsumer import-sourcemap (Vue) — Phase 06.2 P3 D-128', () => {
+  // Use ModalConsumer.rozie — has BOTH a <components>{ Modal, WrapperModal }
+  // block AND a non-trivial <script> block, so the per-block sourcemap
+  // pipeline (Phase 06.1 P1 buildShell + P2 composeMaps + P2 emitScript
+  // scriptMap) produces mappings. Examples with no <script> block fall back
+  // to the legacy empty-source MagicString path which doesn't track sourcemap
+  // positions; per-target import-sourcemap accuracy is only verifiable on
+  // examples with non-empty <script> bodies (V1 reality; VALIDATION.md flags
+  // Card-style component-graphs as v2 follow-up).
+  it('synthesized Modal import resolves to a user-authored .rozie source line (D-128)', () => {
+    const src = readFileSync(MODAL_CONSUMER_ROZIE, 'utf8');
+    const parsed = parse(src, { filename: 'ModalConsumer.rozie' });
     if (!parsed.ast) throw new Error('parse failed');
     const lowered = lowerToIR(parsed.ast, { modifierRegistry: createDefaultRegistry() });
     if (!lowered.ir) throw new Error('lowerToIR failed');
-    const result = emitVue(lowered.ir, { filename: 'Modal.rozie', source: src });
+    const result = emitVue(lowered.ir, { filename: 'ModalConsumer.rozie', source: src });
     expect(result.map).not.toBeNull();
 
     // Locate the synthesized import line in the emitted Vue SFC.
     const lines = result.code.split('\n');
     const importLineIdx = lines.findIndex((l) =>
-      l.includes("import Counter from './Counter.vue'"),
+      l.includes("import Modal from './Modal.vue'"),
     );
     expect(importLineIdx).toBeGreaterThanOrEqual(0);
 
@@ -58,7 +58,7 @@ describe('Modal import-sourcemap (Vue) — Phase 06.2 P3 D-128', () => {
       sourcesContent: (map.sourcesContent ?? null) as (string | null)[] | null,
       names: (map.names ?? []) as string[],
       mappings: map.mappings as string,
-      file: 'Modal.rozie.vue',
+      file: 'ModalConsumer.rozie.vue',
     } as unknown as Parameters<typeof SourceMapConsumer>[0]);
 
     // Walk forward through columns + neighbouring lines to find the nearest
@@ -96,7 +96,7 @@ describe('Modal import-sourcemap (Vue) — Phase 06.2 P3 D-128', () => {
     const orig = found.orig;
 
     expect(typeof orig.source).toBe('string');
-    expect(orig.source).toMatch(/Modal\.rozie$/);
+    expect(orig.source).toMatch(/ModalConsumer\.rozie$/);
     expect(orig.line).not.toBeNull();
     // V1 contract (Phase 06.1 D-110/A1 carry-forward): the synthesized
     // import region must NOT degenerate to line 1 — that's the pre-Phase-06.1

@@ -9,7 +9,6 @@
       <button class="close-btn" aria-label="Close" @click="close">×</button>
     </header><div class="modal-body">
       <slot :close="close"></slot>
-      <Counter></Counter>
     </div>
 
     <footer v-if="$slots.footer">
@@ -19,8 +18,6 @@
 </template>
 
 <script setup lang="ts">
-import Counter from './Counter.vue';
-
 import { onBeforeUnmount, onMounted, ref, watchEffect } from 'vue';
 
 const props = withDefaults(

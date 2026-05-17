@@ -4,9 +4,10 @@ import type { Snippet } from 'svelte';
 interface Props {
   items?: unknown[];
   title?: string;
-  header?: Snippet<[any, any]>;
-  children?: Snippet<[any, any, any]>;
+  header?: Snippet<[{ remaining: any; total: any }]>;
+  children?: Snippet<[{ item: any; toggle: any; remove: any }]>;
   empty?: Snippet;
+  snippets?: Record<string, Snippet<[any]>>;
   onadd?: (...args: unknown[]) => void;
   ontoggle?: (...args: unknown[]) => void;
   onremove?: (...args: unknown[]) => void;
@@ -15,13 +16,18 @@ interface Props {
 let {
   items = $bindable((() => [])()),
   title = 'Todo',
-  header,
-  children,
-  empty,
+  header: __headerProp,
+  children: __childrenProp,
+  empty: __emptyProp,
+  snippets,
   onadd,
   ontoggle,
   onremove,
 }: Props = $props();
+
+const header = $derived(__headerProp ?? snippets?.header);
+const children = $derived(__childrenProp ?? snippets?.children);
+const empty = $derived(__emptyProp ?? snippets?.empty);
 
 let draft = $state('');
 
@@ -54,7 +60,7 @@ const remaining = $derived(items.filter(i => !i.done).length);
 
 <div class="todo-list">
   <header>
-    {#if header}{@render header(remaining, items.length)}{:else}
+    {#if header}{@render header({ remaining, total: items.length })}{:else}
       
       <h3>{title} ({remaining} remaining)</h3>
     {/if}
@@ -68,7 +74,7 @@ const remaining = $derived(items.filter(i => !i.done).length);
   {#if items.length > 0}<ul>
     {#each items as item (item.id)}<li class={{ done: item.done }}>
       
-      {#if children}{@render children(item, () => toggle(item.id), () => remove(item.id))}{:else}
+      {#if children}{@render children({ item, toggle: () => toggle(item.id), remove: () => remove(item.id) })}{:else}
         <label><input type="checkbox" checked={item.done} onchange={(e) => { toggle(item.id); }} /><span>{item.text}</span></label>
         <button aria-label="Remove" onclick={(e) => { remove(item.id); }}>×</button>
       {/if}

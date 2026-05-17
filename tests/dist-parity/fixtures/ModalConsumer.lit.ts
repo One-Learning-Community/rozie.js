@@ -20,46 +20,72 @@ export default class ModalConsumer extends SignalWatcher(LitElement) {
   private _slotName = signal('header');
 
   private _headerCtx?: { close: unknown };
+  private _slotCtxWired_header = false;
   private _footerCtx?: { close: unknown };
+  private _slotCtxWired_footer = false;
 
   private _disconnectCleanups: Array<() => void> = [];
 
   private _armListeners(): void {
     // Phase 07.2: wire ctx capture for scoped slot fill "header".
 
-    (() => {
+    // Phase 07.3.1 Blocker #3 (D-03) — tryWire + microtask retry for producer-upgrade race.
 
-      const producer = this.shadowRoot?.querySelector('[slot="header"]')?.parentElement;
+    {
 
-      const slotEl = producer?.shadowRoot?.querySelector('slot[name="header"]');
+      const tryWire = () => {
 
-      if (slotEl) {
+        const producer = this.shadowRoot?.querySelector('[slot="header"]')?.parentElement;
 
-        const unsubscribe = observeRozieSlotCtx(slotEl as HTMLSlotElement, (c) => { this._headerCtx = c as { close: unknown }; this.requestUpdate(); });
+        const slotEl = producer?.shadowRoot?.querySelector('slot[name="header"]');
 
-        this._disconnectCleanups.push(unsubscribe);
+        if (slotEl) {
 
-      }
+          const unsubscribe = observeRozieSlotCtx(slotEl as HTMLSlotElement, (c) => { this._headerCtx = c as { close: unknown }; this.requestUpdate(); });
 
-    })();
+          this._disconnectCleanups.push(unsubscribe);
+
+          this._slotCtxWired_header = true;
+
+        }
+
+      };
+
+      tryWire();
+
+      queueMicrotask(() => { if (!this._slotCtxWired_header) tryWire(); });
+
+    }
 
     // Phase 07.2: wire ctx capture for scoped slot fill "footer".
 
-    (() => {
+    // Phase 07.3.1 Blocker #3 (D-03) — tryWire + microtask retry for producer-upgrade race.
 
-      const producer = this.shadowRoot?.querySelector('[slot="footer"]')?.parentElement;
+    {
 
-      const slotEl = producer?.shadowRoot?.querySelector('slot[name="footer"]');
+      const tryWire = () => {
 
-      if (slotEl) {
+        const producer = this.shadowRoot?.querySelector('[slot="footer"]')?.parentElement;
 
-        const unsubscribe = observeRozieSlotCtx(slotEl as HTMLSlotElement, (c) => { this._footerCtx = c as { close: unknown }; this.requestUpdate(); });
+        const slotEl = producer?.shadowRoot?.querySelector('slot[name="footer"]');
 
-        this._disconnectCleanups.push(unsubscribe);
+        if (slotEl) {
 
-      }
+          const unsubscribe = observeRozieSlotCtx(slotEl as HTMLSlotElement, (c) => { this._footerCtx = c as { close: unknown }; this.requestUpdate(); });
 
-    })();
+          this._disconnectCleanups.push(unsubscribe);
+
+          this._slotCtxWired_footer = true;
+
+        }
+
+      };
+
+      tryWire();
+
+      queueMicrotask(() => { if (!this._slotCtxWired_footer) tryWire(); });
+
+    }
   }
 
   connectedCallback(): void {
@@ -71,10 +97,35 @@ export default class ModalConsumer extends SignalWatcher(LitElement) {
     this._armListeners();
   }
 
+  updated(changedProperties: Map<string, unknown>): void {
+    // Phase 07.3.1 Blocker #3 (D-03) — re-attempt wiring for "header" on each update until producer's slot appears.
+    if (!this._slotCtxWired_header) {
+      const producer = this.shadowRoot?.querySelector('[slot="header"]')?.parentElement;
+      const slotEl = producer?.shadowRoot?.querySelector('slot[name="header"]');
+      if (slotEl) {
+        const unsubscribe = observeRozieSlotCtx(slotEl as HTMLSlotElement, (c) => { this._headerCtx = c as { close: unknown }; this.requestUpdate(); });
+        this._disconnectCleanups.push(unsubscribe);
+        this._slotCtxWired_header = true;
+      }
+    }
+    // Phase 07.3.1 Blocker #3 (D-03) — re-attempt wiring for "footer" on each update until producer's slot appears.
+    if (!this._slotCtxWired_footer) {
+      const producer = this.shadowRoot?.querySelector('[slot="footer"]')?.parentElement;
+      const slotEl = producer?.shadowRoot?.querySelector('slot[name="footer"]');
+      if (slotEl) {
+        const unsubscribe = observeRozieSlotCtx(slotEl as HTMLSlotElement, (c) => { this._footerCtx = c as { close: unknown }; this.requestUpdate(); });
+        this._disconnectCleanups.push(unsubscribe);
+        this._slotCtxWired_footer = true;
+      }
+    }
+  }
+
   disconnectedCallback(): void {
     super.disconnectedCallback();
     for (const fn of this._disconnectCleanups) fn();
     this._disconnectCleanups = [];
+    this._slotCtxWired_header = false;
+    this._slotCtxWired_footer = false;
   }
 
   render() {
@@ -82,9 +133,9 @@ export default class ModalConsumer extends SignalWatcher(LitElement) {
 <div class="modal-consumer">
   <rozie-modal .open=${this._open1.value} @open-change=${(e: CustomEvent) => { this._open1.value = e.detail; }}><div slot="header">
       <h2>${this.title}</h2>
-      <button class="close" @click=${this._headerCtx?.close}>×</button>
+      <button class="close" @click=${(e) => (this._headerCtx?.close)?.(e)}>×</button>
     </div><div slot="footer">
-      <button @click=${this._footerCtx?.close}>Cancel</button>
+      <button @click=${(e) => (this._footerCtx?.close)?.(e)}>Cancel</button>
       <button @click=${(e: Event) => { this.onConfirm(); }}>OK</button>
     </div>
     Are you sure you want to proceed?

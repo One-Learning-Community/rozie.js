@@ -23,7 +23,6 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const CARD = resolve(HERE, '../fixtures/Card.lit.ts.snap');
 const CARD_HEADER = resolve(HERE, '../fixtures/CardHeader.lit.ts.snap');
 const TREE_NODE = resolve(HERE, '../fixtures/TreeNode.lit.ts.snap');
-const MODAL = resolve(HERE, '../fixtures/Modal.lit.ts.snap');
 
 describe('SC6 — composition + self-reference emit', () => {
   describe('cross-component composition (Card → CardHeader)', () => {
@@ -42,18 +41,6 @@ describe('SC6 — composition + self-reference emit', () => {
     it('CardHeader registers itself via @customElement decorator', () => {
       const code = readFileSync(CARD_HEADER, 'utf8');
       expect(code).toContain("@customElement('rozie-card-header')");
-    });
-  });
-
-  describe('cross-component composition (Modal → Counter)', () => {
-    it("Modal emits `import './Counter.rozie';` side-effect import", () => {
-      const code = readFileSync(MODAL, 'utf8');
-      expect(code).toContain("import './Counter.rozie';");
-    });
-
-    it('Modal emits <rozie-counter> tag in render()', () => {
-      const code = readFileSync(MODAL, 'utf8');
-      expect(code).toContain('<rozie-counter');
     });
   });
 
