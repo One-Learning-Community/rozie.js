@@ -94,44 +94,94 @@ Phase 07.2 Plan 03 added a first-paint smoke check
 verifies the observed ctx is wired correctly on the first paint — no flicker,
 no `undefined` reference in the body's `this._headerCtx?.close` access.
 
-### Consumer-side two-way binding — opt-in directive pending (Phase 07.3)
+### Consumer-side two-way binding
 
 A producer prop declared `model: true` emits the per-target two-way machinery
 (`defineModel`, `$bindable`, `useControllableState`, `model<T>()`,
-`createControllableSignal`, Lit custom-event pair) on the **producer** side —
-that part is solved and identical across all 6 targets. But the **consumer**
-side currently has no template directive to opt into the matching two-way
-binding. Every `:prop="$data.x"` in a `.rozie` consumer template compiles to a
-**one-way** bind regardless of whether the target prop is `model: true`:
+`createControllableSignal`, Lit custom-event pair) on the **producer** side.
+The consumer side opts in to the matching two-way wiring via the
+**`r-model:propName="<writable-lvalue>"` directive** (Phase 07.3 — Vue 3
+`v-model:argName=` analog, parallel to the existing form-input
+`r-model="$data.draft"` sugar).
 
-| Target  | What `:open="$data.open"` emits today | What two-way would look like                    |
-| ------- | ------------------------------------- | ----------------------------------------------- |
-| Vue     | `<Modal :open="open">`                | `<Modal v-model:open="open">`                   |
-| Svelte  | `<Modal open={open}>`                 | `<Modal bind:open={open}>`                      |
-| React   | `<Modal open={open} ...>`             | `<Modal open={open} onOpenChange={setOpen}>`    |
-| Solid   | `<Modal open={open} ...>`             | controllable-state binding + setter pair        |
-| Angular | `[open]="open"`                       | `[(open)]="open"`                               |
-| Lit     | `.open=${open}`                       | `.open=${open} @open-change=${e => open = e.detail}` |
+```rozie
+<!-- consumer.rozie — engaging the producer's model: true machinery -->
+<Modal r-model:open="$data.dialogOpen">
+  <template #footer="{ close }">
+    <button @click="close">×</button>
+  </template>
+</Modal>
+```
 
-The practical impact: when a Rozie consumer passes a writable expression to a
-`model: true` prop, writes to that prop from inside the producer (e.g. the
-scoped `close` callback invoked from a slot fill) do NOT propagate back to the
-consumer's reactive state in Svelte/React/Solid/Lit. Vue + Angular happen to
-close the modal anyway because their reactivity is forgiving under one-way
-binding; the other 4 are no-ops as designed by their controllable-state
-runtimes.
+#### Per-target emit
 
-**Workarounds available today:**
-- Listen for the explicit `@close` event the producer `$emit`s and write back
-  to local state in a handler
-- Use separate state vars per modal instance to avoid shared-state surprises
-- Wire the producer prop as fully uncontrolled by omitting the consumer-side
-  bind entirely (then the producer owns its own state)
+The directive lowers to each target's idiomatic two-way binding shape:
 
-**Tracked fix:** Phase 07.3 adds the `r-model:propName="$data.x"` argument-form
-directive (parallel to existing form-input `r-model="$data.draft"` sugar). The
-4 `.fixme`'d cells of `tests/visual-regression/specs/modal-consumer-close.spec.ts`
-(Svelte/React/Solid/Lit) become the dogfood acceptance gate for that phase.
+| Target  | `r-model:open="$data.open"` emit                                                                        |
+| ------- | ------------------------------------------------------------------------------------------------------- |
+| Vue     | `<Modal v-model:open="open">`                                                                            |
+| Svelte  | `<Modal bind:open={open}>`                                                                               |
+| React   | `<Modal open={open} onOpenChange={setOpen}>`                                                             |
+| Solid   | `<Modal open={open()} onOpenChange={setOpen}>`                                                            |
+| Angular | `<rozie-modal [open]="open()" (openChange)="open.set($event)">` (long-form `[(open)]` banana-in-a-box)  |
+| Lit     | `<rozie-modal .open=${this._open.value} @open-change=${(e: CustomEvent) => { this._open.value = e.detail; }}>` |
+
+The byte-locked dist-parity fixtures live at
+`tests/dist-parity/fixtures/ModalConsumer.{vue,svelte,tsx,solid.tsx,lit.ts,angular.ts}`
+and the matching forwarding-pattern fixtures live at
+`tests/dist-parity/fixtures/WrapperModal.*`. All 6 × 4 entrypoints
+(compile / cli / babel-plugin / unplugin) emit byte-identical output.
+
+#### LHS rules (D-03 permissive)
+
+The right-hand-side expression must be a **writable lvalue**:
+
+- `$data.X` — top-level reactive state member (most common case)
+- `$data.X.Y.Z` — deep member chain rooted in `$data` (validator accepts;
+  Lit/React/Solid emit inline reassignment arrow as setter; Vue/Svelte handle
+  natively via `v-model`/`bind:` macros)
+- `$props.X` — **only when** the consumer's own `<props>` declares `X` with
+  `model: true` (the forwarding pattern; see WrapperModal demonstration below)
+
+Literals, ternaries, function calls, `$computed` refs, `$refs.X`, and
+`$props.X` without `model: true` are rejected at IR-validation time with
+**ROZ951** (LHS not writable).
+
+#### Diagnostic codes
+
+| Code | Trigger | Notes |
+| ---- | ------- | ----- |
+| **ROZ949** | `r-model:propName=` on a component whose producer prop lacks `model: true` | Dual-frame diagnostic — consumer site + producer decl site, so authors see exactly which prop on which producer needs the `model: true` toggle |
+| **ROZ950** | `r-model:` with empty arg (e.g. `r-model:="..."`), OR `r-model:propName=` applied to a non-component HTML tag | Single combined code — both cases share "the directive cannot be applied here" semantics |
+| **ROZ951** | RHS is not a writable lvalue per the D-03 rules above | Hint suggests bind to `$data.X` or, in a wrapper component, `$props.X` declared with `model: true` |
+
+#### WrapperModal forwarding pattern
+
+A consumer component can ITSELF declare a `model: true` prop and forward it
+into a producer's `r-model:propName=` directive. The wrapper's prop becomes
+two-way (its consumers can `r-model:open="$data.x"` on the wrapper) and
+internally propagates through the inner Modal's controllable-state machinery:
+
+```rozie
+<rozie name="WrapperModal">
+<components>{ Modal: './Modal.rozie' }</components>
+<props>
+{
+  open: { type: Boolean, default: false, model: true }
+}
+</props>
+<template>
+<Modal r-model:open="$props.open" />  <!-- forwards wrapper's own model:true prop -->
+</template>
+</rozie>
+```
+
+The byte-locked emit lives at `tests/dist-parity/fixtures/WrapperModal.*` for
+each target. The wrapper's `useControllableState` (React) /
+`createControllableSignal` (Solid) / `defineModel` (Vue) / `$bindable`
+(Svelte) / `model<T>()` (Angular) / `createLitControllableProperty` (Lit)
+instance becomes the bridge between the parent's two-way bind and the inner
+Modal's matching machinery.
 
 ### Lit — scoped + dynamic slot names (deferred combination)
 
@@ -198,8 +248,8 @@ demo. Angular is a first-class v1 target.
 ---
 
 These are the *complete* set of documented limitations as of v1. Everything
-else — props, **producer-side** `model:` two-way machinery, `<data>` reactive
-state, `$computed`, `<listeners>` with modifiers, `r-for` / `r-if` /
-form-input `r-model`, default + named slots, `$emit`, refs — behaves
-identically across all six targets. Consumer-side two-way binding
-(`r-model:propName=`) is tracked as Phase 07.3.
+else — props, **producer-side** `model:` two-way machinery, **consumer-side**
+two-way binding (`r-model:propName=`), `<data>` reactive state, `$computed`,
+`<listeners>` with modifiers, `r-for` / `r-if` / form-input `r-model`,
+default + named slots, `$emit`, refs — behaves identically across all six
+targets.
