@@ -275,19 +275,31 @@ export function emitSlotInvocation(
     return `{typeof ${fieldRef} === 'function' ? ${fieldRef}(${paramObj}) : ${fieldRef}}`;
   }
 
-  // Named slot
+  // Named slot — no params
+  // Phase 07.3.2 fix — INVOKE the function. The consumer ALWAYS wraps the
+  // slot body in an arrow function (emitSlotFiller.ts:126:
+  // `renderHeader={() => (<>...</>)}`), and refineSlotTypes.ts:108 now
+  // declares the field as `() => ReactNode` to match. Before this fix the
+  // producer rendered the function reference directly as a React child,
+  // triggering React's "Functions are not valid as a React child" error
+  // (dev) or silent-no-op (production) — the root cause of WrapperModal
+  // #brand/#actions failing to render in dogfood Modal 3. Mirrors the
+  // with-params named-slot style at L293-301 below (`?.(...)` becomes
+  // `?.()` since this branch has no params). Composes with Plan 01's
+  // merged fieldRef: `(props.renderBrand ?? props.slots?.['brand'])?.()`
+  // is valid JS (`(a ?? b)?.()`).
   if (!hasParams) {
     if (refined.defaultLifting === 'inline') {
       const fallback = renderInlineFallback(slot, ctx.ir);
-      return `{${fieldRef} ?? ${fallback}}`;
+      return `{${fieldRef} ? ${fieldRef}() : ${fallback}}`;
     }
     if (refined.defaultLifting === 'function-const' && refined.defaultFnName !== null) {
-      return `{${fieldRef} ?? ${refined.defaultFnName}({})}`;
+      return `{${fieldRef} ? ${fieldRef}() : ${refined.defaultFnName}({})}`;
     }
     if (hasInvocationFallback) {
-      return `{${fieldRef} ?? ${invocationFallback}}`;
+      return `{${fieldRef} ? ${fieldRef}() : ${invocationFallback}}`;
     }
-    return `{${fieldRef}}`;
+    return `{${fieldRef}?.()}`;
   }
 
   // Named with params — strict render-prop shape (no dual-call; consumers

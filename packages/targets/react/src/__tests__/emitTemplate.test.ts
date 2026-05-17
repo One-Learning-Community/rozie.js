@@ -185,7 +185,7 @@ describe('Slot lowering — Plan 04-03 Task 2', () => {
     expect(slotPropFields.some((s) => /children\?: ReactNode/.test(s))).toBe(true);
   });
 
-  it('Test 4: named slot, no params (Modal header) → {(props.renderHeader ?? props.slots?.[\'header\'])} (Phase 07.3.2 merge)', () => {
+  it('Test 4: named slot, no params (Modal header) → {(props.renderHeader ?? props.slots?.[\'header\'])?.()} (Phase 07.3.2 SC#4 — merge + invoke)', () => {
     const ir = lowerInline(`
 <rozie name="X">
 <template>
@@ -194,10 +194,14 @@ describe('Slot lowering — Plan 04-03 Task 2', () => {
 </rozie>
 `);
     const { jsx, slotPropFields } = emit(ir);
-    // Phase 07.3.2 — fieldRef is now a parenthesised merge expression
+    // Phase 07.3.2 Plan 01 — fieldRef is now a parenthesised merge expression
     // `(props.renderHeader ?? props.slots?.['header'])` per D-SV-16 port.
-    expect(jsx).toContain("{(props.renderHeader ?? props.slots?.['header'])}");
-    expect(slotPropFields.some((s) => /renderHeader\?: ReactNode/.test(s))).toBe(true);
+    // Phase 07.3.2 Plan 04 SC#4 — no-params named-slot path INVOKES via `?.()`
+    // mirroring with-params at L293-301. Consumer-side emitSlotFiller.ts:126
+    // always wraps body in arrow (`renderHeader={() => (<>...</>)}`); producer
+    // must invoke. Composition lock — `(a ?? b)?.()` is valid JS.
+    expect(jsx).toContain("{(props.renderHeader ?? props.slots?.['header'])?.()}");
+    expect(slotPropFields.some((s) => /renderHeader\?: \(\) => ReactNode/.test(s))).toBe(true);
   });
 
   it('Test 6: named slot with params (Dropdown trigger) → {props.renderTrigger?.(ctx)} + interface TriggerCtx', () => {
