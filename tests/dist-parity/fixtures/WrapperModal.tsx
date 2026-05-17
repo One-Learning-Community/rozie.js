@@ -7,9 +7,9 @@ interface WrapperModalProps {
   open?: boolean;
   defaultValue?: boolean;
   onOpenChange?: (open: boolean) => void;
-  renderBrand?: ReactNode;
+  renderBrand?: () => ReactNode;
   children?: ReactNode;
-  renderActions?: ReactNode;
+  renderActions?: () => ReactNode;
   slots?: Record<string, (ctx: any) => import('react').ReactNode>;
 }
 
@@ -27,9 +27,9 @@ export default function WrapperModal(_props: WrapperModalProps): JSX.Element {
   return (
     <>
     <Modal open={open} onOpenChange={setOpen} title={props.title} renderHeader={() => (<>
-        {(props.renderBrand ?? props.slots?.['brand']) ?? <h2 data-rozie-s-1efe6192="">{props.title}</h2>}
+        {(props.renderBrand ?? props.slots?.['brand']) ? (props.renderBrand ?? props.slots?.['brand'])() : <h2 data-rozie-s-1efe6192="">{props.title}</h2>}
       </>)} renderFooter={() => (<>
-        {(props.renderActions ?? props.slots?.['actions'])}
+        {(props.renderActions ?? props.slots?.['actions'])?.()}
       </>)} children={<>{(props.children ?? props.slots?.[''])}</>} />
     </>
   );

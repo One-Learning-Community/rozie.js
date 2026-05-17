@@ -17,7 +17,7 @@ interface TodoListProps {
   onRemove?: (...args: unknown[]) => void;
   renderHeader?: (ctx: HeaderCtx) => ReactNode;
   children?: ReactNode | ((ctx: ChildrenCtx) => ReactNode);
-  renderEmpty?: ReactNode;
+  renderEmpty?: () => ReactNode;
   slots?: Record<string, (ctx: any) => import('react').ReactNode>;
 }
 
@@ -78,7 +78,7 @@ export default function TodoList(_props: TodoListProps): JSX.Element {
           {typeof (props.children ?? props.slots?.['']) === 'function' ? (props.children ?? props.slots?.[''])({ item, toggle: () => toggle(item.id), remove: () => remove(item.id) }) : ((props.children ?? props.slots?.['']) ?? <><label data-rozie-s-52bec3de=""><input type="checkbox" checked={item.done} onChange={(e) => { toggle(item.id); }} data-rozie-s-52bec3de="" /><span data-rozie-s-52bec3de="">{item.text}</span></label><button aria-label="Remove" onClick={(e) => { remove(item.id); }} data-rozie-s-52bec3de="">×</button></>)}
         </li>)}
       </ul> : <p className={styles.empty} data-rozie-s-52bec3de="">
-        {(props.renderEmpty ?? props.slots?.['empty']) ?? "Nothing to do. ✨"}
+        {(props.renderEmpty ?? props.slots?.['empty']) ? (props.renderEmpty ?? props.slots?.['empty'])() : "Nothing to do. ✨"}
       </p>}</div>
     </>
   );
