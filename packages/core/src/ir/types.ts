@@ -425,15 +425,28 @@ export interface TemplateElementIR {
 }
 
 /**
- * AttributeBinding — three kinds:
+ * AttributeBinding — four kinds:
  *
  *   - 'static' — `class="counter"`
  *   - 'binding' — `:class="{ x: y }"`
  *   - 'interpolated' — `class="card--{{ $data.x }}"` (Pitfall 11 / A4)
+ *   - 'twoWayBinding' — `r-model:propName="$data.x"` (Phase 07.3 TWO-WAY-01)
  *
  * Per Pitfall 11: Vue forbids `{{ }}` in attribute values; Rozie permits it.
  * Mixed static + binding segments are preserved in the segments array so
  * emitters can render the literal-template-string idiom.
+ *
+ * The `twoWayBinding` variant is emitted ONLY by the consumer-side
+ * `r-model:propName="expr"` form (TWO-WAY-01) — bare `r-model="expr"` on
+ * form inputs stays as `kind: 'binding'` with `name === 'r-model'`
+ * (TWO-WAY-02 producer-side machinery is untouched). The 6 per-target
+ * emitters (Wave 3) must add a discriminated branch for this kind — TS
+ * exhaustiveness is the enforcement mechanism.
+ *
+ * Carrying fields:
+ *   - `name` — the propName segment (the part after `r-model:`)
+ *   - `expression` — parsed Babel Expression for the RHS (the writable lvalue)
+ *   - `deps` — SignalRef[] for re-execution accounting (same as 'binding')
  *
  * @experimental — shape may change before v1.0
  */
@@ -453,6 +466,15 @@ export type AttributeBinding =
         | { kind: 'static'; text: string }
         | { kind: 'binding'; expression: Expression; deps: SignalRef[] }
       >;
+      sourceLoc: SourceLoc;
+    }
+  | {
+      kind: 'twoWayBinding';
+      /** The propName segment after `r-model:` — never empty (empty is ROZ950). */
+      name: string;
+      /** Parsed RHS expression — caller validates writability via `isWritableLValue`. */
+      expression: Expression;
+      deps: SignalRef[];
       sourceLoc: SourceLoc;
     };
 

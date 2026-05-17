@@ -545,6 +545,35 @@ function lowerBareElement(
     }
 
     if (attr.kind === 'directive') {
+      // Phase 07.3 TWO-WAY-01 — `r-model:propName="expr"` (consumer-side
+      // two-way binding). The parser strips the `r-` prefix and produces
+      // `name === 'model:<propName>'`. This branch MUST run BEFORE the
+      // bare-`r-model` branch below so the colon form is never silently
+      // routed into the form-input sugar path.
+      //
+      // The lowerer ALWAYS emits `kind: 'twoWayBinding'` when the directive
+      // name starts with `model:` — even when the propName is empty
+      // (`r-model:=`) or the target is a non-component HTML tag. Validation
+      // of those shape errors happens in `validateTwoWayBindings` (ROZ950)
+      // so the IR shape stays uniform and the validator owns all error
+      // emission (matches the ROZ947 / threadParamTypes pattern).
+      //
+      // Empty value (no `="…"`) lowers with an `undefined` expression — the
+      // validator's ROZ951 LHS rule will reject it (it's not a writable
+      // lvalue).
+      if (attr.name.startsWith('model:')) {
+        const propName = attr.name.slice('model:'.length);
+        const expr = attr.value !== null ? tryParseExpression(attr.value) : null;
+        attributes.push({
+          kind: 'twoWayBinding',
+          name: propName,
+          expression: expr ?? t.identifier('undefined'),
+          deps: expr ? computeExpressionDeps(expr, bindings) : [],
+          sourceLoc: attr.loc,
+        });
+        continue;
+      }
+
       // r-model / r-show / r-html / r-text are preserved as binding
       // attributes (named with the `r-` prefix) for downstream emitters to
       // expand into target-specific output. r-if/r-else/r-else-if/r-for
