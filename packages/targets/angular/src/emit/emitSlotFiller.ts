@@ -129,36 +129,34 @@ export function emitSlotFiller(
  *
  * Each dynamic filler emits:
  *   - `template`: `<ng-template #__dynSlot_<N>${lets}>${body}</ng-template>`
- *     a synthetic-named `<ng-template>` declaration capturing the fill body
- *   - `dispatch`: `<ng-container *ngTemplateOutlet="templates['__dynSlot_<N>']${ctxAttr}; if templates['__dynSlot_<N>']"></ng-container>` ...
- *     actually we emit the simpler form using runtime expression as the
- *     lookup key and synthesise the templates map from a class-body field
+ *     a synthetic-named `<ng-template>` declaration capturing the fill body.
+ *     The CALLER (emitTemplateNode) is responsible for:
+ *       (a) appending `[templates]="<getterName>"` as a property input on the
+ *           producer tag, where <getterName> is the deterministic class-body
+ *           getter that maps user-runtime-key-exprs to captured refs;
+ *       (b) registering the @ViewChild capture + getter via scriptInjections.
  *
  * Implementation note: Angular's static content-projection (`@ContentChild`)
- * does not natively support a dynamic name. The standard idiom for dynamic
- * template selection is `[ngTemplateOutlet]="templates[expr]"` where
- * `templates` is a `Record<string, TemplateRef<unknown>>` view-children map.
- * We synthesise such a map in the consumer's class body, indexed by the
- * synthetic template-ref names. The producer-side acceptance of a `templates`
- * input prop is the documented Angular divergence (parallel to React/Svelte/
- * Solid render-prop divergence) that Plan 07.2-06 spells out in
- * docs/parity.md.
+ * does not natively support a dynamic name. The producer-side acceptance of
+ * a `templates` input signal (Phase 07.3.2 Plan 03) is the documented Angular
+ * divergence — the consumer wires its dynamic-name fills as a property-INPUT
+ * map rather than as projected `<ng-content>` children. The producer's
+ * merged guard `@if ((headerTpl ?? templates()?.['header']))` (Phase 07.3.2
+ * Plan 10) then resolves the runtime dispatch.
  *
- * Silent fallback on runtime miss (D-05): Angular's `*ngTemplateOutlet`
- * silently no-ops when its template ref is `undefined` (`templates[unknown]`
- * returns undefined). The producer's `*ngTemplateOutlet="namedTpl"` then
- * renders its declared defaultContent.
+ * Silent fallback on runtime miss (D-05): when `templates()?.[expr]` returns
+ * `undefined`, the merged @if short-circuits to the bare-static template
+ * ref (if any) or the producer's declared default content.
  *
- * The templates-map value type is `TemplateRef<unknown>`. The keys are the
- * synthetic `__dynSlot_<N>` names — at runtime, the dispatch reads
- * `templates[<rewrittenExpr>]`, which IS NOT the synthetic name. For Wave
- * 1, the dispatch wires `templates[<rewrittenExpr>]` directly — the producer
- * is expected to accept a `templates` input prop carrying the fill bindings.
- * The synthetic-name keys live in the consumer-side map for QueryList
- * population only; the actual runtime dispatch resolves via the consumer's
- * own `templates` object expression (built once in the consumer constructor
- * from the ViewChild refs). Plan 07.2-06 finalises the producer-side
- * acceptance via the same divergence note.
+ * History — Phase 07.3.2.1-01 (closes F-07.3.2-11-A): prior to this phase
+ * `emitDynamicSlotFiller` was paired with a sibling `dispatch` string of
+ * shape `<ng-container *ngTemplateOutlet="templates[<expr>]">` emitted as
+ * a projected child of the producer tag. That shape was silently dropped
+ * by Angular (no `<ng-content>` slot in the consumed component's view),
+ * so the dynamic-name fill never rendered. The property-input contract
+ * documented above replaces it; the broken projection emission has been
+ * deleted from `emitTemplateNode.ts` (the previous `dispatchParts.push`
+ * call site).
  */
 export interface AngularDynamicSlotFillerEmission {
   /** `<ng-template #__dynSlot_<N>…>body</ng-template>` markup (child of component tag) */

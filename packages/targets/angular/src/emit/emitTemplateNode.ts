@@ -386,30 +386,35 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
     const fillerParts: string[] = [];
     const dispatchParts: string[] = [];
     const dynRefs: { refName: string; keyExpr: string; classBodyKeyExpr: string }[] = [];
+    // Phase 07.3.2.1-01: consumer-side dynamic-name slot dispatch — bound as
+    // an Angular property INPUT on the producer tag (NOT a projected
+    // `<ng-container *ngTemplateOutlet>` child). Composed inside the
+    // `if (dynRefs.length > 0)` block below; empty-string default preserves
+    // D-04 byte-identity for static-only consumers (Pattern A / Pitfall #1).
+    let templatesBinding = '';
     let dynIdx = 0;
     for (const filler of node.slotFillers) {
       if (filler.isDynamic) {
-        // R5 dynamic-name dispatch (Plan 07.2-04 D-04 Angular row):
+        // R5 dynamic-name dispatch (Phase 07.3.2.1-01 closure of F-07.3.2-11-A):
         // emit the body as a synthetic-named `<ng-template #__dynSlot_<N>>`
-        // PLUS an inline `<ng-container *ngTemplateOutlet="templates[<expr>]">`
-        // that resolves the dynamic key against a getter-backed templates
-        // map. The getter is class-field-injected via scriptInjections;
-        // each ViewChild captures one `__dynSlot_<N>` ref. The dispatch
-        // keys by the rewritten user expression at runtime.
+        // declaration (a child of the producer tag). The CALLER no longer
+        // emits an inline projected `<ng-container *ngTemplateOutlet>`
+        // dispatcher — Angular components don't render projected children
+        // unless they declare `<ng-content>`, so the dispatcher would have
+        // been silently dropped. Instead the producer tag is annotated
+        // (below, in the `dynRefs.length > 0` block) with a `[templates]=
+        // "<getterName>"` property input. The producer's already-correct
+        // `templates = input<Record<string, TemplateRef<unknown>> |
+        // undefined>(undefined)` signal (Phase 07.3.2 Plan 03) receives the
+        // consumer's class-body `templates` getter; its merged guard
+        // `@if ((headerTpl ?? templates()?.['header']))` (Plan 10) then
+        // resolves the runtime dispatch.
         //
-        // Silent fallback on runtime miss (D-05): when `templates[<expr>]`
-        // returns undefined, Angular's `*ngTemplateOutlet` no-ops — the
-        // producer's `@ContentChild('header') ?? defaultContent` then
-        // renders its default. Note: the producer-side runtime acceptance
-        // of the `templates` input prop is a documented Angular divergence
-        // (parallel to React render-prop). Plan 07.2-06 finalises the
-        // producer-side wiring + docs/parity.md note.
+        // Each ViewChild captures one `__dynSlot_<N>` ref so the consumer's
+        // getter can compose `{ [<keyExpr>]: this.__dynSlot_<N>! }`.
         const dyn = emitDynamicSlotFiller(filler, fillerCtx, dynIdx);
         if (dyn !== null) {
           fillerParts.push(dyn.template);
-          dispatchParts.push(
-            `<ng-container *ngTemplateOutlet="templates[${dyn.keyExpr}]"></ng-container>`,
-          );
           dynRefs.push({
             refName: dyn.refName,
             keyExpr: dyn.keyExpr,
@@ -457,9 +462,22 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
       if (!ctx.scriptInjections.some((s) => s.name === getterName)) {
         ctx.scriptInjections.push({ name: getterName, decl: getterDecl });
       }
+      // Phase 07.3.2.1-01 — bind the deterministic class-body getter as a
+      // property INPUT on the producer tag. Leading-space prefix matches
+      // the `head`-composition invariant from L337 (tokenizer-safe append).
+      // Reuses `getterName` so a future multi-sibling lift (Plan 07.2-05/06)
+      // that promotes the name to `templates_<N>` auto-follows here. The
+      // RHS is the bare identifier — Angular's template parser resolves it
+      // against the component class, hitting the getter at runtime.
+      templatesBinding = ` [${getterName}]="${getterName}"`;
     }
-    const innerFills = [...fillerParts, ...dispatchParts].join('');
-    return `<${tagOut}${head}>${innerFills}</${tagOut}>`;
+    // `dispatchParts` is intentionally retained as a vestigial declaration
+    // above to minimise diff churn (the non-dynamic branch never populated
+    // it either; the dynamic branch no longer pushes to it post-Phase
+    // 07.3.2.1-01). Future cleanup may delete it once the surrounding
+    // shape stabilises.
+    const innerFills = fillerParts.join('');
+    return `<${tagOut}${head}${templatesBinding}>${innerFills}</${tagOut}>`;
   }
 
   const inner = node.children.map((c) => emitNode(c, ctx)).join('');
