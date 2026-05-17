@@ -65,11 +65,12 @@ and the Phase 07.2 Plan 06 dogfood at `examples/ModalConsumer.rozie` →
 A Rozie consumer using `<template #[expr]>` (dynamic slot name, where `expr`
 evaluates at runtime to the slot name) dispatches differently per target:
 
+<!-- VitePress (Vue compiler-sfc) parses `{{ ... }}` as interpolation even inside markdown inline-code spans inside table cells. The React/Solid/Svelte rows below use HTML entities (`&#123;` / `&#125;`) to render literal `{{` and `}}` without triggering the parser. The comment MUST live outside the table — a mid-table HTML comment breaks markdown table containment (#parity-page render bug). -->
+
 | Target  | Consumer-side dispatch                                                                                       | Producer-side acceptance needed?            |
 | ------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------- |
 | Vue     | `<template #[<expr>]>body</template>` — Vue 3.4+ native scoped-slot bracketed form                            | No — native scoped-slot dispatch handles it |
 | Lit     | `<div slot="${<expr>}">body</div>` — shadow-DOM native projection routes on the runtime `slot=` value         | No — shadow DOM native projection           |
-<!-- VitePress (Vue compiler-sfc) parses `{{ ... }}` as interpolation even inside markdown inline-code spans inside table cells. Use HTML entities to render literal `{{` and `}}` without triggering the parser. -->
 | React   | `<Producer slots=&#123;&#123; [<expr>]: () => <>body</> &#125;&#125; />` — additive `slots` prop with object dispatch             | Yes — producer must accept `slots?: Record<string, (ctx: Ctx) => ReactNode>` |
 | Solid   | `<Producer slots=&#123;&#123; [<expr>()]: () => <>body</> &#125;&#125; />` — signal-auto-called key                               | Yes — producer must accept `slots?: ...`     |
 | Svelte  | `<Producer snippets=&#123;&#123; [<expr>]: __rozieDynSlot_N &#125;&#125;>&#123;#snippet __rozieDynSlot_N()&#125;body&#123;/snippet&#125;</Producer>`  | Yes — producer must accept `snippets?: Record<string, Snippet<[Ctx]>>` |
