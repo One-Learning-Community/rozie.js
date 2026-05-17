@@ -57,7 +57,11 @@ describe('refineSlotTypes — Plan 04-03 Task 2', () => {
     expect(refined.ctxInterface).toMatch(/interface ChildrenCtx \{ item: any; \}/);
   });
 
-  it('named slot, no params → propFieldName: render<Pascal>, propFieldType: ReactNode', () => {
+  it('named slot, no params → propFieldName: render<Pascal>, propFieldType: () => ReactNode (Phase 07.3.2 fix — aligns with emitTypes.ts:152 public .d.ts)', () => {
+    // Phase 07.3.2 SC#4 WrapperModal re-projection root cause was bare
+    // `ReactNode` here vs `() => ReactNode` in emitTypes.ts:152 (.d.ts).
+    // Consumer-side emitSlotFiller.ts:126 always wraps body in an arrow;
+    // producer must declare the function shape so it knows to invoke.
     const slot: SlotDecl = {
       type: 'SlotDecl',
       name: 'header',
@@ -69,7 +73,7 @@ describe('refineSlotTypes — Plan 04-03 Task 2', () => {
     };
     const refined = refineSlotTypes(slot);
     expect(refined.propFieldName).toBe('renderHeader');
-    expect(refined.propFieldType).toBe('ReactNode');
+    expect(refined.propFieldType).toBe('() => ReactNode');
   });
 
   it('named slot WITH params → renderTrigger?: (ctx: TriggerCtx) => ReactNode + interface', () => {

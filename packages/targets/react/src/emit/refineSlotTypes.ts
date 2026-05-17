@@ -103,9 +103,22 @@ export function refineSlotTypes(slot: SlotDecl): RefinedSlotType {
   const pascal = pascalCase(slot.name);
   const propFieldName = 'render' + pascal;
   if (!hasParams) {
+    // Phase 07.3.2 fix — align inline TSX type with public .d.ts
+    // (emitTypes.ts:152 declares `() => ReactNode`). Consumer-side
+    // emitSlotFiller.ts:126 ALWAYS wraps body in an arrow
+    // (`renderHeader={() => (<>...</>)}`); bare `ReactNode` here caused
+    // React to render the function reference directly (React error:
+    // "Functions are not valid as a React child") — root cause of
+    // WrapperModal #brand/#actions silently rendering nothing in dogfood
+    // Modal 3. Pattern 2 (RESEARCH §"State of the Art" / PATTERNS Pattern 2)
+    // — same alignment-with-emitTypes precedent as the default-slot-with-
+    // params union form at L88-100. Composes cleanly with Plan 01's merged
+    // `(props.renderX ?? props.slots?.['x'])` fieldRef because the merge
+    // and the invocation `(...)?.()` layer at distinct grammar levels:
+    // `(a ?? b)?.()` is valid JS.
     return {
       propFieldName,
-      propFieldType: 'ReactNode',
+      propFieldType: '() => ReactNode',
       ctxInterface: null,
       defaultLifting: lifting,
       defaultFnName: lifting === 'function-const' ? `__default${pascal}` : null,
