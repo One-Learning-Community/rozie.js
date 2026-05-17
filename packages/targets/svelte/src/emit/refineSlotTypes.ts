@@ -5,13 +5,16 @@
  * Svelte 5 `interface Props { ... }` block. Each SlotDecl produces ONE entry:
  *
  *   - `name: ''`, params=[]                → `children?: Snippet`
- *   - `name: ''`, params=[Ctx]             → `children?: Snippet<[any]>`
+ *   - `name: ''`, params=[Ctx(close)]      → `children?: Snippet<[{ close: any }]>`
  *   - `name: 'header'`, params=[]          → `header?: Snippet`
- *   - `name: 'header'`, params=[A, B, ...] → `header?: Snippet<[any, any, ...]>`
+ *   - `name: 'header'`, params=[A, B, ...] → `header?: Snippet<[{ A: any; B: any; ... }]>`
  *
- * Per RESEARCH Pattern 3: single-param slots emit `Snippet<[any]>` (single-element
- * tuple); multi-param slots emit `Snippet<[any, any, ...]>`. Each param type is
- * `any` for v1 (TYPES-01 / Phase 6 refines once the type-flow pass lands).
+ * Phase 07.3.1 D-02 (Blocker #2): scoped slots emit a single-tuple object
+ * literal (`Snippet<[{ A: any; B: any }]>`) rather than a multi-arg positional
+ * tuple. This aligns the producer-side Snippet type with the object-payload
+ * shape emitted by emitSlotInvocation.ts and matches the consumer-side
+ * `{#snippet header({ close })}` destructure. Each param value type is `any`
+ * for v1 (TYPES-01 / Phase 6 refines once the type-flow pass lands).
  *
  * Caller composes the returned lines into the Props interface body. Empty
  * input returns an empty array (caller skips the slot section entirely).
@@ -33,10 +36,15 @@ export function buildSlotTypeFields(slots: SlotDecl[]): string[] {
   const lines: string[] = [];
   for (const s of slots) {
     const slotKey = s.name === '' ? 'children' : s.name;
+    // Phase 07.3.1 D-02 — object-tuple matches the object-shape snippet args
+    // emitted by emitSlotInvocation.ts. Single-element tuple wrapping a struct
+    // literal aligns with Vue's `defineSlots<{ header(p: { close: any }): any }>`
+    // convention and lets TypeScript catch destructure-mismatch on the
+    // consumer side.
     const paramTuple =
       s.params.length === 0
         ? ''
-        : `<[${s.params.map(() => 'any').join(', ')}]>`;
+        : `<[{ ${s.params.map((p) => `${p.name}: any`).join('; ')} }]>`;
     lines.push(`  ${slotKey}?: Snippet${paramTuple};`);
   }
   return lines;
