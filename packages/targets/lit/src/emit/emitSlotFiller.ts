@@ -47,8 +47,18 @@
  * Single-root passthrough: when the fill body resolves to a single
  * TemplateElement child, attach `slot="<name>"` directly to it instead of
  * adding a synthetic `<div>` wrapper. Keeps consumer-authored markup
- * structurally faithful. Multi-element bodies (and any non-element root)
- * fall back to the `<div slot="…">` wrapper.
+ * structurally faithful.
+ *
+ * Multi-root spread (Phase 07.3.1 D-LIT-18): when the fill body has
+ * multiple top-level elements separated only by whitespace, inject
+ * `slot="<name>"` into each opening tag instead of div-wrapping. The
+ * producer's named slot then receives each child directly, preserving
+ * consumer DOM structure.
+ *
+ * Mixed bodies (top-level text, top-level `${…}` interpolations, top-level
+ * comments, or any element already carrying `slot=`) fall back to the
+ * `<div slot="…">` wrapper — those cases are structurally ambiguous and
+ * the wrap keeps semantics conservative.
  *
  * Phase 07.1 self-reference pattern: SlotFillerDecl + IRComponent + the IR
  * TemplateNode alias come via the `@rozie/core` package specifier, NOT the
@@ -488,15 +498,26 @@ export function emitSlotFiller(
 }
 
 /**
- * Attach `slot="<name>"` to the body. If the body is a single root HTML
- * element, attach the attribute to that element directly. Otherwise wrap
- * the body in a synthetic `<div slot="<name>">`.
+ * Attach `slot="<name>"` to the body. Three-stage cascade:
+ *
+ *   1. Single-root passthrough — body is exactly one top-level element.
+ *      Attach `slot="<name>"` directly to that element.
+ *   2. Multi-root spread (Phase 07.3.1 D-LIT-18) — body has multiple
+ *      top-level elements with only whitespace between/around them.
+ *      Inject `slot="<name>"` into each top-level element's opening tag
+ *      instead of wrapping in a synthetic `<div>`. This preserves the
+ *      consumer-authored DOM structure: the producer's named slot
+ *      receives each child directly rather than receiving one wrapper
+ *      whose contents are then re-projected.
+ *   3. Fallback wrap — body has non-whitespace text at depth 0, or
+ *      contains a top-level `${...}` interpolation, or is otherwise
+ *      structurally ambiguous. Wrap in `<div slot="<name>">…</div>`.
  *
  * The detection heuristic is conservative — looks for the shape
  * `[whitespace]<tag …>…</tag>[whitespace]` with no sibling content. The
  * body string was produced by the recursive emitChildren callback, so its
- * outermost shape is predictable. For mixed/text/multi-element bodies we
- * fall back to the wrapper.
+ * outermost shape is predictable. For mixed/text bodies we fall back to
+ * the wrapper.
  */
 function wrapWithSlotAttribute(
   body: string,
@@ -534,7 +555,117 @@ function wrapWithSlotAttribute(
       }
     }
   }
+
+  // Phase 07.3.1 D-LIT-18 — multi-root spread. If the body has multiple
+  // top-level elements separated only by whitespace (no text content, no
+  // top-level interpolations), inject `slot="<name>"` into each opening
+  // tag instead of wrapping in a div. Preserves consumer-authored DOM
+  // structure so the producer's named slot receives each child directly.
+  const spread = spreadSlotAttrAcrossTopLevelElements(trimmed, slotName);
+  if (spread !== null) {
+    return spread;
+  }
+
   return `<div slot="${slotName}">${body}</div>`;
+}
+
+/**
+ * Phase 07.3.1 D-LIT-18 — inject `slot="<name>"` into the opening tag of
+ * every top-level element in `body`, returning the rewritten body. Returns
+ * `null` when the body is structurally unsafe to spread across:
+ *
+ *   - Top-level text content (anything non-whitespace outside an element)
+ *   - Top-level `${...}` interpolation (could expand to text at runtime)
+ *   - Top-level HTML comment or processing instruction (semantic surface)
+ *   - Fewer than 2 top-level elements (single-root passthrough handles 1;
+ *     0 means the body is empty/whitespace, where the wrap is innocuous)
+ *   - An existing `slot=` attribute on any top-level element (avoid
+ *     clobbering consumer-authored slot routing)
+ *   - A malformed opening tag (no matching `>` found before EOF)
+ *
+ * The scanner mirrors `hasSiblingAtTopLevel`'s walk so the same
+ * quote-and-interpolation-aware tokenization governs which elements are
+ * "top level."
+ *
+ * Whitespace and existing line structure between elements is preserved
+ * verbatim so emitted output stays readable.
+ */
+function spreadSlotAttrAcrossTopLevelElements(
+  body: string,
+  slotName: string,
+): string | null {
+  type OpenTag = { openIdx: number; closeIdx: number; isSelfClose: boolean };
+  const openTags: OpenTag[] = [];
+
+  let depth = 0;
+  let i = 0;
+  while (i < body.length) {
+    const ch = body[i]!;
+
+    // Top-level `${...}` interpolation = unsafe (could expand to text).
+    if (ch === '$' && body[i + 1] === '{') {
+      if (depth === 0) return null;
+      const end = skipInterpolation(body, i + 2);
+      if (end === -1) return null;
+      i = end + 1;
+      continue;
+    }
+
+    if (ch === '<') {
+      // Closing tag — decrement depth.
+      if (body[i + 1] === '/') {
+        const close = body.indexOf('>', i);
+        if (close === -1) return null;
+        depth = Math.max(0, depth - 1);
+        i = close + 1;
+        continue;
+      }
+      // Comment / processing instruction at depth 0 — unsafe.
+      if (body[i + 1] === '!' || body[i + 1] === '?') {
+        if (depth === 0) return null;
+        const close = body.indexOf('>', i);
+        if (close === -1) return null;
+        i = close + 1;
+        continue;
+      }
+      // Opening tag.
+      const close = findTagClose(body, i + 1);
+      if (close === -1) return null;
+      const isSelfClose = body[close - 1] === '/';
+      if (depth === 0) {
+        // Refuse if the opening tag already carries a `slot=` attribute —
+        // injecting a second one would clobber the consumer's routing.
+        const openTagText = body.slice(i, close + 1);
+        if (/\sslot\s*=/.test(openTagText)) return null;
+        openTags.push({ openIdx: i, closeIdx: close, isSelfClose });
+      }
+      if (!isSelfClose) depth++;
+      i = close + 1;
+      continue;
+    }
+
+    // Text at depth 0 with non-whitespace = unsafe.
+    if (depth === 0 && ch.trim() !== '') {
+      return null;
+    }
+    i++;
+  }
+
+  // Single-root (1 top-level element) is handled by the passthrough path;
+  // 0 top-level elements means whitespace-only body. Either way, defer.
+  if (openTags.length < 2) return null;
+
+  // Inject `slot="<name>"` into each top-level opening tag. Walk in
+  // reverse so earlier index positions stay stable during string surgery.
+  let out = body;
+  const attr = ` slot="${slotName}"`;
+  for (let k = openTags.length - 1; k >= 0; k--) {
+    const t = openTags[k]!;
+    // Inject BEFORE the `/>` for self-close, BEFORE the `>` for normal.
+    const insertAt = t.isSelfClose ? t.closeIdx - 1 : t.closeIdx;
+    out = out.slice(0, insertAt) + attr + out.slice(insertAt);
+  }
+  return out;
 }
 
 /**
