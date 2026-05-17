@@ -1,0 +1,5 @@
+<rozie name="AtPrefixCompletion">
+<template>
+  <div @<caret>></div>
+</template>
+</rozie>

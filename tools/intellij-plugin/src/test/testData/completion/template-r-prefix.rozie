@@ -1,0 +1,5 @@
+<rozie name="RPrefixCompletion">
+<template>
+  <div r-<caret>></div>
+</template>
+</rozie>
