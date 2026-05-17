@@ -1,0 +1,7 @@
+<rozie name="AnnotatorHtmlSigils">
+<template>
+  <div r-if="x" @click="y" :disabled="z" ref="root">
+    <template #header>X</template>
+  </div>
+</template>
+</rozie>

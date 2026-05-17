@@ -1,0 +1,7 @@
+<rozie name="AnnotatorComponentTag">
+<template>
+  <Modal r-model:open="x">
+    <Counter :value="42" />
+  </Modal>
+</template>
+</rozie>
