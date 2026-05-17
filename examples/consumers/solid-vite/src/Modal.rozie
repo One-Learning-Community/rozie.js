@@ -1,0 +1,133 @@
+<!--
+  Modal.rozie
+
+  Demonstrates:
+    - <listeners> with side-effect handlers (body scroll lock, focus management)
+    - .self modifier — only fires when event target IS the bound element (backdrop click)
+    - $emit for parent-controlled close
+    - Multiple $onMount and $onUnmount hooks colocated with the logic they serve
+    - $el — root element access for vanilla-JS lib integration (focus-trap library)
+    - r-if (full unmount) chosen over r-show — modals shouldn't stay in the tree
+
+  Note: this is the kind of component where the <listeners> block + .outside-style
+  modifiers replace ~30 lines of imperative addEventListener / removeEventListener
+  boilerplate that has to be written four times for a four-framework component library.
+-->
+
+<rozie name="Modal">
+
+<props>
+{
+  open:           { type: Boolean, default: false, model: true },
+  closeOnEscape:  { type: Boolean, default: true },
+  closeOnBackdrop:{ type: Boolean, default: true },
+  lockBodyScroll: { type: Boolean, default: true },
+  title:          { type: String,  default: '' },
+}
+</props>
+
+<components>
+{
+  Counter: './Counter.rozie',
+}
+</components>
+
+<script>
+const close = () => { $props.open = false; $emit('close') }
+
+// Body-scroll-lock state lives outside reactive data because it tracks DOM
+// rather than UI; managed entirely via lifecycle and listeners.
+let savedBodyOverflow = ''
+
+const lockScroll = () => {
+  if (!$props.lockBodyScroll) return
+  savedBodyOverflow = document.body.style.overflow
+  document.body.style.overflow = 'hidden'
+}
+
+const unlockScroll = () => {
+  if (!$props.lockBodyScroll) return
+  document.body.style.overflow = savedBodyOverflow
+}
+
+// Colocated lifecycle pair — runs in source order alongside other hooks.
+$onMount(lockScroll)
+$onUnmount(unlockScroll)
+
+// Colocated focus management — separate hook, separate concern.
+$onMount(() => {
+  $refs.dialogEl?.focus()
+})
+</script>
+
+<listeners>
+{
+  // Backdrop click. .self ensures we only close when the click target IS the
+  // backdrop element itself, not a child (the dialog panel) that bubbled up.
+  // Bound to a template ref via the implicit `target:` form — see notes below.
+  "document:keydown.escape": {
+    when:    "$props.open && $props.closeOnEscape",
+    handler: close,
+  },
+}
+</listeners>
+
+<template>
+<div r-if="$props.open" class="modal-backdrop" ref="backdropEl" @click.self="$props.closeOnBackdrop && close()">
+  <div
+    ref="dialogEl"
+    class="modal-dialog"
+    role="dialog"
+    aria-modal="true"
+    :aria-label="$props.title || undefined"
+    tabindex="-1"
+  >
+    <header r-if="$props.title || $slots.header">
+      <slot name="header" :close="close">
+        <h2>{{ $props.title }}</h2>
+      </slot>
+      <button class="close-btn" @click="close" aria-label="Close">×</button>
+    </header>
+
+    <div class="modal-body">
+      <slot :close="close" />
+      <Counter />
+    </div>
+
+    <footer r-if="$slots.footer">
+      <slot name="footer" :close="close" />
+    </footer>
+  </div>
+</div>
+</template>
+
+<style>
+.modal-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex; align-items: center; justify-content: center;
+  z-index: var(--rozie-modal-z, 2000);
+}
+.modal-dialog {
+  background: white;
+  border-radius: 8px;
+  min-width: 20rem;
+  max-width: min(90vw, 40rem);
+  max-height: 90vh;
+  display: flex; flex-direction: column;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  outline: none;
+}
+header, footer { padding: 1rem; display: flex; align-items: center; gap: 0.5rem; }
+header { border-bottom: 1px solid rgba(0, 0, 0, 0.08); }
+header h2 { flex: 1; margin: 0; font-size: 1.1rem; }
+footer { border-top: 1px solid rgba(0, 0, 0, 0.08); justify-content: flex-end; }
+.modal-body { padding: 1rem; overflow: auto; }
+.close-btn { background: none; border: none; cursor: pointer; font-size: 1.5rem; line-height: 1; }
+
+:root {
+  --rozie-modal-z: 2000;
+}
+</style>
+
+</rozie>
