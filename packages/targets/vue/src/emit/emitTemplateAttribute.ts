@@ -140,11 +140,16 @@ function attrToArraySegment(attr: AttributeBinding, ir: IRComponent): string {
  */
 function emitSingleAttr(attr: AttributeBinding, ir: IRComponent): string {
   if (attr.kind === 'twoWayBinding') {
-    // Phase 07.3 Wave 3 stub — Plan 07.3-03 replaces this with the Vue
-    // `v-model:propName="<expr>"` emit.
-    throw new Error(
-      `Vue target: r-model:${attr.name}= consumer-side two-way binding not yet implemented (Phase 07.3 Wave 3 Plan 07.3-03).`,
-    );
+    // Phase 07.3 Wave 3 Plan 07.3-03 (TWO-WAY-03) — consumer-side two-way binding.
+    // Mirror native Vue 3.4+ idiom (D-01): `r-model:propName="<expr>"` lowers to
+    // `v-model:<propName>="<rewritten-expr>"`. The producer-side `defineModel<T>`
+    // machinery (TWO-WAY-02) is already in place; this branch wires the consumer
+    // template attribute into it. The RHS is rewritten via the standard template
+    // expression rewriter so $data.x → x and $props.x (model:true) → x per Vue
+    // auto-unwrap conventions. PropName is preserved verbatim (camelCase
+    // intentional — Vue's `v-model:argName` is camelCase-preserving).
+    const expr = rewriteTemplateExpression(attr.expression, ir);
+    return `v-model:${attr.name}="${expr}"`;
   }
 
   // Special r-model directive (Phase 2 lowerer keeps it as binding name=`r-model`).
