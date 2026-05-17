@@ -43,8 +43,6 @@ dependencies {
         testFramework(TestFrameworkType.Platform)
     }
     testImplementation("junit:junit:4.13.2")
-    // For D-07 TM <-> JFlex drift check (Plan 02 will use it; Plan 01 only verifies path resolution)
-    testImplementation("org.json:json:20240303")
     // Required for the 2024.2 testFramework: BasePlatformTestCase initialization throws
     // NoClassDefFoundError: org/opentest4j/AssertionFailedError without an explicit
     // opentest4j dep. RESEARCH.md "Supporting" table flagged this for <2024.3.
@@ -108,12 +106,3 @@ tasks.register<GenerateLexerTask>("generateRozieLexer") {
 
 tasks.named("compileKotlin") { dependsOn("generateRozieLexer") }
 tasks.named("compileJava") { dependsOn("generateRozieLexer") }
-
-// Pitfall 10 mitigation: pass the absolute path to the TextMate grammar JSON as a
-// system property so the D-07 drift check (Plan 02) can read it regardless of CWD.
-tasks.test {
-    systemProperty(
-        "rozie.tmGrammarPath",
-        "${rootProject.projectDir}/../textmate/syntaxes/rozie.tmLanguage.json"
-    )
-}

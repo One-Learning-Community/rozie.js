@@ -19,6 +19,7 @@
          IDEs that bundle them (IDEA Ultimate, WebStorm, PhpStorm, RubyMine,
          GoLand, PyCharm Pro). Pitfall 1 mitigation. -->
     <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.modules.xml</depends>
     <depends>JavaScript</depends>
     <depends>com.intellij.css</depends>
 
