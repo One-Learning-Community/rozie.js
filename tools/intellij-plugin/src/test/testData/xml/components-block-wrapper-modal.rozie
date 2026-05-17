@@ -1,0 +1,13 @@
+<rozie name="ComponentsBlockWrapperModal">
+
+<components>
+{
+  Modal: './Modal.rozie',
+}
+</components>
+
+<template>
+<Modal>wrapped</Modal>
+</template>
+
+</rozie>

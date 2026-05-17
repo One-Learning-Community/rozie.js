@@ -1,0 +1,22 @@
+<rozie name="ComponentsBlockWithSelfImport">
+
+<components>
+{
+  TreeNode: './TreeNode.rozie',
+}
+</components>
+
+<props>
+{
+  node: { type: Object, default: () => ({ id: '', label: '', children: [] }) },
+}
+</props>
+
+<template>
+<div class="tree-node">
+  <span>{{ $props.node.label }}</span>
+  <TreeNode r-for="child in $props.node.children" :node="child" />
+</div>
+</template>
+
+</rozie>

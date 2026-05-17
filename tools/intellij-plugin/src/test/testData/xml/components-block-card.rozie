@@ -1,0 +1,22 @@
+<rozie name="ComponentsBlockCard">
+
+<components>
+{
+  CardHeader: './CardHeader.rozie',
+}
+</components>
+
+<props>
+{
+  title: { type: String, default: '' },
+}
+</props>
+
+<template>
+<article class="card">
+  <CardHeader :title="$props.title" />
+  <slot />
+</article>
+</template>
+
+</rozie>

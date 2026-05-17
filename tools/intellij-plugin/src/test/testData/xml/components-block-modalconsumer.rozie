@@ -1,0 +1,17 @@
+<rozie name="ComponentsBlockModalConsumer">
+
+<components>
+{
+  Modal: './Modal.rozie',
+  WrapperModal: './WrapperModal.rozie',
+}
+</components>
+
+<template>
+<div class="wrapper">
+  <Modal>body</Modal>
+  <WrapperModal>more</WrapperModal>
+</div>
+</template>
+
+</rozie>
