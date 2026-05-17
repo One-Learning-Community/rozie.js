@@ -52,12 +52,29 @@ class RozieMultiHostInjector : MultiHostInjector {
         while (i < tokens.size) {
             val tok = tokens[i]
             when (tok.type) {
+                // SCRIPT_BODY + LISTENERS_BODY stay UNWRAPPED — see injectJs KDoc.
+                //   - SCRIPT_BODY is a statement list (function decls, const decls, lifecycle
+                //     calls); wrapping in parens would parse it as a single expression and
+                //     break top-level declarations.
+                //   - LISTENERS_BODY is an object literal at top level but UAT-CHECKLIST-v0.2.0
+                //     (lines 165–171) did NOT name <listeners> as noisy, and a populated
+                //     listeners block can legitimately read as a statement list in some
+                //     authoring patterns. Conservative stance for v0.2.0 — revisit in Plan
+                //     08.2-12 human UAT if needed (planner discretion per the plan's
+                //     <interfaces> LISTENERS_BODY decision section).
                 RozieTokenTypes.SCRIPT_BODY,
+                RozieTokenTypes.LISTENERS_BODY,
+                -> { injectJs(registrar, host, tok.range); i++ }
+
+                // PROPS_BODY / DATA_BODY / COMPONENTS_BODY are by-design object literals.
+                // Paren-wrap via addPlace prefix=`(\n` + suffix=`\n)` so the JS parser
+                // sees `({ key: value })` (an expression) instead of `{ key: value }`
+                // (a label-statement) — closes P1-UAT-04 at the injection layer.
+                // See injectJsAsExpression KDoc for full rationale + Vue/Svelte precedent.
                 RozieTokenTypes.PROPS_BODY,
                 RozieTokenTypes.DATA_BODY,
-                RozieTokenTypes.LISTENERS_BODY,
                 RozieTokenTypes.COMPONENTS_BODY,
-                -> { injectJs(registrar, host, tok.range); i++ }
+                -> { injectJsAsExpression(registrar, host, tok.range); i++ }
 
                 RozieTokenTypes.TEMPLATE_BODY,
                 -> {
@@ -98,6 +115,76 @@ class RozieMultiHostInjector : MultiHostInjector {
         val js = Language.findLanguageByID("JavaScript") ?: return
         registrar.startInjecting(js)
             .addPlace(null, null, host, range)
+            .doneInjecting()
+    }
+
+    /**
+     * Inject [range] as JavaScript with a parenthesised-expression wrap.
+     *
+     * Mechanism: `MultiHostRegistrar.addPlace(prefix, suffix, host, range)` lets us
+     * prepend/append text to the injected fragment that does NOT appear in the host
+     * file's byte stream — but DOES affect how the injected language parses the
+     * fragment. By prepending `(\n` and appending `\n)`, the JavaScript parser sees:
+     *
+     *   `(\n{ value: 0, step: 1 }\n)`     ← parenthesised expression
+     *
+     * instead of:
+     *
+     *   `{ value: 0, step: 1 }`           ← parsed at JS top-level as a
+     *                                       JSBlockStatement containing a
+     *                                       JSLabeledStatement (label `value:`
+     *                                       carries the "key" semantics);
+     *                                       triggers "Statement expected" /
+     *                                       JSLabeledStatement family warnings.
+     *
+     * After the wrap, the injected PSI tree is a real JSObjectLiteralExpression
+     * with JSProperty children — the JavaScript inspector's statement-position
+     * heuristics see a valid expression and emit no diagnostics.
+     *
+     * **Closes:** P1-UAT-04 (UAT-CHECKLIST-v0.2.0.md lines 165–171) — the
+     * "Statement expected" / "Component expected" / JSLabeledStatement warning
+     * family on object-literal-shaped block bodies (<components> / <props> /
+     * <data>). Implementation per Plan 08.2-11.
+     *
+     * **Why `\n` on both sides:** the newline padding ensures the prefix/suffix
+     * doesn't collide with comments or unusual string spans in the user's body.
+     * A bare `(` immediately followed by `// comment` is fine in JS, but `(\n` is
+     * more robust against edge cases (the trailing-newline-then-EOF idiom that
+     * some hand-rolled lexer scanners — and some compose-map tooling that snaps
+     * fragments by line — handle more uniformly than a bare-paren).
+     *
+     * **Coordinate-mapping invariant preserved:** the prefix and suffix are
+     * conceptually OUTSIDE the host coordinate space — they exist only in the
+     * injected document. [InjectedLanguageManager.injectedToHost] correctly
+     * subtracts the prefix length when translating an injected offset back to
+     * host coordinates, so Plan 05's [js.rozie.intellij.references.RoziePropsReference]
+     * cross-block Go-to-Declaration continues to work accurately through the
+     * wrap. The behavioral assertion is the
+     * `testPropsParenWrapPreservesCrossBlockGoToDeclaration` test in
+     * `RozieInjectionTest`.
+     *
+     * **Precedent:** Vue's IntelliJ plugin (vue-js-plugin) uses identical
+     * prefix/suffix wrap for `<script setup>` object-literal cases — empirically
+     * verifiable in their open-source plugin sources. Svelte's IntelliJ plugin
+     * uses the same idiom for `$:` reactive declarations. This is the canonical
+     * JetBrains pattern for "inject a fragment that needs an outer syntactic
+     * context that doesn't exist in the host file."
+     *
+     * **What this does NOT silence:** the "unused symbol" family (JSUnusedGlobal/
+     * LocalSymbols) flagged on object-literal keys with no in-file reader — that
+     * is the orthogonal cross-block-unaware case, which Plan 08.2-08's
+     * [js.rozie.intellij.inspection.RozieJSInspectionSuppressor] closes
+     * independently. Paren-wrap and suppressor are complementary fixes for two
+     * different families of P1-UAT-04 noise.
+     */
+    private fun injectJsAsExpression(
+        registrar: MultiHostRegistrar,
+        host: RozieRootBlock,
+        range: TextRange,
+    ) {
+        val js = Language.findLanguageByID("JavaScript") ?: return
+        registrar.startInjecting(js)
+            .addPlace("(\n", "\n)", host, range)
             .doneInjecting()
     }
 

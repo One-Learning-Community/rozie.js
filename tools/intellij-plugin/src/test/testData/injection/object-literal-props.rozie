@@ -1,0 +1,9 @@
+<rozie name="ObjectLiteralProps">
+<props>{ value: 0, step: 1, label: 'count' }</props>
+<script>
+const x = $props.value;
+</script>
+<template>
+  <span>{{ $props.label }}: {{ x }}</span>
+</template>
+</rozie>
