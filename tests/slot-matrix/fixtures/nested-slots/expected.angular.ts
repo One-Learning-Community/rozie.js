@@ -12,7 +12,7 @@ interface InnerCtx {}
   template: `
 
     <div class="nested-slots-fixture">
-      @if (wrapperTpl) {
+      @if ((wrapperTpl ?? templates()?.['wrapper'])) {
     <ng-container *ngTemplateOutlet="(wrapperTpl ?? templates()?.['wrapper'])" />
     } @else {
 

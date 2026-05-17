@@ -25,9 +25,9 @@ interface FooterCtx {
     @if (open()) {
     <div class="modal-backdrop" #backdropEl (click)="_guardedHandler0($event)">
       <div #dialogEl class="modal-dialog" role="dialog" aria-modal="true" [aria-label]="title() || undefined" tabindex="-1">
-        @if (title() || headerTpl) {
+        @if (title() || (headerTpl ?? templates()?.['header'])) {
     <header>
-          @if (headerTpl) {
+          @if ((headerTpl ?? templates()?.['header'])) {
     <ng-container *ngTemplateOutlet="(headerTpl ?? templates()?.['header']); context: { $implicit: { close: _close }, close: _close }" />
     } @else {
 
@@ -40,9 +40,9 @@ interface FooterCtx {
           <ng-container *ngTemplateOutlet="(defaultTpl ?? templates()?.['defaultSlot']); context: { $implicit: { close: _close }, close: _close }" />
         </div>
 
-        @if (footerTpl) {
+        @if ((footerTpl ?? templates()?.['footer'])) {
     <footer>
-          @if (footerTpl) {
+          @if ((footerTpl ?? templates()?.['footer'])) {
     <ng-container *ngTemplateOutlet="(footerTpl ?? templates()?.['footer']); context: { $implicit: { close: _close }, close: _close }" />
     }
         </footer>

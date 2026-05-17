@@ -38,6 +38,38 @@ function flattenInlineCode(code: string): string {
   return code.replace(/\s*\n\s*/g, ' ').replace(/[ \t]+/g, ' ').trim();
 }
 
+/**
+ * Phase 07.3.2 Plan 10 — listener-context `$slots.X` merge with dynamic-name
+ * fallback. Produces `(this.<X>Tpl ?? this.templates()?.['<x>'])`. Listener
+ * bodies run in class context so both operands carry the `this.` prefix.
+ *
+ * Single quotes on the computed-key string applied via `extra.raw` to match
+ * emitSlotInvocation.ts:326 convention and minimize dist-parity diff.
+ */
+function buildListenerSlotsMerge(
+  tplName: string,
+  dynKey: string,
+): t.Expression {
+  const staticRef = t.memberExpression(t.thisExpression(), t.identifier(tplName));
+  const templatesCall = t.callExpression(
+    t.memberExpression(t.thisExpression(), t.identifier('templates')),
+    [],
+  );
+  const dynKeyLit = t.stringLiteral(dynKey);
+  (dynKeyLit as t.StringLiteral & { extra?: { raw?: string; rawValue?: string } }).extra = {
+    raw: `'${dynKey}'`,
+    rawValue: dynKey,
+  };
+  const dynamicRef = t.optionalMemberExpression(
+    templatesCall,
+    dynKeyLit,
+    true,
+    true,
+  );
+  const merge = t.logicalExpression('??', staticRef, dynamicRef);
+  return t.parenthesizedExpression(merge);
+}
+
 export interface RewriteListenerOpts {
   collisionRenames?: ReadonlyMap<string, string> | undefined;
   /**
@@ -146,11 +178,11 @@ export function rewriteListenerExpression(
         return;
       }
       if (obj.name === '$slots' && slotNames.has(prop.name)) {
-        const tplName =
-          prop.name === '' ? 'defaultTpl' : `${prop.name}Tpl`;
-        path.replaceWith(
-          t.memberExpression(t.thisExpression(), t.identifier(tplName)),
-        );
+        // Phase 07.3.2 Plan 10 — listener-context $slots.X also merges with
+        // the dynamic-name fallback (class-body context, `this.` prefix).
+        const tplName = prop.name === '' ? 'defaultTpl' : `${prop.name}Tpl`;
+        const dynKey = prop.name === '' ? 'defaultSlot' : prop.name;
+        path.replaceWith(buildListenerSlotsMerge(tplName, dynKey));
         path.skip();
         return;
       }

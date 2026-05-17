@@ -50,6 +50,45 @@ function flattenInlineCode(code: string): string {
 }
 
 /**
+ * Phase 07.3.2 Plan 10 — build the dynamic-name fallback merge for `$slots.X`.
+ *
+ * Returns `(tplName ?? templates()?.['dynKey'])` (or, with `prefixThis: true`,
+ * `(this.tplName ?? this.templates()?.['dynKey'])`). Both operands flow through
+ * `mkRef()` so the prefixThis discipline (d46f597) is honored end-to-end —
+ * static path AND templates() callee.
+ *
+ * Uses `t.parenthesizedExpression` for the outer parens. Single quotes on the
+ * computed-key StringLiteral are applied via `extra.raw` / `extra.rawValue`
+ * so @babel/generator emits `'header'` not `"header"` — matching the existing
+ * emitSlotInvocation.ts:326 string-concat shape so dist-parity diffs stay
+ * limited to the planned outer-guard merge.
+ */
+function buildSlotsMerge(
+  mkRef: (name: string) => t.Expression,
+  tplName: string,
+  dynKey: string,
+): t.Expression {
+  const dynKeyLit = t.stringLiteral(dynKey);
+  // Force single-quote output for the computed key — matches emitSlotInvocation
+  // template-string convention and existing dist-parity baseline.
+  (dynKeyLit as t.StringLiteral & { extra?: { raw?: string; rawValue?: string } }).extra = {
+    raw: `'${dynKey}'`,
+    rawValue: dynKey,
+  };
+  const merge = t.logicalExpression(
+    '??',
+    mkRef(tplName),
+    t.optionalMemberExpression(
+      t.callExpression(mkRef('templates'), []),
+      dynKeyLit,
+      true,
+      true,
+    ),
+  );
+  return t.parenthesizedExpression(merge);
+}
+
+/**
  * Build `name.set(rhs)` for a plain `=`, or `name.set(name() OP rhs)` for
  * compound operators. Used when rewriting template-context AssignmentExpressions
  * targeting signal-typed members.
@@ -204,11 +243,12 @@ export function rewriteTemplateExpression(
         return;
       }
       if (obj.name === '$slots' && slotNames.has(prop.name)) {
-        const tplName =
-          prop.name === ''
-            ? 'defaultTpl'
-            : `${prop.name}Tpl`;
-        path.replaceWith(mkRef(tplName));
+        // Phase 07.3.2 Plan 10 — guard must merge with dynamic-name fallback
+        // so r-if="$slots.foo" evaluates truthy when ONLY dynamic-name fills
+        // exist. mkRef() respects prefixThis (d46f597) for class-body callsites.
+        const tplName = prop.name === '' ? 'defaultTpl' : `${prop.name}Tpl`;
+        const dynKey = prop.name === '' ? 'defaultSlot' : prop.name;
+        path.replaceWith(buildSlotsMerge(mkRef, tplName, dynKey));
         path.skip();
         return;
       }
@@ -246,11 +286,10 @@ export function rewriteTemplateExpression(
         return;
       }
       if (obj.name === '$slots' && slotNames.has(prop.name)) {
-        const tplName =
-          prop.name === ''
-            ? 'defaultTpl'
-            : `${prop.name}Tpl`;
-        path.replaceWith(mkRef(tplName));
+        // Phase 07.3.2 Plan 10 — same merge as MemberExpression branch.
+        const tplName = prop.name === '' ? 'defaultTpl' : `${prop.name}Tpl`;
+        const dynKey = prop.name === '' ? 'defaultSlot' : prop.name;
+        path.replaceWith(buildSlotsMerge(mkRef, tplName, dynKey));
         path.skip();
         return;
       }

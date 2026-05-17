@@ -91,6 +91,38 @@ const COMPOUND_OP_MAP: Record<string, t.BinaryExpression['operator']> = {
 };
 
 /**
+ * Phase 07.3.2 Plan 10 — script-context `$slots.X` merge with dynamic-name
+ * fallback. Produces `(this.<X>Tpl ?? this.templates()?.['<x>'])` so the
+ * outer-r-if-guard semantics survive lowering through the class-body context.
+ *
+ * Single quotes on the computed-key string applied via `extra.raw` to match
+ * emitSlotInvocation.ts:326 convention and minimize dist-parity diff.
+ */
+function buildScriptSlotsMerge(
+  tplName: string,
+  dynKey: string,
+): t.Expression {
+  const staticRef = t.memberExpression(t.thisExpression(), t.identifier(tplName));
+  const templatesCall = t.callExpression(
+    t.memberExpression(t.thisExpression(), t.identifier('templates')),
+    [],
+  );
+  const dynKeyLit = t.stringLiteral(dynKey);
+  (dynKeyLit as t.StringLiteral & { extra?: { raw?: string; rawValue?: string } }).extra = {
+    raw: `'${dynKey}'`,
+    rawValue: dynKey,
+  };
+  const dynamicRef = t.optionalMemberExpression(
+    templatesCall,
+    dynKeyLit,
+    true,
+    true,
+  );
+  const merge = t.logicalExpression('??', staticRef, dynamicRef);
+  return t.parenthesizedExpression(merge);
+}
+
+/**
  * Build `this.foo.set(rhs)` for a plain `=`, or
  * `this.foo.set(this.foo() OP rhs)` for compound operators.
  */
@@ -410,13 +442,12 @@ export function rewriteRozieIdentifiers(
         return;
       }
       if (obj.name === '$slots' && slotNames.has(prop.name)) {
-        const tplName =
-          prop.name === ''
-            ? 'defaultTpl'
-            : `${prop.name}Tpl`;
-        path.replaceWith(
-          t.memberExpression(t.thisExpression(), t.identifier(tplName)),
-        );
+        // Phase 07.3.2 Plan 10 — merge with dynamic-name fallback so script
+        // expressions referencing $slots.X also benefit from the consumer-side
+        // templates() input map. Script context always uses `this.` prefix.
+        const tplName = prop.name === '' ? 'defaultTpl' : `${prop.name}Tpl`;
+        const dynKey = prop.name === '' ? 'defaultSlot' : prop.name;
+        path.replaceWith(buildScriptSlotsMerge(tplName, dynKey));
         return;
       }
     },

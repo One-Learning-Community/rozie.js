@@ -25,7 +25,7 @@ interface EmptyCtx {}
 
     <div class="todo-list">
       <header>
-        @if (headerTpl) {
+        @if ((headerTpl ?? templates()?.['header'])) {
     <ng-container *ngTemplateOutlet="(headerTpl ?? templates()?.['header']); context: { $implicit: { remaining: remaining(), total: items().length }, remaining: remaining(), total: items().length }" />
     } @else {
 
@@ -45,7 +45,7 @@ interface EmptyCtx {}
         @for (item of items(); track item.id) {
     <li [class]="{ done: item.done }">
           
-          @if (defaultTpl) {
+          @if ((defaultTpl ?? templates()?.['defaultSlot'])) {
     <ng-container *ngTemplateOutlet="(defaultTpl ?? templates()?.['defaultSlot']); context: _defaultSlot_ctx_1(item)" />
     } @else {
 
@@ -58,7 +58,7 @@ interface EmptyCtx {}
       </ul>
     } @else {
     <p class="empty">
-        @if (emptyTpl) {
+        @if ((emptyTpl ?? templates()?.['empty'])) {
     <ng-container *ngTemplateOutlet="(emptyTpl ?? templates()?.['empty'])" />
     } @else {
     Nothing to do. ✨

@@ -2,9 +2,9 @@
 @if (open()) {
 <div class="modal-backdrop" #backdropEl (click)="_guardedHandler0($event)">
   <div #dialogEl class="modal-dialog" role="dialog" aria-modal="true" [aria-label]="title() || undefined" tabindex="-1">
-    @if (title() || headerTpl) {
+    @if (title() || (headerTpl ?? templates()?.['header'])) {
 <header>
-      @if (headerTpl) {
+      @if ((headerTpl ?? templates()?.['header'])) {
 <ng-container *ngTemplateOutlet="(headerTpl ?? templates()?.['header']); context: { $implicit: { close: close }, close: close }" />
 } @else {
 
@@ -17,9 +17,9 @@
       <ng-container *ngTemplateOutlet="(defaultTpl ?? templates()?.['defaultSlot']); context: { $implicit: { close: close }, close: close }" />
     </div>
 
-    @if (footerTpl) {
+    @if ((footerTpl ?? templates()?.['footer'])) {
 <footer>
-      @if (footerTpl) {
+      @if ((footerTpl ?? templates()?.['footer'])) {
 <ng-container *ngTemplateOutlet="(footerTpl ?? templates()?.['footer']); context: { $implicit: { close: close }, close: close }" />
 }
     </footer>
