@@ -51,6 +51,7 @@
         "path": "./syntaxes/rozie.tmLanguage.json",
         "embeddedLanguages": {
           "meta.embedded.block.script.rozie": "javascript",
+          "meta.embedded.block.script.ts.rozie": "typescript",
           "meta.embedded.block.style.rozie": "css",
           "meta.embedded.expression.rozie": "javascript"
         }

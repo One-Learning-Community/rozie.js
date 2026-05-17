@@ -8,6 +8,7 @@
     { "include": "#rozie-wrapper-open" },
     { "include": "#rozie-wrapper-close" },
     { "include": "#block-template" },
+    { "include": "#block-script-ts" },
     { "include": "#block-script" },
     { "include": "#block-props" },
     { "include": "#block-data" },
@@ -71,6 +72,31 @@
       "contentName": "meta.embedded.block.template.rozie",
       "patterns": [
         { "include": "#template-content" }
+      ]
+    },
+    "block-script-ts": {
+      "comment": "Sibling of block-script — listed FIRST in top-level patterns so any `<script>` opener with lang=\"ts\" wins over the generic opener via TextMate first-match-wins. Plain `<script>` (no lang) and `lang=\"js\"` openers fall through to #block-script. The lookahead requires lang=\"ts\" (single- or double-quoted) so this rule cannot match a plain opener.",
+      "begin": "(<)(script)\\b(?=[^>]*\\blang\\s*=\\s*(?:\"ts\"|'ts'))([^>]*)(>)",
+      "end": "(</)(script)(>)",
+      "beginCaptures": {
+        "1": { "name": "punctuation.definition.tag.begin.rozie" },
+        "2": { "name": "entity.name.tag.rozie.block.script.ts" },
+        "3": {
+          "patterns": [
+            { "include": "#tag-attributes" }
+          ]
+        },
+        "4": { "name": "punctuation.definition.tag.end.rozie" }
+      },
+      "endCaptures": {
+        "1": { "name": "punctuation.definition.tag.begin.rozie" },
+        "2": { "name": "entity.name.tag.rozie.block.script.ts" },
+        "3": { "name": "punctuation.definition.tag.end.rozie" }
+      },
+      "contentName": "meta.embedded.block.script.ts.rozie source.ts",
+      "patterns": [
+        { "include": "#magic-identifier" },
+        { "include": "source.ts" }
       ]
     },
     "block-script": {

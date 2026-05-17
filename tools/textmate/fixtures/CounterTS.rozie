@@ -1,0 +1,45 @@
+<!--
+  CounterTS.rozie
+
+  Same shape as Counter.rozie but with <script lang="ts"> + TS-specific
+  constructs (type alias, satisfies, typed local). Used to visually
+  verify that #block-script-ts routes content to source.ts.
+-->
+
+<rozie name="CounterTS">
+
+<props>
+{
+  value: { type: Number, default: 0, model: true },
+  step:  { type: Number, default: 1 },
+}
+</props>
+
+<data>
+{
+  hovering: false,
+}
+</data>
+
+<script lang="ts">
+type CounterShape = { value: number; step: number }
+
+const config = { value: $props.value, step: $props.step } satisfies CounterShape
+
+const canIncrement: boolean = $computed(() => $props.value + $props.step <= 100)
+
+const increment = (): void => { if (canIncrement) $props.value += $props.step }
+</script>
+
+<template>
+<div class="counter">
+  <button @click="increment" aria-label="Increment">+</button>
+  <span>{{ $props.value }}</span>
+</div>
+</template>
+
+<style>
+.counter { display: inline-flex; gap: 0.5rem; align-items: center; }
+</style>
+
+</rozie>
