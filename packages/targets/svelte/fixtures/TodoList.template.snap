@@ -1,7 +1,7 @@
 
 <div class="todo-list">
   <header>
-    {#if header}{@render header(remaining, items.length)}{:else}
+    {#if header}{@render header({ remaining, total: items.length })}{:else}
       
       <h3>{title} ({remaining} remaining)</h3>
     {/if}
@@ -15,7 +15,7 @@
   {#if items.length > 0}<ul>
     {#each items as item (item.id)}<li class={{ done: item.done }}>
       
-      {#if children}{@render children(item, () => toggle(item.id), () => remove(item.id))}{:else}
+      {#if children}{@render children({ item, toggle: () => toggle(item.id), remove: () => remove(item.id) })}{:else}
         <label><input type="checkbox" checked={item.done} onchange={(e) => { toggle(item.id); }} /><span>{item.text}</span></label>
         <button aria-label="Remove" onclick={(e) => { remove(item.id); }}>×</button>
       {/if}

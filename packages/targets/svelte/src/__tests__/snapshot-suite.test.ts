@@ -103,7 +103,9 @@ describe('emitSvelte — substring invariants (Plan 02a Task 3 acceptance criter
     const { code } = emitSvelte(ir, { filename, source: src });
     expect(code).toContain('Snippet<[');
     expect(code).toContain('{#each items as item (item.id)}');
-    expect(code).toMatch(/\{@render header\?\.\([^)]*\)\}|\{#if header\}\{@render header\(/);
+    // Phase 07.3.1 Blocker #2 D-02 — tightened from `[^)]*` to `\{[^}]*\}` to
+    // enforce object-shape snippet args (`{ remaining, total }` not positional).
+    expect(code).toMatch(/\{@render header\?\.\(\{[^}]*\}\)\}|\{#if header\}\{@render header\(\{/);
   });
 
   it('Modal.svelte.snap contains :global(:root) AND paired-cleanup $effect', () => {
