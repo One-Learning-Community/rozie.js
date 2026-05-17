@@ -2,7 +2,7 @@
 <div class="todo-list">
   <header>
     @if (headerTpl) {
-<ng-container *ngTemplateOutlet="headerTpl; context: { $implicit: { remaining: remaining(), total: items().length }, remaining: remaining(), total: items().length }" />
+<ng-container *ngTemplateOutlet="(headerTpl ?? templates()?.['header']); context: { $implicit: { remaining: remaining(), total: items().length }, remaining: remaining(), total: items().length }" />
 } @else {
 
       
@@ -22,7 +22,7 @@
 <li [class]="{ done: item.done }">
       
       @if (defaultTpl) {
-<ng-container *ngTemplateOutlet="defaultTpl; context: _defaultSlot_ctx_1(item)" />
+<ng-container *ngTemplateOutlet="(defaultTpl ?? templates()?.['defaultSlot']); context: _defaultSlot_ctx_1(item)" />
 } @else {
 
         <label><input type="checkbox" [checked]="item.done" (change)="toggle(item.id)" /><span>{{ item.text }}</span></label>
@@ -35,7 +35,7 @@
 } @else {
 <p class="empty">
     @if (emptyTpl) {
-<ng-container *ngTemplateOutlet="emptyTpl" />
+<ng-container *ngTemplateOutlet="(emptyTpl ?? templates()?.['empty'])" />
 } @else {
 Nothing to do. ✨
 }

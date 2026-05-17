@@ -26,7 +26,7 @@ interface EmptyCtx {}
     <div class="todo-list">
       <header>
         @if (headerTpl) {
-    <ng-container *ngTemplateOutlet="headerTpl; context: { $implicit: { remaining: remaining(), total: items().length }, remaining: remaining(), total: items().length }" />
+    <ng-container *ngTemplateOutlet="(headerTpl ?? templates()?.['header']); context: { $implicit: { remaining: remaining(), total: items().length }, remaining: remaining(), total: items().length }" />
     } @else {
 
           
@@ -46,7 +46,7 @@ interface EmptyCtx {}
     <li [class]="{ done: item.done }">
           
           @if (defaultTpl) {
-    <ng-container *ngTemplateOutlet="defaultTpl; context: _defaultSlot_ctx_1(item)" />
+    <ng-container *ngTemplateOutlet="(defaultTpl ?? templates()?.['defaultSlot']); context: _defaultSlot_ctx_1(item)" />
     } @else {
 
             <label><input type="checkbox" [checked]="item.done" (change)="_toggle(item.id)" /><span>{{ item.text }}</span></label>
@@ -59,7 +59,7 @@ interface EmptyCtx {}
     } @else {
     <p class="empty">
         @if (emptyTpl) {
-    <ng-container *ngTemplateOutlet="emptyTpl" />
+    <ng-container *ngTemplateOutlet="(emptyTpl ?? templates()?.['empty'])" />
     } @else {
     Nothing to do. ✨
     }
@@ -86,6 +86,7 @@ export class TodoList {
   @ContentChild('header', { read: TemplateRef }) headerTpl?: TemplateRef<HeaderCtx>;
   @ContentChild('defaultSlot', { read: TemplateRef }) defaultTpl?: TemplateRef<DefaultCtx>;
   @ContentChild('empty', { read: TemplateRef }) emptyTpl?: TemplateRef<EmptyCtx>;
+  templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
 
   remaining = computed(() => this.items().filter(i => !i.done).length);
 

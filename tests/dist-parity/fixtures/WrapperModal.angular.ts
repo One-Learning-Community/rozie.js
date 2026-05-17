@@ -17,15 +17,15 @@ interface ActionsCtx {}
 
     <rozie-modal [open]="open()" (openChange)="open.set($event)" [title]="title()"><ng-template #header>
         @if (brandTpl) {
-    <ng-container *ngTemplateOutlet="brandTpl" />
+    <ng-container *ngTemplateOutlet="(brandTpl ?? templates()?.['brand'])" />
     } @else {
 
           <h2>{{ title() }}</h2>
         
     }
       </ng-template><ng-template #footer>
-        <ng-container *ngTemplateOutlet="actionsTpl" />
-      </ng-template><ng-template #defaultSlot><ng-container *ngTemplateOutlet="defaultTpl" /></ng-template></rozie-modal>
+        <ng-container *ngTemplateOutlet="(actionsTpl ?? templates()?.['actions'])" />
+      </ng-template><ng-template #defaultSlot><ng-container *ngTemplateOutlet="(defaultTpl ?? templates()?.['defaultSlot'])" /></ng-template></rozie-modal>
 
   `,
 })
@@ -35,6 +35,7 @@ export class WrapperModal {
   @ContentChild('brand', { read: TemplateRef }) brandTpl?: TemplateRef<BrandCtx>;
   @ContentChild('defaultSlot', { read: TemplateRef }) defaultTpl?: TemplateRef<DefaultCtx>;
   @ContentChild('actions', { read: TemplateRef }) actionsTpl?: TemplateRef<ActionsCtx>;
+  templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
 
   static ngTemplateContextGuard(
     _dir: WrapperModal,

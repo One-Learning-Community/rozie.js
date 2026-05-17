@@ -53,12 +53,14 @@ describe('emitTemplate — TodoList @for + slots + ngTemplateContextGuard', () =
     expect(template).toContain('@for (item of items(); track item.id)');
   });
 
-  it('TodoList emits *ngTemplateOutlet for slot invocations', () => {
+  it('TodoList emits *ngTemplateOutlet for slot invocations (Phase 07.3.2 — merged with dynamic `templates()?.[name]` signal lookup; @ContentChild static-name path on LEFT of `??` per D-02)', () => {
     const ir = loadIR('TodoList');
     const { template } = emitTemplate(ir, createDefaultRegistry());
-    expect(template).toContain('*ngTemplateOutlet="headerTpl');
-    expect(template).toContain('*ngTemplateOutlet="defaultTpl');
-    expect(template).toContain('*ngTemplateOutlet="emptyTpl');
+    // Phase 07.3.2 — each *ngTemplateOutlet binding is now the merged form
+    // `(<X>Tpl ?? templates()?.['<x>'])` (D-02 static-wins; A7 signal call).
+    expect(template).toContain(`*ngTemplateOutlet="(headerTpl ?? templates()?.['header'])`);
+    expect(template).toContain(`*ngTemplateOutlet="(defaultTpl ?? templates()?.['defaultSlot'])`);
+    expect(template).toContain(`*ngTemplateOutlet="(emptyTpl ?? templates()?.['empty'])`);
   });
 
   it('TodoList template is parseable Angular block-syntax template (no *ngIf/*ngFor)', () => {
