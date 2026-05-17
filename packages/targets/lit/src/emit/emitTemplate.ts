@@ -341,7 +341,22 @@ function buildEventParts(
   opts: EmitTemplateOpts,
 ): { eventName: string; handlerBody: string; optionParts: string[] } {
   const eventName = listener.event;
-  const handler = rewriteTemplateExpression(listener.handler, ir);
+  const handlerRaw = rewriteTemplateExpression(listener.handler, ir);
+
+  // Phase 07.3.1 Blocker #3 (D-03) — wrap scoped-slot-ctx handler in a
+  // late-binding arrow so the ctx read happens at click time, not render
+  // time. The first render captures _<X>Ctx as undefined (firstUpdated()
+  // hasn't run yet, or the producer hasn't upgraded yet); without late
+  // binding, Lit installs no listener and clicks no-op forever. Detection
+  // regex matches only the `this._<name>Ctx?.` shape produced by
+  // emitSlotFiller's rewriteScopedParamRefs (Landmine 3 — must not wrap
+  // user-authored _xxxCtx fields). The wrap is benign for non-undefined
+  // function references at click time — `(e) => (fn)?.(e)` invokes the
+  // function with the event when present and is a silent no-op when not.
+  const isScopedCtxHandler = /this\._[A-Za-z0-9_]+Ctx\?\./.test(handlerRaw);
+  const handler = isScopedCtxHandler
+    ? `(e) => (${handlerRaw})?.(e)`
+    : handlerRaw;
 
   // Detect inlineGuard / native flags from the modifier pipeline.
   //
