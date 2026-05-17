@@ -9,11 +9,12 @@
 <props>
 {
   title: { type: String, default: 'Wrapped' },
+  open: { type: Boolean, default: false, model: true },
 }
 </props>
 
 <template>
-<Modal :open="true" :title="$props.title">
+<Modal r-model:open="$props.open" :title="$props.title">
   <template #header>
     <slot name="brand">
       <h2>{{ $props.title }}</h2>
