@@ -70,9 +70,11 @@ describe('Svelte target — consumer-side two-way binding emit (Phase 07.3-04)',
     // Expected Svelte 5 bind form: `bind:open={x}` (no quotes, no `on:`,
     // matches the runes-mode $bindable() producer-side machinery).
     expect(template).toContain('bind:open={x}');
-    // Hard-negative: must NOT emit `:open=` (Vue-style) or `[(open)]=`
-    // (Angular-style) or `open={x}` (one-way binding form).
-    expect(template).not.toMatch(/[^d]open=\{x\}/); // ensures the `d` of `bind:` precedes
+    // Hard-negatives: must NOT emit Vue-style `:open=` (would be a syntax
+    // error in Svelte 5) and must NOT degrade to a plain one-way `open={x}`
+    // — both shapes would compile but silently break two-way semantics.
+    expect(template).not.toMatch(/(?<!bind):open=/);
+    expect(template).not.toMatch(/(?<!bind:)open=\{x\}/);
   });
 
   it('emits bind:value={count} when propName is a multi-character identifier', () => {

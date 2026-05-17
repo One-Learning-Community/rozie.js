@@ -102,11 +102,20 @@ export function emitSingleAttr(
   }
 
   if (attr.kind === 'twoWayBinding') {
-    // Phase 07.3 Wave 3 stub — Plan 07.3-04 replaces this with the Svelte 5
-    // runes-mode `bind:propName={expr}` emit.
-    throw new Error(
-      `Svelte target: r-model:${attr.name}= consumer-side two-way binding not yet implemented (Phase 07.3 Wave 3 Plan 07.3-04).`,
-    );
+    // Phase 07.3 Plan 04 — Svelte 5 runes-mode consumer-side two-way binding.
+    //
+    // The lowerer (07.3-02) produced this AttributeBinding for
+    // `<Producer r-model:propName="expr"/>` on a component tag, and the
+    // IR-time validator (validateTwoWayBindings) has already certified that
+    // (a) the RHS is a writable lvalue (isWritableLValue / ROZ951), (b) the
+    // propName resolves to a `model: true` <props> entry on the producer
+    // (ROZ949), and (c) the producer is a component (ROZ950). Emit the
+    // Svelte-5 bind: form so the producer's `$bindable(...)` rune sees writes
+    // straight through. Template-expression rewrite handles $data./$props.
+    // prefix stripping (e.g., `$data.x` → `x`, model `$props.active` →
+    // `active`).
+    const expr = rewriteTemplateExpression(attr.expression, ir);
+    return `bind:${attr.name}={${expr}}`;
   }
 
   // interpolated: if exactly one binding segment, simplify to `name={<expr>}`.
