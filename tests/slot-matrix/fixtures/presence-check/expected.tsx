@@ -9,7 +9,7 @@ export default function PresenceCheckFixture(props: PresenceCheckFixtureProps): 
   return (
     <>
     <div className={"presence-check-fixture"} data-rozie-s-313bf282="">
-      {(props.renderAside) && <aside data-rozie-s-313bf282="">
+      {((props.renderAside ?? props.slots?.['aside'])) && <aside data-rozie-s-313bf282="">
         {(props.renderAside ?? props.slots?.['aside'])?.()}
       </aside>}</div>
     </>
