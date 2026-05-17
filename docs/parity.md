@@ -69,9 +69,10 @@ evaluates at runtime to the slot name) dispatches differently per target:
 | ------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------- |
 | Vue     | `<template #[<expr>]>body</template>` — Vue 3.4+ native scoped-slot bracketed form                            | No — native scoped-slot dispatch handles it |
 | Lit     | `<div slot="${<expr>}">body</div>` — shadow-DOM native projection routes on the runtime `slot=` value         | No — shadow DOM native projection           |
-| React   | `<Producer slots={{ [<expr>]: () => <>body</> }} />` — additive `slots` prop with object dispatch             | Yes — producer must accept `slots?: Record<string, (ctx: Ctx) => ReactNode>` |
-| Solid   | `<Producer slots={{ [<expr>()]: () => <>body</> }} />` — signal-auto-called key                               | Yes — producer must accept `slots?: ...`     |
-| Svelte  | `<Producer snippets={{ [<expr>]: __rozieDynSlot_N }}>{#snippet __rozieDynSlot_N()}body{/snippet}</Producer>`  | Yes — producer must accept `snippets?: Record<string, Snippet<[Ctx]>>` |
+<!-- VitePress (Vue compiler-sfc) parses `{{ ... }}` as interpolation even inside markdown inline-code spans inside table cells. Use HTML entities to render literal `{{` and `}}` without triggering the parser. -->
+| React   | `<Producer slots=&#123;&#123; [<expr>]: () => <>body</> &#125;&#125; />` — additive `slots` prop with object dispatch             | Yes — producer must accept `slots?: Record<string, (ctx: Ctx) => ReactNode>` |
+| Solid   | `<Producer slots=&#123;&#123; [<expr>()]: () => <>body</> &#125;&#125; />` — signal-auto-called key                               | Yes — producer must accept `slots?: ...`     |
+| Svelte  | `<Producer snippets=&#123;&#123; [<expr>]: __rozieDynSlot_N &#125;&#125;>&#123;#snippet __rozieDynSlot_N()&#125;body&#123;/snippet&#125;</Producer>`  | Yes — producer must accept `snippets?: Record<string, Snippet<[Ctx]>>` |
 | Angular | `<Producer><ng-template #__dynSlot_N>body</ng-template><ng-container *ngTemplateOutlet="templates[<expr>]" /></Producer>` + class-body `@ViewChild` + `templates` getter | Yes — producer must accept `@Input() templates?: Record<string, TemplateRef<Ctx>>` |
 
 For Vue + Lit a Rozie author writing `<template #[name]>` will get correct
