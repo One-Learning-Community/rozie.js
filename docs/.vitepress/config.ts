@@ -53,7 +53,7 @@ export default defineConfig({
     nav: [
       { text: 'Guide', link: '/guide/why' },
       { text: 'Examples', link: '/examples/' },
-      { text: 'Parity', link: '/parity' },
+      { text: 'Compatibility', link: '/compatibility' },
       { text: 'GitHub', link: 'https://github.com/One-Learning-Community/rozie.js' },
     ],
     sidebar: {
@@ -65,6 +65,16 @@ export default defineConfig({
             { text: 'Install', link: '/guide/install' },
             { text: 'Quick Start', link: '/guide/quick-start' },
             { text: 'Features & design choices', link: '/guide/features' },
+            { text: 'Compatibility', link: '/compatibility' },
+            { text: 'Cross-Framework Parity', link: '/parity' },
+          ],
+        },
+      ],
+      '/compatibility': [
+        {
+          text: 'Reference',
+          items: [
+            { text: 'Compatibility', link: '/compatibility' },
             { text: 'Cross-Framework Parity', link: '/parity' },
           ],
         },
@@ -73,6 +83,7 @@ export default defineConfig({
         {
           text: 'Reference',
           items: [
+            { text: 'Compatibility', link: '/compatibility' },
             { text: 'Cross-Framework Parity', link: '/parity' },
           ],
         },
