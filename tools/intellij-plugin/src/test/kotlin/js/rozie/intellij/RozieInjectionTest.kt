@@ -57,6 +57,28 @@ class RozieInjectionTest : BasePlatformTestCase() {
         assertInjectedLanguageAt("injection-smoke.rozie", "Counter: './Counter", "JavaScript")
     }
 
+    /**
+     * Plan 08.1-04 SC-7: the slot-fill dynamic-name bracket-expression body
+     * (`[$data.slotName]` inside `<template #[...]>` / `<Modal #[...]>`) must
+     * JS-inject via the existing `ATTR_VALUE_JS` injector arm — no new injector
+     * code path is required because `IN_SLOT_BRACKET_EXPR` emits `ATTR_VALUE_JS`
+     * for body chunks (the same token kind the existing JS arm already covers
+     * for `IN_TEMPLATE_ATTR_VALUE_JS_*`). This test pins that contract so a
+     * future refactor cannot accidentally break it.
+     *
+     * Anchor `.slotName` (NOT `$data.slotName`): the `$data` chunk is emitted
+     * as `MAGIC_IDENT` (a separately-themed token kind that intentionally
+     * surfaces magic-name highlighting) and the platform's
+     * `InjectedLanguageManager.findInjectedElementAt(offset)` only finds an
+     * injection when `offset` lands on an injected token. The `.slotName`
+     * portion lives inside the IN_SLOT_BRACKET_EXPR `[^\]$]+ -> ATTR_VALUE_JS`
+     * arm, so the leading `.` is the closest stable offset that is
+     * guaranteed to be JS-injected.
+     */
+    fun testSlotBracketExpressionIsJavaScriptInjected() {
+        assertInjectedLanguageAt("injection-smoke.rozie", ".slotName", "JavaScript")
+    }
+
     // === SC-4 inspection carve-out ===
 
     fun testHtmlInspectionsDoNotFlagRozieAttributes() {

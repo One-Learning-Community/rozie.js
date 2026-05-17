@@ -131,7 +131,16 @@ class TextMateGrammarParityTest {
         "meta.embedded.block.style.rozie" to RozieTokenTypes.STYLE_BODY,
 
         // --- Component references (PascalCase tag names inside <template>) ---
-        "entity.name.tag.component.rozie" to RozieTokenTypes.COMPONENT_REF
+        "entity.name.tag.component.rozie" to RozieTokenTypes.COMPONENT_REF,
+
+        // --- Plan 08.1-04: Slot-fill shorthand ---
+        // Combined with Plan 03's directive-argument rows above, this closes the
+        // last 4 of 6 D-07 RED scopes — parity test goes fully GREEN after both
+        // plans land.
+        "entity.name.tag.slot-name.rozie" to RozieTokenTypes.SLOT_NAME,
+        "punctuation.definition.slot-fill.rozie" to RozieTokenTypes.SLOT_FILL_MARKER,
+        "punctuation.section.brackets.begin.rozie" to RozieTokenTypes.SLOT_DYNAMIC_BRACKET_OPEN,
+        "punctuation.section.brackets.end.rozie" to RozieTokenTypes.SLOT_DYNAMIC_BRACKET_CLOSE
     )
 
     @Test

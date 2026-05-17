@@ -22,6 +22,7 @@ $onMount(() => {
 </components>
 <template>
   <button @click="$data.count++">Click {{ $data.count }}</button>
+  <Modal #[$data.slotName]>Dynamic content</Modal>
 </template>
 <style>
 button { color: red; }
