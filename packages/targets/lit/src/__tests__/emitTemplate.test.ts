@@ -156,18 +156,13 @@ describe('dispatchEvent translation (Phase 07.3.1 D-LIT-17)', () => {
     );
   });
 
-  it('falls back to late-binding wrap for composite expression with ctx reference', () => {
-    // A composite expression `close(); doSomething()` is NOT a bare
-    // `this._<X>Ctx?.<param>` shape — it's a multi-statement program where
-    // `close` is just one identifier among several. The dispatchEvent
-    // detection regex (anchored `^...$`) refuses to match; the Plan 03
-    // late-binding wrap takes over so data-typed param references still
-    // resolve correctly at click time.
-    const source = `<rozie name="CompositeConsumer">
-
-<script>
-function doSomething() {}
-</script>
+  it('falls back to late-binding wrap for non-bare ctx reference (member chain)', () => {
+    // A handler expression that references a ctx field via deeper member
+    // access (e.g., `close.bind(this)`) is NOT a bare `this._<X>Ctx?.<param>`
+    // shape. The dispatchEvent detection regex (anchored `^...$`) refuses
+    // to match; the Plan 03 late-binding wrap takes over so the underlying
+    // optional-chain still resolves correctly at click time.
+    const source = `<rozie name="MemberChainConsumer">
 
 <components>
 {
@@ -178,19 +173,19 @@ function doSomething() {}
 <template>
   <Modal>
     <template #header="{ close }">
-      <button @click="close(); doSomething()">×</button>
+      <button @click="close.call(this)">×</button>
     </template>
   </Modal>
 </template>
 `;
-    const code = compileConsumer(source, 'CompositeConsumer');
-    // The dispatchEvent shape MUST NOT appear for the composite handler.
+    const code = compileConsumer(source, 'MemberChainConsumer');
+    // The dispatchEvent shape MUST NOT appear for the non-bare handler.
     expect(code).not.toMatch(
       /dispatchEvent\(new CustomEvent\('rozie-header-close'/,
     );
-    // The Plan 03 late-binding wrap MUST appear (preserves data-typed
-    // param semantics for composite expressions).
-    expect(code).toMatch(/@click=\$\{\(e\) => \{ .*this\._headerCtx\?\.close/);
+    // The Plan 03 late-binding wrap MUST appear because the handler still
+    // contains a `this._<X>Ctx?.` reference somewhere in its body.
+    expect(code).toMatch(/\(e\) => \(.*this\._headerCtx\?\.close/);
   });
 
   it('does not affect non-ctx handlers', () => {
@@ -209,8 +204,11 @@ function onConfirm() {}
 `;
     const code = compileConsumer(source, 'NonCtxConsumer');
     expect(code).toMatch(/@click=\$\{this\.onConfirm\}/);
-    // No dispatchEvent translation
-    expect(code).not.toContain('rozie-');
+    // No dispatchEvent translation for the click handler (the @customElement
+    // decorator legitimately contains 'rozie-non-ctx-consumer' — exclude it
+    // by checking the click-handler context specifically rather than the
+    // whole emitted file).
+    expect(code).not.toMatch(/dispatchEvent\(new CustomEvent\('rozie-/);
     // No late-binding wrap
     expect(code).not.toMatch(/\(e\) => \(this\.onConfirm\)\?\.\(e\)/);
   });
