@@ -368,20 +368,44 @@ function buildEventParts(
   const eventName = listener.event;
   const handlerRaw = rewriteTemplateExpression(listener.handler, ir);
 
-  // Phase 07.3.1 Blocker #3 (D-03) — wrap scoped-slot-ctx handler in a
-  // late-binding arrow so the ctx read happens at click time, not render
-  // time. The first render captures _<X>Ctx as undefined (firstUpdated()
-  // hasn't run yet, or the producer hasn't upgraded yet); without late
-  // binding, Lit installs no listener and clicks no-op forever. Detection
-  // regex matches only the `this._<name>Ctx?.` shape produced by
-  // emitSlotFiller's rewriteScopedParamRefs (Landmine 3 — must not wrap
-  // user-authored _xxxCtx fields). The wrap is benign for non-undefined
-  // function references at click time — `(e) => (fn)?.(e)` invokes the
-  // function with the event when present and is a silent no-op when not.
-  const isScopedCtxHandler = /this\._[A-Za-z0-9_]+Ctx\?\./.test(handlerRaw);
-  const handler = isScopedCtxHandler
-    ? `(e) => (${handlerRaw})?.(e)`
-    : handlerRaw;
+  // Phase 07.3.1 D-LIT-17 — function-typed scoped-slot params (e.g. `close`)
+  // can't transit through `data-rozie-params` (JSON.stringify silently drops
+  // function values). The producer side already emits a host-listener wiring
+  // `addEventListener('rozie-<slot>-<param>', e => this.<source>(e.detail))`
+  // via emitHostListenerWiring.ts. The consumer must dispatch a matching
+  // CustomEvent instead of trying to invoke the (always-undefined) function
+  // from ctx. Detection matches the EXACT shape `this._<X>Ctx?.<param>` —
+  // composite expressions fall through to the Plan 03 late-binding wrap
+  // (which preserves the previous behavior for data-typed params).
+  //
+  // Cascade order:
+  //   1. dispatchEvent translation (D-LIT-17) — exact shape `this._<X>Ctx?.<param>`
+  //   2. Late-binding wrap (Blocker #3 D-03) — any `this._<X>Ctx?.` reference
+  //   3. Bare handler (existing fallback)
+  const dispatchMatch = handlerRaw.match(
+    /^\s*this\._([A-Za-z0-9_]+)Ctx\?\.([A-Za-z_][A-Za-z0-9_]*)\s*$/,
+  );
+  let handler: string;
+  if (dispatchMatch) {
+    const slot = dispatchMatch[1]!;
+    const param = dispatchMatch[2]!;
+    handler = `(e) => this.dispatchEvent(new CustomEvent('rozie-${slot}-${param}', { detail: e, bubbles: true, composed: true }))`;
+  } else {
+    // Phase 07.3.1 Blocker #3 (D-03) — wrap scoped-slot-ctx handler in a
+    // late-binding arrow so the ctx read happens at click time, not render
+    // time. The first render captures _<X>Ctx as undefined (firstUpdated()
+    // hasn't run yet, or the producer hasn't upgraded yet); without late
+    // binding, Lit installs no listener and clicks no-op forever. Detection
+    // regex matches only the `this._<name>Ctx?.` shape produced by
+    // emitSlotFiller's rewriteScopedParamRefs (Landmine 3 — must not wrap
+    // user-authored _xxxCtx fields). The wrap is benign for non-undefined
+    // function references at click time — `(e) => (fn)?.(e)` invokes the
+    // function with the event when present and is a silent no-op when not.
+    const isScopedCtxHandler = /this\._[A-Za-z0-9_]+Ctx\?\./.test(handlerRaw);
+    handler = isScopedCtxHandler
+      ? `(e) => (${handlerRaw})?.(e)`
+      : handlerRaw;
+  }
 
   // Detect inlineGuard / native flags from the modifier pipeline.
   //
