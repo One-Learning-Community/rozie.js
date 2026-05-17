@@ -128,6 +128,9 @@ export function resolveTwoWayTarget(
     };
   }
 
+  // Phase 07.3.1 — deep chains rejected at validator (ROZ951); this branch defensive.
   // $refs.X, $slots.X, $el etc. are not writable lvalues for r-model.
+  // Any non-shallow LHS that reaches here would indicate a validator regression
+  // (since lvalue.ts now gates on head.depth === 1 for both $data and $props).
   return null;
 }

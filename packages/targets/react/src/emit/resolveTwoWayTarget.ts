@@ -153,6 +153,7 @@ export function resolveTwoWayTarget(
     }
   }
 
+  // Phase 07.3.1 — deep chains rejected at validator (ROZ951); this branch defensive.
   // Defensive — should never reach this branch because the IR-time validator
   // would have emitted ROZ951 for any non-writable LHS. Keep the throw so a
   // regression in the validator surfaces immediately rather than silently
