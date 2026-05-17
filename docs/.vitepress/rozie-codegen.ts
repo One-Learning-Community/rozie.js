@@ -21,7 +21,7 @@
  * info language) BEFORE VitePress's Shiki-based fence renderer runs, so the
  * generated code gets normal syntax highlighting for free.
  */
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { compile, type CompileTarget } from '@rozie/core';
 import type MarkdownIt from 'markdown-it';
@@ -47,8 +47,20 @@ export function rozieCodegen(
   md: MarkdownIt,
   opts: RozieCodegenOptions,
 ): void {
+  // Search both `examples/<Name>.rozie` (canonical producers) and
+  // `examples/demos/<Name>.rozie` (demo-wrapper consumers, e.g. TableDemo)
+  // so docs pages can show their consumer source alongside the producer.
+  const resolveExample = (name: string): string => {
+    const root = resolve(opts.examplesDir, `${name}.rozie`);
+    if (existsSync(root)) return root;
+    const demo = resolve(opts.examplesDir, 'demos', `${name}.rozie`);
+    if (existsSync(demo)) return demo;
+    throw new Error(
+      `[rozie-codegen] cannot read example source: ${root} (and not found under demos/)`,
+    );
+  };
   const readExample = (name: string): string => {
-    const path = resolve(opts.examplesDir, `${name}.rozie`);
+    const path = resolveExample(name);
     try {
       return readFileSync(path, 'utf8');
     } catch {

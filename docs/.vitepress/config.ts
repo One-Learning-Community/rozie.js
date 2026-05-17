@@ -100,6 +100,7 @@ export default defineConfig({
             { text: 'TreeNode', link: '/examples/tree-node' },
             { text: 'Card (with CardHeader)', link: '/examples/card' },
             { text: 'TodoList', link: '/examples/todo-list' },
+            { text: 'Table', link: '/examples/table' },
           ],
         },
       ],

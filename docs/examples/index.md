@@ -1,6 +1,6 @@
 # Examples
 
-Seven reference components, each shipped with byte-verbatim output across all six targets (Vue, React, Svelte, Angular, Solid, Lit). Pick whichever lines up with the feature you're trying to evaluate.
+Eight reference components, each shipped with byte-verbatim output across all six targets (Vue, React, Svelte, Angular, Solid, Lit). Pick whichever lines up with the feature you're trying to evaluate.
 
 ## By complexity
 
@@ -11,6 +11,7 @@ Seven reference components, each shipped with byte-verbatim output across all si
 - [TreeNode](/examples/tree-node) — self-recursion via `<components>` self-import; minimal `<props>`-only component. Demonstrates the per-target self-reference idioms.
 - [Card (with CardHeader)](/examples/card) — wrapper-pair composition. Two `.rozie` files; shows the kebab/camel prop bridge and the per-target child-component import + selector rewrite (notably Angular's `<rozie-card-header>`).
 - [TodoList](/examples/todo-list) — `r-for` with `:key`, multiple `$emit` channels, named + default slots with per-item scoped params, fallback content, `r-if` / `r-else` empty state. Calls out the documented React render-prop divergence in slot consumer ergonomics.
+- [Table](/examples/table) — slot-driven UI-library table (named scoped slots for header/cell/empty), plus a **consumer-side dynamic slot fill** (`` <template #[`footer${mode}`]> ``) toggling between two footer renderers. The dynamic-slot showcase.
 
 ## By feature
 
@@ -40,6 +41,7 @@ If you're looking for a specific authoring feature:
 | Named slots | [Modal](/examples/modal), [Dropdown](/examples/dropdown), [TodoList](/examples/todo-list) |
 | Default slot with scoped params | [Modal](/examples/modal), [Dropdown](/examples/dropdown), [TodoList](/examples/todo-list) |
 | Slot fallback content | [TodoList](/examples/todo-list) |
+| Dynamic slot fills (consumer-side `<template #[expr]>`) | [Table](/examples/table) |
 | `:root { }` global escape hatch in `<style>` | [Modal](/examples/modal), [Dropdown](/examples/dropdown) |
 
 For the design rationale behind each of these, see [Features & design choices](/guide/features).
