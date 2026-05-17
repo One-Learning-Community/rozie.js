@@ -36,9 +36,23 @@ import js.rozie.intellij.xml.RozieContextCheck
  *  - **Narrow allow-list** — only `JSUnusedGlobalSymbols` and
  *    `JSUnusedLocalSymbols` are suppressed. The `JSStatementExpected` /
  *    `JSLabeledStatement` family (the OTHER half of P1-UAT-04) is intentionally
- *    NOT suppressed here. Plan 08.2-10's `RozieMultiHostInjector` paren-wrap is
+ *    NOT suppressed here. Plan 08.2-11's `RozieMultiHostInjector` paren-wrap is
  *    the principled fix for those; if paren-wrap fully resolves them, this
  *    suppressor's list stays narrow.
+ *
+ *    **Plan 08.2-11 outcome (post-paren-wrap):** the paren-wrap on PROPS_BODY /
+ *    DATA_BODY / COMPONENTS_BODY injections (via `MultiHostRegistrar.addPlace`
+ *    prefix=`(\n` + suffix=`\n)`) gives the JS parser a parenthesised expression
+ *    context — the object-literal block bodies now parse as a real
+ *    `JSObjectLiteralExpression` with `JSProperty` children, not a
+ *    `JSBlockStatement` containing `JSLabeledStatement` nodes. The
+ *    Statement-expected / Component-expected / JSLabeledStatement warning family
+ *    disappears at the JS-parser layer, with no suppressor work needed for that
+ *    half of P1-UAT-04. **This suppressor's allow-list therefore stays narrow at
+ *    `{JSUnusedGlobalSymbols, JSUnusedLocalSymbols}` — paren-wrap is the
+ *    principled fix for the statement-shape family; this suppressor handles the
+ *    orthogonal "key has no in-file reader" family that paren-wrap does not
+ *    address.** The two close P1-UAT-04 jointly.
  *  - **Per-block dispatch** — the suppressor identifies which SFC block the
  *    inspected element belongs to via the same `RozieLexerAdapter().apply { start(text) }`
  *    + token-walk pattern that
