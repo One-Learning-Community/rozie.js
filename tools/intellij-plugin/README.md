@@ -52,7 +52,7 @@ cd tools/intellij-plugin
 
 # Build the distributable .zip
 ./gradlew buildPlugin
-# Output: build/distributions/Rozie.js-0.1.0.zip
+# Output: build/distributions/Rozie.js-0.2.0.zip
 
 # Regenerate the JFlex-driven lexer (after editing src/main/jflex/Rozie.flex)
 ./gradlew generateRozieLexer
@@ -98,7 +98,7 @@ The dogfood goal is observation — pile up signals, fix the worst stuff in v0.2
 
 Tags are scope-prefixed: `intellij-plugin/v0.1.0`, `intellij-plugin/v0.2.0`, etc. (per [D-04](../../.planning/phases/08-intellij-platform-plugin-v1-internal-dogfooding/08-CONTEXT.md)) so they don't collide with `@rozie/*` npm package tags.
 
-Current: **v0.1.0** — initial internal dogfooding release.
+Current: **v0.2.0** — backfills `r-model:propName=` argument-form, slot-fill shorthand (`<template #slot>`, `<template #[expr]>`), `$onUpdate` 6-context coverage, and nested-template depth counter. D-07 TextMate parity guard fully GREEN.
 
 ## Stable API
 
