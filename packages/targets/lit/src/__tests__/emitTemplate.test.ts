@@ -125,7 +125,7 @@ describe('dispatchEvent translation (Phase 07.3.1 D-LIT-17)', () => {
 `;
     const code = compileConsumer(source, 'HeaderCloseConsumer');
     expect(code).toContain(
-      "(e) => this.dispatchEvent(new CustomEvent('rozie-header-close', { detail: e, bubbles: true, composed: true }))",
+      "(e) => (e.currentTarget as HTMLElement).dispatchEvent(new CustomEvent('rozie-header-close', { detail: e, bubbles: true, composed: true }))",
     );
     // The old late-binding wrap MUST NOT appear at the dispatch site — that
     // was the broken path (function ref always undefined through JSON).
@@ -152,7 +152,7 @@ describe('dispatchEvent translation (Phase 07.3.1 D-LIT-17)', () => {
     const code = compileConsumer(source, 'FooterToggleConsumer');
     expect(code).toContain("'rozie-footer-toggle'");
     expect(code).toContain(
-      "(e) => this.dispatchEvent(new CustomEvent('rozie-footer-toggle', { detail: e, bubbles: true, composed: true }))",
+      "(e) => (e.currentTarget as HTMLElement).dispatchEvent(new CustomEvent('rozie-footer-toggle', { detail: e, bubbles: true, composed: true }))",
     );
   });
 
@@ -276,7 +276,7 @@ describe('multi-root slot-fill spread (Phase 07.3.1 D-LIT-18)', () => {
     // dispatchEvent prefix to keep the assertion precise).
     expect(code).toContain('<h2 slot="header">Title</h2>');
     expect(code).toContain(
-      `<button @click=\${(e) => this.dispatchEvent(new CustomEvent('rozie-header-close', { detail: e, bubbles: true, composed: true }))} slot="header">×</button>`,
+      `<button @click=\${(e) => (e.currentTarget as HTMLElement).dispatchEvent(new CustomEvent('rozie-header-close', { detail: e, bubbles: true, composed: true }))} slot="header">×</button>`,
     );
     // The wrap MUST be absent for this body — top-level children are
     // separated only by whitespace, which is the D-LIT-18 spread path.

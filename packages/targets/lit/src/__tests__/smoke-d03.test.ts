@@ -71,7 +71,7 @@ describe('Phase 07.3.1 Blocker #3 (D-03) — Lit consumer-side scoped slot fill 
     // JSON.stringify drops the function value through data-rozie-params.
     const code = compileConsumer();
     expect(code).toContain(
-      "@click=${(e) => this.dispatchEvent(new CustomEvent('rozie-header-close', { detail: e, bubbles: true, composed: true }))}",
+      "@click=${(e) => (e.currentTarget as HTMLElement).dispatchEvent(new CustomEvent('rozie-header-close', { detail: e, bubbles: true, composed: true }))}",
     );
     // The old late-binding wrap MUST NOT appear at the dispatch site.
     expect(code).not.toMatch(/\(this\._headerCtx\?\.close\)\?\.\(e\)/);
@@ -93,7 +93,7 @@ describe('Phase 07.3.1 Blocker #3 (D-03) — Lit consumer-side scoped slot fill 
     const code = compileConsumer();
     expect(code).toContain('<h2 slot="header">Title</h2>');
     expect(code).toContain(
-      `<button @click=\${(e) => this.dispatchEvent(new CustomEvent('rozie-header-close', { detail: e, bubbles: true, composed: true }))} slot="header">×</button>`,
+      `<button @click=\${(e) => (e.currentTarget as HTMLElement).dispatchEvent(new CustomEvent('rozie-header-close', { detail: e, bubbles: true, composed: true }))} slot="header">×</button>`,
     );
     expect(code).not.toContain('<div slot="header">');
   });
@@ -163,7 +163,7 @@ function handleClick() {}
     expect(code).toMatch(/@click=\$\{this\.handleClick\}/);
     // Scoped-ctx handler — D-LIT-17 dispatchEvent translation.
     expect(code).toContain(
-      "@click=${(e) => this.dispatchEvent(new CustomEvent('rozie-header-close', { detail: e, bubbles: true, composed: true }))}",
+      "@click=${(e) => (e.currentTarget as HTMLElement).dispatchEvent(new CustomEvent('rozie-header-close', { detail: e, bubbles: true, composed: true }))}",
     );
   });
 });

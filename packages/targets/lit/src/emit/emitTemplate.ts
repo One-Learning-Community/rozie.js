@@ -389,7 +389,15 @@ function buildEventParts(
   if (dispatchMatch) {
     const slot = dispatchMatch[1]!;
     const param = dispatchMatch[2]!;
-    handler = `(e) => this.dispatchEvent(new CustomEvent('rozie-${slot}-${param}', { detail: e, bubbles: true, composed: true }))`;
+    // Dispatch on e.currentTarget (the clicked element INSIDE the producer's
+    // light DOM), NOT on `this` (which is the consumer — PARENT of the
+    // producer in the tree). Bubbling propagates UP, so a consumer-rooted
+    // dispatch never reaches the producer's host listener. The clicked
+    // element lives inside `<producer-tag>…<button>` (post-D-LIT-18, the
+    // button may have slot="…" directly on it); its bubble path goes UP
+    // through the producer, triggering the producer's
+    // `addEventListener('rozie-<X>-<param>', …)` host wiring.
+    handler = `(e) => (e.currentTarget as HTMLElement).dispatchEvent(new CustomEvent('rozie-${slot}-${param}', { detail: e, bubbles: true, composed: true }))`;
   } else {
     // Phase 07.3.1 Blocker #3 (D-03) — wrap scoped-slot-ctx handler in a
     // late-binding arrow so the ctx read happens at click time, not render
