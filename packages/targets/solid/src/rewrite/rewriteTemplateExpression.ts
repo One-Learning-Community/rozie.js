@@ -11,7 +11,7 @@
  *   - `$data.foo`                → `foo()`          (signal getter — D-131)
  *   - `$data.foo = v`            → `setFoo(v)`      (signal setter)
  *   - `$refs.foo`                → `fooRef`         (plain variable; ref={(el) => { fooRef = el; }})
- *   - `$slots.foo`               → `_props.fooSlot !== undefined` (presence check)
+ *   - `$slots.foo`               → `(_props.fooSlot ?? _props.slots?.['foo'])` (Phase 07.3.2 Plan 09 merge — dynamic-name fallback)
  *   - `$emit('foo', x)` call     → `_props.onFoo?.(x)` (camelCase + on-prefix + optional-chain)
  *
  * NOTE: Signal reads (data + model props) need () calls in JSX — Solid reactivity.
@@ -41,7 +41,16 @@ const traverse: TraverseFn =
     ? (_traverse as TraverseFn)
     : ((_traverse as unknown as { default: TraverseFn }).default);
 
-const GEN_OPTS: GeneratorOptions = { retainLines: false, compact: false };
+// jsescOption.quotes='single' aligns generator string-literal output with the
+// canonical merge shape emitted by `emitSlotInvocation.ts:139` (string
+// template uses single quotes). Without this, `$slots.X` rewrite produces
+// `_props.slots?.["x"]` (double quotes) which diverges visually from the
+// invocation site in dist-parity fixtures and tests.
+const GEN_OPTS: GeneratorOptions = {
+  retainLines: false,
+  compact: false,
+  jsescOption: { quotes: 'single' },
+};
 
 function flattenInlineCode(code: string): string {
   return code.replace(/\s*\n\s*/g, ' ').replace(/[ \t]+/g, ' ').trim();
@@ -175,10 +184,52 @@ export function rewriteTemplateExpression(
       }
 
       if (obj.name === '$slots' && slotNames.has(prop.name)) {
-        // $slots.foo → _props.fooSlot !== undefined  (caller layers presence check)
+        // $slots.foo → (_props.fooSlot ?? _props.slots?.['foo'])
+        //
+        // Phase 07.3.2 Plan 09 — gap closure for F-07.3.2-05-A row #4 (Solid
+        // Modal 2 dynamic-fill). The static-named slot field is merged with
+        // the consumer-side dynamic-name `slots?:` map so r-if guards
+        // (`r-if="$slots.header"`) evaluate truthy when ONLY a dynamic-name
+        // fill is present (consumer used `<template #[expr]>` without a
+        // static-name fill). Mirrors the canonical merge already in place at
+        // the invocation site in `emit/emitSlotInvocation.ts` (line ~139).
+        //
+        // Pitfall 2 (Solid reactive-tracking): the merge expression stays
+        // inline — wrapped only with `extra: { parenthesized: true }` so
+        // `@babel/generator` emits the outer parens. Solid's compiler wraps
+        // the whole surrounding JSX expression (`<Show when={...}>` body /
+        // `{...}` braces) in a tracking accessor → reactivity-on-change of
+        // `_props.slots` is preserved. NO hoisting to `untrack(...)` or a
+        // top-level `const merged = ...`.
+        //
+        // Default slot (name === '') keeps the legacy `_props.children`
+        // shape; default-slot guards never reference `$slots.<empty>` from
+        // template source so the dynamic-map merge does not apply there.
         const fieldName = prop.name === '' ? 'children' : prop.name + 'Slot';
-        path.node.object = t.identifier('_props');
-        path.node.property = t.identifier(fieldName);
+        if (prop.name === '') {
+          path.node.object = t.identifier('_props');
+          path.node.property = t.identifier(fieldName);
+          return;
+        }
+        const fieldKey = prop.name;
+        const lhs = t.memberExpression(t.identifier('_props'), t.identifier(fieldName));
+        const slotsMember = t.memberExpression(t.identifier('_props'), t.identifier('slots'));
+        // _props.slots?.['header']  (optional, computed)
+        const rhs = t.optionalMemberExpression(
+          slotsMember,
+          t.stringLiteral(fieldKey),
+          /* computed */ true,
+          /* optional */ true,
+        );
+        const merged = t.logicalExpression('??', lhs, rhs);
+        // `t.parenthesizedExpression` wraps the LogicalExpression so the
+        // generator emits outer parens unconditionally — including when the
+        // merge sits at the top level (where `extra.parenthesized` would be
+        // suppressed as redundant). Matches the canonical merge shape
+        // emitted at the invocation site (`emit/emitSlotInvocation.ts:139`).
+        const wrapped = t.parenthesizedExpression(merged);
+        path.replaceWith(wrapped);
+        path.skip();
         return;
       }
     },
