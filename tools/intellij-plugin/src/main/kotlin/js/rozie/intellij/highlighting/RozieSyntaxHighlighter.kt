@@ -71,8 +71,30 @@ class RozieSyntaxHighlighter : SyntaxHighlighterBase() {
         val COMPONENT_REF: TextAttributesKey =
             TextAttributesKey.createTextAttributesKey("ROZIE_COMPONENT_REF", DLHC.CLASS_NAME)
 
+        /**
+         * The `:` separator between an `r-*` directive and its argument
+         * (e.g. the `:` in `r-model:open`). Fallback DLHC.DOT matches the
+         * existing `PROP_BINDING_PUNCTUATION` family (same visual model — a
+         * punctuator separator). External name "ROZIE_DIRECTIVE_COLON" is
+         * STABLE API (T-8-03-01) — never rename post-ship.
+         */
+        val DIRECTIVE_COLON: TextAttributesKey =
+            TextAttributesKey.createTextAttributesKey("ROZIE_DIRECTIVE_COLON", DLHC.DOT)
+
+        /**
+         * The argument name after an `r-*:` directive (e.g. the `open` in
+         * `r-model:open`). Fallback DLHC.STATIC_FIELD matches the existing
+         * `PROP_BINDING_NAME` family because the argument name is semantically
+         * the same as a prop-binding name. External name "ROZIE_DIRECTIVE_ARG"
+         * is STABLE API (T-8-03-01) — never rename post-ship.
+         */
+        val DIRECTIVE_ARG: TextAttributesKey =
+            TextAttributesKey.createTextAttributesKey("ROZIE_DIRECTIVE_ARG", DLHC.STATIC_FIELD)
+
         // Pre-allocated arrays returned by getTokenHighlights — avoid allocating per call.
         private val COMPONENT_REF_KEYS = arrayOf(COMPONENT_REF)
+        private val DIRECTIVE_COLON_KEYS = arrayOf(DIRECTIVE_COLON)
+        private val DIRECTIVE_ARG_KEYS = arrayOf(DIRECTIVE_ARG)
         private val BLOCK_TAG_KEYS = arrayOf(BLOCK_TAG)
         private val R_DIRECTIVE_KEYS = arrayOf(R_DIRECTIVE)
         private val EVENT_AT_KEYS = arrayOf(EVENT_AT)
@@ -146,6 +168,10 @@ class RozieSyntaxHighlighter : SyntaxHighlighterBase() {
 
         // Component references — PascalCase tag names inside <template>
         RozieTokenTypes.COMPONENT_REF -> COMPONENT_REF_KEYS
+
+        // Directive arguments (r-model:propName)
+        RozieTokenTypes.DIRECTIVE_COLON -> DIRECTIVE_COLON_KEYS
+        RozieTokenTypes.DIRECTIVE_ARGUMENT_NAME -> DIRECTIVE_ARG_KEYS
 
         // Body tokens (SCRIPT_BODY, TEMPLATE_BODY, etc.) and ATTR_VALUE_*
         // — leave uncolored; Plan 04 injection will color via host language

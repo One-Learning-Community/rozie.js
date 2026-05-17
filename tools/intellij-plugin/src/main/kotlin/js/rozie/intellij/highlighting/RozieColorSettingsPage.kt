@@ -54,7 +54,15 @@ class RozieColorSettingsPage : ColorSettingsPage {
             msg("rozie.color.bad.character"),
             RozieSyntaxHighlighter.BAD_CHARACTER
         ),
-        AttributesDescriptor(msg("rozie.color.component.ref"), RozieSyntaxHighlighter.COMPONENT_REF)
+        AttributesDescriptor(msg("rozie.color.component.ref"), RozieSyntaxHighlighter.COMPONENT_REF),
+        AttributesDescriptor(
+            msg("rozie.color.directive.colon"),
+            RozieSyntaxHighlighter.DIRECTIVE_COLON
+        ),
+        AttributesDescriptor(
+            msg("rozie.color.directive.arg"),
+            RozieSyntaxHighlighter.DIRECTIVE_ARG
+        )
     )
 
     override fun getAttributeDescriptors(): Array<AttributesDescriptor> = descriptors
@@ -119,6 +127,7 @@ class RozieColorSettingsPage : ColorSettingsPage {
 
         <template>
           <Counter :value="42" />
+          <Modal r-model:open="${'$'}data.open" />
           <div class="counter counter--{{ ${'$'}props.value > 0 ? 'active' : 'idle' }}"
                ref="root"
                @mouseenter="${'$'}data.hovering = true"
