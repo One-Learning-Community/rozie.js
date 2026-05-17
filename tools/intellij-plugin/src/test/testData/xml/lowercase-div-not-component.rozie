@@ -1,0 +1,5 @@
+<rozie name="LowercaseDivNotComponent">
+<template>
+  <div class="x">content</div>
+</template>
+</rozie>
