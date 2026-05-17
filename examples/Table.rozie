@@ -1,0 +1,87 @@
+<!--
+  Table.rozie
+
+  Demonstrates:
+    - Slot-driven UI-library table — consumer-provided header / cell / empty renderers
+    - Per-column dispatch inside a single shared `cell` slot (the cross-framework
+      alternative to PrimeVue's per-column-keyed cell slot — Rozie producers
+      only support static slot names)
+    - r-if gating on $slots.* for optional footer slots
+    - r-for with :key over $props.rows
+    - Default slot fallback content for "no data" empty state
+
+  Columns are `{ key: string, label: string }`. Per-column rendering happens
+  CONSUMER-side: the consumer's `#cell` template inspects `column.key` and
+  dispatches accordingly. Producer slot outlets are static-name in Rozie —
+  dynamic slot names live on the consumer (`<template #[expr]>`).
+
+  Slot naming: footer slots use camelCase (`footerSummary`, `footerPagination`)
+  rather than kebab-case so `r-if="$slots.footerSummary"` works — magic
+  accessors require static dot keys, not computed access.
+-->
+
+<rozie name="Table">
+
+<props>
+{
+  rows:     { type: Array,   default: () => [] },
+  columns:  { type: Array,   default: () => [] },
+  striped:  { type: Boolean, default: false },
+  caption:  { type: String,  default: '' },
+}
+</props>
+
+<script>
+const getCellValue = (row, column) => row?.[column.key]
+</script>
+
+<template>
+<table class="rozie-table" :class="{ striped: $props.striped }">
+  <caption r-if="$props.caption">{{ $props.caption }}</caption>
+  <thead>
+    <tr>
+      <slot name="header" :columns="$props.columns">
+        <th r-for="column in $props.columns" :key="column.key">{{ column.label }}</th>
+      </slot>
+    </tr>
+  </thead>
+  <tbody r-if="$props.rows.length > 0">
+    <tr r-for="row, rowIndex in $props.rows" :key="rowIndex">
+      <td r-for="column in $props.columns" :key="column.key">
+        <slot name="cell" :column="column" :row="row" :value="getCellValue(row, column)" :rowIndex="rowIndex">
+          {{ getCellValue(row, column) }}
+        </slot>
+      </td>
+    </tr>
+  </tbody>
+  <tbody r-else>
+    <tr>
+      <td :colspan="$props.columns.length">
+        <slot name="empty" :columns="$props.columns">No data</slot>
+      </td>
+    </tr>
+  </tbody>
+  <tfoot r-if="$slots.footerSummary || $slots.footerPagination">
+    <tr r-if="$slots.footerSummary">
+      <td :colspan="$props.columns.length">
+        <slot name="footerSummary" :rows="$props.rows" />
+      </td>
+    </tr>
+    <tr r-if="$slots.footerPagination">
+      <td :colspan="$props.columns.length">
+        <slot name="footerPagination" :rows="$props.rows" />
+      </td>
+    </tr>
+  </tfoot>
+</table>
+</template>
+
+<style>
+.rozie-table { border-collapse: collapse; width: 100%; font: 14px system-ui, sans-serif; }
+.rozie-table th, .rozie-table td { padding: 0.5rem 0.75rem; text-align: left; border-bottom: 1px solid rgba(0,0,0,0.08); }
+.rozie-table thead th { font-weight: 600; background: rgba(0,0,0,0.03); }
+.rozie-table.striped tbody tr:nth-child(even) td { background: rgba(0,0,0,0.02); }
+.rozie-table tfoot td { font-size: 0.85em; color: rgba(0,0,0,0.6); padding: 0.5rem 0.75rem; }
+</style>
+
+</rozie>
