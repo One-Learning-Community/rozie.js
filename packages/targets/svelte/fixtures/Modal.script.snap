@@ -6,9 +6,9 @@ interface Props {
   closeOnBackdrop?: boolean;
   lockBodyScroll?: boolean;
   title?: string;
-  header?: Snippet<[any]>;
-  children?: Snippet<[any]>;
-  footer?: Snippet<[any]>;
+  header?: Snippet<[{ close: any }]>;
+  children?: Snippet<[{ close: any }]>;
+  footer?: Snippet<[{ close: any }]>;
   onclose?: (...args: unknown[]) => void;
 }
 

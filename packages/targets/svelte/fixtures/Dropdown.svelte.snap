@@ -15,8 +15,8 @@ interface Props {
   open?: boolean;
   closeOnOutsideClick?: boolean;
   closeOnEscape?: boolean;
-  trigger?: Snippet<[any, any]>;
-  children?: Snippet<[any]>;
+  trigger?: Snippet<[{ open: any; toggle: any }]>;
+  children?: Snippet<[{ close: any }]>;
 }
 
 let {
@@ -93,11 +93,11 @@ $effect(() => {
 
 <div class="dropdown">
   <div bind:this={triggerEl} onclick={toggle}>
-    {@render trigger?.(open, toggle)}
+    {@render trigger?.({ open, toggle })}
   </div>
 
   {#if open}<div bind:this={panelEl} class="dropdown-panel" role="menu">
-    {@render children?.(close)}
+    {@render children?.({ close })}
   </div>{/if}</div>
 
 

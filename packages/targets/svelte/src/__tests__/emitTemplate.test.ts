@@ -99,12 +99,13 @@ describe('emitTemplate — behavior (Plan 05-02a Task 2)', () => {
     expect(template).toMatch(/class=\{[\s\S]*?done: item\.done[\s\S]*?\}/);
   });
 
-  it('Test 8: Dropdown slot WITHOUT defaultContent uses bare {@render trigger?.(...)} shorthand', () => {
+  it('Test 8: Dropdown slot WITHOUT defaultContent uses bare {@render trigger?.({ ... })} shorthand', () => {
     const { template, diagnostics } = emitTemplate(lowerExample('Dropdown'), REGISTRY);
     expect(diagnostics).toEqual([]);
     // <slot name="trigger" :open="$props.open" :toggle="toggle" /> has no
-    // defaultContent and no fallback children → bare {@render trigger?.(open, toggle)}.
-    expect(template).toMatch(/\{@render trigger\?\.\(open, toggle\)\}/);
+    // defaultContent and no fallback children → bare {@render trigger?.({ open, toggle })}
+    // per Phase 07.3.1 Blocker #2 D-02 (object-shape snippet args).
+    expect(template).toMatch(/\{@render trigger\?\.\(\{ open, toggle \}\)\}/);
   });
 
   it('Test 9: SearchInput `r-model="$data.query"` emits bind:value={query}', () => {

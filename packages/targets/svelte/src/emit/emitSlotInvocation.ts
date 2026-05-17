@@ -66,12 +66,21 @@ export function emitSlotInvocation(
 ): string {
   const slotKey = node.slotName === '' ? 'children' : node.slotName;
 
-  // Build comma-separated arg-render list.
-  // Note: Svelte's snippet invocation is positional, NOT named — args render
-  // in source order. Phase 2 already preserved their order on the IR.
-  const argList = node.args
-    .map((a) => rewriteTemplateExpression(a.expression, ctx.ir))
-    .join(', ');
+  // Build object-shape arg payload per Phase 07.3.1 Blocker #2 D-02. Svelte's
+  // snippet invocation is positional in syntax but Rozie's cross-target
+  // contract uses object-payload destructure on the consumer side; producer
+  // must emit a single object to match. Shorthand collapse (`{ close }` for
+  // `close: close`) keeps the output idiomatic.
+  const argList =
+    node.args.length === 0
+      ? ''
+      : `{ ${node.args
+          .map((a) => {
+            const key = a.name;
+            const expr = rewriteTemplateExpression(a.expression, ctx.ir);
+            return key === expr ? key : `${key}: ${expr}`;
+          })
+          .join(', ')} }`;
 
   // Find matching SlotDecl to determine presence + defaultContent.
   const decl: SlotDecl | undefined = ctx.ir.slots.find(
