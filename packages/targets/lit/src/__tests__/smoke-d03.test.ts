@@ -82,6 +82,22 @@ describe('Phase 07.3.1 Blocker #3 (D-03) — Lit consumer-side scoped slot fill 
     expect(code).toContain('private _slotCtxWired_header = false;');
   });
 
+  it('spreads slot="header" across multi-root fill body instead of div-wrap (D-LIT-18)', () => {
+    // The CONSUMER_SOURCE fixture has two top-level children inside the
+    // `#header` fill (`<h2>Title</h2>` and `<button @click="close">×</button>`).
+    // D-LIT-18 routes this through the multi-root spread path: each
+    // top-level element bears `slot="header"` directly, and no synthetic
+    // `<div slot="header">` wrapper appears. The button's @click handler
+    // is the D-LIT-17 dispatchEvent shape (the bare `close` rewrites to
+    // `this._headerCtx?.close`, which dispatches `rozie-header-close`).
+    const code = compileConsumer();
+    expect(code).toContain('<h2 slot="header">Title</h2>');
+    expect(code).toContain(
+      `<button @click=\${(e) => this.dispatchEvent(new CustomEvent('rozie-header-close', { detail: e, bubbles: true, composed: true }))} slot="header">×</button>`,
+    );
+    expect(code).not.toContain('<div slot="header">');
+  });
+
   it('emits tryWire wrapper with queueMicrotask retry in _armListeners()', () => {
     const code = compileConsumer();
     expect(code).toContain('const tryWire = () =>');
