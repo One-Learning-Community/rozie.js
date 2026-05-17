@@ -25,6 +25,7 @@ import type {
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import type { SolidImportCollector, RuntimeSolidImportCollector } from '../rewrite/collectSolidImports.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
+import { resolveTwoWayTarget } from './resolveTwoWayTarget.js';
 
 export interface EmitAttrCtx {
   ir: IRComponent;
@@ -125,6 +126,11 @@ function colonPropToSolidName(name: string): string {
 
 function escapeJsxAttrLiteral(s: string): string {
   return s.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+}
+
+function capitalize(name: string): string {
+  if (name.length === 0) return name;
+  return name.charAt(0).toUpperCase() + name.slice(1);
 }
 
 function renderExpr(expr: t.Expression, ir: IRComponent): string {
@@ -249,11 +255,37 @@ function emitNonClassAttribute(
   }
 
   if (attr.kind === 'twoWayBinding') {
-    // Phase 07.3 Wave 3 stub — Plan 07.3-07 replaces this with the Solid
-    // controllable-state binding (`prop={local()} on{Cap}Change={setter}`).
-    throw new Error(
-      `Solid target: r-model:${attr.name}= consumer-side two-way binding not yet implemented (Phase 07.3 Wave 3 Plan 07.3-07).`,
-    );
+    // Phase 07.3 D-01 — consumer-side `r-model:propName="expr"` emit.
+    //
+    // Solid shape: `${propName}={${local}()} on${Capitalize(propName)}Change={${setter}}`
+    //
+    // The Accessor invocation (`local()`) is the only structural difference
+    // from React's emit — Solid signals expose the current value via a
+    // callable Accessor (RESEARCH §Solid lines 179-184). The Setter is
+    // passed as a bare identifier; downstream `_props.on${Cap}Change?.(v)`
+    // is wired by createControllableSignal (runtime), not the consumer JSX.
+    //
+    // Event prop name follows the project-wide `on${Capitalize(propName)}Change`
+    // convention (emitPropsInterface.ts:73, RESEARCH line 177).
+    //
+    // The IR-time validator (validateTwoWayBindings) has already rejected
+    // invalid LHS shapes (ROZ949/950/951) before emit runs. resolveTwoWayTarget
+    // returning null here is a defensive guard — fall back to a bare,
+    // one-way binding so the build doesn't crash if validation was skipped
+    // (e.g. unplugin pipeline edge cases).
+    const target = resolveTwoWayTarget(attr.expression, ctx.ir);
+    if (target === null) {
+      const jsxNameFallback = colonPropToSolidName(attr.name);
+      const exprCodeFallback = renderExpr(attr.expression, ctx.ir);
+      return { jsx: `${jsxNameFallback}={${exprCodeFallback}}`, diagnostics };
+    }
+    const { local, setter } = target;
+    const jsxName = colonPropToSolidName(attr.name);
+    const eventProp = `on${capitalize(jsxName)}Change`;
+    return {
+      jsx: `${jsxName}={${local}()} ${eventProp}={${setter}}`,
+      diagnostics,
+    };
   }
 
   // interpolated
