@@ -62,7 +62,16 @@ class RozieColorSettingsPage : ColorSettingsPage {
         AttributesDescriptor(
             msg("rozie.color.directive.arg"),
             RozieSyntaxHighlighter.DIRECTIVE_ARG
-        )
+        ),
+        // Plan 08.1-04 — Slot-fill shorthand (Phase 07.2). Three themable entries:
+        // marker (`#`), slot name, and dynamic-name brackets (OPEN+CLOSE share the
+        // single SLOT_BRACKET highlight key, per IntelliJ bracket-pair convention).
+        AttributesDescriptor(
+            msg("rozie.color.slot.fill.marker"),
+            RozieSyntaxHighlighter.SLOT_FILL_MARKER
+        ),
+        AttributesDescriptor(msg("rozie.color.slot.name"), RozieSyntaxHighlighter.SLOT_NAME),
+        AttributesDescriptor(msg("rozie.color.slot.bracket"), RozieSyntaxHighlighter.SLOT_BRACKET)
     )
 
     override fun getAttributeDescriptors(): Array<AttributesDescriptor> = descriptors
@@ -127,7 +136,10 @@ class RozieColorSettingsPage : ColorSettingsPage {
 
         <template>
           <Counter :value="42" />
-          <Modal r-model:open="${'$'}data.open" />
+          <Modal r-model:open="${'$'}data.open">
+            <template #header="{ close }">Title</template>
+            <template #[${'$'}data.slotName]>Dynamic</template>
+          </Modal>
           <div class="counter counter--{{ ${'$'}props.value > 0 ? 'active' : 'idle' }}"
                ref="root"
                @mouseenter="${'$'}data.hovering = true"

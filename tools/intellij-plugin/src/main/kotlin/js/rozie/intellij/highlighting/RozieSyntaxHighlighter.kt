@@ -91,10 +91,45 @@ class RozieSyntaxHighlighter : SyntaxHighlighterBase() {
         val DIRECTIVE_ARG: TextAttributesKey =
             TextAttributesKey.createTextAttributesKey("ROZIE_DIRECTIVE_ARG", DLHC.STATIC_FIELD)
 
+        /**
+         * The `#` slot-fill marker in `<template #slotName>` (Phase 07.2). Fallback
+         * DLHC.METADATA places it in the same visual family as `BLOCK_TAG`,
+         * `EVENT_AT`, and `LANG_ATTR` — all structural sigils. External name
+         * "ROZIE_SLOT_FILL_MARKER" is STABLE API (T-8-03-01) — never rename
+         * post-ship.
+         */
+        val SLOT_FILL_MARKER: TextAttributesKey =
+            TextAttributesKey.createTextAttributesKey("ROZIE_SLOT_FILL_MARKER", DLHC.METADATA)
+
+        /**
+         * The slot name identifier after `#` in `<template #slotName>`. Fallback
+         * DLHC.LABEL: a slot binding point is semantically a labelled jump-target
+         * for its surrounding component, and "Label" is the closest stock
+         * highlighter family. External name "ROZIE_SLOT_NAME" is STABLE API
+         * (T-8-03-01) — never rename post-ship.
+         */
+        val SLOT_NAME: TextAttributesKey =
+            TextAttributesKey.createTextAttributesKey("ROZIE_SLOT_NAME", DLHC.LABEL)
+
+        /**
+         * The `[` and `]` brackets around a dynamic slot-name expression in
+         * `<template #[$data.slotName]>` — both bracket IElementTypes
+         * (SLOT_DYNAMIC_BRACKET_OPEN + _CLOSE) fold onto this single key per
+         * the IntelliJ convention that paired brackets share one color setting
+         * (RESEARCH § Standard Stack note ~line 183). Fallback DLHC.BRACKETS is
+         * the natural choice for `[`/`]`. External name "ROZIE_SLOT_BRACKET" is
+         * STABLE API (T-8-03-01) — never rename post-ship.
+         */
+        val SLOT_BRACKET: TextAttributesKey =
+            TextAttributesKey.createTextAttributesKey("ROZIE_SLOT_BRACKET", DLHC.BRACKETS)
+
         // Pre-allocated arrays returned by getTokenHighlights — avoid allocating per call.
         private val COMPONENT_REF_KEYS = arrayOf(COMPONENT_REF)
         private val DIRECTIVE_COLON_KEYS = arrayOf(DIRECTIVE_COLON)
         private val DIRECTIVE_ARG_KEYS = arrayOf(DIRECTIVE_ARG)
+        private val SLOT_FILL_MARKER_KEYS = arrayOf(SLOT_FILL_MARKER)
+        private val SLOT_NAME_KEYS = arrayOf(SLOT_NAME)
+        private val SLOT_BRACKET_KEYS = arrayOf(SLOT_BRACKET)
         private val BLOCK_TAG_KEYS = arrayOf(BLOCK_TAG)
         private val R_DIRECTIVE_KEYS = arrayOf(R_DIRECTIVE)
         private val EVENT_AT_KEYS = arrayOf(EVENT_AT)
@@ -172,6 +207,15 @@ class RozieSyntaxHighlighter : SyntaxHighlighterBase() {
         // Directive arguments (r-model:propName)
         RozieTokenTypes.DIRECTIVE_COLON -> DIRECTIVE_COLON_KEYS
         RozieTokenTypes.DIRECTIVE_ARGUMENT_NAME -> DIRECTIVE_ARG_KEYS
+
+        // Slot-fill shorthand (Phase 07.2). OPEN+CLOSE brackets fold onto the
+        // same SLOT_BRACKET_KEYS via the multi-value when arm — mirrors IntelliJ's
+        // bracket-pair UX convention (the IElementTypes remain distinct for D-07
+        // parity; only the highlight key collapses).
+        RozieTokenTypes.SLOT_FILL_MARKER -> SLOT_FILL_MARKER_KEYS
+        RozieTokenTypes.SLOT_NAME -> SLOT_NAME_KEYS
+        RozieTokenTypes.SLOT_DYNAMIC_BRACKET_OPEN,
+        RozieTokenTypes.SLOT_DYNAMIC_BRACKET_CLOSE -> SLOT_BRACKET_KEYS
 
         // Body tokens (SCRIPT_BODY, TEMPLATE_BODY, etc.) and ATTR_VALUE_*
         // — leave uncolored; Plan 04 injection will color via host language
