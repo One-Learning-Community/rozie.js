@@ -1,0 +1,6 @@
+<rozie name="SpikeInjectionHost">
+<props>{ value: { type: Number, default: 0 } }</props>
+<script>
+const x = $props.value;
+</script>
+</rozie>
