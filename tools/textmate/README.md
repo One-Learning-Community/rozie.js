@@ -2,6 +2,16 @@
 
 Syntax highlighting for `.rozie` Single-File Component files. Consumed by JetBrains IDEs (PhpStorm, WebStorm, IDEA, RubyMine, etc.) via the built-in TextMate-bundle host, and reusable as a VSCode `contributes.grammars` entry.
 
+## Install — VS Code (marketplace)
+
+Search **Rozie** in the Extensions view, or install from a local `.vsix` via:
+
+```
+code --install-extension rozie-textmate-0.1.0.vsix
+```
+
+The marketplace listing is pending — the bundle is publishable but has not yet been published. See **Marketplace publish** below for the package + publish workflow.
+
 ## What gets highlighted
 
 - SFC top-level blocks: `<template>`, `<script>`, `<props>`, `<data>`, `<listeners>`, `<components>`, `<style>`
@@ -82,11 +92,34 @@ Open `tools/textmate/fixtures/Counter.rozie`, `Dropdown.rozie`, and `ModalConsum
 
 ## v1 limitations
 
-- `<script lang="ts">` and `<style lang="scss">` — the `lang` attribute is *recognised* (does not break highlighting) but content is still routed to `source.js` / `source.css` regardless. TS still highlights reasonably under `source.js` in JetBrains; full TS / SCSS routing lands when the IntelliJ-Platform plugin replaces this grammar.
+- `<style lang="scss">` — the `lang` attribute is recognised but content is still routed to `source.css` regardless. Full SCSS routing lands when the IntelliJ-Platform plugin replaces this grammar. (`<script lang="ts">` content now routes to `source.ts` correctly — see `fixtures/CounterTS.rozie`.)
 - `<style scoped>` highlights identically to `<style>` — there is no visual difference for the `scoped` attribute itself yet.
 - No folding rules, no indentation rules, no brace-matching, no completion, no diagnostics. This is a colorizer only.
 - Modifier-arg lists tokenize their contents as a JS expression, but errors (mismatched parens, etc.) are not surfaced — the grammar is forgiving.
 - The top-level `<template>` SFC block is matched only when `<template>` (and the closing `</template>`) appear flush-left at column 0. This is what lets nested `<template #header>` slot-fill tags inside the block coexist with the block boundaries — TextMate has no stack-aware tag matching, so indentation is the only signal. If you indent the SFC's top-level block, slot-fill highlighting will appear correct but the outer block end will be detected at the FIRST `</template>` (the inner one), losing highlighting on whatever follows.
+
+## Marketplace publish
+
+1. Install `@vscode/vsce` (declared as a devDependency on this bundle):
+
+   ```
+   pnpm install
+   ```
+
+   If `pnpm` does not pick up `tools/textmate/` as a workspace package, install the packager locally inside the bundle:
+
+   ```
+   cd tools/textmate && npm install --no-save @vscode/vsce@^3
+   ```
+
+2. From `tools/textmate/`:
+
+   ```
+   pnpm package          # produces rozie-textmate-0.1.0.vsix
+   pnpm publish          # after `vsce login <publisher>`, publishes to the marketplace
+   ```
+
+3. **Before publishing publicly:** add an icon. The marketplace listing without an icon shows the default placeholder, which looks unprofessional. Drop a 128×128 PNG at `tools/textmate/icon.png` and add `"icon": "icon.png"` to `package.json`. This is the remaining required step before promoting the listing publicly.
 
 ## Future
 

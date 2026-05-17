@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Initial VS Code marketplace release. Syntax highlighting for `.rozie` Single-File Component files: block-level scopes, `r-*` directives, event-modifier chains with arguments, slot-fill shorthand, mustache interpolation, `$`-prefixed magic identifiers.
+- `<script lang="ts">` content now routes to `source.ts` for proper TypeScript highlighting (interfaces, type-only imports, `satisfies`, etc.). Plain `<script>` openers continue to route to `source.js` unchanged.
 
 ### Known limitations / next steps
 
