@@ -30,10 +30,13 @@
  *     → `<ng-template #defaultSlot let-item="item">…body…</ng-template>`
  *
  *   { isDynamic: true, dynamicNameExpr } — R5 dynamic name
- *     → reserved for Wave 2 (consumer-dynamic-name fixture). The shape
- *       `<ng-container *ngTemplateOutlet="..." />` requires runtime template
- *       refs the consumer dispatches against — full implementation lands in
- *       Plan 07.2-05.
+ *     → `<ng-template #__dynSlot_<N>>…body…</ng-template>` PLUS a
+ *       `[templates]="templates"` property-input binding on the producer tag
+ *       (composed in `emitTemplateNode.ts`). The consumer-side class getter
+ *       `templates` maps the user's runtime-key expression to each captured
+ *       `__dynSlot_<N>` ViewChild; the producer's `templates()` input signal
+ *       (Plan 07.3.2-03) consumes that map at runtime. F-07.3.2-11-A closure
+ *       — see Phase 07.3.2.1 Plan 01 SUMMARY.
  *
  * Arrow-function-in-context caveat (Pitfall 4): when a fill body's event
  * handler contains arrow expressions, the same arrow-function-rejection
@@ -103,8 +106,9 @@ function letBindings(filler: SlotFillerDecl): string {
  * inclusion as a CHILD of the component tag.
  *
  * Dynamic-name branch (R5) — call `emitDynamicSlotFiller` instead, which
- * returns the multi-part shape (ng-template declaration + ng-container
- * dispatch + class-field declarations).
+ * returns the multi-part shape (ng-template declaration + class-field
+ * declarations); the producer-tag `[templates]="templates"` property-input
+ * binding is composed by the caller in `emitTemplateNode.ts` (F-07.3.2-11-A).
  */
 export function emitSlotFiller(
   filler: SlotFillerDecl,
