@@ -119,6 +119,12 @@ function renderInterpolatedTemplateLiteralSafe(
  * array element string.
  */
 function attrToArraySegment(attr: AttributeBinding, ir: IRComponent): string {
+  if (attr.kind === 'twoWayBinding') {
+    // Phase 07.3 Wave 3 stub — twoWayBinding never valid in class/style merge.
+    throw new Error(
+      `Vue target: twoWayBinding not valid in class/style array context (Phase 07.3 Wave 3 Plan 07.3-03).`,
+    );
+  }
   if (attr.kind === 'static') {
     return staticSegmentLiteral(attr.value);
   }
@@ -133,6 +139,14 @@ function attrToArraySegment(attr: AttributeBinding, ir: IRComponent): string {
  * Emit a single non-class/style binding/static attribute as one attribute pair.
  */
 function emitSingleAttr(attr: AttributeBinding, ir: IRComponent): string {
+  if (attr.kind === 'twoWayBinding') {
+    // Phase 07.3 Wave 3 stub — Plan 07.3-03 replaces this with the Vue
+    // `v-model:propName="<expr>"` emit.
+    throw new Error(
+      `Vue target: r-model:${attr.name}= consumer-side two-way binding not yet implemented (Phase 07.3 Wave 3 Plan 07.3-03).`,
+    );
+  }
+
   // Special r-model directive (Phase 2 lowerer keeps it as binding name=`r-model`).
   const name = attr.kind !== 'static' && attr.name === 'r-model' ? 'v-model' : attr.kind === 'static' ? attr.name : attr.name;
 

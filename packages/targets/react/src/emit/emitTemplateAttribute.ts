@@ -322,7 +322,12 @@ function composeClassName(
   > = [];
 
   for (const a of attrs) {
-    if (a.kind === 'static') {
+    if (a.kind === 'twoWayBinding') {
+      // Phase 07.3 Wave 3 stub — twoWayBinding never appears in a class merge.
+      throw new Error(
+        `React target: twoWayBinding not valid in class array context (Phase 07.3 Wave 3 Plan 07.3-06).`,
+      );
+    } else if (a.kind === 'static') {
       const tokens = a.value.split(/\s+/).filter(Boolean);
       segments.push({ kind: 'staticTokens', tokens });
     } else if (a.kind === 'binding') {
@@ -578,6 +583,14 @@ function emitNonClassAttribute(
     const jsxName = colonPropToJsxName(attr.name);
     const exprCode = renderExpr(attr.expression, ctx.ir);
     return { jsx: `${jsxName}={${exprCode}}`, diagnostics };
+  }
+
+  if (attr.kind === 'twoWayBinding') {
+    // Phase 07.3 Wave 3 stub — Plan 07.3-06 replaces this with the React
+    // `prop={local} on{Cap}Change={setter}` JSX attribute-pair emit.
+    throw new Error(
+      `React target: r-model:${attr.name}= consumer-side two-way binding not yet implemented (Phase 07.3 Wave 3 Plan 07.3-06).`,
+    );
   }
 
   // interpolated

@@ -178,7 +178,12 @@ function composeClassValue(attrs: AttributeBinding[], ir: IRComponent): string {
   // Multi-source — join with spaces using template literal or string concat
   const parts: string[] = [];
   for (const a of attrs) {
-    if (a.kind === 'static') {
+    if (a.kind === 'twoWayBinding') {
+      // Phase 07.3 Wave 3 stub — twoWayBinding never appears in a class merge.
+      throw new Error(
+        `Solid target: twoWayBinding not valid in class array context (Phase 07.3 Wave 3 Plan 07.3-07).`,
+      );
+    } else if (a.kind === 'static') {
       parts.push(renderStaticClassValue(a.value));
     } else if (a.kind === 'binding') {
       parts.push(renderExpr(a.expression, ir));
@@ -241,6 +246,14 @@ function emitNonClassAttribute(
     const jsxName = colonPropToSolidName(attr.name);
     const exprCode = renderExpr(attr.expression, ctx.ir);
     return { jsx: `${jsxName}={${exprCode}}`, diagnostics };
+  }
+
+  if (attr.kind === 'twoWayBinding') {
+    // Phase 07.3 Wave 3 stub — Plan 07.3-07 replaces this with the Solid
+    // controllable-state binding (`prop={local()} on{Cap}Change={setter}`).
+    throw new Error(
+      `Solid target: r-model:${attr.name}= consumer-side two-way binding not yet implemented (Phase 07.3 Wave 3 Plan 07.3-07).`,
+    );
   }
 
   // interpolated

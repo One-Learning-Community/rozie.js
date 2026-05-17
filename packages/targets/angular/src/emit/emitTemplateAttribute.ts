@@ -105,6 +105,14 @@ export function emitSingleAttr(
   // r-html handled at the element level.
   if (attr.name === 'r-html') return null;
 
+  // Phase 07.3 Wave 3 stub — Plan 07.3-05 replaces this with the Angular
+  // long-form `[propName]="X()" (propNameChange)="X.set($event)"` emit.
+  if (attr.kind === 'twoWayBinding') {
+    throw new Error(
+      `Angular target: r-model:${attr.name}= consumer-side two-way binding not yet implemented (Phase 07.3 Wave 3 Plan 07.3-05).`,
+    );
+  }
+
   if (attr.kind === 'static') {
     if (attr.name === 'ref') {
       const refNames = new Set(ctx.ir.refs.map((r) => r.name));
@@ -202,6 +210,13 @@ function isComponentTag(ctx: EmitAttrCtx): boolean {
  * inclusion in an array (used by class merge below).
  */
 function attrToArraySegment(attr: AttributeBinding, ctx: EmitAttrCtx): string {
+  // Phase 07.3 Wave 3 stub — twoWayBinding never participates in class/style
+  // array merge (it's a component-prop binding, not an attribute aggregator).
+  if (attr.kind === 'twoWayBinding') {
+    throw new Error(
+      `Angular target: twoWayBinding not valid in class/style array context (Phase 07.3 Wave 3 Plan 07.3-05).`,
+    );
+  }
   if (attr.kind === 'static') {
     return JSON.stringify(attr.value);
   }

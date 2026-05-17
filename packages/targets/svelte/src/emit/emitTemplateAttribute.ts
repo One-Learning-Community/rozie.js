@@ -101,6 +101,14 @@ export function emitSingleAttr(
     return `${attr.name}={${expr}}`;
   }
 
+  if (attr.kind === 'twoWayBinding') {
+    // Phase 07.3 Wave 3 stub — Plan 07.3-04 replaces this with the Svelte 5
+    // runes-mode `bind:propName={expr}` emit.
+    throw new Error(
+      `Svelte target: r-model:${attr.name}= consumer-side two-way binding not yet implemented (Phase 07.3 Wave 3 Plan 07.3-04).`,
+    );
+  }
+
   // interpolated: if exactly one binding segment, simplify to `name={<expr>}`.
   if (attr.segments.length === 1 && attr.segments[0]!.kind === 'binding') {
     const seg = attr.segments[0]! as { kind: 'binding'; expression: t.Expression; deps: unknown };
@@ -117,6 +125,12 @@ export function emitSingleAttr(
  * inclusion in an array (used by class/style merge below).
  */
 function attrToArraySegment(attr: AttributeBinding, ir: IRComponent): string {
+  if (attr.kind === 'twoWayBinding') {
+    // Phase 07.3 Wave 3 stub — twoWayBinding never valid in class/style merge.
+    throw new Error(
+      `Svelte target: twoWayBinding not valid in class/style array context (Phase 07.3 Wave 3 Plan 07.3-04).`,
+    );
+  }
   if (attr.kind === 'static') {
     return JSON.stringify(attr.value);
   }
