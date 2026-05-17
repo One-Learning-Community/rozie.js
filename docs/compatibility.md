@@ -84,11 +84,7 @@ Producer + consumer emit shapes per target are documented in
 | Feature | React | Vue | Svelte | Angular | Solid | Lit |
 | --- | :---: | :---: | :---: | :---: | :---: | :---: |
 | `.rozie` per-statement source maps | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Visual-regression rig (internal screenshot harness) | ✅ | ✅ | ✅ | [⚠︎](/parity#angular-—-visual-regression-rig-host-cell) | ✅ | ✅ |
-
-The Angular emitter itself is fully validated end-to-end via the
-`angular-analogjs` demo (real AOT compile + Playwright e2e). Only the internal
-cross-target screenshot rig has a known-pending Angular cell.
+| Visual-regression rig (internal screenshot harness) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 
 ## How to read the caveats
 
@@ -97,7 +93,6 @@ The pattern across them is consistent:
 
 - **Slot ⚠︎** — the feature works at runtime; the consumer-side *authoring shape* differs (render prop, `data-rozie-params` attribute, additive `slots?:` / `snippets?:` / `templates?:` prop).
 - **Lifecycle ⚠︎** — the hooks fire; the *timing* differs on conditionally-rendered component roots (Lit / Solid keep the instance alive across the toggle).
-- **Tooling ⚠︎** — the emitter is fully supported; only the internal screenshot harness has a pending cell.
 
 The only `❌` in the matrix is the Lit-specific scoped + dynamic slot name
 combination — a deferred v1 limitation pending a Map-keyed ctx-observer RFC.

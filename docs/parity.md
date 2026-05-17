@@ -228,25 +228,6 @@ $onMount(lockScroll)
 The reference `Modal.rozie` already follows this pattern for its
 `lockBodyScroll` prop.
 
-## Tooling notes
-
-### Angular — visual-regression rig host cell
-
-The Angular emitter is fully supported and validated end-to-end: the
-`angular-analogjs` consumer demo builds with real Ahead-of-Time compilation and
-its Playwright e2e suite passes. One internal tooling harness — the uniform
-cross-target *visual-regression* rig that mounts all six targets in a single
-synthetic host — does not yet render the Angular cell, because dynamically
-mounting an AnalogJS-compiled standalone component into a non-AnalogJS host is
-a build-harness wiring problem still being resolved. The rig's build
-orchestrator (`tests/visual-regression/scripts/build-cells.mjs`) soft-fails the
-Angular sub-build, and the matrix spec (`specs/matrix.spec.ts`) correspondingly
-gates the 8 Angular cells with `test.fixme` whenever `dist/angular/` is absent —
-so the column is reported as known-pending rather than failing CI. The gate
-lifts automatically once the Angular sub-build succeeds. This affects only that
-one internal screenshot rig, not the Angular emitter or the `angular-analogjs`
-demo. Angular is a first-class v1 target.
-
 ---
 
 These are the *complete* set of documented limitations as of v1. Everything
