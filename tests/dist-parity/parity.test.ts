@@ -65,6 +65,9 @@ const FIXTURES_DIR = resolve(HERE, 'fixtures');
 // via the IR cache; each Leg below detects `name === 'ModalConsumer'` and
 // stages the sibling .rozie files alongside (or wires resolverRoot) so the
 // producer resolution flows through correctly.
+// Phase 07.3 Plan 09: extended 9 → 10 with WrapperModal so the consumer-side
+// `r-model:open="$props.open"` forwarding pattern is byte-locked across all
+// 4 entrypoints. 10 × 6 × 4 = 240 cells (plus React .d.ts/.module.css sidecars).
 const EXAMPLES = [
   'Counter',
   'SearchInput',
@@ -75,13 +78,17 @@ const EXAMPLES = [
   'Card',
   'CardHeader',
   'ModalConsumer',
+  'WrapperModal',
 ] as const;
 
 // Phase 07.2 Plan 06 — siblings ModalConsumer reaches via `<components>`.
 // Used by Leg 3 (babel-plugin sibling-copy) and Leg 2 (CLI implicit via
 // `root: ROOT`).
+// Phase 07.3 Plan 09 — WrapperModal references Modal.rozie via <components>;
+// its compile likewise needs Modal.rozie staged alongside.
 const EXAMPLE_SIBLING_ROZIE: Record<string, string[]> = {
   ModalConsumer: ['Modal.rozie', 'WrapperModal.rozie', 'Counter.rozie'],
+  WrapperModal: ['Modal.rozie', 'Counter.rozie'],
 };
 // Phase 06.4 P3 (D-LIT-22): TARGETS extended with 'lit' — additive only.
 // 8 examples × 1 target × 3 entrypoints excl. babel-plugin sidecar parity
@@ -302,7 +309,7 @@ describe('DIST-05 strict-bytes parity gate — consumer-side 96-cell subset (Pha
   });
 });
 
-describe('DIST-05 strict-bytes parity gate (D-93) — 9 examples × 6 targets × 4 entrypoints = 216 cells', () => {
+describe('DIST-05 strict-bytes parity gate (D-93) — 10 examples × 6 targets × 4 entrypoints = 240 cells', () => {
   describe.each(EXAMPLES)('%s', (name) => {
     const rozieSourcePath = resolve(ROOT, `examples/${name}.rozie`);
     const rozieSource = readFileSync(rozieSourcePath, 'utf8');

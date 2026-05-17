@@ -1,7 +1,7 @@
 <template>
 
 <div class="modal-consumer">
-  <Modal :open="open"><template #header="{ close }">
+  <Modal v-model:open="open1"><template #header="{ close }">
       <h2>{{ props.title }}</h2>
       <button class="close" @click="close">×</button>
     </template><template #footer="{ close }">
@@ -11,13 +11,13 @@
     Are you sure you want to proceed?
     </Modal>
 
-  <Modal :open="open"><template #[slotName]>
+  <Modal v-model:open="open2"><template #[slotName]>
       <span class="dynamic-fill">Dynamic header via slotName</span>
     </template>
     Dynamic-name demo body
   </Modal>
 
-  <WrapperModal :title="props.title"><template #brand>
+  <WrapperModal v-model:open="open3" :title="props.title"><template #brand>
       <h2>Re-projected brand</h2>
     </template><template #actions>
       <button>Wrapper action</button>
@@ -39,11 +39,13 @@ const props = withDefaults(
   { title: 'Confirm' }
 );
 
-const open = ref(true);
+const open1 = ref(true);
+const open2 = ref(true);
+const open3 = ref(true);
 const slotName = ref('header');
 
 function onConfirm() {
-  open.value = false;
+  open1.value = false;
 }
 </script>
 
