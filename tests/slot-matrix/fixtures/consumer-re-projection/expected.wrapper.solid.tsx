@@ -6,6 +6,7 @@ interface WrapperProps {
   titleSlot?: JSX.Element;
   // D-131: default slot resolved via children() at body top
   children?: JSX.Element;
+  slots?: Record<string, (ctx: any) => JSX.Element>;
 }
 
 export default function Wrapper(_props: WrapperProps): JSX.Element {
@@ -15,7 +16,7 @@ export default function Wrapper(_props: WrapperProps): JSX.Element {
   return (
     <>
     <Inner headerSlot={() => (<>
-        {_props.titleSlot ?? "default title"}
+        {(_props.titleSlot ?? _props.slots?.['title']) ?? "default title"}
       </>)}>{resolved() ?? "default body"}</Inner>
     </>
   );

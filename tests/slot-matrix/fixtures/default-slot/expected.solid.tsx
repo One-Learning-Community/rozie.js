@@ -4,6 +4,7 @@ import { children, splitProps } from 'solid-js';
 interface DefaultSlotFixtureProps {
   // D-131: default slot resolved via children() at body top
   children?: JSX.Element;
+  slots?: Record<string, (ctx: any) => JSX.Element>;
 }
 
 export default function DefaultSlotFixture(_props: DefaultSlotFixtureProps): JSX.Element {

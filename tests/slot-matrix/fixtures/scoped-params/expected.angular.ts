@@ -13,7 +13,7 @@ interface ItemCtx {
   template: `
 
     <div class="scoped-params-fixture">
-      <ng-container *ngTemplateOutlet="itemTpl; context: { $implicit: { value: label() }, value: label() }" />
+      <ng-container *ngTemplateOutlet="(itemTpl ?? templates()?.['item']); context: { $implicit: { value: label() }, value: label() }" />
     </div>
 
   `,
@@ -21,6 +21,7 @@ interface ItemCtx {
 export class ScopedParamsFixture {
   label = input<string>('item');
   @ContentChild('item', { read: TemplateRef }) itemTpl?: TemplateRef<ItemCtx>;
+  templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
 
   static ngTemplateContextGuard(
     _dir: ScopedParamsFixture,

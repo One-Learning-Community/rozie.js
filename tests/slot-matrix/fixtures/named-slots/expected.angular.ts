@@ -1,4 +1,4 @@
-import { Component, ContentChild, TemplateRef, ViewEncapsulation } from '@angular/core';
+import { Component, ContentChild, TemplateRef, ViewEncapsulation, input } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 
 interface HeaderCtx {}
@@ -13,10 +13,10 @@ interface FooterCtx {}
 
     <div class="named-slots-fixture">
       <header>
-        <ng-container *ngTemplateOutlet="headerTpl" />
+        <ng-container *ngTemplateOutlet="(headerTpl ?? templates()?.['header'])" />
       </header>
       <footer>
-        <ng-container *ngTemplateOutlet="footerTpl" />
+        <ng-container *ngTemplateOutlet="(footerTpl ?? templates()?.['footer'])" />
       </footer>
     </div>
 
@@ -25,6 +25,7 @@ interface FooterCtx {}
 export class NamedSlotsFixture {
   @ContentChild('header', { read: TemplateRef }) headerTpl?: TemplateRef<HeaderCtx>;
   @ContentChild('footer', { read: TemplateRef }) footerTpl?: TemplateRef<FooterCtx>;
+  templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
 
   static ngTemplateContextGuard(
     _dir: NamedSlotsFixture,

@@ -10,6 +10,7 @@ interface ScopedSlotContextProps {
   defaultValue?: unknown[];
   onItemsChange?: (items: unknown[]) => void;
   renderItem?: (ctx: ItemCtx) => ReactNode;
+  slots?: Record<string, (ctx: any) => import('react').ReactNode>;
 }
 
 export default function ScopedSlotContext(props: ScopedSlotContextProps): JSX.Element {
@@ -25,7 +26,7 @@ export default function ScopedSlotContext(props: ScopedSlotContextProps): JSX.El
     <ul className={styles.list} data-rozie-s-5e6c469d="">
       
       {items.map((item) => <li key={item.id} data-rozie-s-5e6c469d="">
-        {props.renderItem ? props.renderItem({ item, remaining }) : item.label}
+        {(props.renderItem ?? props.slots?.['item']) ? (props.renderItem ?? props.slots?.['item'])({ item, remaining }) : item.label}
       </li>)}
     </ul>
     </>

@@ -6,6 +6,7 @@ interface PresenceSlotFallbackProps {
   headerSlot?: JSX.Element;
   // D-131: default slot resolved via children() at body top
   children?: JSX.Element;
+  slots?: Record<string, (ctx: any) => JSX.Element>;
 }
 
 export default function PresenceSlotFallback(_props: PresenceSlotFallbackProps): JSX.Element {
@@ -20,7 +21,7 @@ export default function PresenceSlotFallback(_props: PresenceSlotFallbackProps):
     <section class={"panel"} data-rozie-s-224e77e7="">
       {<Show when={_props.headerSlot || local.title}><header data-rozie-s-224e77e7="">
         
-        {_props.headerSlot ?? local.title}
+        {(_props.headerSlot ?? _props.slots?.['header']) ?? local.title}
       </header></Show>}<div class={"body"} data-rozie-s-224e77e7="">
         {resolved()}
       </div>

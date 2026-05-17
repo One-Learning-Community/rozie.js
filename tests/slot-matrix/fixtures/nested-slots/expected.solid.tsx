@@ -4,6 +4,7 @@ import { splitProps } from 'solid-js';
 interface NestedSlotsFixtureProps {
   wrapperSlot?: JSX.Element;
   innerSlot?: JSX.Element;
+  slots?: Record<string, (ctx: any) => JSX.Element>;
 }
 
 export default function NestedSlotsFixture(_props: NestedSlotsFixtureProps): JSX.Element {
@@ -12,8 +13,8 @@ export default function NestedSlotsFixture(_props: NestedSlotsFixtureProps): JSX
   return (
     <>
     <div class={"nested-slots-fixture"} data-rozie-s-4d5488e4="">
-      {_props.wrapperSlot ?? <div class={"wrapper-fallback"} data-rozie-s-4d5488e4="">
-          {_props.innerSlot}
+      {(_props.wrapperSlot ?? _props.slots?.['wrapper']) ?? <div class={"wrapper-fallback"} data-rozie-s-4d5488e4="">
+          {(_props.innerSlot ?? _props.slots?.['inner'])}
         </div>}
     </div>
     </>

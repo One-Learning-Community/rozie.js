@@ -3,6 +3,7 @@ import { Show, splitProps } from 'solid-js';
 
 interface PresenceCheckFixtureProps {
   asideSlot?: JSX.Element;
+  slots?: Record<string, (ctx: any) => JSX.Element>;
 }
 
 export default function PresenceCheckFixture(_props: PresenceCheckFixtureProps): JSX.Element {
@@ -12,7 +13,7 @@ export default function PresenceCheckFixture(_props: PresenceCheckFixtureProps):
     <>
     <div class={"presence-check-fixture"} data-rozie-s-313bf282="">
       {<Show when={_props.asideSlot}><aside data-rozie-s-313bf282="">
-        {_props.asideSlot}
+        {(_props.asideSlot ?? _props.slots?.['aside'])}
       </aside></Show>}</div>
     </>
   );

@@ -1,4 +1,4 @@
-import { Component, ContentChild, TemplateRef, ViewEncapsulation, computed, model } from '@angular/core';
+import { Component, ContentChild, TemplateRef, ViewEncapsulation, computed, input, model } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 
 interface ItemCtx {
@@ -18,7 +18,7 @@ interface ItemCtx {
       @for (item of items(); track item.id) {
     <li>
         @if (itemTpl) {
-    <ng-container *ngTemplateOutlet="itemTpl; context: { $implicit: { item: item, remaining: remaining() }, item: item, remaining: remaining() }" />
+    <ng-container *ngTemplateOutlet="(itemTpl ?? templates()?.['item']); context: { $implicit: { item: item, remaining: remaining() }, item: item, remaining: remaining() }" />
     } @else {
 
           {{ item.label }}
@@ -36,6 +36,7 @@ interface ItemCtx {
 export class ScopedSlotContext {
   items = model<any[]>((() => [])());
   @ContentChild('item', { read: TemplateRef }) itemTpl?: TemplateRef<ItemCtx>;
+  templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
 
   remaining = computed(() => this.items().filter(i => !i.done).length);
 

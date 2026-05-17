@@ -6,6 +6,7 @@ interface ItemSlotCtx { value: any; }
 interface ScopedParamsFixtureProps {
   label?: string;
   itemSlot?: (ctx: ItemSlotCtx) => JSX.Element;
+  slots?: Record<string, (ctx: any) => JSX.Element>;
 }
 
 export default function ScopedParamsFixture(_props: ScopedParamsFixtureProps): JSX.Element {
@@ -15,7 +16,7 @@ export default function ScopedParamsFixture(_props: ScopedParamsFixtureProps): J
   return (
     <>
     <div class={"scoped-params-fixture"} data-rozie-s-94f3adc8="">
-      {_props.itemSlot?.({ value: local.label })}
+      {(_props.itemSlot ?? _props.slots?.['item'])?.({ value: local.label })}
     </div>
     </>
   );

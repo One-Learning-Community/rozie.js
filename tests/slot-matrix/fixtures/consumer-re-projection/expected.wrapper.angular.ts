@@ -1,4 +1,4 @@
-import { Component, ContentChild, TemplateRef, ViewEncapsulation } from '@angular/core';
+import { Component, ContentChild, TemplateRef, ViewEncapsulation, input } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 
 import { Inner } from './inner';
@@ -15,12 +15,12 @@ interface DefaultCtx {}
 
     <rozie-inner><ng-template #header>
         @if (titleTpl) {
-    <ng-container *ngTemplateOutlet="titleTpl" />
+    <ng-container *ngTemplateOutlet="(titleTpl ?? templates()?.['title'])" />
     } @else {
     default title
     }
       </ng-template><ng-template #defaultSlot>@if (defaultTpl) {
-    <ng-container *ngTemplateOutlet="defaultTpl" />
+    <ng-container *ngTemplateOutlet="(defaultTpl ?? templates()?.['defaultSlot'])" />
     } @else {
     default body
     }</ng-template></rozie-inner>
@@ -30,6 +30,7 @@ interface DefaultCtx {}
 export class Wrapper {
   @ContentChild('title', { read: TemplateRef }) titleTpl?: TemplateRef<TitleCtx>;
   @ContentChild('defaultSlot', { read: TemplateRef }) defaultTpl?: TemplateRef<DefaultCtx>;
+  templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
 
   static ngTemplateContextGuard(
     _dir: Wrapper,

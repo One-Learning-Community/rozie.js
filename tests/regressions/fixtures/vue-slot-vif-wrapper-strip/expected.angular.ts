@@ -16,13 +16,13 @@ interface DefaultCtx {}
     <header>
         
         @if (headerTpl) {
-    <ng-container *ngTemplateOutlet="headerTpl" />
+    <ng-container *ngTemplateOutlet="(headerTpl ?? templates()?.['header'])" />
     } @else {
     {{ title() }}
     }
       </header>
     }<div class="body">
-        <ng-container *ngTemplateOutlet="defaultTpl" />
+        <ng-container *ngTemplateOutlet="(defaultTpl ?? templates()?.['defaultSlot'])" />
       </div>
     </section>
 
@@ -35,6 +35,7 @@ export class PresenceSlotFallback {
   title = input<string>('');
   @ContentChild('header', { read: TemplateRef }) headerTpl?: TemplateRef<HeaderCtx>;
   @ContentChild('defaultSlot', { read: TemplateRef }) defaultTpl?: TemplateRef<DefaultCtx>;
+  templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
 
   static ngTemplateContextGuard(
     _dir: PresenceSlotFallback,

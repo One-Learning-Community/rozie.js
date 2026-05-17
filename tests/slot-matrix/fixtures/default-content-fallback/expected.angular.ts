@@ -1,4 +1,4 @@
-import { Component, ContentChild, TemplateRef, ViewEncapsulation } from '@angular/core';
+import { Component, ContentChild, TemplateRef, ViewEncapsulation, input } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 
 interface StatusCtx {}
@@ -11,7 +11,7 @@ interface StatusCtx {}
 
     <div class="default-content-fallback-fixture">
       @if (statusTpl) {
-    <ng-container *ngTemplateOutlet="statusTpl" />
+    <ng-container *ngTemplateOutlet="(statusTpl ?? templates()?.['status'])" />
     } @else {
 
         <span class="fallback">No status provided.</span>
@@ -23,6 +23,7 @@ interface StatusCtx {}
 })
 export class DefaultContentFallbackFixture {
   @ContentChild('status', { read: TemplateRef }) statusTpl?: TemplateRef<StatusCtx>;
+  templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
 
   static ngTemplateContextGuard(
     _dir: DefaultContentFallbackFixture,

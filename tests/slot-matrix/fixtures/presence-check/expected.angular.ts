@@ -1,4 +1,4 @@
-import { Component, ContentChild, TemplateRef, ViewEncapsulation } from '@angular/core';
+import { Component, ContentChild, TemplateRef, ViewEncapsulation, input } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 
 interface AsideCtx {}
@@ -13,7 +13,7 @@ interface AsideCtx {}
       @if (asideTpl) {
     <aside>
         @if (asideTpl) {
-    <ng-container *ngTemplateOutlet="asideTpl" />
+    <ng-container *ngTemplateOutlet="(asideTpl ?? templates()?.['aside'])" />
     }
       </aside>
     }</div>
@@ -22,6 +22,7 @@ interface AsideCtx {}
 })
 export class PresenceCheckFixture {
   @ContentChild('aside', { read: TemplateRef }) asideTpl?: TemplateRef<AsideCtx>;
+  templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
 
   static ngTemplateContextGuard(
     _dir: PresenceCheckFixture,
