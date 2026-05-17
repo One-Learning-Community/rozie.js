@@ -49,5 +49,14 @@
 
         <xml.attributeDescriptorsProvider
             implementation="js.rozie.intellij.xml.RozieAttributeDescriptorsProvider"/>
+
+        <!-- Plan 08.2-03: a single Kotlin class implements both EPs
+             (Angular's AngularJSTagDescriptorsProvider precedent).
+             Two FQN-identical registrations are required — the tag-name
+             autocomplete EP and the tag-recognition descriptor EP. -->
+        <xml.tagNameProvider
+            implementation="js.rozie.intellij.xml.RozieComponentTagProvider"/>
+        <xml.elementDescriptorProvider
+            implementation="js.rozie.intellij.xml.RozieComponentTagProvider"/>
     </extensions>
 </idea-plugin>
