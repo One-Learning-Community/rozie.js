@@ -88,11 +88,41 @@ For each "isn't quite right" finding, file:
 - Expected vs actual:
 - Disposition (FIX-IN-PHASE / TRIAGE-FOLLOWUP):
 
+## Issues captured (2026-05-17 UAT halt — partial walkthrough)
+
+### P0-UAT-01 — HTML inside `<template>` body renders as nearly-uncolored text (UAT-halting)
+- **Severity:** P0 (worse than the TextMate bundle alone)
+- **Steps to repro:** Install v0.2.0 zip in WebStorm; open any reference example (`Counter.rozie`, `Modal.rozie`, etc.); look at `<template>` content
+- **Expected:** HTML elements like `<div class="...">`, `<button>`, `<span>` highlight with HTML colors (tag-bracket color, tag-name color, attr-name color, attr-value color) — TextMate-bundle parity
+- **Actual:** `<` and `>` uncolored (EMPTY_KEYS), tag names (e.g. `div`, `button`) mis-coloured as MARKUP_ATTRIBUTE (because the JFlex lexer emits them as `ATTR_NAME` tokens), attribute values uncoloured. Net effect: template body looks like plain text with a couple sporadically-coloured identifiers.
+- **Root cause:** The JFlex lexer carves `<template>` body into many small tokens (`TEMPLATE_BODY('<')`, `ATTR_NAME('div')`, `GT('>')`, `LT_SLASH('</')`, plus Plan 03+04 additions like `COMPONENT_REF`, `SLOT_FILL_MARKER`, `SLOT_NAME`, `DIRECTIVE_COLON`, `DIRECTIVE_ARGUMENT_NAME`). These fragment the `TEMPLATE_BODY` injection ranges into 1-5 char slivers that `HTMLLanguage` cannot parse — the injection is effectively dead. By contrast, JS injection works fine because `<script>` body emits as one contiguous `SCRIPT_BODY` token.
+- **Disposition:** FIX-IN-PHASE-08.2 (architectural pivot — see decision log below)
+
+### P0-UAT-02 — `$props.x` does NOT Go-to-Declaration into `<props>` block (UAT-halting)
+- **Severity:** P0 (the headline "smart feature" promise of any IntelliJ plugin)
+- **Steps to repro:** Open `Counter.rozie`; in `<script>` block, right-click on `value` in `$props.value`; choose Go to Declaration
+- **Expected:** Cursor jumps to the `value:` key in the `<props>` block (cross-block PSI reference)
+- **Actual:** No navigation, or "Cannot find declaration to go to" — the plugin has no `PsiReferenceContributor` wiring `$props.X` MemberExpression nodes inside the injected JS PSI tree to the corresponding `<props>` key
+- **Disposition:** FIX-IN-PHASE-08.2 (architectural pivot)
+
+### Architectural decision recorded 2026-05-17
+
+User UAT verdict: *"we're better off with the textmate highlighter and no smart features than whatever is currently offered."*
+
+The lexer-heavy architecture shipped in Plans 08.1-03 / 04 / 05 (and inherited from Plans 08-01..05 / 08.1-01..02) optimised for the wrong contract — **D-07 TextMate scope-parity** — when the right contract is **"JetBrains HTML-PSI compatibility + Rozie smarts layered via standard IntelliJ extension points."** TextMate's regex-paint model and IntelliJ's token-stream-injection model are not equivalent: matching scope names in `TextMateGrammarParityTest` does not produce equivalent visual output, and the lexer carve-outs that satisfy parity actively break HTML injection.
+
+**Phase 08.2 reverses course.** See `.planning/ROADMAP.md` Phase 08.2 entry. The pivot:
+1. JFlex template-body rules strip back to "emit one contiguous TEMPLATE_BODY token" (mirror SCRIPT_BODY pattern)
+2. JetBrains' built-in HTML PSI handles structure / completion / inspection / fold / format
+3. Rozie smarts (`r-*`, `@`, `:`, `#`, PascalCase tags, `$props.X` cross-block refs) move to: `XmlAttributeDescriptorsProvider`, `Annotator`, `XmlTagNameProvider`, `PsiReferenceContributor`, `CompletionContributor`
+4. `TextMateGrammarParityTest` retires (D-07 contract was wrong)
+5. `templateNestingDepth` counter (Plan 05) likely becomes unnecessary — HTML parser handles nesting natively
+
 ## Sign-off
 
-- [ ] All 8 examples walked in both IDEs
-- [ ] All `$onUpdate` contexts verified
-- [ ] All P0/P1 issues fixed in this phase OR triaged with explicit reasoning for deferral
-- [ ] `git tag -a intellij-plugin/v0.2.0 -m '...'` cut
-- [ ] User confirms tag push (NOT done automatically — feedback_no_autopush memory)
-- [ ] CI release job green (artifact published to GitHub Releases)
+- [ ] All 8 examples walked in both IDEs — **UAT HALTED 2026-05-17 after Counter.rozie surfaced 2 P0 issues; remaining walkthrough deferred until Phase 08.2 lands a rebuilt v0.2.0**
+- [ ] All `$onUpdate` contexts verified — **deferred (architectural rework will change the surface)**
+- [ ] All P0/P1 issues fixed in this phase OR triaged — **P0-UAT-01 + P0-UAT-02 routed to Phase 08.2**
+- [ ] `git tag -a intellij-plugin/v0.2.0 -m '...'` cut — **NOT cut. Tag will be cut from the Phase 08.2 close-out, replacing the current candidate.**
+- [ ] User confirms tag push (NOT done automatically — feedback_no_autopush memory) — **n/a (no tag cut)**
+- [ ] CI release job green (artifact published to GitHub Releases) — **n/a**
