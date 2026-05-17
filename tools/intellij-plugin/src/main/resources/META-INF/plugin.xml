@@ -80,5 +80,17 @@
              wrapping inside each reference's multiResolve. -->
         <psi.referenceContributor language="JavaScript"
                                   implementation="js.rozie.intellij.references.RozieJSReferenceContributor"/>
+
+        <!-- Plan 08.2-06: SC-6 prefix-aware attribute-name autocomplete —
+             typing r- / @ / : / # in HTML attribute position inside a .rozie
+             <template> surfaces the canonical name lists from
+             RozieKnownAttributes (Plan 02 DRY contract). Registered for
+             language="HTML" because the XmlAttribute PSI we match lives in
+             HTMLLanguage-injected fragments, not host Rozie PSI (Pitfall 3).
+             Pitfall 2 mitigation via RozieContextCheck.isRozieContext
+             short-circuit so non-Rozie .html files anywhere in the user's
+             project stay unaffected. -->
+        <completion.contributor language="HTML"
+            implementationClass="js.rozie.intellij.completion.RozieAttributeNameCompletionContributor"/>
     </extensions>
 </idea-plugin>
