@@ -73,6 +73,9 @@ import static js.rozie.intellij.lexer.RozieTokenTypes.*;
 %state IN_MODIFIER_CHAIN
 %state IN_MODIFIER_ARGS
 
+%state IN_DIRECTIVE_ARG_COLON
+%state IN_DIRECTIVE_ARG_NAME
+
 %state IN_HTML_COMMENT
 
 %{
@@ -293,7 +296,7 @@ PASCAL_IDENT       = [A-Z][A-Za-z0-9]*
   ">"                             { yybegin(IN_TEMPLATE_BODY); return GT; }
   "/>"                            { yybegin(IN_TEMPLATE_BODY); return GT; }
 
-  {R_DIRECTIVE_RE}                { return R_DIRECTIVE; }
+  {R_DIRECTIVE_RE}                { yybegin(IN_DIRECTIVE_ARG_COLON); return R_DIRECTIVE; }
 
   "@" / {IDENT}                   { modifierExpectingEventName = true; yybegin(IN_MODIFIER_CHAIN); return EVENT_AT; }
   // Defensive — bare @ should still produce a usable token stream.
@@ -338,6 +341,26 @@ PASCAL_IDENT       = [A-Z][A-Za-z0-9]*
 
   {WS}                            { return WHITE_SPACE; }
   [^]                             { return BAD_CHARACTER; }
+}
+
+// =====================================================================
+// IN_DIRECTIVE_ARG_COLON / IN_DIRECTIVE_ARG_NAME — transient sub-states
+// after a {R_DIRECTIVE_RE} match, recognising the optional `:propName`
+// argument form (e.g. `r-model:open`). The lookahead-guarded `:` rule
+// commits to the argument form only when followed by an identifier; any
+// other character (including `=`, whitespace, `>`, `"`, `/`) falls through
+// to IN_TEMPLATE_TAG_OPEN via `yypushback(yylength())` so the parent
+// state re-tokenises it under its normal rules. This is the JFlex idiom
+// for "I expected something specific — didn't see it — rewind."
+// =====================================================================
+<IN_DIRECTIVE_ARG_COLON> {
+  ":" / {IDENT}                  { yybegin(IN_DIRECTIVE_ARG_NAME); return DIRECTIVE_COLON; }
+  [^]                            { yypushback(yylength()); yybegin(IN_TEMPLATE_TAG_OPEN); }
+}
+
+<IN_DIRECTIVE_ARG_NAME> {
+  {IDENT}                        { yybegin(IN_TEMPLATE_TAG_OPEN); return DIRECTIVE_ARGUMENT_NAME; }
+  [^]                            { yypushback(yylength()); yybegin(IN_TEMPLATE_TAG_OPEN); }
 }
 
 // =====================================================================

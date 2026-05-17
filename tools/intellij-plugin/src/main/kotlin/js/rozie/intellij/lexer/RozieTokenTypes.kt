@@ -55,6 +55,8 @@ object RozieTokenTypes {
 
     // --- Template-level Rozie-specific tokens ---
     @JvmField val R_DIRECTIVE: IElementType = RozieElementType("R_DIRECTIVE")
+    @JvmField val DIRECTIVE_COLON: IElementType = RozieElementType("DIRECTIVE_COLON")
+    @JvmField val DIRECTIVE_ARGUMENT_NAME: IElementType = RozieElementType("DIRECTIVE_ARGUMENT_NAME")
     @JvmField val EVENT_AT: IElementType = RozieElementType("EVENT_AT")
     @JvmField val EVENT_NAME: IElementType = RozieElementType("EVENT_NAME")
     @JvmField val MODIFIER_DOT: IElementType = RozieElementType("MODIFIER_DOT")
