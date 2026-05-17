@@ -1,0 +1,19 @@
+<rozie name="CssStyleUnused">
+<template>
+  <div>placeholder</div>
+</template>
+<style>
+.card {
+  padding: 1rem;
+  background: white;
+}
+
+.card__body {
+  color: #333;
+}
+
+.card-header__title {
+  font-weight: bold;
+}
+</style>
+</rozie>
