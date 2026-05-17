@@ -19,6 +19,7 @@ interface ModalProps {
   // D-131: default slot resolved via children() at body top
   children?: JSX.Element;
   footerSlot?: (ctx: FooterSlotCtx) => JSX.Element;
+  slots?: Record<string, (ctx: any) => JSX.Element>;
 }
 
 export default function Modal(_props: ModalProps): JSX.Element {
@@ -99,14 +100,14 @@ export default function Modal(_props: ModalProps): JSX.Element {
     {<Show when={open()}><div class={"modal-backdrop"} ref={(el) => { backdropElRef = el as HTMLElement; }} onClick={(e) => { if (e.target !== e.currentTarget) return; local.closeOnBackdrop && close(); }} data-rozie-s-fc45feb2="">
       <div ref={(el) => { dialogElRef = el as HTMLElement; }} class={"modal-dialog"} role="dialog" aria-modal="true" aria-label={local.title || undefined} tabIndex={-1} data-rozie-s-fc45feb2="">
         {<Show when={local.title || _props.headerSlot}><header data-rozie-s-fc45feb2="">
-          {_props.headerSlot ? _props.headerSlot({ close }) : <h2 data-rozie-s-fc45feb2="">{local.title}</h2>}
+          {(_props.headerSlot ?? _props.slots?.['header']) ? (_props.headerSlot ?? _props.slots?.['header'])({ close }) : <h2 data-rozie-s-fc45feb2="">{local.title}</h2>}
           <button aria-label="Close" class={"close-btn"} onClick={close} data-rozie-s-fc45feb2="">×</button>
         </header></Show>}<div class={"modal-body"} data-rozie-s-fc45feb2="">
           {resolved()}
         </div>
 
         {<Show when={_props.footerSlot}><footer data-rozie-s-fc45feb2="">
-          {_props.footerSlot?.({ close })}
+          {(_props.footerSlot ?? _props.slots?.['footer'])?.({ close })}
         </footer></Show>}</div>
     </div></Show>}</>
     </>

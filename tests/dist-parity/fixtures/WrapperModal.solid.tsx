@@ -12,6 +12,7 @@ interface WrapperModalProps {
   // D-131: default slot resolved via children() at body top
   children?: JSX.Element;
   actionsSlot?: JSX.Element;
+  slots?: Record<string, (ctx: any) => JSX.Element>;
 }
 
 export default function WrapperModal(_props: WrapperModalProps): JSX.Element {
@@ -24,9 +25,9 @@ export default function WrapperModal(_props: WrapperModalProps): JSX.Element {
   return (
     <>
     <Modal open={open()} onOpenChange={setOpen} title={local.title} headerSlot={() => (<>
-        {_props.brandSlot ?? <h2 data-rozie-s-1efe6192="">{local.title}</h2>}
+        {(_props.brandSlot ?? _props.slots?.['brand']) ?? <h2 data-rozie-s-1efe6192="">{local.title}</h2>}
       </>)} footerSlot={() => (<>
-        {_props.actionsSlot}
+        {(_props.actionsSlot ?? _props.slots?.['actions'])}
       </>)}>{resolved()}</Modal>
     </>
   );

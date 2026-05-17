@@ -13,6 +13,7 @@ interface DropdownProps {
   triggerSlot?: (ctx: TriggerSlotCtx) => JSX.Element;
   // D-131: default slot resolved via children() at body top
   children?: JSX.Element;
+  slots?: Record<string, (ctx: any) => JSX.Element>;
 }
 
 export default function Dropdown(_props: DropdownProps): JSX.Element {
@@ -92,7 +93,7 @@ export default function Dropdown(_props: DropdownProps): JSX.Element {
     <>
     <div class={"dropdown"} data-rozie-s-6d6bd882="">
       <div ref={(el) => { triggerElRef = el as HTMLElement; }} onClick={toggle} data-rozie-s-6d6bd882="">
-        {_props.triggerSlot?.({ open: open(), toggle })}
+        {(_props.triggerSlot ?? _props.slots?.['trigger'])?.({ open: open(), toggle })}
       </div>
 
       {<Show when={open()}><div ref={(el) => { panelElRef = el as HTMLElement; }} class={"dropdown-panel"} role="menu" data-rozie-s-6d6bd882="">

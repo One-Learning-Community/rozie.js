@@ -100,6 +100,18 @@ export function emitPropsInterface(ir: IRComponent, slotPropFields?: string[]): 
     }
   }
 
+  // Phase 07.3.2 — accept consumer-side dynamic-name slots map (D-SV-16
+  // cross-target port of commit 6060408, svelte/emit/emitScript.ts:154-161).
+  // The consumer-side emitter (emitSlotFiller.ts:166 `emitDynamicSlotsProp`)
+  // emits `slots={{ [expr]: (ctx) => (<>...</>) }}` for `<template #[dynamic]>`
+  // fills; without this prop the producer-side invocation site (emitSlotInvocation.ts)
+  // has nothing to merge against and the dynamic-name fill is silently dropped.
+  // Gated on `ir.slots.length > 0` so non-slotted components stay byte-identical
+  // (D-05). Per-slot merge happens in emitSlotInvocation.ts.
+  if (ir.slots.length > 0) {
+    fields.push(`  slots?: Record<string, (ctx: any) => JSX.Element>;`);
+  }
+
   if (fields.length === 0) {
     return `interface ${ir.name}Props {}`;
   }

@@ -7,6 +7,7 @@ interface CardProps {
   onClose?: (...args: unknown[]) => unknown;
   // D-131: default slot resolved via children() at body top
   children?: JSX.Element;
+  slots?: Record<string, (ctx: any) => JSX.Element>;
 }
 
 export default function Card(_props: CardProps): JSX.Element {
