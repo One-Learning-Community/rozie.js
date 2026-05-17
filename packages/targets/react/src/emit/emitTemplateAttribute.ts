@@ -36,6 +36,7 @@ import {
   RuntimeReactImportCollector,
 } from '../rewrite/collectReactImports.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
+import { resolveTwoWayTarget } from './resolveTwoWayTarget.js';
 
 // CJS interop normalization.
 type GenerateFn = typeof import('@babel/generator').default;
@@ -586,11 +587,18 @@ function emitNonClassAttribute(
   }
 
   if (attr.kind === 'twoWayBinding') {
-    // Phase 07.3 Wave 3 stub — Plan 07.3-06 replaces this with the React
-    // `prop={local} on{Cap}Change={setter}` JSX attribute-pair emit.
-    throw new Error(
-      `React target: r-model:${attr.name}= consumer-side two-way binding not yet implemented (Phase 07.3 Wave 3 Plan 07.3-06).`,
-    );
+    // Phase 07.3 Plan 07.3-06 — D-01 React consumer-side two-way binding.
+    // Emits the JSX attribute-pair `<propName>={local} on<Cap>Change={setter}`
+    // where {local, setter} are resolved via resolveTwoWayTarget. The
+    // propName casing is preserved (camelCase passes through colonPropToJsxName
+    // unchanged when there are no hyphens / aria-/data- prefixes).
+    const { local, setter } = resolveTwoWayTarget(attr.expression, ctx.ir);
+    const propName = colonPropToJsxName(attr.name);
+    const eventProp = `on${propName.charAt(0).toUpperCase()}${propName.slice(1)}Change`;
+    return {
+      jsx: `${propName}={${local}} ${eventProp}={${setter}}`,
+      diagnostics,
+    };
   }
 
   // interpolated
