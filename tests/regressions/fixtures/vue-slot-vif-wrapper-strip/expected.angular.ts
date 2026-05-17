@@ -12,10 +12,10 @@ interface DefaultCtx {}
   template: `
 
     <section class="panel">
-      @if (headerTpl || title()) {
+      @if ((headerTpl ?? templates()?.['header']) || title()) {
     <header>
         
-        @if (headerTpl) {
+        @if ((headerTpl ?? templates()?.['header'])) {
     <ng-container *ngTemplateOutlet="(headerTpl ?? templates()?.['header'])" />
     } @else {
     {{ title() }}

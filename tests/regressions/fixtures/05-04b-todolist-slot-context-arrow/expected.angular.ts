@@ -17,7 +17,7 @@ interface ItemCtx {
       
       @for (item of items(); track item.id) {
     <li>
-        @if (itemTpl) {
+        @if ((itemTpl ?? templates()?.['item'])) {
     <ng-container *ngTemplateOutlet="(itemTpl ?? templates()?.['item']); context: { $implicit: { item: item, remaining: remaining() }, item: item, remaining: remaining() }" />
     } @else {
 

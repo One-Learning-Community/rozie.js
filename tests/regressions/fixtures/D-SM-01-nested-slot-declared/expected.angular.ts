@@ -13,7 +13,7 @@ interface InnerCtx {}
 
     <div class="outer">
       
-      @if (wrapperTpl) {
+      @if ((wrapperTpl ?? templates()?.['wrapper'])) {
     <ng-container *ngTemplateOutlet="(wrapperTpl ?? templates()?.['wrapper'])" />
     } @else {
 

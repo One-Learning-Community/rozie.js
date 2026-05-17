@@ -14,12 +14,12 @@ interface DefaultCtx {}
   template: `
 
     <rozie-inner><ng-template #header>
-        @if (titleTpl) {
+        @if ((titleTpl ?? templates()?.['title'])) {
     <ng-container *ngTemplateOutlet="(titleTpl ?? templates()?.['title'])" />
     } @else {
     default title
     }
-      </ng-template><ng-template #defaultSlot>@if (defaultTpl) {
+      </ng-template><ng-template #defaultSlot>@if ((defaultTpl ?? templates()?.['defaultSlot'])) {
     <ng-container *ngTemplateOutlet="(defaultTpl ?? templates()?.['defaultSlot'])" />
     } @else {
     default body

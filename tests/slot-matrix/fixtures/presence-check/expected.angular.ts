@@ -10,9 +10,9 @@ interface AsideCtx {}
   template: `
 
     <div class="presence-check-fixture">
-      @if (asideTpl) {
+      @if ((asideTpl ?? templates()?.['aside'])) {
     <aside>
-        @if (asideTpl) {
+        @if ((asideTpl ?? templates()?.['aside'])) {
     <ng-container *ngTemplateOutlet="(asideTpl ?? templates()?.['aside'])" />
     }
       </aside>

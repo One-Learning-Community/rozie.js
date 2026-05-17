@@ -10,7 +10,7 @@ interface StatusCtx {}
   template: `
 
     <div class="default-content-fallback-fixture">
-      @if (statusTpl) {
+      @if ((statusTpl ?? templates()?.['status'])) {
     <ng-container *ngTemplateOutlet="(statusTpl ?? templates()?.['status'])" />
     } @else {
 
