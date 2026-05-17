@@ -204,6 +204,35 @@ describe('Slot lowering — Plan 04-03 Task 2', () => {
     expect(slotPropFields.some((s) => /renderHeader\?: \(\) => ReactNode/.test(s))).toBe(true);
   });
 
+  it('Test 5: r-if="$slots.header" guard lowers to merged form (props.renderHeader ?? props.slots?.[\'header\']) (Phase 07.3.2 Plan 08, F-07.3.2-05-A)', () => {
+    // Plan 08 closes the GUARD-site gap: rewriteTemplateExpression's $slots.X
+    // handler now emits the MERGED dynamic-fallback shape so that
+    // `r-if="$slots.header"` (and `$props.title || $slots.header`) evaluate
+    // truthy when ONLY a dynamic-name fill `<template #[slotName]>` is passed.
+    // Mirrors the existing invocation-site merge at emitSlotInvocation.ts:231.
+    // Before Plan 08: `(props.title || props.renderHeader) && <header>` — bug
+    // After  Plan 08: `(props.title || (props.renderHeader ?? props.slots?.['header'])) && <header>`
+    const ir = lowerInline(`
+<rozie name="X">
+<props>{ title: { type: String, default: '' } }</props>
+<template>
+<div>
+  <header r-if="$props.title || $slots.header">
+    <slot name="header"></slot>
+  </header>
+</div>
+</template>
+</rozie>
+`);
+    const { jsx } = emit(ir);
+    // GUARD merge — Plan 08 contract.
+    expect(jsx).toContain("(props.renderHeader ?? props.slots?.['header'])");
+    // Sanity — the $props.title side still rewrites to props.title in the guard.
+    expect(jsx).toMatch(/props\.title\s*\|\|\s*\(props\.renderHeader\s*\?\?\s*props\.slots\?\.\['header'\]\)/);
+    // The bare unmerged `|| props.renderHeader)` shape MUST NOT survive.
+    expect(jsx).not.toMatch(/\|\|\s*props\.renderHeader\)\s*&&/);
+  });
+
   it('Test 6: named slot with params (Dropdown trigger) → {props.renderTrigger?.(ctx)} + interface TriggerCtx', () => {
     const ir = lowerInline(`
 <rozie name="X">

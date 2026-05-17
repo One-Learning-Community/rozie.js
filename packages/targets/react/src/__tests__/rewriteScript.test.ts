@@ -163,6 +163,77 @@ describe('rewriteRozieIdentifiers (React)', () => {
     expect(out).toMatch(/todo\.title\s*=\s*['"]x['"]/);
   });
 
+  it('§slots-X-merge — script-context $slots.header → "(props.renderHeader ?? props.slots?.[\'header\'])" (Phase 07.3.2 Plan 08, F-07.3.2-05-A)', () => {
+    // Mirror of the template-context contract in rewriteTemplateExpression.test.ts.
+    // Both rewriters MUST emit the same merged shape so r-if guards, listener
+    // when-conditions, and any other $slots.X check site agree.
+    const src = `const visible = $slots.header && open;\n`;
+    const program = babelParse(src, { sourceType: 'module' });
+    const syntheticIR: Partial<IRComponent> & {
+      props: IRComponent['props']; state: IRComponent['state']; refs: IRComponent['refs'];
+      computed: IRComponent['computed']; emits: IRComponent['emits']; lifecycle: IRComponent['lifecycle'];
+      listeners: IRComponent['listeners']; slots: IRComponent['slots'];
+    } = {
+      type: 'IRComponent',
+      name: 'Synthetic',
+      props: [],
+      state: [],
+      computed: [],
+      refs: [],
+      slots: [
+        {
+          type: 'SlotDecl',
+          name: 'header',
+          defaultContent: null,
+          params: [],
+          presence: 'conditional',
+          nestedSlots: [],
+          sourceLoc: { start: 0, end: 0 },
+        },
+      ],
+      emits: [],
+      lifecycle: [],
+      listeners: [],
+    };
+    rewriteRozieIdentifiers(program, syntheticIR as IRComponent);
+    const out = generate(program).code;
+    // The rewriter produces a ParenthesizedExpression wrapping a LogicalExpression
+    // of two MemberExpressions; default @babel/generator string-literal output
+    // uses double-quotes for the bracket-access key. The emitter pipeline
+    // (emitScript.ts) uses the same default options, so this matches the
+    // production output shape for any future component with a $slots.X check
+    // inside a <listeners> when: or computed body. The dist-parity Modal.tsx
+    // fixture's existing single-quote `'header'` form at L83 comes from
+    // emitSlotInvocation.ts's hand-built string template, NOT from this rewriter.
+    expect(out).toContain('(props.renderHeader ?? props.slots?.["header"])');
+    expect(out).not.toMatch(/&&\s*props\.renderHeader\b/);
+  });
+
+  it('§slots-X-merge — script-context $slots.nonexistent (NOT in ir.slots) → unchanged', () => {
+    const src = `const x = $slots.nonexistent;\n`;
+    const program = babelParse(src, { sourceType: 'module' });
+    const syntheticIR: Partial<IRComponent> & {
+      props: IRComponent['props']; state: IRComponent['state']; refs: IRComponent['refs'];
+      computed: IRComponent['computed']; emits: IRComponent['emits']; lifecycle: IRComponent['lifecycle'];
+      listeners: IRComponent['listeners']; slots: IRComponent['slots'];
+    } = {
+      type: 'IRComponent',
+      name: 'Synthetic',
+      props: [],
+      state: [],
+      computed: [],
+      refs: [],
+      slots: [],
+      emits: [],
+      lifecycle: [],
+      listeners: [],
+    };
+    rewriteRozieIdentifiers(program, syntheticIR as IRComponent);
+    const out = generate(program).code;
+    // No rewrite applied — $slots.nonexistent survives as-is.
+    expect(out).toContain('$slots.nonexistent');
+  });
+
   it('$emit with hyphenated event name emits a diagnostic (camelCase requirement)', () => {
     // Synthetic: $emit('hyphen-name', x) — produces invalid JS if naively rewritten.
     const src = `$emit('hyphen-name', 1);\n`;

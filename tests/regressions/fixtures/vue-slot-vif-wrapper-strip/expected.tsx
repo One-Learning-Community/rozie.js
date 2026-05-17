@@ -17,7 +17,7 @@ export default function PresenceSlotFallback(_props: PresenceSlotFallbackProps):
   return (
     <>
     <section className={styles.panel} data-rozie-s-224e77e7="">
-      {(props.renderHeader || props.title) && <header data-rozie-s-224e77e7="">
+      {((props.renderHeader ?? props.slots?.['header']) || props.title) && <header data-rozie-s-224e77e7="">
         
         {(props.renderHeader ?? props.slots?.['header']) ? (props.renderHeader ?? props.slots?.['header'])() : props.title}
       </header>}<div className={styles.body} data-rozie-s-224e77e7="">
