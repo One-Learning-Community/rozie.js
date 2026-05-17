@@ -620,6 +620,31 @@ export function emitScript(
     fieldLines.push(decl);
   }
 
+  // 6e.bis Phase 07.3.2 — accept consumer-side dynamic-name templates map
+  // (D-SV-16 cross-target port; signal-era `input<T>()` form per RESEARCH A7,
+  // NOT decorator `@Input()`). Consumer emitter (emitTemplateNode.ts:449)
+  // emits a class-body `templates` getter that returns
+  // `Record<string, TemplateRef<unknown>>`; the producer-side `templates`
+  // signal input declared here is the symmetric receiving half. The
+  // @ContentChild static-name precedence (D-02) is preserved at the binding
+  // site (emitSlotInvocation.ts:311) via the `??` LEFT operand —
+  // @ContentChild populates in `ngAfterContentInit` BEFORE template binding
+  // evaluation (Assumption A5). Gated on `ir.slots.length > 0` so non-slotted
+  // components (Counter, SearchInput, Dropdown) stay byte-identical (D-05
+  // byte-equivalence invariant). The signal-form mirrors the surrounding
+  // Section 6a `input<T>()` style at L569-573 (Pattern 6); the binding-site
+  // read becomes `templates()?.['<X>']` (signal call) — NOT `templates?.['<X>']`.
+  if (ir.slots.length > 0) {
+    fieldLines.push(
+      'templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);',
+    );
+    // Defensive `input` import — Section 6a's `hasNonModelProps` path adds
+    // `input` for components with any non-model prop; a slot-only component
+    // with no props (or only model props) would miss it. collectAngularImports
+    // already adds `TemplateRef` for `ir.slots.length > 0` at L181-184.
+    imports.add('input');
+  }
+
   // 7. Build computed properties.
   const computedLines: string[] = [];
   for (const c of ir.computed) {
