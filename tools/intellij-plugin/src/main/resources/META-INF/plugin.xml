@@ -66,5 +66,7 @@
              non-Rozie .html / .js files (08.2-RESEARCH Pitfall 2). -->
         <annotator language="HTML"
                    implementationClass="js.rozie.intellij.highlighting.RozieAnnotator"/>
+        <annotator language="JavaScript"
+                   implementationClass="js.rozie.intellij.highlighting.RozieJsAnnotator"/>
     </extensions>
 </idea-plugin>
