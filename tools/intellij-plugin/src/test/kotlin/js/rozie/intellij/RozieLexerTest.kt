@@ -39,6 +39,7 @@ class RozieLexerTest : LexerTestCase() {
     fun testEdgeComponentRef() = doFixtureTest("edge-component-ref.rozie", null)
     fun testEdgeDirectiveArg() = doFixtureTest("edge-directive-arg.rozie", null)
     fun testEdgeSlotFill() = doFixtureTest("edge-slot-fill.rozie", null)
+    fun testEdgeOnUpdate() = doFixtureTest("edge-on-update.rozie", null)
 
     /**
      * Drives a single fixture: reads `<inputName>` from [getDirPath], lexes it,
@@ -87,7 +88,8 @@ class RozieLexerTest : LexerTestCase() {
     //         "edge-components-block.rozie",
     //         "edge-component-ref.rozie",
     //         "edge-directive-arg.rozie",
-    //         "edge-slot-fill.rozie"
+    //         "edge-slot-fill.rozie",
+    //         "edge-on-update.rozie"
     //     )
     //     fixtures.forEach { name ->
     //         val input = File("${getDirPath()}/$name").readText()

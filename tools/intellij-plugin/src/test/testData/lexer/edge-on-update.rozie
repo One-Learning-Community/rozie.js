@@ -1,0 +1,27 @@
+<rozie name="OnUpdateProbe">
+<props>
+{ value: { type: Number, default: 0 } }
+</props>
+
+<data>
+{ count: 0 }
+</data>
+
+<script>
+$onUpdate(() => {
+  console.log('script: value changed to', $props.value)
+})
+</script>
+
+<listeners>
+{
+  "window:resize": {
+    handler: "() => { $onUpdate(() => console.log('listener')) }"
+  }
+}
+</listeners>
+
+<template>
+  <button :disabled="$onUpdate(() => true)">{{ $onUpdate(() => $data.count) }}</button>
+</template>
+</rozie>
