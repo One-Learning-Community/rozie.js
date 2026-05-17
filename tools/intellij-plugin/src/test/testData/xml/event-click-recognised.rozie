@@ -1,0 +1,5 @@
+<rozie name="EventClickRecognised">
+<template>
+  <button @click="$data.count++">click me</button>
+</template>
+</rozie>

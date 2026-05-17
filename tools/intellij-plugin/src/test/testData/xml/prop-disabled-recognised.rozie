@@ -1,0 +1,5 @@
+<rozie name="PropDisabledRecognised">
+<template>
+  <button :disabled="$data.loading">submit</button>
+</template>
+</rozie>
