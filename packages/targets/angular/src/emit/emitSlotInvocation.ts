@@ -331,11 +331,18 @@ export function emitSlotInvocation(
     return outletTag;
   }
 
+  // Phase 07.3.2 Plan 10 — inner @if guard MUST use mergedTplRef (computed
+  // at line 326) so the @if evaluates truthy when ONLY dynamic-name templates
+  // are present. Without this, Task 1's outer r-if guard rewrite might
+  // evaluate truthy via the merge, but the inner @if would still short-circuit
+  // on the bare static tplField → *ngTemplateOutlet would never fire.
+  // Completes the symmetry: outer r-if guard (rewriter), outlet binding
+  // (Plan 03), and inner @if guard (Plan 10) all use the same merged shape.
   if (!hasFallback && presence === 'conditional') {
-    return `@if (${tplField}) {\n${outletTag}\n}`;
+    return `@if (${mergedTplRef}) {\n${outletTag}\n}`;
   }
 
   // Has fallback — verbose form.
   const fallbackMarkup = ctx.emitChildren(fallbackChildren);
-  return `@if (${tplField}) {\n${outletTag}\n} @else {\n${fallbackMarkup}\n}`;
+  return `@if (${mergedTplRef}) {\n${outletTag}\n} @else {\n${fallbackMarkup}\n}`;
 }
