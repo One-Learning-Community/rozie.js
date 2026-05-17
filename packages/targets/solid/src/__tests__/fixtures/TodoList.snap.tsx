@@ -16,6 +16,7 @@ interface TodoListProps {
   // D-131: default slot resolved via children() at body top
   children?: JSX.Element;
   emptySlot?: JSX.Element;
+  slots?: Record<string, (ctx: any) => JSX.Element>;
 }
 
 export default function TodoList(_props: TodoListProps): JSX.Element {
@@ -61,7 +62,7 @@ export default function TodoList(_props: TodoListProps): JSX.Element {
     <>
     <div class={"todo-list"} data-rozie-s-52bec3de="">
       <header data-rozie-s-52bec3de="">
-        {_props.headerSlot ? _props.headerSlot({ remaining: remaining(), total: items().length }) : <h3 data-rozie-s-52bec3de="">{local.title} ({remaining()} remaining)</h3>}
+        {(_props.headerSlot ?? _props.slots?.['header']) ? (_props.headerSlot ?? _props.slots?.['header'])({ remaining: remaining(), total: items().length }) : <h3 data-rozie-s-52bec3de="">{local.title} ({remaining()} remaining)</h3>}
       </header>
 
       <form onSubmit={(e) => { e.preventDefault(); add(); }} data-rozie-s-52bec3de="">
@@ -70,7 +71,7 @@ export default function TodoList(_props: TodoListProps): JSX.Element {
       </form>
 
       {<Show when={items().length > 0} fallback={<p class={"empty"} data-rozie-s-52bec3de="">
-        {_props.emptySlot ?? "Nothing to do. ✨"}
+        {(_props.emptySlot ?? _props.slots?.['empty']) ?? "Nothing to do. ✨"}
       </p>}><ul data-rozie-s-52bec3de="">
         <For each={items()}>{(item) => <li classList={{ done: item.done }} data-rozie-s-52bec3de="">
           
