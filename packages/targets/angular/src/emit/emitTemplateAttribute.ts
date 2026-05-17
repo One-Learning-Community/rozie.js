@@ -93,6 +93,45 @@ function isFormInputTag(tagName: string): boolean {
 }
 
 /**
+ * Resolve a writable signal-backed LHS to its signal identifier name.
+ *
+ * Returns the bare signal name when `expr` is `$data.X` (where X is a declared
+ * state signal) or `$props.X` (where X is a declared model prop). Returns null
+ * for any other shape — caller falls back to a one-way binding.
+ *
+ * Shared by the `r-model` form-input branch (emits `[ngModel]`/`(ngModelChange)`)
+ * and the Phase 07.3 consumer-side two-way binding branch (emits
+ * `[prop]`/`(propChange)` per D-01 long-form). Both call sites historically
+ * inlined the same logic; extracted here for parity. Behaviour preserved
+ * byte-for-byte — the existing form-input snapshot lock is unaffected.
+ */
+function resolveSignalNameForLValue(
+  expr: t.Expression,
+  ir: IRComponent,
+): string | null {
+  if (expr.type !== 'MemberExpression') return null;
+  const me = expr;
+  if (
+    me.computed ||
+    me.property.type !== 'Identifier' ||
+    me.object.type !== 'Identifier'
+  ) {
+    return null;
+  }
+  const dataNames = new Set(ir.state.map((s) => s.name));
+  const modelProps = new Set(
+    ir.props.filter((p) => p.isModel).map((p) => p.name),
+  );
+  if (me.object.name === '$data' && dataNames.has(me.property.name)) {
+    return me.property.name;
+  }
+  if (me.object.name === '$props' && modelProps.has(me.property.name)) {
+    return me.property.name;
+  }
+  return null;
+}
+
+/**
  * Emit a single attribute. Returns null when the attribute should be dropped
  * (e.g., r-html, which gets emitted later as `[innerHTML]="..."` by the
  * element emitter).
@@ -105,12 +144,31 @@ export function emitSingleAttr(
   // r-html handled at the element level.
   if (attr.name === 'r-html') return null;
 
-  // Phase 07.3 Wave 3 stub — Plan 07.3-05 replaces this with the Angular
-  // long-form `[propName]="X()" (propNameChange)="X.set($event)"` emit.
+  // Phase 07.3 Wave 3 Plan 07.3-05 — consumer-side r-model:propName= two-way
+  // binding. Emits Angular LONG-FORM `[propName]="X()" (propNameChange)="X.set($event)"`
+  // (NOT the `[(propName)]` banana sugar) per RESEARCH §Landmines — some
+  // Angular 19.x point releases mis-recognise WritableSignal LHS under the
+  // banana-in-a-box form. Mirrors the existing `r-model` form-input branch
+  // below which uses the same long-form for `[ngModel]`/`(ngModelChange)`.
+  //
+  // Signal target detection uses the shared resolveSignalNameForLValue
+  // helper. The validator (validateTwoWayBindings — ROZ950/951) has already
+  // gated empty propName, non-component targets, and non-writable LHS by the
+  // time we reach this emit.
   if (attr.kind === 'twoWayBinding') {
-    throw new Error(
-      `Angular target: r-model:${attr.name}= consumer-side two-way binding not yet implemented (Phase 07.3 Wave 3 Plan 07.3-05).`,
-    );
+    const signalName = resolveSignalNameForLValue(attr.expression, ctx.ir);
+    const bindingName = isComponentTag(ctx) ? kebabToCamel(attr.name) : attr.name;
+    if (signalName !== null) {
+      return `[${bindingName}]="${signalName}()" (${bindingName}Change)="${signalName}.set($event)"`;
+    }
+    // Non-signal fallback — rare-case degrade to one-way binding (the
+    // change-output half is lost). Per Plan 07.3-05 task: "lossy on the
+    // change-output half, planner accepts as rare-case degrade".
+    const expr = rewriteTemplateExpression(attr.expression, ctx.ir, {
+      collisionRenames: ctx.collisionRenames,
+      loopBindings: ctx.loopBindings,
+    });
+    return `[${bindingName}]="${expr}"`;
   }
 
   if (attr.kind === 'static') {
@@ -133,34 +191,11 @@ export function emitSingleAttr(
     // fall back to the shorthand form.
     if (attr.name === 'r-model' && isFormInputTag(elementTagName)) {
       // Detect simple signal-target shape: $data.X or $props.X (model:true).
-      const e = attr.expression;
-      // Use `t` from babel if needed at runtime check.
-      // For v1 we string-emit by re-running rewriteTemplateExpression and
-      // inspecting the original expression structure.
-      const dataNames = new Set(ctx.ir.state.map((s) => s.name));
-      const modelProps = new Set(
-        ctx.ir.props.filter((p) => p.isModel).map((p) => p.name),
-      );
-      let signalName: string | null = null;
-      // @babel/types pattern matching for `$data.X` / `$props.X`
-      // (already-cloned by rewriteTemplateExpression — but here we work on the
-      // pre-rewrite original to detect the shape).
-      const isMember = (e as t.MemberExpression).type === 'MemberExpression';
-      if (isMember) {
-        const me = e as t.MemberExpression;
-        if (
-          !me.computed &&
-          me.property.type === 'Identifier' &&
-          me.object.type === 'Identifier'
-        ) {
-          if (
-            (me.object.name === '$data' && dataNames.has(me.property.name)) ||
-            (me.object.name === '$props' && modelProps.has(me.property.name))
-          ) {
-            signalName = me.property.name;
-          }
-        }
-      }
+      // Plan 07.3-05 extracted this into resolveSignalNameForLValue so the
+      // consumer-side r-model:propName= twoWayBinding branch above can reuse
+      // it. Behaviour is byte-identical — the existing SearchInput snapshot
+      // shape-lock in emitTemplate.test.ts is unaffected.
+      const signalName = resolveSignalNameForLValue(attr.expression, ctx.ir);
 
       if (signalName !== null) {
         // [ngModelOptions]="{standalone:true}" prevents NG01352 when this input
