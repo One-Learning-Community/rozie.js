@@ -41,6 +41,27 @@ export interface EmitSlotDeclResult {
   slotChangeWiring: string;
   /** Function-typed param signaling — spliced into firstUpdated per D-LIT-12. */
   hostListenerWiring: string[];
+  /**
+   * Phase 07.3.1 D-LIT-15 — newline-joined pre-seed assignments, one per slot.
+   *
+   * Lit producer-side `_hasSlot<X>` `@state()` fields are seeded from the
+   * light-DOM children inside `connectedCallback()` BEFORE
+   * `super.connectedCallback()` runs, so the very first render reflects actual
+   * consumer fill presence. This closes the chicken-and-egg deadlock where a
+   * conditionally-rendered slot wrapper (e.g.
+   * `${this._hasSlotHeader ? html\`<header><slot name="header">…</slot></header>\` : nothing}`)
+   * would otherwise prevent its inner `<slot>` from ever existing, which
+   * starves `@queryAssignedElements` of fills, which keeps `_hasSlotHeader`
+   * permanently false, which keeps the wrapper hidden forever.
+   *
+   * Pre-seed inspection is verified against Lit 3.x: by the time
+   * `connectedCallback()` fires, light-DOM children are already attached and
+   * walkable via `this.children`. Future Lit major-version bumps should
+   * trigger a regression run of the dogfood close-spec.
+   *
+   * Empty string when the component has no slots.
+   */
+  preSeedLines: string;
   diagnostics: Diagnostic[];
 }
 
@@ -56,6 +77,7 @@ function emitOneSlot(
   ctxInterfaces: string[],
   hostListenerWiring: string[],
   slotChangeWiringLines: string[],
+  preSeedLines: string[],
 ): string {
   const suffix = slotFieldSuffix(slot.name);
   const stateField = `  @state() private _hasSlot${suffix} = false;`;
@@ -86,6 +108,22 @@ function emitOneSlot(
     ].join('\n'),
   );
 
+  // Phase 07.3.1 D-LIT-15 — pre-seed `_hasSlot<X>` from light-DOM children so
+  // the first render reflects consumer fill presence. Named slots inspect
+  // `slot="<name>"` attribute on direct children. Default slot accepts any
+  // child that has NO `slot` attribute AND is either non-text OR a text node
+  // containing non-whitespace content (whitespace-only text MUST NOT count as
+  // a default-slot fill — Web Components spec treats it as ignored).
+  if (slot.name === '') {
+    preSeedLines.push(
+      `this._hasSlot${suffix} = Array.from(this.children).some((el) => !el.hasAttribute('slot') && (el.nodeType !== 3 || (el.textContent?.trim().length ?? 0) > 0));`,
+    );
+  } else {
+    preSeedLines.push(
+      `this._hasSlot${suffix} = Array.from(this.children).some((el) => el.getAttribute('slot') === '${slot.name}');`,
+    );
+  }
+
   // ctxInterfaces — emit if there are data-typed slot params.
   if (slot.params.length > 0) {
     const ifaceName = `Rozie${suffix}SlotCtx`;
@@ -108,6 +146,7 @@ export function emitSlotDecl(
       ctxInterfaces: [],
       slotChangeWiring: '',
       hostListenerWiring: [],
+      preSeedLines: '',
       diagnostics,
     };
   }
@@ -118,10 +157,17 @@ export function emitSlotDecl(
   const ctxInterfaces: string[] = [];
   const hostListenerWiring: string[] = [];
   const slotChangeWiringLines: string[] = [];
+  const preSeedLinesArr: string[] = [];
 
   const fields = slots
     .map((slot) =>
-      emitOneSlot(slot, ctxInterfaces, hostListenerWiring, slotChangeWiringLines),
+      emitOneSlot(
+        slot,
+        ctxInterfaces,
+        hostListenerWiring,
+        slotChangeWiringLines,
+        preSeedLinesArr,
+      ),
     )
     .join('\n');
 
@@ -130,6 +176,9 @@ export function emitSlotDecl(
     ctxInterfaces,
     slotChangeWiring: slotChangeWiringLines.join('\n\n'),
     hostListenerWiring,
+    // 4-space indent matches the body of connectedCallback() (the splice site
+    // in emitLit.ts composeClassBody).
+    preSeedLines: preSeedLinesArr.join('\n    '),
     diagnostics,
   };
 }

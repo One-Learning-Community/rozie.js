@@ -179,6 +179,10 @@ export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResu
     renderBody: templateResult.renderBody,
     userMethods: scriptResult.methodDecls,
     attributeChangedBody: scriptResult.attributeChangedBody,
+    // Phase 07.3.1 D-LIT-15 — light-DOM pre-seed of `_hasSlot<X>` so the very
+    // first render reflects consumer fill presence and conditionally-rendered
+    // slot wrappers are not deadlocked.
+    slotPreSeedLines: slotResult.preSeedLines,
   });
 
   // 7. Component side-effect imports for cross-component composition (D-LIT).
@@ -275,6 +279,13 @@ interface ComposeClassBodyParts {
   renderBody: string;
   userMethods: string;
   attributeChangedBody: string;
+  /**
+   * Phase 07.3.1 D-LIT-15 — pre-seed assignments threaded from emitSlotDecl.
+   * Spliced inside `connectedCallback()` BEFORE `super.connectedCallback();`
+   * so the first render reflects actual consumer fill presence. Empty string
+   * when the component has no slots.
+   */
+  slotPreSeedLines: string;
 }
 
 function composeClassBody(parts: ComposeClassBodyParts): string {
@@ -299,6 +310,7 @@ function composeClassBody(parts: ComposeClassBodyParts): string {
 
   const hasListenerWiring = parts.listenerWiringBody.trim().length > 0;
   const hasMountHook = parts.mountHookBody.trim().length > 0;
+  const hasSlotPreSeed = parts.slotPreSeedLines.trim().length > 0;
 
   // D-SH-02: re-armable listener wiring lives in `_armListeners()`, called
   // from `firstUpdated()` (first render) AND `connectedCallback()` (reconnect).
@@ -313,17 +325,30 @@ function composeClassBody(parts: ComposeClassBodyParts): string {
         '  }',
       ].join('\n'),
     );
+  }
 
-    // connectedCallback re-arms on reconnect only — `this.hasUpdated` is false
-    // on the very first connect (firstUpdated has not run yet), so the first
-    // arming is owned exclusively by firstUpdated() and there is no double.
+  // connectedCallback is emitted whenever there is listener wiring (for the
+  // reconnect re-arm path) OR pre-seed lines (Phase 07.3.1 D-LIT-15 — the
+  // pre-seed runs on EVERY connect so re-mount cycles also see correct
+  // initial slot presence). The two surfaces compose: pre-seed lines run
+  // first (so `super.connectedCallback()` and downstream reactive updates see
+  // the seeded state), then super, then re-arm.
+  if (hasListenerWiring || hasSlotPreSeed) {
+    const ccParts: string[] = [];
+    if (hasSlotPreSeed) {
+      // Phase 07.3.1 D-LIT-15 — pre-seed _hasSlot<X> from light DOM so first
+      // render isn't deadlocked.
+      ccParts.push(
+        '    // Phase 07.3.1 D-LIT-15 — pre-seed _hasSlot<X> from light DOM so first render isn\'t deadlocked.',
+      );
+      ccParts.push('    ' + parts.slotPreSeedLines);
+    }
+    ccParts.push('    super.connectedCallback();');
+    if (hasListenerWiring) {
+      ccParts.push('    if (this.hasUpdated) this._armListeners();');
+    }
     sections.push(
-      [
-        '  connectedCallback(): void {',
-        '    super.connectedCallback();',
-        '    if (this.hasUpdated) this._armListeners();',
-        '  }',
-      ].join('\n'),
+      ['  connectedCallback(): void {', ...ccParts, '  }'].join('\n'),
     );
   }
 
