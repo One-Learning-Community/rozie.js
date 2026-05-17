@@ -1,0 +1,6 @@
+<rozie name="CounterPropsRef">
+<props>{ value: { type: Number, default: 0, model: true } }</props>
+<script>
+const x = $props.va<caret>lue;
+</script>
+</rozie>

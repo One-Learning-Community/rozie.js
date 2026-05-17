@@ -1,0 +1,6 @@
+<rozie name="CounterDataRef">
+<data>{ count: 0 }</data>
+<script>
+const y = $data.co<caret>unt;
+</script>
+</rozie>
