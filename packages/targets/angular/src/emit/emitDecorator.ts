@@ -149,12 +149,15 @@ export function emitDecorator(
     lines.push(`  imports: ${importsList},`);
   }
   // Template — wrap in backticks. Indent each line of the template by 4 spaces.
+  // User Angular template syntax can include backticks and ${...} interpolations
+  // (e.g., `:class="\`badge badge-${value}\`"`); escape both so they don't close
+  // the surrounding template literal or trigger TS template-string interpolation.
   const indentedTemplate = opts.template
     .split('\n')
     .map((l) => (l.length > 0 ? '    ' + l : l))
     .join('\n');
   lines.push(`  template: \``);
-  lines.push(indentedTemplate);
+  lines.push(escapeForBacktickLiteral(indentedTemplate));
   lines.push(`  \`,`);
   if (opts.stylesArrayBody.length > 0) {
     lines.push(`  styles: [\``);
@@ -162,10 +165,14 @@ export function emitDecorator(
       .split('\n')
       .map((l) => (l.length > 0 ? '    ' + l : l))
       .join('\n');
-    lines.push(indentedStyles);
+    lines.push(escapeForBacktickLiteral(indentedStyles));
     lines.push(`  \`],`);
   }
   lines.push('})');
 
   return lines.join('\n');
+}
+
+function escapeForBacktickLiteral(s: string): string {
+  return s.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$\{/g, '\\${');
 }
