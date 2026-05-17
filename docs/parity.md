@@ -65,15 +65,15 @@ and the Phase 07.2 Plan 06 dogfood at `examples/ModalConsumer.rozie` →
 A Rozie consumer using `<template #[expr]>` (dynamic slot name, where `expr`
 evaluates at runtime to the slot name) dispatches differently per target:
 
-<!-- VitePress (Vue compiler-sfc) parses `{{ ... }}` as interpolation even inside markdown inline-code spans inside table cells. The React/Solid/Svelte rows below use HTML entities (`&#123;` / `&#125;`) to render literal `{{` and `}}` without triggering the parser. The comment MUST live outside the table — a mid-table HTML comment breaks markdown table containment (#parity-page render bug). -->
+<!-- VitePress's Vue runtime parses `{{ ... }}` in markdown as interpolation. The HTML-entity escape (`&#123;`) does NOT work inside markdown code spans because markdown-it HTML-escapes `&` to `&amp;`, leaving a literal `&#123;` on the page. The correct workaround is `<span v-pre>…</span>` around the backticked code, which tells Vue to skip interpolation parsing for that subtree. The React/Solid/Svelte rows below need it because their cells contain `{{ }}`. This comment MUST live outside the table — a mid-table HTML comment breaks markdown table containment. -->
 
 | Target  | Consumer-side dispatch                                                                                       | Producer-side acceptance needed?            |
 | ------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------- |
 | Vue     | `<template #[<expr>]>body</template>` — Vue 3.4+ native scoped-slot bracketed form                            | No — native scoped-slot dispatch handles it |
 | Lit     | `<div slot="${<expr>}">body</div>` — shadow-DOM native projection routes on the runtime `slot=` value         | No — shadow DOM native projection           |
-| React   | `<Producer slots=&#123;&#123; [<expr>]: () => <>body</> &#125;&#125; />` — additive `slots` prop with object dispatch             | Yes — producer must accept `slots?: Record<string, (ctx: Ctx) => ReactNode>` |
-| Solid   | `<Producer slots=&#123;&#123; [<expr>()]: () => <>body</> &#125;&#125; />` — signal-auto-called key                               | Yes — producer must accept `slots?: ...`     |
-| Svelte  | `<Producer snippets=&#123;&#123; [<expr>]: __rozieDynSlot_N &#125;&#125;>&#123;#snippet __rozieDynSlot_N()&#125;body&#123;/snippet&#125;</Producer>`  | Yes — producer must accept `snippets?: Record<string, Snippet<[Ctx]>>` |
+| React   | <span v-pre>`<Producer slots={{ [<expr>]: () => <>body</> }} />`</span> — additive `slots` prop with object dispatch | Yes — producer must accept `slots?: Record<string, (ctx: Ctx) => ReactNode>` |
+| Solid   | <span v-pre>`<Producer slots={{ [<expr>()]: () => <>body</> }} />`</span> — signal-auto-called key | Yes — producer must accept `slots?: ...` |
+| Svelte  | <span v-pre>`<Producer snippets={{ [<expr>]: __rozieDynSlot_N }}>{#snippet __rozieDynSlot_N()}body{/snippet}</Producer>`</span> | Yes — producer must accept `snippets?: Record<string, Snippet<[Ctx]>>` |
 | Angular | `<Producer><ng-template #__dynSlot_N>body</ng-template><ng-container *ngTemplateOutlet="templates[<expr>]" /></Producer>` + class-body `@ViewChild` + `templates` getter | Yes — producer must accept `@Input() templates?: Record<string, TemplateRef<Ctx>>` |
 
 For Vue + Lit a Rozie author writing `<template #[name]>` will get correct
