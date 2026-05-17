@@ -12,7 +12,17 @@
     ]]></description>
 
     <change-notes><![CDATA[
-        <p><strong>0.1.0</strong> — Initial internal dogfooding release.</p>
+        <p><strong>0.2.0</strong> — Architectural pivot to injection-first model.
+        HTML coloring inside &lt;template&gt; now matches the TextMate bundle.
+        Smart navigation: $props.X / $data.X / $refs.X Go-to-Declaration.
+        Color-scheme keys removed (no longer in use): ROZIE_EVENT_AT,
+        ROZIE_EVENT_NAME, ROZIE_MODIFIER, ROZIE_MODIFIER_PUNCTUATION,
+        ROZIE_PROP_BINDING_PUNCT, ROZIE_PROP_BINDING_NAME, ROZIE_INTERPOLATION_DELIM,
+        ROZIE_REF_ATTR, ROZIE_HTML_ATTR_NAME, ROZIE_COMPONENT_REF,
+        ROZIE_DIRECTIVE_COLON, ROZIE_DIRECTIVE_ARG, ROZIE_SLOT_FILL_MARKER,
+        ROZIE_SLOT_NAME, ROZIE_SLOT_BRACKET. Users who customised these will see
+        them revert to default HTML coloring — expected since v0.1.0 was internal
+        dogfooding only.</p>
     ]]></change-notes>
 
     <!-- Required modules. JavaScript + com.intellij.css gate the plugin to

@@ -71,7 +71,22 @@ intellijPlatform {
         // Explicit changeNotes (Rule 3 fix) — the changelog plugin's auto-render
         // path expects a CHANGELOG.md with an [Unreleased] section; we set the
         // value inline instead of carrying a CHANGELOG.md for this internal build.
-        changeNotes = "<p><strong>0.1.0</strong> — Initial internal dogfooding release.</p>"
+        // v0.2.0 content mirrors plugin.xml <change-notes> verbatim (Plan 08.2-07
+        // contract — both surfaces must stay in lockstep so the IDE shows the
+        // architectural-pivot summary regardless of which descriptor it reads).
+        changeNotes = """
+            <p><strong>0.2.0</strong> — Architectural pivot to injection-first model.
+            HTML coloring inside &lt;template&gt; now matches the TextMate bundle.
+            Smart navigation: ${'$'}props.X / ${'$'}data.X / ${'$'}refs.X Go-to-Declaration.
+            Color-scheme keys removed (no longer in use): ROZIE_EVENT_AT,
+            ROZIE_EVENT_NAME, ROZIE_MODIFIER, ROZIE_MODIFIER_PUNCTUATION,
+            ROZIE_PROP_BINDING_PUNCT, ROZIE_PROP_BINDING_NAME, ROZIE_INTERPOLATION_DELIM,
+            ROZIE_REF_ATTR, ROZIE_HTML_ATTR_NAME, ROZIE_COMPONENT_REF,
+            ROZIE_DIRECTIVE_COLON, ROZIE_DIRECTIVE_ARG, ROZIE_SLOT_FILL_MARKER,
+            ROZIE_SLOT_NAME, ROZIE_SLOT_BRACKET. Users who customised these will see
+            them revert to default HTML coloring — expected since v0.1.0 was internal
+            dogfooding only.</p>
+        """.trimIndent()
     }
 
     pluginVerification {
