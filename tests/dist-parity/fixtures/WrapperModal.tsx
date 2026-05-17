@@ -25,7 +25,7 @@ export default function WrapperModal(_props: WrapperModalProps): JSX.Element {
 
   return (
     <>
-    <Modal open={open} onOpenChange={onOpenChange} title={props.title} renderHeader={() => (<>
+    <Modal open={open} onOpenChange={setOpen} title={props.title} renderHeader={() => (<>
         {props.renderBrand ?? <h2 data-rozie-s-1efe6192="">{props.title}</h2>}
       </>)} renderFooter={() => (<>
         {props.renderActions}

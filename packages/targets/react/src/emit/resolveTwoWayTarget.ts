@@ -116,10 +116,23 @@ export function resolveTwoWayTarget(
     }
 
     if (obj === '$props') {
-      // Forwarding pattern — consumer's own prop is model:true, so its
-      // props interface exposes the `on<Cap>Change` callback (synthesised by
-      // emitPropsInterface.ts:92). Local is the destructured prop.
-      return { local: prop, setter: `on${capitalize(prop)}Change` };
+      // Forwarding pattern (D-03) — the consumer's own prop is `model: true`,
+      // so its useControllableState call binds the LOCAL state pair
+      // `[<prop>, set<Cap><prop>]` (e.g. `[open, setOpen]`). Reference those
+      // locally-bound identifiers, NOT the bare prop name (props are accessed
+      // via `props.<name>`, not a destructured identifier) and NOT the bare
+      // `on<Cap>Change` (that's available as `props.on<Cap>Change` but never
+      // as a free identifier inside the function body). Using the local
+      // setter wires the inner Modal's onOpenChange through the wrapper's
+      // useControllableState, which in turn invokes `props.onOpenChange` via
+      // its `onValueChange` callback — the canonical Radix/shadcn-style
+      // controllable-state forwarding contract.
+      // Phase 07.3 Plan 09 — fix: previous emit shape produced a bare
+      // `onOpenChange={onOpenChange}` reference, which is undefined at
+      // runtime (TS would have caught it had types: true been on for
+      // the dist-parity React fixture; type-stripping at emit time hid the
+      // problem until the close-spec at runtime).
+      return { local: prop, setter: `set${capitalize(prop)}` };
     }
   }
 
