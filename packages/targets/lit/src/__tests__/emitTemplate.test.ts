@@ -213,3 +213,168 @@ function onConfirm() {}
     expect(code).not.toMatch(/\(e\) => \(this\.onConfirm\)\?\.\(e\)/);
   });
 });
+
+describe('multi-root slot-fill spread (Phase 07.3.1 D-LIT-18)', () => {
+  /**
+   * D-LIT-18 — when a named-slot fill body has multiple top-level elements
+   * separated only by whitespace, the consumer emitter MUST inject
+   * `slot="<name>"` into each opening tag rather than wrapping the body in
+   * a synthetic `<div slot="<name>">`. The producer's shadow-DOM
+   * `<slot name="<name>">` then receives each child element directly,
+   * matching the consumer-authored DOM structure.
+   *
+   * Fall-back to the `<div>` wrap is preserved when the body contains
+   * non-whitespace top-level text, a top-level `${...}` interpolation,
+   * a top-level HTML comment, or any element already carrying a `slot=`
+   * attribute — those cases are structurally ambiguous and the wrap
+   * keeps semantics conservative.
+   *
+   * Single-root passthrough (the original Phase 07.2 optimization) is
+   * unchanged; this only adds an intermediate path between "single-root
+   * passthrough" and "wrap in <div>".
+   */
+  function compileConsumer(source: string, name = 'TestConsumer'): string {
+    const { ast } = parse(source, { filename: `${name}.rozie` });
+    if (!ast) throw new Error('parse() returned null');
+    const registry = createDefaultRegistry();
+    const { ir } = lowerToIR(ast, { modifierRegistry: registry });
+    if (!ir) throw new Error('lowerToIR() returned null');
+    ir.name = name;
+    return emitLit(ir, {
+      filename: `${name}.rozie`,
+      source,
+      modifierRegistry: registry,
+    }).code;
+  }
+
+  it('multi-root scoped fill spreads slot= across each top-level element (no div-wrap)', () => {
+    // Source mirrors the canonical Modal #header fill pattern: an <h2>
+    // and a <button> as top-level children, with the <button> handler
+    // referencing the scoped param `close`.
+    const source = `<rozie name="MultiRootScopedConsumer">
+
+<components>
+{
+  Modal: './Modal.rozie',
+}
+</components>
+
+<template>
+  <Modal>
+    <template #header="{ close }">
+      <h2>Title</h2>
+      <button @click="close">×</button>
+    </template>
+  </Modal>
+</template>
+`;
+    const code = compileConsumer(source, 'MultiRootScopedConsumer');
+    // Each top-level element bears `slot="header"`. The <h2> picks it up
+    // as the only attribute; the <button> picks it up after its existing
+    // `@click=${...}` handler binding (which under D-LIT-17 expands to a
+    // dispatchEvent call, so the button tag is long — we match the exact
+    // dispatchEvent prefix to keep the assertion precise).
+    expect(code).toContain('<h2 slot="header">Title</h2>');
+    expect(code).toContain(
+      `<button @click=\${(e) => this.dispatchEvent(new CustomEvent('rozie-header-close', { detail: e, bubbles: true, composed: true }))} slot="header">×</button>`,
+    );
+    // The wrap MUST be absent for this body — top-level children are
+    // separated only by whitespace, which is the D-LIT-18 spread path.
+    // Anchor to the slot="header" wrap shape specifically; do NOT use a
+    // broader `/<div slot=/` match because the dynamic-name R5 path
+    // legitimately emits `<div slot="${expr}">` and a future test in
+    // the file could trip the broader assertion.
+    expect(code).not.toContain('<div slot="header">');
+  });
+
+  it('multi-root non-scoped fill spreads slot= across each top-level element (no div-wrap)', () => {
+    // Static (non-scoped) named fill with two top-level elements. The
+    // <img> is self-closing; D-LIT-18 must inject `slot=` BEFORE the
+    // `/>` rather than after.
+    const source = `<rozie name="MultiRootStaticConsumer">
+
+<components>
+{
+  Card: './Card.rozie',
+}
+</components>
+
+<template>
+  <Card>
+    <template #brand>
+      <img src="/logo.svg"/>
+      <span class="brand-name">Acme</span>
+    </template>
+  </Card>
+</template>
+`;
+    const code = compileConsumer(source, 'MultiRootStaticConsumer');
+    // Self-closing <img> — `slot="brand"` lands before the trailing
+    // ` />` (the template emitter normalizes self-close tags with a
+    // space before the `/`; D-LIT-18 walks back over that whitespace
+    // so the inserted attribute lands flush with the previous one).
+    expect(code).toContain('<img src="/logo.svg" slot="brand" />');
+    // Non-self-closing <span> — `slot="brand"` lands before the `>`.
+    expect(code).toContain('<span class="brand-name" slot="brand">Acme</span>');
+    // No `<div slot="brand">` wrap.
+    expect(code).not.toContain('<div slot="brand">');
+  });
+
+  it('falls back to <div slot=> wrap when top-level text is present between elements', () => {
+    // Inline text between elements means the consumer wants that text
+    // to project into the named slot too. Spreading `slot=` onto the
+    // elements would leak the text into the parent's default slot. The
+    // emitter conservatively falls back to the existing wrap.
+    const source = `<rozie name="MultiRootWithTextConsumer">
+
+<components>
+{
+  Modal: './Modal.rozie',
+}
+</components>
+
+<template>
+  <Modal>
+    <template #header="{ close }">
+      <h2>Title</h2>
+      Inline interstitial text
+      <button @click="close">×</button>
+    </template>
+  </Modal>
+</template>
+`;
+    const code = compileConsumer(source, 'MultiRootWithTextConsumer');
+    // The wrap must be present.
+    expect(code).toContain('<div slot="header">');
+    // The wrap must close at the same level.
+    expect(code).toMatch(/<\/div>(?:\s|<\/rozie-modal>)/);
+    // No spread of `slot="header"` onto the <h2> or <button> — those
+    // would clash with the wrap-based projection.
+    expect(code).not.toContain('<h2 slot="header">');
+    expect(code).not.toMatch(/<button[^>]*slot="header"/);
+  });
+
+  it('single-root passthrough is unaffected (D-LIT-18 is purely an additive cascade tier)', () => {
+    // Regression guard. The single-element passthrough (`<h2 slot="<name>">`
+    // direct) predates D-LIT-18 and must keep working.
+    const source = `<rozie name="SingleRootConsumer">
+
+<components>
+{
+  Modal: './Modal.rozie',
+}
+</components>
+
+<template>
+  <Modal>
+    <template #header>
+      <h2>Just one</h2>
+    </template>
+  </Modal>
+</template>
+`;
+    const code = compileConsumer(source, 'SingleRootConsumer');
+    expect(code).toContain('<h2 slot="header">Just one</h2>');
+    expect(code).not.toContain('<div slot="header">');
+  });
+});

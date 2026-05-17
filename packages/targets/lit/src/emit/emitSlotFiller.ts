@@ -662,7 +662,16 @@ function spreadSlotAttrAcrossTopLevelElements(
   for (let k = openTags.length - 1; k >= 0; k--) {
     const t = openTags[k]!;
     // Inject BEFORE the `/>` for self-close, BEFORE the `>` for normal.
-    const insertAt = t.isSelfClose ? t.closeIdx - 1 : t.closeIdx;
+    let insertAt = t.isSelfClose ? t.closeIdx - 1 : t.closeIdx;
+    // For self-close, the emitter often produces `<img src="x" />` with a
+    // space before the `/`. Walk insertAt back past that whitespace so
+    // the injected attribute lands flush with the previous attribute:
+    // `<img src="x" slot="brand"/>` rather than `<img src="x"  slot="brand"/>`.
+    if (t.isSelfClose) {
+      while (insertAt > t.openIdx && out[insertAt - 1] === ' ') {
+        insertAt--;
+      }
+    }
     out = out.slice(0, insertAt) + attr + out.slice(insertAt);
   }
   return out;
