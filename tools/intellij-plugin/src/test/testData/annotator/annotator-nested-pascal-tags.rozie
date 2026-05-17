@@ -1,0 +1,19 @@
+<rozie name="AnnotatorNestedPascalTags">
+
+<components>
+{
+  Card: './Card.rozie',
+  CardHeader: './CardHeader.rozie',
+  SomeChild: './SomeChild.rozie',
+}
+</components>
+
+<template>
+<Card>
+  <CardHeader>
+    <SomeChild />
+  </CardHeader>
+</Card>
+</template>
+
+</rozie>

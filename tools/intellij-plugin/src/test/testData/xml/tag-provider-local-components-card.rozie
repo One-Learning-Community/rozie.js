@@ -1,0 +1,16 @@
+<rozie name="TagProviderLocalComponentsCard">
+
+<components>
+{
+  CardHeader: './CardHeader.rozie',
+  CardFooter: './CardFooter.rozie',
+}
+</components>
+
+<template>
+<article class="card">
+  <Car
+</article>
+</template>
+
+</rozie>
