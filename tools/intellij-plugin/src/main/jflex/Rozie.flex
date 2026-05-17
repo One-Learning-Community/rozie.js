@@ -7,33 +7,23 @@ import static js.rozie.intellij.lexer.RozieTokenTypes.*;
 /*
  * Rozie.flex — JFlex source for the .rozie host lexer.
  *
+ * POST-PIVOT (Phase 08.2): injection-first architecture. The lexer's only job
+ * is to split the file into SFC block boundaries; each block body emits as ONE
+ * contiguous BODY token so JetBrains' built-in HTML/JS/CSS PSI handles parsing
+ * inside the block. Any token-fragmenting rule inside IN_TEMPLATE_BODY
+ * re-creates the Phase 08.1 P0-UAT-01 bug — DO NOT add carve-outs.
+ *
  * Architecture (Pitfall 9 — DO NOT re-implement HTML lexing inside template):
  *   - YYINITIAL handles top-level block boundaries: <rozie>, <template>, <script>,
  *     <props>, <data>, <listeners>, <style>, plus HTML comments and whitespace.
  *   - IN_BLOCK_OPEN_TAG scans attributes inside a block opening tag (e.g.,
  *     `lang="scss"`, `name="Counter"`) until `>`, then transitions to whichever
  *     block-body state was queued by the YYINITIAL rule that matched the open.
- *   - IN_<X>_BODY (one per block kind that holds *opaque* body text — script,
- *     props, data, listeners, style) consumes everything up to the matching
+ *   - IN_<X>_BODY (one per block kind — script, props, data, listeners,
+ *     components, template, style) consumes everything up to the matching
  *     close tag as a single body token. Body content is NOT tokenized further
- *     here — Plan 04's MultiHostInjector splits it.
- *   - IN_TEMPLATE_BODY is special: it scans for HTML tags, mustache `{{ }}`,
- *     and HTML comments; tag content surfaces Rozie carve-outs (r-*, @event,
- *     :prop, ref="..."). Bulk text between tags is emitted as TEMPLATE_BODY
- *     chunks for the HTML injector.
- *   - IN_TEMPLATE_TAG_OPEN tokenizes inside `<foo ...>` — emits R_DIRECTIVE,
- *     EVENT_AT/EVENT_NAME, PROP_COLON/PROP_NAME, REF_ATTR_NAME for Rozie carve
- *     outs; ATTR_NAME for plain HTML attrs; EQ; transitions into attribute
- *     value states on `"` / `'`.
- *   - IN_TEMPLATE_ATTR_VALUE_JS holds attribute values that Plan 04 will JS-
- *     inject (r-*, @, :, ref); $magic identifiers and {{ }} are surfaced.
- *   - IN_TEMPLATE_ATTR_VALUE_PLAIN holds plain HTML attribute values; mustache
- *     interpolation is also recognized here per CONTEXT D-09 ("we permit
- *     `{{ }}` in attribute values; Vue forbids").
- *   - IN_MUSTACHE handles `{{ ... }}`. $magic surfaces; rest is MUSTACHE_BODY.
- *   - IN_MODIFIER_CHAIN handles `@click.foo.bar` chains.
- *   - IN_MODIFIER_ARGS handles `(...)` after `.mod`, with paren-depth tracking
- *     so `.outside($refs.a, $refs.b).stop` works.
+ *     here — RozieMultiHostInjector splits each body via HTMLLanguage /
+ *     JavaScript / CSS injection.
  *
  * Pitfall 4 (state leak) is handled by the FlexAdapter wrapping the generated
  * lexer; YYINITIAL is restored on every reset(...).
@@ -62,22 +52,6 @@ import static js.rozie.intellij.lexer.RozieTokenTypes.*;
 %state IN_STYLE_BODY
 
 %state IN_TEMPLATE_BODY
-%state IN_TEMPLATE_TAG_OPEN
-%state IN_TEMPLATE_TAG_CLOSE
-%state IN_TEMPLATE_ATTR_VALUE_JS_DQ
-%state IN_TEMPLATE_ATTR_VALUE_JS_SQ
-%state IN_TEMPLATE_ATTR_VALUE_PLAIN_DQ
-%state IN_TEMPLATE_ATTR_VALUE_PLAIN_SQ
-
-%state IN_MUSTACHE
-%state IN_MODIFIER_CHAIN
-%state IN_MODIFIER_ARGS
-
-%state IN_DIRECTIVE_ARG_COLON
-%state IN_DIRECTIVE_ARG_NAME
-
-%state IN_AFTER_SLOT_FILL_MARKER
-%state IN_SLOT_BRACKET_EXPR
 
 %state IN_HTML_COMMENT
 
@@ -92,69 +66,21 @@ import static js.rozie.intellij.lexer.RozieTokenTypes.*;
   private int pendingBodyState = YYINITIAL;
 
   /**
-   * Track `(` / `)` depth inside modifier args so `.outside($refs.a, $refs.b)`
-   * doesn't terminate at the first `)`.
-   */
-  private int modifierArgsParenDepth = 0;
-
-  /**
-   * Stack one level of return-state for IN_MUSTACHE so we can pop back to the
-   * right place — mustaches can appear in IN_TEMPLATE_BODY *or* in attribute
-   * values per D-09. The stack size is one because we don't allow nested
-   * mustaches; if they do nest we'd just emit BAD_CHARACTER.
-   */
-  private int mustacheReturnState = YYINITIAL;
-
-  /**
-   * In IN_MODIFIER_CHAIN, the first IDENT is the event name; subsequent IDENTs
-   * (after `.`) are modifier names. Reset to true every time we enter the
-   * chain from IN_TEMPLATE_TAG_OPEN via `@`.
-   */
-  private boolean modifierExpectingEventName = false;
-
-  /**
    * Return state for IN_HTML_COMMENT. Comments can appear at the top level
    * (YYINITIAL) or inside <template> (IN_TEMPLATE_BODY). Set by whichever
    * state opens the comment.
    */
   private int htmlCommentReturnState = YYINITIAL;
-
-  /**
-   * Depth of nested <template> tags inside an outer <template> SFC block body.
-   * Incremented when IN_TEMPLATE_BODY matches an inner "<template" lookahead;
-   * decremented when IN_TEMPLATE_BODY matches "</template>". The
-   * "</template>" rule transitions back to YYINITIAL only when depth reaches 0;
-   * otherwise it decrements and returns TEMPLATE_BODY for the matched text.
-   *
-   * Mirrors the line-anchored fix in tools/textmate/syntaxes/rozie.tmLanguage.json:52
-   * which addresses the same problem TextMate-side via a line anchor. Also mirrors
-   * the existing modifierArgsParenDepth idiom above (paren-depth tracking for
-   * `.outside($refs.a, $refs.b)` modifier args).
-   *
-   * Reset to 0 inside the YYINITIAL "<template" rule (defense against
-   * cross-file state leak — FlexAdapter.reset() restores YYINITIAL but not
-   * user %{ %} fields). See Pitfall 3 of 08.1-RESEARCH.md.
-   */
-  private int templateNestingDepth = 0;
 %}
 
 // ——— Macro definitions ———
 WHITESPACE         = [\ \t\f]+
 EOL                = \r|\n|\r\n
 WS                 = ({WHITESPACE}|{EOL})+
-IDENT              = [A-Za-z_][A-Za-z0-9_-]*
-// `:` was previously in this character class to permit namespaced HTML attrs
-// (xml:lang, xlink:href). Plan 03 narrowed it out to prevent the greedy
-// longest-match rule from swallowing `r-model:open` as one ATTR_IDENT
-// (which would shadow {R_DIRECTIVE_RE}'s 7-char match for `r-model`). The
-// trade-off is acceptable: no current Rozie test fixture uses `xml:`/`xlink:`
-// namespaced attrs, and we never advertised those as a supported feature.
-// If they're needed later, add a dedicated NAMESPACED_ATTR_IDENT rule
-// that explicitly excludes the `r-` prefix to avoid recreating this collision.
+// `:` is not in this character class — block-tag attribute names today never
+// use namespaced HTML attrs (xml:lang, xlink:href). If they're needed later
+// add a dedicated NAMESPACED_ATTR_IDENT rule.
 ATTR_IDENT         = [A-Za-z_][A-Za-z0-9_.\-]*
-MAGIC_IDENT_RE     = "$" ("props"|"data"|"refs"|"slots"|"emit"|"el"|"onMount"|"onUnmount"|"onUpdate"|"computed"|"watch")
-R_DIRECTIVE_RE     = "r-" ("else-if"|"else"|"if"|"show"|"for"|"model"|"html"|"text"|"bind"|"on")
-PASCAL_IDENT       = [A-Z][A-Za-z0-9]*
 
 %%
 
@@ -165,7 +91,7 @@ PASCAL_IDENT       = [A-Z][A-Za-z0-9]*
   "<!--"                          { htmlCommentReturnState = YYINITIAL; yybegin(IN_HTML_COMMENT); return HTML_COMMENT_OPEN; }
 
   "<rozie"                        { pendingBodyState = YYINITIAL;        yybegin(IN_BLOCK_OPEN_TAG); return ROZIE_BLOCK_TAG; }
-  "<template"                     { pendingBodyState = IN_TEMPLATE_BODY; templateNestingDepth = 0; yybegin(IN_BLOCK_OPEN_TAG); return TEMPLATE_BLOCK_TAG; }
+  "<template"                     { pendingBodyState = IN_TEMPLATE_BODY; yybegin(IN_BLOCK_OPEN_TAG); return TEMPLATE_BLOCK_TAG; }
   "<script"                       { pendingBodyState = IN_SCRIPT_BODY;   yybegin(IN_BLOCK_OPEN_TAG); return SCRIPT_BLOCK_TAG; }
   "<props"                        { pendingBodyState = IN_PROPS_BODY;    yybegin(IN_BLOCK_OPEN_TAG); return PROPS_BLOCK_TAG; }
   "<data"                         { pendingBodyState = IN_DATA_BODY;     yybegin(IN_BLOCK_OPEN_TAG); return DATA_BLOCK_TAG; }
@@ -304,276 +230,25 @@ PASCAL_IDENT       = [A-Z][A-Za-z0-9]*
 
 // =====================================================================
 // IN_TEMPLATE_BODY — inside <template> ... </template>
-// Looks for HTML tags, comments, mustaches; everything else is opaque body text.
+//
+// POST-PIVOT (Phase 08.2): three rules only — close-tag (line-anchored),
+// greedy non-`<` body chunk, plain `<`. Any token-fragmenting rule here
+// re-creates the Phase 08.1 P0-UAT-01 bug (HTML injection sees fragmented
+// ranges -> can't parse -> blank coloring). DO NOT add carve-outs.
+//
+// The line-anchor `^` on the close rule is the JFlex equivalent of the
+// TextMate line-anchored fix at rozie.tmLanguage.json:55 — top-level SFC
+// closes MUST be at column 0 (project convention). This means an inner
+// `<template #foo>...</template>` (slot fill) lives inside the greedy
+// TEMPLATE_BODY run; no nesting-depth counter required.
+//
+// The body uses the same `[^<]+` + `<` shape as IN_SCRIPT_BODY (lines
+// for IN_SCRIPT_BODY above) — JFlex longest-match still prefers
+// `^"</template>"` (11 chars) over a stray `<` (1 char) when both apply,
+// so the close-tag rule wins at column-0 positions.
 // =====================================================================
 <IN_TEMPLATE_BODY> {
-  // Outer </template> closes the SFC block when depth==0; inner </template>
-  // tags (slot-fill `<template #foo>...</template>`) only decrement the counter
-  // and emit TEMPLATE_BODY, preserving the enclosing IN_TEMPLATE_BODY state.
-  // Mirrors the modifierArgsParenDepth decrement-and-conditional-yybegin idiom
-  // (lines 526-534). See Pitfall 3 / Example 3 of 08.1-RESEARCH.md.
-  "</template>"                   {
-                                    if (templateNestingDepth > 0) {
-                                      templateNestingDepth--;
-                                      return TEMPLATE_BODY;
-                                    }
-                                    yybegin(YYINITIAL);
-                                    return TEMPLATE_CLOSE_TAG;
-                                  }
-  "<!--"                          { htmlCommentReturnState = IN_TEMPLATE_BODY; yybegin(IN_HTML_COMMENT); return HTML_COMMENT_OPEN; }
-  "{{"                            { mustacheReturnState = IN_TEMPLATE_BODY; yybegin(IN_MUSTACHE); return MUSTACHE_OPEN; }
-  "</"                            { yybegin(IN_TEMPLATE_TAG_CLOSE); return LT_SLASH; }
-  // Inner <template open: increment nesting depth so the matching </template>
-  // is recognised as inner-close (decrement-only) rather than outer-close
-  // (terminate the SFC block). The lookahead `/ [\s>]` ensures `<templateFoo`
-  // (a hypothetical PascalCase component) isn't mistaken for a nested template;
-  // the lookahead character is NOT consumed (JFlex lookahead semantics) and
-  // will be picked up by IN_TEMPLATE_TAG_OPEN's own rules. MUST come BEFORE
-  // the generic `"<"` rule because JFlex longest-match prefers the multi-char
-  // literal — this rule emits TEMPLATE_BODY for `<template` matching the
-  // existing convention that the leading `<` of any opening tag inside
-  // IN_TEMPLATE_BODY surfaces as TEMPLATE_BODY before transitioning to
-  // IN_TEMPLATE_TAG_OPEN for the tag-name and attributes.
-  "<template" / [\s>]             { templateNestingDepth++; yybegin(IN_TEMPLATE_TAG_OPEN); return TEMPLATE_BODY; }
-  "<"                             { yybegin(IN_TEMPLATE_TAG_OPEN); return TEMPLATE_BODY; }
-  // Body chunk: stop at any of the interesting starters above. JFlex prefers
-  // the longer match, so the multi-char literals above win when applicable.
-  [^<{]+                          { return TEMPLATE_BODY; }
-  "{"                             { return TEMPLATE_BODY; }
-}
-
-// =====================================================================
-// IN_TEMPLATE_TAG_OPEN — inside `<foo ...` (unclosed opening tag)
-// =====================================================================
-<IN_TEMPLATE_TAG_OPEN> {
-  ">"                             { yybegin(IN_TEMPLATE_BODY); return GT; }
-  "/>"                            { yybegin(IN_TEMPLATE_BODY); return GT; }
-
-  {R_DIRECTIVE_RE}                { yybegin(IN_DIRECTIVE_ARG_COLON); return R_DIRECTIVE; }
-
-  // Slot-fill shorthand (Phase 07.2): `#slotName` and `#[dynamicExpr]` inside
-  // any opening tag (per RESEARCH Key Finding 12: `#` matches permissively to
-  // mirror the TM grammar's permissiveness — TM doesn't constrain `#` to only
-  // `<template>` tags). The two lookahead rules commit to IN_AFTER_SLOT_FILL_MARKER
-  // only when followed by an identifier or `[`; the bare `#` fallback emits
-  // BAD_CHARACTER to surface a defensive diagnostic on a stray sigil.
-  "#" / {IDENT}                   { yybegin(IN_AFTER_SLOT_FILL_MARKER); return SLOT_FILL_MARKER; }
-  "#" / "["                       { yybegin(IN_AFTER_SLOT_FILL_MARKER); return SLOT_FILL_MARKER; }
-  "#"                             { return BAD_CHARACTER; }
-
-  "@" / {IDENT}                   { modifierExpectingEventName = true; yybegin(IN_MODIFIER_CHAIN); return EVENT_AT; }
-  // Defensive — bare @ should still produce a usable token stream.
-  "@"                             { return EVENT_AT; }
-
-  ":" / {IDENT}                   { return PROP_COLON; }
-  ":"                             { return BAD_CHARACTER; }
-
-  "ref"                           { return REF_ATTR_NAME; }
-
-  "="                             { return EQ; }
-
-  // Attribute values. The host lexer cannot statically know whether the
-  // *previous* attribute name was a Rozie carve-out or a plain HTML attr, so
-  // we emit ATTR_VALUE_JS for every quoted value here. Plan 04's injector then
-  // checks the preceding non-whitespace token to decide whether to JS-inject
-  // (carve-out) or HTML-inject (plain attr — which means no JS injection at
-  // all in v1; HTML injection covers it via TEMPLATE_BODY ranges).
-  //
-  // Rationale: the whole-template HTML injection per D-10 already handles
-  // plain attributes correctly. We only need ATTR_VALUE_JS to *exist* as a
-  // distinct token kind so Plan 04 has something to JS-inject when the
-  // preceding attr name was r-*, @, :, or ref.
-  \"                              { yybegin(IN_TEMPLATE_ATTR_VALUE_JS_DQ); return ATTR_VALUE_JS; }
-  \'                              { yybegin(IN_TEMPLATE_ATTR_VALUE_JS_SQ); return ATTR_VALUE_JS; }
-
-  // Plain attribute name OR tag name. JFlex falls through to this when the
-  // R_DIRECTIVE / @ / : / ref / quote rules above don't apply. This includes
-  // the tag name itself (the leading `<foo`'s `foo` portion). It also handles
-  // the `x` after a `:` prop-binding when JFlex resumes scanning the tag-open
-  // state — we *could* split off PROP_NAME here, but ATTR_IDENT subsumes IDENT
-  // (every IDENT is a valid ATTR_IDENT), so a separate IDENT rule would never
-  // match. Plan 03 colors the post-`:` ATTR_NAME via the highlighter's awareness
-  // of the immediately-preceding PROP_COLON token instead.
-
-  // PascalCase tag names (e.g., Counter, Modal, CardHeader) — MUST appear BEFORE
-  // {ATTR_IDENT} so JFlex first-declaration-order fires COMPONENT_REF for any name
-  // starting with uppercase that contains only letters and digits.
-  {PASCAL_IDENT}                  { return COMPONENT_REF; }
-
-  {ATTR_IDENT}                    { return ATTR_NAME; }
-
-  {WS}                            { return WHITE_SPACE; }
-  [^]                             { return BAD_CHARACTER; }
-}
-
-// =====================================================================
-// IN_DIRECTIVE_ARG_COLON / IN_DIRECTIVE_ARG_NAME — transient sub-states
-// after a {R_DIRECTIVE_RE} match, recognising the optional `:propName`
-// argument form (e.g. `r-model:open`). The lookahead-guarded `:` rule
-// commits to the argument form only when followed by an identifier; any
-// other character (including `=`, whitespace, `>`, `"`, `/`) falls through
-// to IN_TEMPLATE_TAG_OPEN via `yypushback(yylength())` so the parent
-// state re-tokenises it under its normal rules. This is the JFlex idiom
-// for "I expected something specific — didn't see it — rewind."
-// =====================================================================
-<IN_DIRECTIVE_ARG_COLON> {
-  ":" / {IDENT}                  { yybegin(IN_DIRECTIVE_ARG_NAME); return DIRECTIVE_COLON; }
-  [^]                            { yypushback(yylength()); yybegin(IN_TEMPLATE_TAG_OPEN); }
-}
-
-<IN_DIRECTIVE_ARG_NAME> {
-  {IDENT}                        { yybegin(IN_TEMPLATE_TAG_OPEN); return DIRECTIVE_ARGUMENT_NAME; }
-  [^]                            { yypushback(yylength()); yybegin(IN_TEMPLATE_TAG_OPEN); }
-}
-
-// =====================================================================
-// IN_AFTER_SLOT_FILL_MARKER / IN_SLOT_BRACKET_EXPR — transient sub-states
-// for the slot-fill shorthand `<template #slotName>` / `<template #[dynExpr]>`
-// (Phase 07.2). IN_AFTER_SLOT_FILL_MARKER fires right after a `#` and decides
-// between the static-name (IDENT → SLOT_NAME) and dynamic-name (`[` → enter
-// IN_SLOT_BRACKET_EXPR) branches. Any other character falls through via
-// `yypushback(yylength())` so the parent IN_TEMPLATE_TAG_OPEN re-tokenises it
-// — same pushback idiom as IN_DIRECTIVE_ARG_*.
-//
-// IN_SLOT_BRACKET_EXPR is the canonical analog of IN_TEMPLATE_ATTR_VALUE_JS_DQ
-// (lines 359–366 pre-Plan-03): it surfaces $magic identifiers, chunks body
-// text as ATTR_VALUE_JS via a negated character class, and has a literal-`$`
-// fallback to prevent the negated class from stranding a bare `$`. The body
-// emits ATTR_VALUE_JS so the existing RozieMultiHostInjector JS arm (Plan 01)
-// covers it for free — NO new injector code path required.
-// =====================================================================
-<IN_AFTER_SLOT_FILL_MARKER> {
-  {IDENT}                        { yybegin(IN_TEMPLATE_TAG_OPEN); return SLOT_NAME; }
-  "["                            { yybegin(IN_SLOT_BRACKET_EXPR); return SLOT_DYNAMIC_BRACKET_OPEN; }
-  [^]                            { yypushback(yylength()); yybegin(IN_TEMPLATE_TAG_OPEN); }
-}
-
-<IN_SLOT_BRACKET_EXPR> {
-  "]"                            { yybegin(IN_TEMPLATE_TAG_OPEN); return SLOT_DYNAMIC_BRACKET_CLOSE; }
-  {MAGIC_IDENT_RE}               { return MAGIC_IDENT; }
-  [^\]$]+                        { return ATTR_VALUE_JS; }
-  "$"                            { return ATTR_VALUE_JS; }
-}
-
-// =====================================================================
-// IN_TEMPLATE_TAG_CLOSE — inside `</foo>`
-// =====================================================================
-<IN_TEMPLATE_TAG_CLOSE> {
-  ">"                             { yybegin(IN_TEMPLATE_BODY); return GT; }
-  // PascalCase close-tag names (e.g., </Counter>, </Modal>) — visual symmetry with open tags.
-  {PASCAL_IDENT}                  { return COMPONENT_REF; }
-  {ATTR_IDENT}                    { return ATTR_NAME; }
-  {WS}                            { return WHITE_SPACE; }
-  [^]                             { return BAD_CHARACTER; }
-}
-
-// =====================================================================
-// IN_TEMPLATE_ATTR_VALUE_JS_DQ / SQ — value of r-*/@/:/ref/plain attrs in template
-// $magic identifiers and {{ }} mustaches surface; rest is ATTR_VALUE_JS.
-// =====================================================================
-<IN_TEMPLATE_ATTR_VALUE_JS_DQ> {
-  \"                              { yybegin(IN_TEMPLATE_TAG_OPEN); return ATTR_VALUE_JS; }
-  "{{"                            { mustacheReturnState = IN_TEMPLATE_ATTR_VALUE_JS_DQ; yybegin(IN_MUSTACHE); return MUSTACHE_OPEN; }
-  {MAGIC_IDENT_RE}                { return MAGIC_IDENT; }
-  [^\"{$]+                        { return ATTR_VALUE_JS; }
-  "{"                             { return ATTR_VALUE_JS; }
-  "$"                             { return ATTR_VALUE_JS; }
-}
-<IN_TEMPLATE_ATTR_VALUE_JS_SQ> {
-  \'                              { yybegin(IN_TEMPLATE_TAG_OPEN); return ATTR_VALUE_JS; }
-  "{{"                            { mustacheReturnState = IN_TEMPLATE_ATTR_VALUE_JS_SQ; yybegin(IN_MUSTACHE); return MUSTACHE_OPEN; }
-  {MAGIC_IDENT_RE}                { return MAGIC_IDENT; }
-  [^\'{$]+                        { return ATTR_VALUE_JS; }
-  "{"                             { return ATTR_VALUE_JS; }
-  "$"                             { return ATTR_VALUE_JS; }
-}
-
-// IN_TEMPLATE_ATTR_VALUE_PLAIN_* — reserved for a future pass that distinguishes
-// plain HTML attribute values from JS-injected ones. Today every quoted attr
-// value in IN_TEMPLATE_TAG_OPEN routes through the JS state; if Plan 04 needs
-// the distinction it can be added by the IN_TEMPLATE_TAG_OPEN rules above.
-<IN_TEMPLATE_ATTR_VALUE_PLAIN_DQ> {
-  \"                              { yybegin(IN_TEMPLATE_TAG_OPEN); return ATTR_VALUE_PLAIN; }
-  "{{"                            { mustacheReturnState = IN_TEMPLATE_ATTR_VALUE_PLAIN_DQ; yybegin(IN_MUSTACHE); return MUSTACHE_OPEN; }
-  [^\"{]+                         { return ATTR_VALUE_PLAIN; }
-  "{"                             { return ATTR_VALUE_PLAIN; }
-}
-<IN_TEMPLATE_ATTR_VALUE_PLAIN_SQ> {
-  \'                              { yybegin(IN_TEMPLATE_TAG_OPEN); return ATTR_VALUE_PLAIN; }
-  "{{"                            { mustacheReturnState = IN_TEMPLATE_ATTR_VALUE_PLAIN_SQ; yybegin(IN_MUSTACHE); return MUSTACHE_OPEN; }
-  [^\'{]+                         { return ATTR_VALUE_PLAIN; }
-  "{"                             { return ATTR_VALUE_PLAIN; }
-}
-
-// =====================================================================
-// IN_MUSTACHE — inside `{{ ... }}`. Surfaces $magic; rest is opaque body.
-// =====================================================================
-<IN_MUSTACHE> {
-  "}}"                            { yybegin(mustacheReturnState); return MUSTACHE_CLOSE; }
-  {MAGIC_IDENT_RE}                { return MAGIC_IDENT; }
-  [^}$]+                          { return MUSTACHE_BODY; }
-  "}"                             { return MUSTACHE_BODY; }
-  "$"                             { return MUSTACHE_BODY; }
-}
-
-// =====================================================================
-// IN_MODIFIER_CHAIN — after `@event`, looking for `.mod.mod`
-// First emits the EVENT_NAME (or a sequence of MODIFIER_NAME after each `.`),
-// then alternates DOT / NAME / LPAREN. Exits cleanly back to
-// IN_TEMPLATE_TAG_OPEN when the chain ends — typically at `=`, `"`, `'`, `>`,
-// `/>`, or whitespace; we rewind one character and let the tag-open state
-// re-tokenize it.
-// =====================================================================
-<IN_MODIFIER_CHAIN> {
-  // After `.` we expect a modifier name; after `@` we expect the event name.
-  // JFlex's longest-match rule means IDENT wins over the catch-all exit below
-  // when we're sitting on identifier characters. The two callers (EVENT_AT
-  // setup vs MODIFIER_DOT setup) emit EVENT_NAME or MODIFIER_NAME respectively.
-  // Disambiguating which one to return without explicit %{ %} state would
-  // require splitting the state in two; since downstream consumers (Plan 03
-  // highlighter) treat both EVENT_NAME and MODIFIER_NAME with the same
-  // attribute kind family, we collapse them into MODIFIER_NAME except for
-  // the very first IDENT (event name). We track this via a flag set in %{ %}.
-  {IDENT}                         {
-                                    if (modifierExpectingEventName) {
-                                      modifierExpectingEventName = false;
-                                      return EVENT_NAME;
-                                    }
-                                    return MODIFIER_NAME;
-                                  }
-  "."                             { return MODIFIER_DOT; }
-  "("                             { modifierArgsParenDepth = 1; yybegin(IN_MODIFIER_ARGS); return MODIFIER_LPAREN; }
-  {WS}                            { yybegin(IN_TEMPLATE_TAG_OPEN); return WHITE_SPACE; }
-
-  // Explicit chain terminators — consume the character and emit the same
-  // token IN_TEMPLATE_TAG_OPEN would have, while transitioning state.
-  // Avoids zero-width-token issues that yypushback would create.
-  "="                             { yybegin(IN_TEMPLATE_TAG_OPEN); return EQ; }
-  \"                              { yybegin(IN_TEMPLATE_ATTR_VALUE_JS_DQ); return ATTR_VALUE_JS; }
-  \'                              { yybegin(IN_TEMPLATE_ATTR_VALUE_JS_SQ); return ATTR_VALUE_JS; }
-  ">"                             { yybegin(IN_TEMPLATE_BODY); return GT; }
-  "/>"                            { yybegin(IN_TEMPLATE_BODY); return GT; }
-
-  // Catch-all for genuinely unexpected input (e.g., a stray punctuator
-  // mid-chain). Consume one character to keep advancing — emitting
-  // BAD_CHARACTER signals "the lexer recognized this is wrong".
-  [^]                             { yybegin(IN_TEMPLATE_TAG_OPEN); return BAD_CHARACTER; }
-}
-
-// =====================================================================
-// IN_MODIFIER_ARGS — inside `(...)` of `.mod(args)` with paren-depth tracking
-// =====================================================================
-<IN_MODIFIER_ARGS> {
-  "("                             { modifierArgsParenDepth++; return MODIFIER_ARGS; }
-  ")"                             {
-                                    modifierArgsParenDepth--;
-                                    if (modifierArgsParenDepth <= 0) {
-                                      modifierArgsParenDepth = 0;
-                                      yybegin(IN_MODIFIER_CHAIN);
-                                      return MODIFIER_RPAREN;
-                                    }
-                                    return MODIFIER_ARGS;
-                                  }
-  // Greedy chunk; JFlex prefers the literal "(" / ")" rules above when applicable.
-  [^()]+                          { return MODIFIER_ARGS; }
+  ^"</template>"                  { yybegin(YYINITIAL); return TEMPLATE_CLOSE_TAG; }
+  [^<]+                           { return TEMPLATE_BODY; }
+  "<"                             { return TEMPLATE_BODY; }
 }

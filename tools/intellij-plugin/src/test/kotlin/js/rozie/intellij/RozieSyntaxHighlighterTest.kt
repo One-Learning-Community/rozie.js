@@ -8,20 +8,21 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Smoke regression guard for the syntax-highlighter mapping (Plan 03).
+ * Smoke regression guard for the post-pivot syntax-highlighter mapping.
  *
- * Asserts that every Rozie-specific [IElementType] declared on
- * [RozieTokenTypes] returns a non-empty `TextAttributesKey[]` from
+ * Asserts that every host-lexer-emitted IElementType the highlighter is
+ * supposed to colour returns a non-empty `TextAttributesKey[]` from
  * [RozieSyntaxHighlighter.getTokenHighlights] — preventing silent regressions
  * where a token is left unmapped (and would render uncolored) after a
  * future refactor.
  *
  * **Body / generic structural tokens** (e.g., `SCRIPT_BODY`, `TEMPLATE_BODY`,
- * `EQ`, `GT`, `WHITE_SPACE`, `ATTR_VALUE_*`, `MUSTACHE_BODY`, `MODIFIER_ARGS`)
+ * `EQ`, `GT`, `WHITE_SPACE`, `ATTR_VALUE_PLAIN`, `ATTR_NAME`, `LT_SLASH`)
  * are intentionally allowed to fall through to `else -> emptyArray()` —
- * Plan 04 will color them via the host language injection. This test
- * **excludes** them from the must-be-colored set so it remains a forward-
- * compatible guard rather than a brittle fixture.
+ * RozieMultiHostInjector / RozieAnnotator colour them via the host language
+ * injection / Annotator pass. This test **excludes** them from the must-be-
+ * coloured set so it remains a forward-compatible guard rather than a
+ * brittle fixture.
  *
  * Plain JUnit 4 (no `BasePlatformTestCase`) is sufficient: the highlighter
  * neither parses files nor touches PSI; `TextAttributesKey.createTextAttributesKey`
@@ -30,13 +31,13 @@ import org.junit.Test
 class RozieSyntaxHighlighterTest {
 
     /**
-     * Every Rozie-specific IElementType the highlighter MUST color
-     * (i.e., the ones with their own `TextAttributesKey` in
-     * [RozieSyntaxHighlighter]'s companion object).
+     * Every IElementType the post-pivot highlighter MUST colour (block-tag
+     * boundaries, lang attr, HTML comment, bad character).
      *
-     * Adding a new colored token to RozieSyntaxHighlighter without adding it
-     * here is fine — the test only complains if a token in this list is
-     * silently dropped to `emptyArray()` by a future refactor.
+     * Template-level Rozie sigils (`r-*`, `@`, `:`, `#`, `<Component>`,
+     * `$magic`) are NOT in this list because the host lexer no longer emits
+     * them as distinct tokens — they're recognised inside the HTMLLanguage-
+     * injected PSI by RozieAnnotator (Plan 04).
      */
     private val mustBeColored: List<Pair<String, IElementType>> = listOf(
         // Block open tags
@@ -46,6 +47,7 @@ class RozieSyntaxHighlighterTest {
         "PROPS_BLOCK_TAG" to RozieTokenTypes.PROPS_BLOCK_TAG,
         "DATA_BLOCK_TAG" to RozieTokenTypes.DATA_BLOCK_TAG,
         "LISTENERS_BLOCK_TAG" to RozieTokenTypes.LISTENERS_BLOCK_TAG,
+        "COMPONENTS_BLOCK_TAG" to RozieTokenTypes.COMPONENTS_BLOCK_TAG,
         "STYLE_BLOCK_TAG" to RozieTokenTypes.STYLE_BLOCK_TAG,
         // Block close tags
         "ROZIE_CLOSE_TAG" to RozieTokenTypes.ROZIE_CLOSE_TAG,
@@ -54,27 +56,16 @@ class RozieSyntaxHighlighterTest {
         "PROPS_CLOSE_TAG" to RozieTokenTypes.PROPS_CLOSE_TAG,
         "DATA_CLOSE_TAG" to RozieTokenTypes.DATA_CLOSE_TAG,
         "LISTENERS_CLOSE_TAG" to RozieTokenTypes.LISTENERS_CLOSE_TAG,
+        "COMPONENTS_CLOSE_TAG" to RozieTokenTypes.COMPONENTS_CLOSE_TAG,
         "STYLE_CLOSE_TAG" to RozieTokenTypes.STYLE_CLOSE_TAG,
-        // Template-level Rozie tokens
-        "R_DIRECTIVE" to RozieTokenTypes.R_DIRECTIVE,
-        "EVENT_AT" to RozieTokenTypes.EVENT_AT,
-        "EVENT_NAME" to RozieTokenTypes.EVENT_NAME,
-        "MODIFIER_DOT" to RozieTokenTypes.MODIFIER_DOT,
-        "MODIFIER_NAME" to RozieTokenTypes.MODIFIER_NAME,
-        "MODIFIER_LPAREN" to RozieTokenTypes.MODIFIER_LPAREN,
-        "MODIFIER_RPAREN" to RozieTokenTypes.MODIFIER_RPAREN,
-        "PROP_COLON" to RozieTokenTypes.PROP_COLON,
-        "PROP_NAME" to RozieTokenTypes.PROP_NAME,
-        "MUSTACHE_OPEN" to RozieTokenTypes.MUSTACHE_OPEN,
-        "MUSTACHE_CLOSE" to RozieTokenTypes.MUSTACHE_CLOSE,
-        "MAGIC_IDENT" to RozieTokenTypes.MAGIC_IDENT,
-        "REF_ATTR_NAME" to RozieTokenTypes.REF_ATTR_NAME,
+        // Lang attribute
         "LANG_ATTR_NAME" to RozieTokenTypes.LANG_ATTR_NAME,
         "LANG_ATTR_VALUE" to RozieTokenTypes.LANG_ATTR_VALUE,
-        "ATTR_NAME" to RozieTokenTypes.ATTR_NAME,
+        // HTML comments
         "HTML_COMMENT_OPEN" to RozieTokenTypes.HTML_COMMENT_OPEN,
         "HTML_COMMENT_CONTENT" to RozieTokenTypes.HTML_COMMENT_CONTENT,
         "HTML_COMMENT_CLOSE" to RozieTokenTypes.HTML_COMMENT_CLOSE,
+        // Errors
         "BAD_CHARACTER" to RozieTokenTypes.BAD_CHARACTER
     )
 
@@ -88,7 +79,7 @@ class RozieSyntaxHighlighterTest {
             if (keys.isEmpty()) unmapped += name
         }
         assertTrue(
-            "Highlighter dropped these Rozie tokens to empty mappings (Plan 03 regression): $unmapped",
+            "Highlighter dropped these Rozie tokens to empty mappings: $unmapped",
             unmapped.isEmpty()
         )
     }
@@ -112,21 +103,19 @@ class RozieSyntaxHighlighterTest {
     fun `every TextAttributesKey has the stable ROZIE_ external name prefix`() {
         // T-8-03-01: external names are persisted user-customization keys —
         // any deviation from the ROZIE_ prefix should be a deliberate, reviewed
-        // decision, never an accident.
+        // decision, never an accident. Includes the Annotator-paint-target
+        // constants kept on the companion (R_DIRECTIVE / EVENT_AT / etc.)
+        // because they participate in the same STABLE-API contract.
         val keys = listOf(
             RozieSyntaxHighlighter.BLOCK_TAG,
             RozieSyntaxHighlighter.R_DIRECTIVE,
             RozieSyntaxHighlighter.EVENT_AT,
-            RozieSyntaxHighlighter.EVENT_NAME,
-            RozieSyntaxHighlighter.MODIFIER,
-            RozieSyntaxHighlighter.MODIFIER_PUNCTUATION,
-            RozieSyntaxHighlighter.PROP_BINDING_PUNCTUATION,
             RozieSyntaxHighlighter.PROP_BINDING_NAME,
-            RozieSyntaxHighlighter.INTERPOLATION_DELIM,
-            RozieSyntaxHighlighter.MAGIC_IDENT,
+            RozieSyntaxHighlighter.SLOT_FILL_MARKER,
+            RozieSyntaxHighlighter.COMPONENT_REF,
             RozieSyntaxHighlighter.REF_ATTR,
+            RozieSyntaxHighlighter.MAGIC_IDENT,
             RozieSyntaxHighlighter.LANG_ATTR,
-            RozieSyntaxHighlighter.HTML_ATTR_NAME,
             RozieSyntaxHighlighter.HTML_COMMENT,
             RozieSyntaxHighlighter.BAD_CHARACTER
         )

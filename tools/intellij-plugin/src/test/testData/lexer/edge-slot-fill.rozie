@@ -1,8 +1,0 @@
-<rozie name="SlotFillProbe">
-<template>
-  <Modal #header>Static name</Modal>
-  <Modal #[$data.slotName]>Dynamic name</Modal>
-  <Modal #footer="{ close }">Scoped slot static</Modal>
-  <Modal #[$data.kind]="{ value }">Scoped slot dynamic</Modal>
-</template>
-</rozie>

@@ -16,11 +16,15 @@ import js.rozie.intellij.parser.RozieRootBlock
  * Walks every [RozieRootBlock]'s token stream and registers JavaScript / HTML / CSS
  * (or SCSS / Less) injection ranges per the D-09 / D-10 / D-11 / D-12 contracts:
  *
- *  - SCRIPT_BODY / PROPS_BODY / DATA_BODY / LISTENERS_BODY -> JavaScript (D-09, D-12)
+ *  - SCRIPT_BODY / PROPS_BODY / DATA_BODY / LISTENERS_BODY / COMPONENTS_BODY -> JavaScript (D-09, D-12)
  *  - TEMPLATE_BODY                                          -> HTML       (D-10)
  *  - STYLE_BODY                                             -> CSS / SCSS / Less based on `lang=...` (D-11)
- *  - ATTR_VALUE_JS (r-* / @event / :prop / ref values)      -> JavaScript (D-09)
- *  - MUSTACHE_BODY                                          -> NOT injected in v1 (D-09 deferral)
+ *
+ * Post-pivot (Phase 08.2): TEMPLATE_BODY is the SINGLE contiguous range covering
+ * the entire `<template>` body — JetBrains' HTMLLanguage PSI handles attribute
+ * values, JS expression injection inside `r-* / @ / : / ref` (via standard HTML
+ * `attribute-value` injection), tag matching, and Emmet automatically. No
+ * per-attribute ATTR_VALUE_JS arm is required at the host-injector layer.
  *
  * RESEARCH A3 outcome: empirical javap inspection of `plugins/javascript-plugin/lib/javascript-plugin.jar`
  * showed `JavaScriptSupportLoader.JAVASCRIPT` is typed as `LanguageFileType`, not a `Language`,
@@ -59,9 +63,6 @@ class RozieMultiHostInjector : MultiHostInjector {
 
                 RozieTokenTypes.STYLE_BODY,
                 -> injectStyle(registrar, host, tok.range, detectStyleLang(tokens, i))
-
-                RozieTokenTypes.ATTR_VALUE_JS,
-                -> injectJs(registrar, host, tok.range)
 
                 else -> { /* not injected */ }
             }

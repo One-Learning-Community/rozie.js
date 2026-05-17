@@ -7,9 +7,12 @@ import js.rozie.intellij.RozieLanguage
 /**
  * IElementType registry for the Rozie JFlex lexer.
  *
- * Each Rozie-specific TextMate scope in `tools/textmate/syntaxes/rozie.tmLanguage.json`
- * has at least one corresponding [IElementType] field here. The D-07 drift check
- * (`TextMateGrammarParityTest`) asserts every TM scope maps to an entry below.
+ * POST-PIVOT (Phase 08.2): the registry is intentionally small — the lexer's
+ * job is SFC block boundary detection only. Template-level Rozie carve-outs
+ * (`r-*`, `@`, `:`, `{{ }}`, `$magic`, `ref`, `#slot`, `<Component>`) are
+ * recognised inside the HTMLLanguage-injected PSI by RozieAttributeDescriptors-
+ * Provider / RozieComponentTagProvider / RozieAnnotator (Plans 02–04), NOT by
+ * fragmenting tokens at the host-lexer layer.
  *
  * Conventions:
  *  - Block-tag tokens cover the full opening-tag-name span (e.g., `<rozie` or
@@ -17,11 +20,7 @@ import js.rozie.intellij.RozieLanguage
  *    keep downstream code simple. The closing `>` of an opening tag is emitted
  *    separately as [GT].
  *  - Block-body tokens are *single tokens* spanning the entire block body. The
- *    multi-host injector (Plan 04) carves ranges from these.
- *  - Template-level tokens (`r-*`, `@`, `:`, `{{ }}`, `$magic`, `ref`) are
- *    surfaced as their own IElementTypes so the highlighter (Plan 03) can give
- *    them per-token colors. HTML structure inside `<template>` is *not*
- *    recognized — that's HTML injection's job.
+ *    multi-host injector carves ranges from these.
  */
 object RozieTokenTypes {
     // --- Block opening tags (full `<rozie` / `<template` / etc. spans) ---
@@ -53,38 +52,11 @@ object RozieTokenTypes {
     @JvmField val TEMPLATE_BODY: IElementType = RozieElementType("TEMPLATE_BODY")
     @JvmField val STYLE_BODY: IElementType = RozieElementType("STYLE_BODY")
 
-    // --- Template-level Rozie-specific tokens ---
-    @JvmField val R_DIRECTIVE: IElementType = RozieElementType("R_DIRECTIVE")
-    @JvmField val DIRECTIVE_COLON: IElementType = RozieElementType("DIRECTIVE_COLON")
-    @JvmField val DIRECTIVE_ARGUMENT_NAME: IElementType = RozieElementType("DIRECTIVE_ARGUMENT_NAME")
-    @JvmField val EVENT_AT: IElementType = RozieElementType("EVENT_AT")
-    @JvmField val EVENT_NAME: IElementType = RozieElementType("EVENT_NAME")
-    @JvmField val MODIFIER_DOT: IElementType = RozieElementType("MODIFIER_DOT")
-    @JvmField val MODIFIER_NAME: IElementType = RozieElementType("MODIFIER_NAME")
-    @JvmField val MODIFIER_LPAREN: IElementType = RozieElementType("MODIFIER_LPAREN")
-    @JvmField val MODIFIER_RPAREN: IElementType = RozieElementType("MODIFIER_RPAREN")
-    @JvmField val MODIFIER_ARGS: IElementType = RozieElementType("MODIFIER_ARGS")
-    @JvmField val PROP_COLON: IElementType = RozieElementType("PROP_COLON")
-    @JvmField val PROP_NAME: IElementType = RozieElementType("PROP_NAME")
-    @JvmField val REF_ATTR_NAME: IElementType = RozieElementType("REF_ATTR_NAME")
-    @JvmField val ATTR_VALUE_JS: IElementType = RozieElementType("ATTR_VALUE_JS")
+    // --- Block-attribute value (e.g. `<style lang="scss">`, `<rozie name="X">`) ---
+    // Block-tag attribute values stay tokenised (lexer scans `<rozie ...>` etc.
+    // outside of any injection). Template-body attribute values live inside the
+    // contiguous TEMPLATE_BODY token and are HTML-PSI-parsed.
     @JvmField val ATTR_VALUE_PLAIN: IElementType = RozieElementType("ATTR_VALUE_PLAIN")
-    @JvmField val MUSTACHE_OPEN: IElementType = RozieElementType("MUSTACHE_OPEN")
-    @JvmField val MUSTACHE_BODY: IElementType = RozieElementType("MUSTACHE_BODY")
-    @JvmField val MUSTACHE_CLOSE: IElementType = RozieElementType("MUSTACHE_CLOSE")
-    @JvmField val MAGIC_IDENT: IElementType = RozieElementType("MAGIC_IDENT")
-    @JvmField val COMPONENT_REF: IElementType = RozieElementType("COMPONENT_REF")
-
-    // --- Slot-fill shorthand (Phase 07.2) ---
-    // `<template #slotName>` / `<template #[dynamicExpr]>` / scoped-slot variants.
-    // The bracket OPEN+CLOSE are distinct IElementTypes so the D-07 parity test
-    // can map each TM scope individually, but the highlighter folds both onto a
-    // single ROZIE_SLOT_BRACKET TextAttributesKey (IntelliJ convention for paired
-    // brackets — RESEARCH § Standard Stack note ~line 183).
-    @JvmField val SLOT_FILL_MARKER: IElementType = RozieElementType("SLOT_FILL_MARKER")
-    @JvmField val SLOT_NAME: IElementType = RozieElementType("SLOT_NAME")
-    @JvmField val SLOT_DYNAMIC_BRACKET_OPEN: IElementType = RozieElementType("SLOT_DYNAMIC_BRACKET_OPEN")
-    @JvmField val SLOT_DYNAMIC_BRACKET_CLOSE: IElementType = RozieElementType("SLOT_DYNAMIC_BRACKET_CLOSE")
 
     // --- Lang attribute (for <style lang="scss"> / <script lang="ts">) ---
     @JvmField val LANG_ATTR_NAME: IElementType = RozieElementType("LANG_ATTR_NAME")

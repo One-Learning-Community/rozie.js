@@ -10,10 +10,16 @@ import java.util.ResourceBundle
 import javax.swing.Icon
 
 /**
- * Settings → Editor → Color Scheme → Rozie panel exposing every Rozie token
- * class as a separate user-themable slot (D-06). The live-preview pane
- * renders [getDemoText] through [RozieSyntaxHighlighter] so users can see
- * each color change applied to a real `.rozie` excerpt.
+ * Settings → Editor → Color Scheme → Rozie panel.
+ *
+ * Post-pivot (Phase 08.2): the descriptor list collapses from 21 entries to 6.
+ * Surviving entries are the SFC-boundary scopes the host lexer still emits
+ * directly (block-tag, lang-attr, HTML comment, bad character) plus the two
+ * Annotator-painted scopes shipped in Wave 2 (r-directive, magic identifier).
+ *
+ * Additional Annotator-painted scopes will be added in later waves as
+ * RozieAnnotator coverage expands (per 08.2-RESEARCH § ColorSettingsPage
+ * retirements line 156 recommendation).
  */
 class RozieColorSettingsPage : ColorSettingsPage {
 
@@ -22,56 +28,14 @@ class RozieColorSettingsPage : ColorSettingsPage {
 
     private val descriptors: Array<AttributesDescriptor> = arrayOf(
         AttributesDescriptor(msg("rozie.color.block.tag"), RozieSyntaxHighlighter.BLOCK_TAG),
-        AttributesDescriptor(msg("rozie.color.r.directive"), RozieSyntaxHighlighter.R_DIRECTIVE),
-        AttributesDescriptor(msg("rozie.color.event.at"), RozieSyntaxHighlighter.EVENT_AT),
-        AttributesDescriptor(msg("rozie.color.event.name"), RozieSyntaxHighlighter.EVENT_NAME),
-        AttributesDescriptor(msg("rozie.color.modifier"), RozieSyntaxHighlighter.MODIFIER),
-        AttributesDescriptor(
-            msg("rozie.color.modifier.punctuation"),
-            RozieSyntaxHighlighter.MODIFIER_PUNCTUATION
-        ),
-        AttributesDescriptor(
-            msg("rozie.color.prop.binding.punctuation"),
-            RozieSyntaxHighlighter.PROP_BINDING_PUNCTUATION
-        ),
-        AttributesDescriptor(
-            msg("rozie.color.prop.binding.name"),
-            RozieSyntaxHighlighter.PROP_BINDING_NAME
-        ),
-        AttributesDescriptor(
-            msg("rozie.color.interpolation.delim"),
-            RozieSyntaxHighlighter.INTERPOLATION_DELIM
-        ),
-        AttributesDescriptor(msg("rozie.color.magic.ident"), RozieSyntaxHighlighter.MAGIC_IDENT),
-        AttributesDescriptor(msg("rozie.color.ref.attr"), RozieSyntaxHighlighter.REF_ATTR),
         AttributesDescriptor(msg("rozie.color.lang.attr"), RozieSyntaxHighlighter.LANG_ATTR),
-        AttributesDescriptor(
-            msg("rozie.color.html.attr.name"),
-            RozieSyntaxHighlighter.HTML_ATTR_NAME
-        ),
         AttributesDescriptor(msg("rozie.color.html.comment"), RozieSyntaxHighlighter.HTML_COMMENT),
         AttributesDescriptor(
             msg("rozie.color.bad.character"),
             RozieSyntaxHighlighter.BAD_CHARACTER
         ),
-        AttributesDescriptor(msg("rozie.color.component.ref"), RozieSyntaxHighlighter.COMPONENT_REF),
-        AttributesDescriptor(
-            msg("rozie.color.directive.colon"),
-            RozieSyntaxHighlighter.DIRECTIVE_COLON
-        ),
-        AttributesDescriptor(
-            msg("rozie.color.directive.arg"),
-            RozieSyntaxHighlighter.DIRECTIVE_ARG
-        ),
-        // Plan 08.1-04 — Slot-fill shorthand (Phase 07.2). Three themable entries:
-        // marker (`#`), slot name, and dynamic-name brackets (OPEN+CLOSE share the
-        // single SLOT_BRACKET highlight key, per IntelliJ bracket-pair convention).
-        AttributesDescriptor(
-            msg("rozie.color.slot.fill.marker"),
-            RozieSyntaxHighlighter.SLOT_FILL_MARKER
-        ),
-        AttributesDescriptor(msg("rozie.color.slot.name"), RozieSyntaxHighlighter.SLOT_NAME),
-        AttributesDescriptor(msg("rozie.color.slot.bracket"), RozieSyntaxHighlighter.SLOT_BRACKET)
+        AttributesDescriptor(msg("rozie.color.r.directive"), RozieSyntaxHighlighter.R_DIRECTIVE),
+        AttributesDescriptor(msg("rozie.color.magic.ident"), RozieSyntaxHighlighter.MAGIC_IDENT)
     )
 
     override fun getAttributeDescriptors(): Array<AttributesDescriptor> = descriptors
@@ -88,8 +52,13 @@ class RozieColorSettingsPage : ColorSettingsPage {
         null
 
     /**
-     * Demo `.rozie` snippet shown in the live-preview pane. Exercises every
-     * descriptor above so users see the effect of each color tweak.
+     * Demo `.rozie` snippet shown in the live-preview pane. Exercises the
+     * surviving descriptors (block tag, lang attr, HTML comment, bad char)
+     * plus the two Annotator-painted scopes (r-directive, magic identifier)
+     * — the latter render via RozieAnnotator over the HTMLLanguage-injected
+     * PSI in real `.rozie` files (the preview pane uses the host SyntaxHighlighter
+     * only, so r-directive / magic-ident colour appears as their DLHC fallback
+     * KEYWORD / PREDEFINED_SYMBOL until the Annotator runs against user code).
      *
      * Note on `${'$'}` escaping: Kotlin raw strings still interpret `$` as a
      * template-substitution sigil; we use `${'$'}` to literally emit `$` for
@@ -100,64 +69,17 @@ class RozieColorSettingsPage : ColorSettingsPage {
         <rozie name="Counter">
         <props>
         {
-          value: { type: Number, default: 0, model: true },
-          step: { type: Number, default: 1 }
+          value: { type: Number, default: 0 }
         }
         </props>
-
-        <data>
-        {
-          hovering: false
-        }
-        </data>
-
         <script>
-        const canDecrement = ${'$'}computed(() => ${'$'}props.value > 0)
-        ${'$'}onMount(() => {
-          console.log("Counter mounted with value", ${'$'}props.value)
-        })
+        const initial = ${'$'}props.value
         </script>
-
-        <listeners>
-        {
-          "window:resize.debounce(200)": {
-            when: "${'$'}data.hovering",
-            handler: "() => { console.log('resize') }"
-          }
-        }
-        </listeners>
-
-        <components>
-        {
-          Counter: './Counter.rozie',
-          Modal: './Modal.rozie',
-        }
-        </components>
-
         <template>
-          <Counter :value="42" />
-          <Modal r-model:open="${'$'}data.open">
-            <template #header="{ close }">Title</template>
-            <template #[${'$'}data.slotName]>Dynamic</template>
-          </Modal>
-          <div class="counter counter--{{ ${'$'}props.value > 0 ? 'active' : 'idle' }}"
-               ref="root"
-               @mouseenter="${'$'}data.hovering = true"
-               @mouseleave.stop="${'$'}data.hovering = false">
-            <button :disabled="!canDecrement"
-                    @click.prevent="${'$'}props.value -= ${'$'}props.step">
-              − Decrement
-            </button>
-            <span r-if="${'$'}props.value !== 0">{{ ${'$'}props.value }}</span>
-            <span r-else>Zero</span>
-          </div>
+          <button r-if="initial > 0">Above zero</button>
         </template>
-
         <style lang="scss">
-        .counter {
-          padding: 1rem;
-          &--active { color: green; }
-        }
+        .counter { padding: 1rem; }
         </style>
         </rozie>
     """.trimIndent()

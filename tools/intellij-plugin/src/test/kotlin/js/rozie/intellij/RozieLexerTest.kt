@@ -32,14 +32,7 @@ class RozieLexerTest : LexerTestCase() {
     fun testDropdown() = doFixtureTest("Dropdown.rozie", null)
     fun testTodoList() = doFixtureTest("TodoList.rozie", null)
     fun testModal() = doFixtureTest("Modal.rozie", null)
-    fun testEdgeMultiRefModifier() = doFixtureTest("edge-multi-ref-modifier.rozie", null)
-    fun testEdgeMustacheInAttr() = doFixtureTest("edge-mustache-in-attr.rozie", null)
-    fun testEdgeMagicInRfor() = doFixtureTest("edge-magic-in-rfor.rozie", null)
     fun testEdgeComponentsBlock() = doFixtureTest("edge-components-block.rozie", null)
-    fun testEdgeComponentRef() = doFixtureTest("edge-component-ref.rozie", null)
-    fun testEdgeDirectiveArg() = doFixtureTest("edge-directive-arg.rozie", null)
-    fun testEdgeSlotFill() = doFixtureTest("edge-slot-fill.rozie", null)
-    fun testEdgeOnUpdate() = doFixtureTest("edge-on-update.rozie", null)
     fun testEdgeNestedTemplate() = doFixtureTest("edge-nested-template.rozie", null)
 
     /**
@@ -83,14 +76,7 @@ class RozieLexerTest : LexerTestCase() {
     //     val fixtures = listOf(
     //         "Counter.rozie", "SearchInput.rozie", "Dropdown.rozie",
     //         "TodoList.rozie", "Modal.rozie",
-    //         "edge-multi-ref-modifier.rozie",
-    //         "edge-mustache-in-attr.rozie",
-    //         "edge-magic-in-rfor.rozie",
     //         "edge-components-block.rozie",
-    //         "edge-component-ref.rozie",
-    //         "edge-directive-arg.rozie",
-    //         "edge-slot-fill.rozie",
-    //         "edge-on-update.rozie",
     //         "edge-nested-template.rozie"
     //     )
     //     fixtures.forEach { name ->

@@ -1,7 +1,0 @@
-<rozie name="EdgeComponentRef">
-<template>
-  <Counter :value="42" />
-  <div class="wrapper"></div>
-  <Modal />
-</template>
-</rozie>

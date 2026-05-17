@@ -9,15 +9,28 @@ import js.rozie.intellij.lexer.RozieLexerAdapter
 import js.rozie.intellij.lexer.RozieTokenTypes
 
 /**
- * Maps each Rozie [IElementType] from [RozieTokenTypes] to a [TextAttributesKey]
- * so the editor can colorize tokens according to RESEARCH.md Pattern 6.
+ * Maps each Rozie host-lexer [IElementType] from [RozieTokenTypes] to a
+ * [TextAttributesKey].
+ *
+ * Post-pivot (Phase 08.2): the host lexer's when-arm dispatch only covers
+ * surviving SFC-boundary tokens (block-open/close tags, lang attribute,
+ * HTML comment, bad character). Template-level Rozie sigils (`r-*`, `@`,
+ * `:`, `#`, `<Component>`, `$magic`) are coloured by RozieAnnotator /
+ * RozieJsAnnotator (Plan 04) over the HTMLLanguage-injected / JavaScript-
+ * injected PSI — NOT here.
+ *
+ * The R_DIRECTIVE / EVENT_AT / PROP_BINDING_NAME / SLOT_FILL_MARKER /
+ * COMPONENT_REF / REF_ATTR / MAGIC_IDENT TextAttributesKey constants are
+ * KEPT on the companion object (Option A per 08.2-PATTERNS Disposition
+ * Decision 1) for RozieAnnotator + RozieJsAnnotator reuse.
  *
  * **Important — naming convention:** the external names passed to
  * `TextAttributesKey.createTextAttributesKey(name, fallback)` (e.g.,
- * `ROZIE_BLOCK_TAG`, `ROZIE_R_DIRECTIVE`) become the persisted color-scheme keys
- * in users' saved IDE preferences. After v1 ships these names are STABLE API —
- * renaming a key breaks color customization for every user. The convention is
- * `ROZIE_<UPPER_SNAKE>` matching the IElementType name where possible. (T-8-03-01.)
+ * `ROZIE_BLOCK_TAG`, `ROZIE_R_DIRECTIVE`) become the persisted color-scheme
+ * keys in users' saved IDE preferences. After v1 ships these names are
+ * STABLE API — renaming a key breaks color customization for every user.
+ * The convention is `ROZIE_<UPPER_SNAKE>` matching the IElementType name
+ * where possible. (T-8-03-01.)
  */
 class RozieSyntaxHighlighter : SyntaxHighlighterBase() {
 
@@ -26,33 +39,41 @@ class RozieSyntaxHighlighter : SyntaxHighlighterBase() {
 
         val BLOCK_TAG: TextAttributesKey =
             TextAttributesKey.createTextAttributesKey("ROZIE_BLOCK_TAG", DLHC.METADATA)
+
+        /**
+         * Rozie directive (`r-if`, `r-for`, `r-model`, ...). Annotator-painted
+         * from Plan 04 — kept as a companion-object constant so the Annotator
+         * can reference it without re-declaring the external name.
+         */
         val R_DIRECTIVE: TextAttributesKey =
             TextAttributesKey.createTextAttributesKey("ROZIE_R_DIRECTIVE", DLHC.KEYWORD)
+
+        /** Event prefix (`@`). Annotator-painted from Plan 04. */
         val EVENT_AT: TextAttributesKey =
             TextAttributesKey.createTextAttributesKey("ROZIE_EVENT_AT", DLHC.METADATA)
-        val EVENT_NAME: TextAttributesKey =
-            TextAttributesKey.createTextAttributesKey("ROZIE_EVENT_NAME", DLHC.INSTANCE_METHOD)
-        val MODIFIER: TextAttributesKey =
-            TextAttributesKey.createTextAttributesKey("ROZIE_MODIFIER", DLHC.STATIC_METHOD)
-        val MODIFIER_PUNCTUATION: TextAttributesKey =
-            TextAttributesKey.createTextAttributesKey("ROZIE_MODIFIER_PUNCTUATION", DLHC.DOT)
-        val PROP_BINDING_PUNCTUATION: TextAttributesKey =
-            TextAttributesKey.createTextAttributesKey("ROZIE_PROP_BINDING_PUNCT", DLHC.DOT)
+
+        /** Prop-binding name (e.g. `:disabled`, `:value`). Annotator-painted from Plan 04. */
         val PROP_BINDING_NAME: TextAttributesKey =
             TextAttributesKey.createTextAttributesKey("ROZIE_PROP_BINDING_NAME", DLHC.STATIC_FIELD)
-        val INTERPOLATION_DELIM: TextAttributesKey =
-            TextAttributesKey.createTextAttributesKey(
-                "ROZIE_INTERPOLATION_DELIM",
-                DLHC.TEMPLATE_LANGUAGE_COLOR
-            )
-        val MAGIC_IDENT: TextAttributesKey =
-            TextAttributesKey.createTextAttributesKey("ROZIE_MAGIC_IDENT", DLHC.PREDEFINED_SYMBOL)
+
+        /** Slot-fill marker (`#` in `<template #slotName>`). Annotator-painted from Plan 04. */
+        val SLOT_FILL_MARKER: TextAttributesKey =
+            TextAttributesKey.createTextAttributesKey("ROZIE_SLOT_FILL_MARKER", DLHC.METADATA)
+
+        /** Component reference (PascalCase tag name inside template). Annotator-painted from Plan 04. */
+        val COMPONENT_REF: TextAttributesKey =
+            TextAttributesKey.createTextAttributesKey("ROZIE_COMPONENT_REF", DLHC.CLASS_NAME)
+
+        /** `ref` attribute (`ref="root"`). Annotator-painted from Plan 04. */
         val REF_ATTR: TextAttributesKey =
             TextAttributesKey.createTextAttributesKey("ROZIE_REF_ATTR", DLHC.STATIC_FIELD)
+
+        /** Magic identifier (`$props`, `$data`, ...). RozieJsAnnotator-painted from Plan 04. */
+        val MAGIC_IDENT: TextAttributesKey =
+            TextAttributesKey.createTextAttributesKey("ROZIE_MAGIC_IDENT", DLHC.PREDEFINED_SYMBOL)
+
         val LANG_ATTR: TextAttributesKey =
             TextAttributesKey.createTextAttributesKey("ROZIE_LANG_ATTR", DLHC.METADATA)
-        val HTML_ATTR_NAME: TextAttributesKey =
-            TextAttributesKey.createTextAttributesKey("ROZIE_HTML_ATTR_NAME", DLHC.MARKUP_ATTRIBUTE)
         val HTML_COMMENT: TextAttributesKey =
             TextAttributesKey.createTextAttributesKey("ROZIE_HTML_COMMENT", DLHC.LINE_COMMENT)
         val BAD_CHARACTER: TextAttributesKey =
@@ -61,88 +82,9 @@ class RozieSyntaxHighlighter : SyntaxHighlighterBase() {
                 DLHC.INVALID_STRING_ESCAPE
             )
 
-        /**
-         * PascalCase component reference tag names inside `<template>` (e.g., `<Counter />`,
-         * `<Modal />`). Fallback is DLHC.CLASS_NAME — the PascalCase=class-name visual model.
-         *
-         * External name "ROZIE_COMPONENT_REF" is STABLE API (T-8-03-01 contract) — never rename
-         * after v1 ships; renaming breaks saved user color-scheme preferences.
-         */
-        val COMPONENT_REF: TextAttributesKey =
-            TextAttributesKey.createTextAttributesKey("ROZIE_COMPONENT_REF", DLHC.CLASS_NAME)
-
-        /**
-         * The `:` separator between an `r-*` directive and its argument
-         * (e.g. the `:` in `r-model:open`). Fallback DLHC.DOT matches the
-         * existing `PROP_BINDING_PUNCTUATION` family (same visual model — a
-         * punctuator separator). External name "ROZIE_DIRECTIVE_COLON" is
-         * STABLE API (T-8-03-01) — never rename post-ship.
-         */
-        val DIRECTIVE_COLON: TextAttributesKey =
-            TextAttributesKey.createTextAttributesKey("ROZIE_DIRECTIVE_COLON", DLHC.DOT)
-
-        /**
-         * The argument name after an `r-*:` directive (e.g. the `open` in
-         * `r-model:open`). Fallback DLHC.STATIC_FIELD matches the existing
-         * `PROP_BINDING_NAME` family because the argument name is semantically
-         * the same as a prop-binding name. External name "ROZIE_DIRECTIVE_ARG"
-         * is STABLE API (T-8-03-01) — never rename post-ship.
-         */
-        val DIRECTIVE_ARG: TextAttributesKey =
-            TextAttributesKey.createTextAttributesKey("ROZIE_DIRECTIVE_ARG", DLHC.STATIC_FIELD)
-
-        /**
-         * The `#` slot-fill marker in `<template #slotName>` (Phase 07.2). Fallback
-         * DLHC.METADATA places it in the same visual family as `BLOCK_TAG`,
-         * `EVENT_AT`, and `LANG_ATTR` — all structural sigils. External name
-         * "ROZIE_SLOT_FILL_MARKER" is STABLE API (T-8-03-01) — never rename
-         * post-ship.
-         */
-        val SLOT_FILL_MARKER: TextAttributesKey =
-            TextAttributesKey.createTextAttributesKey("ROZIE_SLOT_FILL_MARKER", DLHC.METADATA)
-
-        /**
-         * The slot name identifier after `#` in `<template #slotName>`. Fallback
-         * DLHC.LABEL: a slot binding point is semantically a labelled jump-target
-         * for its surrounding component, and "Label" is the closest stock
-         * highlighter family. External name "ROZIE_SLOT_NAME" is STABLE API
-         * (T-8-03-01) — never rename post-ship.
-         */
-        val SLOT_NAME: TextAttributesKey =
-            TextAttributesKey.createTextAttributesKey("ROZIE_SLOT_NAME", DLHC.LABEL)
-
-        /**
-         * The `[` and `]` brackets around a dynamic slot-name expression in
-         * `<template #[$data.slotName]>` — both bracket IElementTypes
-         * (SLOT_DYNAMIC_BRACKET_OPEN + _CLOSE) fold onto this single key per
-         * the IntelliJ convention that paired brackets share one color setting
-         * (RESEARCH § Standard Stack note ~line 183). Fallback DLHC.BRACKETS is
-         * the natural choice for `[`/`]`. External name "ROZIE_SLOT_BRACKET" is
-         * STABLE API (T-8-03-01) — never rename post-ship.
-         */
-        val SLOT_BRACKET: TextAttributesKey =
-            TextAttributesKey.createTextAttributesKey("ROZIE_SLOT_BRACKET", DLHC.BRACKETS)
-
         // Pre-allocated arrays returned by getTokenHighlights — avoid allocating per call.
-        private val COMPONENT_REF_KEYS = arrayOf(COMPONENT_REF)
-        private val DIRECTIVE_COLON_KEYS = arrayOf(DIRECTIVE_COLON)
-        private val DIRECTIVE_ARG_KEYS = arrayOf(DIRECTIVE_ARG)
-        private val SLOT_FILL_MARKER_KEYS = arrayOf(SLOT_FILL_MARKER)
-        private val SLOT_NAME_KEYS = arrayOf(SLOT_NAME)
-        private val SLOT_BRACKET_KEYS = arrayOf(SLOT_BRACKET)
         private val BLOCK_TAG_KEYS = arrayOf(BLOCK_TAG)
-        private val R_DIRECTIVE_KEYS = arrayOf(R_DIRECTIVE)
-        private val EVENT_AT_KEYS = arrayOf(EVENT_AT)
-        private val EVENT_NAME_KEYS = arrayOf(EVENT_NAME)
-        private val MODIFIER_KEYS = arrayOf(MODIFIER)
-        private val MODIFIER_PUNCT_KEYS = arrayOf(MODIFIER_PUNCTUATION)
-        private val PROP_PUNCT_KEYS = arrayOf(PROP_BINDING_PUNCTUATION)
-        private val PROP_NAME_KEYS = arrayOf(PROP_BINDING_NAME)
-        private val INTERP_KEYS = arrayOf(INTERPOLATION_DELIM)
-        private val MAGIC_KEYS = arrayOf(MAGIC_IDENT)
-        private val REF_KEYS = arrayOf(REF_ATTR)
         private val LANG_KEYS = arrayOf(LANG_ATTR)
-        private val HTML_ATTR_KEYS = arrayOf(HTML_ATTR_NAME)
         private val HTML_COMMENT_KEYS = arrayOf(HTML_COMMENT)
         private val BAD_KEYS = arrayOf(BAD_CHARACTER)
         private val EMPTY_KEYS = emptyArray<TextAttributesKey>()
@@ -161,38 +103,8 @@ class RozieSyntaxHighlighter : SyntaxHighlighterBase() {
         RozieTokenTypes.DATA_CLOSE_TAG, RozieTokenTypes.LISTENERS_CLOSE_TAG,
         RozieTokenTypes.COMPONENTS_CLOSE_TAG, RozieTokenTypes.STYLE_CLOSE_TAG -> BLOCK_TAG_KEYS
 
-        // Directives
-        RozieTokenTypes.R_DIRECTIVE -> R_DIRECTIVE_KEYS
-
-        // Events
-        RozieTokenTypes.EVENT_AT -> EVENT_AT_KEYS
-        RozieTokenTypes.EVENT_NAME -> EVENT_NAME_KEYS
-
-        // Modifiers
-        RozieTokenTypes.MODIFIER_DOT, RozieTokenTypes.MODIFIER_LPAREN,
-        RozieTokenTypes.MODIFIER_RPAREN -> MODIFIER_PUNCT_KEYS
-        RozieTokenTypes.MODIFIER_NAME -> MODIFIER_KEYS
-        // MODIFIER_ARGS — leave as default (could be JS-injected later); render uncolored
-
-        // Prop bindings
-        RozieTokenTypes.PROP_COLON -> PROP_PUNCT_KEYS
-        RozieTokenTypes.PROP_NAME -> PROP_NAME_KEYS
-
-        // Mustache
-        RozieTokenTypes.MUSTACHE_OPEN, RozieTokenTypes.MUSTACHE_CLOSE -> INTERP_KEYS
-        // MUSTACHE_BODY — leave default; Plan 04 may inject JS
-
-        // Magic identifiers
-        RozieTokenTypes.MAGIC_IDENT -> MAGIC_KEYS
-
-        // Ref attribute
-        RozieTokenTypes.REF_ATTR_NAME -> REF_KEYS
-
         // Lang attribute
         RozieTokenTypes.LANG_ATTR_NAME, RozieTokenTypes.LANG_ATTR_VALUE -> LANG_KEYS
-
-        // Generic HTML attributes (in template tags)
-        RozieTokenTypes.ATTR_NAME -> HTML_ATTR_KEYS
 
         // HTML comments
         RozieTokenTypes.HTML_COMMENT_OPEN, RozieTokenTypes.HTML_COMMENT_CONTENT,
@@ -201,24 +113,10 @@ class RozieSyntaxHighlighter : SyntaxHighlighterBase() {
         // Errors
         RozieTokenTypes.BAD_CHARACTER -> BAD_KEYS
 
-        // Component references — PascalCase tag names inside <template>
-        RozieTokenTypes.COMPONENT_REF -> COMPONENT_REF_KEYS
-
-        // Directive arguments (r-model:propName)
-        RozieTokenTypes.DIRECTIVE_COLON -> DIRECTIVE_COLON_KEYS
-        RozieTokenTypes.DIRECTIVE_ARGUMENT_NAME -> DIRECTIVE_ARG_KEYS
-
-        // Slot-fill shorthand (Phase 07.2). OPEN+CLOSE brackets fold onto the
-        // same SLOT_BRACKET_KEYS via the multi-value when arm — mirrors IntelliJ's
-        // bracket-pair UX convention (the IElementTypes remain distinct for D-07
-        // parity; only the highlight key collapses).
-        RozieTokenTypes.SLOT_FILL_MARKER -> SLOT_FILL_MARKER_KEYS
-        RozieTokenTypes.SLOT_NAME -> SLOT_NAME_KEYS
-        RozieTokenTypes.SLOT_DYNAMIC_BRACKET_OPEN,
-        RozieTokenTypes.SLOT_DYNAMIC_BRACKET_CLOSE -> SLOT_BRACKET_KEYS
-
-        // Body tokens (SCRIPT_BODY, TEMPLATE_BODY, etc.) and ATTR_VALUE_*
-        // — leave uncolored; Plan 04 injection will color via host language
+        // ATTR_NAME (block-tag attr names like `name`, `scoped`), body tokens, EQ,
+        // GT, LT_SLASH, ATTR_VALUE_PLAIN, WHITE_SPACE — leave uncolored. Template-
+        // body attribute names render via HTML injection; the few block-tag attr
+        // names render adequately via default highlighting.
         else -> EMPTY_KEYS
     }
 }
