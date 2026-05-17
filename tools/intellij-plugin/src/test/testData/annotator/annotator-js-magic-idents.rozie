@@ -1,0 +1,7 @@
+<rozie name="AnnotatorJsMagicIdents">
+<script>
+const x = $props.value;
+$onMount(() => console.log($data.count, $refs.root));
+const y = $computed(() => x + 1);
+</script>
+</rozie>

@@ -58,5 +58,15 @@
             implementation="js.rozie.intellij.xml.RozieComponentTagProvider"/>
         <xml.elementDescriptorProvider
             implementation="js.rozie.intellij.xml.RozieComponentTagProvider"/>
+
+        <!-- Plan 08.2-04: SC-4 distinctive-coloring layer painted ADDITIVELY
+             over HTML / JavaScript stock coloring inside injected PSI of
+             .rozie files. Both annotators short-circuit on
+             RozieContextCheck.isRozieContext to avoid leaking into the user's
+             non-Rozie .html / .js files (08.2-RESEARCH Pitfall 2). -->
+        <annotator language="HTML"
+                   implementationClass="js.rozie.intellij.highlighting.RozieAnnotator"/>
+        <annotator language="JavaScript"
+                   implementationClass="js.rozie.intellij.highlighting.RozieJsAnnotator"/>
     </extensions>
 </idea-plugin>
