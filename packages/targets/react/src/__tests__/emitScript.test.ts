@@ -213,22 +213,29 @@ describe('emitReact — whole-tsx fixture snapshots', () => {
 // props.slots?.['x'])` at every slot invocation. D-02 static-wins, D-05
 // non-slotted components stay byte-equivalent (Counter has no slots field).
 describe('emitPropsInterface / emitReactTypes — §slots-merge intake (Phase 07.3.2 D-SV-16 port)', () => {
-  it('Modal (slotted) inline Props interface contains slots?: Record<string, (ctx: any) => import(\'react\').ReactNode>', () => {
+  it('Modal (slotted) inline Props interface contains slots?: Record<string, () => import(\'react\').ReactNode>', () => {
     const ir = lowerExample('Modal');
     const ifaceText = emitPropsInterface(ir);
     expect(ifaceText).toContain('interface ModalProps');
-    expect(ifaceText).toMatch(/slots\?:\s*Record<string,\s*\(ctx:\s*any\)\s*=>\s*import\('react'\)\.ReactNode>/);
+    // Phase 07.3.2 Plan 07 (CR-01) — zero-args form matches the no-params
+    // named-slot invocation `?.()` at emitSlotInvocation.ts:302. Prior Plan 01
+    // wrote `(ctx: any) =>` which contradicts the call site and crashes
+    // consumers who destructure ctx.
+    expect(ifaceText).toMatch(/slots\?:\s*Record<string,\s*\(\)\s*=>\s*import\('react'\)\.ReactNode>/);
+    expect(ifaceText).not.toContain('(ctx: any) =>');
   });
 
-  it('Modal (slotted) public .d.ts contains slots?: Record<string, (ctx: any) => ReactNode>', () => {
+  it('Modal (slotted) public .d.ts contains slots?: Record<string, () => ReactNode>', () => {
     const ir = lowerExample('Modal');
     const dtsText = emitReactTypes(ir);
     expect(dtsText).toContain('export interface ModalProps');
     // .d.ts uses bare ReactNode (already imported at file top) — NOT
     // import('react').ReactNode — contrast with inline Props interface.
-    expect(dtsText).toMatch(/slots\?:\s*Record<string,\s*\(ctx:\s*any\)\s*=>\s*ReactNode>/);
+    expect(dtsText).toMatch(/slots\?:\s*Record<string,\s*\(\)\s*=>\s*ReactNode>/);
     // Ensure the .d.ts side does NOT use the import('react') verbose form.
-    expect(dtsText).not.toMatch(/slots\?:\s*Record<string,\s*\(ctx:\s*any\)\s*=>\s*import\('react'\)\.ReactNode>/);
+    expect(dtsText).not.toMatch(/slots\?:\s*Record<string,\s*\(\)\s*=>\s*import\('react'\)\.ReactNode>/);
+    // Phase 07.3.2 Plan 07 (CR-01) — old one-arg form must be gone.
+    expect(dtsText).not.toContain('(ctx: any) =>');
   });
 
   it('Counter (non-slotted) emits NO slots?: field in inline Props interface (D-05 byte-equivalence)', () => {
@@ -241,6 +248,50 @@ describe('emitPropsInterface / emitReactTypes — §slots-merge intake (Phase 07
     const ir = lowerExample('Counter');
     const dtsText = emitReactTypes(ir);
     expect(dtsText).not.toMatch(/slots\?:\s*Record/);
+  });
+});
+
+// Phase 07.3.2-07 — CR-01 fix from REVIEW.md. The dynamic-slots map value
+// type MUST match the no-params named-slot invocation form at
+// emitSlotInvocation.ts:302 (`?.()`, zero args). Plan 01 wrote `(ctx: any)
+// =>` (one arg); Plan 04 wired the call site as zero-args. A consumer-
+// supplied `slots={{ brand: (ctx) => ctx.x }}` crashes at runtime because
+// `ctx === undefined`. This block locks the contract so future drift is a
+// snapshot-layer failure rather than a runtime regression.
+describe('emitPropsInterface / emitReactTypes — §slots-merge-cr01 value type matches no-args invocation form', () => {
+  it('emitPropsInterface(slottedIr) emits the zero-args form on the inline TSX Props interface', () => {
+    const ir = lowerExample('Modal');
+    const out = emitPropsInterface(ir);
+    expect(out).toContain("slots?: Record<string, () => import('react').ReactNode>");
+    expect(out).not.toContain('(ctx: any) =>');
+  });
+
+  it('emitReactTypes(slottedIr) emits the zero-args form on the public .d.ts and brings ReactNode into scope', () => {
+    const ir = lowerExample('Modal');
+    const out = emitReactTypes(ir);
+    expect(out).toContain('slots?: Record<string, () => ReactNode>');
+    expect(out).not.toContain('(ctx: any) =>');
+    expect(out).toContain("import type { ReactNode } from 'react';");
+  });
+
+  it('emitPropsInterface(nonSlottedIr) does NOT emit any slots?: field (Counter — D-05 byte-equivalence)', () => {
+    const ir = lowerExample('Counter');
+    const out = emitPropsInterface(ir);
+    expect(out).not.toMatch(/slots\?:/);
+  });
+
+  it('contract symmetry: BOTH emitters declare the slots map as `() =>` (no args) for the same IR (Pitfall 1 lock)', () => {
+    const ir = lowerExample('Modal');
+    const ifaceText = emitPropsInterface(ir);
+    const dtsText = emitReactTypes(ir);
+    const ifaceSlotLine = ifaceText.split('\n').find((l) => l.includes('slots?:')) ?? '';
+    const dtsSlotLine = dtsText.split('\n').find((l) => l.includes('slots?:')) ?? '';
+    expect(ifaceSlotLine).not.toBe('');
+    expect(dtsSlotLine).not.toBe('');
+    expect(ifaceSlotLine).toContain('() =>');
+    expect(dtsSlotLine).toContain('() =>');
+    expect(ifaceSlotLine).not.toContain('(ctx:');
+    expect(dtsSlotLine).not.toContain('(ctx:');
   });
 });
 
