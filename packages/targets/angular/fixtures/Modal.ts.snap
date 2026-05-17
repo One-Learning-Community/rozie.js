@@ -28,7 +28,7 @@ interface FooterCtx {
         @if (title() || headerTpl) {
     <header>
           @if (headerTpl) {
-    <ng-container *ngTemplateOutlet="headerTpl; context: { $implicit: { close: _close }, close: _close }" />
+    <ng-container *ngTemplateOutlet="(headerTpl ?? templates()?.['header']); context: { $implicit: { close: _close }, close: _close }" />
     } @else {
 
             <h2>{{ title() }}</h2>
@@ -37,13 +37,13 @@ interface FooterCtx {
           <button class="close-btn" aria-label="Close" (click)="_close($event)">×</button>
         </header>
     }<div class="modal-body">
-          <ng-container *ngTemplateOutlet="defaultTpl; context: { $implicit: { close: _close }, close: _close }" />
+          <ng-container *ngTemplateOutlet="(defaultTpl ?? templates()?.['defaultSlot']); context: { $implicit: { close: _close }, close: _close }" />
         </div>
 
         @if (footerTpl) {
     <footer>
           @if (footerTpl) {
-    <ng-container *ngTemplateOutlet="footerTpl; context: { $implicit: { close: _close }, close: _close }" />
+    <ng-container *ngTemplateOutlet="(footerTpl ?? templates()?.['footer']); context: { $implicit: { close: _close }, close: _close }" />
     }
         </footer>
     }</div>
@@ -91,6 +91,7 @@ export class Modal {
   @ContentChild('header', { read: TemplateRef }) headerTpl?: TemplateRef<HeaderCtx>;
   @ContentChild('defaultSlot', { read: TemplateRef }) defaultTpl?: TemplateRef<DefaultCtx>;
   @ContentChild('footer', { read: TemplateRef }) footerTpl?: TemplateRef<FooterCtx>;
+  templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
 
   constructor() {
       const renderer = inject(Renderer2);

@@ -27,6 +27,7 @@ close = output<void>();
 @ContentChild('header', { read: TemplateRef }) headerTpl?: TemplateRef<HeaderCtx>;
 @ContentChild('defaultSlot', { read: TemplateRef }) defaultTpl?: TemplateRef<DefaultCtx>;
 @ContentChild('footer', { read: TemplateRef }) footerTpl?: TemplateRef<FooterCtx>;
+templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
 
 constructor() {
   this.lockScroll();

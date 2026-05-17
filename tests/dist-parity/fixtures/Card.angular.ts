@@ -14,7 +14,7 @@ interface DefaultCtx {}
     <article class="card">
       <rozie-card-header [title]="title()" [onClose]="onClose()"></rozie-card-header>
       <div class="card__body">
-        <ng-container *ngTemplateOutlet="defaultTpl" />
+        <ng-container *ngTemplateOutlet="(defaultTpl ?? templates()?.['defaultSlot'])" />
       </div>
     </article>
 
@@ -28,6 +28,7 @@ export class Card {
   title = input<string>('');
   onClose = input<((...args: unknown[]) => unknown) | null>(null);
   @ContentChild('defaultSlot', { read: TemplateRef }) defaultTpl?: TemplateRef<DefaultCtx>;
+  templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
 
   static ngTemplateContextGuard(
     _dir: Card,

@@ -20,12 +20,12 @@ interface DefaultCtx {
 
     <div class="dropdown">
       <div #triggerEl (click)="toggle($event)">
-        <ng-container *ngTemplateOutlet="triggerTpl; context: { $implicit: { open: open(), toggle: toggle }, open: open(), toggle: toggle }" />
+        <ng-container *ngTemplateOutlet="(triggerTpl ?? templates()?.['trigger']); context: { $implicit: { open: open(), toggle: toggle }, open: open(), toggle: toggle }" />
       </div>
 
       @if (open()) {
     <div #panelEl class="dropdown-panel" role="menu">
-        <ng-container *ngTemplateOutlet="defaultTpl; context: { $implicit: { close: close }, close: close }" />
+        <ng-container *ngTemplateOutlet="(defaultTpl ?? templates()?.['defaultSlot']); context: { $implicit: { close: close }, close: close }" />
       </div>
     }</div>
 
@@ -54,6 +54,7 @@ export class Dropdown {
   panelEl = viewChild<ElementRef<HTMLDivElement>>('panelEl');
   @ContentChild('trigger', { read: TemplateRef }) triggerTpl?: TemplateRef<TriggerCtx>;
   @ContentChild('defaultSlot', { read: TemplateRef }) defaultTpl?: TemplateRef<DefaultCtx>;
+  templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
 
   constructor() {
       const renderer = inject(Renderer2);

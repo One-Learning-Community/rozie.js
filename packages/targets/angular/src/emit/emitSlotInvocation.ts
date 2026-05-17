@@ -308,7 +308,23 @@ export function emitSlotInvocation(
       ctxSuffix = ctxLiteral ? `; context: ${ctxLiteral}` : '';
     }
   }
-  const outletTag = `<ng-container *ngTemplateOutlet="${tplField}${ctxSuffix}" />`;
+  // Phase 07.3.2 — merge @ContentChild static-name ref with the new
+  // `templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined)`
+  // signal map declared in emitScript.ts Section 6e. Static @ContentChild
+  // (`<X>Tpl`) wins LEFT of `??` (D-02 static-wins invariant); dynamic
+  // `templates()?.['<X>']` catches consumer-side `<template #[expr]>`
+  // projections that ContentChild's static-selector path cannot resolve.
+  // @ContentChild populates in `ngAfterContentInit` BEFORE template binding
+  // evaluation (Assumption A5), so the static path is already populated by
+  // the time the template expression is evaluated — first-render precedence
+  // preserved. Default-slot synthetic key `defaultSlot` matches
+  // refineSlotTypes.ts:24 ref name (and the consumer-side
+  // `<ng-template #defaultSlot>` wrap at emitTemplateNode.ts:484).
+  // `templates()` is the signal CALL form per RESEARCH A7 (signal-era
+  // `input<T>()` idiom, NOT decorator `@Input()`).
+  const dynKey = node.slotName === '' ? 'defaultSlot' : node.slotName;
+  const mergedTplRef = `(${tplField} ?? templates()?.['${dynKey}'])`;
+  const outletTag = `<ng-container *ngTemplateOutlet="${mergedTplRef}${ctxSuffix}" />`;
 
   if (!hasFallback && presence === 'always') {
     // Bare *ngTemplateOutlet (TemplateRef may be undefined; Angular renders nothing).

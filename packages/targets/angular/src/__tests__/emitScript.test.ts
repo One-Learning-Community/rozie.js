@@ -12,8 +12,13 @@ import { dirname, resolve } from 'node:path';
 import { parse } from '../../../../core/src/parse.js';
 import { lowerToIR } from '../../../../core/src/ir/lower.js';
 import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
+import type {
+  IRComponent,
+  TemplateNode,
+  TemplateSlotInvocationIR,
+} from '../../../../core/src/ir/types.js';
 import { emitScript } from '../emit/emitScript.js';
+import { emitSlotInvocation } from '../emit/emitSlotInvocation.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '../../../../..');
@@ -211,5 +216,124 @@ $watch(() => $props.open, () => { console.log('fired') })
     const ir = loadIR('Counter');
     const { imports } = emitScript(ir);
     expect(imports.has('effect')).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 07.3.2 Plan 03 — §templates-merge intake + binding
+//
+// Producer-side dynamic-name slot intake: every Angular component that
+// declares slots accepts a signal-era `templates = input<Record<string,
+// TemplateRef<unknown>> | undefined>(undefined);` field (NOT decorator
+// `@Input()` per RESEARCH A7). The producer-side intake closes SC#3 (dogfood
+// ModalConsumer Modal 2 "Dynamic header via slotName" silently dropped in
+// Angular).
+//
+// D-02 static-wins invariant: at each *ngTemplateOutlet binding the merge
+// expression `(<X>Tpl ?? templates()?.['<x>'])` places the `@ContentChild`
+// static-name ref on the LEFT and the dynamic `templates()` signal lookup on
+// the RIGHT, so the static-name path wins by `??` left-precedence + Angular's
+// `ngAfterContentInit` lifecycle ordering (Assumption A5).
+//
+// D-05 byte-equivalence invariant: gated on `ir.slots.length > 0` so
+// non-slotted components (Counter, SearchInput, Dropdown) emit byte-identical
+// output before and after Plan 03.
+// ---------------------------------------------------------------------------
+
+describe('emitScript — §templates-merge intake (Phase 07.3.2 D-SV-16 port, A7 signal-era)', () => {
+  it('Modal (slotted) class body contains `templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);`', () => {
+    const ir = loadIR('Modal');
+    const { classBody } = emitScript(ir);
+    expect(classBody).toContain(
+      'templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);',
+    );
+  });
+
+  it('Modal (slotted) class body does NOT contain `@Input() templates` (A7 signal-form override of CONTEXT.md decorator recommendation)', () => {
+    const ir = loadIR('Modal');
+    const { classBody } = emitScript(ir);
+    expect(classBody).not.toMatch(/@Input\(\)\s+templates/);
+  });
+
+  it('Counter (non-slotted) emits NO `templates = input<...>` field (D-05 byte-equivalence)', () => {
+    const ir = loadIR('Counter');
+    const { classBody } = emitScript(ir);
+    expect(classBody).not.toMatch(/templates\s*=\s*input</);
+  });
+
+  it('TodoList (slotted) class body contains the `templates = input<...>` intake', () => {
+    const ir = loadIR('TodoList');
+    const { classBody } = emitScript(ir);
+    expect(classBody).toContain(
+      'templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);',
+    );
+  });
+
+  it('Modal (slotted) collector includes `input` import (defensive — slotted components always need `input` to call `input<T>()` for templates)', () => {
+    const ir = loadIR('Modal');
+    const { imports } = emitScript(ir);
+    expect(imports.has('input')).toBe(true);
+  });
+});
+
+describe('emitSlotInvocation — §templates-merge binding (Phase 07.3.2 D-02 static-wins, A7 signal call)', () => {
+  // Synthetic slot-invocation node helper. Mirrors the shape produced by
+  // lowerToIR for `<slot name="header" />` references inside a producer
+  // template body. node.fallback / args default to empty.
+  function makeSlotInvocation(slotName: string): TemplateSlotInvocationIR {
+    return {
+      type: 'slot-invocation',
+      slotName,
+      args: [],
+      fallback: [] as TemplateNode[],
+      context: undefined,
+    } as TemplateSlotInvocationIR;
+  }
+
+  function makeCtx(ir: IRComponent) {
+    return {
+      ir,
+      emitChildren: (_children: TemplateNode[]) => '',
+    };
+  }
+
+  it('Modal header-slot binding merges `(headerTpl ?? templates()?.[\'header\'])` at *ngTemplateOutlet (inline form per A7 signal call)', () => {
+    const ir = loadIR('Modal');
+    const out = emitSlotInvocation(makeSlotInvocation('header'), makeCtx(ir));
+    // Inline form (Pitfall 3 not triggered) — matches the canonical D-SV-16
+    // shape adapted for Angular's signal-call `templates()` read.
+    expect(out).toContain(
+      `*ngTemplateOutlet="(headerTpl ?? templates()?.['header'])"`,
+    );
+  });
+
+  it('Modal footer-slot binding merges `(footerTpl ?? templates()?.[\'footer\'])` at *ngTemplateOutlet', () => {
+    const ir = loadIR('Modal');
+    const out = emitSlotInvocation(makeSlotInvocation('footer'), makeCtx(ir));
+    expect(out).toContain(
+      `*ngTemplateOutlet="(footerTpl ?? templates()?.['footer'])"`,
+    );
+  });
+
+  it('Modal default-slot binding uses synthetic `defaultSlot` key (refineSlotTypes.ts:24): `(defaultTpl ?? templates()?.[\'defaultSlot\'])`', () => {
+    const ir = loadIR('Modal');
+    const out = emitSlotInvocation(makeSlotInvocation(''), makeCtx(ir));
+    // tplField for default slot is `defaultTpl` (slotFieldName('') === 'defaultTpl');
+    // dynKey is the synthetic `defaultSlot` ref name.
+    expect(out).toContain(
+      `*ngTemplateOutlet="(defaultTpl ?? templates()?.['defaultSlot'])"`,
+    );
+  });
+
+  it('Modal header-slot binding still emits @ContentChild static-name path on LEFT of `??` (D-02 invariant)', () => {
+    const ir = loadIR('Modal');
+    const out = emitSlotInvocation(makeSlotInvocation('header'), makeCtx(ir));
+    // Static ref MUST appear before `??`; dynamic templates() MUST appear after.
+    const match = out.match(
+      /\*ngTemplateOutlet="\((\w+Tpl)\s*\?\?\s*templates\(\)\?\.\['([^']+)'\]\)/,
+    );
+    expect(match).not.toBeNull();
+    expect(match![1]).toBe('headerTpl');
+    expect(match![2]).toBe('header');
   });
 });
