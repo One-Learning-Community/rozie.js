@@ -64,6 +64,20 @@
         <lang.inspectionSuppressor language="JavaScript"
             implementationClass="js.rozie.intellij.inspection.RozieJSInspectionSuppressor"/>
 
+        <!-- Plan 08.2-09: closes P1-UAT-06 (style unused-selector). Same
+             template as the Plan 08 JS suppressor — Pitfall 2 guarded
+             (RozieContextCheck.isRozieContext) + per-block dispatched
+             (STYLE_BODY only) + narrow allow-list (CssUnusedSymbol). SCSS +
+             Less mirror entries cover <style lang="scss"> / <style lang="less">
+             blocks — RozieMultiHostInjector lines 124-128 already injects per
+             lang= attribute. -->
+        <lang.inspectionSuppressor language="CSS"
+            implementationClass="js.rozie.intellij.inspection.RozieCssInspectionSuppressor"/>
+        <lang.inspectionSuppressor language="SCSS"
+            implementationClass="js.rozie.intellij.inspection.RozieCssInspectionSuppressor"/>
+        <lang.inspectionSuppressor language="LESS"
+            implementationClass="js.rozie.intellij.inspection.RozieCssInspectionSuppressor"/>
+
         <xml.attributeDescriptorsProvider
             implementation="js.rozie.intellij.xml.RozieAttributeDescriptorsProvider"/>
 
