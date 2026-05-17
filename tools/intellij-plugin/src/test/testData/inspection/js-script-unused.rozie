@@ -1,0 +1,17 @@
+<rozie name="JsScriptUnused">
+<data>{ count: 0 }</data>
+<script>
+function increment() {
+  $data.count = $data.count + 1;
+}
+
+function decrement() {
+  $data.count = $data.count - 1;
+}
+
+const helper = 42;
+</script>
+<template>
+  <div>{{ $data.count }}</div>
+</template>
+</rozie>
