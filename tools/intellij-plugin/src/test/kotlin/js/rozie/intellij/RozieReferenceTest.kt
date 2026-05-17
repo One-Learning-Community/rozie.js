@@ -1,7 +1,6 @@
 package js.rozie.intellij
 
 import com.intellij.lang.injection.InjectedLanguageManager
-import com.intellij.lang.javascript.psi.JSProperty
 import com.intellij.lang.javascript.psi.JSReferenceExpression
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.psi.xml.XmlAttribute
@@ -88,23 +87,26 @@ class RozieReferenceTest : BasePlatformTestCase() {
         )
         val resolved = ref!!.resolve()
         assertNotNull(
-            "RoziePropsReference.resolve() returned null for `\$props.value`; expected the " +
-                "JSProperty for `value:` inside the <props> block of the same .rozie file",
+            "RoziePropsReference.resolve() returned null for `\$props.value`; expected " +
+                "the `value:` key inside the <props> block of the same .rozie file " +
+                "(either a JSProperty, or a JSLabeledStatement's labelIdentifier — " +
+                "the latter is the actual shape `{ key: value }` parses to at JS " +
+                "file top-level, see RoziePropsReference.findJsKeyByName docs)",
             resolved,
         )
-        assertTrue(
-            "Resolved target was ${resolved?.javaClass?.name} instead of JSProperty",
-            resolved is JSProperty,
+        assertEquals(
+            "Resolved target should carry the accessed name `value`",
+            "value",
+            resolvedKeyName(resolved!!),
         )
-        assertEquals("value", (resolved as JSProperty).name)
-        // Confirm the resolved JSProperty's top-level file is the same .rozie host
+        // Confirm the resolved element's top-level file is the same .rozie host
         // file we configured — the resolution crossed an injection boundary but
         // stayed within one host file. Use getTopLevelFile to walk back from the
         // injected JS PsiFile to the host RozieFile.
         val ilm = InjectedLanguageManager.getInstance(project)
         val resolvedTopLevelFile = ilm.getTopLevelFile(resolved.containingFile) ?: resolved.containingFile
         assertEquals(
-            "Resolved JSProperty's top-level host file should match the test fixture",
+            "Resolved JS-key's top-level host file should match the test fixture",
             myFixture.file.name,
             resolvedTopLevelFile.name,
         )
@@ -119,14 +121,27 @@ class RozieReferenceTest : BasePlatformTestCase() {
         val resolved = ref!!.resolve()
         assertNotNull(
             "RozieDataReference.resolve() returned null for `\$data.count`; expected the " +
-                "JSProperty for `count:` inside the <data> block",
+                "`count:` key inside the <data> block (JSProperty OR JSLabeledStatement's " +
+                "labelIdentifier — see RoziePropsReference.findJsKeyByName docs)",
             resolved,
         )
-        assertTrue(
-            "Resolved target was ${resolved?.javaClass?.name} instead of JSProperty",
-            resolved is JSProperty,
+        assertEquals(
+            "Resolved target should carry the accessed name `count`",
+            "count",
+            resolvedKeyName(resolved!!),
         )
-        assertEquals("count", (resolved as JSProperty).name)
+    }
+
+    /**
+     * Pull the "key name" string off whichever shape the resolver returned —
+     * [JSProperty] yields .name; [JSLabeledStatement] yields .label; anything
+     * else (the labelIdentifier leaf element returned by findJsKeyByName)
+     * yields its text (which IS the identifier name, e.g. `value`).
+     */
+    private fun resolvedKeyName(e: com.intellij.psi.PsiElement): String = when (e) {
+        is com.intellij.lang.javascript.psi.JSProperty -> e.name ?: ""
+        is com.intellij.lang.javascript.psi.JSLabeledStatement -> e.label ?: ""
+        else -> e.text
     }
 
     // === Task 1 / Behavior 3: $refs.X resolves into <template> ref="X" attribute ===

@@ -68,5 +68,17 @@
                    implementationClass="js.rozie.intellij.highlighting.RozieAnnotator"/>
         <annotator language="JavaScript"
                    implementationClass="js.rozie.intellij.highlighting.RozieJsAnnotator"/>
+
+        <!-- Plan 08.2-05: SC-5 cross-block PsiReferenceContributor — wires
+             $props.X / $data.X / $refs.X Go-to-Declaration / Find-Usages /
+             Rename to declarations in sibling SFC blocks. Registered for
+             language="JavaScript" (NOT "Rozie") per 08.2-RESEARCH Pitfall 3:
+             the JSReferenceExpressions we match live in INJECTED JS PSI, not
+             in host Rozie PSI. Vue's VueJSReferenceContributor uses the same
+             pattern. Pitfall 2 mitigation via RozieContextCheck.isRozieContext
+             short-circuit; Pitfall 5 mitigation via CachedValuesManager cache
+             wrapping inside each reference's multiResolve. -->
+        <psi.referenceContributor language="JavaScript"
+                                  implementation="js.rozie.intellij.references.RozieJSReferenceContributor"/>
     </extensions>
 </idea-plugin>

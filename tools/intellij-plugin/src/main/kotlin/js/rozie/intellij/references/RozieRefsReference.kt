@@ -11,7 +11,6 @@ import com.intellij.psi.util.PsiModificationTracker
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.psi.xml.XmlAttribute
 import js.rozie.intellij.lexer.RozieTokenTypes
-import js.rozie.intellij.parser.RozieRootBlock
 
 /**
  * Cross-block PsiReference for `$refs.X` access — resolves the accessed name `X`
@@ -30,20 +29,23 @@ import js.rozie.intellij.parser.RozieRootBlock
 class RozieRefsReference(
     element: JSReferenceExpression,
     rangeInElement: TextRange,
-    private val host: RozieRootBlock,
     private val accessedName: String,
 ) : PsiReferenceBase.Poly<JSReferenceExpression>(element, rangeInElement, false) {
 
     override fun multiResolve(incompleteCode: Boolean): Array<ResolveResult> {
+        // PSI-leak avoidance: the cache lambda MUST NOT close over a PSI field.
+        // See [RoziePropsReference.multiResolve] for the full rationale.
         return CachedValuesManager.getCachedValue(element) {
+            val resolved = doResolve()
             CachedValueProvider.Result.create(
-                doResolve(),
+                resolved,
                 PsiModificationTracker.MODIFICATION_COUNT,
             )
         }
     }
 
     private fun doResolve(): Array<ResolveResult> {
+        val host = RoziePropsReference.resolveHost(element) ?: return ResolveResult.EMPTY_ARRAY
         val targetRange = RoziePropsReference.findBlockBodyRange(host, RozieTokenTypes.TEMPLATE_BODY)
             ?: return ResolveResult.EMPTY_ARRAY
         val targetHtmlFile = RoziePropsReference.findInjectedFile(host, targetRange, "HTML")
