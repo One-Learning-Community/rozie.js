@@ -197,7 +197,15 @@ describe('rewriteRozieIdentifiers (React)', () => {
     };
     rewriteRozieIdentifiers(program, syntheticIR as IRComponent);
     const out = generate(program).code;
-    expect(out).toContain("(props.renderHeader ?? props.slots?.['header'])");
+    // The rewriter produces a ParenthesizedExpression wrapping a LogicalExpression
+    // of two MemberExpressions; default @babel/generator string-literal output
+    // uses double-quotes for the bracket-access key. The emitter pipeline
+    // (emitScript.ts) uses the same default options, so this matches the
+    // production output shape for any future component with a $slots.X check
+    // inside a <listeners> when: or computed body. The dist-parity Modal.tsx
+    // fixture's existing single-quote `'header'` form at L83 comes from
+    // emitSlotInvocation.ts's hand-built string template, NOT from this rewriter.
+    expect(out).toContain('(props.renderHeader ?? props.slots?.["header"])');
     expect(out).not.toMatch(/&&\s*props\.renderHeader\b/);
   });
 

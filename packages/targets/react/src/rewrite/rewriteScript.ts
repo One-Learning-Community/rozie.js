@@ -14,7 +14,7 @@
  *   - `$data.foo += 1`                    → `setFoo(prev => prev + 1)`
  *   - `$data.foo.bar = X` nested write    → emit ROZ521, leave AST unchanged (Pitfall 7)
  *   - `$refs.foo` read                    → `foo.current`
- *   - `$slots.foo` (boolean check)        → `props.renderFoo`    (Plan 04-03 will refine boolean-context to `!!`)
+ *   - `$slots.foo` (boolean check)        → `(props.renderFoo ?? props.slots?.['foo'])`  (Phase 07.3.2 Plan 08 — merge guard with dynamic-name fallback; mirrors rewriteTemplateExpression)
  *   - `$emit('search', q)`                → `props.onSearch?.(q)`  (camelCase + on-prefix + optional-chain)
  *
  * `$onMount`/`$onUnmount`/`$onUpdate` calls are NOT mutated by this pass —
@@ -252,9 +252,29 @@ export function rewriteRozieIdentifiers(
         return;
       }
       if (obj.name === '$slots' && slotNames.has(prop.name)) {
-        // $slots.foo → props.renderFoo (Plan 04-03 may layer `!!` for boolean ctx)
-        path.node.object = t.identifier('props');
-        path.node.property = t.identifier('render' + capitalize(prop.name));
+        // Phase 07.3.2 Plan 08 (F-07.3.2-05-A) — script-context mirror of the
+        // template rewriter. $slots.foo lowers to:
+        //   (props.renderFoo ?? props.slots?.['foo'])
+        // so listener `when:` conditions, computed bodies, and any other
+        // $slots.X check site agree with the template-side guard and the
+        // canonical invocation-site merge at emitSlotInvocation.ts:231.
+        // See rewriteTemplateExpression.ts for the full rationale.
+        const renderName = 'render' + capitalize(prop.name);
+        const fieldKey = prop.name;
+        const merged = t.parenthesizedExpression(
+          t.logicalExpression(
+            '??',
+            t.memberExpression(t.identifier('props'), t.identifier(renderName)),
+            t.optionalMemberExpression(
+              t.memberExpression(t.identifier('props'), t.identifier('slots')),
+              t.stringLiteral(fieldKey),
+              true, // computed
+              true, // optional
+            ),
+          ),
+        );
+        path.replaceWith(merged);
+        path.skip();
         return;
       }
     },

@@ -10,7 +10,7 @@
  *   - `$props.step`  (non-model) → `props.step`
  *   - `$data.foo`                → `foo`          (bare; useState local)
  *   - `$refs.foo`                → `foo.current`
- *   - `$slots.foo` (boolean ctx) → `props.renderFoo` (caller may layer `!!` for booleans)
+ *   - `$slots.foo` (boolean ctx) → `(props.renderFoo ?? props.slots?.['foo'])` (Phase 07.3.2 Plan 08 — merge guard with dynamic-name fallback)
  *   - `$emit('foo', x)` call     → `props.onFoo?.(x)` (camelCase + on-prefix + optional-chain)
  *
  * Inputs are deep-cloned BEFORE traversal so the IR's referential preservation
@@ -37,7 +37,18 @@ const traverse: TraverseFn =
     ? (_traverse as TraverseFn)
     : ((_traverse as unknown as { default: TraverseFn }).default);
 
-const GEN_OPTS: GeneratorOptions = { retainLines: false, compact: false };
+// Phase 07.3.2 Plan 08 — jsescOption: { quotes: 'single' } so that newly
+// synthesised string literals (e.g., the `'foo'` key inside
+// `props.slots?.['foo']` from the $slots.X merge rewrite at L151+) match the
+// single-quote style emitSlotInvocation.ts already uses at its hand-built
+// fieldRef (emitSlotInvocation.ts:230-231). Keeping both producers in the
+// same quote style means the dist-parity Modal.tsx fixture is internally
+// consistent at both the GUARD site and the INVOCATION site.
+const GEN_OPTS: GeneratorOptions = {
+  retainLines: false,
+  compact: false,
+  jsescOption: { quotes: 'single' },
+};
 
 function flattenInlineCode(code: string): string {
   return code.replace(/\s*\n\s*/g, ' ').replace(/[ \t]+/g, ' ').trim();
@@ -149,9 +160,35 @@ export function rewriteTemplateExpression(
         return;
       }
       if (obj.name === '$slots' && slotNames.has(prop.name)) {
-        // $slots.foo → props.renderFoo (caller layers `!!` for boolean ctx)
-        path.node.object = t.identifier('props');
-        path.node.property = t.identifier('render' + capitalize(prop.name));
+        // Phase 07.3.2 Plan 08 (F-07.3.2-05-A) — $slots.foo lowers to the
+        // MERGED dynamic-fallback shape:
+        //   (props.renderFoo ?? props.slots?.['foo'])
+        // so r-if guards (and any other truthy check on $slots.foo) evaluate
+        // truthy when ONLY a dynamic-name slot fill is present (the consumer
+        // passed `slots={{ [slotName]: () => ... }}` with no static-name fill).
+        //
+        // This mirrors the canonical merge shape Plan 01 already emits at the
+        // slot INVOCATION site (emitSlotInvocation.ts:231). The two layers
+        // (guard + invocation) MUST agree — before this plan, the rewriter
+        // produced a bare `props.renderFoo` and the Modal 2 dynamic-fill cell
+        // in tests/visual-regression/specs/modal-consumer-close.spec.ts failed
+        // because `(undefined || undefined)` short-circuited the <header> guard.
+        const renderName = 'render' + capitalize(prop.name);
+        const fieldKey = prop.name;
+        const merged = t.parenthesizedExpression(
+          t.logicalExpression(
+            '??',
+            t.memberExpression(t.identifier('props'), t.identifier(renderName)),
+            t.optionalMemberExpression(
+              t.memberExpression(t.identifier('props'), t.identifier('slots')),
+              t.stringLiteral(fieldKey),
+              true, // computed (bracket-access)
+              true, // optional (?.)
+            ),
+          ),
+        );
+        path.replaceWith(merged);
+        path.skip();
         return;
       }
     },
