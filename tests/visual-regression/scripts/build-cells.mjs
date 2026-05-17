@@ -11,7 +11,7 @@
  * (vite.preview.config.ts) then serves the unified `dist/` on port 4180.
  */
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, copyFileSync, rmSync } from 'node:fs';
+import { mkdirSync, copyFileSync, readdirSync, rmSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -58,22 +58,49 @@ const REFERENCE_BASENAMES = [
 // don't trip on leftover artifacts from a prior visual-regression CI run
 // on the same runner cache).
 function cleanupCrossTreeAngularArtifacts() {
-  for (const base of REFERENCE_BASENAMES) {
-    rmSync(resolve(EXAMPLES_DIR, `${base}.rozie.ts`), { force: true });
+  // Glob `examples/*.rozie.ts` (Angular disk-cache artefacts) — keeps cleanup
+  // in sync with new fixtures/demos automatically. Previously this was driven
+  // by REFERENCE_BASENAMES alone, which missed transitively-walked components
+  // like Table.rozie (composed by examples/demos/TableDemo.rozie). The walk
+  // happens via `RozieOptions.prebuildExtraRoots: [examplesRoot]`, so any
+  // .rozie file the Angular target reaches lands a sibling .rozie.ts here.
+  try {
+    for (const entry of readdirSync(EXAMPLES_DIR)) {
+      if (entry.endsWith('.rozie.ts')) {
+        rmSync(resolve(EXAMPLES_DIR, entry), { force: true });
+      }
+    }
+  } catch {
+    // examples dir always exists in a checkout — defensive only
   }
   // Cross-rozie composition shims at examples/ root (referenced from the 8
   // reference components — Counter and CardHeader by Card/Modal compositions;
-  // Dropdown by examples/demos/DropdownDemo's `../Dropdown.rozie` reference).
+  // Dropdown by examples/demos/DropdownDemo's `../Dropdown.rozie` reference;
+  // Table by examples/demos/TableDemo's `../Table.rozie` reference).
   rmSync(resolve(EXAMPLES_DIR, 'Counter.ts'), { force: true });
   rmSync(resolve(EXAMPLES_DIR, 'CardHeader.ts'), { force: true });
   rmSync(resolve(EXAMPLES_DIR, 'Dropdown.ts'), { force: true });
+  rmSync(resolve(EXAMPLES_DIR, 'Table.ts'), { force: true });
   // Demo-folder cross-tree artifacts. The Angular sub-build walks
   // `examples/demos/` as part of `prebuildExtraRoots: [examplesRoot]` and
   // emits `<DemoName>.rozie.ts` alongside the source. Leftover files break
   // the lit/solid sub-builds the same way the top-level ones do (cross-tree
   // imports of @angular/* from emitted Angular sources).
+  //
+  // Glob all `*.rozie.ts` files in `examples/demos/` so the cleanup keeps up
+  // with new demos automatically (D-07.3.2-05-B fix — previously this list
+  // was hand-maintained and missed `TableDemo.rozie.ts`, which broke the lit
+  // sub-build because the Angular-emitted file imports `@angular/core`).
   const DEMOS_DIR = resolve(EXAMPLES_DIR, 'demos');
-  rmSync(resolve(DEMOS_DIR, 'DropdownDemo.rozie.ts'), { force: true });
+  try {
+    for (const entry of readdirSync(DEMOS_DIR)) {
+      if (entry.endsWith('.rozie.ts')) {
+        rmSync(resolve(DEMOS_DIR, entry), { force: true });
+      }
+    }
+  } catch {
+    // demos dir may not exist in some checkouts — ignore
+  }
 }
 
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'];
