@@ -1,0 +1,51 @@
+<!--
+  Visual-regression rig demo for the Lit first-paint scoped-slot ctx wiring
+  spec (tests/visual-regression/specs/lit-scoped-fill-firstpaint.spec.ts,
+  RESEARCH A5).
+
+  Consumer-side scoped slot fill: `<template #header="{ close }">` captures
+  the `close` callback from the producer's scoped header slot. In Lit, the
+  emitted button gets a `slot="header"` attribute so it projects through
+  the producer's shadow-DOM header `<slot>`.
+
+  The spec verifies:
+    1. `button[slot="header"]` exists in the consumer's mount root
+    2. Its text reads "×" (basic projection works)
+    3. Visual diff against `lit-scoped-fill-firstpaint.png` shows no
+       flicker / no missing-ctx placeholder (the race observeRozieSlotCtx
+       guards against would leave the button absent or text empty)
+
+  Closes Plan 07.2-06 follow-up surfaced by the spec's Wave-1 .fixme
+  gate (now removed).
+-->
+<rozie name="LitScopedFillFirstpaintDemo">
+
+<components>
+{
+  LitScopedFillFirstpaintDemoProducer: './LitScopedFillFirstpaintDemoProducer.rozie',
+}
+</components>
+
+<template>
+<LitScopedFillFirstpaintDemoProducer>
+  <template #header="{ close }">
+    <button type="button" @click="close()">×</button>
+  </template>
+  Card body content
+</LitScopedFillFirstpaintDemoProducer>
+</template>
+
+<style>
+button {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+  background: #fff;
+  cursor: pointer;
+  font: 16px / 1 system-ui, sans-serif;
+}
+</style>
+
+</rozie>

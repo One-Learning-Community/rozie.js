@@ -1,0 +1,56 @@
+<!--
+  Minimal scoped-slot producer for the Lit first-paint ctx-wiring spec
+  (tests/visual-regression/specs/lit-scoped-fill-firstpaint.spec.ts).
+
+  Declares ONE named slot 'header' exposing a `close` callback via the
+  `:close="close"` scoped-slot bind. The body slot exists too so the
+  filled card has visible content for the screenshot.
+
+  Lit-specific concern (RESEARCH A5): the consumer's `<template #header="{ close }">`
+  fill must capture the ctx via `observeRozieSlotCtx` on first paint —
+  no flicker, no `undefined` reference. This producer's simple shape makes
+  the screenshot deterministic so a race would be visible as a missing
+  button.
+-->
+<rozie name="LitScopedFillFirstpaintDemoProducer">
+
+<script>
+function close() {
+  // No-op for the test — the spec only verifies the close FN reference is
+  // wired into the consumer's scoped fill, not that clicking it does
+  // anything observable.
+}
+</script>
+
+<template>
+<div class="scoped-fill-card">
+  <header><slot name="header" :close="close" /></header>
+  <div class="body"><slot>body</slot></div>
+</div>
+</template>
+
+<style>
+.scoped-fill-card {
+  display: flex;
+  flex-direction: column;
+  width: 240px;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  border-radius: 6px;
+  background: #fff;
+  font: 14px system-ui, sans-serif;
+  overflow: hidden;
+}
+.scoped-fill-card header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 8px 12px;
+  background: #f5f5f5;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+}
+.scoped-fill-card .body {
+  padding: 16px;
+}
+</style>
+
+</rozie>

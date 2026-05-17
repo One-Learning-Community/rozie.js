@@ -1,0 +1,42 @@
+<!--
+  Visual-regression rig producer for DynamicSlotNameDemo.
+
+  Mirrors tests/slot-matrix/fixtures/consumer-dynamic-name/producer.rozie
+  but wraps each named slot in a `<div data-rozie-slot-name="…">` shell so
+  the dynamic-slot-name spec can locate each slot's projected content via
+  the data attribute (independent of class hashing / shadow-DOM differences
+  across the 6 targets).
+
+  The producer declares two named slots ('a' and 'b') with default text;
+  the consumer in DynamicSlotNameDemo.rozie uses `<template #[$data.slotName]>`
+  to dynamically project a single fill into whichever slot slotName names.
+-->
+<rozie name="DynamicSlotNameDemoProducer">
+
+<template>
+<div class="dyn-slot-producer">
+  <div data-rozie-slot-name="a"><slot name="a">A default</slot></div>
+  <div data-rozie-slot-name="b"><slot name="b">B default</slot></div>
+</div>
+</template>
+
+<style>
+.dyn-slot-producer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 6px;
+  font: 14px system-ui, sans-serif;
+  background: #fff;
+  width: 240px;
+}
+.dyn-slot-producer > div {
+  padding: 4px 8px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.03);
+}
+</style>
+
+</rozie>

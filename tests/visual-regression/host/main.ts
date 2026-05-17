@@ -24,6 +24,14 @@ export const EXAMPLES = [
   'CardHeader',
   // Phase 07.2 Plan 06 — ModalConsumer dogfood mount (consumer-side fills).
   'ModalConsumer',
+  // Phase 07.2 Plan 06 follow-ups (closed post-Phase 07.3.2.1):
+  // standalone demos used by the dynamic-slot-name + lit-scoped-fill-firstpaint
+  // specs to exercise runtime behaviors not covered by the matrix screenshots.
+  // No canonical examples/<Name>.rozie sibling exists for these — the loader
+  // falls through to `examples/demos/<Name>Demo.rozie` only. The tag-naming
+  // convention still applies: LIT_TAGS[example] + '-demo' = the demo's tag.
+  'DynamicSlotName',
+  'LitScopedFillFirstpaint',
 ] as const;
 
 export type Example = (typeof EXAMPLES)[number];
@@ -50,6 +58,8 @@ export const LIT_TAGS: Record<Example, string> = {
   Card: 'rozie-card',
   CardHeader: 'rozie-card-header',
   ModalConsumer: 'rozie-modal-consumer',
+  DynamicSlotName: 'rozie-dynamic-slot-name',
+  LitScopedFillFirstpaint: 'rozie-lit-scoped-fill-firstpaint',
 };
 
 export interface HostQuery {
@@ -86,6 +96,11 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   Card: { title: 'Card Title' },
   CardHeader: { title: 'Card Header' },
   ModalConsumer: { title: 'Confirm action' },
+  // Both follow-up demos are self-contained — no props needed; the consumer's
+  // `<data>` block holds all reactive state (slotName for DynamicSlotName;
+  // none for LitScopedFillFirstpaint).
+  DynamicSlotName: {},
+  LitScopedFillFirstpaint: {},
 };
 
 /** Parse `?example=&target=` from the current URL, falling back to defaults. */

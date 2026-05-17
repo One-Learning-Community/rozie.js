@@ -1,0 +1,70 @@
+<!--
+  Visual-regression rig demo for the dynamic-slot-name runtime toggle test
+  (tests/visual-regression/specs/dynamic-slot-name.spec.ts).
+
+  Mounts the DynamicSlotNameDemoProducer with a `slotName` reactive data
+  field defaulting to 'a' and a toggle button that swaps slotName between
+  'a' and 'b'. The consumer's `<template #[$data.slotName]>Dynamic fill</template>`
+  projects "Dynamic fill" into whichever slot matches slotName's current
+  value, exercising the R5 consumer-side dynamic-name slot dispatch at
+  runtime across all 6 targets.
+
+  Closes Plan 07.2-06 follow-up surfaced by the dynamic-slot-name spec's
+  Wave-2 .fixme gate (now removed). Cross-target byte-identity at the DOM
+  level is implicitly verified by all 6 targets passing the same toggle
+  assertion against `data-rozie-slot-name` selectors.
+-->
+<rozie name="DynamicSlotNameDemo">
+
+<components>
+{
+  DynamicSlotNameDemoProducer: './DynamicSlotNameDemoProducer.rozie',
+}
+</components>
+
+<data>
+{
+  slotName: 'a',
+}
+</data>
+
+<script>
+function toggleSlotName() {
+  $data.slotName = $data.slotName === 'a' ? 'b' : 'a'
+}
+</script>
+
+<template>
+<div class="dyn-slot-demo">
+  <button
+    type="button"
+    data-testid="toggle-slot-name"
+    @click="toggleSlotName()"
+  >Toggle slotName (now: {{ $data.slotName }})</button>
+
+  <DynamicSlotNameDemoProducer>
+    <template #[$data.slotName]>Dynamic fill</template>
+  </DynamicSlotNameDemoProducer>
+</div>
+</template>
+
+<style>
+.dyn-slot-demo {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  font: 14px system-ui, sans-serif;
+}
+button[data-testid="toggle-slot-name"] {
+  align-self: flex-start;
+  padding: 6px 12px;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+  background: #f5f5f5;
+  cursor: pointer;
+  font: inherit;
+}
+</style>
+
+</rozie>

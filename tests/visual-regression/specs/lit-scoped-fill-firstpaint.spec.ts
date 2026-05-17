@@ -31,47 +31,35 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  *   - Visual diff against the per-target baseline shows no flicker / no
  *     "missing ctx" placeholder text
  *
- * BLOCKED (Wave 1 — marked .fixme):
- *   This spec depends on a built `dist/lit/` host that mounts a
- *   `consumer-scoped-fill` route. Wave 1 ships the consumer-scoped-fill
- *   slot-matrix fixture (Plan 07.2-03 Task 3) but does NOT wire it into the
- *   `tests/visual-regression/scripts/build-cells.mjs` host build — that
- *   dogfood-style wiring lands in Plan 07.2-06 alongside the
- *   `examples/ModalConsumer.rozie` integration and the ModalConsumer baseline
- *   regen.
+ * Un-gated 2026-05-17 (post-Phase 07.3.2.1 F-07.3.2-11-A closure): the
+ * scoped-fill ctx wiring works at first paint. Wiring:
  *
- *   The spec is committed as-`.fixme` so the Wave-2 work surfaces it as a
- *   known-pending check rather than silently dropping the RESEARCH A5
- *   verification. Plan 07.2-06 will:
- *     (a) build a `host/lit-scoped-fill-firstpaint.html` route mounting the
- *         consumer-scoped-fill fixture's emitted output
- *     (b) regen the baseline PNG via the pinned Playwright Docker image
- *         (per memory `feedback_vr_linux_baselines`)
- *     (c) remove the `.fixme` gate below
+ *     (a) examples/demos/LitScopedFillFirstpaintDemo.rozie         — consumer
+ *         with `<template #header="{ close }"><button @click="close">×</button></template>`
+ *     (b) examples/demos/LitScopedFillFirstpaintDemoProducer.rozie — producer
+ *         with `<slot name="header" :close="close" />`
+ *     (c) tests/visual-regression/host/main.ts EXAMPLES + LIT_TAGS entries
+ *         so the standard `?example=LitScopedFillFirstpaint&target=lit`
+ *         URL router mounts the demo
+ *     (d) Build-availability gate `dist/lit/host/entry.lit.html`
  *
- * If at any point during Wave 2 a race materializes (consumer-side `<button>`
- * rendered with `this._headerCtx` undefined → ctx-wiring observation lands
- * AFTER the first paint), the resolution path is to add a no-flicker guard
- * in the emitted fill body: `${this._headerCtx ? html`<button …/>` : nothing}`.
- * That fix is mechanically applicable in `emitSlotFiller.ts:wrapWithSlotAttribute`
- * (Plan 07.2-03 deliverable). The Wave-1 design choice is to ship the
- * straight-through wiring and verify empirically in Wave 2 — per the plan's
- * must_haves.truths line 8 ("…if a race is observed, document as a deferred
- * follow-up in 07.2-03-SUMMARY.md").
+ * If at any point a race materializes (consumer-side `<button>` rendered
+ * with `this._headerCtx` undefined → ctx-wiring observation lands AFTER
+ * the first paint), the resolution path is to add a no-flicker guard in
+ * the emitted fill body: `${this._headerCtx ? html`<button …/>` : nothing}`.
+ * That fix is mechanically applicable in `emitSlotFiller.ts:wrapWithSlotAttribute`.
  */
 
 const litHostBuilt = existsSync(
-  resolve(__dirname, '../dist/lit/host/lit-scoped-fill-firstpaint.html'),
+  resolve(__dirname, '../dist/lit/host/entry.lit.html'),
 );
 
-// Wave-1 boundary: .fixme until Plan 07.2-06 wires the consumer-scoped-fill
-// fixture into the visual-regression host build.
 const runner = litHostBuilt ? test : test.fixme;
 
 runner('lit-scoped-fill: first-paint header ctx is wired (RESEARCH A5)', async ({
   page,
 }) => {
-  await page.goto('/lit-scoped-fill-firstpaint.html');
+  await page.goto('/?example=LitScopedFillFirstpaint&target=lit');
   const consumer = page.getByTestId('rozie-mount');
   await expect(consumer).toBeVisible();
   // Header projects through and renders the close button — the most
