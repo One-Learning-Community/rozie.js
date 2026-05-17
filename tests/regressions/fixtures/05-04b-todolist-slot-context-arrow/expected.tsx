@@ -10,7 +10,7 @@ interface ScopedSlotContextProps {
   defaultValue?: unknown[];
   onItemsChange?: (items: unknown[]) => void;
   renderItem?: (ctx: ItemCtx) => ReactNode;
-  slots?: Record<string, (ctx: any) => import('react').ReactNode>;
+  slots?: Record<string, () => import('react').ReactNode>;
 }
 
 export default function ScopedSlotContext(props: ScopedSlotContextProps): JSX.Element {

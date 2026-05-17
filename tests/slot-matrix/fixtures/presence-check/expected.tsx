@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 
 interface PresenceCheckFixtureProps {
   renderAside?: () => ReactNode;
-  slots?: Record<string, (ctx: any) => import('react').ReactNode>;
+  slots?: Record<string, () => import('react').ReactNode>;
 }
 
 export default function PresenceCheckFixture(props: PresenceCheckFixtureProps): JSX.Element {

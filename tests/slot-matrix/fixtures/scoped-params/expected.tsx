@@ -5,7 +5,7 @@ interface ItemCtx { value: any; }
 interface ScopedParamsFixtureProps {
   label?: string;
   renderItem?: (ctx: ItemCtx) => ReactNode;
-  slots?: Record<string, (ctx: any) => import('react').ReactNode>;
+  slots?: Record<string, () => import('react').ReactNode>;
 }
 
 export default function ScopedParamsFixture(_props: ScopedParamsFixtureProps): JSX.Element {

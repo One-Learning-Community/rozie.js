@@ -4,7 +4,7 @@ import Inner from './inner';
 interface WrapperProps {
   renderTitle?: () => ReactNode;
   children?: ReactNode;
-  slots?: Record<string, (ctx: any) => import('react').ReactNode>;
+  slots?: Record<string, () => import('react').ReactNode>;
 }
 
 export default function Wrapper(props: WrapperProps): JSX.Element {

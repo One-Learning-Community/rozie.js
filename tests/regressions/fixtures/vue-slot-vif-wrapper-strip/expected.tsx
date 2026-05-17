@@ -5,7 +5,7 @@ interface PresenceSlotFallbackProps {
   title?: string;
   renderHeader?: () => ReactNode;
   children?: ReactNode;
-  slots?: Record<string, (ctx: any) => import('react').ReactNode>;
+  slots?: Record<string, () => import('react').ReactNode>;
 }
 
 export default function PresenceSlotFallback(_props: PresenceSlotFallbackProps): JSX.Element {

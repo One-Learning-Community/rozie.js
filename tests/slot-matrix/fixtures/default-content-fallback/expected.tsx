@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 
 interface DefaultContentFallbackFixtureProps {
   renderStatus?: () => ReactNode;
-  slots?: Record<string, (ctx: any) => import('react').ReactNode>;
+  slots?: Record<string, () => import('react').ReactNode>;
 }
 
 export default function DefaultContentFallbackFixture(props: DefaultContentFallbackFixtureProps): JSX.Element {
