@@ -165,8 +165,16 @@ export interface AngularDynamicSlotFillerEmission {
   template: string;
   /** Synthetic template-ref name `__dynSlot_<N>` */
   refName: string;
-  /** The rewritten dynamic-name expression (used by the dispatch's lookup) */
+  /** The rewritten dynamic-name expression — TEMPLATE context (Angular auto-scopes class members). */
   keyExpr: string;
+  /**
+   * The rewritten dynamic-name expression — CLASS-BODY context (`this.X()` per
+   * identifier reference). Used by the consumer-side `templates` getter where
+   * Angular's template-scope auto-resolution does not apply. Distinct from
+   * `keyExpr` because template-literal shapes like `` `footer${footerMode()}` ``
+   * cannot tolerate a naive outer `this.` prefix.
+   */
+  classBodyKeyExpr: string;
   /** The fill's params (used to build let-bindings on the dispatcher's context) */
   params: readonly { name: string }[];
 }
@@ -183,5 +191,8 @@ export function emitDynamicSlotFiller(
   const body = ctx.emitChildren(filler.body);
   const template = `<ng-template #${refName}${lets}>${body}</ng-template>`;
   const keyExpr = rewriteTemplateExpression(filler.dynamicNameExpr, ctx.ir);
-  return { template, refName, keyExpr, params: filler.params };
+  const classBodyKeyExpr = rewriteTemplateExpression(filler.dynamicNameExpr, ctx.ir, {
+    prefixThis: true,
+  });
+  return { template, refName, keyExpr, classBodyKeyExpr, params: filler.params };
 }

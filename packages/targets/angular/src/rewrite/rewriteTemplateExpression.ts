@@ -90,6 +90,14 @@ export interface RewriteTemplateOpts {
    * names — only user methods that collided are renamed.
    */
   collisionRenames?: ReadonlyMap<string, string> | undefined;
+  /**
+   * When true, emit class-body-scoped references (`this.X()` instead of `X()`,
+   * `this.headerTpl` instead of `headerTpl`). Used when the rewritten expression
+   * is interpolated into a class-body context — e.g., the dynamic-slot `templates`
+   * getter — where Angular's template-scope auto-resolution does not apply.
+   * Default false (template-binding context).
+   */
+  prefixThis?: boolean;
 }
 
 /**
@@ -103,6 +111,11 @@ export function rewriteTemplateExpression(
   const cloned = t.cloneNode(expr, true, false);
   const loopBindings = opts.loopBindings ?? new Set<string>();
   const collisionRenames = opts.collisionRenames ?? new Map<string, string>();
+  const prefixThis = opts.prefixThis ?? false;
+  const mkRef = (name: string): t.Expression =>
+    prefixThis
+      ? t.memberExpression(t.thisExpression(), t.identifier(name))
+      : t.identifier(name);
 
   const modelProps = new Set(ir.props.filter((p) => p.isModel).map((p) => p.name));
   const nonModelProps = new Set(ir.props.filter((p) => !p.isModel).map((p) => p.name));
@@ -167,13 +180,13 @@ export function rewriteTemplateExpression(
       if (obj.name === '$props') {
         if (modelProps.has(prop.name) || nonModelProps.has(prop.name)) {
           // $props.value → value()  (signal call; no `this.` prefix in templates)
-          path.replaceWith(t.callExpression(t.identifier(prop.name), []));
+          path.replaceWith(t.callExpression(mkRef(prop.name), []));
           path.skip();
         }
         return;
       }
       if (obj.name === '$data' && dataNames.has(prop.name)) {
-        path.replaceWith(t.callExpression(t.identifier(prop.name), []));
+        path.replaceWith(t.callExpression(mkRef(prop.name), []));
         path.skip();
         return;
       }
@@ -181,7 +194,7 @@ export function rewriteTemplateExpression(
         // $refs.foo → foo()?.nativeElement (signal call + optional chain)
         path.replaceWith(
           t.optionalMemberExpression(
-            t.callExpression(t.identifier(prop.name), []),
+            t.callExpression(mkRef(prop.name), []),
             t.identifier('nativeElement'),
             false,
             true,
@@ -195,7 +208,7 @@ export function rewriteTemplateExpression(
           prop.name === ''
             ? 'defaultTpl'
             : `${prop.name}Tpl`;
-        path.replaceWith(t.identifier(tplName));
+        path.replaceWith(mkRef(tplName));
         path.skip();
         return;
       }
@@ -210,20 +223,20 @@ export function rewriteTemplateExpression(
 
       if (obj.name === '$props') {
         if (modelProps.has(prop.name) || nonModelProps.has(prop.name)) {
-          path.replaceWith(t.callExpression(t.identifier(prop.name), []));
+          path.replaceWith(t.callExpression(mkRef(prop.name), []));
           path.skip();
         }
         return;
       }
       if (obj.name === '$data' && dataNames.has(prop.name)) {
-        path.replaceWith(t.callExpression(t.identifier(prop.name), []));
+        path.replaceWith(t.callExpression(mkRef(prop.name), []));
         path.skip();
         return;
       }
       if (obj.name === '$refs' && refNames.has(prop.name)) {
         path.replaceWith(
           t.optionalMemberExpression(
-            t.callExpression(t.identifier(prop.name), []),
+            t.callExpression(mkRef(prop.name), []),
             t.identifier('nativeElement'),
             false,
             true,
@@ -237,7 +250,7 @@ export function rewriteTemplateExpression(
           prop.name === ''
             ? 'defaultTpl'
             : `${prop.name}Tpl`;
-        path.replaceWith(t.identifier(tplName));
+        path.replaceWith(mkRef(tplName));
         path.skip();
         return;
       }
@@ -313,7 +326,7 @@ export function rewriteTemplateExpression(
           // Already a call/assignment — no wrap.
           return;
         }
-        path.replaceWith(t.callExpression(t.identifier(effectiveName), []));
+        path.replaceWith(t.callExpression(mkRef(effectiveName), []));
         path.skip();
       }
     },

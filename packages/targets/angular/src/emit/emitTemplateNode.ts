@@ -385,7 +385,7 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
     };
     const fillerParts: string[] = [];
     const dispatchParts: string[] = [];
-    const dynRefs: { refName: string; keyExpr: string }[] = [];
+    const dynRefs: { refName: string; keyExpr: string; classBodyKeyExpr: string }[] = [];
     let dynIdx = 0;
     for (const filler of node.slotFillers) {
       if (filler.isDynamic) {
@@ -410,7 +410,11 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
           dispatchParts.push(
             `<ng-container *ngTemplateOutlet="templates[${dyn.keyExpr}]"></ng-container>`,
           );
-          dynRefs.push({ refName: dyn.refName, keyExpr: dyn.keyExpr });
+          dynRefs.push({
+            refName: dyn.refName,
+            keyExpr: dyn.keyExpr,
+            classBodyKeyExpr: dyn.classBodyKeyExpr,
+          });
           dynIdx++;
         }
       } else {
@@ -434,16 +438,13 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
       // Append a `templates` getter that maps the user's runtime-key
       // expression to each captured ref. Compose the map entries
       // deterministically from the collected dynRefs (one entry per
-      // dynamic filler). The keyExpr is produced by rewriteTemplateExpression
-      // in TEMPLATE context where Angular's template scoping omits the
-      // `this.` prefix on class members; for the class-body getter we
-      // prepend `this.` to surface the same field via class-instance scope.
-      // The transform is bounded: keyExpr is a Babel-rewritten Angular
-      // template expression, never a free-floating literal; the simple
-      // prefix-add is correct for `slotName()` / `slotName.value` shapes
-      // that map to `this.slotName()` / `this.slotName.value`.
+      // dynamic filler). The class-body getter consumes classBodyKeyExpr
+      // (produced by rewriteTemplateExpression with prefixThis:true) so
+      // each identifier reference is correctly scoped via `this.` —
+      // including template-literal shapes like `` `footer${footerMode()}` ``
+      // where a naive outer prefix would be a syntax error.
       const classScopedEntries = dynRefs
-        .map((r) => `[this.${r.keyExpr}]: this.${r.refName}!`)
+        .map((r) => `[${r.classBodyKeyExpr}]: this.${r.refName}!`)
         .join(', ');
       const getterName = 'templates';
       const getterDecl = `get ${getterName}(): Record<string, TemplateRef<unknown>> {\n    return { ${classScopedEntries} };\n  }`;
