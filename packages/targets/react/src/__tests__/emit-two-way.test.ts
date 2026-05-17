@@ -9,7 +9,7 @@
  * Three behavior cases:
  *   1. $data.X (useState-backed)           → `open={open1} onOpenChange={setOpen1}`
  *   2. camelCase propName                  → `closeOnEscape={flag} onCloseOnEscapeChange={setFlag}`
- *   3. Forwarding $props.X (model:true)    → `open={open} onOpenChange={onOpenChange}`
+ *   3. Forwarding $props.X (model:true)    → `open={open} onOpenChange={setOpen}` (Plan 09 correction — local setter, not bare upstream callback)
  *
  * @experimental
  */
@@ -70,7 +70,15 @@ describe('React twoWayBinding emit — Phase 07.3 Plan 07.3-06', () => {
     expect(jsx).toContain('closeOnEscape={flag} onCloseOnEscapeChange={setFlag}');
   });
 
-  it('case 3: forwarding $props.X (model:true) emits `open={open} onOpenChange={onOpenChange}`', () => {
+  it('case 3: forwarding $props.X (model:true) emits `open={open} onOpenChange={setOpen}` (local setter, not bare onOpenChange)', () => {
+    // Phase 07.3 Plan 09 corrected the original Plan 06 design — the
+    // forwarding setter is the LOCAL useControllableState setter
+    // (`setOpen`), not the bare upstream callback name (`onOpenChange`).
+    // The local setter wires the inner Modal's onOpenChange through the
+    // wrapper's useControllableState, which in turn invokes
+    // `props.onOpenChange` via its `onValueChange` callback — the
+    // canonical Radix/shadcn-style controllable-state forwarding contract.
+    // See packages/targets/react/src/emit/resolveTwoWayTarget.ts comments.
     const ir = lowerInline(`
 <rozie name="WrapperModal">
 <props>{ open: { type: Boolean, model: true } }</props>
@@ -80,7 +88,7 @@ describe('React twoWayBinding emit — Phase 07.3 Plan 07.3-06', () => {
 </rozie>
 `);
     const { jsx } = emit(ir);
-    expect(jsx).toContain('open={open} onOpenChange={onOpenChange}');
+    expect(jsx).toContain('open={open} onOpenChange={setOpen}');
   });
 });
 
@@ -118,7 +126,15 @@ describe('resolveTwoWayTarget helper — Phase 07.3 Plan 07.3-06', () => {
     expect(result).toEqual({ local: 'open1', setter: 'setOpen1' });
   });
 
-  it('resolves $props.X (model:true) → { local: X, setter: onXChange } for forwarding pattern', () => {
+  it('resolves $props.X (model:true) → { local: X, setter: setX } for forwarding pattern (Plan 09 correction)', () => {
+    // Phase 07.3 Plan 09 corrected the original Plan 06 design — the
+    // forwarding setter is the LOCAL useControllableState setter
+    // (`setOpen`), not the bare `onOpenChange` upstream callback.
+    // The local setter wires the inner Modal's onOpenChange through the
+    // wrapper's useControllableState, which forwards via its
+    // `onValueChange` to the upstream `props.onOpenChange`. Bare
+    // `onOpenChange` is not in scope as a free identifier inside the
+    // function body (it lives on `props.onOpenChange`).
     const ir = makeIRWithModelProp('open');
     // Build $props.open
     const expr = t.memberExpression(
@@ -126,7 +142,7 @@ describe('resolveTwoWayTarget helper — Phase 07.3 Plan 07.3-06', () => {
       t.identifier('open'),
     );
     const result = resolveTwoWayTarget(expr, ir);
-    expect(result).toEqual({ local: 'open', setter: 'onOpenChange' });
+    expect(result).toEqual({ local: 'open', setter: 'setOpen' });
   });
 
   it('camelCase propName capitalized correctly in setter', () => {
