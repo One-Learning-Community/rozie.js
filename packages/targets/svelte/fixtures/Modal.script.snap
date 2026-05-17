@@ -9,6 +9,7 @@ interface Props {
   header?: Snippet<[{ close: any }]>;
   children?: Snippet<[{ close: any }]>;
   footer?: Snippet<[{ close: any }]>;
+  snippets?: Record<string, Snippet<[any]>>;
   onclose?: (...args: unknown[]) => void;
 }
 
@@ -18,11 +19,16 @@ let {
   closeOnBackdrop = true,
   lockBodyScroll = true,
   title = '',
-  header,
-  children,
-  footer,
+  header: __headerProp,
+  children: __childrenProp,
+  footer: __footerProp,
+  snippets,
   onclose,
 }: Props = $props();
+
+const header = $derived(__headerProp ?? snippets?.header);
+const children = $derived(__childrenProp ?? snippets?.children);
+const footer = $derived(__footerProp ?? snippets?.footer);
 
 let backdropEl = $state<HTMLElement | undefined>(undefined);
 let dialogEl = $state<HTMLElement | undefined>(undefined);

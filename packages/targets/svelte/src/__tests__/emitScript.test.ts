@@ -151,3 +151,102 @@ describe('emitScript — per-block fixture snapshots (Plan 05-02a Task 1)', () =
     });
   }
 });
+
+// Phase 07.3.1 D-SV-16 — Svelte producer reads consumer-emitted `snippets`
+// prop and merges into named-snippet locals via `$derived`. The consumer-side
+// emitter (emitSlotFiller.ts:174) emits `snippets={{ [expr]: __rozieDynSlot_N }}`
+// for `<template #[dynamic]>` fills; without the producer-side merge the
+// dynamic projection is silently dropped (the destructure only reads bare
+// `header`, never `snippets.header`).
+//
+// These tests construct synthetic single-component .rozie sources via the
+// parser path so the IR is hand-built end-to-end (no fixture coupling). They
+// lock the contract at the @rozie/target-svelte level — independent of the
+// shared snapshot suite which exercises the same code path implicitly via
+// Modal/Dropdown/TodoList .svelte.snap re-blessings.
+function emitScriptFromSrc(src: string, name: string): string {
+  const result = parse(src, { filename: `${name}.rozie` });
+  if (!result.ast) throw new Error(`parse() returned null AST for ${name}`);
+  const lowered = lowerToIR(result.ast, { modifierRegistry: createDefaultRegistry() });
+  if (!lowered.ir) throw new Error(`lowerToIR() returned null IR for ${name}`);
+  return emitScript(lowered.ir).scriptBlock;
+}
+
+describe('snippets-merge (Phase 07.3.1 D-SV-16)', () => {
+  it('Props interface includes snippets?: Record<string, Snippet<[any]>>; when ir.slots is non-empty', () => {
+    const src = `<rozie name="SlottedTwo">
+<template>
+  <div>
+    <slot name="header" />
+    <slot />
+  </div>
+</template>
+</rozie>`;
+    const scriptBlock = emitScriptFromSrc(src, 'SlottedTwo');
+    expect(scriptBlock).toContain('snippets?: Record<string, Snippet<[any]>>;');
+  });
+
+  it('Props destructure renames slot entries and appends snippets + emits $derived merge per slot', () => {
+    const src = `<rozie name="SlottedHeader">
+<template>
+  <div>
+    <slot name="header" />
+  </div>
+</template>
+</rozie>`;
+    const scriptBlock = emitScriptFromSrc(src, 'SlottedHeader');
+    // Rename in destructure.
+    expect(scriptBlock).toContain('header: __headerProp');
+    // snippets entry appended to destructure.
+    expect(scriptBlock).toMatch(/\bsnippets\b[,\s}]/);
+    // $derived merge line spliced after the destructure.
+    expect(scriptBlock).toContain(
+      'const header = $derived(__headerProp ?? snippets?.header);',
+    );
+  });
+
+  it('static-named header wins over snippets?.header via `??` left-precedence (T-07.3.1-14)', () => {
+    // The threat-model precedence rule: `__headerProp ?? snippets?.header`
+    // makes the statically-named consumer fill the more specific binding.
+    const src = `<rozie name="SlottedHeader">
+<template>
+  <div>
+    <slot name="header" />
+  </div>
+</template>
+</rozie>`;
+    const scriptBlock = emitScriptFromSrc(src, 'SlottedHeader');
+    // Specifically assert __headerProp comes BEFORE snippets?.header in the
+    // expression — coalesce evaluates left-to-right.
+    const match = scriptBlock.match(
+      /const header = \$derived\(__headerProp \?\? snippets\?\.header\);/,
+    );
+    expect(match).not.toBeNull();
+  });
+
+  it('default-slot lowers to `children` and gets the same merge treatment', () => {
+    const src = `<rozie name="SlottedDefault">
+<template>
+  <div>
+    <slot />
+  </div>
+</template>
+</rozie>`;
+    const scriptBlock = emitScriptFromSrc(src, 'SlottedDefault');
+    expect(scriptBlock).toContain('children: __childrenProp');
+    expect(scriptBlock).toContain(
+      'const children = $derived(__childrenProp ?? snippets?.children);',
+    );
+  });
+
+  it('no snippets merge when ir.slots is empty — Counter byte-equivalent shape', () => {
+    // Counter has props + state + computed but NO slots. The fix must not
+    // touch it at all — no snippets field, no rename, no $derived merge.
+    const scriptBlock = emitScript(lowerExample('Counter')).scriptBlock;
+    expect(scriptBlock).not.toContain('snippets?: Record<string');
+    expect(scriptBlock).not.toMatch(/__\w+Prop\b/);
+    // Counter's $computed legitimately uses $derived — guard the assertion
+    // against false-positives by checking the slot-merge-specific pattern.
+    expect(scriptBlock).not.toMatch(/\$derived\(__\w+Prop \?\? snippets/);
+  });
+});

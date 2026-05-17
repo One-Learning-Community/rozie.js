@@ -151,6 +151,15 @@ function buildPropsInterfaceFields(ir: IRComponent): string[] {
   const slotLines = buildSlotTypeFields(ir.slots);
   for (const sl of slotLines) lines.push(sl);
 
+  // Phase 07.3.1 D-SV-16 — accept consumer-side dynamic-name snippets map;
+  // merged into named props via $derived in script body. The consumer-side
+  // emitter (emitSlotFiller.ts:174) emits `snippets={{ [expr]: __rozieDynSlot_N }}`
+  // for `<template #[dynamic]>` fills; without this prop the producer destructure
+  // silently drops the dynamic projection.
+  if (ir.slots.length > 0) {
+    lines.push('  snippets?: Record<string, Snippet<[any]>>;');
+  }
+
   // Emit callback-prop declarations: $emit('search', x) was rewritten to
   // onsearch?.(x) by rewriteScript; the corresponding `onsearch?` prop must
   // be declared and destructured. Svelte 5 callback-prop convention is
@@ -207,10 +216,29 @@ function buildPropsDestructureEntries(ir: IRComponent): string[] {
     }
   }
 
-  // Slot prop destructures — bare names. Default slot keys as 'children'.
-  for (const s of ir.slots) {
-    const key = s.name === '' ? 'children' : s.name;
-    entries.push(key);
+  // Slot prop destructures.
+  //
+  // Phase 07.3.1 D-SV-16 — when slots are present, rename each destructured
+  // slot prop to a temp (`header: __headerProp`) so the script body can
+  // declare a `$derived` merge (`const header = $derived(__headerProp ?? snippets?.header)`)
+  // that prefers the statically-named consumer fill but falls back to the
+  // dynamic-name `snippets` map entry. Also destructures `snippets` itself.
+  // When `ir.slots.length === 0` we keep the legacy no-snippets shape — no
+  // rename and no `snippets` entry, so non-slotted components are unaffected.
+  if (ir.slots.length > 0) {
+    for (const s of ir.slots) {
+      const key = s.name === '' ? 'children' : s.name;
+      entries.push(`${key}: __${key}Prop`);
+    }
+    entries.push('snippets');
+  } else {
+    // Default-slot sentinel still maps to `children`; bare names per Svelte
+    // magic-prop convention. (Loop body is unreachable when slots.length === 0
+    // but kept for clarity / future-proofing.)
+    for (const s of ir.slots) {
+      const key = s.name === '' ? 'children' : s.name;
+      entries.push(key);
+    }
   }
 
   // Emits → bare destructure of the all-lowercase callback prop. Matches
@@ -223,6 +251,29 @@ function buildPropsDestructureEntries(ir: IRComponent): string[] {
 }
 
 /**
+ * Phase 07.3.1 D-SV-16 — Emit one `$derived` line per slot that merges the
+ * statically-named consumer fill (via `__<key>Prop`) with the dynamic-name
+ * fill (via `snippets?.<key>`).
+ *
+ * Precedence rule (`__<key>Prop ?? snippets?.<key>`): the statically-named
+ * consumer fill wins when both are present. This matches user intent —
+ * `<template #header=...>` is the more specific binding compared with
+ * `<template #[dynamicName]>` where `dynamicName === 'header'`.
+ *
+ * Returns `[]` when `ir.slots.length === 0` so the helper is a no-op for
+ * non-slotted components (preserving byte-identical output for Counter etc.).
+ */
+function emitSlotDerivedMerges(ir: IRComponent): string[] {
+  if (ir.slots.length === 0) return [];
+  const lines: string[] = [];
+  for (const s of ir.slots) {
+    const key = s.name === '' ? 'children' : s.name;
+    lines.push(`const ${key} = $derived(__${key}Prop ?? snippets?.${key});`);
+  }
+  return lines;
+}
+
+/**
  * Emit the Props interface + destructure block. Returns an empty string when
  * there are no props AND no slots.
  */
@@ -231,6 +282,8 @@ function emitPropsBlock(ir: IRComponent): string {
 
   const fields = buildPropsInterfaceFields(ir);
   const entries = buildPropsDestructureEntries(ir);
+  // Phase 07.3.1 D-SV-16 — per-slot merge lines spliced after the destructure.
+  const mergeLines = emitSlotDerivedMerges(ir);
 
   const interfaceBlock = `interface Props {\n${fields.join('\n')}\n}`;
 
@@ -242,7 +295,8 @@ function emitPropsBlock(ir: IRComponent): string {
     destructure = `let {\n  ${entries.join(',\n  ')},\n}: Props = $props();`;
   }
 
-  return `${interfaceBlock}\n\n${destructure}`;
+  const mergeBlock = mergeLines.length > 0 ? `\n\n${mergeLines.join('\n')}` : '';
+  return `${interfaceBlock}\n\n${destructure}${mergeBlock}`;
 }
 
 /**
