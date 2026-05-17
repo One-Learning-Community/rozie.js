@@ -51,8 +51,10 @@ const EXAMPLES = [
   // Phase 07.2 Plan 06 — ModalConsumer dogfood example added to the 48-cell
   // matrix (now 54 cells = 9 × 6). Linux-rendered baseline ModalConsumer.png
   // is generated via the pinned Playwright Docker image per memory
-  // `feedback_vr_linux_baselines` (the matrix baseline is the Vue render at
-  // /?example=ModalConsumer&target=vue; the other 5 targets diff against it).
+  // `feedback_vr_linux_baselines`. Per D-10, all 6 targets diff against the
+  // SAME shared baseline (collapsed from per-target baselines on 2026-05-17
+  // post-Phase 07.3.2.1 F-07.3.2-11-A closure once empirical byte-identity
+  // across all 6 targets was verified — MD5 0d5d3108053af5b7d264affcae82b43d).
   'ModalConsumer',
 ] as const;
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'] as const;
@@ -100,18 +102,18 @@ for (const example of EXAMPLES) {
       await expect(component).toBeVisible();
       await settleExample(example, page);
       // Baseline keyed by example only (D-10) — all 6 targets diff against
-      // the same Vue-generated `${example}.png` — EXCEPT ModalConsumer,
-      // which is a 3-modal dogfood composition exposing per-target rendering
-      // differences (CSS Modules class hashing in React/Solid affects layout
-      // metrics; Lit's shadow-DOM-bounded custom elements have intrinsically
-      // different bounding boxes; Angular's view-encapsulation attribute
-      // selectors emit different generated CSS). Per-target baselines for
-      // ModalConsumer let each cell verify its own deterministic render.
-      const baselineName =
-        example === 'ModalConsumer'
-          ? `${example}-${target}.png`
-          : `${example}.png`;
-      await expect(component).toHaveScreenshot(baselineName, {
+      // the same Vue-generated `${example}.png`. The earlier ModalConsumer
+      // special case (per-target baselines for the 3-modal dogfood) was
+      // collapsed on 2026-05-17 after Phase 07.3.2.1 closed F-07.3.2-11-A:
+      // the 6 ModalConsumer-<target>.png baselines proved byte-identical
+      // (MD5 0d5d3108053af5b7d264affcae82b43d), empirically disproving the
+      // earlier worry that CSS Modules class hashing (React/Solid), Lit's
+      // shadow-DOM-bounded custom elements, and Angular's view-encapsulation
+      // attribute selectors would force per-target rendering divergence.
+      // The shared-baseline pattern now ENFORCES cross-target byte-identity:
+      // any future single-target drift fails the matcher rather than being
+      // hidden behind a per-target baseline.
+      await expect(component).toHaveScreenshot(`${example}.png`, {
         maxDiffPixels: 2,
         animations: 'disabled',
       });
