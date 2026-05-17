@@ -1,0 +1,5 @@
+<rozie name="HashPrefixCompletion">
+<template>
+  <template #<caret>>X</template>
+</template>
+</rozie>
