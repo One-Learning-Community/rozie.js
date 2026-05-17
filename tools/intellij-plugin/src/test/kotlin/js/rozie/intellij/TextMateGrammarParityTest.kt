@@ -78,6 +78,10 @@ class TextMateGrammarParityTest {
         // is emitted by the host as ATTR_VALUE_JS chunks (Plan 04 JS-injects).
         "meta.embedded.expression.rozie" to RozieTokenTypes.ATTR_VALUE_JS,
 
+        // --- Plan 08.1-03: r-model:propName= argument-form ---
+        "entity.other.attribute-name.directive-argument.rozie" to RozieTokenTypes.DIRECTIVE_ARGUMENT_NAME,
+        "punctuation.separator.argument.directive.rozie" to RozieTokenTypes.DIRECTIVE_COLON,
+
         // --- Event bindings (@click) ---
         "punctuation.definition.event.rozie" to RozieTokenTypes.EVENT_AT,
         "entity.name.function.event.rozie" to RozieTokenTypes.EVENT_NAME,

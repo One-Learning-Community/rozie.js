@@ -122,7 +122,15 @@ WHITESPACE         = [\ \t\f]+
 EOL                = \r|\n|\r\n
 WS                 = ({WHITESPACE}|{EOL})+
 IDENT              = [A-Za-z_][A-Za-z0-9_-]*
-ATTR_IDENT         = [A-Za-z_][A-Za-z0-9_:.\-]*
+// `:` was previously in this character class to permit namespaced HTML attrs
+// (xml:lang, xlink:href). Plan 03 narrowed it out to prevent the greedy
+// longest-match rule from swallowing `r-model:open` as one ATTR_IDENT
+// (which would shadow {R_DIRECTIVE_RE}'s 7-char match for `r-model`). The
+// trade-off is acceptable: no current Rozie test fixture uses `xml:`/`xlink:`
+// namespaced attrs, and we never advertised those as a supported feature.
+// If they're needed later, add a dedicated NAMESPACED_ATTR_IDENT rule
+// that explicitly excludes the `r-` prefix to avoid recreating this collision.
+ATTR_IDENT         = [A-Za-z_][A-Za-z0-9_.\-]*
 MAGIC_IDENT_RE     = "$" ("props"|"data"|"refs"|"slots"|"emit"|"el"|"onMount"|"onUnmount"|"onUpdate"|"computed"|"watch")
 R_DIRECTIVE_RE     = "r-" ("else-if"|"else"|"if"|"show"|"for"|"model"|"html"|"text"|"bind"|"on")
 PASCAL_IDENT       = [A-Z][A-Za-z0-9]*
