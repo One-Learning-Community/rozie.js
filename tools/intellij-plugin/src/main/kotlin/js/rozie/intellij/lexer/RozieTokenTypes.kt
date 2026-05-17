@@ -75,6 +75,17 @@ object RozieTokenTypes {
     @JvmField val MAGIC_IDENT: IElementType = RozieElementType("MAGIC_IDENT")
     @JvmField val COMPONENT_REF: IElementType = RozieElementType("COMPONENT_REF")
 
+    // --- Slot-fill shorthand (Phase 07.2) ---
+    // `<template #slotName>` / `<template #[dynamicExpr]>` / scoped-slot variants.
+    // The bracket OPEN+CLOSE are distinct IElementTypes so the D-07 parity test
+    // can map each TM scope individually, but the highlighter folds both onto a
+    // single ROZIE_SLOT_BRACKET TextAttributesKey (IntelliJ convention for paired
+    // brackets — RESEARCH § Standard Stack note ~line 183).
+    @JvmField val SLOT_FILL_MARKER: IElementType = RozieElementType("SLOT_FILL_MARKER")
+    @JvmField val SLOT_NAME: IElementType = RozieElementType("SLOT_NAME")
+    @JvmField val SLOT_DYNAMIC_BRACKET_OPEN: IElementType = RozieElementType("SLOT_DYNAMIC_BRACKET_OPEN")
+    @JvmField val SLOT_DYNAMIC_BRACKET_CLOSE: IElementType = RozieElementType("SLOT_DYNAMIC_BRACKET_CLOSE")
+
     // --- Lang attribute (for <style lang="scss"> / <script lang="ts">) ---
     @JvmField val LANG_ATTR_NAME: IElementType = RozieElementType("LANG_ATTR_NAME")
     @JvmField val LANG_ATTR_VALUE: IElementType = RozieElementType("LANG_ATTR_VALUE")

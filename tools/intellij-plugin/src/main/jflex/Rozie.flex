@@ -76,6 +76,9 @@ import static js.rozie.intellij.lexer.RozieTokenTypes.*;
 %state IN_DIRECTIVE_ARG_COLON
 %state IN_DIRECTIVE_ARG_NAME
 
+%state IN_AFTER_SLOT_FILL_MARKER
+%state IN_SLOT_BRACKET_EXPR
+
 %state IN_HTML_COMMENT
 
 %{
@@ -306,6 +309,16 @@ PASCAL_IDENT       = [A-Z][A-Za-z0-9]*
 
   {R_DIRECTIVE_RE}                { yybegin(IN_DIRECTIVE_ARG_COLON); return R_DIRECTIVE; }
 
+  // Slot-fill shorthand (Phase 07.2): `#slotName` and `#[dynamicExpr]` inside
+  // any opening tag (per RESEARCH Key Finding 12: `#` matches permissively to
+  // mirror the TM grammar's permissiveness — TM doesn't constrain `#` to only
+  // `<template>` tags). The two lookahead rules commit to IN_AFTER_SLOT_FILL_MARKER
+  // only when followed by an identifier or `[`; the bare `#` fallback emits
+  // BAD_CHARACTER to surface a defensive diagnostic on a stray sigil.
+  "#" / {IDENT}                   { yybegin(IN_AFTER_SLOT_FILL_MARKER); return SLOT_FILL_MARKER; }
+  "#" / "["                       { yybegin(IN_AFTER_SLOT_FILL_MARKER); return SLOT_FILL_MARKER; }
+  "#"                             { return BAD_CHARACTER; }
+
   "@" / {IDENT}                   { modifierExpectingEventName = true; yybegin(IN_MODIFIER_CHAIN); return EVENT_AT; }
   // Defensive — bare @ should still produce a usable token stream.
   "@"                             { return EVENT_AT; }
@@ -369,6 +382,35 @@ PASCAL_IDENT       = [A-Z][A-Za-z0-9]*
 <IN_DIRECTIVE_ARG_NAME> {
   {IDENT}                        { yybegin(IN_TEMPLATE_TAG_OPEN); return DIRECTIVE_ARGUMENT_NAME; }
   [^]                            { yypushback(yylength()); yybegin(IN_TEMPLATE_TAG_OPEN); }
+}
+
+// =====================================================================
+// IN_AFTER_SLOT_FILL_MARKER / IN_SLOT_BRACKET_EXPR — transient sub-states
+// for the slot-fill shorthand `<template #slotName>` / `<template #[dynExpr]>`
+// (Phase 07.2). IN_AFTER_SLOT_FILL_MARKER fires right after a `#` and decides
+// between the static-name (IDENT → SLOT_NAME) and dynamic-name (`[` → enter
+// IN_SLOT_BRACKET_EXPR) branches. Any other character falls through via
+// `yypushback(yylength())` so the parent IN_TEMPLATE_TAG_OPEN re-tokenises it
+// — same pushback idiom as IN_DIRECTIVE_ARG_*.
+//
+// IN_SLOT_BRACKET_EXPR is the canonical analog of IN_TEMPLATE_ATTR_VALUE_JS_DQ
+// (lines 359–366 pre-Plan-03): it surfaces $magic identifiers, chunks body
+// text as ATTR_VALUE_JS via a negated character class, and has a literal-`$`
+// fallback to prevent the negated class from stranding a bare `$`. The body
+// emits ATTR_VALUE_JS so the existing RozieMultiHostInjector JS arm (Plan 01)
+// covers it for free — NO new injector code path required.
+// =====================================================================
+<IN_AFTER_SLOT_FILL_MARKER> {
+  {IDENT}                        { yybegin(IN_TEMPLATE_TAG_OPEN); return SLOT_NAME; }
+  "["                            { yybegin(IN_SLOT_BRACKET_EXPR); return SLOT_DYNAMIC_BRACKET_OPEN; }
+  [^]                            { yypushback(yylength()); yybegin(IN_TEMPLATE_TAG_OPEN); }
+}
+
+<IN_SLOT_BRACKET_EXPR> {
+  "]"                            { yybegin(IN_TEMPLATE_TAG_OPEN); return SLOT_DYNAMIC_BRACKET_CLOSE; }
+  {MAGIC_IDENT_RE}               { return MAGIC_IDENT; }
+  [^\]$]+                        { return ATTR_VALUE_JS; }
+  "$"                            { return ATTR_VALUE_JS; }
 }
 
 // =====================================================================
