@@ -97,3 +97,159 @@ describe('emitSlotDecl — D-LIT-14 correction', () => {
     expect(result.slotChangeWiring).toBe('');
   });
 });
+
+/**
+ * Phase 07.3.1 Plan 05 — D-LIT-15: light-DOM pre-seed of `_hasSlot<X>`.
+ *
+ * The producer must inspect `this.children` inside `connectedCallback()`
+ * BEFORE `super.connectedCallback();` runs so the very first render sees
+ * accurate slot-fill presence. Without this, conditionally-rendered slot
+ * wrappers (`${this._hasSlotHeader ? html\`<header><slot name="header">…</slot></header>\` : nothing}`)
+ * deadlock: no wrapper → no `<slot>` element → no `slotchange` event →
+ * `_hasSlotHeader` permanently false → wrapper stays hidden forever.
+ */
+describe('pre-seed lines (Phase 07.3.1 D-LIT-15)', () => {
+  function makeIRWithSlots(
+    slotDefs: Array<{ name: string; params?: Array<{ name: string }> }>,
+  ) {
+    return {
+      type: 'IRComponent' as const,
+      name: 'X',
+      props: [],
+      state: [],
+      computed: [],
+      refs: [],
+      slots: slotDefs.map((s) => ({
+        type: 'SlotDecl' as const,
+        name: s.name,
+        params: s.params ?? [],
+        // SlotPresence baseline; tests don't depend on this field.
+        presence: 'always' as const,
+        defaultContent: null,
+        nestedSlots: [],
+        sourceLoc: { start: 0, end: 0 },
+      })),
+      emits: [],
+      lifecycle: [],
+      watchers: [],
+      listeners: [],
+      setupBody: {
+        type: 'SetupBody' as const,
+        scriptProgram: null as never,
+        annotations: [],
+      },
+      template: null,
+      styles: {
+        type: 'StyleSection' as const,
+        scopedRules: [],
+        rootRules: [],
+        sourceLoc: { start: 0, end: 0 },
+      },
+      components: [],
+      sourceLoc: { start: 0, end: 0 },
+    };
+  }
+
+  it('emits pre-seed line for each named slot with getAttribute check', () => {
+    const result = emitSlotDecl(
+      makeIRWithSlots([{ name: 'header' }, { name: 'footer' }]),
+      { decorators: new LitDecoratorImportCollector() },
+    );
+    expect(result.preSeedLines).toContain(
+      'this._hasSlotHeader = Array.from(this.children).some',
+    );
+    expect(result.preSeedLines).toContain("el.getAttribute('slot') === 'header'");
+    expect(result.preSeedLines).toContain(
+      'this._hasSlotFooter = Array.from(this.children).some',
+    );
+    expect(result.preSeedLines).toContain("el.getAttribute('slot') === 'footer'");
+    // Pre-seed lines for two slots — joined by newline + 4-space indent so
+    // they align with the connectedCallback() body in the emitter shell.
+    expect(result.preSeedLines.split('\n').length).toBe(2);
+  });
+
+  it('emits pre-seed line for default slot with text-node tolerance', () => {
+    const result = emitSlotDecl(makeIRWithSlots([{ name: '' }]), {
+      decorators: new LitDecoratorImportCollector(),
+    });
+    expect(result.preSeedLines).toContain(
+      'this._hasSlotDefault = Array.from(this.children).some',
+    );
+    // Default-slot fill check: child must NOT have a `slot` attribute…
+    expect(result.preSeedLines).toContain("!el.hasAttribute('slot')");
+    // …and must be either non-text OR a text node with non-whitespace content
+    // (Web Components spec: whitespace-only text doesn't count as a fill).
+    expect(result.preSeedLines).toContain('el.nodeType !== 3');
+    expect(result.preSeedLines).toContain('el.textContent?.trim().length');
+  });
+
+  it('returns empty preSeedLines when ir.slots is empty', () => {
+    const result = emitSlotDecl(
+      {
+        type: 'IRComponent',
+        name: 'X',
+        props: [],
+        state: [],
+        computed: [],
+        refs: [],
+        slots: [],
+        emits: [],
+        lifecycle: [],
+        watchers: [],
+        listeners: [],
+        setupBody: { type: 'SetupBody', scriptProgram: null as never, annotations: [] },
+        template: null,
+        styles: { type: 'StyleSection', scopedRules: [], rootRules: [], sourceLoc: { start: 0, end: 0 } },
+        components: [],
+        sourceLoc: { start: 0, end: 0 },
+      },
+      { decorators: new LitDecoratorImportCollector() },
+    );
+    expect(result.preSeedLines).toBe('');
+  });
+
+  it('mixed named + default slots produce ordered pre-seed lines per slot', () => {
+    const result = emitSlotDecl(
+      makeIRWithSlots([{ name: 'header' }, { name: '' }, { name: 'footer' }]),
+      { decorators: new LitDecoratorImportCollector() },
+    );
+    // Three pre-seed lines, in IR slot order: header, default, footer.
+    const lines = result.preSeedLines.split('\n').map((l) => l.trim());
+    expect(lines).toHaveLength(3);
+    expect(lines[0]).toContain('_hasSlotHeader');
+    expect(lines[0]).toContain("'header'");
+    expect(lines[1]).toContain('_hasSlotDefault');
+    expect(lines[1]).toContain("!el.hasAttribute('slot')");
+    expect(lines[2]).toContain('_hasSlotFooter');
+    expect(lines[2]).toContain("'footer'");
+  });
+
+  it('Modal fixture: pre-seed lines emitted inside connectedCallback BEFORE super.connectedCallback()', () => {
+    const code = compile('Modal');
+    // Pre-seed lines present for all three Modal slots.
+    expect(code).toContain(
+      'this._hasSlotHeader = Array.from(this.children).some',
+    );
+    expect(code).toContain(
+      'this._hasSlotDefault = Array.from(this.children).some',
+    );
+    expect(code).toContain(
+      'this._hasSlotFooter = Array.from(this.children).some',
+    );
+
+    // Ordering invariant: every pre-seed line must appear BEFORE
+    // `super.connectedCallback();` inside the same `connectedCallback()`
+    // method body. We slice the emitted module from `connectedCallback(): void {`
+    // to the next `}` line and assert pre-seed before super in that slice.
+    const ccMatch = code.match(/connectedCallback\(\): void \{[\s\S]*?\n  \}/);
+    expect(ccMatch).not.toBeNull();
+    const ccBody = ccMatch![0];
+    const preSeedIdx = ccBody.indexOf('Array.from(this.children).some');
+    const superIdx = ccBody.indexOf('super.connectedCallback();');
+    expect(preSeedIdx).toBeGreaterThanOrEqual(0);
+    expect(superIdx).toBeGreaterThan(preSeedIdx);
+
+    // Provenance comment is emitted alongside the pre-seed lines.
+    expect(ccBody).toContain('Phase 07.3.1 D-LIT-15');
+  });
+});
