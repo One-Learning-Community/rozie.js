@@ -1,0 +1,79 @@
+<!--
+  Demo wrapper for Table — used by the live demo on docs/examples/table.md.
+
+  Demonstrates custom #header (default — the producer's fallback row), per-column
+  dispatch inside a single shared #cell slot, and the marquee showcase: a
+  dynamic-slot footer fill via `<template #[\`footer${$data.footerMode}\`]>`
+  that swaps which static-name producer slot the consumer fills.
+
+  Not registered with tests/visual-regression — Table is demo/dogfood only.
+  No VR baselines, no expected.*.{tsx,vue,svelte,ts} snapshot files. The docs
+  site live-compiles this through @rozie/core's rozie-codegen plugin on every
+  build, so the per-target outputs on /examples/table are always current.
+
+  Slot-name nuance: footer slots on the producer are camelCase (footerSummary,
+  footerPagination) because Rozie's $slots magic accessor requires static dot
+  keys — kebab-case would force `$slots['footer-summary']` which is a computed
+  access (ROZ106). The consumer's dynamic fill follows the same convention.
+-->
+<rozie name="TableDemo">
+
+<components>
+{
+  Table: '../Table.rozie',
+}
+</components>
+
+<data>
+{
+  footerMode: 'Summary',
+  rows: [
+    { id: 1, name: 'Alpha', status: 'active',   score: 92 },
+    { id: 2, name: 'Beta',  status: 'pending',  score: 67 },
+    { id: 3, name: 'Gamma', status: 'inactive', score: 41 },
+  ],
+  columns: [
+    { key: 'name',   label: 'Name'   },
+    { key: 'status', label: 'Status' },
+    { key: 'score',  label: 'Score'  },
+  ],
+}
+</data>
+
+<script>
+const toggleFooter = () => {
+  $data.footerMode = $data.footerMode === 'Summary' ? 'Pagination' : 'Summary'
+}
+
+const total = $computed(() => $data.rows.reduce((s, r) => s + r.score, 0))
+</script>
+
+<template>
+<div class="table-demo">
+  <button @click="toggleFooter">Toggle footer (current: {{ $data.footerMode }})</button>
+
+  <Table :rows="$data.rows" :columns="$data.columns" :striped="true" caption="Members">
+    <template #cell="{ column, row, value }">
+      <span r-if="column.key === 'status'" :class="`badge badge-${value}`">{{ value }}</span>
+      <strong r-else-if="column.key === 'score'">{{ value }}</strong>
+      <span r-else>{{ value }}</span>
+    </template>
+
+    <template #[`footer${$data.footerMode}`]>
+      <span r-if="$data.footerMode === 'Summary'">Total score: {{ total }}</span>
+      <span r-else>Page 1 of 1 — {{ $data.rows.length }} rows</span>
+    </template>
+  </Table>
+</div>
+</template>
+
+<style>
+.table-demo { display: flex; flex-direction: column; gap: 0.75rem; font-family: system-ui, sans-serif; }
+.badge { padding: 0.125rem 0.5rem; border-radius: 999px; font-size: 0.8em; }
+.badge-active { background: #d1fae5; color: #065f46; }
+.badge-pending { background: #fef3c7; color: #92400e; }
+.badge-inactive { background: #f3f4f6; color: #4b5563; }
+button { width: fit-content; padding: 0.4rem 0.75rem; cursor: pointer; }
+</style>
+
+</rozie>
