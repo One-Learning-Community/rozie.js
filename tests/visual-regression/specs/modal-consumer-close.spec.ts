@@ -131,4 +131,58 @@ for (const target of TARGETS) {
     // rerender can take longer than a 1 s override would tolerate.
     await expect(dialogs).toHaveCount(2);
   });
+
+  // Phase 07.3.2 D-04 — Modal 2 dynamic-fill (SC#1-SC#3 acceptance) + Modal 3
+  // WrapperModal re-projection (SC#4 acceptance). Both gate the producer-side
+  // intake landed in Plans 01-04 (React/Solid/Angular `slots?:` / `templates?:`
+  // map merge + React no-params named-slot `?.()` invocation root-cause fix).
+  // These tests are orthogonal to the close-propagation gate above: they only
+  // depend on `built` (the per-target Vite host bundle existing on disk),
+  // NOT on `TARGETS_WHERE_CLOSE_PROPAGATES`. The 12 new cells (6 targets × 2
+  // tests) gate the producer-side intake across the dogfood matrix.
+  const dynRunner = !built ? test.fixme : test;
+  dynRunner(`ModalConsumer · ${target}: Modal 2 dynamic-fill text "Dynamic header via slotName" is visible`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=ModalConsumer&target=${target}`);
+    const mount = page.getByTestId('rozie-mount');
+    await expect(mount).toBeVisible();
+    // All 3 dialogs are present on first paint ($data.open1/2/3 default true).
+    // Wait for the deterministic 3-dialog render before asserting on the
+    // dynamic-fill content (same getByRole('dialog') wait used by the close
+    // test above; pierces shadow DOM for Lit, unaffected by CSS Modules
+    // hashing for React/Solid).
+    await expect(page.getByRole('dialog')).toHaveCount(3);
+    // Modal 2 fills `#[$data.slotName]` (resolves to "header" at runtime, per
+    // ModalConsumer.rozie:21) with `<span class="dynamic-fill">Dynamic header
+    // via slotName</span>` (L47). Before Plans 01-04, React/Solid/Angular's
+    // producer Modal had no `slots?:` / `templates?:` intake field, so the
+    // dynamic-name slot bridge silently no-op'd — the span never rendered in
+    // 3 of 6 targets. Vue/Svelte/Lit already worked (Vue/Lit native slot
+    // resolution, Svelte fixed in commit 6060408 / D-SV-16).
+    const dynamicFill = page.locator('.dynamic-fill');
+    await expect(dynamicFill).toBeVisible();
+    await expect(dynamicFill).toHaveText('Dynamic header via slotName');
+  });
+
+  const reprojRunner = !built ? test.fixme : test;
+  reprojRunner(`ModalConsumer · ${target}: Modal 3 WrapperModal re-projects #brand to inner header and #actions to inner footer`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=ModalConsumer&target=${target}`);
+    const mount = page.getByTestId('rozie-mount');
+    await expect(mount).toBeVisible();
+    await expect(page.getByRole('dialog')).toHaveCount(3);
+    // Modal 3 uses WrapperModal which forwards `<template #brand>` into the
+    // inner Modal's `#header` slot (WrapperModal.rozie:18-22) and
+    // `<template #actions>` into `#footer` (L24-26). Re-projection works in
+    // 5/6 targets natively (Vue/Svelte/Solid/Angular/Lit forward slot fills
+    // through any number of wrapper layers). React failed silently because
+    // its render-prop slot consumer experience requires explicit producer-side
+    // invocation of the no-params named-slot function — fixed in Plan 04
+    // (emitSlotInvocation.ts:279-303 now emits `?.()` form, composing with
+    // Plan 01's `(props.renderBrand ?? props.slots?.['brand'])` merge).
+    await expect(page.getByText('Re-projected brand')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Wrapper action' })).toBeVisible();
+  });
 }
