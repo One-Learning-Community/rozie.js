@@ -160,7 +160,15 @@ for (const target of TARGETS) {
     // dynamic-name slot bridge silently no-op'd — the span never rendered in
     // 3 of 6 targets. Vue/Svelte/Lit already worked (Vue/Lit native slot
     // resolution, Svelte fixed in commit 6060408 / D-SV-16).
-    const dynamicFill = page.locator('.dynamic-fill');
+    //
+    // Phase 07.3.2 Plan 08 — switched to a substring class selector
+    // `[class*="dynamic-fill"]` so the assertion works across BOTH the
+    // unhashed class (vue/svelte/lit/angular/solid) and the CSS-Modules-
+    // hashed class (`_dynamic-fill_o9ucb_3` in React's CSS-Modules pipeline).
+    // The original `.dynamic-fill` literal-class selector only matched the
+    // unhashed targets — the original "pierces shadow DOM for Lit, unaffected
+    // by CSS Modules hashing" comment was wrong about CSS Modules.
+    const dynamicFill = page.locator('[class*="dynamic-fill"]');
     await expect(dynamicFill).toBeVisible();
     await expect(dynamicFill).toHaveText('Dynamic header via slotName');
   });
