@@ -1,0 +1,5 @@
+<rozie name="RIfRecognised">
+<template>
+  <div r-if="$data.visible">visible</div>
+</template>
+</rozie>

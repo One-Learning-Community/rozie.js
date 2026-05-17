@@ -1,0 +1,5 @@
+<rozie name="RForRecognised">
+<template>
+  <div r-for="item in items">{{ item }}</div>
+</template>
+</rozie>

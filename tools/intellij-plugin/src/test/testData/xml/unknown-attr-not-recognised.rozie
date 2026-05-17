@@ -1,0 +1,5 @@
+<rozie name="UnknownAttrNotRecognised">
+<template>
+  <div foo="bar">unknown</div>
+</template>
+</rozie>

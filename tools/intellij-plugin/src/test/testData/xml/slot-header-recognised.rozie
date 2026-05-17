@@ -1,0 +1,7 @@
+<rozie name="SlotHeaderRecognised">
+<template>
+  <Modal>
+    <template #header>title</template>
+  </Modal>
+</template>
+</rozie>
