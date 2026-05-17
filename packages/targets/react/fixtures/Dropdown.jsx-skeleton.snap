@@ -1,10 +1,10 @@
 <>
 <div className={styles.dropdown}>
   <div ref={triggerEl} onClick={toggle}>
-    {props.renderTrigger?.({ open, toggle })}
+    {(props.renderTrigger ?? props.slots?.['trigger'])?.({ open, toggle })}
   </div>
 
   {(open) && <div ref={panelEl} className={styles["dropdown-panel"]} role="menu">
-    {typeof props.children === 'function' ? props.children({ close }) : props.children}
+    {typeof (props.children ?? props.slots?.['']) === 'function' ? (props.children ?? props.slots?.[''])({ close }) : (props.children ?? props.slots?.[''])}
   </div>}</div>
 </>

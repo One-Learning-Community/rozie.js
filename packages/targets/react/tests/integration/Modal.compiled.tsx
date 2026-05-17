@@ -29,6 +29,12 @@ interface ModalProps {
   renderHeader?: (ctx: HeaderCtx) => ReactNode;
   children?: (ctx: ChildrenCtx) => ReactNode;
   renderFooter?: (ctx: FooterCtx) => ReactNode;
+  // Phase 07.3.2 — surface-only field for compiled-fixtures-drift parity
+  // with the canonical Modal.tsx.snap (D-SV-16 cross-target port). The
+  // behavior tests using this hand-tuned variant never exercise the
+  // dynamic slots map, so the field exists purely to satisfy the
+  // propsFields set-equality check in compiled-fixtures-drift.test.ts.
+  slots?: Record<string, (ctx: any) => ReactNode>;
 }
 
 export default function Modal(props: ModalProps): JSX.Element | null {

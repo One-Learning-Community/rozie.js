@@ -18,6 +18,7 @@ interface TodoListProps {
   renderHeader?: (ctx: HeaderCtx) => ReactNode;
   children?: ReactNode | ((ctx: ChildrenCtx) => ReactNode);
   renderEmpty?: ReactNode;
+  slots?: Record<string, (ctx: any) => import('react').ReactNode>;
 }
 
 export default function TodoList(_props: TodoListProps): JSX.Element {
@@ -63,7 +64,7 @@ export default function TodoList(_props: TodoListProps): JSX.Element {
     <>
     <div className={styles["todo-list"]} data-rozie-s-52bec3de="">
       <header data-rozie-s-52bec3de="">
-        {props.renderHeader ? props.renderHeader({ remaining, total: items.length }) : <h3 data-rozie-s-52bec3de="">{props.title} ({remaining} remaining)</h3>}
+        {(props.renderHeader ?? props.slots?.['header']) ? (props.renderHeader ?? props.slots?.['header'])({ remaining, total: items.length }) : <h3 data-rozie-s-52bec3de="">{props.title} ({remaining} remaining)</h3>}
       </header>
 
       <form onSubmit={(e) => { e.preventDefault(); add(e); }} data-rozie-s-52bec3de="">
@@ -74,10 +75,10 @@ export default function TodoList(_props: TodoListProps): JSX.Element {
       {(items.length > 0) ? <ul data-rozie-s-52bec3de="">
         {items.map((item) => <li key={item.id} className={clsx({ [styles.done]: item.done })} data-rozie-s-52bec3de="">
           
-          {typeof props.children === 'function' ? props.children({ item, toggle: () => toggle(item.id), remove: () => remove(item.id) }) : (props.children ?? <><label data-rozie-s-52bec3de=""><input type="checkbox" checked={item.done} onChange={(e) => { toggle(item.id); }} data-rozie-s-52bec3de="" /><span data-rozie-s-52bec3de="">{item.text}</span></label><button aria-label="Remove" onClick={(e) => { remove(item.id); }} data-rozie-s-52bec3de="">×</button></>)}
+          {typeof (props.children ?? props.slots?.['']) === 'function' ? (props.children ?? props.slots?.[''])({ item, toggle: () => toggle(item.id), remove: () => remove(item.id) }) : ((props.children ?? props.slots?.['']) ?? <><label data-rozie-s-52bec3de=""><input type="checkbox" checked={item.done} onChange={(e) => { toggle(item.id); }} data-rozie-s-52bec3de="" /><span data-rozie-s-52bec3de="">{item.text}</span></label><button aria-label="Remove" onClick={(e) => { remove(item.id); }} data-rozie-s-52bec3de="">×</button></>)}
         </li>)}
       </ul> : <p className={styles.empty} data-rozie-s-52bec3de="">
-        {props.renderEmpty ?? "Nothing to do. ✨"}
+        {(props.renderEmpty ?? props.slots?.['empty']) ?? "Nothing to do. ✨"}
       </p>}</div>
     </>
   );

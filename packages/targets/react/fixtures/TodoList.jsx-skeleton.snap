@@ -1,7 +1,7 @@
 <>
 <div className={styles["todo-list"]}>
   <header>
-    {props.renderHeader ? props.renderHeader({ remaining, total: items.length }) : <h3>{props.title} ({remaining} remaining)</h3>}
+    {(props.renderHeader ?? props.slots?.['header']) ? (props.renderHeader ?? props.slots?.['header'])({ remaining, total: items.length }) : <h3>{props.title} ({remaining} remaining)</h3>}
   </header>
 
   <form onSubmit={(e) => { e.preventDefault(); add(e); }}>
@@ -12,9 +12,9 @@
   {(items.length > 0) ? <ul>
     {items.map((item) => <li key={item.id} className={clsx({ [styles.done]: item.done })}>
       
-      {typeof props.children === 'function' ? props.children({ item, toggle: () => toggle(item.id), remove: () => remove(item.id) }) : (props.children ?? <><label><input type="checkbox" checked={item.done} onChange={(e) => { toggle(item.id); }} /><span>{item.text}</span></label><button aria-label="Remove" onClick={(e) => { remove(item.id); }}>×</button></>)}
+      {typeof (props.children ?? props.slots?.['']) === 'function' ? (props.children ?? props.slots?.[''])({ item, toggle: () => toggle(item.id), remove: () => remove(item.id) }) : ((props.children ?? props.slots?.['']) ?? <><label><input type="checkbox" checked={item.done} onChange={(e) => { toggle(item.id); }} /><span>{item.text}</span></label><button aria-label="Remove" onClick={(e) => { remove(item.id); }}>×</button></>)}
     </li>)}
   </ul> : <p className={styles.empty}>
-    {props.renderEmpty ?? "Nothing to do. ✨"}
+    {(props.renderEmpty ?? props.slots?.['empty']) ?? "Nothing to do. ✨"}
   </p>}</div>
 </>

@@ -8,6 +8,7 @@ export interface DropdownProps {
   closeOnEscape?: boolean;
   renderTrigger?: (params: { open: boolean; toggle: () => void }) => ReactNode;
   children?: ReactNode | ((params: { close: () => void }) => ReactNode);
+  slots?: Record<string, (ctx: any) => ReactNode>;
 }
 
 declare function Dropdown(props: DropdownProps): JSX.Element;
