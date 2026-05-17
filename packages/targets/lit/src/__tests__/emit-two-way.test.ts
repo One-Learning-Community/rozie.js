@@ -159,8 +159,16 @@ describe('Lit emit — kebabize utility', () => {
     expect(kebabize('closeOnEscape')).toBe('close-on-escape');
   });
 
-  it('multi-cap acronym: aBC → a-b-c', () => {
-    expect(kebabize('aBC')).toBe('a-b-c');
+  it('multi-cap acronym: aBC → a-bc (producer byte-equal contract)', () => {
+    // Byte-equal-contract with producer-side toKebabCase: the listener
+    // event name MUST match producer's dispatched event name. Producer
+    // algorithm (packages/targets/lit/src/emit/emitDecorator.ts:15) inserts
+    // a hyphen at [a-z0-9][A-Z] boundaries only — so `aBC` → `a-bc` (the
+    // `C` is preceded by an uppercase `B`, not a lowercase, so no hyphen).
+    // PLAN.md draft initially specified `a-b-c` from a naive `/[A-Z]/g`
+    // rewrite; that would break two-way wiring for any prop name with
+    // adjacent capitals. See resolveLitSetterText.ts source comment.
+    expect(kebabize('aBC')).toBe('a-bc');
   });
 
   it('idempotent on already-kebab: foo-bar → foo-bar', () => {
