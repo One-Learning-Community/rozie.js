@@ -8,7 +8,7 @@ export interface WrapperModalProps {
   renderBrand?: () => ReactNode;
   children?: ReactNode;
   renderActions?: () => ReactNode;
-  slots?: Record<string, (ctx: any) => ReactNode>;
+  slots?: Record<string, () => ReactNode>;
 }
 
 declare function WrapperModal(props: WrapperModalProps): JSX.Element;

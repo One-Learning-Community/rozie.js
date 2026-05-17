@@ -10,7 +10,7 @@ interface WrapperModalProps {
   renderBrand?: () => ReactNode;
   children?: ReactNode;
   renderActions?: () => ReactNode;
-  slots?: Record<string, (ctx: any) => import('react').ReactNode>;
+  slots?: Record<string, () => import('react').ReactNode>;
 }
 
 export default function WrapperModal(_props: WrapperModalProps): JSX.Element {

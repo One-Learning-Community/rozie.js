@@ -22,7 +22,7 @@ interface ModalProps {
   renderHeader?: (ctx: HeaderCtx) => ReactNode;
   children?: ReactNode | ((ctx: ChildrenCtx) => ReactNode);
   renderFooter?: (ctx: FooterCtx) => ReactNode;
-  slots?: Record<string, (ctx: any) => import('react').ReactNode>;
+  slots?: Record<string, () => import('react').ReactNode>;
 }
 
 export default function Modal(_props: ModalProps): JSX.Element {

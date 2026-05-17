@@ -6,7 +6,7 @@ interface CardProps {
   title?: string;
   onClose?: (...args: unknown[]) => unknown;
   children?: ReactNode;
-  slots?: Record<string, (ctx: any) => import('react').ReactNode>;
+  slots?: Record<string, () => import('react').ReactNode>;
 }
 
 export default function Card(_props: CardProps): JSX.Element {
