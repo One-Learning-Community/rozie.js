@@ -9,6 +9,11 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 /**
  * Phase 07.2 Plan 06 Task 2 — ModalConsumer close-interaction smoke spec.
  * Plan 07.2-06.1 — debug-fix follow-up: rewrite selectors to be cross-target.
+ * Phase 07.3 Plan 09 — un-fixme'd 4 cells (svelte/react/solid/lit) once the
+ * consumer-side `r-model:propName=` directive landed across all 6 targets.
+ * ModalConsumer.rozie now uses D-04 per-instance state ($data.open1/2/3) and
+ * `r-model:open="$data.openN"` per Modal instance, so the scoped close()
+ * propagates the writeback in every target.
  *
  * Verifies the dogfood acceptance from ROADMAP Phase 07.2 Success Criterion 4:
  *   "Header/footer markup appears, default-slot body renders, scoped `close`
@@ -18,26 +23,17 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  *   1. Each per-target ModalConsumer host route mounts the compiled
  *      ModalConsumer.rozie at `[data-testid="rozie-mount"]`.
  *   2. ModalConsumer renders THREE modals (1: scoped header+footer fill; 2:
- *      dynamic-name fill; 3: re-projection via WrapperModal). On first paint
- *      all three are open: `<data>{ open: true }` for modals 1+2 (shared
- *      bind via `:open="$data.open"`); WrapperModal is hardcoded `:open="true"`.
+ *      dynamic-name fill; 3: re-projection via WrapperModal). Per Phase
+ *      07.3 D-04 each Modal owns its own state (`open1/open2/open3` in
+ *      `<data>`) and binds via `r-model:open="$data.openN"`. On first paint
+ *      all three are `true` so the matrix.spec ModalConsumer screenshot is
+ *      unchanged (3 dialogs visible).
  *   3. Clicking the consumer-fill `×` button fires the scoped `close()`
- *      callback. Empirically (Plan 07.2-06.1) only Vue + Angular flip the
- *      clicked Modal's instance-local open state in this one-way-bind dogfood
- *      configuration; the dialog count goes 3 → 2 (the clicked Modal
- *      unmounts; the other two Modals' independent local state is unaffected).
- *      The other 4 targets are `.fixme`'d:
- *        - Svelte: `$bindable` re-syncs from parent on next render — the
- *          local write is overridden, modal stays open (3 → 3).
- *        - React/Solid/Lit: `useControllableState` / `createControllableSignal` /
- *          `createLitControllableProperty` are no-ops on writes in controlled
- *          mode (consumer didn't wire `onOpenChange`/event handlers).
- *        - Lit additionally has a first-paint timing issue: Modal 1's
- *          consumer-fill button has no usable accessible name at first paint
- *          (slot-ctx observer wiring is async — see Plan 07.2-03
- *          lit-scoped-fill-firstpaint.spec).
- *      All 4 divergences are documented in docs/parity.md as the v1 consumer-
- *      side `model: true` divergence.
+ *      callback, which writes `false` to the bound `$data.openN`. With the
+ *      r-model:open= consumer-side wiring (Phase 07.3) the writeback now
+ *      propagates in ALL six targets — the clicked Modal unmounts and the
+ *      dialog count goes 3 → 2. Modals 2 and 3 keep their own independent
+ *      open state (`open2/open3`) so only the clicked one disappears.
  *
  * Selector strategy (cross-target):
  *   - `.modal-backdrop` is NOT cross-target safe:
@@ -58,11 +54,6 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  *     button-with-× in DOM order is the consumer's header-fill close (the
  *     header slot is rendered before the built-in close-btn in the producer).
  *
- * Active vs .fixme'd targets: see the `TARGETS_WHERE_CLOSE_PROPAGATES` set
- * below. Vue + Angular carry the cross-target coverage; the 4 divergent
- * targets are surfaced as known-pending so CI stays green and the
- * limitations remain visible in test-run output.
- *
  * BLOCKED (gated by dist/ build):
  *   The spec depends on a built `dist/<target>/host/entry.<target>.html`
  *   that mounts the `ModalConsumer` example at `/?example=ModalConsumer&
@@ -73,29 +64,21 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'] as const;
 
-// Targets where the consumer's scoped close() actually unmounts the clicked
-// Modal in this one-way-bind dogfood configuration.
-//
-// Empirically verified inside the pinned Linux Playwright container:
-//   - vue:     dialog count 3 → 2  ✓  (defineModel local write wins for one tick)
-//   - angular: dialog count 3 → 2  ✓  (model() local set propagates locally)
-//   - svelte:  dialog count 3 → 3  ✗  ($bindable re-syncs from parent on next render)
-//   - react:   dialog count 3 → 3  ✗  (useControllableState is no-op in controlled mode)
-//   - solid:   dialog count 3 → 3  ✗  (createControllableSignal is no-op in controlled mode)
-//   - lit:     dialog count 3 → 3  ✗  (createLitControllableProperty is no-op in
-//               controlled mode AND the Modal-1 consumer-fill button has no
-//               usable accessible name at first paint due to async slot-ctx
-//               observer wiring — see Plan 07.2-03 lit-scoped-fill-firstpaint.spec)
-//
-// The 4 divergent targets need consumer-side two-way wiring (bind:open,
-// onOpenChange, etc.) for the scoped close() to propagate; without it,
-// controlled mode is a no-op and the parent's reactive state re-asserts. This
-// is the documented v1 consumer-side `model: true` divergence (see
-// docs/parity.md "Consumer-side slot fill — third-party React" + the per-
-// target dynamic-name dispatch table).
+// Phase 07.3 Plan 09 — consumer-side `r-model:open=` directive now propagates
+// the scoped close()'s writeback in ALL six targets. The previously divergent
+// 4 (svelte/react/solid/lit) used to fail because the consumer's
+// `:open="$data.open"` compiled to a one-way bind and the producer-side
+// controllable-state runtime no-op'd writes in controlled mode. With
+// `r-model:open="$data.openN"` the per-target two-way emit (bind:open,
+// onOpenChange, [(open)], v-model:open, @open-change) wires the writeback
+// path, so the count-drop assertion is semantically meaningful everywhere.
 const TARGETS_WHERE_CLOSE_PROPAGATES = new Set<(typeof TARGETS)[number]>([
   'vue',
+  'react',
+  'svelte',
   'angular',
+  'solid',
+  'lit',
 ]);
 
 for (const target of TARGETS) {
@@ -105,11 +88,15 @@ for (const target of TARGETS) {
   );
   const built = existsSync(distEntry);
   const propagates = TARGETS_WHERE_CLOSE_PROPAGATES.has(target);
-  // dist/ availability gate AND known-divergent-target gate. The 4 non-
-  // propagating targets need consumer-side two-way wiring to make this scoped
-  // close test meaningful; without it, the click is a no-op and the spec
-  // would be a tautology. `.fixme` surfaces them as known-pending while
-  // keeping CI green — Vue + Angular carry the cross-target coverage.
+  // Phase 07.3 Plan 09 — `propagates` is now true for all 6 targets (the
+  // r-model:open= consumer-side directive wires the writeback path in every
+  // target). The `!propagates` half of this gate is kept as defense-in-depth
+  // in case a future regression silently breaks consumer-side two-way on
+  // some target — flipping the set member back to exclude that target turns
+  // the cell into a known-pending `.fixme` without code churn. The active
+  // gate is `!built` (dist/ availability), which surfaces the spec as
+  // known-pending only when the per-target host build hasn't yet produced
+  // `dist/<target>/host/entry.<target>.html`.
   const runner = !built || !propagates ? test.fixme : test;
 
   runner(`ModalConsumer · ${target}: clicking close button in header fill fires the scoped close callback`, async ({
@@ -137,15 +124,15 @@ for (const target of TARGETS) {
     const closeButton = page.getByRole('button', { name: '×' }).first();
     await closeButton.click();
 
-    // Vue + Angular: each Modal instance owns its OWN local `defineModel` /
-    // `model()` state — the consumer's one-way `:open="$data.open"` bind
-    // seeds each Modal's local copy but updates do NOT flow back to the
-    // consumer's `$data.open` (no v-model wiring). So when Modal 1's scoped
-    // close() flips its local open to false, ONLY Modal 1 unmounts. Modal 2 +
-    // WrapperModal keep their own local open=true. Dialog count: 3 → 2.
-    // Use Playwright's default timeout (5 s) — the prior 1 s override was
-    // fragile under resource-constrained CI runners (Linux Docker, GHA free
-    // tier) where DOM rerender can take longer after a click event.
+    // Phase 07.3 — each Modal instance owns its own per-instance state
+    // ($data.open1/2/3) and engages the consumer-side two-way directive
+    // (r-model:open). Clicking Modal 1's scoped close() now writes false
+    // back through the target's two-way wiring (v-model:open / bind:open /
+    // [(open)] / onOpenChange / @open-change), flipping ONLY $data.open1
+    // to false. Modals 2 and 3 keep their own state. Dialog count: 3 → 2.
+    // Default Playwright timeout (5 s) accommodates resource-constrained
+    // CI runners (Linux Docker, GHA free tier) where post-click DOM
+    // rerender can take longer than a 1 s override would tolerate.
     await expect(dialogs).toHaveCount(2);
   });
 }

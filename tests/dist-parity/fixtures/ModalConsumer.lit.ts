@@ -14,7 +14,9 @@ export default class ModalConsumer extends SignalWatcher(LitElement) {
 `;
 
   @property({ type: String, reflect: true }) title: string = 'Confirm';
-  private _open = signal(true);
+  private _open1 = signal(true);
+  private _open2 = signal(true);
+  private _open3 = signal(true);
   private _slotName = signal('header');
 
   private _headerCtx?: { close: unknown };
@@ -78,7 +80,7 @@ export default class ModalConsumer extends SignalWatcher(LitElement) {
   render() {
     return html`
 <div class="modal-consumer">
-  <rozie-modal .open=${this._open.value}><div slot="header">
+  <rozie-modal .open=${this._open1.value} @open-change=${(e: CustomEvent) => { this._open1.value = e.detail; }}><div slot="header">
       <h2>${this.title}</h2>
       <button class="close" @click=${this._headerCtx?.close}>×</button>
     </div><div slot="footer">
@@ -88,13 +90,13 @@ export default class ModalConsumer extends SignalWatcher(LitElement) {
     Are you sure you want to proceed?
     </rozie-modal>
 
-  <rozie-modal .open=${this._open.value}><div slot="${this._slotName.value}">
+  <rozie-modal .open=${this._open2.value} @open-change=${(e: CustomEvent) => { this._open2.value = e.detail; }}><div slot="${this._slotName.value}">
       <span class="dynamic-fill">Dynamic header via slotName</span>
     </div>
     Dynamic-name demo body
   </rozie-modal>
 
-  <rozie-wrapper-modal .title=${this.title}><h2 slot="brand">Re-projected brand</h2><button slot="actions">Wrapper action</button>
+  <rozie-wrapper-modal .open=${this._open3.value} @open-change=${(e: CustomEvent) => { this._open3.value = e.detail; }} .title=${this.title}><h2 slot="brand">Re-projected brand</h2><button slot="actions">Wrapper action</button>
     Body via wrapper's default slot
     </rozie-wrapper-modal>
 </div>
@@ -102,6 +104,6 @@ export default class ModalConsumer extends SignalWatcher(LitElement) {
   }
 
   onConfirm() {
-    this._open.value = false;
+    this._open1.value = false;
   }
 }

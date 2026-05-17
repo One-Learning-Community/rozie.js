@@ -11,7 +11,7 @@ import { WrapperModal } from './WrapperModal';
   template: `
 
     <div class="modal-consumer">
-      <rozie-modal [open]="open()"><ng-template #header let-close="close">
+      <rozie-modal [open]="open1()" (openChange)="open1.set($event)"><ng-template #header let-close="close">
           <h2>{{ title() }}</h2>
           <button class="close" (click)="close($event)">×</button>
         </ng-template><ng-template #footer let-close="close">
@@ -21,13 +21,13 @@ import { WrapperModal } from './WrapperModal';
         Are you sure you want to proceed?
         </ng-template></rozie-modal>
 
-      <rozie-modal [open]="open()"><ng-template #__dynSlot_0>
+      <rozie-modal [open]="open2()" (openChange)="open2.set($event)"><ng-template #__dynSlot_0>
           <span class="dynamic-fill">Dynamic header via slotName</span>
         </ng-template><ng-template #defaultSlot>
         Dynamic-name demo body
       </ng-template><ng-container *ngTemplateOutlet="templates[slotName()]"></ng-container></rozie-modal>
 
-      <rozie-wrapper-modal [title]="title()"><ng-template #brand>
+      <rozie-wrapper-modal [open]="open3()" (openChange)="open3.set($event)" [title]="title()"><ng-template #brand>
           <h2>Re-projected brand</h2>
         </ng-template><ng-template #actions>
           <button>Wrapper action</button>
@@ -45,11 +45,13 @@ import { WrapperModal } from './WrapperModal';
 })
 export class ModalConsumer {
   title = input<string>('Confirm');
-  open = signal(true);
+  open1 = signal(true);
+  open2 = signal(true);
+  open3 = signal(true);
   slotName = signal('header');
 
   onConfirm = () => {
-    this.open.set(false);
+    this.open1.set(false);
   };
 
   @ViewChild('__dynSlot_0', { static: true }) __dynSlot_0?: TemplateRef<unknown>;

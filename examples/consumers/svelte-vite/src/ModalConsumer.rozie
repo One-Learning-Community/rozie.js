@@ -15,20 +15,22 @@
 
 <data>
 {
-  open: true,
+  open1: true,
+  open2: true,
+  open3: true,
   slotName: 'header',
 }
 </data>
 
 <script>
 function onConfirm() {
-  $data.open = false
+  $data.open1 = false
 }
 </script>
 
 <template>
 <div class="modal-consumer">
-  <Modal :open="$data.open">
+  <Modal r-model:open="$data.open1">
     <template #header="{ close }">
       <h2>{{ $props.title }}</h2>
       <button class="close" @click="close">×</button>
@@ -40,14 +42,14 @@ function onConfirm() {
     </template>
   </Modal>
 
-  <Modal :open="$data.open">
+  <Modal r-model:open="$data.open2">
     <template #[$data.slotName]>
       <span class="dynamic-fill">Dynamic header via slotName</span>
     </template>
     Dynamic-name demo body
   </Modal>
 
-  <WrapperModal :title="$props.title">
+  <WrapperModal r-model:open="$data.open3" :title="$props.title">
     <template #brand>
       <h2>Re-projected brand</h2>
     </template>

@@ -35,6 +35,9 @@ const FIXTURES_DIR = resolve(HERE, '../fixtures');
 // Multi-rozie examples (those referencing sibling .rozie producers via
 // <components>) get an absolute filename + resolverRoot below so the IR
 // cache + ProducerResolver can locate the sibling producers at compile time.
+// Phase 07.3 Plan 09 — EXAMPLES extended 9 → 10 with WrapperModal so the
+// consumer-side `r-model:open="$props.open"` forwarding pattern is byte-
+// locked across all 4 entrypoints (compile/cli/babel/unplugin).
 const EXAMPLES = [
   'Counter',
   'SearchInput',
@@ -45,9 +48,10 @@ const EXAMPLES = [
   'Card',
   'CardHeader',
   'ModalConsumer',
+  'WrapperModal',
 ];
 
-const EXAMPLES_NEEDING_RESOLVER_ROOT = new Set(['ModalConsumer']);
+const EXAMPLES_NEEDING_RESOLVER_ROOT = new Set(['ModalConsumer', 'WrapperModal']);
 // Phase 06.4 P3 (D-LIT-22): TARGETS extended with 'lit' — additive only.
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'];
 

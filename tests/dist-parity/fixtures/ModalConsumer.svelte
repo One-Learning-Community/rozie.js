@@ -8,17 +8,19 @@ interface Props {
 
 let { title = 'Confirm' }: Props = $props();
 
-let open = $state(true);
+let open1 = $state(true);
+let open2 = $state(true);
+let open3 = $state(true);
 let slotName = $state('header');
 
 function onConfirm() {
-  open = false;
+  open1 = false;
 }
 </script>
 
 
 <div class="modal-consumer">
-  <Modal open={open}>{#snippet header({ close })}
+  <Modal bind:open={open1}>{#snippet header({ close })}
       <h2>{title}</h2>
       <button class="close" onclick={close}>×</button>
     {/snippet}{#snippet footer({ close })}
@@ -28,13 +30,13 @@ function onConfirm() {
     Are you sure you want to proceed?
     </Modal>
 
-  <Modal open={open} snippets={{ [slotName]: __rozieDynSlot_0 }}>
+  <Modal bind:open={open2} snippets={{ [slotName]: __rozieDynSlot_0 }}>
     Dynamic-name demo body
   {#snippet __rozieDynSlot_0()}
       <span class="dynamic-fill">Dynamic header via slotName</span>
     {/snippet}</Modal>
 
-  <WrapperModal title={title}>{#snippet brand()}
+  <WrapperModal bind:open={open3} title={title}>{#snippet brand()}
       <h2>Re-projected brand</h2>
     {/snippet}{#snippet actions()}
       <button>Wrapper action</button>

@@ -11,11 +11,13 @@ export default function ModalConsumer(_props: ModalConsumerProps): JSX.Element {
   const _merged = mergeProps({ title: 'Confirm' }, _props);
   const [local, rest] = splitProps(_merged, ['title']);
 
-  const [open, setOpen] = createSignal(true);
+  const [open1, setOpen1] = createSignal(true);
+  const [open2, setOpen2] = createSignal(true);
+  const [open3, setOpen3] = createSignal(true);
   const [slotName, setSlotName] = createSignal('header');
 
   function onConfirm() {
-    setOpen(false);
+    setOpen1(false);
   }
 
   return (
@@ -25,7 +27,7 @@ export default function ModalConsumer(_props: ModalConsumerProps): JSX.Element {
     .dynamic-fill[data-rozie-s-5d081d3a] { font-weight: bold; }`}</style>
     <>
     <div class={"modal-consumer"} data-rozie-s-5d081d3a="">
-      <Modal open={open()} headerSlot={({ close }) => (<>
+      <Modal open={open1()} onOpenChange={setOpen1} headerSlot={({ close }) => (<>
           <h2 data-rozie-s-5d081d3a="">{local.title}</h2>
           <button class={"close"} onClick={close} data-rozie-s-5d081d3a="">×</button>
         </>)} footerSlot={({ close }) => (<>
@@ -35,13 +37,13 @@ export default function ModalConsumer(_props: ModalConsumerProps): JSX.Element {
         Are you sure you want to proceed?
         </Modal>
 
-      <Modal open={open()} slots={{ [slotName()]: () => (<>
+      <Modal open={open2()} onOpenChange={setOpen2} slots={{ [slotName()]: () => (<>
           <span class={"dynamic-fill"} data-rozie-s-5d081d3a="">Dynamic header via slotName</span>
         </>) }}>
         Dynamic-name demo body
       </Modal>
 
-      <WrapperModal title={local.title} brandSlot={() => (<>
+      <WrapperModal open={open3()} onOpenChange={setOpen3} title={local.title} brandSlot={() => (<>
           <h2 data-rozie-s-5d081d3a="">Re-projected brand</h2>
         </>)} actionsSlot={() => (<>
           <button data-rozie-s-5d081d3a="">Wrapper action</button>
