@@ -3,10 +3,17 @@ import type { Snippet } from 'svelte';
 
 interface Props {
   items?: unknown[];
-  item?: Snippet<[any, any]>;
+  item?: Snippet<[{ item: any; remaining: any }]>;
+  snippets?: Record<string, Snippet<[any]>>;
 }
 
-let { items = $bindable((() => [])()), item }: Props = $props();
+let {
+  items = $bindable((() => [])()),
+  item: __itemProp,
+  snippets,
+}: Props = $props();
+
+const item = $derived(__itemProp ?? snippets?.item);
 
 const remaining = $derived(items.filter(i => !i.done).length);
 </script>
@@ -15,7 +22,7 @@ const remaining = $derived(items.filter(i => !i.done).length);
 <ul class="list">
   
   {#each items as item (item.id)}<li>
-    {#if item}{@render item(item, remaining)}{:else}
+    {#if item}{@render item({ item, remaining })}{:else}
       {item.label}
     {/if}
   </li>{/each}

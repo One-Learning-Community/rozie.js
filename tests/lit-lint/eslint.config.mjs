@@ -21,6 +21,15 @@ import tsParser from '@typescript-eslint/parser';
 //     `@input=` and `@keydown=` bindings. v1 emitter emits r-model's
 //     @input + the template's @input separately; Phase 7 will merge them
 //     into a single composed handler. See D-LIT-FUTURE-04 in deferred-items.md.
+//   - `wc/no-child-traversal-in-connectedcallback`: OFF for Phase 07.3.1
+//     D-LIT-15 pre-seed lines that read `this.children` in connectedCallback
+//     BEFORE `super.connectedCallback()`. This is the intended fix for the
+//     chicken-and-egg deadlock where conditionally-rendered slot wrappers
+//     never reflect actual fill presence on first paint. The lint rule's
+//     "error prone" warning targets ad-hoc child traversal whose timing
+//     depends on consumer placement — our pre-seed runs immediately after
+//     element insertion when the consumer's `<div slot="...">` is already
+//     in light DOM. See plan 07.3.1-05 SUMMARY for full rationale.
 export default [
   {
     files: ['**/*.ts'],
@@ -41,6 +50,7 @@ export default [
       'wc/guard-super-call': 'off',
       'lit/no-legacy-template-syntax': 'off',
       'lit/no-duplicate-template-bindings': 'off',
+      'wc/no-child-traversal-in-connectedcallback': 'off',
     },
   },
 ];

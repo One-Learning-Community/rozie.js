@@ -6,9 +6,17 @@ import type { Snippet } from 'svelte';
 interface Props {
   title?: Snippet;
   children?: Snippet;
+  snippets?: Record<string, Snippet<[any]>>;
 }
 
-let { title, children }: Props = $props();
+let {
+  title: __titleProp,
+  children: __childrenProp,
+  snippets,
+}: Props = $props();
+
+const title = $derived(__titleProp ?? snippets?.title);
+const children = $derived(__childrenProp ?? snippets?.children);
 </script>
 
 

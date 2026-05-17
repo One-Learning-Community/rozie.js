@@ -37,6 +37,9 @@ export default class Wrapper extends SignalWatcher(LitElement) {
   }
 
   connectedCallback(): void {
+    // Phase 07.3.1 D-LIT-15 — pre-seed _hasSlot<X> from light DOM so first render isn't deadlocked.
+    this._hasSlotTitle = Array.from(this.children).some((el) => el.getAttribute('slot') === 'title');
+    this._hasSlotDefault = Array.from(this.children).some((el) => !el.hasAttribute('slot') && (el.nodeType !== 3 || (el.textContent?.trim().length ?? 0) > 0));
     super.connectedCallback();
     if (this.hasUpdated) this._armListeners();
   }
