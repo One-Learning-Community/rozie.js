@@ -1,6 +1,6 @@
 # Phase 08.1-06 — Human UAT Checklist
 
-**Plugin version:** intellij-plugin/v0.2.0 (built from main @ TBD)
+**Plugin version:** intellij-plugin/v0.2.0 (built from main @ ddaea72bd280814ad6ce5cd7174c2cc806f253b2)
 **Build artifact:** `tools/intellij-plugin/build/distributions/rozie-intellij-plugin-0.2.0.zip` (filename derived from `rootProject.name` in `settings.gradle.kts` — the RESEARCH/PLAN reference to `Rozie.js-0.2.0.zip` is a documentation drift; CI workflow uses a `*.zip` glob so this is purely a cosmetic discrepancy)
 **IDEs tested:**
 - [ ] WebStorm 2024.2.5
