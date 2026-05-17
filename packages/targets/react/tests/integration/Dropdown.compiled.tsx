@@ -34,7 +34,9 @@ interface DropdownProps {
   children?: (ctx: ChildrenCtx) => ReactNode;
   // Phase 07.3.2 — surface-only field for compiled-fixtures-drift parity
   // with the canonical Dropdown.tsx.snap (D-SV-16 cross-target port).
-  slots?: Record<string, (ctx: any) => ReactNode>;
+  // Phase 07.3.2 Plan 07 (CR-01) — zero-args form matches the no-params
+  // named-slot invocation form (emitSlotInvocation.ts:302 `?.()`).
+  slots?: Record<string, () => ReactNode>;
 }
 
 export default function Dropdown(props: DropdownProps): JSX.Element {
