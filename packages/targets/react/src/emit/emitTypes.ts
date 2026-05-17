@@ -175,8 +175,12 @@ export function emitReactTypes(
   // ReactNode; mitigate by updating BOTH atomically. `ReactNode` is already
   // in scope at file top — no `import('react')` namespace prefix needed
   // (contrast with emitPropsInterface.ts which uses the verbose form).
+  //
+  // Phase 07.3.2 Plan 07 (CR-01 fix) — value type aligned with the no-args
+  // invocation form at emitSlotInvocation.ts:302. See the sibling note in
+  // emitPropsInterface.ts for the contract rationale.
   if (ir.slots.length > 0) {
-    lines.push(`  slots?: Record<string, (ctx: any) => ReactNode>;`);
+    lines.push(`  slots?: Record<string, () => ReactNode>;`);
   }
 
   lines.push(`}`);
