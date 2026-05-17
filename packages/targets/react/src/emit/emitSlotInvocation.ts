@@ -220,7 +220,15 @@ export function emitSlotInvocation(
   }
 
   const refined = refineSlotTypes(slot);
-  const fieldRef = `props.${refined.propFieldName}`;
+  // Phase 07.3.2 — merge static-named fill with the dynamic `slots?:` map
+  // intake added in emitPropsInterface.ts + emitTypes.ts. Left-precedence
+  // `??` mirrors Svelte D-SV-16 (commit 6060408) $derived merge — static
+  // wins (D-02); dynamic catches runtime-only mismatches per D-03 silent
+  // no-op invariant. The parenthesised expression keeps operator precedence
+  // intact when wrapped in `{...}` / `?.(...)` / `?? fallback` downstream.
+  // D-18 empty-string sentinel: default slot keys as `''` in the slots map.
+  const dynKey = slot.name === '' ? "''" : `'${slot.name}'`;
+  const fieldRef = `(props.${refined.propFieldName} ?? props.slots?.[${dynKey}])`;
   const hasParams = slot.params.length > 0;
   const paramObj = buildParamObj(node.args, ctx.ir);
 

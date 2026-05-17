@@ -6,6 +6,7 @@ interface CardProps {
   title?: string;
   onClose?: (...args: unknown[]) => unknown;
   children?: ReactNode;
+  slots?: Record<string, (ctx: any) => import('react').ReactNode>;
 }
 
 export default function Card(_props: CardProps): JSX.Element {
@@ -20,7 +21,7 @@ export default function Card(_props: CardProps): JSX.Element {
     <article className={styles.card} data-rozie-s-a88c221e="">
       <CardHeader title={props.title} onClose={props.onClose} />
       <div className={styles.card__body} data-rozie-s-a88c221e="">
-        {props.children}
+        {(props.children ?? props.slots?.[''])}
       </div>
     </article>
     </>

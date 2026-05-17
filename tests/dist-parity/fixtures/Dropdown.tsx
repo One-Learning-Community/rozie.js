@@ -16,6 +16,7 @@ interface DropdownProps {
   closeOnEscape?: boolean;
   renderTrigger?: (ctx: TriggerCtx) => ReactNode;
   children?: ReactNode | ((ctx: ChildrenCtx) => ReactNode);
+  slots?: Record<string, (ctx: any) => import('react').ReactNode>;
 }
 
 export default function Dropdown(_props: DropdownProps): JSX.Element {
@@ -86,11 +87,11 @@ export default function Dropdown(_props: DropdownProps): JSX.Element {
     <>
     <div className={styles.dropdown} data-rozie-s-6d6bd882="">
       <div ref={triggerEl} onClick={toggle} data-rozie-s-6d6bd882="">
-        {props.renderTrigger?.({ open, toggle })}
+        {(props.renderTrigger ?? props.slots?.['trigger'])?.({ open, toggle })}
       </div>
 
       {(open) && <div ref={panelEl} className={styles["dropdown-panel"]} role="menu" data-rozie-s-6d6bd882="">
-        {typeof props.children === 'function' ? props.children({ close }) : props.children}
+        {typeof (props.children ?? props.slots?.['']) === 'function' ? (props.children ?? props.slots?.[''])({ close }) : (props.children ?? props.slots?.[''])}
       </div>}</div>
     </>
   );

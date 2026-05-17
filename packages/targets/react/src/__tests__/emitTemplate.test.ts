@@ -169,7 +169,7 @@ describe('className composition — Plan 04-03 Task 1', () => {
 });
 
 describe('Slot lowering — Plan 04-03 Task 2', () => {
-  it('Test 1: default slot, no params → {props.children}', () => {
+  it('Test 1: default slot, no params → {(props.children ?? props.slots?.[\'\'])} (Phase 07.3.2 merge)', () => {
     const ir = lowerInline(`
 <rozie name="X">
 <template>
@@ -178,11 +178,14 @@ describe('Slot lowering — Plan 04-03 Task 2', () => {
 </rozie>
 `);
     const { jsx, slotPropFields } = emit(ir);
-    expect(jsx).toContain('{props.children}');
+    // Phase 07.3.2 — fieldRef is now a parenthesised merge expression
+    // `(props.children ?? props.slots?.[''])` per D-SV-16 cross-target port.
+    // D-18 empty-string sentinel for default-slot key.
+    expect(jsx).toContain("{(props.children ?? props.slots?.[''])}");
     expect(slotPropFields.some((s) => /children\?: ReactNode/.test(s))).toBe(true);
   });
 
-  it('Test 4: named slot, no params (Modal header) → {props.renderHeader}', () => {
+  it('Test 4: named slot, no params (Modal header) → {(props.renderHeader ?? props.slots?.[\'header\'])} (Phase 07.3.2 merge)', () => {
     const ir = lowerInline(`
 <rozie name="X">
 <template>
@@ -191,7 +194,9 @@ describe('Slot lowering — Plan 04-03 Task 2', () => {
 </rozie>
 `);
     const { jsx, slotPropFields } = emit(ir);
-    expect(jsx).toContain('{props.renderHeader}');
+    // Phase 07.3.2 — fieldRef is now a parenthesised merge expression
+    // `(props.renderHeader ?? props.slots?.['header'])` per D-SV-16 port.
+    expect(jsx).toContain("{(props.renderHeader ?? props.slots?.['header'])}");
     expect(slotPropFields.some((s) => /renderHeader\?: ReactNode/.test(s))).toBe(true);
   });
 

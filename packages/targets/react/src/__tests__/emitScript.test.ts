@@ -10,6 +10,7 @@ import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBu
 import type { IRComponent } from '../../../../core/src/ir/types.js';
 import { emitReact } from '../emitReact.js';
 import { emitPropsInterface } from '../emit/emitPropsInterface.js';
+import { emitReactTypes } from '../emit/emitTypes.js';
 import { emitScript } from '../emit/emitScript.js';
 import {
   ReactImportCollector,
@@ -203,5 +204,64 @@ describe('emitReact — whole-tsx fixture snapshots', () => {
     expect(code).toContain('interface SearchInputProps');
     expect(code).toContain('useState');
     await expect(code).toMatchFileSnapshot(resolve(FIXTURES, 'SearchInput.tsx.snap'));
+  });
+});
+
+// Phase 07.3.2-01 — D-SV-16 cross-target port. Producer-side intake of the
+// consumer's dynamic-name slots map at emitSlotFiller.ts:140 (`slots={{
+// [expr]: (ctx) => (<>...</>) }}`) and per-slot merge `(props.renderX ??
+// props.slots?.['x'])` at every slot invocation. D-02 static-wins, D-05
+// non-slotted components stay byte-equivalent (Counter has no slots field).
+describe('emitPropsInterface / emitReactTypes — §slots-merge intake (Phase 07.3.2 D-SV-16 port)', () => {
+  it('Modal (slotted) inline Props interface contains slots?: Record<string, (ctx: any) => import(\'react\').ReactNode>', () => {
+    const ir = lowerExample('Modal');
+    const ifaceText = emitPropsInterface(ir);
+    expect(ifaceText).toContain('interface ModalProps');
+    expect(ifaceText).toMatch(/slots\?:\s*Record<string,\s*\(ctx:\s*any\)\s*=>\s*import\('react'\)\.ReactNode>/);
+  });
+
+  it('Modal (slotted) public .d.ts contains slots?: Record<string, (ctx: any) => ReactNode>', () => {
+    const ir = lowerExample('Modal');
+    const dtsText = emitReactTypes(ir);
+    expect(dtsText).toContain('export interface ModalProps');
+    // .d.ts uses bare ReactNode (already imported at file top) — NOT
+    // import('react').ReactNode — contrast with inline Props interface.
+    expect(dtsText).toMatch(/slots\?:\s*Record<string,\s*\(ctx:\s*any\)\s*=>\s*ReactNode>/);
+    // Ensure the .d.ts side does NOT use the import('react') verbose form.
+    expect(dtsText).not.toMatch(/slots\?:\s*Record<string,\s*\(ctx:\s*any\)\s*=>\s*import\('react'\)\.ReactNode>/);
+  });
+
+  it('Counter (non-slotted) emits NO slots?: field in inline Props interface (D-05 byte-equivalence)', () => {
+    const ir = lowerExample('Counter');
+    const ifaceText = emitPropsInterface(ir);
+    expect(ifaceText).not.toMatch(/slots\?:\s*Record/);
+  });
+
+  it('Counter (non-slotted) emits NO slots?: field in public .d.ts (D-05 byte-equivalence)', () => {
+    const ir = lowerExample('Counter');
+    const dtsText = emitReactTypes(ir);
+    expect(dtsText).not.toMatch(/slots\?:\s*Record/);
+  });
+});
+
+describe('emitSlotInvocation — §slots-merge invocation (Phase 07.3.2 D-02 static-wins)', () => {
+  it('header-slot invocation merges (props.renderHeader ?? props.slots?.[\'header\']) at invocation site', () => {
+    // Whole-Modal emit ensures the merged fieldRef expression appears at every
+    // invocation site. D-02 static-wins: static prop LEFT of `??`, dynamic
+    // slots map RIGHT.
+    const ir = lowerExample('Modal');
+    const source = readFileSync(resolve(EXAMPLES, 'Modal.rozie'), 'utf8');
+    const { code } = emitReact(ir, { filename: 'Modal.rozie', source });
+    // Modal declares header + default + footer slots.
+    expect(code).toContain("(props.renderHeader ?? props.slots?.['header'])");
+    expect(code).toContain("(props.renderFooter ?? props.slots?.['footer'])");
+  });
+
+  it('default-slot invocation uses empty-string sentinel: (props.children ?? props.slots?.[\'\']) (D-18 invariant)', () => {
+    const ir = lowerExample('Modal');
+    const source = readFileSync(resolve(EXAMPLES, 'Modal.rozie'), 'utf8');
+    const { code } = emitReact(ir, { filename: 'Modal.rozie', source });
+    // D-18 empty-string sentinel for default slot key in the dynamic slots map.
+    expect(code).toContain("(props.children ?? props.slots?.[''])");
   });
 });

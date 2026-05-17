@@ -121,6 +121,19 @@ export function emitPropsInterface(
     }
   }
 
+  // Phase 07.3.2 — accept consumer-side dynamic-name slots map (D-SV-16
+  // cross-target port of Svelte commit 6060408); merged into named
+  // render-prop fields at each invocation site in emitSlotInvocation.ts.
+  // The consumer-side emitter (emitSlotFiller.ts:140 emitDynamicSlotsProp)
+  // emits `slots={{ [expr]: (ctx) => (<>...</>) }}` for `<template #[dynamic]>`
+  // fills; without this field the producer Props interface silently rejects
+  // the consumer's dynamic-name projection. Gated on `ir.slots.length > 0`
+  // so non-slotted components (Counter, SearchInput) stay byte-equivalent
+  // per D-05.
+  if (ir.slots.length > 0) {
+    fields.push(`  slots?: Record<string, (ctx: any) => import('react').ReactNode>;`);
+  }
+
   if (fields.length === 0) {
     return `interface ${ir.name}Props {}`;
   }

@@ -167,6 +167,18 @@ export function emitReactTypes(
     }
   }
 
+  // Phase 07.3.2 — mirror inline Props interface (emitPropsInterface.ts).
+  // Public .d.ts MUST declare the same slots?: field so consumer typecheck
+  // passes when they pass `slots={{ ... }}` from a `<template #[dynamic]>`
+  // fill. Pitfall 1 — drift between the inline TSX Props interface and the
+  // public .d.ts is the same class of bug Plan 04 fixes for ReactNode/() =>
+  // ReactNode; mitigate by updating BOTH atomically. `ReactNode` is already
+  // in scope at file top — no `import('react')` namespace prefix needed
+  // (contrast with emitPropsInterface.ts which uses the verbose form).
+  if (ir.slots.length > 0) {
+    lines.push(`  slots?: Record<string, (ctx: any) => ReactNode>;`);
+  }
+
   lines.push(`}`);
   lines.push('');
   lines.push(
