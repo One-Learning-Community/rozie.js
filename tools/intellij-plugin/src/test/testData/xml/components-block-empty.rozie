@@ -1,0 +1,13 @@
+<rozie name="ComponentsBlockEmpty">
+
+<props>
+{
+  title: { type: String, default: 'no components here' },
+}
+</props>
+
+<template>
+<div>{{ $props.title }}</div>
+</template>
+
+</rozie>

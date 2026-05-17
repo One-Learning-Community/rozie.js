@@ -1,0 +1,17 @@
+<rozie name="AnnotatorModalConsumerLocalComponents">
+
+<components>
+{
+  Modal: './Modal.rozie',
+  WrapperModal: './WrapperModal.rozie',
+}
+</components>
+
+<template>
+<div class="wrapper">
+  <Modal>modal body</Modal>
+  <WrapperModal>wrapper body</WrapperModal>
+</div>
+</template>
+
+</rozie>

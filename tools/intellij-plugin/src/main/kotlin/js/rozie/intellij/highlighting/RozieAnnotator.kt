@@ -69,19 +69,32 @@ class RozieAnnotator : Annotator {
     }
 
     private fun annotateTag(tag: XmlTag, holder: AnnotationHolder) {
-        val name = tag.name
-        if (name.isEmpty() || !name[0].isUpperCase()) return
-        // Tag-name token: walk the tag's children and find the XmlToken whose
-        // tokenType is XmlTokenType.XML_NAME. (Painting tag.textRange would
-        // include all attributes + children, swamping their stock coloring.)
-        // Both open-tag <Modal> and close-tag </Modal> appear as XmlTag children
-        // in HTML PSI, so this paints both name occurrences.
-        val nameToken = tag.children.firstOrNull {
+        // Plan 08.2-10 (P1-UAT-03 coloring-half regression fix): the previous
+        // implementation guarded on `tag.name[0].isUpperCase()`. HTML PSI
+        // normalises tag names: `tag.name` for `<Card>` may surface as `"Card"`
+        // OR (when the platform's HTML-parser lower-cases unknown tag names)
+        // as `"card"`. Use `tag.localName` and additionally the FIRST XML_NAME
+        // child token's text — which preserves source casing — so the
+        // PascalCase guard fires reliably regardless of platform normalisation.
+        val nameTokens = tag.children.filter {
             it is XmlToken && it.tokenType == XmlTokenType.XML_NAME
-        } ?: return
-        holder.newSilentAnnotation(HighlightSeverity.INFORMATION)
-            .range(nameToken.textRange)
-            .textAttributes(RozieSyntaxHighlighter.COMPONENT_REF)
-            .create()
+        }
+        if (nameTokens.isEmpty()) return
+        // Use the source-preserved text of the FIRST XML_NAME token (the
+        // open-tag name) as the casing oracle — `tag.name` / `tag.localName`
+        // can be lower-cased by HTML PSI, hiding PascalCase from the guard.
+        val openSourceText = nameTokens[0].text
+        if (openSourceText.isEmpty() || !openSourceText[0].isUpperCase()) return
+
+        // Paint EVERY XML_NAME child token (open-tag AND close-tag). The pre-fix
+        // implementation called `firstOrNull` which captured only the open-tag
+        // name and left `</Card>` un-painted — the precise symptom the human
+        // UAT surfaced (P1-UAT-03 coloring-half).
+        for (nameToken in nameTokens) {
+            holder.newSilentAnnotation(HighlightSeverity.INFORMATION)
+                .range(nameToken.textRange)
+                .textAttributes(RozieSyntaxHighlighter.COMPONENT_REF)
+                .create()
+        }
     }
 }

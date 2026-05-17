@@ -1,6 +1,7 @@
 package js.rozie.intellij.xml
 
 import com.intellij.codeInsight.lookup.LookupElement
+import com.intellij.codeInsight.lookup.LookupElementBuilder
 import com.intellij.psi.html.HtmlTag
 import com.intellij.psi.impl.source.xml.XmlElementDescriptorProvider
 import com.intellij.psi.xml.XmlTag
@@ -20,12 +21,16 @@ import com.intellij.xml.util.XmlUtil
  * precedent (one class, two `<xml.*>` plugin.xml entries pointing at the
  * same FQN). RESEARCH Pattern 3 (lines 419–476) + Key Finding 11.
  *
- * v0.2.0 ambition: [addTagNameVariants] is a no-op per RESEARCH Open Question
- * 3 — the CompletionContributor in Plan 06 will handle prefix-typed completion;
- * v0.3.0 will mine the `<components>` block here for ranked autocomplete.
- * [getDescriptor] is the load-bearing piece — it returns a permissive
- * [RozieComponentElementDescriptor] for any PascalCase-named tag in Rozie
- * context, silencing the "Unknown HTML tag" inspection.
+ * v0.2.0 status (Plan 08.2-10 update): [addTagNameVariants] consults
+ * [RozieComponentRegistry] to surface file-local `<components>` declarations
+ * as autocomplete [LookupElement]s — the v0.3.0 KDoc-TODO ambition lands in
+ * v0.2.0 gap-closure for P1-UAT-03 (recognition half).
+ * [getDescriptor] is the load-bearing piece for the "Unknown HTML tag"
+ * silencer — it returns a permissive [RozieComponentElementDescriptor] for
+ * ANY PascalCase-named tag in Rozie context (Plan 03's permissive fallback
+ * is intentionally preserved per the Plan 08.2-10 Decision, so e.g. a
+ * just-pasted component that the author has not yet added to the
+ * `<components>` block keeps working).
  *
  * Both methods short-circuit on `!RozieContextCheck.isRozieContext(tag)` per
  * RESEARCH Pitfall 2 + threat T-08.2-05 to avoid contaminating non-Rozie
@@ -38,15 +43,20 @@ import com.intellij.xml.util.XmlUtil
 class RozieComponentTagProvider : XmlTagNameProvider, XmlElementDescriptorProvider {
 
     /**
-     * v0.2.0: no-op. The CompletionContributor scheduled for Plan 06 will
-     * handle prefix-typed completion in HTML attribute / tag positions. The
-     * platform still surfaces tag-names already present in the host file via
-     * its own index even without anything added here.
+     * Surfaces file-local `<components>` declarations as autocomplete
+     * [LookupElement]s. Closes the recognition-half of P1-UAT-03 (Plan
+     * 08.2-10) — the v0.3.0 KDoc-TODO ambition lands in v0.2.0 gap-closure.
      *
-     * TODO(v0.3.0): mine the `<components>` block from the host PSI and add
-     * one [LookupElement] per declared PascalCase import. Requires a host-PSI
-     * walk from the injected fragment + per-file caching to avoid quadratic
-     * cost on every keystroke.
+     * Consults [RozieComponentRegistry.declaredComponents] which walks the
+     * host file's `<components>` block, extracts PascalCase keys via a
+     * brace-aware / string-aware state machine, and caches via
+     * [com.intellij.psi.util.CachedValuesManager] keyed on the file
+     * modification stamp (T-08.2-20 mitigation — per-keystroke cost is
+     * O(1) amortised).
+     *
+     * Prefix-aware: when [prefix] is non-null, only emits names that
+     * start with it (case-insensitive — matches the platform convention
+     * for HTML tag completion).
      */
     override fun addTagNameVariants(
         elements: MutableList<LookupElement>,
@@ -54,7 +64,12 @@ class RozieComponentTagProvider : XmlTagNameProvider, XmlElementDescriptorProvid
         prefix: String?,
     ) {
         if (tag !is HtmlTag || !RozieContextCheck.isRozieContext(tag)) return
-        // intentional no-op for v0.2.0 — see TODO above.
+        val declared = RozieComponentRegistry.declaredComponents(tag)
+        for (name in declared) {
+            if (prefix == null || name.startsWith(prefix, ignoreCase = true)) {
+                elements.add(LookupElementBuilder.create(name))
+            }
+        }
     }
 
     /**

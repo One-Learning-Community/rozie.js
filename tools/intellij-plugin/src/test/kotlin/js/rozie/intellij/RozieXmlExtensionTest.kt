@@ -117,6 +117,52 @@ class RozieXmlExtensionTest : BasePlatformTestCase() {
         assertNull("<div> should NOT get a Rozie component descriptor", descriptor)
     }
 
+    // === Plan 08.2-10 P1-UAT-03 recognition-half: addTagNameVariants surfaces
+    // file-local <components> declarations as autocomplete LookupElements ===
+
+    /**
+     * Regression: a `.rozie` file with `<components>` declaring {CardHeader,
+     * CardFooter}; trigger tag-name-variant collection by handing the provider
+     * a tag from the same file. Asserts both declared PascalCase names appear
+     * in the emitted [com.intellij.codeInsight.lookup.LookupElement] list.
+     *
+     * Mirrors the reflection-based provider-lookup pattern used by the
+     * descriptor-side helpers above so the test stays compilable across
+     * RED states.
+     */
+    fun testLocalComponentsSurfaceInAddTagNameVariants() {
+        myFixture.configureByFile("tag-provider-local-components-card.rozie")
+        val elements = collectTagNameVariants(prefix = "Car")
+        val names = elements.map { it.lookupString }.toSet()
+        assertTrue(
+            "Expected 'CardHeader' to appear in tag-name variants, got: $names",
+            "CardHeader" in names,
+        )
+        assertTrue(
+            "Expected 'CardFooter' to appear in tag-name variants, got: $names",
+            "CardFooter" in names,
+        )
+    }
+
+    /**
+     * Regression: a `.rozie` file with NO `<components>` block — addTagNameVariants
+     * must NOT crash and must NOT emit spurious LookupElements. The Plan 03
+     * permissive `getDescriptor` fallback is intentionally preserved per the
+     * Plan 08.2-10 Decision (KDoc line 25 of RozieComponentTagProvider stays
+     * permissive in v0.2.0); the v0.3.0 narrowing is a future polish opportunity.
+     */
+    fun testFileWithoutComponentsBlockEmitsNoLookupElements() {
+        myFixture.configureByFile("component-modal-recognised.rozie")
+        val elements = collectTagNameVariants(prefix = null)
+        // The fixture has no <components> block, so RozieComponentRegistry
+        // returns emptySet -> addTagNameVariants emits nothing.
+        assertTrue(
+            "Expected zero tag-name variants from file without <components> block, " +
+                "got: ${elements.map { it.lookupString }}",
+            elements.isEmpty(),
+        )
+    }
+
     // === Helpers ===
 
     /**
@@ -199,6 +245,49 @@ class RozieXmlExtensionTest : BasePlatformTestCase() {
         return tag?.let { provider.getDescriptor(it) }
     }
 
+    /**
+     * Plan 08.2-10 helper: enumerate `XmlTagNameProvider` extensions, locate the
+     * Rozie provider by simple-name (mirrors the reflection-lookup pattern of
+     * the descriptor-side helpers above), grab the first `<template>`-injected
+     * [XmlTag] in the configured fixture, and invoke `addTagNameVariants`.
+     * Returns the emitted [com.intellij.codeInsight.lookup.LookupElement] list
+     * unchanged.
+     */
+    private fun collectTagNameVariants(
+        prefix: String?,
+    ): List<com.intellij.codeInsight.lookup.LookupElement> {
+        // Find the first PascalCase-looking tag in the template-injected HTML
+        // PSI by walking the file text. Anchoring on `<` is enough — every
+        // template-position tag we care about starts with `<`.
+        val text = myFixture.file.text
+        // Search the LAST `<` (closer to the bottom of the file, more likely
+        // to be inside the actual template body rather than the <components>
+        // block opener). This is a robust-enough proxy in the test setting;
+        // the real provider call-site uses InjectedLanguageManager.
+        val templateAnchor = text.indexOf("<template>").let { if (it >= 0) it else 0 }
+        val firstTagInTemplate = text.indexOf("<", templateAnchor + "<template>".length)
+        check(firstTagInTemplate >= 0) {
+            "Could not locate any tag inside the template body of the configured fixture"
+        }
+        val offset = firstTagInTemplate + 1
+        val ilm = InjectedLanguageManager.getInstance(project)
+        val injectedElement = ilm.findInjectedElementAt(myFixture.file, offset)
+        val tag: XmlTag = injectedElement
+            ?.let { PsiTreeUtil.getParentOfType(it, XmlTag::class.java, false) }
+            ?: error("No XmlTag found at injected offset $offset")
+
+        val providers = TAG_NAME_PROVIDER_EP_NAME.extensionList
+        val provider = providers.firstOrNull {
+            it.javaClass.simpleName == TAG_PROVIDER_SIMPLE_NAME
+        } ?: error(
+            "RozieComponentTagProvider not found among registered " +
+                "XmlTagNameProvider extensions — registration regression"
+        )
+        val sink = mutableListOf<com.intellij.codeInsight.lookup.LookupElement>()
+        provider.addTagNameVariants(sink, tag, prefix)
+        return sink
+    }
+
     companion object {
         private val EP_NAME: ExtensionPointName<XmlAttributeDescriptorsProvider> =
             ExtensionPointName.create("com.intellij.xml.attributeDescriptorsProvider")
@@ -212,5 +301,11 @@ class RozieXmlExtensionTest : BasePlatformTestCase() {
         private val TAG_PROVIDER_EP_NAME: ExtensionPointName<XmlElementDescriptorProvider> =
             ExtensionPointName.create("com.intellij.xml.elementDescriptorProvider")
         private const val TAG_PROVIDER_SIMPLE_NAME = "RozieComponentTagProvider"
+
+        // Plan 08.2-10 — XmlTagNameProvider EP for the addTagNameVariants
+        // exercise. Same provider class as TAG_PROVIDER_SIMPLE_NAME above
+        // (the Rozie provider implements BOTH interfaces in one class).
+        private val TAG_NAME_PROVIDER_EP_NAME: ExtensionPointName<com.intellij.xml.XmlTagNameProvider> =
+            ExtensionPointName.create("com.intellij.xml.tagNameProvider")
     }
 }

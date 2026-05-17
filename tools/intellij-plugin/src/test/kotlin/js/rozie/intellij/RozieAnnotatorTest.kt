@@ -53,6 +53,63 @@ class RozieAnnotatorTest : BasePlatformTestCase() {
         assertHighlightCoversRange(rozieHighlights, "Counter ", "ROZIE_COMPONENT_REF")
     }
 
+    // === Behavior 2b (Plan 08.2-10 P1-UAT-03 regression): PascalCase coloring on
+    // open-tag + close-tag + self-closing variants across reference-example shapes ===
+
+    /**
+     * Regression: Card.rozie-shaped fixture with `<Card class="outer"> ... </Card>`
+     * wrapping a self-closing `<CardHeader />`. The pre-fix RozieAnnotator failed to
+     * paint at least one of these three name occurrences. Asserts ALL three are
+     * painted with ROZIE_COMPONENT_REF.
+     *
+     * Anchor strategy:
+     *   - "Card class" -> offset of 'C' inside the OPEN-tag name token
+     *   - "Card>"      -> offset of 'C' inside the CLOSE-tag name token (`</Card>`)
+     *   - "CardHeader " (trailing space) -> 'C' inside the SELF-CLOSING tag name
+     */
+    fun testCardPascalColoringOpenCloseAndSelfClosing() {
+        myFixture.configureByFile("annotator-card-pascal-coloring.rozie")
+        val rozieHighlights = findRozieHighlights()
+
+        assertHighlightCoversRange(rozieHighlights, "Card class", "ROZIE_COMPONENT_REF")
+        assertHighlightCoversRange(rozieHighlights, "Card>", "ROZIE_COMPONENT_REF")
+        assertHighlightCoversRange(rozieHighlights, "CardHeader ", "ROZIE_COMPONENT_REF")
+    }
+
+    /**
+     * Regression: ModalConsumer.rozie-shaped fixture exercising two distinct
+     * PascalCase components (`<Modal>` and `<WrapperModal>`) declared in the same
+     * `<components>` block. Asserts both open-tag name occurrences paint.
+     */
+    fun testModalConsumerLocalComponentsPaintBothOpenTags() {
+        myFixture.configureByFile("annotator-modalconsumer-local-components.rozie")
+        val rozieHighlights = findRozieHighlights()
+
+        assertHighlightCoversRange(rozieHighlights, "Modal>", "ROZIE_COMPONENT_REF")
+        assertHighlightCoversRange(rozieHighlights, "WrapperModal>", "ROZIE_COMPONENT_REF")
+    }
+
+    /**
+     * Regression: deeply-nested PascalCase tags — Card wraps CardHeader wraps
+     * SomeChild. Each tag-name token MUST be painted independently; the
+     * pre-fix single-XmlToken walk would only catch the outermost.
+     *
+     * Anchor uniqueness:
+     *   - "Card>" only appears in `</Card>` (open-tag uses `<Card>` without space-before-gt)
+     *   - "CardHeader>" only in `</CardHeader>`
+     *   - "SomeChild " (trailing space, before `/>`) only in `<SomeChild />`
+     */
+    fun testNestedPascalTagsAllPainted() {
+        myFixture.configureByFile("annotator-nested-pascal-tags.rozie")
+        val rozieHighlights = findRozieHighlights()
+
+        // Open tags (anchor on name + first attribute / `>` position)
+        assertHighlightCoversRange(rozieHighlights, "Card>\n  <CardHeader", "ROZIE_COMPONENT_REF")
+        assertHighlightCoversRange(rozieHighlights, "CardHeader>\n    <SomeChild", "ROZIE_COMPONENT_REF")
+        // Self-closing
+        assertHighlightCoversRange(rozieHighlights, "SomeChild ", "ROZIE_COMPONENT_REF")
+    }
+
     // === Behavior 3: JS magic identifiers painted by RozieJsAnnotator ===
 
     fun testJsMagicIdentsArePaintedByJsAnnotator() {

@@ -1,0 +1,17 @@
+<rozie name="AnnotatorCardPascalColoring">
+
+<components>
+{
+  Card: './Card.rozie',
+  CardHeader: './CardHeader.rozie',
+}
+</components>
+
+<template>
+<Card class="outer">
+  <CardHeader />
+  body content
+</Card>
+</template>
+
+</rozie>
