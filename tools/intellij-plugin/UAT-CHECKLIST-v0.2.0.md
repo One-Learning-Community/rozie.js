@@ -193,6 +193,63 @@ User question: *"Can certain warnings/inspections be disabled?"* — yes. JetBra
 
 **Decision:** Phase 08.2 Task 3 (tag cut) is DEFERRED. Gap-closure plan needed before v0.2.0 ships.
 
+## Issues captured (2026-05-17 UAT re-run #2 — gap-closure verification)
+
+**Summary:** Gap-closure plans 08.2-08 / 08.2-09 / 08.2-10 / 08.2-11 landed (commits
+`3bd5bf4` / `2881f1d` / `99b6fce` + `f2e344e` / `1410154` respectively, merged into
+main at HEAD `f6bd4f2`). Plan 08.2-12 Task 1 rebuilt the v0.2.0 zip carrying the
+cumulative pivot + gap-closure code (`./gradlew clean buildPlugin verifyPlugin`
+green, both IDE legs `Compatible`). The rebuilt zip was UAT-walked in BOTH
+WebStorm 2024.2.5 and IDEA Ultimate 2025.3 by the user during Plan 08.2-12 Task 2.
+All 4 P1 findings VERIFIED CLOSED. Full 11-example matrix re-walked; no new P0/P1.
+
+### P1-UAT-03 — PascalCase component refs not painted distinctively + components-block-defined components not recognised
+- **Status:** CLOSED — Plan 08.2-10 landed `RozieComponentRegistry` (file-local
+  `<components>`-block introspection wired into
+  `RozieComponentTagProvider.addTagNameVariants`) AND patched
+  `RozieAnnotator.annotateTag`'s PascalCase paint defect (open / close /
+  self-closing variants now paint consistently). Re-verified on Card.rozie,
+  CardHeader.rozie, ModalConsumer.rozie, and WrapperModal.rozie in both
+  WebStorm 2024.2.5 and IDEA Ultimate 2025.3. Typing `<Car` inside a
+  `<template>` of Card.rozie surfaces "CardHeader" in autocomplete (Ctrl-Space);
+  no "Unknown HTML tag" red squiggle on any PascalCase tag.
+
+### P1-UAT-04 — `<components>` / `<props>` / `<data>` block bodies show "Component/Statement expected" warnings
+- **Status:** CLOSED — Plan 08.2-11 landed `RozieMultiHostInjector` paren-wrap
+  (`(\n` prefix + `\n)` suffix) for `PROPS_BODY` / `DATA_BODY` /
+  `COMPONENTS_BODY` injections — the canonical Vue / Svelte SFC convention for
+  giving the injected JS parser an expression context instead of a statement
+  list. Plan 08.2-08's `RozieJSInspectionSuppressor` closes the orthogonal
+  "key has no in-file reader" family as a JS-side belt-and-suspenders. Re-verified
+  against every example with `<props>` / `<data>` / `<components>` blocks
+  (Counter, Dropdown, SearchInput, TodoList, Modal, ModalConsumer, WrapperModal,
+  Card, CardHeader, TreeNode, Table) — no "Statement expected", "Component
+  expected", or `JSLabeledStatement` dead-code warnings on object-literal keys
+  in either IDE.
+
+### P1-UAT-05 — `<script>` block: every defined function shown as unused
+- **Status:** CLOSED — Plan 08.2-08's `RozieJSInspectionSuppressor` suppresses
+  `JSUnusedGlobalSymbols` + `JSUnusedLocalSymbols` for elements inside the
+  `<script>` body of any Rozie-context file (via `RozieContextCheck.isRozieContext`).
+  Re-verified on Counter.rozie — `increment` / `decrement` / `reset` etc. no
+  longer rendered greyed-out; the JS inspector treats them as used. Confirmed
+  in both target IDEs.
+
+### P1-UAT-06 — `<style>` block: every CSS class/selector shown as unused
+- **Status:** CLOSED — Plan 08.2-09's `RozieCssInspectionSuppressor` suppresses
+  `CssUnusedSymbol` for elements inside the `<style>` body of any Rozie-context
+  file. Registered for the CSS / SCSS / Less language IDs. Re-verified on
+  Counter.rozie — `.counter`, `.counter__value`, `.counter__btn` etc. no longer
+  rendered greyed-out; CSS inspector treats them as used. Confirmed in both
+  target IDEs.
+
+### Aggregate disposition
+
+All 4 P1 findings CLOSED. The injection-first architectural pivot now ships
+with the gap-closure-extended IntelliJ smarts surface. Tag cut authorised
+(Plan 08.2-12 Task 3); local annotated tag `intellij-plugin/v0.2.0` cut at HEAD
+of main; STOPPED at the push boundary per `feedback_no_autopush` user memory.
+
 ## Issues captured (2026-05-17 UAT halt — partial walkthrough)
 
 ## Issues captured (2026-05-17 UAT halt — partial walkthrough)
