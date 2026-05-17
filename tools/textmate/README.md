@@ -4,13 +4,15 @@ Syntax highlighting for `.rozie` Single-File Component files. Consumed by JetBra
 
 ## What gets highlighted
 
-- SFC top-level blocks: `<template>`, `<script>`, `<props>`, `<data>`, `<listeners>`, `<style>`
-- Block content delegated to host grammars (JavaScript for script/props/data/listeners, CSS for style, HTML for template)
-- `r-*` directives (`r-for`, `r-if`, `r-else`, `r-show`, `r-model`, ...)
+- SFC top-level blocks: `<template>`, `<script>`, `<props>`, `<data>`, `<listeners>`, `<components>`, `<style>`
+- Block content delegated to host grammars (JavaScript for script/props/data/listeners/components, CSS for style, HTML for template)
+- `r-*` directives (`r-for`, `r-if`, `r-else-if`, `r-else`, `r-show`, `r-model`, `r-html`, `r-text`, `r-bind`, `r-on`)
+- Directive argument-form `r-model:propName="$data.x"` — the directive name, `:`, and the propName are scoped distinctly (Phase 07.3 consumer-side two-way binding)
 - Event bindings with arbitrary modifier chains and arguments: `@click.outside($refs.x).debounce(300).stop`
-- Prop binding shorthand `:propName="expr"`
+- Prop binding shorthand `:propName="expr"` (kebab-case prop names supported)
+- Slot-fill shorthand on `<template>` tags: `#name`, `#default`, `#[$data.dynamicName]`, and the scoped-params form `#header="{ close }"`
 - Mustache interpolation `{{ expr }}` — supported in text content AND attribute values
-- Special `$`-identifiers: `$props`, `$data`, `$refs`, `$emit`, `$computed`, `$onMount`, `$onUnmount`, `$watch`, `$slots`, `$el`
+- Special `$`-identifiers: `$props`, `$data`, `$refs`, `$emit`, `$computed`, `$onMount`, `$onUnmount`, `$onUpdate`, `$watch`, `$slots`, `$el`
 - `ref="…"` template-ref attribute
 
 ## Bundle layout
@@ -23,7 +25,7 @@ tools/textmate/
 ├── language-configuration.json ← brackets, comments, auto-close pairs
 ├── syntaxes/
 │   └── rozie.tmLanguage.json ← the actual grammar
-├── fixtures/                 ← demo .rozie files for visual verification
+├── fixtures/                 ← demo .rozie files for visual verification (Counter, Dropdown, ModalConsumer)
 └── README.md
 ```
 
@@ -66,13 +68,15 @@ VSCode consumes the same `.tmLanguage.json` format. Either:
 
 ## Verify it works
 
-Open `tools/textmate/fixtures/Counter.rozie` and `Dropdown.rozie`. You should see:
+Open `tools/textmate/fixtures/Counter.rozie`, `Dropdown.rozie`, and `ModalConsumer.rozie`. You should see:
 
 - Each SFC block visually framed (its tags scoped distinctly from generic HTML)
 - `<script>` / `<style>` content highlighted with full JS / CSS support
 - `r-for`, `r-if`, `r-model`, etc. standing out from regular HTML attributes
+- `r-model:open="$data.x"` — the directive name (`r-model`), the `:` separator, and the argument propName (`open`) each scoped distinctly
 - `@click`, `@click.outside(...)`, `@input.debounce(300)` — `@` and the event name distinct from the modifiers, parens and their JS args also highlighted
 - `:disabled`, `:class`, `:placeholder` — `:` and the prop name distinct from a value attribute
+- `<template #header>`, `<template #header="{ close }">`, `<template #[$data.slotName]>` — the `#`, slot name (or bracketed JS expression), and destructured params each styled
 - `{{ $props.value }}` — braces and the `$props` identifier both styled
 - Inside `<listeners>` selector strings like `"document:click.outside($refs.triggerEl, $refs.panelEl)"` — JS-string highlighting for the selector; the modifier args participate in the JS-expression grammar
 
@@ -82,6 +86,7 @@ Open `tools/textmate/fixtures/Counter.rozie` and `Dropdown.rozie`. You should se
 - `<style scoped>` highlights identically to `<style>` — there is no visual difference for the `scoped` attribute itself yet.
 - No folding rules, no indentation rules, no brace-matching, no completion, no diagnostics. This is a colorizer only.
 - Modifier-arg lists tokenize their contents as a JS expression, but errors (mismatched parens, etc.) are not surfaced — the grammar is forgiving.
+- The top-level `<template>` SFC block is matched only when `<template>` (and the closing `</template>`) appear flush-left at column 0. This is what lets nested `<template #header>` slot-fill tags inside the block coexist with the block boundaries — TextMate has no stack-aware tag matching, so indentation is the only signal. If you indent the SFC's top-level block, slot-fill highlighting will appear correct but the outer block end will be detected at the FIRST `</template>` (the inner one), losing highlighting on whatever follows.
 
 ## Future
 

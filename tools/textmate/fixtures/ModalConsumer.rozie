@@ -1,0 +1,100 @@
+<!--
+  ModalConsumer.rozie
+
+  Fixture exercising the syntax additions since the grammar's initial cut:
+    - r-model:propName="$data.x" argument-form (Phase 07.3 consumer-side
+      two-way binding) — `r-model:open` should highlight the directive name,
+      `:`, and the propName argument distinctly
+    - <template #header>             — slot-fill shorthand, named
+    - <template #default>            — slot-fill shorthand, default
+    - <template #header="{ close }"> — scoped-slot destructured params
+    - <template #[$data.slotName]>   — dynamic slot name with bracketed expr
+    - $onUpdate lifecycle hook       — joins $onMount / $onUnmount / $watch
+
+  Co-located with Counter.rozie (basics) and Dropdown.rozie (listeners +
+  modifier args + refs).
+-->
+
+<rozie name="ModalConsumer">
+
+<components>
+{
+  Modal:        './Modal.rozie',
+  WrapperModal: './WrapperModal.rozie',
+}
+</components>
+
+<props>
+{
+  title: { type: String, default: 'Confirm' },
+}
+</props>
+
+<data>
+{
+  open1:    true,
+  open2:    true,
+  open3:    true,
+  slotName: 'header',
+  hits:     0,
+}
+</data>
+
+<script>
+function onConfirm() {
+  $data.open1 = false
+}
+
+// $onUpdate fires on every re-render after mount. Useful when wiring vanilla-JS
+// libraries that need to be re-synced after reactive state changes (e.g.,
+// Popper.js .update() after a position prop flips).
+$onUpdate(() => {
+  $data.hits += 1
+})
+</script>
+
+<template>
+<div class="modal-consumer">
+  <!-- r-model:open is the argument-form: forwards open into the producer's
+       `open` model-prop and writes back to $data.open1 when the producer
+       emits a change. -->
+  <Modal r-model:open="$data.open1">
+    <template #header="{ close }">
+      <h2>{{ $props.title }}</h2>
+      <button class="close" @click="close">×</button>
+    </template>
+    Are you sure you want to proceed?
+    <template #footer="{ close }">
+      <button @click="close">Cancel</button>
+      <button @click="onConfirm()">OK</button>
+    </template>
+  </Modal>
+
+  <Modal r-model:open="$data.open2">
+    <!-- Dynamic slot name — the bracketed expression is a regular JS expression
+         that resolves at render time. -->
+    <template #[$data.slotName]>
+      <span class="dynamic-fill">Dynamic header via slotName ({{ $data.hits }} updates)</span>
+    </template>
+    Dynamic-name demo body
+  </Modal>
+
+  <WrapperModal r-model:open="$data.open3" :title="$props.title">
+    <template #brand>
+      <h2>Re-projected brand</h2>
+    </template>
+    Body via wrapper's default slot
+    <template #actions>
+      <button>Wrapper action</button>
+    </template>
+  </WrapperModal>
+</div>
+</template>
+
+<style>
+.modal-consumer { display: flex; flex-direction: column; gap: 1rem; }
+.close { background: none; border: none; cursor: pointer; font-size: 1.25rem; }
+.dynamic-fill { font-weight: bold; }
+</style>
+
+</rozie>

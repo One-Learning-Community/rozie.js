@@ -50,8 +50,9 @@
       }
     },
     "block-template": {
-      "begin": "(<)(template)\\b([^>]*)(>)",
-      "end": "(</)(template)(>)",
+      "comment": "Anchored at line start so nested `<template #name>` slot-fill tags inside the block do not prematurely close it. Authors are expected to keep top-level SFC tags flush left.",
+      "begin": "^(<)(template)\\b([^>]*)(>)",
+      "end": "^(</)(template)(>)",
       "beginCaptures": {
         "1": { "name": "punctuation.definition.tag.begin.rozie" },
         "2": { "name": "entity.name.tag.rozie.block.template" },
@@ -263,6 +264,7 @@
       "patterns": [
         { "include": "#directive-attribute" },
         { "include": "#event-binding" },
+        { "include": "#slot-fill-shorthand" },
         { "include": "#prop-binding" },
         { "include": "#ref-attribute" },
         { "include": "#html-attribute" }
@@ -287,6 +289,7 @@
       "patterns": [
         { "include": "#directive-attribute" },
         { "include": "#event-binding" },
+        { "include": "#slot-fill-shorthand" },
         { "include": "#prop-binding" },
         { "include": "#ref-attribute" },
         { "include": "#html-attribute" }
@@ -301,12 +304,15 @@
       }
     },
     "directive-attribute": {
-      "begin": "\\b(r-(?:for|if|else-if|else|show|model|html|text|bind|on))(?:(=)(\"|'))?",
-      "end": "(?:(\\3)|(?<=[^=])(?=\\s|/?>))",
+      "comment": "Captures: 1=directive name (`r-model`), 2=`:`, 3=argument propName (`open` in `r-model:open`), 4=`=`, 5=opening quote. The argument-form is currently used by `r-model:propName=` (Phase 07.3 consumer-side two-way binding) but the regex permits it on any directive — the parser will reject unsupported pairings semantically.",
+      "begin": "\\b(r-(?:for|if|else-if|else|show|model|html|text|bind|on))(?:(:)([A-Za-z][\\w-]*))?(?:(=)(\"|'))?",
+      "end": "(?:(\\5)|(?<=[^=])(?=\\s|/?>))",
       "beginCaptures": {
         "1": { "name": "entity.other.attribute-name.directive.rozie" },
-        "2": { "name": "punctuation.separator.key-value.rozie" },
-        "3": { "name": "string.quoted.rozie punctuation.definition.string.begin.rozie" }
+        "2": { "name": "punctuation.separator.argument.directive.rozie" },
+        "3": { "name": "entity.other.attribute-name.directive-argument.rozie" },
+        "4": { "name": "punctuation.separator.key-value.rozie" },
+        "5": { "name": "string.quoted.rozie punctuation.definition.string.begin.rozie" }
       },
       "endCaptures": {
         "1": { "name": "string.quoted.rozie punctuation.definition.string.end.rozie" }
@@ -364,6 +370,73 @@
           "captures": {
             "1": { "name": "punctuation.separator.modifier.rozie" },
             "2": { "name": "support.function.modifier.rozie" }
+          }
+        }
+      ]
+    },
+    "slot-fill-shorthand": {
+      "comment": "`<template #header>`, `<template #default>`, `<template #[$data.slotName]>`, and the scoped-params form `<template #header=\"{ close }\">` per lowerSlotFillers.ts. The `#`-prefix shorthand only carries meaning on `<template>` tags but the grammar matches the form anywhere it appears. Two cases per name-form (bracketed vs identifier) — value-bearing (begin/end on quote) vs boolean (single match) — so spaces inside the destructure literal don't terminate the value match early.",
+      "patterns": [
+        {
+          "begin": "(#)(\\[)([^\\]]*)(\\])\\s*(=)\\s*(\"|')",
+          "end": "\\6",
+          "beginCaptures": {
+            "1": { "name": "punctuation.definition.slot-fill.rozie" },
+            "2": { "name": "punctuation.section.brackets.begin.rozie" },
+            "3": {
+              "name": "meta.embedded.expression.rozie",
+              "patterns": [
+                { "include": "#expression" }
+              ]
+            },
+            "4": { "name": "punctuation.section.brackets.end.rozie" },
+            "5": { "name": "punctuation.separator.key-value.rozie" },
+            "6": { "name": "string.quoted.rozie punctuation.definition.string.begin.rozie" }
+          },
+          "endCaptures": {
+            "0": { "name": "string.quoted.rozie punctuation.definition.string.end.rozie" }
+          },
+          "contentName": "meta.embedded.expression.rozie",
+          "patterns": [
+            { "include": "#expression" }
+          ]
+        },
+        {
+          "match": "(#)(\\[)([^\\]]*)(\\])",
+          "captures": {
+            "1": { "name": "punctuation.definition.slot-fill.rozie" },
+            "2": { "name": "punctuation.section.brackets.begin.rozie" },
+            "3": {
+              "name": "meta.embedded.expression.rozie",
+              "patterns": [
+                { "include": "#expression" }
+              ]
+            },
+            "4": { "name": "punctuation.section.brackets.end.rozie" }
+          }
+        },
+        {
+          "begin": "(#)([A-Za-z][\\w-]*)\\s*(=)\\s*(\"|')",
+          "end": "\\4",
+          "beginCaptures": {
+            "1": { "name": "punctuation.definition.slot-fill.rozie" },
+            "2": { "name": "entity.name.tag.slot-name.rozie" },
+            "3": { "name": "punctuation.separator.key-value.rozie" },
+            "4": { "name": "string.quoted.rozie punctuation.definition.string.begin.rozie" }
+          },
+          "endCaptures": {
+            "0": { "name": "string.quoted.rozie punctuation.definition.string.end.rozie" }
+          },
+          "contentName": "meta.embedded.expression.rozie",
+          "patterns": [
+            { "include": "#expression" }
+          ]
+        },
+        {
+          "match": "(#)([A-Za-z][\\w-]*)",
+          "captures": {
+            "1": { "name": "punctuation.definition.slot-fill.rozie" },
+            "2": { "name": "entity.name.tag.slot-name.rozie" }
           }
         }
       ]
@@ -443,7 +516,8 @@
       ]
     },
     "magic-identifier": {
-      "match": "\\$(props|data|refs|emit|computed|onMount|onUnmount|watch|slots|el)\\b",
+      "comment": "Canonical list per packages/core/src/semantic/validators/unknownRefValidator.ts (lifecycle) + packages/core/src/reactivity/computeDeps.ts (stable refs) + packages/core/src/diagnostics/codes.ts ROZ202 (reserved <data> field names). Keep in sync when new $-identifiers ship.",
+      "match": "\\$(props|data|refs|emit|computed|onMount|onUnmount|onUpdate|watch|slots|el)\\b",
       "name": "variable.language.rozie support.variable.rozie"
     }
   }
