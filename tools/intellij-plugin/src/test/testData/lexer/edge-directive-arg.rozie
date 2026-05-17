@@ -1,7 +1,0 @@
-<rozie name="DirectiveArgProbe">
-<template>
-  <Modal r-model:open="$data.open" />
-  <Modal r-model:value="$data.count" />
-  <input r-model="$data.legacy" />
-</template>
-</rozie>
