@@ -14,10 +14,10 @@ export default function NamedSlotsFixture(_props: NamedSlotsFixtureProps): JSX.E
     <>
     <div class={"named-slots-fixture"} data-rozie-s-a30182bc="">
       <header data-rozie-s-a30182bc="">
-        {(_props.headerSlot ?? _props.slots?.['header'])}
+        {(_props.headerSlot ?? _props.slots?.['header']?.({}))}
       </header>
       <footer data-rozie-s-a30182bc="">
-        {(_props.footerSlot ?? _props.slots?.['footer'])}
+        {(_props.footerSlot ?? _props.slots?.['footer']?.({}))}
       </footer>
     </div>
     </>

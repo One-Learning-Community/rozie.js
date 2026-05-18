@@ -13,7 +13,7 @@
 import CardHeader from './CardHeader.vue';
 
 const props = withDefaults(
-  defineProps<{ title?: string; onClose?: (...args: any[]) => any }>(),
+  defineProps<{ title?: string; onClose?: ((...args: any[]) => any) | null }>(),
   { title: '', onClose: null }
 );
 

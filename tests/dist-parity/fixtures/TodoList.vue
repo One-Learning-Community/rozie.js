@@ -16,9 +16,9 @@
   <ul v-if="items.length > 0">
     <li v-for="item in items" :key="item.id" :class="{ done: item.done }">
       
-      <slot :item="item" :toggle="() => toggle(item.id)" :remove="() => remove(item.id)">
+      <slot :item="item" :toggle="() => toggle(item.id)" :remove="() => removeItem(item.id)">
         <label><input type="checkbox" :checked="item.done" @change="toggle(item.id)" /><span>{{ item.text }}</span></label>
-        <button aria-label="Remove" @click="remove(item.id)">×</button>
+        <button aria-label="Remove" @click="removeItem(item.id)">×</button>
       </slot>
     </li>
   </ul><p v-else class="empty">
@@ -35,7 +35,7 @@ const props = withDefaults(
   { title: 'Todo' }
 );
 
-const items = defineModel<unknown[]>('items', { default: () => [] });
+const items = defineModel<any[]>('items', { default: () => [] });
 
 const emit = defineEmits<{
   add: [...args: any[]];
@@ -71,7 +71,18 @@ const toggle = id => {
   } : i);
   emit('toggle', id);
 };
-const remove = id => {
+
+// Internal method renamed from `remove` to `removeItem` to avoid colliding
+// with `HTMLElement.prototype.remove()` on the Lit target — Lit emits user
+// methods as class fields and the resulting `remove(id)` signature is
+// incompatible with the inherited `remove(): void`. Public API is unchanged:
+// the slot param is still `:remove`, the emitted event is still `'remove'`.
+// Internal method renamed from `remove` to `removeItem` to avoid colliding
+// with `HTMLElement.prototype.remove()` on the Lit target — Lit emits user
+// methods as class fields and the resulting `remove(id)` signature is
+// incompatible with the inherited `remove(): void`. Public API is unchanged:
+// the slot param is still `:remove`, the emitted event is still `'remove'`.
+const removeItem = id => {
   items.value = items.value.filter(i => i.id !== id);
   emit('remove', id);
 };

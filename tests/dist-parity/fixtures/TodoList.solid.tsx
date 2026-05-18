@@ -5,9 +5,9 @@ import { createControllableSignal } from '@rozie/runtime-solid';
 interface HeaderSlotCtx { remaining: any; total: any; }
 
 interface TodoListProps {
-  items?: unknown[];
-  defaultItems?: unknown[];
-  onItemsChange?: (items: unknown[]) => void;
+  items?: any[];
+  defaultItems?: any[];
+  onItemsChange?: (items: any[]) => void;
   title?: string;
   onAdd?: (...args: unknown[]) => void;
   onToggle?: (...args: unknown[]) => void;
@@ -24,7 +24,7 @@ export default function TodoList(_props: TodoListProps): JSX.Element {
   const [local, rest] = splitProps(_merged, ['items', 'title', 'children']);
   const resolved = children(() => local.children);
 
-  const [items, setItems] = createControllableSignal(_props as Record<string, unknown>, 'items', (() => [])());
+  const [items, setItems] = createControllableSignal<any[]>(_props as Record<string, unknown>, 'items', (() => [])());
   const [draft, setDraft] = createSignal('');
   const remaining = createMemo(() => items().filter(i => !i.done).length);
 
@@ -46,7 +46,13 @@ export default function TodoList(_props: TodoListProps): JSX.Element {
     } : i));
     _props.onToggle?.(id);
   };
-  const remove = id => {
+
+  // Internal method renamed from `remove` to `removeItem` to avoid colliding
+  // with `HTMLElement.prototype.remove()` on the Lit target — Lit emits user
+  // methods as class fields and the resulting `remove(id)` signature is
+  // incompatible with the inherited `remove(): void`. Public API is unchanged:
+  // the slot param is still `:remove`, the emitted event is still `'remove'`.
+  const removeItem = id => {
     setItems(items().filter(i => i.id !== id));
     _props.onRemove?.(id);
   };
@@ -62,7 +68,7 @@ export default function TodoList(_props: TodoListProps): JSX.Element {
     <>
     <div class={"todo-list"} data-rozie-s-52bec3de="">
       <header data-rozie-s-52bec3de="">
-        {(_props.headerSlot ?? _props.slots?.['header']) ? (_props.headerSlot ?? _props.slots?.['header'])({ remaining: remaining(), total: items().length }) : <h3 data-rozie-s-52bec3de="">{local.title} ({remaining()} remaining)</h3>}
+        {(_props.headerSlot ?? _props.slots?.['header'])?.({ remaining: remaining(), total: items().length }) ?? <h3 data-rozie-s-52bec3de="">{local.title} ({remaining()} remaining)</h3>}
       </header>
 
       <form onSubmit={(e) => { e.preventDefault(); add(); }} data-rozie-s-52bec3de="">
@@ -71,11 +77,11 @@ export default function TodoList(_props: TodoListProps): JSX.Element {
       </form>
 
       {<Show when={items().length > 0} fallback={<p class={"empty"} data-rozie-s-52bec3de="">
-        {(_props.emptySlot ?? _props.slots?.['empty']) ?? "Nothing to do. ✨"}
+        {(_props.emptySlot ?? _props.slots?.['empty']?.({})) ?? "Nothing to do. ✨"}
       </p>}><ul data-rozie-s-52bec3de="">
         <For each={items()}>{(item) => <li classList={{ done: item.done }} data-rozie-s-52bec3de="">
           
-          {typeof local.children === 'function' ? (local.children as (s: any) => any)({ item, toggle: () => toggle(item.id), remove: () => remove(item.id) }) : (resolved() ?? <><label data-rozie-s-52bec3de=""><input type="checkbox" checked={item.done} onChange={(e) => { toggle(item.id); }} data-rozie-s-52bec3de="" /><span data-rozie-s-52bec3de="">{item.text}</span></label><button aria-label="Remove" onClick={(e) => { remove(item.id); }} data-rozie-s-52bec3de="">×</button></>)}
+          {typeof local.children === 'function' ? (local.children as (s: any) => any)({ item, toggle: () => toggle(item.id), remove: () => removeItem(item.id) }) : (resolved() ?? <><label data-rozie-s-52bec3de=""><input type="checkbox" checked={item.done} onChange={(e) => { toggle(item.id); }} data-rozie-s-52bec3de="" /><span data-rozie-s-52bec3de="">{item.text}</span></label><button aria-label="Remove" onClick={(e) => { removeItem(item.id); }} data-rozie-s-52bec3de="">×</button></>)}
         </li>}</For>
       </ul></Show>}</div>
     </>

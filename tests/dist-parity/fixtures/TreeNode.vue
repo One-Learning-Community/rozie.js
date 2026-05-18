@@ -15,7 +15,7 @@ import TreeNode from './TreeNode.vue';
 defineOptions({ name: 'TreeNode' });
 
 const props = withDefaults(
-  defineProps<{ node?: unknown }>(),
+  defineProps<{ node?: Record<string, any> }>(),
   { node: () => ({
   id: '',
   label: '',

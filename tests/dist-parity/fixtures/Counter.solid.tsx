@@ -15,7 +15,7 @@ export default function Counter(_props: CounterProps): JSX.Element {
   const _merged = mergeProps({ step: 1, min: -Infinity, max: Infinity }, _props);
   const [local, rest] = splitProps(_merged, ['value', 'step', 'min', 'max']);
 
-  const [value, setValue] = createControllableSignal(_props as Record<string, unknown>, 'value', 0);
+  const [value, setValue] = createControllableSignal<number>(_props as Record<string, unknown>, 'value', 0);
   const [hovering, setHovering] = createSignal(false);
   const canIncrement = createMemo(() => value() + local.step <= local.max);
   const canDecrement = createMemo(() => value() - local.step >= local.min);

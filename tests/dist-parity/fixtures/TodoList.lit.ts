@@ -26,8 +26,8 @@ li.done span { text-decoration: line-through; opacity: 0.5; }
 form { display: flex; gap: 0.25rem; margin-block: 0.5rem; }
 `;
 
-  @property({ type: Array, attribute: 'items' }) _items_attr: unknown[] = [];
-  private _itemsControllable = createLitControllableProperty<unknown[]>({ host: this, eventName: 'items-change', defaultValue: [], initialControlledValue: undefined });
+  @property({ type: Array, attribute: 'items' }) _items_attr: any[] = [];
+  private _itemsControllable = createLitControllableProperty<any[]>({ host: this, eventName: 'items-change', defaultValue: [], initialControlledValue: undefined });
   @property({ type: String, reflect: true }) title: string = 'Todo';
   private _draft = signal('');
 
@@ -41,9 +41,9 @@ form { display: flex; gap: 0.25rem; margin-block: 0.5rem; }
   private _disconnectCleanups: Array<() => void> = [];
 
   private _armListeners(): void {
-    this.addEventListener('rozie-default-toggle', (e) => { (() => this.toggle(item.id))((e as CustomEvent).detail); });
+    this.addEventListener('rozie-default-toggle', (e) => { ((() => this.toggle(item.id)) as (...args: any[]) => any)((e as CustomEvent).detail); });
 
-    this.addEventListener('rozie-default-remove', (e) => { (() => this.remove(item.id))((e as CustomEvent).detail); });
+    this.addEventListener('rozie-default-remove', (e) => { ((() => this.removeItem(item.id)) as (...args: any[]) => any)((e as CustomEvent).detail); });
 
     {
       const slotEl = this.shadowRoot?.querySelector('slot[name="header"]');
@@ -100,7 +100,7 @@ form { display: flex; gap: 0.25rem; margin-block: 0.5rem; }
 
   attributeChangedCallback(name: string, old: string | null, value: string | null): void {
     super.attributeChangedCallback(name, old, value);
-    if (name === 'items') this._itemsControllable.notifyAttributeChange(value as unknown as unknown[]);
+    if (name === 'items') this._itemsControllable.notifyAttributeChange(value as unknown as any[]);
   }
 
   render() {
@@ -113,17 +113,17 @@ form { display: flex; gap: 0.25rem; margin-block: 0.5rem; }
     </slot>
   </header>
 
-  <form @submit=${(e: SubmitEvent) => { e.preventDefault(); (this.add)(e); }}>
+  <form @submit=${(e: SubmitEvent) => { e.preventDefault(); ((this.add) as (...args: any[]) => any)(e); }}>
     <input placeholder="What needs doing?" .value=${this._draft.value} @input=${(e) => this._draft.value = (e.target as HTMLInputElement).value} />
     <button type="submit" ?disabled=${!this._draft.value.trim()}>Add</button>
   </form>
 
   ${this.items.length > 0 ? html`<ul>
-    ${repeat(this.items, (item, _idx) => item.id, (item, _idx) => html`<li class="${Object.entries({ done: item.done }).filter(([, v]) => v).map(([k]) => k).join(' ')}" key=${item.id}>
+    ${repeat<any>(this.items, (item, _idx) => item.id, (item, _idx) => html`<li class="${Object.entries({ done: item.done }).filter(([, v]) => v).map(([k]) => k).join(' ')}" key=${item.id}>
       
       <slot data-rozie-params=${(() => { try { return JSON.stringify({item: item}); } catch { return '{}'; } })()}>
         <label><input type="checkbox" ?checked=${item.done} @change=${(e: Event) => { this.toggle(item.id); }} /><span>${item.text}</span></label>
-        <button aria-label="Remove" @click=${(e: Event) => { this.remove(item.id); }}>×</button>
+        <button aria-label="Remove" @click=${(e: Event) => { this.removeItem(item.id); }}>×</button>
       </slot>
     </li>`)}
   </ul>` : html`<p class="empty">
@@ -162,7 +162,7 @@ form { display: flex; gap: 0.25rem; margin-block: 0.5rem; }
   }));
 };
 
-  remove = id => {
+  removeItem = id => {
   this.items = this.items.filter(i => i.id !== id);
   this.dispatchEvent(new CustomEvent("remove", {
     detail: id,
@@ -171,6 +171,6 @@ form { display: flex; gap: 0.25rem; margin-block: 0.5rem; }
   }));
 };
 
-  get items(): unknown[] { return this._itemsControllable.read(); }
-  set items(v: unknown[]) { this._itemsControllable.write(v); }
+  get items(): any[] { return this._itemsControllable.read(); }
+  set items(v: any[]) { this._itemsControllable.write(v); }
 }

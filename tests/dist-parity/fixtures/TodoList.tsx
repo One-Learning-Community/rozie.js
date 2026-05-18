@@ -8,13 +8,13 @@ interface HeaderCtx { remaining: any; total: any; }
 interface ChildrenCtx { item: any; toggle: any; remove: any; }
 
 interface TodoListProps {
-  items?: unknown[];
-  defaultValue?: unknown[];
-  onItemsChange?: (items: unknown[]) => void;
+  items?: any[];
+  defaultValue?: any[];
+  onItemsChange?: (items: any[]) => void;
   title?: string;
-  onAdd?: (...args: unknown[]) => void;
-  onToggle?: (...args: unknown[]) => void;
-  onRemove?: (...args: unknown[]) => void;
+  onAdd?: (...args: any[]) => void;
+  onToggle?: (...args: any[]) => void;
+  onRemove?: (...args: any[]) => void;
   renderHeader?: (ctx: HeaderCtx) => ReactNode;
   children?: ReactNode | ((ctx: ChildrenCtx) => ReactNode);
   renderEmpty?: () => ReactNode;
@@ -22,7 +22,7 @@ interface TodoListProps {
 }
 
 export default function TodoList(_props: TodoListProps): JSX.Element {
-  const props: TodoListProps = {
+  const props: TodoListProps & { title: string } = {
     ..._props,
     title: _props.title ?? 'Todo',
   };
@@ -55,7 +55,7 @@ export default function TodoList(_props: TodoListProps): JSX.Element {
     _rozieProp_onToggle && _rozieProp_onToggle(id);
   }, [_rozieProp_onToggle, items, setItems]);
   const { onRemove: _rozieProp_onRemove } = props;
-    const remove = useCallback(id => {
+    const removeItem = useCallback(id => {
     setItems(items.filter(i => i.id !== id));
     _rozieProp_onRemove && _rozieProp_onRemove(id);
   }, [_rozieProp_onRemove, items, setItems]);
@@ -64,10 +64,10 @@ export default function TodoList(_props: TodoListProps): JSX.Element {
     <>
     <div className={styles["todo-list"]} data-rozie-s-52bec3de="">
       <header data-rozie-s-52bec3de="">
-        {(props.renderHeader ?? props.slots?.['header']) ? (props.renderHeader ?? props.slots?.['header'])({ remaining, total: items.length }) : <h3 data-rozie-s-52bec3de="">{props.title} ({remaining} remaining)</h3>}
+        {(props.renderHeader ?? props.slots?.['header']) ? ((props.renderHeader ?? props.slots?.['header']) as Function)({ remaining, total: items.length }) : <h3 data-rozie-s-52bec3de="">{props.title} ({remaining} remaining)</h3>}
       </header>
 
-      <form onSubmit={(e) => { e.preventDefault(); add(e); }} data-rozie-s-52bec3de="">
+      <form onSubmit={(e) => { e.preventDefault(); ((add) as ((...args: any[]) => any))(e); }} data-rozie-s-52bec3de="">
         <input placeholder="What needs doing?" value={draft} onChange={e => setDraft(e.target.value)} data-rozie-s-52bec3de="" />
         <button type="submit" disabled={!draft.trim()} data-rozie-s-52bec3de="">Add</button>
       </form>
@@ -75,10 +75,10 @@ export default function TodoList(_props: TodoListProps): JSX.Element {
       {(items.length > 0) ? <ul data-rozie-s-52bec3de="">
         {items.map((item) => <li key={item.id} className={clsx({ [styles.done]: item.done })} data-rozie-s-52bec3de="">
           
-          {typeof (props.children ?? props.slots?.['']) === 'function' ? (props.children ?? props.slots?.[''])({ item, toggle: () => toggle(item.id), remove: () => remove(item.id) }) : ((props.children ?? props.slots?.['']) ?? <><label data-rozie-s-52bec3de=""><input type="checkbox" checked={item.done} onChange={(e) => { toggle(item.id); }} data-rozie-s-52bec3de="" /><span data-rozie-s-52bec3de="">{item.text}</span></label><button aria-label="Remove" onClick={(e) => { remove(item.id); }} data-rozie-s-52bec3de="">×</button></>)}
+          {typeof (props.children ?? props.slots?.['']) === 'function' ? ((props.children ?? props.slots?.['']) as Function)({ item, toggle: () => toggle(item.id), remove: () => removeItem(item.id) }) : ((props.children ?? props.slots?.['']) ?? <><label data-rozie-s-52bec3de=""><input type="checkbox" checked={item.done} onChange={(e) => { toggle(item.id); }} data-rozie-s-52bec3de="" /><span data-rozie-s-52bec3de="">{item.text}</span></label><button aria-label="Remove" onClick={(e) => { removeItem(item.id); }} data-rozie-s-52bec3de="">×</button></>)}
         </li>)}
       </ul> : <p className={styles.empty} data-rozie-s-52bec3de="">
-        {(props.renderEmpty ?? props.slots?.['empty']) ? (props.renderEmpty ?? props.slots?.['empty'])() : "Nothing to do. ✨"}
+        {(props.renderEmpty ?? props.slots?.['empty']) ? ((props.renderEmpty ?? props.slots?.['empty']) as Function)() : "Nothing to do. ✨"}
       </p>}</div>
     </>
   );

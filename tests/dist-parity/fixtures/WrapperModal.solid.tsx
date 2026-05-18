@@ -20,14 +20,14 @@ export default function WrapperModal(_props: WrapperModalProps): JSX.Element {
   const [local, rest] = splitProps(_merged, ['title', 'open', 'children']);
   const resolved = children(() => local.children);
 
-  const [open, setOpen] = createControllableSignal(_props as Record<string, unknown>, 'open', false);
+  const [open, setOpen] = createControllableSignal<boolean>(_props as Record<string, unknown>, 'open', false);
 
   return (
     <>
     <Modal open={open()} onOpenChange={setOpen} title={local.title} headerSlot={() => (<>
-        {(_props.brandSlot ?? _props.slots?.['brand']) ?? <h2 data-rozie-s-1efe6192="">{local.title}</h2>}
+        {(_props.brandSlot ?? _props.slots?.['brand']?.({})) ?? <h2 data-rozie-s-1efe6192="">{local.title}</h2>}
       </>)} footerSlot={() => (<>
-        {(_props.actionsSlot ?? _props.slots?.['actions'])}
+        {(_props.actionsSlot ?? _props.slots?.['actions']?.({}))}
       </>)}>{resolved()}</Modal>
     </>
   );

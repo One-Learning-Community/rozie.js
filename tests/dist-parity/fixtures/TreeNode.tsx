@@ -1,11 +1,11 @@
 import styles from './TreeNode.module.css';
 
 interface TreeNodeProps {
-  node?: Record<string, unknown>;
+  node?: Record<string, any>;
 }
 
 export default function TreeNode(_props: TreeNodeProps): JSX.Element {
-  const props: TreeNodeProps = {
+  const props: TreeNodeProps & { node: Record<string, any> } = {
     ..._props,
     node: _props.node ?? (() => ({
     id: '',

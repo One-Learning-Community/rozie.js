@@ -8,7 +8,7 @@ interface ModalConsumerProps {
 }
 
 export default function ModalConsumer(_props: ModalConsumerProps): JSX.Element {
-  const props: ModalConsumerProps = {
+  const props: ModalConsumerProps & { title: string } = {
     ..._props,
     title: _props.title ?? 'Confirm',
   };

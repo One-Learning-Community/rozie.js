@@ -27,7 +27,7 @@ export default function Modal(_props: ModalProps): JSX.Element {
   const [local, rest] = splitProps(_merged, ['open', 'closeOnEscape', 'closeOnBackdrop', 'lockBodyScroll', 'title', 'children']);
   const resolved = children(() => local.children);
 
-  const [open, setOpen] = createControllableSignal(_props as Record<string, unknown>, 'open', false);
+  const [open, setOpen] = createControllableSignal<boolean>(_props as Record<string, unknown>, 'open', false);
   onMount(() => {
     const _cleanup = (lockScroll)() as unknown;
     if (_cleanup) onCleanup(_cleanup as () => void);
@@ -100,7 +100,7 @@ export default function Modal(_props: ModalProps): JSX.Element {
     {<Show when={open()}><div class={"modal-backdrop"} ref={(el) => { backdropElRef = el as HTMLElement; }} onClick={(e) => { if (e.target !== e.currentTarget) return; local.closeOnBackdrop && close(); }} data-rozie-s-fc45feb2="">
       <div ref={(el) => { dialogElRef = el as HTMLElement; }} class={"modal-dialog"} role="dialog" aria-modal="true" aria-label={local.title || undefined} tabIndex={-1} data-rozie-s-fc45feb2="">
         {<Show when={local.title || (_props.headerSlot ?? _props.slots?.['header'])}><header data-rozie-s-fc45feb2="">
-          {(_props.headerSlot ?? _props.slots?.['header']) ? (_props.headerSlot ?? _props.slots?.['header'])({ close }) : <h2 data-rozie-s-fc45feb2="">{local.title}</h2>}
+          {(_props.headerSlot ?? _props.slots?.['header'])?.({ close }) ?? <h2 data-rozie-s-fc45feb2="">{local.title}</h2>}
           <button aria-label="Close" class={"close-btn"} onClick={close} data-rozie-s-fc45feb2="">×</button>
         </header></Show>}<div class={"modal-body"} data-rozie-s-fc45feb2="">
           {typeof local.children === 'function' ? (local.children as (s: any) => any)({ close }) : resolved()}

@@ -50,7 +50,7 @@ interface EmptyCtx {}
     } @else {
 
             <label><input type="checkbox" [checked]="item.done" (change)="_toggle(item.id)" /><span>{{ item.text }}</span></label>
-            <button aria-label="Remove" (click)="_remove(item.id)">×</button>
+            <button aria-label="Remove" (click)="removeItem(item.id)">×</button>
           
     }
         </li>
@@ -108,7 +108,7 @@ export class TodoList {
     } : i));
     this.toggle.emit(id);
   };
-  _remove = (id: any) => {
+  removeItem = (id: any) => {
     this.items.set(this.items().filter(i => i.id !== id));
     this.remove.emit(id);
   };
@@ -125,7 +125,7 @@ export class TodoList {
     this._add();
   };
 
-  private _defaultSlot_ctx_1 = (item: any) => ({ $implicit: { item: item, toggle: () => this._toggle(item.id), remove: () => this._remove(item.id) }, item: item, toggle: () => this._toggle(item.id), remove: () => this._remove(item.id) });
+  private _defaultSlot_ctx_1 = (item: any) => ({ $implicit: { item: item, toggle: () => this._toggle(item.id), remove: () => this.removeItem(item.id) }, item: item, toggle: () => this._toggle(item.id), remove: () => this.removeItem(item.id) });
 }
 
 export default TodoList;

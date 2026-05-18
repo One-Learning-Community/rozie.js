@@ -14,7 +14,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 
-const items = defineModel<unknown[]>('items', { default: () => [] });
+const items = defineModel<any[]>('items', { default: () => [] });
 
 defineSlots<{
   item(props: { item: any; remaining: any }): any;

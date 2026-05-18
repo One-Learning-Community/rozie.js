@@ -14,7 +14,7 @@ interface WrapperModalProps {
 }
 
 export default function WrapperModal(_props: WrapperModalProps): JSX.Element {
-  const props: WrapperModalProps = {
+  const props: WrapperModalProps & { title: string } = {
     ..._props,
     title: _props.title ?? 'Wrapped',
   };
@@ -27,10 +27,10 @@ export default function WrapperModal(_props: WrapperModalProps): JSX.Element {
   return (
     <>
     <Modal open={open} onOpenChange={setOpen} title={props.title} renderHeader={() => (<>
-        {(props.renderBrand ?? props.slots?.['brand']) ? (props.renderBrand ?? props.slots?.['brand'])() : <h2 data-rozie-s-1efe6192="">{props.title}</h2>}
+        {(props.renderBrand ?? props.slots?.['brand']) ? ((props.renderBrand ?? props.slots?.['brand']) as Function)() : <h2 data-rozie-s-1efe6192="">{props.title}</h2>}
       </>)} renderFooter={() => (<>
         {(props.renderActions ?? props.slots?.['actions'])?.()}
-      </>)} children={<>{(props.children ?? props.slots?.[''])}</>} />
+      </>)} children={<>{(typeof (props.children ?? props.slots?.['']) === 'function' ? ((props.children ?? props.slots?.['']) as Function)() : (props.children ?? props.slots?.['']))}</>} />
     </>
   );
 }

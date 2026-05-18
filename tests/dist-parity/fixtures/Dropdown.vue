@@ -82,7 +82,7 @@ const throttledLReposition = throttle(reposition, 100);
 watchEffect((onCleanup) => {
   if (!(open.value)) return;
   window.addEventListener('resize', throttledLReposition, { passive: true });
-  onCleanup(() => window.removeEventListener('resize', throttledLReposition, { passive: true }));
+  onCleanup(() => window.removeEventListener('resize', throttledLReposition));
 });
 </script>
 

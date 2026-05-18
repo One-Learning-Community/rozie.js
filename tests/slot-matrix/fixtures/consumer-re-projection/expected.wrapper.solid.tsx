@@ -16,7 +16,7 @@ export default function Wrapper(_props: WrapperProps): JSX.Element {
   return (
     <>
     <Inner headerSlot={() => (<>
-        {(_props.titleSlot ?? _props.slots?.['title']) ?? "default title"}
+        {(_props.titleSlot ?? _props.slots?.['title']?.({})) ?? "default title"}
       </>)}>{resolved() ?? "default body"}</Inner>
     </>
   );

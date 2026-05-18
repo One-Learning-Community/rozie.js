@@ -8,7 +8,7 @@
 
 <script setup lang="ts">
 const props = withDefaults(
-  defineProps<{ title?: string; onClose?: (...args: any[]) => any }>(),
+  defineProps<{ title?: string; onClose?: ((...args: any[]) => any) | null }>(),
   { title: '', onClose: null }
 );
 </script>

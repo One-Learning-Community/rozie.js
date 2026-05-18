@@ -11,7 +11,7 @@ interface CheckboxRModelProps {
 export default function CheckboxRModel(_props: CheckboxRModelProps): JSX.Element {
   const [local, rest] = splitProps(_props, ['checked']);
 
-  const [checked, setChecked] = createControllableSignal(_props as Record<string, unknown>, 'checked', false);
+  const [checked, setChecked] = createControllableSignal<boolean>(_props as Record<string, unknown>, 'checked', false);
 
   return (
     <>
