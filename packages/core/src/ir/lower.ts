@@ -38,6 +38,7 @@ import { lowerTemplate } from './lowerers/lowerTemplate.js';
 import { lowerComponents } from './lowerers/lowerComponents.js';
 import { lowerSlots } from './lowerers/lowerSlots.js';
 import { lowerStyles } from './lowerers/lowerStyles.js';
+import { lowerRootElementRef } from './lowerers/lowerRootElementRef.js';
 import * as t from '@babel/types';
 
 /**
@@ -166,6 +167,12 @@ export function lowerToIR(ast: RozieAST, opts: LowerOptions): LowerResult {
     components: Array.from(componentsTable.values()),
     sourceLoc: ast.loc,
   };
+
+  // Spike 001 B2 — synthesise a `__rozieRoot` RefDecl + root-element
+  // `ref="__rozieRoot"` AttributeBinding when script context uses `$el`.
+  // Mutates `ir` in place; no-op when $el is unused or root template is not
+  // a single TemplateElement or already has a user-authored ref attribute.
+  lowerRootElementRef(ir);
 
   return { ir, diagnostics, depGraph, bindings };
 }
