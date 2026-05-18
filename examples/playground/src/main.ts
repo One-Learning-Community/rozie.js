@@ -15,10 +15,12 @@ const EDITOR_OPTIONS: monaco.editor.IStandaloneEditorConstructionOptions = {
   scrollBeyondLastLine: false,
   fontSize: 13,
   tabSize: 2,
-  // monaco-editor-textmate replaces the default Monaco theme tokenization rules
-  // with TextMate-scope-aware ones; the 'vs-dark' theme is required for the
-  // bundled token-color map to produce visible color.
-  theme: 'vs-dark',
+  // `rozie-dark` extends vs-dark with scope-name rules that match what the
+  // Rozie TextMate grammar actually emits (entity.name.tag, punctuation.*,
+  // meta.embedded.expression, etc.) — set by textmate-setup before any editor
+  // is created. If textmate setup fails the catch in bootstrap falls the
+  // editor back to plain registration; theme stays vs-dark which is fine.
+  theme: 'rozie-dark',
 };
 
 // Map dropdown target → Monaco built-in language for the right (output) pane.
