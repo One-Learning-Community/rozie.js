@@ -1131,15 +1131,23 @@ export function emitTemplate(
   const optsWithState: EmitTemplateOpts = { ...opts, _state: state };
 
   if (!ir.template) {
+    // CR-01 fix (Phase 07.4 review): the early-return path now uses the same
+    // shape as the non-early-return path below — read every field from
+    // `state` rather than hardcoding `[]`/`false` literals. This eliminates
+    // the drift risk if a future caller populates `state.*` before
+    // `emitNode()` runs (or if a future change adds host-listener pre-pass).
+    // Also push debounceCleanupWiring symmetrically so the two paths cannot
+    // diverge on cleanup-wiring handling.
+    hostListenerWiring.push(...state.debounceCleanupWiring);
     return {
       renderBody: '',
       hostListenerWiring,
-      repeatUsed: false,
-      styleMapUsed: false,
-      debouncedFieldDecls: [],
-      slotFillerClassFields: [],
-      slotFillerUpdatedBody: [],
-      slotFillerDisconnectReset: [],
+      repeatUsed: state.repeatUsed,
+      styleMapUsed: state.styleMapUsed,
+      debouncedFieldDecls: state.debouncedFieldDecls,
+      slotFillerClassFields: state.slotFillerClassFields,
+      slotFillerUpdatedBody: state.slotFillerUpdatedBody,
+      slotFillerDisconnectReset: state.slotFillerDisconnectReset,
       diagnostics,
     };
   }
