@@ -1,0 +1,16 @@
+<rozie name="ClassBindObjectLiteral">
+<data>
+{
+  hovering: false,
+  color: 'red',
+}
+</data>
+<template>
+<div
+  :class="{ hovering: $data.hovering }"
+  :style="{ color: $data.color }"
+>
+  text
+</div>
+</template>
+</rozie>
