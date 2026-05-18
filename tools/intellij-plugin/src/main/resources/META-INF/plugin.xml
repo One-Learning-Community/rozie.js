@@ -124,6 +124,24 @@
         <completion.contributor language="HTML"
             implementationClass="js.rozie.intellij.completion.RozieAttributeNameCompletionContributor"/>
 
+        <!-- Plan 08.2-13: closes P1-UAT-09. SC-6 extended to the JS surface —
+             typing `$` (or a `$X` prefix) in any Rozie-injected JS fragment
+             (<script> / <listeners> / <props> / <data> / <components>)
+             surfaces the 11 canonical Rozie magic identifiers ($props /
+             $data / $refs / $emit / $computed / $onMount / $onUpdate /
+             $watch / $listeners / $slots / $expose) with one-line type-text
+             doc hints. DRY-sourced from RozieMagicIdentifiers; structural
+             mirror of Plan 06's HTML-side contributor.
+             Registered for language="JavaScript" because the
+             JSReferenceExpression PSI we match lives in INJECTED JS PSI,
+             not host Rozie PSI (Pitfall 3 — same reasoning Plan 05's
+             referenceContributor documents). Pitfall 2 mitigation via
+             RozieContextCheck.isRozieContext short-circuit so non-Rozie
+             .js / .ts / .tsx files anywhere in the user's project stay
+             unaffected. -->
+        <completion.contributor language="JavaScript"
+            implementationClass="js.rozie.intellij.completion.RozieJsMagicIdentifierCompletionContributor"/>
+
         <!-- P1-UAT-07: neutralize JetBrains' default INJECTED_LANGUAGE_FRAGMENT
              background tint on .rozie files.  Every SFC block is a language-
              injection target (HTML/JS/CSS), so without these overrides each

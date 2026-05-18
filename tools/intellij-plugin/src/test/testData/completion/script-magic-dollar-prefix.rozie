@@ -1,0 +1,5 @@
+<rozie name="ScriptMagicDollarPrefix">
+<script>
+const x = $pr<caret>
+</script>
+</rozie>

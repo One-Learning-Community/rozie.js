@@ -1,0 +1,7 @@
+<rozie name="ListenersMagicDollarPrefix">
+<listeners>
+{
+  "click": $da<caret>
+}
+</listeners>
+</rozie>

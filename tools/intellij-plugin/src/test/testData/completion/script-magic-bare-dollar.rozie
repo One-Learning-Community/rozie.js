@@ -1,0 +1,5 @@
+<rozie name="ScriptMagicBareDollar">
+<script>
+const y = $<caret>
+</script>
+</rozie>
