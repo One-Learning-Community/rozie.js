@@ -281,6 +281,56 @@ All 4 P1 findings VERIFIED CLOSED. Full 11-example matrix re-walked; no new P0/P
 - **Expected after Plan 08.2-13:** Completion popup appears; all magic identifiers ($props, $data, $refs, $emit, $computed, $onMount, $onUpdate, $watch, $listeners, $slots, $expose) listed with one-line type-text hints
 - **Pending — awaiting human walkthrough verification**
 
+## Issues captured (2026-05-17 UAT re-run #3 — partial — 6 new findings, gap-closure cycle 3 required)
+
+### P1-UAT-10 — `<listeners>` block body has the same "Statement expected / JSLabeledStatement" warnings the other object-literal-shaped blocks had pre-Plan-08.2-11
+- **Severity:** P1 (parity gap — `<listeners>` carries the same object-literal-of-event-name:handler-pairs shape as `<props>` / `<data>` / `<components>`)
+- **Steps to repro:** Open any reference example with a `<listeners>` block (e.g., Dropdown.rozie); observe "Statement expected" / `JSLabeledStatement` / `JSUnusedGlobalSymbols` warnings on the event-name keys
+- **Root cause:** Plan 08.2-11's per-block paren-wrap dispatch covered `PROPS_BODY` / `DATA_BODY` / `COMPONENTS_BODY` only — `LISTENERS_BODY` stayed on the unwrapped JS injection arm. But listeners' body is the same `{ key: factory }` object-literal shape, so it has the same parser-context mismatch.
+- **Fix shape:** Extend Plan 11's paren-wrap dispatch (one-line addition) to include `LISTENERS_BODY` alongside PROPS/DATA/COMPONENTS. Test: extend `RozieInjectionTest` with a listeners-paren-wrap regression case.
+- **Disposition:** FIX-IN-PHASE-08.2 (gap-closure cycle 3 — trivial extension)
+
+### P1-UAT-11 — Bare `$props` / `$data` / `$slots` / `$refs` Go-to-Declaration leaks to other `.rozie` files
+- **Severity:** P1 (UX — Ctrl-click on the magic identifier itself opens a "multiple choices" picker across the user's project instead of staying local or saying "no declaration")
+- **Steps to repro:** Open Counter.rozie; Ctrl-click on the bare `$props` (NOT on `value` in `$props.value`). Observe the IDE offers a list of multiple `.rozie` files instead of a single in-file target.
+- **What works correctly already (per user):** Ctrl-click on the accessed key (`$props.value`'s `value`) DOES navigate to the right block in the current file — Plan 05's contributor handles that case.
+- **Root cause:** Plan 05's `RozieJSReferenceContributor` only intercepts `$X.Y` member-access shapes — bare `$props` / `$data` / `$slots` / `$refs` pass through to the stock JS resolver, which falls back to project-wide free-identifier search. With no declaration in scope, it offers every `.rozie` file that mentions the name.
+- **Fix shape:** Ship a synthetic Rozie globals declaration (TypeScript `.d.ts`-style file registered via `JSPredefinedLibraryProvider` or equivalent) that defines each magic identifier as a known global with its own signature. The JS resolver then finds the synthetic declaration first and stops. Vue's plugin uses the same pattern (`vue3-globals.d.ts`). Combined fix with P1-UAT-12.
+- **Disposition:** FIX-IN-PHASE-08.2 (gap-closure cycle 3)
+
+### P1-UAT-12 — `$computed` (and other magic identifiers used as calls) shown as "Unresolved method or function"
+- **Severity:** P1 (visual noise — every `$computed(() => …)` call is red-underlined)
+- **Steps to repro:** Open Counter.rozie line 34 — `const canIncrement = $computed(() => …)`. The `$computed` token is decorated with the "Unresolved method or function" warning. Same applies to bare `$emit(...)`, `$watch(...)`, etc. when used as call sites.
+- **Root cause:** Same as P1-UAT-11 — magic identifiers have no declaration anywhere in the user's project, so the JS unresolved-symbol inspection flags them.
+- **Fix shape:** Same as P1-UAT-11 — synthetic Rozie globals declaration covers both bare access AND call-site usage. The .d.ts entries declare `$props: any`, `$computed: <T>(getter: () => T) => T`, `$emit: (name: string, ...args: any[]) => void`, etc. with permissive types matching the runtime semantics. Once the synthetic declaration is in scope, the inspection finds it and stops.
+- **Acceptance:** also verify all 11 magic identifiers from Plan 13's `RozieMagicIdentifiers` are represented in the synthetic declaration (user requested "double check all the known keywords are represented")
+- **Disposition:** FIX-IN-PHASE-08.2 (gap-closure cycle 3, combined with P1-UAT-11)
+
+### P1-UAT-13 — `<script>` block is not self-aware of its own local declarations
+- **Severity:** P1 (critical correctness — Ctrl-click on a local var inside `<script>` offers Go-to-Declaration but lands wrong; the script block can't resolve its own properties)
+- **Steps to repro:** Open Counter.rozie. Ctrl-click on `canIncrement` inside line 37's `if (canIncrement)` — the IDE shows a "goto" prompt but doesn't navigate to line 34's `const canIncrement = $computed(...)`. Equivalent issue exists for any local `<script>` declaration referenced elsewhere in the same `<script>` block.
+- **Diagnosis required:** Plan 05's reference contributor only intercepts `$X.Y` shapes — bare `canIncrement` passes through to the stock JS resolver. The stock resolver SHOULD find the `const` declaration in the same injected JS fragment. The failure suggests either (a) `MultiHostRegistrar.addPlace` for `SCRIPT_BODY` is fragmenting the JS-PSI such that statements don't share a scope, (b) the `RozieJSReferenceContributor` is silently EMPTY_ARRAY-ing the resolution chain and breaking stock JS resolution, or (c) a CachedValuesManager Pitfall-5 cache leak in Plan 05 is contaminating the stock JS resolver's cache.
+- **Fix shape:** Investigate root cause; likely a small fix to either the injection registration shape or the reference contributor's pass-through behavior. May need to add an integration test that asserts in-script local-var resolution works.
+- **Disposition:** FIX-IN-PHASE-08.2 (gap-closure cycle 3 — investigation required, fix likely small)
+
+### P1-UAT-14 — `:class="{ key: $data.value }"` object-literal flagged as JSLabeledStatement
+- **Severity:** P1 (extension of the cycle-2 P1-UAT-08 closure to a missed sub-case)
+- **Steps to repro:** Open Counter.rozie line 44 — `:class="{ hovering: $data.hovering }"`. The `hovering:` key inside the object literal is decorated with "Unnecessary label" / `JSLabeledStatement` warning.
+- **Root cause:** Plan 08.2-14 injected directive-attribute-value expressions as JS but used the unwrapped `injectJs` path. When the value starts with `{` (object literal), the JS parser in statement context treats it as a labeled statement, not an object literal — same parser-context mismatch Plan 11 solved for block bodies.
+- **Fix shape:** In Plan 14's `injectExpressionsInTemplateRun`, detect when the attribute value is a single object literal (heuristic: trimmed value starts with `{` and ends with `}`) and route those through Plan 11's `injectJsAsExpression` paren-wrap instead of the unwrapped path. Add regression fixture covering `:class="{ key: value }"` and `:style="{ color: ... }"`.
+- **Disposition:** FIX-IN-PHASE-08.2 (gap-closure cycle 3 — Plan 14 extension)
+
+### P1-UAT-15 — `<script>` declarations not recognised inside template directive expressions
+- **Severity:** P1 (cross-injection visibility gap — `:disabled="!canIncrement"` on line 48 references a `<script>` `const` from line 34; the IDE can't resolve it)
+- **Steps to repro:** Open Counter.rozie. In line 48's `:disabled="!canIncrement"`, the `canIncrement` identifier inside the injected JS attribute-value range is unresolvable, even though `const canIncrement = ...` exists in `<script>` body (also injected as JS, but a SEPARATE injection range with its own PSI tree).
+- **Root cause:** ARCHITECTURAL — each `MultiHostRegistrar.addPlace` call creates its own injection range with its own JS-PSI tree. Local declarations don't span across separate injection ranges. Vue / Svelte solve this by synthesising a single virtual `.ts` / `.js` file per SFC that concatenates `<script>` body + each template expression into one parse unit (so all expressions share scope).
+- **Fix shape:** Requires a new injection architecture — either (a) synthesise a per-`.rozie`-file virtual `.ts` file via `FileViewProvider` + `MultiplePsiFilesPerDocumentFileViewProvider`, or (b) extend `MultiHostRegistrar` usage to register all script + template expressions into one combined injection (advanced — research needed; this is the "synthetic virtual file" pattern Vue's plugin uses).
+- **Disposition:** **DEFERRED to Phase 08.3** — out of scope for Phase 08.2's extension-point pattern; requires a new injection architecture (synthetic-virtual-file pattern). Captured here for traceability; will surface in ROADMAP as a Phase 08.3 entry after Phase 08.2 ships. v0.2.0 tag ships with this limitation documented.
+
+### Aggregate disposition (cycle-3 + deferred)
+
+4 P1 findings (P1-UAT-10, P1-UAT-11+P1-UAT-12 combined, P1-UAT-13, P1-UAT-14) routed to gap-closure cycle 3. P1-UAT-15 deferred to Phase 08.3 (synthetic-virtual-file injection architecture). Tag cut deferred until cycle-3 plans land + UAT re-run #4 confirms closure.
+
 ## Issues captured (2026-05-17 UAT halt — partial walkthrough)
 
 ## Issues captured (2026-05-17 UAT halt — partial walkthrough)
