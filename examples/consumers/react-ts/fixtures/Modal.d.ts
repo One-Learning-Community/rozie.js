@@ -12,6 +12,7 @@ export interface ModalProps {
   renderHeader?: (params: { close: () => void }) => ReactNode;
   children?: ReactNode | ((params: { close: () => void }) => ReactNode);
   renderFooter?: (params: { close: () => void }) => ReactNode;
+  slots?: Record<string, () => ReactNode>;
 }
 
 declare function Modal(props: ModalProps): JSX.Element;

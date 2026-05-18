@@ -27,16 +27,21 @@
  * the contract that v1 ships: each emitted .ts file is valid strict TS
  * with typed `input()`/`model()`/`signal()`/etc. exposures.
  *
- * NOTE — Dropdown + Modal + SearchInput + TodoList imports deliberately
- * COMMENTED OUT and excluded from tsconfig.strict.json. All four compiled
- * .ts files surface PRE-EXISTING Angular emitter type bugs (model.set()
+ * Previously the Angular emit had pre-existing type bugs (model.set()
  * arity mismatch, throttle/debounce spread-arg typing, missing required
- * arguments to `output()` triggers, v-for unknown narrowing) that Plan
- * 06-05 surfaces but is NOT in scope to fix. See:
- * `.planning/phases/06-cli-codegen-babel-plugin-type-emission-hardening/deferred-items.md`
- * → "Plan 06-05 Discoveries → Pre-existing Angular emitter type errors".
+ * arguments to `output()` triggers, r-for unknown narrowing) that forced
+ * Dropdown/Modal/SearchInput/TodoList exclusion. The watcher-arity and
+ * slot-context bugs were fixed during the 2026-05-18 Angular tsc gate
+ * rollout (commit 0fbd6f1); the remaining classes (renderType widening,
+ * removeEventListener options, handler-cast) were fixed across targets
+ * in commits 536575a / d3fd6b4 / 6b50a15. All four fixtures now
+ * typecheck cleanly and are pinned below alongside Counter.
  */
 import { Counter } from './fixtures/Counter';
+import { Dropdown } from './fixtures/Dropdown';
+import { Modal } from './fixtures/Modal';
+import { SearchInput } from './fixtures/SearchInput';
+import { TodoList } from './fixtures/TodoList';
 
 // ---- Counter: model:true via model<T>() (TYPES-02) --------------------
 // Angular 17 signals: `model<number>(0)` returns a `ModelSignal<number>`
@@ -52,4 +57,4 @@ const maxValue: number = counterInst.max();
 void [stepValue, minValue, maxValue];
 
 // Suppress "declared but never read" for shape-pin locals.
-void [Counter];
+void [Counter, Dropdown, Modal, SearchInput, TodoList];

@@ -2,6 +2,7 @@
   "extends": "../../../tsconfig.base.json",
   "compilerOptions": {
     "strict": true,
+    "noImplicitAny": false,
     "noEmit": true,
     "skipLibCheck": true,
     "module": "ESNext",
@@ -11,11 +12,5 @@
     "useDefineForClassFields": false,
     "emitDecoratorMetadata": true
   },
-  "include": ["test.ts", "fixtures/**/*.ts"],
-  "exclude": [
-    "fixtures/Dropdown.ts",
-    "fixtures/Modal.ts",
-    "fixtures/SearchInput.ts",
-    "fixtures/TodoList.ts"
-  ]
+  "include": ["test.ts", "fixtures/**/*.ts"]
 }

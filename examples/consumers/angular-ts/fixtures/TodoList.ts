@@ -25,8 +25,8 @@ interface EmptyCtx {}
 
     <div class="todo-list">
       <header>
-        @if (headerTpl) {
-    <ng-container *ngTemplateOutlet="headerTpl; context: { $implicit: { remaining: remaining(), total: items().length }, remaining: remaining(), total: items().length }" />
+        @if ((headerTpl ?? templates()?.['header'])) {
+    <ng-container *ngTemplateOutlet="(headerTpl ?? templates()?.['header']); context: { $implicit: { remaining: remaining(), total: items().length }, remaining: remaining(), total: items().length }" />
     } @else {
 
           
@@ -45,15 +45,12 @@ interface EmptyCtx {}
         @for (item of items(); track item.id) {
     <li [class]="{ done: item.done }">
           
-          @if (defaultTpl) {
-    <ng-container *ngTemplateOutlet="defaultTpl; context: _defaultSlot_ctx_1(item)" />
+          @if ((defaultTpl ?? templates()?.['defaultSlot'])) {
+    <ng-container *ngTemplateOutlet="(defaultTpl ?? templates()?.['defaultSlot']); context: _defaultSlot_ctx_1(item)" />
     } @else {
 
-            <label>
-              <input type="checkbox" [checked]="item.done" (change)="_toggle(item.id)" />
-              <span>{{ item.text }}</span>
-            </label>
-            <button aria-label="Remove" (click)="_remove(item.id)">×</button>
+            <label><input type="checkbox" [checked]="item.done" (change)="_toggle(item.id)" /><span>{{ item.text }}</span></label>
+            <button aria-label="Remove" (click)="removeItem(item.id)">×</button>
           
     }
         </li>
@@ -61,8 +58,8 @@ interface EmptyCtx {}
       </ul>
     } @else {
     <p class="empty">
-        @if (emptyTpl) {
-    <ng-container *ngTemplateOutlet="emptyTpl" />
+        @if ((emptyTpl ?? templates()?.['empty'])) {
+    <ng-container *ngTemplateOutlet="(emptyTpl ?? templates()?.['empty'])" />
     } @else {
     Nothing to do. ✨
     }
@@ -80,7 +77,7 @@ interface EmptyCtx {}
   `],
 })
 export class TodoList {
-  items = model<unknown[]>((() => [])());
+  items = model<any[]>((() => [])());
   title = input<string>('Todo');
   draft = signal('');
   add = output<unknown>();
@@ -89,6 +86,7 @@ export class TodoList {
   @ContentChild('header', { read: TemplateRef }) headerTpl?: TemplateRef<HeaderCtx>;
   @ContentChild('defaultSlot', { read: TemplateRef }) defaultTpl?: TemplateRef<DefaultCtx>;
   @ContentChild('empty', { read: TemplateRef }) emptyTpl?: TemplateRef<EmptyCtx>;
+  templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
 
   remaining = computed(() => this.items().filter(i => !i.done).length);
 
@@ -103,14 +101,14 @@ export class TodoList {
     this.draft.set('');
     this.add.emit(text);
   };
-  _toggle = id => {
+  _toggle = (id: any) => {
     this.items.set(this.items().map(i => i.id === id ? {
       ...i,
       done: !i.done
     } : i));
     this.toggle.emit(id);
   };
-  _remove = id => {
+  removeItem = (id: any) => {
     this.items.set(this.items().filter(i => i.id !== id));
     this.remove.emit(id);
   };
@@ -124,10 +122,10 @@ export class TodoList {
 
   private _guarded_add = (e: any) => {
     e.preventDefault();
-    this._add(e);
+    this._add();
   };
 
-  private _defaultSlot_ctx_1 = (item: any) => ({ $implicit: { item: item, toggle: () => this._toggle(item.id), remove: () => this._remove(item.id) }, item: item, toggle: () => this._toggle(item.id), remove: () => this._remove(item.id) });
+  private _defaultSlot_ctx_1 = (item: any) => ({ $implicit: { item: item, toggle: () => this._toggle(item.id), remove: () => this.removeItem(item.id) }, item: item, toggle: () => this._toggle(item.id), remove: () => this.removeItem(item.id) });
 }
 
 export default TodoList;

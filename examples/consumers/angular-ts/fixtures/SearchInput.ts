@@ -34,14 +34,15 @@ export class SearchInput {
   query = signal('');
   inputEl = viewChild<ElementRef<HTMLInputElement>>('inputEl');
   search = output<unknown>();
-  clear = output<unknown>();
+  clear = output<void>();
+  private __rozieDestroyRef = inject(DestroyRef);
 
-  constructor() {
+  ngAfterViewInit() {
     if (this.autofocus()) this.inputEl()?.nativeElement?.focus();
 
     // Returning a function from $onMount registers a teardown — equivalent to
     // a separate $onUnmount, useful when setup and teardown logic belong together.
-    inject(DestroyRef).onDestroy(() => {
+    this.__rozieDestroyRef.onDestroy(() => {
       // e.g., abort an in-flight request initialized in this hook
     });
   }
@@ -60,18 +61,18 @@ export class SearchInput {
     let timer: ReturnType<typeof setTimeout> | null = null;
     return (...args: any[]) => {
       if (timer !== null) clearTimeout(timer);
-      timer = setTimeout(() => (this.onSearch)(...args), 300);
+      timer = setTimeout(() => (this.onSearch as (...a: any[]) => any)(...args), 300);
     };
   })();
 
   private _guardedOnSearch_2 = (e: any) => {
     if (e.key !== 'Enter') return;
-    this.onSearch(e);
+    this.onSearch();
   };
 
   private _guarded_clear_3 = (e: any) => {
     if (e.key !== 'Escape') return;
-    this._clear(e);
+    this._clear();
   };
 
   private _merged_keydown_1 = (e: any) => {

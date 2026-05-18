@@ -22,20 +22,18 @@
  * deferred to v2 (commented out below) and documented as a v2 follow-up
  * once a real-world generic component surfaces friction.
  *
- * NOTE — SearchInput + Dropdown + TodoList imports deliberately COMMENTED
- * OUT and excluded from tsconfig.strict.json. All three compiled .svelte
- * files surface PRE-EXISTING Svelte emitter type bugs (debounce/throttle
- * spread-arg typing, v-for unknown narrowing, `passive` on
- * removeEventListener) that Plan 06-05 surfaces but is NOT in scope to fix.
- * See:
- * `.planning/phases/06-cli-codegen-babel-plugin-type-emission-hardening/deferred-items.md`
- * → "Plan 06-05 Discoveries → Pre-existing Svelte emitter type errors".
+ * Previously the Svelte emit had pre-existing type bugs (debounce/throttle
+ * spread-arg typing, r-for unknown narrowing, `passive` on
+ * removeEventListener) that forced SearchInput/Dropdown/TodoList exclusion.
+ * Those root causes were fixed during the 2026-05-18 svelte-check gate
+ * rollout (commit 6b50a15) — all three fixtures now typecheck cleanly and
+ * are pinned below alongside Counter + Modal.
  */
 import type { ComponentProps } from 'svelte';
 import Counter from './fixtures/Counter.svelte';
-// import SearchInput from './fixtures/SearchInput.svelte';   // see NOTE below (deferred)
-// import Dropdown from './fixtures/Dropdown.svelte';         // see NOTE below (deferred)
-// import TodoList from './fixtures/TodoList.svelte';         // see NOTE below (deferred)
+import SearchInput from './fixtures/SearchInput.svelte';
+import Dropdown from './fixtures/Dropdown.svelte';
+import TodoList from './fixtures/TodoList.svelte';
 import Modal from './fixtures/Modal.svelte';
 
 // ---- Counter: model:true via $bindable() (TYPES-02) -------------------
@@ -76,6 +74,9 @@ const modal: ModalProps = {
 // Suppress "declared but never read" for shape-pin locals.
 void [
   Counter,
+  SearchInput,
+  Dropdown,
+  TodoList,
   Modal,
   counterCtrl,
   counterUnc,

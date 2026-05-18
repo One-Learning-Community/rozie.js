@@ -20,12 +20,12 @@ interface DefaultCtx {
 
     <div class="dropdown">
       <div #triggerEl (click)="toggle($event)">
-        <ng-container *ngTemplateOutlet="triggerTpl; context: { $implicit: { open: open(), toggle: toggle }, open: open(), toggle: toggle }" />
+        <ng-container *ngTemplateOutlet="(triggerTpl ?? templates()?.['trigger']); context: { $implicit: { open: open(), toggle: toggle }, open: open(), toggle: toggle }" />
       </div>
 
       @if (open()) {
     <div #panelEl class="dropdown-panel" role="menu">
-        <ng-container *ngTemplateOutlet="defaultTpl; context: { $implicit: { close: close }, close: close }" />
+        <ng-container *ngTemplateOutlet="(defaultTpl ?? templates()?.['defaultSlot']); context: { $implicit: { close: close }, close: close }" />
       </div>
     }</div>
 
@@ -54,6 +54,7 @@ export class Dropdown {
   panelEl = viewChild<ElementRef<HTMLDivElement>>('panelEl');
   @ContentChild('trigger', { read: TemplateRef }) triggerTpl?: TemplateRef<TriggerCtx>;
   @ContentChild('defaultSlot', { read: TemplateRef }) defaultTpl?: TemplateRef<DefaultCtx>;
+  templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
 
   constructor() {
       const renderer = inject(Renderer2);
@@ -85,7 +86,14 @@ export class Dropdown {
         onCleanup(unlisten);
       });
 
-    this.reposition();
+    effect(() => { const __watchVal = (() => this.open())(); (() => {
+      if (this.open()) this.reposition();
+    })(); });
+  }
+
+  ngAfterViewInit() {
+    // Initial reposition only if the panel is open at mount time.
+    if (this.open()) this.reposition();
 
   }
 
@@ -97,8 +105,8 @@ export class Dropdown {
   };
   reposition = () => {
     if (!this.panelEl()?.nativeElement || !this.triggerEl()?.nativeElement) return;
-    const rect = (this.triggerEl()?.nativeElement).getBoundingClientRect();
-    Object.assign((this.panelEl()?.nativeElement).style, {
+    const rect = this.triggerEl()!.nativeElement.getBoundingClientRect();
+    Object.assign(this.panelEl()!.nativeElement.style, {
       top: `${rect.bottom}px`,
       left: `${rect.left}px`
     });
@@ -117,7 +125,7 @@ export class Dropdown {
       const now = Date.now();
       if (now - lastCall < 100) return;
       lastCall = now;
-      (this.reposition)(...args);
+      (this.reposition as (...a: any[]) => any)(...args);
     };
   })();
 }

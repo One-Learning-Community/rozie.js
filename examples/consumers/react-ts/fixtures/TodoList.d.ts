@@ -11,6 +11,7 @@ export interface TodoListProps {
   renderHeader?: (params: { remaining: () => void; total: unknown }) => ReactNode;
   children?: ReactNode | ((params: { item: () => void; toggle: unknown; remove: unknown }) => ReactNode);
   renderEmpty?: () => ReactNode;
+  slots?: Record<string, () => ReactNode>;
 }
 
 declare function TodoList(props: TodoListProps): JSX.Element;

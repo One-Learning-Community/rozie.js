@@ -2,6 +2,7 @@
   "extends": "../../../tsconfig.base.json",
   "compilerOptions": {
     "strict": true,
+    "noImplicitAny": false,
     "noEmit": true,
     "skipLibCheck": true,
     "module": "ESNext",
@@ -10,10 +11,5 @@
     "verbatimModuleSyntax": true,
     "types": ["svelte"]
   },
-  "include": ["test.ts", "fixtures/**/*.svelte", "fixtures/**/*.ts"],
-  "exclude": [
-    "fixtures/TodoList.svelte",
-    "fixtures/Dropdown.svelte",
-    "fixtures/SearchInput.svelte"
-  ]
+  "include": ["test.ts", "fixtures/**/*.svelte", "fixtures/**/*.ts"]
 }

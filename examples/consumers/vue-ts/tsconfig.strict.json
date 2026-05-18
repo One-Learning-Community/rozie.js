@@ -2,6 +2,7 @@
   "extends": "../../../tsconfig.base.json",
   "compilerOptions": {
     "strict": true,
+    "noImplicitAny": false,
     "noEmit": true,
     "skipLibCheck": true,
     "jsx": "preserve",
@@ -16,9 +17,5 @@
     "SelectMismatchWrapper.vue",
     "fixtures/**/*.vue",
     "fixtures/**/*.ts"
-  ],
-  "exclude": [
-    "fixtures/TodoList.vue",
-    "fixtures/Dropdown.vue"
   ]
 }

@@ -25,10 +25,10 @@ interface FooterCtx {
     @if (open()) {
     <div class="modal-backdrop" #backdropEl (click)="_guardedHandler0($event)">
       <div #dialogEl class="modal-dialog" role="dialog" aria-modal="true" [aria-label]="title() || undefined" tabindex="-1">
-        @if (title() || headerTpl) {
+        @if (title() || (headerTpl ?? templates()?.['header'])) {
     <header>
-          @if (headerTpl) {
-    <ng-container *ngTemplateOutlet="headerTpl; context: { $implicit: { close: _close }, close: _close }" />
+          @if ((headerTpl ?? templates()?.['header'])) {
+    <ng-container *ngTemplateOutlet="(headerTpl ?? templates()?.['header']); context: { $implicit: { close: _close }, close: _close }" />
     } @else {
 
             <h2>{{ title() }}</h2>
@@ -37,13 +37,13 @@ interface FooterCtx {
           <button class="close-btn" aria-label="Close" (click)="_close($event)">×</button>
         </header>
     }<div class="modal-body">
-          <ng-container *ngTemplateOutlet="defaultTpl; context: { $implicit: { close: _close }, close: _close }" />
+          <ng-container *ngTemplateOutlet="(defaultTpl ?? templates()?.['defaultSlot']); context: { $implicit: { close: _close }, close: _close }" />
         </div>
 
-        @if (footerTpl) {
+        @if ((footerTpl ?? templates()?.['footer'])) {
     <footer>
-          @if (footerTpl) {
-    <ng-container *ngTemplateOutlet="footerTpl; context: { $implicit: { close: _close }, close: _close }" />
+          @if ((footerTpl ?? templates()?.['footer'])) {
+    <ng-container *ngTemplateOutlet="(footerTpl ?? templates()?.['footer']); context: { $implicit: { close: _close }, close: _close }" />
     }
         </footer>
     }</div>
@@ -80,18 +80,6 @@ interface FooterCtx {
   `],
 })
 export class Modal {
-  open = model<boolean>(false);
-  closeOnEscape = input<boolean>(true);
-  closeOnBackdrop = input<boolean>(true);
-  lockBodyScroll = input<boolean>(true);
-  title = input<string>('');
-  backdropEl = viewChild<ElementRef<HTMLDivElement>>('backdropEl');
-  dialogEl = viewChild<ElementRef<HTMLDivElement>>('dialogEl');
-  close = output<unknown>();
-  @ContentChild('header', { read: TemplateRef }) headerTpl?: TemplateRef<HeaderCtx>;
-  @ContentChild('defaultSlot', { read: TemplateRef }) defaultTpl?: TemplateRef<DefaultCtx>;
-  @ContentChild('footer', { read: TemplateRef }) footerTpl?: TemplateRef<FooterCtx>;
-
   constructor() {
       const renderer = inject(Renderer2);
 
@@ -104,9 +92,25 @@ export class Modal {
         const unlisten = renderer.listen('document', 'keydown', handler);
         onCleanup(unlisten);
       });
+  }
 
+  open = model<boolean>(false);
+  closeOnEscape = input<boolean>(true);
+  closeOnBackdrop = input<boolean>(true);
+  lockBodyScroll = input<boolean>(true);
+  title = input<string>('');
+  backdropEl = viewChild<ElementRef<HTMLDivElement>>('backdropEl');
+  dialogEl = viewChild<ElementRef<HTMLDivElement>>('dialogEl');
+  close = output<void>();
+  @ContentChild('header', { read: TemplateRef }) headerTpl?: TemplateRef<HeaderCtx>;
+  @ContentChild('defaultSlot', { read: TemplateRef }) defaultTpl?: TemplateRef<DefaultCtx>;
+  @ContentChild('footer', { read: TemplateRef }) footerTpl?: TemplateRef<FooterCtx>;
+  templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
+  private __rozieDestroyRef = inject(DestroyRef);
+
+  ngAfterViewInit() {
     this.lockScroll();
-    inject(DestroyRef).onDestroy(this.unlockScroll);
+    this.__rozieDestroyRef.onDestroy(this.unlockScroll);
     this.dialogEl()?.nativeElement?.focus();
   }
 

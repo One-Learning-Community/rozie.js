@@ -10,7 +10,7 @@ interface Props {
   header?: Snippet<[{ close: any }]>;
   children?: Snippet<[{ close: any }]>;
   footer?: Snippet<[{ close: any }]>;
-  snippets?: Record<string, Snippet<[any]>>;
+  snippets?: Record<string, any>;
   onclose?: (...args: unknown[]) => void;
 }
 
