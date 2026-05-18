@@ -70,7 +70,13 @@ export async function importFromString(code) {
  * Standard harness boot — wires the render message handler, signals ready,
  * surfaces errors back to the parent.
  *
- * @param {(code: string) => Promise<void>} onRender — harness-specific render fn
+ * The render fn receives the full payload `{ code, css }`. Targets that emit
+ * scoped CSS as part of the compiled code (Vue SFC, Svelte css:'injected',
+ * Angular @Component({styles}), Solid <style>, Lit static styles) can ignore
+ * `css`. React emits CSS to a separate sidecar — its harness reads `css` and
+ * injects it via `setSidecarCss()`.
+ *
+ * @param {(payload: { code: string, css: string }) => Promise<void>} onRender
  */
 export function bootHarness(onRender) {
   let renderToken = 0;
@@ -79,7 +85,7 @@ export function bootHarness(onRender) {
     if (!data || data.type !== 'render') return;
     const token = ++renderToken;
     try {
-      await onRender(data.code);
+      await onRender({ code: data.code, css: data.css ?? '' });
       // Only confirm if a newer render hasn't superseded us.
       if (token === renderToken) {
         parent.postMessage({ type: 'rendered' }, '*');
@@ -94,6 +100,21 @@ export function bootHarness(onRender) {
   });
   // Signal readiness exactly once on harness load.
   parent.postMessage({ type: 'ready' }, '*');
+}
+
+/**
+ * Install/replace the sidecar <style> tag used for CSS that came in over the
+ * postMessage sidecar (not embedded in the compiled component code).
+ * Idempotent — re-calling replaces the prior CSS.
+ */
+export function setSidecarCss(css) {
+  let tag = document.getElementById('__rozie_sidecar_css');
+  if (!tag) {
+    tag = document.createElement('style');
+    tag.id = '__rozie_sidecar_css';
+    document.head.appendChild(tag);
+  }
+  tag.textContent = css || '';
 }
 
 /**

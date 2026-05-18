@@ -8,6 +8,7 @@
         "imports": {
           "vue": "https://esm.sh/vue@3.5.13/dist/vue.esm-browser.js",
           "@vue/compiler-sfc": "https://esm.sh/@vue/compiler-sfc@3.5.13",
+          "@rozie/runtime-vue": "/preview/runtimes/vue.mjs",
           "sortablejs": "https://esm.sh/sortablejs@1.15.6"
         }
       }
@@ -28,17 +29,26 @@
       let app = null;
       let renderCount = 0;
 
-      bootHarness(async (sfcSource) => {
+      bootHarness(async ({ code: sfcSource }) => {
         const id = `rozie-vue-${++renderCount}`;
         const { descriptor } = parse(sfcSource, { filename: 'Playground.vue' });
+        const hasScoped = descriptor.styles.some((s) => s.scoped);
 
-        // Script (composition API w/ <script setup>)
+        // Script (composition API w/ <script setup>). When the SFC has
+        // <style scoped>, the same `id` MUST be threaded into the inlined
+        // template compile so the template's elements receive the matching
+        // `data-v-<id>` attribute — otherwise the scoped selectors compiled
+        // below have nothing to bind to.
         let scriptCode = '';
         if (descriptor.script || descriptor.scriptSetup) {
           const compiled = compileScript(descriptor, {
             id,
             inlineTemplate: true,
-            templateOptions: { compilerOptions: { expressionPlugins: ['typescript'] } },
+            templateOptions: {
+              id,
+              scoped: hasScoped,
+              compilerOptions: { expressionPlugins: ['typescript'], scopeId: hasScoped ? `data-v-${id}` : undefined },
+            },
           });
           scriptCode = compiled.content;
         } else {
@@ -70,15 +80,24 @@
         const Component = mod.default;
         if (!Component) throw new Error('Vue SFC produced no default export');
 
-        // <style scoped> handling — compile + inject as <style> in iframe head.
+        // <style scoped> handling — compile + inject. We deliberately pass
+        // `scoped: false` even when the SFC declared `<style scoped>`: Vue's
+        // standard build pipeline (vite-plugin-vue) attaches `__scopeId` to
+        // the component options so the runtime auto-stamps the data-v
+        // attribute on the root, but compileScript+inlineTemplate alone
+        // doesn't inject `__scopeId` — leaving scoped selectors that bind
+        // to a never-applied attribute. Since each iframe renders ONE
+        // component at a time, dropping scope is safe and yields visible
+        // styles instead of unmounted CSS rules.
         for (const styleBlock of descriptor.styles) {
           const compiled = compileStyle({
             source: styleBlock.content,
             filename: 'Playground.vue',
             id: `data-v-${id}`,
-            scoped: styleBlock.scoped,
+            scoped: false,
           });
           const tag = document.createElement('style');
+          tag.dataset.rozieVueStyle = id;
           tag.textContent = compiled.code;
           document.head.appendChild(tag);
         }

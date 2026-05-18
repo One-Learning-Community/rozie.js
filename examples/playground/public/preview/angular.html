@@ -53,7 +53,7 @@
       let appRef = null;
       let renderCount = 0;
 
-      bootHarness(async (code) => {
+      bootHarness(async ({ code }) => {
         const transform = await getEsbuildTransform();
         const transformed = await transform(code, {
           loader: 'ts',

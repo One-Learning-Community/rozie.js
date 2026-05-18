@@ -31,7 +31,7 @@
       const host = document.getElementById('app');
       let instance = null;
 
-      bootHarness(async (sfcSource) => {
+      bootHarness(async ({ code: sfcSource }) => {
         // Svelte 5 runes-mode compile to client output.
         const compiled = compile(sfcSource, {
           filename: 'Playground.svelte',

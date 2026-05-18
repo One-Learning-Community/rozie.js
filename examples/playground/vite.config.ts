@@ -1,8 +1,55 @@
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
+import { existsSync, readFileSync } from 'node:fs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+// Map /preview/runtimes/<framework>.mjs in the iframe-served URL space to the
+// matching workspace package's built dist. The compiled output of every
+// non-trivial .rozie file imports from `@rozie/runtime-<framework>` (for
+// model:true props, slot helpers, etc.) and the iframes need a URL to map
+// those bare specifiers to from their importmaps.
+const RUNTIME_FRAMEWORKS = ['react', 'solid', 'vue', 'lit'] as const;
+function runtimeFile(name: string): string {
+  return resolve(__dirname, `../../packages/runtime/${name}/dist/index.mjs`);
+}
+
+function roziePreviewRuntimes(): Plugin {
+  const URL_PREFIX = '/preview/runtimes/';
+  return {
+    name: 'rozie-preview-runtimes',
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        if (!req.url?.startsWith(URL_PREFIX)) return next();
+        const match = req.url.slice(URL_PREFIX.length).match(/^([a-z]+)\.mjs(\?.*)?$/);
+        if (!match) return next();
+        const file = runtimeFile(match[1]);
+        if (!existsSync(file)) {
+          res.statusCode = 404;
+          res.end(`# rozie runtime not built: ${match[1]} — run \`pnpm --filter @rozie/runtime-${match[1]} build\``);
+          return;
+        }
+        res.setHeader('Content-Type', 'application/javascript');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.end(readFileSync(file));
+      });
+    },
+    // For production build, emit each runtime as a static asset under the same
+    // URL the importmap expects.
+    generateBundle() {
+      for (const name of RUNTIME_FRAMEWORKS) {
+        const file = runtimeFile(name);
+        if (!existsSync(file)) continue;
+        this.emitFile({
+          type: 'asset',
+          fileName: `preview/runtimes/${name}.mjs`,
+          source: readFileSync(file),
+        });
+      }
+    },
+  };
+}
 
 // Mitigation strategy: main-thread compile with Vite resolve.alias shims for
 // every Node-ism statically imported by the BUILT @rozie/core bundle AND its
@@ -69,4 +116,5 @@ export default defineConfig({
     format: 'es',
   },
   server: { port: 5180 },
+  plugins: [roziePreviewRuntimes()],
 });

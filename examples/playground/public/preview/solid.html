@@ -10,6 +10,7 @@
           "solid-js/web": "https://esm.sh/solid-js@1.9.4/web",
           "solid-js/store": "https://esm.sh/solid-js@1.9.4/store",
           "solid-js/h/jsx-runtime": "https://esm.sh/solid-js@1.9.4/h/jsx-runtime",
+          "@rozie/runtime-solid": "/preview/runtimes/solid.mjs",
           "sortablejs": "https://esm.sh/sortablejs@1.15.6"
         }
       }
@@ -29,7 +30,7 @@
       const host = document.getElementById('app');
       let dispose = null;
 
-      bootHarness(async (code) => {
+      bootHarness(async ({ code }) => {
         const transform = await getEsbuildTransform();
         const result = await transform(stubUnresolvableImports(code), {
           loader: 'tsx',

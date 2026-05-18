@@ -136,7 +136,7 @@ async function bootstrap(): Promise<void> {
     rightEditor.setValue(outcome.ok ? outcome.code : outcome.errorText);
 
     if (outcome.ok) {
-      previewManager.render(target, outcome.code);
+      previewManager.render(target, outcome.code, outcome.css);
     } else {
       previewManager.clear('compile error — see Output tab');
     }

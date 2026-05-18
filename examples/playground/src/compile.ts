@@ -2,7 +2,7 @@ import { compile, renderDiagnostic } from '@rozie/core';
 import type { CompileTarget } from '@rozie/core';
 
 export type CompileOutcome =
-  | { ok: true; code: string }
+  | { ok: true; code: string; css: string }
   | { ok: false; errorText: string };
 
 /**
@@ -35,7 +35,7 @@ export function compileBuffer(source: string, target: CompileTarget): CompileOut
       };
     }
 
-    return { ok: true, code: result.code };
+    return { ok: true, code: result.code, css: result.css ?? '' };
   } catch (e) {
     // Safety net for the throw-on-call shims: if a user types a <script>
     // import that drives @rozie/core into a code path needing readFileSync /

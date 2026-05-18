@@ -13,6 +13,7 @@
           "lit/directives/style-map.js": "https://esm.sh/lit@3.2.1/directives/style-map.js",
           "@lit-labs/preact-signals": "https://esm.sh/@lit-labs/preact-signals@1.0.3",
           "@preact/signals-core": "https://esm.sh/@preact/signals-core@1.8.0",
+          "@rozie/runtime-lit": "/preview/runtimes/lit.mjs",
           "sortablejs": "https://esm.sh/sortablejs@1.15.6"
         }
       }
@@ -32,7 +33,7 @@
       // elements can only be defined once per tag name; re-defining throws).
       let counter = 0;
 
-      bootHarness(async (code) => {
+      bootHarness(async ({ code }) => {
         const transform = await getEsbuildTransform();
         const result = await transform(stubUnresolvableImports(code), {
           loader: 'ts',

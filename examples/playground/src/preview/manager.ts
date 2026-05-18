@@ -5,16 +5,21 @@
 // no harness reload — so framework runtime + esbuild-wasm only initialize
 // once per session per target.
 //
-// Protocol (parent → iframe): { type: 'render', code: string }
+// Protocol (parent → iframe): { type: 'render', code: string, css: string }
 // Protocol (iframe → parent): { type: 'ready' } | { type: 'rendered' } |
 //                             { type: 'error', message: string }
 
 import type { CompileTarget } from '@rozie/core';
 
+interface RenderPayload {
+  code: string;
+  css: string;
+}
+
 interface IframeEntry {
   iframe: HTMLIFrameElement;
   ready: Promise<void>;
-  pending: string | null; // queued source if iframe not ready yet
+  pending: RenderPayload | null; // queued payload if iframe not ready yet
 }
 
 export class PreviewManager {
@@ -47,10 +52,11 @@ export class PreviewManager {
   }
 
   /**
-   * Render `code` for `target` in its iframe. Creates the iframe on first
-   * call for a target; subsequent calls reuse it. Hides all other iframes.
+   * Render `code` (+ optional `css` sidecar) for `target` in its iframe.
+   * Creates the iframe on first call for a target; subsequent calls reuse it.
+   * Hides all other iframes.
    */
-  render(target: CompileTarget, code: string): void {
+  render(target: CompileTarget, code: string, css: string): void {
     let entry = this.iframes.get(target);
     if (!entry) entry = this.createIframe(target);
 
@@ -64,8 +70,8 @@ export class PreviewManager {
 
     this.setStatus('compiling…', false);
 
-    // If the iframe hasn't reported ready yet, queue the source.
-    entry.pending = code;
+    // If the iframe hasn't reported ready yet, queue the payload.
+    entry.pending = { code, css };
     entry.ready.then(() => {
       if (!entry) return;
       // If a newer render arrived while waiting, the pending field will have
@@ -73,7 +79,10 @@ export class PreviewManager {
       const toSend = entry.pending;
       entry.pending = null;
       if (toSend === null) return;
-      entry.iframe.contentWindow?.postMessage({ type: 'render', code: toSend }, '*');
+      entry.iframe.contentWindow?.postMessage(
+        { type: 'render', code: toSend.code, css: toSend.css },
+        '*',
+      );
     });
   }
 

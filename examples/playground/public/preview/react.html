@@ -10,6 +10,8 @@
           "react/jsx-runtime": "https://esm.sh/react@18.3.1/jsx-runtime",
           "react-dom": "https://esm.sh/react-dom@18.3.1",
           "react-dom/client": "https://esm.sh/react-dom@18.3.1/client",
+          "@rozie/runtime-react": "/preview/runtimes/react.mjs",
+          "clsx": "https://esm.sh/clsx@2.1.1",
           "sortablejs": "https://esm.sh/sortablejs@1.15.6"
         }
       }
@@ -24,12 +26,17 @@
     <script type="module">
       import * as React from 'react';
       import { createRoot } from 'react-dom/client';
-      import { getEsbuildTransform, importFromString, bootHarness, stubUnresolvableImports } from './_shared.js';
+      import { getEsbuildTransform, importFromString, bootHarness, stubUnresolvableImports, setSidecarCss } from './_shared.js';
 
       const host = document.getElementById('app');
       let root = null;
 
-      bootHarness(async (code) => {
+      bootHarness(async ({ code, css }) => {
+        // React target emits CSS to a separate sidecar (r.css) rather than
+        // inlining; install it before transforming so the rendered DOM is
+        // already styled when the JSX mounts.
+        setSidecarCss(css);
+
         const transform = await getEsbuildTransform();
         const result = await transform(stubUnresolvableImports(code), {
           loader: 'tsx',
