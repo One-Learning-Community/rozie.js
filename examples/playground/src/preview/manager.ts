@@ -11,9 +11,14 @@
 //     Each iframe is wrapped in a `.preview-cell` div carrying a target
 //     label so consumers can tell which output is which at a glance.
 //
-// Protocol (parent → iframe): { type: 'render', code: string, css: string }
+// Protocol (parent → iframe): { type: 'render', code: string, css: string,
+//                                siblings: Record<string, string> }
 // Protocol (iframe → parent): { type: 'ready' } | { type: 'rendered' } |
 //                             { type: 'error', message: string }
+//
+// `siblings` is a basename → compiled-source map for multi-file bundle
+// snippets. The harness mints a blob URL per sibling and rewrites the entry's
+// relative imports before importing it. Empty `{}` for single-file snippets.
 
 import type { CompileTarget } from '@rozie/core';
 
@@ -22,6 +27,7 @@ export type PreviewMode = 'single' | 'grid';
 interface RenderPayload {
   code: string;
   css: string;
+  siblings?: Record<string, string>;
 }
 
 interface IframeEntry {
@@ -90,8 +96,19 @@ export class PreviewManager {
    * Render `code` (+ optional `css` sidecar) for `target` in its iframe.
    * Creates the iframe on first call for a target; subsequent calls reuse it.
    * In single mode, hides all other iframes; in grid mode, leaves layout alone.
+   *
+   * `siblings` is the per-target basename→compiled-source map for bundle
+   * snippets — empty `{}` for single-file snippets. The harness mints a blob
+   * URL per sibling and rewrites the entry's `./<basename>` imports before
+   * dynamic-importing the entry, so esbuild-side `from './SortableList'`
+   * specifiers resolve correctly under the iframe's blob: base.
    */
-  render(target: CompileTarget, code: string, css: string): void {
+  render(
+    target: CompileTarget,
+    code: string,
+    css: string,
+    siblings: Record<string, string> = {},
+  ): void {
     let entry = this.iframes.get(target);
     if (!entry) entry = this.createIframe(target);
 
@@ -105,7 +122,7 @@ export class PreviewManager {
       this.setStatus('compiling…', false);
     }
 
-    this.queueRender(entry, { code, css });
+    this.queueRender(entry, { code, css, siblings });
   }
 
   /**
@@ -165,7 +182,12 @@ export class PreviewManager {
       entry.pending = null;
       if (toSend === null) return;
       entry.iframe.contentWindow?.postMessage(
-        { type: 'render', code: toSend.code, css: toSend.css },
+        {
+          type: 'render',
+          code: toSend.code,
+          css: toSend.css,
+          siblings: toSend.siblings ?? {},
+        },
         '*',
       );
     });

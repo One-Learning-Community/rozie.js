@@ -3,7 +3,13 @@
 import './monaco-env';
 
 import * as monaco from 'monaco-editor';
-import { ALL_TARGETS, compileBundle, compileBundleAll } from './compile';
+import {
+  ALL_TARGETS,
+  compileBundle,
+  compileBundleAll,
+  compileBundleRuntime,
+  compileBundleAllRuntime,
+} from './compile';
 import { setupTextmate } from './textmate-setup';
 import { PreviewManager } from './preview/manager';
 import { SNIPPETS, DEFAULT_SNIPPET_KEY, findSnippet, type Snippet } from './snippets';
@@ -157,7 +163,12 @@ async function bootstrap(): Promise<void> {
   function runCompileSingle(): void {
     const bundle = buildLiveBundle();
     const target = targetSelect!.value as CompileTarget;
-    const outcome = compileBundle(bundle, target);
+    // Output pane uses entry-only compileBundle (the displayed code is what
+    // the user wrote, not the auto-compiled sibling code).
+    const outputOutcome = compileBundle(bundle, target);
+    // Preview uses compileBundleRuntime so siblings are available for the
+    // harness's per-sibling blob-URL pass.
+    const previewOutcome = compileBundleRuntime(bundle, target);
 
     const nextLang = OUTPUT_LANGUAGE[target];
     const rightModel = rightEditor.getModel();
@@ -165,11 +176,16 @@ async function bootstrap(): Promise<void> {
       monaco.editor.setModelLanguage(rightModel, nextLang);
     }
 
-    rightEditor.setValue(outcome.ok ? outcome.code : outcome.errorText);
+    rightEditor.setValue(outputOutcome.ok ? outputOutcome.code : outputOutcome.errorText);
 
-    if (outcome.ok) {
+    if (previewOutcome.ok) {
       previewManager.clearError(target);
-      previewManager.render(target, outcome.code, outcome.css);
+      previewManager.render(
+        target,
+        previewOutcome.entry.code,
+        previewOutcome.css,
+        previewOutcome.siblings,
+      );
     } else {
       previewManager.clear('compile error — see Output tab');
     }
@@ -177,20 +193,29 @@ async function bootstrap(): Promise<void> {
 
   function runCompileGrid(): void {
     const bundle = buildLiveBundle();
-    const outcomes = compileBundleAll(bundle);
-    const renderPayloads = new Map<CompileTarget, { code: string; css: string }>();
+    // Output pane displays the user-authored entry-only compile for the
+    // currently-selected target; preview iframes get the full runtime bundle
+    // (entry + siblings) per-target.
+    const outputOutcomes = compileBundleAll(bundle);
+    const previewOutcomes = compileBundleAllRuntime(bundle);
+    const renderPayloads = new Map<
+      CompileTarget,
+      { code: string; css: string; siblings: Record<string, string> }
+    >();
 
-    // The Output pane still tracks the currently-selected target so users can
-    // inspect emitted code while grid view is active.
     const activeTarget = targetSelect!.value as CompileTarget;
-    const activeOutcome = outcomes[activeTarget];
-    rightEditor.setValue(activeOutcome.ok ? activeOutcome.code : activeOutcome.errorText);
+    const activeOutput = outputOutcomes[activeTarget];
+    rightEditor.setValue(activeOutput.ok ? activeOutput.code : activeOutput.errorText);
 
     for (const target of ALL_TARGETS) {
-      const outcome = outcomes[target];
+      const outcome = previewOutcomes[target];
       if (outcome.ok) {
         previewManager.clearError(target);
-        renderPayloads.set(target, { code: outcome.code, css: outcome.css });
+        renderPayloads.set(target, {
+          code: outcome.entry.code,
+          css: outcome.css,
+          siblings: outcome.siblings,
+        });
       } else {
         // Per-cell overlay carries the error; the cell keeps its last good
         // render visible underneath so a fresh typo doesn't blank out the demo.
