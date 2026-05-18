@@ -1,0 +1,42 @@
+html,
+body {
+  height: 100%;
+  margin: 0;
+  font-family: system-ui, -apple-system, Segoe UI, sans-serif;
+}
+
+body {
+  display: grid;
+  grid-template-rows: auto 1fr;
+}
+
+header {
+  padding: 8px 12px;
+  border-bottom: 1px solid #ddd;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+header select {
+  font-size: 14px;
+  padding: 2px 6px;
+}
+
+main {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  min-height: 0;
+}
+
+#editor,
+#output {
+  height: 100%;
+  min-height: 0;
+  border-right: 1px solid #eee;
+}
+
+#output {
+  border-right: none;
+}

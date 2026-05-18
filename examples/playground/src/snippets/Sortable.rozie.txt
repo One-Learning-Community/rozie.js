@@ -1,0 +1,57 @@
+<!--
+  Sortable.rozie — dogfood port of SortableJS as a Rozie cross-framework component.
+
+  Backlog Phase 999.1 leverage criterion:
+    SortableJS engine is framework-agnostic vanilla JS; per-framework wrappers
+    (react-sortablejs, vuedraggable, ngx-sortablejs, ...) are plumbing → one
+    .rozie source produces 6 idiomatic targets.
+
+  Spike scope (intentional non-features):
+    - `disabled` is mount-time only (no $watch). Production version would
+      reconcile via `instance.option('disabled', v)` in a $watch hook.
+    - No `r-model:items` consumer-side two-way binding. SortableJS mutates
+      DOM directly; the consumer-controlled-array story is a follow-up port.
+    - No `handle` / `group` / `animation` as discrete props — pass via :options.
+-->
+
+<rozie name="Sortable">
+
+<props>
+{
+  options:  { type: Object,  default: () => ({}) },
+  disabled: { type: Boolean, default: false },
+}
+</props>
+
+<script>
+import SortableJS from 'sortablejs'
+
+let instance = null
+
+$onMount(() => {
+  instance = new SortableJS($el, {
+    animation: 150,
+    disabled: $props.disabled,
+    ...$props.options,
+    onStart:  (e) => $emit('start',  e),
+    onEnd:    (e) => $emit('end',    e),
+    onUpdate: (e) => $emit('update', e),
+    onAdd:    (e) => $emit('add',    e),
+    onRemove: (e) => $emit('remove', e),
+    onSort:   (e) => $emit('sort',   e),
+  })
+  return () => instance?.destroy()
+})
+</script>
+
+<template>
+<div class="rozie-sortable">
+  <slot />
+</div>
+</template>
+
+<style>
+.rozie-sortable { display: block; }
+</style>
+
+</rozie>
