@@ -29,6 +29,7 @@ const ENGINE_WRAPPERS = [
   'LeafletMap.rozie',
   'LineChart.rozie',
   'TipTap.rozie',
+  'Uppy.rozie',
 ] as const;
 
 // Multi-file consumer demos. Each imports its sibling engine wrapper via
@@ -40,6 +41,7 @@ const ENGINE_DEMOS = [
   'LeafletMapDemo.rozie',
   'LineChartDemo.rozie',
   'TipTapDemo.rozie',
+  'UppyDemo.rozie',
 ] as const;
 
 describe('engine-wrapper examples — cross-target compile gate', () => {

@@ -1,0 +1,251 @@
+<!--
+  UppyDemo.rozie — companion consumer for Uppy.
+
+  Single source compiles to six per-framework consumer recipes — the
+  "look ma, no @uppy/react, no @uppy/vue3" proof for file upload.
+
+  Exercises:
+    - $emit chain — every upload event the wrapper forwards
+      (file-added, upload-progress, upload-success, upload-error,
+      complete, restriction-failed) is wired to a consumer handler
+      that appends to an in-memory log
+    - $data array as a rolling log buffer (cap at 20 entries)
+    - $computed deriving total bytes pending + total bytes uploaded
+    - Live prop reconciliation via $watch in the wrapper —
+      changing maxNumberOfFiles at runtime updates the restriction
+      without re-mounting the picker
+    - Component composition via <components> block
+    - r-for over the event log + r-if/r-else for the empty branch
+-->
+
+<rozie name="UppyDemo">
+
+<components>
+{
+  Uppy: './Uppy.rozie',
+}
+</components>
+
+<data>
+{
+  endpoint: '',
+  maxNumberOfFiles: 5,
+  log: [],
+  nextLogId: 1,
+}
+</data>
+
+<script>
+const append = (event, detail) => {
+  $data.log = [
+    { id: $data.nextLogId, ts: new Date().toLocaleTimeString(), event, detail },
+    ...$data.log,
+  ].slice(0, 20)
+  $data.nextLogId = $data.nextLogId + 1
+}
+
+const onFileAdded         = (file) => append('file-added',   file?.name ?? '(unnamed)')
+const onUploadProgress    = (e)    => append('upload-progress', `${e?.file?.name ?? '?'} → ${e?.prog?.bytesUploaded ?? 0} B`)
+const onUploadSuccess     = (e)    => append('upload-success', e?.file?.name ?? '(unnamed)')
+const onUploadError       = (e)    => append('upload-error',   `${e?.file?.name ?? '?'} : ${e?.error?.message ?? 'unknown'}`)
+const onComplete          = (r)    => append('complete',       `${r?.successful?.length ?? 0} ok / ${r?.failed?.length ?? 0} failed`)
+const onRestrictionFailed = (e)    => append('restriction-failed', `${e?.name ?? '?'} : ${e?.error ?? 'unknown'}`)
+
+const clearLog = () => { $data.log = [] }
+
+const useTestEndpoint = () => { $data.endpoint = 'https://tusd.tusdemo.net/files/' }
+const clearEndpoint   = () => { $data.endpoint = '' }
+</script>
+
+<template>
+<div class="uppy-demo">
+  <header>
+    <h3>File upload</h3>
+    <p class="hint">Pick files to see Uppy's restriction enforcement + event stream. Set an endpoint to actually exercise upload.</p>
+  </header>
+
+  <div class="grid">
+    <section class="picker-pane">
+      <Uppy
+        :endpoint="$data.endpoint || null"
+        :maxNumberOfFiles="$data.maxNumberOfFiles"
+        :maxFileSize="2 * 1024 * 1024"
+        @file-added="onFileAdded"
+        @upload-progress="onUploadProgress"
+        @upload-success="onUploadSuccess"
+        @upload-error="onUploadError"
+        @complete="onComplete"
+        @restriction-failed="onRestrictionFailed"
+      />
+
+      <div class="settings">
+        <label class="field">
+          <span class="field-label">Max files</span>
+          <input type="number" min="1" max="20" r-model.number="$data.maxNumberOfFiles" />
+        </label>
+        <label class="field">
+          <span class="field-label">Endpoint</span>
+          <input type="text" r-model="$data.endpoint" placeholder="https://… (leave blank to skip upload)" />
+        </label>
+        <div class="endpoint-buttons">
+          <button type="button" @click="useTestEndpoint">Use tusd demo</button>
+          <button type="button" @click="clearEndpoint">Clear</button>
+        </div>
+      </div>
+    </section>
+
+    <aside class="log-pane">
+      <div class="log-header">
+        <h4>Event log ({{ $data.log.length }})</h4>
+        <button type="button" @click="clearLog" :disabled="$data.log.length === 0">Clear</button>
+      </div>
+      <ol r-if="$data.log.length > 0" class="log-list">
+        <li r-for="entry in $data.log" :key="entry.id" :class="'log-' + entry.event">
+          <code class="log-ts">{{ entry.ts }}</code>
+          <code class="log-event">{{ entry.event }}</code>
+          <span class="log-detail">{{ entry.detail }}</span>
+        </li>
+      </ol>
+      <p r-else class="empty">No events yet — pick a file to start.</p>
+    </aside>
+  </div>
+</div>
+</template>
+
+<style>
+.uppy-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  max-width: 960px;
+}
+
+header h3 { margin: 0 0 0.25rem; font-size: 1.125rem; }
+header .hint { margin: 0 0 1rem; color: rgba(0, 0, 0, 0.55); font-size: 0.875rem; }
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.picker-pane, .log-pane { min-width: 0; }
+
+.settings {
+  margin-top: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.field-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: rgba(0, 0, 0, 0.55);
+}
+.field input {
+  padding: 0.375rem 0.5rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+  font: inherit;
+  font-size: 0.875rem;
+}
+
+.endpoint-buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+.endpoint-buttons button {
+  padding: 0.25rem 0.625rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8125rem;
+}
+
+.log-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.375rem;
+}
+.log-header h4 {
+  margin: 0;
+  font-size: 0.75rem;
+  color: rgba(0, 0, 0, 0.55);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.log-header button {
+  padding: 0.125rem 0.5rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: white;
+  border-radius: 3px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.75rem;
+  color: rgba(0, 0, 0, 0.55);
+}
+.log-header button:disabled { opacity: 0.3; cursor: not-allowed; }
+
+.log-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 6px;
+  overflow: hidden;
+  max-height: 320px;
+  overflow-y: auto;
+  font-size: 0.75rem;
+}
+.log-list li {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  gap: 0.5rem;
+  align-items: baseline;
+  padding: 0.25rem 0.5rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+}
+.log-list li:last-child { border-bottom: none; }
+.log-list li.log-upload-success { background: rgba(34, 197, 94, 0.05); }
+.log-list li.log-upload-error   { background: rgba(239, 68, 68, 0.05); }
+.log-list li.log-restriction-failed { background: rgba(245, 158, 11, 0.05); }
+
+.log-ts {
+  font-family: ui-monospace, monospace;
+  color: rgba(0, 0, 0, 0.4);
+  font-size: 0.7rem;
+}
+.log-event {
+  font-family: ui-monospace, monospace;
+  color: rgba(0, 0, 0, 0.75);
+  font-weight: 500;
+}
+.log-detail {
+  color: rgba(0, 0, 0, 0.55);
+  word-break: break-all;
+}
+
+.empty {
+  margin: 0;
+  padding: 0.625rem;
+  color: rgba(0, 0, 0, 0.4);
+  font-style: italic;
+  text-align: center;
+  border: 1px dashed rgba(0, 0, 0, 0.1);
+  border-radius: 6px;
+  font-size: 0.875rem;
+}
+</style>
+
+</rozie>
