@@ -2,14 +2,14 @@
 import TreeNode from './TreeNode.svelte';
 
 interface Props {
-  node?: unknown;
+  node?: any;
 }
 
-let { node = () => ({
+let { node = (() => ({
   id: '',
   label: '',
   children: []
-}) }: Props = $props();
+}))() }: Props = $props();
 </script>
 
 

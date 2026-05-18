@@ -5,7 +5,7 @@ const throttledLReposition = (() => {
     const now = Date.now();
     if (now - lastCall < 100) return;
     lastCall = now;
-    (reposition)(...args);
+    (reposition as (...a: any[]) => any)(...args);
   };
 })();
 
@@ -17,7 +17,7 @@ interface Props {
   closeOnEscape?: boolean;
   trigger?: Snippet<[{ open: any; toggle: any }]>;
   children?: Snippet<[{ close: any }]>;
-  snippets?: Record<string, Snippet<[any]>>;
+  snippets?: Record<string, any>;
 }
 
 let {
@@ -63,9 +63,9 @@ $effect(() => {
   // new Popper($refs.triggerEl, $refs.panelEl, { placement: 'bottom-start' })
 });
 
-$effect(() => { const __watchVal = (() => open)(); (() => {
+$effect(() => { (() => open)(); (() => {
   if (open) reposition();
-})(__watchVal); });
+})(); });
 
 $effect(() => {
   if (!(open && closeOnOutsideClick)) return;
@@ -91,7 +91,7 @@ $effect(() => {
 $effect(() => {
   if (!(open)) return;
   window.addEventListener('resize', throttledLReposition, { passive: true });
-  return () => window.removeEventListener('resize', throttledLReposition, { passive: true });
+  return () => window.removeEventListener('resize', throttledLReposition);
 });
 </script>
 

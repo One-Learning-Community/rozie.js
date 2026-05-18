@@ -43,7 +43,7 @@ const debouncedOnSearch = (() => {
   let timer: ReturnType<typeof setTimeout> | null = null;
   return (...args: any[]) => {
     if (timer !== null) clearTimeout(timer);
-    timer = setTimeout(() => (onSearch)(...args), 300);
+    timer = setTimeout(() => (onSearch as (...a: any[]) => any)(...args), 300);
   };
 })();
 </script>
@@ -51,7 +51,7 @@ const debouncedOnSearch = (() => {
 
 <div class="search-input">
   
-  <input bind:this={inputEl} type="search" placeholder={placeholder} bind:value={query} oninput={debouncedOnSearch} onkeydown={(e) => { (() => { if (e.key !== 'Enter') return; onSearch(e); })(); (() => { if (e.key !== 'Escape') return; clear(e); })(); }} />
+  <input bind:this={inputEl} type="search" placeholder={placeholder} bind:value={query} oninput={debouncedOnSearch} onkeydown={(e) => { (() => { if (e.key !== 'Enter') return; (onSearch as (...a: any[]) => any)(e); })(); (() => { if (e.key !== 'Escape') return; (clear as (...a: any[]) => any)(e); })(); }} />
 
   {#if query.length > 0}<button class="clear-btn" aria-label="Clear" onclick={clear}>
     ×

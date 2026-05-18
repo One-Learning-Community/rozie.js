@@ -68,12 +68,15 @@ describe('emitTemplate — behavior (Plan 05-02a Task 2)', () => {
     );
   });
 
-  it('Test 4: TodoList @submit.prevent emits onsubmit={(e) => { e.preventDefault(); add(e); }}', () => {
+  it('Test 4: TodoList @submit.prevent emits onsubmit={(e) => { e.preventDefault(); (add as (...a: any[]) => any)(e); }}', () => {
     const { template, diagnostics } = emitTemplate(lowerExample('TodoList'), REGISTRY);
     expect(diagnostics).toEqual([]);
     // .prevent inlineGuard → e.preventDefault() before handler invocation.
+    // The handler-ref is cast to `(...a: any[]) => any` so the `(e)` forward
+    // type-checks under svelte-check even when the user-authored `add` is
+    // declared `() => void` (TYPES-02 + svelte-check gate).
     expect(template).toMatch(
-      /onsubmit=\{\(e\) => \{ e\.preventDefault\(\); add\(e\); \}\}/,
+      /onsubmit=\{\(e\) => \{ e\.preventDefault\(\); \(add as \(\.\.\.a: any\[\]\) => any\)\(e\); \}\}/,
     );
   });
 

@@ -2,12 +2,12 @@
 import type { Snippet } from 'svelte';
 
 interface Props {
-  items?: unknown[];
+  items?: any[];
   title?: string;
   header?: Snippet<[{ remaining: any; total: any }]>;
   children?: Snippet<[{ item: any; toggle: any; remove: any }]>;
   empty?: Snippet;
-  snippets?: Record<string, Snippet<[any]>>;
+  snippets?: Record<string, any>;
   onadd?: (...args: unknown[]) => void;
   ontoggle?: (...args: unknown[]) => void;
   onremove?: (...args: unknown[]) => void;
@@ -77,7 +77,7 @@ const remaining = $derived(items.filter(i => !i.done).length);
     {/if}
   </header>
 
-  <form onsubmit={(e) => { e.preventDefault(); add(e); }}>
+  <form onsubmit={(e) => { e.preventDefault(); (add as (...a: any[]) => any)(e); }}>
     <input bind:value={draft} placeholder="What needs doing?" />
     <button type="submit" disabled={!draft.trim()}>Add</button>
   </form>

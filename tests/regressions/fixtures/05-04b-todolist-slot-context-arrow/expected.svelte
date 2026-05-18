@@ -2,9 +2,9 @@
 import type { Snippet } from 'svelte';
 
 interface Props {
-  items?: unknown[];
+  items?: any[];
   item?: Snippet<[{ item: any; remaining: any }]>;
-  snippets?: Record<string, Snippet<[any]>>;
+  snippets?: Record<string, any>;
 }
 
 let {

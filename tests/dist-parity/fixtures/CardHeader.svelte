@@ -1,7 +1,7 @@
 <script lang="ts">
 interface Props {
   title?: string;
-  onClose?: (...args: any[]) => any;
+  onClose?: ((...args: any[]) => any) | null;
 }
 
 let { title = '', onClose = null }: Props = $props();

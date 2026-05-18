@@ -7,7 +7,7 @@
     {/if}
   </header>
 
-  <form onsubmit={(e) => { e.preventDefault(); add(e); }}>
+  <form onsubmit={(e) => { e.preventDefault(); (add as (...a: any[]) => any)(e); }}>
     <input bind:value={draft} placeholder="What needs doing?" />
     <button type="submit" disabled={!draft.trim()}>Add</button>
   </form>

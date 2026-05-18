@@ -4,24 +4,30 @@ import type { Snippet } from 'svelte';
 interface Props {
   items?: unknown[];
   title?: string;
-  header?: Snippet<[any, any]>;
-  children?: Snippet<[any, any, any]>;
+  header?: Snippet<[{ remaining: any; total: any }]>;
+  children?: Snippet<[{ item: any; toggle: any; remove: any }]>;
   empty?: Snippet;
+  snippets?: Record<string, Snippet<[any]>>;
   onadd?: (...args: unknown[]) => void;
   ontoggle?: (...args: unknown[]) => void;
   onremove?: (...args: unknown[]) => void;
 }
 
 let {
-  items = $bindable(() => []),
+  items = $bindable((() => [])()),
   title = 'Todo',
-  header,
-  children,
-  empty,
+  header: __headerProp,
+  children: __childrenProp,
+  empty: __emptyProp,
+  snippets,
   onadd,
   ontoggle,
   onremove,
 }: Props = $props();
+
+const header = $derived(__headerProp ?? snippets?.header);
+const children = $derived(__childrenProp ?? snippets?.children);
+const empty = $derived(__emptyProp ?? snippets?.empty);
 
 let draft = $state('');
 
@@ -43,7 +49,18 @@ const toggle = id => {
   } : i);
   ontoggle?.(id);
 };
-const remove = id => {
+
+// Internal method renamed from `remove` to `removeItem` to avoid colliding
+// with `HTMLElement.prototype.remove()` on the Lit target — Lit emits user
+// methods as class fields and the resulting `remove(id)` signature is
+// incompatible with the inherited `remove(): void`. Public API is unchanged:
+// the slot param is still `:remove`, the emitted event is still `'remove'`.
+// Internal method renamed from `remove` to `removeItem` to avoid colliding
+// with `HTMLElement.prototype.remove()` on the Lit target — Lit emits user
+// methods as class fields and the resulting `remove(id)` signature is
+// incompatible with the inherited `remove(): void`. Public API is unchanged:
+// the slot param is still `:remove`, the emitted event is still `'remove'`.
+const removeItem = id => {
   items = items.filter(i => i.id !== id);
   onremove?.(id);
 };
@@ -54,7 +71,7 @@ const remaining = $derived(items.filter(i => !i.done).length);
 
 <div class="todo-list">
   <header>
-    {#if header}{@render header(remaining, items.length)}{:else}
+    {#if header}{@render header({ remaining, total: items.length })}{:else}
       
       <h3>{title} ({remaining} remaining)</h3>
     {/if}
@@ -68,12 +85,9 @@ const remaining = $derived(items.filter(i => !i.done).length);
   {#if items.length > 0}<ul>
     {#each items as item (item.id)}<li class={{ done: item.done }}>
       
-      {#if children}{@render children(item, () => toggle(item.id), () => remove(item.id))}{:else}
-        <label>
-          <input type="checkbox" checked={item.done} onchange={(e) => { toggle(item.id); }} />
-          <span>{item.text}</span>
-        </label>
-        <button aria-label="Remove" onclick={(e) => { remove(item.id); }}>×</button>
+      {#if children}{@render children({ item, toggle: () => toggle(item.id), remove: () => removeItem(item.id) })}{:else}
+        <label><input type="checkbox" checked={item.done} onchange={(e) => { toggle(item.id); }} /><span>{item.text}</span></label>
+        <button aria-label="Remove" onclick={(e) => { removeItem(item.id); }}>×</button>
       {/if}
     </li>{/each}
   </ul>{:else}<p class="empty">

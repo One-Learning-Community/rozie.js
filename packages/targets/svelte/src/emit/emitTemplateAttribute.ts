@@ -32,6 +32,33 @@ import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.
 
 export interface EmitAttrCtx {
   ir: IRComponent;
+  /**
+   * Phase 06.2 — the tagKind of the host element. When 'component' or 'self'
+   * the attribute is a Svelte component prop binding; kebab-case attribute
+   * names like `on-close` MUST be converted to camelCase (`onClose`) to match
+   * the producer's declared prop. Bare HTML elements (kind 'html') keep the
+   * kebab-case form so `aria-*` / `data-*` pass through unchanged.
+   */
+  elementTagKind?: 'html' | 'component' | 'self';
+}
+
+/**
+ * Convert kebab-case to camelCase for component property bindings.
+ *   `on-close` → `onClose`
+ * `aria-label` and `data-*` are NEVER passed through this helper because
+ * callers gate on tagKind: 'component'|'self'. HTML element bindings keep
+ * kebab-case verbatim.
+ */
+function kebabToCamel(name: string): string {
+  if (!name.includes('-')) return name;
+  return name.replace(/-([a-z])/g, (_, ch: string) => ch.toUpperCase());
+}
+
+/** Resolve the emitted attribute name given the host tag kind. */
+function resolveAttrName(name: string, ctx: EmitAttrCtx): string {
+  return ctx.elementTagKind === 'component' || ctx.elementTagKind === 'self'
+    ? kebabToCamel(name)
+    : name;
 }
 
 /** Minimal HTML attribute-value escape. */
@@ -157,10 +184,12 @@ function renderInterpolatedTemplateLiteral(
  */
 export function emitSingleAttr(
   attr: AttributeBinding,
-  ir: IRComponent,
+  ctx: EmitAttrCtx,
 ): string | null {
   // r-html is handled at the element level, not as an attribute.
   if (attr.name === 'r-html') return null;
+
+  const ir = ctx.ir;
 
   if (attr.kind === 'static') {
     // ref="<refName>" → bind:this={refName} (Svelte 5 idiom).
@@ -170,7 +199,8 @@ export function emitSingleAttr(
         return `bind:this={${attr.value}}`;
       }
     }
-    return `${attr.name}="${escapeAttrValue(attr.value)}"`;
+    const outName = resolveAttrName(attr.name, ctx);
+    return `${outName}="${escapeAttrValue(attr.value)}"`;
   }
 
   if (attr.kind === 'binding') {
@@ -187,7 +217,8 @@ export function emitSingleAttr(
     const styleObjectLowered = tryEmitStyleObjectLiteral(attr, ir);
     if (styleObjectLowered !== null) return styleObjectLowered;
     const expr = rewriteTemplateExpression(attr.expression, ir);
-    return `${attr.name}={${expr}}`;
+    const outName = resolveAttrName(attr.name, ctx);
+    return `${outName}={${expr}}`;
   }
 
   if (attr.kind === 'twoWayBinding') {
@@ -210,12 +241,14 @@ export function emitSingleAttr(
   // interpolated: if exactly one binding segment, simplify to `name={<expr>}`.
   if (attr.segments.length === 1 && attr.segments[0]!.kind === 'binding') {
     const seg = attr.segments[0]! as { kind: 'binding'; expression: t.Expression; deps: unknown };
-    return `${attr.name}={${rewriteTemplateExpression(seg.expression, ir)}}`;
+    const outName = resolveAttrName(attr.name, ctx);
+    return `${outName}={${rewriteTemplateExpression(seg.expression, ir)}}`;
   }
 
   // Multi-segment — render as Svelte template literal: `name={`...${...}...`}`.
   const lit = renderInterpolatedTemplateLiteral(attr.segments, ir);
-  return `${attr.name}={\`${lit}\`}`;
+  const outName = resolveAttrName(attr.name, ctx);
+  return `${outName}={\`${lit}\`}`;
 }
 
 /**
@@ -296,7 +329,7 @@ export function emitAttributes(
       continue;
     }
 
-    const rendered = emitSingleAttr(a, ctx.ir);
+    const rendered = emitSingleAttr(a, ctx);
     if (rendered !== null) out.push(rendered);
     consumed.add(a);
   }

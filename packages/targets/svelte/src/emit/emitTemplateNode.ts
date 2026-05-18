@@ -213,7 +213,10 @@ function emitEvents(events: Listener[], ctx: EmitNodeCtx): string {
       const inner = m[1]!;
       // Bare identifier handler:
       if (/^[A-Za-z_$][\w$]*$/.test(inner)) {
-        handlerBodies.push(`(() => { ${inner}(e); })();`);
+        // Cast to permissive Fn so the `(e)` forward type-checks even when the
+        // user-authored handler is `() => void` (see SearchInput's onSearch /
+        // clear merged into the onkeydown handler).
+        handlerBodies.push(`(() => { (${inner} as (...a: any[]) => any)(e); })();`);
         continue;
       }
       // Arrow shape `(e) => { body }` — extract body.
@@ -244,7 +247,10 @@ function emitEvents(events: Listener[], ctx: EmitNodeCtx): string {
  * tag below; no template AST rewrite needed.
  */
 function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
-  const attrText = emitAttributes(node.attributes, { ir: ctx.ir });
+  const attrText = emitAttributes(node.attributes, {
+    ir: ctx.ir,
+    elementTagKind: node.tagKind,
+  });
   const eventText = emitEvents(node.events, ctx);
   const rHtml = findRHtml(node.attributes);
 

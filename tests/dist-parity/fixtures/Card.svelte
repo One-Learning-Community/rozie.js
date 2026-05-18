@@ -5,9 +5,9 @@ import type { Snippet } from 'svelte';
 
 interface Props {
   title?: string;
-  onClose?: (...args: any[]) => any;
+  onClose?: ((...args: any[]) => any) | null;
   children?: Snippet;
-  snippets?: Record<string, Snippet<[any]>>;
+  snippets?: Record<string, any>;
 }
 
 let {
@@ -22,7 +22,7 @@ const children = $derived(__childrenProp ?? snippets?.children);
 
 
 <article class="card">
-  <CardHeader title={title} on-close={onClose}></CardHeader>
+  <CardHeader title={title} onClose={onClose}></CardHeader>
   <div class="card__body">
     {@render children?.()}
   </div>

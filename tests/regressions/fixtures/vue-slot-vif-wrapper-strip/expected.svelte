@@ -5,7 +5,7 @@ interface Props {
   title?: string;
   header?: Snippet;
   children?: Snippet;
-  snippets?: Record<string, Snippet<[any]>>;
+  snippets?: Record<string, any>;
 }
 
 let {

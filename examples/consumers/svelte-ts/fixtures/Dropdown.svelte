@@ -15,17 +15,22 @@ interface Props {
   open?: boolean;
   closeOnOutsideClick?: boolean;
   closeOnEscape?: boolean;
-  trigger?: Snippet<[any, any]>;
-  children?: Snippet<[any]>;
+  trigger?: Snippet<[{ open: any; toggle: any }]>;
+  children?: Snippet<[{ close: any }]>;
+  snippets?: Record<string, Snippet<[any]>>;
 }
 
 let {
   open = $bindable(false),
   closeOnOutsideClick = true,
   closeOnEscape = true,
-  trigger,
-  children,
+  trigger: __triggerProp,
+  children: __childrenProp,
+  snippets,
 }: Props = $props();
+
+const trigger = $derived(__triggerProp ?? snippets?.trigger);
+const children = $derived(__childrenProp ?? snippets?.children);
 
 let triggerEl = $state<HTMLElement | undefined>(undefined);
 let panelEl = $state<HTMLElement | undefined>(undefined);
@@ -45,16 +50,22 @@ const reposition = () => {
   });
 };
 
-// Multiple $onMount calls run in source order. Useful for colocating setup
-// with the logic it serves.
+// Re-fire reposition() whenever the open transition flips on. The panel
+// element is r-if-gated, so $refs.panelEl is undefined at mount time — $watch
+// is the primitive that re-runs the effect after panel mount.
 
 $effect(() => {
-  reposition();
+  // Initial reposition only if the panel is open at mount time.
+  if (open) reposition();
 });
 $effect(() => {
   // Example of integrating a vanilla JS library — $refs gives direct DOM access.
   // new Popper($refs.triggerEl, $refs.panelEl, { placement: 'bottom-start' })
 });
+
+$effect(() => { const __watchVal = (() => open)(); (() => {
+  if (open) reposition();
+})(__watchVal); });
 
 $effect(() => {
   if (!(open && closeOnOutsideClick)) return;
@@ -87,11 +98,11 @@ $effect(() => {
 
 <div class="dropdown">
   <div bind:this={triggerEl} onclick={toggle}>
-    {@render trigger?.(open, toggle)}
+    {@render trigger?.({ open, toggle })}
   </div>
 
   {#if open}<div bind:this={panelEl} class="dropdown-panel" role="menu">
-    {@render children?.(close)}
+    {@render children?.({ close })}
   </div>{/if}</div>
 
 

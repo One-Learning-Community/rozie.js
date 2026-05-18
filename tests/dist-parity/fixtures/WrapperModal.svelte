@@ -9,7 +9,7 @@ interface Props {
   brand?: Snippet;
   children?: Snippet;
   actions?: Snippet;
-  snippets?: Record<string, Snippet<[any]>>;
+  snippets?: Record<string, any>;
 }
 
 let {

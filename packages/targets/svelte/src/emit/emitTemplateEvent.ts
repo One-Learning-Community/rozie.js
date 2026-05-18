@@ -98,12 +98,17 @@ function makeWrapName(
  *   })();
  */
 function buildDebounceIIFE(wrapName: string, origCode: string, ms: string): string {
+  // Cast wrapped handler to `(...a: any[]) => any` so the rest-args forward
+  // type-checks even when the user-authored handler declares zero parameters
+  // (e.g., `onSearch = () => {...}`). Without the cast svelte-check raises
+  // "A spread argument must either have a tuple type or be passed to a rest
+  // parameter" on the inner setTimeout call.
   return [
     `const ${wrapName} = (() => {`,
     `  let timer: ReturnType<typeof setTimeout> | null = null;`,
     `  return (...args: any[]) => {`,
     `    if (timer !== null) clearTimeout(timer);`,
-    `    timer = setTimeout(() => (${origCode})(...args), ${ms});`,
+    `    timer = setTimeout(() => (${origCode} as (...a: any[]) => any)(...args), ${ms});`,
     `  };`,
     `})();`,
   ].join('\n');
@@ -123,6 +128,8 @@ function buildDebounceIIFE(wrapName: string, origCode: string, ms: string): stri
  *   })();
  */
 function buildThrottleIIFE(wrapName: string, origCode: string, ms: string): string {
+  // See buildDebounceIIFE — same cast keeps zero-arg handlers happy under
+  // svelte-check.
   return [
     `const ${wrapName} = (() => {`,
     `  let lastCall = 0;`,
@@ -130,7 +137,7 @@ function buildThrottleIIFE(wrapName: string, origCode: string, ms: string): stri
     `    const now = Date.now();`,
     `    if (now - lastCall < ${ms}) return;`,
     `    lastCall = now;`,
-    `    (${origCode})(...args);`,
+    `    (${origCode} as (...a: any[]) => any)(...args);`,
     `  };`,
     `})();`,
   ].join('\n');
@@ -302,7 +309,11 @@ export function emitTemplateEvent(
     const guardPrefix = guardLines.length > 0 ? `${guardLines} ` : '';
     let body: string;
     if (handlerKind === 'identifier') {
-      body = `${handlerRef}(e)`;
+      // Cast to permissive Fn so the `(e)` forward type-checks even when the
+      // user-authored handler declares zero parameters (e.g. SearchInput's
+      // `onSearch = () => {...}` reached via @keydown.enter). Otherwise
+      // svelte-check raises "Expected 0 arguments, but got 1".
+      body = `(${handlerRef} as (...a: any[]) => any)(e)`;
     } else if (handlerKind === 'callable') {
       body = `(${handlerRef})(e)`;
     } else {

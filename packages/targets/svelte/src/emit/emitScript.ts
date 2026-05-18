@@ -112,10 +112,15 @@ function renderType(type: PropTypeAnnotation): string {
         return 'string';
       case 'Boolean':
         return 'boolean';
+      // Array/Object widen to `any[]` / `any` so user-authored params on
+      // items / nodes don't surface as `'x' is of type 'unknown'` under
+      // svelte-check. v1 IR doesn't carry element / property shape so we
+      // can't narrow further; consumers can still annotate explicitly in
+      // .rozie when they care (TYPES-01 / Phase 6 refines).
       case 'Array':
-        return 'unknown[]';
+        return 'any[]';
       case 'Object':
-        return 'unknown';
+        return 'any';
       case 'Function':
         return '(...args: any[]) => any';
       default:
@@ -126,8 +131,8 @@ function renderType(type: PropTypeAnnotation): string {
     return type.members.map(renderType).join(' | ');
   }
   if (type.kind === 'literal') {
-    if (type.value === 'array') return 'unknown[]';
-    if (type.value === 'object') return 'unknown';
+    if (type.value === 'array') return 'any[]';
+    if (type.value === 'object') return 'any';
     if (type.value === 'function') return '(...args: any[]) => any';
     return type.value;
   }
@@ -145,7 +150,18 @@ function buildPropsInterfaceFields(ir: IRComponent): string[] {
   const lines: string[] = [];
 
   for (const p of ir.props) {
-    lines.push(`  ${p.name}?: ${renderType(p.typeAnnotation)};`);
+    let typeText = renderType(p.typeAnnotation);
+    // When the declared default is `null`, broaden the type with `| null` so
+    // the destructure `name = null` doesn't trip svelte-check (which sees
+    // `Type 'null' is not assignable to type '...'`). Common case is
+    // `Function`-typed props with `default: null` (CardHeader.onClose).
+    // Parens are mandatory — without them `(...args: any[]) => any | null`
+    // parses as `(...args: any[]) => (any | null)` (return-type union), not
+    // a union of the function type with null.
+    if (p.defaultValue !== null && t.isNullLiteral(p.defaultValue)) {
+      typeText = `(${typeText}) | null`;
+    }
+    lines.push(`  ${p.name}?: ${typeText};`);
   }
 
   // Slot fields share the Props interface — Snippet<[...]> typed.
@@ -157,8 +173,16 @@ function buildPropsInterfaceFields(ir: IRComponent): string[] {
   // emitter (emitSlotFiller.ts:174) emits `snippets={{ [expr]: __rozieDynSlot_N }}`
   // for `<template #[dynamic]>` fills; without this prop the producer destructure
   // silently drops the dynamic projection.
+  //
+  // Typed as `Record<string, any>` (not `Record<string, Snippet<[any]>>`) so the
+  // `const X = $derived(__XProp ?? snippets?.X)` merge below preserves the
+  // per-slot Snippet signature from `__XProp`. A more specific Snippet<...>
+  // would force the union into the more-strict shape and surface as
+  // "Expected 1 arguments, but got 0" at every `{@render X?.()}` callsite for
+  // zero-param slots (Card.children, TodoList.empty). Dynamic-name snippets
+  // are inherently untyped — the fill expression is computed at runtime.
   if (ir.slots.length > 0) {
-    lines.push('  snippets?: Record<string, Snippet<[any]>>;');
+    lines.push('  snippets?: Record<string, any>;');
   }
 
   // Emit callback-prop declarations: $emit('search', x) was rewritten to
@@ -210,7 +234,18 @@ function buildPropsDestructureEntries(ir: IRComponent): string[] {
       }
       entries.push(`${p.name} = $bindable(${inner})`);
     } else if (dflt !== null) {
-      entries.push(`${p.name} = ${dflt}`);
+      // Mirror the React/Vue idiom: a `default: () => ({...})` factory MUST be
+      // invoked at destructure time so the prop value is the produced object,
+      // not the function itself. Without this, `node = () => ({...})` typed
+      // as `Object` makes `node.label` fail under svelte-check (the local is
+      // the factory, not the value). Literal/identifier defaults pass through
+      // verbatim.
+      const isFactory =
+        p.defaultValue !== null &&
+        (t.isArrowFunctionExpression(p.defaultValue) ||
+          t.isFunctionExpression(p.defaultValue));
+      const value = isFactory ? `(${dflt})()` : dflt;
+      entries.push(`${p.name} = ${value}`);
     } else {
       // No default — bare destructure (Svelte will leave undefined).
       entries.push(p.name);
@@ -431,10 +466,15 @@ function emitWatcherHooks(
     const cbCode = genCode(cbArg as t.Node);
     // Wrap each in parens so the genCode emits a parenthesized arrow we can
     // immediately invoke as an IIFE inside the $effect block. Bind the
-    // getter's evaluated value as the callback's first argument so
-    // user-authored `(v) => ...` params actually receive the new value at
-    // invocation time. Without this the param is bound to `undefined`.
-    lines.push(`$effect(() => { const __watchVal = (${getterCode})(); (${cbCode})(__watchVal); });`);
+    // getter's evaluated value as the callback's first argument WHEN the
+    // user-authored callback declares a parameter — otherwise svelte-check
+    // flags "Expected 0 arguments, but got 1" for the `(() => {...})()` form.
+    const cbParamCount = (cbArg as t.ArrowFunctionExpression | t.FunctionExpression).params.length;
+    if (cbParamCount > 0) {
+      lines.push(`$effect(() => { const __watchVal = (${getterCode})(); (${cbCode})(__watchVal); });`);
+    } else {
+      lines.push(`$effect(() => { (${getterCode})(); (${cbCode})(); });`);
+    }
   }
   return { lines, consumedIndices: consumed };
 }

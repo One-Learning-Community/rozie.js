@@ -115,12 +115,15 @@ describe('emitScript — behavior (Plan 05-02a Task 1)', () => {
     expect(scriptBlock).toContain("import type { Snippet } from 'svelte';");
   });
 
-  it('Quick 260515-u2b — WatchHook binds the getter value as the callback\'s first arg', () => {
+  it('Quick 260515-u2b — WatchHook binds the getter value as the callback\'s first arg (when callback declares a param)', () => {
+    // Callback declares a param `(v) => ...` so emit MUST bind `__watchVal` to
+    // it; the zero-param variant is covered separately below to ensure the
+    // svelte-check arity gate doesn't regress.
     const src = `<rozie name="WatchSynth">
 <props>{ open: { type: Boolean, default: false } }</props>
 <script>
 const reposition = () => { console.log('repos') }
-$watch(() => $props.open, () => { if ($props.open) reposition() })
+$watch(() => $props.open, (v) => { if (v) reposition() })
 </script>
 <template><div /></template>
 </rozie>`;
@@ -131,7 +134,26 @@ $watch(() => $props.open, () => { if ($props.open) reposition() })
     // as its first argument. Preserves user-authored `(v) => ...` params so
     // `v` binds to the new value (regression: the bare `(cb)()` form left
     // `v` undefined — Svelte/Angular/Lit silent no-op, Solid ReferenceError).
-    expect(scriptBlock).toMatch(/\$effect\(\(\) => \{\s*const __watchVal = \(\(\) => open\)\(\);\s*\(\(\) => \{[\s\S]*?\}\)\(__watchVal\);\s*\}\);/);
+    expect(scriptBlock).toMatch(/\$effect\(\(\) => \{\s*const __watchVal = \(\(\) => open\)\(\);\s*\(v => \{[\s\S]*?\}\)\(__watchVal\);\s*\}\);/);
+  });
+
+  it('Quick 260515-u2b — WatchHook with zero-param callback omits __watchVal (svelte-check arity gate)', () => {
+    // Zero-param callbacks must NOT receive __watchVal — `(() => {...})(__watchVal)`
+    // trips svelte-check "Expected 0 arguments, but got 1". Dropdown.rozie has
+    // exactly this shape (callback closes over `open` directly).
+    const src = `<rozie name="WatchSynthNoArg">
+<props>{ open: { type: Boolean, default: false } }</props>
+<script>
+const reposition = () => { console.log('repos') }
+$watch(() => $props.open, () => { if ($props.open) reposition() })
+</script>
+<template><div /></template>
+</rozie>`;
+    const parsed = parse(src, { filename: 'WatchSynthNoArg.rozie' });
+    const ir = lowerToIR(parsed.ast!, { modifierRegistry: createDefaultRegistry() }).ir!;
+    const { scriptBlock } = emitScript(ir);
+    expect(scriptBlock).toMatch(/\$effect\(\(\) => \{\s*\(\(\) => open\)\(\);\s*\(\(\) => \{[\s\S]*?\}\)\(\);\s*\}\);/);
+    expect(scriptBlock).not.toContain('__watchVal');
   });
 
   it('Quick 260515-u2b — Counter (no watchers) emits no extra $effect lines beyond lifecycle', () => {
@@ -175,7 +197,13 @@ function emitScriptFromSrc(src: string, name: string): string {
 }
 
 describe('snippets-merge (Phase 07.3.1 D-SV-16)', () => {
-  it('Props interface includes snippets?: Record<string, Snippet<[any]>>; when ir.slots is non-empty', () => {
+  it('Props interface includes snippets?: Record<string, any>; when ir.slots is non-empty', () => {
+    // Typed `Record<string, any>` (not `Record<string, Snippet<[any]>>`) so the
+    // `const X = $derived(__XProp ?? snippets?.X)` merge preserves the per-slot
+    // Snippet signature from `__XProp`. A more specific Snippet<...> would
+    // force the union into the strict-arity shape and surface as
+    // "Expected 1 arguments, but got 0" at every `{@render X?.()}` callsite
+    // for zero-param slots (Card.children, TodoList.empty) under svelte-check.
     const src = `<rozie name="SlottedTwo">
 <template>
   <div>
@@ -185,7 +213,7 @@ describe('snippets-merge (Phase 07.3.1 D-SV-16)', () => {
 </template>
 </rozie>`;
     const scriptBlock = emitScriptFromSrc(src, 'SlottedTwo');
-    expect(scriptBlock).toContain('snippets?: Record<string, Snippet<[any]>>;');
+    expect(scriptBlock).toContain('snippets?: Record<string, any>;');
   });
 
   it('Props destructure renames slot entries and appends snippets + emits $derived merge per slot', () => {

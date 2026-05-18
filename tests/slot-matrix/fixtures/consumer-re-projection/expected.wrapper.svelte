@@ -6,7 +6,7 @@ import type { Snippet } from 'svelte';
 interface Props {
   title?: Snippet;
   children?: Snippet;
-  snippets?: Record<string, Snippet<[any]>>;
+  snippets?: Record<string, any>;
 }
 
 let {

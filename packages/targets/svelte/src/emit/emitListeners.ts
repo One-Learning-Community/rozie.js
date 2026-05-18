@@ -110,10 +110,19 @@ function renderTargetExpr(target: ListenerTarget, diagnostics: Diagnostic[], loc
   return 'document';
 }
 
-/** Build the `, { capture: true, passive: true }` options-object suffix. */
-function renderOptionsSuffix(opts: Set<string>): string {
-  if (opts.size === 0) return '';
-  const parts = [...opts].sort().map((o) => `${o}: true`);
+/**
+ * Build the `, { capture: true, passive: true }` options-object suffix for
+ * an addEventListener call. The optional `forRemove` switch drops keys not
+ * valid on removeEventListener (the EventListenerOptions interface only
+ * accepts `capture` — `passive`/`once` are addEventListener-only and trip
+ * svelte-check / strict TS overload resolution).
+ */
+function renderOptionsSuffix(opts: Set<string>, forRemove = false): string {
+  const filtered = forRemove
+    ? new Set([...opts].filter((o) => o === 'capture'))
+    : opts;
+  if (filtered.size === 0) return '';
+  const parts = [...filtered].sort().map((o) => `${o}: true`);
   return `, { ${parts.join(', ')} }`;
 }
 
@@ -145,18 +154,25 @@ function makeWrapName(
 }
 
 function buildDebounceIIFE(wrapName: string, origCode: string, ms: string): string {
+  // Cast the wrapped handler to a permissive Fn type so the rest-args forward
+  // type-checks even when the user-authored handler declares zero params (e.g.,
+  // `reposition = () => {...}`). Without the cast svelte-check raises both
+  // "A spread argument must either have a tuple type or be passed to a rest
+  // parameter" and "Expected 0 arguments, but got 1".
   return [
     `const ${wrapName} = (() => {`,
     `  let timer: ReturnType<typeof setTimeout> | null = null;`,
     `  return (...args: any[]) => {`,
     `    if (timer !== null) clearTimeout(timer);`,
-    `    timer = setTimeout(() => (${origCode})(...args), ${ms});`,
+    `    timer = setTimeout(() => (${origCode} as (...a: any[]) => any)(...args), ${ms});`,
     `  };`,
     `})();`,
   ].join('\n');
 }
 
 function buildThrottleIIFE(wrapName: string, origCode: string, ms: string): string {
+  // See buildDebounceIIFE — same cast keeps zero-arg handlers happy under
+  // svelte-check.
   return [
     `const ${wrapName} = (() => {`,
     `  let lastCall = 0;`,
@@ -164,7 +180,7 @@ function buildThrottleIIFE(wrapName: string, origCode: string, ms: string): stri
     `    const now = Date.now();`,
     `    if (now - lastCall < ${ms}) return;`,
     `    lastCall = now;`,
-    `    (${origCode})(...args);`,
+    `    (${origCode} as (...a: any[]) => any)(...args);`,
     `  };`,
     `})();`,
   ].join('\n');
@@ -309,13 +325,14 @@ function renderListener(
       ? `    ${userHandlerCode}();`
       : `    (${userHandlerCode})(e);`;
     const optsObj = renderOptionsSuffix(classification.listenerOpts);
+    const removeOptsObj = renderOptionsSuffix(classification.listenerOpts, true);
 
     return [
       `$effect(() => {`,
       whenGuard +
         `  const handler = (e: ${evtType}) => {\n${containsGuard}${guardLines}${invocation}\n  };`,
       `  ${targetExpr}.addEventListener('${listener.event}', handler${optsObj});`,
-      `  return () => ${targetExpr}.removeEventListener('${listener.event}', handler${optsObj});`,
+      `  return () => ${targetExpr}.removeEventListener('${listener.event}', handler${removeOptsObj});`,
       `});`,
     ].join('\n');
   }
@@ -339,12 +356,13 @@ function renderListener(
     });
 
     const optsObj = renderOptionsSuffix(classification.listenerOpts);
+    const removeOptsObj = renderOptionsSuffix(classification.listenerOpts, true);
 
     return [
       `$effect(() => {`,
       whenGuard +
         `  ${targetExpr}.addEventListener('${listener.event}', ${wrapName}${optsObj});`,
-      `  return () => ${targetExpr}.removeEventListener('${listener.event}', ${wrapName}${optsObj});`,
+      `  return () => ${targetExpr}.removeEventListener('${listener.event}', ${wrapName}${removeOptsObj});`,
       `});`,
     ].join('\n');
   }
@@ -357,13 +375,14 @@ function renderListener(
     ? `    ${userHandlerCode}();`
     : `    (${userHandlerCode})(e);`;
   const optsObj = renderOptionsSuffix(classification.listenerOpts);
+  const removeOptsObj = renderOptionsSuffix(classification.listenerOpts, true);
 
   return [
     `$effect(() => {`,
     whenGuard +
       `  const handler = (e: ${evtType}) => {\n${guardLines}${invocation}\n  };`,
     `  ${targetExpr}.addEventListener('${listener.event}', handler${optsObj});`,
-    `  return () => ${targetExpr}.removeEventListener('${listener.event}', handler${optsObj});`,
+    `  return () => ${targetExpr}.removeEventListener('${listener.event}', handler${removeOptsObj});`,
     `});`,
   ].join('\n');
 }

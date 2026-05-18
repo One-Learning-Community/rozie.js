@@ -3,7 +3,7 @@ import type { Snippet } from 'svelte';
 
 interface Props {
   children?: Snippet;
-  snippets?: Record<string, Snippet<[any]>>;
+  snippets?: Record<string, any>;
 }
 
 let { children: __childrenProp, snippets }: Props = $props();

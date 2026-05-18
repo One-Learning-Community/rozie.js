@@ -1,6 +1,6 @@
 <script lang="ts">
 interface Props {
-  items?: unknown[];
+  items?: any[];
 }
 
 let { items = $bindable((() => [])()) }: Props = $props();

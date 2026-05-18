@@ -1,0 +1,20 @@
+{
+  "name": "@rozie/svelte-typecheck",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@rozie/core": "workspace:*",
+    "@rozie/target-svelte": "workspace:*"
+  },
+  "devDependencies": {
+    "@tsconfig/svelte": "^5",
+    "svelte": "^5.0.0",
+    "svelte-check": "^4",
+    "typescript": "~5.6.0",
+    "vitest": "^4"
+  }
+}
