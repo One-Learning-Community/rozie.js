@@ -41,6 +41,7 @@ import type {
 import type { SignalRef } from '../../../../core/src/reactivity/signalRef.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { cloneScriptProgram } from '../rewrite/cloneProgram.js';
+import { partitionUserImports } from '../rewrite/partitionUserImports.js';
 import { rewriteRozieIdentifiers } from '../rewrite/rewriteScript.js';
 import { hoistModuleLet } from '../rewrite/hoistModuleLet.js';
 import {
@@ -591,6 +592,15 @@ export interface EmitScriptResult {
   /** User-authored top-level arrows / helpers / console.log preserved verbatim from <script>. */
   userArrowsSection: string;
   /**
+   * Spike 001 B1 — user-authored `<script>` `ImportDeclaration` statements
+   * rendered as a single string, ready to splice at module top by the shell.
+   * Empty string when the script has no imports. Without this hoist the
+   * imports would be emitted INSIDE the component function body and produce
+   * `TS1232: An import declaration can only be used at the top level of a
+   * namespace or module.`
+   */
+  userImports: string;
+  /**
    * Plan 04-04 — useEffect blocks for each LifecycleHook. Emitted AFTER user
    * arrows (and after listener wrapper consts via shell.ts) so they can
    * reference any user helper without TDZ.
@@ -650,6 +660,20 @@ export function emitScript(
 
   // 1. Clone the Babel Program (NEVER mutate ir.setupBody.scriptProgram).
   const cloned = cloneScriptProgram(ir.setupBody.scriptProgram);
+
+  // 1b. Spike 001 B1 — partition user-authored top-level ImportDeclarations
+  //     out of the Program body BEFORE any downstream pass iterates the body.
+  //     Mutate `cloned.program.body` in place to drop the imports; surface
+  //     them via `userImports` rendered as a string for the shell to splice at
+  //     module top. Index-based pairing passes (`pairClonedLifecycle`,
+  //     `pairClonedWatchers`) naturally operate on the partitioned body
+  //     because their input IS the mutated `cloned.program.body`.
+  const { userImports: userImportNodes, bodyStmts } = partitionUserImports(cloned);
+  cloned.program.body = bodyStmts;
+  const userImports =
+    userImportNodes.length > 0
+      ? userImportNodes.map((imp) => genCode(imp)).join('\n') + '\n'
+      : '';
 
   // 2. Hoist module-scoped `let X = init` declarations referenced from
   //    lifecycle hooks. ROZ522 advisories collected.
@@ -1094,6 +1118,7 @@ export function emitScript(
   return {
     hookSection,
     userArrowsSection,
+    userImports,
     lifecycleEffectsSection,
     hasPropsDefaults: defaultedNonModelProps.length > 0,
     hookSectionLines,

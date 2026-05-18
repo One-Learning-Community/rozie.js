@@ -18,6 +18,7 @@ import type { IRComponent } from '../../../../core/src/ir/types.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import type { SolidImportCollector, RuntimeSolidImportCollector } from '../rewrite/collectSolidImports.js';
 import { cloneScriptProgram } from '../rewrite/cloneProgram.js';
+import { partitionUserImports } from '../rewrite/partitionUserImports.js';
 import { rewriteRozieIdentifiers, rewriteRozieExpressionNode as rewriteNode } from '../rewrite/rewriteScript.js';
 
 // CJS interop normalization for @babel/generator default export.
@@ -56,6 +57,12 @@ export interface EmitScriptResult {
   hookSection: string;
   /** Alias for hookSection (kept for structural parity with React's EmitScriptResult). */
   userArrowsSection: string;
+  /**
+   * Spike 001 B1 — user-authored `<script>` `ImportDeclaration` statements
+   * rendered as a single string, ready to splice at module top by the shell.
+   * Empty when the script has no imports.
+   */
+  userImports: string;
   /**
    * `const _merged = mergeProps({ step: 1, ... }, _props);\n` when non-model
    * props have declared defaults. Null when no non-model defaults exist.
@@ -99,6 +106,20 @@ export function emitScript(
   const cloned = cloneScriptProgram(ir.setupBody.scriptProgram);
   const rewriteResult = rewriteRozieIdentifiers(cloned, ir);
   diagnostics.push(...rewriteResult.diagnostics);
+
+  // Spike 001 B1 — partition user-authored top-level ImportDeclarations out
+  // of the rewritten Program body BEFORE the residual-body iteration. Mutate
+  // `rewriteResult.rewrittenProgram.program.body` in place so downstream
+  // iterations naturally see only non-import statements; surface imports via
+  // `userImports` rendered as a string for the shell to splice at module top.
+  const { userImports: userImportNodes, bodyStmts } = partitionUserImports(
+    rewriteResult.rewrittenProgram,
+  );
+  rewriteResult.rewrittenProgram.program.body = bodyStmts;
+  const userImports =
+    userImportNodes.length > 0
+      ? userImportNodes.map((imp) => genCode(imp)).join('\n') + '\n'
+      : '';
 
   // 1. createControllableSignal for model:true props (D-135).
   // 1b. mergeProps call for non-model props with declared defaults.
@@ -312,6 +333,7 @@ export function emitScript(
   return {
     hookSection,
     userArrowsSection,
+    userImports,
     mergePropsCall,
     hookSectionLines,
     scriptMap,

@@ -71,6 +71,12 @@ export interface ShellParts {
    * entry was the self-entry that got filtered).
    */
   componentImportsBlock?: string;
+  /**
+   * Spike 001 B1 — user-authored `<script>` `ImportDeclaration` statements
+   * rendered as a string by emitScript. Placed AFTER target/component imports,
+   * BEFORE the slot ctx interface declarations. Empty when no user imports.
+   */
+  userImports?: string;
 }
 
 /**
@@ -123,6 +129,12 @@ export function buildShell(parts: ShellParts): BuildShellResult {
   // Phase 06.2 P2 (D-118): user-component named imports.
   if (parts.componentImportsBlock && parts.componentImportsBlock.length > 0) {
     moduleParts.push(parts.componentImportsBlock);
+    moduleParts.push('\n');
+  }
+
+  // Spike 001 B1 — user-authored `<script>` imports.
+  if (parts.userImports && parts.userImports.length > 0) {
+    moduleParts.push(parts.userImports);
     moduleParts.push('\n');
   }
 
@@ -202,6 +214,12 @@ function buildShellLegacy(parts: ShellParts): BuildShellResult {
   // Phase 06.2 P2 (D-118): user-component named imports.
   if (parts.componentImportsBlock && parts.componentImportsBlock.length > 0) {
     ms.append(parts.componentImportsBlock);
+    ms.append('\n');
+  }
+
+  // Spike 001 B1 — user-authored `<script>` imports.
+  if (parts.userImports && parts.userImports.length > 0) {
+    ms.append(parts.userImports);
     ms.append('\n');
   }
 

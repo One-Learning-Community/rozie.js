@@ -27,6 +27,12 @@ export interface SolidShellParts {
   /** `import { createControllableSignal, ... } from '@rozie/runtime-solid';\n` (or empty) */
   runtimeImports: string;
   /**
+   * Spike 001 B1 — user-authored `<script>` `ImportDeclaration` statements
+   * rendered as a string by emitScript. Placed AFTER target/runtime/component
+   * imports, BEFORE the blank-line separator. Empty when no user imports.
+   */
+  userImports?: string;
+  /**
    * Standalone interface declarations for slot-context types.
    * Each entry is a complete `interface XCtx { ... }` block.
    */
@@ -128,12 +134,17 @@ export function buildShell(parts: SolidShellParts): BuildShellResult {
   if (parts.componentImportsBlock && parts.componentImportsBlock.length > 0) {
     moduleParts.push(parts.componentImportsBlock);
   }
+  // Spike 001 B1 — user-authored `<script>` imports.
+  if (parts.userImports && parts.userImports.length > 0) {
+    moduleParts.push(parts.userImports);
+  }
 
   // Blank line between imports and interface (only if any imports).
   if (
     parts.solidImports.length > 0 ||
     parts.runtimeImports.length > 0 ||
-    (parts.componentImportsBlock !== undefined && parts.componentImportsBlock.length > 0)
+    (parts.componentImportsBlock !== undefined && parts.componentImportsBlock.length > 0) ||
+    (parts.userImports !== undefined && parts.userImports.length > 0)
   ) {
     moduleParts.push('\n');
   }
@@ -250,11 +261,16 @@ function buildShellLegacy(parts: SolidShellParts): BuildShellResult {
   if (parts.componentImportsBlock && parts.componentImportsBlock.length > 0) {
     ms.append(parts.componentImportsBlock);
   }
+  // Spike 001 B1 — user-authored `<script>` imports.
+  if (parts.userImports && parts.userImports.length > 0) {
+    ms.append(parts.userImports);
+  }
 
   if (
     parts.solidImports.length > 0 ||
     parts.runtimeImports.length > 0 ||
-    (parts.componentImportsBlock !== undefined && parts.componentImportsBlock.length > 0)
+    (parts.componentImportsBlock !== undefined && parts.componentImportsBlock.length > 0) ||
+    (parts.userImports !== undefined && parts.userImports.length > 0)
   ) {
     ms.append('\n');
   }

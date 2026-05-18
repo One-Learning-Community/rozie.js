@@ -31,6 +31,7 @@ import type {
 } from '../rewrite/collectLitImports.js';
 import { rewriteScript, collectMethodNamesFromProgram } from '../rewrite/rewriteScript.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
+import { partitionUserImports } from '../rewrite/partitionUserImports.js';
 import { toKebabCase } from './emitDecorator.js';
 
 type GenerateFn = typeof import('@babel/generator').default;
@@ -61,6 +62,13 @@ export interface EmitScriptResult {
   updateHookBody: string;
   /** attributeChangedCallback body (for model-prop notifyAttributeChange). */
   attributeChangedBody: string;
+  /**
+   * Spike 001 B1 — user-authored `<script>` `ImportDeclaration` statements
+   * rendered as a single string, ready to splice at module top by the shell.
+   * Empty when the script has no imports. Without this hoist they would land
+   * inside `firstUpdated()` and produce TS1232.
+   */
+  userImports: string;
   /** Source map for user-authored statements (unused in P2 — null). */
   scriptMap: EncodedSourceMap | null;
   /** Number of preamble lines (unused in P2). */
@@ -518,6 +526,21 @@ export function emitScript(
   // before we render statements out.
   const rewritten = rewriteScript(ir.setupBody.scriptProgram, ir);
 
+  // 2b. Spike 001 B1 — partition user-authored top-level ImportDeclarations
+  //     out of the rewritten Program body BEFORE partitionScript classifies
+  //     statements. Mutate `rewritten.file.program.body` in place to drop
+  //     the imports; surface them via `userImports` rendered as a string for
+  //     the shell to splice at module top — without this hoist they would
+  //     land inside `firstUpdated()` (the per-target lifecycle body) and
+  //     produce TS1232.
+  const { userImports: userImportNodes, bodyStmts: nonImportStmts } =
+    partitionUserImports(rewritten.file);
+  rewritten.file.program.body = nonImportStmts;
+  const userImports =
+    userImportNodes.length > 0
+      ? userImportNodes.map((imp) => generate(imp, GEN_OPTS).code).join('\n') + '\n'
+      : '';
+
   // 3. Partition the rewritten program into class-level vs lifecycle.
   const partition = partitionScript(rewritten.file);
 
@@ -632,6 +655,7 @@ export function emitScript(
     unmountHookBody: unmountBodies.join('\n\n'),
     updateHookBody: updateBodies.join('\n\n'),
     attributeChangedBody: attrCallbackLines.join('\n'),
+    userImports,
     scriptMap: null,
     preambleSectionLines: 0,
     diagnostics,
