@@ -461,7 +461,15 @@ function buildEventParts(
     // button may have slot="…" directly on it); its bubble path goes UP
     // through the producer, triggering the producer's
     // `addEventListener('rozie-<X>-<param>', …)` host wiring.
-    handler = `(e) => (e.currentTarget as HTMLElement).dispatchEvent(new CustomEvent('rozie-${slotKebab}-${paramKebab}', { detail: e, bubbles: true, composed: true }))`;
+    //
+    // WR-05 (Phase 07.4 review): cast to `EventTarget` (the actual type that
+    // defines `dispatchEvent`) rather than `HTMLElement` — `HTMLElement` is
+    // wrong for SVG-rooted scoped-slot fills (`<svg @click="close">`), where
+    // currentTarget is `SVGElement`. Runtime worked either way because
+    // dispatchEvent is on EventTarget, but the cast was lying to downstream
+    // tooling that reads the emitted .ts. Using EventTarget is correct and
+    // accepts both HTMLElement and SVGElement (and any other EventTarget).
+    handler = `(e) => (e.currentTarget as EventTarget).dispatchEvent(new CustomEvent('rozie-${slotKebab}-${paramKebab}', { detail: e, bubbles: true, composed: true }))`;
   } else {
     // Phase 07.3.1 Blocker #3 (D-03) — wrap scoped-slot-ctx handler in a
     // late-binding arrow so the ctx read happens at click time, not render

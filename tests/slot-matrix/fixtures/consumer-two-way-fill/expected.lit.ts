@@ -79,7 +79,7 @@ export default class Consumer extends SignalWatcher(LitElement) {
   render() {
     return html`
 <rozie-producer .open=${this._outerOpen.value} @open-change=${(e: CustomEvent) => { this._outerOpen.value = e.detail; }}><rozie-inner .open=${this._outerOpen.value} @open-change=${(e: CustomEvent) => { this._outerOpen.value = e.detail; }} slot="footer"></rozie-inner>
-    <button @click=${(e) => (e.currentTarget as HTMLElement).dispatchEvent(new CustomEvent('rozie-footer-close', { detail: e, bubbles: true, composed: true }))} slot="footer">×</button></rozie-producer>
+    <button @click=${(e) => (e.currentTarget as EventTarget).dispatchEvent(new CustomEvent('rozie-footer-close', { detail: e, bubbles: true, composed: true }))} slot="footer">×</button></rozie-producer>
 `;
   }
 }
