@@ -98,9 +98,9 @@ export function rewriteRozieIdentifiers(
       if (!parentPath) return;
       if (parentPath.isVariableDeclarator() && parentPath.node.id === path.node) return;
       if (
-        parentPath.isMemberExpression() &&
-        parentPath.node.property === path.node &&
-        !parentPath.node.computed
+        (parentPath.isMemberExpression() || parentPath.isOptionalMemberExpression()) &&
+        (parentPath.node as t.MemberExpression | t.OptionalMemberExpression).property === path.node &&
+        !(parentPath.node as t.MemberExpression | t.OptionalMemberExpression).computed
       ) {
         return;
       }

@@ -253,7 +253,14 @@ export function rewriteScript(
       if (parentPath.isFunctionDeclaration() && parentPath.node.id === path.node) return;
 
       // Skip property keys + member-expression property references.
-      if (parentPath.isMemberExpression() && parentPath.node.property === path.node && !parentPath.node.computed) return;
+      // OptionalMemberExpression (`obj?.X`) has the same shape — guard both,
+      // otherwise method-name property positions like `instance?.upload()`
+      // get incorrectly rewritten and the AST validator throws.
+      if (
+        (parentPath.isMemberExpression() || parentPath.isOptionalMemberExpression()) &&
+        (parentPath.node as t.MemberExpression | t.OptionalMemberExpression).property === path.node &&
+        !(parentPath.node as t.MemberExpression | t.OptionalMemberExpression).computed
+      ) return;
       if (parentPath.isObjectProperty() && parentPath.node.key === path.node && !parentPath.node.computed) return;
 
       // Skip function parameters.

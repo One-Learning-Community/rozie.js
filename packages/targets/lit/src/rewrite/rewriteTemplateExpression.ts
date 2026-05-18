@@ -213,8 +213,13 @@ export function rewriteTemplateExpression(
       const parentPath = path.parentPath;
       if (!parentPath) return;
 
-      // Skip when identifier is a property key.
-      if (parentPath.isMemberExpression() && parentPath.node.property === path.node && !parentPath.node.computed) return;
+      // Skip when identifier is a property key (MemberExpression OR
+      // OptionalMemberExpression — both have the same property-position shape).
+      if (
+        (parentPath.isMemberExpression() || parentPath.isOptionalMemberExpression()) &&
+        (parentPath.node as t.MemberExpression | t.OptionalMemberExpression).property === path.node &&
+        !(parentPath.node as t.MemberExpression | t.OptionalMemberExpression).computed
+      ) return;
       if (parentPath.isObjectProperty() && parentPath.node.key === path.node && !parentPath.node.computed) return;
       // Skip if it's a function parameter or pattern target.
       if (parentPath.isFunctionExpression() || parentPath.isArrowFunctionExpression() || parentPath.isFunctionDeclaration()) {
