@@ -1,0 +1,105 @@
+<!--
+  SortableList.rozie — data-bound port of SortableJS.
+
+  The "killer demo" companion to the simpler Sortable.rozie (which just
+  hosts a SortableJS instance over consumer-supplied DOM). This version
+  owns the list rendering and gives consumers the experience they actually
+  want: pass an array, hand back a re-ordered array, render whatever you
+  like per row via the default slot.
+
+  Why this is a worthwhile demo:
+    - Replaces four hand-maintained wrapper libraries (react-sortablejs,
+      vuedraggable, ngx-sortablejs, svelte-sortablejs) with a single source.
+    - Encapsulates the cross-framework DOM-reconciler workaround (see the
+      onUpdate handler below) that every wrapper library has to solve
+      independently — and gets it for free on all 6 targets.
+    - Two-way binds the underlying array so consumers don't manually wire
+      `onChange → setState → re-render`. Use `r-model:items="$data.list"`.
+
+  Consumer example:
+
+    <SortableList r-model:items="$data.todos" itemKey="id" handle=".grip">
+      <template #default="{ item }">
+        <span class="grip">⋮⋮</span>
+        <span>{{ item.text }}</span>
+      </template>
+    </SortableList>
+-->
+
+<rozie name="SortableList">
+
+<props>
+{
+  items:     { type: Array,   default: () => [],  model: true },
+  itemKey:   { type: String,  default: null },
+  handle:    { type: String,  default: null },
+  group:     { type: String,  default: null },
+  animation: { type: Number,  default: 150 },
+  disabled:  { type: Boolean, default: false },
+  options:   { type: Object,  default: () => ({}) },
+}
+</props>
+
+<script>
+import SortableJS from 'sortablejs'
+
+let instance = null
+
+const keyFor = (item, index) => {
+  if ($props.itemKey && item !== null && typeof item === 'object') {
+    return item[$props.itemKey] ?? index
+  }
+  return item ?? index
+}
+
+$onMount(() => {
+  instance = new SortableJS($el, {
+    animation: $props.animation,
+    disabled:  $props.disabled,
+    group:     $props.group,
+    handle:    $props.handle,
+    ...$props.options,
+    onStart: (e) => $emit('start', e),
+    onEnd:   (e) => $emit('end',   e),
+    // SortableJS mutates the DOM directly when a drop completes. Every
+    // framework reconciler (React/Vue/Svelte/Solid/Lit/Angular) then notices
+    // the DOM doesn't match its model on the next render and fights it —
+    // flash, snap-back, lost focus, broken animations. The fix is to RESTORE
+    // the pre-drag DOM order before updating the model: the framework then
+    // sees a model change against an unchanged DOM and reconciles cleanly,
+    // moving keyed nodes to their new positions with proper transitions.
+    onUpdate: (e) => {
+      e.item.remove()
+      $el.insertBefore(e.item, $el.children[e.oldIndex] ?? null)
+      const next = [...$props.items]
+      const [moved] = next.splice(e.oldIndex, 1)
+      next.splice(e.newIndex, 0, moved)
+      $props.items = next
+      $emit('change', { oldIndex: e.oldIndex, newIndex: e.newIndex, item: moved })
+    },
+  })
+  return () => instance?.destroy()
+})
+
+// Reconcile prop changes into the live SortableJS instance without
+// re-creating it. instance.option(name, value) is SortableJS's supported
+// runtime update path for these fields.
+$watch(() => $props.disabled, (v) => instance?.option('disabled', v))
+$watch(() => $props.group,    (v) => instance?.option('group',    v))
+$watch(() => $props.handle,   (v) => instance?.option('handle',   v))
+</script>
+
+<template>
+<div class="rozie-sortable-list">
+  <div r-for="item, index in $props.items" :key="keyFor(item, index)" class="rozie-sortable-item">
+    <slot :item="item" :index="index" />
+  </div>
+</div>
+</template>
+
+<style>
+.rozie-sortable-list { display: block; }
+.rozie-sortable-item { display: block; }
+</style>
+
+</rozie>
