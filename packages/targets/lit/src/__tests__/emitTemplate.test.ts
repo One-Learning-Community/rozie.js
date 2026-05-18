@@ -129,9 +129,15 @@ describe('dispatchEvent translation (Phase 07.3.1 D-LIT-17)', () => {
 </template>
 `;
     const code = compileConsumer(source, 'HeaderCloseConsumer');
-    expect(code).toContain(
-      "(e) => (e.currentTarget as HTMLElement).dispatchEvent(new CustomEvent('rozie-header-close', { detail: e, bubbles: true, composed: true }))",
-    );
+    // WR-06 (Phase 07.4 review): split the previous monolithic toContain into
+    // orthogonal regex assertions — each tests one semantic property so the
+    // failure points at one root cause when the emitter is tweaked.
+    expect(code).toMatch(/@click=\$\{\(e\)\s*=>/); // handler wired on @click
+    expect(code).toMatch(/dispatchEvent\(new CustomEvent\(/); // dispatch path used
+    expect(code).toMatch(/'rozie-header-close'/); // event name correct
+    expect(code).toMatch(/bubbles:\s*true/); // bubble flag set
+    expect(code).toMatch(/composed:\s*true/); // shadow-crossing flag set
+    expect(code).toMatch(/detail:\s*e\b/); // original event in detail
     // The old late-binding wrap MUST NOT appear at the dispatch site — that
     // was the broken path (function ref always undefined through JSON).
     expect(code).not.toMatch(/\(this\._headerCtx\?\.close\)\?\.\(e\)/);
@@ -155,10 +161,14 @@ describe('dispatchEvent translation (Phase 07.3.1 D-LIT-17)', () => {
 </template>
 `;
     const code = compileConsumer(source, 'FooterToggleConsumer');
-    expect(code).toContain("'rozie-footer-toggle'");
-    expect(code).toContain(
-      "(e) => (e.currentTarget as HTMLElement).dispatchEvent(new CustomEvent('rozie-footer-toggle', { detail: e, bubbles: true, composed: true }))",
-    );
+    // WR-06 (Phase 07.4 review): orthogonal regex assertions for the
+    // footer-toggle dispatch shape — see HeaderCloseConsumer test above
+    // for rationale.
+    expect(code).toMatch(/@click=\$\{\(e\)\s*=>/);
+    expect(code).toMatch(/dispatchEvent\(new CustomEvent\(/);
+    expect(code).toMatch(/'rozie-footer-toggle'/);
+    expect(code).toMatch(/bubbles:\s*true/);
+    expect(code).toMatch(/composed:\s*true/);
   });
 
   it('falls back to late-binding wrap for non-bare ctx reference (member chain)', () => {
@@ -277,12 +287,16 @@ describe('multi-root slot-fill spread (Phase 07.3.1 D-LIT-18)', () => {
     // Each top-level element bears `slot="header"`. The <h2> picks it up
     // as the only attribute; the <button> picks it up after its existing
     // `@click=${...}` handler binding (which under D-LIT-17 expands to a
-    // dispatchEvent call, so the button tag is long — we match the exact
-    // dispatchEvent prefix to keep the assertion precise).
+    // dispatchEvent call, so the button tag is long).
+    // WR-06 (Phase 07.4 review): orthogonal regex assertions rather than
+    // one monolithic literal — each tests one semantic property.
     expect(code).toContain('<h2 slot="header">Title</h2>');
-    expect(code).toContain(
-      `<button @click=\${(e) => (e.currentTarget as HTMLElement).dispatchEvent(new CustomEvent('rozie-header-close', { detail: e, bubbles: true, composed: true }))} slot="header">×</button>`,
-    );
+    // The <button> must exist with @click + slot="header" spread (D-LIT-18).
+    expect(code).toMatch(/<button[^>]*@click=\$\{\(e\)\s*=>[^>]*slot="header"[^>]*>×<\/button>/);
+    // And the @click handler must dispatch the rozie-header-close event.
+    expect(code).toMatch(/dispatchEvent\(new CustomEvent\('rozie-header-close'/);
+    expect(code).toMatch(/bubbles:\s*true/);
+    expect(code).toMatch(/composed:\s*true/);
     // The wrap MUST be absent for this body — top-level children are
     // separated only by whitespace, which is the D-LIT-18 spread path.
     // Anchor to the slot="header" wrap shape specifically; do NOT use a

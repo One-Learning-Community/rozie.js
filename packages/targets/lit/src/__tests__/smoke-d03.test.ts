@@ -71,9 +71,14 @@ describe('Phase 07.3.1 Blocker #3 (D-03) — Lit consumer-side scoped slot fill 
     // wrap is bypassed for this exact shape — it was a no-op anyway because
     // JSON.stringify drops the function value through data-rozie-params.
     const code = compileConsumer();
-    expect(code).toContain(
-      "@click=${(e) => (e.currentTarget as HTMLElement).dispatchEvent(new CustomEvent('rozie-header-close', { detail: e, bubbles: true, composed: true }))}",
-    );
+    // WR-06 (Phase 07.4 review): orthogonal regex assertions in place of the
+    // previous monolithic literal — one assertion per semantic property so
+    // failures point at one root cause when the emitter is tweaked.
+    expect(code).toMatch(/@click=\$\{\(e\)\s*=>/);
+    expect(code).toMatch(/dispatchEvent\(new CustomEvent\(/);
+    expect(code).toMatch(/'rozie-header-close'/);
+    expect(code).toMatch(/bubbles:\s*true/);
+    expect(code).toMatch(/composed:\s*true/);
     // The old late-binding wrap MUST NOT appear at the dispatch site.
     expect(code).not.toMatch(/\(this\._headerCtx\?\.close\)\?\.\(e\)/);
   });
@@ -92,10 +97,16 @@ describe('Phase 07.3.1 Blocker #3 (D-03) — Lit consumer-side scoped slot fill 
     // is the D-LIT-17 dispatchEvent shape (the bare `close` rewrites to
     // `this._headerCtx?.close`, which dispatches `rozie-header-close`).
     const code = compileConsumer();
+    // WR-06 (Phase 07.4 review): orthogonal regex assertions in place of the
+    // previous monolithic button-tag literal — one assertion per semantic
+    // property so failures point at one root cause.
     expect(code).toContain('<h2 slot="header">Title</h2>');
-    expect(code).toContain(
-      `<button @click=\${(e) => (e.currentTarget as HTMLElement).dispatchEvent(new CustomEvent('rozie-header-close', { detail: e, bubbles: true, composed: true }))} slot="header">×</button>`,
-    );
+    // Button exists with @click + slot="header" spread (D-LIT-18).
+    expect(code).toMatch(/<button[^>]*@click=\$\{\(e\)\s*=>[^>]*slot="header"[^>]*>×<\/button>/);
+    // Dispatch shape + event name asserted independently.
+    expect(code).toMatch(/dispatchEvent\(new CustomEvent\('rozie-header-close'/);
+    expect(code).toMatch(/bubbles:\s*true/);
+    expect(code).toMatch(/composed:\s*true/);
     expect(code).not.toContain('<div slot="header">');
   });
 
@@ -163,8 +174,12 @@ function handleClick() {}
     // Plain handler — NOT wrapped.
     expect(code).toMatch(/@click=\$\{this\.handleClick\}/);
     // Scoped-ctx handler — D-LIT-17 dispatchEvent translation.
-    expect(code).toContain(
-      "@click=${(e) => (e.currentTarget as HTMLElement).dispatchEvent(new CustomEvent('rozie-header-close', { detail: e, bubbles: true, composed: true }))}",
-    );
+    // WR-06 (Phase 07.4 review): orthogonal regex assertions per semantic
+    // property in place of the previous monolithic literal.
+    expect(code).toMatch(/@click=\$\{\(e\)\s*=>/);
+    expect(code).toMatch(/dispatchEvent\(new CustomEvent\(/);
+    expect(code).toMatch(/'rozie-header-close'/);
+    expect(code).toMatch(/bubbles:\s*true/);
+    expect(code).toMatch(/composed:\s*true/);
   });
 });
