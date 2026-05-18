@@ -198,6 +198,51 @@ class RozieInjectionTest : BasePlatformTestCase() {
         )
     }
 
+    // Plan 08.2-15 — extend Plan 11's paren-wrap to LISTENERS_BODY (closes P1-UAT-10).
+    // Mirrors the 3 Plan 11 paren-wrap regression methods verbatim — same
+    // configureAndGetInjectedJs helper, same JSObjectLiteralExpression + JSProperty
+    // assertions, same defence-in-depth ZERO-JSLabeledStatement check. The only diffs
+    // are the fixture path (object-literal-listeners.rozie), the anchor string
+    // (`click: {` — first property key inside the listeners body), and the expected
+    // JSProperty names (`click` / `hover` instead of the props body's `value` /
+    // `step` / `label`).
+    fun testListenersBodyParsesAsObjectLiteralUnderParenWrap() {
+        val injectedFile = configureAndGetInjectedJs("object-literal-listeners.rozie", "click: {")
+        // With paren-wrap: ( { click: {...}, hover: {...} } ) parses as a
+        // JSObjectLiteralExpression containing 2 JSProperty children (`click`, `hover`).
+        // Without paren-wrap: the top-level body parses as a JSLabeledStatement tree
+        // (label `click:` carrying a JSBlockStatement value) and
+        // PsiTreeUtil.findChildrenOfType(file, JSObjectLiteralExpression) would be empty.
+        val objLits = PsiTreeUtil.findChildrenOfType(injectedFile, JSObjectLiteralExpression::class.java)
+        assertTrue(
+            "Expected at least one JSObjectLiteralExpression in paren-wrapped <listeners> body; " +
+                "without paren-wrap the JS parser produces JSLabeledStatement (Statement-expected). " +
+                "Found: ${objLits.map { it.text }}",
+            objLits.isNotEmpty(),
+        )
+        val propNames = PsiTreeUtil.findChildrenOfType(injectedFile, JSProperty::class.java)
+            .mapNotNull { it.name }.toSet()
+        assertTrue(
+            "Expected JSProperty 'click' inside paren-wrapped <listeners>; found: $propNames",
+            "click" in propNames,
+        )
+        assertTrue(
+            "Expected JSProperty 'hover' inside paren-wrapped <listeners>; found: $propNames",
+            "hover" in propNames,
+        )
+        // Defence-in-depth: assert NO labeled-statement tree is present at top-level
+        // within the injected file. If paren-wrap were missing, the event-name keys
+        // (`click:`, `hover:`) would each parse as a JSLabeledStatement; the assertion
+        // below would fail.
+        val labels = PsiTreeUtil.findChildrenOfType(injectedFile, JSLabeledStatement::class.java)
+        assertTrue(
+            "Expected ZERO JSLabeledStatement nodes in paren-wrapped <listeners> body; " +
+                "presence indicates the paren-wrap did not take effect. " +
+                "Labels found: ${labels.map { it.label }}",
+            labels.isEmpty(),
+        )
+    }
+
     fun testScriptBodyRemainsUnwrappedAsStatementList() {
         // The injection-smoke.rozie <script> body is `const message = "hello"; $onMount(...)`.
         // If SCRIPT_BODY were paren-wrapped (which it MUST NOT be), `const` would not
