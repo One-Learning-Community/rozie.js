@@ -35,7 +35,7 @@ const props = withDefaults(
   { title: 'Todo' }
 );
 
-const items = defineModel<unknown[]>('items', { default: () => [] });
+const items = defineModel<any[]>('items', { default: () => [] });
 
 const emit = defineEmits<{
   add: [...args: any[]];

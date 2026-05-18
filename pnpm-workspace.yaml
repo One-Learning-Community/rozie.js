@@ -11,6 +11,7 @@ packages:
   - "tests/smoke-sourcemap"
   - "tests/solid-lint"
   - "tests/lit-lint"
+  - "tests/vue-typecheck"
   - "tests/visual-regression"
   - "tests/slot-matrix"
   - "tests/regressions"

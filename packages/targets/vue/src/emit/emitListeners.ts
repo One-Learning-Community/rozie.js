@@ -104,10 +104,33 @@ function renderTargetExpr(target: ListenerTarget): string {
  * Build the `, { capture: true, ... }` options-object suffix from
  * collected listenerOption entries on a single listener. Returns '' when no
  * options are present.
+ *
+ * Note `removeEventListener` accepts a narrower `EventListenerOptions` type
+ * (only `capture`); `passive` / `once` are valid only on `addEventListener`'s
+ * `AddEventListenerOptions`. Callers building remove calls must filter via
+ * `renderRemoveListenerOptions` to avoid TS2769.
  */
 function renderListenerOptions(listenerOpts: Set<string>): string {
   if (listenerOpts.size === 0) return '';
   const parts = [...listenerOpts].sort().map((opt) => `${opt}: true`);
+  return `, { ${parts.join(', ')} }`;
+}
+
+/**
+ * Variant of `renderListenerOptions` for `removeEventListener` call sites.
+ * The DOM signature `removeEventListener(type, listener, options?: boolean |
+ * EventListenerOptions)` only accepts `capture`; `passive`/`once`/`signal`
+ * are exclusive to `AddEventListenerOptions`. Filter to `capture`-only.
+ *
+ * Catches Dropdown.rozie's `@window:resize.throttle(100).passive` lowering,
+ * which would otherwise emit `removeEventListener(..., { passive: true })`
+ * and trip TS2769 on consumer compile (vue-tsc gate).
+ */
+function renderRemoveListenerOptions(listenerOpts: Set<string>): string {
+  if (listenerOpts.size === 0) return '';
+  const filtered = [...listenerOpts].filter((opt) => opt === 'capture').sort();
+  if (filtered.length === 0) return '';
+  const parts = filtered.map((opt) => `${opt}: true`);
   return `, { ${parts.join(', ')} }`;
 }
 
@@ -307,13 +330,14 @@ function renderListener(
     ? guards.map((g) => `    ${g}`).join('\n') + '\n'
     : '';
 
-  const optsObj = renderListenerOptions(
+  const listenerOptsForCalls =
     classification.kind === 'A'
       ? classification.listenerOpts
       : classification.kind === 'C'
         ? classification.listenerOpts
-        : new Set<string>(),
-  );
+        : new Set<string>();
+  const optsObj = renderListenerOptions(listenerOptsForCalls);
+  const removeOptsObj = renderRemoveListenerOptions(listenerOptsForCalls);
 
   // Whether the user-handler is a bare Identifier — if so, calling it as
   // `handler()` (no event arg) matches the user's source (Dropdown's
@@ -335,7 +359,7 @@ function renderListener(
     // Build add/remove call WITHOUT trailing `;` so we can wrap inside
     // onCleanup(() => removeCall) without a stray `;` inside the arrow.
     const addCallNoSemi = `${targetExpr}.addEventListener('${listener.event}', ${wrapName}${optsObj})`;
-    const removeCallNoSemi = `${targetExpr}.removeEventListener('${listener.event}', ${wrapName}${optsObj})`;
+    const removeCallNoSemi = `${targetExpr}.removeEventListener('${listener.event}', ${wrapName}${removeOptsObj})`;
 
     const guardLine = whenGuard ? `  ${whenGuard}\n` : '';
     return [
@@ -357,7 +381,7 @@ function renderListener(
     : `(${userHandlerCode})(e);`;
   const handlerDecl = `  const handler = (e: ${evtType}) => {\n${guardLines}    ${handlerInvoke}\n  };`;
   const addCallNoSemi = `${targetExpr}.addEventListener('${listener.event}', handler${optsObj})`;
-  const removeCallNoSemi = `${targetExpr}.removeEventListener('${listener.event}', handler${optsObj})`;
+  const removeCallNoSemi = `${targetExpr}.removeEventListener('${listener.event}', handler${removeOptsObj})`;
 
   const guardLine = whenGuard ? `  ${whenGuard}\n` : '';
   return [

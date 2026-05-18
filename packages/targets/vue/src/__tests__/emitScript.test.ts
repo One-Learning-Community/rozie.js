@@ -148,6 +148,40 @@ $watch(() => $props.q, () => { console.log('B') })
     expect(idxB).toBeGreaterThan(idxA);
   });
 
+  // VUE-TSC gate (commit reference: vue-tsc --noEmit gate rollout):
+  // Function-typed props with `default: null` (Card.rozie / CardHeader.rozie)
+  // must render the TS type as `((...args: any[]) => any) | null` so the
+  // emitted `withDefaults(..., { onClose: null })` typechecks against the
+  // prop signature. Without the `| null` suffix vue-tsc trips TS2322.
+  it('VUE-TSC: Function prop with default null renders as `((...args: any[]) => any) | null`', () => {
+    const { script } = emitScript(lowerExample('Card'));
+    expect(script).toContain('onClose?: ((...args: any[]) => any) | null');
+    expect(script).toContain('onClose: null');
+  });
+
+  it('VUE-TSC: CardHeader Function prop with default null typechecks', () => {
+    const { script } = emitScript(lowerExample('CardHeader'));
+    expect(script).toContain('onClose?: ((...args: any[]) => any) | null');
+    expect(script).toContain('onClose: null');
+  });
+
+  // VUE-TSC gate: Array → `any[]` (not `unknown[]`) so template/script
+  // expressions reading element fields (e.g., TodoList's `item.id`,
+  // `item.done`) typecheck without forcing the rozie author to annotate
+  // inner-element type.
+  it('VUE-TSC: Array prop type renders as `any[]` for ergonomic element access', () => {
+    const { script } = emitScript(lowerExample('TodoList'));
+    expect(script).toContain("defineModel<any[]>('items'");
+    expect(script).not.toContain('unknown[]');
+  });
+
+  // VUE-TSC gate: Object → `Record<string, any>` (not `unknown`) so template
+  // dotted access (e.g., TreeNode's `props.node.label`) typechecks.
+  it('VUE-TSC: Object prop type renders as `Record<string, any>`', () => {
+    const { script } = emitScript(lowerExample('TreeNode'));
+    expect(script).toContain('node?: Record<string, any>');
+  });
+
   it('Counter emitVue() without opts.source returns SFC with no <style> block (Plan 05 back-compat path)', () => {
     // Plan 05: emitStyle requires opts.source to slice rule bodies (Wave 0
     // finding). When source is omitted (back-compat with pre-Plan-05 callers),

@@ -1,0 +1,20 @@
+{
+  "name": "@rozie/vue-typecheck",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@rozie/core": "workspace:*",
+    "@rozie/runtime-vue": "workspace:*",
+    "@rozie/target-vue": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "~5.6.0",
+    "vitest": "^4",
+    "vue": "^3.5.33",
+    "vue-tsc": "^2"
+  }
+}

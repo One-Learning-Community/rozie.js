@@ -99,6 +99,17 @@ describe('emitListeners — Dropdown end-to-end', () => {
     expect(code).toContain("window.removeEventListener('resize', throttledLReposition");
   });
 
+  // VUE-TSC gate: `passive` is exclusive to AddEventListenerOptions; the DOM
+  // signature `removeEventListener(type, listener, options?: boolean |
+  // EventListenerOptions)` rejects it. The remove call must NOT carry the
+  // `passive: true` options object — only `capture` survives the filter.
+  it('VUE-TSC: removeEventListener for `.passive` modifier strips passive from options', () => {
+    const { code } = emitListeners(dropdown.listeners, dropdown, registry);
+    // The removeEventListener call must not include `{ passive: true }` —
+    // would trip TS2769 on vue-tsc against EventListenerOptions.
+    expect(code).not.toMatch(/removeEventListener\([^)]*passive/);
+  });
+
   it('Test 4: runtimeImports include useOutsideClick + throttle, NOT debounce (only collected helpers)', () => {
     const { runtimeImports } = emitListeners(dropdown.listeners, dropdown, registry);
     const set = runtimeImports.names();
