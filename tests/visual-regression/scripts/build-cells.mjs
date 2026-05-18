@@ -35,6 +35,10 @@ const REFERENCE_BASENAMES = [
   // Angular sub-build; both must be cleaned up after.
   'ModalConsumer',
   'WrapperModal',
+  // Spike 003 — PortalList wrapper. PortalListDemo (in examples/demos/) is
+  // loaded by the VR rig; both write Angular `.rozie.ts` cache artefacts
+  // that the directory-glob cleanup below sweeps.
+  'PortalList',
 ];
 
 // Cross-tree disk-cache files emitted by the Angular sub-build into the

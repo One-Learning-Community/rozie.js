@@ -32,6 +32,11 @@ export const EXAMPLES = [
   // convention still applies: LIT_TAGS[example] + '-demo' = the demo's tag.
   'DynamicSlotName',
   'LitScopedFillFirstpaint',
+  // Spike 003 portal-slot primitive — VR coverage of the runtime mount
+  // path. Loader resolves to `examples/demos/PortalListDemo.rozie` (which
+  // imports `../PortalList.rozie`); the wrapper instantiates an inline
+  // vanilla-JS engine and mounts each row's content through `$portals.item`.
+  'PortalList',
 ] as const;
 
 export type Example = (typeof EXAMPLES)[number];
@@ -60,6 +65,7 @@ export const LIT_TAGS: Record<Example, string> = {
   ModalConsumer: 'rozie-modal-consumer',
   DynamicSlotName: 'rozie-dynamic-slot-name',
   LitScopedFillFirstpaint: 'rozie-lit-scoped-fill-firstpaint',
+  PortalList: 'rozie-portal-list',
 };
 
 export interface HostQuery {
@@ -101,6 +107,8 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // none for LitScopedFillFirstpaint).
   DynamicSlotName: {},
   LitScopedFillFirstpaint: {},
+  // PortalListDemo carries its item array in <data>; no props needed.
+  PortalList: {},
 };
 
 /** Parse `?example=&target=` from the current URL, falling back to defaults. */

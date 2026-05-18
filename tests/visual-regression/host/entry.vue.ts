@@ -4,20 +4,25 @@
  * Vue is the visual REFERENCE target: the baseline PNGs in `__screenshots__/`
  * are generated from these renders, and every other target diffs against them.
  *
- * `import.meta.glob` gives Vite a static import map for all 8 reference
+ * `import.meta.glob` gives Vite a static import map for the matrix-relevant
  * `.rozie` files; `@rozie/unplugin` (target: vue) + `@vitejs/plugin-vue` compile
  * each to a Vue SFC. The runtime mount is plain `createApp`.
  */
 import { createApp } from 'vue';
 import { parseQuery, mountWrapper, DEFAULT_PROPS } from './main';
 
-// Two glob roots: `examples/*.rozie` is the canonical reference set; the
-// rig-specific `examples/demos/*.rozie` provides per-example wrappers that
-// override the canonical for visual-regression purposes only (e.g. Dropdown
-// needs default-slot content to render a non-empty panel — see
-// examples/demos/Dropdown.rozie). When BOTH globs match, the demos/ entry
-// wins. Globs are non-recursive by default so the two sets don't overlap.
-const baseModules = import.meta.glob('../../../examples/*.rozie');
+// Two glob roots: an EXPLICIT brace-list of matrix-relevant canonical examples
+// (mirrors the EXAMPLES set in main.ts, plus WrapperModal which ModalConsumer
+// composes via its <components> block), and the rig-specific
+// `examples/demos/*.rozie` set. The brace list is deliberate — a permissive
+// `examples/*.rozie` would also pull in every engine-wrapper port
+// (Flatpickr/LeafletMap/LineChart/TipTap/Uppy/FullCalendar/SortableList) and
+// break the Vue sub-build whenever any of their emitted Vue SFCs has a TS-
+// parser-rejected shape. Those wrappers participate in the cross-target
+// compile gate (engine-examples.compile.test.ts) but NOT in the
+// visual-regression matrix. When BOTH globs match (demos/ vs base), the
+// demos/ entry wins per the loader below.
+const baseModules = import.meta.glob('../../../examples/{Counter,SearchInput,Dropdown,TodoList,Modal,TreeNode,Card,CardHeader,ModalConsumer,WrapperModal,PortalList}.rozie');
 const demoModules = import.meta.glob('../../../examples/demos/*.rozie');
 
 async function main(): Promise<void> {

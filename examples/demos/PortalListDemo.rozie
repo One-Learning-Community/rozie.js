@@ -1,0 +1,80 @@
+<!--
+  Visual-regression demo wrapper for PortalList — the portal-slot
+  primitive (Spike 003) exhibit.
+
+  PortalList itself bundles a tiny inline vanilla-JS "engine" that owns
+  per-row `<li>` containers. This demo fills the portal `#item` slot with
+  per-row markup (id + label), so the screenshot captures what consumers
+  actually write — not the wrapper's bare engine output.
+
+  Per-target lowering of the consumer surface:
+    - React  → `<PortalList renderItem={({ item }) => <span>…</span>} />`
+    - Vue    → `<PortalList><template #item="{ item }">…</template></PortalList>`
+    - Svelte → `<PortalList>{#snippet item({ item })}…{/snippet}</PortalList>`
+    - Angular → `<rozie-portal-list><ng-template #item let-item="item">…</ng-template></rozie-portal-list>`
+    - Solid  → `<PortalList item={({ item }) => <span>…</span>} />`
+    - Lit    → `<rozie-portal-list .item=${({ item }) => html\`…\`}>…</rozie-portal-list>`
+-->
+<rozie name="PortalListDemo">
+
+<components>
+{
+  PortalList: '../PortalList.rozie',
+}
+</components>
+
+<data>
+{
+  items: [
+    { id: 1, label: 'Alpha' },
+    { id: 2, label: 'Beta'  },
+    { id: 3, label: 'Gamma' },
+    { id: 4, label: 'Delta' },
+  ],
+}
+</data>
+
+<template>
+<div class="portal-list-demo">
+  <PortalList :items="$data.items">
+    <template #item="{ item }">
+      <!--
+        data-* attributes (rather than class hooks) are deliberate — they
+        survive React/Solid's CSS-Modules class hashing, Angular's
+        view-encapsulation rewrites, and Lit's shadow-DOM boundary. The
+        portal-list.spec.ts runtime smoke locates each row by these.
+
+        Per-row differentiation is text-only — id + label — to keep the demo
+        portable across all 6 targets without tripping on `:style` object-vs-
+        string divergence (Vue/React/Solid accept an object form, Lit/Svelte
+        want a string, Angular wants `[ngStyle]`). The point of the example
+        is portal MOUNTING — that the wrapper's `$portals.item(...)` call
+        successfully drops the consumer's fragment into each engine-owned
+        cell — not the consumer's styling surface.
+      -->
+      <code class="portal-list-demo__id" data-portal-list-id>#{{ item.id }}</code>
+      <strong class="portal-list-demo__label" data-portal-list-label>{{ item.label }}</strong>
+    </template>
+  </PortalList>
+</div>
+</template>
+
+<style>
+.portal-list-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 0.875rem;
+  color: #1a1a1a;
+  padding: 1rem;
+  max-width: 360px;
+}
+.portal-list-demo__id {
+  font-family: ui-monospace, monospace;
+  color: rgba(0, 0, 0, 0.55);
+  font-size: 0.8125rem;
+}
+.portal-list-demo__label {
+  font-weight: 600;
+}
+</style>
+
+</rozie>

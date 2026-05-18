@@ -12,6 +12,7 @@ Eight reference components, each shipped with byte-verbatim output across all si
 - [Card (with CardHeader)](/examples/card) — wrapper-pair composition. Two `.rozie` files; shows the kebab/camel prop bridge and the per-target child-component import + selector rewrite (notably Angular's `<rozie-card-header>`).
 - [TodoList](/examples/todo-list) — `r-for` with `:key`, multiple `$emit` channels, named + default slots with per-item scoped params, fallback content, `r-if` / `r-else` empty state. Calls out the documented React render-prop divergence in slot consumer ergonomics.
 - [Table](/examples/table) — slot-driven UI-library table (named scoped slots for header/cell/empty), plus a **consumer-side dynamic slot fill** (`` <template #[`footer${mode}`]> ``) toggling between two footer renderers. The dynamic-slot showcase.
+- [PortalList](/examples/portal-list) — **portal-slot primitive** demo. A tiny inline vanilla-JS engine owns row containers but the per-row CONTENT is rendered through `<slot name="item" portal />` + `$portals.item(container, scope)`. The cross-target equivalent of FullCalendar's `eventContent`, AG-Grid's `cellRenderer`, Swiper's slide content.
 
 ## By feature
 
@@ -42,6 +43,7 @@ If you're looking for a specific authoring feature:
 | Default slot with scoped params | [Modal](/examples/modal), [Dropdown](/examples/dropdown), [TodoList](/examples/todo-list) |
 | Slot fallback content | [TodoList](/examples/todo-list) |
 | Dynamic slot fills (consumer-side `<template #[expr]>`) | [Table](/examples/table) |
+| Portal slots (`<slot portal />` + `$portals.X`) | [PortalList](/examples/portal-list) |
 | `:root { }` global escape hatch in `<style>` | [Modal](/examples/modal), [Dropdown](/examples/dropdown) |
 
 For the design rationale behind each of these, see [Features & design choices](/guide/features).

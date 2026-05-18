@@ -891,6 +891,24 @@ export function emitScript(
       continue;
     }
 
+    // ClassDeclaration → hoist to MODULE scope (before the @Component class).
+    // The Angular emitter would otherwise land the declaration in the
+    // constructor body via the catch-all `else` below, which means lifecycle
+    // methods (`ngAfterViewInit`, etc.) can't see the class — the
+    // constructor's scope ends as soon as the constructor returns. Piggyback
+    // on the shell's `interfaceDecls` slot, which already lands between
+    // `importLines` and the `@Component` decorator.
+    //
+    // Required for inline-engine wrappers like examples/PortalList.rozie that
+    // declare a tiny vanilla-JS class in `<script>` and reference it from
+    // `$onMount`. Mirrors the natural shape every other target gets for free
+    // (Vue/React/Svelte/Solid/Lit emit class declarations into the same
+    // scope as the lifecycle hook bodies).
+    if (t.isClassDeclaration(stmt) && stmt.id) {
+      interfaceDecls.push(genCode(stmt));
+      continue;
+    }
+
     // ExpressionStatements (console.log, $emit calls, etc.) → constructor body.
     if (t.isExpressionStatement(stmt)) {
       // Already filtered $onMount/$onUnmount/$onUpdate above (consumed).

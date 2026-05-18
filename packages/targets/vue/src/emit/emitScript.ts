@@ -243,7 +243,17 @@ function emitDefineModels(ir: IRComponent): string[] {
  */
 function emitDefineEmitsCall(ir: IRComponent): string {
   if (ir.emits.length === 0) return '';
-  const lines = ir.emits.map((e) => `  ${e}: [...args: any[]];`).join('\n');
+  // Quote hyphenated/dotted event names — Vue's `defineEmits<{ ... }>` type
+  // literal is just a TS type, so kebab-case keys like `event-click` need
+  // string-literal property keys. Plain identifier characters (letters,
+  // digits, underscore, leading-non-digit) pass through unquoted to keep
+  // simple cases readable.
+  const lines = ir.emits
+    .map((e) => {
+      const key = /^[A-Za-z_$][\w$]*$/.test(e) ? e : `'${e}'`;
+      return `  ${key}: [...args: any[]];`;
+    })
+    .join('\n');
   return `const emit = defineEmits<{\n${lines}\n}>();`;
 }
 

@@ -39,8 +39,17 @@ const traverse: TraverseFn =
     ? _traverse
     : (_traverse as unknown as { default: TraverseFn }).default;
 
-/** Magic accessor identifiers — handled in MemberExpression visitor, not Identifier. */
-const MAGIC_ACCESSOR_NAMES = new Set(['$props', '$data', '$refs', '$slots']);
+/**
+ * Magic accessor identifiers — handled in MemberExpression visitor, not Identifier.
+ *
+ * Includes `$portals` (Spike 003 portal-slot primitive). $portals.<name>
+ * resolves to a per-target synthesized closure that lives inside the
+ * mount-phase lifecycle hook — its identity is stable per-mount, not a
+ * reactive dependency. Adding `$portals` here keeps it out of useEffect dep
+ * arrays (without this, React's dep collector treats it as a free identifier
+ * and emits a literal `$portals` token that doesn't resolve at runtime).
+ */
+const MAGIC_ACCESSOR_NAMES = new Set(['$props', '$data', '$refs', '$slots', '$portals']);
 
 /**
  * Stable identifiers that match ExhaustiveDeps's `isStableKnownHookValue` —

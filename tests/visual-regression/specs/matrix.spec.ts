@@ -56,6 +56,12 @@ const EXAMPLES = [
   // post-Phase 07.3.2.1 F-07.3.2-11-A closure once empirical byte-identity
   // across all 6 targets was verified — MD5 0d5d3108053af5b7d264affcae82b43d).
   'ModalConsumer',
+  // Spike 003 portal-slot primitive (added 2026-05-18). PortalListDemo fills
+  // a `<template #item>` filler that mounts through `$portals.item` into the
+  // inline vanilla-JS engine's row containers. Per D-10, all 6 targets diff
+  // against the same shared `PortalList.png` baseline — any per-target
+  // rendering drift in the portal-mount path will fail the matcher.
+  'PortalList',
 ] as const;
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'] as const;
 
@@ -68,6 +74,17 @@ const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'] as const;
 const angularBuilt = existsSync(
   resolve(__dirname, '../dist/angular/host/entry.angular.html'),
 );
+
+// Spike 003 followup gap — see portal-list.spec.ts LIT_PORTAL_GAP comment.
+// PortalList's portal-slot primitive requires consumer-side function-prop
+// shape that Lit's emitSlotFiller doesn't yet emit; the cell renders empty.
+// Gate it as test.fixme until the Lit consumer-side portal-fill emit lands.
+const PORTAL_LIT_GAP: Array<{ example: string; target: string }> = [
+  { example: 'PortalList', target: 'lit' },
+];
+function isPortalLitGap(example: string, target: string): boolean {
+  return PORTAL_LIT_GAP.some((g) => g.example === example && g.target === target);
+}
 
 
 // Per-example pre-screenshot settle conditions.
@@ -95,7 +112,9 @@ async function settleExample(
 for (const example of EXAMPLES) {
   for (const target of TARGETS) {
     const runner =
-      target === 'angular' && !angularBuilt ? test.fixme : test;
+      (target === 'angular' && !angularBuilt) || isPortalLitGap(example, target)
+        ? test.fixme
+        : test;
     runner(`${example} · ${target}`, async ({ page }) => {
       await page.goto(`/?example=${example}&target=${target}`);
       const component = page.getByTestId('rozie-mount');

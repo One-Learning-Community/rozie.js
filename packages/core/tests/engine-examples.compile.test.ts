@@ -31,6 +31,10 @@ const ENGINE_WRAPPERS = [
   'TipTap.rozie',
   'Uppy.rozie',
   'FullCalendar.rozie',
+  // Spike 003 portal-slot demonstration. PortalList ships its own inline
+  // vanilla-JS "engine" so the exhibit has no third-party deps; the wrapper
+  // exercises the same authoring + lowering path the third-party engines do.
+  'PortalList.rozie',
 ] as const;
 
 // Multi-file consumer demos. Each imports its sibling engine wrapper via
@@ -60,6 +64,27 @@ describe('engine-wrapper examples — cross-target compile gate', () => {
 
   describe.each(ENGINE_DEMOS)('%s (consumer demo)', (file) => {
     const path = resolve(EXAMPLES_DIR, file);
+    const source = readFileSync(path, 'utf8');
+    it.each(TARGETS)('compiles to %s with zero errors', (target) => {
+      const result = compile(source, {
+        target,
+        filename: path,
+        resolverRoot: EXAMPLES_DIR,
+      });
+      const errors = result.diagnostics.filter((d) => d.severity === 'error');
+      expect(errors).toEqual([]);
+      expect(result.code.length).toBeGreaterThan(0);
+    });
+  });
+
+  // VR-rig demos live under `examples/demos/` and exist purely to drive
+  // visual-regression screenshots — they import their canonical sibling from
+  // `../<Name>.rozie`. Adding the portal-list one to the compile gate ensures
+  // a per-target consumer-side regression surfaces here instead of waiting for
+  // the (slower, Docker-backed) VR pipeline to catch it.
+  const VR_DEMOS = ['PortalListDemo.rozie'] as const;
+  describe.each(VR_DEMOS)('%s (vr demo)', (file) => {
+    const path = resolve(EXAMPLES_DIR, 'demos', file);
     const source = readFileSync(path, 'utf8');
     it.each(TARGETS)('compiles to %s with zero errors', (target) => {
       const result = compile(source, {

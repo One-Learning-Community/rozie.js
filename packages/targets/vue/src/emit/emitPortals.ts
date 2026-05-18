@@ -34,11 +34,19 @@ function buildSlotMethod(slot: SlotDecl): string {
     paramNames.length > 0
       ? `{ ${paramNames.map((n) => `${n}: unknown`).join('; ')} }`
       : 'unknown';
+  // Wrap the slot's VNode array in a `Fragment` so the rendered output has
+  // NO extra wrapper element — the slot's nodes become direct children of
+  // `container`. An earlier `h('div', null, slotFn(scope))` version added an
+  // unstyled <div> wrapper inside each engine-owned cell, which broke any
+  // inline styles the engine set on the cell container (display: flex / gap
+  // applied to container, but the slot content lived one level deeper and
+  // wasn't affected). Fragment is the Vue idiom for "render these vnodes
+  // here without an extra host element."
   return (
     `  ${slotName}: (container: HTMLElement, scope: ${scopeType}): (() => void) => {\n` +
     `    const slotFn = portalSlots.${slotName};\n` +
     `    if (!slotFn) return () => {};\n` +
-    `    const vnode = h('div', null, slotFn(scope));\n` +
+    `    const vnode = h(Fragment, null, slotFn(scope));\n` +
     `    render(vnode, container);\n` +
     `    portalContainers.add(container);\n` +
     `    return () => {\n` +
@@ -64,6 +72,7 @@ export function emitPortals(
     return { hasPortals: false, setupLines: '' };
   }
 
+  imports.use('Fragment');
   imports.use('h');
   imports.use('render');
   imports.use('useSlots');

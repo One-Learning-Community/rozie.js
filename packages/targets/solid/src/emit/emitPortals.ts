@@ -27,10 +27,16 @@ function buildSlotMethod(slot: SlotDecl): string {
     paramNames.length > 0
       ? `{ ${paramNames.map((n) => `${n}: unknown`).join('; ')} }`
       : 'unknown';
+  // Solid's slot props are accessed via `_props.<name>Slot` — NOT `props.X`
+  // (the React shape) and NOT `local.X` (which only contains keys explicitly
+  // listed in splitProps's second arg, and slot props are not listed there).
+  // Mirrors emitSlotInvocation.ts's `_props.${slotFieldName}` shape. The
+  // merge with the dynamic-name `slots?:` map (`_props.slots?.['name']`)
+  // matches Phase 07.3.2's invocation-site convention.
   return (
     `  ${slotName}: (container: HTMLElement, scope: ${scopeType}): (() => void) => {\n` +
-    `    const slot = props.${slotProp};\n` +
-    `    if (!slot) return () => {};\n` +
+    `    const slot = _props.${slotProp} ?? _props.slots?.['${slotName}'];\n` +
+    `    if (typeof slot !== 'function') return () => {};\n` +
     `    const dispose = render(() => slot(scope), container);\n` +
     `    portalDisposers.add(dispose);\n` +
     `    return () => {\n` +

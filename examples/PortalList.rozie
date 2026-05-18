@@ -1,0 +1,135 @@
+<!--
+  PortalList.rozie — dependency-free demonstration of the portal-slot
+  primitive (Spike 003).
+
+  This wrapper deliberately ships its OWN tiny vanilla-JS "engine" inline so
+  the example has zero third-party dependencies. In a real wrapper this
+  would be `import { Engine } from 'some-vanilla-lib'` (FullCalendar,
+  AG-Grid, Swiper, etc.). The point of the example is the AUTHORING and
+  CONSUMING shape, not the engine.
+
+  The engine pattern PortalList exercises:
+    - Engine owns a structural container (a `<ul>`) + per-row `<li>` elements
+    - Engine calls a `cellRenderer(item)` callback per row
+    - Callback returns `{ node, dispose }` — a DOM node the engine appends
+      into the row, plus a dispose handle the engine invokes on row removal
+    - Rozie's `$portals.item(node, scope)` does the per-target mount and
+      returns the dispose function the contract requires
+
+  Consumer surface (from PortalListDemo.rozie):
+
+    <PortalList :items="$data.items">
+      <template #item="{ item }">
+        <span :style="'color: ' + item.color">
+          <code>#{{ item.id }}</code> <strong>{{ item.label }}</strong>
+        </span>
+      </template>
+    </PortalList>
+
+  …which compiles to the per-target render-prop / scoped-slot / contentChild
+  idiom (see docs/examples/portal-list.md "Per-target output" sections).
+-->
+
+<rozie name="PortalList">
+
+<props>
+{
+  items: { type: Array, default: () => [] }
+}
+</props>
+
+<script>
+// Tiny inline "engine" — kept in this file so the example stays
+// dependency-free. The destruction order matters: dispose all cells BEFORE
+// removing the structural container, otherwise we'd unmount framework trees
+// from already-detached parents (the same constraint FullCalendar / AG-Grid
+// impose in their real wrappers).
+//
+// Styles are applied INLINE via .style assignments rather than via classes
+// referenced from the wrapper's <style> block. Reason: every target scopes
+// the wrapper's CSS (React/Solid via CSS Modules hashed class names; Vue /
+// Svelte / Angular via attribute selectors auto-rewritten onto declared
+// template elements). Engine-created elements are not in the static template,
+// so the scoped class names / attribute selectors never reach them. Inline
+// styles bypass scoping uniformly across all 6 targets, which is the
+// portable contract for engines that own their own DOM.
+class MiniListEngine {
+  constructor(rootEl, opts) {
+    this.rootEl = rootEl
+    this.items = opts.items
+    this.cellRenderer = opts.cellRenderer
+    this.disposers = []
+    this._mount()
+  }
+  _mount() {
+    const ul = document.createElement('ul')
+    Object.assign(ul.style, {
+      listStyle: 'none',
+      margin: '0',
+      padding: '0',
+      border: '1px solid rgba(0, 0, 0, 0.12)',
+      borderRadius: '6px',
+      overflow: 'hidden',
+    })
+    const total = this.items.length
+    for (let i = 0; i < total; i++) {
+      const item = this.items[i]
+      const li = document.createElement('li')
+      Object.assign(li.style, {
+        padding: '0.5rem 0.75rem',
+        borderBottom: i === total - 1 ? 'none' : '1px solid rgba(0, 0, 0, 0.06)',
+      })
+      const cell = this.cellRenderer(item)
+      Object.assign(cell.node.style, {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.5rem',
+      })
+      li.appendChild(cell.node)
+      this.disposers.push(cell.dispose)
+      ul.appendChild(li)
+    }
+    this.rootEl.appendChild(ul)
+  }
+  destroy() {
+    for (const dispose of this.disposers) dispose()
+    this.disposers = []
+    while (this.rootEl.firstChild) this.rootEl.removeChild(this.rootEl.firstChild)
+  }
+}
+
+let instance = null
+
+$onMount(() => {
+  instance = new MiniListEngine($el, {
+    items: $props.items,
+    cellRenderer: (item) => {
+      const node = document.createElement('div')
+      const dispose = $portals.item(node, { item })
+      return { node, dispose }
+    },
+  })
+  return () => instance?.destroy()
+})
+</script>
+
+<template>
+<div class="rozie-portal-list">
+  <!--
+    Portal slot — declared in template but never rendered. The wrapper's
+    $onMount calls $portals.item(node, { item }) per row, which mounts the
+    consumer's `<template #item="{ item }">` content into each engine-owned
+    `<div>` (engine sets the per-cell flex styles inline).
+  -->
+  <slot name="item" portal :params="['item']" />
+</div>
+</template>
+
+<style>
+.rozie-portal-list {
+  display: block;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+</style>
+
+</rozie>

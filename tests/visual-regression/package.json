@@ -13,6 +13,7 @@
     "@rozie/unplugin": "workspace:*",
     "@rozie/runtime-react": "workspace:*",
     "@rozie/runtime-vue": "workspace:*",
+    "@rozie/runtime-svelte": "workspace:*",
     "@rozie/runtime-solid": "workspace:*",
     "@rozie/runtime-lit": "workspace:*",
     "@rozie/target-vue": "workspace:*",
