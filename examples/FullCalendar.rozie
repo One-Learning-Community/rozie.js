@@ -1,0 +1,146 @@
+<!--
+  FullCalendar.rozie — data-bound port of FullCalendar (fullcalendar/fullcalendar).
+
+  FullCalendar ships all four official wrappers (@fullcalendar/react,
+  @fullcalendar/vue3, @fullcalendar/angular, @fullcalendar/svelte) —
+  each one wraps the same vanilla-JS Calendar engine. The perfect
+  "5 wrappers, 1 source" leverage story. ONE Rozie file covers
+  six frameworks.
+
+  Two-way binds the current view name so consumers can react to /
+  drive view switches:
+
+    <FullCalendar
+      r-model:view="$data.view"
+      :events="$data.events"
+      @event-click="onEventClick"
+      @date-click="onDateClick"
+    />
+
+  Consumers must import FullCalendar's CSS themselves — the .rozie
+  file's <style> is scoped so it can't ship the global .fc-* selectors.
+  Either `import '@fullcalendar/core/main.css'` at the app entry or
+  use the CDN copy.
+
+  Why this is a worthwhile demo:
+    - NEW domain: calendar grids with Date objects (not strings)
+    - NEW pattern: object spread inside an engine method call
+      (`cal.addEvent({ ...info, id: nextId(), color: $props.defaultColor })`)
+    - NEW pattern: template literals interpolating $data/$props in
+      $script (event title formatting)
+    - Multi-plugin import shape — @fullcalendar/core + per-view plugins
+      via separate default imports
+    - Structured-payload $emit: event-click forwards { event, jsEvent,
+      view } — heavier payload shape than prior examples
+-->
+
+<rozie name="FullCalendar">
+
+<props>
+{
+  events:       { type: Array,   default: () => [] },
+  view:         { type: String,  default: 'dayGridMonth', model: true },
+  weekends:     { type: Boolean, default: true },
+  editable:     { type: Boolean, default: true },
+  selectable:   { type: Boolean, default: true },
+  height:       { type: Number,  default: 480 },
+  defaultColor: { type: String,  default: '#3b82f6' },
+}
+</props>
+
+<script>
+import { Calendar } from '@fullcalendar/core'
+import dayGridPlugin from '@fullcalendar/daygrid'
+import timeGridPlugin from '@fullcalendar/timegrid'
+import interactionPlugin from '@fullcalendar/interaction'
+
+let instance = null
+let suppressViewSync = false
+
+const PLUGINS = [dayGridPlugin, timeGridPlugin, interactionPlugin]
+
+const normalizeEvent = (e) => {
+  // Object spread + template-literal default — common reconcile shape:
+  // pass user props through, but stamp a sensible title fallback and
+  // honor the wrapper's defaultColor only when the event omits one.
+  return {
+    ...e,
+    title: e.title || `Event ${e.id ?? '(no id)'}`,
+    color: e.color || $props.defaultColor,
+  }
+}
+
+$onMount(() => {
+  instance = new Calendar($el, {
+    plugins:       PLUGINS,
+    initialView:   $props.view,
+    weekends:      $props.weekends,
+    editable:      $props.editable,
+    selectable:    $props.selectable,
+    height:        $props.height,
+    events:        $props.events.map(normalizeEvent),
+    headerToolbar: {
+      left:   'prev,next today',
+      center: 'title',
+      right:  'dayGridMonth,timeGridWeek,timeGridDay',
+    },
+    eventClick: (info) => {
+      $emit('event-click', {
+        event:   { id: info.event.id, title: info.event.title, start: info.event.start, end: info.event.end },
+        jsEvent: info.jsEvent,
+      })
+    },
+    dateClick: (info) => {
+      $emit('date-click', { date: info.date, dateStr: info.dateStr, allDay: info.allDay })
+    },
+    eventDrop: (info) => {
+      $emit('event-drop', {
+        event: { id: info.event.id, title: info.event.title, start: info.event.start, end: info.event.end },
+        delta: info.delta,
+      })
+    },
+    viewDidMount: (info) => {
+      // viewDidMount fires both on initial mount AND on changeView calls.
+      // Same round-trip guard pattern as Flatpickr / LeafletMap.
+      if (suppressViewSync) { suppressViewSync = false; return }
+      if (info.view.type !== $props.view) $props.view = info.view.type
+    },
+  })
+  instance.render()
+  return () => instance?.destroy()
+})
+
+// Reconcile events without remounting: removeAllEvents + addEvent loop is
+// FullCalendar's supported runtime-update path. setOption('events', …)
+// also works but resets internal indexing.
+$watch(() => $props.events, (v) => {
+  if (!instance) return
+  instance.removeAllEvents()
+  for (const e of v) instance.addEvent(normalizeEvent(e))
+})
+
+$watch(() => $props.view, (v) => {
+  if (!instance || !v) return
+  if (v === instance.view.type) return
+  suppressViewSync = true
+  instance.changeView(v)
+})
+
+$watch(() => $props.weekends,   (v) => instance?.setOption('weekends',   v))
+$watch(() => $props.editable,   (v) => instance?.setOption('editable',   v))
+$watch(() => $props.selectable, (v) => instance?.setOption('selectable', v))
+$watch(() => $props.height,     (v) => instance?.setOption('height',     v))
+</script>
+
+<template>
+<div class="rozie-fullcalendar" />
+</template>
+
+<style>
+.rozie-fullcalendar {
+  width: 100%;
+  font-size: 0.875rem;
+}
+</style>
+
+</rozie>
