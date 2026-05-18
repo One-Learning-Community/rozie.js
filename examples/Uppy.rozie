@@ -1,0 +1,294 @@
+<!--
+  Uppy.rozie — data-bound port of Uppy core (transloadit/uppy).
+
+  Uppy is the largest file-uploader in the JS ecosystem; the
+  @uppy/react / @uppy/vue3 / ngx-uppy / svelte-uppy wrappers each
+  exist mostly to mediate between Uppy's event-emitter API and
+  framework reactivity. ONE Rozie source covers six frameworks.
+
+  This wrapper deliberately does NOT use @uppy/dashboard — instead
+  it renders its own minimal file list + progress UI, so the
+  template demonstrates Rozie's r-for + bound-array patterns over
+  the engine's internal state rather than just hosting a black-box
+  Dashboard div.
+
+  Usage:
+
+    <Uppy
+      endpoint="https://example.com/upload"
+      :maxFileSize="5_000_000"
+      :maxNumberOfFiles="5"
+      @complete="onUploadDone"
+    />
+
+  Pass `endpoint` to actually upload via XHR; leave it null for a
+  file-picker-only experience (autoProceed becomes a no-op).
+
+  Why this is a worthwhile demo:
+    - NEW pattern: $data array tracking engine internal state via
+      multiple event handlers (file-added, file-removed, upload-
+      progress) — earlier examples tracked either ONE state field
+      (Flatpickr's date, TipTap's active marks) or pushed updates
+      ONLY via $props (SortableList's items)
+    - NEW pattern: streaming progress events — upload-progress fires
+      per-chunk per-file; the wrapper's $data needs to keep up
+    - Multi-event emit forwarding (file-added, upload-progress,
+      upload-success, upload-error, complete) — exercises the $emit
+      pipeline more heavily than any prior engine wrapper
+    - $watch reconciling restriction props into the live instance
+      via uppy.setOptions() — same shape as SortableList's option(),
+      LeafletMap's setView(), Chart.js's update()
+-->
+
+<rozie name="Uppy">
+
+<props>
+{
+  endpoint:         { type: String,  default: null },
+  autoProceed:      { type: Boolean, default: false },
+  allowMultipleUploadBatches: { type: Boolean, default: true },
+  maxFileSize:      { type: Number,  default: null },
+  maxNumberOfFiles: { type: Number,  default: null },
+  allowedFileTypes: { type: Array,   default: null },
+  disabled:         { type: Boolean, default: false },
+}
+</props>
+
+<data>
+{
+  files: [],
+  uploading: false,
+}
+</data>
+
+<script>
+import UppyCore from '@uppy/core'
+import XHRUpload from '@uppy/xhr-upload'
+
+let instance = null
+
+const restrictionsFromProps = () => ({
+  maxFileSize:      $props.maxFileSize,
+  maxNumberOfFiles: $props.maxNumberOfFiles,
+  allowedFileTypes: $props.allowedFileTypes,
+})
+
+const refreshFiles = () => {
+  if (!instance) return
+  // Uppy returns its own file objects with id/name/size/progress fields;
+  // we snapshot the public shape into $data so the template is bound to
+  // plain values, not the live Uppy instance refs.
+  $data.files = instance.getFiles().map((f) => ({
+    id:        f.id,
+    name:      f.name,
+    size:      f.size,
+    type:      f.type,
+    progress:  f.progress?.percentage ?? 0,
+    uploaded:  Boolean(f.progress?.uploadComplete),
+    failed:    Boolean(f.error),
+    error:     f.error?.message ?? null,
+  }))
+}
+
+const onPick = (e) => {
+  if (!instance) return
+  const fileList = e.target.files
+  if (!fileList || fileList.length === 0) return
+  for (const file of Array.from(fileList)) {
+    try {
+      instance.addFile({
+        name: file.name,
+        type: file.type,
+        data: file,
+        source: 'file-input',
+      })
+    } catch (err) {
+      // Uppy throws synchronously on restriction violations — we forward
+      // them as a `restriction-failed` event for the consumer to display.
+      $emit('restriction-failed', { name: file.name, error: err?.message ?? String(err) })
+    }
+  }
+  e.target.value = ''
+}
+
+const removeFile = (id) => instance?.removeFile(id)
+const clearAll   = () => {
+  if (!instance) return
+  for (const f of instance.getFiles()) instance.removeFile(f.id)
+}
+const upload = () => instance?.upload()
+
+$onMount(() => {
+  instance = new UppyCore({
+    autoProceed:                $props.autoProceed,
+    allowMultipleUploadBatches: $props.allowMultipleUploadBatches,
+    restrictions:               restrictionsFromProps(),
+  })
+
+  if ($props.endpoint) {
+    instance.use(XHRUpload, { endpoint: $props.endpoint })
+  }
+
+  instance.on('file-added',    (file) => { refreshFiles(); $emit('file-added', file) })
+  instance.on('file-removed',  (file) => { refreshFiles(); $emit('file-removed', file) })
+  instance.on('upload-progress', (file, prog) => { refreshFiles(); $emit('upload-progress', { file, prog }) })
+  instance.on('upload-success', (file, response) => { refreshFiles(); $emit('upload-success', { file, response }) })
+  instance.on('upload-error',   (file, error) => { refreshFiles(); $emit('upload-error', { file, error }) })
+  instance.on('upload',         () => { $data.uploading = true })
+  instance.on('complete',       (result) => {
+    $data.uploading = false
+    refreshFiles()
+    $emit('complete', result)
+  })
+
+  return () => instance?.close()
+})
+
+// Reconcile prop changes — Uppy supports setOptions for restrictions at runtime.
+$watch(() => $props.maxFileSize,      () => instance?.setOptions({ restrictions: restrictionsFromProps() }))
+$watch(() => $props.maxNumberOfFiles, () => instance?.setOptions({ restrictions: restrictionsFromProps() }))
+$watch(() => $props.allowedFileTypes, () => instance?.setOptions({ restrictions: restrictionsFromProps() }))
+</script>
+
+<template>
+<div class="rozie-uppy" :class="{ 'is-disabled': $props.disabled, 'is-uploading': $data.uploading }">
+  <label class="rozie-uppy-picker">
+    <input
+      type="file"
+      multiple
+      :disabled="$props.disabled || $data.uploading"
+      :accept="$props.allowedFileTypes ? $props.allowedFileTypes.join(',') : null"
+      @change="onPick"
+    />
+    <span class="picker-cta">Choose files…</span>
+  </label>
+
+  <ul r-if="$data.files.length > 0" class="rozie-uppy-list">
+    <li r-for="f in $data.files" :key="f.id" class="rozie-uppy-item" :class="{ uploaded: f.uploaded, failed: f.failed }">
+      <div class="meta">
+        <span class="name">{{ f.name }}</span>
+        <span class="size">{{ Math.round(f.size / 1024) }} KB</span>
+      </div>
+      <div class="bar"><div class="fill" :style="{ width: f.progress + '%' }" /></div>
+      <span r-if="f.failed" class="status err">{{ f.error }}</span>
+      <span r-else class="status">{{ f.uploaded ? 'Done' : f.progress + '%' }}</span>
+      <button type="button" class="remove" @click="removeFile(f.id)" :disabled="$data.uploading" aria-label="Remove">×</button>
+    </li>
+  </ul>
+
+  <div r-if="$data.files.length > 0" class="rozie-uppy-actions">
+    <button type="button" @click="upload" :disabled="$data.uploading || !$props.endpoint">{{ $data.uploading ? 'Uploading…' : 'Upload' }}</button>
+    <button type="button" @click="clearAll" :disabled="$data.uploading" class="clear">Clear</button>
+  </div>
+</div>
+</template>
+
+<style>
+.rozie-uppy {
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 6px;
+  padding: 0.75rem;
+  background: white;
+}
+.rozie-uppy.is-disabled { opacity: 0.6; pointer-events: none; }
+
+.rozie-uppy-picker {
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+}
+.rozie-uppy-picker input[type=file] {
+  position: absolute;
+  width: 1px; height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+.rozie-uppy-picker .picker-cta {
+  display: inline-block;
+  padding: 0.375rem 0.875rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: #f5f5f7;
+  border-radius: 4px;
+  font: inherit;
+  font-size: 0.875rem;
+}
+.rozie-uppy-picker:hover .picker-cta { background: #ebebed; }
+
+.rozie-uppy-list {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+.rozie-uppy-item {
+  display: grid;
+  grid-template-columns: 1fr 6rem auto auto;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.375rem 0.5rem;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 4px;
+  font-size: 0.8125rem;
+}
+.rozie-uppy-item.uploaded { background: rgba(34, 197, 94, 0.06); border-color: rgba(34, 197, 94, 0.2); }
+.rozie-uppy-item.failed   { background: rgba(239, 68, 68, 0.06); border-color: rgba(239, 68, 68, 0.2); }
+
+.meta { display: flex; flex-direction: column; min-width: 0; }
+.meta .name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.meta .size { color: rgba(0, 0, 0, 0.4); font-size: 0.75rem; }
+
+.bar {
+  height: 6px;
+  background: rgba(0, 0, 0, 0.06);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.bar .fill {
+  height: 100%;
+  background: #3b82f6;
+  transition: width 0.15s ease;
+}
+.rozie-uppy-item.uploaded .bar .fill { background: #22c55e; }
+.rozie-uppy-item.failed   .bar .fill { background: #ef4444; }
+
+.status {
+  font-variant-numeric: tabular-nums;
+  color: rgba(0, 0, 0, 0.55);
+  font-size: 0.75rem;
+  min-width: 3rem;
+  text-align: right;
+}
+.status.err { color: #ef4444; }
+
+.remove {
+  background: transparent;
+  border: none;
+  color: rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+  font-size: 1.125rem;
+  line-height: 1;
+  padding: 0 0.25rem;
+}
+.remove:hover { color: #c00; }
+
+.rozie-uppy-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+.rozie-uppy-actions button {
+  padding: 0.375rem 0.875rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.875rem;
+}
+.rozie-uppy-actions button:disabled { opacity: 0.4; cursor: not-allowed; }
+.rozie-uppy-actions .clear { color: rgba(0, 0, 0, 0.55); margin-left: auto; }
+</style>
+
+</rozie>
