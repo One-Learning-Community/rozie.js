@@ -1,0 +1,84 @@
+/**
+ * REACT-TSC — tsc --noEmit gate over emitted React TSX.
+ *
+ * Compiles all 8 reference examples to React TSX, writes them to a tmp dir
+ * (alongside a tsconfig.json and a node_modules symlink to this workspace),
+ * then invokes `tsc --noEmit`. Fails on any TS error.
+ *
+ * Catches the class of emit bug that does not require runtime instrumentation:
+ *   - "void is not callable" / wrong-arg-count from lifecycle/watcher emit
+ *   - Type mismatches in slot fallback / merge expressions
+ *   - Cast-narrowing failures on optional-callable props
+ *   - Missing or wrong-shaped helper-runtime imports
+ *
+ * Mirrors the SOLID-TSC / LIT-TSC gates added in commit 536575a.
+ */
+import { describe, it, expect } from 'vitest';
+import { execFileSync } from 'node:child_process';
+import {
+  mkdtempSync,
+  writeFileSync,
+  rmSync,
+  copyFileSync,
+  readFileSync,
+  symlinkSync,
+} from 'node:fs';
+import { join, resolve, dirname } from 'node:path';
+import { tmpdir } from 'node:os';
+import { fileURLToPath } from 'node:url';
+import { compile } from '@rozie/core';
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+const ROOT = resolve(HERE, '../..');
+
+const EXAMPLES = [
+  'Counter',
+  'SearchInput',
+  'Dropdown',
+  'TodoList',
+  'Modal',
+  'TreeNode',
+  'Card',
+  'CardHeader',
+];
+
+describe('REACT-TSC — tsc --noEmit clean over emitted React TSX', () => {
+  it('all 8 emitted React TSX files tsc clean', () => {
+    const tmpDir = mkdtempSync(join(tmpdir(), 'rozie-react-tsc-'));
+    try {
+      for (const name of EXAMPLES) {
+        const source = readFileSync(resolve(ROOT, 'examples/' + name + '.rozie'), 'utf8');
+        const result = compile(source, {
+          target: 'react',
+          filename: name + '.rozie',
+          sourceMap: false,
+        });
+        const errors = result.diagnostics.filter((d) => d.severity === 'error');
+        expect(errors).toEqual([]);
+        writeFileSync(join(tmpDir, name + '.tsx'), result.code, 'utf8');
+      }
+
+      copyFileSync(join(HERE, 'tsconfig.json'), join(tmpDir, 'tsconfig.json'));
+      // Copy the css-modules ambient .d.ts so tsc resolves emitted
+      // `import styles from './Foo.module.css'` lines without TS2307.
+      copyFileSync(join(HERE, 'css-modules.d.ts'), join(tmpDir, 'css-modules.d.ts'));
+      // Symlink the workspace's node_modules so tsc resolves react, react-dom,
+      // @rozie/runtime-react, etc.
+      symlinkSync(join(HERE, 'node_modules'), join(tmpDir, 'node_modules'), 'dir');
+
+      const tscBin = resolve(HERE, 'node_modules/.bin/tsc');
+      try {
+        execFileSync(tscBin, ['--noEmit', '-p', 'tsconfig.json'], {
+          cwd: tmpDir,
+          stdio: 'pipe',
+        });
+      } catch (err) {
+        const stdout = (err as { stdout?: Buffer }).stdout?.toString() ?? '';
+        const stderr = (err as { stderr?: Buffer }).stderr?.toString() ?? '';
+        throw new Error('tsc --noEmit exited non-zero:\n' + stdout + '\n' + stderr);
+      }
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+});

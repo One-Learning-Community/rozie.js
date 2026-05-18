@@ -18,7 +18,7 @@ interface ModalProps {
   closeOnBackdrop?: boolean;
   lockBodyScroll?: boolean;
   title?: string;
-  onClose?: (...args: unknown[]) => void;
+  onClose?: (...args: any[]) => void;
   renderHeader?: (ctx: HeaderCtx) => ReactNode;
   children?: ReactNode | ((ctx: ChildrenCtx) => ReactNode);
   renderFooter?: (ctx: FooterCtx) => ReactNode;
@@ -26,7 +26,7 @@ interface ModalProps {
 }
 
 export default function Modal(_props: ModalProps): JSX.Element {
-  const props: ModalProps = {
+  const props: ModalProps & { closeOnEscape: boolean; closeOnBackdrop: boolean; lockBodyScroll: boolean; title: string } = {
     ..._props,
     closeOnEscape: _props.closeOnEscape ?? true,
     closeOnBackdrop: _props.closeOnBackdrop ?? true,
@@ -69,7 +69,7 @@ export default function Modal(_props: ModalProps): JSX.Element {
     if (!(open && props.closeOnEscape)) return;
     const _rozieHandler = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
-      close(e);
+      ((close) as ((...args: any[]) => any))(e);
     };
     document.addEventListener('keydown', _rozieHandler);
     return () => document.removeEventListener('keydown', _rozieHandler);
@@ -80,10 +80,10 @@ export default function Modal(_props: ModalProps): JSX.Element {
     {(open) && <div className={styles["modal-backdrop"]} ref={backdropEl} onClick={(e) => { if (e.target !== e.currentTarget) return; props.closeOnBackdrop && close(); }} data-rozie-s-fc45feb2="">
       <div ref={dialogEl} className={styles["modal-dialog"]} role="dialog" aria-modal="true" aria-label={props.title || undefined} tabIndex={-1} data-rozie-s-fc45feb2="">
         {(props.title || (props.renderHeader ?? props.slots?.['header'])) && <header data-rozie-s-fc45feb2="">
-          {(props.renderHeader ?? props.slots?.['header']) ? (props.renderHeader ?? props.slots?.['header'])({ close }) : <h2 data-rozie-s-fc45feb2="">{props.title}</h2>}
+          {(props.renderHeader ?? props.slots?.['header']) ? ((props.renderHeader ?? props.slots?.['header']) as Function)({ close }) : <h2 data-rozie-s-fc45feb2="">{props.title}</h2>}
           <button className={styles["close-btn"]} aria-label="Close" onClick={close} data-rozie-s-fc45feb2="">×</button>
         </header>}<div className={styles["modal-body"]} data-rozie-s-fc45feb2="">
-          {typeof (props.children ?? props.slots?.['']) === 'function' ? (props.children ?? props.slots?.[''])({ close }) : (props.children ?? props.slots?.[''])}
+          {typeof (props.children ?? props.slots?.['']) === 'function' ? ((props.children ?? props.slots?.['']) as Function)({ close }) : (props.children ?? props.slots?.[''])}
         </div>
 
         {((props.renderFooter ?? props.slots?.['footer'])) && <footer data-rozie-s-fc45feb2="">

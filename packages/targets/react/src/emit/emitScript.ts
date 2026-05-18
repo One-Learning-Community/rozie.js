@@ -307,23 +307,33 @@ function renderType(ann: PropTypeAnnotation): string {
       case 'Boolean':
         return 'boolean';
       case 'Array':
-        return 'unknown[]';
+        return 'any[]';
       case 'Object':
-        return 'Record<string, unknown>';
+        return 'Record<string, any>';
       case 'Function':
-        return '(...args: unknown[]) => unknown';
+        return '(...args: any[]) => any';
       default:
         return ann.name;
     }
   }
   if (ann.kind === 'union') return ann.members.map(renderType).join(' | ');
   if (ann.kind === 'literal') {
-    if (ann.value === 'array') return 'unknown[]';
-    if (ann.value === 'object') return 'Record<string, unknown>';
-    if (ann.value === 'function') return '(...args: unknown[]) => unknown';
+    if (ann.value === 'array') return 'any[]';
+    if (ann.value === 'object') return 'Record<string, any>';
+    if (ann.value === 'function') return '(...args: any[]) => any';
     return ann.value;
   }
   return 'unknown';
+}
+
+/**
+ * For the merged `props` const's intersection-type override: render the prop's
+ * TS type WITHOUT the `?` optional marker. Used to narrow defaulted props from
+ * `step?: number` (interface) to `step: number` (in the merged const), so
+ * downstream `props.step` reads don't fire TS18048. See 5.0 below.
+ */
+function renderPropTypeForOverride(prop: PropDecl): string {
+  return renderType(prop.typeAnnotation);
 }
 
 /**
@@ -705,8 +715,15 @@ export function emitScript(
   //     by useControllableState below; their defaults route through
   //     `defaultValue` rather than this rebind. shell.ts uses the function
   //     parameter name `_props` whenever `propsDefaultsBlock` is non-empty.
+  //
+  // 2026-05-18 — `null`-default props are filtered out (mirrors Solid commit
+  // 536575a). `default: null` in a Rozie <props> block is a "no default; treat
+  // as optional null sentinel" form; emitting `name: _props.name ?? null` here
+  // would assign `null` to a `((...args)=>any)|undefined` slot and trip TS2322
+  // under tests/react-typecheck. The prop stays bound to `_props.name` (the
+  // spread copies it through unchanged).
   const defaultedNonModelProps = ir.props.filter(
-    (p) => !p.isModel && p.defaultValue !== null,
+    (p) => !p.isModel && p.defaultValue !== null && !t.isNullLiteral(p.defaultValue),
   );
   let propsDefaultsBlock = '';
   if (defaultedNonModelProps.length > 0) {
@@ -721,11 +738,24 @@ export function emitScript(
       const dflt = isFactoryArrow ? `(${raw})()` : raw;
       return `  ${p.name}: _props.${p.name} ?? ${dflt},`;
     });
+    // 2026-05-18 — Override defaulted fields as REQUIRED in the merged `props`
+    // type so downstream `props.step` reads don't fire TS18048 ("possibly
+    // undefined"). The intersection narrows just the defaulted slots; other
+    // fields keep the interface's optional-marker. Without this override, the
+    // declared type was bare `${ir.name}Props` and TS treated `..._props` spread
+    // as "still optional" → every `props.step + 1` arithmetic was an error.
+    const requiredOverride = defaultedNonModelProps
+      .map((p) => {
+        const tsTypeForOverride = renderPropTypeForOverride(p);
+        return `${p.name}: ${tsTypeForOverride}`;
+      })
+      .join('; ');
+    const mergedType = `${ir.name}Props & { ${requiredOverride} }`;
     // Spread first so user-supplied values come through, then explicit
     // `X: _props.X ?? <default>` lines override any missing/undefined values
     // with the declared default.
     propsDefaultsBlock =
-      `const props: ${ir.name}Props = {\n` +
+      `const props: ${mergedType} = {\n` +
       `  ..._props,\n` +
       `${defaultLines.join('\n')}\n` +
       `};`;

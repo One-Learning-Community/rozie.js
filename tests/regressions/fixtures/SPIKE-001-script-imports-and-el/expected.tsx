@@ -21,7 +21,7 @@ export default function SpikeImportEl(props: SpikeImportElProps): JSX.Element {
   return (
     <>
     <div className={"spike-root"} ref={__rozieRoot} data-rozie-s-f590f443="">
-      {(props.children ?? props.slots?.[''])}
+      {(typeof (props.children ?? props.slots?.['']) === 'function' ? ((props.children ?? props.slots?.['']) as Function)() : (props.children ?? props.slots?.['']))}
     </div>
     </>
   );

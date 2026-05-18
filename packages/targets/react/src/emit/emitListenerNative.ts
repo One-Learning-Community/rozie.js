@@ -106,10 +106,20 @@ function renderTargetExpr(
 /**
  * Build the `, { capture: true, passive: true }` options-object suffix.
  * Returns `''` when no options are present.
+ *
+ * `kind` selects which options are valid in the call: `addEventListener`
+ * accepts `capture | passive | once`, but `removeEventListener` only accepts
+ * `capture` (the others are ignored at runtime, but TS rejects them under DOM
+ * lib's `EventListenerOptions` shape). 2026-05-18 — surfaced by react-typecheck
+ * gate on the throttled `resize` listener in Dropdown.
  */
-function renderOptionsSuffix(opts: Set<string>): string {
+function renderOptionsSuffix(opts: Set<string>, kind: 'add' | 'remove'): string {
   if (opts.size === 0) return '';
-  const parts = [...opts].sort().map((o) => `${o}: true`);
+  const filtered = kind === 'remove'
+    ? [...opts].filter((o) => o === 'capture')
+    : [...opts];
+  if (filtered.length === 0) return '';
+  const parts = filtered.sort().map((o) => `${o}: true`);
   return `, { ${parts.join(', ')} }`;
 }
 
@@ -188,7 +198,8 @@ export function emitListenerNative(
 
   const evtType = eventTypeFor(listener.event);
   const targetExpr = renderTargetExpr(listener.target, diagnostics, listener.sourceLoc);
-  const optionsSuffix = renderOptionsSuffix(listenerOptions);
+  const addOptionsSuffix = renderOptionsSuffix(listenerOptions, 'add');
+  const removeOptionsSuffix = renderOptionsSuffix(listenerOptions, 'remove');
 
   const whenGuardLine = listener.when
     ? `  if (!(${rewriteTemplateExpression(listener.when, ir)})) return;\n`
@@ -221,10 +232,14 @@ export function emitListenerNative(
     depsExpressions = [options.wrappedHandlerName];
   } else {
     // Class A / D: build an inner handler from the user's expression.
+    // 2026-05-18 — Cast handler before invocation so 0-arg user methods
+    // (Modal's `close: useCallback(() => {...}, [])`) accept the synthetic
+    // event arg without TS2554. The inner handler arrow always passes `(e)`
+    // even for bare-identifier 0-arg handlers.
     const userHandlerCode = rewriteTemplateExpression(listener.handler, ir);
     const handlerIsBareIdentifier = /^[A-Za-z_$][\w$]*$/.test(userHandlerCode);
     const invocation = handlerIsBareIdentifier
-      ? `${userHandlerCode}(e);`
+      ? `((${userHandlerCode}) as ((...args: any[]) => any))(e);`
       : `(${userHandlerCode});`;
     handlerDecl = `  const ${handlerName} = (e: ${evtType}) => {\n${guardBody}    ${invocation}\n  };\n`;
     handlerRef = handlerName;
@@ -244,10 +259,10 @@ export function emitListenerNative(
     depsArray = `[${merged.join(', ')}]`;
   }
 
-  const addCall = `${targetExpr}.addEventListener('${listener.event}', ${handlerRef}${optionsSuffix});`;
+  const addCall = `${targetExpr}.addEventListener('${listener.event}', ${handlerRef}${addOptionsSuffix});`;
   // No trailing semi — the cleanup arrow `() => removeCall` adds the semi via
   // the surrounding `};` outside the arrow body.
-  const removeCallNoSemi = `${targetExpr}.removeEventListener('${listener.event}', ${handlerRef}${optionsSuffix})`;
+  const removeCallNoSemi = `${targetExpr}.removeEventListener('${listener.event}', ${handlerRef}${removeOptionsSuffix})`;
 
   const body = [
     `useEffect(() => {`,

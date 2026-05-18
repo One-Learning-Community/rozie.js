@@ -6,7 +6,7 @@ interface InlineExprHandlerProps {
 }
 
 export default function InlineExprHandler(_props: InlineExprHandlerProps): JSX.Element {
-  const props: InlineExprHandlerProps = {
+  const props: InlineExprHandlerProps & { closeOnBackdrop: boolean } = {
     ..._props,
     closeOnBackdrop: _props.closeOnBackdrop ?? true,
   };

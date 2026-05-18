@@ -362,6 +362,18 @@ export function emitTemplateEvent(
 
   // Compose the handler expression
   const handlerKind = classifyHandler(listener.handler);
+  // 2026-05-18 — Cast handler to `(...args: any[]) => any` before invoking so
+  // 0-arg user methods (`close: useCallback(() => {...}, [])`) accept the
+  // SyntheticEvent arg without TS2554, and optional prop handlers
+  // (`props.onClose?: (...args: any[]) => any`) accept the call without
+  // TS2722. Use optional-call `?.(e)` so undefined handlers no-op rather than
+  // throwing. Mirrors the Lit emit fix (commit 536575a) where the same class
+  // of error surfaced on the Lit `<my-el @click=${(e) => handler(e)}>` shape.
+  // Bare identifiers — local arrows like `decrement` — skip the cast so the
+  // bare-reference shape `onClick={decrement}` (React's idiomatic form) is
+  // preserved; React's event system calls them with the event arg and TS
+  // already accepts the bare reference because the inferred signature is
+  // `(e: SyntheticEvent) => void`.
   let handlerExpr: string;
   if (handlerRef !== null && inlineGuards.length === 0) {
     // Pure helper-wrap: just reference the wrap name.
@@ -369,11 +381,14 @@ export function emitTemplateEvent(
   } else if (inlineGuards.length === 0) {
     const code = renderHandler(listener.handler, ctx.ir);
     if (handlerKind === 'identifier') {
+      // Bare identifier — TS accepts `onClick={decrement}` for a 0-arg
+      // `decrement: () => void` because React's prop signature is widened.
       handlerExpr = code;
     } else if (handlerKind === 'callable') {
       // MemberExpression (e.g. `props.onClose`) or arrow/function expression —
-      // invoke with the event so prop callbacks fire on click.
-      handlerExpr = `(e) => { (${code})(e); }`;
+      // optional-cast so undefined prop handlers no-op and 0-arg signatures
+      // type-check.
+      handlerExpr = `(e) => { ((${code}) as ((...args: any[]) => any) | undefined)?.(e); }`;
     } else {
       // Inline expression like `$props.closeOnBackdrop && close()` — already a call.
       handlerExpr = `(e) => { ${code}; }`;
@@ -385,9 +400,12 @@ export function emitTemplateEvent(
     if (handlerRef !== null) {
       handlerInvocation = `${handlerRef}(e)`;
     } else if (handlerKind === 'identifier') {
-      handlerInvocation = `${renderHandler(listener.handler, ctx.ir)}(e)`;
+      // Cast bare-identifier handlers when an inline guard wraps them; the
+      // wrapper arrow always invokes with `(e)` even when the user method is
+      // 0-arg — without the cast TS2554 fires (e.g. `close(e)` in Modal).
+      handlerInvocation = `((${renderHandler(listener.handler, ctx.ir)}) as ((...args: any[]) => any))(e)`;
     } else if (handlerKind === 'callable') {
-      handlerInvocation = `(${renderHandler(listener.handler, ctx.ir)})(e)`;
+      handlerInvocation = `((${renderHandler(listener.handler, ctx.ir)}) as ((...args: any[]) => any) | undefined)?.(e)`;
     } else {
       handlerInvocation = renderHandler(listener.handler, ctx.ir);
     }

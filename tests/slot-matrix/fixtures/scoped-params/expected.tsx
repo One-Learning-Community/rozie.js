@@ -9,7 +9,7 @@ interface ScopedParamsFixtureProps {
 }
 
 export default function ScopedParamsFixture(_props: ScopedParamsFixtureProps): JSX.Element {
-  const props: ScopedParamsFixtureProps = {
+  const props: ScopedParamsFixtureProps & { label: string } = {
     ..._props,
     label: _props.label ?? 'item',
   };

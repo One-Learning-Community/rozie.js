@@ -11,8 +11,8 @@ export default function Wrapper(props: WrapperProps): JSX.Element {
   return (
     <>
     <Inner renderHeader={() => (<>
-        {(props.renderTitle ?? props.slots?.['title']) ? (props.renderTitle ?? props.slots?.['title'])() : "default title"}
-      </>)} children={<>{(props.children ?? props.slots?.['']) ?? "default body"}</>} />
+        {(props.renderTitle ?? props.slots?.['title']) ? ((props.renderTitle ?? props.slots?.['title']) as Function)() : "default title"}
+      </>)} children={<>{(typeof (props.children ?? props.slots?.['']) === 'function' ? ((props.children ?? props.slots?.['']) as Function)() : (props.children ?? props.slots?.[''])) ?? "default body"}</>} />
     </>
   );
 }

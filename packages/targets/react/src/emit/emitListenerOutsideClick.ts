@@ -106,8 +106,15 @@ export function emitListenerOutsideClick(
   // Render `when` predicate as `() => when` arrow (or undefined).
   // Per RESEARCH Pattern 10 Class B + D-42 Vue analog, the helper re-evaluates
   // the predicate on every event so the closure always sees the latest props.
+  //
+  // 2026-05-18 — Coerce predicate to a boolean via `!!(...)` so the arrow
+  // returns `() => boolean` (matching the runtime signature
+  // `useOutsideClick(refs, cb, when?: () => boolean)`). Without the coerce
+  // bare `() => open && props.closeOnOutsideClick` returns `boolean | undefined`
+  // when `props.closeOnOutsideClick?: boolean` — TS2769 mismatch under tests/
+  // react-typecheck.
   const whenCode = listener.when
-    ? `() => ${rewriteTemplateExpression(listener.when, ir)}`
+    ? `() => !!(${rewriteTemplateExpression(listener.when, ir)})`
     : 'undefined';
 
   // Multi-line layout with trailing comma — matches the canonical
