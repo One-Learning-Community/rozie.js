@@ -3,9 +3,22 @@
   <head>
     <meta charset="utf-8" />
     <title>Rozie Playground</title>
+    <link rel="stylesheet" href="/src/styles.css" />
   </head>
   <body>
-    <div id="app">Rozie playground — loading...</div>
+    <header>
+      <label for="target">Target:</label>
+      <select id="target">
+        <option value="react" selected>react</option>
+        <option value="vue">vue</option>
+        <option value="svelte">svelte</option>
+        <option value="angular">angular</option>
+      </select>
+    </header>
+    <main>
+      <div id="editor"></div>
+      <div id="output"></div>
+    </main>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
