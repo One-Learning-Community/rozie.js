@@ -36,7 +36,13 @@
  */
 import * as t from '@babel/types';
 import _traverse from '@babel/traverse';
-import type { IRComponent, RefDecl, AttributeBinding } from '../types.js';
+import type {
+  IRComponent,
+  RefDecl,
+  AttributeBinding,
+  TemplateNode,
+  TemplateElementIR,
+} from '../types.js';
 
 // CJS interop normalization for @babel/traverse default export.
 type TraverseFn = typeof import('@babel/traverse').default;
@@ -147,11 +153,43 @@ function irHasScriptContextEl(ir: IRComponent): boolean {
 }
 
 /**
+ * Resolve the "effective" root element when `ir.template` is a TemplateFragment
+ * (a common shape — leading/trailing whitespace text nodes around a single
+ * structural element produce a fragment wrapper at lower time). Returns the
+ * single TemplateElement child when:
+ *   - ir.template is itself a TemplateElement (direct hit), OR
+ *   - ir.template is a TemplateFragment whose children contain EXACTLY one
+ *     TemplateElement and zero other structural nodes (text-only siblings
+ *     are skipped as cosmetic whitespace).
+ * Returns null otherwise — conditional, loop, multi-element fragment, etc.
+ */
+function resolveRootElement(node: TemplateNode | null): TemplateElementIR | null {
+  if (!node) return null;
+  if (node.type === 'TemplateElement') return node;
+  if (node.type !== 'TemplateFragment') return null;
+
+  let only: TemplateElementIR | null = null;
+  for (const child of node.children) {
+    if (child.type === 'TemplateStaticText') continue; // cosmetic whitespace
+    if (child.type === 'TemplateElement') {
+      if (only !== null) return null; // multiple structural elements — not a single root
+      only = child;
+      continue;
+    }
+    // Any non-element/non-text structural sibling disqualifies — conditional,
+    // loop, slot invocation, interpolation are not single-root shapes.
+    return null;
+  }
+  return only;
+}
+
+/**
  * Mutate the IR in place to add a synthesised `__rozieRoot` RefDecl and a
  * matching `ref="__rozieRoot"` static AttributeBinding on the root template
  * element, IF AND ONLY IF:
  *   1. A free `$el` read is found in any script/lifecycle/watcher/listener body, AND
- *   2. `ir.template` is a single `TemplateElement` (not a conditional/loop/fragment), AND
+ *   2. The template resolves to a single root `TemplateElement` (directly OR
+ *      wrapped in a TemplateFragment of whitespace + one element), AND
  *   3. The root element does NOT already have a `ref` attribute.
  *
  * Otherwise the IR is left untouched (v1 limitations documented in the
@@ -161,10 +199,11 @@ export function lowerRootElementRef(ir: IRComponent): void {
   // Gate 1 — only synthesise when $el is actually used in script context.
   if (!irHasScriptContextEl(ir)) return;
 
-  // Gate 2 — root template must be a single TemplateElement. Conditional /
-  // loop / fragment / null roots are v1 limitations. The root-element
-  // accessor model assumes a single mountable element.
-  if (!ir.template || ir.template.type !== 'TemplateElement') return;
+  // Gate 2 — root template must resolve to a single TemplateElement.
+  // Multi-element fragments / conditional / loop roots are v1 limitations:
+  // the root-element accessor model assumes a single mountable element.
+  const rootEl = resolveRootElement(ir.template);
+  if (!rootEl) return;
 
   // Gate 3 — bail if user already declared `ref="X"` on the root element.
   // v1 limitation: when user already declared ref=... on root, $el remains a
@@ -172,7 +211,7 @@ export function lowerRootElementRef(ir: IRComponent): void {
   // alternative (synthesise __rozieRoot alongside the user-authored root ref)
   // produces two refs on the same element which neither Vue's templateRef nor
   // Lit's @query handles cleanly.
-  const hasUserRootRef = ir.template.attributes.some(
+  const hasUserRootRef = rootEl.attributes.some(
     (attr) => attr.kind === 'static' && attr.name === 'ref',
   );
   if (hasUserRootRef) return;
@@ -182,8 +221,8 @@ export function lowerRootElementRef(ir: IRComponent): void {
   const synthRef: RefDecl = {
     type: 'RefDecl',
     name: '__rozieRoot',
-    elementTag: ir.template.tagName,
-    sourceLoc: ir.template.sourceLoc,
+    elementTag: rootEl.tagName,
+    sourceLoc: rootEl.sourceLoc,
   };
   ir.refs.push(synthRef);
 
@@ -192,7 +231,7 @@ export function lowerRootElementRef(ir: IRComponent): void {
     kind: 'static',
     name: 'ref',
     value: '__rozieRoot',
-    sourceLoc: ir.template.sourceLoc,
+    sourceLoc: rootEl.sourceLoc,
   };
-  ir.template.attributes.push(synthAttr);
+  rootEl.attributes.push(synthAttr);
 }
