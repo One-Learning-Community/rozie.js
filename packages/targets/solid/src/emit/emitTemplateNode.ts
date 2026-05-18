@@ -70,6 +70,15 @@ export interface EmitNodeCtx {
    * back-compat for callers that don't thread a scope hash.
    */
   scopeAttr?: string;
+  /**
+   * Identifiers in the current lexical scope that resolve to Solid Accessors
+   * (`() => T`) rather than scalar values. emitLoop populates this with the
+   * loop's `indexAlias` so `rewriteTemplateExpression` calls inside the loop
+   * body auto-invoke bare references — `keyFor(item, index)` becomes
+   * `keyFor(item, index())`. Without this, `eslint-plugin-solid` flags the
+   * usage and the value passed to user code is the accessor function itself.
+   */
+  invokeAccessors?: ReadonlySet<string> | undefined;
 }
 
 function emitStaticText(node: TemplateStaticTextIR, _ctx: EmitNodeCtx): string {
@@ -77,7 +86,9 @@ function emitStaticText(node: TemplateStaticTextIR, _ctx: EmitNodeCtx): string {
 }
 
 function emitInterpolation(node: TemplateInterpolationIR, ctx: EmitNodeCtx): string {
-  const code = rewriteTemplateExpression(node.expression, ctx.ir);
+  const code = rewriteTemplateExpression(node.expression, ctx.ir, {
+    invokeAccessors: ctx.invokeAccessors,
+  });
   return `{${code}}`;
 }
 
@@ -101,6 +112,9 @@ function emitFragment(node: TemplateFragmentIR, ctx: EmitNodeCtx): string {
 function emitLoop(node: TemplateLoopIR, ctx: EmitNodeCtx): string {
   ctx.collectors.solid.add('For');
 
+  // The iterable expression is OUTSIDE the loop scope — no accessor wrapping
+  // needed here even if a parent loop is active (Solid's <For> accessor names
+  // shadow parent bindings inside the inner callback only).
   const iterableCode = rewriteTemplateExpression(node.iterableExpression, ctx.ir);
 
   // Build the callback arrow signature: (item) or (item, index)
@@ -108,11 +122,25 @@ function emitLoop(node: TemplateLoopIR, ctx: EmitNodeCtx): string {
     ? `(${node.itemAlias}, ${node.indexAlias})`
     : `(${node.itemAlias})`;
 
+  // Inside the loop body, indexAlias is bound to a Solid Accessor<number>
+  // (NOT a number). Threading it via `invokeAccessors` on a child ctx makes
+  // descendant rewriteTemplateExpression calls auto-wrap bare references in
+  // CallExpressions — see EmitNodeCtx.invokeAccessors for rationale.
+  const childCtx: EmitNodeCtx = node.indexAlias
+    ? {
+        ...ctx,
+        invokeAccessors: new Set([
+          ...(ctx.invokeAccessors ?? []),
+          node.indexAlias,
+        ]),
+      }
+    : ctx;
+
   let bodyJsx: string;
   if (node.body.length === 1) {
-    bodyJsx = emitNode(node.body[0]!, ctx);
+    bodyJsx = emitNode(node.body[0]!, childCtx);
   } else {
-    const parts = node.body.map((c) => emitNode(c, ctx)).join('');
+    const parts = node.body.map((c) => emitNode(c, childCtx)).join('');
     bodyJsx = `<>${parts}</>`;
   }
 
@@ -322,9 +350,11 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
         loc: rHtmlAttr.sourceLoc,
       });
     }
-    const exprCode = rewriteTemplateExpression(rHtmlAttr.expression, ctx.ir);
+    const exprCode = rewriteTemplateExpression(rHtmlAttr.expression, ctx.ir, {
+      invokeAccessors: ctx.invokeAccessors,
+    });
     workingAttrs = workingAttrs.filter((a) => a !== rHtmlAttr);
-    const attrsResult = emitAttributes(workingAttrs, { ir: ctx.ir, collectors: ctx.collectors });
+    const attrsResult = emitAttributes(workingAttrs, { ir: ctx.ir, collectors: ctx.collectors, invokeAccessors: ctx.invokeAccessors });
     for (const d of attrsResult.diagnostics) ctx.diagnostics.push(d);
     const eventsJsx = emitElementEvents(node, ctx);
     const headParts = [attrsResult.jsx, eventsJsx, `innerHTML={${exprCode}}`].filter(Boolean);
@@ -337,7 +367,9 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
   const rTextAttr = findAttribute(workingAttrs, 'r-text');
   let rTextChildren: string | null = null;
   if (rTextAttr && rTextAttr.kind === 'binding') {
-    const exprCode = rewriteTemplateExpression(rTextAttr.expression, ctx.ir);
+    const exprCode = rewriteTemplateExpression(rTextAttr.expression, ctx.ir, {
+      invokeAccessors: ctx.invokeAccessors,
+    });
     rTextChildren = `{${exprCode}}`;
     workingAttrs = workingAttrs.filter((a) => a !== rTextAttr);
   }
@@ -348,7 +380,9 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
   const rShowAttr = findAttribute(workingAttrs, 'r-show');
   let rShowStyleAttr: string | null = null;
   if (rShowAttr && rShowAttr.kind === 'binding') {
-    const exprCode = rewriteTemplateExpression(rShowAttr.expression, ctx.ir);
+    const exprCode = rewriteTemplateExpression(rShowAttr.expression, ctx.ir, {
+      invokeAccessors: ctx.invokeAccessors,
+    });
     rShowStyleAttr = `style={{ display: (${exprCode}) ? '' : 'none' }}`;
     workingAttrs = workingAttrs.filter((a) => a !== rShowAttr);
   }
@@ -365,7 +399,7 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
   }
 
   // Standard attribute emission
-  const attrsResult = emitAttributes(workingAttrs, { ir: ctx.ir, collectors: ctx.collectors });
+  const attrsResult = emitAttributes(workingAttrs, { ir: ctx.ir, collectors: ctx.collectors, invokeAccessors: ctx.invokeAccessors });
   for (const d of attrsResult.diagnostics) ctx.diagnostics.push(d);
 
   const eventsJsx = emitElementEvents(node, ctx);

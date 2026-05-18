@@ -173,7 +173,7 @@ export function emitDynamicSlotsProp(
   const entries: string[] = [];
   for (const filler of dynamics) {
     if (!filler.dynamicNameExpr) continue; // ROZ946 was already emitted upstream
-    const keyExpr = rewriteTemplateExpression(filler.dynamicNameExpr, ctx.ir);
+    const keyExpr = rewriteTemplateExpression(filler.dynamicNameExpr, ctx.ir, { invokeAccessors: ctx.invokeAccessors });
     const destructure = paramsDestructure(filler);
     const argList = destructure === '' ? '()' : `(${destructure})`;
     const bodyJsx = renderFillerBody(filler, ctx);

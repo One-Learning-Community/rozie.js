@@ -519,6 +519,15 @@ interface WatcherClonedBody {
   getterCloned: t.Expression | t.BlockStatement;
   /** Cloned callback body — inlined into the useEffect callback. */
   callbackCloned: t.Expression | t.BlockStatement;
+  /**
+   * Cloned callback parameter list — preserved so the watcher emission can
+   * re-bind each named param to its corresponding getter value before
+   * splicing the body into the useEffect. Without this binding, a callback
+   * like `(v) => instance?.option('disabled', v)` lowers to a useEffect that
+   * references an unresolved `v` (compiles, runs, silently passes undefined).
+   * v1 supports only the first param (the new-value position).
+   */
+  callbackParams: ReadonlyArray<t.Identifier | t.Pattern | t.RestElement>;
 }
 
 function pairClonedWatchers(
@@ -573,9 +582,32 @@ function pairClonedWatchers(
     perWatcher.push({
       getterCloned: entry.getter.body,
       callbackCloned: entry.callback.body,
+      callbackParams: entry.callback.params,
     });
   }
   return { perWatcher, consumedIndices: consumed };
+}
+
+/**
+ * Render a getter body (either the cloned expression/block from the watcher
+ * source, or the raw IR getter ArrowFunctionExpression) as a React-side
+ * expression. Block-bodied getters become an IIFE; expression-bodied getters
+ * inline directly.
+ */
+function renderGetterExpression(
+  getter: t.Expression | t.BlockStatement | t.ArrowFunctionExpression | t.FunctionExpression,
+): string {
+  // If we got the full arrow/function (no clone available), pull the body.
+  let body: t.Expression | t.BlockStatement;
+  if (t.isArrowFunctionExpression(getter) || t.isFunctionExpression(getter)) {
+    body = getter.body;
+  } else {
+    body = getter;
+  }
+  if (t.isBlockStatement(body)) {
+    return `(() => ${genCode(body)})()`;
+  }
+  return genCode(body);
 }
 
 export interface EmitScriptResult {
@@ -942,6 +974,19 @@ export function emitScript(
       // Concise arrow body — emit as an expression statement.
       cbInvocation = `${genCode(cbCloned)};`;
     }
+
+    // Bind the callback's first parameter (the new-value position) to the
+    // getter expression so source like `$watch(() => $props.x, v => ... v)`
+    // lowers to `useEffect(() => { const v = props.x; ... v }, [props.x])`.
+    // useEffect callbacks don't receive args, so without this binding the
+    // identifier `v` would resolve to nothing — body silently passes undefined.
+    const cbParams = paired?.callbackParams ?? [];
+    const firstParam = cbParams[0];
+    const paramBinding =
+      firstParam && t.isIdentifier(firstParam)
+        ? `const ${firstParam.name} = ${renderGetterExpression(paired?.getterCloned ?? wh.getter)};\n  `
+        : '';
+
     // Union getter deps with closure refs walked over the callback body so
     // the lint rule is satisfied without an eslint-disable (D-62 floor).
     const cbDeps = computeHelperBodyDeps(
@@ -953,7 +998,7 @@ export function emitScript(
     const merged = [...wh.getterDeps, ...cbDeps];
     const depsArr = renderDepArray(merged, modelProps);
     lifecycleEffectLines.push(
-      `useEffect(() => {\n  ${cbInvocation}\n}, ${depsArr});`,
+      `useEffect(() => {\n  ${paramBinding}${cbInvocation}\n}, ${depsArr});`,
     );
   });
 

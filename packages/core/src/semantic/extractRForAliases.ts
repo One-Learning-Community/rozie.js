@@ -7,19 +7,22 @@
  *   - `item of items`              → { item: 'item', index: null }
  *   - `(item, idx) in items`       → { item: 'item', index: 'idx' }
  *   - `(item, idx) of items`       → { item: 'item', index: 'idx' }
+ *   - `item, idx in items`         → { item: 'item', index: 'idx' }  (bare-comma form,
+ *                                                                     Vue-flavored shorthand)
  *   - `(value, key) in object`     → { item: 'value', index: 'key' }
  *
  * Returns null on parse failure (D-08 fallback) — the malformed r-for is
  * already reported by parseTemplate / would be reported by a separate
  * malformed-r-for diagnostic in a future plan; this helper stays silent.
  *
- * **ReDoS posture (T-2-02-01):** Both regexes are linear-time anchored
+ * **ReDoS posture (T-2-02-01):** All regexes are linear-time anchored
  * prefix matches with bounded character classes (`[A-Za-z_$][\w$]*`).
  * No nested quantifiers, no alternation backtracking. Validated by the
  * threat-model test that exercises a 10000-char input.
  */
 
 const PAREN_FORM = /^\(\s*([A-Za-z_$][\w$]*)\s*,\s*([A-Za-z_$][\w$]*)\s*\)\s+(?:in|of)\s+/;
+const BARE_COMMA_FORM = /^([A-Za-z_$][\w$]*)\s*,\s*([A-Za-z_$][\w$]*)\s+(?:in|of)\s+/;
 const SIMPLE_FORM = /^([A-Za-z_$][\w$]*)\s+(?:in|of)\s+/;
 
 export interface RForAliases {
@@ -36,6 +39,10 @@ export function extractRForAliases(rForValue: string): RForAliases | null {
   const parenMatch = trimmed.match(PAREN_FORM);
   if (parenMatch) {
     return { item: parenMatch[1]!, index: parenMatch[2]! };
+  }
+  const bareCommaMatch = trimmed.match(BARE_COMMA_FORM);
+  if (bareCommaMatch) {
+    return { item: bareCommaMatch[1]!, index: bareCommaMatch[2]! };
   }
   const simpleMatch = trimmed.match(SIMPLE_FORM);
   if (simpleMatch) {

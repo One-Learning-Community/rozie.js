@@ -30,7 +30,7 @@ export default class TreeNode extends SignalWatcher(LitElement) {
 <div class="tree-node">
   <span class="tree-node__label">${this.node.label}</span>
   ${this.node.children && this.node.children.length > 0 ? html`<ul class="tree-node__children">
-    ${repeat(this.node.children, (child) => child.id, (child, _idx) => html`<li key=${child.id}>
+    ${repeat(this.node.children, (child, childIndex) => child.id, (child, childIndex) => html`<li key=${child.id} data-index=${childIndex}>
       <rozie-tree-node .node=${child}></rozie-tree-node>
     </li>`)}
   </ul>` : nothing}</div>

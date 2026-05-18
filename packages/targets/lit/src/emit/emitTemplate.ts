@@ -903,7 +903,10 @@ function emitLoop(
   const keyExpr = node.keyExpression
     ? rewriteTemplateExpression(node.keyExpression, ir, { shadowAliases: [item, idx] })
     : `${item}`;
-  const keyFn = `(${item}) => ${keyExpr}`;
+  // Both callbacks take (item, idx) so :key expressions referencing the loop
+  // index alias resolve in the key callback's scope (mirrors the renderer's
+  // scope). Without this, `:key="fn(item, index)"` saw an undefined `index`.
+  const keyFn = `(${item}, ${idx}) => ${keyExpr}`;
   return `\${repeat(${items}, ${keyFn}, (${item}, ${idx}) => html\`${body}\`)}`;
 }
 

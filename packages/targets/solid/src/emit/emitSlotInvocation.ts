@@ -62,10 +62,11 @@ function findSlotDecl(name: string, ir: IRComponent): SlotDecl | null {
 function buildParamObj(
   args: TemplateSlotInvocationIR['args'],
   ir: IRComponent,
+  invokeAccessors?: ReadonlySet<string> | undefined,
 ): string {
   if (args.length === 0) return '{}';
   const parts = args.map((a) => {
-    const code = rewriteTemplateExpression(a.expression, ir);
+    const code = rewriteTemplateExpression(a.expression, ir, { invokeAccessors });
     if (code === a.name) return a.name;
     return `${a.name}: ${code}`;
   });
@@ -123,7 +124,7 @@ export function emitSlotInvocation(
   // Named slot — build the prop field name with Slot suffix.
   const slotFieldName = slotName + 'Slot';
   const hasParams = slot ? slot.params.length > 0 : false;
-  const paramObj = slot && hasParams ? buildParamObj(node.args, ctx.ir) : null;
+  const paramObj = slot && hasParams ? buildParamObj(node.args, ctx.ir, ctx.invokeAccessors) : null;
 
   // Phase 07.3.2 — merge static slot prop with the consumer-side dynamic
   // `slots?:` map (D-SV-16 cross-target port of commit 6060408,

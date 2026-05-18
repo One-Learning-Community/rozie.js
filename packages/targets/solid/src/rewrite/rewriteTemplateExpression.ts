@@ -94,12 +94,33 @@ function buildSetterCall(
 }
 
 /**
+ * Optional knobs for callers that need to influence rewriting beyond the IR.
+ */
+export interface RewriteTemplateOpts {
+  /**
+   * Identifiers that resolve to a Solid `Accessor<T>` (a `() => T` getter) at
+   * runtime — bare references in expression position get auto-wrapped in a
+   * CallExpression so the unwrapped VALUE is used, not the accessor function.
+   *
+   * Today's sole caller is `emitLoop`, which passes the loop's `indexAlias`
+   * here because Solid `<For>`'s callback shape is
+   * `(item: T, index: () => number) => JSX.Element` — the index parameter is
+   * a reactive accessor, NOT a scalar. Without this rewrite, user expressions
+   * like `:key="keyFor(item, index)"` would pass the function itself as the
+   * second argument, breaking eslint-plugin-solid's `solid/reactivity` rule
+   * (and silently producing wrong values at runtime).
+   */
+  invokeAccessors?: ReadonlySet<string> | undefined;
+}
+
+/**
  * Render a Babel Expression as a JSX-context string for Solid.
  * IR is consulted for prop/data/ref/computed/slot name lookups.
  */
 export function rewriteTemplateExpression(
   expr: t.Expression,
   ir: IRComponent,
+  opts: RewriteTemplateOpts = {},
 ): string {
   const cloned = t.cloneNode(expr, true, false);
 
@@ -109,6 +130,7 @@ export function rewriteTemplateExpression(
   const computedNames = new Set(ir.computed.map((c) => c.name));
   const refNames = new Set(ir.refs.map((r) => r.name));
   const slotNames = new Set(ir.slots.map((s) => s.name));
+  const invokeAccessors = opts.invokeAccessors;
 
   const wrapper = t.file(t.program([t.expressionStatement(cloned)]));
 
@@ -268,10 +290,13 @@ export function rewriteTemplateExpression(
 
     Identifier(path) {
       const name = path.node.name;
-      // Rewrite bare computed references to getter calls: remaining → remaining().
-      // Only when the identifier is used as a value (not as a callee — already a call,
-      // not as a property key, not in a declaration).
-      if (!computedNames.has(name)) return;
+      const isComputed = computedNames.has(name);
+      const isInvokeAccessor = invokeAccessors?.has(name) ?? false;
+      // Both branches rewrite bare references to `name()` — computed getters
+      // and loop-index accessors share the same wrap-in-CallExpression shape.
+      // Only when the identifier is used as a value (not as a callee — already
+      // a call, not as a property key, not in a declaration).
+      if (!isComputed && !isInvokeAccessor) return;
 
       const parentPath = path.parentPath;
       if (!parentPath) return;
@@ -280,8 +305,17 @@ export function rewriteTemplateExpression(
       if (parentPath.isCallExpression() && parentPath.node.callee === path.node) return;
       // Skip: property key in member expression → `obj.remaining`
       if (parentPath.isMemberExpression() && parentPath.node.property === path.node && !parentPath.node.computed) return;
-      // Skip: object property key
-      if (parentPath.isObjectProperty() && parentPath.node.key === path.node && !parentPath.node.computed) return;
+      // Skip: object property key in shorthand or non-computed form
+      if (parentPath.isObjectProperty() && parentPath.node.key === path.node && !parentPath.node.computed) {
+        // Shorthand `{ index }` would otherwise lose its value half on rewrite;
+        // expand to `{ index: index() }` to keep the rewrite well-formed.
+        if (parentPath.node.shorthand) {
+          parentPath.node.shorthand = false;
+          parentPath.node.value = t.callExpression(t.identifier(name), []);
+          path.skip();
+        }
+        return;
+      }
 
       path.replaceWith(t.callExpression(t.identifier(name), []));
       path.skip();

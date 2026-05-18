@@ -15,6 +15,12 @@
     - Test data shape: { id, label, children: TreeNode[] }; the browser-mount
       integration test (Phase 06.2 P3 Task 2) feeds a 3-level fixture and
       asserts all 3 labels render in DOM.
+    - r-for bare-comma form `r-for="child, childIndex in ..."` exercising both
+      the item alias and the index alias — complements Table.rozie's flat-list
+      coverage with the recursive-tree case. The `:data-index="childIndex"`
+      attribute exposes the index in the DOM so visual regression / browser
+      mount tests can verify per-target index binding (defense in depth for
+      the extractRForAliases bare-comma form support added 2026-05-17).
 -->
 
 <rozie name="TreeNode">
@@ -35,7 +41,7 @@
 <div class="tree-node">
   <span class="tree-node__label">{{ $props.node.label }}</span>
   <ul r-if="$props.node.children && $props.node.children.length > 0" class="tree-node__children">
-    <li r-for="child in $props.node.children" :key="child.id">
+    <li r-for="child, childIndex in $props.node.children" :key="child.id" :data-index="childIndex">
       <TreeNode :node="child" />
     </li>
   </ul>

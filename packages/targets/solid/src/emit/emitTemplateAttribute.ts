@@ -30,6 +30,12 @@ import { resolveTwoWayTarget } from './resolveTwoWayTarget.js';
 export interface EmitAttrCtx {
   ir: IRComponent;
   collectors: { solid: SolidImportCollector; runtime: RuntimeSolidImportCollector };
+  /**
+   * Loop-scoped accessor identifiers — see EmitNodeCtx.invokeAccessors.
+   * Threaded so `:key="keyFor(item, index)"` lowers to `keyFor(item, index())`
+   * inside a `<For>` loop body where `index` is a Solid Accessor.
+   */
+  invokeAccessors?: ReadonlySet<string> | undefined;
 }
 
 /**
@@ -133,8 +139,12 @@ function capitalize(name: string): string {
   return name.charAt(0).toUpperCase() + name.slice(1);
 }
 
-function renderExpr(expr: t.Expression, ir: IRComponent): string {
-  return rewriteTemplateExpression(expr, ir);
+function renderExpr(
+  expr: t.Expression,
+  ir: IRComponent,
+  invokeAccessors?: ReadonlySet<string> | undefined,
+): string {
+  return rewriteTemplateExpression(expr, ir, { invokeAccessors });
 }
 
 /**
@@ -148,7 +158,11 @@ function renderStaticClassValue(className: string): string {
 /**
  * Compose class= value from one or more class attrs.
  */
-function composeClassValue(attrs: AttributeBinding[], ir: IRComponent): string {
+function composeClassValue(
+  attrs: AttributeBinding[],
+  ir: IRComponent,
+  invokeAccessors?: ReadonlySet<string> | undefined,
+): string {
   // Single static → plain string
   if (attrs.length === 1 && attrs[0]!.kind === 'static') {
     return renderStaticClassValue(attrs[0]!.value);
@@ -159,9 +173,9 @@ function composeClassValue(attrs: AttributeBinding[], ir: IRComponent): string {
     const a = attrs[0]!;
     if (t.isObjectExpression(a.expression)) {
       // Object form: { active: isActive } → keep as-is (no styles lookup)
-      return renderExpr(a.expression, ir);
+      return renderExpr(a.expression, ir, invokeAccessors);
     }
-    return renderExpr(a.expression, ir);
+    return renderExpr(a.expression, ir, invokeAccessors);
   }
 
   // Single interpolated — backtick template
@@ -175,7 +189,7 @@ function composeClassValue(attrs: AttributeBinding[], ir: IRComponent): string {
           .replace(/`/g, '\\`')
           .replace(/\$\{/g, '\\${');
       } else {
-        lit += '${' + renderExpr(seg.expression, ir) + '}';
+        lit += '${' + renderExpr(seg.expression, ir, invokeAccessors) + '}';
       }
     }
     return '`' + lit + '`';
@@ -192,7 +206,7 @@ function composeClassValue(attrs: AttributeBinding[], ir: IRComponent): string {
     } else if (a.kind === 'static') {
       parts.push(renderStaticClassValue(a.value));
     } else if (a.kind === 'binding') {
-      parts.push(renderExpr(a.expression, ir));
+      parts.push(renderExpr(a.expression, ir, invokeAccessors));
     } else {
       let lit = '';
       for (const seg of a.segments) {
@@ -202,7 +216,7 @@ function composeClassValue(attrs: AttributeBinding[], ir: IRComponent): string {
             .replace(/`/g, '\\`')
             .replace(/\$\{/g, '\\${');
         } else {
-          lit += '${' + renderExpr(seg.expression, ir) + '}';
+          lit += '${' + renderExpr(seg.expression, ir, invokeAccessors) + '}';
         }
       }
       parts.push('`' + lit + '`');
@@ -250,7 +264,7 @@ function emitNonClassAttribute(
 
   if (attr.kind === 'binding') {
     const jsxName = colonPropToSolidName(attr.name);
-    const exprCode = renderExpr(attr.expression, ctx.ir);
+    const exprCode = renderExpr(attr.expression, ctx.ir, ctx.invokeAccessors);
     return { jsx: `${jsxName}={${exprCode}}`, diagnostics };
   }
 
@@ -276,7 +290,7 @@ function emitNonClassAttribute(
     const target = resolveTwoWayTarget(attr.expression, ctx.ir);
     if (target === null) {
       const jsxNameFallback = colonPropToSolidName(attr.name);
-      const exprCodeFallback = renderExpr(attr.expression, ctx.ir);
+      const exprCodeFallback = renderExpr(attr.expression, ctx.ir, ctx.invokeAccessors);
       return { jsx: `${jsxNameFallback}={${exprCodeFallback}}`, diagnostics };
     }
     const { local, setter } = target;
@@ -298,7 +312,7 @@ function emitNonClassAttribute(
         .replace(/`/g, '\\`')
         .replace(/\$\{/g, '\\${');
     } else {
-      lit += '${' + renderExpr(seg.expression, ctx.ir) + '}';
+      lit += '${' + renderExpr(seg.expression, ctx.ir, ctx.invokeAccessors) + '}';
     }
   }
   return { jsx: `${jsxName}={\`${lit}\`}`, diagnostics };
@@ -350,12 +364,12 @@ export function emitAttributes(
       }
       // Emit `class=` for string/interpolated attrs.
       if (classStrAttrs.length > 0) {
-        const classValue = composeClassValue(classStrAttrs, ctx.ir);
+        const classValue = composeClassValue(classStrAttrs, ctx.ir, ctx.invokeAccessors);
         out.push(`class={${classValue}}`);
       }
       // Emit `classList=` for each object-form `:class` binding.
       for (const cla of classListAttrs) {
-        const exprCode = renderExpr((cla as Extract<AttributeBinding, { kind: 'binding' }>).expression, ctx.ir);
+        const exprCode = renderExpr((cla as Extract<AttributeBinding, { kind: 'binding' }>).expression, ctx.ir, ctx.invokeAccessors);
         out.push(`classList={${exprCode}}`);
       }
       continue;

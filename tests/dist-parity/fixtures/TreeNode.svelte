@@ -16,7 +16,7 @@ let { node = () => ({
 <div class="tree-node">
   <span class="tree-node__label">{node.label}</span>
   {#if node.children && node.children.length > 0}<ul class="tree-node__children">
-    {#each node.children as child (child.id)}<li>
+    {#each node.children as child, childIndex (child.id)}<li data-index={childIndex}>
       <TreeNode node={child}></TreeNode>
     </li>{/each}
   </ul>{/if}</div>

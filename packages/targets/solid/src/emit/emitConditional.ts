@@ -74,7 +74,7 @@ export function emitConditional(
     currentFallback = renderBranchBody(lastBranch.body, ctx, emitNodeFn);
   } else {
     // No trailing r-else — last branch becomes a Show with no fallback
-    const testCode = rewriteTemplateExpression(lastBranch.test, ctx.ir);
+    const testCode = rewriteTemplateExpression(lastBranch.test, ctx.ir, { invokeAccessors: ctx.invokeAccessors });
     const bodyJsx = renderBranchBody(lastBranch.body, ctx, emitNodeFn);
     currentFallback = null;
     // Build from second-to-last going left
@@ -92,7 +92,7 @@ export function emitConditional(
         currentFallback = renderBranchBody(branch.body, ctx, emitNodeFn);
         continue;
       }
-      const bTestCode = rewriteTemplateExpression(branch.test, ctx.ir);
+      const bTestCode = rewriteTemplateExpression(branch.test, ctx.ir, { invokeAccessors: ctx.invokeAccessors });
       const bBodyJsx = renderBranchBody(branch.body, ctx, emitNodeFn);
       // The "show" we built for the next branch becomes the fallback here
       const innerShow = buildShow(bTestCode, bBodyJsx, i === startIdx - 1 ? show : currentFallback!);
@@ -113,7 +113,7 @@ export function emitConditional(
       currentFallback = renderBranchBody(branch.body, ctx, emitNodeFn);
       continue;
     }
-    const testCode = rewriteTemplateExpression(branch.test, ctx.ir);
+    const testCode = rewriteTemplateExpression(branch.test, ctx.ir, { invokeAccessors: ctx.invokeAccessors });
     const bodyJsx = renderBranchBody(branch.body, ctx, emitNodeFn);
     result = buildShow(testCode, bodyJsx, currentFallback);
     currentFallback = result;
