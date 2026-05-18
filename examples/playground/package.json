@@ -10,7 +10,10 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@rozie/core": "workspace:*"
+    "@rozie/core": "workspace:*",
+    "monaco-editor-textmate": "^4.0.0",
+    "monaco-textmate": "^3.0.1",
+    "onigasm": "^2.2.5"
   },
   "devDependencies": {
     "@types/node": "^22",
