@@ -223,7 +223,7 @@ describe('emitScript — Quick 260515-u2b $watch lowering', () => {
     return lowerToIR(parsed.ast!, { modifierRegistry: createDefaultRegistry() }).ir!;
   }
 
-  it('emits `effect(() => { (getter)(); (cb)(); });` inside the constructor for one WatchHook', () => {
+  it('emits `effect(() => { const __watchVal = (getter)(); (cb)(__watchVal); });` inside the constructor for one WatchHook', () => {
     const src = `<rozie name="Synth">
 <props>{ open: { type: Boolean, default: false } }</props>
 <script>
@@ -234,8 +234,9 @@ $watch(() => $props.open, () => { console.log('fired') })
     const ir = lowerSrc(src);
     const { classBody, imports } = emitScript(ir);
     // Angular rewrite: $props.open → this.open (signal-style member access via this.open()).
-    // The effect() wrapper plus IIFE shape should be present.
-    expect(classBody).toMatch(/effect\(\(\) => \{ \([\s\S]+?\)\(\); \([\s\S]+?\)\(\); \}\);/);
+    // The effect() wrapper plus __watchVal-binding shape should be present so
+    // user-authored `(v) => ...` cb params actually receive the new value.
+    expect(classBody).toMatch(/effect\(\(\) => \{ const __watchVal = \([\s\S]+?\)\(\); \([\s\S]+?\)\(__watchVal\); \}\);/);
     expect(imports.has('effect')).toBe(true);
   });
 

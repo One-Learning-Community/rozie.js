@@ -806,8 +806,12 @@ export function emitScript(
     watcherConsumedIndices.add(i);
     const getterCode = genCode(getterArg as t.Node);
     const cbCode = genCode(cbArg as t.Node);
+    // Bind the getter's evaluated value as the callback's first argument so
+    // user-authored `(v) => ...` params actually receive the new value at
+    // invocation time. Without this the param is bound to `undefined` and
+    // any `instance?.option('x', v)` writes a silent no-op.
     lifecycleConstructorLines.push(
-      `effect(() => { (${getterCode})(); (${cbCode})(); });`,
+      `effect(() => { const __watchVal = (${getterCode})(); (${cbCode})(__watchVal); });`,
     );
   }
   // Ensure `effect` is on the @angular/core import list when at least one

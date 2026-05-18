@@ -637,6 +637,7 @@
         ],
         "directives": []
       },
+      "callbackParams": [],
       "getterDeps": [
         {
           "scope": "props",

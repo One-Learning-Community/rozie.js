@@ -90,9 +90,9 @@ export default class Dropdown extends SignalWatcher(LitElement) {
   firstUpdated(): void {
     this._armListeners();
 
-    this._disconnectCleanups.push(effect(() => { (() => this.open)(); (() => {
+    this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this.open)(); (() => {
       if (this.open) this.reposition();
-    })(); }));
+    })(__watchVal); }));
 
     // Initial reposition only if the panel is open at mount time.
     if (this.open) this.reposition();

@@ -638,8 +638,11 @@ export function emitScript(
         t.isExpressionStatement(cbStmt)
           ? generate(cbStmt.expression, GEN_OPTS).code
           : '() => {}';
+      // Bind the getter's evaluated value as the callback's first argument so
+      // user-authored `(v) => ...` params actually receive the new value at
+      // invocation time. Without this the param is bound to `undefined`.
       watcherCleanupPushes.push(
-        `this._disconnectCleanups.push(effect(() => { (${getterCode})(); (${cbCode})(); }));`,
+        `this._disconnectCleanups.push(effect(() => { const __watchVal = (${getterCode})(); (${cbCode})(__watchVal); }));`,
       );
     }
   }

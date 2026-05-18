@@ -86,9 +86,9 @@ export class Dropdown {
         onCleanup(unlisten);
       });
 
-    effect(() => { (() => this.open())(); (() => {
+    effect(() => { const __watchVal = (() => this.open())(); (() => {
       if (this.open()) this.reposition();
-    })(); });
+    })(__watchVal); });
   }
 
   ngAfterViewInit() {

@@ -196,6 +196,7 @@ function buildWatchers(
       type: 'WatchHook',
       getter: entry.getter.body,
       callback: entry.callback.body,
+      callbackParams: [...entry.callback.params] as WatchHook['callbackParams'],
       getterDeps: [...depGraph.forNodeOrEmpty(`watch.${idx}.getter`)],
       sourceLoc: entry.sourceLoc,
     });

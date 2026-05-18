@@ -430,8 +430,11 @@ function emitWatcherHooks(
     const getterCode = genCode(getterArg as t.Node);
     const cbCode = genCode(cbArg as t.Node);
     // Wrap each in parens so the genCode emits a parenthesized arrow we can
-    // immediately invoke as an IIFE inside the $effect block.
-    lines.push(`$effect(() => { (${getterCode})(); (${cbCode})(); });`);
+    // immediately invoke as an IIFE inside the $effect block. Bind the
+    // getter's evaluated value as the callback's first argument so
+    // user-authored `(v) => ...` params actually receive the new value at
+    // invocation time. Without this the param is bound to `undefined`.
+    lines.push(`$effect(() => { const __watchVal = (${getterCode})(); (${cbCode})(__watchVal); });`);
   }
   return { lines, consumedIndices: consumed };
 }

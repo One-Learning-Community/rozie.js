@@ -280,13 +280,17 @@ export function emitScript(
   for (const wh of ir.watchers) {
     collectors.solidImports.add('createEffect');
     const getterArrow = t.arrowFunctionExpression([], wh.getter);
-    const cbArrow = t.arrowFunctionExpression([], wh.callback);
+    // Preserve the user-authored callback params (e.g. `(v) => ...`) so the
+    // reconstructed arrow declares them; otherwise references inside the body
+    // would be unbound. Pass the getter's evaluated value as the first arg so
+    // the param actually has a binding at call time.
+    const cbArrow = t.arrowFunctionExpression(wh.callbackParams, wh.callback);
     const rewrittenGetter = rewriteNode(getterArrow, ir);
     const rewrittenCb = rewriteNode(cbArrow, ir);
     const getterCode = genCode(rewrittenGetter);
     const cbCode = genCode(rewrittenCb);
     hookLines.push(
-      `createEffect(() => { (${getterCode})(); (${cbCode})(); });`,
+      `createEffect(() => { const __watchVal = (${getterCode})(); (${cbCode})(__watchVal); });`,
     );
   }
 

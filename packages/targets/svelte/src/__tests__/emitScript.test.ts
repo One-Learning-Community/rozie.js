@@ -115,7 +115,7 @@ describe('emitScript — behavior (Plan 05-02a Task 1)', () => {
     expect(scriptBlock).toContain("import type { Snippet } from 'svelte';");
   });
 
-  it('Quick 260515-u2b — WatchHook emits `$effect(() => { (() => open)(); (() => { ... })(); });`', () => {
+  it('Quick 260515-u2b — WatchHook binds the getter value as the callback\'s first arg', () => {
     const src = `<rozie name="WatchSynth">
 <props>{ open: { type: Boolean, default: false } }</props>
 <script>
@@ -127,9 +127,11 @@ $watch(() => $props.open, () => { if ($props.open) reposition() })
     const parsed = parse(src, { filename: 'WatchSynth.rozie' });
     const ir = lowerToIR(parsed.ast!, { modifierRegistry: createDefaultRegistry() }).ir!;
     const { scriptBlock } = emitScript(ir);
-    // The IIFE-invocation shape — both getter and callback wrapped in parens
-    // and immediately invoked inside the $effect body.
-    expect(scriptBlock).toMatch(/\$effect\(\(\) => \{\s*\(\(\) => open\)\(\);\s*\(\(\) => \{[\s\S]*?\}\)\(\);\s*\}\);/);
+    // Getter is invoked into __watchVal; callback is invoked with that value
+    // as its first argument. Preserves user-authored `(v) => ...` params so
+    // `v` binds to the new value (regression: the bare `(cb)()` form left
+    // `v` undefined — Svelte/Angular/Lit silent no-op, Solid ReferenceError).
+    expect(scriptBlock).toMatch(/\$effect\(\(\) => \{\s*const __watchVal = \(\(\) => open\)\(\);\s*\(\(\) => \{[\s\S]*?\}\)\(__watchVal\);\s*\}\);/);
   });
 
   it('Quick 260515-u2b — Counter (no watchers) emits no extra $effect lines beyond lifecycle', () => {

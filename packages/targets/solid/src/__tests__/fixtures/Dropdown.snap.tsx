@@ -27,9 +27,9 @@ export default function Dropdown(_props: DropdownProps): JSX.Element {
     if (open()) reposition();
   });
   onMount(() => {});
-  createEffect(() => { (() => open())(); (() => {
+  createEffect(() => { const __watchVal = (() => open())(); (() => {
     if (open()) reposition();
-  })(); });
+  })(__watchVal); });
   let triggerElRef: HTMLElement | null = null;
   let panelElRef: HTMLElement | null = null;
 

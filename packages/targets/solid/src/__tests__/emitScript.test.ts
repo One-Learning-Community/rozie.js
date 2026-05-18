@@ -70,7 +70,7 @@ describe('emitScript — Solid target', () => {
     expect(Array.isArray(result.diagnostics)).toBe(true);
   });
 
-  it('Quick 260515-u2b — $watch lowers to createEffect(() => { (getter)(); (cb)(); }); adds createEffect import', () => {
+  it('Quick 260515-u2b — $watch binds getter value to callback first arg via __watchVal', () => {
     const src = `<rozie name="WatchSynth">
 <props>{ open: { type: Boolean, default: false } }</props>
 <script>
@@ -84,9 +84,11 @@ $watch(() => $props.open, () => { console.log('fired') })
     const solidImports = new SolidImportCollector();
     const runtimeImports = new RuntimeSolidImportCollector();
     const result = emitScript(ir, { solidImports, runtimeImports });
-    // Solid: getter `() => $props.open` → `() => _props.open` after rewrite
-    //   (or just `props.open` depending on Solid's per-target identifier scheme)
-    expect(result.hookSection).toMatch(/createEffect\(\(\) => \{[\s\S]*?\(\(\) =>[\s\S]*?\)\(\);[\s\S]*?\(\(\) => \{[\s\S]*?\}\)\(\);[\s\S]*?\}\);/);
+    // Getter is invoked into __watchVal; callback is invoked with that value
+    // as its first arg. Preserves user-authored `(v) => ...` params so `v`
+    // binds to the new value (regression: bare `(cb)()` ate the param entirely
+    // in Solid emit, esbuild then surfaced `ReferenceError: v is not defined`).
+    expect(result.hookSection).toMatch(/createEffect\(\(\) => \{[\s\S]*?const __watchVal = \(\(\) =>[\s\S]*?\)\(\);[\s\S]*?\(\(\) => \{[\s\S]*?\}\)\(__watchVal\);[\s\S]*?\}\);/);
     expect(solidImports.has('createEffect')).toBe(true);
   });
 

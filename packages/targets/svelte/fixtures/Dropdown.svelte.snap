@@ -63,9 +63,9 @@ $effect(() => {
   // new Popper($refs.triggerEl, $refs.panelEl, { placement: 'bottom-start' })
 });
 
-$effect(() => { (() => open)(); (() => {
+$effect(() => { const __watchVal = (() => open)(); (() => {
   if (open) reposition();
-})(); });
+})(__watchVal); });
 
 $effect(() => {
   if (!(open && closeOnOutsideClick)) return;

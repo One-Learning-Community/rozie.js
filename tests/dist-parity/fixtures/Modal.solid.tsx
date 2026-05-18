@@ -103,7 +103,7 @@ export default function Modal(_props: ModalProps): JSX.Element {
           {(_props.headerSlot ?? _props.slots?.['header']) ? (_props.headerSlot ?? _props.slots?.['header'])({ close }) : <h2 data-rozie-s-fc45feb2="">{local.title}</h2>}
           <button aria-label="Close" class={"close-btn"} onClick={close} data-rozie-s-fc45feb2="">×</button>
         </header></Show>}<div class={"modal-body"} data-rozie-s-fc45feb2="">
-          {resolved()}
+          {typeof local.children === 'function' ? (local.children as (s: any) => any)({ close }) : resolved()}
         </div>
 
         {<Show when={(_props.footerSlot ?? _props.slots?.['footer'])}><footer data-rozie-s-fc45feb2="">

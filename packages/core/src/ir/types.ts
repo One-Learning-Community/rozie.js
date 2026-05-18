@@ -32,7 +32,15 @@
  *
  * @experimental — shape may change before v1.0
  */
-import type { Expression, BlockStatement, TSType, File as BabelFile } from '@babel/types';
+import type {
+  Expression,
+  BlockStatement,
+  TSType,
+  File as BabelFile,
+  Identifier,
+  Pattern,
+  RestElement,
+} from '@babel/types';
 import type { SourceLoc } from '../ast/types.js';
 import type { ModifierPipelineEntry } from '../modifiers/ModifierRegistry.js';
 import type { SignalRef } from '../reactivity/signalRef.js';
@@ -330,6 +338,18 @@ export interface WatchHook {
   getter: BlockStatement | Expression;
   /** Body of the callback arrow: `() => { reposition() }` → BlockStatement. */
   callback: BlockStatement | Expression;
+  /**
+   * Parameters declared on the callback arrow. For `(v) => instance?.option('x', v)`
+   * this is `[Identifier('v')]`; for `() => reposition()` this is `[]`.
+   *
+   * Emitters MUST preserve these on the reconstructed callback arrow AND bind
+   * the getter's evaluated value as the first argument when invoking the
+   * callback. Otherwise references to the param inside the body resolve to
+   * `undefined` (Svelte/Angular/Lit silent no-op) or throw `ReferenceError`
+   * (Solid, where esbuild strips the param entirely when the arrow is
+   * reconstructed with `[]`).
+   */
+  callbackParams: Array<Identifier | Pattern | RestElement>;
   /** SignalRef[] computed from the getter body (NOT the callback). */
   getterDeps: SignalRef[];
   sourceLoc: SourceLoc;
