@@ -108,11 +108,19 @@ main {
   overflow: hidden;
 }
 
-/* Single mode (default): each cell sits absolute, only the active iframe is shown. */
+/* Single mode (default): each cell sits absolute, only the active iframe's
+ * cell is shown. The :has() selector unhides the cell that wraps the active
+ * iframe — without it the cell stays display:none (legacy from the grid-mode
+ * scoping pattern) and the iframe never paints regardless of its own .active
+ * display:block rule. */
 .preview-cell {
   position: absolute;
   inset: 0;
   display: none;
+}
+
+.preview-cell:has(> iframe.active) {
+  display: block;
 }
 
 .preview-cell .preview-cell-label {
