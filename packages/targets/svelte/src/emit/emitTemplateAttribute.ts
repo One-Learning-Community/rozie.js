@@ -40,6 +40,88 @@ function escapeAttrValue(s: string): string {
 }
 
 /**
+ * Convert a JS object-property key (camelCase or already-kebab) to
+ * kebab-case for use as a Svelte 5 `style:<prop>={value}` directive name.
+ *
+ *   backgroundColor → background-color
+ *   background      → background
+ *   borderTopWidth  → border-top-width
+ *   --custom-prop   → --custom-prop   (leading-dash preserved; vendor / CSS-var)
+ *   WebkitTransform → -webkit-transform   (leading capital → leading dash)
+ *
+ * Idempotent on already-kebab inputs.
+ */
+function kebabizeStyleKey(key: string): string {
+  // CSS custom properties (`--foo-bar`) pass through verbatim.
+  if (key.startsWith('--')) return key;
+  // Replace each uppercase letter with `-<lower>`; if the FIRST char is
+  // uppercase (vendor prefix like Webkit/Moz/O/Ms) the leading dash is correct.
+  return key.replace(/[A-Z]/g, (m) => '-' + m.toLowerCase());
+}
+
+/**
+ * Render an ObjectExpression's property KEY as a plain string. Accepts
+ * Identifier (`background`), StringLiteral (`'background'`), or
+ * NumericLiteral (rare — `123` style keys). Returns null for shapes we
+ * cannot safely lower (computed keys, spreads, methods).
+ */
+function objectPropertyKeyAsString(
+  prop: t.ObjectProperty,
+): string | null {
+  if (prop.computed) return null;
+  if (t.isIdentifier(prop.key)) return prop.key.name;
+  if (t.isStringLiteral(prop.key)) return prop.key.value;
+  if (t.isNumericLiteral(prop.key)) return String(prop.key.value);
+  return null;
+}
+
+/**
+ * Lower `:style="{ key: value, ... }"` (literal object expression) into a
+ * series of Svelte-5 `style:<kebab(key)>={<value>}` directives — one per
+ * property — joined by spaces.
+ *
+ * Returns null when the attribute is NOT a binding-kind `:style` with a
+ * literal ObjectExpression, OR when any property is a spread / method /
+ * computed-key / non-property-shape (we bail out and let the caller fall
+ * through to the existing `style={<expr>}` passthrough, which is what
+ * Svelte 5's `style:` directive form requires anyway — the string form
+ * works natively).
+ *
+ * Spike 004 — Svelte subset. Per-key `style:` directives have per-key
+ * reactivity in Svelte 5; this is actually more efficient than the
+ * (rejected) object passthrough, which serializes via toString and
+ * produces `[object Object]`.
+ */
+function tryEmitStyleObjectLiteral(
+  attr: AttributeBinding,
+  ir: IRComponent,
+): string | null {
+  if (attr.kind !== 'binding') return null;
+  if (attr.name !== 'style') return null;
+  if (!t.isObjectExpression(attr.expression)) return null;
+
+  const directives: string[] = [];
+  for (const prop of attr.expression.properties) {
+    // Bail on spreads / methods / computed keys — caller falls through to
+    // the existing single-attribute passthrough.
+    if (!t.isObjectProperty(prop)) return null;
+    const keyName = objectPropertyKeyAsString(prop);
+    if (keyName === null) return null;
+    // ObjectProperty.value is PatternLike | Expression — for literal-object
+    // attribute values we expect Expression. Pattern shapes (RestElement etc.)
+    // would have been spreads, already rejected above; still defensive here.
+    if (!t.isExpression(prop.value)) return null;
+    const valueText = rewriteTemplateExpression(prop.value, ir);
+    directives.push(`style:${kebabizeStyleKey(keyName)}={${valueText}}`);
+  }
+
+  // Empty object — `:style="{}"` — nothing to emit. Return empty string so
+  // the caller treats this as "successfully lowered to nothing" rather than
+  // falling through to a stale `style={ }` passthrough.
+  return directives.join(' ');
+}
+
+/**
  * Render interpolated segments as the inside of a JS template literal
  * (without the surrounding backticks). E.g.,
  *   [{static:'card '}, {binding: variant}] → 'card ${variant}'
@@ -97,6 +179,13 @@ export function emitSingleAttr(
       const expr = rewriteTemplateExpression(attr.expression, ir);
       return `bind:value={${expr}}`;
     }
+    // Spike 004 (Svelte subset) — `:style="{ key: value, ... }"` lowers to
+    // per-key `style:<kebab(key)>={value}` directives so Svelte 5 doesn't
+    // serialize the object via toString() to `[object Object]`. Falls
+    // through to the default attribute emit for non-literal-object exprs
+    // (string form is handled natively by Svelte).
+    const styleObjectLowered = tryEmitStyleObjectLiteral(attr, ir);
+    if (styleObjectLowered !== null) return styleObjectLowered;
     const expr = rewriteTemplateExpression(attr.expression, ir);
     return `${attr.name}={${expr}}`;
   }
@@ -170,10 +259,21 @@ export function emitAttributes(
 ): string {
   if (attrs.length === 0) return '';
 
+  // Spike 004 (Svelte subset) — a literal-object `:style="{...}"` lowers to
+  // multiple `style:<kebab>={value}` directives, NOT a `style={...}` attribute.
+  // Excluding it from the duplicate-name count below ensures the merge path
+  // doesn't try to coalesce it with a sibling static-string `style=` (which
+  // would re-introduce the `[object Object]` serialization path).
+  const isLiteralStyleObjectBinding = (a: AttributeBinding): boolean =>
+    a.kind === 'binding' &&
+    a.name === 'style' &&
+    t.isObjectExpression(a.expression);
+
   // Group by name to detect class/style merges.
   const counts = new Map<string, number>();
   for (const a of attrs) {
     if (a.name === 'r-html') continue;
+    if (isLiteralStyleObjectBinding(a)) continue;
     counts.set(a.name, (counts.get(a.name) ?? 0) + 1);
   }
 
