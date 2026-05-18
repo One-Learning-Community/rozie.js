@@ -249,12 +249,29 @@ All 4 P1 findings VERIFIED CLOSED. Full 11-example matrix re-walked; no new P0/P
 - **Root cause:** IntelliJ's default `INJECTED_LANGUAGE_FRAGMENT` text-attribute paints a background on every language-injection range. Plan 08.2-11's paren-wrap made object-literal blocks proper injection targets, which together with the existing `<script>` / `<style>` / `<listeners>` injections meant every block in a `.rozie` file now carries the tint. The tint was always present on script/style — Plans 08-11 just made it noticeable by removing the inspection noise that previously distracted from it.
 - **Status:** CLOSED — quick-task `260517-XXX` shipped `colorSchemes/RozieDefault.xml` + `colorSchemes/RozieDarcula.xml` overriding `INJECTED_LANGUAGE_FRAGMENT` to a neutral (empty) attribute set, registered via two `<additionalTextAttributes>` entries in `plugin.xml`. Same pattern Vue's plugin uses (`colorSchemes/VueDefault.xml`). v0.2.0 zip rebuilt; `verifyPlugin` re-green against IU-242.24807.4 + IU-253.28294.334.
 
+### P1-UAT-08 — Directive attribute-value expressions not recognised as JS code
+- **Severity:** P1 (the user-facing "smart features" don't reach attribute-value expressions, which is where most consumer-side authoring happens)
+- **Steps to repro:** Open any reference example with directive bindings (e.g., Modal.rozie, ModalConsumer.rozie); look at attribute-value text inside `:foo="contents.id"`, `@click="handler()"`, `r-if="$data.open"`, or `{{ expr }}` template interpolations.
+- **Expected:** The expression substring (e.g., `contents.id`, `handler()`, `$data.open`, the inside of `{{ }}`) renders with JS syntax coloring, supports completion (typing `cont` surfaces `contents`), and resolves Go-to-Declaration (Ctrl-click on `contents` jumps to its `<data>` declaration).
+- **Actual:** The whole quoted value renders as plain attribute-value text (no syntax color, no completion, no navigation). The plugin's `RozieMultiHostInjector` injects JS into `<script>`, `<listeners>`, `<props>`, `<data>`, `<components>` block bodies only — never into the expression substrings of directive-style attribute values or `{{ }}` spans in template body.
+- **Root cause:** Missing injection-host coverage. The host parser sees `r-*` / `@*` / `:*` attributes and `{{ }}` runs as opaque text. Even though Plan 02's `RozieAttributeDescriptorsProvider` recognises the attribute NAMES, no `MultiHostRegistrar.addPlace` call slices out the VALUE substring as injected JS.
+- **Disposition:** FIX-IN-PHASE-08.2 (gap-closure cycle 2; extends `RozieMultiHostInjector` with per-attribute-value + per-interpolation `addPlace` calls). Needs careful range math around quotes and modifier suffixes (e.g., `@click.stop="handler()"` — only `"handler()"` is JS, `.stop` is structural). Once these ranges become JS PSI, Plan 05's `RozieJSReferenceContributor` auto-lights up Go-to-Declaration on `$props.X` / `$data.X` / `$refs.X` inside them with no additional code.
+
+### P1-UAT-09 — No autocomplete for magic identifiers ($props, $data, $refs, $emit, etc.) inside JS contexts
+- **Severity:** P1 (consumer-facing "smart features" stop at HTML attribute names — Plan 06 ships `r-*` / `@*` / `:*` / `#*` autocomplete but nothing analogous for the JS surface inside `<script>` / `<listeners>` / `<computed>` factories)
+- **Steps to repro:** Open Counter.rozie; in `<script>` block, position cursor inside a function body; type `$pr` — no completion popup surfaces `$props`. Same gap for `$data`, `$refs`, `$emit`, `$computed`, `$onMount`, `$onUpdate`, `$watch`, `$listeners`, `$slots`, `$expose`, etc.
+- **Expected:** Typing `$` (or `$pr`, `$da`, etc.) inside any Rozie-injected JS surfaces the canonical magic-identifier list (with one-line doc strings hinting purpose), mirroring Plan 06's HTML-attribute-name behaviour.
+- **Actual:** No completion popup. The JS injector knows the fragment is JS but no `CompletionContributor` registered for `language="JavaScript"` contributes the magic identifiers.
+- **Root cause:** Plan 06 only ships `RozieAttributeNameCompletionContributor` for HTML attribute names. No symmetric `RozieJsMagicIdentifierCompletionContributor` for JavaScript completion was planned.
+- **Disposition:** FIX-IN-PHASE-08.2 (gap-closure cycle 2; ships `RozieJsMagicIdentifierCompletionContributor` + `RozieMagicIdentifiers` constants registry; mirrors Plan 06 structure verbatim — registered for `language="JavaScript"`, `RozieContextCheck.isRozieContext`-gated, contributes `LookupElement`s with `withTypeText("(magic) component props object")` etc.). Smaller surface area than P1-UAT-08.
+
 ### Aggregate disposition
 
-All 5 P1 findings CLOSED (P1-UAT-03..06 via Plans 08.2-08..11; P1-UAT-07 via
-inline color-scheme override). The injection-first architectural pivot now ships
-with the gap-closure-extended IntelliJ smarts surface AND the clean per-block
-visual presentation. Tag cut + UAT walk remain pending (Plan 08.2-12 Task 2 + 3).
+5 P1 findings CLOSED (P1-UAT-03..07). 2 new P1 findings (P1-UAT-08 + P1-UAT-09)
+surfaced during the gap-closure UAT walk and are routed to a second gap-closure
+cycle. Tag cut + final UAT walk deferred until cycle-2 plans land. The
+injection-first architectural pivot continues to pay off — both new findings
+have clean canonical fix shapes within the same extension-point pattern.
 
 ## Issues captured (2026-05-17 UAT halt — partial walkthrough)
 
