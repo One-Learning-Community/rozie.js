@@ -444,6 +444,15 @@ function buildEventParts(
   if (dispatchMatch) {
     const slot = dispatchMatch[1]!;
     const param = dispatchMatch[2]!;
+    // WR-04 (Phase 07.4 review): kebab-case both `slot` and `param` so the
+    // consumer-side dispatched event name matches the producer-side
+    // `@rozie-<slot>-<param>` binding even when the slot or arg name is
+    // camelCase (`<slot name="header" :closeModal="closeModal">` →
+    // event `rozie-header-close-modal` on both sides). For single-word
+    // lowercase identifiers (current test corpus: close, toggle, remove)
+    // `toKebabCase()` is a no-op so existing fixtures are unaffected.
+    const slotKebab = toKebabCase(slot);
+    const paramKebab = toKebabCase(param);
     // Dispatch on e.currentTarget (the clicked element INSIDE the producer's
     // light DOM), NOT on `this` (which is the consumer — PARENT of the
     // producer in the tree). Bubbling propagates UP, so a consumer-rooted
@@ -452,7 +461,7 @@ function buildEventParts(
     // button may have slot="…" directly on it); its bubble path goes UP
     // through the producer, triggering the producer's
     // `addEventListener('rozie-<X>-<param>', …)` host wiring.
-    handler = `(e) => (e.currentTarget as HTMLElement).dispatchEvent(new CustomEvent('rozie-${slot}-${param}', { detail: e, bubbles: true, composed: true }))`;
+    handler = `(e) => (e.currentTarget as HTMLElement).dispatchEvent(new CustomEvent('rozie-${slotKebab}-${paramKebab}', { detail: e, bubbles: true, composed: true }))`;
   } else {
     // Phase 07.3.1 Blocker #3 (D-03) — wrap scoped-slot-ctx handler in a
     // late-binding arrow so the ctx read happens at click time, not render
@@ -1031,7 +1040,14 @@ function emitSlot(
 
       const argCode = rewriteTemplateExpression(arg.expression, ir);
       if (isFnLike) {
-        const evt = `rozie-${name || 'default'}-${arg.name}`;
+        // WR-04 (Phase 07.4 review): kebab-case the slot and param names so
+        // producer and consumer agree on the event-name shape even for
+        // camelCase args (`:closeModal` -> `rozie-<slot>-close-modal` on
+        // both sides). For single-word lowercase identifiers (current
+        // fixtures: close/toggle/remove) `toKebabCase()` is a no-op.
+        const slotPart = toKebabCase(name || 'default');
+        const paramPart = toKebabCase(arg.name);
+        const evt = `rozie-${slotPart}-${paramPart}`;
         // Phase 07.4 D-LIT-12 — emit inline `@event` on the <slot> element
         // instead of pushing to host-scope `_armListeners()` via
         // `hostListenerWiring`. The host-scope path was broken inside `r-for`:
