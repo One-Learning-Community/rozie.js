@@ -84,10 +84,12 @@ describe('dispatchEvent translation (Phase 07.3.1 D-LIT-17)', () => {
   /**
    * D-LIT-17 — function-typed slot params (e.g. `close`) can't cross the
    * `data-rozie-params` JSON transport (JSON.stringify drops function values).
-   * The producer already wires `addEventListener('rozie-<slot>-<param>', ...)`
-   * via emitHostListenerWiring.ts. The consumer must dispatch a matching
-   * CustomEvent instead of trying to invoke the (always-undefined) function
-   * captured into `this._<slot>Ctx`.
+   * The producer emits a matching `@rozie-<slot>-<param>` binding directly on
+   * the producer's `<slot>` element (Phase 07.4 D-LIT-12 — replaces the
+   * previous host-scope `addEventListener` path so loop-local `r-for`
+   * iteration variables are captured naturally). The consumer must dispatch a
+   * matching CustomEvent instead of trying to invoke the (always-undefined)
+   * function captured into `this._<slot>Ctx`.
    *
    * Detection at buildEventParts matches the EXACT shape
    * `this._<X>Ctx?.<param>` (anchored, no surrounding wrap, no member-chain

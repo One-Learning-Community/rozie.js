@@ -80,13 +80,7 @@ describe('LIT-T-06 — eslint-plugin-lit + eslint-plugin-wc clean (--max-warning
   });
 });
 
-// 2026-05-18 — TodoList exercises a known D-LIT-12 producer-side limitation:
-// scoped slot params that capture loop-local variables (`:toggle="() => toggle(item.id)"`)
-// route through CustomEvent dispatch in Lit, but the host listener lives in
-// `_armListeners()` where `item` is not in scope — emit references an undeclared
-// `item`. Excluded from the tsc gate until the Lit emit captures per-iteration
-// vars in the host listener wiring (sibling to project_lit_consumer_slot_bridge_gap).
-const TSC_EXAMPLES = EXAMPLES.filter((n) => n !== 'TodoList');
+const TSC_EXAMPLES = EXAMPLES;
 
 describe('LIT-TSC — tsc --noEmit clean over emitted Lit .ts', () => {
   // Catches the class of bug that eslint-plugin-lit/wc does not:

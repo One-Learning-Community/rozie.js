@@ -52,10 +52,6 @@ export default class Dropdown extends SignalWatcher(LitElement) {
     window.addEventListener('resize', _lh2, { passive: true });
     this._disconnectCleanups.push(() => window.removeEventListener('resize', _lh2, undefined));
 
-    this.addEventListener('rozie-trigger-toggle', (e) => { ((this.toggle) as (...args: any[]) => any)((e as CustomEvent).detail); });
-
-    this.addEventListener('rozie-default-close', (e) => { ((this.close) as (...args: any[]) => any)((e as CustomEvent).detail); });
-
     {
       const slotEl = this.shadowRoot?.querySelector('slot[name="trigger"]');
       if (slotEl !== null && slotEl !== undefined) {
@@ -113,11 +109,11 @@ export default class Dropdown extends SignalWatcher(LitElement) {
     return html`
 <div class="dropdown">
   <div @click=${this.toggle} data-rozie-ref="triggerEl">
-    <slot name="trigger" data-rozie-params=${(() => { try { return JSON.stringify({open: this.open}); } catch { return '{}'; } })()}></slot>
+    <slot name="trigger" data-rozie-params=${(() => { try { return JSON.stringify({open: this.open}); } catch { return '{}'; } })()} @rozie-trigger-toggle=${(e: CustomEvent) => ((this.toggle) as (...args: any[]) => any)(e.detail)}></slot>
   </div>
 
   ${this.open ? html`<div class="dropdown-panel" role="menu" data-rozie-ref="panelEl">
-    <slot></slot>
+    <slot @rozie-default-close=${(e: CustomEvent) => ((this.close) as (...args: any[]) => any)(e.detail)}></slot>
   </div>` : nothing}</div>
 `;
   }

@@ -422,13 +422,16 @@ function buildEventParts(
 
   // Phase 07.3.1 D-LIT-17 — function-typed scoped-slot params (e.g. `close`)
   // can't transit through `data-rozie-params` (JSON.stringify silently drops
-  // function values). The producer side already emits a host-listener wiring
-  // `addEventListener('rozie-<slot>-<param>', e => this.<source>(e.detail))`
-  // via emitHostListenerWiring.ts. The consumer must dispatch a matching
-  // CustomEvent instead of trying to invoke the (always-undefined) function
-  // from ctx. Detection matches the EXACT shape `this._<X>Ctx?.<param>` —
-  // composite expressions fall through to the Plan 03 late-binding wrap
-  // (which preserves the previous behavior for data-typed params).
+  // function values). The producer side emits a matching `@event` binding
+  // (`@rozie-<slot>-<param>=${(e: CustomEvent) => userThunk(e.detail)}`)
+  // directly on the producer's `<slot>` element via inline @event in
+  // emitSlot() (Phase 07.4 D-LIT-12 — replaces the previous host-scope
+  // `addEventListener` path so loop-local `r-for` iteration variables are
+  // captured naturally). The consumer must dispatch a matching CustomEvent
+  // instead of trying to invoke the (always-undefined) function from ctx.
+  // Detection matches the EXACT shape `this._<X>Ctx?.<param>` — composite
+  // expressions fall through to the Plan 03 late-binding wrap (which
+  // preserves the previous behavior for data-typed params).
   //
   // Cascade order:
   //   1. dispatchEvent translation (D-LIT-17) — exact shape `this._<X>Ctx?.<param>`
@@ -997,6 +1000,7 @@ function emitSlot(
   const methodNameSet = collectMethodNamesFromIR(ir);
 
   const dataAttrs: string[] = [];
+  const eventAttrs: string[] = [];
   if (node.args.length > 0) {
     const dataEntries: string[] = [];
     for (const arg of node.args) {
@@ -1016,12 +1020,27 @@ function emitSlot(
       const argCode = rewriteTemplateExpression(arg.expression, ir);
       if (isFnLike) {
         const evt = `rozie-${name || 'default'}-${arg.name}`;
-        // Wrap argCode in parens before the cast — argCode is often an arrow
-        // expression like `() => this.toggle(item.id)` and `as` binds tighter
-        // than `=>`, so a naked cast would attach to the arrow's return value
-        // instead of the whole arrow. The explicit parens fix the precedence.
-        hostListenerWiring.push(
-          `this.addEventListener('${evt}', (e) => { ((${argCode}) as (...args: any[]) => any)((e as CustomEvent).detail); });`,
+        // Phase 07.4 D-LIT-12 — emit inline `@event` on the <slot> element
+        // instead of pushing to host-scope `_armListeners()` via
+        // `hostListenerWiring`. The host-scope path was broken inside `r-for`:
+        // the user thunk references loop-local `item`, which doesn't exist at
+        // host scope (tsc TS2304, runtime ReferenceError). The per-iteration
+        // `<slot>` lives inside the `repeat()` callback closure, so loop-local
+        // identifiers are naturally captured. For non-loop slots (Modal /
+        // Dropdown `:close`) the same path is equally correct — Lit's
+        // html-template `@event` binding works on `<slot>` like any DOM node.
+        //
+        // The argCode is paren-wrapped before the cast — argCode is often an
+        // arrow expression like `() => this.toggle(item.id)` and `as` binds
+        // tighter than `=>`, so a naked cast would attach to the arrow's
+        // return value instead of the whole arrow. The explicit parens fix
+        // the precedence. The `as (...args: any[]) => any` widening is
+        // required for 0-arg user thunks (e.g. `this.close` typed
+        // `() => void`) so they accept `e.detail` uniformly — otherwise tsc
+        // flags TS2554 "Expected 0 arguments, but got 1" against
+        // every `:close="close"` slot-arg binding.
+        eventAttrs.push(
+          `@${evt}=\${(e: CustomEvent) => ((${argCode}) as (...args: any[]) => any)(e.detail)}`,
         );
       } else {
         dataEntries.push(`${arg.name}: ${argCode}`);
@@ -1037,11 +1056,12 @@ function emitSlot(
 
   const slotName = name.length > 0 ? ` name="${name}"` : '';
   const dataStr = dataAttrs.length > 0 ? ' ' + dataAttrs.join(' ') : '';
+  const eventStr = eventAttrs.length > 0 ? ' ' + eventAttrs.join(' ') : '';
 
   if (fallbackChildren.trim().length > 0) {
-    return `<slot${slotName}${dataStr}>${fallbackChildren}</slot>`;
+    return `<slot${slotName}${dataStr}${eventStr}>${fallbackChildren}</slot>`;
   }
-  return `<slot${slotName}${dataStr}></slot>`;
+  return `<slot${slotName}${dataStr}${eventStr}></slot>`;
 }
 
 function collectMethodNamesFromIR(ir: IRComponent): Set<string> {

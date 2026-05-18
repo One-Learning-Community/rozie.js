@@ -12,10 +12,11 @@
  * emitted as a Plan 03 late-binding wrap `(e) => (this._<X>Ctx?.<param>)?.(e)`.
  * That path was a no-op for function-typed params (JSON.stringify drops
  * functions across `data-rozie-params`). The fix translates the exact shape
- * to a dispatchEvent that the producer's host-listener wiring (also emitted
- * here, see emitHostListenerWiring.ts) receives. The late-binding wrap is
- * RETAINED as a fall-through for composite expressions and data-typed
- * param references (e.g., `r-if="open"` reading a data-typed param).
+ * to a dispatchEvent that the producer's `@rozie-<slot>-<param>` binding on
+ * its `<slot>` element receives (Phase 07.4 D-LIT-12 — replaces the previous
+ * host-scope `addEventListener` path). The late-binding wrap is RETAINED as a
+ * fall-through for composite expressions and data-typed param references
+ * (e.g., `r-if="open"` reading a data-typed param).
  *
  * This file is a temporary smoke fixture — it compiles a synthetic
  * consumer-side .rozie source and asserts the emit shape. It is NOT
