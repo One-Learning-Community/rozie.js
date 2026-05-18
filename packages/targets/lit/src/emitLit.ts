@@ -198,6 +198,12 @@ export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResu
     runtimeImports.render(),
     // CR-06 fix: read repeatUsed from templateResult instead of module-level singleton.
     templateResult.repeatUsed ? `import { repeat } from 'lit/directives/repeat.js';\n` : '',
+    // Quick-task 260518-e2t (Spike 004 Lit subset) — conditional styleMap
+    // import. Threaded the SAME way as `repeat`: emitTemplate marks
+    // `styleMapUsed` on EmitTemplateResult when any literal-object `:style`
+    // was lowered via styleMap(); we add the side-effect-free value import
+    // only when actually used, so unused-import noise is avoided.
+    templateResult.styleMapUsed ? `import { styleMap } from 'lit/directives/style-map.js';\n` : '',
   ].filter((s) => s.length > 0).join('');
 
   const shell = buildShell({

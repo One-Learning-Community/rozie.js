@@ -14,9 +14,23 @@
  *
  * @experimental — shape may change before v1.0
  */
+import * as bt from '@babel/types';
 import type { AttributeBinding, IRComponent } from '../../../../core/src/ir/types.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
 import { kebabize, resolveLitSetterText } from './resolveLitSetterText.js';
+
+/**
+ * Test-wrapper context for emitTemplateAttribute. The real emit path
+ * (emitTemplate.ts:emitAttribute) threads a richer `_state` channel so it
+ * can mark `styleMapUsed` for the import wiring; the standalone wrapper
+ * exposes a minimal version of the same signal so unit tests can observe
+ * whether a given attribute would trigger the styleMap import.
+ *
+ * Quick-task 260518-e2t (Spike 004 Lit subset).
+ */
+export interface EmitTemplateAttributeState {
+  styleMapUsed: boolean;
+}
 
 const BOOLEAN_ATTRS = new Set([
   'disabled',
@@ -36,6 +50,7 @@ export function emitTemplateAttribute(
   attr: AttributeBinding,
   ir: IRComponent,
   tagName = 'div',
+  state?: EmitTemplateAttributeState,
 ): string {
   if (attr.kind === 'static') {
     return `${attr.name}="${attr.value}"`;
@@ -56,6 +71,21 @@ export function emitTemplateAttribute(
     return `.${attr.name}=\${${valueExpr}} @${eventName}=\${(e: CustomEvent) => { ${setterText} = e.detail; }}`;
   }
   if (attr.kind === 'binding') {
+    // Quick-task 260518-e2t (Spike 004 Lit subset) — literal-object `:style`
+    // lowers through Lit's styleMap directive. Bails to passthrough on
+    // spread/method/computed-key props (caller falls through to existing
+    // `[object Object]` toString path — known broken, documented gap).
+    if (
+      attr.name === 'style' &&
+      bt.isObjectExpression(attr.expression) &&
+      attr.expression.properties.every(
+        (p) => bt.isObjectProperty(p) && !p.computed,
+      )
+    ) {
+      const expr = rewriteTemplateExpression(attr.expression, ir);
+      if (state) state.styleMapUsed = true;
+      return `style=\${styleMap(${expr})}`;
+    }
     const expr = rewriteTemplateExpression(attr.expression, ir);
     if (BOOLEAN_ATTRS.has(attr.name)) {
       return `?${attr.name}=\${${expr}}`;

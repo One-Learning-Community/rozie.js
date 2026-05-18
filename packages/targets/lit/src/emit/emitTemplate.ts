@@ -91,6 +91,15 @@ export interface EmitTemplateOpts {
    */
   _state?: {
     repeatUsed: boolean;
+    /**
+     * Quick-task 260518-e2t (Spike 004 Lit subset) — true when at least
+     * one literal-object `:style="{...}"` was lowered through `styleMap()`.
+     * emitLit.ts reads this off `EmitTemplateResult` and conditionally
+     * adds `import { styleMap } from 'lit/directives/style-map.js';` to
+     * the shell imports block, mirroring the existing `repeatUsed` →
+     * `{ repeat }` import wiring pattern.
+     */
+    styleMapUsed: boolean;
     debouncedFieldDecls: string[];
     debounceCleanupWiring: string[];
     diagnostics: Diagnostic[];
@@ -127,6 +136,14 @@ export interface EmitTemplateResult {
    * result instead of mutable module state to support concurrent compilation).
    */
   repeatUsed: boolean;
+  /**
+   * Quick-task 260518-e2t (Spike 004 Lit subset) — true when at least one
+   * literal-object `:style="{...}"` was lowered to `styleMap({...})`.
+   * emitLit conditionally wires `import { styleMap } from
+   * 'lit/directives/style-map.js';` based on this flag (same plumbing as
+   * `repeatUsed` → `{ repeat }`).
+   */
+  styleMapUsed: boolean;
   /**
    * Class-field declarations for template-event `.debounce`/`.throttle`
    * wrappers (WR-15). emitLit splices these into the class body alongside the
@@ -221,11 +238,28 @@ function attributeIsRModel(attr: AttributeBinding): boolean {
   return attr.name === 'r-model';
 }
 
+/**
+ * Quick-task 260518-e2t (Spike 004 Lit subset) — admits an ObjectExpression
+ * for `styleMap()` lowering ONLY when every property is a plain `key: value`
+ * pair. Rejects spreads / methods / computed-keys so the bailout path falls
+ * through to the existing passthrough (which would produce
+ * `[object Object]` — known broken, documented gap, out of scope for this
+ * subset).
+ */
+function isPlainObjectLiteral(obj: bt.ObjectExpression): boolean {
+  for (const prop of obj.properties) {
+    if (!bt.isObjectProperty(prop)) return false; // SpreadElement / ObjectMethod
+    if (prop.computed) return false;
+  }
+  return true;
+}
+
 function emitAttribute(
   attr: AttributeBinding,
   ir: IRComponent,
   tagName: string,
   tagKind: 'html' | 'component' | 'self' = 'html',
+  opts?: EmitTemplateOpts,
 ): string {
   if (attr.kind === 'static') {
     // Pass through static attribute as-is.
@@ -250,6 +284,24 @@ function emitAttribute(
   if (attr.kind === 'binding') {
     // r-model handled separately (paired with @input + .value).
     if (attributeIsRModel(attr)) return '';
+
+    // Quick-task 260518-e2t (Spike 004 Lit subset) — `:style="{...}"` with a
+    // literal ObjectExpression lowers through Lit's styleMap directive so
+    // camelCase keys (`backgroundColor`) round-trip to kebab-case CSS, and
+    // the object isn't toString'd to `[object Object]`. Marks
+    // `styleMapUsed = true` on _state so emitLit threads the
+    // `lit/directives/style-map.js` import (mirrors the repeatUsed plumbing).
+    // Bails to the existing passthrough for non-literal-object exprs (string
+    // form like `:style="'background: red'"` works natively).
+    if (
+      attr.name === 'style' &&
+      bt.isObjectExpression(attr.expression) &&
+      isPlainObjectLiteral(attr.expression)
+    ) {
+      const expr = rewriteTemplateExpression(attr.expression, ir);
+      if (opts?._state) opts._state.styleMapUsed = true;
+      return `style=\${styleMap(${expr})}`;
+    }
 
     const expr = rewriteTemplateExpression(attr.expression, ir);
 
@@ -648,7 +700,7 @@ function emitElementOpenTag(
       // Use quoted attribute — lit-html requires quotes for mixed static+dynamic values (CR-01 fix).
       parts.push(`class="${staticPart}\${(${expr})}"`);
     } else if (bindingClass.kind === 'interpolated') {
-      const emitted = emitAttribute(bindingClass, ir, node.tagName);
+      const emitted = emitAttribute(bindingClass, ir, node.tagName, 'html', opts);
       if (emitted) parts.push(emitted);
     }
   } else if (staticClassValues.length > 0) {
@@ -662,7 +714,7 @@ function emitElementOpenTag(
       continue;
     }
     if (attributeIsRModel(attr)) continue;
-    const emitted = emitAttribute(attr, ir, node.tagName, node.tagKind);
+    const emitted = emitAttribute(attr, ir, node.tagName, node.tagKind, opts);
     if (emitted) parts.push(emitted);
   }
 
@@ -1029,6 +1081,7 @@ export function emitTemplate(
   // Initialize per-call state (CR-06 fix: replaces module-level REPEAT_USED singleton).
   const state = {
     repeatUsed: false,
+    styleMapUsed: false,
     debouncedFieldDecls: [] as string[],
     debounceCleanupWiring: [] as string[],
     slotFillerClassFields: [] as string[],
@@ -1043,6 +1096,7 @@ export function emitTemplate(
       renderBody: '',
       hostListenerWiring,
       repeatUsed: false,
+      styleMapUsed: false,
       debouncedFieldDecls: [],
       slotFillerClassFields: [],
       slotFillerUpdatedBody: [],
@@ -1061,6 +1115,7 @@ export function emitTemplate(
     renderBody: body,
     hostListenerWiring,
     repeatUsed: state.repeatUsed,
+    styleMapUsed: state.styleMapUsed,
     debouncedFieldDecls: state.debouncedFieldDecls,
     slotFillerClassFields: state.slotFillerClassFields,
     slotFillerUpdatedBody: state.slotFillerUpdatedBody,
