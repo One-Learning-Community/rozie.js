@@ -6,6 +6,7 @@ import * as monaco from 'monaco-editor';
 import defaultSnippet from './snippets/Sortable.rozie.txt?raw';
 import { compileBuffer } from './compile';
 import { setupTextmate } from './textmate-setup';
+import { PreviewManager } from './preview/manager';
 import type { CompileTarget } from '@rozie/core';
 
 const EDITOR_OPTIONS: monaco.editor.IStandaloneEditorConstructionOptions = {
@@ -40,10 +41,29 @@ const OUTPUT_LANGUAGE: Record<CompileTarget, string> = {
 async function bootstrap(): Promise<void> {
   const editorHost = document.getElementById('editor');
   const outputHost = document.getElementById('output');
+  const previewHost = document.getElementById('preview-host');
+  const previewStatus = document.getElementById('preview-status');
   const targetSelect = document.getElementById('target') as HTMLSelectElement | null;
+  const tabButtons = Array.from(
+    document.querySelectorAll<HTMLButtonElement>('#right-tabs .tab-btn'),
+  );
 
-  if (!editorHost || !outputHost || !targetSelect) {
+  if (!editorHost || !outputHost || !targetSelect || !previewHost || !previewStatus) {
     throw new Error('Playground bootstrap: missing DOM mount points');
+  }
+
+  const previewManager = new PreviewManager(previewHost, previewStatus);
+
+  // Tab toggling — flip .active on button + matching panel.
+  for (const btn of tabButtons) {
+    btn.addEventListener('click', () => {
+      const tab = btn.dataset.tab;
+      if (!tab) return;
+      for (const b of tabButtons) b.classList.toggle('active', b === btn);
+      document.querySelectorAll<HTMLElement>('.tab-panel').forEach((panel) => {
+        panel.classList.toggle('active', panel.id === tab);
+      });
+    });
   }
 
   // Register the rozie TextMate grammar BEFORE creating the editor so the
@@ -85,6 +105,12 @@ async function bootstrap(): Promise<void> {
     }
 
     rightEditor.setValue(outcome.ok ? outcome.code : outcome.errorText);
+
+    if (outcome.ok) {
+      previewManager.render(target, outcome.code);
+    } else {
+      previewManager.clear('compile error — see Output tab');
+    }
   }
 
   let timer: ReturnType<typeof setTimeout> | undefined;

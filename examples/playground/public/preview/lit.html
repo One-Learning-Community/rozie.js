@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Rozie preview — Lit</title>
+    <script type="importmap">
+      {
+        "imports": {
+          "lit": "https://esm.sh/lit@3.2.1",
+          "lit/decorators.js": "https://esm.sh/lit@3.2.1/decorators.js",
+          "lit/directives/repeat.js": "https://esm.sh/lit@3.2.1/directives/repeat.js",
+          "lit/directives/class-map.js": "https://esm.sh/lit@3.2.1/directives/class-map.js",
+          "lit/directives/style-map.js": "https://esm.sh/lit@3.2.1/directives/style-map.js",
+          "@lit-labs/preact-signals": "https://esm.sh/@lit-labs/preact-signals@1.0.3",
+          "@preact/signals-core": "https://esm.sh/@preact/signals-core@1.8.0",
+          "sortablejs": "https://esm.sh/sortablejs@1.15.6"
+        }
+      }
+    </script>
+    <style>
+      html, body { margin: 0; height: 100%; font-family: system-ui; }
+      #app { min-height: 100%; padding: 12px; }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module">
+      import { getEsbuildTransform, importFromString, bootHarness, clearHost, stubUnresolvableImports } from './_shared.js';
+
+      const host = document.getElementById('app');
+      // Counter so each render produces a unique custom-element tag (custom
+      // elements can only be defined once per tag name; re-defining throws).
+      let counter = 0;
+
+      bootHarness(async (code) => {
+        const transform = await getEsbuildTransform();
+        const result = await transform(stubUnresolvableImports(code), {
+          loader: 'ts',
+          format: 'esm',
+          target: 'es2022',
+          tsconfigRaw: {
+            compilerOptions: {
+              experimentalDecorators: true,
+              useDefineForClassFields: false,
+            },
+          },
+        });
+
+        // Strip any `@customElement('...')` decorator + `customElements.define(...)`
+        // call from the compiled output — we re-tag with a unique name below so
+        // re-renders don't collide with prior definitions.
+        let cleaned = result.code
+          .replace(/customElements\s*\.\s*define\s*\([^)]*\)\s*;?/g, '')
+          .replace(/_customElement\(['"][^'"]*['"]\)/g, '_customElement("__placeholder__")');
+
+        const mod = await importFromString(cleaned);
+        const Component = mod.default;
+        if (typeof Component !== 'function') {
+          throw new Error('compiled output has no default LitElement class export');
+        }
+
+        // CustomElementRegistry tracks constructor identity — the same class
+        // can't be registered twice even under different tag names. Wrap in a
+        // fresh anonymous subclass per render so each define() gets a new
+        // constructor.
+        const tag = `rozie-preview-${++counter}`;
+        const Wrapper = class extends Component {};
+        customElements.define(tag, Wrapper);
+
+        clearHost(host);
+        host.appendChild(document.createElement(tag));
+      });
+    </script>
+  </body>
+</html>

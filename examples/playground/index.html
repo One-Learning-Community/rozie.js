@@ -33,7 +33,19 @@
     </header>
     <main>
       <div id="editor"></div>
-      <div id="output"></div>
+      <div id="right-pane">
+        <div id="right-tabs">
+          <button type="button" data-tab="output" class="tab-btn active">Output</button>
+          <button type="button" data-tab="preview" class="tab-btn">Preview</button>
+        </div>
+        <div id="right-body">
+          <div id="output" class="tab-panel active"></div>
+          <div id="preview" class="tab-panel">
+            <div id="preview-host"></div>
+            <div id="preview-status"></div>
+          </div>
+        </div>
+      </div>
     </main>
     <script type="module" src="/src/main.ts"></script>
   </body>

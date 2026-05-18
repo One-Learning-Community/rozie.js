@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Rozie preview — Angular</title>
+    <script type="importmap">
+      {
+        "imports": {
+          "@angular/core": "https://esm.sh/@angular/core@19.0.5",
+          "@angular/core/rxjs-interop": "https://esm.sh/@angular/core@19.0.5/rxjs-interop",
+          "@angular/common": "https://esm.sh/@angular/common@19.0.5",
+          "@angular/compiler": "https://esm.sh/@angular/compiler@19.0.5",
+          "@angular/platform-browser": "https://esm.sh/@angular/platform-browser@19.0.5",
+          "@angular/platform-browser-dynamic": "https://esm.sh/@angular/platform-browser-dynamic@19.0.5",
+          "rxjs": "https://esm.sh/rxjs@7.8.1",
+          "rxjs/operators": "https://esm.sh/rxjs@7.8.1/operators",
+          "tslib": "https://esm.sh/tslib@2.8.1",
+          "sortablejs": "https://esm.sh/sortablejs@1.15.6"
+        }
+      }
+    </script>
+    <style>
+      html, body { margin: 0; height: 100%; font-family: system-ui; }
+      #app { min-height: 100%; padding: 12px; }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module">
+      // Order matters:
+      //   1. zone.js — patches globals; must complete before any Angular code runs.
+      //   2. @angular/compiler — registers the JIT compiler; required because
+      //      Rozie emits standalone components that aren't AOT-precompiled,
+      //      so the platform needs to JIT-compile the template at runtime.
+      //      Without this, you get "needs JIT compiler" errors on every
+      //      injectable.
+      //   3. Everything else.
+      await import('https://esm.sh/zone.js@0.15.0');
+      await import('@angular/compiler');
+
+      const [coreNs, { bootstrapApplication }, { getEsbuildTransform, importFromString, bootHarness, clearHost }] =
+        await Promise.all([
+          import('@angular/core'),
+          import('@angular/platform-browser'),
+          import('./_shared.js'),
+        ]);
+      const { provideZoneChangeDetection, ɵprovideZonelessChangeDetection: provideZonelessChangeDetection } = coreNs;
+
+      // Angular requires a unique element selector + a unique mount-point on
+      // each render; emit a fresh root tag per render and rewrite the
+      // compiled component's selector to match.
+      const host = document.getElementById('app');
+      let appRef = null;
+      let renderCount = 0;
+
+      bootHarness(async (code) => {
+        const transform = await getEsbuildTransform();
+        const transformed = await transform(code, {
+          loader: 'ts',
+          format: 'esm',
+          target: 'es2022',
+          tsconfigRaw: {
+            compilerOptions: {
+              experimentalDecorators: true,
+              emitDecoratorMetadata: true,
+              useDefineForClassFields: false,
+            },
+          },
+        });
+
+        // Rewrite the selector so we can mount a fresh element each render.
+        const sel = `rozie-ng-${++renderCount}`;
+        const rewritten = transformed.code.replace(
+          /selector\s*:\s*['"][^'"]+['"]/,
+          `selector: '${sel}'`,
+        );
+
+        const mod = await importFromString(rewritten);
+        const Component = mod.default || mod[Object.keys(mod)[0]];
+        if (typeof Component !== 'function') {
+          throw new Error('Angular compile produced no component class export');
+        }
+
+        if (appRef) {
+          try { appRef.destroy(); } catch (_) { /* already destroyed */ }
+          appRef = null;
+        }
+        clearHost(host);
+        const mount = document.createElement(sel);
+        host.appendChild(mount);
+
+        appRef = await bootstrapApplication(Component, {
+          providers: [
+            provideZoneChangeDetection({ eventCoalescing: true }),
+          ],
+        });
+      });
+    </script>
+  </body>
+</html>

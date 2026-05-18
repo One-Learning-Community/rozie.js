@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Rozie preview — React</title>
+    <script type="importmap">
+      {
+        "imports": {
+          "react": "https://esm.sh/react@18.3.1",
+          "react/jsx-runtime": "https://esm.sh/react@18.3.1/jsx-runtime",
+          "react-dom": "https://esm.sh/react-dom@18.3.1",
+          "react-dom/client": "https://esm.sh/react-dom@18.3.1/client",
+          "sortablejs": "https://esm.sh/sortablejs@1.15.6"
+        }
+      }
+    </script>
+    <style>
+      html, body { margin: 0; height: 100%; font-family: system-ui; }
+      #app { min-height: 100%; padding: 12px; }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module">
+      import * as React from 'react';
+      import { createRoot } from 'react-dom/client';
+      import { getEsbuildTransform, importFromString, bootHarness, stubUnresolvableImports } from './_shared.js';
+
+      const host = document.getElementById('app');
+      let root = null;
+
+      bootHarness(async (code) => {
+        const transform = await getEsbuildTransform();
+        const result = await transform(stubUnresolvableImports(code), {
+          loader: 'tsx',
+          format: 'esm',
+          target: 'es2020',
+          jsx: 'automatic',
+        });
+
+        const mod = await importFromString(result.code);
+        const Component = mod.default || mod.Component;
+        if (typeof Component !== 'function' && typeof Component !== 'object') {
+          throw new Error('compiled output has no default React component export');
+        }
+
+        if (root) root.unmount();
+        root = createRoot(host);
+        root.render(React.createElement(Component));
+      });
+    </script>
+  </body>
+</html>

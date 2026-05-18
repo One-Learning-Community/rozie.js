@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Rozie preview — Svelte</title>
+    <script type="importmap">
+      {
+        "imports": {
+          "svelte": "https://esm.sh/svelte@5.19.7",
+          "svelte/compiler": "https://esm.sh/svelte@5.19.7/compiler",
+          "svelte/internal": "https://esm.sh/svelte@5.19.7/internal",
+          "svelte/internal/client": "https://esm.sh/svelte@5.19.7/internal/client",
+          "svelte/internal/disclose-version": "https://esm.sh/svelte@5.19.7/internal/disclose-version",
+          "esm-env": "https://esm.sh/esm-env@1.2.2",
+          "sortablejs": "https://esm.sh/sortablejs@1.15.6"
+        }
+      }
+    </script>
+    <style>
+      html, body { margin: 0; height: 100%; font-family: system-ui; }
+      #app { min-height: 100%; padding: 12px; }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module">
+      import { compile } from 'svelte/compiler';
+      import { mount, unmount } from 'svelte';
+      import { getEsbuildTransform, importFromString, bootHarness, clearHost } from './_shared.js';
+
+      const host = document.getElementById('app');
+      let instance = null;
+
+      bootHarness(async (sfcSource) => {
+        // Svelte 5 runes-mode compile to client output.
+        const compiled = compile(sfcSource, {
+          filename: 'Playground.svelte',
+          generate: 'client',
+          dev: false,
+          css: 'injected',
+        });
+
+        // If the <script lang="ts"> block survived compilation as TS, lower
+        // it. Svelte's compile leaves the script type-as-is for some paths.
+        const transform = await getEsbuildTransform();
+        const tsLowered = await transform(compiled.js.code, {
+          loader: 'ts',
+          format: 'esm',
+          target: 'es2022',
+        });
+
+        const mod = await importFromString(tsLowered.code);
+        const Component = mod.default;
+        if (!Component) throw new Error('Svelte compile produced no default export');
+
+        if (instance) {
+          try { unmount(instance); } catch (_) { /* svelte 5 mount return */ }
+        }
+        clearHost(host);
+        instance = mount(Component, { target: host });
+      });
+    </script>
+  </body>
+</html>
