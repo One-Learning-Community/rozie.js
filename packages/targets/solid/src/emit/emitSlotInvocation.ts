@@ -117,7 +117,29 @@ export function emitSlotInvocation(
   const hasInvocationFallback = invocationFallback !== 'null';
 
   // Default slot: use the children() accessor declared by shell.ts (D-131).
+  //
+  // SCOPED-PARAMS CARVE-OUT: when the default-slot SlotDecl declares params
+  // (e.g. `<slot :item="item" :index="index" />` in the producer template),
+  // the consumer's children IS a function — `children={({ item }) => …}`.
+  // Solid's `children()` helper resolves accessor functions but does NOT pass
+  // arguments to a function-typed child, so `{resolved()}` would invoke the
+  // consumer's fn with `undefined` and trigger
+  // `Cannot destructure property 'item' of 'undefined'` at runtime.
+  //
+  // Switch to invoking the raw children prop directly with the scope obj,
+  // mirroring how named-with-params slots emit below.
   if (slotName === '') {
+    const slotHasParams = slot ? slot.params.length > 0 : false;
+    if (slotHasParams) {
+      const paramObj = buildParamObj(node.args, ctx.ir, ctx.invokeAccessors);
+      // Function-child case: invoke with scope. Non-function child case: fall
+      // back to the standard `resolved()` (Solid children() accessor) path so
+      // existing static-child reactivity semantics are preserved.
+      if (hasInvocationFallback) {
+        return `{typeof local.children === 'function' ? (local.children as (s: any) => any)(${paramObj}) : (resolved() ?? ${invocationFallback})}`;
+      }
+      return `{typeof local.children === 'function' ? (local.children as (s: any) => any)(${paramObj}) : resolved()}`;
+    }
     if (hasInvocationFallback) {
       return `{resolved() ?? ${invocationFallback}}`;
     }

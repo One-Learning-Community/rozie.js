@@ -97,7 +97,7 @@ export default function Dropdown(_props: DropdownProps): JSX.Element {
       </div>
 
       {<Show when={open()}><div ref={(el) => { panelElRef = el as HTMLElement; }} class={"dropdown-panel"} role="menu" data-rozie-s-6d6bd882="">
-        {resolved()}
+        {typeof local.children === 'function' ? (local.children as (s: any) => any)({ close }) : resolved()}
       </div></Show>}</div>
     </>
     </>
