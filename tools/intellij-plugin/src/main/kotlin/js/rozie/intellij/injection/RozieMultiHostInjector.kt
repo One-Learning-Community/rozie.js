@@ -320,6 +320,21 @@ class RozieMultiHostInjector : MultiHostInjector {
      *  4. `:bind="…"` → [injectJs].
      *  5. `{{ … }}` interpolations → [injectJs] for the interior substring.
      *
+     * **Plan 08.2-18 — P1-UAT-14 extension:** for COLON_BIND_ATTR and R_OTHER_ATTR
+     * (NOT r-for, NOT @event, NOT `{{ }}`), the captured value is checked via
+     * [isObjectLiteralShape] before dispatch. Object-literal-shape values (trimmed
+     * value matches `^\{.*\}$`) route through [injectJsAsExpression] (paren-wrap
+     * from Plan 08.2-11) instead of the unwrapped [injectJs]. Mirrors the
+     * canonical Vue / Svelte SFC pattern for `:class="{ k: v }"` and
+     * `:style="{ color: c }"` shapes — without the paren-wrap the JS parser
+     * sees the object literal at statement position and parses it as a
+     * JSLabeledStatement (label `k:` + dead-code block `{ v }`), flagging the
+     * "Unnecessary label" / JSLabeledStatement family of inspections. r-for is
+     * EXEMPT (it already paren-wraps in branch 1); @event handlers are EXEMPT
+     * (virtually never have object-literal values — they're function calls or
+     * statements); `{{ }}` interpolations are EXEMPT (the delimiters already
+     * exclude the interior from being parsed at statement position).
+     *
      * CRITICAL byte-range invariants (pinned by RozieInjectionTest Plan 14 methods):
      *
      *  - Quotes excluded: for `:foo="contents.id"` the injected range covers exactly
@@ -377,13 +392,22 @@ class RozieMultiHostInjector : MultiHostInjector {
             injectJsAsExpression(registrar, host, TextRange(absStart, absEnd))
         }
 
-        // 2. Other r-*="…" directives — unwrapped JS. The negative lookahead
-        //    `(?!for\b)` excludes r-for so we don't double-inject.
+        // 2. Other r-*="…" directives — JS expression OR object-literal expression.
+        //    The negative lookahead `(?!for\b)` excludes r-for so we don't
+        //    double-inject. Plan 08.2-18 (P1-UAT-14): when the captured value is
+        //    an object-literal shape (`^\{.*\}$` after trim), route through
+        //    injectJsAsExpression so the JS parser sees a parenthesised
+        //    JSObjectLiteralExpression rather than a JSLabeledStatement.
         R_OTHER_ATTR.findAll(runText).forEach { match ->
             val valueGroup = match.groups[1] ?: return@forEach
             val absStart = runStartOffset + valueGroup.range.first
             val absEnd = runStartOffset + valueGroup.range.last + 1
-            injectJs(registrar, host, TextRange(absStart, absEnd))
+            val range = TextRange(absStart, absEnd)
+            if (isObjectLiteralShape(valueGroup.value)) {
+                injectJsAsExpression(registrar, host, range)
+            } else {
+                injectJs(registrar, host, range)
+            }
         }
 
         // 3. @event[.modifier(args)]*="…" event handlers — modifier suffix lives
@@ -396,12 +420,22 @@ class RozieMultiHostInjector : MultiHostInjector {
             injectJs(registrar, host, TextRange(absStart, absEnd))
         }
 
-        // 4. :bind="…" prop bindings — unwrapped JS expression.
+        // 4. :bind="…" prop bindings — JS expression OR object-literal expression.
+        //    Plan 08.2-18 (P1-UAT-14): when the captured value is an
+        //    object-literal shape (`^\{.*\}$` after trim), route through
+        //    injectJsAsExpression so the canonical Vue-style
+        //    `:class="{ k: v }"` / `:style="{ color: c }"` shapes parse as
+        //    JSObjectLiteralExpression instead of JSLabeledStatement.
         COLON_BIND_ATTR.findAll(runText).forEach { match ->
             val valueGroup = match.groups[1] ?: return@forEach
             val absStart = runStartOffset + valueGroup.range.first
             val absEnd = runStartOffset + valueGroup.range.last + 1
-            injectJs(registrar, host, TextRange(absStart, absEnd))
+            val range = TextRange(absStart, absEnd)
+            if (isObjectLiteralShape(valueGroup.value)) {
+                injectJsAsExpression(registrar, host, range)
+            } else {
+                injectJs(registrar, host, range)
+            }
         }
 
         // 5. {{ … }} mustache interpolations — interior substring is JS.
@@ -413,6 +447,38 @@ class RozieMultiHostInjector : MultiHostInjector {
             val absEnd = runStartOffset + valueGroup.range.last + 1
             injectJs(registrar, host, TextRange(absStart, absEnd))
         }
+    }
+
+    /**
+     * Plan 08.2-18 — P1-UAT-14 heuristic. Returns true if the trimmed [value]
+     * matches `^\{.*\}$` (starts with `{`, ends with `}`, ignoring whitespace
+     * inside the surrounding quotes). When true, the value is an object literal
+     * which MUST be paren-wrapped before injection so the JS parser produces a
+     * JSObjectLiteralExpression instead of a JSLabeledStatement (label `key:` +
+     * dead-code block `{ value }`).
+     *
+     * Used by [injectExpressionsInTemplateRun] branches 2 (R_OTHER_ATTR) and 4
+     * (COLON_BIND_ATTR) to dispatch between [injectJs] (unwrapped — Plan 14
+     * default) and [injectJsAsExpression] (paren-wrap — Plan 11 mechanism).
+     * Closes the canonical Vue-style `:class="{ k: v }"` / `:style="{ color: c }"`
+     * regression that surfaced in UAT re-run #3 against
+     * `examples/Counter.rozie` line 44.
+     *
+     * Conservative heuristic — does NOT recursively parse the body. Treats any
+     * value-shape starting+ending with curly braces as an object literal, which
+     * is correct for the canonical Vue/Svelte-style class / style / r-bind
+     * shapes (`{ key: value }`, `{ active: condition }`).
+     *
+     * **Accepted false-positive edge case (threat T-08.2-43):** block-statement
+     * shaped values like `{ console.log('x'); return 1; }` (rare in template
+     * attribute position) ALSO match this heuristic; the paren-wrap then
+     * produces a parenthesised block statement, which JS parses as a comma
+     * expression — slightly wrong PSI shape but no worse than the pre-Plan-18
+     * JSLabeledStatement noise.
+     */
+    private fun isObjectLiteralShape(value: String): Boolean {
+        val trimmed = value.trim()
+        return trimmed.length >= 2 && trimmed.startsWith("{") && trimmed.endsWith("}")
     }
 
     /**
