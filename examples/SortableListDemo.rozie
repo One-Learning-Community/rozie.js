@@ -28,13 +28,7 @@
 
 <data>
 {
-  items: [
-    { id: 'a', label: 'Apple' },
-    { id: 'b', label: 'Banana' },
-    { id: 'c', label: 'Cherry' },
-    { id: 'd', label: 'Date' },
-    { id: 'e', label: 'Elderberry' },
-  ],
+  items: [],
   newLabel: '',
   disabled: false,
   nextId: 6,
@@ -42,6 +36,14 @@
 </data>
 
 <script>
+const INITIAL_DATA = [
+ { id: 'a', label: 'Apple' },
+ { id: 'b', label: 'Banana' },
+ { id: 'c', label: 'Cherry' },
+ { id: 'd', label: 'Date' },
+ { id: 'e', label: 'Elderberry' },
+];
+
 const addItem = () => {
   const label = $data.newLabel.trim()
   if (!label) return
@@ -55,12 +57,10 @@ const removeItem = (id) => {
 }
 
 const reset = () => {
-  $data.items = [
-    { id: 'a', label: 'Apple' },
-    { id: 'b', label: 'Banana' },
-    { id: 'c', label: 'Cherry' },
-  ]
+  $data.items = INITIAL_DATA
 }
+
+$onMount(() => reset());
 </script>
 
 <template>

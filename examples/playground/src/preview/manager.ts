@@ -209,7 +209,7 @@ export class PreviewManager {
     // `_shared.js` ESM module (otherwise null-origin sandbox CORS-blocks it).
     // This is an internal dev tool with no auth surface — the looser sandbox
     // is acceptable.
-    iframe.setAttribute('sandbox', 'allow-scripts allow-modals allow-same-origin');
+    iframe.setAttribute('sandbox', 'allow-scripts allow-modals allow-same-origin allow-forms');
     iframe.dataset.target = target;
     cell.appendChild(iframe);
 
