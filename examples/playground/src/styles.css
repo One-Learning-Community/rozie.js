@@ -105,9 +105,21 @@ main {
   flex: 1;
   min-height: 0;
   background: #fff;
+  overflow: hidden;
 }
 
-#preview-host iframe {
+/* Single mode (default): each cell sits absolute, only the active iframe is shown. */
+.preview-cell {
+  position: absolute;
+  inset: 0;
+  display: none;
+}
+
+.preview-cell .preview-cell-label {
+  display: none;
+}
+
+.preview-cell iframe {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -117,8 +129,74 @@ main {
   display: none;
 }
 
-#preview-host iframe.active {
+.preview-cell iframe.active {
   display: block;
+}
+
+/* Grid mode: all cells laid out simultaneously in a 3×2 grid. */
+#preview-host.grid-mode {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(2, 1fr);
+  gap: 4px;
+  padding: 4px;
+  background: #1e1e1e;
+}
+
+#preview-host.grid-mode .preview-cell {
+  position: relative;
+  inset: auto;
+  display: none;
+  background: #fff;
+  border: 1px solid #444;
+  border-radius: 2px;
+  overflow: hidden;
+  min-width: 0;
+  min-height: 0;
+}
+
+#preview-host.grid-mode .preview-cell.grid-visible {
+  display: flex;
+  flex-direction: column;
+}
+
+#preview-host.grid-mode .preview-cell .preview-cell-label {
+  display: block;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #ccc;
+  background: #252526;
+  padding: 2px 6px;
+  border-bottom: 1px solid #444;
+  flex-shrink: 0;
+}
+
+#preview-host.grid-mode .preview-cell iframe {
+  position: relative;
+  inset: auto;
+  flex: 1;
+  display: block;
+  min-height: 0;
+}
+
+#preview-host.grid-mode .preview-cell.has-error::after {
+  content: attr(data-error-text);
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #5a1f1f;
+  color: #f48771;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  padding: 4px 6px;
+  border-top: 1px solid #f48771;
+  white-space: pre-wrap;
+  max-height: 40%;
+  overflow: auto;
+  z-index: 1;
 }
 
 #preview-status {
@@ -133,4 +211,19 @@ main {
 
 #preview-status.error {
   color: #f48771;
+}
+
+#preview-mode-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 12px;
+  font-size: 12px;
+  color: #ccc;
+  cursor: pointer;
+  user-select: none;
+}
+
+#preview-mode-toggle input {
+  margin: 0;
 }

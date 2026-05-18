@@ -3,10 +3,10 @@
 import './monaco-env';
 
 import * as monaco from 'monaco-editor';
-import { compileBuffer } from './compile';
+import { ALL_TARGETS, compileBundle, compileBundleAll } from './compile';
 import { setupTextmate } from './textmate-setup';
 import { PreviewManager } from './preview/manager';
-import { SNIPPETS, DEFAULT_SNIPPET_KEY, findSnippet } from './snippets';
+import { SNIPPETS, DEFAULT_SNIPPET_KEY, findSnippet, type Snippet } from './snippets';
 import type { CompileTarget } from '@rozie/core';
 
 const EDITOR_OPTIONS: monaco.editor.IStandaloneEditorConstructionOptions = {
@@ -32,8 +32,6 @@ const OUTPUT_LANGUAGE: Record<CompileTarget, string> = {
   angular: 'typescript',
   vue: 'html',
   svelte: 'html',
-  // Targets the playground dropdown does not currently expose — included so the
-  // type is exhaustive against CompileTarget. Safe defaults.
   solid: 'typescript',
   lit: 'typescript',
 };
@@ -53,9 +51,9 @@ async function bootstrap(): Promise<void> {
     throw new Error('Playground bootstrap: missing DOM mount points');
   }
 
-  // Populate the snippet picker — group spike + examples + demos by their
-  // key prefix (the leading "spike/", "demos/", or none) so the dropdown
-  // organizes cleanly without us hand-categorizing.
+  // Populate the snippet picker — group spike + bundle + examples + demos by
+  // their key prefix (the leading "spike/", "bundle/", "demos/", or none) so
+  // the dropdown organizes cleanly without us hand-categorizing.
   const groups = new Map<string, HTMLOptGroupElement>();
   for (const snippet of SNIPPETS) {
     const slash = snippet.key.indexOf('/');
@@ -74,7 +72,20 @@ async function bootstrap(): Promise<void> {
     group.appendChild(opt);
   }
 
-  const defaultSnippetSource = findSnippet(DEFAULT_SNIPPET_KEY)?.source ?? '';
+  // Inject the "Compare all targets" toggle into the toolbar next to the
+  // existing target select. This is the entry point for grid mode — when
+  // checked, the preview pane lays out all 6 framework outputs side-by-side.
+  const modeToggleLabel = document.createElement('label');
+  modeToggleLabel.id = 'preview-mode-toggle';
+  modeToggleLabel.title = 'Render the current snippet across all 6 targets simultaneously';
+  const modeToggleInput = document.createElement('input');
+  modeToggleInput.type = 'checkbox';
+  modeToggleInput.id = 'preview-mode-toggle-input';
+  modeToggleLabel.appendChild(modeToggleInput);
+  const modeToggleText = document.createElement('span');
+  modeToggleText.textContent = 'Compare all targets';
+  modeToggleLabel.appendChild(modeToggleText);
+  targetSelect.insertAdjacentElement('afterend', modeToggleLabel);
 
   const previewManager = new PreviewManager(previewHost, previewStatus);
 
@@ -91,11 +102,7 @@ async function bootstrap(): Promise<void> {
   }
 
   // Register the rozie TextMate grammar BEFORE creating the editor so the
-  // initial paint is already highlighted. wireTmGrammars internally calls
-  // monaco.languages.setTokensProvider, which any subsequently-created model
-  // for that language picks up automatically.
-  // Non-fatal: if textmate setup fails (e.g., onigasm WASM load failure), the
-  // editor still mounts — just without rozie-aware coloring.
+  // initial paint is already highlighted.
   try {
     await setupTextmate();
   } catch (e) {
@@ -103,15 +110,27 @@ async function bootstrap(): Promise<void> {
     monaco.languages.register({ id: 'rozie', extensions: ['.rozie'] });
   }
 
+  const defaultSnippet =
+    findSnippet(DEFAULT_SNIPPET_KEY) ?? SNIPPETS[0]!;
+  const defaultEntrySource = defaultSnippet.files[defaultSnippet.entry] ?? '';
+
   const leftEditor = monaco.editor.create(editorHost, {
     ...EDITOR_OPTIONS,
     language: 'rozie',
-    value: defaultSnippetSource,
+    value: defaultEntrySource,
   });
+
+  // Track which snippet the editor is currently displaying — when the user
+  // edits, we build an on-the-fly bundle that swaps the entry source for the
+  // editor's contents while keeping any sibling files intact. That way an
+  // edit to SortableListDemo.rozie still resolves './SortableList.rozie'.
+  let currentSnippet: Snippet = defaultSnippet;
 
   snippetSelect.addEventListener('change', () => {
     const next = findSnippet(snippetSelect.value);
-    if (next) leftEditor.setValue(next.source);
+    if (!next) return;
+    currentSnippet = next;
+    leftEditor.setValue(next.files[next.entry] ?? '');
   });
 
   const initialTarget = targetSelect.value as CompileTarget;
@@ -122,10 +141,23 @@ async function bootstrap(): Promise<void> {
     readOnly: true,
   });
 
-  function runCompile(): void {
-    const source = leftEditor.getValue();
+  function buildLiveBundle(): Snippet {
+    // Mirror currentSnippet but replace the entry's source with the live
+    // editor contents — dependencies are passed through unchanged so an edit
+    // to SortableListDemo still finds SortableList in the VFS.
+    return {
+      ...currentSnippet,
+      files: {
+        ...currentSnippet.files,
+        [currentSnippet.entry]: leftEditor.getValue(),
+      },
+    };
+  }
+
+  function runCompileSingle(): void {
+    const bundle = buildLiveBundle();
     const target = targetSelect!.value as CompileTarget;
-    const outcome = compileBuffer(source, target);
+    const outcome = compileBundle(bundle, target);
 
     const nextLang = OUTPUT_LANGUAGE[target];
     const rightModel = rightEditor.getModel();
@@ -136,10 +168,41 @@ async function bootstrap(): Promise<void> {
     rightEditor.setValue(outcome.ok ? outcome.code : outcome.errorText);
 
     if (outcome.ok) {
+      previewManager.clearError(target);
       previewManager.render(target, outcome.code, outcome.css);
     } else {
       previewManager.clear('compile error — see Output tab');
     }
+  }
+
+  function runCompileGrid(): void {
+    const bundle = buildLiveBundle();
+    const outcomes = compileBundleAll(bundle);
+    const renderPayloads = new Map<CompileTarget, { code: string; css: string }>();
+
+    // The Output pane still tracks the currently-selected target so users can
+    // inspect emitted code while grid view is active.
+    const activeTarget = targetSelect!.value as CompileTarget;
+    const activeOutcome = outcomes[activeTarget];
+    rightEditor.setValue(activeOutcome.ok ? activeOutcome.code : activeOutcome.errorText);
+
+    for (const target of ALL_TARGETS) {
+      const outcome = outcomes[target];
+      if (outcome.ok) {
+        previewManager.clearError(target);
+        renderPayloads.set(target, { code: outcome.code, css: outcome.css });
+      } else {
+        // Per-cell overlay carries the error; the cell keeps its last good
+        // render visible underneath so a fresh typo doesn't blank out the demo.
+        previewManager.renderError(target, outcome.errorText);
+      }
+    }
+    if (renderPayloads.size > 0) previewManager.renderMany(renderPayloads);
+  }
+
+  function runCompile(): void {
+    if (previewManager.getMode() === 'grid') runCompileGrid();
+    else runCompileSingle();
   }
 
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -150,6 +213,17 @@ async function bootstrap(): Promise<void> {
 
   // Explicit user dropdown change compiles immediately (no debounce).
   targetSelect.addEventListener('change', runCompile);
+  snippetSelect.addEventListener('change', () => {
+    // The snippet-change handler above already updated the editor; debounce
+    // path will fire too, but explicit compile makes the initial paint feel
+    // responsive on snippet swap.
+    runCompile();
+  });
+
+  modeToggleInput.addEventListener('change', () => {
+    previewManager.setMode(modeToggleInput.checked ? 'grid' : 'single');
+    runCompile();
+  });
 
   // Populate the right pane on first paint.
   runCompile();
