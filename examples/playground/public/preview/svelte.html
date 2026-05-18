@@ -26,30 +26,34 @@
     <script type="module">
       import { compile } from 'svelte/compiler';
       import { mount, unmount } from 'svelte';
-      import { getEsbuildTransform, importFromString, bootHarness, clearHost } from './_shared.js';
+      import { getEsbuildTransform, importBundleWith, bootHarness, clearHost } from './_shared.js';
 
       const host = document.getElementById('app');
       let instance = null;
 
-      bootHarness(async ({ code: sfcSource }) => {
-        // Svelte 5 runes-mode compile to client output.
-        const compiled = compile(sfcSource, {
-          filename: 'Playground.svelte',
-          generate: 'client',
-          dev: false,
-          css: 'injected',
-        });
-
-        // If the <script lang="ts"> block survived compilation as TS, lower
-        // it. Svelte's compile leaves the script type-as-is for some paths.
+      bootHarness(async ({ code: sfcSource, siblings }) => {
         const transform = await getEsbuildTransform();
-        const tsLowered = await transform(compiled.js.code, {
-          loader: 'ts',
-          format: 'esm',
-          target: 'es2022',
-        });
 
-        const mod = await importFromString(tsLowered.code);
+        // Per-source: Svelte 5 runes-mode compile to client output, then ts
+        // lower in case the <script lang="ts"> block survived as TS. Each
+        // sibling SFC becomes its own module whose default export is the
+        // child component the entry imports.
+        const transformOne = async (src) => {
+          const compiled = compile(src, {
+            filename: 'Playground.svelte',
+            generate: 'client',
+            dev: false,
+            css: 'injected',
+          });
+          const tsLowered = await transform(compiled.js.code, {
+            loader: 'ts',
+            format: 'esm',
+            target: 'es2022',
+          });
+          return tsLowered.code;
+        };
+
+        const mod = await importBundleWith(transformOne, sfcSource, siblings ?? {});
         const Component = mod.default;
         if (!Component) throw new Error('Svelte compile produced no default export');
 

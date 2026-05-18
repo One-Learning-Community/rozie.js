@@ -38,7 +38,7 @@
       await import('https://esm.sh/zone.js@0.15.0');
       await import('@angular/compiler');
 
-      const [coreNs, { bootstrapApplication }, { getEsbuildTransform, importFromString, bootHarness, clearHost }] =
+      const [coreNs, { bootstrapApplication }, { getEsbuildTransform, importBundleWith, bootHarness, clearHost }] =
         await Promise.all([
           import('@angular/core'),
           import('@angular/platform-browser'),
@@ -53,32 +53,56 @@
       let appRef = null;
       let renderCount = 0;
 
-      bootHarness(async ({ code }) => {
+      bootHarness(async ({ code, siblings }) => {
+        ++renderCount;
         const transform = await getEsbuildTransform();
-        const transformed = await transform(code, {
-          loader: 'ts',
-          format: 'esm',
-          target: 'es2022',
-          tsconfigRaw: {
-            compilerOptions: {
-              experimentalDecorators: true,
-              emitDecoratorMetadata: true,
-              useDefineForClassFields: false,
+        const siblingsMap = siblings ?? {};
+        const totalCalls = Object.keys(siblingsMap).length + 1; // siblings + entry
+        let callIndex = 0;
+        let entrySelector = null;
+
+        // Per-source esbuild transform. The entry's selector is rewritten to
+        // a fresh per-render tag so we can mount a unique element; sibling
+        // components keep their Rozie-emitter selectors so the entry's
+        // template tags (e.g. `<rozie-sortable-list />`) still match.
+        // Detect the entry as the LAST call importBundleWith makes —
+        // siblings come first (one per entry in `siblings`), entry comes
+        // last.
+        const transformOne = async (src) => {
+          callIndex += 1;
+          const result = await transform(src, {
+            loader: 'ts',
+            format: 'esm',
+            target: 'es2022',
+            tsconfigRaw: {
+              compilerOptions: {
+                experimentalDecorators: true,
+                emitDecoratorMetadata: true,
+                useDefineForClassFields: false,
+              },
             },
-          },
-        });
+          });
+          if (callIndex === totalCalls) {
+            const sel = `rozie-ng-${renderCount}`;
+            entrySelector = sel;
+            return result.code.replace(
+              /selector\s*:\s*['"][^'"]+['"]/,
+              `selector: '${sel}'`,
+            );
+          }
+          return result.code;
+        };
 
-        // Rewrite the selector so we can mount a fresh element each render.
-        const sel = `rozie-ng-${++renderCount}`;
-        const rewritten = transformed.code.replace(
-          /selector\s*:\s*['"][^'"]+['"]/,
-          `selector: '${sel}'`,
-        );
-
-        const mod = await importFromString(rewritten);
+        const mod = await importBundleWith(transformOne, code, siblingsMap);
         const Component = mod.default || mod[Object.keys(mod)[0]];
         if (typeof Component !== 'function') {
           throw new Error('Angular compile produced no component class export');
+        }
+        if (!entrySelector) {
+          // Defensive: importBundleWith should always end with the entry
+          // transform call, but if its call order ever changes we'd silently
+          // mount the wrong element. Bail loudly.
+          throw new Error('Angular harness: entry selector never captured');
         }
 
         if (appRef) {
@@ -86,7 +110,7 @@
           appRef = null;
         }
         clearHost(host);
-        const mount = document.createElement(sel);
+        const mount = document.createElement(entrySelector);
         host.appendChild(mount);
 
         appRef = await bootstrapApplication(Component, {

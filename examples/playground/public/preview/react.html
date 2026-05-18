@@ -26,26 +26,34 @@
     <script type="module">
       import * as React from 'react';
       import { createRoot } from 'react-dom/client';
-      import { getEsbuildTransform, importFromString, bootHarness, stubUnresolvableImports, setSidecarCss } from './_shared.js';
+      import { getEsbuildTransform, importBundleWith, bootHarness, stubUnresolvableImports, setSidecarCss } from './_shared.js';
 
       const host = document.getElementById('app');
       let root = null;
 
-      bootHarness(async ({ code, css }) => {
+      bootHarness(async ({ code, css, siblings }) => {
         // React target emits CSS to a separate sidecar (r.css) rather than
         // inlining; install it before transforming so the rendered DOM is
         // already styled when the JSX mounts.
         setSidecarCss(css);
 
         const transform = await getEsbuildTransform();
-        const result = await transform(stubUnresolvableImports(code), {
-          loader: 'tsx',
-          format: 'esm',
-          target: 'es2020',
-          jsx: 'automatic',
-        });
 
-        const mod = await importFromString(result.code);
+        // Per-source transform used for both the entry and each sibling.
+        // Factored out of the original linear path so importBundleWith can
+        // call it once per sibling AND once for the entry after relative
+        // imports are rewritten to blob URLs.
+        const transformOne = async (src) => {
+          const result = await transform(stubUnresolvableImports(src), {
+            loader: 'tsx',
+            format: 'esm',
+            target: 'es2020',
+            jsx: 'automatic',
+          });
+          return result.code;
+        };
+
+        const mod = await importBundleWith(transformOne, code, siblings ?? {});
         const Component = mod.default || mod.Component;
         if (typeof Component !== 'function' && typeof Component !== 'object') {
           throw new Error('compiled output has no default React component export');

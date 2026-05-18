@@ -23,84 +23,96 @@
     <script type="module">
       import { createApp } from 'vue';
       import { parse, compileScript, compileTemplate, compileStyle } from '@vue/compiler-sfc';
-      import { getEsbuildTransform, importFromString, bootHarness, clearHost } from './_shared.js';
+      import { getEsbuildTransform, importBundleWith, bootHarness, clearHost } from './_shared.js';
 
       const host = document.getElementById('app');
       let app = null;
       let renderCount = 0;
+      let sfcCounter = 0;
 
-      bootHarness(async ({ code: sfcSource }) => {
-        const id = `rozie-vue-${++renderCount}`;
-        const { descriptor } = parse(sfcSource, { filename: 'Playground.vue' });
-        const hasScoped = descriptor.styles.some((s) => s.scoped);
-
-        // Script (composition API w/ <script setup>). When the SFC has
-        // <style scoped>, the same `id` MUST be threaded into the inlined
-        // template compile so the template's elements receive the matching
-        // `data-v-<id>` attribute — otherwise the scoped selectors compiled
-        // below have nothing to bind to.
-        let scriptCode = '';
-        if (descriptor.script || descriptor.scriptSetup) {
-          const compiled = compileScript(descriptor, {
-            id,
-            inlineTemplate: true,
-            templateOptions: {
-              id,
-              scoped: hasScoped,
-              compilerOptions: { expressionPlugins: ['typescript'], scopeId: hasScoped ? `data-v-${id}` : undefined },
-            },
-          });
-          scriptCode = compiled.content;
-        } else {
-          scriptCode = 'export default {}';
-        }
-
-        // If the script has TS (most Rozie-emitted Vue does), lower it.
+      bootHarness(async ({ code: sfcSource, siblings }) => {
+        ++renderCount;
         const transform = await getEsbuildTransform();
-        const tsLowered = await transform(scriptCode, {
-          loader: 'ts',
-          format: 'esm',
-          target: 'es2020',
-        });
 
-        // Inject template render fn if compileScript didn't inline it (e.g.
-        // no <script setup>). For Rozie's output, compileScript w/ inlineTemplate
-        // bakes the template in — so this branch is unlikely but defensive.
-        let finalCode = tsLowered.code;
-        if (descriptor.template && !descriptor.scriptSetup) {
-          const tplCompiled = compileTemplate({
-            source: descriptor.template.content,
-            filename: 'Playground.vue',
-            id,
+        // Per-source SFC pipeline. Each sibling SFC gets its own scope id so
+        // its scoped styles don't collide with the entry or other siblings.
+        // Side effect: injects compiled <style> blocks into document.head,
+        // same as the original linear path — but now per sibling too, so a
+        // sibling SFC's <style> still surfaces in the rendered iframe.
+        const transformOne = async (src) => {
+          const id = `rozie-vue-${renderCount}-${++sfcCounter}`;
+          const { descriptor } = parse(src, { filename: 'Playground.vue' });
+          const hasScoped = descriptor.styles.some((s) => s.scoped);
+
+          // Script (composition API w/ <script setup>). When the SFC has
+          // <style scoped>, the same `id` MUST be threaded into the inlined
+          // template compile so the template's elements receive the matching
+          // `data-v-<id>` attribute — otherwise the scoped selectors compiled
+          // below have nothing to bind to.
+          let scriptCode = '';
+          if (descriptor.script || descriptor.scriptSetup) {
+            const compiled = compileScript(descriptor, {
+              id,
+              inlineTemplate: true,
+              templateOptions: {
+                id,
+                scoped: hasScoped,
+                compilerOptions: { expressionPlugins: ['typescript'], scopeId: hasScoped ? `data-v-${id}` : undefined },
+              },
+            });
+            scriptCode = compiled.content;
+          } else {
+            scriptCode = 'export default {}';
+          }
+
+          // If the script has TS (most Rozie-emitted Vue does), lower it.
+          const tsLowered = await transform(scriptCode, {
+            loader: 'ts',
+            format: 'esm',
+            target: 'es2020',
           });
-          finalCode = tplCompiled.code + '\n' + finalCode;
-        }
 
-        const mod = await importFromString(finalCode);
+          // Inject template render fn if compileScript didn't inline it (e.g.
+          // no <script setup>). For Rozie's output, compileScript w/ inlineTemplate
+          // bakes the template in — so this branch is unlikely but defensive.
+          let finalCode = tsLowered.code;
+          if (descriptor.template && !descriptor.scriptSetup) {
+            const tplCompiled = compileTemplate({
+              source: descriptor.template.content,
+              filename: 'Playground.vue',
+              id,
+            });
+            finalCode = tplCompiled.code + '\n' + finalCode;
+          }
+
+          // <style scoped> handling — compile + inject. We deliberately pass
+          // `scoped: false` even when the SFC declared `<style scoped>`: Vue's
+          // standard build pipeline (vite-plugin-vue) attaches `__scopeId` to
+          // the component options so the runtime auto-stamps the data-v
+          // attribute on the root, but compileScript+inlineTemplate alone
+          // doesn't inject `__scopeId` — leaving scoped selectors that bind
+          // to a never-applied attribute. Since each iframe renders ONE
+          // component at a time, dropping scope is safe and yields visible
+          // styles instead of unmounted CSS rules.
+          for (const styleBlock of descriptor.styles) {
+            const compiled = compileStyle({
+              source: styleBlock.content,
+              filename: 'Playground.vue',
+              id: `data-v-${id}`,
+              scoped: false,
+            });
+            const tag = document.createElement('style');
+            tag.dataset.rozieVueStyle = id;
+            tag.textContent = compiled.code;
+            document.head.appendChild(tag);
+          }
+
+          return finalCode;
+        };
+
+        const mod = await importBundleWith(transformOne, sfcSource, siblings ?? {});
         const Component = mod.default;
         if (!Component) throw new Error('Vue SFC produced no default export');
-
-        // <style scoped> handling — compile + inject. We deliberately pass
-        // `scoped: false` even when the SFC declared `<style scoped>`: Vue's
-        // standard build pipeline (vite-plugin-vue) attaches `__scopeId` to
-        // the component options so the runtime auto-stamps the data-v
-        // attribute on the root, but compileScript+inlineTemplate alone
-        // doesn't inject `__scopeId` — leaving scoped selectors that bind
-        // to a never-applied attribute. Since each iframe renders ONE
-        // component at a time, dropping scope is safe and yields visible
-        // styles instead of unmounted CSS rules.
-        for (const styleBlock of descriptor.styles) {
-          const compiled = compileStyle({
-            source: styleBlock.content,
-            filename: 'Playground.vue',
-            id: `data-v-${id}`,
-            scoped: false,
-          });
-          const tag = document.createElement('style');
-          tag.dataset.rozieVueStyle = id;
-          tag.textContent = compiled.code;
-          document.head.appendChild(tag);
-        }
 
         if (app) app.unmount();
         clearHost(host);

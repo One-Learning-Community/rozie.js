@@ -26,35 +26,40 @@
   <body>
     <div id="app"></div>
     <script type="module">
-      import { getEsbuildTransform, importFromString, bootHarness, clearHost, stubUnresolvableImports } from './_shared.js';
+      import { getEsbuildTransform, importBundleWith, bootHarness, clearHost, stubUnresolvableImports } from './_shared.js';
 
       const host = document.getElementById('app');
       // Counter so each render produces a unique custom-element tag (custom
       // elements can only be defined once per tag name; re-defining throws).
       let counter = 0;
+      let placeholderCounter = 0;
 
-      bootHarness(async ({ code }) => {
+      bootHarness(async ({ code, siblings }) => {
         const transform = await getEsbuildTransform();
-        const result = await transform(stubUnresolvableImports(code), {
-          loader: 'ts',
-          format: 'esm',
-          target: 'es2022',
-          tsconfigRaw: {
-            compilerOptions: {
-              experimentalDecorators: true,
-              useDefineForClassFields: false,
+
+        // Per-source: esbuild ts → esm + customElements-name rewrite. Each
+        // call gets its own placeholder name so the same source compiled
+        // twice doesn't accidentally collide (the importBundleWith pass calls
+        // this once per sibling AND once for the entry).
+        const transformOne = async (src) => {
+          const result = await transform(stubUnresolvableImports(src), {
+            loader: 'ts',
+            format: 'esm',
+            target: 'es2022',
+            tsconfigRaw: {
+              compilerOptions: {
+                experimentalDecorators: true,
+                useDefineForClassFields: false,
+              },
             },
-          },
-        });
+          });
+          const phName = `__placeholder_${++placeholderCounter}__`;
+          return result.code
+            .replace(/customElements\s*\.\s*define\s*\([^)]*\)\s*;?/g, '')
+            .replace(/_customElement\(['"][^'"]*['"]\)/g, `_customElement("${phName}")`);
+        };
 
-        // Strip any `@customElement('...')` decorator + `customElements.define(...)`
-        // call from the compiled output — we re-tag with a unique name below so
-        // re-renders don't collide with prior definitions.
-        let cleaned = result.code
-          .replace(/customElements\s*\.\s*define\s*\([^)]*\)\s*;?/g, '')
-          .replace(/_customElement\(['"][^'"]*['"]\)/g, '_customElement("__placeholder__")');
-
-        const mod = await importFromString(cleaned);
+        const mod = await importBundleWith(transformOne, code, siblings ?? {});
         const Component = mod.default;
         if (typeof Component !== 'function') {
           throw new Error('compiled output has no default LitElement class export');

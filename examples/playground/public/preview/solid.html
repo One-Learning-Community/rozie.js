@@ -25,24 +25,29 @@
     <script type="module">
       import { render } from 'solid-js/web';
       import { createComponent } from 'solid-js';
-      import { getEsbuildTransform, importFromString, bootHarness, stubUnresolvableImports } from './_shared.js';
+      import { getEsbuildTransform, importBundleWith, bootHarness, stubUnresolvableImports } from './_shared.js';
 
       const host = document.getElementById('app');
       let dispose = null;
 
-      bootHarness(async ({ code }) => {
+      bootHarness(async ({ code, siblings }) => {
         const transform = await getEsbuildTransform();
-        const result = await transform(stubUnresolvableImports(code), {
-          loader: 'tsx',
-          format: 'esm',
-          target: 'es2020',
-          // Use solid's jsx runtime so JSX expressions become createComponent /
-          // signals rather than React.createElement.
-          jsx: 'automatic',
-          jsxImportSource: 'solid-js/h',
-        });
 
-        const mod = await importFromString(result.code);
+        // Per-source transform — same shape as React (stub CSS imports, esbuild
+        // tsx → esm) but with the Solid jsx runtime so JSX becomes
+        // createComponent / signals instead of React.createElement.
+        const transformOne = async (src) => {
+          const result = await transform(stubUnresolvableImports(src), {
+            loader: 'tsx',
+            format: 'esm',
+            target: 'es2020',
+            jsx: 'automatic',
+            jsxImportSource: 'solid-js/h',
+          });
+          return result.code;
+        };
+
+        const mod = await importBundleWith(transformOne, code, siblings ?? {});
         const Component = mod.default || mod.Component;
         if (typeof Component !== 'function') {
           throw new Error('compiled output has no default Solid component export');
