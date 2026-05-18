@@ -3,10 +3,10 @@
 import './monaco-env';
 
 import * as monaco from 'monaco-editor';
-import defaultSnippet from './snippets/Sortable.rozie.txt?raw';
 import { compileBuffer } from './compile';
 import { setupTextmate } from './textmate-setup';
 import { PreviewManager } from './preview/manager';
+import { SNIPPETS, DEFAULT_SNIPPET_KEY, findSnippet } from './snippets';
 import type { CompileTarget } from '@rozie/core';
 
 const EDITOR_OPTIONS: monaco.editor.IStandaloneEditorConstructionOptions = {
@@ -44,13 +44,37 @@ async function bootstrap(): Promise<void> {
   const previewHost = document.getElementById('preview-host');
   const previewStatus = document.getElementById('preview-status');
   const targetSelect = document.getElementById('target') as HTMLSelectElement | null;
+  const snippetSelect = document.getElementById('snippet') as HTMLSelectElement | null;
   const tabButtons = Array.from(
     document.querySelectorAll<HTMLButtonElement>('#right-tabs .tab-btn'),
   );
 
-  if (!editorHost || !outputHost || !targetSelect || !previewHost || !previewStatus) {
+  if (!editorHost || !outputHost || !targetSelect || !snippetSelect || !previewHost || !previewStatus) {
     throw new Error('Playground bootstrap: missing DOM mount points');
   }
+
+  // Populate the snippet picker — group spike + examples + demos by their
+  // key prefix (the leading "spike/", "demos/", or none) so the dropdown
+  // organizes cleanly without us hand-categorizing.
+  const groups = new Map<string, HTMLOptGroupElement>();
+  for (const snippet of SNIPPETS) {
+    const slash = snippet.key.indexOf('/');
+    const groupName = slash > -1 ? snippet.key.slice(0, slash) : 'examples';
+    let group = groups.get(groupName);
+    if (!group) {
+      group = document.createElement('optgroup');
+      group.label = groupName;
+      snippetSelect.appendChild(group);
+      groups.set(groupName, group);
+    }
+    const opt = document.createElement('option');
+    opt.value = snippet.key;
+    opt.textContent = slash > -1 ? snippet.key.slice(slash + 1) : snippet.key;
+    if (snippet.key === DEFAULT_SNIPPET_KEY) opt.selected = true;
+    group.appendChild(opt);
+  }
+
+  const defaultSnippetSource = findSnippet(DEFAULT_SNIPPET_KEY)?.source ?? '';
 
   const previewManager = new PreviewManager(previewHost, previewStatus);
 
@@ -82,7 +106,12 @@ async function bootstrap(): Promise<void> {
   const leftEditor = monaco.editor.create(editorHost, {
     ...EDITOR_OPTIONS,
     language: 'rozie',
-    value: defaultSnippet,
+    value: defaultSnippetSource,
+  });
+
+  snippetSelect.addEventListener('change', () => {
+    const next = findSnippet(snippetSelect.value);
+    if (next) leftEditor.setValue(next.source);
   });
 
   const initialTarget = targetSelect.value as CompileTarget;
