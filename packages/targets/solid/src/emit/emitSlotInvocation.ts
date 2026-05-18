@@ -161,28 +161,41 @@ export function emitSlotInvocation(
   // reactive dependency on `_props.slots` is only picked up while the merge
   // lives inside JSX. Hoisting outside (e.g., a local `const merged = ...`
   // declaration in the emitted output) would break reactivity-on-change.
+  //
+  // Type tension: the static prop type for a no-context slot is `JSX.Element`
+  // (direct), but the dynamic `slots?:` map ALWAYS stores functions
+  // `(ctx: any) => JSX.Element`. Naively merging the two as `(static ?? dyn)`
+  // unions an Element with a Function and JSX rejects the Function side
+  // (TS2322). The fix invokes the dynamic-side function with an empty scope
+  // for no-context slots so both sides resolve to `JSX.Element | undefined`.
   const slotKey = `'${slotName}'`;
-  const merged = `(_props.${slotFieldName} ?? _props.slots?.[${slotKey}])`;
+  const mergedFnForm = `(_props.${slotFieldName} ?? _props.slots?.[${slotKey}])`;
+  const mergedDirectForm = `(_props.${slotFieldName} ?? _props.slots?.[${slotKey}]?.({}))`;
 
-  // No SlotDecl found — best-effort fallback using naming convention.
+  // No SlotDecl found — best-effort fallback using naming convention. Treat as
+  // no-context (direct form) so the rendered JSX type checks.
   if (!slot) {
     if (hasInvocationFallback) {
-      return `{${merged} ?? ${invocationFallback}}`;
+      return `{${mergedDirectForm} ?? ${invocationFallback}}`;
     }
-    return `{${merged}}`;
+    return `{${mergedDirectForm}}`;
   }
 
   if (!hasParams) {
-    // Named slot WITHOUT context → `{(_props.headerSlot ?? _props.slots?.['header'])}` (D-133 static form + Phase 07.3.2 merge)
+    // Named slot WITHOUT context → `{(_props.headerSlot ?? _props.slots?.['header']?.({}))}` (D-133 static form + Phase 07.3.2 merge with no-scope invocation)
     if (hasInvocationFallback) {
-      return `{${merged} ?? ${invocationFallback}}`;
+      return `{${mergedDirectForm} ?? ${invocationFallback}}`;
     }
-    return `{${merged}}`;
+    return `{${mergedDirectForm}}`;
   }
 
-  // Named slot WITH context → `{(_props.triggerSlot ?? _props.slots?.['trigger'])?.({ open: open() })}` (D-133 function call + Phase 07.3.2 merge)
+  // Named slot WITH context → `{(_props.triggerSlot ?? _props.slots?.['trigger'])?.({ open: open() })}` (D-133 function call + Phase 07.3.2 merge).
+  // Use optional-call form for the fallback branch too — `(merged ? merged(p) : fallback)`
+  // double-accesses `merged` and TS can't narrow the second access (TS2722). The
+  // optional-call short-circuits when `merged` is undefined and yields the same
+  // semantics with single-access type narrowing.
   if (hasInvocationFallback) {
-    return `{${merged} ? ${merged}(${paramObj!}) : ${invocationFallback}}`;
+    return `{${mergedFnForm}?.(${paramObj!}) ?? ${invocationFallback}}`;
   }
-  return `{${merged}?.(${paramObj!})}`;
+  return `{${mergedFnForm}?.(${paramObj!})}`;
 }

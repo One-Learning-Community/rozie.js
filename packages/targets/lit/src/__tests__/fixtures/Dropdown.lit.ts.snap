@@ -41,20 +41,20 @@ export default class Dropdown extends SignalWatcher(LitElement) {
   private _disconnectCleanups: Array<() => void> = [];
 
   private _armListeners(): void {
-    const _u0 = attachOutsideClickListener([() => this._refTriggerEl, () => this._refPanelEl], (e) => {  (this.close)(e); }, () => (this.open && this.closeOnOutsideClick));
+    const _u0 = attachOutsideClickListener([() => this._refTriggerEl, () => this._refPanelEl], (e) => {  ((this.close) as (...args: any[]) => any)(e); }, () => (this.open && this.closeOnOutsideClick));
     this._disconnectCleanups.push(_u0);
 
-    const _lh1 = (e: KeyboardEvent) => { if (!(this.open && this.closeOnEscape)) return; if (e.key !== 'Escape') return; (this.close)(e); };
+    const _lh1 = (e: KeyboardEvent) => { if (!(this.open && this.closeOnEscape)) return; if (e.key !== 'Escape') return; ((this.close) as (...args: any[]) => any)(e); };
     document.addEventListener('keydown', _lh1, undefined);
     this._disconnectCleanups.push(() => document.removeEventListener('keydown', _lh1, undefined));
 
-    const _lh2 = (() => { let last = 0; return (e: Event) => { if (!(this.open)) return; const now = Date.now(); if (now - last < 100) return; last = now; (this.reposition)(e); }; })();
+    const _lh2 = (() => { let last = 0; return (e: Event) => { if (!(this.open)) return; const now = Date.now(); if (now - last < 100) return; last = now; ((this.reposition) as (...args: any[]) => any)(e); }; })();
     window.addEventListener('resize', _lh2, { passive: true });
     this._disconnectCleanups.push(() => window.removeEventListener('resize', _lh2, undefined));
 
-    this.addEventListener('rozie-trigger-toggle', (e) => { (this.toggle)((e as CustomEvent).detail); });
+    this.addEventListener('rozie-trigger-toggle', (e) => { ((this.toggle) as (...args: any[]) => any)((e as CustomEvent).detail); });
 
-    this.addEventListener('rozie-default-close', (e) => { (this.close)((e as CustomEvent).detail); });
+    this.addEventListener('rozie-default-close', (e) => { ((this.close) as (...args: any[]) => any)((e as CustomEvent).detail); });
 
     {
       const slotEl = this.shadowRoot?.querySelector('slot[name="trigger"]');
@@ -92,7 +92,7 @@ export default class Dropdown extends SignalWatcher(LitElement) {
 
     this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this.open)(); (() => {
       if (this.open) this.reposition();
-    })(__watchVal); }));
+    })(); }));
 
     // Initial reposition only if the panel is open at mount time.
     if (this.open) this.reposition();

@@ -61,15 +61,15 @@ footer { border-top: 1px solid rgba(0, 0, 0, 0.08); justify-content: flex-end; }
   private _disconnectCleanups: Array<() => void> = [];
 
   private _armListeners(): void {
-    const _lh0 = (e: KeyboardEvent) => { if (!(this.open && this.closeOnEscape)) return; if (e.key !== 'Escape') return; (this.close)(e); };
+    const _lh0 = (e: KeyboardEvent) => { if (!(this.open && this.closeOnEscape)) return; if (e.key !== 'Escape') return; ((this.close) as (...args: any[]) => any)(e); };
     document.addEventListener('keydown', _lh0, undefined);
     this._disconnectCleanups.push(() => document.removeEventListener('keydown', _lh0, undefined));
 
-    this.addEventListener('rozie-header-close', (e) => { (this.close)((e as CustomEvent).detail); });
+    this.addEventListener('rozie-header-close', (e) => { ((this.close) as (...args: any[]) => any)((e as CustomEvent).detail); });
 
-    this.addEventListener('rozie-default-close', (e) => { (this.close)((e as CustomEvent).detail); });
+    this.addEventListener('rozie-default-close', (e) => { ((this.close) as (...args: any[]) => any)((e as CustomEvent).detail); });
 
-    this.addEventListener('rozie-footer-close', (e) => { (this.close)((e as CustomEvent).detail); });
+    this.addEventListener('rozie-footer-close', (e) => { ((this.close) as (...args: any[]) => any)((e as CustomEvent).detail); });
 
     {
       const slotEl = this.shadowRoot?.querySelector('slot[name="header"]');

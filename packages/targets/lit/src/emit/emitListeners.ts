@@ -259,7 +259,7 @@ function emitOneListener(
   // from inline expressions. Inline expressions (e.g. `count++`) must be
   // emitted as statements (`count++;`) not calls (`(count++)(e)` — TypeError).
   const isFnLike = isHandlerLike(listener.handler);
-  const userCall = isFnLike ? `(${handlerExpr})(e);` : `${handlerExpr};`;
+  const userCall = isFnLike ? `((${handlerExpr}) as (...args: any[]) => any)(e);` : `${handlerExpr};`;
   const handlerBody = `(e: ${evtType}) => { ${guardLines.join(' ')} ${userCall} }`;
 
   // Build addEventListener options object (all options are significant for the add call).
@@ -295,7 +295,7 @@ function emitOneListener(
       const whenFn = whenExpr ? `, () => (${whenExpr})` : '';
       const unsubVar = `_u${index}`;
       return [
-        `const ${unsubVar} = attachOutsideClickListener(${refsArr}, (e) => { ${cls.inlineGuards.join(' ')} (${handlerExpr})(e); }${whenFn});`,
+        `const ${unsubVar} = attachOutsideClickListener(${refsArr}, (e) => { ${cls.inlineGuards.join(' ')} ((${handlerExpr}) as (...args: any[]) => any)(e); }${whenFn});`,
         `this._disconnectCleanups.push(${unsubVar});`,
       ].join('\n');
     }
@@ -305,8 +305,8 @@ function emitOneListener(
       const ms = extractNumberArg(cls.wrapperArgs) || 100;
       const wrapped =
         cls.wrapper === 'debounce'
-          ? `(() => { let t: ReturnType<typeof setTimeout> | undefined; return (e: Event) => { ${guardLines.join(' ')} if (t) clearTimeout(t); t = setTimeout(() => { (${handlerExpr})(e); }, ${ms}); }; })()`
-          : `(() => { let last = 0; return (e: Event) => { ${guardLines.join(' ')} const now = Date.now(); if (now - last < ${ms}) return; last = now; (${handlerExpr})(e); }; })()`;
+          ? `(() => { let t: ReturnType<typeof setTimeout> | undefined; return (e: Event) => { ${guardLines.join(' ')} if (t) clearTimeout(t); t = setTimeout(() => { ((${handlerExpr}) as (...args: any[]) => any)(e); }, ${ms}); }; })()`
+          : `(() => { let last = 0; return (e: Event) => { ${guardLines.join(' ')} const now = Date.now(); if (now - last < ${ms}) return; last = now; ((${handlerExpr}) as (...args: any[]) => any)(e); }; })()`;
       const target = targetExpression(listener.target);
       const lines = [
         `const ${handlerVar} = ${wrapped};`,

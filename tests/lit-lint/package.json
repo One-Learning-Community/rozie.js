@@ -9,9 +9,11 @@
   },
   "dependencies": {
     "@rozie/core": "workspace:*",
+    "@rozie/runtime-lit": "workspace:*",
     "@rozie/target-lit": "workspace:*"
   },
   "devDependencies": {
+    "@lit-labs/preact-signals": "^1.0.3",
     "@typescript-eslint/parser": "^8.59.2",
     "eslint": "^9",
     "eslint-plugin-lit": "^2.0.0",

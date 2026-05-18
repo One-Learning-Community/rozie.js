@@ -45,7 +45,12 @@ const toggle = (id) => {
   $emit('toggle', id)
 }
 
-const remove = (id) => {
+// Internal method renamed from `remove` to `removeItem` to avoid colliding
+// with `HTMLElement.prototype.remove()` on the Lit target — Lit emits user
+// methods as class fields and the resulting `remove(id)` signature is
+// incompatible with the inherited `remove(): void`. Public API is unchanged:
+// the slot param is still `:remove`, the emitted event is still `'remove'`.
+const removeItem = (id) => {
   $props.items = $props.items.filter(i => i.id !== id)
   $emit('remove', id)
 }
@@ -72,9 +77,9 @@ const remove = (id) => {
         renderer via `#default="{ item, toggle, remove }"`, or omit it entirely
         to get the fallback row below.
       -->
-      <slot :item="item" :toggle="() => toggle(item.id)" :remove="() => remove(item.id)">
+      <slot :item="item" :toggle="() => toggle(item.id)" :remove="() => removeItem(item.id)">
         <label><input type="checkbox" :checked="item.done" @change="toggle(item.id)" /><span>{{ item.text }}</span></label>
-        <button @click="remove(item.id)" aria-label="Remove">×</button>
+        <button @click="removeItem(item.id)" aria-label="Remove">×</button>
       </slot>
     </li>
   </ul>

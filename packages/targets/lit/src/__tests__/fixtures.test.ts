@@ -74,7 +74,8 @@ describe('emitLit fixtures — Plan 06.4-02 locked snapshots', () => {
   it('TodoList.lit.ts.snap', async () => {
     const code = compileToLit('TodoList');
     expect(code).toContain('export default class TodoList extends SignalWatcher(LitElement)');
-    expect(code).toContain('repeat(');
+    // `repeat<any>` (typed) — see emitTemplate.ts:972 explanatory comment.
+    expect(code).toContain('repeat<any>(');
     expect(code).toContain('data-rozie-params');
     expect(code).not.toMatch(/unsafe-html|unsafeHTML/);
     await expect(code).toMatchFileSnapshot(resolve(FIXTURES, 'TodoList.lit.ts.snap'));

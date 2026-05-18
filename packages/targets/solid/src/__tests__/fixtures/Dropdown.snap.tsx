@@ -21,7 +21,7 @@ export default function Dropdown(_props: DropdownProps): JSX.Element {
   const [local, rest] = splitProps(_merged, ['open', 'closeOnOutsideClick', 'closeOnEscape', 'children']);
   const resolved = children(() => local.children);
 
-  const [open, setOpen] = createControllableSignal(_props as Record<string, unknown>, 'open', false);
+  const [open, setOpen] = createControllableSignal<boolean>(_props as Record<string, unknown>, 'open', false);
   onMount(() => {
     // Initial reposition only if the panel is open at mount time.
     if (open()) reposition();
@@ -29,7 +29,7 @@ export default function Dropdown(_props: DropdownProps): JSX.Element {
   onMount(() => {});
   createEffect(() => { const __watchVal = (() => open())(); (() => {
     if (open()) reposition();
-  })(__watchVal); });
+  })(); });
   let triggerElRef: HTMLElement | null = null;
   let panelElRef: HTMLElement | null = null;
 

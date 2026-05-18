@@ -108,8 +108,14 @@ function renderTsType(ann: PropTypeAnnotation): string {
       case 'Number': return 'number';
       case 'String': return 'string';
       case 'Boolean': return 'boolean';
-      case 'Array': return 'unknown[]';
-      case 'Object': return 'object';
+      // Use `any[]` / `any` (not `unknown[]` / `object` / `Record<string, any>`)
+      // so user-authored template expressions like `item.X` typecheck without
+      // requiring an inner-element type annotation in the rozie source. Lit's
+      // `repeat()` infers its element T from the iterable; with `Record<string,
+      // any>` it widens to `unknown` and downstream `(child) => child.id` access
+      // fails. `any` keeps the iteration ergonomic.
+      case 'Array': return 'any[]';
+      case 'Object': return 'any';
       case 'Function': return '((...args: unknown[]) => unknown) | null';
       default: return 'unknown';
     }
@@ -469,8 +475,23 @@ function lifecycleHookBody(
     const rewritten = rewriteScript(wrapper, ir, { methodNamesOverride: methodNames });
     body = rewritten.file.program.body.map((s) => generate(s, GEN_OPTS).code).join('\n');
   } else if (t.isExpression(hook.setup)) {
-    const call = t.callExpression(t.cloneNode(hook.setup, true, false), []);
-    const wrapper = t.file(t.program([t.expressionStatement(call)]));
+    // A bare callable reference (`$onMount(reset)` → Identifier;
+    // `$onMount(obj.handler)` → MemberExpression) needs to be INVOKED, so wrap
+    // it in a CallExpression before splicing as a statement.
+    //
+    // Any other Expression came from extractCleanupReturn unwrapping a
+    // concise-body arrow (`$onMount(() => reset())` → CallExpression `reset()`).
+    // Splice it AS A STATEMENT — wrapping in another CallExpression would emit
+    // `this.reset()();` (double-call), which both fails at runtime and TDZs on
+    // the inner reference because lifecycle bodies run before user arrows are
+    // initialised on the class.
+    const isCallableRef =
+      t.isIdentifier(hook.setup) || t.isMemberExpression(hook.setup);
+    const cloned = t.cloneNode(hook.setup, true, false);
+    const stmt = isCallableRef
+      ? t.expressionStatement(t.callExpression(cloned, []))
+      : t.expressionStatement(cloned);
+    const wrapper = t.file(t.program([stmt]));
     const rewritten = rewriteScript(wrapper, ir, { methodNamesOverride: methodNames });
     body = rewritten.file.program.body.map((s) => generate(s, GEN_OPTS).code).join('\n');
   }
@@ -641,8 +662,14 @@ export function emitScript(
       // Bind the getter's evaluated value as the callback's first argument so
       // user-authored `(v) => ...` params actually receive the new value at
       // invocation time. Without this the param is bound to `undefined`.
+      //
+      // Only pass __watchVal when the callback declares a param to receive it.
+      // Passing an arg to a 0-param arrow is runtime-safe (JS drops extras) but
+      // tsc flags TS2554 "Expected 0 arguments, but got 1". The conditional
+      // bind keeps both `(v) => ...` and `() => ...` shapes type-clean.
+      const callArg = w.callback.params.length > 0 ? '__watchVal' : '';
       watcherCleanupPushes.push(
-        `this._disconnectCleanups.push(effect(() => { const __watchVal = (${getterCode})(); (${cbCode})(__watchVal); }));`,
+        `this._disconnectCleanups.push(effect(() => { const __watchVal = (${getterCode})(); (${cbCode})(${callArg}); }));`,
       );
     }
   }

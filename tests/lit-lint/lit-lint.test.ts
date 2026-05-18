@@ -21,7 +21,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync, rmSync, copyFileSync, readFileSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, rmSync, copyFileSync, readFileSync, symlinkSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -73,6 +73,57 @@ describe('LIT-T-06 — eslint-plugin-lit + eslint-plugin-wc clean (--max-warning
         const stdout = (err as { stdout?: Buffer }).stdout?.toString() ?? '';
         const stderr = (err as { stderr?: Buffer }).stderr?.toString() ?? '';
         throw new Error('eslint exited non-zero:\n' + stdout + '\n' + stderr);
+      }
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+});
+
+// 2026-05-18 — TodoList exercises a known D-LIT-12 producer-side limitation:
+// scoped slot params that capture loop-local variables (`:toggle="() => toggle(item.id)"`)
+// route through CustomEvent dispatch in Lit, but the host listener lives in
+// `_armListeners()` where `item` is not in scope — emit references an undeclared
+// `item`. Excluded from the tsc gate until the Lit emit captures per-iteration
+// vars in the host listener wiring (sibling to project_lit_consumer_slot_bridge_gap).
+const TSC_EXAMPLES = EXAMPLES.filter((n) => n !== 'TodoList');
+
+describe('LIT-TSC — tsc --noEmit clean over emitted Lit .ts', () => {
+  // Catches the class of bug that eslint-plugin-lit/wc does not:
+  //   - "void is not callable" / wrong-arg-count from lifecycle/watcher emit
+  //   - Type mismatches in slot fallback / merge expressions
+  //   - HTMLElement-method-name collisions on user class fields
+  //   - Missing or wrong-shaped helper-runtime imports
+  // Mirrors the eslint gate shape: compile every example to .ts, write into
+  // a tmpdir with tsconfig + node_modules symlink, invoke tsc.
+  it('TSC_EXAMPLES emitted Lit .ts files tsc clean', () => {
+    const tmpDir = mkdtempSync(join(tmpdir(), 'rozie-lit-tsc-'));
+    try {
+      for (const name of TSC_EXAMPLES) {
+        const source = readFileSync(resolve(ROOT, 'examples/' + name + '.rozie'), 'utf8');
+        const result = compile(source, {
+          target: 'lit',
+          filename: name + '.rozie',
+          sourceMap: false,
+        });
+        const errors = result.diagnostics.filter((d) => d.severity === 'error');
+        expect(errors).toEqual([]);
+        writeFileSync(join(tmpDir, name + '.ts'), result.code, 'utf8');
+      }
+
+      copyFileSync(join(HERE, 'tsconfig.json'), join(tmpDir, 'tsconfig.json'));
+      symlinkSync(join(HERE, 'node_modules'), join(tmpDir, 'node_modules'), 'dir');
+
+      const tscBin = resolve(HERE, 'node_modules/.bin/tsc');
+      try {
+        execFileSync(tscBin, ['--noEmit', '-p', 'tsconfig.json'], {
+          cwd: tmpDir,
+          stdio: 'pipe',
+        });
+      } catch (err) {
+        const stdout = (err as { stdout?: Buffer }).stdout?.toString() ?? '';
+        const stderr = (err as { stderr?: Buffer }).stderr?.toString() ?? '';
+        throw new Error('tsc --noEmit exited non-zero:\n' + stdout + '\n' + stderr);
       }
     } finally {
       rmSync(tmpDir, { recursive: true, force: true });

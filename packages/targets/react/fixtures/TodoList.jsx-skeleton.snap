@@ -12,7 +12,7 @@
   {(items.length > 0) ? <ul>
     {items.map((item) => <li key={item.id} className={clsx({ [styles.done]: item.done })}>
       
-      {typeof (props.children ?? props.slots?.['']) === 'function' ? (props.children ?? props.slots?.[''])({ item, toggle: () => toggle(item.id), remove: () => remove(item.id) }) : ((props.children ?? props.slots?.['']) ?? <><label><input type="checkbox" checked={item.done} onChange={(e) => { toggle(item.id); }} /><span>{item.text}</span></label><button aria-label="Remove" onClick={(e) => { remove(item.id); }}>×</button></>)}
+      {typeof (props.children ?? props.slots?.['']) === 'function' ? (props.children ?? props.slots?.[''])({ item, toggle: () => toggle(item.id), remove: () => removeItem(item.id) }) : ((props.children ?? props.slots?.['']) ?? <><label><input type="checkbox" checked={item.done} onChange={(e) => { toggle(item.id); }} /><span>{item.text}</span></label><button aria-label="Remove" onClick={(e) => { removeItem(item.id); }}>×</button></>)}
     </li>)}
   </ul> : <p className={styles.empty}>
     {(props.renderEmpty ?? props.slots?.['empty']) ? (props.renderEmpty ?? props.slots?.['empty'])() : "Nothing to do. ✨"}

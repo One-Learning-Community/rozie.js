@@ -70,26 +70,98 @@ describe('emitScript — Solid target', () => {
     expect(Array.isArray(result.diagnostics)).toBe(true);
   });
 
-  it('Quick 260515-u2b — $watch binds getter value to callback first arg via __watchVal', () => {
-    const src = `<rozie name="WatchSynth">
+  it('Quick 260515-u2b — $watch with `(v) => ...` callback binds getter value to first arg via __watchVal', () => {
+    const src = `<rozie name="WatchSynthParam">
+<props>{ open: { type: Boolean, default: false } }</props>
+<script>
+$watch(() => $props.open, (v) => { console.log(v) })
+</script>
+<template><div /></template>
+</rozie>`;
+    const ir = lowerToIR(parse(src, { filename: 'WatchSynthParam.rozie' }).ast!, {
+      modifierRegistry: createDefaultRegistry(),
+    }).ir!;
+    const solidImports = new SolidImportCollector();
+    const runtimeImports = new RuntimeSolidImportCollector();
+    const result = emitScript(ir, { solidImports, runtimeImports });
+    // Getter is invoked into __watchVal; callback is invoked with that value as
+    // its first arg. Preserves user-authored `(v) => ...` params so `v` binds
+    // to the new value (regression: bare `(cb)()` ate the param entirely in
+    // Solid emit, esbuild then surfaced `ReferenceError: v is not defined`).
+    // @babel/generator drops the parens around single-param arrows, so the
+    // emitted shape is `(v => { ... })(__watchVal)` rather than `((v) => ...)`.
+    expect(result.hookSection).toMatch(/createEffect\(\(\) => \{[\s\S]*?const __watchVal = \(\(\) =>[\s\S]*?\)\(\);[\s\S]*?\(v => \{[\s\S]*?\}\)\(__watchVal\);[\s\S]*?\}\);/);
+    expect(solidImports.has('createEffect')).toBe(true);
+  });
+
+  it('Quick 260515-u2b — $watch with `() => ...` callback omits __watchVal arg (tsc TS2554-safe)', () => {
+    // Tighter than the (v) => ... case: TS flags `((() => ...))(__watchVal)` as
+    // "Expected 0 arguments, but got 1". The emit drops the arg when callback
+    // params are empty so the gated tsc step in tests/solid-lint stays clean.
+    const src = `<rozie name="WatchSynthNoParam">
 <props>{ open: { type: Boolean, default: false } }</props>
 <script>
 $watch(() => $props.open, () => { console.log('fired') })
 </script>
 <template><div /></template>
 </rozie>`;
-    const ir = lowerToIR(parse(src, { filename: 'WatchSynth.rozie' }).ast!, {
+    const ir = lowerToIR(parse(src, { filename: 'WatchSynthNoParam.rozie' }).ast!, {
       modifierRegistry: createDefaultRegistry(),
     }).ir!;
     const solidImports = new SolidImportCollector();
     const runtimeImports = new RuntimeSolidImportCollector();
     const result = emitScript(ir, { solidImports, runtimeImports });
-    // Getter is invoked into __watchVal; callback is invoked with that value
-    // as its first arg. Preserves user-authored `(v) => ...` params so `v`
-    // binds to the new value (regression: bare `(cb)()` ate the param entirely
-    // in Solid emit, esbuild then surfaced `ReferenceError: v is not defined`).
-    expect(result.hookSection).toMatch(/createEffect\(\(\) => \{[\s\S]*?const __watchVal = \(\(\) =>[\s\S]*?\)\(\);[\s\S]*?\(\(\) => \{[\s\S]*?\}\)\(__watchVal\);[\s\S]*?\}\);/);
-    expect(solidImports.has('createEffect')).toBe(true);
+    expect(result.hookSection).toMatch(/\(\(\) => \{[\s\S]*?\}\)\(\);/);
+    expect(result.hookSection).not.toContain(`)(__watchVal);`);
+  });
+
+  it('lifecycle concise-arrow body: `$onMount(() => method())` wraps the body in an arrow (no eager call, no TDZ)', () => {
+    // Regression for 2026-05-18 SortableListDemo bug: extractCleanupReturn strips
+    // the arrow wrapper from `$onMount(() => reset())`, leaving the bare `reset()`
+    // CallExpression as `lh.setup`. Previously emitScript stringified this directly
+    // as `onMount(reset());` — which (a) calls reset() at registration instead of
+    // after mount, and (b) hits TDZ because `const reset = ...` lives in
+    // userArrowsSection AFTER hookSection. Fix wraps non-callable-reference
+    // expressions back into `() => <expr>`.
+    const src = `<rozie name="MountConcise">
+<data>{ items: [] }</data>
+<script>
+const reset = () => { $data.items = [1, 2, 3] }
+$onMount(() => reset())
+</script>
+<template><div /></template>
+</rozie>`;
+    const ir = lowerToIR(parse(src, { filename: 'MountConcise.rozie' }).ast!, {
+      modifierRegistry: createDefaultRegistry(),
+    }).ir!;
+    const solidImports = new SolidImportCollector();
+    const runtimeImports = new RuntimeSolidImportCollector();
+    const result = emitScript(ir, { solidImports, runtimeImports });
+    expect(result.hookSection).toContain('onMount(() => reset());');
+    expect(result.hookSection).not.toContain('onMount(reset());');
+  });
+
+  it('lifecycle identifier-form: `$onMount(reset)` passes the function reference through', () => {
+    // Sibling assertion to the concise-body test — verifies the fix does NOT
+    // over-wrap. An Identifier callback (`$onMount(reset)`) is already a
+    // function value; emitting `onMount(() => reset)` would be subtly wrong
+    // (creates a closure that returns the function instead of calling it).
+    const src = `<rozie name="MountIdentifier">
+<data>{ items: [] }</data>
+<script>
+const reset = () => { $data.items = [1, 2, 3] }
+$onMount(reset)
+</script>
+<template><div /></template>
+</rozie>`;
+    const ir = lowerToIR(parse(src, { filename: 'MountIdentifier.rozie' }).ast!, {
+      modifierRegistry: createDefaultRegistry(),
+    }).ir!;
+    const solidImports = new SolidImportCollector();
+    const runtimeImports = new RuntimeSolidImportCollector();
+    const result = emitScript(ir, { solidImports, runtimeImports });
+    expect(result.hookSection).toContain('onMount(reset);');
+    expect(result.hookSection).not.toContain('onMount(() => reset)');
   });
 
   it('Quick 260515-u2b — no $watch means no extra createEffect call', () => {

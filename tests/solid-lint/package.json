@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@rozie/core": "workspace:*",
+    "@rozie/runtime-solid": "workspace:*",
     "@rozie/target-solid": "workspace:*"
   },
   "devDependencies": {

@@ -16,7 +16,7 @@
  */
 import type { IRComponent, PropTypeAnnotation } from '../../../../core/src/ir/types.js';
 
-function renderType(ann: PropTypeAnnotation): string {
+export function renderType(ann: PropTypeAnnotation): string {
   if (ann.kind === 'identifier') {
     switch (ann.name) {
       case 'Number':
@@ -26,7 +26,12 @@ function renderType(ann: PropTypeAnnotation): string {
       case 'Boolean':
         return 'boolean';
       case 'Array':
-        return 'unknown[]';
+        // Match the `Object → Record<string, any>` precedent: the
+        // PropTypeAnnotation has no inner-element type info, so any element
+        // access (`item.X`) would fail under `unknown[]`. `any[]` keeps
+        // element access ergonomic without casts; refinement happens via
+        // user type annotations when present.
+        return 'any[]';
       case 'Object':
         // Use `any` (not `unknown`) so consumers can access arbitrary properties
         // on Object-typed props without explicit casts in emitted template code.
@@ -42,7 +47,7 @@ function renderType(ann: PropTypeAnnotation): string {
     return ann.members.map(renderType).join(' | ');
   }
   if (ann.kind === 'literal') {
-    if (ann.value === 'array') return 'unknown[]';
+    if (ann.value === 'array') return 'any[]';
     if (ann.value === 'object') return 'Record<string, any>';
     if (ann.value === 'function') return '(...args: unknown[]) => unknown';
     return ann.value;

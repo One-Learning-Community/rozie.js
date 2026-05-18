@@ -459,22 +459,22 @@
           "name": "remaining",
           "valueExpressionRaw": "remaining",
           "sourceLoc": {
-            "start": 1294,
-            "end": 1316
+            "start": 1676,
+            "end": 1698
           }
         },
         {
           "name": "total",
           "valueExpressionRaw": "$props.items.length",
           "sourceLoc": {
-            "start": 1317,
-            "end": 1345
+            "start": 1699,
+            "end": 1727
           }
         }
       ],
       "sourceLoc": {
-        "start": 1274,
-        "end": 1488
+        "start": 1656,
+        "end": 1870
       }
     },
     "": {
@@ -485,30 +485,30 @@
           "name": "item",
           "valueExpressionRaw": "item",
           "sourceLoc": {
-            "start": 2032,
-            "end": 2044
+            "start": 2414,
+            "end": 2426
           }
         },
         {
           "name": "toggle",
           "valueExpressionRaw": "() => toggle(item.id)",
           "sourceLoc": {
-            "start": 2045,
-            "end": 2076
+            "start": 2427,
+            "end": 2458
           }
         },
         {
           "name": "remove",
-          "valueExpressionRaw": "() => remove(item.id)",
+          "valueExpressionRaw": "() => removeItem(item.id)",
           "sourceLoc": {
-            "start": 2077,
-            "end": 2108
+            "start": 2459,
+            "end": 2494
           }
         }
       ],
       "sourceLoc": {
-        "start": 2026,
-        "end": 2319
+        "start": 2408,
+        "end": 2709
       }
     },
     "empty": {
@@ -516,8 +516,8 @@
       "presence": "always",
       "params": [],
       "sourceLoc": {
-        "start": 2370,
-        "end": 2412
+        "start": 2760,
+        "end": 2802
       }
     }
   },

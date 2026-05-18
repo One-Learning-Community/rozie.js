@@ -74,7 +74,7 @@
   "template.attr./div-1/ul-5/li-1/slot-2/:remove": [
     {
       "scope": "closure",
-      "identifier": "remove"
+      "identifier": "removeItem"
     },
     {
       "scope": "closure",
@@ -94,7 +94,7 @@
   "template.attr./div-1/ul-5/li-1/slot-2/button-3/@click": [
     {
       "scope": "closure",
-      "identifier": "remove"
+      "identifier": "removeItem"
     },
     {
       "scope": "closure",

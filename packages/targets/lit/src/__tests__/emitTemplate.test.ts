@@ -52,9 +52,12 @@ describe('emitTemplate — Lit sigil emission table', () => {
     expect(code).toMatch(/\.value=\$\{this\._query\.value\}/);
   });
 
-  it('TodoList: emits ${repeat(...)} for r-for', () => {
+  it('TodoList: emits ${repeat<any>(...)} for r-for', () => {
     const code = compile('TodoList');
-    expect(code).toContain('repeat(');
+    // Explicit `<any>` type arg added 2026-05-18 to satisfy tsc when the
+    // iterable is typed `any` (rozie prop type `Object` lowers to TS `any`,
+    // which can't infer `repeat<T>`'s element type — defaults to `unknown`).
+    expect(code).toContain('repeat<any>(');
     expect(code).toContain("from 'lit/directives/repeat.js'");
   });
 

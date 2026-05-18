@@ -328,8 +328,13 @@ export function emitTemplateEvent(
       handlerExpr = code;
     } else if (handlerKind === 'callable') {
       // MemberExpression (e.g. `local.onClose`) or arrow/function expression —
-      // invoke with the event so prop callbacks fire on click.
-      handlerExpr = `(e) => { (${code})(e); }`;
+      // invoke with the event so prop callbacks fire on click. Use optional-call
+      // (`?.()`) so prop callbacks typed `Function | undefined` (any optional
+      // callback prop) don't trip tsc TS2722 "Cannot invoke an object which is
+      // possibly 'undefined'". Runtime semantics are unchanged — `?.()` is a
+      // no-op when the LHS is null/undefined, matching what users expect when
+      // they pass no handler.
+      handlerExpr = `(e) => { (${code})?.(e); }`;
     } else {
       // Already a call / statement expression — splice verbatim.
       handlerExpr = `(e) => { ${code}; }`;
@@ -344,7 +349,8 @@ export function emitTemplateEvent(
       // `() => void` don't complain about the synthetic event parameter.
       handlerInvocation = `${renderHandler(listener.handler, ctx.ir)}()`;
     } else if (handlerKind === 'callable') {
-      handlerInvocation = `(${renderHandler(listener.handler, ctx.ir)})(e)`;
+      // Optional-call so optional callback props don't TS2722.
+      handlerInvocation = `(${renderHandler(listener.handler, ctx.ir)})?.(e)`;
     } else {
       handlerInvocation = renderHandler(listener.handler, ctx.ir);
     }

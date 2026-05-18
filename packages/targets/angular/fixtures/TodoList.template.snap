@@ -26,7 +26,7 @@
 } @else {
 
         <label><input type="checkbox" [checked]="item.done" (change)="toggle(item.id)" /><span>{{ item.text }}</span></label>
-        <button aria-label="Remove" (click)="remove(item.id)">×</button>
+        <button aria-label="Remove" (click)="removeItem(item.id)">×</button>
       
 }
     </li>

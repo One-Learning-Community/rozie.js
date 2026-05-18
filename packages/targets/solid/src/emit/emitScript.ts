@@ -21,6 +21,7 @@ import { cloneScriptProgram } from '../rewrite/cloneProgram.js';
 import { partitionUserImports } from '../rewrite/partitionUserImports.js';
 import { rewriteRozieIdentifiers, rewriteRozieExpressionNode as rewriteNode } from '../rewrite/rewriteScript.js';
 import { emitPortals } from './emitPortals.js';
+import { renderType } from './emitPropsInterface.js';
 
 // CJS interop normalization for @babel/generator default export.
 type GenerateFn = typeof import('@babel/generator').default;
@@ -174,8 +175,14 @@ export function emitScript(
         dflt = raw;
       }
     }
+    // Thread the prop's TS type to the call site so the resulting Signal<T>
+    // doesn't widen to `never[]` / `unknown` when the default is an empty
+    // factory result. Without this, `default: () => []` makes TS infer T as
+    // `never[]`, which cascades to "Property 'X' does not exist on type
+    // 'never'" everywhere the signal is read.
+    const tsType = renderType(p.typeAnnotation);
     hookLines.push(
-      `const [${p.name}, ${setterName}] = createControllableSignal(_props as Record<string, unknown>, '${p.name}', ${dflt});`,
+      `const [${p.name}, ${setterName}] = createControllableSignal<${tsType}>(_props as Record<string, unknown>, '${p.name}', ${dflt});`,
     );
   }
 
@@ -214,15 +221,31 @@ export function emitScript(
   //
   // Rule 1 fix: when lh.setup is a BlockStatement, genCode() produces `{ ... }`
   // which Babel's generator renders as an object literal — invalid as a function
-  // argument. Wrap BlockStatements in an arrow function; Expressions are passed
-  // directly (they're already function values from user-authored code).
+  // argument. Wrap BlockStatements in an arrow function.
+  //
+  // Callable-reference Expressions (Identifier from `$onMount(reset)`, MemberExpr
+  // from `$onMount(obj.handler)`, or the rare paired `() => () => cleanup`) are
+  // already function values — pass straight through.
+  //
+  // Any OTHER Expression is the unwrapped concise-body of `() => <expr>` —
+  // extractCleanupReturn strips the arrow wrapper, leaving e.g. `reset()` as
+  // `lh.setup`. Passing it through verbatim would emit `onMount(reset())` which
+  // (a) calls reset() at registration instead of after mount, and (b) TDZs on
+  // any `const` declared later in the emitted output (e.g. `const reset = ...`
+  // lives in userArrowsSection AFTER hookSection). Wrap it back in an arrow.
   function lifecycleArg(node: t.Node): string {
     if (t.isBlockStatement(node)) {
-      // Wrap block in arrow: () => { stmts }
-      const code = genCode(node);
-      return `() => ${code}`;
+      return `() => ${genCode(node)}`;
     }
-    return genCode(node);
+    if (
+      t.isIdentifier(node) ||
+      t.isMemberExpression(node) ||
+      t.isArrowFunctionExpression(node) ||
+      t.isFunctionExpression(node)
+    ) {
+      return genCode(node);
+    }
+    return `() => ${genCode(node)}`;
   }
 
   for (const lh of ir.lifecycle) {
@@ -289,8 +312,13 @@ export function emitScript(
     const rewrittenCb = rewriteNode(cbArrow, ir);
     const getterCode = genCode(rewrittenGetter);
     const cbCode = genCode(rewrittenCb);
+    // Only pass __watchVal when the callback declares a param to receive it —
+    // passing an arg to a 0-param arrow is runtime-safe (JS drops extras) but
+    // tsc flags TS2554 "Expected 0 arguments, but got 1". Conditional bind keeps
+    // both `(v) => ...` and `() => ...` shapes type-clean.
+    const callArg = wh.callbackParams.length > 0 ? '__watchVal' : '';
     hookLines.push(
-      `createEffect(() => { const __watchVal = (${getterCode})(); (${cbCode})(__watchVal); });`,
+      `createEffect(() => { const __watchVal = (${getterCode})(); (${cbCode})(${callArg}); });`,
     );
   }
 

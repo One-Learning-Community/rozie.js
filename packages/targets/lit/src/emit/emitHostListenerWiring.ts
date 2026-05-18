@@ -23,5 +23,9 @@ export interface EmitHostListenerWiringOpts {
 
 export function emitHostListenerWiring(opts: EmitHostListenerWiringOpts): string {
   const eventName = `rozie-${opts.slotName === '' ? 'default' : opts.slotName}-${opts.paramName}`;
-  return `this.addEventListener('${eventName}', (e) => { (${opts.handlerExpr})((e as CustomEvent).detail); });`;
+  // Cast handler to permissive signature so user methods declared `() => void`
+  // (e.g. `const close = () => { ... }` invoked from `<slot params.close>`) accept
+  // the synthetic `CustomEvent.detail` arg uniformly. Otherwise tsc flags TS2554
+  // for any 0-arg handler routed through host-listener wiring.
+  return `this.addEventListener('${eventName}', (e) => { ((${opts.handlerExpr}) as (...args: any[]) => any)((e as CustomEvent).detail); });`;
 }

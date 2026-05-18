@@ -4,7 +4,7 @@
     "name": "TodoList",
     "loc": {
       "start": 502,
-      "end": 2810
+      "end": 3200
     },
     "props": {
       "type": "PropsAST",
@@ -487,12 +487,12 @@
       "type": "ScriptAST",
       "loc": {
         "start": 692,
-        "end": 1213
+        "end": 1595
       },
       "program": {
         "type": "File",
         "start": 692,
-        "end": 1213,
+        "end": 1595,
         "loc": {
           "start": {
             "line": 30,
@@ -500,16 +500,16 @@
             "index": 692
           },
           "end": {
-            "line": 52,
+            "line": 57,
             "column": 0,
-            "index": 1213
+            "index": 1595
           },
           "filename": "TodoList.rozie"
         },
         "program": {
           "type": "Program",
           "start": 692,
-          "end": 1213,
+          "end": 1595,
           "loc": {
             "filename": "TodoList.rozie"
           },
@@ -2262,62 +2262,159 @@
                   }
                 }
               ],
-              "kind": "const"
+              "kind": "const",
+              "trailingComments": [
+                {
+                  "type": "CommentLine",
+                  "value": " Internal method renamed from `remove` to `removeItem` to avoid colliding",
+                  "start": 1109,
+                  "end": 1184,
+                  "loc": {
+                    "start": {
+                      "line": 48,
+                      "column": 0,
+                      "index": 1109
+                    },
+                    "end": {
+                      "line": 48,
+                      "column": 75,
+                      "index": 1184
+                    },
+                    "filename": "TodoList.rozie"
+                  }
+                },
+                {
+                  "type": "CommentLine",
+                  "value": " with `HTMLElement.prototype.remove()` on the Lit target — Lit emits user",
+                  "start": 1185,
+                  "end": 1260,
+                  "loc": {
+                    "start": {
+                      "line": 49,
+                      "column": 0,
+                      "index": 1185
+                    },
+                    "end": {
+                      "line": 49,
+                      "column": 75,
+                      "index": 1260
+                    },
+                    "filename": "TodoList.rozie"
+                  }
+                },
+                {
+                  "type": "CommentLine",
+                  "value": " methods as class fields and the resulting `remove(id)` signature is",
+                  "start": 1261,
+                  "end": 1331,
+                  "loc": {
+                    "start": {
+                      "line": 50,
+                      "column": 0,
+                      "index": 1261
+                    },
+                    "end": {
+                      "line": 50,
+                      "column": 70,
+                      "index": 1331
+                    },
+                    "filename": "TodoList.rozie"
+                  }
+                },
+                {
+                  "type": "CommentLine",
+                  "value": " incompatible with the inherited `remove(): void`. Public API is unchanged:",
+                  "start": 1332,
+                  "end": 1409,
+                  "loc": {
+                    "start": {
+                      "line": 51,
+                      "column": 0,
+                      "index": 1332
+                    },
+                    "end": {
+                      "line": 51,
+                      "column": 77,
+                      "index": 1409
+                    },
+                    "filename": "TodoList.rozie"
+                  }
+                },
+                {
+                  "type": "CommentLine",
+                  "value": " the slot param is still `:remove`, the emitted event is still `'remove'`.",
+                  "start": 1410,
+                  "end": 1486,
+                  "loc": {
+                    "start": {
+                      "line": 52,
+                      "column": 0,
+                      "index": 1410
+                    },
+                    "end": {
+                      "line": 52,
+                      "column": 76,
+                      "index": 1486
+                    },
+                    "filename": "TodoList.rozie"
+                  }
+                }
+              ]
             },
             {
               "type": "VariableDeclaration",
-              "start": 1109,
-              "end": 1212,
+              "start": 1487,
+              "end": 1594,
               "loc": {
                 "start": {
-                  "line": 48,
+                  "line": 53,
                   "column": 0,
-                  "index": 1109
+                  "index": 1487
                 },
                 "end": {
-                  "line": 51,
+                  "line": 56,
                   "column": 1,
-                  "index": 1212
+                  "index": 1594
                 },
                 "filename": "TodoList.rozie"
               },
               "declarations": [
                 {
                   "type": "VariableDeclarator",
-                  "start": 1115,
-                  "end": 1212,
+                  "start": 1493,
+                  "end": 1594,
                   "loc": {
                     "start": {
-                      "line": 48,
+                      "line": 53,
                       "column": 6,
-                      "index": 1115
+                      "index": 1493
                     },
                     "filename": "TodoList.rozie"
                   },
                   "id": {
                     "type": "Identifier",
-                    "start": 1115,
-                    "end": 1121,
+                    "start": 1493,
+                    "end": 1503,
                     "loc": {
                       "end": {
-                        "line": 48,
-                        "column": 12,
-                        "index": 1121
+                        "line": 53,
+                        "column": 16,
+                        "index": 1503
                       },
                       "filename": "TodoList.rozie",
-                      "identifierName": "remove"
+                      "identifierName": "removeItem"
                     },
-                    "name": "remove"
+                    "name": "removeItem"
                   },
                   "init": {
                     "type": "ArrowFunctionExpression",
-                    "start": 1124,
-                    "end": 1212,
+                    "start": 1506,
+                    "end": 1594,
                     "loc": {
                       "start": {
-                        "line": 48,
-                        "column": 15,
-                        "index": 1124
+                        "line": 53,
+                        "column": 19,
+                        "index": 1506
                       },
                       "filename": "TodoList.rozie"
                     },
@@ -2327,18 +2424,18 @@
                     "params": [
                       {
                         "type": "Identifier",
-                        "start": 1125,
-                        "end": 1127,
+                        "start": 1507,
+                        "end": 1509,
                         "loc": {
                           "start": {
-                            "line": 48,
-                            "column": 16,
-                            "index": 1125
+                            "line": 53,
+                            "column": 20,
+                            "index": 1507
                           },
                           "end": {
-                            "line": 48,
-                            "column": 18,
-                            "index": 1127
+                            "line": 53,
+                            "column": 22,
+                            "index": 1509
                           },
                           "filename": "TodoList.rozie",
                           "identifierName": "id"
@@ -2348,63 +2445,63 @@
                     ],
                     "body": {
                       "type": "BlockStatement",
-                      "start": 1132,
-                      "end": 1212,
+                      "start": 1514,
+                      "end": 1594,
                       "loc": {
                         "start": {
-                          "line": 48,
-                          "column": 23,
-                          "index": 1132
+                          "line": 53,
+                          "column": 27,
+                          "index": 1514
                         },
                         "filename": "TodoList.rozie"
                       },
                       "body": [
                         {
                           "type": "ExpressionStatement",
-                          "start": 1136,
-                          "end": 1188,
+                          "start": 1518,
+                          "end": 1570,
                           "loc": {
                             "start": {
-                              "line": 49,
+                              "line": 54,
                               "column": 2,
-                              "index": 1136
+                              "index": 1518
                             },
                             "end": {
-                              "line": 49,
+                              "line": 54,
                               "column": 54,
-                              "index": 1188
+                              "index": 1570
                             },
                             "filename": "TodoList.rozie"
                           },
                           "expression": {
                             "type": "AssignmentExpression",
-                            "start": 1136,
-                            "end": 1188,
+                            "start": 1518,
+                            "end": 1570,
                             "loc": {
                               "filename": "TodoList.rozie"
                             },
                             "operator": "=",
                             "left": {
                               "type": "MemberExpression",
-                              "start": 1136,
-                              "end": 1148,
+                              "start": 1518,
+                              "end": 1530,
                               "loc": {
                                 "end": {
-                                  "line": 49,
+                                  "line": 54,
                                   "column": 14,
-                                  "index": 1148
+                                  "index": 1530
                                 },
                                 "filename": "TodoList.rozie"
                               },
                               "object": {
                                 "type": "Identifier",
-                                "start": 1136,
-                                "end": 1142,
+                                "start": 1518,
+                                "end": 1524,
                                 "loc": {
                                   "end": {
-                                    "line": 49,
+                                    "line": 54,
                                     "column": 8,
-                                    "index": 1142
+                                    "index": 1524
                                   },
                                   "filename": "TodoList.rozie",
                                   "identifierName": "$props"
@@ -2414,13 +2511,13 @@
                               "computed": false,
                               "property": {
                                 "type": "Identifier",
-                                "start": 1143,
-                                "end": 1148,
+                                "start": 1525,
+                                "end": 1530,
                                 "loc": {
                                   "start": {
-                                    "line": 49,
+                                    "line": 54,
                                     "column": 9,
-                                    "index": 1143
+                                    "index": 1525
                                   },
                                   "filename": "TodoList.rozie",
                                   "identifierName": "items"
@@ -2430,49 +2527,49 @@
                             },
                             "right": {
                               "type": "CallExpression",
-                              "start": 1151,
-                              "end": 1188,
+                              "start": 1533,
+                              "end": 1570,
                               "loc": {
                                 "start": {
-                                  "line": 49,
+                                  "line": 54,
                                   "column": 17,
-                                  "index": 1151
+                                  "index": 1533
                                 },
                                 "filename": "TodoList.rozie"
                               },
                               "callee": {
                                 "type": "MemberExpression",
-                                "start": 1151,
-                                "end": 1170,
+                                "start": 1533,
+                                "end": 1552,
                                 "loc": {
                                   "end": {
-                                    "line": 49,
+                                    "line": 54,
                                     "column": 36,
-                                    "index": 1170
+                                    "index": 1552
                                   },
                                   "filename": "TodoList.rozie"
                                 },
                                 "object": {
                                   "type": "MemberExpression",
-                                  "start": 1151,
-                                  "end": 1163,
+                                  "start": 1533,
+                                  "end": 1545,
                                   "loc": {
                                     "end": {
-                                      "line": 49,
+                                      "line": 54,
                                       "column": 29,
-                                      "index": 1163
+                                      "index": 1545
                                     },
                                     "filename": "TodoList.rozie"
                                   },
                                   "object": {
                                     "type": "Identifier",
-                                    "start": 1151,
-                                    "end": 1157,
+                                    "start": 1533,
+                                    "end": 1539,
                                     "loc": {
                                       "end": {
-                                        "line": 49,
+                                        "line": 54,
                                         "column": 23,
-                                        "index": 1157
+                                        "index": 1539
                                       },
                                       "filename": "TodoList.rozie",
                                       "identifierName": "$props"
@@ -2482,13 +2579,13 @@
                                   "computed": false,
                                   "property": {
                                     "type": "Identifier",
-                                    "start": 1158,
-                                    "end": 1163,
+                                    "start": 1540,
+                                    "end": 1545,
                                     "loc": {
                                       "start": {
-                                        "line": 49,
+                                        "line": 54,
                                         "column": 24,
-                                        "index": 1158
+                                        "index": 1540
                                       },
                                       "filename": "TodoList.rozie",
                                       "identifierName": "items"
@@ -2499,13 +2596,13 @@
                                 "computed": false,
                                 "property": {
                                   "type": "Identifier",
-                                  "start": 1164,
-                                  "end": 1170,
+                                  "start": 1546,
+                                  "end": 1552,
                                   "loc": {
                                     "start": {
-                                      "line": 49,
+                                      "line": 54,
                                       "column": 30,
-                                      "index": 1164
+                                      "index": 1546
                                     },
                                     "filename": "TodoList.rozie",
                                     "identifierName": "filter"
@@ -2516,18 +2613,18 @@
                               "arguments": [
                                 {
                                   "type": "ArrowFunctionExpression",
-                                  "start": 1171,
-                                  "end": 1187,
+                                  "start": 1553,
+                                  "end": 1569,
                                   "loc": {
                                     "start": {
-                                      "line": 49,
+                                      "line": 54,
                                       "column": 37,
-                                      "index": 1171
+                                      "index": 1553
                                     },
                                     "end": {
-                                      "line": 49,
+                                      "line": 54,
                                       "column": 53,
-                                      "index": 1187
+                                      "index": 1569
                                     },
                                     "filename": "TodoList.rozie"
                                   },
@@ -2537,13 +2634,13 @@
                                   "params": [
                                     {
                                       "type": "Identifier",
-                                      "start": 1171,
-                                      "end": 1172,
+                                      "start": 1553,
+                                      "end": 1554,
                                       "loc": {
                                         "end": {
-                                          "line": 49,
+                                          "line": 54,
                                           "column": 38,
-                                          "index": 1172
+                                          "index": 1554
                                         },
                                         "filename": "TodoList.rozie",
                                         "identifierName": "i"
@@ -2553,37 +2650,37 @@
                                   ],
                                   "body": {
                                     "type": "BinaryExpression",
-                                    "start": 1176,
-                                    "end": 1187,
+                                    "start": 1558,
+                                    "end": 1569,
                                     "loc": {
                                       "start": {
-                                        "line": 49,
+                                        "line": 54,
                                         "column": 42,
-                                        "index": 1176
+                                        "index": 1558
                                       },
                                       "filename": "TodoList.rozie"
                                     },
                                     "left": {
                                       "type": "MemberExpression",
-                                      "start": 1176,
-                                      "end": 1180,
+                                      "start": 1558,
+                                      "end": 1562,
                                       "loc": {
                                         "end": {
-                                          "line": 49,
+                                          "line": 54,
                                           "column": 46,
-                                          "index": 1180
+                                          "index": 1562
                                         },
                                         "filename": "TodoList.rozie"
                                       },
                                       "object": {
                                         "type": "Identifier",
-                                        "start": 1176,
-                                        "end": 1177,
+                                        "start": 1558,
+                                        "end": 1559,
                                         "loc": {
                                           "end": {
-                                            "line": 49,
+                                            "line": 54,
                                             "column": 43,
-                                            "index": 1177
+                                            "index": 1559
                                           },
                                           "filename": "TodoList.rozie",
                                           "identifierName": "i"
@@ -2593,13 +2690,13 @@
                                       "computed": false,
                                       "property": {
                                         "type": "Identifier",
-                                        "start": 1178,
-                                        "end": 1180,
+                                        "start": 1560,
+                                        "end": 1562,
                                         "loc": {
                                           "start": {
-                                            "line": 49,
+                                            "line": 54,
                                             "column": 44,
-                                            "index": 1178
+                                            "index": 1560
                                           },
                                           "filename": "TodoList.rozie",
                                           "identifierName": "id"
@@ -2610,13 +2707,13 @@
                                     "operator": "!==",
                                     "right": {
                                       "type": "Identifier",
-                                      "start": 1185,
-                                      "end": 1187,
+                                      "start": 1567,
+                                      "end": 1569,
                                       "loc": {
                                         "start": {
-                                          "line": 49,
+                                          "line": 54,
                                           "column": 51,
-                                          "index": 1185
+                                          "index": 1567
                                         },
                                         "filename": "TodoList.rozie",
                                         "identifierName": "id"
@@ -2631,37 +2728,37 @@
                         },
                         {
                           "type": "ExpressionStatement",
-                          "start": 1191,
-                          "end": 1210,
+                          "start": 1573,
+                          "end": 1592,
                           "loc": {
                             "start": {
-                              "line": 50,
+                              "line": 55,
                               "column": 2,
-                              "index": 1191
+                              "index": 1573
                             },
                             "end": {
-                              "line": 50,
+                              "line": 55,
                               "column": 21,
-                              "index": 1210
+                              "index": 1592
                             },
                             "filename": "TodoList.rozie"
                           },
                           "expression": {
                             "type": "CallExpression",
-                            "start": 1191,
-                            "end": 1210,
+                            "start": 1573,
+                            "end": 1592,
                             "loc": {
                               "filename": "TodoList.rozie"
                             },
                             "callee": {
                               "type": "Identifier",
-                              "start": 1191,
-                              "end": 1196,
+                              "start": 1573,
+                              "end": 1578,
                               "loc": {
                                 "end": {
-                                  "line": 50,
+                                  "line": 55,
                                   "column": 7,
-                                  "index": 1196
+                                  "index": 1578
                                 },
                                 "filename": "TodoList.rozie",
                                 "identifierName": "$emit"
@@ -2671,18 +2768,18 @@
                             "arguments": [
                               {
                                 "type": "StringLiteral",
-                                "start": 1197,
-                                "end": 1205,
+                                "start": 1579,
+                                "end": 1587,
                                 "loc": {
                                   "start": {
-                                    "line": 50,
+                                    "line": 55,
                                     "column": 8,
-                                    "index": 1197
+                                    "index": 1579
                                   },
                                   "end": {
-                                    "line": 50,
+                                    "line": 55,
                                     "column": 16,
-                                    "index": 1205
+                                    "index": 1587
                                   },
                                   "filename": "TodoList.rozie"
                                 },
@@ -2690,18 +2787,18 @@
                               },
                               {
                                 "type": "Identifier",
-                                "start": 1207,
-                                "end": 1209,
+                                "start": 1589,
+                                "end": 1591,
                                 "loc": {
                                   "start": {
-                                    "line": 50,
+                                    "line": 55,
                                     "column": 18,
-                                    "index": 1207
+                                    "index": 1589
                                   },
                                   "end": {
-                                    "line": 50,
+                                    "line": 55,
                                     "column": 20,
-                                    "index": 1209
+                                    "index": 1591
                                   },
                                   "filename": "TodoList.rozie",
                                   "identifierName": "id"
@@ -2722,23 +2819,29 @@
           ],
           "directives": []
         },
-        "comments": []
+        "comments": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
       }
     },
     "listeners": null,
     "template": {
       "type": "TemplateAST",
       "loc": {
-        "start": 1234,
-        "end": 2427
+        "start": 1616,
+        "end": 2817
       },
       "children": [
         {
           "type": "TemplateText",
           "text": "\n",
           "loc": {
-            "start": 1234,
-            "end": 1235
+            "start": 1616,
+            "end": 1617
           }
         },
         {
@@ -2750,16 +2853,16 @@
               "rawName": "class",
               "name": "class",
               "modifierChainText": "",
-              "modifierChainBaseOffset": 1245,
+              "modifierChainBaseOffset": 1627,
               "chain": [],
               "value": "todo-list",
               "valueLoc": {
-                "start": 1247,
-                "end": 1256
+                "start": 1629,
+                "end": 1638
               },
               "loc": {
-                "start": 1240,
-                "end": 1257
+                "start": 1622,
+                "end": 1639
               }
             }
           ],
@@ -2768,8 +2871,8 @@
               "type": "TemplateText",
               "text": "\n  ",
               "loc": {
-                "start": 1258,
-                "end": 1261
+                "start": 1640,
+                "end": 1643
               }
             },
             {
@@ -2781,8 +2884,8 @@
                   "type": "TemplateText",
                   "text": "\n    ",
                   "loc": {
-                    "start": 1269,
-                    "end": 1274
+                    "start": 1651,
+                    "end": 1656
                   }
                 },
                 {
@@ -2794,16 +2897,16 @@
                       "rawName": "name",
                       "name": "name",
                       "modifierChainText": "",
-                      "modifierChainBaseOffset": 1284,
+                      "modifierChainBaseOffset": 1666,
                       "chain": [],
                       "value": "header",
                       "valueLoc": {
-                        "start": 1286,
-                        "end": 1292
+                        "start": 1668,
+                        "end": 1674
                       },
                       "loc": {
-                        "start": 1280,
-                        "end": 1293
+                        "start": 1662,
+                        "end": 1675
                       }
                     },
                     {
@@ -2811,16 +2914,16 @@
                       "rawName": ":remaining",
                       "name": "remaining",
                       "modifierChainText": "",
-                      "modifierChainBaseOffset": 1304,
+                      "modifierChainBaseOffset": 1686,
                       "chain": [],
                       "value": "remaining",
                       "valueLoc": {
-                        "start": 1306,
-                        "end": 1315
+                        "start": 1688,
+                        "end": 1697
                       },
                       "loc": {
-                        "start": 1294,
-                        "end": 1316
+                        "start": 1676,
+                        "end": 1698
                       }
                     },
                     {
@@ -2828,16 +2931,16 @@
                       "rawName": ":total",
                       "name": "total",
                       "modifierChainText": "",
-                      "modifierChainBaseOffset": 1323,
+                      "modifierChainBaseOffset": 1705,
                       "chain": [],
                       "value": "$props.items.length",
                       "valueLoc": {
-                        "start": 1325,
-                        "end": 1344
+                        "start": 1707,
+                        "end": 1726
                       },
                       "loc": {
-                        "start": 1317,
-                        "end": 1345
+                        "start": 1699,
+                        "end": 1727
                       }
                     }
                   ],
@@ -2846,16 +2949,16 @@
                       "type": "TemplateText",
                       "text": "\n      ",
                       "loc": {
-                        "start": 1346,
-                        "end": 1353
+                        "start": 1728,
+                        "end": 1735
                       }
                     },
                     {
                       "type": "TemplateText",
                       "text": "\n      ",
                       "loc": {
-                        "start": 1414,
-                        "end": 1421
+                        "start": 1796,
+                        "end": 1803
                       }
                     },
                     {
@@ -2867,77 +2970,77 @@
                           "type": "TemplateInterpolation",
                           "rawExpr": " $props.title ",
                           "loc": {
-                            "start": 1425,
-                            "end": 1443
+                            "start": 1807,
+                            "end": 1825
                           }
                         },
                         {
                           "type": "TemplateText",
                           "text": " (",
                           "loc": {
-                            "start": 1443,
-                            "end": 1445
+                            "start": 1825,
+                            "end": 1827
                           }
                         },
                         {
                           "type": "TemplateInterpolation",
                           "rawExpr": " remaining ",
                           "loc": {
-                            "start": 1445,
-                            "end": 1460
+                            "start": 1827,
+                            "end": 1842
                           }
                         },
                         {
                           "type": "TemplateText",
                           "text": " remaining)",
                           "loc": {
-                            "start": 1460,
-                            "end": 1471
+                            "start": 1842,
+                            "end": 1853
                           }
                         }
                       ],
                       "selfClosing": false,
                       "loc": {
-                        "start": 1421,
-                        "end": 1476
+                        "start": 1803,
+                        "end": 1858
                       }
                     },
                     {
                       "type": "TemplateText",
                       "text": "\n    ",
                       "loc": {
-                        "start": 1476,
-                        "end": 1481
+                        "start": 1858,
+                        "end": 1863
                       }
                     }
                   ],
                   "selfClosing": false,
                   "loc": {
-                    "start": 1274,
-                    "end": 1488
+                    "start": 1656,
+                    "end": 1870
                   }
                 },
                 {
                   "type": "TemplateText",
                   "text": "\n  ",
                   "loc": {
-                    "start": 1488,
-                    "end": 1491
+                    "start": 1870,
+                    "end": 1873
                   }
                 }
               ],
               "selfClosing": false,
               "loc": {
-                "start": 1261,
-                "end": 1500
+                "start": 1643,
+                "end": 1882
               }
             },
             {
               "type": "TemplateText",
               "text": "\n\n  ",
               "loc": {
-                "start": 1500,
-                "end": 1504
+                "start": 1882,
+                "end": 1886
               }
             },
             {
@@ -2949,25 +3052,25 @@
                   "rawName": "@submit.prevent",
                   "name": "submit",
                   "modifierChainText": ".prevent",
-                  "modifierChainBaseOffset": 1517,
+                  "modifierChainBaseOffset": 1899,
                   "chain": [
                     {
                       "name": "prevent",
                       "args": [],
                       "loc": {
-                        "start": 1517,
-                        "end": 1525
+                        "start": 1899,
+                        "end": 1907
                       }
                     }
                   ],
                   "value": "add",
                   "valueLoc": {
-                    "start": 1527,
-                    "end": 1530
+                    "start": 1909,
+                    "end": 1912
                   },
                   "loc": {
-                    "start": 1510,
-                    "end": 1531
+                    "start": 1892,
+                    "end": 1913
                   }
                 }
               ],
@@ -2976,8 +3079,8 @@
                   "type": "TemplateText",
                   "text": "\n    ",
                   "loc": {
-                    "start": 1532,
-                    "end": 1537
+                    "start": 1914,
+                    "end": 1919
                   }
                 },
                 {
@@ -2989,16 +3092,16 @@
                       "rawName": "r-model",
                       "name": "model",
                       "modifierChainText": "",
-                      "modifierChainBaseOffset": 1551,
+                      "modifierChainBaseOffset": 1933,
                       "chain": [],
                       "value": "$data.draft",
                       "valueLoc": {
-                        "start": 1553,
-                        "end": 1564
+                        "start": 1935,
+                        "end": 1946
                       },
                       "loc": {
-                        "start": 1544,
-                        "end": 1565
+                        "start": 1926,
+                        "end": 1947
                       }
                     },
                     {
@@ -3006,32 +3109,32 @@
                       "rawName": "placeholder",
                       "name": "placeholder",
                       "modifierChainText": "",
-                      "modifierChainBaseOffset": 1577,
+                      "modifierChainBaseOffset": 1959,
                       "chain": [],
                       "value": "What needs doing?",
                       "valueLoc": {
-                        "start": 1579,
-                        "end": 1596
+                        "start": 1961,
+                        "end": 1978
                       },
                       "loc": {
-                        "start": 1566,
-                        "end": 1597
+                        "start": 1948,
+                        "end": 1979
                       }
                     }
                   ],
                   "children": [],
                   "selfClosing": true,
                   "loc": {
-                    "start": 1537,
-                    "end": 1600
+                    "start": 1919,
+                    "end": 1982
                   }
                 },
                 {
                   "type": "TemplateText",
                   "text": "\n    ",
                   "loc": {
-                    "start": 1600,
-                    "end": 1605
+                    "start": 1982,
+                    "end": 1987
                   }
                 },
                 {
@@ -3043,16 +3146,16 @@
                       "rawName": "type",
                       "name": "type",
                       "modifierChainText": "",
-                      "modifierChainBaseOffset": 1617,
+                      "modifierChainBaseOffset": 1999,
                       "chain": [],
                       "value": "submit",
                       "valueLoc": {
-                        "start": 1619,
-                        "end": 1625
+                        "start": 2001,
+                        "end": 2007
                       },
                       "loc": {
-                        "start": 1613,
-                        "end": 1626
+                        "start": 1995,
+                        "end": 2008
                       }
                     },
                     {
@@ -3060,16 +3163,16 @@
                       "rawName": ":disabled",
                       "name": "disabled",
                       "modifierChainText": "",
-                      "modifierChainBaseOffset": 1636,
+                      "modifierChainBaseOffset": 2018,
                       "chain": [],
                       "value": "!$data.draft.trim()",
                       "valueLoc": {
-                        "start": 1638,
-                        "end": 1657
+                        "start": 2020,
+                        "end": 2039
                       },
                       "loc": {
-                        "start": 1627,
-                        "end": 1658
+                        "start": 2009,
+                        "end": 2040
                       }
                     }
                   ],
@@ -3078,38 +3181,38 @@
                       "type": "TemplateText",
                       "text": "Add",
                       "loc": {
-                        "start": 1659,
-                        "end": 1662
+                        "start": 2041,
+                        "end": 2044
                       }
                     }
                   ],
                   "selfClosing": false,
                   "loc": {
-                    "start": 1605,
-                    "end": 1671
+                    "start": 1987,
+                    "end": 2053
                   }
                 },
                 {
                   "type": "TemplateText",
                   "text": "\n  ",
                   "loc": {
-                    "start": 1671,
-                    "end": 1674
+                    "start": 2053,
+                    "end": 2056
                   }
                 }
               ],
               "selfClosing": false,
               "loc": {
-                "start": 1504,
-                "end": 1681
+                "start": 1886,
+                "end": 2063
               }
             },
             {
               "type": "TemplateText",
               "text": "\n\n  ",
               "loc": {
-                "start": 1681,
-                "end": 1685
+                "start": 2063,
+                "end": 2067
               }
             },
             {
@@ -3121,16 +3224,16 @@
                   "rawName": "r-if",
                   "name": "if",
                   "modifierChainText": "",
-                  "modifierChainBaseOffset": 1693,
+                  "modifierChainBaseOffset": 2075,
                   "chain": [],
                   "value": "$props.items.length > 0",
                   "valueLoc": {
-                    "start": 1695,
-                    "end": 1718
+                    "start": 2077,
+                    "end": 2100
                   },
                   "loc": {
-                    "start": 1689,
-                    "end": 1719
+                    "start": 2071,
+                    "end": 2101
                   }
                 }
               ],
@@ -3139,8 +3242,8 @@
                   "type": "TemplateText",
                   "text": "\n    ",
                   "loc": {
-                    "start": 1720,
-                    "end": 1725
+                    "start": 2102,
+                    "end": 2107
                   }
                 },
                 {
@@ -3152,16 +3255,16 @@
                       "rawName": "r-for",
                       "name": "for",
                       "modifierChainText": "",
-                      "modifierChainBaseOffset": 1734,
+                      "modifierChainBaseOffset": 2116,
                       "chain": [],
                       "value": "item in $props.items",
                       "valueLoc": {
-                        "start": 1736,
-                        "end": 1756
+                        "start": 2118,
+                        "end": 2138
                       },
                       "loc": {
-                        "start": 1729,
-                        "end": 1757
+                        "start": 2111,
+                        "end": 2139
                       }
                     },
                     {
@@ -3169,16 +3272,16 @@
                       "rawName": ":key",
                       "name": "key",
                       "modifierChainText": "",
-                      "modifierChainBaseOffset": 1762,
+                      "modifierChainBaseOffset": 2144,
                       "chain": [],
                       "value": "item.id",
                       "valueLoc": {
-                        "start": 1764,
-                        "end": 1771
+                        "start": 2146,
+                        "end": 2153
                       },
                       "loc": {
-                        "start": 1758,
-                        "end": 1772
+                        "start": 2140,
+                        "end": 2154
                       }
                     },
                     {
@@ -3186,16 +3289,16 @@
                       "rawName": ":class",
                       "name": "class",
                       "modifierChainText": "",
-                      "modifierChainBaseOffset": 1779,
+                      "modifierChainBaseOffset": 2161,
                       "chain": [],
                       "value": "{ done: item.done }",
                       "valueLoc": {
-                        "start": 1781,
-                        "end": 1800
+                        "start": 2163,
+                        "end": 2182
                       },
                       "loc": {
-                        "start": 1773,
-                        "end": 1801
+                        "start": 2155,
+                        "end": 2183
                       }
                     }
                   ],
@@ -3204,16 +3307,16 @@
                       "type": "TemplateText",
                       "text": "\n      ",
                       "loc": {
-                        "start": 1802,
-                        "end": 1809
+                        "start": 2184,
+                        "end": 2191
                       }
                     },
                     {
                       "type": "TemplateText",
                       "text": "\n      ",
                       "loc": {
-                        "start": 2019,
-                        "end": 2026
+                        "start": 2401,
+                        "end": 2408
                       }
                     },
                     {
@@ -3225,16 +3328,16 @@
                           "rawName": ":item",
                           "name": "item",
                           "modifierChainText": "",
-                          "modifierChainBaseOffset": 2037,
+                          "modifierChainBaseOffset": 2419,
                           "chain": [],
                           "value": "item",
                           "valueLoc": {
-                            "start": 2039,
-                            "end": 2043
+                            "start": 2421,
+                            "end": 2425
                           },
                           "loc": {
-                            "start": 2032,
-                            "end": 2044
+                            "start": 2414,
+                            "end": 2426
                           }
                         },
                         {
@@ -3242,16 +3345,16 @@
                           "rawName": ":toggle",
                           "name": "toggle",
                           "modifierChainText": "",
-                          "modifierChainBaseOffset": 2052,
+                          "modifierChainBaseOffset": 2434,
                           "chain": [],
                           "value": "() => toggle(item.id)",
                           "valueLoc": {
-                            "start": 2054,
-                            "end": 2075
+                            "start": 2436,
+                            "end": 2457
                           },
                           "loc": {
-                            "start": 2045,
-                            "end": 2076
+                            "start": 2427,
+                            "end": 2458
                           }
                         },
                         {
@@ -3259,16 +3362,16 @@
                           "rawName": ":remove",
                           "name": "remove",
                           "modifierChainText": "",
-                          "modifierChainBaseOffset": 2084,
+                          "modifierChainBaseOffset": 2466,
                           "chain": [],
-                          "value": "() => remove(item.id)",
+                          "value": "() => removeItem(item.id)",
                           "valueLoc": {
-                            "start": 2086,
-                            "end": 2107
+                            "start": 2468,
+                            "end": 2493
                           },
                           "loc": {
-                            "start": 2077,
-                            "end": 2108
+                            "start": 2459,
+                            "end": 2494
                           }
                         }
                       ],
@@ -3277,8 +3380,8 @@
                           "type": "TemplateText",
                           "text": "\n        ",
                           "loc": {
-                            "start": 2109,
-                            "end": 2118
+                            "start": 2495,
+                            "end": 2504
                           }
                         },
                         {
@@ -3295,16 +3398,16 @@
                                   "rawName": "type",
                                   "name": "type",
                                   "modifierChainText": "",
-                                  "modifierChainBaseOffset": 2136,
+                                  "modifierChainBaseOffset": 2522,
                                   "chain": [],
                                   "value": "checkbox",
                                   "valueLoc": {
-                                    "start": 2138,
-                                    "end": 2146
+                                    "start": 2524,
+                                    "end": 2532
                                   },
                                   "loc": {
-                                    "start": 2132,
-                                    "end": 2147
+                                    "start": 2518,
+                                    "end": 2533
                                   }
                                 },
                                 {
@@ -3312,16 +3415,16 @@
                                   "rawName": ":checked",
                                   "name": "checked",
                                   "modifierChainText": "",
-                                  "modifierChainBaseOffset": 2156,
+                                  "modifierChainBaseOffset": 2542,
                                   "chain": [],
                                   "value": "item.done",
                                   "valueLoc": {
-                                    "start": 2158,
-                                    "end": 2167
+                                    "start": 2544,
+                                    "end": 2553
                                   },
                                   "loc": {
-                                    "start": 2148,
-                                    "end": 2168
+                                    "start": 2534,
+                                    "end": 2554
                                   }
                                 },
                                 {
@@ -3329,24 +3432,24 @@
                                   "rawName": "@change",
                                   "name": "change",
                                   "modifierChainText": "",
-                                  "modifierChainBaseOffset": 2176,
+                                  "modifierChainBaseOffset": 2562,
                                   "chain": [],
                                   "value": "toggle(item.id)",
                                   "valueLoc": {
-                                    "start": 2178,
-                                    "end": 2193
+                                    "start": 2564,
+                                    "end": 2579
                                   },
                                   "loc": {
-                                    "start": 2169,
-                                    "end": 2194
+                                    "start": 2555,
+                                    "end": 2580
                                   }
                                 }
                               ],
                               "children": [],
                               "selfClosing": true,
                               "loc": {
-                                "start": 2125,
-                                "end": 2197
+                                "start": 2511,
+                                "end": 2583
                               }
                             },
                             {
@@ -3358,30 +3461,30 @@
                                   "type": "TemplateInterpolation",
                                   "rawExpr": " item.text ",
                                   "loc": {
-                                    "start": 2203,
-                                    "end": 2218
+                                    "start": 2589,
+                                    "end": 2604
                                   }
                                 }
                               ],
                               "selfClosing": false,
                               "loc": {
-                                "start": 2197,
-                                "end": 2225
+                                "start": 2583,
+                                "end": 2611
                               }
                             }
                           ],
                           "selfClosing": false,
                           "loc": {
-                            "start": 2118,
-                            "end": 2233
+                            "start": 2504,
+                            "end": 2619
                           }
                         },
                         {
                           "type": "TemplateText",
                           "text": "\n        ",
                           "loc": {
-                            "start": 2233,
-                            "end": 2242
+                            "start": 2619,
+                            "end": 2628
                           }
                         },
                         {
@@ -3393,16 +3496,16 @@
                               "rawName": "@click",
                               "name": "click",
                               "modifierChainText": "",
-                              "modifierChainBaseOffset": 2256,
+                              "modifierChainBaseOffset": 2642,
                               "chain": [],
-                              "value": "remove(item.id)",
+                              "value": "removeItem(item.id)",
                               "valueLoc": {
-                                "start": 2258,
-                                "end": 2273
+                                "start": 2644,
+                                "end": 2663
                               },
                               "loc": {
-                                "start": 2250,
-                                "end": 2274
+                                "start": 2636,
+                                "end": 2664
                               }
                             },
                             {
@@ -3410,16 +3513,16 @@
                               "rawName": "aria-label",
                               "name": "aria-label",
                               "modifierChainText": "",
-                              "modifierChainBaseOffset": 2285,
+                              "modifierChainBaseOffset": 2675,
                               "chain": [],
                               "value": "Remove",
                               "valueLoc": {
-                                "start": 2287,
-                                "end": 2293
+                                "start": 2677,
+                                "end": 2683
                               },
                               "loc": {
-                                "start": 2275,
-                                "end": 2294
+                                "start": 2665,
+                                "end": 2684
                               }
                             }
                           ],
@@ -3428,68 +3531,68 @@
                               "type": "TemplateText",
                               "text": "×",
                               "loc": {
-                                "start": 2295,
-                                "end": 2296
+                                "start": 2685,
+                                "end": 2686
                               }
                             }
                           ],
                           "selfClosing": false,
                           "loc": {
-                            "start": 2242,
-                            "end": 2305
+                            "start": 2628,
+                            "end": 2695
                           }
                         },
                         {
                           "type": "TemplateText",
                           "text": "\n      ",
                           "loc": {
-                            "start": 2305,
-                            "end": 2312
+                            "start": 2695,
+                            "end": 2702
                           }
                         }
                       ],
                       "selfClosing": false,
                       "loc": {
-                        "start": 2026,
-                        "end": 2319
+                        "start": 2408,
+                        "end": 2709
                       }
                     },
                     {
                       "type": "TemplateText",
                       "text": "\n    ",
                       "loc": {
-                        "start": 2319,
-                        "end": 2324
+                        "start": 2709,
+                        "end": 2714
                       }
                     }
                   ],
                   "selfClosing": false,
                   "loc": {
-                    "start": 1725,
-                    "end": 2329
+                    "start": 2107,
+                    "end": 2719
                   }
                 },
                 {
                   "type": "TemplateText",
                   "text": "\n  ",
                   "loc": {
-                    "start": 2329,
-                    "end": 2332
+                    "start": 2719,
+                    "end": 2722
                   }
                 }
               ],
               "selfClosing": false,
               "loc": {
-                "start": 1685,
-                "end": 2337
+                "start": 2067,
+                "end": 2727
               }
             },
             {
               "type": "TemplateText",
               "text": "\n\n  ",
               "loc": {
-                "start": 2337,
-                "end": 2341
+                "start": 2727,
+                "end": 2731
               }
             },
             {
@@ -3501,13 +3604,13 @@
                   "rawName": "r-else",
                   "name": "else",
                   "modifierChainText": "",
-                  "modifierChainBaseOffset": 2350,
+                  "modifierChainBaseOffset": 2740,
                   "chain": [],
                   "value": null,
                   "valueLoc": null,
                   "loc": {
-                    "start": 2344,
-                    "end": 2350
+                    "start": 2734,
+                    "end": 2740
                   }
                 },
                 {
@@ -3515,16 +3618,16 @@
                   "rawName": "class",
                   "name": "class",
                   "modifierChainText": "",
-                  "modifierChainBaseOffset": 2356,
+                  "modifierChainBaseOffset": 2746,
                   "chain": [],
                   "value": "empty",
                   "valueLoc": {
-                    "start": 2358,
-                    "end": 2363
+                    "start": 2748,
+                    "end": 2753
                   },
                   "loc": {
-                    "start": 2351,
-                    "end": 2364
+                    "start": 2741,
+                    "end": 2754
                   }
                 }
               ],
@@ -3533,8 +3636,8 @@
                   "type": "TemplateText",
                   "text": "\n    ",
                   "loc": {
-                    "start": 2365,
-                    "end": 2370
+                    "start": 2755,
+                    "end": 2760
                   }
                 },
                 {
@@ -3546,16 +3649,16 @@
                       "rawName": "name",
                       "name": "name",
                       "modifierChainText": "",
-                      "modifierChainBaseOffset": 2380,
+                      "modifierChainBaseOffset": 2770,
                       "chain": [],
                       "value": "empty",
                       "valueLoc": {
-                        "start": 2382,
-                        "end": 2387
+                        "start": 2772,
+                        "end": 2777
                       },
                       "loc": {
-                        "start": 2376,
-                        "end": 2388
+                        "start": 2766,
+                        "end": 2778
                       }
                     }
                   ],
@@ -3564,53 +3667,53 @@
                       "type": "TemplateText",
                       "text": "Nothing to do. ✨",
                       "loc": {
-                        "start": 2389,
-                        "end": 2405
+                        "start": 2779,
+                        "end": 2795
                       }
                     }
                   ],
                   "selfClosing": false,
                   "loc": {
-                    "start": 2370,
-                    "end": 2412
+                    "start": 2760,
+                    "end": 2802
                   }
                 },
                 {
                   "type": "TemplateText",
                   "text": "\n  ",
                   "loc": {
-                    "start": 2412,
-                    "end": 2415
+                    "start": 2802,
+                    "end": 2805
                   }
                 }
               ],
               "selfClosing": false,
               "loc": {
-                "start": 2341,
-                "end": 2419
+                "start": 2731,
+                "end": 2809
               }
             },
             {
               "type": "TemplateText",
               "text": "\n",
               "loc": {
-                "start": 2419,
-                "end": 2420
+                "start": 2809,
+                "end": 2810
               }
             }
           ],
           "selfClosing": false,
           "loc": {
-            "start": 1235,
-            "end": 2426
+            "start": 1617,
+            "end": 2816
           }
         },
         {
           "type": "TemplateText",
           "text": "\n",
           "loc": {
-            "start": 2426,
-            "end": 2427
+            "start": 2816,
+            "end": 2817
           }
         }
       ]
@@ -3618,56 +3721,56 @@
     "style": {
       "type": "StyleAST",
       "loc": {
-        "start": 2447,
-        "end": 2792
+        "start": 2837,
+        "end": 3182
       },
       "cssText": "\n.todo-list { font-family: system-ui, sans-serif; }\nul { list-style: none; padding: 0; }\nli { display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0; }\nli.done span { text-decoration: line-through; opacity: 0.5; }\n.empty { color: rgba(0, 0, 0, 0.4); font-style: italic; }\nform { display: flex; gap: 0.25rem; margin-block: 0.5rem; }\n",
       "rules": [
         {
           "selector": ".todo-list",
           "loc": {
-            "start": 2448,
-            "end": 2498
+            "start": 2838,
+            "end": 2888
           },
           "isRootEscape": false
         },
         {
           "selector": "ul",
           "loc": {
-            "start": 2499,
-            "end": 2535
+            "start": 2889,
+            "end": 2925
           },
           "isRootEscape": false
         },
         {
           "selector": "li",
           "loc": {
-            "start": 2536,
-            "end": 2611
+            "start": 2926,
+            "end": 3001
           },
           "isRootEscape": false
         },
         {
           "selector": "li.done span",
           "loc": {
-            "start": 2612,
-            "end": 2673
+            "start": 3002,
+            "end": 3063
           },
           "isRootEscape": false
         },
         {
           "selector": ".empty",
           "loc": {
-            "start": 2674,
-            "end": 2731
+            "start": 3064,
+            "end": 3121
           },
           "isRootEscape": false
         },
         {
           "selector": "form",
           "loc": {
-            "start": 2732,
-            "end": 2791
+            "start": 3122,
+            "end": 3181
           },
           "isRootEscape": false
         }
@@ -3694,24 +3797,24 @@
         }
       },
       "script": {
-        "content": "\nconst remaining = $computed(() => $props.items.filter(i => !i.done).length)\n\nconst add = () => {\n  const text = $data.draft.trim()\n  if (!text) return\n  $props.items = [...$props.items, { id: crypto.randomUUID(), text, done: false }]\n  $data.draft = ''\n  $emit('add', text)\n}\n\nconst toggle = (id) => {\n  $props.items = $props.items.map(i =>\n    i.id === id ? { ...i, done: !i.done } : i\n  )\n  $emit('toggle', id)\n}\n\nconst remove = (id) => {\n  $props.items = $props.items.filter(i => i.id !== id)\n  $emit('remove', id)\n}\n",
+        "content": "\nconst remaining = $computed(() => $props.items.filter(i => !i.done).length)\n\nconst add = () => {\n  const text = $data.draft.trim()\n  if (!text) return\n  $props.items = [...$props.items, { id: crypto.randomUUID(), text, done: false }]\n  $data.draft = ''\n  $emit('add', text)\n}\n\nconst toggle = (id) => {\n  $props.items = $props.items.map(i =>\n    i.id === id ? { ...i, done: !i.done } : i\n  )\n  $emit('toggle', id)\n}\n\n// Internal method renamed from `remove` to `removeItem` to avoid colliding\n// with `HTMLElement.prototype.remove()` on the Lit target — Lit emits user\n// methods as class fields and the resulting `remove(id)` signature is\n// incompatible with the inherited `remove(): void`. Public API is unchanged:\n// the slot param is still `:remove`, the emitted event is still `'remove'`.\nconst removeItem = (id) => {\n  $props.items = $props.items.filter(i => i.id !== id)\n  $emit('remove', id)\n}\n",
         "loc": {
           "start": 684,
-          "end": 1222
+          "end": 1604
         }
       },
       "template": {
-        "content": "\n<div class=\"todo-list\">\n  <header>\n    <slot name=\"header\" :remaining=\"remaining\" :total=\"$props.items.length\">\n      <!-- Fallback content if consumer doesn't provide #header -->\n      <h3>{{ $props.title }} ({{ remaining }} remaining)</h3>\n    </slot>\n  </header>\n\n  <form @submit.prevent=\"add\">\n    <input r-model=\"$data.draft\" placeholder=\"What needs doing?\" />\n    <button type=\"submit\" :disabled=\"!$data.draft.trim()\">Add</button>\n  </form>\n\n  <ul r-if=\"$props.items.length > 0\">\n    <li r-for=\"item in $props.items\" :key=\"item.id\" :class=\"{ done: item.done }\">\n      <!--\n        Default slot with per-item params. Consumer can provide a custom row\n        renderer via `#default=\"{ item, toggle, remove }\"`, or omit it entirely\n        to get the fallback row below.\n      -->\n      <slot :item=\"item\" :toggle=\"() => toggle(item.id)\" :remove=\"() => remove(item.id)\">\n        <label><input type=\"checkbox\" :checked=\"item.done\" @change=\"toggle(item.id)\" /><span>{{ item.text }}</span></label>\n        <button @click=\"remove(item.id)\" aria-label=\"Remove\">×</button>\n      </slot>\n    </li>\n  </ul>\n\n  <p r-else class=\"empty\">\n    <slot name=\"empty\">Nothing to do. ✨</slot>\n  </p>\n</div>\n",
+        "content": "\n<div class=\"todo-list\">\n  <header>\n    <slot name=\"header\" :remaining=\"remaining\" :total=\"$props.items.length\">\n      <!-- Fallback content if consumer doesn't provide #header -->\n      <h3>{{ $props.title }} ({{ remaining }} remaining)</h3>\n    </slot>\n  </header>\n\n  <form @submit.prevent=\"add\">\n    <input r-model=\"$data.draft\" placeholder=\"What needs doing?\" />\n    <button type=\"submit\" :disabled=\"!$data.draft.trim()\">Add</button>\n  </form>\n\n  <ul r-if=\"$props.items.length > 0\">\n    <li r-for=\"item in $props.items\" :key=\"item.id\" :class=\"{ done: item.done }\">\n      <!--\n        Default slot with per-item params. Consumer can provide a custom row\n        renderer via `#default=\"{ item, toggle, remove }\"`, or omit it entirely\n        to get the fallback row below.\n      -->\n      <slot :item=\"item\" :toggle=\"() => toggle(item.id)\" :remove=\"() => removeItem(item.id)\">\n        <label><input type=\"checkbox\" :checked=\"item.done\" @change=\"toggle(item.id)\" /><span>{{ item.text }}</span></label>\n        <button @click=\"removeItem(item.id)\" aria-label=\"Remove\">×</button>\n      </slot>\n    </li>\n  </ul>\n\n  <p r-else class=\"empty\">\n    <slot name=\"empty\">Nothing to do. ✨</slot>\n  </p>\n</div>\n",
         "loc": {
-          "start": 1224,
-          "end": 2438
+          "start": 1606,
+          "end": 2828
         }
       },
       "style": {
         "content": "\n.todo-list { font-family: system-ui, sans-serif; }\nul { list-style: none; padding: 0; }\nli { display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0; }\nli.done span { text-decoration: line-through; opacity: 0.5; }\n.empty { color: rgba(0, 0, 0, 0.4); font-style: italic; }\nform { display: flex; gap: 0.25rem; margin-block: 0.5rem; }\n",
         "loc": {
-          "start": 2440,
-          "end": 2800
+          "start": 2830,
+          "end": 3190
         }
       }
     }

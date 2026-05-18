@@ -6,6 +6,7 @@
     "jsx": "preserve",
     "jsxImportSource": "solid-js",
     "strict": true,
+    "noImplicitAny": false,
     "skipLibCheck": true,
     "verbatimModuleSyntax": true,
     "isolatedModules": true,

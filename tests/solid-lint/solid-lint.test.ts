@@ -16,7 +16,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync, rmSync, copyFileSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, rmSync, copyFileSync, symlinkSync } from 'node:fs';
 import { readFileSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -73,6 +73,52 @@ describe('SOLID-T-04 — eslint-plugin-solid clean (--max-warnings 0)', () => {
         const stdout = (err as { stdout?: Buffer }).stdout?.toString() ?? '';
         const stderr = (err as { stderr?: Buffer }).stderr?.toString() ?? '';
         throw new Error('eslint exited non-zero:\n' + stdout + '\n' + stderr);
+      }
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('SOLID-TSC — tsc --noEmit clean over emitted Solid TSX', () => {
+  // Catches the class of bug that eslint-plugin-solid does not:
+  //   - TDZ ("use before declaration") in emitter output (2026-05-18 SortableListDemo)
+  //   - "void is not callable" / wrong-arg-count from lifecycle/watcher emit
+  //   - Type mismatches in slot fallback / merge expressions
+  //   - Missing or wrong-shaped helper-runtime imports
+  // Implementation mirrors the eslint gate above: compile every example to TSX,
+  // write them into a tmpdir with a tsconfig + node_modules symlink, invoke tsc.
+  it('all 8 emitted Solid TSX files tsc clean', () => {
+    const tmpDir = mkdtempSync(join(tmpdir(), 'rozie-solid-tsc-'));
+    try {
+      for (const name of EXAMPLES) {
+        const source = readFileSync(resolve(ROOT, 'examples/' + name + '.rozie'), 'utf8');
+        const result = compile(source, {
+          target: 'solid',
+          filename: name + '.rozie',
+          sourceMap: false,
+        });
+        const errors = result.diagnostics.filter((d) => d.severity === 'error');
+        expect(errors).toEqual([]);
+        writeFileSync(join(tmpDir, name + '.tsx'), result.code, 'utf8');
+      }
+
+      copyFileSync(join(HERE, 'tsconfig.json'), join(tmpDir, 'tsconfig.json'));
+      // Symlink the lint workspace's node_modules so tsc resolves solid-js,
+      // @rozie/runtime-solid, etc. — matches the same pattern eslint uses (it
+      // reads its plugins from HERE/node_modules via --config).
+      symlinkSync(join(HERE, 'node_modules'), join(tmpDir, 'node_modules'), 'dir');
+
+      const tscBin = resolve(HERE, 'node_modules/.bin/tsc');
+      try {
+        execFileSync(tscBin, ['--noEmit', '-p', 'tsconfig.json'], {
+          cwd: tmpDir,
+          stdio: 'pipe',
+        });
+      } catch (err) {
+        const stdout = (err as { stdout?: Buffer }).stdout?.toString() ?? '';
+        const stderr = (err as { stderr?: Buffer }).stderr?.toString() ?? '';
+        throw new Error('tsc --noEmit exited non-zero:\n' + stdout + '\n' + stderr);
       }
     } finally {
       rmSync(tmpDir, { recursive: true, force: true });

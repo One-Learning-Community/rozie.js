@@ -101,6 +101,48 @@ describe('emitScript — Lit class-body assembly', () => {
     expect(code).toContain('this.unlockScroll');
   });
 
+  it('lifecycle concise-arrow body: `$onMount(() => method())` splices the call as a statement (no double-call)', () => {
+    // Regression for 2026-05-18 SortableListDemo bug: extractCleanupReturn strips
+    // the arrow wrapper from `$onMount(() => reset())`, leaving the bare `reset()`
+    // CallExpression as `hook.setup`. Previously emitScript wrapped that in another
+    // CallExpression — emitting `this.reset()();` (double-call). Fix splices the
+    // expression as a statement when it's not a callable reference.
+    const src = `<rozie name="MountConcise">
+<data>{ items: [] }</data>
+<script>
+const reset = () => { $data.items = [1, 2, 3] }
+$onMount(() => reset())
+</script>
+<template><div /></template>
+</rozie>`;
+    const { ast } = parse(src, { filename: 'MountConcise.rozie' });
+    const registry = createDefaultRegistry();
+    const { ir } = lowerToIR(ast!, { modifierRegistry: registry });
+    const code = emitLit(ir!, { filename: 'MountConcise.rozie', source: src, modifierRegistry: registry }).code;
+    expect(code).toMatch(/firstUpdated\(\):\s*void\s*\{\s*this\.reset\(\);\s*\}/);
+    expect(code).not.toContain('this.reset()()');
+  });
+
+  it('lifecycle identifier-form: `$onMount(reset)` invokes the function reference (no double-call regression)', () => {
+    // Sibling assertion to the concise-body test — verifies the fix does NOT
+    // break the identifier path. An Identifier callback (`$onMount(reset)`) is
+    // a function reference; the emitter must wrap it in a CallExpression so
+    // the firstUpdated body actually invokes it.
+    const src = `<rozie name="MountIdentifier">
+<data>{ items: [] }</data>
+<script>
+const reset = () => { $data.items = [1, 2, 3] }
+$onMount(reset)
+</script>
+<template><div /></template>
+</rozie>`;
+    const { ast } = parse(src, { filename: 'MountIdentifier.rozie' });
+    const registry = createDefaultRegistry();
+    const { ir } = lowerToIR(ast!, { modifierRegistry: registry });
+    const code = emitLit(ir!, { filename: 'MountIdentifier.rozie', source: src, modifierRegistry: registry }).code;
+    expect(code).toMatch(/firstUpdated\(\):\s*void\s*\{\s*this\.reset\(\);\s*\}/);
+  });
+
   it('Quick 260515-u2b — $watch emits `this._disconnectCleanups.push(effect(() => { ... }))` AND adds effect to @lit-labs/preact-signals imports', () => {
     // Synthesize a minimal source with $watch so we hit only the watcher path.
     const source = `<rozie name="WatchSynth">

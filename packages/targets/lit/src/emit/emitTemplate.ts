@@ -569,10 +569,17 @@ function buildEventParts(
   // keeps the emitted output typecheck-clean. Mirrors emitListeners.ts.
   const isFunctionLike = isHandlerLike(listener.handler);
   const evtType = eventTypeFor(eventName);
+  // Cast the handler to a permissive signature when we invoke it with `e`. A
+  // user method declared `close = () => void` is a perfectly reasonable @click
+  // handler but tsc flags `(this.close)(e)` as TS2554 "Expected 0 arguments,
+  // but got 1". The cast keeps the emit shape identical at runtime while
+  // letting tsc accept the synthetic event arg uniformly across `() => void`
+  // and `(e: Event) => void` user methods.
+  const HANDLER_CAST = ' as (...args: any[]) => any';
   let body: string;
   if (inlineGuards.length > 0) {
     if (isFunctionLike) {
-      body = `(e: ${evtType}) => { ${inlineGuards.join(' ')} (${handler})(e); }`;
+      body = `(e: ${evtType}) => { ${inlineGuards.join(' ')} ((${handler})${HANDLER_CAST})(e); }`;
     } else {
       body = `(e: ${evtType}) => { ${inlineGuards.join(' ')} ${handler}; }`;
     }
@@ -593,7 +600,7 @@ function buildEventParts(
     // AFTER this wrapper field. A lazy `(e) => (body)(e)` defers the lookup
     // to event time, when all class fields are initialized.
     opts._state.debouncedFieldDecls.push(
-      `  private ${fieldName} = ${wrapKind.kind}((e: Event) => (${body})(e), ${wrapKind.ms});`,
+      `  private ${fieldName} = ${wrapKind.kind}((e: Event) => ((${body}) as (...args: any[]) => any)(e), ${wrapKind.ms});`,
     );
     opts._state.debounceCleanupWiring.push(
       `this._disconnectCleanups.push(() => this.${fieldName}.cancel());`,
@@ -637,10 +644,13 @@ function extractNumberArg(args: unknown[] | undefined): number {
  * Calling the body as a function with the event argument works uniformly
  * for all three shapes thanks to JavaScript's `(expr)(arg)` invocation.
  */
-function mergeHandlerBodies(bodies: string[]): string {
+function mergeHandlerBodies(bodies: string[], evtType: string = 'Event'): string {
   if (bodies.length === 1) return bodies[0]!;
   const invocations = bodies.map((b) => `(${b})(e);`).join(' ');
-  return `(e: Event) => { ${invocations} }`;
+  // Type the outer wrapper with the event-specific type so child handlers
+  // typed `(e: KeyboardEvent) => ...` (from inline guards like `.enter`/`.escape`)
+  // don't get a `Event`-typed `e` passed in — tsc flags TS2345 otherwise.
+  return `(e: ${evtType}) => { ${invocations} }`;
 }
 
 function emitElementOpenTag(
@@ -771,7 +781,7 @@ function emitElementOpenTag(
   }
   for (const name of groupOrder) {
     const bodies = groups.get(name)!;
-    const merged = mergeHandlerBodies(bodies);
+    const merged = mergeHandlerBodies(bodies, eventTypeFor(name));
     parts.push(`@${name}=\${${merged}}`);
   }
 
@@ -959,7 +969,12 @@ function emitLoop(
   // index alias resolve in the key callback's scope (mirrors the renderer's
   // scope). Without this, `:key="fn(item, index)"` saw an undefined `index`.
   const keyFn = `(${item}, ${idx}) => ${keyExpr}`;
-  return `\${repeat(${items}, ${keyFn}, (${item}, ${idx}) => html\`${body}\`)}`;
+  // Explicit `<any>` type arg on repeat — Lit's `repeat<T>(items, keyFn, tplFn)`
+  // can't infer T from an `any`-typed iterable (e.g. `this.node` declared as
+  // `any` because the rozie prop type was `Object`), and T defaults to
+  // `unknown`, making `(child) => child.id` access fail. Explicit `<any>`
+  // matches the looseness already in the prop type contract.
+  return `\${repeat<any>(${items}, ${keyFn}, (${item}, ${idx}) => html\`${body}\`)}`;
 }
 
 // NOTE: REPEAT_USED singleton removed in CR-06 fix. repeatUsed is now returned
@@ -1001,8 +1016,12 @@ function emitSlot(
       const argCode = rewriteTemplateExpression(arg.expression, ir);
       if (isFnLike) {
         const evt = `rozie-${name || 'default'}-${arg.name}`;
+        // Wrap argCode in parens before the cast — argCode is often an arrow
+        // expression like `() => this.toggle(item.id)` and `as` binds tighter
+        // than `=>`, so a naked cast would attach to the arrow's return value
+        // instead of the whole arrow. The explicit parens fix the precedence.
         hostListenerWiring.push(
-          `this.addEventListener('${evt}', (e) => { (${argCode})((e as CustomEvent).detail); });`,
+          `this.addEventListener('${evt}', (e) => { ((${argCode}) as (...args: any[]) => any)((e as CustomEvent).detail); });`,
         );
       } else {
         dataEntries.push(`${arg.name}: ${argCode}`);
