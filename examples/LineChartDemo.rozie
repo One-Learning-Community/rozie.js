@@ -1,0 +1,249 @@
+<!--
+  LineChartDemo.rozie — companion consumer for LineChart.
+
+  Six-way fanout of a "live-updating dashboard chart" demo from one .rozie.
+
+  Exercises:
+    - One-way prop reactivity over a deeply-nested object (Chart.js's
+      `{ labels, datasets: [{...}] }` shape) — the wrapper's $watch
+      reconciles into the live chart instead of re-mounting
+    - $computed deriving chart data from raw $data inputs
+    - r-for outside any foreign slot — index() auto-invocation safe on Solid
+    - Interval-driven $data mutation via $onMount + cleanup (the live-feed
+      simulator pushes a new point every 1.2s)
+    - Component composition via <components> block
+-->
+
+<rozie name="LineChartDemo">
+
+<components>
+{
+  LineChart: './LineChart.rozie',
+}
+</components>
+
+<data>
+{
+  points: [12, 19, 8, 15, 22, 18, 24],
+  liveFeed: false,
+  chartType: 'line',
+}
+</data>
+
+<script>
+let timerId = null
+
+const chartData = $computed(() => {
+  const labels = $data.points.map((_, i) => `T-${$data.points.length - i - 1}`)
+  return {
+    labels,
+    datasets: [{
+      label: 'Demand',
+      data: $data.points,
+      borderColor: 'rgb(59, 130, 246)',
+      backgroundColor: 'rgba(59, 130, 246, 0.15)',
+      tension: 0.3,
+      fill: true,
+      pointRadius: 3,
+      pointHoverRadius: 5,
+    }],
+  }
+})
+
+const chartOpts = $computed(() => ({
+  plugins: {
+    legend: { display: true, position: 'top' },
+  },
+  scales: {
+    y: { beginAtZero: true, grid: { color: 'rgba(0, 0, 0, 0.04)' } },
+    x: { grid: { display: false } },
+  },
+}))
+
+const stats = $computed(() => {
+  const xs = $data.points
+  if (xs.length === 0) return { min: 0, max: 0, avg: 0 }
+  const min = Math.min(...xs)
+  const max = Math.max(...xs)
+  const avg = xs.reduce((a, b) => a + b, 0) / xs.length
+  return { min, max, avg: Math.round(avg * 10) / 10 }
+})
+
+const pushPoint = () => {
+  const next = Math.round(5 + Math.random() * 25)
+  $data.points = [...$data.points.slice(-19), next]
+}
+
+const reset = () => {
+  $data.points = [12, 19, 8, 15, 22, 18, 24]
+}
+
+const toggleFeed = () => {
+  $data.liveFeed = !$data.liveFeed
+}
+
+$onMount(() => {
+  // The interval lifecycle is driven by the boolean prop, not by $onMount
+  // alone — we start/stop in a $watch so toggling the checkbox flips the
+  // feed without remounting the component.
+  return () => {
+    if (timerId !== null) {
+      clearInterval(timerId)
+      timerId = null
+    }
+  }
+})
+
+$watch(() => $data.liveFeed, (on) => {
+  if (on) {
+    if (timerId === null) timerId = setInterval(pushPoint, 1200)
+  } else {
+    if (timerId !== null) {
+      clearInterval(timerId)
+      timerId = null
+    }
+  }
+})
+</script>
+
+<template>
+<div class="chart-demo">
+  <header>
+    <h3>Live data feed</h3>
+    <p class="hint">Push points manually or toggle the simulated feed. The chart reconciles via <code>$watch</code> — no remount per tick.</p>
+  </header>
+
+  <div class="chart-wrap">
+    <LineChart :data="chartData" :options="chartOpts" :type="$data.chartType" :height="280" />
+  </div>
+
+  <div class="grid">
+    <section class="controls">
+      <div class="control-row">
+        <button type="button" @click="pushPoint">Push point</button>
+        <button type="button" @click="reset">Reset</button>
+      </div>
+      <label class="check">
+        <input type="checkbox" r-model="$data.liveFeed" />
+        Live feed (1.2s)
+      </label>
+      <div class="control-row">
+        <span class="row-label">Type</span>
+        <button type="button" :class="{ active: $data.chartType === 'line' }" @click="$data.chartType = 'line'">Line</button>
+        <button type="button" :class="{ active: $data.chartType === 'bar' }" @click="$data.chartType = 'bar'">Bar</button>
+      </div>
+    </section>
+
+    <aside class="state-pane">
+      <h4>Stats</h4>
+      <dl class="stats">
+        <dt>Count</dt>
+        <dd>{{ $data.points.length }}</dd>
+        <dt>Min</dt>
+        <dd>{{ stats.min }}</dd>
+        <dt>Max</dt>
+        <dd>{{ stats.max }}</dd>
+        <dt>Avg</dt>
+        <dd>{{ stats.avg }}</dd>
+      </dl>
+    </aside>
+  </div>
+</div>
+</template>
+
+<style>
+.chart-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  max-width: 720px;
+}
+
+header h3 { margin: 0 0 0.25rem; font-size: 1.125rem; }
+header .hint { margin: 0 0 1rem; color: rgba(0, 0, 0, 0.55); font-size: 0.875rem; }
+header code { background: rgba(0, 0, 0, 0.04); padding: 0.0625rem 0.25rem; border-radius: 2px; font-size: 0.85em; }
+
+.chart-wrap {
+  margin-bottom: 1rem;
+  padding: 0.5rem;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 6px;
+  background: white;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.controls, .state-pane { min-width: 0; }
+
+.control-row {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin-bottom: 0.5rem;
+}
+.row-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: rgba(0, 0, 0, 0.55);
+  margin-right: 0.25rem;
+}
+
+.controls button {
+  padding: 0.375rem 0.75rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.875rem;
+}
+.controls button.active {
+  background: #1a1a1a;
+  color: white;
+  border-color: #1a1a1a;
+}
+
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.875rem;
+  margin-bottom: 0.5rem;
+  cursor: pointer;
+}
+
+.state-pane h4 {
+  margin: 0 0 0.5rem;
+  font-size: 0.75rem;
+  color: rgba(0, 0, 0, 0.55);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.375rem 0.75rem;
+  margin: 0;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 6px;
+  font-size: 0.875rem;
+}
+.stats dt {
+  color: rgba(0, 0, 0, 0.55);
+  font-weight: 500;
+}
+.stats dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+</style>
+
+</rozie>

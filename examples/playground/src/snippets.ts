@@ -104,6 +104,12 @@ const BUNDLE_DECLS: readonly BundleDecl[] = [
     entryGlobPath: '../../LeafletMapDemo.rozie',
     dependencyGlobPaths: ['../../LeafletMap.rozie'],
   },
+  {
+    key: 'bundle/LineChartDemo',
+    label: 'bundle/LineChartDemo',
+    entryGlobPath: '../../LineChartDemo.rozie',
+    dependencyGlobPaths: ['../../LineChart.rozie'],
+  },
 ];
 
 function bundleSnippetFromDecl(decl: BundleDecl): Snippet | null {
