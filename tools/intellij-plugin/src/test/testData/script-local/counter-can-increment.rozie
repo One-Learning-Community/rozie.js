@@ -1,0 +1,15 @@
+<rozie name="CounterCanIncrement">
+<props>
+{
+  value: { type: Number, default: 0, model: true },
+  step: { type: Number, default: 1 },
+}
+</props>
+<script>
+const canIncrement = $computed(() => $props.value + $props.step <= 100);
+const canDecrement = $computed(() => $props.value - $props.step >= 0);
+const increment = () => { if (canIncre<caret>ment) $props.value += $props.step; };
+const decrement = () => { if (canDecrement) $props.value -= $props.step; };
+</script>
+<template><button @click="increment">+</button></template>
+</rozie>

@@ -56,8 +56,45 @@ class RozieMultiHostInjector : MultiHostInjector {
                 //   - SCRIPT_BODY is a statement list (function decls, const decls, lifecycle
                 //     calls); wrapping in parens would parse it as a single expression and
                 //     break top-level declarations.
+                //
+                // Plan 08.2-17 (P1-UAT-13 closure): coalesce consecutive SCRIPT_BODY
+                // tokens into ONE JS-injected range. The JFlex IN_SCRIPT_BODY state
+                // (Rozie.flex:198-204) emits a separate SCRIPT_BODY token at every
+                // `<` character — rule `[^<]+` greedily consumes up to the next `<`,
+                // then the standalone `"<"` rule emits a 1-char SCRIPT_BODY for the
+                // `<` itself, then `[^<]+` resumes. A script body containing JS
+                // comparison operators like `$props.step <= $props.max` produces
+                // THREE SCRIPT_BODY tokens. Without coalescing, RozieMultiHostInjector
+                // calls injectJs once per token, creating N independent JS injection
+                // ranges. JavaScript lexical scope cannot span the fragments — so
+                // `const canIncrement` declared in fragment 1 is invisible to
+                // `if (canIncrement)` referenced in fragment 3, and the caret-
+                // containing fragment is also a syntax error (`= 100);` at file
+                // start) so the JS parser cannot even surface a JSReferenceExpression
+                // at the caret. Task 1's diagnostic test
+                // RozieScriptLocalResolutionTest.testInjectedScriptFragmentSharesScopeAcrossStatements
+                // empirically confirmed this — decl file range=(0,5444); ref file
+                // range=(0,5610). Coalescing into one greedy SCRIPT_BODY range
+                // mirrors the TEMPLATE_BODY coalescing immediately below (Plan 02
+                // shipped the same fix for HTMLLanguage). The threat-model entry
+                // T-08.2-40 dispositions this as `mitigate` and explicitly scopes
+                // the coalescing change to SCRIPT_BODY only — other BODY types stay
+                // on their existing per-token helpers (PROPS_BODY / DATA_BODY /
+                // COMPONENTS_BODY / LISTENERS_BODY are object literals where `<` is
+                // virtually never inside the body; the existing Plan 11/15 paren-wrap
+                // tests pin that behavior).
                 RozieTokenTypes.SCRIPT_BODY,
-                -> { injectJs(registrar, host, tok.range); i++ }
+                -> {
+                    var j = i
+                    val start = tok.range.startOffset
+                    var end = tok.range.endOffset
+                    while (j + 1 < tokens.size && tokens[j + 1].type == RozieTokenTypes.SCRIPT_BODY) {
+                        j++
+                        end = tokens[j].range.endOffset
+                    }
+                    injectJs(registrar, host, TextRange(start, end))
+                    i = j + 1
+                }
 
                 // PROPS_BODY / DATA_BODY / COMPONENTS_BODY / LISTENERS_BODY are by-design
                 // object literals. Paren-wrap via addPlace prefix=`(\n` + suffix=`\n)`
