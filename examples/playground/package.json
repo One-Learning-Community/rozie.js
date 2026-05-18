@@ -11,9 +11,9 @@
   },
   "dependencies": {
     "@rozie/core": "workspace:*",
-    "monaco-editor-textmate": "^4.0.0",
-    "monaco-textmate": "^3.0.1",
-    "onigasm": "^2.2.5"
+    "tm-grammars": "^1.31.15",
+    "vscode-oniguruma": "^2.0.1",
+    "vscode-textmate": "^9.3.2"
   },
   "devDependencies": {
     "@types/node": "^22",
