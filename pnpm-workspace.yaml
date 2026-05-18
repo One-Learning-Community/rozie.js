@@ -13,6 +13,7 @@ packages:
   - "tests/lit-lint"
   - "tests/svelte-typecheck"
   - "tests/angular-typecheck"
+  - "tests/vue-typecheck"
   - "tests/visual-regression"
   - "tests/slot-matrix"
   - "tests/regressions"

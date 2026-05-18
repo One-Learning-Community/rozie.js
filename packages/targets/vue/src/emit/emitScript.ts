@@ -97,14 +97,27 @@ function genCode(node: t.Node): string {
  *   - { kind: 'identifier', name: 'Number' }   → 'number'
  *   - { kind: 'identifier', name: 'String' }   → 'string'
  *   - { kind: 'identifier', name: 'Boolean' }  → 'boolean'
- *   - { kind: 'identifier', name: 'Array' }    → 'unknown[]'
- *   - { kind: 'identifier', name: 'Object' }   → 'unknown'
- *   - { kind: 'identifier', name: 'Function' } → '(...args: any[]) => any'
+ *   - { kind: 'identifier', name: 'Array' }    → 'any[]'
+ *   - { kind: 'identifier', name: 'Object' }   → 'Record<string, any>'
+ *   - { kind: 'identifier', name: 'Function' } → '((...args: any[]) => any) | null'
  *   - { kind: 'union', members: [...] }        → join with ' | '
  *   - { kind: 'literal', value: 'string' }     → 'string'
  *
  * Other identifier names pass through verbatim (e.g., user-declared interface
  * names) — TS will validate at consumer compile time.
+ *
+ * Why `any[]` / `Record<string, any>` (not `unknown[]` / `unknown`): the
+ * PropTypeAnnotation carries no inner-element/inner-property info, so under
+ * `unknown` every template expression `item.id` or `props.node.label` fails
+ * with TS18046 ("X is of type 'unknown'"). `any` keeps consumer-side template
+ * expressions ergonomic without requiring inner-type annotations in the rozie
+ * source. Matches the Solid/Lit fix from commit 536575a (vue-tsc gate).
+ *
+ * Why `((...args: any[]) => any) | null` for Function: rozie source patterns
+ * like `onClose: { type: Function, default: null }` (Card.rozie, CardHeader.rozie)
+ * emit `withDefaults(..., { onClose: null })` — vue-tsc rejects `null` against
+ * a non-nullable function type. Including `| null` in the type accepts the
+ * default and matches the Lit target's `renderTsType` convention.
  */
 function renderType(t: PropTypeAnnotation): string {
   if (t.kind === 'identifier') {
@@ -116,11 +129,11 @@ function renderType(t: PropTypeAnnotation): string {
       case 'Boolean':
         return 'boolean';
       case 'Array':
-        return 'unknown[]';
+        return 'any[]';
       case 'Object':
-        return 'unknown';
+        return 'Record<string, any>';
       case 'Function':
-        return '(...args: any[]) => any';
+        return '((...args: any[]) => any) | null';
       default:
         return t.name; // Pass through user-declared types verbatim.
     }
@@ -130,9 +143,9 @@ function renderType(t: PropTypeAnnotation): string {
   }
   if (t.kind === 'literal') {
     // 'string'|'number'|'boolean'|'function'|'object'|'array'
-    if (t.value === 'array') return 'unknown[]';
-    if (t.value === 'object') return 'unknown';
-    if (t.value === 'function') return '(...args: any[]) => any';
+    if (t.value === 'array') return 'any[]';
+    if (t.value === 'object') return 'Record<string, any>';
+    if (t.value === 'function') return '((...args: any[]) => any) | null';
     return t.value;
   }
   // Should be exhaustive — but fall back to 'unknown' for safety.
