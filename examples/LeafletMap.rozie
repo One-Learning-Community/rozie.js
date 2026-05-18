@@ -1,0 +1,133 @@
+<!--
+  LeafletMap.rozie — data-bound port of Leaflet (Leaflet.js).
+
+  Leaflet has solid wrappers in React (react-leaflet) and Vue
+  (vue-leaflet/@vue-leaflet) but Svelte, Angular, Solid, and Lit
+  consumers are stuck with either community-maintained gaps or
+  hand-rolled $el-passing harnesses. ONE Rozie file fixes that.
+
+  Two-way bind the map's view:
+
+    <LeafletMap
+      r-model:center="$data.center"
+      r-model:zoom="$data.zoom"
+      :markers="$data.markers"
+      @click="onMapClick"
+    />
+
+  Consumers must import Leaflet's CSS themselves (the .rozie file's
+  <style> is scoped so it can't ship the .leaflet-* selectors). Either:
+    - `import 'leaflet/dist/leaflet.css'` at the app entry, or
+    - <link> the CDN copy in index.html.
+
+  Why this is a worthwhile demo:
+    - Real $watch exercise — center/zoom reconciliation into a live map
+      instance without re-creating it (re-creating Leaflet maps is slow
+      and flickers).
+    - Two TWO-WAY scalar props at once (cf. SortableList's one array,
+      Flatpickr's one string).
+    - Engine that mutates DOM aggressively under the framework's feet —
+      same shape as SortableJS, different domain.
+-->
+
+<rozie name="LeafletMap">
+
+<props>
+{
+  center:  { type: Array,   default: () => [51.505, -0.09], model: true },
+  zoom:    { type: Number,  default: 13,                    model: true },
+  markers: { type: Array,   default: () => [] },
+  options: { type: Object,  default: () => ({}) },
+}
+</props>
+
+<script>
+import L from 'leaflet'
+
+let instance = null
+let markerLayer = null
+let suppressViewSync = false
+
+const renderMarkers = (list) => {
+  if (!markerLayer) return
+  markerLayer.clearLayers()
+  for (const m of list) {
+    if (!m || typeof m.lat !== 'number' || typeof m.lng !== 'number') continue
+    const marker = L.marker([m.lat, m.lng])
+    if (m.label) marker.bindPopup(String(m.label))
+    marker.addTo(markerLayer)
+  }
+}
+
+$onMount(() => {
+  instance = L.map($el, {
+    center:    $props.center,
+    zoom:      $props.zoom,
+    ...$props.options,
+  })
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    maxZoom: 19,
+  }).addTo(instance)
+
+  markerLayer = L.layerGroup().addTo(instance)
+  renderMarkers($props.markers)
+
+  instance.on('moveend', () => {
+    // suppressViewSync guards the round-trip: when WE call setView from a
+    // prop change, Leaflet still fires moveend — we don't want to bounce
+    // that back as a "user moved the map" event.
+    if (suppressViewSync) { suppressViewSync = false; return }
+    const c = instance.getCenter()
+    const next = [c.lat, c.lng]
+    if (next[0] !== $props.center[0] || next[1] !== $props.center[1]) {
+      $props.center = next
+    }
+    const z = instance.getZoom()
+    if (z !== $props.zoom) $props.zoom = z
+  })
+
+  instance.on('click', (e) => {
+    $emit('click', { lat: e.latlng.lat, lng: e.latlng.lng })
+  })
+
+  return () => instance?.remove()
+})
+
+// Reconcile prop changes into the live map. setView is the supported
+// runtime-update path for center+zoom; we batch them when both change.
+$watch(() => $props.center, (v) => {
+  if (!instance || !Array.isArray(v) || v.length !== 2) return
+  const c = instance.getCenter()
+  if (v[0] === c.lat && v[1] === c.lng) return
+  suppressViewSync = true
+  instance.setView(v, instance.getZoom(), { animate: false })
+})
+
+$watch(() => $props.zoom, (v) => {
+  if (!instance || typeof v !== 'number') return
+  if (v === instance.getZoom()) return
+  suppressViewSync = true
+  instance.setZoom(v, { animate: false })
+})
+
+$watch(() => $props.markers, (v) => renderMarkers(v))
+</script>
+
+<template>
+<div class="rozie-leaflet-map" />
+</template>
+
+<style>
+.rozie-leaflet-map {
+  width: 100%;
+  height: 100%;
+  min-height: 300px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 6px;
+  overflow: hidden;
+}
+</style>
+
+</rozie>
