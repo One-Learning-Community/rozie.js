@@ -219,9 +219,14 @@ export function hoistModuleLet(program: File, ir: IRComponent): HoistResult {
   // 5. Walk again and rewrite all Identifier references to hoisted names
   //    into `name.current` MemberExpressions.
   const hoistedNames = new Set(hoisted.map((h) => h.name));
+  // Identifiers we manufactured as the `.object` of a freshly-built
+  // `name.current` MemberExpression — visiting these would double-rewrite
+  // into `name.current.current`. Tracked via WeakSet keyed on node identity.
+  const synthesizedIdentifiers = new WeakSet<t.Node>();
   if (hoistedNames.size > 0) {
     traverse(program, {
       Identifier(path) {
+        if (synthesizedIdentifiers.has(path.node)) return;
         if (!hoistedNames.has(path.node.name)) return;
         const parent = path.parent;
         // Skip property positions.
@@ -232,8 +237,30 @@ export function hoistModuleLet(program: File, ir: IRComponent): HoistResult {
         ) {
           return;
         }
-        // Skip ObjectProperty key positions.
-        if (t.isObjectProperty(parent) && parent.key === path.node && !parent.shorthand) {
+        // ObjectProperty key positions:
+        //   - non-shorthand `{ X: expr }` → the key is just a property name,
+        //     not a reference; skip.
+        //   - shorthand `{ X }` is BOTH key and value (same Identifier node).
+        //     If the grandparent is an ObjectPattern (destructuring binding,
+        //     e.g. `({ X }) => …` or `const { X } = obj`), this is a BINDING
+        //     not a reference — skip. If the grandparent is an ObjectExpression
+        //     (value position, e.g. `return { X }`), un-shorthand the property
+        //     and rewrite the VALUE to `X.current`, leaving the key as `X`.
+        if (t.isObjectProperty(parent) && parent.key === path.node) {
+          if (!parent.shorthand) return;
+          const grandparent = path.parentPath?.parent;
+          if (t.isObjectPattern(grandparent)) return;
+          // ObjectExpression value position: un-shorthand + rewrite value.
+          // We mutate parent (replaceWith doesn't apply — the path is shared
+          // between key and value in shorthand form, so replacing it would
+          // also clobber the key). Mark the new object Identifier as
+          // synthesized so the visitor skips it on its next descent —
+          // otherwise it would re-rewrite into `name.current.current`.
+          const synthObject = t.identifier(path.node.name);
+          synthesizedIdentifiers.add(synthObject);
+          parent.shorthand = false;
+          parent.value = t.memberExpression(synthObject, t.identifier('current'));
+          path.skip();
           return;
         }
         // Skip declaration-id positions.
@@ -243,6 +270,48 @@ export function hoistModuleLet(program: File, ir: IRComponent): HoistResult {
         if (t.isImportSpecifier(parent) || t.isImportDefaultSpecifier(parent)) return;
         if (t.isExportSpecifier(parent)) return;
         if (t.isLabeledStatement(parent) && parent.label === path.node) return;
+        // Skip identifiers nested ANYWHERE inside an ObjectPattern /
+        // ArrayPattern (destructuring binding positions — function params,
+        // `const { x } = …`, `[a, b] = …`). The shorthand-ObjectProperty
+        // branch above catches the most common case directly; this guard
+        // catches nested patterns (`{ x: { y } }`) and array-pattern
+        // elements. AssignmentPattern default values (`{ x = expr }`) are
+        // expressions, NOT bindings — those should still get rewritten,
+        // so we stop the walk at AssignmentPattern.right.
+        {
+          let walker: typeof path.parentPath | null = path.parentPath;
+          while (walker) {
+            const node = walker.node;
+            if (t.isObjectPattern(node) || t.isArrayPattern(node)) return;
+            if (
+              t.isAssignmentPattern(node) &&
+              walker.parentPath?.node &&
+              (t.isObjectProperty(walker.parentPath.node) ||
+                t.isArrayPattern(walker.parentPath.node) ||
+                t.isObjectPattern(walker.parentPath.node))
+            ) {
+              // We're inside an AssignmentPattern. If we descended via the
+              // RIGHT (default value), it's an expression → keep rewriting.
+              // If via the LEFT (the binding), skip.
+              if (node.left === path.node || isAncestorVia(node, 'left', path.node)) {
+                return;
+              }
+              break;
+            }
+            if (t.isFunction(node)) break;
+            walker = walker.parentPath;
+          }
+        }
+
+        // Lexical-scope shadowing: if a local binding (function param,
+        // destructuring pattern, inner let/const) shadows the hoisted
+        // name, the reference points at the LOCAL, not the (now-removed)
+        // module-let. Skip the rewrite. After removing the module-let
+        // declarations, the only remaining bindings for these names are
+        // local — but Babel's scope cache is stale post-mutation, so we
+        // do a manual ancestor walk looking for binding nodes that
+        // introduce a local `name` shadow.
+        if (hasShadowingBinding(path, path.node.name)) return;
 
         // Replace `X` → `X.current`.
         path.replaceWith(
@@ -254,4 +323,104 @@ export function hoistModuleLet(program: File, ir: IRComponent): HoistResult {
   }
 
   return { hoisted, diagnostics };
+}
+
+/**
+ * Check whether `node` is reachable from `ancestor` exclusively via the
+ * named property (e.g. an AssignmentPattern's `left` subtree). Used to
+ * distinguish "this identifier is the binding side of `{ x = default }`"
+ * from "this identifier is in the default expression side."
+ */
+function isAncestorVia(ancestor: t.Node, key: 'left' | 'right', target: t.Node): boolean {
+  const seed = (ancestor as unknown as Record<string, unknown>)[key];
+  if (!seed) return false;
+  let found = false;
+  function walk(n: t.Node | null | undefined): void {
+    if (!n || found) return;
+    if (n === target) { found = true; return; }
+    for (const k of Object.keys(n)) {
+      if (k === 'loc' || k === 'start' || k === 'end' || k === 'leadingComments' || k === 'trailingComments' || k === 'innerComments') continue;
+      const v = (n as unknown as Record<string, unknown>)[k];
+      if (Array.isArray(v)) {
+        for (const item of v) {
+          if (item && typeof item === 'object' && 'type' in item) walk(item as t.Node);
+        }
+      } else if (v && typeof v === 'object' && 'type' in v) {
+        walk(v as t.Node);
+      }
+    }
+  }
+  walk(seed as t.Node);
+  return found;
+}
+
+/**
+ * Returns true if `name` is bound by a local declaration that lexically
+ * encloses `path`. Walks ancestors looking for function parameters
+ * (including destructuring patterns) and inner `let`/`const`/`var`
+ * declarations that introduce a shadowing binding.
+ *
+ * We do NOT rely on Babel's `path.scope.getBinding` here because the
+ * scope cache is stale after the module-let declarations have been
+ * spliced out of the Program body (step 4 above mutates the AST
+ * without crawling). Manual ancestor inspection avoids the staleness.
+ */
+function hasShadowingBinding(path: { parentPath: ParentPathLike | null }, name: string): boolean {
+  for (let walker: ParentPathLike | null = path.parentPath; walker; walker = walker.parentPath) {
+    const node = walker.node;
+    // Function boundary: check parameters (including destructured ones).
+    if (t.isFunction(node)) {
+      for (const param of node.params) {
+        if (patternIntroducesBinding(param, name)) return true;
+      }
+      // Don't stop here — keep walking outer scopes.
+    }
+    // Block-scoped declarations inside the same scope.
+    if (t.isBlockStatement(node) || t.isProgram(node)) {
+      for (const stmt of node.body) {
+        if (!t.isVariableDeclaration(stmt)) continue;
+        for (const decl of stmt.declarations) {
+          if (patternIntroducesBinding(decl.id, name)) return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
+type ParentPathLike = {
+  node: t.Node;
+  parentPath: ParentPathLike | null;
+};
+
+/**
+ * Returns true if a binding-pattern node (Identifier in simple cases,
+ * ObjectPattern / ArrayPattern / AssignmentPattern / RestElement for
+ * destructured forms) introduces a binding for `name`.
+ */
+function patternIntroducesBinding(pattern: t.Node, name: string): boolean {
+  if (t.isIdentifier(pattern)) return pattern.name === name;
+  if (t.isObjectPattern(pattern)) {
+    for (const prop of pattern.properties) {
+      if (t.isObjectProperty(prop)) {
+        if (patternIntroducesBinding(prop.value as t.Node, name)) return true;
+      } else if (t.isRestElement(prop)) {
+        if (patternIntroducesBinding(prop.argument, name)) return true;
+      }
+    }
+    return false;
+  }
+  if (t.isArrayPattern(pattern)) {
+    for (const el of pattern.elements) {
+      if (el && patternIntroducesBinding(el, name)) return true;
+    }
+    return false;
+  }
+  if (t.isAssignmentPattern(pattern)) {
+    return patternIntroducesBinding(pattern.left, name);
+  }
+  if (t.isRestElement(pattern)) {
+    return patternIntroducesBinding(pattern.argument, name);
+  }
+  return false;
 }

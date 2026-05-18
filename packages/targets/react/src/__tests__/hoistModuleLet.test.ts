@@ -122,6 +122,124 @@ $onMount(helper);
     expect(out).toContain('let untouched');
   });
 
+  it('Test 4 (destructuring + shadowing): callback args that shadow a hoisted name via destructuring do NOT crash and do NOT incorrectly rewrite the inner local', () => {
+    // Regression test (2026-05-17): TipTap.rozie shape — a vanilla-JS
+    // engine that hands its event callback an object containing the
+    // engine instance, which the wrapper destructures. The destructured
+    // param shadows the wrapper's outer `let engine = null`, and the
+    // rewriter used to (a) crash on the shorthand ObjectProperty inside
+    // the ObjectPattern, then (b) once that was guarded, incorrectly
+    // rewrite the body references to `engine.current` even though they
+    // referred to the local destructured param.
+    const src = `
+let engine = null;
+const setup = ($el) => {
+  engine = new Engine($el, {
+    onUpdate: ({ engine }) => {
+      // \`engine\` here is the destructured param, NOT the module let.
+      // Must stay bare; the outer module-let \`engine = ...\` write must
+      // become \`engine.current = ...\`.
+      const html = engine.getHTML();
+      return html;
+    },
+  });
+  return () => engine.destroy();
+};
+$onMount(setup);
+`;
+    const program = babelParse(src, { sourceType: 'module' });
+    const syntheticIR: IRComponent = {
+      type: 'IRComponent',
+      name: 'Synth',
+      props: [],
+      state: [],
+      computed: [],
+      refs: [],
+      slots: [],
+      emits: [],
+      lifecycle: [
+        {
+          type: 'LifecycleHook',
+          phase: 'mount',
+          setup: t.identifier('setup'),
+          setupDeps: [],
+          sourceLoc: { start: 0, end: 0 },
+        },
+      ],
+      watchers: [],
+      listeners: [],
+      setupBody: { type: 'SetupBody', scriptProgram: program, annotations: [] },
+      template: null,
+      styles: { type: 'StyleSection', scopedRules: [], rootRules: [], sourceLoc: { start: 0, end: 0 } },
+      sourceLoc: { start: 0, end: 0 },
+    };
+    // Must not throw on the shorthand-in-ObjectPattern.
+    const { hoisted } = hoistModuleLet(program, syntheticIR);
+    expect(hoisted).toHaveLength(1);
+    expect(hoisted[0]!.name).toBe('engine');
+
+    const out = generate(program).code;
+    // Outer module-let write is rewritten.
+    expect(out).toMatch(/engine\.current\s*=\s*new Engine/);
+    // Outer module-let read in the cleanup return is rewritten.
+    expect(out).toMatch(/engine\.current\.destroy\(\)/);
+    // Destructured shorthand stays as a binding pattern (key only).
+    // Babel may emit it across lines after the rewrite — match flexibly.
+    expect(out).toMatch(/onUpdate:\s*\(\{\s*engine\s*\}\)\s*=>/);
+    // Inside the callback, `engine.getHTML()` must NOT be rewritten — it
+    // refers to the destructured local, not the module-let.
+    expect(out).toMatch(/const html\s*=\s*engine\.getHTML\(\);/);
+    expect(out).not.toMatch(/engine\.current\.getHTML/);
+  });
+
+  it('Test 5 (object-expression shorthand): `return { engine }` in value position is un-shorthanded and rewritten to `{ engine: engine.current }`', () => {
+    // Companion case: when shorthand is used in VALUE position (an
+    // ObjectExpression, not ObjectPattern), the rewriter must un-shorthand
+    // and rewrite the value to preserve the reference semantics.
+    const src = `
+let engine = null;
+const setup = ($el) => {
+  engine = new Engine($el);
+  return () => {
+    const handle = { engine };
+    handle.engine.destroy();
+  };
+};
+$onMount(setup);
+`;
+    const program = babelParse(src, { sourceType: 'module' });
+    const syntheticIR: IRComponent = {
+      type: 'IRComponent',
+      name: 'Synth',
+      props: [],
+      state: [],
+      computed: [],
+      refs: [],
+      slots: [],
+      emits: [],
+      lifecycle: [
+        {
+          type: 'LifecycleHook',
+          phase: 'mount',
+          setup: t.identifier('setup'),
+          setupDeps: [],
+          sourceLoc: { start: 0, end: 0 },
+        },
+      ],
+      watchers: [],
+      listeners: [],
+      setupBody: { type: 'SetupBody', scriptProgram: program, annotations: [] },
+      template: null,
+      styles: { type: 'StyleSection', scopedRules: [], rootRules: [], sourceLoc: { start: 0, end: 0 } },
+      sourceLoc: { start: 0, end: 0 },
+    };
+    const { hoisted } = hoistModuleLet(program, syntheticIR);
+    expect(hoisted).toHaveLength(1);
+    const out = generate(program).code;
+    // Value-position shorthand un-shorthanded and value rewritten.
+    expect(out).toMatch(/\{\s*engine:\s*engine\.current\s*\}/);
+  });
+
   it('Test 3 (deeply-nested): when a let is referenced via 2-level helper indirection it is NOT auto-hoisted (conservative)', () => {
     // Synthetic: let X referenced inside `helperA`, `helperA` called from
     // `helperB`, and `helperB` is the lifecycle setup. Per the spike
