@@ -41,10 +41,6 @@ form { display: flex; gap: 0.25rem; margin-block: 0.5rem; }
   private _disconnectCleanups: Array<() => void> = [];
 
   private _armListeners(): void {
-    this.addEventListener('rozie-default-toggle', (e) => { ((() => this.toggle(item.id)) as (...args: any[]) => any)((e as CustomEvent).detail); });
-
-    this.addEventListener('rozie-default-remove', (e) => { ((() => this.removeItem(item.id)) as (...args: any[]) => any)((e as CustomEvent).detail); });
-
     {
       const slotEl = this.shadowRoot?.querySelector('slot[name="header"]');
       if (slotEl !== null && slotEl !== undefined) {
@@ -121,7 +117,7 @@ form { display: flex; gap: 0.25rem; margin-block: 0.5rem; }
   ${this.items.length > 0 ? html`<ul>
     ${repeat<any>(this.items, (item, _idx) => item.id, (item, _idx) => html`<li class="${Object.entries({ done: item.done }).filter(([, v]) => v).map(([k]) => k).join(' ')}" key=${item.id}>
       
-      <slot data-rozie-params=${(() => { try { return JSON.stringify({item: item}); } catch { return '{}'; } })()}>
+      <slot data-rozie-params=${(() => { try { return JSON.stringify({item: item}); } catch { return '{}'; } })()} @rozie-default-toggle=${(e: CustomEvent) => ((() => this.toggle(item.id)) as (...args: any[]) => any)(e.detail)} @rozie-default-remove=${(e: CustomEvent) => ((() => this.removeItem(item.id)) as (...args: any[]) => any)(e.detail)}>
         <label><input type="checkbox" ?checked=${item.done} @change=${(e: Event) => { this.toggle(item.id); }} /><span>${item.text}</span></label>
         <button aria-label="Remove" @click=${(e: Event) => { this.removeItem(item.id); }}>×</button>
       </slot>
