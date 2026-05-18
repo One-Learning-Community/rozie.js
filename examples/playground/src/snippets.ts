@@ -7,17 +7,12 @@
 // virtual-filesystem resolver can satisfy cross-file <components> imports
 // without ever touching the real filesystem (the browser doesn't have one).
 //
-// Sourced from three places:
-//   1. The Sortable.rozie spike (canonical lives in .planning/spikes/ which
-//      is gitignored, so we keep a copy in src/snippets/ that the build
-//      bundles via the existing `?raw` import).
-//   2. examples/*.rozie — top-level reference components (Counter, Modal, etc.)
-//   3. examples/demos/*.rozie — composed-feature demos (DropdownDemo, ...)
+// Sourced from two places:
+//   1. examples/*.rozie — top-level reference components (Counter, Modal, etc.)
+//   2. examples/demos/*.rozie — composed-feature demos (DropdownDemo, ...)
 //
 // Multi-file bundles are registered explicitly below — each declares its
 // entry file plus every sibling .rozie it imports.
-
-import sortableSpike from './snippets/Sortable.rozie.txt?raw';
 
 const exampleFiles = import.meta.glob('../../*.rozie', {
   eager: true,
@@ -173,18 +168,12 @@ const singleFileEntries = (
     .sort((a, b) => a.label.localeCompare(b.label));
 
 export const SNIPPETS: Snippet[] = [
-  {
-    key: 'spike/Sortable',
-    label: 'spike/Sortable',
-    entry: 'Sortable.rozie',
-    files: { 'Sortable.rozie': sortableSpike },
-  },
   ...bundles,
   ...singleFileEntries(exampleFiles, ''),
   ...singleFileEntries(demoFiles, 'demos'),
 ];
 
-export const DEFAULT_SNIPPET_KEY = 'spike/Sortable';
+export const DEFAULT_SNIPPET_KEY = 'bundle/SortableListDemo';
 
 export function findSnippet(key: string): Snippet | undefined {
   return SNIPPETS.find((s) => s.key === key);
