@@ -1,0 +1,112 @@
+<!--
+  Flatpickr.rozie — data-bound port of flatpickr (chmln/flatpickr).
+
+  The "killer demo" companion that does for date pickers what
+  SortableList does for drag-and-drop: replace five hand-maintained
+  per-framework wrapper libraries (react-flatpickr, vue-flatpickr-
+  component, ngx-flatpickr-wrapper, svelte-flatpickr, plus a few
+  Solid/Lit forks) with ONE Rozie source.
+
+  Two-way binds the picked date(s) as a string so consumers write the
+  same idiom regardless of target:
+
+    <Flatpickr r-model:date="$data.selected" :options="{ minDate: 'today' }" />
+
+  Why this is a worthwhile demo:
+    - Scalar `r-model:date` two-way bind — a different exercise from
+      SortableList's array two-way bind.
+    - $watch reconciles prop changes (mode/options) into the live
+      instance rather than re-creating it — same pattern as SortableList.
+    - flatpickr owns an input element and a popover the framework never
+      sees; we just hand it an empty input and let it take over. Same
+      problem every per-framework wrapper has had to solve since 2016.
+-->
+
+<rozie name="Flatpickr">
+
+<props>
+{
+  date:        { type: String,  default: '',                 model: true },
+  placeholder: { type: String,  default: 'Select a date…' },
+  mode:        { type: String,  default: 'single' },
+  dateFormat:  { type: String,  default: 'Y-m-d' },
+  minDate:     { type: String,  default: null },
+  maxDate:     { type: String,  default: null },
+  disabled:    { type: Boolean, default: false },
+  options:     { type: Object,  default: () => ({}) },
+}
+</props>
+
+<script>
+import flatpickr from 'flatpickr'
+
+let instance = null
+
+$onMount(() => {
+  instance = flatpickr($refs.inputEl, {
+    mode:        $props.mode,
+    dateFormat:  $props.dateFormat,
+    minDate:     $props.minDate,
+    maxDate:     $props.maxDate,
+    defaultDate: $props.date || null,
+    ...$props.options,
+    onChange: (_dates, dateStr) => {
+      // flatpickr emits onChange for every selection step (in range/multiple
+      // modes, two clicks = two events). The string form is always the
+      // authoritative public value, so we forward it verbatim.
+      if (dateStr !== $props.date) $props.date = dateStr
+      $emit('change', dateStr)
+    },
+    onOpen:  () => $emit('open'),
+    onClose: () => $emit('close'),
+  })
+
+  if ($props.disabled) instance.input.disabled = true
+
+  return () => instance?.destroy()
+})
+
+// Reconcile prop changes into the live instance without re-creating it.
+// flatpickr's set(name, value) is the supported runtime-update path.
+$watch(() => $props.date,       (v) => {
+  // Guard against the round-trip: when the user picks a date, flatpickr
+  // fires onChange → we write $props.date → $watch sees the change → we
+  // would call setDate, which would re-fire onChange. Skip if already in sync.
+  if (!instance) return
+  const current = instance.input.value
+  if (v !== current) instance.setDate(v, false)
+})
+$watch(() => $props.mode,       (v) => instance?.set('mode',       v))
+$watch(() => $props.minDate,    (v) => instance?.set('minDate',    v))
+$watch(() => $props.maxDate,    (v) => instance?.set('maxDate',    v))
+$watch(() => $props.dateFormat, (v) => instance?.set('dateFormat', v))
+$watch(() => $props.disabled,   (v) => {
+  if (instance) instance.input.disabled = v
+})
+</script>
+
+<template>
+<input
+  ref="inputEl"
+  type="text"
+  class="rozie-flatpickr"
+  :placeholder="$props.placeholder"
+/>
+</template>
+
+<style>
+.rozie-flatpickr {
+  padding: 0.375rem 0.5rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+  font: inherit;
+  width: 100%;
+  box-sizing: border-box;
+}
+.rozie-flatpickr:focus {
+  outline: 2px solid rgba(0, 100, 255, 0.4);
+  outline-offset: -1px;
+}
+</style>
+
+</rozie>
