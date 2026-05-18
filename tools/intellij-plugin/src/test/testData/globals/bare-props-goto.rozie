@@ -1,0 +1,7 @@
+<rozie name="BareProps">
+<props>{ value: 0 }</props>
+<script>
+const x = $pr<caret>ops;
+</script>
+<template><div></div></template>
+</rozie>
