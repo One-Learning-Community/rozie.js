@@ -989,6 +989,18 @@ function emitSlot(
   hostListenerWiring: string[],
   opts: EmitTemplateOpts,
 ): string {
+  // Phase 07.4 D-LIT-12 (WR-03 from review): this function MUST NOT push to
+  // `hostListenerWiring` for slot-param event handlers — function-typed
+  // slot-args go inline on the <slot> element via `eventAttrs`, NEVER via
+  // host-scope `addEventListener` (the host-scope path was broken inside
+  // `r-for` loops: loop-local identifiers like `item` don't exist at host
+  // scope). The `hostListenerWiring` parameter is forwarded to nested
+  // `emitNode()` calls (for fallback children) only — debounce cleanup and
+  // other host-level wiring still flow through it from those nested paths.
+  // If you find yourself wanting to push slot-param dispatch wiring here,
+  // STOP and re-read CONTEXT.md §D-01 / §D-02 — the universal path is
+  // intentional and any "loop-ancestor detection" approach was explicitly
+  // rejected (see `feedback_no_detection_when_universal.md`).
   void opts;
   // Determine name + args.
   const name = node.slotName === '' ? '' : node.slotName;
