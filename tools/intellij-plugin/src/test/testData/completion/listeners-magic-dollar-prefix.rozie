@@ -1,7 +1,7 @@
 <rozie name="ListenersMagicDollarPrefix">
 <listeners>
 {
-  "click": { when: "true", handler: "() => $da<caret>" }
+  "click": $da<caret>
 }
 </listeners>
 </rozie>

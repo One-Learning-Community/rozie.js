@@ -32,28 +32,39 @@ class RozieJsMagicCompletionTest : BasePlatformTestCase() {
     override fun getTestDataPath(): String = "src/test/testData/completion"
 
     // === Behavior 1: typing `$pr` in <script> surfaces $props (narrow positive) ===
+    //
+    // `$pr` is a UNIQUE-match prefix against the registry (only `$props` starts
+    // with it). IntelliJ's `completeBasic()` auto-inserts the unique match and
+    // returns `null` for `lookupElementStrings` in that path, so we assert on
+    // the post-completion document text — which is the actual P1-UAT-09
+    // contract anyway (the user sees `$props` get filled in).
 
     fun testDollarPrefixSurfacesPropsInScript() {
         myFixture.configureByFile("script-magic-dollar-prefix.rozie")
         myFixture.completeBasic()
-        val lookups = myFixture.lookupElementStrings ?: emptyList()
+        val docText = myFixture.editor.document.text
         assertTrue(
-            "Expected `\$props` in completion suggestions for `\$pr` prefix in <script>; " +
-                "got: $lookups",
-            "\$props" in lookups,
+            "Expected `\$props` to be auto-completed from `\$pr` prefix in <script>; " +
+                "document text was: $docText",
+            "\$props" in docText,
         )
     }
 
     // === Behavior 2: typing `$da` in <listeners> surfaces $data (cross-block-type positive) ===
+    //
+    // `$da` is also unique-match (only `$data` starts with it) — same
+    // auto-insert path assertion as Behavior 1, just inside the second
+    // JS-injected block type to confirm the contributor fires uniformly across
+    // RozieMultiHostInjector's injection targets.
 
     fun testDollarPrefixSurfacesDataInListeners() {
         myFixture.configureByFile("listeners-magic-dollar-prefix.rozie")
         myFixture.completeBasic()
-        val lookups = myFixture.lookupElementStrings ?: emptyList()
+        val docText = myFixture.editor.document.text
         assertTrue(
-            "Expected `\$data` in completion suggestions for `\$da` prefix in <listeners>; " +
-                "got: $lookups",
-            "\$data" in lookups,
+            "Expected `\$data` to be auto-completed from `\$da` prefix in <listeners>; " +
+                "document text was: $docText",
+            "\$data" in docText,
         )
     }
 
