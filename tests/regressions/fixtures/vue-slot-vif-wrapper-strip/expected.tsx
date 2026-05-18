@@ -9,7 +9,7 @@ interface PresenceSlotFallbackProps {
 }
 
 export default function PresenceSlotFallback(_props: PresenceSlotFallbackProps): JSX.Element {
-  const props: PresenceSlotFallbackProps = {
+  const props: PresenceSlotFallbackProps & { title: string } = {
     ..._props,
     title: _props.title ?? '',
   };
@@ -19,9 +19,9 @@ export default function PresenceSlotFallback(_props: PresenceSlotFallbackProps):
     <section className={styles.panel} data-rozie-s-224e77e7="">
       {((props.renderHeader ?? props.slots?.['header']) || props.title) && <header data-rozie-s-224e77e7="">
         
-        {(props.renderHeader ?? props.slots?.['header']) ? (props.renderHeader ?? props.slots?.['header'])() : props.title}
+        {(props.renderHeader ?? props.slots?.['header']) ? ((props.renderHeader ?? props.slots?.['header']) as Function)() : props.title}
       </header>}<div className={styles.body} data-rozie-s-224e77e7="">
-        {(props.children ?? props.slots?.[''])}
+        {(typeof (props.children ?? props.slots?.['']) === 'function' ? ((props.children ?? props.slots?.['']) as Function)() : (props.children ?? props.slots?.['']))}
       </div>
     </section>
     </>

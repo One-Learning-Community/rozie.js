@@ -251,33 +251,53 @@ export function emitSlotInvocation(
   //   2. TemplateSlotInvocationIR.fallback (inline <slot> children) — when present
   //   3. Empty fallback (renders `undefined` — no inline content provided)
   if (slotName === '' && !hasParams) {
-    // Default, no params
+    // Default, no params.
+    //
+    // 2026-05-18 — Discriminate on `typeof === 'function'` for the slot value
+    // because the merged field is `ReactNode | (() => ReactNode) | undefined`:
+    //   - `props.children` is `ReactNode` (the consumer wrote `<X>node</X>`)
+    //   - `props.slots?.['']` is `() => ReactNode` (the dynamic-slots intake
+    //     shape added in Phase 07.3.2; emitSlotFiller.ts:140 wraps every
+    //     emitted fill body in an arrow regardless of slot kind)
+    // Without the discriminator, the merged value rendered as a React child
+    // would either invoke the function as a render component (React error:
+    // "Functions are not valid as a React child") or silently no-op. The
+    // surrogate TS2322 under tests/react-typecheck flags the same shape: bare
+    // `{ReactNode | (() => ReactNode)}` is not assignable to ReactNode.
+    const slotted = `(typeof ${fieldRef} === 'function' ? (${fieldRef} as Function)() : ${fieldRef})`;
     if (refined.defaultLifting === 'inline') {
       const fallback = renderInlineFallback(slot, ctx.ir);
-      return `{${fieldRef} ?? ${fallback}}`;
+      return `{${slotted} ?? ${fallback}}`;
     }
     if (refined.defaultLifting === 'function-const' && refined.defaultFnName !== null) {
-      return `{${fieldRef} ?? ${refined.defaultFnName}({})}`;
+      return `{${slotted} ?? ${refined.defaultFnName}({})}`;
     }
     if (hasInvocationFallback) {
-      return `{${fieldRef} ?? ${invocationFallback}}`;
+      return `{${slotted} ?? ${invocationFallback}}`;
     }
-    return `{${fieldRef}}`;
+    return `{${slotted}}`;
   }
 
   if (slotName === '' && hasParams) {
     // Default with params — dual-shape: function (render-prop) OR ReactNode
     // (raw children, consumer opted out of scope). See header comment.
+    //
+    // 2026-05-18 — Cast the discriminated branch to `Function` then call. TS
+    // can't narrow across two separate `(props.children ?? props.slots?.[''])`
+    // expressions in a ternary (each is a fresh expression so the typeof guard
+    // doesn't apply to the body's re-access), so we cast on the body side. The
+    // outer `?? children`/`?? fallback` produces the React node when typeof is
+    // not 'function'. Mirrors Solid's optional-call slot fix (commit 536575a).
     if (refined.defaultFnName !== null) {
-      return `{typeof ${fieldRef} === 'function' ? ${fieldRef}(${paramObj}) : (${fieldRef} ?? ${refined.defaultFnName}(${paramObj}))}`;
+      return `{typeof ${fieldRef} === 'function' ? (${fieldRef} as Function)(${paramObj}) : (${fieldRef} ?? ${refined.defaultFnName}(${paramObj}))}`;
     }
     if (hasInvocationFallback) {
       // Fallback children may reference slot params (e.g., `item`); they're
       // in scope via the surrounding closure for default-slot inline children
       // because the slot is invoked from the same component body.
-      return `{typeof ${fieldRef} === 'function' ? ${fieldRef}(${paramObj}) : (${fieldRef} ?? ${invocationFallback})}`;
+      return `{typeof ${fieldRef} === 'function' ? (${fieldRef} as Function)(${paramObj}) : (${fieldRef} ?? ${invocationFallback})}`;
     }
-    return `{typeof ${fieldRef} === 'function' ? ${fieldRef}(${paramObj}) : ${fieldRef}}`;
+    return `{typeof ${fieldRef} === 'function' ? (${fieldRef} as Function)(${paramObj}) : ${fieldRef}}`;
   }
 
   // Named slot — no params
@@ -294,26 +314,35 @@ export function emitSlotInvocation(
   // merged fieldRef: `(props.renderBrand ?? props.slots?.['brand'])?.()`
   // is valid JS (`(a ?? b)?.()`).
   if (!hasParams) {
+    // 2026-05-18 — Cast truthy-branch call site to `Function` so the ternary's
+    // truthy guard (`(props.renderX ?? props.slots?.['x']) ? …(...)`) narrows
+    // through the cast instead of demanding TS narrow across two separate
+    // expression-trees.
     if (refined.defaultLifting === 'inline') {
       const fallback = renderInlineFallback(slot, ctx.ir);
-      return `{${fieldRef} ? ${fieldRef}() : ${fallback}}`;
+      return `{${fieldRef} ? (${fieldRef} as Function)() : ${fallback}}`;
     }
     if (refined.defaultLifting === 'function-const' && refined.defaultFnName !== null) {
-      return `{${fieldRef} ? ${fieldRef}() : ${refined.defaultFnName}({})}`;
+      return `{${fieldRef} ? (${fieldRef} as Function)() : ${refined.defaultFnName}({})}`;
     }
     if (hasInvocationFallback) {
-      return `{${fieldRef} ? ${fieldRef}() : ${invocationFallback}}`;
+      return `{${fieldRef} ? (${fieldRef} as Function)() : ${invocationFallback}}`;
     }
     return `{${fieldRef}?.()}`;
   }
 
   // Named with params — strict render-prop shape (no dual-call; consumers
   // explicitly opt into the function form by writing `renderTrigger={…}`).
+  // 2026-05-18 — Cast the truthy-branch call site to `Function` so TS doesn't
+  // require narrowing across the two `(props.renderX ?? props.slots?.['x'])`
+  // expressions (each is a separate AST node; the truthy guard on the test
+  // side doesn't refine the consequent). Same pattern as the default-slot
+  // with-params branch above.
   if (refined.defaultFnName !== null) {
-    return `{${fieldRef} ? ${fieldRef}(${paramObj}) : ${refined.defaultFnName}(${paramObj})}`;
+    return `{${fieldRef} ? (${fieldRef} as Function)(${paramObj}) : ${refined.defaultFnName}(${paramObj})}`;
   }
   if (hasInvocationFallback) {
-    return `{${fieldRef} ? ${fieldRef}(${paramObj}) : ${invocationFallback}}`;
+    return `{${fieldRef} ? (${fieldRef} as Function)(${paramObj}) : ${invocationFallback}}`;
   }
   return `{${fieldRef}?.(${paramObj})}`;
 }

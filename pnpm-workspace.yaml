@@ -14,6 +14,7 @@ packages:
   - "tests/svelte-typecheck"
   - "tests/angular-typecheck"
   - "tests/vue-typecheck"
+  - "tests/react-typecheck"
   - "tests/visual-regression"
   - "tests/slot-matrix"
   - "tests/regressions"

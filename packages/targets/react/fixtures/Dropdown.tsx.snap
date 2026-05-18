@@ -20,7 +20,7 @@ interface DropdownProps {
 }
 
 export default function Dropdown(_props: DropdownProps): JSX.Element {
-  const props: DropdownProps = {
+  const props: DropdownProps & { closeOnOutsideClick: boolean; closeOnEscape: boolean } = {
     ..._props,
     closeOnOutsideClick: _props.closeOnOutsideClick ?? true,
     closeOnEscape: _props.closeOnEscape ?? true,
@@ -64,14 +64,14 @@ export default function Dropdown(_props: DropdownProps): JSX.Element {
   useOutsideClick(
     [triggerEl, panelEl],
     close,
-    () => open && props.closeOnOutsideClick,
+    () => !!(open && props.closeOnOutsideClick),
   );
 
   useEffect(() => {
     if (!(open && props.closeOnEscape)) return;
     const _rozieHandler = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
-      close(e);
+      ((close) as ((...args: any[]) => any))(e);
     };
     document.addEventListener('keydown', _rozieHandler);
     return () => document.removeEventListener('keydown', _rozieHandler);
@@ -80,7 +80,7 @@ export default function Dropdown(_props: DropdownProps): JSX.Element {
   useEffect(() => {
     if (!(open)) return;
     window.addEventListener('resize', _rozieThrottledLReposition, { passive: true });
-    return () => window.removeEventListener('resize', _rozieThrottledLReposition, { passive: true });
+    return () => window.removeEventListener('resize', _rozieThrottledLReposition);
   }, [_rozieThrottledLReposition, open, reposition]);
 
   return (
@@ -91,7 +91,7 @@ export default function Dropdown(_props: DropdownProps): JSX.Element {
       </div>
 
       {(open) && <div ref={panelEl} className={styles["dropdown-panel"]} role="menu" data-rozie-s-6d6bd882="">
-        {typeof (props.children ?? props.slots?.['']) === 'function' ? (props.children ?? props.slots?.[''])({ close }) : (props.children ?? props.slots?.[''])}
+        {typeof (props.children ?? props.slots?.['']) === 'function' ? ((props.children ?? props.slots?.['']) as Function)({ close }) : (props.children ?? props.slots?.[''])}
       </div>}</div>
     </>
   );

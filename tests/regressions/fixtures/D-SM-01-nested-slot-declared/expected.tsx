@@ -12,7 +12,7 @@ export default function NestedSlotDeclared(props: NestedSlotDeclaredProps): JSX.
     <>
     <div className={styles.outer} data-rozie-s-3bc5be6c="">
       
-      {(props.renderWrapper ?? props.slots?.['wrapper']) ? (props.renderWrapper ?? props.slots?.['wrapper'])() : <div className={styles["wrapper-fallback"]} data-rozie-s-3bc5be6c="">
+      {(props.renderWrapper ?? props.slots?.['wrapper']) ? ((props.renderWrapper ?? props.slots?.['wrapper']) as Function)() : <div className={styles["wrapper-fallback"]} data-rozie-s-3bc5be6c="">
           {(props.renderInner ?? props.slots?.['inner'])?.()}
         </div>}
     </div>

@@ -27,11 +27,21 @@ import type { IRComponent, PropTypeAnnotation } from '../../../../core/src/ir/ty
  *   - { kind: 'identifier', name: 'Number' }   → 'number'
  *   - { kind: 'identifier', name: 'String' }   → 'string'
  *   - { kind: 'identifier', name: 'Boolean' }  → 'boolean'
- *   - { kind: 'identifier', name: 'Array' }    → 'unknown[]'
- *   - { kind: 'identifier', name: 'Object' }   → 'Record<string, unknown>'
- *   - { kind: 'identifier', name: 'Function' } → '(...args: unknown[]) => unknown'
+ *   - { kind: 'identifier', name: 'Array' }    → 'any[]'
+ *   - { kind: 'identifier', name: 'Object' }   → 'Record<string, any>'
+ *   - { kind: 'identifier', name: 'Function' } → '(...args: any[]) => any'
  *   - { kind: 'union', members }               → join with ' | '
  *   - { kind: 'literal', value }               → 'string'/'number'/etc.
+ *
+ * 2026-05-18 — `Array → any[]` (not `unknown[]`) and `Object → Record<string, any>`
+ * (not `Record<string, unknown>`) to permit consumer-side property access without
+ * forcing the author to type each rozie `<props>` element-by-element. Mirrors the
+ * Solid+Lit emit fix (commit 536575a). The gate is the React-emit tsc gate at
+ * tests/react-typecheck/; with `unknown` the gate fires TS18046 on every
+ * `items.filter(i => !i.done)` shape and TS2339 on every `node.label` lookup.
+ * `(...args: any[]) => any` for Function lets bare `@click="$props.onClose"`
+ * call shapes type-check; the alternative is per-call-site casts which would
+ * leak into emit at every template event.
  */
 function renderType(ann: PropTypeAnnotation): string {
   if (ann.kind === 'identifier') {
@@ -43,11 +53,11 @@ function renderType(ann: PropTypeAnnotation): string {
       case 'Boolean':
         return 'boolean';
       case 'Array':
-        return 'unknown[]';
+        return 'any[]';
       case 'Object':
-        return 'Record<string, unknown>';
+        return 'Record<string, any>';
       case 'Function':
-        return '(...args: unknown[]) => unknown';
+        return '(...args: any[]) => any';
       default:
         return ann.name;
     }
@@ -56,9 +66,9 @@ function renderType(ann: PropTypeAnnotation): string {
     return ann.members.map(renderType).join(' | ');
   }
   if (ann.kind === 'literal') {
-    if (ann.value === 'array') return 'unknown[]';
-    if (ann.value === 'object') return 'Record<string, unknown>';
-    if (ann.value === 'function') return '(...args: unknown[]) => unknown';
+    if (ann.value === 'array') return 'any[]';
+    if (ann.value === 'object') return 'Record<string, any>';
+    if (ann.value === 'function') return '(...args: any[]) => any';
     return ann.value;
   }
   return 'unknown';
@@ -96,11 +106,13 @@ export function emitPropsInterface(
   }
 
   // Emits → optional `on<EventPascal>` props.
-  // v1: ship `(...args: unknown[]) => void` since IR doesn't carry per-emit arg types.
+  // v1: ship `(...args: any[]) => void` since IR doesn't carry per-emit arg types.
+  // 2026-05-18 — `any[]` (not `unknown[]`) so consumer-side TS doesn't complain
+  // about untyped event args at call sites like `props.onSearch(query)`.
   for (const e of ir.emits) {
     const eventPascal = toPascalCase(e);
     if (eventPascal.length === 0) continue;
-    fields.push(`  on${eventPascal}?: (...args: unknown[]) => void;`);
+    fields.push(`  on${eventPascal}?: (...args: any[]) => void;`);
   }
 
   // Slots — Plan 04-03 fills slotPropFields via emitSlotDecl(ir).

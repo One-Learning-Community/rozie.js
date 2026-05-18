@@ -1,10 +1,10 @@
 <>
 <div className={styles["todo-list"]}>
   <header>
-    {(props.renderHeader ?? props.slots?.['header']) ? (props.renderHeader ?? props.slots?.['header'])({ remaining, total: items.length }) : <h3>{props.title} ({remaining} remaining)</h3>}
+    {(props.renderHeader ?? props.slots?.['header']) ? ((props.renderHeader ?? props.slots?.['header']) as Function)({ remaining, total: items.length }) : <h3>{props.title} ({remaining} remaining)</h3>}
   </header>
 
-  <form onSubmit={(e) => { e.preventDefault(); add(e); }}>
+  <form onSubmit={(e) => { e.preventDefault(); ((add) as ((...args: any[]) => any))(e); }}>
     <input placeholder="What needs doing?" value={draft} onChange={e => setDraft(e.target.value)} />
     <button type="submit" disabled={!draft.trim()}>Add</button>
   </form>
@@ -12,9 +12,9 @@
   {(items.length > 0) ? <ul>
     {items.map((item) => <li key={item.id} className={clsx({ [styles.done]: item.done })}>
       
-      {typeof (props.children ?? props.slots?.['']) === 'function' ? (props.children ?? props.slots?.[''])({ item, toggle: () => toggle(item.id), remove: () => removeItem(item.id) }) : ((props.children ?? props.slots?.['']) ?? <><label><input type="checkbox" checked={item.done} onChange={(e) => { toggle(item.id); }} /><span>{item.text}</span></label><button aria-label="Remove" onClick={(e) => { removeItem(item.id); }}>×</button></>)}
+      {typeof (props.children ?? props.slots?.['']) === 'function' ? ((props.children ?? props.slots?.['']) as Function)({ item, toggle: () => toggle(item.id), remove: () => remove(item.id) }) : ((props.children ?? props.slots?.['']) ?? <><label><input type="checkbox" checked={item.done} onChange={(e) => { toggle(item.id); }} /><span>{item.text}</span></label><button aria-label="Remove" onClick={(e) => { remove(item.id); }}>×</button></>)}
     </li>)}
   </ul> : <p className={styles.empty}>
-    {(props.renderEmpty ?? props.slots?.['empty']) ? (props.renderEmpty ?? props.slots?.['empty'])() : "Nothing to do. ✨"}
+    {(props.renderEmpty ?? props.slots?.['empty']) ? ((props.renderEmpty ?? props.slots?.['empty']) as Function)() : "Nothing to do. ✨"}
   </p>}</div>
 </>

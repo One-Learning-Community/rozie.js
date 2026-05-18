@@ -9,7 +9,7 @@ export default function DefaultSlotFixture(props: DefaultSlotFixtureProps): JSX.
   return (
     <>
     <div className={"default-slot-fixture"} data-rozie-s-61728cb8="">
-      {(props.children ?? props.slots?.[''])}
+      {(typeof (props.children ?? props.slots?.['']) === 'function' ? ((props.children ?? props.slots?.['']) as Function)() : (props.children ?? props.slots?.['']))}
     </div>
     </>
   );

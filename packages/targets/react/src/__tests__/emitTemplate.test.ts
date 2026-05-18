@@ -169,7 +169,7 @@ describe('className composition — Plan 04-03 Task 1', () => {
 });
 
 describe('Slot lowering — Plan 04-03 Task 2', () => {
-  it('Test 1: default slot, no params → {(props.children ?? props.slots?.[\'\'])} (Phase 07.3.2 merge)', () => {
+  it('Test 1: default slot, no params → typeof-discriminated merge (Phase 07.3.2 + 2026-05-18 tsc gate)', () => {
     const ir = lowerInline(`
 <rozie name="X">
 <template>
@@ -181,7 +181,14 @@ describe('Slot lowering — Plan 04-03 Task 2', () => {
     // Phase 07.3.2 — fieldRef is now a parenthesised merge expression
     // `(props.children ?? props.slots?.[''])` per D-SV-16 cross-target port.
     // D-18 empty-string sentinel for default-slot key.
-    expect(jsx).toContain("{(props.children ?? props.slots?.[''])}");
+    //
+    // 2026-05-18 — wrapped in `typeof === 'function' ? (fieldRef as Function)()
+    // : fieldRef` to discriminate between `props.children` (ReactNode) and
+    // `props.slots?.['']` (() => ReactNode). Without the discriminator the
+    // dynamic-slots fill renders the function reference directly (broken at
+    // runtime, TS2322 at compile under tests/react-typecheck).
+    expect(jsx).toContain("(props.children ?? props.slots?.[''])");
+    expect(jsx).toContain("typeof (props.children ?? props.slots?.['']) === 'function'");
     expect(slotPropFields.some((s) => /children\?: ReactNode/.test(s))).toBe(true);
   });
 
