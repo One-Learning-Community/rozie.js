@@ -96,6 +96,7 @@ export function emitReact(
   const {
     hookSection,
     userArrowsSection,
+    userImports: userScriptImports,
     lifecycleEffectsSection,
     hasPropsDefaults,
     hookSectionLines,
@@ -210,6 +211,7 @@ export function emitReact(
     reactImports: reactImports.render(),
     reactTypeImports,
     runtimeImports: runtimeImports.render(),
+    userImports: userScriptImports,
     cssModuleImport,
     globalCssImport,
     ctxInterfaces: tmpl.slotCtxInterfaces,

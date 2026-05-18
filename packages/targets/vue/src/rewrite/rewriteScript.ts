@@ -172,13 +172,51 @@ export function rewriteRozieIdentifiers(
     },
 
     Identifier(path) {
+      const name = path.node.name;
+
+      // Spike 001 B2 — script-context `$el` lowers to
+      // `MemberExpression($refs, __rozieRoot)`. The IR pass `lowerRootElementRef`
+      // already appended `RefDecl { name: '__rozieRoot' }` to `ir.refs` when a
+      // free `$el` read was detected, so the synthesised MemberExpression
+      // naturally flows into the existing `$refs.X` handler above and lowers
+      // to `__rozieRootRef.value` (Vue's templateRef accessor).
+      if (name === '$el') {
+        const parentPath = path.parentPath;
+        if (!parentPath) return;
+        if (parentPath.isVariableDeclarator() && parentPath.node.id === path.node) return;
+        if (
+          parentPath.isMemberExpression() &&
+          parentPath.node.property === path.node &&
+          !parentPath.node.computed
+        ) {
+          return;
+        }
+        if (
+          parentPath.isObjectProperty() &&
+          parentPath.node.key === path.node &&
+          !parentPath.node.computed
+        ) {
+          return;
+        }
+        if (parentPath.isFunction()) {
+          const params = (parentPath.node as { params: t.Node[] }).params;
+          if (params.includes(path.node)) return;
+        }
+        path.replaceWith(
+          t.memberExpression(t.identifier('$refs'), t.identifier('__rozieRoot')),
+        );
+        // Do NOT path.skip() — let the visitor re-visit the synthesised
+        // MemberExpression so the `$refs.X` handler downstream lowers it to
+        // the Vue-side templateRef accessor.
+        return;
+      }
+
       // Bare reads of a $computed name need `.value` appended.
       // Skip:
       //   - Identifiers in declarator id position (`const X = ...`)
       //   - Identifiers in property position of MemberExpression (already handled / N/A)
       //   - Identifiers being the `object` we just rewrote into (e.g. `value.value` —
       //     the new `value` Identifier should NOT also get .value).
-      const name = path.node.name;
       if (!computedNames.has(name)) return;
 
       const parent = path.parent;

@@ -1,0 +1,9 @@
+{
+  "id": "SPIKE-001-01",
+  "source": "Spike 001 — SortableJS port — .planning/spikes/001-sortablejs-port/README.md",
+  "sourceKind": "phase-7-loop",
+  "phase": "999.1",
+  "desc": "user <script> ImportDeclarations must hoist to module top (B1) AND script-context $el must lower to per-target root-element ref (B2)",
+  "targets": ["vue", "react", "svelte", "angular", "solid", "lit"],
+  "discoveredBy": "Spike 001 SortableJS port — 2026-05-17"
+}

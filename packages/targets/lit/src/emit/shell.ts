@@ -27,6 +27,13 @@ export interface LitShellParts {
    * element via customElements.define). No symbol binding.
    */
   componentImportsBlock?: string | undefined;
+  /**
+   * Spike 001 B1 — user-authored `<script>` `ImportDeclaration` statements
+   * rendered as a string by emitScript. Placed AFTER target/component imports,
+   * BEFORE the blank line that separates imports from interface decls.
+   * Empty when no user imports.
+   */
+  userImports?: string | undefined;
   /** Standalone `interface XCtx { ... }` declarations from emitSlotDecl. */
   interfaceDecls: string[];
   /** `@customElement('rozie-counter')` decorator line. */
@@ -66,6 +73,13 @@ export function buildShell(parts: LitShellParts): BuildShellResult {
   if (parts.componentImportsBlock && parts.componentImportsBlock.length > 0) {
     moduleParts.push(parts.componentImportsBlock);
     if (!parts.componentImportsBlock.endsWith('\n')) moduleParts.push('\n');
+  }
+
+  // Spike 001 B1 — user-authored `<script>` imports, AFTER target/component
+  // imports, BEFORE the blank-line separator.
+  if (parts.userImports && parts.userImports.length > 0) {
+    moduleParts.push(parts.userImports);
+    if (!parts.userImports.endsWith('\n')) moduleParts.push('\n');
   }
 
   // Blank line after imports.

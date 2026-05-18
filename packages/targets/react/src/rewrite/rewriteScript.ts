@@ -208,6 +208,49 @@ export function rewriteRozieIdentifiers(
       }
     },
 
+    Identifier(path) {
+      // Spike 001 B2 — script-context `$el` lowers to
+      // `MemberExpression($refs, __rozieRoot)`. The IR pass `lowerRootElementRef`
+      // already appended `RefDecl { name: '__rozieRoot' }` to `ir.refs` when a
+      // free `$el` read was detected and the root template qualifies, so the
+      // synthesised MemberExpression naturally flows into the existing
+      // `$refs.X` handler below and lowers to `__rozieRoot.current` (React's
+      // useRef accessor). When the IR pass declined to synthesise (root is
+      // conditional/loop/fragment, OR user already has root ref), `$el`
+      // remains a free identifier — v1 limitation, surfaced in spike docs.
+      if (path.node.name !== '$el') return;
+      const parentPath = path.parentPath;
+      if (!parentPath) return;
+      // Skip binding/declaration positions — same gating as Lit's existing
+      // pattern at rewriteScript.ts:234.
+      if (parentPath.isVariableDeclarator() && parentPath.node.id === path.node) return;
+      if (
+        parentPath.isMemberExpression() &&
+        parentPath.node.property === path.node &&
+        !parentPath.node.computed
+      ) {
+        return;
+      }
+      if (
+        parentPath.isObjectProperty() &&
+        parentPath.node.key === path.node &&
+        !parentPath.node.computed
+      ) {
+        return;
+      }
+      if (parentPath.isFunction()) {
+        const params = (parentPath.node as { params: t.Node[] }).params;
+        if (params.includes(path.node)) return;
+      }
+      path.replaceWith(
+        t.memberExpression(t.identifier('$refs'), t.identifier('__rozieRoot')),
+      );
+      // Do NOT path.skip() — let the visitor re-visit the synthesised
+      // MemberExpression so the `$refs.X` handler downstream lowers it to
+      // the target-native ref.
+      return;
+    },
+
     MemberExpression(path) {
       const obj = path.node.object;
       if (!t.isIdentifier(obj)) return;

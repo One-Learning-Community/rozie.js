@@ -169,6 +169,7 @@ export function emitSolid(ir: IRComponent, opts: EmitSolidOptions = {}): EmitSol
     propsInterface,
     solidImports: solidImportsStr,
     runtimeImports: runtimeImports.render(),
+    userImports: scriptResult.userImports,
     componentImportsBlock,
     ctxInterfaces: slotResult.ctxInterfaces,
     mergePropsCall: scriptResult.mergePropsCall ?? undefined,

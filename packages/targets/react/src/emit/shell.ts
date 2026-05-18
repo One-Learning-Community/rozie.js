@@ -33,6 +33,14 @@ export interface ShellParts {
   reactTypeImports?: string;
   /** `import { useControllableState, ... } from '@rozie/runtime-react';\n` (or empty) */
   runtimeImports: string;
+  /**
+   * Spike 001 B1 — user-authored `<script>` `ImportDeclaration` statements
+   * rendered as a string by emitScript. Placed AFTER target/runtime/CSS
+   * imports and AFTER the component-imports block, but BEFORE the blank line
+   * that separates imports from the interface declaration. Empty when no
+   * user imports exist.
+   */
+  userImports?: string;
   /** `import styles from './Foo.module.css';` or null (Plan 04-05 wires) */
   cssModuleImport: string | null;
   /** `import './Foo.global.css';` or null (Plan 04-05 wires) */
@@ -171,6 +179,11 @@ export function buildShell(parts: ShellParts): BuildShellResult {
   if (parts.componentImportsBlock && parts.componentImportsBlock.length > 0) {
     moduleParts.push(parts.componentImportsBlock);
   }
+  // Spike 001 B1 — user-authored `<script>` imports, AFTER target/runtime/CSS/
+  // component imports but BEFORE the blank-line separator.
+  if (parts.userImports && parts.userImports.length > 0) {
+    moduleParts.push(parts.userImports);
+  }
 
   // Blank line between imports and interface (only if any imports).
   if (
@@ -179,7 +192,8 @@ export function buildShell(parts: ShellParts): BuildShellResult {
     parts.runtimeImports.length > 0 ||
     parts.cssModuleImport !== null ||
     parts.globalCssImport !== null ||
-    (parts.componentImportsBlock !== undefined && parts.componentImportsBlock.length > 0)
+    (parts.componentImportsBlock !== undefined && parts.componentImportsBlock.length > 0) ||
+    (parts.userImports !== undefined && parts.userImports.length > 0)
   ) {
     moduleParts.push('\n');
   }
@@ -306,6 +320,10 @@ function buildShellLegacy(parts: ShellParts): BuildShellResult {
   if (parts.componentImportsBlock && parts.componentImportsBlock.length > 0) {
     ms.append(parts.componentImportsBlock);
   }
+  // Spike 001 B1 — user-authored `<script>` imports.
+  if (parts.userImports && parts.userImports.length > 0) {
+    ms.append(parts.userImports);
+  }
 
   if (
     parts.reactImports.length > 0 ||
@@ -313,7 +331,8 @@ function buildShellLegacy(parts: ShellParts): BuildShellResult {
     parts.runtimeImports.length > 0 ||
     parts.cssModuleImport ||
     parts.globalCssImport ||
-    (parts.componentImportsBlock !== undefined && parts.componentImportsBlock.length > 0)
+    (parts.componentImportsBlock !== undefined && parts.componentImportsBlock.length > 0) ||
+    (parts.userImports !== undefined && parts.userImports.length > 0)
   ) {
     ms.append('\n');
   }

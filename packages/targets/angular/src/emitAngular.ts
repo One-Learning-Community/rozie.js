@@ -345,6 +345,7 @@ export function emitAngular(
     scriptMap: scriptResult.scriptMap,
     preambleSectionLines: scriptResult.preambleSectionLines,
     componentImportsBlock,
+    userImports: scriptResult.userImports,
   });
 
   const code = ms.toString();

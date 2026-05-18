@@ -203,6 +203,7 @@ export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResu
   const shell = buildShell({
     importLines: allImports,
     componentImportsBlock,
+    userImports: scriptResult.userImports,
     interfaceDecls: slotResult.ctxInterfaces,
     customElementDecorator: `@customElement('${emitTagName(ir.name)}')`,
     componentName: ir.name,

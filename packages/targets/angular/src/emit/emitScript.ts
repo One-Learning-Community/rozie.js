@@ -46,6 +46,7 @@ import type {
 } from '../../../../core/src/ir/types.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { cloneScriptProgram } from '../rewrite/cloneProgram.js';
+import { partitionUserImports } from '../rewrite/partitionUserImports.js';
 import { rewriteRozieIdentifiers } from '../rewrite/rewriteScript.js';
 import {
   AngularImportCollector,
@@ -478,6 +479,13 @@ export interface EmitScriptResult {
   /** Standalone interface declarations (slot ctx interfaces) — emitted BEFORE the class. */
   interfaceDecls: string[];
   /**
+   * Spike 001 B1 — user-authored `<script>` `ImportDeclaration` statements
+   * rendered as a single string, ready to splice at module top by the shell.
+   * Empty when the script has no imports. Without this hoist the imports
+   * would be emitted INSIDE the constructor body and produce TS1232.
+   */
+  userImports: string;
+  /**
    * Phase 06.1 P2 (D-100/D-101): per-expression child sourcemap produced by
    * generating the user-authored constructor-expression statements as a single
    * t.Program with sourceMaps:true. Maps generated positions back to .rozie
@@ -517,6 +525,20 @@ export function emitScript(
 
   // 1. Clone Program (NEVER mutate ir.setupBody.scriptProgram).
   const cloned = cloneScriptProgram(ir.setupBody.scriptProgram);
+
+  // 1b. Spike 001 B1 — partition user-authored top-level ImportDeclarations
+  //     out of the Program body BEFORE any downstream pass iterates the body.
+  //     Mutate `cloned.program.body` in place so index-based passes (lifecycle
+  //     pairing, $watch consumption, the residual user-script loop) naturally
+  //     operate on the partitioned body. Surface imports via `userImports`
+  //     rendered as a string for the shell to splice at module top — without
+  //     this hoist they would land in the constructor body and produce TS1232.
+  const { userImports: userImportNodes, bodyStmts } = partitionUserImports(cloned);
+  cloned.program.body = bodyStmts;
+  const userImports =
+    userImportNodes.length > 0
+      ? userImportNodes.map((imp) => genCode(imp)).join('\n') + '\n'
+      : '';
 
   // 2. Pair lifecycle hooks BEFORE rewriting identifiers — pairClonedLifecycle
   //    looks for top-level `$onMount(IDENTIFIER)` patterns; the rewrite would
@@ -872,5 +894,13 @@ export function emitScript(
   const preambleSectionLines =
     fieldLineCount + (fieldLineCount > 0 ? 1 : 0) + 1;
 
-  return { classBody, imports, interfaceDecls, scriptMap, preambleSectionLines, diagnostics };
+  return {
+    classBody,
+    imports,
+    interfaceDecls,
+    userImports,
+    scriptMap,
+    preambleSectionLines,
+    diagnostics,
+  };
 }
