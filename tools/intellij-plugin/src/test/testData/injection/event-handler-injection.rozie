@@ -1,0 +1,8 @@
+<rozie name="EventHandlerExpression">
+<script>
+const handler = () => null;
+</script>
+<template>
+  <button @click="handler()">click</button>
+</template>
+</rozie>

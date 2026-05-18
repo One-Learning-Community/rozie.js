@@ -1,0 +1,8 @@
+<rozie name="RForExpression">
+<data>{ items: [] }</data>
+<template>
+  <ul>
+    <li r-for="item in items">{{ item }}</li>
+  </ul>
+</template>
+</rozie>
