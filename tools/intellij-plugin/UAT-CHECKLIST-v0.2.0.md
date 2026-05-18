@@ -329,7 +329,50 @@ All 4 P1 findings VERIFIED CLOSED. Full 11-example matrix re-walked; no new P0/P
 
 ### Aggregate disposition (cycle-3 + deferred)
 
-4 P1 findings (P1-UAT-10, P1-UAT-11+P1-UAT-12 combined, P1-UAT-13, P1-UAT-14) routed to gap-closure cycle 3. P1-UAT-15 deferred to Phase 08.3 (synthetic-virtual-file injection architecture). Tag cut deferred until cycle-3 plans land + UAT re-run #4 confirms closure.
+5 P1 findings routed to gap-closure cycle 3 — ALL CLOSED at the code layer:
+
+- **P1-UAT-10** CLOSED — Plan 08.2-15 moved `LISTENERS_BODY` from the SCRIPT_BODY (unwrapped) when-arm into the PROPS/DATA/COMPONENTS (paren-wrapped via `injectJsAsExpression`) when-arm in `RozieMultiHostInjector`. Single-line dispatch change. Verified via `testListenersBodyParsesAsObjectLiteralUnderParenWrap`.
+
+- **P1-UAT-11 + P1-UAT-12 (combined)** CLOSED — Plan 08.2-16 shipped `tools/intellij-plugin/src/main/resources/rozie-globals.d.ts` declaring all 11 magic identifiers from `RozieMagicIdentifiers` (`$props`, `$data`, `$refs`, `$emit`, `$computed`, `$onMount`, `$onUpdate`, `$watch`, `$listeners`, `$slots`, `$expose`). Adopted **Strategy B** (ambient-decl injection prefix via `ROZIE_GLOBALS_PREFIX` companion constant threaded into both `injectJs` and `injectJsAsExpression`) over Strategy A (`JSPredefinedLibraryProvider`) after investigation confirmed Strategy A's API is project-wide-only and would leak globals into the user's `.js` / `.ts` / `.tsx` files (Pitfall 2 violation). Strategy B mitigates Pitfall 2 by construction — the prefix only appears in `.rozie`-context injections. Vue plugin precedent confirmed this is the right call (Vue's `vuejs.jar` has zero `predefinedLibrary` registrations for the same reason).
+
+- **P1-UAT-13** CLOSED — Plan 08.2-17 investigation surfaced **cause (a)** as the sole root cause: JFlex `SCRIPT_BODY` token fragmentation at `<` characters (e.g., `$props.value + $props.step <= $props.max` lexed as 3 separate SCRIPT_BODY tokens, creating 3 independent JS injection ranges with no shared lexical scope). Fix: ~10-line SCRIPT_BODY coalescing in `getLanguagesToInject` mirroring the existing TEMPLATE_BODY coalescing pattern. Causes (b) and (c) (Plan 05 contributor EMPTY_ARRAY short-circuit / CachedValuesManager cache leak) were downstream consequences of (a)'s malformed PSI — both turned GREEN after the (a)-only fix. Verified via `RozieScriptLocalResolutionTest` (4 cells).
+
+- **P1-UAT-14** CLOSED — Plan 08.2-18 extended Plan 14's `injectExpressionsInTemplateRun` with an `isObjectLiteralShape(value)` predicate (`trimmed value matches ^\{.*\}$`) for the COLON_BIND_ATTR + R_OTHER_ATTR branches. Object-literal values now route through Plan 11's `injectJsAsExpression` paren-wrap instead of unwrapped `injectJs`. Counter.rozie line 44 `:class="{ hovering: $data.hovering }"` no longer flagged as `JSLabeledStatement`. Verified via `testClassBindObjectLiteralParenWrapped`.
+
+- **P1-UAT-15** DEFERRED — Phase 08.3 (synthetic-virtual-file injection architecture; needs separate research + design).
+
+v0.2.0 zip rebuilt cumulative through cycle 3. Tag cut + final UAT walk now depend on UAT re-run #4 against the rebuilt zip; once that signs off and no new findings surface, Plan 12 Task 3 cuts the `intellij-plugin/v0.2.0` tag locally and STOPS at the push boundary per `feedback_no_autopush`.
+
+## Issues captured (2026-05-17 UAT re-run #4 — cycle-3 verification + final pre-tag walk)
+
+**Summary:** Gap-closure cycle 3 (Plans 08.2-15..18) closed P1-UAT-10..14 at the code layer. P1-UAT-15 deferred to Phase 08.3. Awaiting human re-run of UAT in WebStorm 2024.2.5 + IDEA Ultimate 2025.3 against the rebuilt v0.2.0 zip to verify behavioral closure + catch any cycle-3 regressions. If clean, tag is cut next.
+
+### P1-UAT-10 re-verification
+- **Steps to repro fix:** Open Dropdown.rozie (or any reference example with a `<listeners>` block). Observe the event-name keys inside `<listeners>` body.
+- **Expected after Plan 08.2-15:** No "Statement expected" / `JSLabeledStatement` warnings on event-name keys; injection works identically to `<props>` / `<data>` (now paren-wrapped object-literal context).
+- **Pending — awaiting human walkthrough verification**
+
+### P1-UAT-11 + P1-UAT-12 re-verification
+- **Steps to repro fix (bare `$props` goto, P1-UAT-11):** Open Counter.rozie. Ctrl-click on bare `$props` (NOT on a `.X` accessor). Single-target navigation expected (to the synthetic `rozie-globals.d.ts` declaration), not multi-file picker.
+- **Steps to repro fix (magic ident calls, P1-UAT-12):** Open Counter.rozie line 34 `const canIncrement = $computed(...)`. `$computed` token expected NOT to carry "Unresolved method or function" red underline. Same for `$emit(...)`, `$watch(...)`, etc.
+- **Expected after Plan 08.2-16:** Bare `$X` resolves to synthetic declaration; `$X(...)` call sites recognised; plain `.js` files anywhere in user's project unaffected (Pitfall 2 leak guard).
+- **Pending — awaiting human walkthrough verification**
+
+### P1-UAT-13 re-verification
+- **Steps to repro fix:** Open Counter.rozie. Ctrl-click on `canIncrement` inside line 37's `if (canIncrement)`. Navigation expected to jump to line 34's `const canIncrement = $computed(...)`. Same for `canDecrement` (line 38 → line 35).
+- **Expected after Plan 08.2-17:** Script-local declarations resolve correctly across the full script body (SCRIPT_BODY now coalesced into one contiguous injection range; lexical scope spans the full body).
+- **Pending — awaiting human walkthrough verification**
+
+### P1-UAT-14 re-verification
+- **Steps to repro fix:** Open Counter.rozie line 44 — `:class="{ hovering: $data.hovering }"`. The `hovering:` key expected NOT to carry the "Unnecessary label" / `JSLabeledStatement` warning.
+- **Expected after Plan 08.2-18:** Object-literal attribute values render cleanly under paren-wrap; expression-position parsing applies.
+- **Pending — awaiting human walkthrough verification**
+
+### Full 11-example regression walkthrough
+- **Pending — walk Counter, Dropdown, SearchInput, TodoList, Modal, ModalConsumer, WrapperModal, Card, CardHeader, TreeNode, Table to confirm cycles 1+2+3 didn't break anything in prior closures (P1-UAT-03..09 + P0-UAT-01/02)**
+
+### If clean → tag cut
+- **Plan 08.2-12 Task 3** cuts `intellij-plugin/v0.2.0` annotated tag locally; STOPS at the push boundary per `feedback_no_autopush`; orchestrator surfaces the `git push origin intellij-plugin/v0.2.0` command for user authorization.
 
 ## Issues captured (2026-05-17 UAT halt — partial walkthrough)
 
