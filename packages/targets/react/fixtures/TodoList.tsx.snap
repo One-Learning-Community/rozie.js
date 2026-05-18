@@ -55,7 +55,7 @@ export default function TodoList(_props: TodoListProps): JSX.Element {
     _rozieProp_onToggle && _rozieProp_onToggle(id);
   }, [_rozieProp_onToggle, items, setItems]);
   const { onRemove: _rozieProp_onRemove } = props;
-    const remove = useCallback(id => {
+    const removeItem = useCallback(id => {
     setItems(items.filter(i => i.id !== id));
     _rozieProp_onRemove && _rozieProp_onRemove(id);
   }, [_rozieProp_onRemove, items, setItems]);
@@ -75,7 +75,7 @@ export default function TodoList(_props: TodoListProps): JSX.Element {
       {(items.length > 0) ? <ul data-rozie-s-52bec3de="">
         {items.map((item) => <li key={item.id} className={clsx({ [styles.done]: item.done })} data-rozie-s-52bec3de="">
           
-          {typeof (props.children ?? props.slots?.['']) === 'function' ? ((props.children ?? props.slots?.['']) as Function)({ item, toggle: () => toggle(item.id), remove: () => remove(item.id) }) : ((props.children ?? props.slots?.['']) ?? <><label data-rozie-s-52bec3de=""><input type="checkbox" checked={item.done} onChange={(e) => { toggle(item.id); }} data-rozie-s-52bec3de="" /><span data-rozie-s-52bec3de="">{item.text}</span></label><button aria-label="Remove" onClick={(e) => { remove(item.id); }} data-rozie-s-52bec3de="">×</button></>)}
+          {typeof (props.children ?? props.slots?.['']) === 'function' ? ((props.children ?? props.slots?.['']) as Function)({ item, toggle: () => toggle(item.id), remove: () => removeItem(item.id) }) : ((props.children ?? props.slots?.['']) ?? <><label data-rozie-s-52bec3de=""><input type="checkbox" checked={item.done} onChange={(e) => { toggle(item.id); }} data-rozie-s-52bec3de="" /><span data-rozie-s-52bec3de="">{item.text}</span></label><button aria-label="Remove" onClick={(e) => { removeItem(item.id); }} data-rozie-s-52bec3de="">×</button></>)}
         </li>)}
       </ul> : <p className={styles.empty} data-rozie-s-52bec3de="">
         {(props.renderEmpty ?? props.slots?.['empty']) ? ((props.renderEmpty ?? props.slots?.['empty']) as Function)() : "Nothing to do. ✨"}
