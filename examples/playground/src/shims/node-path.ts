@@ -1,8 +1,10 @@
-// Browser shim for `node:path`. The resolver may path-massage strings even
-// when it never hits the filesystem, so these are cheap real implementations
-// rather than throws. They are NOT POSIX-spec-complete — they only need to be
-// safe-no-ops for the single-buffer playground path. If a future feature
-// requires real path math, swap to `pathe` (browser-friendly path module).
+// Browser shim for `node:path` (and bare `path`). Real-ish POSIX implementations
+// for the names @rozie/core + transitive deps (postcss) actually consume:
+// dirname, isAbsolute, join, resolve, relative, sep.
+// Not POSIX-spec-complete — only safe-no-ops for the single-buffer playground
+// path. If a feature ever needs real path math, swap to `pathe`.
+
+export const sep = '/';
 
 export function dirname(p: string): string {
   const i = p.lastIndexOf('/');
@@ -23,4 +25,11 @@ export function resolve(...parts: string[]): string {
   return '/' + parts.filter(Boolean).join('/').replace(/\/+/g, '/').replace(/^\//, '');
 }
 
-export default { dirname, isAbsolute, join, resolve };
+export function relative(from: string, to: string): string {
+  if (from === to) return '';
+  return to.startsWith(from + '/') ? to.slice(from.length + 1) : to;
+}
+
+export const posix = { sep, dirname, isAbsolute, join, resolve, relative };
+
+export default { sep, dirname, isAbsolute, join, resolve, relative, posix };

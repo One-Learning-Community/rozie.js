@@ -4,6 +4,20 @@
     <meta charset="utf-8" />
     <title>Rozie Playground</title>
     <link rel="stylesheet" href="/src/styles.css" />
+    <script>
+      // Runtime process polyfill — installed synchronously before any ES
+      // module loads so that dep code reading `process.env.X` at module-eval
+      // time (postcss, @babel/types) sees a defined global. The vite `define`
+      // block handles known literal keys at transform time; this catches the
+      // dynamic and unknown-key cases.
+      window.process = window.process || {
+        env: { NODE_ENV: 'production' },
+        platform: 'browser',
+        cwd: function () { return '/'; },
+        versions: {},
+        argv: [],
+      };
+    </script>
   </head>
   <body>
     <header>
