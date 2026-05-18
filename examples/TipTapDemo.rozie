@@ -1,0 +1,204 @@
+<!--
+  TipTapDemo.rozie — companion consumer for TipTap.
+
+  Single source compiles to six per-framework consumer recipes — the
+  "look ma, no @tiptap/react, no @tiptap/vue-3, no tiptap-svelte" proof.
+
+  Exercises:
+    - SCALAR string r-model:html consumer-side two-way bind for rich content
+    - Live derived $computed over the bound HTML — word/character counts
+      that update as the user types (HTML stripping for the count)
+    - Buttons that programmatically reset $data.content — flows back into
+      the editor via the wrapper's $watch + setContent path
+    - Component composition via <components> block
+    - r-if / r-else for the editability toggle preview state
+-->
+
+<rozie name="TipTapDemo">
+
+<components>
+{
+  TipTap: './TipTap.rozie',
+}
+</components>
+
+<data>
+{
+  content: '<h2>Welcome</h2><p>This editor is bound to <strong>$data.content</strong>. Edit text and watch the stats pane update live.</p><ul><li>Bold and italic via the toolbar</li><li>Heading levels</li><li>Bullet lists</li></ul>',
+  editable: true,
+}
+</data>
+
+<script>
+const stripHtml = (html) => {
+  // Quick-and-dirty word/char counter — the demo is the point, not
+  // production-grade HTML parsing. Strips tags + collapses whitespace.
+  return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+}
+
+const stats = $computed(() => {
+  const text = stripHtml($data.content)
+  const chars = text.length
+  const words = text === '' ? 0 : text.split(/\s+/).length
+  return { chars, words }
+})
+
+const presets = [
+  { label: 'Short', html: '<p>Hello, world.</p>' },
+  { label: 'Article', html: '<h1>An article</h1><p>Opening paragraph with some <strong>bold</strong> and <em>italic</em> emphasis.</p><h2>A subsection</h2><p>Body text follows.</p>' },
+  { label: 'List', html: '<h2>Things to do</h2><ul><li>Write the spec</li><li>Ship the demo</li><li>Update the memory</li></ul>' },
+  { label: 'Empty', html: '<p></p>' },
+]
+
+const loadPreset = (html) => { $data.content = html }
+const reset = () => loadPreset('<p>Start writing…</p>')
+</script>
+
+<template>
+<div class="tiptap-demo">
+  <header>
+    <h3>Rich text bound to component state</h3>
+    <p class="hint">The toolbar's active state and the bound HTML are both live — toggle <code>editable</code> to see the round-trip behave correctly in both directions.</p>
+  </header>
+
+  <div class="grid">
+    <section class="editor-pane">
+      <TipTap r-model:html="$data.content" :editable="$data.editable" placeholder="Start writing…" />
+
+      <div class="controls">
+        <label class="check">
+          <input type="checkbox" r-model="$data.editable" />
+          Editable
+        </label>
+
+        <span class="presets-label">Presets</span>
+        <button r-for="p in presets" :key="p.label" type="button" @click="loadPreset(p.html)">{{ p.label }}</button>
+        <button type="button" @click="reset" class="reset">Reset</button>
+      </div>
+    </section>
+
+    <aside class="state-pane">
+      <h4>Stats</h4>
+      <dl class="stats">
+        <dt>Words</dt>
+        <dd>{{ stats.words }}</dd>
+        <dt>Chars</dt>
+        <dd>{{ stats.chars }}</dd>
+        <dt>HTML size</dt>
+        <dd>{{ $data.content.length }} bytes</dd>
+      </dl>
+
+      <h4>Bound HTML</h4>
+      <pre class="html-preview">{{ $data.content }}</pre>
+    </aside>
+  </div>
+</div>
+</template>
+
+<style>
+.tiptap-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  max-width: 960px;
+}
+
+header h3 { margin: 0 0 0.25rem; font-size: 1.125rem; }
+header .hint { margin: 0 0 1rem; color: rgba(0, 0, 0, 0.55); font-size: 0.875rem; }
+header code { background: rgba(0, 0, 0, 0.04); padding: 0.0625rem 0.25rem; border-radius: 2px; font-size: 0.85em; }
+
+.grid {
+  display: grid;
+  grid-template-columns: 3fr 2fr;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.editor-pane, .state-pane { min-width: 0; }
+
+.controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  margin-top: 0.75rem;
+}
+
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.875rem;
+  cursor: pointer;
+  margin-right: 0.75rem;
+}
+
+.presets-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: rgba(0, 0, 0, 0.55);
+  margin: 0 0.25rem 0 0.5rem;
+}
+
+.controls button {
+  padding: 0.25rem 0.625rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8125rem;
+}
+.controls button.reset {
+  margin-left: auto;
+  color: rgba(0, 0, 0, 0.55);
+}
+
+.state-pane h4 {
+  margin: 0 0 0.375rem;
+  font-size: 0.75rem;
+  color: rgba(0, 0, 0, 0.55);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.state-pane h4 + .stats { margin-bottom: 0.75rem; }
+.state-pane h4 + h4 { margin-top: 0.75rem; }
+
+.stats {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.375rem 0.75rem;
+  margin: 0;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 6px;
+  font-size: 0.875rem;
+}
+.stats dt {
+  color: rgba(0, 0, 0, 0.55);
+  font-weight: 500;
+}
+.stats dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.html-preview {
+  margin: 0;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 6px;
+  background: #fafafa;
+  font-family: ui-monospace, monospace;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 240px;
+  overflow-y: auto;
+  color: rgba(0, 0, 0, 0.75);
+}
+</style>
+
+</rozie>
