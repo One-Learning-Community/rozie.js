@@ -30,6 +30,11 @@ export function emitSlotInvocation(
   ir: IRComponent,
   fallbackChildren: string,
 ): string {
+  // Portal-slot primitive (Spike 003) — Lit's shadow-DOM <slot> can't be
+  // invoked imperatively. Portal slots come through as function-typed
+  // @property fields and are render()ed into the foreign engine's container
+  // from script via `$portals.<name>(...)`. Skip template emit entirely.
+  if (node.isPortal) return '';
   const name = node.slotName;
   const slotName = name.length > 0 ? ` name="${name}"` : '';
   const dataAttrs: string[] = [];

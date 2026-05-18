@@ -197,6 +197,10 @@ function emitSlotInvocation(
   node: TemplateSlotInvocationIR,
   ctx: EmitNodeCtx,
 ): string {
+  // Portal-slot primitive (Spike 003) — skip template emit entirely. Portal
+  // slots are invoked from script via `$portals.<name>(...)` and rendered
+  // imperatively into foreign engine containers.
+  if (node.isPortal) return '';
   const slotKey = node.slotName === '' ? '' : node.slotName;
   const nameAttr = slotKey ? ` name="${slotKey}"` : '';
   const argAttrs = node.args

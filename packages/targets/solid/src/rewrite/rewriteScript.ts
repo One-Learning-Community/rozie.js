@@ -150,6 +150,9 @@ export function rewriteRozieIdentifiers(
   const dataNames = new Set(ir.state.map((s) => s.name));
   const computedNames = new Set(ir.computed.map((c) => c.name));
   const refNames = new Set(ir.refs.map((r) => r.name));
+  const portalSlotNames = new Set(
+    ir.slots.filter((s) => s.isPortal === true).map((s) => s.name),
+  );
 
   traverse(cloned, {
     // Rewrite bare computed-memo references to getter calls: canIncrement → canIncrement().
@@ -278,6 +281,14 @@ export function rewriteRozieIdentifiers(
         // $refs.foo → fooRef (plain variable initialized to null at top of body)
         path.replaceWith(t.identifier(property.name + 'Ref'));
         path.skip();
+        return;
+      }
+
+      if (object.name === '$portals' && portalSlotNames.has(property.name)) {
+        // Portal-slot primitive (Spike 003). $portals.<name> resolves to the
+        // synthesized local `portals` closure that emitScript injects at the
+        // top of the onMount callback.
+        path.node.object = t.identifier('portals');
         return;
       }
     },

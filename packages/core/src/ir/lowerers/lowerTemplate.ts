@@ -458,11 +458,20 @@ function lowerBareElement(
   // <slot> elements lower to TemplateSlotInvocationIR.
   if (el.tagName === 'slot') {
     let slotName = '';
+    let isPortal = false;
     const args: TemplateSlotInvocationIR['args'] = [];
     for (const attr of el.attributes) {
       if (attr.kind === 'static' && attr.name === 'name' && attr.value !== null) {
         slotName = attr.value;
+      } else if (attr.kind === 'static' && attr.name === 'portal' && attr.value === null) {
+        // Portal-slot primitive (Spike 003) — boolean attribute.
+        isPortal = true;
       } else if (attr.kind === 'binding' && attr.value !== null) {
+        // Portal slots use `:params="['arg']"` as a TYPE DECLARATION (consumed
+        // by lowerSlots into SlotDecl.portalParamNames) — strip it here so it
+        // doesn't reach the per-target template emitter as a normal scoped
+        // binding. Non-portal slots and other bindings are passed through.
+        if (attr.name === 'params') continue;
         const expr = tryParseExpression(attr.value);
         if (expr) {
           args.push({
@@ -490,7 +499,7 @@ function lowerBareElement(
       usedNames,
       lowerInFillBody,
     );
-    return {
+    const inv: TemplateSlotInvocationIR = {
       type: 'TemplateSlotInvocation',
       slotName,
       args,
@@ -502,6 +511,8 @@ function lowerBareElement(
       // (RESEARCH Pitfall 5 — re-projection-in-re-projection nesting).
       context: lowerInFillBody ? 'fill-body' : 'declaration',
     };
+    if (isPortal) inv.isPortal = true;
+    return inv;
   }
 
   // Lower attributes + collect template @event listeners.

@@ -64,6 +64,10 @@ export function emitSlotInvocation(
   node: TemplateSlotInvocationIR,
   ctx: EmitSlotInvocationCtx,
 ): string {
+  // Portal-slot primitive (Spike 003) — skip template emit. Portal slots are
+  // mount()ed into foreign engine containers from the wrapper's script via
+  // `$portals.<name>(...)`.
+  if (node.isPortal) return '';
   const slotKey = node.slotName === '' ? 'children' : node.slotName;
 
   // Build object-shape arg payload per Phase 07.3.1 Blocker #2 D-02. Svelte's

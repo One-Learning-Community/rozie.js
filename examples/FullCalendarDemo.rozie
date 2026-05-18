@@ -146,7 +146,25 @@ const formatStart = (e) => {
       @event-click="onEventClick"
       @date-click="onDateClick"
       @event-drop="onEventDrop"
-    />
+    >
+      <!--
+        Portal-slot primitive (Spike 003) — supply a templated event
+        renderer. FullCalendar normally renders a plain title string per
+        cell; with this filler, every cell renders consumer-supplied
+        markup. Compiles per target as:
+          - React  → `renderEvent={({ arg }) => <span>…</span>}`
+          - Vue    → `<template #event="{ arg }">…</template>` consumed via slot()
+          - Svelte → `{#snippet event(scope)}…{/snippet}` mounted via PortalHost
+          - Angular → `<ng-template #event let-arg="arg">…</ng-template>` via vcr
+          - Solid  → `event={(scope) => <span>…</span>}`
+          - Lit    → `.event=${(scope) => html\`…\`}`
+        The wrapper's $portals.event closure handles per-target mounting
+        into the engine-owned cell container.
+      -->
+      <template #event="{ arg }">
+        <span class="fc-event-title">{{ arg.event.title }}</span>
+      </template>
+    </FullCalendar>
   </div>
 
   <div class="grid">
@@ -242,6 +260,11 @@ header code { background: rgba(0, 0, 0, 0.04); padding: 0.0625rem 0.25rem; borde
   border: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: 6px;
   background: white;
+}
+
+.fc-event-title {
+  font-weight: 500;
+  font-size: 0.78rem;
 }
 
 .grid {

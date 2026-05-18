@@ -71,7 +71,7 @@ const normalizeEvent = (e) => {
 }
 
 $onMount(() => {
-  instance = new Calendar($el, {
+  const opts = {
     plugins:       PLUGINS,
     initialView:   $props.view,
     weekends:      $props.weekends,
@@ -105,7 +105,24 @@ $onMount(() => {
       if (suppressViewSync) { suppressViewSync = false; return }
       if (info.view.type !== $props.view) $props.view = info.view.type
     },
-  })
+  }
+
+  // Portal-slot primitive (Spike 003) — when a consumer supplies an `event`
+  // slot, route every cell render through it. The portal helper mounts the
+  // consumer's framework-native fragment (React JSX, Vue VNodes, Svelte
+  // Snippet, etc.) into a DOM container that FullCalendar owns; the dispose
+  // handle is returned to FullCalendar so it cleans up the mounted tree when
+  // the cell is removed. Consumers that don't fill the slot get FullCalendar's
+  // default rendering (title text) — guarded by `$slots.event`.
+  if ($slots.event) {
+    opts.eventContent = (arg) => {
+      const node = document.createElement('div')
+      const dispose = $portals.event(node, { arg })
+      return { domNodes: [node], dispose }
+    }
+  }
+
+  instance = new Calendar($el, opts)
   instance.render()
   return () => instance?.destroy()
 })
@@ -134,6 +151,16 @@ $watch(() => $props.height,     (v) => instance?.setOption('height',     v))
 
 <template>
 <div class="rozie-fullcalendar" />
+<!--
+  Portal-slot primitive (Spike 003). The `event` slot is declared but NOT
+  rendered in the template — per-target template emitters skip it. It exists
+  only to declare the consumer-facing render-prop / scoped-slot / contentChild
+  shape (per target). The wrapper invokes the slot from script via
+  $portals.event(node, { arg }) inside FullCalendar's `eventContent` callback;
+  the portal helper mounts the consumer's fragment into the engine-owned node
+  and returns a dispose handle the engine calls on cell teardown.
+-->
+<slot name="event" portal :params="['arg']" />
 </template>
 
 <style>

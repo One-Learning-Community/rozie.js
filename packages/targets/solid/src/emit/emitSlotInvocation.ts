@@ -108,6 +108,9 @@ export function emitSlotInvocation(
   node: TemplateSlotInvocationIR,
   ctx: EmitNodeCtx,
 ): string {
+  // Portal-slot primitive (Spike 003) — skip template emit. Portal slots are
+  // render()ed into foreign engine containers from script via `$portals.<name>(...)`.
+  if (node.isPortal) return '';
   const slotName = node.slotName;
   const slot = findSlotDecl(slotName, ctx.ir);
   const invocationFallback = renderInvocationFallback(node.fallback, ctx);

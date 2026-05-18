@@ -20,6 +20,7 @@ import type { SolidImportCollector, RuntimeSolidImportCollector } from '../rewri
 import { cloneScriptProgram } from '../rewrite/cloneProgram.js';
 import { partitionUserImports } from '../rewrite/partitionUserImports.js';
 import { rewriteRozieIdentifiers, rewriteRozieExpressionNode as rewriteNode } from '../rewrite/rewriteScript.js';
+import { emitPortals } from './emitPortals.js';
 
 // CJS interop normalization for @babel/generator default export.
 type GenerateFn = typeof import('@babel/generator').default;
@@ -51,6 +52,15 @@ function capitalize(name: string): string {
 }
 
 export interface EmitScriptResult {
+  /**
+   * Portal-slot primitive (Spike 003) — when true, the shell must add
+   * `import { render } from 'solid-js/web';` because the portals closure
+   * uses Solid's imperative render API. The existing 'solid-js/web' import
+   * (used for the component's main `render` mount call in the shell) is
+   * already present, so this is informational — but kept distinct for
+   * future emit shape evolution.
+   */
+  hasPortals: boolean;
   /**
    * Solid signal/memo/lifecycle declarations + user-authored helpers.
    */
@@ -185,6 +195,19 @@ export function emitScript(
     const rewrittenBody = rewriteNode(c.body, ir);
     const bodyCode = genCode(rewrittenBody);
     hookLines.push(`const ${c.name} = createMemo(() => ${bodyCode});`);
+  }
+
+  // Portal-slot primitive (Spike 003) — emit portal scaffolding just before
+  // the lifecycle hooks so the `portals` closure exists when user code's
+  // onMount runs. The closure references `props.XSlot`, `render` (from
+  // 'solid-js/web'), and `onCleanup`.
+  const portalsEmit = emitPortals(ir);
+  if (portalsEmit.hasPortals) {
+    collectors.solidImports.add('onCleanup');
+    // The `render` named import lives on 'solid-js/web', not 'solid-js'.
+    // SolidImportCollector currently only emits 'solid-js' — wire a separate
+    // shell field through the script-emit result for the web import line.
+    hookLines.push(portalsEmit.setupLines);
   }
 
   // 4. onMount/onCleanup for each LifecycleHook.
@@ -331,6 +354,7 @@ export function emitScript(
   const hookSectionLines = hookLines.length;
 
   return {
+    hasPortals: portalsEmit.hasPortals,
     hookSection,
     userArrowsSection,
     userImports,

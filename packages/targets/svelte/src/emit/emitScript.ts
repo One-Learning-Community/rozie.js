@@ -45,6 +45,7 @@ import { cloneScriptProgram } from '../rewrite/cloneProgram.js';
 import { rewriteRozieIdentifiers } from '../rewrite/rewriteScript.js';
 import { collectSvelteImports } from '../rewrite/collectSvelteImports.js';
 import { buildSlotTypeFields } from './refineSlotTypes.js';
+import { emitPortals } from './emitPortals.js';
 
 // CJS interop normalization for @babel/generator default export.
 type GenerateFn = typeof import('@babel/generator').default;
@@ -640,6 +641,12 @@ function emitResidualScriptBody(
  * @experimental — shape may change before v1.0
  */
 export interface EmitScriptResult {
+  /**
+   * Portal-slot primitive (Spike 003) — true when any slot has isPortal.
+   * Informational; the actual extra imports are already spliced into the
+   * scriptBlock by emitScript.
+   */
+  hasPortals: boolean;
   /** The script body (without surrounding `<script lang="ts">` tags). */
   scriptBlock: string;
   /** Pending injections — Plan 02a Task 2/3 append to this. v1 always empty. */
@@ -695,6 +702,14 @@ export function emitScript(
     importLines.push(`import type { ${sorted.join(', ')} } from 'svelte';`);
   }
 
+  // Portal-slot primitive (Spike 003) — synthesize PortalHost-based portal
+  // closure for portal slots. Imports `mount`/`unmount` from 'svelte' and
+  // `PortalHost` from '@rozie/runtime-svelte/PortalHost.svelte'.
+  const portalsEmit = emitPortals(ir);
+  if (portalsEmit.hasPortals) {
+    importLines.push(portalsEmit.extraImports.trimEnd());
+  }
+
   // 4. Emit blocks in canonical order.
   const propsBlock = emitPropsBlock(ir);
   const stateLines = emitStateDecls(ir);
@@ -735,6 +750,9 @@ export function emitScript(
   // arrows) are visible to subsequent $derived / $effect references.
   const sections = [...preambleSections];
   if (residualCode.trim().length > 0) sections.push(residualCode);
+  // Portal-slot primitive — emit portal scaffolding before lifecycle so the
+  // `portals` closure is in scope when user $onMount callbacks fire.
+  if (portalsEmit.hasPortals) sections.push(portalsEmit.setupLines);
   if (derivedLines.length > 0) sections.push(derivedLines.join('\n'));
   if (lifecycleLines.length > 0) sections.push(lifecycleLines.join('\n'));
   // Quick plan 260515-u2b — watcher $effect blocks after lifecycle.
@@ -758,5 +776,12 @@ export function emitScript(
     }
   }
 
-  return { scriptBlock, scriptInjections, scriptMap, preambleSectionLines, diagnostics };
+  return {
+    hasPortals: portalsEmit.hasPortals,
+    scriptBlock,
+    scriptInjections,
+    scriptMap,
+    preambleSectionLines,
+    diagnostics,
+  };
 }

@@ -60,6 +60,7 @@ import {
   collectAngularImports,
 } from '../rewrite/collectAngularImports.js';
 import { buildSlotCtx, buildNgTemplateContextGuard } from './refineSlotTypes.js';
+import { emitPortals } from './emitPortals.js';
 
 // CJS interop normalization for @babel/generator default export.
 type GenerateFn = typeof import('@babel/generator').default;
@@ -510,6 +511,13 @@ function invokeOrPass(
 }
 
 export interface EmitScriptResult {
+  /**
+   * Portal-slot primitive (Spike 003) — markup to append to the component
+   * template when the wrapper uses any `<slot portal />`. Empty string when
+   * no portal slots are present. emitAngular splices this into the rendered
+   * template string AFTER emitTemplate runs.
+   */
+  portalTemplateAppend: string;
   /** The class body text (lines inside `class X { ... }`, without surrounding braces). */
   classBody: string;
   /** Import collector — populated with every @angular/core symbol referenced. */
@@ -732,6 +740,27 @@ export function emitScript(
       lifecycleConstructorLines.push(rendered.code);
     }
     if (rendered.needsDestroyRefField) lifecycleNeedsDestroyRefField = true;
+  }
+
+  // Portal-slot primitive (Spike 003) — synthesize portal scaffolding before
+  // we finalize lifecycleAfterViewInitLines / fieldLines so we can splice
+  // the closure + destroy registration into the same ngAfterViewInit block.
+  const portalsEmit = emitPortals(ir);
+  if (portalsEmit.hasPortals) {
+    for (const symName of portalsEmit.angularImports) {
+      // AngularImportCollector accepts any string via .add — narrow at runtime.
+      (imports as { add: (n: string) => void }).add(symName);
+    }
+    for (const decl of portalsEmit.fieldDecls) fieldLines.push(decl);
+    // Closure runs FIRST in ngAfterViewInit so user lifecycle bodies below
+    // can reference `portals.<name>(...)`. Destroy registration runs LAST so
+    // the cleanup loop executes before user-registered cleanups (Angular runs
+    // onDestroy callbacks in registration order — last in, last out).
+    lifecycleAfterViewInitLines.unshift(portalsEmit.closureBlock);
+    lifecycleAfterViewInitLines.push(portalsEmit.destroyRegister);
+    if (portalsEmit.needsDestroyRefField) {
+      lifecycleNeedsDestroyRefField = true;
+    }
   }
 
   // When at least one mount hook with paired cleanup landed in ngAfterViewInit,
@@ -968,6 +997,7 @@ export function emitScript(
     fieldLineCount + (fieldLineCount > 0 ? 1 : 0) + 1;
 
   return {
+    portalTemplateAppend: portalsEmit.templateAppend,
     classBody,
     imports,
     interfaceDecls,

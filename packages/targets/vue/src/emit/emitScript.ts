@@ -48,6 +48,7 @@ import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js'
 import { cloneScriptProgram } from '../rewrite/cloneProgram.js';
 import { rewriteRozieIdentifiers } from '../rewrite/rewriteScript.js';
 import { VueImportCollector } from '../rewrite/collectVueImports.js';
+import { emitPortals } from './emitPortals.js';
 import { buildSlotTypeBlock } from './refineSlotTypes.js';
 
 // CJS interop normalization for @babel/generator default export.
@@ -720,6 +721,12 @@ export function emitScript(
 
   const { lines: lifecycleLines, consumedIndices } = emitLifecycleHooks(cloned, imports);
 
+  // Portal-slot primitive (Spike 003) — synthesize setup-level scaffolding
+  // when ir.slots has any portal entries. Lines are spliced between residual
+  // and lifecycle sections below so the `portals` closure exists before user
+  // $onMount callbacks that capture it.
+  const portalsEmit = emitPortals(ir, imports);
+
   // Quick plan 260515-u2b — $watch emission. Walks the same cloned program
   // and emits one `watch(getter, cb);` per top-level $watch call. Returns the
   // additional consumed indices so emitResidualScriptBody skips them.
@@ -761,6 +768,9 @@ export function emitScript(
   // long as the const exists by the time `onMounted`'s argument is evaluated.
   const sections = [...preambleSections];
   if (residualCode.trim().length > 0) sections.push(residualCode);
+  // Portal-slot primitive — emit portal scaffolding BEFORE lifecycle so the
+  // `portals` closure is in scope when the user's onMounted callback fires.
+  if (portalsEmit.hasPortals) sections.push(portalsEmit.setupLines);
   if (lifecycleLines.length > 0) sections.push(lifecycleLines.join('\n'));
   // Quick plan 260515-u2b — emit watch() calls AFTER lifecycle calls so any
   // helpers referenced inside the watch callback (declared in residual body)

@@ -50,6 +50,7 @@ import {
 } from '../rewrite/collectReactImports.js';
 import { computeHelperBodyDeps } from './computeHelperDeps.js';
 import { renderDepArray as renderDepArrayWithIR } from './renderDepArray.js';
+import { emitPortals } from './emitPortals.js';
 
 // CJS interop normalization for @babel/generator default export.
 type GenerateFn = typeof import('@babel/generator').default;
@@ -612,6 +613,13 @@ function renderGetterExpression(
 
 export interface EmitScriptResult {
   /**
+   * Portal-slot primitive (Spike 003) — true when the IR has any slot with
+   * `isPortal === true`. emitReact uses this to inject the
+   * `import { createRoot, type Root } from 'react-dom/client';` line into
+   * the shell.
+   */
+  hasPortals: boolean;
+  /**
    * React state-style hook declarations: useRef hoists + useControllableState +
    * useState + useRef (template refs) + useMemo. NO useEffects here.
    *
@@ -728,8 +736,20 @@ export function emitScript(
   // statements so they don't appear in userArrowsSection.
   const watcherPairing = pairClonedWatchers(cloned, ir);
 
+  // Portal-slot primitive (Spike 003) — synthesize per-target portal
+  // scaffolding when ir.slots has any portal entries. Three artefacts
+  // (see emitPortals.ts):
+  //   - refDeclLine    → pushed to hookLines below (component-scope useRef)
+  //   - closureBlock   → prepended to the first mount-phase useEffect body
+  //   - bulkDispose    → prepended to the first mount-phase useEffect cleanup
+  const portalsEmit = emitPortals(ir, collectors);
+
   // 5. Build hookSection.
   const hookLines: string[] = [];
+
+  if (portalsEmit.hasPortals) {
+    hookLines.push(portalsEmit.refDeclLine);
+  }
 
   // 5.0. Defaults rebind for non-model props that declare a default. We rebind
   //     the function parameter `_props` to a new const `props` whose missing
@@ -871,12 +891,20 @@ export function emitScript(
   // Same `renderDepArray` helper applies; callback body is inlined into the
   // useEffect callback exactly like a lifecycle setup body.
   const lifecycleEffectLines: string[] = [];
+  // Portal-slot primitive (Spike 003) — inject the portals closure into the
+  // FIRST mount-phase lifecycle hook. The closure depends on `portalRoots`
+  // (hoisted in hookLines) and `props`, both in scope at useEffect-body
+  // position. Same hook gets the bulk-dispose prepended to its cleanup.
+  let portalsInjected = false;
   ir.lifecycle.forEach((lh, idx) => {
     collectors.react.add('useEffect');
     const paired = lifecyclePairing.perHook[idx];
     const setupCloned = paired?.setupCloned ?? lh.setup;
     const cleanupCloned = paired?.cleanupCloned ?? null;
     const depsArr = renderDepArray(lh.setupDeps, modelProps);
+    const injectPortalsHere =
+      portalsEmit.hasPortals && !portalsInjected && lh.phase === 'mount';
+    if (injectPortalsHere) portalsInjected = true;
 
     // Build the useEffect callback body.
     // setup may be Identifier (helper fn ref) or arrow/fn (inline body).
@@ -898,6 +926,12 @@ export function emitScript(
       setupInvocation = genCode(setupCloned) + ';';
     }
 
+    if (injectPortalsHere) {
+      // Prepend the `const portals = { ... };` closure to the setup body so
+      // user code's rewritten `portals.<name>(...)` references resolve.
+      setupInvocation = portalsEmit.closureBlock + '\n  ' + setupInvocation;
+    }
+
     let cleanupInvocation = '';
     if (cleanupCloned) {
       if (t.isIdentifier(cleanupCloned)) {
@@ -909,13 +943,29 @@ export function emitScript(
         const fnBody = cleanupCloned.body;
         if (t.isBlockStatement(fnBody)) {
           const innerStmts = fnBody.body.map((s) => genCode(s)).join('\n        ');
-          cleanupInvocation = `\n  return () => {\n    ${innerStmts}\n  };`;
+          const cleanupBody = injectPortalsHere
+            ? portalsEmit.bulkDisposeBlock + '\n    ' + innerStmts
+            : innerStmts;
+          cleanupInvocation = `\n  return () => {\n    ${cleanupBody}\n  };`;
         } else {
-          cleanupInvocation = `\n  return () => ${genCode(fnBody)};`;
+          const cleanupBody = injectPortalsHere
+            ? `{\n    ${portalsEmit.bulkDisposeBlock}\n    ${genCode(fnBody)};\n  }`
+            : genCode(fnBody);
+          cleanupInvocation = injectPortalsHere
+            ? `\n  return () => ${cleanupBody};`
+            : `\n  return () => ${cleanupBody};`;
         }
       } else {
-        cleanupInvocation = `\n  return () => (${genCode(cleanupCloned)})();`;
+        const inner = `(${genCode(cleanupCloned)})()`;
+        if (injectPortalsHere) {
+          cleanupInvocation = `\n  return () => {\n    ${portalsEmit.bulkDisposeBlock}\n    ${inner};\n  };`;
+        } else {
+          cleanupInvocation = `\n  return () => ${inner};`;
+        }
       }
+    } else if (injectPortalsHere) {
+      // No user cleanup but portals need bulk-dispose — synthesize one.
+      cleanupInvocation = `\n  return () => {\n    ${portalsEmit.bulkDisposeBlock}\n  };`;
     }
 
     lifecycleEffectLines.push(
@@ -1161,6 +1211,7 @@ export function emitScript(
     : 0;
 
   return {
+    hasPortals: portalsEmit.hasPortals,
     hookSection,
     userArrowsSection,
     userImports,

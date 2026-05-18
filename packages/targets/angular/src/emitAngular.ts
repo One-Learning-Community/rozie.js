@@ -215,10 +215,20 @@ export function emitAngular(
     imports.addCommon('NgTemplateOutlet');
   }
 
+  // Portal-slot primitive (Spike 003) — append `<ng-container #rozie_portalAnchor>`
+  // to the rendered template so the ViewContainerRef query has an anchor to
+  // read. The portal closure synthesized in ngAfterViewInit reads from this
+  // anchor; without it `_portalAnchor()` returns undefined and every portal
+  // mount silently no-ops.
+  const finalTemplate =
+    scriptResult.portalTemplateAppend.length > 0
+      ? tmplResult.template + scriptResult.portalTemplateAppend
+      : tmplResult.template;
+
   // 6. Build the @Component decorator.
   const decorator = emitDecorator(ir, {
     componentName: ir.name,
-    template: tmplResult.template,
+    template: finalTemplate,
     stylesArrayBody: styleResult.stylesArrayBody,
     hasSlots: ir.slots.length > 0,
     hasNgModel: tmplResult.hasNgModel,

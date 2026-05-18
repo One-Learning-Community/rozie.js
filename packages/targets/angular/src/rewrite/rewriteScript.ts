@@ -198,6 +198,9 @@ export function rewriteRozieIdentifiers(
   const dataNames = new Set(ir.state.map((s) => s.name));
   const refNames = new Set(ir.refs.map((r) => r.name));
   const slotNames = new Set(ir.slots.map((s) => (s.name === '' ? '' : s.name)));
+  const portalSlotNames = new Set(
+    ir.slots.filter((s) => s.isPortal === true).map((s) => s.name),
+  );
   const computedNames = new Set(ir.computed.map((c) => c.name));
   const emits = new Set(ir.emits);
 
@@ -448,6 +451,13 @@ export function rewriteRozieIdentifiers(
         const tplName = prop.name === '' ? 'defaultTpl' : `${prop.name}Tpl`;
         const dynKey = prop.name === '' ? 'defaultSlot' : prop.name;
         path.replaceWith(buildScriptSlotsMerge(tplName, dynKey));
+        return;
+      }
+      if (obj.name === '$portals' && portalSlotNames.has(prop.name)) {
+        // Portal-slot primitive (Spike 003). $portals.<name> resolves to the
+        // synthesized local `portals` closure that emitScript injects at the
+        // top of the ngAfterViewInit() method body.
+        path.node.object = t.identifier('portals');
         return;
       }
     },

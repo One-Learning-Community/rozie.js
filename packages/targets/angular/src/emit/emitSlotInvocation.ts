@@ -256,6 +256,9 @@ export function emitSlotInvocation(
   node: TemplateSlotInvocationIR,
   ctx: EmitSlotInvocationCtx,
 ): string {
+  // Portal-slot primitive (Spike 003) — skip template emit. Portal slots are
+  // mounted via vcr.createEmbeddedView from script using `$portals.<name>(...)`.
+  if (node.isPortal) return '';
   const tplField = slotFieldName(node.slotName);
 
   // Find matching SlotDecl to determine presence + defaultContent.

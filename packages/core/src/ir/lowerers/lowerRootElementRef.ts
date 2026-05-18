@@ -171,13 +171,20 @@ function resolveRootElement(node: TemplateNode | null): TemplateElementIR | null
   let only: TemplateElementIR | null = null;
   for (const child of node.children) {
     if (child.type === 'TemplateStaticText') continue; // cosmetic whitespace
+    // Portal-slot primitive (Spike 003) — portal slots are declared in the
+    // template tree but NEVER render. They exist only to surface a
+    // consumer-facing prop in the per-target slot-decl machinery. Skipping
+    // them here lets a wrapper that uses `$el` AND a portal slot still
+    // qualify as single-root, which is what lowerRootElementRef cares about
+    // (does the template have exactly one mountable element?).
+    if (child.type === 'TemplateSlotInvocation' && child.isPortal === true) continue;
     if (child.type === 'TemplateElement') {
       if (only !== null) return null; // multiple structural elements — not a single root
       only = child;
       continue;
     }
     // Any non-element/non-text structural sibling disqualifies — conditional,
-    // loop, slot invocation, interpolation are not single-root shapes.
+    // loop, non-portal slot invocation, interpolation are not single-root shapes.
     return null;
   }
   return only;

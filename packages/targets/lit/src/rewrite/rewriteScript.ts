@@ -132,6 +132,9 @@ export function rewriteScript(
   const computedNames = new Set(ir.computed.map((c) => c.name));
   const refNames = new Set(ir.refs.map((r) => r.name));
   const slotNames = new Set(ir.slots.map((s) => (s.name === '' ? 'default' : s.name)));
+  const portalSlotNames = new Set(
+    ir.slots.filter((s) => s.isPortal === true).map((s) => s.name),
+  );
   const methodNames =
     opts.methodNamesOverride ?? collectMethodNamesFromProgram(cloned, ir);
 
@@ -200,6 +203,14 @@ export function rewriteScript(
           path.skip();
           return;
         }
+      }
+
+      if (obj.name === '$portals' && portalSlotNames.has(prop.name)) {
+        // Portal-slot primitive (Spike 003). $portals.<name> resolves to the
+        // synthesized local `portals` closure that emitScript injects at the
+        // top of the firstUpdated() method.
+        path.node.object = t.identifier('portals');
+        return;
       }
     },
 

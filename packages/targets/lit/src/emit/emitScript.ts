@@ -33,6 +33,7 @@ import { rewriteScript, collectMethodNamesFromProgram } from '../rewrite/rewrite
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
 import { partitionUserImports } from '../rewrite/partitionUserImports.js';
 import { toKebabCase } from './emitDecorator.js';
+import { emitPortals } from './emitPortals.js';
 
 type GenerateFn = typeof import('@babel/generator').default;
 const generate: GenerateFn =
@@ -50,6 +51,12 @@ export interface EmitScriptOpts {
 }
 
 export interface EmitScriptResult {
+  /**
+   * Portal-slot primitive (Spike 003) — when true, emitLit's shell must
+   * ensure `render` and `nothing` are imported from 'lit' for the portal-
+   * closure body that uses them.
+   */
+  hasPortals: boolean;
   /** Class field declarations (props + state + refs + signal-wrapped data). */
   fieldDecls: string;
   /** Class method declarations (computed getters + user methods + model setters). */
@@ -637,22 +644,42 @@ export function emitScript(
     }
   }
 
+  // Portal-slot primitive (Spike 003) — synthesize the per-component
+  // portal scaffolding. Three artefacts:
+  //   - fieldDecl       → pushed alongside other class fields
+  //   - closureBlock    → prepended to the firstUpdated body so user code
+  //                       (which got `$portals.X` rewritten to `portals.X`)
+  //                       has the closure in scope
+  //   - disconnectedBlock → prepended to disconnectedCallback body
+  const portalsEmit = emitPortals(ir);
+  if (portalsEmit.hasPortals) {
+    opts.lit.add('render');
+    opts.lit.add('nothing');
+    fieldLines.push(portalsEmit.fieldDecl);
+  }
+
   // 6. firstUpdated body: free-statement preamble + cleanup pushes + mount hooks
   //    + watcher effect registrations. Watcher registrations live alongside
   //    cleanup pushes — they MUST fire at first paint so the @lit-labs/preact-signals
   //    effect subscribes before any user interaction.
   const mountSegments: string[] = [];
+  if (portalsEmit.hasPortals) mountSegments.push(portalsEmit.closureBlock);
   if (freeStatements.trim()) mountSegments.push(freeStatements);
   if (cleanupPushes.length > 0) mountSegments.push(cleanupPushes.join('\n'));
   if (watcherCleanupPushes.length > 0)
     mountSegments.push(watcherCleanupPushes.join('\n'));
   for (const body of mountBodies) mountSegments.push(body);
 
+  const unmountSegments: string[] = [];
+  if (portalsEmit.hasPortals) unmountSegments.push(portalsEmit.disconnectedBlock);
+  unmountSegments.push(...unmountBodies);
+
   return {
+    hasPortals: portalsEmit.hasPortals,
     fieldDecls: fieldLines.join('\n'),
     methodDecls,
     mountHookBody: mountSegments.join('\n\n'),
-    unmountHookBody: unmountBodies.join('\n\n'),
+    unmountHookBody: unmountSegments.join('\n\n'),
     updateHookBody: updateBodies.join('\n\n'),
     attributeChangedBody: attrCallbackLines.join('\n'),
     userImports,

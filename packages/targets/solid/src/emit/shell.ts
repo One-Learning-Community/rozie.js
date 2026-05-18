@@ -24,6 +24,11 @@ export interface SolidShellParts {
   propsInterface: string;
   /** `import { createSignal, ... } from 'solid-js';\n` (or empty) */
   solidImports: string;
+  /**
+   * Portal-slot primitive (Spike 003) — `import { render } from 'solid-js/web';\n`
+   * line. Empty/undefined when no portal slots.
+   */
+  portalImport?: string;
   /** `import { createControllableSignal, ... } from '@rozie/runtime-solid';\n` (or empty) */
   runtimeImports: string;
   /**
@@ -129,6 +134,8 @@ export function buildShell(parts: SolidShellParts): BuildShellResult {
   const moduleParts: string[] = [];
 
   if (parts.solidImports.length > 0) moduleParts.push(parts.solidImports);
+  if (parts.portalImport && parts.portalImport.length > 0)
+    moduleParts.push(parts.portalImport);
   if (parts.runtimeImports.length > 0) moduleParts.push(parts.runtimeImports);
   // Phase 06.2 P2 (D-118): user-component imports.
   if (parts.componentImportsBlock && parts.componentImportsBlock.length > 0) {

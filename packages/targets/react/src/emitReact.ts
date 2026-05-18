@@ -94,6 +94,7 @@ export function emitReact(
   const scriptOpts: { filename?: string } = {};
   if (opts.filename !== undefined) scriptOpts.filename = opts.filename;
   const {
+    hasPortals,
     hookSection,
     userArrowsSection,
     userImports: userScriptImports,
@@ -107,6 +108,14 @@ export function emitReact(
     { react: reactImports, runtime: runtimeImports, filename: opts.filename },
     scriptOpts,
   );
+
+  // Portal-slot primitive (Spike 003) — when the script emit synthesized a
+  // portals closure, the shell needs the matching react-dom/client import.
+  // `Root` is type-only so the line uses `type Root` to avoid a runtime
+  // import (the value-side reference is `createRoot`).
+  const portalImport = hasPortals
+    ? "import { createRoot, type Root } from 'react-dom/client';\n"
+    : '';
 
   // Plan 04-03: emit the template-side JSX, slot-prop fields + ctx interfaces.
   // Threads scopeAttr through to emitTemplateNode so every HTML host element
@@ -210,6 +219,7 @@ export function emitReact(
     propsInterface,
     reactImports: reactImports.render(),
     reactTypeImports,
+    portalImport,
     runtimeImports: runtimeImports.render(),
     userImports: userScriptImports,
     cssModuleImport,

@@ -190,6 +190,36 @@ export interface SlotDecl {
   presence: 'always' | 'conditional';
   nestedSlots: SlotDecl[];
   sourceLoc: SourceLoc;
+  /**
+   * Portal-slot primitive (Spike 003). When `true`, the slot is NOT rendered
+   * in the template — it exists only as a script-callable function via
+   * `$portals.<name>(container, scope) => disposeFn`. Per-target emitters:
+   *  - skip the matching TemplateSlotInvocationIR during template emit
+   *  - synthesize a `portals` closure inside the mount-phase lifecycle hook
+   *    that wraps the per-target imperative-render API
+   *  - hoist a dispose-tracking Set at component scope so wrapper teardown
+   *    bulk-disposes all in-flight portal mounts before destroying the engine
+   *
+   * Authored as `<slot name="event" portal :params="['arg']" />` in the
+   * template; consumed as `<rozie-foo><template #event="{ arg }">…</template></rozie-foo>`
+   * (Vue), `<Foo slotEvent={(s) => …} />` (React), etc.
+   *
+   * V1 constraint (REQ-5): portal slots are NOT reactive after mount. They
+   * re-render only when the wrapper's script re-invokes them.
+   *
+   * Undefined === false (back-compat with pre-spike IRs).
+   *
+   * @experimental — added in Spike 003
+   */
+  isPortal?: boolean;
+  /**
+   * Portal-slot scope-key names declared via `:params="['name1', 'name2']"`
+   * on the `<slot>` element. Only populated when `isPortal === true`. Used by
+   * per-target emitters to type the scope parameter (each key → `unknown`).
+   *
+   * @experimental — added in Spike 003
+   */
+  portalParamNames?: string[];
 }
 
 /**
@@ -538,6 +568,17 @@ export interface TemplateSlotInvocationIR {
    * carries `'fill-body'` (Pitfall 5 — re-projection-in-re-projection).
    */
   context: 'declaration' | 'fill-body';
+  /**
+   * Portal-slot primitive (Spike 003). When `true`, the slot was authored
+   * with the `portal` boolean attribute and per-target template emitters
+   * MUST skip rendering this invocation — portal slots are invoked from
+   * script via `$portals.<name>`, not from the template tree.
+   *
+   * Undefined === false.
+   *
+   * @experimental — added in Spike 003
+   */
+  isPortal?: boolean;
 }
 
 /**

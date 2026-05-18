@@ -78,11 +78,16 @@ interface SlotVisitContext {
   rIfStack: string[];
 }
 
-function collectParamsFromSlotElement(slot: TemplateElement): ParamDecl[] {
+function collectParamsFromSlotElement(slot: TemplateElement, isPortal: boolean): ParamDecl[] {
   const params: ParamDecl[] = [];
   for (const attr of slot.attributes) {
     if (attr.kind !== 'binding') continue;
     if (attr.value === null) continue;
+    // Portal slots use `:params="['arg', ...]"` as a TYPE DECLARATION for
+    // the scope-key names, not as a normal scoped-slot binding source —
+    // strip it here so it doesn't reach the consumer-facing scoped-slot
+    // surface (it lowers separately into SlotDecl.portalParamNames).
+    if (isPortal && attr.name === 'params') continue;
     let expr: t.Expression;
     try {
       expr = parseExpression(attr.value, { sourceType: 'module' });
@@ -98,6 +103,42 @@ function collectParamsFromSlotElement(slot: TemplateElement): ParamDecl[] {
     });
   }
   return params;
+}
+
+/**
+ * Detect the bare `portal` static attribute on a `<slot>` element. The parser
+ * emits boolean attrs as `kind: 'static', value: null`.
+ */
+function detectPortal(slot: TemplateElement): boolean {
+  for (const a of slot.attributes) {
+    if (a.kind === 'static' && a.name === 'portal' && a.value === null) return true;
+  }
+  return false;
+}
+
+/**
+ * Extract the scope-key names from a portal slot's `:params="['a', 'b']"`
+ * attribute. Returns [] when omitted or unparseable — emitters degrade to
+ * an `unknown` scope.
+ */
+function extractPortalParamNames(slot: TemplateElement): string[] {
+  for (const attr of slot.attributes) {
+    if (attr.kind !== 'binding') continue;
+    if (attr.name !== 'params' || attr.value === null) continue;
+    let expr: t.Expression;
+    try {
+      expr = parseExpression(attr.value, { sourceType: 'module' });
+    } catch {
+      return [];
+    }
+    if (!t.isArrayExpression(expr)) return [];
+    const names: string[] = [];
+    for (const el of expr.elements) {
+      if (el && t.isStringLiteral(el)) names.push(el.value);
+    }
+    return names;
+  }
+  return [];
 }
 
 function determinePresence(
@@ -151,8 +192,27 @@ function visit(
           break;
         }
       }
-      const params = collectParamsFromSlotElement(node);
+      const isPortal = detectPortal(node);
+      const params = collectParamsFromSlotElement(node, isPortal);
       const presence = determinePresence(node, childCtx);
+      const portalParamNames = isPortal ? extractPortalParamNames(node) : [];
+      // Portal slots are never invoked from the template, but the per-target
+      // slot-type emitters (refineSlotTypes etc.) build the ctx type from
+      // `params`. Synthesize one ParamDecl per portal scope-key name so
+      // downstream type emission produces `interface EventCtx { arg: any }`
+      // without per-target portal-branch refactors. The valueExpression is
+      // an `undefined` placeholder — never evaluated because lowerTemplate
+      // skips emitting the portal slot's invocation.
+      if (isPortal) {
+        for (const pname of portalParamNames) {
+          params.push({
+            type: 'ParamDecl',
+            name: pname,
+            valueExpression: t.identifier('undefined'),
+            sourceLoc: node.loc,
+          });
+        }
+      }
 
       // defaultContent is always `null` here. To avoid double-lowering and
       // keep the slot snapshot lean, lowerSlots does NOT lower a slot's inline
@@ -167,7 +227,7 @@ function visit(
       const nestedSlots: SlotDecl[] = [];
       visit(node.children, childCtx, nestedSlots);
 
-      out.push({
+      const decl: SlotDecl = {
         type: 'SlotDecl',
         name: slotName,
         defaultContent,
@@ -175,7 +235,12 @@ function visit(
         presence,
         nestedSlots,
         sourceLoc: node.loc,
-      });
+      };
+      if (isPortal) {
+        decl.isPortal = true;
+        decl.portalParamNames = portalParamNames;
+      }
+      out.push(decl);
       continue;
     }
 

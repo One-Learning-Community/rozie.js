@@ -199,6 +199,11 @@ export function emitSlotInvocation(
   node: TemplateSlotInvocationIR,
   ctx: EmitNodeCtx,
 ): string {
+  // Portal-slot primitive (Spike 003) — portal slots are invoked from script
+  // via `$portals.<name>(...)`, NOT from the rendered template tree. Skip
+  // emission entirely. The slot still appears in ir.slots so its render-prop
+  // appears on the props interface; the engine wrapper consumes it imperatively.
+  if (node.isPortal) return '';
   const slotName = node.slotName;
   const slot = findSlotDecl(slotName, ctx.ir);
   // Build the invocation-site fallback once. Used when SlotDecl.defaultContent

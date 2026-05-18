@@ -150,6 +150,9 @@ export function rewriteRozieIdentifiers(
   const dataNames = new Set(ir.state.map((s) => s.name));
   const refNames = new Set(ir.refs.map((r) => r.name));
   const slotNames = new Set(ir.slots.map((s) => s.name));
+  const portalSlotNames = new Set(
+    ir.slots.filter((s) => s.isPortal === true).map((s) => s.name),
+  );
 
   // Phase 06.1 P2 (D-104/D-106): name → IR-primitive lookups so synthesized
   // identifier nodes can inherit the IR's sourceLoc. The .loc cast is `as any`
@@ -318,6 +321,14 @@ export function rewriteRozieIdentifiers(
         );
         path.replaceWith(merged);
         path.skip();
+        return;
+      }
+      if (obj.name === '$portals' && portalSlotNames.has(prop.name)) {
+        // Portal-slot primitive (Spike 003). $portals.<name> resolves to the
+        // synthesized local `portals` closure that emitScript injects at the
+        // top of the mount-phase useEffect body. Just rename the object —
+        // member traversal continues into the call args.
+        path.node.object = t.identifier('portals');
         return;
       }
     },

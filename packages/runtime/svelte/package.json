@@ -1,0 +1,35 @@
+{
+  "name": "@rozie/runtime-svelte",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "license": "MIT",
+  "author": "Rozie maintainers",
+  "exports": {
+    ".": {
+      "svelte": "./src/index.ts",
+      "types": "./src/index.ts"
+    },
+    "./PortalHost.svelte": "./src/PortalHost.svelte"
+  },
+  "files": [
+    "src"
+  ],
+  "peerDependencies": {
+    "svelte": "^5"
+  },
+  "peerDependenciesMeta": {
+    "svelte": {
+      "optional": false
+    }
+  },
+  "devDependencies": {
+    "svelte": "^5",
+    "vitest": "^4.1.0"
+  },
+  "scripts": {
+    "test": "vitest run --passWithNoTests",
+    "build": "echo 'svelte runtime ships source; no build'",
+    "typecheck": "echo 'svelte runtime: source-only, no typecheck'"
+  }
+}

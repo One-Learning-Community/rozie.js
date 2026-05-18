@@ -164,10 +164,17 @@ export function emitSolid(ir: IRComponent, opts: EmitSolidOptions = {}): EmitSol
   // Prepend JSX type import before the value imports (or stand alone if none).
   const solidImportsStr = jsxTypeImport + solidImports.render();
 
+  // Portal-slot primitive (Spike 003) — when the script emit synthesized a
+  // portals closure, add the matching solid-js/web import for `render`.
+  const portalImport = scriptResult.hasPortals
+    ? "import { render } from 'solid-js/web';\n"
+    : '';
+
   const shellParts = {
     componentName: ir.name,
     propsInterface,
     solidImports: solidImportsStr,
+    portalImport,
     runtimeImports: runtimeImports.render(),
     userImports: scriptResult.userImports,
     componentImportsBlock,

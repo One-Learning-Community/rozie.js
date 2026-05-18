@@ -34,6 +34,11 @@ export interface ShellParts {
   /** `import { useControllableState, ... } from '@rozie/runtime-react';\n` (or empty) */
   runtimeImports: string;
   /**
+   * Portal-slot primitive (Spike 003) — `import { createRoot, type Root } from 'react-dom/client';\n`
+   * line. Empty/undefined when the component has no portal slots.
+   */
+  portalImport?: string;
+  /**
    * Spike 001 B1 — user-authored `<script>` `ImportDeclaration` statements
    * rendered as a string by emitScript. Placed AFTER target/runtime/CSS
    * imports and AFTER the component-imports block, but BEFORE the blank line
@@ -172,6 +177,8 @@ export function buildShell(parts: ShellParts): BuildShellResult {
   if (parts.reactImports.length > 0) moduleParts.push(parts.reactImports);
   if (parts.reactTypeImports && parts.reactTypeImports.length > 0)
     moduleParts.push(parts.reactTypeImports);
+  if (parts.portalImport && parts.portalImport.length > 0)
+    moduleParts.push(parts.portalImport);
   if (parts.runtimeImports.length > 0) moduleParts.push(parts.runtimeImports);
   if (parts.cssModuleImport !== null) moduleParts.push(parts.cssModuleImport + '\n');
   if (parts.globalCssImport !== null) moduleParts.push(parts.globalCssImport + '\n');
@@ -313,6 +320,8 @@ function buildShellLegacy(parts: ShellParts): BuildShellResult {
   if (parts.reactImports.length > 0) ms.append(parts.reactImports);
   if (parts.reactTypeImports && parts.reactTypeImports.length > 0)
     ms.append(parts.reactTypeImports);
+  if (parts.portalImport && parts.portalImport.length > 0)
+    ms.append(parts.portalImport);
   if (parts.runtimeImports.length > 0) ms.append(parts.runtimeImports);
   if (parts.cssModuleImport) ms.append(parts.cssModuleImport + '\n');
   if (parts.globalCssImport) ms.append(parts.globalCssImport + '\n');

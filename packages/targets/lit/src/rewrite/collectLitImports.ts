@@ -22,6 +22,7 @@ export type LitImport =
   | 'html'
   | 'css'
   | 'nothing'
+  | 'render'
   | 'svg'
   | 'PropertyValues';
 
