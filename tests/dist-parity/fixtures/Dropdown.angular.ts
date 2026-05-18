@@ -86,12 +86,15 @@ export class Dropdown {
         onCleanup(unlisten);
       });
 
-    // Initial reposition only if the panel is open at mount time.
-    if (this.open()) this.reposition();
-
     effect(() => { (() => this.open())(); (() => {
       if (this.open()) this.reposition();
     })(); });
+  }
+
+  ngAfterViewInit() {
+    // Initial reposition only if the panel is open at mount time.
+    if (this.open()) this.reposition();
+
   }
 
   toggle = () => {

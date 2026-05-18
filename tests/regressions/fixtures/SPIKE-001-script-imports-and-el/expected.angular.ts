@@ -21,12 +21,13 @@ export class SpikeImportEl {
   __rozieRoot = viewChild<ElementRef<HTMLDivElement>>('__rozieRoot');
   @ContentChild('defaultSlot', { read: TemplateRef }) defaultTpl?: TemplateRef<DefaultCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
+  private __rozieDestroyRef = inject(DestroyRef);
 
-  constructor() {
+  ngAfterViewInit() {
     this.instance = new DummyEngine(this.__rozieRoot()?.nativeElement, {
       animation: 150
     });
-    inject(DestroyRef).onDestroy(() => this.instance?.destroy());
+    this.__rozieDestroyRef.onDestroy(() => this.instance?.destroy());
   }
 
   instance = null;
