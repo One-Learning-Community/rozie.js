@@ -26,10 +26,10 @@
 <data>
 {
   items: [
-    { id: 1, label: 'Alpha' },
-    { id: 2, label: 'Beta'  },
-    { id: 3, label: 'Gamma' },
-    { id: 4, label: 'Delta' },
+    { id: 1, label: 'Alpha', color: '#3b82f6' },
+    { id: 2, label: 'Beta', color: '#10b981' },
+    { id: 3, label: 'Gamma', color: '#f59e0b' },
+    { id: 4, label: 'Delta', color: '#ef4444' }
   ],
 }
 </data>
@@ -52,6 +52,7 @@
         successfully drops the consumer's fragment into each engine-owned
         cell — not the consumer's styling surface.
       -->
+      <span class="portal-list-demo__swatch" data-portal-list-swatch :style="{background: item.color}"></span>
       <code class="portal-list-demo__id" data-portal-list-id>#{{ item.id }}</code>
       <strong class="portal-list-demo__label" data-portal-list-label>{{ item.label }}</strong>
     </template>
@@ -67,6 +68,15 @@
   padding: 1rem;
   max-width: 360px;
 }
+
+.portal-list-demo__swatch {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
 .portal-list-demo__id {
   font-family: ui-monospace, monospace;
   color: rgba(0, 0, 0, 0.55);
