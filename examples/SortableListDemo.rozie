@@ -1,0 +1,248 @@
+<!--
+  SortableListDemo.rozie — companion consumer for SortableList.
+
+  The whole point of writing the demo IN Rozie: a single source compiles
+  to React + Vue + Svelte + Angular + Solid + Lit consumers automatically,
+  so the demo is itself a six-way "look ma, no per-framework integration"
+  proof. There is no /examples/consumers/react-sortable-page.tsx companion
+  here — there's just THIS file, fanned out by the compiler.
+
+  Exercises (in addition to dragging):
+    - `r-model:items` consumer-side two-way binding (Phase 07.3)
+    - Component composition via <components> block
+    - Default slot with scoped params + fallback
+    - r-for (in the state-display section) — covered by the bare-comma
+      regression coverage in extractRForAliases
+    - r-model on text input + checkbox
+    - @submit.prevent + @click event-modifier passthrough
+    - r-if / r-else for the empty-state branch
+-->
+
+<rozie name="SortableListDemo">
+
+<components>
+{
+  SortableList: './SortableList.rozie',
+}
+</components>
+
+<data>
+{
+  items: [
+    { id: 'a', label: 'Apple' },
+    { id: 'b', label: 'Banana' },
+    { id: 'c', label: 'Cherry' },
+    { id: 'd', label: 'Date' },
+    { id: 'e', label: 'Elderberry' },
+  ],
+  newLabel: '',
+  disabled: false,
+  nextId: 6,
+}
+</data>
+
+<script>
+const addItem = () => {
+  const label = $data.newLabel.trim()
+  if (!label) return
+  $data.items = [...$data.items, { id: String($data.nextId), label }]
+  $data.nextId = $data.nextId + 1
+  $data.newLabel = ''
+}
+
+const removeItem = (id) => {
+  $data.items = $data.items.filter(i => i.id !== id)
+}
+
+const reset = () => {
+  $data.items = [
+    { id: 'a', label: 'Apple' },
+    { id: 'b', label: 'Banana' },
+    { id: 'c', label: 'Cherry' },
+  ]
+}
+</script>
+
+<template>
+<div class="sortable-demo">
+  <header>
+    <h3>Drag to reorder</h3>
+    <p class="hint">Grab a row by the handle (⋮⋮) and drop it elsewhere. The bound array on the right updates in real time.</p>
+  </header>
+
+  <div class="grid">
+    <section class="list-pane">
+      <SortableList r-model:items="$data.items" itemKey="id" handle=".grip" :disabled="$data.disabled">
+        <template #default="{ item }">
+          <div class="row">
+            <span class="grip" aria-label="Drag handle">⋮⋮</span>
+            <span class="label">{{ item.label }}</span>
+            <button class="remove" @click="removeItem(item.id)" aria-label="Remove">×</button>
+          </div>
+        </template>
+      </SortableList>
+
+      <form @submit.prevent="addItem" class="add-form">
+        <input r-model="$data.newLabel" placeholder="Add an item…" />
+        <button type="submit" :disabled="!$data.newLabel.trim()">Add</button>
+      </form>
+
+      <div class="controls">
+        <label><input type="checkbox" r-model="$data.disabled" /> Disabled</label>
+        <button type="button" @click="reset">Reset</button>
+      </div>
+    </section>
+
+    <aside class="state-pane">
+      <h4>Bound state ({{ $data.items.length }})</h4>
+      <ol r-if="$data.items.length > 0" class="state-list">
+        <li r-for="item, index in $data.items" :key="item.id">
+          <span class="state-index">{{ index + 1 }}.</span>
+          <code>{{ item.id }}</code>
+          <span>{{ item.label }}</span>
+        </li>
+      </ol>
+      <p r-else class="empty">Empty.</p>
+    </aside>
+  </div>
+</div>
+</template>
+
+<style>
+.sortable-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  max-width: 720px;
+}
+
+header h3 { margin: 0 0 0.25rem; font-size: 1.125rem; }
+header .hint { margin: 0 0 1rem; color: rgba(0, 0, 0, 0.55); font-size: 0.875rem; }
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.list-pane, .state-pane { min-width: 0; }
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: #f5f5f7;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 6px;
+  margin: 0.25rem 0;
+}
+
+.grip {
+  color: rgba(0, 0, 0, 0.35);
+  cursor: grab;
+  user-select: none;
+  font-family: monospace;
+}
+.grip:active { cursor: grabbing; }
+
+.label { flex: 1; }
+
+.remove {
+  background: transparent;
+  border: none;
+  color: rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+  font-size: 1.125rem;
+  line-height: 1;
+  padding: 0 0.25rem;
+}
+.remove:hover { color: #c00; }
+
+.add-form {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+.add-form input {
+  flex: 1;
+  padding: 0.375rem 0.5rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+  font: inherit;
+}
+.add-form button {
+  padding: 0.375rem 0.875rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+}
+.controls button {
+  padding: 0.25rem 0.625rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.state-pane h4 {
+  margin: 0 0 0.5rem;
+  font-size: 0.875rem;
+  color: rgba(0, 0, 0, 0.55);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.state-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.state-list li {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.375rem 0.625rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+}
+.state-list li:last-child { border-bottom: none; }
+.state-index {
+  color: rgba(0, 0, 0, 0.35);
+  font-variant-numeric: tabular-nums;
+  min-width: 1.5rem;
+}
+.state-list code {
+  font-family: ui-monospace, monospace;
+  font-size: 0.75rem;
+  color: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.04);
+  padding: 0.0625rem 0.25rem;
+  border-radius: 2px;
+}
+
+.empty {
+  margin: 0;
+  padding: 0.75rem;
+  color: rgba(0, 0, 0, 0.4);
+  font-style: italic;
+  text-align: center;
+  border: 1px dashed rgba(0, 0, 0, 0.1);
+  border-radius: 6px;
+}
+</style>
+
+</rozie>
