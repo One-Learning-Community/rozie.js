@@ -571,6 +571,59 @@ describe('emitTemplate — example-specific substring assertions', () => {
   });
 });
 
+describe('emitTemplate — default-slot scoped-param carve-out (SortableListDemo regression)', () => {
+  const registry = createDefaultRegistry();
+  // Regression: consumer-side `<template #default="{ item }">` was previously
+  // collapsed to bare children inside the component tag because the
+  // default-shorthand branch in emitSlotFiller fired even when scope params
+  // were present. Vue's template compiler then treated `item` as a top-level
+  // instance reference and emitted `_ctx.item.label` → undefined at runtime.
+  // The fix gates the shorthand on `params.length === 0` and emits an
+  // explicit `<template #default="{ item }">` wrapper otherwise. The Solid
+  // sibling fix lives in solid/emit/emitSlotInvocation.ts.
+  it('default scoped slot keeps the <template #default="{ item }"> wrapper', async () => {
+    const src = `<rozie name="Parent">
+<components>{ Child: './Child.rozie' }</components>
+<data>{ items: [{ id: 'a', label: 'A' }] }</data>
+<template>
+  <Child :items="$data.items">
+    <template #default="{ item }">
+      <span class="label">{{ item.label }}</span>
+    </template>
+  </Child>
+</template>
+</rozie>`;
+    const parsed = parse(src, { filename: 'Parent.rozie' });
+    expect(parsed.ast).not.toBeNull();
+    const lowered = lowerToIR(parsed.ast!, { modifierRegistry: registry });
+    expect(lowered.ir).not.toBeNull();
+    const { template } = emitTemplate(lowered.ir!, registry);
+    expect(template).toContain('<template #default="{ item }">');
+    expect(template).toContain('{{ item.label }}');
+  });
+
+  it('default slot WITHOUT scope params still emits bare children (no regression on shorthand)', () => {
+    const src = `<rozie name="Parent">
+<components>{ Child: './Child.rozie' }</components>
+<template>
+  <Child>
+    <template #default>
+      <span class="label">static text</span>
+    </template>
+  </Child>
+</template>
+</rozie>`;
+    const parsed = parse(src, { filename: 'Parent.rozie' });
+    expect(parsed.ast).not.toBeNull();
+    const lowered = lowerToIR(parsed.ast!, { modifierRegistry: registry });
+    expect(lowered.ir).not.toBeNull();
+    const { template } = emitTemplate(lowered.ir!, registry);
+    // Bare children — Vue treats name-less, params-less children as default fill.
+    expect(template).not.toMatch(/<template #default/);
+    expect(template).toContain('static text');
+  });
+});
+
 describe('emitVue — script-injection merge for template @event modifier wraps', () => {
   it('SearchInput: full SFC contains runtime-vue import + debouncedOnSearch decl', async () => {
     // Lazy-import emitVue here so it runs through the merge layer.

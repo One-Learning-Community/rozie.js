@@ -313,7 +313,14 @@ function emitSlotFiller(filler: SlotFillerDecl, ctx: EmitNodeCtx): string {
 
   // Default-shorthand: bare children, NO <template> wrapper. Vue treats
   // children-without-`#name` as the default-slot fill.
-  if (!filler.isDynamic && filler.name === '') {
+  //
+  // SCOPE-PARAM CARVE-OUT: the shorthand is only valid when the consumer
+  // didn't introduce slot-scope bindings. `<template #default="{ item }">`
+  // MUST emit the explicit `<template #default="{ item }">` form — dropping
+  // the wrapper there loses the scope-parameter binding entirely (Vue's
+  // template compiler then treats `item` as a top-level instance reference
+  // and renders `_ctx.item.label`, which is undefined).
+  if (!filler.isDynamic && filler.name === '' && filler.params.length === 0) {
     return bodyText;
   }
 
@@ -334,7 +341,11 @@ function emitSlotFiller(filler: SlotFillerDecl, ctx: EmitNodeCtx): string {
   }
 
   // Named static form `<template #name>` / `<template #name="{ a, b }">`.
-  return `<template #${filler.name}${paramsAttr}>${bodyText}</template>`;
+  // For the default slot with scope params (the new carve-out branch from
+  // above), normalize the empty IR name to the explicit `default` so the
+  // emitted text reads `<template #default="{ a, b }">`.
+  const slotName = filler.name === '' ? 'default' : filler.name;
+  return `<template #${slotName}${paramsAttr}>${bodyText}</template>`;
 }
 
 /**
