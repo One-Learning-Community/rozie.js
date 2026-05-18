@@ -96,6 +96,13 @@ export interface EmitNodeCtx {
   loopBindings?: Set<string> | undefined;
   /** Bug 5: handler-name → param-count map for guarded-wrapper arity. */
   handlerArity?: ReadonlyMap<string, number> | undefined;
+  /**
+   * Class members from rewriteScript — includes user-method names lifted to
+   * class fields. Threaded into emitSlotInvocation / emitTemplateEvent for
+   * accurate `this.`-prefixing inside class-body field initializers. See
+   * EmitTemplateOpts.classMembers docstring for rationale.
+   */
+  classMembers?: ReadonlySet<string> | undefined;
 }
 
 function emitStaticText(node: TemplateStaticTextIR): string {
@@ -532,6 +539,7 @@ export function emitNode(node: TemplateNode, ctx: EmitNodeCtx): string {
         loopBindings: ctx.loopBindings,
         scriptInjections: ctx.scriptInjections,
         injectionCounter: ctx.injectionCounter,
+        classMembers: ctx.classMembers,
       });
     case 'TemplateElement':
       return emitElement(node, ctx);

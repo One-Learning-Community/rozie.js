@@ -28,6 +28,18 @@ export interface EmitTemplateOpts {
   collisionRenames?: ReadonlyMap<string, string> | undefined;
   /** Bug 5: handler-name → param-count map for guarded-wrapper arity. */
   handlerArity?: ReadonlyMap<string, number> | undefined;
+  /**
+   * Class members from rewriteScript — includes props, state, computed,
+   * refs, emits, AND collision-renamed user methods (e.g., `removeItem`,
+   * `_close`). emitSlotInvocation / emitTemplateEvent use this when emitting
+   * class-body field initializers from template expressions: those
+   * initializers run in class scope (no template-implicit-this), so any
+   * bare identifier that matches a class member must be `this.`-prefixed.
+   * Without user-method names included, a TodoList slot arg like
+   * `:remove="() => removeItem(item.id)"` lifts to `() => removeItem(item.id)`
+   * inside a class field, which tsc flags TS2663.
+   */
+  classMembers?: ReadonlySet<string> | undefined;
 }
 
 export interface EmitTemplateResult {
@@ -75,6 +87,7 @@ export function emitTemplate(
     collisionRenames: opts.collisionRenames,
     loopBindings: new Set(),
     handlerArity: opts.handlerArity,
+    classMembers: opts.classMembers,
   };
 
   const template = emitNode(ir.template, ctx);

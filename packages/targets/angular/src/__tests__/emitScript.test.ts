@@ -223,7 +223,9 @@ describe('emitScript — Quick 260515-u2b $watch lowering', () => {
     return lowerToIR(parsed.ast!, { modifierRegistry: createDefaultRegistry() }).ir!;
   }
 
-  it('emits `effect(() => { const __watchVal = (getter)(); (cb)(__watchVal); });` inside the constructor for one WatchHook', () => {
+  it('emits `effect(() => { const __watchVal = (getter)(); (cb)(); });` for a 0-param callback (TS2554-safe)', () => {
+    // 0-param `() => ...` cb: passing __watchVal would be runtime-safe but TS2554
+    // ("Expected 0 arguments, but got 1") in `tsc --noEmit` — bind no arg.
     const src = `<rozie name="Synth">
 <props>{ open: { type: Boolean, default: false } }</props>
 <script>
@@ -233,9 +235,24 @@ $watch(() => $props.open, () => { console.log('fired') })
 </rozie>`;
     const ir = lowerSrc(src);
     const { classBody, imports } = emitScript(ir);
-    // Angular rewrite: $props.open → this.open (signal-style member access via this.open()).
-    // The effect() wrapper plus __watchVal-binding shape should be present so
-    // user-authored `(v) => ...` cb params actually receive the new value.
+    // __watchVal is still computed (we keep the binding shape consistent),
+    // but the callback receives NO arg when it declares zero params.
+    expect(classBody).toMatch(/effect\(\(\) => \{ const __watchVal = \([\s\S]+?\)\(\); \([\s\S]+?\)\(\); \}\);/);
+    expect(imports.has('effect')).toBe(true);
+  });
+
+  it('emits `effect(() => { const __watchVal = (getter)(); (cb)(__watchVal); });` for a (v) => callback', () => {
+    // (v) => ...` cb: pass __watchVal so the user-authored param actually
+    // receives the getter's evaluated value.
+    const src = `<rozie name="Synth">
+<props>{ open: { type: Boolean, default: false } }</props>
+<script>
+$watch(() => $props.open, (v) => { console.log('fired', v) })
+</script>
+<template><div /></template>
+</rozie>`;
+    const ir = lowerSrc(src);
+    const { classBody, imports } = emitScript(ir);
     expect(classBody).toMatch(/effect\(\(\) => \{ const __watchVal = \([\s\S]+?\)\(\); \([\s\S]+?\)\(__watchVal\); \}\);/);
     expect(imports.has('effect')).toBe(true);
   });

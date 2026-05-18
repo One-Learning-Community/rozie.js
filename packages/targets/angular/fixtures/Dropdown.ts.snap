@@ -88,7 +88,7 @@ export class Dropdown {
 
     effect(() => { const __watchVal = (() => this.open())(); (() => {
       if (this.open()) this.reposition();
-    })(__watchVal); });
+    })(); });
   }
 
   ngAfterViewInit() {

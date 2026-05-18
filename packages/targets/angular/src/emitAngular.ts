@@ -169,6 +169,7 @@ export function emitAngular(
   const tmplResult = emitTemplate(ir, registry, {
     collisionRenames,
     handlerArity,
+    classMembers,
   });
 
   // 3. Listeners-block emission.

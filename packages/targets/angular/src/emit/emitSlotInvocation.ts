@@ -78,6 +78,18 @@ export interface EmitSlotInvocationCtx {
   scriptInjections?: AngularScriptInjection[] | undefined;
   /** Per-component counter shared across emit passes for stable suffixes. */
   injectionCounter?: { next: number } | undefined;
+  /**
+   * Class members from rewriteScript (props, state, computed, refs, emits,
+   * AND collision-renamed user methods like `removeItem`, `_close`). Used by
+   * `applyThisPrefixing` when generating class-body slot-context helper
+   * fields — those run in class scope, not template-implicit-this scope,
+   * so any bare identifier that matches a class member needs `this.` prefix.
+   * The locally-built ir-only set in `applyThisPrefixing` is the fallback
+   * when callers don't plumb this (e.g., the per-block emitTemplate.test.ts
+   * harness); production callers in emitAngular.ts must thread the real
+   * set so user-method references emit correctly.
+   */
+  classMembers?: ReadonlySet<string> | undefined;
 }
 
 /**
@@ -170,15 +182,26 @@ function applyThisPrefixing(
   ir: IRComponent,
   collisionRenames?: ReadonlyMap<string, string>,
   loopParams?: ReadonlySet<string>,
+  classMembers?: ReadonlySet<string>,
 ): string {
+  // Prefer the rewriteScript-provided classMembers set when available — it's
+  // the canonical record of every name lifted to the class (props, state,
+  // computed, refs, emits, collision-renamed user methods, slot tplFields).
+  // The fallback below mirrors the historic shape so the per-block
+  // emitTemplate.test.ts harness (which doesn't plumb classMembers) keeps
+  // working for cases without user-method slot args.
   const memberNames = new Set<string>();
-  for (const p of ir.props) memberNames.add(p.name);
-  for (const s of ir.state) memberNames.add(s.name);
-  for (const c of ir.computed) memberNames.add(c.name);
-  for (const r of ir.refs) memberNames.add(r.name);
-  for (const e of ir.emits) memberNames.add(e);
-  if (collisionRenames) {
-    for (const renamed of collisionRenames.values()) memberNames.add(renamed);
+  if (classMembers) {
+    for (const m of classMembers) memberNames.add(m);
+  } else {
+    for (const p of ir.props) memberNames.add(p.name);
+    for (const s of ir.state) memberNames.add(s.name);
+    for (const c of ir.computed) memberNames.add(c.name);
+    for (const r of ir.refs) memberNames.add(r.name);
+    for (const e of ir.emits) memberNames.add(e);
+    if (collisionRenames) {
+      for (const renamed of collisionRenames.values()) memberNames.add(renamed);
+    }
   }
   // Loop-binding params shadow members.
   if (loopParams) {
@@ -215,6 +238,7 @@ function buildSlotCtxHelper(
   helperName: string,
   loopBindingsList: string[],
   collisionRenames?: ReadonlyMap<string, string>,
+  classMembers?: ReadonlySet<string>,
 ): { fieldDecl: string; templateCallExpr: string } {
   const loopParamSet = new Set(loopBindingsList);
   // Render each arg expression in template style (signal calls etc.), then
@@ -226,7 +250,7 @@ function buildSlotCtxHelper(
       collisionRenames,
       loopBindings: loopParamSet,
     });
-    const exprClass = applyThisPrefixing(exprTemplate, ir, collisionRenames, loopParamSet);
+    const exprClass = applyThisPrefixing(exprTemplate, ir, collisionRenames, loopParamSet, classMembers);
     namedFields.push(`${a.name}: ${exprClass}`);
   }
   const implicitFields = node.args
@@ -235,7 +259,7 @@ function buildSlotCtxHelper(
         collisionRenames,
         loopBindings: loopParamSet,
       });
-      const exprClass = applyThisPrefixing(exprTemplate, ir, collisionRenames, loopParamSet);
+      const exprClass = applyThisPrefixing(exprTemplate, ir, collisionRenames, loopParamSet, classMembers);
       return `${a.name}: ${exprClass}`;
     })
     .join(', ');
@@ -295,6 +319,7 @@ export function emitSlotInvocation(
         helperName,
         loopBindingsList,
         ctx.collisionRenames,
+        ctx.classMembers,
       );
       ctx.scriptInjections.push({ name: helperName, decl: fieldDecl });
       ctxSuffix = `; context: ${templateCallExpr}`;

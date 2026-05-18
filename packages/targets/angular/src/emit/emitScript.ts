@@ -810,8 +810,18 @@ export function emitScript(
     // user-authored `(v) => ...` params actually receive the new value at
     // invocation time. Without this the param is bound to `undefined` and
     // any `instance?.option('x', v)` writes a silent no-op.
+    //
+    // Only pass __watchVal when the callback declares a param to receive it —
+    // passing an arg to a 0-param arrow is runtime-safe (JS drops extras) but
+    // tsc flags TS2554 "Expected 0 arguments, but got 1". Conditional bind keeps
+    // both `(v) => ...` and `() => ...` shapes type-clean. Matches Solid + Lit.
+    const cbParamCount =
+      t.isArrowFunctionExpression(cbArg) || t.isFunctionExpression(cbArg)
+        ? cbArg.params.length
+        : 0;
+    const callArg = cbParamCount > 0 ? '__watchVal' : '';
     lifecycleConstructorLines.push(
-      `effect(() => { const __watchVal = (${getterCode})(); (${cbCode})(__watchVal); });`,
+      `effect(() => { const __watchVal = (${getterCode})(); (${cbCode})(${callArg}); });`,
     );
   }
   // Ensure `effect` is on the @angular/core import list when at least one
