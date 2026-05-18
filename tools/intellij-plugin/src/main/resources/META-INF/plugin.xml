@@ -123,5 +123,13 @@
              project stay unaffected. -->
         <completion.contributor language="HTML"
             implementationClass="js.rozie.intellij.completion.RozieAttributeNameCompletionContributor"/>
+
+        <!-- P1-UAT-07: neutralize JetBrains' default INJECTED_LANGUAGE_FRAGMENT
+             background tint on .rozie files.  Every SFC block is a language-
+             injection target (HTML/JS/CSS), so without these overrides each
+             block paints a distracting backdrop.  Vue's plugin uses the same
+             additionalTextAttributes pattern. -->
+        <additionalTextAttributes scheme="Default" file="colorSchemes/RozieDefault.xml"/>
+        <additionalTextAttributes scheme="Darcula" file="colorSchemes/RozieDarcula.xml"/>
     </extensions>
 </idea-plugin>

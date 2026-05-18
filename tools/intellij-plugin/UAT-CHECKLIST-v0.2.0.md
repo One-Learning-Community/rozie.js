@@ -243,12 +243,18 @@ All 4 P1 findings VERIFIED CLOSED. Full 11-example matrix re-walked; no new P0/P
   rendered greyed-out; CSS inspector treats them as used. Confirmed in both
   target IDEs.
 
+### P1-UAT-07 — Every SFC block paints a distracting backdrop tint (injected-language fragment background)
+- **Severity:** P1 (visually distracting once the inspection noise from P1-UAT-04..06 cleared)
+- **Steps to repro:** Install rebuilt v0.2.0 zip; open any reference example (`Counter.rozie`, `Modal.rozie`, etc.); observe every `<script>` / `<style>` / `<props>` / `<data>` / `<components>` / `<listeners>` block has a subtle uniform background tint distinct from the surrounding host text.
+- **Root cause:** IntelliJ's default `INJECTED_LANGUAGE_FRAGMENT` text-attribute paints a background on every language-injection range. Plan 08.2-11's paren-wrap made object-literal blocks proper injection targets, which together with the existing `<script>` / `<style>` / `<listeners>` injections meant every block in a `.rozie` file now carries the tint. The tint was always present on script/style — Plans 08-11 just made it noticeable by removing the inspection noise that previously distracted from it.
+- **Status:** CLOSED — quick-task `260517-XXX` shipped `colorSchemes/RozieDefault.xml` + `colorSchemes/RozieDarcula.xml` overriding `INJECTED_LANGUAGE_FRAGMENT` to a neutral (empty) attribute set, registered via two `<additionalTextAttributes>` entries in `plugin.xml`. Same pattern Vue's plugin uses (`colorSchemes/VueDefault.xml`). v0.2.0 zip rebuilt; `verifyPlugin` re-green against IU-242.24807.4 + IU-253.28294.334.
+
 ### Aggregate disposition
 
-All 4 P1 findings CLOSED. The injection-first architectural pivot now ships
-with the gap-closure-extended IntelliJ smarts surface. Tag cut authorised
-(Plan 08.2-12 Task 3); local annotated tag `intellij-plugin/v0.2.0` cut at HEAD
-of main; STOPPED at the push boundary per `feedback_no_autopush` user memory.
+All 5 P1 findings CLOSED (P1-UAT-03..06 via Plans 08.2-08..11; P1-UAT-07 via
+inline color-scheme override). The injection-first architectural pivot now ships
+with the gap-closure-extended IntelliJ smarts surface AND the clean per-block
+visual presentation. Tag cut + UAT walk remain pending (Plan 08.2-12 Task 2 + 3).
 
 ## Issues captured (2026-05-17 UAT halt — partial walkthrough)
 

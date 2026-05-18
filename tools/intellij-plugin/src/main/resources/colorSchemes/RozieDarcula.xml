@@ -1,0 +1,9 @@
+<scheme name="Darcula" version="142" parent_scheme="Darcula">
+    <attributes>
+        <!-- Darcula companion to RozieDefault.xml — neutralizes the
+             INJECTED_LANGUAGE_FRAGMENT backdrop on the dark theme. -->
+        <option name="INJECTED_LANGUAGE_FRAGMENT">
+            <value/>
+        </option>
+    </attributes>
+</scheme>

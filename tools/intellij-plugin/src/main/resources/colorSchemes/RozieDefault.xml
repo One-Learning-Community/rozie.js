@@ -1,0 +1,14 @@
+<scheme name="Default" version="142" parent_scheme="Default">
+    <attributes>
+        <!-- Neutralize the default INJECTED_LANGUAGE_FRAGMENT background tint.
+             Empty <value/> clears all attribute overrides so the editor's
+             normal foreground/background apply.  Every Rozie SFC block
+             (<script>, <style>, <props>, <data>, <components>, <listeners>)
+             is a language-injection target; without this override every
+             .rozie file shows a distracting per-block backdrop.  Vue's plugin
+             ships an equivalent override (colorSchemes/VueDefault.xml). -->
+        <option name="INJECTED_LANGUAGE_FRAGMENT">
+            <value/>
+        </option>
+    </attributes>
+</scheme>
