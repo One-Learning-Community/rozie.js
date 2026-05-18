@@ -92,6 +92,12 @@ const BUNDLE_DECLS: readonly BundleDecl[] = [
     entryGlobPath: '../../SortableListDemo.rozie',
     dependencyGlobPaths: ['../../SortableList.rozie'],
   },
+  {
+    key: 'bundle/FlatpickrDemo',
+    label: 'bundle/FlatpickrDemo',
+    entryGlobPath: '../../FlatpickrDemo.rozie',
+    dependencyGlobPaths: ['../../Flatpickr.rozie'],
+  },
 ];
 
 function bundleSnippetFromDecl(decl: BundleDecl): Snippet | null {
