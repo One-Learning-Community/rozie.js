@@ -1,0 +1,6 @@
+<rozie name="RIfExpression">
+<data>{ open: false }</data>
+<template>
+  <div r-if="$data.open">visible</div>
+</template>
+</rozie>

@@ -1,0 +1,8 @@
+<rozie name="EventWithModifiers">
+<script>
+function saveForm() { /* no-op */ }
+</script>
+<template>
+  <form @submit.prevent.stop="saveForm()">form</form>
+</template>
+</rozie>

@@ -1,0 +1,6 @@
+<rozie name="MustacheInterpolation">
+<data>{ count: 0 }</data>
+<template>
+  <span>{{ $data.count + 1 }}</span>
+</template>
+</rozie>

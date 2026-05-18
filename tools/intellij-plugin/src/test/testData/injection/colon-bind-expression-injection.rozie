@@ -1,0 +1,9 @@
+<rozie name="ColonBindExpression">
+<data>{ modalOpen: false }</data>
+<script>
+const contents = { id: 'x' };
+</script>
+<template>
+  <Modal :open="$data.modalOpen" :title="contents.id">body</Modal>
+</template>
+</rozie>

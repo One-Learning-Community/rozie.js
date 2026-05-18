@@ -1,6 +1,7 @@
 package js.rozie.intellij
 
 import com.intellij.lang.injection.InjectedLanguageManager
+import com.intellij.lang.javascript.psi.JSBinaryExpression
 import com.intellij.lang.javascript.psi.JSLabeledStatement
 import com.intellij.lang.javascript.psi.JSObjectLiteralExpression
 import com.intellij.lang.javascript.psi.JSProperty
@@ -278,6 +279,111 @@ class RozieInjectionTest : BasePlatformTestCase() {
             "Resolved key's top-level host file should match the test fixture (cross-block-but-same-file)",
             myFixture.file.name,
             topFile.name,
+        )
+    }
+
+    // === Plan 08.2-14: Per-expression JS injection inside TEMPLATE_BODY ===
+    //
+    // P1-UAT-08 closure at the injection layer: directive attribute-value expressions
+    // (`r-if="..."`, `r-for="..."`, `@click="..."`, `:foo="..."`) AND `{{ }}` mustache
+    // interpolations inside template body are JS-injected. Each test anchors on the
+    // expression substring and asserts a JavaScript injection covers that offset.
+    //
+    // Range-math invariants pinned by these tests:
+    //  - Quotes excluded (Tests 1, 3, 4) — anchor lands inside the value, not on `"`.
+    //  - Modifier suffixes excluded (Test 5) — `.prevent` lives in the attribute NAME
+    //    and is NOT covered by any JS injection.
+    //  - `{{` / `}}` delimiters excluded (Test 6) — anchor inside the interior.
+    //  - r-for paren-wrap (Test 2) — `item in items` parses as JSBinaryExpression `in`
+    //    under the paren-wrap; without paren-wrap it would be JSLabeledStatement.
+
+    fun testRIfExpressionIsJsInjected() {
+        assertInjectedLanguageAt("r-if-expression-injection.rozie", "\$data.open", "JavaScript")
+    }
+
+    fun testRForExpressionIsJsInjectedWithParenWrap() {
+        val injectedFile = configureAndGetInjectedJs(
+            "r-for-expression-injection.rozie",
+            "item in items",
+        )
+        // With paren-wrap, the injected fragment is `(\nitem in items\n)`, which
+        // parses as a JSBinaryExpression with operator `in`. Without paren-wrap,
+        // JS would parse this at statement position as `item:` label + invalid
+        // `in items` remainder (JSLabeledStatement family), producing no
+        // JSBinaryExpression at top level.
+        val bins = PsiTreeUtil.findChildrenOfType(injectedFile, JSBinaryExpression::class.java)
+        assertTrue(
+            "Expected at least one JSBinaryExpression in paren-wrapped r-for value; " +
+                "without paren-wrap the JS parser produces JSLabeledStatement and no JSBinaryExpression. " +
+                "Found: ${bins.map { it.text }}",
+            bins.isNotEmpty(),
+        )
+        // Defence-in-depth: at least one `in` binary expression must exist (not just
+        // any binary expression — pin the operator).
+        val hasInBinary = bins.any { it.operationSign?.toString().orEmpty().contains("in", ignoreCase = true) ||
+            it.text.contains(" in ") }
+        assertTrue(
+            "Expected a JSBinaryExpression using the `in` operator from r-for value; found ops: " +
+                bins.map { it.operationSign },
+            hasInBinary,
+        )
+    }
+
+    fun testEventHandlerExpressionIsJsInjected() {
+        assertInjectedLanguageAt("event-handler-injection.rozie", "handler()", "JavaScript")
+    }
+
+    fun testColonBindExpressionIsJsInjected() {
+        // Two distinct expressions in the same TEMPLATE_BODY — regression test that
+        // multiple per-attribute injections per host coalesce correctly.
+        assertInjectedLanguageAt(
+            "colon-bind-expression-injection.rozie",
+            "\$data.modalOpen",
+            "JavaScript",
+        )
+        assertInjectedLanguageAt(
+            "colon-bind-expression-injection.rozie",
+            "contents.id",
+            "JavaScript",
+        )
+    }
+
+    fun testEventWithModifiersInjectsOnlyExpressionPart() {
+        // POSITIVE: the expression `saveForm()` (between the quotes, after the `=`) IS
+        // JS-injected.
+        assertInjectedLanguageAt(
+            "event-with-modifiers-injection.rozie",
+            "saveForm()",
+            "JavaScript",
+        )
+        // NEGATIVE: `.prevent` lives in the attribute NAME (`@submit.prevent.stop`),
+        // BEFORE the `=`. It MUST NOT be covered by any JavaScript injection — the
+        // modifier suffix is Rozie syntax, not JS.
+        myFixture.configureByFile("event-with-modifiers-injection.rozie")
+        val text = myFixture.file.text
+        val preventOffset = text.indexOf(".prevent")
+        check(preventOffset >= 0) { "Anchor '.prevent' not found in fixture" }
+        val ilm = InjectedLanguageManager.getInstance(project)
+        val injectedAtPrevent = ilm.findInjectedElementAt(myFixture.file, preventOffset + 1)
+        // Either no injected element at this offset, or the injected element is not
+        // JavaScript (e.g., the HTML injection over the whole template body is fine —
+        // HTML treats `.prevent` as part of an attribute name).
+        val injectedLangId = injectedAtPrevent?.containingFile?.language?.id
+        assertTrue(
+            "Modifier suffix `.prevent` MUST NOT land inside a JavaScript injection — " +
+                "the modifier chain is Rozie syntax, not JS. Got injected language id: $injectedLangId",
+            injectedLangId != "JavaScript",
+        )
+    }
+
+    fun testMustacheInterpolationIsJsInjected() {
+        // Anchor on `$data.count + 1` — pins both that the interior is JS-injected
+        // AND that the `{{` / `}}` delimiters are not part of the JS range (the
+        // anchor offset sits strictly inside the delimiters).
+        assertInjectedLanguageAt(
+            "mustache-interpolation-injection.rozie",
+            "\$data.count + 1",
+            "JavaScript",
         )
     }
 

@@ -97,7 +97,24 @@ class RozieMultiHostInjector : MultiHostInjector {
                         j++
                         end = tokens[j].range.endOffset
                     }
+                    // Register the whole-range HTML injection FIRST so it forms the
+                    // base parse layer for the template body (tags, attribute names,
+                    // structure). Plan 08.2-14 then layers per-expression JavaScript
+                    // injections on top — one independent injection trio per
+                    // discovered attribute-value / {{ }} site. Order matters: the
+                    // JetBrains platform resolves overlapping injections at a given
+                    // offset by returning the LAST-registered injection that covers
+                    // it, so the JS injections (registered AFTER the HTML one) take
+                    // precedence at offsets they cover, while the HTML injection
+                    // remains the resolved injection at every other offset inside
+                    // the template body.
                     injectHtml(registrar, host, TextRange(start, end))
+                    injectExpressionsInTemplateRun(
+                        registrar,
+                        host,
+                        host.text.substring(start, end),
+                        start,
+                    )
                     i = j + 1
                 }
 
@@ -195,6 +212,123 @@ class RozieMultiHostInjector : MultiHostInjector {
     }
 
     /**
+     * Plan 08.2-14: scan a coalesced TEMPLATE_BODY run for per-expression JavaScript
+     * sites and emit per-site addPlace trios. Closes P1-UAT-08 at the injection
+     * layer for the four directive-attribute-value families plus `{{ }}` mustache
+     * interpolations.
+     *
+     * Sites recognised (each gets its own startInjecting + addPlace + doneInjecting
+     * call so the platform sees N independent JS injections per host element):
+     *
+     *  1. `r-for="…"` → [injectJsAsExpression] (paren-wrap so JS parses `item in items`
+     *     as a parenthesised JSBinaryExpression `in`, not as a JSLabeledStatement).
+     *     Mirrors Plan 11's PROPS_BODY / DATA_BODY / COMPONENTS_BODY paren-wrap.
+     *  2. Other `r-*="…"` directives → [injectJs] (the value is a normal JS expression
+     *     or statement-position-acceptable shape, e.g., `r-if="$data.open"`,
+     *     `r-show="…"`, `r-model="…"`, `r-html="…"`, `r-text="…"`, `r-bind="…"`,
+     *     `r-on="…"`, etc.).
+     *  3. `@event[.modifier(args)]*="…"` → [injectJs]. The modifier suffix lives in
+     *     the ATTRIBUTE NAME (before `=`), so the value-quote-pair extraction
+     *     naturally excludes it.
+     *  4. `:bind="…"` → [injectJs].
+     *  5. `{{ … }}` interpolations → [injectJs] for the interior substring.
+     *
+     * CRITICAL byte-range invariants (pinned by RozieInjectionTest Plan 14 methods):
+     *
+     *  - Quotes excluded: for `:foo="contents.id"` the injected range covers exactly
+     *    `contents.id`, NOT the surrounding `"…"`. JS parsers reject a leading-quote
+     *    sequence as a syntax error; including the wrap would break the injection.
+     *  - Modifier suffixes excluded: for `@click.stop="handler()"` only `handler()`
+     *    is injected as JS. `.stop` lives in the attribute name, which is structurally
+     *    outside the value-quote range.
+     *  - `{{` / `}}` delimiters excluded: for `{{ count }}` the injected range covers
+     *    ` count ` (leading + trailing whitespace permitted — JS tolerates them).
+     *
+     * Compositional benefits, achieved with ZERO additional code outside this scanner:
+     *
+     *  - Plan 05's RozieJSReferenceContributor (registered for language="JavaScript")
+     *    auto-fires on JSReferenceExpression nodes inside any JS-injected range —
+     *    Go-to-Declaration on `$data.modalOpen` inside `:open="$data.modalOpen"`
+     *    resolves to the `<data>` block's `modalOpen:` key for free.
+     *  - Plan 13's RozieJsMagicIdentifierCompletionContributor (same registration
+     *    scope) auto-fires on identifier-position offsets inside any JS-injected
+     *    range — typing `$pr` inside `:foo="$pr|"` surfaces `$props` completion
+     *    for free.
+     *
+     * Executor-discretion fallback for r-for (NOT taken in this implementation —
+     * documented for posterity): if paren-wrap on `r-for` values produces a
+     * confusing UX (e.g., red-squiggled `item` identifier as "unresolved reference"),
+     * fall back to "do not inject JS into r-for values in v0.2.0" and document
+     * the partial closure in SUMMARY. Plan 14 ships the other 3 attribute families
+     * either way, so P1-UAT-08 partial closure is acceptable.
+     *
+     * Scanner shape: a single pass per pattern family using [Regex.findAll]. Patterns
+     * anchor on a leading whitespace boundary (`\s` or `^`) to ensure the match
+     * starts at an attribute-name position, not mid-text. The captured value-group's
+     * absolute host offsets are computed as `runStartOffset + group.range.first` /
+     * `runStartOffset + group.range.last + 1` (Kotlin IntRange is inclusive on both
+     * ends; TextRange end is exclusive).
+     *
+     * Single-quoted attribute values (`@click='alert("hi")'`) are NOT recognised in
+     * v0.2.0 — the threat model accepts this (T-08.2-32). Real-world `.rozie` files
+     * predominantly use double-quoted attribute values; the single-quote alternative
+     * is the documented workaround for embedded-quote edge cases (rare in practice).
+     */
+    private fun injectExpressionsInTemplateRun(
+        registrar: MultiHostRegistrar,
+        host: RozieRootBlock,
+        runText: String,
+        runStartOffset: Int,
+    ) {
+        // 1. r-for="…" — paren-wrap to make `item in items` a real expression.
+        //    Match r-for SPECIFICALLY first so the generic r-* regex below can
+        //    safely match all other r-* attributes without re-matching r-for.
+        R_FOR_ATTR.findAll(runText).forEach { match ->
+            val valueGroup = match.groups[1] ?: return@forEach
+            val absStart = runStartOffset + valueGroup.range.first
+            val absEnd = runStartOffset + valueGroup.range.last + 1
+            injectJsAsExpression(registrar, host, TextRange(absStart, absEnd))
+        }
+
+        // 2. Other r-*="…" directives — unwrapped JS. The negative lookahead
+        //    `(?!for\b)` excludes r-for so we don't double-inject.
+        R_OTHER_ATTR.findAll(runText).forEach { match ->
+            val valueGroup = match.groups[1] ?: return@forEach
+            val absStart = runStartOffset + valueGroup.range.first
+            val absEnd = runStartOffset + valueGroup.range.last + 1
+            injectJs(registrar, host, TextRange(absStart, absEnd))
+        }
+
+        // 3. @event[.modifier(args)]*="…" event handlers — modifier suffix lives
+        //    in the attribute name (before `=`), so quote-pair extraction naturally
+        //    excludes it. The captured group 1 is ONLY the value between the quotes.
+        EVENT_ATTR.findAll(runText).forEach { match ->
+            val valueGroup = match.groups[1] ?: return@forEach
+            val absStart = runStartOffset + valueGroup.range.first
+            val absEnd = runStartOffset + valueGroup.range.last + 1
+            injectJs(registrar, host, TextRange(absStart, absEnd))
+        }
+
+        // 4. :bind="…" prop bindings — unwrapped JS expression.
+        COLON_BIND_ATTR.findAll(runText).forEach { match ->
+            val valueGroup = match.groups[1] ?: return@forEach
+            val absStart = runStartOffset + valueGroup.range.first
+            val absEnd = runStartOffset + valueGroup.range.last + 1
+            injectJs(registrar, host, TextRange(absStart, absEnd))
+        }
+
+        // 5. {{ … }} mustache interpolations — interior substring is JS.
+        //    Non-greedy match allows multiple interpolations per template body.
+        //    DOTALL flag permits multi-line interpolation bodies (rare but valid).
+        MUSTACHE_INTERP.findAll(runText).forEach { match ->
+            val valueGroup = match.groups[1] ?: return@forEach
+            val absStart = runStartOffset + valueGroup.range.first
+            val absEnd = runStartOffset + valueGroup.range.last + 1
+            injectJs(registrar, host, TextRange(absStart, absEnd))
+        }
+    }
+
+    /**
      * D-11 lang detection.
      *
      * NOTE: SCSS/Less injection is editor-only — the .rozie compiler currently parses
@@ -267,4 +401,53 @@ class RozieMultiHostInjector : MultiHostInjector {
         val range: TextRange,
         val text: String,
     )
+
+    /**
+     * Pre-compiled regex constants for [injectExpressionsInTemplateRun] (Plan 08.2-14).
+     *
+     * All four directive-attribute patterns anchor on a leading whitespace boundary
+     * `(?:^|\s)` to match attribute-name position. Each captures EXACTLY the value
+     * substring (group 1) between the surrounding double-quotes — the quotes themselves
+     * are NOT inside the capture group, satisfying the quote-exclusion invariant
+     * documented on [injectExpressionsInTemplateRun].
+     *
+     * For r-* directives we split into two patterns ([R_FOR_ATTR] and [R_OTHER_ATTR])
+     * so r-for can route through [injectJsAsExpression] (paren-wrap for the
+     * in-expression shape) while all other r-* directives stay on the unwrapped
+     * [injectJs] path. The negative lookahead `(?!for\b)` in [R_OTHER_ATTR] excludes
+     * r-for from the generic family — without it, every r-for would receive both a
+     * paren-wrapped AND an unwrapped JS injection at the same range, producing
+     * undefined behaviour in the JetBrains injection stack.
+     *
+     * The event-attribute pattern matches the optional `.modifier(args)*` chain inside
+     * the attribute name (NOT capturing it — group 1 stays scoped to the value); the
+     * `[^)]*` inside modifier-arg parentheses is intentionally simple (no nested
+     * parens) because Rozie's modifier grammar (Plan 04 / compiler PEG) does not allow
+     * nested call expressions inside modifier args at the surface syntax level.
+     */
+    companion object {
+        // r-for="…": value captured in group 1. Paren-wrap dispatch.
+        private val R_FOR_ATTR: Regex =
+            """(?:^|\s)r-for\s*=\s*"([^"]*)"""".toRegex()
+
+        // Other r-*="…": value captured in group 1. Unwrapped dispatch.
+        // Negative lookahead `(?!for\b)` excludes r-for to avoid double-inject.
+        private val R_OTHER_ATTR: Regex =
+            """(?:^|\s)r-(?!for\b)[\w-]+\s*=\s*"([^"]*)"""".toRegex()
+
+        // @event[.modifier(args)]*="…": value captured in group 1. Modifier suffix
+        // lives in the attribute name (before `=`) and is NOT inside the capture.
+        private val EVENT_ATTR: Regex =
+            """(?:^|\s)@[\w-]+(?:\.[\w-]+(?:\([^)]*\))?)*\s*=\s*"([^"]*)"""".toRegex()
+
+        // :bind="…": value captured in group 1.
+        private val COLON_BIND_ATTR: Regex =
+            """(?:^|\s):[\w-]+\s*=\s*"([^"]*)"""".toRegex()
+
+        // {{ … }}: interior captured in group 1. Non-greedy with DOTALL so multi-line
+        // interpolation bodies parse correctly. `{{` and `}}` delimiters are NOT
+        // inside the capture group.
+        private val MUSTACHE_INTERP: Regex =
+            """\{\{(.*?)\}\}""".toRegex(RegexOption.DOT_MATCHES_ALL)
+    }
 }
