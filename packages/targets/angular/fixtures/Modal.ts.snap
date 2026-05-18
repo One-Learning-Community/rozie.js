@@ -80,19 +80,6 @@ interface FooterCtx {
   `],
 })
 export class Modal {
-  open = model<boolean>(false);
-  closeOnEscape = input<boolean>(true);
-  closeOnBackdrop = input<boolean>(true);
-  lockBodyScroll = input<boolean>(true);
-  title = input<string>('');
-  backdropEl = viewChild<ElementRef<HTMLDivElement>>('backdropEl');
-  dialogEl = viewChild<ElementRef<HTMLDivElement>>('dialogEl');
-  close = output<void>();
-  @ContentChild('header', { read: TemplateRef }) headerTpl?: TemplateRef<HeaderCtx>;
-  @ContentChild('defaultSlot', { read: TemplateRef }) defaultTpl?: TemplateRef<DefaultCtx>;
-  @ContentChild('footer', { read: TemplateRef }) footerTpl?: TemplateRef<FooterCtx>;
-  templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
-
   constructor() {
       const renderer = inject(Renderer2);
 
@@ -105,9 +92,25 @@ export class Modal {
         const unlisten = renderer.listen('document', 'keydown', handler);
         onCleanup(unlisten);
       });
+  }
 
+  open = model<boolean>(false);
+  closeOnEscape = input<boolean>(true);
+  closeOnBackdrop = input<boolean>(true);
+  lockBodyScroll = input<boolean>(true);
+  title = input<string>('');
+  backdropEl = viewChild<ElementRef<HTMLDivElement>>('backdropEl');
+  dialogEl = viewChild<ElementRef<HTMLDivElement>>('dialogEl');
+  close = output<void>();
+  @ContentChild('header', { read: TemplateRef }) headerTpl?: TemplateRef<HeaderCtx>;
+  @ContentChild('defaultSlot', { read: TemplateRef }) defaultTpl?: TemplateRef<DefaultCtx>;
+  @ContentChild('footer', { read: TemplateRef }) footerTpl?: TemplateRef<FooterCtx>;
+  templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
+  private __rozieDestroyRef = inject(DestroyRef);
+
+  ngAfterViewInit() {
     this.lockScroll();
-    inject(DestroyRef).onDestroy(this.unlockScroll);
+    this.__rozieDestroyRef.onDestroy(this.unlockScroll);
     this.dialogEl()?.nativeElement?.focus();
   }
 

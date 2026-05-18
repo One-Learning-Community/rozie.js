@@ -35,13 +35,14 @@ export class SearchInput {
   inputEl = viewChild<ElementRef<HTMLInputElement>>('inputEl');
   search = output<unknown>();
   clear = output<void>();
+  private __rozieDestroyRef = inject(DestroyRef);
 
-  constructor() {
+  ngAfterViewInit() {
     if (this.autofocus()) this.inputEl()?.nativeElement?.focus();
 
     // Returning a function from $onMount registers a teardown — equivalent to
     // a separate $onUnmount, useful when setup and teardown logic belong together.
-    inject(DestroyRef).onDestroy(() => {
+    this.__rozieDestroyRef.onDestroy(() => {
       // e.g., abort an in-flight request initialized in this hook
     });
   }

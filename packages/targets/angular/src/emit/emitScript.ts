@@ -10,15 +10,22 @@
  *      - viewChild refs           (`name = viewChild<ElementRef>('name')`)
  *      - output emits             (`name = output<T>()`)
  *      - @ContentChild slot tpls  (Plan 05-04a Task 2 — emitSlotDecl)
+ *      - private __rozieDestroyRef = inject(DestroyRef);  // hoisted when a
+ *        paired-cleanup $onMount lands in ngAfterViewInit (inject() is invalid
+ *        outside injection context, so cleanups dereference this field).
  *   2. constructor() {
  *        const renderer = inject(Renderer2);   // Listeners use this
- *        const destroyRef = inject(DestroyRef);// Lifecycle cleanup uses this
  *        ...user residual <script> body (DX-03 floor)
- *        ...lifecycle effect blocks (D-19 paired)
+ *        ...$onUnmount standalone hooks (inject(DestroyRef).onDestroy(...))
+ *        ...$onUpdate hooks (effect(() => ...))
  *        ...listener effect blocks (Plan 05-04a Task 3)
  *      }
- *   3. computed properties (`name = computed(() => ...)`)
- *   4. method/arrow declarations from user's <script> body — emitted at class
+ *   3. ngAfterViewInit() {                     // mount-phase lifecycle lands here
+ *        ...$onMount setup bodies (viewChild() signals are populated post-init)
+ *        ...this.__rozieDestroyRef.onDestroy(<cleanup>) for paired mount+cleanup
+ *      }
+ *   4. computed properties (`name = computed(() => ...)`)
+ *   5. method/arrow declarations from user's <script> body — emitted at class
  *      level (NOT in constructor) so they're invokable as `this.name(...)`.
  *
  * Pitfall 8 mitigation: `inject(Renderer2)` / `inject(DestroyRef)` calls live
@@ -341,53 +348,84 @@ function pairClonedLifecycle(
 }
 
 /**
- * Render a single lifecycle hook as Angular constructor-body code.
+ * One rendered lifecycle hook, bucketed into either the constructor or
+ * ngAfterViewInit() — see renderLifecycleHook for the bucketing rules.
+ */
+interface RenderedLifecycleHook {
+  /** Which class member the rendered code belongs in. */
+  kind: 'constructor' | 'afterViewInit';
+  /** Generated source lines (already trimmed; caller handles indentation). */
+  code: string;
+  /**
+   * True when the rendered code references `this.__rozieDestroyRef` — the
+   * caller must hoist `private __rozieDestroyRef = inject(DestroyRef);` as a
+   * class field. `inject()` is only valid in constructor / field-initializer
+   * injection context, so cleanup callbacks emitted from ngAfterViewInit must
+   * dereference the pre-injected field instead of calling inject() inline.
+   */
+  needsDestroyRefField: boolean;
+}
+
+/**
+ * Render a single lifecycle hook into the class member it belongs in.
  *
- * Strategy per RESEARCH Pattern 6 + Pitfall 8:
- *   - phase 'mount' or 'update' → wrap the setup body in `effect(() => { ... })`
- *     IF it reads signals (auto-tracking). For paired-cleanup form, emit:
- *       <setup invocation>;
- *       inject(DestroyRef).onDestroy(<cleanup invocation>);
- *   - phase 'unmount' standalone → `inject(DestroyRef).onDestroy(<cleanup>);`
- *
- * For the v1 reference examples (Counter/Modal/SearchInput/Dropdown/TodoList):
- *   - Counter: console.log only — no lifecycle hooks
- *   - Modal: $onMount(lockScroll) + $onUnmount(unlockScroll) PAIRED + standalone
- *     $onMount(() => dialogEl.focus())
- *   - SearchInput: $onMount(arrow with cleanup-return)
- *   - Dropdown: 2× standalone $onMount calls (no cleanup)
- *
- * For v1 we keep the body shape SIMPLE: invoke setup directly in constructor
- * (one-time mount), pair cleanup with `inject(DestroyRef).onDestroy(...)`.
+ * Bucketing rules:
+ *   - phase 'mount' (with or without paired cleanup) → `ngAfterViewInit()`.
+ *     Angular's `viewChild()` signals return `undefined` until after view-init
+ *     fires; running setup in the constructor breaks any `$el`-touching mount
+ *     body (e.g., `new SortableJS(this.__rozieRoot()?.nativeElement, ...)`
+ *     throws because the nativeElement is undefined pre-view-init). Mirrors
+ *     React `useEffect(..., [])`, Vue `onMounted`, Svelte `$effect`.
+ *   - phase 'mount' + paired cleanup → setup + cleanup BOTH go into
+ *     ngAfterViewInit, with the cleanup registered through the hoisted
+ *     `this.__rozieDestroyRef` field (inject() is invalid outside the
+ *     constructor / field-initializer context). Keeping the pair together
+ *     preserves any locals declared in the setup body that the cleanup
+ *     closure references (cleanup-return form).
+ *   - phase 'unmount' standalone → constructor: `inject(DestroyRef).onDestroy(<cleanup>);`
+ *   - phase 'update' → constructor: `effect(() => { ... })` (auto-tracks
+ *     reactive reads; effect() must run in injection context).
  */
 function renderLifecycleHook(
   hook: LifecycleClonedBody,
   classMembers: ReadonlySet<string>,
   collisionRenames: ReadonlyMap<string, string>,
-): string {
+): RenderedLifecycleHook {
   const { setupCloned, cleanupCloned, phase } = hook;
 
   if (phase === 'unmount') {
-    // Standalone unmount: inject(DestroyRef).onDestroy(<cleanup>)
-    return `inject(DestroyRef).onDestroy(${invokeOrPass(setupCloned, classMembers, collisionRenames)});`;
+    return {
+      kind: 'constructor',
+      code: `inject(DestroyRef).onDestroy(${invokeOrPass(setupCloned, classMembers, collisionRenames)});`,
+      needsDestroyRefField: false,
+    };
   }
 
   if (phase === 'update') {
-    // $onUpdate → effect(() => { ... }) — auto-tracks reactive reads.
-    return `effect(() => ${invokeOrPass(setupCloned, classMembers, collisionRenames, true)});`;
+    return {
+      kind: 'constructor',
+      code: `effect(() => ${invokeOrPass(setupCloned, classMembers, collisionRenames, true)});`,
+      needsDestroyRefField: false,
+    };
   }
 
-  // phase === 'mount'
+  // phase === 'mount' — runs after view init so viewChild() signals are populated.
   const setupInvocation = invokeAndExpand(setupCloned, classMembers, collisionRenames);
 
   if (cleanupCloned === null) {
-    // Pure setup, no cleanup.
-    return setupInvocation;
+    return {
+      kind: 'afterViewInit',
+      code: setupInvocation,
+      needsDestroyRefField: false,
+    };
   }
 
-  // Setup + cleanup paired.
   const cleanupRef = invokeOrPass(cleanupCloned, classMembers, collisionRenames);
-  return `${setupInvocation}\ninject(DestroyRef).onDestroy(${cleanupRef});`;
+  return {
+    kind: 'afterViewInit',
+    code: `${setupInvocation}\nthis.__rozieDestroyRef.onDestroy(${cleanupRef});`,
+    needsDestroyRefField: true,
+  };
 }
 
 /**
@@ -675,12 +713,36 @@ export function emitScript(
     computedLines.push(`${c.name} = computed(() => ${bodyCode});`);
   }
 
-  // 8. Build lifecycle effect blocks for the constructor body.
+  // 8. Build lifecycle blocks, bucketed per-phase:
+  //    - mount → ngAfterViewInit() so viewChild() signals are populated
+  //    - unmount / update → constructor (inject() / effect() need injection context)
+  //    See renderLifecycleHook for the bucketing rationale.
   const lifecycleConstructorLines: string[] = [];
+  const lifecycleAfterViewInitLines: string[] = [];
+  let lifecycleNeedsDestroyRefField = false;
   for (const hook of lifecyclePairing.perHook) {
-    lifecycleConstructorLines.push(
-      renderLifecycleHook(hook, rewriteResult.classMembers, rewriteResult.collisionRenames),
+    const rendered = renderLifecycleHook(
+      hook,
+      rewriteResult.classMembers,
+      rewriteResult.collisionRenames,
     );
+    if (rendered.kind === 'afterViewInit') {
+      lifecycleAfterViewInitLines.push(rendered.code);
+    } else {
+      lifecycleConstructorLines.push(rendered.code);
+    }
+    if (rendered.needsDestroyRefField) lifecycleNeedsDestroyRefField = true;
+  }
+
+  // When at least one mount hook with paired cleanup landed in ngAfterViewInit,
+  // hoist `private __rozieDestroyRef = inject(DestroyRef);` as a class field.
+  // inject() is only valid in injection context (constructor body /
+  // field initializer); cleanup callbacks run from ngAfterViewInit must call
+  // `this.__rozieDestroyRef.onDestroy(...)` instead. `inject` and `DestroyRef`
+  // are already on the imports list when ir.lifecycle is non-empty with cleanup
+  // (see collectAngularImports).
+  if (lifecycleNeedsDestroyRefField) {
+    fieldLines.push('private __rozieDestroyRef = inject(DestroyRef);');
   }
 
   // 8b. Quick plan 260515-u2b — $watch lowers to effect(() => { (getter)(); (cb)(); }).
@@ -849,6 +911,17 @@ export function emitScript(
       )
       .join('\n');
     classBodyParts.push(`constructor() {\n${indented}\n}`);
+  }
+  if (lifecycleAfterViewInitLines.length > 0) {
+    const indented = lifecycleAfterViewInitLines
+      .map((l) =>
+        l
+          .split('\n')
+          .map((line) => (line.length > 0 ? '  ' + line : line))
+          .join('\n'),
+      )
+      .join('\n');
+    classBodyParts.push(`ngAfterViewInit() {\n${indented}\n}`);
   }
   if (computedLines.length > 0) {
     classBodyParts.push(computedLines.join('\n'));

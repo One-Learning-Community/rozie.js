@@ -133,11 +133,16 @@ describe('emitAngular — substring invariants (Plan 05-04a Task 3 acceptance cr
     expect(code).toContain("'defaultSlot'");
   });
 
-  it('Modal.ts.snap contains ::ng-deep :root AND multiple inject(DestroyRef).onDestroy in constructor (Pitfall 8)', () => {
+  it('Modal.ts.snap contains ::ng-deep :root AND registers cleanup via hoisted __rozieDestroyRef (Pitfall 8)', () => {
     const { ir, src, filename } = loadExample('Modal');
     const { code } = emitAngular(ir, { filename, source: src });
     expect(code).toContain('::ng-deep :root');
-    expect(code).toContain('inject(DestroyRef).onDestroy(');
+    // Mount-phase lifecycle (lockScroll/unlockScroll pair) lives in
+    // ngAfterViewInit; the cleanup registration must dereference the hoisted
+    // field rather than calling inject(DestroyRef) inline (which is invalid
+    // outside the constructor / field-initializer injection context).
+    expect(code).toContain('private __rozieDestroyRef = inject(DestroyRef);');
+    expect(code).toContain('this.__rozieDestroyRef.onDestroy(');
   });
 
   it('NO @Input / @Output / @ViewChild legacy decorators (signal API exclusively)', () => {

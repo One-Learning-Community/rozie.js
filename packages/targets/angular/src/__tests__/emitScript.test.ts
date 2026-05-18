@@ -77,25 +77,45 @@ describe('emitScript — Counter signal mapping', () => {
 });
 
 describe('emitScript — Modal D-19 paired-cleanup', () => {
-  it('Modal emits multiple inject(DestroyRef).onDestroy(...) calls in source order', () => {
+  it('Modal registers paired cleanup via the hoisted __rozieDestroyRef field', () => {
     const ir = loadIR('Modal');
     const { classBody } = emitScript(ir);
-    // D-19 paired pair: lockScroll mounted with unlockScroll cleanup.
-    expect(classBody).toContain('inject(DestroyRef).onDestroy(this.unlockScroll)');
+    // D-19 paired pair: lockScroll mounted with unlockScroll cleanup. The
+    // cleanup is registered from ngAfterViewInit, which is outside injection
+    // context — so it must dereference the hoisted private field rather than
+    // calling inject(DestroyRef) inline.
+    expect(classBody).toContain('private __rozieDestroyRef = inject(DestroyRef);');
+    expect(classBody).toContain('this.__rozieDestroyRef.onDestroy(this.unlockScroll)');
   });
 
-  it('Modal class body has inject(DestroyRef) ONLY in constructor (Pitfall 8)', () => {
+  it('Modal $el-touching mount setup lives in ngAfterViewInit (not constructor)', () => {
     const ir = loadIR('Modal');
     const { classBody } = emitScript(ir);
-    // Find each occurrence of `inject(` and verify it is INSIDE constructor block.
-    const constructorMatch = classBody.match(/constructor\(\) \{([\s\S]*?)\n\}/);
-    expect(constructorMatch).not.toBeNull();
-    const constructorBody = constructorMatch![1]!;
-    // Count inject() occurrences in constructor and globally.
-    const totalInjects = (classBody.match(/inject\(/g) ?? []).length;
-    const constructorInjects = (constructorBody.match(/inject\(/g) ?? []).length;
-    expect(constructorInjects).toBe(totalInjects);
-    expect(totalInjects).toBeGreaterThanOrEqual(1);
+    // Bug fix: viewChild() signals are undefined until view-init fires, so
+    // `this.dialogEl()?.nativeElement?.focus()` would no-op (or throw on
+    // .nativeElement-required APIs) in the constructor. Mount hooks must
+    // lower into ngAfterViewInit.
+    const afterViewInitMatch = classBody.match(/ngAfterViewInit\(\) \{([\s\S]*?)\n\}/);
+    expect(afterViewInitMatch).not.toBeNull();
+    const afterViewInitBody = afterViewInitMatch![1]!;
+    expect(afterViewInitBody).toContain('this.dialogEl()?.nativeElement?.focus()');
+    expect(afterViewInitBody).toContain('this.lockScroll()');
+  });
+
+  it('Modal class body has inject() ONLY in injection context (Pitfall 8)', () => {
+    const ir = loadIR('Modal');
+    const { classBody } = emitScript(ir);
+    // Pitfall 8: inject() is only valid in constructor body or field
+    // initializers. After the mount-→-ngAfterViewInit lowering, paired
+    // cleanups call this.__rozieDestroyRef.onDestroy(...) instead — and the
+    // ngAfterViewInit body itself must contain zero `inject(` calls.
+    const afterViewInitMatch = classBody.match(/ngAfterViewInit\(\) \{([\s\S]*?)\n\}/);
+    expect(afterViewInitMatch).not.toBeNull();
+    const afterViewInitBody = afterViewInitMatch![1]!;
+    expect(afterViewInitBody.match(/inject\(/g) ?? []).toEqual([]);
+    // And the class globally must still inject DestroyRef at least once
+    // (through the hoisted field initializer).
+    expect((classBody.match(/inject\(/g) ?? []).length).toBeGreaterThanOrEqual(1);
   });
 });
 
@@ -106,10 +126,18 @@ describe('emitScript — SearchInput debounce + cleanup-return', () => {
     expect(classBody).toContain("inputEl = viewChild<ElementRef<HTMLInputElement>>('inputEl')");
   });
 
-  it('SearchInput onMount-with-cleanup-return emits inject(DestroyRef).onDestroy(...)', () => {
+  it('SearchInput onMount-with-cleanup-return registers cleanup via __rozieDestroyRef in ngAfterViewInit', () => {
     const ir = loadIR('SearchInput');
     const { classBody } = emitScript(ir);
-    expect(classBody).toContain('inject(DestroyRef).onDestroy(');
+    // The cleanup-return form pairs setup + cleanup; both land in
+    // ngAfterViewInit so the cleanup arrow can still close over locals
+    // declared in the setup body. The registration call dereferences the
+    // hoisted private field (inject() is invalid outside injection context).
+    expect(classBody).toContain('private __rozieDestroyRef = inject(DestroyRef);');
+    expect(classBody).toContain('this.__rozieDestroyRef.onDestroy(');
+    const afterViewInitMatch = classBody.match(/ngAfterViewInit\(\) \{([\s\S]*?)\n\}/);
+    expect(afterViewInitMatch).not.toBeNull();
+    expect(afterViewInitMatch![1]!).toContain('this.__rozieDestroyRef.onDestroy(');
   });
 
   it('SearchInput emits output() for both `search` and `clear` events', () => {

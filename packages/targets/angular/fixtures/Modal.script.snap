@@ -28,10 +28,11 @@ close = output<void>();
 @ContentChild('defaultSlot', { read: TemplateRef }) defaultTpl?: TemplateRef<DefaultCtx>;
 @ContentChild('footer', { read: TemplateRef }) footerTpl?: TemplateRef<FooterCtx>;
 templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
+private __rozieDestroyRef = inject(DestroyRef);
 
-constructor() {
+ngAfterViewInit() {
   this.lockScroll();
-  inject(DestroyRef).onDestroy(this.unlockScroll);
+  this.__rozieDestroyRef.onDestroy(this.unlockScroll);
   this.dialogEl()?.nativeElement?.focus();
 }
 
