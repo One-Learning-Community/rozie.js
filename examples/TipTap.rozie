@@ -1,0 +1,188 @@
+<!--
+  TipTap.rozie — data-bound port of TipTap (ProseMirror-based rich-text editor).
+
+  TipTap's value isn't the editor logic — that's ProseMirror, framework-
+  agnostic. The value-add of the official wrappers (@tiptap/react,
+  @tiptap/vue-3, tiptap-svelte, …) is just gluing onUpdate to component
+  state and forwarding extensions. Five maintenance burdens, ONE Rozie
+  source covers six frameworks.
+
+  Two-way binds the editor HTML:
+
+    <TipTap r-model:html="$data.content" />
+
+  And ships with an internal toolbar (Bold/Italic/H1/H2/Bullet/Link).
+  The toolbar tracks live editor state via the wrapper's own $data —
+  `isActive('bold')` results flow into reactive booleans through the
+  editor.on('selectionUpdate') hook.
+
+  Why this is a worthwhile demo:
+    - NEW pattern: engine commands surfaced via the wrapper's INTERNAL
+      UI (toolbar buttons calling editor.chain()…run()), not via
+      imperative-handle escape hatch
+    - NEW pattern: $data tracking live engine state (active marks/nodes)
+      kept in sync via an engine event handler
+    - Engine that owns a contenteditable DOM tree the framework never
+      touches — opaque DOM, same shape as SortableJS's mutate-under-foot
+      problem but for a totally different domain
+    - Scalar string two-way bind with the same round-trip guard
+      Flatpickr uses
+-->
+
+<rozie name="TipTap">
+
+<props>
+{
+  html:        { type: String,  default: '<p>Start writing…</p>', model: true },
+  placeholder: { type: String,  default: '' },
+  autofocus:   { type: Boolean, default: false },
+  editable:    { type: Boolean, default: true },
+}
+</props>
+
+<data>
+{
+  active: {
+    bold:   false,
+    italic: false,
+    h1:     false,
+    h2:     false,
+    bulletList: false,
+  },
+}
+</data>
+
+<script>
+import { Editor } from '@tiptap/core'
+import StarterKit from '@tiptap/starter-kit'
+
+let editor = null
+
+const refreshActive = () => {
+  if (!editor) return
+  $data.active = {
+    bold:       editor.isActive('bold'),
+    italic:     editor.isActive('italic'),
+    h1:         editor.isActive('heading', { level: 1 }),
+    h2:         editor.isActive('heading', { level: 2 }),
+    bulletList: editor.isActive('bulletList'),
+  }
+}
+
+const cmd = (fn) => {
+  if (!editor) return
+  fn(editor.chain().focus()).run()
+  refreshActive()
+}
+
+const toggleBold       = () => cmd((ch) => ch.toggleBold())
+const toggleItalic     = () => cmd((ch) => ch.toggleItalic())
+const toggleH1         = () => cmd((ch) => ch.toggleHeading({ level: 1 }))
+const toggleH2         = () => cmd((ch) => ch.toggleHeading({ level: 2 }))
+const toggleBulletList = () => cmd((ch) => ch.toggleBulletList())
+
+$onMount(() => {
+  editor = new Editor({
+    element:    $refs.editorEl,
+    content:    $props.html,
+    editable:   $props.editable,
+    autofocus:  $props.autofocus,
+    extensions: [StarterKit],
+    onUpdate: ({ editor }) => {
+      const next = editor.getHTML()
+      // Round-trip guard — see Flatpickr for the same shape.
+      if (next !== $props.html) $props.html = next
+      $emit('update', next)
+    },
+    onSelectionUpdate: () => refreshActive(),
+  })
+  refreshActive()
+  return () => editor?.destroy()
+})
+
+// Reconcile external prop changes back into the editor without bouncing
+// through onUpdate. setContent(html, false) skips the change emission.
+$watch(() => $props.html, (v) => {
+  if (!editor) return
+  if (v === editor.getHTML()) return
+  editor.commands.setContent(v, false)
+  refreshActive()
+})
+
+$watch(() => $props.editable, (v) => editor?.setEditable(v))
+</script>
+
+<template>
+<div class="rozie-tiptap" :class="{ 'is-readonly': !$props.editable }">
+  <div class="rozie-tiptap-toolbar" r-if="$props.editable">
+    <button type="button" :class="{ active: $data.active.bold }"       @click="toggleBold"       aria-label="Bold"><strong>B</strong></button>
+    <button type="button" :class="{ active: $data.active.italic }"     @click="toggleItalic"     aria-label="Italic"><em>I</em></button>
+    <span class="sep" />
+    <button type="button" :class="{ active: $data.active.h1 }"         @click="toggleH1"         aria-label="Heading 1">H1</button>
+    <button type="button" :class="{ active: $data.active.h2 }"         @click="toggleH2"         aria-label="Heading 2">H2</button>
+    <span class="sep" />
+    <button type="button" :class="{ active: $data.active.bulletList }" @click="toggleBulletList" aria-label="Bullet list">• List</button>
+  </div>
+  <div ref="editorEl" class="rozie-tiptap-content" :data-placeholder="$props.placeholder" />
+</div>
+</template>
+
+<style>
+.rozie-tiptap {
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 6px;
+  overflow: hidden;
+  background: white;
+}
+.rozie-tiptap.is-readonly {
+  background: #fafafa;
+}
+
+.rozie-tiptap-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.125rem;
+  padding: 0.25rem 0.375rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  background: #f5f5f7;
+}
+.rozie-tiptap-toolbar button {
+  padding: 0.25rem 0.5rem;
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: 3px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8125rem;
+  min-width: 1.75rem;
+  color: rgba(0, 0, 0, 0.65);
+}
+.rozie-tiptap-toolbar button:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+.rozie-tiptap-toolbar button.active {
+  background: #1a1a1a;
+  color: white;
+  border-color: #1a1a1a;
+}
+.rozie-tiptap-toolbar .sep {
+  width: 1px;
+  height: 1rem;
+  background: rgba(0, 0, 0, 0.1);
+  margin: 0 0.25rem;
+}
+
+.rozie-tiptap-content {
+  padding: 0.625rem 0.875rem;
+  min-height: 6rem;
+  font: inherit;
+  outline: none;
+}
+.rozie-tiptap-content p { margin: 0 0 0.5rem; }
+.rozie-tiptap-content p:last-child { margin-bottom: 0; }
+.rozie-tiptap-content h1 { font-size: 1.5rem; margin: 0.5rem 0 0.375rem; }
+.rozie-tiptap-content h2 { font-size: 1.25rem; margin: 0.5rem 0 0.375rem; }
+.rozie-tiptap-content ul { margin: 0 0 0.5rem; padding-left: 1.5rem; }
+</style>
+
+</rozie>
