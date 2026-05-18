@@ -482,6 +482,34 @@ function buildEventParts(
     // function references at click time — `(e) => (fn)?.(e)` invokes the
     // function with the event when present and is a silent no-op when not.
     const isScopedCtxHandler = /this\._[A-Za-z0-9_]+Ctx\?\./.test(handlerRaw);
+    // WR-02 (Phase 07.4 review): if the handler looks like a bare
+    // `this._<X>Ctx<some>.<param>` reference (matches the loose ctx-handler
+    // pattern) but does NOT match the strict dispatchEvent shape — e.g.
+    // missing the `?.` optional chain (`this._XCtx.param`), extra
+    // whitespace, an unexpected member access in the middle — emit a
+    // warning so a future change in `rewriteScopedParamRefs` (emitSlotFiller)
+    // that breaks the strict-match contract surfaces immediately rather
+    // than silently producing a late-binding wrap that always resolves
+    // `undefined` for function-typed params (which JSON.stringify dropped
+    // through `data-rozie-params`). The bare-`this._<X>Ctx?.<param>` shape
+    // is the ONLY shape function-typed params can take; any other shape
+    // here means the producer-side `@event` binding will not receive
+    // matching CustomEvents.
+    const looseScopedCtxBare = /^\s*this\._[A-Za-z0-9_]+Ctx[A-Za-z0-9_?.]*\s*$/.test(handlerRaw);
+    if (looseScopedCtxBare && !dispatchMatch) {
+      const diagnosticsArr = opts._state?.diagnostics;
+      diagnosticsArr?.push({
+        code: RozieErrorCode.TARGET_LIT_RESERVED,
+        severity: 'warning',
+        message:
+          `Function-typed scoped-slot-param handler '${handlerRaw.trim()}' did not match the strict ` +
+          `dispatchEvent shape (this._<slot>Ctx?.<param>). The handler will fall through to the ` +
+          `late-binding wrap, which is a no-op for function-typed params (they cannot transit through ` +
+          `data-rozie-params). If you changed emitSlotFiller.rewriteScopedParamRefs, update the ` +
+          `dispatchMatch regex in buildEventParts() to match the new shape.`,
+        loc: listener.sourceLoc,
+      });
+    }
     handler = isScopedCtxHandler
       ? `(e) => (${handlerRaw})?.(e)`
       : handlerRaw;
