@@ -494,3 +494,59 @@ describe('DIST-05 strict-bytes parity gate (D-93) — 10 examples × 6 targets �
     });
   });
 });
+
+/**
+ * WR-07 (Phase 07.4 review) — snapshot/dist-parity Lit fixture byte-identity.
+ *
+ * The 8 Lit reference examples are fixtured in two places that BOTH come
+ * from the same `compile()` output of the same `.rozie` source:
+ *
+ *   • `packages/targets/lit/src/__tests__/fixtures/<Name>.lit.ts.snap`
+ *     — the target-lit unit-test snapshot (Vitest `toMatchFileSnapshot`).
+ *   • `tests/dist-parity/fixtures/<Name>.lit.ts`
+ *     — the canonical baseline bytes that all 4 distribution entrypoints
+ *     (compile / CLI / babel-plugin / unplugin) must produce.
+ *
+ * They MUST agree byte-for-byte. Without this guard, a future emit change
+ * that regenerates one file via `pnpm --filter @rozie/target-lit test -u`
+ * but forgets `pnpm --filter dist-parity bootstrap` (or vice versa) leaves
+ * silent drift — the dist-parity gate keeps asserting the OLD shape and
+ * production consumers ship the NEW shape.
+ *
+ * This is option (c) from the WR-07 review fix: "add a test that asserts
+ * byte-identity between the two sets and fails CI if they drift." Symlinks
+ * (option a) and pretest-hook generation (option b) were rejected for
+ * platform/portability reasons.
+ *
+ * The two extra dist-parity fixtures (ModalConsumer, WrapperModal) are
+ * consumer-side and have no snap counterpart — excluded from this check.
+ */
+describe('WR-07 — snap/dist-parity Lit fixture byte-identity', () => {
+  const LIT_OVERLAP = [
+    'Counter',
+    'SearchInput',
+    'Dropdown',
+    'TodoList',
+    'Modal',
+    'TreeNode',
+    'Card',
+    'CardHeader',
+  ] as const;
+
+  describe.each(LIT_OVERLAP)('%s', (name) => {
+    it('__tests__/fixtures/*.lit.ts.snap == tests/dist-parity/fixtures/*.lit.ts', () => {
+      const snapPath = resolve(
+        ROOT,
+        'packages/targets/lit/src/__tests__/fixtures',
+        `${name}.lit.ts.snap`,
+      );
+      const distPath = resolve(FIXTURES_DIR, `${name}.lit.ts`);
+      const snap = readFileSync(snapPath, 'utf8');
+      const dist = readFileSync(distPath, 'utf8');
+      // Bytes must match exactly. If this fails, regenerate BOTH:
+      //   pnpm --filter @rozie/target-lit test -u
+      //   pnpm --filter dist-parity bootstrap
+      expect(snap).toBe(dist);
+    });
+  });
+});
