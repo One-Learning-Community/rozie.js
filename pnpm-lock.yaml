@@ -450,6 +450,22 @@ importers:
         specifier: ^2
         version: 2.2.12(typescript@5.9.3)
 
+  examples/playground:
+    dependencies:
+      '@rozie/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+    devDependencies:
+      '@types/node':
+        specifier: ^22
+        version: 22.19.17
+      typescript:
+        specifier: ~5.6
+        version: 5.6.3
+      vite:
+        specifier: ^5
+        version: 5.4.21(@types/node@22.19.17)(less@4.4.2)(lightningcss@1.32.0)(sass@1.97.3)(terser@5.46.2)
+
   packages/babel-plugin:
     dependencies:
       '@babel/helper-plugin-utils':

@@ -3,6 +3,7 @@ packages:
   - "packages/targets/*"
   - "packages/runtime/*"
   - "examples/consumers/*"
+  - "examples/playground"
   - "tests/plugins/*"
   - "tests/integration/*"
   - "tests/timing"
