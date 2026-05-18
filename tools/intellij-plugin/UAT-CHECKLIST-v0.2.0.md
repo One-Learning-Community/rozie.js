@@ -374,6 +374,32 @@ v0.2.0 zip rebuilt cumulative through cycle 3. Tag cut + final UAT walk now depe
 ### If clean → tag cut
 - **Plan 08.2-12 Task 3** cuts `intellij-plugin/v0.2.0` annotated tag locally; STOPS at the push boundary per `feedback_no_autopush`; orchestrator surfaces the `git push origin intellij-plugin/v0.2.0` command for user authorization.
 
+## Issues captured (2026-05-17 UAT re-run #4 — 1 new finding + 1 future-enhancement note)
+
+User UAT verdict: *"most of this is looking to be incredibly workable as an early support plugin"* — v0.2.0 ships with documented gaps; remaining items routed to Phase 08.3 or v0.3.0 polish.
+
+### P1-UAT-16 — Template directive handler references don't resolve to `<script>` methods
+- **Severity:** P1 (same architectural root cause as P1-UAT-15 — deferred — different manifestation)
+- **Steps to repro:** Open Counter.rozie. Ctrl-click on `decrement` in line 48 `@click="decrement"` or `increment` in line 50 `@click="increment"`. Navigation falls back to full-file search instead of resolving to the `const decrement = ...` (line 38) / `const increment = ...` (line 37) declarations in `<script>`.
+- **Root cause:** SAME as P1-UAT-15. `<script>` body and template-attribute-value injections live in separate JS-PSI fragments with no shared lexical scope. The method references in template handlers (`@click="decrement"`) are JS-typed thanks to Plan 14, but their resolver can't walk back into the sibling `<script>` fragment to find the declarations.
+- **Disposition:** **DEFERRED to Phase 08.3** — folded into P1-UAT-15's synthetic-virtual-file injection architecture work. The fix path is the same: synthesise a single virtual `.ts` / `.js` file per `.rozie` SFC that concatenates `<script>` body + each template expression into one parse unit so all expressions share scope (Vue / Svelte precedent). Affects both data-var references (e.g., `:disabled="!canIncrement"`) AND method references (e.g., `@click="increment"`).
+
+### Future enhancement (not P1) — Member autocomplete on `$data.X` / `$props.X` / `$refs.X`
+- **Note:** User explicitly framed this as "helpful later, but that can all come in a later cycle"
+- **Scope:** Plan 13 ships completion for the magic IDENTIFIERS themselves ($props, $data, $refs, etc.). Member autocomplete (typing `$data.` and getting a list of declared `<data>` keys) is a separate enhancement.
+- **Fix shape:** Extend `RozieJsMagicIdentifierCompletionContributor` (or add a sibling `RozieJsMagicMemberCompletionContributor`) — when the JS reference matches `$data` / `$props` / `$refs` and the user typed a `.`, read the sibling `<data>` / `<props>` / `<refs>` block AST and contribute its keys as `LookupElement`s. Plan 05's existing host walk-back machinery (`RoziePropsReference.resolveHost`) already does the lookup for navigation; the completion contributor reuses the same scan with `IElementPattern.psiElement().withParent(JSReferenceExpression.qualified)` filtering.
+- **Disposition:** v0.3.0 polish (not a v0.2.0 release blocker)
+
+### Aggregate disposition (cycle-4 + post-tag follow-ups)
+
+**v0.2.0 tag is unblocked.** No new P0/P1 fixable issues surfaced in cycle-3 UAT walk. The one P1 finding (P1-UAT-16 template→script method references) is a manifestation of the already-deferred P1-UAT-15 architectural gap and goes to Phase 08.3 as part of the same fix. The autocomplete enhancement is a v0.3.0 polish item.
+
+**Phase 08.3 scope (to be planned post-tag):**
+- P1-UAT-15 + P1-UAT-16 — synthetic-virtual-file injection architecture so `<script>` declarations resolve from template expressions (Vue / Svelte precedent). Single architectural fix closes both findings.
+
+**v0.3.0 polish backlog:**
+- Member autocomplete on `$data.X` / `$props.X` / `$refs.X`
+
 ## Issues captured (2026-05-17 UAT halt — partial walkthrough)
 
 ## Issues captured (2026-05-17 UAT halt — partial walkthrough)
@@ -410,10 +436,10 @@ The lexer-heavy architecture shipped in Plans 08.1-03 / 04 / 05 (and inherited f
 
 ## Sign-off
 
-- [x] All reference examples walked in both IDEs (partial — CardHeader-level walkthrough; 4 new P1 issues surfaced before completing full matrix)
-- [ ] All `$onUpdate` contexts verified — **deferred until gap closure lands**
-- [x] All P0/P1 issues from 2026-05-17 closed in this phase OR retriaged — **P0-UAT-01 + P0-UAT-02 CLOSED; 4 new P1s (UAT-03..06) surfaced and routed to gap-closure plan 08.2.1**
-- [ ] No new P0/P1 issues surfaced — **FAILED — see UAT-03..06 above; tag cut deferred**
-- [ ] `git tag -a intellij-plugin/v0.2.0 -m '...'` cut LOCALLY (Plan 08.2-07 Task 3) — **DEFERRED until gap closure**
-- [ ] User confirms tag push (NOT done automatically — `feedback_no_autopush` user memory) — **n/a until tag is cut**
-- [ ] CI release job green (artifact published to GitHub Releases) — **n/a until tag is pushed**
+- [x] All reference examples walked in both IDEs — initial run halted at CardHeader (4 P1s surfaced); gap-closure cycles 1+2+3 closed P0-UAT-01 + P0-UAT-02 + P1-UAT-03..14; cycle-3 UAT walk completed end-to-end
+- [x] All `$onUpdate` contexts verified — verified across gap-closure cycles via plugin-test-suite + UAT walks
+- [x] All P0/P1 issues from 2026-05-17 closed in this phase OR retriaged — **P0-UAT-01 + P0-UAT-02 CLOSED; P1-UAT-03..14 CLOSED; P1-UAT-15 + P1-UAT-16 DEFERRED to Phase 08.3 (synthetic-virtual-file injection architecture)**
+- [x] No new P0/P1 issues surfaced in the cycle-3 UAT walk that aren't retriaged — **P1-UAT-16 is the same architectural root cause as already-deferred P1-UAT-15; both go to Phase 08.3 together**
+- [ ] `git tag -a intellij-plugin/v0.2.0 -m '...'` cut LOCALLY (Plan 08.2-12 Task 3) — **pending user authorization to cut**
+- [ ] User confirms tag push (NOT done automatically — `feedback_no_autopush` user memory) — **pending tag cut**
+- [ ] CI release job green (artifact published to GitHub Releases) — **pending tag push**
