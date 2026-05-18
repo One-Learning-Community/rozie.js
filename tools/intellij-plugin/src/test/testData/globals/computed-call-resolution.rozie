@@ -1,0 +1,6 @@
+<rozie name="ComputedCall">
+<script>
+const d = $com<caret>puted(() => 1);
+</script>
+<template><div></div></template>
+</rozie>

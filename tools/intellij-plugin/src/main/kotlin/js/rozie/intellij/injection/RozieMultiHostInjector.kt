@@ -127,10 +127,46 @@ class RozieMultiHostInjector : MultiHostInjector {
 
     // ---- per-language helpers ---------------------------------------------------
 
+    /**
+     * Inject [range] as JavaScript with the Strategy-B Rozie globals ambient-decl
+     * prefix prepended.
+     *
+     * **Closes (Plan 08.2-16):** P1-UAT-11 (bare `$props` / `$data` / `$slots` /
+     * etc. Ctrl-click no longer leaks to other `.rozie` files via stock JS
+     * project-wide free-identifier search — the synthetic `declare const $props`
+     * in the prepended prefix is found first by the JS resolver) and P1-UAT-12
+     * (`$computed(...)` / `$emit(...)` / `$watch(...)` etc. call sites no longer
+     * flagged as "Unresolved method or function" — the prefix declares each
+     * magic identifier as a function with permissive `any`-typed signatures).
+     *
+     * **Why a prefix and not a project-wide library:** Task 1 investigation
+     * (recorded in `rozie-globals.d.ts`'s leading comment block) confirmed that
+     * `com.intellij.lang.javascript.library.JSPredefinedLibraryProvider` exists
+     * on both IU-242 and IU-253 floors with identical signatures, but its API
+     * is project-wide by design (`getPredefinedLibraries(Project)` with no file
+     * predicate). Registering Rozie globals via that EP would leak `$props` /
+     * `$data` / etc. into every `.js` / `.ts` / `.tsx` file in the user's
+     * project, directly violating Plan 16 Pitfall 2. Vue's plugin uses
+     * `JSImplicitElementProvider` / web-symbols instead for the same reason
+     * (verified — `vuejs.jar`'s plugin.xml has ZERO `predefinedLibrary`
+     * registrations). Strategy B (prefix-on-injection) mitigates Pitfall 2 by
+     * construction: the prefix only appears in injected JS fragments, and
+     * [RozieMultiHostInjector] only fires on [RozieRootBlock] hosts (which
+     * exist only inside `.rozie` files).
+     *
+     * **Cost (T-08.2-37, dispositioned `accept`):** ~500 bytes of ambient
+     * declarations per Rozie JS injection. The JS parser handles thousands of
+     * `declare` statements without measurable slowdown. The coordinate-mapping
+     * invariant is preserved by the platform's standard
+     * [com.intellij.lang.injection.InjectedLanguageManager.injectedToHost]
+     * prefix-length subtraction — Plan 05's [js.rozie.intellij.references
+     * .RoziePropsReference] cross-block resolution continues to work because
+     * the prefix lives in the injected document only, never in host coordinates.
+     */
     private fun injectJs(registrar: MultiHostRegistrar, host: RozieRootBlock, range: TextRange) {
         val js = Language.findLanguageByID("JavaScript") ?: return
         registrar.startInjecting(js)
-            .addPlace(null, null, host, range)
+            .addPlace(ROZIE_GLOBALS_PREFIX, null, host, range)
             .doneInjecting()
     }
 
@@ -203,8 +239,19 @@ class RozieMultiHostInjector : MultiHostInjector {
         range: TextRange,
     ) {
         val js = Language.findLanguageByID("JavaScript") ?: return
+        // Plan 08.2-16 (Strategy B): concatenate the Rozie globals ambient-decl
+        // prefix BEFORE the paren-wrap so the JS parser sees:
+        //   `<globals decls>\n(\n<body>\n)`
+        // The globals declarations are top-level `declare const|function`
+        // statements which parse cleanly at statement position; the paren-wrap
+        // that follows turns the body into a parenthesised expression as Plan 11
+        // intended. Closes P1-UAT-11/12 for all 4 object-literal-shaped block
+        // bodies (PROPS_BODY / DATA_BODY / COMPONENTS_BODY / LISTENERS_BODY)
+        // AND r-for attribute-value injections (Plan 14 routes r-for here).
+        //
+        // See [injectJs] KDoc for the strategy rationale and Pitfall 2 mitigation.
         registrar.startInjecting(js)
-            .addPlace("(\n", "\n)", host, range)
+            .addPlace(ROZIE_GLOBALS_PREFIX + "(\n", "\n)", host, range)
             .doneInjecting()
     }
 
@@ -429,6 +476,36 @@ class RozieMultiHostInjector : MultiHostInjector {
      * nested call expressions inside modifier args at the surface syntax level.
      */
     companion object {
+        /**
+         * Plan 08.2-16 — Strategy B Rozie globals ambient-decl prefix.
+         *
+         * Loaded once at class-load from the bundled
+         * `tools/intellij-plugin/src/main/resources/rozie-globals.d.ts` resource.
+         * Prepended verbatim (plus a trailing newline) to every Rozie JS injection
+         * via [injectJs] and [injectJsAsExpression].
+         *
+         * The file content is 11 `declare const` / `declare function` statements,
+         * one per [js.rozie.intellij.completion.RozieMagicIdentifiers] entry. The
+         * 1:1 correspondence is enforced by
+         * `RozieGlobalsLibraryTest.testAllElevenMagicIdentifiersAreDeclared`.
+         *
+         * If the resource cannot be loaded (should never happen — the file is
+         * shipped in the plugin jar), the prefix degrades to empty string and
+         * Plan 08.2-16's P1-UAT-11/12 closure regresses, but other injection
+         * behaviour (Plans 11/14/15 paren-wrap, Plans 05/13 cross-block
+         * resolution) continues to work normally.
+         *
+         * Cost: ~500 bytes per injection (dispositioned `accept` in Plan 16's
+         * T-08.2-37 threat entry — the JS parser handles thousands of `declare`
+         * statements with no measurable perf impact).
+         */
+        internal val ROZIE_GLOBALS_PREFIX: String = loadGlobalsAsPrefix()
+
+        private fun loadGlobalsAsPrefix(): String =
+            RozieMultiHostInjector::class.java.getResourceAsStream("/rozie-globals.d.ts")
+                ?.bufferedReader()?.use { it.readText() + "\n" }
+                ?: ""
+
         // r-for="…": value captured in group 1. Paren-wrap dispatch.
         private val R_FOR_ATTR: Regex =
             """(?:^|\s)r-for\s*=\s*"([^"]*)"""".toRegex()
