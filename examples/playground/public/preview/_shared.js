@@ -67,16 +67,93 @@ export async function importFromString(code) {
 }
 
 /**
+ * Rewrite `from './Foo'` / `import './Foo'` style relative specifiers in
+ * `code` to point at `blobMap[Foo]` blob: URLs. Used by `importBundleWith`
+ * so the entry module can dynamic-import its compiled sibling modules even
+ * though the entry itself lives at a non-hierarchical `blob:` base URL
+ * (which the HTML spec forbids resolving relative URLs against).
+ *
+ * The regex is scoped to `from ` / `import ` heads so we never touch
+ * unrelated string literals that happen to look like relative paths.
+ * Matches both bare-basename (`'./SortableList'`) and with-extension
+ * (`'./SortableList.js'`, `'./SortableList.svelte'`) forms.
+ *
+ * Pass-through for anything not in the map — so unrelated imports of
+ * `./foo/bar` or relative CSS paths fall through to the existing
+ * stubUnresolvableImports pass (or fail loudly downstream, which is
+ * already the case today).
+ */
+export function rewriteRelativeImports(code, blobMap) {
+  return code.replace(
+    /(\b(?:from|import)\s+)(['"])\.\/([\w-]+)(?:\.[\w]+)?\2/g,
+    (m, head, q, name) => (blobMap[name] ? `${head}${q}${blobMap[name]}${q}` : m),
+  );
+}
+
+/**
+ * Orchestrates the blob-URL bundle dance for a multi-file snippet:
+ *   1. Transform every sibling via `transformFn` (per-target pipeline:
+ *      esbuild tsx/ts, @vue/compiler-sfc, svelte.compile, etc.).
+ *   2. Mint a blob: URL per sibling and remember it by basename.
+ *   3. Rewrite the entry's `./<basename>` relative specifiers to point at
+ *      those sibling blob URLs.
+ *   4. Transform the rewritten entry via the same `transformFn`.
+ *   5. Mint the entry blob URL, dynamic-import it, return the module.
+ *   6. Revoke every blob URL on a microtask so the dynamic-import resolves
+ *      before garbage collection.
+ *
+ * Empty `siblingsCode` (single-file snippets) collapses to "transform entry,
+ * import, return" — i.e. equivalent to `importFromString(transformFn(entry))`.
+ *
+ * `siblingsCode` is `{ basename: rozieCompiledSource }` — the same shape the
+ * playground's `compileBundleRuntime` returns. The harness's `transformFn`
+ * lowers each into target-executable JS (or for Vue, an SFC → script-and-style
+ * pair where styles are document.head-injected as a side-effect inside
+ * `transformFn` itself).
+ *
+ * @param {(src: string) => Promise<string>} transformFn
+ * @param {string} entryCode
+ * @param {Record<string, string>} siblingsCode
+ * @returns {Promise<any>} the imported entry module
+ */
+export async function importBundleWith(transformFn, entryCode, siblingsCode) {
+  const siblingBlobs = {};
+  const allBlobUrls = [];
+  try {
+    for (const [name, src] of Object.entries(siblingsCode || {})) {
+      const transformedJs = await transformFn(src);
+      const blob = new Blob([transformedJs], { type: 'text/javascript' });
+      const url = URL.createObjectURL(blob);
+      siblingBlobs[name] = url;
+      allBlobUrls.push(url);
+    }
+    const rewritten = rewriteRelativeImports(entryCode, siblingBlobs);
+    const entryJs = await transformFn(rewritten);
+    const entryBlob = new Blob([entryJs], { type: 'text/javascript' });
+    const entryUrl = URL.createObjectURL(entryBlob);
+    allBlobUrls.push(entryUrl);
+    return await import(/* @vite-ignore */ entryUrl);
+  } finally {
+    // Revoke after a tick so any still-resolving dynamic imports complete.
+    setTimeout(() => {
+      for (const u of allBlobUrls) URL.revokeObjectURL(u);
+    }, 0);
+  }
+}
+
+/**
  * Standard harness boot — wires the render message handler, signals ready,
  * surfaces errors back to the parent.
  *
- * The render fn receives the full payload `{ code, css }`. Targets that emit
- * scoped CSS as part of the compiled code (Vue SFC, Svelte css:'injected',
- * Angular @Component({styles}), Solid <style>, Lit static styles) can ignore
- * `css`. React emits CSS to a separate sidecar — its harness reads `css` and
- * injects it via `setSidecarCss()`.
+ * The render fn receives the full payload `{ code, css, siblings }`.
+ *   - `code` is the compiled entry source
+ *   - `css` is the React-sidecar CSS string (other targets inline CSS into
+ *     the component module and ignore this field)
+ *   - `siblings` is the basename → compiled-source map for multi-file bundle
+ *     snippets (empty `{}` for single-file snippets); harnesses pass it
+ *     straight to `importBundleWith(transformFn, code, siblings)`.
  *
- * @param {(payload: { code: string, css: string }) => Promise<void>} onRender
+ * @param {(payload: { code: string, css: string, siblings: Record<string, string> }) => Promise<void>} onRender
  */
 export function bootHarness(onRender) {
   let renderToken = 0;
@@ -85,7 +162,11 @@ export function bootHarness(onRender) {
     if (!data || data.type !== 'render') return;
     const token = ++renderToken;
     try {
-      await onRender({ code: data.code, css: data.css ?? '' });
+      await onRender({
+        code: data.code,
+        css: data.css ?? '',
+        siblings: data.siblings ?? {},
+      });
       // Only confirm if a newer render hasn't superseded us.
       if (token === renderToken) {
         parent.postMessage({ type: 'rendered' }, '*');
