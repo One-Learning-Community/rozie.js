@@ -52,28 +52,27 @@ class RozieMultiHostInjector : MultiHostInjector {
         while (i < tokens.size) {
             val tok = tokens[i]
             when (tok.type) {
-                // SCRIPT_BODY + LISTENERS_BODY stay UNWRAPPED — see injectJs KDoc.
+                // SCRIPT_BODY stays UNWRAPPED — see injectJs KDoc.
                 //   - SCRIPT_BODY is a statement list (function decls, const decls, lifecycle
                 //     calls); wrapping in parens would parse it as a single expression and
                 //     break top-level declarations.
-                //   - LISTENERS_BODY is an object literal at top level but UAT-CHECKLIST-v0.2.0
-                //     (lines 165–171) did NOT name <listeners> as noisy, and a populated
-                //     listeners block can legitimately read as a statement list in some
-                //     authoring patterns. Conservative stance for v0.2.0 — revisit in Plan
-                //     08.2-12 human UAT if needed (planner discretion per the plan's
-                //     <interfaces> LISTENERS_BODY decision section).
                 RozieTokenTypes.SCRIPT_BODY,
-                RozieTokenTypes.LISTENERS_BODY,
                 -> { injectJs(registrar, host, tok.range); i++ }
 
-                // PROPS_BODY / DATA_BODY / COMPONENTS_BODY are by-design object literals.
-                // Paren-wrap via addPlace prefix=`(\n` + suffix=`\n)` so the JS parser
-                // sees `({ key: value })` (an expression) instead of `{ key: value }`
-                // (a label-statement) — closes P1-UAT-04 at the injection layer.
+                // PROPS_BODY / DATA_BODY / COMPONENTS_BODY / LISTENERS_BODY are by-design
+                // object literals. Paren-wrap via addPlace prefix=`(\n` + suffix=`\n)`
+                // so the JS parser sees `({ key: value })` (an expression) instead of
+                // `{ key: value }` (a label-statement). Closes P1-UAT-04 (Plan 08.2-11)
+                // + P1-UAT-10 (Plan 08.2-15 — added LISTENERS_BODY to the wrap set after
+                // UAT re-run #3 confirmed the noise surfaces in populated <listeners>
+                // blocks; Plan 11 had left LISTENERS_BODY on the unwrapped arm as a
+                // conservative stance and explicitly anticipated the planner discretion
+                // to extend the wrap set in a follow-up plan).
                 // See injectJsAsExpression KDoc for full rationale + Vue/Svelte precedent.
                 RozieTokenTypes.PROPS_BODY,
                 RozieTokenTypes.DATA_BODY,
                 RozieTokenTypes.COMPONENTS_BODY,
+                RozieTokenTypes.LISTENERS_BODY,
                 -> { injectJsAsExpression(registrar, host, tok.range); i++ }
 
                 RozieTokenTypes.TEMPLATE_BODY,
@@ -158,10 +157,14 @@ class RozieMultiHostInjector : MultiHostInjector {
      * with JSProperty children — the JavaScript inspector's statement-position
      * heuristics see a valid expression and emit no diagnostics.
      *
-     * **Closes:** P1-UAT-04 (UAT-CHECKLIST-v0.2.0.md lines 165–171) — the
+     * **Closes:** P1-UAT-04 (Plan 08.2-11 — UAT-CHECKLIST-v0.2.0.md lines 165–171)
+     * + P1-UAT-10 (Plan 08.2-15 — UAT-CHECKLIST-v0.2.0.md lines 286–291). The
      * "Statement expected" / "Component expected" / JSLabeledStatement warning
-     * family on object-literal-shaped block bodies (<components> / <props> /
-     * <data>). Implementation per Plan 08.2-11.
+     * family on object-literal-shaped block bodies. Plan 11 shipped paren-wrap for
+     * <components> / <props> / <data>; Plan 15 extends it to <listeners> after UAT
+     * re-run #3 confirmed the same noise surfaces on populated <listeners> blocks
+     * (Dropdown.rozie, SearchInput.rozie). All 4 object-literal-shaped block bodies
+     * now route through this helper.
      *
      * **Why `\n` on both sides:** the newline padding ensures the prefix/suffix
      * doesn't collide with comments or unusual string spans in the user's body.

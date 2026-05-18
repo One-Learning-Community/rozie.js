@@ -1,0 +1,11 @@
+<rozie name="ObjectLiteralListeners">
+<listeners>
+{
+  click: { when: 'true', handler: '() => {}' },
+  hover: { when: 'true', handler: '() => {}' }
+}
+</listeners>
+<template>
+  <div>listeners-only fixture</div>
+</template>
+</rozie>
