@@ -8,10 +8,6 @@ interface RozieTriggerSlotCtx {
   toggle: unknown;
 }
 
-interface RozieDefaultSlotCtx {
-  close: unknown;
-}
-
 @customElement('rozie-dropdown')
 export default class Dropdown extends SignalWatcher(LitElement) {
   static styles = css`

@@ -58,6 +58,7 @@ import { emitSlotFiller, type EmitSlotFillerCtx } from './emitSlotFiller.js';
 // emitTemplateAttribute branch (re-exported from emitDecorator.toKebabCase
 // to guarantee byte-equal CustomEvent name parity with the producer).
 import { resolveLitSetterText } from './resolveLitSetterText.js';
+import { collectMethodNamesFromIR } from './methodNames.js';
 
 export interface EmitTemplateOpts {
   lit: LitImportCollector;
@@ -1128,41 +1129,7 @@ function emitSlot(
   return `<slot${slotName}${dataStr}${eventStr}></slot>`;
 }
 
-function collectMethodNamesFromIR(ir: IRComponent): Set<string> {
-  const names = new Set<string>();
-  const reserved = new Set<string>([
-    ...ir.state.map((s) => s.name),
-    ...ir.computed.map((c) => c.name),
-    ...ir.refs.map((r) => r.name),
-    ...ir.props.map((p) => p.name),
-  ]);
-  for (const stmt of ir.setupBody.scriptProgram.program.body) {
-    if (bt.isVariableDeclaration(stmt)) {
-      for (const decl of stmt.declarations) {
-        if (bt.isIdentifier(decl.id) && !reserved.has(decl.id.name)) {
-          if (
-            decl.init &&
-            bt.isCallExpression(decl.init) &&
-            bt.isIdentifier(decl.init.callee) &&
-            decl.init.callee.name === '$computed'
-          ) {
-            continue;
-          }
-          if (
-            decl.init &&
-            (bt.isArrowFunctionExpression(decl.init) ||
-              bt.isFunctionExpression(decl.init))
-          ) {
-            names.add(decl.id.name);
-          }
-        }
-      }
-    } else if (bt.isFunctionDeclaration(stmt) && stmt.id && !reserved.has(stmt.id.name)) {
-      names.add(stmt.id.name);
-    }
-  }
-  return names;
-}
+// collectMethodNamesFromIR moved to ./methodNames.ts so emitSlotDecl can reuse it (WR-01).
 
 function emitFragment(
   node: TemplateFragmentIR,

@@ -24,12 +24,26 @@
  *
  * @experimental — shape may change before v1.0
  */
-import type { IRComponent, SlotDecl } from '../../../../core/src/ir/types.js';
+import * as bt from '@babel/types';
+import type { IRComponent, SlotDecl, ParamDecl } from '../../../../core/src/ir/types.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import type { LitDecoratorImportCollector } from '../rewrite/collectLitImports.js';
+import { collectMethodNamesFromIR } from './methodNames.js';
 
 export interface EmitSlotDeclOpts {
   decorators: LitDecoratorImportCollector;
+}
+
+// WR-01 (Phase 07.4 review): a slot param resolves through dispatchEvent
+// (D-LIT-17 / D-LIT-12) — and never through the data-typed
+// `observeRozieSlotCtx` ctx field — when its source expression is a literal
+// function or a bare reference to a known method. Mirrors the producer-side
+// detection in buildEventParts() / emitSlot() in emitTemplate.ts.
+function isFunctionTypedParam(p: ParamDecl, methodNameSet: Set<string>): boolean {
+  const expr = p.valueExpression;
+  if (bt.isArrowFunctionExpression(expr) || bt.isFunctionExpression(expr)) return true;
+  if (bt.isIdentifier(expr) && methodNameSet.has(expr.name)) return true;
+  return false;
 }
 
 export interface EmitSlotDeclResult {
@@ -78,6 +92,7 @@ function emitOneSlot(
   hostListenerWiring: string[],
   slotChangeWiringLines: string[],
   preSeedLines: string[],
+  methodNameSet: Set<string>,
 ): string {
   const suffix = slotFieldSuffix(slot.name);
   const stateField = `  @state() private _hasSlot${suffix} = false;`;
@@ -124,11 +139,23 @@ function emitOneSlot(
     );
   }
 
-  // ctxInterfaces — emit if there are data-typed slot params.
+  // ctxInterfaces — emit only when at least one slot param is data-typed.
+  // WR-01 (Phase 07.4 review): function-typed params resolve through
+  // dispatchEvent (D-LIT-17), not through the `observeRozieSlotCtx` ctx
+  // field, so an interface listing only function-typed params is dead text
+  // in the producer file (nothing references `Rozie<X>SlotCtx` from inside
+  // the same emit — consumers declare their own inline `{ ... }` shape via
+  // `c as { ... }` in `observeRozieSlotCtx`). Drop the interface entirely
+  // when every param is function-typed; otherwise emit it with ALL params
+  // (function-typed included) so the interface still documents the full
+  // surface for IDE introspection of mixed-shape slots.
   if (slot.params.length > 0) {
-    const ifaceName = `Rozie${suffix}SlotCtx`;
-    const fields = slot.params.map((p) => `  ${p.name}: unknown;`).join('\n');
-    ctxInterfaces.push(`interface ${ifaceName} {\n${fields}\n}`);
+    const anyDataTyped = slot.params.some((p) => !isFunctionTypedParam(p, methodNameSet));
+    if (anyDataTyped) {
+      const ifaceName = `Rozie${suffix}SlotCtx`;
+      const fields = slot.params.map((p) => `  ${p.name}: unknown;`).join('\n');
+      ctxInterfaces.push(`interface ${ifaceName} {\n${fields}\n}`);
+    }
   }
 
   return `${stateField}\n${queryField}`;
@@ -158,6 +185,7 @@ export function emitSlotDecl(
   const hostListenerWiring: string[] = [];
   const slotChangeWiringLines: string[] = [];
   const preSeedLinesArr: string[] = [];
+  const methodNameSet = collectMethodNamesFromIR(ir);
 
   const fields = slots
     .map((slot) =>
@@ -167,6 +195,7 @@ export function emitSlotDecl(
         hostListenerWiring,
         slotChangeWiringLines,
         preSeedLinesArr,
+        methodNameSet,
       ),
     )
     .join('\n');

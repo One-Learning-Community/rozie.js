@@ -3,18 +3,6 @@ import { customElement, property, query, queryAssignedElements, state } from 'li
 import { SignalWatcher } from '@lit-labs/preact-signals';
 import { createLitControllableProperty, injectGlobalStyles } from '@rozie/runtime-lit';
 
-interface RozieHeaderSlotCtx {
-  close: unknown;
-}
-
-interface RozieDefaultSlotCtx {
-  close: unknown;
-}
-
-interface RozieFooterSlotCtx {
-  close: unknown;
-}
-
 @customElement('rozie-modal')
 export default class Modal extends SignalWatcher(LitElement) {
   static styles = css`
