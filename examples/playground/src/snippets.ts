@@ -122,6 +122,12 @@ const BUNDLE_DECLS: readonly BundleDecl[] = [
     entryGlobPath: '../../UppyDemo.rozie',
     dependencyGlobPaths: ['../../Uppy.rozie'],
   },
+  {
+    key: 'bundle/FullCalendarDemo',
+    label: 'bundle/FullCalendarDemo',
+    entryGlobPath: '../../FullCalendarDemo.rozie',
+    dependencyGlobPaths: ['../../FullCalendar.rozie'],
+  },
 ];
 
 function bundleSnippetFromDecl(decl: BundleDecl): Snippet | null {

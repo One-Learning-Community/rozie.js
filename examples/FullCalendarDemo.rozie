@@ -1,0 +1,391 @@
+<!--
+  FullCalendarDemo.rozie — companion consumer for FullCalendar.
+
+  Single source compiles to six per-framework consumer recipes.
+
+  Exercises:
+    - SCALAR string r-model:view consumer-side two-way bind for the
+      active view name — both consumer button clicks AND user clicks
+      on FullCalendar's own toolbar flow into the bound state
+    - Date-typed event objects (Date instances, not date strings) —
+      different from any prior demo's scalar/string payloads
+    - Multi-event handler chain: event-click + date-click + event-drop,
+      each with a structured payload
+    - $computed deriving a sorted/formatted event list from raw $data
+    - r-for over events in the sidebar (outside any wrapper slot —
+      no foreign-slot accessor concern)
+    - Object spread in handler bodies (adding events)
+    - Template literals interpolating runtime values for the event log
+-->
+
+<rozie name="FullCalendarDemo">
+
+<components>
+{
+  FullCalendar: './FullCalendar.rozie',
+}
+</components>
+
+<data>
+{
+  view: 'dayGridMonth',
+  events: [],
+  nextId: 1,
+  log: [],
+  logNextId: 1,
+  newTitle: '',
+  newDate: '',
+}
+</data>
+
+<script>
+const sampleEvents = () => {
+  // Seed with three events anchored to "today" — the demo stays
+  // self-contained without external date math.
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const day = (offset) => {
+    const d = new Date(today)
+    d.setDate(d.getDate() + offset)
+    return d.toISOString().slice(0, 10)
+  }
+  return [
+    { id: 'seed-1', title: 'Standup',  start: day(0), color: '#22c55e' },
+    { id: 'seed-2', title: 'Demo',     start: day(2) },
+    { id: 'seed-3', title: 'Sprint review', start: day(4), end: day(5) },
+  ]
+}
+
+$onMount(() => {
+  $data.events = sampleEvents()
+  $data.nextId = 4
+  return undefined
+})
+
+const appendLog = (event, detail) => {
+  $data.log = [
+    { id: $data.logNextId, ts: new Date().toLocaleTimeString(), event, detail },
+    ...$data.log,
+  ].slice(0, 12)
+  $data.logNextId = $data.logNextId + 1
+}
+
+const onEventClick = (e) => appendLog('event-click', `${e?.event?.title ?? '?'} (id=${e?.event?.id ?? '?'})`)
+const onDateClick  = (d) => appendLog('date-click',  `${d?.dateStr ?? '?'} ${d?.allDay ? '(all day)' : ''}`.trim())
+const onEventDrop  = (e) => {
+  appendLog('event-drop', `${e?.event?.title ?? '?'} → ${e?.event?.start?.toISOString?.().slice(0, 10) ?? '?'}`)
+  // Mirror the drop into our $data so the bound list re-orders accordingly.
+  $data.events = $data.events.map((src) => {
+    if (src.id !== e?.event?.id) return src
+    return { ...src, start: e.event.start, end: e.event.end }
+  })
+}
+
+const addEvent = () => {
+  const title = $data.newTitle.trim()
+  const date  = $data.newDate
+  if (!title || !date) return
+  // Object spread + computed id — exercises both patterns end-to-end.
+  $data.events = [
+    ...$data.events,
+    { id: `evt-${$data.nextId}`, title, start: date },
+  ]
+  $data.nextId = $data.nextId + 1
+  $data.newTitle = ''
+  $data.newDate = ''
+}
+
+const removeEvent = (id) => {
+  $data.events = $data.events.filter((e) => e.id !== id)
+}
+
+const clearAll = () => { $data.events = [] }
+const reset    = () => {
+  $data.events = sampleEvents()
+  $data.nextId = 4
+}
+
+const setView = (v) => { $data.view = v }
+
+const sortedEvents = $computed(() => {
+  return [...$data.events].sort((a, b) => {
+    const sa = typeof a.start === 'string' ? a.start : a.start?.toISOString?.() ?? ''
+    const sb = typeof b.start === 'string' ? b.start : b.start?.toISOString?.() ?? ''
+    return sa.localeCompare(sb)
+  })
+})
+
+const formatStart = (e) => {
+  const s = e.start
+  if (!s) return '(no date)'
+  if (typeof s === 'string') return s
+  return s.toISOString().slice(0, 10)
+}
+</script>
+
+<template>
+<div class="fc-demo">
+  <header>
+    <h3>Calendar bound to component state</h3>
+    <p class="hint">View name is two-way bound — clicking the calendar's own toolbar OR the pills below both update <code>$data.view</code>. Events list reflects the bound array; drag an event to see eventDrop sync back.</p>
+  </header>
+
+  <div class="view-bar">
+    <span class="bar-label">View</span>
+    <button type="button" :class="{ active: $data.view === 'dayGridMonth' }"   @click="setView('dayGridMonth')">Month</button>
+    <button type="button" :class="{ active: $data.view === 'timeGridWeek' }"   @click="setView('timeGridWeek')">Week</button>
+    <button type="button" :class="{ active: $data.view === 'timeGridDay' }"    @click="setView('timeGridDay')">Day</button>
+    <span class="bar-value">current: <code>{{ $data.view }}</code></span>
+  </div>
+
+  <div class="calendar-wrap">
+    <FullCalendar
+      r-model:view="$data.view"
+      :events="$data.events"
+      :height="420"
+      @event-click="onEventClick"
+      @date-click="onDateClick"
+      @event-drop="onEventDrop"
+    />
+  </div>
+
+  <div class="grid">
+    <section class="add-pane">
+      <h4>Add event</h4>
+      <form @submit.prevent="addEvent" class="add-form">
+        <input type="text" r-model="$data.newTitle" placeholder="Title…" />
+        <input type="date" r-model="$data.newDate" />
+        <button type="submit" :disabled="!$data.newTitle.trim() || !$data.newDate">Add</button>
+      </form>
+
+      <h4>Events ({{ $data.events.length }})</h4>
+      <ol r-if="$data.events.length > 0" class="event-list">
+        <li r-for="e in sortedEvents" :key="e.id">
+          <code class="event-date">{{ formatStart(e) }}</code>
+          <span class="event-title">{{ e.title }}</span>
+          <button type="button" class="remove" @click="removeEvent(e.id)" aria-label="Remove">×</button>
+        </li>
+      </ol>
+      <p r-else class="empty">No events yet.</p>
+
+      <div class="bulk">
+        <button type="button" @click="clearAll" :disabled="$data.events.length === 0">Clear all</button>
+        <button type="button" @click="reset">Reset to samples</button>
+      </div>
+    </section>
+
+    <aside class="log-pane">
+      <h4>Event log ({{ $data.log.length }})</h4>
+      <ol r-if="$data.log.length > 0" class="log-list">
+        <li r-for="entry in $data.log" :key="entry.id" :class="'log-' + entry.event">
+          <code class="log-ts">{{ entry.ts }}</code>
+          <code class="log-event">{{ entry.event }}</code>
+          <span class="log-detail">{{ entry.detail }}</span>
+        </li>
+      </ol>
+      <p r-else class="empty">Click a date or event in the calendar.</p>
+    </aside>
+  </div>
+</div>
+</template>
+
+<style>
+.fc-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  max-width: 1080px;
+}
+
+header h3 { margin: 0 0 0.25rem; font-size: 1.125rem; }
+header .hint { margin: 0 0 0.75rem; color: rgba(0, 0, 0, 0.55); font-size: 0.875rem; }
+header code { background: rgba(0, 0, 0, 0.04); padding: 0.0625rem 0.25rem; border-radius: 2px; font-size: 0.85em; }
+
+.view-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.875rem;
+}
+.bar-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: rgba(0, 0, 0, 0.55);
+  margin-right: 0.25rem;
+}
+.view-bar button {
+  padding: 0.25rem 0.625rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8125rem;
+}
+.view-bar button.active {
+  background: #1a1a1a;
+  color: white;
+  border-color: #1a1a1a;
+}
+.bar-value {
+  margin-left: auto;
+  color: rgba(0, 0, 0, 0.55);
+  font-size: 0.8125rem;
+}
+.bar-value code { background: rgba(0, 0, 0, 0.04); padding: 0.0625rem 0.25rem; border-radius: 2px; }
+
+.calendar-wrap {
+  margin-bottom: 1rem;
+  padding: 0.5rem;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 6px;
+  background: white;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.add-pane, .log-pane { min-width: 0; }
+
+.add-pane h4, .log-pane h4 {
+  margin: 0 0 0.375rem;
+  font-size: 0.75rem;
+  color: rgba(0, 0, 0, 0.55);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.add-pane h4 + .add-form { margin-bottom: 0.75rem; }
+.add-pane h4 + h4 { margin-top: 0.75rem; }
+
+.add-form {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 0.375rem;
+}
+.add-form input {
+  padding: 0.375rem 0.5rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+  font: inherit;
+  font-size: 0.875rem;
+}
+.add-form button {
+  padding: 0.375rem 0.875rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.875rem;
+}
+.add-form button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.event-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 6px;
+  overflow: hidden;
+  font-size: 0.8125rem;
+}
+.event-list li {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.375rem 0.625rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+}
+.event-list li:last-child { border-bottom: none; }
+.event-date {
+  font-family: ui-monospace, monospace;
+  font-size: 0.75rem;
+  color: rgba(0, 0, 0, 0.55);
+}
+.event-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.remove {
+  background: transparent;
+  border: none;
+  color: rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+  font-size: 1.125rem;
+  line-height: 1;
+  padding: 0 0.25rem;
+}
+.remove:hover { color: #c00; }
+
+.bulk {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.625rem;
+}
+.bulk button {
+  padding: 0.25rem 0.625rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8125rem;
+  color: rgba(0, 0, 0, 0.65);
+}
+.bulk button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.log-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 6px;
+  overflow: hidden;
+  max-height: 320px;
+  overflow-y: auto;
+  font-size: 0.75rem;
+}
+.log-list li {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  gap: 0.5rem;
+  align-items: baseline;
+  padding: 0.25rem 0.5rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+}
+.log-list li:last-child { border-bottom: none; }
+.log-list li.log-event-click { background: rgba(59, 130, 246, 0.05); }
+.log-list li.log-event-drop  { background: rgba(34, 197, 94, 0.05); }
+
+.log-ts {
+  font-family: ui-monospace, monospace;
+  color: rgba(0, 0, 0, 0.4);
+  font-size: 0.7rem;
+}
+.log-event {
+  font-family: ui-monospace, monospace;
+  color: rgba(0, 0, 0, 0.75);
+  font-weight: 500;
+}
+.log-detail {
+  color: rgba(0, 0, 0, 0.55);
+  word-break: break-word;
+}
+
+.empty {
+  margin: 0;
+  padding: 0.625rem;
+  color: rgba(0, 0, 0, 0.4);
+  font-style: italic;
+  text-align: center;
+  border: 1px dashed rgba(0, 0, 0, 0.1);
+  border-radius: 6px;
+  font-size: 0.875rem;
+}
+</style>
+
+</rozie>
