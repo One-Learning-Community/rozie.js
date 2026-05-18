@@ -432,6 +432,66 @@ class RozieInjectionTest : BasePlatformTestCase() {
         )
     }
 
+    // === Plan 08.2-18: Object-literal-shape attribute values paren-wrapped ===
+    //
+    // P1-UAT-14 closure: directive attribute values whose trimmed value matches
+    // `^\{.*\}$` (the canonical Vue-style `:class="{ k: v }"` / `:style="{ k: v }"`
+    // shape) are routed through Plan 11's `injectJsAsExpression` paren-wrap helper
+    // instead of the unwrapped `injectJs` path Plan 14 shipped. The JS parser
+    // then sees `(\n{ hovering: $data.hovering }\n)` — a parenthesised
+    // expression containing a JSObjectLiteralExpression — instead of a
+    // JSLabeledStatement (label `hovering:` + dead-code block `{ $data.hovering }`).
+    //
+    // The fixture mirrors examples/Counter.rozie line 44's
+    // `:class="{ hovering: $data.hovering }"` shape and includes a SECOND
+    // object-literal directive value (`:style="{ color: $data.color }"`) to pin
+    // multi-injection regression — one match must not accidentally suppress the
+    // second (the same property Plan 14's testColonBindExpressionIsJsInjected
+    // exercises on single-expression values).
+
+    fun testClassBindObjectLiteralParenWrapped() {
+        val injectedFile = configureAndGetInjectedJs(
+            "class-bind-object-literal.rozie",
+            "hovering: \$data.hovering",
+        )
+        // With paren-wrap: ( { hovering: $data.hovering } ) parses as a
+        // JSObjectLiteralExpression containing a JSProperty `hovering`. Without
+        // paren-wrap: the value parses at statement position as a
+        // JSLabeledStatement (label `hovering:`) and
+        // PsiTreeUtil.findChildOfType(file, JSObjectLiteralExpression) would
+        // return null.
+        val objectLiteral = PsiTreeUtil.findChildOfType(
+            injectedFile,
+            JSObjectLiteralExpression::class.java,
+        )
+        assertNotNull(
+            "Expected JSObjectLiteralExpression under paren-wrapped class-bind value; " +
+                "without paren-wrap the JS parser produces JSLabeledStatement. " +
+                "Injected text: ${injectedFile.text}",
+            objectLiteral,
+        )
+        // Assert the object literal contains a JSProperty whose name is `hovering`.
+        val properties = PsiTreeUtil.findChildrenOfType(injectedFile, JSProperty::class.java)
+        assertTrue(
+            "Expected JSProperty 'hovering' inside paren-wrapped class-bind value; " +
+                "found: ${properties.map { it.name }}",
+            properties.any { it.name == "hovering" },
+        )
+        // Defence-in-depth: assert ZERO JSLabeledStatement nodes (unwrapped form
+        // would have produced these — their absence confirms paren-wrap took
+        // effect for the colon-bind branch).
+        val labeled = PsiTreeUtil.findChildrenOfType(
+            injectedFile,
+            JSLabeledStatement::class.java,
+        )
+        assertTrue(
+            "Expected ZERO JSLabeledStatement under paren-wrapped class-bind value; " +
+                "presence indicates the isObjectLiteralShape dispatch did not take effect. " +
+                "Labels found: ${labeled.map { it.label }}",
+            labeled.isEmpty(),
+        )
+    }
+
     // === Helpers ===
 
     /**
