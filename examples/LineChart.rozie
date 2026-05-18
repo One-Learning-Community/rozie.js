@@ -1,0 +1,109 @@
+<!--
+  LineChart.rozie — data-bound port of Chart.js (chartjs/Chart.js).
+
+  Chart.js has wrappers in every framework (react-chartjs-2, vue-chartjs,
+  ng2-charts, svelte-chartjs, …) — each one a 200-2000 LOC project that
+  mostly exists to shuttle props into a `new Chart()` call and forward
+  events out. Five maintenance burdens, ONE Rozie source.
+
+  Usage:
+
+    <LineChart :data="$data.chartData" :options="$data.chartOpts" />
+
+  Where `data` matches Chart.js's
+  `{ labels: string[], datasets: [{ label, data, ... }] }` shape. Pass
+  options for axis/tooltip/legend/scale tweaks; Chart.js's defaults are
+  used for everything else.
+
+  Why this is a worthwhile demo:
+    - One-way ARRAY-prop reactivity at scale — Chart.js's data prop is a
+      nested object with arrays inside; reconciling that requires the
+      `chart.update()` call after mutating `chart.data.*` in place.
+    - Engine that paints to a <canvas> the framework never touches —
+      simpler DOM-ownership story than SortableJS or Leaflet, harder
+      reactivity story because the prop is deeply nested.
+    - $watch with deep-ish reconciliation: when labels OR any dataset's
+      data array changes, we mutate the live chart.data and call update,
+      avoiding an expensive full re-mount.
+-->
+
+<rozie name="LineChart">
+
+<props>
+{
+  data:    { type: Object,  default: () => ({ labels: [], datasets: [] }) },
+  options: { type: Object,  default: () => ({}) },
+  type:    { type: String,  default: 'line' },
+  height:  { type: Number,  default: 240 },
+}
+</props>
+
+<script>
+import { Chart, registerables } from 'chart.js'
+
+// Chart.js v3+ ships with no controllers/elements/scales pre-registered;
+// the consumer has to opt in. registerables is the "kitchen sink" bundle.
+Chart.register(...registerables)
+
+let instance = null
+
+const buildConfig = () => ({
+  type: $props.type,
+  data: $props.data,
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: { duration: 250 },
+    ...$props.options,
+  },
+})
+
+$onMount(() => {
+  instance = new Chart($refs.canvasEl, buildConfig())
+  return () => instance?.destroy()
+})
+
+// Reconcile prop changes. Mutating chart.data in place and calling update()
+// is the Chart.js-supported runtime path — re-creating the Chart instance
+// on every data tick would flicker and leak.
+$watch(() => $props.data, (v) => {
+  if (!instance) return
+  instance.data = v
+  instance.update()
+})
+
+$watch(() => $props.options, (v) => {
+  if (!instance) return
+  instance.options = { ...instance.options, ...v }
+  instance.update()
+})
+
+// Chart.js doesn't expose a "change type at runtime" path that's stable
+// across versions, so we re-create the instance when type changes. Rare
+// enough to be acceptable.
+$watch(() => $props.type, () => {
+  if (!instance) return
+  instance.destroy()
+  instance = new Chart($refs.canvasEl, buildConfig())
+})
+</script>
+
+<template>
+<div class="rozie-linechart" :style="{ height: $props.height + 'px' }">
+  <canvas ref="canvasEl" />
+</div>
+</template>
+
+<style>
+.rozie-linechart {
+  position: relative;
+  width: 100%;
+}
+.rozie-linechart canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+</style>
+
+</rozie>
