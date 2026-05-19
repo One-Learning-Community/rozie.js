@@ -52,7 +52,8 @@ const sampleEvents = () => {
   return [
     { id: 'seed-1', title: 'Standup',  start: day(0), color: '#22c55e' },
     { id: 'seed-2', title: 'Demo',     start: day(2) },
-    { id: 'seed-3', title: 'Sprint review', start: day(4), end: day(5) },
+    { id: 'seed-3', title: 'Sprint review', start: day(4), end: day(6) },
+    { id: 'seed-4', title: 'Past Event', start: day(-2) },
   ]
 }
 
@@ -191,19 +192,20 @@ const formatStart = (e) => {
         <button type="button" @click="reset">Reset to samples</button>
       </div>
     </section>
-
-    <aside class="log-pane">
-      <h4>Event log ({{ $data.log.length }})</h4>
-      <ol r-if="$data.log.length > 0" class="log-list">
-        <li r-for="entry in $data.log" :key="entry.id" :class="'log-' + entry.event">
-          <code class="log-ts">{{ entry.ts }}</code>
-          <code class="log-event">{{ entry.event }}</code>
-          <span class="log-detail">{{ entry.detail }}</span>
-        </li>
-      </ol>
-      <p r-else class="empty">Click a date or event in the calendar.</p>
-    </aside>
   </div>
+
+  <aside class="log-pane">
+    <h4>Event log ({{ $data.log.length }})</h4>
+    <ol r-if="$data.log.length > 0" class="log-list">
+      <li r-for="entry in $data.log" :key="entry.id" :class="'log-' + entry.event">
+        <code class="log-ts">{{ entry.ts }}</code>
+        <code class="log-event">{{ entry.event }}</code>
+        <span class="log-detail">{{ entry.detail }}</span>
+      </li>
+    </ol>
+    <p r-else class="empty">Click a date or event in the calendar.</p>
+  </aside>
+
 </div>
 </template>
 
@@ -272,6 +274,10 @@ header code { background: rgba(0, 0, 0, 0.04); padding: 0.0625rem 0.25rem; borde
   grid-template-columns: 1fr 1fr;
   gap: 1.5rem;
   align-items: start;
+}
+
+.log-pane {
+  margin-top: 1.25rem
 }
 
 .add-pane, .log-pane { min-width: 0; }

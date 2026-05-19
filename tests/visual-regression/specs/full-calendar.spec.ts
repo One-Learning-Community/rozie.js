@@ -71,7 +71,17 @@ const KNOWN_FAILING: ReadonlySet<typeof TARGETS[number]> = new Set<
   typeof TARGETS[number]
 >();
 
-const EXPECTED_TITLES = ['Standup', 'Demo', 'Sprint review'];
+// Seed event titles from FullCalendarDemo.rozie's `sampleEvents()`. Rendered
+// text carries a trailing random emoji per the demo's `<span>{{ title }}
+// {{ randomEmoji() }}</span>` template, so we match on the title PREFIX.
+const EXPECTED_TITLES = ['Standup', 'Demo', 'Sprint review', 'Past Event'];
+
+// Multi-day events render once per occupied cell in `dayGridMonth`, so the
+// rendered element count is >= seed count (Sprint review spans 2 cells).
+// Past Event is also subject to month-boundary cropping when day(-2) lands
+// in the previous month. Floor at 3 — the minimum that proves the portal
+// scope param actually reached the engine.
+const MIN_RENDERED_TITLES = 3;
 
 for (const target of TARGETS) {
   const built = existsSync(
@@ -116,14 +126,42 @@ for (const target of TARGETS) {
     // class name was the original assertion before the React target's
     // CSS-Modules-by-default landed.
     const titles = mount.locator('[class*="fc-event-title"]');
-    await expect(titles).toHaveCount(EXPECTED_TITLES.length, { timeout: 5_000 });
-
-    // Spot-check that the scope param survives the portal mount — at least
-    // one title text must match the seeded data. Per-title order varies
-    // by view (dayGridMonth orders by date) so we collect all rendered
-    // titles and assert set-equality.
+    // At least MIN_RENDERED_TITLES elements must materialize. Multi-day
+    // events legitimately produce > seed-count occurrences (one per cell),
+    // so we floor-gate rather than equality-gate the count.
+    await expect(
+      titles,
+      'portal-mounted event titles should render across cells',
+    ).not.toHaveCount(0, { timeout: 5_000 });
     const renderedTitles = await titles.allTextContents();
-    const normalized = renderedTitles.map((t) => t.trim()).sort();
-    expect(normalized).toEqual([...EXPECTED_TITLES].sort());
+    expect(renderedTitles.length).toBeGreaterThanOrEqual(MIN_RENDERED_TITLES);
+
+    // Spot-check that the scope param survived the portal mount — every
+    // rendered title's prefix must match one of the seeded titles. The
+    // trailing ` <emoji>` (from the demo's `{{ randomEmoji() }}`) is
+    // stripped before matching.
+    const expectedSet = new Set(EXPECTED_TITLES);
+    const renderedSet = new Set<string>();
+    for (const raw of renderedTitles) {
+      const trimmed = raw.trim();
+      // The randomEmoji() suffix is one grapheme separated by a space.
+      // Strip the last whitespace-delimited token if there's more than one.
+      const tokens = trimmed.split(/\s+/);
+      const titlePrefix = tokens.length > 1
+        ? tokens.slice(0, -1).join(' ')
+        : trimmed;
+      renderedSet.add(titlePrefix);
+    }
+    // Every rendered title must be one the demo seeded — guards against the
+    // portal mount routing the wrong scope param.
+    for (const rendered of renderedSet) {
+      expect(expectedSet, `unexpected rendered title: "${rendered}"`).toContain(
+        rendered,
+      );
+    }
+    // And we should have seen at least 3 distinct seeded titles (Past Event
+    // may be cropped to the previous month, but the other three are
+    // anchored to today/today+2/today+4).
+    expect(renderedSet.size).toBeGreaterThanOrEqual(MIN_RENDERED_TITLES);
   });
 }
