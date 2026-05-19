@@ -11,7 +11,8 @@
     "test": "turbo run test",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
-    "format": "biome format --write ."
+    "format": "biome format --write .",
+    "vr:debug": "pnpm --filter=@rozie/visual-regression run build:debug"
   },
   "devDependencies": {
     "turbo": "^2.9.7",

@@ -180,7 +180,22 @@ export default defineConfig(async () => {
     outDir: resolve(__dirname, 'dist', TARGET),
     // Each target build must NOT wipe sibling target builds.
     emptyOutDir: false,
-    sourcemap: false,
+    // Sourcemaps are OFF for CI / VR matrix builds (the screenshot tests
+    // don't need them and they bloat dist/). For manual debugging via the
+    // /compare.html iframes, set ROZIE_VR_SOURCEMAP=true (external .map
+    // files) or ROZIE_VR_SOURCEMAP=inline (data-URI sourcemaps embedded in
+    // the bundles — handy because iframes can't always fetch sibling .map
+    // files cleanly).
+    sourcemap:
+      process.env.ROZIE_VR_SOURCEMAP === 'inline'
+        ? 'inline'
+        : process.env.ROZIE_VR_SOURCEMAP === 'true',
+    // Set ROZIE_VR_MINIFY=false to ship readable bundles for manual
+    // debugging — variable names, comments, and module boundaries survive
+    // so DevTools "Sources" shows something close to the emitted .ts /
+    // .tsx / .vue per-target output. CI / VR matrix runs keep the default
+    // (minified via esbuild).
+    minify: process.env.ROZIE_VR_MINIFY === 'false' ? false : 'esbuild',
     rollupOptions: {
       input: resolve(__dirname, 'host', `entry.${TARGET}.html`),
     },

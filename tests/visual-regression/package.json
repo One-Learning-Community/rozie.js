@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "node scripts/build-cells.mjs",
+    "build:debug": "ROZIE_VR_SOURCEMAP=inline ROZIE_VR_MINIFY=false node scripts/build-cells.mjs",
     "preview": "vite preview --config vite.preview.config.ts",
     "test:visual": "playwright test"
   },
