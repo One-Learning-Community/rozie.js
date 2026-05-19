@@ -653,14 +653,7 @@
         },
         "comments": []
       },
-      "deps": [
-        {
-          "scope": "data",
-          "path": [
-            "hovering"
-          ]
-        }
-      ],
+      "deps": [],
       "source": "template-event",
       "sourceLoc": {
         "start": 1081,
@@ -749,14 +742,7 @@
         },
         "comments": []
       },
-      "deps": [
-        {
-          "scope": "data",
-          "path": [
-            "hovering"
-          ]
-        }
-      ],
+      "deps": [],
       "source": "template-event",
       "sourceLoc": {
         "start": 1119,

@@ -242,6 +242,43 @@ describe('computeExpressionDeps (Plan 02-03 Task 1) — single-expression analyz
     // Refs are stable — neither ref appears.
     expect(deps).toHaveLength(0);
   });
+
+  it('Test 15: plain `=` write target $data.events is NOT a dep — writes are not reads (FullCalendar $onMount loop fix)', () => {
+    const bindings = syntheticBindings({ data: ['events'] });
+    // `$data.events = helper()` — the LHS is a pure write; only the RHS reads.
+    const expr = parseExpression('$data.events = sampleEvents()');
+    const deps = computeExpressionDeps(expr, bindings);
+    // events must NOT appear — recording it would re-fire the React $onMount
+    // useEffect on its own write (infinite loop).
+    expect(findRef(deps, 'data', 'events')).toBeUndefined();
+    // sampleEvents (the RHS helper call) IS a closure dep.
+    expect(findRef(deps, 'closure', 'sampleEvents')).toBeDefined();
+  });
+
+  it('Test 16: RHS read of the same accessor still counts — `$data.x = $data.x + 1`', () => {
+    const bindings = syntheticBindings({ data: ['x'] });
+    const expr = parseExpression('$data.x = $data.x + 1');
+    const deps = computeExpressionDeps(expr, bindings);
+    // The RHS `$data.x` is a genuine read — it must remain a dep even though
+    // the identically-named LHS is skipped.
+    expect(findRef(deps, 'data', 'x')).toBeDefined();
+  });
+
+  it('Test 17: compound assignment `$data.count += 1` reads the LHS — kept as a dep', () => {
+    const bindings = syntheticBindings({ data: ['count'] });
+    const expr = parseExpression('$data.count += 1');
+    const deps = computeExpressionDeps(expr, bindings);
+    // `+=` reads the current value to compute the new one — count is a dep.
+    expect(findRef(deps, 'data', 'count')).toBeDefined();
+  });
+
+  it('Test 18: deep write `$data.user.name = x` still reads $data.user to dereference', () => {
+    const bindings = syntheticBindings({ data: ['user'] });
+    const expr = parseExpression('$data.user.name = x');
+    const deps = computeExpressionDeps(expr, bindings);
+    // The chain dereferences $data.user (a read) before writing `.name`.
+    expect(findRef(deps, 'data', 'user')).toBeDefined();
+  });
 });
 
 describe('buildReactiveDepGraph (Plan 02-03 Task 2) — coordinator + canonical fixtures', () => {

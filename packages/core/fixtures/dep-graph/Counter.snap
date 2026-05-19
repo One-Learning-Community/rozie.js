@@ -47,22 +47,8 @@
       ]
     }
   ],
-  "template.attr./div-1/@mouseenter": [
-    {
-      "scope": "data",
-      "path": [
-        "hovering"
-      ]
-    }
-  ],
-  "template.attr./div-1/@mouseleave": [
-    {
-      "scope": "data",
-      "path": [
-        "hovering"
-      ]
-    }
-  ],
+  "template.attr./div-1/@mouseenter": [],
+  "template.attr./div-1/@mouseleave": [],
   "template.attr./div-1/button-1/:disabled": [
     {
       "scope": "computed",

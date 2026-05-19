@@ -157,6 +157,29 @@ export function computeExpressionDeps(
           return;
         }
 
+        // Skip the LHS of a plain `=` assignment when the magic accessor IS
+        // the assignment target — `$data.x = expr` is a WRITE not a read, and
+        // the rewriter lowers it to a target-native setter call (`setX(expr)`
+        // on React; direct signal write elsewhere). Recording it as a dep here
+        // pollutes the React useEffect dep array for $onMount bodies — every
+        // state write inside the mount hook would push its own state var into
+        // the deps, causing the effect to re-fire on its own writes (infinite
+        // loop).
+        //
+        // Only the chain-depth-1 case is a pure write: `$data.events = arr`.
+        // Deeper writes like `$data.events.foo = bar` still READ `$data.events`
+        // to dereference the path, so we keep those as deps. Compound (`+=`)
+        // and UpdateExpressions (`x++`) also read the LHS — left alone.
+        if (
+          path.node === cur &&
+          t.isAssignmentExpression(path.parent) &&
+          path.parent.operator === '=' &&
+          path.parent.left === path.node
+        ) {
+          path.skip();
+          return;
+        }
+
         // Skip nested traversal — we've already handled the chain via its root.
         path.skip();
         push({ scope: access.scope, path: [access.member] } as SignalRef);
