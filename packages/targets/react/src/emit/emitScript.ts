@@ -26,6 +26,7 @@
 import * as t from '@babel/types';
 import _generate from '@babel/generator';
 import _traverse from '@babel/traverse';
+import type { NodePath } from '@babel/traverse';
 import type { GeneratorOptions } from '@babel/generator';
 import type { EncodedSourceMap } from '@ampproject/remapping';
 import type {
@@ -210,6 +211,64 @@ function tryWrapEscapingHelperUseCallback(
 }
 
 /**
+ * Plan 07.7 follow-up — wrap a top-level NON-FUNCTION `const X = init`
+ * declaration in `useMemo(() => init, [...initDeps])` when the binding
+ * escapes into a useEffect (i.e., its identifier appears as a `closure`
+ * SignalRef in any Listener.deps / LifecycleHook.setupDeps / WatchHook.getterDeps).
+ *
+ * Why useMemo? A bare `const X = [a, b, c]` inside the component function
+ * is re-evaluated on every render, producing a fresh value identity
+ * (`Object.is(prev, curr) === false`) and re-firing every useEffect that
+ * lists X in its dep array. The "engine wrapper" pattern (FullCalendar /
+ * AG-Grid / Swiper / Flatpickr — Vue/Svelte-flavored module-scoped consts
+ * read from `$onMount`) trips this every time: the engine destroys +
+ * recreates on every consumer render → portal `createRoot()` work
+ * unmounted before commit. `useMemo(() => init, [...initDeps])` gives the
+ * const stable identity across renders (modulo its real reactive deps).
+ *
+ * The companion case (function-shaped escapees → useCallback) is handled
+ * by `tryWrapEscapingHelperUseCallback` above. The companion-companion
+ * (top-level mutable `let X` referenced from a lifecycle hook → useRef
+ * via `hoistModuleLet`) is handled in `hoistModuleLet.ts`.
+ *
+ * Returns the rendered `const X = useMemo(...);` line on success, or null
+ * when:
+ *   - stmt isn't a single-declarator initializer,
+ *   - OR init IS an arrow/fn (handled by tryWrapEscapingHelperUseCallback),
+ *   - OR the binding's name isn't in `escapingHelperNames` (no wrap needed —
+ *     the binding doesn't escape into any effect).
+ */
+function tryWrapEscapingConstUseMemo(
+  stmt: t.Statement,
+  escapingHelperNames: Set<string>,
+  ir: IRComponent,
+  allHelperNames: Set<string>,
+  collectors: { react: ReactImportCollector; runtime: RuntimeReactImportCollector },
+): string | null {
+  if (!t.isVariableDeclaration(stmt)) return null;
+  if (stmt.kind !== 'const') return null;
+  if (stmt.declarations.length !== 1) return null;
+  const decl = stmt.declarations[0]!;
+  if (!t.isIdentifier(decl.id)) return null;
+  const init = decl.init;
+  if (!init) return null;
+  // Arrow/fn-expression inits are handled by tryWrapEscapingHelperUseCallback.
+  if (t.isArrowFunctionExpression(init) || t.isFunctionExpression(init)) return null;
+  const constName = decl.id.name;
+  if (!escapingHelperNames.has(constName)) return null;
+
+  collectors.react.add('useMemo');
+
+  // Compute deps the same way useCallback wraps do — walk the initializer
+  // for reactive references.
+  const initDeps = computeHelperBodyDeps(init, ir, allHelperNames, constName);
+  const depsLiteral = renderDepArrayWithIR(initDeps, ir);
+
+  const initSource = genCode(init);
+  return `const ${constName} = useMemo(() => ${initSource}, ${depsLiteral});`;
+}
+
+/**
  * Find all distinct `props.onX` names that appear in CALL position inside
  * `body`. Returns the set of names (without the `on` prefix? no — keep raw
  * since the destructure binds the same name, e.g. `const { onClose } = props`).
@@ -263,6 +322,129 @@ function rewritePropsToBareLocals(
     },
   });
   return cloned;
+}
+
+/**
+ * Plan 07.7 follow-up — rewrite watched-prop reads inside a lifecycle hook
+ * body to stable-ref `.current` reads, returning the rewritten cloned node.
+ *
+ * For each prop X with a sibling `$watch(() => $props.X, ...)` declaration,
+ * any read of X inside the lifecycle setup/cleanup body — either as a bare
+ * `<X>` Identifier (model-bound props post-rewrite) or as a `props.<X>`
+ * MemberExpression (non-model props post-rewrite) — is replaced with a
+ * MemberExpression `_<X>Ref.current`. The caller is responsible for
+ * declaring the matching `const _<X>Ref = useRef(<reactIdent>); _<X>Ref.current = <reactIdent>;`
+ * lines in `hookSection`.
+ *
+ * Why? The React useEffect's exhaustive-deps lint rule (D-62 floor — no
+ * eslint-disable) requires every identifier READ inside the callback to
+ * appear in the dep array. For the "engine wrapper" pattern (FullCalendar /
+ * AG-Grid / Swiper / Flatpickr — Vue/Svelte-flavored module-let mutators
+ * read from `$onMount`) we ALSO need the watched prop OUT of the dep array
+ * (otherwise the engine destroy + recreate cycle thrashes portal trees on
+ * every consumer render). Rewriting the read to `_<X>Ref.current` satisfies
+ * both constraints simultaneously: the body now reads from the stable ref
+ * (no lint warning), and the dep array can drop `props.<X>` / `<X>` (no
+ * re-mount cycle). The watcher itself handles reactive updates for X.
+ *
+ * Identifier-rewrite safety: skips
+ *   - property keys of MemberExpressions (e.g., `obj.X` — X is a key, not a ref)
+ *   - ObjectProperty keys (non-shorthand `{X: ...}` — X is a key)
+ *   - VariableDeclarator id positions (`let X = ...` — X is a binding)
+ *   - Function param positions (`(X) => ...` — X is a binding)
+ *   - Function declaration names
+ *   - Import / export specifier slots
+ *   - Label identifiers
+ *
+ * BlockStatement bodies and Expression bodies are both supported.
+ */
+function rewriteWatchedPropReads(
+  bodyClone: t.Expression | t.BlockStatement,
+  watchedModelProps: ReadonlySet<string>,
+  watchedNonModelProps: ReadonlySet<string>,
+): t.Expression | t.BlockStatement {
+  // Wrap into a Program-rooted file so we can traverse with scope.
+  const programStmts: t.Statement[] = t.isBlockStatement(bodyClone)
+    ? bodyClone.body
+    : [t.expressionStatement(bodyClone as t.Expression)];
+  const file = t.file(t.program(programStmts));
+
+  // Identifiers we MANUFACTURED as the `object` of a freshly-built
+  // `_<X>Ref.current` MemberExpression — visiting them would re-rewrite
+  // and produce `_<X>Ref.current.current`. Tracked via WeakSet keyed on
+  // node identity (same pattern as hoistModuleLet).
+  const synthesizedIdentifiers = new WeakSet<t.Node>();
+
+  traverse(file, {
+    MemberExpression(path: NodePath<t.MemberExpression>) {
+      // Match `props.<X>` where X is a watched non-model prop.
+      const obj = path.node.object;
+      const prop = path.node.property;
+      if (path.node.computed) return;
+      if (!t.isIdentifier(obj) || obj.name !== 'props') return;
+      if (!t.isIdentifier(prop)) return;
+      if (!watchedNonModelProps.has(prop.name)) return;
+      const refIdent = t.identifier(`_${prop.name}Ref`);
+      synthesizedIdentifiers.add(refIdent);
+      path.replaceWith(t.memberExpression(refIdent, t.identifier('current')));
+      path.skip();
+    },
+    Identifier(path: NodePath<t.Identifier>) {
+      if (synthesizedIdentifiers.has(path.node)) return;
+      const name = path.node.name;
+      if (!watchedModelProps.has(name)) return;
+      const parent = path.parent;
+      // Skip property positions of MemberExpressions: `obj.X` — X is a property,
+      // not a real reference.
+      if (
+        (t.isMemberExpression(parent) || t.isOptionalMemberExpression(parent)) &&
+        parent.property === path.node &&
+        !parent.computed
+      ) {
+        return;
+      }
+      // Skip ObjectProperty key positions (non-shorthand).
+      if (t.isObjectProperty(parent) && parent.key === path.node && !parent.shorthand) {
+        return;
+      }
+      // Skip declaration-id positions.
+      if (t.isVariableDeclarator(parent) && parent.id === path.node) return;
+      if (t.isFunctionDeclaration(parent) && parent.id === path.node) return;
+      if (t.isFunction(parent) && parent.params.includes(path.node)) return;
+      if (t.isImportSpecifier(parent) || t.isImportDefaultSpecifier(parent)) return;
+      if (t.isExportSpecifier(parent)) return;
+      if (t.isLabeledStatement(parent) && parent.label === path.node) return;
+      // Skip identifiers nested ANYWHERE inside a binding pattern (e.g.,
+      // destructuring on the LHS of an assignment or in a function param).
+      let p: NodePath | null = path.parentPath;
+      while (p) {
+        if (t.isObjectPattern(p.node) || t.isArrayPattern(p.node)) {
+          // We're inside a destructure binding — skip rewrite.
+          return;
+        }
+        // Stop early at function boundaries (param-list patterns are caught
+        // by the above; function bodies are normal scope).
+        if (t.isFunction(p.node) || t.isBlockStatement(p.node) || t.isProgram(p.node)) break;
+        p = p.parentPath;
+      }
+      // Rewrite to `_<name>Ref.current`.
+      const refIdent = t.identifier(`_${name}Ref`);
+      synthesizedIdentifiers.add(refIdent);
+      path.replaceWith(t.memberExpression(refIdent, t.identifier('current')));
+    },
+  });
+
+  // Reassemble — file.program.body now contains the rewritten Program body.
+  if (t.isBlockStatement(bodyClone)) {
+    return t.blockStatement(file.program.body);
+  }
+  // Expression body: pop the single ExpressionStatement.
+  const stmt = file.program.body[0];
+  if (stmt && t.isExpressionStatement(stmt)) {
+    return stmt.expression;
+  }
+  // Defensive fallback (shouldn't happen for well-formed input).
+  return bodyClone;
 }
 
 function tryHoistArrowToFunction(stmt: t.Statement): t.Statement | null {
@@ -775,6 +957,198 @@ export function emitScript(
   //   - bulkDispose    → prepended to the first mount-phase useEffect cleanup
   const portalsEmit = emitPortals(ir, collectors);
 
+  // 4b. Plan 07.7 follow-up — pre-compute the watched-prop ref-rewrite plan.
+  // For each prop X that has a sibling `$watch(() => $props.X, ...)`, we
+  // want the mount-phase useEffect body to read `_<X>Ref.current` instead
+  // of `props.<X>` (or bare `<X>` for model props), so the useEffect dep
+  // array can drop the watched prop without tripping
+  // `react-hooks/exhaustive-deps` (D-62 floor: no eslint-disable in
+  // emitted output).
+  //
+  // The watcher itself owns reactive updates for X. The mount useEffect
+  // captures the INITIAL value of X via `useRef(<X>)` and re-reads the
+  // latest value on every engine callback via `.current` — without
+  // re-mounting the engine on every consumer render.
+  //
+  // Two passes:
+  //   (a) Walk every lifecycle hook's setup AND cleanup bodies to discover
+  //       which watched props are actually referenced. Skip emitting refs
+  //       for watched props that aren't read from any lifecycle body
+  //       (avoids unused-variable noise).
+  //   (b) Rewrite those references in-place on the cloned bodies before
+  //       the lifecycle forEach below emits them.
+  //
+  // The model-prop vs non-model-prop distinction follows `renderSignalRef`:
+  // model props lower to bare identifiers, non-model props lower to
+  // `props.<X>` MemberExpressions. The rewriter handles both shapes.
+  const watchedModelPropNames = new Set<string>();
+  const watchedNonModelPropNames = new Set<string>();
+  for (const wh of ir.watchers) {
+    for (const d of wh.getterDeps) {
+      if (d.scope === 'props' && d.path.length > 0) {
+        const name = d.path[0]!;
+        if (modelProps.has(name)) watchedModelPropNames.add(name);
+        else watchedNonModelPropNames.add(name);
+      }
+    }
+  }
+
+  // Discover-then-rewrite per lifecycle hook. We collect the rewritten
+  // bodies into Maps keyed by hook index so the lifecycle forEach below
+  // uses them instead of `paired?.setupCloned` / `paired?.cleanupCloned`.
+  const rewrittenSetupByIdx = new Map<number, t.Expression | t.BlockStatement>();
+  const rewrittenCleanupByIdx = new Map<number, t.Expression>();
+  const actuallyRewrittenModelProps = new Set<string>();
+  const actuallyRewrittenNonModelProps = new Set<string>();
+
+  if (
+    (watchedModelPropNames.size > 0 || watchedNonModelPropNames.size > 0) &&
+    ir.lifecycle.length > 0
+  ) {
+    const findRefsInBody = (
+      bodyNode: t.Expression | t.BlockStatement,
+      outModel: Set<string>,
+      outNonModel: Set<string>,
+    ): void => {
+      const programStmts: t.Statement[] = t.isBlockStatement(bodyNode)
+        ? bodyNode.body
+        : [t.expressionStatement(bodyNode as t.Expression)];
+      const f = t.file(t.program(programStmts));
+      traverse(f, {
+        MemberExpression(p) {
+          if (p.node.computed) return;
+          const obj = p.node.object;
+          const prop = p.node.property;
+          if (!t.isIdentifier(obj) || obj.name !== 'props') return;
+          if (!t.isIdentifier(prop)) return;
+          if (watchedNonModelPropNames.has(prop.name)) outNonModel.add(prop.name);
+        },
+        Identifier(p) {
+          const name = p.node.name;
+          if (!watchedModelPropNames.has(name)) return;
+          const parent = p.parent;
+          if (
+            (t.isMemberExpression(parent) || t.isOptionalMemberExpression(parent)) &&
+            parent.property === p.node &&
+            !parent.computed
+          ) return;
+          if (t.isObjectProperty(parent) && parent.key === p.node && !parent.shorthand) return;
+          if (t.isVariableDeclarator(parent) && parent.id === p.node) return;
+          if (t.isFunctionDeclaration(parent) && parent.id === p.node) return;
+          if (t.isFunction(parent) && parent.params.includes(p.node)) return;
+          outModel.add(name);
+        },
+      });
+    };
+
+    ir.lifecycle.forEach((lh, idx) => {
+      const paired = lifecyclePairing.perHook[idx];
+      const setupCloned = paired?.setupCloned ?? lh.setup;
+      const cleanupCloned = paired?.cleanupCloned ?? null;
+
+      // Determine the actual body to walk + rewrite. For arrow/fn-expr
+      // setups, we operate on the body (block or expression). For Identifier
+      // setups (e.g. `$onMount(lockScroll)`), the helper's body is in
+      // userArrows — out of scope for this pass (the helper's reads are
+      // tracked separately via the closure-dep system).
+      let setupBodyForRewrite: t.Expression | t.BlockStatement | null = null;
+      if (t.isArrowFunctionExpression(setupCloned) || t.isFunctionExpression(setupCloned)) {
+        setupBodyForRewrite = setupCloned.body;
+      } else if (t.isBlockStatement(setupCloned) || t.isExpression(setupCloned)) {
+        setupBodyForRewrite = setupCloned as t.Expression | t.BlockStatement;
+      }
+      if (!setupBodyForRewrite) return;
+
+      const localModel = new Set<string>();
+      const localNonModel = new Set<string>();
+      findRefsInBody(setupBodyForRewrite, localModel, localNonModel);
+      // Walk cleanup too (engine wrappers sometimes read props from cleanup
+      // for teardown sequencing).
+      if (cleanupCloned) {
+        let cleanupBodyForRewrite: t.Expression | t.BlockStatement | null = null;
+        if (t.isArrowFunctionExpression(cleanupCloned) || t.isFunctionExpression(cleanupCloned)) {
+          cleanupBodyForRewrite = cleanupCloned.body;
+        } else if (t.isExpression(cleanupCloned)) {
+          cleanupBodyForRewrite = cleanupCloned;
+        }
+        if (cleanupBodyForRewrite) findRefsInBody(cleanupBodyForRewrite, localModel, localNonModel);
+      }
+
+      if (localModel.size === 0 && localNonModel.size === 0) return;
+
+      for (const n of localModel) actuallyRewrittenModelProps.add(n);
+      for (const n of localNonModel) actuallyRewrittenNonModelProps.add(n);
+
+      // Now rewrite setupCloned. We replace setupBodyForRewrite (the inner
+      // body) with the rewritten version. For arrow/fn-expr setups, we
+      // rebuild the arrow with the rewritten body. For block/expression
+      // setups, we rewrite directly.
+      const rewrittenInner = rewriteWatchedPropReads(
+        setupBodyForRewrite,
+        localModel,
+        localNonModel,
+      );
+      let newSetupCloned: t.Expression | t.BlockStatement;
+      if (t.isArrowFunctionExpression(setupCloned)) {
+        newSetupCloned = t.arrowFunctionExpression(
+          setupCloned.params,
+          rewrittenInner,
+          setupCloned.async,
+        );
+      } else if (t.isFunctionExpression(setupCloned)) {
+        newSetupCloned = t.functionExpression(
+          setupCloned.id,
+          setupCloned.params,
+          t.isBlockStatement(rewrittenInner)
+            ? rewrittenInner
+            : t.blockStatement([t.returnStatement(rewrittenInner)]),
+          setupCloned.generator ?? false,
+          setupCloned.async ?? false,
+        );
+      } else {
+        newSetupCloned = rewrittenInner;
+      }
+      rewrittenSetupByIdx.set(idx, newSetupCloned);
+
+      if (cleanupCloned) {
+        let cleanupBodyForRewrite: t.Expression | t.BlockStatement | null = null;
+        if (t.isArrowFunctionExpression(cleanupCloned) || t.isFunctionExpression(cleanupCloned)) {
+          cleanupBodyForRewrite = cleanupCloned.body;
+        } else if (t.isExpression(cleanupCloned)) {
+          cleanupBodyForRewrite = cleanupCloned;
+        }
+        if (cleanupBodyForRewrite) {
+          const rewrittenCleanupInner = rewriteWatchedPropReads(
+            cleanupBodyForRewrite,
+            localModel,
+            localNonModel,
+          );
+          let newCleanupCloned: t.Expression;
+          if (t.isArrowFunctionExpression(cleanupCloned)) {
+            newCleanupCloned = t.arrowFunctionExpression(
+              cleanupCloned.params,
+              rewrittenCleanupInner,
+              cleanupCloned.async,
+            );
+          } else if (t.isFunctionExpression(cleanupCloned)) {
+            newCleanupCloned = t.functionExpression(
+              cleanupCloned.id,
+              cleanupCloned.params,
+              t.isBlockStatement(rewrittenCleanupInner)
+                ? rewrittenCleanupInner
+                : t.blockStatement([t.returnStatement(rewrittenCleanupInner)]),
+              cleanupCloned.generator ?? false,
+              cleanupCloned.async ?? false,
+            );
+          } else {
+            newCleanupCloned = rewrittenCleanupInner as t.Expression;
+          }
+          rewrittenCleanupByIdx.set(idx, newCleanupCloned);
+        }
+      }
+    });
+  }
+
   // 5. Build hookSection.
   const hookLines: string[] = [];
 
@@ -835,6 +1209,29 @@ export function emitScript(
     hookLines.push(propsDefaultsBlock);
   }
 
+  // 5a-bis. Portal-slot stable-renderer refs (Spike 003 FullCalendar React fix).
+  //
+  // For each portal slot, emit two lines:
+  //   const _render<Pascal>Ref = useRef(props.render<Pascal>);
+  //   _render<Pascal>Ref.current = props.render<Pascal>;
+  //
+  // The mount-phase useEffect's portal closure (emitPortals.closureBlock)
+  // reads `_render<Pascal>Ref.current` instead of `props.render<Pascal>`,
+  // and the slot SignalRef is filtered out of the useEffect dep array below.
+  // Without this indirection, a consumer passing a fresh-arrow
+  // `renderEvent={({ arg }) => <span>...</span>}` would trigger useEffect
+  // cleanup → setup on every consumer render, unmounting just-scheduled-
+  // but-not-yet-committed `createRoot(node).render(...)` calls and leaving
+  // engine-owned portal containers empty (FullCalendar VR `react` cell).
+  //
+  // The during-render `ref.current = props.X` assignment is the canonical
+  // React 18 idiom for "stable handler / mutable value" — see useEffectEvent
+  // RFC + React 18 useRef docs. It's safe here because the assignment is
+  // idempotent (same prop → same value) and the ref isn't a DOM ref.
+  if (portalsEmit.hasPortals && portalsEmit.rendererRefLines.length > 0) {
+    hookLines.push(portalsEmit.rendererRefLines);
+  }
+
   // 5a. Hoisted useRef declarations (one per hoist instruction).
   for (const h of hoistResult.hoisted) {
     hookLines.push(`const ${h.name} = useRef(${genCode(h.initialExpr)});`);
@@ -878,6 +1275,43 @@ export function emitScript(
         `  onValueChange: props.on${capitalize(p.name)}Change,\n` +
         `});`,
     );
+  }
+
+  // 5b-bis. Plan 07.7 follow-up — watched-prop stable-renderer refs.
+  //
+  // For each prop X that has a sibling `$watch(() => $props.X, ...)` AND
+  // is actually read from a lifecycle hook body (discovered by the
+  // pre-compute pass above), emit:
+  //   const _<X>Ref = useRef(<reactIdent>);
+  //   _<X>Ref.current = <reactIdent>;
+  //
+  // The lifecycle body's `<reactIdent>` reads were rewritten to
+  // `_<X>Ref.current` by the same pre-compute pass, so the useEffect
+  // dep array drops the watched prop without tripping
+  // `react-hooks/exhaustive-deps`. The watcher itself owns reactive
+  // updates for X — the mount-phase useEffect captures the INITIAL
+  // value of X via useRef and reads the latest value on engine
+  // callbacks via `.current`.
+  //
+  // Sorting (alphabetical) keeps the emit deterministic across runs
+  // for snapshot stability.
+  {
+    const sortedModelRefs = [...actuallyRewrittenModelProps].sort();
+    const sortedNonModelRefs = [...actuallyRewrittenNonModelProps].sort();
+    for (const name of sortedNonModelRefs) {
+      collectors.react.add('useRef');
+      hookLines.push(
+        `const _${name}Ref = useRef(props.${name});\n` +
+          `_${name}Ref.current = props.${name};`,
+      );
+    }
+    for (const name of sortedModelRefs) {
+      collectors.react.add('useRef');
+      hookLines.push(
+        `const _${name}Ref = useRef(${name});\n` +
+          `_${name}Ref.current = ${name};`,
+      );
+    }
   }
 
   // 5c. useState for each StateDecl.
@@ -950,9 +1384,52 @@ export function emitScript(
   ir.lifecycle.forEach((lh, idx) => {
     collectors.react.add('useEffect');
     const paired = lifecyclePairing.perHook[idx];
-    const setupCloned = paired?.setupCloned ?? lh.setup;
-    const cleanupCloned = paired?.cleanupCloned ?? null;
-    const depsArr = renderDepArray(lh.setupDeps, modelProps);
+    // Use the rewritten setup/cleanup bodies (watched-prop reads replaced
+    // with `_<X>Ref.current`) when the pre-compute pass produced them.
+    // Falls back to the un-rewritten paired clone otherwise.
+    const setupCloned = rewrittenSetupByIdx.get(idx) ?? paired?.setupCloned ?? lh.setup;
+    const cleanupCloned = rewrittenCleanupByIdx.get(idx) ?? paired?.cleanupCloned ?? null;
+    // Filter SignalRefs out of the mount-phase useEffect dep array when
+    // keeping them would re-fire the engine-mount cleanup+setup loop on
+    // every consumer render:
+    //
+    //   1. Portal-slot renderer SignalRefs (`{ scope: 'slots', path: [<portalName>] }`)
+    //      — the portal closure reads the latest renderer via
+    //      `_render<Pascal>Ref.current` (Spike 003 FullCalendar React fix).
+    //      Per V1 portal-slot constraint (REQ-5): portal slots are NOT
+    //      reactive after mount.
+    //
+    //   2. Watched-prop SignalRefs (`{ scope: 'props', path: [X] }` where
+    //      a sibling `$watch(() => $props.X, ...)` exists AND X was
+    //      actually read from this hook's body). The body's reads were
+    //      already rewritten to `_<X>Ref.current` by the pre-compute pass,
+    //      so the dep can drop `props.<X>` / `<X>` without tripping
+    //      `react-hooks/exhaustive-deps` (D-62 floor: no eslint-disable).
+    //
+    // Non-portal slots never appear in `setupDeps` (their content lives
+    // in the template, not the lifecycle hook body), so the slot filter
+    // doesn't disturb general code paths.
+    const filteredSetupDeps = lh.setupDeps.filter((d) => {
+      if (
+        d.scope === 'slots' &&
+        d.path.length > 0 &&
+        portalsEmit.portalSlotNames.has(d.path[0]!)
+      ) {
+        return false;
+      }
+      if (
+        d.scope === 'props' &&
+        d.path.length > 0 &&
+        (
+          actuallyRewrittenModelProps.has(d.path[0]!) ||
+          actuallyRewrittenNonModelProps.has(d.path[0]!)
+        )
+      ) {
+        return false;
+      }
+      return true;
+    });
+    const depsArr = renderDepArray(filteredSetupDeps, modelProps);
     const injectPortalsHere =
       portalsEmit.hasPortals && !portalsInjected && lh.phase === 'mount';
     if (injectPortalsHere) portalsInjected = true;
@@ -1266,6 +1743,24 @@ export function emitScript(
       // Wrapped statements are emitted as strings via genCode on the callback
       // body; their source locations are unreliable post-transformation.
       // Exclude from mappableStmts.
+      continue;
+    }
+
+    // Plan 07.7 follow-up — non-function const escapees → useMemo wrap.
+    // Handles patterns like `const PLUGINS = [dayGridPlugin, ...]` referenced
+    // from `$onMount` body: without stable identity, every consumer render
+    // produces a fresh array → mount-phase useEffect dep change → engine
+    // destroy + recreate cycle → portal trees unmounted before commit.
+    const memoWrapped = tryWrapEscapingConstUseMemo(
+      stmt,
+      escapingHelperNames,
+      ir,
+      allHelperNames,
+      collectors,
+    );
+    if (memoWrapped) {
+      userArrowsLines.push(memoWrapped);
+      // Same source-map exclusion rationale as the useCallback wrap above.
       continue;
     }
 

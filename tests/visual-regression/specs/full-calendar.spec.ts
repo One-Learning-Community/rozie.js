@@ -68,13 +68,6 @@ const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'] as const;
  * runtime check that resolves correctly.
  */
 const KNOWN_FAILING: ReadonlySet<typeof TARGETS[number]> = new Set([
-  // React: cleanup-undefined fix + portal+useEffect wiring get the calendar
-  // chrome to render, but the portal-mounted event titles do not commit.
-  // Root cause hypothesis: the FullCalendar useEffect's dep array includes
-  // `props.renderEvent` (fresh arrow each consumer render), so the effect
-  // cleans up before React commits the `createRoot(node).render` call.
-  // Needs deeper redesign — likely a useRef-stable renderEvent indirection.
-  'react',
   // Lit: `$el → $refs.__rozieRoot` + `$slots.<portal> → this.<X> !== undefined`
   // + cleanup-undefined-drop fixes get the engine mounted inside the shadow
   // root, but `$watch(() => $props.events, …)` doesn't re-fire — Lit's @lit-
@@ -115,11 +108,21 @@ for (const target of TARGETS) {
     // engine-owned event cells. `.fc-event-title` is the consumer-authored
     // class (NOT a FullCalendar built-in — FC's own class is
     // `.fc-event-title-container` / `.fc-event-main-frame`). If the
-    // assertion finds zero `.fc-event-title` spans, the portal-slot bridge
-    // is broken: either consumer's `.event=${fn}` isn't being assigned, or
-    // producer's `eventContent: (arg) => { $portals.event(node, { arg }) }`
-    // never fires.
-    const titles = mount.locator('.fc-event-title');
+    // assertion finds zero matches, the portal-slot bridge is broken: either
+    // consumer's `.event=${fn}` isn't being assigned, or producer's
+    // `eventContent: (arg) => { $portals.event(node, { arg }) }` never fires.
+    //
+    // Substring-match `[class*="fc-event-title"]` instead of literal
+    // `.fc-event-title` because the React target applies CSS Modules to
+    // consumer styles, renaming the consumer-authored `fc-event-title`
+    // class to a scoped name like `_fc-event-title_nzury_51` (the original
+    // class name is preserved as a substring per Vite/PostCSS-Modules'
+    // localIdentName default). Vue / Svelte / Angular / Solid keep the
+    // class literal (their scoping uses attribute selectors), so the
+    // substring matcher subsumes both forms cross-target. The literal
+    // class name was the original assertion before the React target's
+    // CSS-Modules-by-default landed.
+    const titles = mount.locator('[class*="fc-event-title"]');
     await expect(titles).toHaveCount(EXPECTED_TITLES.length, { timeout: 5_000 });
 
     // Spot-check that the scope param survives the portal mount — at least

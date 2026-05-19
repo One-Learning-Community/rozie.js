@@ -30,6 +30,8 @@ export default function Dropdown(_props: DropdownProps): JSX.Element {
     defaultValue: props.defaultValue ?? false,
     onValueChange: props.onOpenChange,
   });
+  const _openRef = useRef(open);
+  _openRef.current = open;
   const triggerEl = useRef<HTMLDivElement | null>(null);
   const panelEl = useRef<HTMLDivElement | null>(null);
 
@@ -50,8 +52,8 @@ export default function Dropdown(_props: DropdownProps): JSX.Element {
 
   useEffect(() => {
     // Initial reposition only if the panel is open at mount time.
-  if (open) reposition();
-  }, [open, reposition]);
+  if (_openRef.current) reposition();
+  }, [reposition]);
   useEffect(() => {
     
   }, []);

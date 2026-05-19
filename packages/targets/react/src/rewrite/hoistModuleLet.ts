@@ -60,7 +60,13 @@ function collectIdentifierRefs(
   candidateNames: ReadonlySet<string>,
 ): Set<string> {
   const found = new Set<string>();
-  traverse(t.file(t.program([t.expressionStatement(bodyNode as t.Expression)])), {
+  // The walker needs a Program-rooted path. BlockStatements lift directly
+  // into the Program; everything else (Expressions / Arrows / FnExprs /
+  // Identifiers) we wrap in an ExpressionStatement first.
+  const programStmts: t.Statement[] = t.isBlockStatement(bodyNode)
+    ? bodyNode.body
+    : [t.expressionStatement(bodyNode as t.Expression)];
+  traverse(t.file(t.program(programStmts)), {
     Identifier(path) {
       if (!candidateNames.has(path.node.name)) return;
       const parent = path.parent;
@@ -160,16 +166,37 @@ export function hoistModuleLet(program: File, ir: IRComponent): HoistResult {
     if (refs.size > 0) topLevelHelpers.set(helperName, refs);
   }
 
-  // 3. Walk lifecycle hooks → which lets are referenced via (a) or (b)?
+  // 3. Walk lifecycle hooks AND watchers → which lets are referenced via
+  //     (a) / (a') / (b)? Watchers must participate because the common
+  //     "round-trip guard" pattern (FullCalendar / Flatpickr / Leaflet)
+  //     mutates a module-scoped let from the watcher and reads it from the
+  //     mount-phase setup — both sides must agree on hoisting for the
+  //     guard's value to persist across renders.
   const referencedLets = new Set<string>();
   for (const lh of ir.lifecycle) {
     classifyExpr(lh.setup);
     if (lh.cleanup) classifyExpr(lh.cleanup);
   }
+  for (const wh of ir.watchers) {
+    classifyExpr(wh.getter);
+    classifyExpr(wh.callback);
+  }
 
   function classifyExpr(expr: t.Expression | t.BlockStatement): void {
     // (a) DIRECT — arrow/fn expression body references a let.
     if (t.isArrowFunctionExpression(expr) || t.isFunctionExpression(expr)) {
+      const refs = collectIdentifierRefs(expr, moduleLetNames);
+      for (const r of refs) referencedLets.add(r);
+      return;
+    }
+    // (a') DIRECT — BlockStatement body (post-`extractCleanupReturn` lift,
+    // the IR's `lh.setup` is the cleanup-trimmed BlockStatement directly).
+    // Without this branch any `let` referenced inside a `$onMount(() => {
+    // ...; return cleanupFn })` arrow falls through to case (c) and stays
+    // unhoisted — its bare-identifier references then re-bind on every
+    // React render, breaking the let's "module-scoped scratch state"
+    // semantics (e.g. FullCalendar's `let suppressViewSync = false`).
+    if (t.isBlockStatement(expr)) {
       const refs = collectIdentifierRefs(expr, moduleLetNames);
       for (const r of refs) referencedLets.add(r);
       return;

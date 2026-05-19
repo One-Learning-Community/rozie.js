@@ -113,8 +113,12 @@ export function emitReact(
   // portals closure, the shell needs the matching react-dom/client import.
   // `Root` is type-only so the line uses `type Root` to avoid a runtime
   // import (the value-side reference is `createRoot`).
+  // The flushSync line lives in 'react-dom' (not 'react-dom/client'); it
+  // forces synchronous portal-tree commits so engine callbacks never see
+  // an unmounted-but-DOM-attached node mid-reconciliation (see emitPortals.ts
+  // for the rationale).
   const portalImport = hasPortals
-    ? "import { createRoot, type Root } from 'react-dom/client';\n"
+    ? "import { createRoot, type Root } from 'react-dom/client';\nimport { flushSync } from 'react-dom';\n"
     : '';
 
   // Plan 04-03: emit the template-side JSX, slot-prop fields + ctx interfaces.
