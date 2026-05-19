@@ -48,11 +48,29 @@ const traverse: TraverseFn =
  * @param ir - the IRComponent (used for prop/data/ref/computed name lookups)
  * @param diagnostics - collected-not-thrown sink for ROZ420 collision diagnostics
  */
+export interface RewriteRozieIdentifiersResult {
+  /**
+   * True if the script body referenced `$slots.X` for any non-portal slot
+   * name. emitScript uses this to conditionally inject `const slots =
+   * useSlots();` + the corresponding `useSlots` import. Phase 07.7 bug fix:
+   * without this, `$slots is not defined` ReferenceError at runtime
+   * (surfaced by FullCalendar.rozie's `if ($slots.event)` guard).
+   */
+  slotsUsed: boolean;
+}
+
 export function rewriteRozieIdentifiers(
   program: t.File,
   ir: IRComponent,
   diagnostics: Diagnostic[],
-): void {
+): RewriteRozieIdentifiersResult {
+  let slotsUsed = false;
+  // Non-portal slot names — portals are routed through `portals.X` (a
+  // separate setup-level closure synthesized by emitScript). Only
+  // light-DOM / scoped-fill slots route through `$slots.X` → `slots.X`.
+  const nonPortalSlotNames = new Set(
+    ir.slots.filter((s) => s.isPortal !== true).map((s) => s.name),
+  );
   const modelProps = new Set(ir.props.filter((p) => p.isModel).map((p) => p.name));
   const nonModelProps = new Set(ir.props.filter((p) => !p.isModel).map((p) => p.name));
   const dataNames = new Set(ir.state.map((s) => s.name));
@@ -141,6 +159,19 @@ export function rewriteRozieIdentifiers(
         path.node.object = t.identifier('portals');
         return;
       }
+      if (obj.name === '$slots') {
+        // Phase 07.7 fix — `$slots.X` (script-side slot presence check)
+        // lowers to `slots.X` where `slots` is the const from `useSlots()`.
+        // Common pattern: `if ($slots.event) { … }` in producer wrappers
+        // that conditionally wire third-party-engine slot callbacks (e.g.
+        // FullCalendar.rozie's eventContent gate). Without the rewrite,
+        // `$slots is not defined` ReferenceError at runtime.
+        if (nonPortalSlotNames.has(prop.name)) {
+          path.node.object = t.identifier('slots');
+          slotsUsed = true;
+        }
+        return;
+      }
     },
 
     OptionalMemberExpression(path) {
@@ -168,6 +199,13 @@ export function rewriteRozieIdentifiers(
       if (obj.name === '$refs' && refNames.has(prop.name)) {
         path.node.object = t.identifier(prop.name + 'Ref');
         path.node.property = t.identifier('value');
+        return;
+      }
+      if (obj.name === '$slots' && nonPortalSlotNames.has(prop.name)) {
+        // Phase 07.7 fix — mirror of MemberExpression branch above for
+        // optional-chained `$slots.X?.foo` patterns.
+        path.node.object = t.identifier('slots');
+        slotsUsed = true;
         return;
       }
     },
@@ -299,4 +337,6 @@ export function rewriteRozieIdentifiers(
       path.skip();
     },
   });
+
+  return { slotsUsed };
 }

@@ -28,6 +28,22 @@ import type { IRComponent } from '../../../../core/src/ir/types.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
 
+/**
+ * Normalize an emit name to a Svelte 5 callback-prop identifier.
+ *
+ * Svelte 5 convention is ALL-LOWERCASE callback props (`onclose`, `onsearch`).
+ * Hyphens in event names (e.g. `event-click`) MUST be stripped — preserving
+ * them would produce `onevent-click`, an invalid TS identifier. Both
+ * rewriteScript ($emit lowering) and emitScript (Props interface emit) MUST
+ * use this helper so the rewritten body's `oneventclick?.(x)` call site agrees
+ * with the destructured prop `oneventclick`. Phase 07.7 fix — surfaced by
+ * `examples/FullCalendar.rozie` which emits `event-click` / `date-click` /
+ * `event-drop`. Re-exported so emitScript imports the same definition.
+ */
+export function svelteCallbackPropName(eventName: string): string {
+  return `on${eventName.replace(/-/g, '').toLowerCase()}`;
+}
+
 // CJS interop normalization (Phase 2 D-T-2-01-04 pattern).
 type TraverseFn = typeof import('@babel/traverse').default;
 const traverse: TraverseFn =
@@ -240,7 +256,15 @@ export function rewriteRozieIdentifiers(
       // Replace with optional-call: onfoo?.(restArgs). Do NOT path.skip() —
       // remaining args may contain nested $data/$props/$refs MemberExpressions
       // that still need rewriting (babel will re-traverse the replaced node).
-      const callbackName = `on${first.value}`;
+      //
+      // Phase 07.7 fix — strip non-identifier chars from the event name
+      // (hyphens specifically) before prepending `on`. Without this, an
+      // emit like `$emit('event-click', payload)` produced `onevent-click`
+      // — a literal hyphen in a TS identifier position, which is invalid
+      // syntax. Both rewriteScript (here) and emitScript (Props interface
+      // emit) MUST agree on the normalization; the shared `svelteCallbackPropName`
+      // helper enforces that lockstep.
+      const callbackName = svelteCallbackPropName(first.value);
       const rest = args.slice(1);
       const optCall = t.optionalCallExpression(
         t.identifier(callbackName),

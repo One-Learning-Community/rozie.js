@@ -42,7 +42,7 @@ import type {
 } from '../../../../core/src/ir/types.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { cloneScriptProgram } from '../rewrite/cloneProgram.js';
-import { rewriteRozieIdentifiers } from '../rewrite/rewriteScript.js';
+import { rewriteRozieIdentifiers, svelteCallbackPropName } from '../rewrite/rewriteScript.js';
 import { collectSvelteImports } from '../rewrite/collectSvelteImports.js';
 import { buildSlotTypeFields } from './refineSlotTypes.js';
 import { emitPortals } from './emitPortals.js';
@@ -191,8 +191,14 @@ function buildPropsInterfaceFields(ir: IRComponent): string[] {
   // ALL-LOWERCASE (e.g., `onclose`, `onsearch`) — NOT React's PascalCase
   // `onSearch`. v1 types args as `(...args: unknown[]) => void` since IR
   // doesn't carry per-emit arg types (Phase 6 TYPES-01 refines).
+  //
+  // Phase 07.7 fix — shared `svelteCallbackPropName` helper strips hyphens
+  // from emit names before lowercasing. Without the strip, an emit like
+  // `event-click` produced `onevent-click` (literal hyphen in identifier
+  // position) — invalid TS syntax. Both this emit and rewriteScript's
+  // $emit-lowering use the same helper to stay in lockstep.
   for (const e of ir.emits) {
-    const onName = `on${e.toLowerCase()}`;
+    const onName = svelteCallbackPropName(e);
     lines.push(`  ${onName}?: (...args: unknown[]) => void;`);
   }
 
@@ -277,10 +283,11 @@ function buildPropsDestructureEntries(ir: IRComponent): string[] {
     }
   }
 
-  // Emits → bare destructure of the all-lowercase callback prop. Matches
-  // the rewriteScript output (`onsearch?.(x)`).
+  // Emits → bare destructure of the normalized callback prop. Matches
+  // the rewriteScript output (`onsearch?.(x)` / `oneventclick?.(x)`).
+  // Phase 07.7 fix — shared svelteCallbackPropName helper strips hyphens.
   for (const e of ir.emits) {
-    entries.push(`on${e.toLowerCase()}`);
+    entries.push(svelteCallbackPropName(e));
   }
 
   return entries;

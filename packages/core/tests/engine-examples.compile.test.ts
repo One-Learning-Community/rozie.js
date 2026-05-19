@@ -47,7 +47,7 @@ const ENGINE_DEMOS = [
   'LineChartDemo.rozie',
   'TipTapDemo.rozie',
   'UppyDemo.rozie',
-  'FullCalendarDemo.rozie',
+  'demos/FullCalendarDemo.rozie',
 ] as const;
 
 describe('engine-wrapper examples — cross-target compile gate', () => {

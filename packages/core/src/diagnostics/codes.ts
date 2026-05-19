@@ -106,6 +106,7 @@ export const RozieErrorCode = {
   TARGET_REACT_NESTED_STATE_MUTATION: 'ROZ521', // Pitfall 7 — $data.foo.bar = 'x' nested member writes; v1 warns + leaves AST unchanged
   TARGET_REACT_MODULE_LET_AUTO_HOISTED: 'ROZ522', // Pitfall 3/8 — module-scoped `let X` referenced from LifecycleHook setup auto-hoisted to useRef
   TARGET_REACT_MODULE_LET_UNHOISTABLE: 'ROZ523', // Pitfall 3/8 — module-scoped `let X` referenced too indirectly to safely auto-hoist; user must refactor
+  TARGET_REACT_SETTER_NAME_COLLISION: 'ROZ524', // Phase 07.7 — user-defined function `set<X>` collides with auto-generated useState/useControllableState setter `setX` for state/model prop X; emits "already declared" + infinite recursion when `$data.X = v` rewrites to `setX(v)` inside the same-named user wrapper
 
   // ---- @rozie/runtime-react warnings (Phase 4 D-63) — ROZ550..ROZ579 ----
   RUNTIME_REACT_CONTROLLABLE_MODE_FLIP: 'ROZ550', // D-57 — useControllableState detected parent flipping controlled/uncontrolled mid-lifecycle

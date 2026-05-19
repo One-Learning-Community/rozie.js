@@ -40,6 +40,7 @@ import type {
 } from '../../../../core/src/ir/types.js';
 import type { SignalRef } from '../../../../core/src/reactivity/signalRef.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
+import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
 import { cloneScriptProgram } from '../rewrite/cloneProgram.js';
 import { partitionUserImports } from '../rewrite/partitionUserImports.js';
 import { rewriteRozieIdentifiers } from '../rewrite/rewriteScript.js';
@@ -1120,6 +1121,8 @@ export function emitScript(
   // computeHelperBodyDeps walk knows which identifiers are sibling helpers
   // (and should be classified as `closure` deps, not unknown identifiers).
   const allHelperNames = new Set<string>();
+  // Build helper-name → declaration-location map for the ROZ524 diagnostic.
+  const helperLocByName = new Map<string, { start: number; end: number }>();
   for (let i = 0; i < cloned.program.body.length; i++) {
     if (lifecyclePairing.consumedIndices.has(i)) continue;
     // Quick plan 260515-u2b — $watch lines were emitted as useEffects.
@@ -1127,6 +1130,12 @@ export function emitScript(
     const stmt = cloned.program.body[i]!;
     if (t.isFunctionDeclaration(stmt) && stmt.id) {
       allHelperNames.add(stmt.id.name);
+      if (stmt.id.loc) {
+        helperLocByName.set(stmt.id.name, {
+          start: stmt.id.loc.start.index ?? 0,
+          end: stmt.id.loc.end.index ?? 0,
+        });
+      }
       continue;
     }
     if (t.isVariableDeclaration(stmt)) {
@@ -1137,8 +1146,48 @@ export function emitScript(
           (t.isArrowFunctionExpression(d.init) || t.isFunctionExpression(d.init))
         ) {
           allHelperNames.add(d.id.name);
+          if (d.id.loc) {
+            helperLocByName.set(d.id.name, {
+              start: d.id.loc.start.index ?? 0,
+              end: d.id.loc.end.index ?? 0,
+            });
+          }
         }
       }
+    }
+  }
+
+  // Phase 07.7 — ROZ524 collision detection. React auto-generates `set<Cap>`
+  // setters for every state / model-prop via `useState` / `useControllableState`
+  // destructure. If the user authors a top-level helper with the same name
+  // (e.g. `const setView = (v) => { $data.view = v }` when `view` is a model
+  // prop), the emitted code has TWO `setView` bindings — useState's destructure
+  // AND the user's const — producing "Identifier 'setView' has already been
+  // declared". Worse, the user's body `$data.view = v` rewrites to `setView(v)`
+  // which then targets the user's own wrapper → infinite recursion. Detect at
+  // compile time; emit ROZ524; user must rename. Surfaced by FullCalendarDemo's
+  // `setView` wrapper for `view: { model: true }`.
+  const autoSetters = new Set<string>();
+  for (const p of ir.props) {
+    if (p.isModel) autoSetters.add('set' + capitalize(p.name));
+  }
+  for (const s of ir.state) {
+    autoSetters.add('set' + capitalize(s.name));
+  }
+  for (const name of allHelperNames) {
+    if (autoSetters.has(name)) {
+      const loc = helperLocByName.get(name);
+      diagnostics.push({
+        code: RozieErrorCode.TARGET_REACT_SETTER_NAME_COLLISION,
+        severity: 'error',
+        message:
+          `User-defined function '${name}' collides with the React auto-generated setter for the same-named state/model prop. ` +
+          `React's \`useState\` / \`useControllableState\` destructure binds '${name}' from the IR's state/model props, ` +
+          `and a top-level user helper with the same identifier produces "Identifier '${name}' has already been declared" at runtime, ` +
+          `plus the user's body rewrite ('$data.${name.slice(3, 4).toLowerCase()}${name.slice(4)} = v' → '${name}(v)') becomes infinite recursion. ` +
+          `Rename the user function — e.g. '${name}' → 'select${name.slice(3)}'.`,
+        loc: loc ? { start: loc.start, end: loc.end } : undefined,
+      });
     }
   }
 

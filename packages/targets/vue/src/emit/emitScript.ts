@@ -727,7 +727,7 @@ export function emitScript(
   const cloned = cloneScriptProgram(ir.setupBody.scriptProgram);
 
   // 2. Rewrite identifiers on the clone.
-  rewriteRozieIdentifiers(cloned, ir, diagnostics);
+  const { slotsUsed } = rewriteRozieIdentifiers(cloned, ir, diagnostics);
 
   const imports = new VueImportCollector();
 
@@ -736,6 +736,16 @@ export function emitScript(
   const modelLines = emitDefineModels(ir);
   const emitsLine = emitDefineEmitsCall(ir);
   const slotsLine = emitDefineSlotsStub(ir);
+  // Phase 07.7 fix — script-level $slots references rewrite to `slots.X`
+  // (see rewriteScript.ts MemberExpression branch for `$slots`). When that
+  // rewrite fires, emit `const slots = useSlots();` + import `useSlots`.
+  // Surfaced by FullCalendar.rozie's `if ($slots.event)` engine-callback gate
+  // (was emitting bare `$slots.event` → ReferenceError at runtime).
+  const useSlotsLine: string[] = [];
+  if (slotsUsed) {
+    imports.use('useSlots');
+    useSlotsLine.push('const slots = useSlots();');
+  }
   const dataLines = emitDataRefs(ir, imports);
   const refLines = emitTemplateRefs(ir, imports);
 
@@ -767,6 +777,7 @@ export function emitScript(
   if (modelLines.length > 0) preambleSections.push(modelLines.join('\n'));
   if (emitsLine) preambleSections.push(emitsLine);
   if (slotsLine) preambleSections.push(slotsLine);
+  if (useSlotsLine.length > 0) preambleSections.push(useSlotsLine.join('\n'));
   if (dataLines.length > 0) preambleSections.push(dataLines.join('\n'));
   if (refLines.length > 0) preambleSections.push(refLines.join('\n'));
   if (computedLines.length > 0) preambleSections.push(computedLines.join('\n'));
