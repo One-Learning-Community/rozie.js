@@ -75,16 +75,9 @@ const angularBuilt = existsSync(
   resolve(__dirname, '../dist/angular/host/entry.angular.html'),
 );
 
-// Spike 003 followup gap — see portal-list.spec.ts LIT_PORTAL_GAP comment.
-// PortalList's portal-slot primitive requires consumer-side function-prop
-// shape that Lit's emitSlotFiller doesn't yet emit; the cell renders empty.
-// Gate it as test.fixme until the Lit consumer-side portal-fill emit lands.
-const PORTAL_LIT_GAP: Array<{ example: string; target: string }> = [
-  { example: 'PortalList', target: 'lit' },
-];
-function isPortalLitGap(example: string, target: string): boolean {
-  return PORTAL_LIT_GAP.some((g) => g.example === example && g.target === target);
-}
+// Phase 07.5 closure — PORTAL_LIT_GAP removed once consumer-side function-prop
+// emit landed for portal slots. PortalList · lit renders against the SAME
+// shared `PortalList.png` baseline as the other 5 targets (D-10 byte-identity).
 
 
 // Per-example pre-screenshot settle conditions.
@@ -111,10 +104,7 @@ async function settleExample(
 
 for (const example of EXAMPLES) {
   for (const target of TARGETS) {
-    const runner =
-      (target === 'angular' && !angularBuilt) || isPortalLitGap(example, target)
-        ? test.fixme
-        : test;
+    const runner = target === 'angular' && !angularBuilt ? test.fixme : test;
     runner(`${example} · ${target}`, async ({ page }) => {
       await page.goto(`/?example=${example}&target=${target}`);
       const component = page.getByTestId('rozie-mount');

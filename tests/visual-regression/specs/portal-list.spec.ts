@@ -40,18 +40,10 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'] as const;
 
-// Lit consumer-side portal-slot gap (Spike 003 followup): the producer-side
-// portal closure (`this.<name>`) expects a function-typed @property, but the
-// consumer-side emitter still routes `<template #item>` fills as shadow-DOM
-// `<element slot="X">` projections (because Rozie's emitSlotFiller doesn't
-// yet look up the producer's `SlotDecl.isPortal` to switch to the
-// function-prop shape). Net effect: the 4 engine-owned cells stay empty in
-// Lit. The 5/6 other targets fully demonstrate the primitive.
-//
-// Removing this `LIT_PORTAL_GAP` set is the closure signal for the followup:
-// once emitSlotFiller (Lit) emits `.item=${(scope) => html\`…\`}` instead of
-// `<element slot="item">` for portal slots, this gate lifts automatically.
-const LIT_PORTAL_GAP = new Set<(typeof TARGETS)[number]>(['lit']);
+// Phase 07.5 closure — LIT_PORTAL_GAP removed once consumer-side function-prop
+// emit landed for portal slots. Lit now emits `.item=${(scope) => html\`…\`}`
+// on the producer's open tag (instead of `<element slot="item">`), and the
+// 4 engine-owned cells render correctly.
 
 // Build-availability gate — matches the matrix.spec.ts pattern. When
 // `dist/<target>/host/entry.<target>.html` is absent (Angular soft-fails on
@@ -69,8 +61,7 @@ for (const target of TARGETS) {
   const built = existsSync(
     resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
   );
-  const hasLitGap = LIT_PORTAL_GAP.has(target);
-  const runner = built && !hasLitGap ? test : test.fixme;
+  const runner = built ? test : test.fixme;
   runner(`portal-list [${target}]: mounts each row through $portals.item`, async ({
     page,
   }) => {

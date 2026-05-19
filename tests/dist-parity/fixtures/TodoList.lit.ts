@@ -33,8 +33,10 @@ form { display: flex; gap: 0.25rem; margin-block: 0.5rem; }
 
   @state() private _hasSlotHeader = false;
   @queryAssignedElements({ slot: 'header', flatten: true }) private _slotHeaderElements!: Element[];
+  @property({ attribute: false }) header?: (scope: { remaining: unknown; total: unknown }) => unknown;
   @state() private _hasSlotDefault = false;
   @queryAssignedElements({ flatten: true }) private _slotDefaultElements!: Element[];
+  @property({ attribute: false }) _defaultSlotFn?: (scope: { item: unknown; toggle: unknown; remove: unknown }) => unknown;
   @state() private _hasSlotEmpty = false;
   @queryAssignedElements({ slot: 'empty', flatten: true }) private _slotEmptyElements!: Element[];
 

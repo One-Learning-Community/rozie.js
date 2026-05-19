@@ -916,10 +916,20 @@ function emitElement(
         children.map((c) => emitNode(c, ir, hostListenerWiring, opts)).join(''),
     };
     const fillerChildren: string[] = [];
+    // Phase 07.5 — function-prop emit path: portal slots + scoped slots where
+    // the consumer destructures populate `out.propertyAttr` instead of
+    // `out.childTemplate`. We accumulate those snippets and splice them into
+    // the component's open tag before the final `>` (mirrors emitSlot's
+    // eventStr splicing established in Phase 07.4).
+    const propertyAttrs: string[] = [];
     let needsObserveImport = false;
     for (const filler of node.slotFillers) {
       const out = emitSlotFiller(filler, fillerCtx);
-      if (out.childTemplate) fillerChildren.push(out.childTemplate);
+      if (out.propertyAttr !== undefined && out.propertyAttr.length > 0) {
+        propertyAttrs.push(out.propertyAttr);
+      } else if (out.childTemplate) {
+        fillerChildren.push(out.childTemplate);
+      }
       for (const f of out.classFields) {
         opts._state?.slotFillerClassFields.push(f);
       }
@@ -942,7 +952,22 @@ function emitElement(
     if (needsObserveImport) {
       opts.runtime.add('observeRozieSlotCtx');
     }
-    return `${open}${fillerChildren.join('')}</${tagName}>`;
+    // Phase 07.5 — splice property attrs into the parent component's open
+    // tag before the final `>`. `open` is the component's open tag (e.g.
+    // `<rozie-modal r-model:open=${…}>`); never self-close in the
+    // slot-filler path (components with fills are container elements).
+    let openWithProps = open;
+    if (propertyAttrs.length > 0) {
+      const lastGt = open.lastIndexOf('>');
+      if (lastGt === -1) {
+        // Defensive — should never happen; degrade gracefully.
+        openWithProps = open;
+      } else {
+        openWithProps =
+          open.slice(0, lastGt) + ' ' + propertyAttrs.join(' ') + open.slice(lastGt);
+      }
+    }
+    return `${openWithProps}${fillerChildren.join('')}</${tagName}>`;
   }
 
   const children = node.children

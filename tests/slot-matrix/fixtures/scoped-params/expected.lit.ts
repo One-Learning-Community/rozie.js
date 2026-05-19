@@ -12,6 +12,7 @@ export default class ScopedParamsFixture extends SignalWatcher(LitElement) {
 
   @state() private _hasSlotItem = false;
   @queryAssignedElements({ slot: 'item', flatten: true }) private _slotItemElements!: Element[];
+  @property({ attribute: false }) item?: (scope: { value: unknown }) => unknown;
 
   private _disconnectCleanups: Array<() => void> = [];
 

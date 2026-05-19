@@ -31,8 +31,10 @@ export default class Dropdown extends SignalWatcher(LitElement) {
 
   @state() private _hasSlotTrigger = false;
   @queryAssignedElements({ slot: 'trigger', flatten: true }) private _slotTriggerElements!: Element[];
+  @property({ attribute: false }) trigger?: (scope: { open: unknown; toggle: unknown }) => unknown;
   @state() private _hasSlotDefault = false;
   @queryAssignedElements({ flatten: true }) private _slotDefaultElements!: Element[];
+  @property({ attribute: false }) _defaultSlotFn?: (scope: { close: unknown }) => unknown;
 
   private _disconnectCleanups: Array<() => void> = [];
 

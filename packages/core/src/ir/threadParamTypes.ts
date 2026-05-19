@@ -269,6 +269,14 @@ export function threadParamTypes(
         continue;
       }
 
+      // Phase 07.5 — thread producer SlotDecl.isPortal + scope-param-count onto consumer
+      // SlotFillerDecl, so per-target emitters can switch between function-prop and
+      // light-DOM emit paths without re-walking the producer IR at emit time.
+      if (matchingSlot.isPortal === true) {
+        filler.isPortal = true;
+      }
+      filler.producerSlotParamCount = matchingSlot.params.length;
+
       // R4 — thread producer paramTypes onto consumer.
       if (matchingSlot.paramTypes !== undefined) {
         filler.paramTypes = matchingSlot.paramTypes;
