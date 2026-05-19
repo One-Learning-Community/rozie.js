@@ -35,6 +35,11 @@ const ENGINE_WRAPPERS = [
   // vanilla-JS "engine" so the exhibit has no third-party deps; the wrapper
   // exercises the same authoring + lowering path the third-party engines do.
   'PortalList.rozie',
+  // CodeMirror (added 2026-05-19) — r-model:value through a non-input
+  // contenteditable engine. Two-way binding archetype for engine-mediated
+  // value flows; consumer edits flow back via an `updateListener` extension,
+  // not a DOM input event.
+  'CodeMirror.rozie',
 ] as const;
 
 // Multi-file consumer demos. Each imports its sibling engine wrapper via
@@ -48,6 +53,7 @@ const ENGINE_DEMOS = [
   'TipTapDemo.rozie',
   'UppyDemo.rozie',
   'demos/FullCalendarDemo.rozie',
+  'demos/CodeMirrorDemo.rozie',
 ] as const;
 
 describe('engine-wrapper examples — cross-target compile gate', () => {

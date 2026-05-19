@@ -55,6 +55,15 @@ export const EXAMPLES = [
   // `{ labels, datasets: [{ data: [] }] }` ChartData object — a richer
   // all-`$props` getterDep shape than FullCalendar's flat events array.
   'LineChart',
+  // CodeMirror (added 2026-05-19) — r-model:value two-way binding
+  // through a non-input contenteditable engine. Existing model:true
+  // examples in the suite wrap form inputs (Counter, SearchInput,
+  // SortableList items). CodeMirror reflects user edits via an
+  // `EditorView.updateListener` extension, not a DOM input event —
+  // the archetypal engine-mediated two-way case. The demo binds two
+  // editors to the same `$data.code` signal, so an edit in one round-
+  // trips through the model emit path to the other.
+  'CodeMirror',
 ] as const;
 
 export type Example = (typeof EXAMPLES)[number];
@@ -86,6 +95,7 @@ export const LIT_TAGS: Record<Example, string> = {
   PortalList: 'rozie-portal-list',
   FullCalendar: 'rozie-full-calendar',
   LineChart: 'rozie-line-chart',
+  CodeMirror: 'rozie-code-mirror',
 };
 
 export interface HostQuery {
@@ -138,6 +148,10 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // flag); the LineChart wrapper itself takes `data` / `options` / `type` /
   // `height` props but the demo wrapper is self-contained.
   LineChart: {},
+  // CodeMirrorDemo seeds the `code` string and `theme` in `<data>`; the
+  // CodeMirror wrapper itself takes `value` (model: true) / `theme` / etc.
+  // but the demo wrapper is self-contained.
+  CodeMirror: {},
 };
 
 /** Parse `?example=&target=` from the current URL, falling back to defaults. */

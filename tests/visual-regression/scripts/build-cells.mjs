@@ -45,6 +45,10 @@ const REFERENCE_BASENAMES = [
   // `examples/LineChart.ts` cross-rozie composition shim — gitignored and
   // regenerated each Angular sub-build — that the cleanup deletes too.
   'LineChart',
+  // CodeMirror wrapper (added 2026-05-19). CodeMirrorDemo (in examples/demos/)
+  // is loaded by the VR rig; same Angular `.rozie.ts` + cross-rozie shim
+  // cleanup pattern as LineChart.
+  'CodeMirror',
 ];
 
 // Cross-tree disk-cache files emitted by the Angular sub-build into the
