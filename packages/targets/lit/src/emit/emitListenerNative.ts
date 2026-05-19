@@ -4,7 +4,7 @@
  * Returns the wiring lines for a Class-A (pure native) or Class-D (filter
  * guards) listener:
  *
- *   const _lh = (e) => { guards; userHandler(e); };
+ *   const _lh = ($event) => { guards; userHandler($event); };
  *   target.addEventListener('event', _lh, options);
  *   this._disconnectCleanups.push(() => target.removeEventListener('event', _lh, options));
  *
@@ -34,7 +34,7 @@ export function emitListenerNative(opts: EmitListenerNativeOpts): string {
   const guardLines: string[] = [];
   if (opts.whenExpr) guardLines.push(`if (!(${opts.whenExpr})) return;`);
   guardLines.push(...opts.guards);
-  const body = `(e: Event) => { ${guardLines.join(' ')} (${opts.handler})(e); }`;
+  const body = `($event: Event) => { ${guardLines.join(' ')} (${opts.handler})($event); }`;
   const handlerVar = `_h${opts.index}`;
   return [
     `const ${handlerVar} = ${body};`,

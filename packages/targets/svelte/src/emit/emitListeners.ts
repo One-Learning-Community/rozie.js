@@ -53,21 +53,21 @@ import type { SvelteScriptInjection } from './emitScript.js';
  * inlined as an early-return guard inside $effect-emitted handlers.
  */
 const NATIVE_KEY_GUARDS: Record<string, string> = {
-  enter: "if (e.key !== 'Enter') return;",
-  esc: "if (e.key !== 'Escape') return;",
-  escape: "if (e.key !== 'Escape') return;",
-  tab: "if (e.key !== 'Tab') return;",
-  delete: "if (e.key !== 'Delete' && e.key !== 'Backspace') return;",
-  space: "if (e.key !== ' ') return;",
-  up: "if (e.key !== 'ArrowUp') return;",
-  down: "if (e.key !== 'ArrowDown') return;",
-  left: "if (e.key !== 'ArrowLeft') return;",
-  right: "if (e.key !== 'ArrowRight') return;",
-  home: "if (e.key !== 'Home') return;",
-  end: "if (e.key !== 'End') return;",
-  pageUp: "if (e.key !== 'PageUp') return;",
-  pageDown: "if (e.key !== 'PageDown') return;",
-  middle: "if (e.button !== 1) return;",
+  enter: "if ($event.key !== 'Enter') return;",
+  esc: "if ($event.key !== 'Escape') return;",
+  escape: "if ($event.key !== 'Escape') return;",
+  tab: "if ($event.key !== 'Tab') return;",
+  delete: "if ($event.key !== 'Delete' && $event.key !== 'Backspace') return;",
+  space: "if ($event.key !== ' ') return;",
+  up: "if ($event.key !== 'ArrowUp') return;",
+  down: "if ($event.key !== 'ArrowDown') return;",
+  left: "if ($event.key !== 'ArrowLeft') return;",
+  right: "if ($event.key !== 'ArrowRight') return;",
+  home: "if ($event.key !== 'Home') return;",
+  end: "if ($event.key !== 'End') return;",
+  pageUp: "if ($event.key !== 'PageUp') return;",
+  pageDown: "if ($event.key !== 'PageDown') return;",
+  middle: "if ($event.button !== 1) return;",
 };
 
 /** Map common DOM events → TypeScript event types for the handler signature. */
@@ -243,9 +243,9 @@ function classifyListener(
       // Stop / prevent in <listeners> blocks — raw addEventListener has no
       // such mechanism; emit explicit side-effect calls.
       if (entry.modifier === 'stop') {
-        nativeKeyGuards.push('e.stopPropagation();');
+        nativeKeyGuards.push('$event.stopPropagation();');
       } else if (entry.modifier === 'prevent') {
-        nativeKeyGuards.push('e.preventDefault();');
+        nativeKeyGuards.push('$event.preventDefault();');
       } else {
         // Key/button filter — push guard if associated with a key-check.
         const guard = NATIVE_KEY_GUARDS[descriptor.token] ?? NATIVE_KEY_GUARDS[entry.modifier];
@@ -314,7 +314,7 @@ function renderListener(
       .join(' || ');
 
     const containsGuard = refChecks.length > 0
-      ? `    const target = e.target as Node;\n    if (${refChecks}) return;\n`
+      ? `    const target = $event.target as Node;\n    if (${refChecks}) return;\n`
       : '';
 
     const guardLines = classification.nativeKeyGuards.length > 0
@@ -323,14 +323,14 @@ function renderListener(
 
     const invocation = handlerIsBareIdentifier
       ? `    ${userHandlerCode}();`
-      : `    (${userHandlerCode})(e);`;
+      : `    (${userHandlerCode})($event);`;
     const optsObj = renderOptionsSuffix(classification.listenerOpts);
     const removeOptsObj = renderOptionsSuffix(classification.listenerOpts, true);
 
     return [
       `$effect(() => {`,
       whenGuard +
-        `  const handler = (e: ${evtType}) => {\n${containsGuard}${guardLines}${invocation}\n  };`,
+        `  const handler = ($event: ${evtType}) => {\n${containsGuard}${guardLines}${invocation}\n  };`,
       `  ${targetExpr}.addEventListener('${listener.event}', handler${optsObj});`,
       `  return () => ${targetExpr}.removeEventListener('${listener.event}', handler${removeOptsObj});`,
       `});`,
@@ -373,14 +373,14 @@ function renderListener(
     : '';
   const invocation = handlerIsBareIdentifier
     ? `    ${userHandlerCode}();`
-    : `    (${userHandlerCode})(e);`;
+    : `    (${userHandlerCode})($event);`;
   const optsObj = renderOptionsSuffix(classification.listenerOpts);
   const removeOptsObj = renderOptionsSuffix(classification.listenerOpts, true);
 
   return [
     `$effect(() => {`,
     whenGuard +
-      `  const handler = (e: ${evtType}) => {\n${guardLines}${invocation}\n  };`,
+      `  const handler = ($event: ${evtType}) => {\n${guardLines}${invocation}\n  };`,
     `  ${targetExpr}.addEventListener('${listener.event}', handler${optsObj});`,
     `  return () => ${targetExpr}.removeEventListener('${listener.event}', handler${removeOptsObj});`,
     `});`,

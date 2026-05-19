@@ -11,35 +11,35 @@
   },
   "delete": {
     "kind": "inlineGuard",
-    "code": "if (e.key !== 'Delete') return;"
+    "code": "if ($event.key !== 'Delete') return;"
   },
   "down": {
     "kind": "inlineGuard",
-    "code": "if (e.key !== 'ArrowDown') return;"
+    "code": "if ($event.key !== 'ArrowDown') return;"
   },
   "end": {
     "kind": "inlineGuard",
-    "code": "if (e.key !== 'End') return;"
+    "code": "if ($event.key !== 'End') return;"
   },
   "enter": {
     "kind": "inlineGuard",
-    "code": "if (e.key !== 'Enter') return;"
+    "code": "if ($event.key !== 'Enter') return;"
   },
   "escape": {
     "kind": "inlineGuard",
-    "code": "if (e.key !== 'Escape') return;"
+    "code": "if ($event.key !== 'Escape') return;"
   },
   "home": {
     "kind": "inlineGuard",
-    "code": "if (e.key !== 'Home') return;"
+    "code": "if ($event.key !== 'Home') return;"
   },
   "left": {
     "kind": "inlineGuard",
-    "code": "if (e.key !== 'ArrowLeft') return;"
+    "code": "if ($event.key !== 'ArrowLeft') return;"
   },
   "middle": {
     "kind": "inlineGuard",
-    "code": "if (e.key !== 'Middle') return;"
+    "code": "if ($event.key !== 'Middle') return;"
   },
   "once": {
     "kind": "native",
@@ -54,11 +54,11 @@
   },
   "pageDown": {
     "kind": "inlineGuard",
-    "code": "if (e.key !== 'PageDown') return;"
+    "code": "if ($event.key !== 'PageDown') return;"
   },
   "pageUp": {
     "kind": "inlineGuard",
-    "code": "if (e.key !== 'PageUp') return;"
+    "code": "if ($event.key !== 'PageUp') return;"
   },
   "passive": {
     "kind": "native",
@@ -66,27 +66,27 @@
   },
   "prevent": {
     "kind": "inlineGuard",
-    "code": "e.preventDefault();"
+    "code": "$event.preventDefault();"
   },
   "right": {
     "kind": "inlineGuard",
-    "code": "if (e.key !== 'ArrowRight') return;"
+    "code": "if ($event.key !== 'ArrowRight') return;"
   },
   "self": {
     "kind": "inlineGuard",
-    "code": "if (e.target !== e.currentTarget) return;"
+    "code": "if ($event.target !== $event.currentTarget) return;"
   },
   "space": {
     "kind": "inlineGuard",
-    "code": "if (e.key !== ' ') return;"
+    "code": "if ($event.key !== ' ') return;"
   },
   "stop": {
     "kind": "inlineGuard",
-    "code": "e.stopPropagation();"
+    "code": "$event.stopPropagation();"
   },
   "tab": {
     "kind": "inlineGuard",
-    "code": "if (e.key !== 'Tab') return;"
+    "code": "if ($event.key !== 'Tab') return;"
   },
   "throttle": {
     "kind": "helper",
@@ -96,6 +96,6 @@
   },
   "up": {
     "kind": "inlineGuard",
-    "code": "if (e.key !== 'ArrowUp') return;"
+    "code": "if ($event.key !== 'ArrowUp') return;"
   }
 }

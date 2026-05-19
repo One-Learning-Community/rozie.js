@@ -67,7 +67,7 @@ export default function TodoList(_props: TodoListProps): JSX.Element {
         {(props.renderHeader ?? props.slots?.['header']) ? ((props.renderHeader ?? props.slots?.['header']) as Function)({ remaining, total: items.length }) : <h3 data-rozie-s-52bec3de="">{props.title} ({remaining} remaining)</h3>}
       </header>
 
-      <form onSubmit={(e) => { e.preventDefault(); ((add) as ((...args: any[]) => any))(e); }} data-rozie-s-52bec3de="">
+      <form onSubmit={($event) => { $event.preventDefault(); ((add) as ((...args: any[]) => any))($event); }} data-rozie-s-52bec3de="">
         <input placeholder="What needs doing?" value={draft} onChange={e => setDraft(e.target.value)} data-rozie-s-52bec3de="" />
         <button type="submit" disabled={!draft.trim()} data-rozie-s-52bec3de="">Add</button>
       </form>
@@ -75,7 +75,7 @@ export default function TodoList(_props: TodoListProps): JSX.Element {
       {(items.length > 0) ? <ul data-rozie-s-52bec3de="">
         {items.map((item) => <li key={item.id} className={clsx({ [styles.done]: item.done })} data-rozie-s-52bec3de="">
           
-          {typeof (props.children ?? props.slots?.['']) === 'function' ? ((props.children ?? props.slots?.['']) as Function)({ item, toggle: () => toggle(item.id), remove: () => removeItem(item.id) }) : ((props.children ?? props.slots?.['']) ?? <><label data-rozie-s-52bec3de=""><input type="checkbox" checked={item.done} onChange={(e) => { toggle(item.id); }} data-rozie-s-52bec3de="" /><span data-rozie-s-52bec3de="">{item.text}</span></label><button aria-label="Remove" onClick={(e) => { removeItem(item.id); }} data-rozie-s-52bec3de="">×</button></>)}
+          {typeof (props.children ?? props.slots?.['']) === 'function' ? ((props.children ?? props.slots?.['']) as Function)({ item, toggle: () => toggle(item.id), remove: () => removeItem(item.id) }) : ((props.children ?? props.slots?.['']) ?? <><label data-rozie-s-52bec3de=""><input type="checkbox" checked={item.done} onChange={($event) => { toggle(item.id); }} data-rozie-s-52bec3de="" /><span data-rozie-s-52bec3de="">{item.text}</span></label><button aria-label="Remove" onClick={($event) => { removeItem(item.id); }} data-rozie-s-52bec3de="">×</button></>)}
         </li>)}
       </ul> : <p className={styles.empty} data-rozie-s-52bec3de="">
         {(props.renderEmpty ?? props.slots?.['empty']) ? ((props.renderEmpty ?? props.slots?.['empty']) as Function)() : "Nothing to do. ✨"}

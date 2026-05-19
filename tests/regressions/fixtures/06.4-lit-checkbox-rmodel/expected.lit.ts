@@ -29,7 +29,7 @@ export default class CheckboxRModel extends SignalWatcher(LitElement) {
     return html`
 <label class="toggle" data-rozie-s-5898a126>
   
-  <input type="checkbox" .checked=${this.checked} @change=${(e) => this.checked = (e.target as HTMLInputElement).checked} data-rozie-s-5898a126 />
+  <input type="checkbox" .checked=${this.checked} @change=${($event) => this.checked = ($event.target as HTMLInputElement).checked} data-rozie-s-5898a126 />
   <span data-rozie-s-5898a126>Enabled</span>
 </label>
 `;

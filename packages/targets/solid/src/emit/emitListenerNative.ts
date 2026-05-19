@@ -10,9 +10,9 @@
  *   ```
  *   createEffect(() => {
  *     if (!(when)) return;           // optional — only if listener.when set
- *     const handler = (e: Event) => {
- *       if (e.key !== 'Escape') return;  // inlineGuards
- *       userHandler(e);
+ *     const handler = ($event: Event) => {
+ *       if ($event.key !== 'Escape') return;  // inlineGuards
+ *       userHandler($event);
  *     };
  *     document.addEventListener('keydown', handler, { passive: true });
  *     onCleanup(() => document.removeEventListener('keydown', handler));
@@ -186,7 +186,7 @@ export function emitListenerNative(
       handlerDecl = '';
       handlerRef = options.wrappedHandlerName;
     } else {
-      handlerDecl = `  const _rozieGuardedHandler = (e: ${evtType}) => {\n${guardBody}    ${options.wrappedHandlerName}(e);\n  };\n`;
+      handlerDecl = `  const _rozieGuardedHandler = ($event: ${evtType}) => {\n${guardBody}    ${options.wrappedHandlerName}($event);\n  };\n`;
       handlerRef = '_rozieGuardedHandler';
     }
   } else {
@@ -200,7 +200,7 @@ export function emitListenerNative(
     const invocation = handlerIsBareIdentifier
       ? `${userHandlerCode}();`
       : `(${userHandlerCode});`;
-    handlerDecl = `  const ${handlerName} = (e: ${evtType}) => {\n${guardBody}    ${invocation}\n  };\n`;
+    handlerDecl = `  const ${handlerName} = ($event: ${evtType}) => {\n${guardBody}    ${invocation}\n  };\n`;
     handlerRef = handlerName;
   }
 

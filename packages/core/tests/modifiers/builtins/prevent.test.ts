@@ -36,13 +36,13 @@ describe('builtin: .prevent — Plan 02-04', () => {
   });
 
   // Phase 07.1 — Solid/Lit emission descriptors (parallels svelte()/angular()).
-  it('.prevent solid() → inlineGuard with e.preventDefault()', () => {
+  it('.prevent solid() → inlineGuard with $event.preventDefault()', () => {
     const desc = prevent.solid!([], CTX);
-    expect(desc).toEqual({ kind: 'inlineGuard', code: 'e.preventDefault();' });
+    expect(desc).toEqual({ kind: 'inlineGuard', code: '$event.preventDefault();' });
   });
 
-  it('.prevent lit() → inlineGuard with e.preventDefault()', () => {
+  it('.prevent lit() → inlineGuard with $event.preventDefault()', () => {
     const desc = prevent.lit!([], CTX);
-    expect(desc).toEqual({ kind: 'inlineGuard', code: 'e.preventDefault();' });
+    expect(desc).toEqual({ kind: 'inlineGuard', code: '$event.preventDefault();' });
   });
 });

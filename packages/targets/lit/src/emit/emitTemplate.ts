@@ -9,8 +9,8 @@
  *   - `:prop="expr"` → `.prop=${expr}` (property binding)
  *   - boolean attr → `?attr=${expr}` (Lit boolean attr sigil)
  *   - `class=` / `style=` → static "..."
- *   - `@event="fn"` → `@event=${(e) => fn(e)}` (handler binding)
- *   - r-model on form input → `.value=${this.X.value} @input=${(e) => this.X.value = e.target.value}`
+ *   - `@event="fn"` → `@event=${($event) => fn($event)}` (handler binding)
+ *   - r-model on form input → `.value=${this.X.value} @input=${($event) => this.X.value = $event.target.value}`
  *   - composition tag `<Foo>` → `<rozie-foo>...</rozie-foo>`
  *   - `<slot>` → `<slot name="..."></slot>` with data-rozie-params transport for scoped slots
  *   - `{{ expr }}` → `${expr}` (lit-html auto-escapes by default — T-06.4-03)
@@ -216,7 +216,7 @@ function isHandlerLike(expr: bt.Expression): boolean {
   // identifier handler refs (`@click="close"`) into OptionalMemberExpressions
   // (`this._headerCtx?.close`). These are still handler-like — lit-html's
   // `@event=${fn}` semantics call `fn` directly with the event. Treating them
-  // as handler-like avoids the synthesized `(e: Event) => { …; }` wrap that
+  // as handler-like avoids the synthesized `($event: Event) => { …; }` wrap that
   // would otherwise insert a statement-shape body for what is actually a
   // function-reference expression.
   if (bt.isOptionalMemberExpression(expr)) return true;
@@ -311,7 +311,7 @@ function emitAttribute(
     const valueExpr = rewriteTemplateExpression(attr.expression, ir);
     const setterText = resolveLitSetterText(attr.expression, ir);
     const eventName = `${toKebabCase(attr.name)}-change`;
-    return `.${attr.name}=\${${valueExpr}} @${eventName}=\${(e: CustomEvent) => { ${setterText} = e.detail; }}`;
+    return `.${attr.name}=\${${valueExpr}} @${eventName}=\${($event: CustomEvent) => { ${setterText} = $event.detail; }}`;
   }
 
   if (attr.kind === 'binding') {
@@ -418,14 +418,14 @@ function buildRModelParts(
     return {
       propBinding: `.checked=\${${code}}`,
       eventName: 'change',
-      handlerBody: `(e) => ${code} = (e.target as HTMLInputElement).checked`,
+      handlerBody: `($event) => ${code} = ($event.target as HTMLInputElement).checked`,
     };
   }
 
   return {
     propBinding: `.value=\${${code}}`,
     eventName: 'input',
-    handlerBody: `(e) => ${code} = (e.target as HTMLInputElement).value`,
+    handlerBody: `($event) => ${code} = ($event.target as HTMLInputElement).value`,
   };
 }
 
@@ -456,7 +456,7 @@ function buildEventParts(
   // Phase 07.3.1 D-LIT-17 — function-typed scoped-slot params (e.g. `close`)
   // can't transit through `data-rozie-params` (JSON.stringify silently drops
   // function values). The producer side emits a matching `@event` binding
-  // (`@rozie-<slot>-<param>=${(e: CustomEvent) => userThunk(e.detail)}`)
+  // (`@rozie-<slot>-<param>=${($event: CustomEvent) => userThunk($event.detail)}`)
   // directly on the producer's `<slot>` element via inline @event in
   // emitSlot() (Phase 07.4 D-LIT-12 — replaces the previous host-scope
   // `addEventListener` path so loop-local `r-for` iteration variables are
@@ -486,7 +486,7 @@ function buildEventParts(
     // `toKebabCase()` is a no-op so existing fixtures are unaffected.
     const slotKebab = toKebabCase(slot);
     const paramKebab = toKebabCase(param);
-    // Dispatch on e.currentTarget (the clicked element INSIDE the producer's
+    // Dispatch on $event.currentTarget (the clicked element INSIDE the producer's
     // light DOM), NOT on `this` (which is the consumer — PARENT of the
     // producer in the tree). Bubbling propagates UP, so a consumer-rooted
     // dispatch never reaches the producer's host listener. The clicked
@@ -502,7 +502,7 @@ function buildEventParts(
     // dispatchEvent is on EventTarget, but the cast was lying to downstream
     // tooling that reads the emitted .ts. Using EventTarget is correct and
     // accepts both HTMLElement and SVGElement (and any other EventTarget).
-    handler = `(e) => (e.currentTarget as EventTarget).dispatchEvent(new CustomEvent('rozie-${slotKebab}-${paramKebab}', { detail: e, bubbles: true, composed: true }))`;
+    handler = `($event) => ($event.currentTarget as EventTarget).dispatchEvent(new CustomEvent('rozie-${slotKebab}-${paramKebab}', { detail: e, bubbles: true, composed: true }))`;
   } else {
     // Phase 07.3.1 Blocker #3 (D-03) — wrap scoped-slot-ctx handler in a
     // late-binding arrow so the ctx read happens at click time, not render
@@ -512,7 +512,7 @@ function buildEventParts(
     // regex matches only the `this._<name>Ctx?.` shape produced by
     // emitSlotFiller's rewriteScopedParamRefs (Landmine 3 — must not wrap
     // user-authored _xxxCtx fields). The wrap is benign for non-undefined
-    // function references at click time — `(e) => (fn)?.(e)` invokes the
+    // function references at click time — `($event) => (fn)?.($event)` invokes the
     // function with the event when present and is a silent no-op when not.
     const isScopedCtxHandler = /this\._[A-Za-z0-9_]+Ctx\?\./.test(handlerRaw);
     // WR-02 (Phase 07.4 review): if the handler looks like a bare
@@ -544,7 +544,7 @@ function buildEventParts(
       });
     }
     handler = isScopedCtxHandler
-      ? `(e) => (${handlerRaw})?.(e)`
+      ? `($event) => (${handlerRaw})?.($event)`
       : handlerRaw;
   }
 
@@ -646,26 +646,26 @@ function buildEventParts(
   // Plan 07.1-03: when inlineGuards are present the synthesized arrow's `e`
   // param is typed via `eventTypeFor(eventName)` (e.g. `KeyboardEvent`,
   // `TouchEvent`) — the registry's builtin/third-party inlineGuard codes are
-  // cast-free (`e.key`, `e.touches`), so the precise DOM event type is what
+  // cast-free (`$event.key`, `e.touches`), so the precise DOM event type is what
   // keeps the emitted output typecheck-clean. Mirrors emitListeners.ts.
   const isFunctionLike = isHandlerLike(listener.handler);
   const evtType = eventTypeFor(eventName);
   // Cast the handler to a permissive signature when we invoke it with `e`. A
   // user method declared `close = () => void` is a perfectly reasonable @click
-  // handler but tsc flags `(this.close)(e)` as TS2554 "Expected 0 arguments,
+  // handler but tsc flags `(this.close)($event)` as TS2554 "Expected 0 arguments,
   // but got 1". The cast keeps the emit shape identical at runtime while
   // letting tsc accept the synthetic event arg uniformly across `() => void`
-  // and `(e: Event) => void` user methods.
+  // and `($event: Event) => void` user methods.
   const HANDLER_CAST = ' as (...args: any[]) => any';
   let body: string;
   if (inlineGuards.length > 0) {
     if (isFunctionLike) {
-      body = `(e: ${evtType}) => { ${inlineGuards.join(' ')} ((${handler})${HANDLER_CAST})(e); }`;
+      body = `($event: ${evtType}) => { ${inlineGuards.join(' ')} ((${handler})${HANDLER_CAST})($event); }`;
     } else {
-      body = `(e: ${evtType}) => { ${inlineGuards.join(' ')} ${handler}; }`;
+      body = `($event: ${evtType}) => { ${inlineGuards.join(' ')} ${handler}; }`;
     }
   } else {
-    body = isFunctionLike ? `${handler}` : `(e: Event) => { ${handler}; }`;
+    body = isFunctionLike ? `${handler}` : `($event: Event) => { ${handler}; }`;
   }
 
   // WR-15: .debounce/.throttle wrapper must live on a class field so its timer
@@ -678,10 +678,10 @@ function buildEventParts(
     opts.runtime.add(wrapKind.kind);
     // The wrapped body is invoked lazily through an arrow — `body` may be a
     // bare method reference (`this.onSearch`) whose class field is declared
-    // AFTER this wrapper field. A lazy `(e) => (body)(e)` defers the lookup
+    // AFTER this wrapper field. A lazy `($event) => (body)($event)` defers the lookup
     // to event time, when all class fields are initialized.
     opts._state.debouncedFieldDecls.push(
-      `  private ${fieldName} = ${wrapKind.kind}((e: Event) => ((${body}) as (...args: any[]) => any)(e), ${wrapKind.ms});`,
+      `  private ${fieldName} = ${wrapKind.kind}(($event: Event) => ((${body}) as (...args: any[]) => any)($event), ${wrapKind.ms});`,
     );
     opts._state.debounceCleanupWiring.push(
       `this._disconnectCleanups.push(() => this.${fieldName}.cancel());`,
@@ -720,18 +720,18 @@ function extractNumberArg(args: unknown[] | undefined): number {
 /**
  * Combine two-or-more same-name handler bodies into a single arrow that
  * dispatches each in declaration order. Each `handlerBody` is either a
- * function reference (`this.onSearch`), an inline arrow (`(e) => …`), or a
- * guard-wrapped arrow (`(e: Event) => { if (…) return; (this.fn)(e); }`).
+ * function reference (`this.onSearch`), an inline arrow (`($event) => …`), or a
+ * guard-wrapped arrow (`($event: Event) => { if (…) return; (this.fn)($event); }`).
  * Calling the body as a function with the event argument works uniformly
  * for all three shapes thanks to JavaScript's `(expr)(arg)` invocation.
  */
 function mergeHandlerBodies(bodies: string[], evtType: string = 'Event'): string {
   if (bodies.length === 1) return bodies[0]!;
-  const invocations = bodies.map((b) => `(${b})(e);`).join(' ');
+  const invocations = bodies.map((b) => `(${b})($event);`).join(' ');
   // Type the outer wrapper with the event-specific type so child handlers
-  // typed `(e: KeyboardEvent) => ...` (from inline guards like `.enter`/`.escape`)
+  // typed `($event: KeyboardEvent) => ...` (from inline guards like `.enter`/`.escape`)
   // don't get a `Event`-typed `e` passed in — tsc flags TS2345 otherwise.
-  return `(e: ${evtType}) => { ${invocations} }`;
+  return `($event: ${evtType}) => { ${invocations} }`;
 }
 
 function emitElementOpenTag(
@@ -1003,7 +1003,7 @@ function emitElement(
     // WR-03 (Phase 07.5 review): use findTagClose (quote + `${...}`-aware
     // scanner shared with emitSlotFiller) instead of `lastIndexOf('>')`.
     // A naive lastIndexOf walks past attribute interpolations like
-    // `@click=${(e) => fn(e)}` and would splice inside an attribute value
+    // `@click=${($event) => fn($event)}` and would splice inside an attribute value
     // if any such interpolation followed the property-prop emit. Starting
     // the scan at index 1 skips the opening `<` of the tag itself.
     let openWithProps = open;
@@ -1191,11 +1191,11 @@ function emitSlot(
         // return value instead of the whole arrow. The explicit parens fix
         // the precedence. The `as (...args: any[]) => any` widening is
         // required for 0-arg user thunks (e.g. `this.close` typed
-        // `() => void`) so they accept `e.detail` uniformly — otherwise tsc
+        // `() => void`) so they accept `$event.detail` uniformly — otherwise tsc
         // flags TS2554 "Expected 0 arguments, but got 1" against
         // every `:close="close"` slot-arg binding.
         eventAttrs.push(
-          `@${evt}=\${(e: CustomEvent) => ((${argCode}) as (...args: any[]) => any)(e.detail)}`,
+          `@${evt}=\${($event: CustomEvent) => ((${argCode}) as (...args: any[]) => any)($event.detail)}`,
         );
       } else {
         dataEntries.push(`${arg.name}: ${argCode}`);

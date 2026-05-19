@@ -18,7 +18,7 @@ input[data-rozie-s-8bbc4a60] { padding: 0.25rem 0.5rem; }
   private _query = signal('');
   @query('[data-rozie-ref="inputEl"]') private _refInputEl!: HTMLElement;
 
-  private _tw0 = debounce((e: Event) => ((this.onSearch) as (...args: any[]) => any)(e), 300);
+  private _tw0 = debounce(($event: Event) => ((this.onSearch) as (...args: any[]) => any)($event), 300);
 
   private _disconnectCleanups: Array<() => void> = [];
 
@@ -54,7 +54,7 @@ input[data-rozie-s-8bbc4a60] { padding: 0.25rem 0.5rem; }
     return html`
 <div class="search-input" data-rozie-s-8bbc4a60>
   
-  <input type="search" placeholder=${this.placeholder} .value=${this._query.value} @input=${(e: InputEvent) => { ((e) => this._query.value = (e.target as HTMLInputElement).value)(e); (this._tw0)(e); }} @keydown=${(e: KeyboardEvent) => { ((e: KeyboardEvent) => { if (e.key !== 'Enter') return; ((this.onSearch) as (...args: any[]) => any)(e); })(e); ((e: KeyboardEvent) => { if (e.key !== 'Escape') return; ((this.clear) as (...args: any[]) => any)(e); })(e); }} data-rozie-ref="inputEl" data-rozie-s-8bbc4a60 />
+  <input type="search" placeholder=${this.placeholder} .value=${this._query.value} @input=${($event: InputEvent) => { (($event) => this._query.value = ($event.target as HTMLInputElement).value)($event); (this._tw0)($event); }} @keydown=${($event: KeyboardEvent) => { (($event: KeyboardEvent) => { if ($event.key !== 'Enter') return; ((this.onSearch) as (...args: any[]) => any)($event); })($event); (($event: KeyboardEvent) => { if ($event.key !== 'Escape') return; ((this.clear) as (...args: any[]) => any)($event); })($event); }} data-rozie-ref="inputEl" data-rozie-s-8bbc4a60 />
 
   ${this._query.value.length > 0 ? html`<button class="clear-btn" aria-label="Clear" @click=${this.clear} data-rozie-s-8bbc4a60>
     ×

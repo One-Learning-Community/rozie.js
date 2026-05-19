@@ -9,7 +9,7 @@
  * template-event context must inlineGuard inside a synthesized arrow handler:
  *
  *   `@click.stop="handler"`
- *     → `onclick={(e) => { e.stopPropagation(); handler(e); }}`
+ *     → `onclick={($event) => { $event.stopPropagation(); handler($event); }}`
  *
  * Modifier-descriptor handling (per ModifierImpl.svelte() hook):
  *   - `kind: 'inlineGuard'` — append the guard's `code` before the handler
@@ -146,7 +146,7 @@ function buildThrottleIIFE(wrapName: string, origCode: string, ms: string): stri
 /**
  * Classify the handler shape so we know how to assemble the synthesized arrow.
  *
- *   - 'identifier' — bare ref like `decrement`. Use as a callable; pass `(e)`.
+ *   - 'identifier' — bare ref like `decrement`. Use as a callable; pass `($event)`.
  *   - 'callable'   — invokable expression (CallExpression, ArrowFunction,
  *                    FunctionExpression, MemberExpression that ends in a call,
  *                    LogicalExpression where right side is a call). Treated
@@ -304,23 +304,23 @@ export function emitTemplateEvent(
     // Synthesize an arrow handler. Body shape depends on handler kind:
     //   - 'identifier'/'callable' — invoke as `handler(e)` so the user's
     //     handler signature receives the DOM event.
-    //   - 'statement' — splice as a statement (no `(e)` invocation).
+    //   - 'statement' — splice as a statement (no `($event)` invocation).
     const guardLines = inlineGuards.join(' ');
     const guardPrefix = guardLines.length > 0 ? `${guardLines} ` : '';
     let body: string;
     if (handlerKind === 'identifier') {
-      // Cast to permissive Fn so the `(e)` forward type-checks even when the
+      // Cast to permissive Fn so the `($event)` forward type-checks even when the
       // user-authored handler declares zero parameters (e.g. SearchInput's
       // `onSearch = () => {...}` reached via @keydown.enter). Otherwise
       // svelte-check raises "Expected 0 arguments, but got 1".
-      body = `(${handlerRef} as (...a: any[]) => any)(e)`;
+      body = `(${handlerRef} as (...a: any[]) => any)($event)`;
     } else if (handlerKind === 'callable') {
-      body = `(${handlerRef})(e)`;
+      body = `(${handlerRef})($event)`;
     } else {
       // statement — splice verbatim.
       body = handlerRef;
     }
-    attrValue = `(e) => { ${guardPrefix}${body}; }`;
+    attrValue = `($event) => { ${guardPrefix}${body}; }`;
   }
 
   const eventAttr = `${attrName}={${attrValue}}`;

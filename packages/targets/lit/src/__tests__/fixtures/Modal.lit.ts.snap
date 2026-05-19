@@ -52,7 +52,7 @@ footer[data-rozie-s-fc45feb2] { border-top: 1px solid rgba(0, 0, 0, 0.08); justi
   private _disconnectCleanups: Array<() => void> = [];
 
   private _armListeners(): void {
-    const _lh0 = (e: KeyboardEvent) => { if (!(this.open && this.closeOnEscape)) return; if (e.key !== 'Escape') return; ((this.close) as (...args: any[]) => any)(e); };
+    const _lh0 = ($event: KeyboardEvent) => { if (!(this.open && this.closeOnEscape)) return; if ($event.key !== 'Escape') return; ((this.close) as (...args: any[]) => any)($event); };
     document.addEventListener('keydown', _lh0, undefined);
     this._disconnectCleanups.push(() => document.removeEventListener('keydown', _lh0, undefined));
 
@@ -122,19 +122,19 @@ footer[data-rozie-s-fc45feb2] { border-top: 1px solid rgba(0, 0, 0, 0.08); justi
 
   render() {
     return html`
-${this.open ? html`<div class="modal-backdrop" @click=${(e: MouseEvent) => { if (e.target !== e.currentTarget) return; this.closeOnBackdrop && this.close(); }} data-rozie-ref="backdropEl" data-rozie-s-fc45feb2>
+${this.open ? html`<div class="modal-backdrop" @click=${($event: MouseEvent) => { if ($event.target !== $event.currentTarget) return; this.closeOnBackdrop && this.close(); }} data-rozie-ref="backdropEl" data-rozie-s-fc45feb2>
   <div class="modal-dialog" role="dialog" aria-modal="true" aria-label=${this.title || undefined} tabindex="-1" data-rozie-ref="dialogEl" data-rozie-s-fc45feb2>
     ${this.title || this._hasSlotHeader || this.header !== undefined ? html`<header data-rozie-s-fc45feb2>
-      ${this.header !== undefined ? this.header({close: this.close}) : html`<slot name="header" @rozie-header-close=${(e: CustomEvent) => ((this.close) as (...args: any[]) => any)(e.detail)}>
+      ${this.header !== undefined ? this.header({close: this.close}) : html`<slot name="header" @rozie-header-close=${($event: CustomEvent) => ((this.close) as (...args: any[]) => any)($event.detail)}>
         <h2 data-rozie-s-fc45feb2>${this.title}</h2>
       </slot>`}
       <button class="close-btn" aria-label="Close" @click=${this.close} data-rozie-s-fc45feb2>×</button>
     </header>` : nothing}<div class="modal-body" data-rozie-s-fc45feb2>
-      ${this.__rozieDefaultSlot__ !== undefined ? this.__rozieDefaultSlot__({close: this.close}) : html`<slot @rozie-default-close=${(e: CustomEvent) => ((this.close) as (...args: any[]) => any)(e.detail)}></slot>`}
+      ${this.__rozieDefaultSlot__ !== undefined ? this.__rozieDefaultSlot__({close: this.close}) : html`<slot @rozie-default-close=${($event: CustomEvent) => ((this.close) as (...args: any[]) => any)($event.detail)}></slot>`}
     </div>
 
     ${this._hasSlotFooter || this.footer !== undefined ? html`<footer data-rozie-s-fc45feb2>
-      ${this.footer !== undefined ? this.footer({close: this.close}) : html`<slot name="footer" @rozie-footer-close=${(e: CustomEvent) => ((this.close) as (...args: any[]) => any)(e.detail)}></slot>`}
+      ${this.footer !== undefined ? this.footer({close: this.close}) : html`<slot name="footer" @rozie-footer-close=${($event: CustomEvent) => ((this.close) as (...args: any[]) => any)($event.detail)}></slot>`}
     </footer>` : nothing}</div>
 </div>` : nothing}`;
   }

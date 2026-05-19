@@ -3,7 +3,7 @@
  *
  * Per Claude's Discretion r-model bullet: emits the pair
  *
- *   .value=${expr} @input=${(e) => expr = (e.target as HTMLInputElement).value}
+ *   .value=${expr} @input=${($event) => expr = ($event.target as HTMLInputElement).value}
  *
  * for form inputs (input/textarea/select). For checkboxes, the caller swaps
  * `.value`/`.value` for `.checked`/`.checked`.
@@ -26,6 +26,6 @@ export function emitRModel(opts: EmitRModelOpts): string {
   const prop = isCheckbox ? 'checked' : 'value';
   return [
     `.${prop}=\${${opts.bindingExpr}}`,
-    `@input=\${(e) => ${opts.bindingExpr} = (e.target as HTMLInputElement).${prop}}`,
+    `@input=\${($event) => ${opts.bindingExpr} = ($event.target as HTMLInputElement).${prop}}`,
   ].join(' ');
 }

@@ -44,26 +44,26 @@ export const prevent: ModifierImpl = {
   react() {
     // D-65 inlineGuard: React JSX has no native modifier syntax for prevent —
     // emitter inserts the side-effect call before the user handler runs.
-    return { kind: 'inlineGuard', code: 'e.preventDefault();' };
+    return { kind: 'inlineGuard', code: '$event.preventDefault();' };
   },
   svelte() {
     // Phase 5 inlineGuard: Svelte 5 dropped `|preventDefault` shorthand
     // (RESEARCH.md Pitfall 4) — template @event modifiers MUST inlineGuard.
-    return { kind: 'inlineGuard', code: 'e.preventDefault();' };
+    return { kind: 'inlineGuard', code: '$event.preventDefault();' };
   },
   angular() {
     // Phase 5 inlineGuard: Angular has no template modifier sugar; inlineGuard
     // is the path.
-    return { kind: 'inlineGuard', code: 'e.preventDefault();' };
+    return { kind: 'inlineGuard', code: '$event.preventDefault();' };
   },
   solid() {
     // Phase 07.1 inlineGuard: Solid JSX has no native modifier syntax for
     // prevent — emitter inserts the side-effect call before the user handler.
-    return { kind: 'inlineGuard', code: 'e.preventDefault();' };
+    return { kind: 'inlineGuard', code: '$event.preventDefault();' };
   },
   lit() {
     // Phase 07.1 inlineGuard: Lit has no template modifier sugar; inlineGuard
     // is the path.
-    return { kind: 'inlineGuard', code: 'e.preventDefault();' };
+    return { kind: 'inlineGuard', code: '$event.preventDefault();' };
   },
 };

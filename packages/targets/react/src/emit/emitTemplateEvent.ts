@@ -6,7 +6,7 @@
  *
  * Modifier resolution per D-65 ReactEmissionDescriptor:
  *   - 'inlineGuard' kind — prepend code into a synthetic arrow handler before
- *     calling the user handler. e.g., `e.stopPropagation();` from .stop.
+ *     calling the user handler. e.g., `$event.stopPropagation();` from .stop.
  *   - 'native' kind — capture-only is supported via the JSX onClickCapture
  *     suffix. .passive / .once on JSX events have no native form (addEventListener
  *     options); emit an info diagnostic and fall through to inline guard fallback
@@ -20,7 +20,7 @@
  *   - When no modifiers AND handler is a bare Identifier: emit `onClick={handler}`
  *     directly (no arrow wrapper).
  *   - When modifiers present OR handler is a CallExpression/ArrowFunction: wrap in
- *     synthetic `(e) => { ...inlineGuards; userHandler(e); }`.
+ *     synthetic `($event) => { ...inlineGuards; userHandler($event); }`.
  *
  * @experimental — shape may change before v1.0
  */
@@ -233,9 +233,9 @@ function renderHandler(handler: t.Expression, ir: IRComponent): string {
  *     React's event system calls it with the SyntheticEvent.
  *   - 'callable'   — invokable expression that is NOT itself a call:
  *     MemberExpression (`props.onClose`, `obj.method`), ArrowFunctionExpression,
- *     FunctionExpression. Wrap in `(e) => { (code)(e); }` so React still drives
+ *     FunctionExpression. Wrap in `($event) => { (code)($event); }` so React still drives
  *     it with the event. Without this branch `@click="$props.onClose"` lowers
- *     to `(e) => { props.onClose; }` — reads but never invokes.
+ *     to `($event) => { props.onClose; }` — reads but never invokes.
  *   - 'statement'  — already a CallExpression / AssignmentExpression / etc.
  *     Inline verbatim inside the arrow body — the user wrote the call
  *     themselves (`@click="closeOnBackdrop && close()"`).
@@ -368,12 +368,12 @@ export function emitTemplateEvent(
   // (`props.onClose?: (...args: any[]) => any`) accept the call without
   // TS2722. Use optional-call `?.(e)` so undefined handlers no-op rather than
   // throwing. Mirrors the Lit emit fix (commit 536575a) where the same class
-  // of error surfaced on the Lit `<my-el @click=${(e) => handler(e)}>` shape.
+  // of error surfaced on the Lit `<my-el @click=${($event) => handler($event)}>` shape.
   // Bare identifiers — local arrows like `decrement` — skip the cast so the
   // bare-reference shape `onClick={decrement}` (React's idiomatic form) is
   // preserved; React's event system calls them with the event arg and TS
   // already accepts the bare reference because the inferred signature is
-  // `(e: SyntheticEvent) => void`.
+  // `($event: SyntheticEvent) => void`.
   let handlerExpr: string;
   if (handlerRef !== null && inlineGuards.length === 0) {
     // Pure helper-wrap: just reference the wrap name.
@@ -388,28 +388,28 @@ export function emitTemplateEvent(
       // MemberExpression (e.g. `props.onClose`) or arrow/function expression —
       // optional-cast so undefined prop handlers no-op and 0-arg signatures
       // type-check.
-      handlerExpr = `(e) => { ((${code}) as ((...args: any[]) => any) | undefined)?.(e); }`;
+      handlerExpr = `($event) => { ((${code}) as ((...args: any[]) => any) | undefined)?.($event); }`;
     } else {
       // Inline expression like `$props.closeOnBackdrop && close()` — already a call.
-      handlerExpr = `(e) => { ${code}; }`;
+      handlerExpr = `($event) => { ${code}; }`;
     }
   } else {
-    // Has inline guards: wrap in synthetic (e) => {...} arrow.
+    // Has inline guards: wrap in synthetic ($event) => {...} arrow.
     const guardLines = inlineGuards.join(' ');
     let handlerInvocation: string;
     if (handlerRef !== null) {
-      handlerInvocation = `${handlerRef}(e)`;
+      handlerInvocation = `${handlerRef}($event)`;
     } else if (handlerKind === 'identifier') {
       // Cast bare-identifier handlers when an inline guard wraps them; the
-      // wrapper arrow always invokes with `(e)` even when the user method is
+      // wrapper arrow always invokes with `($event)` even when the user method is
       // 0-arg — without the cast TS2554 fires (e.g. `close(e)` in Modal).
-      handlerInvocation = `((${renderHandler(listener.handler, ctx.ir)}) as ((...args: any[]) => any))(e)`;
+      handlerInvocation = `((${renderHandler(listener.handler, ctx.ir)}) as ((...args: any[]) => any))($event)`;
     } else if (handlerKind === 'callable') {
-      handlerInvocation = `((${renderHandler(listener.handler, ctx.ir)}) as ((...args: any[]) => any) | undefined)?.(e)`;
+      handlerInvocation = `((${renderHandler(listener.handler, ctx.ir)}) as ((...args: any[]) => any) | undefined)?.($event)`;
     } else {
       handlerInvocation = renderHandler(listener.handler, ctx.ir);
     }
-    handlerExpr = `(e) => { ${guardLines} ${handlerInvocation}; }`;
+    handlerExpr = `($event) => { ${guardLines} ${handlerInvocation}; }`;
   }
 
   return {

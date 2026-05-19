@@ -109,7 +109,7 @@ function classifyListener(
     }
   }
   // No wrap-helper → Class A or D depending on whether listenerOption present.
-  const hasNative = pipeline.some((e) => e.kind === 'listenerOption');
+  const hasNative = pipeline.some((p) => p.kind === 'listenerOption');
   return hasNative
     ? { kind: 'A', pipeline }
     : { kind: 'D', pipeline };

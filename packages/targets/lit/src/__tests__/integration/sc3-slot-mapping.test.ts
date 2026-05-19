@@ -59,7 +59,7 @@ describe('SC3 — slot mapping (partial integration)', () => {
     // inline on the `<slot>` element itself so loop-local `r-for` vars are
     // captured naturally — same path used for both loop and non-loop slots.
     const code = readFileSync(DROPDOWN, 'utf8');
-    expect(code).toMatch(/@rozie-trigger-toggle=\$\{\(e: CustomEvent\) =>/);
+    expect(code).toMatch(/@rozie-trigger-toggle=\$\{\(\$event: CustomEvent\) =>/);
     expect(code).not.toMatch(/this\.addEventListener\('rozie-trigger-toggle'/);
   });
 

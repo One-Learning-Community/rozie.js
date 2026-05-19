@@ -13,7 +13,7 @@ const close = () => {
 </script>
 
 
-<div class="backdrop" onclick={(e) => { closeOnBackdrop && close(); }}>
+<div class="backdrop" onclick={($event) => { closeOnBackdrop && close(); }}>
   
   <button onclick={close}>Close</button>
 </div>

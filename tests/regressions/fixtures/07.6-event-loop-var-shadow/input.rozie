@@ -1,0 +1,35 @@
+<rozie name="EventLoopVarShadow">
+
+<data>
+{
+  items: [
+    { id: 'a', label: 'A' },
+    { id: 'b', label: 'B' },
+  ],
+}
+</data>
+
+<script>
+const removeItem = (id) => {
+  $data.items = $data.items.filter((x) => x.id !== id)
+}
+</script>
+
+<template>
+<ul>
+  <li r-for="e in $data.items" :key="e.id">
+    <span>{{ e.label }}</span>
+    <!--
+      REG-07.6-001 — loop variable named `e` must NOT be shadowed by the
+      synthetic event-handler closure param. The lowered JS form should keep
+      `e.id` resolving to the loop scope. Pre-fix, the closure was
+      `(e) => { removeItem(e.id); }` where `e` shadowed the loop var; post-fix
+      the closure is `($event) => { removeItem(e.id); }` and `e.id` lexically
+      resolves to the loop var.
+    -->
+    <button type="button" @click="removeItem(e.id)">×</button>
+  </li>
+</ul>
+</template>
+
+</rozie>

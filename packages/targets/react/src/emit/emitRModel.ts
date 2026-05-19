@@ -5,11 +5,11 @@
  * binding into the React controlled-input pattern per RESEARCH Pattern 7.
  *
  * Patterns (chosen by element tag + type):
- *   - <input type="text"> (default) → value={X} onChange={(e) => setX(e.target.value)}
- *   - <input type="checkbox">       → checked={X} onChange={(e) => setX(e.target.checked)}
- *   - <input type="radio" value="V">→ checked={X === 'V'} onChange={(e) => setX('V')}
- *   - <select>                       → value={X} onChange={(e) => setX(e.target.value)}
- *   - <textarea>                     → value={X} onChange={(e) => setX(e.target.value)}
+ *   - <input type="text"> (default) → value={X} onChange={($event) => setX($event.target.value)}
+ *   - <input type="checkbox">       → checked={X} onChange={($event) => setX($event.target.checked)}
+ *   - <input type="radio" value="V">→ checked={X === 'V'} onChange={($event) => setX('V')}
+ *   - <select>                       → value={X} onChange={($event) => setX($event.target.value)}
+ *   - <textarea>                     → value={X} onChange={($event) => setX($event.target.value)}
  *   - <CustomComponent>              → value={X} onValueChange={setX}
  *
  * The setter name comes from looking up X's StateDecl/PropDecl in the IR.

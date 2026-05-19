@@ -31,7 +31,7 @@ export function emitListenerWrap(opts: EmitListenerWrapOpts): string {
   if (opts.whenExpr) guardLines.push(`if (!(${opts.whenExpr})) return;`);
   guardLines.push(...opts.guards);
   if (opts.kind === 'debounce') {
-    return `(() => { let t: ReturnType<typeof setTimeout> | undefined; return (e: Event) => { ${guardLines.join(' ')} if (t) clearTimeout(t); t = setTimeout(() => { (${opts.handler})(e); }, ${opts.ms}); }; })()`;
+    return `(() => { let t: ReturnType<typeof setTimeout> | undefined; return ($event: Event) => { ${guardLines.join(' ')} if (t) clearTimeout(t); t = setTimeout(() => { (${opts.handler})($event); }, ${opts.ms}); }; })()`;
   }
-  return `(() => { let last = 0; return (e: Event) => { ${guardLines.join(' ')} const now = Date.now(); if (now - last < ${opts.ms}) return; last = now; (${opts.handler})(e); }; })()`;
+  return `(() => { let last = 0; return ($event: Event) => { ${guardLines.join(' ')} const now = Date.now(); if (now - last < ${opts.ms}) return; last = now; (${opts.handler})($event); }; })()`;
 }

@@ -85,8 +85,8 @@ export class Modal {
 
       effect((onCleanup) => {
         if (!(this.open() && this.closeOnEscape())) return;
-        const handler = (e: KeyboardEvent) => {
-          if (e.key !== 'Escape') return;
+        const handler = ($event: KeyboardEvent) => {
+          if ($event.key !== 'Escape') return;
           this._close();
         };
         const unlisten = renderer.listen('document', 'keydown', handler);
@@ -136,8 +136,8 @@ export class Modal {
     return true;
   }
 
-  private _guardedHandler0 = (e: any) => {
-    if (e.target !== e.currentTarget) return;
+  private _guardedHandler0 = ($event: any) => {
+    if ($event.target !== $event.currentTarget) return;
     this.closeOnBackdrop() && this._close();
   };
 }

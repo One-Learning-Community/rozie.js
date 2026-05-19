@@ -18,7 +18,7 @@ export default function CardHeader(_props: CardHeaderProps): JSX.Element {
     <>
     <header class={"card-header"} data-rozie-s-f3e60f5a="">
       <h3 class={"card-header__title"} data-rozie-s-f3e60f5a="">{local.title}</h3>
-      {<Show when={local.onClose}><button class={"card-header__close"} onClick={(e) => { (local.onClose)?.(e); }} data-rozie-s-f3e60f5a="">×</button></Show>}</header>
+      {<Show when={local.onClose}><button class={"card-header__close"} onClick={($event) => { (local.onClose)?.($event); }} data-rozie-s-f3e60f5a="">×</button></Show>}</header>
     </>
     </>
   );

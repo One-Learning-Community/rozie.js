@@ -268,7 +268,7 @@ export function emitTemplateEvent(
     // Inline guards present — synthesize a class-body wrapper method that
     // runs the guards then invokes the handler. The wrapper body uses `e`
     // as the event arg so that inlineGuard fragments like
-    // `if (e.target !== e.currentTarget) return;` resolve naturally.
+    // `if ($event.target !== $event.currentTarget) return;` resolve naturally.
     //
     // The body's class-member references need `this.` prefix because we're
     // inside a class arrow field, not a template binding. We post-process
@@ -300,15 +300,15 @@ export function emitTemplateEvent(
           ? ctx.handlerArity?.get(originalName)
           : undefined;
       innerInvocation =
-        arity === 0 ? `this.${handlerRef}()` : `this.${handlerRef}(e)`;
+        arity === 0 ? `this.${handlerRef}()` : `this.${handlerRef}($event)`;
     } else if (handlerKind === 'callable') {
-      innerInvocation = `(${thisPrefixed})(e)`;
+      innerInvocation = `(${thisPrefixed})($event)`;
     } else {
       // statement — splice as-is with `this.` prefixing.
       innerInvocation = thisPrefixed;
     }
     const decl = [
-      `private ${wrapperName} = (e: any) => {`,
+      `private ${wrapperName} = ($event: any) => {`,
       guardLines,
       `  ${innerInvocation};`,
       `};`,

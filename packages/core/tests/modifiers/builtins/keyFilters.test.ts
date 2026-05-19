@@ -118,7 +118,7 @@ describe('builtin: key filters — Plan 02-04', () => {
     const desc = findFilter('escape').solid!([], KEYDOWN_CTX);
     expect(desc).toEqual({
       kind: 'inlineGuard',
-      code: "if (e.key !== 'Escape') return;",
+      code: "if ($event.key !== 'Escape') return;",
     });
   });
 
@@ -126,7 +126,7 @@ describe('builtin: key filters — Plan 02-04', () => {
     const desc = findFilter('escape').lit!([], KEYDOWN_CTX);
     expect(desc).toEqual({
       kind: 'inlineGuard',
-      code: "if (e.key !== 'Escape') return;",
+      code: "if ($event.key !== 'Escape') return;",
     });
   });
 

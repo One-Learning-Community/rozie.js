@@ -70,8 +70,8 @@ $effect(() => { (() => open)(); if (__rozieWatchInitial_0) { __rozieWatchInitial
 
 $effect(() => {
   if (!(open && closeOnOutsideClick)) return;
-  const handler = (e: MouseEvent) => {
-    const target = e.target as Node;
+  const handler = ($event: MouseEvent) => {
+    const target = $event.target as Node;
     if (triggerEl?.contains(target) || panelEl?.contains(target)) return;
     close();
   };
@@ -81,8 +81,8 @@ $effect(() => {
 
 $effect(() => {
   if (!(open && closeOnEscape)) return;
-  const handler = (e: KeyboardEvent) => {
-    if (e.key !== 'Escape') return;
+  const handler = ($event: KeyboardEvent) => {
+    if ($event.key !== 'Escape') return;
     close();
   };
   document.addEventListener('keydown', handler);

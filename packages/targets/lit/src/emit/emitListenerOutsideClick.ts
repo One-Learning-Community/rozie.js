@@ -18,11 +18,11 @@ import type { RuntimeLitImportCollector } from '../rewrite/collectLitImports.js'
 export interface EmitListenerOutsideClickOpts {
   /** Names of refs (without `_ref` prefix) the click must be outside of. */
   refNames: string[];
-  /** Rewritten handler expression (e.g., `(this.close)` or `(e) => this.close()`). */
+  /** Rewritten handler expression (e.g., `(this.close)` or `($event) => this.close()`). */
   handler: string;
   /** Optional when-guard expression (string form). */
   whenExpr: string | null;
-  /** Inline filter guards (e.g., `e.stopPropagation();`). */
+  /** Inline filter guards (e.g., `$event.stopPropagation();`). */
   guards: string[];
   /** Index for unique variable naming. */
   index: number;
@@ -39,7 +39,7 @@ export function emitListenerOutsideClick(opts: EmitListenerOutsideClickOpts): st
   const whenFn = opts.whenExpr ? `, () => (${opts.whenExpr})` : '';
   const unsubVar = `_u${opts.index}`;
   return [
-    `const ${unsubVar} = attachOutsideClickListener(${refsArr}, (e) => { ${opts.guards.join(' ')} (${opts.handler})(e); }${whenFn});`,
+    `const ${unsubVar} = attachOutsideClickListener(${refsArr}, ($event) => { ${opts.guards.join(' ')} (${opts.handler})($event); }${whenFn});`,
     `this._disconnectCleanups.push(${unsubVar});`,
   ].join('\n');
 }

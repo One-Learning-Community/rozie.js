@@ -48,7 +48,7 @@ describe('WR-03 — .outside inline-expression handler emits as statement', () =
     // followed by ';' — no `(…)(e)` call-wrap around the assignment.
     expect(code).toContain('attachOutsideClickListener');
     expect(code).toMatch(/this\._open\.value\s*=\s*false;/);
-    expect(code).not.toMatch(/\(this\._open\.value\s*=\s*false\)\s*\(e\)/);
+    expect(code).not.toMatch(/\(this\._open\.value\s*=\s*false\)\s*\(\$event\)/);
   });
 
   it('method-identifier handler stays call-wrapped (negative case)', () => {
@@ -72,6 +72,6 @@ function close() { $data.open = false }
     // Method-like handler should be call-wrapped: `((this.close) as ...)(e);`
     // The TS cast has parens of its own, so just assert the head + tail.
     expect(code).toContain('((this.close) as');
-    expect(code).toMatch(/\)\s*\(e\);/);
+    expect(code).toMatch(/\)\s*\(\$event\);/);
   });
 });

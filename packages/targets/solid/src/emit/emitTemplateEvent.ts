@@ -191,10 +191,10 @@ function renderHandler(handler: t.Expression, ir: IRComponent): string {
  *     Solid's JSX runtime calls it with the synthetic event.
  *   - 'callable'   — invokable expression that is NOT itself a call:
  *     MemberExpression (`$props.onClose`, `obj.method`), ArrowFunctionExpression,
- *     FunctionExpression. Wrap in `(e) => { (code)(e); }` so Solid still drives
+ *     FunctionExpression. Wrap in `($event) => { (code)($event); }` so Solid still drives
  *     it with the event. The MemberExpression case is what was broken before
  *     this helper landed: `@click="$props.onClose"` was emitted as
- *     `(e) => { local.onClose; }` (reads but never invokes).
+ *     `($event) => { local.onClose; }` (reads but never invokes).
  *   - 'statement'  — already a CallExpression / AssignmentExpression / etc.
  *     Inline verbatim inside the arrow body — the user already wrote the call
  *     (`@click="closeOnBackdrop && close()"`).
@@ -334,27 +334,27 @@ export function emitTemplateEvent(
       // possibly 'undefined'". Runtime semantics are unchanged — `?.()` is a
       // no-op when the LHS is null/undefined, matching what users expect when
       // they pass no handler.
-      handlerExpr = `(e) => { (${code})?.(e); }`;
+      handlerExpr = `($event) => { (${code})?.($event); }`;
     } else {
       // Already a call / statement expression — splice verbatim.
-      handlerExpr = `(e) => { ${code}; }`;
+      handlerExpr = `($event) => { ${code}; }`;
     }
   } else {
     const guardLines = inlineGuards.join(' ');
     let handlerInvocation: string;
     if (handlerRef !== null) {
-      handlerInvocation = `${handlerRef}(e)`;
+      handlerInvocation = `${handlerRef}($event)`;
     } else if (handlerKind === 'identifier') {
       // Bare identifier (e.g. `onSearch`) — call without args so handlers typed
       // `() => void` don't complain about the synthetic event parameter.
       handlerInvocation = `${renderHandler(listener.handler, ctx.ir)}()`;
     } else if (handlerKind === 'callable') {
       // Optional-call so optional callback props don't TS2722.
-      handlerInvocation = `(${renderHandler(listener.handler, ctx.ir)})?.(e)`;
+      handlerInvocation = `(${renderHandler(listener.handler, ctx.ir)})?.($event)`;
     } else {
       handlerInvocation = renderHandler(listener.handler, ctx.ir);
     }
-    handlerExpr = `(e) => { ${guardLines} ${handlerInvocation}; }`;
+    handlerExpr = `($event) => { ${guardLines} ${handlerInvocation}; }`;
   }
 
   return {

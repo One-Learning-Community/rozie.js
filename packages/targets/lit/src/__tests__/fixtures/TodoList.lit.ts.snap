@@ -111,17 +111,17 @@ form[data-rozie-s-52bec3de] { display: flex; gap: 0.25rem; margin-block: 0.5rem;
     </slot>`}
   </header>
 
-  <form @submit=${(e: SubmitEvent) => { e.preventDefault(); ((this.add) as (...args: any[]) => any)(e); }} data-rozie-s-52bec3de>
-    <input placeholder="What needs doing?" .value=${this._draft.value} @input=${(e) => this._draft.value = (e.target as HTMLInputElement).value} data-rozie-s-52bec3de />
+  <form @submit=${($event: SubmitEvent) => { $event.preventDefault(); ((this.add) as (...args: any[]) => any)($event); }} data-rozie-s-52bec3de>
+    <input placeholder="What needs doing?" .value=${this._draft.value} @input=${($event) => this._draft.value = ($event.target as HTMLInputElement).value} data-rozie-s-52bec3de />
     <button type="submit" ?disabled=${!this._draft.value.trim()} data-rozie-s-52bec3de>Add</button>
   </form>
 
   ${this.items.length > 0 ? html`<ul data-rozie-s-52bec3de>
     ${repeat<any>(this.items, (item, _idx) => item.id, (item, _idx) => html`<li class="${Object.entries({ done: item.done }).filter(([, v]) => v).map(([k]) => k).join(' ')}" key=${item.id} data-rozie-s-52bec3de>
       
-      ${this.__rozieDefaultSlot__ !== undefined ? this.__rozieDefaultSlot__({item: item, toggle: () => this.toggle(item.id), remove: () => this.removeItem(item.id)}) : html`<slot data-rozie-params=${(() => { try { return JSON.stringify({item: item}); } catch { return '{}'; } })()} @rozie-default-toggle=${(e: CustomEvent) => ((() => this.toggle(item.id)) as (...args: any[]) => any)(e.detail)} @rozie-default-remove=${(e: CustomEvent) => ((() => this.removeItem(item.id)) as (...args: any[]) => any)(e.detail)}>
-        <label data-rozie-s-52bec3de><input type="checkbox" ?checked=${item.done} @change=${(e: Event) => { this.toggle(item.id); }} data-rozie-s-52bec3de /><span data-rozie-s-52bec3de>${item.text}</span></label>
-        <button aria-label="Remove" @click=${(e: Event) => { this.removeItem(item.id); }} data-rozie-s-52bec3de>×</button>
+      ${this.__rozieDefaultSlot__ !== undefined ? this.__rozieDefaultSlot__({item: item, toggle: () => this.toggle(item.id), remove: () => this.removeItem(item.id)}) : html`<slot data-rozie-params=${(() => { try { return JSON.stringify({item: item}); } catch { return '{}'; } })()} @rozie-default-toggle=${($event: CustomEvent) => ((() => this.toggle(item.id)) as (...args: any[]) => any)($event.detail)} @rozie-default-remove=${($event: CustomEvent) => ((() => this.removeItem(item.id)) as (...args: any[]) => any)($event.detail)}>
+        <label data-rozie-s-52bec3de><input type="checkbox" ?checked=${item.done} @change=${($event: Event) => { this.toggle(item.id); }} data-rozie-s-52bec3de /><span data-rozie-s-52bec3de>${item.text}</span></label>
+        <button aria-label="Remove" @click=${($event: Event) => { this.removeItem(item.id); }} data-rozie-s-52bec3de>×</button>
       </slot>`}
     </li>`)}
   </ul>` : html`<p class="empty" data-rozie-s-52bec3de>

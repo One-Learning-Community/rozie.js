@@ -753,7 +753,7 @@ function wrapWithSlotAttribute(
   // Identify a single top-level <tag …>…</tag> via a quote+interpolation-
   // aware scanner. Replaces the previous `[^>]*` regex which falsely
   // terminated the attribute scan at `>` characters inside template-literal
-  // interpolations (e.g., `@click=${(e) => ...}` introduced by the Phase
+  // interpolations (e.g., `@click=${($event) => ...}` introduced by the Phase
   // 07.3.1 Blocker #3 D-03 late-binding wrap). The scanner uses
   // `findTagClose` which is now `${...}`-aware (Phase 07.3.1 Rule 1 fix).
   const tagOpenMatch = trimmed.match(/^<([a-zA-Z][\w-]*)\b/);
@@ -907,7 +907,7 @@ function spreadSlotAttrAcrossTopLevelElements(
  * skipping over (a) quoted attribute values so that `>` characters inside
  * strings (e.g., `<button title="score > 0">`) are not treated as tag-end
  * markers, and (b) `${...}` template-literal interpolations (e.g.
- * `<button @click=${(e) => fn(e)}>` — the `>` in `=>` MUST be ignored).
+ * `<button @click=${($event) => fn($event)}>` — the `>` in `=>` MUST be ignored).
  * The interpolation skip is brace-balanced so nested `${...}` inside the
  * inner expression are handled. Phase 07.3.1 Blocker #3 (D-03) added the
  * `${...}` skip — the late-binding event-handler wrap introduces `>`
@@ -929,7 +929,7 @@ export function findTagClose(body: string, start: number): number {
       continue;
     }
     // Phase 07.3.1 Blocker #3 (D-03) — skip balanced `${...}` blocks.
-    // Late-binding handler wrap produces `@click=${(e) => fn(e)}` whose
+    // Late-binding handler wrap produces `@click=${($event) => fn($event)}` whose
     // `>` in the arrow MUST NOT terminate the tag-attribute scan.
     if (ch === '$' && body[i + 1] === '{') {
       i = skipInterpolation(body, i + 2);
@@ -1001,7 +1001,7 @@ function hasSiblingAtTopLevel(body: string, _rootTag: string): boolean {
   while (i < body.length) {
     const ch = body[i]!;
     // Phase 07.3.1 Blocker #3 (D-03) — skip balanced `${...}` blocks at
-    // the text level so handler-wrap content (`(e) => fn(e)`) inside
+    // the text level so handler-wrap content (`($event) => fn(e)`) inside
     // attribute interpolations does not perturb the depth counter.
     if (ch === '$' && body[i + 1] === '{') {
       const end = skipInterpolation(body, i + 2);

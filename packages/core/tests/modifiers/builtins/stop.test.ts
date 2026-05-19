@@ -36,13 +36,13 @@ describe('builtin: .stop — Plan 02-04', () => {
   });
 
   // Phase 07.1 — Solid/Lit emission descriptors (parallels svelte()/angular()).
-  it('.stop solid() → inlineGuard with e.stopPropagation()', () => {
+  it('.stop solid() → inlineGuard with $event.stopPropagation()', () => {
     const desc = stop.solid!([], CTX);
-    expect(desc).toEqual({ kind: 'inlineGuard', code: 'e.stopPropagation();' });
+    expect(desc).toEqual({ kind: 'inlineGuard', code: '$event.stopPropagation();' });
   });
 
-  it('.stop lit() → inlineGuard with e.stopPropagation()', () => {
+  it('.stop lit() → inlineGuard with $event.stopPropagation()', () => {
     const desc = stop.lit!([], CTX);
-    expect(desc).toEqual({ kind: 'inlineGuard', code: 'e.stopPropagation();' });
+    expect(desc).toEqual({ kind: 'inlineGuard', code: '$event.stopPropagation();' });
   });
 });

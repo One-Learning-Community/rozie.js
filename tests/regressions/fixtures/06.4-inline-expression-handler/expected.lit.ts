@@ -21,7 +21,7 @@ export default class InlineExprHandler extends SignalWatcher(LitElement) {
 
   render() {
     return html`
-<div class="backdrop" @click=${(e: Event) => { this.closeOnBackdrop && this.close(); }} data-rozie-s-8ec7623e>
+<div class="backdrop" @click=${($event: Event) => { this.closeOnBackdrop && this.close(); }} data-rozie-s-8ec7623e>
   
   <button @click=${this.close} data-rozie-s-8ec7623e>Close</button>
 </div>

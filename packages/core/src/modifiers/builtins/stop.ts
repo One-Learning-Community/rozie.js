@@ -44,27 +44,27 @@ export const stop: ModifierImpl = {
   react() {
     // D-65 inlineGuard: React JSX has no native modifier syntax for stop —
     // emitter inserts the side-effect call before the user handler runs.
-    return { kind: 'inlineGuard', code: 'e.stopPropagation();' };
+    return { kind: 'inlineGuard', code: '$event.stopPropagation();' };
   },
   svelte() {
     // Phase 5 inlineGuard: Svelte 5 dropped both `on:click` syntax AND
     // `|preventDefault` shorthand (RESEARCH.md Pitfall 4) — template @event
     // modifiers MUST inlineGuard.
-    return { kind: 'inlineGuard', code: 'e.stopPropagation();' };
+    return { kind: 'inlineGuard', code: '$event.stopPropagation();' };
   },
   angular() {
     // Phase 5 inlineGuard: Angular has no template modifier sugar
     // (no [(click).stop] equivalent), so inlineGuard is the path.
-    return { kind: 'inlineGuard', code: 'e.stopPropagation();' };
+    return { kind: 'inlineGuard', code: '$event.stopPropagation();' };
   },
   solid() {
     // Phase 07.1 inlineGuard: Solid JSX has no native modifier syntax for
     // stop — emitter inserts the side-effect call before the user handler runs.
-    return { kind: 'inlineGuard', code: 'e.stopPropagation();' };
+    return { kind: 'inlineGuard', code: '$event.stopPropagation();' };
   },
   lit() {
     // Phase 07.1 inlineGuard: Lit has no template modifier sugar; inlineGuard
     // is the path.
-    return { kind: 'inlineGuard', code: 'e.stopPropagation();' };
+    return { kind: 'inlineGuard', code: '$event.stopPropagation();' };
   },
 };

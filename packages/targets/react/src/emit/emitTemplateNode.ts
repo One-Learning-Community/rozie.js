@@ -323,11 +323,11 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
  * JSX prop name (e.g., `@keydown.enter` + `@keydown.escape` both map to
  * `onKeyDown`) are combined into a single dispatcher arrow:
  *
- *   onKeyDown={(e) => {
+ *   onKeyDown={($event) => {
  *     // Branch 1 (from @keydown.enter):
- *     if (e.key === 'Enter') { onSearch(e); return; }
+ *     if ($event.key === 'Enter') { onSearch($event); return; }
  *     // Branch 2 (from @keydown.escape):
- *     if (e.key === 'Escape') { clear(e); return; }
+ *     if ($event.key === 'Escape') { clear($event); return; }
  *   }}
  *
  * Without this merge, JSX silently keeps only the LAST attribute when keys
@@ -389,13 +389,13 @@ function emitElementEvents(node: TemplateElementIR, ctx: EmitNodeCtx): string {
     const branches = items.map((it) => {
       const body = it.body;
       // If body is a plain identifier (e.g. `close`), call as `body(e)`.
-      // If body is an arrow `(e) => {...}`, invoke as `(body)(e)`.
+      // If body is an arrow `($event) => {...}`, invoke as `(body)($event)`.
       if (/^[A-Za-z_$][\w$]*$/.test(body)) {
-        return `${body}(e);`;
+        return `${body}($event);`;
       }
-      return `(${body})(e);`;
+      return `(${body})($event);`;
     });
-    const dispatcher = `(e) => { ${branches.join(' ')} }`;
+    const dispatcher = `($event) => { ${branches.join(' ')} }`;
     out.push(`${name}={${dispatcher}}`);
   }
   return out.join(' ');

@@ -87,7 +87,7 @@ describe('emitListeners — Dropdown end-to-end', () => {
     const { code } = emitListeners(dropdown.listeners, dropdown, registry);
     expect(code).toContain('watchEffect((onCleanup) => {');
     expect(code).toContain('if (!(open.value && props.closeOnEscape)) return;');
-    expect(code).toContain("if (e.key !== 'Escape') return;");
+    expect(code).toContain("if ($event.key !== 'Escape') return;");
     expect(code).toContain("document.addEventListener('keydown'");
     expect(code).toContain("document.removeEventListener('keydown'");
   });

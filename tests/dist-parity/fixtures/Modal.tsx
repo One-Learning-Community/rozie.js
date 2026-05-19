@@ -67,9 +67,9 @@ export default function Modal(_props: ModalProps): JSX.Element {
 
   useEffect(() => {
     if (!(open && props.closeOnEscape)) return;
-    const _rozieHandler = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
-      ((close) as ((...args: any[]) => any))(e);
+    const _rozieHandler = ($event: KeyboardEvent) => {
+      if ($event.key !== 'Escape') return;
+      ((close) as ((...args: any[]) => any))($event);
     };
     document.addEventListener('keydown', _rozieHandler);
     return () => document.removeEventListener('keydown', _rozieHandler);
@@ -77,7 +77,7 @@ export default function Modal(_props: ModalProps): JSX.Element {
 
   return (
     <>
-    {(open) && <div className={styles["modal-backdrop"]} ref={backdropEl} onClick={(e) => { if (e.target !== e.currentTarget) return; props.closeOnBackdrop && close(); }} data-rozie-s-fc45feb2="">
+    {(open) && <div className={styles["modal-backdrop"]} ref={backdropEl} onClick={($event) => { if ($event.target !== $event.currentTarget) return; props.closeOnBackdrop && close(); }} data-rozie-s-fc45feb2="">
       <div ref={dialogEl} className={styles["modal-dialog"]} role="dialog" aria-modal="true" aria-label={props.title || undefined} tabIndex={-1} data-rozie-s-fc45feb2="">
         {(props.title || (props.renderHeader ?? props.slots?.['header'])) && <header data-rozie-s-fc45feb2="">
           {(props.renderHeader ?? props.slots?.['header']) ? ((props.renderHeader ?? props.slots?.['header']) as Function)({ close }) : <h2 data-rozie-s-fc45feb2="">{props.title}</h2>}

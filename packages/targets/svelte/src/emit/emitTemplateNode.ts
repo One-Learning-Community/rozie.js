@@ -163,7 +163,7 @@ function emitLoop(node: TemplateLoopIR, ctx: EmitNodeCtx): string {
  * `@keydown.escape="y"`) MUST merge into a single `onkeydown={...}` handler
  * — Svelte rejects duplicate attribute names on the same element. We
  * synthesize a single arrow that runs each handler's inlineGuards + body in
- * sequence; the inlineGuards' early-returns (e.g., `if (e.key !== 'Enter')
+ * sequence; the inlineGuards' early-returns (e.g., `if ($event.key !== 'Enter')
  * return`) naturally route the event to the correct user handler.
  */
 function emitEvents(events: Listener[], ctx: EmitNodeCtx): string {
@@ -206,30 +206,30 @@ function emitEvents(events: Listener[], ctx: EmitNodeCtx): string {
       if (result.scriptInjection) ctx.scriptInjections.push(result.scriptInjection);
       for (const d of result.diagnostics) ctx.diagnostics.push(d);
       // Extract the inner arrow body. emitTemplateEvent always returns either
-      //   `onevent={handler}` (bare identifier) — we wrap as `handler(e);`
-      //   `onevent={(e) => { ...body... }}` — we lift the `...body...` out.
+      //   `onevent={handler}` (bare identifier) — we wrap as `handler($event);`
+      //   `onevent={($event) => { ...body... }}` — we lift the `...body...` out.
       const m = result.eventAttr.match(/^on[a-z]+=\{(.*)\}$/s);
       if (!m) continue;
       const inner = m[1]!;
       // Bare identifier handler:
       if (/^[A-Za-z_$][\w$]*$/.test(inner)) {
-        // Cast to permissive Fn so the `(e)` forward type-checks even when the
+        // Cast to permissive Fn so the `($event)` forward type-checks even when the
         // user-authored handler is `() => void` (see SearchInput's onSearch /
         // clear merged into the onkeydown handler).
-        handlerBodies.push(`(() => { (${inner} as (...a: any[]) => any)(e); })();`);
+        handlerBodies.push(`(() => { (${inner} as (...a: any[]) => any)($event); })();`);
         continue;
       }
-      // Arrow shape `(e) => { body }` — extract body.
+      // Arrow shape `($event) => { body }` — extract body.
       const arrowMatch = inner.match(/^\(e\) => \{\s*([\s\S]*?)\s*\}$/);
       if (arrowMatch) {
         handlerBodies.push(`(() => { ${arrowMatch[1]!} })();`);
         continue;
       }
       // Fallback — wrap whatever it is in a callable IIFE.
-      handlerBodies.push(`(() => { (${inner})(e); })();`);
+      handlerBodies.push(`(() => { (${inner})($event); })();`);
     }
 
-    const merged = `on${eventName}={(e) => { ${handlerBodies.join(' ')} }}`;
+    const merged = `on${eventName}={($event) => { ${handlerBodies.join(' ')} }}`;
     out.push(merged);
   }
 

@@ -25,7 +25,7 @@ function onConfirm() {
       <button class="close" onclick={close}>×</button>
     {/snippet}{#snippet footer({ close })}
       <button onclick={close}>Cancel</button>
-      <button onclick={(e) => { onConfirm(); }}>OK</button>
+      <button onclick={($event) => { onConfirm(); }}>OK</button>
     {/snippet}
     Are you sure you want to proceed?
     </Modal>

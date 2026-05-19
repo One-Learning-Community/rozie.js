@@ -74,13 +74,13 @@ describe('Phase 07.3.1 Blocker #3 (D-03) — Lit consumer-side scoped slot fill 
     // WR-06 (Phase 07.4 review): orthogonal regex assertions in place of the
     // previous monolithic literal — one assertion per semantic property so
     // failures point at one root cause when the emitter is tweaked.
-    expect(code).toMatch(/@click=\$\{\(e\)\s*=>/);
+    expect(code).toMatch(/@click=\$\{\(\$event\)\s*=>/);
     expect(code).toMatch(/dispatchEvent\(new CustomEvent\(/);
     expect(code).toMatch(/'rozie-header-close'/);
     expect(code).toMatch(/bubbles:\s*true/);
     expect(code).toMatch(/composed:\s*true/);
     // The old late-binding wrap MUST NOT appear at the dispatch site.
-    expect(code).not.toMatch(/\(this\._headerCtx\?\.close\)\?\.\(e\)/);
+    expect(code).not.toMatch(/\(this\._headerCtx\?\.close\)\?\.\(\$event\)/);
   });
 
   it('declares per-filler _slotCtxWired_<name> class field', () => {
@@ -103,7 +103,7 @@ describe('Phase 07.3.1 Blocker #3 (D-03) — Lit consumer-side scoped slot fill 
     // Phase 07.6 — data-rozie-s-<hash> scope stamp precedes slot=.
     expect(code).toMatch(/<h2[^>]*slot="header"[^>]*>Title<\/h2>/);
     // Button exists with @click + slot="header" spread (D-LIT-18).
-    expect(code).toMatch(/<button[^>]*@click=\$\{\(e\)\s*=>[^>]*slot="header"[^>]*>×<\/button>/);
+    expect(code).toMatch(/<button[^>]*@click=\$\{\(\$event\)\s*=>[^>]*slot="header"[^>]*>×<\/button>/);
     // Dispatch shape + event name asserted independently.
     expect(code).toMatch(/dispatchEvent\(new CustomEvent\('rozie-header-close'/);
     expect(code).toMatch(/bubbles:\s*true/);
@@ -177,7 +177,7 @@ function handleClick() {}
     // Scoped-ctx handler — D-LIT-17 dispatchEvent translation.
     // WR-06 (Phase 07.4 review): orthogonal regex assertions per semantic
     // property in place of the previous monolithic literal.
-    expect(code).toMatch(/@click=\$\{\(e\)\s*=>/);
+    expect(code).toMatch(/@click=\$\{\(\$event\)\s*=>/);
     expect(code).toMatch(/dispatchEvent\(new CustomEvent\(/);
     expect(code).toMatch(/'rozie-header-close'/);
     expect(code).toMatch(/bubbles:\s*true/);

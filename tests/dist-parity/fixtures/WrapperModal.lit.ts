@@ -80,7 +80,7 @@ export default class WrapperModal extends SignalWatcher(LitElement) {
 
   render() {
     return html`
-<rozie-modal .open=${this.open} @open-change=${(e: CustomEvent) => { this.open = e.detail; }} .title=${this.title}><slot name="brand" slot="header">
+<rozie-modal .open=${this.open} @open-change=${($event: CustomEvent) => { this.open = $event.detail; }} .title=${this.title}><slot name="brand" slot="header">
       <h2 data-rozie-s-1efe6192>${this.title}</h2>
     </slot><slot name="actions" slot="footer"></slot><slot></slot></rozie-modal>
 `;

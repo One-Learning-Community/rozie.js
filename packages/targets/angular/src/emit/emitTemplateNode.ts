@@ -262,13 +262,13 @@ function emitEvents(events: Listener[], ctx: EmitNodeCtx): string {
           return `this.${fn}($event)`;
         },
       );
-      // Replace `$event` -> `e` for the wrapper signature.
-      inner = inner.replace(/\$event/g, 'e');
+      // Wrapper signature is `($event: any) => {...}` so user-side `$event`
+      // references resolve naturally — no rewrite needed.
       guardLines.push(`  ${inner};`);
     }
 
     const decl = [
-      `private ${wrapperName} = (e: any) => {`,
+      `private ${wrapperName} = ($event: any) => {`,
       ...guardLines,
       `};`,
     ].join('\n');

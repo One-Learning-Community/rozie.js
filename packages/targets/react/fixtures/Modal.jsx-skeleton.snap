@@ -1,5 +1,5 @@
 <>
-{(open) && <div className={styles["modal-backdrop"]} ref={backdropEl} onClick={(e) => { if (e.target !== e.currentTarget) return; props.closeOnBackdrop && close(); }}>
+{(open) && <div className={styles["modal-backdrop"]} ref={backdropEl} onClick={($event) => { if ($event.target !== $event.currentTarget) return; props.closeOnBackdrop && close(); }}>
   <div ref={dialogEl} className={styles["modal-dialog"]} role="dialog" aria-modal="true" aria-label={props.title || undefined} tabIndex={-1}>
     {(props.title || (props.renderHeader ?? props.slots?.['header'])) && <header>
       {(props.renderHeader ?? props.slots?.['header']) ? ((props.renderHeader ?? props.slots?.['header']) as Function)({ close }) : <h2>{props.title}</h2>}

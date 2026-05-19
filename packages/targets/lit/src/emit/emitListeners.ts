@@ -178,7 +178,7 @@ function extractNumberArg(args: ModifierArg[] | undefined): number {
 
 /**
  * Map a DOM event name to the matching DOM event interface so registry-driven
- * inlineGuards (e.g. `if (e.key !== 'Escape') return;`) typecheck against the
+ * inlineGuards (e.g. `if ($event.key !== 'Escape') return;`) typecheck against the
  * handler parameter without a per-guard `(e as KeyboardEvent)` cast. Mirrors
  * the Svelte target's `eventTypeFor`.
  *
@@ -226,7 +226,7 @@ export function eventTypeFor(event: string): string {
 /**
  * WR-03 fix: mirror emitTemplate.ts's AST-based isHandlerLike check.
  * Arrow functions and function expressions passed by reference are function-like
- * and can be called as `(handler)(e)`. Inline expressions (count++, etc.)
+ * and can be called as `(handler)($event)`. Inline expressions (count++, etc.)
  * must be emitted as statement form `handler;` without the call wrapper.
  */
 function isHandlerLike(expr: bt.Expression): boolean {
@@ -257,10 +257,10 @@ function emitOneListener(
 
   // WR-03 fix: use AST-based detection to distinguish function-like handlers
   // from inline expressions. Inline expressions (e.g. `count++`) must be
-  // emitted as statements (`count++;`) not calls (`(count++)(e)` — TypeError).
+  // emitted as statements (`count++;`) not calls (`(count++)($event)` — TypeError).
   const isFnLike = isHandlerLike(listener.handler);
-  const userCall = isFnLike ? `((${handlerExpr}) as (...args: any[]) => any)(e);` : `${handlerExpr};`;
-  const handlerBody = `(e: ${evtType}) => { ${guardLines.join(' ')} ${userCall} }`;
+  const userCall = isFnLike ? `((${handlerExpr}) as (...args: any[]) => any)($event);` : `${handlerExpr};`;
+  const handlerBody = `($event: ${evtType}) => { ${guardLines.join(' ')} ${userCall} }`;
 
   // Build addEventListener options object (all options are significant for the add call).
   const addOptionFields: string[] = [];
@@ -297,9 +297,9 @@ function emitOneListener(
       // WR-03 fix: respect isHandlerLike for the outside-click handler too.
       // Inline expressions (e.g. `@click.outside="$data.open = false"`) must
       // emit as statements (`this.open.value = false;`) not calls
-      // (`(this.open.value = false)(e)` — TypeError at click time).
+      // (`(this.open.value = false)($event)` — TypeError at click time).
       return [
-        `const ${unsubVar} = attachOutsideClickListener(${refsArr}, (e) => { ${cls.inlineGuards.join(' ')} ${userCall} }${whenFn});`,
+        `const ${unsubVar} = attachOutsideClickListener(${refsArr}, ($event) => { ${cls.inlineGuards.join(' ')} ${userCall} }${whenFn});`,
         `this._disconnectCleanups.push(${unsubVar});`,
       ].join('\n');
     }
@@ -309,8 +309,8 @@ function emitOneListener(
       const ms = extractNumberArg(cls.wrapperArgs) || 100;
       const wrapped =
         cls.wrapper === 'debounce'
-          ? `(() => { let t: ReturnType<typeof setTimeout> | undefined; return (e: Event) => { ${guardLines.join(' ')} if (t) clearTimeout(t); t = setTimeout(() => { ((${handlerExpr}) as (...args: any[]) => any)(e); }, ${ms}); }; })()`
-          : `(() => { let last = 0; return (e: Event) => { ${guardLines.join(' ')} const now = Date.now(); if (now - last < ${ms}) return; last = now; ((${handlerExpr}) as (...args: any[]) => any)(e); }; })()`;
+          ? `(() => { let t: ReturnType<typeof setTimeout> | undefined; return ($event: Event) => { ${guardLines.join(' ')} if (t) clearTimeout(t); t = setTimeout(() => { ((${handlerExpr}) as (...args: any[]) => any)($event); }, ${ms}); }; })()`
+          : `(() => { let last = 0; return ($event: Event) => { ${guardLines.join(' ')} const now = Date.now(); if (now - last < ${ms}) return; last = now; ((${handlerExpr}) as (...args: any[]) => any)($event); }; })()`;
       const target = targetExpression(listener.target);
       const lines = [
         `const ${handlerVar} = ${wrapped};`,

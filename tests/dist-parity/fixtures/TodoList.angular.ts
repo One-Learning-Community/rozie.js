@@ -120,8 +120,8 @@ export class TodoList {
     return true;
   }
 
-  private _guarded_add = (e: any) => {
-    e.preventDefault();
+  private _guarded_add = ($event: any) => {
+    $event.preventDefault();
     this._add();
   };
 

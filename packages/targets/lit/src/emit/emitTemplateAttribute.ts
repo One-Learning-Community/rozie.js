@@ -63,12 +63,12 @@ export function emitTemplateAttribute(
   //
   // Landmine guard (RESEARCH §Landmines): the listener arg MUST be annotated
   // `(e: CustomEvent)` — Lit's default @event arg type is `Event`, which
-  // does not expose `.detail`. Untyped `(e)` would emit but fail TS.
+  // does not expose `.detail`. Untyped `($event)` would emit but fail TS.
   if (attr.kind === 'twoWayBinding') {
     const valueExpr = rewriteTemplateExpression(attr.expression, ir);
     const setterText = resolveLitSetterText(attr.expression, ir);
     const eventName = `${kebabize(attr.name)}-change`;
-    return `.${attr.name}=\${${valueExpr}} @${eventName}=\${(e: CustomEvent) => { ${setterText} = e.detail; }}`;
+    return `.${attr.name}=\${${valueExpr}} @${eventName}=\${($event: CustomEvent) => { ${setterText} = $event.detail; }}`;
   }
   if (attr.kind === 'binding') {
     // Quick-task 260518-e2t (Spike 004 Lit subset) — literal-object `:style`

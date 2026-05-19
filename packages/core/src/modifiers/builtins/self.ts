@@ -47,7 +47,7 @@ export const self: ModifierImpl = {
     // emitter inserts an early-return guard before the user handler runs.
     return {
       kind: 'inlineGuard',
-      code: 'if (e.target !== e.currentTarget) return;',
+      code: 'if ($event.target !== $event.currentTarget) return;',
     };
   },
   svelte() {
@@ -55,7 +55,7 @@ export const self: ModifierImpl = {
     // Pitfall 4) — emitter inserts an early-return guard.
     return {
       kind: 'inlineGuard',
-      code: 'if (e.target !== e.currentTarget) return;',
+      code: 'if ($event.target !== $event.currentTarget) return;',
     };
   },
   angular() {
@@ -63,7 +63,7 @@ export const self: ModifierImpl = {
     // inserts an early-return guard.
     return {
       kind: 'inlineGuard',
-      code: 'if (e.target !== e.currentTarget) return;',
+      code: 'if ($event.target !== $event.currentTarget) return;',
     };
   },
   solid() {
@@ -71,7 +71,7 @@ export const self: ModifierImpl = {
     // self — emitter inserts an early-return guard before the user handler.
     return {
       kind: 'inlineGuard',
-      code: 'if (e.target !== e.currentTarget) return;',
+      code: 'if ($event.target !== $event.currentTarget) return;',
     };
   },
   lit() {
@@ -79,7 +79,7 @@ export const self: ModifierImpl = {
     // inserts an early-return guard.
     return {
       kind: 'inlineGuard',
-      code: 'if (e.target !== e.currentTarget) return;',
+      code: 'if ($event.target !== $event.currentTarget) return;',
     };
   },
 };

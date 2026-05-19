@@ -39,14 +39,14 @@ export default class Dropdown extends SignalWatcher(LitElement) {
   private _disconnectCleanups: Array<() => void> = [];
 
   private _armListeners(): void {
-    const _u0 = attachOutsideClickListener([() => this._refTriggerEl, () => this._refPanelEl], (e) => {  ((this.close) as (...args: any[]) => any)(e); }, () => (this.open && this.closeOnOutsideClick));
+    const _u0 = attachOutsideClickListener([() => this._refTriggerEl, () => this._refPanelEl], ($event) => {  ((this.close) as (...args: any[]) => any)($event); }, () => (this.open && this.closeOnOutsideClick));
     this._disconnectCleanups.push(_u0);
 
-    const _lh1 = (e: KeyboardEvent) => { if (!(this.open && this.closeOnEscape)) return; if (e.key !== 'Escape') return; ((this.close) as (...args: any[]) => any)(e); };
+    const _lh1 = ($event: KeyboardEvent) => { if (!(this.open && this.closeOnEscape)) return; if ($event.key !== 'Escape') return; ((this.close) as (...args: any[]) => any)($event); };
     document.addEventListener('keydown', _lh1, undefined);
     this._disconnectCleanups.push(() => document.removeEventListener('keydown', _lh1, undefined));
 
-    const _lh2 = (() => { let last = 0; return (e: Event) => { if (!(this.open)) return; const now = Date.now(); if (now - last < 100) return; last = now; ((this.reposition) as (...args: any[]) => any)(e); }; })();
+    const _lh2 = (() => { let last = 0; return ($event: Event) => { if (!(this.open)) return; const now = Date.now(); if (now - last < 100) return; last = now; ((this.reposition) as (...args: any[]) => any)($event); }; })();
     window.addEventListener('resize', _lh2, { passive: true });
     this._disconnectCleanups.push(() => window.removeEventListener('resize', _lh2, undefined));
 
@@ -109,11 +109,11 @@ export default class Dropdown extends SignalWatcher(LitElement) {
     return html`
 <div class="dropdown" data-rozie-s-6d6bd882>
   <div @click=${this.toggle} data-rozie-ref="triggerEl" data-rozie-s-6d6bd882>
-    ${this.trigger !== undefined ? this.trigger({open: this.open, toggle: this.toggle}) : html`<slot name="trigger" data-rozie-params=${(() => { try { return JSON.stringify({open: this.open}); } catch { return '{}'; } })()} @rozie-trigger-toggle=${(e: CustomEvent) => ((this.toggle) as (...args: any[]) => any)(e.detail)}></slot>`}
+    ${this.trigger !== undefined ? this.trigger({open: this.open, toggle: this.toggle}) : html`<slot name="trigger" data-rozie-params=${(() => { try { return JSON.stringify({open: this.open}); } catch { return '{}'; } })()} @rozie-trigger-toggle=${($event: CustomEvent) => ((this.toggle) as (...args: any[]) => any)($event.detail)}></slot>`}
   </div>
 
   ${this.open ? html`<div class="dropdown-panel" role="menu" data-rozie-ref="panelEl" data-rozie-s-6d6bd882>
-    ${this.__rozieDefaultSlot__ !== undefined ? this.__rozieDefaultSlot__({close: this.close}) : html`<slot @rozie-default-close=${(e: CustomEvent) => ((this.close) as (...args: any[]) => any)(e.detail)}></slot>`}
+    ${this.__rozieDefaultSlot__ !== undefined ? this.__rozieDefaultSlot__({close: this.close}) : html`<slot @rozie-default-close=${($event: CustomEvent) => ((this.close) as (...args: any[]) => any)($event.detail)}></slot>`}
   </div>` : nothing}</div>
 `;
   }

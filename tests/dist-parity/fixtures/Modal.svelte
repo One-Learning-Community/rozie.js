@@ -66,8 +66,8 @@ $effect(() => {
 
 $effect(() => {
   if (!(open && closeOnEscape)) return;
-  const handler = (e: KeyboardEvent) => {
-    if (e.key !== 'Escape') return;
+  const handler = ($event: KeyboardEvent) => {
+    if ($event.key !== 'Escape') return;
     close();
   };
   document.addEventListener('keydown', handler);
@@ -76,7 +76,7 @@ $effect(() => {
 </script>
 
 
-{#if open}<div class="modal-backdrop" bind:this={backdropEl} onclick={(e) => { if (e.target !== e.currentTarget) return; closeOnBackdrop && close(); }}>
+{#if open}<div class="modal-backdrop" bind:this={backdropEl} onclick={($event) => { if ($event.target !== $event.currentTarget) return; closeOnBackdrop && close(); }}>
   <div bind:this={dialogEl} class="modal-dialog" role="dialog" aria-modal="true" aria-label={title || undefined} tabindex="-1">
     {#if title || header}<header>
       {#if header}{@render header({ close })}{:else}

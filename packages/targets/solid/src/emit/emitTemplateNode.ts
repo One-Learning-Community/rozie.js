@@ -224,11 +224,11 @@ function emitElementEvents(node: TemplateElementIR, ctx: EmitNodeCtx): string {
     const branches = items.map((it) => {
       const body = it.body;
       if (/^[A-Za-z_$][\w$]*$/.test(body)) {
-        return `${body}(e);`;
+        return `${body}($event);`;
       }
-      return `(${body})(e);`;
+      return `(${body})($event);`;
     });
-    const dispatcher = `(e) => { ${branches.join(' ')} }`;
+    const dispatcher = `($event) => { ${branches.join(' ')} }`;
     out.push(`${name}={${dispatcher}}`);
   }
   return out.join(' ');
@@ -307,10 +307,10 @@ function mergeEventAttributes(attrsJsx: string, eventsJsx: string): string {
       // Merge: build a dispatcher that calls both handlers with `e`.
       const wrap = (body: string) => {
         // If body is already a bare identifier, call it; otherwise invoke the expression.
-        if (/^[A-Za-z_$][\w$]*$/.test(body)) return `${body}(e);`;
-        return `(${body})(e);`;
+        if (/^[A-Za-z_$][\w$]*$/.test(body)) return `${body}($event);`;
+        return `(${body})($event);`;
       };
-      merged.push(`${name}={(e) => { ${wrap(attrsBody)} ${wrap(eventsBody)} }}`);
+      merged.push(`${name}={($event) => { ${wrap(attrsBody)} ${wrap(eventsBody)} }}`);
       eventsNamed.delete(name);
     } else {
       merged.push(`${name}={${attrsBody}}`);

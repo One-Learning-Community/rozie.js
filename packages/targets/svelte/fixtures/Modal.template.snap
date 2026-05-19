@@ -1,5 +1,5 @@
 
-{#if open}<div class="modal-backdrop" bind:this={backdropEl} onclick={(e) => { if (e.target !== e.currentTarget) return; closeOnBackdrop && close(); }}>
+{#if open}<div class="modal-backdrop" bind:this={backdropEl} onclick={($event) => { if ($event.target !== $event.currentTarget) return; closeOnBackdrop && close(); }}>
   <div bind:this={dialogEl} class="modal-dialog" role="dialog" aria-modal="true" aria-label={title || undefined} tabindex="-1">
     {#if title || header}<header>
       {#if header}{@render header({ close })}{:else}

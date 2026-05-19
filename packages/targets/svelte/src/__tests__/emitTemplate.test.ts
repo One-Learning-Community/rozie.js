@@ -5,7 +5,7 @@
 //  1. Counter @click → onclick={handler} (lowercase, no `on:` prefix)
 //  2. TodoList r-for + :key → {#each items as item (item.id)}
 //  3. Modal slot with defaultContent → A1 RESOLVED verbose form ({:else} fallback)
-//  4. @click.stop → onclick={(e) => { e.stopPropagation(); handler(e); }}
+//  4. @click.stop → onclick={(e) => { $event.stopPropagation(); handler(e); }}
 //  5. ROZ621 raised on template @click.once (native descriptor in template ctx)
 //  6. Mustache-in-attribute → template literal: class={`card card--${variant}`}
 //  7. r-html → {@html expr}; ROZ620 if same element has children
@@ -68,15 +68,15 @@ describe('emitTemplate — behavior (Plan 05-02a Task 2)', () => {
     );
   });
 
-  it('Test 4: TodoList @submit.prevent emits onsubmit={(e) => { e.preventDefault(); (add as (...a: any[]) => any)(e); }}', () => {
+  it('Test 4: TodoList @submit.prevent emits onsubmit={(e) => { $event.preventDefault(); (add as (...a: any[]) => any)(e); }}', () => {
     const { template, diagnostics } = emitTemplate(lowerExample('TodoList'), REGISTRY);
     expect(diagnostics).toEqual([]);
-    // .prevent inlineGuard → e.preventDefault() before handler invocation.
+    // .prevent inlineGuard → $event.preventDefault() before handler invocation.
     // The handler-ref is cast to `(...a: any[]) => any` so the `(e)` forward
     // type-checks under svelte-check even when the user-authored `add` is
     // declared `() => void` (TYPES-02 + svelte-check gate).
     expect(template).toMatch(
-      /onsubmit=\{\(e\) => \{ e\.preventDefault\(\); \(add as \(\.\.\.a: any\[\]\) => any\)\(e\); \}\}/,
+      /onsubmit=\{\(\$event\) => \{ \$event\.preventDefault\(\); \(add as \(\.\.\.a: any\[\]\) => any\)\(\$event\); \}\}/,
     );
   });
 
@@ -85,8 +85,8 @@ describe('emitTemplate — behavior (Plan 05-02a Task 2)', () => {
     // they do NOT trigger ROZ621 (that's reserved for native+template-context).
     const { template, diagnostics } = emitTemplate(lowerExample('SearchInput'), REGISTRY);
     expect(diagnostics.filter((d) => d.code === 'ROZ621')).toEqual([]);
-    expect(template).toContain("e.key !== 'Enter'");
-    expect(template).toContain("e.key !== 'Escape'");
+    expect(template).toContain("$event.key !== 'Enter'");
+    expect(template).toContain("$event.key !== 'Escape'");
   });
 
   it('Test 6: Modal `:aria-label="$props.title || undefined"` emits aria-label={title || undefined}', () => {

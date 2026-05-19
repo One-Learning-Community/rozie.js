@@ -62,8 +62,8 @@ export default function Dropdown(_props: DropdownProps): JSX.Element {
 
   createEffect(() => {
     if (!(open() && local.closeOnEscape)) return;
-    const _rozieHandler = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
+    const _rozieHandler = ($event: KeyboardEvent) => {
+      if ($event.key !== 'Escape') return;
       close();
     };
     document.addEventListener('keydown', _rozieHandler);

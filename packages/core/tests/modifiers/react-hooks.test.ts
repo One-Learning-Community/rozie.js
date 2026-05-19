@@ -49,21 +49,21 @@ describe('Phase 4 D-65 React emission descriptors', () => {
     }
   });
 
-  it('.stop returns inlineGuard with e.stopPropagation()', () => {
+  it('.stop returns inlineGuard with $event.stopPropagation()', () => {
     const desc = registry.get('stop')!.react!([], LISTENER_CTX);
-    expect(desc).toEqual({ kind: 'inlineGuard', code: 'e.stopPropagation();' });
+    expect(desc).toEqual({ kind: 'inlineGuard', code: '$event.stopPropagation();' });
   });
 
-  it('.prevent returns inlineGuard with e.preventDefault()', () => {
+  it('.prevent returns inlineGuard with $event.preventDefault()', () => {
     const desc = registry.get('prevent')!.react!([], LISTENER_CTX);
-    expect(desc).toEqual({ kind: 'inlineGuard', code: 'e.preventDefault();' });
+    expect(desc).toEqual({ kind: 'inlineGuard', code: '$event.preventDefault();' });
   });
 
-  it('.self returns inlineGuard checking e.target !== e.currentTarget (D-65 exemplar)', () => {
+  it('.self returns inlineGuard checking $event.target !== $event.currentTarget (D-65 exemplar)', () => {
     const desc = registry.get('self')!.react!([], LISTENER_CTX);
     expect(desc).toEqual({
       kind: 'inlineGuard',
-      code: 'if (e.target !== e.currentTarget) return;',
+      code: 'if ($event.target !== $event.currentTarget) return;',
     });
   });
 
@@ -82,56 +82,56 @@ describe('Phase 4 D-65 React emission descriptors', () => {
     expect(desc).toEqual({ kind: 'native', token: 'once' });
   });
 
-  it('escape maps to inlineGuard checking e.key === "Escape" (React idiom, NOT Vue "esc")', () => {
+  it('escape maps to inlineGuard checking $event.key === "Escape" (React idiom, NOT Vue "esc")', () => {
     const desc = registry.get('escape')!.react!([], LISTENER_CTX);
     expect(desc).toEqual({
       kind: 'inlineGuard',
-      code: "if (e.key !== 'Escape') return;",
+      code: "if ($event.key !== 'Escape') return;",
     });
   });
 
-  it('enter maps to inlineGuard checking e.key === "Enter"', () => {
+  it('enter maps to inlineGuard checking $event.key === "Enter"', () => {
     const desc = registry.get('enter')!.react!([], LISTENER_CTX);
     expect(desc).toEqual({
       kind: 'inlineGuard',
-      code: "if (e.key !== 'Enter') return;",
+      code: "if ($event.key !== 'Enter') return;",
     });
   });
 
   it('tab/delete map to inlineGuard with their full React key names', () => {
     expect(registry.get('tab')!.react!([], LISTENER_CTX)).toEqual({
       kind: 'inlineGuard',
-      code: "if (e.key !== 'Tab') return;",
+      code: "if ($event.key !== 'Tab') return;",
     });
     expect(registry.get('delete')!.react!([], LISTENER_CTX)).toEqual({
       kind: 'inlineGuard',
-      code: "if (e.key !== 'Delete') return;",
+      code: "if ($event.key !== 'Delete') return;",
     });
   });
 
-  it('space maps to inlineGuard checking e.key === " " (literal space char)', () => {
+  it('space maps to inlineGuard checking $event.key === " " (literal space char)', () => {
     expect(registry.get('space')!.react!([], LISTENER_CTX)).toEqual({
       kind: 'inlineGuard',
-      code: "if (e.key !== ' ') return;",
+      code: "if ($event.key !== ' ') return;",
     });
   });
 
   it('arrow keys (up/down/left/right) map to ArrowUp/ArrowDown/ArrowLeft/ArrowRight', () => {
     expect(registry.get('up')!.react!([], LISTENER_CTX)).toEqual({
       kind: 'inlineGuard',
-      code: "if (e.key !== 'ArrowUp') return;",
+      code: "if ($event.key !== 'ArrowUp') return;",
     });
     expect(registry.get('down')!.react!([], LISTENER_CTX)).toEqual({
       kind: 'inlineGuard',
-      code: "if (e.key !== 'ArrowDown') return;",
+      code: "if ($event.key !== 'ArrowDown') return;",
     });
     expect(registry.get('left')!.react!([], LISTENER_CTX)).toEqual({
       kind: 'inlineGuard',
-      code: "if (e.key !== 'ArrowLeft') return;",
+      code: "if ($event.key !== 'ArrowLeft') return;",
     });
     expect(registry.get('right')!.react!([], LISTENER_CTX)).toEqual({
       kind: 'inlineGuard',
-      code: "if (e.key !== 'ArrowRight') return;",
+      code: "if ($event.key !== 'ArrowRight') return;",
     });
   });
 

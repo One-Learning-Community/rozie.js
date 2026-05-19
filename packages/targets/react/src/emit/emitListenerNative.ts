@@ -12,9 +12,9 @@
  *   ```
  *   useEffect(() => {
  *     if (!(when)) return;          // optional — only if listener.when set
- *     const handler = (e: Event) => {
- *       if (e.key !== 'Escape') return;   // inlineGuards from D-65
- *       userHandler(e);
+ *     const handler = ($event: Event) => {
+ *       if ($event.key !== 'Escape') return;   // inlineGuards from D-65
+ *       userHandler($event);
  *     };
  *     document.addEventListener('keydown', handler);
  *     return () => document.removeEventListener('keydown', handler);
@@ -207,7 +207,7 @@ export function emitListenerNative(
 
   // Render the user handler. For Identifier handlers, call as `name(e)` so
   // the user's signature receives the event arg; for non-Identifier shapes
-  // (arrow / call), wrap in (e) => {...} (Pitfall 5).
+  // (arrow / call), wrap in ($event) => {...} (Pitfall 5).
   const handlerName = options.wrappedHandlerName ?? '_rozieHandler';
   const guardBody = inlineGuards.length > 0
     ? inlineGuards.map((g) => `    ${g}`).join('\n') + '\n'
@@ -225,7 +225,7 @@ export function emitListenerNative(
       handlerDecl = '';
       handlerRef = options.wrappedHandlerName;
     } else {
-      handlerDecl = `  const _rozieGuardedHandler = (e: ${evtType}) => {\n${guardBody}    ${options.wrappedHandlerName}(e);\n  };\n`;
+      handlerDecl = `  const _rozieGuardedHandler = ($event: ${evtType}) => {\n${guardBody}    ${options.wrappedHandlerName}($event);\n  };\n`;
       handlerRef = '_rozieGuardedHandler';
     }
     // Wrapper name is stable across renders but exhaustive-deps wants it listed.
@@ -234,14 +234,14 @@ export function emitListenerNative(
     // Class A / D: build an inner handler from the user's expression.
     // 2026-05-18 — Cast handler before invocation so 0-arg user methods
     // (Modal's `close: useCallback(() => {...}, [])`) accept the synthetic
-    // event arg without TS2554. The inner handler arrow always passes `(e)`
+    // event arg without TS2554. The inner handler arrow always passes `($event)`
     // even for bare-identifier 0-arg handlers.
     const userHandlerCode = rewriteTemplateExpression(listener.handler, ir);
     const handlerIsBareIdentifier = /^[A-Za-z_$][\w$]*$/.test(userHandlerCode);
     const invocation = handlerIsBareIdentifier
-      ? `((${userHandlerCode}) as ((...args: any[]) => any))(e);`
+      ? `((${userHandlerCode}) as ((...args: any[]) => any))($event);`
       : `(${userHandlerCode});`;
-    handlerDecl = `  const ${handlerName} = (e: ${evtType}) => {\n${guardBody}    ${invocation}\n  };\n`;
+    handlerDecl = `  const ${handlerName} = ($event: ${evtType}) => {\n${guardBody}    ${invocation}\n  };\n`;
     handlerRef = handlerName;
   }
 

@@ -49,7 +49,7 @@ export default function SearchInput(_props: SearchInputProps): JSX.Element {
     <>
     <div class={"search-input"} data-rozie-s-8bbc4a60="">
       
-      <input type="search" ref={(el) => { inputElRef = el as HTMLElement; }} placeholder={local.placeholder} value={query()} onInput={(e) => { (e => setQuery(e.currentTarget.value))(e); _rozieDebouncedOnSearch(e); }} onKeyDown={(e) => { ((e) => { if (e.key !== 'Enter') return; onSearch(); })(e); ((e) => { if (e.key !== 'Escape') return; clear(); })(e); }} data-rozie-s-8bbc4a60="" />
+      <input type="search" ref={(el) => { inputElRef = el as HTMLElement; }} placeholder={local.placeholder} value={query()} onInput={($event) => { (e => setQuery(e.currentTarget.value))($event); _rozieDebouncedOnSearch($event); }} onKeyDown={($event) => { (($event) => { if ($event.key !== 'Enter') return; onSearch(); })($event); (($event) => { if ($event.key !== 'Escape') return; clear(); })($event); }} data-rozie-s-8bbc4a60="" />
 
       {<Show when={query().length > 0} fallback={<span class={"hint"} data-rozie-s-8bbc4a60="">{local.minLength}+ chars</span>}><button aria-label="Clear" class={"clear-btn"} onClick={clear} data-rozie-s-8bbc4a60="">
         ×

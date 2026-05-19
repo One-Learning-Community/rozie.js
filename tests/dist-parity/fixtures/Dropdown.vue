@@ -70,8 +70,8 @@ useOutsideClick(
 
 watchEffect((onCleanup) => {
   if (!(open.value && props.closeOnEscape)) return;
-  const handler = (e: KeyboardEvent) => {
-    if (e.key !== 'Escape') return;
+  const handler = ($event: KeyboardEvent) => {
+    if ($event.key !== 'Escape') return;
     close();
   };
   document.addEventListener('keydown', handler);

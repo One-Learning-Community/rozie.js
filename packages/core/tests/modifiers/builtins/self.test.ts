@@ -40,7 +40,7 @@ describe('builtin: .self — Plan 02-04', () => {
     const desc = self.solid!([], CTX);
     expect(desc).toEqual({
       kind: 'inlineGuard',
-      code: 'if (e.target !== e.currentTarget) return;',
+      code: 'if ($event.target !== $event.currentTarget) return;',
     });
   });
 
@@ -48,7 +48,7 @@ describe('builtin: .self — Plan 02-04', () => {
     const desc = self.lit!([], CTX);
     expect(desc).toEqual({
       kind: 'inlineGuard',
-      code: 'if (e.target !== e.currentTarget) return;',
+      code: 'if ($event.target !== $event.currentTarget) return;',
     });
   });
 });

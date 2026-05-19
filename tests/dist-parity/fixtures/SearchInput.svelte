@@ -51,7 +51,7 @@ const debouncedOnSearch = (() => {
 
 <div class="search-input">
   
-  <input bind:this={inputEl} type="search" placeholder={placeholder} bind:value={query} oninput={debouncedOnSearch} onkeydown={(e) => { (() => { if (e.key !== 'Enter') return; (onSearch as (...a: any[]) => any)(e); })(); (() => { if (e.key !== 'Escape') return; (clear as (...a: any[]) => any)(e); })(); }} />
+  <input bind:this={inputEl} type="search" placeholder={placeholder} bind:value={query} oninput={debouncedOnSearch} onkeydown={($event) => { (() => { (($event) => { if ($event.key !== 'Enter') return; (onSearch as (...a: any[]) => any)($event); })($event); })(); (() => { (($event) => { if ($event.key !== 'Escape') return; (clear as (...a: any[]) => any)($event); })($event); })(); }} />
 
   {#if query.length > 0}<button class="clear-btn" aria-label="Clear" onclick={clear}>
     ×

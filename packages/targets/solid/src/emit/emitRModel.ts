@@ -7,15 +7,15 @@
  * KEY SOLID DIFFERENCES from React emitRModel:
  *   - Text inputs use `onInput` not `onChange` (Solid's onChange fires on blur, not per-keystroke)
  *   - Signal reads need `()` getter call: `value()` not `value`
- *   - The setter call uses Solid signal setter: `setX(e.currentTarget.value)`
+ *   - The setter call uses Solid signal setter: `setX($event.currentTarget.value)`
  *   - Custom components: `value={value()} onValueChange={setValue}`
  *
  * Patterns:
- *   - <input type="text"> (default) → `value={X()} onInput={(e) => setX(e.currentTarget.value)}`
- *   - <input type="checkbox">       → `checked={X()} onChange={(e) => setX(e.currentTarget.checked)}`
- *   - <input type="radio" value="V">→ `checked={X() === 'V'} onChange={(e) => setX('V')}`
- *   - <select>                       → `value={X()} onInput={(e) => setX(e.currentTarget.value)}`
- *   - <textarea>                     → `value={X()} onInput={(e) => setX(e.currentTarget.value)}`
+ *   - <input type="text"> (default) → `value={X()} onInput={($event) => setX($event.currentTarget.value)}`
+ *   - <input type="checkbox">       → `checked={X()} onChange={($event) => setX($event.currentTarget.checked)}`
+ *   - <input type="radio" value="V">→ `checked={X() === 'V'} onChange={($event) => setX('V')}`
+ *   - <select>                       → `value={X()} onInput={($event) => setX($event.currentTarget.value)}`
+ *   - <textarea>                     → `value={X()} onInput={($event) => setX($event.currentTarget.value)}`
  *   - <CustomComponent>              → `value={X()} onValueChange={setX}`
  *
  * @experimental — shape may change before v1.0
@@ -134,7 +134,7 @@ export function emitRModel(
     };
   }
 
-  // <input type="checkbox">: checked={X()} onChange={(e) => setX(e.currentTarget.checked)}
+  // <input type="checkbox">: checked={X()} onChange={($event) => setX($event.currentTarget.checked)}
   if (tag === 'input' && inputType === 'checkbox') {
     const eTargetChecked = t.memberExpression(
       t.memberExpression(eId, t.identifier('currentTarget')),
@@ -153,7 +153,7 @@ export function emitRModel(
     };
   }
 
-  // <input type="radio" value="V">: checked={X() === 'V'} onChange={(e) => setX('V')}
+  // <input type="radio" value="V">: checked={X() === 'V'} onChange={($event) => setX('V')}
   if (tag === 'input' && inputType === 'radio') {
     const radioValue = getStaticAttr(element.attributes, 'value') ?? '';
     const checkedExpr = t.binaryExpression(
@@ -175,7 +175,7 @@ export function emitRModel(
   }
 
   // <select>, <textarea>, <input type="text"> (default):
-  // value={X()} onInput={(e) => setX(e.currentTarget.value)}
+  // value={X()} onInput={($event) => setX($event.currentTarget.value)}
   // Solid's onInput fires on every keystroke; onChange fires on blur.
   const eTargetValue = t.memberExpression(
     t.memberExpression(eId, t.identifier('currentTarget')),

@@ -77,7 +77,7 @@ const remaining = $derived(items.filter(i => !i.done).length);
     {/if}
   </header>
 
-  <form onsubmit={(e) => { e.preventDefault(); (add as (...a: any[]) => any)(e); }}>
+  <form onsubmit={($event) => { $event.preventDefault(); (add as (...a: any[]) => any)($event); }}>
     <input bind:value={draft} placeholder="What needs doing?" />
     <button type="submit" disabled={!draft.trim()}>Add</button>
   </form>
@@ -86,8 +86,8 @@ const remaining = $derived(items.filter(i => !i.done).length);
     {#each items as item (item.id)}<li class={{ done: item.done }}>
       
       {#if children}{@render children({ item, toggle: () => toggle(item.id), remove: () => removeItem(item.id) })}{:else}
-        <label><input type="checkbox" checked={item.done} onchange={(e) => { toggle(item.id); }} /><span>{item.text}</span></label>
-        <button aria-label="Remove" onclick={(e) => { removeItem(item.id); }}>×</button>
+        <label><input type="checkbox" checked={item.done} onchange={($event) => { toggle(item.id); }} /><span>{item.text}</span></label>
+        <button aria-label="Remove" onclick={($event) => { removeItem(item.id); }}>×</button>
       {/if}
     </li>{/each}
   </ul>{:else}<p class="empty">

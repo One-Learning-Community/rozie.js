@@ -79,8 +79,8 @@ export default function Modal(props: ModalProps): JSX.Element | null {
 
   useEffect(() => {
     if (!(open && props.closeOnEscape)) return;
-    const _rozieHandler = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
+    const _rozieHandler = ($event: KeyboardEvent) => {
+      if ($event.key !== 'Escape') return;
       close();
     };
     document.addEventListener('keydown', _rozieHandler);
@@ -94,7 +94,7 @@ export default function Modal(props: ModalProps): JSX.Element | null {
       ref={backdropEl}
       data-testid="modal-backdrop"
       onClick={(e) => {
-        if (e.target !== e.currentTarget) return;
+        if ($event.target !== $event.currentTarget) return;
         if (props.closeOnBackdrop) close();
       }}
     >

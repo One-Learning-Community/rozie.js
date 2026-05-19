@@ -65,19 +65,19 @@ export class SearchInput {
     };
   })();
 
-  private _guardedOnSearch_2 = (e: any) => {
-    if (e.key !== 'Enter') return;
+  private _guardedOnSearch_2 = ($event: any) => {
+    if ($event.key !== 'Enter') return;
     this.onSearch();
   };
 
-  private _guarded_clear_3 = (e: any) => {
-    if (e.key !== 'Escape') return;
+  private _guarded_clear_3 = ($event: any) => {
+    if ($event.key !== 'Escape') return;
     this._clear();
   };
 
-  private _merged_keydown_1 = (e: any) => {
-    this._guardedOnSearch_2(e);
-    this._guarded_clear_3(e);
+  private _merged_keydown_1 = ($event: any) => {
+    this._guardedOnSearch_2($event);
+    this._guarded_clear_3($event);
   };
 }
 

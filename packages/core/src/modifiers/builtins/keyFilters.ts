@@ -148,7 +148,7 @@ function makeFilter(name: KeyFilterName): ModifierImpl {
       const reactKey = REACT_KEY_NAME_MAP[name];
       return {
         kind: 'inlineGuard',
-        code: `if (e.key !== '${reactKey}') return;`,
+        code: `if ($event.key !== '${reactKey}') return;`,
       };
     },
     svelte() {
@@ -159,7 +159,7 @@ function makeFilter(name: KeyFilterName): ModifierImpl {
       const reactKey = REACT_KEY_NAME_MAP[name];
       return {
         kind: 'inlineGuard',
-        code: `if (e.key !== '${reactKey}') return;`,
+        code: `if ($event.key !== '${reactKey}') return;`,
       };
     },
     angular() {
@@ -170,7 +170,7 @@ function makeFilter(name: KeyFilterName): ModifierImpl {
       const reactKey = REACT_KEY_NAME_MAP[name];
       return {
         kind: 'inlineGuard',
-        code: `if (e.key !== '${reactKey}') return;`,
+        code: `if ($event.key !== '${reactKey}') return;`,
       };
     },
     solid() {
@@ -180,7 +180,7 @@ function makeFilter(name: KeyFilterName): ModifierImpl {
       const reactKey = REACT_KEY_NAME_MAP[name];
       return {
         kind: 'inlineGuard',
-        code: `if (e.key !== '${reactKey}') return;`,
+        code: `if ($event.key !== '${reactKey}') return;`,
       };
     },
     lit() {
@@ -190,7 +190,7 @@ function makeFilter(name: KeyFilterName): ModifierImpl {
       const reactKey = REACT_KEY_NAME_MAP[name];
       return {
         kind: 'inlineGuard',
-        code: `if (e.key !== '${reactKey}') return;`,
+        code: `if ($event.key !== '${reactKey}') return;`,
       };
     },
   };

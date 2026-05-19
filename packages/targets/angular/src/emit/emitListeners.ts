@@ -61,21 +61,21 @@ export interface AngularListenerInjection {
 }
 
 const NATIVE_KEY_GUARDS: Record<string, string> = {
-  enter: "if (e.key !== 'Enter') return;",
-  esc: "if (e.key !== 'Escape') return;",
-  escape: "if (e.key !== 'Escape') return;",
-  tab: "if (e.key !== 'Tab') return;",
-  delete: "if (e.key !== 'Delete' && e.key !== 'Backspace') return;",
-  space: "if (e.key !== ' ') return;",
-  up: "if (e.key !== 'ArrowUp') return;",
-  down: "if (e.key !== 'ArrowDown') return;",
-  left: "if (e.key !== 'ArrowLeft') return;",
-  right: "if (e.key !== 'ArrowRight') return;",
-  home: "if (e.key !== 'Home') return;",
-  end: "if (e.key !== 'End') return;",
-  pageUp: "if (e.key !== 'PageUp') return;",
-  pageDown: "if (e.key !== 'PageDown') return;",
-  middle: "if (e.button !== 1) return;",
+  enter: "if ($event.key !== 'Enter') return;",
+  esc: "if ($event.key !== 'Escape') return;",
+  escape: "if ($event.key !== 'Escape') return;",
+  tab: "if ($event.key !== 'Tab') return;",
+  delete: "if ($event.key !== 'Delete' && $event.key !== 'Backspace') return;",
+  space: "if ($event.key !== ' ') return;",
+  up: "if ($event.key !== 'ArrowUp') return;",
+  down: "if ($event.key !== 'ArrowDown') return;",
+  left: "if ($event.key !== 'ArrowLeft') return;",
+  right: "if ($event.key !== 'ArrowRight') return;",
+  home: "if ($event.key !== 'Home') return;",
+  end: "if ($event.key !== 'End') return;",
+  pageUp: "if ($event.key !== 'PageUp') return;",
+  pageDown: "if ($event.key !== 'PageDown') return;",
+  middle: "if ($event.button !== 1) return;",
 };
 
 function eventTypeFor(event: string): string {
@@ -294,7 +294,7 @@ function renderListener(
       .join(' || ');
 
     const containsGuard = refChecks.length > 0
-      ? `        const target = e.target as Node;\n        if (${refChecks}) return;\n`
+      ? `        const target = $event.target as Node;\n        if (${refChecks}) return;\n`
       : '';
 
     const guardLines = classification.nativeKeyGuards.length > 0
@@ -303,11 +303,11 @@ function renderListener(
 
     const invocation = handlerIsBareIdentifier
       ? `        ${handlerRef}();`
-      : `        (${userHandlerCode})(e);`;
+      : `        (${userHandlerCode})($event);`;
 
     return [
       `effect((onCleanup) => {`,
-      `${whenGuard}      const handler = (e: ${evtType}) => {\n${containsGuard}${guardLines}${invocation}\n      };`,
+      `${whenGuard}      const handler = ($event: ${evtType}) => {\n${containsGuard}${guardLines}${invocation}\n      };`,
       `      const unlisten = renderer.listen(${targetExpr}, '${listener.event}', handler);`,
       `      onCleanup(unlisten);`,
       `    });`,
@@ -340,11 +340,11 @@ function renderListener(
     : '';
   const invocation = handlerIsBareIdentifier
     ? `        ${handlerRef}();`
-    : `        (${userHandlerCode})(e);`;
+    : `        (${userHandlerCode})($event);`;
 
   return [
     `effect((onCleanup) => {`,
-    `${whenGuard}      const handler = (e: ${evtType}) => {\n${guardLines}${invocation}\n      };`,
+    `${whenGuard}      const handler = ($event: ${evtType}) => {\n${guardLines}${invocation}\n      };`,
     `      const unlisten = renderer.listen(${targetExpr}, '${listener.event}', handler);`,
     `      onCleanup(unlisten);`,
     `    });`,

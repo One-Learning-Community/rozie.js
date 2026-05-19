@@ -6,13 +6,13 @@
  * `<Modal r-model:open="$data.open1">` lowers to an AttributeBinding with
  * `kind: 'twoWayBinding'` and must emit the html`` template-fragment pair:
  *
- *   .open=${this._open1.value} @open-change=${(e: CustomEvent) => { this._open1.value = e.detail; }}
+ *   .open=${this._open1.value} @open-change=${($event: CustomEvent) => { this._open1.value = $event.detail; }}
  *
  * Tests pin:
  *   1. $data.X case — preact-signals signal-backed state → `this._X.value`
  *   2. CamelCase propName → kebab-cased event name landmine (A2)
  *   3. Forwarding $props.X (model:true) → @property setter `this.X`
- *   4. (e: CustomEvent) type annotation MUST be present (Lit @event landmine)
+ *   4. ($event: CustomEvent) type annotation MUST be present (Lit @event landmine)
  *   5. kebabize unit test cases (open/closeOnEscape/aBC)
  */
 import { describe, expect, it } from 'vitest';
@@ -60,7 +60,7 @@ function emptyIR(): IRComponent {
 }
 
 describe('Lit emit — twoWayBinding (Phase 07.3 Plan 08 — TWO-WAY-03)', () => {
-  it('$data.X case: emits `.open=${this._open1.value} @open-change=${(e: CustomEvent) => { this._open1.value = e.detail; }}`', () => {
+  it('$data.X case: emits `.open=${this._open1.value} @open-change=${($event: CustomEvent) => { this._open1.value = $event.detail; }}`', () => {
     const ir = emptyIR();
     ir.state.push({
       type: 'StateDecl',
@@ -77,7 +77,7 @@ describe('Lit emit — twoWayBinding (Phase 07.3 Plan 08 — TWO-WAY-03)', () =>
     };
     const out = emitTemplateAttribute(attr, ir);
     expect(out).toBe(
-      '.open=${this._open1.value} @open-change=${(e: CustomEvent) => { this._open1.value = e.detail; }}',
+      '.open=${this._open1.value} @open-change=${($event: CustomEvent) => { this._open1.value = $event.detail; }}',
     );
   });
 
@@ -98,7 +98,7 @@ describe('Lit emit — twoWayBinding (Phase 07.3 Plan 08 — TWO-WAY-03)', () =>
     };
     const out = emitTemplateAttribute(attr, ir);
     expect(out).toBe(
-      '.closeOnEscape=${this._flag.value} @close-on-escape-change=${(e: CustomEvent) => { this._flag.value = e.detail; }}',
+      '.closeOnEscape=${this._flag.value} @close-on-escape-change=${($event: CustomEvent) => { this._flag.value = $event.detail; }}',
     );
     // Belt-and-suspenders: event name must contain kebabized propName + -change
     expect(out).toContain('@close-on-escape-change=');
@@ -123,11 +123,11 @@ describe('Lit emit — twoWayBinding (Phase 07.3 Plan 08 — TWO-WAY-03)', () =>
     };
     const out = emitTemplateAttribute(attr, ir);
     expect(out).toBe(
-      '.open=${this.open} @open-change=${(e: CustomEvent) => { this.open = e.detail; }}',
+      '.open=${this.open} @open-change=${($event: CustomEvent) => { this.open = $event.detail; }}',
     );
   });
 
-  it('(e: CustomEvent) type annotation is mandatory (Landmine guard)', () => {
+  it('($event: CustomEvent) type annotation is mandatory (Landmine guard)', () => {
     const ir = emptyIR();
     ir.state.push({
       type: 'StateDecl',
@@ -143,10 +143,10 @@ describe('Lit emit — twoWayBinding (Phase 07.3 Plan 08 — TWO-WAY-03)', () =>
       sourceLoc: LOC,
     };
     const out = emitTemplateAttribute(attr, ir);
-    // The annotation must be present — never `(e: Event)` or untyped `(e)`.
-    expect(out).toContain('(e: CustomEvent)');
-    expect(out).not.toMatch(/\(e:\s*Event\)/);
-    expect(out).not.toMatch(/\(e\)\s*=>/);
+    // The annotation must be present — never `($event: Event)` or untyped `(e)`.
+    expect(out).toContain('($event: CustomEvent)');
+    expect(out).not.toMatch(/\(\$event:\s*Event\)/);
+    expect(out).not.toMatch(/\(\$event\)\s*=>/);
   });
 });
 

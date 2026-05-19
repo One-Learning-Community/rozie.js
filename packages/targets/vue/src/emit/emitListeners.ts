@@ -23,7 +23,7 @@
  *     throttle(X, 100);`) followed by a watchEffect using the wrapped
  *     handler.
  *
- * Native modifier passthrough produces inline guard checks (`if (e.key !==
+ * Native modifier passthrough produces inline guard checks (`if ($event.key !==
  * 'Escape') return;`) inside the watchEffect handler — Vue's automatic
  * modifier handling only applies to template @event, not raw
  * addEventListener.
@@ -64,24 +64,24 @@ import { emitOutsideClickCall } from './emitListenerCollapsedOutsideClick.js';
  * (avoids requiring the runtime-vue import for every key-filter listener).
  */
 const NATIVE_KEY_GUARDS: Record<string, string> = {
-  enter: "if (e.key !== 'Enter') return;",
-  esc: "if (e.key !== 'Escape') return;",
+  enter: "if ($event.key !== 'Enter') return;",
+  esc: "if ($event.key !== 'Escape') return;",
   // Rozie modifier name 'escape' maps to Vue token 'esc' (via VUE_KEY_TOKEN_MAP)
   // but we also accept 'escape' here for direct modifier-name lookups.
-  escape: "if (e.key !== 'Escape') return;",
-  tab: "if (e.key !== 'Tab') return;",
-  delete: "if (e.key !== 'Delete' && e.key !== 'Backspace') return;",
-  space: "if (e.key !== ' ') return;",
-  up: "if (e.key !== 'ArrowUp') return;",
-  down: "if (e.key !== 'ArrowDown') return;",
-  left: "if (e.key !== 'ArrowLeft') return;",
-  right: "if (e.key !== 'ArrowRight') return;",
-  home: "if (e.key !== 'Home') return;",
-  end: "if (e.key !== 'End') return;",
-  pageUp: "if (e.key !== 'PageUp') return;",
-  pageDown: "if (e.key !== 'PageDown') return;",
+  escape: "if ($event.key !== 'Escape') return;",
+  tab: "if ($event.key !== 'Tab') return;",
+  delete: "if ($event.key !== 'Delete' && $event.key !== 'Backspace') return;",
+  space: "if ($event.key !== ' ') return;",
+  up: "if ($event.key !== 'ArrowUp') return;",
+  down: "if ($event.key !== 'ArrowDown') return;",
+  left: "if ($event.key !== 'ArrowLeft') return;",
+  right: "if ($event.key !== 'ArrowRight') return;",
+  home: "if ($event.key !== 'Home') return;",
+  end: "if ($event.key !== 'End') return;",
+  pageUp: "if ($event.key !== 'PageUp') return;",
+  pageDown: "if ($event.key !== 'PageDown') return;",
   // Mouse-button: middle = button 1
-  middle: "if (e.button !== 1) return;",
+  middle: "if ($event.button !== 1) return;",
 };
 
 /** Map common DOM events → TypeScript event types for the handler signature. */
@@ -241,9 +241,9 @@ function classifyListener(
       // these as @event modifiers, but raw addEventListener has no such mechanism;
       // emit explicit side-effect calls instead.
       if (entry.modifier === 'stop') {
-        nativeKeyGuards.push('e.stopPropagation();');
+        nativeKeyGuards.push('$event.stopPropagation();');
       } else if (entry.modifier === 'prevent') {
-        nativeKeyGuards.push('e.preventDefault();');
+        nativeKeyGuards.push('$event.preventDefault();');
       }
       continue;
     }
@@ -378,8 +378,8 @@ function renderListener(
   // non-Identifier handlers, call `(e)` defensively.
   const handlerInvoke = handlerIsBareIdentifier
     ? `${userHandlerCode}();`
-    : `(${userHandlerCode})(e);`;
-  const handlerDecl = `  const handler = (e: ${evtType}) => {\n${guardLines}    ${handlerInvoke}\n  };`;
+    : `(${userHandlerCode})($event);`;
+  const handlerDecl = `  const handler = ($event: ${evtType}) => {\n${guardLines}    ${handlerInvoke}\n  };`;
   const addCallNoSemi = `${targetExpr}.addEventListener('${listener.event}', handler${optsObj})`;
   const removeCallNoSemi = `${targetExpr}.removeEventListener('${listener.event}', handler${removeOptsObj})`;
 

@@ -96,12 +96,12 @@ export function emitListenerOutsideClick(
   const refsArrayLiteral = `[${refIdents.join(', ')}]`;
 
   // Render handler. For Identifier handlers we pass by identity; for arrow /
-  // call expressions we wrap them in `(e) => { ... }` (Pitfall 5: useOutsideClick
-  // signature expects `(e: MouseEvent) => void`).
+  // call expressions we wrap them in `($event) => { ... }` (Pitfall 5: useOutsideClick
+  // signature expects `($event: MouseEvent) => void`).
   const handlerCode = rewriteTemplateExpression(listener.handler, ir);
   const handlerExpr = /^[A-Za-z_$][\w$]*$/.test(handlerCode)
     ? handlerCode
-    : `(e) => { ${handlerCode}; }`;
+    : `($event) => { ${handlerCode}; }`;
 
   // Render `when` predicate as `() => when` arrow (or undefined).
   // Per RESEARCH Pattern 10 Class B + D-42 Vue analog, the helper re-evaluates

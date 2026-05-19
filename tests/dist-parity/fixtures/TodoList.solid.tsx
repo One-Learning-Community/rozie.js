@@ -71,7 +71,7 @@ export default function TodoList(_props: TodoListProps): JSX.Element {
         {(_props.headerSlot ?? _props.slots?.['header'])?.({ remaining: remaining(), total: items().length }) ?? <h3 data-rozie-s-52bec3de="">{local.title} ({remaining()} remaining)</h3>}
       </header>
 
-      <form onSubmit={(e) => { e.preventDefault(); add(); }} data-rozie-s-52bec3de="">
+      <form onSubmit={($event) => { $event.preventDefault(); add(); }} data-rozie-s-52bec3de="">
         <input placeholder="What needs doing?" value={draft()} onInput={e => setDraft(e.currentTarget.value)} data-rozie-s-52bec3de="" />
         <button type="submit" disabled={!draft().trim()} data-rozie-s-52bec3de="">Add</button>
       </form>
@@ -81,7 +81,7 @@ export default function TodoList(_props: TodoListProps): JSX.Element {
       </p>}><ul data-rozie-s-52bec3de="">
         <For each={items()}>{(item) => <li classList={{ done: item.done }} data-rozie-s-52bec3de="">
           
-          {typeof local.children === 'function' ? (local.children as (s: any) => any)({ item, toggle: () => toggle(item.id), remove: () => removeItem(item.id) }) : (resolved() ?? <><label data-rozie-s-52bec3de=""><input type="checkbox" checked={item.done} onChange={(e) => { toggle(item.id); }} data-rozie-s-52bec3de="" /><span data-rozie-s-52bec3de="">{item.text}</span></label><button aria-label="Remove" onClick={(e) => { removeItem(item.id); }} data-rozie-s-52bec3de="">×</button></>)}
+          {typeof local.children === 'function' ? (local.children as (s: any) => any)({ item, toggle: () => toggle(item.id), remove: () => removeItem(item.id) }) : (resolved() ?? <><label data-rozie-s-52bec3de=""><input type="checkbox" checked={item.done} onChange={($event) => { toggle(item.id); }} data-rozie-s-52bec3de="" /><span data-rozie-s-52bec3de="">{item.text}</span></label><button aria-label="Remove" onClick={($event) => { removeItem(item.id); }} data-rozie-s-52bec3de="">×</button></>)}
         </li>}</For>
       </ul></Show>}</div>
     </>

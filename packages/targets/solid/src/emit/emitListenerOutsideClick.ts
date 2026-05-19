@@ -90,11 +90,11 @@ export function emitListenerOutsideClick(
   const refsArrayLiteral = `[${refAccessors.join(', ')}]`;
 
   // Render handler. For Identifier handlers pass by identity; for complex
-  // expressions wrap in arrow (Solid createOutsideClick expects (e: MouseEvent) => void).
+  // expressions wrap in arrow (Solid createOutsideClick expects ($event: MouseEvent) => void).
   const handlerCode = rewriteTemplateExpression(listener.handler, ir);
   const handlerExpr = /^[A-Za-z_$][\w$]*$/.test(handlerCode)
     ? handlerCode
-    : `(e) => { ${handlerCode}; }`;
+    : `($event) => { ${handlerCode}; }`;
 
   // Render `when` as `() => when` arrow — createOutsideClick re-evaluates reactively.
   const whenCode = listener.when

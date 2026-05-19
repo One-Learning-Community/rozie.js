@@ -10,7 +10,7 @@ let { title = '', onClose = null }: Props = $props();
 
 <header class="card-header">
   <h3 class="card-header__title">{title}</h3>
-  {#if onClose}<button class="card-header__close" onclick={(e) => { (onClose)(e); }}>×</button>{/if}</header>
+  {#if onClose}<button class="card-header__close" onclick={($event) => { (onClose)($event); }}>×</button>{/if}</header>
 
 
 <style>

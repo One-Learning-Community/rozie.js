@@ -1,0 +1,9 @@
+{
+  "id": "REG-07.6-001",
+  "source": "FullCalendarDemo.rozie:170-173 manual debug",
+  "sourceKind": "phase-7-loop",
+  "phase": "07.6",
+  "desc": "When an r-for loop variable is named `e` (or any other identifier that previously collided with the synthetic event-handler closure param), the user expression in @click=\"...\" must resolve `e.id` to the OUTER loop scope, NOT the synthetic event. Pre-fix: React/Svelte/Solid/Lit emitted `(e) => { removeItem(e.id); }` where `e` was the SyntheticEvent → runtime undefined. Post-fix: closure param renamed to `$event`, so user-written `e.id` resolves to the loop var. Vue/Angular were already correct because their template bindings don't introduce a JS closure scope.",
+  "targets": ["lit", "vue", "react", "svelte", "angular", "solid"],
+  "discoveredBy": "FullCalendarDemo manual debugging 2026-05-19"
+}

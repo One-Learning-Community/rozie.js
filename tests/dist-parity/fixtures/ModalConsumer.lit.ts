@@ -31,23 +31,23 @@ export default class ModalConsumer extends SignalWatcher(LitElement) {
   render() {
     return html`
 <div class="modal-consumer" data-rozie-s-5d081d3a>
-  <rozie-modal .open=${this._open1.value} @open-change=${(e: CustomEvent) => { this._open1.value = e.detail; }} .header=${(scope: { close: unknown }) => html`
+  <rozie-modal .open=${this._open1.value} @open-change=${($event: CustomEvent) => { this._open1.value = $event.detail; }} .header=${(scope: { close: unknown }) => html`
       <h2 data-rozie-s-5d081d3a>${this.title}</h2>
       <button class="close" @click=${scope.close} data-rozie-s-5d081d3a>×</button>
     `} .footer=${(scope: { close: unknown }) => html`
       <button @click=${scope.close} data-rozie-s-5d081d3a>Cancel</button>
-      <button @click=${(e: Event) => { this.onConfirm(); }} data-rozie-s-5d081d3a>OK</button>
+      <button @click=${($event: Event) => { this.onConfirm(); }} data-rozie-s-5d081d3a>OK</button>
     `} ${ref((el: Element | undefined) => el && adoptConsumerStyles(el, (this.constructor as { styles?: unknown }).styles))}>
     Are you sure you want to proceed?
     </rozie-modal>
 
-  <rozie-modal .open=${this._open2.value} @open-change=${(e: CustomEvent) => { this._open2.value = e.detail; }}><div slot="${this._slotName.value}">
+  <rozie-modal .open=${this._open2.value} @open-change=${($event: CustomEvent) => { this._open2.value = $event.detail; }}><div slot="${this._slotName.value}">
       <span class="dynamic-fill" data-rozie-s-5d081d3a>Dynamic header via slotName</span>
     </div>
     Dynamic-name demo body
   </rozie-modal>
 
-  <rozie-wrapper-modal .open=${this._open3.value} @open-change=${(e: CustomEvent) => { this._open3.value = e.detail; }} .title=${this.title}><h2 data-rozie-s-5d081d3a slot="brand">Re-projected brand</h2><button data-rozie-s-5d081d3a slot="actions">Wrapper action</button>
+  <rozie-wrapper-modal .open=${this._open3.value} @open-change=${($event: CustomEvent) => { this._open3.value = $event.detail; }} .title=${this.title}><h2 data-rozie-s-5d081d3a slot="brand">Re-projected brand</h2><button data-rozie-s-5d081d3a slot="actions">Wrapper action</button>
     Body via wrapper's default slot
     </rozie-wrapper-modal>
 </div>

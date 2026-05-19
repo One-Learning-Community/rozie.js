@@ -16,7 +16,7 @@ function Synth(props: { open: boolean }) {
   const [count, setCount] = useState(0);
   const close = () => setCount(0);  // bare top-level handler — escapes to useEffect
   useEffect(() => {
-    const h = (e: Event) => close();
+    const h = ($event: Event) => close();
     document.addEventListener('click', h);
     return () => document.removeEventListener('click', h);
   }, [close]);  // bare reference in deps[]
@@ -29,7 +29,7 @@ function Synth(props: { open: boolean }) {
   const [count, setCount] = useState(0);
   const close = useCallback(() => setCount(0), []);  // useCallback wrap — stable identity
   useEffect(() => {
-    const h = (e: Event) => close();
+    const h = ($event: Event) => close();
     document.addEventListener('click', h);
     return () => document.removeEventListener('click', h);
   }, [close]);  // close has stable identity from useCallback

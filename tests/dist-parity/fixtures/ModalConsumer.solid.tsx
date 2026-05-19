@@ -32,7 +32,7 @@ export default function ModalConsumer(_props: ModalConsumerProps): JSX.Element {
           <button class={"close"} onClick={close} data-rozie-s-5d081d3a="">×</button>
         </>)} footerSlot={({ close }) => (<>
           <button onClick={close} data-rozie-s-5d081d3a="">Cancel</button>
-          <button onClick={(e) => { onConfirm(); }} data-rozie-s-5d081d3a="">OK</button>
+          <button onClick={($event) => { onConfirm(); }} data-rozie-s-5d081d3a="">OK</button>
         </>)}>
         Are you sure you want to proceed?
         </Modal>

@@ -126,7 +126,7 @@ const close = () => { $props.open = false }
     const { code, collectors } = emit(ir);
     expect(code).toContain('useEffect');
     expect(code).toMatch(/document\.addEventListener\('keydown'/);
-    expect(code).toMatch(/if \(e\.key !== 'Escape'\) return/);
+    expect(code).toMatch(/if \(\$event\.key !== 'Escape'\) return/);
     // Listener.deps spread directly — REACT-T-02 marquee claim.
     expect(code).toMatch(/\}, \[.*open.*\]\);$/m);
     expect(collectors.react.has('useEffect')).toBe(true);
@@ -197,7 +197,7 @@ const onClick = () => {}
     const { code } = emit(ir);
     // Class D — addEventListener has NO options-object suffix.
     expect(code).toMatch(/document\.addEventListener\('click', _rozieHandler\);$/m);
-    expect(code).toMatch(/e\.stopPropagation\(\);/);
+    expect(code).toMatch(/\$event\.stopPropagation\(\);/);
   });
 
   it('does not emit code for template-event listeners (only <listeners> block entries)', () => {
