@@ -49,34 +49,27 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'] as const;
 
 /**
- * Targets with known-failing FullCalendar compile output (added 2026-05-19,
- * discovered while standing up this spec). Tracked as PHASE_07_7 candidate
- * in `outstanding-issues-post-gate-rollout` memory. Cells gate on `test.fixme`
- * until the underlying target-emitter bug ships:
+ * KNOWN_FAILING is empty as of 2026-05-19. The earlier 4-cell fixme list was
+ * progressively closed:
  *
- *   - vue: `$slots.event` in `<script>` is emitted as a bare identifier
- *     (`$slots is not defined` ReferenceError). The Vue target needs to lower
- *     `$slots.X` to `useSlots().X` (in `<script setup>`) or `this.$slots.X`.
- *   - react: `const setView = useCallback(v => { setView(v); }, [])` —
- *     `model: true` setter shadows itself when the user authors a same-named
- *     wrapper. The compiler needs to rename one or use a guaranteed-unique
- *     internal identifier.
- *   - solid: same `$slots` bug surface (likely; not yet root-caused).
- *   - lit: same `$slots` bug surface (likely; not yet root-caused).
+ *   - vue / solid / svelte / angular: closed in Phase 07.7 (commit 67b0918,
+ *     6ecb6f0) once `$slots.event` lowering landed for the JSX-emitting
+ *     targets and the slot-runtime check was added for Svelte / Angular.
+ *   - react: closed by `ca9d339` (2026-05-18) — useRef-stable portal-slot
+ *     renderers + BlockStatement hoist + tryWrapEscapingConstUseMemo +
+ *     watched-prop ref indirection + flushSync at portal mount.
+ *   - lit: closed by the fullcalendar-lit-watch-property fix (2026-05-19) —
+ *     $watch on $props.X now lowers to `updated(changedProperties)` instead
+ *     of `effect()`, which never re-fired because @lit-labs/preact-signals'
+ *     `effect()` doesn't subscribe to Lit @property reads.
  *
- * svelte + angular pass — their target emitters lower `$slots.event` to a
- * runtime check that resolves correctly.
+ * The set is retained (vs. removed entirely) so a future regression can
+ * temporarily re-fixme a cell without altering the spec's test-generation
+ * shape.
  */
-const KNOWN_FAILING: ReadonlySet<typeof TARGETS[number]> = new Set([
-  // Lit: `$el → $refs.__rozieRoot` + `$slots.<portal> → this.<X> !== undefined`
-  // + cleanup-undefined-drop fixes get the engine mounted inside the shadow
-  // root, but `$watch(() => $props.events, …)` doesn't re-fire — Lit's @lit-
-  // labs/preact-signals `effect()` tracks signals, not Lit @property accesses.
-  // Demo seeds events in `firstUpdated`, child's calendar is already created
-  // with the initial `[]`. Fix path: route @property reads through signal
-  // wrappers in the Lit script-rewrite so `effect()` subscribes correctly.
-  'lit',
-] as const);
+const KNOWN_FAILING: ReadonlySet<typeof TARGETS[number]> = new Set<
+  typeof TARGETS[number]
+>();
 
 const EXPECTED_TITLES = ['Standup', 'Demo', 'Sprint review'];
 

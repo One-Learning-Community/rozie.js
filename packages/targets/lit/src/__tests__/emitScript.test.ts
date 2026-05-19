@@ -143,9 +143,19 @@ $onMount(reset)
     expect(code).toMatch(/firstUpdated\(\):\s*void\s*\{\s*this\.reset\(\);\s*\}/);
   });
 
-  it('Quick 260515-u2b — $watch emits `this._disconnectCleanups.push(effect(() => { ... }))` AND adds effect to @lit-labs/preact-signals imports', () => {
-    // Synthesize a minimal source with $watch so we hit only the watcher path.
-    const source = `<rozie name="WatchSynth">
+  it('fullcalendar-lit-watch-property fix (2026-05-19) — $watch on $props.X routes through updated(changedProperties), NOT effect()', () => {
+    // Hybrid IR-classification fix (option #3 per memory
+    // project_fullcalendar_react_lit_gaps.md). Pre-fix, ALL $watch hooks
+    // lowered to `this._disconnectCleanups.push(effect(() => { ... }))`,
+    // which silently never re-fired for $props-only getters because
+    // @lit-labs/preact-signals `effect()` doesn't subscribe to Lit @property
+    // reads (@property accessors are NOT preact-signals). Post-fix,
+    // $props-only watchers lower to an `if (changedProperties.has('X'))`
+    // branch inside `updated()` — Lit's idiomatic prop-change observer.
+    //
+    // Surfaced by FullCalendar's `$watch(() => $props.events, …)` never
+    // reflecting consumer event updates into `instance.addEvent(...)`.
+    const source = `<rozie name="WatchPropsOnly">
 <props>{ open: { type: Boolean, default: false } }</props>
 <script>
 const reposition = () => { console.log('repos') }
@@ -153,15 +163,46 @@ $watch(() => $props.open, () => { if ($props.open) reposition() })
 </script>
 <template><div /></template>
 </rozie>`;
-    const { ast } = parse(source, { filename: 'WatchSynth.rozie' });
+    const { ast } = parse(source, { filename: 'WatchPropsOnly.rozie' });
     const registry = createDefaultRegistry();
     const { ir } = lowerToIR(ast!, { modifierRegistry: registry });
     const code = emitLit(ir!, {
-      filename: 'WatchSynth.rozie',
+      filename: 'WatchPropsOnly.rozie',
       source,
       modifierRegistry: registry,
     }).code;
-    // effect symbol pulled in from @lit-labs/preact-signals.
+    // updated() override with the prop-name branch.
+    expect(code).toMatch(/updated\(changedProperties:[\s\S]+?\):\s*void\s*\{[\s\S]*?changedProperties\.has\('open'\)/);
+    // No effect()-based watcher push for a $props-only getter.
+    expect(code).not.toMatch(/this\._disconnectCleanups\.push\(effect\(/);
+    // And `effect` is NOT imported from preact-signals when no $data
+    // watcher requires it.
+    expect(code).not.toMatch(/import \{[^}]*\beffect\b[^}]*\} from '@lit-labs\/preact-signals'/);
+  });
+
+  it('fullcalendar-lit-watch-property fix (2026-05-19) — $watch on $data.X keeps the effect() route', () => {
+    // The effect() route remains correct when the getter reads $data (which
+    // IS a preact-signal in target-lit). This guards against accidentally
+    // collapsing every $watch through updated() — $data-only changes don't
+    // flow through @property setters, so updated()'s `changedProperties`
+    // branch would never fire on them.
+    const source = `<rozie name="WatchDataOnly">
+<data>{ count: 0 }</data>
+<script>
+const onChange = (v) => { console.log('change', v) }
+$watch(() => $data.count, (v) => { onChange(v) })
+</script>
+<template><div /></template>
+</rozie>`;
+    const { ast } = parse(source, { filename: 'WatchDataOnly.rozie' });
+    const registry = createDefaultRegistry();
+    const { ir } = lowerToIR(ast!, { modifierRegistry: registry });
+    const code = emitLit(ir!, {
+      filename: 'WatchDataOnly.rozie',
+      source,
+      modifierRegistry: registry,
+    }).code;
+    // effect imported from preact-signals.
     expect(code).toMatch(/import \{[^}]*\beffect\b[^}]*\} from '@lit-labs\/preact-signals'/);
     // Cleanup-push registration via effect().
     expect(code).toMatch(/this\._disconnectCleanups\.push\(effect\(\(\) => \{[\s\S]+?\}\)\);/);

@@ -21,6 +21,7 @@ import type {
   PropDecl,
   PropTypeAnnotation,
   LifecycleHook,
+  WatchHook,
 } from '../../../../core/src/ir/types.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import type {
@@ -375,6 +376,49 @@ function partitionScript(program: t.File): PartitionedScript {
 }
 
 /**
+ * Classify a WatchHook by its IR-computed `getterDeps`:
+ *   - 'props' — every dep is a $props.X read; safe to route through Lit's
+ *     `updated(changedProperties)` because Lit fires `updated()` whenever
+ *     any `@property` accessor changes. The fullcalendar-lit-watch-property
+ *     gap (2026-05-19) is exactly this case: `@lit-labs/preact-signals`
+ *     `effect()` ONLY subscribes to preact-signal reads, and Lit `@property`
+ *     accessors are NOT preact-signals — so `effect()`-routed $watch never
+ *     re-fires for prop changes. Per memory project_fullcalendar_react_lit_gaps,
+ *     this is option #3 (hybrid IR classification).
+ *   - 'effect' — at least one dep reads from `$data` (preact-signal),
+ *     `$computed` (computed signal), or `$slots` (signal-watched), OR is an
+ *     opaque closure dep we cannot reason about. Keep the `effect()` route so
+ *     signal subscriptions are established normally. Lit-`updated()` route
+ *     would not fire on $data-only changes (those don't flow through @property
+ *     setters) so `effect()` is necessary.
+ *
+ * `'computed'` and `'slots'` deps go through `effect()` because they ARE
+ * preact-signals under the hood in target-lit (computed → `computed()`,
+ * slots-presence → `signal()`); the existing `effect()` plumbing observes them
+ * correctly.
+ */
+function classifyWatcherRoute(
+  watcher: WatchHook,
+): { route: 'props' | 'effect'; propNames: string[] } {
+  const propNames = new Set<string>();
+  let nonPropsSeen = false;
+  for (const dep of watcher.getterDeps) {
+    if (dep.scope === 'props') {
+      if (dep.path.length > 0) propNames.add(dep.path[0]!);
+      continue;
+    }
+    // 'data' | 'computed' | 'slots' | 'closure' — route through effect()
+    nonPropsSeen = true;
+  }
+  // Edge case: getterDeps is empty (constant getter — `() => 42`). Treat as
+  // 'props' route with no prop names so the watcher body never re-runs after
+  // mount via either route. The initial firing semantic is preserved either
+  // way; constant getters don't observe any change.
+  if (nonPropsSeen) return { route: 'effect', propNames: [] };
+  return { route: 'props', propNames: [...propNames] };
+}
+
+/**
  * Convert a top-level variable declaration into a class field or class method.
  *
  * Rules:
@@ -644,15 +688,43 @@ export function emitScript(
     }
   }
 
-  // 5b. Quick plan 260515-u2b — emit `this._disconnectCleanups.push(effect(() => { (getter)(); (cb)(); }));`
-  // for each top-level $watch in the partition. effect() from
-  // @lit-labs/preact-signals returns an unsubscribe function; pushing it onto
-  // _disconnectCleanups means the existing disconnectedCallback drain handles
-  // teardown automatically.
+  // 5b. Quick plan 260515-u2b + fullcalendar-lit-watch-property fix (2026-05-19,
+  // option #3 hybrid IR classification). $watch routing depends on
+  // `WatchHook.getterDeps`:
+  //
+  //   - props-only getter → emit `if (changedProperties.has('X')) { … }`
+  //     blocks inside `updated()`. Lit fires `updated()` whenever a
+  //     @property accessor changes, which subsumes the watcher contract for
+  //     prop reads. `@lit-labs/preact-signals` `effect()` does NOT subscribe
+  //     to @property reads (those aren't preact-signals), so the historic
+  //     `effect()` route was a silent no-op for $props-only watchers — the
+  //     bug that left FullCalendar's `$watch(() => $props.events, …)` from
+  //     ever firing post-mount.
+  //
+  //   - data/computed/slots/closure-touching getter → keep the `effect()`
+  //     route since those scopes ARE preact-signals in target-lit's emit
+  //     surface and `effect()` subscribes correctly. The route is also
+  //     necessary because $data-only changes don't flow through @property
+  //     setters, so `updated()` wouldn't fire on them.
+  //
+  // partition.watcherHooks (rewritten Babel bodies, in source order) and
+  // ir.watchers (IR-level WatchHook[] with getterDeps, in source order) are
+  // 1:1 by source-order pairing — the same algorithm React's emitScript uses
+  // (see `pairClonedWatchers`).
   const watcherCleanupPushes: string[] = [];
+  const watcherUpdatedBranches: string[] = [];
   if (partition.watcherHooks.length > 0) {
-    opts.signals.add('effect');
-    for (const w of partition.watcherHooks) {
+    // We may add 'effect' below depending on classification — accumulate.
+    let needsEffectImport = false;
+    const watcherCount = Math.min(
+      partition.watcherHooks.length,
+      ir.watchers.length,
+    );
+    for (let i = 0; i < watcherCount; i++) {
+      const w = partition.watcherHooks[i]!;
+      const irWatcher = ir.watchers[i]!;
+      const classification = classifyWatcherRoute(irWatcher);
+
       // Wrap each function expression in @babel/types in a Program so the
       // rewrite pass can lower $props.x → this.x, $data.x → this._x.value, etc.
       const getterWrapper = t.file(t.program([t.expressionStatement(w.getter)]));
@@ -682,10 +754,32 @@ export function emitScript(
       // tsc flags TS2554 "Expected 0 arguments, but got 1". The conditional
       // bind keeps both `(v) => ...` and `() => ...` shapes type-clean.
       const callArg = w.callback.params.length > 0 ? '__watchVal' : '';
-      watcherCleanupPushes.push(
-        `this._disconnectCleanups.push(effect(() => { const __watchVal = (${getterCode})(); (${cbCode})(${callArg}); }));`,
-      );
+
+      if (classification.route === 'props' && classification.propNames.length > 0) {
+        // updated(changedProperties)-based route. One branch per WatchHook.
+        // The branch fires when ANY of the prop names the getter reads has
+        // changed. We evaluate the rewritten getter (which already reads
+        // `this.X` after rewriteScript) to obtain the new value, then invoke
+        // the user callback with that value.
+        //
+        // changedProperties.has() check union: `(changedProperties.has('a') || changedProperties.has('b'))`.
+        // For the single-prop common case, this collapses to one check.
+        const propChecks = classification.propNames
+          .map((n) => `changedProperties.has('${n}')`)
+          .join(' || ');
+        watcherUpdatedBranches.push(
+          `if (${propChecks}) { const __watchVal = (${getterCode})(); (${cbCode})(${callArg}); }`,
+        );
+      } else {
+        // effect()-based route (data/computed/slots/closure-touching, OR
+        // empty getterDeps as a defensive fallback).
+        needsEffectImport = true;
+        watcherCleanupPushes.push(
+          `this._disconnectCleanups.push(effect(() => { const __watchVal = (${getterCode})(); (${cbCode})(${callArg}); }));`,
+        );
+      }
     }
+    if (needsEffectImport) opts.signals.add('effect');
   }
 
   // Portal-slot primitive (Spike 003) — synthesize the per-component
@@ -718,13 +812,23 @@ export function emitScript(
   if (portalsEmit.hasPortals) unmountSegments.push(portalsEmit.disconnectedBlock);
   unmountSegments.push(...unmountBodies);
 
+  // 7. updated() body: $watch property-route branches + $onUpdate hook bodies.
+  // The $watch branches go FIRST so a user $onUpdate that wants to observe a
+  // mutation triggered by a watcher sees the post-watcher state. Both surfaces
+  // run only AFTER firstUpdated (Lit's lifecycle ordering), so the initial
+  // mount uses firstUpdated for setup and `updated()` for reactive sync.
+  const updatedSegments: string[] = [];
+  if (watcherUpdatedBranches.length > 0)
+    updatedSegments.push(watcherUpdatedBranches.join('\n'));
+  if (updateBodies.length > 0) updatedSegments.push(updateBodies.join('\n\n'));
+
   return {
     hasPortals: portalsEmit.hasPortals,
     fieldDecls: fieldLines.join('\n'),
     methodDecls,
     mountHookBody: mountSegments.join('\n\n'),
     unmountHookBody: unmountSegments.join('\n\n'),
-    updateHookBody: updateBodies.join('\n\n'),
+    updateHookBody: updatedSegments.join('\n\n'),
     attributeChangedBody: attrCallbackLines.join('\n'),
     userImports,
     scriptMap: null,

@@ -1,6 +1,6 @@
 import { LitElement, css, html, nothing } from 'lit';
 import { customElement, property, query, queryAssignedElements, state } from 'lit/decorators.js';
-import { SignalWatcher, effect } from '@lit-labs/preact-signals';
+import { SignalWatcher } from '@lit-labs/preact-signals';
 import { attachOutsideClickListener, createLitControllableProperty, injectGlobalStyles } from '@rozie/runtime-lit';
 
 interface RozieTriggerSlotCtx {
@@ -84,12 +84,14 @@ export default class Dropdown extends SignalWatcher(LitElement) {
   firstUpdated(): void {
     this._armListeners();
 
-    this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this.open)(); (() => {
-      if (this.open) this.reposition();
-    })(); }));
-
     // Initial reposition only if the panel is open at mount time.
     if (this.open) this.reposition();
+  }
+
+  updated(changedProperties: Map<string, unknown>): void {
+    if (changedProperties.has('open')) { const __watchVal = (() => this.open)(); (() => {
+      if (this.open) this.reposition();
+    })(); }
   }
 
   disconnectedCallback(): void {
