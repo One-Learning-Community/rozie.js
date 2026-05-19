@@ -44,7 +44,7 @@ footer { border-top: 1px solid rgba(0, 0, 0, 0.08); justify-content: flex-end; }
   @property({ attribute: false }) header?: (scope: { close: unknown }) => unknown;
   @state() private _hasSlotDefault = false;
   @queryAssignedElements({ flatten: true }) private _slotDefaultElements!: Element[];
-  @property({ attribute: false }) _defaultSlotFn?: (scope: { close: unknown }) => unknown;
+  @property({ attribute: false }) __rozieDefaultSlot__?: (scope: { close: unknown }) => unknown;
   @state() private _hasSlotFooter = false;
   @queryAssignedElements({ slot: 'footer', flatten: true }) private _slotFooterElements!: Element[];
   @property({ attribute: false }) footer?: (scope: { close: unknown }) => unknown;
@@ -125,16 +125,16 @@ footer { border-top: 1px solid rgba(0, 0, 0, 0.08); justify-content: flex-end; }
 ${this.open ? html`<div class="modal-backdrop" @click=${(e: MouseEvent) => { if (e.target !== e.currentTarget) return; this.closeOnBackdrop && this.close(); }} data-rozie-ref="backdropEl">
   <div class="modal-dialog" role="dialog" aria-modal="true" aria-label=${this.title || undefined} tabindex="-1" data-rozie-ref="dialogEl">
     ${this.title || this._hasSlotHeader ? html`<header>
-      <slot name="header" @rozie-header-close=${(e: CustomEvent) => ((this.close) as (...args: any[]) => any)(e.detail)}>
+      ${this.header !== undefined ? this.header({close: this.close}) : html`<slot name="header" @rozie-header-close=${(e: CustomEvent) => ((this.close) as (...args: any[]) => any)(e.detail)}>
         <h2>${this.title}</h2>
-      </slot>
+      </slot>`}
       <button class="close-btn" aria-label="Close" @click=${this.close}>×</button>
     </header>` : nothing}<div class="modal-body">
-      <slot @rozie-default-close=${(e: CustomEvent) => ((this.close) as (...args: any[]) => any)(e.detail)}></slot>
+      ${this.__rozieDefaultSlot__ !== undefined ? this.__rozieDefaultSlot__({close: this.close}) : html`<slot @rozie-default-close=${(e: CustomEvent) => ((this.close) as (...args: any[]) => any)(e.detail)}></slot>`}
     </div>
 
     ${this._hasSlotFooter ? html`<footer>
-      <slot name="footer" @rozie-footer-close=${(e: CustomEvent) => ((this.close) as (...args: any[]) => any)(e.detail)}></slot>
+      ${this.footer !== undefined ? this.footer({close: this.close}) : html`<slot name="footer" @rozie-footer-close=${(e: CustomEvent) => ((this.close) as (...args: any[]) => any)(e.detail)}></slot>`}
     </footer>` : nothing}</div>
 </div>` : nothing}`;
   }

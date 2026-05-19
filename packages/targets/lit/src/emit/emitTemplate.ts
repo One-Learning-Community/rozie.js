@@ -52,7 +52,7 @@ import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.
 import { toKebabCase } from './emitDecorator.js';
 import { eventTypeFor } from './emitListeners.js';
 // Phase 07.2 Plan 03 — consumer-side slot-fill emit for component-tag elements.
-import { emitSlotFiller, type EmitSlotFillerCtx } from './emitSlotFiller.js';
+import { emitSlotFiller, findTagClose, type EmitSlotFillerCtx } from './emitSlotFiller.js';
 // Phase 07.3 Plan 09 — consumer-side `r-model:propName=` two-way binding.
 // resolveLitSetterText + kebabize are shared with the standalone
 // emitTemplateAttribute branch (re-exported from emitDecorator.toKebabCase
@@ -956,15 +956,22 @@ function emitElement(
     // tag before the final `>`. `open` is the component's open tag (e.g.
     // `<rozie-modal r-model:open=${…}>`); never self-close in the
     // slot-filler path (components with fills are container elements).
+    //
+    // WR-03 (Phase 07.5 review): use findTagClose (quote + `${...}`-aware
+    // scanner shared with emitSlotFiller) instead of `lastIndexOf('>')`.
+    // A naive lastIndexOf walks past attribute interpolations like
+    // `@click=${(e) => fn(e)}` and would splice inside an attribute value
+    // if any such interpolation followed the property-prop emit. Starting
+    // the scan at index 1 skips the opening `<` of the tag itself.
     let openWithProps = open;
     if (propertyAttrs.length > 0) {
-      const lastGt = open.lastIndexOf('>');
-      if (lastGt === -1) {
-        // Defensive — should never happen; degrade gracefully.
+      const tagClose = findTagClose(open, 1);
+      if (tagClose === -1) {
+        // Defensive — should never happen for well-formed emit output.
         openWithProps = open;
       } else {
         openWithProps =
-          open.slice(0, lastGt) + ' ' + propertyAttrs.join(' ') + open.slice(lastGt);
+          open.slice(0, tagClose) + ' ' + propertyAttrs.join(' ') + open.slice(tagClose);
       }
     }
     return `${openWithProps}${fillerChildren.join('')}</${tagName}>`;
@@ -1148,10 +1155,41 @@ function emitSlot(
   const dataStr = dataAttrs.length > 0 ? ' ' + dataAttrs.join(' ') : '';
   const eventStr = eventAttrs.length > 0 ? ' ' + eventAttrs.join(' ') : '';
 
-  if (fallbackChildren.trim().length > 0) {
-    return `<slot${slotName}${dataStr}${eventStr}>${fallbackChildren}</slot>`;
+  const slotElement =
+    fallbackChildren.trim().length > 0
+      ? `<slot${slotName}${dataStr}${eventStr}>${fallbackChildren}</slot>`
+      : `<slot${slotName}${dataStr}${eventStr}></slot>`;
+
+  // Phase 07.5 CR-01 — producer-side function-prop invocation for scoped
+  // slots. When this <slot> declaration has scope-params, the consumer's
+  // Phase 07.5 emit may set the matching `this.<propRef>` function-prop
+  // (via `.<propRef>=${(scope) => html\`…\`}` on the parent component open
+  // tag). The producer MUST invoke that function when set, falling back to
+  // the light-DOM `<slot>` projection only when no consumer has assigned
+  // the property — consumers still using the legacy `observeRozieSlotCtx`
+  // ctx-roundtrip path with `<element slot="X">` light-DOM children rely
+  // on the fallback rendering. Without this invocation the consumer's
+  // function-prop is dead at runtime (the producer renders default slot
+  // content; the consumer's body is never called).
+  //
+  // Portal slots (isPortal === true) are emitted from script via
+  // `$portals.<X>` and `emitPortals.buildSlotMethod` already handles the
+  // function-prop invocation — those invocations must NOT also fire from
+  // template render, so skip the wrap for them.
+  //
+  // Default-slot mapping: name '' → property `__rozieDefaultSlot__` (mirrors
+  // emitSlotDecl and emitSlotFiller — see Phase 07.5 SUMMARY decisions).
+  // WR-02 (Phase 07.5 review): renamed from `_defaultSlotFn` to dodge any
+  // realistic user-authored slot name collision.
+  if (node.args.length > 0 && node.isPortal !== true) {
+    const scopeEntries = node.args
+      .map((a) => `${a.name}: ${rewriteTemplateExpression(a.expression, ir)}`)
+      .join(', ');
+    const propRef = name === '' ? '__rozieDefaultSlot__' : name;
+    return `\${this.${propRef} !== undefined ? this.${propRef}({${scopeEntries}}) : html\`${slotElement}\`}`;
   }
-  return `<slot${slotName}${dataStr}${eventStr}></slot>`;
+
+  return slotElement;
 }
 
 // collectMethodNamesFromIR moved to ./methodNames.ts so emitSlotDecl can reuse it (WR-01).

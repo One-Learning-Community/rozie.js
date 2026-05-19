@@ -536,15 +536,23 @@ export function emitSlotFiller(
     // a destructure here would shadow `scope` and break the rewritten body.
     const paramSig = `scope: ${scopeTypeStr}`;
 
-    // Property field name on producer: default slot ('') maps to '_defaultSlotFn'
-    // per the producer-side mapping in emitSlotDecl.ts; named slots use the
-    // bare slot name. Both sides MUST agree — keep the mapping in lockstep.
-    const propertyFieldName = filler.name === '' ? '_defaultSlotFn' : filler.name;
+    // Property field name on producer: default slot ('') maps to
+    // '__rozieDefaultSlot__' per the producer-side mapping in emitSlotDecl.ts
+    // (WR-02 (Phase 07.5 review): double-underscore + rozie-infix to dodge
+    // user-slot-name collision). Named slots use the bare slot name. Both
+    // sides MUST agree — keep the mapping in lockstep.
+    const propertyFieldName = filler.name === '' ? '__rozieDefaultSlot__' : filler.name;
 
     const propertyAttr =
       '.' + propertyFieldName + '=${(' + paramSig + ') => html`' + body + '`}';
 
     return {
+      // IN-03 (Phase 07.5 review): the four arrays below are intentionally
+      // empty — the function-prop emit path needs zero observer-callback
+      // wiring (no observeRozieSlotCtx, no _<X>Ctx class field, no
+      // tryWire/updated() retry, no disconnectReset). emitTemplate iterates
+      // them and pushes nothing per filler; the loop is correct, the empties
+      // are by design.
       childTemplate: '',
       firstUpdatedLines: [],
       classFields: [],
@@ -908,7 +916,7 @@ function spreadSlotAttrAcrossTopLevelElements(
  *
  * Returns the index of the closing `>`, or -1 if not found before end-of-string.
  */
-function findTagClose(body: string, start: number): number {
+export function findTagClose(body: string, start: number): number {
   let inQuote: '"' | "'" | null = null;
   for (let i = start; i < body.length; i++) {
     const ch = body[i]!;

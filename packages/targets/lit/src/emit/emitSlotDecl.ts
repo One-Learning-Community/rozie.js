@@ -170,7 +170,13 @@ function emitOneSlot(
     // Default slot ('') collides with the JS reserved word 'default'; use a
     // clearly-prefixed sentinel. consumer-side emitSlotFiller must use the
     // SAME mapping (cross-file lockstep enforced by Task 2 grep checks).
-    const propertyFieldName = slot.name === '' ? '_defaultSlotFn' : slot.name;
+    // WR-02 (Phase 07.5 review): sentinel uses double-underscore + `rozie` infix
+    // so the chance of a user authoring `<slot name="__rozieDefaultSlot__">` and
+    // colliding with the synthetic default-slot property is vanishingly small.
+    // Single-underscore `_defaultSlotFn` was the prior name; it left a plausible
+    // collision surface in v1 user slot names. Lockstep across emitSlotDecl /
+    // emitSlotFiller / emitTemplate.
+    const propertyFieldName = slot.name === '' ? '__rozieDefaultSlot__' : slot.name;
     const scopeType =
       slot.params.length > 0
         ? `{ ${slot.params.map((p) => `${p.name}: unknown`).join('; ')} }`

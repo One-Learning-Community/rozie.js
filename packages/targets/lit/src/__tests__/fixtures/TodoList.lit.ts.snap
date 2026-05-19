@@ -36,7 +36,7 @@ form { display: flex; gap: 0.25rem; margin-block: 0.5rem; }
   @property({ attribute: false }) header?: (scope: { remaining: unknown; total: unknown }) => unknown;
   @state() private _hasSlotDefault = false;
   @queryAssignedElements({ flatten: true }) private _slotDefaultElements!: Element[];
-  @property({ attribute: false }) _defaultSlotFn?: (scope: { item: unknown; toggle: unknown; remove: unknown }) => unknown;
+  @property({ attribute: false }) __rozieDefaultSlot__?: (scope: { item: unknown; toggle: unknown; remove: unknown }) => unknown;
   @state() private _hasSlotEmpty = false;
   @queryAssignedElements({ slot: 'empty', flatten: true }) private _slotEmptyElements!: Element[];
 
@@ -105,10 +105,10 @@ form { display: flex; gap: 0.25rem; margin-block: 0.5rem; }
     return html`
 <div class="todo-list">
   <header>
-    <slot name="header" data-rozie-params=${(() => { try { return JSON.stringify({remaining: this.remaining, total: this.items.length}); } catch { return '{}'; } })()}>
+    ${this.header !== undefined ? this.header({remaining: this.remaining, total: this.items.length}) : html`<slot name="header" data-rozie-params=${(() => { try { return JSON.stringify({remaining: this.remaining, total: this.items.length}); } catch { return '{}'; } })()}>
       
       <h3>${this.title} (${this.remaining} remaining)</h3>
-    </slot>
+    </slot>`}
   </header>
 
   <form @submit=${(e: SubmitEvent) => { e.preventDefault(); ((this.add) as (...args: any[]) => any)(e); }}>
@@ -119,10 +119,10 @@ form { display: flex; gap: 0.25rem; margin-block: 0.5rem; }
   ${this.items.length > 0 ? html`<ul>
     ${repeat<any>(this.items, (item, _idx) => item.id, (item, _idx) => html`<li class="${Object.entries({ done: item.done }).filter(([, v]) => v).map(([k]) => k).join(' ')}" key=${item.id}>
       
-      <slot data-rozie-params=${(() => { try { return JSON.stringify({item: item}); } catch { return '{}'; } })()} @rozie-default-toggle=${(e: CustomEvent) => ((() => this.toggle(item.id)) as (...args: any[]) => any)(e.detail)} @rozie-default-remove=${(e: CustomEvent) => ((() => this.removeItem(item.id)) as (...args: any[]) => any)(e.detail)}>
+      ${this.__rozieDefaultSlot__ !== undefined ? this.__rozieDefaultSlot__({item: item, toggle: () => this.toggle(item.id), remove: () => this.removeItem(item.id)}) : html`<slot data-rozie-params=${(() => { try { return JSON.stringify({item: item}); } catch { return '{}'; } })()} @rozie-default-toggle=${(e: CustomEvent) => ((() => this.toggle(item.id)) as (...args: any[]) => any)(e.detail)} @rozie-default-remove=${(e: CustomEvent) => ((() => this.removeItem(item.id)) as (...args: any[]) => any)(e.detail)}>
         <label><input type="checkbox" ?checked=${item.done} @change=${(e: Event) => { this.toggle(item.id); }} /><span>${item.text}</span></label>
         <button aria-label="Remove" @click=${(e: Event) => { this.removeItem(item.id); }}>×</button>
-      </slot>
+      </slot>`}
     </li>`)}
   </ul>` : html`<p class="empty">
     <slot name="empty">Nothing to do. ✨</slot>

@@ -272,9 +272,12 @@ export function threadParamTypes(
       // Phase 07.5 — thread producer SlotDecl.isPortal + scope-param-count onto consumer
       // SlotFillerDecl, so per-target emitters can switch between function-prop and
       // light-DOM emit paths without re-walking the producer IR at emit time.
-      if (matchingSlot.isPortal === true) {
-        filler.isPortal = true;
-      }
+      // WR-05 (Phase 07.5 review): symmetric assignment — the producer slot is the
+      // single source of truth for the consumer-side flag, so always overwrite from
+      // matchingSlot. The one-way `if (... === true) filler.isPortal = true` form
+      // would leak a stale `true` across re-threads (watch-mode loops) if an
+      // upstream pass ever pre-seeded the filler.
+      filler.isPortal = matchingSlot.isPortal === true;
       filler.producerSlotParamCount = matchingSlot.params.length;
 
       // R4 — thread producer paramTypes onto consumer.
