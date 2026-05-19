@@ -11,8 +11,8 @@
  *   5. Cross-check: unplugin path output is byte-identical to the
  *      packages/targets/angular/fixtures/Counter.ts.snap fixture.
  */
-import { describe, it, expect, vi } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
+import { readFileSync, existsSync, readdirSync, unlinkSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -34,6 +34,42 @@ function makeRegistry(): ModifierRegistry {
   registerBuiltins(r);
   return r;
 }
+
+/**
+ * Hermeticity guard — three tests in this file assert behavior that depends
+ * on `examples/<Name>.rozie.ts` Angular disk-cache sidecars NOT existing on
+ * disk (D-70 fail-fast semantics: without prebuild, the synthetic
+ * `<abs>/Foo.rozie.ts` path either resolves to a real disk file written by
+ * `prebuildAngularRozieFiles`, or it returns null). The VR build process
+ * (`tests/visual-regression/scripts/build-cells.mjs`) AND a stray
+ * `pnpm --filter @rozie/visual-regression build` that dies mid-build BOTH
+ * leave these sidecars on disk between invocations (the
+ * `cleanupCrossTreeAngularArtifacts` step runs at the end, not in a finally).
+ * If those tests run in this environment, the load hook reads the on-disk
+ * sidecar instead of triggering the compile path, and the assertions about
+ * code containing `from '@angular/core'` etc. fail with stale-cache content.
+ *
+ * Fix: glob `examples/*.rozie.ts` at the start of every test and remove
+ * each one before the body runs. Pure cleanup — never writes anything. Also
+ * runs once after the whole file completes in case a previous file in the
+ * vitest run wrote sidecars that another sibling test depends on absence.
+ */
+function purgeExamplesRozieTsSidecars(): void {
+  if (!existsSync(EXAMPLES)) return;
+  for (const entry of readdirSync(EXAMPLES)) {
+    if (entry.endsWith('.rozie.ts')) {
+      try {
+        unlinkSync(resolve(EXAMPLES, entry));
+      } catch {
+        // Best-effort cleanup — if the file vanished between readdir and
+        // unlink, that's fine; we just wanted it gone.
+      }
+    }
+  }
+}
+
+beforeEach(purgeExamplesRozieTsSidecars);
+afterAll(purgeExamplesRozieTsSidecars);
 
 describe('transformInclude — Plan 05-04b angular surface', () => {
   it('matches *.rozie.ts synthetic ids', () => {
