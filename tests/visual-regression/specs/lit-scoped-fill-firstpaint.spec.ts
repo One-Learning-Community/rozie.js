@@ -65,7 +65,15 @@ runner('lit-scoped-fill: first-paint header ctx is wired (RESEARCH A5)', async (
   // Header projects through and renders the close button — the most
   // load-bearing first-paint assertion since a race would leave the body
   // text empty or the button missing.
-  const closeBtn = consumer.locator('button[slot="header"]');
+  //
+  // Selector note: post-ec24d26, scoped destructured fills
+  // (`<template #header="{ close }">`) flow through Lit's function-prop
+  // path (`.header=${(scope) => html`<button>...</button>`}`), so the
+  // button renders INSIDE the producer's shadow DOM, not as a
+  // `<button slot="header">` in the consumer's light DOM. The accessible-
+  // name role lookup pierces shadow roots and finds the button regardless
+  // of which slot mechanism the consumer-side emitter chose.
+  const closeBtn = consumer.getByRole('button', { name: '×' });
   await expect(closeBtn).toHaveText('×');
   // Visual diff confirms no flicker / no missing-ctx placeholder. Baseline
   // generated in the pinned Playwright Docker image (`docs/parity.md` →

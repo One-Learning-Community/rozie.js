@@ -124,7 +124,7 @@ footer { border-top: 1px solid rgba(0, 0, 0, 0.08); justify-content: flex-end; }
     return html`
 ${this.open ? html`<div class="modal-backdrop" @click=${(e: MouseEvent) => { if (e.target !== e.currentTarget) return; this.closeOnBackdrop && this.close(); }} data-rozie-ref="backdropEl">
   <div class="modal-dialog" role="dialog" aria-modal="true" aria-label=${this.title || undefined} tabindex="-1" data-rozie-ref="dialogEl">
-    ${this.title || this._hasSlotHeader ? html`<header>
+    ${this.title || this._hasSlotHeader || this.header !== undefined ? html`<header>
       ${this.header !== undefined ? this.header({close: this.close}) : html`<slot name="header" @rozie-header-close=${(e: CustomEvent) => ((this.close) as (...args: any[]) => any)(e.detail)}>
         <h2>${this.title}</h2>
       </slot>`}
@@ -133,7 +133,7 @@ ${this.open ? html`<div class="modal-backdrop" @click=${(e: MouseEvent) => { if 
       ${this.__rozieDefaultSlot__ !== undefined ? this.__rozieDefaultSlot__({close: this.close}) : html`<slot @rozie-default-close=${(e: CustomEvent) => ((this.close) as (...args: any[]) => any)(e.detail)}></slot>`}
     </div>
 
-    ${this._hasSlotFooter ? html`<footer>
+    ${this._hasSlotFooter || this.footer !== undefined ? html`<footer>
       ${this.footer !== undefined ? this.footer({close: this.close}) : html`<slot name="footer" @rozie-footer-close=${(e: CustomEvent) => ((this.close) as (...args: any[]) => any)(e.detail)}></slot>`}
     </footer>` : nothing}</div>
 </div>` : nothing}`;

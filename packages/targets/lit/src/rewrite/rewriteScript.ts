@@ -132,6 +132,15 @@ export function rewriteScript(
   const computedNames = new Set(ir.computed.map((c) => c.name));
   const refNames = new Set(ir.refs.map((r) => r.name));
   const slotNames = new Set(ir.slots.map((s) => (s.name === '' ? 'default' : s.name)));
+  // Scoped (non-portal) slots receive the consumer's `.X=${fn}` property fill
+  // when the consumer uses a destructured `<template #X="{ p }">` (ec24d26).
+  // The producer's `_hasSlot<X>` light-DOM detector never flips for property
+  // fills, so the `$slots.X` presence check must union both signals.
+  const scopedSlotNames = new Set(
+    ir.slots
+      .filter((s) => s.isPortal !== true && s.params.length > 0)
+      .map((s) => s.name),
+  );
   const portalSlotNames = new Set(
     ir.slots.filter((s) => s.isPortal === true).map((s) => s.name),
   );
@@ -205,6 +214,24 @@ export function rewriteScript(
               '!==',
               thisDot(prop.name),
               t.identifier('undefined'),
+            ),
+          );
+          path.skip();
+          return;
+        }
+        // Scoped non-portal slots also receive property-fill from destructured
+        // `<template #X="{ p }">` consumer fills (ec24d26). Emit the union so
+        // the gate flips for BOTH light-DOM legacy fills and property fills.
+        if (scopedSlotNames.has(prop.name)) {
+          path.replaceWith(
+            t.logicalExpression(
+              '||',
+              thisDot(`_hasSlot${slotFieldSuffix(prop.name)}`),
+              t.binaryExpression(
+                '!==',
+                thisDot(prop.name),
+                t.identifier('undefined'),
+              ),
             ),
           );
           path.skip();
