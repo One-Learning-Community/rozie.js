@@ -185,6 +185,13 @@ copyFileSync(
   resolve(ROOT, 'host', 'index.html'),
   resolve(distDir, 'index.html'),
 );
+// Side-by-side compare page — opens 6 iframes (one per target) with an
+// example dropdown. Served at /compare.html for manual debugging; not part
+// of the Playwright matrix.
+copyFileSync(
+  resolve(ROOT, 'host', 'compare.html'),
+  resolve(distDir, 'compare.html'),
+);
 
 // Clean up cross-tree disk-cache artifacts the Angular sub-build dropped into
 // the shared `<repo>/examples/` directory — see the function comment for why.

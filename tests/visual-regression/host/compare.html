@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Rozie VR — Side-by-Side Compare</title>
+    <style>
+      * { box-sizing: border-box; }
+      html, body { height: 100%; margin: 0; }
+      body {
+        display: flex; flex-direction: column;
+        font: 14px/1.4 system-ui, -apple-system, sans-serif;
+        background: #f5f5f5;
+        color: #1a1a1a;
+      }
+      header {
+        flex: 0 0 auto;
+        display: flex; align-items: center; gap: 1rem;
+        padding: 0.75rem 1rem;
+        background: #fff;
+        border-bottom: 1px solid #e0e0e0;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+      }
+      header h1 {
+        font-size: 0.95rem; font-weight: 600; margin: 0;
+        color: #1a1a1a;
+      }
+      header label { font-weight: 500; }
+      header select {
+        font: inherit;
+        padding: 0.35rem 0.5rem;
+        border: 1px solid #c0c0c0;
+        border-radius: 4px;
+        background: #fff;
+        min-width: 14rem;
+      }
+      header .hint {
+        margin-left: auto; color: #666; font-size: 0.85rem;
+      }
+      header a { color: #2563eb; text-decoration: none; }
+      header a:hover { text-decoration: underline; }
+      main {
+        flex: 1 1 auto;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        grid-template-rows: repeat(2, 1fr);
+        gap: 8px;
+        padding: 8px;
+        min-height: 0;
+      }
+      .cell {
+        display: flex; flex-direction: column;
+        background: #fff;
+        border: 1px solid #d0d0d0;
+        border-radius: 6px;
+        overflow: hidden;
+        min-height: 0;
+      }
+      .cell-label {
+        flex: 0 0 auto;
+        font-size: 0.75rem; font-weight: 600;
+        color: #444;
+        background: #fafafa;
+        padding: 0.35rem 0.6rem;
+        border-bottom: 1px solid #e0e0e0;
+        display: flex; align-items: center; justify-content: space-between;
+      }
+      .cell-label .target-name {
+        text-transform: uppercase; letter-spacing: 0.04em;
+      }
+      .cell-label a {
+        font-size: 0.7rem; font-weight: 400;
+        color: #666; text-decoration: none;
+      }
+      .cell-label a:hover { color: #2563eb; text-decoration: underline; }
+      iframe {
+        flex: 1 1 auto;
+        width: 100%; height: 100%;
+        border: 0;
+        background: #fff;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Rozie VR · Side-by-Side</h1>
+      <label for="ex-select">Example:</label>
+      <select id="ex-select"></select>
+      <span class="hint">
+        Single-target view: <a href="./index.html?example=Counter&target=vue">index.html</a>
+      </span>
+    </header>
+    <main id="grid"></main>
+    <script>
+      // Mirror of EXAMPLES in tests/visual-regression/host/main.ts. Add new
+      // examples here when they land in the canonical list. The build script
+      // (scripts/build-cells.mjs) copies this file to `dist/compare.html` so
+      // it's served at http://localhost:4180/compare.html alongside the
+      // single-target router at /index.html.
+      const EXAMPLES = [
+        'Counter',
+        'SearchInput',
+        'Dropdown',
+        'TodoList',
+        'Modal',
+        'TreeNode',
+        'Card',
+        'CardHeader',
+        'ModalConsumer',
+        'DynamicSlotName',
+        'LitScopedFillFirstpaint',
+        'PortalList',
+        'FullCalendar',
+        'LineChart',
+        'CodeMirror',
+      ];
+      const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'];
+
+      const select = document.getElementById('ex-select');
+      for (const ex of EXAMPLES) {
+        const opt = document.createElement('option');
+        opt.value = ex; opt.textContent = ex;
+        select.appendChild(opt);
+      }
+
+      const grid = document.getElementById('grid');
+      const frames = new Map();
+      for (const target of TARGETS) {
+        const cell = document.createElement('div');
+        cell.className = 'cell';
+        const label = document.createElement('div');
+        label.className = 'cell-label';
+        const name = document.createElement('span');
+        name.className = 'target-name';
+        name.textContent = target;
+        const openLink = document.createElement('a');
+        openLink.textContent = 'open ↗';
+        openLink.target = '_blank';
+        openLink.rel = 'noopener';
+        label.appendChild(name);
+        label.appendChild(openLink);
+        const iframe = document.createElement('iframe');
+        iframe.title = `Rozie · ${target}`;
+        cell.appendChild(label);
+        cell.appendChild(iframe);
+        grid.appendChild(cell);
+        frames.set(target, { iframe, openLink });
+      }
+
+      function urlFor(example, target) {
+        return `/${target}/host/entry.${target}.html?example=${encodeURIComponent(example)}&target=${target}`;
+      }
+
+      function paramOrDefault(name, fallback) {
+        const v = new URLSearchParams(location.search).get(name);
+        return v && v.length > 0 ? v : fallback;
+      }
+
+      function setExample(example) {
+        for (const target of TARGETS) {
+          const { iframe, openLink } = frames.get(target);
+          const url = urlFor(example, target);
+          iframe.src = url;
+          openLink.href = url;
+        }
+        // Reflect selection in URL so refresh + share works.
+        const sp = new URLSearchParams(location.search);
+        sp.set('example', example);
+        history.replaceState(null, '', `${location.pathname}?${sp}`);
+      }
+
+      const initial = paramOrDefault('example', 'ModalConsumer');
+      if (EXAMPLES.includes(initial)) select.value = initial;
+      else select.value = 'Counter';
+      setExample(select.value);
+
+      select.addEventListener('change', () => setExample(select.value));
+    </script>
+  </body>
+</html>
