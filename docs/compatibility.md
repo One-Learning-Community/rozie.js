@@ -55,6 +55,7 @@ For the narrative behind each ⚠︎, follow the link to the matching section in
 | `$watch(() => getter, cb)` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `$emit(name, …)` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `$refs.name` from `ref="name"` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `$snapshot(x)` — crossing into untyped JS | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `$onMount` / `$onUnmount` | ✅ | ✅ | ✅ | ✅ | [⚠︎](/parity#lit-solid-—-lifecycle-hooks-colocated-with-an-always-rendered-component) | [⚠︎](/parity#lit-solid-—-lifecycle-hooks-colocated-with-an-always-rendered-component) |
 
 ## Two-way binding
