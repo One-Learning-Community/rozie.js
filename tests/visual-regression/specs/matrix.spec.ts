@@ -62,8 +62,27 @@ const EXAMPLES = [
   // against the same shared `PortalList.png` baseline — any per-target
   // rendering drift in the portal-mount path will fail the matcher.
   'PortalList',
+  // FullCalendar (added 2026-05-19) — real-third-party-engine portal-slot
+  // coverage. FullCalendarDemo fills a `<template #event>` that mounts
+  // through `$portals.event` into engine-owned event cells. Per D-10, all
+  // 6 targets diff against the same shared `FullCalendar.png` baseline —
+  // any per-target rendering drift in the real-engine portal-mount path
+  // will fail the matcher. Baseline must be Linux-rendered via the pinned
+  // Playwright Docker image per `feedback_vr_linux_baselines`; cells
+  // gate on baseline presence below (downgrade to fixme until the .png
+  // exists). Behavioral coverage is independently guaranteed by
+  // `full-calendar.spec.ts` runtime smoke (no screenshot dependency).
+  'FullCalendar',
 ] as const;
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'] as const;
+
+// Baseline-availability gate (per-example). When __screenshots__/<Name>.png
+// is missing, the cells for that example downgrade to test.fixme so the
+// suite stays green until a Linux-Docker baseline regen lands the PNG.
+// Mirrors the Angular column build-availability gate below.
+function baselineExists(name: string): boolean {
+  return existsSync(resolve(__dirname, `../__screenshots__/${name}.png`));
+}
 
 // Build-availability gate for the Angular column. `build-cells.mjs` soft-fails
 // the Angular sub-build on a known out-of-scope upstream breakage, so
@@ -103,8 +122,14 @@ async function settleExample(
 }
 
 for (const example of EXAMPLES) {
+  const hasBaseline = baselineExists(example);
   for (const target of TARGETS) {
-    const runner = target === 'angular' && !angularBuilt ? test.fixme : test;
+    // Cell fixme-gates on EITHER:
+    //  - Angular column build availability (existing)
+    //  - per-example baseline PNG presence (new — for examples added before
+    //    their Linux-Docker baseline regen has landed)
+    const runner =
+      (target === 'angular' && !angularBuilt) || !hasBaseline ? test.fixme : test;
     runner(`${example} · ${target}`, async ({ page }) => {
       await page.goto(`/?example=${example}&target=${target}`);
       const component = page.getByTestId('rozie-mount');

@@ -13,8 +13,8 @@
     <FullCalendar
       r-model:view="$data.view"
       :events="$data.events"
-      @event-click="onEventClick"
-      @date-click="onDateClick"
+      @eventClick="onEventClick"
+      @dateClick="onDateClick"
     />
 
   Consumers must import FullCalendar's CSS themselves — the .rozie
@@ -30,7 +30,7 @@
       $script (event title formatting)
     - Multi-plugin import shape — @fullcalendar/core + per-view plugins
       via separate default imports
-    - Structured-payload $emit: event-click forwards { event, jsEvent,
+    - Structured-payload $emit: eventClick forwards { event, jsEvent,
       view } — heavier payload shape than prior examples
 -->
 
@@ -85,16 +85,16 @@ $onMount(() => {
       right:  'dayGridMonth,timeGridWeek,timeGridDay',
     },
     eventClick: (info) => {
-      $emit('event-click', {
+      $emit('eventClick', {
         event:   { id: info.event.id, title: info.event.title, start: info.event.start, end: info.event.end },
         jsEvent: info.jsEvent,
       })
     },
     dateClick: (info) => {
-      $emit('date-click', { date: info.date, dateStr: info.dateStr, allDay: info.allDay })
+      $emit('dateClick', { date: info.date, dateStr: info.dateStr, allDay: info.allDay })
     },
     eventDrop: (info) => {
-      $emit('event-drop', {
+      $emit('eventDrop', {
         event: { id: info.event.id, title: info.event.title, start: info.event.start, end: info.event.end },
         delta: info.delta,
       })

@@ -37,6 +37,14 @@ export const EXAMPLES = [
   // imports `../PortalList.rozie`); the wrapper instantiates an inline
   // vanilla-JS engine and mounts each row's content through `$portals.item`.
   'PortalList',
+  // FullCalendar (added 2026-05-19) — real-third-party-engine portal-slot
+  // smoke. Loader resolves to `examples/demos/FullCalendarDemo.rozie`
+  // (which imports `../FullCalendar.rozie`). The wrapper boots a real
+  // FullCalendar 6.x instance; consumer's `<template #event>` fills mount
+  // through `$portals.event` into engine-owned event cells. Validates the
+  // portal-slot primitive against a real third-party JS engine,
+  // complementing PortalList's synthetic in-line engine coverage.
+  'FullCalendar',
 ] as const;
 
 export type Example = (typeof EXAMPLES)[number];
@@ -66,6 +74,7 @@ export const LIT_TAGS: Record<Example, string> = {
   DynamicSlotName: 'rozie-dynamic-slot-name',
   LitScopedFillFirstpaint: 'rozie-lit-scoped-fill-firstpaint',
   PortalList: 'rozie-portal-list',
+  FullCalendar: 'rozie-full-calendar',
 };
 
 export interface HostQuery {
@@ -109,6 +118,11 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   LitScopedFillFirstpaint: {},
   // PortalListDemo carries its item array in <data>; no props needed.
   PortalList: {},
+  // FullCalendarDemo carries events + view in <data> and seeds them in
+  // `$onMount`; no parent-supplied props needed. (FullCalendar itself
+  // has `events`, `view`, `weekends`, etc. props but the demo wrapper is
+  // self-contained.)
+  FullCalendar: {},
 };
 
 /** Parse `?example=&target=` from the current URL, falling back to defaults. */

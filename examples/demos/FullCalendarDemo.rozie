@@ -9,7 +9,7 @@
       on FullCalendar's own toolbar flow into the bound state
     - Date-typed event objects (Date instances, not date strings) —
       different from any prior demo's scalar/string payloads
-    - Multi-event handler chain: event-click + date-click + event-drop,
+    - Multi-event handler chain: eventClick + dateClick + eventDrop,
       each with a structured payload
     - $computed deriving a sorted/formatted event list from raw $data
     - r-for over events in the sidebar (outside any wrapper slot —
@@ -22,7 +22,7 @@
 
 <components>
 {
-  FullCalendar: './FullCalendar.rozie',
+  FullCalendar: '../FullCalendar.rozie',
 }
 </components>
 
@@ -70,10 +70,10 @@ const appendLog = (event, detail) => {
   $data.logNextId = $data.logNextId + 1
 }
 
-const onEventClick = (e) => appendLog('event-click', `${e?.event?.title ?? '?'} (id=${e?.event?.id ?? '?'})`)
-const onDateClick  = (d) => appendLog('date-click',  `${d?.dateStr ?? '?'} ${d?.allDay ? '(all day)' : ''}`.trim())
+const onEventClick = (e) => appendLog('eventClick', `${e?.event?.title ?? '?'} (id=${e?.event?.id ?? '?'})`)
+const onDateClick  = (d) => appendLog('dateClick',  `${d?.dateStr ?? '?'} ${d?.allDay ? '(all day)' : ''}`.trim())
 const onEventDrop  = (e) => {
-  appendLog('event-drop', `${e?.event?.title ?? '?'} → ${e?.event?.start?.toISOString?.().slice(0, 10) ?? '?'}`)
+  appendLog('eventDrop', `${e?.event?.title ?? '?'} → ${e?.event?.start?.toISOString?.().slice(0, 10) ?? '?'}`)
   // Mirror the drop into our $data so the bound list re-orders accordingly.
   $data.events = $data.events.map((src) => {
     if (src.id !== e?.event?.id) return src
@@ -105,7 +105,7 @@ const reset    = () => {
   $data.nextId = 4
 }
 
-const setView = (v) => { $data.view = v }
+const selectView = (v) => { $data.view = v }
 
 const sortedEvents = $computed(() => {
   return [...$data.events].sort((a, b) => {
@@ -132,9 +132,9 @@ const formatStart = (e) => {
 
   <div class="view-bar">
     <span class="bar-label">View</span>
-    <button type="button" :class="{ active: $data.view === 'dayGridMonth' }"   @click="setView('dayGridMonth')">Month</button>
-    <button type="button" :class="{ active: $data.view === 'timeGridWeek' }"   @click="setView('timeGridWeek')">Week</button>
-    <button type="button" :class="{ active: $data.view === 'timeGridDay' }"    @click="setView('timeGridDay')">Day</button>
+    <button type="button" :class="{ active: $data.view === 'dayGridMonth' }"   @click="selectView('dayGridMonth')">Month</button>
+    <button type="button" :class="{ active: $data.view === 'timeGridWeek' }"   @click="selectView('timeGridWeek')">Week</button>
+    <button type="button" :class="{ active: $data.view === 'timeGridDay' }"    @click="selectView('timeGridDay')">Day</button>
     <span class="bar-value">current: <code>{{ $data.view }}</code></span>
   </div>
 
@@ -143,9 +143,9 @@ const formatStart = (e) => {
       r-model:view="$data.view"
       :events="$data.events"
       :height="420"
-      @event-click="onEventClick"
-      @date-click="onDateClick"
-      @event-drop="onEventDrop"
+      @eventClick="onEventClick"
+      @dateClick="onDateClick"
+      @eventDrop="onEventDrop"
     >
       <!--
         Portal-slot primitive (Spike 003) — supply a templated event
@@ -381,8 +381,8 @@ header code { background: rgba(0, 0, 0, 0.04); padding: 0.0625rem 0.25rem; borde
   border-bottom: 1px solid rgba(0, 0, 0, 0.04);
 }
 .log-list li:last-child { border-bottom: none; }
-.log-list li.log-event-click { background: rgba(59, 130, 246, 0.05); }
-.log-list li.log-event-drop  { background: rgba(34, 197, 94, 0.05); }
+.log-list li.log-eventClick { background: rgba(59, 130, 246, 0.05); }
+.log-list li.log-eventDrop  { background: rgba(34, 197, 94, 0.05); }
 
 .log-ts {
   font-family: ui-monospace, monospace;
