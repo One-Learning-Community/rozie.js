@@ -18,12 +18,12 @@ interface RozieDefaultSlotCtx {
 @customElement('rozie-todo-list')
 export default class TodoList extends SignalWatcher(LitElement) {
   static styles = css`
-.todo-list { font-family: system-ui, sans-serif; }
-ul { list-style: none; padding: 0; }
-li { display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0; }
-li.done span { text-decoration: line-through; opacity: 0.5; }
-.empty { color: rgba(0, 0, 0, 0.4); font-style: italic; }
-form { display: flex; gap: 0.25rem; margin-block: 0.5rem; }
+.todo-list[data-rozie-s-52bec3de] { font-family: system-ui, sans-serif; }
+ul[data-rozie-s-52bec3de] { list-style: none; padding: 0; }
+li[data-rozie-s-52bec3de] { display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0; }
+li.done[data-rozie-s-52bec3de] span[data-rozie-s-52bec3de] { text-decoration: line-through; opacity: 0.5; }
+.empty[data-rozie-s-52bec3de] { color: rgba(0, 0, 0, 0.4); font-style: italic; }
+form[data-rozie-s-52bec3de] { display: flex; gap: 0.25rem; margin-block: 0.5rem; }
 `;
 
   @property({ type: Array, attribute: 'items' }) _items_attr: any[] = [];
@@ -103,28 +103,28 @@ form { display: flex; gap: 0.25rem; margin-block: 0.5rem; }
 
   render() {
     return html`
-<div class="todo-list">
-  <header>
+<div class="todo-list" data-rozie-s-52bec3de>
+  <header data-rozie-s-52bec3de>
     ${this.header !== undefined ? this.header({remaining: this.remaining, total: this.items.length}) : html`<slot name="header" data-rozie-params=${(() => { try { return JSON.stringify({remaining: this.remaining, total: this.items.length}); } catch { return '{}'; } })()}>
       
-      <h3>${this.title} (${this.remaining} remaining)</h3>
+      <h3 data-rozie-s-52bec3de>${this.title} (${this.remaining} remaining)</h3>
     </slot>`}
   </header>
 
-  <form @submit=${(e: SubmitEvent) => { e.preventDefault(); ((this.add) as (...args: any[]) => any)(e); }}>
-    <input placeholder="What needs doing?" .value=${this._draft.value} @input=${(e) => this._draft.value = (e.target as HTMLInputElement).value} />
-    <button type="submit" ?disabled=${!this._draft.value.trim()}>Add</button>
+  <form @submit=${(e: SubmitEvent) => { e.preventDefault(); ((this.add) as (...args: any[]) => any)(e); }} data-rozie-s-52bec3de>
+    <input placeholder="What needs doing?" .value=${this._draft.value} @input=${(e) => this._draft.value = (e.target as HTMLInputElement).value} data-rozie-s-52bec3de />
+    <button type="submit" ?disabled=${!this._draft.value.trim()} data-rozie-s-52bec3de>Add</button>
   </form>
 
-  ${this.items.length > 0 ? html`<ul>
-    ${repeat<any>(this.items, (item, _idx) => item.id, (item, _idx) => html`<li class="${Object.entries({ done: item.done }).filter(([, v]) => v).map(([k]) => k).join(' ')}" key=${item.id}>
+  ${this.items.length > 0 ? html`<ul data-rozie-s-52bec3de>
+    ${repeat<any>(this.items, (item, _idx) => item.id, (item, _idx) => html`<li class="${Object.entries({ done: item.done }).filter(([, v]) => v).map(([k]) => k).join(' ')}" key=${item.id} data-rozie-s-52bec3de>
       
       ${this.__rozieDefaultSlot__ !== undefined ? this.__rozieDefaultSlot__({item: item, toggle: () => this.toggle(item.id), remove: () => this.removeItem(item.id)}) : html`<slot data-rozie-params=${(() => { try { return JSON.stringify({item: item}); } catch { return '{}'; } })()} @rozie-default-toggle=${(e: CustomEvent) => ((() => this.toggle(item.id)) as (...args: any[]) => any)(e.detail)} @rozie-default-remove=${(e: CustomEvent) => ((() => this.removeItem(item.id)) as (...args: any[]) => any)(e.detail)}>
-        <label><input type="checkbox" ?checked=${item.done} @change=${(e: Event) => { this.toggle(item.id); }} /><span>${item.text}</span></label>
-        <button aria-label="Remove" @click=${(e: Event) => { this.removeItem(item.id); }}>×</button>
+        <label data-rozie-s-52bec3de><input type="checkbox" ?checked=${item.done} @change=${(e: Event) => { this.toggle(item.id); }} data-rozie-s-52bec3de /><span data-rozie-s-52bec3de>${item.text}</span></label>
+        <button aria-label="Remove" @click=${(e: Event) => { this.removeItem(item.id); }} data-rozie-s-52bec3de>×</button>
       </slot>`}
     </li>`)}
-  </ul>` : html`<p class="empty">
+  </ul>` : html`<p class="empty" data-rozie-s-52bec3de>
     <slot name="empty">Nothing to do. ✨</slot>
   </p>`}</div>
 `;

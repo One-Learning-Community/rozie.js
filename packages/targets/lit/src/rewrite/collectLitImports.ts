@@ -117,6 +117,7 @@ export type RuntimeLitImport =
   | 'observeRozieSlotCtx'
   | 'attachOutsideClickListener'
   | 'injectGlobalStyles'
+  | 'adoptConsumerStyles'
   | 'debounce'
   | 'throttle';
 

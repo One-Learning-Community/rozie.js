@@ -41,9 +41,9 @@ export default class DefaultContentFallbackFixture extends SignalWatcher(LitElem
 
   render() {
     return html`
-<div class="default-content-fallback-fixture">
+<div class="default-content-fallback-fixture" data-rozie-s-62104151>
   <slot name="status">
-    <span class="fallback">No status provided.</span>
+    <span class="fallback" data-rozie-s-62104151>No status provided.</span>
   </slot>
 </div>
 `;

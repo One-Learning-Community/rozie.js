@@ -1,15 +1,17 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { SignalWatcher, signal } from '@lit-labs/preact-signals';
+import { adoptConsumerStyles } from '@rozie/runtime-lit';
+import { ref } from 'lit/directives/ref.js';
 import './Modal.rozie';
 import './WrapperModal.rozie';
 
 @customElement('rozie-modal-consumer')
 export default class ModalConsumer extends SignalWatcher(LitElement) {
   static styles = css`
-.modal-consumer { display: flex; flex-direction: column; gap: 1rem; }
-.close { background: none; border: none; cursor: pointer; font-size: 1.25rem; }
-.dynamic-fill { font-weight: bold; }
+.modal-consumer[data-rozie-s-5d081d3a] { display: flex; flex-direction: column; gap: 1rem; }
+.close[data-rozie-s-5d081d3a] { background: none; border: none; cursor: pointer; font-size: 1.25rem; }
+.dynamic-fill[data-rozie-s-5d081d3a] { font-weight: bold; }
 `;
 
   @property({ type: String, reflect: true }) title: string = 'Confirm';
@@ -28,24 +30,24 @@ export default class ModalConsumer extends SignalWatcher(LitElement) {
 
   render() {
     return html`
-<div class="modal-consumer">
+<div class="modal-consumer" data-rozie-s-5d081d3a>
   <rozie-modal .open=${this._open1.value} @open-change=${(e: CustomEvent) => { this._open1.value = e.detail; }} .header=${(scope: { close: unknown }) => html`
-      <h2>${this.title}</h2>
-      <button class="close" @click=${scope.close}>×</button>
+      <h2 data-rozie-s-5d081d3a>${this.title}</h2>
+      <button class="close" @click=${scope.close} data-rozie-s-5d081d3a>×</button>
     `} .footer=${(scope: { close: unknown }) => html`
-      <button @click=${scope.close}>Cancel</button>
-      <button @click=${(e: Event) => { this.onConfirm(); }}>OK</button>
-    `}>
+      <button @click=${scope.close} data-rozie-s-5d081d3a>Cancel</button>
+      <button @click=${(e: Event) => { this.onConfirm(); }} data-rozie-s-5d081d3a>OK</button>
+    `} ${ref((el: Element | undefined) => el && adoptConsumerStyles(el, (this.constructor as { styles?: unknown }).styles))}>
     Are you sure you want to proceed?
     </rozie-modal>
 
   <rozie-modal .open=${this._open2.value} @open-change=${(e: CustomEvent) => { this._open2.value = e.detail; }}><div slot="${this._slotName.value}">
-      <span class="dynamic-fill">Dynamic header via slotName</span>
+      <span class="dynamic-fill" data-rozie-s-5d081d3a>Dynamic header via slotName</span>
     </div>
     Dynamic-name demo body
   </rozie-modal>
 
-  <rozie-wrapper-modal .open=${this._open3.value} @open-change=${(e: CustomEvent) => { this._open3.value = e.detail; }} .title=${this.title}><h2 slot="brand">Re-projected brand</h2><button slot="actions">Wrapper action</button>
+  <rozie-wrapper-modal .open=${this._open3.value} @open-change=${(e: CustomEvent) => { this._open3.value = e.detail; }} .title=${this.title}><h2 data-rozie-s-5d081d3a slot="brand">Re-projected brand</h2><button data-rozie-s-5d081d3a slot="actions">Wrapper action</button>
     Body via wrapper's default slot
     </rozie-wrapper-modal>
 </div>

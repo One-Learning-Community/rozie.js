@@ -5,7 +5,7 @@ import { SignalWatcher, signal } from '@lit-labs/preact-signals';
 @customElement('rozie-inline-expr-handler')
 export default class InlineExprHandler extends SignalWatcher(LitElement) {
   static styles = css`
-.backdrop { position: fixed; inset: 0; }
+.backdrop[data-rozie-s-8ec7623e] { position: fixed; inset: 0; }
 `;
 
   @property({ type: Boolean, reflect: true }) closeOnBackdrop: boolean = true;
@@ -21,9 +21,9 @@ export default class InlineExprHandler extends SignalWatcher(LitElement) {
 
   render() {
     return html`
-<div class="backdrop" @click=${(e: Event) => { this.closeOnBackdrop && this.close(); }}>
+<div class="backdrop" @click=${(e: Event) => { this.closeOnBackdrop && this.close(); }} data-rozie-s-8ec7623e>
   
-  <button @click=${this.close}>Close</button>
+  <button @click=${this.close} data-rozie-s-8ec7623e>Close</button>
 </div>
 `;
   }

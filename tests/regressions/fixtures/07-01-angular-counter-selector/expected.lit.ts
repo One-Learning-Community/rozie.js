@@ -6,7 +6,7 @@ import { createLitControllableProperty } from '@rozie/runtime-lit';
 @customElement('rozie-counter')
 export default class Counter extends SignalWatcher(LitElement) {
   static styles = css`
-.counter { font-variant-numeric: tabular-nums; }
+.counter[data-rozie-s-80d69145] { font-variant-numeric: tabular-nums; }
 `;
 
   @property({ type: Number, attribute: 'value' }) _value_attr: number = 0;
@@ -27,7 +27,7 @@ export default class Counter extends SignalWatcher(LitElement) {
 
   render() {
     return html`
-<button class="counter" @click=${this.bump}>${this.value}</button>
+<button class="counter" @click=${this.bump} data-rozie-s-80d69145>${this.value}</button>
 `;
   }
 

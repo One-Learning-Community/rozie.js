@@ -48,7 +48,7 @@ export default class ScopedParamsFixture extends SignalWatcher(LitElement) {
 
   render() {
     return html`
-<div class="scoped-params-fixture">
+<div class="scoped-params-fixture" data-rozie-s-94f3adc8>
   ${this.item !== undefined ? this.item({value: this.label}) : html`<slot name="item" data-rozie-params=${(() => { try { return JSON.stringify({value: this.label}); } catch { return '{}'; } })()}></slot>`}
 </div>
 `;

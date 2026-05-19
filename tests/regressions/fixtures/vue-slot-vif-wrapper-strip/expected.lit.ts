@@ -5,7 +5,7 @@ import { SignalWatcher } from '@lit-labs/preact-signals';
 @customElement('rozie-presence-slot-fallback')
 export default class PresenceSlotFallback extends SignalWatcher(LitElement) {
   static styles = css`
-.panel { border: 1px solid rgba(0, 0, 0, 0.1); }
+.panel[data-rozie-s-224e77e7] { border: 1px solid rgba(0, 0, 0, 0.1); }
 `;
 
   @property({ type: String, reflect: true }) title: string = '';
@@ -61,11 +61,11 @@ export default class PresenceSlotFallback extends SignalWatcher(LitElement) {
 
   render() {
     return html`
-<section class="panel">
-  ${this._hasSlotHeader || this.title ? html`<header>
+<section class="panel" data-rozie-s-224e77e7>
+  ${this._hasSlotHeader || this.title ? html`<header data-rozie-s-224e77e7>
     
     <slot name="header">${this.title}</slot>
-  </header>` : nothing}<div class="body">
+  </header>` : nothing}<div class="body" data-rozie-s-224e77e7>
     <slot></slot>
   </div>
 </section>

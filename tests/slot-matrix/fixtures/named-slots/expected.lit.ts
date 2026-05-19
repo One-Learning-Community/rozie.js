@@ -55,11 +55,11 @@ export default class NamedSlotsFixture extends SignalWatcher(LitElement) {
 
   render() {
     return html`
-<div class="named-slots-fixture">
-  <header>
+<div class="named-slots-fixture" data-rozie-s-a30182bc>
+  <header data-rozie-s-a30182bc>
     <slot name="header"></slot>
   </header>
-  <footer>
+  <footer data-rozie-s-a30182bc>
     <slot name="footer"></slot>
   </footer>
 </div>

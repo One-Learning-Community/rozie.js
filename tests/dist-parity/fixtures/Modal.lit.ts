@@ -6,13 +6,13 @@ import { createLitControllableProperty, injectGlobalStyles } from '@rozie/runtim
 @customElement('rozie-modal')
 export default class Modal extends SignalWatcher(LitElement) {
   static styles = css`
-.modal-backdrop {
+.modal-backdrop[data-rozie-s-fc45feb2] {
   position: fixed; inset: 0;
   background: rgba(0, 0, 0, 0.4);
   display: flex; align-items: center; justify-content: center;
   z-index: var(--rozie-modal-z, 2000);
 }
-.modal-dialog {
+.modal-dialog[data-rozie-s-fc45feb2] {
   background: white;
   border-radius: 8px;
   min-width: 20rem;
@@ -22,12 +22,12 @@ export default class Modal extends SignalWatcher(LitElement) {
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
   outline: none;
 }
-header, footer { padding: 1rem; display: flex; align-items: center; gap: 0.5rem; }
-header { border-bottom: 1px solid rgba(0, 0, 0, 0.08); }
-header h2 { flex: 1; margin: 0; font-size: 1.1rem; }
-footer { border-top: 1px solid rgba(0, 0, 0, 0.08); justify-content: flex-end; }
-.modal-body { padding: 1rem; overflow: auto; }
-.close-btn { background: none; border: none; cursor: pointer; font-size: 1.5rem; line-height: 1; }
+header[data-rozie-s-fc45feb2], footer[data-rozie-s-fc45feb2] { padding: 1rem; display: flex; align-items: center; gap: 0.5rem; }
+header[data-rozie-s-fc45feb2] { border-bottom: 1px solid rgba(0, 0, 0, 0.08); }
+header[data-rozie-s-fc45feb2] h2[data-rozie-s-fc45feb2] { flex: 1; margin: 0; font-size: 1.1rem; }
+footer[data-rozie-s-fc45feb2] { border-top: 1px solid rgba(0, 0, 0, 0.08); justify-content: flex-end; }
+.modal-body[data-rozie-s-fc45feb2] { padding: 1rem; overflow: auto; }
+.close-btn[data-rozie-s-fc45feb2] { background: none; border: none; cursor: pointer; font-size: 1.5rem; line-height: 1; }
 `;
 
   @property({ type: Boolean, attribute: 'open' }) _open_attr: boolean = false;
@@ -122,18 +122,18 @@ footer { border-top: 1px solid rgba(0, 0, 0, 0.08); justify-content: flex-end; }
 
   render() {
     return html`
-${this.open ? html`<div class="modal-backdrop" @click=${(e: MouseEvent) => { if (e.target !== e.currentTarget) return; this.closeOnBackdrop && this.close(); }} data-rozie-ref="backdropEl">
-  <div class="modal-dialog" role="dialog" aria-modal="true" aria-label=${this.title || undefined} tabindex="-1" data-rozie-ref="dialogEl">
-    ${this.title || this._hasSlotHeader || this.header !== undefined ? html`<header>
+${this.open ? html`<div class="modal-backdrop" @click=${(e: MouseEvent) => { if (e.target !== e.currentTarget) return; this.closeOnBackdrop && this.close(); }} data-rozie-ref="backdropEl" data-rozie-s-fc45feb2>
+  <div class="modal-dialog" role="dialog" aria-modal="true" aria-label=${this.title || undefined} tabindex="-1" data-rozie-ref="dialogEl" data-rozie-s-fc45feb2>
+    ${this.title || this._hasSlotHeader || this.header !== undefined ? html`<header data-rozie-s-fc45feb2>
       ${this.header !== undefined ? this.header({close: this.close}) : html`<slot name="header" @rozie-header-close=${(e: CustomEvent) => ((this.close) as (...args: any[]) => any)(e.detail)}>
-        <h2>${this.title}</h2>
+        <h2 data-rozie-s-fc45feb2>${this.title}</h2>
       </slot>`}
-      <button class="close-btn" aria-label="Close" @click=${this.close}>×</button>
-    </header>` : nothing}<div class="modal-body">
+      <button class="close-btn" aria-label="Close" @click=${this.close} data-rozie-s-fc45feb2>×</button>
+    </header>` : nothing}<div class="modal-body" data-rozie-s-fc45feb2>
       ${this.__rozieDefaultSlot__ !== undefined ? this.__rozieDefaultSlot__({close: this.close}) : html`<slot @rozie-default-close=${(e: CustomEvent) => ((this.close) as (...args: any[]) => any)(e.detail)}></slot>`}
     </div>
 
-    ${this._hasSlotFooter || this.footer !== undefined ? html`<footer>
+    ${this._hasSlotFooter || this.footer !== undefined ? html`<footer data-rozie-s-fc45feb2>
       ${this.footer !== undefined ? this.footer({close: this.close}) : html`<slot name="footer" @rozie-footer-close=${(e: CustomEvent) => ((this.close) as (...args: any[]) => any)(e.detail)}></slot>`}
     </footer>` : nothing}</div>
 </div>` : nothing}`;

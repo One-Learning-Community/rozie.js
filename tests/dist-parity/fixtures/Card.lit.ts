@@ -6,8 +6,8 @@ import './CardHeader.rozie';
 @customElement('rozie-card')
 export default class Card extends SignalWatcher(LitElement) {
   static styles = css`
-.card { border: 1px solid #ddd; border-radius: 6px; overflow: hidden; background: #fff; }
-.card__body { padding: 1rem; }
+.card[data-rozie-s-a88c221e] { border: 1px solid #ddd; border-radius: 6px; overflow: hidden; background: #fff; }
+.card__body[data-rozie-s-a88c221e] { padding: 1rem; }
 `;
 
   @property({ type: String, reflect: true }) title: string = '';
@@ -50,9 +50,9 @@ export default class Card extends SignalWatcher(LitElement) {
 
   render() {
     return html`
-<article class="card">
+<article class="card" data-rozie-s-a88c221e>
   <rozie-card-header .title=${this.title} .onClose=${this.onClose}></rozie-card-header>
-  <div class="card__body">
+  <div class="card__body" data-rozie-s-a88c221e>
     <slot></slot>
   </div>
 </article>

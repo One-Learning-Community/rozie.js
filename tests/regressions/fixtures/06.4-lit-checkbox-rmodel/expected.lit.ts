@@ -6,7 +6,7 @@ import { createLitControllableProperty } from '@rozie/runtime-lit';
 @customElement('rozie-checkbox-rmodel')
 export default class CheckboxRModel extends SignalWatcher(LitElement) {
   static styles = css`
-.toggle { display: inline-flex; gap: 0.25rem; align-items: center; }
+.toggle[data-rozie-s-5898a126] { display: inline-flex; gap: 0.25rem; align-items: center; }
 `;
 
   @property({ type: Boolean, attribute: 'checked' }) _checked_attr: boolean = false;
@@ -27,10 +27,10 @@ export default class CheckboxRModel extends SignalWatcher(LitElement) {
 
   render() {
     return html`
-<label class="toggle">
+<label class="toggle" data-rozie-s-5898a126>
   
-  <input type="checkbox" .checked=${this.checked} @change=${(e) => this.checked = (e.target as HTMLInputElement).checked} />
-  <span>Enabled</span>
+  <input type="checkbox" .checked=${this.checked} @change=${(e) => this.checked = (e.target as HTMLInputElement).checked} data-rozie-s-5898a126 />
+  <span data-rozie-s-5898a126>Enabled</span>
 </label>
 `;
   }

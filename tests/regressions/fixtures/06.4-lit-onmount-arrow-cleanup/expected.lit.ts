@@ -5,7 +5,7 @@ import { SignalWatcher, signal } from '@lit-labs/preact-signals';
 @customElement('rozie-on-mount-arrow-cleanup')
 export default class OnMountArrowCleanup extends SignalWatcher(LitElement) {
   static styles = css`
-.ticker { font-variant-numeric: tabular-nums; }
+.ticker[data-rozie-s-722b58d1] { font-variant-numeric: tabular-nums; }
 `;
 
   private _ticks = signal(0);
@@ -27,7 +27,7 @@ export default class OnMountArrowCleanup extends SignalWatcher(LitElement) {
 
   render() {
     return html`
-<div class="ticker">${this._ticks.value}</div>
+<div class="ticker" data-rozie-s-722b58d1>${this._ticks.value}</div>
 `;
   }
 

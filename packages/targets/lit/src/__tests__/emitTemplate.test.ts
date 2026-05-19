@@ -290,7 +290,10 @@ describe('multi-root slot-fill spread (Phase 07.3.1 D-LIT-18)', () => {
     // dispatchEvent call, so the button tag is long).
     // WR-06 (Phase 07.4 review): orthogonal regex assertions rather than
     // one monolithic literal — each tests one semantic property.
-    expect(code).toContain('<h2 slot="header">Title</h2>');
+    // Phase 07.6 — `data-rozie-s-<hash>` scope stamp now precedes `slot=`
+    // on every producer-template HTML element, so the assertion is now
+    // attribute-order-tolerant.
+    expect(code).toMatch(/<h2[^>]*slot="header"[^>]*>Title<\/h2>/);
     // The <button> must exist with @click + slot="header" spread (D-LIT-18).
     expect(code).toMatch(/<button[^>]*@click=\$\{\(e\)\s*=>[^>]*slot="header"[^>]*>×<\/button>/);
     // And the @click handler must dispatch the rozie-header-close event.
@@ -332,9 +335,10 @@ describe('multi-root slot-fill spread (Phase 07.3.1 D-LIT-18)', () => {
     // ` />` (the template emitter normalizes self-close tags with a
     // space before the `/`; D-LIT-18 walks back over that whitespace
     // so the inserted attribute lands flush with the previous one).
-    expect(code).toContain('<img src="/logo.svg" slot="brand" />');
+    // Phase 07.6 — scope-stamp is now part of the attribute sequence.
+    expect(code).toMatch(/<img[^>]*src="\/logo\.svg"[^>]*slot="brand"[^>]*\/>/);
     // Non-self-closing <span> — `slot="brand"` lands before the `>`.
-    expect(code).toContain('<span class="brand-name" slot="brand">Acme</span>');
+    expect(code).toMatch(/<span[^>]*class="brand-name"[^>]*slot="brand"[^>]*>Acme<\/span>/);
     // No `<div slot="brand">` wrap.
     expect(code).not.toContain('<div slot="brand">');
   });
@@ -393,7 +397,8 @@ describe('multi-root slot-fill spread (Phase 07.3.1 D-LIT-18)', () => {
 </template>
 `;
     const code = compileConsumer(source, 'SingleRootConsumer');
-    expect(code).toContain('<h2 slot="header">Just one</h2>');
+    // Phase 07.6 — scope-stamp precedes slot=.
+    expect(code).toMatch(/<h2[^>]*slot="header"[^>]*>Just one<\/h2>/);
     expect(code).not.toContain('<div slot="header">');
   });
 });

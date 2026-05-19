@@ -1,6 +1,8 @@
 import { LitElement, html } from 'lit';
 import { customElement } from 'lit/decorators.js';
 import { SignalWatcher, signal } from '@lit-labs/preact-signals';
+import { adoptConsumerStyles } from '@rozie/runtime-lit';
+import { ref } from 'lit/directives/ref.js';
 import './producer.rozie';
 import './producer.rozie';
 
@@ -21,8 +23,8 @@ export default class Consumer extends SignalWatcher(LitElement) {
     return html`
 <rozie-producer .open=${this._outerOpen.value} @open-change=${(e: CustomEvent) => { this._outerOpen.value = e.detail; }} .footer=${(scope: { close: unknown }) => html`
     <rozie-inner .open=${this._outerOpen.value} @open-change=${(e: CustomEvent) => { this._outerOpen.value = e.detail; }}></rozie-inner>
-    <button @click=${scope.close}>×</button>
-  `}></rozie-producer>
+    <button @click=${scope.close} data-rozie-s-bd0c3708>×</button>
+  `} ${ref((el: Element | undefined) => el && adoptConsumerStyles(el, (this.constructor as { styles?: unknown }).styles))}></rozie-producer>
 `;
   }
 }

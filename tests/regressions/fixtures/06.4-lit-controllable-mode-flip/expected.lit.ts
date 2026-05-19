@@ -6,7 +6,7 @@ import { createLitControllableProperty } from '@rozie/runtime-lit';
 @customElement('rozie-controllable-mode-flip')
 export default class ControllableModeFlip extends SignalWatcher(LitElement) {
   static styles = css`
-.bump { font-variant-numeric: tabular-nums; }
+.bump[data-rozie-s-bfc3e9cf] { font-variant-numeric: tabular-nums; }
 `;
 
   @property({ type: Number, attribute: 'value' }) _value_attr: number = 0;
@@ -27,7 +27,7 @@ export default class ControllableModeFlip extends SignalWatcher(LitElement) {
 
   render() {
     return html`
-<button class="bump" @click=${this.bump}>${this.value}</button>
+<button class="bump" @click=${this.bump} data-rozie-s-bfc3e9cf>${this.value}</button>
 `;
   }
 

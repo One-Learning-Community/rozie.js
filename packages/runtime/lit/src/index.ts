@@ -13,6 +13,7 @@ export {
 export { observeRozieSlotCtx } from './observeRozieSlotCtx.js';
 export { attachOutsideClickListener } from './attachOutsideClickListener.js';
 export { injectGlobalStyles } from './injectGlobalStyles.js';
+export { adoptConsumerStyles } from './adoptConsumerStyles.js';
 export { debounce, type DebouncedFn } from './debounce.js';
 export { throttle } from './throttle.js';
 export {

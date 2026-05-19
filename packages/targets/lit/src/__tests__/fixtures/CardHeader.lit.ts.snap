@@ -5,9 +5,9 @@ import { SignalWatcher } from '@lit-labs/preact-signals';
 @customElement('rozie-card-header')
 export default class CardHeader extends SignalWatcher(LitElement) {
   static styles = css`
-.card-header { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1rem; border-bottom: 1px solid #eee; }
-.card-header__title { margin: 0; font-size: 1rem; font-weight: 600; }
-.card-header__close { background: none; border: 0; cursor: pointer; font-size: 1.25rem; padding: 0; line-height: 1; }
+.card-header[data-rozie-s-f3e60f5a] { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1rem; border-bottom: 1px solid #eee; }
+.card-header__title[data-rozie-s-f3e60f5a] { margin: 0; font-size: 1rem; font-weight: 600; }
+.card-header__close[data-rozie-s-f3e60f5a] { background: none; border: 0; cursor: pointer; font-size: 1.25rem; padding: 0; line-height: 1; }
 `;
 
   @property({ type: String, reflect: true }) title: string = '';
@@ -23,9 +23,9 @@ export default class CardHeader extends SignalWatcher(LitElement) {
 
   render() {
     return html`
-<header class="card-header">
-  <h3 class="card-header__title">${this.title}</h3>
-  ${this.onClose ? html`<button class="card-header__close" @click=${this.onClose}>×</button>` : nothing}</header>
+<header class="card-header" data-rozie-s-f3e60f5a>
+  <h3 class="card-header__title" data-rozie-s-f3e60f5a>${this.title}</h3>
+  ${this.onClose ? html`<button class="card-header__close" @click=${this.onClose} data-rozie-s-f3e60f5a>×</button>` : nothing}</header>
 `;
   }
 }

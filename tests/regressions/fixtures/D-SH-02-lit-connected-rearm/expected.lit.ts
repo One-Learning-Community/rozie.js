@@ -5,7 +5,7 @@ import { SignalWatcher, signal } from '@lit-labs/preact-signals';
 @customElement('rozie-connected-rearm')
 export default class ConnectedRearm extends SignalWatcher(LitElement) {
   static styles = css`
-.rearm { font-variant-numeric: tabular-nums; }
+.rearm[data-rozie-s-453272bf] { font-variant-numeric: tabular-nums; }
 `;
 
   private _pressed = signal(0);
@@ -35,7 +35,7 @@ export default class ConnectedRearm extends SignalWatcher(LitElement) {
 
   render() {
     return html`
-<div class="rearm">${this._pressed.value}</div>
+<div class="rearm" data-rozie-s-453272bf>${this._pressed.value}</div>
 `;
   }
 

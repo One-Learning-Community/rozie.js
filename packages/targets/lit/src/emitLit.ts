@@ -40,6 +40,7 @@ import { emitSlotDecl } from './emit/emitSlotDecl.js';
 import { emitStyle } from './emit/emitStyle.js';
 import { buildShell } from './emit/shell.js';
 import { emitTagName } from './emit/emitDecorator.js';
+import { computeScopeHash } from './emit/scopeHash.js';
 
 export interface EmitLitOptions {
   filename?: string;
@@ -80,6 +81,12 @@ export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResu
 
   const diagnostics: Diagnostic[] = [];
 
+  // Phase 07.6 — producer-side CSS scope token. Derived the same way as
+  // react/solid (basename + componentName via FNV-1a-32) so the hash is
+  // stable across the four emit entrypoints (compile / CLI / babel / unplugin)
+  // and dist-parity strict-bytes assertions don't drift.
+  const scopeHash = computeScopeHash(ir.name, opts.filename);
+
   // Modifier registry — caller may pass a shared registry (tests / unplugin
   // layer); otherwise construct a fresh default registry per call. Mirrors
   // emitVue's pattern. emitListeners requires a non-optional registry for
@@ -95,6 +102,7 @@ export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResu
     componentName: ir.name,
     lit: litImports,
     runtime: runtimeImports,
+    scopeHash,
   });
   diagnostics.push(...styleResult.diagnostics);
 
@@ -123,6 +131,7 @@ export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResu
     decorators: decoratorImports,
     runtime: runtimeImports,
     modifierRegistry: registry,
+    scopeHash,
   });
   diagnostics.push(...templateResult.diagnostics);
 
@@ -204,6 +213,13 @@ export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResu
     // was lowered via styleMap(); we add the side-effect-free value import
     // only when actually used, so unused-import noise is avoided.
     templateResult.styleMapUsed ? `import { styleMap } from 'lit/directives/style-map.js';\n` : '',
+    // Phase 07.6 — consumer-side property-fill bridge (see
+    // emitTemplate's `refUsed` plumbing). When any property-fill is emitted
+    // onto a producer component's open tag, we wrap that tag with a `ref()`
+    // directive that propagates the consumer's stylesheets across the
+    // producer's shadow boundary via `adoptedStyleSheets`. Same conditional
+    // pattern as `repeat`/`styleMap`.
+    templateResult.refUsed ? `import { ref } from 'lit/directives/ref.js';\n` : '',
   ].filter((s) => s.length > 0).join('');
 
   const shell = buildShell({

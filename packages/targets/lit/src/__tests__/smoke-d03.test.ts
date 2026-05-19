@@ -100,7 +100,8 @@ describe('Phase 07.3.1 Blocker #3 (D-03) — Lit consumer-side scoped slot fill 
     // WR-06 (Phase 07.4 review): orthogonal regex assertions in place of the
     // previous monolithic button-tag literal — one assertion per semantic
     // property so failures point at one root cause.
-    expect(code).toContain('<h2 slot="header">Title</h2>');
+    // Phase 07.6 — data-rozie-s-<hash> scope stamp precedes slot=.
+    expect(code).toMatch(/<h2[^>]*slot="header"[^>]*>Title<\/h2>/);
     // Button exists with @click + slot="header" spread (D-LIT-18).
     expect(code).toMatch(/<button[^>]*@click=\$\{\(e\)\s*=>[^>]*slot="header"[^>]*>×<\/button>/);
     // Dispatch shape + event name asserted independently.

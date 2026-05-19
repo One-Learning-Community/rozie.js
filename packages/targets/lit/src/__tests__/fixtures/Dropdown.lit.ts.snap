@@ -11,8 +11,8 @@ interface RozieTriggerSlotCtx {
 @customElement('rozie-dropdown')
 export default class Dropdown extends SignalWatcher(LitElement) {
   static styles = css`
-.dropdown { position: relative; display: inline-block; }
-.dropdown-panel {
+.dropdown[data-rozie-s-6d6bd882] { position: relative; display: inline-block; }
+.dropdown-panel[data-rozie-s-6d6bd882] {
   position: fixed;
   z-index: var(--rozie-dropdown-z, 1000);
   background: white;
@@ -107,12 +107,12 @@ export default class Dropdown extends SignalWatcher(LitElement) {
 
   render() {
     return html`
-<div class="dropdown">
-  <div @click=${this.toggle} data-rozie-ref="triggerEl">
+<div class="dropdown" data-rozie-s-6d6bd882>
+  <div @click=${this.toggle} data-rozie-ref="triggerEl" data-rozie-s-6d6bd882>
     ${this.trigger !== undefined ? this.trigger({open: this.open, toggle: this.toggle}) : html`<slot name="trigger" data-rozie-params=${(() => { try { return JSON.stringify({open: this.open}); } catch { return '{}'; } })()} @rozie-trigger-toggle=${(e: CustomEvent) => ((this.toggle) as (...args: any[]) => any)(e.detail)}></slot>`}
   </div>
 
-  ${this.open ? html`<div class="dropdown-panel" role="menu" data-rozie-ref="panelEl">
+  ${this.open ? html`<div class="dropdown-panel" role="menu" data-rozie-ref="panelEl" data-rozie-s-6d6bd882>
     ${this.__rozieDefaultSlot__ !== undefined ? this.__rozieDefaultSlot__({close: this.close}) : html`<slot @rozie-default-close=${(e: CustomEvent) => ((this.close) as (...args: any[]) => any)(e.detail)}></slot>`}
   </div>` : nothing}</div>
 `;

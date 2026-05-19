@@ -41,8 +41,8 @@ export default class PresenceCheckFixture extends SignalWatcher(LitElement) {
 
   render() {
     return html`
-<div class="presence-check-fixture">
-  ${this._hasSlotAside ? html`<aside>
+<div class="presence-check-fixture" data-rozie-s-313bf282>
+  ${this._hasSlotAside ? html`<aside data-rozie-s-313bf282>
     <slot name="aside"></slot>
   </aside>` : nothing}</div>
 `;

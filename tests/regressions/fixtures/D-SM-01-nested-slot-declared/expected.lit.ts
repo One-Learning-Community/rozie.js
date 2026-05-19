@@ -5,7 +5,7 @@ import { SignalWatcher } from '@lit-labs/preact-signals';
 @customElement('rozie-nested-slot-declared')
 export default class NestedSlotDeclared extends SignalWatcher(LitElement) {
   static styles = css`
-.outer { display: block; }
+.outer[data-rozie-s-3bc5be6c] { display: block; }
 `;
 
   @state() private _hasSlotWrapper = false;
@@ -59,10 +59,10 @@ export default class NestedSlotDeclared extends SignalWatcher(LitElement) {
 
   render() {
     return html`
-<div class="outer">
+<div class="outer" data-rozie-s-3bc5be6c>
   
   <slot name="wrapper">
-    <div class="wrapper-fallback">
+    <div class="wrapper-fallback" data-rozie-s-3bc5be6c>
       <slot name="inner"></slot>
     </div>
   </slot>

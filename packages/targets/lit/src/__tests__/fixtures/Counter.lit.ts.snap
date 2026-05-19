@@ -6,11 +6,11 @@ import { createLitControllableProperty } from '@rozie/runtime-lit';
 @customElement('rozie-counter')
 export default class Counter extends SignalWatcher(LitElement) {
   static styles = css`
-.counter { display: inline-flex; gap: 0.5rem; align-items: center; }
-.counter.hovering { background: rgba(0, 0, 0, 0.04); }
-.value { font-variant-numeric: tabular-nums; min-width: 3ch; text-align: center; }
-button { padding: 0.25rem 0.5rem; }
-button:disabled { opacity: 0.4; cursor: not-allowed; }
+.counter[data-rozie-s-c72e01d0] { display: inline-flex; gap: 0.5rem; align-items: center; }
+.counter.hovering[data-rozie-s-c72e01d0] { background: rgba(0, 0, 0, 0.04); }
+.value[data-rozie-s-c72e01d0] { font-variant-numeric: tabular-nums; min-width: 3ch; text-align: center; }
+button[data-rozie-s-c72e01d0] { padding: 0.25rem 0.5rem; }
+button[data-rozie-s-c72e01d0]:disabled { opacity: 0.4; cursor: not-allowed; }
 `;
 
   @property({ type: Number, attribute: 'value' }) _value_attr: number = 0;
@@ -39,10 +39,10 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 
   render() {
     return html`
-<div class="${Object.entries({ "counter": true, hovering: this._hovering.value }).filter(([, v]) => v).map(([k]) => k).join(' ')}" @mouseenter=${(e: Event) => { this._hovering.value = true; }} @mouseleave=${(e: Event) => { this._hovering.value = false; }}>
-  <button ?disabled=${!this.canDecrement} aria-label="Decrement" @click=${this.decrement}>−</button>
-  <span class="value">${this.value}</span>
-  <button ?disabled=${!this.canIncrement} aria-label="Increment" @click=${this.increment}>+</button>
+<div class="${Object.entries({ "counter": true, hovering: this._hovering.value }).filter(([, v]) => v).map(([k]) => k).join(' ')}" @mouseenter=${(e: Event) => { this._hovering.value = true; }} @mouseleave=${(e: Event) => { this._hovering.value = false; }} data-rozie-s-c72e01d0>
+  <button ?disabled=${!this.canDecrement} aria-label="Decrement" @click=${this.decrement} data-rozie-s-c72e01d0>−</button>
+  <span class="value" data-rozie-s-c72e01d0>${this.value}</span>
+  <button ?disabled=${!this.canIncrement} aria-label="Increment" @click=${this.increment} data-rozie-s-c72e01d0>+</button>
 </div>
 `;
   }

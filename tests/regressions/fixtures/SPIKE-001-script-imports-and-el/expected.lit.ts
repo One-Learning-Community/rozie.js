@@ -37,7 +37,7 @@ export default class SpikeImportEl extends SignalWatcher(LitElement) {
 
     this._disconnectCleanups.push((() => this.instance?.destroy()));
 
-    this.instance = new DummyEngine(this, {
+    this.instance = new DummyEngine(this._ref__rozieRoot, {
       animation: 150
     });
   }
@@ -50,7 +50,7 @@ export default class SpikeImportEl extends SignalWatcher(LitElement) {
 
   render() {
     return html`
-<div class="spike-root" data-rozie-ref="__rozieRoot">
+<div class="spike-root" data-rozie-ref="__rozieRoot" data-rozie-s-f590f443>
   <slot></slot>
 </div>
 `;

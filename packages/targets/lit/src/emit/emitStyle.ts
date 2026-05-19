@@ -23,11 +23,24 @@ import type {
   RuntimeLitImportCollector,
 } from '../rewrite/collectLitImports.js';
 import { toKebabCase } from './emitDecorator.js';
+import { scopeCss } from './scopeCss.js';
 
 export interface EmitStyleOpts {
   componentName: string;
   lit: LitImportCollector;
   runtime: RuntimeLitImportCollector;
+  /**
+   * Phase 07.6 — per-component scope hash (see `scopeHash.ts`). When set,
+   * every rule in the scoped CSS is rewritten to require
+   * `[data-rozie-s-<hash>]` on its last simple selector, mirroring Vue's
+   * scoped-CSS / React+Solid CSS-Modules attribute-selector confinement.
+   * Producer-template HTML elements are stamped with the matching
+   * attribute in `emitTemplate`; consumer-projected property-fill content
+   * does NOT carry the attribute and therefore does not match.
+   *
+   * `:host` / `::slotted()` selectors are exempted automatically.
+   */
+  scopeHash?: string;
 }
 
 export interface EmitStyleResult {
@@ -73,7 +86,10 @@ export function emitStyle(
   const scopedRules = styles.scopedRules as StyleRule[];
   const rootRules = styles.rootRules as StyleRule[];
 
-  const scopedCss = stringifyRules(scopedRules, source);
+  const rawScopedCss = stringifyRules(scopedRules, source);
+  const scopedCss = opts.scopeHash
+    ? scopeCss(rawScopedCss, opts.scopeHash)
+    : rawScopedCss;
   const globalCss = rootRules.length > 0 ? stringifyRules(rootRules, source) : '';
 
   let staticStylesField = '';

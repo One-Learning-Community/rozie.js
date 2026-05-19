@@ -55,9 +55,9 @@ export default class NestedSlotsFixture extends SignalWatcher(LitElement) {
 
   render() {
     return html`
-<div class="nested-slots-fixture">
+<div class="nested-slots-fixture" data-rozie-s-4d5488e4>
   <slot name="wrapper">
-    <div class="wrapper-fallback">
+    <div class="wrapper-fallback" data-rozie-s-4d5488e4>
       <slot name="inner"></slot>
     </div>
   </slot>

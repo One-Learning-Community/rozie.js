@@ -75,6 +75,18 @@ export interface EmitTemplateOpts {
    */
   modifierRegistry?: ModifierRegistry;
   /**
+   * Phase 07.6 — producer-side CSS scope token. When set, every
+   * `tagKind === 'html'` template element emits with
+   * `data-rozie-s-<scopeHash>` so producer's static-styles rules (rewritten
+   * via `scopeCss`) can confine to producer-template elements. Consumer
+   * property-fill content carries the CONSUMER's hash (different value),
+   * so producer rules don't accidentally apply to it post-ec24d26.
+   *
+   * Same value flows to `emitStyle` so attribute names match between the
+   * stamp and the rewritten selectors.
+   */
+  scopeHash?: string;
+  /**
    * Internal mutable state threaded through the emit call chain so recursive
    * emitters (emitLoop) can communicate back to emitTemplate without a module-level
    * singleton. Callers (emitTemplate) initialize this; nested callers mutate it.
@@ -101,6 +113,19 @@ export interface EmitTemplateOpts {
      * `{ repeat }` import wiring pattern.
      */
     styleMapUsed: boolean;
+    /**
+     * True when at least one consumer-side property-fill (function-prop
+     * scoped destructured or portal fill) was emitted onto a producer
+     * component's open tag. Triggers a single `ref()` directive per parent
+     * tag that calls `adoptConsumerStyles` to bridge the consumer's
+     * stylesheets across the producer's shadow boundary — see
+     * `@rozie/runtime-lit/adoptConsumerStyles.ts` for the why.
+     *
+     * Threaded the SAME way as `repeatUsed`/`styleMapUsed`: emitLit reads
+     * this off `EmitTemplateResult` and conditionally adds
+     * `import { ref } from 'lit/directives/ref.js';` to the shell imports.
+     */
+    refUsed: boolean;
     debouncedFieldDecls: string[];
     debounceCleanupWiring: string[];
     diagnostics: Diagnostic[];
@@ -145,6 +170,13 @@ export interface EmitTemplateResult {
    * `repeatUsed` → `{ repeat }`).
    */
   styleMapUsed: boolean;
+  /**
+   * True when at least one consumer-side property-fill was emitted onto a
+   * producer component's open tag. emitLit conditionally wires
+   * `import { ref } from 'lit/directives/ref.js';` based on this flag
+   * (same plumbing as `repeatUsed`/`styleMapUsed`).
+   */
+  refUsed: boolean;
   /**
    * Class-field declarations for template-event `.debounce`/`.throttle`
    * wrappers (WR-15). emitLit splices these into the class body alongside the
@@ -849,6 +881,17 @@ function emitElementOpenTag(
 
   if (refAttr) parts.push(refAttr);
 
+  // Phase 07.6 — producer-side CSS scope stamp. Only `tagKind === 'html'`
+  // elements get the marker; composed custom elements (`component`) own
+  // their own internal shadow scope, and the implicit host ('self') is the
+  // producer custom element itself (CSS uses `:host` to target it, exempted
+  // in scopeCss). Consumer property-fill body elements flow through this
+  // path too — they carry the CONSUMER's scope hash, NOT the producer's,
+  // so producer-CSS rules never match them across the shadow boundary.
+  if (node.tagKind === 'html' && opts.scopeHash) {
+    parts.push(`data-rozie-s-${opts.scopeHash}`);
+  }
+
   const attrsText = parts.length > 0 ? ' ' + parts.join(' ') : '';
   const isVoid = isVoidElement(node.tagName);
   if (isVoid && node.children.length === 0) {
@@ -965,6 +1008,21 @@ function emitElement(
     // the scan at index 1 skips the opening `<` of the tag itself.
     let openWithProps = open;
     if (propertyAttrs.length > 0) {
+      // Phase 07.6 — bridge consumer's stylesheets across the producer's
+      // shadow boundary. Function-prop fills render their html template
+      // inside the producer's shadow DOM, where the consumer's static
+      // styles (scoped to the consumer's own shadow root) cannot reach.
+      // Emit a single `ref()` directive per parent tag that adopts the
+      // consumer's CSSStyleSheet instances onto the producer's
+      // `shadowRoot.adoptedStyleSheets` — the standard Web Components
+      // cross-root style-sharing mechanism. Idempotent + safe-when-no-shadow
+      // (helper no-ops if the producer is not a Lit custom element).
+      opts.runtime.add('adoptConsumerStyles');
+      if (opts._state) opts._state.refUsed = true;
+      const refAttr =
+        '${ref((el: Element | undefined) => el && adoptConsumerStyles(el, ' +
+        '(this.constructor as { styles?: unknown }).styles))}';
+      propertyAttrs.push(refAttr);
       const tagClose = findTagClose(open, 1);
       if (tagClose === -1) {
         // Defensive — should never happen for well-formed emit output.
@@ -1215,6 +1273,7 @@ export function emitTemplate(
   const state = {
     repeatUsed: false,
     styleMapUsed: false,
+    refUsed: false,
     debouncedFieldDecls: [] as string[],
     debounceCleanupWiring: [] as string[],
     slotFillerClassFields: [] as string[],
@@ -1238,6 +1297,7 @@ export function emitTemplate(
       hostListenerWiring,
       repeatUsed: state.repeatUsed,
       styleMapUsed: state.styleMapUsed,
+      refUsed: state.refUsed,
       debouncedFieldDecls: state.debouncedFieldDecls,
       slotFillerClassFields: state.slotFillerClassFields,
       slotFillerUpdatedBody: state.slotFillerUpdatedBody,
@@ -1257,6 +1317,7 @@ export function emitTemplate(
     hostListenerWiring,
     repeatUsed: state.repeatUsed,
     styleMapUsed: state.styleMapUsed,
+    refUsed: state.refUsed,
     debouncedFieldDecls: state.debouncedFieldDecls,
     slotFillerClassFields: state.slotFillerClassFields,
     slotFillerUpdatedBody: state.slotFillerUpdatedBody,

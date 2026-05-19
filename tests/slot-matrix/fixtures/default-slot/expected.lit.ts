@@ -41,7 +41,7 @@ export default class DefaultSlotFixture extends SignalWatcher(LitElement) {
 
   render() {
     return html`
-<div class="default-slot-fixture">
+<div class="default-slot-fixture" data-rozie-s-61728cb8>
   <slot></slot>
 </div>
 `;

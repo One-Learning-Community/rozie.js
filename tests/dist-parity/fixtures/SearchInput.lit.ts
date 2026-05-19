@@ -6,10 +6,10 @@ import { debounce } from '@rozie/runtime-lit';
 @customElement('rozie-search-input')
 export default class SearchInput extends SignalWatcher(LitElement) {
   static styles = css`
-.search-input { display: inline-flex; align-items: center; gap: 0.25rem; }
-input { padding: 0.25rem 0.5rem; }
-.clear-btn { background: none; border: none; cursor: pointer; font-size: 1.25rem; }
-.hint { color: rgba(0, 0, 0, 0.4); font-size: 0.85em; }
+.search-input[data-rozie-s-8bbc4a60] { display: inline-flex; align-items: center; gap: 0.25rem; }
+input[data-rozie-s-8bbc4a60] { padding: 0.25rem 0.5rem; }
+.clear-btn[data-rozie-s-8bbc4a60] { background: none; border: none; cursor: pointer; font-size: 1.25rem; }
+.hint[data-rozie-s-8bbc4a60] { color: rgba(0, 0, 0, 0.4); font-size: 0.85em; }
 `;
 
   @property({ type: String, reflect: true }) placeholder: string = 'Search…';
@@ -52,13 +52,13 @@ input { padding: 0.25rem 0.5rem; }
 
   render() {
     return html`
-<div class="search-input">
+<div class="search-input" data-rozie-s-8bbc4a60>
   
-  <input type="search" placeholder=${this.placeholder} .value=${this._query.value} @input=${(e: InputEvent) => { ((e) => this._query.value = (e.target as HTMLInputElement).value)(e); (this._tw0)(e); }} @keydown=${(e: KeyboardEvent) => { ((e: KeyboardEvent) => { if (e.key !== 'Enter') return; ((this.onSearch) as (...args: any[]) => any)(e); })(e); ((e: KeyboardEvent) => { if (e.key !== 'Escape') return; ((this.clear) as (...args: any[]) => any)(e); })(e); }} data-rozie-ref="inputEl" />
+  <input type="search" placeholder=${this.placeholder} .value=${this._query.value} @input=${(e: InputEvent) => { ((e) => this._query.value = (e.target as HTMLInputElement).value)(e); (this._tw0)(e); }} @keydown=${(e: KeyboardEvent) => { ((e: KeyboardEvent) => { if (e.key !== 'Enter') return; ((this.onSearch) as (...args: any[]) => any)(e); })(e); ((e: KeyboardEvent) => { if (e.key !== 'Escape') return; ((this.clear) as (...args: any[]) => any)(e); })(e); }} data-rozie-ref="inputEl" data-rozie-s-8bbc4a60 />
 
-  ${this._query.value.length > 0 ? html`<button class="clear-btn" aria-label="Clear" @click=${this.clear}>
+  ${this._query.value.length > 0 ? html`<button class="clear-btn" aria-label="Clear" @click=${this.clear} data-rozie-s-8bbc4a60>
     ×
-  </button>` : html`<span class="hint">${this.minLength}+ chars</span>`}</div>
+  </button>` : html`<span class="hint" data-rozie-s-8bbc4a60>${this.minLength}+ chars</span>`}</div>
 `;
   }
 
