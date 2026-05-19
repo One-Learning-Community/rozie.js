@@ -53,9 +53,16 @@
         background: #fff;
         border: 1px solid #d0d0d0;
         border-radius: 6px;
-        overflow: hidden;
+        overflow: auto;
         min-height: 0;
       }
+      .cell.cell-stack {
+          position: absolute;
+          width: 80vw;
+          height: 90vh;
+          opacity: 0.15;
+      }
+
       .cell-label {
         flex: 0 0 auto;
         font-size: 0.75rem; font-weight: 600;
@@ -86,6 +93,7 @@
       <h1>Rozie VR · Side-by-Side</h1>
       <label for="ex-select">Example:</label>
       <select id="ex-select"></select>
+      <label><input type="checkbox" id="ex-stack"/> Stack</label>
       <span class="hint">
         Single-target view: <a href="./index.html?example=Counter&target=vue">index.html</a>
       </span>
@@ -122,6 +130,11 @@
         opt.value = ex; opt.textContent = ex;
         select.appendChild(opt);
       }
+
+      const stack = document.getElementById('ex-stack');
+      stack.addEventListener('change', () => {
+          [...document.querySelectorAll('.cell')].forEach(el => el.classList.toggle('cell-stack', stack.checked));
+      });
 
       const grid = document.getElementById('grid');
       const frames = new Map();
