@@ -196,6 +196,20 @@ export function rewriteScript(
       }
 
       if (obj.name === '$slots') {
+        // Portal slots: function-prop filler (`.X=${fn}` on the consumer side)
+        // — the `_hasSlot<X>` light-DOM detector never flips, so use the
+        // function-prop presence check `this.<X> !== undefined` instead.
+        if (portalSlotNames.has(prop.name)) {
+          path.replaceWith(
+            t.binaryExpression(
+              '!==',
+              thisDot(prop.name),
+              t.identifier('undefined'),
+            ),
+          );
+          path.skip();
+          return;
+        }
         // $slots.x → this._hasSlot<X> (presence boolean)
         const key = prop.name === '' ? 'default' : prop.name;
         if (slotNames.has(key)) {
@@ -243,12 +257,45 @@ export function rewriteScript(
       const name = path.node.name;
       // Don't touch identifiers inside declarations or property keys.
       if (name === '$el') {
+        // Spike 001 B2 — script-context `$el` lowers to
+        // `MemberExpression($refs, __rozieRoot)`. The IR pass
+        // `lowerRootElementRef` already appended `RefDecl { name: '__rozieRoot' }`
+        // and a `ref="__rozieRoot"` binding on the template root. The
+        // synthesised MemberExpression naturally flows into the existing
+        // `$refs.X` MemberExpression handler below and lowers to
+        // `this._ref__rozieRoot` (the @query template-ref accessor).
+        // Previously this lowered to `this` (the host LitElement), but
+        // engines that mount into the host append their DOM as LIGHT-DOM
+        // children — outside the shadow root — invisible to the shadow's
+        // scoped styles and breaking any engine (FullCalendar, Sortable
+        // when used with shadow consumers) that needs a stable container
+        // inside the rendered tree.
         const parentPath = path.parentPath;
-        if (parentPath && parentPath.isVariableDeclarator() && parentPath.node.id === path.node) {
+        if (!parentPath) return;
+        if (parentPath.isVariableDeclarator() && parentPath.node.id === path.node) return;
+        if (
+          parentPath.isMemberExpression() &&
+          parentPath.node.property === path.node &&
+          !parentPath.node.computed
+        ) {
           return;
         }
-        path.replaceWith(t.thisExpression());
-        path.skip();
+        if (
+          parentPath.isObjectProperty() &&
+          parentPath.node.key === path.node &&
+          !parentPath.node.computed
+        ) {
+          return;
+        }
+        if (parentPath.isFunction()) {
+          const params = (parentPath.node as { params: t.Node[] }).params;
+          if (params.includes(path.node)) return;
+        }
+        path.replaceWith(
+          t.memberExpression(t.identifier('$refs'), t.identifier('__rozieRoot')),
+        );
+        // Don't path.skip() — the synthesised MemberExpression should be
+        // re-visited so the `$refs.__rozieRoot` handler fires.
         return;
       }
 

@@ -55,8 +55,21 @@ const MAGIC_ACCESSOR_NAMES = new Set(['$props', '$data', '$refs', '$slots', '$po
  * Stable identifiers that match ExhaustiveDeps's `isStableKnownHookValue` —
  * never appear as deps. `$refs.foo` is handled as a MemberExpression skip;
  * `$emit` and `$el` are handled as Identifier skips.
+ *
+ * Also includes the JS-literal-shaped globals (`undefined`, `null`, `NaN`,
+ * `Infinity`) — Babel parses these as Identifier nodes but they're value
+ * literals, not bindings to track. Without this exclusion a user-written
+ * `return undefined` inside `$onMount` lifts `undefined` into the React
+ * useEffect cleanup wrapper and dep array → runtime `(void 0)()` TypeError.
  */
-const STABLE_IDENTIFIERS = new Set(['$emit', '$el']);
+const STABLE_IDENTIFIERS = new Set([
+  '$emit',
+  '$el',
+  'undefined',
+  'null',
+  'NaN',
+  'Infinity',
+]);
 
 /**
  * Compute the set of SignalRef reads inside a single expression.

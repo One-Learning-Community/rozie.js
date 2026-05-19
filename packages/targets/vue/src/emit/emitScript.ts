@@ -738,11 +738,15 @@ export function emitScript(
   const slotsLine = emitDefineSlotsStub(ir);
   // Phase 07.7 fix — script-level $slots references rewrite to `slots.X`
   // (see rewriteScript.ts MemberExpression branch for `$slots`). When that
-  // rewrite fires, emit `const slots = useSlots();` + import `useSlots`.
-  // Surfaced by FullCalendar.rozie's `if ($slots.event)` engine-callback gate
-  // (was emitting bare `$slots.event` → ReferenceError at runtime).
+  // rewrite fires OR when the component has any portal slot (whose emitted
+  // closure also reads from `slots.${name}`), emit `const slots = useSlots();`
+  // + import `useSlots`. Surfaced by FullCalendar.rozie's `if ($slots.event)`
+  // engine-callback gate (was emitting bare `$slots.event` → ReferenceError
+  // at runtime; `event` is itself a portal slot, so the legacy non-portal-only
+  // condition skipped the rewrite).
+  const hasPortalSlots = ir.slots.some((s) => s.isPortal === true);
   const useSlotsLine: string[] = [];
-  if (slotsUsed) {
+  if (slotsUsed || hasPortalSlots) {
     imports.use('useSlots');
     useSlotsLine.push('const slots = useSlots();');
   }

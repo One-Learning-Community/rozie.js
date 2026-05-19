@@ -275,8 +275,22 @@ function inlineHookBody(arg: t.Expression): { body: string; cleanup: string } {
       if (stmts.length > 0) {
         const last = stmts[stmts.length - 1]!;
         if (t.isReturnStatement(last) && last.argument) {
-          cleanup = renderExpression(last.argument);
-          stmts.pop();
+          // `return undefined` / `return null` is "no cleanup" — drop the
+          // statement without pushing anything to _disconnectCleanups. Without
+          // this guard the literal becomes a non-callable cleanup entry that
+          // throws on disconnectedCallback (FullCalendarDemo.rozie's
+          // `$onMount(() => { …; return undefined })` repro).
+          const isNoCleanupReturn =
+            (t.isIdentifier(last.argument) &&
+              (last.argument.name === 'undefined' ||
+                last.argument.name === 'null')) ||
+            t.isNullLiteral(last.argument);
+          if (isNoCleanupReturn) {
+            stmts.pop();
+          } else {
+            cleanup = renderExpression(last.argument);
+            stmts.pop();
+          }
         }
       }
       const rendered = stmts.map((s) => generate(s, GEN_OPTS).code).join('\n');

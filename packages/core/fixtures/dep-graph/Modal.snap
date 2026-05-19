@@ -50,10 +50,6 @@
       "path": [
         "title"
       ]
-    },
-    {
-      "scope": "closure",
-      "identifier": "undefined"
     }
   ],
   "template.attr./div-1/div-1/div-3/slot-1/:close": [

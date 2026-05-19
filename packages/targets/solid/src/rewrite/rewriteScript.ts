@@ -153,6 +153,7 @@ export function rewriteRozieIdentifiers(
   const portalSlotNames = new Set(
     ir.slots.filter((s) => s.isPortal === true).map((s) => s.name),
   );
+  const allSlotNames = new Set(ir.slots.map((s) => s.name));
 
   traverse(cloned, {
     // Rewrite bare computed-memo references to getter calls: canIncrement → canIncrement().
@@ -289,6 +290,33 @@ export function rewriteRozieIdentifiers(
         // synthesized local `portals` closure that emitScript injects at the
         // top of the onMount callback.
         path.node.object = t.identifier('portals');
+        return;
+      }
+
+      if (object.name === '$slots' && allSlotNames.has(property.name)) {
+        // Script-side slot presence check (FullCalendar.rozie's
+        // `if ($slots.event)` engine-callback gate). Mirrors the canonical
+        // template-side rewrite in `rewriteTemplateExpression.ts:208` —
+        // lowers to `(_props.<X>Slot ?? _props.slots?.['<X>'])` so the
+        // static-named slot field is merged with the consumer-side
+        // dynamic-name `slots?:` map.
+        const fieldName = property.name === '' ? 'children' : property.name + 'Slot';
+        if (property.name === '') {
+          path.node.object = t.identifier('_props');
+          path.node.property = t.identifier(fieldName);
+          return;
+        }
+        const lhs = t.memberExpression(t.identifier('_props'), t.identifier(fieldName));
+        const slotsMember = t.memberExpression(t.identifier('_props'), t.identifier('slots'));
+        const rhs = t.optionalMemberExpression(
+          slotsMember,
+          t.stringLiteral(property.name),
+          /* computed */ true,
+          /* optional */ true,
+        );
+        const merged = t.logicalExpression('??', lhs, rhs);
+        path.replaceWith(t.parenthesizedExpression(merged));
+        path.skip();
         return;
       }
     },

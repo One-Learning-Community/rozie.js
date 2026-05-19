@@ -68,9 +68,20 @@ const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'] as const;
  * runtime check that resolves correctly.
  */
 const KNOWN_FAILING: ReadonlySet<typeof TARGETS[number]> = new Set([
-  'vue',
+  // React: cleanup-undefined fix + portal+useEffect wiring get the calendar
+  // chrome to render, but the portal-mounted event titles do not commit.
+  // Root cause hypothesis: the FullCalendar useEffect's dep array includes
+  // `props.renderEvent` (fresh arrow each consumer render), so the effect
+  // cleans up before React commits the `createRoot(node).render` call.
+  // Needs deeper redesign — likely a useRef-stable renderEvent indirection.
   'react',
-  'solid',
+  // Lit: `$el → $refs.__rozieRoot` + `$slots.<portal> → this.<X> !== undefined`
+  // + cleanup-undefined-drop fixes get the engine mounted inside the shadow
+  // root, but `$watch(() => $props.events, …)` doesn't re-fire — Lit's @lit-
+  // labs/preact-signals `effect()` tracks signals, not Lit @property accesses.
+  // Demo seeds events in `firstUpdated`, child's calendar is already created
+  // with the initial `[]`. Fix path: route @property reads through signal
+  // wrappers in the Lit script-rewrite so `effect()` subscribes correctly.
   'lit',
 ] as const);
 

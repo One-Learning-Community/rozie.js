@@ -2443,10 +2443,6 @@
                             "path": [
                               "title"
                             ]
-                          },
-                          {
-                            "scope": "closure",
-                            "identifier": "undefined"
                           }
                         ],
                         "sourceLoc": {

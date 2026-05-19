@@ -498,7 +498,27 @@ function pairClonedLifecycle(
         const fnBody = setupCloned.body;
         if (t.isBlockStatement(fnBody) && !setupCloned.async) {
           const lastStmt = fnBody.body[fnBody.body.length - 1];
-          if (lastStmt && t.isReturnStatement(lastStmt) && lastStmt.argument) {
+          // `return undefined` / `return null` / `return` are "no cleanup" —
+          // skip the lift so React's useEffect sees a plain mount-only effect
+          // (without this guard, the emit wraps the literal in a callable
+          // `() => undefined()` → runtime TypeError when React fires cleanup).
+          const isNoCleanupReturn =
+            lastStmt &&
+            t.isReturnStatement(lastStmt) &&
+            (lastStmt.argument === null ||
+              lastStmt.argument === undefined ||
+              (t.isIdentifier(lastStmt.argument) &&
+                (lastStmt.argument.name === 'undefined' ||
+                  lastStmt.argument.name === 'null')) ||
+              t.isNullLiteral(lastStmt.argument));
+          if (isNoCleanupReturn && lastStmt && t.isReturnStatement(lastStmt)) {
+            // Strip the dead return so it doesn't show up in residual emit.
+            setupCloned = t.arrowFunctionExpression(
+              setupCloned.params,
+              t.blockStatement(fnBody.body.slice(0, -1)),
+              setupCloned.async,
+            );
+          } else if (lastStmt && t.isReturnStatement(lastStmt) && lastStmt.argument) {
             cleanupCloned = lastStmt.argument;
             // Strip the return from the setup body.
             const newBody = t.blockStatement(fnBody.body.slice(0, -1));
@@ -1186,7 +1206,7 @@ export function emitScript(
           `and a top-level user helper with the same identifier produces "Identifier '${name}' has already been declared" at runtime, ` +
           `plus the user's body rewrite ('$data.${name.slice(3, 4).toLowerCase()}${name.slice(4)} = v' → '${name}(v)') becomes infinite recursion. ` +
           `Rename the user function — e.g. '${name}' → 'select${name.slice(3)}'.`,
-        loc: loc ? { start: loc.start, end: loc.end } : undefined,
+        loc: loc ? { start: loc.start, end: loc.end } : { start: 0, end: 0 },
       });
     }
   }

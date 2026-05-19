@@ -7,9 +7,12 @@
  *   1. `setupLines`         — declared at script-setup top level (after
  *                              residual + before lifecycle). Includes:
  *                                - `const portalContainers = new Set<HTMLElement>();`
- *                                - `const portalSlots = useSlots();`
  *                                - `const portals = { X: (...) => {...} };`
  *                                - `onBeforeUnmount(() => { /* bulk dispose *\/ });`
+ *
+ * The `const slots = useSlots();` declaration is emitted by emitScript when
+ * either portals are present OR the rewriter saw `$slots.X` in user code;
+ * portal methods read fills via `slots.${slotName}`.
  *
  * The portal closure wraps Vue 3's imperative `render(h(...), container)` /
  * `render(null, container)` mount-API in the `$portals.NAME(container, scope)
@@ -44,7 +47,7 @@ function buildSlotMethod(slot: SlotDecl): string {
   // here without an extra host element."
   return (
     `  ${slotName}: (container: HTMLElement, scope: ${scopeType}): (() => void) => {\n` +
-    `    const slotFn = portalSlots.${slotName};\n` +
+    `    const slotFn = slots.${slotName};\n` +
     `    if (!slotFn) return () => {};\n` +
     `    const vnode = h(Fragment, null, slotFn(scope));\n` +
     `    render(vnode, container);\n` +
@@ -75,13 +78,12 @@ export function emitPortals(
   imports.use('Fragment');
   imports.use('h');
   imports.use('render');
-  imports.use('useSlots');
+  // useSlots() is imported + declared by emitScript via the slotsUsed flag.
   imports.use('onBeforeUnmount');
 
   const methodLines = portals.map(buildSlotMethod).join('\n');
   const lines = [
     'const portalContainers = new Set<HTMLElement>();',
-    'const portalSlots = useSlots();',
     `const portals = {\n${methodLines}\n};`,
     'onBeforeUnmount(() => {',
     '  for (const container of portalContainers) render(null, container);',

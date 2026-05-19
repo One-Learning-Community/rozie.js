@@ -65,12 +65,12 @@ export function rewriteRozieIdentifiers(
   diagnostics: Diagnostic[],
 ): RewriteRozieIdentifiersResult {
   let slotsUsed = false;
-  // Non-portal slot names — portals are routed through `portals.X` (a
-  // separate setup-level closure synthesized by emitScript). Only
-  // light-DOM / scoped-fill slots route through `$slots.X` → `slots.X`.
-  const nonPortalSlotNames = new Set(
-    ir.slots.filter((s) => s.isPortal !== true).map((s) => s.name),
-  );
+  // All slot names — both portal and non-portal slots route their
+  // script-side presence checks (`$slots.X`) through `slots.X`, where
+  // `slots` is a single `useSlots()` const at script-setup scope.
+  // (Portal *invocations* — `$portals.X(node, scope)` — go through the
+  // separate `portals` closure synthesized by emitScript / emitPortals.)
+  const allSlotNames = new Set(ir.slots.map((s) => s.name));
   const modelProps = new Set(ir.props.filter((p) => p.isModel).map((p) => p.name));
   const nonModelProps = new Set(ir.props.filter((p) => !p.isModel).map((p) => p.name));
   const dataNames = new Set(ir.state.map((s) => s.name));
@@ -166,7 +166,7 @@ export function rewriteRozieIdentifiers(
         // that conditionally wire third-party-engine slot callbacks (e.g.
         // FullCalendar.rozie's eventContent gate). Without the rewrite,
         // `$slots is not defined` ReferenceError at runtime.
-        if (nonPortalSlotNames.has(prop.name)) {
+        if (allSlotNames.has(prop.name)) {
           path.node.object = t.identifier('slots');
           slotsUsed = true;
         }
@@ -201,7 +201,7 @@ export function rewriteRozieIdentifiers(
         path.node.property = t.identifier('value');
         return;
       }
-      if (obj.name === '$slots' && nonPortalSlotNames.has(prop.name)) {
+      if (obj.name === '$slots' && allSlotNames.has(prop.name)) {
         // Phase 07.7 fix — mirror of MemberExpression branch above for
         // optional-chained `$slots.X?.foo` patterns.
         path.node.object = t.identifier('slots');

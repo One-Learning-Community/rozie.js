@@ -121,6 +121,9 @@ export function rewriteTemplateExpression(
   const computedNames = new Set(ir.computed.map((c) => c.name));
   const refNames = new Set(ir.refs.map((r) => r.name));
   const slotNames = new Set(ir.slots.map((s) => (s.name === '' ? 'default' : s.name)));
+  const portalSlotNames = new Set(
+    ir.slots.filter((s) => s.isPortal === true).map((s) => s.name),
+  );
   const methodNames = collectMethodNames(ir);
 
   traverse(wrapper, {
@@ -168,6 +171,20 @@ export function rewriteTemplateExpression(
         return;
       }
       if (obj.name === '$slots') {
+        // Portal slots: see rewrite/rewriteScript.ts for the mirrored
+        // function-prop presence check (light-DOM detector never flips
+        // for `.X=${fn}` consumer fills).
+        if (portalSlotNames.has(prop.name)) {
+          path.replaceWith(
+            t.binaryExpression(
+              '!==',
+              thisDot(prop.name),
+              t.identifier('undefined'),
+            ),
+          );
+          path.skip();
+          return;
+        }
         const key = prop.name === '' ? 'default' : prop.name;
         if (slotNames.has(key)) {
           path.replaceWith(thisDot(`_hasSlot${slotFieldSuffix(prop.name)}`));
