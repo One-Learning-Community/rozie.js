@@ -97,6 +97,20 @@ function genCode(node: t.Node): string {
 }
 
 /**
+ * Emit `() => body` for an Expression or BlockStatement body.
+ *
+ * Why not `\`() => ${genCode(body)}\``? When `body` is an ObjectExpression
+ * (e.g. `$computed(() => ({ x: 1 }))`), `genCode(body)` returns `{ x: 1 }`
+ * and the template yields `() => { x: 1 }` — an arrow with a BlockStatement
+ * body containing a LabeledStatement `x: 1`, not an arrow returning an
+ * object literal. Building the arrow as a Babel node lets @babel/generator
+ * auto-wrap the body in parens.
+ */
+function arrowBody(body: t.Expression | t.BlockStatement): string {
+  return genCode(t.arrowFunctionExpression([], body));
+}
+
+/**
  * Convert `const X = (...args) => body` (or function expression) into
  * `function X(...args) { ... }` so the binding hoists. Returns the new
  * statement on success, or null when the input is not a single-declarator
@@ -264,8 +278,7 @@ function tryWrapEscapingConstUseMemo(
   const initDeps = computeHelperBodyDeps(init, ir, allHelperNames, constName);
   const depsLiteral = renderDepArrayWithIR(initDeps, ir);
 
-  const initSource = genCode(init);
-  return `const ${constName} = useMemo(() => ${initSource}, ${depsLiteral});`;
+  return `const ${constName} = useMemo(${arrowBody(init)}, ${depsLiteral});`;
 }
 
 /**
@@ -1354,16 +1367,10 @@ export function emitScript(
   for (const c of ir.computed) {
     collectors.react.add('useMemo');
     const body = clonedComputedBodies.get(c.name) ?? c.body;
-    const bodyCode = genCode(body);
     const depsArr = renderDepArray(c.deps, modelProps);
-    // For BlockStatement bodies, wrap as `() => { ... }`. For Expression
-    // bodies, wrap as `() => expr`. genCode already prints both correctly,
-    // but for an ArrowFunctionBody we need the outer arrow form.
-    if (t.isBlockStatement(body)) {
-      hookLines.push(`const ${c.name} = useMemo(() => ${bodyCode}, ${depsArr});`);
-    } else {
-      hookLines.push(`const ${c.name} = useMemo(() => ${bodyCode}, ${depsArr});`);
-    }
+    // arrowBody handles BlockStatement vs Expression bodies (incl. the
+    // ObjectExpression paren-wrap case) by building the arrow as an AST node.
+    hookLines.push(`const ${c.name} = useMemo(${arrowBody(body)}, ${depsArr});`);
   }
 
   // 5f. useEffect for each paired LifecycleHook — Plan 04-04: split into a

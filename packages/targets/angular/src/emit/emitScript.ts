@@ -93,6 +93,19 @@ function genCode(node: t.Node): string {
 }
 
 /**
+ * Emit `() => body` for an Expression or BlockStatement body.
+ *
+ * Building the arrow as a Babel node (rather than string-templating
+ * `() => ${genCode(body)}`) lets @babel/generator auto-wrap ObjectExpression
+ * bodies in parens, so `$computed(() => ({ x: 1 }))` emits `() => ({ x: 1 })`
+ * instead of `() => { x: 1 }` (a BlockStatement with LabeledStatement
+ * `x: 1`).
+ */
+function arrowBody(body: t.Expression | t.BlockStatement): string {
+  return genCode(t.arrowFunctionExpression([], body));
+}
+
+/**
  * Bug 2: annotate any parameter that lacks a type annotation with `: any`.
  * User `<script>` arrows/functions get lifted to class fields verbatim; under
  * the consumer's `strict` tsconfig an un-annotated param is TS7006 (implicit
@@ -717,8 +730,7 @@ export function emitScript(
   const computedLines: string[] = [];
   for (const c of ir.computed) {
     const body = clonedComputedBodies.get(c.name) ?? c.body;
-    const bodyCode = genCode(body);
-    computedLines.push(`${c.name} = computed(() => ${bodyCode});`);
+    computedLines.push(`${c.name} = computed(${arrowBody(body)});`);
   }
 
   // 8. Build lifecycle blocks, bucketed per-phase:

@@ -91,6 +91,21 @@ function genCode(node: t.Node): string {
 }
 
 /**
+ * Emit `() => body` for an Expression or BlockStatement body.
+ *
+ * Why not `\`() => ${genCode(body)}\``? When `body` is an ObjectExpression
+ * (e.g. user wrote `$computed(() => ({ x: 1 }))`), `genCode(body)` returns
+ * `{ x: 1 }` and the surrounding template yields `() => { x: 1 }`, which
+ * parses as an arrow with a BlockStatement body containing a LabeledStatement
+ * `x: 1` — not an arrow returning an object literal. Building the arrow as a
+ * Babel node and letting `@babel/generator` print it produces the correct
+ * `() => ({ x: 1 })` automatically.
+ */
+function arrowBody(body: t.Expression | t.BlockStatement): string {
+  return genCode(t.arrowFunctionExpression([], body));
+}
+
+/**
  * Render a PropTypeAnnotation as a TypeScript type string.
  *
  * Reference examples produce these patterns:
@@ -357,7 +372,7 @@ function emitComputedDecls(
     // rewriteRozieIdentifiers' Identifier visitor in templates / scripts.
     // genCode handles both BlockStatement (`{ return x; }`) and Expression (`x`)
     // bodies correctly — the if/else was dead code (both branches identical).
-    lines.push(`const ${c.name} = computed(() => ${genCode(body)});`);
+    lines.push(`const ${c.name} = computed(${arrowBody(body)});`);
   }
   return lines;
 }

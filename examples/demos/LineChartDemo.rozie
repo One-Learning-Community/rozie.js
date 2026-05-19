@@ -50,17 +50,15 @@ const chartData = $computed(() => {
   }
 })
 
-const chartOpts = $computed(() => {
-  return {
-    plugins: {
-      legend: { display: true, position: 'top' },
-    },
-    scales: {
-      y: { beginAtZero: true, grid: { color: 'rgba(0, 0, 0, 0.04)' } },
-      x: { grid: { display: false } },
-    },
-  }
-})
+const chartOpts = $computed(() => ({
+  plugins: {
+    legend: { display: true, position: 'top' },
+  },
+  scales: {
+    y: { beginAtZero: true, grid: { color: 'rgba(0, 0, 0, 0.04)' } },
+    x: { grid: { display: false } },
+  },
+}))
 
 const stats = $computed(() => {
   const xs = $data.points

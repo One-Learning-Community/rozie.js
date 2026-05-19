@@ -47,6 +47,19 @@ function genCode(node: t.Node): string {
   return generate(node, GEN_OPTS).code;
 }
 
+/**
+ * Emit `() => body` for an Expression or BlockStatement body.
+ *
+ * Building the arrow as a Babel node (rather than string-templating
+ * `() => ${genCode(body)}`) lets @babel/generator auto-wrap ObjectExpression
+ * bodies in parens, so `$computed(() => ({ x: 1 }))` emits `() => ({ x: 1 })`
+ * instead of `() => { x: 1 }` (which would parse as a BlockStatement with a
+ * LabeledStatement and break the consumer).
+ */
+function arrowBody(body: t.Expression | t.BlockStatement): string {
+  return genCode(t.arrowFunctionExpression([], body));
+}
+
 function capitalize(name: string): string {
   if (name.length === 0) return name;
   return name.charAt(0).toUpperCase() + name.slice(1);
@@ -200,8 +213,7 @@ export function emitScript(
   for (const c of ir.computed) {
     collectors.solidImports.add('createMemo');
     const rewrittenBody = rewriteNode(c.body, ir);
-    const bodyCode = genCode(rewrittenBody);
-    hookLines.push(`const ${c.name} = createMemo(() => ${bodyCode});`);
+    hookLines.push(`const ${c.name} = createMemo(${arrowBody(rewrittenBody)});`);
   }
 
   // Portal-slot primitive (Spike 003) — emit portal scaffolding just before
@@ -235,7 +247,7 @@ export function emitScript(
   // lives in userArrowsSection AFTER hookSection). Wrap it back in an arrow.
   function lifecycleArg(node: t.Node): string {
     if (t.isBlockStatement(node)) {
-      return `() => ${genCode(node)}`;
+      return arrowBody(node);
     }
     if (
       t.isIdentifier(node) ||
@@ -245,7 +257,9 @@ export function emitScript(
     ) {
       return genCode(node);
     }
-    return `() => ${genCode(node)}`;
+    // Generic Expression fallback — use arrowBody so ObjectExpression bodies
+    // get auto-parenthesized.
+    return arrowBody(node as t.Expression);
   }
 
   for (const lh of ir.lifecycle) {

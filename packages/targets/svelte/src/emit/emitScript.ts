@@ -79,6 +79,19 @@ function genCode(node: t.Node): string {
 }
 
 /**
+ * Emit `() => body` for an Expression or BlockStatement body.
+ *
+ * Building the arrow as a Babel node (rather than string-templating
+ * `() => ${genCode(body)}`) lets @babel/generator auto-wrap ObjectExpression
+ * bodies in parens, so `$computed(() => ({ x: 1 }))` emits `() => ({ x: 1 })`
+ * instead of `() => { x: 1 }` (a BlockStatement with LabeledStatement
+ * `x: 1`).
+ */
+function arrowBody(body: t.Expression | t.BlockStatement): string {
+  return genCode(t.arrowFunctionExpression([], body));
+}
+
+/**
  * SvelteScriptInjection — opaque token type that Tasks 2/3 append to. Mirrors
  * Vue's ScriptInjection — emitTemplate (Task 2) may add inline-debounce IIFEs
  * for template @event modifiers, emitListeners (Task 3) may add throttle
@@ -423,8 +436,12 @@ function emitDerivedDecls(
   for (const c of computedDecls) {
     const body = clonedComputedBodies.get(c.name) ?? c.body;
     if (t.isBlockStatement(body)) {
-      lines.push(`const ${c.name} = $derived.by(() => ${genCode(body)});`);
+      lines.push(`const ${c.name} = $derived.by(${arrowBody(body)});`);
     } else {
+      // Plain Expression body — pass directly to $derived(expr) so reactivity
+      // tracks the read sites in `expr`. ObjectExpression bodies render as
+      // `$derived({ x: 1 })` which is valid (and tracks any reactive reads
+      // inside the object literal).
       lines.push(`const ${c.name} = $derived(${genCode(body)});`);
     }
   }
@@ -608,18 +625,14 @@ function emitLifecycleHooks(
           ...setupBody.body,
           t.returnStatement(cleanupExpr),
         ]);
-        lines.push(`$effect(() => ${genCode(merged)});`);
+        lines.push(`$effect(${arrowBody(merged)});`);
         continue;
       }
 
       // No cleanup — invoke the arrow body inline as the effect.
-      // Emit as `$effect(() => { ...body... })` for arrow with block body,
-      // `$effect(() => expr)` for expression-bodied arrows.
-      if (t.isBlockStatement(fnBody)) {
-        lines.push(`$effect(() => ${genCode(fnBody)});`);
-      } else {
-        lines.push(`$effect(() => ${genCode(fnBody)});`);
-      }
+      // arrowBody handles BlockStatement vs Expression bodies (incl. the
+      // ObjectExpression paren-wrap case).
+      lines.push(`$effect(${arrowBody(fnBody)});`);
       continue;
     }
 
