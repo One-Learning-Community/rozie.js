@@ -47,18 +47,18 @@ Chart.register(...registerables)
 
 let instance = null
 
-// Deep-snapshot the data object so Chart.js's internal `Object.defineProperty`
-// calls don't hit a Svelte 5 `$state` proxy (`state_descriptors_fixed`).
-// Consumers can pass `points` directly as `datasets[0].data` without having
-// to remember to spread it — the wrapper handles the framework-reactive →
-// plain-data unwrap. JSON-clone is sufficient because Chart.js's `data`
-// field carries only JSON-serializable values (labels, numbers, colors).
-const snapshotData = (d) =>
-  d == null ? { labels: [], datasets: [] } : JSON.parse(JSON.stringify(d))
-
+// `$snapshot(x)` lowers to `$state.snapshot(x)` on the Svelte target and to
+// identity (`x`) on the other five — see the Rozie docs section "Crossing
+// into untyped JS" for when this is necessary. Chart.js's internal
+// `Object.defineProperty` on its data config conflicts with Svelte 5's
+// `$state` proxy (`state_descriptors_fixed`); $snapshot breaks the proxy
+// chain so the engine can mutate descriptors freely. The other five
+// targets pass `x` straight through — Vue refs unwrap on read, React/
+// Solid/Angular/Lit hand back plain values, so the snapshot call is a
+// no-op there.
 const buildConfig = () => ({
   type: $props.type,
-  data: snapshotData($props.data),
+  data: $snapshot($props.data),
   options: {
     responsive: true,
     maintainAspectRatio: false,
@@ -77,7 +77,7 @@ $onMount(() => {
 // on every data tick would flicker and leak.
 $watch(() => $props.data, (v) => {
   if (!instance) return
-  instance.data = snapshotData(v)
+  instance.data = $snapshot(v)
   instance.update()
 })
 

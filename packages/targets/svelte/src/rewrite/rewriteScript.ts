@@ -244,11 +244,33 @@ export function rewriteRozieIdentifiers(
     },
 
     CallExpression(path) {
+      const callee = path.node.callee;
+      if (!t.isIdentifier(callee)) return;
+
+      // $snapshot(x) → $state.snapshot(x) — Svelte 5 idiom for breaking out
+      // of a `$state` proxy so the value can cross into untyped JS (e.g.
+      // Chart.js / Flatpickr / Leaflet config objects whose internal use of
+      // `Object.defineProperty` is incompatible with the proxy). The other
+      // five targets lower `$snapshot(x)` to identity in their respective
+      // rewriteScripts. See examples/LineChart.rozie for the canonical use.
+      if (callee.name === '$snapshot') {
+        const args = path.node.arguments;
+        if (args.length !== 1) return;
+        const arg = args[0]!;
+        if (!t.isExpression(arg)) return;
+        path.node.callee = t.memberExpression(
+          t.identifier('$state'),
+          t.identifier('snapshot'),
+        );
+        // Do NOT path.skip() — the argument may contain $props.X / $data.X
+        // reads that still need rewriting.
+        return;
+      }
+
       // $emit('foo', x) → onfoo?.(x) — Svelte 5 callback-prop convention.
       // Do NOT touch $onMount/$onUnmount/$onUpdate (consumed structurally
       // from ir.lifecycle by emitScript).
-      const callee = path.node.callee;
-      if (!t.isIdentifier(callee) || callee.name !== '$emit') return;
+      if (callee.name !== '$emit') return;
       const args = path.node.arguments;
       if (args.length === 0) return;
       const first = args[0];

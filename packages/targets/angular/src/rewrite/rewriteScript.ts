@@ -508,10 +508,25 @@ export function rewriteRozieIdentifiers(
 
     /**
      * `$emit('event', ...args)` → `this.event.emit(...args)`
+     *
+     * Also: `$snapshot(x)` → `x` — Angular signal reads via `this.X()` yield
+     * plain values, so the engine library already receives a non-reactive
+     * value. Identity lowering keeps wrapper authors' `$snapshot()` calls
+     * cross-target safe (the Svelte target uses `$state.snapshot(x)`).
      */
     CallExpression(path) {
       const callee = path.node.callee;
       if (!t.isIdentifier(callee)) return;
+
+      if (callee.name === '$snapshot') {
+        const args = path.node.arguments;
+        if (args.length === 1) {
+          const arg = args[0]!;
+          if (t.isExpression(arg)) path.replaceWith(arg);
+        }
+        return;
+      }
+
       if (callee.name !== '$emit') return;
 
       const args = path.node.arguments;

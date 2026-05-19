@@ -341,6 +341,18 @@ export function rewriteScript(
       if (!t.isIdentifier(callee)) return;
       const args = path.node.arguments;
 
+      // $snapshot(x) → x — Lit `@property` accessors return plain values, so
+      // the engine library already receives a non-reactive value. Identity
+      // lowering keeps wrapper authors' `$snapshot()` calls cross-target
+      // safe (the Svelte target uses `$state.snapshot(x)`).
+      if (callee.name === '$snapshot') {
+        if (args.length === 1) {
+          const arg = args[0]!;
+          if (t.isExpression(arg)) path.replaceWith(arg);
+        }
+        return;
+      }
+
       if (callee.name === '$emit' && args.length > 0) {
         const firstArg = args[0]!;
         if (!t.isStringLiteral(firstArg)) return;

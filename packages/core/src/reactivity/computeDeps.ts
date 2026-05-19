@@ -65,6 +65,10 @@ const MAGIC_ACCESSOR_NAMES = new Set(['$props', '$data', '$refs', '$slots', '$po
 const STABLE_IDENTIFIERS = new Set([
   '$emit',
   '$el',
+  // `$snapshot` is a target-rewritten passthrough (`$snapshot(x)` lowers to
+  // `$state.snapshot(x)` on Svelte, `x` on the other five targets). It's not
+  // itself a reactive binding — the dep tracking happens on the argument.
+  '$snapshot',
   'undefined',
   'null',
   'NaN',

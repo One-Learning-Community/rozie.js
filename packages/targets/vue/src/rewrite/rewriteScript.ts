@@ -211,10 +211,25 @@ export function rewriteRozieIdentifiers(
     },
 
     CallExpression(path) {
+      const callee = path.node.callee;
+      if (!t.isIdentifier(callee)) return;
+
+      // $snapshot(x) → x — Vue refs unwrap via `.value` at read time, so the
+      // engine library receives a plain value, never a reactive proxy.
+      // Identity lowering keeps wrapper authors' `$snapshot()` calls
+      // cross-target safe (the Svelte target uses `$state.snapshot(x)`).
+      if (callee.name === '$snapshot') {
+        const args = path.node.arguments;
+        if (args.length === 1) {
+          const arg = args[0]!;
+          if (t.isExpression(arg)) path.replaceWith(arg);
+        }
+        return;
+      }
+
       // $emit('foo', x) → emit('foo', x). Do NOT touch $onMount/$onUnmount/$onUpdate
       // (those are consumed structurally from ir.lifecycle by emitScript).
-      const callee = path.node.callee;
-      if (t.isIdentifier(callee) && callee.name === '$emit') {
+      if (callee.name === '$emit') {
         path.node.callee = t.identifier('emit');
       }
     },

@@ -232,6 +232,52 @@ $onMount(() => {
 
 This is the integration story for component libraries that wrap vanilla-JS engines (focus-trap, popper, downshift-style state machines): one `$refs.x` access, idiomatic per-target ref handling on the emit side.
 
+## `$snapshot()` — crossing into untyped JS
+
+`$snapshot(x)` is the escape hatch for handing a reactive value to a library that mutates the value's property descriptors. The canonical case is Chart.js's data config: Chart.js internally calls `Object.defineProperty(data, ...)` to install reactive getters, and Svelte 5's `$state` Proxy raises `state_descriptors_fixed` rather than allowing the mutation. The other five targets unwrap to plain values at read time and don't have this problem.
+
+```rozie
+<script>
+import { Chart } from 'chart.js'
+
+let instance = null
+
+const buildConfig = () => ({
+  type: $props.type,
+  // Hand a non-reactive snapshot to the engine; Chart.js's internal
+  // Object.defineProperty calls otherwise crash on Svelte 5's $state proxy.
+  data: $snapshot($props.data),
+})
+
+$onMount(() => {
+  instance = new Chart($refs.canvasEl, buildConfig())
+  return () => instance?.destroy()
+})
+
+$watch(() => $props.data, (v) => {
+  instance.data = $snapshot(v)
+  instance.update()
+})
+</script>
+```
+
+Per-target lowering:
+
+| Target | Expansion |
+| --- | --- |
+| Svelte 5 | `$state.snapshot(x)` — Svelte 5's native deep-clone primitive |
+| Vue | `x` — identity passthrough (refs unwrap via `.value` at read time) |
+| React | `x` — identity passthrough (props are plain JS values) |
+| Solid | `x` — identity passthrough (signal reads return plain values) |
+| Angular | `x` — identity passthrough (signal reads return plain values) |
+| Lit | `x` — identity passthrough (`@property` accessors return plain values) |
+
+::: warning Narrow use case
+Reach for `$snapshot()` **only** when you're handing a reactive value to library code that mutates the value's property descriptors. Most engine wrappers (SortableJS, Leaflet, TipTap, FullCalendar) hand the library plain primitives or fresh objects built via `.map()` / spreads and never need it. If you're not sure, leave it out — the compile-time and runtime cost on the non-Svelte targets is zero, but on Svelte the snapshot is a deep clone, so blanket-snapshotting every `$props.X` read would burn CPU you don't need to burn.
+
+If you skip it where you do need it, you'll see the Svelte runtime error [`state_descriptors_fixed`](https://svelte.dev/e/state_descriptors_fixed) the first time the library tries to mutate the value.
+:::
+
 ## Slots with scoped params
 
 Slot content can receive parameters from the component, and consumers can destructure them with `#name="{ … }"`. Fallback content is just children of the `<slot>` tag — same shape as Vue, same emit semantics as Svelte snippets / React render props / Angular `*ngTemplateOutlet`:
