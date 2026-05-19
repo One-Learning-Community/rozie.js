@@ -1,7 +1,6 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { SignalWatcher, signal } from '@lit-labs/preact-signals';
-import { observeRozieSlotCtx } from '@rozie/runtime-lit';
 import './Modal.rozie';
 import './WrapperModal.rozie';
 
@@ -19,121 +18,24 @@ export default class ModalConsumer extends SignalWatcher(LitElement) {
   private _open3 = signal(true);
   private _slotName = signal('header');
 
-  private _headerCtx?: { close: unknown };
-  private _slotCtxWired_header = false;
-  private _footerCtx?: { close: unknown };
-  private _slotCtxWired_footer = false;
-
   private _disconnectCleanups: Array<() => void> = [];
-
-  private _armListeners(): void {
-    // Phase 07.2: wire ctx capture for scoped slot fill "header".
-
-    // Phase 07.3.1 Blocker #3 (D-03) — tryWire + microtask retry for producer-upgrade race.
-
-    {
-
-      const tryWire = () => {
-
-        const producer = this.shadowRoot?.querySelector('[slot="header"]')?.parentElement;
-
-        const slotEl = producer?.shadowRoot?.querySelector('slot[name="header"]');
-
-        if (slotEl) {
-
-          const unsubscribe = observeRozieSlotCtx(slotEl as HTMLSlotElement, (c) => { this._headerCtx = c as { close: unknown }; this.requestUpdate(); });
-
-          this._disconnectCleanups.push(unsubscribe);
-
-          this._slotCtxWired_header = true;
-
-        }
-
-      };
-
-      tryWire();
-
-      queueMicrotask(() => { if (!this._slotCtxWired_header) tryWire(); });
-
-    }
-
-    // Phase 07.2: wire ctx capture for scoped slot fill "footer".
-
-    // Phase 07.3.1 Blocker #3 (D-03) — tryWire + microtask retry for producer-upgrade race.
-
-    {
-
-      const tryWire = () => {
-
-        const producer = this.shadowRoot?.querySelector('[slot="footer"]')?.parentElement;
-
-        const slotEl = producer?.shadowRoot?.querySelector('slot[name="footer"]');
-
-        if (slotEl) {
-
-          const unsubscribe = observeRozieSlotCtx(slotEl as HTMLSlotElement, (c) => { this._footerCtx = c as { close: unknown }; this.requestUpdate(); });
-
-          this._disconnectCleanups.push(unsubscribe);
-
-          this._slotCtxWired_footer = true;
-
-        }
-
-      };
-
-      tryWire();
-
-      queueMicrotask(() => { if (!this._slotCtxWired_footer) tryWire(); });
-
-    }
-  }
-
-  connectedCallback(): void {
-    super.connectedCallback();
-    if (this.hasUpdated) this._armListeners();
-  }
-
-  firstUpdated(): void {
-    this._armListeners();
-  }
-
-  updated(changedProperties: Map<string, unknown>): void {
-    // Phase 07.3.1 Blocker #3 (D-03) — re-attempt wiring for "header" on each update until producer's slot appears.
-    if (!this._slotCtxWired_header) {
-      const producer = this.shadowRoot?.querySelector('[slot="header"]')?.parentElement;
-      const slotEl = producer?.shadowRoot?.querySelector('slot[name="header"]');
-      if (slotEl) {
-        const unsubscribe = observeRozieSlotCtx(slotEl as HTMLSlotElement, (c) => { this._headerCtx = c as { close: unknown }; this.requestUpdate(); });
-        this._disconnectCleanups.push(unsubscribe);
-        this._slotCtxWired_header = true;
-      }
-    }
-    // Phase 07.3.1 Blocker #3 (D-03) — re-attempt wiring for "footer" on each update until producer's slot appears.
-    if (!this._slotCtxWired_footer) {
-      const producer = this.shadowRoot?.querySelector('[slot="footer"]')?.parentElement;
-      const slotEl = producer?.shadowRoot?.querySelector('slot[name="footer"]');
-      if (slotEl) {
-        const unsubscribe = observeRozieSlotCtx(slotEl as HTMLSlotElement, (c) => { this._footerCtx = c as { close: unknown }; this.requestUpdate(); });
-        this._disconnectCleanups.push(unsubscribe);
-        this._slotCtxWired_footer = true;
-      }
-    }
-  }
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
     for (const fn of this._disconnectCleanups) fn();
     this._disconnectCleanups = [];
-    this._slotCtxWired_header = false;
-    this._slotCtxWired_footer = false;
   }
 
   render() {
     return html`
 <div class="modal-consumer">
-  <rozie-modal .open=${this._open1.value} @open-change=${(e: CustomEvent) => { this._open1.value = e.detail; }}><h2 slot="header">${this.title}</h2>
-      <button class="close" @click=${(e) => (e.currentTarget as EventTarget).dispatchEvent(new CustomEvent('rozie-header-close', { detail: e, bubbles: true, composed: true }))} slot="header">×</button><button @click=${(e) => (e.currentTarget as EventTarget).dispatchEvent(new CustomEvent('rozie-footer-close', { detail: e, bubbles: true, composed: true }))} slot="footer">Cancel</button>
-      <button @click=${(e: Event) => { this.onConfirm(); }} slot="footer">OK</button>
+  <rozie-modal .open=${this._open1.value} @open-change=${(e: CustomEvent) => { this._open1.value = e.detail; }} .header=${(scope: { close: unknown }) => html`
+      <h2>${this.title}</h2>
+      <button class="close" @click=${scope.close}>×</button>
+    `} .footer=${(scope: { close: unknown }) => html`
+      <button @click=${scope.close}>Cancel</button>
+      <button @click=${(e: Event) => { this.onConfirm(); }}>OK</button>
+    `}>
     Are you sure you want to proceed?
     </rozie-modal>
 

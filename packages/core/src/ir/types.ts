@@ -272,6 +272,21 @@ export interface SlotFillerDecl {
   isDynamic?: boolean;
   /** Parsed JS expression for the bracketed dynamic name; only populated when isDynamic. */
   dynamicNameExpr?: Expression;
+  /**
+   * Phase 07.5 — threaded from producer SlotDecl.isPortal via threadParamTypes.
+   * When true, the consumer-side emitter (Lit specifically) emits a
+   * function-prop `.<slotName>=${fn}` form instead of `<element slot="X">`
+   * light-DOM projection. Cross-target: undefined === false (back-compat).
+   */
+  isPortal?: boolean;
+  /**
+   * Phase 07.5 — count of scope params declared by the matching producer SlotDecl.
+   * Threaded by threadParamTypes (matchingSlot.params.length). Lets the consumer-side
+   * emitter distinguish 'consumer destructures scope' (filler.params.length > 0 AND
+   * producerSlotParamCount > 0) from 'consumer destructures nothing' (filler.params.length === 0).
+   * Undefined === 0 (back-compat).
+   */
+  producerSlotParamCount?: number;
 }
 
 /**

@@ -158,7 +158,27 @@ function emitOneSlot(
     }
   }
 
-  return `${stateField}\n${queryField}`;
+  // Phase 07.5 — producer-side @property emission for scoped/portal slots.
+  // Receives the consumer's `.<slotName>=${fn}` property assignment that the
+  // consumer-side emitSlotFiller now emits for portal or destructured-scope
+  // fills. Without this typed receiver, `this.<slotName>` resolves to implicit
+  // any inside emitPortals.ts:30 — fine at runtime but flagged by stricter
+  // consumer tsconfigs.
+  const isScopedOrPortal = slot.isPortal === true || slot.params.length > 0;
+  let propertyField = '';
+  if (isScopedOrPortal) {
+    // Default slot ('') collides with the JS reserved word 'default'; use a
+    // clearly-prefixed sentinel. consumer-side emitSlotFiller must use the
+    // SAME mapping (cross-file lockstep enforced by Task 2 grep checks).
+    const propertyFieldName = slot.name === '' ? '_defaultSlotFn' : slot.name;
+    const scopeType =
+      slot.params.length > 0
+        ? `{ ${slot.params.map((p) => `${p.name}: unknown`).join('; ')} }`
+        : 'unknown';
+    propertyField = `  @property({ attribute: false }) ${propertyFieldName}?: (scope: ${scopeType}) => unknown;`;
+  }
+
+  return [stateField, queryField, propertyField].filter((s) => s.length > 0).join('\n');
 }
 
 export function emitSlotDecl(
@@ -180,6 +200,12 @@ export function emitSlotDecl(
 
   opts.decorators.add('state');
   opts.decorators.add('queryAssignedElements');
+  // Phase 07.5 — add `property` decorator import only when at least one slot
+  // needs the function-prop receiver (scoped or portal). Avoids unused-import
+  // noise for components with paramless static slots only.
+  if (slots.some((s) => s.isPortal === true || s.params.length > 0)) {
+    opts.decorators.add('property');
+  }
 
   const ctxInterfaces: string[] = [];
   const hostListenerWiring: string[] = [];

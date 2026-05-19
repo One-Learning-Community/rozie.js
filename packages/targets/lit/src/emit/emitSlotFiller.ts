@@ -107,6 +107,20 @@ export interface LitFillerEmission {
    * (without this, a re-mounted consumer would skip retry forever).
    */
   disconnectResetLines: string[];
+  /**
+   * Phase 07.5 — when populated, the parent component's open tag splices
+   * `${propertyAttr}` before the final `>`; emitTemplate.emitElement handles
+   * the splice. Mutually exclusive with `childTemplate` — when propertyAttr
+   * is set, childTemplate is empty and the light-DOM `<element slot="X">`
+   * path is bypassed in favor of a `.<slotName>=${(scope) => html\`...\`}`
+   * function-prop property assignment on the producer's open tag.
+   *
+   * Triggered when `filler.isPortal === true` OR (`filler.params.length > 0`
+   * AND the producer declares scope params i.e. `filler.producerSlotParamCount > 0`).
+   * Paramless static slots continue to use the light-DOM `childTemplate` path
+   * (SC2 no-regression invariant).
+   */
+  propertyAttr?: string;
 }
 
 /**
@@ -284,6 +298,145 @@ function rewriteExpr(
 }
 
 /**
+ * Phase 07.5 — sibling of `rewriteScopedParamRefs` but the rewriting target
+ * is `scope.<name>` (plain MemberExpression on a `scope` identifier) instead
+ * of `this.<ctxField>?.<name>` (OptionalMemberExpression). Used by the new
+ * function-prop emit path where the consumer's destructured fill body runs
+ * inside an arrow function whose first parameter (`scope`) is guaranteed
+ * defined by the consumer's destructure — so no optional chaining is needed.
+ *
+ * Same skip-conditions as the original helper (MemberExpression property keys,
+ * ObjectProperty keys, function param bindings).
+ */
+function rewriteScopedParamRefsToScope(
+  nodes: TemplateNode[],
+  params: ReadonlySet<string>,
+): void {
+  if (params.size === 0) return;
+  for (const node of nodes) {
+    rewriteScopedParamRefsInNodeToScope(node, params);
+  }
+}
+
+function rewriteScopedParamRefsInNodeToScope(
+  node: TemplateNode,
+  params: ReadonlySet<string>,
+): void {
+  switch (node.type) {
+    case 'TemplateStaticText':
+      return;
+    case 'TemplateInterpolation':
+      node.expression = rewriteExprToScope(node.expression, params);
+      return;
+    case 'TemplateFragment':
+      for (const c of node.children) rewriteScopedParamRefsInNodeToScope(c, params);
+      return;
+    case 'TemplateConditional':
+      for (const b of node.branches) {
+        if (b.test) b.test = rewriteExprToScope(b.test, params);
+        for (const c of b.body) rewriteScopedParamRefsInNodeToScope(c, params);
+      }
+      return;
+    case 'TemplateLoop':
+      node.iterableExpression = rewriteExprToScope(node.iterableExpression, params);
+      if (node.keyExpression) node.keyExpression = rewriteExprToScope(node.keyExpression, params);
+      for (const c of node.body) rewriteScopedParamRefsInNodeToScope(c, params);
+      return;
+    case 'TemplateSlotInvocation':
+      for (const a of node.args) a.expression = rewriteExprToScope(a.expression, params);
+      for (const c of node.fallback) rewriteScopedParamRefsInNodeToScope(c, params);
+      return;
+    case 'TemplateElement':
+      for (const a of node.attributes) {
+        if (a.kind === 'binding') {
+          a.expression = rewriteExprToScope(a.expression, params);
+        } else if (a.kind === 'interpolated') {
+          for (const seg of a.segments) {
+            if (seg.kind === 'binding') {
+              seg.expression = rewriteExprToScope(seg.expression, params);
+            }
+          }
+        }
+      }
+      for (const ev of node.events) {
+        if (ev !== null && ev !== undefined) {
+          ev.handler = rewriteExprToScope(ev.handler, params);
+        }
+      }
+      for (const c of node.children) rewriteScopedParamRefsInNodeToScope(c, params);
+      return;
+  }
+}
+
+/**
+ * Walk one Expression and rewrite Identifier-matches-param into
+ * `scope.<name>`. Returns the (possibly-replaced) expression. Mirrors
+ * rewriteExpr's structure (same skip-conditions, same root-identifier
+ * shortcut, same `@babel/traverse` wrapper pattern), but the rewriting
+ * target is a plain MemberExpression on a `scope` identifier rather than
+ * an OptionalMemberExpression on `this.<ctxField>`.
+ */
+function rewriteExprToScope(
+  expr: t.Expression,
+  params: ReadonlySet<string>,
+): t.Expression {
+  if (t.isIdentifier(expr) && params.has(expr.name)) {
+    return t.memberExpression(
+      t.identifier('scope'),
+      t.identifier(expr.name),
+      false,
+      false,
+    );
+  }
+  const wrapper = t.file(t.program([t.expressionStatement(expr)]));
+  traverse(wrapper, {
+    Identifier(path) {
+      const name = path.node.name;
+      if (!params.has(name)) return;
+      const parentPath = path.parentPath;
+      if (parentPath) {
+        if (
+          parentPath.isMemberExpression() &&
+          parentPath.node.property === path.node &&
+          !parentPath.node.computed
+        )
+          return;
+        if (
+          parentPath.isOptionalMemberExpression() &&
+          parentPath.node.property === path.node &&
+          !parentPath.node.computed
+        )
+          return;
+        if (
+          parentPath.isObjectProperty() &&
+          parentPath.node.key === path.node &&
+          !parentPath.node.computed
+        )
+          return;
+        if (
+          (parentPath.isFunctionExpression() ||
+            parentPath.isArrowFunctionExpression() ||
+            parentPath.isFunctionDeclaration()) &&
+          (parentPath.node as t.Function).params.some((p) => p === path.node)
+        ) {
+          return;
+        }
+      }
+      path.replaceWith(
+        t.memberExpression(
+          t.identifier('scope'),
+          t.identifier(name),
+          false,
+          false,
+        ),
+      );
+      path.skip();
+    },
+  });
+  return expr;
+}
+
+/**
  * Format ONE static-named filler (or default-shorthand) as a Lit
  * consumer-side emission tuple.
  *
@@ -342,6 +495,65 @@ export function emitSlotFiller(
     };
   }
 
+  // Phase 07.5 — function-prop branch: portal slots, OR scoped slots where
+  // the consumer destructures producer-declared scope params. Routes through
+  // a `.<slotName>=${(scope) => html\`…\`}` property assignment on the parent
+  // component's open tag (instead of `<element slot="X">` light-DOM projection).
+  //
+  // Branch condition per ROADMAP SC1: filler.isPortal === true OR
+  // (filler.params.length > 0 AND producer declares scope params i.e.
+  //  filler.producerSlotParamCount > 0). The second conjunct guards against
+  // consumer-side destructure on a slot the producer never declared with
+  // scope params (which would have already emitted ROZ947 SCOPED_PARAM_MISMATCH
+  // in threadParamTypes line 277-302; emit defensively here).
+  const useFunctionPropPath =
+    filler.isPortal === true ||
+    (filler.params.length > 0 &&
+      (filler.producerSlotParamCount ?? 0) > 0);
+
+  if (useFunctionPropPath) {
+    // Rewrite param Identifiers in body → `scope.<name>` MemberExpressions
+    // BEFORE rendering, so the recursive emitChildren passes them through
+    // verbatim.
+    const paramSet = new Set(filler.params.map((p) => p.name));
+    rewriteScopedParamRefsToScope(filler.body, paramSet);
+
+    const body = ctx.emitChildren(filler.body);
+
+    // Scope-type TS annotation: `{ p1: unknown; p2: unknown; ... }`.
+    // Uses filler.params (consumer's destructured names) — guaranteed to be
+    // a subset of producer's declared params after threadParamTypes
+    // SCOPED_PARAM_MISMATCH validation.
+    const scopeTypeStr =
+      filler.params.length > 0
+        ? `{ ${filler.params.map((p) => `${p.name}: unknown`).join('; ')} }`
+        : 'unknown';
+
+    // Single-parameter form: `(scope: { close: unknown }) => html\`…body refs scope.close…\``.
+    // `rewriteScopedParamRefsToScope` has already rewritten body param refs
+    // to `scope.<name>` MemberExpressions, so we use a bare `scope` parameter
+    // (NOT a destructure pattern) to keep the body's references valid. Using
+    // a destructure here would shadow `scope` and break the rewritten body.
+    const paramSig = `scope: ${scopeTypeStr}`;
+
+    // Property field name on producer: default slot ('') maps to '_defaultSlotFn'
+    // per the producer-side mapping in emitSlotDecl.ts; named slots use the
+    // bare slot name. Both sides MUST agree — keep the mapping in lockstep.
+    const propertyFieldName = filler.name === '' ? '_defaultSlotFn' : filler.name;
+
+    const propertyAttr =
+      '.' + propertyFieldName + '=${(' + paramSig + ') => html`' + body + '`}';
+
+    return {
+      childTemplate: '',
+      firstUpdatedLines: [],
+      classFields: [],
+      updatedBodyLines: [],
+      disconnectResetLines: [],
+      propertyAttr,
+    };
+  }
+
   // Phase 07.2 Plan 03 — scoped-param IR pre-transform.
   // Inside a `<template #header="{ close }">…<button @click="close">×</button></template>`
   // fill body, bare `close` rewrites to `this._headerCtx?.close` so the
@@ -349,6 +561,11 @@ export function emitSlotFiller(
   // IR pre-transform (vs an opt threaded through every rewriteTemplateExpression
   // call site) so the change is isolated to this module — no per-call-site
   // plumbing through emitTemplate.ts.
+  //
+  // Note (Phase 07.5): with the new function-prop branch above, this path is
+  // unreachable for scoped fills with destructure when the IR is fully
+  // threaded (filler.producerSlotParamCount > 0). It remains as a safety net
+  // for malformed/unthreaded IRs.
   if (filler.params.length > 0 && filler.name !== '') {
     const ctxField = `_${filler.name}Ctx`;
     const paramSet = new Set(filler.params.map((p) => p.name));
