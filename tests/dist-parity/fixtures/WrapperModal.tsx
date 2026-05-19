@@ -5,7 +5,7 @@ import Modal from './Modal';
 interface WrapperModalProps {
   title?: string;
   open?: boolean;
-  defaultValue?: boolean;
+  defaultOpen?: boolean;
   onOpenChange?: (open: boolean) => void;
   renderBrand?: () => ReactNode;
   children?: ReactNode;
@@ -20,7 +20,7 @@ export default function WrapperModal(_props: WrapperModalProps): JSX.Element {
   };
   const [open, setOpen] = useControllableState({
     value: props.open,
-    defaultValue: props.defaultValue ?? false,
+    defaultValue: props.defaultOpen ?? false,
     onValueChange: props.onOpenChange,
   });
 

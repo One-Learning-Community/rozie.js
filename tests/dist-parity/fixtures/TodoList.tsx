@@ -9,7 +9,7 @@ interface ChildrenCtx { item: any; toggle: any; remove: any; }
 
 interface TodoListProps {
   items?: any[];
-  defaultValue?: any[];
+  defaultItems?: any[];
   onItemsChange?: (items: any[]) => void;
   title?: string;
   onAdd?: (...args: any[]) => void;
@@ -28,7 +28,7 @@ export default function TodoList(_props: TodoListProps): JSX.Element {
   };
   const [items, setItems] = useControllableState({
     value: props.items,
-    defaultValue: props.defaultValue ?? (() => [])(),
+    defaultValue: props.defaultItems ?? (() => [])(),
     onValueChange: props.onItemsChange,
   });
   const [draft, setDraft] = useState('');

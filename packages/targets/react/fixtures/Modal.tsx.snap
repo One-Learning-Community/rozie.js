@@ -12,7 +12,7 @@ interface FooterCtx { close: any; }
 
 interface ModalProps {
   open?: boolean;
-  defaultValue?: boolean;
+  defaultOpen?: boolean;
   onOpenChange?: (open: boolean) => void;
   closeOnEscape?: boolean;
   closeOnBackdrop?: boolean;
@@ -36,7 +36,7 @@ export default function Modal(_props: ModalProps): JSX.Element {
   const savedBodyOverflow = useRef('');
   const [open, setOpen] = useControllableState({
     value: props.open,
-    defaultValue: props.defaultValue ?? false,
+    defaultValue: props.defaultOpen ?? false,
     onValueChange: props.onOpenChange,
   });
   const backdropEl = useRef<HTMLDivElement | null>(null);

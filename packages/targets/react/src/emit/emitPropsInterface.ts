@@ -6,9 +6,10 @@
  * them as the source-of-truth for prop types. Phase 6 (TYPES-01) emits
  * separate .d.ts via dts-buddy.
  *
- * Model:true props synthesize 3 fields per D-31/D-56 React analog:
+ * Model:true props synthesize 3 fields per D-31/D-56 React analog, all keyed
+ * to the model name (shown here for a model prop named `value`):
  *   - `value?: T`         (controlled-input current value)
- *   - `defaultValue?: T`  (uncontrolled-mode initial value)
+ *   - `defaultValue?: T`  (uncontrolled-mode initial value — `default${Pascal}`)
  *   - `onValueChange?: (value: T) => void`  (parent notification)
  *
  * Slot decls produce render-prop signatures (`renderX?: (ctx: XCtx) => ReactNode`)
@@ -96,9 +97,11 @@ export function emitPropsInterface(
   for (const p of ir.props) {
     const tsType = renderType(p.typeAnnotation);
     if (p.isModel) {
-      // 3-field synthesis per D-31/D-56 React analog
+      // 3-field synthesis per D-31/D-56 React analog. All three are keyed to
+      // the model name — `default${Pascal}` matches emitTypes.ts's `.d.ts`
+      // emission (and Radix's `defaultOpen`/`defaultChecked` convention).
       fields.push(`  ${p.name}?: ${tsType};`);
-      fields.push(`  defaultValue?: ${tsType};`);
+      fields.push(`  default${capitalize(p.name)}?: ${tsType};`);
       fields.push(`  on${capitalize(p.name)}Change?: (${p.name}: ${tsType}) => void;`);
     } else {
       fields.push(`  ${p.name}?: ${tsType};`);

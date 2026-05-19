@@ -1172,8 +1172,8 @@ export function emitScript(
   // 5.0. Defaults rebind for non-model props that declare a default. We rebind
   //     the function parameter `_props` to a new const `props` whose missing
   //     fields are filled from declared defaults. Model:true props are handled
-  //     by useControllableState below; their defaults route through
-  //     `defaultValue` rather than this rebind. shell.ts uses the function
+  //     by useControllableState below; their defaults route through the
+  //     `default<Name>` seed prop rather than this rebind. shell.ts uses the function
   //     parameter name `_props` whenever `propsDefaultsBlock` is non-empty.
   //
   // 2026-05-18 — `null`-default props are filtered out (mirrors Solid commit
@@ -1281,10 +1281,15 @@ export function emitScript(
         dflt = `${dflt}()`;
       }
     }
+    // D-84 model:true triplet — the public seed prop is keyed to the model
+    // name (`default${Pascal}`: defaultValue / defaultOpen / defaultItems),
+    // matching emitTypes.ts's `.d.ts` emission and Radix's `defaultOpen` /
+    // `defaultChecked` convention. The `useControllableState` OPTION key stays
+    // `defaultValue` — that's the runtime hook's own API, not the public prop.
     hookLines.push(
       `const [${p.name}, ${setterName}] = useControllableState({\n` +
         `  value: props.${p.name},\n` +
-        `  defaultValue: props.defaultValue ?? ${dflt},\n` +
+        `  defaultValue: props.default${capitalize(p.name)} ?? ${dflt},\n` +
         `  onValueChange: props.on${capitalize(p.name)}Change,\n` +
         `});`,
     );

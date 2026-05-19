@@ -26,7 +26,7 @@ interface ChildrenCtx { close: any; }
 
 interface DropdownProps {
   open?: boolean;
-  defaultValue?: boolean;
+  defaultOpen?: boolean;
   onOpenChange?: (open: boolean) => void;
   closeOnOutsideClick?: boolean;
   closeOnEscape?: boolean;
@@ -42,7 +42,7 @@ interface DropdownProps {
 export default function Dropdown(props: DropdownProps): JSX.Element {
   const [open, setOpen] = useControllableState({
     value: props.open,
-    defaultValue: props.defaultValue ?? false,
+    defaultValue: props.defaultOpen ?? false,
     onValueChange: props.onOpenChange,
   });
   const triggerEl = useRef<HTMLDivElement | null>(null);

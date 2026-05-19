@@ -3,14 +3,14 @@ import styles from './CheckboxRModel.module.css';
 
 interface CheckboxRModelProps {
   checked?: boolean;
-  defaultValue?: boolean;
+  defaultChecked?: boolean;
   onCheckedChange?: (checked: boolean) => void;
 }
 
 export default function CheckboxRModel(props: CheckboxRModelProps): JSX.Element {
   const [checked, setChecked] = useControllableState({
     value: props.checked,
-    defaultValue: props.defaultValue ?? false,
+    defaultValue: props.defaultChecked ?? false,
     onValueChange: props.onCheckedChange,
   });
 

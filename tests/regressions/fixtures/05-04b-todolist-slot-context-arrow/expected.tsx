@@ -7,7 +7,7 @@ interface ItemCtx { item: any; remaining: any; }
 
 interface ScopedSlotContextProps {
   items?: any[];
-  defaultValue?: any[];
+  defaultItems?: any[];
   onItemsChange?: (items: any[]) => void;
   renderItem?: (ctx: ItemCtx) => ReactNode;
   slots?: Record<string, () => import('react').ReactNode>;
@@ -16,7 +16,7 @@ interface ScopedSlotContextProps {
 export default function ScopedSlotContext(props: ScopedSlotContextProps): JSX.Element {
   const [items, setItems] = useControllableState({
     value: props.items,
-    defaultValue: props.defaultValue ?? (() => [])(),
+    defaultValue: props.defaultItems ?? (() => [])(),
     onValueChange: props.onItemsChange,
   });
   const remaining = useMemo(() => items.filter(i => !i.done).length, [items]);
