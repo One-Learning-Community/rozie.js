@@ -63,7 +63,8 @@ $effect(() => {
   // new Popper($refs.triggerEl, $refs.panelEl, { placement: 'bottom-start' })
 });
 
-$effect(() => { (() => open)(); (() => {
+let __rozieWatchInitial_0 = true;
+$effect(() => { (() => open)(); if (__rozieWatchInitial_0) { __rozieWatchInitial_0 = false; return; } (() => {
   if (open) reposition();
 })(); });
 

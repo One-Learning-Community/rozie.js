@@ -56,20 +56,19 @@ const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'] as const;
 /**
  * KNOWN_FAILING — targets that cannot paint at runtime today.
  *
- *   - svelte: Chart.js wrapper mounts but canvas paints 0 pixels. Suspected
- *     `$watch`-effect ordering: target-svelte's emitScript emits one
- *     `$effect` per `$watch` block, and on first flush the `$watch(type)`
- *     effect runs AFTER the mount `$effect`, sees `instance !== null`, calls
- *     `instance.destroy() + new Chart(...)`. This pattern paints reliably
- *     for Vue/React/Solid/Angular/Lit (5/6 cells green) but Svelte 5's
- *     `$effect` flush ordering interacts badly with Chart.js's
- *     canvas-context teardown — see `packages/targets/svelte/src/emit/emitScript.ts`
- *     watcher emission + Chart.js v4 `chart.destroy()` semantics. Follow-up
- *     gsd-debug brief required to root-cause the timing.
+ * Empty post-260519-svelte-watch-skip-initial. Svelte was previously here:
+ * its $watch lowering fired on initial mount because $effect always fires
+ * once at registration. LineChart's `$watch(() => $props.type, ...)` would
+ * then destroy the freshly-mounted Chart.js instance and recreate it in
+ * the same microtask, racing Chart.js's first-paint RAF and leaving the
+ * canvas blank. Fixed by gating the callback invocation behind a per-
+ * watcher `__rozieWatchInitial_N` flag — initial run subscribes the
+ * tracked reads but skips the body, matching the Vue/React/Solid/Angular
+ * /Lit primitive contracts.
  */
 const KNOWN_FAILING: ReadonlySet<typeof TARGETS[number]> = new Set<
   typeof TARGETS[number]
->(['svelte']);
+>();
 
 for (const target of TARGETS) {
   const built = existsSync(

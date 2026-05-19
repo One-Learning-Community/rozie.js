@@ -465,6 +465,7 @@ function emitWatcherHooks(
   const lines: string[] = [];
   const consumed = new Set<number>();
   const body = clonedProgram.program.body;
+  let watcherIdx = 0;
   for (let i = 0; i < body.length; i++) {
     const stmt = body[i];
     if (!stmt || !t.isExpressionStatement(stmt)) continue;
@@ -493,14 +494,42 @@ function emitWatcherHooks(
     // getter's evaluated value as the callback's first argument WHEN the
     // user-authored callback declares a parameter — otherwise svelte-check
     // flags "Expected 0 arguments, but got 1" for the `(() => {...})()` form.
-    const cbParamCount = (cbArg as t.ArrowFunctionExpression | t.FunctionExpression).params.length;
-    if (cbParamCount > 0) {
-      lines.push(`$effect(() => { const __watchVal = (${getterCode})(); (${cbCode})(__watchVal); });`);
+    //
+    // Skip-initial gate: $watch is a "fire on CHANGE" contract — Vue's
+    // `watch(getter, cb)`, Lit's updated()-route, Solid's createEffect via
+    // on(), and the user's mental model all skip the initial mount fire. In
+    // Svelte 5, `$effect` always fires once at registration so the tracked
+    // reads get subscribed; we still want the read for subscription but must
+    // gate the callback invocation behind a per-watcher flag.
+    //
+    // Without this gate, LineChart's `$watch($props.type)` body destroys the
+    // freshly-mounted Chart.js instance on first flush and recreates it in
+    // the same microtask, racing Chart.js's first-paint RAF (260519-5h8 VR
+    // KNOWN_FAILING). Vue/React/Solid/Angular/Lit don't see this race because
+    // their `$watch` lowering is skip-initial by primitive contract.
+    //
+    // Top-level `let` in Svelte 5 runes mode is a plain, NON-reactive
+    // variable (need `$state(...)` to opt in) — perfect for a setup-time flag.
+    const flag = `__rozieWatchInitial_${watcherIdx}`;
+    watcherIdx += 1;
+    const skipInitial = `if (${flag}) { ${flag} = false; return; }`;
+    if (cbParamCount(cbArg) > 0) {
+      lines.push(
+        `let ${flag} = true;\n$effect(() => { const __watchVal = (${getterCode})(); ${skipInitial} (${cbCode})(__watchVal); });`,
+      );
     } else {
-      lines.push(`$effect(() => { (${getterCode})(); (${cbCode})(); });`);
+      lines.push(
+        `let ${flag} = true;\n$effect(() => { (${getterCode})(); ${skipInitial} (${cbCode})(); });`,
+      );
     }
   }
   return { lines, consumedIndices: consumed };
+}
+
+function cbParamCount(
+  cbArg: t.ArrowFunctionExpression | t.FunctionExpression,
+): number {
+  return cbArg.params.length;
 }
 
 /**

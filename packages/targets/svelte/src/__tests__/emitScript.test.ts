@@ -134,7 +134,13 @@ $watch(() => $props.open, (v) => { if (v) reposition() })
     // as its first argument. Preserves user-authored `(v) => ...` params so
     // `v` binds to the new value (regression: the bare `(cb)()` form left
     // `v` undefined — Svelte/Angular/Lit silent no-op, Solid ReferenceError).
-    expect(scriptBlock).toMatch(/\$effect\(\(\) => \{\s*const __watchVal = \(\(\) => open\)\(\);\s*\(v => \{[\s\S]*?\}\)\(__watchVal\);\s*\}\);/);
+    //
+    // Skip-initial gate (260519-svelte-watch fix): the user callback must be
+    // gated behind a per-watcher `__rozieWatchInitial_N` flag so $watch fires
+    // only on CHANGE, not on the initial $effect registration.
+    expect(scriptBlock).toMatch(
+      /let __rozieWatchInitial_0 = true;\s*\$effect\(\(\) => \{\s*const __watchVal = \(\(\) => open\)\(\);\s*if \(__rozieWatchInitial_0\) \{ __rozieWatchInitial_0 = false; return; \}\s*\(v => \{[\s\S]*?\}\)\(__watchVal\);\s*\}\);/,
+    );
   });
 
   it('Quick 260515-u2b — WatchHook with zero-param callback omits __watchVal (svelte-check arity gate)', () => {
@@ -152,7 +158,9 @@ $watch(() => $props.open, () => { if ($props.open) reposition() })
     const parsed = parse(src, { filename: 'WatchSynthNoArg.rozie' });
     const ir = lowerToIR(parsed.ast!, { modifierRegistry: createDefaultRegistry() }).ir!;
     const { scriptBlock } = emitScript(ir);
-    expect(scriptBlock).toMatch(/\$effect\(\(\) => \{\s*\(\(\) => open\)\(\);\s*\(\(\) => \{[\s\S]*?\}\)\(\);\s*\}\);/);
+    expect(scriptBlock).toMatch(
+      /let __rozieWatchInitial_0 = true;\s*\$effect\(\(\) => \{\s*\(\(\) => open\)\(\);\s*if \(__rozieWatchInitial_0\) \{ __rozieWatchInitial_0 = false; return; \}\s*\(\(\) => \{[\s\S]*?\}\)\(\);\s*\}\);/,
+    );
     expect(scriptBlock).not.toContain('__watchVal');
   });
 
