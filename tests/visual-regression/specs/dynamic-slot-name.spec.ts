@@ -58,25 +58,58 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'] as const;
 
-// Targets where consumer-side `<template #[$data.slotName]>` dispatches into
-// an arbitrary new producer (not Modal). Lit is fixme'd here because the
-// runtime smoke surfaced a gap on 2026-05-17 against a fresh
-// DynamicSlotNameDemoProducer: the dispatched body lands in the default
-// position rather than the dynamically-named shadow-DOM slot, so the
-// `[data-rozie-slot-name="a"]` wrapper still contains the slot fallback
-// content. The 5/6 working targets (Vue/React/Svelte/Angular/Solid) prove
-// the F-07.3.2-11-A closure delivered cross-target dynamic-name dispatch
-// for the *Modal* case; the Lit-specific arbitrary-producer gap is filed
-// for follow-up debug. Remove the gate once the Lit emitter wires
-// dynamic-name `slot="${expr}"` projection for non-Modal producers.
-const LIT_DYNAMIC_NAME_GAP = new Set<(typeof TARGETS)[number]>(['lit']);
+// Phase 07.6 (2026-05-19) — `LIT_DYNAMIC_NAME_GAP` retired. The original
+// 2026-05-17 diagnosis ("dispatched body lands in the default position")
+// was misleading: empirical probing via slot.assignedNodes() shows the Lit
+// emit DOES correctly project `<div slot="${this._slotName.value}">…</div>`
+// into the producer's `<slot name="X">` via standard shadow-DOM slotting,
+// and the projection follows toggles in lockstep. The actual failure was
+// in this spec's assertion: a `toContainText` check on the shadow-DOM
+// wrapper `[data-rozie-slot-name="a"]` doesn't see projected content
+// because shadow-tree textContent doesn't traverse light-DOM-assigned
+// nodes. Solution: the assertion now reads the slot's projected text via
+// a target-agnostic helper that handles both light-DOM and shadow-DOM
+// projection — see `getSlotText` below.
+
+/**
+ * Read the projected text content of the producer's slot wrapper for slot
+ * `name`. Target-agnostic: walks both light-DOM and shadow-DOM, and resolves
+ * the slot via `assignedNodes({ flatten: true })` when the wrapper contains
+ * a `<slot>` element (Lit's shadow-DOM projection). Falls back to plain
+ * textContent for the 5 light-DOM targets.
+ */
+async function getSlotText(page: import('@playwright/test').Page, name: string): Promise<string> {
+  return page.evaluate((slotName) => {
+    function findAll(root: Element | Document | ShadowRoot | null | undefined, sel: string, found: Element[] = []): Element[] {
+      if (!root) return found;
+      if ((root as Element).matches?.(sel)) found.push(root as Element);
+      const shadowRoot = (root as Element).shadowRoot;
+      if (shadowRoot) findAll(shadowRoot, sel, found);
+      const children = (root as Element).children ?? [];
+      for (const c of Array.from(children)) findAll(c, sel, found);
+      return found;
+    }
+    const wrapper = findAll(document, `[data-rozie-slot-name="${slotName}"]`)[0];
+    if (!wrapper) return '<no-wrapper>';
+    const slotEl = wrapper.querySelector('slot');
+    if (slotEl) {
+      const assigned = (slotEl as HTMLSlotElement).assignedNodes({ flatten: true });
+      if (assigned.length === 0) return (slotEl.textContent ?? '').trim();
+      return assigned
+        .map((n) => (n.textContent ?? '').trim())
+        .filter(Boolean)
+        .join(' ')
+        .trim();
+    }
+    return (wrapper.textContent ?? '').trim();
+  }, name);
+}
 
 for (const target of TARGETS) {
   const built = existsSync(
     resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
   );
-  const hasLitGap = LIT_DYNAMIC_NAME_GAP.has(target);
-  const runner = !built || hasLitGap ? test.fixme : test;
+  const runner = !built ? test.fixme : test;
   runner(`dynamic-slot-name [${target}]: runtime toggle of slotName swaps the projected fill`, async ({
     page,
   }) => {
@@ -85,10 +118,9 @@ for (const target of TARGETS) {
     await expect(mount).toBeVisible();
 
     // Pre-toggle assertions: body should be in slot "a", default in slot "b".
-    const slotA = mount.locator('[data-rozie-slot-name="a"]').first();
-    const slotB = mount.locator('[data-rozie-slot-name="b"]').first();
-    await expect(slotA).toContainText('Dynamic fill');
-    await expect(slotB).toContainText('B default');
+    // Use polling expectation around `getSlotText` so the async mount completes.
+    await expect.poll(() => getSlotText(page, 'a'), { timeout: 5_000 }).toContain('Dynamic fill');
+    await expect.poll(() => getSlotText(page, 'b'), { timeout: 5_000 }).toContain('B default');
 
     // Programmatic toggle of slotName from 'a' to 'b'. The host page
     // exposes a button or input element that mutates the consumer's
@@ -99,7 +131,7 @@ for (const target of TARGETS) {
     await page.getByTestId('toggle-slot-name').click();
 
     // Post-toggle assertions: body should be in slot "b", default in "a".
-    await expect(slotA).toContainText('A default');
-    await expect(slotB).toContainText('Dynamic fill');
+    await expect.poll(() => getSlotText(page, 'a'), { timeout: 5_000 }).toContain('A default');
+    await expect.poll(() => getSlotText(page, 'b'), { timeout: 5_000 }).toContain('Dynamic fill');
   });
 }
