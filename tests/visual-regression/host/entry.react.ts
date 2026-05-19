@@ -11,7 +11,7 @@
  */
 import { createElement } from 'react';
 import { createRoot } from 'react-dom/client';
-import { parseQuery, mountWrapper, DEFAULT_PROPS } from './main';
+import { parseQuery, mountWrapper, DEFAULT_PROPS, toUncontrolledProps } from './main';
 
 // Two glob roots: `examples/*.rozie` is the canonical reference set;
 // `examples/demos/*.rozie` provides per-example wrappers that override the
@@ -40,10 +40,20 @@ async function main(): Promise<void> {
   // (e.g. `<Dropdown :open="true">…</Dropdown>` in demos/DropdownDemo.rozie),
   // so DEFAULT_PROPS is skipped — passing them would trip React's "unknown
   // prop on a component" warning since the wrapper has no matching props.
+  //
+  // `toUncontrolledProps` remaps `model: true` props to React's `default<Key>`
+  // seed prop so the component owns its state — without it, React's strict
+  // `useControllableState` freezes the value (the host wires no listener) and
+  // every interaction in the compare.html 6-up is inert. See main.ts.
   createRoot(mountWrapper()).render(
     createElement(
       mod.default,
-      isDemo ? null : (DEFAULT_PROPS[example] as Record<string, unknown>),
+      isDemo
+        ? null
+        : toUncontrolledProps(
+            example,
+            DEFAULT_PROPS[example] as Record<string, unknown>,
+          ),
     ),
   );
 }

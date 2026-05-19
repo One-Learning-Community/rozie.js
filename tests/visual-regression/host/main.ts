@@ -154,6 +154,59 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   CodeMirror: {},
 };
 
+/**
+ * `model: true` prop keys per example — the props the host must mount
+ * UNCONTROLLED on strict-controllable targets (React, Solid). See
+ * `toUncontrolledProps` below. Examples absent from this map have no model
+ * prop and are mounted with `DEFAULT_PROPS` verbatim.
+ */
+export const MODEL_PROPS: Partial<Record<Example, readonly string[]>> = {
+  Counter: ['value'],
+  Dropdown: ['open'],
+  TodoList: ['items'],
+  Modal: ['open'],
+};
+
+/**
+ * Rewrite a `DEFAULT_PROPS` entry so every `model: true` prop is passed via the
+ * uncontrolled-default seed prop (`default<Key>` — `defaultValue`, `defaultOpen`,
+ * `defaultItems`) instead of its controlled value name.
+ *
+ * Why: React (`useControllableState`) and Solid (`createControllableSignal`)
+ * implement strict Radix-style controllable state — when a controlled value is
+ * supplied WITHOUT a change listener, every internal write is silently dropped
+ * and the value stays frozen at what the parent passed. The VR host wires no
+ * parent listener, so on those two targets Counter/TodoList/Modal/Dropdown are
+ * completely inert (TodoList: Add clears the box but appends nothing; toggling
+ * a checkbox snaps straight back; Remove does nothing).
+ *
+ * Mounting uncontrolled hands state ownership to the component itself, so the
+ * compare.html 6-up is fully interactive. First paint is identical (the seed
+ * value is the same either way), so `matrix.spec.ts` screenshots are unaffected.
+ *
+ * Both targets emit the same `default<Key>` seed-prop name (the React emitter
+ * keys it to the model identifier just like Solid), so this helper is shared
+ * verbatim by `entry.react.ts` and `entry.solid.ts`.
+ *
+ * Vue (`defineModel`) / Svelte (`$bindable`) / Angular (`model()`) / Lit keep
+ * local state even when the controlled prop is supplied without a listener, so
+ * those entries pass `DEFAULT_PROPS` unchanged.
+ */
+export function toUncontrolledProps(
+  example: Example,
+  props: Record<string, unknown>,
+): Record<string, unknown> {
+  const modelKeys = MODEL_PROPS[example];
+  if (!modelKeys || modelKeys.length === 0) return props;
+  const seedKey = (k: string): string =>
+    `default${k.charAt(0).toUpperCase()}${k.slice(1)}`;
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(props)) {
+    out[modelKeys.includes(key) ? seedKey(key) : key] = value;
+  }
+  return out;
+}
+
 /** Parse `?example=&target=` from the current URL, falling back to defaults. */
 export function parseQuery(): HostQuery {
   const params = new URLSearchParams(location.search);
