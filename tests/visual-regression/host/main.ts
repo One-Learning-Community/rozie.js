@@ -45,6 +45,16 @@ export const EXAMPLES = [
   // portal-slot primitive against a real third-party JS engine,
   // complementing PortalList's synthetic in-line engine coverage.
   'FullCalendar',
+  // LineChart (added 2026-05-19) — non-portal engine-wrapper runtime
+  // smoke. Loader resolves to `examples/demos/LineChartDemo.rozie`
+  // (which imports `../LineChart.rozie`). Validates that the compiler
+  // does NOT activate portal machinery when no `<slot portal />` is
+  // declared — Chart.js paints to a `<canvas>` the framework never
+  // touches. Also exercises the Lit updated() shim on
+  // `$watch(() => $props.data, ...)` where data is a
+  // `{ labels, datasets: [{ data: [] }] }` ChartData object — a richer
+  // all-`$props` getterDep shape than FullCalendar's flat events array.
+  'LineChart',
 ] as const;
 
 export type Example = (typeof EXAMPLES)[number];
@@ -75,6 +85,7 @@ export const LIT_TAGS: Record<Example, string> = {
   LitScopedFillFirstpaint: 'rozie-lit-scoped-fill-firstpaint',
   PortalList: 'rozie-portal-list',
   FullCalendar: 'rozie-full-calendar',
+  LineChart: 'rozie-line-chart',
 };
 
 export interface HostQuery {
@@ -123,6 +134,10 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // has `events`, `view`, `weekends`, etc. props but the demo wrapper is
   // self-contained.)
   FullCalendar: {},
+  // LineChartDemo seeds its own state in `<data>` (points array + live-feed
+  // flag); the LineChart wrapper itself takes `data` / `options` / `type` /
+  // `height` props but the demo wrapper is self-contained.
+  LineChart: {},
 };
 
 /** Parse `?example=&target=` from the current URL, falling back to defaults. */

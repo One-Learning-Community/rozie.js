@@ -17,7 +17,7 @@ import { createComponent, type Type } from '@angular/core';
 import { parseQuery, mountWrapper, DEFAULT_PROPS } from './main';
 
 // Two glob roots — see entry.vue.ts for rationale; demos/ wins over root.
-const baseModules = import.meta.glob('../../../examples/{Counter,SearchInput,Dropdown,TodoList,Modal,TreeNode,Card,CardHeader,ModalConsumer,WrapperModal,PortalList,FullCalendar}.rozie');
+const baseModules = import.meta.glob('../../../examples/{Counter,SearchInput,Dropdown,TodoList,Modal,TreeNode,Card,CardHeader,ModalConsumer,WrapperModal,PortalList,FullCalendar,LineChart}.rozie');
 const demoModules = import.meta.glob('../../../examples/demos/*.rozie');
 
 /**

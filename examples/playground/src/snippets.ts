@@ -102,7 +102,7 @@ const BUNDLE_DECLS: readonly BundleDecl[] = [
   {
     key: 'bundle/LineChartDemo',
     label: 'bundle/LineChartDemo',
-    entryGlobPath: '../../LineChartDemo.rozie',
+    entryGlobPath: '../../demos/LineChartDemo.rozie',
     dependencyGlobPaths: ['../../LineChart.rozie'],
   },
   {
@@ -125,14 +125,24 @@ const BUNDLE_DECLS: readonly BundleDecl[] = [
   },
 ];
 
+// Bundle entry/dep paths can resolve against either glob root: top-level
+// `examples/*.rozie` (the original convention) OR `examples/demos/*.rozie`
+// (the VR-rig convention for demo wrappers that import a sibling
+// `<components>` engine). Look up against both maps so a bundle whose
+// entry lives under demos/ — like FullCalendarDemo and LineChartDemo —
+// resolves regardless of where future demos land.
+function lookupRozieSource(path: string): string | undefined {
+  return exampleFiles[path] ?? demoFiles[path];
+}
+
 function bundleSnippetFromDecl(decl: BundleDecl): Snippet | null {
-  const entrySource = exampleFiles[decl.entryGlobPath];
+  const entrySource = lookupRozieSource(decl.entryGlobPath);
   if (entrySource === undefined) return null;
   const files: Record<string, string> = {
     [filenameFromGlob(decl.entryGlobPath)]: entrySource,
   };
   for (const depPath of decl.dependencyGlobPaths) {
-    const depSource = exampleFiles[depPath];
+    const depSource = lookupRozieSource(depPath);
     if (depSource === undefined) {
       // Missing dependency — skip the bundle rather than emit a half-broken one.
       return null;

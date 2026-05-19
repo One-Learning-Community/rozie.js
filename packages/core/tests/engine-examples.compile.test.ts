@@ -44,7 +44,7 @@ const ENGINE_DEMOS = [
   'SortableListDemo.rozie',
   'FlatpickrDemo.rozie',
   'LeafletMapDemo.rozie',
-  'LineChartDemo.rozie',
+  'demos/LineChartDemo.rozie',
   'TipTapDemo.rozie',
   'UppyDemo.rozie',
   'demos/FullCalendarDemo.rozie',

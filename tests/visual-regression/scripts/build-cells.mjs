@@ -39,6 +39,12 @@ const REFERENCE_BASENAMES = [
   // loaded by the VR rig; both write Angular `.rozie.ts` cache artefacts
   // that the directory-glob cleanup below sweeps.
   'PortalList',
+  // Chart.js wrapper (added 2026-05-19). LineChartDemo (in examples/demos/)
+  // is loaded by the VR rig; both write Angular `.rozie.ts` cache artefacts
+  // that the directory-glob cleanup below sweeps. There is a sibling
+  // `examples/LineChart.ts` cross-rozie composition shim — gitignored and
+  // regenerated each Angular sub-build — that the cleanup deletes too.
+  'LineChart',
 ];
 
 // Cross-tree disk-cache files emitted by the Angular sub-build into the

@@ -10,7 +10,7 @@
     - $computed deriving chart data from raw $data inputs
     - r-for outside any foreign slot — index() auto-invocation safe on Solid
     - Interval-driven $data mutation via $onMount + cleanup (the live-feed
-      simulator pushes a new point every 1.2s)
+      simulator pushes a new point every 0.8s)
     - Component composition via <components> block
 -->
 
@@ -18,14 +18,14 @@
 
 <components>
 {
-  LineChart: './LineChart.rozie',
+  LineChart: '../LineChart.rozie',
 }
 </components>
 
 <data>
 {
   points: [12, 19, 8, 15, 22, 18, 24],
-  liveFeed: false,
+  liveFeed: true,
   chartType: 'line',
 }
 </data>
@@ -50,15 +50,17 @@ const chartData = $computed(() => {
   }
 })
 
-const chartOpts = $computed(() => ({
-  plugins: {
-    legend: { display: true, position: 'top' },
-  },
-  scales: {
-    y: { beginAtZero: true, grid: { color: 'rgba(0, 0, 0, 0.04)' } },
-    x: { grid: { display: false } },
-  },
-}))
+const chartOpts = $computed(() => {
+  return {
+    plugins: {
+      legend: { display: true, position: 'top' },
+    },
+    scales: {
+      y: { beginAtZero: true, grid: { color: 'rgba(0, 0, 0, 0.04)' } },
+      x: { grid: { display: false } },
+    },
+  }
+})
 
 const stats = $computed(() => {
   const xs = $data.points
@@ -96,7 +98,7 @@ $onMount(() => {
 
 $watch(() => $data.liveFeed, (on) => {
   if (on) {
-    if (timerId === null) timerId = setInterval(pushPoint, 1200)
+    if (timerId === null) timerId = setInterval(pushPoint, 800)
   } else {
     if (timerId !== null) {
       clearInterval(timerId)
@@ -125,7 +127,7 @@ $watch(() => $data.liveFeed, (on) => {
       </div>
       <label class="check">
         <input type="checkbox" r-model="$data.liveFeed" />
-        Live feed (1.2s)
+        Live feed (0.8s)
       </label>
       <div class="control-row">
         <span class="row-label">Type</span>

@@ -18,7 +18,7 @@ import { parseQuery, mountWrapper, DEFAULT_PROPS } from './main';
 // canonical for visual-regression purposes (e.g. demos/Dropdown.rozie fills
 // the default panel slot so the screenshot captures menu items instead of
 // an empty 1×18 box). When both globs match, the demos/ entry wins.
-const baseModules = import.meta.glob('../../../examples/{Counter,SearchInput,Dropdown,TodoList,Modal,TreeNode,Card,CardHeader,ModalConsumer,WrapperModal,PortalList,FullCalendar}.rozie');
+const baseModules = import.meta.glob('../../../examples/{Counter,SearchInput,Dropdown,TodoList,Modal,TreeNode,Card,CardHeader,ModalConsumer,WrapperModal,PortalList,FullCalendar,LineChart}.rozie');
 const demoModules = import.meta.glob('../../../examples/demos/*.rozie');
 
 async function main(): Promise<void> {

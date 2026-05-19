@@ -16,13 +16,13 @@ import { parseQuery, mountWrapper, DEFAULT_PROPS } from './main';
 // composes via its <components> block), and the rig-specific
 // `examples/demos/*.rozie` set. The brace list is deliberate — a permissive
 // `examples/*.rozie` would also pull in every engine-wrapper port
-// (Flatpickr/LeafletMap/LineChart/TipTap/Uppy/FullCalendar/SortableList) and
+// (Flatpickr/LeafletMap/TipTap/Uppy/SortableList) and
 // break the Vue sub-build whenever any of their emitted Vue SFCs has a TS-
 // parser-rejected shape. Those wrappers participate in the cross-target
 // compile gate (engine-examples.compile.test.ts) but NOT in the
 // visual-regression matrix. When BOTH globs match (demos/ vs base), the
 // demos/ entry wins per the loader below.
-const baseModules = import.meta.glob('../../../examples/{Counter,SearchInput,Dropdown,TodoList,Modal,TreeNode,Card,CardHeader,ModalConsumer,WrapperModal,PortalList,FullCalendar}.rozie');
+const baseModules = import.meta.glob('../../../examples/{Counter,SearchInput,Dropdown,TodoList,Modal,TreeNode,Card,CardHeader,ModalConsumer,WrapperModal,PortalList,FullCalendar,LineChart}.rozie');
 const demoModules = import.meta.glob('../../../examples/demos/*.rozie');
 
 async function main(): Promise<void> {
