@@ -6,7 +6,7 @@
  *   - `:class="expr"`                → `class=${expr}`
  *   - `:disabled="cond"` (boolean)   → `?disabled=${cond}`
  *   - `:value="expr"` on form input  → `.value=${expr}`
- *   - `@click="fn"`                  → handled by emitTemplateEvent
+ *   - `@click="fn"`                  → handled inline in emitTemplate.ts (buildEventParts)
  *
  * Real attribute emission lives inside emitTemplate.ts (per-element walk needs
  * context). This module exposes a typed wrapper for unit tests + external

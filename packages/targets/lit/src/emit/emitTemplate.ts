@@ -521,9 +521,9 @@ function buildEventParts(
   // Plan 07.1-03: `filter`-kind modifiers are resolved via registry dispatch
   // (`registry.get(name).lit(...)` -> LitEmissionDescriptor) instead of a
   // hand-rolled builtin-name `if`-ladder. This is the same dispatch contract
-  // emitListeners.ts / emitTemplateEvent.ts already use — Plan 07.1-02 missed
-  // this real template-event path, so third-party modifiers (the swipe
-  // dogfood canary) silently emitted no guard. `.debounce`/`.throttle`
+  // emitListeners.ts already uses — Plan 07.1-02 missed this real template-
+  // event path, so third-party modifiers (the swipe dogfood canary) silently
+  // emitted no guard. `.debounce`/`.throttle`
   // (`wrap`-kind) keep their bespoke class-field hoisting (WR-15) and
   // capture/passive/once (`listenerOption`-kind) keep their option-token
   // handling — those are not `inlineGuard` descriptors.

@@ -294,8 +294,12 @@ function emitOneListener(
       const refsArr = `[${refs.join(', ')}]`;
       const whenFn = whenExpr ? `, () => (${whenExpr})` : '';
       const unsubVar = `_u${index}`;
+      // WR-03 fix: respect isHandlerLike for the outside-click handler too.
+      // Inline expressions (e.g. `@click.outside="$data.open = false"`) must
+      // emit as statements (`this.open.value = false;`) not calls
+      // (`(this.open.value = false)(e)` — TypeError at click time).
       return [
-        `const ${unsubVar} = attachOutsideClickListener(${refsArr}, (e) => { ${cls.inlineGuards.join(' ')} ((${handlerExpr}) as (...args: any[]) => any)(e); }${whenFn});`,
+        `const ${unsubVar} = attachOutsideClickListener(${refsArr}, (e) => { ${cls.inlineGuards.join(' ')} ${userCall} }${whenFn});`,
         `this._disconnectCleanups.push(${unsubVar});`,
       ].join('\n');
     }
