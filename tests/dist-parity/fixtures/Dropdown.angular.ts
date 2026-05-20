@@ -1,4 +1,4 @@
-import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, effect, inject, input, model, viewChild } from '@angular/core';
+import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, effect, inject, input, model, untracked, viewChild } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 
 interface TriggerCtx {
@@ -86,9 +86,9 @@ export class Dropdown {
         onCleanup(unlisten);
       });
 
-    effect(() => { const __watchVal = (() => this.open())(); (() => {
+    effect(() => { const __watchVal = (() => this.open())(); untracked(() => (() => {
       if (this.open()) this.reposition();
-    })(); });
+    })()); });
   }
 
   ngAfterViewInit() {
