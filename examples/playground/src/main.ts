@@ -13,6 +13,7 @@ import {
 import { setupTextmate } from './textmate-setup';
 import { PreviewManager } from './preview/manager';
 import { SNIPPETS, DEFAULT_SNIPPET_KEY, findSnippet, type Snippet } from './snippets';
+import { encodeState, decodeState } from './url-state';
 import type { CompileTarget } from '@rozie/core';
 
 const EDITOR_OPTIONS: monaco.editor.IStandaloneEditorConstructionOptions = {
@@ -57,6 +58,12 @@ async function bootstrap(): Promise<void> {
     throw new Error('Playground bootstrap: missing DOM mount points');
   }
 
+  // Restore editor state from the URL hash (#<deflate-raw + base64url state>).
+  // A shared link or a post-refresh reload carries the snippet, target, and
+  // live buffer; absent a hash this is null and we fall back to the default.
+  const restored =
+    location.hash.length > 1 ? await decodeState(location.hash.slice(1)) : null;
+
   // Populate the snippet picker — group spike + bundle + examples + demos by
   // their key prefix (the leading "spike/", "bundle/", "demos/", or none) so
   // the dropdown organizes cleanly without us hand-categorizing.
@@ -76,6 +83,15 @@ async function bootstrap(): Promise<void> {
     opt.textContent = slash > -1 ? snippet.key.slice(slash + 1) : snippet.key;
     if (snippet.key === DEFAULT_SNIPPET_KEY) opt.selected = true;
     group.appendChild(opt);
+  }
+
+  // A restored link overrides the default selections — reflect its snippet
+  // and target in the pickers before the editor + first compile read them.
+  if (restored) {
+    if (findSnippet(restored.snippet)) snippetSelect.value = restored.snippet;
+    if ((ALL_TARGETS as readonly string[]).includes(restored.target)) {
+      targetSelect.value = restored.target;
+    }
   }
 
   // Inject the "Compare all targets" toggle into the toolbar next to the
@@ -116,21 +132,39 @@ async function bootstrap(): Promise<void> {
     monaco.languages.register({ id: 'rozie', extensions: ['.rozie'] });
   }
 
-  const defaultSnippet =
-    findSnippet(DEFAULT_SNIPPET_KEY) ?? SNIPPETS[0]!;
-  const defaultEntrySource = defaultSnippet.files[defaultSnippet.entry] ?? '';
+  const fallbackSnippet = findSnippet(DEFAULT_SNIPPET_KEY) ?? SNIPPETS[0]!;
+
+  // Resolve what the editor opens with. A restored URL state wins over the
+  // default snippet. An unknown restored snippet key (the snippet was removed
+  // since the link was made) degrades to a synthetic single-file snippet so
+  // the buffer still compiles — just without any bundle siblings.
+  let initialSnippet: Snippet;
+  let initialCode: string;
+  if (restored) {
+    initialSnippet =
+      findSnippet(restored.snippet) ?? {
+        key: restored.snippet,
+        label: restored.snippet,
+        entry: 'Playground.rozie',
+        files: { 'Playground.rozie': restored.code },
+      };
+    initialCode = restored.code;
+  } else {
+    initialSnippet = fallbackSnippet;
+    initialCode = fallbackSnippet.files[fallbackSnippet.entry] ?? '';
+  }
 
   const leftEditor = monaco.editor.create(editorHost, {
     ...EDITOR_OPTIONS,
     language: 'rozie',
-    value: defaultEntrySource,
+    value: initialCode,
   });
 
   // Track which snippet the editor is currently displaying — when the user
   // edits, we build an on-the-fly bundle that swaps the entry source for the
   // editor's contents while keeping any sibling files intact. That way an
   // edit to SortableListDemo.rozie still resolves './SortableList.rozie'.
-  let currentSnippet: Snippet = defaultSnippet;
+  let currentSnippet: Snippet = initialSnippet;
 
   snippetSelect.addEventListener('change', () => {
     const next = findSnippet(snippetSelect.value);
@@ -230,19 +264,43 @@ async function bootstrap(): Promise<void> {
     else runCompileSingle();
   }
 
+  // Mirror the live editor state into the URL hash so a refresh keeps
+  // unsaved edits and the address bar stays a shareable link. replaceState
+  // (not pushState) keeps keystrokes out of the back-button history.
+  function syncUrl(): void {
+    encodeState({
+      snippet: currentSnippet.key,
+      target: targetSelect!.value as CompileTarget,
+      code: leftEditor.getValue(),
+    })
+      .then((encoded) => {
+        history.replaceState(null, '', '#' + encoded);
+      })
+      .catch(() => {
+        /* encoding failure is non-fatal — the editor keeps working */
+      });
+  }
+
   let timer: ReturnType<typeof setTimeout> | undefined;
   leftEditor.onDidChangeModelContent(() => {
     if (timer !== undefined) clearTimeout(timer);
-    timer = setTimeout(runCompile, 250);
+    timer = setTimeout(() => {
+      runCompile();
+      syncUrl();
+    }, 250);
   });
 
   // Explicit user dropdown change compiles immediately (no debounce).
-  targetSelect.addEventListener('change', runCompile);
+  targetSelect.addEventListener('change', () => {
+    runCompile();
+    syncUrl();
+  });
   snippetSelect.addEventListener('change', () => {
     // The snippet-change handler above already updated the editor; debounce
     // path will fire too, but explicit compile makes the initial paint feel
     // responsive on snippet swap.
     runCompile();
+    syncUrl();
   });
 
   modeToggleInput.addEventListener('change', () => {
