@@ -287,16 +287,24 @@ Playwright container. macOS-generated baselines diff against every cell
 on CI due to font binary / glyph metric differences (no amount of
 `-webkit-font-smoothing: none` fixes this).
 
-Recipe — runs the same exact image CI uses, mounts the workspace,
-regenerates Vue baselines via `-u`, then verifies all 48 cells against
-them inside the container:
+Recipe — runs a Playwright container, mounts the workspace, regenerates
+Vue baselines via `-u`, then verifies all 48 cells against them inside
+the container:
+
+The image tag must match the installed `@playwright/test` version
+(`^1.59.1`) — the container ships the browser build for exactly its own
+Playwright version, so a mismatch fails with "Executable doesn't exist".
+Bumping Playwright is perfectly fine; the snippet derives the tag from
+the lockfile so the image tracks the package automatically — no manual
+edit here when Playwright updates.
 
 ```sh
-docker pull mcr.microsoft.com/playwright:v1.60.0-jammy
+PW=$(cd tests/visual-regression && node -p "require('@playwright/test/package.json').version")
+docker pull "mcr.microsoft.com/playwright:v${PW}-jammy"
 
 docker run --rm \
   -v "$PWD":/workspace -w /workspace \
-  mcr.microsoft.com/playwright:v1.60.0-jammy bash -c '
+  "mcr.microsoft.com/playwright:v${PW}-jammy" bash -c '
     npm i -g pnpm@10 > /dev/null 2>&1 &&
     CI=true pnpm install --frozen-lockfile --prefer-offline &&
     pnpm turbo run build &&

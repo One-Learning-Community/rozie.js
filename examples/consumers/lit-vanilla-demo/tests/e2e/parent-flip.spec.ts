@@ -6,11 +6,15 @@
 // observe the change.
 //
 // In Lit-target output, value-change is fired by createLitControllableProperty
-// in BOTH controlled and uncontrolled modes. The shadow-DOM re-render path on
-// property writes is a v1 emitter limitation (the controllable does not call
-// `host.requestUpdate()` after a property write); the EVENT path verified here
-// is fully wired — `(el as any).value = 20` fires the CustomEvent with
-// detail=20, bubbles=true, composed=true.
+// in BOTH controlled and uncontrolled modes. This spec verifies the EVENT
+// path — `(el as any).value = 20` fires the CustomEvent with detail=20,
+// bubbles=true, composed=true.
+//
+// NOTE (2026-05-20): the shadow-DOM re-render path on property writes IS
+// wired. createLitControllableProperty is backed by a @preact/signals-core
+// signal, so write() updates a signal that SignalWatcher tracks → re-render
+// (no host.requestUpdate() needed). Verified in a browser. The earlier
+// "v1 emitter limitation" note here was stale.
 //
 // The attribute-driven path (setAttribute → notifyAttributeChange → re-render)
 // is verified in counter.spec.ts's third test.
