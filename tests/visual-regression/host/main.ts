@@ -74,6 +74,19 @@ export const EXAMPLES = [
   // `@portal` primitive its visual/runtime VR coverage to complement the
   // structural dist-parity coverage landed by 260519-vyv.
   'PortalListStyled',
+  // Engine-wrapper demos (added 2026-05-20, quick-task 260520-hus) — standing
+  // VR coverage for the 6-demo render-confirm sweep. Each loader-resolves to
+  // `examples/demos/<Name>Demo.rozie` (which imports its canonical sibling
+  // `../<Name>.rozie`). SortableList/Flatpickr/TipTap/Uppy + the already-wired
+  // Table are baseline-gated screenshot cells in matrix.spec.ts; LeafletMap is
+  // behavioral-only (live OSM tiles are non-deterministic — see
+  // leaflet-map.spec.ts). All 6 build clean on all 6 targets.
+  'SortableList',
+  'Flatpickr',
+  'LeafletMap',
+  'TipTap',
+  'Uppy',
+  'Table',
 ] as const;
 
 export type Example = (typeof EXAMPLES)[number];
@@ -107,6 +120,13 @@ export const LIT_TAGS: Record<Example, string> = {
   LineChart: 'rozie-line-chart',
   CodeMirror: 'rozie-code-mirror',
   PortalListStyled: 'rozie-portal-list-styled',
+  // Engine-wrapper demos — canonical kebab tag; the lit entry appends `-demo`.
+  SortableList: 'rozie-sortable-list',
+  Flatpickr: 'rozie-flatpickr',
+  LeafletMap: 'rozie-leaflet-map',
+  TipTap: 'rozie-tip-tap',
+  Uppy: 'rozie-uppy',
+  Table: 'rozie-table',
 };
 
 export interface HostQuery {
@@ -165,6 +185,15 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   CodeMirror: {},
   // PortalListStyledDemo carries its 4-item array in <data>; no props needed.
   PortalListStyled: {},
+  // Engine-wrapper demos — each <Name>Demo carries its reactive state in
+  // <data> (and seeds it in `$onMount` where needed); the wrappers themselves
+  // expose props, but the demo consumers are self-contained, so `{}`.
+  SortableList: {},
+  Flatpickr: {},
+  LeafletMap: {},
+  TipTap: {},
+  Uppy: {},
+  Table: {},
 };
 
 /**
