@@ -1,6 +1,16 @@
 import type { SourceLoc } from '../ast/types.js';
 
-export type DiagnosticSeverity = 'error' | 'warning';
+/**
+ * Diagnostic severity levels:
+ * - `error`   — compilation cannot produce correct output; aborts emit.
+ * - `warning` — emit succeeds but the author should look at something;
+ *   surfaced to the user (e.g. via unplugin's `this.warn`).
+ * - `info`    — non-actionable advisory: the compiler did something
+ *   automatically and correctly, reported purely as an FYI. NOT surfaced
+ *   via `this.warn`. Every consumer filters on `=== 'error'` / `=== 'warning'`
+ *   explicitly, so `info` diagnostics fall through both and stay quiet.
+ */
+export type DiagnosticSeverity = 'error' | 'warning' | 'info';
 
 /**
  * Stable diagnostic shape. Codes follow ROZxxx convention (D-07):

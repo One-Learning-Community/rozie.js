@@ -230,8 +230,8 @@ export function hoistModuleLet(program: File, ir: IRComponent): HoistResult {
     }
     diagnostics.push({
       code: RozieErrorCode.TARGET_REACT_MODULE_LET_AUTO_HOISTED,
-      severity: 'warning',
-      message: `Module-scoped \`let ${name}\` referenced from a lifecycle hook auto-hoisted to \`useRef\` (\`${name}.current\`). Reads and writes are rewritten to \`${name}.current\`. To suppress this advisory, refactor to a useRef declaration in your script.`,
+      severity: 'info',
+      message: `Module-scoped \`let ${name}\` referenced from a lifecycle hook was auto-hoisted to per-instance storage so each React instance keeps its own copy. Reads and writes to \`${name}\` are handled automatically — no action needed.`,
       loc: c.sourceLoc,
     });
   }

@@ -53,10 +53,10 @@ describe('hoistModuleLet', () => {
       expect(inst.initialExpr.value).toBe('');
     }
 
-    // ROZ522 diagnostic emitted as advisory (severity warning).
+    // ROZ522 diagnostic emitted as advisory (severity info).
     const roz522 = diagnostics.find((d) => d.code === 'ROZ522');
     expect(roz522).toBeDefined();
-    expect(roz522!.severity).toBe('warning');
+    expect(roz522!.severity).toBe('info');
 
     // Module-let declaration removed from cloned Program top level.
     const stillHasLet = cloned.program.body.some(

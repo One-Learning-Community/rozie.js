@@ -426,7 +426,7 @@ describe('emitReact — whole-tsx fixture snapshots', () => {
     expect(code).not.toContain("import React from 'react'");
     expect(code).toContain('savedBodyOverflow.current');
     expect(code).toContain('const savedBodyOverflow = useRef');
-    // ROZ522 warning emitted as advisory
+    // ROZ522 info advisory emitted
     const roz522 = diagnostics.find((d) => d.code === 'ROZ522');
     expect(roz522).toBeDefined();
 
