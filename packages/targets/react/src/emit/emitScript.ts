@@ -1387,6 +1387,53 @@ export function emitScript(
   // array comes from WatchHook.getterDeps (NOT the callback body's deps).
   // Same `renderDepArray` helper applies; callback body is inlined into the
   // useEffect callback exactly like a lifecycle setup body.
+
+  // Pre-scan ALL top-level helpers (arrow + function decl) so the
+  // `computeHelperBodyDeps` walk knows which identifiers are sibling helpers
+  // (and should be classified as `closure` deps, not unknown identifiers).
+  //
+  // 260519 linechart-watch-recreate Round 4 — this pre-scan was previously
+  // built in section 6b (AFTER the lifecycle + watcher loops). It is hoisted
+  // here so the watcher loop's callback-body walk can consult it when deciding
+  // whether to emit the targeted `react-hooks/exhaustive-deps` disable
+  // directive (see the per-watcher block below).
+  const allHelperNames = new Set<string>();
+  // Build helper-name -> declaration-location map for the ROZ524 diagnostic.
+  const helperLocByName = new Map<string, { start: number; end: number }>();
+  for (let i = 0; i < cloned.program.body.length; i++) {
+    if (lifecyclePairing.consumedIndices.has(i)) continue;
+    // Quick plan 260515-u2b - $watch lines were emitted as useEffects.
+    if (watcherPairing.consumedIndices.has(i)) continue;
+    const stmt = cloned.program.body[i]!;
+    if (t.isFunctionDeclaration(stmt) && stmt.id) {
+      allHelperNames.add(stmt.id.name);
+      if (stmt.id.loc) {
+        helperLocByName.set(stmt.id.name, {
+          start: stmt.id.loc.start.index ?? 0,
+          end: stmt.id.loc.end.index ?? 0,
+        });
+      }
+      continue;
+    }
+    if (t.isVariableDeclaration(stmt)) {
+      for (const d of stmt.declarations) {
+        if (
+          t.isIdentifier(d.id) &&
+          d.init &&
+          (t.isArrowFunctionExpression(d.init) || t.isFunctionExpression(d.init))
+        ) {
+          allHelperNames.add(d.id.name);
+          if (d.id.loc) {
+            helperLocByName.set(d.id.name, {
+              start: d.id.loc.start.index ?? 0,
+              end: d.id.loc.end.index ?? 0,
+            });
+          }
+        }
+      }
+    }
+  }
+
   const lifecycleEffectLines: string[] = [];
   // Portal-slot primitive (Spike 003) — inject the portals closure into the
   // FIRST mount-phase lifecycle hook. The closure depends on `portalRoots`
@@ -1525,9 +1572,53 @@ export function emitScript(
       cleanupInvocation = `\n  return () => {\n    ${portalsEmit.bulkDisposeBlock}\n  };`;
     }
 
-    lifecycleEffectLines.push(
-      `useEffect(() => {\n  ${setupInvocation}${cleanupInvocation}\n}, ${depsArr});`,
+    // 260519 linechart-watch-recreate Round 4 — emit a TARGETED
+    // `react-hooks/exhaustive-deps` disable on the dependency-array line of an
+    // intentional mount-once useEffect. A mount hook emits `[]` by contract
+    // (see the `depsArr` comment above); `exhaustive-deps` is a static lint
+    // that cannot distinguish that intentional `[]` from a forgotten
+    // dependency, so it flags every mount useEffect whose body reads a
+    // closure helper / state var / prop. D-62 (relaxed for justified cases)
+    // permits this rule-specific, idiomatic disable — it is exactly what a
+    // careful React dev hand-writes for an intentional `[]`.
+    //
+    // PLACEMENT: `exhaustive-deps` reports on the dependency-array node, i.e.
+    // the `}, [...]);` line. The directive is appended as a trailing
+    // `eslint-disable-line` on that exact line so it suppresses the report.
+    //
+    // CONDITIONAL: eslint v9 flat config defaults `reportUnusedDisableDirectives`
+    // to `warn`, so a directive on a non-violating effect (an empty-body mount
+    // useEffect, or one that only reads stable refs) becomes an unused-directive
+    // warning that re-fails the strict gate. `filteredSetupDeps` is non-empty
+    // only when the body reads a flagged binding (closure / props / data /
+    // computed — refs are already excluded per D-21b), so it is the exact
+    // proxy for "this `[]` mount effect actually trips the rule".
+    //
+    // PREDICATE PRECISION: `filteredSetupDeps` non-empty is NOT a sufficient
+    // proxy on its own. The IR's dep analysis classifies a bare global
+    // (`console`, `window`, ...) read inside the hook body as a `closure`
+    // SignalRef — but `exhaustive-deps` knows globals are stable and does NOT
+    // flag them. A directive emitted for a body that reads ONLY globals would
+    // become an unused-directive warning. So a setup dep counts as
+    // lint-flaggable only when it is a genuine reactive binding:
+    //   - props / data / computed / slots — always real reactive reads;
+    //   - closure — real ONLY when the identifier is a top-level helper
+    //     (`allHelperNames`); those get a `useCallback` wrap (section 6a) and
+    //     thus an unstable identity the rule flags. A `closure` ref whose
+    //     identifier is NOT a known helper is a mis-tagged global — skip it.
+    const mountHasFlaggableDep = filteredSetupDeps.some((d) =>
+      d.scope === 'closure' ? allHelperNames.has(d.identifier) : true,
     );
+    const mountNeedsDisable = lh.phase === 'mount' && mountHasFlaggableDep;
+    if (mountNeedsDisable) {
+      lifecycleEffectLines.push(
+        `useEffect(() => {\n  ${setupInvocation}${cleanupInvocation}\n}, ${depsArr}); // eslint-disable-line react-hooks/exhaustive-deps`,
+      );
+    } else {
+      lifecycleEffectLines.push(
+        `useEffect(() => {\n  ${setupInvocation}${cleanupInvocation}\n}, ${depsArr});`,
+      );
+    }
   });
 
   // Quick plan 260515-u2b — emit one useEffect per WatchHook.
@@ -1585,9 +1676,53 @@ export function emitScript(
     // deps rule is advisory tooling; the watcher-fires-on-getter contract is
     // the correctness invariant — and it matches the five sibling targets.
     const depsArr = renderDepArray(wh.getterDeps, modelProps);
-    lifecycleEffectLines.push(
-      `useEffect(() => {\n  ${paramBinding}${cbInvocation}\n}, ${depsArr});`,
+
+    // 260519 linechart-watch-recreate Round 4 — emit a TARGETED
+    // `react-hooks/exhaustive-deps` disable on the watcher useEffect's
+    // dependency-array line WHEN (and only when) the callback body reads a
+    // binding beyond the getter's deps. The watcher's dep array is the
+    // getter's deps ONLY (the watcher-fires-on-getter contract above); the
+    // callback body's reads are consequences of the watcher firing, not
+    // subscription sources. `exhaustive-deps` cannot know that, so it flags
+    // any callback-body read missing from `depsArr`.
+    //
+    // CONDITIONAL: `computeHelperBodyDeps` (the pre-Bug-B helper that the dep
+    // array used to union in) computes exactly the set of bindings the
+    // callback body reads. If every one of those is already covered by
+    // `wh.getterDeps`, the effect does not trip the rule and a directive
+    // would become an unused-directive warning — so emit it only for the
+    // genuine over-read case. Refs / stable identifiers are excluded by
+    // `computeHelperBodyDeps` itself (D-21b), so a callback that only touches
+    // refs correctly gets no directive.
+    const getterDepKeys = new Set(
+      wh.getterDeps.map((d) =>
+        d.scope === 'closure'
+          ? `closure::${d.identifier}`
+          : `${d.scope}::${d.path.join('.')}`,
+      ),
     );
+    const callbackBodyDeps = computeHelperBodyDeps(
+      cbCloned,
+      ir,
+      allHelperNames,
+      '',
+    );
+    const watcherNeedsDisable = callbackBodyDeps.some((d) => {
+      const key =
+        d.scope === 'closure'
+          ? `closure::${d.identifier}`
+          : `${d.scope}::${d.path.join('.')}`;
+      return !getterDepKeys.has(key);
+    });
+    if (watcherNeedsDisable) {
+      lifecycleEffectLines.push(
+        `useEffect(() => {\n  ${paramBinding}${cbInvocation}\n}, ${depsArr}); // eslint-disable-line react-hooks/exhaustive-deps`,
+      );
+    } else {
+      lifecycleEffectLines.push(
+        `useEffect(() => {\n  ${paramBinding}${cbInvocation}\n}, ${depsArr});`,
+      );
+    }
   });
 
   const hookSection = hookLines.join('\n');
@@ -1624,45 +1759,10 @@ export function emitScript(
     }
   }
 
-  // 6b. Pre-scan ALL top-level helpers (arrow + function decl) so the
-  // computeHelperBodyDeps walk knows which identifiers are sibling helpers
-  // (and should be classified as `closure` deps, not unknown identifiers).
-  const allHelperNames = new Set<string>();
-  // Build helper-name → declaration-location map for the ROZ524 diagnostic.
-  const helperLocByName = new Map<string, { start: number; end: number }>();
-  for (let i = 0; i < cloned.program.body.length; i++) {
-    if (lifecyclePairing.consumedIndices.has(i)) continue;
-    // Quick plan 260515-u2b — $watch lines were emitted as useEffects.
-    if (watcherPairing.consumedIndices.has(i)) continue;
-    const stmt = cloned.program.body[i]!;
-    if (t.isFunctionDeclaration(stmt) && stmt.id) {
-      allHelperNames.add(stmt.id.name);
-      if (stmt.id.loc) {
-        helperLocByName.set(stmt.id.name, {
-          start: stmt.id.loc.start.index ?? 0,
-          end: stmt.id.loc.end.index ?? 0,
-        });
-      }
-      continue;
-    }
-    if (t.isVariableDeclaration(stmt)) {
-      for (const d of stmt.declarations) {
-        if (
-          t.isIdentifier(d.id) &&
-          d.init &&
-          (t.isArrowFunctionExpression(d.init) || t.isFunctionExpression(d.init))
-        ) {
-          allHelperNames.add(d.id.name);
-          if (d.id.loc) {
-            helperLocByName.set(d.id.name, {
-              start: d.id.loc.start.index ?? 0,
-              end: d.id.loc.end.index ?? 0,
-            });
-          }
-        }
-      }
-    }
-  }
+  // 6b. Helper-name pre-scan (`allHelperNames` / `helperLocByName`) is built
+  // earlier — hoisted above the lifecycle + watcher loops in Round 4 of
+  // 260519 linechart-watch-recreate so the watcher loop's callback-body walk
+  // can consult it. See the pre-scan block before `lifecycleEffectLines`.
 
   // Phase 07.7 — ROZ524 collision detection. React auto-generates `set<Cap>`
   // setters for every state / model-prop via `useState` / `useControllableState`

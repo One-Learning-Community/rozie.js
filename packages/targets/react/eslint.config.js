@@ -36,22 +36,21 @@ export default [
       // manages its dep set internally via ref-storage (D-61 stale-closure
       // defense), so consumer call-sites are safe by construction.
       //
-      // 260519 linechart-watch-recreate Bug B — exhaustive-deps is 'warn',
-      // not 'error'. Rozie's mount-phase $onMount lowering MUST emit an empty
+      // 260519 linechart-watch-recreate Round 4 — exhaustive-deps is back at
+      // 'error'. Rozie's mount-phase $onMount lowering MUST emit an empty
       // `[]` dep array: a mount hook runs exactly once by contract (the other
       // five targets honour this structurally — Vue onMounted, Svelte/Solid
       // onMount, Lit firstUpdated, Angular ngAfterViewInit). exhaustive-deps
       // is a *static* lint that cannot distinguish an intentional mount-once
-      // `[]` from a forgotten dependency, so it flags every emitted mount
-      // useEffect that calls a prop-keyed helper (`lockScroll`, `reposition`).
-      // D-62's floor is "no `eslint-disable` comments in emitted output" — it
-      // is NOT "exhaustive-deps must be error severity". Demoting to 'warn'
-      // keeps the rule advisory (it still surfaces in editors and CI logs)
-      // while letting the now-correct mount/`$watch` dep arrays through. The
-      // stale-closure protection that mattered — functional-updater lowering
-      // for `$data.x = f($data.x)` — is enforced correct-by-construction in
-      // the compiler (rewriteScript.ts), not by this lint.
-      'react-hooks/exhaustive-deps': ['warn', {
+      // `[]` from a forgotten dependency, so the React emitter now emits a
+      // TARGETED `// eslint-disable-line react-hooks/exhaustive-deps` on the
+      // dependency-array line of those intentional mount-once / getter-scoped
+      // $watch useEffects (emitScript.ts) — exactly what a careful React dev
+      // hand-writes for an intentional `[]`. D-62 is relaxed to permit that
+      // justified, rule-specific disable; blanket disables stay forbidden.
+      // With the directive carried in the emitted output, the rule can sit at
+      // 'error' so any OTHER missing-dep (a real bug) still fails CI.
+      'react-hooks/exhaustive-deps': ['error', {
         additionalHooks: '(useDebouncedCallback|useThrottledCallback)'
       }]
     }
