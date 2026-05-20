@@ -263,7 +263,9 @@ function cssPropToStyleKey(prop: string): string {
  * shape to object-form `:style`. When a declaration carries `!important`,
  * a ROZ083 WARN is collected (Solid's object form silently drops it).
  *
- * Spike 004 locked decision #8: v1 is syntactic-parse only.
+ * Spike 004 locked decision #8: v1 is syntactic-parse only — a malformed
+ * style string surfaces as a ROZ080 diagnostic (caught here, never a raw
+ * PostCSS throw).
  */
 function lowerStringLiteralStyle(
   attr: Extract<AttributeBinding, { kind: 'binding' }>,
@@ -271,7 +273,24 @@ function lowerStringLiteralStyle(
 ): { jsx: string; diagnostics: Diagnostic[] } {
   const diagnostics: Diagnostic[] = [];
   const props: string[] = [];
-  const root = postcss.parse(literal);
+  let root;
+  try {
+    root = postcss.parse(literal);
+  } catch (err) {
+    // Malformed inline-style literal (e.g. an unclosed `url(` or stray brace).
+    // Surface a ROZ080 rather than letting the raw PostCSS exception abort the
+    // whole compile; fall back to an empty style object so the emitted
+    // component still type-checks.
+    diagnostics.push({
+      code: RozieErrorCode.STYLE_PARSE_ERROR,
+      severity: 'error',
+      message:
+        `Could not parse inline \`:style\` string ${JSON.stringify(literal)}: ` +
+        `${err instanceof Error ? err.message : String(err)}`,
+      loc: attr.sourceLoc,
+    });
+    return { jsx: 'style={{}}', diagnostics };
+  }
   root.walkDecls((decl) => {
     const key = cssPropToStyleKey(decl.prop);
     const keyOut = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(key) ? key : JSON.stringify(key);

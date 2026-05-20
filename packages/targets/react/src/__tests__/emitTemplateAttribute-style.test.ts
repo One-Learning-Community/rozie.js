@@ -118,4 +118,20 @@ describe('emitTemplateAttribute (React) — string-form `:style` (Plan 260520-8i
     expect(jsx).not.toContain('parseInlineStyle');
     expect(ctx.collectors.runtime.has('parseInlineStyle')).toBe(false);
   });
+
+  it('malformed string LITERAL `:style` → ROZ080 diagnostic, not a raw PostCSS throw', () => {
+    const ir = emptyIR();
+    // `'a {'` is an unclosed CSS block — `postcss.parse` throws on it. Pre-fix
+    // that raw exception aborted the whole compile; now it is caught and
+    // surfaced as a ROZ080 with an empty-style-object fallback.
+    expect(() =>
+      emitAttributes([styleBinding(`'a {'`)], freshCtx(ir)),
+    ).not.toThrow();
+    const { jsx, diagnostics } = emitAttributes([styleBinding(`'a {'`)], freshCtx(ir));
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]!.code).toBe('ROZ080');
+    expect(diagnostics[0]!.severity).toBe('error');
+    expect(jsx).toContain('style={{}}');
+    expect(jsx).not.toContain('parseInlineStyle');
+  });
 });
