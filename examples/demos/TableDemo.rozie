@@ -68,7 +68,14 @@ const total = $computed(() => $data.rows.reduce((s, r) => s + r.score, 0))
 </template>
 
 <style>
-.table-demo { display: flex; flex-direction: column; gap: 0.75rem; font-family: system-ui, sans-serif; }
+/* Fixed width decouples the table from the toggle button's `fit-content`
+   size. The button text interpolates `{{ footerMode }}`, which JSX/Lit emit
+   as multiple text nodes (vs one for Vue/Svelte/Angular); Chromium accrues
+   ~1/64px of kerning per text-node boundary, so a fit-content button is
+   ~0.016px wider on react/solid/lit. The `width:100%` table tracked that
+   drift and shifted the `-webkit-center` <caption>, failing the VR matcher.
+   A fixed width keeps all six targets pixel-stable. */
+.table-demo { display: flex; flex-direction: column; gap: 0.75rem; font-family: system-ui, sans-serif; width: 280px; }
 .badge { padding: 0.125rem 0.5rem; border-radius: 999px; font-size: 0.8em; }
 .badge-active { background: #d1fae5; color: #065f46; }
 .badge-pending { background: #fef3c7; color: #92400e; }

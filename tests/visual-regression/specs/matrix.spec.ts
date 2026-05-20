@@ -234,33 +234,40 @@ async function settleExample(
 // bug is fixed and this gate is removed.
 const TIPTAP_SOLID_KNOWN_RUNTIME_BUG = true;
 
-// Known cross-target-divergence gate (baseline run 2026-05-20). The 5
-// engine-wrapper demos (Table / SortableList / Flatpickr / Uppy / TipTap) do
-// NOT render byte-identical to the Vue baseline on the cells listed below.
-// The Linux-Docker baseline regen verified all 6 targets against the
-// Vue-generated `${example}.png` and 12 cells diverged:
-//   - STRUCTURAL (7): real layout deltas — Table·angular renders 24px wider,
-//     TipTap·react 37px taller, Table·react / TipTap·svelte / TipTap·lit carry
-//     genuine content offsets; Table·solid / Table·lit are marginal (~33px,
-//     one glyph of antialiasing, just over `maxDiffPixels: 2`). React is the
-//     outlier — 8 of the 12 cells.
-//   - SETTLE-TIMING (5): SortableList·react, Flatpickr·react, Uppy·react,
+// Known cross-target-divergence gate. The engine-wrapper demos do NOT all
+// render byte-identical to the Vue baseline; the cells below are gated
+// `test.fixme` (known-pending) so the suite stays GREEN-PENDING, not red.
+// This is NOT a D-11 visual exemption — D-11 forbids hiding drift on cells
+// that DO render byte-identical; these provably do not.
+//
+// RESOLVED (quick-task 260520-hus follow-up, 2026-05-20) — the 4 Table cells
+// that previously diverged are fixed and now pass; their entries are removed:
+//   - Table·react: dynamic `:class` template literal (`badge badge-${value}`)
+//     bypassed the React CSS-Modules `styles` lookup → hashed `._badge_<h>`
+//     selectors never matched, badge pills lost styling. Fixed in the React
+//     emitter (composeClassName routes StringLiteral/TemplateLiteral `:class`
+//     through `styles`).
+//   - Table·angular: dynamic `:colspan` emitted `[colspan]` — an Angular
+//     DOM-property binding to a non-existent lowercase property, a silent
+//     no-op → footer cell never spanned → table ~24px wider. Fixed via the
+//     Angular emitter's HTML_ATTR_CASING map (`[colSpan]`, et al.).
+//   - Table·solid / Table·lit: ~33px caption antialiasing — the `width:100%`
+//     table tracked the toggle button's `fit-content` width, which kerns
+//     ~1/64px wider on react/solid/lit (Chromium text-node-boundary drift),
+//     shifting the `-webkit-center` <caption>. Fixed by pinning a fixed
+//     `.table-demo` width in TableDemo.rozie. Table.png baseline regenerated.
+//
+// REMAINING (8 cells):
+//   - TipTap·react / ·svelte / ·lit: NOT structural — the editor is captured
+//     in a different STATE (toolbar-active button + bound-HTML content differ
+//     from the Vue baseline). Belongs with the settle-timing class below;
+//     left here pending the settleExample / state-determinism follow-up.
+//   - SETTLE-TIMING: SortableList·react, Flatpickr·react, Uppy·react,
 //     Uppy·angular, TipTap·angular each retried `toHaveScreenshot` to a ~5s
 //     timeout — the engine demo had not stabilized when captured;
 //     `settleExample` is not yet sufficient for these.
-// D-10 single-baseline byte-identity holds for the 9 simple reference
-// components but NOT these complex engine wrappers. These cells are gated
-// `test.fixme` (known-pending) so the suite stays GREEN-PENDING, not red.
-// This is NOT a D-11 visual exemption — D-11 forbids hiding drift on cells
-// that DO render byte-identical; these provably do not. Tracked follow-up:
-// investigate the React-outlier structural divergence + tighten
-// `settleExample` for the timing cells, removing each entry as it resolves.
 const KNOWN_CROSS_TARGET_DIVERGENCE = new Set<string>([
-  // structural layout divergence
-  'Table::react',
-  'Table::angular',
-  'Table::solid',
-  'Table::lit',
+  // editor-state divergence (capture-time state, not a structural emit bug)
   'TipTap::react',
   'TipTap::svelte',
   'TipTap::lit',
