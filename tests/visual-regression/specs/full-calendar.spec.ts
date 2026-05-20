@@ -71,9 +71,10 @@ const KNOWN_FAILING: ReadonlySet<typeof TARGETS[number]> = new Set<
   typeof TARGETS[number]
 >();
 
-// Seed event titles from FullCalendarDemo.rozie's `sampleEvents()`. Rendered
-// text carries a trailing random emoji per the demo's `<span>{{ title }}
-// {{ randomEmoji() }}</span>` template, so we match on the title PREFIX.
+// Seed event titles from FullCalendarDemo.rozie's `sampleEvents()`. The demo's
+// portal slot renders the bare `<span class="fc-event-title">{{ arg.event.title
+// }}</span>` — no suffix — so rendered text equals the seeded title verbatim
+// (whitespace-trimmed).
 const EXPECTED_TITLES = ['Standup', 'Demo', 'Sprint review', 'Past Event'];
 
 // Multi-day events render once per occupied cell in `dayGridMonth`, so the
@@ -137,20 +138,13 @@ for (const target of TARGETS) {
     expect(renderedTitles.length).toBeGreaterThanOrEqual(MIN_RENDERED_TITLES);
 
     // Spot-check that the scope param survived the portal mount — every
-    // rendered title's prefix must match one of the seeded titles. The
-    // trailing ` <emoji>` (from the demo's `{{ randomEmoji() }}`) is
-    // stripped before matching.
+    // rendered title must match one of the seeded titles. The demo's portal
+    // slot renders `{{ arg.event.title }}` with no suffix, so the rendered
+    // text IS the seeded title once whitespace-trimmed.
     const expectedSet = new Set(EXPECTED_TITLES);
     const renderedSet = new Set<string>();
     for (const raw of renderedTitles) {
-      const trimmed = raw.trim();
-      // The randomEmoji() suffix is one grapheme separated by a space.
-      // Strip the last whitespace-delimited token if there's more than one.
-      const tokens = trimmed.split(/\s+/);
-      const titlePrefix = tokens.length > 1
-        ? tokens.slice(0, -1).join(' ')
-        : trimmed;
-      renderedSet.add(titlePrefix);
+      renderedSet.add(raw.trim());
     }
     // Every rendered title must be one the demo seeded — guards against the
     // portal mount routing the wrong scope param.
