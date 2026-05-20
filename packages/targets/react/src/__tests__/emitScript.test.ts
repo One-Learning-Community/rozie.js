@@ -116,7 +116,7 @@ $watch(() => $props.open, () => { if ($props.closeOnEscape) reposition() })
     expect(collectors.react.has('useEffect')).toBe(true);
   });
 
-  it('Quick 260515-u2b — WatchHook callback body is INLINED into the useEffect callback; deps include both fire (closure) and props.open (getter)', () => {
+  it('Quick 260515-u2b — WatchHook callback body is INLINED into the useEffect callback; deps are the GETTER deps only (props.open)', () => {
     const src = `<rozie name="WatchInlined">
 <props>{ open: { type: Boolean, default: false } }</props>
 <script>
@@ -132,8 +132,13 @@ $watch(() => $props.open, () => { fire() })
       runtime: new RuntimeReactImportCollector(),
     };
     const { lifecycleEffectsSection } = emitScript(ir, collectors);
-    // Callback body is inlined; deps array sorted alphabetically.
-    expect(lifecycleEffectsSection).toMatch(/useEffect\(\(\) => \{\s*fire\(\);\s*\}, \[fire, props\.open\]\);/);
+    // Callback body is inlined; the dep array is the WATCHED EXPRESSION's deps
+    // only — `[props.open]`. Bug B fix (260519 linechart-watch-recreate): a
+    // $watch re-runs when its getter changes, NOT when callback-body closures
+    // (`fire`) change identity. The closure-body union was removed because it
+    // pulled unstable `useCallback` identities into the array and re-fired
+    // engine recreation every tick. Matches all five sibling targets.
+    expect(lifecycleEffectsSection).toMatch(/useEffect\(\(\) => \{\s*fire\(\);\s*\}, \[props\.open\]\);/);
   });
 
   it('Quick 260515-u2b — Counter (no watchers) emits no extra useEffect; existing fixtures untouched', () => {

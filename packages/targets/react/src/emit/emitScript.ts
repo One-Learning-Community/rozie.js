@@ -1441,7 +1441,24 @@ export function emitScript(
       }
       return true;
     });
-    const depsArr = renderDepArray(filteredSetupDeps, modelProps);
+    // Bug B fix (260519 linechart-watch-recreate) — a MOUNT-phase lifecycle
+    // hook runs exactly ONCE by contract. The other five targets honour this
+    // structurally: Vue `onMounted`, Svelte `onMount`, Solid `onMount`, Lit
+    // `firstUpdated`, Angular `ngAfterViewInit` all run once regardless of
+    // what reactive values their body reads. React's useEffect has no such
+    // primitive — re-run is governed entirely by the dep array — so a mount
+    // hook MUST emit `[]`. Any non-empty dep array makes the hook re-run on a
+    // consumer render, which (for engine-wrapper components like LineChart)
+    // destroys + recreates the engine instance every tick.
+    //
+    // `filteredSetupDeps` is correct for $onUpdate (update-phase re-runs on
+    // dependency change) but wrong for $onMount: the closure deps it carries
+    // (`Chart` import, `buildConfig` helper, the `instance` let) are setup
+    // ingredients, not subscription sources. Reconciliation of post-mount
+    // prop changes is owned by the sibling $watch hooks, never the mount
+    // useEffect. So: mount → `[]`; update → keep the computed deps.
+    const depsArr =
+      lh.phase === 'mount' ? '[]' : renderDepArray(filteredSetupDeps, modelProps);
     const injectPortalsHere =
       portalsEmit.hasPortals && !portalsInjected && lh.phase === 'mount';
     if (injectPortalsHere) portalsInjected = true;
@@ -1513,43 +1530,17 @@ export function emitScript(
     );
   });
 
-  // Quick plan 260515-u2b — emit one useEffect per WatchHook. Dep array
-  // unions WatchHook.getterDeps with the callback body's deps walked via
-  // computeHelperBodyDeps. WHY UNION: react-hooks/exhaustive-deps flags any
-  // identifier READ inside the useEffect callback that isn't in the deps —
-  // and the callback body typically calls helper functions like
-  // `reposition()` (closure refs) AND reads reactive values. The Vue/Svelte/
-  // Solid/Angular/Lit targets auto-track reactive reads inside their effect
-  // primitive and ignore the array entirely; React's static lint requires
-  // the union. We compute callback-body deps below (after allHelperNames is
-  // collected) — see immediately following block.
+  // Quick plan 260515-u2b — emit one useEffect per WatchHook.
   //
-  // Note: helper-name discovery happens AFTER this loop today, so we collect
-  // them inline here for the watcher's callback walk only. The earlier
-  // allHelperNames block (line ~929) still runs independently for the
-  // useArrows section's tryWrapEscapingHelperUseCallback path.
-  const watcherHelperNames = new Set<string>();
-  for (let i = 0; i < cloned.program.body.length; i++) {
-    if (lifecyclePairing.consumedIndices.has(i)) continue;
-    if (watcherPairing.consumedIndices.has(i)) continue;
-    const stmt = cloned.program.body[i]!;
-    if (t.isFunctionDeclaration(stmt) && stmt.id) {
-      watcherHelperNames.add(stmt.id.name);
-      continue;
-    }
-    if (t.isVariableDeclaration(stmt)) {
-      for (const d of stmt.declarations) {
-        if (
-          t.isIdentifier(d.id) &&
-          d.init &&
-          (t.isArrowFunctionExpression(d.init) || t.isFunctionExpression(d.init))
-        ) {
-          watcherHelperNames.add(d.id.name);
-        }
-      }
-    }
-  }
-
+  // Bug B fix (260519 linechart-watch-recreate) — the dep array is the
+  // WatchHook's GETTER deps only (see the per-watcher block below). The
+  // previous implementation also walked the callback body via
+  // computeHelperBodyDeps and unioned those deps to satisfy
+  // `react-hooks/exhaustive-deps`; that pulled the unstable `buildConfig`
+  // useCallback identity into the `type`-watcher array and re-fired the
+  // engine recreation every data tick. The watcher-fires-on-getter contract
+  // (shared by all six targets) is the correctness invariant, so the
+  // callback-body walk is gone.
   ir.watchers.forEach((wh, idx) => {
     collectors.react.add('useEffect');
     const paired = watcherPairing.perWatcher[idx];
@@ -1577,16 +1568,23 @@ export function emitScript(
         ? `const ${firstParam.name} = ${renderGetterExpression(paired?.getterCloned ?? wh.getter)};\n  `
         : '';
 
-    // Union getter deps with closure refs walked over the callback body so
-    // the lint rule is satisfied without an eslint-disable (D-62 floor).
-    const cbDeps = computeHelperBodyDeps(
-      cbCloned,
-      ir,
-      watcherHelperNames,
-      '', // synthetic helper name; never collides because we don't filter on it
-    );
-    const merged = [...wh.getterDeps, ...cbDeps];
-    const depsArr = renderDepArray(merged, modelProps);
+    // Bug B fix (260519 linechart-watch-recreate) — the watcher useEffect's
+    // dep array is the GETTER's deps ONLY. A $watch re-runs when its WATCHED
+    // expression changes; this is the contract on every other target —
+    // Vue `watch(getter, cb)`, Svelte/Solid untrack-wrapped callbacks, Lit
+    // `changedProperties`-gated `updated()`. The callback BODY's reads are
+    // NOT subscription sources: they're consequences of the watcher firing.
+    //
+    // The previous code unioned `computeHelperBodyDeps(callback)` into the
+    // dep array to satisfy `react-hooks/exhaustive-deps`. But that pulled
+    // unstable identities into the array — LineChart's `type` watcher
+    // callback calls `buildConfig()`, a `useCallback` keyed on
+    // `[props.data, props.options, props.type]`, so its identity changes
+    // every data tick. Listing it made the `type` watcher re-fire (and
+    // recreate the Chart.js instance) on every data change. The exhaustive-
+    // deps rule is advisory tooling; the watcher-fires-on-getter contract is
+    // the correctness invariant — and it matches the five sibling targets.
+    const depsArr = renderDepArray(wh.getterDeps, modelProps);
     lifecycleEffectLines.push(
       `useEffect(() => {\n  ${paramBinding}${cbInvocation}\n}, ${depsArr});`,
     );

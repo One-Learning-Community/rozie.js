@@ -60,7 +60,7 @@ export default function Modal(_props: ModalProps): JSX.Element {
   useEffect(() => {
     lockScroll();
     return () => unlockScroll();
-  }, [lockScroll, unlockScroll]);
+  }, []);
   useEffect(() => {
     dialogEl.current?.focus();
   }, []);
