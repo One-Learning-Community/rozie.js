@@ -40,6 +40,17 @@ export interface EmitAttrCtx {
    * kebab-case form so `aria-*` / `data-*` pass through unchanged.
    */
   elementTagKind?: 'html' | 'component' | 'self';
+  /**
+   * 260519 linechart-watch-recreate step 5 — the host element's static `type`
+   * attribute value, lowercased, when the host is an `<input>`. `r-model` on a
+   * `<input type="checkbox">` must emit `bind:checked` (Svelte's checkbox
+   * two-way primitive); every other input type uses `bind:value`. emitAttributes
+   * resolves this from the sibling static `type` attribute and threads it here
+   * so the per-attribute emit can pick the right `bind:` directive. Undefined
+   * for non-input hosts or inputs with no static type (Svelte defaults
+   * `<input>` to text — `bind:value` is correct there).
+   */
+  inputType?: string;
 }
 
 /**
@@ -204,10 +215,18 @@ export function emitSingleAttr(
   }
 
   if (attr.kind === 'binding') {
-    // r-model="<expr>" on form input → bind:value={<expr>}.
+    // r-model="<expr>" on form input → bind:value={<expr>}, EXCEPT a
+    // `<input type="checkbox">` which requires Svelte's `bind:checked`
+    // two-way primitive (`bind:value` silently no-ops on a checkbox — the
+    // box renders unchecked and toggling never writes back). React, Vue,
+    // Angular, Lit, and Solid already special-case checkbox; Svelte was the
+    // only target still emitting `bind:value` unconditionally
+    // (260519 linechart-watch-recreate step 5). Radio inputs (`bind:group`)
+    // are out of scope — checkbox only.
     if (attr.name === 'r-model') {
       const expr = rewriteTemplateExpression(attr.expression, ir);
-      return `bind:value={${expr}}`;
+      const directive = ctx.inputType === 'checkbox' ? 'bind:checked' : 'bind:value';
+      return `${directive}={${expr}}`;
     }
     // Spike 004 (Svelte subset) — `:style="{ key: value, ... }"` lowers to
     // per-key `style:<kebab(key)>={value}` directives so Svelte 5 doesn't

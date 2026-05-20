@@ -247,9 +247,27 @@ function emitEvents(events: Listener[], ctx: EmitNodeCtx): string {
  * tag below; no template AST rewrite needed.
  */
 function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
+  // 260519 linechart-watch-recreate step 5 — resolve the host's static `type`
+  // attribute when it is an `<input>`, so emitAttributes can route an
+  // `r-model` on a `<input type="checkbox">` to `bind:checked` instead of
+  // `bind:value`. Only a STATIC type attribute is read — a bound `:type` is a
+  // runtime value the static emitter can't resolve, and r-model on a
+  // dynamically-typed input is an unsupported edge case anyway.
+  let inputType: string | undefined;
+  if (node.tagName.toLowerCase() === 'input') {
+    for (const a of node.attributes) {
+      if (a.kind === 'static' && a.name === 'type') {
+        inputType = a.value.toLowerCase();
+        break;
+      }
+    }
+  }
   const attrText = emitAttributes(node.attributes, {
     ir: ctx.ir,
     elementTagKind: node.tagKind,
+    // Spread only when defined — `exactOptionalPropertyTypes` rejects an
+    // explicit `inputType: undefined` against the optional `inputType?` field.
+    ...(inputType !== undefined ? { inputType } : {}),
   });
   const eventText = emitEvents(node.events, ctx);
   const rHtml = findRHtml(node.attributes);

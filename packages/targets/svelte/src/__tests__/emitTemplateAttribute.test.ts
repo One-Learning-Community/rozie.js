@@ -103,3 +103,48 @@ describe('emitTemplateAttribute — `:style` literal-object lowering (Svelte / S
     expect(template).toContain('style:background={item.color}');
   });
 });
+
+describe('emitTemplateAttribute — r-model on form inputs (Svelte bind: directive selection)', () => {
+  it('r-model on `<input type="checkbox">` emits bind:checked (NOT bind:value)', () => {
+    // 260519 linechart-watch-recreate step 5 — `bind:value` silently no-ops on
+    // a checkbox: the box renders unchecked and toggling never writes back.
+    // Svelte's checkbox two-way primitive is `bind:checked`.
+    const ir = lowerInline(`<rozie name="Test">
+<data>{ enabled: true }</data>
+<template>
+  <input type="checkbox" r-model="$data.enabled" />
+</template>
+</rozie>`);
+    const { template, diagnostics } = emitTemplate(ir, REGISTRY);
+    expect(diagnostics).toEqual([]);
+    expect(template).toContain('bind:checked={enabled}');
+    expect(template).not.toContain('bind:value={enabled}');
+  });
+
+  it('r-model on `<input type="text">` keeps bind:value', () => {
+    const ir = lowerInline(`<rozie name="Test">
+<data>{ query: '' }</data>
+<template>
+  <input type="text" r-model="$data.query" />
+</template>
+</rozie>`);
+    const { template, diagnostics } = emitTemplate(ir, REGISTRY);
+    expect(diagnostics).toEqual([]);
+    expect(template).toContain('bind:value={query}');
+    expect(template).not.toContain('bind:checked');
+  });
+
+  it('r-model on `<input>` with no static type defaults to bind:value', () => {
+    // Svelte treats a typeless <input> as text — bind:value is correct.
+    const ir = lowerInline(`<rozie name="Test">
+<data>{ query: '' }</data>
+<template>
+  <input r-model="$data.query" />
+</template>
+</rozie>`);
+    const { template, diagnostics } = emitTemplate(ir, REGISTRY);
+    expect(diagnostics).toEqual([]);
+    expect(template).toContain('bind:value={query}');
+    expect(template).not.toContain('bind:checked');
+  });
+});
