@@ -34,10 +34,6 @@ const close = () => { $props.open = false; $emit('close') }
 let savedBodyOverflow = ''
 
 const lockScroll = () => {
-  // Guard on $props.open so the React-target lifecycle effect re-fires when
-  // the parent toggles open. (See Modal.compiled.tsx for the hand-tuned
-  // shape this lowers to; the open guard is what makes the effect's auto-
-  // computed dep array include `props.open`.)
   if (!$props.lockBodyScroll || !$props.open) return
   savedBodyOverflow = document.body.style.overflow
   document.body.style.overflow = 'hidden'
@@ -48,7 +44,14 @@ const unlockScroll = () => {
   document.body.style.overflow = savedBodyOverflow
 }
 
-// Colocated lifecycle pair — runs in source order alongside other hooks.
+// $watch re-fires on every `open` toggle — the cross-target primitive for
+// reacting to a prop change. The $onMount/$onUnmount pair anchors the
+// unmount-time restore; $onMount runs exactly once on every target (a
+// guarded no-op here) and must not be relied on to re-fire.
+$watch(() => $props.open, (isOpen) => {
+  if (isOpen) lockScroll()
+  else unlockScroll()
+})
 $onMount(lockScroll)
 $onUnmount(unlockScroll)
 
