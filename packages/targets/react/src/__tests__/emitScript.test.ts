@@ -31,6 +31,14 @@ function lowerExample(name: string): IRComponent {
   return lowered.ir;
 }
 
+function lowerInline(src: string, name: string): IRComponent {
+  const result = parse(src, { filename: `${name}.rozie` });
+  if (!result.ast) throw new Error(`parse() returned null AST for ${name}`);
+  const lowered = lowerToIR(result.ast, { modifierRegistry: createDefaultRegistry() });
+  if (!lowered.ir) throw new Error(`lowerToIR() returned null IR for ${name}`);
+  return lowered.ir;
+}
+
 describe('emitScript — behavior', () => {
   it('Test 4: Counter produces useControllableState (model:value), useState (hovering), useMemo×2 (canIncrement/canDecrement)', () => {
     const ir = lowerExample('Counter');
@@ -87,6 +95,51 @@ describe('emitScript — behavior', () => {
     expect(collectors.react.has('useEffect')).toBe(true);
   });
 
+  // ---------------------------------------------------------------------------
+  // Regression R1d — debug session `linechart-watch-recreate` (round 1, commit
+  // cf4f518). Bug B: a `$onMount` hook must run ONCE.
+  //
+  // Rozie's hook dependency analysis attributed transitive reactive reads —
+  // reads occurring inside helper functions a hook merely CALLS — to the
+  // caller hook. LineChart.rozie's `$onMount` calls `buildConfig()`, which
+  // reads `$props.data`/`$props.options`/`$props.type`. Pre-fix, that turned
+  // the mount `useEffect`'s dep array into `[Chart, buildConfig, instance]` —
+  // so the mount hook (and its `new Chart()`) re-fired on every data tick.
+  //
+  // The fix: a mount `useEffect` ALWAYS emits an empty `[]` dep array. Assert
+  // it explicitly — a snapshot would silently re-bless a regressed dep array
+  // on the next `vitest -u`.
+  // ---------------------------------------------------------------------------
+  it('R1d: a `$onMount` hook calling a helper that reads $props emits an EMPTY `[]` dep array', () => {
+    // Synthetic mirror of LineChart.rozie's mount path: $onMount calls a
+    // helper (buildConfig) whose body reads a reactive prop. Pre-fix the
+    // helper's reads leaked into the mount useEffect's dep array.
+    const src = `<rozie name="MountSynth">
+<props>{ data: { type: Object, default: () => ({}) } }</props>
+<data>{ instance: null }</data>
+<script>
+const buildConfig = () => { return { payload: $props.data } }
+$onMount(() => { $data.instance = buildConfig() })
+</script>
+<template><div /></template>
+</rozie>`;
+    const ir = lowerInline(src, 'MountSynth');
+    const collectors = {
+      react: new ReactImportCollector(),
+      runtime: new RuntimeReactImportCollector(),
+    };
+    const { lifecycleEffectsSection } = emitScript(ir, collectors);
+    // Exactly one mount useEffect, and its dep array is the empty literal.
+    const useEffectMatches = lifecycleEffectsSection.match(/useEffect\(/g) ?? [];
+    expect(useEffectMatches.length).toBe(1);
+    // The mount hook MUST close with `, []);` — a run-once effect.
+    expect(lifecycleEffectsSection).toMatch(/useEffect\([\s\S]*?,\s*\[\]\s*\)\s*;/);
+    // The transitive helper read MUST NOT have pulled `buildConfig` /
+    // `props.data` into the dep array (Bug B over-tracking regression).
+    expect(lifecycleEffectsSection).not.toMatch(/,\s*\[[^\]]*\bbuildConfig\b[^\]]*\]\s*\)/);
+    expect(lifecycleEffectsSection).not.toMatch(/,\s*\[[^\]]*\bprops\.data\b[^\]]*\]\s*\)/);
+  });
+
   it('Quick 260515-u2b — WatchHook emits useEffect(cb, deps); deps union getter body deps + callback closure refs to satisfy react-hooks/exhaustive-deps (D-62)', () => {
     const src = `<rozie name="WatchOne">
 <props>{ open: { type: Boolean, default: false }, closeOnEscape: { type: Boolean, default: true } }</props>
@@ -139,6 +192,34 @@ $watch(() => $props.open, () => { fire() })
     // pulled unstable `useCallback` identities into the array and re-fired
     // engine recreation every tick. Matches all five sibling targets.
     expect(lifecycleEffectsSection).toMatch(/useEffect\(\(\) => \{\s*fire\(\);\s*\}, \[props\.open\]\);/);
+  });
+
+  // Regression R1e — debug session `linechart-watch-recreate` (round 1, commit
+  // cf4f518). The watcher `useEffect` dep array MUST NOT carry the helper /
+  // callback identifier (`buildConfig`) — that identifier is an unstable
+  // `useCallback` and re-firing the watcher on its identity change is exactly
+  // the Bug B chart-recreation defect. Strengthens the WatchInlined case above
+  // with an explicit negative assertion keyed to a `buildConfig` helper.
+  it('R1e: the watcher `useEffect` dep array does NOT pull in a callback-body helper identifier', () => {
+    const src = `<rozie name="WatchHelperSynth">
+<props>{ type: { type: String, default: 'line' }, data: { type: Object, default: () => ({}) } }</props>
+<data>{ instance: null }</data>
+<script>
+const buildConfig = () => { return { kind: $props.type, payload: $props.data } }
+$watch(() => $props.type, () => { $data.instance = buildConfig() })
+</script>
+<template><div /></template>
+</rozie>`;
+    const ir = lowerInline(src, 'WatchHelperSynth');
+    const collectors = {
+      react: new ReactImportCollector(),
+      runtime: new RuntimeReactImportCollector(),
+    };
+    const { lifecycleEffectsSection } = emitScript(ir, collectors);
+    // The watcher fires on its getter — `props.type` MUST be in the deps.
+    expect(lifecycleEffectsSection).toMatch(/useEffect\([\s\S]*?\bprops\.type\b/);
+    // The unstable `buildConfig` helper identity MUST NOT be in the dep array.
+    expect(lifecycleEffectsSection).not.toMatch(/,\s*\[[^\]]*\bbuildConfig\b[^\]]*\]\s*\)/);
   });
 
   it('Quick 260515-u2b — Counter (no watchers) emits no extra useEffect; existing fixtures untouched', () => {

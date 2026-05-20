@@ -88,6 +88,47 @@ describe('rewriteRozieIdentifiers (React)', () => {
     expect(code).not.toContain('$data.');
   });
 
+  // ---------------------------------------------------------------------------
+  // Regression R1f — debug session `linechart-watch-recreate` (round 1, commit
+  // 7317038). React stale-closure bug.
+  //
+  // A plain `$data.x = f($data.x)` assignment whose RHS reads the SAME state
+  // MUST lower to the functional updater `setX(prev => f(prev))`, with the
+  // self-read inside the RHS rewritten to the `prev` param. The pre-fix form
+  // `setX(f(x))` captures `x` from the enclosing closure — when the write is
+  // driven by a `setInterval` callback pinned at mount, `x` is forever the
+  // initial value, which is exactly why LineChartDemo's live feed froze at 8
+  // points forever. An explicit `toMatch`/`not.toMatch` net here (snapshots
+  // would silently re-bless a regression on `vitest -u`).
+  // ---------------------------------------------------------------------------
+  it('R1f: self-referential `$data.x = f($data.x)` lowers to `setX(prev => ...)` (NOT stale `setX(f(x))`)', () => {
+    // Synthetic component mirroring LineChartDemo's `pushPoint`:
+    //   $data.points = [...$data.points.slice(-19), next]
+    const src = `<rozie name="FeedSynth">
+<data>{ points: [], next: 0 }</data>
+<script>
+const pushPoint = () => { $data.points = [...$data.points.slice(-19), $data.next] }
+</script>
+<template><div /></template>
+</rozie>`;
+    const ir = lowerToIR(parse(src, { filename: 'FeedSynth.rozie' }).ast!, {
+      modifierRegistry: createDefaultRegistry(),
+    }).ir!;
+    const cloned = cloneScriptProgram(ir.setupBody.scriptProgram);
+    rewriteRozieIdentifiers(cloned, ir);
+    const code = generate(cloned).code;
+    // The write uses the functional updater — a `prev =>` arrow argument.
+    expect(code).toMatch(/setPoints\s*\(\s*prev\s*=>/);
+    // The self-read `$data.points.slice(-19)` inside the RHS is rewritten to
+    // read the `prev` param, NOT the stale closure-captured `points`.
+    expect(code).toMatch(/prev\s*=>\s*\[\s*\.\.\.\s*prev\.slice\s*\(\s*-?\s*19\s*\)/);
+    // The pre-fix stale form `setPoints([...points.slice` MUST NOT appear —
+    // it closes over the mount-time `points` binding and freezes the feed.
+    expect(code).not.toMatch(/setPoints\s*\(\s*\[\s*\.\.\.\s*points\.slice/);
+    // No leftover Rozie sigils.
+    expect(code).not.toContain('$data.');
+  });
+
   it('SearchInput: $emit("search", q) → props.onSearch && props.onSearch(q) (Plan 04-04 lint fix)', () => {
     // Plan 04-04 changed $emit emission from optional chain to logical-AND
     // guard so eslint-plugin-react-hooks v5 narrows the deps[] entry
