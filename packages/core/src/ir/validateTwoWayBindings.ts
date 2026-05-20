@@ -125,7 +125,6 @@ export function validateTwoWayBindings(
     // and ROZ949 silently degrades.
     let producerProps: readonly PropDecl[] | null = null;
     let producerLookupAttempted = false;
-    let producerLookupHardFailed = false;
 
     const resolveProducerProps = (): readonly PropDecl[] | null => {
       if (producerLookupAttempted) return producerProps;
@@ -142,7 +141,6 @@ export function validateTwoWayBindings(
         // Non-component target — ROZ950 handles this branch separately, so
         // we never even attempt producer lookup. Returning null here means
         // ROZ949 silently degrades (the shape error covers the case).
-        producerLookupHardFailed = true;
         return null;
       }
 
@@ -158,13 +156,11 @@ export function validateTwoWayBindings(
           loc: node.componentRef.sourceLoc,
           hint: 'Verify the path exists and is reachable via tsconfig "paths" / Node module resolution / npm install.',
         });
-        producerLookupHardFailed = true;
         return null;
       }
       const producerIR = cache.getIRComponent(resolvedPath, consumerPath);
       if (producerIR === null) {
         // Cycle / parse failure / unreadable — silent degrade (no false ROZ949).
-        producerLookupHardFailed = true;
         return null;
       }
       producerProps = producerIR.props;
@@ -231,11 +227,6 @@ export function validateTwoWayBindings(
         // degraded — either way, skip ROZ949 for this binding.
         continue;
       }
-      // Mark lookup-hard-failed loop-suppressed access (TS noUnusedLocals fix —
-      // the flag is consumed transitively via producerProps but readers want
-      // an explicit marker for "we tried and gave up").
-      void producerLookupHardFailed;
-
       const producerProp = producerPropDecls.find((p) => p.name === attr.name);
       if (producerProp === undefined) {
         // Producer doesn't declare this prop at all. This is NOT ROZ949 —
