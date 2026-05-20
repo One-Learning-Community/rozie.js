@@ -24,3 +24,4 @@ export {
   isShift,
   isMeta,
 } from './keyFilter.js';
+export { parseInlineStyle, toStyleObjectKey } from './parseInlineStyle.js';

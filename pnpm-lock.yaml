@@ -648,6 +648,9 @@ importers:
       clsx:
         specifier: ^2
         version: 2.1.1
+      postcss:
+        specifier: ^8.5.13
+        version: 8.5.13
     devDependencies:
       '@testing-library/react':
         specifier: ^16
@@ -684,6 +687,10 @@ importers:
         version: 4.1.5(@types/node@22.19.17)(happy-dom@15.11.7)(jsdom@25.0.1)(vite@8.0.10(@types/node@22.19.17)(esbuild@0.28.0)(jiti@2.7.0)(less@4.4.2)(sass@1.97.3)(terser@5.46.2))
 
   packages/runtime/solid:
+    dependencies:
+      postcss:
+        specifier: ^8.5.13
+        version: 8.5.13
     devDependencies:
       '@typescript-eslint/parser':
         specifier: ^8.59.1

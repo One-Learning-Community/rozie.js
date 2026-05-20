@@ -20,7 +20,8 @@
     "src"
   ],
   "dependencies": {
-    "clsx": "^2"
+    "clsx": "^2",
+    "postcss": "^8.5.13"
   },
   "peerDependencies": {
     "react": "^18.2 || ^19"

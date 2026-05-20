@@ -16,6 +16,9 @@
     }
   },
   "files": ["dist", "src"],
+  "dependencies": {
+    "postcss": "^8.5.13"
+  },
   "peerDependencies": {
     "solid-js": "^1.8"
   },

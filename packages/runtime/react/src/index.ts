@@ -26,3 +26,4 @@ export {
   isMeta,
 } from './keyFilter.js';
 export { clsx } from './clsx.js';
+export { parseInlineStyle, toStyleObjectKey } from './parseInlineStyle.js';

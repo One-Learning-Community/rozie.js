@@ -41,12 +41,12 @@ export const RozieErrorCode = {
   // ---- Style parse (Plan 03) — ROZ080..ROZ089 ----
   STYLE_PARSE_ERROR: 'ROZ080',
   STYLE_MIXED_ROOT_SELECTOR: 'ROZ081',
-  // Spike 004 (@portal producer-side CSS scoping). ROZ083 is intentionally
-  // skipped — it was reserved for `:style` string-literal `!important`
-  // dropping, but no `:style` string-literal lowering path exists in the
-  // codebase, so ROZ083 has no host to attach to. Codes are public API and
-  // never renumber; ROZ083 stays unallocated until that parser ships.
   STYLE_PORTAL_INVALID_NESTING: 'ROZ082', // @portal nested inside @media (or any non-@portal at-rule) — invalid per Spike 004 locked decision #2
+  // Spike 004 (string-form `:style` lowering, quick-task 260520-8iu): a
+  // string-literal `:style` carries `!important` AND the target's object-form
+  // lowering (React/Solid) silently drops it — per Spike 004 locked decision
+  // #7 this is a WARN. Codes are public API and never renumber.
+  STYLE_IMPORTANT_DROPPED_IN_STYLE_OBJECT: 'ROZ083',
   STYLE_PORTAL_SELECTOR_PARSE_ERROR: 'ROZ084', // @portal block has empty/malformed prelude or unparseable inner content
 
   // ---- ROZ090..ROZ099 reserved for late-Phase-1 needs ----
