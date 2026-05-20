@@ -5,8 +5,15 @@
  * eslint pass. This file enforces TWO additional invariants the project relies
  * on:
  *
- *   1. NO `eslint-disable` comment in ANY emitted .tsx fixture (D-62 absolute
- *      rule). The compiler MUST NOT paper over exhaustive-deps failures.
+ *   1. Only TARGETED, justified `eslint-disable` directives in emitted output
+ *      (D-62, relaxed 260519 linechart-watch-recreate Round 4). The compiler
+ *      MUST NOT paper over exhaustive-deps failures with a blanket disable —
+ *      but a rule-specific, line-scoped `// eslint-disable-line
+ *      react-hooks/exhaustive-deps` on an intentional mount-once / getter-
+ *      scoped $watch useEffect IS permitted: React provides no other way to
+ *      express an intentional `[]`, and the directive is exactly what a
+ *      careful React dev hand-writes. Blanket file/block disables and disables
+ *      for any OTHER rule remain forbidden.
  *
  *   2. ALL 5 reference fixtures (Counter/SearchInput/Dropdown/TodoList/Modal)
  *      have a corresponding .tsx.snap on disk. If a future plan removes one
@@ -29,6 +36,10 @@ const REQUIRED_FIXTURES = [
   'Modal',
 ] as const;
 
+// The ONLY eslint directive the emitter is permitted to produce (D-62 relaxed):
+// a line-scoped disable naming exactly `react-hooks/exhaustive-deps`.
+const ALLOWED_DIRECTIVE = /\/\/ eslint-disable-line react-hooks\/exhaustive-deps$/;
+
 describe('Phase 4 SC2 / REACT-T-05 / D-62 — exhaustive-deps fixture gate', () => {
   it.each(REQUIRED_FIXTURES)('%s.tsx.snap exists (SC2 coverage gate)', (name) => {
     const path = resolve(FIXTURES, `${name}.tsx.snap`);
@@ -38,12 +49,20 @@ describe('Phase 4 SC2 / REACT-T-05 / D-62 — exhaustive-deps fixture gate', () 
     ).toBe(true);
   });
 
-  it.each(REQUIRED_FIXTURES)('%s.tsx.snap contains NO eslint-disable comments (D-62 absolute rule)', (name) => {
+  it.each(REQUIRED_FIXTURES)('%s.tsx.snap carries ONLY targeted exhaustive-deps disables (D-62 relaxed)', (name) => {
     const path = resolve(FIXTURES, `${name}.tsx.snap`);
     const src = readFileSync(path, 'utf8');
-    expect(
-      src,
-      `${name}.tsx.snap contains an eslint-disable comment — D-62 forbids this. The emitter MUST produce code that passes exhaustive-deps cleanly.`,
-    ).not.toMatch(/eslint-disable/);
+    // Every line that mentions `eslint-disable` MUST be the exact targeted
+    // `eslint-disable-line react-hooks/exhaustive-deps` form. A blanket
+    // `/* eslint-disable */`, a whole-file disable, or a disable for any
+    // other rule fails the gate.
+    for (const line of src.split('\n')) {
+      if (!line.includes('eslint-disable')) continue;
+      expect(
+        ALLOWED_DIRECTIVE.test(line.trimEnd()),
+        `${name}.tsx.snap has a non-targeted eslint-disable — D-62 (relaxed) permits ONLY ` +
+          `\`// eslint-disable-line react-hooks/exhaustive-deps\`. Offending line: ${line.trim()}`,
+      ).toBe(true);
+    }
   });
 });

@@ -138,6 +138,47 @@ $onMount(() => { $data.instance = buildConfig() })
     // `props.data` into the dep array (Bug B over-tracking regression).
     expect(lifecycleEffectsSection).not.toMatch(/,\s*\[[^\]]*\bbuildConfig\b[^\]]*\]\s*\)/);
     expect(lifecycleEffectsSection).not.toMatch(/,\s*\[[^\]]*\bprops\.data\b[^\]]*\]\s*\)/);
+    // 260519 linechart-watch-recreate Round 4 — the mount `[]` is intentional,
+    // so the dependency-array line MUST carry the targeted, justified
+    // `eslint-disable` (this mount body reads the `buildConfig` closure helper,
+    // so `exhaustive-deps` WOULD flag the `[]` without it). Placement: trailing
+    // the `}, []);` line — `exhaustive-deps` reports on that node.
+    expect(lifecycleEffectsSection).toMatch(
+      /,\s*\[\]\s*\)\s*;\s*\/\/ eslint-disable-line react-hooks\/exhaustive-deps/,
+    );
+  });
+
+  // ---------------------------------------------------------------------------
+  // Regression R4a — debug session `linechart-watch-recreate` (round 4). The
+  // targeted `eslint-disable` is CONDITIONAL: eslint v9 reports an unused
+  // `eslint-disable` directive as a warning, so emitting one on a mount
+  // useEffect that has NO exhaustive-deps violation re-fails the strict gate.
+  // A mount `$onMount` whose body reads NOTHING reactive (no closure helper, no
+  // prop, no state) must emit a bare `, []);` with NO directive.
+  // ---------------------------------------------------------------------------
+  it('R4a: a `$onMount` hook with a non-reactive body emits `[]` WITHOUT an eslint-disable directive', () => {
+    // Mount body reads only a global (`console`) — nothing reactive — so the
+    // emitted `[]` does not trip exhaustive-deps and must NOT carry a directive.
+    const src = `<rozie name="MountNoReadSynth">
+<data>{ ready: false }</data>
+<script>
+$onMount(() => { console.log('mounted') })
+</script>
+<template><div /></template>
+</rozie>`;
+    const ir = lowerInline(src, 'MountNoReadSynth');
+    const collectors = {
+      react: new ReactImportCollector(),
+      runtime: new RuntimeReactImportCollector(),
+    };
+    const { lifecycleEffectsSection } = emitScript(ir, collectors);
+    const useEffectMatches = lifecycleEffectsSection.match(/useEffect\(/g) ?? [];
+    expect(useEffectMatches.length).toBe(1);
+    // Still a run-once `[]` mount effect.
+    expect(lifecycleEffectsSection).toMatch(/useEffect\([\s\S]*?,\s*\[\]\s*\)\s*;/);
+    // But NO directive — the body reads nothing reactive, so a directive would
+    // become an unused-directive warning and re-fail `lint:fixtures`.
+    expect(lifecycleEffectsSection).not.toMatch(/eslint-disable/);
   });
 
   it('Quick 260515-u2b — WatchHook emits useEffect(cb, deps); deps union getter body deps + callback closure refs to satisfy react-hooks/exhaustive-deps (D-62)', () => {

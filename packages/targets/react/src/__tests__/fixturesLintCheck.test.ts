@@ -2,11 +2,16 @@
  * Plan 04-04 Task 2 — REACT-T-05 anchor.
  *
  * Programmatic ESLint API run against every emitted fixture .tsx.snap. The
- * D-62 floor: NO compiler-emitted `eslint-disable` comments anywhere, AND
- * `react-hooks/exhaustive-deps: error` passes with `--max-warnings 0`.
+ * D-62 floor (relaxed 260519 linechart-watch-recreate Round 4): the ONLY
+ * compiler-emitted `eslint-disable` permitted is a TARGETED, line-scoped
+ * `// eslint-disable-line react-hooks/exhaustive-deps` — blanket file/block
+ * disables and disables for any other rule are still forbidden. AND
+ * `react-hooks/exhaustive-deps: error` passes with `--max-warnings 0`
+ * (including zero unused-directive warnings).
  *
  * Lint failures here fail the build — they signal that `Listener.deps` (or
- * `LifecycleHook.setupDeps`) doesn't match what the closure actually reads.
+ * `LifecycleHook.setupDeps`) doesn't match what the closure actually reads,
+ * or that a targeted disable was emitted on a non-violating effect.
  */
 import { describe, it, expect } from 'vitest';
 import { ESLint } from 'eslint';
@@ -18,12 +23,25 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const FIXTURES = resolve(__dirname, '../../fixtures');
 const ESLINT_CONFIG = resolve(__dirname, '../../eslint.config.js');
 
+// The ONLY eslint directive the emitter is permitted to produce (D-62 relaxed):
+// a line-scoped disable naming exactly `react-hooks/exhaustive-deps`.
+const ALLOWED_DIRECTIVE = /\/\/ eslint-disable-line react-hooks\/exhaustive-deps$/;
+
 describe('Fixture exhaustive-deps lint (REACT-T-05 / D-62)', () => {
   const snapFiles = readdirSync(FIXTURES).filter((f) => f.endsWith('.tsx.snap'));
 
-  it.each(snapFiles)('%s: no eslint-disable comments (D-62)', (snapName) => {
+  it.each(snapFiles)('%s: only targeted exhaustive-deps disables (D-62 relaxed)', (snapName) => {
     const src = readFileSync(resolve(FIXTURES, snapName), 'utf8');
-    expect(src).not.toMatch(/eslint-disable/);
+    // Every line mentioning `eslint-disable` MUST be the exact targeted
+    // `eslint-disable-line react-hooks/exhaustive-deps` form.
+    for (const line of src.split('\n')) {
+      if (!line.includes('eslint-disable')) continue;
+      expect(
+        ALLOWED_DIRECTIVE.test(line.trimEnd()),
+        `${snapName} has a non-targeted eslint-disable — D-62 (relaxed) permits ONLY ` +
+          `\`// eslint-disable-line react-hooks/exhaustive-deps\`. Offending line: ${line.trim()}`,
+      ).toBe(true);
+    }
   });
 
   it.each(snapFiles)('%s: passes react-hooks/exhaustive-deps lint', async (snapName) => {
@@ -38,13 +56,21 @@ describe('Fixture exhaustive-deps lint (REACT-T-05 / D-62)', () => {
     const results = await eslint.lintText(src, {
       filePath: resolve(FIXTURES, snapName.replace(/\.snap$/, '.lint.tsx')),
     });
-    const errs = results.flatMap((r) => r.messages.filter((m) => m.severity === 2));
-    if (errs.length > 0) {
-      const msg = errs
-        .map((e) => `[${e.ruleId}] ${snapName}:${e.line}:${e.column} — ${e.message}`)
+    // Strict gate: zero errors AND zero warnings. eslint v9 surfaces an
+    // unused `eslint-disable` directive as a (rule-less) warning, so this
+    // also guards the conditional-emission logic — a directive emitted on a
+    // non-violating effect would re-fail here.
+    const problems = results.flatMap((r) => r.messages);
+    if (problems.length > 0) {
+      const msg = problems
+        .map(
+          (e) =>
+            `[${e.severity === 2 ? 'ERROR' : 'WARN'}] [${e.ruleId ?? '<no-rule>'}] ` +
+            `${snapName}:${e.line}:${e.column} — ${e.message}`,
+        )
         .join('\n');
-      throw new Error('Lint errors in fixture:\n' + msg);
+      throw new Error('Lint problems in fixture:\n' + msg);
     }
-    expect(errs).toHaveLength(0);
+    expect(problems).toHaveLength(0);
   });
 });
