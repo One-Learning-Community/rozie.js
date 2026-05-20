@@ -55,6 +55,7 @@ import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js'
 import { cloneScriptProgram } from '../rewrite/cloneProgram.js';
 import { partitionUserImports } from '../rewrite/partitionUserImports.js';
 import { rewriteRozieIdentifiers } from '../rewrite/rewriteScript.js';
+import { sanitizeEventName } from '../rewrite/sanitizeEventName.js';
 import {
   AngularImportCollector,
   collectAngularImports,
@@ -698,9 +699,18 @@ export function emitScript(
   //     Bug 4: events that never carry a payload emit `output<void>()` so a
   //     payload-less `.emit()` call typechecks; payload-carrying events keep
   //     `output<unknown>()`.
+  //     Bug 2 (260520-gi1): kebab/snake-case event names are not valid JS
+  //     identifiers — sanitize the field id and preserve the consumer-facing
+  //     event name via `output()`'s optional `{ alias }` argument. Names that
+  //     are already valid identifiers stay byte-identical (no alias arg).
   for (const e of ir.emits) {
     const outputType = emitsWithPayload.has(e) ? 'unknown' : 'void';
-    fieldLines.push(`${e} = output<${outputType}>();`);
+    const fieldId = sanitizeEventName(e);
+    if (fieldId === e) {
+      fieldLines.push(`${fieldId} = output<${outputType}>();`);
+    } else {
+      fieldLines.push(`${fieldId} = output<${outputType}>({ alias: '${e}' });`);
+    }
   }
 
   // 6e. @ContentChild slot tpl fields.
