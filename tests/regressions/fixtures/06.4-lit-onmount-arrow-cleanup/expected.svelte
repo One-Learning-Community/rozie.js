@@ -1,4 +1,6 @@
 <script lang="ts">
+import { onMount } from 'svelte';
+
 let ticks = $state(0);
 let running = $state(true);
 
@@ -12,7 +14,7 @@ const onResize = () => {
   ticks += 1;
 };
 
-$effect(() => {
+onMount(() => {
   window.addEventListener('resize', onResize);
   return () => window.removeEventListener('resize', onResize);
 });

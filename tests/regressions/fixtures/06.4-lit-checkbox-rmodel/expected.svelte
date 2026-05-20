@@ -9,7 +9,7 @@ let { checked = $bindable(false) }: Props = $props();
 
 <label class="toggle">
   
-  <input type="checkbox" bind:value={checked} />
+  <input type="checkbox" bind:checked={checked} />
   <span>Enabled</span>
 </label>
 

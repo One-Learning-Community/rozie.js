@@ -12,8 +12,8 @@ export default function EventLoopVarShadow(props: EventLoopVarShadowProps): JSX.
   }]);
 
   const removeItem = useCallback(id => {
-    setItems(items.filter(x => x.id !== id));
-  }, [items]);
+    setItems(prev => prev.filter(x => x.id !== id));
+  }, []);
 
   return (
     <>

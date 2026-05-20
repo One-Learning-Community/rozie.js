@@ -1,5 +1,6 @@
 <script lang="ts">
 import type { Snippet } from 'svelte';
+import { onMount } from 'svelte';
 
 interface Props {
   children?: Snippet;
@@ -15,7 +16,7 @@ let __rozieRoot = $state<HTMLElement | undefined>(undefined);
 import DummyEngine from 'dummy-engine';
 let instance = null;
 
-$effect(() => {
+onMount(() => {
   instance = new DummyEngine(__rozieRoot, {
     animation: 150
   });

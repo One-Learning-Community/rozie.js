@@ -16,7 +16,7 @@ export default function SpikeImportEl(props: SpikeImportElProps): JSX.Element {
     animation: 150
   });
     return () => instance.current?.destroy();
-  }, [DummyEngine, instance]);
+  }, []);
 
   return (
     <>
