@@ -206,5 +206,11 @@ $watch(() => $data.count, (v) => { onChange(v) })
     expect(code).toMatch(/import \{[^}]*\beffect\b[^}]*\} from '@lit-labs\/preact-signals'/);
     // Cleanup-push registration via effect().
     expect(code).toMatch(/this\._disconnectCleanups\.push\(effect\(\(\) => \{[\s\S]+?\}\)\);/);
+    // Bug B fix (260519 linechart-watch-recreate) — the effect-route callback
+    // runs inside `untracked(...)` so its reads (and transitive helper reads)
+    // DON'T join the effect's dependency set; only the getter defines re-runs.
+    // `untracked` is re-exported by @lit-labs/preact-signals.
+    expect(code).toMatch(/effect\(\(\) => \{ const __watchVal = \([\s\S]+?\)\(\); untracked\(\(\) => \([\s\S]+?\)\([\s\S]*?\)\); \}\)/);
+    expect(code).toMatch(/import \{[^}]*\buntracked\b[^}]*\} from '@lit-labs\/preact-signals'/);
   });
 });

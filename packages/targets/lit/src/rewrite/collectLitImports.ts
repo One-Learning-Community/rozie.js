@@ -88,6 +88,13 @@ export type PreactSignalsImport =
   | 'signal'
   | 'computed'
   | 'effect'
+  /**
+   * Bug B fix (260519 linechart-watch-recreate): `untracked` — wraps the
+   * effect-route $watch callback so its reactive reads (and transitive helper
+   * reads) don't join the `effect()` dependency set. `@lit-labs/preact-signals`
+   * re-exports `untracked` via `export * from '@preact/signals-core'`.
+   */
+  | 'untracked'
   | 'batch';
 
 export class PreactSignalsImportCollector {

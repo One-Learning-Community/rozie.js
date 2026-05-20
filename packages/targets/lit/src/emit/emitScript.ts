@@ -773,13 +773,28 @@ export function emitScript(
       } else {
         // effect()-based route (data/computed/slots/closure-touching, OR
         // empty getterDeps as a defensive fallback).
+        //
+        // Bug B fix (260519 linechart-watch-recreate) — the callback runs
+        // inside `untracked(...)` so its reactive reads (and transitive ones
+        // via a helper call like `buildConfig()` reading a `$data` signal) do
+        // NOT join the `effect()` dependency set. The getter is still invoked
+        // in the tracking scope so its reads subscribe the effect; only those
+        // reads define what re-runs the watcher — matching Vue's
+        // `watch(getter, cb)`, Solid's untrack-wrapped callback (e57df14), and
+        // Angular's `untracked`-wrapped callback. The `updated()`-route
+        // branch above is `changedProperties`-gated and needs no untrack.
         needsEffectImport = true;
         watcherCleanupPushes.push(
-          `this._disconnectCleanups.push(effect(() => { const __watchVal = (${getterCode})(); (${cbCode})(${callArg}); }));`,
+          `this._disconnectCleanups.push(effect(() => { const __watchVal = (${getterCode})(); untracked(() => (${cbCode})(${callArg})); }));`,
         );
       }
     }
-    if (needsEffectImport) opts.signals.add('effect');
+    if (needsEffectImport) {
+      opts.signals.add('effect');
+      // `untracked` is re-exported by @lit-labs/preact-signals (via
+      // `export * from '@preact/signals-core'`) — same import source as `effect`.
+      opts.signals.add('untracked');
+    }
   }
 
   // Portal-slot primitive (Spike 003) — synthesize the per-component
