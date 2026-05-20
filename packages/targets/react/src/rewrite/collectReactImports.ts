@@ -59,6 +59,7 @@ export class ReactImportCollector {
  *   - `useDebouncedCallback` — D-65 .debounce(ms) wrap
  *   - `useThrottledCallback` — D-65 .throttle(ms) wrap
  *   - `clsx`                 — Plan 04-03 dynamic class composition
+ *   - `parseInlineStyle`     — Spike 004 dynamic-string `:style` lowering
  *   - `isEnter`/`isEscape`/...— key-filter predicates
  *
  * Sorted alphabetically on render so snapshot output is deterministic.
@@ -71,6 +72,7 @@ export type RuntimeReactImport =
   | 'useDebouncedCallback'
   | 'useThrottledCallback'
   | 'clsx'
+  | 'parseInlineStyle'
   | 'isEnter'
   | 'isEscape'
   | 'isTab'

@@ -99,6 +99,27 @@ describe('emitTemplateAttribute (Lit) — `:style` literal-object → styleMap()
     expect(state.styleMapUsed).toBe(false);
   });
 
+  it('Spike 004 (260520-8iu): dynamic-string `:style` → native `style=${<expr>}`, no parseInlineStyle helper', () => {
+    // Iteration-4 asymmetry: Lit's `style=${string}` attribute accepts a
+    // string natively, so a dynamic-string `:style` (concatenation, not an
+    // object literal) needs NO emitter change and NO React/Solid helper.
+    const ir = emptyIR();
+    const state: EmitTemplateAttributeState = { styleMapUsed: false };
+    const out = emitTemplateAttribute(
+      bindingAttr('style', `'opacity: ' + (cond ? '0.5' : '1')`),
+      ir,
+      'div',
+      state,
+    );
+    // Native passthrough — string expression, no styleMap, no helper.
+    expect(out).toMatch(/^style=\$\{/);
+    expect(out).toContain("'opacity: '");
+    expect(out).not.toContain('styleMap(');
+    expect(out).not.toContain('parseInlineStyle');
+    // Critical: did NOT mark styleMapUsed (would emit a spurious import).
+    expect(state.styleMapUsed).toBe(false);
+  });
+
   it('shell wiring: compiling a source with literal-object :style emits the styleMap import', () => {
     const src = `<rozie name="StyledSpan">
 <data>{ color: '#3b82f6' }</data>

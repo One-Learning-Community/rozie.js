@@ -83,6 +83,26 @@ describe('emitTemplateAttribute — `:style` literal-object lowering (Svelte / S
     expect(template).not.toMatch(/\bstyle:[a-z]/);
   });
 
+  it('Spike 004 (260520-8iu): dynamic-string `:style` → native `style={<expr>}`, no parseInlineStyle helper', () => {
+    // Iteration-4 asymmetry: Svelte accepts a string `style=` attribute
+    // natively, so a dynamic-string `:style` (concatenation, not an object
+    // literal) needs NO emitter change and NO React/Solid runtime helper.
+    const ir = lowerInline(`<rozie name="Test">
+<data>{ cond: true }</data>
+<template>
+  <div :style="'opacity: ' + ($data.cond ? '0.5' : '1')"></div>
+</template>
+</rozie>`);
+    const { template, diagnostics } = emitTemplate(ir, REGISTRY);
+    expect(diagnostics).toEqual([]);
+    // Native passthrough — string expression through the generic binding path.
+    expect(template).toMatch(/style=\{/);
+    expect(template).toContain("'opacity: '");
+    // No style: directive (that's the literal-object path) and no helper.
+    expect(template).not.toMatch(/\bstyle:[a-z]/);
+    expect(template).not.toContain('parseInlineStyle');
+  });
+
   it('PortalListDemo-shape: `:style="{background: item.color}"` inside r-for emits style:background={item.color}', () => {
     // Drive the same shape PortalListDemo.rozie has: a literal-object :style
     // whose value reads a loop-scoped identifier. The lowering should NOT

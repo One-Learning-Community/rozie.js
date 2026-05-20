@@ -25,12 +25,14 @@
 import * as t from '@babel/types';
 import _generate from '@babel/generator';
 import type { GeneratorOptions } from '@babel/generator';
+import postcss from 'postcss';
 import type {
   IRComponent,
   AttributeBinding,
   RefDecl,
 } from '../../../../core/src/ir/types.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
+import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
 import {
   ReactImportCollector,
   RuntimeReactImportCollector,
@@ -545,6 +547,62 @@ function inferRefDomType(refName: string, refs: RefDecl[]): string {
 }
 
 /**
+ * Convert a kebab-case CSS property name to a React style-object key.
+ * Mirrors `@rozie/runtime-react`'s `toStyleObjectKey` — kept as a small
+ * self-contained emitter local (per the emitter's self-contained style;
+ * no shared home for a ~10-line converter).
+ *
+ *   background-color  →  backgroundColor
+ *   -webkit-mask      →  WebkitMask
+ *   --custom-prop     →  --custom-prop  (CSS custom properties pass through)
+ */
+function cssPropToStyleKey(prop: string): string {
+  if (prop.startsWith('--')) return prop;
+  if (prop.startsWith('-')) {
+    const stripped = prop.slice(1);
+    const camel = stripped.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase());
+    return camel.charAt(0).toUpperCase() + camel.slice(1);
+  }
+  return prop.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase());
+}
+
+/**
+ * Lower a string-LITERAL `:style` value at compile time. PostCSS-parses the
+ * declaration list and renders a JSX object-expression — byte-identical in
+ * shape to object-form `:style`. When a declaration carries `!important`,
+ * a ROZ083 WARN is collected (React's object form silently drops it).
+ *
+ * Spike 004 locked decision #8: v1 is syntactic-parse only — a malformed
+ * style string surfaces through PostCSS's own parse error; no CSS
+ * property-name validation.
+ */
+function lowerStringLiteralStyle(
+  attr: Extract<AttributeBinding, { kind: 'binding' }>,
+  literal: string,
+): { jsx: string; diagnostics: Diagnostic[] } {
+  const diagnostics: Diagnostic[] = [];
+  const props: string[] = [];
+  const root = postcss.parse(literal);
+  root.walkDecls((decl) => {
+    const key = cssPropToStyleKey(decl.prop);
+    const keyOut = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(key) ? key : JSON.stringify(key);
+    if (decl.important) {
+      diagnostics.push({
+        code: RozieErrorCode.STYLE_IMPORTANT_DROPPED_IN_STYLE_OBJECT,
+        severity: 'warning',
+        message:
+          `\`!important\` on \`${decl.prop}\` is dropped by React's style-object form. ` +
+          `React silently ignores \`!important\` in inline style objects.`,
+        loc: attr.sourceLoc,
+      });
+    }
+    props.push(`${keyOut}: ${JSON.stringify(decl.value)}`);
+  });
+  const objBody = props.length > 0 ? `{ ${props.join(', ')} }` : '{}';
+  return { jsx: `style={${objBody}}`, diagnostics };
+}
+
+/**
  * Emit a single non-class attribute as a JSX attribute pair.
  * Returns the rendered attribute string (e.g., `onClick={handler}`).
  */
@@ -580,6 +638,24 @@ function emitNonClassAttribute(
   }
 
   if (attr.kind === 'binding') {
+    // `:style` special-case (Spike 004 string-form `:style` lowering).
+    //   - ObjectExpression → leave to the generic binding emit below (React
+    //     accepts object-form `style` natively; 260518-e2t object passthrough).
+    //   - String LITERAL → PostCSS-parse at compile time, emit the object
+    //     form (`style={{ ... }}`) — identical shape to object-form `:style`.
+    //   - Dynamic (any other expr) → `style={parseInlineStyle(<expr>)}` +
+    //     register the runtime helper import.
+    if (attr.name === 'style') {
+      if (t.isStringLiteral(attr.expression)) {
+        return lowerStringLiteralStyle(attr, attr.expression.value);
+      }
+      if (!t.isObjectExpression(attr.expression)) {
+        ctx.collectors.runtime.add('parseInlineStyle');
+        const exprCode = renderExpr(attr.expression, ctx.ir);
+        return { jsx: `style={parseInlineStyle(${exprCode})}`, diagnostics };
+      }
+      // ObjectExpression falls through to the generic binding emit.
+    }
     // ':name="expr"' → camelCased JSX name + expression value
     const jsxName = colonPropToJsxName(attr.name);
     const exprCode = renderExpr(attr.expression, ctx.ir);
