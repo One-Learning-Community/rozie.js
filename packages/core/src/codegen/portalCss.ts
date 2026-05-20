@@ -23,22 +23,31 @@
  *
  * Cross-target specificity compensation (quick task 260520-bu7)
  * ------------------------------------------------------------
- * A competing CONSUMER component's scoped `<style>` rule receives a
- * target-dependent specificity bump: React/Solid/Lit +0, Vue/Angular/Svelte
- * +1 attribute unit (their scoped-CSS mechanism appends `[data-v-*]` /
- * `[_ngcontent-*]` / `.svelte-*`). Left uncompensated, an `@portal`-vs-consumer
- * cascade conflict resolves to a different winner per target — the VR matrix's
- * D-10 byte-identity invariant catches this.
+ * A competing CONSUMER component's scoped `<style>` rule is specificity-bumped
+ * by +1 `(0,1,0)` unit on ALL 6 targets — React/Solid/Lit via Rozie's own
+ * `scopeCss` `[data-rozie-s-*]` append, Vue via `[data-v-*]`, Angular via
+ * `[_ngcontent-*]`, Svelte via `.svelte-*`. That bump alone is uniform and
+ * harmless. The inconsistency came from the `@portal` rule's OWN baseline:
+ * Angular wraps `@portal` selectors `:host ::ng-deep`, and `:host` contributes
+ * a `(0,1,0)` unit that the other five targets' `@portal` emission lacked — so
+ * Angular's `@portal` rule sat one unit above the other five, and an
+ * `@portal`-vs-consumer cascade conflict resolved to a different winner on
+ * Angular than elsewhere. The VR matrix's D-10 byte-identity invariant catches
+ * this.
  *
  * The fix: each target's `emitStyle` passes a `scopeRepeat` count that repeats
  * the portal scope attribute selector that many ADDITIONAL times
  * (`[a="b"]` → `[a="b"][a="b"]`). Each repeat is a legal CSS attribute
- * selector worth one `(0,1,0)` specificity unit, so the target adds the SAME
- * delta to BOTH the `@portal` rule and the consumer rule — keeping
- * `specificity(@portal) − specificity(consumer)` a target-invariant constant.
- * `scopeRepeat = 0` (the default) is byte-identical to the pre-260520-bu7
- * single-attribute output. The mechanism is plain repeated attribute
- * selectors only — no `:not()`, `@layer`, or `!important`.
+ * selector worth one `(0,1,0)` specificity unit. The counts are chosen so
+ * every target's `@portal` rule lands at the SAME specificity: the five
+ * bare-attribute targets use `scopeRepeat = 1` (→ two attribute selectors),
+ * Angular uses `scopeRepeat = 0` because its `:host` wrap already supplies the
+ * second unit. With every `@portal` rule at an equal baseline and every
+ * consumer rule bumped by the same +1, `specificity(@portal) − specificity(
+ * consumer)` is a target-invariant constant. `scopeRepeat = 0` (the default)
+ * is byte-identical to the pre-260520-bu7 single-attribute output. The
+ * mechanism is plain repeated attribute selectors only — no `:not()`,
+ * `@layer`, or `!important`.
  *
  * @experimental — shape may change before v1.0
  */
