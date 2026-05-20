@@ -1,5 +1,6 @@
 <script lang="ts">
 import type { Snippet } from 'svelte';
+import { onMount } from 'svelte';
 
 interface Props {
   open?: boolean;
@@ -56,11 +57,11 @@ const unlockScroll = () => {
 
 // Colocated lifecycle pair — runs in source order alongside other hooks.
 
-$effect(() => {
+onMount(() => {
   lockScroll();
   return () => unlockScroll();
 });
-$effect(() => {
+onMount(() => {
   dialogEl?.focus();
 });
 

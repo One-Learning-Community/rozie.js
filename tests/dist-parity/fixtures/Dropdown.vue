@@ -60,7 +60,7 @@ onMounted(() => {
 
 watch(() => open.value, () => {
   if (open.value) reposition();
-});
+}, { immediate: true });
 
 useOutsideClick(
   [triggerElRef, panelElRef],

@@ -38,27 +38,27 @@ export default function TodoList(_props: TodoListProps): JSX.Element {
     const add = useCallback(() => {
     const text = draft.trim();
     if (!text) return;
-    setItems([...items, {
+    setItems(prev => [...prev, {
       id: crypto.randomUUID(),
       text,
       done: false
     }]);
     setDraft('');
     _rozieProp_onAdd && _rozieProp_onAdd(text);
-  }, [_rozieProp_onAdd, draft, items, setItems]);
+  }, [_rozieProp_onAdd, draft, setItems]);
   const { onToggle: _rozieProp_onToggle } = props;
     const toggle = useCallback(id => {
-    setItems(items.map(i => i.id === id ? {
+    setItems(prev => prev.map(i => i.id === id ? {
       ...i,
       done: !i.done
     } : i));
     _rozieProp_onToggle && _rozieProp_onToggle(id);
-  }, [_rozieProp_onToggle, items, setItems]);
+  }, [_rozieProp_onToggle, setItems]);
   const { onRemove: _rozieProp_onRemove } = props;
     const removeItem = useCallback(id => {
-    setItems(items.filter(i => i.id !== id));
+    setItems(prev => prev.filter(i => i.id !== id));
     _rozieProp_onRemove && _rozieProp_onRemove(id);
-  }, [_rozieProp_onRemove, items, setItems]);
+  }, [_rozieProp_onRemove, setItems]);
 
   return (
     <>

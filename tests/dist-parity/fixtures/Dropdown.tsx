@@ -36,8 +36,8 @@ export default function Dropdown(_props: DropdownProps): JSX.Element {
   const panelEl = useRef<HTMLDivElement | null>(null);
 
   const toggle = useCallback(() => {
-    setOpen(!open);
-  }, [open, setOpen]);
+    setOpen(prev => !prev);
+  }, [setOpen]);
   const close = useCallback(() => {
     setOpen(false);
   }, [setOpen]);
@@ -53,13 +53,13 @@ export default function Dropdown(_props: DropdownProps): JSX.Element {
   useEffect(() => {
     // Initial reposition only if the panel is open at mount time.
   if (_openRef.current) reposition();
-  }, [reposition]);
+  }, []);
   useEffect(() => {
     
   }, []);
   useEffect(() => {
     if (open) reposition();
-  }, [open, reposition]);
+  }, [open]);
 
   const _rozieThrottledLReposition = useThrottledCallback(reposition, [open, reposition], 100);
 

@@ -39,7 +39,7 @@ export default function SearchInput(_props: SearchInputProps): JSX.Element {
     return () => {
       
     };
-  }, [props.autofocus]);
+  }, []);
 
   const _rozieDebouncedOnSearch = useDebouncedCallback(onSearch, [onSearch], 300);
 
