@@ -49,6 +49,13 @@ export interface EmitScriptOpts {
   signals: PreactSignalsImportCollector;
   runtime: RuntimeLitImportCollector;
   lit: LitImportCollector;
+  /**
+   * Spike 004 — per-component scope hash threaded into `emitPortals` so the
+   * portal closure's `container.setAttribute('data-rozie-portal-<name>', …)`
+   * line uses the same hash the `@portal` CSS rules are scoped with. Empty
+   * string / omitted when the caller has no portal slots to scope.
+   */
+  portalScopeHash?: string;
 }
 
 export interface EmitScriptResult {
@@ -804,7 +811,7 @@ export function emitScript(
   //                       (which got `$portals.X` rewritten to `portals.X`)
   //                       has the closure in scope
   //   - disconnectedBlock → prepended to disconnectedCallback body
-  const portalsEmit = emitPortals(ir);
+  const portalsEmit = emitPortals(ir, opts.portalScopeHash ?? '');
   if (portalsEmit.hasPortals) {
     opts.lit.add('render');
     opts.lit.add('nothing');

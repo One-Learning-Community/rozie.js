@@ -27,7 +27,7 @@
  * @experimental — shape may change before v1.0
  */
 import postcss from 'postcss';
-import type { AtRule, ChildNode, Root, Rule } from 'postcss';
+import type { AtRule, ChildNode, Node, Root, Rule } from 'postcss';
 import type { SourceLoc } from '../ast/types.js';
 import type { Diagnostic } from '../diagnostics/Diagnostic.js';
 import type { StyleAST, StyleRule } from '../ast/blocks/StyleAST.js';
@@ -115,14 +115,14 @@ export function parseStyle(
     // `@media (...) { @portal x {} }`). The valid direction
     // (`@portal x { @media (...) {} }`) has `@media` as a DESCENDANT, which
     // this ancestor walk does not flag.
-    let ancestor = atRule.parent;
+    let ancestor: Node | undefined = atRule.parent;
     let invalidNesting = false;
     while (ancestor && ancestor.type !== 'root') {
       if (ancestor.type === 'atrule') {
         invalidNesting = true;
         break;
       }
-      ancestor = (ancestor as ChildNode).parent ?? undefined;
+      ancestor = ancestor.parent;
     }
     if (invalidNesting) {
       diagnostics.push({
@@ -205,12 +205,12 @@ export function parseStyle(
  * are collected exactly once (by the `walkAtRules` pass).
  */
 function hasPortalAncestor(rule: Rule): boolean {
-  let parent = rule.parent;
+  let parent: Node | undefined = rule.parent;
   while (parent && parent.type !== 'root') {
     if (parent.type === 'atrule' && (parent as AtRule).name === 'portal') {
       return true;
     }
-    parent = (parent as ChildNode).parent ?? undefined;
+    parent = parent.parent;
   }
   return false;
 }

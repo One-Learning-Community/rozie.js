@@ -34,6 +34,7 @@ import type { StyleSection } from '../../../../core/src/ir/types.js';
 import type { StyleRule } from '../../../../core/src/ast/blocks/StyleAST.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { scopeCss } from './scopeCss.js';
+import { rewriteAllPortalBlocks } from '../../../../core/src/codegen/portalCss.js';
 
 export interface EmitStyleResult {
   /**
@@ -93,6 +94,7 @@ export function emitStyle(
 
   const scopedRules = styles.scopedRules as StyleRule[];
   const rootRules = styles.rootRules as StyleRule[];
+  const portalRules = (styles.portalRules ?? []) as StyleRule[];
 
   const rawScopedCss = stringifyRules(scopedRules, source);
   const scopedCss = scopeHash.length > 0 && rawScopedCss.length > 0
@@ -100,14 +102,25 @@ export function emitStyle(
     : rawScopedCss;
   const globalCss = rootRules.length > 0 ? stringifyRules(rootRules, source) : null;
 
-  if (!scopedCss && !globalCss) {
+  // Spike 004 — @portal rules emit as BARE attribute selectors into the SAME
+  // inline <style> JSX node as the scoped rules. Solid's CSS pipeline is
+  // unscoped-by-default (no class hashing), so the
+  // [data-rozie-portal-<NAME>="<hash>"] selectors slot in verbatim — the
+  // portal attribute is their sole scoping.
+  const portalCss = rewriteAllPortalBlocks(portalRules, source, scopeHash);
+  // Append portal CSS after the scoped CSS so both live in one <style> block.
+  const combinedScoped = portalCss.length > 0
+    ? (scopedCss.length > 0 ? `${scopedCss}\n${portalCss}` : portalCss)
+    : scopedCss;
+
+  if (!combinedScoped && !globalCss) {
     return { styleJsx: '', diagnostics };
   }
 
   const styleParts: string[] = [];
 
-  if (scopedCss) {
-    const escaped = escapeCssForTemplateLiteral(scopedCss);
+  if (combinedScoped) {
+    const escaped = escapeCssForTemplateLiteral(combinedScoped);
     styleParts.push(`<style>{\`${escaped}\`}</style>`);
   }
   if (globalCss) {

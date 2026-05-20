@@ -91,7 +91,11 @@ export function emitReact(
   const scopeHash = computeScopeHash(ir.name, opts.filename);
   const scopeAttr = scopeAttrName(scopeHash);
 
-  const scriptOpts: { filename?: string } = {};
+  // Spike 004 — reuse the per-component `scopeHash` for the `@portal` closure
+  // setAttribute so it matches the emitted `@portal` CSS selectors.
+  const scriptOpts: { filename?: string; portalScopeHash?: string } = {
+    portalScopeHash: scopeHash,
+  };
   if (opts.filename !== undefined) scriptOpts.filename = opts.filename;
   const {
     hasPortals,

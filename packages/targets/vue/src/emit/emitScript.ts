@@ -714,6 +714,13 @@ export interface EmitScriptOptions {
    * real filename through).
    */
   filename?: string;
+  /**
+   * Spike 004 — per-component scope hash threaded into `emitPortals` so the
+   * portal closure's `container.setAttribute('data-rozie-portal-<name>', …)`
+   * line uses the same hash the `@portal` CSS rules are scoped with. Empty
+   * string (the default) when the caller has no portal slots to scope.
+   */
+  portalScopeHash?: string;
 }
 
 /**
@@ -785,7 +792,7 @@ export function emitScript(
   // when ir.slots has any portal entries. Lines are spliced between residual
   // and lifecycle sections below so the `portals` closure exists before user
   // $onMount callbacks that capture it.
-  const portalsEmit = emitPortals(ir, imports);
+  const portalsEmit = emitPortals(ir, imports, opts.portalScopeHash ?? '');
 
   // Quick plan 260515-u2b — $watch emission. Walks the same cloned program
   // and emits one `watch(getter, cb);` per top-level $watch call. Returns the

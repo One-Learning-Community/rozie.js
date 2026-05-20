@@ -911,6 +911,13 @@ export interface EmitScriptOptions {
    * per-call output map (D-103). Defaults to '<rozie>' when omitted.
    */
   filename?: string;
+  /**
+   * Spike 004 — per-component scope hash threaded into `emitPortals` so the
+   * portal closure's `container.setAttribute('data-rozie-portal-<name>', …)`
+   * line uses the same hash the `@portal` CSS rules are scoped with. Empty
+   * string / omitted when the caller has no portal slots to scope.
+   */
+  portalScopeHash?: string;
 }
 
 export function emitScript(
@@ -968,7 +975,7 @@ export function emitScript(
   //   - refDeclLine    → pushed to hookLines below (component-scope useRef)
   //   - closureBlock   → prepended to the first mount-phase useEffect body
   //   - bulkDispose    → prepended to the first mount-phase useEffect cleanup
-  const portalsEmit = emitPortals(ir, collectors);
+  const portalsEmit = emitPortals(ir, collectors, opts.portalScopeHash ?? '');
 
   // 4b. Plan 07.7 follow-up — pre-compute the watched-prop ref-rewrite plan.
   // For each prop X that has a sibling `$watch(() => $props.X, ...)`, we

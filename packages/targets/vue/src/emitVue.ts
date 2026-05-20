@@ -29,6 +29,7 @@ import type { BlockMap } from '../../../core/src/ast/types.js';
 import { splitBlocks } from '../../../core/src/splitter/splitBlocks.js';
 import { createDefaultRegistry } from '../../../core/src/modifiers/registerBuiltins.js';
 import { rewriteRozieImport } from '../../../core/src/codegen/rewriteRozieImport.js';
+import { computeScopeHash } from '../../../core/src/codegen/portalCss.js';
 import type { SourceMap } from 'magic-string';
 import { emitScript } from './emit/emitScript.js';
 import { emitTemplate } from './emit/emitTemplate.js';
@@ -282,9 +283,14 @@ export function emitVue(ir: IRComponent, opts: EmitVueOptions = {}): EmitVueResu
   // requires conditional spread on `genericParams` so `undefined` is never
   // forwarded as an explicit property of the emitScript options.
   // Phase 06.1 P2: thread filename for sourceFileName + capture scriptMap.
-  const scriptOpts: { genericParams?: string[]; filename?: string } = {};
+  // Spike 004 — per-component scope hash for `@portal` CSS scoping. Vue has
+  // no native scope-hash infra (it uses `[data-v-*]`); the shared helper
+  // gives the identical FNV-1a value the other targets compute.
+  const portalScopeHash = computeScopeHash(ir.name, opts.filename);
+  const scriptOpts: { genericParams?: string[]; filename?: string; portalScopeHash?: string } = {};
   if (opts.genericParams !== undefined) scriptOpts.genericParams = opts.genericParams;
   if (opts.filename !== undefined) scriptOpts.filename = opts.filename;
+  scriptOpts.portalScopeHash = portalScopeHash;
   const { script, scriptMap, preambleSectionLines, diagnostics: scriptDiags } = emitScript(ir, scriptOpts);
   const {
     template,
@@ -327,10 +333,11 @@ export function emitVue(ir: IRComponent, opts: EmitVueOptions = {}): EmitVueResu
   // shell has no `<style>` blocks (back-compat with Plan 02-04 callers that
   // never invoked emitStyle).
   const styleResult = opts.source !== undefined
-    ? emitStyle(ir.styles, opts.source)
-    : { scoped: '', global: null as string | null, diagnostics: [] };
+    ? emitStyle(ir.styles, opts.source, portalScopeHash)
+    : { scoped: '', global: null as string | null, portal: null as string | null, diagnostics: [] };
   const styleScoped = styleResult.scoped;
   const styleGlobal = styleResult.global;
+  const stylePortal = styleResult.portal;
   const styleDiags = styleResult.diagnostics;
 
   // Plan 05 — compose the SFC envelope via magic-string for source-map plumbing.
@@ -379,6 +386,7 @@ export function emitVue(ir: IRComponent, opts: EmitVueOptions = {}): EmitVueResu
     script: enrichedScript,
     styleScoped,
     styleGlobal,
+    stylePortal,
     scriptGeneric:
       opts.genericParams && opts.genericParams.length > 0
         ? opts.genericParams.join(', ')

@@ -44,6 +44,7 @@ import type { StyleSection } from '../../../../core/src/ir/types.js';
 import type { StyleRule } from '../../../../core/src/ast/blocks/StyleAST.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { scopeCss } from './scopeCss.js';
+import { rewriteAllPortalBlocks } from '../../../../core/src/codegen/portalCss.js';
 
 export interface EmitStyleResult {
   /** CSS body for the sibling `.module.css` file (D-53). Empty string when no scoped rules. */
@@ -76,11 +77,23 @@ export function emitStyle(
 
   const scopedRules = styles.scopedRules as StyleRule[];
   const rootRules = styles.rootRules as StyleRule[];
+  const portalRules = (styles.portalRules ?? []) as StyleRule[];
 
   const rawScopedCss = stringifyRules(scopedRules, source);
-  const moduleCss = scopeHash.length > 0 && rawScopedCss.length > 0
+  const scopedModuleCss = scopeHash.length > 0 && rawScopedCss.length > 0
     ? scopeCss(rawScopedCss, scopeHash)
     : rawScopedCss;
+
+  // Spike 004 — @portal rules emit into the SAME `.module.css` file but as
+  // BARE attribute selectors. They must NOT run through `scopeCss` (which
+  // would append `[data-rozie-s-*]`) — the `[data-rozie-portal-<NAME>]`
+  // attribute is their sole scoping. CSS Modules only hashes class names, so
+  // bare attribute selectors survive the Vite pipeline untouched.
+  const portalCss = rewriteAllPortalBlocks(portalRules, source, scopeHash);
+  const moduleCss = portalCss.length > 0
+    ? (scopedModuleCss.length > 0 ? `${scopedModuleCss}\n${portalCss}` : portalCss)
+    : scopedModuleCss;
+
   const globalCss = rootRules.length > 0 ? stringifyRules(rootRules, source) : null;
 
   return { moduleCss, globalCss, diagnostics };

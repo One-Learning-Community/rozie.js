@@ -24,6 +24,7 @@ import type {
 } from '../rewrite/collectLitImports.js';
 import { toKebabCase } from './emitDecorator.js';
 import { scopeCss } from './scopeCss.js';
+import { rewriteAllPortalBlocks } from '../../../../core/src/codegen/portalCss.js';
 
 export interface EmitStyleOpts {
   componentName: string;
@@ -85,6 +86,7 @@ export function emitStyle(
 
   const scopedRules = styles.scopedRules as StyleRule[];
   const rootRules = styles.rootRules as StyleRule[];
+  const portalRules = (styles.portalRules ?? []) as StyleRule[];
 
   const rawScopedCss = stringifyRules(scopedRules, source);
   const scopedCss = opts.scopeHash
@@ -92,12 +94,22 @@ export function emitStyle(
     : rawScopedCss;
   const globalCss = rootRules.length > 0 ? stringifyRules(rootRules, source) : '';
 
+  // Spike 004 — @portal rules emit INTO the same `static styles` css block.
+  // Lit's shadow-DOM CSS encapsulation already isolates these selectors to
+  // this component's shadow tree, which IS where the engine appends children
+  // (via the shadow-DOM-rooted `_ref__rozieRoot` query). The
+  // [data-rozie-portal-<NAME>="<hash>"] attribute reaches the engine subtree.
+  const portalCss = rewriteAllPortalBlocks(portalRules, source, opts.scopeHash ?? '');
+  const combinedScoped = portalCss.length > 0
+    ? (scopedCss.length > 0 ? `${scopedCss}\n${portalCss}` : portalCss)
+    : scopedCss;
+
   let staticStylesField = '';
   let globalStyleCall = '';
 
-  if (scopedCss.length > 0) {
+  if (combinedScoped.length > 0) {
     opts.lit.add('css');
-    const escaped = escapeCssForTemplateLiteral(scopedCss);
+    const escaped = escapeCssForTemplateLiteral(combinedScoped);
     staticStylesField = `  static styles = css\`\n${escaped}\n\`;`;
   }
 

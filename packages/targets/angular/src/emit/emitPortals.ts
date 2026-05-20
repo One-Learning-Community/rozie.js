@@ -27,8 +27,24 @@
  * V1 reactivity constraint (REQ-5): portal slots are NOT reactive after mount.
  */
 import type { IRComponent, SlotDecl } from '../../../../core/src/ir/types.js';
+import { portalAttrName } from '../../../../core/src/codegen/portalCss.js';
 
-function buildSlotMethod(slot: SlotDecl): string {
+/**
+ * Spike 004 — portal-scope `setAttribute` line, or '' when no scopeHash.
+ *
+ * Open question Q4 resolution: the attribute is set on the per-cell
+ * `container` (the value passed to the portal closure), NOT on the wrapper
+ * root once. All 6 hand-written exemplars set it per-container.
+ */
+function setAttrLine(slotName: string, scopeHash: string): string {
+  if (scopeHash.length === 0) return '';
+  return (
+    `    // Spike 004: portal-scope attribute injection.\n` +
+    `    container.setAttribute('${portalAttrName(slotName)}', '${scopeHash}');\n`
+  );
+}
+
+function buildSlotMethod(slot: SlotDecl, scopeHash: string): string {
   const slotName = slot.name;
   const tplField = `_${slotName}Tpl`;
   const paramNames = slot.portalParamNames ?? [];
@@ -41,6 +57,7 @@ function buildSlotMethod(slot: SlotDecl): string {
     `    const tpl = this.${tplField}();\n` +
     `    const vcr = this._portalAnchor();\n` +
     `    if (!tpl || !vcr) return () => {};\n` +
+    setAttrLine(slotName, scopeHash) +
     `    const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);\n` +
     `    view.detectChanges();\n` +
     `    for (const node of view.rootNodes as Node[]) container.appendChild(node);\n` +
@@ -69,7 +86,7 @@ export interface PortalsEmit {
   angularImports: string[];
 }
 
-export function emitPortals(ir: IRComponent): PortalsEmit {
+export function emitPortals(ir: IRComponent, scopeHash: string = ''): PortalsEmit {
   const portals = ir.slots.filter((s) => s.isPortal === true);
   if (portals.length === 0) {
     return {
@@ -99,7 +116,7 @@ export function emitPortals(ir: IRComponent): PortalsEmit {
     );
   }
 
-  const methodLines = portals.map(buildSlotMethod).join('\n');
+  const methodLines = portals.map((slot) => buildSlotMethod(slot, scopeHash)).join('\n');
   const closureBlock = `const portals = {\n${methodLines}\n};`;
 
   const destroyRegister =

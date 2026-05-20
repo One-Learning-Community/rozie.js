@@ -32,6 +32,7 @@ import type { BlockMap } from '../../../core/src/ast/types.js';
 import { splitBlocks } from '../../../core/src/splitter/splitBlocks.js';
 import { createDefaultRegistry } from '../../../core/src/modifiers/registerBuiltins.js';
 import { rewriteRozieImport } from '../../../core/src/codegen/rewriteRozieImport.js';
+import { computeScopeHash } from '../../../core/src/codegen/portalCss.js';
 
 /**
  * Phase 06.2 P2 — recursive walk over the IR template detecting any
@@ -142,7 +143,13 @@ export function emitSvelte(
 
   // 1. Script-side emission.
   // Phase 06.1 P2: thread filename for sourceFileName + capture scriptMap + preambleSectionLines.
-  const scriptOpts: { filename?: string } = {};
+  // Spike 004 — per-component scope hash for `@portal` CSS scoping. Svelte
+  // has no native scope-hash infra (it class-hashes selectors); the shared
+  // helper gives the identical FNV-1a value the other targets compute.
+  const portalScopeHash = computeScopeHash(ir.name, opts.filename);
+  const scriptOpts: { filename?: string; portalScopeHash?: string } = {
+    portalScopeHash,
+  };
   if (opts.filename !== undefined) scriptOpts.filename = opts.filename;
   const {
     scriptBlock,
@@ -170,7 +177,7 @@ export function emitSvelte(
 
   // 4. Style-block emission.
   const styleResult = opts.source !== undefined
-    ? emitStyle(ir.styles, opts.source)
+    ? emitStyle(ir.styles, opts.source, portalScopeHash)
     : { block: '', diagnostics: [] as Diagnostic[] };
 
   // 5. Compose the script body: scriptBlock + listenerBlock + injections.

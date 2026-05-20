@@ -36,6 +36,25 @@ import type {
   ReactImportCollector,
   RuntimeReactImportCollector,
 } from '../rewrite/collectReactImports.js';
+import { portalAttrName } from '../../../../core/src/codegen/portalCss.js';
+
+/**
+ * Spike 004 — portal-scope `setAttribute` line, or '' when no scopeHash.
+ *
+ * Open question Q4 resolution: the attribute is set on the per-cell
+ * `container` (the value passed to the portal closure), NOT on the wrapper
+ * root once. All 6 hand-written exemplars set it per-container; a portal
+ * closure runs once per cell so the cost is negligible.
+ */
+function setAttrLine(slotName: string, scopeHash: string): string {
+  if (scopeHash.length === 0) return '';
+  return (
+    `    // Spike 004: portal-scope attribute injection.\n` +
+    `    // Cascades the @portal ${slotName} { … } selectors from the\n` +
+    `    // component's .module.css into the engine-owned subtree.\n` +
+    `    container.setAttribute('${portalAttrName(slotName)}', '${scopeHash}');\n`
+  );
+}
 
 function capitalize(name: string): string {
   if (name.length === 0) return name;
@@ -82,7 +101,7 @@ function slotIdsFor(slot: SlotDecl): SlotIds {
  * `<Wrapper slots={{ X: fn }} />` consumer shape used by per-target
  * conformance tests.
  */
-function buildSlotMethod(slot: SlotDecl): string {
+function buildSlotMethod(slot: SlotDecl, scopeHash: string): string {
   const { slotName, refIdent } = slotIdsFor(slot);
   const paramNames = slot.portalParamNames ?? [];
   // Scope type: `{ arg: unknown; ... }` from portalParamNames, or `unknown`
@@ -95,6 +114,7 @@ function buildSlotMethod(slot: SlotDecl): string {
     `  ${slotName}: (container: HTMLElement, scope: ${scopeType}): (() => void) => {\n` +
     `    const slot = ${refIdent}.current ?? props.slots?.['${slotName}'];\n` +
     `    if (typeof slot !== 'function') return () => {};\n` +
+    setAttrLine(slotName, scopeHash) +
     `    const root = createRoot(container);\n` +
     // flushSync forces React to commit the portal render synchronously
     // BEFORE returning to the engine. Without flushSync, React schedules
@@ -150,6 +170,7 @@ export function emitPortals(
     react: ReactImportCollector;
     runtime: RuntimeReactImportCollector;
   },
+  scopeHash: string = '',
 ): PortalsEmit {
   const portals = ir.slots.filter((s) => s.isPortal === true);
   if (portals.length === 0) {
@@ -191,7 +212,7 @@ export function emitPortals(
     })
     .join('\n');
 
-  const methodLines = portals.map(buildSlotMethod).join('\n');
+  const methodLines = portals.map((slot) => buildSlotMethod(slot, scopeHash)).join('\n');
   const closureBlock = `const portals = {\n${methodLines}\n};`;
 
   const bulkDisposeBlock =

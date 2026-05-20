@@ -30,34 +30,55 @@
 import type { StyleSection } from '../../../../core/src/ir/types.js';
 import type { StyleRule } from '../../../../core/src/ast/blocks/StyleAST.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
+import { rewriteAllPortalBlocks } from '../../../../core/src/codegen/portalCss.js';
 
 export interface EmitStyleResult {
   /** Body of the `<style scoped>` block — never null; empty string when no scoped rules. */
   scoped: string;
   /** Body of the global `<style>` block, or null when no :root rules were extracted. */
   global: string | null;
+  /**
+   * Spike 004 — body of a SECOND, UNSCOPED `<style>` block emitted from
+   * `@portal NAME { ... }` blocks. Null when the component has no @portal
+   * blocks. Vue's `<style scoped>` auto-injects `[data-v-<hash>]` onto
+   * template elements only; engine-created DOM has no such attribute, so the
+   * @portal rules must live in an unscoped block where the
+   * `[data-rozie-portal-<NAME>="<hash>"]` attribute is the sole scoping.
+   */
+  portal: string | null;
   diagnostics: Diagnostic[];
 }
 
 /**
  * Re-stringify a StyleSection.
  *
- * @param styles  — Phase 2 IR StyleSection (already split by lowerStyles).
- * @param source  — original .rozie source text. Required when scopedRules or
- *                  rootRules are non-empty (used to slice each rule's body
- *                  by absolute loc.start..loc.end). Empty StyleSection accepts
- *                  any source value (including empty string).
+ * @param styles     — Phase 2 IR StyleSection (already split by lowerStyles).
+ * @param source     — original .rozie source text. Required when scopedRules or
+ *                     rootRules are non-empty (used to slice each rule's body
+ *                     by absolute loc.start..loc.end). Empty StyleSection accepts
+ *                     any source value (including empty string).
+ * @param scopeHash  — Spike 004 per-component scope hash. Reused verbatim for
+ *                     the `@portal` attribute selector. Empty string (default)
+ *                     when the caller has no @portal blocks to scope.
  */
-export function emitStyle(styles: StyleSection, source: string): EmitStyleResult {
+export function emitStyle(
+  styles: StyleSection,
+  source: string,
+  scopeHash: string = '',
+): EmitStyleResult {
   const diagnostics: Diagnostic[] = [];
 
   const scopedRules = styles.scopedRules as StyleRule[];
   const rootRules = styles.rootRules as StyleRule[];
+  const portalRules = (styles.portalRules ?? []) as StyleRule[];
 
   const scoped = stringifyRules(scopedRules, source);
   const global = rootRules.length > 0 ? stringifyRules(rootRules, source) : null;
 
-  return { scoped, global, diagnostics };
+  const portalCss = rewriteAllPortalBlocks(portalRules, source, scopeHash);
+  const portal = portalCss.length > 0 ? portalCss : null;
+
+  return { scoped, global, portal, diagnostics };
 }
 
 /**

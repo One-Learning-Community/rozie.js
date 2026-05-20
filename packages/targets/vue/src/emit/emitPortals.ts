@@ -27,9 +27,29 @@
  */
 import type { IRComponent, SlotDecl } from '../../../../core/src/ir/types.js';
 import type { VueImportCollector } from '../rewrite/collectVueImports.js';
+import { portalAttrName } from '../../../../core/src/codegen/portalCss.js';
+
+/**
+ * Spike 004 — portal-scope `setAttribute` line, or '' when no scopeHash.
+ *
+ * Open question Q4 resolution: the attribute is set on the per-cell
+ * `container` (the value passed to the portal closure), NOT on the wrapper
+ * root once. The spike's vanilla smoke used root-once, but all 6 hand-written
+ * exemplars — the structural snapshot contract — set it per-container. A
+ * portal closure runs once per cell so the cost is negligible.
+ */
+function setAttrLine(slotName: string, scopeHash: string): string {
+  if (scopeHash.length === 0) return '';
+  return (
+    `    // Spike 004: portal-scope attribute injection. Cascades the @portal\n` +
+    `    // ${slotName} { … } selectors from the unscoped <style> block below into\n` +
+    `    // the engine-owned subtree.\n` +
+    `    container.setAttribute('${portalAttrName(slotName)}', '${scopeHash}');\n`
+  );
+}
 
 /** Build the per-slot method body for the portals closure. */
-function buildSlotMethod(slot: SlotDecl): string {
+function buildSlotMethod(slot: SlotDecl, scopeHash: string): string {
   const slotName = slot.name;
   const paramNames = slot.portalParamNames ?? [];
   // Scope type from portalParamNames; falls back to `unknown` when omitted.
@@ -49,6 +69,7 @@ function buildSlotMethod(slot: SlotDecl): string {
     `  ${slotName}: (container: HTMLElement, scope: ${scopeType}): (() => void) => {\n` +
     `    const slotFn = slots.${slotName};\n` +
     `    if (!slotFn) return () => {};\n` +
+    setAttrLine(slotName, scopeHash) +
     `    const vnode = h(Fragment, null, slotFn(scope));\n` +
     `    render(vnode, container);\n` +
     `    portalContainers.add(container);\n` +
@@ -69,6 +90,7 @@ export interface PortalsEmit {
 export function emitPortals(
   ir: IRComponent,
   imports: VueImportCollector,
+  scopeHash: string = '',
 ): PortalsEmit {
   const portals = ir.slots.filter((s) => s.isPortal === true);
   if (portals.length === 0) {
@@ -81,7 +103,7 @@ export function emitPortals(
   // useSlots() is imported + declared by emitScript via the slotsUsed flag.
   imports.use('onBeforeUnmount');
 
-  const methodLines = portals.map(buildSlotMethod).join('\n');
+  const methodLines = portals.map((slot) => buildSlotMethod(slot, scopeHash)).join('\n');
   const lines = [
     'const portalContainers = new Set<HTMLElement>();',
     `const portals = {\n${methodLines}\n};`,

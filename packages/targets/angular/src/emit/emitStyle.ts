@@ -26,27 +26,52 @@
 import type { StyleSection } from '../../../../core/src/ir/types.js';
 import type { StyleRule } from '../../../../core/src/ast/blocks/StyleAST.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
+import { rewriteAllPortalBlocks } from '../../../../core/src/codegen/portalCss.js';
 
 export interface EmitStyleResult {
   /**
    * Concatenated CSS body (scoped rules + ::ng-deep :root block when present).
-   * Empty string when StyleSection is empty.
+   * Empty string when StyleSection has no scoped/root rules.
    */
   stylesArrayBody: string;
+  /**
+   * Spike 004 — body of a SEPARATE `styles` array entry for `@portal NAME
+   * { ... }` rules, each inner selector wrapped in `:host ::ng-deep` so
+   * Angular view-encapsulation's `_ngcontent-*` attribute scoping doesn't
+   * prevent matching engine-created DOM. Empty string when no @portal blocks.
+   */
+  portalStylesEntry: string;
   diagnostics: Diagnostic[];
 }
 
 /**
  * Emit the styles body for `styles: [\`<body>\`]`. Returns
- * `{ stylesArrayBody: '', diagnostics: [] }` when StyleSection is empty.
+ * `{ stylesArrayBody: '', portalStylesEntry: '', diagnostics: [] }` when the
+ * StyleSection is empty.
+ *
+ * @param styles     — Phase 2 IR StyleSection (already split by lowerStyles).
+ * @param source     — original .rozie source text.
+ * @param scopeHash  — Spike 004 per-component scope hash for `@portal`
+ *                     attribute selectors. Empty string (default) when there
+ *                     are no @portal blocks.
  */
-export function emitStyle(styles: StyleSection, source: string): EmitStyleResult {
+export function emitStyle(
+  styles: StyleSection,
+  source: string,
+  scopeHash: string = '',
+): EmitStyleResult {
   const diagnostics: Diagnostic[] = [];
   const scopedRules = styles.scopedRules as StyleRule[];
   const rootRules = styles.rootRules as StyleRule[];
+  const portalRules = (styles.portalRules ?? []) as StyleRule[];
 
-  if (scopedRules.length === 0 && rootRules.length === 0) {
-    return { stylesArrayBody: '', diagnostics };
+  // Spike 004 — @portal rules go in a SEPARATE styles entry, each selector
+  // wrapped `:host ::ng-deep` to pierce Angular's view encapsulation.
+  const portalCss = rewriteAllPortalBlocks(portalRules, source, scopeHash);
+  const portalStylesEntry = portalCss.length > 0 ? wrapPortalSelectors(portalCss) : '';
+
+  if (scopedRules.length === 0 && rootRules.length === 0 && portalStylesEntry.length === 0) {
+    return { stylesArrayBody: '', portalStylesEntry: '', diagnostics };
   }
 
   const parts: string[] = [];
@@ -58,7 +83,43 @@ export function emitStyle(styles: StyleSection, source: string): EmitStyleResult
     parts.push(`::ng-deep :root {\n${rootBodies.join('\n')}\n}`);
   }
 
-  return { stylesArrayBody: parts.join('\n\n'), diagnostics };
+  return {
+    stylesArrayBody: parts.join('\n\n'),
+    portalStylesEntry,
+    diagnostics,
+  };
+}
+
+/**
+ * Prefix every SELECTOR line of a portal CSS string with `:host ::ng-deep `.
+ * A selector line is one that ends with `{` (the rule's opening). Declaration
+ * lines and the closing `}` are left alone. Multi-line selector lists
+ * (`a,\n  b {`) have each part prefixed.
+ */
+function wrapPortalSelectors(css: string): string {
+  const lines = css.split('\n');
+  const out: string[] = [];
+  // A run of selector lines accumulates until the line ending with `{`.
+  let selectorBuf: string[] = [];
+  for (const line of lines) {
+    const trimmed = line.trim();
+    const isOpening = trimmed.endsWith('{');
+    const isSelectorPart = !isOpening && trimmed.endsWith(',');
+    if (isSelectorPart) {
+      selectorBuf.push(`:host ::ng-deep ${trimmed}`);
+      continue;
+    }
+    if (isOpening) {
+      selectorBuf.push(`:host ::ng-deep ${trimmed}`);
+      out.push(...selectorBuf);
+      selectorBuf = [];
+      continue;
+    }
+    // declaration line or closing brace — emit verbatim.
+    out.push(line);
+  }
+  out.push(...selectorBuf);
+  return out.join('\n');
 }
 
 function stringifyRules(rules: StyleRule[], source: string): string {

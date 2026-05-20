@@ -107,11 +107,14 @@ export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResu
   diagnostics.push(...styleResult.diagnostics);
 
   // 3. Script emission (props, state, refs, computed, lifecycle, user methods).
+  // Spike 004 — reuse the per-component `scopeHash` for the `@portal` closure
+  // setAttribute so it matches the emitted `@portal` CSS selectors.
   const scriptResult = emitScript(ir, {
     decorators: decoratorImports,
     signals: signalsImports,
     runtime: runtimeImports,
     lit: litImports,
+    portalScopeHash: scopeHash,
   });
   diagnostics.push(...scriptResult.diagnostics);
 

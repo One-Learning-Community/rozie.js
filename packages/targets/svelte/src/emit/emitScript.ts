@@ -792,6 +792,13 @@ export interface EmitScriptOptions {
    * per-call output map (D-103). Defaults to '<rozie>' when omitted.
    */
   filename?: string;
+  /**
+   * Spike 004 — per-component scope hash threaded into `emitPortals` so the
+   * portal closure's `container.setAttribute('data-rozie-portal-<name>', …)`
+   * line uses the same hash the `@portal` CSS rules are scoped with. Empty
+   * string (the default) when the caller has no portal slots to scope.
+   */
+  portalScopeHash?: string;
 }
 
 export function emitScript(
@@ -818,7 +825,7 @@ export function emitScript(
   // Portal-slot primitive (Spike 003) — synthesize PortalHost-based portal
   // closure for portal slots. Imports `mount`/`unmount` from 'svelte' and
   // `PortalHost` from '@rozie/runtime-svelte/PortalHost.svelte'.
-  const portalsEmit = emitPortals(ir);
+  const portalsEmit = emitPortals(ir, opts.portalScopeHash ?? '');
   if (portalsEmit.hasPortals) {
     importLines.push(portalsEmit.extraImports.trimEnd());
   }

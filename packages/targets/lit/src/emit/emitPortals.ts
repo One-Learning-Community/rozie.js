@@ -17,8 +17,24 @@
  * V1 reactivity constraint (REQ-5): portal slots are NOT reactive after mount.
  */
 import type { IRComponent, SlotDecl } from '../../../../core/src/ir/types.js';
+import { portalAttrName } from '../../../../core/src/codegen/portalCss.js';
 
-function buildSlotMethod(slot: SlotDecl): string {
+/**
+ * Spike 004 — portal-scope `setAttribute` line, or '' when no scopeHash.
+ *
+ * Open question Q4 resolution: the attribute is set on the per-cell
+ * `container` (the value passed to the portal closure), NOT on the wrapper
+ * root once. All 6 hand-written exemplars set it per-container.
+ */
+function setAttrLine(slotName: string, scopeHash: string): string {
+  if (scopeHash.length === 0) return '';
+  return (
+    `    // Spike 004: portal-scope attribute injection.\n` +
+    `    container.setAttribute('${portalAttrName(slotName)}', '${scopeHash}');\n`
+  );
+}
+
+function buildSlotMethod(slot: SlotDecl, scopeHash: string): string {
   const slotName = slot.name;
   const paramNames = slot.portalParamNames ?? [];
   const scopeType =
@@ -29,6 +45,7 @@ function buildSlotMethod(slot: SlotDecl): string {
     `  ${slotName}: (container: HTMLElement, scope: ${scopeType}): (() => void) => {\n` +
     `    const tpl = this.${slotName};\n` +
     `    if (typeof tpl !== 'function') return () => {};\n` +
+    setAttrLine(slotName, scopeHash) +
     `    render(tpl(scope), container);\n` +
     `    this._portalContainers.add(container);\n` +
     `    return () => {\n` +
@@ -49,7 +66,7 @@ export interface PortalsEmit {
   disconnectedBlock: string;
 }
 
-export function emitPortals(ir: IRComponent): PortalsEmit {
+export function emitPortals(ir: IRComponent, scopeHash: string = ''): PortalsEmit {
   const portals = ir.slots.filter((s) => s.isPortal === true);
   if (portals.length === 0) {
     return {
@@ -61,7 +78,7 @@ export function emitPortals(ir: IRComponent): PortalsEmit {
   }
 
   const fieldDecl = 'private _portalContainers = new Set<HTMLElement>();';
-  const methodLines = portals.map(buildSlotMethod).join('\n');
+  const methodLines = portals.map((slot) => buildSlotMethod(slot, scopeHash)).join('\n');
   const closureBlock = `const portals = {\n${methodLines}\n};`;
   const disconnectedBlock =
     'for (const container of this._portalContainers) render(nothing, container);\n' +

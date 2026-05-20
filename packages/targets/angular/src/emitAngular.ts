@@ -32,6 +32,7 @@ import type { BlockMap } from '../../../core/src/ast/types.js';
 import { splitBlocks } from '../../../core/src/splitter/splitBlocks.js';
 import { createDefaultRegistry } from '../../../core/src/modifiers/registerBuiltins.js';
 import { rewriteRozieImport } from '../../../core/src/codegen/rewriteRozieImport.js';
+import { computeScopeHash } from '../../../core/src/codegen/portalCss.js';
 
 /**
  * Phase 06.2 P2 — recursive walk over the IR template detecting any
@@ -161,7 +162,13 @@ export function emitAngular(
 
   // 1. Script-side emission.
   // Phase 06.1 P2: thread filename for sourceFileName + capture scriptMap.
-  const scriptOpts: { filename?: string } = {};
+  // Spike 004 — per-component scope hash for `@portal` CSS scoping. Angular
+  // has no native scope-hash infra (it uses `_ngcontent-*`); the shared
+  // helper gives the identical FNV-1a value the other targets compute.
+  const portalScopeHash = computeScopeHash(ir.name, opts.filename);
+  const scriptOpts: { filename?: string; portalScopeHash?: string } = {
+    portalScopeHash,
+  };
   if (opts.filename !== undefined) scriptOpts.filename = opts.filename;
   const scriptResult = emitScript(ir, scriptOpts);
 
@@ -184,8 +191,8 @@ export function emitAngular(
 
   // 4. Style emission.
   const styleResult = opts.source !== undefined
-    ? emitStyle(ir.styles, opts.source)
-    : { stylesArrayBody: '', diagnostics: [] as Diagnostic[] };
+    ? emitStyle(ir.styles, opts.source, portalScopeHash)
+    : { stylesArrayBody: '', portalStylesEntry: '', diagnostics: [] as Diagnostic[] };
 
   // 5. Register conditional imports based on template features.
   const imports = scriptResult.imports;
@@ -231,6 +238,7 @@ export function emitAngular(
     componentName: ir.name,
     template: finalTemplate,
     stylesArrayBody: styleResult.stylesArrayBody,
+    portalStylesEntry: styleResult.portalStylesEntry,
     hasSlots: ir.slots.length > 0,
     hasNgModel: tmplResult.hasNgModel,
     hasDynamicSlotFiller: tmplResult.hasDynamicSlotFiller,

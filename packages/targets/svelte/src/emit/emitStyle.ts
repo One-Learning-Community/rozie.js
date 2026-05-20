@@ -26,9 +26,10 @@
 import type { StyleSection } from '../../../../core/src/ir/types.js';
 import type { StyleRule } from '../../../../core/src/ast/blocks/StyleAST.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
+import { rewriteAllPortalBlocks } from '../../../../core/src/codegen/portalCss.js';
 
 export interface EmitStyleResult {
-  /** Body of the single `<style>` block (joined scoped + :global(:root) rules). */
+  /** Body of the single `<style>` block (joined scoped + :global(:root) + @portal rules). */
   block: string;
   diagnostics: Diagnostic[];
 }
@@ -37,16 +38,33 @@ export interface EmitStyleResult {
  * Emit a Svelte 5 `<style>` body. Returns `{ block: '', diagnostics: [] }`
  * when the StyleSection is empty.
  *
- * @param styles  — Phase 2 IR StyleSection (already split by lowerStyles).
- * @param source  — original .rozie source text (used to slice each rule's body).
+ * Spike 004 — `@portal NAME { ... }` rules emit INSIDE this same `<style>`
+ * block (Svelte allows only one top-level block), wrapped in Svelte 5's
+ * `:global { ... }` block syntax. That disables Svelte's per-class
+ * scope-hashing for the portal selectors — engine-created DOM has no
+ * Svelte-hashed classes, so the `[data-rozie-portal-<NAME>="<hash>"]`
+ * attribute is the sole scoping mechanism.
+ *
+ * @param styles     — Phase 2 IR StyleSection (already split by lowerStyles).
+ * @param source     — original .rozie source text (used to slice each rule's body).
+ * @param scopeHash  — Spike 004 per-component scope hash for the `@portal`
+ *                     attribute selector. Empty string (default) when there
+ *                     are no @portal blocks.
  */
-export function emitStyle(styles: StyleSection, source: string): EmitStyleResult {
+export function emitStyle(
+  styles: StyleSection,
+  source: string,
+  scopeHash: string = '',
+): EmitStyleResult {
   const diagnostics: Diagnostic[] = [];
 
   const scopedRules = styles.scopedRules as StyleRule[];
   const rootRules = styles.rootRules as StyleRule[];
+  const portalRules = (styles.portalRules ?? []) as StyleRule[];
 
-  if (scopedRules.length === 0 && rootRules.length === 0) {
+  const portalCss = rewriteAllPortalBlocks(portalRules, source, scopeHash);
+
+  if (scopedRules.length === 0 && rootRules.length === 0 && portalCss.length === 0) {
     return { block: '', diagnostics };
   }
 
@@ -60,6 +78,15 @@ export function emitStyle(styles: StyleSection, source: string): EmitStyleResult
   if (rootRules.length > 0) {
     const rootBodies = rootRules.map((r) => sliceRuleBody(r, source));
     parts.push(`:global(:root) {\n${rootBodies.join('\n')}\n}`);
+  }
+
+  // Spike 004 — @portal rules wrap inside a Svelte 5 `:global { ... }` block.
+  if (portalCss.length > 0) {
+    const indented = portalCss
+      .split('\n')
+      .map((l) => (l.length > 0 ? `  ${l}` : l))
+      .join('\n');
+    parts.push(`:global {\n${indented}\n}`);
   }
 
   return { block: parts.join('\n\n'), diagnostics };

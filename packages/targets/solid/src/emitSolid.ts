@@ -117,7 +117,14 @@ export function emitSolid(ir: IRComponent, opts: EmitSolidOptions = {}): EmitSol
   // 5. Per-segment emit.
   const slotResult = emitSlotDecl(ir);
   const propsInterface = emitPropsInterface(ir, slotResult.fields);
-  const scriptResult = emitScript(ir, { solidImports, runtimeImports, filename: opts.filename }, registry);
+  // Spike 004 — reuse the per-component `scopeHash` (already computed above)
+  // for the `@portal` CSS scope so the portal closure's setAttribute value
+  // matches the emitted `@portal` CSS selectors.
+  const scriptResult = emitScript(
+    ir,
+    { solidImports, runtimeImports, filename: opts.filename, portalScopeHash: scopeHash },
+    registry,
+  );
   // Thread scopeAttr through so every HTML host element gets the matching
   // attribute. Component tags (tagKind 'component'/'self') skip the attribute —
   // their own bundles carry their own scope.

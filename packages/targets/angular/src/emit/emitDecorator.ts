@@ -35,6 +35,12 @@ export interface EmitDecoratorOpts {
   /** Compiled style body string (single concatenated string for `styles: [\`...\`]`). */
   stylesArrayBody: string;
   /**
+   * Spike 004 — body of a SEPARATE `styles` array entry for `@portal NAME
+   * { ... }` rules (each selector already wrapped `:host ::ng-deep`). Empty
+   * string when the component has no @portal blocks.
+   */
+  portalStylesEntry?: string;
+  /**
    * Whether the IR has any SlotDecl — drives conditional NgTemplateOutlet
    * import in the decorator's `imports: [...]` array (Pitfall 10).
    */
@@ -159,14 +165,46 @@ export function emitDecorator(
   lines.push(`  template: \``);
   lines.push(escapeForBacktickLiteral(indentedTemplate));
   lines.push(`  \`,`);
-  if (opts.stylesArrayBody.length > 0) {
-    lines.push(`  styles: [\``);
-    const indentedStyles = opts.stylesArrayBody
+  const portalStylesEntry = opts.portalStylesEntry ?? '';
+  if (portalStylesEntry.length === 0) {
+    // Existing single-entry layout — preserved byte-identical for all
+    // @portal-free components.
+    if (opts.stylesArrayBody.length > 0) {
+      lines.push(`  styles: [\``);
+      const indentedStyles = opts.stylesArrayBody
+        .split('\n')
+        .map((l) => (l.length > 0 ? '    ' + l : l))
+        .join('\n');
+      lines.push(escapeForBacktickLiteral(indentedStyles));
+      lines.push(`  \`],`);
+    }
+  } else {
+    // Spike 004 — multi-entry layout: scoped/:root entry (when present) +
+    // a SECOND @portal entry wrapped in :host ::ng-deep so
+    // view-encapsulation's _ngcontent-* scoping doesn't prevent matching
+    // engine-created DOM.
+    lines.push(`  styles: [`);
+    if (opts.stylesArrayBody.length > 0) {
+      lines.push(`    \``);
+      const indentedStyles = opts.stylesArrayBody
+        .split('\n')
+        .map((l) => (l.length > 0 ? '    ' + l : l))
+        .join('\n');
+      lines.push(escapeForBacktickLiteral(indentedStyles));
+      lines.push(`  \`,`);
+    }
+    lines.push(`    // Spike 004 NEW — @portal item { … } as a separate styles entry`);
+    lines.push(`    // wrapped in :host ::ng-deep so view-encapsulation's`);
+    lines.push(`    // _ngcontent-* attribute scoping doesn't prevent matching`);
+    lines.push(`    // engine-created DOM.`);
+    lines.push(`    \``);
+    const indentedPortal = portalStylesEntry
       .split('\n')
       .map((l) => (l.length > 0 ? '    ' + l : l))
       .join('\n');
-    lines.push(escapeForBacktickLiteral(indentedStyles));
-    lines.push(`  \`],`);
+    lines.push(escapeForBacktickLiteral(indentedPortal));
+    lines.push(`  \`,`);
+    lines.push(`  ],`);
   }
   lines.push('})');
 

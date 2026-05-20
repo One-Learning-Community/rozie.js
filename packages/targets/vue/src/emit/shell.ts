@@ -36,6 +36,13 @@ export interface ShellParts {
   /** Body of trailing global `<style>...</style>` (D-38 :root extraction), or null. */
   styleGlobal: string | null;
   /**
+   * Spike 004 — body of a SECOND, UNSCOPED `<style>` block emitted from
+   * `@portal NAME { ... }`. Null when the component has no @portal blocks.
+   * Emitted after the `<style scoped>` block so its `[data-rozie-portal-*]`
+   * attribute selectors are NOT layered with Vue's `[data-v-*]` scoping.
+   */
+  stylePortal?: string | null;
+  /**
    * D-85 Vue full (Plan 06-02 Task 3): comma-separated list of generic type
    * parameters for the SFC's `<script setup generic="...">` attribute (Vue
    * 3.4+ stable). When `null` (the default for the 5 reference examples),
@@ -239,6 +246,10 @@ export function buildShell(parts: ShellParts): BuildShellResult {
     if (parts.styleGlobal !== null && parts.styleGlobal.length > 0) {
       styleParts.push(`<style>\n${parts.styleGlobal}\n</style>`);
     }
+    // Spike 004 — @portal rules in a SECOND, UNSCOPED <style> block.
+    if (parts.stylePortal != null && parts.stylePortal.length > 0) {
+      styleParts.push(`<style>\n${parts.stylePortal}\n</style>`);
+    }
     if (styleParts.length === 0) {
       // No emitted style output — remove the source style range entirely.
       ms.remove(blocks.style.loc.start, blocks.style.loc.end);
@@ -354,6 +365,12 @@ function buildShellLegacy(parts: ShellParts): BuildShellResult {
   if (parts.styleGlobal !== null && parts.styleGlobal.length > 0) {
     ms.append('\n<style>\n');
     ms.append(parts.styleGlobal);
+    ms.append('\n</style>\n');
+  }
+  // Spike 004 — @portal rules in a SECOND, UNSCOPED <style> block.
+  if (parts.stylePortal != null && parts.stylePortal.length > 0) {
+    ms.append('\n<style>\n');
+    ms.append(parts.stylePortal);
     ms.append('\n</style>\n');
   }
   return { ms, scriptOutputOffset: 0, userCodeLineOffset: 0, scriptMap: parts.scriptMap ?? null };

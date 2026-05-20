@@ -115,6 +115,13 @@ export interface EmitScriptCollectors {
   runtimeImports: RuntimeSolidImportCollector;
   /** .rozie filename; when provided, enables per-statement source map generation. */
   filename?: string | undefined;
+  /**
+   * Spike 004 — per-component scope hash threaded into `emitPortals` so the
+   * portal closure's `container.setAttribute('data-rozie-portal-<name>', …)`
+   * line uses the same hash the `@portal` CSS rules are scoped with. Empty
+   * string / omitted when the caller has no portal slots to scope.
+   */
+  portalScopeHash?: string | undefined;
 }
 
 export function emitScript(
@@ -220,7 +227,7 @@ export function emitScript(
   // the lifecycle hooks so the `portals` closure exists when user code's
   // onMount runs. The closure references `props.XSlot`, `render` (from
   // 'solid-js/web'), and `onCleanup`.
-  const portalsEmit = emitPortals(ir);
+  const portalsEmit = emitPortals(ir, collectors.portalScopeHash ?? '');
   if (portalsEmit.hasPortals) {
     collectors.solidImports.add('onCleanup');
     // The `render` named import lives on 'solid-js/web', not 'solid-js'.
