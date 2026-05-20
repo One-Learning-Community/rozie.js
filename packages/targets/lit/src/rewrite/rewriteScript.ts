@@ -25,6 +25,10 @@ import type { GeneratorOptions } from '@babel/generator';
 import type { IRComponent } from '../../../../core/src/ir/types.js';
 import type { File, Program, Expression, Statement } from '@babel/types';
 import { cloneScriptProgram } from './cloneProgram.js';
+import {
+  hasShadowingBinding,
+  isInBindingPosition,
+} from './scopeAwareSkip.js';
 
 // CJS interop normalization.
 type GenerateFn = typeof import('@babel/generator').default;
@@ -346,9 +350,33 @@ export function rewriteScript(
         (parentPath.node as t.MemberExpression | t.OptionalMemberExpression).property === path.node &&
         !(parentPath.node as t.MemberExpression | t.OptionalMemberExpression).computed
       ) return;
-      if (parentPath.isObjectProperty() && parentPath.node.key === path.node && !parentPath.node.computed) return;
 
-      // Skip function parameters.
+      // ObjectProperty key positions:
+      //   - non-shorthand `{ X: expr }` → the key is just a property name,
+      //     not a reference; skip.
+      //   - shorthand `{ X }` is BOTH key and value (same Identifier node).
+      //     If the grandparent is an ObjectPattern (a destructuring BINDING,
+      //     e.g. `({ X }) => …` or `const { X } = obj`), this is a binding —
+      //     skip. If the grandparent is an ObjectExpression (a VALUE position,
+      //     e.g. `return { X }`), un-shorthand the property and rewrite the
+      //     value to `this.X`, leaving the key as `X`.
+      if (parentPath.isObjectProperty() && parentPath.node.key === path.node) {
+        if (parentPath.node.computed) return;
+        if (!parentPath.node.shorthand) return;
+        const grandparent = parentPath.parentPath?.node;
+        if (t.isObjectPattern(grandparent)) return;
+        // ObjectExpression value position: un-shorthand + rewrite value.
+        // The path is shared between key and value in shorthand form, so
+        // mutate the parent ObjectProperty directly rather than replaceWith.
+        parentPath.node.shorthand = false;
+        parentPath.node.value = thisDot(name);
+        path.skip();
+        return;
+      }
+
+      // Skip function parameters that ARE a bare Identifier (e.g.
+      // `(editor) => …`). Destructured params (`({ editor }) => …`) are
+      // handled by the binding-position / shadowing guards below.
       if (
         parentPath.isFunctionExpression() ||
         parentPath.isArrowFunctionExpression() ||
@@ -357,6 +385,20 @@ export function rewriteScript(
         const fnNode = parentPath.node as t.Function;
         if (fnNode.params.some((p) => p === path.node)) return;
       }
+
+      // Skip identifiers nested ANYWHERE inside an ObjectPattern / ArrayPattern
+      // — these are destructuring BINDING positions (function params,
+      // `const { x } = …`, `[a] = …`), not references. Catches the
+      // destructured-parameter case `onUpdate: ({ editor }) => …` whose
+      // `editor` shadows a promoted class field.
+      if (isInBindingPosition(path)) return;
+
+      // Lexical-scope shadowing: if a local binding (function param,
+      // destructuring pattern, inner let/const/var) shadows the promoted
+      // class-field/method name, the reference points at the LOCAL — skip.
+      // Babel's scope cache is stale post-mutation, so this is a manual
+      // ancestor walk.
+      if (hasShadowingBinding(path, name)) return;
 
       // Rewrite to `this.<name>`.
       path.replaceWith(thisDot(name));

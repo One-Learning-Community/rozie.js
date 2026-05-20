@@ -39,6 +39,10 @@ import _traverse from '@babel/traverse';
 import type { File } from '@babel/types';
 import type { IRComponent } from '../../../../core/src/ir/types.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
+import {
+  hasShadowingBinding,
+  isInBindingPosition,
+} from './scopeAwareSkip.js';
 
 // CJS interop normalization (Phase 2 D-T-2-01-04 pattern).
 type TraverseFn = typeof import('@babel/traverse').default;
@@ -619,6 +623,54 @@ export function rewriteRozieIdentifiers(
           return;
         }
       }
+
+      // Scope-aware binding guards (Bug 1 — quick task 260520-gi1).
+      //
+      // Shorthand ObjectProperty `{ X }`: after cloneScriptProgram the key and
+      // value Identifiers may be distinct nodes, so `isBareReference` no longer
+      // reliably skips the value side. Handle it explicitly:
+      //   - grandparent ObjectPattern (a destructuring BINDING, e.g.
+      //     `onUpdate: ({ editor }) => …`) → skip; rewriting it to
+      //     `{ editor: this.editor }` is an illegal binding pattern.
+      //   - grandparent ObjectExpression (a VALUE position, e.g.
+      //     `return { editor }`) → un-shorthand to `{ editor: this.editor() }`
+      //     so the class-member reference still resolves; the `()` signal
+      //     suffix is applied by the normal rewrite path below.
+      {
+        const p = path.parent;
+        if (
+          t.isObjectProperty(p) &&
+          !p.computed &&
+          p.shorthand &&
+          (p.key === path.node || p.value === path.node)
+        ) {
+          const grandparent = path.parentPath?.parentPath?.node;
+          if (t.isObjectPattern(grandparent)) return;
+          if (t.isObjectExpression(grandparent)) {
+            if (!classMembers.has(name) && !collisionRenames.has(name)) return;
+            const renamed = collisionRenames.get(name) ?? name;
+            const memberRef = t.memberExpression(
+              t.thisExpression(),
+              t.identifier(renamed),
+            );
+            p.shorthand = false;
+            p.value = signalMembers.has(name)
+              ? t.callExpression(memberRef, [])
+              : memberRef;
+            path.skip();
+            return;
+          }
+        }
+      }
+      // Identifiers nested ANYWHERE inside an ObjectPattern / ArrayPattern are
+      // destructuring BINDING positions, not references — skip. Catches nested
+      // patterns (`{ a: { editor } }`) and array-pattern elements that the flat
+      // `parent.params.includes(node)` guard in `isBareReference` misses.
+      if (isInBindingPosition(path)) return;
+      // Lexical-scope shadowing: a local binding (function param, destructuring
+      // pattern, inner let/const/var) that shadows a promoted class-member name
+      // means the reference points at the LOCAL — skip the `this.` rewrite.
+      if (hasShadowingBinding(path, name)) return;
 
       if (!isBareReference(path)) return;
       // Don't rewrite the magic Rozie identifiers themselves — already handled.
