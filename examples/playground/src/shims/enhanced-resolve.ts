@@ -39,6 +39,20 @@ function tryCandidates(absPath: string): string | null {
   if (v.has(absPath)) return absPath;
   if (v.has(absPath + '.rozie')) return absPath + '.rozie';
   if (v.has(absPath + '/index.rozie')) return absPath + '/index.rozie';
+  // Basename fallback. The playground VFS is FLAT — every bundle file is
+  // keyed `/vfs/<basename>` (snippets.ts `filenameFromGlob` strips any
+  // directory prefix), so a `<components>` import that climbs out of `/vfs`
+  // via `../` (e.g. `examples/demos/FooDemo.rozie` importing
+  // `../Foo.rozie`) computes an absPath like `/Foo.rozie` that never
+  // literally exists. Resolve such imports by basename instead: bundle
+  // siblings always have distinct basenames, so this is unambiguous for the
+  // flat-VFS model and makes every relative form (`./`, `../`, `../../`)
+  // resolve uniformly.
+  const base = absPath.split('/').pop() ?? absPath;
+  if (base) {
+    if (v.has('/vfs/' + base)) return '/vfs/' + base;
+    if (v.has('/vfs/' + base + '.rozie')) return '/vfs/' + base + '.rozie';
+  }
   return null;
 }
 

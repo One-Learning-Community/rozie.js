@@ -11,10 +11,22 @@
           "lit/directives/repeat.js": "https://esm.sh/lit@3.2.1/directives/repeat.js",
           "lit/directives/class-map.js": "https://esm.sh/lit@3.2.1/directives/class-map.js",
           "lit/directives/style-map.js": "https://esm.sh/lit@3.2.1/directives/style-map.js",
+          "lit/directives/ref.js": "https://esm.sh/lit@3.2.1/directives/ref.js",
           "@lit-labs/preact-signals": "https://esm.sh/@lit-labs/preact-signals@1.0.3",
           "@preact/signals-core": "https://esm.sh/@preact/signals-core@1.8.0",
           "@rozie/runtime-lit": "/preview/runtimes/lit.mjs",
-          "sortablejs": "https://esm.sh/sortablejs@1.15.6"
+          "sortablejs": "https://esm.sh/sortablejs@1.15.6",
+          "flatpickr": "https://esm.sh/flatpickr@4.6.13",
+          "leaflet": "https://esm.sh/leaflet@1.9.4",
+          "chart.js": "https://esm.sh/chart.js@4.5.1",
+          "@fullcalendar/core": "https://esm.sh/@fullcalendar/core@6.1.20",
+          "@fullcalendar/daygrid": "https://esm.sh/@fullcalendar/daygrid@6.1.20",
+          "@fullcalendar/timegrid": "https://esm.sh/@fullcalendar/timegrid@6.1.20",
+          "@fullcalendar/interaction": "https://esm.sh/@fullcalendar/interaction@6.1.20",
+          "@tiptap/core": "https://esm.sh/@tiptap/core@3.23.5",
+          "@tiptap/starter-kit": "https://esm.sh/@tiptap/starter-kit@3.23.5",
+          "@uppy/core": "https://esm.sh/@uppy/core@5.2.0",
+          "@uppy/xhr-upload": "https://esm.sh/@uppy/xhr-upload@5.2.0"
         }
       }
     </script>
@@ -33,6 +45,23 @@
       // elements can only be defined once per tag name; re-defining throws).
       let counter = 0;
       let placeholderCounter = 0;
+
+      // Idempotent customElements.define. Multi-file bundle siblings (e.g.
+      // SortableListDemo importing SortableList) compile to LitElement custom
+      // elements with a STABLE tag (`rozie-sortable-list`) — the entry's
+      // template references that exact tag, so the sibling cannot be given a
+      // per-render placeholder name like the entry is. But this iframe is
+      // reused across renders, so the sibling's `customElements.define` runs
+      // again on every re-render and throws `NotSupportedError: ... already
+      // been defined`. Skipping the redefine keeps the first render's class
+      // registered — acceptable for a preview surface, and far better than a
+      // hard crash. The entry itself still gets a fresh `rozie-preview-N` tag
+      // per render (below), so editing the entry always re-renders live.
+      const __origDefine = customElements.define.bind(customElements);
+      customElements.define = (name, ctor, options) => {
+        if (customElements.get(name)) return;
+        __origDefine(name, ctor, options);
+      };
 
       bootHarness(async ({ code, siblings }) => {
         const transform = await getEsbuildTransform();

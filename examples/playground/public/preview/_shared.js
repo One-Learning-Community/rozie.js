@@ -76,7 +76,12 @@ export async function importFromString(code) {
  * The regex is scoped to `from ` / `import ` heads so we never touch
  * unrelated string literals that happen to look like relative paths.
  * Matches both bare-basename (`'./SortableList'`) and with-extension
- * (`'./SortableList.js'`, `'./SortableList.svelte'`) forms.
+ * (`'./SortableList.js'`, `'./SortableList.svelte'`) forms, and any depth
+ * of leading `../` segments (`'../LineChart'`, `'../../shared/Foo'`) —
+ * a bundle's entry and its dependency need not live in the same directory
+ * (e.g. `examples/demos/LineChartDemo.rozie` imports `../LineChart.rozie`).
+ * Only the basename is matched against `blobMap`, so the leading path is
+ * irrelevant to the lookup — the VFS keys siblings by basename.
  *
  * Pass-through for anything not in the map — so unrelated imports of
  * `./foo/bar` or relative CSS paths fall through to the existing
@@ -85,7 +90,7 @@ export async function importFromString(code) {
  */
 export function rewriteRelativeImports(code, blobMap) {
   return code.replace(
-    /(\b(?:from|import)\s+)(['"])\.\/([\w-]+)(?:\.[\w]+)?\2/g,
+    /(\b(?:from|import)\s+)(['"])(?:\.\.?\/)+([\w-]+)(?:\.[\w]+)?\2/g,
     (m, head, q, name) => (blobMap[name] ? `${head}${q}${blobMap[name]}${q}` : m),
   );
 }
