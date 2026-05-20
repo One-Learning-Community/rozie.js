@@ -29,6 +29,7 @@ import _generate from '@babel/generator';
 import _traverse from '@babel/traverse';
 import type { GeneratorOptions } from '@babel/generator';
 import type { IRComponent } from '../../../../core/src/ir/types.js';
+import { sanitizeEventName } from './sanitizeEventName.js';
 
 // CJS interop normalization (Phase 2 D-T-2-01-04 pattern).
 type GenerateFn = typeof import('@babel/generator').default;
@@ -306,7 +307,10 @@ export function rewriteTemplateExpression(
       if (args.length === 0) return;
       const first = args[0];
       if (!t.isStringLiteral(first)) return;
-      const eventName = first.value;
+      // Bug 2 (260520-gi1): the output() field id is the sanitized
+      // (valid-identifier) name; `<field>.emit(…)` must agree with the
+      // field declaration emitted in emitScript.ts.
+      const eventName = sanitizeEventName(first.value);
       const rest = args.slice(1);
       const replacement = t.callExpression(
         t.memberExpression(t.identifier(eventName), t.identifier('emit')),

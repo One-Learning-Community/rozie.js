@@ -18,6 +18,7 @@ import _generate from '@babel/generator';
 import _traverse from '@babel/traverse';
 import type { GeneratorOptions } from '@babel/generator';
 import type { IRComponent } from '../../../../core/src/ir/types.js';
+import { sanitizeEventName } from './sanitizeEventName.js';
 
 // CJS interop normalization.
 type GenerateFn = typeof import('@babel/generator').default;
@@ -111,7 +112,10 @@ export function rewriteListenerExpression(
   const refNames = new Set(ir.refs.map((r) => r.name));
   const computedNames = new Set(ir.computed.map((c) => c.name));
   const slotNames = new Set(ir.slots.map((s) => (s.name === '' ? '' : s.name)));
-  const emits = new Set(ir.emits);
+  // Bug 2 (260520-gi1): the output() FIELD identifier is the sanitized
+  // (valid-identifier) name — classMembers must track the sanitized form so
+  // bare-identifier `this.` prefixing references the real field.
+  const emits = new Set(ir.emits.map((e) => sanitizeEventName(e)));
 
   // signalIdentifiers: bare ID -> needs `()` invocation when read.
   const signalIdentifiers = opts.signalMembers ?? new Set<string>([
@@ -241,7 +245,10 @@ export function rewriteListenerExpression(
       if (args.length === 0) return;
       const first = args[0];
       if (!t.isStringLiteral(first)) return;
-      const eventName = first.value;
+      // Bug 2 (260520-gi1): the output() field id is the sanitized
+      // (valid-identifier) name; `this.<field>.emit(…)` must agree with the
+      // field declaration emitted in emitScript.ts.
+      const eventName = sanitizeEventName(first.value);
       const rest = args.slice(1);
       const replacement = t.callExpression(
         t.memberExpression(

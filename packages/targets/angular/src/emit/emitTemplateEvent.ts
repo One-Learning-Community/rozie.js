@@ -33,6 +33,7 @@ import type { ModifierArg } from '../../../../core/src/modifier-grammar/parseMod
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
+import { sanitizeEventName } from '../rewrite/sanitizeEventName.js';
 
 export interface AngularScriptInjection {
   /** Field name (e.g., `debouncedOnSearch`). */
@@ -356,7 +357,10 @@ function applyThisPrefixing(
   for (const s of ir.state) memberNames.add(s.name);
   for (const c of ir.computed) memberNames.add(c.name);
   for (const r of ir.refs) memberNames.add(r.name);
-  for (const e of ir.emits) memberNames.add(e);
+  // Bug 2 (260520-gi1): the output() field id is the sanitized
+  // (valid-identifier) name — the member-name set must hold the sanitized
+  // form so `applyThisPrefixing` matches the real field.
+  for (const e of ir.emits) memberNames.add(sanitizeEventName(e));
   // Add collision-renamed targets (e.g., _close).
   if (collisionRenames) {
     for (const renamed of collisionRenames.values()) memberNames.add(renamed);

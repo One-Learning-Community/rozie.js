@@ -43,6 +43,7 @@ import {
   hasShadowingBinding,
   isInBindingPosition,
 } from './scopeAwareSkip.js';
+import { sanitizeEventName } from './sanitizeEventName.js';
 
 // CJS interop normalization (Phase 2 D-T-2-01-04 pattern).
 type TraverseFn = typeof import('@babel/traverse').default;
@@ -257,7 +258,9 @@ export function rewriteRozieIdentifiers(
     // Output fields are NOT signals — they're EventEmitter-like. Bare reads
     // shouldn't be invoked, but they shouldn't appear in user code anyway
     // (user uses $emit instead).
-    classMembers.add(name);
+    // Bug 2 (260520-gi1): the output() FIELD identifier is the sanitized
+    // (valid-identifier) name; `this.<field>.emit(…)` must reference it.
+    classMembers.add(sanitizeEventName(name));
   }
   // User methods (after collision rename) are class members but NOT signals.
   for (const original of userMethodNames) {
@@ -539,7 +542,10 @@ export function rewriteRozieIdentifiers(
       if (!t.isStringLiteral(firstArg)) {
         return;
       }
-      const eventName = firstArg.value;
+      // Bug 2 (260520-gi1): the output() field id is the sanitized
+      // (valid-identifier) name; `this.<field>.emit(…)` must agree with the
+      // field declaration emitted in emitScript.ts.
+      const eventName = sanitizeEventName(firstArg.value);
       const restArgs = args.slice(1) as Array<
         t.Expression | t.SpreadElement | t.ArgumentPlaceholder
       >;

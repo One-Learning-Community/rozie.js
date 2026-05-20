@@ -61,6 +61,7 @@ import type {
   SlotDecl,
 } from '../../../../core/src/ir/types.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
+import { sanitizeEventName } from '../rewrite/sanitizeEventName.js';
 import { slotFieldName } from './refineSlotTypes.js';
 import type { AngularScriptInjection } from './emitTemplateEvent.js';
 
@@ -198,7 +199,10 @@ function applyThisPrefixing(
     for (const s of ir.state) memberNames.add(s.name);
     for (const c of ir.computed) memberNames.add(c.name);
     for (const r of ir.refs) memberNames.add(r.name);
-    for (const e of ir.emits) memberNames.add(e);
+    // Bug 2 (260520-gi1): the output() field id is the sanitized
+    // (valid-identifier) name — the member-name set must hold the sanitized
+    // form so `this.` prefixing matches the real field.
+    for (const e of ir.emits) memberNames.add(sanitizeEventName(e));
     if (collisionRenames) {
       for (const renamed of collisionRenames.values()) memberNames.add(renamed);
     }
