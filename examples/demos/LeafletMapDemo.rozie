@@ -19,7 +19,7 @@
 
 <components>
 {
-  LeafletMap: './LeafletMap.rozie',
+  LeafletMap: '../LeafletMap.rozie',
 }
 </components>
 

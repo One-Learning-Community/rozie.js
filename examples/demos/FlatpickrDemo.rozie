@@ -20,7 +20,7 @@
 
 <components>
 {
-  Flatpickr: './Flatpickr.rozie',
+  Flatpickr: '../Flatpickr.rozie',
 }
 </components>
 

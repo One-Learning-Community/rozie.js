@@ -22,7 +22,7 @@
 
 <components>
 {
-  Uppy: './Uppy.rozie',
+  Uppy: '../Uppy.rozie',
 }
 </components>
 

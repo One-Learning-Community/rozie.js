@@ -18,7 +18,7 @@
 
 <components>
 {
-  TipTap: './TipTap.rozie',
+  TipTap: '../TipTap.rozie',
 }
 </components>
 
