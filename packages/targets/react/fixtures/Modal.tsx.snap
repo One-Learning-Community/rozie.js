@@ -60,7 +60,7 @@ export default function Modal(_props: ModalProps): JSX.Element {
   useEffect(() => {
     lockScroll();
     return () => unlockScroll();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     dialogEl.current?.focus();
   }, []);

@@ -39,7 +39,7 @@ export default function SearchInput(_props: SearchInputProps): JSX.Element {
     return () => {
       
     };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const _rozieDebouncedOnSearch = useDebouncedCallback(onSearch, [onSearch], 300);
 

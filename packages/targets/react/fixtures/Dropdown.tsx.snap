@@ -53,13 +53,13 @@ export default function Dropdown(_props: DropdownProps): JSX.Element {
   useEffect(() => {
     // Initial reposition only if the panel is open at mount time.
   if (_openRef.current) reposition();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     
   }, []);
   useEffect(() => {
     if (open) reposition();
-  }, [open]);
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const _rozieThrottledLReposition = useThrottledCallback(reposition, [open, reposition], 100);
 

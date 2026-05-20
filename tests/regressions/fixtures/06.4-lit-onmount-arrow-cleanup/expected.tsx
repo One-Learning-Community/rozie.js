@@ -14,7 +14,7 @@ export default function OnMountArrowCleanup(props: OnMountArrowCleanupProps): JS
   useEffect(() => {
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <>
