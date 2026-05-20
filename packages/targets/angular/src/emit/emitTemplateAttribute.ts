@@ -57,6 +57,100 @@ function escapeAttrValue(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
 }
 
+/**
+ * HTML attributes whose dynamic Angular binding name differs from the
+ * lowercased HTML attribute name. Angular `[name]="expr"` is a DOM-PROPERTY
+ * binding: `[colspan]` assigns a no-op `el['colspan']` expando — the real
+ * `colSpan` property and `colspan` attribute stay at their default, so the
+ * binding silently does nothing (the table cell never spans). The DOM
+ * property is camelCased; emit that.
+ *
+ * This is the FULL set of current-spec, non-deprecated HTML attributes with a
+ * simple camelCase casing mismatch — table layout, form controls, media /
+ * embedding, microdata, etc. We list them all rather than only the ones an
+ * example happens to exercise: a missing entry is a silent no-op footgun that
+ * surfaces only at runtime, with no compile error to catch it.
+ *
+ * Every value is a VERIFIED standard DOM-property name — NOT a React-JSX
+ * alias. React's attribute map cannot be copied wholesale: React's `srcSet` /
+ * `spellCheck` / `autoComplete` are React-isms whose real DOM properties are
+ * lowercase (`srcset` / `spellcheck` / `autocomplete`), so a blind copy would
+ * emit NEW silent no-ops. Attributes already lowercase as DOM properties
+ * (`srcset`, `spellcheck`, `autocomplete`, `autofocus`, `hreflang`, `enctype`,
+ * …) are correctly absent — `[srcset]` works as-is.
+ *
+ * DELIBERATELY EXCLUDED:
+ *   - `aria-*` / `data-*`: attribute-only (no scalar DOM property), so a
+ *     dynamic `:aria-label` / `:data-x` needs Angular's `[attr.aria-label]`
+ *     form — a property-vs-attribute decision, not a casing remap. Tracked as
+ *     a separate backlog item.
+ *   - Deprecated/obsolete attrs (`cellpadding`, `frameborder`, `bgcolor`,
+ *     `valign`, `marginwidth`, …) — out of scope for modern target frameworks.
+ *   - `popovertarget` — reflects to an *element* reference, not a string;
+ *     not a simple casing remap.
+ *
+ * STATIC attributes are unaffected — `colspan="3"` emits as a plain HTML
+ * attribute, which the browser reflects onto `colSpan` natively. Property
+ * binding (not `[attr.]`) is also why this map is correct for the boolean
+ * members (`readonly`, `ismap`, `nomodule`, `novalidate`, `formnovalidate`,
+ * `playsinline`, `allowfullscreen`, `itemscope`): `[attr.readonly]="false"`
+ * leaves `readonly="false"` present (still readonly), whereas `[readOnly]=
+ * "false"` correctly clears it.
+ */
+const HTML_ATTR_CASING: Readonly<Record<string, string>> = {
+  // Table layout
+  colspan: 'colSpan',
+  rowspan: 'rowSpan',
+  // Global / accessibility
+  tabindex: 'tabIndex',
+  contenteditable: 'contentEditable',
+  accesskey: 'accessKey',
+  inputmode: 'inputMode',
+  enterkeyhint: 'enterKeyHint',
+  // Form controls
+  readonly: 'readOnly',
+  maxlength: 'maxLength',
+  minlength: 'minLength',
+  for: 'htmlFor',
+  novalidate: 'noValidate',
+  formaction: 'formAction',
+  formenctype: 'formEnctype',
+  formmethod: 'formMethod',
+  formnovalidate: 'formNoValidate',
+  formtarget: 'formTarget',
+  acceptcharset: 'acceptCharset',
+  dirname: 'dirName',
+  // Media / embedding
+  crossorigin: 'crossOrigin',
+  referrerpolicy: 'referrerPolicy',
+  fetchpriority: 'fetchPriority',
+  usemap: 'useMap',
+  ismap: 'isMap',
+  playsinline: 'playsInline',
+  allowfullscreen: 'allowFullscreen',
+  nomodule: 'noModule',
+  // Time
+  datetime: 'dateTime',
+  // Microdata
+  itemid: 'itemId',
+  itemprop: 'itemProp',
+  itemref: 'itemRef',
+  itemscope: 'itemScope',
+  itemtype: 'itemType',
+};
+
+/**
+ * Resolve the Angular binding name for an attribute bound on the current
+ * element. Component/self tags camelCase kebab names (Angular `@Input`
+ * convention). HTML elements keep the name verbatim EXCEPT casing-mismatched
+ * DOM-property attributes (see HTML_ATTR_CASING), which must bind to the
+ * camelCase property or the binding is a silent no-op.
+ */
+function resolveBindingName(name: string, ctx: EmitAttrCtx): string {
+  if (isComponentTag(ctx)) return kebabToCamel(name);
+  return HTML_ATTR_CASING[name] ?? name;
+}
+
 /** Render interpolated segments as the inside of a JS template literal. */
 function renderInterpolatedTemplateLiteral(
   segments: Array<
@@ -157,7 +251,7 @@ export function emitSingleAttr(
   // time we reach this emit.
   if (attr.kind === 'twoWayBinding') {
     const signalName = resolveSignalNameForLValue(attr.expression, ctx.ir);
-    const bindingName = isComponentTag(ctx) ? kebabToCamel(attr.name) : attr.name;
+    const bindingName = resolveBindingName(attr.name, ctx);
     if (signalName !== null) {
       return `[${bindingName}]="${signalName}()" (${bindingName}Change)="${signalName}.set($event)"`;
     }
@@ -215,7 +309,7 @@ export function emitSingleAttr(
       collisionRenames: ctx.collisionRenames,
       loopBindings: ctx.loopBindings,
     });
-    const bindingName = isComponentTag(ctx) ? kebabToCamel(attr.name) : attr.name;
+    const bindingName = resolveBindingName(attr.name, ctx);
     return `[${bindingName}]="${expr}"`;
   }
 
@@ -226,13 +320,13 @@ export function emitSingleAttr(
       collisionRenames: ctx.collisionRenames,
       loopBindings: ctx.loopBindings,
     });
-    const bindingName = isComponentTag(ctx) ? kebabToCamel(attr.name) : attr.name;
+    const bindingName = resolveBindingName(attr.name, ctx);
     return `[${bindingName}]="${expr}"`;
   }
 
   // Multi-segment — render as Angular property-binding with template literal.
   const lit = renderInterpolatedTemplateLiteral(attr.segments, ctx);
-  const bindingName = isComponentTag(ctx) ? kebabToCamel(attr.name) : attr.name;
+  const bindingName = resolveBindingName(attr.name, ctx);
   return `[${bindingName}]="\`${lit}\`"`;
 }
 

@@ -74,6 +74,20 @@ describe('emitTemplate — TodoList @for + slots + ngTemplateContextGuard', () =
   });
 });
 
+describe('emitTemplate — HTML attribute casing (260520-hus #1, Table·angular)', () => {
+  it('Table emits `[colSpan]` not `[colspan]` for dynamic :colspan', () => {
+    // Regression: `:colspan="$props.columns.length"` emitted `[colspan]="…"` —
+    // an Angular DOM-property binding to the lowercase `colspan`, which the
+    // browser does not recognise (the property is `colSpan`). The binding was
+    // a silent no-op: every footer cell stayed `colspan=1`, collapsing into
+    // column 1 and forcing the table ~24px wider than the Vue baseline.
+    const ir = loadIR('Table');
+    const { template } = emitTemplate(ir, createDefaultRegistry());
+    expect(template).toContain('[colSpan]="columns().length"');
+    expect(template).not.toMatch(/\[colspan\]/);
+  });
+});
+
 describe('emitTemplate — Modal r-if conditional + paired close', () => {
   it('Modal r-if emits @if (open()) { ... } block syntax', () => {
     const ir = loadIR('Modal');
