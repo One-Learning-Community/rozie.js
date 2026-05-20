@@ -215,24 +215,15 @@ async function settleExample(
   }
 }
 
-// Known-runtime-bug gate (quick-task 260520-hus): TipTapDemo · solid.
-//
-// TipTapDemo builds cleanly on the Solid target — the per-target VR sub-build
-// produces a valid `dist/solid/` artifact — but it throws AT RUNTIME with
-// `ReferenceError: Cannot access 'a' before initialization`. This is a known
-// Solid emitter ordering bug: the generated Solid module has a temporal dead
-// zone (a hoisted reference is read before its declaration runs). It is OUT OF
-// SCOPE for this task; a separate quick/debug task will diagnose the Solid
-// emitter's hoist ordering for the TipTap wrapper.
-//
-// This is NOT a D-11 visual exemption. D-11 forbids per-cell *visual*
-// exemptions for targets that build+render. TipTap · solid does NOT render —
-// it crashes at runtime. This gate is the same category as the Angular-column
-// build-availability gate above: a known-pending cell surfaced as `test.fixme`
-// so the suite stays GREEN-PENDING rather than red. The gate is unconditional
-// (it does NOT lift on baseline presence) — it lifts only when the Solid TDZ
-// bug is fixed and this gate is removed.
-const TIPTAP_SOLID_KNOWN_RUNTIME_BUG = true;
+// TipTap · solid Solid-emitter TDZ runtime crash — RESOLVED 2026-05-20
+// (quick-task 260520-hus follow-up). TipTapDemo@solid threw at runtime with
+// `ReferenceError: Cannot access 'stripHtml' before initialization`: a
+// `$computed` (→ `createMemo`, eager callback) called a user `<script>`
+// helper that the Solid emitter emitted as a non-hoisting `const` arrow
+// AFTER the memo. Fixed by hoisting `const X = () => …` helpers to
+// `function X() {…}` declarations (Solid emitScript `tryHoistArrowToFunction`,
+// mirroring the React emitter). The cell now renders and runs normally; the
+// dedicated runtime-bug gate is removed.
 
 // Known cross-target-divergence gate. The engine-wrapper demos do NOT all
 // render byte-identical to the Vue baseline; the cells below are gated
@@ -257,11 +248,14 @@ const TIPTAP_SOLID_KNOWN_RUNTIME_BUG = true;
 //     shifting the `-webkit-center` <caption>. Fixed by pinning a fixed
 //     `.table-demo` width in TableDemo.rozie. Table.png baseline regenerated.
 //
-// REMAINING (8 cells):
-//   - TipTap·react / ·svelte / ·lit: NOT structural — the editor is captured
-//     in a different STATE (toolbar-active button + bound-HTML content differ
-//     from the Vue baseline). Belongs with the settle-timing class below;
-//     left here pending the settleExample / state-determinism follow-up.
+// REMAINING (9 cells):
+//   - TipTap·react / ·svelte / ·lit / ·solid: NOT structural — the editor is
+//     captured in a different STATE (toolbar-active button + bound-HTML
+//     content differ from the Vue baseline). TipTap·solid joined this group
+//     once its TDZ crash was fixed (above): it now renders, but exhibits the
+//     same editor-state divergence as its siblings. Belongs with the
+//     settle-timing class below; left here pending the settleExample /
+//     state-determinism follow-up.
 //   - SETTLE-TIMING: SortableList·react, Flatpickr·react, Uppy·react,
 //     Uppy·angular, TipTap·angular each retried `toHaveScreenshot` to a ~5s
 //     timeout — the engine demo had not stabilized when captured;
@@ -271,6 +265,7 @@ const KNOWN_CROSS_TARGET_DIVERGENCE = new Set<string>([
   'TipTap::react',
   'TipTap::svelte',
   'TipTap::lit',
+  'TipTap::solid',
   // settle-timing non-determinism (engine demo not stabilized at capture)
   'SortableList::react',
   'Flatpickr::react',
@@ -286,21 +281,14 @@ for (const example of EXAMPLES) {
     //  - Angular column build availability (existing)
     //  - per-example baseline PNG presence (for examples added before their
     //    Linux-Docker baseline regen has landed)
-    //  - the TipTap · solid known-runtime-bug gate (documented above) —
-    //    unconditional, does NOT lift on baseline presence
     //  - the known cross-target-divergence gate (documented above) — the
     //    engine-wrapper cells that provably do not match the Vue baseline
-    const tipTapSolidGated =
-      example === 'TipTap' &&
-      target === 'solid' &&
-      TIPTAP_SOLID_KNOWN_RUNTIME_BUG;
     const crossTargetDivergent = KNOWN_CROSS_TARGET_DIVERGENCE.has(
       `${example}::${target}`,
     );
     const runner =
       (target === 'angular' && !angularBuilt) ||
       !hasBaseline ||
-      tipTapSolidGated ||
       crossTargetDivergent
         ? test.fixme
         : test;
