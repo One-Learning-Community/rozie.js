@@ -13,6 +13,8 @@
  *      replaces with the live implementation.
  *   4. runRForKeyValidator — ROZ300/ROZ301/ROZ302 (SEM-03). Stubbed in
  *      Task 1; Task 3 replaces.
+ *   5. runReservedIdentifierValidator — ROZ202. Flags <data> fields and
+ *      r-for loop variables that shadow a reserved `$`-sigil.
  *
  * Per D-08 collected-not-thrown: NEVER throws. A malformed AST (e.g., empty
  * RozieAST wrapper) returns a non-null bindings table and an empty/
@@ -27,6 +29,7 @@ import { collectAllDeclarations } from './bindings.js';
 import { runUnknownRefValidator } from './validators/unknownRefValidator.js';
 import { runPropWriteValidator } from './validators/propWriteValidator.js';
 import { runRForKeyValidator } from './validators/rForKeyValidator.js';
+import { runReservedIdentifierValidator } from './validators/reservedIdentifierValidator.js';
 
 export interface AnalyzeResult {
   bindings: BindingsTable;
@@ -48,5 +51,6 @@ export function analyzeAST(ast: RozieAST): AnalyzeResult {
   runUnknownRefValidator(ast, bindings, diagnostics);
   runPropWriteValidator(ast, bindings, diagnostics);
   runRForKeyValidator(ast, diagnostics);
+  runReservedIdentifierValidator(ast, bindings, diagnostics);
   return { bindings, diagnostics };
 }
