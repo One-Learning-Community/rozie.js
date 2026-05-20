@@ -22,7 +22,7 @@
 
 <components>
 {
-  SortableList: './SortableList.rozie',
+  SortableList: '../SortableList.rozie',
 }
 </components>
 

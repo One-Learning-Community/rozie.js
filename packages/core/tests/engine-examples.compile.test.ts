@@ -46,12 +46,12 @@ const ENGINE_WRAPPERS = [
 // a <components> block, so compilation needs resolverRoot pointing at
 // examples/.
 const ENGINE_DEMOS = [
-  'SortableListDemo.rozie',
-  'FlatpickrDemo.rozie',
-  'LeafletMapDemo.rozie',
+  'demos/SortableListDemo.rozie',
+  'demos/FlatpickrDemo.rozie',
+  'demos/LeafletMapDemo.rozie',
   'demos/LineChartDemo.rozie',
-  'TipTapDemo.rozie',
-  'UppyDemo.rozie',
+  'demos/TipTapDemo.rozie',
+  'demos/UppyDemo.rozie',
   'demos/FullCalendarDemo.rozie',
   'demos/CodeMirrorDemo.rozie',
 ] as const;

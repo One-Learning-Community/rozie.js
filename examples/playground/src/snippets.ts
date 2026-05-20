@@ -84,19 +84,19 @@ const BUNDLE_DECLS: readonly BundleDecl[] = [
   {
     key: 'bundle/SortableListDemo',
     label: 'bundle/SortableListDemo',
-    entryGlobPath: '../../SortableListDemo.rozie',
+    entryGlobPath: '../../demos/SortableListDemo.rozie',
     dependencyGlobPaths: ['../../SortableList.rozie'],
   },
   {
     key: 'bundle/FlatpickrDemo',
     label: 'bundle/FlatpickrDemo',
-    entryGlobPath: '../../FlatpickrDemo.rozie',
+    entryGlobPath: '../../demos/FlatpickrDemo.rozie',
     dependencyGlobPaths: ['../../Flatpickr.rozie'],
   },
   {
     key: 'bundle/LeafletMapDemo',
     label: 'bundle/LeafletMapDemo',
-    entryGlobPath: '../../LeafletMapDemo.rozie',
+    entryGlobPath: '../../demos/LeafletMapDemo.rozie',
     dependencyGlobPaths: ['../../LeafletMap.rozie'],
   },
   {
@@ -108,13 +108,13 @@ const BUNDLE_DECLS: readonly BundleDecl[] = [
   {
     key: 'bundle/TipTapDemo',
     label: 'bundle/TipTapDemo',
-    entryGlobPath: '../../TipTapDemo.rozie',
+    entryGlobPath: '../../demos/TipTapDemo.rozie',
     dependencyGlobPaths: ['../../TipTap.rozie'],
   },
   {
     key: 'bundle/UppyDemo',
     label: 'bundle/UppyDemo',
-    entryGlobPath: '../../UppyDemo.rozie',
+    entryGlobPath: '../../demos/UppyDemo.rozie',
     dependencyGlobPaths: ['../../Uppy.rozie'],
   },
   {
