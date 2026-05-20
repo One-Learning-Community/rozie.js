@@ -151,6 +151,61 @@ describe('className composition — Plan 04-03 Task 1', () => {
     expect(collectors.runtime.has('clsx')).toBe(false);
   });
 
+  it('template-literal :class WITH <style> → tokens routed through styles (260520-hus #1)', () => {
+    // Regression: a plain-binding `:class` whose value is a JS template
+    // literal was emitted verbatim — `className={`badge badge-${kind}`}` —
+    // bypassing the CSS-Modules `styles` lookup, so the hashed `._badge_<h>`
+    // selector in the sibling `.module.css` never matched and the styling
+    // silently dropped (the React-target Table VR divergence).
+    const ir = lowerInline(`
+<rozie name="X">
+<data>{ kind: 'active' }</data>
+<template>
+<span :class="\`badge badge-\${$data.kind}\`"></span>
+</template>
+<style>
+.badge { color: red; }
+.badge-active { color: green; }
+</style>
+</rozie>
+`);
+    const { jsx } = emit(ir);
+    // Pure-static token → styles.X; composite token → styles[`...`].
+    expect(jsx).toContain('${styles.badge}');
+    expect(jsx).toContain('${styles[`badge-${kind}`]}');
+    // The verbatim un-routed literal must NOT survive.
+    expect(jsx).not.toContain('className={`badge badge-${kind}`}');
+  });
+
+  it('template-literal :class WITHOUT <style> → plain backtick literal, no styles ref', () => {
+    const ir = lowerInline(`
+<rozie name="X">
+<data>{ kind: 'active' }</data>
+<template>
+<span :class="\`badge badge-\${$data.kind}\`"></span>
+</template>
+</rozie>
+`);
+    const { jsx } = emit(ir);
+    expect(jsx).not.toMatch(/\bstyles[.[]/);
+    expect(jsx).toContain('badge-${kind}');
+  });
+
+  it('string-literal :class WITH <style> → token routed through styles', () => {
+    const ir = lowerInline(`
+<rozie name="X">
+<template>
+<span :class="'badge'"></span>
+</template>
+<style>
+.badge { color: red; }
+</style>
+</rozie>
+`);
+    const { jsx } = emit(ir);
+    expect(jsx).toContain('${styles.badge}');
+  });
+
   it('Test 17: emitted code uses className= NOT class=', () => {
     const ir = lowerInline(`
 <rozie name="X">

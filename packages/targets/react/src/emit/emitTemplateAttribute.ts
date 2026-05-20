@@ -371,6 +371,21 @@ function composeClassName(
   // CASE C: Single plain binding (e.g., :class="someComputed")
   if (segments.length === 1 && segments[0]!.kind === 'plainBinding') {
     const seg = segments[0]! as { kind: 'plainBinding'; expr: t.Expression };
+    // A plain-binding `:class` whose expression is a statically-shaped string
+    // — a string literal or a template literal — IS tokenisable at compile
+    // time, so route each class token through the CSS-Modules `styles` lookup.
+    // Without this, `:class="`badge badge-${x}`"` emits the verbatim literal
+    // `className={`badge badge-${x}`}`, which never matches the hashed
+    // `._badge_<hash>` selector in the sibling `.module.css` — the consumer
+    // styling is silently dropped. (React is the only target affected: it
+    // hashes class NAMES via CSS Modules; Vue/Svelte/Angular/Solid/Lit use
+    // attribute-scoping, which preserves literal class names so a dynamic
+    // class string just works.) Non-decomposable expressions (identifiers,
+    // calls, members) still pass through as-is — a documented v1 limitation.
+    const staticSegs = decomposeStaticClassExpr(seg.expr);
+    if (staticSegs) {
+      return renderInterpolatedClass(staticSegs, ir);
+    }
     return renderExpr(seg.expr, ir);
   }
 
@@ -411,6 +426,48 @@ function composeClassName(
     }
   }
   return `clsx(${clsxArgs.join(', ')})`;
+}
+
+/**
+ * Decompose a statically-shaped class expression — a string literal or a
+ * template literal — into the `{ static | binding }` segment stream consumed
+ * by `renderInterpolatedClass`. This lets a plain-binding `:class` whose
+ * value is a template literal (e.g. `` `badge badge-${value}` ``) route its
+ * class tokens through the CSS-Modules `styles` lookup, identically to a
+ * `{{ }}`-interpolated `class` attribute.
+ *
+ * Returns null for any other expression shape (identifier, member, call, …)
+ * which cannot be statically tokenised — those keep the as-is passthrough.
+ */
+function decomposeStaticClassExpr(
+  expr: t.Expression,
+):
+  | Array<
+      | { kind: 'static'; text: string }
+      | { kind: 'binding'; expression: t.Expression; deps: unknown }
+    >
+  | null {
+  if (t.isStringLiteral(expr)) {
+    return [{ kind: 'static', text: expr.value }];
+  }
+  if (t.isTemplateLiteral(expr)) {
+    const segs: Array<
+      | { kind: 'static'; text: string }
+      | { kind: 'binding'; expression: t.Expression; deps: unknown }
+    > = [];
+    // A TemplateLiteral interleaves `quasis` (n+1 static chunks) and
+    // `expressions` (n interpolations): quasi[0] expr[0] quasi[1] … quasi[n].
+    for (let i = 0; i < expr.quasis.length; i++) {
+      const cooked = expr.quasis[i]!.value.cooked ?? expr.quasis[i]!.value.raw;
+      if (cooked.length > 0) segs.push({ kind: 'static', text: cooked });
+      const e = expr.expressions[i];
+      if (e && t.isExpression(e)) {
+        segs.push({ kind: 'binding', expression: e, deps: undefined });
+      }
+    }
+    return segs;
+  }
+  return null;
 }
 
 /**
