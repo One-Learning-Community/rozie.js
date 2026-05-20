@@ -78,13 +78,13 @@ $onMount(() => {
 $watch(() => $props.data, (v) => {
   if (!instance) return
   instance.data = $snapshot(v)
-  instance.update()
+  instance.update('none')
 })
 
 $watch(() => $props.options, (v) => {
   if (!instance) return
   instance.options = { ...instance.options, ...v }
-  instance.update()
+  instance.update('none')
 })
 
 // Chart.js doesn't expose a "change type at runtime" path that's stable
