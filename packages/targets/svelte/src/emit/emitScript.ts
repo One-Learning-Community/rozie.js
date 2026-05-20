@@ -476,7 +476,6 @@ function emitWatcherHooks(
   const consumed = new Set<number>();
   let needsUntrack = false;
   const body = clonedProgram.program.body;
-  let watcherIdx = 0;
   for (let i = 0; i < body.length; i++) {
     const stmt = body[i];
     if (!stmt || !t.isExpressionStatement(stmt)) continue;
@@ -507,30 +506,32 @@ function emitWatcherHooks(
     // user-authored callback declares a parameter — otherwise svelte-check
     // flags "Expected 0 arguments, but got 1" for the `(() => {...})()` form.
     //
-    // Skip-initial gate: $watch is a "fire on CHANGE" contract. In Svelte 5,
-    // `$effect` always fires once at registration so the tracked getter reads
-    // get subscribed; we keep that read for subscription but gate the callback
-    // invocation behind a per-watcher flag. (260519 linechart-watch-recreate
-    // step 6 lifts this gate to make $watch immediate-by-default; that change
-    // ships as a separate atomic commit AFTER the Bug B fixes land.)
+    // $watch immediate-fire contract (260519 linechart-watch-recreate step 6):
+    // $watch is immediate-by-default across all six targets. In Svelte 5,
+    // `$effect` already fires once at registration — the getter read subscribes
+    // and the callback runs — which IS the immediate fire. There is no
+    // skip-initial gate: a $watch that toggles an interval (LineChartDemo's
+    // liveFeed feed) needs the init fire so the feed auto-starts.
     //
-    // Bug B fix (260519 linechart-watch-recreate) — the callback runs inside
-    // `untrack(...)` so transitive reactive reads (a helper like `buildConfig()`
-    // reading `$props.data`) do NOT subscribe the watcher. Only the getter
-    // defines the watcher's dependency set — matching Vue/Solid/Angular/Lit.
-    // Without this, LineChart's `$watch($props.type)` callback called
-    // `buildConfig()`, whose `$props.data` read landed in the watcher deps, so
-    // the watcher re-fired (and recreated the Chart.js instance) every tick.
-    const flag = `__rozieWatchInitial_${watcherIdx}`;
-    watcherIdx += 1;
-    const skipInitial = `if (${flag}) { ${flag} = false; return; }`;
+    // The earlier skip-initial `__rozieWatchInitial_N` gate was added to dodge
+    // a LineChart Chart.js race, but that race was Bug B — the mount/callback
+    // dependency leakage — now fixed structurally (mount hooks lower to the
+    // non-tracking `onMount`, and the callback below runs inside `untrack`).
+    // With Bug B fixed the gate is no longer load-bearing, and removing it
+    // makes Svelte's $watch consistent with Vue's `{ immediate: true }` and
+    // React/Solid/Angular/Lit's already-immediate watcher emit.
+    //
+    // Bug B fix — the callback runs inside `untrack(...)` so transitive
+    // reactive reads (a helper like `buildConfig()` reading `$props.data`) do
+    // NOT subscribe the watcher. Only the getter defines the watcher's
+    // dependency set — matching Vue/Solid/Angular/Lit.
     if (cbParamCount(cbArg) > 0) {
       lines.push(
-        `let ${flag} = true;\n$effect(() => { const __watchVal = (${getterCode})(); ${skipInitial} untrack(() => (${cbCode})(__watchVal)); });`,
+        `$effect(() => { const __watchVal = (${getterCode})(); untrack(() => (${cbCode})(__watchVal)); });`,
       );
     } else {
       lines.push(
-        `let ${flag} = true;\n$effect(() => { (${getterCode})(); ${skipInitial} untrack(() => (${cbCode})()); });`,
+        `$effect(() => { (${getterCode})(); untrack(() => (${cbCode})()); });`,
       );
     }
   }

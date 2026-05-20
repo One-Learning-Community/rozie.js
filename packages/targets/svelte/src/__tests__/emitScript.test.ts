@@ -141,12 +141,13 @@ $watch(() => $props.open, (v) => { if (v) reposition() })
     // `v` binds to the new value (regression: the bare `(cb)()` form left
     // `v` undefined — Svelte/Angular/Lit silent no-op, Solid ReferenceError).
     //
-    // Skip-initial gate (260519-svelte-watch fix): the user callback must be
-    // gated behind a per-watcher `__rozieWatchInitial_N` flag so $watch fires
-    // only on CHANGE, not on the initial $effect registration.
+    // $watch immediate-fire (260519 linechart-watch-recreate step 6): no
+    // skip-initial gate — Svelte 5's `$effect` fires once at registration,
+    // which IS the immediate fire. The callback runs inside `untrack(...)`.
     expect(scriptBlock).toMatch(
-      /let __rozieWatchInitial_0 = true;\s*\$effect\(\(\) => \{\s*const __watchVal = \(\(\) => open\)\(\);\s*if \(__rozieWatchInitial_0\) \{ __rozieWatchInitial_0 = false; return; \}\s*untrack\(\(\) => \(v => \{[\s\S]*?\}\)\(__watchVal\)\);\s*\}\);/,
+      /\$effect\(\(\) => \{\s*const __watchVal = \(\(\) => open\)\(\);\s*untrack\(\(\) => \(v => \{[\s\S]*?\}\)\(__watchVal\)\);\s*\}\);/,
     );
+    expect(scriptBlock).not.toContain('__rozieWatchInitial');
   });
 
   it('Quick 260515-u2b — WatchHook with zero-param callback omits __watchVal (svelte-check arity gate)', () => {
@@ -165,9 +166,10 @@ $watch(() => $props.open, () => { if ($props.open) reposition() })
     const ir = lowerToIR(parsed.ast!, { modifierRegistry: createDefaultRegistry() }).ir!;
     const { scriptBlock } = emitScript(ir);
     expect(scriptBlock).toMatch(
-      /let __rozieWatchInitial_0 = true;\s*\$effect\(\(\) => \{\s*\(\(\) => open\)\(\);\s*if \(__rozieWatchInitial_0\) \{ __rozieWatchInitial_0 = false; return; \}\s*untrack\(\(\) => \(\(\) => \{[\s\S]*?\}\)\(\)\);\s*\}\);/,
+      /\$effect\(\(\) => \{\s*\(\(\) => open\)\(\);\s*untrack\(\(\) => \(\(\) => \{[\s\S]*?\}\)\(\)\);\s*\}\);/,
     );
     expect(scriptBlock).not.toContain('__watchVal');
+    expect(scriptBlock).not.toContain('__rozieWatchInitial');
   });
 
   it('Quick 260515-u2b — Counter (no watchers) emits no extra $effect lines beyond lifecycle', () => {

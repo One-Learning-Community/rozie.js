@@ -122,7 +122,12 @@ $watch(() => $props.open, () => { if ($props.open) reposition() })
     const ir = lowerSource(src, 'WatchSynth.rozie');
     const { script } = emitScript(ir);
     expect(script).toMatch(/import \{[^}]*\bwatch\b[^}]*\} from 'vue'/);
-    expect(script).toMatch(/watch\(\(\) => props\.open, \(\) => \{[\s\S]*?\}\);/);
+    // 260519 linechart-watch-recreate step 6 — $watch is immediate-by-default;
+    // Vue's lazy `watch(getter, cb)` needs `{ immediate: true }` to fire on
+    // registration like the other five targets.
+    expect(script).toMatch(
+      /watch\(\(\) => props\.open, \(\) => \{[\s\S]*?\}, \{ immediate: true \}\);/,
+    );
   });
 
   it('Quick 260515-u2b — zero watchers means no `watch(` call AND no `watch` import', () => {

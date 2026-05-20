@@ -469,7 +469,15 @@ function emitWatcherHooks(
     // emit them verbatim — no body-extraction needed.
     const getterCode = genCode(getterArg as t.Node);
     const cbCode = genCode(cbArg as t.Node);
-    lines.push(`watch(${getterCode}, ${cbCode});`);
+    // 260519 linechart-watch-recreate step 6 — `$watch` is immediate-by-default
+    // across all six targets. Vue's `watch(getter, cb)` is LAZY (first run on
+    // the next change, not on registration), so we pass `{ immediate: true }`.
+    // React / Angular / Solid / Lit already fire their watcher callback on the
+    // initial run; Svelte's emit drops its skip-initial gate in the same
+    // change. LineChartDemo's `$watch(() => $data.liveFeed, ...)` needs the
+    // init fire to START the simulated feed (liveFeed defaults to true) — a
+    // lazy watcher would leave the feed dead until the user toggled it.
+    lines.push(`watch(${getterCode}, ${cbCode}, { immediate: true });`);
   }
   return { lines, consumedIndices: consumed };
 }
