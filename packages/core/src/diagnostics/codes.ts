@@ -223,7 +223,8 @@ export const RozieErrorCode = {
   TWO_WAY_PROP_NOT_MODEL: 'ROZ949',           // error — r-model:prop= where producer prop lacks model:true (dual-frame: consumer site + producer decl)
   TWO_WAY_ARG_OR_TARGET_INVALID: 'ROZ950',    // error — r-model: with empty arg (`r-model:=`), OR applied to non-component HTML tag (`<div r-model:foo=`)
   TWO_WAY_LHS_NOT_WRITABLE: 'ROZ951',         // error — RHS not a writable lvalue per 07.3-CONTEXT D-03 permissive rule (literal/ternary/call/$computed)
-  // ROZ952..ROZ959 reserved
+  TWO_WAY_DIRECTIVE_TYPO: 'ROZ952',           // error — colon-form directive `r-<base>:<arg>` whose `<base>` is a Levenshtein near-miss of `model` (e.g. `r-modle:open`); `model` is the only directive taking a colon argument, so the typo'd directive would otherwise be silently dropped. did-you-mean suggests `r-model:<arg>`.
+  // ROZ953..ROZ959 reserved
 } as const;
 
 export type RozieErrorCode = (typeof RozieErrorCode)[keyof typeof RozieErrorCode];

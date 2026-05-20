@@ -572,6 +572,32 @@ function lowerBareElement(
       // Empty value (no `="…"`) lowers with an `undefined` expression — the
       // validator's ROZ951 LHS rule will reject it (it's not a writable
       // lvalue).
+      //
+      // ROZ952 — typo'd colon-form directive. The colon-argument shape
+      // `r-<base>:<arg>` is only valid on `r-model` (two-way binding); no
+      // other Rozie directive takes a colon argument. A `<base>` that is a
+      // near-miss of `model` (Levenshtein <= 2) but not exactly `model` is
+      // almost certainly a typo — and would otherwise be silently dropped,
+      // since no branch below matches it. Emit a did-you-mean and skip.
+      const colonIdx = attr.name.indexOf(':');
+      if (colonIdx > 0) {
+        const directiveBase = attr.name.slice(0, colonIdx);
+        if (
+          directiveBase !== 'model' &&
+          didYouMean(directiveBase, ['model']) === 'model'
+        ) {
+          const directiveArg = attr.name.slice(colonIdx + 1);
+          diagnostics.push({
+            code: RozieErrorCode.TWO_WAY_DIRECTIVE_TYPO,
+            severity: 'error',
+            message: `Unknown directive 'r-${attr.name}' — did you mean 'r-model:${directiveArg}'? The colon-argument form is only valid on r-model (consumer-side two-way binding).`,
+            loc: attr.loc,
+            hint: `Write 'r-model:${directiveArg}="…"' for a two-way binding to the '${directiveArg}' prop.`,
+          });
+          continue;
+        }
+      }
+
       if (attr.name.startsWith('model:')) {
         const propName = attr.name.slice('model:'.length);
         const expr = attr.value !== null ? tryParseExpression(attr.value) : null;
