@@ -2083,6 +2083,7 @@
     "type": "StyleSection",
     "scopedRules": [
       {
+        "kind": "rule",
         "selector": ".counter",
         "loc": {
           "start": 1412,
@@ -2091,6 +2092,7 @@
         "isRootEscape": false
       },
       {
+        "kind": "rule",
         "selector": ".counter.hovering",
         "loc": {
           "start": 1481,
@@ -2099,6 +2101,7 @@
         "isRootEscape": false
       },
       {
+        "kind": "rule",
         "selector": ".value",
         "loc": {
           "start": 1536,
@@ -2107,6 +2110,7 @@
         "isRootEscape": false
       },
       {
+        "kind": "rule",
         "selector": "button",
         "loc": {
           "start": 1619,
@@ -2115,6 +2119,7 @@
         "isRootEscape": false
       },
       {
+        "kind": "rule",
         "selector": "button:disabled",
         "loc": {
           "start": 1655,
@@ -2124,6 +2129,7 @@
       }
     ],
     "rootRules": [],
+    "portalRules": [],
     "sourceLoc": {
       "start": 1411,
       "end": 1710

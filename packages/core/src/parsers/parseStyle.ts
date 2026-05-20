@@ -13,6 +13,13 @@
  * ROZxxx codes owned here:
  *  - ROZ080  PostCSS parse error
  *  - ROZ081  Mixed :root selector (e.g., `:root, .other` — must be split)
+ *  - ROZ082  `@portal` nested inside `@media` (or any non-`@portal` at-rule)
+ *  - ROZ084  `@portal` block with empty/malformed prelude or content (Spike 004)
+ *
+ * Spike 004 — `@portal NAME { ... }` at-rule recognition. An `@portal item
+ * { ul {} li {} }` block parses to a `portal-block` StyleRule whose `children`
+ * carry the inner selectors. Producer-side CSS scoping (per-target emitStyle)
+ * rewrites those children to `[data-rozie-portal-<NAME>="<hash>"] <selector>`.
  *
  * Threat model T-1-03-05: postcss.parse is invoked with NO plugins (postcss
  * does not load plugins from CSS source anyway, but verified by code review).
@@ -20,7 +27,7 @@
  * @experimental — shape may change before v1.0
  */
 import postcss from 'postcss';
-import type { Root, Rule } from 'postcss';
+import type { AtRule, ChildNode, Root, Rule } from 'postcss';
 import type { SourceLoc } from '../ast/types.js';
 import type { Diagnostic } from '../diagnostics/Diagnostic.js';
 import type { StyleAST, StyleRule } from '../ast/blocks/StyleAST.js';
@@ -60,20 +67,24 @@ export function parseStyle(
   }
 
   const rules: StyleRule[] = [];
-  root.walkRules((rule: Rule) => {
-    // Block-relative offsets from postcss source. Per node.d.ts, Position.offset
-    // is non-optional; we still defensively fall back to a line/column compute.
+
+  /** Absolute byte span of any postcss node, with offset fallbacks. */
+  const nodeLoc = (node: ChildNode | Rule | AtRule): SourceLoc => {
     const startOffsetRel =
-      rule.source?.start?.offset ??
-      lineColToOffset(content, rule.source?.start?.line ?? 1, rule.source?.start?.column ?? 1);
+      node.source?.start?.offset ??
+      lineColToOffset(content, node.source?.start?.line ?? 1, node.source?.start?.column ?? 1);
     const endOffsetRel =
-      rule.source?.end?.offset ??
-      lineColToOffset(content, rule.source?.end?.line ?? 1, rule.source?.end?.column ?? 1);
-    const ruleLoc: SourceLoc = {
+      node.source?.end?.offset ??
+      lineColToOffset(content, node.source?.end?.line ?? 1, node.source?.end?.column ?? 1);
+    return {
       start: contentLoc.start + startOffsetRel,
       end: contentLoc.start + endOffsetRel,
     };
+  };
 
+  /** Build a plain (non-portal) StyleRule, emitting ROZ081 on mixed :root. */
+  const buildPlainRule = (rule: Rule): StyleRule => {
+    const ruleLoc = nodeLoc(rule);
     // Selector classification (Pitfall 6 — mixed-:root rejection).
     const parts = rule.selector.split(',').map(s => s.trim());
     const hasRoot = parts.includes(':root');
@@ -88,18 +99,120 @@ export function parseStyle(
         hint: 'Move :root rules into a separate selector block; combining :root with other selectors mixes scoped and unscoped emission.',
       });
     }
+    return { kind: 'rule', selector: rule.selector, loc: ruleLoc, isRootEscape: isPureRoot };
+  };
+
+  // Spike 004 — first collect `@portal NAME { ... }` blocks. PostCSS's
+  // top-level `root.walkRules` descends INTO at-rule bodies too, so we must
+  // skip portal-block inner rules in the top-level pass below to avoid
+  // double-collecting them as plain scopedRules.
+  root.walkAtRules((atRule: AtRule) => {
+    if (atRule.name !== 'portal') return;
+
+    const blockLoc = nodeLoc(atRule);
+
+    // ROZ082 — `@portal` must NOT be nested inside another at-rule (e.g.
+    // `@media (...) { @portal x {} }`). The valid direction
+    // (`@portal x { @media (...) {} }`) has `@media` as a DESCENDANT, which
+    // this ancestor walk does not flag.
+    let ancestor = atRule.parent;
+    let invalidNesting = false;
+    while (ancestor && ancestor.type !== 'root') {
+      if (ancestor.type === 'atrule') {
+        invalidNesting = true;
+        break;
+      }
+      ancestor = (ancestor as ChildNode).parent ?? undefined;
+    }
+    if (invalidNesting) {
+      diagnostics.push({
+        code: RozieErrorCode.STYLE_PORTAL_INVALID_NESTING,
+        severity: 'error',
+        message:
+          '@portal cannot be nested inside @media or another at-rule. ' +
+          'Put the at-rule INSIDE the @portal block (@portal X { @media ... }).',
+        loc: blockLoc,
+        ...(filename !== undefined ? { filename } : {}),
+        hint: 'Invert the nesting: `@portal X { @media (...) { ul {} } }`.',
+      });
+      return;
+    }
+
+    // ROZ084 — empty / malformed prelude.
+    const portalName = atRule.params.trim();
+    if (portalName.length === 0) {
+      diagnostics.push({
+        code: RozieErrorCode.STYLE_PORTAL_SELECTOR_PARSE_ERROR,
+        severity: 'error',
+        message: '@portal requires a name (e.g. `@portal item { ... }`).',
+        loc: blockLoc,
+        ...(filename !== undefined ? { filename } : {}),
+        hint: 'Name the portal block after the portal slot it styles: `@portal <slotName> { ... }`.',
+      });
+      return;
+    }
+
+    // Collect inner selectors (recursive — descends into nested @media etc.).
+    const children: StyleRule[] = [];
+    try {
+      atRule.walkRules((inner: Rule) => {
+        children.push({
+          kind: 'rule',
+          selector: inner.selector,
+          loc: nodeLoc(inner),
+          isRootEscape: false,
+        });
+      });
+    } catch (innerErr: unknown) {
+      const e = innerErr as { message?: string };
+      diagnostics.push({
+        code: RozieErrorCode.STYLE_PORTAL_SELECTOR_PARSE_ERROR,
+        severity: 'error',
+        message: `@portal ${portalName} block selector parse error: ${e.message ?? 'parse failed'}`,
+        loc: blockLoc,
+        ...(filename !== undefined ? { filename } : {}),
+      });
+      return;
+    }
 
     rules.push({
-      selector: rule.selector,
-      loc: ruleLoc,
-      isRootEscape: isPureRoot,
+      kind: 'portal-block',
+      selector: `@portal ${portalName}`,
+      loc: blockLoc,
+      isRootEscape: false,
+      portalName,
+      children,
     });
+  });
+
+  // Top-level plain rules. Skip any rule that descends from a `@portal`
+  // at-rule — those are collected (as `children`) by the walkAtRules pass
+  // above. Without this gate they would be double-counted as scopedRules.
+  root.walkRules((rule: Rule) => {
+    if (hasPortalAncestor(rule)) return;
+    rules.push(buildPlainRule(rule));
   });
 
   return {
     node: { type: 'StyleAST', loc: contentLoc, cssText: content, rules },
     diagnostics,
   };
+}
+
+/**
+ * True when `rule` is nested (at any depth) inside a `@portal` at-rule.
+ * Used to gate the top-level `walkRules` pass so portal-block inner rules
+ * are collected exactly once (by the `walkAtRules` pass).
+ */
+function hasPortalAncestor(rule: Rule): boolean {
+  let parent = rule.parent;
+  while (parent && parent.type !== 'root') {
+    if (parent.type === 'atrule' && (parent as AtRule).name === 'portal') {
+      return true;
+    }
+    parent = (parent as ChildNode).parent ?? undefined;
+  }
+  return false;
 }
 
 /**

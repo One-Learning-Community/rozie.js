@@ -115,3 +115,69 @@ describe('parseStyle (PARSE-06)', () => {
     expect(sel).toContain('button:disabled');
   });
 });
+
+describe('parseStyle — @portal blocks (Spike 004)', () => {
+  it('recognizes `@portal item { ul {} li {} }` as a portal-block rule with 2 children', () => {
+    const css = '@portal item {\n  ul { list-style: none; }\n  li { padding: 0.5rem; }\n}';
+    const { node, diagnostics } = parseStyle(css, { start: 0, end: css.length }, css);
+    expect(diagnostics).toEqual([]);
+    const portalBlocks = node!.rules.filter(r => r.kind === 'portal-block');
+    expect(portalBlocks.length).toBe(1);
+    expect(portalBlocks[0]!.portalName).toBe('item');
+    expect(portalBlocks[0]!.children!.length).toBe(2);
+    expect(portalBlocks[0]!.children!.map(c => c.selector)).toEqual(['ul', 'li']);
+    // The @portal inner rules must NOT also appear as top-level scoped rules.
+    const plainRules = node!.rules.filter(r => r.kind !== 'portal-block');
+    expect(plainRules.length).toBe(0);
+  });
+
+  it('a plain rule alongside a @portal block lands as a plain rule, not double-collected', () => {
+    const css = '.box { color: red; }\n@portal item {\n  ul { margin: 0; }\n}';
+    const { node, diagnostics } = parseStyle(css, { start: 0, end: css.length }, css);
+    expect(diagnostics).toEqual([]);
+    const plain = node!.rules.filter(r => r.kind !== 'portal-block');
+    const portal = node!.rules.filter(r => r.kind === 'portal-block');
+    expect(plain.length).toBe(1);
+    expect(plain[0]!.selector).toBe('.box');
+    expect(portal.length).toBe(1);
+    expect(portal[0]!.children!.length).toBe(1);
+  });
+
+  it('portal-block child loc byte-slices to the inner selector verbatim', () => {
+    const css = '@portal item {\n  ul { list-style: none; }\n}';
+    const { node } = parseStyle(css, { start: 0, end: css.length }, css);
+    const child = node!.rules.find(r => r.kind === 'portal-block')!.children![0]!;
+    expect(css.slice(child.loc.start, child.loc.start + 2)).toBe('ul');
+  });
+
+  it('emits ROZ082 when @portal is nested inside @media', () => {
+    const css = '@media (min-width: 600px) {\n  @portal x {\n    ul { margin: 0; }\n  }\n}';
+    const { node, diagnostics } = parseStyle(css, { start: 0, end: css.length }, css);
+    expect(diagnostics.some(d => d.code === 'ROZ082')).toBe(true);
+    // The invalid @portal must not be collected as a portal-block rule.
+    expect(node!.rules.some(r => r.kind === 'portal-block')).toBe(false);
+  });
+
+  it('allows @media nested INSIDE @portal (valid direction — no ROZ082)', () => {
+    const css = '@portal item {\n  @media (min-width: 600px) {\n    ul { margin: 0; }\n  }\n}';
+    const { node, diagnostics } = parseStyle(css, { start: 0, end: css.length }, css);
+    expect(diagnostics.some(d => d.code === 'ROZ082')).toBe(false);
+    const portal = node!.rules.find(r => r.kind === 'portal-block')!;
+    expect(portal.portalName).toBe('item');
+    // walkRules descends into the nested @media, so `ul` is collected.
+    expect(portal.children!.map(c => c.selector)).toEqual(['ul']);
+  });
+
+  it('emits ROZ084 on an empty-params @portal block', () => {
+    const css = '@portal {\n  ul { margin: 0; }\n}';
+    const { node, diagnostics } = parseStyle(css, { start: 0, end: css.length }, css);
+    expect(diagnostics.some(d => d.code === 'ROZ084')).toBe(true);
+    expect(node!.rules.some(r => r.kind === 'portal-block')).toBe(false);
+  });
+
+  it('does NOT register or emit ROZ083 (out of scope — no :style string-literal parser)', () => {
+    const css = '@portal item { ul { margin: 0; } }';
+    const { diagnostics } = parseStyle(css, { start: 0, end: css.length }, css);
+    expect(diagnostics.some(d => d.code === 'ROZ083')).toBe(false);
+  });
+});

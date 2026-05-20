@@ -3147,6 +3147,7 @@
     "type": "StyleSection",
     "scopedRules": [
       {
+        "kind": "rule",
         "selector": ".dropdown",
         "loc": {
           "start": 2797,
@@ -3155,6 +3156,7 @@
         "isRootEscape": false
       },
       {
+        "kind": "rule",
         "selector": ".dropdown-panel",
         "loc": {
           "start": 2854,
@@ -3165,6 +3167,7 @@
     ],
     "rootRules": [
       {
+        "kind": "rule",
         "selector": ":root",
         "loc": {
           "start": 3142,
@@ -3173,6 +3176,7 @@
         "isRootEscape": true
       }
     ],
+    "portalRules": [],
     "sourceLoc": {
       "start": 2796,
       "end": 3180

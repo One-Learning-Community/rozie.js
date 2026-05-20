@@ -657,6 +657,14 @@ export interface StyleSection {
   type: 'StyleSection';
   scopedRules: unknown[];
   rootRules: unknown[];
+  /**
+   * Spike 004 — `@portal NAME { ... }` blocks (StyleRule with
+   * `kind: 'portal-block'`). Each carries `portalName` + flattened `children`.
+   * Target emitters rewrite each child selector to
+   * `[data-rozie-portal-<NAME>="<scopeHash>"] <selector>`. `unknown[]` matches
+   * the erased-type convention used by `scopedRules`/`rootRules`.
+   */
+  portalRules: unknown[];
   sourceLoc: SourceLoc;
 }
 

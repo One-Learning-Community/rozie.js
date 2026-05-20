@@ -66,7 +66,7 @@ function emptyIR(): IRComponent {
     listeners: [],
     setupBody: { type: 'SetupBody', scriptProgram: t.file(t.program([])), annotations: [] },
     template: null,
-    styles: { type: 'StyleSection', scopedRules: [], rootRules: [], sourceLoc: LOC },
+    styles: { type: 'StyleSection', scopedRules: [], rootRules: [], portalRules: [], sourceLoc: LOC },
     sourceLoc: LOC,
   };
 }

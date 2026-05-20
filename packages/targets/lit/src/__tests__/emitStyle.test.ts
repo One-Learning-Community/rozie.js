@@ -58,7 +58,7 @@ describe('emitStyle — D-LIT-15 / D-LIT-16 split', () => {
 
   it('emitStyle() unit: empty styles produce empty result', () => {
     const result = emitStyle(
-      { type: 'StyleSection', scopedRules: [], rootRules: [], sourceLoc: { start: 0, end: 0 } },
+      { type: 'StyleSection', scopedRules: [], rootRules: [], portalRules: [], sourceLoc: { start: 0, end: 0 } },
       '',
       {
         componentName: 'X',

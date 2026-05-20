@@ -3317,6 +3317,7 @@
       "cssText": "\n.dropdown { position: relative; display: inline-block; }\n.dropdown-panel {\n  position: fixed;\n  z-index: var(--rozie-dropdown-z, 1000);\n  background: white;\n  border: 1px solid rgba(0, 0, 0, 0.1);\n  border-radius: 6px;\n  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);\n}\n\n/* Unscoped escape hatch — anything inside :root { } is emitted globally. */\n:root {\n  --rozie-dropdown-z: 1000;\n}\n",
       "rules": [
         {
+          "kind": "rule",
           "selector": ".dropdown",
           "loc": {
             "start": 2797,
@@ -3325,6 +3326,7 @@
           "isRootEscape": false
         },
         {
+          "kind": "rule",
           "selector": ".dropdown-panel",
           "loc": {
             "start": 2854,
@@ -3333,6 +3335,7 @@
           "isRootEscape": false
         },
         {
+          "kind": "rule",
           "selector": ":root",
           "loc": {
             "start": 3142,

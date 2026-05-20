@@ -53,6 +53,7 @@ function emptyIR(): IRComponent {
       type: 'StyleSection',
       scopedRules: [],
       rootRules: [],
+      portalRules: [],
       sourceLoc: LOC,
     },
     sourceLoc: LOC,

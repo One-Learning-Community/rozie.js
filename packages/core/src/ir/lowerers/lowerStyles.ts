@@ -9,6 +9,11 @@
  * (per StyleAST commentary) and not exposed in v1; we re-encode our scoped/
  * root partition over the StyleRule shape we DO have.
  *
+ * Spike 004 — a third bucket, `portalRules`, holds `@portal NAME { ... }`
+ * blocks (StyleRule with `kind: 'portal-block'`). The `portalName` + `children`
+ * payload is preserved verbatim so target emitters can rewrite each inner
+ * selector with the `[data-rozie-portal-<NAME>]` scope.
+ *
  * @experimental — shape may change before v1.0
  */
 import type { StyleAST } from '../../ast/blocks/StyleAST.js';
@@ -17,13 +22,21 @@ import type { StyleSection } from '../types.js';
 export function lowerStyles(style: StyleAST): StyleSection {
   const scopedRules: unknown[] = [];
   const rootRules: unknown[] = [];
+  const portalRules: unknown[] = [];
   for (const rule of style.rules) {
-    (rule.isRootEscape ? rootRules : scopedRules).push(rule);
+    if (rule.kind === 'portal-block') {
+      portalRules.push(rule);
+    } else if (rule.isRootEscape) {
+      rootRules.push(rule);
+    } else {
+      scopedRules.push(rule);
+    }
   }
   return {
     type: 'StyleSection',
     scopedRules,
     rootRules,
+    portalRules,
     sourceLoc: style.loc,
   };
 }

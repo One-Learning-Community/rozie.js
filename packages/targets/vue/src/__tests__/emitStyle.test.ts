@@ -80,6 +80,7 @@ describe('emitStyle — Wave 0 + reference example tests', () => {
       type: 'StyleSection',
       scopedRules: [],
       rootRules: [],
+      portalRules: [],
       sourceLoc: { start: 0, end: 0 },
     };
     const result = emitStyle(empty, '');

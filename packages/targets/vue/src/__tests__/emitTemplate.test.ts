@@ -63,7 +63,7 @@ function emptyIR(): IRComponent {
     listeners: [],
     setupBody: { type: 'SetupBody', scriptProgram: t.file(t.program([])), annotations: [] },
     template: null,
-    styles: { type: 'StyleSection', scopedRules: [], rootRules: [], sourceLoc: { start: 0, end: 0 } },
+    styles: { type: 'StyleSection', scopedRules: [], rootRules: [], portalRules: [], sourceLoc: { start: 0, end: 0 } },
     sourceLoc: { start: 0, end: 0 },
   };
 }

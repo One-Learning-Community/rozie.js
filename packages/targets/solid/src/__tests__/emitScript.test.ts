@@ -43,7 +43,7 @@ function buildMinimalIR(overrides: Partial<IRComponent> = {}): IRComponent {
     lifecycle: [],
     watchers: [],
     listeners: [],
-    styles: { type: 'StyleSection', scopedRules: [], rootRules: [], sourceLoc: { start: 0, end: 0 } },
+    styles: { type: 'StyleSection', scopedRules: [], rootRules: [], portalRules: [], sourceLoc: { start: 0, end: 0 } },
     components: [],
     setupBody: {
       type: 'SetupBody',

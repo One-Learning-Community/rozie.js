@@ -80,6 +80,7 @@ function emptyStyles(): StyleSection {
     type: 'StyleSection',
     scopedRules: [],
     rootRules: [],
+    portalRules: [],
     sourceLoc: { start: 0, end: 0 },
   };
 }

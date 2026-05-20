@@ -1988,6 +1988,7 @@
     "type": "StyleSection",
     "scopedRules": [
       {
+        "kind": "rule",
         "selector": ".search-input",
         "loc": {
           "start": 1950,
@@ -1996,6 +1997,7 @@
         "isRootEscape": false
       },
       {
+        "kind": "rule",
         "selector": "input",
         "loc": {
           "start": 2025,
@@ -2004,6 +2006,7 @@
         "isRootEscape": false
       },
       {
+        "kind": "rule",
         "selector": ".clear-btn",
         "loc": {
           "start": 2060,
@@ -2012,6 +2015,7 @@
         "isRootEscape": false
       },
       {
+        "kind": "rule",
         "selector": ".hint",
         "loc": {
           "start": 2144,
@@ -2021,6 +2025,7 @@
       }
     ],
     "rootRules": [],
+    "portalRules": [],
     "sourceLoc": {
       "start": 1949,
       "end": 2200

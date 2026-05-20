@@ -3052,6 +3052,7 @@
     "type": "StyleSection",
     "scopedRules": [
       {
+        "kind": "rule",
         "selector": ".modal-backdrop",
         "loc": {
           "start": 2920,
@@ -3060,6 +3061,7 @@
         "isRootEscape": false
       },
       {
+        "kind": "rule",
         "selector": ".modal-dialog",
         "loc": {
           "start": 3105,
@@ -3068,6 +3070,7 @@
         "isRootEscape": false
       },
       {
+        "kind": "rule",
         "selector": "header, footer",
         "loc": {
           "start": 3340,
@@ -3076,6 +3079,7 @@
         "isRootEscape": false
       },
       {
+        "kind": "rule",
         "selector": "header",
         "loc": {
           "start": 3423,
@@ -3084,6 +3088,7 @@
         "isRootEscape": false
       },
       {
+        "kind": "rule",
         "selector": "header h2",
         "loc": {
           "start": 3480,
@@ -3092,6 +3097,7 @@
         "isRootEscape": false
       },
       {
+        "kind": "rule",
         "selector": "footer",
         "loc": {
           "start": 3533,
@@ -3100,6 +3106,7 @@
         "isRootEscape": false
       },
       {
+        "kind": "rule",
         "selector": ".modal-body",
         "loc": {
           "start": 3614,
@@ -3108,6 +3115,7 @@
         "isRootEscape": false
       },
       {
+        "kind": "rule",
         "selector": ".close-btn",
         "loc": {
           "start": 3661,
@@ -3118,6 +3126,7 @@
     ],
     "rootRules": [
       {
+        "kind": "rule",
         "selector": ":root",
         "loc": {
           "start": 3761,
@@ -3126,6 +3135,7 @@
         "isRootEscape": true
       }
     ],
+    "portalRules": [],
     "sourceLoc": {
       "start": 2919,
       "end": 3796

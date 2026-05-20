@@ -8,6 +8,7 @@
     "cssText": "\n.todo-list { font-family: system-ui, sans-serif; }\nul { list-style: none; padding: 0; }\nli { display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0; }\nli.done span { text-decoration: line-through; opacity: 0.5; }\n.empty { color: rgba(0, 0, 0, 0.4); font-style: italic; }\nform { display: flex; gap: 0.25rem; margin-block: 0.5rem; }\n",
     "rules": [
       {
+        "kind": "rule",
         "selector": ".todo-list",
         "loc": {
           "start": 2838,
@@ -16,6 +17,7 @@
         "isRootEscape": false
       },
       {
+        "kind": "rule",
         "selector": "ul",
         "loc": {
           "start": 2889,
@@ -24,6 +26,7 @@
         "isRootEscape": false
       },
       {
+        "kind": "rule",
         "selector": "li",
         "loc": {
           "start": 2926,
@@ -32,6 +35,7 @@
         "isRootEscape": false
       },
       {
+        "kind": "rule",
         "selector": "li.done span",
         "loc": {
           "start": 3002,
@@ -40,6 +44,7 @@
         "isRootEscape": false
       },
       {
+        "kind": "rule",
         "selector": ".empty",
         "loc": {
           "start": 3064,
@@ -48,6 +53,7 @@
         "isRootEscape": false
       },
       {
+        "kind": "rule",
         "selector": "form",
         "loc": {
           "start": 3122,
