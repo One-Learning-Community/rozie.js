@@ -306,16 +306,26 @@ export function emitScript(
 
   // 4c. Quick plan 260515-u2b — $watch lowers to createEffect(() => { getter(); cb(); }).
   // Solid's createEffect auto-tracks reads inside its callback. We IIFE-invoke
-  // both getter and callback so:
-  //   - Calling the getter performs the reactive reads → subscribes the effect
-  //   - Calling the callback fires the user code on first run + on re-trigger
+  // the getter so its reactive reads subscribe the effect, then run the
+  // callback inside `untrack(...)` so the callback fires on first run + on
+  // re-trigger WITHOUT its own reads (or transitive helper reads) joining the
+  // effect's dependency set.
   // Both bodies need rewriteNode (post-IR rewrite) so $props.X / $data.X /
   // $refs.X lower to the Solid-side idiom (props.X / dataX() / xRef).
   // The getter/callback fields in the IR are bodies (BlockStatement | Expression);
   // wrap each back into a Babel arrow expression, then run rewriteNode, then
   // genCode.
+  //
+  // Bug B fix (260519 linechart-watch-recreate) — without the `untrack`
+  // wrapper, the callback's transitive reads land in the watcher's deps:
+  // LineChart's `$watch($props.type)` callback calls `buildConfig()` which
+  // reads `$props.data`, so the `type` watcher re-fired (destroying +
+  // recreating the Chart.js instance) on every data tick. `untrack` confines
+  // the watcher's dependency set to the getter's reads only — matching Vue's
+  // `watch(getter, cb)` and Svelte's untrack-wrapped $watch callback.
   for (const wh of ir.watchers) {
     collectors.solidImports.add('createEffect');
+    collectors.solidImports.add('untrack');
     const getterArrow = t.arrowFunctionExpression([], wh.getter);
     // Preserve the user-authored callback params (e.g. `(v) => ...`) so the
     // reconstructed arrow declares them; otherwise references inside the body
@@ -332,7 +342,7 @@ export function emitScript(
     // both `(v) => ...` and `() => ...` shapes type-clean.
     const callArg = wh.callbackParams.length > 0 ? '__watchVal' : '';
     hookLines.push(
-      `createEffect(() => { const __watchVal = (${getterCode})(); (${cbCode})(${callArg}); });`,
+      `createEffect(() => { const __watchVal = (${getterCode})(); untrack(() => (${cbCode})(${callArg})); });`,
     );
   }
 

@@ -15,6 +15,7 @@ export type SolidImport =
   | 'createSignal'
   | 'createMemo'
   | 'createEffect'
+  | 'untrack'
   | 'mergeProps'
   | 'onMount'
   | 'onCleanup'

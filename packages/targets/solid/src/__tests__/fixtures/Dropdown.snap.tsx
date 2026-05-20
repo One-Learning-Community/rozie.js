@@ -1,5 +1,5 @@
 import type { JSX } from 'solid-js';
-import { Show, children, createEffect, mergeProps, onCleanup, onMount, splitProps } from 'solid-js';
+import { Show, children, createEffect, mergeProps, onCleanup, onMount, splitProps, untrack } from 'solid-js';
 import { createControllableSignal, createOutsideClick, createThrottledHandler } from '@rozie/runtime-solid';
 
 interface TriggerSlotCtx { open: any; toggle: any; }
@@ -27,9 +27,9 @@ export default function Dropdown(_props: DropdownProps): JSX.Element {
     if (open()) reposition();
   });
   onMount(() => {});
-  createEffect(() => { const __watchVal = (() => open())(); (() => {
+  createEffect(() => { const __watchVal = (() => open())(); untrack(() => (() => {
     if (open()) reposition();
-  })(); });
+  })()); });
   let triggerElRef: HTMLElement | null = null;
   let panelElRef: HTMLElement | null = null;
 

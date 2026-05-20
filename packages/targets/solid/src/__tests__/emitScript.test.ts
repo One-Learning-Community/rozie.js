@@ -84,14 +84,20 @@ $watch(() => $props.open, (v) => { console.log(v) })
     const solidImports = new SolidImportCollector();
     const runtimeImports = new RuntimeSolidImportCollector();
     const result = emitScript(ir, { solidImports, runtimeImports });
-    // Getter is invoked into __watchVal; callback is invoked with that value as
-    // its first arg. Preserves user-authored `(v) => ...` params so `v` binds
-    // to the new value (regression: bare `(cb)()` ate the param entirely in
-    // Solid emit, esbuild then surfaced `ReferenceError: v is not defined`).
+    // Getter is invoked into __watchVal; the callback is invoked with that
+    // value as its first arg, inside an `untrack(...)` wrapper. Preserves
+    // user-authored `(v) => ...` params so `v` binds to the new value
+    // (regression: bare `(cb)()` ate the param entirely in Solid emit,
+    // esbuild then surfaced `ReferenceError: v is not defined`).
     // @babel/generator drops the parens around single-param arrows, so the
     // emitted shape is `(v => { ... })(__watchVal)` rather than `((v) => ...)`.
-    expect(result.hookSection).toMatch(/createEffect\(\(\) => \{[\s\S]*?const __watchVal = \(\(\) =>[\s\S]*?\)\(\);[\s\S]*?\(v => \{[\s\S]*?\}\)\(__watchVal\);[\s\S]*?\}\);/);
+    //
+    // Bug B fix (260519 linechart-watch-recreate) — the callback runs inside
+    // `untrack(...)` so its reads (and transitive helper reads) DON'T join the
+    // createEffect's dependency set; only the getter defines what re-runs it.
+    expect(result.hookSection).toMatch(/createEffect\(\(\) => \{[\s\S]*?const __watchVal = \(\(\) =>[\s\S]*?\)\(\);[\s\S]*?untrack\(\(\) => \(v => \{[\s\S]*?\}\)\(__watchVal\)\);[\s\S]*?\}\);/);
     expect(solidImports.has('createEffect')).toBe(true);
+    expect(solidImports.has('untrack')).toBe(true);
   });
 
   it('Quick 260515-u2b — $watch with `() => ...` callback omits __watchVal arg (tsc TS2554-safe)', () => {
@@ -111,8 +117,10 @@ $watch(() => $props.open, () => { console.log('fired') })
     const solidImports = new SolidImportCollector();
     const runtimeImports = new RuntimeSolidImportCollector();
     const result = emitScript(ir, { solidImports, runtimeImports });
-    expect(result.hookSection).toMatch(/\(\(\) => \{[\s\S]*?\}\)\(\);/);
-    expect(result.hookSection).not.toContain(`)(__watchVal);`);
+    // Bug B fix (260519 linechart-watch-recreate) — the zero-param callback is
+    // wrapped in `untrack(...)`; the inner IIFE takes no argument.
+    expect(result.hookSection).toMatch(/untrack\(\(\) => \(\(\) => \{[\s\S]*?\}\)\(\)\);/);
+    expect(result.hookSection).not.toContain(`)(__watchVal)`);
   });
 
   it('lifecycle concise-arrow body: `$onMount(() => method())` wraps the body in an arrow (no eager call, no TDZ)', () => {
