@@ -1,4 +1,6 @@
 <script lang="ts">
+import { onMount } from 'svelte';
+
 interface Props {
   placeholder?: string;
   minLength?: number;
@@ -29,7 +31,7 @@ const clear = () => {
 
 const isValid = $derived(query.length >= minLength);
 
-$effect(() => {
+onMount(() => {
   if (autofocus) inputEl?.focus();
 
   // Returning a function from $onMount registers a teardown — equivalent to

@@ -456,14 +456,25 @@ function emitDerivedDecls(
  *   2. The callback fires both on first run AND on any subsequent re-trigger
  *      driven by getter signal changes
  *
+ * Bug B fix (260519 linechart-watch-recreate) — the callback runs inside
+ * `untrack(...)` so any reactive read that happens transitively (e.g. via a
+ * helper `buildConfig()` that reads `$props.data`) is NOT pulled into the
+ * watcher's dependency set. Only the getter defines what the watcher reacts
+ * to — matching Vue's `watch(getter, cb)`, Solid's `on(getter, cb)`, and the
+ * user's mental model. Without this, LineChart's `$watch($props.type)`
+ * callback calls `buildConfig()` which reads `$props.data`; the data read
+ * landed in the watcher's deps so it re-fired (and recreated the Chart.js
+ * instance) on every data tick.
+ *
  * Walks the cloned program; rewriteRozieIdentifiers already normalized
  * `$props.x` → `x` (post-destructure) and `$data.x` → bare-let-read.
  */
 function emitWatcherHooks(
   clonedProgram: t.File,
-): { lines: string[]; consumedIndices: Set<number> } {
+): { lines: string[]; consumedIndices: Set<number>; needsUntrack: boolean } {
   const lines: string[] = [];
   const consumed = new Set<number>();
+  let needsUntrack = false;
   const body = clonedProgram.program.body;
   let watcherIdx = 0;
   for (let i = 0; i < body.length; i++) {
@@ -489,41 +500,41 @@ function emitWatcherHooks(
     consumed.add(i);
     const getterCode = genCode(getterArg as t.Node);
     const cbCode = genCode(cbArg as t.Node);
+    needsUntrack = true;
     // Wrap each in parens so the genCode emits a parenthesized arrow we can
     // immediately invoke as an IIFE inside the $effect block. Bind the
     // getter's evaluated value as the callback's first argument WHEN the
     // user-authored callback declares a parameter — otherwise svelte-check
     // flags "Expected 0 arguments, but got 1" for the `(() => {...})()` form.
     //
-    // Skip-initial gate: $watch is a "fire on CHANGE" contract — Vue's
-    // `watch(getter, cb)`, Lit's updated()-route, Solid's createEffect via
-    // on(), and the user's mental model all skip the initial mount fire. In
-    // Svelte 5, `$effect` always fires once at registration so the tracked
-    // reads get subscribed; we still want the read for subscription but must
-    // gate the callback invocation behind a per-watcher flag.
+    // Skip-initial gate: $watch is a "fire on CHANGE" contract. In Svelte 5,
+    // `$effect` always fires once at registration so the tracked getter reads
+    // get subscribed; we keep that read for subscription but gate the callback
+    // invocation behind a per-watcher flag. (260519 linechart-watch-recreate
+    // step 6 lifts this gate to make $watch immediate-by-default; that change
+    // ships as a separate atomic commit AFTER the Bug B fixes land.)
     //
-    // Without this gate, LineChart's `$watch($props.type)` body destroys the
-    // freshly-mounted Chart.js instance on first flush and recreates it in
-    // the same microtask, racing Chart.js's first-paint RAF (260519-5h8 VR
-    // KNOWN_FAILING). Vue/React/Solid/Angular/Lit don't see this race because
-    // their `$watch` lowering is skip-initial by primitive contract.
-    //
-    // Top-level `let` in Svelte 5 runes mode is a plain, NON-reactive
-    // variable (need `$state(...)` to opt in) — perfect for a setup-time flag.
+    // Bug B fix (260519 linechart-watch-recreate) — the callback runs inside
+    // `untrack(...)` so transitive reactive reads (a helper like `buildConfig()`
+    // reading `$props.data`) do NOT subscribe the watcher. Only the getter
+    // defines the watcher's dependency set — matching Vue/Solid/Angular/Lit.
+    // Without this, LineChart's `$watch($props.type)` callback called
+    // `buildConfig()`, whose `$props.data` read landed in the watcher deps, so
+    // the watcher re-fired (and recreated the Chart.js instance) every tick.
     const flag = `__rozieWatchInitial_${watcherIdx}`;
     watcherIdx += 1;
     const skipInitial = `if (${flag}) { ${flag} = false; return; }`;
     if (cbParamCount(cbArg) > 0) {
       lines.push(
-        `let ${flag} = true;\n$effect(() => { const __watchVal = (${getterCode})(); ${skipInitial} (${cbCode})(__watchVal); });`,
+        `let ${flag} = true;\n$effect(() => { const __watchVal = (${getterCode})(); ${skipInitial} untrack(() => (${cbCode})(__watchVal)); });`,
       );
     } else {
       lines.push(
-        `let ${flag} = true;\n$effect(() => { (${getterCode})(); ${skipInitial} (${cbCode})(); });`,
+        `let ${flag} = true;\n$effect(() => { (${getterCode})(); ${skipInitial} untrack(() => (${cbCode})()); });`,
       );
     }
   }
-  return { lines, consumedIndices: consumed };
+  return { lines, consumedIndices: consumed, needsUntrack };
 }
 
 function cbParamCount(
@@ -533,27 +544,33 @@ function cbParamCount(
 }
 
 /**
- * Walk lifecycle hooks (D-19 paired) and emit one `$effect(() => { ... })`
- * block per hook. Returns lifecycle code lines + the SET of indices CONSUMED
- * in clonedProgram.body (so emitResidualScriptBody can skip them).
+ * Walk lifecycle hooks (D-19 paired) and emit lifecycle code per hook.
+ * Returns lifecycle code lines + the SET of indices CONSUMED in
+ * clonedProgram.body (so emitResidualScriptBody can skip them) + the set of
+ * `'svelte'` runtime imports the emitted code needs (`onMount` / `onDestroy`).
  *
- * Pairing rules per D-19 + Pitfall 4:
- *   - $onMount(setup) + $onUnmount(cleanup) ADJACENT identifier pair →
- *     ONE `$effect(() => { setup(); return cleanup; });`
- *   - $onMount(arrow with cleanup-return) → preserve verbatim — `$effect(() => {
- *     setup; return cleanup; });`
- *   - $onMount alone (no cleanup) → `$effect(() => { setup; });`
- *   - $onUnmount alone → `$effect(() => () => { cleanup; });` (return-only effect)
- *   - $onUpdate → `$effect(() => { body });` (auto-tracks reactive reads)
- *
- * D-19 Modal repro: `$onMount(lockScroll); $onUnmount(unlockScroll);` adjacent
- * pair MUST emit as ONE $effect block, not split.
+ * Lowering rules (260519 linechart-watch-recreate Bug B + D-19 + Pitfall 4):
+ *   - `$onMount` lowers to `onMount(...)` from `'svelte'` — NOT `$effect`.
+ *     `$effect` is a TRACKING context: any reactive read inside the mount
+ *     body (directly, or transitively via a helper call like `buildConfig()`
+ *     reading `$props.data`) subscribes the mount effect, so it re-runs on
+ *     every data change and recreates engine instances (LineChart's Chart.js
+ *     `new Chart()` re-fired every tick). `onMount`'s callback runs OUTSIDE
+ *     any tracking scope and runs exactly once — matching Vue's `onMounted`,
+ *     Lit's `firstUpdated`, and Angular's `ngAfterViewInit`. `onMount`
+ *     natively supports a cleanup-return.
+ *   - `$onUnmount` (standalone) lowers to `onDestroy(...)` from `'svelte'`.
+ *   - `$onMount` + adjacent `$onUnmount` identifier pair → ONE `onMount` that
+ *     returns the cleanup (Modal lockScroll/unlockScroll D-19 anchor).
+ *   - `$onUpdate` STAYS a `$effect` — it IS the update phase: re-run on every
+ *     tracked reactive change. Svelte's `$effect` auto-tracks signal reads.
  */
 function emitLifecycleHooks(
   clonedProgram: t.File,
-): { lines: string[]; consumedIndices: Set<number> } {
+): { lines: string[]; consumedIndices: Set<number>; runtimeImports: Set<string> } {
   const lines: string[] = [];
   const consumed = new Set<number>();
+  const runtimeImports = new Set<string>();
 
   const body = clonedProgram.program.body;
 
@@ -584,15 +601,16 @@ function emitLifecycleHooks(
     }
 
     if (calleeName === '$onUnmount') {
-      // Standalone unmount (no preceding mount paired earlier).
-      // Svelte 5 idiom: `$effect(() => () => { cleanup() })` — the outer
-      // arrow returns the cleanup arrow on first run.
-      lines.push(`$effect(() => () => (${genCode(arg as t.Node)})());`);
+      // Standalone unmount (no preceding mount paired earlier). `onDestroy`
+      // from 'svelte' runs the callback once at teardown — no tracking scope.
+      runtimeImports.add('onDestroy');
+      lines.push(`onDestroy(() => (${genCode(arg as t.Node)})());`);
       continue;
     }
 
-    // calleeName === '$onMount' — emit $effect; check for paired $onUnmount
-    // OR for an inline cleanup-return inside an arrow callback.
+    // calleeName === '$onMount' — emit `onMount(...)`; check for a paired
+    // $onUnmount OR an inline cleanup-return inside an arrow callback.
+    runtimeImports.add('onMount');
 
     if (t.isIdentifier(arg)) {
       // Identifier-pair case (Modal lockScroll/unlockScroll).
@@ -620,15 +638,16 @@ function emitLifecycleHooks(
 
       if (pairedIdx !== null && pairedCleanupName !== null) {
         consumed.add(pairedIdx);
-        // Modal D-19 anchor: ONE $effect block per pair.
+        // Modal D-19 anchor: ONE onMount block per pair; onMount returns the
+        // cleanup function (Svelte invokes it on destroy).
         lines.push(
-          `$effect(() => {\n  ${arg.name}();\n  return () => ${pairedCleanupName}();\n});`,
+          `onMount(() => {\n  ${arg.name}();\n  return () => ${pairedCleanupName}();\n});`,
         );
         continue;
       }
 
-      // No paired unmount — bare `$effect(() => identifier())`.
-      lines.push(`$effect(() => { ${arg.name}(); });`);
+      // No paired unmount — bare `onMount(() => identifier())`.
+      lines.push(`onMount(() => { ${arg.name}(); });`);
       continue;
     }
 
@@ -647,29 +666,30 @@ function emitLifecycleHooks(
       }
 
       if (cleanupExpr && setupBody) {
-        // $effect(() => { setupBody; return cleanupExpr; })
+        // onMount(() => { setupBody; return cleanupExpr; })
         // Reconstruct: emit the setup statements + a return statement holding
-        // the cleanup expression.
+        // the cleanup expression. onMount runs the callback once and uses the
+        // returned function as the destroy-time cleanup.
         const merged = t.blockStatement([
           ...setupBody.body,
           t.returnStatement(cleanupExpr),
         ]);
-        lines.push(`$effect(${arrowBody(merged)});`);
+        lines.push(`onMount(${arrowBody(merged)});`);
         continue;
       }
 
-      // No cleanup — invoke the arrow body inline as the effect.
+      // No cleanup — invoke the arrow body inline as the onMount callback.
       // arrowBody handles BlockStatement vs Expression bodies (incl. the
       // ObjectExpression paren-wrap case).
-      lines.push(`$effect(${arrowBody(fnBody)});`);
+      lines.push(`onMount(${arrowBody(fnBody)});`);
       continue;
     }
 
-    // Fallback: emit as IIFE.
-    lines.push(`$effect(() => (${genCode(arg as t.Node)})());`);
+    // Fallback: emit as IIFE inside onMount.
+    lines.push(`onMount(() => (${genCode(arg as t.Node)})());`);
   }
 
-  return { lines, consumedIndices: consumed };
+  return { lines, consumedIndices: consumed, runtimeImports };
 }
 
 /**
@@ -810,12 +830,32 @@ export function emitScript(
   const clonedComputedBodies = findClonedComputedBodies(cloned);
   const derivedLines = emitDerivedDecls(ir.computed, clonedComputedBodies);
 
-  const { lines: lifecycleLines, consumedIndices } = emitLifecycleHooks(cloned);
+  const {
+    lines: lifecycleLines,
+    consumedIndices,
+    runtimeImports: lifecycleRuntimeImports,
+  } = emitLifecycleHooks(cloned);
   // Quick plan 260515-u2b — $watch lowering (emits `$effect(() => {...})`).
-  const { lines: watcherLines, consumedIndices: watcherConsumed } =
-    emitWatcherHooks(cloned);
+  const {
+    lines: watcherLines,
+    consumedIndices: watcherConsumed,
+    needsUntrack,
+  } = emitWatcherHooks(cloned);
   for (const idx of watcherConsumed) consumedIndices.add(idx);
   const { code: residualCode, stmts: residualStmts } = emitResidualScriptBody(cloned, consumedIndices);
+
+  // Bug B fix (260519 linechart-watch-recreate) — assemble the `'svelte'`
+  // value-import line. `onMount` / `onDestroy` are emitted by emitLifecycleHooks
+  // for mount/unmount-phase hooks (non-tracking lifecycle); `untrack` is
+  // emitted by emitWatcherHooks to keep the $watch callback's transitive
+  // reactive reads out of the watcher's dependency set. Runes
+  // ($props/$state/$derived/$effect/$bindable) need no import.
+  const valueImports = new Set<string>([...lifecycleRuntimeImports]);
+  if (needsUntrack) valueImports.add('untrack');
+  if (valueImports.size > 0) {
+    const sorted = [...valueImports].sort();
+    importLines.push(`import { ${sorted.join(', ')} } from 'svelte';`);
+  }
 
   // 5. Assemble preamble sections (everything BEFORE the residual user code).
   const preambleSections: string[] = [];

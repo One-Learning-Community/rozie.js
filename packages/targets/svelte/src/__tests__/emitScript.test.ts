@@ -65,30 +65,36 @@ describe('emitScript — behavior (Plan 05-02a Task 1)', () => {
     expect(scriptBlock).toMatch(/value - step >= min/);
   });
 
-  it('Test 4: Counter has NO $effect line (no $onMount/$onUnmount in source)', () => {
+  it('Test 4: Counter has NO lifecycle line (no $onMount/$onUnmount in source)', () => {
     const { scriptBlock } = emitScript(lowerExample('Counter'));
     expect(scriptBlock).not.toMatch(/\$effect\(/);
+    expect(scriptBlock).not.toMatch(/\bonMount\(/);
   });
 
-  it('Test 5: SearchInput $onMount with cleanup-return emits ONE $effect with `return () => ...`', () => {
+  it('Test 5: SearchInput $onMount with cleanup-return emits ONE onMount with `return () => ...`', () => {
     const { scriptBlock } = emitScript(lowerExample('SearchInput'));
-    expect(scriptBlock).toMatch(/\$effect\(\(\) => \{/);
+    // Bug B fix (260519 linechart-watch-recreate) — $onMount lowers to the
+    // non-tracking `onMount` lifecycle, NOT a tracking `$effect`. onMount
+    // natively supports a cleanup-return.
+    expect(scriptBlock).toMatch(/onMount\(\(\) => \{/);
     expect(scriptBlock).toContain('return () =>');
+    expect(scriptBlock).toContain("import { onMount } from 'svelte';");
     // No external runtime-svelte import — A8/A9 RESOLVED.
     expect(scriptBlock).not.toContain("from '@rozie/runtime-svelte'");
   });
 
-  it('Test 6: Modal D-19 paired-cleanup → ONE $effect block per $onMount/$onUnmount pair', () => {
+  it('Test 6: Modal D-19 paired-cleanup → ONE onMount block per $onMount/$onUnmount pair', () => {
     const { scriptBlock } = emitScript(lowerExample('Modal'));
-    // The lockScroll/unlockScroll pair must merge into ONE $effect block:
-    //   $effect(() => { lockScroll(); return () => unlockScroll(); });
+    // Bug B fix (260519 linechart-watch-recreate) — the lockScroll/unlockScroll
+    // pair merges into ONE non-tracking `onMount` block that returns the
+    // cleanup:  onMount(() => { lockScroll(); return () => unlockScroll(); });
     expect(scriptBlock).toMatch(
-      /\$effect\(\(\) => \{[\s\S]*lockScroll\(\)[\s\S]*return \(\) => unlockScroll\(\)[\s\S]*\}\);/,
+      /onMount\(\(\) => \{[\s\S]*lockScroll\(\)[\s\S]*return \(\) => unlockScroll\(\)[\s\S]*\}\);/,
     );
     // The standalone `$onMount(() => { $refs.dialogEl?.focus() })` becomes
-    // its OWN second $effect block.
-    const effectMatches = scriptBlock.match(/\$effect\(/g) ?? [];
-    expect(effectMatches.length).toBe(2);
+    // its OWN second `onMount` block.
+    const onMountMatches = scriptBlock.match(/onMount\(/g) ?? [];
+    expect(onMountMatches.length).toBe(2);
   });
 
   it('Test 7: Counter console.log("hello from rozie") survives verbatim (DX-03 trust-erosion floor)', () => {
@@ -139,7 +145,7 @@ $watch(() => $props.open, (v) => { if (v) reposition() })
     // gated behind a per-watcher `__rozieWatchInitial_N` flag so $watch fires
     // only on CHANGE, not on the initial $effect registration.
     expect(scriptBlock).toMatch(
-      /let __rozieWatchInitial_0 = true;\s*\$effect\(\(\) => \{\s*const __watchVal = \(\(\) => open\)\(\);\s*if \(__rozieWatchInitial_0\) \{ __rozieWatchInitial_0 = false; return; \}\s*\(v => \{[\s\S]*?\}\)\(__watchVal\);\s*\}\);/,
+      /let __rozieWatchInitial_0 = true;\s*\$effect\(\(\) => \{\s*const __watchVal = \(\(\) => open\)\(\);\s*if \(__rozieWatchInitial_0\) \{ __rozieWatchInitial_0 = false; return; \}\s*untrack\(\(\) => \(v => \{[\s\S]*?\}\)\(__watchVal\)\);\s*\}\);/,
     );
   });
 
@@ -159,7 +165,7 @@ $watch(() => $props.open, () => { if ($props.open) reposition() })
     const ir = lowerToIR(parsed.ast!, { modifierRegistry: createDefaultRegistry() }).ir!;
     const { scriptBlock } = emitScript(ir);
     expect(scriptBlock).toMatch(
-      /let __rozieWatchInitial_0 = true;\s*\$effect\(\(\) => \{\s*\(\(\) => open\)\(\);\s*if \(__rozieWatchInitial_0\) \{ __rozieWatchInitial_0 = false; return; \}\s*\(\(\) => \{[\s\S]*?\}\)\(\);\s*\}\);/,
+      /let __rozieWatchInitial_0 = true;\s*\$effect\(\(\) => \{\s*\(\(\) => open\)\(\);\s*if \(__rozieWatchInitial_0\) \{ __rozieWatchInitial_0 = false; return; \}\s*untrack\(\(\) => \(\(\) => \{[\s\S]*?\}\)\(\)\);\s*\}\);/,
     );
     expect(scriptBlock).not.toContain('__watchVal');
   });

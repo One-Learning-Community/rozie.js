@@ -108,13 +108,15 @@ describe('emitSvelte — substring invariants (Plan 02a Task 3 acceptance criter
     expect(code).toMatch(/\{@render header\?\.\(\{[^}]*\}\)\}|\{#if header\}\{@render header\(\{/);
   });
 
-  it('Modal.svelte.snap contains :global(:root) AND paired-cleanup $effect', () => {
+  it('Modal.svelte.snap contains :global(:root) AND paired-cleanup onMount', () => {
     const { ir, src, filename } = loadExample('Modal');
     const { code } = emitSvelte(ir, { filename, source: src });
     expect(code).toContain(':global(:root)');
-    // D-19: ONE $effect with both lockScroll() and unlockScroll() (paired pattern).
+    // D-19: ONE onMount with both lockScroll() and unlockScroll() (paired
+    // pattern). Bug B fix (260519 linechart-watch-recreate) — mount hooks
+    // lower to the non-tracking `onMount` lifecycle, not a tracking `$effect`.
     expect(code).toMatch(
-      /\$effect\(\(\) => \{[\s\S]*lockScroll\(\)[\s\S]*return \(\) => unlockScroll\(\)[\s\S]*\}\);/,
+      /onMount\(\(\) => \{[\s\S]*lockScroll\(\)[\s\S]*return \(\) => unlockScroll\(\)[\s\S]*\}\);/,
     );
   });
 
