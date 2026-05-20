@@ -1,0 +1,106 @@
+<rozie name="PortalListStyled">
+
+<props>
+{
+  items: { type: Array, default: () => [] }
+}
+</props>
+
+<script>
+// Tiny inline "engine" — same shape as examples/PortalList.rozie but
+// with the inline-style ceremony removed. The engine now just creates
+// structural DOM; cosmetic styling is the wrapper's <style> block's job.
+//
+// Destruction order still matters: dispose all cells BEFORE removing
+// the structural container (same constraint as FullCalendar / AG-Grid).
+class MiniListEngine {
+  constructor(rootEl, opts) {
+    this.rootEl = rootEl
+    this.items = opts.items
+    this.cellRenderer = opts.cellRenderer
+    this.disposers = []
+    this._mount()
+  }
+  _mount() {
+    const ul = document.createElement('ul')
+    for (const item of this.items) {
+      const li = document.createElement('li')
+      const cell = this.cellRenderer(item)
+      li.appendChild(cell.node)
+      this.disposers.push(cell.dispose)
+      ul.appendChild(li)
+    }
+    this.rootEl.appendChild(ul)
+  }
+  destroy() {
+    for (const dispose of this.disposers) dispose()
+    this.disposers = []
+    while (this.rootEl.firstChild) this.rootEl.removeChild(this.rootEl.firstChild)
+  }
+}
+
+let instance = null
+
+$onMount(() => {
+  instance = new MiniListEngine($el, {
+    items: $props.items,
+    cellRenderer: (item) => {
+      const node = document.createElement('div')
+      const dispose = $portals.item(node, { item })
+      return { node, dispose }
+    },
+  })
+  return () => instance?.destroy()
+})
+</script>
+
+<template>
+<div class="rozie-portal-list">
+  <slot name="item" portal :params="['item']" />
+</div>
+</template>
+
+<style>
+.rozie-portal-list {
+  display: block;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+/*
+  @portal item — Spike 004 feature.
+
+  Every selector inside this block is rewritten at emit time to be
+  prefixed with [data-rozie-portal-item="<scopeHash>"]. The portal
+  closure adds the matching attribute to the engine-owned cell
+  container at mount time, so the selectors cascade through the
+  engine subtree.
+
+  Subtree-reaching semantics: works exactly like Vue scoped CSS's
+  [data-v-X] descendant cascade. NOT engine-DOM-only — that strict
+  variant would require per-element attribute injection and push
+  burden back into the engine, which defeats the point.
+*/
+@portal item {
+  ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  li {
+    padding: 0.5rem 0.75rem;
+  }
+  li + li {
+    border-top: 1px solid rgba(0, 0, 0, 0.06);
+  }
+  div {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+}
+</style>
+
+</rozie>

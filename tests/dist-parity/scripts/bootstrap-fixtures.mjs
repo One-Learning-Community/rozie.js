@@ -38,6 +38,9 @@ const FIXTURES_DIR = resolve(HERE, '../fixtures');
 // Phase 07.3 Plan 09 — EXAMPLES extended 9 → 10 with WrapperModal so the
 // consumer-side `r-model:open="$props.open"` forwarding pattern is byte-
 // locked across all 4 entrypoints (compile/cli/babel/unplugin).
+// Quick-task 260519-vyv (Spike 004) — EXAMPLES extended 10 → 11 with
+// PortalListStyled, the canonical `@portal NAME { ... }` producer-side
+// CSS-scoping fixture (single-file; no sibling .rozie producers).
 const EXAMPLES = [
   'Counter',
   'SearchInput',
@@ -49,6 +52,7 @@ const EXAMPLES = [
   'CardHeader',
   'ModalConsumer',
   'WrapperModal',
+  'PortalListStyled',
 ];
 
 const EXAMPLES_NEEDING_RESOLVER_ROOT = new Set(['ModalConsumer', 'WrapperModal']);

@@ -68,6 +68,10 @@ const FIXTURES_DIR = resolve(HERE, 'fixtures');
 // Phase 07.3 Plan 09: extended 9 → 10 with WrapperModal so the consumer-side
 // `r-model:open="$props.open"` forwarding pattern is byte-locked across all
 // 4 entrypoints. 10 × 6 × 4 = 240 cells (plus React .d.ts/.module.css sidecars).
+// Quick-task 260519-vyv (Spike 004) — extended 10 → 11 with PortalListStyled,
+// the canonical `@portal NAME { ... }` producer-side CSS-scoping fixture.
+// Single-file example (no sibling .rozie); byte-locked across all 4
+// entrypoints. 11 × 6 × 4 = 264 cells (+ React .d.ts/.module.css sidecars).
 const EXAMPLES = [
   'Counter',
   'SearchInput',
@@ -79,6 +83,7 @@ const EXAMPLES = [
   'CardHeader',
   'ModalConsumer',
   'WrapperModal',
+  'PortalListStyled',
 ] as const;
 
 // Phase 07.2 Plan 06 — siblings ModalConsumer reaches via `<components>`.
