@@ -22,9 +22,9 @@ export default function OnMountArrowCleanup(_props: OnMountArrowCleanupProps): J
   // resize subscription across disconnect. The teardown here is self-contained
   // (no reference to a hoisted setup local) so the fixture isolates exactly the
   // "is the returned cleanup registered?" contract.
-  const onResize = () => {
+  function onResize() {
     setTicks(ticks() + 1);
-  };
+  }
 
   return (
     <>

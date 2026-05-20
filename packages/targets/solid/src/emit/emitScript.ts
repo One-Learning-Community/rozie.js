@@ -65,6 +65,60 @@ function capitalize(name: string): string {
   return name.charAt(0).toUpperCase() + name.slice(1);
 }
 
+/**
+ * Convert `const X = (...args) => body` (or function expression) into
+ * `function X(...args) { ... }` so the binding HOISTS. Returns the new
+ * statement, or null when the input is not a single-declarator
+ * arrow/function-expression initializer (left as-is by the caller).
+ *
+ * **Why hoist?** `createMemo` (from `$computed`) runs its callback EAGERLY at
+ * component-setup time, and memos are emitted in `hookSection` — above the
+ * user helpers in `userArrowsSection`. A `$computed` whose body calls a
+ * user-authored helper (`stats = $computed(() => stripHtml($data.content))`)
+ * therefore reads that helper before its `const` declaration runs → TDZ
+ * `ReferenceError: Cannot access 'stripHtml' before initialization`. A
+ * `function` declaration hoists to the top of the component-function scope,
+ * so it is defined before any eager memo callback fires. This mirrors
+ * `tryHoistArrowToFunction` in the React emitter (whose `useMemo` callback
+ * has the same eager-evaluation property).
+ *
+ * Multi-declarator / non-arrow declarations are left untouched. `async` is
+ * preserved via FunctionDeclaration's `async` flag; a concise-expression
+ * arrow body is wrapped in `{ return <expr>; }`.
+ */
+function tryHoistArrowToFunction(stmt: t.Statement): t.Statement | null {
+  if (!t.isVariableDeclaration(stmt)) return null;
+  if (stmt.declarations.length !== 1) return null;
+  const decl = stmt.declarations[0]!;
+  if (!t.isIdentifier(decl.id)) return null;
+  const init = decl.init;
+  if (!init) return null;
+  if (!t.isArrowFunctionExpression(init) && !t.isFunctionExpression(init)) return null;
+
+  const body: t.BlockStatement = t.isBlockStatement(init.body)
+    ? init.body
+    : t.blockStatement([t.returnStatement(init.body)]);
+
+  const params = init.params.filter(
+    (p): p is t.Identifier | t.Pattern | t.RestElement =>
+      t.isIdentifier(p) ||
+      t.isRestElement(p) ||
+      t.isAssignmentPattern(p) ||
+      t.isObjectPattern(p) ||
+      t.isArrayPattern(p),
+  );
+
+  const fn = t.functionDeclaration(decl.id, params, body, false, init.async ?? false);
+  // Inherit the original statement's `loc` + attached comments onto the
+  // synthetic FunctionDeclaration. Without this the new node has no source
+  // position, so @babel/generator (a) drops any user `<script>` comments
+  // attached to the declaration, (b) falls back to default blank-line
+  // spacing, and (c) loses the source-map mapping for these lines — Solid's
+  // emitScript generates code + map in a single pass over `filteredStmts`,
+  // so the synthetic node must carry position metadata.
+  return t.inherits(fn, stmt);
+}
+
 export interface EmitScriptResult {
   /**
    * Portal-slot primitive (Spike 003) — when true, the shell must add
@@ -389,7 +443,10 @@ export function emitScript(
         continue;
       }
     }
-    filteredStmts.push(stmt);
+    // Hoist `const X = () => …` helpers to `function X() {…}` so they are
+    // defined before any eagerly-evaluated `createMemo` callback in
+    // hookSection references them (TDZ fix — see tryHoistArrowToFunction).
+    filteredStmts.push(tryHoistArrowToFunction(stmt) ?? stmt);
   }
 
   // Generate user statements as a single Babel program so we get one coherent

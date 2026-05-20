@@ -19,9 +19,9 @@ export default function ControllableNoProps(_props: ControllableNoPropsProps): J
   // `_props === undefined` and crashed with "Cannot read properties of undefined
   // (reading 'defaultValue')". The runtime helper must tolerate an absent props
   // object and fall back to the declared default.
-  const bump = () => {
+  function bump() {
     setValue(value() + 1);
-  };
+  }
 
   return (
     <>

@@ -21,12 +21,12 @@ export default function Counter(_props: CounterProps): JSX.Element {
   const canDecrement = createMemo(() => value() - local.step >= local.min);
 
   console.log("hello from rozie");
-  const increment = () => {
+  function increment() {
     if (canIncrement()) setValue(value() + local.step);
-  };
-  const decrement = () => {
+  }
+  function decrement() {
     if (canDecrement()) setValue(value() - local.step);
-  };
+  }
 
   return (
     <>

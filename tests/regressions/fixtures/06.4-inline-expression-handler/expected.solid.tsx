@@ -11,9 +11,9 @@ export default function InlineExprHandler(_props: InlineExprHandlerProps): JSX.E
 
   const [open, setOpen] = createSignal(false);
 
-  const close = () => {
+  function close() {
     setOpen(false);
-  };
+  }
 
   return (
     <>

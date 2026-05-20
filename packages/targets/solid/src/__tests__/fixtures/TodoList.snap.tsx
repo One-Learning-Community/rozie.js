@@ -28,7 +28,7 @@ export default function TodoList(_props: TodoListProps): JSX.Element {
   const [draft, setDraft] = createSignal('');
   const remaining = createMemo(() => items().filter(i => !i.done).length);
 
-  const add = () => {
+  function add() {
     const text = draft().trim();
     if (!text) return;
     setItems([...items(), {
@@ -38,24 +38,24 @@ export default function TodoList(_props: TodoListProps): JSX.Element {
     }]);
     setDraft('');
     _props.onAdd?.(text);
-  };
-  const toggle = id => {
+  }
+  function toggle(id) {
     setItems(items().map(i => i.id === id ? {
       ...i,
       done: !i.done
     } : i));
     _props.onToggle?.(id);
-  };
+  }
 
   // Internal method renamed from `remove` to `removeItem` to avoid colliding
   // with `HTMLElement.prototype.remove()` on the Lit target — Lit emits user
   // methods as class fields and the resulting `remove(id)` signature is
   // incompatible with the inherited `remove(): void`. Public API is unchanged:
   // the slot param is still `:remove`, the emitted event is still `'remove'`.
-  const removeItem = id => {
+  function removeItem(id) {
     setItems(items().filter(i => i.id !== id));
     _props.onRemove?.(id);
-  };
+  }
 
   return (
     <>

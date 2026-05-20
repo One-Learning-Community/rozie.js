@@ -30,13 +30,13 @@ export default function SearchInput(_props: SearchInputProps): JSX.Element {
   });
   let inputElRef: HTMLElement | null = null;
 
-  const onSearch = () => {
+  function onSearch() {
     if (isValid()) _props.onSearch?.(query());
-  };
-  const clear = () => {
+  }
+  function clear() {
     setQuery('');
     _props.onClear?.();
-  };
+  }
 
   const _rozieDebouncedOnSearch = createDebouncedHandler(onSearch, 300);
 

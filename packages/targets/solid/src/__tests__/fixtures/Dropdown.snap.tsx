@@ -33,20 +33,20 @@ export default function Dropdown(_props: DropdownProps): JSX.Element {
   let triggerElRef: HTMLElement | null = null;
   let panelElRef: HTMLElement | null = null;
 
-  const toggle = () => {
+  function toggle() {
     setOpen(!open());
-  };
-  const close = () => {
+  }
+  function close() {
     setOpen(false);
-  };
-  const reposition = () => {
+  }
+  function reposition() {
     if (!panelElRef || !triggerElRef) return;
     const rect = triggerElRef.getBoundingClientRect();
     Object.assign(panelElRef.style, {
       top: `${rect.bottom}px`,
       left: `${rect.left}px`
     });
-  };
+  }
 
   // Re-fire reposition() whenever the open transition flips on. The panel
   // element is r-if-gated, so $refs.panelEl is undefined at mount time — $watch

@@ -39,23 +39,23 @@ export default function Modal(_props: ModalProps): JSX.Element {
   let backdropElRef: HTMLElement | null = null;
   let dialogElRef: HTMLElement | null = null;
 
-  const close = () => {
+  function close() {
     setOpen(false);
     _props.onClose?.();
-  };
+  }
 
   // Body-scroll-lock state lives outside reactive data because it tracks DOM
   // rather than UI; managed entirely via lifecycle and listeners.
   let savedBodyOverflow = '';
-  const lockScroll = () => {
+  function lockScroll() {
     if (!local.lockBodyScroll) return;
     savedBodyOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-  };
-  const unlockScroll = () => {
+  }
+  function unlockScroll() {
     if (!local.lockBodyScroll) return;
     document.body.style.overflow = savedBodyOverflow;
-  };
+  }
 
   // Colocated lifecycle pair — runs in source order alongside other hooks.
 

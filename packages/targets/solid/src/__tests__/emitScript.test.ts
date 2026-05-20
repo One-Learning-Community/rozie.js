@@ -304,3 +304,37 @@ describe('emitSlotInvocation — §slots-merge invocation (Phase 07.3.2 D-02 sta
     }
   });
 });
+
+describe('emitScript — helper hoisting (260520-hus #2, TipTap·solid TDZ)', () => {
+  it('hoists a `const` arrow helper to a `function` declaration so an eager createMemo can call it', () => {
+    // Regression: `$computed` lowers to `createMemo`, whose callback runs
+    // EAGERLY at component setup. Memos are emitted in `hookSection`, ABOVE
+    // the user helpers in `userArrowsSection` — so a `$computed` body calling
+    // a user helper read that helper before its `const` declaration ran →
+    // TDZ `ReferenceError: Cannot access 'strip' before initialization`
+    // (TipTapDemo·solid). Emitting the helper as a hoisted `function`
+    // declaration makes it defined regardless of textual position.
+    const source = [
+      '<rozie name="TdzRepro">',
+      "<data>{ value: 'hello world' }</data>",
+      '<script>',
+      'const strip = (s) => s.trim()',
+      'const derived = $computed(() => strip($data.value))',
+      '</script>',
+      '<template><p>{{ derived }}</p></template>',
+      '</rozie>',
+    ].join('\n');
+    const { ast } = parse(source, { filename: 'TdzRepro.rozie' });
+    expect(ast).not.toBeNull();
+    const { ir } = lowerToIR(ast!, { modifierRegistry: createDefaultRegistry() });
+    expect(ir).not.toBeNull();
+    const result = emitSolid(ir!, { filename: 'TdzRepro.rozie', source });
+    expect(result.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+    // Helper emitted as a hoisted `function` declaration — NOT a `const` arrow
+    // (which has a temporal dead zone and would TDZ when the memo runs).
+    expect(result.code).toMatch(/function strip\(/);
+    expect(result.code).not.toMatch(/const strip\s*=/);
+    // The eagerly-evaluated memo callback references the helper.
+    expect(result.code).toContain('createMemo');
+  });
+});
