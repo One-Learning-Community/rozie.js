@@ -27,7 +27,7 @@
  * @experimental — shape may change before v1.0
  */
 
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { dirname, resolve, parse as pathParse } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -62,20 +62,38 @@ function defaultCwd(): string {
 }
 
 /**
- * Walk upward from `startDir` looking for `node_modules/<pkg>` (and its
- * pnpm-flat sibling `node_modules/.pnpm/node_modules/<pkg>`). Returns true
- * on first hit, false when the filesystem root is reached.
+ * Walk upward from `startDir` looking for `<pkg>` installed at any level.
+ * At each `node_modules` it checks three layouts and returns true on the
+ * first hit, false when the filesystem root is reached:
+ *
+ *   1. `node_modules/<pkg>` — direct dependency / npm-flat / hoisted.
+ *   2. `node_modules/.pnpm/node_modules/<pkg>` — pnpm's legacy flat dir.
+ *   3. `node_modules/.pnpm/<pkg>@<version>_<hash>/` — pnpm's versioned
+ *      virtual store. pnpm v10 does NOT hoist a workspace package's devDeps
+ *      into any walked `node_modules/`, but it always materializes every
+ *      package under the workspace-root `.pnpm` store. Without this check a
+ *      monorepo-internal probe (the no-`cwd` path) misses peer deps that
+ *      are declared only in a consumer demo's `package.json`.
  */
 function canResolveDirectory(startDir: string, pkgName: string): boolean {
   let dir = resolve(startDir);
   const root = pathParse(dir).root;
+  // pnpm escapes the scope separator in its virtual store — a scoped
+  // package `@scope/name` is materialized under `.pnpm/@scope+name@…/`.
+  const pnpmStorePrefix = pkgName.replace(/\//g, '+') + '@';
   // Bound the loop generously to avoid pathological infinite loops on
   // unusual filesystems.
   for (let i = 0; i < 100; i++) {
-    const direct = resolve(dir, 'node_modules', pkgName);
-    if (existsSync(direct)) return true;
-    const pnpmFlat = resolve(dir, 'node_modules', '.pnpm', 'node_modules', pkgName);
-    if (existsSync(pnpmFlat)) return true;
+    const nodeModules = resolve(dir, 'node_modules');
+    if (existsSync(resolve(nodeModules, pkgName))) return true;
+    if (existsSync(resolve(nodeModules, '.pnpm', 'node_modules', pkgName))) return true;
+    try {
+      for (const entry of readdirSync(resolve(nodeModules, '.pnpm'))) {
+        if (entry.startsWith(pnpmStorePrefix)) return true;
+      }
+    } catch {
+      // No `.pnpm` directory at this level — keep walking upward.
+    }
     if (dir === root) return false;
     const parent = dirname(dir);
     if (parent === dir) return false;
