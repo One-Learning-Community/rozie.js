@@ -80,16 +80,141 @@ const COMPOUND_OP_MAP: Record<string, t.BinaryExpression['operator']> = {
 };
 
 /**
- * Build the per-state setter call: `setName(rhs)` for plain `=`, or
- * `setName(prev => prev OP rhs)` for compound operators (Pitfall 6).
+ * Detect whether `expr` reads the magic accessor `<accessor>.<name>` anywhere
+ * inside it (e.g. `$data.points` inside `[...$data.points.slice(-19), next]`).
+ *
+ * Walks the expression's own subtree only; nested function bodies count too
+ * (a stale read inside an inline callback is just as stale). Returns true on
+ * the first match.
+ */
+function exprReadsAccessor(
+  expr: t.Expression,
+  accessor: '$data' | '$props',
+  name: string,
+): boolean {
+  let found = false;
+  const file = t.file(t.program([t.expressionStatement(expr)]));
+  try {
+    traverse(file, {
+      MemberExpression(path) {
+        if (path.node.computed) return;
+        const o = path.node.object;
+        const pr = path.node.property;
+        if (
+          t.isIdentifier(o) &&
+          o.name === accessor &&
+          t.isIdentifier(pr) &&
+          pr.name === name
+        ) {
+          found = true;
+          path.stop();
+        }
+      },
+      OptionalMemberExpression(path) {
+        if (path.node.computed) return;
+        const o = path.node.object;
+        const pr = path.node.property;
+        if (
+          t.isIdentifier(o) &&
+          o.name === accessor &&
+          t.isIdentifier(pr) &&
+          pr.name === name
+        ) {
+          found = true;
+          path.stop();
+        }
+      },
+    });
+  } catch {
+    // Defensive (D-08) — never throw on an unusual AST shape.
+  }
+  return found;
+}
+
+/**
+ * Rewrite every `<accessor>.<name>` SELF-REFERENCE inside `expr` to a bare
+ * `Identifier(paramName)`. Used to build the React functional-updater form:
+ * `$data.points = f($data.points)` → `setPoints(prev => f(prev))` so the
+ * `prev` is always the latest state, never a stale closure capture.
+ *
+ * Only the SAME-name accessor reads are rewritten; reads of OTHER state /
+ * props pass through untouched and flow into the normal MemberExpression
+ * rewrite downstream. Mutates `expr` in place.
+ */
+function rewriteSelfReadsToParam(
+  expr: t.Expression,
+  accessor: '$data' | '$props',
+  name: string,
+  paramName: string,
+): void {
+  const file = t.file(t.program([t.expressionStatement(expr)]));
+  try {
+    traverse(file, {
+      MemberExpression(path) {
+        if (path.node.computed) return;
+        const o = path.node.object;
+        const pr = path.node.property;
+        if (
+          t.isIdentifier(o) &&
+          o.name === accessor &&
+          t.isIdentifier(pr) &&
+          pr.name === name
+        ) {
+          path.replaceWith(t.identifier(paramName));
+          path.skip();
+        }
+      },
+      OptionalMemberExpression(path) {
+        if (path.node.computed) return;
+        const o = path.node.object;
+        const pr = path.node.property;
+        if (
+          t.isIdentifier(o) &&
+          o.name === accessor &&
+          t.isIdentifier(pr) &&
+          pr.name === name
+        ) {
+          path.replaceWith(t.identifier(paramName));
+          path.skip();
+        }
+      },
+    });
+  } catch {
+    // Defensive (D-08).
+  }
+}
+
+/**
+ * Build the per-state setter call.
+ *
+ *   - plain `=` with NO self-read of the same state  → `setName(rhs)`
+ *   - plain `=` whose RHS reads the SAME state        → `setName(prev => rhs')`
+ *     (functional updater; `rhs'` has the self-reads rewritten to `prev`)
+ *   - compound `+=` etc.                              → `setName(prev => prev OP rhs)`
+ *
+ * The functional-updater form for plain `=` (Pitfall 6, extended) is what
+ * keeps `$data.points = [...$data.points.slice(-19), next]` correct: React's
+ * `setX(value)` form captures the rendered-time `points`, so a setter pinned
+ * by `setInterval` rebuilds from a stale array forever. `setX(prev => ...)`
+ * always receives the current state. `accessor` selects which magic accessor
+ * counts as the self-reference ($data for state writes, $props for model
+ * writes).
  */
 function buildSetterCall(
   stateName: string,
   operator: string,
   rhs: t.Expression,
+  accessor: '$data' | '$props',
 ): t.CallExpression {
   const setterName = 'set' + capitalize(stateName);
   if (operator === '=') {
+    if (exprReadsAccessor(rhs, accessor, stateName)) {
+      // Functional updater — rewrite the self-reads to the `prev` param so the
+      // updater is concurrent-safe and free of stale-closure capture.
+      rewriteSelfReadsToParam(rhs, accessor, stateName, 'prev');
+      const arrow = t.arrowFunctionExpression([t.identifier('prev')], rhs);
+      return t.callExpression(t.identifier(setterName), [arrow]);
+    }
     return t.callExpression(t.identifier(setterName), [rhs]);
   }
   const binOp = COMPOUND_OP_MAP[operator];
@@ -196,16 +321,29 @@ export function rewriteRozieIdentifiers(
 
       if (obj.name === '$data') {
         if (!dataNames.has(prop.name)) return;
-        const setterCall = buildSetterCall(prop.name, node.operator, node.right);
+        const setterCall = buildSetterCall(
+          prop.name,
+          node.operator,
+          node.right,
+          '$data',
+        );
         path.replaceWith(setterCall);
         // No path.skip() — let traversal descend into the new arrow body so
-        // `$props.step` references inside `prev + $props.step` get rewritten.
+        // `$props.step` references inside `prev + $props.step` get rewritten,
+        // and so other-name `$data.Y` reads in a functional updater body still
+        // lower to their bare locals. Same-name `$data.X` reads were already
+        // replaced with the `prev` param by buildSetterCall.
         return;
       }
 
       if (obj.name === '$props') {
         if (!modelProps.has(prop.name)) return;
-        const setterCall = buildSetterCall(prop.name, node.operator, node.right);
+        const setterCall = buildSetterCall(
+          prop.name,
+          node.operator,
+          node.right,
+          '$props',
+        );
         path.replaceWith(setterCall);
         return;
       }

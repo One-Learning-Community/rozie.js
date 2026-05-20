@@ -36,8 +36,8 @@ export default function Dropdown(_props: DropdownProps): JSX.Element {
   const panelEl = useRef<HTMLDivElement | null>(null);
 
   const toggle = useCallback(() => {
-    setOpen(!open);
-  }, [open, setOpen]);
+    setOpen(prev => !prev);
+  }, [setOpen]);
   const close = useCallback(() => {
     setOpen(false);
   }, [setOpen]);
