@@ -64,6 +64,16 @@ export const EXAMPLES = [
   // editors to the same `$data.code` signal, so an edit in one round-
   // trips through the model emit path to the other.
   'CodeMirror',
+  // PortalListStyled (added 2026-05-20, quick-task 260520-8iu) — Spike 004
+  // string-`:style` + `@portal` VR coverage. Loader resolves to
+  // `examples/demos/PortalListStyledDemo.rozie` (which imports
+  // `../PortalListStyled.rozie`). The consumer fills the `@portal`-scoped
+  // `#item` slot with rows carrying BOTH an object-form `:style` (the
+  // `.swatch` color) and a dynamic-string `:style` (the `.row` opacity) —
+  // exercising the Part-A string-`:style` lowering visually, and giving the
+  // `@portal` primitive its visual/runtime VR coverage to complement the
+  // structural dist-parity coverage landed by 260519-vyv.
+  'PortalListStyled',
 ] as const;
 
 export type Example = (typeof EXAMPLES)[number];
@@ -96,6 +106,7 @@ export const LIT_TAGS: Record<Example, string> = {
   FullCalendar: 'rozie-full-calendar',
   LineChart: 'rozie-line-chart',
   CodeMirror: 'rozie-code-mirror',
+  PortalListStyled: 'rozie-portal-list-styled',
 };
 
 export interface HostQuery {
@@ -152,6 +163,8 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // CodeMirror wrapper itself takes `value` (model: true) / `theme` / etc.
   // but the demo wrapper is self-contained.
   CodeMirror: {},
+  // PortalListStyledDemo carries its 4-item array in <data>; no props needed.
+  PortalListStyled: {},
 };
 
 /**

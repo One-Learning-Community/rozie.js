@@ -49,6 +49,11 @@ const REFERENCE_BASENAMES = [
   // is loaded by the VR rig; same Angular `.rozie.ts` + cross-rozie shim
   // cleanup pattern as LineChart.
   'CodeMirror',
+  // PortalListStyled wrapper (added 2026-05-20, quick-task 260520-8iu).
+  // PortalListStyledDemo (in examples/demos/) is loaded by the VR rig;
+  // both write Angular `.rozie.ts` cache artefacts that the directory-glob
+  // cleanup below sweeps. Doc-parity entry — the cleanup is glob-driven.
+  'PortalListStyled',
 ];
 
 // Cross-tree disk-cache files emitted by the Angular sub-build into the
