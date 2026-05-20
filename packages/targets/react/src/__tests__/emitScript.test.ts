@@ -273,6 +273,116 @@ $watch(() => $props.type, () => { $data.instance = buildConfig() })
     // Counter has zero lifecycle + zero watchers, so the section should be empty.
     expect(lifecycleEffectsSection.trim()).toBe('');
   });
+
+  // ---------------------------------------------------------------------------
+  // Regression — debug session `react-watch-onunmount-emit` bug #14. A $watch
+  // whose callback's first param name COLLIDES with the getter's React-side
+  // identifier. `$watch(() => $data.open, (open) => …)` rewrites the getter
+  // `$data.open` to the bare `useState` binding `open`; the callback param is
+  // also `open`. The param-rebind `const <param> = <getter>;` then emitted a
+  // self-referential `const open = open;` — `ReferenceError: Cannot access
+  // 'open' before initialization` (TDZ) at render. Fix: skip the rebind when
+  // the rendered getter is textually identical to the param name (the body's
+  // reads resolve straight to the outer hook binding — a pure no-op rebind).
+  // ---------------------------------------------------------------------------
+  it('Bug #14: $watch param name colliding with a $data-backed getter emits NO self-referential const', () => {
+    const src = `<rozie name="WatchDataCollision">
+<data>{ open: false }</data>
+<script>
+$watch(() => $data.open, (open) => { console.log(open) })
+</script>
+<template><div /></template>
+</rozie>`;
+    const ir = lowerInline(src, 'WatchDataCollision');
+    const collectors = {
+      react: new ReactImportCollector(),
+      runtime: new RuntimeReactImportCollector(),
+    };
+    const { lifecycleEffectsSection } = emitScript(ir, collectors);
+    // The TDZ-throwing self-referential declaration MUST NOT appear.
+    expect(lifecycleEffectsSection).not.toMatch(/const\s+open\s*=\s*open\s*;/);
+    // The watcher still fires on `open` (the getter's dep).
+    expect(lifecycleEffectsSection).toMatch(/useEffect\([\s\S]*?,\s*\[open\]\s*\)/);
+    // The callback body reads `open` directly — resolves to the outer binding.
+    expect(lifecycleEffectsSection).toMatch(/console\.log\(open\)/);
+  });
+
+  it('Bug #14: $watch param name colliding with a $computed-backed getter emits NO self-referential const', () => {
+    const src = `<rozie name="WatchComputedCollision">
+<props>{ a: { type: Number, default: 1 } }</props>
+<script>
+const open = $computed(() => $props.a > 0)
+$watch(() => open, (open) => { console.log(open) })
+</script>
+<template><div /></template>
+</rozie>`;
+    const ir = lowerInline(src, 'WatchComputedCollision');
+    const collectors = {
+      react: new ReactImportCollector(),
+      runtime: new RuntimeReactImportCollector(),
+    };
+    const { lifecycleEffectsSection } = emitScript(ir, collectors);
+    expect(lifecycleEffectsSection).not.toMatch(/const\s+open\s*=\s*open\s*;/);
+    expect(lifecycleEffectsSection).toMatch(/useEffect\([\s\S]*?,\s*\[open\]\s*\)/);
+  });
+
+  it('Bug #14: a NON-colliding $watch param (getter rewrites to props.open) STILL emits the rebind', () => {
+    // Guard the fix's precision — when the getter rewrites to `props.open`
+    // (NOT a bare identifier) there is no collision, so the rebind
+    // `const open = props.open;` must be preserved.
+    const src = `<rozie name="WatchPropNoCollision">
+<props>{ open: { type: Boolean, default: false } }</props>
+<script>
+$watch(() => $props.open, (open) => { console.log(open) })
+</script>
+<template><div /></template>
+</rozie>`;
+    const ir = lowerInline(src, 'WatchPropNoCollision');
+    const collectors = {
+      react: new ReactImportCollector(),
+      runtime: new RuntimeReactImportCollector(),
+    };
+    const { lifecycleEffectsSection } = emitScript(ir, collectors);
+    expect(lifecycleEffectsSection).toMatch(/const\s+open\s*=\s*props\.open\s*;/);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Regression — debug session `react-watch-onunmount-emit` bug #15. A
+  // STANDALONE `$onUnmount(fn)` (not paired with a preceding `$onMount`) is a
+  // cleanup-only hook: `fn` must run on UNMOUNT. The IR carries the body in
+  // `lh.setup` with `lh.phase === 'unmount'`; the general lifecycle path
+  // treats `lh.setup` as the useEffect SETUP body (runs on mount), so a lone
+  // `$onUnmount` previously mis-lowered to `useEffect(() => { fn(); }, [fn])`
+  // — firing on MOUNT. Correct shape: `useEffect(() => () => { fn(); }, [])`.
+  // ---------------------------------------------------------------------------
+  it('Bug #15: a standalone $onUnmount lowers to a cleanup-only useEffect (returns the body, [] deps)', () => {
+    const src = `<rozie name="LoneUnmount">
+<data>{ ready: false }</data>
+<script>
+const teardown = () => { console.log('bye') }
+$onUnmount(() => { teardown() })
+</script>
+<template><div /></template>
+</rozie>`;
+    const ir = lowerInline(src, 'LoneUnmount');
+    const collectors = {
+      react: new ReactImportCollector(),
+      runtime: new RuntimeReactImportCollector(),
+    };
+    const { lifecycleEffectsSection } = emitScript(ir, collectors);
+    // Exactly one useEffect for the lone unmount hook.
+    const useEffectMatches = lifecycleEffectsSection.match(/useEffect\(/g) ?? [];
+    expect(useEffectMatches.length).toBe(1);
+    // The body must be RETURNED as a cleanup function — `return () => { … }`.
+    expect(lifecycleEffectsSection).toMatch(/useEffect\(\(\)\s*=>\s*\{\s*return\s*\(\)\s*=>\s*\{/);
+    // The teardown call lives inside the returned cleanup, not the setup body.
+    expect(lifecycleEffectsSection).toMatch(/return\s*\(\)\s*=>\s*\{[\s\S]*?teardown\(\)/);
+    // Empty dep array — registers once, fires once on unmount.
+    expect(lifecycleEffectsSection).toMatch(/,\s*\[\]\s*\)\s*;/);
+    // The teardown call MUST NOT appear as a bare setup-phase statement
+    // (i.e. directly inside the useEffect callback, before the `return`).
+    expect(lifecycleEffectsSection).not.toMatch(/useEffect\(\(\)\s*=>\s*\{\s*teardown\(\)/);
+  });
 });
 
 describe('emitPropsInterface — behavior', () => {

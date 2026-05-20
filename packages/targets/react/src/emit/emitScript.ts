@@ -1443,6 +1443,43 @@ export function emitScript(
   ir.lifecycle.forEach((lh, idx) => {
     collectors.react.add('useEffect');
     const paired = lifecyclePairing.perHook[idx];
+
+    // Bug #15 fix (260519 react-watch-onunmount-emit) — a STANDALONE
+    // `$onUnmount(fn)` (one not paired with a preceding `$onMount`) is a
+    // cleanup-only lifecycle hook: `fn` must run on UNMOUNT. The IR carries
+    // its body in `lh.setup` with `lh.phase === 'unmount'`. The general path
+    // below treats `lh.setup` as the useEffect SETUP body — which runs on
+    // MOUNT — so a lone `$onUnmount` previously mis-lowered to
+    // `useEffect(() => { fn(); }, [fn])` (fires on mount). The correct React
+    // shape is `useEffect(() => () => { fn(); }, [])`: an empty setup that
+    // RETURNS the body as the cleanup, with `[]` deps so it registers once
+    // and fires exactly once on unmount. This matches the five sibling
+    // targets (Vue `onBeforeUnmount(fn)`, Svelte/Solid `onMount` return,
+    // Angular `DestroyRef`, Lit `disconnectedCallback`).
+    if (lh.phase === 'unmount') {
+      const unmountCloned = paired?.setupCloned ?? lh.setup;
+      let unmountBody: string;
+      if (t.isIdentifier(unmountCloned)) {
+        unmountBody = `${unmountCloned.name}();`;
+      } else if (
+        t.isArrowFunctionExpression(unmountCloned) ||
+        t.isFunctionExpression(unmountCloned)
+      ) {
+        const fnBody = unmountCloned.body;
+        if (t.isBlockStatement(fnBody)) {
+          unmountBody = fnBody.body.map((s) => genCode(s)).join('\n    ');
+        } else {
+          unmountBody = genCode(fnBody) + ';';
+        }
+      } else {
+        unmountBody = genCode(unmountCloned) + ';';
+      }
+      lifecycleEffectLines.push(
+        `useEffect(() => {\n  return () => {\n    ${unmountBody}\n  };\n}, []);`,
+      );
+      return;
+    }
+
     // Use the rewritten setup/cleanup bodies (watched-prop reads replaced
     // with `_<X>Ref.current`) when the pre-compute pass produced them.
     // Falls back to the un-rewritten paired clone otherwise.
@@ -1652,11 +1689,26 @@ export function emitScript(
     // lowers to `useEffect(() => { const v = props.x; ... v }, [props.x])`.
     // useEffect callbacks don't receive args, so without this binding the
     // identifier `v` would resolve to nothing — body silently passes undefined.
+    //
+    // Bug #14 fix (260519 react-watch-onunmount-emit) — SKIP the rebind when
+    // the rendered getter expression is textually IDENTICAL to the param name.
+    // `$watch(() => $data.open, (open) => …)` rewrites the getter `$data.open`
+    // to the bare React-side identifier `open` (the `useState`/`useMemo`
+    // binding); the param is also named `open`. Emitting `const open = open;`
+    // is a self-referential declaration — the RHS `open` resolves to the
+    // not-yet-initialised `const open` (TDZ), throwing
+    // `ReferenceError: Cannot access 'open' before initialization` at render.
+    // When the getter already IS the param identifier the rebind is a pure
+    // no-op: the callback body's reads of `open` resolve straight to the outer
+    // hook binding, which holds exactly the watched value. So we drop it.
     const cbParams = paired?.callbackParams ?? [];
     const firstParam = cbParams[0];
+    const renderedGetter = renderGetterExpression(paired?.getterCloned ?? wh.getter);
     const paramBinding =
-      firstParam && t.isIdentifier(firstParam)
-        ? `const ${firstParam.name} = ${renderGetterExpression(paired?.getterCloned ?? wh.getter)};\n  `
+      firstParam &&
+      t.isIdentifier(firstParam) &&
+      renderedGetter !== firstParam.name
+        ? `const ${firstParam.name} = ${renderedGetter};\n  `
         : '';
 
     // Bug B fix (260519 linechart-watch-recreate) — the watcher useEffect's
