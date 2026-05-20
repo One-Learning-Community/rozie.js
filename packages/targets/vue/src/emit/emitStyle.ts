@@ -32,6 +32,17 @@ import type { StyleRule } from '../../../../core/src/ast/blocks/StyleAST.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { rewriteAllPortalBlocks } from '../../../../core/src/codegen/portalCss.js';
 
+/**
+ * Quick task 260520-bu7 — additional repeats of the portal scope attribute
+ * selector for cross-target CSS-specificity compensation.
+ *
+ * Vue: 1. A competing consumer scoped-CSS rule gets `[data-v-<hash>]` appended
+ * by Vue's `<style scoped>` compiler — one extra `(0,1,0)` specificity unit.
+ * Repeating the `@portal` scope attribute once matches that delta so the
+ * `@portal`-vs-consumer cascade resolves identically to the bare-attr targets.
+ */
+const PORTAL_SCOPE_REPEAT = 1;
+
 export interface EmitStyleResult {
   /** Body of the `<style scoped>` block — never null; empty string when no scoped rules. */
   scoped: string;
@@ -75,7 +86,7 @@ export function emitStyle(
   const scoped = stringifyRules(scopedRules, source);
   const global = rootRules.length > 0 ? stringifyRules(rootRules, source) : null;
 
-  const portalCss = rewriteAllPortalBlocks(portalRules, source, scopeHash);
+  const portalCss = rewriteAllPortalBlocks(portalRules, source, scopeHash, PORTAL_SCOPE_REPEAT);
   const portal = portalCss.length > 0 ? portalCss : null;
 
   return { scoped, global, portal, diagnostics };

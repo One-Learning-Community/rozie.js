@@ -93,7 +93,7 @@ export default function PortalListStyled(_props: PortalListStyledProps): JSX.Ele
       display: block;
       font-family: system-ui, -apple-system, sans-serif;
     }
-    [data-rozie-portal-item="18e5aac6"] ul {
+    [data-rozie-portal-item="18e5aac6"][data-rozie-portal-item="18e5aac6"] ul {
       list-style: none;
       margin: 0;
       padding: 0;
@@ -101,13 +101,13 @@ export default function PortalListStyled(_props: PortalListStyledProps): JSX.Ele
       border-radius: 6px;
       overflow: hidden;
     }
-    [data-rozie-portal-item="18e5aac6"] li {
+    [data-rozie-portal-item="18e5aac6"][data-rozie-portal-item="18e5aac6"] li {
       padding: 0.5rem 0.75rem;
     }
-    [data-rozie-portal-item="18e5aac6"] li + li {
+    [data-rozie-portal-item="18e5aac6"][data-rozie-portal-item="18e5aac6"] li + li {
       border-top: 1px solid rgba(0, 0, 0, 0.06);
     }
-    [data-rozie-portal-item="18e5aac6"] div {
+    [data-rozie-portal-item="18e5aac6"][data-rozie-portal-item="18e5aac6"] div {
       display: flex;
       align-items: center;
       gap: 0.5rem;

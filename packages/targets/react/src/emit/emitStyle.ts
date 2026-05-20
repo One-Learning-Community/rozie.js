@@ -46,6 +46,23 @@ import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js'
 import { scopeCss } from './scopeCss.js';
 import { rewriteAllPortalBlocks } from '../../../../core/src/codegen/portalCss.js';
 
+/**
+ * Quick task 260520-bu7 — additional repeats of the portal scope attribute
+ * selector for cross-target CSS-specificity compensation.
+ *
+ * React: 1. A competing consumer scoped-CSS rule is run through `scopeCss`,
+ * which appends `[data-rozie-s-<hash>]` to every selector — one extra
+ * `(0,1,0)` specificity unit (CSS Modules class-renaming is specificity-
+ * neutral, but Rozie's own `scopeCss` confinement layer is NOT). Repeating
+ * the `@portal` scope attribute once matches that delta so the
+ * `@portal`-vs-consumer cascade resolves identically to every other target.
+ *
+ * (The plan's first-guess `0` assumed CSS-Modules-only scoping; the VR
+ * matrix oracle in Task 2 corrected it once `scopeCss`'s consumer-rule
+ * `[data-rozie-s-*]` append was accounted for.)
+ */
+const PORTAL_SCOPE_REPEAT = 1;
+
 export interface EmitStyleResult {
   /** CSS body for the sibling `.module.css` file (D-53). Empty string when no scoped rules. */
   moduleCss: string;
@@ -89,7 +106,7 @@ export function emitStyle(
   // would append `[data-rozie-s-*]`) — the `[data-rozie-portal-<NAME>]`
   // attribute is their sole scoping. CSS Modules only hashes class names, so
   // bare attribute selectors survive the Vite pipeline untouched.
-  const portalCss = rewriteAllPortalBlocks(portalRules, source, scopeHash);
+  const portalCss = rewriteAllPortalBlocks(portalRules, source, scopeHash, PORTAL_SCOPE_REPEAT);
   const moduleCss = portalCss.length > 0
     ? (scopedModuleCss.length > 0 ? `${scopedModuleCss}\n${portalCss}` : portalCss)
     : scopedModuleCss;

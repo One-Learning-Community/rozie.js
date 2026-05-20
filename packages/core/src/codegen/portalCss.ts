@@ -21,6 +21,25 @@
  * Angular have no native scope-hash infra, so `computeScopeHash` here gives
  * them the identical FNV-1a value.
  *
+ * Cross-target specificity compensation (quick task 260520-bu7)
+ * ------------------------------------------------------------
+ * A competing CONSUMER component's scoped `<style>` rule receives a
+ * target-dependent specificity bump: React/Solid/Lit +0, Vue/Angular/Svelte
+ * +1 attribute unit (their scoped-CSS mechanism appends `[data-v-*]` /
+ * `[_ngcontent-*]` / `.svelte-*`). Left uncompensated, an `@portal`-vs-consumer
+ * cascade conflict resolves to a different winner per target — the VR matrix's
+ * D-10 byte-identity invariant catches this.
+ *
+ * The fix: each target's `emitStyle` passes a `scopeRepeat` count that repeats
+ * the portal scope attribute selector that many ADDITIONAL times
+ * (`[a="b"]` → `[a="b"][a="b"]`). Each repeat is a legal CSS attribute
+ * selector worth one `(0,1,0)` specificity unit, so the target adds the SAME
+ * delta to BOTH the `@portal` rule and the consumer rule — keeping
+ * `specificity(@portal) − specificity(consumer)` a target-invariant constant.
+ * `scopeRepeat = 0` (the default) is byte-identical to the pre-260520-bu7
+ * single-attribute output. The mechanism is plain repeated attribute
+ * selectors only — no `:not()`, `@layer`, or `!important`.
+ *
  * @experimental — shape may change before v1.0
  */
 import postcss from 'postcss';
@@ -78,9 +97,26 @@ export function portalAttrName(portalName: string): string {
 /**
  * Build the portal scope attribute selector prefix:
  * `[data-rozie-portal-<name>="<scopeHash>"]`.
+ *
+ * @param scopeRepeat - Number of ADDITIONAL repeats of the attribute selector
+ *                      (quick task 260520-bu7 specificity compensation). `0`
+ *                      (default) → `[a="b"]` (byte-identical to pre-260520-bu7);
+ *                      `1` → `[a="b"][a="b"]`; `2` → `[a="b"][a="b"][a="b"]`.
+ *                      Each repeat adds one `(0,1,0)` CSS specificity unit so a
+ *                      target can match the consumer-rule scoping bump its
+ *                      framework applies (Vue `[data-v-*]`, Angular
+ *                      `[_ngcontent-*]`, Svelte `.svelte-*`).
  */
-export function portalScopeSelector(portalName: string, scopeHash: string): string {
-  return `[${portalAttrName(portalName)}="${scopeHash}"]`;
+export function portalScopeSelector(
+  portalName: string,
+  scopeHash: string,
+  scopeRepeat = 0,
+): string {
+  const attr = `[${portalAttrName(portalName)}="${scopeHash}"]`;
+  // attr appears once + `scopeRepeat` additional times, concatenated with no
+  // separator so the result is a single compound attribute selector.
+  const repeats = scopeRepeat > 0 ? scopeRepeat : 0;
+  return attr.repeat(1 + repeats);
 }
 
 /**
@@ -108,15 +144,21 @@ function stringifyScopedRule(rule: Rule, prefix: string): string {
  * and re-parsed with postcss so nested at-rules (`@portal X { @media (...) {
  * ul {} } }`) are descended correctly — the prefix is applied only at the
  * bottom selector level. Returns `''` when the block is empty.
+ *
+ * @param scopeRepeat - Additional repeats of the portal scope attribute
+ *                      selector (quick task 260520-bu7). Threaded straight
+ *                      through to `portalScopeSelector`. `0` (default) is
+ *                      byte-identical to the pre-260520-bu7 output.
  */
 export function rewritePortalBlock(
   portalRule: StyleRule,
   source: string,
   scopeHash: string,
+  scopeRepeat = 0,
 ): string {
   const portalName = portalRule.portalName ?? '';
   if (portalName.length === 0) return '';
-  const prefix = portalScopeSelector(portalName, scopeHash);
+  const prefix = portalScopeSelector(portalName, scopeHash, scopeRepeat);
 
   // Byte-slice the whole `@portal NAME { ... }` block and re-parse just its
   // inner content. We strip the `@portal NAME {` header + trailing `}` so
@@ -160,15 +202,24 @@ export function rewritePortalBlock(
  * Rewrite every `portal-block` rule in a `StyleSection.portalRules` bucket
  * into a single CSS string, newline-joined. Returns `''` when there are no
  * portal blocks.
+ *
+ * @param scopeRepeat - Additional repeats of the portal scope attribute
+ *                      selector (quick task 260520-bu7 specificity
+ *                      compensation). Each target's `emitStyle` owns its own
+ *                      per-target count (a local `PORTAL_SCOPE_REPEAT`
+ *                      constant) and threads it here. `0` (default) is
+ *                      byte-identical to the pre-260520-bu7 output, keeping
+ *                      back-compat for any caller not yet threading it.
  */
 export function rewriteAllPortalBlocks(
   portalRules: readonly StyleRule[],
   source: string,
   scopeHash: string,
+  scopeRepeat = 0,
 ): string {
   if (portalRules.length === 0) return '';
   return portalRules
-    .map((rule) => rewritePortalBlock(rule, source, scopeHash))
+    .map((rule) => rewritePortalBlock(rule, source, scopeHash, scopeRepeat))
     .filter((s) => s.length > 0)
     .join('\n');
 }

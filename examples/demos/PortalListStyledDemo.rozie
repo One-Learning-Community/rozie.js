@@ -50,15 +50,17 @@
 /*
   `.row` is the row container the engine's `@portal item div { display:flex }`
   rule (in PortalListStyled.rozie) targets — it IS the descendant `div` of the
-  portal-scoped cell node, so the flex layout + gap lands here. The spike's
-  source demo additionally set `.row { display: contents }`, which collapsed
-  the row box and made the `@portal` flex rule a no-op; worse, the resulting
-  cascade resolved differently per target (Angular's `:host ::ng-deep` portal
-  selectors out-specify the demo's scoped `.row`, the other five do not),
-  breaking the VR matrix's D-10 cross-target byte-identity invariant. Dropping
-  the redundant `display` declaration lets the single `@portal` flex rule win
-  identically on all six targets — the spike's intended row layout.
+  portal-scoped cell node. This `display: contents` declaration is the
+  INTENTIONAL cross-target CSS-specificity regression case: it competes with
+  the wrapper's `@portal item { div { display: flex } }` rule on the same
+  element. Quick task 260520-bu7 makes `specificity(@portal) − specificity(.row)`
+  a target-invariant constant (each target's emitStyle adds a matching scope-
+  attribute-repeat delta), so the `@portal` flex rule wins identically on all
+  six targets and the VR matrix D-10 byte-identity invariant holds.
 */
+.row {
+  display: contents;
+}
 .swatch {
   display: inline-block;
   width: 12px;

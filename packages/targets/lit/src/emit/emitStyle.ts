@@ -26,6 +26,23 @@ import { toKebabCase } from './emitDecorator.js';
 import { scopeCss } from './scopeCss.js';
 import { rewriteAllPortalBlocks } from '../../../../core/src/codegen/portalCss.js';
 
+/**
+ * Quick task 260520-bu7 — additional repeats of the portal scope attribute
+ * selector for cross-target CSS-specificity compensation.
+ *
+ * Lit: 1. A competing consumer scoped-CSS rule is run through `scopeCss`
+ * (Phase 07.6 consumer-scoping confinement), which appends
+ * `[data-rozie-s-<hash>]` to every selector — one extra `(0,1,0)` specificity
+ * unit. Repeating the `@portal` scope attribute once matches that delta so
+ * the `@portal`-vs-consumer cascade resolves identically to every other
+ * target.
+ *
+ * (The plan's first-guess `0` assumed shadow-DOM with no consumer rewrite;
+ * the VR matrix oracle in Task 2 corrected it once `scopeCss`'s consumer-rule
+ * `[data-rozie-s-*]` append was accounted for.)
+ */
+const PORTAL_SCOPE_REPEAT = 1;
+
 export interface EmitStyleOpts {
   componentName: string;
   lit: LitImportCollector;
@@ -99,7 +116,7 @@ export function emitStyle(
   // this component's shadow tree, which IS where the engine appends children
   // (via the shadow-DOM-rooted `_ref__rozieRoot` query). The
   // [data-rozie-portal-<NAME>="<hash>"] attribute reaches the engine subtree.
-  const portalCss = rewriteAllPortalBlocks(portalRules, source, opts.scopeHash ?? '');
+  const portalCss = rewriteAllPortalBlocks(portalRules, source, opts.scopeHash ?? '', PORTAL_SCOPE_REPEAT);
   const combinedScoped = portalCss.length > 0
     ? (scopedCss.length > 0 ? `${scopedCss}\n${portalCss}` : portalCss)
     : scopedCss;

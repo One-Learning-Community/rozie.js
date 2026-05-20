@@ -28,6 +28,20 @@ import type { StyleRule } from '../../../../core/src/ast/blocks/StyleAST.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { rewriteAllPortalBlocks } from '../../../../core/src/codegen/portalCss.js';
 
+/**
+ * Quick task 260520-bu7 — additional repeats of the portal scope attribute
+ * selector for cross-target CSS-specificity compensation.
+ *
+ * Svelte: 1. A competing consumer scoped-CSS rule gets a `.svelte-<hash>`
+ * scope class appended — one extra `(0,1,0)` specificity unit — so the
+ * `@portal` scope attribute is repeated once to match.
+ *
+ * FIRST GUESS — the VR matrix D-10 byte-identity is the oracle (Task 2).
+ * Svelte 5 MAY wrap the scope class in `:where()` (which contributes `(0,0,0)`);
+ * if so this should drop to 0. The VR run confirms or corrects this value.
+ */
+const PORTAL_SCOPE_REPEAT = 1;
+
 export interface EmitStyleResult {
   /** Body of the single `<style>` block (joined scoped + :global(:root) + @portal rules). */
   block: string;
@@ -62,7 +76,7 @@ export function emitStyle(
   const rootRules = styles.rootRules as StyleRule[];
   const portalRules = (styles.portalRules ?? []) as StyleRule[];
 
-  const portalCss = rewriteAllPortalBlocks(portalRules, source, scopeHash);
+  const portalCss = rewriteAllPortalBlocks(portalRules, source, scopeHash, PORTAL_SCOPE_REPEAT);
 
   if (scopedRules.length === 0 && rootRules.length === 0 && portalCss.length === 0) {
     return { block: '', diagnostics };

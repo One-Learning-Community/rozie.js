@@ -28,6 +28,21 @@ import type { StyleRule } from '../../../../core/src/ast/blocks/StyleAST.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { rewriteAllPortalBlocks } from '../../../../core/src/codegen/portalCss.js';
 
+/**
+ * Quick task 260520-bu7 — additional repeats of the portal scope attribute
+ * selector for cross-target CSS-specificity compensation.
+ *
+ * Angular: 0. A competing consumer scoped-CSS rule gets `[_ngcontent-<hash>]`
+ * appended by emulated view encapsulation (+1 unit) — BUT the `@portal` rule
+ * here is wrapped `:host ::ng-deep`, and `:host` ALREADY contributes one
+ * `(0,1,0)` unit. That `:host` unit compensates the consumer's `[_ngcontent-*]`
+ * bump, so no extra attribute repeat is needed.
+ *
+ * FIRST GUESS — the VR matrix D-10 byte-identity is the oracle (Task 2). If
+ * `:host ::ng-deep` does NOT fully compensate, this bumps to a non-zero count.
+ */
+const PORTAL_SCOPE_REPEAT = 0;
+
 export interface EmitStyleResult {
   /**
    * Concatenated CSS body (scoped rules + ::ng-deep :root block when present).
@@ -67,7 +82,7 @@ export function emitStyle(
 
   // Spike 004 — @portal rules go in a SEPARATE styles entry, each selector
   // wrapped `:host ::ng-deep` to pierce Angular's view encapsulation.
-  const portalCss = rewriteAllPortalBlocks(portalRules, source, scopeHash);
+  const portalCss = rewriteAllPortalBlocks(portalRules, source, scopeHash, PORTAL_SCOPE_REPEAT);
   const portalStylesEntry = portalCss.length > 0 ? wrapPortalSelectors(portalCss) : '';
 
   if (scopedRules.length === 0 && rootRules.length === 0 && portalStylesEntry.length === 0) {
