@@ -832,14 +832,23 @@ export function emitScript(
         ? cbArg.params.length
         : 0;
     const callArg = cbParamCount > 0 ? '__watchVal' : '';
+    // Bug B fix (260519 linechart-watch-recreate) — the callback runs inside
+    // `untracked(...)` (from @angular/core) so its reads — including transitive
+    // ones via a helper call like `buildConfig()` reading `$props.data` — do
+    // NOT join the watcher effect's dependency set. The getter is still invoked
+    // in the tracking scope so its reads subscribe the effect; only those reads
+    // define what re-runs the watcher — matching Vue's `watch(getter, cb)` and
+    // Solid's untrack-wrapped $watch callback (commit e57df14).
     lifecycleConstructorLines.push(
-      `effect(() => { const __watchVal = (${getterCode})(); (${cbCode})(${callArg}); });`,
+      `effect(() => { const __watchVal = (${getterCode})(); untracked(() => (${cbCode})(${callArg})); });`,
     );
   }
   // Ensure `effect` is on the @angular/core import list when at least one
   // watcher exists (covers the case where the IR has no $onUpdate hook).
+  // `untracked` is paired with `effect` for the Bug B $watch callback wrap.
   if (ir.watchers.length > 0) {
     imports.add('effect');
+    imports.add('untracked');
   }
 
   // 9. Build residual user-script body — methods/arrows go at CLASS level

@@ -223,7 +223,7 @@ describe('emitScript — Quick 260515-u2b $watch lowering', () => {
     return lowerToIR(parsed.ast!, { modifierRegistry: createDefaultRegistry() }).ir!;
   }
 
-  it('emits `effect(() => { const __watchVal = (getter)(); (cb)(); });` for a 0-param callback (TS2554-safe)', () => {
+  it('emits `effect(() => { const __watchVal = (getter)(); untracked(() => (cb)()); });` for a 0-param callback (TS2554-safe)', () => {
     // 0-param `() => ...` cb: passing __watchVal would be runtime-safe but TS2554
     // ("Expected 0 arguments, but got 1") in `tsc --noEmit` — bind no arg.
     const src = `<rozie name="Synth">
@@ -237,11 +237,16 @@ $watch(() => $props.open, () => { console.log('fired') })
     const { classBody, imports } = emitScript(ir);
     // __watchVal is still computed (we keep the binding shape consistent),
     // but the callback receives NO arg when it declares zero params.
-    expect(classBody).toMatch(/effect\(\(\) => \{ const __watchVal = \([\s\S]+?\)\(\); \([\s\S]+?\)\(\); \}\);/);
+    //
+    // Bug B fix (260519 linechart-watch-recreate) — the callback runs inside
+    // `untracked(...)` so its reads (and transitive helper reads) DON'T join
+    // the watcher effect's dependency set; only the getter defines re-runs.
+    expect(classBody).toMatch(/effect\(\(\) => \{ const __watchVal = \([\s\S]+?\)\(\); untracked\(\(\) => \([\s\S]+?\)\(\)\); \}\);/);
     expect(imports.has('effect')).toBe(true);
+    expect(imports.has('untracked')).toBe(true);
   });
 
-  it('emits `effect(() => { const __watchVal = (getter)(); (cb)(__watchVal); });` for a (v) => callback', () => {
+  it('emits `effect(() => { const __watchVal = (getter)(); untracked(() => (cb)(__watchVal)); });` for a (v) => callback', () => {
     // (v) => ...` cb: pass __watchVal so the user-authored param actually
     // receives the getter's evaluated value.
     const src = `<rozie name="Synth">
@@ -253,8 +258,12 @@ $watch(() => $props.open, (v) => { console.log('fired', v) })
 </rozie>`;
     const ir = lowerSrc(src);
     const { classBody, imports } = emitScript(ir);
-    expect(classBody).toMatch(/effect\(\(\) => \{ const __watchVal = \([\s\S]+?\)\(\); \([\s\S]+?\)\(__watchVal\); \}\);/);
+    // Bug B fix (260519 linechart-watch-recreate) — the callback is invoked
+    // with __watchVal as its first arg, inside an `untracked(...)` wrapper so
+    // its reads don't subscribe the watcher effect; only the getter does.
+    expect(classBody).toMatch(/effect\(\(\) => \{ const __watchVal = \([\s\S]+?\)\(\); untracked\(\(\) => \([\s\S]+?\)\(__watchVal\)\); \}\);/);
     expect(imports.has('effect')).toBe(true);
+    expect(imports.has('untracked')).toBe(true);
   });
 
   it('emits no effect() call AND no `effect` import when there are zero watchers AND no $onUpdate', () => {

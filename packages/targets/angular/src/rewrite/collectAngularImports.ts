@@ -45,6 +45,14 @@ export type AngularCoreImport =
   | 'ContentChild'
   | 'TemplateRef'
   /**
+   * Bug B fix (260519 linechart-watch-recreate): `untracked` — wraps the
+   * $watch callback invocation inside the watcher `effect()` so the
+   * callback's reactive reads (and transitive helper reads) don't join the
+   * effect's dependency set. Added by emitScript alongside `effect` whenever
+   * the IR declares at least one watcher.
+   */
+  | 'untracked'
+  /**
    * Phase 07.2 Plan 04 (R5 dynamic-name): `ViewChild` — captures the
    * synthetic `<ng-template #__dynSlot_<N>>` declared inside a consumer's
    * component-tag body so the templates getter can resolve it for
