@@ -1,0 +1,137 @@
+<rozie name="PortalListStyledScss">
+
+<props>
+{
+  items: { type: Array, default: () => [] }
+}
+</props>
+
+<script>
+// Tiny inline "engine" — same shape as examples/PortalList.rozie but
+// with the inline-style ceremony removed. The engine now just creates
+// structural DOM; cosmetic styling is the wrapper's <style> block's job.
+//
+// Destruction order still matters: dispose all cells BEFORE removing
+// the structural container (same constraint as FullCalendar / AG-Grid).
+class MiniListEngine {
+  constructor(rootEl, opts) {
+    this.rootEl = rootEl
+    this.items = opts.items
+    this.cellRenderer = opts.cellRenderer
+    this.disposers = []
+    this._mount()
+  }
+  _mount() {
+    const ul = document.createElement('ul')
+    for (const item of this.items) {
+      const li = document.createElement('li')
+      const cell = this.cellRenderer(item)
+      li.appendChild(cell.node)
+      this.disposers.push(cell.dispose)
+      ul.appendChild(li)
+    }
+    this.rootEl.appendChild(ul)
+  }
+  destroy() {
+    for (const dispose of this.disposers) dispose()
+    this.disposers = []
+    while (this.rootEl.firstChild) this.rootEl.removeChild(this.rootEl.firstChild)
+  }
+}
+
+let instance = null
+
+$onMount(() => {
+  instance = new MiniListEngine($el, {
+    items: $props.items,
+    cellRenderer: (item) => {
+      const node = document.createElement('div')
+      const dispose = $portals.item(node, { item })
+      return { node, dispose }
+    },
+  })
+  return () => instance?.destroy()
+})
+</script>
+
+<template>
+<div class="rozie-portal-list">
+  <slot name="item" portal :params="['item']" />
+</div>
+</template>
+
+<style lang="scss">
+// SCSS proving fixture (Phase 10). Exercises every SPEC-required SCSS
+// feature in one legible component-library-style stylesheet: $variables
+// for design tokens, a @mixin / @include for a repeated pattern, nesting
+// for structure, and an & parent-ref for a hover state — plus the :root
+// custom-property escape hatch and the @portal item {} at-rule.
+//
+// Values are kept simple and integer-ish (plain hex, px/rem integers). The
+// deprecated Sass color-adjustment functions are deliberately avoided —
+// they emit warnings and their decimal output drifts across dart-sass patch
+// versions, threatening the dist-parity byte gate.
+
+$radius: 6px;
+$divider: #ededed;
+$hover-bg: #f5f5f5;
+
+@mixin reset-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --rozie-portal-list-gap: 8px;
+  --rozie-portal-list-fg: #1a1a1a;
+}
+
+.rozie-portal-list {
+  display: block;
+  font-family: system-ui, -apple-system, sans-serif;
+  color: var(--rozie-portal-list-fg);
+
+  ul {
+    @include reset-list;
+    border: 1px solid $divider;
+    border-radius: $radius;
+  }
+}
+
+/*
+  @portal item — Spike 004 feature.
+
+  Every selector inside this block is rewritten at emit time to be
+  prefixed with [data-rozie-portal-item="<scopeHash>"]. The portal
+  closure adds the matching attribute to the engine-owned cell
+  container at mount time, so the selectors cascade through the
+  engine subtree.
+
+  The nested & hover state below proves SCSS nesting flattens
+  correctly inside the @portal at-rule.
+*/
+@portal item {
+  ul {
+    @include reset-list;
+    overflow: hidden;
+  }
+  li {
+    padding: 0.5rem 0.75rem;
+
+    & + li {
+      border-top: 1px solid $divider;
+    }
+    &:hover {
+      background: $hover-bg;
+    }
+  }
+  div {
+    display: flex;
+    align-items: center;
+    gap: var(--rozie-portal-list-gap);
+  }
+}
+</style>
+
+</rozie>
