@@ -136,13 +136,63 @@ function renderTsType(ann: PropTypeAnnotation): string {
       case 'Array': return 'any[]';
       case 'Object': return 'any';
       case 'Function': return '((...args: unknown[]) => unknown) | null';
-      default: return 'unknown';
+      // A non-builtin identifier is a bare type name referencing a type alias
+      // / interface declared in the component's `<script lang="ts">` block
+      // (those declarations are module-hoisted on this class-based target).
+      // Pass it through verbatim — exactly as the other five targets do — so
+      // the consumer's type-checker sees the real type instead of `unknown`.
+      default: return ann.name;
     }
   }
   if (ann.kind === 'union') {
     return ann.members.map(renderTsType).join(' | ');
   }
   return 'unknown';
+}
+
+/**
+ * True iff `ann` is a builtin identifier type whose `renderDefault` fallback
+ * yields a real zero-value (Number→0, String→'', Boolean→false, Array→[],
+ * Object→{}, Function→null). For these, the field can keep the
+ * `name: type = <zero>;` initializer form. For a custom identifier type (a
+ * `<script lang="ts">` alias / interface) there is NO synthesizable zero —
+ * `renderDefault` falls through to its `'undefined'` tail — so a default-less
+ * field of that type must use the definite-assignment `name!: Type;` form.
+ */
+function isBuiltinWithZeroValue(ann: PropTypeAnnotation): boolean {
+  if (ann.kind !== 'identifier') return false;
+  switch (ann.name) {
+    case 'Number':
+    case 'String':
+    case 'Boolean':
+    case 'Array':
+    case 'Object':
+    case 'Function':
+      return true;
+    default:
+      return false;
+  }
+}
+
+/**
+ * Render a class-field declaration suffix for a prop.
+ *
+ *   - When a real default is synthesizable (an author `default:` expression,
+ *     or a builtin type with a zero-value) → `: <tsType> = <default>`.
+ *   - When NO default is synthesizable (a required custom-typed prop with no
+ *     author `default:`) → `!: <tsType>` (definite-assignment, no initializer).
+ *     `<tsType> = undefined` would be a tsc error since `undefined` is not
+ *     assignable to a custom type. This is the same `!`-shape Rozie already
+ *     emits for Angular `@Input` and Lit `@query` ref fields.
+ */
+function renderFieldSuffix(prop: PropDecl): string {
+  const tsType = renderTsType(prop.typeAnnotation);
+  const hasSynthesizableDefault =
+    prop.defaultValue != null || isBuiltinWithZeroValue(prop.typeAnnotation);
+  if (hasSynthesizableDefault) {
+    return `: ${tsType} = ${renderDefault(prop.defaultValue, prop.typeAnnotation)}`;
+  }
+  return `!: ${tsType}`;
 }
 
 function isPrimitiveType(ann: PropTypeAnnotation): boolean {
@@ -188,11 +238,12 @@ function renderDefault(expr: t.Expression | null, ann: PropTypeAnnotation): stri
 
 function emitNonModelProp(prop: PropDecl): string {
   const litType = renderType(prop.typeAnnotation);
-  const tsType = renderTsType(prop.typeAnnotation);
   const reflect = isPrimitiveType(prop.typeAnnotation);
   const reflectField = reflect ? ', reflect: true' : '';
-  const defaultStr = renderDefault(prop.defaultValue, prop.typeAnnotation);
-  return `  @property({ type: ${litType}${reflectField} }) ${prop.name}: ${tsType} = ${defaultStr};`;
+  // `fieldSuffix` is either `: <type> = <default>` (real/zero-value default)
+  // or `!: <type>` (required custom-typed prop with no synthesizable default).
+  const fieldSuffix = renderFieldSuffix(prop);
+  return `  @property({ type: ${litType}${reflectField} }) ${prop.name}${fieldSuffix};`;
 }
 
 interface ModelPropEmit {
@@ -214,8 +265,17 @@ function emitModelProp(prop: PropDecl, componentName: string): ModelPropEmit {
 
   // We emit an @property attribute mirror, plus a private controllable backing.
   // Public getter/setter goes into methodDecls.
+  //
+  // The `_<name>_attr` FIELD DECLARATION takes the definite-assignment form
+  // when no default is synthesizable (a required custom-typed model prop) —
+  // `_x_attr: Custom = undefined` is a tsc error. The
+  // `createLitControllableProperty` `defaultValue:` arg and the `coerce`
+  // expression below still consume the literal `defaultStr` (they need a
+  // runtime value, not a `!`-form) — for a custom type that is the string
+  // `'undefined'`, the pre-existing behavior, out of scope to change here.
+  const attrFieldSuffix = renderFieldSuffix(prop);
   const fieldDecl = [
-    `  @property({ type: ${litType}${reflectField}, attribute: '${attrName}' }) _${prop.name}_attr: ${tsType} = ${defaultStr};`,
+    `  @property({ type: ${litType}${reflectField}, attribute: '${attrName}' }) _${prop.name}_attr${attrFieldSuffix};`,
     `  private _${prop.name}Controllable = createLitControllableProperty<${tsType}>({ host: this, eventName: '${eventName}', defaultValue: ${defaultStr}, initialControlledValue: undefined });`,
   ].join('\n');
 
