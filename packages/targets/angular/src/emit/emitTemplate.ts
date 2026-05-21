@@ -53,7 +53,48 @@ export interface EmitTemplateResult {
    * the synthetic `__dynSlot_<N>` template-ref capture + outlet dispatch.
    */
   hasDynamicSlotFiller: boolean;
+  /**
+   * Quick task 260520-w18 bug class 6(ii) — well-known JS global namespaces
+   * (`Math`, `JSON`, …) referenced inside template expressions. Angular's
+   * `strictTemplates` resolves bare template identifiers against the
+   * component instance, so `{{ Math.round(x) }}` is a TS2339 unless the
+   * component exposes `Math` as a member. `emitAngular` adds a
+   * `protected readonly Math = Math;` field for each entry here.
+   */
+  usedGlobals: string[];
   diagnostics: Diagnostic[];
+}
+
+/**
+ * Well-known JS global namespaces that may legitimately appear in a `.rozie`
+ * template expression (`{{ Math.round(f.size / 1024) }}`). When detected, the
+ * Angular component must expose them as members so `strictTemplates` resolves
+ * the reference. Quick task 260520-w18 bug class 6(ii).
+ */
+const KNOWN_TEMPLATE_GLOBALS: readonly string[] = [
+  'Math',
+  'JSON',
+  'Number',
+  'Object',
+  'Array',
+  'Date',
+  'String',
+  'Boolean',
+];
+
+/**
+ * Scan an emitted Angular template string for `<Global>.` member-access usage
+ * (e.g. `Math.round(...)`). Returns the subset of KNOWN_TEMPLATE_GLOBALS that
+ * appear as a namespace, de-duplicated. The regex requires a word boundary
+ * before the name so `customMath.x` does not falsely match `Math`.
+ */
+function detectUsedGlobals(template: string): string[] {
+  const found: string[] = [];
+  for (const g of KNOWN_TEMPLATE_GLOBALS) {
+    const re = new RegExp(`(?<![\\w$.])${g}\\s*\\.`);
+    if (re.test(template)) found.push(g);
+  }
+  return found;
 }
 
 export function emitTemplate(
@@ -72,6 +113,7 @@ export function emitTemplate(
       scriptInjections,
       hasNgModel: false,
       hasDynamicSlotFiller: false,
+      usedGlobals: [],
       diagnostics,
     };
   }
@@ -97,6 +139,7 @@ export function emitTemplate(
     scriptInjections,
     hasNgModel: hasNgModel.value,
     hasDynamicSlotFiller: hasDynamicSlotFiller.value,
+    usedGlobals: detectUsedGlobals(template),
     diagnostics,
   };
 }

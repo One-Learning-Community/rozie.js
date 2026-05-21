@@ -249,6 +249,248 @@ function collectUserMethodNames(program: File): Set<string> {
 }
 
 /**
+ * Quick task 260520-w18 bug class 5 — Angular signal double-call narrowing.
+ *
+ * A `$props.X` / `$data.X` referenced TWICE in one function lowers to two
+ * independent `this.X()` signal calls. TS narrowing does not survive across
+ * two separate call expressions, so a guarded `if ($props.itemKey) … item[$props.itemKey]`
+ * still sees `string | null` at the index (TS2538), and
+ * `$props.allowedFileTypes ? $props.allowedFileTypes.join(',') : null` sees
+ * `… | null` at `.join` (TS2531).
+ *
+ * The idiomatic fix is to read the signal ONCE into a local. This pre-pass
+ * runs BEFORE the magic-accessor rewrite: for every function whose body is a
+ * BlockStatement, it counts the non-computed `$props.X` / `$data.X` reads that
+ * occur DIRECTLY in that function's own scope (descent stops at nested
+ * function boundaries — a later-running callback must keep reading the live
+ * signal). When the same accessor is read 2+ times read-only, it hoists a
+ * `const __<X> = $props.<X>;` at the top of the block and rewrites every
+ * occurrence to the bare `__<X>` identifier. The hoisted declarator's
+ * `$props.<X>` initializer then flows through the normal MemberExpression
+ * rewrite below and becomes `const __X = this.X();` — a single signal read
+ * the rest of the body narrows against.
+ *
+ * Scope discipline keeps this from disturbing already-clean reference
+ * examples: Counter's `$props.value += $props.step` reads each accessor once,
+ * Dropdown / Modal / SearchInput / TodoList have no in-function double reads.
+ */
+export function hoistDoubleReadAccessors(program: File): void {
+  // Walk one function body's OWN scope (not nested functions) collecting
+  // read-only $props.X / $data.X MemberExpressions, keyed by `$accessor.name`.
+  function collectInScope(
+    node: t.Node,
+    found: Map<string, t.MemberExpression[]>,
+  ): void {
+    // Stop at nested function boundaries — their reads belong to a different
+    // (possibly later-running) scope.
+    if (
+      t.isFunctionDeclaration(node) ||
+      t.isFunctionExpression(node) ||
+      t.isArrowFunctionExpression(node) ||
+      t.isObjectMethod(node) ||
+      t.isClassMethod(node)
+    ) {
+      return;
+    }
+    if (
+      t.isMemberExpression(node) &&
+      !node.computed &&
+      t.isIdentifier(node.object) &&
+      (node.object.name === '$props' || node.object.name === '$data') &&
+      t.isIdentifier(node.property)
+    ) {
+      const key = `${node.object.name}.${node.property.name}`;
+      const list = found.get(key) ?? [];
+      list.push(node);
+      found.set(key, list);
+      // Do NOT descend — $props.X has no rewritable children for this purpose.
+      return;
+    }
+    // Recurse into children.
+    for (const key of Object.keys(node)) {
+      if (key === 'loc' || key === 'leadingComments' || key === 'trailingComments') {
+        continue;
+      }
+      const child = (node as unknown as Record<string, unknown>)[key];
+      if (Array.isArray(child)) {
+        for (const c of child) {
+          if (c && typeof c === 'object' && 'type' in c) {
+            collectInScope(c as t.Node, found);
+          }
+        }
+      } else if (child && typeof child === 'object' && 'type' in child) {
+        collectInScope(child as t.Node, found);
+      }
+    }
+  }
+
+  // True when the given MemberExpression is the LHS of an AssignmentExpression
+  // anywhere in the body — model writes / `$data.X = …` must NOT be hoisted.
+  function isAssignedAnywhere(
+    node: t.Node,
+    accessor: string,
+    name: string,
+  ): boolean {
+    let assigned = false;
+    function walk(n: t.Node): void {
+      if (assigned) return;
+      if (t.isAssignmentExpression(n)) {
+        const l = n.left;
+        if (
+          t.isMemberExpression(l) &&
+          !l.computed &&
+          t.isIdentifier(l.object) &&
+          l.object.name === accessor &&
+          t.isIdentifier(l.property) &&
+          l.property.name === name
+        ) {
+          assigned = true;
+          return;
+        }
+      }
+      for (const key of Object.keys(n)) {
+        if (key === 'loc') continue;
+        const child = (n as unknown as Record<string, unknown>)[key];
+        if (Array.isArray(child)) {
+          for (const c of child) {
+            if (c && typeof c === 'object' && 'type' in c) walk(c as t.Node);
+          }
+        } else if (child && typeof child === 'object' && 'type' in child) {
+          walk(child as t.Node);
+        }
+      }
+    }
+    walk(node);
+    return assigned;
+  }
+
+  // Replace every occurrence of `$accessor.name` in `body` (own scope only)
+  // with `Identifier(localName)`.
+  function replaceInScope(
+    node: t.Node,
+    accessor: string,
+    name: string,
+    localName: string,
+  ): void {
+    if (
+      t.isFunctionDeclaration(node) ||
+      t.isFunctionExpression(node) ||
+      t.isArrowFunctionExpression(node) ||
+      t.isObjectMethod(node) ||
+      t.isClassMethod(node)
+    ) {
+      // Still descend into nested functions — the hoisted const is in their
+      // closure scope, so replacing the read with the local keeps the single
+      // narrowed value. (Nested functions inside `keyFor` etc. are rare; this
+      // keeps the rewrite consistent when they DO appear.)
+    }
+    for (const key of Object.keys(node)) {
+      if (key === 'loc') continue;
+      const child = (node as unknown as Record<string, unknown>)[key];
+      if (Array.isArray(child)) {
+        for (let i = 0; i < child.length; i++) {
+          const c = child[i];
+          if (c && typeof c === 'object' && 'type' in c) {
+            const cn = c as t.Node;
+            if (
+              t.isMemberExpression(cn) &&
+              !cn.computed &&
+              t.isIdentifier(cn.object) &&
+              cn.object.name === accessor &&
+              t.isIdentifier(cn.property) &&
+              cn.property.name === name
+            ) {
+              child[i] = t.identifier(localName);
+            } else {
+              replaceInScope(cn, accessor, name, localName);
+            }
+          }
+        }
+      } else if (child && typeof child === 'object' && 'type' in child) {
+        const cn = child as t.Node;
+        if (
+          t.isMemberExpression(cn) &&
+          !cn.computed &&
+          t.isIdentifier(cn.object) &&
+          cn.object.name === accessor &&
+          t.isIdentifier(cn.property) &&
+          cn.property.name === name
+        ) {
+          (node as unknown as Record<string, unknown>)[key] = t.identifier(
+            localName,
+          );
+        } else {
+          replaceInScope(cn, accessor, name, localName);
+        }
+      }
+    }
+  }
+
+  // Process a single function-body BlockStatement: hoist double-read accessors.
+  function processBlock(block: t.BlockStatement): void {
+    const found = new Map<string, t.MemberExpression[]>();
+    for (const stmt of block.body) {
+      collectInScope(stmt, found);
+    }
+    const hoists: t.Statement[] = [];
+    for (const [key, occurrences] of found) {
+      if (occurrences.length < 2) continue;
+      const dotIdx = key.indexOf('.');
+      const accessor = key.slice(0, dotIdx);
+      const name = key.slice(dotIdx + 1);
+      // Skip accessors that are also ASSIGNED in the body — single-reading a
+      // mutated value would change semantics.
+      if (isAssignedAnywhere(block, accessor, name)) continue;
+      const localName = `__${name}`;
+      // Hoist `const __X = $props.X;` — the initializer flows through the
+      // normal $props.X → this.X() lowering downstream.
+      hoists.push(
+        t.variableDeclaration('const', [
+          t.variableDeclarator(
+            t.identifier(localName),
+            t.memberExpression(
+              t.identifier(accessor),
+              t.identifier(name),
+            ),
+          ),
+        ]),
+      );
+      replaceInScope(block, accessor, name, localName);
+    }
+    if (hoists.length > 0) {
+      block.body.unshift(...hoists);
+    }
+  }
+
+  // Visit every function body in the Program.
+  function visit(node: t.Node): void {
+    if (
+      (t.isFunctionDeclaration(node) ||
+        t.isFunctionExpression(node) ||
+        t.isArrowFunctionExpression(node) ||
+        t.isObjectMethod(node) ||
+        t.isClassMethod(node)) &&
+      t.isBlockStatement(node.body)
+    ) {
+      processBlock(node.body);
+    }
+    for (const key of Object.keys(node)) {
+      if (key === 'loc') continue;
+      const child = (node as unknown as Record<string, unknown>)[key];
+      if (Array.isArray(child)) {
+        for (const c of child) {
+          if (c && typeof c === 'object' && 'type' in c) visit(c as t.Node);
+        }
+      } else if (child && typeof child === 'object' && 'type' in child) {
+        visit(child as t.Node);
+      }
+    }
+  }
+
+  visit(program.program);
+}
+
+/**
  * Rewrite Rozie magic-accessor identifiers in-place on a cloned Program.
  *
  * Strategy: single-pass @babel/traverse with multiple visitors. Replacements
@@ -260,6 +502,11 @@ export function rewriteRozieIdentifiers(
   ir: IRComponent,
 ): RewriteScriptResult {
   const diagnostics: Diagnostic[] = [];
+
+  // Quick task 260520-w18 bug class 5 — the double-read accessor hoist is
+  // run by emitScript BEFORE pairClonedLifecycle (which slices lifecycle
+  // hook bodies). Running it here would be too late: a hoisted `const`
+  // unshifted after the slice would not survive into the lifecycle copy.
 
   const modelProps = new Set(ir.props.filter((p) => p.isModel).map((p) => p.name));
   const nonModelProps = new Set(ir.props.filter((p) => !p.isModel).map((p) => p.name));

@@ -280,6 +280,11 @@ export function emitAngular(
   const allFieldInjections: string[] = [
     ...listenersResult.fieldInitializers.map((fi) => fi.decl),
     ...tmplResult.scriptInjections.map((si) => si.decl),
+    // Quick task 260520-w18 bug class 6(ii) — expose well-known JS global
+    // namespaces referenced in template expressions (e.g. `Math.round(...)`)
+    // as component members so Angular's `strictTemplates` resolves them
+    // against the class instead of failing TS2339.
+    ...tmplResult.usedGlobals.map((g) => `protected readonly ${g} = ${g};`),
   ];
 
   // Find the constructor block and splice the listener effects + renderer

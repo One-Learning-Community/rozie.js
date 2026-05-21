@@ -54,7 +54,10 @@ import type {
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { cloneScriptProgram } from '../rewrite/cloneProgram.js';
 import { partitionUserImports } from '../rewrite/partitionUserImports.js';
-import { rewriteRozieIdentifiers } from '../rewrite/rewriteScript.js';
+import {
+  rewriteRozieIdentifiers,
+  hoistDoubleReadAccessors,
+} from '../rewrite/rewriteScript.js';
 import { sanitizeEventName } from '../rewrite/sanitizeEventName.js';
 import {
   AngularImportCollector,
@@ -607,6 +610,15 @@ export function emitScript(
       ? userImportNodes.map((imp) => genCode(imp)).join('\n') + '\n'
       : '';
 
+  // 1c. Quick task 260520-w18 bug class 5 — hoist double-read $props/$data
+  //     accessors to a single signal-read local. MUST run BEFORE
+  //     pairClonedLifecycle: that pass slices `$onMount` bodies into a fresh
+  //     statement array, so a `const __X` unshifted afterwards would not
+  //     survive into the lifecycle copy. Running it here, on the shared
+  //     statement nodes, means both the top-level body and the sliced
+  //     lifecycle bodies see the hoist.
+  hoistDoubleReadAccessors(cloned);
+
   // 2. Pair lifecycle hooks BEFORE rewriting identifiers — pairClonedLifecycle
   //    looks for top-level `$onMount(IDENTIFIER)` patterns; the rewrite would
   //    otherwise convert bare Identifier names like `lockScroll` to
@@ -666,7 +678,16 @@ export function emitScript(
   // 6b. State signals.
   for (const s of ir.state) {
     const initText = genCode(s.initializer);
-    fieldLines.push(`${s.name} = signal(${initText});`);
+    // Quick task 260520-w18 bug class 2/6(iii) — an empty-array `<data>`
+    // initializer (`files: []`) types as `signal<never[]>`, so
+    // `files().map(f => f.id)` fails TS2339 and an `@for` over `files()`
+    // types its loop variable as `never`. Annotate the empty-array literal
+    // case as `signal<any[]>([])`. Mirrors the React/Vue/Svelte fix.
+    const signalTypeArg =
+      t.isArrayExpression(s.initializer) && s.initializer.elements.length === 0
+        ? '<any[]>'
+        : '';
+    fieldLines.push(`${s.name} = signal${signalTypeArg}(${initText});`);
   }
 
   // 6c. RefDecls — viewChild signals.

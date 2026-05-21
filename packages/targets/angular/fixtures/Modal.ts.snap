@@ -34,7 +34,7 @@ interface FooterCtx {
             <h2>{{ title() }}</h2>
           
     }
-          <button class="close-btn" aria-label="Close" (click)="_close($event)">×</button>
+          <button class="close-btn" aria-label="Close" (click)="_close()">×</button>
         </header>
     }<div class="modal-body">
           <ng-container *ngTemplateOutlet="(defaultTpl ?? templates()?.['defaultSlot']); context: { $implicit: { close: _close }, close: _close }" />

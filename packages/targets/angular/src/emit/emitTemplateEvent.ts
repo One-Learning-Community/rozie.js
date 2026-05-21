@@ -257,8 +257,23 @@ export function emitTemplateEvent(
   //   (eventName)="handler($event)" or (eventName)="<expr>"
   let attrValue: string;
   if (inlineGuards.length === 0 && handlerKind === 'identifier') {
-    // Short form: `(click)="handler($event)"`
-    attrValue = `${handlerRef}($event)`;
+    // Short form: `(click)="handler($event)"`.
+    // Quick task 260520-w18 bug class 6(i) — when the bound handler is a
+    // 0-arg user method/arrow (e.g. TipTap's `toggleBold = () => …`),
+    // passing `$event` is a strictTemplates TS2554 (expected 0, got 1).
+    // Look up the original user handler's arity and drop `$event` for
+    // 0-arg handlers. Debounce/throttle wrap names also have
+    // `handlerKind: 'identifier'` but their original `listener.handler` is
+    // not a bare Identifier, so `originalName` is undefined and the arg is
+    // kept (the IIFE wrapper takes `...args`).
+    const originalName = t.isIdentifier(listener.handler)
+      ? listener.handler.name
+      : undefined;
+    const arity =
+      originalName !== undefined
+        ? ctx.handlerArity?.get(originalName)
+        : undefined;
+    attrValue = arity === 0 ? `${handlerRef}()` : `${handlerRef}($event)`;
   } else if (inlineGuards.length === 0 && handlerKind === 'statement') {
     // Statement-form handler — splice as-is (e.g., `closeOnBackdrop && close()`).
     attrValue = handlerRef;
