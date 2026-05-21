@@ -145,6 +145,35 @@ function annotateUntypedParams(
   }
 }
 
+/**
+ * WR-01 ROOT CAUSE 2 — render a `VariableDeclarator` `id`'s author type
+ * annotation as a `": <Type>"` suffix string (empty when the id is untyped).
+ * Used by the class-field rebuild site so an author declarator annotation
+ * (`const f: (e: MouseEvent) => void = …`) survives onto the emitted field.
+ */
+function renderDeclaratorTypeSuffix(id: t.LVal): string {
+  if (!t.isIdentifier(id)) return '';
+  const ann = id.typeAnnotation;
+  if (!ann || !t.isTSTypeAnnotation(ann)) return '';
+  // @babel/generator cannot print a bare `TSTypeAnnotation` (its printer
+  // dereferences a parent that no longer exists). Print the INNER type node
+  // and prepend the `: ` ourselves.
+  return `: ${genCode(ann.typeAnnotation)}`;
+}
+
+/**
+ * WR-01 ROOT CAUSE 1 — true when a `VariableDeclarator` `id` carries a genuine
+ * FUNCTION-type annotation. When true, the arrow `init`'s params are
+ * contextually typed by that annotation and must NOT be `: any`-stamped. A
+ * non-function annotation does not contextually type params.
+ */
+function declaratorHasFunctionType(id: t.LVal): boolean {
+  if (!t.isIdentifier(id)) return false;
+  const ann = id.typeAnnotation;
+  if (!ann || !t.isTSTypeAnnotation(ann)) return false;
+  return t.isTSFunctionType(ann.typeAnnotation);
+}
+
 /** Render a PropTypeAnnotation as a TS type string. */
 function renderType(ann: PropTypeAnnotation): string {
   if (ann.kind === 'identifier') {
@@ -966,11 +995,23 @@ export function emitScript(
           t.isArrowFunctionExpression(d.init) ||
           t.isFunctionExpression(d.init)
         ) {
-          // Emit as class-level arrow field. Bug 2: annotate un-typed params
-          // with `: any` so the lifted field typechecks under `strict`.
-          annotateUntypedParams(d.init.params);
+          // Emit as class-level arrow field. WR-01 ROOT CAUSE 2: a declarator
+          // type annotation (`const f: (e: MouseEvent) => void = …`) must
+          // survive onto the class field — `${d.id.name} = …` alone drops it.
+          // Re-emit it as `f: (e: MouseEvent) => void = …`. When that
+          // annotation is a genuine FUNCTION type, the arrow's params are
+          // contextually typed by it, so do NOT `annotateUntypedParams` — a
+          // `: any` fill would override the author's types (and core's
+          // typeNeutralizeScript already left them bare for this shape).
+          // Otherwise (Bug 2 path, including a non-function declarator
+          // annotation) annotate un-typed params with `: any` so the lifted
+          // field typechecks under `strict`.
+          const declTypeSuffix = renderDeclaratorTypeSuffix(d.id);
+          if (!declaratorHasFunctionType(d.id)) {
+            annotateUntypedParams(d.init.params);
+          }
           const arrowCode = genCode(d.init);
-          classMethodLines.push(`${d.id.name} = ${arrowCode};`);
+          classMethodLines.push(`${d.id.name}${declTypeSuffix} = ${arrowCode};`);
         } else {
           // Primitive / other init — emit as class-level field too. Class fields
           // initialized at field declaration time match user intent ("this is

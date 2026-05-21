@@ -91,6 +91,31 @@ const traverse: TraverseFn =
 const anyAnnotation = (): t.TSTypeAnnotation =>
   t.tsTypeAnnotation(t.tsAnyKeyword());
 
+/**
+ * True when `fn` (an arrow or function expression) is CONTEXTUALLY typed by
+ * the annotation on the `id` of its enclosing `VariableDeclarator` — i.e. the
+ * declaration is `const f: (a: A) => R = (a) => {…}`. In that shape the
+ * declarator's function-type annotation supplies the types of `a` (and the
+ * return), so the arrow's params are NOT untyped residue — stamping `: any` on
+ * them would *override* the contextual typing and silently discard the
+ * author's `A`.
+ *
+ * Precision: this is true ONLY when the declarator's `id.typeAnnotation` is a
+ * genuine function type (`TSFunctionType`). A non-function declarator
+ * annotation — `const f: SomeObject = (a) => {…}` (a type error the author
+ * owns) — does NOT contextually type the params, so it must NOT suppress the
+ * `: any` fill. Constructor types (`TSConstructorType`) are deliberately out of
+ * scope: a `new`-able type does not contextually type a plain arrow.
+ */
+function isContextuallyTypedByDeclarator(path: { parent: t.Node }): boolean {
+  const parent = path.parent;
+  if (!t.isVariableDeclarator(parent)) return false;
+  if (!t.isIdentifier(parent.id)) return false;
+  const ann = parent.id.typeAnnotation;
+  if (!ann || !t.isTSTypeAnnotation(ann)) return false;
+  return t.isTSFunctionType(ann.typeAnnotation);
+}
+
 /** A fresh `: any[]` annotation node — used for rest params (`...args`). */
 const anyArrayAnnotation = (): t.TSTypeAnnotation =>
   t.tsTypeAnnotation(t.tsArrayType(t.tsAnyKeyword()));
@@ -157,6 +182,22 @@ export function typeNeutralizeScript(
     // FunctionExpression, FunctionDeclaration, ObjectMethod, ClassMethod,
     // and ClassPrivateMethod — i.e. every params-bearing node.
     Function(path) {
+      // ROOT CAUSE 1 (WR-01 adjacent): when an arrow / function expression is
+      // the `init` of a `VariableDeclarator` whose `id` carries a function-type
+      // annotation — `const f: (e: MouseEvent) => void = (e) => {…}` — the
+      // arrow's params are CONTEXTUALLY typed by that declarator annotation.
+      // They are not untyped residue; stamping `: any` would override the
+      // author's `MouseEvent` and silently drop it. Leave such params bare so
+      // the contextual typing survives. (A param the author typed DIRECTLY —
+      // `const f = (e: MouseEvent) => {…}` — is already left alone by
+      // `annotateParam`'s `typeAnnotation` guard; that path is unaffected.)
+      if (
+        (t.isArrowFunctionExpression(path.node) ||
+          t.isFunctionExpression(path.node)) &&
+        isContextuallyTypedByDeclarator(path)
+      ) {
+        return;
+      }
       for (const param of path.node.params) annotateParam(param);
     },
 

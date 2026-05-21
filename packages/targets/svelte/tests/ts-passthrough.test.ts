@@ -129,3 +129,24 @@ describe('Svelte ts-passthrough — untyped emit byte-identity anchor', () => {
     expect(code).toContain('<script lang="ts">');
   });
 });
+
+// WR-01 + ROOT CAUSE 1 regression — a callback typed via its DECLARATOR ID
+// (`const f: (e: MouseEvent) => void = (e) => {…}`) must keep the author's
+// `MouseEvent`: typeNeutralizeScript must NOT `: any`-stamp the contextually-
+// typed param (which would override the author's type).
+const DECLARATOR_TYPED_SRC = `<rozie name="DeclTyped">
+<script lang="ts">
+const onMove: (e: MouseEvent) => void = (e) => { document.title = String(e.clientX); };
+</script>
+<template><button @mousemove="onMove">go</button></template>
+</rozie>`;
+
+describe('ts-passthrough — declarator-id-typed callback (WR-01 / ROOT CAUSE 1)', () => {
+  it('keeps the author MouseEvent: declarator annotation survives, param stays bare', () => {
+    const code = compile(DECLARATOR_TYPED_SRC);
+    expect(code).toContain('onMove: (e: MouseEvent) => void');
+    // The param must NOT be `: any`-stamped — it is contextually typed by the
+    // declarator annotation. A typo `e.clientXX` would then be a tsc error.
+    expect(code).not.toMatch(/\be: any\b/);
+  });
+});

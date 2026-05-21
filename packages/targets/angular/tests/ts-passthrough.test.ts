@@ -138,3 +138,26 @@ describe('Angular <script lang="ts"> passthrough — Plan 09-04', () => {
     expect(code).toMatchSnapshot();
   });
 });
+
+// WR-01 + ROOT CAUSE 1 regression — a callback typed via its DECLARATOR ID
+// (`const f: (e: MouseEvent) => void = (e) => {…}`) must keep the author's
+// `MouseEvent`. The arrow becomes a class field; the field rebuild must
+// re-emit the declarator annotation (`f: (e: MouseEvent) => void = …`) — it is
+// the sole type carrier once typeNeutralizeScript correctly leaves the
+// contextually-typed param bare instead of `: any`-stamping it.
+const DECLARATOR_TYPED_SRC = `<rozie name="DeclTyped">
+<script lang="ts">
+const onMove: (e: MouseEvent) => void = (e) => { document.title = String(e.clientX); };
+</script>
+<template><button @mousemove="onMove">go</button></template>
+</rozie>`;
+
+describe('ts-passthrough — declarator-id-typed callback (WR-01 / ROOT CAUSE 1+2)', () => {
+  it('keeps the author MouseEvent: declarator annotation survives onto the class field', () => {
+    const code = compileSource(DECLARATOR_TYPED_SRC, 'DeclTyped.rozie');
+    expect(code).toContain('onMove: (e: MouseEvent) => void');
+    // The param must NOT be `: any`-stamped — it is contextually typed by the
+    // class-field annotation. A typo `e.clientXX` would then be a tsc error.
+    expect(code).not.toMatch(/\be: any\b/);
+  });
+});

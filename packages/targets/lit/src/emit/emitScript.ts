@@ -449,6 +449,22 @@ function classifyWatcherRoute(
  * statements inside the field-init for a private dummy (rare and benign for
  * code-library audience).
  */
+/**
+ * WR-01 ROOT CAUSE 2 — render a `VariableDeclarator` `id`'s author type
+ * annotation as a `": <Type>"` suffix string (empty when the id is untyped).
+ * Used by the class-field rebuild site so an author declarator annotation
+ * (`const f: (e: MouseEvent) => void = …`) survives onto the emitted field.
+ */
+function renderDeclaratorTypeSuffix(id: t.LVal): string {
+  if (!t.isIdentifier(id)) return '';
+  const ann = id.typeAnnotation;
+  if (!ann || !t.isTSTypeAnnotation(ann)) return '';
+  // @babel/generator cannot print a bare `TSTypeAnnotation` (its printer
+  // dereferences a parent that no longer exists). Print the INNER type node
+  // and prepend the `: ` ourselves.
+  return `: ${generate(ann.typeAnnotation, GEN_OPTS).code}`;
+}
+
 function classBodyFromStatements(
   stmts: t.Statement[],
   computedNames: Set<string>,
@@ -493,9 +509,16 @@ function classBodyFromStatements(
           t.isArrowFunctionExpression(decl.init) ||
           t.isFunctionExpression(decl.init)
         ) {
-          // Render as `name = (args) => body;` (preserves arrow lexical this)
+          // Render as `name = (args) => body;` (preserves arrow lexical this).
+          // WR-01 ROOT CAUSE 2: a declarator type annotation
+          // (`const f: (e: MouseEvent) => void = …`) must survive onto the
+          // class field — `${name} = …` alone drops it. For a declarator-typed
+          // callback the field annotation is the sole type carrier (core's
+          // typeNeutralizeScript leaves the contextually-typed params bare), so
+          // re-emit it as `f: (e: MouseEvent) => void = …`.
           const code = renderExpression(decl.init);
-          methodChunks.push(`  ${name} = ${code};`);
+          const declTypeSuffix = renderDeclaratorTypeSuffix(decl.id);
+          methodChunks.push(`  ${name}${declTypeSuffix} = ${code};`);
           continue;
         }
 

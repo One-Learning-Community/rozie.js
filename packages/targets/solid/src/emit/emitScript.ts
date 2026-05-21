@@ -109,6 +109,13 @@ function tryHoistArrowToFunction(stmt: t.Statement): t.Statement | null {
   );
 
   const fn = t.functionDeclaration(decl.id, params, body, false, init.async ?? false);
+  // WR-01 ROOT CAUSE 2 — `function f() {}` cannot carry a type annotation on
+  // its `id`, so hoisting `const f: (e: MouseEvent) => void = (e) => {…}` would
+  // drop the author's declarator annotation. Re-project the declarator's
+  // function-type onto the hoisted FunctionDeclaration's params + returnType so
+  // the author's types survive (and the hoist — which fixes a real TDZ — is
+  // preserved).
+  reprojectDeclaratorFunctionType(decl.id, init, fn);
   // Inherit the original statement's `loc` + attached comments onto the
   // synthetic FunctionDeclaration. Without this the new node has no source
   // position, so @babel/generator (a) drops any user `<script>` comments
@@ -117,6 +124,53 @@ function tryHoistArrowToFunction(stmt: t.Statement): t.Statement | null {
   // emitScript generates code + map in a single pass over `filteredStmts`,
   // so the synthetic node must carry position metadata.
   return t.inherits(fn, stmt);
+}
+
+/**
+ * WR-01 ROOT CAUSE 2 — re-project an author function-type annotation written
+ * on a `VariableDeclarator` `id` (`const f: (e: E) => R = …`) onto a rebuilt
+ * `FunctionDeclaration` (which has no annotatable `id`). Each declarator-type
+ * parameter type is copied onto the matching positional param of `fn`; the
+ * declarator-type return type becomes `fn.returnType`.
+ *
+ * Idempotent / conservative: only fills a param that has NO `typeAnnotation`
+ * already, and only when `id.typeAnnotation` is genuinely a `TSFunctionType`.
+ */
+function reprojectDeclaratorFunctionType(
+  id: t.Identifier,
+  init: t.ArrowFunctionExpression | t.FunctionExpression,
+  fn: t.FunctionDeclaration,
+): void {
+  if (init.returnType) fn.returnType = init.returnType;
+  if (init.typeParameters && !t.isNoop(init.typeParameters)) {
+    fn.typeParameters = init.typeParameters;
+  }
+  const ann = id.typeAnnotation;
+  if (!ann || !t.isTSTypeAnnotation(ann)) return;
+  const fnType = ann.typeAnnotation;
+  if (!t.isTSFunctionType(fnType)) return;
+  if (!fn.returnType && fnType.typeAnnotation) {
+    fn.returnType = fnType.typeAnnotation;
+  }
+  const declParams = fnType.parameters;
+  for (let i = 0; i < fn.params.length && i < declParams.length; i++) {
+    const target = fn.params[i]!;
+    const sourceParam = declParams[i]!;
+    const sourceAnn =
+      t.isIdentifier(sourceParam) || t.isRestElement(sourceParam)
+        ? sourceParam.typeAnnotation
+        : undefined;
+    if (!sourceAnn || !t.isTSTypeAnnotation(sourceAnn)) continue;
+    if (
+      (t.isIdentifier(target) ||
+        t.isObjectPattern(target) ||
+        t.isArrayPattern(target) ||
+        t.isRestElement(target)) &&
+      !target.typeAnnotation
+    ) {
+      target.typeAnnotation = t.cloneNode(sourceAnn, true);
+    }
+  }
 }
 
 export interface EmitScriptResult {

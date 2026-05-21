@@ -255,7 +255,32 @@ function tryWrapEscapingHelperUseCallback(
 
   const arrowSource = genCode(initToEmit);
 
-  return `${destructurePrefix}const ${helperName} = useCallback(${arrowSource}, ${depsLiteral});`;
+  // WR-01 ROOT CAUSE 2 — the `useCallback` wrap rebuilds the declaration as a
+  // string from `helperName`, which drops a declarator-id type annotation
+  // (`const handleClick: (e: MouseEvent) => void = …`). Re-emit that
+  // annotation onto the `const` so the author's contextual typing survives the
+  // wrap. (typeNeutralizeScript already leaves the arrow's params bare for the
+  // declarator-typed shape, so `: (e: MouseEvent) => void` on the const is the
+  // sole — and sufficient — carrier.)
+  const declTypeSuffix = renderDeclaratorTypeSuffix(decl.id);
+
+  return `${destructurePrefix}const ${helperName}${declTypeSuffix} = useCallback(${arrowSource}, ${depsLiteral});`;
+}
+
+/**
+ * WR-01 ROOT CAUSE 2 helper — render a `VariableDeclarator` `id`'s author type
+ * annotation as a `": <Type>"` suffix string (empty when the id is untyped).
+ * Used by the `const`-preserving rebuild sites (`useCallback` wrap) so an
+ * author declarator annotation survives a string-template rebuild.
+ */
+function renderDeclaratorTypeSuffix(id: t.LVal): string {
+  if (!t.isIdentifier(id)) return '';
+  const ann = id.typeAnnotation;
+  if (!ann || !t.isTSTypeAnnotation(ann)) return '';
+  // @babel/generator cannot print a bare `TSTypeAnnotation` (its printer
+  // dereferences a parent that no longer exists → "Cannot read properties of
+  // null"). Print the INNER type node and prepend the `: ` ourselves.
+  return `: ${genCode(ann.typeAnnotation)}`;
 }
 
 /**
@@ -527,7 +552,67 @@ function tryHoistArrowToFunction(stmt: t.Statement): t.Statement | null {
   // scope; a future maintainer adding return-type / generic support must
   // copy `init.returnType` / `init.typeParameters` onto `fn` here.
   const fn = t.functionDeclaration(decl.id, params, body, false, init.async ?? false);
+  // WR-01 ROOT CAUSE 2 — `function f() {}` cannot carry a type annotation on
+  // its `id`, so hoisting `const f: (e: MouseEvent) => void = (e) => {…}` would
+  // drop the author's declarator annotation. Re-project the declarator's
+  // function-type onto the hoisted FunctionDeclaration's params + returnType so
+  // the author's types survive (and the hoist — which fixes a real TDZ — is
+  // preserved). `init`'s OWN returnType/typeParameters are also carried so a
+  // future return-type/generics surface expansion is covered.
+  reprojectDeclaratorFunctionType(decl.id, init, fn);
   return fn;
+}
+
+/**
+ * WR-01 ROOT CAUSE 2 — re-project an author function-type annotation written
+ * on a `VariableDeclarator` `id` (`const f: (e: E) => R = …`) onto a rebuilt
+ * `FunctionDeclaration` (which has no annotatable `id`). Each declarator-type
+ * parameter type is copied onto the matching positional param of `fn`; the
+ * declarator-type return type becomes `fn.returnType`.
+ *
+ * Idempotent / conservative: only fills a param that has NO `typeAnnotation`
+ * already (a directly-typed param wins), and only when `id.typeAnnotation` is
+ * genuinely a `TSFunctionType`. `init`'s own `returnType`/`typeParameters`
+ * (rare on an arrow but legal) are carried first so nothing is lost.
+ */
+function reprojectDeclaratorFunctionType(
+  id: t.Identifier,
+  init: t.ArrowFunctionExpression | t.FunctionExpression,
+  fn: t.FunctionDeclaration,
+): void {
+  // Carry the arrow's own type metadata (defensive — usually absent).
+  if (init.returnType) fn.returnType = init.returnType;
+  if (init.typeParameters && !t.isNoop(init.typeParameters)) {
+    fn.typeParameters = init.typeParameters;
+  }
+  const ann = id.typeAnnotation;
+  if (!ann || !t.isTSTypeAnnotation(ann)) return;
+  const fnType = ann.typeAnnotation;
+  if (!t.isTSFunctionType(fnType)) return;
+  // Return type: declarator wins only when the arrow didn't declare its own.
+  if (!fn.returnType && fnType.typeAnnotation) {
+    fn.returnType = fnType.typeAnnotation;
+  }
+  // Param types: positional copy onto bare params.
+  const declParams = fnType.parameters;
+  for (let i = 0; i < fn.params.length && i < declParams.length; i++) {
+    const target = fn.params[i]!;
+    const sourceParam = declParams[i]!;
+    const sourceAnn =
+      t.isIdentifier(sourceParam) || t.isRestElement(sourceParam)
+        ? sourceParam.typeAnnotation
+        : undefined;
+    if (!sourceAnn || !t.isTSTypeAnnotation(sourceAnn)) continue;
+    if (
+      (t.isIdentifier(target) ||
+        t.isObjectPattern(target) ||
+        t.isArrayPattern(target) ||
+        t.isRestElement(target)) &&
+      !target.typeAnnotation
+    ) {
+      target.typeAnnotation = t.cloneNode(sourceAnn, true);
+    }
+  }
 }
 
 function capitalize(name: string): string {

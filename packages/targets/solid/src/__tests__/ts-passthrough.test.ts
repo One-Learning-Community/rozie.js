@@ -123,3 +123,27 @@ describe('Solid ts-passthrough — untyped emit byte-identity anchor', () => {
     expect(code).toMatchSnapshot('untyped-tsx-anchor');
   });
 });
+
+// WR-01 + ROOT CAUSE 1 regression — a callback typed via its DECLARATOR ID
+// (`const f: (e: MouseEvent) => void = (e) => {…}`) must keep the author's
+// `MouseEvent`. Solid hoists top-level `const` arrows to `function`
+// declarations; the hoist must re-project the declarator function-type's
+// param + return types onto the rebuilt FunctionDeclaration (a `function`'s
+// `id` cannot carry a type annotation), and typeNeutralizeScript must NOT
+// `: any`-stamp the contextually-typed param.
+const DECLARATOR_TYPED_SRC = `<rozie name="DeclTyped">
+<script lang="ts">
+const onMove: (e: MouseEvent) => void = (e) => { document.title = String(e.clientX); };
+</script>
+<template><button @mousemove="onMove">go</button></template>
+</rozie>`;
+
+describe('Solid ts-passthrough — declarator-id-typed callback (WR-01 / ROOT CAUSE 1+2)', () => {
+  it('keeps the author MouseEvent: hoisted function carries the re-projected param type', () => {
+    const code = compile(DECLARATOR_TYPED_SRC);
+    // The declarator function-type's param + return survive onto the hoist.
+    expect(code).toContain('function onMove(e: MouseEvent): void');
+    // The param must NOT be `: any`-stamped.
+    expect(code).not.toMatch(/\be: any\b/);
+  });
+});
