@@ -52,8 +52,18 @@ export interface EmitEventCtx {
 export interface ScriptInjection {
   /** Wrap variable name, e.g. `debouncedOnSearch`. */
   wrapName: string;
-  /** Import descriptor — emitVue dedupes across multiple injections. */
-  import: { from: '@rozie/runtime-vue'; name: 'debounce' | 'throttle' | 'useOutsideClick' };
+  /**
+   * Import descriptor — emitVue dedupes across multiple injections.
+   *
+   * Phase 11 plan 11-06: the `r-match` hoist path (D-04) synthesizes a
+   * `computed` injection whose helper is imported from `'vue'` (not
+   * `@rozie/runtime-vue`). The `from` union therefore carries both module
+   * sources; `mergeScriptInjections` already emits one import line per
+   * distinct `from`, so a `'vue'`-sourced `computed` flows through unchanged.
+   */
+  import:
+    | { from: '@rozie/runtime-vue'; name: 'debounce' | 'throttle' | 'useOutsideClick' }
+    | { from: 'vue'; name: 'computed' };
   /** Full `const wrapName = helper(handler, ...args);` declaration. */
   decl: string;
 }
