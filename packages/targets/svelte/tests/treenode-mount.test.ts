@@ -24,6 +24,19 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+// Static imports — formerly dynamic `await import()` calls inside the it()
+// bodies. Under turbo's parallel suite runs the cold TS transform of core's
+// module graph starved and the Stage-1 test exceeded vitest's 5s per-test
+// timeout (intermittent react/svelte/angular failures). Hoisting moves the
+// transform cost into the file-collection phase, matching the rest of the repo.
+import { parse } from '../../../core/src/parse.js';
+import { lowerToIR } from '../../../core/src/ir/lower.js';
+import { createDefaultRegistry } from '../../../core/src/modifiers/registerBuiltins.js';
+import { emitSvelte } from '../src/emitSvelte.js';
+import * as svelteCompiler from 'svelte/compiler';
+import * as svelteInternalClient from 'svelte/internal/client';
+import 'svelte/internal/disclose-version';
+import * as svelte from 'svelte';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const TREE_NODE_ROZIE = resolve(__dirname, '../../../../examples/TreeNode.rozie');
@@ -48,14 +61,7 @@ const FIXTURE_3_LEVEL: TreeNodeData = {
 
 describe('TreeNode browser-mount (Svelte) — Phase 06.2 P3 COMP-05', () => {
   // Stage 1 — emit-side canonical idiom assertions.
-  it('emitted Svelte component carries the canonical self-import idiom (D-117)', async () => {
-    const { parse } = await import('../../../core/src/parse.js');
-    const { lowerToIR } = await import('../../../core/src/ir/lower.js');
-    const { createDefaultRegistry } = await import(
-      '../../../core/src/modifiers/registerBuiltins.js'
-    );
-    const { emitSvelte } = await import('../src/emitSvelte.js');
-
+  it('emitted Svelte component carries the canonical self-import idiom (D-117)', () => {
     const src = readFileSync(TREE_NODE_ROZIE, 'utf8');
     const parsed = parse(src, { filename: 'TreeNode.rozie' });
     if (!parsed.ast) throw new Error('parse failed');
@@ -86,11 +92,6 @@ describe('TreeNode browser-mount (Svelte) — Phase 06.2 P3 COMP-05', () => {
   // imports — Vite/Rollup defer those resolutions to runtime, which the
   // hand-authored source compiles down to via Svelte's compiler.
   it('renders 3-level recursive tree with all labels in DOM', async () => {
-    const compiler = await import('svelte/compiler');
-    const svelteInternalClient = await import('svelte/internal/client');
-    await import('svelte/internal/disclose-version');
-    const svelte = await import('svelte');
-
     // Hand-authored mirror of TreeNode.svelte's recursive shape.
     // (Same as what `emitSvelte(treeNodeIR)` produces — the structural test
     // above already verifies that the emitted source carries this shape.)
@@ -109,7 +110,7 @@ describe('TreeNode browser-mount (Svelte) — Phase 06.2 P3 COMP-05', () => {
     </ul>
   {/if}
 </div>`;
-    const compiled = compiler.compile(treeSource, {
+    const compiled = svelteCompiler.compile(treeSource, {
       generate: 'client',
       filename: 'TreeNode.svelte',
       runes: true,

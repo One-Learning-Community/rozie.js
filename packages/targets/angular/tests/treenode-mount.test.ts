@@ -33,6 +33,15 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+// Static imports — formerly dynamic `await import()` calls inside the it()
+// body. Under turbo's parallel suite runs the cold TS transform of core's
+// module graph starved and the Stage-1 test exceeded vitest's 5s per-test
+// timeout (intermittent react/svelte/angular failures). Hoisting moves the
+// transform cost into the file-collection phase, matching the rest of the repo.
+import { parse } from '../../../core/src/parse.js';
+import { lowerToIR } from '../../../core/src/ir/lower.js';
+import { createDefaultRegistry } from '../../../core/src/modifiers/registerBuiltins.js';
+import { emitAngular } from '../src/emitAngular.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const TREE_NODE_ROZIE = resolve(__dirname, '../../../../examples/TreeNode.rozie');
@@ -56,14 +65,7 @@ const FIXTURE_3_LEVEL: TreeNodeData = {
 };
 
 describe('TreeNode browser-mount (Angular) — Phase 06.2 P3 COMP-05', () => {
-  it('emitted .angular.ts carries the canonical self-reference idiom (Pitfall 5 forwardRef)', async () => {
-    const { parse } = await import('../../../core/src/parse.js');
-    const { lowerToIR } = await import('../../../core/src/ir/lower.js');
-    const { createDefaultRegistry } = await import(
-      '../../../core/src/modifiers/registerBuiltins.js'
-    );
-    const { emitAngular } = await import('../src/emitAngular.js');
-
+  it('emitted .angular.ts carries the canonical self-reference idiom (Pitfall 5 forwardRef)', () => {
     const src = readFileSync(TREE_NODE_ROZIE, 'utf8');
     const parsed = parse(src, { filename: 'TreeNode.rozie' });
     if (!parsed.ast) throw new Error('parse failed');

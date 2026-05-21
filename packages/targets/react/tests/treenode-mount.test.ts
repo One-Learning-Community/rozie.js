@@ -25,6 +25,16 @@ import { fileURLToPath } from 'node:url';
 import { createElement } from 'react';
 import { render, cleanup } from '@testing-library/react';
 import { afterEach } from 'vitest';
+// Static imports of @rozie/core source + the emit entrypoint. These were
+// previously dynamic `await import()` calls inside the it() body — under
+// turbo's parallel suite runs the cold TS transform of core's module graph
+// starved and the test exceeded vitest's 5s per-test timeout (intermittent
+// react/svelte/angular failures). Hoisting them moves the transform cost into
+// the file-collection phase, matching every other test file in the repo.
+import { parse } from '../../../core/src/parse.js';
+import { lowerToIR } from '../../../core/src/ir/lower.js';
+import { createDefaultRegistry } from '../../../core/src/modifiers/registerBuiltins.js';
+import { emitReact } from '../src/emitReact.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const TREE_NODE_ROZIE = resolve(__dirname, '../../../../examples/TreeNode.rozie');
@@ -53,14 +63,7 @@ afterEach(() => {
 
 describe('TreeNode browser-mount (React) — Phase 06.2 P3 COMP-05', () => {
   // Stage 1 — emit-side canonical idiom assertions.
-  it('emitted React .tsx carries the canonical self-reference idioms (Pitfall 7)', async () => {
-    const { parse } = await import('../../../core/src/parse.js');
-    const { lowerToIR } = await import('../../../core/src/ir/lower.js');
-    const { createDefaultRegistry } = await import(
-      '../../../core/src/modifiers/registerBuiltins.js'
-    );
-    const { emitReact } = await import('../src/emitReact.js');
-
+  it('emitted React .tsx carries the canonical self-reference idioms (Pitfall 7)', () => {
     const src = readFileSync(TREE_NODE_ROZIE, 'utf8');
     const parsed = parse(src, { filename: 'TreeNode.rozie' });
     if (!parsed.ast) throw new Error('parse failed');
