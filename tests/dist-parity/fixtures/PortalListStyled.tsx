@@ -74,18 +74,18 @@ export default function PortalListStyled(_props: PortalListStyledProps): JSX.Ele
     },
   };
     instance.current = new MiniListEngine(__rozieRoot.current!, {
-    items: props.items,
-    cellRenderer: (item: any) => {
-      const node = document.createElement('div');
-      const dispose = portals.item(node, {
-        item
-      });
-      return {
-        node,
-        dispose
-      };
-    }
-  });
+      items: props.items,
+      cellRenderer: (item: any) => {
+        const node = document.createElement('div');
+        const dispose = portals.item(node, {
+          item
+        });
+        return {
+          node,
+          dispose
+        };
+      }
+    });
     return () => {
       for (const root of portalRoots.current) root.unmount();
   portalRoots.current.clear();

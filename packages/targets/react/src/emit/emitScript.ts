@@ -97,6 +97,40 @@ function genCode(node: t.Node): string {
 }
 
 /**
+ * Render the inner statements of a BlockStatement as a string, generated
+ * in ONE @babel/generator pass.
+ *
+ * Why one pass: a comment sitting BETWEEN two statements is attached by
+ * Babel's parser to BOTH neighbours — as the `trailingComments` of the
+ * earlier statement and the `leadingComments` of the later one. Each
+ * `generate()` call carries its own printed-comments dedup set, so
+ * rendering statements one-at-a-time (`body.map(genCode)`) emits such a
+ * comment TWICE: once trailing the earlier stmt, once leading the later.
+ * Generating the whole block keeps a single dedup set across every
+ * statement, so each comment prints exactly once.
+ *
+ * The outer braces are stripped (callers supply their own useEffect
+ * block). `indent` is prepended to every continuation line — the first
+ * line is left flush, since the call site's template provides its
+ * indentation.
+ */
+function genBlockInner(block: t.BlockStatement, indent: string): string {
+  const code = genCode(block);
+  const inner = code.slice(1, -1).replace(/^\n/, '').replace(/\s+$/, '');
+  if (inner === '') return '';
+  return inner
+    .split('\n')
+    .map((line, i) => {
+      // Drop @babel/generator's base 2-space block indent; deeper
+      // (nested) indentation is preserved relative to it.
+      const dedented = line.startsWith('  ') ? line.slice(2) : line;
+      if (i === 0) return dedented;
+      return dedented === '' ? '' : indent + dedented;
+    })
+    .join('\n');
+}
+
+/**
  * Emit `() => body` for an Expression or BlockStatement body.
  *
  * Why not `\`() => ${genCode(body)}\``? When `body` is an ObjectExpression
@@ -1489,7 +1523,7 @@ export function emitScript(
       ) {
         const fnBody = unmountCloned.body;
         if (t.isBlockStatement(fnBody)) {
-          unmountBody = fnBody.body.map((s) => genCode(s)).join('\n    ');
+          unmountBody = genBlockInner(fnBody, '    ');
         } else {
           unmountBody = genCode(fnBody) + ';';
         }
@@ -1579,9 +1613,9 @@ export function emitScript(
       const fnBody = setupCloned.body;
       if (t.isBlockStatement(fnBody)) {
         // Strip the surrounding block braces — the useEffect callback
-        // already provides its own block. Use @babel/generator on each stmt.
-        const innerStmts = fnBody.body.map((s) => genCode(s)).join('\n      ');
-        setupInvocation = innerStmts;
+        // already provides its own block. Generated as ONE block so
+        // @babel/generator de-dups comments across statement boundaries.
+        setupInvocation = genBlockInner(fnBody, '  ');
       } else {
         setupInvocation = genCode(fnBody) + ';';
       }
@@ -1605,7 +1639,7 @@ export function emitScript(
       ) {
         const fnBody = cleanupCloned.body;
         if (t.isBlockStatement(fnBody)) {
-          const innerStmts = fnBody.body.map((s) => genCode(s)).join('\n        ');
+          const innerStmts = genBlockInner(fnBody, '    ');
           const cleanupBody = injectPortalsHere
             ? portalsEmit.bulkDisposeBlock + '\n    ' + innerStmts
             : innerStmts;
@@ -1699,8 +1733,7 @@ export function emitScript(
     const cbCloned = paired?.callbackCloned ?? wh.callback;
     let cbInvocation: string;
     if (t.isBlockStatement(cbCloned)) {
-      const innerStmts = cbCloned.body.map((s) => genCode(s)).join('\n      ');
-      cbInvocation = innerStmts;
+      cbInvocation = genBlockInner(cbCloned, '  ');
     } else {
       // Concise arrow body — emit as an expression statement.
       cbInvocation = `${genCode(cbCloned)};`;

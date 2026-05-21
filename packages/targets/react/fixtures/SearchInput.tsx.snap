@@ -34,10 +34,10 @@ export default function SearchInput(_props: SearchInputProps): JSX.Element {
   useEffect(() => {
     if (props.autofocus) inputEl.current?.focus();
 
-  // Returning a function from $onMount registers a teardown — equivalent to
-  // a separate $onUnmount, useful when setup and teardown logic belong together.
+    // Returning a function from $onMount registers a teardown — equivalent to
+    // a separate $onUnmount, useful when setup and teardown logic belong together.
     return () => {
-      
+      // e.g., abort an in-flight request initialized in this hook
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 

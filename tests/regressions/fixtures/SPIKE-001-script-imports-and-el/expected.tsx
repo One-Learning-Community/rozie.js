@@ -12,9 +12,9 @@ export default function SpikeImportEl(props: SpikeImportElProps): JSX.Element {
   const __rozieRoot = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    instance.current = new DummyEngine(__rozieRoot.current, {
-    animation: 150
-  });
+    instance.current = new DummyEngine(__rozieRoot.current!, {
+      animation: 150
+    });
     return () => instance.current?.destroy();
   }, []);
 

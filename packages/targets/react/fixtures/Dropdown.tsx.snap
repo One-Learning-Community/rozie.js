@@ -52,10 +52,11 @@ export default function Dropdown(_props: DropdownProps): JSX.Element {
 
   useEffect(() => {
     // Initial reposition only if the panel is open at mount time.
-  if (_openRef.current) reposition();
+    if (_openRef.current) reposition();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    
+    // Example of integrating a vanilla JS library — $refs gives direct DOM access.
+    // new Popper($refs.triggerEl, $refs.panelEl, { placement: 'bottom-start' })
   }, []);
   useEffect(() => {
     if (open) reposition();
