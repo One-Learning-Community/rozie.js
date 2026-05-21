@@ -38,11 +38,24 @@ export interface ParseStyleResult {
   diagnostics: Diagnostic[];
 }
 
+/**
+ * Parse a `<style>` block into a `StyleAST`.
+ *
+ * @param lang - the resolved `lang=` attribute from the source `<style>` tag
+ *   (Phase 9 generic `lang=` substrate). `parseStyle` does not consume it yet —
+ *   no SCSS/LESS preprocessing this phase — but it is threaded through the
+ *   signature and built into the returned node so the future
+ *   `<style lang="scss/less">` work reuses the same plumbing as `parseScript`.
+ *   Threading it here (rather than mutating the node after construction in
+ *   `parse.ts`) keeps `StyleAST.lang` set at construction time, consistent with
+ *   every other block AST and with `exactOptionalPropertyTypes` (WR-04).
+ */
 export function parseStyle(
   content: string,
   contentLoc: SourceLoc,
   source: string,
   filename?: string,
+  lang?: string,
 ): ParseStyleResult {
   // `source` is required by every parser's signature for diagnostic
   // line/column rendering, but parseStyle does not currently consume it
@@ -194,7 +207,16 @@ export function parseStyle(
   });
 
   return {
-    node: { type: 'StyleAST', loc: contentLoc, cssText: content, rules },
+    node: {
+      type: 'StyleAST',
+      loc: contentLoc,
+      cssText: content,
+      rules,
+      // Phase 9: carry the resolved `lang` onto the StyleAST. Set only when
+      // present — conditional-spread keeps the key absent under
+      // `exactOptionalPropertyTypes: true` (WR-04).
+      ...(lang !== undefined ? { lang } : {}),
+    },
     diagnostics,
   };
 }

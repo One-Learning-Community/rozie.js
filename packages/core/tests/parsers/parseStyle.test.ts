@@ -180,4 +180,22 @@ describe('parseStyle — @portal blocks (Spike 004)', () => {
     const { diagnostics } = parseStyle(css, { start: 0, end: css.length }, css);
     expect(diagnostics.some(d => d.code === 'ROZ083')).toBe(false);
   });
+
+  // Phase 9 / WR-04 — `lang` is threaded through parseStyle's signature and
+  // built into the returned node at construction time (no post-construction
+  // mutation in parse.ts).
+  describe('<style lang="..."> — generic lang= substrate (Phase 9)', () => {
+    it('carries the lang argument onto StyleAST.lang', () => {
+      const css = '.a { color: red; }';
+      const { node } = parseStyle(css, { start: 0, end: css.length }, css, undefined, 'scss');
+      expect(node?.lang).toBe('scss');
+    });
+
+    it('leaves StyleAST.lang absent when no lang argument is passed', () => {
+      const css = '.a { color: red; }';
+      const { node } = parseStyle(css, { start: 0, end: css.length }, css);
+      expect(node?.lang).toBeUndefined();
+      expect(Object.hasOwn(node as object, 'lang')).toBe(false);
+    });
+  });
 });

@@ -93,17 +93,18 @@ export function parse(source: string, opts: { filename?: string } = {}): ParseRe
     ? parseListeners(blocks.listeners.content, blocks.listeners.contentLoc, source, filename)
     : { node: null, diagnostics: [] as Diagnostic[] };
   const styleRes = blocks.style
-    ? parseStyle(blocks.style.content, blocks.style.contentLoc, source, filename)
+    ? // Phase 9: thread the resolved `<style lang="...">` value from the
+      // splitter through parseStyle's signature (mirrors parseScript). The
+      // value is carried onto the StyleAST for the future `<style
+      // lang="scss/less">` phase; parseStyle does not consume it yet.
+      parseStyle(
+        blocks.style.content,
+        blocks.style.contentLoc,
+        source,
+        filename,
+        blocks.style.lang,
+      )
     : { node: null, diagnostics: [] as Diagnostic[] };
-
-  // Phase 9: carry the generic `lang=` substrate onto the StyleAST. parseStyle
-  // does not consume `lang` (no SCSS/LESS preprocessing this phase) — the value
-  // is carried so the future `<style lang="scss/less">` phase reuses it. Set
-  // only when present (mutating in place keeps the key absent otherwise, as
-  // required by `exactOptionalPropertyTypes: true`).
-  if (styleRes.node && blocks.style?.lang !== undefined) {
-    styleRes.node.lang = blocks.style.lang;
-  }
 
   diagnostics.push(
     ...propsRes.diagnostics,
