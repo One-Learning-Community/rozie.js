@@ -43,8 +43,8 @@ export default function Dropdown(_props: DropdownProps): JSX.Element {
   }, [setOpen]);
   const reposition = useCallback(() => {
     if (!panelEl.current || !triggerEl.current) return;
-    const rect = triggerEl.current.getBoundingClientRect();
-    Object.assign(panelEl.current.style, {
+    const rect = triggerEl.current!.getBoundingClientRect();
+    Object.assign(panelEl.current!.style, {
       top: `${rect.bottom}px`,
       left: `${rect.left}px`
     });

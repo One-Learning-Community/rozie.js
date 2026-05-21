@@ -44,8 +44,8 @@ const close = () => {
 };
 const reposition = () => {
   if (!panelEl || !triggerEl) return;
-  const rect = triggerEl.getBoundingClientRect();
-  Object.assign(panelEl.style, {
+  const rect = triggerEl!.getBoundingClientRect();
+  Object.assign(panelEl!.style, {
     top: `${rect.bottom}px`,
     left: `${rect.left}px`
   });

@@ -1349,8 +1349,17 @@ export function emitScript(
   for (const s of ir.state) {
     collectors.react.add('useState');
     const setterName = 'set' + capitalize(s.name);
+    // Quick task 260520-w18 bug class 2 — an empty-array `<data>` initializer
+    // (`files: []`) types as `useState<never[]>([])`, so `files.map(f => f.id)`
+    // fails TS2339 ("Property 'id' does not exist on type 'never'"). Engine
+    // wrappers routinely seed a `$data` array empty and let the engine
+    // populate it. Annotate the empty-array literal case as `any[]`.
+    const stateTypeArg =
+      t.isArrayExpression(s.initializer) && s.initializer.elements.length === 0
+        ? '<any[]>'
+        : '';
     hookLines.push(
-      `const [${s.name}, ${setterName}] = useState(${genCode(s.initializer)});`,
+      `const [${s.name}, ${setterName}] = useState${stateTypeArg}(${genCode(s.initializer)});`,
     );
   }
 

@@ -30,6 +30,7 @@
  */
 import * as t from '@babel/types';
 import _traverse from '@babel/traverse';
+import type { NodePath } from '@babel/traverse';
 import type { IRComponent } from '../../../../core/src/ir/types.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
@@ -40,6 +41,74 @@ const traverse: TraverseFn =
   typeof _traverse === 'function'
     ? (_traverse as TraverseFn)
     : ((_traverse as unknown as { default: TraverseFn }).default);
+
+/**
+ * Decide whether a `$refs.X` / `$el` access should lower to a non-null
+ * assertion (`XRef.value!`) instead of the default optional handle
+ * (`XRef.value`, typed `T | undefined`).
+ *
+ * Ported verbatim from the Angular target's `refLowersToNonNull`
+ * (`packages/targets/angular/src/rewrite/rewriteScript.ts`) — quick task
+ * 260520-w18 bug class 1. Each target package owns its own copy of this
+ * helper per the per-package `cloneProgram.ts` convention.
+ *
+ * The optional handle is the safe DEFAULT — a ref whose element is `r-if`-gated
+ * (e.g. Dropdown's `panelEl`) is genuinely `undefined` before it renders, and
+ * guard code like `if (!$refs.panelEl) return` depends on `.value` yielding
+ * `undefined`.
+ *
+ * Two contexts prove the author has asserted the element exists:
+ *
+ *   1. The author wrote a NON-optional access on it — `$refs.X.method()` /
+ *      `$refs.X.prop` — so each independent optional lowering would otherwise
+ *      defeat TS narrowing across an earlier `if (!$refs.X) return` (TS18048).
+ *   2. It is handed to a function/constructor call — `flatpickr($refs.inputEl)`,
+ *      `new SortableJS($el, …)`, `new Editor({ element: $refs.editorEl })` —
+ *      the canonical engine-wrapper pattern. The host element a vanilla-JS
+ *      engine mounts into is unconditional by construction; passing a
+ *      possibly-`undefined` value into a typed engine constructor is TS18048.
+ *      The walk steps out through enclosing object/array literals so
+ *      `{ element: $refs.editorEl }` is recognised as "passed into `new Editor(...)`".
+ */
+function refLowersToNonNull(
+  path: NodePath<t.MemberExpression> | NodePath<t.OptionalMemberExpression>,
+): boolean {
+  const parent = path.parent;
+  // (1) authored non-optional member/call on the ref itself. OptionalMember /
+  //     OptionalCall parents are intentionally excluded — the author opted
+  //     into optionality there (`$refs.dialogEl?.focus()`).
+  if (t.isMemberExpression(parent) && parent.object === path.node) return true;
+  if (t.isCallExpression(parent) && parent.callee === path.node) return true;
+  // (2) flows into a Call/NewExpression argument, possibly nested inside
+  //     object/array literals.
+  let child: t.Node = path.node;
+  let p: NodePath | null = path.parentPath;
+  while (p) {
+    const n = p.node;
+    if (
+      (t.isCallExpression(n) || t.isNewExpression(n)) &&
+      n.arguments.some((a) => (a as t.Node) === child)
+    ) {
+      return true;
+    }
+    if (t.isObjectProperty(n) && n.value === child) {
+      child = n;
+      p = p.parentPath;
+      continue;
+    }
+    if (
+      t.isObjectExpression(n) ||
+      t.isArrayExpression(n) ||
+      t.isSpreadElement(n)
+    ) {
+      child = n;
+      p = p.parentPath;
+      continue;
+    }
+    break;
+  }
+  return false;
+}
 
 /**
  * Rewrite Rozie magic-accessor identifiers in-place on a cloned Program.
@@ -148,6 +217,19 @@ export function rewriteRozieIdentifiers(
         const refDecl = refByName.get(prop.name);
         const newObj = t.identifier(prop.name + 'Ref');
         if (refDecl) newObj.loc = refDecl.sourceLoc as any;
+        // Lower to `dialogElRef.value!` (non-null) vs `dialogElRef.value`
+        // (optional) per refLowersToNonNull — authored non-optional access
+        // (TS18048 narrowing) OR passed into an engine constructor/function
+        // call (TS18048 on a `T | undefined` argument). Quick task
+        // 260520-w18 bug class 1. See refLowersToNonNull's doc comment.
+        if (refLowersToNonNull(path)) {
+          path.replaceWith(
+            t.tsNonNullExpression(
+              t.memberExpression(newObj, t.identifier('value')),
+            ),
+          );
+          return;
+        }
         path.node.object = newObj;
         path.node.property = t.identifier('value');
         return;
@@ -197,6 +279,19 @@ export function rewriteRozieIdentifiers(
         return;
       }
       if (obj.name === '$refs' && refNames.has(prop.name)) {
+        // refLowersToNonNull non-null lowering (260520-w18 bug class 1) —
+        // mirrors the MemberExpression branch above for `$refs.foo?.bar`.
+        if (refLowersToNonNull(path)) {
+          path.replaceWith(
+            t.tsNonNullExpression(
+              t.memberExpression(
+                t.identifier(prop.name + 'Ref'),
+                t.identifier('value'),
+              ),
+            ),
+          );
+          return;
+        }
         path.node.object = t.identifier(prop.name + 'Ref');
         path.node.property = t.identifier('value');
         return;

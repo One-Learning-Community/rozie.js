@@ -304,7 +304,16 @@ function emitDataRefs(ir: IRComponent, imports: VueImportCollector): string[] {
   const lines: string[] = [];
   for (const s of ir.state) {
     imports.use('ref');
-    lines.push(`const ${s.name} = ref(${genCode(s.initializer)});`);
+    // Quick task 260520-w18 bug class 2 — an empty-array `<data>` initializer
+    // (`files: []`) types as `ref<never[]>`, so `files.value.map(f => f.id)`
+    // fails TS2339 ("Property 'id' does not exist on type 'never'"). Engine
+    // wrappers routinely seed a `$data` array empty and let the engine
+    // populate it. Annotate the empty-array literal case as `any[]`.
+    const refTypeArg =
+      t.isArrayExpression(s.initializer) && s.initializer.elements.length === 0
+        ? '<any[]>'
+        : '';
+    lines.push(`const ${s.name} = ref${refTypeArg}(${genCode(s.initializer)});`);
   }
   return lines;
 }
