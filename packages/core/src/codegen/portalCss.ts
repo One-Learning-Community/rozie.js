@@ -178,7 +178,7 @@ export function rewritePortalBlock(
   if (openIdx === -1 || closeIdx === -1 || closeIdx <= openIdx) return '';
   const innerCss = blockText.slice(openIdx + 1, closeIdx);
 
-  let root;
+  let root: ReturnType<typeof postcss.parse>;
   try {
     root = postcss.parse(innerCss);
   } catch {

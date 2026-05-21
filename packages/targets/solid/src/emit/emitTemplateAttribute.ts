@@ -273,7 +273,7 @@ function lowerStringLiteralStyle(
 ): { jsx: string; diagnostics: Diagnostic[] } {
   const diagnostics: Diagnostic[] = [];
   const props: string[] = [];
-  let root;
+  let root: ReturnType<typeof postcss.parse>;
   try {
     root = postcss.parse(literal);
   } catch (err) {

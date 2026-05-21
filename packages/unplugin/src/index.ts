@@ -251,7 +251,9 @@ export const unplugin = createUnpluginV3<Partial<RozieOptions>>((rawOptions) => 
           }
         }
 
-        mods.forEach((m: any) => server.moduleGraph.invalidateModule(m));
+        mods.forEach((m: any) => {
+          server.moduleGraph.invalidateModule(m);
+        });
         return mods;
       },
     },

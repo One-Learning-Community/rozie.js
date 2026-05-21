@@ -561,8 +561,8 @@ function renderInterpolatedClass(
   function pushTextRun(text: string) {
     // Split on whitespace; runs of whitespace separate tokens.
     const re = /(\S+)|\s+/g;
-    let m: RegExpExecArray | null;
-    while ((m = re.exec(text)) !== null) {
+    let m: RegExpExecArray | null = re.exec(text);
+    while (m !== null) {
       if (m[0].trim().length === 0) {
         // whitespace boundary — close current token
         if (current && current.parts.length > 0) {
@@ -573,6 +573,7 @@ function renderInterpolatedClass(
         if (!current) current = { parts: [] };
         current.parts.push({ kind: 'static', text: m[1]! });
       }
+      m = re.exec(text);
     }
   }
 
@@ -691,7 +692,7 @@ function lowerStringLiteralStyle(
 ): { jsx: string; diagnostics: Diagnostic[] } {
   const diagnostics: Diagnostic[] = [];
   const props: string[] = [];
-  let root;
+  let root: ReturnType<typeof postcss.parse>;
   try {
     root = postcss.parse(literal);
   } catch (err) {

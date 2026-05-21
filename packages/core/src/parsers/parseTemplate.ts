@@ -151,8 +151,8 @@ export function parseTemplate(
     const out: TemplateNode[] = [];
     let cursor = 0;
     MUSTACHE_RE.lastIndex = 0;
-    let m: RegExpExecArray | null;
-    while ((m = MUSTACHE_RE.exec(text)) !== null) {
+    let m: RegExpExecArray | null = MUSTACHE_RE.exec(text);
+    while (m !== null) {
       if (m.index > cursor) {
         const t: TemplateText = {
           type: 'TemplateText',
@@ -168,6 +168,7 @@ export function parseTemplate(
       };
       out.push(interp);
       cursor = m.index + m[0].length;
+      m = MUSTACHE_RE.exec(text);
     }
     if (cursor < text.length) {
       // Detect unmatched mustache opener in the trailing tail.

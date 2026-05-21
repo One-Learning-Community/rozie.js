@@ -58,7 +58,7 @@ export async function expandInputs(args: string[]): Promise<string[]> {
     //    transparently followed. The walkRozieFiles posture in
     //    packages/unplugin/src/transform.ts:737 is the canonical reference.
     const abs = pathResolve(arg);
-    let stat;
+    let stat: ReturnType<typeof lstatSync>;
     try {
       stat = lstatSync(abs);
     } catch {
