@@ -59,7 +59,7 @@ const EXAMPLES = [
 // `examples/typed/`, NOT added to the dist-parity EXAMPLES baseline. This gate
 // compiles + tsc-checks them in a separate describe block so a typed-fixture
 // failure is distinguishable from an untyped regression.
-const TYPED_EXAMPLES = ['Counter', 'Dropdown', 'SortableList', 'TypedCard'];
+const TYPED_EXAMPLES = ['Counter', 'Dropdown', 'SortableList', 'TypedCard', 'MatchUnion'];
 
 describe('REACT-TSC — tsc --noEmit clean over emitted React TSX', () => {
   it('all 12 emitted React TSX files (8 reference + 4 engine-wrapper) tsc clean', () => {
@@ -106,7 +106,7 @@ describe('REACT-TSC — tsc --noEmit clean over emitted React TSX', () => {
 });
 
 describe('REACT-TSC (typed) — tsc --noEmit clean over emitted typed React TSX', () => {
-  it('all 4 emitted typed React TSX files (examples/typed/*) tsc clean', () => {
+  it('all 5 emitted typed React TSX files (examples/typed/*) tsc clean', () => {
     const tmpDir = mkdtempSync(join(tmpdir(), 'rozie-react-tsc-typed-'));
     try {
       for (const name of TYPED_EXAMPLES) {
