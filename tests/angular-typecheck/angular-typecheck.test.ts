@@ -74,7 +74,7 @@ const EXAMPLES = [
 // interface/type module-scope hoist (Plan 09-04 OQ-3) on this class-based
 // target — a TSInterfaceDeclaration inside the @Component class body would be
 // a tsc syntax error if the hoist regressed.
-const TYPED_EXAMPLES = ['Counter', 'Dropdown', 'SortableList', 'TypedCard', 'MatchUnion', 'DataCast'];
+const TYPED_EXAMPLES = ['Counter', 'Dropdown', 'SortableList', 'TypedCard', 'MatchUnion', 'DataCast', 'PropsCustomType'];
 
 describe('ANGULAR-TSC — tsc --noEmit clean over emitted Angular standalone components', () => {
   it('all 12 emitted Angular .ts files (8 reference + 4 engine-wrapper) tsc clean', () => {
@@ -118,7 +118,7 @@ describe('ANGULAR-TSC — tsc --noEmit clean over emitted Angular standalone com
 });
 
 describe('ANGULAR-TSC (typed) — tsc --noEmit clean over emitted typed Angular components', () => {
-  it('all 6 emitted typed Angular .ts files (examples/typed/*) tsc clean', () => {
+  it('all 7 emitted typed Angular .ts files (examples/typed/*) tsc clean', () => {
     const tmpDir = mkdtempSync(join(tmpdir(), 'rozie-angular-tsc-typed-'));
     try {
       for (const name of TYPED_EXAMPLES) {

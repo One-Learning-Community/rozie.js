@@ -57,7 +57,7 @@ const EXAMPLES = [
 // `examples/typed/`, NOT added to the dist-parity EXAMPLES baseline. Checked
 // in a separate describe block so a typed-fixture failure is distinguishable
 // from an untyped regression.
-const TYPED_EXAMPLES = ['Counter', 'Dropdown', 'SortableList', 'TypedCard', 'MatchUnion', 'DataCast'];
+const TYPED_EXAMPLES = ['Counter', 'Dropdown', 'SortableList', 'TypedCard', 'MatchUnion', 'DataCast', 'PropsCustomType'];
 
 describe('SVELTE-CHECK — svelte-check --threshold error clean over emitted Svelte SFCs', () => {
   it('all 12 emitted Svelte .svelte files (8 reference + 4 engine-wrapper) svelte-check clean', () => {
@@ -105,7 +105,7 @@ describe('SVELTE-CHECK — svelte-check --threshold error clean over emitted Sve
 });
 
 describe('SVELTE-CHECK (typed) — svelte-check clean over emitted typed Svelte SFCs', () => {
-  it('all 6 emitted typed Svelte .svelte files (examples/typed/*) svelte-check clean', () => {
+  it('all 7 emitted typed Svelte .svelte files (examples/typed/*) svelte-check clean', () => {
     const tmpDir = mkdtempSync(join(tmpdir(), 'rozie-svelte-check-typed-'));
     try {
       for (const name of TYPED_EXAMPLES) {

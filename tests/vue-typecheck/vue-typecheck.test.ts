@@ -54,7 +54,7 @@ const EXAMPLES = [
 // `examples/typed/`, NOT added to the dist-parity EXAMPLES baseline. Checked
 // in a separate describe block so a typed-fixture failure is distinguishable
 // from an untyped regression.
-const TYPED_EXAMPLES = ['Counter', 'Dropdown', 'SortableList', 'TypedCard', 'MatchUnion', 'DataCast'];
+const TYPED_EXAMPLES = ['Counter', 'Dropdown', 'SortableList', 'TypedCard', 'MatchUnion', 'DataCast', 'PropsCustomType'];
 
 describe('VUE-TSC — vue-tsc --noEmit clean over emitted Vue SFCs', () => {
   it('all 12 emitted Vue SFC files (8 reference + 4 engine-wrapper) typecheck clean', () => {
@@ -98,7 +98,7 @@ describe('VUE-TSC — vue-tsc --noEmit clean over emitted Vue SFCs', () => {
 });
 
 describe('VUE-TSC (typed) — vue-tsc --noEmit clean over emitted typed Vue SFCs', () => {
-  it('all 6 emitted typed Vue SFC files (examples/typed/*) typecheck clean', () => {
+  it('all 7 emitted typed Vue SFC files (examples/typed/*) typecheck clean', () => {
     const tmpDir = mkdtempSync(join(tmpdir(), 'rozie-vue-tsc-typed-'));
     try {
       for (const name of TYPED_EXAMPLES) {
