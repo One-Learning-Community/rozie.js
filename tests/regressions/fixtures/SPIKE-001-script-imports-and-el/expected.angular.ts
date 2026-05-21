@@ -24,13 +24,13 @@ export class SpikeImportEl {
   private __rozieDestroyRef = inject(DestroyRef);
 
   ngAfterViewInit() {
-    this.instance = new DummyEngine(this.__rozieRoot()?.nativeElement, {
+    this.instance = new DummyEngine(this.__rozieRoot()!.nativeElement, {
       animation: 150
     });
     this.__rozieDestroyRef.onDestroy(() => this.instance?.destroy());
   }
 
-  instance = null;
+  instance: any = null;
 
   static ngTemplateContextGuard(
     _dir: SpikeImportEl,

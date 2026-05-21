@@ -488,8 +488,13 @@ function classBodyFromStatements(
           continue;
         }
 
-        // Plain value initializer → class field
-        methodChunks.push(`  ${name} = ${renderExpression(decl.init)};`);
+        // Plain value initializer → class field. genCode the whole declarator
+        // (not just the init) so a `: any` annotation added by
+        // typeNeutralizeScript — e.g. `let editor = null` → `editor: any =
+        // null` — survives onto the field; without it the field is typed
+        // `null` and every reassignment (`this.editor = new Editor()`) is
+        // TS2322.
+        methodChunks.push(`  ${generate(decl, GEN_OPTS).code};`);
       }
       continue;
     }

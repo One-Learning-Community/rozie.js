@@ -35,10 +35,19 @@ const EXAMPLES = [
   'TreeNode',
   'Card',
   'CardHeader',
+  // Engine-wrapper examples — non-trivial `<script>` logic (an engine instance
+  // held in `let editor = null`, untyped callback params). This is the shape
+  // the untyped-`<script>` type-broken-emit bug regresses; covering it here is
+  // what would have caught that bug. Engine imports resolve against the
+  // ambient `engine-modules.d.ts` stub copied into the tmp dir below.
+  // (Uppy/SortableList/Flatpickr are NOT yet covered — they hit a separate class of
+  // pre-existing emit limitations; see
+  // .planning/todos/pending/engine-wrapper-residual-type-errors.md.)
+  'TipTap',
 ];
 
 describe('VUE-TSC — vue-tsc --noEmit clean over emitted Vue SFCs', () => {
-  it('all 8 emitted Vue SFC files typecheck clean', () => {
+  it('all 9 emitted Vue SFC files (8 reference + 1 engine-wrapper) typecheck clean', () => {
     const tmpDir = mkdtempSync(join(tmpdir(), 'rozie-vue-tsc-'));
     try {
       for (const name of EXAMPLES) {
@@ -54,6 +63,9 @@ describe('VUE-TSC — vue-tsc --noEmit clean over emitted Vue SFCs', () => {
       }
 
       copyFileSync(join(HERE, 'tsconfig.json'), join(tmpDir, 'tsconfig.json'));
+      // Ambient `any` stubs for engine modules imported by the engine-wrapper
+      // examples (TipTap → @tiptap/*, Flatpickr → flatpickr).
+      copyFileSync(join(HERE, 'engine-modules.d.ts'), join(tmpDir, 'engine-modules.d.ts'));
       // Symlink the workspace's node_modules so vue-tsc resolves vue,
       // @rozie/runtime-vue, etc.
       symlinkSync(join(HERE, 'node_modules'), join(tmpDir, 'node_modules'), 'dir');

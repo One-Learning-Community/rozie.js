@@ -248,30 +248,50 @@ async function settleExample(
 //     shifting the `-webkit-center` <caption>. Fixed by pinning a fixed
 //     `.table-demo` width in TableDemo.rozie. Table.png baseline regenerated.
 //
-// REMAINING (9 cells):
-//   - TipTap·react / ·svelte / ·lit / ·solid: NOT structural — the editor is
-//     captured in a different STATE (toolbar-active button + bound-HTML
-//     content differ from the Vue baseline). TipTap·solid joined this group
-//     once its TDZ crash was fixed (above): it now renders, but exhibits the
-//     same editor-state divergence as its siblings. Belongs with the
-//     settle-timing class below; left here pending the settleExample /
-//     state-determinism follow-up.
-//   - SETTLE-TIMING: SortableList·react, Flatpickr·react, Uppy·react,
-//     Uppy·angular, TipTap·angular each retried `toHaveScreenshot` to a ~5s
-//     timeout — the engine demo had not stabilized when captured;
-//     `settleExample` is not yet sufficient for these.
+// RESOLVED (2026-05-20, untyped-<script> follow-up) — TipTap·angular and
+// Uppy·angular previously threw "JIT compiler unavailable" at runtime. Earlier
+// notes here mislabelled this "settle-timing"; the real cause was an Angular
+// emitter bug. A merged object-literal `[ngClass]` / `[ngStyle]` value with a
+// hyphenated (hence single-quoted) class key was emitted with its quotes
+// backslash-escaped — `[ngClass]="{ \'is-readonly\': … }"`. `\'` is invalid in
+// an Angular template expression, so the template failed to parse, ngtsc
+// skipped the component's AOT `ɵcmp`, and the class fell back to a runtime
+// `@Component` decorator → JIT compilation → "JIT compiler unavailable" in the
+// prod bundle (which ships no `@angular/compiler`). Fixed in
+// `packages/targets/angular/src/emit/emitTemplateAttribute.ts` — the merged
+// value is now emitted verbatim, matching the single-binding path. Both cells
+// render again. Uppy·angular is un-gated below: Uppy is deterministic and the
+// other non-react Uppy cells already match the shared `Uppy.png` baseline.
+//
+// (Separately, the engine wrappers also emitted type-broken TypeScript because
+// `<script>` is parsed as plain JS — fixed by `typeNeutralizeScript` in
+// @rozie/core. That bug failed `tsc`/`ngc`/`vue-tsc`/`svelte-check`, NOT the
+// runtime render — it was not the JIT-crash cause. See the writeup at
+// .planning/todos/pending/untyped-script-emits-type-broken-output.md.)
+//
+// REMAINING (8 cells):
+//   - TipTap·react / ·svelte / ·lit / ·solid / ·angular: NOT a structural emit
+//     bug — the ProseMirror editor is captured in a different STATE
+//     (toolbar-active button + bound-HTML content) than the Vue baseline.
+//     TipTap·angular joins this group post-fix: it now renders, but shares the
+//     same capture-time editor-state non-determinism as its siblings. Closing
+//     these needs a settleExample / state-determinism follow-up.
+//   - STABLE CROSS-TARGET PIXEL DIVERGENCE: SortableList·react, Flatpickr·react,
+//     Uppy·react render with a small but STABLE per-target pixel difference
+//     from the shared baseline (React CSS-Modules class hashing + Chromium
+//     text-node-boundary kerning). Not settle-timing — they stabilize
+//     immediately; they simply do not match the baseline byte-for-byte.
 const KNOWN_CROSS_TARGET_DIVERGENCE = new Set<string>([
-  // editor-state divergence (capture-time state, not a structural emit bug)
+  // editor-state divergence (capture-time ProseMirror state, not an emit bug)
   'TipTap::react',
   'TipTap::svelte',
   'TipTap::lit',
   'TipTap::solid',
-  // settle-timing non-determinism (engine demo not stabilized at capture)
+  'TipTap::angular',
+  // stable cross-target pixel divergence (React CSS-Modules hashing + kerning)
   'SortableList::react',
   'Flatpickr::react',
   'Uppy::react',
-  'Uppy::angular',
-  'TipTap::angular',
 ]);
 
 for (const example of EXAMPLES) {

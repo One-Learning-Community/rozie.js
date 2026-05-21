@@ -56,5 +56,5 @@ export default class SpikeImportEl extends SignalWatcher(LitElement) {
 `;
   }
 
-  instance = null;
+  instance: any = null;
 }

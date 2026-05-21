@@ -14,7 +14,7 @@ const children = $derived(__childrenProp ?? snippets?.children);
 let __rozieRoot = $state<HTMLElement | undefined>(undefined);
 
 import DummyEngine from 'dummy-engine';
-let instance = null;
+let instance: any = null;
 
 onMount(() => {
   instance = new DummyEngine(__rozieRoot, {

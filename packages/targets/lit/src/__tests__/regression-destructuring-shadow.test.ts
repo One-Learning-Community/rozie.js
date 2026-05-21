@@ -58,7 +58,9 @@ describe('Bug 1 (Lit) — scope-aware identifier rewrite', () => {
 
   it('still emits `editor = null` as a class field (promotion preserved)', () => {
     const code = compile('TipTap');
-    expect(code).toMatch(/\beditor\s*=\s*null/);
+    // `: any` is added by typeNeutralizeScript — `let editor = null` would
+    // otherwise type the field `null` and reject `this.editor = new Editor()`.
+    expect(code).toMatch(/\beditor(?::\s*any)?\s*=\s*null/);
   });
 
   it('still rewrites genuine bare references to `this.editor`', () => {

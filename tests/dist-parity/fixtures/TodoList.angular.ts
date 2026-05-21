@@ -88,7 +88,7 @@ export class TodoList {
   @ContentChild('empty', { read: TemplateRef }) emptyTpl?: TemplateRef<EmptyCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
 
-  remaining = computed(() => this.items().filter(i => !i.done).length);
+  remaining = computed(() => this.items().filter((i: any) => !i.done).length);
 
   _add = () => {
     const text = this.draft().trim();
@@ -102,14 +102,14 @@ export class TodoList {
     this.add.emit(text);
   };
   _toggle = (id: any) => {
-    this.items.set(this.items().map(i => i.id === id ? {
+    this.items.set(this.items().map((i: any) => i.id === id ? {
       ...i,
       done: !i.done
     } : i));
     this.toggle.emit(id);
   };
   removeItem = (id: any) => {
-    this.items.set(this.items().filter(i => i.id !== id));
+    this.items.set(this.items().filter((i: any) => i.id !== id));
     this.remove.emit(id);
   };
 

@@ -95,7 +95,9 @@ $watch(() => $props.open, (v) => { console.log(v) })
     // Bug B fix (260519 linechart-watch-recreate) — the callback runs inside
     // `untrack(...)` so its reads (and transitive helper reads) DON'T join the
     // createEffect's dependency set; only the getter defines what re-runs it.
-    expect(result.hookSection).toMatch(/createEffect\(\(\) => \{[\s\S]*?const __watchVal = \(\(\) =>[\s\S]*?\)\(\);[\s\S]*?untrack\(\(\) => \(v => \{[\s\S]*?\}\)\(__watchVal\)\);[\s\S]*?\}\);/);
+    // `v` carries a `: any` annotation from typeNeutralizeScript (untyped
+    // `<script>` callback param) — the watcher binding is otherwise unchanged.
+    expect(result.hookSection).toMatch(/createEffect\(\(\) => \{[\s\S]*?const __watchVal = \(\(\) =>[\s\S]*?\)\(\);[\s\S]*?untrack\(\(\) => \((?:v|\(v: any\)) => \{[\s\S]*?\}\)\(__watchVal\)\);[\s\S]*?\}\);/);
     expect(solidImports.has('createEffect')).toBe(true);
     expect(solidImports.has('untrack')).toBe(true);
   });

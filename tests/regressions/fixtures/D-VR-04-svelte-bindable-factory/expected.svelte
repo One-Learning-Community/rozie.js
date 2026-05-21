@@ -5,7 +5,7 @@ interface Props {
 
 let { items = $bindable((() => [])()) }: Props = $props();
 
-const remaining = $derived(items.filter(i => !i.done).length);
+const remaining = $derived(items.filter((i: any) => !i.done).length);
 </script>
 
 

@@ -7,8 +7,8 @@ let items = $state([{
   label: 'B'
 }]);
 
-const removeItem = id => {
-  items = items.filter(x => x.id !== id);
+const removeItem = (id: any) => {
+  items = items.filter((x: any) => x.id !== id);
 };
 </script>
 

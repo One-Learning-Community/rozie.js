@@ -27,7 +27,7 @@ let __rozieRoot = $state<HTMLElement | undefined>(undefined);
 // Destruction order still matters: dispose all cells BEFORE removing
 // the structural container (same constraint as FullCalendar / AG-Grid).
 class MiniListEngine {
-  constructor(rootEl, opts) {
+  constructor(rootEl: any, opts: any) {
     this.rootEl = rootEl;
     this.items = opts.items;
     this.cellRenderer = opts.cellRenderer;
@@ -36,7 +36,7 @@ class MiniListEngine {
   }
   _mount() {
     const ul = document.createElement('ul');
-    for (const item of this.items) {
+    for (const item of this.items as any) {
       const li = document.createElement('li');
       const cell = this.cellRenderer(item);
       li.appendChild(cell.node);
@@ -46,12 +46,12 @@ class MiniListEngine {
     this.rootEl.appendChild(ul);
   }
   destroy() {
-    for (const dispose of this.disposers) dispose();
+    for (const dispose of this.disposers as any) dispose();
     this.disposers = [];
     while (this.rootEl.firstChild) this.rootEl.removeChild(this.rootEl.firstChild);
   }
 }
-let instance = null;
+let instance: any = null;
 
 const portalInstances = new Set<Record<string, unknown>>();
 const portals = {
@@ -78,7 +78,7 @@ $effect(() => () => {
 onMount(() => {
   instance = new MiniListEngine(__rozieRoot, {
     items: items,
-    cellRenderer: item => {
+    cellRenderer: (item: any) => {
       const node = document.createElement('div');
       const dispose = portals.item(node, {
         item

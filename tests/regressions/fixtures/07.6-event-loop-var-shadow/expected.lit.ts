@@ -33,7 +33,7 @@ export default class EventLoopVarShadow extends SignalWatcher(LitElement) {
 `;
   }
 
-  removeItem = id => {
-  this._items.value = this._items.value.filter(x => x.id !== id);
+  removeItem = (id: any) => {
+  this._items.value = this._items.value.filter((x: any) => x.id !== id);
 };
 }

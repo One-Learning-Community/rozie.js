@@ -36,6 +36,7 @@
  */
 import * as t from '@babel/types';
 import _traverse from '@babel/traverse';
+import type { NodePath } from '@babel/traverse';
 import type { File } from '@babel/types';
 import type { IRComponent } from '../../../../core/src/ir/types.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
@@ -51,6 +52,68 @@ const traverse: TraverseFn =
   typeof _traverse === 'function'
     ? (_traverse as TraverseFn)
     : ((_traverse as unknown as { default: TraverseFn }).default);
+
+/**
+ * Decide whether a `$refs.X` access should lower to a non-null assertion
+ * (`this.foo()!.nativeElement`) instead of the default optional chain
+ * (`this.foo()?.nativeElement`).
+ *
+ * The optional chain is the safe DEFAULT — a ref whose element is `r-if`-gated
+ * (e.g. Dropdown's `panelEl`) is genuinely `undefined` before it renders, and
+ * guard code like `if (!$refs.panelEl) return` depends on `?.` yielding
+ * `undefined`.
+ *
+ * Two contexts prove the author has asserted the element exists:
+ *
+ *   1. The author wrote a NON-optional access on it — `$refs.X.method()` /
+ *      `$refs.X.prop` — so each independent `?.` lowering would otherwise
+ *      defeat TS narrowing across an earlier `if (!$refs.X) return` (TS2532).
+ *   2. It is handed to a function/constructor call — `flatpickr($refs.inputEl)`,
+ *      `new Chart($refs.canvasEl)`, `new Editor({ element: $refs.editorEl })`
+ *      — the canonical engine-wrapper pattern. The host element a vanilla-JS
+ *      engine mounts into is unconditional by construction; passing a
+ *      possibly-`undefined` value into a typed engine constructor is TS2379
+ *      under `exactOptionalPropertyTypes`. The walk steps out through enclosing
+ *      object/array literals so `{ element: $refs.editorEl }` is recognised as
+ *      "passed into `new Editor(...)`".
+ */
+function refLowersToNonNull(path: NodePath<t.MemberExpression>): boolean {
+  const parent = path.parent;
+  // (1) authored non-optional member/call on the ref itself. OptionalMember /
+  //     OptionalCall parents are intentionally excluded — the author opted
+  //     into optionality there (`$refs.dialogEl?.focus()`).
+  if (t.isMemberExpression(parent) && parent.object === path.node) return true;
+  if (t.isCallExpression(parent) && parent.callee === path.node) return true;
+  // (2) flows into a Call/NewExpression argument, possibly nested inside
+  //     object/array literals.
+  let child: t.Node = path.node;
+  let p: NodePath | null = path.parentPath;
+  while (p) {
+    const n = p.node;
+    if (
+      (t.isCallExpression(n) || t.isNewExpression(n)) &&
+      n.arguments.some((a) => (a as t.Node) === child)
+    ) {
+      return true;
+    }
+    if (t.isObjectProperty(n) && n.value === child) {
+      child = n;
+      p = p.parentPath;
+      continue;
+    }
+    if (
+      t.isObjectExpression(n) ||
+      t.isArrayExpression(n) ||
+      t.isSpreadElement(n)
+    ) {
+      child = n;
+      p = p.parentPath;
+      continue;
+    }
+    break;
+  }
+  return false;
+}
 
 export interface RewriteScriptResult {
   rewrittenProgram: File;
@@ -420,19 +483,12 @@ export function rewriteRozieIdentifiers(
           t.memberExpression(t.thisExpression(), synthId),
           [],
         );
-        // Bug 7: when the author wrote a NON-optional access on `$refs.X`
-        // (e.g. `$refs.triggerEl.getBoundingClientRect()` — `$refs.X` is the
-        // `object` of a non-optional MemberExpression, or the `callee` of a
-        // CallExpression), each `?.` lowering produces a fresh independent
-        // optional chain that TS cannot re-narrow across an earlier
-        // `if (!$refs.X) return` guard → TS2532. The author already opted
-        // out of optionality by not writing `?.`, so emit a non-null
-        // assertion `this.foo()!.nativeElement` instead.
-        const parent = path.parent;
-        const authoredNonOptional =
-          (t.isMemberExpression(parent) && parent.object === path.node) ||
-          (t.isCallExpression(parent) && parent.callee === path.node);
-        if (authoredNonOptional) {
+        // Lower to `this.foo()!.nativeElement` (non-null) vs
+        // `this.foo()?.nativeElement` (optional) per refLowersToNonNull —
+        // authored non-optional access (TS2532 narrowing) OR passed into an
+        // engine constructor/function call (TS2379 under
+        // exactOptionalPropertyTypes). See refLowersToNonNull's doc comment.
+        if (refLowersToNonNull(path)) {
           path.replaceWith(
             t.memberExpression(
               t.tsNonNullExpression(refCall),

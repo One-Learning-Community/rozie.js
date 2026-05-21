@@ -16,7 +16,7 @@ defineSlots<{
 const __rozieRootRef = ref<HTMLElement>();
 
 import DummyEngine from 'dummy-engine';
-let instance = null;
+let instance: any = null;
 
 let _cleanup_0: (() => void) | undefined;
 onMounted(() => {

@@ -26,7 +26,7 @@ export default function TodoList(_props: TodoListProps): JSX.Element {
 
   const [items, setItems] = createControllableSignal<any[]>(_props as Record<string, unknown>, 'items', (() => [])());
   const [draft, setDraft] = createSignal('');
-  const remaining = createMemo(() => items().filter(i => !i.done).length);
+  const remaining = createMemo(() => items().filter((i: any) => !i.done).length);
 
   function add() {
     const text = draft().trim();
@@ -39,8 +39,8 @@ export default function TodoList(_props: TodoListProps): JSX.Element {
     setDraft('');
     _props.onAdd?.(text);
   }
-  function toggle(id) {
-    setItems(items().map(i => i.id === id ? {
+  function toggle(id: any) {
+    setItems(items().map((i: any) => i.id === id ? {
       ...i,
       done: !i.done
     } : i));
@@ -52,8 +52,8 @@ export default function TodoList(_props: TodoListProps): JSX.Element {
   // methods as class fields and the resulting `remove(id)` signature is
   // incompatible with the inherited `remove(): void`. Public API is unchanged:
   // the slot param is still `:remove`, the emitted event is still `'remove'`.
-  function removeItem(id) {
-    setItems(items().filter(i => i.id !== id));
+  function removeItem(id: any) {
+    setItems(items().filter((i: any) => i.id !== id));
     _props.onRemove?.(id);
   }
 

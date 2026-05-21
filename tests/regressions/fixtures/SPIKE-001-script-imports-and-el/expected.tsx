@@ -8,7 +8,7 @@ interface SpikeImportElProps {
 }
 
 export default function SpikeImportEl(props: SpikeImportElProps): JSX.Element {
-  const instance = useRef(null);
+  const instance = useRef<any>(null);
   const __rozieRoot = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {

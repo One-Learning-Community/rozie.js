@@ -42,8 +42,8 @@ const add = () => {
   draft = '';
   onadd?.(text);
 };
-const toggle = id => {
-  items = items.map(i => i.id === id ? {
+const toggle = (id: any) => {
+  items = items.map((i: any) => i.id === id ? {
     ...i,
     done: !i.done
   } : i);
@@ -60,12 +60,12 @@ const toggle = id => {
 // methods as class fields and the resulting `remove(id)` signature is
 // incompatible with the inherited `remove(): void`. Public API is unchanged:
 // the slot param is still `:remove`, the emitted event is still `'remove'`.
-const removeItem = id => {
-  items = items.filter(i => i.id !== id);
+const removeItem = (id: any) => {
+  items = items.filter((i: any) => i.id !== id);
   onremove?.(id);
 };
 
-const remaining = $derived(items.filter(i => !i.done).length);
+const remaining = $derived(items.filter((i: any) => !i.done).length);
 </script>
 
 

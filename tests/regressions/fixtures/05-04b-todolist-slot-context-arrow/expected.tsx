@@ -19,7 +19,7 @@ export default function ScopedSlotContext(props: ScopedSlotContextProps): JSX.El
     defaultValue: props.defaultItems ?? (() => [])(),
     onValueChange: props.onItemsChange,
   });
-  const remaining = useMemo(() => items.filter(i => !i.done).length, [items]);
+  const remaining = useMemo(() => items.filter((i: any) => !i.done).length, [items]);
 
   return (
     <>

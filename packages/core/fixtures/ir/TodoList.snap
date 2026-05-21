@@ -254,7 +254,13 @@
                     "filename": "TodoList.rozie",
                     "identifierName": "i"
                   },
-                  "name": "i"
+                  "name": "i",
+                  "typeAnnotation": {
+                    "type": "TSTypeAnnotation",
+                    "typeAnnotation": {
+                      "type": "TSAnyKeyword"
+                    }
+                  }
                 }
               ],
               "body": {
@@ -2013,7 +2019,13 @@
                         "filename": "TodoList.rozie",
                         "identifierName": "id"
                       },
-                      "name": "id"
+                      "name": "id",
+                      "typeAnnotation": {
+                        "type": "TSTypeAnnotation",
+                        "typeAnnotation": {
+                          "type": "TSAnyKeyword"
+                        }
+                      }
                     }
                   ],
                   "body": {
@@ -2218,7 +2230,13 @@
                                       "filename": "TodoList.rozie",
                                       "identifierName": "i"
                                     },
-                                    "name": "i"
+                                    "name": "i",
+                                    "typeAnnotation": {
+                                      "type": "TSTypeAnnotation",
+                                      "typeAnnotation": {
+                                        "type": "TSAnyKeyword"
+                                      }
+                                    }
                                   }
                                 ],
                                 "body": {
@@ -2741,7 +2759,13 @@
                         "filename": "TodoList.rozie",
                         "identifierName": "id"
                       },
-                      "name": "id"
+                      "name": "id",
+                      "typeAnnotation": {
+                        "type": "TSTypeAnnotation",
+                        "typeAnnotation": {
+                          "type": "TSAnyKeyword"
+                        }
+                      }
                     }
                   ],
                   "body": {
@@ -2946,7 +2970,13 @@
                                       "filename": "TodoList.rozie",
                                       "identifierName": "i"
                                     },
-                                    "name": "i"
+                                    "name": "i",
+                                    "typeAnnotation": {
+                                      "type": "TSTypeAnnotation",
+                                      "typeAnnotation": {
+                                        "type": "TSAnyKeyword"
+                                      }
+                                    }
                                   }
                                 ],
                                 "body": {

@@ -130,7 +130,7 @@ form[data-rozie-s-52bec3de] { display: flex; gap: 0.25rem; margin-block: 0.5rem;
 `;
   }
 
-  get remaining() { return this.items.filter(i => !i.done).length; }
+  get remaining() { return this.items.filter((i: any) => !i.done).length; }
 
   add = () => {
   const text = this._draft.value.trim();
@@ -148,8 +148,8 @@ form[data-rozie-s-52bec3de] { display: flex; gap: 0.25rem; margin-block: 0.5rem;
   }));
 };
 
-  toggle = id => {
-  this.items = this.items.map(i => i.id === id ? {
+  toggle = (id: any) => {
+  this.items = this.items.map((i: any) => i.id === id ? {
     ...i,
     done: !i.done
   } : i);
@@ -160,8 +160,8 @@ form[data-rozie-s-52bec3de] { display: flex; gap: 0.25rem; margin-block: 0.5rem;
   }));
 };
 
-  removeItem = id => {
-  this.items = this.items.filter(i => i.id !== id);
+  removeItem = (id: any) => {
+  this.items = this.items.filter((i: any) => i.id !== id);
   this.dispatchEvent(new CustomEvent("remove", {
     detail: id,
     bubbles: true,

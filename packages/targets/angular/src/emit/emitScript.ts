@@ -918,9 +918,12 @@ export function emitScript(
         } else {
           // Primitive / other init — emit as class-level field too. Class fields
           // initialized at field declaration time match user intent ("this is
-          // module-level state").
-          const initCode = genCode(d.init);
-          classMethodLines.push(`${d.id.name} = ${initCode};`);
+          // module-level state"). genCode the whole declarator (not just the
+          // init) so a `: any` annotation added by typeNeutralizeScript — e.g.
+          // `let editor = null` → `editor: any = null` — survives onto the
+          // field; without it the field is typed `null` and every reassignment
+          // (`this.editor = new Editor()`) is TS2322.
+          classMethodLines.push(`${genCode(d)};`);
         }
       }
       continue;

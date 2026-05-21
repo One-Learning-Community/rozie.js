@@ -32,7 +32,7 @@ export default function TodoList(_props: TodoListProps): JSX.Element {
     onValueChange: props.onItemsChange,
   });
   const [draft, setDraft] = useState('');
-  const remaining = useMemo(() => items.filter(i => !i.done).length, [items]);
+  const remaining = useMemo(() => items.filter((i: any) => !i.done).length, [items]);
 
   const { onAdd: _rozieProp_onAdd } = props;
     const add = useCallback(() => {
@@ -47,16 +47,16 @@ export default function TodoList(_props: TodoListProps): JSX.Element {
     _rozieProp_onAdd && _rozieProp_onAdd(text);
   }, [_rozieProp_onAdd, draft, setItems]);
   const { onToggle: _rozieProp_onToggle } = props;
-    const toggle = useCallback(id => {
-    setItems(prev => prev.map(i => i.id === id ? {
+    const toggle = useCallback((id: any) => {
+    setItems(prev => prev.map((i: any) => i.id === id ? {
       ...i,
       done: !i.done
     } : i));
     _rozieProp_onToggle && _rozieProp_onToggle(id);
   }, [_rozieProp_onToggle, setItems]);
   const { onRemove: _rozieProp_onRemove } = props;
-    const removeItem = useCallback(id => {
-    setItems(prev => prev.filter(i => i.id !== id));
+    const removeItem = useCallback((id: any) => {
+    setItems(prev => prev.filter((i: any) => i.id !== id));
     _rozieProp_onRemove && _rozieProp_onRemove(id);
   }, [_rozieProp_onRemove, setItems]);
 

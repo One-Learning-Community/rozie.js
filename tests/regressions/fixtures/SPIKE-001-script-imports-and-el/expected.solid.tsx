@@ -23,7 +23,7 @@ export default function SpikeImportEl(_props: SpikeImportElProps): JSX.Element {
   });
   let __rozieRootRef: HTMLElement | null = null;
 
-  let instance = null;
+  let instance: any = null;
 
   return (
     <>

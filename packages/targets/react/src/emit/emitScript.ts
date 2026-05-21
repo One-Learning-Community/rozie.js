@@ -1253,8 +1253,14 @@ export function emitScript(
   }
 
   // 5a. Hoisted useRef declarations (one per hoist instruction).
+  //     `h.tsType` carries the explicit type argument when typeNeutralizeScript
+  //     annotated the source `let` declarator (a null/undefined-initialised
+  //     module-let — the engine-wrapper pattern). Bare `useRef(null)` infers
+  //     `RefObject<null>`, so the engine assignment would be TS2322;
+  //     `useRef<any>(null)` keeps `.current` assignable.
   for (const h of hoistResult.hoisted) {
-    hookLines.push(`const ${h.name} = useRef(${genCode(h.initialExpr)});`);
+    const typeArg = h.tsType ? `<${h.tsType}>` : '';
+    hookLines.push(`const ${h.name} = useRef${typeArg}(${genCode(h.initialExpr)});`);
   }
 
   // 5b. useControllableState for each model:true prop.

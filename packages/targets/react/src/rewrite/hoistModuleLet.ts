@@ -47,6 +47,15 @@ const traverse: TraverseFn =
 export interface HoistInstruction {
   name: string;
   initialExpr: t.Expression;
+  /**
+   * Rendered TS type argument for the synthesized `useRef<…>(…)` call, or
+   * undefined to emit a bare `useRef(…)`. Set to `'any'` when
+   * typeNeutralizeScript annotated the source `let` declarator (a
+   * `null`/`undefined`-initialised module-let, the engine-wrapper pattern):
+   * `useRef(null)` infers `RefObject<null>`, so `editorRef.current = new
+   * Editor()` would be TS2322 — `useRef<any>(null)` keeps it assignable.
+   */
+  tsType?: string;
 }
 
 export interface HoistResult {
@@ -112,6 +121,8 @@ export function hoistModuleLet(program: File, ir: IRComponent): HoistResult {
     declIndex: number;
     declaratorIndex: number;
     sourceLoc: { start: number; end: number };
+    /** True when typeNeutralizeScript annotated the declarator id `: any`. */
+    typeNeutralized: boolean;
   };
   const moduleLets = new Map<string, LetCandidate>();
   program.program.body.forEach((stmt, idx) => {
@@ -129,6 +140,7 @@ export function hoistModuleLet(program: File, ir: IRComponent): HoistResult {
         declIndex: idx,
         declaratorIndex: declIdx,
         sourceLoc: { start, end },
+        typeNeutralized: decl.id.typeAnnotation != null,
       });
     });
   });
@@ -219,7 +231,11 @@ export function hoistModuleLet(program: File, ir: IRComponent): HoistResult {
   for (const name of referencedLets) {
     const c = moduleLets.get(name);
     if (!c) continue;
-    hoisted.push({ name: c.name, initialExpr: c.initialExpr });
+    hoisted.push({
+      name: c.name,
+      initialExpr: c.initialExpr,
+      ...(c.typeNeutralized ? { tsType: 'any' } : {}),
+    });
     // Mark the entire VariableDeclaration for removal IF every declarator
     // in it is a hoist target (the common case is single-declarator). For
     // mixed declarations, splice the specific declarator out.

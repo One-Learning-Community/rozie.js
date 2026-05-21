@@ -409,18 +409,25 @@ export function emitAttributes(
         out.push(`class="${escapeAttrValue(staticParts.join(' '))}"`);
       }
       if (dynamicParts.length > 0) {
-        // Multiple dynamic class bindings — merge into ngClass array.
-        // Use JS-safe escaping (backslash-escape single quotes) rather than
-        // HTML-entity escaping (&quot;). Angular's template compiler processes
-        // binding values as JS expressions — HTML entities are NOT decoded —
-        // so &quot; would be passed literally to the expression evaluator.
-        // Closes WR-06.
-        const escapeForJsAttr = (s: string) =>
-          s.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        // Multiple dynamic class bindings — merge into Angular's [ngClass].
+        // The merged value is an Angular expression; emit it VERBATIM into the
+        // double-quoted attribute, exactly as the single-binding path does
+        // (emitSingleAttr emits `[${bindingName}]="${expr}"` with no escaping).
+        // attrToArraySegment produces single-quoted string literals
+        // (`{ 'is-readonly': … }`), so the value never collides with the `"`
+        // attribute delimiter.
+        //
+        // Earlier revisions escaped this value — first HTML-entity (`&quot;`),
+        // then backslash (`\'`, "WR-06"). Both were wrong: a `"`-delimited HTML
+        // attribute needs NO escaping of `'`, and `\'` is invalid in an Angular
+        // expression — the object key `{ 'is-readonly': … }` became
+        // `{ \'is-readonly\': … }` → Angular template parse error → the
+        // component fell back to a runtime `@Component` decorator (no AOT
+        // `ɵcmp`) → "JIT compiler unavailable" at runtime (TipTap/Uppy·angular).
         if (dynamicParts.length === 1) {
-          out.push(`[ngClass]="${escapeForJsAttr(dynamicParts[0]!)}"`);
+          out.push(`[ngClass]="${dynamicParts[0]!}"`);
         } else {
-          out.push(`[ngClass]="[${dynamicParts.map(escapeForJsAttr).join(', ')}]"`);
+          out.push(`[ngClass]="[${dynamicParts.join(', ')}]"`);
         }
       }
       continue;
@@ -443,14 +450,13 @@ export function emitAttributes(
         out.push(`style="${escapeAttrValue(staticParts.join(';'))}"`);
       }
       if (dynamicParts.length > 0) {
-        // Same JS-safe escaping as [ngClass] above — Angular template compiler
-        // does not decode HTML entities in binding values. Closes WR-06.
-        const escapeForJsAttr = (s: string) =>
-          s.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        // Emit the merged [ngStyle] expression verbatim — same rationale as the
+        // [ngClass] block above (no escaping; the value is a single-quoted
+        // Angular expression that never collides with the `"` delimiter).
         if (dynamicParts.length === 1) {
-          out.push(`[ngStyle]="${escapeForJsAttr(dynamicParts[0]!)}"`);
+          out.push(`[ngStyle]="${dynamicParts[0]!}"`);
         } else {
-          out.push(`[ngStyle]="[${dynamicParts.map(escapeForJsAttr).join(', ')}]"`);
+          out.push(`[ngStyle]="[${dynamicParts.join(', ')}]"`);
         }
       }
       continue;

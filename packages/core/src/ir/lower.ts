@@ -38,6 +38,7 @@ import { lowerTemplate } from './lowerers/lowerTemplate.js';
 import { lowerComponents } from './lowerers/lowerComponents.js';
 import { lowerSlots } from './lowerers/lowerSlots.js';
 import { lowerStyles } from './lowerers/lowerStyles.js';
+import { typeNeutralizeScript } from '../codegen/typeNeutralizeScript.js';
 import { lowerRootElementRef } from './lowerers/lowerRootElementRef.js';
 import * as t from '@babel/types';
 
@@ -174,6 +175,19 @@ export function lowerToIR(ast: RozieAST, opts: LowerOptions): LowerResult {
   // Mutates `ir` in place; no-op when $el is unused or root template is not
   // a single TemplateElement or already has a user-authored ref attribute.
   lowerRootElementRef(ir);
+
+  // Type-neutralize the untyped `<script>` AST so every target emits
+  // type-correct TypeScript. `<script>` is parsed as plain JS, so non-trivial
+  // `<script>` logic (an engine instance in `let editor = null`, untyped
+  // callback params) would otherwise emit type-broken output on all six
+  // targets. This runs HERE — in lowerToIR — rather than in compile() because
+  // `@rozie/unplugin` has its own `parse → lowerToIR → emit{Target}` pipeline
+  // that bypasses compile(); lowering is the single point both paths share.
+  // Mutates `ir.setupBody.scriptProgram` in place (IR-04: that program is the
+  // SAME node as `ast.script.program`, but every emitter clones it before
+  // mutation, and the annotations are exactly what each emitter needs).
+  // See packages/core/src/codegen/typeNeutralizeScript.ts.
+  typeNeutralizeScript(ir.setupBody.scriptProgram);
 
   return { ir, diagnostics, depGraph, bindings };
 }

@@ -144,8 +144,10 @@ $watch(() => $props.open, (v) => { if (v) reposition() })
     // $watch immediate-fire (260519 linechart-watch-recreate step 6): no
     // skip-initial gate — Svelte 5's `$effect` fires once at registration,
     // which IS the immediate fire. The callback runs inside `untrack(...)`.
+    // `v` carries a `: any` annotation from typeNeutralizeScript (untyped
+    // `<script>` callback param) — the watcher binding is otherwise unchanged.
     expect(scriptBlock).toMatch(
-      /\$effect\(\(\) => \{\s*const __watchVal = \(\(\) => open\)\(\);\s*untrack\(\(\) => \(v => \{[\s\S]*?\}\)\(__watchVal\)\);\s*\}\);/,
+      /\$effect\(\(\) => \{\s*const __watchVal = \(\(\) => open\)\(\);\s*untrack\(\(\) => \((?:v|\(v: any\)) => \{[\s\S]*?\}\)\(__watchVal\)\);\s*\}\);/,
     );
     expect(scriptBlock).not.toContain('__rozieWatchInitial');
   });

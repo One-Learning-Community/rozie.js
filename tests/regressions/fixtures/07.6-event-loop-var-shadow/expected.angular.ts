@@ -27,7 +27,7 @@ export class EventLoopVarShadow {
   }]);
 
   removeItem = (id: any) => {
-    this.items.set(this.items().filter(x => x.id !== id));
+    this.items.set(this.items().filter((x: any) => x.id !== id));
   };
 }
 

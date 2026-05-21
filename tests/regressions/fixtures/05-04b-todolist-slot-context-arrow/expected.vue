@@ -20,7 +20,7 @@ defineSlots<{
   item(props: { item: any; remaining: any }): any;
 }>();
 
-const remaining = computed(() => items.value.filter(i => !i.done).length);
+const remaining = computed(() => items.value.filter((i: any) => !i.done).length);
 </script>
 
 <style scoped>

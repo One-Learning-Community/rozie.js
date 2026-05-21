@@ -21,7 +21,7 @@ const items = ref([{
   label: 'B'
 }]);
 
-const removeItem = id => {
-  items.value = items.value.filter(x => x.id !== id);
+const removeItem = (id: any) => {
+  items.value = items.value.filter((x: any) => x.id !== id);
 };
 </script>

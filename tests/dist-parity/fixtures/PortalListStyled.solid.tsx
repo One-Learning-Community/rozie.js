@@ -37,7 +37,7 @@ export default function PortalListStyled(_props: PortalListStyledProps): JSX.Ele
     const _cleanup = (() => {
     instance = new MiniListEngine(__rozieRootRef, {
       items: local.items,
-      cellRenderer: item => {
+      cellRenderer: (item: any) => {
         const node = document.createElement('div');
         const dispose = portals.item(node, {
           item
@@ -61,7 +61,7 @@ export default function PortalListStyled(_props: PortalListStyledProps): JSX.Ele
   // Destruction order still matters: dispose all cells BEFORE removing
   // the structural container (same constraint as FullCalendar / AG-Grid).
   class MiniListEngine {
-    constructor(rootEl, opts) {
+    constructor(rootEl: any, opts: any) {
       this.rootEl = rootEl;
       this.items = opts.items;
       this.cellRenderer = opts.cellRenderer;
@@ -70,7 +70,7 @@ export default function PortalListStyled(_props: PortalListStyledProps): JSX.Ele
     }
     _mount() {
       const ul = document.createElement('ul');
-      for (const item of this.items) {
+      for (const item of this.items as any) {
         const li = document.createElement('li');
         const cell = this.cellRenderer(item);
         li.appendChild(cell.node);
@@ -80,12 +80,12 @@ export default function PortalListStyled(_props: PortalListStyledProps): JSX.Ele
       this.rootEl.appendChild(ul);
     }
     destroy() {
-      for (const dispose of this.disposers) dispose();
+      for (const dispose of this.disposers as any) dispose();
       this.disposers = [];
       while (this.rootEl.firstChild) this.rootEl.removeChild(this.rootEl.firstChild);
     }
   }
-  let instance = null;
+  let instance: any = null;
 
   return (
     <>

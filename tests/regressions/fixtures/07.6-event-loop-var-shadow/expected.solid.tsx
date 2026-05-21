@@ -14,8 +14,8 @@ export default function EventLoopVarShadow(_props: EventLoopVarShadowProps): JSX
     label: 'B'
   }]);
 
-  function removeItem(id) {
-    setItems(items().filter(x => x.id !== id));
+  function removeItem(id: any) {
+    setItems(items().filter((x: any) => x.id !== id));
   }
 
   return (

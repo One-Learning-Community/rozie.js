@@ -38,7 +38,7 @@ export class ScopedSlotContext {
   @ContentChild('item', { read: TemplateRef }) itemTpl?: TemplateRef<ItemCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
 
-  remaining = computed(() => this.items().filter(i => !i.done).length);
+  remaining = computed(() => this.items().filter((i: any) => !i.done).length);
 
   static ngTemplateContextGuard(
     _dir: ScopedSlotContext,
