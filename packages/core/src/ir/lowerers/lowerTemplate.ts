@@ -992,6 +992,12 @@ function lowerNodeList(
 
         if (childDir.kind === 'default') {
           if (defaultSeen) {
+            // WR-04 — a SECOND r-default: emit ONLY the diagnostic and do
+            // NOT push it into `branches[]`. A `branches[]` with two trailing
+            // `test: null` entries is structurally invalid for every
+            // per-target `emitConditional` (React/Solid overwrite the chain,
+            // Vue/Svelte emit a doubled `v-else`/`{:else}`). Pruning the extra
+            // rung keeps the IR shape stable regardless of source malformation.
             diagnostics.push({
               code: RozieErrorCode.MATCH_MULTIPLE_DEFAULT,
               severity: 'error',
@@ -999,6 +1005,7 @@ function lowerNodeList(
               loc: childDir.attr.loc,
               hint: `Remove the extra r-default — only the first catch-all branch is reachable.`,
             });
+            continue;
           }
           defaultSeen = true;
           // Phase 11 R8 / CR-01 — a `<template r-default>` host is
