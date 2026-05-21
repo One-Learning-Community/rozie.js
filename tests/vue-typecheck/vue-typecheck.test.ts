@@ -49,6 +49,13 @@ const EXAMPLES = [
   'Flatpickr',
 ];
 
+// TYPED_EXAMPLES — the `examples/typed/*` fixture set (Phase 9
+// `<script lang="ts">`). Side-by-side typed variants resolved under
+// `examples/typed/`, NOT added to the dist-parity EXAMPLES baseline. Checked
+// in a separate describe block so a typed-fixture failure is distinguishable
+// from an untyped regression.
+const TYPED_EXAMPLES = ['Counter', 'Dropdown', 'SortableList', 'TypedCard'];
+
 describe('VUE-TSC — vue-tsc --noEmit clean over emitted Vue SFCs', () => {
   it('all 12 emitted Vue SFC files (8 reference + 4 engine-wrapper) typecheck clean', () => {
     const tmpDir = mkdtempSync(join(tmpdir(), 'rozie-vue-tsc-'));
@@ -71,6 +78,45 @@ describe('VUE-TSC — vue-tsc --noEmit clean over emitted Vue SFCs', () => {
       copyFileSync(join(HERE, 'engine-modules.d.ts'), join(tmpDir, 'engine-modules.d.ts'));
       // Symlink the workspace's node_modules so vue-tsc resolves vue,
       // @rozie/runtime-vue, etc.
+      symlinkSync(join(HERE, 'node_modules'), join(tmpDir, 'node_modules'), 'dir');
+
+      const vueTscBin = resolve(HERE, 'node_modules/.bin/vue-tsc');
+      try {
+        execFileSync(vueTscBin, ['--noEmit', '-p', 'tsconfig.json'], {
+          cwd: tmpDir,
+          stdio: 'pipe',
+        });
+      } catch (err) {
+        const stdout = (err as { stdout?: Buffer }).stdout?.toString() ?? '';
+        const stderr = (err as { stderr?: Buffer }).stderr?.toString() ?? '';
+        throw new Error('vue-tsc --noEmit exited non-zero:\n' + stdout + '\n' + stderr);
+      }
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('VUE-TSC (typed) — vue-tsc --noEmit clean over emitted typed Vue SFCs', () => {
+  it('all 4 emitted typed Vue SFC files (examples/typed/*) typecheck clean', () => {
+    const tmpDir = mkdtempSync(join(tmpdir(), 'rozie-vue-tsc-typed-'));
+    try {
+      for (const name of TYPED_EXAMPLES) {
+        const source = readFileSync(resolve(ROOT, 'examples/typed/' + name + '.rozie'), 'utf8');
+        const result = compile(source, {
+          target: 'vue',
+          filename: name + '.rozie',
+          sourceMap: false,
+        });
+        const errors = result.diagnostics.filter((d) => d.severity === 'error');
+        expect(errors).toEqual([]);
+        writeFileSync(join(tmpDir, name + '.vue'), result.code, 'utf8');
+      }
+
+      copyFileSync(join(HERE, 'tsconfig.json'), join(tmpDir, 'tsconfig.json'));
+      // typed/SortableList imports `sortablejs`; typed/TypedCard `import type`s
+      // from it — the ambient engine-module stub resolves both to `any`.
+      copyFileSync(join(HERE, 'engine-modules.d.ts'), join(tmpDir, 'engine-modules.d.ts'));
       symlinkSync(join(HERE, 'node_modules'), join(tmpDir, 'node_modules'), 'dir');
 
       const vueTscBin = resolve(HERE, 'node_modules/.bin/vue-tsc');

@@ -52,6 +52,13 @@ const EXAMPLES = [
   'Flatpickr',
 ];
 
+// TYPED_EXAMPLES — the `examples/typed/*` fixture set (Phase 9
+// `<script lang="ts">`). Side-by-side typed variants resolved under
+// `examples/typed/`, NOT added to the dist-parity EXAMPLES baseline. Checked
+// in a separate describe block so a typed-fixture failure is distinguishable
+// from an untyped regression.
+const TYPED_EXAMPLES = ['Counter', 'Dropdown', 'SortableList', 'TypedCard'];
+
 describe('SVELTE-CHECK — svelte-check --threshold error clean over emitted Svelte SFCs', () => {
   it('all 12 emitted Svelte .svelte files (8 reference + 4 engine-wrapper) svelte-check clean', () => {
     const tmpDir = mkdtempSync(join(tmpdir(), 'rozie-svelte-check-'));
@@ -74,6 +81,49 @@ describe('SVELTE-CHECK — svelte-check --threshold error clean over emitted Sve
       copyFileSync(join(HERE, 'engine-modules.d.ts'), join(tmpDir, 'engine-modules.d.ts'));
       // Symlink the workspace's node_modules so svelte-check resolves svelte,
       // typescript, etc. — same pattern the Solid/Lit tsc gates use.
+      symlinkSync(join(HERE, 'node_modules'), join(tmpDir, 'node_modules'), 'dir');
+
+      const svelteCheckBin = resolve(HERE, 'node_modules/.bin/svelte-check');
+      try {
+        execFileSync(
+          svelteCheckBin,
+          ['--tsconfig', './tsconfig.json', '--threshold', 'error', '--output', 'human'],
+          {
+            cwd: tmpDir,
+            stdio: 'pipe',
+          },
+        );
+      } catch (err) {
+        const stdout = (err as { stdout?: Buffer }).stdout?.toString() ?? '';
+        const stderr = (err as { stderr?: Buffer }).stderr?.toString() ?? '';
+        throw new Error('svelte-check exited non-zero:\n' + stdout + '\n' + stderr);
+      }
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('SVELTE-CHECK (typed) — svelte-check clean over emitted typed Svelte SFCs', () => {
+  it('all 4 emitted typed Svelte .svelte files (examples/typed/*) svelte-check clean', () => {
+    const tmpDir = mkdtempSync(join(tmpdir(), 'rozie-svelte-check-typed-'));
+    try {
+      for (const name of TYPED_EXAMPLES) {
+        const source = readFileSync(resolve(ROOT, 'examples/typed/' + name + '.rozie'), 'utf8');
+        const result = compile(source, {
+          target: 'svelte',
+          filename: name + '.rozie',
+          sourceMap: false,
+        });
+        const errors = result.diagnostics.filter((d) => d.severity === 'error');
+        expect(errors).toEqual([]);
+        writeFileSync(join(tmpDir, name + '.svelte'), result.code, 'utf8');
+      }
+
+      copyFileSync(join(HERE, 'tsconfig.json'), join(tmpDir, 'tsconfig.json'));
+      // typed/SortableList imports `sortablejs`; typed/TypedCard `import type`s
+      // from it — the ambient engine-module stub resolves both to `any`.
+      copyFileSync(join(HERE, 'engine-modules.d.ts'), join(tmpDir, 'engine-modules.d.ts'));
       symlinkSync(join(HERE, 'node_modules'), join(tmpDir, 'node_modules'), 'dir');
 
       const svelteCheckBin = resolve(HERE, 'node_modules/.bin/svelte-check');

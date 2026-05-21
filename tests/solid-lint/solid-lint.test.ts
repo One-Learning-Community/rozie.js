@@ -37,6 +37,14 @@ const EXAMPLES = [
   'CardHeader',
 ];
 
+// TYPED_EXAMPLES — the `examples/typed/*` fixture set (Phase 9
+// `<script lang="ts">`). Side-by-side typed variants resolved under
+// `examples/typed/`, NOT added to the dist-parity EXAMPLES baseline. Linted +
+// tsc-checked in separate describe blocks so a typed-fixture failure is
+// distinguishable from an untyped regression. Solid uses a LINT gate (this
+// workspace) as its per-target gate — it has no separate typecheck workspace.
+const TYPED_EXAMPLES = ['Counter', 'Dropdown', 'SortableList', 'TypedCard'];
+
 describe('SOLID-T-04 — eslint-plugin-solid clean (--max-warnings 0)', () => {
   it('all 8 emitted Solid TSX files lint clean', () => {
     const tmpDir = mkdtempSync(join(tmpdir(), 'rozie-solid-lint-'));
@@ -107,6 +115,85 @@ describe('SOLID-TSC — tsc --noEmit clean over emitted Solid TSX', () => {
       // Symlink the lint workspace's node_modules so tsc resolves solid-js,
       // @rozie/runtime-solid, etc. — matches the same pattern eslint uses (it
       // reads its plugins from HERE/node_modules via --config).
+      symlinkSync(join(HERE, 'node_modules'), join(tmpDir, 'node_modules'), 'dir');
+
+      const tscBin = resolve(HERE, 'node_modules/.bin/tsc');
+      try {
+        execFileSync(tscBin, ['--noEmit', '-p', 'tsconfig.json'], {
+          cwd: tmpDir,
+          stdio: 'pipe',
+        });
+      } catch (err) {
+        const stdout = (err as { stdout?: Buffer }).stdout?.toString() ?? '';
+        const stderr = (err as { stderr?: Buffer }).stderr?.toString() ?? '';
+        throw new Error('tsc --noEmit exited non-zero:\n' + stdout + '\n' + stderr);
+      }
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('SOLID-T-04 (typed) — eslint-plugin-solid clean over emitted typed Solid TSX', () => {
+  it('all 4 emitted typed Solid TSX files (examples/typed/*) lint clean', () => {
+    const tmpDir = mkdtempSync(join(tmpdir(), 'rozie-solid-lint-typed-'));
+    try {
+      for (const name of TYPED_EXAMPLES) {
+        const source = readFileSync(resolve(ROOT, 'examples/typed/' + name + '.rozie'), 'utf8');
+        const result = compile(source, {
+          target: 'solid',
+          filename: name + '.rozie',
+          sourceMap: false,
+        });
+        const errors = result.diagnostics.filter((d) => d.severity === 'error');
+        expect(errors).toEqual([]);
+        writeFileSync(join(tmpDir, name + '.tsx'), result.code, 'utf8');
+      }
+
+      copyFileSync(join(HERE, 'tsconfig.json'), join(tmpDir, 'tsconfig.json'));
+      // typed/SortableList imports `sortablejs`; typed/TypedCard `import type`s
+      // from it — the ambient engine-module stub resolves both to `any` so the
+      // type-aware ESLint parser does not flag an unresolved module.
+      copyFileSync(join(HERE, 'engine-modules.d.ts'), join(tmpDir, 'engine-modules.d.ts'));
+
+      const eslintBin = resolve(HERE, 'node_modules/.bin/eslint');
+      const configPath = join(HERE, 'eslint.config.mjs');
+      try {
+        execFileSync(eslintBin, ['.', '--config', configPath, '--max-warnings', '0'], {
+          cwd: tmpDir,
+          stdio: 'pipe',
+        });
+      } catch (err) {
+        const stdout = (err as { stdout?: Buffer }).stdout?.toString() ?? '';
+        const stderr = (err as { stderr?: Buffer }).stderr?.toString() ?? '';
+        throw new Error('eslint exited non-zero:\n' + stdout + '\n' + stderr);
+      }
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('SOLID-TSC (typed) — tsc --noEmit clean over emitted typed Solid TSX', () => {
+  it('all 4 emitted typed Solid TSX files (examples/typed/*) tsc clean', () => {
+    const tmpDir = mkdtempSync(join(tmpdir(), 'rozie-solid-tsc-typed-'));
+    try {
+      for (const name of TYPED_EXAMPLES) {
+        const source = readFileSync(resolve(ROOT, 'examples/typed/' + name + '.rozie'), 'utf8');
+        const result = compile(source, {
+          target: 'solid',
+          filename: name + '.rozie',
+          sourceMap: false,
+        });
+        const errors = result.diagnostics.filter((d) => d.severity === 'error');
+        expect(errors).toEqual([]);
+        writeFileSync(join(tmpDir, name + '.tsx'), result.code, 'utf8');
+      }
+
+      copyFileSync(join(HERE, 'tsconfig.json'), join(tmpDir, 'tsconfig.json'));
+      // typed/SortableList imports `sortablejs`; typed/TypedCard `import type`s
+      // from it — the ambient engine-module stub resolves both to `any`.
+      copyFileSync(join(HERE, 'engine-modules.d.ts'), join(tmpDir, 'engine-modules.d.ts'));
       symlinkSync(join(HERE, 'node_modules'), join(tmpDir, 'node_modules'), 'dir');
 
       const tscBin = resolve(HERE, 'node_modules/.bin/tsc');

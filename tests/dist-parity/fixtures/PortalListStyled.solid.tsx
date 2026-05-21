@@ -35,7 +35,7 @@ export default function PortalListStyled(_props: PortalListStyledProps): JSX.Ele
   });
   onMount(() => {
     const _cleanup = (() => {
-    instance = new MiniListEngine(__rozieRootRef, {
+    instance = new MiniListEngine(__rozieRootRef!, {
       items: local.items,
       cellRenderer: (item: any) => {
         const node = document.createElement('div');

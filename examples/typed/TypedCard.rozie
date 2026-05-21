@@ -7,12 +7,15 @@
   example can be forked into:
     - declares an `interface` and a `type` alias inside <script lang="ts">
     - uses a type-only import (`import type { … } from '…'`)
-    - the author types are consumed by typed `const` declarations
+    - the author types are consumed by typed `$computed` declarations and a
+      typed function parameter
 
   Statement-position `interface` / `type` declarations must be hoisted to
   module scope for the class-based targets (Angular / Lit) — this fixture
-  exercises that hoist path (Plan 09-04 OQ-3). It is small on purpose and
-  compiles cleanly to all six targets.
+  exercises that hoist path (Plan 09-04 OQ-3). Prop reads are routed through
+  `$computed` (the idiomatic Rozie pattern) so the emitted output is
+  reactivity-clean on every target, including Solid. It is small on purpose
+  and compiles cleanly to all six targets.
 -->
 
 <rozie name="TypedCard">
@@ -26,8 +29,8 @@
 
 <script lang="ts">
 // Type-only import — resolves against the ambient engine-module stub in the
-// per-target typecheck gates (sortablejs → `any`). Demonstrates that an
-// `import type { … }` survives to every target's module scope.
+// per-target typecheck gates (sortablejs → minimal real types). Demonstrates
+// that an `import type { … }` survives to every target's module scope.
 import type { Options } from 'sortablejs'
 
 // Author-declared type alias — must be preserved verbatim and hoisted to
@@ -40,21 +43,29 @@ interface CardMeta {
   emphasis: boolean
 }
 
-const meta: CardMeta = {
-  label: $props.title,
-  emphasis: ($props.tone as Tone) === 'accent',
+// A typed function parameter (`opts: Options | null`) consumes the type-only
+// import, so the `import type` is genuinely referenced (not elided as unused).
+const optionCount = (opts: Options | null): number => {
+  return opts === null ? 0 : Object.keys(opts).length
 }
 
-// Reference the type-only import so it is not elided as unused.
-const engineOptions: Options | null = null
+// Prop reads happen inside $computed (a tracked scope on every target) — the
+// idiomatic Rozie pattern. The author annotations on these computed `const`s
+// are exactly the Phase 9 surface.
+const meta: CardMeta = $computed(() => ({
+  label: $props.title,
+  emphasis: ($props.tone as Tone) === 'accent',
+}))
 
-const badge: string = meta.emphasis ? meta.label.toUpperCase() : meta.label
+const badge: string = $computed(() => meta.emphasis ? meta.label.toUpperCase() : meta.label)
+const optionLabel: string = `${optionCount(null)} options`
 </script>
 
 <template>
 <article class="typed-card" :class="{ 'typed-card--accent': $props.tone === 'accent' }">
   <h3 class="typed-card__title">{{ badge }}</h3>
   <div class="typed-card__body">
+    <span class="typed-card__meta">{{ optionLabel }}</span>
     <slot />
   </div>
 </article>
@@ -65,6 +76,7 @@ const badge: string = meta.emphasis ? meta.label.toUpperCase() : meta.label
 .typed-card--accent { border-color: #4f46e5; }
 .typed-card__title { margin: 0; padding: 0.75rem 1rem; font-size: 1rem; font-weight: 600; border-bottom: 1px solid #eee; }
 .typed-card__body { padding: 1rem; }
+.typed-card__meta { display: block; font-size: 0.75rem; color: #666; margin-bottom: 0.5rem; }
 </style>
 
 </rozie>

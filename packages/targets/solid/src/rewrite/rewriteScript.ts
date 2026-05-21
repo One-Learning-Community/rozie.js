@@ -280,7 +280,21 @@ export function rewriteRozieIdentifiers(
 
       if (object.name === '$refs' && refNames.has(property.name)) {
         // $refs.foo → fooRef (plain variable initialized to null at top of body)
-        path.replaceWith(t.identifier(property.name + 'Ref'));
+        const refIdent = t.identifier(property.name + 'Ref');
+        // Script-context `$el` (Spike 001 B2) lowers through here as the
+        // synthesised `$refs.__rozieRoot`. Its callback-ref local is typed
+        // `HTMLElement | null`, but every free `$el` read sits inside a
+        // lifecycle hook ($onMount/$onUnmount) where the root element is
+        // guaranteed mounted — so emit a non-null assertion (`__rozieRootRef!`)
+        // to keep the emitted Solid TSX type-safe, matching React's
+        // `__rozieRoot.current!`. Plain author `$refs.X` reads stay bare:
+        // they can legitimately be null (r-if-gated panels etc.) and the
+        // author owns that narrowing.
+        if (property.name === '__rozieRoot') {
+          path.replaceWith(t.tsNonNullExpression(refIdent));
+        } else {
+          path.replaceWith(refIdent);
+        }
         path.skip();
         return;
       }

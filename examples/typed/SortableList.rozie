@@ -37,11 +37,11 @@ import SortableJS from 'sortablejs'
 
 let instance: SortableJS | null = null
 
-const keyFor = (item: unknown, index: number): unknown => {
+const keyFor = (item: unknown, index: number): string | number => {
   if ($props.itemKey && item !== null && typeof item === 'object') {
-    return (item as Record<string, unknown>)[$props.itemKey] ?? index
+    return ((item as Record<string, unknown>)[$props.itemKey] ?? index) as string | number
   }
-  return item ?? index
+  return (item ?? index) as string | number
 }
 
 $onMount(() => {

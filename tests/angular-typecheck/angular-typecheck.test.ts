@@ -66,6 +66,16 @@ const EXAMPLES = [
   'Flatpickr',
 ];
 
+// TYPED_EXAMPLES — the `examples/typed/*` fixture set (Phase 9
+// `<script lang="ts">`). Side-by-side typed variants resolved under
+// `examples/typed/`, NOT added to the dist-parity EXAMPLES baseline. Checked
+// in a separate describe block so a typed-fixture failure is distinguishable
+// from an untyped regression. typed/TypedCard exercises the statement-position
+// interface/type module-scope hoist (Plan 09-04 OQ-3) on this class-based
+// target — a TSInterfaceDeclaration inside the @Component class body would be
+// a tsc syntax error if the hoist regressed.
+const TYPED_EXAMPLES = ['Counter', 'Dropdown', 'SortableList', 'TypedCard'];
+
 describe('ANGULAR-TSC — tsc --noEmit clean over emitted Angular standalone components', () => {
   it('all 12 emitted Angular .ts files (8 reference + 4 engine-wrapper) tsc clean', () => {
     const tmpDir = mkdtempSync(join(tmpdir(), 'rozie-angular-tsc-'));
@@ -88,6 +98,45 @@ describe('ANGULAR-TSC — tsc --noEmit clean over emitted Angular standalone com
       copyFileSync(join(HERE, 'engine-modules.d.ts'), join(tmpDir, 'engine-modules.d.ts'));
       // Symlink the workspace's node_modules so tsc resolves @angular/core,
       // @angular/common, etc. Mirrors the Solid + Lit gate pattern.
+      symlinkSync(join(HERE, 'node_modules'), join(tmpDir, 'node_modules'), 'dir');
+
+      const tscBin = resolve(HERE, 'node_modules/.bin/tsc');
+      try {
+        execFileSync(tscBin, ['--noEmit', '-p', 'tsconfig.json'], {
+          cwd: tmpDir,
+          stdio: 'pipe',
+        });
+      } catch (err) {
+        const stdout = (err as { stdout?: Buffer }).stdout?.toString() ?? '';
+        const stderr = (err as { stderr?: Buffer }).stderr?.toString() ?? '';
+        throw new Error('tsc --noEmit exited non-zero:\n' + stdout + '\n' + stderr);
+      }
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('ANGULAR-TSC (typed) — tsc --noEmit clean over emitted typed Angular components', () => {
+  it('all 4 emitted typed Angular .ts files (examples/typed/*) tsc clean', () => {
+    const tmpDir = mkdtempSync(join(tmpdir(), 'rozie-angular-tsc-typed-'));
+    try {
+      for (const name of TYPED_EXAMPLES) {
+        const source = readFileSync(resolve(ROOT, 'examples/typed/' + name + '.rozie'), 'utf8');
+        const result = compile(source, {
+          target: 'angular',
+          filename: name + '.rozie',
+          sourceMap: false,
+        });
+        const errors = result.diagnostics.filter((d) => d.severity === 'error');
+        expect(errors).toEqual([]);
+        writeFileSync(join(tmpDir, name + '.ts'), result.code, 'utf8');
+      }
+
+      copyFileSync(join(HERE, 'tsconfig.json'), join(tmpDir, 'tsconfig.json'));
+      // typed/SortableList imports `sortablejs`; typed/TypedCard `import type`s
+      // from it — the ambient engine-module stub resolves both to `any`.
+      copyFileSync(join(HERE, 'engine-modules.d.ts'), join(tmpDir, 'engine-modules.d.ts'));
       symlinkSync(join(HERE, 'node_modules'), join(tmpDir, 'node_modules'), 'dir');
 
       const tscBin = resolve(HERE, 'node_modules/.bin/tsc');
