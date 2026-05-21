@@ -373,6 +373,44 @@ function emitEvents(events: Listener[], ctx: EmitNodeCtx): string {
 }
 
 /**
+ * Recursively scan an AST node for an `Identifier` whose name equals `name`.
+ *
+ * Used to decide whether a `hoist`-mode match actually needs its temp emitted:
+ * core (plan 11-01) classifies a literal-`true` predicate-chain discriminant as
+ * `hoist` (it is not a bare Identifier / MemberExpression) and allocates a
+ * `tempName` — but `foldCaseTest` folds each rung to the BARE predicate, so the
+ * temp is never referenced. Emitting the hoist declaration anyway would produce
+ * a dead, unused `computed`. We skip the injection when no branch test mentions
+ * the temp.
+ */
+function astReferencesIdentifier(node: unknown, name: string): boolean {
+  if (node === null || typeof node !== 'object') return false;
+  const n = node as { type?: string; name?: string };
+  if (n.type === 'Identifier' && n.name === name) return true;
+  for (const key of Object.keys(node)) {
+    if (key === 'loc' || key === 'sourceLoc') continue;
+    const value = (node as Record<string, unknown>)[key];
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        if (astReferencesIdentifier(item, name)) return true;
+      }
+    } else if (value !== null && typeof value === 'object') {
+      if (astReferencesIdentifier(value, name)) return true;
+    }
+  }
+  return false;
+}
+
+/** True when at least one folded branch test references the hoist temp. */
+function hoistTempIsReferenced(node: TemplateMatchIR): boolean {
+  if (node.tempName === undefined) return false;
+  const tempName = node.tempName;
+  return node.branches.some(
+    (b) => b.test !== null && astReferencesIdentifier(b.test, tempName),
+  );
+}
+
+/**
  * Emit a TemplateMatch (Phase 11 `r-match` / `r-case` / `r-default`).
  *
  * D-02 — pure delegation: the `r-match` construct lowers to a node whose
@@ -382,8 +420,14 @@ function emitEvents(events: Listener[], ctx: EmitNodeCtx): string {
  * existing inline `emitConditional` — no bespoke match emit logic (RESEARCH
  * Open Question 2 recommendation (a)).
  *
- * `discriminantMode === 'hoist'`: handled the same way here — the hoist-temp
- * declaration is plan 11-05's job.
+ * `discriminantMode === 'hoist'` (D-04 — plan 11-06): an impure
+ * `CallExpression` discriminant must be evaluated EXACTLY ONCE per render. Vue
+ * has no template-level `computed` precedent (`computed` appears only in
+ * `emitScript.ts`), so the hoist temp is synthesized as a `<script setup>`
+ * injection: `const <tempName> = computed(() => <rewritten-discriminant>);`.
+ * The `v-if` ladder references `<tempName>` by name — core (plan 11-01) already
+ * folded each `r-case` test to `<tempName> === <caseValue>`, and a `computed`
+ * ref is auto-unwrapped inside a Vue template, so no `.value` is needed.
  *
  * `hostElement` (real-element `<div r-match>` host): the wrapper element must
  * survive emission. We render the host's tag/attributes via `emitElement` with
@@ -391,6 +435,37 @@ function emitEvents(events: Listener[], ctx: EmitNodeCtx): string {
  * child — `emitStaticText` passes its `text` through unchanged.
  */
 function delegateMatchToConditional(node: TemplateMatchIR, ctx: EmitNodeCtx): string {
+  // D-04 hoist: synthesize the `computed` script injection BEFORE the ladder is
+  // emitted, so `<tempName>` is declared in `<script setup>` and the ladder's
+  // folded branch tests resolve. Nested hoisting matches recurse through
+  // `emitNode`/`emitConditional` and push their own distinct-`tempName`
+  // injections — the core per-component counter (plan 11-01) guarantees the
+  // names never collide.
+  //
+  // The `hoistTempIsReferenced` guard skips the injection for literal-`true`
+  // predicate-chain matches: core marks them `hoist` and allocates a `tempName`,
+  // but `foldCaseTest` folds each rung to a bare predicate that never mentions
+  // the temp — emitting the `computed` anyway would be dead code.
+  //
+  // r-for LIMITATION: a `computed` is created once and shared across all loop
+  // iterations — wrong for a per-iteration discriminant. The correct fix inside
+  // an `r-for` is a METHOD injection taking the loop variables as args, but the
+  // Vue `EmitNodeCtx` carries no loop-bindings signal to detect that context.
+  // Per plan 11-06 we emit the `computed` form unconditionally (correct for the
+  // common non-loop case) and record the in-`r-for` gap as a SUMMARY follow-up
+  // rather than emitting code that silently mis-detects the context.
+  if (
+    node.discriminantMode === 'hoist' &&
+    node.tempName !== undefined &&
+    hoistTempIsReferenced(node)
+  ) {
+    const rewritten = rewriteTemplateExpression(node.discriminant, ctx.ir);
+    ctx.scriptInjections.push({
+      wrapName: node.tempName,
+      import: { from: 'vue', name: 'computed' },
+      decl: `const ${node.tempName} = computed(() => ${rewritten});`,
+    });
+  }
   const synthetic: TemplateConditionalIR = {
     type: 'TemplateConditional',
     branches: node.branches,
@@ -400,8 +475,6 @@ function delegateMatchToConditional(node: TemplateMatchIR, ctx: EmitNodeCtx): st
   if (node.hostElement === undefined) {
     return ladder;
   }
-  // TODO(11-05): hoist placement — a `hoist`-mode discriminant declares its
-  // temp above this wrapper; for now the wrapper is emitted unconditionally.
   const verbatim: TemplateStaticTextIR = {
     type: 'TemplateStaticText',
     text: ladder,

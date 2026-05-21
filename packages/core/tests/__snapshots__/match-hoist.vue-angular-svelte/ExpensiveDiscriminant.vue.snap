@@ -1,0 +1,28 @@
+<template>
+
+<template v-if="__rozieMatch_0 === 'pass'">
+    <div class="passed">
+      <strong v-if="__rozieMatch_1 === 'distinction'">passed with distinction</strong><span v-else-if="__rozieMatch_1 === 'merit'">passed with merit</span><span v-else>passed</span>
+    </div>
+  </template><span v-else-if="__rozieMatch_0 === 'fail'" class="failed">did not pass</span><span v-else class="unknown">ungraded</span>
+
+</template>
+
+<script setup lang="ts">
+import { ref } from 'vue';
+import { computed } from 'vue';
+
+const score = ref(72);
+
+const classify = () => score.value >= 50 ? 'pass' : 'fail';
+const subClassify = () => score.value >= 90 ? 'distinction' : 'merit';
+
+const __rozieMatch_0 = computed(() => classify());
+const __rozieMatch_1 = computed(() => subClassify());
+</script>
+
+<style scoped>
+.passed { color: #15803d; }
+.failed { color: #b91c1c; }
+.unknown { opacity: 0.5; }
+</style>
