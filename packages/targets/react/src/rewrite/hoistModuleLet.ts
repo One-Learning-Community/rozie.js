@@ -33,6 +33,7 @@
  */
 import * as t from '@babel/types';
 import _traverse from '@babel/traverse';
+import _generate from '@babel/generator';
 import type { File } from '@babel/types';
 import type { IRComponent } from '../../../../core/src/ir/types.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
@@ -44,16 +45,58 @@ const traverse: TraverseFn =
     ? (_traverse as TraverseFn)
     : ((_traverse as unknown as { default: TraverseFn }).default);
 
+// CJS interop normalization for @babel/generator default export.
+type GenerateFn = typeof import('@babel/generator').default;
+const generate: GenerateFn =
+  typeof _generate === 'function'
+    ? (_generate as GenerateFn)
+    : ((_generate as unknown as { default: GenerateFn }).default);
+
+/**
+ * OQ-2 (Phase 09 Plan 03) — resolve the TS type argument for a hoisted
+ * module-let's synthesized `useRef<…>(…)` call from the declarator's
+ * `typeAnnotation`.
+ *
+ * Returns:
+ *   - the author's type rendered as source text when the declarator carries
+ *     a real annotation (`let editor: Editor | null` → `'Editor | null'`),
+ *   - `'any'` when the annotation is exactly the bare `: any` keyword (the
+ *     `typeNeutralizeScript`-injected residue for a null/undefined-init'd
+ *     untyped module-let — `useRef<any>(null)` keeps `.current` assignable),
+ *   - `undefined` when the declarator has no annotation at all (emit a bare
+ *     `useRef(…)`).
+ *
+ * Before Phase 09 this conflated "has an annotation" with "type is `any`":
+ * once authors can type their `<script>` lets, that annotation IS the
+ * author's type and emitting `any` would silently downgrade it.
+ */
+function resolveHoistTsType(declId: t.Identifier): string | undefined {
+  const ann = declId.typeAnnotation;
+  if (!ann || !t.isTSTypeAnnotation(ann)) return undefined;
+  const inner = ann.typeAnnotation;
+  // Exactly the bare `: any` keyword — the typeNeutralizeScript-injected case.
+  if (t.isTSAnyKeyword(inner)) return 'any';
+  // A real author type — render it to source text. `@babel/generator` prints
+  // every TSType node natively.
+  return generate(inner).code;
+}
+
 export interface HoistInstruction {
   name: string;
   initialExpr: t.Expression;
   /**
    * Rendered TS type argument for the synthesized `useRef<…>(…)` call, or
-   * undefined to emit a bare `useRef(…)`. Set to `'any'` when
-   * typeNeutralizeScript annotated the source `let` declarator (a
-   * `null`/`undefined`-initialised module-let, the engine-wrapper pattern):
-   * `useRef(null)` infers `RefObject<null>`, so `editorRef.current = new
-   * Editor()` would be TS2322 — `useRef<any>(null)` keeps it assignable.
+   * undefined to emit a bare `useRef(…)`.
+   *
+   * OQ-2 (Phase 09 Plan 03): this carries the AUTHOR's declared type when the
+   * source `let` declarator was annotated (`let editor: Editor | null = null`
+   * → `'Editor | null'`). When the declarator carried no annotation but
+   * `typeNeutralizeScript` injected the bare `: any` residue (a
+   * `null`/`undefined`-initialised UNTYPED module-let — the engine-wrapper
+   * pattern), it is `'any'`: `useRef(null)` infers `RefObject<null>`, so
+   * `editorRef.current = new Editor()` would be TS2322 — `useRef<any>(null)`
+   * keeps it assignable. It is `undefined` only when the declarator has no
+   * `typeAnnotation` at all.
    */
   tsType?: string;
 }
@@ -70,11 +113,17 @@ function collectIdentifierRefs(
 ): Set<string> {
   const found = new Set<string>();
   // The walker needs a Program-rooted path. BlockStatements lift directly
-  // into the Program; everything else (Expressions / Arrows / FnExprs /
-  // Identifiers) we wrap in an ExpressionStatement first.
+  // into the Program; a Statement node (e.g. a top-level `function X() {}`
+  // declaration passed by step 2) is itself a valid Program member; only
+  // genuine Expressions (Arrows / FnExprs / Identifiers) need wrapping in an
+  // ExpressionStatement — wrapping a Statement crashes Babel's builder
+  // validator ("Property expression … expected node to be of a type
+  // ['Expression']").
   const programStmts: t.Statement[] = t.isBlockStatement(bodyNode)
     ? bodyNode.body
-    : [t.expressionStatement(bodyNode as t.Expression)];
+    : t.isStatement(bodyNode)
+      ? [bodyNode]
+      : [t.expressionStatement(bodyNode as t.Expression)];
   traverse(t.file(t.program(programStmts)), {
     Identifier(path) {
       if (!candidateNames.has(path.node.name)) return;
@@ -121,8 +170,12 @@ export function hoistModuleLet(program: File, ir: IRComponent): HoistResult {
     declIndex: number;
     declaratorIndex: number;
     sourceLoc: { start: number; end: number };
-    /** True when typeNeutralizeScript annotated the declarator id `: any`. */
-    typeNeutralized: boolean;
+    /**
+     * OQ-2: resolved `useRef<…>` type argument — the author's declared type
+     * when annotated, `'any'` for the typeNeutralizeScript-injected bare
+     * `: any` residue, `undefined` when the declarator carried no annotation.
+     */
+    hoistTsType: string | undefined;
   };
   const moduleLets = new Map<string, LetCandidate>();
   program.program.body.forEach((stmt, idx) => {
@@ -140,7 +193,7 @@ export function hoistModuleLet(program: File, ir: IRComponent): HoistResult {
         declIndex: idx,
         declaratorIndex: declIdx,
         sourceLoc: { start, end },
-        typeNeutralized: decl.id.typeAnnotation != null,
+        hoistTsType: resolveHoistTsType(decl.id),
       });
     });
   });
@@ -234,7 +287,11 @@ export function hoistModuleLet(program: File, ir: IRComponent): HoistResult {
     hoisted.push({
       name: c.name,
       initialExpr: c.initialExpr,
-      ...(c.typeNeutralized ? { tsType: 'any' } : {}),
+      // OQ-2: emit the author's declared type as the `useRef<…>` argument
+      // when present; fall back to the injected `: any` only when the
+      // declarator was untyped (`c.hoistTsType` is `'any'`) — and to a bare
+      // `useRef(…)` when the declarator carried no annotation at all.
+      ...(c.hoistTsType !== undefined ? { tsType: c.hoistTsType } : {}),
     });
     // Mark the entire VariableDeclaration for removal IF every declarator
     // in it is a hoist target (the common case is single-declarator). For

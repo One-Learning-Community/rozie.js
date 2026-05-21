@@ -1,0 +1,77 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Solid ts-passthrough — author annotation survival (Phase 09 Plan 03 Task 1) > compiles a typed .rozie to a .tsx preserving author annotations > typed-tsx 1`] = `
+"import type { JSX } from 'solid-js';
+import { mergeProps, onCleanup, onMount, splitProps } from 'solid-js';
+import type { EditorOptions } from './editor-types';
+
+interface TsPassthroughProps {
+  label?: string;
+}
+
+export default function TsPassthrough(_props: TsPassthroughProps): JSX.Element {
+  const _merged = mergeProps({ label: 'Count' }, _props);
+  const [local, rest] = splitProps(_merged, ['label']);
+
+  onMount(() => {
+    editor = makeEditor();
+  });
+  onCleanup(() => {
+    editor = null;
+  });
+
+  interface InternalShape {
+    id: number;
+    ready: boolean;
+  }
+  type Mode = 'idle' | 'busy';
+  let count: number = 0;
+  let editor: Editor | null = null;
+  let mode: Mode = 'idle';
+  function inc(by: number): void {
+    count = count + by;
+  }
+
+  return (
+    <>
+      <button onClick={($event) => { inc(1); }} data-rozie-s-189ead9a="">{label}: {count}</button>
+    </>
+  );
+}
+"
+`;
+
+exports[`Solid ts-passthrough — untyped emit byte-identity anchor > untyped emit is byte-identical to today (snapshot anchor) > untyped-tsx-anchor 1`] = `
+"import type { JSX } from 'solid-js';
+import { mergeProps, onCleanup, onMount, splitProps } from 'solid-js';
+
+interface TsPassthroughProps {
+  label?: string;
+}
+
+export default function TsPassthrough(_props: TsPassthroughProps): JSX.Element {
+  const _merged = mergeProps({ label: 'Count' }, _props);
+  const [local, rest] = splitProps(_merged, ['label']);
+
+  onMount(() => {
+    editor = makeEditor();
+  });
+  onCleanup(() => {
+    editor = null;
+  });
+
+  let count = 0;
+  let editor: any = null;
+  let mode = 'idle';
+  function inc(by: any) {
+    count = count + by;
+  }
+
+  return (
+    <>
+      <button onClick={($event) => { inc(1); }} data-rozie-s-189ead9a="">{label}: {count}</button>
+    </>
+  );
+}
+"
+`;

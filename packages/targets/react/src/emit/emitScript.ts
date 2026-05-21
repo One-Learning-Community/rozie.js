@@ -518,6 +518,14 @@ function tryHoistArrowToFunction(stmt: t.Statement): t.Statement | null {
     t.isObjectPattern(p) || t.isArrayPattern(p),
   );
 
+  // Phase 09 rebuild-site audit (Pattern 4 / Pitfall 3): `params` is passed by
+  // reference, so each param's `typeAnnotation` survives verbatim into output.
+  // `t.functionDeclaration` has no `returnType` / `typeParameters` parameters —
+  // those fields are NOT carried from `init`. The locked Phase 09 TS surface
+  // (annotations on declarations/params/catch + interface/type + import type)
+  // excludes explicit return types and generic functions, so the drop is in
+  // scope; a future maintainer adding return-type / generic support must
+  // copy `init.returnType` / `init.typeParameters` onto `fn` here.
   const fn = t.functionDeclaration(decl.id, params, body, false, init.async ?? false);
   return fn;
 }
@@ -742,6 +750,10 @@ function pairClonedLifecycle(
               t.isNullLiteral(lastStmt.argument));
           if (isNoCleanupReturn && lastStmt && t.isReturnStatement(lastStmt)) {
             // Strip the dead return so it doesn't show up in residual emit.
+            // Phase 09 rebuild-site audit (Pattern 4): `setupCloned.params` is
+            // reused by reference — param `typeAnnotation`s survive. Lifecycle
+            // setup arrows take no params in the locked surface and never
+            // carry a `returnType`, so nothing else needs copying here.
             setupCloned = t.arrowFunctionExpression(
               setupCloned.params,
               t.blockStatement(fnBody.body.slice(0, -1)),
@@ -1142,6 +1154,12 @@ export function emitScript(
         localModel,
         localNonModel,
       );
+      // Phase 09 rebuild-site audit (Pattern 4 / Pitfall 3): both the arrow
+      // and function-expression rebuilds below reuse `setupCloned.params` /
+      // `cleanupCloned.params` by reference — every param `typeAnnotation`
+      // survives. `t.arrowFunctionExpression` / `t.functionExpression` do NOT
+      // carry `returnType` / `typeParameters`; the locked Phase 09 TS surface
+      // excludes both, so the drop is in scope and intentional.
       let newSetupCloned: t.Expression | t.BlockStatement;
       if (t.isArrowFunctionExpression(setupCloned)) {
         newSetupCloned = t.arrowFunctionExpression(

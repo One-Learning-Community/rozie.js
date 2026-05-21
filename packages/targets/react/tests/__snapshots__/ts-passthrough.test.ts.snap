@@ -1,0 +1,89 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`React ts-passthrough — author annotation survival (Phase 09 Plan 03 Task 1) > compiles a typed .rozie to a .tsx preserving author annotations > typed-tsx 1`] = `
+"import { useEffect, useRef } from 'react';
+import type { EditorOptions } from './editor-types';
+
+interface TsPassthroughProps {
+  label?: string;
+}
+
+export default function TsPassthrough(_props: TsPassthroughProps): JSX.Element {
+  const props: TsPassthroughProps & { label: string } = {
+    ..._props,
+    label: _props.label ?? 'Count',
+  };
+  const editor = useRef<Editor | null>(null);
+  const untypedHandle = useRef<any>(null);
+
+  interface InternalShape {
+    id: number;
+    ready: boolean;
+  }
+  type Mode = 'idle' | 'busy';
+  let count: number = 0;
+  let mode: Mode = 'idle';
+  function inc(by: number): void {
+    count = count + by;
+  }
+
+  useEffect(() => {
+    editor.current = makeEditor();
+    untypedHandle.current = openHandle();
+  }, []);
+  useEffect(() => {
+    return () => {
+      editor.current = null;
+      untypedHandle.current = null;
+    };
+  }, []);
+
+  return (
+    <>
+      <button onClick={($event) => { inc(1); }} data-rozie-s-189ead9a="">{label}: {count}</button>
+    </>
+  );
+}
+"
+`;
+
+exports[`React ts-passthrough — untyped emit byte-identity anchor > untyped emit is byte-identical to today (snapshot anchor) > untyped-tsx-anchor 1`] = `
+"import { useEffect, useRef } from 'react';
+
+interface TsPassthroughProps {
+  label?: string;
+}
+
+export default function TsPassthrough(_props: TsPassthroughProps): JSX.Element {
+  const props: TsPassthroughProps & { label: string } = {
+    ..._props,
+    label: _props.label ?? 'Count',
+  };
+  const editor = useRef<any>(null);
+  const untypedHandle = useRef<any>(null);
+
+  let count = 0;
+  let mode = 'idle';
+  function inc(by: any) {
+    count = count + by;
+  }
+
+  useEffect(() => {
+    editor.current = makeEditor();
+    untypedHandle.current = openHandle();
+  }, []);
+  useEffect(() => {
+    return () => {
+      editor.current = null;
+      untypedHandle.current = null;
+    };
+  }, []);
+
+  return (
+    <>
+      <button onClick={($event) => { inc(1); }} data-rozie-s-189ead9a="">{label}: {count}</button>
+    </>
+  );
+}
+"
+`;
