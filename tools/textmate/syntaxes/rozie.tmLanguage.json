@@ -14,6 +14,7 @@
     { "include": "#block-data" },
     { "include": "#block-listeners" },
     { "include": "#block-components" },
+    { "include": "#block-style-scss" },
     { "include": "#block-style" }
   ],
   "repository": {
@@ -217,6 +218,30 @@
       "patterns": [
         { "include": "#magic-identifier" },
         { "include": "source.js" }
+      ]
+    },
+    "block-style-scss": {
+      "comment": "Sibling of block-style — listed FIRST in top-level patterns so any `<style>` opener with lang=\"scss\" wins over the generic opener via TextMate first-match-wins. Plain `<style>` (no lang) and `lang=\"css\"` openers fall through to #block-style, which keeps source.css. The lookahead requires lang=\"scss\" (single- or double-quoted) so this rule cannot match a plain opener.",
+      "begin": "(<)(style)\\b(?=[^>]*\\blang\\s*=\\s*(?:\"scss\"|'scss'))([^>]*)(>)",
+      "end": "(</)(style)(>)",
+      "beginCaptures": {
+        "1": { "name": "punctuation.definition.tag.begin.rozie" },
+        "2": { "name": "entity.name.tag.rozie.block.style.scss" },
+        "3": {
+          "patterns": [
+            { "include": "#tag-attributes" }
+          ]
+        },
+        "4": { "name": "punctuation.definition.tag.end.rozie" }
+      },
+      "endCaptures": {
+        "1": { "name": "punctuation.definition.tag.begin.rozie" },
+        "2": { "name": "entity.name.tag.rozie.block.style.scss" },
+        "3": { "name": "punctuation.definition.tag.end.rozie" }
+      },
+      "contentName": "meta.embedded.block.style.scss.rozie source.css.scss",
+      "patterns": [
+        { "include": "source.css.scss" }
       ]
     },
     "block-style": {
