@@ -128,6 +128,11 @@ describe('r-match diagnostics — ROZ953..ROZ959 (R6/R7)', () => {
     const hits = byCode(diags, 'ROZ958');
     expect(hits.length, JSON.stringify(hits)).toBe(1);
     expect(hits[0]!.severity).toBe('error');
+    // WR-01 — a pure duplicate-default input must emit ONLY ROZ958. The
+    // second r-default that is itself the last branch is a duplicate, not
+    // "not last": ROZ957 (MATCH_DEFAULT_NOT_LAST) must NOT fire here.
+    const misorder = byCode(diags, 'ROZ957');
+    expect(misorder.length, JSON.stringify(misorder)).toBe(0);
   });
 
   // ROZ959 — duplicate literal r-case value (WARNING, first wins) — and the

@@ -960,9 +960,11 @@ function lowerNodeList(
           continue;
         }
 
-        // A rung that follows an r-default is misordered (ROZ957). Still lower
-        // it so emitters get a stable shape.
-        if (defaultSeen) {
+        // An r-case rung that follows an r-default is misordered (ROZ957).
+        // WR-01 — restrict to `kind === 'case'`: a SECOND r-default that
+        // follows the first is a duplicate, not "not last", and must emit
+        // only ROZ958 below — never ROZ957+ROZ958 for one mistake.
+        if (defaultSeen && childDir.kind === 'case') {
           diagnostics.push({
             code: RozieErrorCode.MATCH_DEFAULT_NOT_LAST,
             severity: 'error',
