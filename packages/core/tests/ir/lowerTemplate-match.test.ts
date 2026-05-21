@@ -263,11 +263,23 @@ describe('r-match IR shape — flexible host & multi-root branches (R8)', () => 
 `;
     const { ir } = lowerSource(src);
     const match = matchNodes(ir!.template)[0]!;
-    // The <template r-case="'loading'"> branch body holds both children
-    // (<span> and <progress>) — more than one node.
-    const elementBodyCounts = match.branches.map(
-      (b) => b.body.filter((n) => (n as { type?: string }).type === 'TemplateElement').length,
-    );
+    // A branch body is always a single lowered node (`[lowerElement(child)]`,
+    // mirroring how `<template r-if>` lowers). For a `<template r-case>` that
+    // single node is a non-rendering wrapper (a TemplateFragment) whose
+    // children carry BOTH the <span> and the <progress>. Count TemplateElement
+    // nodes recursively through the wrapper — the multi-root branch must
+    // preserve more than one child element.
+    const countElements = (nodes: readonly unknown[]): number => {
+      let count = 0;
+      for (const node of nodes) {
+        const n = node as { type?: string; children?: unknown[]; body?: unknown[] };
+        if (n.type === 'TemplateElement') count += 1;
+        if (Array.isArray(n.children)) count += countElements(n.children);
+        if (Array.isArray(n.body)) count += countElements(n.body);
+      }
+      return count;
+    };
+    const elementBodyCounts = match.branches.map((b) => countElements(b.body));
     expect(Math.max(...elementBodyCounts)).toBeGreaterThan(1);
   });
 });
