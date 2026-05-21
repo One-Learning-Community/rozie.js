@@ -32,7 +32,7 @@ function makeAst(style: StyleAST | null): RozieAST {
     template: null,
     style,
     components: null,
-    blocks: { rozie: { contentLoc: { start: 0, end: 0 }, loc: { start: 0, end: 0 }, raw: '' } },
+    blocks: { rozie: { name: 'Stub', loc: { start: 0, end: 0 } } },
   } as RozieAST;
 }
 

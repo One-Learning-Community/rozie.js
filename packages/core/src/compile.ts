@@ -57,6 +57,13 @@ import { threadParamTypes } from './ir/threadParamTypes.js';
 // threadParamTypes so any producer IR fetched for paramTypes threading is
 // already cached (lookup-order-independent, but threading errors fire first).
 import { validateTwoWayBindings } from './ir/validateTwoWayBindings.js';
+// Phase 10 Plan 04 — splice compiled SCSS-to-CSS into the emitter source string.
+// For `<style lang="scss">` the six emitStyle.ts files slice rule bodies at byte
+// offsets that index the COMPILED CSS (built by parseStyle, Plan 10-03); the
+// helper substitutes that compiled CSS into the style-block body span so a later
+// `source.slice(rule.loc.start, rule.loc.end)` lands on plain CSS (SPEC-REQ-2).
+// No-op (byte-identical) for plain-CSS components (SPEC-REQ-8).
+import { substituteCompiledStyle } from './codegen/substituteCompiledStyle.js';
 
 // Per-target imports use RELATIVE paths to avoid the `@rozie/target-*` →
 // `@rozie/core` circular dep (mirrors @rozie/unplugin's transform.ts).
@@ -255,10 +262,16 @@ export function compile(source: string, opts: CompileOptions): CompileResult {
   // early before any per-target branch could run.
 
   // 3. emit per target
+  // Phase 10 Plan 04 — for a `<style lang="scss">` component the emitters slice
+  // CSS rule bodies at offsets that index the compiled CSS; substitute that
+  // compiled CSS into the style-block body span of the source string the
+  // emitters receive. Byte-identical to `source` for plain-CSS components
+  // (SPEC-REQ-8). CLI + babel-plugin inherit this through compile().
+  const emitSource = substituteCompiledStyle(source, ast);
   // Per Phase 1 convention: exactOptionalPropertyTypes:true requires conditional
   // spread on `filename` so we never pass `filename: undefined` into Emit*Options.
   const emitOpts = {
-    source,
+    source: emitSource,
     modifierRegistry: registry,
     ...(filename !== undefined ? { filename } : {}),
   };

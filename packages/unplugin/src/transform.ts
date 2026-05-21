@@ -43,6 +43,15 @@ import { lowerToIR } from '../../core/src/ir/lower.js';
 // would then fail on every consumer-scoped-fill cell.
 import { threadParamTypes } from '../../core/src/ir/threadParamTypes.js';
 import { validateTwoWayBindings } from '../../core/src/ir/validateTwoWayBindings.js';
+// Phase 10 Plan 04 — splice compiled SCSS-to-CSS into the emitter source string.
+// `@rozie/unplugin` does NOT call `compile()`; each per-target pipeline parses
+// and emits independently, so every parse-then-emit site must call this helper
+// (mirrors `compile.ts` step 3). For a `<style lang="scss">` component the six
+// emitStyle.ts files slice rule bodies at offsets indexing the COMPILED CSS;
+// the helper substitutes that compiled CSS into the style-block body span. The
+// dist-parity 4-entrypoint byte gate is the proof a pipeline was missed
+// (SPEC-REQ-2 / SPEC-REQ-7). No-op (byte-identical) for plain CSS (SPEC-REQ-8).
+import { substituteCompiledStyle } from '../../core/src/codegen/substituteCompiledStyle.js';
 import { IRCache } from '../../core/src/ir/cache.js';
 import { ProducerResolver } from '../../core/src/resolver/index.js';
 import type { ModifierRegistry } from '@rozie/core';
@@ -692,9 +701,12 @@ function runRoziePipeline(
   }
 
   // 3. emitVue
+  // Phase 10 Plan 04 — splice compiled SCSS-to-CSS into the emitter source
+  // (no-op for plain CSS). `parse()` above still saw the original `source`.
+  const emitSource = substituteCompiledStyle(source, ast);
   const result = emitVue(ir, {
     filename: filePath,
-    source,
+    source: emitSource,
     modifierRegistry: registry,
     blockOffsets: ast.blocks,
   });
@@ -756,9 +768,12 @@ function runReactPipeline(
   }
 
   // 3. emitReact
+  // Phase 10 Plan 04 — splice compiled SCSS-to-CSS into the emitter source
+  // (no-op for plain CSS). `parse()` above still saw the original `source`.
+  const emitSource = substituteCompiledStyle(source, ast);
   const result = emitReact(ir, {
     filename: filePath,
-    source,
+    source: emitSource,
     modifierRegistry: registry,
     blockOffsets: ast.blocks,
   });
@@ -820,9 +835,12 @@ function runSveltePipeline(
   }
 
   // 3. emitSvelte
+  // Phase 10 Plan 04 — splice compiled SCSS-to-CSS into the emitter source
+  // (no-op for plain CSS). `parse()` above still saw the original `source`.
+  const emitSource = substituteCompiledStyle(source, ast);
   const result = emitSvelte(ir, {
     filename: filePath,
-    source,
+    source: emitSource,
     modifierRegistry: registry,
     blockOffsets: ast.blocks,
   });
@@ -886,9 +904,12 @@ function runSolidPipeline(
   }
 
   // 3. emitSolid
+  // Phase 10 Plan 04 — splice compiled SCSS-to-CSS into the emitter source
+  // (no-op for plain CSS). `parse()` above still saw the original `source`.
+  const emitSource = substituteCompiledStyle(source, ast);
   const result = emitSolid(ir, {
     filename: filePath,
-    source,
+    source: emitSource,
     modifierRegistry: registry,
     blockOffsets: ast.blocks,
   });
@@ -951,9 +972,12 @@ function runLitPipeline(
   }
 
   // 3. emitLit
+  // Phase 10 Plan 04 — splice compiled SCSS-to-CSS into the emitter source
+  // (no-op for plain CSS). `parse()` above still saw the original `source`.
+  const emitSource = substituteCompiledStyle(source, ast);
   const result = emitLit(ir, {
     filename: filePath,
-    source,
+    source: emitSource,
     modifierRegistry: registry,
     blockOffsets: ast.blocks,
   });
@@ -1020,9 +1044,12 @@ function runAngularPipeline(
   }
 
   // 3. emitAngular
+  // Phase 10 Plan 04 — splice compiled SCSS-to-CSS into the emitter source
+  // (no-op for plain CSS). `parse()` above still saw the original `source`.
+  const emitSource = substituteCompiledStyle(source, ast);
   const result = emitAngular(ir, {
     filename: filePath,
-    source,
+    source: emitSource,
     modifierRegistry: registry,
     blockOffsets: ast.blocks,
   });
@@ -1313,9 +1340,12 @@ function runAngularEmitForDisk(
   if (threadError) {
     throw new Error(`[${threadError.code}] ${threadError.message}`);
   }
+  // Phase 10 Plan 04 — splice compiled SCSS-to-CSS into the emitter source
+  // (no-op for plain CSS). `parse()` above still saw the original `source`.
+  const emitSource = substituteCompiledStyle(source, ast);
   const result = emitAngular(ir, {
     filename: filePath,
-    source,
+    source: emitSource,
     modifierRegistry: registry,
     blockOffsets: ast.blocks,
   });
