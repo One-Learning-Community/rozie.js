@@ -14,7 +14,7 @@ export default function SpikeImportEl(_props: SpikeImportElProps): JSX.Element {
 
   onMount(() => {
     const _cleanup = (() => {
-    instance = new DummyEngine(__rozieRootRef, {
+    instance = new DummyEngine(__rozieRootRef!, {
       animation: 150
     });
   })() as unknown;
