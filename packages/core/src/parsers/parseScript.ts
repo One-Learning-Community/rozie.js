@@ -36,11 +36,24 @@ export interface ParseScriptResult {
   diagnostics: Diagnostic[];
 }
 
+/**
+ * Parse a `<script>` block into a Babel `File` AST.
+ *
+ * @param content - the raw `<script>` block body text.
+ * @param contentLoc - byte span of the content inside the original `.rozie` file.
+ * @param source - the full `.rozie` source (for position accounting).
+ * @param filename - optional filename for diagnostics / `sourceFilename`.
+ * @param lang - the resolved `lang=` attribute from the source `<script>` tag
+ *   (Phase 9). When `'ts'`, the Babel `typescript` parser plugin is enabled so
+ *   author type annotations parse into `TS*` AST nodes. Any other value (or
+ *   undefined) keeps the plugin off — byte-identical to plain-JS parsing.
+ */
 export function parseScript(
   content: string,
   contentLoc: SourceLoc,
   source: string,
   filename?: string,
+  lang?: string,
 ): ParseScriptResult {
   const diagnostics: Diagnostic[] = [];
   const pos = parserPositionFor(source, contentLoc);
@@ -53,12 +66,15 @@ export function parseScript(
       ...(filename !== undefined ? { sourceFilename: filename } : {}),
       attachComment: true,
       errorRecovery: true,
-      // Plugin policy:
-      //   - 'typescript' is intentionally NOT enabled in Phase 1; <script lang="ts">
-      //     support lands in Phase 2+ when the IR understands type annotations.
-      //   - 'jsx' is intentionally NOT enabled — Rozie does not accept JSX in <script>
-      //     (PROJECT.md Out of Scope: "JSX as an input syntax").
-      plugins: [],
+      // Plugin policy (Phase 9):
+      //   - 'typescript' is enabled ONLY for `<script lang="ts">` (lang === 'ts').
+      //     A plain `<script>` (or any other lang value) keeps plugins: [] —
+      //     byte-identical to pre-Phase-9 plain-JavaScript parsing.
+      //   - 'jsx' stays OFF unconditionally — Rozie does not accept JSX in
+      //     <script> (PROJECT.md Out of Scope: "JSX as an input syntax"). With
+      //     jsx off and typescript on, `<T>expr` parses as a TS type assertion,
+      //     which is the desired behavior — do NOT "fix" this by enabling jsx.
+      plugins: lang === 'ts' ? ['typescript'] : [],
     });
   } catch (err: unknown) {
     const e = err as { message?: string; loc?: { line: number; column: number; index?: number } };
@@ -88,7 +104,16 @@ export function parseScript(
   }
 
   return {
-    node: { type: 'ScriptAST', loc: contentLoc, program },
+    node: {
+      type: 'ScriptAST',
+      loc: contentLoc,
+      program,
+      // Phase 9: carry the resolved `lang` onto the ScriptAST so downstream
+      // passes (IR lowering, typeNeutralizeScript) can branch on it. Set only
+      // when present — conditional-spread keeps the key absent under
+      // `exactOptionalPropertyTypes: true`.
+      ...(lang !== undefined ? { lang } : {}),
+    },
     diagnostics,
   };
 }
