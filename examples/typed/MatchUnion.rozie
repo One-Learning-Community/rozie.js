@@ -30,7 +30,15 @@ type Shape =
   | { kind: 'ring'; radius: number }
   | { kind: 'square'; side: number }
 
-const shape: Shape = $computed<Shape>(() => ({ kind: 'circle', radius: 4 }))
+// The factory's object literal carries an `as Shape` assertion. That
+// assertion lives ON the returned expression itself, so it is preserved
+// verbatim into every target's computed-emit output — `shape` is inferred
+// as `Shape` on React (`useMemo`), Vue (`computed`), Svelte (`$derived`)
+// and Angular (`computed`) alike. (The `$computed<Shape>` type-argument
+// and a `const shape: Shape` variable annotation are NOT threaded into
+// emitted output today; an `as` assertion on the body IS — it is the
+// portable way to type a `$computed` signal across all six targets.)
+const shape = $computed(() => ({ kind: 'circle', radius: 4 } as Shape))
 </script>
 
 <template>

@@ -54,9 +54,11 @@ const total = $computed(() => $data.rows.reduce((s, r) => s + r.score, 0))
 
   <Table :rows="$data.rows" :columns="$data.columns" :striped="true" caption="Members">
     <template #cell="{ column, row, value }">
-      <span r-if="column.key === 'status'" :class="`badge badge-${value}`">{{ value }}</span>
-      <strong r-else-if="column.key === 'score'">{{ value }}</strong>
-      <span r-else>{{ value }}</span>
+      <template r-match="column.key">
+        <span r-case="'status'" :class="`badge badge-${value}`">{{ value }}</span>
+        <strong r-case="'score'">{{ value }}</strong>
+        <span r-default>{{ value }}</span>
+      </template>
     </template>
 
     <template #[`footer${$data.footerMode}`]>
