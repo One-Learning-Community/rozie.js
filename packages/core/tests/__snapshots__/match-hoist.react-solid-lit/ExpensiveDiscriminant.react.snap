@@ -1,0 +1,25 @@
+import { useState } from 'react';
+import styles from './ExpensiveDiscriminant.module.css';
+
+interface ExpensiveDiscriminantProps {}
+
+export default function ExpensiveDiscriminant(props: ExpensiveDiscriminantProps): JSX.Element {
+  const [score, setScore] = useState(72);
+
+  function classify() {
+    return score >= 50 ? 'pass' : 'fail';
+  }
+  function subClassify() {
+    return score >= 90 ? 'distinction' : 'merit';
+  }
+
+  return (
+    <>
+    {(() => { const __rozieMatch_0 = classify(); return (__rozieMatch_0 === 'pass') ? <template data-rozie-s-bb543ee0="">
+        <div className={styles.passed} data-rozie-s-bb543ee0="">
+          {(() => { const __rozieMatch_1 = subClassify(); return (__rozieMatch_1 === 'distinction') ? <strong data-rozie-s-bb543ee0="">passed with distinction</strong> : (__rozieMatch_1 === 'merit') ? <span data-rozie-s-bb543ee0="">passed with merit</span> : <span data-rozie-s-bb543ee0="">passed</span>; })()}
+        </div>
+      </template> : (__rozieMatch_0 === 'fail') ? <span className={styles.failed} data-rozie-s-bb543ee0="">did not pass</span> : <span className={styles.unknown} data-rozie-s-bb543ee0="">ungraded</span>; })()}
+    </>
+  );
+}

@@ -471,6 +471,27 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
 }
 
 /**
+ * True when some `r-match` branch test references an `Identifier` named
+ * `tempName` — i.e. core actually folded the hoist temp into the rungs.
+ *
+ * Core classifies a non-`Identifier`/`MemberExpression` discriminant as
+ * `hoist` (D-03), but the literal-`true`/`false` predicate-chain form (R4)
+ * lowers each rung to a BARE predicate that never references the temp. For
+ * that form the hoist wrapper would be a dead `const __rozieMatch_N = true`
+ * binding — so the wrapper is emitted only when the temp is genuinely used.
+ */
+function tempNameIsReferenced(node: TemplateMatchIR, tempName: string): boolean {
+  const walk = (value: unknown): boolean => {
+    if (Array.isArray(value)) return value.some(walk);
+    if (value === null || typeof value !== 'object') return false;
+    const obj = value as Record<string, unknown>;
+    if (obj['type'] === 'Identifier' && obj['name'] === tempName) return true;
+    return Object.values(obj).some(walk);
+  };
+  return node.branches.some((b) => b.test !== null && walk(b.test));
+}
+
+/**
  * D-02 — the `r-match` (`TemplateMatch`) delegate.
  *
  * `node.branches` is byte-identical to `TemplateConditionalIR.branches` (the
@@ -484,9 +505,16 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
  * of that host element — so the host tag + its attributes survive to emitted
  * output (R8), mirroring how a real-element `r-if` host keeps its tag.
  *
- * The `discriminantMode === 'hoist'` path (an expensive `CallExpression`
- * discriminant) is delegated as-if-inline here; the hoist-temp declaration is
- * owned by plan 11-05 for the Solid target.
+ * The `discriminantMode === 'hoist'` path (D-04 — plan 11-05): an expensive
+ * `CallExpression` discriminant must evaluate EXACTLY ONCE per render. The
+ * `<Show>` ladder is wrapped in a return-position IIFE that binds the
+ * discriminant to `node.tempName` (`__rozieMatch_N`, allocated by core):
+ * `{(() => { const <tempName> = <discriminant>; return <ladder>; })()}`. The
+ * folded branch tests already reference `t.identifier(node.tempName)`, so each
+ * `<Show when>` rung reads the temp, never re-invokes the call. Solid's JSX
+ * accepts the same return-position IIFE React uses. A `hoist`-classified
+ * literal predicate chain whose rungs never reference the temp falls through
+ * to pure delegation — no dead wrapper.
  */
 function emitMatchNode(node: TemplateMatchIR, ctx: EmitNodeCtx): string {
   const synthetic: TemplateConditionalIR = {
@@ -494,9 +522,37 @@ function emitMatchNode(node: TemplateMatchIR, ctx: EmitNodeCtx): string {
     branches: node.branches,
     sourceLoc: node.sourceLoc,
   };
-  if (node.discriminantMode === 'hoist') {
-    // TODO(11-05): hoist placement — declare the discriminant temp once
-    // before the <Show> ladder so an expensive discriminant evaluates once.
+  if (
+    node.discriminantMode === 'hoist' &&
+    node.tempName !== undefined &&
+    tempNameIsReferenced(node, node.tempName)
+  ) {
+    // D-04 hoist — `emitConditional` returns a `{...}`-wrapped JSX expression;
+    // strip the braces and re-wrap as a return-position IIFE binding the
+    // discriminant temp once. `node.discriminant` is routed through the SAME
+    // `rewriteTemplateExpression` (with the ctx's `invokeAccessors`) the folded
+    // branch tests use, so Solid accessor invocation is consistent.
+    const ladder = emitConditional(synthetic, ctx, emitNode);
+    const inner = ladder.startsWith('{') && ladder.endsWith('}')
+      ? ladder.slice(1, -1)
+      : ladder;
+    const discriminantCode = rewriteTemplateExpression(node.discriminant, ctx.ir, {
+      invokeAccessors: ctx.invokeAccessors,
+    });
+    const hoisted = `{(() => { const ${node.tempName} = ${discriminantCode}; return ${inner}; })()}`;
+    if (node.hostElement !== undefined) {
+      const verbatim: TemplateStaticTextIR = {
+        type: 'TemplateStaticText',
+        text: hoisted,
+        sourceLoc: node.hostElement.sourceLoc,
+      };
+      const wrapper: TemplateElementIR = {
+        ...node.hostElement,
+        children: [verbatim],
+      };
+      return emitElement(wrapper, ctx);
+    }
+    return hoisted;
   }
   if (node.hostElement !== undefined) {
     const wrapper: TemplateElementIR = {

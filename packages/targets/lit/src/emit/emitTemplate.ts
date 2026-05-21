@@ -1045,6 +1045,27 @@ function emitElement(
 }
 
 /**
+ * True when some `r-match` branch test references an `Identifier` named
+ * `tempName` — i.e. core actually folded the hoist temp into the rungs.
+ *
+ * Core classifies a non-`Identifier`/`MemberExpression` discriminant as
+ * `hoist` (D-03), but the literal-`true`/`false` predicate-chain form (R4)
+ * lowers each rung to a BARE predicate that never references the temp. For
+ * that form the hoist wrapper would be a dead `const __rozieMatch_N = true`
+ * binding — so the wrapper is emitted only when the temp is genuinely used.
+ */
+function tempNameIsReferenced(node: TemplateMatchIR, tempName: string): boolean {
+  const walk = (value: unknown): boolean => {
+    if (Array.isArray(value)) return value.some(walk);
+    if (value === null || typeof value !== 'object') return false;
+    const obj = value as Record<string, unknown>;
+    if (obj['type'] === 'Identifier' && obj['name'] === tempName) return true;
+    return Object.values(obj).some(walk);
+  };
+  return node.branches.some((b) => b.test !== null && walk(b.test));
+}
+
+/**
  * D-02 — the `r-match` (`TemplateMatch`) delegate.
  *
  * `node.branches` is byte-identical to `TemplateConditionalIR.branches` (the
@@ -1062,9 +1083,23 @@ function emitElement(
  * of that host element — so the host tag + its attributes survive to emitted
  * output (R8), mirroring how a real-element `r-if` host keeps its tag.
  *
- * The `discriminantMode === 'hoist'` path (an expensive `CallExpression`
- * discriminant) is delegated as-if-inline here; the hoist-temp declaration is
- * owned by plan 11-05 for the Lit target.
+ * The `discriminantMode === 'hoist'` path (D-04 — plan 11-05): an expensive
+ * `CallExpression` discriminant must be evaluated EXACTLY ONCE per render. The
+ * inline `emitConditional` returns a `${...}` interpolation wrapping a ternary
+ * ladder; we re-wrap that ladder in a render-scoped arrow IIFE that declares
+ * the discriminant temp `node.tempName` (`__rozieMatch_N`, allocated by core)
+ * as a local `const` before returning the ladder:
+ * `${(() => { const <tempName> = <discriminant>; return <ladder>; })()}`.
+ *
+ * The arrow runs once each time `render()` evaluates this interpolation, so
+ * `<discriminant>` is invoked exactly once and every folded `r-case` test —
+ * which already references `t.identifier(node.tempName)` — reads the temp
+ * rather than re-invoking the call. (`renderBody` is interpolated inside
+ * `html``` by `emitLit.ts`, which is out of this plan's scope, so the temp is
+ * declared in this render-scoped arrow rather than as a bare method-prelude
+ * statement — functionally a render() prelude `const`: one evaluation, before
+ * the ladder.) A `hoist`-classified literal predicate chain whose rungs never
+ * reference the temp falls through to pure delegation — no dead wrapper.
  */
 function emitMatchNode(
   node: TemplateMatchIR,
@@ -1077,9 +1112,34 @@ function emitMatchNode(
     branches: node.branches,
     sourceLoc: node.sourceLoc,
   };
-  if (node.discriminantMode === 'hoist') {
-    // TODO(11-05): hoist placement — declare the discriminant temp once in
-    // the render() prelude so an expensive discriminant evaluates once.
+  if (
+    node.discriminantMode === 'hoist' &&
+    node.tempName !== undefined &&
+    tempNameIsReferenced(node, node.tempName)
+  ) {
+    // D-04 hoist — `emitConditional` returns `${<ladder>}`; strip the `${}`
+    // interpolation wrapper and re-wrap as a render-scoped arrow IIFE that
+    // binds the discriminant temp once. `node.discriminant` is routed through
+    // the SAME `rewriteTemplateExpression` the folded branch tests use.
+    const ladderInterp = emitConditional(synthetic, ir, hostListenerWiring, opts);
+    const ladder = ladderInterp.startsWith('${') && ladderInterp.endsWith('}')
+      ? ladderInterp.slice(2, -1)
+      : ladderInterp;
+    const discriminantCode = rewriteTemplateExpression(node.discriminant, ir);
+    const hoisted = `\${(() => { const ${node.tempName} = ${discriminantCode}; return ${ladder}; })()}`;
+    if (node.hostElement !== undefined) {
+      const verbatim: TemplateStaticTextIR = {
+        type: 'TemplateStaticText',
+        text: hoisted,
+        sourceLoc: node.hostElement.sourceLoc,
+      };
+      const wrapper: TemplateElementIR = {
+        ...node.hostElement,
+        children: [verbatim],
+      };
+      return emitElement(wrapper, ir, hostListenerWiring, opts);
+    }
+    return hoisted;
   }
   if (node.hostElement !== undefined) {
     const wrapper: TemplateElementIR = {
