@@ -37,9 +37,18 @@
     "picocolors": "^1.1.0",
     "postcss": "^8.5.13"
   },
+  "peerDependencies": {
+    "sass": "^1.54.0"
+  },
+  "peerDependenciesMeta": {
+    "sass": {
+      "optional": true
+    }
+  },
   "devDependencies": {
     "@types/babel__code-frame": "^7.0.6",
     "@types/babel__traverse": "^7.28.0",
-    "peggy": "^5.1.0"
+    "peggy": "^5.1.0",
+    "sass": "1.97.3"
   }
 }

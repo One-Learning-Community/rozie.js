@@ -21,6 +21,7 @@
     "@babel/core": "^7.29.0"
   },
   "devDependencies": {
+    "sass": "1.97.3",
     "vitest": "^4"
   }
 }
