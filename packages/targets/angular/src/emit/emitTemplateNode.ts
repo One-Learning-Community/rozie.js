@@ -321,6 +321,10 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
     collisionRenames: ctx.collisionRenames,
     loopBindings: ctx.loopBindings,
     elementTagKind: node.tagKind,
+    // Quick task 260520-w18 follow-up — thread the class-body injection sink so
+    // a template attr expression with a double-read accessor can synthesise a
+    // single-read getter member (strictTemplates double-signal-call narrowing).
+    scriptInjections: ctx.scriptInjections,
   }, node.tagName);
   const eventText = emitEvents(node.events, ctx);
   const rHtml = findRHtml(node.attributes);

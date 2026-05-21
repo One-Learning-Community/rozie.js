@@ -24,7 +24,11 @@ import type {
   IRComponent,
   AttributeBinding,
 } from '../../../../core/src/ir/types.js';
-import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
+import {
+  rewriteTemplateExpression,
+  hoistTemplateDoubleReadAccessor,
+} from '../rewrite/rewriteTemplateExpression.js';
+import type { AngularScriptInjection } from './emitTemplateEvent.js';
 
 export interface EmitAttrCtx {
   ir: IRComponent;
@@ -41,6 +45,19 @@ export interface EmitAttrCtx {
    * property binding is a silent no-op (no scalar DOM property exists).
    */
   elementTagKind?: 'html' | 'component' | 'self';
+  /**
+   * Quick task 260520-w18 follow-up — class-body field injections collected
+   * during attribute emission. When a template attribute expression reads the
+   * SAME `$props.X` / `$data.X` accessor 2+ times in a guard-and-use shape,
+   * a single-read getter member is synthesised here and the attribute binds to
+   * it instead — Angular `strictTemplates` cannot narrow a signal-call result
+   * across two independent `X()` calls. emitTemplateNode threads its own
+   * `scriptInjections` array + `injectionCounter` through so the synthesised
+   * getter lands in the class body via emitAngular's class-body composer.
+   * Synthesised member names are disambiguated against the names already in
+   * this array, so no separate counter is needed.
+   */
+  scriptInjections?: AngularScriptInjection[] | undefined;
 }
 
 /**
@@ -241,6 +258,41 @@ function resolveSignalNameForLValue(
 }
 
 /**
+ * Lower a single bound-attribute expression to a template-binding string.
+ *
+ * When the expression reads the SAME `$props.X` / `$data.X` accessor 2+ times
+ * in a guard-and-use shape, synthesise a single-read getter class member
+ * (registered on `ctx.scriptInjections`) and return the bare getter name so
+ * the attribute binds to it — Angular `strictTemplates` cannot narrow a
+ * signal-call result across two independent `X()` calls (Uppy's
+ * `:accept="$props.allowedFileTypes ? $props.allowedFileTypes.join(',') : null"`).
+ *
+ * Falls back to the normal `rewriteTemplateExpression` path when no double-read
+ * accessor is present — reference examples are byte-stable.
+ */
+function lowerBoundAttrExpression(
+  expr: t.Expression,
+  ctx: EmitAttrCtx,
+  attrName: string,
+): string {
+  if (ctx.scriptInjections !== undefined) {
+    const taken = new Set(ctx.scriptInjections.map((si) => si.name));
+    const hoist = hoistTemplateDoubleReadAccessor(expr, ctx.ir, attrName, taken, {
+      collisionRenames: ctx.collisionRenames,
+      loopBindings: ctx.loopBindings,
+    });
+    if (hoist !== null) {
+      ctx.scriptInjections.push({ name: hoist.memberName, decl: hoist.decl });
+      return hoist.memberName;
+    }
+  }
+  return rewriteTemplateExpression(expr, ctx.ir, {
+    collisionRenames: ctx.collisionRenames,
+    loopBindings: ctx.loopBindings,
+  });
+}
+
+/**
  * Emit a single attribute. Returns null when the attribute should be dropped
  * (e.g., r-html, which gets emitted later as `[innerHTML]="..."` by the
  * element emitter).
@@ -320,22 +372,16 @@ export function emitSingleAttr(
       });
       return `[(ngModel)]="${expr}" [ngModelOptions]="{standalone: true}"`;
     }
-    const expr = rewriteTemplateExpression(attr.expression, ctx.ir, {
-      collisionRenames: ctx.collisionRenames,
-      loopBindings: ctx.loopBindings,
-    });
     const bindingName = resolveBindingName(attr.name, ctx);
+    const expr = lowerBoundAttrExpression(attr.expression, ctx, bindingName);
     return `[${bindingName}]="${expr}"`;
   }
 
   // interpolated: simplify single-binding-segment to direct property binding.
   if (attr.segments.length === 1 && attr.segments[0]!.kind === 'binding') {
     const seg = attr.segments[0]! as { kind: 'binding'; expression: t.Expression; deps: unknown };
-    const expr = rewriteTemplateExpression(seg.expression, ctx.ir, {
-      collisionRenames: ctx.collisionRenames,
-      loopBindings: ctx.loopBindings,
-    });
     const bindingName = resolveBindingName(attr.name, ctx);
+    const expr = lowerBoundAttrExpression(seg.expression, ctx, bindingName);
     return `[${bindingName}]="${expr}"`;
   }
 
