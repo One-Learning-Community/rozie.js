@@ -39,16 +39,24 @@ export interface StyleRule {
 export interface StyleAST {
   type: 'StyleAST';
   loc: SourceLoc;
-  /** Raw CSS source (unmodified — postcss AST is held internally by parseStyle and not exposed in v1). */
+  /**
+   * The CSS source handed to the PostCSS scoping pass. For a plain `<style>`
+   * block this is the raw style body verbatim. For `<style lang="scss">`
+   * (Phase 10) this is the COMPILED plain CSS — `parseStyle` runs dart-sass
+   * before `postcss.parse`, so nesting/`$variables`/mixins are already
+   * flattened. The postcss AST itself is held internally by parseStyle and not
+   * exposed in v1.
+   */
   cssText: string;
   /** All top-level rules with :root-escape flagging. */
   rules: StyleRule[];
   /**
    * Resolved `lang="..."` attribute from the source `<style>` opening tag.
-   * Phase 9 carries this value through the generic SFC-block `lang=` substrate
-   * so the future `<style lang="scss/less">` preprocessor phase reuses it
-   * rather than re-plumbing. This phase implements NO SCSS/LESS behavior — the
-   * value is carried, not consumed. Undefined (key omitted under
+   * Phase 9 introduced this value via the generic SFC-block `lang=` substrate.
+   * Phase 10 consumes `'scss'` — `parseStyle` performs compile-time SCSS-to-CSS
+   * preprocessing and `cssText` holds the compiled plain CSS. `'css'` or absent
+   * is the plain-CSS path (today's default — byte-identical). Resolved
+   * case-insensitively and trimmed. Undefined (key omitted under
    * `exactOptionalPropertyTypes`) for a plain `<style>` block.
    */
   lang?: string;

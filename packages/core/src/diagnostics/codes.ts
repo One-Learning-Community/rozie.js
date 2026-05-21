@@ -53,6 +53,21 @@ export const RozieErrorCode = {
   // #7 this is a WARN. Codes are public API and never renumber.
   STYLE_IMPORTANT_DROPPED_IN_STYLE_OBJECT: 'ROZ083',
   STYLE_PORTAL_SELECTOR_PARSE_ERROR: 'ROZ084', // @portal block has empty/malformed prelude or unparseable inner content
+  // Phase 10: `<style lang="scss">` was used but the optional `sass` (dart-sass)
+  // peer dependency is not installed. Error severity, fail loud — there is no
+  // SCSS-to-CSS path without the compiler, so emitting partial/raw output would
+  // ship un-preprocessed SCSS to the scoping pass. Mirrors the `ROZ085`-must-be-
+  // an-error reasoning in 10-SPEC.md.
+  STYLE_MISSING_SASS: 'ROZ085',
+  // Phase 10: dart-sass threw on invalid SCSS during `sass.compileString`. Per
+  // D-08 the exception is COLLECTED, never propagated — the thrown
+  // `sass.Exception` becomes this diagnostic and `parseStyle` returns node null.
+  STYLE_SCSS_COMPILE_ERROR: 'ROZ086',
+  // Phase 10 (D-02): a `<style lang>` value that is neither `scss` nor `css`
+  // (nor absent). Error severity with no `<style>` output — feeding Less/Sass-
+  // indented syntax to `postcss.parse` would otherwise surface as a confusing
+  // ROZ080. The `lang="less"` case carries a Less-aware deferral hint (D-03).
+  STYLE_UNRECOGNIZED_LANG: 'ROZ087',
 
   // ---- ROZ090..ROZ099 reserved for late-Phase-1 needs ----
 
