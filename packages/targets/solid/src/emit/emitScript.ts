@@ -196,6 +196,17 @@ export interface EmitScriptResult {
    */
   userImports: string;
   /**
+   * Quick task 260521-mj9 — author-declared `<script lang="ts">`
+   * statement-position `interface` / `type` declarations, each rendered as a
+   * string. emitSolid routes these into the shell's module-scope interface
+   * bucket so they land ABOVE the props interface. Without this hoist they
+   * stay inside the component function body, where the module-scope props
+   * interface cannot see them — a custom prop type (`kind?: Kind`) referencing
+   * such a name fails with TS2304. Always empty for an untyped `<script>`, so
+   * untyped emit is byte-identical.
+   */
+  hoistedTypeDecls: string[];
+  /**
    * `const _merged = mergeProps({ step: 1, ... }, _props);\n` when non-model
    * props have declared defaults. Null when no non-model defaults exist.
    * Emitted before splitPropsCall in the shell so `local.*` gets defaults.
@@ -246,19 +257,35 @@ export function emitScript(
   const rewriteResult = rewriteRozieIdentifiers(cloned, ir);
   diagnostics.push(...rewriteResult.diagnostics);
 
-  // Spike 001 B1 — partition user-authored top-level ImportDeclarations out
-  // of the rewritten Program body BEFORE the residual-body iteration. Mutate
-  // `rewriteResult.rewrittenProgram.program.body` in place so downstream
-  // iterations naturally see only non-import statements; surface imports via
-  // `userImports` rendered as a string for the shell to splice at module top.
-  const { userImports: userImportNodes, bodyStmts } = partitionUserImports(
-    rewriteResult.rewrittenProgram,
-  );
+  // Spike 001 B1 + quick task 260521-mj9 — partition user-authored top-level
+  // ImportDeclarations AND statement-position `interface`/`type` declarations
+  // out of the rewritten Program body BEFORE the residual-body iteration.
+  // Mutate `rewriteResult.rewrittenProgram.program.body` in place so downstream
+  // iterations naturally see only the residual statements.
+  //
+  // `userImports` is surfaced as a string for the shell to splice at module
+  // top — without this hoist imports would land inside the component function
+  // body and produce TS1232.
+  //
+  // `hoistedTypeDecls` carries any `<script lang="ts">` statement-position
+  // `TSInterfaceDeclaration` / `TSTypeAliasDeclaration`. Left in the function
+  // body they are out of scope of the MODULE-scope props interface
+  // (`interface FooProps { kind?: Kind }`), so a custom prop type like `Kind`
+  // referenced from that interface fails with TS2304. emitSolid routes the
+  // rendered strings into the shell's module-scope bucket — mirroring
+  // Angular/Lit, which already hoist these. Always empty for an untyped
+  // `<script>`, so untyped emit stays byte-identical.
+  const {
+    userImports: userImportNodes,
+    hoistedTypeDecls: hoistedTypeNodes,
+    bodyStmts,
+  } = partitionUserImports(rewriteResult.rewrittenProgram);
   rewriteResult.rewrittenProgram.program.body = bodyStmts;
   const userImports =
     userImportNodes.length > 0
       ? userImportNodes.map((imp) => genCode(imp)).join('\n') + '\n'
       : '';
+  const hoistedTypeDecls = hoistedTypeNodes.map((decl) => genCode(decl));
 
   // 1. createControllableSignal for model:true props (D-135).
   // 1b. mergeProps call for non-model props with declared defaults.
@@ -532,6 +559,7 @@ export function emitScript(
     hookSection,
     userArrowsSection,
     userImports,
+    hoistedTypeDecls,
     mergePropsCall,
     hookSectionLines,
     scriptMap,

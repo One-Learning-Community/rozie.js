@@ -1,21 +1,41 @@
 /**
- * partitionUserImports — Spike 001 B1 fix.
+ * partitionUserImports — Spike 001 B1 fix; Phase 9 Plan 09-04 extension.
  *
- * Walk a cloned Babel Program ONCE and bucket-sort top-level
- * `ImportDeclaration` statements into `userImports` and everything else into
- * `bodyStmts`. Source order is preserved within each bucket.
+ * Walk a cloned Babel Program ONCE and bucket-sort top-level statements into
+ * three buckets, preserving source order within each:
  *
- * Why: the React/Solid/Angular/Lit emitters iterate `cloned.program.body` and
- * emit each statement INSIDE the per-target component body (function body /
- * constructor body / firstUpdated body). For ES `ImportDeclaration` statements
- * this produces `TS1232: An import declaration can only be used at the top
- * level of a namespace or module.` This helper lets emitters lift user
- * imports out of the per-target body and route them to a new
- * `ShellParts.userImports` field placed at module top alongside the
- * target/runtime/component import sections.
+ *   - `userImports`      — `ImportDeclaration` statements (value AND type-only).
+ *   - `hoistedTypeDecls` — `TSInterfaceDeclaration` / `TSTypeAliasDeclaration`
+ *                          statements (Phase 9 — `<script lang="ts">`).
+ *   - `bodyStmts`        — every other top-level statement.
  *
- * Type-only imports (`import type X from 'pkg'`) and value imports are
- * treated identically — both go in `userImports`.
+ * Why imports are hoisted: the React/Solid/Angular/Lit emitters iterate
+ * `cloned.program.body` and emit each statement INSIDE the per-target
+ * component body (function body / constructor body / firstUpdated body). For
+ * ES `ImportDeclaration` statements this produces `TS1232: An import
+ * declaration can only be used at the top level of a namespace or module.`
+ * This helper lets emitters lift user imports out of the per-target body and
+ * route them to a module-top `ShellParts.userImports` field.
+ *
+ * Why interface/type declarations are hoisted (Phase 9 Plan 09-04 / RESEARCH
+ * Pattern 5, Pitfall 2): Angular and Lit emit CLASS-BASED components. A
+ * `<script lang="ts">` may declare a statement-position `interface X {}` /
+ * `type Y = …`. If left in `bodyStmts` it falls through the emitter's
+ * residual-statement loop into the CLASS BODY (Angular constructor, Lit
+ * `firstUpdated()`), where an `interface`/`type` declaration is a TypeScript
+ * syntax error (TS1068 / TS1184). Pulling these into `hoistedTypeDecls` lets
+ * the emitter route them to module scope alongside the hoisted imports — the
+ * same module-top placement the slot-context `interface` decls already get.
+ *
+ * Hoisting interface/type out of `bodyStmts` BEFORE the emitter runs its
+ * identifier-rewrite pass also keeps that pass from mangling type-position
+ * identifiers inside the interface body (e.g. a `count: number` property
+ * signature being rewritten to `this.count(): number`).
+ *
+ * Type-only imports (`import type X from 'pkg'`) and value imports are treated
+ * identically — both go in `userImports` — because both are `ImportDeclaration`
+ * nodes (`import type` carries `importKind: 'type'`); module-top is the legal
+ * placement for either.
  *
  * Convention: each of the 4 broken targets keeps its own byte-identical copy
  * of this helper, matching the existing per-target `cloneProgram.ts` /
@@ -30,19 +50,39 @@ import * as t from '@babel/types';
 export interface PartitionedUserImports {
   /** Top-level `ImportDeclaration` statements in source order. */
   userImports: t.ImportDeclaration[];
-  /** Every non-`ImportDeclaration` top-level statement in source order. */
+  /**
+   * Top-level `TSInterfaceDeclaration` / `TSTypeAliasDeclaration` statements
+   * in source order. Class-based targets (Angular, Lit) emit these at module
+   * scope — a type declaration inside a class body is a TS syntax error.
+   * Always empty for an untyped `<script>` (no `interface`/`type` is ever
+   * present), so the untyped emit path stays byte-identical.
+   */
+  hoistedTypeDecls: Array<t.TSInterfaceDeclaration | t.TSTypeAliasDeclaration>;
+  /**
+   * Every top-level statement that is NOT an `ImportDeclaration` and NOT a
+   * statement-position `TSInterfaceDeclaration` / `TSTypeAliasDeclaration`,
+   * in source order.
+   */
   bodyStmts: t.Statement[];
 }
 
 export function partitionUserImports(file: t.File): PartitionedUserImports {
   const userImports: t.ImportDeclaration[] = [];
+  const hoistedTypeDecls: Array<
+    t.TSInterfaceDeclaration | t.TSTypeAliasDeclaration
+  > = [];
   const bodyStmts: t.Statement[] = [];
   for (const stmt of file.program.body) {
     if (t.isImportDeclaration(stmt)) {
       userImports.push(stmt);
+    } else if (
+      t.isTSInterfaceDeclaration(stmt) ||
+      t.isTSTypeAliasDeclaration(stmt)
+    ) {
+      hoistedTypeDecls.push(stmt);
     } else {
       bodyStmts.push(stmt);
     }
   }
-  return { userImports, bodyStmts };
+  return { userImports, hoistedTypeDecls, bodyStmts };
 }

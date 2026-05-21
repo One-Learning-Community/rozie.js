@@ -2,7 +2,7 @@
   typed/PropsCustomType.rozie
 
   Genuinely-new typed example for quick task 260521-mj9
-  (Lit emitter dropping custom/named `<props>` types).
+  (cross-target custom/named `<props>` type passthrough).
 
   Its job is to prove that a `<props>` prop whose `type:` token is a bare
   identifier — a type alias / interface declared in this component's
@@ -10,16 +10,16 @@
   targets, with the named type landing in PROP-TYPE POSITION:
 
     - `kind: { type: Kind, default: 'primary' }` — a prop typed by a
-      string-literal union alias, WITH a `default:`. Exercises the
-      `name: Kind = 'primary'` field-with-initializer emit branch.
-    - `item: { type: Item }` — a prop typed by a custom interface, with NO
-      `default:`. A `<props>` entry with no `default:` is a "required" prop
-      (the IR has no `required:` key — absence of `default:` IS the signal).
-      Exercises the definite-assignment `name!: Item;` emit branch on the
-      class-based targets (Lit / Angular). WITHOUT the Lit fix this field
-      degraded to `item: unknown = undefined;` — `unknown` defeats the
-      `.label` member access in the template, AND `undefined` is not
-      assignable to `Item`.
+      string-literal union alias.
+    - `item: { type: Item, default: () => ({ id: 0, label: '—' }) }` — a
+      prop typed by a custom interface. Because `item` is an object type,
+      its `default:` is an arrow factory (Vue Options-API convention, which
+      Rozie follows — same shape as `default: () => []` elsewhere).
+
+  Both props carry a `default:`, so this fixture exercises ONLY the
+  custom-named-type passthrough — it does NOT exercise required / no-default
+  prop semantics (the IR has no `required:` field; that is a separate,
+  deferred question and this fixture must not depend on it).
 
   The template does a TYPE-DISCRIMINATING member access on the
   interface-typed prop — `{{ $props.item.label }}` — which only typechecks
@@ -57,7 +57,7 @@ interface Item {
 <props>
 {
   kind: { type: Kind, default: 'primary' },
-  item: { type: Item },
+  item: { type: Item, default: () => ({ id: 0, label: '—' }) },
 }
 </props>
 

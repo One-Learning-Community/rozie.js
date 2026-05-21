@@ -184,6 +184,7 @@ export function emitSolid(ir: IRComponent, opts: EmitSolidOptions = {}): EmitSol
     portalImport,
     runtimeImports: runtimeImports.render(),
     userImports: scriptResult.userImports,
+    hoistedTypeDecls: scriptResult.hoistedTypeDecls,
     componentImportsBlock,
     ctxInterfaces: slotResult.ctxInterfaces,
     mergePropsCall: scriptResult.mergePropsCall ?? undefined,

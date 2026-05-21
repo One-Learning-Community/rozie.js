@@ -46,6 +46,16 @@ export interface ShellParts {
    * user imports exist.
    */
   userImports?: string;
+  /**
+   * Quick task 260521-mj9 — author-declared `<script lang="ts">`
+   * statement-position `interface` / `type` declarations, rendered as strings
+   * by emitScript. Emitted at MODULE scope, immediately after the imports and
+   * BEFORE the slot-context interfaces and the props interface — mirroring
+   * Angular/Lit. Without this hoist a custom prop type (`kind?: Kind`)
+   * referenced from the module-scope props interface fails with TS2304.
+   * Empty/undefined for an untyped `<script>`.
+   */
+  hoistedTypeDecls?: string[];
   /** `import styles from './Foo.module.css';` or null (Plan 04-05 wires) */
   cssModuleImport: string | null;
   /** `import './Foo.global.css';` or null (Plan 04-05 wires) */
@@ -205,6 +215,16 @@ export function buildShell(parts: ShellParts): BuildShellResult {
     moduleParts.push('\n');
   }
 
+  // Quick task 260521-mj9 — author-declared `<script lang="ts">` `interface` /
+  // `type` declarations, hoisted to MODULE scope above the props interface so
+  // a custom prop type referenced from `interface FooProps` resolves.
+  if (parts.hoistedTypeDecls && parts.hoistedTypeDecls.length > 0) {
+    for (const decl of parts.hoistedTypeDecls) {
+      moduleParts.push(decl);
+      moduleParts.push('\n\n');
+    }
+  }
+
   // Slot-context interfaces — Plan 04-03 — BEFORE the props interface.
   if (parts.ctxInterfaces && parts.ctxInterfaces.length > 0) {
     for (const iface of parts.ctxInterfaces) {
@@ -344,6 +364,14 @@ function buildShellLegacy(parts: ShellParts): BuildShellResult {
     (parts.userImports !== undefined && parts.userImports.length > 0)
   ) {
     ms.append('\n');
+  }
+
+  // Quick task 260521-mj9 — module-scope hoisted `<script lang="ts">` types.
+  if (parts.hoistedTypeDecls && parts.hoistedTypeDecls.length > 0) {
+    for (const decl of parts.hoistedTypeDecls) {
+      ms.append(decl);
+      ms.append('\n\n');
+    }
   }
 
   if (parts.ctxInterfaces && parts.ctxInterfaces.length > 0) {

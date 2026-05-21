@@ -998,6 +998,17 @@ export interface EmitScriptResult {
    */
   userImports: string;
   /**
+   * Quick task 260521-mj9 — author-declared `<script lang="ts">`
+   * statement-position `interface` / `type` declarations, each rendered as a
+   * string. emitReact routes these into the shell's module-scope interface
+   * bucket so they land ABOVE the props interface. Without this hoist they
+   * stay inside the component function body, where the module-scope props
+   * interface cannot see them — a custom prop type (`kind?: Kind`) referencing
+   * such a name fails with TS2304. Always empty for an untyped `<script>`, so
+   * untyped emit is byte-identical.
+   */
+  hoistedTypeDecls: string[];
+  /**
    * Plan 04-04 — useEffect blocks for each LifecycleHook. Emitted AFTER user
    * arrows (and after listener wrapper consts via shell.ts) so they can
    * reference any user helper without TDZ.
@@ -1065,19 +1076,37 @@ export function emitScript(
   // 1. Clone the Babel Program (NEVER mutate ir.setupBody.scriptProgram).
   const cloned = cloneScriptProgram(ir.setupBody.scriptProgram);
 
-  // 1b. Spike 001 B1 — partition user-authored top-level ImportDeclarations
-  //     out of the Program body BEFORE any downstream pass iterates the body.
-  //     Mutate `cloned.program.body` in place to drop the imports; surface
-  //     them via `userImports` rendered as a string for the shell to splice at
-  //     module top. Index-based pairing passes (`pairClonedLifecycle`,
-  //     `pairClonedWatchers`) naturally operate on the partitioned body
-  //     because their input IS the mutated `cloned.program.body`.
-  const { userImports: userImportNodes, bodyStmts } = partitionUserImports(cloned);
+  // 1b. Spike 001 B1 + quick task 260521-mj9 — partition user-authored
+  //     top-level ImportDeclarations AND statement-position `interface`/`type`
+  //     declarations out of the Program body BEFORE any downstream pass
+  //     iterates the body. Mutate `cloned.program.body` in place to drop both;
+  //     index-based pairing passes (`pairClonedLifecycle`, `pairClonedWatchers`)
+  //     naturally operate on the partitioned body because their input IS the
+  //     mutated `cloned.program.body`.
+  //
+  //     `userImports` is surfaced as a string for the shell to splice at module
+  //     top — without this hoist imports would land inside the component
+  //     function body and produce TS1232.
+  //
+  //     `hoistedTypeDecls` carries any `<script lang="ts">` statement-position
+  //     `TSInterfaceDeclaration` / `TSTypeAliasDeclaration`. Left in the
+  //     function body they are out of scope of the MODULE-scope props interface
+  //     (`interface FooProps { kind?: Kind }`), so a custom prop type like
+  //     `Kind` referenced from that interface fails with TS2304. emitReact
+  //     routes the rendered strings into the shell's module-scope bucket —
+  //     mirroring Angular/Lit, which already hoist these. Always empty for an
+  //     untyped `<script>`, so untyped emit stays byte-identical.
+  const {
+    userImports: userImportNodes,
+    hoistedTypeDecls: hoistedTypeNodes,
+    bodyStmts,
+  } = partitionUserImports(cloned);
   cloned.program.body = bodyStmts;
   const userImports =
     userImportNodes.length > 0
       ? userImportNodes.map((imp) => genCode(imp)).join('\n') + '\n'
       : '';
+  const hoistedTypeDecls = hoistedTypeNodes.map((decl) => genCode(decl));
 
   // 2. Hoist module-scoped `let X = init` declarations referenced from
   //    lifecycle hooks. ROZ522 advisories collected.
@@ -2129,6 +2158,7 @@ export function emitScript(
     hookSection,
     userArrowsSection,
     userImports,
+    hoistedTypeDecls,
     lifecycleEffectsSection,
     hasPropsDefaults: defaultedNonModelProps.length > 0,
     hookSectionLines,
