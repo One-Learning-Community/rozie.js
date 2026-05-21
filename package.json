@@ -12,6 +12,12 @@
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "format": "biome format --write .",
+    "playground": "pnpm --filter rozie-playground dev",
+    "playground:rebuild": "turbo run build --filter=@rozie/core --force && pnpm --filter rozie-playground dev",
+    "vr": "pnpm --filter @rozie/visual-regression test:visual",
+    "vr:rebuild": "turbo run build --filter=@rozie/visual-regression --force && pnpm --filter @rozie/visual-regression test:visual",
+    "vr-preview": "pnpm --filter @rozie/visual-regression preview",
+    "vr-preview:build": "turbo run build --filter=@rozie/visual-regression --force && pnpm --filter @rozie/visual-regression preview",
     "vr:debug": "pnpm --filter=@rozie/visual-regression run build:debug"
   },
   "devDependencies": {
