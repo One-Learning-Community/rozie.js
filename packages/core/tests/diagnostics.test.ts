@@ -12,6 +12,7 @@ import { parseProps } from '../src/parsers/parseProps.js';
 import { parseStyle } from '../src/parsers/parseStyle.js';
 import { parseTemplate } from '../src/parsers/parseTemplate.js';
 import { parseListeners } from '../src/parsers/parseListeners.js';
+import { parse } from '../src/parse.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -200,8 +201,10 @@ describe('Negative tests by ROZ-code range (at least one per range)', () => {
 });
 
 describe('end-to-end diagnostics via parse() (D-08)', () => {
-  it('multi-error parse() collects ALL diagnostics without throwing — ≥3 distinct codes', async () => {
-    const { parse } = await import('../src/parse.js');
+  it('multi-error parse() collects ALL diagnostics without throwing — ≥3 distinct codes', () => {
+    // `parse` is a static top-level import — hoisted from a per-test `await
+    // import()` so its module graph transforms at file load, not against the
+    // 5s test timeout (turbo's parallel runner starves CPU enough to blow it).
     const source = `<rozie name="Bad">
   <refs></refs>
   <props>{ ??? }</props>

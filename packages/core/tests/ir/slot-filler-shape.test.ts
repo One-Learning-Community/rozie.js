@@ -12,6 +12,8 @@
 // re-export at `packages/core/src/index.ts` ever drops `SlotFillerDecl`, this
 // test file fails to type-check, surfacing the regression at the CI gate.
 import { describe, it, expect, expectTypeOf } from 'vitest';
+// Value import of the @rozie/core barrel (hoisted — see the re-export tests below).
+import * as rozieCore from '@rozie/core';
 import type { TSType, Expression } from '@babel/types';
 import type {
   SlotFillerDecl,
@@ -80,17 +82,17 @@ describe('SlotFillerDecl shape lock — Phase 07.2 Plan 01 Task 2 (R2 acceptance
     expectTypeOf<Ctx>().toEqualTypeOf<'declaration' | 'fill-body'>();
   });
 
-  it('SlotFillerDecl is re-exported from @rozie/core barrel (Phase 07.1 self-reference pattern)', async () => {
+  it('SlotFillerDecl is re-exported from @rozie/core barrel (Phase 07.1 self-reference pattern)', () => {
     // The act of `import type { SlotFillerDecl } from '@rozie/core'` succeeding
-    // above is the existence proof under verbatimModuleSyntax — but verify the
-    // runtime barrel is also reachable so future relative-path regressions
-    // surface here too.
-    const mod = await import('@rozie/core');
-    expect(mod.RozieErrorCode).toBeDefined();
+    // above is the existence proof under verbatimModuleSyntax — the static
+    // `import * as rozieCore from '@rozie/core'` at the top verifies the
+    // runtime barrel is reachable too. Hoisted from a per-test `await
+    // import()`, which under turbo's parallel runner raced the 5s timeout.
+    expect(rozieCore.RozieErrorCode).toBeDefined();
   });
 
-  it('ROZ940..ROZ947 codes are registered per D-08 policy', async () => {
-    const { RozieErrorCode } = await import('@rozie/core');
+  it('ROZ940..ROZ947 codes are registered per D-08 policy', () => {
+    const { RozieErrorCode } = rozieCore;
     expect(RozieErrorCode.DUPLICATE_DEFAULT_FILL).toBe('ROZ940');
     expect(RozieErrorCode.UNKNOWN_SLOT_NAME).toBe('ROZ941');
     expect(RozieErrorCode.DUPLICATE_NAMED_FILL).toBe('ROZ942');

@@ -6,6 +6,8 @@
 // levels. Phase 4 React emitter MAY amend; that amendment must be a deliberate
 // ROADMAP change, not silent drift.
 import { describe, it, expect, expectTypeOf } from 'vitest';
+// Value import of the @rozie/core barrel (hoisted — see the re-export test below).
+import * as rozieCore from '../../src/index.js';
 import type { TSType } from '@babel/types';
 import type {
   SlotDecl,
@@ -138,13 +140,15 @@ describe('SlotDecl shape lock — Plan 02-05 (D-18)', () => {
     expect(_proof).toBeUndefined();
   });
 
-  it('IRComponent type is re-exported from @rozie/core public surface', async () => {
-    // This import test verifies index.ts re-export wiring. Resolution itself
-    // is the assertion (failed import = test failure at module load).
-    const mod = await import('../../src/index.js');
-    expect(mod.parse).toBeTypeOf('function');
+  it('IRComponent type is re-exported from @rozie/core public surface', () => {
+    // Verifies index.ts re-export wiring: the static top-level import of
+    // ../../src/index.js IS the resolution assertion — a broken barrel fails
+    // the whole file at load. Hoisted from a per-test `await import()`, which
+    // under turbo's parallel runner raced the 5s test timeout (the barrel's
+    // transform cost is now paid at file load, which has no per-test cap).
+    expect(rozieCore.parse).toBeTypeOf('function');
     // lowerToIR should be exported (Task 2 lands the real impl; Task 1 stub OK)
-    expect(mod.lowerToIR).toBeTypeOf('function');
+    expect(rozieCore.lowerToIR).toBeTypeOf('function');
   });
 
   it('Every IR node type carries sourceLoc: SourceLoc', () => {
