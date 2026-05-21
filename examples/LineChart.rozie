@@ -35,6 +35,7 @@
   options: { type: Object,  default: () => ({}) },
   type:    { type: String,  default: 'line' },
   height:  { type: Number,  default: 240 },
+  updateMode: { type: String, default: undefined },
 }
 </props>
 
@@ -77,12 +78,41 @@ $onMount(() => {
 // on every data tick would flicker and leak.
 $watch(() => $props.data, (v) => {
   if (!instance) return
-  instance.data = $snapshot(v)
-  instance.update('none')
+
+  // Reconcile a new data object into the LIVE chart instead of replacing
+  // instance.data. Chart.js matches dataset controllers and point elements
+  // by array index across an update(), so mutating the existing labels /
+  // datasets arrays is what lets it tween every point from its old value to
+  // its new one. Assigning a fresh instance.data severs that identity — the
+  // only clean update left would be update('none'), i.e. no animation.
+  // ($snapshot strips Svelte 5's $state proxy first; Chart.js redefines
+  // property descriptors on whatever object it is handed — see above.)
+  const next = $snapshot(v)
+  const live = instance.data
+
+  // labels: same array, contents swapped.
+  live.labels ??= []
+  live.labels.length = 0
+  live.labels.push(...(next.labels ?? []))
+
+  // datasets: update matched datasets in place (preserves each point's
+  // animation state), then trim/extend so the counts line up.
+  live.datasets ??= []
+  const nextSets = next.datasets ?? []
+  nextSets.forEach((ds, i) => {
+    if (live.datasets[i]) Object.assign(live.datasets[i], ds)
+    else live.datasets[i] = ds
+  })
+  live.datasets.length = nextSets.length
+
+  instance.update($props.updateMode)
 })
 
 $watch(() => $props.options, (v) => {
   if (!instance) return
+  // Options aren't tweened point-to-point, and we replace the options object
+  // wholesale here — there's no per-element identity to preserve. Skip the
+  // animation rather than rescale-flicker on every options tick.
   instance.options = { ...instance.options, ...v }
   instance.update('none')
 })
