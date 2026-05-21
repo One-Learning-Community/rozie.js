@@ -1,0 +1,14 @@
+import { useState } from 'react';
+import styles from './CommaAlternatives.module.css';
+
+interface CommaAlternativesProps {}
+
+export default function CommaAlternatives(props: CommaAlternativesProps): JSX.Element {
+  const [bound, setBound] = useState('max');
+
+  return (
+    <>
+    {(bound === 'max' || bound === 'min') ? <span className={styles.extremum} data-rozie-s-65af5512="">at an extremum</span> : (bound === 'mid') ? <span className={styles.middle} data-rozie-s-65af5512="">in the middle</span> : <span className={styles.other} data-rozie-s-65af5512="">somewhere else</span>}
+    </>
+  );
+}

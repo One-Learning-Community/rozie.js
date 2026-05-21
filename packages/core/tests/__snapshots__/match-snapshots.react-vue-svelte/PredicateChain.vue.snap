@@ -1,0 +1,17 @@
+<template>
+
+<strong v-if="count > 10" class="high">plenty</strong><span v-else-if="count > 0" class="some">a few</span><span v-else class="none">none</span>
+
+</template>
+
+<script setup lang="ts">
+import { ref } from 'vue';
+
+const count = ref(5);
+</script>
+
+<style scoped>
+.high { font-weight: 700; }
+.some { opacity: 0.85; }
+.none { opacity: 0.5; }
+</style>
