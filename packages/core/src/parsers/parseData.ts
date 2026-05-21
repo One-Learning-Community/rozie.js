@@ -9,6 +9,13 @@
  *  - ROZ010  Invalid JS expression in <data>
  *  - ROZ011  <data> top-level is not an object literal
  *
+ * `<data>` initializers accept TypeScript `as` / `satisfies` expressions
+ * (e.g. `selected: null as User | null`). The `typescript` parser plugin is
+ * enabled unconditionally — `<data>` has no `lang` attribute to gate on, and
+ * TypeScript is a syntactic superset of JS for expressions, so plain-JS data
+ * blocks parse identically; enabling it only ADDS the `as`/`satisfies` forms
+ * (which are not valid JS and would have errored anyway).
+ *
  * @experimental — shape may change before v1.0
  */
 import { parseExpression } from '@babel/parser';
@@ -38,6 +45,7 @@ export function parseData(
     expr = parseExpression(content, {
       ...pos,
       ...(filename !== undefined ? { sourceFilename: filename } : {}),
+      plugins: ['typescript'],
       errorRecovery: true,
     });
   } catch (err: unknown) {
