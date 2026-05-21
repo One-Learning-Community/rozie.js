@@ -1,0 +1,100 @@
+<!--
+  typed/SortableList.rozie
+
+  Typed fork of examples/SortableList.rozie for Phase 9 (`<script lang="ts">`).
+
+  Component LOGIC is behavior-identical to examples/SortableList.rozie. The
+  deltas are:
+    - <script> becomes <script lang="ts">
+    - author type annotations on the engine-instance declaration
+      (`let instance: SortableJS | null = null` — the case where author types
+      matter most: without it `typeNeutralizeScript` injects `: any`)
+    - author type annotations on the keyFor() parameters
+    - the model-rebuild in onUpdate uses a `for-of` over the typed `$props.items`
+      array (a behavior-identical shallow copy) so the `typeNeutralizeScript`
+      ForOfStatement gating — skipped for `lang="ts"` — is exercised end-to-end.
+
+  This is the engine-wrapper fixture: it imports a vanilla-JS engine and holds
+  the instance in a typed `let`.
+-->
+
+<rozie name="SortableList">
+
+<props>
+{
+  items:     { type: Array,   default: () => [],  model: true },
+  itemKey:   { type: String,  default: null },
+  handle:    { type: String,  default: null },
+  group:     { type: String,  default: null },
+  animation: { type: Number,  default: 150 },
+  disabled:  { type: Boolean, default: false },
+  options:   { type: Object,  default: () => ({}) },
+}
+</props>
+
+<script lang="ts">
+import SortableJS from 'sortablejs'
+
+let instance: SortableJS | null = null
+
+const keyFor = (item: unknown, index: number): unknown => {
+  if ($props.itemKey && item !== null && typeof item === 'object') {
+    return (item as Record<string, unknown>)[$props.itemKey] ?? index
+  }
+  return item ?? index
+}
+
+$onMount(() => {
+  instance = new SortableJS($el, {
+    animation: $props.animation,
+    disabled:  $props.disabled,
+    group:     $props.group,
+    handle:    $props.handle,
+    ...$props.options,
+    onStart: (e) => $emit('start', e),
+    onEnd:   (e) => $emit('end',   e),
+    // SortableJS mutates the DOM directly when a drop completes. Every
+    // framework reconciler (React/Vue/Svelte/Solid/Lit/Angular) then notices
+    // the DOM doesn't match its model on the next render and fights it —
+    // flash, snap-back, lost focus, broken animations. The fix is to RESTORE
+    // the pre-drag DOM order before updating the model: the framework then
+    // sees a model change against an unchanged DOM and reconciles cleanly,
+    // moving keyed nodes to their new positions with proper transitions.
+    onUpdate: (e) => {
+      e.item.remove()
+      $el.insertBefore(e.item, $el.children[e.oldIndex] ?? null)
+      // Behavior-identical shallow copy of the typed items array, written as
+      // a for-of so the typed-script ForOfStatement gating is exercised.
+      const next: unknown[] = []
+      for (const it of $props.items) next.push(it)
+      const [moved] = next.splice(e.oldIndex, 1)
+      next.splice(e.newIndex, 0, moved)
+      $props.items = next
+      $emit('change', { oldIndex: e.oldIndex, newIndex: e.newIndex, item: moved })
+    },
+  })
+  return () => instance?.destroy()
+})
+
+// Reconcile prop changes into the live SortableJS instance without
+// re-creating it. instance.option(name, value) is SortableJS's supported
+// runtime update path for these fields.
+$watch(() => $props.disabled, (v) => instance?.option('disabled', v))
+$watch(() => $props.group,    (v) => instance?.option('group',    v))
+$watch(() => $props.handle,   (v) => instance?.option('handle',   v))
+</script>
+
+<template>
+<div class="rozie-sortable-list">
+  <div r-for="item, index in $props.items" :key="keyFor(item, index)" class="rozie-sortable-item">
+    <slot :item="item" :index="index" />
+  </div>
+</div>
+</template>
+
+<style>
+.rozie-sortable-list { display: block; }
+.rozie-sortable-item { display: block; }
+</style>
+
+</rozie>

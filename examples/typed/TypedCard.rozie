@@ -1,0 +1,70 @@
+<!--
+  typed/TypedCard.rozie
+
+  Genuinely-new typed example for Phase 9 (`<script lang="ts">`) — NOT a fork.
+
+  Its job is to prove author-defined-type preservation, which no untyped
+  example can be forked into:
+    - declares an `interface` and a `type` alias inside <script lang="ts">
+    - uses a type-only import (`import type { … } from '…'`)
+    - the author types are consumed by typed `const` declarations
+
+  Statement-position `interface` / `type` declarations must be hoisted to
+  module scope for the class-based targets (Angular / Lit) — this fixture
+  exercises that hoist path (Plan 09-04 OQ-3). It is small on purpose and
+  compiles cleanly to all six targets.
+-->
+
+<rozie name="TypedCard">
+
+<props>
+{
+  title: { type: String, default: '' },
+  tone:  { type: String, default: 'neutral' },
+}
+</props>
+
+<script lang="ts">
+// Type-only import — resolves against the ambient engine-module stub in the
+// per-target typecheck gates (sortablejs → `any`). Demonstrates that an
+// `import type { … }` survives to every target's module scope.
+import type { Options } from 'sortablejs'
+
+// Author-declared type alias — must be preserved verbatim and hoisted to
+// module scope on the class-based targets.
+type Tone = 'neutral' | 'accent'
+
+// Author-declared interface — same hoisting requirement.
+interface CardMeta {
+  label: string
+  emphasis: boolean
+}
+
+const meta: CardMeta = {
+  label: $props.title,
+  emphasis: ($props.tone as Tone) === 'accent',
+}
+
+// Reference the type-only import so it is not elided as unused.
+const engineOptions: Options | null = null
+
+const badge: string = meta.emphasis ? meta.label.toUpperCase() : meta.label
+</script>
+
+<template>
+<article class="typed-card" :class="{ 'typed-card--accent': $props.tone === 'accent' }">
+  <h3 class="typed-card__title">{{ badge }}</h3>
+  <div class="typed-card__body">
+    <slot />
+  </div>
+</article>
+</template>
+
+<style>
+.typed-card { border: 1px solid #ddd; border-radius: 6px; overflow: hidden; background: #fff; }
+.typed-card--accent { border-color: #4f46e5; }
+.typed-card__title { margin: 0; padding: 0.75rem 1rem; font-size: 1rem; font-weight: 600; border-bottom: 1px solid #eee; }
+.typed-card__body { padding: 1rem; }
+</style>
+
+</rozie>

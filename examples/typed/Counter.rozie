@@ -1,0 +1,65 @@
+<!--
+  typed/Counter.rozie
+
+  Typed fork of examples/Counter.rozie — the locked KEY VERIFICATION ARTIFACT
+  for Phase 9 (`<script lang="ts">`).
+
+  IDENTICAL component logic to examples/Counter.rozie. The ONLY deltas:
+    - <script> becomes <script lang="ts">
+    - author type annotations on the four `const` declarations in <script>
+
+  Every per-target diff of Counter vs typed/Counter must show ONLY these author
+  annotations where `typeNeutralizeScript` would otherwise have left a bare
+  declaration — nothing else moved. That diff proves "TS path = untyped path +
+  author types, nothing else regressed."
+-->
+
+<rozie name="Counter">
+
+<props>
+{
+  value: { type: Number, default: 0,  model: true },
+  step:  { type: Number, default: 1 },
+  min:   { type: Number, default: -Infinity },
+  max:   { type: Number, default: Infinity },
+}
+</props>
+
+<data>
+{
+  hovering: false,
+}
+</data>
+
+<script lang="ts">
+console.log("hello from rozie")
+
+const canIncrement: boolean = $computed(() => $props.value + $props.step <= $props.max)
+const canDecrement: boolean = $computed(() => $props.value - $props.step >= $props.min)
+
+const increment: () => void = () => { if (canIncrement) $props.value += $props.step }
+const decrement: () => void = () => { if (canDecrement) $props.value -= $props.step }
+</script>
+
+<template>
+<div
+  class="counter"
+  :class="{ hovering: $data.hovering }"
+  @mouseenter="$data.hovering = true"
+  @mouseleave="$data.hovering = false"
+>
+  <button :disabled="!canDecrement" @click="decrement" aria-label="Decrement">−</button>
+  <span class="value">{{ $props.value }}</span>
+  <button :disabled="!canIncrement" @click="increment" aria-label="Increment">+</button>
+</div>
+</template>
+
+<style>
+.counter { display: inline-flex; gap: 0.5rem; align-items: center; }
+.counter.hovering { background: rgba(0, 0, 0, 0.04); }
+.value { font-variant-numeric: tabular-nums; min-width: 3ch; text-align: center; }
+button { padding: 0.25rem 0.5rem; }
+button:disabled { opacity: 0.4; cursor: not-allowed; }
+</style>
+
+</rozie>
