@@ -117,3 +117,10 @@ export { registerBuiltins, createDefaultRegistry } from './modifiers/registerBui
 // @experimental — shape may change before v1.0
 export { lowerToIR } from './ir/lower.js';
 export type { LowerOptions, LowerResult } from './ir/lower.js';
+
+// Optional-`sass` resolver — Phase 10 Plan 01. `loadSass()` synchronously
+// resolves the optional `sass` peer dependency for the `<style lang="scss">`
+// branch of parseStyle (Plan 10-03); returns `null` when `sass` is absent.
+// @experimental — shape may change before v1.0
+export { loadSass } from './parsers/resolveSass.js';
+export type { SassModule } from './parsers/resolveSass.js';
