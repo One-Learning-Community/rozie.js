@@ -24,7 +24,7 @@ interface FooterCtx {
 
     @if (open()) {
     <div class="modal-backdrop" #backdropEl (click)="_guardedHandler0($event)">
-      <div #dialogEl class="modal-dialog" role="dialog" aria-modal="true" [aria-label]="title() || undefined" tabindex="-1">
+      <div #dialogEl class="modal-dialog" role="dialog" aria-modal="true" [attr.aria-label]="title() || undefined" tabindex="-1">
         @if (title() || (headerTpl ?? templates()?.['header'])) {
     <header>
           @if ((headerTpl ?? templates()?.['header'])) {

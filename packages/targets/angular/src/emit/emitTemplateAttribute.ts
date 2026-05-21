@@ -35,8 +35,10 @@ export interface EmitAttrCtx {
    * Phase 06.2 — element's tagKind. When 'component' or 'self', kebab-case
    * binding names are camelCased before emit (Angular component properties
    * are camelCase by convention, and Angular rejects `on-` prefix bindings
-   * with NG0306 for security). HTML elements keep kebab-case so
-   * `[aria-label]`, `[data-foo]`, etc. work naturally.
+   * with NG0306 for security). HTML elements keep kebab-case; dynamic
+   * `aria-*` / `data-*` are additionally routed through Angular's
+   * `[attr.NAME]` form by `resolveBindingName` — a plain `[aria-label]`
+   * property binding is a silent no-op (no scalar DOM property exists).
    */
   elementTagKind?: 'html' | 'component' | 'self';
 }
@@ -82,8 +84,9 @@ function escapeAttrValue(s: string): string {
  * DELIBERATELY EXCLUDED:
  *   - `aria-*` / `data-*`: attribute-only (no scalar DOM property), so a
  *     dynamic `:aria-label` / `:data-x` needs Angular's `[attr.aria-label]`
- *     form — a property-vs-attribute decision, not a casing remap. Tracked as
- *     a separate backlog item.
+ *     form — a property-vs-attribute decision, not a casing remap. Handled
+ *     separately in `resolveBindingName` (which prefixes `attr.`), NOT via
+ *     this casing map.
  *   - Deprecated/obsolete attrs (`cellpadding`, `frameborder`, `bgcolor`,
  *     `valign`, `marginwidth`, …) — out of scope for modern target frameworks.
  *   - `popovertarget` — reflects to an *element* reference, not a string;
@@ -148,6 +151,18 @@ const HTML_ATTR_CASING: Readonly<Record<string, string>> = {
  */
 function resolveBindingName(name: string, ctx: EmitAttrCtx): string {
   if (isComponentTag(ctx)) return kebabToCamel(name);
+  // `aria-*` / `data-*` have no scalar DOM property — Angular's default
+  // `[name]` is a DOM-PROPERTY binding, so `[aria-label]="x"` assigns a no-op
+  // `el['aria-label']` expando and the real attribute is never set. The
+  // attribute-binding form `[attr.aria-label]="x"` sets it correctly. Every
+  // `binding` / `interpolated` emit path wraps this return value as
+  // `[<name>]="…"`, so returning `attr.aria-label` here yields a valid
+  // `[attr.aria-label]` target. (STATIC `aria-`/`data-` attributes bypass this
+  // — they emit as plain HTML attributes via the `attr.kind === 'static'`
+  // branch — and component tags never reach this line.)
+  if (name.startsWith('aria-') || name.startsWith('data-')) {
+    return `attr.${name}`;
+  }
   return HTML_ATTR_CASING[name] ?? name;
 }
 

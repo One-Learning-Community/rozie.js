@@ -88,6 +88,71 @@ describe('emitTemplate — HTML attribute casing (260520-hus #1, Table·angular)
   });
 });
 
+describe('emitTemplate — dynamic aria-*/data-* attribute bindings', () => {
+  // Regression (.planning/todos angular-aria-data-dynamic-binding): a dynamic
+  // `:aria-label` emitted `[aria-label]="…"` — an Angular DOM-PROPERTY binding.
+  // `aria-*` / `data-*` have no scalar DOM property, so the binding assigned a
+  // no-op expando and the real attribute was never set: a silent a11y
+  // regression with no compile error. The correct form is `[attr.aria-label]`.
+  function lowerInline(src: string): IRComponent {
+    const result = parse(src, { filename: 'AriaTest.rozie' });
+    if (!result.ast) {
+      throw new Error(
+        `parse() failed: ${result.diagnostics.map((d) => d.code).join(', ')}`,
+      );
+    }
+    const lowered = lowerToIR(result.ast, {
+      modifierRegistry: createDefaultRegistry(),
+    });
+    if (!lowered.ir) throw new Error('lowerToIR() returned null IR');
+    return lowered.ir;
+  }
+
+  const ARIA_SRC = `<rozie name="AriaTest">
+<props>{ label: { type: String }, rowId: { type: String } }</props>
+<data>{ pressed: false }</data>
+<template>
+  <div :aria-label="$props.label" :data-row-id="$props.rowId" aria-hidden="true">
+    <button :aria-pressed="$data.pressed" :data-label="static {{ $props.label }}">x</button>
+  </div>
+</template>
+</rozie>`;
+
+  it('dynamic :aria-* / :data-* bindings emit the `[attr.NAME]` form', () => {
+    const ir = lowerInline(ARIA_SRC);
+    const { template } = emitTemplate(ir, createDefaultRegistry());
+    expect(template).toContain('[attr.aria-label]="label()"');
+    expect(template).toContain('[attr.data-row-id]="rowId()"');
+    expect(template).toContain('[attr.aria-pressed]="pressed()"');
+  });
+
+  it('interpolated aria-*/data-* attribute emits the `[attr.NAME]` form', () => {
+    const ir = lowerInline(ARIA_SRC);
+    const { template } = emitTemplate(ir, createDefaultRegistry());
+    // `:data-label="static {{ $props.label }}"` — a `{{ }}`-interpolated
+    // binding attr, lowered to the `interpolated` AttributeBinding kind.
+    expect(template).toMatch(/\[attr\.data-label\]="`static \$\{label\(\)\}`"/);
+  });
+
+  it('never emits the silent-no-op DOM-property form `[aria-*]` / `[data-*]`', () => {
+    const ir = lowerInline(ARIA_SRC);
+    const { template } = emitTemplate(ir, createDefaultRegistry());
+    // The buggy property-binding form — `[` immediately followed by the kebab
+    // name — must not appear. `[attr.aria-label]` does not match (the prefix
+    // after `[` is `attr.`).
+    expect(template).not.toMatch(/\[aria-/);
+    expect(template).not.toMatch(/\[data-/);
+  });
+
+  it('STATIC aria-*/data-* attributes stay plain HTML attributes', () => {
+    const ir = lowerInline(ARIA_SRC);
+    const { template } = emitTemplate(ir, createDefaultRegistry());
+    // `aria-hidden="true"` is static — it must NOT be routed through `[attr.]`.
+    expect(template).toContain('aria-hidden="true"');
+    expect(template).not.toContain('[attr.aria-hidden]');
+  });
+});
+
 describe('emitTemplate — Modal r-if conditional + paired close', () => {
   it('Modal r-if emits @if (open()) { ... } block syntax', () => {
     const ir = loadIR('Modal');
