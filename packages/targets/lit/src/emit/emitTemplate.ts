@@ -32,6 +32,7 @@ import type {
   TemplateNode,
   TemplateElementIR,
   TemplateConditionalIR,
+  TemplateMatchIR,
   TemplateLoopIR,
   TemplateSlotInvocationIR,
   TemplateFragmentIR,
@@ -923,6 +924,8 @@ function emitNode(
       return emitElement(node, ir, hostListenerWiring, opts);
     case 'TemplateConditional':
       return emitConditional(node, ir, hostListenerWiring, opts);
+    case 'TemplateMatch':
+      return emitMatchNode(node, ir, hostListenerWiring, opts);
     case 'TemplateLoop':
       return emitLoop(node, ir, hostListenerWiring, opts);
     case 'TemplateSlotInvocation':
@@ -1039,6 +1042,53 @@ function emitElement(
     .map((c) => emitNode(c, ir, hostListenerWiring, opts))
     .join('');
   return `${open}${children}</${tagName}>`;
+}
+
+/**
+ * D-02 — the `r-match` (`TemplateMatch`) delegate.
+ *
+ * `node.branches` is byte-identical to `TemplateConditionalIR.branches` (the
+ * `r-case`/`r-default` tests are pre-folded by core, plan 11-01), so emitting a
+ * match is pure delegation: construct a synthetic `TemplateConditional` and
+ * hand it to the INLINE `emitConditional` (the standalone
+ * `lit/src/emit/emitConditional.ts` is dead code — RESEARCH Pitfall 2). No
+ * bespoke `emitMatch` logic, no touch to `emitConditional`'s signature.
+ *
+ * Lit's `emitNode` `default:` has no `_exhaustive` never-check, so TS does NOT
+ * flag a missing `TemplateMatch` case — this case is added deliberately.
+ *
+ * When `node.hostElement` is present (a real-element host, `<div r-match>`),
+ * the conditional ladder is rendered as the single child of a synthetic copy
+ * of that host element — so the host tag + its attributes survive to emitted
+ * output (R8), mirroring how a real-element `r-if` host keeps its tag.
+ *
+ * The `discriminantMode === 'hoist'` path (an expensive `CallExpression`
+ * discriminant) is delegated as-if-inline here; the hoist-temp declaration is
+ * owned by plan 11-05 for the Lit target.
+ */
+function emitMatchNode(
+  node: TemplateMatchIR,
+  ir: IRComponent,
+  hostListenerWiring: string[],
+  opts: EmitTemplateOpts,
+): string {
+  const synthetic: TemplateConditionalIR = {
+    type: 'TemplateConditional',
+    branches: node.branches,
+    sourceLoc: node.sourceLoc,
+  };
+  if (node.discriminantMode === 'hoist') {
+    // TODO(11-05): hoist placement — declare the discriminant temp once in
+    // the render() prelude so an expensive discriminant evaluates once.
+  }
+  if (node.hostElement !== undefined) {
+    const wrapper: TemplateElementIR = {
+      ...node.hostElement,
+      children: [synthetic],
+    };
+    return emitElement(wrapper, ir, hostListenerWiring, opts);
+  }
+  return emitConditional(synthetic, ir, hostListenerWiring, opts);
 }
 
 function emitConditional(
