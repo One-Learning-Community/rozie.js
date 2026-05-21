@@ -440,6 +440,22 @@ function caseLiteralValue(caseValue: t.Expression): string | undefined {
   if (t.isNumericLiteral(caseValue)) return `n:${caseValue.value}`;
   if (t.isBooleanLiteral(caseValue)) return `b:${caseValue.value}`;
   if (t.isNullLiteral(caseValue)) return 'null';
+  // WR-03 — a negative numeric `r-case="-1"` parses (via @babel/parser) as a
+  // UnaryExpression with operator `-` wrapping a NumericLiteral, NOT a plain
+  // NumericLiteral. Special-case the unary-minus/plus-on-numeric form so two
+  // `r-case="-1"` rungs are still caught by the ROZ959 duplicate-case check.
+  if (
+    t.isUnaryExpression(caseValue, { operator: '-' }) &&
+    t.isNumericLiteral(caseValue.argument)
+  ) {
+    return `n:${-caseValue.argument.value}`;
+  }
+  if (
+    t.isUnaryExpression(caseValue, { operator: '+' }) &&
+    t.isNumericLiteral(caseValue.argument)
+  ) {
+    return `n:${+caseValue.argument.value}`;
+  }
   return undefined;
 }
 
