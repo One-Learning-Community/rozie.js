@@ -13,7 +13,9 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 export default defineConfig({
   test: {
     environment: 'happy-dom',
-    include: ['src/**/*.test.ts'],
+    // `tests/**` carries the Phase 9 `ts-passthrough` suite alongside the
+    // co-located `src/**` unit tests (mirrors @rozie/target-angular's config).
+    include: ['src/**/*.test.ts', 'tests/**/*.test.ts'],
     root: __dirname,
     snapshotFormat: { printBasicPrototype: false },
   },
