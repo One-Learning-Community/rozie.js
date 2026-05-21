@@ -183,6 +183,69 @@ describe('lowerTemplate — Plan 02-05', () => {
   });
 });
 
+describe('lowerTemplate — mustache in plain (non-`:`) attribute values', () => {
+  // Regression (.planning/todos mustache-in-plain-attr-not-lowered): `{{ }}`
+  // interpolation in a plain attribute value was only lowered for `:`-prefixed
+  // binding attrs — a plain `class="card {{ x }}"` stayed a `static`
+  // AttributeBinding and emitted the literal `{{ }}` text on every target.
+  // PROJECT.md lists mustache in attribute values as a deliberate Rozie
+  // feature (Vue forbids it).
+  function lowerInline(src: string) {
+    const result = parse(src, { filename: 'MustacheAttr.rozie' });
+    if (!result.ast) {
+      throw new Error(
+        `parse() failed: ${result.diagnostics.map((d) => d.code).join(', ')}`,
+      );
+    }
+    const lowered = lowerToIR(result.ast, {
+      modifierRegistry: createDefaultRegistry(),
+    });
+    if (!lowered.ir) throw new Error('lowerToIR() returned null IR');
+    return lowered.ir;
+  }
+
+  const SRC = `<rozie name="MustacheAttr">
+<props>{ variant: { type: String }, rowId: { type: String } }</props>
+<template>
+  <div class="card card--{{ $props.variant }}" data-id="{{ $props.rowId }}" title="plain"></div>
+</template>
+</rozie>`;
+
+  function divAttrs(): Array<Record<string, unknown>> {
+    const ir = lowerInline(SRC);
+    const els = collectByType<'TemplateElement'>(ir.template, 'TemplateElement');
+    const div = els.find((e) => e['tagName'] === 'div');
+    expect(div).toBeDefined();
+    return div!['attributes'] as Array<Record<string, unknown>>;
+  }
+
+  it('a plain attribute containing {{ }} lowers to an interpolated AttributeBinding', () => {
+    const attrs = divAttrs();
+    // `class="card card--{{ … }}"` — static text + one binding segment.
+    expect(attrs.find((a) => a['name'] === 'class')?.['kind']).toBe('interpolated');
+    // `data-id="{{ … }}"` — a pure-mustache plain attribute.
+    expect(attrs.find((a) => a['name'] === 'data-id')?.['kind']).toBe('interpolated');
+  });
+
+  it('the interpolated segments carry the parsed binding expression', () => {
+    const classAttr = divAttrs().find((a) => a['name'] === 'class')!;
+    const segments = classAttr['segments'] as Array<{
+      kind: string;
+      expression?: t.Expression;
+    }>;
+    const binding = segments.find((s) => s.kind === 'binding');
+    expect(binding).toBeDefined();
+    // `$props.variant` — a MemberExpression.
+    expect(t.isMemberExpression(binding!.expression!)).toBe(true);
+  });
+
+  it('a plain attribute with no {{ }} stays a static AttributeBinding', () => {
+    const title = divAttrs().find((a) => a['name'] === 'title');
+    expect(title?.['kind']).toBe('static');
+    expect(title?.['value']).toBe('plain');
+  });
+});
+
 describe('lowerSlots — Plan 02-05 (D-18 presence detection)', () => {
   it('TodoList.rozie produces 3 SlotDecl entries (header, default, empty) all presence: always', () => {
     const { ir } = lowerExample('TodoList');

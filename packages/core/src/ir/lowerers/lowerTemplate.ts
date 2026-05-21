@@ -258,6 +258,22 @@ function lowerAttribute(
   }
 
   if (attr.kind === 'static') {
+    // `{{ }}` mustache is permitted in plain (non-`:`) attribute values too —
+    // a deliberate Rozie feature (Vue forbids it; see PROJECT.md). Lower it to
+    // the same `interpolated` AttributeBinding the `:`-binding branch produces
+    // below, so every target emits a real interpolation rather than the
+    // literal `{{ }}` text. Values with no `{{` early-return null from
+    // parseInterpolatedSegments and fall through to the plain `static` shape.
+    if (attr.value !== null) {
+      const interp = parseInterpolatedSegments(attr.value, bindings);
+      if (interp && interp.kind === 'interpolated') {
+        return {
+          ...interp,
+          name: attr.name,
+          sourceLoc: attr.loc,
+        };
+      }
+    }
     return {
       kind: 'static',
       name: attr.name,
