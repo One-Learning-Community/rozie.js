@@ -147,3 +147,47 @@ describe('Solid ts-passthrough — declarator-id-typed callback (WR-01 / ROOT CA
     expect(code).not.toMatch(/\be: any\b/);
   });
 });
+
+// WR-02 regression — a `<script lang="ts">` type-reference identifier that
+// COLLIDES with a `$computed` runtime name must NOT be rewritten into a
+// runtime accessor inside the type annotation. Solid's `rewriteScript`
+// Identifier visitor rewrites a bare `$computed` name to `name()`; without the
+// `isInTypePosition` guard a generic type parameter named `total` (a pure
+// type-level identifier) would be mangled to `total()` inside the `: total`
+// param / return annotations, producing invalid TS. The guard lives in
+// `@rozie/core` (ast/typePosition.ts) and is shared with computeDeps.
+const TYPE_COLLISION_SRC = `<rozie name="TypeCollision">
+<props>
+{
+  step: { type: Number, default: 1 }
+}
+</props>
+<script lang="ts">
+const total = $computed(() => $props.step * 2)
+// \`total\` here is a GENERIC TYPE PARAMETER — a pure type-level identifier
+// that happens to share the name of the $computed memo above. The runtime
+// \`total\` and the type-level \`total\` are distinct; the rewriter must touch
+// only the runtime one.
+function identity<total>(x: total): total {
+  return x
+}
+const probe = identity<number>(total)
+</script>
+<template>
+  <button @click="probe">{{ total }}</button>
+</template>
+</rozie>`;
+
+describe('Solid ts-passthrough — type-reference / $computed name collision (WR-02)', () => {
+  it('does NOT rewrite a type-position identifier colliding with a $computed name', () => {
+    const code = compile(TYPE_COLLISION_SRC);
+    // The generic param + its type-position uses survive verbatim — NOT `total()`.
+    expect(code).toContain('function identity<total>(x: total): total');
+    expect(code).not.toContain('x: total()');
+    expect(code).not.toContain('): total()');
+    // The genuine RUNTIME read of the $computed `total` IS still rewritten to
+    // the Solid accessor call — proving the guard is narrow, not a blanket
+    // disable. `identity<number>(total)` passes the runtime memo value.
+    expect(code).toContain('identity<number>(total())');
+  });
+});

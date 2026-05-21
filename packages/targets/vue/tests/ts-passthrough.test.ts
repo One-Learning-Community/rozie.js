@@ -152,3 +152,46 @@ describe('ts-passthrough — declarator-id-typed callback (WR-01 / ROOT CAUSE 1)
     expect(code).not.toMatch(/\be: any\b/);
   });
 });
+
+// WR-02 regression — a `<script lang="ts">` type-reference identifier that
+// COLLIDES with a `$computed` runtime name must NOT be rewritten into a
+// runtime accessor inside the type annotation. Vue's `rewriteScript`
+// Identifier visitor appends `.value` to a bare `$computed` name; without the
+// `isInTypePosition` guard a generic type parameter named `total` (a pure
+// type-level identifier) would be mangled to `total.value` inside the
+// `: total` param / return annotations, producing invalid TS. The guard lives
+// in `@rozie/core` (ast/typePosition.ts) and is shared with computeDeps.
+const TYPE_COLLISION_SRC = `<rozie name="TypeCollision">
+<props>
+{
+  step: { type: Number, default: 1 }
+}
+</props>
+<script lang="ts">
+const total = $computed(() => $props.step * 2)
+// \`total\` here is a GENERIC TYPE PARAMETER — a pure type-level identifier
+// sharing the name of the $computed memo above. Only the runtime read may be
+// rewritten; the type-position uses must survive verbatim.
+function identity<total>(x: total): total {
+  return x
+}
+const probe = identity<number>(total)
+</script>
+<template>
+  <button @click="probe">{{ total }}</button>
+</template>
+</rozie>`;
+
+describe('ts-passthrough — type-reference / $computed name collision (WR-02)', () => {
+  it('does NOT rewrite a type-position identifier colliding with a $computed name', () => {
+    const code = compile(TYPE_COLLISION_SRC);
+    // The generic param + its type-position uses survive verbatim — NOT `.value`.
+    expect(code).toContain('function identity<total>(x: total): total');
+    expect(code).not.toContain('x: total.value');
+    expect(code).not.toContain('): total.value');
+    // The genuine RUNTIME read of the $computed `total` IS still rewritten to
+    // the Vue `.value` accessor — proving the guard is narrow, not a blanket
+    // disable.
+    expect(code).toContain('identity<number>(total.value)');
+  });
+});

@@ -83,6 +83,13 @@ export type {
 export type { SignalRef } from './reactivity/signalRef.js';
 export type { ReactiveDepGraph } from './reactivity/ReactiveDepGraph.js';
 
+// TS-type-position ancestor guard — Phase 9 WR-02. Shared by core's dep
+// analyzer and every per-target `rewriteScript` so a `<script lang="ts">`
+// type-reference identifier colliding with a runtime name is never rewritten
+// inside a type annotation.
+// @experimental — shape may change before v1.0
+export { isInTypePosition } from './ast/typePosition.js';
+
 // Modifier registry public surface — Phase 2 Plan 02-04.
 // SemVer-stable per D-22b — Phase 4 React emitter is the dogfooding consumer.
 export { ModifierRegistry } from './modifiers/ModifierRegistry.js';

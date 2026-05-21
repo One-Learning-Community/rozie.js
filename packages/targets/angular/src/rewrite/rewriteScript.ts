@@ -40,6 +40,7 @@ import type { NodePath } from '@babel/traverse';
 import type { File } from '@babel/types';
 import type { IRComponent } from '../../../../core/src/ir/types.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
+import { isInTypePosition } from '../../../../core/src/ast/typePosition.js';
 import {
   hasShadowingBinding,
   isInBindingPosition,
@@ -683,6 +684,10 @@ export function rewriteRozieIdentifiers(
     },
 
     MemberExpression(path) {
+      // WR-02 (Phase 9) — skip member expressions in TS type position
+      // (`let x: typeof $data.foo`). Without this the `$data.foo` rewrite
+      // would mangle a `typeof`-query inside a type annotation.
+      if (isInTypePosition(path)) return;
       const obj = path.node.object;
       if (!t.isIdentifier(obj)) return;
       if (path.node.computed) return;
@@ -879,6 +884,15 @@ export function rewriteRozieIdentifiers(
      */
     Identifier(path) {
       const name = path.node.name;
+
+      // WR-02 (Phase 9) — skip identifiers in TypeScript type position. A
+      // `<script lang="ts">` Program carries `TS*` nodes and @babel/traverse
+      // descends into them; without this guard a type-reference identifier
+      // (`let x: someClassMember`) whose name collides with a promoted class
+      // member would be rewritten to `this.someClassMember` INSIDE the type
+      // annotation, producing invalid TS. Mirrors the identical guard in
+      // core's computeDeps.
+      if (isInTypePosition(path)) return;
 
       // Spike 001 B2 — script-context `$el` lowers to
       // `MemberExpression($refs, __rozieRoot)`. The IR pass `lowerRootElementRef`

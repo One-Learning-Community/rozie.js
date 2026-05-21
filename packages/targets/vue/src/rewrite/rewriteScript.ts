@@ -34,6 +34,7 @@ import type { NodePath } from '@babel/traverse';
 import type { IRComponent } from '../../../../core/src/ir/types.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
+import { isInTypePosition } from '../../../../core/src/ast/typePosition.js';
 
 // CJS interop normalization (Phase 2 D-T-2-01-04 pattern).
 type TraverseFn = typeof import('@babel/traverse').default;
@@ -178,6 +179,10 @@ export function rewriteRozieIdentifiers(
 
   traverse(program, {
     MemberExpression(path) {
+      // WR-02 (Phase 9) — skip member expressions in TS type position
+      // (`let x: typeof $data.foo`). Without this the `$data.foo` rewrite
+      // would mangle a `typeof`-query inside a type annotation.
+      if (isInTypePosition(path)) return;
       const obj = path.node.object;
       if (!t.isIdentifier(obj)) return;
       // Skip computed access (`$props['foo']`) — Phase 2 ROZ106 already warned.
@@ -331,6 +336,15 @@ export function rewriteRozieIdentifiers(
 
     Identifier(path) {
       const name = path.node.name;
+
+      // WR-02 (Phase 9) — skip identifiers in TypeScript type position. A
+      // `<script lang="ts">` Program carries `TS*` nodes and @babel/traverse
+      // descends into them; without this guard a type reference (`let x:
+      // someComputed`) whose name collides with a `$computed` memo would be
+      // rewritten to `someComputed.value` INSIDE the type annotation,
+      // producing invalid TS. Mirrors the identical guard in core's
+      // computeDeps.
+      if (isInTypePosition(path)) return;
 
       // Spike 001 B2 — script-context `$el` lowers to
       // `MemberExpression($refs, __rozieRoot)`. The IR pass `lowerRootElementRef`

@@ -161,3 +161,49 @@ describe('ts-passthrough — declarator-id-typed callback (WR-01 / ROOT CAUSE 1+
     expect(code).not.toMatch(/\be: any\b/);
   });
 });
+
+// WR-02 regression — a `<script lang="ts">` type-reference identifier that
+// COLLIDES with a promoted class-member name must NOT be rewritten into a
+// `this.` member access inside the type annotation. Angular's `rewriteScript`
+// Identifier visitor rewrites every bare reference to a `<script>` function /
+// computed into `this.X` / `this.X()`. Without the `isInTypePosition` guard a
+// generic type parameter named `compute` (a pure type-level identifier
+// sharing a name with the `<script>` function `compute`) would be mangled to
+// `this.compute` inside the `: compute` annotations, producing invalid TS.
+const TYPE_COLLISION_SRC = `<rozie name="TypeCollision">
+<props>
+{
+  step: { type: Number, default: 1 }
+}
+</props>
+<script lang="ts">
+function compute(): number {
+  return $props.step * 2
+}
+// \`compute\` here is a GENERIC TYPE PARAMETER — a pure type-level identifier
+// sharing the name of the \`<script>\` function above. Only the runtime call
+// may be rewritten to \`this.compute()\`; the type-position uses survive.
+function identity<compute>(x: compute): compute {
+  return x
+}
+const probe = identity<number>(compute())
+</script>
+<template>
+  <button @click="probe">{{ compute() }}</button>
+</template>
+</rozie>`;
+
+describe('ts-passthrough — type-reference / class-member name collision (WR-02)', () => {
+  it('does NOT rewrite a type-position identifier colliding with a class-member name', () => {
+    const code = compileSource(TYPE_COLLISION_SRC, 'TypeCollision.rozie');
+    // `identity` is promoted to a class-field arrow; its generic param and the
+    // type-position `compute` uses survive verbatim — NOT rewritten to `this.`.
+    expect(code).toContain('(x: compute): compute');
+    expect(code).not.toContain('x: this.compute');
+    expect(code).not.toContain('): this.compute');
+    // The genuine RUNTIME call to the `<script>` function `compute` IS still
+    // rewritten to the Angular `this.` member access — proving the guard is
+    // narrow, not a blanket disable.
+    expect(code).toContain('this.identity<number>(this.compute())');
+  });
+});

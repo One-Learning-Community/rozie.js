@@ -34,6 +34,7 @@ import type { File } from '@babel/types';
 import type { IRComponent } from '../../../../core/src/ir/types.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
+import { isInTypePosition } from '../../../../core/src/ast/typePosition.js';
 
 // CJS interop normalization (Phase 2 D-T-2-01-04 pattern).
 type TraverseFn = typeof import('@babel/traverse').default;
@@ -427,6 +428,10 @@ export function rewriteRozieIdentifiers(
       // useRef accessor). When the IR pass declined to synthesise (root is
       // conditional/loop/fragment, OR user already has root ref), `$el`
       // remains a free identifier — v1 limitation, surfaced in spike docs.
+      // WR-02 (Phase 9) — skip identifiers in TS type position. `$el` is a
+      // Rozie sigil that should never appear in a type annotation, but the
+      // guard keeps this visitor uniform with the other targets.
+      if (isInTypePosition(path)) return;
       if (path.node.name !== '$el') return;
       const parentPath = path.parentPath;
       if (!parentPath) return;
@@ -461,6 +466,10 @@ export function rewriteRozieIdentifiers(
     },
 
     MemberExpression(path) {
+      // WR-02 (Phase 9) — skip member expressions in TS type position
+      // (`let x: typeof $data.foo`). Without this the `$data.foo` rewrite
+      // would mangle a `typeof`-query inside a type annotation.
+      if (isInTypePosition(path)) return;
       const obj = path.node.object;
       if (!t.isIdentifier(obj)) return;
       if (path.node.computed) return;

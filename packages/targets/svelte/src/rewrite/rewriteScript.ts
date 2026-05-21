@@ -28,6 +28,7 @@ import type { NodePath } from '@babel/traverse';
 import type { IRComponent } from '../../../../core/src/ir/types.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
+import { isInTypePosition } from '../../../../core/src/ast/typePosition.js';
 
 /**
  * Normalize an emit name to a Svelte 5 callback-prop identifier.
@@ -176,6 +177,10 @@ export function rewriteRozieIdentifiers(
 
   traverse(program, {
     Identifier(path) {
+      // WR-02 (Phase 9) — skip identifiers in TS type position. `$el` is a
+      // Rozie sigil that should never appear in a type annotation, but the
+      // guard keeps this visitor uniform with the other targets.
+      if (isInTypePosition(path)) return;
       // Spike 001 B2 — script-context `$el` lowers to
       // `MemberExpression($refs, __rozieRoot)`. The IR pass `lowerRootElementRef`
       // already appended `RefDecl { name: '__rozieRoot' }` to `ir.refs` when a
@@ -214,6 +219,10 @@ export function rewriteRozieIdentifiers(
     },
 
     MemberExpression(path) {
+      // WR-02 (Phase 9) — skip member expressions in TS type position
+      // (`let x: typeof $data.foo`). Without this the `$data.foo` rewrite
+      // would mangle a `typeof`-query inside a type annotation.
+      if (isInTypePosition(path)) return;
       const obj = path.node.object;
       if (!t.isIdentifier(obj)) return;
       // Skip computed access (`$props['foo']`).

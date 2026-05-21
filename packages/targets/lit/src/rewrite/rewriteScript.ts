@@ -24,6 +24,7 @@ import _traverse from '@babel/traverse';
 import type { GeneratorOptions } from '@babel/generator';
 import type { IRComponent } from '../../../../core/src/ir/types.js';
 import type { File, Program, Expression, Statement } from '@babel/types';
+import { isInTypePosition } from '../../../../core/src/ast/typePosition.js';
 import { cloneScriptProgram } from './cloneProgram.js';
 import {
   hasShadowingBinding,
@@ -179,6 +180,10 @@ export function rewriteScript(
     },
 
     MemberExpression(path) {
+      // WR-02 (Phase 9) — skip member expressions in TS type position
+      // (`let x: typeof $data.foo`). Without this the `$data.foo` rewrite
+      // would mangle a `typeof`-query inside a type annotation.
+      if (isInTypePosition(path)) return;
       const obj = path.node.object;
       if (!t.isIdentifier(obj)) return;
       if (path.node.computed) return;
@@ -286,6 +291,14 @@ export function rewriteScript(
 
     Identifier(path) {
       const name = path.node.name;
+      // WR-02 (Phase 9) — skip identifiers in TypeScript type position. A
+      // `<script lang="ts">` Program carries `TS*` nodes and @babel/traverse
+      // descends into them; without this guard a type-reference identifier
+      // (`let x: someComputed`) whose name collides with a promoted class
+      // field/method would be rewritten to `this.someComputed` INSIDE the
+      // type annotation, producing invalid TS. Mirrors the identical guard in
+      // core's computeDeps.
+      if (isInTypePosition(path)) return;
       // Don't touch identifiers inside declarations or property keys.
       if (name === '$el') {
         // Spike 001 B2 — script-context `$el` lowers to

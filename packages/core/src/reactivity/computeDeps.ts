@@ -29,6 +29,7 @@ import type { NodePath } from '@babel/traverse';
 import type { BindingsTable } from '../semantic/types.js';
 import type { SignalRef } from './signalRef.js';
 import { detectMagicAccess } from '../semantic/visitors.js';
+import { isInTypePosition } from '../ast/typePosition.js';
 
 // Default-export interop: @babel/traverse ships a CJS default export that some
 // bundlers (incl. Vitest's ESM resolver) wrap into { default: fn }. Normalize
@@ -86,55 +87,11 @@ const STABLE_IDENTIFIERS = new Set([
  * `[SomeType]` into a `useEffect` / `useMemo` dep array → a runtime
  * `ReferenceError` for a name that only ever existed at type level.
  *
- * `isInTypePosition` walks an Identifier's ancestor chain and returns true when
- * the identifier sits inside a TypeScript TYPE construct — a type annotation, a
- * type reference, an interface/alias declaration, a qualified type name, or the
- * type child of an `as` / angle-bracket assertion. The guard is deliberately
- * NARROW: it keys on type-position ancestry, not on "any ancestor is a TS node".
- * An `as`/assertion EXPRESSION still contributes the wrapped runtime
- * expression's deps — only the type child is in type position, and only that
- * child is skipped.
+ * The guard — `isInTypePosition` — lives in `../ast/typePosition.ts` so the
+ * per-target `rewriteScript` identifier/member visitors reuse the IDENTICAL
+ * check (WR-02). See that module's header for the precise set of type
+ * positions and the deliberate narrowness of the check.
  */
-function isInTypePosition(path: NodePath<t.Identifier>): boolean {
-  let current: NodePath | null = path;
-  let child: t.Node = path.node;
-  while (current) {
-    const node: t.Node = current.node;
-    // Any TSType node (TSTypeReference, TSAnyKeyword, TSUnionType, …) — the
-    // whole subtree is type-level. `t.isTSType` is the Babel alias covering
-    // every type-expression node kind.
-    if (t.isTSType(node)) return true;
-    // A TS type annotation (`: SomeType`) — its `typeAnnotation` child is the
-    // type. The annotation node itself is not a TSType, so check it explicitly.
-    if (t.isTSTypeAnnotation(node)) return true;
-    // Statement-position type declarations: `interface Foo {}` / `type Bar`.
-    // Their entire body is type-level (the alias `id` IS runtime-shaped but is
-    // a declaration name, not a free reference — never a dep regardless).
-    if (
-      t.isTSInterfaceDeclaration(node) ||
-      t.isTSTypeAliasDeclaration(node) ||
-      t.isTSInterfaceBody(node)
-    ) {
-      return true;
-    }
-    // Qualified type names (`A.B` inside a type) — the dotted segments are
-    // Identifiers but live entirely at type level.
-    if (t.isTSQualifiedName(node)) return true;
-    // `expr as T` / `<T>expr`: only the TYPE child is type position. The
-    // wrapped runtime expression must still be walked for its deps, so do NOT
-    // treat the assertion node itself as type position — only short-circuit
-    // when we arrived here via the `typeAnnotation` child.
-    if (
-      (t.isTSAsExpression(node) || t.isTSTypeAssertion(node)) &&
-      (node.typeAnnotation as t.Node) === child
-    ) {
-      return true;
-    }
-    child = node;
-    current = current.parentPath;
-  }
-  return false;
-}
 
 /**
  * Compute the set of SignalRef reads inside a single expression.

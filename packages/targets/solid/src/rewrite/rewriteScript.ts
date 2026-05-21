@@ -20,9 +20,11 @@
  */
 import * as t from '@babel/types';
 import _traverse from '@babel/traverse';
+import type { NodePath } from '@babel/traverse';
 import type { File } from '@babel/types';
 import type { IRComponent } from '../../../../core/src/ir/types.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
+import { isInTypePosition } from '../../../../core/src/ast/typePosition.js';
 
 // CJS interop normalization (Phase 2 D-T-2-01-04 pattern).
 type TraverseFn = typeof import('@babel/traverse').default;
@@ -159,8 +161,16 @@ export function rewriteRozieIdentifiers(
     // Rewrite bare computed-memo references to getter calls: canIncrement → canIncrement().
     // User-authored <script> code references $computed-derived names by bare identifier;
     // after compilation they become createMemo() Accessors that must be invoked.
-    Identifier(path) {
+    Identifier(path: NodePath<t.Identifier>) {
       const name = path.node.name;
+
+      // WR-02 (Phase 9) — skip identifiers in TypeScript type position. A
+      // `<script lang="ts">` Program carries `TS*` nodes and @babel/traverse
+      // descends into them; without this guard a type reference (`let x:
+      // someComputed`) whose name collides with a `$computed` memo would be
+      // rewritten to `someComputed()` INSIDE the type annotation, producing
+      // invalid TS. Mirrors the identical guard in core's computeDeps.
+      if (isInTypePosition(path)) return;
 
       // Spike 001 B2 — script-context `$el` lowers to
       // `MemberExpression($refs, __rozieRoot)`. The IR pass `lowerRootElementRef`
@@ -249,6 +259,10 @@ export function rewriteRozieIdentifiers(
     // $data.x → x() (signal getter call)
     // $refs.x → xRef (plain variable)
     MemberExpression(path) {
+      // WR-02 (Phase 9) — skip member expressions in TS type position
+      // (`let x: typeof $data.foo`). Without this the `$data.foo` rewrite
+      // would mangle a `typeof`-query inside a type annotation.
+      if (isInTypePosition(path)) return;
       const { object, property, computed } = path.node;
       if (computed) return;
       if (!t.isIdentifier(object) || !t.isIdentifier(property)) return;
