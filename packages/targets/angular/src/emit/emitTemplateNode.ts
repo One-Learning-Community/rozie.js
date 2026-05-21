@@ -537,9 +537,16 @@ function isFormInputTag(tagName: string): boolean {
  * of that host element — so the host tag + its attributes survive to emitted
  * output (R8), mirroring how a real-element `r-if` host keeps its tag.
  *
- * The `discriminantMode === 'hoist'` path (an expensive `CallExpression`
- * discriminant) is delegated as-if-inline here; the hoist-temp declaration is
- * owned by plan 11-06 for the Angular target.
+ * The `discriminantMode === 'hoist'` path (D-04 — plan 11-06): an impure
+ * `CallExpression` discriminant must be evaluated EXACTLY ONCE per render.
+ * Angular has no `@let` precedent (`grep "@let"` across the emitter → zero
+ * hits); `@let` is Angular 18.1+ template syntax, valid on the 19+ floor. We
+ * emit `@let <tempName> = <rewritten-discriminant>;` as a line IMMEDIATELY
+ * BEFORE the `@if` ladder, in the SAME template view — an `@let` is visible to
+ * the following siblings in its view, so the `@if` ladder's folded branch
+ * tests (`<tempName> === <caseValue>`, pre-folded by core, plan 11-01) resolve.
+ * Nested hoisting matches recurse through `emitNode`; the core per-component
+ * counter (plan 11-01) guarantees their `tempName`s never collide.
  */
 function emitMatchNode(node: TemplateMatchIR, ctx: EmitNodeCtx): string {
   const synthetic: TemplateConditionalIR = {
@@ -547,18 +554,31 @@ function emitMatchNode(node: TemplateMatchIR, ctx: EmitNodeCtx): string {
     branches: node.branches,
     sourceLoc: node.sourceLoc,
   };
-  if (node.discriminantMode === 'hoist') {
-    // TODO(11-06): hoist placement — declare the discriminant temp once
-    // before the @if ladder so an expensive discriminant evaluates once.
+  // D-04 hoist: build the `@let` declaration line. It must precede the `@if`
+  // ladder in the same view so the ladder's `<tempName>` references resolve.
+  let letLine = '';
+  if (node.discriminantMode === 'hoist' && node.tempName !== undefined) {
+    const rewritten = rewriteTemplateExpression(node.discriminant, ctx.ir, {
+      collisionRenames: ctx.collisionRenames,
+      loopBindings: ctx.loopBindings,
+    });
+    letLine = `@let ${node.tempName} = ${rewritten};\n`;
   }
   if (node.hostElement !== undefined) {
+    // Real-element host: the `@let` lives inside the host element's view,
+    // immediately before the ladder, so it stays in scope for the ladder.
+    const ladderText: TemplateStaticTextIR = {
+      type: 'TemplateStaticText',
+      text: letLine + emitConditional(synthetic, ctx, emitNode),
+      sourceLoc: node.hostElement.sourceLoc,
+    };
     const wrapper: TemplateElementIR = {
       ...node.hostElement,
-      children: [synthetic],
+      children: [ladderText],
     };
     return emitElement(wrapper, ctx);
   }
-  return emitConditional(synthetic, ctx, emitNode);
+  return letLine + emitConditional(synthetic, ctx, emitNode);
 }
 
 /** Top-level dispatch over TemplateNode discriminator. */
