@@ -1,0 +1,69 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Lit <script lang="ts"> passthrough — Plan 09-04 > untyped Counter emit is byte-identical to today (anchor snapshot) 1`] = `
+"import { LitElement, css, html } from 'lit';
+import { customElement, property } from 'lit/decorators.js';
+import { SignalWatcher, signal } from '@lit-labs/preact-signals';
+import { createLitControllableProperty } from '@rozie/runtime-lit';
+
+@customElement('rozie-counter')
+export default class Counter extends SignalWatcher(LitElement) {
+  static styles = css\`
+.counter[data-rozie-s-c72e01d0] { display: inline-flex; gap: 0.5rem; align-items: center; }
+.counter.hovering[data-rozie-s-c72e01d0] { background: rgba(0, 0, 0, 0.04); }
+.value[data-rozie-s-c72e01d0] { font-variant-numeric: tabular-nums; min-width: 3ch; text-align: center; }
+button[data-rozie-s-c72e01d0] { padding: 0.25rem 0.5rem; }
+button[data-rozie-s-c72e01d0]:disabled { opacity: 0.4; cursor: not-allowed; }
+\`;
+
+  @property({ type: Number, attribute: 'value' }) _value_attr: number = 0;
+  private _valueControllable = createLitControllableProperty<number>({ host: this, eventName: 'value-change', defaultValue: 0, initialControlledValue: undefined });
+  @property({ type: Number, reflect: true }) step: number = 1;
+  @property({ type: Number, reflect: true }) min: number = -Infinity;
+  @property({ type: Number, reflect: true }) max: number = Infinity;
+  private _hovering = signal(false);
+
+  private _disconnectCleanups: Array<() => void> = [];
+
+  firstUpdated(): void {
+    console.log("hello from rozie");
+  }
+
+  disconnectedCallback(): void {
+    super.disconnectedCallback();
+    for (const fn of this._disconnectCleanups) fn();
+    this._disconnectCleanups = [];
+  }
+
+  attributeChangedCallback(name: string, old: string | null, value: string | null): void {
+    super.attributeChangedCallback(name, old, value);
+    if (name === 'value') this._valueControllable.notifyAttributeChange(value === null ? 0 : Number(value));
+  }
+
+  render() {
+    return html\`
+<div class="\${Object.entries({ "counter": true, hovering: this._hovering.value }).filter(([, v]) => v).map(([k]) => k).join(' ')}" @mouseenter=\${($event: Event) => { this._hovering.value = true; }} @mouseleave=\${($event: Event) => { this._hovering.value = false; }} data-rozie-s-c72e01d0>
+  <button ?disabled=\${!this.canDecrement} aria-label="Decrement" @click=\${this.decrement} data-rozie-s-c72e01d0>−</button>
+  <span class="value" data-rozie-s-c72e01d0>\${this.value}</span>
+  <button ?disabled=\${!this.canIncrement} aria-label="Increment" @click=\${this.increment} data-rozie-s-c72e01d0>+</button>
+</div>
+\`;
+  }
+
+  get canIncrement() { return this.value + this.step <= this.max; }
+
+  get canDecrement() { return this.value - this.step >= this.min; }
+
+  increment = () => {
+  if (this.canIncrement) this.value += this.step;
+};
+
+  decrement = () => {
+  if (this.canDecrement) this.value -= this.step;
+};
+
+  get value(): number { return this._valueControllable.read(); }
+  set value(v: number) { this._valueControllable.write(v); }
+}
+"
+`;

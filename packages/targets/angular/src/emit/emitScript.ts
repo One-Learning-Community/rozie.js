@@ -349,6 +349,15 @@ function pairClonedLifecycle(
           if (lastStmt && t.isReturnStatement(lastStmt) && lastStmt.argument) {
             cleanupCloned = lastStmt.argument;
             const newBody = t.blockStatement(fnBody.body.slice(0, -1));
+            // Phase 9 Plan 09-04 (RESEARCH Pitfall 3) — `returnType` is
+            // intentionally NOT carried over: the `return` statement was just
+            // peeled off into `cleanupCloned`, so the original setup
+            // callback's return annotation no longer describes this body.
+            // `params` (with any author annotations) ARE passed by reference,
+            // and a lifecycle setup callback declaring `typeParameters` is
+            // outside the supported TS surface (CONTEXT — annotations on
+            // let/const, function params, catch bindings). Re-attaching
+            // either here would be wrong.
             const newArrow = t.arrowFunctionExpression(
               setupCloned.params,
               newBody,
@@ -596,14 +605,33 @@ export function emitScript(
   // 1. Clone Program (NEVER mutate ir.setupBody.scriptProgram).
   const cloned = cloneScriptProgram(ir.setupBody.scriptProgram);
 
-  // 1b. Spike 001 B1 — partition user-authored top-level ImportDeclarations
-  //     out of the Program body BEFORE any downstream pass iterates the body.
-  //     Mutate `cloned.program.body` in place so index-based passes (lifecycle
-  //     pairing, $watch consumption, the residual user-script loop) naturally
-  //     operate on the partitioned body. Surface imports via `userImports`
-  //     rendered as a string for the shell to splice at module top — without
-  //     this hoist they would land in the constructor body and produce TS1232.
-  const { userImports: userImportNodes, bodyStmts } = partitionUserImports(cloned);
+  // 1b. Spike 001 B1 + Phase 9 Plan 09-04 — partition user-authored top-level
+  //     ImportDeclarations AND statement-position `interface`/`type`
+  //     declarations out of the Program body BEFORE any downstream pass
+  //     iterates the body. Mutate `cloned.program.body` in place so index-based
+  //     passes (lifecycle pairing, $watch consumption, the residual user-script
+  //     loop) naturally operate on the partitioned body.
+  //
+  //     `userImports` is rendered as a string for the shell to splice at module
+  //     top — without this hoist imports would land in the constructor body and
+  //     produce TS1232.
+  //
+  //     `hoistedTypeDecls` carries any `<script lang="ts">` statement-position
+  //     `TSInterfaceDeclaration` / `TSTypeAliasDeclaration`. A type declaration
+  //     inside the `@Component` class body is a TS syntax error (TS1068), and
+  //     leaving it in `bodyStmts` would also expose its type-position
+  //     identifiers to `rewriteRozieIdentifiers` below (mangling a
+  //     `count: number` property signature into `this.count(): number`). We
+  //     push them onto `interfaceDecls` — the shell already emits that bucket
+  //     at MODULE scope, above the `@Component` decorator — so they land in
+  //     legal module scope, exactly like the inline-`ClassDeclaration` hoist at
+  //     Section 9 and the slot-context interfaces. `hoistedTypeDecls` is always
+  //     empty for an untyped `<script>`, so untyped emit is byte-identical.
+  const {
+    userImports: userImportNodes,
+    hoistedTypeDecls,
+    bodyStmts,
+  } = partitionUserImports(cloned);
   cloned.program.body = bodyStmts;
   const userImports =
     userImportNodes.length > 0
@@ -642,8 +670,15 @@ export function emitScript(
   // 4b. Locate cloned bodies for ComputedDecl post-rewrite.
   const clonedComputedBodies = findClonedComputedBodies(cloned);
 
-  // 5. Build slot interface decls (rendered above the class).
+  // 5. Build module-scope declarations rendered above the @Component class.
+  //    Author-declared `<script lang="ts">` `interface`/`type` aliases
+  //    (hoisted in Section 1b) go FIRST so user-authored types read at the
+  //    top of the file; the synthesized per-slot context interfaces follow.
+  //    Both land at module scope via the shell's `interfaceDecls` bucket.
   const interfaceDecls: string[] = [];
+  for (const typeDecl of hoistedTypeDecls) {
+    interfaceDecls.push(genCode(typeDecl));
+  }
   const slotFieldDecls: string[] = [];
   for (const slot of ir.slots) {
     const ctx = buildSlotCtx(slot);
@@ -956,13 +991,24 @@ export function emitScript(
       // un-typed params with `: any` so the lifted field typechecks under
       // `strict`.
       annotateUntypedParams(stmt.params);
-      const fnCode = genCode(
-        t.arrowFunctionExpression(
-          stmt.params,
-          stmt.body,
-          stmt.async ?? false,
-        ),
+      const arrow = t.arrowFunctionExpression(
+        stmt.params,
+        stmt.body,
+        stmt.async ?? false,
       );
+      // Phase 9 Plan 09-04 (RESEARCH Pitfall 3) — `t.arrowFunctionExpression`
+      // does NOT carry over a `FunctionDeclaration`'s author `returnType` /
+      // `typeParameters`. For a `<script lang="ts">` `function describe(x):
+      // string {…}` the `: string` return annotation would be silently
+      // dropped from the lifted class field. Re-attach both so author types
+      // survive verbatim. `?? null` because a `FunctionDeclaration` carries
+      // these as `… | null | undefined` while an `ArrowFunctionExpression`'s
+      // fields are `… | null` (no `undefined` under `exactOptionalPropertyTypes`);
+      // for an untyped function both are absent, so the result is `null` —
+      // no emit change.
+      arrow.returnType = stmt.returnType ?? null;
+      arrow.typeParameters = stmt.typeParameters ?? null;
+      const fnCode = genCode(arrow);
       classMethodLines.push(`${stmt.id.name} = ${fnCode};`);
       continue;
     }

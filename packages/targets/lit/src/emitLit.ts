@@ -225,11 +225,22 @@ export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResu
     templateResult.refUsed ? `import { ref } from 'lit/directives/ref.js';\n` : '',
   ].filter((s) => s.length > 0).join('');
 
+  // Phase 9 Plan 09-04 — author-declared `<script lang="ts">` `interface`/`type`
+  // declarations (hoisted out of the class body by emitScript) are emitted at
+  // MODULE scope, above the class. They go FIRST so user-authored types read at
+  // the top of the file; the synthesized per-slot context interfaces follow.
+  // Both share the shell's `interfaceDecls` bucket. `hoistedTypeDecls` is empty
+  // for an untyped `<script>`, so untyped emit stays byte-identical.
+  const moduleScopeDecls = [
+    ...scriptResult.hoistedTypeDecls,
+    ...slotResult.ctxInterfaces,
+  ];
+
   const shell = buildShell({
     importLines: allImports,
     componentImportsBlock,
     userImports: scriptResult.userImports,
-    interfaceDecls: slotResult.ctxInterfaces,
+    interfaceDecls: moduleScopeDecls,
     customElementDecorator: `@customElement('${emitTagName(ir.name)}')`,
     componentName: ir.name,
     baseClassExpression: 'SignalWatcher(LitElement)',

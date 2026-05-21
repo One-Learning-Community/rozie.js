@@ -84,6 +84,17 @@ export interface EmitScriptResult {
    * inside `firstUpdated()` and produce TS1232.
    */
   userImports: string;
+  /**
+   * Phase 9 Plan 09-04 — author-declared `<script lang="ts">` statement-position
+   * `interface` / `type` declarations, each rendered as a string. emitLit
+   * concatenates these into the shell's `interfaceDecls` bucket so they land at
+   * MODULE scope, above the `class extends SignalWatcher(LitElement)`. Without
+   * this hoist a `TSInterfaceDeclaration` falls through `partitionScript` →
+   * `classBodyFromStatements` into `firstUpdated()`, where an `interface`/`type`
+   * declaration is a TS syntax error (TS1184). Always empty for an untyped
+   * `<script>`, so untyped emit is byte-identical.
+   */
+  hoistedTypeDecls: string[];
   /** Source map for user-authored statements (unused in P2 — null). */
   scriptMap: EncodedSourceMap | null;
   /** Number of preamble lines (unused in P2). */
@@ -500,10 +511,38 @@ function classBodyFromStatements(
     }
 
     if (t.isFunctionDeclaration(stmt) && stmt.id) {
-      const name = stmt.id.name;
-      const params = stmt.params.map((p) => renderExpression(p as t.Expression)).join(', ');
-      const body = stmt.body.body.map((s) => generate(s, GEN_OPTS).code).join('\n');
-      methodChunks.push(`  ${name}(${params}) {\n${indent(body, 4)}\n  }`);
+      // Convert `function X(...) {...}` → a class method. Phase 9 Plan 09-04
+      // (RESEARCH Pitfall 3): build a real `t.classMethod` node and let
+      // @babel/generator print it rather than hand-stringifying
+      // `name(params) { body }`. Generating each param in ISOLATION
+      // (`generate(param)`) drops its `typeAnnotation` — @babel/generator only
+      // prints a param's annotation when the param sits in a typed parent
+      // context. A `ClassMethod` provides that context, so a
+      // `<script lang="ts">` `function describe(item: Item): string {…}`
+      // keeps both the `Item` param type and the `string` return type. The
+      // generated shape is byte-identical to the previous hand-rolled output
+      // for an untyped function (no annotations to print). `returnType` and
+      // `typeParameters` are first-class `ClassMethod` fields — re-attached
+      // from the source `FunctionDeclaration` so author generics survive too.
+      const method = t.classMethod(
+        'method',
+        t.identifier(stmt.id.name),
+        stmt.params,
+        stmt.body,
+        false,
+        false,
+        false,
+        stmt.async ?? false,
+      );
+      // `?? null` because a `FunctionDeclaration` carries these as
+      // `… | null | undefined` while a `ClassMethod`'s fields are `… | null`
+      // (no `undefined` under `exactOptionalPropertyTypes`). For an untyped
+      // function both are absent, so the result is `null` — no emit change.
+      method.returnType = stmt.returnType ?? null;
+      method.typeParameters = stmt.typeParameters ?? null;
+      // Indent the generated method by 2 to carry the class-body prefix the
+      // surrounding `methodChunks` entries already include.
+      methodChunks.push(indent(generate(method, GEN_OPTS).code, 2));
       continue;
     }
 
@@ -624,20 +663,38 @@ export function emitScript(
   // before we render statements out.
   const rewritten = rewriteScript(ir.setupBody.scriptProgram, ir);
 
-  // 2b. Spike 001 B1 — partition user-authored top-level ImportDeclarations
-  //     out of the rewritten Program body BEFORE partitionScript classifies
-  //     statements. Mutate `rewritten.file.program.body` in place to drop
-  //     the imports; surface them via `userImports` rendered as a string for
-  //     the shell to splice at module top — without this hoist they would
-  //     land inside `firstUpdated()` (the per-target lifecycle body) and
-  //     produce TS1232.
-  const { userImports: userImportNodes, bodyStmts: nonImportStmts } =
-    partitionUserImports(rewritten.file);
+  // 2b. Spike 001 B1 + Phase 9 Plan 09-04 — partition user-authored top-level
+  //     ImportDeclarations AND statement-position `interface`/`type`
+  //     declarations out of the rewritten Program body BEFORE partitionScript
+  //     classifies statements. Mutate `rewritten.file.program.body` in place to
+  //     drop both.
+  //
+  //     `userImports` is surfaced as a string for the shell to splice at module
+  //     top — without this hoist imports would land inside `firstUpdated()`
+  //     (the per-target lifecycle body) and produce TS1232.
+  //
+  //     `hoistedTypeNodes` carries any `<script lang="ts">` statement-position
+  //     `TSInterfaceDeclaration` / `TSTypeAliasDeclaration`. Left in the body
+  //     they would fall through `partitionScript` → `classBodyFromStatements`
+  //     into the `freeChunks` bucket and land inside `firstUpdated()`, where a
+  //     type declaration is a TS syntax error (TS1184). They are rendered into
+  //     `hoistedTypeDecls`; emitLit concatenates that into the shell's
+  //     `interfaceDecls` bucket so they land at MODULE scope, above the class.
+  //     Always empty for an untyped `<script>`, so untyped emit is
+  //     byte-identical.
+  const {
+    userImports: userImportNodes,
+    hoistedTypeDecls: hoistedTypeNodes,
+    bodyStmts: nonImportStmts,
+  } = partitionUserImports(rewritten.file);
   rewritten.file.program.body = nonImportStmts;
   const userImports =
     userImportNodes.length > 0
       ? userImportNodes.map((imp) => generate(imp, GEN_OPTS).code).join('\n') + '\n'
       : '';
+  const hoistedTypeDecls = hoistedTypeNodes.map(
+    (decl) => generate(decl, GEN_OPTS).code,
+  );
 
   // 3. Partition the rewritten program into class-level vs lifecycle.
   const partition = partitionScript(rewritten.file);
@@ -858,6 +915,7 @@ export function emitScript(
     updateHookBody: updatedSegments.join('\n\n'),
     attributeChangedBody: attrCallbackLines.join('\n'),
     userImports,
+    hoistedTypeDecls,
     scriptMap: null,
     preambleSectionLines: 0,
     diagnostics,
