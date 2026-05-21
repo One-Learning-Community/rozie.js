@@ -1,0 +1,72 @@
+<!--
+  typed/DataCast.rozie
+
+  Genuinely-new typed example for quick task 260521-lhq
+  (`<data>` initializer `as` / `satisfies` annotations).
+
+  Its job is to prove that a TypeScript `as` / `satisfies` annotation on a
+  `<data>` block initializer survives lowering and emit on all six targets:
+    - `selected: null as Item | null` — a null-initialized reactive field
+      that, WITHOUT the annotation, would be typed `null` (and any later
+      assignment of a real `Item` would be a consumer-side TS error). The
+      template reads `$data.selected.name` — type-safe ONLY if the field is
+      typed `Item | null` and the `r-if` narrows away `null`.
+    - `items: [] as string[]` — an empty-array field that, WITHOUT the
+      annotation, lowers to `any[]`. The template iterates it and calls
+      `.toUpperCase()` on each element — type-safe ONLY if the field is
+      typed `string[]`.
+    - `count: 0 satisfies number` — proves the `satisfies` path parses and
+      emits too.
+
+  A field that emitted as `null` / `any` would NOT catch a regression — the
+  template member accesses below are deliberately type-discriminating.
+
+  This fixture is wired into all six per-target typecheck/lint gates
+  (tsc, vue-tsc, svelte-check, Angular template type-checker, eslint-plugin-
+  solid, eslint-plugin-lit) via the TYPED_EXAMPLES array, so a future
+  narrowing regression fails CI automatically.
+-->
+
+<rozie name="DataCast">
+
+<data>
+{
+  selected: null as Item | null,
+  items: [] as string[],
+  count: 0 satisfies number,
+}
+</data>
+
+<script lang="ts">
+// The author-declared type consumed by the `<data>` `as` annotation. A
+// statement-position `interface` is hoisted to module scope on the
+// class-based targets (Angular / Lit).
+interface Item {
+  id: number
+  name: string
+}
+
+const pick: (item: Item) => void = (item: Item) => {
+  $data.selected = item
+}
+</script>
+
+<template>
+<div class="data-cast">
+  <p class="selected">
+    selected: {{ $data.selected ? $data.selected.name : 'none' }}
+  </p>
+  <p class="count">items: {{ $data.items.length }} ({{ $data.count }})</p>
+  <ul class="item-list">
+    <li r-for="item in $data.items" :key="item">{{ item.toUpperCase() }}</li>
+  </ul>
+</div>
+</template>
+
+<style>
+.data-cast { font-family: sans-serif; }
+.selected { font-weight: 600; }
+.count { color: #666; }
+</style>
+
+</rozie>
