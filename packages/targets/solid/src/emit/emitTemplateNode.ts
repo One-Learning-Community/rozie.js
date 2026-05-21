@@ -484,9 +484,14 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
  * of that host element — so the host tag + its attributes survive to emitted
  * output (R8), mirroring how a real-element `r-if` host keeps its tag.
  *
- * The `discriminantMode === 'hoist'` path (an expensive `CallExpression`
- * discriminant) is delegated as-if-inline here; the hoist-temp declaration is
- * owned by plan 11-05 for the Solid target.
+ * The `discriminantMode === 'hoist'` path (D-04 — plan 11-05): an expensive
+ * `CallExpression` discriminant must evaluate EXACTLY ONCE per render. The
+ * `<Show>` ladder is wrapped in a return-position IIFE that binds the
+ * discriminant to `node.tempName` (`__rozieMatch_N`, allocated by core):
+ * `{(() => { const <tempName> = <discriminant>; return <ladder>; })()}`. The
+ * folded branch tests already reference `t.identifier(node.tempName)`, so each
+ * `<Show when>` rung reads the temp, never re-invokes the call. Solid's JSX
+ * accepts the same return-position IIFE React uses.
  */
 function emitMatchNode(node: TemplateMatchIR, ctx: EmitNodeCtx): string {
   const synthetic: TemplateConditionalIR = {
@@ -494,9 +499,33 @@ function emitMatchNode(node: TemplateMatchIR, ctx: EmitNodeCtx): string {
     branches: node.branches,
     sourceLoc: node.sourceLoc,
   };
-  if (node.discriminantMode === 'hoist') {
-    // TODO(11-05): hoist placement — declare the discriminant temp once
-    // before the <Show> ladder so an expensive discriminant evaluates once.
+  if (node.discriminantMode === 'hoist' && node.tempName !== undefined) {
+    // D-04 hoist — `emitConditional` returns a `{...}`-wrapped JSX expression;
+    // strip the braces and re-wrap as a return-position IIFE binding the
+    // discriminant temp once. `node.discriminant` is routed through the SAME
+    // `rewriteTemplateExpression` (with the ctx's `invokeAccessors`) the folded
+    // branch tests use, so Solid accessor invocation is consistent.
+    const ladder = emitConditional(synthetic, ctx, emitNode);
+    const inner = ladder.startsWith('{') && ladder.endsWith('}')
+      ? ladder.slice(1, -1)
+      : ladder;
+    const discriminantCode = rewriteTemplateExpression(node.discriminant, ctx.ir, {
+      invokeAccessors: ctx.invokeAccessors,
+    });
+    const hoisted = `{(() => { const ${node.tempName} = ${discriminantCode}; return ${inner}; })()}`;
+    if (node.hostElement !== undefined) {
+      const verbatim: TemplateStaticTextIR = {
+        type: 'TemplateStaticText',
+        text: hoisted,
+        sourceLoc: node.hostElement.sourceLoc,
+      };
+      const wrapper: TemplateElementIR = {
+        ...node.hostElement,
+        children: [verbatim],
+      };
+      return emitElement(wrapper, ctx);
+    }
+    return hoisted;
   }
   if (node.hostElement !== undefined) {
     const wrapper: TemplateElementIR = {

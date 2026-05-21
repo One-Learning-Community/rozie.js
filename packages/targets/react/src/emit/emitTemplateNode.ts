@@ -413,15 +413,21 @@ function emitElementEvents(node: TemplateElementIR, ctx: EmitNodeCtx): string {
  * existing `emitConditional` — no bespoke match emit logic (RESEARCH Open
  * Question 2 recommendation (a)).
  *
- * `discriminantMode === 'hoist'`: handled the same way here — the hoist-temp
- * declaration is plan 11-05's job. The folded tests reference an undeclared
- * `tempName` identifier until then; that interim red state is expected.
+ * `discriminantMode === 'hoist'` (D-04 — plan 11-05): an expensive
+ * `CallExpression` discriminant must be evaluated EXACTLY ONCE per render. We
+ * wrap the conditional ladder in a return-position IIFE that binds the
+ * discriminant to `node.tempName` (`__rozieMatch_N`, allocated by core):
+ * `{(() => { const <tempName> = <discriminant>; return <ladder>; })()}`. The
+ * folded branch tests already reference `t.identifier(node.tempName)`, so the
+ * rungs read the temp, never re-invoke the call. JSX return-position IIFE is
+ * idiomatic React. `inline`-mode discriminants need no wrapper — pure
+ * delegation.
  *
  * `hostElement` (real-element `<div r-match>` host): the wrapper element must
  * survive emission. We render the host's tag/attributes via `emitElement` with
  * the conditional ladder spliced in as a single verbatim child — `emitStaticText`
  * passes its `text` through unchanged, so the `{...}` JSX expression produced by
- * `emitConditional` lands intact inside the wrapper.
+ * `emitConditional` (or the hoist IIFE) lands intact inside the wrapper.
  */
 function delegateMatchToConditional(node: TemplateMatchIR, ctx: EmitNodeCtx): string {
   const synthetic: TemplateConditionalIR = {
@@ -429,12 +435,22 @@ function delegateMatchToConditional(node: TemplateMatchIR, ctx: EmitNodeCtx): st
     branches: node.branches,
     sourceLoc: node.sourceLoc,
   };
-  const ladder = emitConditional(synthetic, ctx, emitNode);
+  let ladder = emitConditional(synthetic, ctx, emitNode);
+  if (node.discriminantMode === 'hoist' && node.tempName !== undefined) {
+    // D-04 hoist — `emitConditional` returns a `{...}`-wrapped JSX expression;
+    // strip the braces and re-wrap as a return-position IIFE binding the
+    // discriminant temp once. `node.discriminant` is routed through the SAME
+    // `rewriteTemplateExpression` the folded branch tests use, so magic
+    // accessors (`$data.x()`) are rewritten identically.
+    const inner = ladder.startsWith('{') && ladder.endsWith('}')
+      ? ladder.slice(1, -1)
+      : ladder;
+    const discriminantCode = rewriteTemplateExpression(node.discriminant, ctx.ir);
+    ladder = `{(() => { const ${node.tempName} = ${discriminantCode}; return ${inner}; })()}`;
+  }
   if (node.hostElement === undefined) {
     return ladder;
   }
-  // TODO(11-05): hoist placement — a `hoist`-mode discriminant declares its
-  // temp above this wrapper; for now the wrapper is emitted unconditionally.
   const verbatim: TemplateStaticTextIR = {
     type: 'TemplateStaticText',
     text: ladder,
