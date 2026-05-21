@@ -39,6 +39,7 @@ import rozieGrammarJson from '../../../tools/textmate/syntaxes/rozie.tmLanguage.
 import tsGrammarJson from 'tm-grammars/grammars/typescript.json?raw';
 import jsGrammarJson from 'tm-grammars/grammars/javascript.json?raw';
 import cssGrammarJson from 'tm-grammars/grammars/css.json?raw';
+import scssGrammarJson from 'tm-grammars/grammars/scss.json?raw';
 import htmlGrammarJson from 'tm-grammars/grammars/html.json?raw';
 import tsxGrammarJson from 'tm-grammars/grammars/tsx.json?raw';
 
@@ -48,6 +49,11 @@ const GRAMMAR_JSON_BY_SCOPE: Record<string, string> = {
   'source.ts': tsGrammarJson,
   'source.js': jsGrammarJson,
   'source.css': cssGrammarJson,
+  // SCSS only appears embedded inside .rozie (<style lang="scss">), never as a
+  // top-level Monaco language — so it gets a GRAMMAR_JSON_BY_SCOPE entry but no
+  // LANGUAGE_SCOPES entry. source.css.scss's grammar `include`s source.css
+  // internally, and source.css is already registered above.
+  'source.css.scss': scssGrammarJson,
   'text.html.basic': htmlGrammarJson,
   'source.tsx': tsxGrammarJson,
 };

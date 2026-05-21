@@ -1,0 +1,59 @@
+<!--
+  CounterScss.rozie
+
+  Same shape as Counter.rozie but with <style lang="scss"> + SCSS-specific
+  constructs ($variables, nesting, & parent-ref). Used to visually verify
+  that #block-style-scss routes the <style> body to source.css.scss.
+-->
+
+<rozie name="CounterScss">
+
+<props>
+{
+  value: { type: Number, default: 0, model: true },
+  step:  { type: Number, default: 1 },
+}
+</props>
+
+<data>
+{
+  hovering: false,
+}
+</data>
+
+<script>
+const increment = () => { $props.value += $props.step }
+</script>
+
+<template>
+<div class="counter">
+  <button @click="increment" aria-label="Increment">+</button>
+  <span>{{ $props.value }}</span>
+</div>
+</template>
+
+<style lang="scss">
+$gap: 0.5rem;
+$accent: #3b82f6;
+
+.counter {
+  display: inline-flex;
+  gap: $gap;
+  align-items: center;
+
+  button {
+    color: $accent;
+    cursor: pointer;
+
+    &:hover {
+      color: darken($accent, 10%);
+    }
+
+    &:focus-visible {
+      outline: 2px solid $accent;
+    }
+  }
+}
+</style>
+
+</rozie>
