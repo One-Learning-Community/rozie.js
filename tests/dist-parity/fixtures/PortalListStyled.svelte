@@ -76,7 +76,7 @@ $effect(() => () => {
 });
 
 onMount(() => {
-  instance = new MiniListEngine(__rozieRoot, {
+  instance = new MiniListEngine(__rozieRoot!, {
     items: items,
     cellRenderer: (item: any) => {
       const node = document.createElement('div');

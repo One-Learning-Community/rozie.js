@@ -80,7 +80,7 @@ onBeforeUnmount(() => {
 
 let _cleanup_0: (() => void) | undefined;
 onMounted(() => {
-  instance = new MiniListEngine(__rozieRootRef.value, {
+  instance = new MiniListEngine(__rozieRootRef.value!, {
     items: props.items,
     cellRenderer: (item: any) => {
       const node = document.createElement('div');

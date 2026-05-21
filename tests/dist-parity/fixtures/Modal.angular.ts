@@ -24,7 +24,7 @@ interface FooterCtx {
 
     @if (open()) {
     <div class="modal-backdrop" #backdropEl (click)="_guardedHandler0($event)">
-      <div #dialogEl class="modal-dialog" role="dialog" aria-modal="true" [aria-label]="title() || undefined" tabindex="-1">
+      <div #dialogEl class="modal-dialog" role="dialog" aria-modal="true" [attr.aria-label]="title() || undefined" tabindex="-1">
         @if (title() || (headerTpl ?? templates()?.['header'])) {
     <header>
           @if ((headerTpl ?? templates()?.['header'])) {
@@ -34,7 +34,7 @@ interface FooterCtx {
             <h2>{{ title() }}</h2>
           
     }
-          <button class="close-btn" aria-label="Close" (click)="_close($event)">×</button>
+          <button class="close-btn" aria-label="Close" (click)="_close()">×</button>
         </header>
     }<div class="modal-body">
           <ng-container *ngTemplateOutlet="(defaultTpl ?? templates()?.['defaultSlot']); context: { $implicit: { close: _close }, close: _close }" />

@@ -11,7 +11,7 @@ import { Component, ViewEncapsulation, forwardRef, input } from '@angular/core';
       @if (node().children && node().children.length > 0) {
     <ul class="tree-node__children">
         @for (child of node().children; track child.id; let childIndex = $index) {
-    <li [data-index]="childIndex">
+    <li [attr.data-index]="childIndex">
           <rozie-tree-node [node]="child"></rozie-tree-node>
         </li>
     }

@@ -6,9 +6,9 @@ import { Component, ViewEncapsulation, computed, input, model, signal } from '@a
   template: `
 
     <div class="counter" [ngClass]="{ hovering: hovering() }" (mouseenter)="hovering.set(true)" (mouseleave)="hovering.set(false)">
-      <button [disabled]="!canDecrement()" aria-label="Decrement" (click)="decrement($event)">−</button>
+      <button [disabled]="!canDecrement()" aria-label="Decrement" (click)="decrement()">−</button>
       <span class="value">{{ value() }}</span>
-      <button [disabled]="!canIncrement()" aria-label="Increment" (click)="increment($event)">+</button>
+      <button [disabled]="!canIncrement()" aria-label="Increment" (click)="increment()">+</button>
     </div>
 
   `,

@@ -19,7 +19,7 @@ interface DefaultCtx {
   template: `
 
     <div class="dropdown">
-      <div #triggerEl (click)="toggle($event)">
+      <div #triggerEl (click)="toggle()">
         <ng-container *ngTemplateOutlet="(triggerTpl ?? templates()?.['trigger']); context: { $implicit: { open: open(), toggle: toggle }, open: open(), toggle: toggle }" />
       </div>
 
