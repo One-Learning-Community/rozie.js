@@ -229,7 +229,18 @@ export const RozieErrorCode = {
   TWO_WAY_ARG_OR_TARGET_INVALID: 'ROZ950',    // error — r-model: with empty arg (`r-model:=`), OR applied to non-component HTML tag (`<div r-model:foo=`)
   TWO_WAY_LHS_NOT_WRITABLE: 'ROZ951',         // error — RHS not a writable lvalue per 07.3-CONTEXT D-03 permissive rule (literal/ternary/call/$computed)
   TWO_WAY_DIRECTIVE_TYPO: 'ROZ952',           // error — colon-form directive `r-<base>:<arg>` whose `<base>` is a Levenshtein near-miss of `model` (e.g. `r-modle:open`); `model` is the only directive taking a colon argument, so the typo'd directive would otherwise be silently dropped. did-you-mean suggests `r-model:<arg>`.
-  // ROZ953..ROZ959 reserved
+
+  // ---- Phase 11 r-match construct — ROZ953..ROZ959 ----
+  // The switch-style `r-match` / `r-case` / `r-default` trio. Six error
+  // conditions + one warning, all detected inline in the lowerTemplate
+  // match-grouping pass (D-05) and collected-not-thrown.
+  MATCH_EMPTY_DISCRIMINANT: 'ROZ953',   // error — r-match host with no value (`<template r-match>` / `<template r-match="">`)
+  MATCH_STRAY_CHILD: 'ROZ954',          // error — r-match host child that is neither r-case nor r-default
+  MATCH_CASE_NO_VALUE: 'ROZ955',        // error — valueless r-case (hint: did you mean r-default?)
+  MATCH_CASE_WITH_FOR: 'ROZ956',        // error — r-case + r-for on the same element
+  MATCH_DEFAULT_NOT_LAST: 'ROZ957',     // error — r-default is not the last branch of the match
+  MATCH_MULTIPLE_DEFAULT: 'ROZ958',     // error — more than one r-default in a single r-match
+  MATCH_DUPLICATE_CASE: 'ROZ959',       // warning — duplicate literal r-case value (first occurrence wins, like `switch`)
 } as const;
 
 export type RozieErrorCode = (typeof RozieErrorCode)[keyof typeof RozieErrorCode];

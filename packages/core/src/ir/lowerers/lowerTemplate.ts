@@ -44,6 +44,7 @@ import type {
   TemplateNode as IRTemplateNode,
   TemplateElementIR,
   TemplateConditionalIR,
+  TemplateMatchIR,
   TemplateLoopIR,
   TemplateSlotInvocationIR,
   TemplateInterpolationIR,
@@ -354,6 +355,95 @@ function getRForDirective(el: ASTTemplateElement): TemplateAttr | null {
 }
 
 /**
+ * Phase 11 — find an `r-match` / `r-case` / `r-default` directive on a
+ * template element. Parallels `getConditionalDirective`. The parser strips the
+ * `r-` prefix, so `a.name` is `match` / `case` / `default`.
+ *
+ * Returns the directive `attr` alongside `kind`/`expr` so the match-grouping
+ * branch can attach the most specific source frame to ROZ953-959 diagnostics.
+ */
+function getMatchDirective(
+  el: ASTTemplateElement,
+): {
+  kind: 'match' | 'case' | 'default';
+  expr: string | null;
+  attr: TemplateAttr;
+} | null {
+  for (const a of el.attributes) {
+    if (a.kind !== 'directive') continue;
+    if (a.name === 'match') return { kind: 'match', expr: a.value, attr: a };
+    if (a.name === 'case') return { kind: 'case', expr: a.value, attr: a };
+    if (a.name === 'default') return { kind: 'default', expr: null, attr: a };
+  }
+  return null;
+}
+
+/**
+ * Phase 11 D-03 — per-component-unique hoist temp-name counter. A single
+ * `{ next: number }` ref is created once per `lowerTemplate` call and threaded
+ * through `lowerNodeList` recursion, so nested `r-match` blocks that hoist
+ * never collide on `__rozieMatch_N` (RESEARCH Pitfall 5).
+ */
+interface MatchTempCounter {
+  next: number;
+}
+
+/**
+ * Phase 11 D-01 — fold one `r-case` value into a ready-to-emit branch test.
+ *
+ * The folded test is built entirely with `@babel/types` builders — never
+ * string-concatenated from user expression text (threat T-11-02). The
+ * comma-alternative form (a top-level `SequenceExpression` from
+ * `tryParseExpression`) is an intentional Rozie sub-grammar — it lowers to a
+ * `||`-chain of `===` comparisons (NOT `.includes()`, which does not narrow
+ * for TypeScript — R3/R9).
+ *
+ * `discriminantExpr` is the raw discriminant when `discriminantMode` is
+ * `'inline'`, or `t.identifier(tempName)` when `'hoist'`.
+ */
+function foldCaseTest(
+  caseValue: t.Expression,
+  discriminantExpr: t.Expression,
+  discriminant: t.Expression,
+): t.Expression {
+  // Literal-boolean discriminant special case (R4).
+  if (t.isBooleanLiteral(discriminant, { value: true })) {
+    return caseValue; // bare predicate
+  }
+  if (t.isBooleanLiteral(discriminant, { value: false })) {
+    return t.unaryExpression('!', caseValue);
+  }
+  // Comma-alternative sub-grammar — a top-level SequenceExpression.
+  if (t.isSequenceExpression(caseValue)) {
+    const comparisons: t.Expression[] = caseValue.expressions.map((v) =>
+      t.binaryExpression('===', t.cloneNode(discriminantExpr), v),
+    );
+    return comparisons.reduce((acc, cmp) =>
+      t.logicalExpression('||', acc, cmp),
+    );
+  }
+  // Normal strict-equality case.
+  return t.binaryExpression('===', discriminantExpr, caseValue);
+}
+
+/**
+ * Phase 11 — derive a stable, type-tagged comparison key for an `r-case` value
+ * for the ROZ959 duplicate-case check. Returns a tagged string when the value
+ * is a literal the warning can compare (e.g. `s:foo`, `n:1`, `b:true`,
+ * `null`); `undefined` for any non-literal (those are never flagged). Keys are
+ * stored in a `Set` of these tagged *values* — never used as bare object keys
+ * — as a prototype-pollution guard (threat T-11-03). The type tag also stops a
+ * string `r-case="'1'"` colliding with a numeric `r-case="1"`.
+ */
+function caseLiteralValue(caseValue: t.Expression): string | undefined {
+  if (t.isStringLiteral(caseValue)) return `s:${caseValue.value}`;
+  if (t.isNumericLiteral(caseValue)) return `n:${caseValue.value}`;
+  if (t.isBooleanLiteral(caseValue)) return `b:${caseValue.value}`;
+  if (t.isNullLiteral(caseValue)) return 'null';
+  return undefined;
+}
+
+/**
  * Lower a single ASTTemplateElement to IR. Handles r-for first (loop wrap),
  * then converts the bare element node.
  *
@@ -376,6 +466,9 @@ function lowerElement(
   // recursion has crossed a SlotFillerDecl.body boundary; every <slot>
   // lowered with this true gets context: 'fill-body' (Pitfall 5).
   lowerInFillBody: boolean,
+  // Phase 11 D-03 — per-component hoist temp-name counter, threaded so nested
+  // r-match blocks allocate distinct __rozieMatch_N names (Pitfall 5).
+  matchCounter: MatchTempCounter,
 ): IRTemplateNode {
   const elPath = `${pathPrefix}/${el.tagName}-${index}`;
 
@@ -420,6 +513,7 @@ function lowerElement(
       declaredNames,
       usedNames,
       lowerInFillBody,
+      matchCounter,
     );
 
     const loop: TemplateLoopIR = {
@@ -448,6 +542,7 @@ function lowerElement(
     declaredNames,
     usedNames,
     lowerInFillBody,
+    matchCounter,
   );
 }
 
@@ -470,6 +565,8 @@ function lowerBareElement(
   // Phase 07.2 D-06 — sticky-downward flag. When true, every <slot> lowered
   // here gets context: 'fill-body'; otherwise context: 'declaration' (default).
   lowerInFillBody: boolean,
+  // Phase 11 D-03 — per-component hoist temp-name counter (Pitfall 5).
+  matchCounter: MatchTempCounter,
 ): IRTemplateNode {
   // <slot> elements lower to TemplateSlotInvocationIR.
   if (el.tagName === 'slot') {
@@ -514,6 +611,7 @@ function lowerBareElement(
       declaredNames,
       usedNames,
       lowerInFillBody,
+      matchCounter,
     );
     const inv: TemplateSlotInvocationIR = {
       type: 'TemplateSlotInvocation',
@@ -697,6 +795,7 @@ function lowerBareElement(
     declaredNames,
     usedNames,
     childFillBodyFlag,
+    matchCounter,
   );
 
   // Phase 07.2 R3 — when this element is a component-tag, extract slot fillers
@@ -727,7 +826,8 @@ function lowerBareElement(
 
 /**
  * Walk a sibling list. Groups consecutive r-if / r-else-if / r-else into a
- * single TemplateConditionalIR.
+ * single TemplateConditionalIR; groups an r-match host plus its r-case /
+ * r-default children into a single TemplateMatchIR (Phase 11).
  */
 function lowerNodeList(
   nodes: readonly ASTTemplateNode[],
@@ -743,6 +843,8 @@ function lowerNodeList(
   usedNames: Set<string>,
   // Phase 07.2 D-06 — sticky-downward fill-body flag inherited from caller.
   lowerInFillBody: boolean,
+  // Phase 11 D-03 — per-component hoist temp-name counter (Pitfall 5).
+  matchCounter: MatchTempCounter,
 ): IRTemplateNode[] {
   const out: IRTemplateNode[] = [];
 
@@ -772,6 +874,263 @@ function lowerNodeList(
     }
 
     // TemplateElement
+
+    // Phase 11 — r-match grouping. An element carrying `r-match` is the group
+    // HEAD; its `r-case` / `r-default` rungs are CHILDREN of the host (not
+    // siblings, unlike the r-if ladder). The whole construct collapses into a
+    // single folded TemplateMatchIR. All seven ROZ953-959 diagnostics are
+    // detected inline here (D-05) and pushed — never thrown.
+    const matchDir = getMatchDirective(node);
+    if (matchDir && matchDir.kind === 'match') {
+      // Parse the discriminant. An empty/whitespace-only/unparseable r-match
+      // value is ROZ953 — push and skip the node entirely.
+      const discriminantText = matchDir.expr;
+      const discriminant =
+        discriminantText && discriminantText.trim() !== ''
+          ? tryParseExpression(discriminantText)
+          : null;
+      if (discriminant === null) {
+        diagnostics.push({
+          code: RozieErrorCode.MATCH_EMPTY_DISCRIMINANT,
+          severity: 'error',
+          message: `r-match requires a discriminant expression.`,
+          loc: matchDir.attr.loc,
+          hint: `Write r-match="<expression>" — e.g. r-match="status". Use r-match="true" for a predicate chain.`,
+        });
+        continue;
+      }
+
+      // D-03 hoist classification. A bare Identifier / MemberExpression is
+      // cheap — inline it into every rung. A CallExpression (or anything else
+      // non-trivial) is hoisted so it evaluates exactly once; allocate a
+      // per-component-unique temp name from the threaded counter.
+      const isInline =
+        t.isIdentifier(discriminant) || t.isMemberExpression(discriminant);
+      const discriminantMode: 'inline' | 'hoist' = isInline ? 'inline' : 'hoist';
+      const tempName = isInline
+        ? undefined
+        : `__rozieMatch_${matchCounter.next++}`;
+      // The expression substituted into each folded branch test.
+      const discriminantExpr: t.Expression =
+        tempName !== undefined ? t.identifier(tempName) : discriminant;
+
+      const branches: TemplateMatchIR['branches'] = [];
+      // ROZ959 — track seen literal r-case values by a type-tagged key
+      // (NOT used as a bare object key — prototype-pollution guard, T-11-03).
+      const seenLiterals = new Set<string>();
+      let defaultSeen = false;
+
+      for (let k = 0; k < node.children.length; k++) {
+        const child = node.children[k]!;
+        // Pure-whitespace text between rungs is skipped silently.
+        if (child.type === 'TemplateText') {
+          if (child.text.trim() === '') continue;
+          // Non-whitespace bare text is a stray child.
+          diagnostics.push({
+            code: RozieErrorCode.MATCH_STRAY_CHILD,
+            severity: 'error',
+            message: `An r-match host may only contain r-case / r-default elements.`,
+            loc: child.loc,
+            hint: `Wrap stray content in <template r-case="…"> or <template r-default>.`,
+          });
+          continue;
+        }
+        if (child.type !== 'TemplateElement') {
+          diagnostics.push({
+            code: RozieErrorCode.MATCH_STRAY_CHILD,
+            severity: 'error',
+            message: `An r-match host may only contain r-case / r-default elements.`,
+            loc: child.loc,
+            hint: `Wrap stray content in <template r-case="…"> or <template r-default>.`,
+          });
+          continue;
+        }
+
+        const childDir = getMatchDirective(child);
+        if (!childDir || childDir.kind === 'match') {
+          // A child element with neither r-case nor r-default (or a nested
+          // r-match host, which is not a valid direct rung) is stray.
+          diagnostics.push({
+            code: RozieErrorCode.MATCH_STRAY_CHILD,
+            severity: 'error',
+            message: `Direct children of an r-match host must carry r-case or r-default.`,
+            loc: child.loc,
+            hint: `Add r-case="<value>" or r-default to <${child.tagName}>, or move it out of the r-match block.`,
+          });
+          continue;
+        }
+
+        // A rung that follows an r-default is misordered (ROZ957). Still lower
+        // it so emitters get a stable shape.
+        if (defaultSeen) {
+          diagnostics.push({
+            code: RozieErrorCode.MATCH_DEFAULT_NOT_LAST,
+            severity: 'error',
+            message: `r-default must be the last branch of an r-match block.`,
+            loc: childDir.attr.loc,
+            hint: `Move r-default after every r-case branch.`,
+          });
+        }
+
+        if (childDir.kind === 'default') {
+          if (defaultSeen) {
+            diagnostics.push({
+              code: RozieErrorCode.MATCH_MULTIPLE_DEFAULT,
+              severity: 'error',
+              message: `An r-match block may declare at most one r-default branch.`,
+              loc: childDir.attr.loc,
+              hint: `Remove the extra r-default — only the first catch-all branch is reachable.`,
+            });
+          }
+          defaultSeen = true;
+          branches.push({
+            test: null,
+            deps: [],
+            body: [
+              lowerElement(
+                child,
+                bindings,
+                depGraph,
+                registry,
+                diagnostics,
+                templateListeners,
+                pathPrefix,
+                k,
+                outerName,
+                componentsTable,
+                declaredNames,
+                usedNames,
+                lowerInFillBody,
+                matchCounter,
+              ),
+            ],
+            sourceLoc: child.loc,
+          });
+          continue;
+        }
+
+        // childDir.kind === 'case'.
+        // r-case + r-for on the same element is forbidden (ROZ956).
+        if (getRForDirective(child) !== null) {
+          diagnostics.push({
+            code: RozieErrorCode.MATCH_CASE_WITH_FOR,
+            severity: 'error',
+            message: `r-case and r-for cannot appear on the same element.`,
+            loc: childDir.attr.loc,
+            hint: `Wrap the r-for element in a <template r-case="…"> rung instead.`,
+          });
+        }
+
+        // A valueless r-case is ROZ955 — still lower the rung with a
+        // null-literal placeholder test so the IR shape stays stable.
+        const caseText = childDir.expr;
+        const caseValue =
+          caseText && caseText.trim() !== ''
+            ? tryParseExpression(caseText)
+            : null;
+        if (caseValue === null) {
+          diagnostics.push({
+            code: RozieErrorCode.MATCH_CASE_NO_VALUE,
+            severity: 'error',
+            message: `r-case requires a value.`,
+            loc: childDir.attr.loc,
+            hint: `Write r-case="<value>", or use r-default for the catch-all branch.`,
+          });
+        } else {
+          // ROZ959 — duplicate literal r-case value (first occurrence wins).
+          const literal = caseLiteralValue(caseValue);
+          if (literal !== undefined) {
+            if (seenLiterals.has(literal)) {
+              diagnostics.push({
+                code: RozieErrorCode.MATCH_DUPLICATE_CASE,
+                severity: 'warning',
+                message: `Duplicate r-case value — this branch is unreachable; the first occurrence wins.`,
+                loc: childDir.attr.loc,
+                hint: `Remove the duplicate r-case, or change its value.`,
+              });
+            } else {
+              seenLiterals.add(literal);
+            }
+          }
+        }
+
+        const folded =
+          caseValue !== null
+            ? foldCaseTest(caseValue, discriminantExpr, discriminant)
+            : t.nullLiteral();
+        branches.push({
+          test: folded,
+          deps: computeExpressionDeps(folded, bindings),
+          body: [
+            lowerElement(
+              child,
+              bindings,
+              depGraph,
+              registry,
+              diagnostics,
+              templateListeners,
+              pathPrefix,
+              k,
+              outerName,
+              componentsTable,
+              declaredNames,
+              usedNames,
+              lowerInFillBody,
+              matchCounter,
+            ),
+          ],
+          sourceLoc: child.loc,
+        });
+      }
+
+      // A real-element host (`<div r-match>`) keeps its <div> wrapper; a
+      // `<template r-match>` host is non-rendering (hostElement undefined).
+      let hostElement: TemplateElementIR | undefined;
+      if (node.tagName !== 'template') {
+        // Lower the host element WITHOUT its r-case/r-default children — the
+        // children are the branches. Strip the r-match directive so the
+        // wrapper element itself carries no leftover match attribute.
+        const hostShell: ASTTemplateElement = {
+          ...node,
+          attributes: node.attributes.filter(
+            (a) => !(a.kind === 'directive' && a.name === 'match'),
+          ),
+          children: [],
+        };
+        const loweredHost = lowerElement(
+          hostShell,
+          bindings,
+          depGraph,
+          registry,
+          diagnostics,
+          templateListeners,
+          pathPrefix,
+          i,
+          outerName,
+          componentsTable,
+          declaredNames,
+          usedNames,
+          lowerInFillBody,
+          matchCounter,
+        );
+        if (loweredHost.type === 'TemplateElement') {
+          hostElement = loweredHost;
+        }
+      }
+
+      const matchNode: TemplateMatchIR = {
+        type: 'TemplateMatch',
+        discriminant,
+        discriminantMode,
+        ...(tempName !== undefined ? { tempName } : {}),
+        branches,
+        ...(hostElement !== undefined ? { hostElement } : {}),
+        sourceLoc: node.loc,
+      };
+      out.push(matchNode);
+      continue;
+    }
+
     const cond = getConditionalDirective(node);
     if (cond && cond.kind === 'if') {
       // Start a conditional group; consume siblings while they're else-if/else.
@@ -793,6 +1152,7 @@ function lowerNodeList(
           declaredNames,
           usedNames,
           lowerInFillBody,
+          matchCounter,
         ),
       ];
       branches.push({
@@ -833,6 +1193,7 @@ function lowerNodeList(
               declaredNames,
               usedNames,
               lowerInFillBody,
+              matchCounter,
             ),
           ],
           sourceLoc: sib.loc,
@@ -865,6 +1226,7 @@ function lowerNodeList(
         declaredNames,
         usedNames,
         lowerInFillBody,
+        matchCounter,
       ),
     );
   }
@@ -887,6 +1249,10 @@ export function lowerTemplate(
   const declaredNames: string[] = [outerName, ...componentsTable.keys()];
   // Used names tracked for ROZ924 (UNUSED_COMPONENT_ENTRY).
   const usedNames = new Set<string>();
+  // Phase 11 D-03 — one hoist temp-name counter per component (per
+  // lowerTemplate call), so nested r-match blocks never collide on
+  // __rozieMatch_N (Pitfall 5).
+  const matchCounter: MatchTempCounter = { next: 0 };
   const children = lowerNodeList(
     template.children,
     bindings,
@@ -901,6 +1267,7 @@ export function lowerTemplate(
     usedNames,
     // Phase 07.2 D-06 — root walk starts outside any fill body.
     false,
+    matchCounter,
   );
 
   // Phase 06.2 P1 Task 4 — ROZ924: warn for declared <components> entries

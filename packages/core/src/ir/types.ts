@@ -447,6 +447,7 @@ export interface SetupAnnotation {
 export type TemplateNode =
   | TemplateElementIR
   | TemplateConditionalIR
+  | TemplateMatchIR
   | TemplateLoopIR
   | TemplateSlotInvocationIR
   | TemplateFragmentIR
@@ -557,6 +558,62 @@ export interface TemplateConditionalIR {
     body: TemplateNode[];
     sourceLoc: SourceLoc;
   }>;
+  sourceLoc: SourceLoc;
+}
+
+/**
+ * @experimental — shape may change before v1.0
+ *
+ * Phase 11 — captures the `r-match` / `r-case` / `r-default` switch-style
+ * construct as ONE node. It deliberately parallels `TemplateConditionalIR`:
+ * its `branches[]` is byte-identical to `TemplateConditionalIR.branches[]`,
+ * so each per-target `emitConditional` can lower it with zero bespoke match
+ * logic (D-02).
+ *
+ * Per D-01 all semantic work is folded in core during lowering:
+ *   - each `r-case` branch's `test` is a ready-to-emit Babel expression
+ *     (`discriminant === caseValue`, an `||`-chain of `===` comparisons for
+ *     comma alternatives, or a bare / negated predicate for the
+ *     literal-boolean discriminant special case);
+ *   - `r-default` is the only branch whose `test` is `null`.
+ *
+ * Per D-03 the discriminant is shape-classified during lowering:
+ *   - a bare `Identifier` / `MemberExpression` → `discriminantMode: 'inline'`
+ *     (the discriminant is substituted directly into each branch test;
+ *     `tempName` is absent);
+ *   - a `CallExpression` (or otherwise non-trivial expression) →
+ *     `discriminantMode: 'hoist'`, with `tempName` a per-component-unique
+ *     identifier (`__rozieMatch_0`, `_1`, …) so the discriminant evaluates
+ *     exactly once and nested matches never collide.
+ */
+export interface TemplateMatchIR {
+  type: 'TemplateMatch';
+  /**
+   * The `r-match` discriminant. Carried for the hoist wrapper (D-04); for the
+   * `inline` mode it is already folded into each branch test, so emitters only
+   * reference it directly in the `hoist` path.
+   */
+  discriminant: Expression;
+  /** D-03 — `'inline'` (Identifier/MemberExpression) | `'hoist'` (CallExpression/other). */
+  discriminantMode: 'inline' | 'hoist';
+  /** D-03 — per-component-unique temp name; present iff `discriminantMode === 'hoist'`. */
+  tempName?: string;
+  /**
+   * D-01 — conditional-shaped branches; byte-identical to
+   * `TemplateConditionalIR.branches`. Each `test` is already folded; `null`
+   * marks the `r-default` branch.
+   */
+  branches: Array<{
+    test: Expression | null;
+    deps: SignalRef[];
+    body: TemplateNode[];
+    sourceLoc: SourceLoc;
+  }>;
+  /**
+   * The wrapper element for a real-element host (`<div r-match>`); `undefined`
+   * for a non-rendering `<template r-match>` host.
+   */
+  hostElement?: TemplateElementIR;
   sourceLoc: SourceLoc;
 }
 
