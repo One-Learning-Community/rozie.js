@@ -176,18 +176,26 @@ export function lowerToIR(ast: RozieAST, opts: LowerOptions): LowerResult {
   // a single TemplateElement or already has a user-authored ref attribute.
   lowerRootElementRef(ir);
 
-  // Type-neutralize the untyped `<script>` AST so every target emits
-  // type-correct TypeScript. `<script>` is parsed as plain JS, so non-trivial
-  // `<script>` logic (an engine instance in `let editor = null`, untyped
-  // callback params) would otherwise emit type-broken output on all six
-  // targets. This runs HERE — in lowerToIR — rather than in compile() because
-  // `@rozie/unplugin` has its own `parse → lowerToIR → emit{Target}` pipeline
-  // that bypasses compile(); lowering is the single point both paths share.
-  // Mutates `ir.setupBody.scriptProgram` in place (IR-04: that program is the
-  // SAME node as `ast.script.program`, but every emitter clones it before
-  // mutation, and the annotations are exactly what each emitter needs).
+  // Type-neutralize the `<script>` AST so every target emits type-correct
+  // TypeScript. The pass fills only the untyped residue and preserves author
+  // annotations — non-trivial `<script>` logic (an engine instance in
+  // `let editor = null`, untyped callback params) would otherwise emit
+  // type-broken output on all six targets. This runs HERE — in lowerToIR —
+  // rather than in compile() because `@rozie/unplugin` has its own
+  // `parse → lowerToIR → emit{Target}` pipeline that bypasses compile();
+  // lowering is the single point both paths share. Mutates
+  // `ir.setupBody.scriptProgram` in place (IR-04: that program is the SAME node
+  // as `ast.script.program`, but every emitter clones it before mutation, and
+  // the annotations are exactly what each emitter needs).
+  //
+  // `ast.script?.lang === 'ts'` (Phase 9) gates the for-of `as any` wrap: it is
+  // applied for plain `<script>` (the untyped default) and skipped for
+  // `<script lang="ts">` so the author's iterable element type survives.
   // See packages/core/src/codegen/typeNeutralizeScript.ts.
-  typeNeutralizeScript(ir.setupBody.scriptProgram);
+  typeNeutralizeScript(
+    ir.setupBody.scriptProgram,
+    ast.script?.lang === 'ts',
+  );
 
   return { ir, diagnostics, depGraph, bindings };
 }
