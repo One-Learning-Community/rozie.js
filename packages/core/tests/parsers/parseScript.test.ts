@@ -176,4 +176,75 @@ describe('parseScript (PARSE-03)', () => {
     // Just verify the file parsed successfully and produced a non-empty body.
     expect(node!.program.program.body.length).toBeGreaterThan(0);
   });
+
+  // Phase 9 Plan 09-01 Task 2 — conditional `typescript` Babel plugin.
+  // The plugin is enabled ONLY when the resolved block `lang` is `'ts'`.
+  describe('<script lang="ts"> — typescript plugin enablement (Phase 9)', () => {
+    it('parses a type annotation into a TSTypeAnnotation node when lang="ts"', () => {
+      const ts = 'let count: number = 0;';
+      const { node, diagnostics } = parseScript(
+        ts,
+        { start: 0, end: ts.length },
+        ts,
+        'Typed.rozie',
+        'ts',
+      );
+      expect(diagnostics).toEqual([]);
+      expect(node).not.toBeNull();
+      const decl = node!.program.program.body[0];
+      expect(decl?.type).toBe('VariableDeclaration');
+      const declarator = (decl as { declarations: Array<{ id: { typeAnnotation?: { type: string } } }> })
+        .declarations[0]!;
+      // The author's `: number` survives as a TSTypeAnnotation on the binding id.
+      expect(declarator.id.typeAnnotation?.type).toBe('TSTypeAnnotation');
+    });
+
+    it('the SAME TS body WITHOUT lang="ts" yields a parse-error diagnostic, never a throw (plugin genuinely off)', () => {
+      const ts = 'let count: number = 0;';
+      // No `lang` argument → typescript plugin OFF → the `: number` annotation
+      // is a Babel parse error. parseScript surfaces it as a diagnostic and
+      // NEVER propagates the exception (D-08 collected-not-thrown). Babel may
+      // recover (ROZ030) or throw-and-be-caught (ROZ031) depending on the
+      // construct — either proves the plugin is off; the load-bearing fact is
+      // that the SAME body with lang="ts" parses clean (the test above).
+      let threw = false;
+      let result: ReturnType<typeof parseScript> | null = null;
+      try {
+        result = parseScript(ts, { start: 0, end: ts.length }, ts);
+      } catch {
+        threw = true;
+      }
+      expect(threw).toBe(false);
+      const codes = result!.diagnostics.map((d) => d.code);
+      expect(codes.some((c) => c === 'ROZ030' || c === 'ROZ031')).toBe(true);
+    });
+
+    it('parses `import type { … }` into an ImportDeclaration with importKind "type"', () => {
+      const ts = "import type { Foo } from './foo';";
+      const { node, diagnostics } = parseScript(
+        ts,
+        { start: 0, end: ts.length },
+        ts,
+        'Typed.rozie',
+        'ts',
+      );
+      expect(diagnostics).toEqual([]);
+      const stmt = node!.program.program.body[0];
+      expect(stmt?.type).toBe('ImportDeclaration');
+      expect((stmt as { importKind?: string }).importKind).toBe('type');
+    });
+
+    it('untyped JS parses identically with or without the lang argument', () => {
+      const js = 'const a = 1;\nfunction f() { return a; }';
+      const withoutLang = parseScript(js, { start: 0, end: js.length }, js);
+      const withTs = parseScript(js, { start: 0, end: js.length }, js, undefined, 'ts');
+      expect(withoutLang.diagnostics).toEqual([]);
+      expect(withTs.diagnostics).toEqual([]);
+      // Same top-level statement count regardless of plugin state — the
+      // typescript plugin does not alter plain-JS parsing.
+      expect(withoutLang.node!.program.program.body.length).toBe(
+        withTs.node!.program.program.body.length,
+      );
+    });
+  });
 });

@@ -122,6 +122,49 @@ describe('splitBlocks (PARSE-01)', () => {
     expect(result.rozie?.name).toBe('Counter'); // must NOT be "ts"
   });
 
+  // Phase 9 Plan 09-01 Task 1 — generic SFC-block `lang=` attribute substrate.
+  // `lang` is extracted on any recognized block opening tag at depth 1, not
+  // just `<rozie name=>`. `<script lang="ts">` consumes it this phase;
+  // `<style lang="scss">` proves the substrate is generic (not script-only).
+  describe('block lang= attribute (Phase 9)', () => {
+    it('captures lang="ts" on a <script> block', () => {
+      const src =
+        '<rozie name="Typed"><script lang="ts">const x: number = 1;</script></rozie>';
+      const result = splitBlocks(src, 'Typed.rozie');
+      expect(result.diagnostics).toEqual([]);
+      expect(result.script?.lang).toBe('ts');
+    });
+
+    it('captures lang="js" on a <script> block', () => {
+      const src =
+        '<rozie name="PlainJs"><script lang="js">const x = 1;</script></rozie>';
+      const result = splitBlocks(src, 'PlainJs.rozie');
+      expect(result.diagnostics).toEqual([]);
+      expect(result.script?.lang).toBe('js');
+    });
+
+    it('leaves lang undefined on a plain <script> (no attribute)', () => {
+      const src =
+        '<rozie name="Bare"><script>const x = 1;</script></rozie>';
+      const result = splitBlocks(src, 'Bare.rozie');
+      expect(result.diagnostics).toEqual([]);
+      expect(result.script).toBeDefined();
+      // Under exactOptionalPropertyTypes the key is absent, not `undefined`.
+      expect(result.script?.lang).toBeUndefined();
+      expect(Object.hasOwn(result.script as object, 'lang')).toBe(false);
+    });
+
+    it('captures lang="scss" on a <style> block — generic-substrate proof', () => {
+      // The substrate is deliberately not script-only: a future
+      // <style lang="scss/less"> phase reuses this exact plumbing.
+      const src =
+        '<rozie name="Styled"><style lang="scss">.a { .b { color: red; } }</style></rozie>';
+      const result = splitBlocks(src, 'Styled.rozie');
+      expect(result.diagnostics).toEqual([]);
+      expect(result.style?.lang).toBe('scss');
+    });
+  });
+
   it('emits ROZ001 when <rozie> envelope is missing (collected, not thrown)', () => {
     // Per D-08: function does NOT throw on malformed input.
     const result = splitBlocks('<props>{}</props>');
