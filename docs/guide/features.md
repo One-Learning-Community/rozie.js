@@ -178,6 +178,22 @@ Most config-block DSLs stop at JSON5. Rozie's parser uses `@babel/parser.parseEx
 
 That `default: () => []` is real, not a string template — every target's emitter unwraps it into the framework's native default-prop mechanism (`withDefaults`, `?? ...`, `$bindable(...)`, `input<T>(...)`, a `@property` field initializer for Lit, etc.).
 
+A prop's `type:` is just as flexible. It can be a builtin constructor token (`Number` / `String` / `Boolean` / `Array` / `Object` / `Function`), or a bare identifier naming a `type` alias or `interface` declared in the same component's `<script lang="ts">` block. Rozie passes that identifier through verbatim into each target's typed prop signature, so the consumer's type-checker sees the real type — not a widened `unknown`.
+
+```rozie
+<script lang="ts">
+type Variant = 'a' | 'b'
+</script>
+
+<props>
+{
+  variant: { type: Variant, default: 'a' },
+}
+</props>
+```
+
+See `examples/typed/PropsCustomType.rozie` for a worked reference covering both a string-literal union alias and a custom `interface` flowing into prop-type position across all six targets.
+
 ## `model: true` → idiomatic two-way binding everywhere
 
 One flag in `<props>`. Six different two-way-binding expansions, each one the target's native pattern:
