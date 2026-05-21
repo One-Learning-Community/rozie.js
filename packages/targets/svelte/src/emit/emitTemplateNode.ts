@@ -343,6 +343,42 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
 }
 
 /**
+ * Recursively scan an AST node for an `Identifier` whose name equals `name`.
+ *
+ * Used to decide whether a `hoist`-mode match actually needs its temp emitted:
+ * core (plan 11-01) classifies a literal-`true` predicate-chain discriminant as
+ * `hoist` and allocates a `tempName` — but `foldCaseTest` folds each rung to the
+ * BARE predicate, so the temp is never referenced. Emitting the `$derived`
+ * declaration anyway would produce a dead, unused rune binding.
+ */
+function astReferencesIdentifier(node: unknown, name: string): boolean {
+  if (node === null || typeof node !== 'object') return false;
+  const n = node as { type?: string; name?: string };
+  if (n.type === 'Identifier' && n.name === name) return true;
+  for (const key of Object.keys(node)) {
+    if (key === 'loc' || key === 'sourceLoc') continue;
+    const value = (node as Record<string, unknown>)[key];
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        if (astReferencesIdentifier(item, name)) return true;
+      }
+    } else if (value !== null && typeof value === 'object') {
+      if (astReferencesIdentifier(value, name)) return true;
+    }
+  }
+  return false;
+}
+
+/** True when at least one folded branch test references the hoist temp. */
+function hoistTempIsReferenced(node: TemplateMatchIR): boolean {
+  if (node.tempName === undefined) return false;
+  const tempName = node.tempName;
+  return node.branches.some(
+    (b) => b.test !== null && astReferencesIdentifier(b.test, tempName),
+  );
+}
+
+/**
  * Emit a TemplateMatch (Phase 11 `r-match` / `r-case` / `r-default`).
  *
  * D-02 — pure delegation: the `r-match` construct lowers to a node whose
@@ -352,8 +388,22 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
  * existing inline `emitConditional` — no bespoke match emit logic (RESEARCH
  * Open Question 2 recommendation (a)).
  *
- * `discriminantMode === 'hoist'`: handled the same way here — the hoist-temp
- * declaration is plan 11-05's job.
+ * `discriminantMode === 'hoist'` (D-04 — plan 11-06): an impure
+ * `CallExpression` discriminant must be evaluated EXACTLY ONCE per render.
+ * Svelte has no `{@const}` precedent, and `{@const}` is legal only INSIDE a
+ * Svelte block. The match ladder's first `{#if}` test references the hoist
+ * temp — but a `{#if}` test is evaluated BEFORE the block opens, so a
+ * `{@const}` placed just inside the `{#if}` cannot supply the very test that
+ * gates the block (a chicken-and-egg, RESEARCH Open Question 1). We therefore
+ * use the `$derived` script-injection fallback: push a `SvelteScriptInjection`
+ * emitting `const <tempName> = $derived(<rewritten-discriminant>);`. `$derived`
+ * is a Svelte 5 rune (project floor) — no import needed. The injection lands
+ * at `position: 'bottom'` because the discriminant references user `<script>`
+ * declarations (e.g. `classify`) that would TDZ if the temp were hoisted above
+ * them. The `{#if}` ladder's folded branch tests (`<tempName> === <caseValue>`,
+ * pre-folded by core, plan 11-01) then resolve against the `$derived` value.
+ * Nested hoisting matches recurse through `emitNode`; the core per-component
+ * counter (plan 11-01) guarantees their `tempName`s never collide.
  *
  * `hostElement` (real-element `<div r-match>` host): the wrapper element must
  * survive emission. We render the host's tag/attributes via `emitElement` with
@@ -361,6 +411,24 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
  * `emitStaticText` passes its `text` through unchanged.
  */
 function delegateMatchToConditional(node: TemplateMatchIR, ctx: EmitNodeCtx): string {
+  // D-04 hoist: synthesize the `$derived` script injection. Done before the
+  // ladder is emitted so the temp is declared in `<script>` and the ladder's
+  // folded branch tests resolve. The `hoistTempIsReferenced` guard skips the
+  // injection for literal-`true` predicate-chain matches (core marks them
+  // `hoist` and allocates a `tempName`, but each rung folds to a bare predicate
+  // that never mentions the temp).
+  if (
+    node.discriminantMode === 'hoist' &&
+    node.tempName !== undefined &&
+    hoistTempIsReferenced(node)
+  ) {
+    const rewritten = rewriteTemplateExpression(node.discriminant, ctx.ir);
+    ctx.scriptInjections.push({
+      name: node.tempName,
+      decl: `const ${node.tempName} = $derived(${rewritten});`,
+      position: 'bottom',
+    });
+  }
   const synthetic: TemplateConditionalIR = {
     type: 'TemplateConditional',
     branches: node.branches,
@@ -370,8 +438,6 @@ function delegateMatchToConditional(node: TemplateMatchIR, ctx: EmitNodeCtx): st
   if (node.hostElement === undefined) {
     return ladder;
   }
-  // TODO(11-05): hoist placement — a `hoist`-mode discriminant declares its
-  // temp above this wrapper; for now the wrapper is emitted unconditionally.
   const verbatim: TemplateStaticTextIR = {
     type: 'TemplateStaticText',
     text: ladder,

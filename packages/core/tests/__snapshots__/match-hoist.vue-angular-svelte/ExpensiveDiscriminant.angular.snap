@@ -1,0 +1,42 @@
+import { Component, ViewEncapsulation, signal } from '@angular/core';
+
+@Component({
+  selector: 'rozie-expensive-discriminant',
+  standalone: true,
+  template: `
+
+    @let __rozieMatch_0 = classify();
+    @if (__rozieMatch_0 === 'pass') {
+    <template>
+        <div class="passed">
+          @let __rozieMatch_1 = subClassify();
+    @if (__rozieMatch_1 === 'distinction') {
+    <strong>passed with distinction</strong>
+    } @else if (__rozieMatch_1 === 'merit') {
+    <span>passed with merit</span>
+    } @else {
+    <span>passed</span>
+    }
+        </div>
+      </template>
+    } @else if (__rozieMatch_0 === 'fail') {
+    <span class="failed">did not pass</span>
+    } @else {
+    <span class="unknown">ungraded</span>
+    }
+
+  `,
+  styles: [`
+    .passed { color: #15803d; }
+    .failed { color: #b91c1c; }
+    .unknown { opacity: 0.5; }
+  `],
+})
+export class ExpensiveDiscriminant {
+  score = signal(72);
+
+  classify = () => this.score() >= 50 ? 'pass' : 'fail';
+  subClassify = () => this.score() >= 90 ? 'distinction' : 'merit';
+}
+
+export default ExpensiveDiscriminant;
