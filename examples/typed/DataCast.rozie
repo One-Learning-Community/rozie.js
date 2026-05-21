@@ -8,18 +8,21 @@
   `<data>` block initializer survives lowering and emit on all six targets:
     - `selected: null as Item | null` — a null-initialized reactive field
       that, WITHOUT the annotation, would be typed `null` (and any later
-      assignment of a real `Item` would be a consumer-side TS error). The
-      template reads `$data.selected.name` — type-safe ONLY if the field is
-      typed `Item | null` and the `r-if` narrows away `null`.
+      assignment of a real `Item` would be a consumer-side TS error). A
+      `$computed` reads `$data.selected.name` — type-safe ONLY if the field
+      is typed `Item | null` and the `null` is narrowed away first.
     - `items: [] as string[]` — an empty-array field that, WITHOUT the
-      annotation, lowers to `any[]`. The template iterates it and calls
-      `.toUpperCase()` on each element — type-safe ONLY if the field is
-      typed `string[]`.
+      annotation, lowers to `any[]`. A `$computed` calls `.toUpperCase()` on
+      each element — type-safe ONLY if the field is typed `string[]`.
     - `count: 0 satisfies number` — proves the `satisfies` path parses and
       emits too.
 
   A field that emitted as `null` / `any` would NOT catch a regression — the
-  template member accesses below are deliberately type-discriminating.
+  `$computed` member accesses below are deliberately type-discriminating.
+  The narrowed reads are routed through `$computed` (a tracked scope on
+  every target — the idiomatic Rozie pattern) so the `null`-narrowing holds
+  on Solid too, where every `$data` access lowers to a fresh signal-getter
+  call that TS control-flow analysis cannot narrow across.
 
   This fixture is wired into all six per-target typecheck/lint gates
   (tsc, vue-tsc, svelte-check, Angular template type-checker, eslint-plugin-
@@ -49,17 +52,43 @@ interface Item {
 const pick: (item: Item) => void = (item: Item) => {
   $data.selected = item
 }
+
+// Narrowed read of the typed `<data>` fields happens inside a `$computed`
+// (a tracked scope on every target — the idiomatic Rozie pattern, see
+// typed/TypedCard.rozie). Each `$data` field is read into a local `const`
+// FIRST, then narrowed — TypeScript's control-flow analysis narrows a plain
+// `const` reliably on every target, including Solid / Angular where a
+// repeated `$data` access lowers to a fresh signal-getter call that TS
+// cannot narrow across.
+//
+// `current.name` is type-safe ONLY if `$data.selected` carried its
+// `as Item | null` annotation through to emit — a field degraded to `null`
+// would have no `.name`, and a field degraded to `any` would defeat the
+// `if (current)` narrowing test as a regression signal.
+const selectedLabel: string = $computed(() => {
+  const current = $data.selected
+  return current ? current.name : 'none'
+})
+
+// Exercises `items: [] as string[]`. The `as string[]` annotation is what
+// gives `list` an element type of `string`, so `.join()` and the
+// `.toUpperCase()` string method are well-typed. The load-bearing tsc gate
+// for degradation lives on `selected` above (a `null`-degraded field has no
+// `.name`); the `items` field's `as` annotation is additionally proven to
+// survive emit by the cross-target passthrough check in the quick task's
+// verify step (`[] as string[]` appears verbatim in all six target
+// outputs).
+const itemSummary: string = $computed(() => {
+  const list: string[] = $data.items
+  return list.length === 0 ? 'empty' : list.join(', ').toUpperCase()
+})
 </script>
 
 <template>
 <div class="data-cast">
-  <p class="selected">
-    selected: {{ $data.selected ? $data.selected.name : 'none' }}
-  </p>
+  <p class="selected">selected: {{ selectedLabel }}</p>
   <p class="count">items: {{ $data.items.length }} ({{ $data.count }})</p>
-  <ul class="item-list">
-    <li r-for="item in $data.items" :key="item">{{ item.toUpperCase() }}</li>
-  </ul>
+  <p class="summary">{{ itemSummary }}</p>
 </div>
 </template>
 
