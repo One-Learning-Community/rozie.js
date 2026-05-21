@@ -43,4 +43,13 @@ export interface StyleAST {
   cssText: string;
   /** All top-level rules with :root-escape flagging. */
   rules: StyleRule[];
+  /**
+   * Resolved `lang="..."` attribute from the source `<style>` opening tag.
+   * Phase 9 carries this value through the generic SFC-block `lang=` substrate
+   * so the future `<style lang="scss/less">` preprocessor phase reuses it
+   * rather than re-plumbing. This phase implements NO SCSS/LESS behavior — the
+   * value is carried, not consumed. Undefined (key omitted under
+   * `exactOptionalPropertyTypes`) for a plain `<style>` block.
+   */
+  lang?: string;
 }

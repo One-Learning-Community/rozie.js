@@ -16,4 +16,12 @@ export interface ScriptAST {
   loc: SourceLoc;
   /** Babel File node (Program inside) — sourceType: 'module', attachComment: true. */
   program: File;
+  /**
+   * Resolved `lang="..."` attribute from the source `<script>` opening tag.
+   * `'ts'` when the source block was `<script lang="ts">` — the `typescript`
+   * Babel parser plugin was enabled and `program` may contain `TS*` nodes.
+   * Undefined (key omitted under `exactOptionalPropertyTypes`) for a plain
+   * `<script>` or any `lang` value other than `ts`. Phase 9.
+   */
+  lang?: string;
 }

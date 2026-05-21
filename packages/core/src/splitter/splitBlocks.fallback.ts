@@ -164,7 +164,14 @@ export function splitBlocksFallback(source: string, filename?: string): SplitBlo
  */
 function sfcBlockToEntry(
   source: string,
-  block: { content: string; loc: { start: { offset: number }; end: { offset: number } } },
+  block: {
+    content: string;
+    loc: { start: { offset: number }; end: { offset: number } };
+    // Phase 9: Vue's SFCBlock carries opening-tag attributes in `attrs`. A
+    // valued attribute is a string; a boolean attribute is `true`. We only
+    // consume `lang`, and only when it is a string value.
+    attrs?: Record<string, string | true>;
+  },
 ): BlockEntry | null {
   const contentStart = block.loc.start.offset;
   const contentEnd = block.loc.end.offset;
@@ -183,9 +190,16 @@ function sfcBlockToEntry(
   }
   if (closeGt >= source.length) return null;
 
+  // Phase 9: carry the `lang=` attribute so the fallback path stays
+  // shape-consistent with the primary `splitBlocks.ts`. Conditional-spread
+  // keeps the key absent when `lang` is not a string (required under
+  // `exactOptionalPropertyTypes: true`).
+  const langAttr = block.attrs?.lang;
+
   return {
     content: block.content,
     contentLoc: { start: contentStart, end: contentEnd },
     loc: { start: openLt, end: closeGt + 1 },
+    ...(typeof langAttr === 'string' ? { lang: langAttr } : {}),
   };
 }

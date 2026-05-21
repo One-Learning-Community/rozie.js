@@ -18,6 +18,14 @@ export interface BlockEntry {
   content: string;
   contentLoc: SourceLoc;
   loc: SourceLoc;
+  /**
+   * Resolved `lang="..."` attribute on the block's opening tag, if present.
+   * Phase 9: the generic SFC-block `lang=` substrate. `<script lang="ts">`
+   * consumes it this phase; `<style lang="scss">` reuses it in a later phase.
+   * Absent (key omitted under `exactOptionalPropertyTypes`) when the opening
+   * tag carried no `lang` attribute.
+   */
+  lang?: string;
 }
 
 export interface BlockMap {

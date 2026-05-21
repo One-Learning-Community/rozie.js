@@ -84,14 +84,27 @@ export function splitBlocks(source: string, filename?: string): SplitBlocksResul
   let pendingTagName = '';
   let blockTagStart = 0; // '<' of the block's opening tag
   let blockContentStart = 0; // first byte after '>' of opening tag
+  // Phase 9: the resolved `lang=` value for the active block, captured at
+  // block-open time. `null` when the block opening tag carried no `lang`.
+  // Captured per-block here (not read live from `savedLangChunks`) because a
+  // nested tag inside the block would reset `savedLangChunks` before the
+  // block's close tag fires.
+  let blockLang: string | null = null;
   let rozieTagStart = 0; // '<' of the <rozie> opening tag
 
   // <rozie name="..."> attribute extraction (only at depth 0)
   // and unknown-block (ROZ003) tracking inside envelope.
   let inRozieOpenTag = false;
+  // Phase 9: generic `lang=` substrate. The same chunked attribute-collection
+  // machinery (`onattribname`/`onattribdata`/`onattribend`) used for the
+  // `<rozie name=>` attribute is generalized to also fire inside a recognized
+  // block opening tag at depth 1 (`<script>`, `<style>`, `<template>`, etc.).
+  // `inBlockOpenTag` is the depth-1 block-tag analogue of `inRozieOpenTag`.
+  let inBlockOpenTag = false;
   let pendingAttribName = '';
   let pendingAttribValueChunks: string[] = [];
   let savedNameChunks: string[] = []; // holds chunks for the 'name' attr once onattribend fires
+  let savedLangChunks: string[] = []; // holds chunks for the 'lang' attr once onattribend fires (Phase 9)
   let collectingAttribValue = false;
   let unknownTagStart = -1; // tracks <` position of an unknown top-level block, -1 = none
 
@@ -111,14 +124,21 @@ export function splitBlocks(source: string, filename?: string): SplitBlocksResul
         lastOpenTagStart = start - 1;
         // Reset attribute-extraction state for this tag.
         inRozieOpenTag = depth === 0 && name === 'rozie';
+        // Phase 9: a recognized block opening tag at depth 1 — the only other
+        // site where we collect attributes (the `lang=` substrate). Note the
+        // `<rozie>` tag itself is excluded here: it lives at depth 0 and its
+        // attribute is `name`, handled via `inRozieOpenTag`.
+        inBlockOpenTag =
+          depth === 1 && name !== 'rozie' && BLOCK_NAMES.has(name as 'rozie');
         pendingAttribName = '';
         pendingAttribValueChunks = [];
         savedNameChunks = [];
+        savedLangChunks = [];
         collectingAttribValue = false;
       },
 
       onattribname(start, endIndex) {
-        if (!inRozieOpenTag) return;
+        if (!inRozieOpenTag && !inBlockOpenTag) return;
         pendingAttribName = source.slice(start, endIndex).toLowerCase();
         pendingAttribValueChunks = [];
         collectingAttribValue = true;
@@ -126,16 +146,22 @@ export function splitBlocks(source: string, filename?: string): SplitBlocksResul
 
       onattribdata(start, endIndex) {
         // May fire MULTIPLE times per attribute (Pitfall 3 — chunked values).
-        if (!inRozieOpenTag || !collectingAttribValue) return;
+        if ((!inRozieOpenTag && !inBlockOpenTag) || !collectingAttribValue) return;
         pendingAttribValueChunks.push(source.slice(start, endIndex));
       },
 
       onattribend(_quote, _endIndex) {
-        if (!inRozieOpenTag) return;
-        if (pendingAttribName === 'name') {
+        if (!inRozieOpenTag && !inBlockOpenTag) return;
+        if (inRozieOpenTag && pendingAttribName === 'name') {
           // Save the chunks for the 'name' attribute now, before the next onattribname
           // clears pendingAttribValueChunks. onopentagend reads from savedNameChunks.
           savedNameChunks = [...pendingAttribValueChunks];
+        }
+        if (inBlockOpenTag && pendingAttribName === 'lang') {
+          // Phase 9: save the `lang` attribute chunks for the current block
+          // opening tag. Same chunked push/join pattern as `name` — onattribdata
+          // may have fired multiple times. onclosetag stamps it onto BlockEntry.
+          savedLangChunks = [...pendingAttribValueChunks];
         }
         collectingAttribValue = false;
       },
@@ -198,6 +224,10 @@ export function splitBlocks(source: string, filename?: string): SplitBlocksResul
             currentBlock = blockName;
             blockTagStart = lastOpenTagStart;
             blockContentStart = endIndex + 1;
+            // Phase 9: capture the block's resolved `lang=` value now, before
+            // any nested opening tag resets `savedLangChunks`. `null` when the
+            // block carried no `lang` attribute → BlockEntry.lang stays absent.
+            blockLang = savedLangChunks.length > 0 ? savedLangChunks.join('') : null;
           } else {
             // Unknown top-level block — ROZ003.
             const isRefs = pendingTagName === 'refs';
@@ -218,11 +248,13 @@ export function splitBlocks(source: string, filename?: string): SplitBlocksResul
         // depth > 1: nested HTML inside a block — handled by the tokenizer; we just track depth.
         depth++;
         inRozieOpenTag = false;
+        inBlockOpenTag = false;
       },
 
       onselfclosingtag(_endIndex) {
         // Self-closing tags do NOT increment depth and do NOT begin a block.
         inRozieOpenTag = false;
+        inBlockOpenTag = false;
         unknownTagStart = -1;
       },
 
@@ -258,10 +290,15 @@ export function splitBlocks(source: string, filename?: string): SplitBlocksResul
               content: source.slice(contentLoc.start, contentLoc.end),
               contentLoc,
               loc: blockLoc,
+              // Phase 9: only set `lang` when the block opening tag carried a
+              // `lang` attribute — conditional-spread keeps the key absent
+              // otherwise (required under `exactOptionalPropertyTypes: true`).
+              ...(blockLang !== null ? { lang: blockLang } : {}),
             };
             result[currentBlock] = entry;
           }
           currentBlock = null;
+          blockLang = null;
         } else if (tagName === 'rozie' && depth === 0 && result.rozie) {
           // Update <rozie> envelope's loc.end to include the </rozie> tag.
           result.rozie.loc.end = endIndex + 1;
