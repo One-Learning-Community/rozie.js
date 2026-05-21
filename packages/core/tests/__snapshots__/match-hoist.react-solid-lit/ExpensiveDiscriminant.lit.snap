@@ -22,11 +22,11 @@ export default class ExpensiveDiscriminant extends SignalWatcher(LitElement) {
 
   render() {
     return html`
-${(() => { const __rozieMatch_0 = this.classify(); return __rozieMatch_0 === 'pass' ? html`<template data-rozie-s-bb543ee0>
+${(() => { const __rozieMatch_0 = this.classify(); return __rozieMatch_0 === 'pass' ? html`
     <div class="passed" data-rozie-s-bb543ee0>
       ${(() => { const __rozieMatch_1 = this.subClassify(); return __rozieMatch_1 === 'distinction' ? html`<strong data-rozie-s-bb543ee0>passed with distinction</strong>` : __rozieMatch_1 === 'merit' ? html`<span data-rozie-s-bb543ee0>passed with merit</span>` : html`<span data-rozie-s-bb543ee0>passed</span>`; })()}
     </div>
-  </template>` : __rozieMatch_0 === 'fail' ? html`<span class="failed" data-rozie-s-bb543ee0>did not pass</span>` : html`<span class="unknown" data-rozie-s-bb543ee0>ungraded</span>`; })()}
+  ` : __rozieMatch_0 === 'fail' ? html`<span class="failed" data-rozie-s-bb543ee0>did not pass</span>` : html`<span class="unknown" data-rozie-s-bb543ee0>ungraded</span>`; })()}
 `;
   }
 

@@ -983,27 +983,50 @@ function lowerNodeList(
             });
           }
           defaultSeen = true;
+          // Phase 11 R8 / CR-01 — a `<template r-default>` host is
+          // non-rendering: emit its CHILDREN directly (flattened, multi-node
+          // body) rather than a literal `TemplateElement{tagName:'template'}`,
+          // which 5/6 targets would render as an inert HTML `<template>`. A
+          // real-element host (e.g. `<p r-default>`) keeps `[lowerElement]`.
+          // Mirrors the `r-match` host-unwrap below.
           branches.push({
             test: null,
             deps: [],
-            body: [
-              lowerElement(
-                child,
-                bindings,
-                depGraph,
-                registry,
-                diagnostics,
-                templateListeners,
-                pathPrefix,
-                k,
-                outerName,
-                componentsTable,
-                declaredNames,
-                usedNames,
-                lowerInFillBody,
-                matchCounter,
-              ),
-            ],
+            body:
+              child.tagName === 'template'
+                ? lowerNodeList(
+                    child.children,
+                    bindings,
+                    depGraph,
+                    registry,
+                    diagnostics,
+                    templateListeners,
+                    pathPrefix,
+                    outerName,
+                    componentsTable,
+                    declaredNames,
+                    usedNames,
+                    lowerInFillBody,
+                    matchCounter,
+                  )
+                : [
+                    lowerElement(
+                      child,
+                      bindings,
+                      depGraph,
+                      registry,
+                      diagnostics,
+                      templateListeners,
+                      pathPrefix,
+                      k,
+                      outerName,
+                      componentsTable,
+                      declaredNames,
+                      usedNames,
+                      lowerInFillBody,
+                      matchCounter,
+                    ),
+                  ],
             sourceLoc: child.loc,
           });
           continue;
@@ -1058,27 +1081,50 @@ function lowerNodeList(
           caseValue !== null
             ? foldCaseTest(caseValue, discriminantExpr, discriminant)
             : t.nullLiteral();
+        // Phase 11 R8 / CR-01 — a `<template r-case>` host is non-rendering:
+        // emit its CHILDREN directly (flattened, multi-node body) rather than
+        // a literal `TemplateElement{tagName:'template'}`, which 5/6 targets
+        // would render as an inert HTML `<template>`. A real-element host
+        // (e.g. `<p r-case>`) keeps `[lowerElement]`. Mirrors the `r-match`
+        // host-unwrap below.
         branches.push({
           test: folded,
           deps: computeExpressionDeps(folded, bindings),
-          body: [
-            lowerElement(
-              child,
-              bindings,
-              depGraph,
-              registry,
-              diagnostics,
-              templateListeners,
-              pathPrefix,
-              k,
-              outerName,
-              componentsTable,
-              declaredNames,
-              usedNames,
-              lowerInFillBody,
-              matchCounter,
-            ),
-          ],
+          body:
+            child.tagName === 'template'
+              ? lowerNodeList(
+                  child.children,
+                  bindings,
+                  depGraph,
+                  registry,
+                  diagnostics,
+                  templateListeners,
+                  pathPrefix,
+                  outerName,
+                  componentsTable,
+                  declaredNames,
+                  usedNames,
+                  lowerInFillBody,
+                  matchCounter,
+                )
+              : [
+                  lowerElement(
+                    child,
+                    bindings,
+                    depGraph,
+                    registry,
+                    diagnostics,
+                    templateListeners,
+                    pathPrefix,
+                    k,
+                    outerName,
+                    componentsTable,
+                    declaredNames,
+                    usedNames,
+                    lowerInFillBody,
+                    matchCounter,
+                  ),
+                ],
           sourceLoc: child.loc,
         });
       }

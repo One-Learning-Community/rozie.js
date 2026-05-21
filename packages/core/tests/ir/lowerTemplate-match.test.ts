@@ -263,12 +263,14 @@ describe('r-match IR shape — flexible host & multi-root branches (R8)', () => 
 `;
     const { ir } = lowerSource(src);
     const match = matchNodes(ir!.template)[0]!;
-    // A branch body is always a single lowered node (`[lowerElement(child)]`,
-    // mirroring how `<template r-if>` lowers). For a `<template r-case>` that
-    // single node is a non-rendering wrapper (a TemplateFragment) whose
-    // children carry BOTH the <span> and the <progress>. Count TemplateElement
-    // nodes recursively through the wrapper — the multi-root branch must
-    // preserve more than one child element.
+    // CR-01 — a `<template r-case>` host is non-rendering: the lowerer
+    // FLATTENS its children directly into the branch `body` array via
+    // `lowerNodeList(child.children)`. The branch body is therefore a
+    // multi-node array carrying BOTH the <span> and the <progress> as
+    // top-level nodes — NOT a single literal `TemplateElement{tagName:
+    // 'template'}` wrapper (which 5/6 targets would render as an inert HTML
+    // <template>). Count TemplateElement nodes recursively to confirm the
+    // multi-root branch preserves more than one child element.
     const countElements = (nodes: readonly unknown[]): number => {
       let count = 0;
       for (const node of nodes) {
@@ -281,5 +283,27 @@ describe('r-match IR shape — flexible host & multi-root branches (R8)', () => 
     };
     const elementBodyCounts = match.branches.map((b) => countElements(b.body));
     expect(Math.max(...elementBodyCounts)).toBeGreaterThan(1);
+
+    // CR-01 — the multi-root children must be FLATTENED, not wrapped: the
+    // `<template r-case>` branch body must contain NO `TemplateElement` whose
+    // `tagName === 'template'`. Such a node would emit an inert HTML
+    // `<template>` element on React/Solid/Lit/Svelte/Angular, trapping the
+    // branch children so they never render.
+    const hasTemplateTagged = (nodes: readonly unknown[]): boolean => {
+      for (const node of nodes) {
+        const n = node as {
+          type?: string;
+          tagName?: string;
+          children?: unknown[];
+          body?: unknown[];
+        };
+        if (n.type === 'TemplateElement' && n.tagName === 'template') return true;
+        if (Array.isArray(n.children) && hasTemplateTagged(n.children)) return true;
+        if (Array.isArray(n.body) && hasTemplateTagged(n.body)) return true;
+      }
+      return false;
+    };
+    // The first branch is the `<template r-case="'loading'">` rung.
+    expect(hasTemplateTagged(match.branches[0]!.body)).toBe(false);
   });
 });

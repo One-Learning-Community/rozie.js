@@ -7,7 +7,7 @@ import { Component, ViewEncapsulation, signal } from '@angular/core';
 
     @let __rozieMatch_0 = classify();
     @if (__rozieMatch_0 === 'pass') {
-    <template>
+
         <div class="passed">
           @let __rozieMatch_1 = subClassify();
     @if (__rozieMatch_1 === 'distinction') {
@@ -18,7 +18,7 @@ import { Component, ViewEncapsulation, signal } from '@angular/core';
     <span>passed</span>
     }
         </div>
-      </template>
+      
     } @else if (__rozieMatch_0 === 'fail') {
     <span class="failed">did not pass</span>
     } @else {

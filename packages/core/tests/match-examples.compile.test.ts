@@ -73,6 +73,27 @@ describe('r-match R8 — real-element host + multi-root branch survive emission'
     expect(result.code).toContain('status-label');
     expect(result.code).toContain('status-bar');
   });
+
+  // CR-01 — the `<template r-case="'loading'">` branch must emit its two
+  // children with NO inert HTML `<template>` wrapper. Asserting the
+  // `status-label`/`status-bar` substrings above is NOT sufficient: with the
+  // CR-01 bug those substrings still appeared, trapped inside a dead
+  // `<template>…</template>` element that 5/6 targets render but never
+  // display. This block locks the rendered SHAPE: no `<template>` tag may
+  // survive emission. Vue is exempt — Vue's `<template>` is the native
+  // non-rendering group and legitimately appears in emitted Vue SFCs.
+  const NON_VUE_TARGETS = TARGETS.filter((t) => t !== 'vue');
+  it.each(NON_VUE_TARGETS)(
+    'emits no inert <template> tag for the multi-root branch on %s',
+    (target) => {
+      const result = compile(source, { target, filename: path });
+      const errors = result.diagnostics.filter((d) => d.severity === 'error');
+      expect(errors).toEqual([]);
+      // `/<template[\s>]/` matches an opening `<template>` or `<template …>`
+      // tag — it must NOT appear in non-Vue emitted code.
+      expect(result.code).not.toMatch(/<template[\s>]/);
+    },
+  );
 });
 
 // R11 dogfood anchor — `examples/demos/TableDemo.rozie`'s `#cell` slot was
