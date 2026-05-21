@@ -34,6 +34,13 @@
 </data>
 
 <script>
+// Consumer-side vendor-CSS import — the .rozie file's scoped <style> can't
+// ship flatpickr's global .flatpickr-* selectors, so the consuming app pulls
+// the engine's stylesheet itself. Survives compilation to all six targets;
+// the VR rig's per-cell `vite build` resolves + code-splits it into the
+// Flatpickr chunk so it loads only for this cell.
+import 'flatpickr/dist/flatpickr.css'
+
 const clear = () => { $data.picked = '' }
 
 const pickToday = () => {

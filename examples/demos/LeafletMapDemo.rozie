@@ -35,6 +35,13 @@
 </data>
 
 <script>
+// Consumer-side vendor-CSS import — the .rozie file's scoped <style> can't
+// ship Leaflet's global .leaflet-* selectors, so the consuming app pulls the
+// engine's stylesheet itself. Survives compilation to all six targets; the VR
+// rig's per-cell `vite build` resolves + code-splits it into the LeafletMap
+// chunk so it loads only for this cell.
+import 'leaflet/dist/leaflet.css'
+
 const addMarker = (e) => {
   const label = `Pin ${$data.nextId}`
   $data.markers = [...$data.markers, { lat: e.lat, lng: e.lng, label }]
