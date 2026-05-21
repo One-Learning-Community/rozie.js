@@ -167,9 +167,15 @@ function sfcBlockToEntry(
   block: {
     content: string;
     loc: { start: { offset: number }; end: { offset: number } };
-    // Phase 9: Vue's SFCBlock carries opening-tag attributes in `attrs`. A
-    // valued attribute is a string; a boolean attribute is `true`. We only
-    // consume `lang`, and only when it is a string value.
+    // Phase 9: Vue's SFCBlock carries the resolved `lang` value as a top-level
+    // `lang?: string` property. This is distinct from `attrs.lang`, which Vue
+    // normalizes to `true` for both boolean `<script lang>` AND
+    // `<script lang="">` (empty value). Only `block.lang` correctly
+    // distinguishes the two: boolean-`lang` → `block.lang === undefined`,
+    // `lang=""` → `block.lang === ""`. Using `block.lang` keeps the fallback
+    // byte-equivalent to the primary splitter's behavior (primary emits
+    // `lang: ''` for `lang=""`; absent for boolean-`lang`).
+    lang?: string;
     attrs?: Record<string, string | true>;
   },
 ): BlockEntry | null {
@@ -191,15 +197,20 @@ function sfcBlockToEntry(
   if (closeGt >= source.length) return null;
 
   // Phase 9: carry the `lang=` attribute so the fallback path stays
-  // shape-consistent with the primary `splitBlocks.ts`. Conditional-spread
-  // keeps the key absent when `lang` is not a string (required under
-  // `exactOptionalPropertyTypes: true`).
-  const langAttr = block.attrs?.lang;
+  // shape-consistent with the primary `splitBlocks.ts`. Use `block.lang`
+  // (Vue's resolved lang property) rather than `block.attrs.lang`:
+  // Vue normalises `lang=""` to `attrs.lang = true` (boolean), so reading
+  // `attrs.lang` would silently drop the empty-string case. `block.lang`
+  // is `""` for `lang=""` and `undefined` for boolean `lang` or absent,
+  // which matches the primary splitter's `savedLangChunks.join('')` logic.
+  // Conditional-spread keeps the key absent when lang is not set (required
+  // under `exactOptionalPropertyTypes: true`).
+  const resolvedLang = block.lang;
 
   return {
     content: block.content,
     contentLoc: { start: contentStart, end: contentEnd },
     loc: { start: openLt, end: closeGt + 1 },
-    ...(typeof langAttr === 'string' ? { lang: langAttr } : {}),
+    ...(resolvedLang !== undefined ? { lang: resolvedLang } : {}),
   };
 }
