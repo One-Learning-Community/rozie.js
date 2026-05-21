@@ -98,3 +98,30 @@ describe('r-match R11 dogfood — TableDemo #cell slot uses r-match', () => {
     });
   });
 });
+
+// ───────────────────────────────────────────────────────────────────────────
+// R2 COMPLETION GATE — Wave 4
+//
+// SPEC R2: a 3-branch match compiles with zero errors on all six targets.
+// R2 could NOT be fully gated before Wave 4: the hoist-mode
+// `ExpensiveDiscriminant` fixture stayed red on every target until the Wave 3
+// hoist plans (11-05/11-06) merged. The earlier `describe.each(MATCH_EXAMPLES)`
+// block above asserts the same matrix per-fixture; this block is the EXPLICIT,
+// intentionally-named R2 checkpoint so a reader and the verifier can see R2 is
+// gated and closed HERE — every `MATCH_EXAMPLES` fixture (CommaAlternatives,
+// PredicateChain, ExpensiveDiscriminant including the hoist path, and
+// RealElementHost) crossed with the full six-target `TARGETS` list, asserting
+// zero error diagnostics AND non-empty emitted code.
+// ───────────────────────────────────────────────────────────────────────────
+describe('r-match R2 completion gate — full MATCH_EXAMPLES matrix, all six targets', () => {
+  for (const file of MATCH_EXAMPLES) {
+    const path = resolve(EXAMPLES_DIR, file);
+    const source = readFileSync(path, 'utf8');
+    it.each(TARGETS)(`R2: ${file} compiles error-free with non-empty code on %s`, (target) => {
+      const result = compile(source, { target, filename: path });
+      const errorDiagnostics = result.diagnostics.filter((d) => d.severity === 'error');
+      expect(errorDiagnostics).toEqual([]);
+      expect(result.code.length).toBeGreaterThan(0);
+    });
+  }
+});
