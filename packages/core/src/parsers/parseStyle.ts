@@ -15,6 +15,17 @@
  *  - ROZ081  Mixed :root selector (e.g., `:root, .other` — must be split)
  *  - ROZ082  `@portal` nested inside `@media` (or any non-`@portal` at-rule)
  *  - ROZ084  `@portal` block with empty/malformed prelude or content (Spike 004)
+ *  - ROZ085  `<style lang="scss">` used but the optional `sass` peer is absent (Phase 10)
+ *  - ROZ086  dart-sass threw on invalid SCSS — collected, never propagated (Phase 10, D-08)
+ *  - ROZ087  unrecognized `<style lang>` value (neither `scss` nor `css`) (Phase 10, D-02)
+ *
+ * Phase 10 — SCSS preprocessing. When `lang === 'scss'` (resolved
+ * case-insensitively + trimmed, mirroring `parseScript`'s `normalizedLang`),
+ * the style body is compiled to plain CSS by dart-sass BEFORE `postcss.parse`
+ * runs — so the existing scoping / `@portal` / `:root` machinery (and the six
+ * `emitStyle.ts` files) need no change. The SCSS branch is fully gated on
+ * `lang === 'scss'`; the plain-CSS path is the untouched `else` and stays
+ * byte-identical (SPEC-REQ-8).
  *
  * Spike 004 — `@portal NAME { ... }` at-rule recognition. An `@portal item
  * { ul {} li {} }` block parses to a `portal-block` StyleRule whose `children`
@@ -32,6 +43,7 @@ import type { SourceLoc } from '../ast/types.js';
 import type { Diagnostic } from '../diagnostics/Diagnostic.js';
 import type { StyleAST, StyleRule } from '../ast/blocks/StyleAST.js';
 import { RozieErrorCode } from '../diagnostics/codes.js';
+import { loadSass } from './resolveSass.js';
 
 export interface ParseStyleResult {
   node: StyleAST | null;
@@ -42,10 +54,11 @@ export interface ParseStyleResult {
  * Parse a `<style>` block into a `StyleAST`.
  *
  * @param lang - the resolved `lang=` attribute from the source `<style>` tag
- *   (Phase 9 generic `lang=` substrate). `parseStyle` does not consume it yet —
- *   no SCSS/LESS preprocessing this phase — but it is threaded through the
- *   signature and built into the returned node so the future
- *   `<style lang="scss/less">` work reuses the same plumbing as `parseScript`.
+ *   (Phase 9 generic `lang=` substrate). Phase 10 consumes it: resolved
+ *   case-insensitively + trimmed (mirroring `parseScript`'s `normalizedLang`),
+ *   `'scss'` triggers compile-time SCSS-to-CSS preprocessing via dart-sass;
+ *   `'css'` or absent is the plain-CSS path (byte-identical to pre-Phase-10).
+ *   Any other non-empty value emits ROZ087 and returns `node: null` (D-02).
  *   Threading it here (rather than mutating the node after construction in
  *   `parse.ts`) keeps `StyleAST.lang` set at construction time, consistent with
  *   every other block AST and with `exactOptionalPropertyTypes` (WR-04).
@@ -64,9 +77,100 @@ export function parseStyle(
   void source;
 
   const diagnostics: Diagnostic[] = [];
+
+  // Phase 10 — resolve the `lang=` attribute. Mirrors `parseScript`'s
+  // `normalizedLang` (D-01): trimmed + lowercased. Recognized values are
+  // `scss` (preprocess) and `css`/absent (plain CSS — today's default path).
+  const normalizedLang = lang?.trim().toLowerCase();
+  const isScss = normalizedLang === 'scss';
+  const isPlain =
+    normalizedLang === undefined || normalizedLang === '' || normalizedLang === 'css';
+
+  // D-02 — an unrecognized non-empty `lang` fires ROZ087 at error severity and
+  // emits NO `<style>` output (fail loud — feeding e.g. Less to `postcss.parse`
+  // otherwise surfaces as a confusing ROZ080). D-03 — the hint branches on the
+  // value: `less` gets a Less-aware deferral message; anything else a generic
+  // typo hint. Unlike `parseScript`'s ROZ032 (warn + continue), parseStyle must
+  // return `node: null` here.
+  if (!isScss && !isPlain) {
+    const hint =
+      normalizedLang === 'less'
+        ? 'Less is planned for a follow-up phase — use <style lang="scss"> or plain CSS for now.'
+        : 'Use <style lang="scss"> for SCSS, or omit lang for plain CSS.';
+    diagnostics.push({
+      code: RozieErrorCode.STYLE_UNRECOGNIZED_LANG,
+      severity: 'error',
+      message: `Unrecognized <style lang="${lang}"> value. Recognized: "scss" (SCSS) or "css" / no lang (plain CSS).`,
+      loc: contentLoc,
+      ...(filename !== undefined ? { filename } : {}),
+      hint,
+    });
+    return { node: null, diagnostics };
+  }
+
+  // Phase 10 — SCSS pre-pass. Runs BEFORE `postcss.parse` so all downstream
+  // machinery (scoping, @portal, :root, the six emitStyle.ts files) operates on
+  // plain CSS. `cssForPostcss` is `content` for the plain-CSS path and the
+  // dart-sass-compiled CSS for the SCSS path.
+  let cssForPostcss = content;
+  if (isScss) {
+    const sass = loadSass();
+    if (sass === null) {
+      // ROZ085 — `lang="scss"` used but the optional `sass` peer is absent.
+      // Error severity, no partial output (D-08-aligned fail-loud).
+      diagnostics.push({
+        code: RozieErrorCode.STYLE_MISSING_SASS,
+        severity: 'error',
+        message:
+          '<style lang="scss"> requires the "sass" package, which is not installed.',
+        loc: contentLoc,
+        ...(filename !== undefined ? { filename } : {}),
+        hint: 'Install dart-sass as a dev dependency: `npm install -D sass` (or `pnpm add -D sass`).',
+      });
+      return { node: null, diagnostics };
+    }
+    try {
+      // The option object is deterministic for the dist-parity byte gate.
+      // `charset: false` is LOAD-BEARING — it suppresses the `@charset`/BOM
+      // dart-sass would otherwise inject; `sourceMap: false` and the silent
+      // logger keep output reproducible with no embedded comments.
+      cssForPostcss = sass.compileString(content, {
+        style: 'expanded',
+        charset: false,
+        sourceMap: false,
+        logger: sass.Logger.silent,
+      }).css;
+    } catch (err: unknown) {
+      // ROZ086 — dart-sass threw on invalid SCSS. Collected, never propagated
+      // (D-08). dart-sass carries `span.start.offset` — a block-relative,
+      // 0-based UTF-16 offset into the SCSS string — and `sassMessage` (clean
+      // text). Map the offset block-relative -> absolute; fall back to
+      // `contentLoc` when no span is present. Do NOT branch on `err.name`
+      // (it is `'Error'`, not `'Exception'`).
+      const e = err as {
+        message?: string;
+        sassMessage?: string;
+        span?: { start?: { offset?: number } };
+      };
+      const off = e.span?.start?.offset;
+      const loc =
+        off !== undefined
+          ? { start: contentLoc.start + off, end: contentLoc.start + off }
+          : contentLoc;
+      diagnostics.push({
+        code: RozieErrorCode.STYLE_SCSS_COMPILE_ERROR,
+        severity: 'error',
+        message: `SCSS compile error: ${e.sassMessage ?? e.message ?? 'compile failed'}`,
+        loc,
+        ...(filename !== undefined ? { filename } : {}),
+      });
+      return { node: null, diagnostics };
+    }
+  }
+
   let root: Root;
   try {
-    root = postcss.parse(content, filename !== undefined ? { from: filename } : {});
+    root = postcss.parse(cssForPostcss, filename !== undefined ? { from: filename } : {});
   } catch (err: unknown) {
     const e = err as { message?: string };
     diagnostics.push({
@@ -81,14 +185,26 @@ export function parseStyle(
 
   const rules: StyleRule[] = [];
 
-  /** Absolute byte span of any postcss node, with offset fallbacks. */
+  /**
+   * Absolute byte span of any postcss node, with offset fallbacks.
+   *
+   * The `lineColToOffset` fallback indexes into `cssForPostcss` — the string
+   * postcss actually parsed (the compiled CSS for the SCSS path, `content` for
+   * plain CSS). D-07: for SCSS these offsets correspond to compiled-CSS bytes,
+   * NOT the SCSS source — callers that surface user-facing locs for SCSS
+   * blocks clamp to `contentLoc` instead (see `buildPlainRule`'s ROZ081 push).
+   */
   const nodeLoc = (node: ChildNode | Rule | AtRule): SourceLoc => {
     const startOffsetRel =
       node.source?.start?.offset ??
-      lineColToOffset(content, node.source?.start?.line ?? 1, node.source?.start?.column ?? 1);
+      lineColToOffset(
+        cssForPostcss,
+        node.source?.start?.line ?? 1,
+        node.source?.start?.column ?? 1,
+      );
     const endOffsetRel =
       node.source?.end?.offset ??
-      lineColToOffset(content, node.source?.end?.line ?? 1, node.source?.end?.column ?? 1);
+      lineColToOffset(cssForPostcss, node.source?.end?.line ?? 1, node.source?.end?.column ?? 1);
     return {
       start: contentLoc.start + startOffsetRel,
       end: contentLoc.start + endOffsetRel,
@@ -103,11 +219,16 @@ export function parseStyle(
     const hasRoot = parts.includes(':root');
     const isPureRoot = parts.length === 1 && parts[0] === ':root';
     if (hasRoot && !isPureRoot) {
+      // D-07 — for SCSS-sourced blocks, `ruleLoc` indexes into the COMPILED
+      // CSS (nesting flattened, mixins expanded) and has no correspondence to
+      // SCSS source bytes; reporting it would actively mislead. Clamp to the
+      // coarse `<style>`-block content span. The plain-CSS path keeps the
+      // precise per-rule `nodeLoc` unchanged (SPEC-REQ-8).
       diagnostics.push({
         code: RozieErrorCode.STYLE_MIXED_ROOT_SELECTOR,
         severity: 'error',
         message: `Mixed :root selector "${rule.selector}" is not allowed. Split :root rules into their own block.`,
-        loc: ruleLoc,
+        loc: isScss ? contentLoc : ruleLoc,
         ...(filename !== undefined ? { filename } : {}),
         hint: 'Move :root rules into a separate selector block; combining :root with other selectors mixes scoped and unscoped emission.',
       });
@@ -210,7 +331,10 @@ export function parseStyle(
     node: {
       type: 'StyleAST',
       loc: contentLoc,
-      cssText: content,
+      // Phase 10: `cssForPostcss` is the raw body for plain CSS and the
+      // dart-sass-compiled plain CSS for `lang="scss"` — it is the string the
+      // downstream PostCSS scoping pass consumes.
+      cssText: cssForPostcss,
       rules,
       // Phase 9: carry the resolved `lang` onto the StyleAST. Set only when
       // present — conditional-spread keeps the key absent under
