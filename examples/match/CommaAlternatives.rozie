@@ -1,0 +1,38 @@
+<!--
+  match/CommaAlternatives.rozie
+
+  Feature probe (R3) — comma-alternative `r-case` values.
+
+  A single `r-case="'max', 'min'"` carries TWO alternatives separated by a
+  comma. The comma sub-grammar parses to a top-level `SequenceExpression`,
+  which the lowerer folds to a `===`-OR chain
+  (`bound === 'max' || bound === 'min'`) — NEVER `.includes()`. The `===`-OR
+  form is what preserves TypeScript narrowing (see typed/MatchUnion.rozie).
+
+  The discriminant `$data.bound` is a `<data>` member (a MemberExpression) —
+  an `inline`-mode discriminant, so no hoist temp is allocated.
+-->
+
+<rozie name="CommaAlternatives">
+
+<data>
+{
+  bound: 'max',
+}
+</data>
+
+<template>
+<template r-match="$data.bound">
+  <span r-case="'max', 'min'" class="extremum">at an extremum</span>
+  <span r-case="'mid'" class="middle">in the middle</span>
+  <span r-default class="other">somewhere else</span>
+</template>
+</template>
+
+<style>
+.extremum { font-weight: 600; }
+.middle { opacity: 0.8; }
+.other { opacity: 0.5; }
+</style>
+
+</rozie>

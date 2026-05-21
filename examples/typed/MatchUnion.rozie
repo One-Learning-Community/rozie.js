@@ -1,0 +1,50 @@
+<!--
+  typed/MatchUnion.rozie
+
+  Genuinely-new typed example for Phase 11 (`r-match` conditional construct).
+
+  Its job is to prove that `r-match` lowering preserves TypeScript narrowing
+  for the consumer's type-checker:
+    - declares a discriminated union (`Shape`) inside <script lang="ts">
+    - `r-match` discriminates on the `.kind` tag
+    - each `r-case` body accesses branch-SPECIFIC properties (`radius` for
+      circle, `side` for square) — type-safe ONLY if the branch test narrows
+    - one `r-case` carries a COMMA alternative (`'circle', 'ring'`); the
+      comma sub-grammar MUST lower to a `===`-OR chain
+      (`shape.kind === 'circle' || shape.kind === 'ring'`), which TypeScript
+      narrows. A `.includes()` lowering would NOT narrow and would fail tsc.
+
+  This fixture is wired into the four per-target typecheck gates (tsc,
+  vue-tsc, svelte-check, Angular template type-checker) via the
+  TYPED_EXAMPLES array so a narrowing regression is caught automatically.
+-->
+
+<rozie name="MatchUnion">
+
+<script lang="ts">
+// Discriminated union — the `kind` field is the discriminant tag. `circle`
+// and `ring` both carry `radius`; `square` carries `side`. Branch-specific
+// property access below is type-safe only when the `r-case` test narrows.
+type Shape =
+  | { kind: 'circle'; radius: number }
+  | { kind: 'ring'; radius: number }
+  | { kind: 'square'; side: number }
+
+const shape: Shape = $computed<Shape>(() => ({ kind: 'circle', radius: 4 }))
+</script>
+
+<template>
+<template r-match="shape.kind">
+  <span r-case="'circle', 'ring'" class="round">radius {{ shape.radius }}</span>
+  <span r-case="'square'" class="square">side {{ shape.side }}</span>
+  <span r-default class="unknown">unknown shape</span>
+</template>
+</template>
+
+<style>
+.round { border-radius: 999px; }
+.square { border-radius: 0; }
+.unknown { opacity: 0.5; }
+</style>
+
+</rozie>

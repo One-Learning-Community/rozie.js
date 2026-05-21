@@ -1,0 +1,54 @@
+<!--
+  match/ExpensiveDiscriminant.rozie
+
+  Feature probe (R5) — the evaluate-once discriminant hoist.
+
+  Both `r-match` discriminants here are `CallExpression`s
+  (`classify()` / `subClassify()`). A bare identifier or member-expression
+  discriminant is `inline`-mode (substituted into every rung, no temp); a
+  `CallExpression` is `hoist`-mode — it is evaluated EXACTLY ONCE per render
+  into a per-component-unique `__rozieMatch_N` temp, and every rung's `===`
+  test references that temp.
+
+  A SECOND `r-match` (also a `CallExpression` discriminant) is nested inside
+  the outer match's first branch. The per-component hoist counter must
+  allocate two DISTINCT `__rozieMatch_` names — a per-match-local counter
+  would collide here (RESEARCH Pitfall 5).
+-->
+
+<rozie name="ExpensiveDiscriminant">
+
+<data>
+{
+  score: 72,
+}
+</data>
+
+<script>
+const classify = () => ($data.score >= 50 ? 'pass' : 'fail')
+const subClassify = () => ($data.score >= 90 ? 'distinction' : 'merit')
+</script>
+
+<template>
+<template r-match="classify()">
+  <template r-case="'pass'">
+    <div class="passed">
+      <template r-match="subClassify()">
+        <strong r-case="'distinction'">passed with distinction</strong>
+        <span r-case="'merit'">passed with merit</span>
+        <span r-default>passed</span>
+      </template>
+    </div>
+  </template>
+  <span r-case="'fail'" class="failed">did not pass</span>
+  <span r-default class="unknown">ungraded</span>
+</template>
+</template>
+
+<style>
+.passed { color: #15803d; }
+.failed { color: #b91c1c; }
+.unknown { opacity: 0.5; }
+</style>
+
+</rozie>

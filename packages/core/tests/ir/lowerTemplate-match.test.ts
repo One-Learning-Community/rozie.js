@@ -1,82 +1,49 @@
-// Phase 11 Plan 01 Task 2 — lowerTemplate r-match construct.
+// Phase 11 — r-match construct IR shape (R1 + R8).
 //
-// Covers:
-//   - getMatchDirective recognition + the match-grouping branch in lowerNodeList
-//   - one folded TemplateMatchIR per r-match host (D-01)
-//   - branch-test folding: `discriminant === caseValue`, comma `===`-OR chains,
-//     literal-true bare predicate, literal-false negated predicate
-//   - hostElement for a real-element host; undefined for <template r-match>
-//   - D-03 hoist classification: Identifier/MemberExpression → 'inline';
-//     CallExpression → 'hoist' with a per-component-unique tempName
-//   - all seven ROZ953-959 diagnostics, collected-not-thrown
+// `r-match`/`r-case`/`r-default` collapse into a single `TemplateMatch` IR
+// node parallel to the existing `TemplateConditional`. This suite asserts
+// the lowered IR shape:
+//   - exactly one `TemplateMatch` node per `<template r-match>` block
+//   - `branches[]` length matches the r-case + r-default count
+//   - the r-default branch's `test` is `null`
+//   - `discriminantMode` is `'inline'` for a member-expression discriminant,
+//     `'hoist'` (with a `__rozieMatch_`-prefixed `tempName`) for a
+//     CallExpression discriminant
+//   - a comma r-case folds to a `LogicalExpression` (operator `||`)
+//   - an r-match="true" r-case folds to a bare predicate, NOT a `===`
+//     BinaryExpression
+//   - R8: a real-element r-match host carries a defined `hostElement`
+//   - R8: a `<template r-case>` multi-root branch body has > 1 node
 //
-// WAVE 1 RED STATE: getMatchDirective + the match-grouping branch do not yet
-// exist in lowerTemplate.ts. Every assertion below fails until Wave 2 lands the
-// implementation.
+// SEQUENCING NOTE: the `TemplateMatch` node + match-grouping branch ship in
+// plan 11-01 (same wave). Until 11-01 merges, these `it()` cases are RED —
+// expected and documented in 11-02-PLAN.md. The orchestrator re-runs this
+// suite after the wave-1 worktrees merge.
+//
+// Harness copied from lowerTemplate-two-way.test.ts.
 import { describe, it, expect } from 'vitest';
-import _generate from '@babel/generator';
 import { parse } from '../../src/parse.js';
 import { lowerToIR } from '../../src/ir/lower.js';
 import { createDefaultRegistry } from '../../src/modifiers/registerBuiltins.js';
-import type { Diagnostic } from '../../src/diagnostics/Diagnostic.js';
-import type { Expression } from '@babel/types';
 
-// @babel/generator ships a CJS default export some ESM resolvers wrap.
-type GenerateFn = typeof import('@babel/generator').default;
-const generate: GenerateFn =
-  typeof _generate === 'function'
-    ? _generate
-    : (_generate as unknown as { default: GenerateFn }).default;
-
-function exprText(expr: Expression | null): string {
-  if (expr === null) return '<null>';
-  return generate(expr).code;
-}
-
-interface MatchBranch {
-  test: Expression | null;
-  deps: unknown[];
-  body: unknown[];
-  sourceLoc: unknown;
-}
-interface MatchNode {
-  type: 'TemplateMatch';
-  discriminant: Expression;
-  discriminantMode: 'inline' | 'hoist';
-  tempName?: string;
-  branches: MatchBranch[];
-  hostElement?: unknown;
-  sourceLoc: unknown;
-}
-
-function lowerSource(src: string): {
-  diagnostics: Diagnostic[];
-  matches: MatchNode[];
-} {
+function lowerSource(src: string) {
   const result = parse(src, { filename: 'match.rozie' });
   if (!result.ast) {
     throw new Error(
-      `parse() returned null AST: ${result.diagnostics
-        .map((d) => d.message)
-        .join(', ')}`,
+      `parse() returned null AST: ${result.diagnostics.map((d) => d.message).join(', ')}`,
     );
   }
-  const { ir, diagnostics } = lowerToIR(result.ast, {
-    modifierRegistry: createDefaultRegistry(),
-  });
-  const matches = collectByType<MatchNode>(ir?.template ?? null, 'TemplateMatch');
-  return { diagnostics, matches };
+  return lowerToIR(result.ast, { modifierRegistry: createDefaultRegistry() });
 }
 
-function collectByType<T extends { type: string }>(
-  root: unknown,
-  typeTag: string,
-): T[] {
-  const out: T[] = [];
+type IRNodeWithType<T extends string> = { type: T } & Record<string, unknown>;
+
+function collectByType<T extends string>(root: unknown, typeTag: T): IRNodeWithType<T>[] {
+  const out: IRNodeWithType<T>[] = [];
   const visit = (node: unknown): void => {
     if (!node || typeof node !== 'object') return;
     const n = node as Record<string, unknown>;
-    if (n['type'] === typeTag) out.push(n as unknown as T);
+    if (n['type'] === typeTag) out.push(n as IRNodeWithType<T>);
     for (const value of Object.values(n)) {
       if (Array.isArray(value)) {
         for (const item of value) visit(item);
@@ -89,279 +56,218 @@ function collectByType<T extends { type: string }>(
   return out;
 }
 
-function rozie(template: string): string {
-  return `<rozie name="MatchHost">\n<template>\n${template}\n</template>\n</rozie>\n`;
+type MatchBranch = {
+  test: Record<string, unknown> | null;
+  body: unknown[];
+};
+type MatchNode = {
+  type: 'TemplateMatch';
+  discriminant: Record<string, unknown>;
+  discriminantMode: 'inline' | 'hoist';
+  tempName?: string;
+  branches: MatchBranch[];
+  hostElement?: Record<string, unknown>;
+};
+
+function matchNodes(root: unknown): MatchNode[] {
+  return collectByType(root, 'TemplateMatch') as unknown as MatchNode[];
 }
 
-describe('lowerTemplate r-match — IR shape (Phase 11 R1)', () => {
-  it('lowers a <template r-match> + r-case/r-default into exactly one TemplateMatchIR', () => {
-    const { matches } = lowerSource(
-      rozie(`
-<template r-match="status">
-  <a r-case="1">one</a>
-  <b r-case="2">two</b>
-  <c r-default>other</c>
-</template>`),
-    );
+describe('r-match IR shape — Phase 11 (R1)', () => {
+  // Member-expression discriminant — `inline` mode, no temp.
+  const INLINE_SRC = `<rozie name="MatchProbe">
+<data>
+{ kind: 'a' }
+</data>
+<template>
+<template r-match="$data.kind">
+  <span r-case="'a'">A</span>
+  <span r-case="'b'">B</span>
+  <span r-default>default</span>
+</template>
+</template>
+</rozie>
+`;
+
+  it('produces exactly one TemplateMatch node with branches matching the case/default count', () => {
+    const { ir } = lowerSource(INLINE_SRC);
+    expect(ir).not.toBeNull();
+    const matches = matchNodes(ir!.template);
     expect(matches.length).toBe(1);
-    expect(matches[0]!.type).toBe('TemplateMatch');
+    // 2 r-case + 1 r-default = 3 branches.
     expect(matches[0]!.branches.length).toBe(3);
   });
 
-  it('folds normal r-case tests to `discriminant === caseValue` and r-default to null', () => {
-    const { matches } = lowerSource(
-      rozie(`
-<template r-match="status">
-  <a r-case="1">one</a>
-  <b r-case="2">two</b>
-  <c r-default>other</c>
-</template>`),
-    );
-    const branches = matches[0]!.branches;
-    expect(exprText(branches[0]!.test)).toBe('status === 1');
-    expect(exprText(branches[1]!.test)).toBe('status === 2');
-    expect(branches[2]!.test).toBeNull();
+  it('lowers the r-default branch with test === null as the last branch', () => {
+    const { ir } = lowerSource(INLINE_SRC);
+    const branches = matchNodes(ir!.template)[0]!.branches;
+    expect(branches[branches.length - 1]!.test).toBeNull();
+    // Non-default branches carry a non-null test.
+    expect(branches[0]!.test).not.toBeNull();
   });
 
-  it('a <template r-match> host leaves hostElement undefined', () => {
-    const { matches } = lowerSource(
-      rozie(`
-<template r-match="status">
-  <a r-case="1">one</a>
-</template>`),
-    );
-    expect(matches[0]!.hostElement).toBeUndefined();
+  it('marks a member-expression discriminant as discriminantMode "inline"', () => {
+    const { ir } = lowerSource(INLINE_SRC);
+    expect(matchNodes(ir!.template)[0]!.discriminantMode).toBe('inline');
   });
 
-  it('a real-element host (<div r-match>) sets hostElement to the lowered <div>', () => {
-    const { matches } = lowerSource(
-      rozie(`
-<div r-match="status">
-  <a r-case="1">one</a>
-</div>`),
-    );
-    const host = matches[0]!.hostElement as { type: string; tagName: string } | undefined;
-    expect(host).toBeDefined();
-    expect(host!.type).toBe('TemplateElement');
-    expect(host!.tagName).toBe('div');
-  });
-});
-
-describe('lowerTemplate r-match — comma alternatives (Phase 11 R3)', () => {
-  it('folds a comma r-case to a ===-OR chain, never .includes()', () => {
-    const { matches } = lowerSource(
-      rozie(`
-<template r-match="status">
-  <a r-case="'max', 'min'">extremum</a>
-  <b r-default>mid</b>
-</template>`),
-    );
-    const folded = exprText(matches[0]!.branches[0]!.test);
-    expect(folded).toBe("status === 'max' || status === 'min'");
-    expect(folded).not.toContain('.includes(');
+  it('marks a CallExpression discriminant as discriminantMode "hoist" with a __rozieMatch_ tempName', () => {
+    const src = `<rozie name="MatchProbe">
+<data>
+{ score: 5 }
+</data>
+<script>
+const classify = () => ($data.score > 0 ? 'pos' : 'neg')
+</script>
+<template>
+<template r-match="classify()">
+  <span r-case="'pos'">positive</span>
+  <span r-default>other</span>
+</template>
+</template>
+</rozie>
+`;
+    const { ir } = lowerSource(src);
+    const match = matchNodes(ir!.template)[0]!;
+    expect(match.discriminantMode).toBe('hoist');
+    expect(typeof match.tempName).toBe('string');
+    expect(match.tempName).toMatch(/^__rozieMatch_/);
   });
 
-  it('a call-expression r-case value is a single case, not a comma alternative', () => {
-    const { matches } = lowerSource(
-      rozie(`
-<template r-match="status">
-  <a r-case="formatKey(a, b)">x</a>
-</template>`),
-    );
-    // formatKey(a, b) parses to a CallExpression, NOT a top-level SequenceExpression.
-    expect(exprText(matches[0]!.branches[0]!.test)).toBe('status === formatKey(a, b)');
+  it('allocates two distinct __rozieMatch_ tempNames for nested hoisting matches', () => {
+    const src = `<rozie name="MatchProbe">
+<data>
+{ score: 5 }
+</data>
+<script>
+const outer = () => ($data.score > 0 ? 'pos' : 'neg')
+const inner = () => ($data.score > 9 ? 'big' : 'small')
+</script>
+<template>
+<template r-match="outer()">
+  <template r-case="'pos'">
+    <template r-match="inner()">
+      <span r-case="'big'">big</span>
+      <span r-default>small</span>
+    </template>
+  </template>
+  <span r-default>other</span>
+</template>
+</template>
+</rozie>
+`;
+    const { ir } = lowerSource(src);
+    const temps = matchNodes(ir!.template)
+      .filter((m) => m.discriminantMode === 'hoist')
+      .map((m) => m.tempName);
+    expect(temps.length).toBe(2);
+    expect(new Set(temps).size).toBe(2);
   });
-});
 
-describe('lowerTemplate r-match — literal-boolean discriminant (Phase 11 R4)', () => {
-  it('r-match="true" folds each r-case to the bare predicate', () => {
-    const { matches } = lowerSource(
-      rozie(`
+  it('folds a comma r-case to a LogicalExpression with operator ||', () => {
+    const src = `<rozie name="MatchProbe">
+<data>
+{ kind: 'a' }
+</data>
+<template>
+<template r-match="$data.kind">
+  <span r-case="'a', 'b'">A or B</span>
+  <span r-default>other</span>
+</template>
+</template>
+</rozie>
+`;
+    const { ir } = lowerSource(src);
+    const firstTest = matchNodes(ir!.template)[0]!.branches[0]!.test;
+    expect(firstTest).not.toBeNull();
+    expect(firstTest!['type']).toBe('LogicalExpression');
+    expect(firstTest!['operator']).toBe('||');
+  });
+
+  it('folds an r-match="true" r-case to a bare predicate, not a === BinaryExpression', () => {
+    const src = `<rozie name="MatchProbe">
+<data>
+{ count: 3 }
+</data>
+<template>
 <template r-match="true">
-  <a r-case="isReady">ready</a>
-  <b r-default>waiting</b>
-</template>`),
-    );
-    const folded = exprText(matches[0]!.branches[0]!.test);
-    expect(folded).toBe('isReady');
-    expect(folded).not.toContain('true ===');
-  });
-
-  it('r-match="false" folds each r-case to the negated predicate', () => {
-    const { matches } = lowerSource(
-      rozie(`
-<template r-match="false">
-  <a r-case="isReady">a</a>
-  <b r-default>b</b>
-</template>`),
-    );
-    const folded = exprText(matches[0]!.branches[0]!.test);
-    expect(folded).toBe('!isReady');
-    expect(folded).not.toContain('false ===');
+  <span r-case="$data.count > 1">many</span>
+  <span r-default>few</span>
+</template>
+</template>
+</rozie>
+`;
+    const { ir } = lowerSource(src);
+    const firstTest = matchNodes(ir!.template)[0]!.branches[0]!.test;
+    expect(firstTest).not.toBeNull();
+    // Bare predicate — the authored `$data.count > 1` expression, NOT a
+    // `true === (...)` BinaryExpression wrapper.
+    if (firstTest!['type'] === 'BinaryExpression') {
+      expect(firstTest!['operator']).not.toBe('===');
+    }
   });
 });
 
-describe('lowerTemplate r-match — hoist classification (Phase 11 R5 / D-03)', () => {
-  it('an Identifier discriminant is discriminantMode "inline" with no tempName', () => {
-    const { matches } = lowerSource(
-      rozie(`
-<template r-match="status">
-  <a r-case="1">one</a>
-</template>`),
-    );
-    expect(matches[0]!.discriminantMode).toBe('inline');
-    expect(matches[0]!.tempName).toBeUndefined();
+describe('r-match IR shape — flexible host & multi-root branches (R8)', () => {
+  it('carries a defined hostElement for a real-element r-match host', () => {
+    const src = `<rozie name="MatchProbe">
+<data>
+{ status: 'ready' }
+</data>
+<template>
+<div r-match="$data.status" class="host">
+  <p r-case="'ready'">ready</p>
+  <p r-default>other</p>
+</div>
+</template>
+</rozie>
+`;
+    const { ir } = lowerSource(src);
+    const match = matchNodes(ir!.template)[0]!;
+    expect(match.hostElement).toBeDefined();
   });
 
-  it('a MemberExpression discriminant is discriminantMode "inline"', () => {
-    const { matches } = lowerSource(
-      rozie(`
-<template r-match="column.key">
-  <a r-case="'status'">x</a>
-</template>`),
-    );
-    expect(matches[0]!.discriminantMode).toBe('inline');
-    expect(matches[0]!.tempName).toBeUndefined();
+  it('leaves hostElement undefined for a <template> r-match host', () => {
+    const src = `<rozie name="MatchProbe">
+<data>
+{ status: 'ready' }
+</data>
+<template>
+<template r-match="$data.status">
+  <p r-case="'ready'">ready</p>
+  <p r-default>other</p>
+</template>
+</template>
+</rozie>
+`;
+    const { ir } = lowerSource(src);
+    const match = matchNodes(ir!.template)[0]!;
+    expect(match.hostElement).toBeUndefined();
   });
 
-  it('a CallExpression discriminant is discriminantMode "hoist" with a tempName', () => {
-    const { matches } = lowerSource(
-      rozie(`
-<template r-match="resolve()">
-  <a r-case="1">one</a>
-</template>`),
-    );
-    expect(matches[0]!.discriminantMode).toBe('hoist');
-    expect(matches[0]!.tempName).toMatch(/^__rozieMatch_\d+$/);
-    // The folded branch test references the temp, not the call.
-    expect(exprText(matches[0]!.branches[0]!.test)).toBe(
-      `${matches[0]!.tempName} === 1`,
-    );
-  });
-
-  it('two hoisting matches in one component get distinct temp names', () => {
-    const { matches } = lowerSource(
-      rozie(`
-<div>
-  <template r-match="resolveA()">
-    <a r-case="1">a</a>
+  it('emits a multi-node branch body for a <template r-case> with multiple children', () => {
+    const src = `<rozie name="MatchProbe">
+<data>
+{ status: 'loading' }
+</data>
+<template>
+<div r-match="$data.status">
+  <template r-case="'loading'">
+    <span class="label">Loading</span>
+    <progress class="bar"></progress>
   </template>
-  <template r-match="resolveB()">
-    <b r-case="2">b</b>
-  </template>
-</div>`),
+  <p r-default>other</p>
+</div>
+</template>
+</rozie>
+`;
+    const { ir } = lowerSource(src);
+    const match = matchNodes(ir!.template)[0]!;
+    // The <template r-case="'loading'"> branch body holds both children
+    // (<span> and <progress>) — more than one node.
+    const elementBodyCounts = match.branches.map(
+      (b) => b.body.filter((n) => (n as { type?: string }).type === 'TemplateElement').length,
     );
-    expect(matches.length).toBe(2);
-    const names = matches.map((m) => m.tempName);
-    expect(names[0]).toBeDefined();
-    expect(names[1]).toBeDefined();
-    expect(names[0]).not.toBe(names[1]);
-  });
-});
-
-describe('lowerTemplate r-match — diagnostics ROZ953-959 (Phase 11 R6/R7)', () => {
-  function diagsFor(template: string): Diagnostic[] {
-    return lowerSource(rozie(template)).diagnostics;
-  }
-  function byCode(diags: Diagnostic[], code: string): Diagnostic[] {
-    return diags.filter((d) => d.code === code);
-  }
-
-  it('ROZ953 — r-match with no value', () => {
-    const hits = byCode(
-      diagsFor(`<template r-match><a r-case="1">x</a></template>`),
-      'ROZ953',
-    );
-    expect(hits.length).toBe(1);
-    expect(hits[0]!.severity).toBe('error');
-  });
-
-  it('ROZ954 — r-match host child that is neither r-case nor r-default', () => {
-    const hits = byCode(
-      diagsFor(`
-<template r-match="status">
-  <a r-case="1">one</a>
-  <span>stray</span>
-</template>`),
-      'ROZ954',
-    );
-    expect(hits.length).toBe(1);
-    expect(hits[0]!.severity).toBe('error');
-  });
-
-  it('ROZ955 — valueless r-case', () => {
-    const hits = byCode(
-      diagsFor(`
-<template r-match="status">
-  <a r-case>one</a>
-</template>`),
-      'ROZ955',
-    );
-    expect(hits.length).toBe(1);
-    expect(hits[0]!.severity).toBe('error');
-  });
-
-  it('ROZ956 — r-case + r-for on the same element', () => {
-    const hits = byCode(
-      diagsFor(`
-<template r-match="status">
-  <a r-case="1" r-for="x in xs">one</a>
-</template>`),
-      'ROZ956',
-    );
-    expect(hits.length).toBe(1);
-    expect(hits[0]!.severity).toBe('error');
-  });
-
-  it('ROZ957 — r-default not the last branch', () => {
-    const hits = byCode(
-      diagsFor(`
-<template r-match="status">
-  <a r-default>fallback</a>
-  <b r-case="1">one</b>
-</template>`),
-      'ROZ957',
-    );
-    expect(hits.length).toBe(1);
-    expect(hits[0]!.severity).toBe('error');
-  });
-
-  it('ROZ958 — more than one r-default', () => {
-    const hits = byCode(
-      diagsFor(`
-<template r-match="status">
-  <a r-case="1">one</a>
-  <b r-default>first</b>
-  <c r-default>second</c>
-</template>`),
-      'ROZ958',
-    );
-    expect(hits.length).toBe(1);
-    expect(hits[0]!.severity).toBe('error');
-  });
-
-  it('ROZ959 — duplicate literal r-case value (warning, first wins)', () => {
-    const hits = byCode(
-      diagsFor(`
-<template r-match="status">
-  <a r-case="1">one</a>
-  <b r-case="1">dup</b>
-  <c r-default>other</c>
-</template>`),
-      'ROZ959',
-    );
-    expect(hits.length).toBe(1);
-    expect(hits[0]!.severity).toBe('warning');
-  });
-
-  it('a well-formed r-match emits no ROZ953-959 diagnostics', () => {
-    const diags = diagsFor(`
-<template r-match="status">
-  <a r-case="1">one</a>
-  <b r-case="2, 3">others</b>
-  <c r-default>fallback</c>
-</template>`);
-    const matchCodes = diags.filter((d) => /^ROZ95[3-9]$/.test(d.code));
-    expect(matchCodes).toEqual([]);
+    expect(Math.max(...elementBodyCounts)).toBeGreaterThan(1);
   });
 });

@@ -1,0 +1,48 @@
+<!--
+  match/RealElementHost.rozie
+
+  Feature probe (R8) — flexible host + multi-root branches.
+
+  This fixture exercises BOTH R8 sub-requirements in one file:
+
+    1. `r-match` on a REAL element, not `<template>`. The host `<div r-match>`
+       is kept as a rendered wrapper element (a `<template r-match>` host is
+       non-rendering — see the other probes). The IR carries the host as
+       `hostElement`.
+
+    2. A `<template r-case>` multi-root branch. The `'loading'` branch is
+       authored on `<template>` so its body emits MULTIPLE child elements
+       (a `<span>` and a `<progress>`) with no wrapper. The remaining rungs
+       are normal single-element real-element branches.
+
+  The `r-match` discriminant `$data.status` is an `inline`-mode member
+  expression — no hoist temp.
+-->
+
+<rozie name="RealElementHost">
+
+<data>
+{
+  status: 'loading',
+}
+</data>
+
+<template>
+<div r-match="$data.status" class="status-host">
+  <template r-case="'loading'">
+    <span class="status-label">Loading</span>
+    <progress class="status-bar"></progress>
+  </template>
+  <p r-case="'ready'" class="status-ready">Ready to go</p>
+  <p r-default class="status-error">Something went wrong</p>
+</div>
+</template>
+
+<style>
+.status-host { display: block; }
+.status-label { font-weight: 600; }
+.status-ready { color: #15803d; }
+.status-error { color: #b91c1c; }
+</style>
+
+</rozie>

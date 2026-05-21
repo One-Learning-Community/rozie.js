@@ -1,0 +1,37 @@
+<!--
+  match/PredicateChain.rozie
+
+  Feature probe (R4) — the literal-`true` predicate-chain form.
+
+  When the `r-match` discriminant is the boolean literal `true`, each
+  `r-case="X"` switches to BARE-PREDICATE mode: the rung lowers to the
+  predicate `X` directly, NOT to `true === X`. This turns `r-match` into a
+  switch-flavored if/else-if ladder where each rung is its own condition.
+
+  The probe asserts no `true ===` / `false ===` text appears in any emitted
+  match code across the six targets.
+-->
+
+<rozie name="PredicateChain">
+
+<data>
+{
+  count: 5,
+}
+</data>
+
+<template>
+<template r-match="true">
+  <strong r-case="$data.count > 10" class="high">plenty</strong>
+  <span r-case="$data.count > 0" class="some">a few</span>
+  <span r-default class="none">none</span>
+</template>
+</template>
+
+<style>
+.high { font-weight: 700; }
+.some { opacity: 0.85; }
+.none { opacity: 0.5; }
+</style>
+
+</rozie>
