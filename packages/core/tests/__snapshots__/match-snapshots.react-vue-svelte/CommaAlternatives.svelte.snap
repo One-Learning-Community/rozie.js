@@ -1,0 +1,13 @@
+<script lang="ts">
+let bound = $state('max');
+</script>
+
+
+{#if bound === 'max' || bound === 'min'}<span class="extremum">at an extremum</span>{:else if bound === 'mid'}<span class="middle">in the middle</span>{:else}<span class="other">somewhere else</span>{/if}
+
+
+<style>
+.extremum { font-weight: 600; }
+.middle { opacity: 0.8; }
+.other { opacity: 0.5; }
+</style>

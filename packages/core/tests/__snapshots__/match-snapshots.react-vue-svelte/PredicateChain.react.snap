@@ -1,0 +1,14 @@
+import { useState } from 'react';
+import styles from './PredicateChain.module.css';
+
+interface PredicateChainProps {}
+
+export default function PredicateChain(props: PredicateChainProps): JSX.Element {
+  const [count, setCount] = useState(5);
+
+  return (
+    <>
+    {(count > 10) ? <strong className={styles.high} data-rozie-s-e116a46e="">plenty</strong> : (count > 0) ? <span className={styles.some} data-rozie-s-e116a46e="">a few</span> : <span className={styles.none} data-rozie-s-e116a46e="">none</span>}
+    </>
+  );
+}

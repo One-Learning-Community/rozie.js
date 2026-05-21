@@ -1,0 +1,17 @@
+<template>
+
+<span v-if="bound === 'max' || bound === 'min'" class="extremum">at an extremum</span><span v-else-if="bound === 'mid'" class="middle">in the middle</span><span v-else class="other">somewhere else</span>
+
+</template>
+
+<script setup lang="ts">
+import { ref } from 'vue';
+
+const bound = ref('max');
+</script>
+
+<style scoped>
+.extremum { font-weight: 600; }
+.middle { opacity: 0.8; }
+.other { opacity: 0.5; }
+</style>

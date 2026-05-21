@@ -30,6 +30,8 @@ import type {
   IRComponent,
   TemplateNode,
   TemplateElementIR,
+  TemplateConditionalIR,
+  TemplateMatchIR,
   TemplateLoopIR,
   TemplateInterpolationIR,
   TemplateStaticTextIR,
@@ -402,6 +404,50 @@ function emitElementEvents(node: TemplateElementIR, ctx: EmitNodeCtx): string {
 }
 
 /**
+ * Emit a TemplateMatch (Phase 11 `r-match` / `r-case` / `r-default`).
+ *
+ * D-02 — pure delegation: the `r-match` construct lowers to a node whose
+ * `branches[]` is byte-identical to `TemplateConditionalIR.branches[]`, with
+ * the discriminant already folded into each `r-case` test by core (plan 11-01).
+ * We construct a synthetic `TemplateConditionalIR` and hand it straight to the
+ * existing `emitConditional` — no bespoke match emit logic (RESEARCH Open
+ * Question 2 recommendation (a)).
+ *
+ * `discriminantMode === 'hoist'`: handled the same way here — the hoist-temp
+ * declaration is plan 11-05's job. The folded tests reference an undeclared
+ * `tempName` identifier until then; that interim red state is expected.
+ *
+ * `hostElement` (real-element `<div r-match>` host): the wrapper element must
+ * survive emission. We render the host's tag/attributes via `emitElement` with
+ * the conditional ladder spliced in as a single verbatim child — `emitStaticText`
+ * passes its `text` through unchanged, so the `{...}` JSX expression produced by
+ * `emitConditional` lands intact inside the wrapper.
+ */
+function delegateMatchToConditional(node: TemplateMatchIR, ctx: EmitNodeCtx): string {
+  const synthetic: TemplateConditionalIR = {
+    type: 'TemplateConditional',
+    branches: node.branches,
+    sourceLoc: node.sourceLoc,
+  };
+  const ladder = emitConditional(synthetic, ctx, emitNode);
+  if (node.hostElement === undefined) {
+    return ladder;
+  }
+  // TODO(11-05): hoist placement — a `hoist`-mode discriminant declares its
+  // temp above this wrapper; for now the wrapper is emitted unconditionally.
+  const verbatim: TemplateStaticTextIR = {
+    type: 'TemplateStaticText',
+    text: ladder,
+    sourceLoc: node.hostElement.sourceLoc,
+  };
+  const hostWithLadder: TemplateElementIR = {
+    ...node.hostElement,
+    children: [verbatim],
+  };
+  return emitElement(hostWithLadder, ctx);
+}
+
+/**
  * Top-level dispatch.
  */
 export function emitNode(node: TemplateNode, ctx: EmitNodeCtx): string {
@@ -414,6 +460,8 @@ export function emitNode(node: TemplateNode, ctx: EmitNodeCtx): string {
       return emitFragment(node, ctx);
     case 'TemplateConditional':
       return emitConditional(node, ctx, emitNode);
+    case 'TemplateMatch':
+      return delegateMatchToConditional(node, ctx);
     case 'TemplateLoop':
       return emitLoop(node, ctx);
     case 'TemplateSlotInvocation':
