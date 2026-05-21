@@ -27,6 +27,8 @@
 import type {
   TemplateNode,
   TemplateElementIR,
+  TemplateConditionalIR,
+  TemplateMatchIR,
   TemplateLoopIR,
   TemplateInterpolationIR,
   TemplateStaticTextIR,
@@ -469,6 +471,44 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
 }
 
 /**
+ * D-02 — the `r-match` (`TemplateMatch`) delegate.
+ *
+ * `node.branches` is byte-identical to `TemplateConditionalIR.branches` (the
+ * `r-case`/`r-default` tests are pre-folded by core, plan 11-01), so emitting a
+ * match is pure delegation: construct a synthetic `TemplateConditional` and
+ * hand it to the existing `emitConditional`. No bespoke `emitMatch` logic, no
+ * touch to `emitConditional`'s signature.
+ *
+ * When `node.hostElement` is present (a real-element host, `<div r-match>`),
+ * the conditional ladder is rendered as the single child of a synthetic copy
+ * of that host element — so the host tag + its attributes survive to emitted
+ * output (R8), mirroring how a real-element `r-if` host keeps its tag.
+ *
+ * The `discriminantMode === 'hoist'` path (an expensive `CallExpression`
+ * discriminant) is delegated as-if-inline here; the hoist-temp declaration is
+ * owned by plan 11-05 for the Solid target.
+ */
+function emitMatchNode(node: TemplateMatchIR, ctx: EmitNodeCtx): string {
+  const synthetic: TemplateConditionalIR = {
+    type: 'TemplateConditional',
+    branches: node.branches,
+    sourceLoc: node.sourceLoc,
+  };
+  if (node.discriminantMode === 'hoist') {
+    // TODO(11-05): hoist placement — declare the discriminant temp once
+    // before the <Show> ladder so an expensive discriminant evaluates once.
+  }
+  if (node.hostElement !== undefined) {
+    const wrapper: TemplateElementIR = {
+      ...node.hostElement,
+      children: [synthetic],
+    };
+    return emitElement(wrapper, ctx);
+  }
+  return emitConditional(synthetic, ctx, emitNode);
+}
+
+/**
  * Top-level dispatch.
  */
 export function emitNode(node: TemplateNode, ctx: EmitNodeCtx): string {
@@ -481,6 +521,8 @@ export function emitNode(node: TemplateNode, ctx: EmitNodeCtx): string {
       return emitFragment(node, ctx);
     case 'TemplateConditional':
       return emitConditional(node, ctx, emitNode);
+    case 'TemplateMatch':
+      return emitMatchNode(node, ctx);
     case 'TemplateLoop':
       return emitLoop(node, ctx);
     case 'TemplateSlotInvocation':
