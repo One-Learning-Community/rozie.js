@@ -1,0 +1,27 @@
+import { Component, ViewEncapsulation, signal } from '@angular/core';
+
+@Component({
+  selector: 'rozie-predicate-chain',
+  standalone: true,
+  template: `
+
+    @if (count() > 10) {
+    <strong class="high">plenty</strong>
+    } @else if (count() > 0) {
+    <span class="some">a few</span>
+    } @else {
+    <span class="none">none</span>
+    }
+
+  `,
+  styles: [`
+    .high { font-weight: 700; }
+    .some { opacity: 0.85; }
+    .none { opacity: 0.5; }
+  `],
+})
+export class PredicateChain {
+  count = signal(5);
+}
+
+export default PredicateChain;

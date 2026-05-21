@@ -1,0 +1,21 @@
+import type { JSX } from 'solid-js';
+import { Show, createSignal, splitProps } from 'solid-js';
+
+interface PredicateChainProps {}
+
+export default function PredicateChain(_props: PredicateChainProps): JSX.Element {
+  const [local, rest] = splitProps(_props, []);
+
+  const [count, setCount] = createSignal(5);
+
+  return (
+    <>
+    <style>{`.high[data-rozie-s-e116a46e] { font-weight: 700; }
+    .some[data-rozie-s-e116a46e] { opacity: 0.85; }
+    .none[data-rozie-s-e116a46e] { opacity: 0.5; }`}</style>
+    <>
+    {<Show when={count() > 10} fallback={<Show when={count() > 0} fallback={<span class={"none"} data-rozie-s-e116a46e="">none</span>}><span class={"some"} data-rozie-s-e116a46e="">a few</span></Show>}><strong class={"high"} data-rozie-s-e116a46e="">plenty</strong></Show>}
+    </>
+    </>
+  );
+}

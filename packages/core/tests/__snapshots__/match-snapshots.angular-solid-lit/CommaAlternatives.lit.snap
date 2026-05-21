@@ -1,0 +1,28 @@
+import { LitElement, css, html } from 'lit';
+import { customElement } from 'lit/decorators.js';
+import { SignalWatcher, signal } from '@lit-labs/preact-signals';
+
+@customElement('rozie-comma-alternatives')
+export default class CommaAlternatives extends SignalWatcher(LitElement) {
+  static styles = css`
+.extremum[data-rozie-s-65af5512] { font-weight: 600; }
+.middle[data-rozie-s-65af5512] { opacity: 0.8; }
+.other[data-rozie-s-65af5512] { opacity: 0.5; }
+`;
+
+  private _bound = signal('max');
+
+  private _disconnectCleanups: Array<() => void> = [];
+
+  disconnectedCallback(): void {
+    super.disconnectedCallback();
+    for (const fn of this._disconnectCleanups) fn();
+    this._disconnectCleanups = [];
+  }
+
+  render() {
+    return html`
+${this._bound.value === 'max' || this._bound.value === 'min' ? html`<span class="extremum" data-rozie-s-65af5512>at an extremum</span>` : this._bound.value === 'mid' ? html`<span class="middle" data-rozie-s-65af5512>in the middle</span>` : html`<span class="other" data-rozie-s-65af5512>somewhere else</span>`}
+`;
+  }
+}

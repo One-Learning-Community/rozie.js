@@ -1,0 +1,27 @@
+import { Component, ViewEncapsulation, signal } from '@angular/core';
+
+@Component({
+  selector: 'rozie-comma-alternatives',
+  standalone: true,
+  template: `
+
+    @if (bound() === 'max' || bound() === 'min') {
+    <span class="extremum">at an extremum</span>
+    } @else if (bound() === 'mid') {
+    <span class="middle">in the middle</span>
+    } @else {
+    <span class="other">somewhere else</span>
+    }
+
+  `,
+  styles: [`
+    .extremum { font-weight: 600; }
+    .middle { opacity: 0.8; }
+    .other { opacity: 0.5; }
+  `],
+})
+export class CommaAlternatives {
+  bound = signal('max');
+}
+
+export default CommaAlternatives;
