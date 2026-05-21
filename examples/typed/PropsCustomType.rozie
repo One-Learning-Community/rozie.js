@@ -1,0 +1,77 @@
+<!--
+  typed/PropsCustomType.rozie
+
+  Genuinely-new typed example for quick task 260521-mj9
+  (Lit emitter dropping custom/named `<props>` types).
+
+  Its job is to prove that a `<props>` prop whose `type:` token is a bare
+  identifier — a type alias / interface declared in this component's
+  `<script lang="ts">` block — survives lowering and emit on all six
+  targets, with the named type landing in PROP-TYPE POSITION:
+
+    - `kind: { type: Kind, default: 'primary' }` — a prop typed by a
+      string-literal union alias, WITH a `default:`. Exercises the
+      `name: Kind = 'primary'` field-with-initializer emit branch.
+    - `item: { type: Item }` — a prop typed by a custom interface, with NO
+      `default:`. A `<props>` entry with no `default:` is a "required" prop
+      (the IR has no `required:` key — absence of `default:` IS the signal).
+      Exercises the definite-assignment `name!: Item;` emit branch on the
+      class-based targets (Lit / Angular). WITHOUT the Lit fix this field
+      degraded to `item: unknown = undefined;` — `unknown` defeats the
+      `.label` member access in the template, AND `undefined` is not
+      assignable to `Item`.
+
+  The template does a TYPE-DISCRIMINATING member access on the
+  interface-typed prop — `{{ $props.item.label }}` — which only typechecks
+  if `Item` flowed through to prop-type position; a degradation to `unknown`
+  would NOT have a `.label` member and the tsc / svelte-check / vue-tsc /
+  Angular template type-checker gate would fail. The union-typed `kind`
+  prop is referenced in a `:class` binding so it is genuinely consumed.
+
+  Builtin-typed props (`type: Number` etc.) are deliberately NOT exercised
+  here — Counter / TypedCard already cover that the builtin branch keeps
+  `count: number = 0`. This fixture isolates the custom-identifier path.
+
+  This fixture is wired into all six per-target typecheck/lint gates
+  (tsc, vue-tsc, svelte-check, Angular template type-checker, eslint-plugin-
+  solid, eslint-plugin-lit) via the TYPED_EXAMPLES array, so a future
+  custom-type-passthrough regression fails CI automatically.
+-->
+
+<rozie name="PropsCustomType">
+
+<script lang="ts">
+// String-literal union type alias — the discriminant set for the `kind`
+// prop. A statement-position `type` is hoisted to module scope on the
+// class-based targets (Angular / Lit) — the same hoist DataCast relies on.
+type Kind = 'primary' | 'ghost' | 'danger'
+
+// Custom interface — the shape of the `item` prop. Also statement-position,
+// so it is module-hoisted on Angular / Lit too.
+interface Item {
+  id: number
+  label: string
+}
+</script>
+
+<props>
+{
+  kind: { type: Kind, default: 'primary' },
+  item: { type: Item },
+}
+</props>
+
+<template>
+<div class="props-custom-type">
+  <span class="kind" :class="$props.kind">variant: {{ $props.kind }}</span>
+  <span class="item">item #{{ $props.item.id }}: {{ $props.item.label }}</span>
+</div>
+</template>
+
+<style>
+.props-custom-type { font-family: sans-serif; }
+.kind { font-weight: 600; }
+.item { color: #444; }
+</style>
+
+</rozie>
