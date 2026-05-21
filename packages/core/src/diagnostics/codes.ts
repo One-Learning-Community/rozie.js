@@ -30,6 +30,11 @@ export const RozieErrorCode = {
   // ---- Script parse (Plan 03) — ROZ030..ROZ049 ----
   SCRIPT_PARSE_ERROR: 'ROZ030',
   SCRIPT_UNRECOVERABLE: 'ROZ031',
+  // Phase 9 (WR-03): `<script lang="...">` carries an unrecognized value
+  // (e.g. `tsx`). Only `ts`/`typescript` enable the TypeScript parser plugin;
+  // any other non-empty `lang` would otherwise parse as plain JS and surface
+  // confusing syntax errors with no hint at the real cause.
+  SCRIPT_UNRECOGNIZED_LANG: 'ROZ032',
 
   // ---- Template parse (Plan 03) — ROZ050..ROZ069 ----
   TEMPLATE_UNCLOSED_ELEMENT: 'ROZ050',

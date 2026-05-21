@@ -246,5 +246,55 @@ describe('parseScript (PARSE-03)', () => {
         withTs.node!.program.program.body.length,
       );
     });
+
+    // Phase 9 / WR-03 — `ts` and `typescript` are both recognized,
+    // case-insensitively, and canonicalized to `'ts'` on ScriptAST.lang.
+    it('recognizes lang="typescript" and lang="TS" — plugin on, lang canonicalized to "ts"', () => {
+      const ts = 'let count: number = 0;';
+      for (const variant of ['typescript', 'TS', 'TypeScript']) {
+        const { node, diagnostics } = parseScript(
+          ts,
+          { start: 0, end: ts.length },
+          ts,
+          'Typed.rozie',
+          variant,
+        );
+        expect(diagnostics).toEqual([]);
+        expect(node).not.toBeNull();
+        // Canonicalized so downstream `lang === 'ts'` checks fire.
+        expect(node!.lang).toBe('ts');
+        const decl = node!.program.program.body[0];
+        const declarator = (decl as { declarations: Array<{ id: { typeAnnotation?: { type: string } } }> })
+          .declarations[0]!;
+        expect(declarator.id.typeAnnotation?.type).toBe('TSTypeAnnotation');
+      }
+    });
+
+    it('emits ROZ032 for an unrecognized lang value (e.g. "tsx") — never a throw', () => {
+      const ts = 'let count: number = 0;';
+      let threw = false;
+      let result: ReturnType<typeof parseScript> | null = null;
+      try {
+        result = parseScript(ts, { start: 0, end: ts.length }, ts, 'Bad.rozie', 'tsx');
+      } catch {
+        threw = true;
+      }
+      expect(threw).toBe(false);
+      const roz032 = result!.diagnostics.filter((d) => d.code === 'ROZ032');
+      expect(roz032).toHaveLength(1);
+      expect(roz032[0]!.severity).toBe('error');
+      // Unrecognized → plugin stays off → the `: number` annotation also
+      // surfaces a recoverable/unrecoverable script syntax error.
+      const codes = result!.diagnostics.map((d) => d.code);
+      expect(codes.some((c) => c === 'ROZ030' || c === 'ROZ031')).toBe(true);
+    });
+
+    it('does NOT emit ROZ032 for a plain <script> (lang undefined) or an empty lang', () => {
+      const js = 'const a = 1;';
+      for (const lang of [undefined, '', '  ']) {
+        const { diagnostics } = parseScript(js, { start: 0, end: js.length }, js, undefined, lang);
+        expect(diagnostics.some((d) => d.code === 'ROZ032')).toBe(false);
+      }
+    });
   });
 });

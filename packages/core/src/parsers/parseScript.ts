@@ -20,6 +20,7 @@
  * ROZxxx codes owned here:
  *  - ROZ030  Recoverable script syntax error (Babel collected via errorRecovery)
  *  - ROZ031  Unrecoverable script syntax error (Babel threw despite errorRecovery)
+ *  - ROZ032  Unrecognized `<script lang>` value (Phase 9 / WR-03)
  *
  * @experimental — shape may change before v1.0
  */
@@ -44,9 +45,14 @@ export interface ParseScriptResult {
  * @param source - the full `.rozie` source (for position accounting).
  * @param filename - optional filename for diagnostics / `sourceFilename`.
  * @param lang - the resolved `lang=` attribute from the source `<script>` tag
- *   (Phase 9). When `'ts'`, the Babel `typescript` parser plugin is enabled so
- *   author type annotations parse into `TS*` AST nodes. Any other value (or
- *   undefined) keeps the plugin off — byte-identical to plain-JS parsing.
+ *   (Phase 9). Recognized case-insensitively as TypeScript when it is `'ts'` or
+ *   `'typescript'` — the Babel `typescript` parser plugin is then enabled so
+ *   author type annotations parse into `TS*` AST nodes, and the value is
+ *   canonicalized to `'ts'` on the returned `ScriptAST.lang`. `undefined` (a
+ *   plain `<script>`) keeps the plugin off — byte-identical to plain-JS
+ *   parsing. Any OTHER non-empty value (e.g. `'tsx'`) is unrecognized: the
+ *   plugin stays off AND a ROZ032 diagnostic is emitted (WR-03) so the author
+ *   gets an actionable error instead of a confusing downstream syntax error.
  */
 export function parseScript(
   content: string,
@@ -58,6 +64,26 @@ export function parseScript(
   const diagnostics: Diagnostic[] = [];
   const pos = parserPositionFor(source, contentLoc);
 
+  // Phase 9 / WR-03 — resolve the `lang=` attribute. `ts` and `typescript` are
+  // both recognized, case-insensitively, as "TypeScript, no JSX". Any other
+  // non-empty value (notably `tsx`) is unrecognized — the plugin stays off and
+  // we emit ROZ032 so the failure is actionable rather than a silent cliff.
+  const normalizedLang = lang?.trim().toLowerCase();
+  const isTypeScript = normalizedLang === 'ts' || normalizedLang === 'typescript';
+  // Canonicalize so downstream `ScriptAST.lang === 'ts'` checks (lowerToIR,
+  // typeNeutralizeScript) fire for `lang="TS"` / `lang="typescript"` too.
+  const canonicalLang = isTypeScript ? 'ts' : normalizedLang;
+  if (normalizedLang !== undefined && normalizedLang !== '' && !isTypeScript) {
+    diagnostics.push({
+      code: RozieErrorCode.SCRIPT_UNRECOGNIZED_LANG,
+      severity: 'error',
+      message: `Unrecognized <script lang="${lang}"> value. Recognized: "ts" (TypeScript). Author type annotations will be parsed as syntax errors.`,
+      loc: contentLoc,
+      ...(filename !== undefined ? { filename } : {}),
+      hint: 'Use <script lang="ts"> for TypeScript. JSX inside <script> (lang="tsx") is not a supported Rozie input syntax.',
+    });
+  }
+
   let program: File;
   try {
     program = babelParse(content, {
@@ -67,14 +93,15 @@ export function parseScript(
       attachComment: true,
       errorRecovery: true,
       // Plugin policy (Phase 9):
-      //   - 'typescript' is enabled ONLY for `<script lang="ts">` (lang === 'ts').
-      //     A plain `<script>` (or any other lang value) keeps plugins: [] —
-      //     byte-identical to pre-Phase-9 plain-JavaScript parsing.
+      //   - 'typescript' is enabled ONLY for `<script lang="ts">` /
+      //     `lang="typescript"` (recognized case-insensitively, WR-03). A plain
+      //     `<script>` keeps plugins: [] — byte-identical to pre-Phase-9
+      //     plain-JavaScript parsing.
       //   - 'jsx' stays OFF unconditionally — Rozie does not accept JSX in
       //     <script> (PROJECT.md Out of Scope: "JSX as an input syntax"). With
       //     jsx off and typescript on, `<T>expr` parses as a TS type assertion,
       //     which is the desired behavior — do NOT "fix" this by enabling jsx.
-      plugins: lang === 'ts' ? ['typescript'] : [],
+      plugins: isTypeScript ? ['typescript'] : [],
     });
   } catch (err: unknown) {
     const e = err as { message?: string; loc?: { line: number; column: number; index?: number } };
@@ -108,11 +135,11 @@ export function parseScript(
       type: 'ScriptAST',
       loc: contentLoc,
       program,
-      // Phase 9: carry the resolved `lang` onto the ScriptAST so downstream
-      // passes (IR lowering, typeNeutralizeScript) can branch on it. Set only
-      // when present — conditional-spread keeps the key absent under
-      // `exactOptionalPropertyTypes: true`.
-      ...(lang !== undefined ? { lang } : {}),
+      // Phase 9: carry the canonicalized `lang` onto the ScriptAST so
+      // downstream passes (IR lowering, typeNeutralizeScript) can branch on it.
+      // Set only when present and non-empty — conditional-spread keeps the key
+      // absent under `exactOptionalPropertyTypes: true`.
+      ...(canonicalLang !== undefined && canonicalLang !== '' ? { lang: canonicalLang } : {}),
     },
     diagnostics,
   };
