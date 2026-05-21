@@ -26,6 +26,18 @@ const demoFiles = import.meta.glob('../../demos/*.rozie', {
   import: 'default',
 }) as Record<string, string>;
 
+// examples/match/*.rozie — the r-match feature-probe fixtures. These are
+// covered by NEITHER the examples/*.rozie nor examples/demos/*.rozie glob
+// (they live in a subdirectory). They are feature probes with verbose header
+// comments rather than reference components, so they are NOT surfaced
+// wholesale — exactly one is registered explicitly below (MATCH_SNIPPET_PATH)
+// to give the playground an r-match demo without cluttering the picker.
+const matchFiles = import.meta.glob('../../match/*.rozie', {
+  eager: true,
+  query: '?raw',
+  import: 'default',
+}) as Record<string, string>;
+
 export interface Snippet {
   /** Display label shown in the dropdown. */
   label: string;
@@ -177,10 +189,24 @@ const singleFileEntries = (
     .map(([path, source]) => singleFileSnippet(path, source, prefix))
     .sort((a, b) => a.label.localeCompare(b.label));
 
+// One explicitly-registered r-match snippet, sourced from a real
+// examples/match/*.rozie feature-probe fixture. CommaAlternatives is the
+// clearest single-file demonstration of the construct (discriminant +
+// comma-alternative r-case + r-default). The other match/ probes are not
+// surfaced — they exist for the compile/snapshot matrix, not the picker.
+const MATCH_SNIPPET_PATH = '../../match/CommaAlternatives.rozie';
+
+const matchSnippets: Snippet[] = (() => {
+  const source = matchFiles[MATCH_SNIPPET_PATH];
+  if (source === undefined) return [];
+  return [singleFileSnippet(MATCH_SNIPPET_PATH, source, 'match')];
+})();
+
 export const SNIPPETS: Snippet[] = [
   ...bundles,
   ...singleFileEntries(exampleFiles, ''),
   ...singleFileEntries(demoFiles, 'demos'),
+  ...matchSnippets,
 ];
 
 export const DEFAULT_SNIPPET_KEY = 'bundle/SortableListDemo';
