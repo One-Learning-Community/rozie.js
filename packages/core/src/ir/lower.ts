@@ -188,14 +188,11 @@ export function lowerToIR(ast: RozieAST, opts: LowerOptions): LowerResult {
   // as `ast.script.program`, but every emitter clones it before mutation, and
   // the annotations are exactly what each emitter needs).
   //
-  // `ast.script?.lang === 'ts'` (Phase 9) gates the for-of `as any` wrap: it is
-  // applied for plain `<script>` (the untyped default) and skipped for
-  // `<script lang="ts">` so the author's iterable element type survives.
-  // See packages/core/src/codegen/typeNeutralizeScript.ts.
-  typeNeutralizeScript(
-    ir.setupBody.scriptProgram,
-    ast.script?.lang === 'ts',
-  );
+  // The pass is residue-only and `lang`-agnostic (WR-05): every visitor,
+  // including the for-of `as any` wrap, fills only the syntactically-detected
+  // untyped residue, so typed and untyped `<script>` blocks are handled
+  // identically. See packages/core/src/codegen/typeNeutralizeScript.ts.
+  typeNeutralizeScript(ir.setupBody.scriptProgram);
 
   return { ir, diagnostics, depGraph, bindings };
 }

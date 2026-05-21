@@ -5,19 +5,25 @@
 // every for-of iterable in `as any`). Phase 9 introduces `<script lang="ts">`,
 // so the pass becomes RESIDUE-ONLY: it fills only the untyped residue and
 // preserves author annotations. The four per-node guards (annotateParam,
-// CatchClause, VariableDeclaration, ForOfStatement idempotency) already check
+// CatchClause, VariableDeclaration, ForOfStatement idempotency) check
 // `typeAnnotation` presence per node, so they are residue-correct for
-// declarators/params/catch. The one ADDITIVE change: a `lang`-gated
-// ForOfStatement — the `as any` wrap is skipped entirely for typed scripts so
-// the author's iterable element type survives.
+// declarators/params/catch.
 //
-// These tests cover all five `<behavior>` cases from the plan:
+// WR-05 (Phase 9 code review) — the `ForOfStatement` wrap is PER-STATEMENT,
+// not lang-gated. An earlier design skipped the `as any` wrap wholesale for
+// `<script lang="ts">`; that was too coarse, since a typed script can still
+// contain a genuinely-untyped iterable (`Array.from(someAny)`) that needs the
+// `unknown`-defeating wrap. The pass has no type info, so it wraps EVERY
+// for-of iterable and skips ONLY when `right` is already an author assertion
+// (`as T` / `<T>expr`) — typed and untyped scripts behave identically.
+//
+// These tests cover the residue-only cases:
 //   1. untyped Program → identical mutated AST as before (the no-regression
 //      anchor protecting the 264-cell dist-parity gate),
 //   2. typed Program, author-typed declarator → annotation preserved verbatim,
 //   3. typed Program, untyped residue → still gets `: any`,
-//   4. typed Program, for-of → NOT wrapped in `as any`,
-//   5. untyped Program, for-of → STILL wrapped in `as any`.
+//   4. for-of over a bare iterable → wrapped in `as any` (typed AND untyped),
+//   5. for-of over an author-asserted iterable → NOT re-wrapped (WR-05).
 import { describe, expect, it } from 'vitest';
 import { parse as babelParse } from '@babel/parser';
 import _generate from '@babel/generator';
@@ -56,7 +62,7 @@ describe('typeNeutralizeScript — residue-only inversion (Task 3)', () => {
         'try { editor = 1; } catch (err) { void err; }',
       ].join('\n'),
     );
-    typeNeutralizeScript(file, false);
+    typeNeutralizeScript(file);
     const out = emit(file);
     expect(out).toContain('let editor: any = null');
     expect(out).toContain('function handle(ch: any)');
@@ -65,14 +71,14 @@ describe('typeNeutralizeScript — residue-only inversion (Task 3)', () => {
 
   it('untyped Program: for-of iterable is STILL wrapped in `as any`', () => {
     const file = parseJs('for (const f of files) { void f; }');
-    typeNeutralizeScript(file, false);
+    typeNeutralizeScript(file);
     expect(emit(file)).toContain('files as any');
   });
 
   // ── Case 2: typed Program — author annotations preserved verbatim ────────
   it('typed Program: an author-typed declarator is left untouched', () => {
     const file = parseTs('let editor: Editor | null = null;');
-    typeNeutralizeScript(file, true);
+    typeNeutralizeScript(file);
     const out = emit(file);
     expect(out).toContain('let editor: Editor | null = null');
     // The author type must NOT be clobbered with `any`.
@@ -86,7 +92,7 @@ describe('typeNeutralizeScript — residue-only inversion (Task 3)', () => {
         'try { void 0; } catch (err: unknown) { void err; }',
       ].join('\n'),
     );
-    typeNeutralizeScript(file, true);
+    typeNeutralizeScript(file);
     const out = emit(file);
     expect(out).toContain('handle(ch: number)');
     expect(out).toContain('catch (err: unknown)');
@@ -98,19 +104,61 @@ describe('typeNeutralizeScript — residue-only inversion (Task 3)', () => {
     const file = parseTs(
       'let typed: Editor | null = null;\nlet bare = null;',
     );
-    typeNeutralizeScript(file, true);
+    typeNeutralizeScript(file);
     const out = emit(file);
     // Author annotation kept; the untyped residue still filled.
     expect(out).toContain('let typed: Editor | null = null');
     expect(out).toContain('let bare: any = null');
   });
 
-  // ── Case 4: typed Program — for-of NOT wrapped ───────────────────────────
-  it('typed Program: a for-of iterable is NOT wrapped in `as any`', () => {
+  // ── Case 4: WR-05 — for-of wrap is per-statement, not lang-gated ─────────
+  it('typed Program: a bare for-of iterable IS wrapped in `as any` (WR-05)', () => {
+    // The pre-WR-05 design skipped the wrap wholesale for typed scripts. The
+    // wrap defeats `unknown` widening (TS18046) and the hazard exists in typed
+    // scripts too, so a bare iterable must still be wrapped there.
     const file = parseTs('for (const f of files) { void f; }');
-    typeNeutralizeScript(file, true);
+    typeNeutralizeScript(file);
     const out = emit(file);
+    expect(out).toContain('files as any');
+  });
+
+  it('typed Program: an untyped `Array.from` for-of iterable IS wrapped (WR-05)', () => {
+    // The WR-05 regression case: a typed `<script lang="ts">` containing a
+    // genuinely-untyped iterable. `Array.from(someAny)` widens its element to
+    // `unknown`; without the wrap every member access on the loop variable is
+    // TS18046. The wrap — `for (const f of (Array.from(someAny) as any))` —
+    // defeats that, and it must NOT be suppressed just because the script is
+    // typed. EMITTED CODE is inspected here, not a diagnostic.
+    const file = parseTs(
+      'declare const someAny: any;\nfor (const f of Array.from(someAny)) { f.doThing(); }',
+    );
+    typeNeutralizeScript(file);
+    const out = emit(file);
+    expect(out).toContain('Array.from(someAny) as any');
+    // The loop variable member access survives — the wrap makes `f` an `any`.
+    expect(out).toContain('f.doThing()');
+  });
+
+  // ── Case 5: WR-05 — author-asserted iterable is NOT re-wrapped ───────────
+  it('typed Program: an author-asserted for-of iterable is NOT re-wrapped (WR-05)', () => {
+    // When the author already asserted the iterable (`as Foo[]`), the wrap is
+    // skipped — wrapping `as any` would downgrade the author-owned type. The
+    // emitted code keeps the author assertion and gains no `as any`.
+    const file = parseTs(
+      'for (const f of (raw as string[])) { void f; }',
+    );
+    typeNeutralizeScript(file);
+    const out = emit(file);
+    expect(out).toContain('raw as string[]');
     expect(out).not.toContain('as any');
-    expect(out).toContain('for (const f of files)');
+  });
+
+  it('the for-of wrap is idempotent — a second run adds no extra `as any`', () => {
+    const file = parseTs('for (const f of files) { void f; }');
+    typeNeutralizeScript(file);
+    typeNeutralizeScript(file);
+    const out = emit(file);
+    // Exactly one `as any` — the second run sees its own assertion and skips.
+    expect(out.match(/as any/g)?.length).toBe(1);
   });
 });

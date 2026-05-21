@@ -47,20 +47,25 @@
  * keeps TypeScript OPTIONAL for `<script>` authors while letting a
  * `<script lang="ts">` author own as much of the internal typing as they like.
  *
- * ## The `isTypeScript` parameter
+ * ## The `ForOfStatement` wrap is per-statement, not lang-gated (WR-05)
  *
- * `lowerToIR` passes `ast.script?.lang === 'ts'`. It gates the `ForOfStatement`
- * neutralization only:
+ * `for (const f of <iterable>)` over an `any`/`unknown`-producing iterable
+ * (`Array.from(someAny)`) widens `f` to `unknown` → TS18046 on every member
+ * access. A for-of loop variable cannot carry a type annotation, so the pass
+ * neutralizes the ITERABLE instead: `for (const f of (<expr> as any))`.
  *
- *   - `isTypeScript === false` (plain `<script>`): every behavior is identical
- *     to the pre-Phase-9 pass — the for-of `as any` wrap is applied. This is
- *     the untyped DEFAULT and FALLBACK path and MUST stay byte-identical (the
- *     264-cell dist-parity gate depends on it).
- *   - `isTypeScript === true` (`<script lang="ts">`): the `as any` wrap is
- *     skipped entirely. The wrap only ever existed to defeat `unknown` widening
- *     on `Array.from` over an `any`; in a typed script the author owns the
- *     iterable's element type and the wrap would *downgrade* `f: File` to
- *     `f: any`. Letting the author keep their type is the correct behavior.
+ * The decision is PER-`ForOfStatement`. An earlier design lang-gated the wrap
+ * — skipping it wholesale for `<script lang="ts">` — but that was too coarse: a
+ * typed script can still contain a genuinely-untyped iterable, and suppressing
+ * the wrap there reintroduces the TS18046 hazard. The pass has NO type
+ * information, so it cannot distinguish a typed iterable from an untyped one;
+ * the one signal it can read syntactically is whether the author already
+ * asserted the iterable's type (`as T` / `<T>expr`). The wrap is therefore
+ * applied to EVERY for-of iterable — typed and untyped scripts alike — and
+ * skipped ONLY when `right` is already an author assertion (wrapping it `as
+ * any` would downgrade an author-owned type, and the skip also makes the pass
+ * idempotent). For the untyped DEFAULT / FALLBACK path this is byte-identical
+ * to the pre-Phase-9 pass — the 264-cell dist-parity gate depends on it.
  *
  * The four `typeAnnotation`-guarded visitors run identically for typed and
  * untyped scripts — they already fill only the residue.
@@ -164,19 +169,15 @@ function annotateParam(param: t.Node): void {
  * preserving any author-written annotations. See the file header for the
  * rationale, the residue-only contract, and the exact set of transforms.
  *
+ * Identical for typed (`<script lang="ts">`) and untyped scripts: every
+ * per-node visitor — including the `ForOfStatement` `as any` wrap (WR-05) — is
+ * residue-only and the residue is detected syntactically, so the source
+ * block's `lang` does not change behavior.
+ *
  * @param file - a Babel `File` the caller owns and may mutate (the compile
  *   pipeline passes `ir.setupBody.scriptProgram`).
- * @param isTypeScript - true when the source block was `<script lang="ts">`
- *   (`lowerToIR` passes `ast.script?.lang === 'ts'`). Gates the `ForOfStatement`
- *   `as any` wrap: applied for untyped scripts, skipped for typed scripts so the
- *   author's iterable element type survives. Defaults to `false` — the untyped
- *   path — so any caller that has not yet been threaded behaves exactly as the
- *   pre-Phase-9 pass.
  */
-export function typeNeutralizeScript(
-  file: File,
-  isTypeScript = false,
-): void {
+export function typeNeutralizeScript(file: File): void {
   traverse(file, {
     // `Function` is the Babel alias covering ArrowFunctionExpression,
     // FunctionExpression, FunctionDeclaration, ObjectMethod, ClassMethod,
@@ -244,18 +245,27 @@ export function typeNeutralizeScript(
     // makes `f` an `any`. `as any` is the universally-legal assertion (unlike
     // `as any[]`, which TS rejects when the source is a typed non-array).
     //
-    // Phase 9 lang gate: for a `<script lang="ts">` script the `as any` wrap is
-    // skipped entirely. The wrap only ever existed to defeat `unknown` widening
-    // in the untyped case; in a typed script the author owns the iterable's
-    // element type, and wrapping it would *downgrade* `f: File` → `f: any`.
+    // Phase 9 WR-05 — the decision is PER-`ForOfStatement`, not whole-script.
+    // The earlier `if (isTypeScript) return;` whole-script bailout was too
+    // coarse: a `<script lang="ts">` script can contain a genuinely-untyped
+    // iterable (`for (const f of Array.from(someAny))`) that still widens `f`
+    // to `unknown` (TS18046) — the `unknown`-defeating wrap is just as needed
+    // there as in an untyped script. The pass has NO type information, so it
+    // cannot tell a typed iterable from an untyped one; the one signal it CAN
+    // read syntactically is whether the author already asserted the iterable's
+    // type themselves. So: skip the wrap ONLY when `right` is already an `as`
+    // / `<T>` assertion the author wrote — in that case the author owns the
+    // element type and wrapping it `as any` would *downgrade* it. Every other
+    // iterable is wrapped, in typed and untyped scripts alike.
     ForOfStatement(path) {
-      // Typed scripts: leave the iterable alone — the author owns its type.
-      if (isTypeScript) return;
       // Only when the head DECLARES the loop variable — `for (existing of …)`
       // reuses an outer binding whose type is already settled.
       if (!t.isVariableDeclaration(path.node.left)) return;
       const right = path.node.right;
-      // Idempotent — leave an already-asserted iterable alone.
+      // Skip when the author already asserted the iterable's type
+      // (`as T` / `<T>expr`) — the author owns it; wrapping `as any` would
+      // downgrade it. This also makes the pass idempotent (a second run sees
+      // its own `as any` wrap and leaves it alone).
       if (t.isTSAsExpression(right) || t.isTSTypeAssertion(right)) return;
       path.node.right = t.tsAsExpression(right, t.tsAnyKeyword());
     },

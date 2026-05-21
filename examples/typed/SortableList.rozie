@@ -12,7 +12,7 @@
     - author type annotations on the keyFor() parameters
     - the model-rebuild in onUpdate uses a `for-of` over the typed `$props.items`
       array (a behavior-identical shallow copy) so the `typeNeutralizeScript`
-      ForOfStatement gating — skipped for `lang="ts"` — is exercised end-to-end.
+      ForOfStatement neutralization is exercised (WR-05: per-statement wrap).
 
   This is the engine-wrapper fixture: it imports a vanilla-JS engine and holds
   the instance in a typed `let`.
