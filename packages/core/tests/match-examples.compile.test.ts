@@ -7,11 +7,10 @@
 // in engine-examples.compile.test.ts — and compiles each probe across all
 // six targets, mirroring that file's describe.each matrix.
 //
-// SEQUENCING NOTE: per-target `TemplateMatch` emit delegates land in plans
-// 11-03/11-04 (Wave 2). Until then this MATCH_EXAMPLES matrix is EXPECTED to
-// be partially red — the test file is syntactically valid and discoverable
-// now (11-02-PLAN.md verification §). The orchestrator does not block plan
-// 11-02 on this matrix being fully green.
+// SEQUENCING (closed): per-target `TemplateMatch` emit delegates landed in
+// plans 11-03/11-04 (Wave 2) and the hoist path in 11-05/11-06 (Wave 3). As
+// of plan 11-07 (Wave 4) this whole matrix is GREEN — see the explicit R2
+// completion gate at the bottom of this file.
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -73,5 +72,29 @@ describe('r-match R8 — real-element host + multi-root branch survive emission'
     // wrapper — the `status-label` span and the `status-bar` progress.
     expect(result.code).toContain('status-label');
     expect(result.code).toContain('status-bar');
+  });
+});
+
+// R11 dogfood anchor — `examples/demos/TableDemo.rozie`'s `#cell` slot was
+// converted from an `r-if`/`r-else-if`/`r-else` ladder to `r-match` (D-08).
+// TableDemo was previously in NO compile-matrix array (RESEARCH Open Question
+// 3); this DOGFOOD block gives the motivating-example conversion a CI anchor.
+// TableDemo imports `Table` via a <components> block, so compilation needs
+// `resolverRoot: EXAMPLES_DIR` — exactly as the engine-examples VR_DEMOS block.
+const DOGFOOD = ['demos/TableDemo.rozie'] as const;
+describe('r-match R11 dogfood — TableDemo #cell slot uses r-match', () => {
+  describe.each(DOGFOOD)('%s', (file) => {
+    const path = resolve(EXAMPLES_DIR, file);
+    const source = readFileSync(path, 'utf8');
+    it.each(TARGETS)('compiles to %s with zero errors', (target) => {
+      const result = compile(source, {
+        target,
+        filename: path,
+        resolverRoot: EXAMPLES_DIR,
+      });
+      const errors = result.diagnostics.filter((d) => d.severity === 'error');
+      expect(errors).toEqual([]);
+      expect(result.code.length).toBeGreaterThan(0);
+    });
   });
 });
