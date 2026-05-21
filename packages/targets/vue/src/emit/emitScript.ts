@@ -168,6 +168,37 @@ function renderType(t: PropTypeAnnotation): string {
 }
 
 /**
+ * True when the prop has an explicit `default: null` in the `.rozie` source —
+ * i.e. `prop.defaultValue` is a `NullLiteral` node (NOT the `null`-the-absence
+ * sentinel, which is `prop.defaultValue === null`). When true, the emitted
+ * field type must be widened to `... | null` so the `withDefaults` `null`
+ * default is assignable. Mirrors the Angular target's `hasExplicitNullDefault`.
+ * Quick task 260520-w18 bug class 3.
+ */
+function hasExplicitNullDefault(prop: PropDecl): boolean {
+  return prop.defaultValue !== null && t.isNullLiteral(prop.defaultValue);
+}
+
+/**
+ * Render a non-model prop's `name?: type` field for the defineProps type
+ * literal, widening to `... | null` when the prop declares `default: null`.
+ *
+ * Quick task 260520-w18 bug class 3 — `{ type: String, default: null }` would
+ * otherwise emit `withDefaults(defineProps<{ x?: string }>(), { x: null })`,
+ * and `null` is not assignable to `InferDefault<…, string | undefined>`
+ * (TS2322). `renderType` already appends `| null` for `Function`-typed props,
+ * so the widening is suppressed when the rendered type already ends in
+ * `| null` to avoid a double suffix.
+ */
+function renderPropField(p: PropDecl): string {
+  const baseType = renderType(p.typeAnnotation);
+  const needsNull =
+    hasExplicitNullDefault(p) && !/\|\s*null$/.test(baseType.trimEnd());
+  const finalType = needsNull ? `${baseType} | null` : baseType;
+  return `${p.name}?: ${finalType}`;
+}
+
+/**
  * Emit `withDefaults(defineProps<{...}>(), { ... })` for non-model props.
  * Returns empty string when no non-model props exist.
  *
@@ -198,9 +229,9 @@ function emitPropsDecl(
     return '';
   }
 
-  const fields = nonModel.map(
-    (p) => `${p.name}?: ${renderType(p.typeAnnotation)}`,
-  );
+  // Both the generic-mode interface branch and the non-generic inline-literal
+  // branch build from this single `fields` array, so widening here covers both.
+  const fields = nonModel.map(renderPropField);
 
   // Build the defaults object — only include props with non-null defaultValue.
   const defaultsEntries: string[] = [];

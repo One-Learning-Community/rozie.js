@@ -51,6 +51,34 @@ function escapeAttrValue(s: string): string {
 }
 
 /**
+ * HTML attributes whose Vue prop type is `Booleanish`. A valueless boolean
+ * attribute in `.rozie` source (`<input multiple>`) arrives at the static
+ * emit branch with `attr.value === ''` — emitting `multiple=""` (an empty
+ * string) is rejected by Vue's `Booleanish` type. Quick task 260520-w18 bug
+ * class 4 — emit the bare valueless attribute `multiple` instead.
+ */
+const BOOLEAN_HTML_ATTRS: ReadonlySet<string> = new Set([
+  'multiple',
+  'disabled',
+  'readonly',
+  'required',
+  'checked',
+  'selected',
+  'hidden',
+  'autofocus',
+  'autoplay',
+  'controls',
+  'loop',
+  'muted',
+  'default',
+  'open',
+  'novalidate',
+  'formnovalidate',
+  'itemscope',
+  'reversed',
+]);
+
+/**
  * Render a static text segment as a JS-string literal suitable for inclusion
  * in an array (`'counter'`, `'card '`).
  */
@@ -168,6 +196,12 @@ function emitSingleAttr(attr: AttributeBinding, ir: IRComponent): string {
       if (refNames.has(attr.value)) {
         return `ref="${attr.value}Ref"`;
       }
+    }
+    // Valueless boolean HTML attribute (`<input multiple>`) — emit the bare
+    // attribute `multiple` (not `multiple=""`, which Vue's `Booleanish` type
+    // rejects). Quick task 260520-w18 bug class 4.
+    if (attr.value === '' && BOOLEAN_HTML_ATTRS.has(attr.name.toLowerCase())) {
+      return name;
     }
     return `${name}="${escapeAttrValue(attr.value)}"`;
   }

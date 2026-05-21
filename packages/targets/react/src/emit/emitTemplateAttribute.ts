@@ -153,6 +153,34 @@ const NUMERIC_HTML_ATTRS: ReadonlySet<string> = new Set([
 ]);
 
 /**
+ * HTML attributes whose JSX prop type is `boolean`. A valueless boolean
+ * attribute in `.rozie` source (`<input multiple>`) arrives at the static
+ * emit branch with `attr.value === ''` — emitting `multiple=""` (a string)
+ * fails React's `boolean`-typed JSX prop (TS2322 `'string'` vs `'boolean'`).
+ * Quick task 260520-w18 bug class 4 — emit the JSX boolean form `multiple={true}`.
+ */
+const BOOLEAN_HTML_ATTRS: ReadonlySet<string> = new Set([
+  'multiple',
+  'disabled',
+  'readonly',
+  'required',
+  'checked',
+  'selected',
+  'hidden',
+  'autofocus',
+  'autoplay',
+  'controls',
+  'loop',
+  'muted',
+  'default',
+  'open',
+  'novalidate',
+  'formnovalidate',
+  'itemscope',
+  'reversed',
+]);
+
+/**
  * Translate a bare DOM attribute name (lowercased) to its React JSX prop
  * name. For non-mapped names, returns the input unchanged.
  */
@@ -704,6 +732,13 @@ function emitNonClassAttribute(
   if (attr.kind === 'static') {
     // Apply HTML→JSX alias for special-cased names (tabindex → tabIndex, etc.)
     const jsxName = htmlAttrToJsxName(attr.name);
+    // Valueless boolean HTML attribute (`<input multiple>`) — emit the JSX
+    // boolean form `multiple={true}` (not `multiple=""`, which is a string
+    // and fails React's boolean-typed JSX prop, TS2322). Quick task
+    // 260520-w18 bug class 4.
+    if (attr.value === '' && BOOLEAN_HTML_ATTRS.has(attr.name.toLowerCase())) {
+      return { jsx: `${jsxName}={true}`, diagnostics };
+    }
     // Coerce known-numeric DOM attrs to JSX expression form: tabindex="-1" → tabIndex={-1}
     if (NUMERIC_HTML_ATTRS.has(attr.name.toLowerCase()) && /^-?\d+(?:\.\d+)?$/.test(attr.value)) {
       return { jsx: `${jsxName}={${attr.value}}`, diagnostics };
