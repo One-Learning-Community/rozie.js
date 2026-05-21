@@ -45,14 +45,17 @@ const EXAMPLES = [
   // the untyped-`<script>` type-broken-emit bug regresses; covering it here is
   // what would have caught that bug. Engine imports resolve against the
   // ambient `engine-modules.d.ts` stub copied into the tmp dir below.
-  // (Uppy/SortableList/Flatpickr are NOT yet covered — they hit a separate class of
-  // pre-existing emit limitations; see
-  // .planning/todos/pending/engine-wrapper-residual-type-errors.md.)
+  // All four engine wrappers are now covered — quick task 260520-w18 closed
+  // the residual type-error bug classes that previously blocked Uppy /
+  // SortableList / Flatpickr.
   'TipTap',
+  'Uppy',
+  'SortableList',
+  'Flatpickr',
 ];
 
 describe('REACT-TSC — tsc --noEmit clean over emitted React TSX', () => {
-  it('all 9 emitted React TSX files (8 reference + 1 engine-wrapper) tsc clean', () => {
+  it('all 12 emitted React TSX files (8 reference + 4 engine-wrapper) tsc clean', () => {
     const tmpDir = mkdtempSync(join(tmpdir(), 'rozie-react-tsc-'));
     try {
       for (const name of EXAMPLES) {

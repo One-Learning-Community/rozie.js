@@ -54,6 +54,36 @@ export interface EmitAttrCtx {
 }
 
 /**
+ * HTML attributes whose Svelte JSX-element prop type is `boolean`. A valueless
+ * boolean attribute in `.rozie` source (`<input multiple>`) arrives at the
+ * static emit branch with `attr.value === ''` — emitting `multiple=""` (a
+ * string) fails Svelte's `boolean | null | undefined`-typed prop. Quick task
+ * 260520-w18 bug class 4 (extended to Svelte — the inventory only named
+ * React/Vue, but Svelte hits the identical mismatch). Emit the bare valueless
+ * attribute `multiple` instead.
+ */
+const BOOLEAN_HTML_ATTRS: ReadonlySet<string> = new Set([
+  'multiple',
+  'disabled',
+  'readonly',
+  'required',
+  'checked',
+  'selected',
+  'hidden',
+  'autofocus',
+  'autoplay',
+  'controls',
+  'loop',
+  'muted',
+  'default',
+  'open',
+  'novalidate',
+  'formnovalidate',
+  'itemscope',
+  'reversed',
+]);
+
+/**
  * Convert kebab-case to camelCase for component property bindings.
  *   `on-close` → `onClose`
  * `aria-label` and `data-*` are NEVER passed through this helper because
@@ -211,6 +241,12 @@ export function emitSingleAttr(
       }
     }
     const outName = resolveAttrName(attr.name, ctx);
+    // Valueless boolean HTML attribute (`<input multiple>`) — emit the bare
+    // attribute `multiple` (not `multiple=""`, a string Svelte's boolean prop
+    // type rejects). Quick task 260520-w18 bug class 4.
+    if (attr.value === '' && BOOLEAN_HTML_ATTRS.has(attr.name.toLowerCase())) {
+      return outName;
+    }
     return `${outName}="${escapeAttrValue(attr.value)}"`;
   }
 

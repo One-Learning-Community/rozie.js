@@ -234,6 +234,30 @@ function renderExpr(
 }
 
 /**
+ * Quick task 260520-w18 — `:attr` binding `null`-fallback normalization.
+ *
+ * A `.rozie` author writes the Vue idiom `:accept="x ? x.join(',') : null"`,
+ * where `null` means "remove the attribute". React's optional HTML-attribute
+ * JSX props are typed `string | undefined` (NOT `string | null`), so a
+ * `null`-yielding ternary branch is a TS2322. React treats `undefined`
+ * identically to `null` at runtime ("attribute absent"), so translating a
+ * branch-position `null` literal to `undefined` is the faithful cross-target
+ * mapping. Returns a cloned expression with branch-position `NullLiteral`
+ * nodes replaced — the IR node is never mutated.
+ */
+function normalizeNullAttrBinding(expr: t.Expression): t.Expression {
+  if (!t.isConditionalExpression(expr)) return expr;
+  const cloned = t.cloneNode(expr, true, false) as t.ConditionalExpression;
+  if (t.isNullLiteral(cloned.consequent)) {
+    cloned.consequent = t.identifier('undefined');
+  }
+  if (t.isNullLiteral(cloned.alternate)) {
+    cloned.alternate = t.identifier('undefined');
+  }
+  return cloned;
+}
+
+/**
  * Detect whether an expression's source-text is an object-literal expression
  * (e.g., `{ active: isActive }`). Used to route :class={...} to the
  * `clsx({...})` form per RESEARCH Pattern 6 line 713.
@@ -765,9 +789,15 @@ function emitNonClassAttribute(
       }
       // ObjectExpression falls through to the generic binding emit.
     }
-    // ':name="expr"' → camelCased JSX name + expression value
+    // ':name="expr"' → camelCased JSX name + expression value.
+    // A `null`-fallback ternary (`x ? … : null`) is normalized to yield
+    // `undefined` so React's `string | undefined` attr types accept it
+    // (quick task 260520-w18). `style`/`class` already handled above.
     const jsxName = colonPropToJsxName(attr.name);
-    const exprCode = renderExpr(attr.expression, ctx.ir);
+    const exprCode = renderExpr(
+      normalizeNullAttrBinding(attr.expression),
+      ctx.ir,
+    );
     return { jsx: `${jsxName}={${exprCode}}`, diagnostics };
   }
 

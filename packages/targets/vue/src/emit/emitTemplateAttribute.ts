@@ -79,6 +79,29 @@ const BOOLEAN_HTML_ATTRS: ReadonlySet<string> = new Set([
 ]);
 
 /**
+ * Quick task 260520-w18 — `:attr` binding `null`-fallback normalization.
+ *
+ * A `.rozie` author writes `:accept="x ? x.join(',') : null"`, where `null`
+ * means "remove the attribute". `vue-tsc`'s DOM-attribute typings type
+ * optional HTML attributes as `string | undefined` (NOT `string | null`), so
+ * a `null`-yielding ternary branch is a TS2322. Vue treats `undefined`
+ * identically to `null` for attribute binding ("attribute absent"), so
+ * translating a branch-position `null` literal to `undefined` is the faithful
+ * mapping. Returns a cloned expression — the IR node is never mutated.
+ */
+function normalizeNullAttrBinding(expr: t.Expression): t.Expression {
+  if (!t.isConditionalExpression(expr)) return expr;
+  const cloned = t.cloneNode(expr, true, false) as t.ConditionalExpression;
+  if (t.isNullLiteral(cloned.consequent)) {
+    cloned.consequent = t.identifier('undefined');
+  }
+  if (t.isNullLiteral(cloned.alternate)) {
+    cloned.alternate = t.identifier('undefined');
+  }
+  return cloned;
+}
+
+/**
  * Render a static text segment as a JS-string literal suitable for inclusion
  * in an array (`'counter'`, `'card '`).
  */
@@ -212,7 +235,13 @@ function emitSingleAttr(attr: AttributeBinding, ir: IRComponent): string {
       const expr = rewriteTemplateExpression(attr.expression, ir);
       return `v-model="${expr}"`;
     }
-    const expr = rewriteTemplateExpression(attr.expression, ir);
+    // A `null`-fallback ternary (`x ? … : null`) is normalized to yield
+    // `undefined` so vue-tsc's `string | undefined` attr types accept it
+    // (quick task 260520-w18).
+    const expr = rewriteTemplateExpression(
+      normalizeNullAttrBinding(attr.expression),
+      ir,
+    );
     return `:${name}="${expr}"`;
   }
 
