@@ -1,0 +1,36 @@
+import { LitElement, css, html } from 'lit';
+import { customElement } from 'lit/decorators.js';
+import { SignalWatcher, signal } from '@lit-labs/preact-signals';
+
+@customElement('rozie-expensive-discriminant')
+export default class ExpensiveDiscriminant extends SignalWatcher(LitElement) {
+  static styles = css`
+.passed[data-rozie-s-bb543ee0] { color: #15803d; }
+.failed[data-rozie-s-bb543ee0] { color: #b91c1c; }
+.unknown[data-rozie-s-bb543ee0] { opacity: 0.5; }
+`;
+
+  private _score = signal(72);
+
+  private _disconnectCleanups: Array<() => void> = [];
+
+  disconnectedCallback(): void {
+    super.disconnectedCallback();
+    for (const fn of this._disconnectCleanups) fn();
+    this._disconnectCleanups = [];
+  }
+
+  render() {
+    return html`
+${(() => { const __rozieMatch_0 = this.classify(); return __rozieMatch_0 === 'pass' ? html`<template data-rozie-s-bb543ee0>
+    <div class="passed" data-rozie-s-bb543ee0>
+      ${(() => { const __rozieMatch_1 = this.subClassify(); return __rozieMatch_1 === 'distinction' ? html`<strong data-rozie-s-bb543ee0>passed with distinction</strong>` : __rozieMatch_1 === 'merit' ? html`<span data-rozie-s-bb543ee0>passed with merit</span>` : html`<span data-rozie-s-bb543ee0>passed</span>`; })()}
+    </div>
+  </template>` : __rozieMatch_0 === 'fail' ? html`<span class="failed" data-rozie-s-bb543ee0>did not pass</span>` : html`<span class="unknown" data-rozie-s-bb543ee0>ungraded</span>`; })()}
+`;
+  }
+
+  classify = () => this._score.value >= 50 ? 'pass' : 'fail';
+
+  subClassify = () => this._score.value >= 90 ? 'distinction' : 'merit';
+}

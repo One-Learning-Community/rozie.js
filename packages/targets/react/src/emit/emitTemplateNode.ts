@@ -404,6 +404,27 @@ function emitElementEvents(node: TemplateElementIR, ctx: EmitNodeCtx): string {
 }
 
 /**
+ * True when some `r-match` branch test references an `Identifier` named
+ * `tempName` — i.e. core actually folded the hoist temp into the rungs.
+ *
+ * Core classifies a non-`Identifier`/`MemberExpression` discriminant as
+ * `hoist` (D-03), but the literal-`true`/`false` predicate-chain form (R4)
+ * lowers each rung to a BARE predicate that never references the temp. For
+ * that form the hoist wrapper would be a dead `const __rozieMatch_N = true`
+ * binding — so the wrapper is emitted only when the temp is genuinely used.
+ */
+function tempNameIsReferenced(node: TemplateMatchIR, tempName: string): boolean {
+  const walk = (value: unknown): boolean => {
+    if (Array.isArray(value)) return value.some(walk);
+    if (value === null || typeof value !== 'object') return false;
+    const obj = value as Record<string, unknown>;
+    if (obj['type'] === 'Identifier' && obj['name'] === tempName) return true;
+    return Object.values(obj).some(walk);
+  };
+  return node.branches.some((b) => b.test !== null && walk(b.test));
+}
+
+/**
  * Emit a TemplateMatch (Phase 11 `r-match` / `r-case` / `r-default`).
  *
  * D-02 — pure delegation: the `r-match` construct lowers to a node whose
@@ -420,8 +441,9 @@ function emitElementEvents(node: TemplateElementIR, ctx: EmitNodeCtx): string {
  * `{(() => { const <tempName> = <discriminant>; return <ladder>; })()}`. The
  * folded branch tests already reference `t.identifier(node.tempName)`, so the
  * rungs read the temp, never re-invoke the call. JSX return-position IIFE is
- * idiomatic React. `inline`-mode discriminants need no wrapper — pure
- * delegation.
+ * idiomatic React. `inline`-mode discriminants — and `hoist`-classified
+ * literal predicate chains whose rungs never reference the temp — need no
+ * wrapper (pure delegation).
  *
  * `hostElement` (real-element `<div r-match>` host): the wrapper element must
  * survive emission. We render the host's tag/attributes via `emitElement` with
@@ -436,7 +458,11 @@ function delegateMatchToConditional(node: TemplateMatchIR, ctx: EmitNodeCtx): st
     sourceLoc: node.sourceLoc,
   };
   let ladder = emitConditional(synthetic, ctx, emitNode);
-  if (node.discriminantMode === 'hoist' && node.tempName !== undefined) {
+  if (
+    node.discriminantMode === 'hoist' &&
+    node.tempName !== undefined &&
+    tempNameIsReferenced(node, node.tempName)
+  ) {
     // D-04 hoist — `emitConditional` returns a `{...}`-wrapped JSX expression;
     // strip the braces and re-wrap as a return-position IIFE binding the
     // discriminant temp once. `node.discriminant` is routed through the SAME
