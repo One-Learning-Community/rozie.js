@@ -642,6 +642,16 @@ function emitLifecycleHooks(
 
         // Render setup body as `() => { ...; _cleanup_N = <cleanupExpr>; }`.
         // Strategy: prepend assignment of the cleanup to _cleanup_N inside the setup body.
+        //
+        // Phase 09 rebuild-site audit (Pattern 4): `t.blockStatement([...])`
+        // here reuses `setupBlock.body` statements by reference, so any author
+        // `TS*` annotation on a declaration / param / catch binding inside the
+        // lifecycle setup body survives verbatim. This path rebuilds a
+        // BlockStatement, not a function — no `returnType` / `typeParameters`
+        // to drop. The cloned setup/cleanup arrows elsewhere in this emitter
+        // are passed whole to `genCode`, so their param annotations survive
+        // too. Vue has no `t.functionDeclaration` / `t.arrowFunctionExpression`
+        // rebuild of a USER function — no annotation-dropping site exists.
         const setupBlock = t.isBlockStatement(setupBody) ? setupBody : t.blockStatement([t.expressionStatement(setupBody)]);
         // Append assignment to _cleanup_N.
         const assign = t.expressionStatement(

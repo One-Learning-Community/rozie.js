@@ -1,0 +1,63 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Vue ts-passthrough — author annotation survival (Phase 09 Plan 03 Task 2) > compiles a typed .rozie to a <script setup lang="ts"> SFC preserving annotations > typed-vue 1`] = `
+"<template>
+
+  <button @click="inc(1)">{{ label }}: {{ count }}</button>
+
+</template>
+
+<script setup lang="ts">
+import { onMounted } from 'vue';
+
+const props = withDefaults(
+  defineProps<{ label?: string }>(),
+  { label: 'Count' }
+);
+
+import type { EditorOptions } from './editor-types';
+interface InternalShape {
+  id: number;
+  ready: boolean;
+}
+type Mode = 'idle' | 'busy';
+let count: number = 0;
+let mode: Mode = 'idle';
+function inc(by: number): void {
+  count = count + by;
+}
+
+onMounted(() => {
+  count = 1;
+});
+</script>
+"
+`;
+
+exports[`Vue ts-passthrough — untyped emit byte-identity anchor > untyped emit is byte-identical to today (snapshot anchor) > untyped-vue-anchor 1`] = `
+"<template>
+
+  <button @click="inc(1)">{{ label }}: {{ count }}</button>
+
+</template>
+
+<script setup lang="ts">
+import { onMounted } from 'vue';
+
+const props = withDefaults(
+  defineProps<{ label?: string }>(),
+  { label: 'Count' }
+);
+
+let count = 0;
+let mode = 'idle';
+function inc(by: any) {
+  count = count + by;
+}
+
+onMounted(() => {
+  count = 1;
+});
+</script>
+"
+`;

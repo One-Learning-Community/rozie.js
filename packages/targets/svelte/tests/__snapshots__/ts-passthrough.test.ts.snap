@@ -1,0 +1,61 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Svelte ts-passthrough — author annotation survival (Phase 09 Plan 03 Task 2) > compiles a typed .rozie to a .svelte whose <script> carries lang="ts" > typed-svelte 1`] = `
+"<script lang="ts">
+import { onMount } from 'svelte';
+
+interface Props {
+  label?: string;
+}
+
+let { label = 'Count' }: Props = $props();
+
+import type { EditorOptions } from './editor-types';
+interface InternalShape {
+  id: number;
+  ready: boolean;
+}
+type Mode = 'idle' | 'busy';
+let count: number = 0;
+let mode: Mode = 'idle';
+function inc(by: number): void {
+  count = count + by;
+}
+
+onMount(() => {
+  count = 1;
+});
+</script>
+
+
+  <button onclick={($event) => { inc(1); }}>{label}: {count}</button>
+
+"
+`;
+
+exports[`Svelte ts-passthrough — untyped emit byte-identity anchor > untyped emit is byte-identical to today (snapshot anchor) > untyped-svelte-anchor 1`] = `
+"<script lang="ts">
+import { onMount } from 'svelte';
+
+interface Props {
+  label?: string;
+}
+
+let { label = 'Count' }: Props = $props();
+
+let count = 0;
+let mode = 'idle';
+function inc(by: any) {
+  count = count + by;
+}
+
+onMount(() => {
+  count = 1;
+});
+</script>
+
+
+  <button onclick={($event) => { inc(1); }}>{label}: {count}</button>
+
+"
+`;

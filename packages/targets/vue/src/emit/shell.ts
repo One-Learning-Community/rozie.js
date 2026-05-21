@@ -174,6 +174,14 @@ export function buildShell(parts: ShellParts): BuildShellResult {
     scriptGeneric !== null && scriptGeneric.length > 0
       ? ` generic="${scriptGeneric}"`
       : '';
+  // Phase 09 (`<script lang="ts">` support): the `<script setup>` tag is
+  // emitted with `lang="ts"` UNCONDITIONALLY — Vue's emitted output is always
+  // TypeScript (`defineProps<T>()` macros, typed refs) regardless of whether
+  // the AUTHOR typed their `<script>`. So a typed source's author annotations
+  // simply land in an already-`lang="ts"` block; no `lang` threading is
+  // needed. Making this tag conditional on the author's `lang` would strip
+  // `lang="ts"` from every untyped component and break the untyped
+  // dist-parity path (Pitfall 5) — explicitly out of scope.
   const scriptOpenFraming = `<script setup lang="ts"${genericAttr}>\n`;
   const scriptCloseFraming = '\n</script>\n';
 

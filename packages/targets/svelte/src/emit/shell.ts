@@ -111,6 +111,14 @@ export function buildShell(parts: ShellParts): BuildShellResult {
 
   const ms = new MagicString(parts.rozieSource);
 
+  // Phase 09 (`<script lang="ts">` support): the `<script>` tag is emitted
+  // with `lang="ts"` UNCONDITIONALLY — Svelte's emitted output is always
+  // TypeScript (runes `$props<{…}>()`, typed `$state`) regardless of whether
+  // the AUTHOR typed their `<script>`. So a typed source's author annotations
+  // simply land in an already-`lang="ts"` block; no `lang` threading is
+  // needed. Making this tag conditional on the author's `lang` would strip
+  // `lang="ts"` from every untyped component and break the untyped
+  // dist-parity path (Pitfall 5) — explicitly out of scope.
   const scriptOpenFraming = '<script lang="ts">\n';
   const scriptCloseFraming = '\n</script>\n';
 

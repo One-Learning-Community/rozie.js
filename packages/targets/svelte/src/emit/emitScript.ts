@@ -681,6 +681,16 @@ function emitLifecycleHooks(
         // Reconstruct: emit the setup statements + a return statement holding
         // the cleanup expression. onMount runs the callback once and uses the
         // returned function as the destroy-time cleanup.
+        //
+        // Phase 09 rebuild-site audit (Pattern 4): `t.blockStatement([...])`
+        // reuses `setupBody.body` statements by reference — any author `TS*`
+        // annotation on a declaration / param / catch binding inside the
+        // lifecycle setup body survives verbatim. This rebuilds a
+        // BlockStatement, not a function, so there is no `returnType` /
+        // `typeParameters` to drop. Every cloned setup/cleanup arrow elsewhere
+        // in this emitter is passed whole to `genCode` (param annotations
+        // survive); Svelte has no `t.functionDeclaration` /
+        // `t.arrowFunctionExpression` rebuild of a USER function.
         const merged = t.blockStatement([
           ...setupBody.body,
           t.returnStatement(cleanupExpr),
