@@ -405,6 +405,18 @@ function hoistTempIsReferenced(node: TemplateMatchIR): boolean {
  * Nested hoisting matches recurse through `emitNode`; the core per-component
  * counter (plan 11-01) guarantees their `tempName`s never collide.
  *
+ * r-for LIMITATION: the `$derived` script injection is component-scoped — it
+ * is created ONCE and shared across all loop iterations, which is wrong for a
+ * per-iteration discriminant. A hoist-mode `r-match` nested inside an `r-for`
+ * therefore resolves to one shared `$derived` value for every row. The correct
+ * fix inside an `r-for` is a per-iteration `{@const}` taking the loop
+ * variables, but the Svelte `EmitNodeCtx` carries no loop-bindings signal to
+ * detect that context. Per plan 11-06 we emit the component-scoped `$derived`
+ * form unconditionally (correct for the common non-loop case) and record the
+ * in-`r-for` gap as a SUMMARY follow-up — Vue's emitter shares this exact gap;
+ * React/Solid/Lit (return-position IIFE) and Angular (`@let` inside `@for`)
+ * are per-iteration-correct.
+ *
  * `hostElement` (real-element `<div r-match>` host): the wrapper element must
  * survive emission. We render the host's tag/attributes via `emitElement` with
  * the `{#if}…{:else if}…{/if}` block spliced in as a single verbatim child —
