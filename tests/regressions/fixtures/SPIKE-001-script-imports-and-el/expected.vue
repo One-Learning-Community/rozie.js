@@ -20,7 +20,7 @@ let instance: any = null;
 
 let _cleanup_0: (() => void) | undefined;
 onMounted(() => {
-  instance = new DummyEngine(__rozieRootRef.value, {
+  instance = new DummyEngine(__rozieRootRef.value!, {
     animation: 150
   });
   _cleanup_0 = () => instance?.destroy();

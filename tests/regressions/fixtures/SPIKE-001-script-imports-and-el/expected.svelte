@@ -17,7 +17,7 @@ import DummyEngine from 'dummy-engine';
 let instance: any = null;
 
 onMount(() => {
-  instance = new DummyEngine(__rozieRoot, {
+  instance = new DummyEngine(__rozieRoot!, {
     animation: 150
   });
   return () => instance?.destroy();

@@ -7,7 +7,7 @@ import { Component, ViewEncapsulation, input, signal } from '@angular/core';
 
     <div class="backdrop" (click)="closeOnBackdrop() && close()">
       
-      <button (click)="close($event)">Close</button>
+      <button (click)="close()">Close</button>
     </div>
 
   `,

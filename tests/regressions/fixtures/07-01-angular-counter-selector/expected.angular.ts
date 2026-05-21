@@ -5,7 +5,7 @@ import { Component, ViewEncapsulation, model } from '@angular/core';
   standalone: true,
   template: `
 
-    <button class="counter" (click)="bump($event)">{{ value() }}</button>
+    <button class="counter" (click)="bump()">{{ value() }}</button>
 
   `,
   styles: [`
