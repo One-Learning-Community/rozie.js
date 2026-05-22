@@ -8,6 +8,28 @@ while chasing bugs. Add new entries when you find something non-obvious —
 
 ## Visual-regression matrix
 
+### Reproduce the VR matrix in the pinned CI container (no host clobber)
+
+`tools/ci-repro/vr.sh` runs the Visual Regression Matrix in the exact
+sha256-pinned Playwright container CI uses — the only environment whose
+screenshots match the committed `__screenshots__/` baselines — WITHOUT
+overwriting the host checkout's macOS native bindings.
+
+```sh
+tools/ci-repro/vr.sh                 # full matrix (exactly what CI runs)
+tools/ci-repro/vr.sh Uppy            # only cells matching --grep "Uppy"
+tools/ci-repro/vr.sh 'Uppy|Table'    # the argument is a Playwright --grep regex
+```
+
+It rsyncs the working tree — uncommitted changes included, build output
+excluded — into a sibling `../rozie-ci-linux` mirror, runs the container
+against the mirror, and leaves the diff/actual/expected PNGs in
+`../rozie-ci-linux/tests/visual-regression/test-results/`. The mirror's
+`node_modules` is Linux and is reused across runs; the host checkout is never
+mounted, so its rolldown/esbuild/swc binaries are never clobbered and no
+recovery `pnpm install` is needed afterward. The pinned image is read straight
+out of `visual-regression.yml`, so it cannot drift from what CI runs.
+
 ### Dump every (example × target) screenshot to a temp dir
 
 After a vr build runs, capture each cell to `/tmp/rozie-vr-screens/<target>/<Example>.png`
