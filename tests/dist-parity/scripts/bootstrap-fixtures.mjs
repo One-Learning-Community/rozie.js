@@ -58,7 +58,10 @@ const FIXTURES_DIR = resolve(HERE, '../fixtures');
 // for these fixtures. RModelCustom is deliberately NOT added: its
 // `.phone` modifier is not in createDefaultRegistry() (the registry the
 // bootstrap's compile() uses), so it would fail the bootstrap with an
-// unknown-modifier error. RModelCustom's AC-11 proof is instead the six
+// unknown-modifier error. It lives in tests/plugins/phone/examples/ (NOT
+// in examples/) so the plain-registry examples/ build glob — the CLI
+// runBuildMatrix and friends — never tries to compile it plugin-less.
+// RModelCustom's AC-11 proof is instead the six
 // tests/plugins/phone/src/__tests__/phone-<target>-emit.test.ts tests.
 // All three are single-file; no sibling .rozie producers.
 // Phase 13 — EXAMPLES extended 13 → 14 with ClassSelectorProbe ($classSelector
