@@ -1,18 +1,18 @@
 # Rozie.js
 
-A cross-framework component definition language and compiler. Authors write components once in a Vue/Alpine-flavored block-based syntax (`.rozie` files), and Rozie compiles them to idiomatic React, Vue, Svelte, Angular, and Solid components. The name derives from the Rosetta Stone — one source, many target languages.
+A cross-framework component definition language and compiler. Authors write components once in a Vue/Alpine-flavored block-based syntax (`.rozie` files), and Rozie compiles them to idiomatic React, Vue, Svelte, Angular, Solid, and Lit components. The name derives from the Rosetta Stone — one source, many target languages.
 
-Rozie is **not** a runtime framework. It does not own the rendering pipeline; the heavy lifting still happens in whichever target framework the consumer chose. Rozie owns the **author-side API** so a single component definition can drop into any of the five supported frameworks without per-framework wrapper boilerplate.
+Rozie is **not** a runtime framework. It does not own the rendering pipeline; the heavy lifting still happens in whichever target framework the consumer chose. Rozie owns the **author-side API** so a single component definition can drop into any of the six supported frameworks without per-framework wrapper boilerplate.
 
 **📖 [Documentation](https://one-learning-community.github.io/rozie.js/)** — install, quick start, features tour, and live examples (the docs site dogfoods the compiler — every example is the actual `.rozie` source compiled by `@rozie/unplugin/vite` and rendered inline).
 
 ## Who it's for
 
-Component-library and design-system authors who today maintain manual bindings/wrappers across React, Vue, Svelte, Angular, and Solid for libraries that ultimately do their real work in vanilla JS. Write one `.rozie` file, ship working idiomatic consumers in every framework from it.
+Component-library and design-system authors who today maintain manual bindings/wrappers across React, Vue, Svelte, Angular, Solid, and Lit for libraries that ultimately do their real work in vanilla JS. Write one `.rozie` file, ship working idiomatic consumers in every framework from it.
 
 ## Status
 
-Pre-v1.0, internal monorepo. All five target emitters are shipped and pass byte-identical dist-parity across eight reference components × five targets × three entrypoints (120 assertions). Each target ships with a Vite consumer demo plus Playwright e2e coverage.
+Pre-v1.0, internal monorepo. All six target emitters are shipped and gated by a byte-identical dist-parity suite — every reference component compiled across all six targets and every entrypoint (compile API / CLI / Babel plugin / unplugin) must match byte-for-byte. Each target ships with a consumer demo plus Playwright e2e coverage.
 
 | Package | Status |
 |---|---|
@@ -20,18 +20,22 @@ Pre-v1.0, internal monorepo. All five target emitters are shipped and pass byte-
 | [`@rozie/target-vue`](packages/targets/vue) | Shipped — Vue 3.4+ SFC emitter |
 | [`@rozie/target-react`](packages/targets/react) | Shipped — React 18+ function-component emitter |
 | [`@rozie/target-svelte`](packages/targets/svelte) | Shipped — Svelte 5+ runes-mode emitter |
-| [`@rozie/target-angular`](packages/targets/angular) | Shipped — Angular 17+ standalone-component emitter |
+| [`@rozie/target-angular`](packages/targets/angular) | Shipped — Angular 19+ standalone-component emitter |
 | [`@rozie/target-solid`](packages/targets/solid) | Shipped — Solid 1.8+ signals-native emitter |
+| [`@rozie/target-lit`](packages/targets/lit) | Shipped — Lit web-component emitter |
 | [`@rozie/runtime-vue`](packages/runtime/vue) | Shipped — runtime helpers (`useOutsideClick`, `debounce`, `throttle`, key filters) |
 | [`@rozie/runtime-react`](packages/runtime/react) | Shipped — runtime helpers + `useControllableState` |
+| [`@rozie/runtime-svelte`](packages/runtime/svelte) | Shipped — runtime helpers |
 | [`@rozie/runtime-solid`](packages/runtime/solid) | Shipped — runtime helpers + `createControllableSignal` |
+| [`@rozie/runtime-lit`](packages/runtime/lit) | Shipped — runtime helpers |
 | [`@rozie/unplugin`](packages/unplugin) | Shipped — Vite + Rollup + Webpack + esbuild + Rolldown + Rspack |
-| [`@rozie/cli`](packages/cli) | Shipped — `rozie build` CLI across all five targets |
+| [`@rozie/cli`](packages/cli) | Shipped — `rozie build` CLI across all six targets |
 | [`@rozie/babel-plugin`](packages/babel-plugin) | Shipped — Babel-plugin path for non-Vite consumers |
 | [`@rozie/docs`](docs) | Shipped — VitePress documentation site |
 | [`tools/intellij-plugin`](tools/intellij-plugin) | Shipped — JetBrains IDE syntax + injection plugin |
+| [`tools/textmate`](tools/textmate) | Shipped — TextMate grammar (VS Code, IDEA Community, docs-site Shiki) |
 
-Phase 06.4 (Lit / Web Components target) and Phase 07 (publish to npm under MIT v1.0) are the remaining milestones before public release.
+All six target emitters and the toolchain (CLI, Babel plugin, unplugin, editor tooling) are shipped and feature-complete internally. Public npm release under MIT (v1.0) is the remaining milestone before public availability.
 
 ## Quick look
 
@@ -59,7 +63,7 @@ import Rozie from '@rozie/unplugin/vite';
 import vue from '@vitejs/plugin-vue'; // or @vitejs/plugin-react, @sveltejs/vite-plugin-svelte, etc.
 
 export default { plugins: [Rozie({ target: 'vue' }), vue()] };
-//                                  ^^^^^ swap for 'react' | 'svelte' | 'angular' | 'solid'
+//                                  ^^^^^ swap for 'react' | 'svelte' | 'angular' | 'solid' | 'lit'
 ```
 
 ```vue
@@ -69,15 +73,15 @@ import Counter from './Counter.rozie';
 <template><Counter v-model:value="n" /></template>
 ```
 
-See the [docs site](https://one-learning-community.github.io/rozie.js/examples/) for the same `.rozie` source compiled side-by-side into all five targets, plus live demos for each example.
+See the [docs site](https://one-learning-community.github.io/rozie.js/examples/) for the same `.rozie` source compiled side-by-side into all six targets, plus live demos for each example.
 
 ## Repo layout
 
 ```
 packages/
   core/                                SFC parser, IR, lowering pipeline
-  targets/{vue,react,svelte,angular,solid}/   Per-framework emitters
-  runtime/{vue,react,solid}/           Runtime helpers consumed by emitted code
+  targets/{vue,react,svelte,angular,solid,lit}/  Per-framework emitters
+  runtime/{vue,react,svelte,solid,lit}/  Runtime helpers consumed by emitted code
   unplugin/                            Vite/Rollup/Webpack/esbuild/Rolldown/Rspack plugin
   cli/                                 Standalone `rozie build` CLI
   babel-plugin/                        Babel-plugin path for non-Vite consumers
@@ -107,7 +111,7 @@ pnpm -r --filter '@rozie/core' --filter '@rozie/unplugin' --filter '@rozie/targe
 Then either run one of the consumer demos:
 
 ```bash
-cd examples/consumers/vue-vite      # or react-vite, svelte-vite, angular-analogjs, solid-vite
+cd examples/consumers/vue-vite      # or react-vite, svelte-vite, angular-analogjs, solid-vite, lit-vanilla-demo
 pnpm dev                            # dev server with HMR
 pnpm test:e2e                       # Playwright suite for this target
 ```
