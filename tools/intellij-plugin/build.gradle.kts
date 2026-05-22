@@ -94,7 +94,9 @@ intellijPlatform {
             three <code>r-model</code> modifiers. SFC block folding:
             <code>&lt;template&gt;</code>, <code>&lt;script&gt;</code>,
             <code>&lt;style&gt;</code> and the other blocks collapse to a
-            one-line placeholder.</p>
+            one-line placeholder. Quick documentation: Ctrl-Q / hover on an
+            <code>r-*</code> directive, a modifier, or a <code>${'$'}</code>-magic
+            identifier now shows inline docs.</p>
             <p><strong>0.2.0</strong> — Architectural pivot to injection-first model.
             HTML coloring inside &lt;template&gt; now matches the TextMate bundle.
             Smart navigation: ${'$'}props.X / ${'$'}data.X / ${'$'}refs.X Go-to-Declaration.

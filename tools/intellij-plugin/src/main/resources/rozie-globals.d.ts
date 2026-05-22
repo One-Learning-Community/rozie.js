@@ -74,16 +74,29 @@
 // Strategy B is the only mechanism that satisfies Pitfall 2.
 // =============================================================================
 
+/** Component props object — declared in the `<props>` block. Reactive accessor. */
 declare const $props: any;
+/** Reactive local state — declared in the `<data>` block. */
 declare const $data: any;
+/** Element refs — populated by `ref="name"` attributes in `<template>`. */
 declare const $refs: any;
+/** Dispatch a custom event upward to the consumer. */
 declare function $emit(name: string, ...args: any[]): void;
+/** Derived reactive value — `$computed(() => expr)` returns a computed signal. */
 declare function $computed<T>(getter: () => T): T;
+/** Lifecycle hook — runs after the component's first render. */
 declare function $onMount(callback: () => void | (() => void)): void;
+/** Lifecycle hook — runs on teardown / cleanup. */
 declare function $onUnmount(callback: () => void): void;
+/** Lifecycle hook — runs after every reactive update. */
 declare function $onUpdate(callback: () => void | (() => void)): void;
+/** React to a getter — `$watch(() => expr, (next, prev) => {})`. */
 declare function $watch<T>(getter: () => T, callback: (newValue: T, oldValue: T) => void): void;
+/** Named slot fills passed by the consumer. */
 declare const $slots: any;
+/** The component's root DOM element. */
 declare const $el: any;
+/** Render a slot into an external container — `$portals.X(el, scope)`. */
 declare const $portals: any;
+/** Resolve an authored class name to its emitted CSS selector string. */
 declare function $classSelector(className: string): string;

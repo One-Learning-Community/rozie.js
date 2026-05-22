@@ -29,7 +29,9 @@
         modifiers, the key/button filters (on keyboard events), and the three
         <code>r-model</code> modifiers. SFC block folding: <code>&lt;template&gt;</code>,
         <code>&lt;script&gt;</code>, <code>&lt;style&gt;</code> and the other
-        blocks collapse to a one-line placeholder.</p>
+        blocks collapse to a one-line placeholder. Quick documentation:
+        Ctrl-Q / hover on an <code>r-*</code> directive, a modifier, or a
+        <code>$</code>-magic identifier now shows inline docs.</p>
         <p><strong>0.2.0</strong> — Architectural pivot to injection-first model.
         HTML coloring inside &lt;template&gt; now matches the TextMate bundle.
         Smart navigation: $props.X / $data.X / $refs.X Go-to-Declaration.
@@ -77,6 +79,17 @@
         <lang.foldingBuilder
             language="Rozie"
             implementationClass="js.rozie.intellij.folding.RozieFoldingBuilder"/>
+
+        <!-- 0.3.0: Quick-Doc (Ctrl-Q) / hover documentation for Rozie template
+             attributes — r-* directives, @event / r-on listeners, :prop
+             bindings, #slot fills, ref, and the .modifier chain. Registered
+             for HTML because the XmlAttribute PSI lives in the injected
+             <template> fragment; RozieContextCheck guards non-Rozie .html
+             files. The $-magic-identifier docs ride the JSDoc on
+             rozie-globals.d.ts instead. -->
+        <lang.documentationProvider
+            language="HTML"
+            implementationClass="js.rozie.intellij.documentation.RozieAttributeDocumentationProvider"/>
 
         <multiHostInjector
             implementation="js.rozie.intellij.injection.RozieMultiHostInjector"/>

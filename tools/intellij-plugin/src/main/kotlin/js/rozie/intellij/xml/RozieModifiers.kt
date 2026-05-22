@@ -65,4 +65,46 @@ object RozieModifiers {
         in KEY_FILTERS -> "key filter"
         else -> "event modifier"
     }
+
+    /**
+     * Extract the bare modifier names from a modifier chain such as
+     * `.outside($refs.x).stop.debounce(300)` → `["outside", "stop", "debounce"]`.
+     *
+     * Balanced parentheses are skipped, so a `.` inside an argument expression
+     * (e.g. `$refs.x`) does not split a segment — a naive `split('.')` would
+     * mis-parse arg-bearing chains. [chain] is expected to begin at the first
+     * `.` of the chain; a leading `.` is required for the first modifier to be
+     * picked up.
+     */
+    fun parseModifierNames(chain: String): List<String> {
+        val names = ArrayList<String>()
+        var i = 0
+        while (i < chain.length) {
+            if (chain[i] != '.') {
+                i++
+                continue
+            }
+            i++ // past the '.'
+            val start = i
+            while (i < chain.length &&
+                (chain[i].isLetterOrDigit() || chain[i] == '-' || chain[i] == '_')
+            ) {
+                i++
+            }
+            if (i > start) names.add(chain.substring(start, i))
+            // Skip a balanced (...) argument list if one follows the name.
+            if (i < chain.length && chain[i] == '(') {
+                var depth = 1
+                i++
+                while (i < chain.length && depth > 0) {
+                    when (chain[i]) {
+                        '(' -> depth++
+                        ')' -> depth--
+                    }
+                    i++
+                }
+            }
+        }
+        return names
+    }
 }
