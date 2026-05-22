@@ -2,8 +2,8 @@ package js.rozie.intellij
 
 import com.intellij.codeInspection.InspectionSuppressor
 import com.intellij.codeInspection.LanguageInspectionSuppressors
+import com.intellij.lang.Language
 import com.intellij.lang.injection.InjectedLanguageManager
-import com.intellij.lang.javascript.JavascriptLanguage
 import com.intellij.psi.PsiFile
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
@@ -151,7 +151,13 @@ class RozieJSInspectionSuppressorTest : BasePlatformTestCase() {
      * we explicitly pick our own class so the assertion is unambiguous.
      */
     private fun resolveJsSuppressor(): RozieJSInspectionSuppressor {
-        val all = LanguageInspectionSuppressors.INSTANCE.allForLanguage(JavascriptLanguage.INSTANCE)
+        // `Language.findLanguageByID("JavaScript")` rather than
+        // `JavascriptLanguage.INSTANCE`: the latter's `INSTANCE` field was
+        // removed in IntelliJ 2025.3 (the class became a Kotlin `object`),
+        // so the static accessor compiles on 2024.2 but not 2025.3. Lookup
+        // by language ID is stable across both platform versions.
+        val jsLanguage = Language.findLanguageByID("JavaScript")!!
+        val all = LanguageInspectionSuppressors.INSTANCE.allForLanguage(jsLanguage)
         val ours = all.filterIsInstance<RozieJSInspectionSuppressor>().firstOrNull()
         assertNotNull(
             "RozieJSInspectionSuppressor must be registered via " +
