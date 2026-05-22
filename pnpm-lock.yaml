@@ -1443,6 +1443,37 @@ importers:
         specifier: ^4
         version: 4.1.5(@types/node@22.19.17)(@vitest/coverage-v8@4.1.5)(happy-dom@15.11.7)(jsdom@25.0.1)(vite@8.0.10(@types/node@22.19.17)(esbuild@0.28.0)(jiti@2.7.0)(less@4.4.2)(sass@1.97.3)(terser@5.46.2))
 
+  tests/plugins/phone:
+    dependencies:
+      '@rozie/core':
+        specifier: workspace:*
+        version: link:../../../packages/core
+    devDependencies:
+      '@rozie/target-angular':
+        specifier: workspace:*
+        version: link:../../../packages/targets/angular
+      '@rozie/target-lit':
+        specifier: workspace:*
+        version: link:../../../packages/targets/lit
+      '@rozie/target-react':
+        specifier: workspace:*
+        version: link:../../../packages/targets/react
+      '@rozie/target-solid':
+        specifier: workspace:*
+        version: link:../../../packages/targets/solid
+      '@rozie/target-svelte':
+        specifier: workspace:*
+        version: link:../../../packages/targets/svelte
+      '@rozie/target-vue':
+        specifier: workspace:*
+        version: link:../../../packages/targets/vue
+      typescript:
+        specifier: ^5.6
+        version: 5.6.3
+      vitest:
+        specifier: ^4
+        version: 4.1.5(@types/node@22.19.17)(@vitest/coverage-v8@4.1.5)(happy-dom@15.11.7)(jsdom@25.0.1)(vite@8.0.10(@types/node@22.19.17)(esbuild@0.28.0)(jiti@2.7.0)(less@4.4.2)(sass@1.97.3)(terser@5.46.2))
+
   tests/plugins/swipe:
     dependencies:
       '@rozie/core':
