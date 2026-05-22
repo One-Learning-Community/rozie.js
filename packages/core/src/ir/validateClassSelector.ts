@@ -48,7 +48,6 @@ import type {
   StyleSection,
   TemplateNode,
   Listener,
-  ComputedDecl,
 } from './types.js';
 
 // Default-export interop: @babel/traverse ships a CJS default export that some
@@ -265,11 +264,19 @@ function scanNode(
 /**
  * Validate every `$classSelector('<class>')` call in the component's IR.
  *
- * Scans four IR regions where a `$classSelector` call can appear:
- *   1. `ir.setupBody.scriptProgram`        — the `<script>` Babel Program.
- *   2. `ir.template` `AttributeBinding`s   — `:attr="$classSelector('x')"`.
+ * Scans three IR regions where a `$classSelector` call can appear:
+ *   1. `ir.setupBody.scriptProgram`        — the `<script>` Babel Program. This
+ *      ALSO covers every `$computed(() => …)` initializer body: `lowerScript`
+ *      classifies declarators but does not splice the `$computed` variable
+ *      declarator out of the Program, and `ComputedDecl.body` is a *reference*
+ *      into `scriptProgram` (not a copy). A separate `ir.computed[].body` scan
+ *      would re-visit the same nodes and push a byte-identical duplicate
+ *      diagnostic for every `$classSelector` call inside a `$computed` body.
+ *   2. `ir.template` `AttributeBinding`s   — `:attr="$classSelector('x')"`. The
+ *      `AttributeBinding` kinds scanned are `binding` (`:attr="…"`),
+ *      `twoWayBinding` (`r-model:prop="…"` RHS), and the `binding` segments of
+ *      an `interpolated` attribute; `static` segments are literal text.
  *   3. `ir.listeners` `when` / `handler`   — `<listeners>` block + template @event.
- *   4. `ir.computed[].body`                — `$computed(() => $classSelector('x'))`.
  *
  * @param ir          - the lowered IRComponent
  * @param diagnostics - accumulator (mutated in place; ROZ965/966/967 pushed)
@@ -316,8 +323,9 @@ export function validateClassSelector(
   };
   for (const listener of ir.listeners) scanListener(listener);
 
-  // (4) $computed initializer bodies.
-  for (const computed of ir.computed as ComputedDecl[]) {
-    scanNode(computed.body, declared, diagnostics);
-  }
+  // (4) $computed initializer bodies — REMOVED: `ComputedDecl.body` is a
+  // reference into `ir.setupBody.scriptProgram` (the `$computed` declarator is
+  // never spliced out of the Program), so it is already scanned by region (1).
+  // Scanning it again double-reported every `$classSelector` call inside a
+  // `$computed` body with a byte-identical diagnostic (WR-01).
 }
