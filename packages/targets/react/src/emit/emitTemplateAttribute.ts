@@ -391,6 +391,13 @@ function composeClassName(
       } else {
         segments.push({ kind: 'plainBinding', expr: a.expression });
       }
+    } else if (a.kind === 'spreadBinding') {
+      // Phase 14 — `spreadBinding` is the name-less kind: `bucket()` skips it
+      // so it never reaches a `class` merge. Unreachable; mirrors the
+      // `twoWayBinding` guard above.
+      throw new Error(
+        `React target: spreadBinding not valid in class array context (Phase 14).`,
+      );
     } else {
       // interpolated
       segments.push({ kind: 'interpolated', segments: a.segments as InterpolatedSeg[] });
@@ -621,10 +628,16 @@ function renderInterpolatedClass(
 
 /**
  * Group attributes by name, returning a Map for lookup.
+ *
+ * Phase 14 — `spreadBinding` is the name-less `AttributeBinding` kind (D-07):
+ * it binds an open-ended object, not a single named attribute, so it never
+ * participates in class name-bucketing and is skipped here. `emitAttributes`
+ * emits it directly as a JSX spread (`{...<expr>}`).
  */
 function bucket(attrs: AttributeBinding[]): Map<string, AttributeBinding[]> {
   const map = new Map<string, AttributeBinding[]>();
   for (const a of attrs) {
+    if (a.kind === 'spreadBinding') continue;
     const list = map.get(a.name) ?? [];
     list.push(a);
     map.set(a.name, list);
@@ -817,6 +830,13 @@ function emitNonClassAttribute(
     };
   }
 
+  // Phase 14 — `spreadBinding` is handled in `emitAttributes` before this
+  // function is ever called (the JSX `{...obj}` spread has no name to render
+  // as a pair). This guard is for TS exhaustiveness only.
+  if (attr.kind === 'spreadBinding') {
+    return { jsx: `{...${renderExpr(attr.expression, ctx.ir)}}`, diagnostics };
+  }
+
   // interpolated
   const jsxName = colonPropToJsxName(attr.name);
   // Build a backtick template literal directly without class-token splitting
@@ -859,6 +879,16 @@ export function emitAttributes(
 
   for (const a of attrs) {
     if (consumed.has(a)) continue;
+
+    // Phase 14 R2 / D-07 — the bare-spread `r-bind="<expr>"` form (and the
+    // synthesized `$attrs` auto-fallthrough spread). React's native
+    // attribute-spread idiom is the JSX spread `{...<obj>}` — every own
+    // enumerable key of the object becomes a prop on the host element.
+    if (a.kind === 'spreadBinding') {
+      out.push(`{...${renderExpr(a.expression, ctx.ir)}}`);
+      consumed.add(a);
+      continue;
+    }
 
     if (isConsumedAttribute(a.name)) {
       consumed.add(a);

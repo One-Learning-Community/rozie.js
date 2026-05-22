@@ -188,8 +188,11 @@ export function emitRModel(
 ): EmitRModelResult {
   const diagnostics: Diagnostic[] = [];
 
+  // Phase 14 — `spreadBinding` is the name-less kind; guard before `.name`.
   const rModelAttr = element.attributes.find(
-    (a) => a.name === 'r-model' || a.name === 'r-model:value',
+    (a) =>
+      a.kind !== 'spreadBinding' &&
+      (a.name === 'r-model' || a.name === 'r-model:value'),
   );
   if (!rModelAttr) return { replacementAttributes: [], diagnostics };
   if (rModelAttr.kind !== 'binding') return { replacementAttributes: [], diagnostics };

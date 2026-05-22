@@ -355,6 +355,17 @@ export function emitSingleAttr(
   ctx: EmitAttrCtx,
   elementTagName: string,
 ): string | null {
+  // Phase 14 R2 / D-07 / D-01 — the bare-spread `r-bind="<expr>"` form (and the
+  // synthesized `$attrs` auto-fallthrough spread). Angular has NO native
+  // attribute-object spread; D-01 / 14-RESEARCH Pattern 3 specifies an
+  // `effect()` + `Renderer2` imperative diff helper. That bespoke mechanism is
+  // Wave 3 (Plan 14-03) work — RESEARCH §Recommendation explicitly scopes
+  // "Angular + Lit bespoke mechanisms" to a later wave than the four
+  // near-native targets. Until then, skip the spread (emit nothing) so the IR
+  // can carry the synthesized `$attrs` spreadBinding without crashing the
+  // Angular emitter. KNOWN STUB — resolved by Plan 14-03.
+  if (attr.kind === 'spreadBinding') return null;
+
   // r-html handled at the element level.
   if (attr.name === 'r-html') return null;
 
@@ -488,6 +499,14 @@ function attrToArraySegment(attr: AttributeBinding, ctx: EmitAttrCtx): string {
       loopBindings: ctx.loopBindings,
     });
   }
+  if (attr.kind === 'spreadBinding') {
+    // Phase 14 — `spreadBinding` is the name-less kind: it never reaches a
+    // class/style merge (no name to coalesce on). Unreachable; mirrors the
+    // `twoWayBinding` guard above.
+    throw new Error(
+      `Angular target: spreadBinding not valid in class/style array context (Phase 14).`,
+    );
+  }
   if (attr.segments.length === 1 && attr.segments[0]!.kind === 'binding') {
     const seg = attr.segments[0]! as { kind: 'binding'; expression: t.Expression; deps: unknown };
     return rewriteTemplateExpression(seg.expression, ctx.ir, {
@@ -510,9 +529,12 @@ export function emitAttributes(
 ): string {
   if (attrs.length === 0) return '';
 
-  // Group by name to detect class/style merges.
+  // Group by name to detect class/style merges. Phase 14 — `spreadBinding`
+  // is the name-less kind: it never participates in class/style merging, so
+  // it is excluded from the duplicate-name count.
   const counts = new Map<string, number>();
   for (const a of attrs) {
+    if (a.kind === 'spreadBinding') continue;
     if (a.name === 'r-html') continue;
     counts.set(a.name, (counts.get(a.name) ?? 0) + 1);
   }
@@ -522,11 +544,24 @@ export function emitAttributes(
 
   for (const a of attrs) {
     if (consumed.has(a)) continue;
+
+    // Phase 14 — the name-less `spreadBinding` goes straight to `emitSingleAttr`
+    // (which skips it — Angular D-01 spread is Wave 3 / Plan 14-03), bypassing
+    // the class/style name-merge logic that would read its absent `.name`.
+    if (a.kind === 'spreadBinding') {
+      const rendered = emitSingleAttr(a, ctx, elementTagName);
+      if (rendered !== null) out.push(rendered);
+      consumed.add(a);
+      continue;
+    }
+
     if (a.name === 'r-html') continue;
 
     // class= merge: multiple class attrs combine via Angular's [ngClass].
     if (a.name === 'class' && (counts.get('class') ?? 0) > 1) {
-      const sameName = attrs.filter((x) => x.name === 'class');
+      const sameName = attrs.filter(
+        (x) => x.kind !== 'spreadBinding' && x.name === 'class',
+      );
       for (const x of sameName) consumed.add(x);
       // Static classes stay as `class="..."`; dynamic merges to `[ngClass]`.
       const staticParts: string[] = [];
@@ -568,7 +603,9 @@ export function emitAttributes(
 
     // style= merge similarly via [ngStyle].
     if (a.name === 'style' && (counts.get('style') ?? 0) > 1) {
-      const sameName = attrs.filter((x) => x.name === 'style');
+      const sameName = attrs.filter(
+        (x) => x.kind !== 'spreadBinding' && x.name === 'style',
+      );
       for (const x of sameName) consumed.add(x);
       const staticParts: string[] = [];
       const dynamicParts: string[] = [];
@@ -608,6 +645,8 @@ export function findRHtml(
   attrs: AttributeBinding[],
 ): { expression: t.Expression } | null {
   for (const a of attrs) {
+    // Phase 14 — `spreadBinding` is the name-less kind; skip before `.name`.
+    if (a.kind === 'spreadBinding') continue;
     if (a.name !== 'r-html') continue;
     if (a.kind === 'binding') return { expression: a.expression };
   }
@@ -619,6 +658,8 @@ export function findRShow(
   attrs: AttributeBinding[],
 ): { expression: t.Expression } | null {
   for (const a of attrs) {
+    // Phase 14 — `spreadBinding` is the name-less kind; skip before `.name`.
+    if (a.kind === 'spreadBinding') continue;
     if (a.name !== 'r-show') continue;
     if (a.kind === 'binding') return { expression: a.expression };
   }

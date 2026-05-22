@@ -285,9 +285,17 @@ export function emitSingleAttr(
   ctx: EmitAttrCtx,
 ): string | null {
   // r-html is handled at the element level, not as an attribute.
-  if (attr.name === 'r-html') return null;
+  if (attr.kind !== 'spreadBinding' && attr.name === 'r-html') return null;
 
   const ir = ctx.ir;
+
+  // Phase 14 R2 / D-07 — the bare-spread `r-bind="<expr>"` form (and the
+  // synthesized `$attrs` auto-fallthrough spread). Svelte's native
+  // attribute-spread idiom is the `{...<obj>}` spread directive — every own
+  // enumerable key of the object becomes an attribute on the host element.
+  if (attr.kind === 'spreadBinding') {
+    return `{...${rewriteTemplateExpression(attr.expression, ir)}}`;
+  }
 
   if (attr.kind === 'static') {
     // ref="<refName>" → bind:this={refName} (Svelte 5 idiom).
@@ -411,6 +419,14 @@ function attrToArraySegment(attr: AttributeBinding, ir: IRComponent): string {
   if (attr.kind === 'binding') {
     return rewriteTemplateExpression(attr.expression, ir);
   }
+  if (attr.kind === 'spreadBinding') {
+    // Phase 14 — `spreadBinding` is the name-less kind: it never reaches a
+    // class/style merge (it has no name to coalesce on). Unreachable; mirrors
+    // the `twoWayBinding` guard above.
+    throw new Error(
+      `Svelte target: spreadBinding not valid in class/style array context (Phase 14).`,
+    );
+  }
   // interpolated
   if (attr.segments.length === 1 && attr.segments[0]!.kind === 'binding') {
     const seg = attr.segments[0]! as { kind: 'binding'; expression: t.Expression; deps: unknown };
@@ -445,9 +461,12 @@ export function emitAttributes(
     a.name === 'style' &&
     t.isObjectExpression(a.expression);
 
-  // Group by name to detect class/style merges.
+  // Group by name to detect class/style merges. Phase 14 — `spreadBinding`
+  // is the name-less kind: it never participates in class/style merging, so
+  // it is excluded from the duplicate-name count.
   const counts = new Map<string, number>();
   for (const a of attrs) {
+    if (a.kind === 'spreadBinding') continue;
     if (a.name === 'r-html') continue;
     if (isLiteralStyleObjectBinding(a)) continue;
     counts.set(a.name, (counts.get(a.name) ?? 0) + 1);
@@ -458,6 +477,16 @@ export function emitAttributes(
 
   for (const a of attrs) {
     if (consumed.has(a)) continue;
+
+    // Phase 14 R2 / D-07 — emit the name-less `spreadBinding` directly via
+    // `emitSingleAttr` (→ `{...<expr>}`); it skips the class/style name-merge.
+    if (a.kind === 'spreadBinding') {
+      const rendered = emitSingleAttr(a, ctx);
+      if (rendered !== null) out.push(rendered);
+      consumed.add(a);
+      continue;
+    }
+
     if (a.name === 'r-html') continue;
 
     if (
@@ -465,7 +494,10 @@ export function emitAttributes(
       (counts.get(a.name) ?? 0) > 1
     ) {
       // Merge ALL same-named class/style attrs into ONE array binding.
-      const sameName = attrs.filter((x) => x.name === a.name);
+      // Phase 14 — `spreadBinding` is the name-less kind; guard before `.name`.
+      const sameName = attrs.filter(
+        (x) => x.kind !== 'spreadBinding' && x.name === a.name,
+      );
       for (const x of sameName) consumed.add(x);
       const segments = sameName.map((x) => attrToArraySegment(x, ctx.ir));
       out.push(`${a.name}={[${segments.join(', ')}]}`);
@@ -489,6 +521,8 @@ export function findRHtml(
   attrs: AttributeBinding[],
 ): { expression: t.Expression } | null {
   for (const a of attrs) {
+    // Phase 14 — `spreadBinding` is the name-less kind; skip before `.name`.
+    if (a.kind === 'spreadBinding') continue;
     if (a.name !== 'r-html') continue;
     if (a.kind === 'binding') return { expression: a.expression };
   }

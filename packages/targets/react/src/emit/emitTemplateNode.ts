@@ -146,6 +146,9 @@ function emitLoop(node: TemplateLoopIR, ctx: EmitNodeCtx): string {
  */
 function findAttribute(attrs: AttributeBinding[], name: string): AttributeBinding | null {
   for (const a of attrs) {
+    // Phase 14 — `spreadBinding` is the name-less kind; it never matches a
+    // by-name lookup.
+    if (a.kind === 'spreadBinding') continue;
     if (a.name === name) return a;
   }
   return null;

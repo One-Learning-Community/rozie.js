@@ -55,6 +55,15 @@ export function emitTemplateAttribute(
   if (attr.kind === 'static') {
     return `${attr.name}="${attr.value}"`;
   }
+  // Phase 14 R2 / D-07 / D-02 — the bare-spread `r-bind="<expr>"` form (and the
+  // synthesized `$attrs` auto-fallthrough spread). Lit has no native
+  // attribute-object spread; D-02 specifies a lit-html element-position
+  // `rozieSpread` directive (14-RESEARCH Pattern 4) shipped from
+  // `@rozie/runtime-lit`. That bespoke mechanism is Wave 3 (Plan 14-03) work.
+  // Until then, skip the spread (emit nothing) so the IR can carry the
+  // synthesized `$attrs` spreadBinding without crashing the Lit emitter.
+  // KNOWN STUB — resolved by Plan 14-03.
+  if (attr.kind === 'spreadBinding') return '';
   // Phase 07.3 Plan 07.3-08 (TWO-WAY-03) — consumer-side `r-model:propName=`
   // two-way binding. Producer side (createLitControllableProperty +
   // dispatchEvent('<kebab(propName)>-change', { detail })) is already locked

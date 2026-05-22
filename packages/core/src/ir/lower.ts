@@ -34,13 +34,14 @@ import { lowerProps } from './lowerers/lowerProps.js';
 import { lowerData } from './lowerers/lowerData.js';
 import { lowerScript } from './lowerers/lowerScript.js';
 import { lowerListeners } from './lowerers/lowerListeners.js';
-import { lowerTemplate } from './lowerers/lowerTemplate.js';
+import { lowerTemplate, synthesizeAttrsFallthrough } from './lowerers/lowerTemplate.js';
 import { lowerComponents } from './lowerers/lowerComponents.js';
 import { lowerSlots } from './lowerers/lowerSlots.js';
 import { lowerStyles } from './lowerers/lowerStyles.js';
 import { typeNeutralizeScript } from '../codegen/typeNeutralizeScript.js';
 import { lowerRootElementRef } from './lowerers/lowerRootElementRef.js';
 import { validateClassSelector } from './validateClassSelector.js';
+import { validateAttrFallthrough } from './validateAttrFallthrough.js';
 import * as t from '@babel/types';
 
 /**
@@ -210,6 +211,27 @@ export function lowerToIR(ast: RozieAST, opts: LowerOptions): LowerResult {
   // Collected-not-thrown (D-08): pushes ROZ965/966/967 diagnostics; never
   // mutates `ir`.
   validateClassSelector(ir, diagnostics);
+
+  // Phase 14 — validate cross-framework attribute fallthrough (R8/R9). Wired
+  // directly after validateClassSelector — the same lowerToIR chokepoint both
+  // compile() and @rozie/unplugin share, so a fallthrough problem is caught
+  // regardless of entrypoint. Collected-not-thrown (D-08): pushes ROZ970
+  // (multi-root error) / ROZ971 (double-apply warning); never mutates `ir`.
+  validateAttrFallthrough(ir, diagnostics);
+
+  // Phase 14 R4 / RESEARCH.md Pattern 5 — `synthesizeAttrsFallthrough` (defined
+  // in `lowerers/lowerTemplate.ts`) appends the `$attrs` auto-fallthrough
+  // `spreadBinding` onto the single root element. It is INTENTIONALLY NOT
+  // CALLED here yet: synthesizing the spread produces a `$attrs` magic-accessor
+  // Identifier in the IR, and lowering that accessor to a real per-target
+  // binding (React `props` rest, Svelte `$$restProps`, Solid `splitProps`
+  // rest, Vue native `$attrs`, Angular/Lit bespoke) is per-target emitter work
+  // — Plan 14-03 (Wave 3). Running synthesis before that lowering exists emits
+  // a literal, unbound `$attrs` identifier on 5/6 targets (e.g. Svelte rejects
+  // `{...$attrs}` outright — `$`-prefixed identifiers are illegal). Plan 14-03
+  // wires the per-target `$attrs` lowering AND the `synthesizeAttrsFallthrough`
+  // call together. See 14-02-SUMMARY.md § Deviations for the full rationale.
+  void synthesizeAttrsFallthrough;
 
   return { ir, diagnostics, depGraph, bindings };
 }

@@ -270,6 +270,8 @@ function emitStaticText(node: TemplateStaticTextIR): string {
 }
 
 function attributeIsRModel(attr: AttributeBinding): boolean {
+  // Phase 14 — `spreadBinding` is the name-less kind; it is never `r-model`.
+  if (attr.kind === 'spreadBinding') return false;
   return attr.name === 'r-model';
 }
 
@@ -300,6 +302,18 @@ function emitAttribute(
     // Pass through static attribute as-is.
     return `${attr.name}="${attr.value}"`;
   }
+
+  // Phase 14 R2 / D-07 / D-02 — the bare-spread `r-bind="<expr>"` form (and the
+  // synthesized `$attrs` auto-fallthrough spread). Lit has no native
+  // attribute-object spread; D-02 / 14-RESEARCH Pattern 4 specifies a
+  // lit-html element-position `rozieSpread` directive shipped from
+  // `@rozie/runtime-lit`. That bespoke mechanism is Wave 3 (Plan 14-03) work —
+  // RESEARCH §Recommendation explicitly scopes "Angular + Lit bespoke
+  // mechanisms" to a later wave than the four near-native targets. Until then,
+  // skip the spread (emit nothing) so the IR can carry the synthesized
+  // `$attrs` spreadBinding without crashing the Lit emitter. KNOWN STUB —
+  // resolved by Plan 14-03.
+  if (attr.kind === 'spreadBinding') return '';
 
   // Phase 07.3 Plan 09 — consumer-side `r-model:propName=` two-way binding.
   // Producer side (`createLitControllableProperty` + dispatchEvent of
@@ -408,7 +422,7 @@ function buildRModelParts(
   // WR-10 fix: detect checkbox/radio inputs via the sibling `type` attribute
   // and use `.checked` / `@change` instead of `.value` / `@input`.
   const typeAttr = allAttrs.find(
-    (a) => a.name === 'type' && a.kind === 'static',
+    (a) => a.kind === 'static' && a.name === 'type',
   );
   const inputType =
     typeAttr && typeAttr.kind === 'static' ? typeAttr.value.toLowerCase() : '';
@@ -820,6 +834,9 @@ function emitElementOpenTag(
   const staticClassValues: string[] = [];
   let bindingClass: AttributeBinding | null = null;
   for (const attr of node.attributes) {
+    // Phase 14 — `spreadBinding` is the name-less kind; it is not a `class`
+    // attribute and never participates in the classMap merge.
+    if (attr.kind === 'spreadBinding') continue;
     if (attr.name === 'class') {
       if (attr.kind === 'static') {
         staticClassValues.push(attr.value);
@@ -866,12 +883,17 @@ function emitElementOpenTag(
   }
 
   for (const attr of node.attributes) {
-    if (attr.name === 'class') continue;
-    if (attr.kind === 'static' && attr.name === 'ref') {
-      refAttr = `data-rozie-ref="${attr.value}"`;
-      continue;
+    // Phase 14 — `spreadBinding` is the name-less kind; it is not `class`/`ref`
+    // and is not `r-model`. Route it straight to `emitAttribute` (which skips
+    // it — Lit D-02 spread is Wave 3 / Plan 14-03).
+    if (attr.kind !== 'spreadBinding') {
+      if (attr.name === 'class') continue;
+      if (attr.kind === 'static' && attr.name === 'ref') {
+        refAttr = `data-rozie-ref="${attr.value}"`;
+        continue;
+      }
+      if (attributeIsRModel(attr)) continue;
     }
-    if (attributeIsRModel(attr)) continue;
     const emitted = emitAttribute(attr, ir, node.tagName, node.tagKind, opts);
     if (emitted) parts.push(emitted);
   }

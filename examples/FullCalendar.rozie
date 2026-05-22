@@ -34,7 +34,7 @@
       view } — heavier payload shape than prior examples
 -->
 
-<rozie name="FullCalendar">
+<rozie name="FullCalendar" inherit-attrs="false">
 
 <props>
 {

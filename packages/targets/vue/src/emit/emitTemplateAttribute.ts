@@ -261,6 +261,14 @@ function attrToArraySegment(attr: AttributeBinding, ir: IRComponent): string {
   if (attr.kind === 'binding') {
     return rewriteTemplateExpression(attr.expression, ir);
   }
+  if (attr.kind === 'spreadBinding') {
+    // Phase 14 — `spreadBinding` is the name-less kind: it never reaches a
+    // class/style merge (no name to coalesce on). Unreachable; mirrors the
+    // `twoWayBinding` guard above.
+    throw new Error(
+      `Vue target: spreadBinding not valid in class/style array context (Phase 14).`,
+    );
+  }
   // interpolated
   return '`' + renderInterpolatedTemplateLiteralSafe(attr.segments, ir) + '`';
 }
@@ -270,6 +278,14 @@ function attrToArraySegment(attr: AttributeBinding, ir: IRComponent): string {
  */
 function emitSingleAttr(attr: AttributeBinding, ctx: EmitAttrCtx): string {
   const ir = ctx.ir;
+  if (attr.kind === 'spreadBinding') {
+    // Phase 14 R2 / D-07 — the bare-spread `r-bind="<expr>"` form (and the
+    // synthesized `$attrs` auto-fallthrough spread). Vue's native
+    // attribute-spread idiom is argument-less `v-bind="<obj>"` — every own
+    // enumerable key of the object becomes an attribute on the host element.
+    const expr = rewriteTemplateExpression(attr.expression, ir);
+    return `v-bind="${expr}"`;
+  }
   if (attr.kind === 'twoWayBinding') {
     // Phase 07.3 Wave 3 Plan 07.3-03 (TWO-WAY-03) — consumer-side two-way binding.
     // Mirror native Vue 3.4+ idiom (D-01): `r-model:propName="<expr>"` lowers to
@@ -382,10 +398,16 @@ function emitSingleAttr(attr: AttributeBinding, ctx: EmitAttrCtx): string {
 
 /**
  * Bucket attributes by name. Returns lists keyed by name.
+ *
+ * Phase 14 — `spreadBinding` is the name-less `AttributeBinding` kind (D-07):
+ * it binds an open-ended object, not a single named attribute, so it never
+ * participates in class/style name-merging and is skipped here. `emitSingleAttr`
+ * still emits it (as `v-bind="<expr>"`) on the `emitMergedAttributes` pass.
  */
 function bucket(attrs: AttributeBinding[]): Map<string, AttributeBinding[]> {
   const map = new Map<string, AttributeBinding[]>();
   for (const a of attrs) {
+    if (a.kind === 'spreadBinding') continue;
     const list = map.get(a.name) ?? [];
     list.push(a);
     map.set(a.name, list);
@@ -423,6 +445,16 @@ export function emitMergedAttributes(
 
   for (const a of attrs) {
     if (consumed.has(a)) continue;
+
+    // Phase 14 — `spreadBinding` is the name-less kind (D-07): it never
+    // participates in class/style name-merging. Emit it directly via
+    // `emitSingleAttr` (→ `v-bind="<expr>"`) and skip the name-bucket logic,
+    // which would otherwise read its non-existent `.name`.
+    if (a.kind === 'spreadBinding') {
+      out.push(emitSingleAttr(a, ctx));
+      consumed.add(a);
+      continue;
+    }
 
     const sameNameAttrs = buckets.get(a.name) ?? [a];
 

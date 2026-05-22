@@ -1,4 +1,4 @@
-<rozie name="D20Template">
+<rozie name="D20Template" inherit-attrs="false">
 <props>{ closeOnOutsideClick: { type: Boolean, default: true } }</props>
 <script>
 const noop = () => {}

@@ -1478,6 +1478,77 @@ function lowerNodeList(
   return out;
 }
 
+/**
+ * Phase 14 R4 / RESEARCH.md Pattern 5 — synthesize the `$attrs` auto-fallthrough
+ * spread.
+ *
+ * When `inheritAttrs !== false` and the lowered template resolves to exactly
+ * one root `TemplateElement`, append a `spreadBinding` whose `expression` is the
+ * bare `$attrs` Identifier to that root element's `attributes`. This makes
+ * auto-fallthrough and a hand-written `r-bind="$attrs"` the IDENTICAL downstream
+ * code path — every emitter (Waves 2-3) handles exactly one `spreadBinding`
+ * branch, not a bespoke fallthrough feature.
+ *
+ * The synthesized spread is appended LAST so it positionally last-wins over the
+ * author's own named attributes for non-class/style keys (R6). class/style
+ * always-merge — that is the per-target emitter's job, not this pass's.
+ *
+ * No synthesis when:
+ *   - `inheritAttrs === false` (the author opted out), OR
+ *   - the template is multi-root / not a single `TemplateElement` (R8 — the
+ *     `validateAttrFallthrough` pass errors ROZ970 instead; there is no single
+ *     root to receive the spread).
+ *
+ * Single-root resolution mirrors `lowerRootElementRef.resolveRootElement`: a
+ * `TemplateElement` directly, OR a `TemplateFragment` whose children are one
+ * `TemplateElement` plus cosmetic whitespace text (any other structural sibling
+ * disqualifies). Mutates the passed template node in place; never throws (D-08).
+ *
+ * @param template      - the lowered template root (`LowerTemplateResult.template`)
+ * @param inheritAttrs  - `IRComponent.inheritAttrs`
+ */
+export function synthesizeAttrsFallthrough(
+  template: IRTemplateNode | null,
+  inheritAttrs: boolean,
+): void {
+  if (inheritAttrs === false) return;
+  if (template === null) return;
+
+  // Resolve the single root TemplateElement (direct, or the sole element of a
+  // whitespace-padded TemplateFragment). Anything else is multi-root / not a
+  // single element — no synthesis (R8 handles it).
+  let rootEl: TemplateElementIR | null = null;
+  if (template.type === 'TemplateElement') {
+    rootEl = template;
+  } else if (template.type === 'TemplateFragment') {
+    for (const child of template.children) {
+      if (child.type === 'TemplateStaticText') continue; // cosmetic whitespace
+      if (child.type === 'TemplateElement') {
+        if (rootEl !== null) {
+          rootEl = null; // multiple structural elements — not single-root
+          break;
+        }
+        rootEl = child;
+        continue;
+      }
+      // Any non-element/non-text structural sibling disqualifies.
+      rootEl = null;
+      break;
+    }
+  }
+  if (rootEl === null) return;
+
+  // Append the synthesized `$attrs` spread LAST. `deps` is empty — `$attrs` is
+  // a stable identifier (registered in STABLE_IDENTIFIERS, Plan 14-01), so it
+  // never participates in a target's reactive dep accounting.
+  rootEl.attributes.push({
+    kind: 'spreadBinding',
+    expression: t.identifier('$attrs'),
+    deps: [],
+    sourceLoc: rootEl.sourceLoc,
+  });
+}
+
 export function lowerTemplate(
   template: TemplateAST,
   bindings: BindingsTable,
