@@ -16,9 +16,18 @@ screenshots match the committed `__screenshots__/` baselines — WITHOUT
 overwriting the host checkout's macOS native bindings.
 
 ```sh
-tools/ci-repro/vr.sh                 # full matrix (exactly what CI runs)
-tools/ci-repro/vr.sh Uppy            # only cells matching --grep "Uppy"
-tools/ci-repro/vr.sh 'Uppy|Table'    # the argument is a Playwright --grep regex
+tools/ci-repro/vr.sh                       # full matrix (exactly what CI runs)
+tools/ci-repro/vr.sh Uppy                  # only cells matching --grep "Uppy"
+tools/ci-repro/vr.sh -g 'Uppy|Table'       # explicit --grep (named form)
+tools/ci-repro/vr.sh -u -g ThemedButton    # regen Linux baselines for that grep
+tools/ci-repro/vr.sh -u -g NewExample \
+  -b NewExample                            # regen + bootstrap-ungate matrix
+                                           # cells whose .png baseline is
+                                           # missing (chicken-and-egg escape
+                                           # hatch — see matrix.spec.ts)
+tools/ci-repro/vr.sh --shell               # interactive bash inside the
+                                           # pinned container; /work = mirror
+tools/ci-repro/vr.sh -h | --help           # full flag listing
 ```
 
 It rsyncs the working tree — uncommitted changes included, build output
@@ -29,6 +38,21 @@ against the mirror, and leaves the diff/actual/expected PNGs in
 mounted, so its rolldown/esbuild/swc binaries are never clobbered and no
 recovery `pnpm install` is needed afterward. The pinned image is read straight
 out of `visual-regression.yml`, so it cannot drift from what CI runs.
+
+**Baseline regen (`--update` / `-u`):** forwards `--update-snapshots` to
+Playwright inside the container. After the container exits 0, the mirror's
+`tests/visual-regression/__screenshots__/` is rsync'd back to the host repo so
+the regenerated PNGs are committable from your normal checkout. A
+`git status` summary of which baselines moved prints at the end. Use
+`-b <names>` to set `ROZIE_VR_BOOTSTRAP_BASELINE` for a brand-new example
+whose cells are still `test.fixme`-gated on baseline presence — without it
+`--update-snapshots` cannot reach the cell to generate the PNG.
+
+**Interactive debug (`--shell` / `-s`):** drops into bash inside the pinned
+container at `/work` (the mirror), with the Linux `node_modules` already
+populated. Useful for ad-hoc render inspection, repeated `playwright test`
+invocations, or trying out a fix without paying the install + build cost of
+each run. Mutually exclusive with `--update`.
 
 ### Dump every (example × target) screenshot to a temp dir
 
@@ -309,24 +333,35 @@ Playwright container. macOS-generated baselines diff against every cell
 on CI due to font binary / glyph metric differences (no amount of
 `-webkit-font-smoothing: none` fixes this).
 
-Recipe — runs a Playwright container, mounts the workspace, regenerates
-Vue baselines via `-u`, then verifies all 48 cells against them inside
-the container:
-
-The image tag must match the installed `@playwright/test` version
-(`^1.59.1`) — the container ships the browser build for exactly its own
-Playwright version, so a mismatch fails with "Executable doesn't exist".
-Bumping Playwright is perfectly fine; the snippet derives the tag from
-the lockfile so the image tracks the package automatically — no manual
-edit here when Playwright updates.
+**Preferred path — `tools/ci-repro/vr.sh -u`**. It uses the same pinned
+container as CI, runs against the Linux mirror (so the host checkout's
+native bindings are never clobbered), forces a Vue cell to render first
+so the D-10 single-baseline rule is satisfied, and rsync's the
+regenerated PNGs back to the host repo for commit. For a brand-new
+example whose cells are still baseline-gated as `test.fixme`, add
+`-b <Name>` to forward `ROZIE_VR_BOOTSTRAP_BASELINE` (the chicken-and-
+egg escape hatch in `matrix.spec.ts`):
 
 ```sh
-PW=$(cd tests/visual-regression && node -p "require('@playwright/test/package.json').version")
-docker pull "mcr.microsoft.com/playwright:v${PW}-jammy"
+# Per-example regen (recommended):
+tools/ci-repro/vr.sh -u -g '<Example> · vue' -b <Example>   # first pass: vue baseline
+tools/ci-repro/vr.sh -u -g <Example>                        # second pass: optional verify
+tools/ci-repro/vr.sh -g <Example>                           # third pass: stability check
+git add tests/visual-regression/__screenshots__/<Example>.png
+```
+
+**Full-matrix regen (fallback — only when the entire `__screenshots__/`
+folder needs to be rebuilt from scratch):** raw docker against the
+same digest-pinned container. The image tag is read from the workflow
+file the same way `vr.sh` does it, so it can never drift from CI:
+
+```sh
+IMAGE=$(grep -oE 'mcr\.microsoft\.com/playwright:[^ ]+' .github/workflows/visual-regression.yml | head -1)
+docker pull "$IMAGE"
 
 docker run --rm \
   -v "$PWD":/workspace -w /workspace \
-  "mcr.microsoft.com/playwright:v${PW}-jammy" bash -c '
+  "$IMAGE" bash -c '
     npm i -g pnpm@10 > /dev/null 2>&1 &&
     CI=true pnpm install --frozen-lockfile --prefer-offline &&
     pnpm turbo run build &&
@@ -336,14 +371,15 @@ docker run --rm \
   '
 ```
 
+The raw-docker form mounts the host workspace directly, which clobbers
+host `node_modules` native bindings on macOS (see
+`feedback_docker_clobbers_host_native_bindings`). Use `vr.sh -u`
+unless you specifically need a from-scratch full-matrix regen.
+
 Vue must run with `-u` first because the matrix is D-10 single-baseline
 (every target diffs against `${example}.png` which Vue generates). If
 all 6 targets run with `-u`, each subsequent one overwrites the prior's
 baseline.
-
-The mutated `tests/visual-regression/__screenshots__/*.png` files appear
-on the host after the container exits (OrbStack/Docker volume mount
-passes through writes). Commit and push.
 
 **Do not** set up `webServer:` workarounds — playwright.config.ts has
 `reuseExistingServer: !process.env.CI` and starts its own preview server
