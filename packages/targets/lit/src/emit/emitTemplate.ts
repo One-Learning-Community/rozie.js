@@ -424,11 +424,58 @@ function buildRModelParts(
     };
   }
 
+  // Phase 12 — the resolved `r-model` modifier chain. `.number`/`.trim` splice
+  // a `$v`-placeholder value-transform around the value access; `.lazy` swaps
+  // the event from `@input` to `@change` (D-08). Both are empty/absent for
+  // bare `r-model`, so its emit stays byte-identical to pre-phase.
+  const { valueTransforms, isLazy } = partitionModelModifiers(rModelAttr.modifiers);
+  const committedValue = applyValueTransformsString(
+    '($event.target as HTMLInputElement).value',
+    valueTransforms,
+  );
+
   return {
     propBinding: `.value=\${${code}}`,
-    eventName: 'input',
-    handlerBody: `($event) => ${code} = ($event.target as HTMLInputElement).value`,
+    eventName: isLazy ? 'change' : 'input',
+    handlerBody: `($event) => ${code} = ${committedValue}`,
   };
+}
+
+/**
+ * Phase 12 — partition the resolved `r-model` modifier list (mirrors the
+ * AST-based react/solid emitters, string-side):
+ *   - `valueTransforms`: ordered `$v`-placeholder fragments (D-07-canonical).
+ *   - `isLazy`: whether any modifier declares `eventSwap: 'change'` (`.lazy`).
+ */
+function partitionModelModifiers(
+  modifiers:
+    | { name: string; descriptor: { valueTransform?: string; eventSwap?: 'change' } }[]
+    | undefined,
+): { valueTransforms: string[]; isLazy: boolean } {
+  const valueTransforms: string[] = [];
+  let isLazy = false;
+  for (const m of modifiers ?? []) {
+    if (m.descriptor.valueTransform) valueTransforms.push(m.descriptor.valueTransform);
+    if (m.descriptor.eventSwap === 'change') isLazy = true;
+  }
+  return { valueTransforms, isLazy };
+}
+
+/**
+ * Phase 12 — splice the resolved `valueTransform` fragments into a value-access
+ * expression STRING. Each fragment carries the literal `$v` placeholder (D-03);
+ * substitute `$v` with the current expression text and chain. Empty list ⇒ the
+ * input string is returned unchanged (bare `r-model` byte-identical).
+ */
+function applyValueTransformsString(
+  valueAccess: string,
+  valueTransforms: string[],
+): string {
+  let current = valueAccess;
+  for (const fragment of valueTransforms) {
+    current = fragment.split('$v').join(`(${current})`);
+  }
+  return current;
 }
 
 /**

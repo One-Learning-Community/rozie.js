@@ -21,13 +21,25 @@
  * @experimental — shape may change before v1.0
  */
 import * as t from '@babel/types';
+import _generate from '@babel/generator';
+import type { GeneratorOptions } from '@babel/generator';
+import { parseExpression } from '@babel/parser';
 import type {
   IRComponent,
   TemplateElementIR,
   AttributeBinding,
+  ResolvedModelModifier,
 } from '../../../../core/src/ir/types.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { isPascalCase } from '../../../../core/src/ir/utils/isPascalCase.js';
+
+type GenerateFn = typeof import('@babel/generator').default;
+const generate: GenerateFn =
+  typeof _generate === 'function'
+    ? (_generate as GenerateFn)
+    : ((_generate as unknown as { default: GenerateFn }).default);
+
+const GEN_OPTS: GeneratorOptions = { retainLines: false, compact: true };
 
 function capitalize(name: string): string {
   if (name.length === 0) return name;
@@ -89,6 +101,45 @@ function makeBindingAttr(name: string, expression: t.Expression): AttributeBindi
 }
 
 /**
+ * Phase 12 — partition the resolved `r-model` modifier list into the two
+ * orthogonal concerns the emitter handles (mirrors the React emitter):
+ *   - `valueTransforms`: ordered `$v`-placeholder code fragments (already
+ *     D-07-canonicalized: `.trim` -> custom -> `.number` terminal).
+ *   - `isLazy`: whether any modifier declares `eventSwap: 'change'` (`.lazy`).
+ */
+function partitionModifiers(
+  modifiers: ResolvedModelModifier[] | undefined,
+): { valueTransforms: string[]; isLazy: boolean } {
+  const valueTransforms: string[] = [];
+  let isLazy = false;
+  for (const m of modifiers ?? []) {
+    if (m.descriptor.valueTransform) valueTransforms.push(m.descriptor.valueTransform);
+    if (m.descriptor.eventSwap === 'change') isLazy = true;
+  }
+  return { valueTransforms, isLazy };
+}
+
+/**
+ * Phase 12 — apply the resolved `valueTransform` fragments to a value-access
+ * expression node. Each fragment is a string containing the literal `$v`
+ * placeholder (D-03); substitute `$v` with the current expression source,
+ * re-parse, and chain. Empty list ⇒ the input node is returned unchanged, so
+ * non-modifier `r-model` stays byte-identical to pre-phase. A malformed
+ * fragment fails the parse loudly (threat register T-12-07).
+ */
+function applyValueTransforms(
+  valueAccess: t.Expression,
+  valueTransforms: string[],
+): t.Expression {
+  let current = valueAccess;
+  for (const fragment of valueTransforms) {
+    const currentSrc = generate(current, GEN_OPTS).code;
+    current = parseExpression(fragment.split('$v').join(`(${currentSrc})`));
+  }
+  return current;
+}
+
+/**
  * Emit r-model lowering for Solid. Returns replacement attributes.
  *
  * Signal getter: we emit `X()` by wrapping the identifier in a CallExpression.
@@ -114,6 +165,11 @@ export function emitRModel(
   const { local, setter } = target;
   const tag = element.tagName.toLowerCase();
   const inputType = (getStaticAttr(element.attributes, 'type') ?? 'text').toLowerCase();
+
+  // Phase 12 — the resolved `r-model` modifier chain. `valueTransforms` are
+  // the ordered `$v`-placeholder fragments (D-07-canonicalized); `isLazy`
+  // flags `.lazy`. Both are empty/false for bare `r-model`.
+  const { valueTransforms, isLazy } = partitionModifiers(rModelAttr.modifiers);
 
   // Build Babel nodes for replacement attributes.
   // Signal getter: local() — use a CallExpression so it passes through rewriteTemplateExpression
@@ -177,18 +233,23 @@ export function emitRModel(
   // <select>, <textarea>, <input type="text"> (default):
   // value={X()} onInput={($event) => setX($event.currentTarget.value)}
   // Solid's onInput fires on every keystroke; onChange fires on blur.
+  //
+  // Phase 12: `.number`/`.trim` wrap the committed value; `.lazy` swaps the
+  // event from `onInput` to `onChange` (D-08 — in Solid `onChange` IS the
+  // native change event, so no React-style uncontrolled-input workaround).
   const eTargetValue = t.memberExpression(
     t.memberExpression(eId, t.identifier('currentTarget')),
     t.identifier('value'),
   );
-  const onInputArrow = t.arrowFunctionExpression(
+  const committedValue = applyValueTransforms(eTargetValue, valueTransforms);
+  const handlerArrow = t.arrowFunctionExpression(
     [eId],
-    t.callExpression(setterId, [eTargetValue]),
+    t.callExpression(setterId, [committedValue]),
   );
   return {
     replacementAttributes: [
       makeBindingAttr(':value', localCallExpr),
-      makeBindingAttr(':onInput', onInputArrow),
+      makeBindingAttr(isLazy ? ':onChange' : ':onInput', handlerArrow),
     ],
     diagnostics,
   };
