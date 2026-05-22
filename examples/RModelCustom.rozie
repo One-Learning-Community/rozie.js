@@ -1,0 +1,39 @@
+<!--
+  RModelCustom.rozie
+
+  Demonstrates:
+    - A CUSTOM `r-model` modifier (`.phone`) chained with the built-in
+      `.lazy`. `.phone` is the value-transform model modifier shipped by the
+      `tests/plugins/phone` dogfood — a US phone-number reformatter. Pairing
+      it with `.lazy` (per Phase 12 / D-07 + CONTEXT §Discretion) reformats
+      the value on commit rather than on every keystroke.
+
+  This fixture exercises a custom + built-in modifier chain through the full
+  D-07 compose pipeline. Because `.phone` is NOT in `createDefaultRegistry()`,
+  this fixture compiles only when the `.phone` modifier is registered — its
+  six-target compile proof is the six tests/plugins/phone/src/__tests__/
+  phone-<target>-emit.test.ts tests, not the default-registry dist-parity
+  gate.
+-->
+
+<rozie name="RModelCustom">
+
+<data>
+{
+  tel: '',
+}
+</data>
+
+<template>
+<div class="rmodel-custom">
+  <input type="tel" r-model.phone.lazy="$data.tel" placeholder="Phone number" />
+  <p class="echo">Formatted: {{ $data.tel }}</p>
+</div>
+</template>
+
+<style>
+.rmodel-custom { display: inline-flex; flex-direction: column; gap: 0.25rem; }
+.echo { color: rgba(0, 0, 0, 0.55); font-size: 0.85em; }
+</style>
+
+</rozie>

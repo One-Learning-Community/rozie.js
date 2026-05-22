@@ -1,0 +1,35 @@
+<!--
+  RModelNumberTrim.rozie
+
+  Demonstrates:
+    - The `r-model.number` and `r-model.trim` built-in modifiers composing on
+      one input. Per Phase 12 / D-07 the compose pipeline is fixed and
+      Vue-canonical regardless of authored order: `.trim` (whitespace strip)
+      runs first, `.number` (numeric coercion) is always terminal — so
+      `r-model.number.trim` and `r-model.trim.number` emit identically and
+      `"  42  "` coerces to the number `42`.
+    - `.number` ≈ Vue's `looseToNumber`: parse as a float, fall back to the
+      raw string when the result is `NaN`.
+-->
+
+<rozie name="RModelNumberTrim">
+
+<data>
+{
+  quantity: 0,
+}
+</data>
+
+<template>
+<div class="rmodel-number-trim">
+  <input type="text" r-model.number.trim="$data.quantity" placeholder="Enter a quantity" />
+  <p class="echo">Quantity: {{ $data.quantity }}</p>
+</div>
+</template>
+
+<style>
+.rmodel-number-trim { display: inline-flex; flex-direction: column; gap: 0.25rem; }
+.echo { color: rgba(0, 0, 0, 0.55); font-size: 0.85em; }
+</style>
+
+</rozie>

@@ -1,0 +1,34 @@
+<!--
+  RModelLazy.rozie
+
+  Demonstrates:
+    - The `r-model.lazy` built-in modifier — binds on the `change` event
+      instead of `input`, so state commits when the field is left, not on
+      every keystroke. Mirrors Vue's `v-model.lazy`.
+
+  Per Phase 12 / D-08, `.lazy` is the one accepted parity edge case: React
+  emits it as an uncontrolled `defaultValue` + `onBlur` input (the idiomatic
+  React deferred-commit pattern). See docs/compatibility.md.
+-->
+
+<rozie name="RModelLazy">
+
+<data>
+{
+  draft: '',
+}
+</data>
+
+<template>
+<div class="rmodel-lazy">
+  <input type="text" r-model.lazy="$data.draft" placeholder="Commit on blur" />
+  <p class="echo">Committed: {{ $data.draft }}</p>
+</div>
+</template>
+
+<style>
+.rmodel-lazy { display: inline-flex; flex-direction: column; gap: 0.25rem; }
+.echo { color: rgba(0, 0, 0, 0.55); font-size: 0.85em; }
+</style>
+
+</rozie>

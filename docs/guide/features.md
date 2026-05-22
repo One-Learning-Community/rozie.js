@@ -41,6 +41,88 @@ The grammar is a small dedicated PEG (`packages/core/src/modifier-grammar/modifi
 
 Each one compiles to the per-target idiom: Vue's `@keydown.enter`/`watchEffect`-with-cleanup, React's `useEffect`-with-removeEventListener, Svelte's `$effect` teardown, Angular's `Renderer2.listen` + `DestroyRef`, Solid's `createEffect` + `onCleanup`, Lit's `firstUpdated` wiring + `disconnectedCallback` cleanup (with `.debounce`/`.throttle` hoisted to stable class fields). **You write the modifier; Rozie writes the rest.**
 
+## `r-model` modifiers — `.lazy`, `.number`, `.trim`
+
+`r-model` (the form-input two-way sugar) takes its own modifier chain, with the same Vue muscle memory:
+
+```rozie
+<template>
+  <!-- commit on `change`, not on every keystroke -->
+  <input type="text" r-model.lazy="$data.draft" />
+
+  <!-- coerce to a number; strip whitespace first -->
+  <input type="text" r-model.number.trim="$data.quantity" />
+</template>
+```
+
+| Modifier | What it does |
+| --- | --- |
+| `.lazy` | Bind on the `change` event instead of `input` — state commits when the field is left, not per keystroke |
+| `.number` | Coerce the value with a `looseToNumber`-equivalent: parse as a float, fall back to the raw string when the result is `NaN` |
+| `.trim` | `String.prototype.trim()` the value before it is committed |
+
+**Compose order is fixed and Vue-canonical** — value transforms always run `.trim` (whitespace strip) → custom transforms → `.number` (coercion, always terminal, because it produces a non-string). `r-model.number.trim` and `r-model.trim.number` emit byte-identical code, so writing them "in the wrong order" is never an error — it is silently canonicalized. `.lazy` is orthogonal (an event-binding swap, not a value transform).
+
+The built-ins apply to the **form-input `r-model`** sugar only. A built-in on the consumer-side `r-model:propName` two-way form, an unknown modifier (`r-model.numbr` → did-you-mean `.number`), an event modifier misused on `r-model` (`r-model.stop`), or any modifier on a non-modifier directive (`r-show.foo`) are all **hard compile errors** (`ROZ960`–`ROZ963`) — replacing the old behavior where `<input r-model.number>` compiled silently to a dead `<input/>`.
+
+**One documented parity edge case (React `.lazy`).** React has no true `change` event — `onChange` fires per keystroke — so `r-model.lazy` in React emits an **uncontrolled `defaultValue` + `onBlur`** input (`<input defaultValue={x} onBlur={…} />`), the idiomatic React deferred-commit pattern. The trade-off: programmatic writes to the bound state mid-edit are not reflected by the uncontrolled input. The other five targets just swap their event name (Vue `v-model.lazy`, Svelte `on:change`, Angular `(change)`, Solid `onChange`, Lit `@change`). This is consistent with Rozie's "high-percentage parity, not 100%" policy — see [`docs/compatibility.md`](../compatibility.md).
+
+## Custom modifiers — the `registerModifier` extension API
+
+The modifier system is open: a component-library author can register their own modifiers — for **events** and for **`r-model`** — using the same public API, and thread them through `compile()`. There is one `ModifierRegistry`, one `registerModifier(...)` authoring call, and one `compile({ modifierRegistry })` threading path.
+
+```ts
+import {
+  ModifierRegistry,
+  registerBuiltins,
+  registerModifier,
+  compile,
+  type EventModifierImpl,
+  type ModelModifierImpl,
+} from '@rozie/core';
+
+// An EVENT modifier — carries six per-target emission descriptors, because
+// event wiring genuinely diverges per target. `resolve()` returns
+// `{ entries, diagnostics }`.
+const logClick: EventModifierImpl = {
+  // `kind` is optional for event modifiers — absent ⇒ 'event'.
+  name: 'log',
+  arity: 'none',
+  resolve() {
+    return { entries: [{ kind: 'filter', modifier: 'log', args: [], sourceLoc: { start: 0, end: 0 } }], diagnostics: [] };
+  },
+  react() { return { kind: 'inlineGuard', code: 'console.log("clicked");' }; },
+  vue()    { return { kind: 'inlineGuard', code: 'console.log("clicked");' }; },
+  // …svelte / angular / solid / lit
+};
+
+// A MODEL modifier — target-agnostic. `kind: 'model'` is REQUIRED. `resolve()`
+// returns ONE `{ descriptor, diagnostics }`; the descriptor's `valueTransform`
+// is a code fragment with a `$v` placeholder each emitter substitutes with its
+// own extracted-value access, and an optional `eventSwap: 'change'` flag.
+const upper: ModelModifierImpl = {
+  kind: 'model',
+  name: 'upper',
+  arity: 'none',
+  resolve() {
+    return { descriptor: { valueTransform: 'String($v).toUpperCase()' }, diagnostics: [] };
+  },
+};
+
+// Build a registry, add the built-ins, then register your own.
+const registry = new ModifierRegistry();
+registerBuiltins(registry);
+registerModifier(registry, logClick);
+registerModifier(registry, upper);
+
+// Thread it through compile() — the registry flows through lowering + emit.
+const result = compile(source, { target: 'react', modifierRegistry: registry });
+```
+
+A model modifier declares **one descriptor**, not six per-target methods — `.trim` is `v.trim()` everywhere, `.number` is a `looseToNumber` coercion everywhere, a custom reformatter is one fragment everywhere. The flat shared namespace (an event and a model modifier cannot share a name) is what lets the compiler tell you precisely whether a misused modifier is an unknown name or an event modifier on `r-model`.
+
+The `tests/plugins/phone` dogfood is a worked end-to-end example — a custom `.phone` US-phone-number reformatter (a `kind: 'model'` value-transform modifier) that compiles across all six targets using only `@rozie/core`'s public barrel.
+
 ## `<listeners>` block with reactive `when`
 
 Document-level and window-level listeners belong outside the markup, so Rozie gives them their own block. Each entry is a key (`scope:event.modifier(...).modifier`), an optional `when` predicate, and a handler:
