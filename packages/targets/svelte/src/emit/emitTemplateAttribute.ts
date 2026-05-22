@@ -108,6 +108,47 @@ function escapeAttrValue(s: string): string {
 }
 
 /**
+ * Phase 12 — partition a resolved `r-model` modifier list into the pieces the
+ * Svelte emitter needs:
+ *   - `valueTransforms`: ordered `$v`-placeholder fragments (D-07-canonical).
+ *   - `isLazy`: whether any modifier declares `eventSwap: 'change'` (`.lazy`).
+ *   - `hasAny`: whether the chain carries at least one modifier — when true the
+ *     emit drops Svelte's `bind:value` two-way sugar (which cannot carry a
+ *     value coercion) for an explicit `value={…}` + handler form.
+ */
+function partitionSvelteModelModifiers(
+  modifiers:
+    | { name: string; descriptor: { valueTransform?: string; eventSwap?: 'change' } }[]
+    | undefined,
+): { valueTransforms: string[]; isLazy: boolean; hasAny: boolean } {
+  const valueTransforms: string[] = [];
+  let isLazy = false;
+  const list = modifiers ?? [];
+  for (const m of list) {
+    if (m.descriptor.valueTransform) valueTransforms.push(m.descriptor.valueTransform);
+    if (m.descriptor.eventSwap === 'change') isLazy = true;
+  }
+  return { valueTransforms, isLazy, hasAny: list.length > 0 };
+}
+
+/**
+ * Phase 12 — splice the resolved `valueTransform` fragments into a value-access
+ * expression STRING. Each fragment carries the literal `$v` placeholder (D-03);
+ * substitute `$v` with the current expression text and chain. Empty list ⇒ the
+ * input string is returned unchanged.
+ */
+function applyValueTransformsString(
+  valueAccess: string,
+  valueTransforms: string[],
+): string {
+  let current = valueAccess;
+  for (const fragment of valueTransforms) {
+    current = fragment.split('$v').join(`(${current})`);
+  }
+  return current;
+}
+
+/**
  * Convert a JS object-property key (camelCase or already-kebab) to
  * kebab-case for use as a Svelte 5 `style:<prop>={value}` directive name.
  *
@@ -261,8 +302,34 @@ export function emitSingleAttr(
     // are out of scope — checkbox only.
     if (attr.name === 'r-model') {
       const expr = rewriteTemplateExpression(attr.expression, ir);
-      const directive = ctx.inputType === 'checkbox' ? 'bind:checked' : 'bind:value';
-      return `${directive}={${expr}}`;
+      // A `<input type="checkbox">` always uses `bind:checked` — the built-in
+      // value modifiers (`.number`/`.trim`) need a string value access and
+      // `.lazy`'s change-swap is meaningless for a checkbox (its `change` IS
+      // the commit event). So a checkbox keeps pre-phase behaviour.
+      if (ctx.inputType === 'checkbox') {
+        return `bind:checked={${expr}}`;
+      }
+      // Phase 12 — the resolved `r-model` modifier chain. Svelte's `bind:value`
+      // two-way sugar cannot carry a value coercion, so when ANY modifier is
+      // present the emit drops to an explicit `value={…}` plus an event
+      // handler. The handler event is `on:input` normally, `on:change` when
+      // `.lazy` is in the chain (D-08). The handler body assigns the
+      // transformed value back — chaining each `valueTransform` fragment in
+      // D-07 list order (the resolved list arrives already canonicalized).
+      const { valueTransforms, isLazy, hasAny } = partitionSvelteModelModifiers(
+        attr.modifiers,
+      );
+      if (!hasAny) {
+        // Bare `r-model` (no modifier) — `bind:value` byte-identical to
+        // pre-phase.
+        return `bind:value={${expr}}`;
+      }
+      const committedValue = applyValueTransformsString(
+        '$event.currentTarget.value',
+        valueTransforms,
+      );
+      const eventName = isLazy ? 'change' : 'input';
+      return `value={${expr}} on:${eventName}={($event) => ${expr} = ${committedValue}}`;
     }
     // Spike 004 (Svelte subset) — `:style="{ key: value, ... }"` lowers to
     // per-key `style:<kebab(key)>={value}` directives so Svelte 5 doesn't

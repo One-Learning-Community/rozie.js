@@ -219,6 +219,43 @@ function isFormInputTag(tagName: string): boolean {
 }
 
 /**
+ * Phase 12 — partition a resolved `r-model` modifier list into the pieces the
+ * Angular emitter needs:
+ *   - `valueTransforms`: ordered `$v`-placeholder fragments (D-07-canonical).
+ *   - `isLazy`: whether any modifier declares `eventSwap: 'change'` (`.lazy`).
+ */
+function partitionAngularModelModifiers(
+  modifiers:
+    | { name: string; descriptor: { valueTransform?: string; eventSwap?: 'change' } }[]
+    | undefined,
+): { valueTransforms: string[]; isLazy: boolean } {
+  const valueTransforms: string[] = [];
+  let isLazy = false;
+  for (const m of modifiers ?? []) {
+    if (m.descriptor.valueTransform) valueTransforms.push(m.descriptor.valueTransform);
+    if (m.descriptor.eventSwap === 'change') isLazy = true;
+  }
+  return { valueTransforms, isLazy };
+}
+
+/**
+ * Phase 12 — splice the resolved `valueTransform` fragments into a value-access
+ * expression STRING. Each fragment carries the literal `$v` placeholder (D-03);
+ * substitute `$v` with the current expression text and chain. Empty list ⇒ the
+ * input string is returned unchanged.
+ */
+function applyValueTransformsString(
+  valueAccess: string,
+  valueTransforms: string[],
+): string {
+  let current = valueAccess;
+  for (const fragment of valueTransforms) {
+    current = fragment.split('$v').join(`(${current})`);
+  }
+  return current;
+}
+
+/**
  * Resolve a writable signal-backed LHS to its signal identifier name.
  *
  * Returns the bare signal name when `expr` is `$data.X` (where X is a declared
@@ -359,11 +396,30 @@ export function emitSingleAttr(
       const signalName = resolveSignalNameForLValue(attr.expression, ctx.ir);
 
       if (signalName !== null) {
+        // Phase 12 — the resolved `r-model` modifier chain. `.number`/`.trim`
+        // hand-emit a value coercion spliced into the change-handler
+        // expression; `.lazy` swaps the bound event from `(ngModelChange)` to
+        // `(change)` (D-08). Both are empty/absent for bare `r-model`, so its
+        // emit stays byte-identical to pre-phase.
+        const { valueTransforms, isLazy } = partitionAngularModelModifiers(
+          attr.modifiers,
+        );
+        // `(ngModelChange)` receives the value directly; the native `(change)`
+        // DOM event (used for `.lazy`) carries an Event, so the value access
+        // differs. The `$v` placeholder is substituted with the appropriate
+        // access expression and the resolved transforms are chained in D-07
+        // list order.
+        const valueAccess = isLazy ? '$event.target.value' : '$event';
+        const committedValue = applyValueTransformsString(
+          valueAccess,
+          valueTransforms,
+        );
+        const eventBinding = isLazy ? 'change' : 'ngModelChange';
         // [ngModelOptions]="{standalone:true}" prevents NG01352 when this input
         // is nested inside a <form> — Angular would otherwise require a `name`
         // attribute to register the control with the parent FormGroup. Rozie
         // manages state via signals, so we always opt out of the forms model.
-        return `[ngModel]="${signalName}()" (ngModelChange)="${signalName}.set($event)" [ngModelOptions]="{standalone: true}"`;
+        return `[ngModel]="${signalName}()" (${eventBinding})="${signalName}.set(${committedValue})" [ngModelOptions]="{standalone: true}"`;
       }
       // Non-signal target — fall back to bare [(ngModel)] with rewritten expression.
       const expr = rewriteTemplateExpression(attr.expression, ctx.ir, {
