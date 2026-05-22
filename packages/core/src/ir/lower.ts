@@ -40,6 +40,7 @@ import { lowerSlots } from './lowerers/lowerSlots.js';
 import { lowerStyles } from './lowerers/lowerStyles.js';
 import { typeNeutralizeScript } from '../codegen/typeNeutralizeScript.js';
 import { lowerRootElementRef } from './lowerers/lowerRootElementRef.js';
+import { validateClassSelector } from './validateClassSelector.js';
 import * as t from '@babel/types';
 
 /**
@@ -193,6 +194,17 @@ export function lowerToIR(ast: RozieAST, opts: LowerOptions): LowerResult {
   // untyped residue, so typed and untyped `<script>` blocks are handled
   // identically. See packages/core/src/codegen/typeNeutralizeScript.ts.
   typeNeutralizeScript(ir.setupBody.scriptProgram);
+
+  // Phase 13 — validate every `$classSelector('<class>')` call (R3/R4/R5).
+  // Runs HERE in lowerToIR rather than in compile() for the same reason as
+  // typeNeutralizeScript above: `@rozie/unplugin` has its own
+  // `parse → lowerToIR → emit{Target}` pipeline that bypasses compile(), and
+  // lowering is the single chokepoint both paths share — one wiring site catches
+  // a bad `$classSelector` call regardless of entrypoint. The validator needs
+  // only `ir.styles` (no resolver / cache, unlike validateTwoWayBindings).
+  // Collected-not-thrown (D-08): pushes ROZ965/966/967 diagnostics; never
+  // mutates `ir`.
+  validateClassSelector(ir, diagnostics);
 
   return { ir, diagnostics, depGraph, bindings };
 }

@@ -15,21 +15,18 @@
 //                                             combinator argument)
 // Plan 13-02 adds them to `diagnostics/codes.ts` as RozieErrorCode.* symbols.
 //
-// TODO Plan 13-02: switch the bare string literals below to RozieErrorCode.*
-// once codes.ts ships the CLASS_SELECTOR_* entries. String literals are used
-// here deliberately — referencing the not-yet-existent RozieErrorCode.*
-// members would be a TS error that blocks the whole suite from collecting,
-// defeating the Wave 0 "fails for the RIGHT reason" contract.
-//
 // Codes are ROZ965/966/967 — NOT ROZ964/965/966 — because ROZ964 was taken by
 // a Phase 12 fix (RMODEL_MODIFIER_NOT_APPLICABLE) committed since planning.
+// Plan 13-02 shipped the RozieErrorCode.CLASS_SELECTOR_* symbols, so the bare
+// string literals from the Wave 0 scaffold now reference the registry directly.
 import { describe, it, expect } from 'vitest';
 import { compile } from '../compile.js';
 import type { Diagnostic } from '../diagnostics/Diagnostic.js';
+import { RozieErrorCode } from '../diagnostics/codes.js';
 
-const CLASS_SELECTOR_ARG_NOT_LITERAL = 'ROZ965'; // R3
-const CLASS_SELECTOR_UNKNOWN_CLASS = 'ROZ966'; // R4
-const CLASS_SELECTOR_INVALID_TOKEN = 'ROZ967'; // R5
+const CLASS_SELECTOR_ARG_NOT_LITERAL = RozieErrorCode.CLASS_SELECTOR_ARG_NOT_LITERAL; // ROZ965 — R3
+const CLASS_SELECTOR_UNKNOWN_CLASS = RozieErrorCode.CLASS_SELECTOR_UNKNOWN_CLASS; // ROZ966 — R4
+const CLASS_SELECTOR_INVALID_TOKEN = RozieErrorCode.CLASS_SELECTOR_INVALID_TOKEN; // ROZ967 — R5
 
 /**
  * Compile an inline `.rozie` source through the Vue target (any target works —
