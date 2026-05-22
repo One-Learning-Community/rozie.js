@@ -46,6 +46,10 @@ function buildSlotDecl(name: string): SlotDecl {
   };
 }
 
+function buildPortalSlotDecl(name: string): SlotDecl {
+  return { ...buildSlotDecl(name), isPortal: true, portalParamNames: [] };
+}
+
 function buildIR(overrides: Partial<IRComponent> = {}): IRComponent {
   const scriptProgram = t.file(t.program([]));
   return {
@@ -240,6 +244,38 @@ describe('rewriteRozieIdentifiers — sigil rewrites', () => {
     const { code } = rewrite("const c = $props['x'];", ir);
     expect(code).toContain("$props['x']");
   });
+
+  it('plain $props.X for an unknown prop name is left untouched', () => {
+    const ir = buildIR({ props: [prop('known', true)] });
+    // Non-computed member, sigil `$props`, but the prop name is in neither
+    // modelProps nor nonModelProps — the `||` test's false arm.
+    const { code } = rewrite('const c = $props.mystery;', ir);
+    expect(code).toContain('$props.mystery');
+  });
+
+  it('plain $data.X for an unknown data name is left untouched', () => {
+    const ir = buildIR({ state: [state('known')] });
+    const { code } = rewrite('const c = $data.unknown;', ir);
+    expect(code).toContain('$data.unknown');
+  });
+
+  it('plain $refs.X for an unknown ref name is left untouched', () => {
+    const ir = buildIR({ refs: [ref('known')] });
+    const { code } = rewrite('const c = $refs.unknown;', ir);
+    expect(code).toContain('$refs.unknown');
+  });
+
+  it('plain $slots.X for an unknown slot name is left untouched', () => {
+    const ir = buildIR({ slots: [buildSlotDecl('header')] });
+    const { code } = rewrite('const c = $slots.footer;', ir);
+    expect(code).toContain('$slots.footer');
+  });
+
+  it('a non-sigil object name passes through the MemberExpression visitor', () => {
+    const ir = buildIR({ props: [prop('value', true)] });
+    const { code } = rewrite('const c = whatever.value;', ir);
+    expect(code).toContain('whatever.value');
+  });
 });
 
 describe('rewriteRozieIdentifiers — refLowersToNonNull', () => {
@@ -279,6 +315,15 @@ describe('rewriteRozieIdentifiers — refLowersToNonNull', () => {
     const { code } = rewrite('$refs.dialogEl?.focus();', ir);
     expect(code).toContain('dialogEl?.focus()');
     expect(code).not.toContain('dialogEl!');
+  });
+
+  it('$refs.X invoked directly as a call callee → X! (parent.callee === node)', () => {
+    const ir = buildIR({ refs: [ref('cleanup')] });
+    // `$refs.cleanup()` — the ref itself is the callee of a CallExpression, so
+    // refLowersToNonNull's `t.isCallExpression(parent) && parent.callee === node`
+    // arm returns true.
+    const { code } = rewrite('$refs.cleanup();', ir);
+    expect(code).toContain('cleanup!()');
   });
 });
 
@@ -355,5 +400,190 @@ describe('rewriteRozieIdentifiers — console preservation', () => {
     );
     expect(code).toContain('console.log("hello from rozie")');
     expect(code).toContain('const y = value;');
+  });
+});
+
+// `$props.value?.y` parses the `?.` BETWEEN `value` and `y`, so the
+// OptionalMemberExpression object is the plain MemberExpression `$props.value`
+// — the OptionalMember visitor bails at `!t.isIdentifier(obj)`. To exercise the
+// OptionalMemberExpression visitor's OWN sigil branches the `?.` must sit
+// directly after the sigil object: `$props?.value`.
+describe('rewriteRozieIdentifiers — OptionalMemberExpression sigil-object branches', () => {
+  it('$props?.X (model) → X', () => {
+    const ir = buildIR({ props: [prop('value', true)] });
+    const { code } = rewrite('const c = $props?.value;', ir);
+    expect(code).toContain('const c = value;');
+    expect(code).not.toContain('$props');
+  });
+
+  it('$props?.X (non-model) → X', () => {
+    const ir = buildIR({ props: [prop('step', false)] });
+    const { code } = rewrite('const c = $props?.step;', ir);
+    expect(code).toContain('const c = step;');
+  });
+
+  it('$props?.X (unknown prop name) is left untouched', () => {
+    const ir = buildIR();
+    const { code } = rewrite('const c = $props?.mystery;', ir);
+    expect(code).toContain('$props?.mystery');
+  });
+
+  it('$data?.X → X', () => {
+    const ir = buildIR({ state: [state('count')] });
+    const { code } = rewrite('const c = $data?.count;', ir);
+    expect(code).toContain('const c = count;');
+  });
+
+  it('$data?.X (unknown data name) is left untouched', () => {
+    const ir = buildIR({ state: [state('known')] });
+    const { code } = rewrite('const c = $data?.unknown;', ir);
+    expect(code).toContain('$data?.unknown');
+  });
+
+  it('$refs?.X (bare read) → X (no non-null assertion)', () => {
+    const ir = buildIR({ refs: [ref('panelEl')] });
+    const { code } = rewrite('const el = $refs?.panelEl;', ir);
+    expect(code).toContain('const el = panelEl;');
+    expect(code).not.toContain('panelEl!');
+  });
+
+  it('$refs?.X flowing into a constructor argument → X! (refLowersToNonNull)', () => {
+    const ir = buildIR({ refs: [ref('inputEl')] });
+    const { code } = rewrite('flatpickr($refs?.inputEl);', ir);
+    expect(code).toContain('flatpickr(inputEl!)');
+  });
+
+  it('$slots?.X → X', () => {
+    const ir = buildIR({ slots: [buildSlotDecl('header')] });
+    const { code } = rewrite('const present = $slots?.header;', ir);
+    expect(code).toContain('const present = header;');
+  });
+
+  it('computed OptionalMember ($props?.[x]) is left untouched', () => {
+    const ir = buildIR({ props: [prop('x', true)] });
+    const { code } = rewrite('const c = $props?.[k];', ir);
+    expect(code).toContain('$props?.[k]');
+  });
+
+  it('non-sigil OptionalMember object name is left untouched', () => {
+    const ir = buildIR({ props: [prop('value', true)] });
+    const { code } = rewrite('const c = whatever?.value;', ir);
+    expect(code).toContain('whatever?.value');
+  });
+
+  it('OptionalMember whose object is not an identifier passes through', () => {
+    const ir = buildIR();
+    const { code } = rewrite('const c = makeIt()?.value;', ir);
+    expect(code).toContain('makeIt()?.value');
+  });
+});
+
+describe('rewriteRozieIdentifiers — $el parent-position skip ladder', () => {
+  it('$el as a VariableDeclarator id is NOT rewritten', () => {
+    const ir = buildIR({ refs: [ref('__rozieRoot')] });
+    // `let $el = ...` — `$el` occupies the declarator `id`, not a free read.
+    const { code } = rewrite('let $el = computeIt();', ir);
+    expect(code).toContain('let $el =');
+    expect(code).not.toContain('__rozieRoot');
+  });
+
+  it('$el as a non-computed member property name is NOT rewritten', () => {
+    const ir = buildIR({ refs: [ref('__rozieRoot')] });
+    const { code } = rewrite('const v = obj.$el;', ir);
+    expect(code).toContain('obj.$el');
+    expect(code).not.toContain('__rozieRoot');
+  });
+
+  it('$el as a non-computed ObjectProperty key is NOT rewritten', () => {
+    const ir = buildIR({ refs: [ref('__rozieRoot')] });
+    const { code } = rewrite('const o = { $el: 1 };', ir);
+    expect(code).toContain('$el: 1');
+    expect(code).not.toContain('__rozieRoot');
+  });
+
+  it('$el occupying a function-parameter position is NOT rewritten', () => {
+    const ir = buildIR({ refs: [ref('__rozieRoot')] });
+    // The visitor is scope-unaware: it skips the `$el` node that IS the param
+    // (the `parentPath.isFunction()` / `params.includes` guard) but still
+    // lowers a free `$el` read in the body. The param identifier staying bare
+    // is the assertion that exercises the skip arm.
+    const { code } = rewrite('function handle($el) { doThing(); }', ir);
+    expect(code).toContain('function handle($el)');
+    expect(code).not.toContain('__rozieRoot');
+  });
+
+  it('arrow-function $el parameter is NOT rewritten', () => {
+    const ir = buildIR({ refs: [ref('__rozieRoot')] });
+    const { code } = rewrite('const f = ($el) => doThing();', ir);
+    expect(code).toContain('$el =>');
+    expect(code).not.toContain('__rozieRoot');
+  });
+
+  it('$el as a computed member property IS treated as a free read', () => {
+    const ir = buildIR({ refs: [ref('__rozieRoot')] });
+    // Computed access — `$el` is a genuine value read here, so it lowers.
+    const { code } = rewrite('const v = obj[$el];', ir);
+    expect(code).toContain('__rozieRoot');
+  });
+
+  it('$el as a computed ObjectProperty key IS treated as a free read', () => {
+    const ir = buildIR({ refs: [ref('__rozieRoot')] });
+    // Computed key — the `!parentPath.node.computed` ObjectProperty guard does
+    // NOT skip; `$el` lowers.
+    const { code } = rewrite('const o = { [$el]: 1 };', ir);
+    expect(code).toContain('__rozieRoot');
+  });
+
+  it('$el as an arrow-function expression body (parented by Function, not a param) lowers', () => {
+    const ir = buildIR({ refs: [ref('__rozieRoot')] });
+    // `() => $el` — `$el`'s parentPath is the ArrowFunctionExpression but it is
+    // NOT in `params`, so the `params.includes` guard's false arm falls through
+    // and the free read lowers.
+    const { code } = rewrite('const f = () => $el;', ir);
+    expect(code).toContain('__rozieRoot');
+  });
+});
+
+describe('rewriteRozieIdentifiers — $portals portal-slot branch', () => {
+  it('$portals.<name>(...) renames the object to `portals`', () => {
+    const ir = buildIR({ slots: [buildPortalSlotDecl('item')] });
+    const { code } = rewrite('$portals.item(container, scope);', ir);
+    expect(code).toContain('portals.item(container, scope)');
+    expect(code).not.toContain('$portals');
+  });
+
+  it('$portals.<name> with no matching portal slot is left untouched', () => {
+    const ir = buildIR({ slots: [buildPortalSlotDecl('item')] });
+    const { code } = rewrite('$portals.other(container);', ir);
+    expect(code).toContain('$portals.other(container)');
+  });
+
+  it('a non-portal slot of the same name does NOT enable the $portals rename', () => {
+    // buildSlotDecl produces a slot with isPortal undefined → not in portalSlotNames.
+    const ir = buildIR({ slots: [buildSlotDecl('item')] });
+    const { code } = rewrite('$portals.item(container);', ir);
+    expect(code).toContain('$portals.item(container)');
+  });
+});
+
+describe('rewriteRozieIdentifiers — MemberExpression TS type-position skip', () => {
+  it('$data.X inside a `typeof` member-expression type query is left intact', () => {
+    const ir = buildIR({ state: [state('foo')] });
+    // The MemberExpression `$data.foo` lives inside a TS type annotation —
+    // isInTypePosition must short-circuit the MemberExpression visitor.
+    const { code } = rewrite('let x: typeof $data.foo;', ir, ['typescript']);
+    expect(code).toContain('typeof $data.foo');
+    expect(code).not.toContain('typeof foo');
+  });
+});
+
+describe('rewriteRozieIdentifiers — $snapshot non-expression argument', () => {
+  it('$snapshot(...x) (spread argument) is left untouched', () => {
+    const ir = buildIR();
+    // A SpreadElement is not a t.Expression — the `!t.isExpression(arg)` guard
+    // returns before the $state.snapshot rewrite.
+    const { code } = rewrite('const c = $snapshot(...x);', ir);
+    expect(code).toContain('$snapshot(...x)');
+    expect(code).not.toContain('$state.snapshot');
   });
 });

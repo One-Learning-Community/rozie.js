@@ -190,6 +190,75 @@ describe('rewriteTemplateExpression — OptionalMemberExpression variants', () =
   });
 });
 
+// `$props.value?.y` parses with the `?.` BETWEEN `value` and `y`, so the
+// OptionalMemberExpression's *object* is the plain MemberExpression `$props.value`
+// — the OptionalMember visitor bails at its `!t.isIdentifier(obj)` guard and the
+// sigil rewrite is actually carried out by the plain MemberExpression visitor.
+// To exercise the OptionalMemberExpression visitor's OWN sigil branches the `?.`
+// must sit directly after the sigil object: `$props?.value`.
+describe('rewriteTemplateExpression — OptionalMemberExpression sigil-object branches', () => {
+  it('$props?.X (model) → X (OptionalMember object is the $props identifier)', () => {
+    const ir = buildIR({ props: [prop('value', true)] });
+    const expr = parseExpression('$props?.value');
+    expect(rewriteTemplateExpression(expr, ir)).toBe('value');
+  });
+
+  it('$props?.X (non-model) → X', () => {
+    const ir = buildIR({ props: [prop('step', false)] });
+    const expr = parseExpression('$props?.step');
+    expect(rewriteTemplateExpression(expr, ir)).toBe('step');
+  });
+
+  it('$data?.X → X', () => {
+    const ir = buildIR({ state: [state('hovering')] });
+    const expr = parseExpression('$data?.hovering');
+    expect(rewriteTemplateExpression(expr, ir)).toBe('hovering');
+  });
+
+  it('$refs?.X → X', () => {
+    const ir = buildIR({ refs: [ref('dialogEl')] });
+    const expr = parseExpression('$refs?.dialogEl');
+    expect(rewriteTemplateExpression(expr, ir)).toBe('dialogEl');
+  });
+
+  it('$slots?.X → X', () => {
+    const ir = buildIR({ slots: [buildSlotDecl('header')] });
+    const expr = parseExpression('$slots?.header');
+    expect(rewriteTemplateExpression(expr, ir)).toBe('header');
+  });
+
+  it('$props?.X (unknown prop name) is left untouched', () => {
+    const ir = buildIR();
+    const expr = parseExpression('$props?.unknown');
+    expect(rewriteTemplateExpression(expr, ir)).toBe('$props?.unknown');
+  });
+
+  it('$data?.X (unknown data name) is left untouched', () => {
+    const ir = buildIR({ state: [state('known')] });
+    const expr = parseExpression('$data?.unknown');
+    expect(rewriteTemplateExpression(expr, ir)).toBe('$data?.unknown');
+  });
+
+  it('computed OptionalMember ($props?.[x]) is left untouched', () => {
+    const ir = buildIR({ props: [prop('x', true)] });
+    const expr = parseExpression('$props?.[x]');
+    expect(rewriteTemplateExpression(expr, ir)).toBe('$props?.[x]');
+  });
+
+  it('non-sigil OptionalMember object name is left untouched', () => {
+    const ir = buildIR({ props: [prop('value', true)] });
+    const expr = parseExpression('whatever?.value');
+    expect(rewriteTemplateExpression(expr, ir)).toBe('whatever?.value');
+  });
+
+  it('OptionalMember whose object is not an identifier passes through', () => {
+    const ir = buildIR();
+    // object is a CallExpression, not an Identifier — `!t.isIdentifier(obj)`.
+    const expr = parseExpression('makeIt()?.value');
+    expect(rewriteTemplateExpression(expr, ir)).toBe('makeIt()?.value');
+  });
+});
+
 describe('rewriteTemplateExpression — negatives', () => {
   it('$emit() with zero args is left untouched', () => {
     const ir = buildIR();
@@ -229,5 +298,12 @@ describe('rewriteTemplateExpression — negatives', () => {
     const ir = buildIR();
     expect(rewriteTemplateExpression(parseExpression('foo.bar'), ir)).toBe('foo.bar');
     expect(rewriteTemplateExpression(parseExpression('doThing(1)'), ir)).toBe('doThing(1)');
+  });
+
+  it('MemberExpression whose object is not an identifier passes through', () => {
+    const ir = buildIR();
+    // `foo().bar` — the MemberExpression object is a CallExpression, hitting
+    // the `!t.isIdentifier(obj)` early return in the MemberExpression visitor.
+    expect(rewriteTemplateExpression(parseExpression('foo().bar'), ir)).toBe('foo().bar');
   });
 });

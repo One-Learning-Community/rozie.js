@@ -68,6 +68,10 @@ export function rewriteTemplateExpression(
       if (!t.isIdentifier(obj)) return;
       if (path.node.computed) return;
       const prop = path.node.property;
+      // Unreachable: a non-computed MemberExpression property is always an
+      // Identifier; the only non-Identifier form is a PrivateName, which is
+      // syntactically invalid outside a class body and cannot reach here.
+      /* v8 ignore next */
       if (!t.isIdentifier(prop)) return;
 
       if (obj.name === '$props') {
@@ -99,6 +103,9 @@ export function rewriteTemplateExpression(
       if (!t.isIdentifier(obj)) return;
       if (path.node.computed) return;
       const prop = path.node.property;
+      // Unreachable for the same reason as the MemberExpression twin above —
+      // a non-computed optional-member property is always an Identifier.
+      /* v8 ignore next */
       if (!t.isIdentifier(prop)) return;
 
       if (obj.name === '$props') {
@@ -146,6 +153,9 @@ export function rewriteTemplateExpression(
 
   // Pull the rewritten expression back out of the wrapper.
   const stmt = wrapper.program.body[0]!;
+  // The wrapper's body[0] is the ExpressionStatement constructed just above;
+  // the `!isExpressionStatement` arm is a defensive fallback and unreachable.
+  /* v8 ignore next */
   const rewrittenExpr = !t.isExpressionStatement(stmt) ? cloned : stmt.expression;
   const raw = generate(rewrittenExpr, GEN_OPTS).code;
   return flattenInlineCode(raw);

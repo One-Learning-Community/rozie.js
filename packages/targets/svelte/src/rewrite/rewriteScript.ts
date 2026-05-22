@@ -189,6 +189,9 @@ export function rewriteRozieIdentifiers(
       // to `__rozieRoot` (Svelte's bare-let ref idiom).
       if (path.node.name !== '$el') return;
       const parentPath = path.parentPath;
+      // Unreachable: a `$el` Identifier parsed from a script body always has a
+      // parent NodePath (the File root is the only parent-less path).
+      /* v8 ignore next */
       if (!parentPath) return;
       if (parentPath.isVariableDeclarator() && parentPath.node.id === path.node) return;
       if (
@@ -219,15 +222,22 @@ export function rewriteRozieIdentifiers(
     },
 
     MemberExpression(path) {
-      // WR-02 (Phase 9) — skip member expressions in TS type position
-      // (`let x: typeof $data.foo`). Without this the `$data.foo` rewrite
-      // would mangle a `typeof`-query inside a type annotation.
+      // WR-02 (Phase 9) — defensive uniformity guard mirroring the other
+      // targets' MemberExpression visitors. Unreachable in practice: a TS
+      // `typeof X.Y` query parses its dotted name as a `TSQualifiedName`, not a
+      // Babel `MemberExpression`, so no constructible script input places a
+      // `MemberExpression` in type position. Kept for cross-target symmetry.
+      /* v8 ignore next */
       if (isInTypePosition(path)) return;
       const obj = path.node.object;
       if (!t.isIdentifier(obj)) return;
       // Skip computed access (`$props['foo']`).
       if (path.node.computed) return;
       const prop = path.node.property;
+      // Unreachable: a non-computed MemberExpression property is always an
+      // Identifier; the only non-Identifier form is a PrivateName, which is
+      // syntactically invalid outside a class body and cannot reach here.
+      /* v8 ignore next */
       if (!t.isIdentifier(prop)) return;
 
       if (obj.name === '$props') {
@@ -236,6 +246,10 @@ export function rewriteRozieIdentifiers(
           // Phase 06.1 P2 D-104/D-106: anchor synth identifier loc to IR PropDecl.
           const propDecl = propByName.get(prop.name);
           const synthId = t.identifier(prop.name);
+          // `propByName` is built from the same `ir.props` as the model/non-model
+          // Sets — a name in either Set is always present in the Map. The `if`
+          // is a defensive lookup-safety guard; its false arm is unreachable.
+          /* v8 ignore next */
           if (propDecl) synthId.loc = propDecl.sourceLoc as any;
           path.replaceWith(synthId);
           path.skip();
@@ -247,6 +261,9 @@ export function rewriteRozieIdentifiers(
         // Phase 06.1 P2 D-104/D-106: anchor synth identifier loc to IR StateDecl.
         const stateDecl = stateByName.get(prop.name);
         const synthId = t.identifier(prop.name);
+        // `stateByName` is built from the same `ir.state` as `dataNames` — the
+        // false arm is unreachable (defensive lookup-safety guard).
+        /* v8 ignore next */
         if (stateDecl) synthId.loc = stateDecl.sourceLoc as any;
         path.replaceWith(synthId);
         path.skip();
@@ -257,6 +274,9 @@ export function rewriteRozieIdentifiers(
         // Phase 06.1 P2 D-104/D-106: anchor synth identifier loc to IR RefDecl.
         const refDecl = refByName.get(prop.name);
         const synthId = t.identifier(prop.name);
+        // `refByName` is built from the same `ir.refs` as `refNames` — the false
+        // arm is unreachable (defensive lookup-safety guard).
+        /* v8 ignore next */
         if (refDecl) synthId.loc = refDecl.sourceLoc as any;
         // Lower to `dialogEl!` (non-null) vs `dialogEl` (bare, `T | undefined`)
         // per refLowersToNonNull — authored non-optional access (TS18048
@@ -294,6 +314,9 @@ export function rewriteRozieIdentifiers(
       if (!t.isIdentifier(obj)) return;
       if (path.node.computed) return;
       const prop = path.node.property;
+      // Unreachable for the same reason as the MemberExpression twin above —
+      // a non-computed optional-member property is always an Identifier.
+      /* v8 ignore next */
       if (!t.isIdentifier(prop)) return;
 
       if (obj.name === '$props') {
@@ -301,6 +324,9 @@ export function rewriteRozieIdentifiers(
           // Phase 06.1 P2 D-104/D-106: anchor synth identifier loc to IR PropDecl.
           const propDecl = propByName.get(prop.name);
           const synthId = t.identifier(prop.name);
+          // Defensive lookup-safety guard — false arm unreachable (see the
+          // MemberExpression twin above).
+          /* v8 ignore next */
           if (propDecl) synthId.loc = propDecl.sourceLoc as any;
           path.replaceWith(synthId);
           path.skip();
@@ -311,6 +337,8 @@ export function rewriteRozieIdentifiers(
         // Phase 06.1 P2 D-104/D-106: anchor synth identifier loc to IR StateDecl.
         const stateDecl = stateByName.get(prop.name);
         const synthId = t.identifier(prop.name);
+        // Defensive lookup-safety guard — false arm unreachable.
+        /* v8 ignore next */
         if (stateDecl) synthId.loc = stateDecl.sourceLoc as any;
         path.replaceWith(synthId);
         path.skip();
@@ -320,6 +348,8 @@ export function rewriteRozieIdentifiers(
         // Phase 06.1 P2 D-104/D-106: anchor synth identifier loc to IR RefDecl.
         const refDecl = refByName.get(prop.name);
         const synthId = t.identifier(prop.name);
+        // Defensive lookup-safety guard — false arm unreachable.
+        /* v8 ignore next */
         if (refDecl) synthId.loc = refDecl.sourceLoc as any;
         // refLowersToNonNull non-null lowering (260520-w18 bug class 1) —
         // mirrors the MemberExpression branch above for `$refs.foo?.bar`.
