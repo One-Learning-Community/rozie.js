@@ -42,7 +42,10 @@ import type {
   RestElement,
 } from '@babel/types';
 import type { SourceLoc } from '../ast/types.js';
-import type { ModifierPipelineEntry } from '../modifiers/ModifierRegistry.js';
+import type {
+  ModifierPipelineEntry,
+  ModelModifierDescriptor,
+} from '../modifiers/ModifierRegistry.js';
 import type { SignalRef } from '../reactivity/signalRef.js';
 import type { IRNodeId } from '../reactivity/ReactiveDepGraph.js';
 
@@ -540,6 +543,16 @@ export interface TemplateElementIR {
  *   - `expression` — parsed Babel Expression for the RHS (the writable lvalue)
  *   - `deps` — SignalRef[] for re-execution accounting (same as 'binding')
  *
+ * Phase 12 — the `binding` and `twoWayBinding` kinds carry an optional
+ * `modifiers` field: the RESOLVED r-model modifier chain (built-in or custom),
+ * one `{ name, descriptor }` pair per `.modifier` token in source order. The
+ * registry lookup happens at lower time, so this is a resolved representation
+ * — never raw chain text. The field is OPTIONAL: bare `<input r-model>` (no
+ * `.modifier`) sets nothing, so its IR stays byte-identical to pre-phase. A
+ * built-in model modifier on a `twoWayBinding` (`r-model:propName`) is itself
+ * a compile error (ROZ963) — the field exists on both kinds so the lowerer
+ * can carry whatever it resolved before emitting that diagnostic.
+ *
  * @experimental — shape may change before v1.0
  */
 export type AttributeBinding =
@@ -550,6 +563,12 @@ export type AttributeBinding =
       expression: Expression;
       deps: SignalRef[];
       sourceLoc: SourceLoc;
+      /**
+       * Phase 12 — resolved r-model modifier chain (built-in or custom), in
+       * source order. Optional/absent when no `.modifier` chain is present, so
+       * bare `r-model` IR is byte-identical to pre-phase.
+       */
+      modifiers?: ResolvedModelModifier[];
     }
   | {
       kind: 'interpolated';
@@ -568,7 +587,30 @@ export type AttributeBinding =
       expression: Expression;
       deps: SignalRef[];
       sourceLoc: SourceLoc;
+      /**
+       * Phase 12 — resolved r-model modifier chain (consumer-side
+       * `r-model:propName`). Optional/absent when no `.modifier` chain is
+       * present. A BUILT-IN model modifier here is a compile error (ROZ963).
+       */
+      modifiers?: ResolvedModelModifier[];
     };
+
+/**
+ * ResolvedModelModifier — Phase 12. One entry of the resolved r-model
+ * modifier chain carried on an `AttributeBinding`.
+ *
+ * `name` identifies which modifier (for emitters + tests); `descriptor` is
+ * the resolved `ModelModifierDescriptor` shape (the `$v`-placeholder
+ * value-transform fragment and/or the `eventSwap` flag) the registry's
+ * `ModelModifierImpl.resolve()` produced. This is a RESOLVED representation —
+ * the registry lookup already happened at lower time.
+ *
+ * @experimental — shape may change before v1.0
+ */
+export interface ResolvedModelModifier {
+  name: string;
+  descriptor: ModelModifierDescriptor;
+}
 
 /**
  * @experimental — shape may change before v1.0
