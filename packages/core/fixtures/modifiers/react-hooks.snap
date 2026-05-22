@@ -33,6 +33,7 @@
     "kind": "inlineGuard",
     "code": "if ($event.key !== 'Home') return;"
   },
+  "lazy": null,
   "left": {
     "kind": "inlineGuard",
     "code": "if ($event.key !== 'ArrowLeft') return;"
@@ -41,6 +42,7 @@
     "kind": "inlineGuard",
     "code": "if ($event.key !== 'Middle') return;"
   },
+  "number": null,
   "once": {
     "kind": "native",
     "token": "once"
@@ -94,6 +96,7 @@
     "helperName": "useThrottledCallback",
     "args": []
   },
+  "trim": null,
   "up": {
     "kind": "inlineGuard",
     "code": "if ($event.key !== 'ArrowUp') return;"

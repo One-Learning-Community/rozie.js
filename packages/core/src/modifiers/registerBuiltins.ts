@@ -24,12 +24,17 @@ import { passive } from './builtins/passive.js';
 import { debounce } from './builtins/debounce.js';
 import { throttle } from './builtins/throttle.js';
 import { registerKeyFilters } from './builtins/keyFilters.js';
+// Phase 12 — the three built-in r-model MODEL modifiers (D-03).
+import { lazy } from './builtins/lazy.js';
+import { number } from './builtins/number.js';
+import { trim } from './builtins/trim.js';
 
 /**
- * Register the 9 composition modifiers (outside/self/stop/prevent/once/
+ * Register the 9 EVENT composition modifiers (outside/self/stop/prevent/once/
  * capture/passive/debounce/throttle) plus the 14 key/button filter names
  * (escape/enter/tab/delete/space/up/down/left/right/home/end/pageUp/
- * pageDown/middle) into `registry`.
+ * pageDown/middle), AND the 3 MODEL modifiers (lazy/number/trim — Phase 12),
+ * into `registry`.
  *
  * Throws if any name is already registered (programmer-error path —
  * re-running registerBuiltins on a populated registry is a bug).
@@ -47,6 +52,12 @@ export function registerBuiltins(registry: ModifierRegistry): void {
   registry.register(debounce);
   registry.register(throttle);
   registerKeyFilters(registry);
+  // Phase 12 — built-in r-model model modifiers. Registered in the SAME flat
+  // namespace as the event modifiers (D-05); no name collision — .lazy/.number/
+  // .trim are model-only, the 25 event names are event-only.
+  registry.register(lazy);
+  registry.register(number);
+  registry.register(trim);
 }
 
 /**

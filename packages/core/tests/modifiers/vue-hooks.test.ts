@@ -13,6 +13,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import {
   ModifierRegistry,
+  isEventModifier,
   type ModifierContext,
 } from '../../src/modifiers/ModifierRegistry.js';
 import { registerBuiltins } from '../../src/modifiers/registerBuiltins.js';
@@ -31,13 +32,16 @@ describe('Phase 3 D-40 Vue emission descriptors', () => {
   const registry = new ModifierRegistry();
   registerBuiltins(registry);
 
-  it('every builtin implements vue?', () => {
+  it('every EVENT builtin implements vue?', () => {
+    // Phase 12 / D-03 — model modifiers (lazy/number/trim) are target-agnostic
+    // and intentionally carry NO vue?() hook; filter them out.
     for (const name of registry.list()) {
       const impl = registry.get(name);
       expect(impl, `builtin '${name}' should be retrievable`).toBeDefined();
+      if (!impl || !isEventModifier(impl)) continue;
       expect(
-        typeof impl?.vue,
-        `builtin '${name}' missing vue? hook`,
+        typeof impl.vue,
+        `event builtin '${name}' missing vue? hook`,
       ).toBe('function');
     }
   });
@@ -150,7 +154,8 @@ describe('Phase 3 D-40 Vue emission descriptors', () => {
     for (const name of registry.list()) {
       const impl = registry.get(name);
       if (!impl) throw new Error(`unreachable: ${name} listed but not retrievable`);
-      out[name] = impl.vue ? impl.vue([], LISTENER_CTX) : null;
+      // Phase 12 / D-03 — model modifiers have no vue?() hook; record null.
+      out[name] = isEventModifier(impl) && impl.vue ? impl.vue([], LISTENER_CTX) : null;
     }
     await expect(JSON.stringify(out, null, 2)).toMatchFileSnapshot(
       resolve(__dirname, '../../fixtures/modifiers/vue-hooks.snap'),

@@ -33,6 +33,7 @@
     "kind": "native",
     "token": "home"
   },
+  "lazy": null,
   "left": {
     "kind": "native",
     "token": "left"
@@ -41,6 +42,7 @@
     "kind": "native",
     "token": "middle"
   },
+  "number": null,
   "once": {
     "kind": "native",
     "token": "once"
@@ -94,6 +96,7 @@
     "helperName": "throttle",
     "args": []
   },
+  "trim": null,
   "up": {
     "kind": "native",
     "token": "up"

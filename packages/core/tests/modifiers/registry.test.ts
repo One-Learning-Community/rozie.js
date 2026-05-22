@@ -145,7 +145,7 @@ describe('ModifierRegistry — Plan 02-04 Task 1', () => {
 });
 
 describe('registerBuiltins / createDefaultRegistry — Plan 02-04 Task 2', () => {
-  it('registerBuiltins(reg) populates 23 default modifiers (9 composition + 14 key/button filters)', () => {
+  it('registerBuiltins(reg) populates 26 default modifiers (9 composition + 14 key/button filters + 3 model)', () => {
     const reg = new ModifierRegistry();
     registerBuiltins(reg);
     // 9 composition modifiers
@@ -161,6 +161,10 @@ describe('registerBuiltins / createDefaultRegistry — Plan 02-04 Task 2', () =>
       'throttle',
     ]) {
       expect(reg.has(name), `${name} should be registered`).toBe(true);
+    }
+    // Phase 12 — 3 built-in r-model model modifiers
+    for (const name of ['lazy', 'number', 'trim']) {
+      expect(reg.has(name), `${name} model modifier should be registered`).toBe(true);
     }
     // 14 key/button filters
     for (const name of [
@@ -181,14 +185,14 @@ describe('registerBuiltins / createDefaultRegistry — Plan 02-04 Task 2', () =>
     ]) {
       expect(reg.has(name), `${name} key/button filter should be registered`).toBe(true);
     }
-    expect(reg.list().length).toBe(23);
+    expect(reg.list().length).toBe(26);
   });
 
   it('createDefaultRegistry() returns a fresh registry pre-populated with builtins', () => {
     const reg = createDefaultRegistry();
     expect(reg.has('outside')).toBe(true);
     expect(reg.has('escape')).toBe(true);
-    expect(reg.list().length).toBe(23);
+    expect(reg.list().length).toBe(26);
   });
 
   it('createDefaultRegistry() called twice returns INDEPENDENT registries (no shared state)', () => {

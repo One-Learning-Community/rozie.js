@@ -20,6 +20,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import {
   ModifierRegistry,
+  isEventModifier,
   type ModifierContext,
 } from '../../src/modifiers/ModifierRegistry.js';
 import { registerBuiltins } from '../../src/modifiers/registerBuiltins.js';
@@ -38,13 +39,16 @@ describe('Phase 4 D-65 React emission descriptors', () => {
   const registry = new ModifierRegistry();
   registerBuiltins(registry);
 
-  it('every builtin implements react?', () => {
+  it('every EVENT builtin implements react?', () => {
+    // Phase 12 / D-03 — model modifiers (lazy/number/trim) are target-agnostic
+    // and intentionally carry NO react?() hook; filter them out.
     for (const name of registry.list()) {
       const impl = registry.get(name);
       expect(impl, `builtin '${name}' should be retrievable`).toBeDefined();
+      if (!impl || !isEventModifier(impl)) continue;
       expect(
-        typeof impl?.react,
-        `builtin '${name}' missing react? hook`,
+        typeof impl.react,
+        `event builtin '${name}' missing react? hook`,
       ).toBe('function');
     }
   });
@@ -187,7 +191,8 @@ describe('Phase 4 D-65 React emission descriptors', () => {
     for (const name of registry.list()) {
       const impl = registry.get(name);
       if (!impl) throw new Error(`unreachable: ${name} listed but not retrievable`);
-      out[name] = impl.react ? impl.react([], LISTENER_CTX) : null;
+      // Phase 12 / D-03 — model modifiers have no react?() hook; record null.
+      out[name] = isEventModifier(impl) && impl.react ? impl.react([], LISTENER_CTX) : null;
     }
     await expect(JSON.stringify(out, null, 2)).toMatchFileSnapshot(
       resolve(__dirname, '../../fixtures/modifiers/react-hooks.snap'),

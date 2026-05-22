@@ -32,11 +32,19 @@
     "arity": "none"
   },
   {
+    "name": "lazy",
+    "arity": "none"
+  },
+  {
     "name": "left",
     "arity": "none"
   },
   {
     "name": "middle",
+    "arity": "none"
+  },
+  {
+    "name": "number",
     "arity": "none"
   },
   {
@@ -86,6 +94,10 @@
   {
     "name": "throttle",
     "arity": "one"
+  },
+  {
+    "name": "trim",
+    "arity": "none"
   },
   {
     "name": "up",
