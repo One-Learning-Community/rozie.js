@@ -97,7 +97,12 @@ object RoziePropsModel {
                 Entry(name, p.nameIdentifier ?: p, p.value)
             }
         is JSBlockStatement ->
-            element.statements.filterIsInstance<JSLabeledStatement>().mapNotNull { labeled ->
+            // Direct labeled-statement children. NOT `element.statements`: that
+            // is `JSBlockStatement.getStatements()`, deprecated in 2024.2 and
+            // removed in 2025.3 — the verifier flags it as a binary-compat
+            // (NoSuchMethodError) problem. `PsiTreeUtil.getChildrenOfTypeAsList`
+            // is stable across both platform versions and gives the same set.
+            PsiTreeUtil.getChildrenOfTypeAsList(element, JSLabeledStatement::class.java).mapNotNull { labeled ->
                 val name = labeled.label ?: return@mapNotNull null
                 Entry(name, labeled.labelIdentifier ?: labeled, labeled.statement)
             }
