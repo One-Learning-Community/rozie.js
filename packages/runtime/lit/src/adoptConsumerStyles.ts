@@ -73,6 +73,8 @@ export function adoptConsumerStyles(
   producerEl: Element,
   consumerStyles: CSSResultGroupLike | undefined,
 ): void {
+  /* v8 ignore next -- SSR guard: happy-dom always defines `document`, so the
+     non-browser early-return is unreachable under the vitest happy-dom env. */
   if (typeof document === 'undefined') return;
   const sheets = collectSheets(consumerStyles);
   if (sheets.length === 0) return;
@@ -93,6 +95,10 @@ export function adoptConsumerStyles(
   // the custom element class is registered AND a frame has elapsed for
   // firstUpdated to attach the shadow root.
   customElements.whenDefined(localName).then(() => {
+    /* v8 ignore next -- happy-dom never attaches a shadow root via
+       connectedCallback, so the whenDefined()-resolves-and-shadowRoot-now-exists
+       success arm cannot be driven under the vitest happy-dom env; the
+       fall-through to requestAnimationFrame IS exercised. */
     if (trySync()) return;
     requestAnimationFrame(() => {
       trySync();

@@ -42,6 +42,9 @@ export function throttle<A extends unknown[]>(
         timer = setTimeout(() => {
           last = Date.now();
           timer = undefined;
+          /* v8 ignore next -- defensive: `pendingArgs` is always assigned on
+             the line that precedes scheduling this timer, so the falsy arm is
+             unreachable; `.cancel()` clears the timer before it can fire. */
           if (pendingArgs) fn(...pendingArgs);
         }, remaining);
       }

@@ -27,6 +27,8 @@ const STYLE_MARKER_ATTR = 'data-rozie-global-id';
 export function injectGlobalStyles(id: string, css: string): void {
   // SSR / non-browser guard: silently no-op if `document` isn't defined
   // (e.g., the module loads in a Node test runner without happy-dom).
+  /* v8 ignore next 2 -- SSR guard: happy-dom always defines `document`, so the
+     non-browser early-return is unreachable under the vitest happy-dom env. */
   if (typeof document === 'undefined') return;
 
   // WR-02 fix: use CSS.escape() instead of manual quote-only escaping so
