@@ -795,10 +795,20 @@ function lowerBareElement(
       // almost certainly a typo — and would otherwise be silently dropped,
       // since no branch below matches it. Emit a did-you-mean and skip.
       const colonIdx = attr.name.indexOf(':');
+      // Phase 14 R1 — `r-bind:foo="x"` colon form. The colon-argument shape
+      // is a `r-model:propName`-only feature; on `r-bind` it is rejected
+      // with ROZ969. The diagnostic is emitted at the PARSE level (in
+      // `ast/normalize.ts` `enrichAttr`) so `parse()`-only callers see it
+      // — `compile()` aggregates parse + lower diagnostics, so emitting it
+      // again HERE would double-report. The colon-form attr arrives with
+      // `name === 'bind:foo'`; it does NOT match the bare-`bind` spread
+      // branch below, and falls through the directive `else` harmlessly
+      // (the attribute is dropped; the parse-level ROZ969 already errored).
       if (colonIdx > 0) {
         const directiveBase = attr.name.slice(0, colonIdx);
         if (
           directiveBase !== 'model' &&
+          directiveBase !== 'bind' &&
           didYouMean(directiveBase, ['model']) === 'model'
         ) {
           const directiveArg = attr.name.slice(colonIdx + 1);
@@ -844,6 +854,32 @@ function lowerBareElement(
           deps: expr ? computeExpressionDeps(expr, bindings) : [],
           sourceLoc: attr.loc,
           ...(twoWayModifiers.length > 0 ? { modifiers: twoWayModifiers } : {}),
+        });
+        continue;
+      }
+
+      // Phase 14 R2 / D-07 — the bare-spread `r-bind="<expr>"` form. The
+      // expression evaluates to an object whose own enumerable keys are each
+      // applied as an attribute on the host element (attribute fallthrough).
+      // Lowers to a name-less `spreadBinding` AttributeBinding.
+      //
+      // The push happens HERE, at the attribute's source position in the
+      // `el.attributes` iteration — NOT collected separately and appended.
+      // Source order is load-bearing for R6's positional last-wins
+      // (RESEARCH.md Pitfall 2): a `r-bind` between two static attributes
+      // yields `[static, spreadBinding, static]` in that exact order.
+      //
+      // `tryParseExpression` try/catch-wraps a malformed `r-bind` value into
+      // a `null` return (the parser layer already collected ROZ051) — a bad
+      // expression becomes a collected diagnostic, never an uncaught throw
+      // (D-08 collected-not-thrown; threat T-14-03).
+      if (attr.name === 'bind') {
+        const expr = attr.value !== null ? tryParseExpression(attr.value) : null;
+        attributes.push({
+          kind: 'spreadBinding',
+          expression: expr ?? t.identifier('undefined'),
+          deps: expr ? computeExpressionDeps(expr, bindings) : [],
+          sourceLoc: attr.loc,
         });
         continue;
       }

@@ -34,6 +34,7 @@ import type {
 import type { StyleAST } from './blocks/StyleAST.js';
 import type { ComponentsAST } from './blocks/ComponentsAST.js';
 import { parseModifierChain } from '../modifier-grammar/parseModifierChain.js';
+import { RozieErrorCode } from '../diagnostics/codes.js';
 
 export interface NormalizeInput {
   blocks: BlockMap;
@@ -138,6 +139,26 @@ function enrichNode(node: TemplateNode, diagnostics: Diagnostic[]): TemplateNode
 }
 
 function enrichAttr(attr: TemplateAttr, diagnostics: Diagnostic[]): TemplateAttr {
+  // Phase 14 R1 — `r-bind:foo="x"` colon form is not supported. The parser
+  // does not split a `:arg` off `r-bind` (only `r-model` carries a colon
+  // argument), so the colon form arrives here as a `directive` attr whose
+  // `name` is `bind:foo`. Reject it with ROZ969 (R_BIND_COLON_FORM) — the
+  // colon-argument shape is a `r-model:propName`-only feature; on `r-bind`
+  // it is a compile error. Emitting here at the PARSE level (rather than in
+  // `lowerTemplate`) means `parse()`-only callers see it AND `compile()` (which
+  // aggregates parse + lower diagnostics) does not double-report.
+  if (attr.kind === 'directive' && attr.name.startsWith('bind:')) {
+    const directiveArg = attr.name.slice('bind:'.length);
+    diagnostics.push({
+      code: RozieErrorCode.R_BIND_COLON_FORM,
+      severity: 'error',
+      message: `'r-${attr.name}' is not supported — r-bind has no colon-argument form.`,
+      loc: attr.loc,
+      hint: `Use ':${directiveArg}="<expr>"' for a single named binding, or the bare-spread 'r-bind="<obj>"' to apply an object of attributes.`,
+    });
+    // Fall through — the attr keeps its shape so the downstream walk stays
+    // uniform; `lowerTemplate` drops a `name:'bind:foo'` directive harmlessly.
+  }
   // Phase 12 — `r-model` is the one directive that carries a modifier chain
   // (`r-model.lazy.number.trim`). The parser splits the chain text off only
   // for `r-model` (bare or the `r-model:propName` colon-arg form), so any

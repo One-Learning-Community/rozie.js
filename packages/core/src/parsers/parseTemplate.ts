@@ -126,6 +126,14 @@ export function parseTemplate(
       // directives keep the whole remainder as `name` so they parse
       // byte-identically to pre-phase — a `.` on `r-show`/`r-if`/etc.
       // stays observable in `name` for the lowerer to flag (ROZ962).
+      //
+      // Phase 14 — `bind` is now a recognized directive base alongside
+      // `model` (the bare-spread `r-bind="<expr>"` attribute-fallthrough
+      // form, D-07). It needs NO new classification branch: a bare `r-bind`
+      // already lands as `kind:'directive'`, `name:'bind'`, and the
+      // `.modifier`-chain split below stays `r-model`-only — `r-bind` takes
+      // no modifiers. The colon form `r-bind:foo` flows through the `else`
+      // with `name='bind:foo'` and is rejected (ROZ969) in `lowerTemplate`.
       const dotIdx = rest.indexOf('.');
       const colonIdx = rest.indexOf(':');
       const directiveBase =
