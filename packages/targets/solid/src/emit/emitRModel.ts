@@ -31,6 +31,7 @@ import type {
   ResolvedModelModifier,
 } from '../../../../core/src/ir/types.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
+import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
 import { isPascalCase } from '../../../../core/src/ir/utils/isPascalCase.js';
 
 type GenerateFn = typeof import('@babel/generator').default;
@@ -120,21 +121,55 @@ function partitionModifiers(
 }
 
 /**
+ * Phase 12 / CR-02 (12-REVIEW) — substitute the reserved `$v` value-access
+ * placeholder token in a `valueTransform` fragment. Token-aware: only `$v`
+ * appearing as a standalone token (not part of a longer identifier such as
+ * `$value` or `__$v_tmp`) is replaced, so a chain step whose intermediate
+ * output contains the literal substring `$v` cannot be double-substituted by
+ * a later iteration. `$` is a JS identifier character, so the lookbehind
+ * excludes both `\w` and `$` and the lookahead excludes `\w`.
+ */
+function substituteValuePlaceholder(
+  fragment: string,
+  replacement: string,
+): string {
+  return fragment.replace(/(?<![\w$])\$v(?!\w)/g, `(${replacement})`);
+}
+
+/**
  * Phase 12 — apply the resolved `valueTransform` fragments to a value-access
  * expression node. Each fragment is a string containing the literal `$v`
  * placeholder (D-03); substitute `$v` with the current expression source,
  * re-parse, and chain. Empty list ⇒ the input node is returned unchanged, so
- * non-modifier `r-model` stays byte-identical to pre-phase. A malformed
- * fragment fails the parse loudly (threat register T-12-07).
+ * non-modifier `r-model` stays byte-identical to pre-phase.
+ *
+ * CR-03 (12-REVIEW) — `parseExpression` is wrapped in try/catch so a custom
+ * modifier whose `valueTransform` produces invalid JS after substitution
+ * yields a COLLECTED diagnostic (D-08 collected-not-thrown) instead of an
+ * uncaught crash. On failure the raw value-access node is returned and the
+ * remaining transforms are skipped.
  */
 function applyValueTransforms(
   valueAccess: t.Expression,
   valueTransforms: string[],
+  diagnostics: Diagnostic[],
 ): t.Expression {
   let current = valueAccess;
   for (const fragment of valueTransforms) {
     const currentSrc = generate(current, GEN_OPTS).code;
-    current = parseExpression(fragment.split('$v').join(`(${currentSrc})`));
+    const substituted = substituteValuePlaceholder(fragment, currentSrc);
+    try {
+      current = parseExpression(substituted);
+    } catch (err) {
+      diagnostics.push({
+        code: RozieErrorCode.RMODEL_UNKNOWN_MODIFIER,
+        severity: 'error',
+        message: `r-model modifier valueTransform produced invalid JS after $v substitution: ${String(err)}`,
+        loc: { start: 0, end: 0 },
+        hint: 'Check the custom model modifier’s valueTransform fragment — it must be a valid JS expression once `$v` is substituted.',
+      });
+      return valueAccess;
+    }
   }
   return current;
 }
@@ -192,6 +227,21 @@ export function emitRModel(
 
   // <input type="checkbox">: checked={X()} onChange={($event) => setX($event.currentTarget.checked)}
   if (tag === 'input' && inputType === 'checkbox') {
+    // CR-01 (12-REVIEW) — a value-transform modifier (.number/.trim/custom)
+    // cannot apply to a checkbox: the bound value is the boolean `checked`
+    // state, not a user-typed string. Phase 12's purpose is killing silent
+    // drops, so emit a warning rather than discarding the modifier silently.
+    // `.lazy` is exempt — `change` is already the checkbox commit event.
+    if (valueTransforms.length > 0) {
+      diagnostics.push({
+        code: RozieErrorCode.RMODEL_MODIFIER_NOT_APPLICABLE,
+        severity: 'warning',
+        message:
+          'Value-transform r-model modifiers (.number/.trim/custom) have no effect on <input type="checkbox"> — the bound value is the boolean `checked` state, not a coercible string.',
+        loc: rModelAttr.sourceLoc,
+        hint: 'Remove the modifier from this checkbox r-model. `.lazy` is fine (change is already the commit event).',
+      });
+    }
     const eTargetChecked = t.memberExpression(
       t.memberExpression(eId, t.identifier('currentTarget')),
       t.identifier('checked'),
@@ -211,6 +261,19 @@ export function emitRModel(
 
   // <input type="radio" value="V">: checked={X() === 'V'} onChange={($event) => setX('V')}
   if (tag === 'input' && inputType === 'radio') {
+    // CR-01 (12-REVIEW) — a value-transform modifier cannot apply to a radio:
+    // the committed value is the fixed `value="V"` attribute the input
+    // carries, not user-typed text. Emit a warning rather than a silent drop.
+    if (valueTransforms.length > 0) {
+      diagnostics.push({
+        code: RozieErrorCode.RMODEL_MODIFIER_NOT_APPLICABLE,
+        severity: 'warning',
+        message:
+          'Value-transform r-model modifiers (.number/.trim/custom) have no effect on <input type="radio"> — the committed value is the fixed `value` attribute, not a coercible string.',
+        loc: rModelAttr.sourceLoc,
+        hint: 'Remove the modifier from this radio r-model. `.lazy` is fine (change is already the commit event).',
+      });
+    }
     const radioValue = getStaticAttr(element.attributes, 'value') ?? '';
     const checkedExpr = t.binaryExpression(
       '===',
@@ -241,7 +304,7 @@ export function emitRModel(
     t.memberExpression(eId, t.identifier('currentTarget')),
     t.identifier('value'),
   );
-  const committedValue = applyValueTransforms(eTargetValue, valueTransforms);
+  const committedValue = applyValueTransforms(eTargetValue, valueTransforms, diagnostics);
   const handlerArrow = t.arrowFunctionExpression(
     [eId],
     t.callExpression(setterId, [committedValue]),

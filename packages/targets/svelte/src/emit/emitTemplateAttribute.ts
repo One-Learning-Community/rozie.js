@@ -132,6 +132,22 @@ function partitionSvelteModelModifiers(
 }
 
 /**
+ * Phase 12 / CR-02 (12-REVIEW) — substitute the reserved `$v` value-access
+ * placeholder token in a `valueTransform` fragment. Token-aware: only `$v`
+ * appearing as a standalone token (not part of a longer identifier such as
+ * `$value` or `__$v_tmp`) is replaced, so a chain step whose intermediate
+ * output contains the literal substring `$v` cannot be double-substituted by
+ * a later iteration. `$` is a JS identifier character, so the lookbehind
+ * excludes both `\w` and `$` and the lookahead excludes `\w`.
+ */
+function substituteValuePlaceholder(
+  fragment: string,
+  replacement: string,
+): string {
+  return fragment.replace(/(?<![\w$])\$v(?!\w)/g, `(${replacement})`);
+}
+
+/**
  * Phase 12 — splice the resolved `valueTransform` fragments into a value-access
  * expression STRING. Each fragment carries the literal `$v` placeholder (D-03);
  * substitute `$v` with the current expression text and chain. Empty list ⇒ the
@@ -143,7 +159,7 @@ function applyValueTransformsString(
 ): string {
   let current = valueAccess;
   for (const fragment of valueTransforms) {
-    current = fragment.split('$v').join(`(${current})`);
+    current = substituteValuePlaceholder(fragment, current);
   }
   return current;
 }

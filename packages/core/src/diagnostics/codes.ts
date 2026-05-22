@@ -261,7 +261,7 @@ export const RozieErrorCode = {
   MATCH_MULTIPLE_DEFAULT: 'ROZ958',     // error — more than one r-default in a single r-match
   MATCH_DUPLICATE_CASE: 'ROZ959',       // warning — duplicate literal r-case value (first occurrence wins, like `switch`)
 
-  // ---- Phase 12 r-model modifiers — ROZ960..ROZ963 ----
+  // ---- Phase 12 r-model modifiers — ROZ960..ROZ964 ----
   // The r-model modifier chain: an unknown / misused modifier is a hard
   // error, never a silent drop. All four are detected inline in the
   // lowerTemplate r-model branch (collected-not-thrown), parallel to where
@@ -270,6 +270,15 @@ export const RozieErrorCode = {
   RMODEL_EVENT_MODIFIER_MISUSED: 'ROZ961',  // error — a valid event modifier used on r-model
   DIRECTIVE_TAKES_NO_MODIFIERS: 'ROZ962',   // error — modifier on r-if/r-for/r-show/r-html/r-text
   RMODEL_BUILTIN_ON_TWO_WAY: 'ROZ963',      // error — built-in r-model modifier on consumer-side r-model:propName
+  // CR-01 (12-REVIEW) — a value-transform modifier (.number/.trim/custom) on a
+  // checkbox/radio r-model has no effect: the bound value is a boolean
+  // `checked` (checkbox) or a fixed `value` string chosen by the input, not a
+  // user-typed string the transform could coerce. Phase 12's whole purpose is
+  // killing silent drops, so this is a warning emitted at per-target emit
+  // time (the React/Solid checkbox/radio branches) rather than a silent
+  // discard. `.lazy` is exempt — `change` is already the checkbox/radio
+  // commit event, so `.lazy` is a genuine no-op there, not a dropped intent.
+  RMODEL_MODIFIER_NOT_APPLICABLE: 'ROZ964', // warning — value-transform modifier on a checkbox/radio r-model
 } as const;
 
 export type RozieErrorCode = (typeof RozieErrorCode)[keyof typeof RozieErrorCode];
