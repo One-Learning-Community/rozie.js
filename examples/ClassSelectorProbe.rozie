@@ -24,8 +24,8 @@
 </data>
 
 <script>
-// <script>-position $classSelector call — exercises the rewriteScript.ts hook.
-// Lowers per-target: ".grip" literal (Vue/Svelte/Solid/Angular/Lit) or
+// script-position class-selector helper call — exercises the rewriteScript.ts
+// hook. Lowers per-target: ".grip" literal (Vue/Svelte/Solid/Angular/Lit) or
 // "." + styles.grip (React).
 const gripSelector = $classSelector('grip')
 

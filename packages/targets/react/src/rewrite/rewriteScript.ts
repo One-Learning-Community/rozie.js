@@ -35,6 +35,7 @@ import type { IRComponent } from '../../../../core/src/ir/types.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
 import { isInTypePosition } from '../../../../core/src/ast/typePosition.js';
+import { lowerClassSelectorCall } from './lowerClassSelectorCall.js';
 
 // CJS interop normalization (Phase 2 D-T-2-01-04 pattern).
 type TraverseFn = typeof import('@babel/traverse').default;
@@ -633,6 +634,15 @@ export function rewriteRozieIdentifiers(
           const arg = args[0]!;
           if (t.isExpression(arg)) path.replaceWith(arg);
         }
+        return;
+      }
+
+      // $classSelector('grip') → "." + styles.grip — React runs class names
+      // through CSS Modules, so a literal ".grip" never matches the hashed
+      // DOM. Shared with rewriteTemplateExpression.ts via lowerClassSelectorCall
+      // so the two hooks cannot drift (Pitfall 4).
+      if (callee.name === '$classSelector') {
+        lowerClassSelectorCall(path);
         return;
       }
 
