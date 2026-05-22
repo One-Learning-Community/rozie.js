@@ -61,6 +61,13 @@ const FIXTURES_DIR = resolve(HERE, '../fixtures');
 // unknown-modifier error. RModelCustom's AC-11 proof is instead the six
 // tests/plugins/phone/src/__tests__/phone-<target>-emit.test.ts tests.
 // All three are single-file; no sibling .rozie producers.
+// Phase 13 — EXAMPLES extended 13 → 14 with ClassSelectorProbe ($classSelector
+// proving fixture). The probe exercises `$classSelector` in BOTH a `<script>`
+// call and a `:attr` binding, so registering it here makes the bootstrap
+// compile() it across all six targets — the dist-parity proof that both
+// rewrite hooks (rewriteScript.ts + rewriteTemplateExpression.ts) lower the
+// helper byte-identically across all four entrypoints. Single-file; no
+// sibling .rozie producers.
 const EXAMPLES = [
   'Counter',
   'SearchInput',
@@ -77,6 +84,7 @@ const EXAMPLES = [
   'BadgeGridStyledScss',
   'RModelLazy',
   'RModelNumberTrim',
+  'ClassSelectorProbe',
 ];
 
 const EXAMPLES_NEEDING_RESOLVER_ROOT = new Set(['ModalConsumer', 'WrapperModal']);

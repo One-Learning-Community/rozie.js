@@ -1,0 +1,58 @@
+<!--
+  ClassSelectorProbe.rozie — Phase 13 dist-parity proving fixture for the
+  `$classSelector` helper.
+
+  Single-file (no sibling `.rozie` producers). Mirrors PortalListStyled's
+  shape: a `<style>` block declaring the scoped classes plus a minimal
+  feature exercise.
+
+  This fixture deliberately exercises BOTH `$classSelector` rewrite hooks:
+    - `$classSelector('grip')`  — a `<script>` call (rewriteScript.ts path)
+    - `$classSelector('panel')` — a `:attr` binding   (rewriteTemplateExpression.ts path)
+
+  `.grip` is the class SortableListDemo also uses, so the probe stays
+  parallel to the real engine-wrapper case; `.panel` covers a second,
+  non-`grip` class so dist-parity sees more than one token.
+-->
+
+<rozie name="ClassSelectorProbe">
+
+<data>
+{
+  ready: false
+}
+</data>
+
+<script>
+// <script>-position $classSelector call — exercises the rewriteScript.ts hook.
+// Lowers per-target: ".grip" literal (Vue/Svelte/Solid/Angular/Lit) or
+// "." + styles.grip (React).
+const gripSelector = $classSelector('grip')
+
+$onMount(() => {
+  $data.ready = true
+})
+</script>
+
+<template>
+<div class="panel" :data-handle="$classSelector('panel')" :data-grip="gripSelector">
+  <span class="grip" aria-hidden="true">⋮⋮</span>
+  <span r-if="$data.ready">ready</span>
+</div>
+</template>
+
+<style>
+.panel {
+  display: block;
+  padding: 0.5rem;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+.grip {
+  cursor: grab;
+  user-select: none;
+  color: rgba(0, 0, 0, 0.35);
+}
+</style>
+
+</rozie>
