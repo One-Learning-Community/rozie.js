@@ -43,6 +43,43 @@ describe('createControllableSignal', () => {
     });
   });
 
+  // Quick task 260521-qsh — close the `props ?? {}` undefined-arm branch.
+  it('Test 4a: tolerates an undefined props object (D-VR-03 bare-mount path)', () => {
+    createRoot((dispose) => {
+      const [get, set] = createControllableSignal<number>(undefined, 'value', 9);
+      // No props at all — getter falls back to defaultFallback.
+      expect(get()).toBe(9);
+      // Uncontrolled (no `value` key) — setter updates the internal signal.
+      set(11 as unknown as Parameters<typeof set>[0]);
+      expect(get()).toBe(11);
+      dispose();
+    });
+  });
+
+  // Quick task 260521-qsh — close the controlled→uncontrolled message arms.
+  it('Test 4b: controlled→uncontrolled flip warns once with the controlled→uncontrolled message', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    createRoot((dispose) => {
+      // Start controlled (a `value` key is present).
+      const props: Record<string, unknown> = { value: 5 };
+      const [get, set] = createControllableSignal(props, 'value', 0);
+      expect(get()).toBe(5);
+
+      // Parent stops controlling — remove the `value` key.
+      delete props['value'];
+      set(8 as unknown as Parameters<typeof set>[0]);
+
+      expect(warnSpy).toHaveBeenCalledOnce();
+      const warnMsg = warnSpy.mock.calls[0]![0] as string;
+      expect(warnMsg).toContain('[ROZ812]');
+      // Exercises the `wasInitiallyControlled ? 'controlled' : ...` true-arm
+      // and the `nowControlled ? ... : 'uncontrolled'` false-arm.
+      expect(warnMsg).toContain('from controlled to uncontrolled');
+      dispose();
+    });
+    warnSpy.mockRestore();
+  });
+
   it('Test 4: parent-flip ROZ812 warning emitted exactly once', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     createRoot((dispose) => {

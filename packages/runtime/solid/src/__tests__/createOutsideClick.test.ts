@@ -65,4 +65,21 @@ describe('createOutsideClick', () => {
     outside.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(handler).not.toHaveBeenCalled();
   });
+
+  // Quick task 260521-qsh — close the `if (target === null) return` branch gap.
+  it('Test 9: does NOT fire when the click event has a null target', () => {
+    document.body.innerHTML = '<div id="inside"></div>';
+    const inside = document.getElementById('inside')!;
+    const handler = vi.fn();
+    createRoot((dispose) => {
+      createOutsideClick([() => inside], handler);
+      // Force a null `target` on the event (a real browser never retargets to
+      // null, but the defensive guard exists — drive it explicitly).
+      const evt = new MouseEvent('click', { bubbles: true });
+      Object.defineProperty(evt, 'target', { value: null, configurable: true });
+      inside.dispatchEvent(evt);
+      expect(handler).not.toHaveBeenCalled();
+      dispose();
+    });
+  });
 });
