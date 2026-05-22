@@ -4835,6 +4835,7 @@
       "end": 2817
     }
   },
+  "inheritAttrs": true,
   "styles": {
     "type": "StyleSection",
     "scopedRules": [

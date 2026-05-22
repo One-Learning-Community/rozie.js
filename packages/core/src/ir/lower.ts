@@ -164,6 +164,11 @@ export function lowerToIR(ast: RozieAST, opts: LowerOptions): LowerResult {
     listeners: [...listenersFromBlock, ...templateResult.templateListeners],
     setupBody: scriptResult.setupBody,
     template: templateResult.template,
+    // Phase 14 R5 — cross-framework attribute fallthrough. Threaded from the
+    // `<rozie inherit-attrs>` attribute captured by splitBlocks onto
+    // `BlockMap.rozie.inheritAttrs`. An absent attribute (key omitted under
+    // exactOptionalPropertyTypes) lowers to the `true` default.
+    inheritAttrs: ast.blocks.rozie?.inheritAttrs ?? true,
     styles,
     // Phase 06.2 P1 D-115 — populated from componentsTable.values() in source-order
     // (Map preserves insertion order per D-129).

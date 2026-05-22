@@ -1987,6 +1987,7 @@
       "end": 1929
     }
   },
+  "inheritAttrs": true,
   "styles": {
     "type": "StyleSection",
     "scopedRules": [

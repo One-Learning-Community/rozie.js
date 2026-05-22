@@ -151,6 +151,7 @@
       "end": 132
     }
   },
+  "inheritAttrs": true,
   "styles": {
     "type": "StyleSection",
     "scopedRules": [],

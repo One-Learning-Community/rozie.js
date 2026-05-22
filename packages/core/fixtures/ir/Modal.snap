@@ -3053,6 +3053,7 @@
       "end": 2899
     }
   },
+  "inheritAttrs": true,
   "styles": {
     "type": "StyleSection",
     "scopedRules": [

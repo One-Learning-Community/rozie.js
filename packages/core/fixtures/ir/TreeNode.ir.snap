@@ -304,6 +304,7 @@
       "end": 274
     }
   },
+  "inheritAttrs": true,
   "styles": {
     "type": "StyleSection",
     "scopedRules": [],

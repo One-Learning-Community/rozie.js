@@ -120,6 +120,7 @@
       "end": 156
     }
   },
+  "inheritAttrs": true,
   "styles": {
     "type": "StyleSection",
     "scopedRules": [],
