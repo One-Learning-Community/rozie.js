@@ -9,7 +9,7 @@ interface ModalConsumerProps {
 
 export default function ModalConsumer(_props: ModalConsumerProps): JSX.Element {
   const _merged = mergeProps({ title: 'Confirm' }, _props);
-  const [local, rest] = splitProps(_merged, ['title']);
+  const [local, attrs] = splitProps(_merged, ['title']);
 
   const [open1, setOpen1] = createSignal(true);
   const [open2, setOpen2] = createSignal(true);
@@ -26,7 +26,7 @@ export default function ModalConsumer(_props: ModalConsumerProps): JSX.Element {
     .close[data-rozie-s-5d081d3a] { background: none; border: none; cursor: pointer; font-size: 1.25rem; }
     .dynamic-fill[data-rozie-s-5d081d3a] { font-weight: bold; }`}</style>
     <>
-    <div class={"modal-consumer"} data-rozie-s-5d081d3a="">
+    <div class={"modal-consumer"} {...attrs} data-rozie-s-5d081d3a="">
       <Modal open={open1()} onOpenChange={setOpen1} headerSlot={({ close }) => (<>
           <h2 data-rozie-s-5d081d3a="">{local.title}</h2>
           <button class={"close"} onClick={close} data-rozie-s-5d081d3a="">×</button>

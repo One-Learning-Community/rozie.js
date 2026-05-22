@@ -221,6 +221,17 @@ function buildPropsInterfaceFields(ir: IRComponent): string[] {
     lines.push(`  ${onName}?: (...args: unknown[]) => void;`);
   }
 
+  // Plan 14-05 — when `inheritAttrs !== false`, declare an index signature so
+  // the synthesised `...__rozieAttrs` rest destructure types as
+  // `Record<string, unknown>`. The signature is permissive (`unknown` not
+  // `any`) — consumer-facing typing stays strict for ALL declared props
+  // above; only the rest bucket accepts arbitrary keys (mirrors Vue's
+  // `$attrs: Record<string, unknown>` magic accessor / React's
+  // `Omit<HTMLAttributes, …>` spread idiom).
+  if (ir.inheritAttrs !== false) {
+    lines.push('  [key: string]: unknown;');
+  }
+
   return lines;
 }
 
@@ -309,6 +320,19 @@ function buildPropsDestructureEntries(ir: IRComponent): string[] {
     entries.push(svelteCallbackPropName(e));
   }
 
+  // Plan 14-05 — cross-framework attribute fallthrough rest binding. When
+  // `inheritAttrs !== false`, synthesise `...__rozieAttrs` so the
+  // template-root `{...$attrs}` spread (synthesised by `synthesizeAttrsFallthrough`
+  // in lower.ts AND any author-written `r-bind="$attrs"`) has a runes-mode-
+  // compatible target. Svelte 5 runes-mode rejects the legacy `$$restProps`
+  // identifier (`Cannot use \`$$restProps\` in runes mode`), so the rewrite
+  // in `rewriteTemplateExpression.ts` lowers `$attrs` → `__rozieAttrs` and
+  // this entry binds the rest. When `inheritAttrs === false`, no entry is
+  // added (and the synthesis pass skips the spread injection per R5).
+  if (ir.inheritAttrs !== false) {
+    entries.push('...__rozieAttrs');
+  }
+
   return entries;
 }
 
@@ -340,7 +364,20 @@ function emitSlotDerivedMerges(ir: IRComponent): string[] {
  * there are no props AND no slots.
  */
 function emitPropsBlock(ir: IRComponent): string {
-  if (ir.props.length === 0 && ir.slots.length === 0 && ir.emits.length === 0) return '';
+  // Plan 14-05 — even when no props/slots/emits, an `inheritAttrs !== false`
+  // component needs the `...__rozieAttrs` rest binding so the synthesised
+  // template-root `{...$attrs}` spread (lower.ts `synthesizeAttrsFallthrough`)
+  // resolves. The condition below therefore considers attr-fallthrough as a
+  // gating signal alongside the legacy props/slots/emits trio.
+  const hasAttrsFallthrough = ir.inheritAttrs !== false;
+  if (
+    ir.props.length === 0 &&
+    ir.slots.length === 0 &&
+    ir.emits.length === 0 &&
+    !hasAttrsFallthrough
+  ) {
+    return '';
+  }
 
   const fields = buildPropsInterfaceFields(ir);
   const entries = buildPropsDestructureEntries(ir);
@@ -350,11 +387,16 @@ function emitPropsBlock(ir: IRComponent): string {
   const interfaceBlock = `interface Props {\n${fields.join('\n')}\n}`;
 
   // Multi-line destructure for readability when more than 2 entries.
+  // Plan 14-05 — when the last entry is the `...__rozieAttrs` rest pattern,
+  // the trailing-comma form `..., \n}` is a JS parse error
+  // ("Comma is not permitted after the rest element"). Use a no-trailing-comma
+  // form for the multi-line variant; the rest entry is ALWAYS last when it
+  // exists (appended after props/slots/emits in buildPropsDestructureEntries).
   let destructure: string;
   if (entries.length <= 2) {
     destructure = `let { ${entries.join(', ')} }: Props = $props();`;
   } else {
-    destructure = `let {\n  ${entries.join(',\n  ')},\n}: Props = $props();`;
+    destructure = `let {\n  ${entries.join(',\n  ')}\n}: Props = $props();`;
   }
 
   const mergeBlock = mergeLines.length > 0 ? `\n\n${mergeLines.join('\n')}` : '';

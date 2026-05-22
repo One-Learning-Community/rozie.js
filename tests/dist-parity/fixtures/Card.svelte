@@ -8,6 +8,7 @@ interface Props {
   onClose?: ((...args: any[]) => any) | null;
   children?: Snippet;
   snippets?: Record<string, any>;
+  [key: string]: unknown;
 }
 
 let {
@@ -15,13 +16,14 @@ let {
   onClose = null,
   children: __childrenProp,
   snippets,
+  ...__rozieAttrs
 }: Props = $props();
 
 const children = $derived(__childrenProp ?? snippets?.children);
 </script>
 
 
-<article class="card">
+<article class="card" {...__rozieAttrs}>
   <CardHeader title={title} onClose={onClose}></CardHeader>
   <div class="card__body">
     {@render children?.()}

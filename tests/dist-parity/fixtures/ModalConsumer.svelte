@@ -4,9 +4,10 @@ import WrapperModal from './WrapperModal.svelte';
 
 interface Props {
   title?: string;
+  [key: string]: unknown;
 }
 
-let { title = 'Confirm' }: Props = $props();
+let { title = 'Confirm', ...__rozieAttrs }: Props = $props();
 
 let open1 = $state(true);
 let open2 = $state(true);
@@ -19,7 +20,7 @@ function onConfirm() {
 </script>
 
 
-<div class="modal-consumer">
+<div class="modal-consumer" {...__rozieAttrs}>
   <Modal bind:open={open1}>{#snippet header({ close })}
       <h2>{title}</h2>
       <button class="close" onclick={close}>×</button>

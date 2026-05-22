@@ -9,10 +9,15 @@ export default function BadgeGridStyledScss(_props: BadgeGridStyledScssProps): J
     ..._props,
     badges: _props.badges ?? (() => [])(),
   };
+  const attrs: Record<string, unknown> = (() => {
+    const { badges, ...rest } = _props as BadgeGridStyledScssProps & Record<string, unknown>;
+    void badges;
+    return rest;
+  })();
 
   return (
     <>
-    <div className={styles["badge-grid"]} data-rozie-s-44801268="">
+    <div className={styles["badge-grid"]} {...attrs} data-rozie-s-44801268="">
       {props.badges.map((badge) => <span key={badge} className={`${styles.badge} ${styles["badge--neutral"]}`} data-rozie-s-44801268="">
         {badge}
       </span>)}

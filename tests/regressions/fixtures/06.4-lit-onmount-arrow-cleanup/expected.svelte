@@ -1,6 +1,12 @@
 <script lang="ts">
 import { onMount } from 'svelte';
 
+interface Props {
+  [key: string]: unknown;
+}
+
+let { ...__rozieAttrs }: Props = $props();
+
 let ticks = $state(0);
 let running = $state(true);
 
@@ -21,7 +27,7 @@ onMount(() => {
 </script>
 
 
-<div class="ticker">{ticks}</div>
+<div class="ticker" {...__rozieAttrs}>{ticks}</div>
 
 
 <style>

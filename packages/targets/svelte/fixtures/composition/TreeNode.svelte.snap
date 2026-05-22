@@ -1,11 +1,15 @@
 <script lang="ts">
 import TreeNode from './TreeNode.svelte';
 
+interface Props {
+  [key: string]: unknown;
+}
 
+let { ...__rozieAttrs }: Props = $props();
 </script>
 
 
-  <li>
+  <li {...__rozieAttrs}>
     <span>{$props.label}</span>
     <TreeNode node={$props.children}></TreeNode>
   </li>

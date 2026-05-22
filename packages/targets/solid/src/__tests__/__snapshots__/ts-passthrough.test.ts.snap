@@ -18,7 +18,7 @@ interface TsPassthroughProps {
 
 export default function TsPassthrough(_props: TsPassthroughProps): JSX.Element {
   const _merged = mergeProps({ label: 'Count' }, _props);
-  const [local, rest] = splitProps(_merged, ['label']);
+  const [local, attrs] = splitProps(_merged, ['label']);
 
   onMount(() => {
     editor = makeEditor();
@@ -36,7 +36,7 @@ export default function TsPassthrough(_props: TsPassthroughProps): JSX.Element {
 
   return (
     <>
-      <button onClick={($event) => { inc(1); }} data-rozie-s-189ead9a="">{label}: {count}</button>
+      <button {...attrs} onClick={($event) => { inc(1); }} data-rozie-s-189ead9a="">{label}: {count}</button>
     </>
   );
 }
@@ -53,7 +53,7 @@ interface TsPassthroughProps {
 
 export default function TsPassthrough(_props: TsPassthroughProps): JSX.Element {
   const _merged = mergeProps({ label: 'Count' }, _props);
-  const [local, rest] = splitProps(_merged, ['label']);
+  const [local, attrs] = splitProps(_merged, ['label']);
 
   onMount(() => {
     editor = makeEditor();
@@ -71,7 +71,7 @@ export default function TsPassthrough(_props: TsPassthroughProps): JSX.Element {
 
   return (
     <>
-      <button onClick={($event) => { inc(1); }} data-rozie-s-189ead9a="">{label}: {count}</button>
+      <button {...attrs} onClick={($event) => { inc(1); }} data-rozie-s-189ead9a="">{label}: {count}</button>
     </>
   );
 }

@@ -4,6 +4,7 @@ import styles from './CommaAlternatives.module.css';
 interface CommaAlternativesProps {}
 
 export default function CommaAlternatives(props: CommaAlternativesProps): JSX.Element {
+  const attrs = props as Record<string, unknown>;
   const [bound, setBound] = useState('max');
 
   return (

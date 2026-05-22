@@ -1,6 +1,6 @@
 <template>
 
-<div class="scoped-params-fixture">
+<div class="scoped-params-fixture" v-bind="$attrs">
   <slot name="item" :value="props.label"></slot>
 </div>
 

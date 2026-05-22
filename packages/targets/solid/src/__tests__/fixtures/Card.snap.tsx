@@ -12,7 +12,7 @@ interface CardProps {
 
 export default function Card(_props: CardProps): JSX.Element {
   const _merged = mergeProps({ title: '' }, _props);
-  const [local, rest] = splitProps(_merged, ['title', 'onClose', 'children']);
+  const [local, attrs] = splitProps(_merged, ['title', 'onClose', 'children']);
   const resolved = children(() => local.children);
 
   return (
@@ -20,7 +20,7 @@ export default function Card(_props: CardProps): JSX.Element {
     <style>{`.card[data-rozie-s-a88c221e] { border: 1px solid #ddd; border-radius: 6px; overflow: hidden; background: #fff; }
     .card__body[data-rozie-s-a88c221e] { padding: 1rem; }`}</style>
     <>
-    <article class={"card"} data-rozie-s-a88c221e="">
+    <article class={"card"} {...attrs} data-rozie-s-a88c221e="">
       <CardHeader title={local.title} onClose={local.onClose} />
       <div class={"card__body"} data-rozie-s-a88c221e="">
         {resolved()}

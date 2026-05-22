@@ -1,6 +1,7 @@
 import { LitElement, css, html, nothing, render } from 'lit';
 import { customElement, property, query, queryAssignedElements, state } from 'lit/decorators.js';
 import { SignalWatcher } from '@lit-labs/preact-signals';
+import { rozieSpread } from '@rozie/runtime-lit';
 
 interface RozieItemSlotCtx {
   item: unknown;
@@ -141,11 +142,23 @@ private _portalContainers = new Set<HTMLElement>();
 
   render() {
     return html`
-<div class="rozie-portal-list" data-rozie-ref="__rozieRoot" data-rozie-s-18e5aac6>
+<div class="rozie-portal-list" ${rozieSpread(this.$attrs)} data-rozie-ref="__rozieRoot" data-rozie-s-18e5aac6>
   <slot name="item"></slot>
 </div>
 `;
   }
 
   instance: any = null;
+
+  /**
+   * Plan 14-05 — cross-framework attribute fallthrough source. Reads the
+   * host custom element's attributes on each call so a consumer-side bound
+   * attribute flows through on every render. The `rozieSpread` directive
+   * (D-02) does the cross-render diff downstream.
+   */
+  private get $attrs(): Record<string, string> {
+    const out: Record<string, string> = {};
+    for (const a of Array.from(this.attributes)) out[a.name] = a.value;
+    return out;
+  }
 }

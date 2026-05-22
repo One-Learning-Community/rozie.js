@@ -8,11 +8,11 @@ interface NestedSlotsFixtureProps {
 }
 
 export default function NestedSlotsFixture(_props: NestedSlotsFixtureProps): JSX.Element {
-  const [local, rest] = splitProps(_props, []);
+  const [local, attrs] = splitProps(_props, []);
 
   return (
     <>
-    <div class={"nested-slots-fixture"} data-rozie-s-4d5488e4="">
+    <div class={"nested-slots-fixture"} {...attrs} data-rozie-s-4d5488e4="">
       {(_props.wrapperSlot ?? _props.slots?.['wrapper']?.({})) ?? <div class={"wrapper-fallback"} data-rozie-s-4d5488e4="">
           {(_props.innerSlot ?? _props.slots?.['inner']?.({}))}
         </div>}

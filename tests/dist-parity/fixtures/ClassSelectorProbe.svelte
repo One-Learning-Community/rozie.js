@@ -1,6 +1,12 @@
 <script lang="ts">
 import { onMount } from 'svelte';
 
+interface Props {
+  [key: string]: unknown;
+}
+
+let { ...__rozieAttrs }: Props = $props();
+
 let ready = $state(false);
 
 // script-position class-selector helper call — exercises the rewriteScript.ts
@@ -14,7 +20,7 @@ onMount(() => {
 </script>
 
 
-<div class="panel" data-handle={".panel"} data-grip={gripSelector}>
+<div class="panel" data-handle={".panel"} data-grip={gripSelector} {...__rozieAttrs}>
   <span class="grip" aria-hidden="true">⋮⋮</span>
   {#if ready}<span>ready</span>{/if}</div>
 

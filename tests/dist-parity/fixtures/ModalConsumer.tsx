@@ -12,6 +12,11 @@ export default function ModalConsumer(_props: ModalConsumerProps): JSX.Element {
     ..._props,
     title: _props.title ?? 'Confirm',
   };
+  const attrs: Record<string, unknown> = (() => {
+    const { title, ...rest } = _props as ModalConsumerProps & Record<string, unknown>;
+    void title;
+    return rest;
+  })();
   const [open1, setOpen1] = useState(true);
   const [open2, setOpen2] = useState(true);
   const [open3, setOpen3] = useState(true);
@@ -23,7 +28,7 @@ export default function ModalConsumer(_props: ModalConsumerProps): JSX.Element {
 
   return (
     <>
-    <div className={styles["modal-consumer"]} data-rozie-s-5d081d3a="">
+    <div className={styles["modal-consumer"]} {...attrs} data-rozie-s-5d081d3a="">
       <Modal open={open1} onOpenChange={setOpen1} renderHeader={({ close }) => (<>
           <h2 data-rozie-s-5d081d3a="">{props.title}</h2>
           <button className={styles.close} onClick={close} data-rozie-s-5d081d3a="">×</button>

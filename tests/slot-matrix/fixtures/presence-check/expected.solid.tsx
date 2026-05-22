@@ -7,11 +7,11 @@ interface PresenceCheckFixtureProps {
 }
 
 export default function PresenceCheckFixture(_props: PresenceCheckFixtureProps): JSX.Element {
-  const [local, rest] = splitProps(_props, []);
+  const [local, attrs] = splitProps(_props, []);
 
   return (
     <>
-    <div class={"presence-check-fixture"} data-rozie-s-313bf282="">
+    <div class={"presence-check-fixture"} {...attrs} data-rozie-s-313bf282="">
       {<Show when={(_props.asideSlot ?? _props.slots?.['aside'])}><aside data-rozie-s-313bf282="">
         {(_props.asideSlot ?? _props.slots?.['aside']?.({}))}
       </aside></Show>}</div>

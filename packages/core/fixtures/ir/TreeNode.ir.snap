@@ -105,7 +105,20 @@
       {
         "type": "TemplateElement",
         "tagName": "li",
-        "attributes": [],
+        "attributes": [
+          {
+            "kind": "spreadBinding",
+            "expression": {
+              "type": "Identifier",
+              "name": "$attrs"
+            },
+            "deps": [],
+            "sourceLoc": {
+              "start": 184,
+              "end": 273
+            }
+          }
+        ],
         "events": [],
         "children": [
           {

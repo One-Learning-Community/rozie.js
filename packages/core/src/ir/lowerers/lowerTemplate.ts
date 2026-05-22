@@ -1537,15 +1537,28 @@ export function synthesizeAttrsFallthrough(
     }
   }
   if (rootEl === null) return;
+  // Plan 14-05 — skip synthesis when the single root is NOT an HTML element.
+  // Component-tag / self-tag roots are nested Rozie/cross-framework component
+  // invocations: the spread would land as a "prop" on the inner component,
+  // not as a DOM attribute on the consumer's element. The semantics there
+  // are target-specific and out of scope for v1 — the consumer in that case
+  // is itself a thin wrapper and the inner component owns its own
+  // fallthrough surface. R8/R9 still apply via validateAttrFallthrough.
+  if (rootEl.tagKind !== 'html') return;
 
   // Append the synthesized `$attrs` spread LAST. `deps` is empty — `$attrs` is
   // a stable identifier (registered in STABLE_IDENTIFIERS, Plan 14-01), so it
   // never participates in a target's reactive dep accounting.
+  //
+  // CLONE the parent element's sourceLoc rather than reference it directly —
+  // sharing the object reference would cause JSON snapshot dedup to collapse
+  // the two identical-text positions and produce confusing snapshot diffs
+  // (the rootEl's own sourceLoc would appear "moved" to the spreadBinding).
   rootEl.attributes.push({
     kind: 'spreadBinding',
     expression: t.identifier('$attrs'),
     deps: [],
-    sourceLoc: rootEl.sourceLoc,
+    sourceLoc: { start: rootEl.sourceLoc.start, end: rootEl.sourceLoc.end },
   });
 }
 

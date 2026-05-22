@@ -13,10 +13,15 @@ export default function TreeNode(_props: TreeNodeProps): JSX.Element {
     children: []
   }))(),
   };
+  const attrs: Record<string, unknown> = (() => {
+    const { node, ...rest } = _props as TreeNodeProps & Record<string, unknown>;
+    void node;
+    return rest;
+  })();
 
   return (
     <>
-    <div className={styles["tree-node"]} data-rozie-s-a7176a6e="">
+    <div className={styles["tree-node"]} {...attrs} data-rozie-s-a7176a6e="">
       <span className={styles["tree-node__label"]} data-rozie-s-a7176a6e="">{props.node.label}</span>
       {(props.node.children && props.node.children.length > 0) && <ul className={styles["tree-node__children"]} data-rozie-s-a7176a6e="">
         {props.node.children.map((child, childIndex) => <li key={child.id} data-index={childIndex} data-rozie-s-a7176a6e="">

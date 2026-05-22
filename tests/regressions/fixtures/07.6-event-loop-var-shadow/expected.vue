@@ -1,6 +1,6 @@
 <template>
 
-<ul>
+<ul v-bind="$attrs">
   <li v-for="e in items" :key="e.id">
     <span>{{ e.label }}</span>
     

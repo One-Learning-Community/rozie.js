@@ -1,6 +1,6 @@
 <template>
 
-<div class="backdrop" @click="props.closeOnBackdrop && close()">
+<div class="backdrop" v-bind="$attrs" @click="props.closeOnBackdrop && close()">
   
   <button @click="close">Close</button>
 </div>

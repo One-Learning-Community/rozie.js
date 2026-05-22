@@ -255,6 +255,28 @@ export function rewriteTemplateExpression(
         path.skip();
         return;
       }
+      // Plan 14-05 — `$attrs` lowers to `this.$attrs` (the synthesised getter
+      // declared in emitLit.ts that reads the host custom element's
+      // attributes). Skip property-position occurrences (handled by Member /
+      // OptionalMember visitors above) and object-literal key positions.
+      if (name === '$attrs') {
+        const parentPath = path.parentPath;
+        if (parentPath) {
+          if (
+            (parentPath.isMemberExpression() || parentPath.isOptionalMemberExpression()) &&
+            (parentPath.node as t.MemberExpression | t.OptionalMemberExpression).property === path.node &&
+            !(parentPath.node as t.MemberExpression | t.OptionalMemberExpression).computed
+          ) {
+            return;
+          }
+          if (parentPath.isObjectProperty() && parentPath.node.key === path.node && !parentPath.node.computed) {
+            return;
+          }
+        }
+        path.replaceWith(thisDot('$attrs'));
+        path.skip();
+        return;
+      }
       if (!computedNames.has(name) && !methodNames.has(name)) return;
 
       const parentPath = path.parentPath;

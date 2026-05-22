@@ -26,6 +26,11 @@ export default function TodoList(_props: TodoListProps): JSX.Element {
     ..._props,
     title: _props.title ?? 'Todo',
   };
+  const attrs: Record<string, unknown> = (() => {
+    const { items, title, defaultValue, onItemsChange, defaultItems, ...rest } = _props as TodoListProps & Record<string, unknown>;
+    void items; void title; void defaultValue; void onItemsChange; void defaultItems;
+    return rest;
+  })();
   const [items, setItems] = useControllableState({
     value: props.items,
     defaultValue: props.defaultItems ?? (() => [])(),
@@ -62,7 +67,7 @@ export default function TodoList(_props: TodoListProps): JSX.Element {
 
   return (
     <>
-    <div className={styles["todo-list"]} data-rozie-s-52bec3de="">
+    <div className={styles["todo-list"]} {...attrs} data-rozie-s-52bec3de="">
       <header data-rozie-s-52bec3de="">
         {(props.renderHeader ?? props.slots?.['header']) ? ((props.renderHeader ?? props.slots?.['header']) as Function)({ remaining, total: items.length }) : <h3 data-rozie-s-52bec3de="">{props.title} ({remaining} remaining)</h3>}
       </header>

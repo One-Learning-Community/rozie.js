@@ -146,6 +146,33 @@ export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResu
     runtimeImports.add('rozieSpread');
   }
 
+  // Plan 14-05 — `$attrs` getter for Lit. Lit has no native template-side
+  // `$attrs` proxy (cf. Vue's magic accessor); the consumer's attributes land
+  // on the host custom element (`<rozie-foo id="x">`) and we re-project them
+  // onto the TEMPLATE-ROOT element (CONTEXT.md A1) via `${rozieSpread($attrs)}`.
+  // Synthesise a getter that reads `this.attributes` on each call so a
+  // consumer-side bound attribute (`?disabled=${...}`) flows through on the
+  // next render. Only emitted when `inheritAttrs !== false` AND at least one
+  // `spreadBinding` was lowered (a manual `r-bind="$attrs"` fixture would
+  // also need the getter even if `inheritAttrs === false`, but that combo is
+  // unusual; the gating below favours synthesis-driven emit).
+  const litAttrsGetter =
+    templateResult.rozieSpreadUsed && ir.inheritAttrs !== false
+      ? [
+          '  /**',
+          '   * Plan 14-05 — cross-framework attribute fallthrough source. Reads the',
+          '   * host custom element\'s attributes on each call so a consumer-side bound',
+          '   * attribute flows through on every render. The `rozieSpread` directive',
+          '   * (D-02) does the cross-render diff downstream.',
+          '   */',
+          '  private get $attrs(): Record<string, string> {',
+          '    const out: Record<string, string> = {};',
+          '    for (const a of Array.from(this.attributes)) out[a.name] = a.value;',
+          '    return out;',
+          '  }',
+        ].join('\n')
+      : '';
+
   // 6. Compose class body.
   // Insertion order:
   //   - static styles field
@@ -197,7 +224,9 @@ export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResu
     slotFillerDisconnectReset: templateResult.slotFillerDisconnectReset.join('\n'),
     updatedBody: composedUpdatedBody,
     renderBody: templateResult.renderBody,
-    userMethods: scriptResult.methodDecls,
+    userMethods: [scriptResult.methodDecls, litAttrsGetter]
+      .filter((s) => s.trim().length > 0)
+      .join('\n\n'),
     attributeChangedBody: scriptResult.attributeChangedBody,
     // Phase 07.3.1 D-LIT-15 — light-DOM pre-seed of `_hasSlot<X>` so the very
     // first render reflects consumer fill presence and conditionally-rendered

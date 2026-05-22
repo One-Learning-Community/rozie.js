@@ -1,7 +1,7 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, property, queryAssignedElements, state } from 'lit/decorators.js';
 import { SignalWatcher, signal } from '@lit-labs/preact-signals';
-import { createLitControllableProperty } from '@rozie/runtime-lit';
+import { createLitControllableProperty, rozieSpread } from '@rozie/runtime-lit';
 import { repeat } from 'lit/directives/repeat.js';
 
 interface RozieHeaderSlotCtx {
@@ -103,7 +103,7 @@ form[data-rozie-s-52bec3de] { display: flex; gap: 0.25rem; margin-block: 0.5rem;
 
   render() {
     return html`
-<div class="todo-list" data-rozie-s-52bec3de>
+<div class="todo-list" ${rozieSpread(this.$attrs)} data-rozie-s-52bec3de>
   <header data-rozie-s-52bec3de>
     ${this.header !== undefined ? this.header({remaining: this.remaining, total: this.items.length}) : html`<slot name="header" data-rozie-params=${(() => { try { return JSON.stringify({remaining: this.remaining, total: this.items.length}); } catch { return '{}'; } })()}>
       
@@ -171,4 +171,16 @@ form[data-rozie-s-52bec3de] { display: flex; gap: 0.25rem; margin-block: 0.5rem;
 
   get items(): any[] { return this._itemsControllable.read(); }
   set items(v: any[]) { this._itemsControllable.notifyPropertyWrite(v); }
+
+  /**
+   * Plan 14-05 — cross-framework attribute fallthrough source. Reads the
+   * host custom element's attributes on each call so a consumer-side bound
+   * attribute flows through on every render. The `rozieSpread` directive
+   * (D-02) does the cross-render diff downstream.
+   */
+  private get $attrs(): Record<string, string> {
+    const out: Record<string, string> = {};
+    for (const a of Array.from(this.attributes)) out[a.name] = a.value;
+    return out;
+  }
 }

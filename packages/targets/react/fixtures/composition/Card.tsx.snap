@@ -3,9 +3,11 @@ import CardHeader from './CardHeader';
 interface CardProps {}
 
 export default function Card(props: CardProps): JSX.Element {
+  const attrs = props as Record<string, unknown>;
+
   return (
     <>
-      <div className={"card"} data-rozie-s-a88c221e="">
+      <div className={"card"} {...attrs} data-rozie-s-a88c221e="">
         <CardHeader title="Hello" />
       </div>
     </>

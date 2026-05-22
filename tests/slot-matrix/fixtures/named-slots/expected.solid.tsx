@@ -8,11 +8,11 @@ interface NamedSlotsFixtureProps {
 }
 
 export default function NamedSlotsFixture(_props: NamedSlotsFixtureProps): JSX.Element {
-  const [local, rest] = splitProps(_props, []);
+  const [local, attrs] = splitProps(_props, []);
 
   return (
     <>
-    <div class={"named-slots-fixture"} data-rozie-s-a30182bc="">
+    <div class={"named-slots-fixture"} {...attrs} data-rozie-s-a30182bc="">
       <header data-rozie-s-a30182bc="">
         {(_props.headerSlot ?? _props.slots?.['header']?.({}))}
       </header>

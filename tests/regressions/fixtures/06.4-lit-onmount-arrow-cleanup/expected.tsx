@@ -4,6 +4,7 @@ import styles from './OnMountArrowCleanup.module.css';
 interface OnMountArrowCleanupProps {}
 
 export default function OnMountArrowCleanup(props: OnMountArrowCleanupProps): JSX.Element {
+  const attrs = props as Record<string, unknown>;
   const [ticks, setTicks] = useState(0);
   const [running, setRunning] = useState(true);
 
@@ -18,7 +19,7 @@ export default function OnMountArrowCleanup(props: OnMountArrowCleanupProps): JS
 
   return (
     <>
-    <div className={styles.ticker} data-rozie-s-722b58d1="">{ticks}</div>
+    <div className={styles.ticker} {...attrs} data-rozie-s-722b58d1="">{ticks}</div>
     </>
   );
 }

@@ -10,6 +10,11 @@ export default function InlineExprHandler(_props: InlineExprHandlerProps): JSX.E
     ..._props,
     closeOnBackdrop: _props.closeOnBackdrop ?? true,
   };
+  const attrs: Record<string, unknown> = (() => {
+    const { closeOnBackdrop, ...rest } = _props as InlineExprHandlerProps & Record<string, unknown>;
+    void closeOnBackdrop;
+    return rest;
+  })();
   const [open, setOpen] = useState(false);
 
   const close = useCallback(() => {
@@ -18,7 +23,7 @@ export default function InlineExprHandler(_props: InlineExprHandlerProps): JSX.E
 
   return (
     <>
-    <div className={styles.backdrop} onClick={($event) => { props.closeOnBackdrop && close(); }} data-rozie-s-8ec7623e="">
+    <div className={styles.backdrop} {...attrs} onClick={($event) => { props.closeOnBackdrop && close(); }} data-rozie-s-8ec7623e="">
       
       <button onClick={close} data-rozie-s-8ec7623e="">Close</button>
     </div>

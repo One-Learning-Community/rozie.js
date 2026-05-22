@@ -3,6 +3,7 @@ interface Props {
   step?: number;
   min?: number;
   max?: number;
+  [key: string]: unknown;
 }
 
 let {
@@ -10,6 +11,7 @@ let {
   step = 1,
   min = -Infinity,
   max = Infinity,
+  ...__rozieAttrs
 }: Props = $props();
 
 let hovering = $state(false);

@@ -1,6 +1,6 @@
 <template>
 
-<ul class="list">
+<ul class="list" v-bind="$attrs">
   
   <li v-for="item in items" :key="item.id">
     <slot name="item" :item="item" :remaining="remaining">

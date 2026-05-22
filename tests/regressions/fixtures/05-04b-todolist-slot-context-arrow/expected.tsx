@@ -14,6 +14,11 @@ interface ScopedSlotContextProps {
 }
 
 export default function ScopedSlotContext(props: ScopedSlotContextProps): JSX.Element {
+  const attrs: Record<string, unknown> = (() => {
+    const { items, defaultValue, onItemsChange, defaultItems, ...rest } = props as ScopedSlotContextProps & Record<string, unknown>;
+    void items; void defaultValue; void onItemsChange; void defaultItems;
+    return rest;
+  })();
   const [items, setItems] = useControllableState({
     value: props.items,
     defaultValue: props.defaultItems ?? (() => [])(),
@@ -23,7 +28,7 @@ export default function ScopedSlotContext(props: ScopedSlotContextProps): JSX.El
 
   return (
     <>
-    <ul className={styles.list} data-rozie-s-5e6c469d="">
+    <ul className={styles.list} {...attrs} data-rozie-s-5e6c469d="">
       
       {items.map((item) => <li key={item.id} data-rozie-s-5e6c469d="">
         {(props.renderItem ?? props.slots?.['item']) ? ((props.renderItem ?? props.slots?.['item']) as Function)({ item, remaining }) : item.label}

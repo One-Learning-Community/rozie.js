@@ -1,7 +1,7 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, property, query } from 'lit/decorators.js';
 import { SignalWatcher, signal } from '@lit-labs/preact-signals';
-import { debounce } from '@rozie/runtime-lit';
+import { debounce, rozieSpread } from '@rozie/runtime-lit';
 
 @customElement('rozie-search-input')
 export default class SearchInput extends SignalWatcher(LitElement) {
@@ -52,7 +52,7 @@ input[data-rozie-s-8bbc4a60] { padding: 0.25rem 0.5rem; }
 
   render() {
     return html`
-<div class="search-input" data-rozie-s-8bbc4a60>
+<div class="search-input" ${rozieSpread(this.$attrs)} data-rozie-s-8bbc4a60>
   
   <input type="search" placeholder=${this.placeholder} .value=${this._query.value} @input=${($event: InputEvent) => { (($event) => this._query.value = ($event.target as HTMLInputElement).value)($event); (this._tw0)($event); }} @keydown=${($event: KeyboardEvent) => { (($event: KeyboardEvent) => { if ($event.key !== 'Enter') return; ((this.onSearch) as (...args: any[]) => any)($event); })($event); (($event: KeyboardEvent) => { if ($event.key !== 'Escape') return; ((this.clear) as (...args: any[]) => any)($event); })($event); }} data-rozie-ref="inputEl" data-rozie-s-8bbc4a60 />
 
@@ -80,4 +80,16 @@ input[data-rozie-s-8bbc4a60] { padding: 0.25rem 0.5rem; }
     composed: true
   }));
 };
+
+  /**
+   * Plan 14-05 — cross-framework attribute fallthrough source. Reads the
+   * host custom element's attributes on each call so a consumer-side bound
+   * attribute flows through on every render. The `rozieSpread` directive
+   * (D-02) does the cross-render diff downstream.
+   */
+  private get $attrs(): Record<string, string> {
+    const out: Record<string, string> = {};
+    for (const a of Array.from(this.attributes)) out[a.name] = a.value;
+    return out;
+  }
 }

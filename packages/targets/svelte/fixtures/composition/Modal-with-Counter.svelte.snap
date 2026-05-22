@@ -1,11 +1,15 @@
 <script lang="ts">
 import Counter from './Counter.svelte';
 
+interface Props {
+  [key: string]: unknown;
+}
 
+let { ...__rozieAttrs }: Props = $props();
 </script>
 
 
-  <div class="modal">
+  <div class="modal" {...__rozieAttrs}>
     <Counter></Counter>
   </div>
 

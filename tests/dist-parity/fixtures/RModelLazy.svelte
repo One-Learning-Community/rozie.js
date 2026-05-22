@@ -1,9 +1,15 @@
 <script lang="ts">
+interface Props {
+  [key: string]: unknown;
+}
+
+let { ...__rozieAttrs }: Props = $props();
+
 let draft = $state('');
 </script>
 
 
-<div class="rmodel-lazy">
+<div class="rmodel-lazy" {...__rozieAttrs}>
   <input type="text" value={draft} onchange={($event) => draft = $event.currentTarget.value} placeholder="Commit on blur" />
   <p class="echo">Committed: {draft}</p>
 </div>

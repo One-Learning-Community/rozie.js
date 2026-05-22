@@ -17,6 +17,11 @@ export default function SearchInput(_props: SearchInputProps): JSX.Element {
     minLength: _props.minLength ?? 2,
     autofocus: _props.autofocus ?? false,
   };
+  const attrs: Record<string, unknown> = (() => {
+    const { placeholder, minLength, autofocus, ...rest } = _props as SearchInputProps & Record<string, unknown>;
+    void placeholder; void minLength; void autofocus;
+    return rest;
+  })();
   const [query, setQuery] = useState('');
   const inputEl = useRef<HTMLInputElement | null>(null);
   const isValid = useMemo(() => query.length >= props.minLength, [props.minLength, query]);
@@ -45,7 +50,7 @@ export default function SearchInput(_props: SearchInputProps): JSX.Element {
 
   return (
     <>
-    <div className={styles["search-input"]} data-rozie-s-8bbc4a60="">
+    <div className={styles["search-input"]} {...attrs} data-rozie-s-8bbc4a60="">
       
       <input ref={inputEl} type="search" placeholder={props.placeholder} value={query} onChange={e => setQuery(e.target.value)} onInput={_rozieDebouncedOnSearch} onKeyDown={($event) => { (($event) => { if ($event.key !== 'Enter') return; ((onSearch) as ((...args: any[]) => any))($event); })($event); (($event) => { if ($event.key !== 'Escape') return; ((clear) as ((...args: any[]) => any))($event); })($event); }} data-rozie-s-8bbc4a60="" />
 

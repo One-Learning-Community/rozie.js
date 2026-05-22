@@ -1,4 +1,4 @@
-import { Component, ContentChild, TemplateRef, ViewEncapsulation, computed, input, model, output, signal } from '@angular/core';
+import { Component, ContentChild, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, computed, effect, inject, input, model, output, signal, viewChild } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
@@ -23,7 +23,7 @@ interface EmptyCtx {}
   imports: [NgTemplateOutlet, FormsModule],
   template: `
 
-    <div class="todo-list">
+    <div class="todo-list" #rozieSpread_0>
       <header>
         @if ((headerTpl ?? templates()?.['header'])) {
     <ng-container *ngTemplateOutlet="(headerTpl ?? templates()?.['header']); context: { $implicit: { remaining: remaining(), total: items().length }, remaining: remaining(), total: items().length }" />
@@ -35,7 +35,7 @@ interface EmptyCtx {}
     }
       </header>
 
-      <form (submit)="_guarded_add($event)">
+      <form (submit)="_guarded_add_1($event)">
         <input [ngModel]="draft()" (ngModelChange)="draft.set($event)" [ngModelOptions]="{standalone: true}" placeholder="What needs doing?" />
         <button type="submit" [disabled]="!draft().trim()">Add</button>
       </form>
@@ -46,7 +46,7 @@ interface EmptyCtx {}
     <li [class]="{ done: item.done }">
           
           @if ((defaultTpl ?? templates()?.['defaultSlot'])) {
-    <ng-container *ngTemplateOutlet="(defaultTpl ?? templates()?.['defaultSlot']); context: _defaultSlot_ctx_1(item)" />
+    <ng-container *ngTemplateOutlet="(defaultTpl ?? templates()?.['defaultSlot']); context: _defaultSlot_ctx_2(item)" />
     } @else {
 
             <label><input type="checkbox" [checked]="item.done" (change)="_toggle(item.id)" /><span>{{ item.text }}</span></label>
@@ -120,12 +120,45 @@ export class TodoList {
     return true;
   }
 
-  private _guarded_add = ($event: any) => {
+  private rozieSpread_0 = viewChild<ElementRef>('rozieSpread_0');
+
+  private __rozieApplyAttrs = (() => {
+    const renderer = inject(Renderer2);
+    let prevKeys: string[] = [];
+    return (el: HTMLElement, obj: Record<string, unknown>) => {
+      for (const k of prevKeys) {
+        if (!(k in obj)) renderer.removeAttribute(el, k);
+      }
+      for (const [k, v] of Object.entries(obj)) {
+        if (v === null || v === false) renderer.removeAttribute(el, k);
+        else renderer.setAttribute(el, k, String(v));
+      }
+      prevKeys = Object.keys(obj);
+    };
+  })();
+
+  private __rozieGetHostAttrs = (() => {
+    const host = inject(ElementRef);
+    return () => {
+      const el = host.nativeElement as HTMLElement;
+      const out: Record<string, unknown> = {};
+      for (const a of Array.from(el.attributes)) out[a.name] = a.value;
+      return out;
+    };
+  })();
+
+  private __rozieSpread_0_effect = effect(() => {
+    const el = this.rozieSpread_0()?.nativeElement;
+    if (!el) return;
+    this.__rozieApplyAttrs(el, this.__rozieGetHostAttrs());
+  });
+
+  private _guarded_add_1 = ($event: any) => {
     $event.preventDefault();
     this._add();
   };
 
-  private _defaultSlot_ctx_1 = (item: any) => ({ $implicit: { item: item, toggle: () => this._toggle(item.id), remove: () => this.removeItem(item.id) }, item: item, toggle: () => this._toggle(item.id), remove: () => this.removeItem(item.id) });
+  private _defaultSlot_ctx_2 = (item: any) => ({ $implicit: { item: item, toggle: () => this._toggle(item.id), remove: () => this.removeItem(item.id) }, item: item, toggle: () => this._toggle(item.id), remove: () => this.removeItem(item.id) });
 }
 
 export default TodoList;

@@ -17,7 +17,7 @@ interface WrapperModalProps {
 
 export default function WrapperModal(_props: WrapperModalProps): JSX.Element {
   const _merged = mergeProps({ title: 'Wrapped' }, _props);
-  const [local, rest] = splitProps(_merged, ['title', 'open', 'children']);
+  const [local, attrs] = splitProps(_merged, ['title', 'open', 'children']);
   const resolved = children(() => local.children);
 
   const [open, setOpen] = createControllableSignal<boolean>(_props as unknown as Record<string, unknown>, 'open', false);

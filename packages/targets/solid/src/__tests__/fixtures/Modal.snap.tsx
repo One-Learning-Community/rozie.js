@@ -24,7 +24,7 @@ interface ModalProps {
 
 export default function Modal(_props: ModalProps): JSX.Element {
   const _merged = mergeProps({ closeOnEscape: true, closeOnBackdrop: true, lockBodyScroll: true, title: '' }, _props);
-  const [local, rest] = splitProps(_merged, ['open', 'closeOnEscape', 'closeOnBackdrop', 'lockBodyScroll', 'title', 'children']);
+  const [local, attrs] = splitProps(_merged, ['open', 'closeOnEscape', 'closeOnBackdrop', 'lockBodyScroll', 'title', 'children']);
   const resolved = children(() => local.children);
 
   const [open, setOpen] = createControllableSignal<boolean>(_props as unknown as Record<string, unknown>, 'open', false);

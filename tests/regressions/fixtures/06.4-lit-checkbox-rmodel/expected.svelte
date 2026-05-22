@@ -1,13 +1,14 @@
 <script lang="ts">
 interface Props {
   checked?: boolean;
+  [key: string]: unknown;
 }
 
-let { checked = $bindable(false) }: Props = $props();
+let { checked = $bindable(false), ...__rozieAttrs }: Props = $props();
 </script>
 
 
-<label class="toggle">
+<label class="toggle" {...__rozieAttrs}>
   
   <input type="checkbox" bind:checked={checked} />
   <span>Enabled</span>

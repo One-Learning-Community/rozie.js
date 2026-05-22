@@ -1,6 +1,6 @@
 <template>
 
-<div class="outer">
+<div class="outer" v-bind="$attrs">
   
   <slot name="wrapper">
     <div class="wrapper-fallback">

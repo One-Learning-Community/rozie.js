@@ -97,17 +97,18 @@ describe('emitTemplateAttribute (Lit) — spreadBinding (Plan 14-05 Task 1)', ()
     expect(state.rozieSpreadUsed).toBe(true);
   });
 
-  it('(3) $attrs spread → `${rozieSpread($attrs)}` (Lit has no native magic accessor)', () => {
+  it('(3) $attrs spread → ${rozieSpread(this.$attrs)} (Lit synthesises a $attrs getter)', () => {
     const ir = emptyIR();
     const state = freshState();
     const out = emitTemplateAttribute(spread('$attrs'), ir, 'button', state);
-    // Lit's $attrs lowering is target-bespoke: the Lit shell synthesises
-    // an `$attrs` binding (see lit emitScript) carrying the consumer's
-    // attribute payload. The emitter leaves the bare `$attrs` Identifier
-    // alone — it reaches the output as the literal `$attrs`, resolved by
-    // the synthesised shell binding (NOT a target-native accessor).
-    expect(out).toMatchInlineSnapshot(`"\${rozieSpread($attrs)}"`);
-    expect(out).toContain('$attrs');
+    // Plan 14-05 — Lit has no native template-side `$attrs` proxy; the bare
+    // `$attrs` Identifier is rewritten (in rewriteTemplateExpression) to
+    // `this.$attrs`, a synthesised getter (declared by emitLit when
+    // `rozieSpreadUsed && inheritAttrs !== false`) that reads the host
+    // custom element's attributes per call. The rozieSpread directive does
+    // cross-render diffing downstream.
+    expect(out).toMatchInlineSnapshot(`"\${rozieSpread(this.$attrs)}"`);
+    expect(out).toContain('this.$attrs');
     expect(state.rozieSpreadUsed).toBe(true);
   });
 

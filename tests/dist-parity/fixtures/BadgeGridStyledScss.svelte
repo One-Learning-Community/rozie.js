@@ -1,13 +1,14 @@
 <script lang="ts">
 interface Props {
   badges?: any[];
+  [key: string]: unknown;
 }
 
-let { badges = (() => [])() }: Props = $props();
+let { badges = (() => [])(), ...__rozieAttrs }: Props = $props();
 </script>
 
 
-<div class="badge-grid">
+<div class="badge-grid" {...__rozieAttrs}>
   {#each badges as badge (badge)}<span class="badge badge--neutral">
     {badge}
   </span>{/each}

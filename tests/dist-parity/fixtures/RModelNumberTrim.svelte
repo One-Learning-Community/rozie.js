@@ -1,9 +1,15 @@
 <script lang="ts">
+interface Props {
+  [key: string]: unknown;
+}
+
+let { ...__rozieAttrs }: Props = $props();
+
 let quantity = $state(0);
 </script>
 
 
-<div class="rmodel-number-trim">
+<div class="rmodel-number-trim" {...__rozieAttrs}>
   <input type="text" value={quantity} oninput={($event) => quantity = (Number.isNaN(Number.parseFloat((($event.currentTarget.value).trim()))) ? (($event.currentTarget.value).trim()) : Number.parseFloat((($event.currentTarget.value).trim())))} placeholder="Enter a quantity" />
   <p class="echo">Quantity: {quantity}</p>
 </div>

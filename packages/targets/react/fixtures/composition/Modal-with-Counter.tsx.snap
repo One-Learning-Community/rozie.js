@@ -3,9 +3,11 @@ import Counter from './Counter';
 interface ModalProps {}
 
 export default function Modal(props: ModalProps): JSX.Element {
+  const attrs = props as Record<string, unknown>;
+
   return (
     <>
-      <div className={"modal"} data-rozie-s-d24f9140="">
+      <div className={"modal"} {...attrs} data-rozie-s-d24f9140="">
         <Counter />
       </div>
     </>

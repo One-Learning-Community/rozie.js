@@ -1,6 +1,6 @@
 <template>
 
-<div class="tree-node">
+<div class="tree-node" v-bind="$attrs">
   <span class="tree-node__label">{{ props.node.label }}</span>
   <ul v-if="props.node.children && props.node.children.length > 0" class="tree-node__children">
     <li v-for="(child, childIndex) in props.node.children" :key="child.id" :data-index="childIndex">

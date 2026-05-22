@@ -19,6 +19,11 @@ export default function PortalListStyledScss(_props: PortalListStyledScssProps):
     ..._props,
     items: _props.items ?? (() => [])(),
   };
+  const attrs: Record<string, unknown> = (() => {
+    const { items, ...rest } = _props as PortalListStyledScssProps & Record<string, unknown>;
+    void items;
+    return rest;
+  })();
   const _renderItemRef = useRef(props.renderItem);
   _renderItemRef.current = props.renderItem;
   const instance = useRef<any>(null);
@@ -96,7 +101,7 @@ export default function PortalListStyledScss(_props: PortalListStyledScssProps):
 
   return (
     <>
-    <div className={styles["rozie-portal-list"]} ref={__rozieRoot} data-rozie-s-860cc87e="">
+    <div className={styles["rozie-portal-list"]} ref={__rozieRoot} {...attrs} data-rozie-s-860cc87e="">
       
     </div>
     </>

@@ -1,6 +1,6 @@
 <template>
 
-<div class="rozie-portal-list" ref="__rozieRootRef">
+<div class="rozie-portal-list" ref="__rozieRootRef" v-bind="$attrs">
   
 </div>
 

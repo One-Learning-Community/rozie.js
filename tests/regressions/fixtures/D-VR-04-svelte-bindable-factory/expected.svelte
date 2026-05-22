@@ -1,15 +1,16 @@
 <script lang="ts">
 interface Props {
   items?: any[];
+  [key: string]: unknown;
 }
 
-let { items = $bindable((() => [])()) }: Props = $props();
+let { items = $bindable((() => [])()), ...__rozieAttrs }: Props = $props();
 
 const remaining = $derived(items.filter((i: any) => !i.done).length);
 </script>
 
 
-<div class="count">{remaining}</div>
+<div class="count" {...__rozieAttrs}>{remaining}</div>
 
 
 <style>

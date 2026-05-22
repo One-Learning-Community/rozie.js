@@ -64,6 +64,18 @@
               "start": 87,
               "end": 106
             }
+          },
+          {
+            "kind": "spreadBinding",
+            "expression": {
+              "type": "Identifier",
+              "name": "$attrs"
+            },
+            "deps": [],
+            "sourceLoc": {
+              "start": 82,
+              "end": 131
+            }
           }
         ],
         "events": [],

@@ -12,7 +12,7 @@ interface SearchInputProps {
 
 export default function SearchInput(_props: SearchInputProps): JSX.Element {
   const _merged = mergeProps({ placeholder: 'Search…', minLength: 2, autofocus: false }, _props);
-  const [local, rest] = splitProps(_merged, ['placeholder', 'minLength', 'autofocus']);
+  const [local, attrs] = splitProps(_merged, ['placeholder', 'minLength', 'autofocus']);
 
   const [query, setQuery] = createSignal('');
   const isValid = createMemo(() => query().length >= local.minLength);
@@ -47,7 +47,7 @@ export default function SearchInput(_props: SearchInputProps): JSX.Element {
     .clear-btn[data-rozie-s-8bbc4a60] { background: none; border: none; cursor: pointer; font-size: 1.25rem; }
     .hint[data-rozie-s-8bbc4a60] { color: rgba(0, 0, 0, 0.4); font-size: 0.85em; }`}</style>
     <>
-    <div class={"search-input"} data-rozie-s-8bbc4a60="">
+    <div class={"search-input"} {...attrs} data-rozie-s-8bbc4a60="">
       
       <input type="search" ref={(el) => { inputElRef = el as HTMLElement; }} placeholder={local.placeholder} value={query()} onInput={($event) => { (e => setQuery(e.currentTarget.value))($event); _rozieDebouncedOnSearch($event); }} onKeyDown={($event) => { (($event) => { if ($event.key !== 'Enter') return; onSearch(); })($event); (($event) => { if ($event.key !== 'Escape') return; clear(); })($event); }} data-rozie-s-8bbc4a60="" />
 

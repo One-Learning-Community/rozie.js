@@ -1,6 +1,6 @@
 <template>
 
-<header class="card-header">
+<header class="card-header" v-bind="$attrs">
   <h3 class="card-header__title">{{ props.title }}</h3>
   <button v-if="props.onClose" class="card-header__close" @click="props.onClose">×</button></header>
 

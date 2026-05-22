@@ -4,6 +4,7 @@ interface Props {
   step?: number;
   min?: number;
   max?: number;
+  [key: string]: unknown;
 }
 
 let {
@@ -11,6 +12,7 @@ let {
   step = 1,
   min = -Infinity,
   max = Infinity,
+  ...__rozieAttrs
 }: Props = $props();
 
 let hovering = $state(false);
@@ -28,7 +30,7 @@ const canDecrement = $derived(value - step >= min);
 </script>
 
 
-<div class={["counter", { hovering: hovering }]} onmouseenter={($event) => { hovering = true; }} onmouseleave={($event) => { hovering = false; }}>
+<div class={["counter", { hovering: hovering }]} {...__rozieAttrs} onmouseenter={($event) => { hovering = true; }} onmouseleave={($event) => { hovering = false; }}>
   <button disabled={!canDecrement} aria-label="Decrement" onclick={decrement}>−</button>
   <span class="value">{value}</span>
   <button disabled={!canIncrement} aria-label="Increment" onclick={increment}>+</button>

@@ -7,7 +7,7 @@ interface BadgeGridStyledScssProps {
 
 export default function BadgeGridStyledScss(_props: BadgeGridStyledScssProps): JSX.Element {
   const _merged = mergeProps({ badges: (() => [])() }, _props);
-  const [local, rest] = splitProps(_merged, ['badges']);
+  const [local, attrs] = splitProps(_merged, ['badges']);
 
   return (
     <>
@@ -51,7 +51,7 @@ export default function BadgeGridStyledScss(_props: BadgeGridStyledScssProps): J
       gap: 12px;
     }`}</style>
     <>
-    <div class={"badge-grid"} data-rozie-s-44801268="">
+    <div class={"badge-grid"} {...attrs} data-rozie-s-44801268="">
       <For each={local.badges}>{(badge) => <span class={"badge badge--neutral"} data-rozie-s-44801268="">
         {badge}
       </span>}</For>

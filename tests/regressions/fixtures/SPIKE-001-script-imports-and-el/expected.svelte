@@ -5,9 +5,14 @@ import { onMount } from 'svelte';
 interface Props {
   children?: Snippet;
   snippets?: Record<string, any>;
+  [key: string]: unknown;
 }
 
-let { children: __childrenProp, snippets }: Props = $props();
+let {
+  children: __childrenProp,
+  snippets,
+  ...__rozieAttrs
+}: Props = $props();
 
 const children = $derived(__childrenProp ?? snippets?.children);
 
@@ -25,7 +30,7 @@ onMount(() => {
 </script>
 
 
-<div class="spike-root" bind:this={__rozieRoot}>
+<div class="spike-root" bind:this={__rozieRoot} {...__rozieAttrs}>
   {@render children?.()}
 </div>
 

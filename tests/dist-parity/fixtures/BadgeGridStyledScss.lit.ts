@@ -1,6 +1,7 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { SignalWatcher } from '@lit-labs/preact-signals';
+import { rozieSpread } from '@rozie/runtime-lit';
 import { repeat } from 'lit/directives/repeat.js';
 
 @customElement('rozie-badge-grid-styled-scss')
@@ -59,11 +60,23 @@ export default class BadgeGridStyledScss extends SignalWatcher(LitElement) {
 
   render() {
     return html`
-<div class="badge-grid" data-rozie-s-44801268>
+<div class="badge-grid" ${rozieSpread(this.$attrs)} data-rozie-s-44801268>
   ${repeat<any>(this.badges, (badge, _idx) => badge, (badge, _idx) => html`<span class="badge badge--neutral" key=${badge} data-rozie-s-44801268>
     ${badge}
   </span>`)}
 </div>
 `;
+  }
+
+  /**
+   * Plan 14-05 — cross-framework attribute fallthrough source. Reads the
+   * host custom element's attributes on each call so a consumer-side bound
+   * attribute flows through on every render. The `rozieSpread` directive
+   * (D-02) does the cross-render diff downstream.
+   */
+  private get $attrs(): Record<string, string> {
+    const out: Record<string, string> = {};
+    for (const a of Array.from(this.attributes)) out[a.name] = a.value;
+    return out;
   }
 }

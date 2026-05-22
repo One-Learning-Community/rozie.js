@@ -1,7 +1,11 @@
 <script lang="ts">
 import Wrapper from './wrapper.svelte';
 
+interface Props {
+  [key: string]: unknown;
+}
 
+let { ...__rozieAttrs }: Props = $props();
 </script>
 
 

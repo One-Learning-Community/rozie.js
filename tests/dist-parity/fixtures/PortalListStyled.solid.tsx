@@ -12,7 +12,7 @@ interface PortalListStyledProps {
 
 export default function PortalListStyled(_props: PortalListStyledProps): JSX.Element {
   const _merged = mergeProps({ items: (() => [])() }, _props);
-  const [local, rest] = splitProps(_merged, ['items']);
+  const [local, attrs] = splitProps(_merged, ['items']);
 
   const portalDisposers = new Set<() => void>();
   const portals = {
@@ -113,7 +113,7 @@ export default function PortalListStyled(_props: PortalListStyledProps): JSX.Ele
       gap: 0.5rem;
     }`}</style>
     <>
-    <div class={"rozie-portal-list"} ref={(el) => { __rozieRootRef = el as HTMLElement; }} data-rozie-s-18e5aac6="">
+    <div class={"rozie-portal-list"} ref={(el) => { __rozieRootRef = el as HTMLElement; }} {...attrs} data-rozie-s-18e5aac6="">
       
     </div>
     </>

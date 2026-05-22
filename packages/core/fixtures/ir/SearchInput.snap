@@ -1523,6 +1523,18 @@
               "start": 1271,
               "end": 1291
             }
+          },
+          {
+            "kind": "spreadBinding",
+            "expression": {
+              "type": "Identifier",
+              "name": "$attrs"
+            },
+            "deps": [],
+            "sourceLoc": {
+              "start": 1266,
+              "end": 1928
+            }
           }
         ],
         "events": [],

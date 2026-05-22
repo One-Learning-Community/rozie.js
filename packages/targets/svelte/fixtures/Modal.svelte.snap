@@ -13,6 +13,7 @@ interface Props {
   footer?: Snippet<[{ close: any }]>;
   snippets?: Record<string, any>;
   onclose?: (...args: unknown[]) => void;
+  [key: string]: unknown;
 }
 
 let {
@@ -26,6 +27,7 @@ let {
   footer: __footerProp,
   snippets,
   onclose,
+  ...__rozieAttrs
 }: Props = $props();
 
 const header = $derived(__headerProp ?? snippets?.header);

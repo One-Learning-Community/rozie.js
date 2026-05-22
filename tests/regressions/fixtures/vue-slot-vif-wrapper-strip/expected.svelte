@@ -6,6 +6,7 @@ interface Props {
   header?: Snippet;
   children?: Snippet;
   snippets?: Record<string, any>;
+  [key: string]: unknown;
 }
 
 let {
@@ -13,6 +14,7 @@ let {
   header: __headerProp,
   children: __childrenProp,
   snippets,
+  ...__rozieAttrs
 }: Props = $props();
 
 const header = $derived(__headerProp ?? snippets?.header);
@@ -20,7 +22,7 @@ const children = $derived(__childrenProp ?? snippets?.children);
 </script>
 
 
-<section class="panel">
+<section class="panel" {...__rozieAttrs}>
   {#if header || title}<header>
     
     {#if header}{@render header()}{:else}{title}{/if}

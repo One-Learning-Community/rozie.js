@@ -1,6 +1,6 @@
 <template>
 
-<div class="badge-grid">
+<div class="badge-grid" v-bind="$attrs">
   <span v-for="badge in props.badges" :key="badge" class="badge badge--neutral">
     {{ badge }}
   </span>

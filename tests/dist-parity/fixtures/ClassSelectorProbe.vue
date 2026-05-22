@@ -1,6 +1,6 @@
 <template>
 
-<div class="panel" :data-handle="'.panel'" :data-grip="gripSelector">
+<div class="panel" :data-handle="'.panel'" :data-grip="gripSelector" v-bind="$attrs">
   <span class="grip" aria-hidden="true">⋮⋮</span>
   <span v-if="ready">ready</span></div>
 

@@ -7,6 +7,7 @@ interface Props {
   autofocus?: boolean;
   onsearch?: (...args: unknown[]) => void;
   onclear?: (...args: unknown[]) => void;
+  [key: string]: unknown;
 }
 
 let {
@@ -15,6 +16,7 @@ let {
   autofocus = false,
   onsearch,
   onclear,
+  ...__rozieAttrs
 }: Props = $props();
 
 let query = $state('');
@@ -51,7 +53,7 @@ const debouncedOnSearch = (() => {
 </script>
 
 
-<div class="search-input">
+<div class="search-input" {...__rozieAttrs}>
   
   <input bind:this={inputEl} type="search" placeholder={placeholder} bind:value={query} oninput={debouncedOnSearch} onkeydown={($event) => { (() => { (($event) => { if ($event.key !== 'Enter') return; (onSearch as (...a: any[]) => any)($event); })($event); })(); (() => { (($event) => { if ($event.key !== 'Escape') return; (clear as (...a: any[]) => any)($event); })($event); })(); }} />
 

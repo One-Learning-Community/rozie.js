@@ -1,5 +1,5 @@
 <>
-<div className={styles.dropdown}>
+<div className={styles.dropdown} {...attrs}>
   <div ref={triggerEl} onClick={toggle}>
     {(props.renderTrigger ?? props.slots?.['trigger'])?.({ open, toggle })}
   </div>

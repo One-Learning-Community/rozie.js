@@ -4,7 +4,7 @@ import { For, createSignal, splitProps } from 'solid-js';
 interface EventLoopVarShadowProps {}
 
 export default function EventLoopVarShadow(_props: EventLoopVarShadowProps): JSX.Element {
-  const [local, rest] = splitProps(_props, []);
+  const [local, attrs] = splitProps(_props, []);
 
   const [items, setItems] = createSignal([{
     id: 'a',
@@ -20,7 +20,7 @@ export default function EventLoopVarShadow(_props: EventLoopVarShadowProps): JSX
 
   return (
     <>
-    <ul data-rozie-s-a955b18d="">
+    <ul {...attrs} data-rozie-s-a955b18d="">
       <For each={items()}>{(e) => <li data-rozie-s-a955b18d="">
         <span data-rozie-s-a955b18d="">{e.label}</span>
         

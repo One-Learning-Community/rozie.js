@@ -4,6 +4,7 @@ import styles from './PredicateChain.module.css';
 interface PredicateChainProps {}
 
 export default function PredicateChain(props: PredicateChainProps): JSX.Element {
+  const attrs = props as Record<string, unknown>;
   const [count, setCount] = useState(5);
 
   return (

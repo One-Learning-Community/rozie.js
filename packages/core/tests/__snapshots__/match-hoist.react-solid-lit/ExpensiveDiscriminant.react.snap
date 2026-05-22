@@ -4,6 +4,7 @@ import styles from './ExpensiveDiscriminant.module.css';
 interface ExpensiveDiscriminantProps {}
 
 export default function ExpensiveDiscriminant(props: ExpensiveDiscriminantProps): JSX.Element {
+  const attrs = props as Record<string, unknown>;
   const [score, setScore] = useState(72);
 
   function classify() {

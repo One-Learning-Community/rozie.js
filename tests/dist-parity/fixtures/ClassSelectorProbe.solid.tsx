@@ -4,7 +4,7 @@ import { Show, createSignal, onMount, splitProps } from 'solid-js';
 interface ClassSelectorProbeProps {}
 
 export default function ClassSelectorProbe(_props: ClassSelectorProbeProps): JSX.Element {
-  const [local, rest] = splitProps(_props, []);
+  const [local, attrs] = splitProps(_props, []);
 
   const [ready, setReady] = createSignal(false);
   onMount(() => {
@@ -29,7 +29,7 @@ export default function ClassSelectorProbe(_props: ClassSelectorProbeProps): JSX
       color: rgba(0, 0, 0, 0.35);
     }`}</style>
     <>
-    <div class={"panel"} data-handle={'.panel'} data-grip={gripSelector} data-rozie-s-899140be="">
+    <div class={"panel"} data-handle={'.panel'} data-grip={gripSelector} {...attrs} data-rozie-s-899140be="">
       <span class={"grip"} aria-hidden="true" data-rozie-s-899140be="">⋮⋮</span>
       {<Show when={ready()}><span data-rozie-s-899140be="">ready</span></Show>}</div>
     </>

@@ -1,6 +1,7 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, queryAssignedElements, state } from 'lit/decorators.js';
 import { SignalWatcher } from '@lit-labs/preact-signals';
+import { rozieSpread } from '@rozie/runtime-lit';
 
 @customElement('rozie-nested-slot-declared')
 export default class NestedSlotDeclared extends SignalWatcher(LitElement) {
@@ -59,7 +60,7 @@ export default class NestedSlotDeclared extends SignalWatcher(LitElement) {
 
   render() {
     return html`
-<div class="outer" data-rozie-s-3bc5be6c>
+<div class="outer" ${rozieSpread(this.$attrs)} data-rozie-s-3bc5be6c>
   
   <slot name="wrapper">
     <div class="wrapper-fallback" data-rozie-s-3bc5be6c>
@@ -68,5 +69,17 @@ export default class NestedSlotDeclared extends SignalWatcher(LitElement) {
   </slot>
 </div>
 `;
+  }
+
+  /**
+   * Plan 14-05 — cross-framework attribute fallthrough source. Reads the
+   * host custom element's attributes on each call so a consumer-side bound
+   * attribute flows through on every render. The `rozieSpread` directive
+   * (D-02) does the cross-render diff downstream.
+   */
+  private get $attrs(): Record<string, string> {
+    const out: Record<string, string> = {};
+    for (const a of Array.from(this.attributes)) out[a.name] = a.value;
+    return out;
   }
 }

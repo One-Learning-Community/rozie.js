@@ -9,7 +9,7 @@ interface CheckboxRModelProps {
 }
 
 export default function CheckboxRModel(_props: CheckboxRModelProps): JSX.Element {
-  const [local, rest] = splitProps(_props, ['checked']);
+  const [local, attrs] = splitProps(_props, ['checked']);
 
   const [checked, setChecked] = createControllableSignal<boolean>(_props as unknown as Record<string, unknown>, 'checked', false);
 
@@ -17,7 +17,7 @@ export default function CheckboxRModel(_props: CheckboxRModelProps): JSX.Element
     <>
     <style>{`.toggle[data-rozie-s-5898a126] { display: inline-flex; gap: 0.25rem; align-items: center; }`}</style>
     <>
-    <label class={"toggle"} data-rozie-s-5898a126="">
+    <label class={"toggle"} {...attrs} data-rozie-s-5898a126="">
       
       <input type="checkbox" checked={checked()} onChange={e => setChecked(e.currentTarget.checked)} data-rozie-s-5898a126="" />
       <span data-rozie-s-5898a126="">Enabled</span>

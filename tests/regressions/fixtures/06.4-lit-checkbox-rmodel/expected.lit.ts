@@ -1,7 +1,7 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { SignalWatcher } from '@lit-labs/preact-signals';
-import { createLitControllableProperty } from '@rozie/runtime-lit';
+import { createLitControllableProperty, rozieSpread } from '@rozie/runtime-lit';
 
 @customElement('rozie-checkbox-rmodel')
 export default class CheckboxRModel extends SignalWatcher(LitElement) {
@@ -27,7 +27,7 @@ export default class CheckboxRModel extends SignalWatcher(LitElement) {
 
   render() {
     return html`
-<label class="toggle" data-rozie-s-5898a126>
+<label class="toggle" ${rozieSpread(this.$attrs)} data-rozie-s-5898a126>
   
   <input type="checkbox" .checked=${this.checked} @change=${($event) => this.checked = ($event.target as HTMLInputElement).checked} data-rozie-s-5898a126 />
   <span data-rozie-s-5898a126>Enabled</span>
@@ -37,4 +37,16 @@ export default class CheckboxRModel extends SignalWatcher(LitElement) {
 
   get checked(): boolean { return this._checkedControllable.read(); }
   set checked(v: boolean) { this._checkedControllable.notifyPropertyWrite(v); }
+
+  /**
+   * Plan 14-05 — cross-framework attribute fallthrough source. Reads the
+   * host custom element's attributes on each call so a consumer-side bound
+   * attribute flows through on every render. The `rozieSpread` directive
+   * (D-02) does the cross-render diff downstream.
+   */
+  private get $attrs(): Record<string, string> {
+    const out: Record<string, string> = {};
+    for (const a of Array.from(this.attributes)) out[a.name] = a.value;
+    return out;
+  }
 }

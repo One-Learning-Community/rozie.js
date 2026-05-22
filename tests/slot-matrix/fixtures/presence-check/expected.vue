@@ -1,6 +1,6 @@
 <template>
 
-<div class="presence-check-fixture">
+<div class="presence-check-fixture" v-bind="$attrs">
   <aside v-if="$slots.aside">
     <slot name="aside"></slot>
   </aside></div>

@@ -20,6 +20,11 @@ export default function TsPassthrough(_props: TsPassthroughProps): JSX.Element {
     ..._props,
     label: _props.label ?? 'Count',
   };
+  const attrs: Record<string, unknown> = (() => {
+    const { label, ...rest } = _props as TsPassthroughProps & Record<string, unknown>;
+    void label;
+    return rest;
+  })();
   const editor = useRef<Editor | null>(null);
   const untypedHandle = useRef<any>(null);
 
@@ -42,7 +47,7 @@ export default function TsPassthrough(_props: TsPassthroughProps): JSX.Element {
 
   return (
     <>
-      <button onClick={($event) => { inc(1); }} data-rozie-s-189ead9a="">{label}: {count}</button>
+      <button {...attrs} onClick={($event) => { inc(1); }} data-rozie-s-189ead9a="">{label}: {count}</button>
     </>
   );
 }
@@ -61,6 +66,11 @@ export default function TsPassthrough(_props: TsPassthroughProps): JSX.Element {
     ..._props,
     label: _props.label ?? 'Count',
   };
+  const attrs: Record<string, unknown> = (() => {
+    const { label, ...rest } = _props as TsPassthroughProps & Record<string, unknown>;
+    void label;
+    return rest;
+  })();
   const editor = useRef<any>(null);
   const untypedHandle = useRef<any>(null);
 
@@ -83,7 +93,7 @@ export default function TsPassthrough(_props: TsPassthroughProps): JSX.Element {
 
   return (
     <>
-      <button onClick={($event) => { inc(1); }} data-rozie-s-189ead9a="">{label}: {count}</button>
+      <button {...attrs} onClick={($event) => { inc(1); }} data-rozie-s-189ead9a="">{label}: {count}</button>
     </>
   );
 }

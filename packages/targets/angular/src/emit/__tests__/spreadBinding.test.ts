@@ -100,7 +100,7 @@ describe('emitAngular — spreadBinding (Plan 14-05 Task 2 / D-01)', () => {
     expect(code).toMatch(/this\.obj\(\)/);
   });
 
-  it('(3) $attrs spread → applyAttrs receives the $attrs identifier', () => {
+  it('(3) $attrs spread → applyAttrs receives the synthesised host-attrs getter', () => {
     const code = compileAngular(`<rozie name="Test">
 <template>
   <button r-bind="$attrs"></button>
@@ -108,13 +108,19 @@ describe('emitAngular — spreadBinding (Plan 14-05 Task 2 / D-01)', () => {
 </rozie>`);
     expect(code).toContain('#rozieSpread_');
     expect(code).toContain('__rozieApplyAttrs');
-    // The Angular emitter leaves the bare `$attrs` Identifier alone — the
-    // shell binding wires the consumer's attribute payload. The emitted
-    // effect references `$attrs` (the to-be-bound symbol).
-    expect(code).toContain('$attrs');
+    // Angular has no native template-side `$attrs` accessor; the lowering
+    // synthesises `__rozieGetHostAttrs()` which reads the host element's
+    // attributes per call (CONTEXT.md A1 — auto-fallthrough projects the
+    // consumer's attributes onto the template-root).
+    expect(code).toContain('__rozieGetHostAttrs');
+    expect(code).toMatch(/this\.__rozieGetHostAttrs\(\)/);
   });
 
   it('(4) two spreads → SHARED __rozieApplyAttrs (single IIFE), distinct refs', () => {
+    // The template's `<div>` root has `inheritAttrs` defaulted to true, so
+    // `synthesizeAttrsFallthrough` (lower.ts) appends a 3rd `$attrs` spread
+    // onto the `<div>` root in addition to the two author-written spreads.
+    // Total refs = 3 (1 synthesised + 2 explicit). All share the IIFE.
     const code = compileAngular(`<rozie name="Test">
 <template>
   <div>
@@ -123,11 +129,9 @@ describe('emitAngular — spreadBinding (Plan 14-05 Task 2 / D-01)', () => {
   </div>
 </template>
 </rozie>`);
-    // Two refs (rozieSpread_0 + rozieSpread_1, or similar — exact counter
-    // values are an emitter detail; the contract is "distinct").
     const refMatches = code.match(/#rozieSpread_(\d+)/g) ?? [];
-    expect(refMatches.length).toBe(2);
-    expect(new Set(refMatches).size).toBe(2);
+    expect(refMatches.length).toBe(3);
+    expect(new Set(refMatches).size).toBe(3);
     // Single applyAttrs IIFE — only ONE declaration of __rozieApplyAttrs.
     const helperDecls = (code.match(/__rozieApplyAttrs = /g) ?? []).length;
     expect(helperDecls).toBe(1);

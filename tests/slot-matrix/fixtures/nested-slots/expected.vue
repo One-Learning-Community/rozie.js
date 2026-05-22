@@ -1,6 +1,6 @@
 <template>
 
-<div class="nested-slots-fixture">
+<div class="nested-slots-fixture" v-bind="$attrs">
   <slot name="wrapper">
     <div class="wrapper-fallback">
       <slot name="inner"></slot>

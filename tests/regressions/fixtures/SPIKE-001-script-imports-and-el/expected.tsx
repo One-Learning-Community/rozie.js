@@ -8,6 +8,7 @@ interface SpikeImportElProps {
 }
 
 export default function SpikeImportEl(props: SpikeImportElProps): JSX.Element {
+  const attrs = props as Record<string, unknown>;
   const instance = useRef<any>(null);
   const __rozieRoot = useRef<HTMLDivElement | null>(null);
 
@@ -20,7 +21,7 @@ export default function SpikeImportEl(props: SpikeImportElProps): JSX.Element {
 
   return (
     <>
-    <div className={"spike-root"} ref={__rozieRoot} data-rozie-s-f590f443="">
+    <div className={"spike-root"} ref={__rozieRoot} {...attrs} data-rozie-s-f590f443="">
       {(typeof (props.children ?? props.slots?.['']) === 'function' ? ((props.children ?? props.slots?.['']) as Function)() : (props.children ?? props.slots?.['']))}
     </div>
     </>

@@ -1,6 +1,6 @@
 <template>
 
-<label class="toggle">
+<label class="toggle" v-bind="$attrs">
   
   <input type="checkbox" v-model="checked" />
   <span>Enabled</span>

@@ -7,12 +7,14 @@ interface Props {
   title?: Snippet;
   children?: Snippet;
   snippets?: Record<string, any>;
+  [key: string]: unknown;
 }
 
 let {
   title: __titleProp,
   children: __childrenProp,
   snippets,
+  ...__rozieAttrs
 }: Props = $props();
 
 const title = $derived(__titleProp ?? snippets?.title);

@@ -8,12 +8,12 @@ interface DefaultSlotFixtureProps {
 }
 
 export default function DefaultSlotFixture(_props: DefaultSlotFixtureProps): JSX.Element {
-  const [local, rest] = splitProps(_props, ['children']);
+  const [local, attrs] = splitProps(_props, ['children']);
   const resolved = children(() => local.children);
 
   return (
     <>
-    <div class={"default-slot-fixture"} data-rozie-s-61728cb8="">
+    <div class={"default-slot-fixture"} {...attrs} data-rozie-s-61728cb8="">
       {resolved()}
     </div>
     </>

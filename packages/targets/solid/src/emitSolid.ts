@@ -152,7 +152,12 @@ export function emitSolid(ir: IRComponent, opts: EmitSolidOptions = {}): EmitSol
   // When non-model defaults exist, emitScript emits `const _merged = mergeProps({...}, _props)`.
   // splitProps must use `_merged` so `local.*` gets the declared defaults.
   const propsTarget = scriptResult.mergePropsCall ? '_merged' : '_props';
-  const splitPropsCall = `const [local, rest] = splitProps(${propsTarget}, [${propNames}]);\n`;
+  // Plan 14-05 — rename the splitProps rest binding from `rest` to `attrs`
+  // so the Solid `$attrs` rewrite in rewriteTemplateExpression (which lowers
+  // bare `$attrs` Identifier to `attrs`) resolves to the synthesised rest
+  // bucket. Cross-framework `$attrs` parity (Vue native, Svelte __rozieAttrs,
+  // React/Solid `attrs`, Angular/Lit bespoke).
+  const splitPropsCall = `const [local, attrs] = splitProps(${propsTarget}, [${propNames}]);\n`;
 
   // 7. Compose shell.
   // Merge script injections: template-event wraps + listener wraps go after user arrows.

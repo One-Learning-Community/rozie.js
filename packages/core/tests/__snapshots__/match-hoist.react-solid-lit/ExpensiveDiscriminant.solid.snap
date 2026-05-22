@@ -4,7 +4,7 @@ import { Show, createSignal, splitProps } from 'solid-js';
 interface ExpensiveDiscriminantProps {}
 
 export default function ExpensiveDiscriminant(_props: ExpensiveDiscriminantProps): JSX.Element {
-  const [local, rest] = splitProps(_props, []);
+  const [local, attrs] = splitProps(_props, []);
 
   const [score, setScore] = createSignal(72);
 

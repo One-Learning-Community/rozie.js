@@ -1,6 +1,6 @@
 <template>
 
-<div class="modal-consumer">
+<div class="modal-consumer" v-bind="$attrs">
   <Modal v-model:open="open1"><template #header="{ close }">
       <h2>{{ props.title }}</h2>
       <button class="close" @click="close">×</button>

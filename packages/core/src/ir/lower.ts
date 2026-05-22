@@ -219,19 +219,28 @@ export function lowerToIR(ast: RozieAST, opts: LowerOptions): LowerResult {
   // (multi-root error) / ROZ971 (double-apply warning); never mutates `ir`.
   validateAttrFallthrough(ir, diagnostics);
 
-  // Phase 14 R4 / RESEARCH.md Pattern 5 — `synthesizeAttrsFallthrough` (defined
-  // in `lowerers/lowerTemplate.ts`) appends the `$attrs` auto-fallthrough
-  // `spreadBinding` onto the single root element. It is INTENTIONALLY NOT
-  // CALLED here yet: synthesizing the spread produces a `$attrs` magic-accessor
-  // Identifier in the IR, and lowering that accessor to a real per-target
-  // binding (React `props` rest, Svelte `$$restProps`, Solid `splitProps`
-  // rest, Vue native `$attrs`, Angular/Lit bespoke) is per-target emitter work
-  // — Plan 14-03 (Wave 3). Running synthesis before that lowering exists emits
-  // a literal, unbound `$attrs` identifier on 5/6 targets (e.g. Svelte rejects
-  // `{...$attrs}` outright — `$`-prefixed identifiers are illegal). Plan 14-03
-  // wires the per-target `$attrs` lowering AND the `synthesizeAttrsFallthrough`
-  // call together. See 14-02-SUMMARY.md § Deviations for the full rationale.
-  void synthesizeAttrsFallthrough;
+  // Phase 14 R4 / Plan 14-05 / RESEARCH.md Pattern 5 — synthesize the `$attrs`
+  // auto-fallthrough `spreadBinding` onto the single root element when
+  // `inheritAttrs !== false`. By the time this code runs, all six target
+  // emitters can lower a `$attrs`-bearing `spreadBinding`:
+  //   - React: `{...attrs}` via the `attrs` rest binding (Plan 14-03)
+  //   - Solid: `{...attrs}` via splitProps rest (Plan 14-03)
+  //   - Vue:   `v-bind="$attrs"` (template-native magic accessor, Plan 14-04)
+  //   - Svelte: `{...$$restProps}` via Identifier rewrite (Plan 14-04)
+  //   - Angular: effect()+Renderer2 applyAttrs (Plan 14-05 / D-01)
+  //   - Lit:    rozieSpread directive (Plan 14-05 / D-02)
+  //
+  // Multi-root templates and `inherit-attrs="false"` skip synthesis (handled
+  // inside synthesizeAttrsFallthrough); R8 (multi-root + inheritAttrs default)
+  // emits ROZ970 via validateAttrFallthrough above.
+  //
+  // This un-gate completes the cross-framework attribute-fallthrough phase's
+  // R4 requirement (auto-fallthrough by default). Plan 14-02 deferred this
+  // call to 14-05; see 14-02-SUMMARY.md § Deviations (Rule 4) and
+  // 14-05-PLAN.md cross-plan instructions for the full rationale.
+  if (ir.template !== null) {
+    synthesizeAttrsFallthrough(ir.template, ir.inheritAttrs);
+  }
 
   return { ir, diagnostics, depGraph, bindings };
 }

@@ -1,4 +1,10 @@
 <script lang="ts">
+interface Props {
+  [key: string]: unknown;
+}
+
+let { ...__rozieAttrs }: Props = $props();
+
 let items = $state([{
   id: 'a',
   label: 'A'
@@ -13,7 +19,7 @@ const removeItem = (id: any) => {
 </script>
 
 
-<ul>
+<ul {...__rozieAttrs}>
   {#each items as e (e.id)}<li>
     <span>{e.label}</span>
     

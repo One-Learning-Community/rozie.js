@@ -65,13 +65,22 @@ export function rewriteTemplateExpression(
   const wrapper = t.file(t.program([t.expressionStatement(cloned)]));
 
   traverse(wrapper, {
-    // Phase 14 D-04 — the `$attrs` magic accessor lowers to Svelte 5's native
-    // `$$restProps` automatic-rest-attributes object. A bare `r-bind="$attrs"`
-    // therefore emits `{...$$restProps}`. The spread emitter has ALREADY
-    // decided this is a `$attrs` case BEFORE calling rewrite; this visitor is
-    // what turns the bare `$attrs` Identifier into `$$restProps`. Until
-    // synthesis is un-gated in Plan 14-05 the rewrite is observable only via
-    // manual `r-bind="$attrs"` fixtures.
+    // Phase 14 D-04 / Plan 14-05 — the `$attrs` magic accessor lowers to a
+    // synthesised `__rozieAttrs` rest binding produced by Svelte 5's runes-
+    // mode `$props()` destructure (e.g. `let { value, ...__rozieAttrs } =
+    // $props()`). Bare `r-bind="$attrs"` therefore emits `{...__rozieAttrs}`.
+    //
+    // The original Plan 14-04 lowering to `$$restProps` was INCORRECT for
+    // runes-mode Svelte 5: `Cannot use \`$$restProps\` in runes mode`
+    // (legacy_rest_props_invalid). The Svelte target emits `<script lang="ts">`
+    // with `$state`/`$derived`/`$props()` runes — so the legacy auto-
+    // populated `$$restProps` symbol is forbidden. Plan 14-05 swaps the
+    // rewrite target to `__rozieAttrs`, which is the rest-destructure name
+    // synthesised in `emitScript.ts` `buildPropsDestructureEntries`.
+    //
+    // The spread emitter has ALREADY decided this is a `$attrs` case BEFORE
+    // calling rewrite; this visitor is what turns the bare `$attrs` Identifier
+    // into the synthesised rest-binding name.
     Identifier(path) {
       if (path.node.name !== '$attrs') return;
       // Skip the RHS-position of a MemberExpression / OptionalMemberExpression
@@ -87,7 +96,7 @@ export function rewriteTemplateExpression(
       if (t.isObjectProperty(parent) && parent.key === path.node && !parent.computed) {
         return;
       }
-      path.replaceWith(t.identifier('$$restProps'));
+      path.replaceWith(t.identifier('__rozieAttrs'));
       path.skip();
     },
 

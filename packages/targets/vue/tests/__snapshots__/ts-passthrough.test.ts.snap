@@ -3,7 +3,7 @@
 exports[`Vue ts-passthrough — author annotation survival (Phase 09 Plan 03 Task 2) > compiles a typed .rozie to a <script setup lang="ts"> SFC preserving annotations > typed-vue 1`] = `
 "<template>
 
-  <button @click="inc(1)">{{ label }}: {{ count }}</button>
+  <button v-bind="$attrs" @click="inc(1)">{{ label }}: {{ count }}</button>
 
 </template>
 
@@ -37,7 +37,7 @@ onMounted(() => {
 exports[`Vue ts-passthrough — untyped emit byte-identity anchor > untyped emit is byte-identical to today (snapshot anchor) > untyped-vue-anchor 1`] = `
 "<template>
 
-  <button @click="inc(1)">{{ label }}: {{ count }}</button>
+  <button v-bind="$attrs" @click="inc(1)">{{ label }}: {{ count }}</button>
 
 </template>
 

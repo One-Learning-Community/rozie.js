@@ -1,6 +1,6 @@
 <template>
 
-<section class="panel">
+<section class="panel" v-bind="$attrs">
   <header v-if="$slots.header || props.title">
     
     <slot name="header">{{ props.title }}</slot>

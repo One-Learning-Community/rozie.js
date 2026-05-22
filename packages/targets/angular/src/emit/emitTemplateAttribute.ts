@@ -456,6 +456,7 @@ function extractLiteralClassStyleFromAngularSpread(
  * `rozieSpread` directive (cross-target parity).
  */
 const APPLY_ATTRS_FIELD_NAME = '__rozieApplyAttrs';
+const HOST_ATTRS_GETTER_NAME = '__rozieGetHostAttrs';
 
 function applyAttrsHelperDecl(): string {
   return [
@@ -471,6 +472,36 @@ function applyAttrsHelperDecl(): string {
     `      else renderer.setAttribute(el, k, String(v));`,
     `    }`,
     `    prevKeys = Object.keys(obj);`,
+    `  };`,
+    `})();`,
+  ].join('\n');
+}
+
+/**
+ * Plan 14-05 — synthesised `__rozieGetHostAttrs` helper for the Angular target's
+ * `$attrs` lowering. Angular has no native `$attrs` proxy (cf. Vue's
+ * template-side `$attrs` magic accessor). The consumer's attributes land on
+ * the host custom element (`<rozie-foo id="x">`); auto-fallthrough must
+ * re-project them onto the TEMPLATE-ROOT element (CONTEXT.md A1).
+ *
+ * The helper reads attributes from the host element on each call so a
+ * consumer-side dynamic binding (`[id]="someSignal()"`) flows through on the
+ * next effect re-run (Angular reflects the binding onto the host DOM
+ * attribute; the next `__rozieApplyAttrs` invocation sees the new value).
+ *
+ * `inject(ElementRef)` lives in a field initializer (injection context per
+ * Phase 05 Pitfall 8). The host element is captured ONCE; only the attribute
+ * read iterates per call.
+ */
+function hostAttrsGetterDecl(): string {
+  return [
+    `private ${HOST_ATTRS_GETTER_NAME} = (() => {`,
+    `  const host = inject(ElementRef);`,
+    `  return () => {`,
+    `    const el = host.nativeElement as HTMLElement;`,
+    `    const out: Record<string, unknown> = {};`,
+    `    for (const a of Array.from(el.attributes)) out[a.name] = a.value;`,
+    `    return out;`,
     `  };`,
     `})();`,
   ].join('\n');
@@ -514,49 +545,65 @@ function emitSpreadBinding(
   const refName = `rozieSpread_${idx}`;
   const effectFieldName = `__rozieSpread_${idx}_effect`;
 
+  // Plan 14-05 — detect the bare `$attrs` Identifier. Angular has no native
+  // template-side `$attrs` accessor (unlike Vue); the consumer's attributes
+  // land on the host custom element (`<rozie-foo id="x">`) and we must
+  // re-project them onto the TEMPLATE-ROOT element (CONTEXT.md A1). Lower the
+  // `$attrs` Identifier to a call into a synthesised `__rozieGetHostAttrs()`
+  // helper; on each effect run it returns the host's current attributes.
+  const isAttrsSpread = t.isIdentifier(attr.expression, { name: '$attrs' });
+
   // Build the spread expression: when an explicit class/style sibling exists,
   // drop class/style from the LITERAL object — the extracted values are fed
   // into the Angular [ngClass]/[ngStyle] merge path by emitAttributes.
-  let exprNode: t.Expression;
-  if (
-    hasExplicitClassOrStyle &&
-    t.isObjectExpression(attr.expression)
-  ) {
-    const { rest } = splitClassStyleFromAngularLiteral(attr.expression);
-    exprNode = rest;
-  } else if (t.isObjectExpression(attr.expression)) {
-    // LITERAL spread without an explicit class/style sibling — apply the
-    // T-14-11 pollution guard, then re-attach scrubbed class/style so they
-    // flow through the spread (no merge target exists). Mirrors Vue/Svelte.
-    const { rest, classValue, styleValue } = splitClassStyleFromAngularLiteral(
-      attr.expression,
-    );
-    const restProps = [...rest.properties];
-    if (classValue !== null) {
-      restProps.push(t.objectProperty(t.identifier('class'), classValue));
-    }
-    if (styleValue !== null) {
-      restProps.push(t.objectProperty(t.identifier('style'), styleValue));
-    }
-    exprNode = t.objectExpression(restProps);
+  let exprText: string;
+  if (isAttrsSpread) {
+    // $attrs → synthesised host-attrs getter call. Bypasses the regular
+    // rewriter because the bare `$attrs` Identifier has no template-side
+    // meaning on Angular; the meaning is encoded in the synthesised helper.
+    exprText = `this.${HOST_ATTRS_GETTER_NAME}()`;
   } else {
-    // DYNAMIC spread or bare `$attrs` Identifier — pass through.
-    exprNode = attr.expression;
-  }
+    let exprNode: t.Expression;
+    if (
+      hasExplicitClassOrStyle &&
+      t.isObjectExpression(attr.expression)
+    ) {
+      const { rest } = splitClassStyleFromAngularLiteral(attr.expression);
+      exprNode = rest;
+    } else if (t.isObjectExpression(attr.expression)) {
+      // LITERAL spread without an explicit class/style sibling — apply the
+      // T-14-11 pollution guard, then re-attach scrubbed class/style so they
+      // flow through the spread (no merge target exists). Mirrors Vue/Svelte.
+      const { rest, classValue, styleValue } = splitClassStyleFromAngularLiteral(
+        attr.expression,
+      );
+      const restProps = [...rest.properties];
+      if (classValue !== null) {
+        restProps.push(t.objectProperty(t.identifier('class'), classValue));
+      }
+      if (styleValue !== null) {
+        restProps.push(t.objectProperty(t.identifier('style'), styleValue));
+      }
+      exprNode = t.objectExpression(restProps);
+    } else {
+      // DYNAMIC spread — pass through.
+      exprNode = attr.expression;
+    }
 
-  // The spread expression is evaluated inside a CLASS-FIELD INITIALIZER's
-  // `effect()` body, NOT inside an Angular template binding. Pass
-  // `prefixThis: true` so `$data.X` lowers to `this.X()` (signal call on the
-  // class member), `$props.Y` to `this.Y()`, etc. — Angular templates have
-  // implicit-this resolution at the binding level, but a class-body
-  // initializer has no such implicit binding and tsc requires the explicit
-  // `this.` qualifier (TS2663). Mirrors the slot-invocation / class-body
-  // pattern in this file.
-  const exprText = rewriteTemplateExpression(exprNode, ctx.ir, {
-    collisionRenames: ctx.collisionRenames,
-    loopBindings: ctx.loopBindings,
-    prefixThis: true,
-  });
+    // The spread expression is evaluated inside a CLASS-FIELD INITIALIZER's
+    // `effect()` body, NOT inside an Angular template binding. Pass
+    // `prefixThis: true` so `$data.X` lowers to `this.X()` (signal call on the
+    // class member), `$props.Y` to `this.Y()`, etc. — Angular templates have
+    // implicit-this resolution at the binding level, but a class-body
+    // initializer has no such implicit binding and tsc requires the explicit
+    // `this.` qualifier (TS2663). Mirrors the slot-invocation / class-body
+    // pattern in this file.
+    exprText = rewriteTemplateExpression(exprNode, ctx.ir, {
+      collisionRenames: ctx.collisionRenames,
+      loopBindings: ctx.loopBindings,
+      prefixThis: true,
+    });
+  }
 
   // Push the viewChild query for the spread target.
   if (ctx.scriptInjections !== undefined) {
@@ -574,6 +621,20 @@ function emitSpreadBinding(
         name: APPLY_ATTRS_FIELD_NAME,
         decl: applyAttrsHelperDecl(),
       });
+    }
+
+    // Push the host-attrs getter when this spread is a `$attrs` lowering.
+    // One per component (dedup); only synthesised when actually needed.
+    if (isAttrsSpread) {
+      const hostGetterAlreadyPushed = ctx.scriptInjections.some(
+        (si) => si.name === HOST_ATTRS_GETTER_NAME,
+      );
+      if (!hostGetterAlreadyPushed) {
+        ctx.scriptInjections.push({
+          name: HOST_ATTRS_GETTER_NAME,
+          decl: hostAttrsGetterDecl(),
+        });
+      }
     }
 
     // Push the per-spread `effect()` field initializer. The guard

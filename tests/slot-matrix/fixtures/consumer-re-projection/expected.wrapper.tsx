@@ -8,6 +8,8 @@ interface WrapperProps {
 }
 
 export default function Wrapper(props: WrapperProps): JSX.Element {
+  const attrs = props as Record<string, unknown>;
+
   return (
     <>
     <Inner renderHeader={() => (<>

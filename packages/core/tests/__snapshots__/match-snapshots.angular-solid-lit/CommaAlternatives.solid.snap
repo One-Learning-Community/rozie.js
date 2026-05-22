@@ -4,7 +4,7 @@ import { Show, createSignal, splitProps } from 'solid-js';
 interface CommaAlternativesProps {}
 
 export default function CommaAlternatives(_props: CommaAlternativesProps): JSX.Element {
-  const [local, rest] = splitProps(_props, []);
+  const [local, attrs] = splitProps(_props, []);
 
   const [bound, setBound] = createSignal('max');
 

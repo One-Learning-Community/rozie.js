@@ -1,9 +1,11 @@
 interface TreeNodeProps {}
 
 export default function TreeNode(props: TreeNodeProps): JSX.Element {
+  const attrs = props as Record<string, unknown>;
+
   return (
     <>
-      <li data-rozie-s-a7176a6e="">
+      <li {...attrs} data-rozie-s-a7176a6e="">
         <span data-rozie-s-a7176a6e="">{$props.label}</span>
         <TreeNode node={$props.children} />
       </li>

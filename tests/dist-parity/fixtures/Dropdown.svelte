@@ -19,6 +19,7 @@ interface Props {
   trigger?: Snippet<[{ open: any; toggle: any }]>;
   children?: Snippet<[{ close: any }]>;
   snippets?: Record<string, any>;
+  [key: string]: unknown;
 }
 
 let {
@@ -28,6 +29,7 @@ let {
   trigger: __triggerProp,
   children: __childrenProp,
   snippets,
+  ...__rozieAttrs
 }: Props = $props();
 
 const trigger = $derived(__triggerProp ?? snippets?.trigger);
@@ -97,7 +99,7 @@ $effect(() => {
 </script>
 
 
-<div class="dropdown">
+<div class="dropdown" {...__rozieAttrs}>
   <div bind:this={triggerEl} onclick={toggle}>
     {@render trigger?.({ open, toggle })}
   </div>

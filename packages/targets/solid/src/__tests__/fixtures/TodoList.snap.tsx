@@ -21,7 +21,7 @@ interface TodoListProps {
 
 export default function TodoList(_props: TodoListProps): JSX.Element {
   const _merged = mergeProps({ title: 'Todo' }, _props);
-  const [local, rest] = splitProps(_merged, ['items', 'title', 'children']);
+  const [local, attrs] = splitProps(_merged, ['items', 'title', 'children']);
   const resolved = children(() => local.children);
 
   const [items, setItems] = createControllableSignal<any[]>(_props as unknown as Record<string, unknown>, 'items', (() => [])());
@@ -66,7 +66,7 @@ export default function TodoList(_props: TodoListProps): JSX.Element {
     .empty[data-rozie-s-52bec3de] { color: rgba(0, 0, 0, 0.4); font-style: italic; }
     form[data-rozie-s-52bec3de] { display: flex; gap: 0.25rem; margin-block: 0.5rem; }`}</style>
     <>
-    <div class={"todo-list"} data-rozie-s-52bec3de="">
+    <div class={"todo-list"} {...attrs} data-rozie-s-52bec3de="">
       <header data-rozie-s-52bec3de="">
         {(_props.headerSlot ?? _props.slots?.['header'])?.({ remaining: remaining(), total: items().length }) ?? <h3 data-rozie-s-52bec3de="">{local.title} ({remaining()} remaining)</h3>}
       </header>

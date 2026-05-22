@@ -1,5 +1,5 @@
 <>
-<div className={styles["search-input"]}>
+<div className={styles["search-input"]} {...attrs}>
   
   <input ref={inputEl} type="search" placeholder={props.placeholder} value={query} onChange={e => setQuery(e.target.value)} onInput={_rozieDebouncedOnSearch} onKeyDown={($event) => { (($event) => { if ($event.key !== 'Enter') return; ((onSearch) as ((...args: any[]) => any))($event); })($event); (($event) => { if ($event.key !== 'Escape') return; ((clear) as ((...args: any[]) => any))($event); })($event); }} />
 

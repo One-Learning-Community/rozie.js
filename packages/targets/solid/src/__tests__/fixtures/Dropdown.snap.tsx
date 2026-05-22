@@ -18,7 +18,7 @@ interface DropdownProps {
 
 export default function Dropdown(_props: DropdownProps): JSX.Element {
   const _merged = mergeProps({ closeOnOutsideClick: true, closeOnEscape: true }, _props);
-  const [local, rest] = splitProps(_merged, ['open', 'closeOnOutsideClick', 'closeOnEscape', 'children']);
+  const [local, attrs] = splitProps(_merged, ['open', 'closeOnOutsideClick', 'closeOnEscape', 'children']);
   const resolved = children(() => local.children);
 
   const [open, setOpen] = createControllableSignal<boolean>(_props as unknown as Record<string, unknown>, 'open', false);
@@ -91,7 +91,7 @@ export default function Dropdown(_props: DropdownProps): JSX.Element {
       --rozie-dropdown-z: 1000;
     }`}</style>
     <>
-    <div class={"dropdown"} data-rozie-s-6d6bd882="">
+    <div class={"dropdown"} {...attrs} data-rozie-s-6d6bd882="">
       <div ref={(el) => { triggerElRef = el as HTMLElement; }} onClick={toggle} data-rozie-s-6d6bd882="">
         {(_props.triggerSlot ?? _props.slots?.['trigger'])?.({ open: open(), toggle })}
       </div>

@@ -3,17 +3,18 @@ import TreeNode from './TreeNode.svelte';
 
 interface Props {
   node?: any;
+  [key: string]: unknown;
 }
 
 let { node = (() => ({
   id: '',
   label: '',
   children: []
-}))() }: Props = $props();
+}))(), ...__rozieAttrs }: Props = $props();
 </script>
 
 
-<div class="tree-node">
+<div class="tree-node" {...__rozieAttrs}>
   <span class="tree-node__label">{node.label}</span>
   {#if node.children && node.children.length > 0}<ul class="tree-node__children">
     {#each node.children as child, childIndex (child.id)}<li data-index={childIndex}>

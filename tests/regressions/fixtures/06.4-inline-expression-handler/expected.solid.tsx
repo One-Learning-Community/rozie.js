@@ -7,7 +7,7 @@ interface InlineExprHandlerProps {
 
 export default function InlineExprHandler(_props: InlineExprHandlerProps): JSX.Element {
   const _merged = mergeProps({ closeOnBackdrop: true }, _props);
-  const [local, rest] = splitProps(_merged, ['closeOnBackdrop']);
+  const [local, attrs] = splitProps(_merged, ['closeOnBackdrop']);
 
   const [open, setOpen] = createSignal(false);
 
@@ -19,7 +19,7 @@ export default function InlineExprHandler(_props: InlineExprHandlerProps): JSX.E
     <>
     <style>{`.backdrop[data-rozie-s-8ec7623e] { position: fixed; inset: 0; }`}</style>
     <>
-    <div class={"backdrop"} onClick={($event) => { local.closeOnBackdrop && close(); }} data-rozie-s-8ec7623e="">
+    <div {...attrs} class={"backdrop"} onClick={($event) => { local.closeOnBackdrop && close(); }} data-rozie-s-8ec7623e="">
       
       <button onClick={close} data-rozie-s-8ec7623e="">Close</button>
     </div>

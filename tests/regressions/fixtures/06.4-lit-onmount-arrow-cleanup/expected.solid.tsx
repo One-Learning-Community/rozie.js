@@ -4,7 +4,7 @@ import { createSignal, onCleanup, onMount, splitProps } from 'solid-js';
 interface OnMountArrowCleanupProps {}
 
 export default function OnMountArrowCleanup(_props: OnMountArrowCleanupProps): JSX.Element {
-  const [local, rest] = splitProps(_props, []);
+  const [local, attrs] = splitProps(_props, []);
 
   const [ticks, setTicks] = createSignal(0);
   const [running, setRunning] = createSignal(true);
@@ -30,7 +30,7 @@ export default function OnMountArrowCleanup(_props: OnMountArrowCleanupProps): J
     <>
     <style>{`.ticker[data-rozie-s-722b58d1] { font-variant-numeric: tabular-nums; }`}</style>
     <>
-    <div class={"ticker"} data-rozie-s-722b58d1="">{ticks()}</div>
+    <div class={"ticker"} {...attrs} data-rozie-s-722b58d1="">{ticks()}</div>
     </>
     </>
   );

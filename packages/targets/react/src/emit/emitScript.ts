@@ -1499,6 +1499,68 @@ export function emitScript(
     hookLines.push(propsDefaultsBlock);
   }
 
+  // Plan 14-05 — cross-framework attribute fallthrough rest binding. When
+  // `inheritAttrs !== false`, synthesise `const { foo, ...attrs } = <propsParam>`
+  // so the rewriteTemplateExpression `$attrs` Identifier rewrite (which lowers
+  // `$attrs` → bare `attrs`, set up in Plan 14-03) resolves. Declared prop
+  // names are listed explicitly so the rest bucket carries only consumer-
+  // passed attributes the component did NOT declare. A `void name1, name2;`
+  // line follows the destructure to suppress TS6133 (unused-locals) for the
+  // declared names — the prop values are read via the existing `props.X` /
+  // `_props.X` patterns set up above, NOT via these destructured locals
+  // (which would collide with the upstream state hooks).
+  //
+  // `hasPropsDefaults` decides the parameter name: when at least one non-
+  // model prop has a declared default, shell.ts renames the function param
+  // from `props` to `_props` (the rebinder block creates `props` as the
+  // merged object). Both expose every consumer-passed key — read from
+  // whichever the shell named.
+  if (ir.inheritAttrs !== false) {
+    const propsParam = defaultedNonModelProps.length > 0 ? '_props' : 'props';
+    if (ir.props.length === 0 && ir.emits.length === 0) {
+      // No declared surface — every key on the param is a fallthrough attribute.
+      hookLines.push(
+        `const attrs = ${propsParam} as Record<string, unknown>;`,
+      );
+    } else {
+      // Wrap the destructure in an IIFE so the destructured prop locals are
+      // scoped inside the IIFE — otherwise a declared prop name collides with
+      // an outer state hook (`const items` clashes with
+      // `const [items, setItems] = useControllableState(...)`). The IIFE
+      // returns ONLY the rest bucket; outer `attrs` carries no inner locals.
+      const declaredNames = [
+        ...ir.props.map((p) => p.name),
+        // model: true props add `defaultValue` + `onValueChange` consumer-side
+        // (useControllableState convention) — strip both so they never leak
+        // into the rest bucket. The model prop name itself (`value`) is in
+        // declaredNames already.
+        ...ir.props.flatMap((p) =>
+          p.isModel
+            ? [
+                'defaultValue',
+                `on${p.name[0]!.toUpperCase()}${p.name.slice(1)}Change`,
+                // Some model props use `default<Name>` (e.g. `defaultItems` for `items` model);
+                `default${p.name[0]!.toUpperCase()}${p.name.slice(1)}`,
+              ]
+            : [],
+        ),
+      ];
+      const declaredNamesUnique = Array.from(new Set(declaredNames));
+      const propNameList = declaredNamesUnique.join(', ');
+      // TypeScript flags unused destructured locals (TS6133) under strict
+      // settings; the IIFE wrapper plus `void` short-circuits also silences
+      // them. We use a single statement chain since the IIFE only returns
+      // the rest bucket.
+      hookLines.push(
+        `const attrs: Record<string, unknown> = (() => {\n` +
+          `  const { ${propNameList}, ...rest } = ${propsParam} as ${ir.name}Props & Record<string, unknown>;\n` +
+          `  void ${declaredNamesUnique.join('; void ')};\n` +
+          `  return rest;\n` +
+          `})();`,
+      );
+    }
+  }
+
   // 5a-bis. Portal-slot stable-renderer refs (Spike 003 FullCalendar React fix).
   //
   // For each portal slot, emit two lines:

@@ -11,11 +11,11 @@ interface ScopedParamsFixtureProps {
 
 export default function ScopedParamsFixture(_props: ScopedParamsFixtureProps): JSX.Element {
   const _merged = mergeProps({ label: 'item' }, _props);
-  const [local, rest] = splitProps(_merged, ['label']);
+  const [local, attrs] = splitProps(_merged, ['label']);
 
   return (
     <>
-    <div class={"scoped-params-fixture"} data-rozie-s-94f3adc8="">
+    <div class={"scoped-params-fixture"} {...attrs} data-rozie-s-94f3adc8="">
       {(_props.itemSlot ?? _props.slots?.['item'])?.({ value: local.label })}
     </div>
     </>

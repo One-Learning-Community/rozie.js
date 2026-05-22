@@ -8,13 +8,13 @@ interface NestedSlotDeclaredProps {
 }
 
 export default function NestedSlotDeclared(_props: NestedSlotDeclaredProps): JSX.Element {
-  const [local, rest] = splitProps(_props, []);
+  const [local, attrs] = splitProps(_props, []);
 
   return (
     <>
     <style>{`.outer[data-rozie-s-3bc5be6c] { display: block; }`}</style>
     <>
-    <div class={"outer"} data-rozie-s-3bc5be6c="">
+    <div class={"outer"} {...attrs} data-rozie-s-3bc5be6c="">
       
       {(_props.wrapperSlot ?? _props.slots?.['wrapper']?.({})) ?? <div class={"wrapper-fallback"} data-rozie-s-3bc5be6c="">
           {(_props.innerSlot ?? _props.slots?.['inner']?.({}))}

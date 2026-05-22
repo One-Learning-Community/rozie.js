@@ -11,6 +11,7 @@ interface Props {
   onadd?: (...args: unknown[]) => void;
   ontoggle?: (...args: unknown[]) => void;
   onremove?: (...args: unknown[]) => void;
+  [key: string]: unknown;
 }
 
 let {
@@ -23,6 +24,7 @@ let {
   onadd,
   ontoggle,
   onremove,
+  ...__rozieAttrs
 }: Props = $props();
 
 const header = $derived(__headerProp ?? snippets?.header);
@@ -69,7 +71,7 @@ const remaining = $derived(items.filter((i: any) => !i.done).length);
 </script>
 
 
-<div class="todo-list">
+<div class="todo-list" {...__rozieAttrs}>
   <header>
     {#if header}{@render header({ remaining, total: items.length })}{:else}
       

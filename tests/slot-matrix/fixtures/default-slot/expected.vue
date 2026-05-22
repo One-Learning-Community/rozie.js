@@ -1,6 +1,6 @@
 <template>
 
-<div class="default-slot-fixture">
+<div class="default-slot-fixture" v-bind="$attrs">
   <slot></slot>
 </div>
 

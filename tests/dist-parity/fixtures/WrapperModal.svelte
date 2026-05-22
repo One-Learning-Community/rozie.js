@@ -10,6 +10,7 @@ interface Props {
   children?: Snippet;
   actions?: Snippet;
   snippets?: Record<string, any>;
+  [key: string]: unknown;
 }
 
 let {
@@ -19,6 +20,7 @@ let {
   children: __childrenProp,
   actions: __actionsProp,
   snippets,
+  ...__rozieAttrs
 }: Props = $props();
 
 const brand = $derived(__brandProp ?? snippets?.brand);

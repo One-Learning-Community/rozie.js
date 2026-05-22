@@ -1,6 +1,6 @@
 <template>
 
-<div class="rmodel-lazy">
+<div class="rmodel-lazy" v-bind="$attrs">
   <input type="text" v-model.lazy="draft" placeholder="Commit on blur" />
   <p class="echo">Committed: {{ draft }}</p>
 </div>

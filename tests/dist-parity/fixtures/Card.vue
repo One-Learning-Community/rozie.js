@@ -1,6 +1,6 @@
 <template>
 
-<article class="card">
+<article class="card" v-bind="$attrs">
   <CardHeader :title="props.title" :on-close="props.onClose"></CardHeader>
   <div class="card__body">
     <slot></slot>

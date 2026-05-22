@@ -39,7 +39,20 @@
       {
         "type": "TemplateElement",
         "tagName": "UnknownTag",
-        "attributes": [],
+        "attributes": [
+          {
+            "kind": "spreadBinding",
+            "expression": {
+              "type": "Identifier",
+              "name": "$attrs"
+            },
+            "deps": [],
+            "sourceLoc": {
+              "start": 32,
+              "end": 46
+            }
+          }
+        ],
         "events": [],
         "children": [],
         "sourceLoc": {

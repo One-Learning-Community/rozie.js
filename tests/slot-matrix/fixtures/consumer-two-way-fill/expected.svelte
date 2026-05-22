@@ -2,6 +2,12 @@
 import Producer from './producer.svelte';
 import Inner from './producer.svelte';
 
+interface Props {
+  [key: string]: unknown;
+}
+
+let { ...__rozieAttrs }: Props = $props();
+
 let outerOpen = $state(true);
 let innerVal = $state('hello');
 </script>

@@ -1,6 +1,6 @@
 <template>
 
-<div class="default-content-fallback-fixture">
+<div class="default-content-fallback-fixture" v-bind="$attrs">
   <slot name="status">
     <span class="fallback">No status provided.</span>
   </slot>

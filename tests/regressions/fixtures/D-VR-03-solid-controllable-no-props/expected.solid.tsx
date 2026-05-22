@@ -9,7 +9,7 @@ interface ControllableNoPropsProps {
 }
 
 export default function ControllableNoProps(_props: ControllableNoPropsProps): JSX.Element {
-  const [local, rest] = splitProps(_props, ['value']);
+  const [local, attrs] = splitProps(_props, ['value']);
 
   const [value, setValue] = createControllableSignal<number>(_props as unknown as Record<string, unknown>, 'value', 0);
 
@@ -27,7 +27,7 @@ export default function ControllableNoProps(_props: ControllableNoPropsProps): J
     <>
     <style>{`.bump[data-rozie-s-141c4000] { font-variant-numeric: tabular-nums; }`}</style>
     <>
-    <button class={"bump"} onClick={bump} data-rozie-s-141c4000="">{value()}</button>
+    <button {...attrs} class={"bump"} onClick={bump} data-rozie-s-141c4000="">{value()}</button>
     </>
     </>
   );

@@ -1,7 +1,7 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { SignalWatcher, signal } from '@lit-labs/preact-signals';
-import { createLitControllableProperty } from '@rozie/runtime-lit';
+import { createLitControllableProperty, rozieSpread } from '@rozie/runtime-lit';
 
 @customElement('rozie-counter')
 export default class Counter extends SignalWatcher(LitElement) {
@@ -39,7 +39,7 @@ button[data-rozie-s-c72e01d0]:disabled { opacity: 0.4; cursor: not-allowed; }
 
   render() {
     return html`
-<div class="${Object.entries({ "counter": true, hovering: this._hovering.value }).filter(([, v]) => v).map(([k]) => k).join(' ')}" @mouseenter=${($event: Event) => { this._hovering.value = true; }} @mouseleave=${($event: Event) => { this._hovering.value = false; }} data-rozie-s-c72e01d0>
+<div class="${Object.entries({ "counter": true, hovering: this._hovering.value }).filter(([, v]) => v).map(([k]) => k).join(' ')}" ${rozieSpread(this.$attrs)} @mouseenter=${($event: Event) => { this._hovering.value = true; }} @mouseleave=${($event: Event) => { this._hovering.value = false; }} data-rozie-s-c72e01d0>
   <button ?disabled=${!this.canDecrement} aria-label="Decrement" @click=${this.decrement} data-rozie-s-c72e01d0>−</button>
   <span class="value" data-rozie-s-c72e01d0>${this.value}</span>
   <button ?disabled=${!this.canIncrement} aria-label="Increment" @click=${this.increment} data-rozie-s-c72e01d0>+</button>
@@ -61,4 +61,16 @@ button[data-rozie-s-c72e01d0]:disabled { opacity: 0.4; cursor: not-allowed; }
 
   get value(): number { return this._valueControllable.read(); }
   set value(v: number) { this._valueControllable.notifyPropertyWrite(v); }
+
+  /**
+   * Plan 14-05 — cross-framework attribute fallthrough source. Reads the
+   * host custom element's attributes on each call so a consumer-side bound
+   * attribute flows through on every render. The `rozieSpread` directive
+   * (D-02) does the cross-render diff downstream.
+   */
+  private get $attrs(): Record<string, string> {
+    const out: Record<string, string> = {};
+    for (const a of Array.from(this.attributes)) out[a.name] = a.value;
+    return out;
+  }
 }

@@ -1,6 +1,6 @@
 <template>
 
-<div class="rmodel-number-trim">
+<div class="rmodel-number-trim" v-bind="$attrs">
   <input type="text" v-model.trim.number="quantity" placeholder="Enter a quantity" />
   <p class="echo">Quantity: {{ quantity }}</p>
 </div>

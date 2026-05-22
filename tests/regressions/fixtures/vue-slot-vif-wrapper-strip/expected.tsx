@@ -13,10 +13,15 @@ export default function PresenceSlotFallback(_props: PresenceSlotFallbackProps):
     ..._props,
     title: _props.title ?? '',
   };
+  const attrs: Record<string, unknown> = (() => {
+    const { title, ...rest } = _props as PresenceSlotFallbackProps & Record<string, unknown>;
+    void title;
+    return rest;
+  })();
 
   return (
     <>
-    <section className={styles.panel} data-rozie-s-224e77e7="">
+    <section className={styles.panel} {...attrs} data-rozie-s-224e77e7="">
       {((props.renderHeader ?? props.slots?.['header']) || props.title) && <header data-rozie-s-224e77e7="">
         
         {(props.renderHeader ?? props.slots?.['header']) ? ((props.renderHeader ?? props.slots?.['header']) as Function)() : props.title}

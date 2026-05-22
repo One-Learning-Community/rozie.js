@@ -1,7 +1,7 @@
 import { LitElement, css, html, nothing } from 'lit';
 import { customElement, property, query, queryAssignedElements, state } from 'lit/decorators.js';
 import { SignalWatcher } from '@lit-labs/preact-signals';
-import { attachOutsideClickListener, createLitControllableProperty, injectGlobalStyles } from '@rozie/runtime-lit';
+import { attachOutsideClickListener, createLitControllableProperty, injectGlobalStyles, rozieSpread } from '@rozie/runtime-lit';
 
 interface RozieTriggerSlotCtx {
   open: unknown;
@@ -107,7 +107,7 @@ export default class Dropdown extends SignalWatcher(LitElement) {
 
   render() {
     return html`
-<div class="dropdown" data-rozie-s-6d6bd882>
+<div class="dropdown" ${rozieSpread(this.$attrs)} data-rozie-s-6d6bd882>
   <div @click=${this.toggle} data-rozie-ref="triggerEl" data-rozie-s-6d6bd882>
     ${this.trigger !== undefined ? this.trigger({open: this.open, toggle: this.toggle}) : html`<slot name="trigger" data-rozie-params=${(() => { try { return JSON.stringify({open: this.open}); } catch { return '{}'; } })()} @rozie-trigger-toggle=${($event: CustomEvent) => ((this.toggle) as (...args: any[]) => any)($event.detail)}></slot>`}
   </div>
@@ -137,6 +137,18 @@ export default class Dropdown extends SignalWatcher(LitElement) {
 
   get open(): boolean { return this._openControllable.read(); }
   set open(v: boolean) { this._openControllable.notifyPropertyWrite(v); }
+
+  /**
+   * Plan 14-05 — cross-framework attribute fallthrough source. Reads the
+   * host custom element's attributes on each call so a consumer-side bound
+   * attribute flows through on every render. The `rozieSpread` directive
+   * (D-02) does the cross-render diff downstream.
+   */
+  private get $attrs(): Record<string, string> {
+    const out: Record<string, string> = {};
+    for (const a of Array.from(this.attributes)) out[a.name] = a.value;
+    return out;
+  }
 }
 
 injectGlobalStyles('rozie-dropdown-global', `

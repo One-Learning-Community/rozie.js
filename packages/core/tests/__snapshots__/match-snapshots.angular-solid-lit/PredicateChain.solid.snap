@@ -4,7 +4,7 @@ import { Show, createSignal, splitProps } from 'solid-js';
 interface PredicateChainProps {}
 
 export default function PredicateChain(_props: PredicateChainProps): JSX.Element {
-  const [local, rest] = splitProps(_props, []);
+  const [local, attrs] = splitProps(_props, []);
 
   const [count, setCount] = createSignal(5);
 

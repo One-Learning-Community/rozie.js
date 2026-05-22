@@ -1,6 +1,6 @@
 <template>
 
-<div class="spike-root" ref="__rozieRootRef">
+<div class="spike-root" ref="__rozieRootRef" v-bind="$attrs">
   <slot></slot>
 </div>
 

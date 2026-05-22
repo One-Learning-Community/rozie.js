@@ -6,9 +6,10 @@ import { onMount } from 'svelte';
 
 interface Props {
   label?: string;
+  [key: string]: unknown;
 }
 
-let { label = 'Count' }: Props = $props();
+let { label = 'Count', ...__rozieAttrs }: Props = $props();
 
 import type { EditorOptions } from './editor-types';
 interface InternalShape {
@@ -28,7 +29,7 @@ onMount(() => {
 </script>
 
 
-  <button onclick={($event) => { inc(1); }}>{label}: {count}</button>
+  <button {...__rozieAttrs} onclick={($event) => { inc(1); }}>{label}: {count}</button>
 
 "
 `;
@@ -39,9 +40,10 @@ import { onMount } from 'svelte';
 
 interface Props {
   label?: string;
+  [key: string]: unknown;
 }
 
-let { label = 'Count' }: Props = $props();
+let { label = 'Count', ...__rozieAttrs }: Props = $props();
 
 let count = 0;
 let mode = 'idle';
@@ -55,7 +57,7 @@ onMount(() => {
 </script>
 
 
-  <button onclick={($event) => { inc(1); }}>{label}: {count}</button>
+  <button {...__rozieAttrs} onclick={($event) => { inc(1); }}>{label}: {count}</button>
 
 "
 `;

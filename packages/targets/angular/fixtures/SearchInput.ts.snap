@@ -1,4 +1,4 @@
-import { Component, DestroyRef, ElementRef, ViewEncapsulation, computed, effect, inject, input, output, signal, viewChild } from '@angular/core';
+import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, computed, effect, inject, input, output, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 @Component({
@@ -7,9 +7,9 @@ import { FormsModule } from '@angular/forms';
   imports: [FormsModule],
   template: `
 
-    <div class="search-input">
+    <div class="search-input" #rozieSpread_0>
       
-      <input #inputEl type="search" [placeholder]="placeholder()" [ngModel]="query()" (ngModelChange)="query.set($event)" [ngModelOptions]="{standalone: true}" (input)="debouncedOnSearch()" (keydown)="_merged_keydown_1($event)" />
+      <input #inputEl type="search" [placeholder]="placeholder()" [ngModel]="query()" (ngModelChange)="query.set($event)" [ngModelOptions]="{standalone: true}" (input)="debouncedOnSearch_1()" (keydown)="_merged_keydown_2($event)" />
 
       @if (query().length > 0) {
     <button class="clear-btn" aria-label="Clear" (click)="_clear()">
@@ -57,7 +57,40 @@ export class SearchInput {
     this.clear.emit();
   };
 
-  private debouncedOnSearch = (() => {
+  private rozieSpread_0 = viewChild<ElementRef>('rozieSpread_0');
+
+  private __rozieApplyAttrs = (() => {
+    const renderer = inject(Renderer2);
+    let prevKeys: string[] = [];
+    return (el: HTMLElement, obj: Record<string, unknown>) => {
+      for (const k of prevKeys) {
+        if (!(k in obj)) renderer.removeAttribute(el, k);
+      }
+      for (const [k, v] of Object.entries(obj)) {
+        if (v === null || v === false) renderer.removeAttribute(el, k);
+        else renderer.setAttribute(el, k, String(v));
+      }
+      prevKeys = Object.keys(obj);
+    };
+  })();
+
+  private __rozieGetHostAttrs = (() => {
+    const host = inject(ElementRef);
+    return () => {
+      const el = host.nativeElement as HTMLElement;
+      const out: Record<string, unknown> = {};
+      for (const a of Array.from(el.attributes)) out[a.name] = a.value;
+      return out;
+    };
+  })();
+
+  private __rozieSpread_0_effect = effect(() => {
+    const el = this.rozieSpread_0()?.nativeElement;
+    if (!el) return;
+    this.__rozieApplyAttrs(el, this.__rozieGetHostAttrs());
+  });
+
+  private debouncedOnSearch_1 = (() => {
     let timer: ReturnType<typeof setTimeout> | null = null;
     return (...args: any[]) => {
       if (timer !== null) clearTimeout(timer);
@@ -65,19 +98,19 @@ export class SearchInput {
     };
   })();
 
-  private _guardedOnSearch_2 = ($event: any) => {
+  private _guardedOnSearch_3 = ($event: any) => {
     if ($event.key !== 'Enter') return;
     this.onSearch();
   };
 
-  private _guarded_clear_3 = ($event: any) => {
+  private _guarded_clear_4 = ($event: any) => {
     if ($event.key !== 'Escape') return;
     this._clear();
   };
 
-  private _merged_keydown_1 = ($event: any) => {
-    this._guardedOnSearch_2($event);
-    this._guarded_clear_3($event);
+  private _merged_keydown_2 = ($event: any) => {
+    this._guardedOnSearch_3($event);
+    this._guarded_clear_4($event);
   };
 }
 

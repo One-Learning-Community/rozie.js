@@ -9,7 +9,7 @@ interface SpikeImportElProps {
 }
 
 export default function SpikeImportEl(_props: SpikeImportElProps): JSX.Element {
-  const [local, rest] = splitProps(_props, ['children']);
+  const [local, attrs] = splitProps(_props, ['children']);
   const resolved = children(() => local.children);
 
   onMount(() => {
@@ -27,7 +27,7 @@ export default function SpikeImportEl(_props: SpikeImportElProps): JSX.Element {
 
   return (
     <>
-    <div class={"spike-root"} ref={(el) => { __rozieRootRef = el as HTMLElement; }} data-rozie-s-f590f443="">
+    <div class={"spike-root"} ref={(el) => { __rozieRootRef = el as HTMLElement; }} {...attrs} data-rozie-s-f590f443="">
       {resolved()}
     </div>
     </>

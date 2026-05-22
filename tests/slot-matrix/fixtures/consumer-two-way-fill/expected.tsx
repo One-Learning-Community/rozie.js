@@ -5,6 +5,7 @@ import Inner from './producer';
 interface ConsumerProps {}
 
 export default function Consumer(props: ConsumerProps): JSX.Element {
+  const attrs = props as Record<string, unknown>;
   const [outerOpen, setOuterOpen] = useState(true);
   const [innerVal, setInnerVal] = useState('hello');
 

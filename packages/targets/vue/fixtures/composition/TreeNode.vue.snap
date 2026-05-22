@@ -1,6 +1,6 @@
 <template>
 
-  <li>
+  <li v-bind="$attrs">
     <span>{{ $props.label }}</span>
     <TreeNode :node="$props.children"></TreeNode>
   </li>

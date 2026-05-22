@@ -1,6 +1,6 @@
 <template>
 
-  <div class="modal">
+  <div class="modal" v-bind="$attrs">
     <Counter></Counter>
   </div>
 

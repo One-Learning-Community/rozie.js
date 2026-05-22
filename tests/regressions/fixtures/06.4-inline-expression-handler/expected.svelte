@@ -1,9 +1,10 @@
 <script lang="ts">
 interface Props {
   closeOnBackdrop?: boolean;
+  [key: string]: unknown;
 }
 
-let { closeOnBackdrop = true }: Props = $props();
+let { closeOnBackdrop = true, ...__rozieAttrs }: Props = $props();
 
 let open = $state(false);
 
@@ -13,7 +14,7 @@ const close = () => {
 </script>
 
 
-<div class="backdrop" onclick={($event) => { closeOnBackdrop && close(); }}>
+<div class="backdrop" {...__rozieAttrs} onclick={($event) => { closeOnBackdrop && close(); }}>
   
   <button onclick={close}>Close</button>
 </div>

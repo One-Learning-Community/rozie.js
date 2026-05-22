@@ -2,13 +2,18 @@
 interface Props {
   title?: string;
   onClose?: ((...args: any[]) => any) | null;
+  [key: string]: unknown;
 }
 
-let { title = '', onClose = null }: Props = $props();
+let {
+  title = '',
+  onClose = null,
+  ...__rozieAttrs
+}: Props = $props();
 </script>
 
 
-<header class="card-header">
+<header class="card-header" {...__rozieAttrs}>
   <h3 class="card-header__title">{title}</h3>
   {#if onClose}<button class="card-header__close" onclick={($event) => { (onClose)($event); }}>×</button>{/if}</header>
 

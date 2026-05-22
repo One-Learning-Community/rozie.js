@@ -25,6 +25,11 @@ export default function Dropdown(_props: DropdownProps): JSX.Element {
     closeOnOutsideClick: _props.closeOnOutsideClick ?? true,
     closeOnEscape: _props.closeOnEscape ?? true,
   };
+  const attrs: Record<string, unknown> = (() => {
+    const { open, closeOnOutsideClick, closeOnEscape, defaultValue, onOpenChange, defaultOpen, ...rest } = _props as DropdownProps & Record<string, unknown>;
+    void open; void closeOnOutsideClick; void closeOnEscape; void defaultValue; void onOpenChange; void defaultOpen;
+    return rest;
+  })();
   const [open, setOpen] = useControllableState({
     value: props.open,
     defaultValue: props.defaultOpen ?? false,
@@ -88,7 +93,7 @@ export default function Dropdown(_props: DropdownProps): JSX.Element {
 
   return (
     <>
-    <div className={styles.dropdown} data-rozie-s-6d6bd882="">
+    <div className={styles.dropdown} {...attrs} data-rozie-s-6d6bd882="">
       <div ref={triggerEl} onClick={toggle} data-rozie-s-6d6bd882="">
         {(props.renderTrigger ?? props.slots?.['trigger'])?.({ open, toggle })}
       </div>

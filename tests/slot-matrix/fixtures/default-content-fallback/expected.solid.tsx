@@ -7,11 +7,11 @@ interface DefaultContentFallbackFixtureProps {
 }
 
 export default function DefaultContentFallbackFixture(_props: DefaultContentFallbackFixtureProps): JSX.Element {
-  const [local, rest] = splitProps(_props, []);
+  const [local, attrs] = splitProps(_props, []);
 
   return (
     <>
-    <div class={"default-content-fallback-fixture"} data-rozie-s-62104151="">
+    <div class={"default-content-fallback-fixture"} {...attrs} data-rozie-s-62104151="">
       {(_props.statusSlot ?? _props.slots?.['status']?.({})) ?? <span class={"fallback"} data-rozie-s-62104151="">No status provided.</span>}
     </div>
     </>

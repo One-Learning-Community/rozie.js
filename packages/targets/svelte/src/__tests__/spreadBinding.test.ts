@@ -96,15 +96,19 @@ describe('emitTemplateAttribute (Svelte) — spreadBinding (Plan 14-04 Task 2)',
     expect(out).not.toContain('normalizeAttrs');
   });
 
-  it('(3) $attrs spread → `{...$$restProps}` (Svelte 5 native rest-attributes)', () => {
+  it('(3) $attrs spread → `{...__rozieAttrs}` (Svelte 5 runes-mode rest binding)', () => {
     const ir = emptyIR();
     const ctx = freshCtx(ir);
     const out = emitAttributes([spread(`$attrs`)], ctx);
-    // The bare `$attrs` Identifier is rewritten in rewriteTemplateExpression
-    // to Svelte's native `$$restProps` rest-attributes object.
-    expect(out).toMatchInlineSnapshot(`"{...$$restProps}"`);
-    expect(out).toContain('$$restProps');
+    // Plan 14-05 — Svelte 5 runes-mode rejects the legacy `$$restProps`
+    // identifier (`Cannot use $$restProps in runes mode`). The Identifier
+    // visitor in `rewriteTemplateExpression` rewrites `$attrs` to the
+    // synthesised `__rozieAttrs` rest binding (declared in the `$props()`
+    // destructure via `buildPropsDestructureEntries`).
+    expect(out).toMatchInlineSnapshot(`"{...__rozieAttrs}"`);
+    expect(out).toContain('__rozieAttrs');
     expect(out).not.toContain('$attrs');
+    expect(out).not.toContain('$$restProps');
   });
 
   it('(4) R6 — class + r-bind LITERAL class merge: both classes render, only `id` spreads', () => {

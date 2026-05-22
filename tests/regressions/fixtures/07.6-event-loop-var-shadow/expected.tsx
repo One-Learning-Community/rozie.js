@@ -3,6 +3,7 @@ import { useCallback, useState } from 'react';
 interface EventLoopVarShadowProps {}
 
 export default function EventLoopVarShadow(props: EventLoopVarShadowProps): JSX.Element {
+  const attrs = props as Record<string, unknown>;
   const [items, setItems] = useState([{
     id: 'a',
     label: 'A'
@@ -17,7 +18,7 @@ export default function EventLoopVarShadow(props: EventLoopVarShadowProps): JSX.
 
   return (
     <>
-    <ul data-rozie-s-a955b18d="">
+    <ul {...attrs} data-rozie-s-a955b18d="">
       {items.map((e) => <li key={e.id} data-rozie-s-a955b18d="">
         <span data-rozie-s-a955b18d="">{e.label}</span>
         

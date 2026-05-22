@@ -1,6 +1,7 @@
 import { LitElement, css, html, nothing } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { SignalWatcher } from '@lit-labs/preact-signals';
+import { rozieSpread } from '@rozie/runtime-lit';
 
 @customElement('rozie-card-header')
 export default class CardHeader extends SignalWatcher(LitElement) {
@@ -23,9 +24,21 @@ export default class CardHeader extends SignalWatcher(LitElement) {
 
   render() {
     return html`
-<header class="card-header" data-rozie-s-f3e60f5a>
+<header class="card-header" ${rozieSpread(this.$attrs)} data-rozie-s-f3e60f5a>
   <h3 class="card-header__title" data-rozie-s-f3e60f5a>${this.title}</h3>
   ${this.onClose ? html`<button class="card-header__close" @click=${this.onClose} data-rozie-s-f3e60f5a>×</button>` : nothing}</header>
 `;
+  }
+
+  /**
+   * Plan 14-05 — cross-framework attribute fallthrough source. Reads the
+   * host custom element's attributes on each call so a consumer-side bound
+   * attribute flows through on every render. The `rozieSpread` directive
+   * (D-02) does the cross-render diff downstream.
+   */
+  private get $attrs(): Record<string, string> {
+    const out: Record<string, string> = {};
+    for (const a of Array.from(this.attributes)) out[a.name] = a.value;
+    return out;
   }
 }

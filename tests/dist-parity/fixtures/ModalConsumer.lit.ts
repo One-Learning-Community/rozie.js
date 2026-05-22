@@ -1,7 +1,7 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { SignalWatcher, signal } from '@lit-labs/preact-signals';
-import { adoptConsumerStyles } from '@rozie/runtime-lit';
+import { adoptConsumerStyles, rozieSpread } from '@rozie/runtime-lit';
 import { ref } from 'lit/directives/ref.js';
 import './Modal.rozie';
 import './WrapperModal.rozie';
@@ -30,7 +30,7 @@ export default class ModalConsumer extends SignalWatcher(LitElement) {
 
   render() {
     return html`
-<div class="modal-consumer" data-rozie-s-5d081d3a>
+<div class="modal-consumer" ${rozieSpread(this.$attrs)} data-rozie-s-5d081d3a>
   <rozie-modal .open=${this._open1.value} @open-change=${($event: CustomEvent) => { this._open1.value = $event.detail; }} .header=${(scope: { close: unknown }) => html`
       <h2 data-rozie-s-5d081d3a>${this.title}</h2>
       <button class="close" @click=${scope.close} data-rozie-s-5d081d3a>×</button>
@@ -56,5 +56,17 @@ export default class ModalConsumer extends SignalWatcher(LitElement) {
 
   onConfirm() {
     this._open1.value = false;
+  }
+
+  /**
+   * Plan 14-05 — cross-framework attribute fallthrough source. Reads the
+   * host custom element's attributes on each call so a consumer-side bound
+   * attribute flows through on every render. The `rozieSpread` directive
+   * (D-02) does the cross-render diff downstream.
+   */
+  private get $attrs(): Record<string, string> {
+    const out: Record<string, string> = {};
+    for (const a of Array.from(this.attributes)) out[a.name] = a.value;
+    return out;
   }
 }

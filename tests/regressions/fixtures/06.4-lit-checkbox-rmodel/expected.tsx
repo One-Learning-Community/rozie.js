@@ -8,6 +8,11 @@ interface CheckboxRModelProps {
 }
 
 export default function CheckboxRModel(props: CheckboxRModelProps): JSX.Element {
+  const attrs: Record<string, unknown> = (() => {
+    const { checked, defaultValue, onCheckedChange, defaultChecked, ...rest } = props as CheckboxRModelProps & Record<string, unknown>;
+    void checked; void defaultValue; void onCheckedChange; void defaultChecked;
+    return rest;
+  })();
   const [checked, setChecked] = useControllableState({
     value: props.checked,
     defaultValue: props.defaultChecked ?? false,
@@ -16,7 +21,7 @@ export default function CheckboxRModel(props: CheckboxRModelProps): JSX.Element 
 
   return (
     <>
-    <label className={styles.toggle} data-rozie-s-5898a126="">
+    <label className={styles.toggle} {...attrs} data-rozie-s-5898a126="">
       
       <input type="checkbox" checked={checked} onChange={e => setChecked(e.target.checked)} data-rozie-s-5898a126="" />
       <span data-rozie-s-5898a126="">Enabled</span>

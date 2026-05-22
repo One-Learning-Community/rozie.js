@@ -1,6 +1,7 @@
 import { LitElement, html } from 'lit';
 import { customElement, query, queryAssignedElements, state } from 'lit/decorators.js';
 import { SignalWatcher } from '@lit-labs/preact-signals';
+import { rozieSpread } from '@rozie/runtime-lit';
 import DummyEngine from 'dummy-engine';
 
 @customElement('rozie-spike-import-el')
@@ -50,11 +51,23 @@ export default class SpikeImportEl extends SignalWatcher(LitElement) {
 
   render() {
     return html`
-<div class="spike-root" data-rozie-ref="__rozieRoot" data-rozie-s-f590f443>
+<div class="spike-root" ${rozieSpread(this.$attrs)} data-rozie-ref="__rozieRoot" data-rozie-s-f590f443>
   <slot></slot>
 </div>
 `;
   }
 
   instance: any = null;
+
+  /**
+   * Plan 14-05 — cross-framework attribute fallthrough source. Reads the
+   * host custom element's attributes on each call so a consumer-side bound
+   * attribute flows through on every render. The `rozieSpread` directive
+   * (D-02) does the cross-render diff downstream.
+   */
+  private get $attrs(): Record<string, string> {
+    const out: Record<string, string> = {};
+    for (const a of Array.from(this.attributes)) out[a.name] = a.value;
+    return out;
+  }
 }

@@ -3,9 +3,15 @@ interface CardHeaderProps {
 }
 
 export default function CardHeader(props: CardHeaderProps): JSX.Element {
+  const attrs: Record<string, unknown> = (() => {
+    const { title, ...rest } = props as CardHeaderProps & Record<string, unknown>;
+    void title;
+    return rest;
+  })();
+
   return (
     <>
-      <div className={"card-header"} data-rozie-s-f3e60f5a="">{props.title}</div>
+      <div className={"card-header"} {...attrs} data-rozie-s-f3e60f5a="">{props.title}</div>
     </>
   );
 }

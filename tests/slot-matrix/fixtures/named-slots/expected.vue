@@ -1,6 +1,6 @@
 <template>
 
-<div class="named-slots-fixture">
+<div class="named-slots-fixture" v-bind="$attrs">
   <header>
     <slot name="header"></slot>
   </header>

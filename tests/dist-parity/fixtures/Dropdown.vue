@@ -1,6 +1,6 @@
 <template>
 
-<div class="dropdown">
+<div class="dropdown" v-bind="$attrs">
   <div ref="triggerElRef" @click="toggle">
     <slot name="trigger" :open="open" :toggle="toggle"></slot>
   </div>

@@ -1,6 +1,7 @@
 import { LitElement, html } from 'lit';
 import { customElement, queryAssignedElements, state } from 'lit/decorators.js';
 import { SignalWatcher } from '@lit-labs/preact-signals';
+import { rozieSpread } from '@rozie/runtime-lit';
 
 @customElement('rozie-default-content-fallback-fixture')
 export default class DefaultContentFallbackFixture extends SignalWatcher(LitElement) {
@@ -41,11 +42,23 @@ export default class DefaultContentFallbackFixture extends SignalWatcher(LitElem
 
   render() {
     return html`
-<div class="default-content-fallback-fixture" data-rozie-s-62104151>
+<div class="default-content-fallback-fixture" ${rozieSpread(this.$attrs)} data-rozie-s-62104151>
   <slot name="status">
     <span class="fallback" data-rozie-s-62104151>No status provided.</span>
   </slot>
 </div>
 `;
+  }
+
+  /**
+   * Plan 14-05 — cross-framework attribute fallthrough source. Reads the
+   * host custom element's attributes on each call so a consumer-side bound
+   * attribute flows through on every render. The `rozieSpread` directive
+   * (D-02) does the cross-render diff downstream.
+   */
+  private get $attrs(): Record<string, string> {
+    const out: Record<string, string> = {};
+    for (const a of Array.from(this.attributes)) out[a.name] = a.value;
+    return out;
   }
 }

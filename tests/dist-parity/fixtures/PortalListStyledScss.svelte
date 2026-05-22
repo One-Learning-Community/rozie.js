@@ -8,12 +8,14 @@ interface Props {
   items?: any[];
   item?: Snippet<[{ item: any }]>;
   snippets?: Record<string, any>;
+  [key: string]: unknown;
 }
 
 let {
   items = (() => [])(),
   item: __itemProp,
   snippets,
+  ...__rozieAttrs
 }: Props = $props();
 
 const item = $derived(__itemProp ?? snippets?.item);
@@ -94,7 +96,7 @@ onMount(() => {
 </script>
 
 
-<div class="rozie-portal-list" bind:this={__rozieRoot}>
+<div class="rozie-portal-list" bind:this={__rozieRoot} {...__rozieAttrs}>
   
 </div>
 
