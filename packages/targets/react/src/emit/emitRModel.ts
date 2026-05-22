@@ -19,10 +19,12 @@
 import * as t from '@babel/types';
 import _generate from '@babel/generator';
 import type { GeneratorOptions } from '@babel/generator';
+import { parseExpression } from '@babel/parser';
 import type {
   IRComponent,
   TemplateElementIR,
   AttributeBinding,
+  ResolvedModelModifier,
 } from '../../../../core/src/ir/types.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 // Phase 06.2 P1 D-116 — shared PascalCase predicate. Replaces the local
@@ -36,10 +38,7 @@ const generate: GenerateFn =
     ? (_generate as GenerateFn)
     : ((_generate as unknown as { default: GenerateFn }).default);
 
-void generate;
-
-const GEN_OPTS: GeneratorOptions = { retainLines: false, compact: false };
-void GEN_OPTS;
+const GEN_OPTS: GeneratorOptions = { retainLines: false, compact: true };
 
 function capitalize(name: string): string {
   if (name.length === 0) return name;
@@ -109,6 +108,49 @@ function makeBindingAttr(name: string, expression: t.Expression): AttributeBindi
 }
 
 /**
+ * Phase 12 — partition the resolved `r-model` modifier list into the two
+ * orthogonal concerns the emitter handles:
+ *   - `valueTransforms`: ordered `$v`-placeholder code fragments from every
+ *     modifier that declares one (the list is ALREADY canonicalized per D-07:
+ *     `.trim` -> custom string-transforms -> `.number` terminal).
+ *   - `isLazy`: whether any modifier declares `eventSwap: 'change'` (`.lazy`).
+ */
+function partitionModifiers(
+  modifiers: ResolvedModelModifier[] | undefined,
+): { valueTransforms: string[]; isLazy: boolean } {
+  const valueTransforms: string[] = [];
+  let isLazy = false;
+  for (const m of modifiers ?? []) {
+    if (m.descriptor.valueTransform) valueTransforms.push(m.descriptor.valueTransform);
+    if (m.descriptor.eventSwap === 'change') isLazy = true;
+  }
+  return { valueTransforms, isLazy };
+}
+
+/**
+ * Phase 12 — apply the resolved `valueTransform` fragments to a value-access
+ * expression node. Each fragment is a string containing the literal `$v`
+ * placeholder (D-03). Starting from the value-access node, substitute `$v`
+ * with the current expression's generated source, re-parse the result, and
+ * chain. When `valueTransforms` is empty, the input node is returned
+ * unchanged — so non-modifier `r-model` stays byte-identical to pre-phase.
+ */
+function applyValueTransforms(
+  valueAccess: t.Expression,
+  valueTransforms: string[],
+): t.Expression {
+  let current = valueAccess;
+  for (const fragment of valueTransforms) {
+    const currentSrc = generate(current, GEN_OPTS).code;
+    // Re-parse the fragment with `$v` replaced by the current value source.
+    // A syntactically malformed fragment fails the parse loudly (threat
+    // register T-12-07 — fail-loud, never emit raw text).
+    current = parseExpression(fragment.split('$v').join(`(${currentSrc})`));
+  }
+  return current;
+}
+
+/**
  * Emit r-model lowering. Returns the set of replacement attributes
  * (e.g., value, checked, onChange/onValueChange).
  *
@@ -145,6 +187,12 @@ export function emitRModel(
   const tag = element.tagName.toLowerCase();
   const inputType = (getStaticAttr(element.attributes, 'type') ?? 'text').toLowerCase();
 
+  // Phase 12 — the resolved `r-model` modifier chain. `valueTransforms` are
+  // the ordered `$v`-placeholder fragments (already D-07-canonicalized);
+  // `isLazy` flags `.lazy`. Both are empty/false for bare `r-model`, so the
+  // non-modifier paths below stay byte-identical to pre-phase.
+  const { valueTransforms, isLazy } = partitionModifiers(rModelAttr.modifiers);
+
   // Build babel nodes for replacement attribute expressions.
   // Each replacement attribute is encoded with a binding expression that
   // will pass through rewriteTemplateExpression unchanged (since we use
@@ -172,16 +220,32 @@ export function emitRModel(
     };
   }
 
-  // <select> or <textarea> — value/onChange
+  // <select> or <textarea> — value/onChange.
+  // Phase 12: `.number`/`.trim` wrap the committed value; `.lazy` swaps to the
+  // uncontrolled `defaultValue`+`onBlur` deferred-commit pattern (D-08).
   if (tag === 'select' || tag === 'textarea') {
-    const onChangeArrow = t.arrowFunctionExpression(
+    const committed = applyValueTransforms(eTargetValue, valueTransforms);
+    const handlerArrow = t.arrowFunctionExpression(
       [eId],
-      t.callExpression(setterId, [eTargetValue]),
+      t.callExpression(setterId, [committed]),
     );
+    if (isLazy) {
+      return {
+        replacementAttributes: [
+          // D-08 — React has no true `change` event, so `.lazy` emits an
+          // uncontrolled deferred-commit input (documented parity edge case;
+          // see docs/compatibility.md). Programmatic mid-edit writes to the
+          // bound state are not reflected by an uncontrolled input.
+          makeBindingAttr(':defaultValue', localId),
+          makeBindingAttr(':onBlur', handlerArrow),
+        ],
+        diagnostics,
+      };
+    }
     return {
       replacementAttributes: [
         makeBindingAttr(':value', localId),
-        makeBindingAttr(':onChange', onChangeArrow),
+        makeBindingAttr(':onChange', handlerArrow),
       ],
       diagnostics,
     };
@@ -223,11 +287,27 @@ export function emitRModel(
     };
   }
 
-  // <input type="text"> (default for input)
+  // <input type="text"> (default for input).
+  // Phase 12: `.number`/`.trim` wrap the committed value; `.lazy` swaps to the
+  // uncontrolled `defaultValue`+`onBlur` deferred-commit pattern (D-08).
+  const committedValue = applyValueTransforms(eTargetValue, valueTransforms);
   const onChangeArrow = t.arrowFunctionExpression(
     [eId],
-    t.callExpression(setterId, [eTargetValue]),
+    t.callExpression(setterId, [committedValue]),
   );
+  if (isLazy) {
+    return {
+      replacementAttributes: [
+        // D-08 — React's `.lazy` is an uncontrolled `defaultValue`+`onBlur`
+        // deferred-commit input (documented parity edge case; see
+        // docs/compatibility.md). Programmatic mid-edit writes to the bound
+        // state are not reflected by an uncontrolled input.
+        makeBindingAttr(':defaultValue', localId),
+        makeBindingAttr(':onBlur', onChangeArrow),
+      ],
+      diagnostics,
+    };
+  }
   return {
     replacementAttributes: [
       makeBindingAttr(':value', localId),
