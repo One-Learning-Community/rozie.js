@@ -289,20 +289,32 @@ async function settleExample(
 // All three React cells now render and match the shared baseline within the
 // 2px tolerance — un-gated. This was a test-harness bug, not an emitter bug.
 //
-// REMAINING (5 cells):
-//   - TipTap·react / ·svelte / ·lit / ·solid / ·angular: NOT a structural emit
-//     bug — the ProseMirror editor is captured in a different STATE
-//     (toolbar-active button + bound-HTML content) than the Vue baseline.
-//     TipTap·angular joins this group post-fix: it now renders, but shares the
-//     same capture-time editor-state non-determinism as its siblings. Closing
-//     these needs a settleExample / state-determinism follow-up.
+// RESOLVED (2026-05-22, vr-uppy-matrix-red follow-up) — TipTap·angular is no
+// longer divergent. Verified in the pinned container: it renders byte-identical
+// to the Vue baseline and passes. Removed from the gate — only the 4 JS-context
+// targets remain.
+//
+// REMAINING (4 cells) — TipTap·react / ·svelte / ·solid / ·lit:
+//   A real init-time cross-target divergence (NOT a settle-timing flake, NOT a
+//   structural emit bug). On these 4 targets the editor's initial content-load
+//   round-trips ProseMirror's NORMALISED html back into `$data.content` through
+//   the two-way `r-model:html` binding on mount: `<li>x</li>` becomes
+//   `<li><p>x</p></li>` plus a trailing `<p></p>` (219→247 bytes, visible in
+//   the BOUND HTML <pre>), and the editor's selection lands in a different node
+//   so a different toolbar button shows active (`• List` instead of `H2`). On
+//   vue/angular the bound model keeps the author's original string until the
+//   first real edit. This is the `$watch` / init-emission consistency follow-up
+//   the matrix has long flagged — a real divergence, tracked separately; needs
+//   a proper debug session, not a spec-side fix.
 const KNOWN_CROSS_TARGET_DIVERGENCE = new Set<string>([
-  // editor-state divergence (capture-time ProseMirror state, not an emit bug)
+  // TipTap init-time r-model:html normalisation divergence (see above). vue +
+  // angular hold the author string; these 4 hold ProseMirror's normalised
+  // round-trip. A real divergence — not hidden drift on a byte-identical cell,
+  // so not a D-11 violation.
   'TipTap::react',
   'TipTap::svelte',
-  'TipTap::lit',
   'TipTap::solid',
-  'TipTap::angular',
+  'TipTap::lit',
 ]);
 
 for (const example of EXAMPLES) {
