@@ -102,6 +102,72 @@ function normalizeNullAttrBinding(expr: t.Expression): t.Expression {
 }
 
 /**
+ * Phase 12 — the three BUILT-IN model modifiers. Vue has a native `v-model`
+ * suffix for each (`v-model.lazy.number.trim`), so a chain composed only of
+ * these maps ~1:1. Any modifier NOT in this set is a CUSTOM model modifier
+ * with no native Vue equivalent — its presence forces the whole `r-model`
+ * attribute to be hand-emitted (`:value` + `@input`/`@change`).
+ */
+const VUE_NATIVE_MODEL_MODIFIERS: ReadonlySet<string> = new Set([
+  'lazy',
+  'number',
+  'trim',
+]);
+
+/**
+ * Phase 12 — partition a resolved `r-model` modifier list into the pieces the
+ * Vue emitter needs:
+ *   - `nativeSuffixes`: built-in modifier names (`.lazy`/`.number`/`.trim`) —
+ *     emitted as native `v-model` suffixes when no custom modifier is present.
+ *   - `valueTransforms`: ordered `$v`-placeholder fragments (D-07-canonical) —
+ *     used when hand-emitting because a custom modifier is present.
+ *   - `isLazy`: whether any modifier declares `eventSwap: 'change'` (`.lazy`).
+ *   - `hasCustom`: whether any modifier is NOT a Vue native built-in.
+ */
+function partitionVueModelModifiers(
+  modifiers:
+    | { name: string; descriptor: { valueTransform?: string; eventSwap?: 'change' } }[]
+    | undefined,
+): {
+  nativeSuffixes: string[];
+  valueTransforms: string[];
+  isLazy: boolean;
+  hasCustom: boolean;
+} {
+  const nativeSuffixes: string[] = [];
+  const valueTransforms: string[] = [];
+  let isLazy = false;
+  let hasCustom = false;
+  for (const m of modifiers ?? []) {
+    if (VUE_NATIVE_MODEL_MODIFIERS.has(m.name)) {
+      nativeSuffixes.push(m.name);
+    } else {
+      hasCustom = true;
+    }
+    if (m.descriptor.valueTransform) valueTransforms.push(m.descriptor.valueTransform);
+    if (m.descriptor.eventSwap === 'change') isLazy = true;
+  }
+  return { nativeSuffixes, valueTransforms, isLazy, hasCustom };
+}
+
+/**
+ * Phase 12 — splice the resolved `valueTransform` fragments into a value-access
+ * expression STRING. Each fragment carries the literal `$v` placeholder (D-03);
+ * substitute `$v` with the current expression text and chain. Empty list ⇒ the
+ * input string is returned unchanged.
+ */
+function applyValueTransformsString(
+  valueAccess: string,
+  valueTransforms: string[],
+): string {
+  let current = valueAccess;
+  for (const fragment of valueTransforms) {
+    current = fragment.split('$v').join(`(${current})`);
+  }
+  return current;
+}
+
+/**
  * Render a static text segment as a JS-string literal suitable for inclusion
  * in an array (`'counter'`, `'card '`).
  */
@@ -233,7 +299,29 @@ function emitSingleAttr(attr: AttributeBinding, ir: IRComponent): string {
     // r-model rewrites to v-model directive form (NOT :v-model).
     if (attr.name === 'r-model') {
       const expr = rewriteTemplateExpression(attr.expression, ir);
-      return `v-model="${expr}"`;
+      // Phase 12 — the resolved `r-model` modifier chain.
+      const { nativeSuffixes, valueTransforms, isLazy, hasCustom } =
+        partitionVueModelModifiers(attr.modifiers);
+      if (!hasCustom) {
+        // No custom modifier — every modifier (if any) is a Vue native
+        // built-in. Append them as `.`-separated `v-model` suffixes. Bare
+        // `r-model` (empty list) stays exactly `v-model="${expr}"`.
+        const suffix =
+          nativeSuffixes.length > 0 ? `.${nativeSuffixes.join('.')}` : '';
+        return `v-model${suffix}="${expr}"`;
+      }
+      // A custom model modifier is present — Vue has no native equivalent, so
+      // hand-emit. Drop `v-model` and emit an explicit `:value` plus an event
+      // handler (`@input` normally, `@change` when `.lazy` is in the chain)
+      // whose body assigns the transformed value back. The transformed value
+      // chains each modifier's `valueTransform` fragment in D-07 list order
+      // (the resolved list arrives already canonicalized).
+      const committedValue = applyValueTransformsString(
+        '$event.target.value',
+        valueTransforms,
+      );
+      const eventName = isLazy ? 'change' : 'input';
+      return `:value="${expr}" @${eventName}="${expr} = ${committedValue}"`;
     }
     // A `null`-fallback ternary (`x ? … : null`) is normalized to yield
     // `undefined` so vue-tsc's `string | undefined` attr types accept it
