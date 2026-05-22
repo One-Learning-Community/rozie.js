@@ -58,6 +58,24 @@ export interface EmitAttrCtx {
    * this array, so no separate counter is needed.
    */
   scriptInjections?: AngularScriptInjection[] | undefined;
+  /**
+   * Plan 14-05 / D-01 — per-component counter for the `rozieSpread_<N>`
+   * template-ref / `__rozieSpread_<N>_effect` field-decl pair synthesised on
+   * every `spreadBinding`. The same counter is shared with `emitTemplateEvent`
+   * so suffixes never collide. emitTemplateNode threads its own counter
+   * through this channel; absent → the spreadBinding arm allocates fresh
+   * names with `0` as the start.
+   */
+  injectionCounter?: { next: number } | undefined;
+  /**
+   * Plan 14-05 — set to `true` by the `spreadBinding` arm when at least one
+   * `r-bind`/`$attrs` spread was lowered to the `effect()` + `Renderer2`
+   * `applyAttrs` path. emitAngular reads this off `EmitTemplateResult` and
+   * conditionally adds `inject`/`Renderer2`/`ElementRef`/`effect`/`viewChild`
+   * to the `@angular/core` import line (the same pattern `hasDynamicSlotFiller`
+   * uses to add `ViewChild`/`TemplateRef`/`NgTemplateOutlet`).
+   */
+  hasSpreadBinding?: { value: boolean } | undefined;
 }
 
 /**
@@ -346,6 +364,251 @@ function lowerBoundAttrExpression(
 }
 
 /**
+ * Plan 14-05 R6 — keys that must never reach the emitted object from an
+ * author-controlled `r-bind` LITERAL. Mirrors the React/Solid/Vue/Svelte
+ * `FORBIDDEN_SPREAD_KEYS` set + the Phase 02 `collectPropDecls` write-time
+ * guard (T-14-11 — prototype-pollution).
+ */
+const FORBIDDEN_SPREAD_KEYS: ReadonlySet<string> = new Set([
+  '__proto__',
+  'constructor',
+  'prototype',
+]);
+
+/**
+ * Read an ObjectProperty's static key name, or null when the key is not a
+ * statically-knowable Identifier / StringLiteral (computed expressions etc.).
+ */
+function staticSpreadPropKey(prop: t.ObjectProperty): string | null {
+  if (t.isIdentifier(prop.key) && !prop.computed) return prop.key.name;
+  if (t.isStringLiteral(prop.key)) return prop.key.value;
+  return null;
+}
+
+/**
+ * Plan 14-05 R6 — split an `r-bind` LITERAL object into (classValue, styleValue,
+ * rest). The `class`/`style` keys are extracted so they can be fed into the
+ * existing multi-source class/style merge paths (Angular `[ngClass]`/`[ngStyle]`);
+ * `rest` is the object with those keys removed, ready for the `applyAttrs`
+ * effect. Returns null entries when a key is absent. T-14-11:
+ * `__proto__`/`constructor`/`prototype` keys are dropped from the literal
+ * entirely (mirrors the React/Solid/Vue/Svelte compile-time pollution guard).
+ *
+ * Operates on Angular HTML attribute names verbatim — no key remap is applied
+ * here (D-03 is React/Solid-only; Angular wants HTML names through).
+ */
+function splitClassStyleFromAngularLiteral(obj: t.ObjectExpression): {
+  classValue: t.Expression | null;
+  styleValue: t.Expression | null;
+  rest: t.ObjectExpression;
+} {
+  let classValue: t.Expression | null = null;
+  let styleValue: t.Expression | null = null;
+  const restProps: t.ObjectExpression['properties'] = [];
+  for (const prop of obj.properties) {
+    if (t.isObjectProperty(prop)) {
+      const keyName = staticSpreadPropKey(prop);
+      // T-14-11 — drop a pollution-vector literal key entirely.
+      if (keyName !== null && FORBIDDEN_SPREAD_KEYS.has(keyName)) continue;
+      if (keyName === 'class' && t.isExpression(prop.value)) {
+        classValue = prop.value;
+        continue;
+      }
+      if (keyName === 'style' && t.isExpression(prop.value)) {
+        styleValue = prop.value;
+        continue;
+      }
+    }
+    restProps.push(prop);
+  }
+  const rest = t.objectExpression(restProps);
+  return { classValue, styleValue, rest };
+}
+
+/**
+ * Extract a `class`/`style` value from an `r-bind` LITERAL so it can be folded
+ * into the element's `[ngClass]`/`[ngStyle]` merge. Returns null entries when
+ * the spread is not a literal (dynamic spreads / `$attrs` — keys unknowable;
+ * see KNOWN LIMITATION at the `emitSpreadBinding` call site).
+ */
+function extractLiteralClassStyleFromAngularSpread(
+  attr: Extract<AttributeBinding, { kind: 'spreadBinding' }>,
+): { classValue: t.Expression | null; styleValue: t.Expression | null } {
+  if (!t.isObjectExpression(attr.expression)) {
+    return { classValue: null, styleValue: null };
+  }
+  const { classValue, styleValue } = splitClassStyleFromAngularLiteral(
+    attr.expression,
+  );
+  return { classValue, styleValue };
+}
+
+/**
+ * Plan 14-05 / D-01 — the SHARED `__rozieApplyAttrs` private class-field IIFE
+ * diff helper. One per component (deduplicated via `ctx.scriptInjections`).
+ * Diffs `prevKeys` between renders so a key dropped from the object is removed
+ * from the DOM (T-14-10 stale-attribute prevention). `inject(Renderer2)` lives
+ * in the field initializer (a class-field initializer IS injection context —
+ * Phase 05 Pitfall 8 mitigation).
+ *
+ * `null` / `false` values trigger `removeAttribute`; everything else routes
+ * through `setAttribute(String(v))` — the same contract as the Lit
+ * `rozieSpread` directive (cross-target parity).
+ */
+const APPLY_ATTRS_FIELD_NAME = '__rozieApplyAttrs';
+
+function applyAttrsHelperDecl(): string {
+  return [
+    `private ${APPLY_ATTRS_FIELD_NAME} = (() => {`,
+    `  const renderer = inject(Renderer2);`,
+    `  let prevKeys: string[] = [];`,
+    `  return (el: HTMLElement, obj: Record<string, unknown>) => {`,
+    `    for (const k of prevKeys) {`,
+    `      if (!(k in obj)) renderer.removeAttribute(el, k);`,
+    `    }`,
+    `    for (const [k, v] of Object.entries(obj)) {`,
+    `      if (v === null || v === false) renderer.removeAttribute(el, k);`,
+    `      else renderer.setAttribute(el, k, String(v));`,
+    `    }`,
+    `    prevKeys = Object.keys(obj);`,
+    `  };`,
+    `})();`,
+  ].join('\n');
+}
+
+/**
+ * Plan 14-05 / D-01 — emit the per-element machinery for ONE `spreadBinding`:
+ *   - a `#rozieSpread_<N>` template-ref attribute (returned for splicing
+ *     onto the open tag),
+ *   - a `viewChild<ElementRef>('rozieSpread_<N>')` private field (pushed onto
+ *     `ctx.scriptInjections`),
+ *   - the SHARED `__rozieApplyAttrs` IIFE field (pushed once per component),
+ *   - a `private __rozieSpread_<N>_effect = effect(() => { ... });` field
+ *     initializer that guards `nativeElement` (Pitfall 7) and feeds the
+ *     rewritten expression into the diff helper.
+ *
+ * The diff helper is in a field initializer (injection context — Phase 05
+ * Pitfall 8). The `effect()` call also lives in a field initializer (the
+ * effect signal subscribes to reactive reads in its body — `inject` /
+ * `effect` must both be in injection context, which a field initializer IS).
+ *
+ * KNOWN LIMITATION (RESEARCH OQ1 / A4 / Option a) — for a DYNAMIC `r-bind`
+ * object the keys are NOT known at compile time, so a `class`/`style` key
+ * inside a dynamic spread CANNOT be extracted into the class/style merge
+ * path. `applyAttrs` sets all object keys imperatively, so a dynamic `class`
+ * inside the spread overwrites rather than merges with an explicit `class`/
+ * `[ngClass]` sibling. The R6 acceptance fixture uses a LITERAL `r-bind`,
+ * so the literal path is the mandatory one and is fully merge-correct.
+ */
+function emitSpreadBinding(
+  attr: Extract<AttributeBinding, { kind: 'spreadBinding' }>,
+  ctx: EmitAttrCtx,
+  /** When the element has an explicit class/style binding, the literal's
+   *  class/style is extracted upstream — emit only the `rest`. */
+  hasExplicitClassOrStyle: boolean,
+): string {
+  // Allocate a fresh ref name. Use the shared injection counter when present;
+  // otherwise start fresh (test path / standalone wrapper).
+  const counter = ctx.injectionCounter ?? { next: 0 };
+  const idx = counter.next++;
+  const refName = `rozieSpread_${idx}`;
+  const effectFieldName = `__rozieSpread_${idx}_effect`;
+
+  // Build the spread expression: when an explicit class/style sibling exists,
+  // drop class/style from the LITERAL object — the extracted values are fed
+  // into the Angular [ngClass]/[ngStyle] merge path by emitAttributes.
+  let exprNode: t.Expression;
+  if (
+    hasExplicitClassOrStyle &&
+    t.isObjectExpression(attr.expression)
+  ) {
+    const { rest } = splitClassStyleFromAngularLiteral(attr.expression);
+    exprNode = rest;
+  } else if (t.isObjectExpression(attr.expression)) {
+    // LITERAL spread without an explicit class/style sibling — apply the
+    // T-14-11 pollution guard, then re-attach scrubbed class/style so they
+    // flow through the spread (no merge target exists). Mirrors Vue/Svelte.
+    const { rest, classValue, styleValue } = splitClassStyleFromAngularLiteral(
+      attr.expression,
+    );
+    const restProps = [...rest.properties];
+    if (classValue !== null) {
+      restProps.push(t.objectProperty(t.identifier('class'), classValue));
+    }
+    if (styleValue !== null) {
+      restProps.push(t.objectProperty(t.identifier('style'), styleValue));
+    }
+    exprNode = t.objectExpression(restProps);
+  } else {
+    // DYNAMIC spread or bare `$attrs` Identifier — pass through.
+    exprNode = attr.expression;
+  }
+
+  // The spread expression is evaluated inside a CLASS-FIELD INITIALIZER's
+  // `effect()` body, NOT inside an Angular template binding. Pass
+  // `prefixThis: true` so `$data.X` lowers to `this.X()` (signal call on the
+  // class member), `$props.Y` to `this.Y()`, etc. — Angular templates have
+  // implicit-this resolution at the binding level, but a class-body
+  // initializer has no such implicit binding and tsc requires the explicit
+  // `this.` qualifier (TS2663). Mirrors the slot-invocation / class-body
+  // pattern in this file.
+  const exprText = rewriteTemplateExpression(exprNode, ctx.ir, {
+    collisionRenames: ctx.collisionRenames,
+    loopBindings: ctx.loopBindings,
+    prefixThis: true,
+  });
+
+  // Push the viewChild query for the spread target.
+  if (ctx.scriptInjections !== undefined) {
+    ctx.scriptInjections.push({
+      name: refName,
+      decl: `private ${refName} = viewChild<ElementRef>('${refName}');`,
+    });
+
+    // Push the shared applyAttrs IIFE — only once per component.
+    const helperAlreadyPushed = ctx.scriptInjections.some(
+      (si) => si.name === APPLY_ATTRS_FIELD_NAME,
+    );
+    if (!helperAlreadyPushed) {
+      ctx.scriptInjections.push({
+        name: APPLY_ATTRS_FIELD_NAME,
+        decl: applyAttrsHelperDecl(),
+      });
+    }
+
+    // Push the per-spread `effect()` field initializer. The guard
+    // (`viewChild()?.nativeElement` is undefined before first render) makes
+    // the effect a no-op until the element exists (Pitfall 7).
+    const effectDecl = [
+      `private ${effectFieldName} = effect(() => {`,
+      `  const el = this.${refName}()?.nativeElement;`,
+      `  if (!el) return;`,
+      `  this.${APPLY_ATTRS_FIELD_NAME}(el, ${exprText});`,
+      `});`,
+    ].join('\n');
+    ctx.scriptInjections.push({
+      name: effectFieldName,
+      decl: effectDecl,
+    });
+  }
+
+  // Signal to emitAngular that the new @angular/core imports are needed.
+  if (ctx.hasSpreadBinding !== undefined) {
+    ctx.hasSpreadBinding.value = true;
+  }
+
+  // The template attribute is the template-ref declaration `#rozieSpread_<N>`.
+  // AUTO-FALLTHROUGH TARGET (resolves CONTEXT.md A1 for Angular): the
+  // synthesized `$attrs` spreadBinding from Plan 14-02 lowers through the
+  // SAME effect()+Renderer2 path and lands on the template-root element
+  // (the `<button>` the author wrote), NOT the Angular host element. The
+  // host element receives consumer attributes natively via Angular's
+  // attribute forwarding, but cross-target parity requires fallthrough to
+  // land on the inner element.
+  return `#${refName}`;
+}
+
+/**
  * Emit a single attribute. Returns null when the attribute should be dropped
  * (e.g., r-html, which gets emitted later as `[innerHTML]="..."` by the
  * element emitter).
@@ -355,16 +618,17 @@ export function emitSingleAttr(
   ctx: EmitAttrCtx,
   elementTagName: string,
 ): string | null {
-  // Phase 14 R2 / D-07 / D-01 — the bare-spread `r-bind="<expr>"` form (and the
-  // synthesized `$attrs` auto-fallthrough spread). Angular has NO native
-  // attribute-object spread; D-01 / 14-RESEARCH Pattern 3 specifies an
-  // `effect()` + `Renderer2` imperative diff helper. That bespoke mechanism is
-  // Wave 3 (Plan 14-03) work — RESEARCH §Recommendation explicitly scopes
-  // "Angular + Lit bespoke mechanisms" to a later wave than the four
-  // near-native targets. Until then, skip the spread (emit nothing) so the IR
-  // can carry the synthesized `$attrs` spreadBinding without crashing the
-  // Angular emitter. KNOWN STUB — resolved by Plan 14-03.
-  if (attr.kind === 'spreadBinding') return null;
+  // Phase 14 R2 / D-07 / D-01 / Plan 14-05 — the bare-spread `r-bind="<expr>"`
+  // form (and the synthesized `$attrs` auto-fallthrough spread). Angular has
+  // NO native attribute-object spread; D-01 / 14-RESEARCH Pattern 3 specifies
+  // an `effect()` + `Renderer2` imperative diff helper. The shared
+  // `__rozieApplyAttrs` IIFE inlines per Phase 05 OQ A8/A9 (no
+  // `@rozie/runtime-angular` package); `effect()` lives in a field initializer
+  // and guards `viewChild()?.nativeElement` (Pitfall 7). See
+  // `emitSpreadBinding` for the full mechanism.
+  if (attr.kind === 'spreadBinding') {
+    return emitSpreadBinding(attr, ctx, /* hasExplicitClassOrStyle */ false);
+  }
 
   // r-html handled at the element level.
   if (attr.name === 'r-html') return null;
@@ -539,18 +803,62 @@ export function emitAttributes(
     counts.set(a.name, (counts.get(a.name) ?? 0) + 1);
   }
 
+  // Plan 14-05 R6 — does the element have an explicit `class`/`style` binding?
+  // When so, a `class`/`style` key inside an `r-bind` LITERAL must be folded
+  // into the [ngClass]/[ngStyle] merge path (not spread via applyAttrs, which
+  // would imperatively overwrite the explicit class/style on every effect run).
+  const hasExplicitClass = (counts.get('class') ?? 0) > 0;
+  const hasExplicitStyle = (counts.get('style') ?? 0) > 0;
+
+  // Plan 14-05 R6 — synthesise extra `class`/`style` AttributeBindings from any
+  // `r-bind` LITERAL that carries those keys, so the existing class/style merge
+  // path sees both the explicit binding(s) AND the literal's value as merge
+  // sources. Mirrors the Vue/Svelte 14-04 pattern; preserves positional
+  // last-wins (Pitfall 2) by adopting the spread's source position.
+  const literalClassBindings = new Map<AttributeBinding, AttributeBinding>();
+  const literalStyleBindings = new Map<AttributeBinding, AttributeBinding>();
+  for (const a of attrs) {
+    if (a.kind !== 'spreadBinding') continue;
+    const { classValue, styleValue } = extractLiteralClassStyleFromAngularSpread(a);
+    if (hasExplicitClass && classValue !== null) {
+      literalClassBindings.set(a, {
+        kind: 'binding',
+        name: 'class',
+        expression: classValue,
+        deps: [],
+        sourceLoc: a.sourceLoc,
+      });
+      counts.set('class', (counts.get('class') ?? 0) + 1);
+    }
+    if (hasExplicitStyle && styleValue !== null) {
+      literalStyleBindings.set(a, {
+        kind: 'binding',
+        name: 'style',
+        expression: styleValue,
+        deps: [],
+        sourceLoc: a.sourceLoc,
+      });
+      counts.set('style', (counts.get('style') ?? 0) + 1);
+    }
+  }
+
   const out: string[] = [];
   const consumed = new WeakSet<AttributeBinding>();
 
   for (const a of attrs) {
     if (consumed.has(a)) continue;
 
-    // Phase 14 — the name-less `spreadBinding` goes straight to `emitSingleAttr`
-    // (which skips it — Angular D-01 spread is Wave 3 / Plan 14-03), bypassing
-    // the class/style name-merge logic that would read its absent `.name`.
+    // Plan 14-05 — the name-less `spreadBinding` goes straight to
+    // `emitSingleAttr` (which lowers it via the effect()+Renderer2 mechanism),
+    // bypassing the class/style name-merge logic that would read its absent
+    // `.name`. When a sibling explicit class/style exists, the literal's
+    // class/style is folded into the merge below; `emitSpreadBinding` drops
+    // those keys from the spread's `rest` (so applyAttrs doesn't apply them).
     if (a.kind === 'spreadBinding') {
-      const rendered = emitSingleAttr(a, ctx, elementTagName);
-      if (rendered !== null) out.push(rendered);
+      const dropClass = literalClassBindings.has(a);
+      const dropStyle = literalStyleBindings.has(a);
+      const rendered = emitSpreadBinding(a, ctx, dropClass || dropStyle);
+      out.push(rendered);
       consumed.add(a);
       continue;
     }
@@ -558,11 +866,19 @@ export function emitAttributes(
     if (a.name === 'r-html') continue;
 
     // class= merge: multiple class attrs combine via Angular's [ngClass].
+    // Plan 14-05 R6 — includes synthetic bindings extracted from r-bind
+    // LITERAL spreads.
     if (a.name === 'class' && (counts.get('class') ?? 0) > 1) {
-      const sameName = attrs.filter(
-        (x) => x.kind !== 'spreadBinding' && x.name === 'class',
-      );
-      for (const x of sameName) consumed.add(x);
+      const sameName: AttributeBinding[] = [];
+      for (const src of attrs) {
+        if (src.kind === 'spreadBinding') {
+          const synthetic = literalClassBindings.get(src);
+          if (synthetic) sameName.push(synthetic);
+        } else if (src.name === 'class') {
+          sameName.push(src);
+          consumed.add(src);
+        }
+      }
       // Static classes stay as `class="..."`; dynamic merges to `[ngClass]`.
       const staticParts: string[] = [];
       const dynamicParts: string[] = [];
@@ -602,11 +918,19 @@ export function emitAttributes(
     }
 
     // style= merge similarly via [ngStyle].
+    // Plan 14-05 R6 — includes synthetic bindings extracted from r-bind
+    // LITERAL spreads.
     if (a.name === 'style' && (counts.get('style') ?? 0) > 1) {
-      const sameName = attrs.filter(
-        (x) => x.kind !== 'spreadBinding' && x.name === 'style',
-      );
-      for (const x of sameName) consumed.add(x);
+      const sameName: AttributeBinding[] = [];
+      for (const src of attrs) {
+        if (src.kind === 'spreadBinding') {
+          const synthetic = literalStyleBindings.get(src);
+          if (synthetic) sameName.push(synthetic);
+        } else if (src.name === 'style') {
+          sameName.push(src);
+          consumed.add(src);
+        }
+      }
       const staticParts: string[] = [];
       const dynamicParts: string[] = [];
       for (const x of sameName) {

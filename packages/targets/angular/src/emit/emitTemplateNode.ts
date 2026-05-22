@@ -87,6 +87,14 @@ export interface EmitNodeCtx {
    */
   hasDynamicSlotFiller?: { value: boolean };
   /**
+   * Plan 14-05 — when the template includes at least one `spreadBinding`
+   * (`r-bind="<expr>"` or synthesized `$attrs` fallthrough), set to
+   * `{ value: true }` so emitAngular adds `inject` / `Renderer2` /
+   * `ElementRef` / `effect` / `viewChild` to the `@angular/core` import line.
+   * Same pattern as `hasDynamicSlotFiller`.
+   */
+  hasSpreadBinding?: { value: boolean };
+  /**
    * Whether the template has produced at least one [(ngModel)] binding —
    * drives FormsModule conditional import in emitDecorator.
    */
@@ -326,6 +334,13 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
     // a template attr expression with a double-read accessor can synthesise a
     // single-read getter member (strictTemplates double-signal-call narrowing).
     scriptInjections: ctx.scriptInjections,
+    // Plan 14-05 — thread the shared injection counter (used by template-event
+    // debounce/throttle wrappers) so the `rozieSpread_<N>` ref/effect-field
+    // names never collide with same-component event wrappers.
+    injectionCounter: ctx.injectionCounter,
+    // Plan 14-05 — flag that emitAngular reads to add inject/Renderer2/
+    // ElementRef/effect/viewChild to the @angular/core import line.
+    hasSpreadBinding: ctx.hasSpreadBinding,
   }, node.tagName);
   const eventText = emitEvents(node.events, ctx);
   const rHtml = findRHtml(node.attributes);

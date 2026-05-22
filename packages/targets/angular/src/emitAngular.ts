@@ -223,6 +223,22 @@ export function emitAngular(
     imports.addCommon('NgTemplateOutlet');
   }
 
+  // Plan 14-05 / D-01 — when the template lowered at least one `spreadBinding`
+  // (`r-bind="<expr>"` or the synthesized `$attrs` auto-fallthrough), the
+  // emitted component needs `inject` (for the shared `__rozieApplyAttrs`
+  // IIFE's `Renderer2` injection), `Renderer2` (the safe imperative DOM API),
+  // `ElementRef` (the `viewChild<ElementRef>(...)` generic), `effect` (the
+  // signal-based per-spread reactive subscriber), and `viewChild` (the
+  // signal-based template-ref query). Same conditional-import pattern as
+  // `hasDynamicSlotFiller`.
+  if (tmplResult.hasSpreadBinding) {
+    imports.add('inject');
+    imports.add('Renderer2');
+    imports.add('ElementRef');
+    imports.add('effect');
+    imports.add('viewChild');
+  }
+
   // Portal-slot primitive (Spike 003) — append `<ng-container #rozie_portalAnchor>`
   // to the rendered template so the ViewContainerRef query has an anchor to
   // read. The portal closure synthesized in ngAfterViewInit reads from this

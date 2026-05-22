@@ -54,6 +54,14 @@ export interface EmitTemplateResult {
    */
   hasDynamicSlotFiller: boolean;
   /**
+   * Plan 14-05 — true when the template emitted at least one `spreadBinding`
+   * (`r-bind="<expr>"` or synthesized `$attrs` auto-fallthrough). emitAngular
+   * adds `inject`, `Renderer2`, `ElementRef`, `effect`, `viewChild` to the
+   * `@angular/core` import line based on this flag. Same plumbing pattern as
+   * `hasDynamicSlotFiller`.
+   */
+  hasSpreadBinding: boolean;
+  /**
    * Quick task 260520-w18 bug class 6(ii) — well-known JS global namespaces
    * (`Math`, `JSON`, …) referenced inside template expressions. Angular's
    * `strictTemplates` resolves bare template identifiers against the
@@ -106,6 +114,7 @@ export function emitTemplate(
   const scriptInjections: AngularScriptInjection[] = [];
   const hasNgModel = { value: false };
   const hasDynamicSlotFiller = { value: false };
+  const hasSpreadBinding = { value: false };
 
   if (ir.template === null) {
     return {
@@ -113,6 +122,7 @@ export function emitTemplate(
       scriptInjections,
       hasNgModel: false,
       hasDynamicSlotFiller: false,
+      hasSpreadBinding: false,
       usedGlobals: [],
       diagnostics,
     };
@@ -126,6 +136,7 @@ export function emitTemplate(
     injectionCounter: { next: 0 },
     hasNgModel,
     hasDynamicSlotFiller,
+    hasSpreadBinding,
     collisionRenames: opts.collisionRenames,
     loopBindings: new Set(),
     handlerArity: opts.handlerArity,
@@ -139,6 +150,7 @@ export function emitTemplate(
     scriptInjections,
     hasNgModel: hasNgModel.value,
     hasDynamicSlotFiller: hasDynamicSlotFiller.value,
+    hasSpreadBinding: hasSpreadBinding.value,
     usedGlobals: detectUsedGlobals(template),
     diagnostics,
   };
