@@ -1,0 +1,11 @@
+<rozie name="${NAME}">
+<template>
+  <div></div>
+</template>
+
+<script>
+</script>
+
+<style>
+</style>
+</rozie>

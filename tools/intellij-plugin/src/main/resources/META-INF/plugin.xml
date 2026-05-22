@@ -36,7 +36,8 @@
         a typo'd <code>r-*</code> directive or <code>.modifier</code> is
         flagged with a "did you mean" rename quick-fix. Structure view: a
         <code>.rozie</code> file's SFC blocks appear in the Structure tool
-        window for quick navigation.</p>
+        window for quick navigation. New-file action: "New &gt; Rozie
+        Component" scaffolds a <code>.rozie</code> single-file component.</p>
         <p><strong>0.2.0</strong> — Architectural pivot to injection-first model.
         HTML coloring inside &lt;template&gt; now matches the TextMate bundle.
         Smart navigation: $props.X / $data.X / $refs.X Go-to-Declaration.
@@ -90,6 +91,10 @@
         <lang.psiStructureViewFactory
             language="Rozie"
             implementationClass="js.rozie.intellij.structure.RozieStructureViewFactory"/>
+
+        <!-- 0.3.0: skeleton for the "New > Rozie Component" action. Content
+             lives in resources/fileTemplates/internal/Rozie Component.ft. -->
+        <internalFileTemplate name="Rozie Component"/>
 
         <!-- 0.3.0: Quick-Doc (Ctrl-Q) / hover documentation for Rozie template
              attributes — r-* directives, @event / r-on listeners, :prop
@@ -216,4 +221,13 @@
         <additionalTextAttributes scheme="Default" file="colorSchemes/RozieDefault.xml"/>
         <additionalTextAttributes scheme="Darcula" file="colorSchemes/RozieDarcula.xml"/>
     </extensions>
+
+    <actions>
+        <!-- 0.3.0: "New > Rozie Component" entry in the project-view New menu. -->
+        <action
+            id="js.rozie.NewRozieComponent"
+            class="js.rozie.intellij.actions.RozieCreateComponentAction">
+            <add-to-group group-id="NewGroup" anchor="first"/>
+        </action>
+    </actions>
 </idea-plugin>
