@@ -62,17 +62,13 @@ const EXAMPLES = [
   // against the same shared `PortalList.png` baseline — any per-target
   // rendering drift in the portal-mount path will fail the matcher.
   'PortalList',
-  // FullCalendar (added 2026-05-19) — real-third-party-engine portal-slot
-  // coverage. FullCalendarDemo fills a `<template #event>` that mounts
-  // through `$portals.event` into engine-owned event cells. Per D-10, all
-  // 6 targets diff against the same shared `FullCalendar.png` baseline —
-  // any per-target rendering drift in the real-engine portal-mount path
-  // will fail the matcher. Baseline must be Linux-rendered via the pinned
-  // Playwright Docker image per `feedback_vr_linux_baselines`; cells
-  // gate on baseline presence below (downgrade to fixme until the .png
-  // exists). Behavioral coverage is independently guaranteed by
-  // `full-calendar.spec.ts` runtime smoke (no screenshot dependency).
-  'FullCalendar',
+  // FullCalendar is deliberately NOT in this list (removed 2026-05-22). Like
+  // LeafletMap below, its render is non-deterministic: `FullCalendarDemo.rozie`
+  // anchors its calendar grid + seed events to `new Date()` ("today"), so a
+  // pixel baseline would change every day/month. A stable `FullCalendar.png`
+  // is therefore impossible — the baseline was never generated and the 6 cells
+  // sat permanently baseline-gated. FullCalendar keeps full behavioral coverage
+  // in `full-calendar.spec.ts` (structural assertions, no screenshot).
   // PortalListStyled (added 2026-05-20, quick-task 260520-8iu) — Spike 004
   // string-`:style` + `@portal` VR coverage. PortalListStyledDemo fills a
   // `<template #item>` whose rows carry an object-form `:style` (the swatch
