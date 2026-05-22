@@ -116,6 +116,14 @@ export interface EmitTemplateOpts {
      */
     styleMapUsed: boolean;
     /**
+     * Plan 14-05 / D-02 — true when at least one `spreadBinding` was lowered
+     * via the `${rozieSpread(<expr>)}` lit-html element-position directive.
+     * emitLit reads this off `EmitTemplateResult` and conditionally adds
+     * `import { rozieSpread } from '@rozie/runtime-lit';` to the shell imports
+     * block (mirrors the existing `styleMapUsed` / `repeatUsed` plumbing).
+     */
+    rozieSpreadUsed: boolean;
+    /**
      * True when at least one consumer-side property-fill (function-prop
      * scoped destructured or portal fill) was emitted onto a producer
      * component's open tag. Triggers a single `ref()` directive per parent
@@ -172,6 +180,13 @@ export interface EmitTemplateResult {
    * `repeatUsed` → `{ repeat }`).
    */
   styleMapUsed: boolean;
+  /**
+   * Plan 14-05 / D-02 — true when at least one `spreadBinding` was lowered
+   * via the `${rozieSpread(<expr>)}` element-position directive. emitLit
+   * conditionally wires `import { rozieSpread } from '@rozie/runtime-lit';`
+   * based on this flag (same plumbing as `styleMapUsed`/`repeatUsed`).
+   */
+  rozieSpreadUsed: boolean;
   /**
    * True when at least one consumer-side property-fill was emitted onto a
    * producer component's open tag. emitLit conditionally wires
@@ -303,17 +318,47 @@ function emitAttribute(
     return `${attr.name}="${attr.value}"`;
   }
 
-  // Phase 14 R2 / D-07 / D-02 — the bare-spread `r-bind="<expr>"` form (and the
-  // synthesized `$attrs` auto-fallthrough spread). Lit has no native
-  // attribute-object spread; D-02 / 14-RESEARCH Pattern 4 specifies a
+  // Phase 14 R2 / D-07 / D-02 / Plan 14-05 — the bare-spread `r-bind="<expr>"`
+  // form (and the synthesized `$attrs` auto-fallthrough spread). Lit has no
+  // native attribute-object spread; D-02 / 14-RESEARCH Pattern 4 specifies the
   // lit-html element-position `rozieSpread` directive shipped from
-  // `@rozie/runtime-lit`. That bespoke mechanism is Wave 3 (Plan 14-03) work —
-  // RESEARCH §Recommendation explicitly scopes "Angular + Lit bespoke
-  // mechanisms" to a later wave than the four near-native targets. Until then,
-  // skip the spread (emit nothing) so the IR can carry the synthesized
-  // `$attrs` spreadBinding without crashing the Lit emitter. KNOWN STUB —
-  // resolved by Plan 14-03.
-  if (attr.kind === 'spreadBinding') return '';
+  // `@rozie/runtime-lit`. Emit `${rozieSpread(<expr>)}` in element position;
+  // the directive does cross-render diffing (removes keys dropped between
+  // renders; null/false → removeAttribute). The `_state.rozieSpreadUsed` flag
+  // tells the emitLit shell to add the `import { rozieSpread } …` line
+  // (mirrors the `styleMapUsed`/`repeatUsed` plumbing).
+  //
+  // No key normalization is applied (D-03 is React/Solid-only). HTML attribute
+  // names flow through verbatim.
+  //
+  // AUTO-FALLTHROUGH TARGET (resolves CONTEXT.md A1 for Lit): the synthesized
+  // `$attrs` `spreadBinding` from Plan 14-02 lands on the template-root element
+  // INSIDE the component's shadow tree (the `<button>` the author wrote),
+  // NEVER the host custom element. The emitter places the directive on the
+  // inner element it sees in the author's template; the host element receives
+  // consumer attributes natively via lit-element's reflection layer.
+  //
+  // R6 LITERAL class/style merge: when a literal `r-bind` object carries
+  // `class`/`style` AND the element has an explicit `class`/`:class`/
+  // `style`/`:style` sibling, the literal's class/style is folded into Lit's
+  // existing class/style attribute path; only the remaining keys flow through
+  // `rozieSpread`. The current emit path delegates that R6 fold to the
+  // upstream `emitAttributes`-equivalent walk site; here we always emit the
+  // full spread (the R6 R6 acceptance fixture's rest is the entire object on
+  // the no-sibling path). DYNAMIC objects: see KNOWN LIMITATION below.
+  //
+  // KNOWN LIMITATION (RESEARCH OQ1 / A4 / Option a) — for a DYNAMIC `r-bind`
+  // object the keys are NOT known at compile time, so a `class`/`style` key
+  // inside a dynamic spread CANNOT be extracted into the class/style merge
+  // path. lit-html's own `rozieSpread` last-applied-wins applies (a later
+  // `rozieSpread` overrides an earlier `class={…}` for the same key). The R6
+  // acceptance fixture uses a LITERAL `r-bind`, so the literal path is the
+  // mandatory, fully-merge-correct one.
+  if (attr.kind === 'spreadBinding') {
+    const expr = rewriteTemplateExpression(attr.expression, ir);
+    if (opts?._state) opts._state.rozieSpreadUsed = true;
+    return `\${rozieSpread(${expr})}`;
+  }
 
   // Phase 07.3 Plan 09 — consumer-side `r-model:propName=` two-way binding.
   // Producer side (`createLitControllableProperty` + dispatchEvent of
@@ -1471,6 +1516,7 @@ export function emitTemplate(
   const state = {
     repeatUsed: false,
     styleMapUsed: false,
+    rozieSpreadUsed: false,
     refUsed: false,
     debouncedFieldDecls: [] as string[],
     debounceCleanupWiring: [] as string[],
@@ -1495,6 +1541,7 @@ export function emitTemplate(
       hostListenerWiring,
       repeatUsed: state.repeatUsed,
       styleMapUsed: state.styleMapUsed,
+      rozieSpreadUsed: state.rozieSpreadUsed,
       refUsed: state.refUsed,
       debouncedFieldDecls: state.debouncedFieldDecls,
       slotFillerClassFields: state.slotFillerClassFields,
@@ -1515,6 +1562,7 @@ export function emitTemplate(
     hostListenerWiring,
     repeatUsed: state.repeatUsed,
     styleMapUsed: state.styleMapUsed,
+    rozieSpreadUsed: state.rozieSpreadUsed,
     refUsed: state.refUsed,
     debouncedFieldDecls: state.debouncedFieldDecls,
     slotFillerClassFields: state.slotFillerClassFields,

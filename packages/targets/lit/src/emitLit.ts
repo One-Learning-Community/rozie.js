@@ -138,6 +138,14 @@ export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResu
   });
   diagnostics.push(...templateResult.diagnostics);
 
+  // Plan 14-05 / D-02 — register the `rozieSpread` directive import from
+  // `@rozie/runtime-lit` when emitTemplate lowered at least one `spreadBinding`
+  // via `${rozieSpread(<expr>)}`. The runtimeImports collector renders the
+  // single import line; mirrors the styleMap/repeat conditional pattern.
+  if (templateResult.rozieSpreadUsed) {
+    runtimeImports.add('rozieSpread');
+  }
+
   // 6. Compose class body.
   // Insertion order:
   //   - static styles field

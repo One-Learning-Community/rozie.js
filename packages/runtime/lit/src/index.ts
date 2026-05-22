@@ -11,6 +11,7 @@ export {
   type LitControllableProperty,
 } from './createLitControllableProperty.js';
 export { observeRozieSlotCtx } from './observeRozieSlotCtx.js';
+export { rozieSpread } from './rozieSpread.js';
 export { attachOutsideClickListener } from './attachOutsideClickListener.js';
 export { injectGlobalStyles } from './injectGlobalStyles.js';
 export { adoptConsumerStyles } from './adoptConsumerStyles.js';

@@ -126,7 +126,14 @@ export type RuntimeLitImport =
   | 'injectGlobalStyles'
   | 'adoptConsumerStyles'
   | 'debounce'
-  | 'throttle';
+  | 'throttle'
+  /**
+   * Plan 14-05 / D-02 — `rozieSpread` lit-html element-position directive,
+   * shipped from `@rozie/runtime-lit`. Added by emitLit conditionally when
+   * `EmitTemplateResult.rozieSpreadUsed` is true (i.e., at least one
+   * `r-bind`/`$attrs` `spreadBinding` was lowered to `${rozieSpread(...)}`).
+   */
+  | 'rozieSpread';
 
 export class RuntimeLitImportCollector {
   private symbols = new Set<RuntimeLitImport>();

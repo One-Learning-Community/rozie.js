@@ -22,14 +22,25 @@ import { kebabize, resolveLitSetterText } from './resolveLitSetterText.js';
 /**
  * Test-wrapper context for emitTemplateAttribute. The real emit path
  * (emitTemplate.ts:emitAttribute) threads a richer `_state` channel so it
- * can mark `styleMapUsed` for the import wiring; the standalone wrapper
- * exposes a minimal version of the same signal so unit tests can observe
- * whether a given attribute would trigger the styleMap import.
+ * can mark `styleMapUsed` / `rozieSpreadUsed` for the import wiring; the
+ * standalone wrapper exposes a minimal version of the same signals so unit
+ * tests can observe whether a given attribute would trigger the styleMap
+ * import or the `rozieSpread` (Plan 14-05) directive import.
  *
- * Quick-task 260518-e2t (Spike 004 Lit subset).
+ * Quick-task 260518-e2t (Spike 004 Lit subset); Plan 14-05 adds
+ * `rozieSpreadUsed` for the D-02 directive (14-RESEARCH Pattern 4).
  */
 export interface EmitTemplateAttributeState {
   styleMapUsed: boolean;
+  /**
+   * Plan 14-05 / D-02 — set true whenever a `spreadBinding` is emitted via
+   * `${rozieSpread(<expr>)}`. The emitLit shell reads this off the
+   * `EmitTemplateResult` and conditionally adds
+   * `import { rozieSpread } from '@rozie/runtime-lit';` to the shell imports
+   * block, mirroring the existing `styleMapUsed` → `lit/directives/style-map.js`
+   * plumbing.
+   */
+  rozieSpreadUsed: boolean;
 }
 
 const BOOLEAN_ATTRS = new Set([
@@ -55,15 +66,29 @@ export function emitTemplateAttribute(
   if (attr.kind === 'static') {
     return `${attr.name}="${attr.value}"`;
   }
-  // Phase 14 R2 / D-07 / D-02 — the bare-spread `r-bind="<expr>"` form (and the
-  // synthesized `$attrs` auto-fallthrough spread). Lit has no native
-  // attribute-object spread; D-02 specifies a lit-html element-position
-  // `rozieSpread` directive (14-RESEARCH Pattern 4) shipped from
-  // `@rozie/runtime-lit`. That bespoke mechanism is Wave 3 (Plan 14-03) work.
-  // Until then, skip the spread (emit nothing) so the IR can carry the
-  // synthesized `$attrs` spreadBinding without crashing the Lit emitter.
-  // KNOWN STUB — resolved by Plan 14-03.
-  if (attr.kind === 'spreadBinding') return '';
+  // Phase 14 R2 / D-07 / D-02 / Plan 14-05 — the bare-spread `r-bind="<expr>"`
+  // form (and the synthesized `$attrs` auto-fallthrough spread). Lit has no
+  // native attribute-object spread; D-02 / 14-RESEARCH Pattern 4 specifies a
+  // lit-html element-position `rozieSpread` directive shipped from
+  // `@rozie/runtime-lit`. Emit `${rozieSpread(<expr>)}` in element position;
+  // the directive does cross-render diffing (removes keys dropped between
+  // renders, null/false → removeAttribute). The `_state.rozieSpreadUsed` flag
+  // tells the emitLit shell to add the `import { rozieSpread } …` line.
+  //
+  // No key normalization is applied (D-03 is React/Solid-only). HTML attribute
+  // names flow through verbatim.
+  //
+  // AUTO-FALLTHROUGH TARGET (resolves CONTEXT.md A1 for Lit): the synthesized
+  // `$attrs` `spreadBinding` from Plan 14-02 lands on the template-root element
+  // INSIDE the component's shadow tree (the `<button>` the author wrote),
+  // NEVER the host custom element. The emitter places the directive on the
+  // inner element it sees in the author's template; the host element receives
+  // consumer attributes natively via lit-element's reflection layer.
+  if (attr.kind === 'spreadBinding') {
+    const expr = rewriteTemplateExpression(attr.expression, ir);
+    if (state) state.rozieSpreadUsed = true;
+    return `\${rozieSpread(${expr})}`;
+  }
   // Phase 07.3 Plan 07.3-08 (TWO-WAY-03) — consumer-side `r-model:propName=`
   // two-way binding. Producer side (createLitControllableProperty +
   // dispatchEvent('<kebab(propName)>-change', { detail })) is already locked
