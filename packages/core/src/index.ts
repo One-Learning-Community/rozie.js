@@ -61,6 +61,10 @@ export type {
   SlotFillerDecl,
   ParamDecl,
   LifecycleHook,
+  // Phase 12 (WR-02) — `WatchHook` appears on `IRComponent.watchers` (an
+  // exported type) but was never itself re-exported; a plugin author
+  // type-annotating that field had to reach the internal `ir/types.js` path.
+  WatchHook,
   Listener,
   ListenerTarget,
   SetupBody,
@@ -68,8 +72,15 @@ export type {
   TemplateNode as IRTemplateNode,
   TemplateElementIR,
   AttributeBinding,
+  // Phase 12 (WR-02) — the resolved r-model modifier shape carried on the
+  // `modifiers` field of an exported `AttributeBinding`; a third-party plugin
+  // inspecting that field needs this type from the public barrel.
+  ResolvedModelModifier,
   TemplateConditionalIR,
   TemplateLoopIR,
+  // Phase 12 (WR-02) — `TemplateMatchIR` is a member of the exported
+  // `TemplateNode` union but was never itself re-exported.
+  TemplateMatchIR,
   TemplateSlotInvocationIR,
   TemplateFragmentIR,
   TemplateInterpolationIR,
