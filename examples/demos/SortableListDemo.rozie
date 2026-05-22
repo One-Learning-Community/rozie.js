@@ -72,7 +72,7 @@ $onMount(() => reset());
 
   <div class="grid">
     <section class="list-pane">
-      <SortableList r-model:items="$data.items" itemKey="id" handle=".grip" :disabled="$data.disabled">
+      <SortableList r-model:items="$data.items" itemKey="id" :handle="$classSelector('grip')" :disabled="$data.disabled">
         <template #default="{ item }">
           <div class="row">
             <span class="grip" aria-label="Drag handle">⋮⋮</span>
