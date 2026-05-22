@@ -279,6 +279,19 @@ export const RozieErrorCode = {
   // discard. `.lazy` is exempt — `change` is already the checkbox/radio
   // commit event, so `.lazy` is a genuine no-op there, not a dropped intent.
   RMODEL_MODIFIER_NOT_APPLICABLE: 'ROZ964', // warning — value-transform modifier on a checkbox/radio r-model
+
+  // ---- Phase 13 $classSelector — ROZ965..ROZ967 ----
+  // The `$classSelector('<class>')` compile-time helper lowers a class name to
+  // a CSS selector matching the class as it actually renders (literal `.grip`
+  // on five targets, runtime `"." + styles.grip` on React). Three validation
+  // rules guard the argument; all three are hard errors detected by the
+  // IR-level `validateClassSelector` validator (collected-not-thrown), wired
+  // into `lowerToIR` so they fire for both `compile()` and `@rozie/unplugin`.
+  // `ROZ964` is the verified current highest (Phase 12 RMODEL fix) — these do
+  // NOT collide.
+  CLASS_SELECTOR_ARG_NOT_LITERAL: 'ROZ965', // error — R3: $classSelector argument is not a string literal
+  CLASS_SELECTOR_UNKNOWN_CLASS: 'ROZ966',   // error — R4: class not declared in the component's <style> scope; did-you-mean hint
+  CLASS_SELECTOR_INVALID_TOKEN: 'ROZ967',   // error — R5: multi-token / dotted / combinator / `#` argument (fails the bare-class-token regex)
 } as const;
 
 export type RozieErrorCode = (typeof RozieErrorCode)[keyof typeof RozieErrorCode];

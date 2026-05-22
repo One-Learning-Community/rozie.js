@@ -70,6 +70,14 @@ const STABLE_IDENTIFIERS = new Set([
   // `$state.snapshot(x)` on Svelte, `x` on the other five targets). It's not
   // itself a reactive binding — the dep tracking happens on the argument.
   '$snapshot',
+  // `$classSelector` is a target-rewritten passthrough — `$classSelector('x')`
+  // lowers to a compile-time literal `'.x'` on five targets and to a runtime
+  // `"." + styles.x` expression on React. Like `$snapshot`, it is not itself a
+  // reactive binding; without this entry the React dep collector treats a
+  // `$classSelector` call inside a `<listeners>` / `$computed` body as a free
+  // closure identifier and emits `[$classSelector]` into a `useEffect` /
+  // `useMemo` dep array → runtime `ReferenceError`.
+  '$classSelector',
   'undefined',
   'null',
   'NaN',
