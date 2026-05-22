@@ -143,6 +143,22 @@ describe('useOutsideClick (Plan 04-04 Task 1 / MOD-04)', () => {
     expect(cb).toHaveBeenCalledTimes(1);
   });
 
+  // Quick task 260521-qsh — close the `if (!target) return` null-target branch.
+  it('Test 8 — null event target: the handler short-circuits without firing', () => {
+    const cb = vi.fn();
+    const outer = { current: null as HTMLDivElement | null };
+    const a = { current: null as HTMLDivElement | null };
+    render(<Harness callback={cb} outerOut={outer} innerARefOut={a} />);
+
+    // A real browser never produces a click with a null target, but the
+    // defensive guard exists — drive it by forcing `target` to null on a
+    // capture-phase click dispatched at the document.
+    const evt = new MouseEvent('click', { bubbles: true });
+    Object.defineProperty(evt, 'target', { value: null, configurable: true });
+    document.dispatchEvent(evt);
+    expect(cb).not.toHaveBeenCalled();
+  });
+
   it('stale-closure defense: when prop changes, latest closure runs (D-61)', () => {
     let captured = 0;
     const outer = { current: null as HTMLDivElement | null };

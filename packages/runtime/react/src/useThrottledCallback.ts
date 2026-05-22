@@ -53,6 +53,9 @@ export function useThrottledCallback<F extends (...args: never[]) => void>(
         trailingTimerRef.current = setTimeout(() => {
           lastCallRef.current = Date.now();
           trailingTimerRef.current = null;
+          /* v8 ignore next -- defensive: `trailingArgsRef.current` is always
+             assigned on the line that precedes scheduling this trailing timer,
+             so the null arm is unreachable when the timer fires. */
           if (trailingArgsRef.current !== null) {
             const callArgs = trailingArgsRef.current;
             trailingArgsRef.current = null;

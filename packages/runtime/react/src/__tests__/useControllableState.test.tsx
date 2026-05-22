@@ -77,6 +77,42 @@ describe('useControllableState (Plan 04-04 Task 1 / D-56)', () => {
     expect(String(warnSpy.mock.calls[0]![0])).toContain('[ROZ550]');
   });
 
+  // Quick task 260521-qsh — close the controlled→uncontrolled flip branch
+  // (the opposite direction of Test 3): covers the `? 'controlled'` true-arm
+  // and the `: 'uncontrolled'` false-arm of the ROZ550 warn message.
+  it('Test 3b — parent-flip controlled→uncontrolled: ROZ550 warn fires once, follows uncontrolled value', () => {
+    const setter = { current: null as ((n: number | ((p: number) => number)) => void) | null };
+    const valueOut = { current: null as number | null };
+    const { rerender } = render(
+      <Harness value={10} defaultValue={5} setterOut={setter} valueOut={valueOut} />,
+    );
+    expect(valueOut.current).toBe(10);
+    expect(warnSpy).not.toHaveBeenCalled();
+
+    // Rerender WITHOUT `value` — controlled → uncontrolled.
+    rerender(<Harness defaultValue={5} setterOut={setter} valueOut={valueOut} />);
+    // Now follows the uncontrolled value (the defaultValue-seeded local state).
+    expect(valueOut.current).toBe(5);
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(String(warnSpy.mock.calls[0]![0])).toContain('[ROZ550]');
+    expect(String(warnSpy.mock.calls[0]![0])).toContain(
+      'from controlled to uncontrolled',
+    );
+  });
+
+  // Quick task 260521-qsh — exercise the `onValueChange?.(...)` absent-callback
+  // optional-chaining arm: an uncontrolled setValue with NO onValueChange prop.
+  it('Test 2b — uncontrolled with no onValueChange: setValue updates state without throwing', () => {
+    const setter = { current: null as ((n: number | ((p: number) => number)) => void) | null };
+    const valueOut = { current: null as number | null };
+    render(<Harness defaultValue={1} setterOut={setter} valueOut={valueOut} />);
+    expect(valueOut.current).toBe(1);
+    act(() => {
+      setter.current!(2);
+    });
+    expect(valueOut.current).toBe(2);
+  });
+
   it('Test 4a — functional updater (uncontrolled): setValue(prev => prev + 1) increments local', () => {
     const setter = { current: null as ((n: number | ((p: number) => number)) => void) | null };
     const valueOut = { current: null as number | null };

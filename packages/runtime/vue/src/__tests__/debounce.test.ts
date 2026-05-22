@@ -61,4 +61,30 @@ describe('debounce — D-41 helper contract', () => {
     // A9: calling debounce() outside a setup context must not throw.
     expect(() => debounce(() => {}, 100)).not.toThrow();
   });
+
+  // Quick task 260521-qsh — close the onBeforeUnmount `if (timer)` FALSE arm:
+  // unmount a component whose debounce has no pending timer.
+  it('Test 7: unmount with no pending timer — onBeforeUnmount falsy-timer arm', () => {
+    vi.useFakeTimers();
+    try {
+      const fn = vi.fn();
+
+      const Comp = defineComponent({
+        setup() {
+          // Created inside setup but never invoked — no timer is ever set.
+          debounce(fn, 100);
+          return () => h('div');
+        },
+      });
+
+      const wrapper = mount(Comp);
+      // Unmount with no pending timer — onBeforeUnmount runs, `timer` is
+      // undefined, so the clearTimeout is skipped (the falsy arm).
+      expect(() => wrapper.unmount()).not.toThrow();
+      vi.advanceTimersByTime(500);
+      expect(fn).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
