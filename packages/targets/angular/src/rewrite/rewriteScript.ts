@@ -209,6 +209,7 @@ function buildAngularSetterCall(
     return t.callExpression(setterCallee, [rhs]);
   }
   const binOp = COMPOUND_OP_MAP[operator];
+  /* v8 ignore next 3 -- defensive: COMPOUND_OP_MAP covers every compound operator @babel/parser produces */
   if (!binOp) {
     return t.callExpression(setterCallee, [rhs]);
   }
@@ -666,6 +667,7 @@ export function rewriteRozieIdentifiers(
       const prop = left.property;
       if (!t.isIdentifier(obj)) return;
       if (left.computed) return;
+      /* v8 ignore next -- defensive: a non-computed MemberExpression LHS always has an Identifier property */
       if (!t.isIdentifier(prop)) return;
 
       if (obj.name === '$data') {
@@ -684,14 +686,18 @@ export function rewriteRozieIdentifiers(
     },
 
     MemberExpression(path) {
-      // WR-02 (Phase 9) — skip member expressions in TS type position
-      // (`let x: typeof $data.foo`). Without this the `$data.foo` rewrite
-      // would mangle a `typeof`-query inside a type annotation.
+      // WR-02 (Phase 9) — skip member expressions in TS type position.
+      // Defensive: `typeof X.Y` parses its entity name as a TSQualifiedName,
+      // not a MemberExpression, so a MemberExpression node in genuine type
+      // position does not arise from current TS syntax — the guard mirrors the
+      // Identifier visitor's and is kept for safety.
+      /* v8 ignore next -- defensive: MemberExpression nodes do not occur in TS type position */
       if (isInTypePosition(path)) return;
       const obj = path.node.object;
       if (!t.isIdentifier(obj)) return;
       if (path.node.computed) return;
       const prop = path.node.property;
+      /* v8 ignore next -- defensive: a non-computed MemberExpression always has an Identifier property */
       if (!t.isIdentifier(prop)) return;
 
       if (obj.name === '$props') {
@@ -782,6 +788,7 @@ export function rewriteRozieIdentifiers(
       if (!t.isIdentifier(obj)) return;
       if (path.node.computed) return;
       const prop = path.node.property;
+      /* v8 ignore next -- defensive: a non-computed OptionalMemberExpression always has an Identifier property */
       if (!t.isIdentifier(prop)) return;
 
       if (obj.name === '$props') {
@@ -903,6 +910,7 @@ export function rewriteRozieIdentifiers(
       // accessor).
       if (name === '$el') {
         const parentPath = path.parentPath;
+        /* v8 ignore next -- defensive: a traversed Identifier always has a parentPath */
         if (!parentPath) return;
         if (parentPath.isVariableDeclarator() && parentPath.node.id === path.node) return;
         if (

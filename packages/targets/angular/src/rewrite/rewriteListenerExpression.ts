@@ -142,6 +142,7 @@ export function rewriteListenerExpression(
       if (!t.isIdentifier(obj)) return;
       if (path.node.computed) return;
       const prop = path.node.property;
+      /* v8 ignore next -- defensive: a non-computed MemberExpression always has an Identifier property */
       if (!t.isIdentifier(prop)) return;
 
       if (obj.name === '$props') {
@@ -197,6 +198,7 @@ export function rewriteListenerExpression(
       if (!t.isIdentifier(obj)) return;
       if (path.node.computed) return;
       const prop = path.node.property;
+      /* v8 ignore next -- defensive: a non-computed OptionalMemberExpression always has an Identifier property */
       if (!t.isIdentifier(prop)) return;
 
       if (obj.name === '$props') {
@@ -341,7 +343,10 @@ export function rewriteListenerExpression(
   });
 
   const stmt = wrapper.program.body[0]!;
-  const rewrittenExpr = !t.isExpressionStatement(stmt) ? cloned : stmt.expression;
+  const rewrittenExpr = !t.isExpressionStatement(stmt)
+    ? /* v8 ignore next -- defensive: the wrapper is built from a single ExpressionStatement */
+      cloned
+    : stmt.expression;
   const raw = generate(rewrittenExpr, GEN_OPTS).code;
   return flattenInlineCode(raw);
 }
