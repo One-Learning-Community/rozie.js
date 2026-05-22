@@ -71,6 +71,18 @@ const FIXTURES_DIR = resolve(HERE, '../fixtures');
 // rewrite hooks (rewriteScript.ts + rewriteTemplateExpression.ts) lower the
 // helper byte-identically across all four entrypoints. Single-file; no
 // sibling .rozie producers.
+// Phase 14 — EXAMPLES extended 16 → 20 with the four attribute-fallthrough
+// proving fixtures: ThemedButton (D-05/D-06 auto-fallthrough + CSS-custom-
+// property style merge), ThemedButtonManual (R5 `inherit-attrs="false"`
+// opt-out + manual `r-bind="$attrs"`), ThemedButtonConsumer (the consumer
+// dogfood — multi-rozie, references both ThemedButton wrappers via
+// <components>), and RBindProbe (R11d literal `r-bind` class-merge +
+// reordered-source-order probe; single-file). ThemedButtonConsumer is
+// added to EXAMPLES_NEEDING_RESOLVER_ROOT so the <components> import
+// resolves at compile time. Registering all four here makes the bootstrap
+// compile() them across all six targets — the dist-parity proof that
+// `spreadBinding` (the new D-07 IR variant) lowers byte-identically across
+// all four entrypoints and all six targets.
 const EXAMPLES = [
   'Counter',
   'SearchInput',
@@ -88,9 +100,19 @@ const EXAMPLES = [
   'RModelLazy',
   'RModelNumberTrim',
   'ClassSelectorProbe',
+  // Phase 14 attribute-fallthrough proving fixtures.
+  'ThemedButton',
+  'ThemedButtonManual',
+  'ThemedButtonConsumer',
+  'RBindProbe',
 ];
 
-const EXAMPLES_NEEDING_RESOLVER_ROOT = new Set(['ModalConsumer', 'WrapperModal']);
+const EXAMPLES_NEEDING_RESOLVER_ROOT = new Set([
+  'ModalConsumer',
+  'WrapperModal',
+  // Phase 14 — references ThemedButton + ThemedButtonManual via <components>.
+  'ThemedButtonConsumer',
+]);
 // Phase 06.4 P3 (D-LIT-22): TARGETS extended with 'lit' — additive only.
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'];
 

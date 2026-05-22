@@ -1,0 +1,69 @@
+<!--
+  ThemedButtonConsumer.rozie — Phase 14 dist-parity consumer dogfood
+  for the ThemedButton + ThemedButtonManual sibling pair.
+
+  The consumer forwards consumer-passed attributes (`id`, `aria-*`,
+  `data-*`, `type`, `disabled`, plus an extra `class` and a `style="--btn-bg: …"`
+  CSS-custom-property override) onto the wrappers. ThemedButton uses
+  auto-fallthrough (default `inherit-attrs`); ThemedButtonManual uses the
+  `inherit-attrs="false"` opt-out + manual `r-bind="$attrs"`. The consumer
+  exercises:
+
+    - SPEC R4: auto-fallthrough lands consumer attrs on the wrapper's root
+      <button> (ThemedButton).
+    - SPEC R5: manual `r-bind="$attrs"` lands the same set explicitly with
+      no ROZ971 (ThemedButtonManual).
+    - SPEC R6 class-always-merge: consumer's `class="extra-variant"` merges
+      with the wrapper's `btn` + `:class="$props.variant"`.
+    - D-06 style-always-merge via CSS custom properties: consumer's
+      `style="--btn-bg: …"` shallow-merges with the wrapper's `:style` object.
+
+  Multi-rozie fixture: references the two producers via <components>;
+  registered in EXAMPLES_NEEDING_RESOLVER_ROOT in bootstrap-fixtures.mjs.
+-->
+
+<rozie name="ThemedButtonConsumer">
+
+<components>
+{
+  ThemedButton: './ThemedButton.rozie',
+  ThemedButtonManual: './ThemedButtonManual.rozie',
+}
+</components>
+
+<template>
+<div class="themed-button-consumer">
+  <ThemedButton
+    id="auto-btn"
+    type="button"
+    aria-label="Auto-fallthrough button"
+    data-testid="auto-themed-button"
+    class="extra-variant"
+    style="--btn-bg: #ef4444"
+    :label="'Auto'"
+  />
+
+  <ThemedButtonManual
+    id="manual-btn"
+    type="button"
+    aria-label="Manual fallthrough button"
+    data-testid="manual-themed-button"
+    class="extra-variant"
+    style="--btn-bg: #10b981"
+    :label="'Manual'"
+  />
+</div>
+</template>
+
+<style>
+.themed-button-consumer {
+  display: inline-flex;
+  gap: 0.75rem;
+  padding: 0.5rem;
+}
+.extra-variant {
+  font-weight: 600;
+}
+</style>
+
+</rozie>

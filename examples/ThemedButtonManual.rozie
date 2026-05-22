@@ -1,0 +1,57 @@
+<!--
+  ThemedButtonManual.rozie — Phase 14 sibling variant of ThemedButton with
+  manual `r-bind="$attrs"` placement and `<rozie inherit-attrs="false">`
+  opt-out.
+
+  Demonstrates SPEC R5: with `inherit-attrs="false"`, the compiler does NOT
+  synthesize an auto-fallthrough spread; the author owns where the consumer-
+  passed attributes land via an explicit `r-bind="$attrs"` directive. Because
+  fallthrough is opt-out, NO ROZ971 (`ATTR_DOUBLE_APPLY`) warning is emitted —
+  the validator emits ROZ971 only when both auto-fallthrough AND a manual
+  `r-bind="$attrs"` would apply on the same element.
+
+  Single root, single-file. Mirrors ThemedButton's shape so the consumer can
+  pair them under one consumer fixture (ThemedButtonConsumer.rozie) and
+  exercise both fallthrough modes.
+-->
+
+<rozie name="ThemedButtonManual" inherit-attrs="false">
+
+<props>
+{
+  label:   { type: String,  default: 'Click me' },
+  variant: { type: String,  default: 'primary' },
+}
+</props>
+
+<template>
+<button
+  class="btn"
+  :class="$props.variant"
+  :style="{ '--btn-bg': '#3b82f6', '--btn-fg': '#ffffff' }"
+  r-bind="$attrs"
+>
+  {{ $props.label }}
+</button>
+</template>
+
+<style>
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 0.25rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: var(--btn-bg, #3b82f6);
+  color: var(--btn-fg, #ffffff);
+  font: inherit;
+  cursor: pointer;
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+</style>
+
+</rozie>

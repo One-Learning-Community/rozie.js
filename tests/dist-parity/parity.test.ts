@@ -88,6 +88,14 @@ const FIXTURES_DIR = resolve(HERE, 'fixtures');
 // identical plain CSS across all 4 entrypoints and 6 targets with zero
 // preprocessor leakage. Single-file example (no sibling .rozie).
 // 13 × 6 × 4 = 312 cells (+ React .d.ts/.module.css sidecars).
+// Phase 14 attribute-fallthrough — extended 13 → 17 with the four
+// proving fixtures: ThemedButton (D-05/D-06 auto-fallthrough dogfood),
+// ThemedButtonManual (R5 `inherit-attrs="false"` + manual `r-bind="$attrs"`),
+// ThemedButtonConsumer (the consumer dogfood — multi-rozie, references the
+// two ThemedButton variants via <components>; registered in
+// EXAMPLE_SIBLING_ROZIE below), and RBindProbe (R11d literal `r-bind`
+// class-merge + reordered probe; single-file). 17 × 6 × 4 = 408 cells
+// (+ React .d.ts/.module.css sidecars).
 const EXAMPLES = [
   'Counter',
   'SearchInput',
@@ -102,6 +110,10 @@ const EXAMPLES = [
   'PortalListStyled',
   'PortalListStyledScss',
   'BadgeGridStyledScss',
+  'ThemedButton',
+  'ThemedButtonManual',
+  'ThemedButtonConsumer',
+  'RBindProbe',
 ] as const;
 
 // Phase 07.2 Plan 06 — siblings ModalConsumer reaches via `<components>`.
@@ -112,6 +124,10 @@ const EXAMPLES = [
 const EXAMPLE_SIBLING_ROZIE: Record<string, string[]> = {
   ModalConsumer: ['Modal.rozie', 'WrapperModal.rozie', 'Counter.rozie'],
   WrapperModal: ['Modal.rozie', 'Counter.rozie'],
+  // Phase 14 — ThemedButtonConsumer references both ThemedButton wrappers
+  // via `<components>`; the babel-plugin Leg 3 needs both siblings staged
+  // in tmpDir so the producer resolver can find them.
+  ThemedButtonConsumer: ['ThemedButton.rozie', 'ThemedButtonManual.rozie'],
 };
 // Phase 06.4 P3 (D-LIT-22): TARGETS extended with 'lit' — additive only.
 // 8 examples × 1 target × 3 entrypoints excl. babel-plugin sidecar parity
@@ -332,7 +348,7 @@ describe('DIST-05 strict-bytes parity gate — consumer-side 96-cell subset (Pha
   });
 });
 
-describe('DIST-05 strict-bytes parity gate (D-93) — 13 examples × 6 targets × 4 entrypoints = 312 cells', () => {
+describe('DIST-05 strict-bytes parity gate (D-93) — 17 examples × 6 targets × 4 entrypoints = 408 cells', () => {
   describe.each(EXAMPLES)('%s', (name) => {
     const rozieSourcePath = resolve(ROOT, `examples/${name}.rozie`);
     const rozieSource = readFileSync(rozieSourcePath, 'utf8');

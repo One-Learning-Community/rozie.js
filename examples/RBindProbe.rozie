@@ -1,0 +1,46 @@
+<!--
+  RBindProbe.rozie — Phase 14 dist-parity literal `r-bind` probe (R11d).
+
+  Single-file (no sibling .rozie producers). Mirrors ClassSelectorProbe's
+  shape: a minimal, single-concern probe whose committed per-target output
+  is the byte-locked proof that the literal `r-bind` lowering path is
+  cross-target-equivalent across all 6 targets × 4 entrypoints.
+
+  Exercises:
+    - SPEC R6 class-always-merge for a LITERAL `r-bind` object: an explicit
+      `:class="'a'"` + an `r-bind="{ class: 'b', id: 'x' }"` on the SAME
+      element produces a merged class containing both 'a' and 'b' (positional
+      last-wins does NOT apply to class/style — both render).
+    - Reordered variant: `r-bind` BEFORE `:class` proves source-order
+      last-wins for `id` while `class` continues to always-merge regardless
+      of order.
+    - D-03 compile-time literal key-normalization branch on React/Solid:
+      a LITERAL `r-bind` object has its keys remapped at compile time
+      (`class` → `className` for React).
+
+  Two elements: one canonical (`:class` before `r-bind`), one reordered
+  (`r-bind` before `:class`). `inherit-attrs="false"` keeps synthesis off
+  so the probe's roots stay deterministic (multi-root + auto-fallthrough
+  would emit ROZ970; we don't want fallthrough — only literal r-bind).
+-->
+
+<rozie name="RBindProbe" inherit-attrs="false">
+
+<template>
+<div class="rbind-probe">
+  <span :class="'a'" r-bind="{ class: 'b', id: 'x' }">canonical</span>
+  <span r-bind="{ class: 'b', id: 'y' }" :class="'a'">reordered</span>
+</div>
+</template>
+
+<style>
+.rbind-probe {
+  display: inline-flex;
+  gap: 0.5rem;
+  padding: 0.25rem;
+}
+.a { color: #1f2937; }
+.b { font-weight: 700; }
+</style>
+
+</rozie>
