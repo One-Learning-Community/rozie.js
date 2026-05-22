@@ -217,3 +217,148 @@ describe('Rozie TextMate grammar — <style lang="scss"> routing', () => {
     expect(includes.indexOf('#block-style-scss')).toBeLessThan(includes.indexOf('#block-style'));
   });
 });
+
+describe('Rozie TextMate grammar — directives & r-model modifier chains', () => {
+  // RModelMatch.rozie exercises every construct the grammar gained in v0.2.0:
+  // the r-match / r-case / r-default switch-style directives (Phase 11),
+  // r-model modifier chains (Phase 12), and the $portals magic identifier.
+  const FIXTURE = 'RModelMatch.rozie';
+
+  it('scopes r-match / r-case / r-default as r-* directives', () => {
+    const tokens = tokenizeAll(readFileSync(join(FIXTURES_DIR, FIXTURE), 'utf8'));
+
+    for (const directive of ['r-match', 'r-case', 'r-default']) {
+      const tok = tokens.find(
+        (t) =>
+          t.text === directive &&
+          t.scopes.some((s) => s.includes('entity.other.attribute-name.directive.rozie')),
+      );
+      expect(tok, `expected ${directive} to carry the directive scope`).toBeDefined();
+    }
+  });
+
+  it('scopes the r-model modifier chain (.trim / .lazy / .number)', () => {
+    const tokens = tokenizeAll(readFileSync(join(FIXTURES_DIR, FIXTURE), 'utf8'));
+
+    // The modifier segments must land inside meta.modifier-chain.rozie — the
+    // capture-group scope #directive-attribute now shares with #event-binding.
+    const chainTokens = tokens.filter((t) =>
+      t.scopes.some((s) => s.includes('meta.modifier-chain.rozie')),
+    );
+    expect(
+      chainTokens.length,
+      'expected modifier-chain-scoped tokens on r-model',
+    ).toBeGreaterThan(0);
+
+    // Each modifier name must carry support.function.modifier.rozie — the same
+    // scope event-modifier names get, so themes colour them identically.
+    for (const modifier of ['trim', 'lazy', 'number']) {
+      const tok = tokens.find(
+        (t) =>
+          t.text === modifier &&
+          t.scopes.some((s) => s.includes('support.function.modifier.rozie')),
+      );
+      expect(
+        tok,
+        `expected the .${modifier} modifier to carry support.function.modifier.rozie`,
+      ).toBeDefined();
+    }
+  });
+
+  it('keeps the r-model:propName argument scope alongside a modifier', () => {
+    const tokens = tokenizeAll(readFileSync(join(FIXTURES_DIR, FIXTURE), 'utf8'));
+
+    // r-model:amount.number — the `:amount` argument must still tokenize as a
+    // directive argument even when a `.number` modifier chain follows it.
+    const arg = tokens.find(
+      (t) =>
+        t.text === 'amount' &&
+        t.scopes.some((s) =>
+          s.includes('entity.other.attribute-name.directive-argument.rozie'),
+        ),
+    );
+    expect(arg, 'expected the r-model:amount argument to keep its argument scope').toBeDefined();
+  });
+
+  it('scopes $portals as a magic identifier', () => {
+    const tokens = tokenizeAll(readFileSync(join(FIXTURES_DIR, FIXTURE), 'utf8'));
+
+    const tok = tokens.find(
+      (t) => t.text === '$portals' && t.scopes.some((s) => s.includes('variable.language.rozie')),
+    );
+    expect(tok, 'expected $portals to carry the magic-identifier scope').toBeDefined();
+  });
+});
+
+describe('Rozie TextMate grammar — <script lang="ts"> routing', () => {
+  // #block-script-ts is listed FIRST in the grammar's top-level patterns with
+  // a lang="ts" lookahead, so a `<script lang="ts">` opener routes its body to
+  // the `source.ts` embedded grammar (contentName meta.embedded.block.script.ts.rozie)
+  // while a plain `<script>` falls through to #block-script (source.js).
+
+  it('routes <script lang="ts"> block body to the source.ts embedded scope', () => {
+    const source = readFileSync(join(FIXTURES_DIR, 'CounterTS.rozie'), 'utf8');
+    const tokens = tokenizeAll(source);
+
+    const tsBodyTokens = tokens.filter((t) =>
+      t.scopes.some((s) => s.includes('meta.embedded.block.script.ts.rozie')),
+    );
+    expect(
+      tsBodyTokens.length,
+      'expected tokens inside the <script lang="ts"> body',
+    ).toBeGreaterThan(0);
+
+    // Every ts-body token carries `source.ts` — the contentName the
+    // #block-script-ts rule applies, and the scope VS Code's embeddedLanguages
+    // map keys TypeScript editor features off.
+    const tsScoped = tsBodyTokens.filter((t) =>
+      t.scopes.some((s) => s.split(' ').includes('source.ts')),
+    );
+    expect(
+      tsScoped.length,
+      'expected source.ts-scoped tokens inside <script lang="ts">',
+    ).toBeGreaterThan(0);
+
+    // And it must NOT also carry the plain-JS embedded scope — proving the
+    // lang="ts" opener won over the generic #block-script rule.
+    const jsLeak = tsBodyTokens.filter((t) =>
+      t.scopes.some((s) => s.includes('meta.embedded.block.script.rozie source.js')),
+    );
+    expect(jsLeak, '<script lang="ts"> body must not pick up the source.js scope').toEqual([]);
+  });
+
+  it('keeps a plain <script> block body on source.js (no ts over-match)', () => {
+    // Counter.rozie has a plain `<script>` (no lang). The #block-script-ts
+    // lookahead requires lang="ts", so a plain opener must fall through.
+    const source = readFileSync(join(FIXTURES_DIR, 'Counter.rozie'), 'utf8');
+    const tokens = tokenizeAll(source);
+
+    const jsBodyTokens = tokens.filter((t) =>
+      t.scopes.some((s) => s.includes('meta.embedded.block.script.rozie')),
+    );
+    expect(
+      jsBodyTokens.length,
+      'expected tokens inside the plain <script> body',
+    ).toBeGreaterThan(0);
+
+    const tsOverMatch = jsBodyTokens.filter((t) =>
+      t.scopes.some((s) => s.includes('meta.embedded.block.script.ts.rozie')),
+    );
+    expect(tsOverMatch, 'plain <script> body must not pick up the .ts embedded scope').toEqual([]);
+  });
+
+  it('the two block-script rules emit distinct embedded scope names', () => {
+    // Sanity guard on the grammar contract: routing only works if the ts block
+    // and the plain block use different `contentName`s, and #block-script-ts is
+    // ordered first for first-match-wins.
+    const grammarJson = JSON.parse(readFileSync(ROZIE_GRAMMAR_PATH, 'utf8'));
+    const repo = grammarJson.repository;
+
+    expect(repo['block-script-ts'].contentName).toContain('source.ts');
+    expect(repo['block-script'].contentName).toContain('source.js');
+    expect(repo['block-script'].contentName).not.toContain('source.ts');
+
+    const includes: string[] = grammarJson.patterns.map((p: { include?: string }) => p.include);
+    expect(includes.indexOf('#block-script-ts')).toBeLessThan(includes.indexOf('#block-script'));
+  });
+});

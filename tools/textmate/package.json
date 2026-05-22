@@ -2,7 +2,7 @@
   "name": "rozie-textmate",
   "displayName": "Rozie",
   "description": "Syntax highlighting for .rozie Single-File Component files",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "onelearningcommunity",
   "license": "MIT",
   "repository": {
@@ -53,6 +53,7 @@
           "meta.embedded.block.script.rozie": "javascript",
           "meta.embedded.block.script.ts.rozie": "typescript",
           "meta.embedded.block.style.rozie": "css",
+          "meta.embedded.block.style.scss.rozie": "scss",
           "meta.embedded.expression.rozie": "javascript"
         }
       }

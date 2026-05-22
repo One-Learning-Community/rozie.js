@@ -1,0 +1,48 @@
+<!--
+  RModelMatch.rozie
+
+  Grammar fixture — exercises the constructs the TextMate grammar gained in
+  v0.2.0. Tokenized by tests/textmate/grammar-routing.test.ts; this file is
+  a syntax fixture, not a compile target.
+
+    - r-model modifier chains          r-model.trim.lazy, r-model.number
+    - r-model:propName + modifier      r-model:amount.number
+    - r-match / r-case / r-default     switch-style conditionals (Phase 11)
+    - comma-alternative r-case         r-case="'loading', 'pending'"
+    - the $portals magic identifier
+-->
+
+<rozie name="RModelMatch">
+
+<props>
+{
+  amount: { type: Number, default: 0, model: true },
+}
+</props>
+
+<data>
+{
+  query: '',
+  status: 'idle',
+}
+</data>
+
+<script>
+const teardownTooltip = $portals.tooltip(document.body, {})
+</script>
+
+<template>
+<div class="rmm">
+  <input r-model.trim.lazy="$data.query" placeholder="Search" />
+  <input r-model.number="$props.amount" type="number" />
+  <input r-model:amount.number="$props.amount" />
+
+  <div r-match="$data.status" class="status">
+    <span r-case="'idle'">Waiting</span>
+    <span r-case="'loading', 'pending'">Working</span>
+    <span r-default>Done</span>
+  </div>
+</div>
+</template>
+
+</rozie>
