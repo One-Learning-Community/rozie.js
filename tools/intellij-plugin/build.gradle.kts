@@ -99,7 +99,9 @@ intellijPlatform {
             <code>r-*</code> directive, a modifier, or a <code>${'$'}</code>-magic
             identifier now shows inline docs. Inspection: a typo'd
             <code>r-*</code> directive or <code>.modifier</code> is flagged
-            with a "did you mean" rename quick-fix.</p>
+            with a "did you mean" rename quick-fix. Structure view: a
+            <code>.rozie</code> file's SFC blocks appear in the Structure
+            tool window for quick navigation.</p>
             <p><strong>0.2.0</strong> — Architectural pivot to injection-first model.
             HTML coloring inside &lt;template&gt; now matches the TextMate bundle.
             Smart navigation: ${'$'}props.X / ${'$'}data.X / ${'$'}refs.X Go-to-Declaration.
