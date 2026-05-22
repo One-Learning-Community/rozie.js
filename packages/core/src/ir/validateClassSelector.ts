@@ -66,25 +66,71 @@ const CLASS_SELECTOR_CALLEE = '$classSelector';
 /** A single bare CSS class identifier — no `.`, `#`, whitespace, or combinator. */
 const VALID_CLASS_TOKEN = /^[A-Za-z_-][A-Za-z0-9_-]*$/;
 
-/** Class-token extractor over a raw postcss selector string. */
+/** Class-token extractor over a sanitized postcss selector string. */
 const CLASS_TOKEN_IN_SELECTOR = /\.([A-Za-z_-][A-Za-z0-9_-]*)/g;
 
 /**
- * Extract the set of class names declared in the component's `<style>` scope.
+ * Strip the parts of a raw postcss selector that can contain a literal `.`
+ * which is NOT a class-token delimiter:
  *
- * `ir.styles.scopedRules` is `unknown[]` of `StyleRule`; each rule's `selector`
- * is the RAW postcss selector text verbatim — there is no pre-extracted class
- * list, so class tokens are pulled out with a regex. D-06: an even-empty
- * `.foo {}` rule IS in `scopedRules`, so a marker class declared with an empty
+ *   - attribute selectors `[href$=".pdf"]`           → removed wholesale
+ *   - bare quoted strings  (e.g. inside `:is()` args) → removed wholesale
+ *
+ * Without this, `CLASS_TOKEN_IN_SELECTOR` would match the `.pdf` substring
+ * inside `a[href$=".pdf"]` and register a phantom `pdf` "class", letting
+ * `$classSelector('pdf')` falsely pass R4 (WR-03). Removing these regions
+ * before the class regex runs keeps only genuine `.class` tokens.
+ */
+function stripNonClassDots(selector: string): string {
+  return selector
+    // Attribute selectors `[...]` — drop the whole bracketed region.
+    .replace(/\[[^\]]*\]/g, ' ')
+    // Any remaining quoted string literal (single or double).
+    .replace(/"[^"]*"/g, ' ')
+    .replace(/'[^']*'/g, ' ');
+}
+
+/** Pull genuine `.class` tokens out of a single (sanitized) selector string. */
+function collectClassTokens(selector: unknown, out: Set<string>): void {
+  if (typeof selector !== 'string') return;
+  for (const m of stripNonClassDots(selector).matchAll(CLASS_TOKEN_IN_SELECTOR)) {
+    if (m[1]) out.add(m[1]);
+  }
+}
+
+/**
+ * Extract the set of class names declared anywhere in the component's
+ * `<style>` block.
+ *
+ * Each `StyleRule.selector` is the RAW postcss selector text verbatim — there
+ * is no pre-extracted class list, so class tokens are pulled out with a regex
+ * (after `stripNonClassDots` removes attribute-selector / string regions that
+ * would otherwise yield phantom tokens — WR-03). D-06: an even-empty
+ * `.foo {}` rule IS in the rule list, so a marker class declared with an empty
  * body still registers here.
+ *
+ * R4's intent is "the class has a CSS rule in this component" — so all three
+ * rule buckets count (WR-02): `scopedRules`, `rootRules` (`:root {}`
+ * escape-hatch blocks), and `portalRules` (`@portal NAME {}` blocks, whose
+ * inner selectors live on each rule's `children`).
  */
 function declaredScopedClasses(styles: StyleSection): Set<string> {
   const out = new Set<string>();
   for (const rule of styles.scopedRules as Array<{ selector?: unknown }>) {
-    const selector = rule?.selector;
-    if (typeof selector !== 'string') continue;
-    for (const m of selector.matchAll(CLASS_TOKEN_IN_SELECTOR)) {
-      if (m[1]) out.add(m[1]);
+    collectClassTokens(rule?.selector, out);
+  }
+  for (const rule of styles.rootRules as Array<{ selector?: unknown }>) {
+    collectClassTokens(rule?.selector, out);
+  }
+  // `@portal NAME { ... }` blocks: the block's own `selector` is the
+  // `@portal` at-rule text — the real class tokens live on `children[].selector`.
+  for (const rule of styles.portalRules as Array<{
+    selector?: unknown;
+    children?: Array<{ selector?: unknown }>;
+  }>) {
+    collectClassTokens(rule?.selector, out);
+    if (Array.isArray(rule?.children)) {
+      for (const child of rule.children) collectClassTokens(child?.selector, out);
     }
   }
   return out;
