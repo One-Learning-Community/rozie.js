@@ -151,48 +151,31 @@ function renderTsType(ann: PropTypeAnnotation): string {
 }
 
 /**
- * True iff `ann` is a builtin identifier type whose `renderDefault` fallback
- * yields a real zero-value (Number→0, String→'', Boolean→false, Array→[],
- * Object→{}, Function→null). For these, the field can keep the
- * `name: type = <zero>;` initializer form. For a custom identifier type (a
- * `<script lang="ts">` alias / interface) there is NO synthesizable zero —
- * `renderDefault` falls through to its `'undefined'` tail — so a default-less
- * field of that type must use the definite-assignment `name!: Type;` form.
- */
-function isBuiltinWithZeroValue(ann: PropTypeAnnotation): boolean {
-  if (ann.kind !== 'identifier') return false;
-  switch (ann.name) {
-    case 'Number':
-    case 'String':
-    case 'Boolean':
-    case 'Array':
-    case 'Object':
-    case 'Function':
-      return true;
-    default:
-      return false;
-  }
-}
-
-/**
  * Render a class-field declaration suffix for a prop.
  *
- *   - When a real default is synthesizable (an author `default:` expression,
- *     or a builtin type with a zero-value) → `: <tsType> = <default>`.
- *   - When NO default is synthesizable (a required custom-typed prop with no
- *     author `default:`) → `!: <tsType>` (definite-assignment, no initializer).
- *     `<tsType> = undefined` would be a tsc error since `undefined` is not
- *     assignable to a custom type. This is the same `!`-shape Rozie already
- *     emits for Angular `@Input` and Lit `@query` ref fields.
+ * 260521-oao — optionality is driven by `prop.required`, NOT by whether a
+ * builtin zero-value default can be fabricated:
+ *
+ *   - prop carries a `default:` (`prop.defaultValue != null`) → keep the
+ *     `: <tsType> = <default>` initializer form (UNCHANGED).
+ *   - no `default:`, `prop.required === true` → `!: <tsType>`
+ *     (definite-assignment; the consumer MUST set the attribute/property).
+ *     Applies to BOTH builtin and custom-typed props — the fabricated builtin
+ *     zero-value default is no longer emitted for required props.
+ *   - no `default:`, `prop.required !== true` → `?: <tsType>` (optional; the
+ *     field may legitimately be `undefined`). Applies to BOTH builtin and
+ *     custom-typed props — the fabricated builtin `= ''`/`= 0`/`= false`
+ *     default is no longer emitted for optional no-default props.
+ *
+ * The `!`-shape matches what Rozie already emits for Angular `@Input` and Lit
+ * `@query` ref fields.
  */
 function renderFieldSuffix(prop: PropDecl): string {
   const tsType = renderTsType(prop.typeAnnotation);
-  const hasSynthesizableDefault =
-    prop.defaultValue != null || isBuiltinWithZeroValue(prop.typeAnnotation);
-  if (hasSynthesizableDefault) {
+  if (prop.defaultValue != null) {
     return `: ${tsType} = ${renderDefault(prop.defaultValue, prop.typeAnnotation)}`;
   }
-  return `!: ${tsType}`;
+  return prop.required ? `!: ${tsType}` : `?: ${tsType}`;
 }
 
 function isPrimitiveType(ann: PropTypeAnnotation): boolean {

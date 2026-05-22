@@ -733,9 +733,16 @@ export function emitScript(
     }
     if (defaultVal) {
       fieldLines.push(`${p.name} = ${fnName}<${tsType}>(${defaultVal});`);
-    } else {
-      // No default — `input.required<T>()` for non-model, `model.required<T>()` for model
+    } else if (p.required) {
+      // 260521-oao — `p.required` is the SOLE optionality determinant. A
+      // `required: true` no-default prop emits `input.required<T>()` /
+      // `model.required<T>()` (consumer MUST pass it).
       fieldLines.push(`${p.name} = ${fnName}.required<${tsType}>();`);
+    } else {
+      // 260521-oao — a plain no-default prop is OPTIONAL: emit `input<T>()` /
+      // `model<T>()` (the initializerless signal is `T | undefined`). Angular
+      // no longer treats no-default as required — `required` does that.
+      fieldLines.push(`${p.name} = ${fnName}<${tsType}>();`);
     }
   }
 
