@@ -178,23 +178,30 @@ async function settleExample(
   //
   // SortableList: the SortableList wrapper renders one `.rozie-sortable-item`
   // per item; SortableListDemo seeds 5 items in `$onMount` via reset() — wait
-  // for exactly 5. `.rozie-sortable-item` is a wrapper-authored class, stable
-  // across all 6 targets.
+  // for exactly 5. The `[class*=...]` substring locator survives React's
+  // CSS-Modules class hashing: the wrapper styles `.rozie-sortable-item` in
+  // its `<style>` block, so the React target emits it as `_rozie-sortable-
+  // item_xxxx_NN` (original class preserved as a substring per Vite/PostCSS-
+  // Modules' localIdentName default). Same rationale as the Table branch below.
   if (example === 'SortableList') {
-    await expect(page.locator('.rozie-sortable-item')).toHaveCount(5);
+    await expect(page.locator('[class*="rozie-sortable-item"]')).toHaveCount(5);
   }
   // Flatpickr: the Flatpickr wrapper renders `<input class="rozie-flatpickr">`;
   // the flatpickr engine attaches to it on `$onMount`. Wait for the input to
   // be visible — its presence proves the wrapper template painted and the
-  // engine had a host element to attach to.
+  // engine had a host element to attach to. The `[class*=...]` substring
+  // locator survives React's CSS-Modules class hashing — same rationale as
+  // the Table branch below.
   if (example === 'Flatpickr') {
-    await expect(page.locator('.rozie-flatpickr')).toBeVisible();
+    await expect(page.locator('[class*="rozie-flatpickr"]').first()).toBeVisible();
   }
   // Uppy: the Uppy wrapper renders `<label class="rozie-uppy-picker">`; the
   // Uppy core engine wires its file-input to it on `$onMount`. Wait for the
-  // picker label to be visible.
+  // picker label to be visible. The `[class*=...]` substring locator survives
+  // React's CSS-Modules class hashing — same rationale as the Table branch
+  // below.
   if (example === 'Uppy') {
-    await expect(page.locator('.rozie-uppy-picker')).toBeVisible();
+    await expect(page.locator('[class*="rozie-uppy-picker"]').first()).toBeVisible();
   }
   // TipTap: the TipTap wrapper mounts a ProseMirror editor into a host div;
   // ProseMirror adds the `.ProseMirror` class to its contenteditable root once
@@ -269,18 +276,26 @@ async function settleExample(
 // runtime render — it was not the JIT-crash cause. See the writeup at
 // .planning/todos/pending/untyped-script-emits-type-broken-output.md.)
 //
-// REMAINING (8 cells):
+// RESOLVED (2026-05-22, vr-uppy-matrix-red follow-up) — SortableList·react,
+// Flatpickr·react and Uppy·react were NEVER a pixel divergence. The earlier
+// "STABLE CROSS-TARGET PIXEL DIVERGENCE" note here was wrong: those cells
+// never reached the screenshot matcher at all. `settleExample` waited on a
+// LITERAL-class locator (`.rozie-sortable-item` / `.rozie-flatpickr` /
+// `.rozie-uppy-picker`); each wrapper styles that class in its `<style>`
+// block, so the React target emits it CSS-Modules-hashed (`_rozie-..._xxxx`)
+// and the literal locator found nothing → 5s settle timeout → the cell was
+// gated as "divergent". Fixed by switching those three settle locators to the
+// `[class*=...]` substring form (the pattern the Table branch already used).
+// All three React cells now render and match the shared baseline within the
+// 2px tolerance — un-gated. This was a test-harness bug, not an emitter bug.
+//
+// REMAINING (5 cells):
 //   - TipTap·react / ·svelte / ·lit / ·solid / ·angular: NOT a structural emit
 //     bug — the ProseMirror editor is captured in a different STATE
 //     (toolbar-active button + bound-HTML content) than the Vue baseline.
 //     TipTap·angular joins this group post-fix: it now renders, but shares the
 //     same capture-time editor-state non-determinism as its siblings. Closing
 //     these needs a settleExample / state-determinism follow-up.
-//   - STABLE CROSS-TARGET PIXEL DIVERGENCE: SortableList·react, Flatpickr·react,
-//     Uppy·react render with a small but STABLE per-target pixel difference
-//     from the shared baseline (React CSS-Modules class hashing + Chromium
-//     text-node-boundary kerning). Not settle-timing — they stabilize
-//     immediately; they simply do not match the baseline byte-for-byte.
 const KNOWN_CROSS_TARGET_DIVERGENCE = new Set<string>([
   // editor-state divergence (capture-time ProseMirror state, not an emit bug)
   'TipTap::react',
@@ -288,10 +303,6 @@ const KNOWN_CROSS_TARGET_DIVERGENCE = new Set<string>([
   'TipTap::lit',
   'TipTap::solid',
   'TipTap::angular',
-  // stable cross-target pixel divergence (React CSS-Modules hashing + kerning)
-  'SortableList::react',
-  'Flatpickr::react',
-  'Uppy::react',
 ]);
 
 for (const example of EXAMPLES) {
