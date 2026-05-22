@@ -192,6 +192,18 @@ function rewriteScopedParamRefsInNode(
         for (const c of b.body) rewriteScopedParamRefsInNode(c, ctxField, params);
       }
       return;
+    case 'TemplateMatch':
+      // Phase 11 r-match — see the sibling case in
+      // `rewriteScopedParamRefsInNodeToScope` for the rationale.
+      node.discriminant = rewriteExpr(node.discriminant, ctxField, params);
+      for (const b of node.branches) {
+        if (b.test) b.test = rewriteExpr(b.test, ctxField, params);
+        for (const c of b.body) rewriteScopedParamRefsInNode(c, ctxField, params);
+      }
+      if (node.hostElement) {
+        rewriteScopedParamRefsInNode(node.hostElement, ctxField, params);
+      }
+      return;
     case 'TemplateLoop':
       node.iterableExpression = rewriteExpr(node.iterableExpression, ctxField, params);
       if (node.keyExpression) node.keyExpression = rewriteExpr(node.keyExpression, ctxField, params);
@@ -335,6 +347,25 @@ function rewriteScopedParamRefsInNodeToScope(
       for (const b of node.branches) {
         if (b.test) b.test = rewriteExprToScope(b.test, params);
         for (const c of b.body) rewriteScopedParamRefsInNodeToScope(c, params);
+      }
+      return;
+    case 'TemplateMatch':
+      // Phase 11 r-match — structurally parallels TemplateConditional but
+      // also carries a `discriminant` (emitted only in `hoist` mode; in
+      // `inline` mode it is already folded into each branch `test`). Rewrite
+      // the discriminant, every branch test + body, and the optional
+      // `<div r-match>` host element so scope-param refs inside an
+      // r-match-bodied slot filler reach `scope.<name>`. Without this case
+      // the branch bodies keep bare param identifiers (`column`, `value`)
+      // and throw ReferenceError at runtime — the whole component fails to
+      // render. The switch has no `default`, so a missing case is silent.
+      node.discriminant = rewriteExprToScope(node.discriminant, params);
+      for (const b of node.branches) {
+        if (b.test) b.test = rewriteExprToScope(b.test, params);
+        for (const c of b.body) rewriteScopedParamRefsInNodeToScope(c, params);
+      }
+      if (node.hostElement) {
+        rewriteScopedParamRefsInNodeToScope(node.hostElement, params);
       }
       return;
     case 'TemplateLoop':
