@@ -30,6 +30,7 @@ import {
   hasShadowingBinding,
   isInBindingPosition,
 } from './scopeAwareSkip.js';
+import { lowerClassSelectorCall } from './lowerClassSelectorCall.js';
 
 // CJS interop normalization.
 type GenerateFn = typeof import('@babel/generator').default;
@@ -515,6 +516,16 @@ export function rewriteScript(
           const arg = args[0]!;
           if (t.isExpression(arg)) path.replaceWith(arg);
         }
+        return;
+      }
+
+      // $classSelector('grip') → ".grip" — Lit keeps authored class names
+      // literal in the emitted DOM (style isolation via [data-rozie-s-<hash>]),
+      // so the compile-time literal is correct. Shared with
+      // rewriteTemplateExpression.ts via lowerClassSelectorCall so the two
+      // hooks cannot drift (Pitfall 4).
+      if (callee.name === '$classSelector') {
+        lowerClassSelectorCall(path);
         return;
       }
 

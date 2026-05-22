@@ -18,6 +18,7 @@ import _generate from '@babel/generator';
 import _traverse from '@babel/traverse';
 import type { GeneratorOptions } from '@babel/generator';
 import type { IRComponent } from '../../../../core/src/ir/types.js';
+import { lowerClassSelectorCall } from './lowerClassSelectorCall.js';
 
 type GenerateFn = typeof import('@babel/generator').default;
 const generate: GenerateFn =
@@ -280,6 +281,16 @@ export function rewriteTemplateExpression(
     CallExpression(path) {
       const callee = path.node.callee;
       if (!t.isIdentifier(callee)) return;
+
+      // $classSelector('panel') → ".panel" — same lowering as the <script> path
+      // (rewriteScript.ts); both hooks call the SAME shared helper so they
+      // cannot drift (Pitfall 4). Handled BEFORE the $emit-only early-return so
+      // a :attr-position $classSelector is rewritten.
+      if (callee.name === '$classSelector') {
+        lowerClassSelectorCall(path);
+        return;
+      }
+
       if (callee.name !== '$emit') return;
       const args = path.node.arguments;
       if (args.length === 0) return;
