@@ -33,12 +33,30 @@ import type {
   IRComponent,
   AttributeBinding,
 } from '../../../../core/src/ir/types.js';
+import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
+import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
 import type { ModifierRegistry } from '@rozie/core';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
 
 export interface EmitAttrCtx {
   ir: IRComponent;
   registry: ModifierRegistry;
+  /**
+   * WR-03 (12-REVIEW) — the host element's tag name (`input`/`select`/
+   * `textarea`/…). Optional so existing call sites (and the unit-test
+   * harness) stay source-compatible. The custom-modifier `r-model`
+   * hand-emit path needs it to distinguish `<input>` (where the
+   * `$event.target.value` committed-value form is correct) from
+   * `<select>`/`<textarea>` (where it cannot — e.g. `<select multiple>`'s
+   * value is an array, not `$event.target.value`).
+   */
+  elementTagName?: string;
+  /**
+   * WR-03 (12-REVIEW) — optional diagnostics sink. When present, the
+   * custom-modifier hand-emit path pushes a warning here for an unsupported
+   * host element instead of silently producing wrong output.
+   */
+  diagnostics?: Diagnostic[];
 }
 
 /**
@@ -151,6 +169,22 @@ function partitionVueModelModifiers(
 }
 
 /**
+ * Phase 12 / CR-02 (12-REVIEW) — substitute the reserved `$v` value-access
+ * placeholder token in a `valueTransform` fragment. Token-aware: only `$v`
+ * appearing as a standalone token (not part of a longer identifier such as
+ * `$value` or `__$v_tmp`) is replaced, so a chain step whose intermediate
+ * output contains the literal substring `$v` cannot be double-substituted by
+ * a later iteration. `$` is a JS identifier character, so the lookbehind
+ * excludes both `\w` and `$` and the lookahead excludes `\w`.
+ */
+function substituteValuePlaceholder(
+  fragment: string,
+  replacement: string,
+): string {
+  return fragment.replace(/(?<![\w$])\$v(?!\w)/g, `(${replacement})`);
+}
+
+/**
  * Phase 12 — splice the resolved `valueTransform` fragments into a value-access
  * expression STRING. Each fragment carries the literal `$v` placeholder (D-03);
  * substitute `$v` with the current expression text and chain. Empty list ⇒ the
@@ -162,7 +196,7 @@ function applyValueTransformsString(
 ): string {
   let current = valueAccess;
   for (const fragment of valueTransforms) {
-    current = fragment.split('$v').join(`(${current})`);
+    current = substituteValuePlaceholder(fragment, current);
   }
   return current;
 }
@@ -178,36 +212,15 @@ function staticSegmentLiteral(text: string): string {
 }
 
 /**
- * Render an interpolated AttributeBinding's segments as a template literal
- * inner contents (without the surrounding backticks). E.g.,
+ * Render an interpolated AttributeBinding's segments as template-literal inner
+ * contents (without the surrounding backticks). E.g.,
  *   [{static:'card '}, {binding: variant}] → 'card ${variant}'
- */
-function renderInterpolatedTemplateLiteral(
-  segments: Array<
-    | { kind: 'static'; text: string }
-    | { kind: 'binding'; expression: t.Expression; deps: unknown }
-  >,
-  ir: IRComponent,
-): string {
-  let out = '';
-  for (const seg of segments) {
-    if (seg.kind === 'static') {
-      // Backtick-safe escape: escape `\`, backtick, and `$`.
-      out += seg.text.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$/g, '\\$');
-      // But \${...} would be wrongly escaped — reverse if directly preceding `{`:
-      // simpler: only escape backticks and backslashes; leave $ alone since we
-      // emit the binding via `${...}` ourselves and any literal $ in static text
-      // would also need escaping. Re-do conservatively:
-    } else {
-      out += '${' + rewriteTemplateExpression(seg.expression, ir) + '}';
-    }
-  }
-  return out;
-}
-
-/**
- * Conservative re-implementation: render segments correctly. Static text gets
- * minimal escape (backtick + backslash + dollar-only-when-followed-by-brace).
+ *
+ * Static text gets a minimal escape (backslash + backtick + `${` sequences).
+ *
+ * WR-01 (12-REVIEW) — the earlier non-`Safe` variant of this function (which
+ * over-escaped a bare `$`) was dead code and has been deleted; this is the
+ * single correct implementation and covers every call site.
  */
 function renderInterpolatedTemplateLiteralSafe(
   segments: Array<
@@ -255,7 +268,8 @@ function attrToArraySegment(attr: AttributeBinding, ir: IRComponent): string {
 /**
  * Emit a single non-class/style binding/static attribute as one attribute pair.
  */
-function emitSingleAttr(attr: AttributeBinding, ir: IRComponent): string {
+function emitSingleAttr(attr: AttributeBinding, ctx: EmitAttrCtx): string {
+  const ir = ctx.ir;
   if (attr.kind === 'twoWayBinding') {
     // Phase 07.3 Wave 3 Plan 07.3-03 (TWO-WAY-03) — consumer-side two-way binding.
     // Mirror native Vue 3.4+ idiom (D-01): `r-model:propName="<expr>"` lowers to
@@ -316,6 +330,26 @@ function emitSingleAttr(attr: AttributeBinding, ir: IRComponent): string {
       // whose body assigns the transformed value back. The transformed value
       // chains each modifier's `valueTransform` fragment in D-07 list order
       // (the resolved list arrives already canonicalized).
+      //
+      // WR-03 (12-REVIEW) — the hand-emit committed-value form below reads
+      // `$event.target.value`, which is correct for `<input>` but wrong for
+      // `<select multiple>` (whose value is an array of selected options,
+      // not `$event.target.value`). The custom-modifier hand-emit path is
+      // therefore supported on `<input>` only; for `<select>`/`<textarea>`
+      // with a custom modifier, emit a warning rather than silently shipping
+      // wrong output. (`elementTagName` is optional context; when absent the
+      // emitter assumes `<input>` — the overwhelmingly common host and the
+      // pre-WR-03 behavior — so no false positives in legacy call sites.)
+      const tagName = ctx.elementTagName?.toLowerCase();
+      if (tagName === 'select' || tagName === 'textarea') {
+        ctx.diagnostics?.push({
+          code: RozieErrorCode.RMODEL_MODIFIER_NOT_APPLICABLE,
+          severity: 'warning',
+          message: `Custom r-model modifiers are not supported on <${tagName}> in the Vue target — the hand-emitted committed value reads $event.target.value, which is incorrect for <select multiple> and may misbehave for <textarea>.`,
+          loc: attr.sourceLoc,
+          hint: 'Use a custom r-model modifier on an <input>, or coerce the value inside the bound state instead.',
+        });
+      }
       const committedValue = applyValueTransformsString(
         '$event.target.value',
         valueTransforms,
@@ -400,7 +434,7 @@ export function emitMergedAttributes(
     }
 
     // Single attr (or non-class/style multi which we don't merge).
-    out.push(emitSingleAttr(a, ctx.ir));
+    out.push(emitSingleAttr(a, ctx));
     consumed.add(a);
   }
 

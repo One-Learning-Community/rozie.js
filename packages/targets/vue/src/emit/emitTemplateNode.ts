@@ -253,6 +253,12 @@ function emitElementWithExtraDirective(
   const attrText = emitMergedAttributes(node.attributes, {
     ir: ctx.ir,
     registry: ctx.registry,
+    // WR-03 (12-REVIEW) — thread the host element's tag name + diagnostics
+    // sink so the custom-modifier r-model hand-emit path can detect an
+    // unsupported host (<select>/<textarea>) and warn instead of silently
+    // emitting wrong output.
+    elementTagName: node.tagName,
+    diagnostics: ctx.diagnostics,
   });
   const eventText = emitEvents(node.events, ctx);
 
