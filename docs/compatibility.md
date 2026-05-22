@@ -22,12 +22,15 @@ For the narrative behind each ⚠︎, follow the link to the matching section in
 | `<components>` block (incl. self-recursion) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `<listeners>` block with reactive `when` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `<style>` scoped + `:root { }` global escape hatch | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `<style lang="scss">` SCSS preprocessing | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `<script lang="ts">` TypeScript in the `<script>` block | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 
 ## Template directives
 
 | Feature | React | Vue | Svelte | Angular | Solid | Lit |
 | --- | :---: | :---: | :---: | :---: | :---: | :---: |
 | `r-if` / `r-else-if` / `r-else` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `r-match` / `r-case` / `r-default` (switch-style conditionals) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `r-show` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `r-for` with `:key` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `r-model` (form-input sugar) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
@@ -100,6 +103,7 @@ combination — a deferred v1 limitation pending a Map-keyed ctx-observer RFC.
 
 Everything else — props, `<data>`, `<listeners>`, `$computed`, `$watch`,
 modifier grammar, two-way binding machinery, default + named slots, refs,
-`$emit` — is byte-locked identical across all six targets, with dist-parity
-fixtures in `tests/dist-parity/fixtures/` verifying each entrypoint
+`$emit`, `<style lang="scss">` preprocessing — is byte-locked identical across
+all six targets, with dist-parity fixtures in `tests/dist-parity/fixtures/`
+verifying each entrypoint
 (compile / cli / babel-plugin / unplugin) emits the same output.
