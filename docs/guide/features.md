@@ -453,6 +453,63 @@ Reach for `$snapshot()` **only** when you're handing a reactive value to library
 If you skip it where you do need it, you'll see the Svelte runtime error [`state_descriptors_fixed`](https://svelte.dev/e/state_descriptors_fixed) the first time the library tries to mutate the value.
 :::
 
+## `$classSelector()` — handing a class name to a vanilla-JS engine
+
+`$classSelector('grip')` turns an authored class name into a CSS selector that matches the class **as it actually renders at runtime** — on every target. It exists because one of the six targets renames your class names behind your back.
+
+Five targets (Vue, Svelte, Solid, Angular, Lit) keep authored class names literal in the emitted DOM and isolate styles with a scoping attribute, so a class written `grip` renders as `class="grip"`. The React target is the exception: it runs class names through CSS Modules, so `class="grip"` is emitted as `className={styles.grip}` and renders as a hashed class like `_grip_17x98_26`.
+
+That breaks any string that references a class as a *selector* passed to a third-party engine. The triggering case: a SortableJS wrapper that hands `handle: '.grip'` into `new Sortable(el, { handle })`. SortableJS queries `.grip`; React's DOM only has `_grip_17x98_26`, so the handle never matches and React cannot start a drag. The other five targets keep the literal `grip` class and work. `$classSelector` closes that gap — author once, get a correct selector on all six.
+
+```rozie
+<components>
+{
+  SortableList: './SortableList.rozie',
+}
+</components>
+
+<template>
+  <SortableList r-model:items="$data.items" :handle="$classSelector('grip')">
+    <template #default="{ item }">
+      <span class="grip" aria-label="Drag handle">⋮⋮</span>
+      <span>{{ item.label }}</span>
+    </template>
+  </SortableList>
+</template>
+
+<style>
+.grip { cursor: grab; }
+</style>
+```
+
+It works anywhere an expression is valid — a `:prop` binding as above, the `<script>` block, or a `<listeners>` expression.
+
+Per-target lowering:
+
+| Target | Expansion |
+| --- | --- |
+| Vue | `".grip"` — compile-time literal (classes stay literal in the DOM) |
+| Svelte 5 | `".grip"` — compile-time literal |
+| Solid | `".grip"` — compile-time literal |
+| Angular | `".grip"` — compile-time literal |
+| Lit | `".grip"` — compile-time literal |
+| React | `"." + styles.grip` — runtime expression (the CSS-Modules hash is only known at build time) |
+
+::: warning Single class token only
+The argument must be **one bare CSS class identifier** — `$classSelector('grip')`. It is validated at compile time: a non-string-literal argument, a class that has no rule in the component's own `<style>` scope, or a value containing whitespace, a leading `.` / `#`, or a combinator (`$classSelector('a b')`, `$classSelector('.grip')`, `$classSelector('a > b')`) is a compile error with a code-frame. Referencing an undeclared class also fails — React would otherwise silently emit `".undefined"` — and the diagnostic suggests a near-match class name when one exists.
+
+Need a more specific selector — a descendant or compound selector? The escape hatch is to **declare a dedicated marker class** and `$classSelector` that. An even-empty CSS rule registers the class:
+
+```rozie
+<style>
+/* a marker class — no visual style, just a stable selector target */
+.drag-handle {}
+</style>
+```
+
+`$classSelector('drag-handle')` then resolves correctly on all six targets. The empty rule survives to the emitted CSS but produces no visual style — it exists purely so the class is a declared, scoped, hashable token.
+:::
+
 ## Slots with scoped params
 
 Slot content can receive parameters from the component, and consumers can destructure them with `#name="{ … }"`. Fallback content is just children of the `<slot>` tag — same shape as Vue, same emit semantics as Svelte snippets / React render props / Angular `*ngTemplateOutlet`:
