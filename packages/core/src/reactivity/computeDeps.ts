@@ -50,7 +50,18 @@ const traverse: TraverseFn =
  * arrays (without this, React's dep collector treats it as a free identifier
  * and emits a literal `$portals` token that doesn't resolve at runtime).
  */
-const MAGIC_ACCESSOR_NAMES = new Set(['$props', '$data', '$refs', '$slots', '$portals']);
+const MAGIC_ACCESSOR_NAMES = new Set([
+  '$props',
+  '$data',
+  '$refs',
+  '$slots',
+  '$portals',
+  // Phase 14 — `$attrs.<someAttr>` member reads resolve to a per-instance
+  // attribute on the consumer-passed attribute cluster. Like `$props`, the
+  // member access is the unit the dep collector tracks, not the `$attrs`
+  // identifier itself.
+  '$attrs',
+]);
 
 /**
  * Stable identifiers that match ExhaustiveDeps's `isStableKnownHookValue` —
@@ -78,6 +89,15 @@ const STABLE_IDENTIFIERS = new Set([
   // closure identifier and emits `[$classSelector]` into a `useEffect` /
   // `useMemo` dep array → runtime `ReferenceError`.
   '$classSelector',
+  // `$attrs` is a per-instance attribute cluster — conceptually like `$props`
+  // for the dep collector, not a reactive binding. Phase 14's `r-bind="$attrs"`
+  // bare-spread form uses the BARE-IDENTIFIER `$attrs` (RESEARCH.md Pitfall 4 /
+  // Assumption A2), not a member access — so the MAGIC_ACCESSOR_NAMES member
+  // skip alone is insufficient. Without this STABLE_IDENTIFIERS entry the React
+  // dep collector treats the bare `$attrs` as a free closure identifier and
+  // emits `[$attrs]` into a `useEffect` / `useMemo` dep array → runtime
+  // `ReferenceError`.
+  '$attrs',
   'undefined',
   'null',
   'NaN',

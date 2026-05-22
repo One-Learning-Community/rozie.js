@@ -105,6 +105,10 @@ export function splitBlocks(source: string, filename?: string): SplitBlocksResul
   let pendingAttribValueChunks: string[] = [];
   let savedNameChunks: string[] = []; // holds chunks for the 'name' attr once onattribend fires
   let savedLangChunks: string[] = []; // holds chunks for the 'lang' attr once onattribend fires (Phase 9)
+  // Phase 14: holds chunks for the `inherit-attrs` attr on the <rozie> tag.
+  // `null` = the attribute was not present on the opening tag at all (vs. an
+  // empty-string value, which is a present-without-value boolean attribute).
+  let savedInheritAttrsChunks: string[] | null = null;
   let collectingAttribValue = false;
   let unknownTagStart = -1; // tracks <` position of an unknown top-level block, -1 = none
 
@@ -134,6 +138,7 @@ export function splitBlocks(source: string, filename?: string): SplitBlocksResul
         pendingAttribValueChunks = [];
         savedNameChunks = [];
         savedLangChunks = [];
+        savedInheritAttrsChunks = null;
         collectingAttribValue = false;
       },
 
@@ -156,6 +161,14 @@ export function splitBlocks(source: string, filename?: string): SplitBlocksResul
           // Save the chunks for the 'name' attribute now, before the next onattribname
           // clears pendingAttribValueChunks. onopentagend reads from savedNameChunks.
           savedNameChunks = [...pendingAttribValueChunks];
+        }
+        if (inRozieOpenTag && pendingAttribName === 'inherit-attrs') {
+          // Phase 14: save the `inherit-attrs` attribute chunks on the <rozie>
+          // tag. A present-without-value boolean attribute (`<rozie
+          // inherit-attrs>`) fired no onattribdata, so the snapshot is `[]` —
+          // distinct from `null` (attribute absent), which onopentagend treats
+          // as "key omitted". onopentagend joins + parses these chunks.
+          savedInheritAttrsChunks = [...pendingAttribValueChunks];
         }
         if (inBlockOpenTag && pendingAttribName === 'lang') {
           // Phase 9: save the `lang` attribute chunks for the current block
@@ -184,8 +197,21 @@ export function splitBlocks(source: string, filename?: string): SplitBlocksResul
               const nameValue = savedNameChunks.join('') || 'Anonymous';
               savedNameChunks = [];
               rozieTagStart = lastOpenTagStart;
+              // Phase 14: parse the `inherit-attrs` attribute. `null` chunks =
+              // the attribute was absent → omit the key entirely
+              // (exactOptionalPropertyTypes — conditional spread → treated as
+              // `true` downstream). `"false"` → `false`; everything else
+              // (present-without-value `[]`, `"true"`, or any other value)
+              // → `true`, the safe default (threat T-14-01).
+              let inheritAttrs: boolean | undefined;
+              if (savedInheritAttrsChunks !== null) {
+                const raw = savedInheritAttrsChunks.join('').trim();
+                inheritAttrs = raw !== 'false';
+              }
+              savedInheritAttrsChunks = null;
               result.rozie = {
                 name: nameValue,
+                ...(inheritAttrs !== undefined ? { inheritAttrs } : {}),
                 // loc start = '<' of <rozie>; loc end is patched at onclosetag time
                 // to include the </rozie> close tag. Use endIndex+1 here as a conservative
                 // initial value; we update it when </rozie> fires.

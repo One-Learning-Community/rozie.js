@@ -29,7 +29,17 @@ export interface BlockEntry {
 }
 
 export interface BlockMap {
-  rozie?: { name: string; loc: SourceLoc };
+  rozie?: {
+    name: string;
+    /**
+     * Phase 14 — the `inherit-attrs` boolean attribute on the `<rozie>` tag.
+     * `false` opts the component out of cross-framework attribute fallthrough.
+     * Absent (key omitted under `exactOptionalPropertyTypes`) when the tag
+     * carried no `inherit-attrs` attribute — treated as `true` downstream.
+     */
+    inheritAttrs?: boolean;
+    loc: SourceLoc;
+  };
   props?: BlockEntry;
   data?: BlockEntry;
   script?: BlockEntry;

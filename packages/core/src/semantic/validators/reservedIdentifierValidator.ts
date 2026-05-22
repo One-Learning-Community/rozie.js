@@ -13,6 +13,7 @@
  *   $event  — the closure parameter name emitted for every event handler
  *             (`($event) => …`) across the React / Svelte / Solid / Lit
  *             targets and the Vue / Angular host-listener forms (Phase 07.6).
+ *   $attrs  — consumer-passed attribute cluster minus declared props (Phase 14)
  *
  * A user-authored identifier that shadows one of these — a `<data>` field
  * name or an `r-for` loop variable — would be silently captured by the
@@ -52,9 +53,11 @@ export const RESERVED_SIGILS: ReadonlySet<string> = new Set([
   '$slots',
   '$emit',
   '$event',
+  '$attrs',
 ]);
 
-const RESERVED_SIGIL_LIST = '$el, $props, $data, $refs, $slots, $emit, $event';
+const RESERVED_SIGIL_LIST =
+  '$el, $props, $data, $refs, $slots, $emit, $event, $attrs';
 
 function emitCollision(
   name: string,
