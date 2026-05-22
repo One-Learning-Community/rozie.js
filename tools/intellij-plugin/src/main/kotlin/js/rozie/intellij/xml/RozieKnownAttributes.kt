@@ -28,6 +28,9 @@ object RozieKnownAttributes {
     val R_DIRECTIVES: List<String> = listOf(
         "r-if", "r-else-if", "r-else", "r-for", "r-show",
         "r-model", "r-html", "r-text", "r-bind", "r-on",
+        // Phase 11 switch-style conditionals — mirrors the TextMate grammar
+        // v0.2.0 `directive-attribute` rule.
+        "r-match", "r-case", "r-default",
     )
 
     val EVENT_SIGILS: List<String> = listOf(

@@ -12,7 +12,7 @@ import com.intellij.util.ProcessingContext
 import js.rozie.intellij.xml.RozieContextCheck
 
 /**
- * SC-6 — prefix-aware autocomplete for the 11 canonical Rozie `$`-prefixed
+ * SC-6 — prefix-aware autocomplete for the 13 canonical Rozie `$`-prefixed
  * magic identifiers inside JS identifier positions of `.rozie` injected JS
  * fragments. Fires across all 5 JS-injected block types — `<script>`,
  * `<listeners>`, `<props>`, `<data>`, `<components>` — because

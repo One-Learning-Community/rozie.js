@@ -84,6 +84,20 @@ object RozieTokenTypes {
         DATA_CLOSE_TAG, LISTENERS_CLOSE_TAG, COMPONENTS_CLOSE_TAG, STYLE_CLOSE_TAG
     )
 
+    /** Block OPENING tag tokens only (`<template`, `<script`, …). Used by RozieFoldingBuilder. */
+    @JvmField
+    val BLOCK_OPEN_TAGS: TokenSet = TokenSet.create(
+        ROZIE_BLOCK_TAG, TEMPLATE_BLOCK_TAG, SCRIPT_BLOCK_TAG, PROPS_BLOCK_TAG,
+        DATA_BLOCK_TAG, LISTENERS_BLOCK_TAG, COMPONENTS_BLOCK_TAG, STYLE_BLOCK_TAG
+    )
+
+    /** Block CLOSING tag tokens only (`</template>`, `</script>`, …). Used by RozieFoldingBuilder. */
+    @JvmField
+    val BLOCK_CLOSE_TAGS: TokenSet = TokenSet.create(
+        ROZIE_CLOSE_TAG, TEMPLATE_CLOSE_TAG, SCRIPT_CLOSE_TAG, PROPS_CLOSE_TAG,
+        DATA_CLOSE_TAG, LISTENERS_CLOSE_TAG, COMPONENTS_CLOSE_TAG, STYLE_CLOSE_TAG
+    )
+
     /**
      * Body tokens for blocks whose contents are JS-flavored (script, props, data, listeners).
      * Plan 04 JS-injects each.

@@ -1,0 +1,5 @@
+<rozie name="KeydownModifierCompletion">
+<template>
+  <input @keydown.<caret> />
+</template>
+</rozie>

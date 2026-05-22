@@ -1,0 +1,5 @@
+<rozie name="EventModifierCompletion">
+<template>
+  <button @click.<caret>></button>
+</template>
+</rozie>

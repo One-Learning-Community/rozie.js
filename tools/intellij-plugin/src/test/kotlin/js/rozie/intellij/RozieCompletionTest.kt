@@ -2,6 +2,7 @@ package js.rozie.intellij
 
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import js.rozie.intellij.xml.RozieKnownAttributes
+import js.rozie.intellij.xml.RozieModifiers
 
 /**
  * SC-6 contract test for [js.rozie.intellij.completion.RozieAttributeNameCompletionContributor]:
@@ -28,7 +29,7 @@ class RozieCompletionTest : BasePlatformTestCase() {
 
     override fun getTestDataPath(): String = "src/test/testData/completion"
 
-    // === Behavior 1: typing `r-` surfaces all 10 R_DIRECTIVES ===
+    // === Behavior 1: typing `r-` surfaces all 13 R_DIRECTIVES ===
 
     fun testRPrefixCompletion() {
         myFixture.configureByFile("template-r-prefix.rozie")
@@ -84,6 +85,66 @@ class RozieCompletionTest : BasePlatformTestCase() {
                 "Expected `$name` in completion suggestions for `#` prefix; " +
                     "got: $lookups",
                 name in lookups,
+            )
+        }
+    }
+
+    // === Behavior 5: typing `@click.` surfaces the event composition modifiers ===
+    //
+    // Lookup strings are the FULL attribute name (`@click.stop`) — see
+    // `modifierCandidates` in the contributor. A non-keyboard event MUST NOT
+    // offer key filters.
+
+    fun testEventModifierCompletion() {
+        myFixture.configureByFile("template-event-modifier.rozie")
+        myFixture.completeBasic()
+        val lookups = myFixture.lookupElementStrings ?: emptyList()
+        for (modifier in RozieModifiers.EVENT_MODIFIERS) {
+            assertTrue(
+                "Expected `@click.$modifier` in completion for `@click.` prefix; " +
+                    "got: $lookups",
+                "@click.$modifier" in lookups,
+            )
+        }
+        assertFalse(
+            "Key filter `@click.enter` MUST NOT be offered on a non-keyboard " +
+                "event; got: $lookups",
+            "@click.enter" in lookups,
+        )
+    }
+
+    // === Behavior 6: typing `@keydown.` surfaces key filters AND event modifiers ===
+
+    fun testKeyboardEventSurfacesKeyFilters() {
+        myFixture.configureByFile("template-keydown-modifier.rozie")
+        myFixture.completeBasic()
+        val lookups = myFixture.lookupElementStrings ?: emptyList()
+        for (modifier in RozieModifiers.KEY_FILTERS) {
+            assertTrue(
+                "Expected key filter `@keydown.$modifier` for `@keydown.` prefix; " +
+                    "got: $lookups",
+                "@keydown.$modifier" in lookups,
+            )
+        }
+        // Composition modifiers are still valid on keyboard events.
+        assertTrue(
+            "Expected `@keydown.stop` (event modifier) for `@keydown.` prefix; " +
+                "got: $lookups",
+            "@keydown.stop" in lookups,
+        )
+    }
+
+    // === Behavior 7: typing `r-model.` surfaces the three r-model modifiers ===
+
+    fun testModelModifierCompletion() {
+        myFixture.configureByFile("template-model-modifier.rozie")
+        myFixture.completeBasic()
+        val lookups = myFixture.lookupElementStrings ?: emptyList()
+        for (modifier in RozieModifiers.MODEL_MODIFIERS) {
+            assertTrue(
+                "Expected `r-model.$modifier` in completion for `r-model.` prefix; " +
+                    "got: $lookups",
+                "r-model.$modifier" in lookups,
             )
         }
     }

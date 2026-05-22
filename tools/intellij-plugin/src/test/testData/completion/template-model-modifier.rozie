@@ -1,0 +1,5 @@
+<rozie name="ModelModifierCompletion">
+<template>
+  <input r-model.<caret> />
+</template>
+</rozie>

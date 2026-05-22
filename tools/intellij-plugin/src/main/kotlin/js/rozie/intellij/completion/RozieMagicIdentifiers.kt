@@ -1,30 +1,48 @@
 package js.rozie.intellij.completion
 
 /**
- * Single source of truth for the 11 canonical Rozie `$`-prefixed magic
+ * Single source of truth for the 13 canonical Rozie `$`-prefixed magic
  * identifiers + their one-line type-text doc hints (surfaced by
  * `LookupElementBuilder.withTypeText` in the completion popup per the
  * P1-UAT-09 acceptance prose).
  *
- * Consumed by [RozieJsMagicIdentifierCompletionContributor] (Plan 13) and
- * pinned by `RozieJsMagicCompletionTest.testBareDollarSurfacesAllMagicIdentifiers`
- * which iterates [MAGIC_IDENTIFIERS] directly — adding a 12th magic name in
- * v0.3.0 is a 1-line append here; both the contributor and the test pick it
- * up automatically (DRY contract, identical to Plan 02's
- * [js.rozie.intellij.xml.RozieKnownAttributes] / Plan 06 mirror).
+ * The set mirrors the TextMate grammar's `magic-identifier` rule
+ * (`tools/textmate/syntaxes/rozie.tmLanguage.json`, grammar v0.2.0) verbatim
+ * — that grammar is the canonical enumeration of the author-facing sigil
+ * surface, cross-checked against the compiler (`$portals` in
+ * `computeDeps.MAGIC_ACCESSOR_NAMES`, `$classSelector` in
+ * `computeDeps.STABLE_IDENTIFIERS`, the lifecycle quartet in
+ * `unknownRefValidator.LIFECYCLE_NAMES`).
+ *
+ * Consumed by:
+ *  - [RozieJsMagicIdentifierCompletionContributor] (Plan 13) — completion popup.
+ *  - [js.rozie.intellij.highlighting.RozieJsAnnotator] (Plan 04) — sigil
+ *    coloring; reads [NAMES] so the painted set and the offered set are
+ *    provably identical (one registry, two consumers).
+ *  - `rozie-globals.d.ts` — the synthetic ambient-declaration twin; the
+ *    `RozieGlobalsLibraryTest` coverage assertion pins the two in lockstep.
+ *
+ * `RozieJsMagicCompletionTest.testBareDollarSurfacesAllMagicIdentifiers`
+ * iterates [MAGIC_IDENTIFIERS] directly — adding a 14th magic name is a 1-line
+ * append here (plus the matching `declare` in `rozie-globals.d.ts`); the
+ * contributor, the annotator, and the test all pick it up automatically (DRY
+ * contract, identical to Plan 02's [js.rozie.intellij.xml.RozieKnownAttributes]).
  *
  * Names locked in by the Rozie compiler + per-target emitters:
- *  - `$props`     — declared in `<props>` block; reactive prop accessor
- *  - `$data`      — declared in `<data>` block; reactive local state
- *  - `$refs`      — wired via `ref="name"` in `<template>`; element handle map
- *  - `$emit`      — call to dispatch a custom event upward
- *  - `$computed`  — derived reactive value factory `$computed(() => expr)`
- *  - `$onMount`   — lifecycle: runs after first render
- *  - `$onUpdate`  — lifecycle: runs after every reactive update
- *  - `$watch`     — reactive `$watch(() => getter, callback)`
- *  - `$listeners` — externally-declared event handlers map
- *  - `$slots`     — named slot fills passed by the consumer
- *  - `$expose`    — expose imperative API to the consumer ref
+ *  - `$props`        — declared in `<props>` block; reactive prop accessor
+ *  - `$data`         — declared in `<data>` block; reactive local state
+ *  - `$refs`         — wired via `ref="name"` in `<template>`; element handle map
+ *  - `$emit`         — call to dispatch a custom event upward
+ *  - `$computed`     — derived reactive value factory `$computed(() => expr)`
+ *  - `$onMount`      — lifecycle: runs after first render
+ *  - `$onUnmount`    — lifecycle: runs on teardown / cleanup
+ *  - `$onUpdate`     — lifecycle: runs after every reactive update
+ *  - `$watch`        — reactive `$watch(() => getter, callback)`
+ *  - `$slots`        — named slot fills passed by the consumer
+ *  - `$el`           — the component's root DOM element
+ *  - `$portals`      — render a slot into an external container (Spike 003)
+ *  - `$classSelector`— resolve an authored class to its emitted CSS selector
+ *                      (Phase 13 — survives React's class-name hashing)
  *
  * Pattern note: each entry is a `(name, typeText)` pair; the contributor
  * destructures the pair into `LookupElementBuilder.create(name).bold()
@@ -32,10 +50,10 @@ package js.rozie.intellij.completion
  */
 object RozieMagicIdentifiers {
     /**
-     * Ordered (name, typeText) pairs for the 11 canonical Rozie magic
-     * identifiers. Order is the natural read-order from the public API
-     * documentation; the lookup popup does its own alphabetical sort, so
-     * source order here is purely for readability of the registry itself.
+     * Ordered (name, typeText) pairs for the 13 canonical Rozie magic
+     * identifiers. Order mirrors the TextMate grammar's `magic-identifier`
+     * regex so the two artifacts diff trivially; the lookup popup does its
+     * own alphabetical sort, so source order is purely for readability.
      */
     val MAGIC_IDENTIFIERS: List<Pair<String, String>> = listOf(
         "\$props" to "(magic) component props object — declared in <props>",
@@ -44,10 +62,21 @@ object RozieMagicIdentifiers {
         "\$emit" to "(magic) emit a custom event",
         "\$computed" to "(magic) derived reactive value — returns a computed signal",
         "\$onMount" to "(magic) lifecycle: runs after first render",
+        "\$onUnmount" to "(magic) lifecycle: runs on teardown / cleanup",
         "\$onUpdate" to "(magic) lifecycle: runs after every reactive update",
         "\$watch" to "(magic) react to a getter — \$watch(() => expr, callback)",
-        "\$listeners" to "(magic) externally-declared event handlers map",
         "\$slots" to "(magic) named slot fills passed by the consumer",
-        "\$expose" to "(magic) expose imperative API to the consumer ref",
+        "\$el" to "(magic) the component's root DOM element",
+        "\$portals" to "(magic) render a slot into a container — \$portals.X(el, scope)",
+        "\$classSelector" to "(magic) authored class → emitted CSS selector string",
     )
+
+    /**
+     * Bare identifier names (with the leading `$`) extracted from
+     * [MAGIC_IDENTIFIERS]. Consumed by
+     * [js.rozie.intellij.highlighting.RozieJsAnnotator] for O(1) membership
+     * lookup on each candidate `JSReferenceExpression` — keeps the annotator's
+     * painted set and the completion popup's offered set provably identical.
+     */
+    val NAMES: Set<String> = MAGIC_IDENTIFIERS.mapTo(LinkedHashSet()) { it.first }
 }

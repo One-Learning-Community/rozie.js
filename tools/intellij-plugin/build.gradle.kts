@@ -71,10 +71,30 @@ intellijPlatform {
         // Explicit changeNotes (Rule 3 fix) — the changelog plugin's auto-render
         // path expects a CHANGELOG.md with an [Unreleased] section; we set the
         // value inline instead of carrying a CHANGELOG.md for this internal build.
-        // v0.2.0 content mirrors plugin.xml <change-notes> verbatim (Plan 08.2-07
+        // Content mirrors plugin.xml <change-notes> verbatim (Plan 08.2-07
         // contract — both surfaces must stay in lockstep so the IDE shows the
-        // architectural-pivot summary regardless of which descriptor it reads).
+        // same release summary regardless of which descriptor it reads).
         changeNotes = """
+            <p><strong>0.3.0</strong> — Language constructs synced to Rozie grammar
+            v0.2.0. New directives recognised in &lt;template&gt;:
+            <code>r-match</code> / <code>r-case</code> / <code>r-default</code>
+            (Phase 11 switch-style conditionals) — attribute-name completion and
+            sigil coloring. New magic identifiers recognised in injected JS:
+            <code>${'$'}el</code>, <code>${'$'}onUnmount</code>,
+            <code>${'$'}portals</code>, <code>${'$'}classSelector</code> —
+            completion, coloring, and synthetic ambient declarations. Dropped
+            <code>${'$'}listeners</code> and <code>${'$'}expose</code> from the
+            magic-identifier set: neither is a compiler-recognised identifier
+            (<code>${'$'}expose</code> is a deferred v2 feature;
+            <code>&lt;listeners&gt;</code> is a block, not a sigil).</p>
+            <p><strong>0.3.0</strong> (editor) — Modifier autocomplete: typing a
+            <code>.</code> in an <code>@event</code> / <code>r-on:event</code> /
+            <code>r-model</code> attribute now offers the event composition
+            modifiers, the key/button filters (on keyboard events), and the
+            three <code>r-model</code> modifiers. SFC block folding:
+            <code>&lt;template&gt;</code>, <code>&lt;script&gt;</code>,
+            <code>&lt;style&gt;</code> and the other blocks collapse to a
+            one-line placeholder.</p>
             <p><strong>0.2.0</strong> — Architectural pivot to injection-first model.
             HTML coloring inside &lt;template&gt; now matches the TextMate bundle.
             Smart navigation: ${'$'}props.X / ${'$'}data.X / ${'$'}refs.X Go-to-Declaration.

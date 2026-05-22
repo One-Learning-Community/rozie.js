@@ -11,11 +11,18 @@ import com.intellij.psi.xml.XmlAttribute
 import com.intellij.util.ProcessingContext
 import js.rozie.intellij.xml.RozieContextCheck
 import js.rozie.intellij.xml.RozieKnownAttributes
+import js.rozie.intellij.xml.RozieModifiers
 
 /**
  * SC-6 — prefix-aware attribute-name autocomplete for the four Rozie sigils
  * (`r-`, `@`, `:`, `#`) inside HTML attribute position of a `.rozie`
  * `<template>` block.
+ *
+ * Additionally surfaces the `.modifier` chain: typing a `.` inside an
+ * `@event` / `r-on:event` / `r-model` attribute name offers the canonical
+ * modifier set from [RozieModifiers] — event composition modifiers always,
+ * key/button filters on keyboard events, the three `r-model` modifiers on
+ * `r-model`. See [modifierCandidates].
  *
  * Registered for `language="HTML"` (NOT `"Rozie"`) per 08.2-RESEARCH Pitfall 3:
  * the `XmlAttribute` PSI we match lives inside the HTMLLanguage fragment that
@@ -57,6 +64,21 @@ class RozieAttributeNameCompletionContributor : CompletionContributor() {
                     if (!RozieContextCheck.isRozieContext(pos)) return
 
                     val prefix = result.prefixMatcher.prefix
+
+                    // A `.` inside an @event / r-on:event / r-model attribute
+                    // name is a modifier-chain position — surface modifiers
+                    // instead of the directive/sigil lists.
+                    val modifiers = modifierCandidates(prefix)
+                    if (modifiers != null) {
+                        modifiers.forEach { (name, typeText) ->
+                            result.addElement(
+                                LookupElementBuilder.create(name).bold()
+                                    .withTypeText(typeText),
+                            )
+                        }
+                        return
+                    }
+
                     val candidates: List<String> = when {
                         // RESEARCH line 709: empty prefix (caret immediately
                         // after `<div ` with nothing typed yet) defaults to
@@ -77,4 +99,40 @@ class RozieAttributeNameCompletionContributor : CompletionContributor() {
             },
         )
     }
+}
+
+/**
+ * If [prefix] is a modifier-chain position — a `.` inside an `@event`,
+ * `r-on:event`, or `r-model` attribute name — return the full attribute-name
+ * lookup strings paired with a type-text label; otherwise `null` (so the
+ * caller falls back to the directive/sigil lists).
+ *
+ * Lookup strings are the COMPLETE attribute name (`@click.stop`, not bare
+ * `stop`) so the platform's prefix matcher — which sees the whole XML
+ * attribute name as a single identifier — keeps matching and the accepted
+ * item replaces the entire name. This mirrors how the four sigil lists
+ * already use full names (`@click`, `r-if`).
+ *
+ * Modifiers already typed earlier in the chain are filtered out so a partial
+ * `@click.stop.` does not re-offer `stop`.
+ */
+private fun modifierCandidates(prefix: String): List<Pair<String, String>>? {
+    if ('.' !in prefix) return null
+
+    // Everything up to and including the last `.` — reused verbatim as the
+    // lookup-string head. The segment after it is the partial being typed.
+    val base = prefix.substringBeforeLast('.') + "."
+    val alreadyTyped = prefix.split('.').drop(1).dropLast(1).toSet()
+
+    val pool: List<String> = when {
+        prefix.startsWith("@") ->
+            RozieModifiers.forEvent(prefix.drop(1).substringBefore('.'))
+        prefix.startsWith("r-on:") ->
+            RozieModifiers.forEvent(prefix.removePrefix("r-on:").substringBefore('.'))
+        prefix.startsWith("r-model") -> RozieModifiers.MODEL_MODIFIERS
+        else -> return null
+    }
+    return pool
+        .filter { it !in alreadyTyped }
+        .map { (base + it) to RozieModifiers.typeTextFor(it) }
 }

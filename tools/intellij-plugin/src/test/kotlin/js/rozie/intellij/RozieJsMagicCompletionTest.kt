@@ -13,7 +13,7 @@ import js.rozie.intellij.completion.RozieMagicIdentifiers
  *
  * Behavior 3 asserts against the registry itself (not a hard-coded copy of the
  * names), which proves the DRY contract: Plan 13's completion contributor reads
- * the same source the test reads. Adding a 12th magic identifier in v0.3.0 needs
+ * the same source the test reads. Adding a 14th magic identifier needs a
  * 1-line append to [RozieMagicIdentifiers.MAGIC_IDENTIFIERS] and zero edits to
  * the contributor or this test — the assertion picks up the new name
  * automatically.
@@ -68,7 +68,7 @@ class RozieJsMagicCompletionTest : BasePlatformTestCase() {
         )
     }
 
-    // === Behavior 3: typing bare `$` surfaces all 11 magic identifiers (DRY assertion) ===
+    // === Behavior 3: typing bare `$` surfaces all 13 magic identifiers (DRY assertion) ===
 
     fun testBareDollarSurfacesAllMagicIdentifiers() {
         myFixture.configureByFile("script-magic-bare-dollar.rozie")

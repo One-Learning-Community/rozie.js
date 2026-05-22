@@ -2,6 +2,9 @@
 <script>
 const x = $props.value;
 $onMount(() => console.log($data.count, $refs.root));
+$onUnmount(() => console.log($el));
 const y = $computed(() => x + 1);
+const sel = $classSelector('row');
+$portals.outlet(x, {});
 </script>
 </rozie>

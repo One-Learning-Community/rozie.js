@@ -1,4 +1,4 @@
-// rozie-globals.d.ts — synthetic ambient declarations for the 11 Rozie
+// rozie-globals.d.ts — synthetic ambient declarations for the 13 Rozie
 // magic identifiers. Source of truth: Plan 13's
 // `tools/intellij-plugin/src/main/kotlin/js/rozie/intellij/completion/RozieMagicIdentifiers.kt`
 // `MAGIC_IDENTIFIERS` registry. v0.2.0 ships permissive `any`-typed shapes;
@@ -80,8 +80,10 @@ declare const $refs: any;
 declare function $emit(name: string, ...args: any[]): void;
 declare function $computed<T>(getter: () => T): T;
 declare function $onMount(callback: () => void | (() => void)): void;
+declare function $onUnmount(callback: () => void): void;
 declare function $onUpdate(callback: () => void | (() => void)): void;
 declare function $watch<T>(getter: () => T, callback: (newValue: T, oldValue: T) => void): void;
-declare const $listeners: any;
 declare const $slots: any;
-declare function $expose(api: Record<string, any>): void;
+declare const $el: any;
+declare const $portals: any;
+declare function $classSelector(className: string): string;

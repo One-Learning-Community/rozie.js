@@ -1,0 +1,11 @@
+<fold text='<rozie>...'><rozie name="FoldingBlocks">
+<fold text='<template>...'><template>
+  <div></div>
+</template></fold>
+<fold text='<script>...'><script>
+const count = 1;
+</script></fold>
+<fold text='<style>...'><style>
+.box { color: red; }
+</style></fold>
+</rozie></fold>

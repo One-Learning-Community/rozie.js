@@ -121,6 +121,13 @@ class RozieAnnotatorTest : BasePlatformTestCase() {
         assertHighlightCoversRange(rozieHighlights, "\$refs", "ROZIE_MAGIC_IDENT")
         assertHighlightCoversRange(rozieHighlights, "\$onMount", "ROZIE_MAGIC_IDENT")
         assertHighlightCoversRange(rozieHighlights, "\$computed", "ROZIE_MAGIC_IDENT")
+        // Constructs added in grammar v0.2.0 — $onUnmount lifecycle hook,
+        // $el root-element handle, $classSelector helper (Phase 13), and the
+        // $portals slot primitive (Spike 003).
+        assertHighlightCoversRange(rozieHighlights, "\$onUnmount", "ROZIE_MAGIC_IDENT")
+        assertHighlightCoversRange(rozieHighlights, "\$el", "ROZIE_MAGIC_IDENT")
+        assertHighlightCoversRange(rozieHighlights, "\$classSelector", "ROZIE_MAGIC_IDENT")
+        assertHighlightCoversRange(rozieHighlights, "\$portals", "ROZIE_MAGIC_IDENT")
     }
 
     // === Helpers ===

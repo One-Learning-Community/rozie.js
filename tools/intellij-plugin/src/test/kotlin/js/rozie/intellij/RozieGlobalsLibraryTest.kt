@@ -48,10 +48,10 @@ import js.rozie.intellij.completion.RozieMagicIdentifiers
  *     `$computed` at a call site resolves to a `JSFunction` named `$computed`.
  *     Pre-Plan-16 the JS inspector rendered `$computed` with the
  *     "Unresolved method or function" diagnostic (P1-UAT-12 symptom).
- *  3. [testAllElevenMagicIdentifiersAreDeclared] — coverage / DRY contract:
+ *  3. [testAllMagicIdentifiersAreDeclared] — coverage / DRY contract:
  *     iterates [RozieMagicIdentifiers.MAGIC_IDENTIFIERS] and asserts each
  *     entry has a matching `declare const|function <name>` in
- *     `rozie-globals.d.ts`. Adding a 12th identifier in v0.3.0 requires
+ *     `rozie-globals.d.ts`. Adding another identifier requires
  *     1-line edits to BOTH the registry AND the `.d.ts`; this test fails
  *     fast otherwise (T-08.2-36 mitigation).
  *  4. [testPlainJsFileDoesNotResolveBareDollarProps] — Pitfall 2 negative
@@ -136,9 +136,9 @@ class RozieGlobalsLibraryTest : BasePlatformTestCase() {
         )
     }
 
-    // === Behavior 3: Coverage — all 11 RozieMagicIdentifiers represented in .d.ts ===
+    // === Behavior 3: Coverage — all RozieMagicIdentifiers represented in .d.ts ===
 
-    fun testAllElevenMagicIdentifiersAreDeclared() {
+    fun testAllMagicIdentifiersAreDeclared() {
         val dts = javaClass.getResourceAsStream("/rozie-globals.d.ts")
             ?.bufferedReader()?.use { it.readText() }
             ?: fail(
@@ -157,7 +157,7 @@ class RozieGlobalsLibraryTest : BasePlatformTestCase() {
             assertTrue(
                 "Expected `declare const $name` OR `declare function $name` in rozie-globals.d.ts; " +
                     "RozieMagicIdentifiers and rozie-globals.d.ts are twin sources of truth " +
-                    "(T-08.2-36) and MUST mirror the same 11-identifier set. Got:\n$dts",
+                    "(T-08.2-36) and MUST mirror the same identifier set. Got:\n$dts",
                 Regex("""declare\s+(const|function)\s+\Q$name\E""").containsMatchIn(dts),
             )
         }

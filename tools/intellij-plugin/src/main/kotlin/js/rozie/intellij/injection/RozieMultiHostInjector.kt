@@ -587,10 +587,10 @@ class RozieMultiHostInjector : MultiHostInjector {
          * Prepended verbatim (plus a trailing newline) to every Rozie JS injection
          * via [injectJs] and [injectJsAsExpression].
          *
-         * The file content is 11 `declare const` / `declare function` statements,
-         * one per [js.rozie.intellij.completion.RozieMagicIdentifiers] entry. The
+         * The file content is one `declare const` / `declare function` statement
+         * per [js.rozie.intellij.completion.RozieMagicIdentifiers] entry. The
          * 1:1 correspondence is enforced by
-         * `RozieGlobalsLibraryTest.testAllElevenMagicIdentifiersAreDeclared`.
+         * `RozieGlobalsLibraryTest.testAllMagicIdentifiersAreDeclared`.
          *
          * If the resource cannot be loaded (should never happen — the file is
          * shipped in the plugin jar), the prefix degrades to empty string and
