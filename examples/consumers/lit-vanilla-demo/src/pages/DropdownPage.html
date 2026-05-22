@@ -26,6 +26,13 @@
       <a href="/">&larr; back</a> — shadow-DOM-aware outside-click via
       <code>composedPath()</code>.
     </p>
+    <p>
+      Open state:
+      <span id="open-state" data-testid="dropdown-open-state">false</span>
+    </p>
+    <p>
+      <button id="outside" data-testid="outside-target">outside element</button>
+    </p>
     <rozie-dropdown id="dropdown">
       <button slot="trigger" id="trigger-btn" data-testid="dropdown-trigger">
         Toggle
@@ -36,13 +43,6 @@
         <li>Item C</li>
       </ul>
     </rozie-dropdown>
-    <p>
-      Open state:
-      <span id="open-state" data-testid="dropdown-open-state">false</span>
-    </p>
-    <p>
-      <button id="outside" data-testid="outside-target">outside element</button>
-    </p>
     <h2>Event log</h2>
     <pre id="log" data-testid="event-log"></pre>
     <script type="module">

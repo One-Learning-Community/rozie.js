@@ -18,6 +18,21 @@ export default function DropdownPage() {
   return (
     <div>
       <h2>Dropdown</h2>
+      <p>
+        Open: <span data-testid="dropdown-open-state">{String(open())}</span>
+      </p>
+      <button
+        data-testid="parent-lock"
+        onClick={() => setLockedClosed(true)}
+      >
+        Lock closed
+      </button>
+      <button
+        data-testid="parent-unlock"
+        onClick={() => setLockedClosed(false)}
+      >
+        Unlock
+      </button>
       <Dropdown
         open={open()}
         onOpenChange={(v: boolean) => {
@@ -38,21 +53,6 @@ export default function DropdownPage() {
           <li>Item C</li>
         </ul>
       </Dropdown>
-      <p>
-        Open: <span data-testid="dropdown-open-state">{String(open())}</span>
-      </p>
-      <button
-        data-testid="parent-lock"
-        onClick={() => setLockedClosed(true)}
-      >
-        Lock closed
-      </button>
-      <button
-        data-testid="parent-unlock"
-        onClick={() => setLockedClosed(false)}
-      >
-        Unlock
-      </button>
     </div>
   );
 }
