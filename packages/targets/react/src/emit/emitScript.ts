@@ -1208,22 +1208,67 @@ export function emitScript(
     }
   }
 
+  // 260521 sortable-stale-state — the watched-prop ref-rewrite above fixes
+  // stale reads of *props*, but a mount-phase `$onMount` that registers a
+  // long-lived engine callback can ALSO read reactive STATE / MODEL values
+  // (`useState` / `useControllableState` destructured locals). A mount hook
+  // lowers to `useEffect(() => {...}, [])` (mount-once, by contract — see the
+  // `depsArr` comment in the lifecycle loop), so any closure created inside
+  // it permanently captures the FIRST-render value of those plain destructured
+  // consts. The other 5 targets are immune: they read bound state through a
+  // LIVE accessor (`.value` / signal call / getter) that a mount-once closure
+  // still resolves freshly. React alone destructures a frozen plain value.
+  //
+  // Surfaced by SortableList.rozie: its `$onMount` registers SortableJS's
+  // `onUpdate`, whose body does `const next = [...items]` where `items` is the
+  // `model: true` prop. Every drop spliced a stale snapshot (the initial empty
+  // `[]`) and committed a wrong order.
+  //
+  // The fix routes those reactive state/model reads through the SAME synced
+  // ref (`_<X>Ref.current`, kept current via `_<X>Ref.current = <X>`) the
+  // watched-prop rewrite already uses — the ref-sync idiom generalizes to any
+  // read inside a mount-once effect, not just the splice-then-set case.
+  //
+  // Reactive state/model names lower to BARE identifiers (see `renderSignalRef`):
+  //   - `ir.state`  → `useState` destructure  → bare `<name>`
+  //   - model props → `useControllableState` destructure → bare `<name>`
+  // so they slot into `rewriteWatchedPropReads`'s model-set (bare-identifier)
+  // path. `ir.computed` is intentionally EXCLUDED — a `useMemo` value is
+  // recomputed by React and a fresh closure already sees it; only the
+  // `useState`/`useControllableState` destructured frozen consts are at risk.
+  const mountReactiveStateNames = new Set<string>();
+  for (const s of ir.state) mountReactiveStateNames.add(s.name);
+  for (const name of modelProps) mountReactiveStateNames.add(name);
+
   // Discover-then-rewrite per lifecycle hook. We collect the rewritten
   // bodies into Maps keyed by hook index so the lifecycle forEach below
   // uses them instead of `paired?.setupCloned` / `paired?.cleanupCloned`.
   const rewrittenSetupByIdx = new Map<number, t.Expression | t.BlockStatement>();
   const rewrittenCleanupByIdx = new Map<number, t.Expression>();
+  // 260521 sortable-stale-state — `actuallyRewrittenModelProps` holds two
+  // flavours of bare-identifier name post-discovery: watched model props (its
+  // original role) AND mount-phase reactive state/model reads (the new path).
+  // Both lower to the identical `_<X>Ref.current` synced-ref shape, so they
+  // share this one set; section 5b-bis emits one ref decl per entry.
   const actuallyRewrittenModelProps = new Set<string>();
   const actuallyRewrittenNonModelProps = new Set<string>();
 
   if (
-    (watchedModelPropNames.size > 0 || watchedNonModelPropNames.size > 0) &&
+    (watchedModelPropNames.size > 0 ||
+      watchedNonModelPropNames.size > 0 ||
+      mountReactiveStateNames.size > 0) &&
     ir.lifecycle.length > 0
   ) {
+    // `bareNames` is the set of bare-identifier reactive names this walk
+    // should discover (watched model props always; mount-phase reactive
+    // state/model names ADDITIONALLY for mount hooks — see the caller). The
+    // discovered names are merged into `outModel` because both flavours lower
+    // to the identical `_<X>Ref.current` bare-identifier rewrite shape.
     const findRefsInBody = (
       bodyNode: t.Expression | t.BlockStatement,
       outModel: Set<string>,
       outNonModel: Set<string>,
+      bareNames: ReadonlySet<string>,
     ): void => {
       const programStmts: t.Statement[] = t.isBlockStatement(bodyNode)
         ? bodyNode.body
@@ -1240,7 +1285,7 @@ export function emitScript(
         },
         Identifier(p) {
           const name = p.node.name;
-          if (!watchedModelPropNames.has(name)) return;
+          if (!bareNames.has(name)) return;
           const parent = p.parent;
           if (
             (t.isMemberExpression(parent) || t.isOptionalMemberExpression(parent)) &&
@@ -1261,6 +1306,20 @@ export function emitScript(
       const setupCloned = paired?.setupCloned ?? lh.setup;
       const cleanupCloned = paired?.cleanupCloned ?? null;
 
+      // 260521 sortable-stale-state — reactive state/model reads are routed
+      // through a synced ref ONLY for MOUNT-phase hooks. A mount hook lowers
+      // to a `[]`-dep `useEffect` (mount-once), so a closure created inside it
+      // permanently freezes the destructured state value. `$onUpdate` hooks
+      // keep their real dep array, so React re-creates the effect (and its
+      // closures) when the state changes — no staleness to defend against.
+      // Watched props are rewritten regardless of phase (their existing
+      // contract); reactive state names join the bare-identifier set only
+      // here, for `phase === 'mount'`.
+      const bareNamesForHook =
+        lh.phase === 'mount'
+          ? new Set<string>([...watchedModelPropNames, ...mountReactiveStateNames])
+          : watchedModelPropNames;
+
       // Determine the actual body to walk + rewrite. For arrow/fn-expr
       // setups, we operate on the body (block or expression). For Identifier
       // setups (e.g. `$onMount(lockScroll)`), the helper's body is in
@@ -1276,7 +1335,7 @@ export function emitScript(
 
       const localModel = new Set<string>();
       const localNonModel = new Set<string>();
-      findRefsInBody(setupBodyForRewrite, localModel, localNonModel);
+      findRefsInBody(setupBodyForRewrite, localModel, localNonModel, bareNamesForHook);
       // Walk cleanup too (engine wrappers sometimes read props from cleanup
       // for teardown sequencing).
       if (cleanupCloned) {
@@ -1286,11 +1345,21 @@ export function emitScript(
         } else if (t.isExpression(cleanupCloned)) {
           cleanupBodyForRewrite = cleanupCloned;
         }
-        if (cleanupBodyForRewrite) findRefsInBody(cleanupBodyForRewrite, localModel, localNonModel);
+        if (cleanupBodyForRewrite) {
+          findRefsInBody(cleanupBodyForRewrite, localModel, localNonModel, bareNamesForHook);
+        }
       }
 
       if (localModel.size === 0 && localNonModel.size === 0) return;
 
+      // 260521 sortable-stale-state — `localModel` now holds two flavours of
+      // bare-identifier name: watched model props AND mount-phase reactive
+      // state/model reads. Both rewrite to `_<X>Ref.current` and both want the
+      // identical synced-ref decl (`const _<X>Ref = useRef(<bareName>); …`),
+      // so both are merged into `actuallyRewrittenModelProps` — the section
+      // 5b-bis ref-decl emit iterates that one set, and because it is a `Set`
+      // a name that is BOTH a watched prop and a mount-state read emits
+      // exactly once.
       for (const n of localModel) actuallyRewrittenModelProps.add(n);
       for (const n of localNonModel) actuallyRewrittenNonModelProps.add(n);
 
@@ -1518,24 +1587,39 @@ export function emitScript(
     );
   }
 
-  // 5b-bis. Plan 07.7 follow-up — watched-prop stable-renderer refs.
+  // 5b-bis. Plan 07.7 follow-up — watched-prop / mount-state stable refs.
   //
-  // For each prop X that has a sibling `$watch(() => $props.X, ...)` AND
-  // is actually read from a lifecycle hook body (discovered by the
-  // pre-compute pass above), emit:
+  // For each prop X that has a sibling `$watch(() => $props.X, ...)` AND is
+  // actually read from a lifecycle hook body — OR (260521 sortable-stale-state)
+  // each reactive state/model value read from a MOUNT-phase hook body —
+  // emit:
   //   const _<X>Ref = useRef(<reactIdent>);
   //   _<X>Ref.current = <reactIdent>;
   //
   // The lifecycle body's `<reactIdent>` reads were rewritten to
-  // `_<X>Ref.current` by the same pre-compute pass, so the useEffect
-  // dep array drops the watched prop without tripping
-  // `react-hooks/exhaustive-deps`. The watcher itself owns reactive
-  // updates for X — the mount-phase useEffect captures the INITIAL
-  // value of X via useRef and reads the latest value on engine
-  // callbacks via `.current`.
+  // `_<X>Ref.current` by the same pre-compute pass, so (for watched props) the
+  // useEffect dep array drops the watched prop without tripping
+  // `react-hooks/exhaustive-deps`, and (for mount-state reads) a closure
+  // created in the `[]`-dep mount effect reads the LATEST value via `.current`
+  // instead of the frozen first-render destructured const. The watcher /
+  // React state owns reactive updates; the synced `_<X>Ref.current = <X>`
+  // assignment during render keeps the ref live.
+  //
+  // ORDERING — a ref decl `useRef(<reactIdent>)` references the bound binding,
+  // so it MUST be emitted AFTER that binding's declaration:
+  //   - non-model props  → `props.<X>` is always in scope → emit here.
+  //   - model props      → `useControllableState` (section 5b above) → emit here.
+  //   - `ir.state` names → `useState` (section 5c BELOW) → DEFERRED to 5c-bis,
+  //                        else `const _<X>Ref = useRef(<X>)` would hit the
+  //                        not-yet-declared `useState` const (TDZ at render).
+  // `actuallyRewrittenModelProps` carries both watched model props and
+  // mount-state model/`ir.state` reads; we partition `ir.state` names out so
+  // they emit after section 5c.
   //
   // Sorting (alphabetical) keeps the emit deterministic across runs
   // for snapshot stability.
+  const stateDeclNames = new Set(ir.state.map((s) => s.name));
+  const deferredStateRefNames: string[] = [];
   {
     const sortedModelRefs = [...actuallyRewrittenModelProps].sort();
     const sortedNonModelRefs = [...actuallyRewrittenNonModelProps].sort();
@@ -1547,6 +1631,12 @@ export function emitScript(
       );
     }
     for (const name of sortedModelRefs) {
+      // `ir.state` names lower to `useState` (section 5c) which is declared
+      // AFTER this block — defer their ref decls to section 5c-bis.
+      if (stateDeclNames.has(name)) {
+        deferredStateRefNames.push(name);
+        continue;
+      }
       collectors.react.add('useRef');
       hookLines.push(
         `const _${name}Ref = useRef(${name});\n` +
@@ -1570,6 +1660,19 @@ export function emitScript(
         : '';
     hookLines.push(
       `const [${s.name}, ${setterName}] = useState${stateTypeArg}(${genCode(s.initializer)});`,
+    );
+  }
+
+  // 5c-bis. 260521 sortable-stale-state — synced refs for `ir.state` names
+  // read from a mount-phase hook body, deferred from section 5b-bis so they
+  // land AFTER the `useState` declarations they reference (avoids a TDZ
+  // ReferenceError at render — see the 5b-bis ORDERING note). Same shape as
+  // the model-prop refs: `const _<X>Ref = useRef(<X>); _<X>Ref.current = <X>;`.
+  for (const name of deferredStateRefNames.sort()) {
+    collectors.react.add('useRef');
+    hookLines.push(
+      `const _${name}Ref = useRef(${name});\n` +
+        `_${name}Ref.current = ${name};`,
     );
   }
 
