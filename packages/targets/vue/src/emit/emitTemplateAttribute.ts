@@ -245,6 +245,82 @@ function renderInterpolatedTemplateLiteralSafe(
 }
 
 /**
+ * Phase 14 R6 — keys that must never reach the emitted object from an
+ * author-controlled `r-bind` LITERAL. Mirrors the React/Solid `FORBIDDEN_SPREAD_KEYS`
+ * set and the Phase 02 `collectPropDecls` write-time guard (T-14-06).
+ */
+const FORBIDDEN_SPREAD_KEYS: ReadonlySet<string> = new Set([
+  '__proto__',
+  'constructor',
+  'prototype',
+]);
+
+/**
+ * Read an ObjectProperty's static key name, or null when the key is not a
+ * statically-knowable Identifier / StringLiteral (computed expressions etc.).
+ */
+function staticPropKey(prop: t.ObjectProperty): string | null {
+  if (t.isIdentifier(prop.key) && !prop.computed) return prop.key.name;
+  if (t.isStringLiteral(prop.key)) return prop.key.value;
+  return null;
+}
+
+/**
+ * Phase 14 R6 — split an `r-bind` LITERAL object into (class-value, style-value,
+ * rest). The `class`/`style` keys are extracted so they can be fed into the
+ * existing multi-source class/style merge paths; `rest` is the object with those
+ * keys removed, ready for a `v-bind` spread. Returns null entries when a key is
+ * absent. T-14-06: `__proto__`/`constructor`/`prototype` keys are dropped from
+ * the literal entirely (mirrors the React/Solid compile-time pollution guard).
+ *
+ * Operates on Vue HTML attribute names verbatim — no key remap is applied here
+ * (D-03 is React/Solid-only; Vue/Svelte want HTML names through).
+ */
+function splitClassStyleFromVueLiteral(obj: t.ObjectExpression): {
+  classValue: t.Expression | null;
+  styleValue: t.Expression | null;
+  rest: t.ObjectExpression;
+} {
+  let classValue: t.Expression | null = null;
+  let styleValue: t.Expression | null = null;
+  const restProps: t.ObjectExpression['properties'] = [];
+  for (const prop of obj.properties) {
+    if (t.isObjectProperty(prop)) {
+      const keyName = staticPropKey(prop);
+      // T-14-06 — drop a pollution-vector literal key entirely.
+      if (keyName !== null && FORBIDDEN_SPREAD_KEYS.has(keyName)) continue;
+      if (keyName === 'class' && t.isExpression(prop.value)) {
+        classValue = prop.value;
+        continue;
+      }
+      if (keyName === 'style' && t.isExpression(prop.value)) {
+        styleValue = prop.value;
+        continue;
+      }
+    }
+    restProps.push(prop);
+  }
+  const rest = t.objectExpression(restProps);
+  return { classValue, styleValue, rest };
+}
+
+/**
+ * Phase 14 R6 — extract a `class`/`style` value from an `r-bind` LITERAL so it
+ * can be folded into the element's class/style merge. Returns null entries when
+ * the spread is not a literal (dynamic spreads / `$attrs` — keys unknowable;
+ * see `emitSingleAttr` KNOWN LIMITATION).
+ */
+function extractLiteralClassStyleFromSpread(
+  attr: Extract<AttributeBinding, { kind: 'spreadBinding' }>,
+): { classValue: t.Expression | null; styleValue: t.Expression | null } {
+  if (!t.isObjectExpression(attr.expression)) {
+    return { classValue: null, styleValue: null };
+  }
+  const { classValue, styleValue } = splitClassStyleFromVueLiteral(attr.expression);
+  return { classValue, styleValue };
+}
+
+/**
  * For class-array merge (Pitfall 7): convert each AttributeBinding to a single
  * array element string.
  */
@@ -262,8 +338,11 @@ function attrToArraySegment(attr: AttributeBinding, ir: IRComponent): string {
     return rewriteTemplateExpression(attr.expression, ir);
   }
   if (attr.kind === 'spreadBinding') {
-    // Phase 14 — `spreadBinding` is the name-less kind: it never reaches a
-    // class/style merge (no name to coalesce on). Unreachable; mirrors the
+    // Phase 14 R6 — a `spreadBinding` reaches this array-segment helper ONLY
+    // when its LITERAL object carries a `class`/`style` key that has been
+    // extracted upstream as a synthetic class/style binding. The synthetic
+    // binding has kind='binding', not kind='spreadBinding', so a real
+    // `spreadBinding` never lands here. Unreachable — mirrors the
     // `twoWayBinding` guard above.
     throw new Error(
       `Vue target: spreadBinding not valid in class/style array context (Phase 14).`,
@@ -274,17 +353,78 @@ function attrToArraySegment(attr: AttributeBinding, ir: IRComponent): string {
 }
 
 /**
+ * Phase 14 R2 / D-07 — render an `r-bind` spread for the Vue target. Vue's
+ * native attribute-spread idiom is argument-less `v-bind="<obj>"` — every own
+ * enumerable key of the object becomes an attribute on the host element. No
+ * key normalization is applied: Vue wants HTML attribute names verbatim (D-03
+ * is React/Solid-only).
+ *
+ * `$attrs` is Vue's NATIVE template magic accessor (Vue auto-binds the
+ * consumer's non-prop attributes to it). A bare `r-bind="$attrs"` emits
+ * `v-bind="$attrs"` straight through — `rewriteTemplateExpression` leaves the
+ * bare `$attrs` Identifier alone (no `$props`/`$data`/`$refs` member match), so
+ * Vue's own `$attrs` proxy is the runtime source. No additional rewrite is
+ * needed in Vue's `rewriteTemplateExpression` for `$attrs`.
+ *
+ * KNOWN LIMITATION (RESEARCH Open Question 1 / Assumption A4 / Option a) — for
+ * a DYNAMIC `r-bind` object the keys are NOT known at compile time, so a
+ * `class`/`style` key inside a dynamic spread CANNOT be extracted into the
+ * class/style merge path. Vue's own `v-bind` merge order applies (a later
+ * `v-bind` overrides an earlier `:class` for the same key). The R6 acceptance
+ * fixture uses a LITERAL `r-bind`, so the literal path is the mandatory one
+ * and is fully merge-correct.
+ */
+function emitSpread(
+  attr: Extract<AttributeBinding, { kind: 'spreadBinding' }>,
+  ir: IRComponent,
+  /** When the element has an explicit `class`/`style` binding, the literal's
+   *  class/style is extracted upstream — emit only the `rest`. */
+  hasExplicitClassOrStyle: boolean,
+): string {
+  if (
+    hasExplicitClassOrStyle &&
+    t.isObjectExpression(attr.expression)
+  ) {
+    // R6 — LITERAL spread with class/style extracted into the merge path; only
+    // spread the remaining keys.
+    const { rest } = splitClassStyleFromVueLiteral(attr.expression);
+    const expr = rewriteTemplateExpression(rest, ir);
+    return `v-bind="${expr}"`;
+  }
+  if (t.isObjectExpression(attr.expression)) {
+    // LITERAL spread without an explicit class/style sibling — still apply the
+    // T-14-06 pollution guard so a `__proto__`/`constructor`/`prototype`
+    // literal key never reaches the emitted object.
+    const { rest, classValue, styleValue } = splitClassStyleFromVueLiteral(attr.expression);
+    // No explicit sibling means class/style flow through `v-bind` normally —
+    // re-attach the extracted keys onto `rest` after the pollution scrub.
+    const restProps = [...rest.properties];
+    if (classValue !== null) {
+      restProps.push(t.objectProperty(t.identifier('class'), classValue));
+    }
+    if (styleValue !== null) {
+      restProps.push(t.objectProperty(t.identifier('style'), styleValue));
+    }
+    const scrubbed = t.objectExpression(restProps);
+    const expr = rewriteTemplateExpression(scrubbed, ir);
+    return `v-bind="${expr}"`;
+  }
+  // DYNAMIC spread or bare `$attrs` Identifier — pass through verbatim. Vue
+  // handles attribute-object spread natively with `v-bind="<obj>"`.
+  const expr = rewriteTemplateExpression(attr.expression, ir);
+  return `v-bind="${expr}"`;
+}
+
+/**
  * Emit a single non-class/style binding/static attribute as one attribute pair.
  */
 function emitSingleAttr(attr: AttributeBinding, ctx: EmitAttrCtx): string {
   const ir = ctx.ir;
   if (attr.kind === 'spreadBinding') {
-    // Phase 14 R2 / D-07 — the bare-spread `r-bind="<expr>"` form (and the
-    // synthesized `$attrs` auto-fallthrough spread). Vue's native
-    // attribute-spread idiom is argument-less `v-bind="<obj>"` — every own
-    // enumerable key of the object becomes an attribute on the host element.
-    const expr = rewriteTemplateExpression(attr.expression, ir);
-    return `v-bind="${expr}"`;
+    // Phase 14 R2 / D-07 — bare-spread emit. The R6 class/style merge is
+    // handled in `emitMergedAttributes`; this single-attr fallback path is
+    // reached when no explicit class/style sibling exists.
+    return emitSpread(attr, ir, /* hasExplicitClassOrStyle */ false);
   }
   if (attr.kind === 'twoWayBinding') {
     // Phase 07.3 Wave 3 Plan 07.3-03 (TWO-WAY-03) — consumer-side two-way binding.
@@ -443,26 +583,87 @@ export function emitMergedAttributes(
   const out: string[] = [];
   const consumed = new Set<AttributeBinding>();
 
+  // Phase 14 R6 — does the element have an explicit `class`/`style` binding?
+  // When so, a `class`/`style` key inside an `r-bind` LITERAL must be folded
+  // into the class/style merge path (not spread as a separate `:class`/`:style`,
+  // which Vue's `v-bind` would last-wins-overwrite the explicit one).
+  const hasExplicitClass = (buckets.get('class')?.length ?? 0) > 0;
+  const hasExplicitStyle = (buckets.get('style')?.length ?? 0) > 0;
+
+  // Phase 14 R6 — synthesise extra `class`/`style` AttributeBindings from any
+  // `r-bind` LITERAL that carries those keys, so `emitClassOrStyleArrayMerge`
+  // sees both the explicit `:class`/`:style` and the literal's value as merge
+  // sources. The synthetic bindings adopt the spread's source position so the
+  // existing positional last-wins semantics are preserved.
+  const literalClassBindings = new Map<AttributeBinding, AttributeBinding>();
+  const literalStyleBindings = new Map<AttributeBinding, AttributeBinding>();
+  for (const a of attrs) {
+    if (a.kind !== 'spreadBinding') continue;
+    const { classValue, styleValue } = extractLiteralClassStyleFromSpread(a);
+    if (hasExplicitClass && classValue !== null) {
+      literalClassBindings.set(a, {
+        kind: 'binding',
+        name: 'class',
+        expression: classValue,
+        deps: [],
+        sourceLoc: a.sourceLoc,
+      });
+    }
+    if (hasExplicitStyle && styleValue !== null) {
+      literalStyleBindings.set(a, {
+        kind: 'binding',
+        name: 'style',
+        expression: styleValue,
+        deps: [],
+        sourceLoc: a.sourceLoc,
+      });
+    }
+  }
+
   for (const a of attrs) {
     if (consumed.has(a)) continue;
 
     // Phase 14 — `spreadBinding` is the name-less kind (D-07): it never
-    // participates in class/style name-merging. Emit it directly via
-    // `emitSingleAttr` (→ `v-bind="<expr>"`) and skip the name-bucket logic,
-    // which would otherwise read its non-existent `.name`.
+    // participates in class/style name-bucketing. Emit it directly via
+    // `emitSpread` (→ `v-bind="<expr>"`). When a sibling explicit
+    // `class`/`style` exists, the literal's class/style is folded into the
+    // class/style merge path below (consumed.add'd into the synthesized
+    // bindings) and `emitSpread` drops those keys from the spread's `rest`.
     if (a.kind === 'spreadBinding') {
-      out.push(emitSingleAttr(a, ctx));
+      const dropClass = literalClassBindings.has(a);
+      const dropStyle = literalStyleBindings.has(a);
+      out.push(emitSpread(a, ctx.ir, dropClass || dropStyle));
       consumed.add(a);
       continue;
     }
 
     const sameNameAttrs = buckets.get(a.name) ?? [a];
 
-    if ((a.name === 'class' || a.name === 'style') && sameNameAttrs.length > 1) {
-      // Merge all attrs sharing this name into one :class array binding.
-      out.push(emitClassOrStyleArrayMerge(a.name, sameNameAttrs, ctx.ir));
-      for (const x of sameNameAttrs) consumed.add(x);
-      continue;
+    // R6 — when an explicit `class`/`style` binding coexists with an `r-bind`
+    // LITERAL carrying that same key, build the merge input from BOTH sources
+    // walked in source order so positional last-wins is preserved.
+    if (a.name === 'class' || a.name === 'style') {
+      const literalMap = a.name === 'class' ? literalClassBindings : literalStyleBindings;
+      const hasLiteralMerge = literalMap.size > 0;
+      if (sameNameAttrs.length > 1 || hasLiteralMerge) {
+        // Walk the FULL attrs list in source order, picking out the
+        // same-named bindings + any synthesised binding extracted from an
+        // `r-bind` LITERAL at its source position.
+        const merged: AttributeBinding[] = [];
+        for (const src of attrs) {
+          if (src.kind === 'spreadBinding') {
+            const synthetic = literalMap.get(src);
+            if (synthetic) merged.push(synthetic);
+          } else if (src.name === a.name) {
+            merged.push(src);
+          }
+        }
+        if (merged.length > 1) {
+          out.push(emitClassOrStyleArrayMerge(a.name, merged, ctx.ir));
+          for (const x of sameNameAttrs) consumed.add(x);
+          continue;
+        }
+      }
     }
 
     // Single attr (or non-class/style multi which we don't merge).
