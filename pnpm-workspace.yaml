@@ -9,6 +9,7 @@ packages:
   - "tests/timing"
   - "tests/dist-parity"
   - "tests/smoke-sourcemap"
+  - "tests/textmate"
   - "tests/solid-lint"
   - "tests/lit-lint"
   - "tests/svelte-typecheck"

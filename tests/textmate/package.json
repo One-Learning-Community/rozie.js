@@ -1,0 +1,15 @@
+{
+  "name": "@rozie/tests-textmate",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "tm-grammars": "^1.31.15",
+    "vitest": "^4",
+    "vscode-oniguruma": "^2.0.1",
+    "vscode-textmate": "^9.3.2"
+  }
+}
