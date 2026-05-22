@@ -195,7 +195,10 @@ function renderPropField(p: PropDecl): string {
   const needsNull =
     hasExplicitNullDefault(p) && !/\|\s*null$/.test(baseType.trimEnd());
   const finalType = needsNull ? `${baseType} | null` : baseType;
-  return `${p.name}?: ${finalType}`;
+  // 260521-oao — `p.required` is the SOLE optionality determinant: a
+  // `required: true` prop drops the `?` and emits a non-optional field.
+  const opt = p.required ? '' : '?';
+  return `${p.name}${opt}: ${finalType}`;
 }
 
 /**
@@ -284,9 +287,18 @@ function emitDefineModels(ir: IRComponent): string[] {
     if (!p.isModel) continue;
     const tsType = renderType(p.typeAnnotation);
     if (p.defaultValue !== null) {
+      // A defaulted model prop is optional regardless of `required`
+      // (260521-oao — `required: true` + `default:` is dropped upstream in
+      // lowerProps, so a defaultValue here means the prop was NOT required).
       const dflt = genCode(p.defaultValue);
       lines.push(
         `const ${p.name} = defineModel<${tsType}>('${p.name}', { default: ${dflt} });`,
+      );
+    } else if (p.required) {
+      // 260521-oao — a required no-default model prop emits the Vue
+      // `required: true` options form so the consumer MUST pass it.
+      lines.push(
+        `const ${p.name} = defineModel<${tsType}>('${p.name}', { required: true });`,
       );
     } else {
       lines.push(`const ${p.name} = defineModel<${tsType}>('${p.name}');`);

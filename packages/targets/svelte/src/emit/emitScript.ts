@@ -174,7 +174,13 @@ function buildPropsInterfaceFields(ir: IRComponent): string[] {
     if (p.defaultValue !== null && t.isNullLiteral(p.defaultValue)) {
       typeText = `(${typeText}) | null`;
     }
-    lines.push(`  ${p.name}?: ${typeText};`);
+    // 260521-oao — `p.required` is the SOLE optionality determinant: a
+    // `required: true` prop drops the `?` and emits a non-optional field.
+    // The destructure entry already emits a bare `name` (non-model) /
+    // `$bindable()` (model) for no-default props, so no destructure change
+    // is needed — the interface `?:` removal is the load-bearing change.
+    const opt = p.required ? '' : '?';
+    lines.push(`  ${p.name}${opt}: ${typeText};`);
   }
 
   // Slot fields share the Props interface — Snippet<[...]> typed.

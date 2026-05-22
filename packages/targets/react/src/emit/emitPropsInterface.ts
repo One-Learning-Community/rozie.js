@@ -93,18 +93,23 @@ export function emitPropsInterface(
 ): string {
   const fields: string[] = [];
 
-  // Props (split by isModel)
+  // Props (split by isModel).
+  // 260521-oao — `p.required` is the SOLE optionality determinant: a
+  // `required: true` prop emits a non-optional contract (`name: T`), every
+  // other prop keeps the optional `name?: T` form. The model `default`/
+  // `on…Change` companion fields STAY optional regardless of `required`.
   for (const p of ir.props) {
     const tsType = renderType(p.typeAnnotation);
+    const opt = p.required ? '' : '?';
     if (p.isModel) {
       // 3-field synthesis per D-31/D-56 React analog. All three are keyed to
       // the model name — `default${Pascal}` matches emitTypes.ts's `.d.ts`
       // emission (and Radix's `defaultOpen`/`defaultChecked` convention).
-      fields.push(`  ${p.name}?: ${tsType};`);
+      fields.push(`  ${p.name}${opt}: ${tsType};`);
       fields.push(`  default${capitalize(p.name)}?: ${tsType};`);
       fields.push(`  on${capitalize(p.name)}Change?: (${p.name}: ${tsType}) => void;`);
     } else {
-      fields.push(`  ${p.name}?: ${tsType};`);
+      fields.push(`  ${p.name}${opt}: ${tsType};`);
     }
   }
 
