@@ -32,7 +32,9 @@
         <code>&lt;script&gt;</code>, <code>&lt;style&gt;</code> and the other
         blocks collapse to a one-line placeholder. Quick documentation:
         Ctrl-Q / hover on an <code>r-*</code> directive, a modifier, or a
-        <code>$</code>-magic identifier now shows inline docs.</p>
+        <code>$</code>-magic identifier now shows inline docs. Inspection:
+        a typo'd <code>r-*</code> directive or <code>.modifier</code> is
+        flagged with a "did you mean" rename quick-fix.</p>
         <p><strong>0.2.0</strong> — Architectural pivot to injection-first model.
         HTML coloring inside &lt;template&gt; now matches the TextMate bundle.
         Smart navigation: $props.X / $data.X / $refs.X Go-to-Declaration.
@@ -118,6 +120,20 @@
             implementationClass="js.rozie.intellij.inspection.RozieCssInspectionSuppressor"/>
         <lang.inspectionSuppressor language="LESS"
             implementationClass="js.rozie.intellij.inspection.RozieCssInspectionSuppressor"/>
+
+        <!-- 0.3.0: flag typo'd Rozie template attributes — an unknown r-*
+             directive or an unknown .modifier on @event / r-on / r-model.
+             Registered for HTML (the XmlAttribute PSI is in the injected
+             <template>); RozieContextCheck guards non-Rozie .html files.
+             Offers a Levenshtein-based "did you mean" rename quick-fix. -->
+        <localInspection
+            language="HTML"
+            shortName="RozieTemplateAttribute"
+            displayName="Unknown Rozie directive or modifier"
+            groupName="Rozie"
+            enabledByDefault="true"
+            level="WARNING"
+            implementationClass="js.rozie.intellij.inspection.RozieTemplateAttributeInspection"/>
 
         <xml.attributeDescriptorsProvider
             implementation="js.rozie.intellij.xml.RozieAttributeDescriptorsProvider"/>
