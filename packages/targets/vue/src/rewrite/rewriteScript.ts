@@ -179,15 +179,19 @@ export function rewriteRozieIdentifiers(
 
   traverse(program, {
     MemberExpression(path) {
-      // WR-02 (Phase 9) — skip member expressions in TS type position
-      // (`let x: typeof $data.foo`). Without this the `$data.foo` rewrite
-      // would mangle a `typeof`-query inside a type annotation.
+      // WR-02 (Phase 9) — skip member expressions in TS type position.
+      // Defensive: a `typeof X.Y` query parses its entity name as a
+      // TSQualifiedName, not a MemberExpression, so a MemberExpression node
+      // in genuine type position does not arise from current TS syntax — the
+      // guard mirrors the Identifier visitor's and is kept for safety.
+      /* v8 ignore next -- defensive: MemberExpression nodes do not occur in TS type position */
       if (isInTypePosition(path)) return;
       const obj = path.node.object;
       if (!t.isIdentifier(obj)) return;
       // Skip computed access (`$props['foo']`) — Phase 2 ROZ106 already warned.
       if (path.node.computed) return;
       const prop = path.node.property;
+      /* v8 ignore next -- defensive: a non-computed MemberExpression always has an Identifier property */
       if (!t.isIdentifier(prop)) return;
 
       if (obj.name === '$props') {
@@ -267,6 +271,7 @@ export function rewriteRozieIdentifiers(
       if (!t.isIdentifier(obj)) return;
       if (path.node.computed) return;
       const prop = path.node.property;
+      /* v8 ignore next -- defensive: a non-computed OptionalMemberExpression always has an Identifier property */
       if (!t.isIdentifier(prop)) return;
 
       if (obj.name === '$props') {
@@ -354,6 +359,7 @@ export function rewriteRozieIdentifiers(
       // to `__rozieRootRef.value` (Vue's templateRef accessor).
       if (name === '$el') {
         const parentPath = path.parentPath;
+        /* v8 ignore next -- defensive: a traversed Identifier always has a parentPath */
         if (!parentPath) return;
         if (parentPath.isVariableDeclarator() && parentPath.node.id === path.node) return;
         if (
