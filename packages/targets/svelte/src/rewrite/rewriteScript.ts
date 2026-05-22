@@ -29,6 +29,7 @@ import type { IRComponent } from '../../../../core/src/ir/types.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
 import { isInTypePosition } from '../../../../core/src/ast/typePosition.js';
+import { lowerClassSelectorCall } from './lowerClassSelectorCall.js';
 
 /**
  * Normalize an emit name to a Svelte 5 callback-prop identifier.
@@ -390,6 +391,15 @@ export function rewriteRozieIdentifiers(
         );
         // Do NOT path.skip() — the argument may contain $props.X / $data.X
         // reads that still need rewriting.
+        return;
+      }
+
+      // $classSelector('grip') → ".grip" — Svelte keeps authored class names
+      // literal in the emitted DOM, so the compile-time literal is correct.
+      // Shared with rewriteTemplateExpression.ts via lowerClassSelectorCall so
+      // the two hooks cannot drift (Pitfall 4).
+      if (callee.name === '$classSelector') {
+        lowerClassSelectorCall(path);
         return;
       }
 
