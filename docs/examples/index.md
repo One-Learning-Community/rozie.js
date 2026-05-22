@@ -11,7 +11,7 @@ Fourteen example pages, each kept live against the compiler: every source listin
 - [TreeNode](/examples/tree-node) — self-recursion via `<components>` self-import; minimal `<props>`-only component. Demonstrates the per-target self-reference idioms.
 - [Card (with CardHeader)](/examples/card) — wrapper-pair composition. Two `.rozie` files; shows the kebab/camel prop bridge and the per-target child-component import + selector rewrite (notably Angular's `<rozie-card-header>`).
 - [TodoList](/examples/todo-list) — `r-for` with `:key`, multiple `$emit` channels, named + default slots with per-item scoped params, fallback content, `r-if` / `r-else` empty state. Calls out the documented React render-prop divergence in slot consumer ergonomics.
-- [Table](/examples/table) — slot-driven UI-library table (named scoped slots for header/cell/empty), plus a **consumer-side dynamic slot fill** (`` <template #[`footer${mode}`]> ``) toggling between two footer renderers. The dynamic-slot showcase.
+- [Table](/examples/table) — slot-driven UI-library table (named scoped slots for header/cell/empty), a **consumer-side dynamic slot fill** (`` <template #[`footer${mode}`]> ``) toggling between two footer renderers, and an `r-match` / `r-case` / `r-default` switch in the consumer's `#cell` template. The dynamic-slot and `r-match` showcase.
 - [PortalList](/examples/portal-list) — **portal-slot primitive** demo. A tiny inline vanilla-JS engine owns row containers but the per-row CONTENT is rendered through `<slot name="item" portal />` + `$portals.item(container, scope)`. The cross-target equivalent of FullCalendar's `eventContent`, AG-Grid's `cellRenderer`, Swiper's slide content.
 
 ## Engine wrappers
@@ -55,6 +55,7 @@ If you're looking for a specific authoring feature:
 | Self-recursion | [TreeNode](/examples/tree-node) |
 | `r-for` with `:key` | [TodoList](/examples/todo-list), [TreeNode](/examples/tree-node) |
 | `r-if` / `r-else` | [SearchInput](/examples/search-input), [TodoList](/examples/todo-list) |
+| `r-match` / `r-case` / `r-default` switch | [Table](/examples/table) |
 | `r-model` | [SearchInput](/examples/search-input), [TodoList](/examples/todo-list) |
 | Named slots | [Modal](/examples/modal), [Dropdown](/examples/dropdown), [TodoList](/examples/todo-list) |
 | Default slot with scoped params | [Modal](/examples/modal), [Dropdown](/examples/dropdown), [TodoList](/examples/todo-list) |
