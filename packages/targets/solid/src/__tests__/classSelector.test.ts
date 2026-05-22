@@ -66,10 +66,15 @@ describe('$classSelector emit (Solid) [Wave 0 RED — implemented in Wave 2]', (
     expect(code).not.toContain('$classSelector');
   });
 
-  it('R2: :attr-position $classSelector(\'panel\') lowers to the literal ".panel"', () => {
+  it('R2: :attr-position $classSelector(\'panel\') lowers to the literal .panel selector', () => {
     const { code } = compileProbe();
     // The :data-handle binding flows through rewriteTemplateExpression.ts.
-    expect(code).toContain('".panel"');
+    // Solid's template-expression generator forces single-quote string
+    // literals (jsescOption.quotes='single' — aligns with how `_props.slots?.['x']`
+    // lookups already emit), so the `:attr`-position literal renders as
+    // `'.panel'` while the `<script>`-position one renders as `".panel"`.
+    // The quote style is incidental; assert quote-agnostically.
+    expect(code).toMatch(/['"]\.panel['"]/);
     expect(code).not.toContain('$classSelector');
   });
 });
