@@ -41,6 +41,9 @@ const FIXTURES_DIR = resolve(HERE, '../fixtures');
 // Quick-task 260519-vyv (Spike 004) — EXAMPLES extended 10 → 11 with
 // PortalListStyled, the canonical `@portal NAME { ... }` producer-side
 // CSS-scoping fixture (single-file; no sibling .rozie producers).
+// Phase 10 Plan 04 — EXAMPLES extended 11 → 12 with PortalListStyledScss, the
+// SCSS proving fixture (a `<style lang="scss">` fork of PortalListStyled).
+// Single-file; no sibling .rozie producers.
 const EXAMPLES = [
   'Counter',
   'SearchInput',
@@ -53,6 +56,7 @@ const EXAMPLES = [
   'ModalConsumer',
   'WrapperModal',
   'PortalListStyled',
+  'PortalListStyledScss',
 ];
 
 const EXAMPLES_NEEDING_RESOLVER_ROOT = new Set(['ModalConsumer', 'WrapperModal']);

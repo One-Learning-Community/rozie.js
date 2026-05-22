@@ -72,6 +72,12 @@ const FIXTURES_DIR = resolve(HERE, 'fixtures');
 // the canonical `@portal NAME { ... }` producer-side CSS-scoping fixture.
 // Single-file example (no sibling .rozie); byte-locked across all 4
 // entrypoints. 11 × 6 × 4 = 264 cells (+ React .d.ts/.module.css sidecars).
+// Phase 10 Plan 04 — extended 11 → 12 with PortalListStyledScss, the SCSS
+// proving fixture (a `<style lang="scss">` fork of PortalListStyled). It proves
+// the substituteCompiledStyle splice carries the compiled SCSS-to-CSS output
+// byte-identically across all 4 entrypoints and 6 targets with zero
+// preprocessor leakage (SPEC-REQ-6/7). Single-file example (no sibling .rozie).
+// 12 × 6 × 4 = 288 cells (+ React .d.ts/.module.css sidecars).
 const EXAMPLES = [
   'Counter',
   'SearchInput',
@@ -84,6 +90,7 @@ const EXAMPLES = [
   'ModalConsumer',
   'WrapperModal',
   'PortalListStyled',
+  'PortalListStyledScss',
 ] as const;
 
 // Phase 07.2 Plan 06 — siblings ModalConsumer reaches via `<components>`.

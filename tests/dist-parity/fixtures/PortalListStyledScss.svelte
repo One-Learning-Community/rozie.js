@@ -1,0 +1,143 @@
+<script lang="ts">
+import type { Snippet } from 'svelte';
+import { mount, unmount } from 'svelte';
+import PortalHost from '@rozie/runtime-svelte/PortalHost.svelte';
+import { onMount } from 'svelte';
+
+interface Props {
+  items?: any[];
+  item?: Snippet<[{ item: any }]>;
+  snippets?: Record<string, any>;
+}
+
+let {
+  items = (() => [])(),
+  item: __itemProp,
+  snippets,
+}: Props = $props();
+
+const item = $derived(__itemProp ?? snippets?.item);
+
+let __rozieRoot = $state<HTMLElement | undefined>(undefined);
+
+// Tiny inline "engine" — same shape as examples/PortalList.rozie but
+// with the inline-style ceremony removed. The engine now just creates
+// structural DOM; cosmetic styling is the wrapper's <style> block's job.
+//
+// Destruction order still matters: dispose all cells BEFORE removing
+// the structural container (same constraint as FullCalendar / AG-Grid).
+class MiniListEngine {
+  constructor(rootEl: any, opts: any) {
+    this.rootEl = rootEl;
+    this.items = opts.items;
+    this.cellRenderer = opts.cellRenderer;
+    this.disposers = [];
+    this._mount();
+  }
+  _mount() {
+    const ul = document.createElement('ul');
+    for (const item of this.items as any) {
+      const li = document.createElement('li');
+      const cell = this.cellRenderer(item);
+      li.appendChild(cell.node);
+      this.disposers.push(cell.dispose);
+      ul.appendChild(li);
+    }
+    this.rootEl.appendChild(ul);
+  }
+  destroy() {
+    for (const dispose of this.disposers as any) dispose();
+    this.disposers = [];
+    while (this.rootEl.firstChild) this.rootEl.removeChild(this.rootEl.firstChild);
+  }
+}
+let instance: any = null;
+
+const portalInstances = new Set<Record<string, unknown>>();
+const portals = {
+  item: (container: HTMLElement, scope: { item: unknown }): (() => void) => {
+    if (!item) return () => {};
+    // Spike 004: portal-scope attribute injection.
+    container.setAttribute('data-rozie-portal-item', '860cc87e');
+    const inst = mount(PortalHost, {
+      target: container,
+      props: { snippet: item, scope },
+    });
+    portalInstances.add(inst as Record<string, unknown>);
+    return () => {
+      unmount(inst);
+      portalInstances.delete(inst as Record<string, unknown>);
+    };
+  },
+};
+$effect(() => () => {
+  for (const inst of portalInstances) unmount(inst as Parameters<typeof unmount>[0]);
+  portalInstances.clear();
+});
+
+onMount(() => {
+  instance = new MiniListEngine(__rozieRoot!, {
+    items: items,
+    cellRenderer: (item: any) => {
+      const node = document.createElement('div');
+      const dispose = portals.item(node, {
+        item
+      });
+      return {
+        node,
+        dispose
+      };
+    }
+  });
+  return () => instance?.destroy();
+});
+</script>
+
+
+<div class="rozie-portal-list" bind:this={__rozieRoot}>
+  
+</div>
+
+
+<style>
+.rozie-portal-list {
+  display: block;
+  font-family: system-ui, -apple-system, sans-serif;
+  color: var(--rozie-portal-list-fg);
+}
+.rozie-portal-list ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid #ededed;
+  border-radius: 6px;
+}
+
+:global(:root) {
+--rozie-portal-list-gap: 8px;
+  --rozie-portal-list-fg: #1a1a1a;
+}
+
+:global {
+  [data-rozie-portal-item="860cc87e"][data-rozie-portal-item="860cc87e"] ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+  }
+  [data-rozie-portal-item="860cc87e"][data-rozie-portal-item="860cc87e"] li {
+    padding: 0.5rem 0.75rem;
+  }
+  [data-rozie-portal-item="860cc87e"][data-rozie-portal-item="860cc87e"] li + li {
+    border-top: 1px solid #ededed;
+  }
+  [data-rozie-portal-item="860cc87e"][data-rozie-portal-item="860cc87e"] li:hover {
+    background: #f5f5f5;
+  }
+  [data-rozie-portal-item="860cc87e"][data-rozie-portal-item="860cc87e"] div {
+    display: flex;
+    align-items: center;
+    gap: var(--rozie-portal-list-gap);
+  }
+}
+</style>

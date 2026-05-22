@@ -36,6 +36,8 @@ import { existsSync, readFileSync, writeFileSync, readdirSync, statSync, lstatSy
 import { isAbsolute, resolve as pathResolve, dirname, join as pathJoin, relative as pathRelative } from 'node:path';
 import { parse } from '../../core/src/parse.js';
 import { lowerToIR } from '../../core/src/ir/lower.js';
+import { splitBlocks } from '../../core/src/splitter/splitBlocks.js';
+import type { BlockMap } from '../../core/src/ast/types.js';
 // Phase 07.2 Plan 03 — thread producer paramTypes onto consumer SlotFillerDecl.
 // Without this step, unplugin's per-target output would diverge from compile()'s
 // output for the consumer-scoped-fill case (compile() runs threadParamTypes
@@ -659,6 +661,41 @@ function validateTwoWayBindingsForPipeline(
 }
 
 /**
+ * Phase 10 Plan 04 — compute the emit source string + the matching block
+ * offsets for the per-target pipelines.
+ *
+ * `substituteCompiledStyle` splices the compiled SCSS-to-CSS output into the
+ * `<style>` body for a `lang="scss"` component. That splice changes the byte
+ * length of the source string, which INVALIDATES `ast.blocks` — the BlockMap
+ * `parse()` built against the ORIGINAL `.rozie` source. The per-target
+ * pipelines pass `blockOffsets: ast.blocks` to the emitters, and an emitter
+ * (e.g. solid's `buildShell`) drives `MagicString.overwrite` from those
+ * offsets — stale offsets that index past the (shorter) substituted string
+ * throw `end is out of bounds`.
+ *
+ * `compile.ts` is unaffected because it does NOT pass `blockOffsets`; the
+ * emitters re-derive them from `opts.source` via `splitBlocks()`. This helper
+ * gives the unplugin pipelines the same correctness: when the source was
+ * substituted, re-run `splitBlocks` on the substituted string so the offsets
+ * match. When no substitution happened (plain CSS — the dominant case), the
+ * original `ast.blocks` is returned untouched, byte-identical (SPEC-REQ-8).
+ */
+function emitSourceAndBlocks(
+  source: string,
+  ast: import('../../core/src/ast/types.js').RozieAST,
+  filePath: string,
+): { emitSource: string; blockOffsets: BlockMap } {
+  const emitSource = substituteCompiledStyle(source, ast);
+  if (emitSource === source) {
+    return { emitSource, blockOffsets: ast.blocks };
+  }
+  // Substitution occurred — re-derive block offsets against the new string so
+  // they stay consistent with the source the emitter slices/overwrites.
+  const { diagnostics: _ignored, ...blockOffsets } = splitBlocks(emitSource, filePath);
+  return { emitSource, blockOffsets };
+}
+
+/**
  * Shared parse → lowerToIR → emitVue pipeline. Throws Vite-shaped errors on
  * fatal diagnostics; calls `this.warn` on warnings. Returns `{ code, map }`
  * suitable for Vite's transform/load return shape.
@@ -702,13 +739,14 @@ function runRoziePipeline(
 
   // 3. emitVue
   // Phase 10 Plan 04 — splice compiled SCSS-to-CSS into the emitter source
-  // (no-op for plain CSS). `parse()` above still saw the original `source`.
-  const emitSource = substituteCompiledStyle(source, ast);
+  // (no-op for plain CSS) and re-derive block offsets to match. `parse()`
+  // above still saw the original `source`.
+  const { emitSource, blockOffsets } = emitSourceAndBlocks(source, ast, filePath);
   const result = emitVue(ir, {
     filename: filePath,
     source: emitSource,
     modifierRegistry: registry,
-    blockOffsets: ast.blocks,
+    blockOffsets,
   });
   const emitErrors = result.diagnostics.filter((d) => d.severity === 'error');
   if (emitErrors.length > 0) {
@@ -769,13 +807,14 @@ function runReactPipeline(
 
   // 3. emitReact
   // Phase 10 Plan 04 — splice compiled SCSS-to-CSS into the emitter source
-  // (no-op for plain CSS). `parse()` above still saw the original `source`.
-  const emitSource = substituteCompiledStyle(source, ast);
+  // (no-op for plain CSS) and re-derive block offsets to match. `parse()`
+  // above still saw the original `source`.
+  const { emitSource, blockOffsets } = emitSourceAndBlocks(source, ast, filePath);
   const result = emitReact(ir, {
     filename: filePath,
     source: emitSource,
     modifierRegistry: registry,
-    blockOffsets: ast.blocks,
+    blockOffsets,
   });
   const emitErrors = result.diagnostics.filter((d) => d.severity === 'error');
   if (emitErrors.length > 0) {
@@ -836,13 +875,14 @@ function runSveltePipeline(
 
   // 3. emitSvelte
   // Phase 10 Plan 04 — splice compiled SCSS-to-CSS into the emitter source
-  // (no-op for plain CSS). `parse()` above still saw the original `source`.
-  const emitSource = substituteCompiledStyle(source, ast);
+  // (no-op for plain CSS) and re-derive block offsets to match. `parse()`
+  // above still saw the original `source`.
+  const { emitSource, blockOffsets } = emitSourceAndBlocks(source, ast, filePath);
   const result = emitSvelte(ir, {
     filename: filePath,
     source: emitSource,
     modifierRegistry: registry,
-    blockOffsets: ast.blocks,
+    blockOffsets,
   });
   const emitErrors = result.diagnostics.filter((d) => d.severity === 'error');
   if (emitErrors.length > 0) {
@@ -905,13 +945,14 @@ function runSolidPipeline(
 
   // 3. emitSolid
   // Phase 10 Plan 04 — splice compiled SCSS-to-CSS into the emitter source
-  // (no-op for plain CSS). `parse()` above still saw the original `source`.
-  const emitSource = substituteCompiledStyle(source, ast);
+  // (no-op for plain CSS) and re-derive block offsets to match. `parse()`
+  // above still saw the original `source`.
+  const { emitSource, blockOffsets } = emitSourceAndBlocks(source, ast, filePath);
   const result = emitSolid(ir, {
     filename: filePath,
     source: emitSource,
     modifierRegistry: registry,
-    blockOffsets: ast.blocks,
+    blockOffsets,
   });
   const emitErrors = result.diagnostics.filter((d) => d.severity === 'error');
   if (emitErrors.length > 0) {
@@ -973,13 +1014,14 @@ function runLitPipeline(
 
   // 3. emitLit
   // Phase 10 Plan 04 — splice compiled SCSS-to-CSS into the emitter source
-  // (no-op for plain CSS). `parse()` above still saw the original `source`.
-  const emitSource = substituteCompiledStyle(source, ast);
+  // (no-op for plain CSS) and re-derive block offsets to match. `parse()`
+  // above still saw the original `source`.
+  const { emitSource, blockOffsets } = emitSourceAndBlocks(source, ast, filePath);
   const result = emitLit(ir, {
     filename: filePath,
     source: emitSource,
     modifierRegistry: registry,
-    blockOffsets: ast.blocks,
+    blockOffsets,
   });
   const emitErrors = result.diagnostics.filter((d) => d.severity === 'error');
   if (emitErrors.length > 0) {
@@ -1045,13 +1087,14 @@ function runAngularPipeline(
 
   // 3. emitAngular
   // Phase 10 Plan 04 — splice compiled SCSS-to-CSS into the emitter source
-  // (no-op for plain CSS). `parse()` above still saw the original `source`.
-  const emitSource = substituteCompiledStyle(source, ast);
+  // (no-op for plain CSS) and re-derive block offsets to match. `parse()`
+  // above still saw the original `source`.
+  const { emitSource, blockOffsets } = emitSourceAndBlocks(source, ast, filePath);
   const result = emitAngular(ir, {
     filename: filePath,
     source: emitSource,
     modifierRegistry: registry,
-    blockOffsets: ast.blocks,
+    blockOffsets,
   });
   const emitErrors = result.diagnostics.filter((d) => d.severity === 'error');
   if (emitErrors.length > 0) {
@@ -1341,13 +1384,14 @@ function runAngularEmitForDisk(
     throw new Error(`[${threadError.code}] ${threadError.message}`);
   }
   // Phase 10 Plan 04 — splice compiled SCSS-to-CSS into the emitter source
-  // (no-op for plain CSS). `parse()` above still saw the original `source`.
-  const emitSource = substituteCompiledStyle(source, ast);
+  // (no-op for plain CSS) and re-derive block offsets to match. `parse()`
+  // above still saw the original `source`.
+  const { emitSource, blockOffsets } = emitSourceAndBlocks(source, ast, filePath);
   const result = emitAngular(ir, {
     filename: filePath,
     source: emitSource,
     modifierRegistry: registry,
-    blockOffsets: ast.blocks,
+    blockOffsets,
   });
   const emitError = result.diagnostics.find((d) => d.severity === 'error');
   if (emitError) {
