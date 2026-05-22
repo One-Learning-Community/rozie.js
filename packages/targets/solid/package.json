@@ -29,6 +29,7 @@
     "@rozie/runtime-solid": "workspace:*"
   },
   "devDependencies": {
+    "@vitest/coverage-v8": "4.1.5",
     "@types/babel__generator": "^7",
     "@types/babel__traverse": "^7",
     "@typescript-eslint/parser": "^8.59.1",
@@ -41,6 +42,7 @@
   },
   "scripts": {
     "test": "vitest run --passWithNoTests",
+    "test:coverage": "vitest run --coverage --coverage.provider=v8 --coverage.reporter=text --coverage.reporter=html",
     "test:watch": "vitest",
     "build": "tsdown",
     "lint": "biome lint src",
