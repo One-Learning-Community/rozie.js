@@ -1,0 +1,105 @@
+name: Lit 3.2 + 3.x Matrix
+
+# Per-target CI for the Lit compile target.
+#
+# The cross-framework matrix workflows previously covered only
+# React/Vue/Svelte/Angular — the "core four". Solid and Lit shipped later as
+# targets 5 and 6 and never got dedicated workflows, leaving their per-target
+# unit suites and consumer demos CI-dark: only the Visual Regression matrix
+# (which renders all six targets) exercised them at all.
+#
+# This workflow closes the Lit half of that gap. It mirrors svelte-matrix.yml:
+# build the workspace, run the Lit target + runtime + unplugin unit suites,
+# then build the lit-vanilla demo and run its Playwright e2e.
+#
+# Matrix: lit ~3.2 (the line every package pins as its floor) + ~3 (latest
+# 3.x). The lit-vanilla demo is plain Vite + @rozie/unplugin (no framework
+# Vite plugin), so the meaningful axis is the Lit line itself. Single Vite —
+# the demo pins vite ^6.
+#
+# `push: [main]` runs on every push (no path filter) so a `packages/core/**`
+# emitter change always re-exercises Lit even when nothing under
+# packages/targets/lit changed — the drift the matrix is here to catch.
+
+on:
+  pull_request:
+    paths:
+      - 'packages/targets/lit/**'
+      - 'packages/runtime/lit/**'
+      - 'packages/unplugin/**'
+      - 'packages/core/**'
+      - 'examples/consumers/lit-vanilla-demo/**'
+      - '.github/workflows/lit-matrix.yml'
+  push:
+    branches: [main]
+
+jobs:
+  lit-matrix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        lit-version: ['3.2', '3']
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Cache turbo build output
+        uses: actions/cache@v5
+        with:
+          path: .turbo
+          key: ${{ runner.os }}-turbo-${{ github.job }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-turbo-${{ github.job }}-
+            ${{ runner.os }}-turbo-
+
+      # Build the whole workspace via turbo. The swipe canary's emit tests
+      # import every target's dist/ and the dts-identity test reads every
+      # target's dist/index.d.mts — so all 6 targets must be built even on a
+      # Lit-only CI run.
+      - name: Build all packages
+        run: pnpm turbo run build
+
+      - name: Run unit tests (core + target-lit + runtime-lit + unplugin)
+        run: |
+          pnpm exec vitest run --root packages/core
+          pnpm exec vitest run --root packages/targets/lit
+          pnpm exec vitest run --root packages/runtime/lit
+          pnpm exec vitest run --root packages/unplugin
+
+      - name: Override Lit version for the demo
+        working-directory: examples/consumers/lit-vanilla-demo
+        run: pnpm add lit@~${{ matrix.lit-version }}
+
+      - name: Re-install with version override
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Typecheck demo
+        run: pnpm --filter lit-vanilla-demo run typecheck
+
+      - name: Build demo
+        run: pnpm --filter lit-vanilla-demo run build
+
+      - name: Install Playwright Chromium
+        run: pnpm --filter lit-vanilla-demo run test:e2e:install
+
+      - name: Run Playwright e2e tests
+        run: pnpm --filter lit-vanilla-demo run test:e2e
+
+      - name: Upload Playwright HTML report on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report-lit-${{ matrix.lit-version }}
+          path: examples/consumers/lit-vanilla-demo/playwright-report
+          retention-days: 7

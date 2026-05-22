@@ -1,0 +1,106 @@
+name: Solid 1.8 + 1.9 Matrix
+
+# Per-target CI for the Solid compile target.
+#
+# The cross-framework matrix workflows previously covered only
+# React/Vue/Svelte/Angular — the "core four". Solid and Lit shipped later as
+# targets 5 and 6 and never got dedicated workflows, leaving their per-target
+# unit suites and consumer demos CI-dark: only the Visual Regression matrix
+# (which renders all six targets) exercised them at all.
+#
+# This workflow closes the Solid half of that gap. It mirrors
+# svelte-matrix.yml: build the workspace, run the Solid target + runtime +
+# unplugin unit suites, then build the solid-vite demo and run its Playwright
+# e2e against both supported solid-js lines.
+#
+# Matrix: solid-js 1.8 (runtime-solid's declared peer-dep floor) + 1.9 (the
+# line the demo and @rozie/target-solid pin). Single Vite — the demo pins
+# vite ^6 and vite-plugin-solid 2.11 drives the JSX transform; a Vite-version
+# axis is deferred (Solid breakage does not live there).
+#
+# `push: [main]` runs on every push (no path filter) so a `packages/core/**`
+# emitter change always re-exercises Solid even when nothing under
+# packages/targets/solid changed — the drift the matrix is here to catch.
+
+on:
+  pull_request:
+    paths:
+      - 'packages/targets/solid/**'
+      - 'packages/runtime/solid/**'
+      - 'packages/unplugin/**'
+      - 'packages/core/**'
+      - 'examples/consumers/solid-vite/**'
+      - '.github/workflows/solid-matrix.yml'
+  push:
+    branches: [main]
+
+jobs:
+  solid-matrix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        solid-version: ['1.8', '1.9']
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Cache turbo build output
+        uses: actions/cache@v5
+        with:
+          path: .turbo
+          key: ${{ runner.os }}-turbo-${{ github.job }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-turbo-${{ github.job }}-
+            ${{ runner.os }}-turbo-
+
+      # Build the whole workspace via turbo. The swipe canary's emit tests
+      # import every target's dist/ and the dts-identity test reads every
+      # target's dist/index.d.mts — so all 6 targets must be built even on a
+      # Solid-only CI run.
+      - name: Build all packages
+        run: pnpm turbo run build
+
+      - name: Run unit tests (core + target-solid + runtime-solid + unplugin)
+        run: |
+          pnpm exec vitest run --root packages/core
+          pnpm exec vitest run --root packages/targets/solid
+          pnpm exec vitest run --root packages/runtime/solid
+          pnpm exec vitest run --root packages/unplugin
+
+      - name: Override Solid version for the demo
+        working-directory: examples/consumers/solid-vite
+        run: pnpm add solid-js@~${{ matrix.solid-version }}
+
+      - name: Re-install with version override
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Typecheck demo
+        run: pnpm --filter solid-vite-demo run typecheck
+
+      - name: Build demo
+        run: pnpm --filter solid-vite-demo run build
+
+      - name: Install Playwright Chromium
+        run: pnpm --filter solid-vite-demo run test:e2e:install
+
+      - name: Run Playwright e2e tests
+        run: pnpm --filter solid-vite-demo run test:e2e
+
+      - name: Upload Playwright HTML report on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report-solid-${{ matrix.solid-version }}
+          path: examples/consumers/solid-vite/playwright-report
+          retention-days: 7
