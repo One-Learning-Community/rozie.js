@@ -267,6 +267,105 @@ function isObjectLiteralExpression(expr: t.Expression): boolean {
 }
 
 /**
+ * Phase 14 D-04 — the magic accessor whose `r-bind` spread is EXEMPT from key
+ * normalization. A `$attrs` cluster already carries target-native keys (the
+ * consumer wrote `className`, not `class`), so it is spread verbatim.
+ */
+function isAttrsIdentifier(expr: t.Expression): boolean {
+  return t.isIdentifier(expr, { name: '$attrs' });
+}
+
+/**
+ * Phase 14 SECURITY (T-14-06) — keys that must never reach the emitted object
+ * from an author-controlled `r-bind` literal. Mirrors the runtime
+ * `normalizeAttrs` `FORBIDDEN_KEYS` set and the Phase 02 `collectPropDecls`
+ * guard.
+ */
+const FORBIDDEN_SPREAD_KEYS: ReadonlySet<string> = new Set([
+  '__proto__',
+  'constructor',
+  'prototype',
+]);
+
+/**
+ * Read an ObjectProperty's static key name, or null when the key is not a
+ * statically-knowable Identifier / StringLiteral (computed expressions etc.).
+ */
+function staticPropKey(prop: t.ObjectProperty): string | null {
+  if (t.isIdentifier(prop.key) && !prop.computed) return prop.key.name;
+  if (t.isStringLiteral(prop.key)) return prop.key.value;
+  return null;
+}
+
+/**
+ * Phase 14 D-03 — compile-time key remap of an `r-bind` LITERAL object for the
+ * React target. Returns a NEW ObjectExpression (the IR node is never mutated)
+ * with HTML-shape keys renamed to React-DOM naming (`class`→`className`, …) and
+ * `__proto__`/`constructor`/`prototype` keys SKIPPED (T-14-06). Spread / method
+ * / computed-key properties pass through verbatim — only statically-named
+ * data properties are remappable.
+ */
+function remapObjectKeysReact(obj: t.ObjectExpression): t.ObjectExpression {
+  const cloned = t.cloneNode(obj, true, false) as t.ObjectExpression;
+  const kept: t.ObjectExpression['properties'] = [];
+  for (const prop of cloned.properties) {
+    if (!t.isObjectProperty(prop)) {
+      // SpreadElement / ObjectMethod — pass through; not key-remappable.
+      kept.push(prop);
+      continue;
+    }
+    const keyName = staticPropKey(prop);
+    if (keyName !== null && FORBIDDEN_SPREAD_KEYS.has(keyName)) {
+      // SECURITY (T-14-06) — drop a pollution-vector literal key entirely.
+      continue;
+    }
+    if (keyName !== null) {
+      const mapped = htmlAttrToJsxName(keyName);
+      if (mapped !== keyName) {
+        prop.key = t.identifier(mapped);
+        prop.computed = false;
+      }
+    }
+    kept.push(prop);
+  }
+  cloned.properties = kept;
+  return cloned;
+}
+
+/**
+ * Phase 14 R6 — split an `r-bind` LITERAL into (class-value, style-value, rest).
+ * The `class`/`style` keys are extracted so they can be fed into the existing
+ * multi-source class/style merge paths; `rest` is the object with those keys
+ * removed, ready for a `{...rest}` spread. Returns null entries when a key is
+ * absent. Operates on the ALREADY-REMAPPED object (key is `className`/`style`).
+ */
+function splitClassStyleFromLiteral(obj: t.ObjectExpression): {
+  classValue: t.Expression | null;
+  styleValue: t.Expression | null;
+  rest: t.ObjectExpression;
+} {
+  let classValue: t.Expression | null = null;
+  let styleValue: t.Expression | null = null;
+  const restProps: t.ObjectExpression['properties'] = [];
+  for (const prop of obj.properties) {
+    if (t.isObjectProperty(prop)) {
+      const keyName = staticPropKey(prop);
+      if (keyName === 'className' && t.isExpression(prop.value)) {
+        classValue = prop.value;
+        continue;
+      }
+      if (keyName === 'style' && t.isExpression(prop.value)) {
+        styleValue = prop.value;
+        continue;
+      }
+    }
+    restProps.push(prop);
+  }
+  const rest = t.objectExpression(restProps);
+  return { classValue, styleValue, rest };
+}
+
+/**
  * Render an object-literal expression's properties as a clsx-compatible
  * object expression that maps `styles.X` for known CSS module class keys.
  *
@@ -860,6 +959,73 @@ export interface EmitAttributesResult {
 }
 
 /**
+ * Phase 14 D-03/D-04/R6 — render an `r-bind` spread for the React target.
+ *
+ * Three cases:
+ *   - `$attrs` (bare Identifier) → `{...attrs}` — EXEMPT from key normalization
+ *     (D-04). `rewriteTemplateExpression` rewrites the `$attrs` accessor.
+ *   - LITERAL ObjectExpression  → keys remapped at compile time
+ *     (`class`→`className`, …); `__proto__`/`constructor`/`prototype` skipped.
+ *     R6: when the element ALSO has an explicit `class` binding, the literal's
+ *     `className` key is extracted (see `extractLiteralClassExpr`) and only the
+ *     `rest` keys are spread here.
+ *   - DYNAMIC (any other expr)  → `{...normalizeAttrs(<expr>)}` + the runtime
+ *     import is collected.
+ *
+ * KNOWN LIMITATION (RESEARCH Open Question 1 / Assumption A4) — for a DYNAMIC
+ * `r-bind` object the keys are NOT known at compile time, so a `class`/`style`
+ * key inside a dynamic spread CANNOT be extracted into the class/style merge.
+ * Per RESEARCH Option (a) this is an accepted v1 limitation: React's own JSX
+ * `{...obj}` last-wins ordering applies (a later `{...obj}` overrides an
+ * earlier `className`). The R6 acceptance fixture uses a LITERAL `r-bind`, so
+ * the literal path is the mandatory one and is fully merge-correct.
+ */
+function emitSpread(
+  attr: Extract<AttributeBinding, { kind: 'spreadBinding' }>,
+  ctx: EmitAttrCtx,
+  /** When the element has an explicit `class` binding, the literal's class is
+   *  extracted upstream — emit only the `rest`. */
+  hasExplicitClass: boolean,
+): string {
+  if (isAttrsIdentifier(attr.expression)) {
+    // D-04 — $attrs spread, no key normalization.
+    return `{...${renderExpr(attr.expression, ctx.ir)}}`;
+  }
+  if (t.isObjectExpression(attr.expression)) {
+    // D-03 LITERAL — compile-time key remap, zero runtime cost.
+    const remapped = remapObjectKeysReact(attr.expression);
+    if (hasExplicitClass) {
+      // R6 — `className`/`style` already extracted into the merge paths; only
+      // spread the remaining keys.
+      const { rest } = splitClassStyleFromLiteral(remapped);
+      return `{...${renderExpr(rest, ctx.ir)}}`;
+    }
+    return `{...${renderExpr(remapped, ctx.ir)}}`;
+  }
+  // D-03 DYNAMIC — runtime key remap.
+  ctx.collectors.runtime.add('normalizeAttrs');
+  return `{...normalizeAttrs(${renderExpr(attr.expression, ctx.ir)})}`;
+}
+
+/**
+ * Phase 14 R6 — extract a `class`/`className` value from an `r-bind` LITERAL so
+ * it can be folded into the element's class-merge. Returns the value
+ * expressions (class + style) when the spread is a literal carrying those
+ * keys, else null entries. Dynamic spreads return nulls (keys unknowable —
+ * see `emitSpread` KNOWN LIMITATION).
+ */
+function extractLiteralClassStyle(
+  attr: Extract<AttributeBinding, { kind: 'spreadBinding' }>,
+): { classValue: t.Expression | null; styleValue: t.Expression | null } {
+  if (isAttrsIdentifier(attr.expression) || !t.isObjectExpression(attr.expression)) {
+    return { classValue: null, styleValue: null };
+  }
+  const remapped = remapObjectKeysReact(attr.expression);
+  const { classValue, styleValue } = splitClassStyleFromLiteral(remapped);
+  return { classValue, styleValue };
+}
+
+/**
  * Top-level entry: emit all attributes for an element. Buckets `class` and
  * `:class` together for single-className composition, and emits other
  * attributes through emitNonClassAttribute.
@@ -877,15 +1043,42 @@ export function emitAttributes(
   const out: string[] = [];
   const consumed = new Set<AttributeBinding>();
 
+  // Phase 14 R6 — does the element have an explicit `class` binding? When so,
+  // a `class`/`className` key inside an `r-bind` LITERAL must be folded into
+  // the class-merge (not spread as a separate `className`, which would clobber
+  // the explicit one). A bare `class` static / `:class` binding both bucket
+  // under name `class` in Phase-2 IR.
+  const hasExplicitClass = (buckets.get('class')?.length ?? 0) > 0;
+
+  // Phase 14 R6 — synthesise extra `class` AttributeBindings from any `r-bind`
+  // LITERAL that carries a `class` key, so `composeClassName` merges them with
+  // the explicit `:class`. The synthetic bindings adopt the spread's source
+  // position so the existing positional last-wins semantics are preserved.
+  const literalClassBindings = new Map<AttributeBinding, AttributeBinding>();
+  if (hasExplicitClass) {
+    for (const a of attrs) {
+      if (a.kind !== 'spreadBinding') continue;
+      const { classValue } = extractLiteralClassStyle(a);
+      if (classValue !== null) {
+        literalClassBindings.set(a, {
+          kind: 'binding',
+          name: 'class',
+          expression: classValue,
+          deps: [],
+          sourceLoc: a.sourceLoc,
+        });
+      }
+    }
+  }
+
   for (const a of attrs) {
     if (consumed.has(a)) continue;
 
     // Phase 14 R2 / D-07 — the bare-spread `r-bind="<expr>"` form (and the
     // synthesized `$attrs` auto-fallthrough spread). React's native
-    // attribute-spread idiom is the JSX spread `{...<obj>}` — every own
-    // enumerable key of the object becomes a prop on the host element.
+    // attribute-spread idiom is the JSX spread `{...<obj>}`.
     if (a.kind === 'spreadBinding') {
-      out.push(`{...${renderExpr(a.expression, ctx.ir)}}`);
+      out.push(emitSpread(a, ctx, literalClassBindings.has(a)));
       consumed.add(a);
       continue;
     }
@@ -907,8 +1100,19 @@ export function emitAttributes(
           consumed.add(ba);
         }
       }
-      if (classAttrs.length === 0) continue;
-      const classNameValue = composeClassName(classAttrs, ctx);
+      // R6 — fold in the class extracted from any `r-bind` LITERAL, in the
+      // spread's source order (positional last-wins is preserved).
+      const merged: AttributeBinding[] = [];
+      for (const src of attrs) {
+        if (src.kind === 'spreadBinding') {
+          const synthetic = literalClassBindings.get(src);
+          if (synthetic) merged.push(synthetic);
+        } else if (classAttrs.includes(src)) {
+          merged.push(src);
+        }
+      }
+      if (merged.length === 0) continue;
+      const classNameValue = composeClassName(merged, ctx);
       out.push(`className={${classNameValue}}`);
       continue;
     }

@@ -122,6 +122,139 @@ function htmlAttrToSolidName(name: string): string {
   return HTML_TO_SOLID_ATTR[lower] ?? name;
 }
 
+/**
+ * Phase 14 D-04 — the magic accessor whose `r-bind` spread is EXEMPT from key
+ * normalization. A `$attrs` cluster already carries target-native keys.
+ */
+function isAttrsIdentifier(expr: t.Expression): boolean {
+  return t.isIdentifier(expr, { name: '$attrs' });
+}
+
+/**
+ * Phase 14 SECURITY (T-14-06) — keys that must never reach the emitted object
+ * from an author-controlled `r-bind` literal.
+ */
+const FORBIDDEN_SPREAD_KEYS: ReadonlySet<string> = new Set([
+  '__proto__',
+  'constructor',
+  'prototype',
+]);
+
+/**
+ * Read an ObjectProperty's static key name, or null when the key is not a
+ * statically-knowable Identifier / StringLiteral.
+ */
+function staticPropKey(prop: t.ObjectProperty): string | null {
+  if (t.isIdentifier(prop.key) && !prop.computed) return prop.key.name;
+  if (t.isStringLiteral(prop.key)) return prop.key.value;
+  return null;
+}
+
+/**
+ * Phase 14 D-03 — compile-time r-bind key remap for the Solid target.
+ *
+ * This map is INTENTIONALLY DISTINCT from `HTML_TO_SOLID_ATTR` (the generic
+ * attribute-name map): for a `r-bind` LITERAL object, `for` MUST become
+ * `htmlFor` to align with the runtime `normalizeAttrs` helper and with the
+ * React-DOM-shared property names that Solid honors when used as a JSX
+ * prop. (`HTML_TO_SOLID_ATTR.for` keeps `for` for `<label for="...">` —
+ * a different code path; conflating the two would silently break consumers
+ * who spread `for: 'input-id'` through `r-bind`.)
+ *
+ * Solid keeps `class` as `class` (Solid JSX native) — `class` is NOT in this
+ * table.
+ */
+const RBIND_HTML_TO_SOLID_ATTR: Readonly<Record<string, string>> = {
+  for: 'htmlFor',
+  tabindex: 'tabIndex',
+  readonly: 'readOnly',
+  maxlength: 'maxLength',
+  minlength: 'minLength',
+  colspan: 'colSpan',
+  rowspan: 'rowSpan',
+  contenteditable: 'contentEditable',
+  spellcheck: 'spellCheck',
+  crossorigin: 'crossOrigin',
+  inputmode: 'inputMode',
+  enterkeyhint: 'enterKeyHint',
+  formaction: 'formAction',
+  formenctype: 'formEnctype',
+  formmethod: 'formMethod',
+  formnovalidate: 'formNoValidate',
+  formtarget: 'formTarget',
+  referrerpolicy: 'referrerPolicy',
+  srcset: 'srcSet',
+  enctype: 'encType',
+  novalidate: 'noValidate',
+  usemap: 'useMap',
+  acceptcharset: 'acceptCharset',
+  hreflang: 'hrefLang',
+  datetime: 'dateTime',
+};
+
+/**
+ * Phase 14 D-03 — compile-time key remap of an `r-bind` LITERAL object for the
+ * Solid target. Returns a NEW ObjectExpression (IR never mutated) with the
+ * HTML-shape keys renamed to Solid-JSX naming, `class` KEPT (Solid difference),
+ * and `__proto__`/`constructor`/`prototype` keys SKIPPED (T-14-06).
+ */
+function remapObjectKeysSolid(obj: t.ObjectExpression): t.ObjectExpression {
+  const cloned = t.cloneNode(obj, true, false) as t.ObjectExpression;
+  const kept: t.ObjectExpression['properties'] = [];
+  for (const prop of cloned.properties) {
+    if (!t.isObjectProperty(prop)) {
+      kept.push(prop);
+      continue;
+    }
+    const keyName = staticPropKey(prop);
+    if (keyName !== null && FORBIDDEN_SPREAD_KEYS.has(keyName)) {
+      continue;
+    }
+    if (keyName !== null) {
+      // r-bind uses a distinct remap table — see comment on
+      // RBIND_HTML_TO_SOLID_ATTR for why this is NOT htmlAttrToSolidName.
+      const mapped = RBIND_HTML_TO_SOLID_ATTR[keyName.toLowerCase()] ?? keyName;
+      if (mapped !== keyName) {
+        prop.key = t.identifier(mapped);
+        prop.computed = false;
+      }
+    }
+    kept.push(prop);
+  }
+  cloned.properties = kept;
+  return cloned;
+}
+
+/**
+ * Phase 14 R6 — split an `r-bind` LITERAL into (class-value, style-value, rest).
+ * Operates on the ALREADY-REMAPPED object (Solid key for class is still `class`).
+ */
+function splitClassStyleFromLiteral(obj: t.ObjectExpression): {
+  classValue: t.Expression | null;
+  styleValue: t.Expression | null;
+  rest: t.ObjectExpression;
+} {
+  let classValue: t.Expression | null = null;
+  let styleValue: t.Expression | null = null;
+  const restProps: t.ObjectExpression['properties'] = [];
+  for (const prop of obj.properties) {
+    if (t.isObjectProperty(prop)) {
+      const keyName = staticPropKey(prop);
+      if (keyName === 'class' && t.isExpression(prop.value)) {
+        classValue = prop.value;
+        continue;
+      }
+      if (keyName === 'style' && t.isExpression(prop.value)) {
+        styleValue = prop.value;
+        continue;
+      }
+    }
+    restProps.push(prop);
+  }
+  const rest = t.objectExpression(restProps);
+  return { classValue, styleValue, rest };
+}
+
 function colonPropToSolidName(name: string): string {
   const bare = name.startsWith(':') ? name.slice(1) : name;
   if (bare.startsWith('aria-') || bare.startsWith('data-')) return bare;
@@ -439,6 +572,68 @@ export interface EmitAttributesResult {
 }
 
 /**
+ * Phase 14 D-03/D-04/R6 — render an `r-bind` spread for the Solid target.
+ *
+ * Three cases:
+ *   - `$attrs` (bare Identifier) → `{...attrs}` — EXEMPT from key normalization
+ *     (D-04). `rewriteTemplateExpression` rewrites the `$attrs` accessor.
+ *   - LITERAL ObjectExpression  → keys remapped at compile time (`class` is
+ *     KEPT for Solid; `for`→`htmlFor`, …); `__proto__`/`constructor`/`prototype`
+ *     skipped. R6: when the element ALSO has an explicit `class` binding, the
+ *     literal's `class` is extracted upstream and only `rest` is spread here.
+ *   - DYNAMIC (any other expr)  → `{...normalizeAttrs(<expr>)}` + the runtime
+ *     import is collected.
+ *
+ * KNOWN LIMITATION (RESEARCH Open Question 1 / Assumption A4) — for a DYNAMIC
+ * `r-bind` object the keys are NOT known at compile time, so a `class`/`style`
+ * key inside a dynamic spread CANNOT be extracted into the class merge. Per
+ * RESEARCH Option (a) this is an accepted v1 limitation: Solid's own JSX
+ * `{...obj}` last-wins ordering applies. The R6 acceptance fixture uses a
+ * LITERAL `r-bind`, so the literal path is the mandatory one and is fully
+ * merge-correct.
+ */
+function emitSpread(
+  attr: Extract<AttributeBinding, { kind: 'spreadBinding' }>,
+  ctx: EmitAttrCtx,
+  /** When the element has an explicit `class` binding, the literal's class is
+   *  extracted upstream — emit only the `rest`. */
+  hasExplicitClass: boolean,
+): string {
+  if (isAttrsIdentifier(attr.expression)) {
+    // D-04 — $attrs spread, no key normalization.
+    return `{...${renderExpr(attr.expression, ctx.ir, ctx.invokeAccessors)}}`;
+  }
+  if (t.isObjectExpression(attr.expression)) {
+    // D-03 LITERAL — compile-time key remap, zero runtime cost.
+    const remapped = remapObjectKeysSolid(attr.expression);
+    if (hasExplicitClass) {
+      const { rest } = splitClassStyleFromLiteral(remapped);
+      return `{...${renderExpr(rest, ctx.ir, ctx.invokeAccessors)}}`;
+    }
+    return `{...${renderExpr(remapped, ctx.ir, ctx.invokeAccessors)}}`;
+  }
+  // D-03 DYNAMIC — runtime key remap.
+  ctx.collectors.runtime.add('normalizeAttrs');
+  return `{...normalizeAttrs(${renderExpr(attr.expression, ctx.ir, ctx.invokeAccessors)})}`;
+}
+
+/**
+ * Phase 14 R6 — extract a `class`/`style` value from an `r-bind` LITERAL so it
+ * can be folded into the element's merge paths. Returns null entries for a
+ * `$attrs` spread or a dynamic spread.
+ */
+function extractLiteralClassStyle(
+  attr: Extract<AttributeBinding, { kind: 'spreadBinding' }>,
+): { classValue: t.Expression | null; styleValue: t.Expression | null } {
+  if (isAttrsIdentifier(attr.expression) || !t.isObjectExpression(attr.expression)) {
+    return { classValue: null, styleValue: null };
+  }
+  const remapped = remapObjectKeysSolid(attr.expression);
+  const { classValue, styleValue } = splitClassStyleFromLiteral(remapped);
+  return { classValue, styleValue };
+}
+
+/**
  * Top-level entry: emit all attributes for an element.
  * Buckets `class` and `:class` together for composition.
  * Skips consumed (r-* / @event / :key) attributes.
@@ -454,15 +649,37 @@ export function emitAttributes(
   const out: string[] = [];
   const consumed = new Set<AttributeBinding>();
 
+  // Phase 14 R6 — does the element have an explicit `class` binding?
+  const hasExplicitClass = (buckets.get('class')?.length ?? 0) > 0;
+
+  // Phase 14 R6 — synthesise extra `class` AttributeBindings from any `r-bind`
+  // LITERAL that carries a `class` key, in spread source order, so the existing
+  // class merge sees them.
+  const literalClassBindings = new Map<AttributeBinding, AttributeBinding>();
+  if (hasExplicitClass) {
+    for (const a of attrs) {
+      if (a.kind !== 'spreadBinding') continue;
+      const { classValue } = extractLiteralClassStyle(a);
+      if (classValue !== null) {
+        literalClassBindings.set(a, {
+          kind: 'binding',
+          name: 'class',
+          expression: classValue,
+          deps: [],
+          sourceLoc: a.sourceLoc,
+        });
+      }
+    }
+  }
+
   for (const a of attrs) {
     if (consumed.has(a)) continue;
 
     // Phase 14 R2 / D-07 — the bare-spread `r-bind="<expr>"` form (and the
     // synthesized `$attrs` auto-fallthrough spread). Solid's native
-    // attribute-spread idiom is the JSX spread `{...<obj>}` — every own
-    // enumerable key of the object becomes a prop on the host element.
+    // attribute-spread idiom is the JSX spread `{...<obj>}`.
     if (a.kind === 'spreadBinding') {
-      out.push(`{...${renderExpr(a.expression, ctx.ir, ctx.invokeAccessors)}}`);
+      out.push(emitSpread(a, ctx, literalClassBindings.has(a)));
       consumed.add(a);
       continue;
     }
@@ -479,14 +696,23 @@ export function emitAttributes(
       const bucketAttrs = buckets.get('class') ?? [];
       const classListAttrs: AttributeBinding[] = [];
       const classStrAttrs: AttributeBinding[] = [];
-      for (const ba of bucketAttrs) {
-        if (consumed.has(ba)) continue;
-        if (ba.kind === 'binding' && t.isObjectExpression(ba.expression)) {
-          classListAttrs.push(ba);
-        } else {
-          classStrAttrs.push(ba);
+      // Walk the FULL attrs list to preserve source order — at each spread
+      // position with a literal class, insert the synthetic class binding so
+      // the R6 positional last-wins merge matches the author's source order.
+      for (const src of attrs) {
+        if (src.kind === 'spreadBinding') {
+          const synthetic = literalClassBindings.get(src);
+          if (synthetic) classStrAttrs.push(synthetic);
+          continue;
         }
-        consumed.add(ba);
+        if (!bucketAttrs.includes(src)) continue;
+        if (consumed.has(src)) continue;
+        if (src.kind === 'binding' && t.isObjectExpression(src.expression)) {
+          classListAttrs.push(src);
+        } else {
+          classStrAttrs.push(src);
+        }
+        consumed.add(src);
       }
       // Emit `class=` for string/interpolated attrs.
       if (classStrAttrs.length > 0) {

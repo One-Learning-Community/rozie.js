@@ -51,7 +51,8 @@ export type RuntimeSolidImport =
   | 'createOutsideClick'
   | 'createDebouncedHandler'
   | 'createThrottledHandler'
-  | 'parseInlineStyle';
+  | 'parseInlineStyle'
+  | 'normalizeAttrs';
 
 export class RuntimeSolidImportCollector {
   private symbols = new Set<RuntimeSolidImport>();

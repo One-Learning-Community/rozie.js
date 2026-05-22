@@ -295,6 +295,29 @@ export function rewriteTemplateExpression(
 
     Identifier(path) {
       const name = path.node.name;
+
+      // Phase 14 D-04 — the `$attrs` magic accessor lowers to the bare `attrs`
+      // identifier. The spread emitter decides this is a `$attrs` case BEFORE
+      // calling rewrite (so it skips the `normalizeAttrs` wrap); this branch
+      // turns `{...$attrs}` into the lowered `{...attrs}`. `attrs` is the
+      // synthesised binding the per-target shell will introduce when synthesis
+      // is un-gated in Plan 14-05.
+      if (name === '$attrs') {
+        const parent = path.parent;
+        if (
+          (t.isMemberExpression(parent) || t.isOptionalMemberExpression(parent)) &&
+          parent.property === path.node
+        ) {
+          return;
+        }
+        if (t.isObjectProperty(parent) && parent.key === path.node && !parent.computed) {
+          return;
+        }
+        path.replaceWith(t.identifier('attrs'));
+        path.skip();
+        return;
+      }
+
       const isComputed = computedNames.has(name);
       const isInvokeAccessor = invokeAccessors?.has(name) ?? false;
       // Both branches rewrite bare references to `name()` — computed getters

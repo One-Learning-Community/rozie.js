@@ -112,6 +112,32 @@ export function rewriteTemplateExpression(
   }
 
   traverse(wrapper, {
+    // Phase 14 D-04 — the `$attrs` magic accessor lowers to the bare `attrs`
+    // identifier. The spread emitter has ALREADY decided this is a `$attrs`
+    // case BEFORE calling rewrite (so it skips the `normalizeAttrs` wrap);
+    // this visitor is what turns `{...$attrs}` into the lowered `{...attrs}`.
+    // `attrs` is the synthesised binding the per-target shell will introduce
+    // when synthesis is un-gated in Plan 14-05. Until then this rewrite is
+    // observable only via manual `r-bind="$attrs"` fixtures (synthesis off).
+    Identifier(path) {
+      if (path.node.name !== '$attrs') return;
+      // Skip the LHS of a MemberExpression / OptionalMemberExpression (those
+      // are handled by their own visitors when applicable). Skip property keys
+      // on object literals (`{ $attrs: x }` is not a magic reference).
+      const parent = path.parent;
+      if (
+        (t.isMemberExpression(parent) || t.isOptionalMemberExpression(parent)) &&
+        parent.property === path.node
+      ) {
+        return;
+      }
+      if (t.isObjectProperty(parent) && parent.key === path.node && !parent.computed) {
+        return;
+      }
+      path.replaceWith(t.identifier('attrs'));
+      path.skip();
+    },
+
     AssignmentExpression(path) {
       const node = path.node;
       const left = node.left;

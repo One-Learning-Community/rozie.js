@@ -73,6 +73,7 @@ export type RuntimeReactImport =
   | 'useThrottledCallback'
   | 'clsx'
   | 'parseInlineStyle'
+  | 'normalizeAttrs'
   | 'isEnter'
   | 'isEscape'
   | 'isTab'
