@@ -65,6 +65,32 @@ export function rewriteTemplateExpression(
   const wrapper = t.file(t.program([t.expressionStatement(cloned)]));
 
   traverse(wrapper, {
+    // Phase 14 D-04 — the `$attrs` magic accessor lowers to Svelte 5's native
+    // `$$restProps` automatic-rest-attributes object. A bare `r-bind="$attrs"`
+    // therefore emits `{...$$restProps}`. The spread emitter has ALREADY
+    // decided this is a `$attrs` case BEFORE calling rewrite; this visitor is
+    // what turns the bare `$attrs` Identifier into `$$restProps`. Until
+    // synthesis is un-gated in Plan 14-05 the rewrite is observable only via
+    // manual `r-bind="$attrs"` fixtures.
+    Identifier(path) {
+      if (path.node.name !== '$attrs') return;
+      // Skip the RHS-position of a MemberExpression / OptionalMemberExpression
+      // (handled by their own visitors when applicable). Skip object-literal
+      // property keys (`{ $attrs: x }` is not a magic reference).
+      const parent = path.parent;
+      if (
+        (t.isMemberExpression(parent) || t.isOptionalMemberExpression(parent)) &&
+        parent.property === path.node
+      ) {
+        return;
+      }
+      if (t.isObjectProperty(parent) && parent.key === path.node && !parent.computed) {
+        return;
+      }
+      path.replaceWith(t.identifier('$$restProps'));
+      path.skip();
+    },
+
     MemberExpression(path) {
       const obj = path.node.object;
       if (!t.isIdentifier(obj)) return;

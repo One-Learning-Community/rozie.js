@@ -247,6 +247,85 @@ function tryEmitStyleObjectLiteral(
 }
 
 /**
+ * Phase 14 R6 — keys that must never reach the emitted object from an
+ * author-controlled `r-bind` LITERAL. Mirrors the React/Solid/Vue
+ * `FORBIDDEN_SPREAD_KEYS` set and the Phase 02 `collectPropDecls` guard
+ * (T-14-06).
+ */
+const FORBIDDEN_SPREAD_KEYS: ReadonlySet<string> = new Set([
+  '__proto__',
+  'constructor',
+  'prototype',
+]);
+
+/**
+ * Read an ObjectProperty's static key name, or null when the key is not a
+ * statically-knowable Identifier / StringLiteral (computed expressions etc.).
+ */
+function staticPropKey(prop: t.ObjectProperty): string | null {
+  if (t.isIdentifier(prop.key) && !prop.computed) return prop.key.name;
+  if (t.isStringLiteral(prop.key)) return prop.key.value;
+  return null;
+}
+
+/**
+ * Phase 14 R6 — split an `r-bind` LITERAL object into (class-value, style-value,
+ * rest). The `class`/`style` keys are extracted so they can be fed into Svelte's
+ * `class={[...]}` / `style={[...]}` merge paths; `rest` is the object with those
+ * keys removed, ready for a `{...obj}` spread. Returns null entries when a key
+ * is absent. T-14-06: `__proto__`/`constructor`/`prototype` keys are dropped
+ * from the literal entirely.
+ *
+ * Operates on Svelte HTML attribute names verbatim — no key remap is applied
+ * (D-03 is React/Solid-only; Svelte wants HTML names through).
+ */
+function splitClassStyleFromSvelteLiteral(obj: t.ObjectExpression): {
+  classValue: t.Expression | null;
+  styleValue: t.Expression | null;
+  rest: t.ObjectExpression;
+} {
+  let classValue: t.Expression | null = null;
+  let styleValue: t.Expression | null = null;
+  const restProps: t.ObjectExpression['properties'] = [];
+  for (const prop of obj.properties) {
+    if (t.isObjectProperty(prop)) {
+      const keyName = staticPropKey(prop);
+      // T-14-06 — drop a pollution-vector literal key entirely.
+      if (keyName !== null && FORBIDDEN_SPREAD_KEYS.has(keyName)) continue;
+      if (keyName === 'class' && t.isExpression(prop.value)) {
+        classValue = prop.value;
+        continue;
+      }
+      if (keyName === 'style' && t.isExpression(prop.value)) {
+        styleValue = prop.value;
+        continue;
+      }
+    }
+    restProps.push(prop);
+  }
+  const rest = t.objectExpression(restProps);
+  return { classValue, styleValue, rest };
+}
+
+/**
+ * Phase 14 R6 — extract a `class`/`style` value from an `r-bind` LITERAL so it
+ * can be folded into the element's class/style merge. Returns null entries when
+ * the spread is not a literal (dynamic spreads / `$attrs` — keys unknowable;
+ * see `emitSingleAttr` KNOWN LIMITATION).
+ */
+function extractLiteralClassStyleFromSpread(
+  attr: Extract<AttributeBinding, { kind: 'spreadBinding' }>,
+): { classValue: t.Expression | null; styleValue: t.Expression | null } {
+  if (!t.isObjectExpression(attr.expression)) {
+    return { classValue: null, styleValue: null };
+  }
+  const { classValue, styleValue } = splitClassStyleFromSvelteLiteral(
+    attr.expression,
+  );
+  return { classValue, styleValue };
+}
+
+/**
  * Render interpolated segments as the inside of a JS template literal
  * (without the surrounding backticks). E.g.,
  *   [{static:'card '}, {binding: variant}] → 'card ${variant}'
@@ -274,6 +353,68 @@ function renderInterpolatedTemplateLiteral(
 }
 
 /**
+ * Phase 14 R2 / D-07 — render an `r-bind` spread for the Svelte target.
+ * Svelte 5's native attribute-spread idiom is the `{...<obj>}` directive —
+ * every own enumerable key of the object becomes an attribute on the host
+ * element. No key normalization is applied: Svelte wants HTML attribute names
+ * verbatim (D-03 is React/Solid-only).
+ *
+ * Per-target $attrs lowering: `rewriteTemplateExpression` rewrites a bare
+ * `$attrs` Identifier → `$$restProps`, Svelte's native rest-attributes object
+ * that captures every consumer-passed prop not destructured from `$props()`.
+ * The rewrite is observable here via manual `r-bind="$attrs"` fixtures;
+ * synthesis of the auto-fallthrough spread lands in Plan 14-05.
+ *
+ * KNOWN LIMITATION (RESEARCH Open Question 1 / Assumption A4 / Option a) — for
+ * a DYNAMIC `r-bind` object the keys are NOT known at compile time, so a
+ * `class`/`style` key inside a dynamic spread CANNOT be extracted into the
+ * class/style merge path. Svelte's own `{...obj}` last-wins applies (a later
+ * `{...obj}` overrides an earlier `class={...}` for the same key). The R6
+ * acceptance fixture uses a LITERAL `r-bind`, so the literal path is the
+ * mandatory one and is fully merge-correct.
+ */
+function emitSpread(
+  attr: Extract<AttributeBinding, { kind: 'spreadBinding' }>,
+  ir: IRComponent,
+  /** When the element has an explicit `class`/`style` binding, the literal's
+   *  class/style is extracted upstream — emit only the `rest`. */
+  hasExplicitClassOrStyle: boolean,
+): string {
+  if (
+    hasExplicitClassOrStyle &&
+    t.isObjectExpression(attr.expression)
+  ) {
+    // R6 — LITERAL spread with class/style extracted into the merge path; only
+    // spread the remaining keys.
+    const { rest } = splitClassStyleFromSvelteLiteral(attr.expression);
+    const expr = rewriteTemplateExpression(rest, ir);
+    return `{...${expr}}`;
+  }
+  if (t.isObjectExpression(attr.expression)) {
+    // LITERAL spread without an explicit class/style sibling — still apply the
+    // T-14-06 pollution guard so a `__proto__`/`constructor`/`prototype`
+    // literal key never reaches the emitted object.
+    const { rest, classValue, styleValue } = splitClassStyleFromSvelteLiteral(
+      attr.expression,
+    );
+    const restProps = [...rest.properties];
+    if (classValue !== null) {
+      restProps.push(t.objectProperty(t.identifier('class'), classValue));
+    }
+    if (styleValue !== null) {
+      restProps.push(t.objectProperty(t.identifier('style'), styleValue));
+    }
+    const scrubbed = t.objectExpression(restProps);
+    const expr = rewriteTemplateExpression(scrubbed, ir);
+    return `{...${expr}}`;
+  }
+  // DYNAMIC spread or bare `$attrs` Identifier — pass through verbatim.
+  // `rewriteTemplateExpression` rewrites `$attrs` → `$$restProps`.
+  const expr = rewriteTemplateExpression(attr.expression, ir);
+  return `{...${expr}}`;
+}
+
+/**
  * Emit a single attribute. Filters r-html (handled separately by
  * emitTemplateNode as a sibling `{@html ...}`).
  *
@@ -289,12 +430,11 @@ export function emitSingleAttr(
 
   const ir = ctx.ir;
 
-  // Phase 14 R2 / D-07 — the bare-spread `r-bind="<expr>"` form (and the
-  // synthesized `$attrs` auto-fallthrough spread). Svelte's native
-  // attribute-spread idiom is the `{...<obj>}` spread directive — every own
-  // enumerable key of the object becomes an attribute on the host element.
+  // Phase 14 R2 / D-07 — bare-spread emit. The R6 class/style merge is handled
+  // in `emitAttributes`; this single-attr fallback path is reached when no
+  // explicit class/style sibling exists.
   if (attr.kind === 'spreadBinding') {
-    return `{...${rewriteTemplateExpression(attr.expression, ir)}}`;
+    return emitSpread(attr, ir, /* hasExplicitClassOrStyle */ false);
   }
 
   if (attr.kind === 'static') {
@@ -472,6 +612,43 @@ export function emitAttributes(
     counts.set(a.name, (counts.get(a.name) ?? 0) + 1);
   }
 
+  // Phase 14 R6 — does the element have an explicit `class`/`style` binding?
+  // When so, a `class`/`style` key inside an `r-bind` LITERAL must be folded
+  // into the class/style merge path (not spread as a separate `class={…}`,
+  // which Svelte's `{...obj}` would last-wins-overwrite the explicit one).
+  const hasExplicitClass = (counts.get('class') ?? 0) > 0;
+  const hasExplicitStyle = (counts.get('style') ?? 0) > 0;
+
+  // Phase 14 R6 — synthesise extra `class`/`style` AttributeBindings from any
+  // `r-bind` LITERAL that carries those keys, so the merge path sees both the
+  // explicit `class`/`style` and the literal's value as merge sources. The
+  // synthetic bindings adopt the spread's source position so positional
+  // last-wins is preserved (Pitfall 2).
+  const literalClassBindings = new Map<AttributeBinding, AttributeBinding>();
+  const literalStyleBindings = new Map<AttributeBinding, AttributeBinding>();
+  for (const a of attrs) {
+    if (a.kind !== 'spreadBinding') continue;
+    const { classValue, styleValue } = extractLiteralClassStyleFromSpread(a);
+    if (hasExplicitClass && classValue !== null) {
+      literalClassBindings.set(a, {
+        kind: 'binding',
+        name: 'class',
+        expression: classValue,
+        deps: [],
+        sourceLoc: a.sourceLoc,
+      });
+    }
+    if (hasExplicitStyle && styleValue !== null) {
+      literalStyleBindings.set(a, {
+        kind: 'binding',
+        name: 'style',
+        expression: styleValue,
+        deps: [],
+        sourceLoc: a.sourceLoc,
+      });
+    }
+  }
+
   const out: string[] = [];
   const consumed = new WeakSet<AttributeBinding>();
 
@@ -479,29 +656,43 @@ export function emitAttributes(
     if (consumed.has(a)) continue;
 
     // Phase 14 R2 / D-07 — emit the name-less `spreadBinding` directly via
-    // `emitSingleAttr` (→ `{...<expr>}`); it skips the class/style name-merge.
+    // `emitSpread` (→ `{...<expr>}`). When a sibling explicit `class`/`style`
+    // exists AND the spread is a LITERAL carrying that key, the literal's
+    // value is folded into the class/style merge below; `emitSpread` drops
+    // those keys from the spread's `rest`.
     if (a.kind === 'spreadBinding') {
-      const rendered = emitSingleAttr(a, ctx);
-      if (rendered !== null) out.push(rendered);
+      const dropClass = literalClassBindings.has(a);
+      const dropStyle = literalStyleBindings.has(a);
+      out.push(emitSpread(a, ctx.ir, dropClass || dropStyle));
       consumed.add(a);
       continue;
     }
 
     if (a.name === 'r-html') continue;
 
-    if (
-      (a.name === 'class' || a.name === 'style') &&
-      (counts.get(a.name) ?? 0) > 1
-    ) {
-      // Merge ALL same-named class/style attrs into ONE array binding.
-      // Phase 14 — `spreadBinding` is the name-less kind; guard before `.name`.
-      const sameName = attrs.filter(
-        (x) => x.kind !== 'spreadBinding' && x.name === a.name,
-      );
-      for (const x of sameName) consumed.add(x);
-      const segments = sameName.map((x) => attrToArraySegment(x, ctx.ir));
-      out.push(`${a.name}={[${segments.join(', ')}]}`);
-      continue;
+    if (a.name === 'class' || a.name === 'style') {
+      const literalMap = a.name === 'class' ? literalClassBindings : literalStyleBindings;
+      const hasLiteralMerge = literalMap.size > 0;
+      const totalCount = (counts.get(a.name) ?? 0) + literalMap.size;
+      if (totalCount > 1) {
+        // Walk the FULL attrs list in source order, picking out the
+        // same-named bindings + any synthesised binding extracted from an
+        // `r-bind` LITERAL at its source position. Preserves positional
+        // last-wins between explicit `class`/`style` and the literal.
+        const merged: AttributeBinding[] = [];
+        for (const src of attrs) {
+          if (src.kind === 'spreadBinding') {
+            const synthetic = literalMap.get(src);
+            if (synthetic) merged.push(synthetic);
+          } else if (src.name === a.name && !isLiteralStyleObjectBinding(src)) {
+            merged.push(src);
+          }
+        }
+        for (const x of merged) consumed.add(x);
+        const segments = merged.map((x) => attrToArraySegment(x, ctx.ir));
+        out.push(`${a.name}={[${segments.join(', ')}]}`);
+        continue;
+      }
     }
 
     const rendered = emitSingleAttr(a, ctx);
