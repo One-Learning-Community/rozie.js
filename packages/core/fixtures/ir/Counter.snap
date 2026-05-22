@@ -29,6 +29,7 @@
         "value": 0
       },
       "isModel": true,
+      "required": false,
       "sourceLoc": {
         "start": 411,
         "end": 460
@@ -61,6 +62,7 @@
         "value": 1
       },
       "isModel": false,
+      "required": false,
       "sourceLoc": {
         "start": 464,
         "end": 499
@@ -109,6 +111,7 @@
         }
       },
       "isModel": false,
+      "required": false,
       "sourceLoc": {
         "start": 503,
         "end": 546
@@ -142,6 +145,7 @@
         "name": "Infinity"
       },
       "isModel": false,
+      "required": false,
       "sourceLoc": {
         "start": 550,
         "end": 592

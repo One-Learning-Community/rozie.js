@@ -29,6 +29,7 @@
         "value": false
       },
       "isModel": true,
+      "required": false,
       "sourceLoc": {
         "start": 624,
         "end": 691
@@ -61,6 +62,7 @@
         "value": true
       },
       "isModel": false,
+      "required": false,
       "sourceLoc": {
         "start": 695,
         "end": 748
@@ -93,6 +95,7 @@
         "value": true
       },
       "isModel": false,
+      "required": false,
       "sourceLoc": {
         "start": 752,
         "end": 805

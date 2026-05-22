@@ -26,6 +26,10 @@ export const RozieErrorCode = {
   NOT_OBJECT_LITERAL: 'ROZ011',
   LISTENER_KEY_NOT_STRING: 'ROZ012',
   LISTENER_VALUE_NOT_OBJECT: 'ROZ013',
+  // A `<props>` entry declared `required: true` also carries a `default:` —
+  // the default can never fire (a required prop is always passed), so Rozie
+  // drops the default. Warning severity (260521-oao).
+  REQUIRED_PROP_HAS_DEFAULT: 'ROZ014',
 
   // ---- Script parse (Plan 03) — ROZ030..ROZ049 ----
   SCRIPT_PARSE_ERROR: 'ROZ030',

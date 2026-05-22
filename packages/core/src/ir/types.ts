@@ -108,6 +108,24 @@ export interface ComponentDecl {
 }
 
 /**
+ * PropDecl — one declared `<props>` entry.
+ *
+ * Requiredness is a THREE-STATE semantic, and `required` is its SOLE
+ * determinant — `defaultValue` is orthogonal (mirrors the Vue Options-API
+ * model):
+ *
+ *   (a) `required === true` AND `defaultValue === null` ⇒ REQUIRED — the
+ *       consumer MUST pass the prop; emitters produce a non-optional prop
+ *       contract (`name: T` / `input.required` / `!: T` / `defineModel(...,
+ *       { required: true })`).
+ *   (b) any prop carrying a `default:` (`defaultValue !== null`) ⇒ OPTIONAL,
+ *       regardless of `required`. A `required: true` + `default:` pairing is
+ *       incoherent — the default could never fire — so `lowerProps` DROPS the
+ *       default (forces `defaultValue` to `null`) and emits a ROZ014 warning;
+ *       the prop then behaves as case (a).
+ *   (c) neither `required` nor `default:` ⇒ OPTIONAL — the consumer MAY omit
+ *       the prop and the internal value is `T | undefined`.
+ *
  * @experimental — shape may change before v1.0
  */
 export interface PropDecl {
@@ -116,6 +134,14 @@ export interface PropDecl {
   typeAnnotation: PropTypeAnnotation;
   defaultValue: Expression | null;
   isModel: boolean;
+  /**
+   * `true` iff the `<props>` entry declared `required: true` (literal boolean
+   * `true` — `false`, non-boolean values, and an absent key all yield
+   * `false`). The SOLE determinant of prop requiredness; see the interface
+   * JSDoc for the three-state semantic and the ROZ014 `required`+`default`
+   * interaction.
+   */
+  required: boolean;
   sourceLoc: SourceLoc;
 }
 

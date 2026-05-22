@@ -29,6 +29,7 @@
         "value": "Search…"
       },
       "isModel": false,
+      "required": false,
       "sourceLoc": {
         "start": 523,
         "end": 573
@@ -61,6 +62,7 @@
         "value": 2
       },
       "isModel": false,
+      "required": false,
       "sourceLoc": {
         "start": 577,
         "end": 619
@@ -93,6 +95,7 @@
         "value": false
       },
       "isModel": false,
+      "required": false,
       "sourceLoc": {
         "start": 623,
         "end": 669

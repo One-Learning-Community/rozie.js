@@ -29,6 +29,7 @@
         "value": false
       },
       "isModel": true,
+      "required": false,
       "sourceLoc": {
         "start": 787,
         "end": 849
@@ -61,6 +62,7 @@
         "value": true
       },
       "isModel": false,
+      "required": false,
       "sourceLoc": {
         "start": 853,
         "end": 901
@@ -93,6 +95,7 @@
         "value": true
       },
       "isModel": false,
+      "required": false,
       "sourceLoc": {
         "start": 905,
         "end": 953
@@ -125,6 +128,7 @@
         "value": true
       },
       "isModel": false,
+      "required": false,
       "sourceLoc": {
         "start": 957,
         "end": 1005
@@ -157,6 +161,7 @@
         "value": ""
       },
       "isModel": false,
+      "required": false,
       "sourceLoc": {
         "start": 1009,
         "end": 1055

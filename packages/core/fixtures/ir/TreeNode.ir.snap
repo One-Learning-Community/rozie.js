@@ -11,6 +11,7 @@
       },
       "defaultValue": null,
       "isModel": false,
+      "required": false,
       "sourceLoc": {
         "start": 91,
         "end": 114
@@ -60,6 +61,7 @@
         }
       },
       "isModel": false,
+      "required": false,
       "sourceLoc": {
         "start": 116,
         "end": 160

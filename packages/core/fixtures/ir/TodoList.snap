@@ -46,6 +46,7 @@
         }
       },
       "isModel": true,
+      "required": false,
       "sourceLoc": {
         "start": 539,
         "end": 593
@@ -78,6 +79,7 @@
         "value": "Todo"
       },
       "isModel": false,
+      "required": false,
       "sourceLoc": {
         "start": 597,
         "end": 637

@@ -11,6 +11,7 @@
       },
       "defaultValue": null,
       "isModel": false,
+      "required": false,
       "sourceLoc": {
         "start": 35,
         "end": 58

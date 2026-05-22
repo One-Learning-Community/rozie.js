@@ -17,6 +17,7 @@ import * as t from '@babel/types';
 import type { PropsAST } from '../../ast/blocks/PropsAST.js';
 import type { BindingsTable, PropDeclEntry } from '../../semantic/types.js';
 import type { Diagnostic } from '../../diagnostics/Diagnostic.js';
+import { RozieErrorCode } from '../../diagnostics/codes.js';
 import type { PropDecl, PropTypeAnnotation } from '../types.js';
 
 /**
@@ -70,20 +71,60 @@ function findTypeExpression(entry: PropDeclEntry): t.Expression | null {
   return null;
 }
 
+/**
+ * Read the `required:` flag off a prop's options ObjectExpression.
+ *
+ * Modeled on `findTypeExpression` — walks `entry.decl.value`'s
+ * ObjectProperties. Returns `true` ONLY when a `required:` key carries a
+ * literal boolean `true`. An absent key, `required: false`, or any
+ * non-boolean value (`required: 0`, `required: someIdent`) all yield `false`.
+ */
+function findRequiredFlag(entry: PropDeclEntry): boolean {
+  const decl = entry.decl;
+  if (!t.isObjectExpression(decl.value)) return false;
+  for (const prop of decl.value.properties) {
+    if (!t.isObjectProperty(prop)) continue;
+    const key = prop.key;
+    const keyName =
+      t.isIdentifier(key) ? key.name :
+      t.isStringLiteral(key) ? key.value :
+      null;
+    if (keyName !== 'required') continue;
+    return t.isBooleanLiteral(prop.value) && prop.value.value;
+  }
+  return false;
+}
+
 export function lowerProps(
   _propsAst: PropsAST,
   bindings: BindingsTable,
-  _diagnostics: Diagnostic[],
+  diagnostics: Diagnostic[],
 ): PropDecl[] {
   const out: PropDecl[] = [];
   for (const entry of bindings.props.values()) {
     const typeExpr = findTypeExpression(entry);
+    const required = findRequiredFlag(entry);
+    // `required` is the sole determinant of requiredness; a `required: true`
+    // prop that ALSO carries a `default:` is incoherent — the default can
+    // never fire — so drop it and emit a ROZ014 warning.
+    let defaultValue = entry.defaultExpression;
+    if (required && defaultValue !== null) {
+      diagnostics.push({
+        code: RozieErrorCode.REQUIRED_PROP_HAS_DEFAULT,
+        severity: 'warning',
+        message: `Prop '${entry.name}' is declared 'required: true' but also has a 'default:' — the default can never fire on a required prop and has been dropped.`,
+        loc: entry.sourceLoc,
+        hint: "Remove either 'required: true' or the 'default:' value. A prop with a default is optional; a required prop is always passed by the consumer.",
+      });
+      defaultValue = null;
+    }
     out.push({
       type: 'PropDecl',
       name: entry.name,
       typeAnnotation: inferTypeAnnotation(typeExpr),
-      defaultValue: entry.defaultExpression,
+      defaultValue,
       isModel: entry.isModel,
+      required,
       sourceLoc: entry.sourceLoc,
     });
   }
