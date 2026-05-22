@@ -170,6 +170,7 @@ const y = $props.value + 2;
           typeAnnotation: { kind: 'identifier', name: 'Number' },
           defaultValue: null,
           isModel: false,
+          required: false,
           sourceLoc: { start: 0, end: 0 },
         },
       ],

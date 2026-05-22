@@ -27,7 +27,7 @@ export default function Modal(_props: ModalProps): JSX.Element {
   const [local, rest] = splitProps(_merged, ['open', 'closeOnEscape', 'closeOnBackdrop', 'lockBodyScroll', 'title', 'children']);
   const resolved = children(() => local.children);
 
-  const [open, setOpen] = createControllableSignal<boolean>(_props as Record<string, unknown>, 'open', false);
+  const [open, setOpen] = createControllableSignal<boolean>(_props as unknown as Record<string, unknown>, 'open', false);
   onMount(() => {
     const _cleanup = (lockScroll)() as unknown;
     if (_cleanup) onCleanup(_cleanup as () => void);

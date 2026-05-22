@@ -10,7 +10,7 @@ import { Component, ViewEncapsulation, input } from '@angular/core';
   `,
 })
 export class CardHeader {
-  title = input.required<string>();
+  title = input<string>();
 }
 
 export default CardHeader;

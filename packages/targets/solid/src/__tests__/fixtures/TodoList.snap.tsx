@@ -24,7 +24,7 @@ export default function TodoList(_props: TodoListProps): JSX.Element {
   const [local, rest] = splitProps(_merged, ['items', 'title', 'children']);
   const resolved = children(() => local.children);
 
-  const [items, setItems] = createControllableSignal<any[]>(_props as Record<string, unknown>, 'items', (() => [])());
+  const [items, setItems] = createControllableSignal<any[]>(_props as unknown as Record<string, unknown>, 'items', (() => [])());
   const [draft, setDraft] = createSignal('');
   const remaining = createMemo(() => items().filter((i: any) => !i.done).length);
 

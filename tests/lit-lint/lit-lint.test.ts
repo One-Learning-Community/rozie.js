@@ -49,7 +49,7 @@ const EXAMPLES = [
 // workspace) as its per-target gate. typed/TypedCard exercises the
 // statement-position interface/type module-scope hoist (Plan 09-04 OQ-3) on
 // this class-based target.
-const TYPED_EXAMPLES = ['Counter', 'Dropdown', 'SortableList', 'TypedCard', 'DataCast', 'PropsCustomType'];
+const TYPED_EXAMPLES = ['Counter', 'Dropdown', 'SortableList', 'TypedCard', 'DataCast', 'PropsCustomType', 'PropsRequired'];
 
 describe('LIT-T-06 — eslint-plugin-lit + eslint-plugin-wc clean (--max-warnings 0)', () => {
   it('all 8 emitted Lit .ts files lint clean', () => {
@@ -136,7 +136,7 @@ describe('LIT-TSC — tsc --noEmit clean over emitted Lit .ts', () => {
 });
 
 describe('LIT-T-06 (typed) — eslint-plugin-lit + wc clean over emitted typed Lit .ts', () => {
-  it('all 6 emitted typed Lit .ts files (examples/typed/*) lint clean', () => {
+  it('all 7 emitted typed Lit .ts files (examples/typed/*) lint clean', () => {
     const tmpDir = mkdtempSync(join(tmpdir(), 'rozie-lit-lint-typed-'));
     try {
       for (const name of TYPED_EXAMPLES) {
@@ -172,7 +172,7 @@ describe('LIT-T-06 (typed) — eslint-plugin-lit + wc clean over emitted typed L
 });
 
 describe('LIT-TSC (typed) — tsc --noEmit clean over emitted typed Lit .ts', () => {
-  it('all 6 emitted typed Lit .ts files (examples/typed/*) tsc clean', () => {
+  it('all 7 emitted typed Lit .ts files (examples/typed/*) tsc clean', () => {
     const tmpDir = mkdtempSync(join(tmpdir(), 'rozie-lit-tsc-typed-'));
     try {
       for (const name of TYPED_EXAMPLES) {

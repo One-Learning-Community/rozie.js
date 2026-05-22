@@ -212,6 +212,7 @@ describe('emitTemplate — behavior tests (synthetic IR)', () => {
       typeAnnotation: { kind: 'identifier', name: 'Boolean' },
       defaultValue: t.booleanLiteral(false),
       isModel: true,
+      required: false,
       sourceLoc: LOC,
     });
     const slot: TemplateNode = {

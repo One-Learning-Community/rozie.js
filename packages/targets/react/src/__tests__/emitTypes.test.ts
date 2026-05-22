@@ -141,6 +141,7 @@ describe('emitReactTypes — D-84 canonical shape (Plan 06-02 Task 1)', () => {
         typeAnnotation: { kind: 'identifier', name: 'Boolean' },
         defaultValue: null,
         isModel: false,
+        required: false,
         sourceLoc: { start: 0, end: 0 },
       },
     ];
@@ -174,13 +175,13 @@ describe('emitReactTypes — D-84 canonical shape (Plan 06-02 Task 1)', () => {
   it('Test 8: PropTypeAnnotation kinds map per spec', () => {
     const ir = emptyIR('Kinds');
     ir.props = [
-      { type: 'PropDecl', name: 'a', typeAnnotation: { kind: 'identifier', name: 'Number' }, defaultValue: null, isModel: false, sourceLoc: { start: 0, end: 0 } },
-      { type: 'PropDecl', name: 'b', typeAnnotation: { kind: 'identifier', name: 'String' }, defaultValue: null, isModel: false, sourceLoc: { start: 0, end: 0 } },
-      { type: 'PropDecl', name: 'c', typeAnnotation: { kind: 'identifier', name: 'Boolean' }, defaultValue: null, isModel: false, sourceLoc: { start: 0, end: 0 } },
-      { type: 'PropDecl', name: 'd', typeAnnotation: { kind: 'identifier', name: 'Array' }, defaultValue: null, isModel: false, sourceLoc: { start: 0, end: 0 } },
-      { type: 'PropDecl', name: 'e', typeAnnotation: { kind: 'identifier', name: 'Object' }, defaultValue: null, isModel: false, sourceLoc: { start: 0, end: 0 } },
-      { type: 'PropDecl', name: 'f', typeAnnotation: { kind: 'identifier', name: 'Function' }, defaultValue: null, isModel: false, sourceLoc: { start: 0, end: 0 } },
-      { type: 'PropDecl', name: 'g', typeAnnotation: { kind: 'identifier', name: 'MyType' }, defaultValue: null, isModel: false, sourceLoc: { start: 0, end: 0 } },
+      { type: 'PropDecl', name: 'a', typeAnnotation: { kind: 'identifier', name: 'Number' }, defaultValue: null, isModel: false, required: false, sourceLoc: { start: 0, end: 0 } },
+      { type: 'PropDecl', name: 'b', typeAnnotation: { kind: 'identifier', name: 'String' }, defaultValue: null, isModel: false, required: false, sourceLoc: { start: 0, end: 0 } },
+      { type: 'PropDecl', name: 'c', typeAnnotation: { kind: 'identifier', name: 'Boolean' }, defaultValue: null, isModel: false, required: false, sourceLoc: { start: 0, end: 0 } },
+      { type: 'PropDecl', name: 'd', typeAnnotation: { kind: 'identifier', name: 'Array' }, defaultValue: null, isModel: false, required: false, sourceLoc: { start: 0, end: 0 } },
+      { type: 'PropDecl', name: 'e', typeAnnotation: { kind: 'identifier', name: 'Object' }, defaultValue: null, isModel: false, required: false, sourceLoc: { start: 0, end: 0 } },
+      { type: 'PropDecl', name: 'f', typeAnnotation: { kind: 'identifier', name: 'Function' }, defaultValue: null, isModel: false, required: false, sourceLoc: { start: 0, end: 0 } },
+      { type: 'PropDecl', name: 'g', typeAnnotation: { kind: 'identifier', name: 'MyType' }, defaultValue: null, isModel: false, required: false, sourceLoc: { start: 0, end: 0 } },
     ];
     const out = emitReactTypes(ir);
     expect(out).toContain(`a: number;`);
@@ -207,6 +208,7 @@ describe('emitReactTypes — D-84 canonical shape (Plan 06-02 Task 1)', () => {
         },
         defaultValue: null,
         isModel: false,
+        required: false,
         sourceLoc: { start: 0, end: 0 },
       },
     ];
@@ -248,6 +250,7 @@ describe('emitReactTypes — D-84 canonical shape (Plan 06-02 Task 1)', () => {
         typeAnnotation: { kind: 'identifier', name: 'Boolean' },
         defaultValue: null,
         isModel: false,
+        required: false,
         sourceLoc: { start: 0, end: 0 },
       },
     ];
@@ -285,6 +288,7 @@ describe('emitReactTypes — D-84 canonical shape (Plan 06-02 Task 1)', () => {
         typeAnnotation: { kind: 'identifier', name: 'Number' },
         defaultValue: null,
         isModel: false,
+        required: false,
         sourceLoc: { start: 0, end: 0 },
       },
     ];

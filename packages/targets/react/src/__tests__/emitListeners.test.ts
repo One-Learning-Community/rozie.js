@@ -49,7 +49,7 @@ describe('renderDepArray (Plan 04-04 Task 2)', () => {
   it('Test 1 — basic mixed deps alphabetized', () => {
     const ir: IRComponent = {
       ...STUB_IR,
-      props: [{ type: 'PropDecl', name: 'open', typeAnnotation: { kind: 'literal', value: 'boolean' }, defaultValue: null, isModel: false, sourceLoc: { start: 0, end: 0 } }],
+      props: [{ type: 'PropDecl', name: 'open', typeAnnotation: { kind: 'literal', value: 'boolean' }, defaultValue: null, isModel: false, required: false, sourceLoc: { start: 0, end: 0 } }],
       state: [{ type: 'StateDecl', name: 'count', initializer: { type: 'NumericLiteral', value: 0 } as any, sourceLoc: { start: 0, end: 0 } }],
     };
     const deps: SignalRef[] = [
@@ -62,7 +62,7 @@ describe('renderDepArray (Plan 04-04 Task 2)', () => {
   it('Test 2 — model:true prop reads bare local', () => {
     const ir: IRComponent = {
       ...STUB_IR,
-      props: [{ type: 'PropDecl', name: 'value', typeAnnotation: { kind: 'literal', value: 'number' }, defaultValue: null, isModel: true, sourceLoc: { start: 0, end: 0 } }],
+      props: [{ type: 'PropDecl', name: 'value', typeAnnotation: { kind: 'literal', value: 'number' }, defaultValue: null, isModel: true, required: false, sourceLoc: { start: 0, end: 0 } }],
     };
     const deps: SignalRef[] = [{ scope: 'props', path: ['value'] }];
     expect(renderDepArray(deps, ir)).toBe('[value]');
@@ -93,7 +93,7 @@ describe('renderDepArray (Plan 04-04 Task 2)', () => {
     ];
     const ir: IRComponent = {
       ...STUB_IR,
-      props: [{ type: 'PropDecl', name: 'x', typeAnnotation: { kind: 'literal', value: 'number' }, defaultValue: null, isModel: false, sourceLoc: { start: 0, end: 0 } }],
+      props: [{ type: 'PropDecl', name: 'x', typeAnnotation: { kind: 'literal', value: 'number' }, defaultValue: null, isModel: false, required: false, sourceLoc: { start: 0, end: 0 } }],
     };
     expect(renderDepArray(deps, ir)).toBe('[props.x]');
   });

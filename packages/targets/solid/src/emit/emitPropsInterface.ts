@@ -55,6 +55,41 @@ export function renderType(ann: PropTypeAnnotation): string {
   return 'unknown';
 }
 
+/**
+ * 260521-oao — builtin zero-value for a prop type, used as the
+ * `createControllableSignal` `defaultFallback` seed for a no-default model
+ * prop. A custom (non-builtin) identifier type has no synthesizable zero —
+ * fall back to `undefined as unknown as <T>` so the call still typechecks
+ * (the seed is unobserved for a required model prop, always controlled).
+ */
+export function zeroValueFor(ann: PropTypeAnnotation): string {
+  if (ann.kind === 'identifier') {
+    switch (ann.name) {
+      case 'Number':
+        return '0';
+      case 'String':
+        return "''";
+      case 'Boolean':
+        return 'false';
+      case 'Array':
+        return '[]';
+      case 'Object':
+        return '{}';
+      case 'Function':
+        return 'null';
+    }
+  }
+  if (ann.kind === 'literal') {
+    if (ann.value === 'number') return '0';
+    if (ann.value === 'string') return "''";
+    if (ann.value === 'boolean') return 'false';
+    if (ann.value === 'array') return '[]';
+    if (ann.value === 'object') return '{}';
+    if (ann.value === 'function') return 'null';
+  }
+  return `undefined as unknown as ${renderType(ann)}`;
+}
+
 function capitalize(name: string): string {
   if (name.length === 0) return name;
   return name.charAt(0).toUpperCase() + name.slice(1);

@@ -21,7 +21,7 @@ import { cloneScriptProgram } from '../rewrite/cloneProgram.js';
 import { partitionUserImports } from '../rewrite/partitionUserImports.js';
 import { rewriteRozieIdentifiers, rewriteRozieExpressionNode as rewriteNode } from '../rewrite/rewriteScript.js';
 import { emitPortals } from './emitPortals.js';
-import { renderType } from './emitPropsInterface.js';
+import { renderType, zeroValueFor } from './emitPropsInterface.js';
 
 // CJS interop normalization for @babel/generator default export.
 type GenerateFn = typeof import('@babel/generator').default;
@@ -314,7 +314,13 @@ export function emitScript(
     if (!p.isModel) continue;
     collectors.runtimeImports.add('createControllableSignal');
     const setterName = 'set' + capitalize(p.name);
-    let dflt = 'undefined';
+    // 260521-oao — a no-default model prop (notably a `required: true` model
+    // prop) has no author `default:`. `createControllableSignal`'s
+    // `defaultFallback` arg is typed `T` (non-optional), so a bare `undefined`
+    // fails tsc. Seed it with the builtin zero-value for the prop's type. For
+    // a required model prop `_props[key]` is always present so the signal is
+    // always controlled and this seed is never observed.
+    let dflt = zeroValueFor(p.typeAnnotation);
     if (p.defaultValue !== null) {
       const raw = genCode(p.defaultValue);
       // When the prop default is a factory arrow/function (e.g. `default: () => []`),
@@ -337,7 +343,13 @@ export function emitScript(
     // 'never'" everywhere the signal is read.
     const tsType = renderType(p.typeAnnotation);
     hookLines.push(
-      `const [${p.name}, ${setterName}] = createControllableSignal<${tsType}>(_props as Record<string, unknown>, '${p.name}', ${dflt});`,
+      // 260521-oao — `_props as unknown as Record<string, unknown>`: a direct
+      // `as Record<string, unknown>` cast fails (TS2352, missing index
+      // signature) once the props interface carries a `required: true`
+      // non-optional field. Routing through `unknown` is the cast TS itself
+      // suggests and is sound here — `createControllableSignal` only ever does
+      // string-keyed reads on the object.
+      `const [${p.name}, ${setterName}] = createControllableSignal<${tsType}>(_props as unknown as Record<string, unknown>, '${p.name}', ${dflt});`,
     );
   }
 

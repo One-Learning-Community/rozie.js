@@ -1,0 +1,68 @@
+<!--
+  typed/PropsRequired.rozie
+
+  Genuinely-new typed example for quick task 260521-oao
+  (cross-target `required:` prop threading).
+
+  Its job is to prove that a `<props>` entry declared `required: true` with
+  NO `default:` lands as a NON-OPTIONAL prop contract on all six targets, so
+  one `.rozie` source produces ONE prop contract — not six divergent guesses
+  derived from `default:` presence:
+
+    - `item: { type: Item, required: true }` — a required prop typed by an
+      interface declared in this component's `<script lang="ts">` block, with
+      no `default:`. The template does a TYPE-DISCRIMINATING member access on
+      it — `{{ $props.item.label }}` — which only typechecks if `required`
+      genuinely threads through to a non-optional contract (React/Solid/Vue/
+      Svelte `item: Item`, Angular `input.required<Item>()`, Lit `item!: Item`).
+      If the prop degraded to optional (`item?: Item`), the per-target gate
+      would catch `Object is possibly 'undefined'` on the `.label` access.
+    - `selected: { type: Boolean, required: true, model: true }` — a required
+      two-way (`model: true`) prop with no `default:`. It is consumed in a
+      `:class` binding so it is genuinely read. Proves the required contract
+      threads through the model emit path too (Vue `defineModel(..., {
+      required: true })`, Angular `model.required<boolean>()`, etc.).
+
+  No prop here uses `required: true` + `default:` together — that combination
+  emits a ROZ014 warning (the default is dropped); ROZ014 itself is unit-
+  tested in packages/core/tests/ir/lowerProps.test.ts. This fixture stays
+  focused on the cross-target consistency proof.
+
+  This fixture is wired into all six per-target typecheck/lint gates
+  (tsc, vue-tsc, svelte-check, Angular template type-checker, eslint-plugin-
+  solid, eslint-plugin-lit) via the TYPED_EXAMPLES array, so a future
+  required-prop-threading regression fails CI automatically.
+-->
+
+<rozie name="PropsRequired">
+
+<script lang="ts">
+// Custom interface — the shape of the required `item` prop. A statement-
+// position `interface` is hoisted to module scope on the class-based targets
+// (Angular / Lit), the same hoist PropsCustomType / DataCast rely on.
+interface Item {
+  id: number
+  label: string
+}
+</script>
+
+<props>
+{
+  item: { type: Item, required: true },
+  selected: { type: Boolean, required: true, model: true },
+}
+</props>
+
+<template>
+<div class="props-required">
+  <span class="item" :class="{ active: $props.selected }">item #{{ $props.item.id }}: {{ $props.item.label }}</span>
+</div>
+</template>
+
+<style>
+.props-required { font-family: sans-serif; }
+.item { color: #444; }
+.item.active { font-weight: 600; }
+</style>
+
+</rozie>

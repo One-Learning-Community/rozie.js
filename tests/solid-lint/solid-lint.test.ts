@@ -43,7 +43,7 @@ const EXAMPLES = [
 // tsc-checked in separate describe blocks so a typed-fixture failure is
 // distinguishable from an untyped regression. Solid uses a LINT gate (this
 // workspace) as its per-target gate — it has no separate typecheck workspace.
-const TYPED_EXAMPLES = ['Counter', 'Dropdown', 'SortableList', 'TypedCard', 'DataCast', 'PropsCustomType'];
+const TYPED_EXAMPLES = ['Counter', 'Dropdown', 'SortableList', 'TypedCard', 'DataCast', 'PropsCustomType', 'PropsRequired'];
 
 describe('SOLID-T-04 — eslint-plugin-solid clean (--max-warnings 0)', () => {
   it('all 8 emitted Solid TSX files lint clean', () => {
@@ -135,7 +135,7 @@ describe('SOLID-TSC — tsc --noEmit clean over emitted Solid TSX', () => {
 });
 
 describe('SOLID-T-04 (typed) — eslint-plugin-solid clean over emitted typed Solid TSX', () => {
-  it('all 6 emitted typed Solid TSX files (examples/typed/*) lint clean', () => {
+  it('all 7 emitted typed Solid TSX files (examples/typed/*) lint clean', () => {
     const tmpDir = mkdtempSync(join(tmpdir(), 'rozie-solid-lint-typed-'));
     try {
       for (const name of TYPED_EXAMPLES) {
@@ -175,7 +175,7 @@ describe('SOLID-T-04 (typed) — eslint-plugin-solid clean over emitted typed So
 });
 
 describe('SOLID-TSC (typed) — tsc --noEmit clean over emitted typed Solid TSX', () => {
-  it('all 6 emitted typed Solid TSX files (examples/typed/*) tsc clean', () => {
+  it('all 7 emitted typed Solid TSX files (examples/typed/*) tsc clean', () => {
     const tmpDir = mkdtempSync(join(tmpdir(), 'rozie-solid-tsc-typed-'));
     try {
       for (const name of TYPED_EXAMPLES) {

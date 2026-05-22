@@ -651,6 +651,41 @@ function renderType(ann: PropTypeAnnotation): string {
 }
 
 /**
+ * 260521-oao — builtin zero-value for a prop type, used as the
+ * `useControllableState` `defaultValue` seed for a no-default model prop. A
+ * custom (non-builtin) identifier type has no synthesizable zero — fall back
+ * to `undefined as unknown as <T>` so the option still typechecks (the seed
+ * is unobserved for a required model prop, which is always controlled).
+ */
+function zeroValueFor(ann: PropTypeAnnotation): string {
+  if (ann.kind === 'identifier') {
+    switch (ann.name) {
+      case 'Number':
+        return '0';
+      case 'String':
+        return "''";
+      case 'Boolean':
+        return 'false';
+      case 'Array':
+        return '[]';
+      case 'Object':
+        return '{}';
+      case 'Function':
+        return 'null';
+    }
+  }
+  if (ann.kind === 'literal') {
+    if (ann.value === 'number') return '0';
+    if (ann.value === 'string') return "''";
+    if (ann.value === 'boolean') return 'false';
+    if (ann.value === 'array') return '[]';
+    if (ann.value === 'object') return '{}';
+    if (ann.value === 'function') return 'null';
+  }
+  return `undefined as unknown as ${renderType(ann)}`;
+}
+
+/**
  * For the merged `props` const's intersection-type override: render the prop's
  * TS type WITHOUT the `?` optional marker. Used to narrow defaulted props from
  * `step?: number` (interface) to `step: number` (in the merged const), so
@@ -1440,7 +1475,16 @@ export function emitScript(
     // Wrap in parens unconditionally for arrow / function-expression defaults.
     let dflt: string;
     if (p.defaultValue === null) {
-      dflt = 'undefined';
+      // 260521-oao — a no-default model prop (notably a `required: true`
+      // model prop) has no author `default:`. `useControllableState`'s
+      // `defaultValue` option is typed `T` (non-optional), so a bare
+      // `undefined` fails tsc. Seed the uncontrolled-mode fallback with the
+      // builtin zero-value for the prop's type (matching Lit's `renderDefault`
+      // fallback and Dropdown's explicit `false`). For a required model prop
+      // `value` is always present so the hook is always controlled and this
+      // seed is never observed; for an optional no-default model prop it is a
+      // sound uncontrolled-mode initial value.
+      dflt = zeroValueFor(p.typeAnnotation);
     } else {
       const raw = genCode(p.defaultValue);
       const needsParens =

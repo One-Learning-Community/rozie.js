@@ -101,6 +101,7 @@ describe('Vue emitTemplateAttribute — r-model:propName= consumer-side two-way 
       typeAnnotation: { kind: 'identifier', name: 'Boolean' },
       defaultValue: t.booleanLiteral(false),
       isModel: true,
+      required: false,
       sourceLoc: LOC,
     });
     const attrs: AttributeBinding[] = [

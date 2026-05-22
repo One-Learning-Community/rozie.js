@@ -113,6 +113,7 @@ describe('Lit emit — twoWayBinding (Phase 07.3 Plan 08 — TWO-WAY-03)', () =>
       typeAnnotation: { kind: 'identifier', name: 'Boolean' },
       defaultValue: t.booleanLiteral(false),
       isModel: true,
+      required: false,
       sourceLoc: LOC,
     });
     const attr: AttributeBinding = {
@@ -199,6 +200,7 @@ describe('Lit emit — resolveLitSetterText helper', () => {
       typeAnnotation: { kind: 'identifier', name: 'Boolean' },
       defaultValue: t.booleanLiteral(false),
       isModel: true,
+      required: false,
       sourceLoc: LOC,
     });
     expect(resolveLitSetterText(parseExpression('$props.open'), ir)).toBe(
