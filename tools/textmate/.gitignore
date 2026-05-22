@@ -1,0 +1,2 @@
+# VS Code extension build artifacts produced by `vsce package` / `pnpm package`
+*.vsix
