@@ -67,7 +67,7 @@ const FIXTURES_DIR = resolve(HERE, 'fixtures');
 // producer resolution flows through correctly.
 // Phase 07.3 Plan 09: extended 9 → 10 with WrapperModal so the consumer-side
 // `r-model:open="$props.open"` forwarding pattern is byte-locked across all
-// 4 entrypoints. 10 × 6 × 4 = 240 cells (plus React .d.ts/.module.css sidecars).
+// 4 entrypoints. (10 × 6 × 4 = 240 cells as of Phase 07.3 — superseded below.)
 // Quick-task 260519-vyv (Spike 004) — extended 10 → 11 with PortalListStyled,
 // the canonical `@portal NAME { ... }` producer-side CSS-scoping fixture.
 // Single-file example (no sibling .rozie); byte-locked across all 4
@@ -321,7 +321,7 @@ describe('DIST-05 strict-bytes parity gate — consumer-side 96-cell subset (Pha
   });
 });
 
-describe('DIST-05 strict-bytes parity gate (D-93) — 10 examples × 6 targets × 4 entrypoints = 240 cells', () => {
+describe('DIST-05 strict-bytes parity gate (D-93) — 12 examples × 6 targets × 4 entrypoints = 288 cells', () => {
   describe.each(EXAMPLES)('%s', (name) => {
     const rozieSourcePath = resolve(ROOT, `examples/${name}.rozie`);
     const rozieSource = readFileSync(rozieSourcePath, 'utf8');
