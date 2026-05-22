@@ -25,3 +25,4 @@ export {
   isMeta,
 } from './keyFilter.js';
 export { parseInlineStyle, toStyleObjectKey } from './parseInlineStyle.js';
+export { normalizeAttrs, SOLID_ATTR_KEY_MAP } from './normalizeAttrs.js';
