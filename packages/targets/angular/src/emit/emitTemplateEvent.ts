@@ -29,6 +29,7 @@ import type {
   ModifierRegistry,
   AngularEmissionDescriptor,
 } from '@rozie/core';
+import { isEventModifier } from '@rozie/core';
 import type { ModifierArg } from '../../../../core/src/modifier-grammar/parseModifierChain.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
@@ -174,7 +175,9 @@ export function emitTemplateEvent(
     }
 
     const impl = ctx.registry.get(modifierName);
-    if (!impl || !impl.angular) {
+    // Phase 12 / D-01 — narrow the discriminated `ModifierImpl` union to the
+    // event-shaped variant before touching the event-only `angular()` hook.
+    if (!impl || !isEventModifier(impl) || !impl.angular) {
       diagnostics.push({
         code: RozieErrorCode.TARGET_ANGULAR_RESERVED, // ROZ722
         severity: 'error',

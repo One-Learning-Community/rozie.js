@@ -35,6 +35,7 @@ import type {
   ModifierRegistry,
   SolidEmissionDescriptor,
 } from '@rozie/core';
+import { isEventModifier } from '@rozie/core';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
@@ -129,7 +130,9 @@ export function emitListenerNative(
       continue;
     }
     const impl = registry.get(entry.modifier);
-    if (!impl || !impl.solid) {
+    // Phase 12 / D-01 — narrow the discriminated `ModifierImpl` union to the
+    // event-shaped variant before touching the event-only `solid()` hook.
+    if (!impl || !isEventModifier(impl) || !impl.solid) {
       diagnostics.push({
         code: RozieErrorCode.TARGET_SOLID_RESERVED,
         severity: 'error',

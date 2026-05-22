@@ -282,16 +282,34 @@ export type LitEmissionDescriptor =
   | { kind: 'inlineGuard'; code: string };
 
 /**
- * ModifierImpl — what a modifier plugin author implements.
+ * EventModifierImpl — what an EVENT modifier plugin author implements.
  *
  * `resolve()` validates args + emits diagnostics for malformed input
  * (D-08 collected-not-thrown applies — never throw on user input). On
  * success, returns one or more ModifierPipelineEntry objects describing
  * how the target emitter should wire the modifier.
  *
+ * Phase 12 / D-01 — `ModifierImpl` became a discriminated union
+ * `EventModifierImpl | ModelModifierImpl`. This interface is the original
+ * event-shaped contract verbatim, plus an OPTIONAL `kind?: 'event'`
+ * discriminant. The field is SemVer-additive: absent ⇒ `'event'`, so the
+ * 25 builtin event modifiers AND the `tests/plugins/swipe` dogfood plugin
+ * need ZERO change and stay byte-identical post-extension. This mirrors the
+ * `inlineGuard` SemVer-additive precedent on `VueEmissionDescriptor` (above,
+ * "NO Phase 3 builtin emits this kind, so the v1 Vue fixtures remain
+ * byte-identical"). The flat shared registry namespace (D-05) is what lets a
+ * found-but-`kind:'event'` lookup yield the precise "event modifier, not a
+ * model modifier" misuse diagnostic (D-02).
+ *
  * @public — SemVer-stable per D-22b. Phase 4 React emitter is the dogfooding consumer.
  */
-export interface ModifierImpl {
+export interface EventModifierImpl {
+  /**
+   * Phase 12 / D-01 — OPTIONAL discriminant. Absent ⇒ `'event'`. SemVer-additive:
+   * existing event-modifier impls omit it and stay byte-identical. Present-and-
+   * `'event'` is also accepted (explicit form).
+   */
+  kind?: 'event';
   /** Modifier name, e.g., 'outside'. Must match the registered key. */
   name: string;
   /**
@@ -345,6 +363,118 @@ export interface ModifierImpl {
    * Third-party plugins MAY omit; emitter falls back to a ROZ832-class diagnostic.
    */
   lit?(args: ModifierArg[], ctx: ModifierContext): LitEmissionDescriptor;
+}
+
+/**
+ * ModelModifierDescriptor — Phase 12 / D-03. The single, target-agnostic
+ * descriptor a `ModelModifierImpl.resolve()` returns.
+ *
+ * Unlike event modifiers — which carry six per-target `vue()/react()/...`
+ * methods because event wiring genuinely diverges per target — a model
+ * modifier's value transform is the SAME everywhere: `.trim` is `v.trim()`
+ * on every target, `.number` is a `looseToNumber` coercion everywhere, a
+ * custom `.phone` is one regex everywhere. So a model modifier declares ONE
+ * descriptor; the per-target emitter handles the small `change`-vs-`input`
+ * event divergence itself (D-08).
+ *
+ * @public — SemVer-stable per D-22b.
+ */
+export interface ModelModifierDescriptor {
+  /**
+   * D-03 — a code-fragment string containing the literal `$v` placeholder.
+   * Each emitter substitutes `$v` with its own extracted-value access
+   * expression (e.g. `e.target.value` for the AST-based react/solid/lit
+   * emitters, the bound-value string for vue/svelte/angular). This mirrors
+   * the event side's `inlineGuard.code` precedent, so the fragment is
+   * consumable by BOTH the AST-based emitters and the string-based ones.
+   * Absent ⇒ the modifier performs no value transform (e.g. `.lazy`).
+   */
+  valueTransform?: string;
+  /**
+   * D-03 / D-08 — a flag. `'change'` means the bound input should commit on
+   * the `change` event instead of `input`. Each target emitter wires its own
+   * event; the per-target divergence (`change` vs `input`, React's
+   * uncontrolled `defaultValue`+`onBlur` quirk) stays the emitter's job, not
+   * the modifier's. Absent ⇒ no event swap (the default `input` binding).
+   */
+  eventSwap?: 'change';
+}
+
+/**
+ * ModelModifierImpl — what a MODEL modifier plugin author implements
+ * (Phase 12 / D-01, D-03, D-04).
+ *
+ * Parallels `EventModifierImpl`'s authoring surface — `name`, `arity`, and a
+ * `resolve(args, ctx)` returning the same collected-not-thrown shape — but
+ * with the REQUIRED `kind: 'model'` discriminant and a `resolve()` that
+ * returns ONE target-agnostic `ModelModifierDescriptor` instead of
+ * `entries[]` + six per-target methods (D-03). Model modifiers are
+ * target-agnostic by construction, so they carry no
+ * `vue()/react()/svelte()/angular()/solid()/lit()` methods.
+ *
+ * @public — SemVer-stable per D-22b.
+ */
+export interface ModelModifierImpl {
+  /** Phase 12 / D-01 — REQUIRED discriminant. Always `'model'`. */
+  kind: 'model';
+  /** Modifier name, e.g., 'trim'. Must match the registered key. */
+  name: string;
+  /**
+   * Documented arity for arg-count validation. 'none' = zero args expected;
+   * 'one' = exactly one; 'one-or-more' = at least zero.
+   */
+  arity: 'none' | 'one' | 'one-or-more';
+  /**
+   * Resolve the modifier into a single target-agnostic descriptor.
+   * Implementations validate arg count/shape and emit Diagnostic[] for
+   * mismatches (collected-not-thrown — never throw on user input).
+   */
+  resolve(
+    args: ModifierArg[],
+    ctx: ModifierContext,
+  ): { descriptor: ModelModifierDescriptor; diagnostics: Diagnostic[] };
+}
+
+/**
+ * ModifierImpl — Phase 12 / D-01 discriminated union.
+ *
+ * A registered modifier is EITHER an event modifier OR a model modifier,
+ * never both (D-06). The discriminant is the `kind` field: absent or
+ * `'event'` ⇒ `EventModifierImpl`, `'model'` ⇒ `ModelModifierImpl`. Because
+ * `EventModifierImpl.kind` is optional, the 25 builtin event modifiers and
+ * the `tests/plugins/swipe` plugin compile unchanged (SemVer-additive).
+ *
+ * @public — SemVer-stable per D-22b.
+ */
+export type ModifierImpl = EventModifierImpl | ModelModifierImpl;
+
+/**
+ * isEventModifier — Phase 12 / D-01 narrowing predicate.
+ *
+ * Returns `true` when the modifier is an `EventModifierImpl` (its `kind` is
+ * absent or `'event'`). Event-context consumers (`<listeners>` / `@event`
+ * emitters) use this to narrow a `ModifierImpl` looked up from the flat
+ * registry down to the event-shaped variant before touching event-only
+ * fields (`vue()/react()/...`, `resolve().entries`). A `kind: 'model'`
+ * modifier appearing in event context is a cross-context misuse.
+ *
+ * @public — SemVer-stable per D-22b.
+ */
+export function isEventModifier(impl: ModifierImpl): impl is EventModifierImpl {
+  return impl.kind === undefined || impl.kind === 'event';
+}
+
+/**
+ * isModelModifier — Phase 12 / D-01 narrowing predicate.
+ *
+ * Returns `true` when the modifier is a `ModelModifierImpl` (its `kind` is
+ * `'model'`). The r-model lowering path uses this to narrow a registry
+ * lookup before consuming the model-shaped `resolve().descriptor`.
+ *
+ * @public — SemVer-stable per D-22b.
+ */
+export function isModelModifier(impl: ModifierImpl): impl is ModelModifierImpl {
+  return impl.kind === 'model';
 }
 
 /**

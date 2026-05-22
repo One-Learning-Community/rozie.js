@@ -43,6 +43,7 @@ import type {
 } from '../../../../core/src/ir/types.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import type { ModifierRegistry, LitEmissionDescriptor } from '@rozie/core';
+import { isEventModifier } from '@rozie/core';
 import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
 import type {
   LitImportCollector,
@@ -589,7 +590,9 @@ function buildEventParts(
       // builtin (.stop/.prevent/.self/.enter/...) or third-party (.swipe) —
       // resolves through the same `impl.lit()` -> LitEmissionDescriptor path.
       const impl = registry?.get(entry.modifier);
-      if (!impl || !impl.lit) {
+      // Phase 12 / D-01 — narrow the discriminated `ModifierImpl` union to the
+      // event-shaped variant before touching the event-only `lit()` hook.
+      if (!impl || !isEventModifier(impl) || !impl.lit) {
         diagnostics?.push({
           code: RozieErrorCode.TARGET_LIT_RESERVED,
           severity: 'error',

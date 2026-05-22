@@ -42,6 +42,7 @@ import type {
   ModifierPipelineEntry,
   SvelteEmissionDescriptor,
 } from '@rozie/core';
+import { isEventModifier } from '@rozie/core';
 import type { ModifierArg } from '../../../../core/src/modifier-grammar/parseModifierChain.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
@@ -221,7 +222,9 @@ function classifyListener(
       continue;
     }
     const impl = opts.registry.get(entry.modifier);
-    if (!impl || !impl.svelte) {
+    // Phase 12 / D-01 — narrow the discriminated `ModifierImpl` union to the
+    // event-shaped variant before touching the event-only `svelte()` hook.
+    if (!impl || !isEventModifier(impl) || !impl.svelte) {
       opts.diagnostics.push({
         code: RozieErrorCode.TARGET_SVELTE_RESERVED,
         severity: 'error',

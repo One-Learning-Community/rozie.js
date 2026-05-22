@@ -32,6 +32,7 @@ import type {
   ModifierPipelineEntry,
   SolidEmissionDescriptor,
 } from '@rozie/core';
+import { isEventModifier } from '@rozie/core';
 import type { ModifierArg } from '../../../../core/src/modifier-grammar/parseModifierChain.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import type { SolidImportCollector, RuntimeSolidImportCollector } from '../rewrite/collectSolidImports.js';
@@ -77,7 +78,9 @@ function classifyListener(
     // dropped them with no diagnostic. Mirrors Lit's classifyListener.
     if (entry.kind === 'listenerOption') continue;
     const impl = registry.get(entry.modifier);
-    if (!impl?.solid) continue;
+    // Phase 12 / D-01 — narrow the discriminated `ModifierImpl` union to the
+    // event-shaped variant before touching the event-only `solid()` hook.
+    if (!impl || !isEventModifier(impl) || !impl.solid) continue;
     const desc: SolidEmissionDescriptor = impl.solid(entry.args, {
       source: 'listeners-block',
       event: listener.event,

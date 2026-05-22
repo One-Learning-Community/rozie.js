@@ -36,6 +36,7 @@ import type {
   RuntimeLitImportCollector,
 } from '../rewrite/collectLitImports.js';
 import type { ModifierRegistry, LitEmissionDescriptor } from '@rozie/core';
+import { isEventModifier } from '@rozie/core';
 import type { ModifierArg } from '../../../../core/src/modifier-grammar/parseModifierChain.js';
 import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
@@ -110,7 +111,9 @@ function classifyListener(
     }
 
     const impl = opts.registry.get(entry.modifier);
-    if (!impl || !impl.lit) {
+    // Phase 12 / D-01 — narrow the discriminated `ModifierImpl` union to the
+    // event-shaped variant before touching the event-only `lit()` hook.
+    if (!impl || !isEventModifier(impl) || !impl.lit) {
       opts.diagnostics.push({
         code: RozieErrorCode.TARGET_LIT_RESERVED,
         severity: 'error',

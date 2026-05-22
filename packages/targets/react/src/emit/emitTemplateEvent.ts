@@ -33,6 +33,7 @@ import type {
   ModifierRegistry,
   ReactEmissionDescriptor,
 } from '@rozie/core';
+import { isEventModifier } from '@rozie/core';
 import type { ModifierArg } from '../../../../core/src/modifier-grammar/parseModifierChain.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
@@ -281,7 +282,9 @@ export function emitTemplateEvent(
     }
 
     const impl = ctx.registry.get(modifierName);
-    if (!impl || !impl.react) {
+    // Phase 12 / D-01 — narrow the discriminated `ModifierImpl` union to the
+    // event-shaped variant before touching the event-only `react()` hook.
+    if (!impl || !isEventModifier(impl) || !impl.react) {
       // No react() hook — emit ROZ520-class diagnostic. Plan 04-04 broadens the
       // "missing-hook" diagnostic surface; v1 reuses ROZ520 for any react-side
       // template-event modifier that has no descriptor.

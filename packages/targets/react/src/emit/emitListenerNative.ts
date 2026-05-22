@@ -35,6 +35,7 @@ import type {
   ModifierRegistry,
   ReactEmissionDescriptor,
 } from '@rozie/core';
+import { isEventModifier } from '@rozie/core';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
@@ -169,7 +170,9 @@ export function emitListenerNative(
     // that case the wrap entry is already accounted for via wrappedHandlerName,
     // so we only consume the filter/inlineGuard entries.
     const impl = registry.get(entry.modifier);
-    if (!impl || !impl.react) {
+    // Phase 12 / D-01 — narrow the discriminated `ModifierImpl` union to the
+    // event-shaped variant before touching the event-only `react()` hook.
+    if (!impl || !isEventModifier(impl) || !impl.react) {
       diagnostics.push({
         code: RozieErrorCode.TARGET_REACT_RHTML_WITH_CHILDREN,
         severity: 'error',

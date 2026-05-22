@@ -93,8 +93,20 @@ export { isInTypePosition } from './ast/typePosition.js';
 // Modifier registry public surface — Phase 2 Plan 02-04.
 // SemVer-stable per D-22b — Phase 4 React emitter is the dogfooding consumer.
 export { ModifierRegistry } from './modifiers/ModifierRegistry.js';
+// Phase 12 / D-01 — narrowing predicates for the discriminated `ModifierImpl`
+// union. Event-context consumers (`<listeners>` / `@event` emitters) and the
+// r-model lowering path use these to narrow a flat-registry lookup before
+// touching kind-specific fields.
+export { isEventModifier, isModelModifier } from './modifiers/ModifierRegistry.js';
 export type {
   ModifierImpl,
+  // Phase 12 / D-01 — `ModifierImpl` is now the discriminated union
+  // `EventModifierImpl | ModelModifierImpl`; the model-modifier public types
+  // are exported so third-party plugins (the `.phone` dogfood, Plan 05) can
+  // author against the `@rozie/core` barrel exclusively.
+  EventModifierImpl,
+  ModelModifierImpl,
+  ModelModifierDescriptor,
   ModifierPipelineEntry,
   ModifierContext,
   VueEmissionDescriptor,

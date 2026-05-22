@@ -77,6 +77,21 @@ export function resolveModifierPipeline(
       });
       continue;
     }
+    // Phase 12 / D-01 — `ModifierImpl` is a discriminated union; this resolver
+    // runs in event context (`<listeners>` / `@event`). A `kind: 'model'`
+    // modifier looked up here is a cross-context misuse — the dedicated
+    // model-side diagnostic lives on the r-model lowering path. Skip it so the
+    // event pipeline only ever consumes `EventModifierImpl` entries.
+    if (impl.kind === 'model') {
+      diagnostics.push({
+        code: RozieErrorCode.UNKNOWN_MODIFIER,
+        severity: 'error',
+        message: `'.${c.name}' is a model modifier and cannot be used on an event binding`,
+        loc: c.loc,
+        hint: 'Model modifiers (.lazy/.number/.trim) apply only to r-model.',
+      });
+      continue;
+    }
     // Adjust ctx so each chain entry's sourceLoc anchors the pipeline entry.
     const entryCtx: ModifierContext = {
       source: ctx.source,

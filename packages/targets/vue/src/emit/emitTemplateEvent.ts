@@ -32,6 +32,7 @@ import type {
   ModifierRegistry,
   VueEmissionDescriptor,
 } from '@rozie/core';
+import { isEventModifier } from '@rozie/core';
 import type { ModifierArg } from '../../../../core/src/modifier-grammar/parseModifierChain.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
@@ -157,7 +158,9 @@ export function emitTemplateEvent(
     }
 
     const impl = ctx.registry.get(modifierName);
-    if (!impl || !impl.vue) {
+    // Phase 12 / D-01 — narrow the discriminated `ModifierImpl` union to the
+    // event-shaped variant before touching the event-only `vue()` hook.
+    if (!impl || !isEventModifier(impl) || !impl.vue) {
       // Unknown / no vue() hook — fall through to ROZ420 reservoir per
       // Plan 01 D-40. Phase 3 emits a diagnostic.
       diagnostics.push({

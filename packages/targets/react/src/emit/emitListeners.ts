@@ -40,6 +40,7 @@ import type {
   ModifierPipelineEntry,
   ReactEmissionDescriptor,
 } from '@rozie/core';
+import { isEventModifier } from '@rozie/core';
 import type { ModifierArg } from '../../../../core/src/modifier-grammar/parseModifierChain.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import {
@@ -89,7 +90,9 @@ function classifyListener(
   for (const entry of pipeline) {
     if (entry.kind !== 'wrap') continue;
     const impl = registry.get(entry.modifier);
-    if (!impl?.react) continue;
+    // Phase 12 / D-01 — narrow the discriminated `ModifierImpl` union to the
+    // event-shaped variant before touching the event-only `react()` hook.
+    if (!impl || !isEventModifier(impl) || !impl.react) continue;
     const desc: ReactEmissionDescriptor = impl.react(entry.args, {
       source: 'listeners-block',
       event: listener.event,
