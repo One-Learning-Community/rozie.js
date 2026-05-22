@@ -128,10 +128,20 @@ export function createLitControllableProperty<T>(
   // since mount. Used to gate the HTML-parser-seed window — see notify
   // implementation below.
   let userHasWritten = false;
+  // One-shot token: holds the value of our most recent self-dispatched event.
+  // When `notifyPropertyWrite(next)` arrives with `next` matching this token,
+  // we recognise it as the parent listener's round-trip re-bind (the producer
+  // wrote → CustomEvent → parent setState → parent re-render → setter calls
+  // notifyPropertyWrite with the same value) and silently suppress one
+  // re-dispatch. The token is cleared after that single suppression so any
+  // subsequent same-value property write (e.g. external imperative `el.prop =
+  // value` from arbitrary JS) still fires a change event.
+  let pendingRoundTripValue: { v: T } | undefined;
 
   const currentValue = (): T => _state.value;
 
   const dispatchChange = (next: T): void => {
+    pendingRoundTripValue = { v: next };
     host.dispatchEvent(
       new CustomEvent(eventName, {
         detail: next,
@@ -212,8 +222,40 @@ export function createLitControllableProperty<T>(
       // A property binding can never make the component uncontrolled — `next`
       // is always defined — so there is no uncontrolled-direction flip to
       // consider.
+      //
+      // Dispatch policy (Phase 14-adjacent fix, 2026-05-22):
+      //   `notifyPropertyWrite` now dispatches a `*-change` CustomEvent on a
+      //   real, non-round-trip value change. This restores observability of
+      //   EXTERNAL imperative writes — vanilla JS doing `el.prop = X` lands on
+      //   `set X(v) { _xControllable.notifyPropertyWrite(v); }`, and observers
+      //   listening to `'<event>-change'` (or test harnesses) need to see that
+      //   value change just as they would for a producer-side `write(...)`.
+      //   The original "never dispatch" rule was over-broad: it suppressed
+      //   producer→listener→re-bind round-trips (correct) but also swallowed
+      //   external writes (incorrect). We now use a one-shot
+      //   `pendingRoundTripValue` token set by `dispatchChange`: when a parent
+      //   re-bind comes back carrying the same value we just dispatched, the
+      //   token matches and we silently consume it (no re-dispatch, no loop).
+      //   Outside that single suppression window, real value changes — which
+      //   in practice means external imperative writes and parent-initiated
+      //   value bumps — fire the event once, on actual change. Matches the
+      //   "fire change events only on actual change" semantics shared by the
+      //   other 5 target frameworks.
+      const prev = _state.value;
       wasControlled = true;
       _state.value = next;
+      if (
+        pendingRoundTripValue !== undefined &&
+        Object.is(pendingRoundTripValue.v, next)
+      ) {
+        // Producer's own dispatch echoing back via parent's listener re-bind.
+        // Consume the token (one-shot) and skip the re-dispatch.
+        pendingRoundTripValue = undefined;
+        return;
+      }
+      if (!Object.is(next, prev)) {
+        dispatchChange(next);
+      }
     },
   };
 }

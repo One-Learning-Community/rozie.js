@@ -292,10 +292,19 @@ describe('createLitControllableProperty — notifyPropertyWrite (property-bindin
     expect(cp.read()).toBe(8);
   });
 
-  it('property-setter write still dispatches the change event via a subsequent producer write()', () => {
-    // notifyPropertyWrite itself does not dispatch (it is the parent asserting
-    // its own value — dispatching back would loop). The producer's write()
-    // remains the dispatch path, and it carries the resolved value out.
+  it('property-setter write dispatches on real value changes, suppresses producer→listener round-trips', () => {
+    // notifyPropertyWrite is the entry point for two paths that look identical
+    // at the DOM level: (a) the parent's `.prop=${x}` re-bind that ROUND-TRIPS
+    // our own dispatched event, and (b) an EXTERNAL imperative `el.prop = x`
+    // from arbitrary JS that observers need to see. The helper suppresses
+    // exactly one round-trip per write() via a one-shot token, and dispatches
+    // on every other real value change — same "fire change events only on
+    // actual change" semantics the other 5 target frameworks expose.
+    //
+    // Earlier contract: notifyPropertyWrite "never dispatched", which broke (b)
+    // — external imperative writes were silently swallowed. The one-shot token
+    // restores observability of (b) without re-introducing the loop the old
+    // never-dispatch rule was guarding against.
     const dispatched: CustomEvent[] = [];
     const host = {
       dispatchEvent: (ev: Event) => {
@@ -309,10 +318,35 @@ describe('createLitControllableProperty — notifyPropertyWrite (property-bindin
       defaultValue: 0,
       initialControlledValue: undefined,
     });
+
+    // (b) Property-setter write on a real value change (external imperative
+    // `el.value = 3` from arbitrary JS, or a parent's first `.value=${3}`
+    // binding) — observers see it.
     cp.notifyPropertyWrite(3);
-    expect(dispatched).toHaveLength(0);
-    cp.write(4);
     expect(dispatched).toHaveLength(1);
-    expect(dispatched[0]!.detail).toBe(4);
+    expect(dispatched[0]!.detail).toBe(3);
+
+    // (a) Producer-initiated round-trip: write(4) dispatches, then the parent
+    // listener catches `value-change`, updates its bound state to 4, re-renders,
+    // and Lit re-applies `.value=${4}` which lands as notifyPropertyWrite(4).
+    // The one-shot token recognises that re-bind as our own echo and suppresses
+    // the re-dispatch — no loop, exactly one event total.
+    cp.write(4);
+    expect(dispatched).toHaveLength(2);
+    expect(dispatched[1]!.detail).toBe(4);
+    cp.notifyPropertyWrite(4); // parent's round-trip echo
+    expect(dispatched).toHaveLength(2); // round-trip suppressed
+
+    // After the round-trip token is consumed, a no-op re-assertion of the same
+    // value silently stays a no-op (matches standard change-event semantics —
+    // no event on equal values).
+    cp.notifyPropertyWrite(4);
+    expect(dispatched).toHaveLength(2);
+
+    // A parent-driven value bump (or a new external imperative write) to a
+    // genuinely different value fires once.
+    cp.notifyPropertyWrite(7);
+    expect(dispatched).toHaveLength(3);
+    expect(dispatched[2]!.detail).toBe(7);
   });
 });
