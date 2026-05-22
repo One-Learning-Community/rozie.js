@@ -70,7 +70,7 @@ And the consumer-side fill looks identical to any other scoped slot fill:
 ```rozie
 <PortalList :items="$data.items">
   <template #item="{ item }">
-    <span :style="'background: ' + item.color"></span>
+    <span :style="{ background: item.color }"></span>
     <code>#{{ item.id }}</code>
     <strong>{{ item.label }}</strong>
   </template>

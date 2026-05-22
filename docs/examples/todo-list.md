@@ -11,9 +11,9 @@ const items = ref([
 
 # TodoList
 
-Demonstrates `r-for` with required `:key`, two-way bound `items` array via `model: true`, multiple `$emit` calls for `add`/`toggle`/`remove`, named slot with fallback content (`#header` falls back to a default heading), default slot with per-item scoped params (the marquee scoped-slot pattern — consumer can override the row renderer), and `r-if` / `r-else` for the empty-state branch.
+Demonstrates `r-for` with required `:key`, two-way bound `items` array via `model: true`, an `r-model` two-way input binding on the draft field, multiple `$emit` calls for `add`/`toggle`/`remove`, named slot with fallback content (`#header` falls back to a default heading), default slot with per-item scoped params (the marquee scoped-slot pattern — consumer can override the row renderer), and `r-if` / `r-else` for the empty-state branch.
 
-This is the heaviest scoped-slots example. The React output shows the documented divergence: instead of children-as-JSX, React consumers see a render-prop callback (`children?: (ctx) => ReactNode`, `renderHeader?: (ctx) => ReactNode`). The other four targets keep an idiomatic markup form.
+This is the heaviest scoped-slots example. The React output shows the documented divergence: instead of children-as-JSX, React consumers see a render-prop callback (`children?: (ctx) => ReactNode`, `renderHeader?: (ctx) => ReactNode`). The other five targets keep an idiomatic markup form.
 
 ## Live demo
 

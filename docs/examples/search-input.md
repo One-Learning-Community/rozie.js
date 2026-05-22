@@ -11,7 +11,7 @@ function logEvent(type, value) {
 
 # SearchInput
 
-Demonstrates `r-model` on a form input, `$emit` for custom events, `$onMount` with a teardown return, the parameterized `.debounce(300)` modifier, conditional rendering (`r-if` / `r-else`), and `$refs`.
+Demonstrates `r-model` on a form input, the `<data>` block, `$computed` deriving from `$data`, `$emit` for custom events, `$onMount` with a teardown return, the parameterized `.debounce(300)` modifier, conditional rendering (`r-if` / `r-else`), and `$refs`.
 
 ## Live demo
 

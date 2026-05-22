@@ -14,6 +14,7 @@ const tree = {
         { id: 'p3c', label: 'svelte', children: [] },
         { id: 'p3d', label: 'angular', children: [] },
         { id: 'p3e', label: 'solid', children: [] },
+        { id: 'p3f', label: 'lit', children: [] },
       ] },
     ] },
     { id: 'e', label: 'examples', children: [
@@ -27,7 +28,7 @@ const tree = {
 
 # TreeNode
 
-A minimal recursive component. Demonstrates `<components>` block self-import and the inline `<TreeNode :node="child" />` recursion inside its own `<template>`. Each target gets the idiomatic self-reference form: Vue's `defineOptions({ name })` + setup-scope import, React's hoisted named function declaration, Svelte's `import TreeNode from './TreeNode.svelte'` (with extension), Angular's `forwardRef(() => TreeNode)`, Solid's named function declaration.
+A minimal recursive component. Demonstrates `<components>` block self-import and the inline `<TreeNode :node="child" />` recursion inside its own `<template>`. Each target gets the idiomatic self-reference form: Vue's `defineOptions({ name })` + setup-scope import, React's hoisted named function declaration, Svelte's `import TreeNode from './TreeNode.svelte'` (with extension), Angular's `forwardRef(() => TreeNode)`, Solid's named function declaration, and Lit's self-referencing custom-element tag.
 
 ## Live demo
 
