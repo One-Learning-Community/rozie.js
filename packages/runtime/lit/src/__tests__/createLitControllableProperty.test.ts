@@ -201,3 +201,118 @@ describe('createLitControllableProperty — parent-flip detection (ROZ840)', () 
     expect(cp.read()).toBe(5);
   });
 });
+
+describe('createLitControllableProperty — notifyPropertyWrite (property-binding controlled-mode entry)', () => {
+  // Part A regression — the Lit controlled/uncontrolled mismatch on a
+  // property-bound two-way model (SortableList desync). A Lit consumer drives
+  // a two-way model with the `.items=${…}` PROPERTY binding, which lands on
+  // the host's public `set items(v)` and NEVER reaches attributeChangedCallback.
+  // The emitted property setter therefore routes through `notifyPropertyWrite`
+  // (NOT `write`) so a property-bound parent establishes controlled mode and
+  // there is a single source of truth.
+
+  it('a property-setter write puts a fresh uncontrolled controllable into controlled mode', () => {
+    const host = document.createElement('div');
+    const cp = createLitControllableProperty<number[]>({
+      host,
+      eventName: 'items-change',
+      defaultValue: [],
+      initialControlledValue: undefined,
+    });
+    // Parent applies its `.items=${[1, 2, 3]}` binding.
+    cp.notifyPropertyWrite([1, 2, 3]);
+    expect(cp.read()).toEqual([1, 2, 3]);
+
+    // Now in controlled mode: the producer's own write() must NOT mutate the
+    // local mirror — the parent owns the value (single source of truth). It
+    // only dispatches the change event for the parent to observe.
+    cp.write([1, 2, 3, 4]);
+    expect(cp.read()).toEqual([1, 2, 3]);
+  });
+
+  it('the two-way round-trip (write → change event → parent re-binds) does NOT spuriously warn', () => {
+    // After the producer's write() dispatches `items-change`, a two-way parent
+    // updates its state and re-applies `.items=${newValue}`, hitting the setter
+    // again. That round-trip is the NORMAL data flow — it must NOT emit the
+    // ROZ840 flip warning (which is reserved for the attribute path).
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const host = document.createElement('div');
+    const cp = createLitControllableProperty<number>({
+      host,
+      eventName: 'value-change',
+      defaultValue: 0,
+      initialControlledValue: undefined,
+    });
+    // Initial property binding.
+    cp.notifyPropertyWrite(1);
+    // Producer mutates → dispatches change → parent re-binds with the new value.
+    cp.write(2);
+    cp.notifyPropertyWrite(2);
+    // Parent drives a fresh value.
+    cp.notifyPropertyWrite(9);
+    expect(warnSpy).not.toHaveBeenCalled();
+    expect(cp.read()).toBe(9);
+  });
+
+  it('a property-bound controllable stays controlled — no dual copy', () => {
+    // The whole point of Part A: producer + consumer share ONE value. Once a
+    // property binding has established controlled mode, every subsequent
+    // producer write() defers to the parent's re-binding rather than forking a
+    // private local copy.
+    const host = document.createElement('div');
+    const cp = createLitControllableProperty<string>({
+      host,
+      eventName: 'text-change',
+      defaultValue: 'default',
+      initialControlledValue: undefined,
+    });
+    cp.notifyPropertyWrite('parent-owned');
+    // Producer write() does not fork a local copy.
+    cp.write('producer-attempt');
+    expect(cp.read()).toBe('parent-owned');
+    // Parent re-binds (the round-trip from the producer's change event).
+    cp.notifyPropertyWrite('producer-attempt');
+    expect(cp.read()).toBe('producer-attempt');
+  });
+
+  it('a property write keeps an already-controlled controllable controlled', () => {
+    const host = document.createElement('div');
+    const cp = createLitControllableProperty<number>({
+      host,
+      eventName: 'value-change',
+      // Constructed controlled (parent passed an initial value at mount).
+      defaultValue: 0,
+      initialControlledValue: 5,
+    });
+    expect(cp.read()).toBe(5);
+    cp.notifyPropertyWrite(8);
+    expect(cp.read()).toBe(8);
+    // Still controlled — producer write() does not mutate the mirror.
+    cp.write(99);
+    expect(cp.read()).toBe(8);
+  });
+
+  it('property-setter write still dispatches the change event via a subsequent producer write()', () => {
+    // notifyPropertyWrite itself does not dispatch (it is the parent asserting
+    // its own value — dispatching back would loop). The producer's write()
+    // remains the dispatch path, and it carries the resolved value out.
+    const dispatched: CustomEvent[] = [];
+    const host = {
+      dispatchEvent: (ev: Event) => {
+        dispatched.push(ev as CustomEvent);
+        return true;
+      },
+    } as unknown as HTMLElement;
+    const cp = createLitControllableProperty<number>({
+      host,
+      eventName: 'value-change',
+      defaultValue: 0,
+      initialControlledValue: undefined,
+    });
+    cp.notifyPropertyWrite(3);
+    expect(dispatched).toHaveLength(0);
+    cp.write(4);
+    expect(dispatched).toHaveLength(1);
+    expect(dispatched[0]!.detail).toBe(4);
+  });
+});

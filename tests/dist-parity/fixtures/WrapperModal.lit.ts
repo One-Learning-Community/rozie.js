@@ -87,5 +87,5 @@ export default class WrapperModal extends SignalWatcher(LitElement) {
   }
 
   get open(): boolean { return this._openControllable.read(); }
-  set open(v: boolean) { this._openControllable.write(v); }
+  set open(v: boolean) { this._openControllable.notifyPropertyWrite(v); }
 }

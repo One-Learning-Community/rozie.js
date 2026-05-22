@@ -279,9 +279,21 @@ function emitModelProp(prop: PropDecl, componentName: string): ModelPropEmit {
 
 function emitModelGetterSetter(prop: PropDecl): string {
   const tsType = renderTsType(prop.typeAnnotation);
+  // The public PROPERTY setter is the entry point for an EXTERNAL parent
+  // reassigning the model via a Lit `.${prop.name}=${…}` property binding.
+  // A property binding bypasses `attributeChangedCallback` entirely, so it
+  // must route through `notifyPropertyWrite` — which establishes / keeps
+  // controlled mode — rather than `write` (the producer-internal mutation
+  // path that never flips mode). Routing the setter through `write` left a
+  // property-bound two-way parent permanently uncontrolled: producer and
+  // consumer then held two divergent copies synced only by `*-change`
+  // CustomEvent round-trips (the Lit SortableList desync). The producer's OWN
+  // `$props.${prop.name} = …` mutations are emitted as direct
+  // `_${prop.name}Controllable.write(…)` calls by rewriteScript and never hit
+  // this setter, so a standalone (uncontrolled) producer is unaffected.
   return [
     `  get ${prop.name}(): ${tsType} { return this._${prop.name}Controllable.read(); }`,
-    `  set ${prop.name}(v: ${tsType}) { this._${prop.name}Controllable.write(v); }`,
+    `  set ${prop.name}(v: ${tsType}) { this._${prop.name}Controllable.notifyPropertyWrite(v); }`,
   ].join('\n');
 }
 

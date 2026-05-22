@@ -36,5 +36,5 @@ export default class CheckboxRModel extends SignalWatcher(LitElement) {
   }
 
   get checked(): boolean { return this._checkedControllable.read(); }
-  set checked(v: boolean) { this._checkedControllable.write(v); }
+  set checked(v: boolean) { this._checkedControllable.notifyPropertyWrite(v); }
 }

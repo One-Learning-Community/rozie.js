@@ -64,14 +64,40 @@ describe('emitScript — Lit class-body assembly', () => {
     expect(code).toContain('createLitControllableProperty<number>');
     expect(code).toContain("eventName: 'value-change'");
     expect(code).toContain('get value(): number { return this._valueControllable.read(); }');
-    expect(code).toContain('set value(v: number) { this._valueControllable.write(v); }');
+    // The public PROPERTY setter routes through `notifyPropertyWrite` — the
+    // external-parent controlled-mode entry point. A Lit `.value=${…}`
+    // property binding lands here and must establish controlled mode; routing
+    // it through `write` left a property-bound two-way parent permanently
+    // uncontrolled (dual-copy desync).
+    expect(code).toContain('set value(v: number) { this._valueControllable.notifyPropertyWrite(v); }');
   });
 
-  it('rewrites $props.X → this.X in <script> AST', () => {
+  it('rewrites $props.X (model) compound write → controllable.write functional updater', () => {
     const code = compile('Counter');
-    // Counter's `if (canIncrement) $props.value += $props.step` becomes
-    // `if (this.canIncrement) this.value += this.step`
-    expect(code).toContain('this.value += this.step');
+    // Counter's `if (canIncrement) $props.value += $props.step` becomes a
+    // direct controllable write (NOT `this.value += …`, which would hit the
+    // public setter / notifyPropertyWrite and flip a standalone producer into
+    // controlled mode). The compound op desugars to a functional updater.
+    expect(code).toContain('this._valueControllable.write(prev => prev + this.step)');
+    expect(code).not.toContain('this.value += this.step');
+  });
+
+  it('SortableList: producer-internal r-model write routes through controllable.write, setter through notifyPropertyWrite', () => {
+    // Part A regression — the Lit controlled/uncontrolled mismatch on the
+    // property-bound two-way `r-model:items`. SortableList's onUpdate handler
+    // does `$props.items = next` (a plain `=` model write); this must lower to
+    // a direct `_itemsControllable.write(next)` so a STANDALONE (uncontrolled)
+    // SortableList still mutates its own local copy. The public PROPERTY
+    // setter — the entry point for a parent's `.items=${…}` binding — must
+    // route through `notifyPropertyWrite` so a property-bound two-way parent
+    // establishes controlled mode (single source of truth, no dual copy).
+    const code = compile('SortableList');
+    expect(code).toContain('this._itemsControllable.write(next)');
+    expect(code).toContain(
+      'set items(v: any[]) { this._itemsControllable.notifyPropertyWrite(v); }',
+    );
+    // The producer's own write must NOT go through the public setter.
+    expect(code).not.toContain('this.items = next');
   });
 
   it('rewrites $data.X → this._X.value (signal access)', () => {

@@ -194,8 +194,30 @@ describe('rewriteScript — sigil rewrites', () => {
     expect(rewrite('$data.count = 5;', ir)).toContain('this._count.value = 5;');
   });
 
-  it('$props.X = y → this.X = y (AssignmentExpression left)', () => {
+  it('$props.X = y (model) → this._XControllable.write(y) — NOT the public setter', () => {
+    // A producer mutating its own `model: true` prop must route through the
+    // controllable's `write()` directly. The public `set X()` property setter
+    // routes through `notifyPropertyWrite` (external-parent controlled-mode
+    // entry) — sending the producer's own write there would flip a standalone
+    // uncontrolled producer into controlled mode and freeze its local state.
     const ir = buildIR({ props: [prop('value', true)] });
+    const out = rewrite('$props.value = 5;', ir);
+    expect(out).toContain('this._valueControllable.write(5);');
+    expect(out).not.toContain('this.value = 5');
+  });
+
+  it('$props.X += y (model compound) → write(prev => prev + y) functional updater', () => {
+    // Compound model writes desugar to a functional updater so the OLD value
+    // is read through the controllable's resolver, not the public getter.
+    const ir = buildIR({ props: [prop('count', true)] });
+    const out = rewrite('$props.count += 3;', ir);
+    expect(out).toContain('this._countControllable.write(prev => prev + 3);');
+  });
+
+  it('$props.X = y (non-model) → this.X = y (best-effort runtime-error path)', () => {
+    // A non-model prop write stays as a plain member assignment — it never has
+    // a controllable backing.
+    const ir = buildIR({ props: [prop('value', false)] });
     expect(rewrite('$props.value = 5;', ir)).toContain('this.value = 5;');
   });
 

@@ -76,6 +76,71 @@ function thisSignalRead(name: string): t.MemberExpression {
 }
 
 /**
+ * Map a JS compound-assignment operator (`+=`, `-=`, …) to its binary
+ * counterpart (`+`, `-`, …). Used to desugar a producer-internal compound
+ * model write into a functional-updater `write(prev => prev OP rhs)` call.
+ */
+const COMPOUND_OP_MAP: Record<string, t.BinaryExpression['operator']> = {
+  '+=': '+',
+  '-=': '-',
+  '*=': '*',
+  '/=': '/',
+  '%=': '%',
+  '**=': '**',
+  '&=': '&',
+  '|=': '|',
+  '^=': '^',
+  '<<=': '<<',
+  '>>=': '>>',
+  '>>>=': '>>>',
+};
+
+/**
+ * Build the producer-internal model-write call:
+ *
+ *   `$props.items = next`        →  `this._itemsControllable.write(next)`
+ *   `$props.value += $props.step` →  `this._valueControllable.write(prev => prev + $props.step)`
+ *
+ * The producer mutating its OWN `model: true` prop must NOT go through the
+ * public `set <name>()` property setter — that setter is reserved for an
+ * external parent's `.prop=${…}` binding and routes through
+ * `notifyPropertyWrite` (controlled-mode entry). Routing the producer's own
+ * write there would spuriously flip a standalone uncontrolled producer into
+ * controlled mode and freeze its local state. So the producer write is lowered
+ * to a direct `_<name>Controllable.write(…)` call (mirroring React's
+ * `setValue(…)` model-write contract).
+ *
+ * The returned node is left UN-skipped by the caller so the surrounding
+ * traversal still descends into the `write(…)` argument and rewrites any
+ * `$props.X` / `$data.X` reads inside the RHS.
+ */
+function buildModelWriteCall(
+  propName: string,
+  operator: string,
+  rhs: t.Expression,
+): t.CallExpression {
+  const controllable = t.memberExpression(
+    t.memberExpression(t.thisExpression(), t.identifier(`_${propName}Controllable`)),
+    t.identifier('write'),
+  );
+  if (operator === '=') {
+    return t.callExpression(controllable, [rhs]);
+  }
+  const binOp = COMPOUND_OP_MAP[operator];
+  if (!binOp) {
+    // Unknown compound operator — fall back to a plain write of the RHS.
+    return t.callExpression(controllable, [rhs]);
+  }
+  // `prev => prev OP rhs` — functional updater so the OLD value is read
+  // through the controllable's resolver rather than via the public getter.
+  const arrow = t.arrowFunctionExpression(
+    [t.identifier('prev')],
+    t.binaryExpression(binOp, t.identifier('prev'), rhs),
+  );
+  return t.callExpression(controllable, [arrow]);
+}
+
+/**
  * Collect names of top-level script bindings (functions, arrow consts) that
  * become class methods/fields. References to these names inside class-method
  * bodies need `this.` prefix.
@@ -167,13 +232,31 @@ export function rewriteScript(
         return;
       }
 
-      if (
-        obj.name === '$props' &&
-        (modelProps.has(prop.name) || nonModelProps.has(prop.name))
-      ) {
-        // $props.x = y  →  this.x = y
-        // (For non-model props this is a runtime error path; emitter does
-        //  best-effort. Model props go through the public getter/setter pair.)
+      if (obj.name === '$props' && modelProps.has(prop.name)) {
+        // $props.x = y  (model write) →  this._xControllable.write(y)
+        //
+        // The producer mutating its own model goes through the controllable's
+        // `write()` directly, NOT through the public `set x()` property
+        // setter. The setter is the external-parent entry point and routes
+        // through `notifyPropertyWrite` (controlled-mode entry); sending the
+        // producer's own write there would flip a standalone uncontrolled
+        // producer into controlled mode. Compound writes (`+=` etc.) desugar
+        // to `write(prev => prev OP rhs)`. This mirrors React's `setValue(…)`
+        // model-write contract.
+        //
+        // No `path.skip()` — let the traversal descend into the synthesized
+        // `write(…)` argument so `$props.Y` / `$data.Y` reads in the RHS
+        // (e.g. `$props.value += $props.step`, `[...$props.items, …]`) are
+        // still rewritten by the MemberExpression visitor.
+        path.replaceWith(
+          buildModelWriteCall(prop.name, node.operator, node.right),
+        );
+        return;
+      }
+
+      if (obj.name === '$props' && nonModelProps.has(prop.name)) {
+        // $props.x = y  (non-model write) →  this.x = y
+        // (This is a runtime error path; emitter does best-effort.)
         path.get('left').replaceWith(thisDot(prop.name));
         return;
       }

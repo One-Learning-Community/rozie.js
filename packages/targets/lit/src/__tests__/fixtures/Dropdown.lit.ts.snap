@@ -119,11 +119,11 @@ export default class Dropdown extends SignalWatcher(LitElement) {
   }
 
   toggle = () => {
-  this.open = !this.open;
+  this._openControllable.write(!this.open);
 };
 
   close = () => {
-  this.open = false;
+  this._openControllable.write(false);
 };
 
   reposition = () => {
@@ -136,7 +136,7 @@ export default class Dropdown extends SignalWatcher(LitElement) {
 };
 
   get open(): boolean { return this._openControllable.read(); }
-  set open(v: boolean) { this._openControllable.write(v); }
+  set open(v: boolean) { this._openControllable.notifyPropertyWrite(v); }
 }
 
 injectGlobalStyles('rozie-dropdown-global', `

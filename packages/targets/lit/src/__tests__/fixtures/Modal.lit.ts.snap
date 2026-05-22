@@ -140,7 +140,7 @@ ${this.open ? html`<div class="modal-backdrop" @click=${($event: MouseEvent) => 
   }
 
   close = () => {
-  this.open = false;
+  this._openControllable.write(false);
   this.dispatchEvent(new CustomEvent("close", {
     detail: undefined,
     bubbles: true,
@@ -162,7 +162,7 @@ ${this.open ? html`<div class="modal-backdrop" @click=${($event: MouseEvent) => 
 };
 
   get open(): boolean { return this._openControllable.read(); }
-  set open(v: boolean) { this._openControllable.write(v); }
+  set open(v: boolean) { this._openControllable.notifyPropertyWrite(v); }
 }
 
 injectGlobalStyles('rozie-modal-global', `

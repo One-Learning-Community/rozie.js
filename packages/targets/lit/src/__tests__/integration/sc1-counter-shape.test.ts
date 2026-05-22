@@ -41,9 +41,11 @@ describe('SC1 — Counter class shape (Phase 06.4 Success Criterion 1)', () => {
     expect(code).toContain('createLitControllableProperty<number>');
     expect(code).toContain("eventName: 'value-change'");
 
-    // Public getter/setter pair (the model-prop façade)
+    // Public getter/setter pair (the model-prop façade). The setter routes
+    // through `notifyPropertyWrite` — a Lit `.value=${…}` property binding
+    // from an external parent lands here and must establish controlled mode.
     expect(code).toContain('get value(): number { return this._valueControllable.read(); }');
-    expect(code).toContain('set value(v: number) { this._valueControllable.write(v); }');
+    expect(code).toContain('set value(v: number) { this._valueControllable.notifyPropertyWrite(v); }');
 
     // render() returns html``
     expect(code).toMatch(/render\(\)\s*\{[^}]*return html`/s);

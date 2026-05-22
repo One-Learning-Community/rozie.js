@@ -135,11 +135,11 @@ form[data-rozie-s-52bec3de] { display: flex; gap: 0.25rem; margin-block: 0.5rem;
   add = () => {
   const text = this._draft.value.trim();
   if (!text) return;
-  this.items = [...this.items, {
+  this._itemsControllable.write([...this.items, {
     id: crypto.randomUUID(),
     text,
     done: false
-  }];
+  }]);
   this._draft.value = '';
   this.dispatchEvent(new CustomEvent("add", {
     detail: text,
@@ -149,10 +149,10 @@ form[data-rozie-s-52bec3de] { display: flex; gap: 0.25rem; margin-block: 0.5rem;
 };
 
   toggle = (id: any) => {
-  this.items = this.items.map((i: any) => i.id === id ? {
+  this._itemsControllable.write(this.items.map((i: any) => i.id === id ? {
     ...i,
     done: !i.done
-  } : i);
+  } : i));
   this.dispatchEvent(new CustomEvent("toggle", {
     detail: id,
     bubbles: true,
@@ -161,7 +161,7 @@ form[data-rozie-s-52bec3de] { display: flex; gap: 0.25rem; margin-block: 0.5rem;
 };
 
   removeItem = (id: any) => {
-  this.items = this.items.filter((i: any) => i.id !== id);
+  this._itemsControllable.write(this.items.filter((i: any) => i.id !== id));
   this.dispatchEvent(new CustomEvent("remove", {
     detail: id,
     bubbles: true,
@@ -170,5 +170,5 @@ form[data-rozie-s-52bec3de] { display: flex; gap: 0.25rem; margin-block: 0.5rem;
 };
 
   get items(): any[] { return this._itemsControllable.read(); }
-  set items(v: any[]) { this._itemsControllable.write(v); }
+  set items(v: any[]) { this._itemsControllable.notifyPropertyWrite(v); }
 }

@@ -55,15 +55,15 @@ button[data-rozie-s-c72e01d0]:disabled { opacity: 0.4; cursor: not-allowed; }
   get canDecrement() { return this.value - this.step >= this.min; }
 
   increment = () => {
-  if (this.canIncrement) this.value += this.step;
+  if (this.canIncrement) this._valueControllable.write(prev => prev + this.step);
 };
 
   decrement = () => {
-  if (this.canDecrement) this.value -= this.step;
+  if (this.canDecrement) this._valueControllable.write(prev => prev - this.step);
 };
 
   get value(): number { return this._valueControllable.read(); }
-  set value(v: number) { this._valueControllable.write(v); }
+  set value(v: number) { this._valueControllable.notifyPropertyWrite(v); }
 }
 "
 `;

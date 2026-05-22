@@ -27,6 +27,17 @@
  * runtime's ROZ550 warning. Mirrors Radix's behavior — flips are programmer
  * error in production but never silently break the UI.
  *
+ * **Property-binding controlled-mode entry (`notifyPropertyWrite`)**: a Lit
+ * consumer drives a two-way model with the `.items=${…}` *property* binding
+ * (dot syntax), which lands on the host's public `set items(v)` and NEVER
+ * reaches `attributeChangedCallback`. The emitted property setter therefore
+ * routes through `notifyPropertyWrite` (NOT `write`) so a property-bound
+ * parent establishes / keeps controlled mode — a single source of truth —
+ * exactly as the attribute path does. The PRODUCER's own model mutations
+ * (`$props.items = next` in the `.rozie` `<script>`) are emitted as direct
+ * `write(...)` calls and stay clear of the public setter, so they never
+ * spuriously flip a standalone (uncontrolled) producer.
+ *
  * **HTML-parser-seed window**: the HTML parser populates attributes AFTER the
  * constructor runs, so the first `attributeChangedCallback` fires after the
  * controllable is constructed in uncontrolled mode. The emitter coerces a
@@ -57,17 +68,34 @@ export interface LitControllableProperty<T> {
   /** Read the current value (controlled or uncontrolled). */
   read(): T;
   /**
-   * Write a new value. In uncontrolled mode the internal state updates;
-   * in controlled mode only the CustomEvent dispatches (parent owns value).
-   * Always dispatches the `eventName` CustomEvent on the host element.
+   * Write a new value from the PRODUCER's own code (the component mutating its
+   * own model — e.g. `$props.items = next` inside the `.rozie` `<script>`).
+   * In uncontrolled mode the internal state updates; in controlled mode only
+   * the CustomEvent dispatches (parent owns value). Always dispatches the
+   * `eventName` CustomEvent on the host element. NEVER flips controlled mode —
+   * a producer mutating its own model is not a parent assertion.
    */
   write(next: T | ((prev: T) => T)): void;
   /**
-   * Called by the host element when the controlled attribute / property
-   * changes from outside (e.g. parent reassigns). Updates internal mirror
-   * AND detects controlled<->uncontrolled mode flips (D-LIT-10 / D-57).
+   * Called by the host element when the controlled attribute changes from
+   * outside (e.g. parent `setAttribute`). Updates internal mirror AND detects
+   * controlled<->uncontrolled mode flips (D-LIT-10 / D-57).
    */
   notifyAttributeChange(next: T | undefined): void;
+  /**
+   * Called by the host element's public PROPERTY setter (`set items(v)`) when a
+   * parent reassigns via a Lit `.items=${…}` property binding. A property
+   * binding bypasses `attributeChangedCallback` entirely, so without this hook
+   * a property-bound two-way parent would never push the producer into
+   * controlled mode — leaving producer and consumer holding two divergent
+   * copies, synced only loosely by `*-change` CustomEvent round-trips.
+   *
+   * Semantically a property write from a parent IS the controlled signal:
+   * it establishes / keeps controlled mode, mirroring `notifyAttributeChange`
+   * for a defined value. The HTML-parser-seed window and the `[ROZ840]`
+   * mode-flip warning contract are honoured identically.
+   */
+  notifyPropertyWrite(next: T): void;
 }
 
 export interface CreateLitControllablePropertyOpts<T> {
@@ -130,7 +158,8 @@ export function createLitControllableProperty<T>(
       }
       // Both modes — fire the change event so parent observers / two-way
       // binding helpers see the update. Controlled-mode parents typically
-      // re-assert via `notifyAttributeChange` from their event handler.
+      // re-assert via `notifyAttributeChange` / `notifyPropertyWrite` from
+      // their event handler.
       dispatchChange(resolved);
     },
     notifyAttributeChange(next: T | undefined): void {
@@ -163,6 +192,28 @@ export function createLitControllableProperty<T>(
       if (nextIsControlled) {
         _state.value = next as T;
       }
+    },
+    notifyPropertyWrite(next: T): void {
+      // A `.prop=${…}` Lit binding always carries a DEFINED value (the parent's
+      // bound expression) and re-applies on EVERY parent render — including the
+      // round-trip that follows the producer's own `write()` → `*-change`
+      // CustomEvent → parent state update → parent re-render. That round-trip
+      // is the NORMAL, EXPECTED two-way data flow, NOT a programmer error.
+      //
+      // Therefore this path silently ESTABLISHES / KEEPS controlled mode and
+      // deliberately does NOT emit the `[ROZ840]` flip warning: a property-
+      // bound parent IS the controlled signal, and warning on the legitimate
+      // property-binding path would be spurious noise (the ROZ840 warning is
+      // reserved for `notifyAttributeChange`, where an attribute appearing /
+      // disappearing mid-lifecycle is genuinely surprising). Adopting the
+      // parent's value here gives producer + consumer a single source of truth
+      // and eliminates the dual-copy desync.
+      //
+      // A property binding can never make the component uncontrolled — `next`
+      // is always defined — so there is no uncontrolled-direction flip to
+      // consider.
+      wasControlled = true;
+      _state.value = next;
     },
   };
 }

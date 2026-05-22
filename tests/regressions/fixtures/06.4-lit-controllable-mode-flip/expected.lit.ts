@@ -32,9 +32,9 @@ export default class ControllableModeFlip extends SignalWatcher(LitElement) {
   }
 
   bump = () => {
-  this.value += 1;
+  this._valueControllable.write(prev => prev + 1);
 };
 
   get value(): number { return this._valueControllable.read(); }
-  set value(v: number) { this._valueControllable.write(v); }
+  set value(v: number) { this._valueControllable.notifyPropertyWrite(v); }
 }
