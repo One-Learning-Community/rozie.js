@@ -8,10 +8,16 @@
  * SemVer-additive amendment proven byte-identical to Phase 3 fixtures).
  *
  * Public-API surface used (all SemVer-stable v1 per D-22b):
- *   - ModifierImpl, ModifierContext, ModifierArg
+ *   - EventModifierImpl, ModifierContext, ModifierArg
  *   - VueEmissionDescriptor, ReactEmissionDescriptor, SvelteEmissionDescriptor,
  *     AngularEmissionDescriptor, SolidEmissionDescriptor, LitEmissionDescriptor
  *     (all six `inlineGuard` kind)
+ *
+ * Phase 12 / D-01 — `ModifierImpl` became the discriminated union
+ * `EventModifierImpl | ModelModifierImpl`. `swipeModifier` is an EVENT
+ * modifier, so it is typed `EventModifierImpl` (the event-shaped member) —
+ * this keeps the six per-target `vue()/react()/...` methods directly
+ * accessible without a narrowing predicate.
  *
  * Usage in a .rozie file:
  *   <template>
@@ -24,7 +30,7 @@
  *   - Svelte / Angular / Solid / Lit: the same inlineGuard code spliced into each target's synthesized handler.
  */
 import type {
-  ModifierImpl,
+  EventModifierImpl,
   ModifierContext,
   ModifierArg,
   VueEmissionDescriptor,
@@ -66,7 +72,7 @@ function buildGuardCode(direction: SwipeDirection): string {
  * register anything; consumers must explicitly call
  * `registry.register(swipeModifier)`.
  */
-export const swipeModifier: ModifierImpl = {
+export const swipeModifier: EventModifierImpl = {
   name: 'swipe',
   arity: 'one',
   resolve(args: ModifierArg[], ctx: ModifierContext) {

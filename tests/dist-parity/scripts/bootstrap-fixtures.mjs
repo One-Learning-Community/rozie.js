@@ -50,6 +50,17 @@ const FIXTURES_DIR = resolve(HERE, '../fixtures');
 // @if/@else, @each, @for, a @function, %placeholder + @extend, #{...}
 // interpolation, and a Sass map via `@use 'sass:map'`. Single-file; no
 // sibling .rozie producers.
+// Phase 12 Plan 05 — EXAMPLES extended 13 → 15 with RModelLazy and
+// RModelNumberTrim, the two built-in-only r-model-modifier fixtures
+// (`.lazy` / `.number`+`.trim`). Registering a name here makes the
+// bootstrap call compile() on it for all six targets (throwing on any
+// error diagnostic) — this IS the SPEC AC-11 six-target compile proof
+// for these fixtures. RModelCustom is deliberately NOT added: its
+// `.phone` modifier is not in createDefaultRegistry() (the registry the
+// bootstrap's compile() uses), so it would fail the bootstrap with an
+// unknown-modifier error. RModelCustom's AC-11 proof is instead the six
+// tests/plugins/phone/src/__tests__/phone-<target>-emit.test.ts tests.
+// All three are single-file; no sibling .rozie producers.
 const EXAMPLES = [
   'Counter',
   'SearchInput',
@@ -64,6 +75,8 @@ const EXAMPLES = [
   'PortalListStyled',
   'PortalListStyledScss',
   'BadgeGridStyledScss',
+  'RModelLazy',
+  'RModelNumberTrim',
 ];
 
 const EXAMPLES_NEEDING_RESOLVER_ROOT = new Set(['ModalConsumer', 'WrapperModal']);

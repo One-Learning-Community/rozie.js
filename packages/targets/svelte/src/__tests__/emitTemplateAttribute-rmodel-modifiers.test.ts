@@ -3,9 +3,11 @@
 // Svelte's `bind:value` two-way sugar cannot carry a value coercion, so when
 // any modifier is present the emit drops to an explicit `value={x}` plus an
 // event handler. `.number`/`.trim` hand-emit the value coercion via
-// `$v`-substitution; `.lazy` swaps the handler event from `on:input` to
-// `on:change` (D-08). Bare `r-model` keeps `bind:value={x}` byte-identical to
-// pre-phase.
+// `$v`-substitution; `.lazy` swaps the handler event from `oninput` to
+// `onchange` (D-08). The Svelte 5 attribute form (`oninput=`/`onchange=`) is
+// used — NOT the deprecated `on:input` directive — so the emit never mixes
+// old + new event syntax on one element. Bare `r-model` keeps
+// `bind:value={x}` byte-identical to pre-phase.
 //
 // Test surface drives the public `emitTemplate` output (template text).
 import { describe, expect, it } from 'vitest';
@@ -64,11 +66,11 @@ describe('emitTemplateAttribute — Svelte r-model modifiers', () => {
     const { template, diagnostics } = emitTemplate(ir, REGISTRY);
     expect(diagnostics).toEqual([]);
     expect(template).toContain('bind:value={query}');
-    expect(template).not.toContain('on:input');
-    expect(template).not.toContain('on:change');
+    expect(template).not.toContain('oninput');
+    expect(template).not.toContain('onchange');
   });
 
-  it('r-model.number drops bind:value for value={...} + on:input with coercion', () => {
+  it('r-model.number drops bind:value for value={...} + oninput with coercion', () => {
     const ir = lowerInline(`<rozie name="Test">
 <data>{ amount: '' }</data>
 <template>
@@ -79,12 +81,12 @@ describe('emitTemplateAttribute — Svelte r-model modifiers', () => {
     expect(diagnostics).toEqual([]);
     expect(template).not.toContain('bind:value');
     expect(template).toContain('value={amount}');
-    expect(template).toContain('on:input=');
+    expect(template).toContain('oninput=');
     // The .number coercion fragment is spliced into the handler.
     expect(template).toContain('parseFloat');
   });
 
-  it('r-model.trim drops bind:value for value={...} + on:input with .trim()', () => {
+  it('r-model.trim drops bind:value for value={...} + oninput with .trim()', () => {
     const ir = lowerInline(`<rozie name="Test">
 <data>{ name: '' }</data>
 <template>
@@ -95,11 +97,11 @@ describe('emitTemplateAttribute — Svelte r-model modifiers', () => {
     expect(diagnostics).toEqual([]);
     expect(template).not.toContain('bind:value');
     expect(template).toContain('value={name}');
-    expect(template).toContain('on:input=');
+    expect(template).toContain('oninput=');
     expect(template).toContain('.trim()');
   });
 
-  it('r-model.lazy uses an on:change handler', () => {
+  it('r-model.lazy uses an onchange handler', () => {
     const ir = lowerInline(`<rozie name="Test">
 <data>{ query: '' }</data>
 <template>
@@ -110,11 +112,11 @@ describe('emitTemplateAttribute — Svelte r-model modifiers', () => {
     expect(diagnostics).toEqual([]);
     expect(template).not.toContain('bind:value');
     expect(template).toContain('value={query}');
-    expect(template).toContain('on:change=');
-    expect(template).not.toContain('on:input=');
+    expect(template).toContain('onchange=');
+    expect(template).not.toContain('oninput=');
   });
 
-  it('r-model.lazy.number.trim uses on:change and chains the coercions', () => {
+  it('r-model.lazy.number.trim uses onchange and chains the coercions', () => {
     const ir = lowerInline(`<rozie name="Test">
 <data>{ amount: '' }</data>
 <template>
@@ -123,7 +125,7 @@ describe('emitTemplateAttribute — Svelte r-model modifiers', () => {
 </rozie>`);
     const { template, diagnostics } = emitTemplate(ir, REGISTRY);
     expect(diagnostics).toEqual([]);
-    expect(template).toContain('on:change=');
+    expect(template).toContain('onchange=');
     expect(template).toContain('.trim()');
     expect(template).toContain('parseFloat');
   });

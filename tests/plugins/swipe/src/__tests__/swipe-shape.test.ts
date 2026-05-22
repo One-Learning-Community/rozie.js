@@ -9,7 +9,7 @@ import { describe, expect, it } from 'vitest';
 import {
   ModifierRegistry,
   registerBuiltins,
-  type ModifierImpl,
+  type EventModifierImpl,
   type ModifierContext,
   type ModifierArg,
   type VueEmissionDescriptor,
@@ -25,7 +25,11 @@ describe('MOD-05 — swipe ModifierImpl shape (D-22b public surface)', () => {
   it('imports the publicly-exported types verbatim', () => {
     // Compile-time assertion via type narrowing at runtime: the test merely
     // needs to mention each type in a typed context to keep TS sturdy.
-    const _impl: ModifierImpl = swipeModifier;
+    // Phase 12 / D-01 — `ModifierImpl` is now the discriminated union
+    // `EventModifierImpl | ModelModifierImpl`; swipe is an event modifier, so
+    // the event-shaped `EventModifierImpl` member is asserted directly (the
+    // six per-target methods exist only on that member).
+    const _impl: EventModifierImpl = swipeModifier;
     expect(_impl.name).toBe('swipe');
     expect(_impl.arity).toBe('one');
     expect(typeof _impl.resolve).toBe('function');

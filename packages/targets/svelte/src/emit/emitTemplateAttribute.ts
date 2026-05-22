@@ -312,10 +312,15 @@ export function emitSingleAttr(
       // Phase 12 — the resolved `r-model` modifier chain. Svelte's `bind:value`
       // two-way sugar cannot carry a value coercion, so when ANY modifier is
       // present the emit drops to an explicit `value={…}` plus an event
-      // handler. The handler event is `on:input` normally, `on:change` when
-      // `.lazy` is in the chain (D-08). The handler body assigns the
-      // transformed value back — chaining each `valueTransform` fragment in
-      // D-07 list order (the resolved list arrives already canonicalized).
+      // handler. The handler event is `oninput` normally, `onchange` when
+      // `.lazy` is in the chain (D-08). The Svelte 5 ATTRIBUTE form
+      // (`oninput=`/`onchange=`) is used — NOT the deprecated `on:input`
+      // directive — so the emit never mixes old + new event syntax with a
+      // sibling `oninput` handler on the same element (Svelte 5 forbids
+      // mixing; emitTemplateEvent.ts already emits the `on<event>=` form).
+      // The handler body assigns the transformed value back — chaining each
+      // `valueTransform` fragment in D-07 list order (the resolved list
+      // arrives already canonicalized).
       const { valueTransforms, isLazy, hasAny } = partitionSvelteModelModifiers(
         attr.modifiers,
       );
@@ -328,8 +333,8 @@ export function emitSingleAttr(
         '$event.currentTarget.value',
         valueTransforms,
       );
-      const eventName = isLazy ? 'change' : 'input';
-      return `value={${expr}} on:${eventName}={($event) => ${expr} = ${committedValue}}`;
+      const eventName = isLazy ? 'onchange' : 'oninput';
+      return `value={${expr}} ${eventName}={($event) => ${expr} = ${committedValue}}`;
     }
     // Spike 004 (Svelte subset) — `:style="{ key: value, ... }"` lowers to
     // per-key `style:<kebab(key)>={value}` directives so Svelte 5 doesn't
