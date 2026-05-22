@@ -592,14 +592,12 @@ function resolveModelModifiers(
   registry: ModifierRegistry,
   diagnostics: Diagnostic[],
 ): ResolvedModelModifier[] {
-  // Build the candidate list of registered MODEL-modifier names for ROZ960's
-  // did-you-mean. Iterate the registry (it exposes only list()/get()).
-  const modelModifierNames = registry
-    .list()
-    .filter((n) => {
-      const impl = registry.get(n);
-      return impl !== undefined && isModelModifier(impl);
-    });
+  // The candidate list of registered MODEL-modifier names for ROZ960's
+  // did-you-mean. WR-04 (12-REVIEW) — `listModelModifiers()` is memoized on
+  // the registry (invalidated on `register()`), so this is an O(1) cache hit
+  // on every `r-model` attribute after the first, rather than a per-attribute
+  // `list()` sort + full-registry `isModelModifier` filter.
+  const modelModifierNames = registry.listModelModifiers();
 
   const resolved: ResolvedModelModifier[] = [];
   for (const c of chain) {

@@ -493,6 +493,17 @@ export class ModifierRegistry {
   private map = new Map<string, ModifierImpl>();
 
   /**
+   * WR-04 (12-REVIEW) — memoized sorted list of registered MODEL-modifier
+   * names. `resolveModelModifiers` (in `lowerTemplate.ts`) needs this list
+   * for every `r-model` attribute's did-you-mean candidate set; recomputing
+   * it (a `list()` sort + per-name `get()` + `isModelModifier()` filter) on
+   * each call is wasted work in the compiler hot path. The cache is
+   * invalidated on every `register()` — registration is the only mutation
+   * path — so it can never go stale.
+   */
+  private modelModifierNamesCache: readonly string[] | null = null;
+
+  /**
    * Register a modifier implementation. THROWS on duplicate name —
    * this is a programmer-error path during compiler setup (NOT a
    * user-input validation), so throwing is correct here. The conflict
@@ -504,6 +515,9 @@ export class ModifierRegistry {
       throw new Error(`Modifier '${impl.name}' is already registered`);
     }
     this.map.set(impl.name, impl);
+    // WR-04 — invalidate the model-modifier-name cache; the next
+    // listModelModifiers() call recomputes it.
+    this.modelModifierNamesCache = null;
   }
 
   /** Look up a modifier by name. Returns undefined if not registered. */
@@ -522,5 +536,23 @@ export class ModifierRegistry {
    */
   list(): readonly string[] {
     return [...this.map.keys()].sort();
+  }
+
+  /**
+   * WR-04 (12-REVIEW) — sorted list of registered MODEL-modifier names only
+   * (`kind: 'model'`). Memoized: computed once and reused until the next
+   * `register()` invalidates it. `resolveModelModifiers` calls this once per
+   * `r-model` attribute for its ROZ960 did-you-mean candidate set, so the
+   * memoization removes a per-attribute `list()` sort + full-registry filter
+   * from the compiler hot path.
+   */
+  listModelModifiers(): readonly string[] {
+    if (this.modelModifierNamesCache === null) {
+      this.modelModifierNamesCache = [...this.map.entries()]
+        .filter(([, impl]) => isModelModifier(impl))
+        .map(([name]) => name)
+        .sort();
+    }
+    return this.modelModifierNamesCache;
   }
 }
