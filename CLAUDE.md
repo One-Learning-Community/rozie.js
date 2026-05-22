@@ -3,13 +3,13 @@
 
 **Rozie.js**
 
-Rozie.js is a cross-framework component definition language and compiler. Authors write components once in a Vue/Alpine-flavored block-based syntax (`.rozie` files), and Rozie compiles them to idiomatic React, Vue, Svelte, and Angular components. The name derives from the Rosetta Stone — one source, many target languages.
+Rozie.js is a cross-framework component definition language and compiler. Authors write components once in a Vue/Alpine-flavored block-based syntax (`.rozie` files), and Rozie compiles them to idiomatic React, Vue, Svelte, Angular, Solid, and Lit components. The name derives from the Rosetta Stone — one source, many target languages.
 
-It is **not** a runtime framework. Rozie deliberately does not try to be a "better React" or own the rendering pipeline; the heavy lifting still happens in whichever target framework the consumer chose. Rozie owns the **author-side API** so a single component definition can drop into any of the four major frameworks without per-framework wrapper boilerplate.
+It is **not** a runtime framework. Rozie deliberately does not try to be a "better React" or own the rendering pipeline; the heavy lifting still happens in whichever target framework the consumer chose. Rozie owns the **author-side API** so a single component definition can drop into any of its six compile targets without per-framework wrapper boilerplate.
 
 The audience is **component-library and design-system authors** who today maintain manual bindings/wrappers across React, Vue, Svelte, and Angular for libraries that ultimately do their real work in vanilla JS.
 
-**Core Value:** A component-library author can write one `.rozie` file and ship working, idiomatic React + Vue + Svelte + Angular consumers from it — eliminating the manual cross-framework wrapper work that today dominates the maintenance budget of cross-framework UI libraries.
+**Core Value:** A component-library author can write one `.rozie` file and ship working, idiomatic React, Vue, Svelte, Angular, Solid, and Lit consumers from it — eliminating the manual cross-framework wrapper work that today dominates the maintenance budget of cross-framework UI libraries.
 
 ### Constraints
 
