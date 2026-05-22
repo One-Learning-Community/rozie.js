@@ -1,0 +1,5 @@
+<rozie name="ROnPrefixCompletion">
+<template>
+  <button r-on:<caret>></button>
+</template>
+</rozie>

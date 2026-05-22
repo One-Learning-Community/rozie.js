@@ -80,6 +80,12 @@ class RozieAttributeNameCompletionContributor : CompletionContributor() {
                     }
 
                     val candidates: List<String> = when {
+                        // `r-on:` longhand event binding — surface the same
+                        // DOM events the `@` shorthand offers, re-prefixed.
+                        // Checked before the generic `r-` arm below since
+                        // `r-on:click` also starts with `r-`.
+                        prefix.startsWith("r-on:") ->
+                            RozieKnownAttributes.EVENT_SIGILS.map { "r-on:" + it.drop(1) }
                         // RESEARCH line 709: empty prefix (caret immediately
                         // after `<div ` with nothing typed yet) defaults to
                         // suggesting the r-directives. The other sigils only

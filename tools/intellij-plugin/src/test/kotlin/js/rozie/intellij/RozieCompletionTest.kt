@@ -148,4 +148,22 @@ class RozieCompletionTest : BasePlatformTestCase() {
             )
         }
     }
+
+    // === Behavior 8: typing `r-on:` surfaces the DOM events as `r-on:event` ===
+    //
+    // The `r-on:` longhand offers the same events as the `@` shorthand,
+    // re-prefixed — `@click` becomes `r-on:click`.
+
+    fun testROnPrefixSurfacesEventNames() {
+        myFixture.configureByFile("template-r-on-prefix.rozie")
+        myFixture.completeBasic()
+        val lookups = myFixture.lookupElementStrings ?: emptyList()
+        for (sigil in RozieKnownAttributes.EVENT_SIGILS) {
+            val expected = "r-on:" + sigil.drop(1)
+            assertTrue(
+                "Expected `$expected` in completion for `r-on:` prefix; got: $lookups",
+                expected in lookups,
+            )
+        }
+    }
 }
