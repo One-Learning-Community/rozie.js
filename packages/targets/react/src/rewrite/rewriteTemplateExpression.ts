@@ -55,6 +55,7 @@ function flattenInlineCode(code: string): string {
 }
 
 function capitalize(name: string): string {
+  /* v8 ignore next -- defensive: state/model-prop names are never empty (parser rejects empty identifiers) */
   if (name.length === 0) return name;
   return name.charAt(0).toUpperCase() + name.slice(1);
 }
@@ -100,6 +101,7 @@ export function rewriteTemplateExpression(
       return t.callExpression(t.identifier(setterName), [rhs]);
     }
     const binOp = COMPOUND_OP_MAP[operator];
+    /* v8 ignore next -- defensive: COMPOUND_OP_MAP covers every compound operator @babel/parser produces */
     if (!binOp) return t.callExpression(t.identifier(setterName), [rhs]);
     const arrow = t.arrowFunctionExpression(
       [t.identifier('prev')],
@@ -134,6 +136,7 @@ export function rewriteTemplateExpression(
       if (!t.isIdentifier(obj)) return;
       if (path.node.computed) return;
       const prop = path.node.property;
+      /* v8 ignore next -- defensive: a non-computed MemberExpression always has an Identifier property */
       if (!t.isIdentifier(prop)) return;
 
       if (obj.name === '$props') {
@@ -198,6 +201,7 @@ export function rewriteTemplateExpression(
       if (!t.isIdentifier(obj)) return;
       if (path.node.computed) return;
       const prop = path.node.property;
+      /* v8 ignore next -- defensive: a non-computed OptionalMemberExpression always has an Identifier property */
       if (!t.isIdentifier(prop)) return;
 
       if (obj.name === '$props') {
@@ -252,7 +256,8 @@ export function rewriteTemplateExpression(
 
   const stmt = wrapper.program.body[0]!;
   const raw = !t.isExpressionStatement(stmt)
-    ? generate(cloned, GEN_OPTS).code
+    ? /* v8 ignore next -- defensive: the wrapper is built from a single ExpressionStatement, so this arm is unreachable */
+      generate(cloned, GEN_OPTS).code
     : generate(stmt.expression, GEN_OPTS).code;
   return flattenInlineCode(raw);
 }
