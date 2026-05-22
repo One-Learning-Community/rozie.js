@@ -47,16 +47,23 @@ export function rozieCodegen(
   md: MarkdownIt,
   opts: RozieCodegenOptions,
 ): void {
-  // Search both `examples/<Name>.rozie` (canonical producers) and
-  // `examples/demos/<Name>.rozie` (demo-wrapper consumers, e.g. TableDemo)
-  // so docs pages can show their consumer source alongside the producer.
+  // Resolution order: canonical producers (`examples/<Name>.rozie`), then
+  // demo-wrapper consumers (`examples/demos/<Name>.rozie`, e.g. TableDemo),
+  // then the typed-example corpus (`examples/typed/<Name>.rozie`). Order is
+  // load-bearing: `SortableList` exists in BOTH `examples/` and
+  // `examples/typed/` — the root branch wins, so docs pages get the
+  // engine-wrapper producer rather than the typed-coverage fixture.
+  // `TypedCard` lives only under `typed/`, so it falls through to the last
+  // branch. This lets docs pages show producer, consumer, and typed sources.
   const resolveExample = (name: string): string => {
     const root = resolve(opts.examplesDir, `${name}.rozie`);
     if (existsSync(root)) return root;
     const demo = resolve(opts.examplesDir, 'demos', `${name}.rozie`);
     if (existsSync(demo)) return demo;
+    const typed = resolve(opts.examplesDir, 'typed', `${name}.rozie`);
+    if (existsSync(typed)) return typed;
     throw new Error(
-      `[rozie-codegen] cannot read example source: ${root} (and not found under demos/)`,
+      `[rozie-codegen] cannot read example source: ${root} (and not found under demos/ or typed/)`,
     );
   };
   const readExample = (name: string): string => {
