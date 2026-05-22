@@ -57,6 +57,9 @@ function setAttrLine(slotName: string, scopeHash: string): string {
 }
 
 function capitalize(name: string): string {
+  // `pascalCase` filters parts through `Boolean`, so `capitalize` never
+  // receives an empty string in practice — this guard is defensive only.
+  /* v8 ignore next */
   if (name.length === 0) return name;
   return name.charAt(0).toUpperCase() + name.slice(1);
 }
