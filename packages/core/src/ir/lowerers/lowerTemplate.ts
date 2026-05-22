@@ -33,6 +33,7 @@ import type {
   ModifierRegistry,
   ModifierContext,
 } from '../../modifiers/ModifierRegistry.js';
+import { isModelModifier } from '../../modifiers/ModifierRegistry.js';
 import { extractRForAliases } from '../../semantic/extractRForAliases.js';
 import { computeExpressionDeps } from '../../reactivity/computeDeps.js';
 import { resolveModifierPipeline } from './lowerListeners.js';
@@ -53,7 +54,9 @@ import type {
   ComponentDecl,
   Listener,
   SlotFillerDecl,
+  ResolvedModelModifier,
 } from '../types.js';
+import type { ModifierChain } from '../../modifier-grammar/parseModifierChain.js';
 
 /**
  * Per-element annotation of tagKind + diagnostic emission for Phase 06.2 P1
@@ -563,6 +566,90 @@ function lowerElement(
 }
 
 /**
+ * Phase 12 — the names of the BUILT-IN model modifiers. A built-in used on
+ * the consumer-side `r-model:propName` two-way form is a hard error (ROZ963);
+ * a CUSTOM model modifier on the two-way form is permitted (SPEC R5).
+ */
+const BUILTIN_MODEL_MODIFIERS = new Set(['lazy', 'number', 'trim']);
+
+/**
+ * Phase 12 / D-02, D-07 — resolve an `r-model` modifier chain against the
+ * registry inline (collected-not-thrown), parallel to `resolveModifierPipeline`
+ * on the event side. For each chain entry:
+ *   - registry miss             → ROZ960 (did-you-mean among model modifiers)
+ *   - found but `kind: 'event'` → ROZ961 (event modifier, not a model modifier)
+ *   - found `kind: 'model'`     → resolve(), collect `{ name, descriptor }`
+ *
+ * The resolved list is ordered per D-07's Vue-canonical compose pipeline:
+ * `.trim` → custom string-transforms (authored order) → `.number` (terminal).
+ * `.lazy` is orthogonal (an event-binding swap, not a value transform) — it is
+ * included in the list (emitters need to see it) but does not participate in
+ * the value-pipeline ordering; it keeps its authored position relative to the
+ * non-`.number` entries.
+ */
+function resolveModelModifiers(
+  chain: readonly ModifierChain[],
+  registry: ModifierRegistry,
+  diagnostics: Diagnostic[],
+): ResolvedModelModifier[] {
+  // Build the candidate list of registered MODEL-modifier names for ROZ960's
+  // did-you-mean. Iterate the registry (it exposes only list()/get()).
+  const modelModifierNames = registry
+    .list()
+    .filter((n) => {
+      const impl = registry.get(n);
+      return impl !== undefined && isModelModifier(impl);
+    });
+
+  const resolved: ResolvedModelModifier[] = [];
+  for (const c of chain) {
+    const impl = registry.get(c.name);
+    if (!impl) {
+      const suggestion = didYouMean(c.name, modelModifierNames);
+      diagnostics.push({
+        code: RozieErrorCode.RMODEL_UNKNOWN_MODIFIER,
+        severity: 'error',
+        message: suggestion
+          ? `Unknown r-model modifier '.${c.name}' — did you mean '.${suggestion}'?`
+          : `Unknown r-model modifier '.${c.name}' — not a registered model modifier.`,
+        loc: c.loc,
+        hint: 'Built-in r-model modifiers are .lazy/.number/.trim. Register a custom one via registerModifier(registry, name, impl).',
+      });
+      continue;
+    }
+    if (!isModelModifier(impl)) {
+      // Found, but it is an EVENT modifier — D-02's precise misuse message.
+      diagnostics.push({
+        code: RozieErrorCode.RMODEL_EVENT_MODIFIER_MISUSED,
+        severity: 'error',
+        message: `'.${c.name}' is an event modifier, not a model modifier — it cannot be used on r-model.`,
+        loc: c.loc,
+        hint: 'Event modifiers apply to @event bindings. r-model accepts .lazy/.number/.trim or a custom model modifier.',
+      });
+      continue;
+    }
+    const result = impl.resolve(c.args as never, {
+      // Model modifiers are target-agnostic — the context only carries the
+      // source-loc for diagnostics. `source`/`event` are event-side concepts;
+      // reuse the chain entry's loc for both the entry and the context.
+      source: 'template-event',
+      event: 'model',
+      sourceLoc: c.loc,
+    });
+    diagnostics.push(...result.diagnostics);
+    resolved.push({ name: c.name, descriptor: result.descriptor });
+  }
+
+  // D-07 compose-order canonicalization: `.number` is always terminal among
+  // the resolved entries; everything else keeps its relative order. This is a
+  // stable partition — `.trim` and custom string-transforms stay in authored
+  // order, `.lazy` keeps its slot, only `.number` migrates to the end.
+  const nonNumber = resolved.filter((m) => m.name !== 'number');
+  const numbers = resolved.filter((m) => m.name === 'number');
+  return [...nonNumber, ...numbers];
+}
+
+/**
  * Lower an element node WITHOUT r-for/r-if wrapping. Handles <slot>,
  * static + binding attrs, template @event bindings, recursive children.
  */
@@ -731,12 +818,54 @@ function lowerBareElement(
       if (attr.name.startsWith('model:')) {
         const propName = attr.name.slice('model:'.length);
         const expr = attr.value !== null ? tryParseExpression(attr.value) : null;
+        // Phase 12 — resolve any `.modifier` chain on the consumer-side
+        // `r-model:propName` two-way form. A BUILT-IN model modifier here is
+        // a hard error (ROZ963 — built-ins are form-input-`r-model`-only per
+        // SPEC R5); a custom model modifier on the two-way form is permitted.
+        // The resolved list is still carried on the IR regardless.
+        const twoWayModifiers = resolveModelModifiers(
+          attr.chain,
+          registry,
+          diagnostics,
+        );
+        for (const m of twoWayModifiers) {
+          if (BUILTIN_MODEL_MODIFIERS.has(m.name)) {
+            diagnostics.push({
+              code: RozieErrorCode.RMODEL_BUILTIN_ON_TWO_WAY,
+              severity: 'error',
+              message: `Built-in r-model modifier '.${m.name}' is not allowed on the consumer-side two-way form 'r-model:${propName}' — built-in modifiers apply only to the form-input r-model.`,
+              loc: attr.loc,
+              hint: 'Use .lazy/.number/.trim on a form-input r-model (e.g. <input r-model.number>), or register a custom model modifier for the two-way form.',
+            });
+          }
+        }
         attributes.push({
           kind: 'twoWayBinding',
           name: propName,
           expression: expr ?? t.identifier('undefined'),
           deps: expr ? computeExpressionDeps(expr, bindings) : [],
           sourceLoc: attr.loc,
+          ...(twoWayModifiers.length > 0 ? { modifiers: twoWayModifiers } : {}),
+        });
+        continue;
+      }
+
+      // Phase 12 — generic guard (ROZ962). The parser splits a `.modifier`
+      // chain off `r-model` ONLY; for every other directive the dot stays
+      // inside `attr.name` (`r-show.foo` → name `show.foo`). A `.` in a
+      // non-`model` directive name means the author wrote a modifier on a
+      // directive that takes none — today that attribute is silently
+      // dropped. Emit a hard error instead, closing the whole silent-drop
+      // class, then `continue` (drop the attribute, but loudly).
+      const dotInName = attr.name.indexOf('.');
+      if (dotInName >= 0 && attr.name.slice(0, dotInName) !== 'model') {
+        const directiveBase = attr.name.slice(0, dotInName);
+        diagnostics.push({
+          code: RozieErrorCode.DIRECTIVE_TAKES_NO_MODIFIERS,
+          severity: 'error',
+          message: `r-${directiveBase} takes no modifiers — '.${attr.name.slice(dotInName + 1)}' is not valid on r-${directiveBase}.`,
+          loc: attr.loc,
+          hint: 'Only r-model accepts a .modifier chain (.lazy/.number/.trim or a custom model modifier).',
         });
         continue;
       }
@@ -754,12 +883,22 @@ function lowerBareElement(
         attr.value !== null
       ) {
         const expr = tryParseExpression(attr.value);
+        // Phase 12 — resolve the r-model `.modifier` chain inline (ROZ960/
+        // ROZ961 collected-not-thrown). `attr.chain` is populated by
+        // buildRozieAST for r-model directive attrs; it is empty for a bare
+        // r-model and for r-show/r-html/r-text (they never carry a chain —
+        // a dot on them was already caught by the ROZ962 guard above).
+        const modifiers =
+          attr.name === 'model'
+            ? resolveModelModifiers(attr.chain, registry, diagnostics)
+            : [];
         attributes.push({
           kind: 'binding',
           name: `r-${attr.name}`,
           expression: expr ?? t.identifier('undefined'),
           deps: expr ? computeExpressionDeps(expr, bindings) : [],
           sourceLoc: attr.loc,
+          ...(modifiers.length > 0 ? { modifiers } : {}),
         });
       }
       // r-if / r-else / r-else-if / r-for handled at the parent walker.
