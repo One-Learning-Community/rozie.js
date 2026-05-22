@@ -5,6 +5,13 @@ exports[`Solid ts-passthrough — author annotation survival (Phase 09 Plan 03 T
 import { mergeProps, onCleanup, onMount, splitProps } from 'solid-js';
 import type { EditorOptions } from './editor-types';
 
+interface InternalShape {
+  id: number;
+  ready: boolean;
+}
+
+type Mode = 'idle' | 'busy';
+
 interface TsPassthroughProps {
   label?: string;
 }
@@ -20,11 +27,6 @@ export default function TsPassthrough(_props: TsPassthroughProps): JSX.Element {
     editor = null;
   });
 
-  interface InternalShape {
-    id: number;
-    ready: boolean;
-  }
-  type Mode = 'idle' | 'busy';
   let count: number = 0;
   let editor: Editor | null = null;
   let mode: Mode = 'idle';
