@@ -37,7 +37,9 @@
         flagged with a "did you mean" rename quick-fix. Structure view: a
         <code>.rozie</code> file's SFC blocks appear in the Structure tool
         window for quick navigation. New-file action: "New &gt; Rozie
-        Component" scaffolds a <code>.rozie</code> single-file component.</p>
+        Component" scaffolds a <code>.rozie</code> single-file component.
+        Inspection: assigning to a non-<code>model</code> prop
+        (<code>$props.x = …</code>) is flagged as a ROZ200 error.</p>
         <p><strong>0.2.0</strong> — Architectural pivot to injection-first model.
         HTML coloring inside &lt;template&gt; now matches the TextMate bundle.
         Smart navigation: $props.X / $data.X / $refs.X Go-to-Declaration.
@@ -147,6 +149,20 @@
             enabledByDefault="true"
             level="WARNING"
             implementationClass="js.rozie.intellij.inspection.RozieTemplateAttributeInspection"/>
+
+        <!-- 0.3.0: flag `$props.x = …` assignments where x is a declared prop
+             not marked `model: true` — props are read-only (compiler ROZ200).
+             JavaScript-registered (the writes live in injected JS); prop
+             metadata via the reusable RoziePropsModel; RozieContextCheck
+             guards non-Rozie .js files. -->
+        <localInspection
+            language="JavaScript"
+            shortName="RoziePropAssignment"
+            displayName="Assignment to a non-model Rozie prop"
+            groupName="Rozie"
+            enabledByDefault="true"
+            level="ERROR"
+            implementationClass="js.rozie.intellij.inspection.RoziePropAssignmentInspection"/>
 
         <xml.attributeDescriptorsProvider
             implementation="js.rozie.intellij.xml.RozieAttributeDescriptorsProvider"/>

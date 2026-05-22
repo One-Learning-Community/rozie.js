@@ -103,7 +103,8 @@ intellijPlatform {
             <code>.rozie</code> file's SFC blocks appear in the Structure
             tool window for quick navigation. New-file action: "New &gt;
             Rozie Component" scaffolds a <code>.rozie</code> single-file
-            component.</p>
+            component. Inspection: assigning to a non-<code>model</code> prop
+            (<code>${'$'}props.x = …</code>) is flagged as a ROZ200 error.</p>
             <p><strong>0.2.0</strong> — Architectural pivot to injection-first model.
             HTML coloring inside &lt;template&gt; now matches the TextMate bundle.
             Smart navigation: ${'$'}props.X / ${'$'}data.X / ${'$'}refs.X Go-to-Declaration.
