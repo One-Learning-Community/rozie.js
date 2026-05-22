@@ -95,6 +95,14 @@ const EXAMPLES = [
   'Flatpickr',
   'Uppy',
   'TipTap',
+  // Phase 14 — ThemedButtonConsumer attribute-fallthrough dogfood (D-05/D-06).
+  // Auto-fallthrough renders consumer-passed attributes on the inner <button>;
+  // the manual sibling with `inherit-attrs="false"` + explicit `r-bind="$attrs"`
+  // produces the equivalent DOM through the opt-out path. Per D-10, all 6
+  // targets diff against the same shared `ThemedButtonConsumer.png` baseline.
+  // Baseline-gates to test.fixme via `baselineExists()` below until a
+  // Linux-Docker baseline regen lands the PNG (`feedback_vr_linux_baselines`).
+  'ThemedButtonConsumer',
 ] as const;
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'] as const;
 

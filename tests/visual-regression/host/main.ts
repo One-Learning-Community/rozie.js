@@ -87,6 +87,16 @@ export const EXAMPLES = [
   'TipTap',
   'Uppy',
   'Table',
+  // Phase 14 — ThemedButtonConsumer is the dist-parity dogfood for the
+  // attribute-fallthrough feature (D-05/D-06). The consumer mounts a
+  // ThemedButton (default auto-fallthrough) + ThemedButtonManual
+  // (`inherit-attrs="false"` + manual `r-bind="$attrs"`) side by side and
+  // forwards id / aria-* / data-* / type / extra class + a `style="--btn-bg: …"`
+  // CSS-custom-property override onto each. Wired into the VR matrix here +
+  // covered by structural assertions in themed-button.spec.ts (fallthrough
+  // attributes on the rendered <button>s; the cross-target class/style merge
+  // applied — auto and manual modes produce equivalent DOM).
+  'ThemedButtonConsumer',
 ] as const;
 
 export type Example = (typeof EXAMPLES)[number];
@@ -127,6 +137,11 @@ export const LIT_TAGS: Record<Example, string> = {
   TipTap: 'rozie-tip-tap',
   Uppy: 'rozie-uppy',
   Table: 'rozie-table',
+  // Phase 14 ThemedButton dogfood — kebab tag for the Lit cell. The Lit
+  // entry will append `-demo` if a `examples/demos/<Name>Demo.rozie` is
+  // present; ThemedButtonConsumer is a base example (no `<Name>Demo` sibling),
+  // so the loader resolves directly to `examples/ThemedButtonConsumer.rozie`.
+  ThemedButtonConsumer: 'rozie-themed-button-consumer',
 };
 
 export interface HostQuery {
@@ -194,6 +209,11 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   TipTap: {},
   Uppy: {},
   Table: {},
+  // ThemedButtonConsumer is self-contained — it forwards a hardcoded set of
+  // attributes onto its two ThemedButton wrapper instances (id, aria-*,
+  // data-*, type, style="--btn-bg: …", extra class). No parent-side props
+  // are needed.
+  ThemedButtonConsumer: {},
 };
 
 /**
