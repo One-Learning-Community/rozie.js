@@ -1,0 +1,125 @@
+<!--
+  BadgeGridStyledScss.rozie — second SCSS dist-parity proving fixture
+  (Phase 10, test-coverage gap closure 13th example).
+
+  PortalListStyledScss already covers the "structural" SCSS surface:
+  nesting, $variables, one @mixin/@include, the & parent-ref, :root and
+  @portal. This sibling fixture deliberately covers the COMPLEMENT — the
+  programmatic SCSS surface that otherwise has ZERO cross-target
+  regression coverage:
+
+    - @if / @else        — conditional declarations
+    - @each              — iterate a Sass map
+    - @for               — generate an indexed utility scale
+    - @function          — a pure user-defined function
+    - %placeholder + @extend
+    - #{...}             — interpolation, in a selector AND a value
+    - a Sass map + `@use 'sass:map'` (a BUILT-IN module — never a
+      filesystem @use; no importer is configured)
+
+  Determinism (the dist-parity gate is strict byte-identity):
+    - Every computed value is integer-ish (integer px, plain hex). No
+      decimal arithmetic, no deprecated color functions (darken / lighten
+      etc. warn and their decimal output drifts across dart-sass patch
+      releases).
+    - Only the built-in `sass:map` module is used.
+
+  The component itself is intentionally tiny — a static grid of status
+  badges. The markup exists only to give the <style lang="scss"> block a
+  natural set of class names to target.
+-->
+
+<rozie name="BadgeGridStyledScss">
+
+<props>
+{
+  badges: { type: Array, default: () => [] }
+}
+</props>
+
+<template>
+<div class="badge-grid">
+  <span r-for="badge in $props.badges" :key="badge" class="badge badge--neutral">
+    {{ badge }}
+  </span>
+</div>
+</template>
+
+<style lang="scss">
+// SCSS proving fixture (Phase 10) — programmatic surface.
+//
+// `@use` of a BUILT-IN module only. dart-sass resolves `sass:map` from its
+// own bundle; no filesystem importer is configured for the dist-parity
+// compile, so a `@use './partial'` would fail. `sass:map` is always safe.
+@use 'sass:map';
+
+// A Sass map — status name → token color. Iterated by @each below and
+// read by map.get inside the @function.
+$status-colors: (
+  neutral: #6b7280,
+  success: #16a34a,
+  warning: #d97706,
+  danger: #dc2626,
+);
+
+// Integer-only design scale. @for walks 1..3 to emit spacing utilities;
+// keeping the step an integer keeps every computed px value exact across
+// dart-sass patch versions.
+$space-step: 4px;
+$grid-columns: 3;
+
+// %placeholder — shared badge skeleton. @extend-ed by `.badge` below; it
+// must NOT appear on its own in the compiled CSS (placeholders are
+// emit-only-when-extended).
+%badge-base {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+// @function — pure integer math. Given a size step it returns the
+// horizontal padding. The @if / @else picks a floor so the smallest
+// step never collapses to 0.
+@function badge-padding($step) {
+  @if $step <= 0 {
+    @return 4px;
+  } @else {
+    @return $step * 8px;
+  }
+}
+
+.badge-grid {
+  display: grid;
+  // Interpolation in a property value — `#{$grid-columns}` splices the
+  // raw token into the `repeat(...)` argument list.
+  grid-template-columns: repeat(#{$grid-columns}, 1fr);
+  gap: $space-step;
+}
+
+.badge {
+  // @extend pulls every %badge-base declaration into `.badge`.
+  @extend %badge-base;
+  padding: 2px badge-padding(1);
+}
+
+// @each over the map — interpolation in the SELECTOR (`.badge--#{$name}`)
+// generates one variant rule per map entry; map.get re-reads the color so
+// the loop proves both map iteration and keyed lookup.
+@each $name, $color in $status-colors {
+  .badge--#{$name} {
+    color: #ffffff;
+    background: map.get($status-colors, $name);
+  }
+}
+
+// @for — indexed utility scale. 1..3 inclusive (`through`); each step
+// multiplies the integer $space-step so all four px outputs are exact.
+@for $i from 1 through $grid-columns {
+  .badge-grid--gap-#{$i} {
+    gap: $space-step * $i;
+  }
+}
+</style>
+
+</rozie>

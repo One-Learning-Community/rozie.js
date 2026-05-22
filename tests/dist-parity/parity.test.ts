@@ -77,7 +77,17 @@ const FIXTURES_DIR = resolve(HERE, 'fixtures');
 // the substituteCompiledStyle splice carries the compiled SCSS-to-CSS output
 // byte-identically across all 4 entrypoints and 6 targets with zero
 // preprocessor leakage (SPEC-REQ-6/7). Single-file example (no sibling .rozie).
-// 12 × 6 × 4 = 288 cells (+ React .d.ts/.module.css sidecars).
+// (12 × 6 × 4 = 288 cells as of Phase 10 Plan 04 — superseded below.)
+// Phase 10 test-coverage gap closure — extended 12 → 13 with
+// BadgeGridStyledScss, a SECOND SCSS proving fixture. PortalListStyledScss
+// only exercises the structural SCSS surface (nesting, $variables, one
+// @mixin/@include, the & parent-ref, :root, @portal); BadgeGridStyledScss
+// covers the otherwise-uncovered PROGRAMMATIC surface — @if/@else, @each,
+// @for, a @function, %placeholder + @extend, #{...} interpolation, and a
+// Sass map via `@use 'sass:map'` — proving all of it compiles to byte-
+// identical plain CSS across all 4 entrypoints and 6 targets with zero
+// preprocessor leakage. Single-file example (no sibling .rozie).
+// 13 × 6 × 4 = 312 cells (+ React .d.ts/.module.css sidecars).
 const EXAMPLES = [
   'Counter',
   'SearchInput',
@@ -91,6 +101,7 @@ const EXAMPLES = [
   'WrapperModal',
   'PortalListStyled',
   'PortalListStyledScss',
+  'BadgeGridStyledScss',
 ] as const;
 
 // Phase 07.2 Plan 06 — siblings ModalConsumer reaches via `<components>`.
@@ -321,7 +332,7 @@ describe('DIST-05 strict-bytes parity gate — consumer-side 96-cell subset (Pha
   });
 });
 
-describe('DIST-05 strict-bytes parity gate (D-93) — 12 examples × 6 targets × 4 entrypoints = 288 cells', () => {
+describe('DIST-05 strict-bytes parity gate (D-93) — 13 examples × 6 targets × 4 entrypoints = 312 cells', () => {
   describe.each(EXAMPLES)('%s', (name) => {
     const rozieSourcePath = resolve(ROOT, `examples/${name}.rozie`);
     const rozieSource = readFileSync(rozieSourcePath, 'utf8');

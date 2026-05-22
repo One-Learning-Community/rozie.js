@@ -44,6 +44,12 @@ const FIXTURES_DIR = resolve(HERE, '../fixtures');
 // Phase 10 Plan 04 — EXAMPLES extended 11 → 12 with PortalListStyledScss, the
 // SCSS proving fixture (a `<style lang="scss">` fork of PortalListStyled).
 // Single-file; no sibling .rozie producers.
+// Phase 10 test-coverage gap closure — EXAMPLES extended 12 → 13 with
+// BadgeGridStyledScss, a SECOND SCSS proving fixture covering the
+// PROGRAMMATIC SCSS surface PortalListStyledScss leaves untested:
+// @if/@else, @each, @for, a @function, %placeholder + @extend, #{...}
+// interpolation, and a Sass map via `@use 'sass:map'`. Single-file; no
+// sibling .rozie producers.
 const EXAMPLES = [
   'Counter',
   'SearchInput',
@@ -57,6 +63,7 @@ const EXAMPLES = [
   'WrapperModal',
   'PortalListStyled',
   'PortalListStyledScss',
+  'BadgeGridStyledScss',
 ];
 
 const EXAMPLES_NEEDING_RESOLVER_ROOT = new Set(['ModalConsumer', 'WrapperModal']);
