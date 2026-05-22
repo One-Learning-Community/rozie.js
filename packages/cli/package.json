@@ -43,7 +43,8 @@
     "htmlparser2": "^12.0.0",
     "magic-string": "^0.30.21",
     "picocolors": "^1.1.0",
-    "postcss": "^8.5.13"
+    "postcss": "^8.5.13",
+    "sass": "^1.97.3"
   },
   "devDependencies": {
     "vitest": "^4.1.5"
