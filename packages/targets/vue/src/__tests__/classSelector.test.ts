@@ -66,10 +66,14 @@ describe('$classSelector emit (Vue) [Wave 0 RED — implemented in Wave 2]', () 
     expect(code).not.toContain('$classSelector');
   });
 
-  it('R2: :attr-position $classSelector(\'panel\') lowers to the literal ".panel"', () => {
+  it('R2: :attr-position $classSelector(\'panel\') lowers to the literal `.panel`', () => {
     const { code } = compileProbe();
     // The :data-handle binding flows through rewriteTemplateExpression.ts.
-    expect(code).toContain('".panel"');
+    // The lowered literal is single-quoted (`'.panel'`) in the :attr path: a
+    // Vue `:attr="..."` binding double-quotes its expression, so the literal
+    // must use single quotes to avoid colliding with that wrapper. Quote style
+    // is incidental to lowering correctness — match either.
+    expect(code).toMatch(/['"]\.panel['"]/);
     expect(code).not.toContain('$classSelector');
   });
 });

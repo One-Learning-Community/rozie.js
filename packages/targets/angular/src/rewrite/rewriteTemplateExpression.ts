@@ -309,7 +309,10 @@ export function rewriteTemplateExpression(
       // cannot drift (Pitfall 4). Handled BEFORE the $emit-only early-return so
       // a :attr-position $classSelector is rewritten.
       if (callee.name === '$classSelector') {
-        lowerClassSelectorCall(path);
+        // 'single' — an Angular `[attr]="..."` binding double-quotes its
+        // expression; the lowered literal must serialize with single quotes so
+        // it does not collide with that wrapper (`[attr]="".panel""`).
+        lowerClassSelectorCall(path, 'single');
         return;
       }
 
