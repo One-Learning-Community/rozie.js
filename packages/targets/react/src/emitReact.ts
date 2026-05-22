@@ -35,6 +35,8 @@ import type { Diagnostic } from '../../../core/src/diagnostics/Diagnostic.js';
 import type { ModifierRegistry } from '@rozie/core';
 import type { BlockMap } from '../../../core/src/ast/types.js';
 import type { SourceMap } from 'magic-string';
+import { RozieErrorCode } from '../../../core/src/diagnostics/codes.js';
+import { componentUsesClassSelector } from '../../../core/src/ir/validateClassSelector.js';
 import { splitBlocks } from '../../../core/src/splitter/splitBlocks.js';
 import { createDefaultRegistry } from '../../../core/src/modifiers/registerBuiltins.js';
 import { rewriteRozieImport } from '../../../core/src/codegen/rewriteRozieImport.js';
@@ -176,6 +178,26 @@ export function emitReact(
   const globalCssImport =
     globalCss !== null ? `import './${ir.name}.global.css';` : null;
 
+  // WR-04 guard: React lowers `$classSelector('x')` to a runtime
+  // `"." + styles.x` expression. `styles` is the CSS-Modules import emitted
+  // above — but ONLY when `moduleCss` is non-empty, which itself requires
+  // `opts.source` (emitStyle slices rule bodies by absolute byte offset). On
+  // the back-compat no-`source` emit path `cssModuleImport` is null, so a
+  // lowered `$classSelector` call would reference an unimported `styles`
+  // (`ReferenceError` at runtime / `Cannot find name 'styles'` in TS). Detect
+  // the call up front and refuse with ROZ968 rather than emitting broken code.
+  const classSelectorDiags: Diagnostic[] = [];
+  if (cssModuleImport === null && componentUsesClassSelector(ir)) {
+    classSelectorDiags.push({
+      code: RozieErrorCode.CLASS_SELECTOR_REACT_NO_SOURCE,
+      severity: 'error',
+      message:
+        '$classSelector() in a React component requires emitReact to be called with `opts.source`: the React lowering emits a runtime `"." + styles.<class>` expression, and the `styles` CSS-Modules import it depends on is only emitted on the source-supplied path.',
+      loc: { start: 0, end: 0 },
+      hint: 'Call emitReact(ir, { source, filename }) — the back-compat no-`source` path does not support $classSelector.',
+    });
+  }
+
   // Plan 04-04 composition order (Wave 0 spike Variant A):
   //   hookSection (state hooks)
   //     → userArrowsSection (useCallback wraps + plain helpers + computed)
@@ -267,7 +289,13 @@ export function emitReact(
     code,
     css: moduleCss,
     map,
-    diagnostics: [...scriptDiags, ...tmpl.diagnostics, ...listeners.diagnostics, ...styleDiags],
+    diagnostics: [
+      ...scriptDiags,
+      ...tmpl.diagnostics,
+      ...listeners.diagnostics,
+      ...styleDiags,
+      ...classSelectorDiags,
+    ],
   };
   if (globalCss !== null) {
     result.globalCss = globalCss;

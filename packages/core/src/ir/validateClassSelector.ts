@@ -375,3 +375,99 @@ export function validateClassSelector(
   // Scanning it again double-reported every `$classSelector` call inside a
   // `$computed` body with a byte-identical diagnostic (WR-01).
 }
+
+/** Detect a `$classSelector` CallExpression anywhere reachable from `node`. */
+function nodeHasClassSelectorCall(node: t.Node | null | undefined): boolean {
+  if (!node) return false;
+  let root: t.File;
+  try {
+    if (t.isFile(node)) {
+      root = node;
+    } else if (t.isProgram(node)) {
+      root = t.file(node);
+    } else if (t.isExpression(node)) {
+      root = t.file(t.program([t.expressionStatement(node)]));
+    } else if (t.isStatement(node)) {
+      root = t.isBlockStatement(node)
+        ? t.file(
+            t.program([
+              t.expressionStatement(t.arrowFunctionExpression([], node)),
+            ]),
+          )
+        : t.file(t.program([node]));
+    } else {
+      return false;
+    }
+  } catch {
+    return false;
+  }
+
+  let found = false;
+  try {
+    traverse(root, {
+      CallExpression(path) {
+        const callee = path.node.callee;
+        if (t.isIdentifier(callee) && callee.name === CLASS_SELECTOR_CALLEE) {
+          found = true;
+          path.stop();
+        }
+      },
+    });
+  } catch {
+    // Defensive — a traverse failure reports "not found" rather than throwing.
+  }
+  return found;
+}
+
+/**
+ * Whether the component contains at least one `$classSelector('<class>')` call
+ * in any of the three IR regions `validateClassSelector` scans.
+ *
+ * Used by the React emitter: React lowers `$classSelector` to a runtime
+ * `"." + styles.<class>` expression, which only type-checks / runs when the
+ * `styles` CSS-Modules import is present. `emitReact` emits that import only on
+ * the `opts.source`-supplied path, so it must detect a `$classSelector` call up
+ * front and refuse the back-compat no-`source` path with a diagnostic rather
+ * than emitting a dangling `styles` reference (WR-04).
+ */
+export function componentUsesClassSelector(ir: IRComponent): boolean {
+  if (nodeHasClassSelectorCall(ir.setupBody?.scriptProgram)) return true;
+
+  let found = false;
+  walkTemplate(ir.template, (node) => {
+    if (found) return;
+    if (node.type === 'TemplateInterpolation') {
+      if (nodeHasClassSelectorCall(node.expression)) found = true;
+      return;
+    }
+    if (node.type !== 'TemplateElement') return;
+    for (const attr of node.attributes) {
+      switch (attr.kind) {
+        case 'binding':
+        case 'twoWayBinding':
+          if (nodeHasClassSelectorCall(attr.expression)) found = true;
+          break;
+        case 'interpolated':
+          for (const seg of attr.segments) {
+            if (seg.kind === 'binding' && nodeHasClassSelectorCall(seg.expression)) {
+              found = true;
+            }
+          }
+          break;
+        case 'static':
+          break;
+      }
+    }
+  });
+  if (found) return true;
+
+  for (const listener of ir.listeners) {
+    if (
+      nodeHasClassSelectorCall(listener.when) ||
+      nodeHasClassSelectorCall(listener.handler)
+    ) {
+      return true;
+    }
+  }
+  return false;
+}

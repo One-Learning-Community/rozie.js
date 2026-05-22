@@ -292,6 +292,13 @@ export const RozieErrorCode = {
   CLASS_SELECTOR_ARG_NOT_LITERAL: 'ROZ965', // error — R3: $classSelector argument is not a string literal
   CLASS_SELECTOR_UNKNOWN_CLASS: 'ROZ966',   // error — R4: class not declared in the component's <style> scope; did-you-mean hint
   CLASS_SELECTOR_INVALID_TOKEN: 'ROZ967',   // error — R5: multi-token / dotted / combinator / `#` argument (fails the bare-class-token regex)
+  // React emit-config error: the React lowering of `$classSelector` emits a
+  // runtime `"." + styles.<class>` expression, but `emitReact` only emits the
+  // `styles` CSS-Modules import when `opts.source` is supplied (it needs the
+  // raw source to slice rule bodies). On the back-compat no-`source` emit path
+  // the lowering would reference an unimported `styles`, so emitReact refuses
+  // and reports this instead of producing a dangling reference.
+  CLASS_SELECTOR_REACT_NO_SOURCE: 'ROZ968', // error — $classSelector used in a React emit without opts.source (styles import unavailable)
 } as const;
 
 export type RozieErrorCode = (typeof RozieErrorCode)[keyof typeof RozieErrorCode];
