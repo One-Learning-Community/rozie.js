@@ -1,9 +1,10 @@
-// rozie-globals.d.ts — synthetic ambient declarations for the 13 Rozie
+// rozie-globals.d.ts — synthetic ambient declarations for the 14 Rozie
 // magic identifiers. Source of truth: Plan 13's
 // `tools/intellij-plugin/src/main/kotlin/js/rozie/intellij/completion/RozieMagicIdentifiers.kt`
 // `MAGIC_IDENTIFIERS` registry. v0.2.0 ships permissive `any`-typed shapes;
 // per-component prop interface synthesis is deferred to a v0.3.0 follow-up
-// (captured in Plan 08.2-16 SUMMARY "Known Stubs" section).
+// (captured in Plan 08.2-16 SUMMARY "Known Stubs" section). Phase 14 (2026-
+// 05-22) added `$attrs` as the 14th magic identifier.
 //
 // =============================================================================
 // Strategy chosen: B (ambient-decl prefix injected into every Rozie JS fragment)
@@ -100,3 +101,13 @@ declare const $el: any;
 declare const $portals: any;
 /** Resolve an authored class name to its emitted CSS selector string. */
 declare function $classSelector(className: string): string;
+/**
+ * Consumer-passed attribute cluster minus declared props. Available as a
+ * bare identifier in `<template>` for `r-bind="$attrs"` manual placement,
+ * and as a member-accessor for individual reads (`$attrs.id`,
+ * `$attrs['aria-label']`). Per-target lowering: Vue keeps the native
+ * `$attrs` template accessor; Svelte rewrites to `__rozieAttrs`; React/Solid
+ * rewrite to a `props`-derived `attrs` rest binding; Angular/Lit synthesize
+ * host-element-attribute getters. Phase 14.
+ */
+declare const $attrs: Record<string, unknown>;

@@ -68,7 +68,7 @@ class RozieJsMagicCompletionTest : BasePlatformTestCase() {
         )
     }
 
-    // === Behavior 3: typing bare `$` surfaces all 13 magic identifiers (DRY assertion) ===
+    // === Behavior 3: typing bare `$` surfaces all 14 magic identifiers (DRY assertion) ===
 
     fun testBareDollarSurfacesAllMagicIdentifiers() {
         myFixture.configureByFile("script-magic-bare-dollar.rozie")

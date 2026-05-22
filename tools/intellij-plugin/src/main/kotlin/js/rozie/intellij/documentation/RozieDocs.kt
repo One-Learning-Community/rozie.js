@@ -47,8 +47,13 @@ object RozieDocs {
         "r-text" to
             "Set the element's <code>textContent</code> to the expression value.",
         "r-bind" to
-            "Bind an attribute or DOM property to an expression. Usually " +
-            "written in the shorthand form <code>:attr</code>.",
+            "Object spread — bind an object of attributes onto an element. " +
+            "<code>r-bind=\"obj\"</code> spreads every key of <code>obj</code> " +
+            "as an attribute on this element. Object form only — there is no " +
+            "<code>r-bind:attr</code> colon form (use the <code>:attr</code> " +
+            "shorthand for single named bindings). <code>r-bind=\"\$attrs\"</code> " +
+            "manually lands the consumer-passed attribute cluster (typically " +
+            "paired with <code>&lt;rozie inherit-attrs=\"false\"&gt;</code>).",
         "r-on" to
             "Attach an event listener. Usually written in the shorthand form " +
             "<code>@event</code>. Supports modifier chains.",
@@ -71,8 +76,9 @@ object RozieDocs {
         "such as <code>.enter</code>."
 
     private const val PROP_BIND_DOC =
-        "Property / attribute binding — shorthand for <code>r-bind</code>. " +
-        "Binds the attribute to the expression value."
+        "Property / attribute binding — bind a single named attribute or DOM " +
+        "property to an expression value. For an object-spread of multiple " +
+        "attributes, use <code>r-bind=\"obj\"</code>."
 
     private const val SLOT_FILL_DOC =
         "Named slot fill — provides content for the component slot of this name."

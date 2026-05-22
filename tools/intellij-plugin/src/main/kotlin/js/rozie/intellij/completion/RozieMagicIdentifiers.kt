@@ -1,7 +1,7 @@
 package js.rozie.intellij.completion
 
 /**
- * Single source of truth for the 13 canonical Rozie `$`-prefixed magic
+ * Single source of truth for the 14 canonical Rozie `$`-prefixed magic
  * identifiers + their one-line type-text doc hints (surfaced by
  * `LookupElementBuilder.withTypeText` in the completion popup per the
  * P1-UAT-09 acceptance prose).
@@ -43,6 +43,9 @@ package js.rozie.intellij.completion
  *  - `$portals`      — render a slot into an external container (Spike 003)
  *  - `$classSelector`— resolve an authored class to its emitted CSS selector
  *                      (Phase 13 — survives React's class-name hashing)
+ *  - `$attrs`        — consumer-passed attribute cluster minus declared props
+ *                      (Phase 14 — for `r-bind="$attrs"` manual placement and
+ *                      member reads `$attrs.someAttr`)
  *
  * Pattern note: each entry is a `(name, typeText)` pair; the contributor
  * destructures the pair into `LookupElementBuilder.create(name).bold()
@@ -50,7 +53,7 @@ package js.rozie.intellij.completion
  */
 object RozieMagicIdentifiers {
     /**
-     * Ordered (name, typeText) pairs for the 13 canonical Rozie magic
+     * Ordered (name, typeText) pairs for the 14 canonical Rozie magic
      * identifiers. Order mirrors the TextMate grammar's `magic-identifier`
      * regex so the two artifacts diff trivially; the lookup popup does its
      * own alphabetical sort, so source order is purely for readability.
@@ -69,6 +72,7 @@ object RozieMagicIdentifiers {
         "\$el" to "(magic) the component's root DOM element",
         "\$portals" to "(magic) render a slot into a container — \$portals.X(el, scope)",
         "\$classSelector" to "(magic) authored class → emitted CSS selector string",
+        "\$attrs" to "(magic) consumer-passed attributes minus declared props",
     )
 
     /**

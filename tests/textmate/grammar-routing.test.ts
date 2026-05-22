@@ -288,6 +288,26 @@ describe('Rozie TextMate grammar — directives & r-model modifier chains', () =
     );
     expect(tok, 'expected $portals to carry the magic-identifier scope').toBeDefined();
   });
+
+  // Phase 14: `$attrs` joined the magic-identifier set (consumer-passed
+  // attribute cluster minus declared props). Inline-tokenized — no new fixture
+  // file is needed because the assertion is purely "the regex matches this
+  // identifier and emits the magic scope."
+  it('scopes $attrs as a magic identifier (Phase 14)', () => {
+    const source = [
+      '<rozie name="X" inherit-attrs="false">',
+      '<template>',
+      '<button r-bind="$attrs">{{ $attrs.label }}</button>',
+      '</template>',
+      '</rozie>',
+    ].join('\n');
+    const tokens = tokenizeAll(source);
+
+    const tok = tokens.find(
+      (t) => t.text === '$attrs' && t.scopes.some((s) => s.includes('variable.language.rozie')),
+    );
+    expect(tok, 'expected $attrs to carry the magic-identifier scope').toBeDefined();
+  });
 });
 
 describe('Rozie TextMate grammar — <script lang="ts"> routing', () => {
