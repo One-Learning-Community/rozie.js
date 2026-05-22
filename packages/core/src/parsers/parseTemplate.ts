@@ -119,7 +119,29 @@ export function parseTemplate(
       }
     } else if (rawName.startsWith('r-')) {
       kind = 'directive';
-      name = rawName.slice(2);
+      const rest = rawName.slice(2);
+      // Phase 12 — split a `.modifier` chain off `r-model` ONLY. The
+      // directive base is `rest` up to its first `.`; the `:arg` segment
+      // (`r-model:open.lazy`) always precedes that first `.`. Non-`model`
+      // directives keep the whole remainder as `name` so they parse
+      // byte-identically to pre-phase — a `.` on `r-show`/`r-if`/etc.
+      // stays observable in `name` for the lowerer to flag (ROZ962).
+      const dotIdx = rest.indexOf('.');
+      const colonIdx = rest.indexOf(':');
+      const directiveBase =
+        colonIdx >= 0
+          ? rest.slice(0, colonIdx)
+          : dotIdx >= 0
+            ? rest.slice(0, dotIdx)
+            : rest;
+      if (directiveBase === 'model' && dotIdx >= 0) {
+        name = rest.slice(0, dotIdx);
+        modifierChainText = rest.slice(dotIdx);
+        // The leading '.' lives at `a.nameStart + 2 (the 'r-' prefix) + dotIdx`.
+        modifierChainBaseOffset = a.nameStart + 2 + dotIdx;
+      } else {
+        name = rest;
+      }
     } else {
       kind = 'static';
       name = rawName;

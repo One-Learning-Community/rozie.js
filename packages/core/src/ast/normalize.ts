@@ -138,7 +138,15 @@ function enrichNode(node: TemplateNode, diagnostics: Diagnostic[]): TemplateNode
 }
 
 function enrichAttr(attr: TemplateAttr, diagnostics: Diagnostic[]): TemplateAttr {
-  if (attr.kind !== 'event') return { ...attr, chain: [] };
+  // Phase 12 — `r-model` is the one directive that carries a modifier chain
+  // (`r-model.lazy.number.trim`). The parser splits the chain text off only
+  // for `r-model` (bare or the `r-model:propName` colon-arg form), so any
+  // directive attr with a non-empty `modifierChainText` is an `r-model`
+  // chain. Run it through the same peggy grammar as event attrs.
+  const carriesChain =
+    attr.kind === 'event' ||
+    (attr.kind === 'directive' && attr.modifierChainText !== '');
+  if (!carriesChain) return { ...attr, chain: [] };
   const { chain, diagnostics: chainDiags } = parseModifierChain(
     attr.modifierChainText,
     attr.modifierChainBaseOffset,
