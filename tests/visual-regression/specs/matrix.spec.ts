@@ -228,11 +228,11 @@ async function settleExample(
 // mirroring the React emitter). The cell now renders and runs normally; the
 // dedicated runtime-bug gate is removed.
 
-// Known cross-target-divergence gate. The engine-wrapper demos do NOT all
-// render byte-identical to the Vue baseline; the cells below are gated
-// `test.fixme` (known-pending) so the suite stays GREEN-PENDING, not red.
-// This is NOT a D-11 visual exemption — D-11 forbids hiding drift on cells
-// that DO render byte-identical; these provably do not.
+// Known cross-target-divergence gate — NOW EMPTY. The engine-wrapper demos
+// all render byte-identical to the Vue baseline; every (example × target) cell
+// runs as `test`. The set is kept (empty) so a future genuinely-divergent cell
+// has a documented, single place to be quarantined — never as a D-11 escape
+// hatch for hidden drift, only for a cell that provably cannot match.
 //
 // RESOLVED (quick-task 260520-hus follow-up, 2026-05-20) — the 4 Table cells
 // that previously diverged are fixed and now pass; their entries are removed:
@@ -287,31 +287,26 @@ async function settleExample(
 //
 // RESOLVED (2026-05-22, vr-uppy-matrix-red follow-up) — TipTap·angular is no
 // longer divergent. Verified in the pinned container: it renders byte-identical
-// to the Vue baseline and passes. Removed from the gate — only the 4 JS-context
-// targets remain.
+// to the Vue baseline and passes.
 //
-// REMAINING (4 cells) — TipTap·react / ·svelte / ·solid / ·lit:
-//   A real init-time cross-target divergence (NOT a settle-timing flake, NOT a
-//   structural emit bug). On these 4 targets the editor's initial content-load
-//   round-trips ProseMirror's NORMALISED html back into `$data.content` through
-//   the two-way `r-model:html` binding on mount: `<li>x</li>` becomes
-//   `<li><p>x</p></li>` plus a trailing `<p></p>` (219→247 bytes, visible in
-//   the BOUND HTML <pre>), and the editor's selection lands in a different node
-//   so a different toolbar button shows active (`• List` instead of `H2`). On
-//   vue/angular the bound model keeps the author's original string until the
-//   first real edit. This is the `$watch` / init-emission consistency follow-up
-//   the matrix has long flagged — a real divergence, tracked separately; needs
-//   a proper debug session, not a spec-side fix.
-const KNOWN_CROSS_TARGET_DIVERGENCE = new Set<string>([
-  // TipTap init-time r-model:html normalisation divergence (see above). vue +
-  // angular hold the author string; these 4 hold ProseMirror's normalised
-  // round-trip. A real divergence — not hidden drift on a byte-identical cell,
-  // so not a D-11 violation.
-  'TipTap::react',
-  'TipTap::svelte',
-  'TipTap::solid',
-  'TipTap::lit',
-]);
+// RESOLVED (2026-05-22, debug session tiptap-rmodel-html-init-emit) —
+// TipTap·react / ·svelte / ·solid / ·lit are no longer divergent. The init-time
+// `r-model:html` round-trip was NOT a `$watch` lowering inconsistency: it was a
+// stale-API call in `examples/TipTap.rozie`. The wrapper's reconciler `$watch`
+// called `editor.commands.setContent(v, false)` using the TipTap **v2** API,
+// where the 2nd arg was an `emitUpdate` boolean. The repo is on TipTap
+// **v3.23.5**, where `setContent`'s 2nd arg is an options OBJECT
+// (`{ emitUpdate?, parseOptions?, errorOnInvalidContent? }`). Passing the bare
+// `false` destructured to `{ emitUpdate = true }` (the v3 default), so the
+// update was emitted: ProseMirror's onUpdate fired, `editor.getHTML()` returned
+// the NORMALISED 247-byte doc, and the `model:true` two-way path wrote it back
+// into `$data.content`. The immediate `$watch` runs AFTER `$onMount` on
+// react/svelte/solid/lit (editor already created → `setContent` actually
+// executes) but BEFORE it on vue/angular (editor still `null` → the
+// `if (!editor) return` guard short-circuits) — hence the 4-vs-2 split. Fixed
+// by changing the call to the v3 form `setContent(v, { emitUpdate: false })`.
+// All 6 TipTap cells now render byte-identical to the shared baseline.
+const KNOWN_CROSS_TARGET_DIVERGENCE = new Set<string>([]);
 
 for (const example of EXAMPLES) {
   const hasBaseline = baselineExists(example);
@@ -320,8 +315,8 @@ for (const example of EXAMPLES) {
     //  - Angular column build availability (existing)
     //  - per-example baseline PNG presence (for examples added before their
     //    Linux-Docker baseline regen has landed)
-    //  - the known cross-target-divergence gate (documented above) — the
-    //    engine-wrapper cells that provably do not match the Vue baseline
+    //  - the known cross-target-divergence gate (documented above) — currently
+    //    empty; reserved for a future cell that provably cannot match
     const crossTargetDivergent = KNOWN_CROSS_TARGET_DIVERGENCE.has(
       `${example}::${target}`,
     );
@@ -347,9 +342,7 @@ for (const example of EXAMPLES) {
       // attribute selectors would force per-target rendering divergence.
       // The shared-baseline pattern now ENFORCES cross-target byte-identity:
       // any future single-target drift fails the matcher rather than being
-      // hidden behind a per-target baseline. Exception: the engine-wrapper
-      // demos do NOT all satisfy this — see KNOWN_CROSS_TARGET_DIVERGENCE
-      // above; their 12 provably-divergent cells are fixme-gated.
+      // hidden behind a per-target baseline.
       await expect(component).toHaveScreenshot(`${example}.png`, {
         maxDiffPixels: 2,
         animations: 'disabled',

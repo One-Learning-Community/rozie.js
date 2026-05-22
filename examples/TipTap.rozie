@@ -58,6 +58,15 @@ import StarterKit from '@tiptap/starter-kit'
 
 let editor = null
 
+// The raw HTML string the editor currently reflects. Compared against in the
+// $props.html reconciler so the watcher's mount-time fire is a no-op: the
+// editor is created with `content: $props.html`, so right after mount the
+// bound model already matches and setContent must NOT re-run (re-running it
+// replaces the whole ProseMirror document and resets the selection — the
+// official @tiptap/* wrappers guard the same way against the *raw* value,
+// never against the normalized `editor.getHTML()`).
+let lastHtml = null
+
 const refreshActive = () => {
   if (!editor) return
   $data.active = {
@@ -82,6 +91,7 @@ const toggleH2         = () => cmd((ch) => ch.toggleHeading({ level: 2 }))
 const toggleBulletList = () => cmd((ch) => ch.toggleBulletList())
 
 $onMount(() => {
+  lastHtml = $props.html
   editor = new Editor({
     element:    $refs.editorEl,
     content:    $props.html,
@@ -90,6 +100,7 @@ $onMount(() => {
     extensions: [StarterKit],
     onUpdate: ({ editor }) => {
       const next = editor.getHTML()
+      lastHtml = next
       // Round-trip guard — see Flatpickr for the same shape.
       if (next !== $props.html) $props.html = next
       $emit('update', next)
@@ -100,16 +111,28 @@ $onMount(() => {
   return () => editor?.destroy()
 })
 
-// Reconcile external prop changes back into the editor without bouncing
-// through onUpdate. setContent(html, false) skips the change emission.
+// Reconcile EXTERNAL prop changes back into the editor without bouncing
+// through onUpdate. The guard compares against `lastHtml` (the value the
+// editor was last set with) — NOT `editor.getHTML()` (ProseMirror's
+// normalized serialization, which never string-equals the author's raw
+// HTML, so a getHTML() guard would re-run setContent on every mount and
+// reset the selection). setContent's { emitUpdate: false } option skips
+// the change emission (TipTap v3 — the 2nd arg is an options object, not
+// a bare boolean as in v2).
 $watch(() => $props.html, (v) => {
   if (!editor) return
-  if (v === editor.getHTML()) return
-  editor.commands.setContent(v, false)
+  if (v === lastHtml) return
+  lastHtml = v
+  editor.commands.setContent(v, { emitUpdate: false })
   refreshActive()
 })
 
-$watch(() => $props.editable, (v) => editor?.setEditable(v))
+// setEditable's 2nd arg is `emitUpdate` (defaults to true in TipTap v3).
+// Pass `false` — toggling editability is not a content change and must NOT
+// emit an `update`, which would round-trip ProseMirror's normalized HTML
+// back into the bound model. (See examples/Flatpickr.rozie for the same
+// "engine setters emit by default" guard.)
+$watch(() => $props.editable, (v) => editor?.setEditable(v, false))
 </script>
 
 <template>
