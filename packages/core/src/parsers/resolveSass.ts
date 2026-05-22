@@ -26,15 +26,38 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 
 /**
+ * The deterministic option subset of `compileString` the compiler relies on.
+ *
+ * Typing this explicitly (rather than a bare `object`) makes a typo such as
+ * `charSet: false` a compile error. `charset: false` is LOAD-BEARING for the
+ * dist-parity byte gate — it suppresses the `@charset`/BOM dart-sass would
+ * otherwise inject; a silent revert to defaults would break byte parity.
+ */
+export interface SassCompileStringOptions {
+  style?: 'expanded' | 'compressed';
+  charset?: boolean;
+  sourceMap?: boolean;
+  logger?: object;
+}
+
+/**
  * The subset of the `sass` (dart-sass) public API the compiler uses.
  *
  * `compileString` is the modern synchronous API (stable since dart-sass 1.45.0);
- * `Exception` is the error type thrown on invalid SCSS; `Logger.silent`
- * suppresses dart-sass's deprecation warnings on stderr.
+ * `Logger.silent` suppresses dart-sass's deprecation warnings on stderr.
+ *
+ * `Exception` is dart-sass's invalid-SCSS error type. Its real constructor is
+ * NOT zero-arg, so it is typed here as an opaque constructor only. Callers must
+ * NOT use `new sass.Exception()` or `err instanceof sass.Exception` — `parseStyle`
+ * deliberately duck-types `sassMessage`/`span` instead (a thrown error's `name`
+ * is the generic `'Error'`, not `'Exception'`).
  */
 export interface SassModule {
-  compileString(source: string, options?: object): { css: string };
-  Exception: new () => Error;
+  compileString(
+    source: string,
+    options?: SassCompileStringOptions,
+  ): { css: string };
+  Exception: new (...args: never[]) => Error;
   Logger: { silent: object };
 }
 
