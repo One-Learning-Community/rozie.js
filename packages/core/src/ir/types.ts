@@ -76,6 +76,20 @@ export interface IRComponent {
   /** IR-04: preserved Babel Program (referential equality with ast.script.program). */
   setupBody: SetupBody;
   template: TemplateNode | null;
+  /**
+   * Phase 14 R5 — cross-framework attribute fallthrough.
+   *
+   * `true` (the default) enables auto-fallthrough: consumer-passed attributes
+   * that do NOT match a declared `<props>` entry are forwarded onto the
+   * component's single root element by each target emitter. `false` disables
+   * it — the author opts out via `<rozie inherit-attrs="false">` and is then
+   * responsible for placing `r-bind="$attrs"` explicitly.
+   *
+   * Threaded from `BlockMap.rozie.inheritAttrs` in `lower.ts`: an absent
+   * `<rozie>` attribute (key omitted under `exactOptionalPropertyTypes`)
+   * lowers to `true` here.
+   */
+  inheritAttrs: boolean;
   styles: StyleSection;
   /**
    * Phase 06.2 P1 D-115 — declared via `<components>` block. Empty array
@@ -593,6 +607,25 @@ export type AttributeBinding =
        * present. A BUILT-IN model modifier here is a compile error (ROZ963).
        */
       modifiers?: ResolvedModelModifier[];
+    }
+  /**
+   * Phase 14 R2 / D-07 — the `spreadBinding` kind: `r-bind="<expr>"` in the
+   * bare (non-colon) form. The expression evaluates to an object whose own
+   * enumerable keys are each applied as an attribute on the host element.
+   *
+   * INVARIANT — the name-less member. Unlike every other `AttributeBinding`
+   * kind (`static` / `binding` / `interpolated` / `twoWayBinding`), this
+   * member deliberately carries NO `name` field and NO `modifiers` field: a
+   * spread binds an open-ended object, not a single named attribute. Any
+   * emitter helper that buckets `AttributeBinding`s by `.name` (e.g. a
+   * `bucket()`-by-name pass) MUST guard against `kind === 'spreadBinding'`
+   * before reading `.name`, or TypeScript's exhaustiveness check will flag it.
+   */
+  | {
+      kind: 'spreadBinding';
+      expression: Expression;
+      deps: SignalRef[];
+      sourceLoc: SourceLoc;
     };
 
 /**
