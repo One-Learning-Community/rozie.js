@@ -46,7 +46,7 @@ $accent: #3b82f6;
     cursor: pointer;
 
     &:hover {
-      color: darken($accent, 10%);
+      color: #1d4ed8;
     }
 
     &:focus-visible {
