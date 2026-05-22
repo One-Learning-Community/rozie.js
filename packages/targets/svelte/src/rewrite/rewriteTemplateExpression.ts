@@ -24,6 +24,7 @@ import _traverse from '@babel/traverse';
 import type { GeneratorOptions } from '@babel/generator';
 import type { IRComponent } from '../../../../core/src/ir/types.js';
 import { lowerClassSelectorCall } from './lowerClassSelectorCall.js';
+import { svelteCallbackPropName } from './rewriteScript.js';
 
 // CJS interop normalization (Phase 2 D-T-2-01-04 pattern).
 type GenerateFn = typeof import('@babel/generator').default;
@@ -152,7 +153,13 @@ export function rewriteTemplateExpression(
       if (args.length === 0) return;
       const first = args[0];
       if (!t.isStringLiteral(first)) return;
-      const callbackName = `on${first.value}`;
+      // Use the SHARED normalizer (the same one rewriteScript.ts's $emit
+      // lowering and emitScript's Props-interface emit use). A raw
+      // `on${first.value}` produces the invalid identifier `onevent-click`
+      // for a hyphenated event name; svelteCallbackPropName strips hyphens
+      // and lowercases so the template path agrees with the script path
+      // (WR-06).
+      const callbackName = svelteCallbackPropName(first.value);
       const rest = args.slice(1);
       const optCall = t.optionalCallExpression(
         t.identifier(callbackName),
