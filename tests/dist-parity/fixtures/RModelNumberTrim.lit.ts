@@ -22,7 +22,7 @@ export default class RModelNumberTrim extends SignalWatcher(LitElement) {
   render() {
     return html`
 <div class="rmodel-number-trim" data-rozie-s-dfdb7742>
-  <input type="text" placeholder="Enter a quantity" .value=${this._quantity.value} @input=${($event) => this._quantity.value = ((__v) => { const __n = parseFloat(__v); return isNaN(__n) ? __v : __n; })(((($event.target as HTMLInputElement).value).trim()))} data-rozie-s-dfdb7742 />
+  <input type="text" placeholder="Enter a quantity" .value=${this._quantity.value} @input=${($event) => this._quantity.value = (Number.isNaN(Number.parseFloat(((($event.target as HTMLInputElement).value).trim()))) ? ((($event.target as HTMLInputElement).value).trim()) : Number.parseFloat(((($event.target as HTMLInputElement).value).trim())))} data-rozie-s-dfdb7742 />
   <p class="echo" data-rozie-s-dfdb7742>Quantity: ${this._quantity.value}</p>
 </div>
 `;

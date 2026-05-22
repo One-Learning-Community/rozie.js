@@ -8,7 +8,7 @@ import { FormsModule } from '@angular/forms';
   template: `
 
     <div class="rmodel-number-trim">
-      <input type="text" [ngModel]="quantity()" (ngModelChange)="quantity.set(((__v) => { const __n = parseFloat(__v); return isNaN(__n) ? __v : __n; })((($event).trim())))" [ngModelOptions]="{standalone: true}" placeholder="Enter a quantity" />
+      <input type="text" [ngModel]="quantity()" (ngModelChange)="quantity.set((Number.isNaN(Number.parseFloat((($event).trim()))) ? (($event).trim()) : Number.parseFloat((($event).trim()))))" [ngModelOptions]="{standalone: true}" placeholder="Enter a quantity" />
       <p class="echo">Quantity: {{ quantity() }}</p>
     </div>
 
@@ -20,6 +20,8 @@ import { FormsModule } from '@angular/forms';
 })
 export class RModelNumberTrim {
   quantity = signal(0);
+
+  protected readonly Number = Number;
 }
 
 export default RModelNumberTrim;

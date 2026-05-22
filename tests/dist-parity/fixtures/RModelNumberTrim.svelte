@@ -4,7 +4,7 @@ let quantity = $state(0);
 
 
 <div class="rmodel-number-trim">
-  <input type="text" value={quantity} oninput={($event) => quantity = ((__v) => { const __n = parseFloat(__v); return isNaN(__n) ? __v : __n; })((($event.currentTarget.value).trim()))} placeholder="Enter a quantity" />
+  <input type="text" value={quantity} oninput={($event) => quantity = (Number.isNaN(Number.parseFloat((($event.currentTarget.value).trim()))) ? (($event.currentTarget.value).trim()) : Number.parseFloat((($event.currentTarget.value).trim())))} placeholder="Enter a quantity" />
   <p class="echo">Quantity: {quantity}</p>
 </div>
 
