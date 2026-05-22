@@ -1,18 +1,59 @@
 /*
- * Styles scoped to .rozie-demo wrappers on example pages.
+ * .rozie-demo — a fixed light "preview island" for the live example embeds.
  *
- * The canonical .rozie examples assume their consuming app provides form-element
- * styling and a white background — that's a reasonable assumption for a real
- * component-library consumer but breaks the docs preview, where VitePress
- * resets form elements and offers a dark theme.
+ * The canonical .rozie examples hardcode light-mode colors (white surfaces,
+ * dark text) in their <style> blocks — correct for a drop-in component
+ * library, but it means a demo cannot follow VitePress's dark theme. Rather
+ * than chase every component class with per-class dark patches (unmaintainable
+ * — every example added grows the list, and the patches still miss anything
+ * unstyled), each demo renders inside a self-contained light island:
  *
- * These overrides only affect the live demos. The byte-verbatim fixtures shown
- * below each demo are unchanged.
+ *   - `color-scheme: light` forces native form controls (buttons, inputs,
+ *     checkboxes, date pickers, scrollbars) to render light even in dark
+ *     docs — without it the browser paints them with its dark UA theme.
+ *   - VitePress's color tokens are re-pinned to their light-theme values
+ *     (from vitepress/theme-default/styles/vars.css `:root`), scoped to
+ *     .rozie-demo, so any inherited `.vp-doc` rule resolves light inside it.
+ *   - A white surface + dark default text is the context the examples were
+ *     authored against.
+ *
+ * Net result: every demo renders identically in light- and dark-mode docs —
+ * the way a consumer in a light app sees it — with zero per-component CSS.
+ * The byte-verbatim source/output blocks below each demo are unaffected.
  */
 
-/* --- Form element re-styling (light + dark) --- */
+.vp-doc .rozie-demo {
+  /* Light island — pin the VitePress color tokens to their `:root` values. */
+  color-scheme: light;
+  --vp-c-bg: #ffffff;
+  --vp-c-bg-alt: #f6f6f7;
+  --vp-c-bg-elv: #ffffff;
+  --vp-c-bg-soft: #f6f6f7;
+  --vp-c-bg-mute: #ebebef;
+  --vp-c-border: #c2c2c4;
+  --vp-c-divider: #e2e2e3;
+  --vp-c-text-1: #3c3c43;
+  --vp-c-text-2: #67676c;
+  --vp-c-text-3: #929295;
 
-.vp-doc .rozie-demo button {
+  margin: 1rem 0 1.5rem;
+  padding: 1rem;
+  border: 1px dashed var(--vp-c-divider);
+  border-radius: 8px;
+  background: var(--vp-c-bg);
+  color: var(--vp-c-text-1);
+}
+
+/* --- Form-control fallback styling ---
+ *
+ * Some canonical examples (Counter, …) ship bare <button>/<input> elements,
+ * assuming the consuming app provides the styling — the docs are that
+ * consumer. `:where()` keeps these rules at ZERO specificity, so a demo that
+ * DOES style its own controls (e.g. the Flatpickr / LineChart / SortableList
+ * demos) always wins; these only fill in for the unstyled ones.
+ */
+
+.vp-doc .rozie-demo :where(button) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -27,18 +68,17 @@
   transition: background-color 0.15s, border-color 0.15s;
 }
 
-.vp-doc .rozie-demo button:hover:not(:disabled) {
+.vp-doc .rozie-demo :where(button:hover:not(:disabled)) {
   background: var(--vp-c-bg-mute);
   border-color: var(--vp-c-brand-1);
 }
 
-.vp-doc .rozie-demo button:disabled {
-  opacity: 0.4;
+.vp-doc .rozie-demo :where(button:disabled) {
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
-.vp-doc .rozie-demo input[type="text"],
-.vp-doc .rozie-demo input[type="search"] {
+.vp-doc .rozie-demo :where(input[type="text"], input[type="search"]) {
   padding: 0.4rem 0.6rem;
   border: 1px solid var(--vp-c-border);
   background: var(--vp-c-bg);
@@ -48,68 +88,24 @@
   line-height: 1.4;
 }
 
-.vp-doc .rozie-demo input:focus-visible,
-.vp-doc .rozie-demo button:focus-visible {
-  outline: 2px solid var(--vp-c-brand-1);
-  outline-offset: 2px;
-}
-
-.vp-doc .rozie-demo input[type="checkbox"] {
+.vp-doc .rozie-demo :where(input[type="checkbox"]) {
   accent-color: var(--vp-c-brand-1);
   margin-right: 0.4rem;
 }
 
-.vp-doc .rozie-demo form {
-  margin-block: 0.5rem;
+.vp-doc .rozie-demo :where(input:focus-visible, button:focus-visible) {
+  outline: 2px solid var(--vp-c-brand-1);
+  outline-offset: 2px;
 }
 
-/* --- Component-specific dark-mode overrides ---
- * The .rozie components hardcode `background: white` / `background: #fff` in
- * their <style> blocks (correct for a "drop-in component library" mental model).
- * Override only inside .rozie-demo so the dark-mode docs preview reads cleanly.
- * Higher specificity than the Vue-scoped `.card[data-v-XXX]` selectors thanks
- * to the `.dark .vp-doc .rozie-demo` chain (3 classes vs scoped 1 class + 1 attr).
+/* --- Neutralize VitePress `.vp-doc` element bleed ---
+ *
+ * VitePress styles raw <code> inside `.vp-doc`; in dark docs that uses dark
+ * values that look wrong on the light island. `:where()` again keeps this a
+ * fallback that a demo's own scoped rule overrides.
  */
 
-.dark .vp-doc .rozie-demo .modal-dialog,
-.dark .vp-doc .rozie-demo .dropdown-panel,
-.dark .vp-doc .rozie-demo .card {
-  background: var(--vp-c-bg-soft);
+.vp-doc .rozie-demo :where(code) {
+  background: rgba(0, 0, 0, 0.06);
   color: var(--vp-c-text-1);
-  border-color: var(--vp-c-divider);
-}
-
-.dark .vp-doc .rozie-demo .card-header {
-  border-bottom-color: var(--vp-c-divider);
-}
-
-.dark .vp-doc .rozie-demo .modal-dialog header,
-.dark .vp-doc .rozie-demo .modal-dialog footer {
-  border-color: var(--vp-c-divider);
-}
-
-.dark .vp-doc .rozie-demo .empty {
-  color: var(--vp-c-text-3);
-}
-
-.dark .vp-doc .rozie-demo .hint {
-  color: var(--vp-c-text-3);
-}
-
-.dark .vp-doc .rozie-demo .counter.hovering {
-  background: var(--vp-c-bg-mute);
-}
-
-/* --- Spacing around the live-demo block --- */
-
-.vp-doc .rozie-demo {
-  margin: 1rem 0 1.5rem;
-  padding: 1rem;
-  border: 1px dashed var(--vp-c-divider);
-  border-radius: 8px;
-  background: var(--vp-c-bg-soft);
-}
-
-.dark .vp-doc .rozie-demo {
-  background: var(--vp-c-bg);
 }
