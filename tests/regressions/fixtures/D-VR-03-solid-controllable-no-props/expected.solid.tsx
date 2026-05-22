@@ -11,7 +11,7 @@ interface ControllableNoPropsProps {
 export default function ControllableNoProps(_props: ControllableNoPropsProps): JSX.Element {
   const [local, rest] = splitProps(_props, ['value']);
 
-  const [value, setValue] = createControllableSignal<number>(_props as Record<string, unknown>, 'value', 0);
+  const [value, setValue] = createControllableSignal<number>(_props as unknown as Record<string, unknown>, 'value', 0);
 
   // D-VR-03 reproduction: a Solid component with a defaulted model:true prop,
   // mounted with NO props passed (the visual-regression host mounts every cell
