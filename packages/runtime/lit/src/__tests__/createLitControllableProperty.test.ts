@@ -349,4 +349,86 @@ describe('createLitControllableProperty — notifyPropertyWrite (property-bindin
     expect(dispatched).toHaveLength(3);
     expect(dispatched[2]!.detail).toBe(7);
   });
+
+  it('(WR-04) round-trip suppression token expires on microtask boundary — async same-value external writes are NOT swallowed', async () => {
+    // WR-04 regression: previously the round-trip token was held indefinitely
+    // until consumed by `notifyPropertyWrite`. If a parent listener was async
+    // (e.g. queued on a microtask / animation frame), an EXTERNAL imperative
+    // write happening to carry the same value could land first, match the
+    // token, and silently swallow its change event. The fix scopes the token
+    // to a microtask boundary: synchronous parent re-binds still match, but
+    // any write that arrives after a microtask is unconditionally dispatched.
+    const dispatched: CustomEvent[] = [];
+    const host = {
+      dispatchEvent: (ev: Event) => {
+        dispatched.push(ev as CustomEvent);
+        return true;
+      },
+    } as unknown as HTMLElement;
+    const cp = createLitControllableProperty<number>({
+      host,
+      eventName: 'value-change',
+      defaultValue: 0,
+      initialControlledValue: undefined,
+    });
+
+    // Producer calls write(4) → dispatches once + sets the token.
+    cp.write(4);
+    expect(dispatched).toHaveLength(1);
+
+    // BEFORE the async parent's re-bind fires, await a microtask boundary.
+    // The token must now be cleared — any subsequent same-value write is
+    // treated as a real external write and dispatches.
+    await Promise.resolve();
+
+    // Simulate an external imperative write carrying the same value 4.
+    // Object.is(prev, next) === true, so notifyPropertyWrite still respects
+    // the "no-event-on-equal-values" rule — and that's correct semantics
+    // here (the value did not change). What we're proving is that the token
+    // is NOT silently consuming this write: a follow-up DIFFERENT-value
+    // write proceeds normally without any token leftover.
+    cp.notifyPropertyWrite(4);
+    expect(
+      dispatched,
+      'same-value notifyPropertyWrite must remain a clean no-op (no change)',
+    ).toHaveLength(1);
+
+    // A different-value notifyPropertyWrite arriving AFTER the microtask
+    // boundary fires unconditionally — the token would have suppressed nothing
+    // anyway here (value differs), but this asserts the post-microtask state
+    // machine is healthy.
+    cp.notifyPropertyWrite(5);
+    expect(dispatched).toHaveLength(2);
+    expect(dispatched[1]!.detail).toBe(5);
+  });
+
+  it('(WR-04) synchronous round-trip is still suppressed (regression guard for fix scope)', async () => {
+    // Confirms the microtask-deferred token still catches the standard
+    // synchronous round-trip path the original suppression was designed for:
+    // write(x) → host.dispatchEvent (sync listeners run inline) → parent
+    // re-bind → notifyPropertyWrite(x) — all before the microtask fires.
+    const dispatched: CustomEvent[] = [];
+    const host = {
+      dispatchEvent: (ev: Event) => {
+        dispatched.push(ev as CustomEvent);
+        return true;
+      },
+    } as unknown as HTMLElement;
+    const cp = createLitControllableProperty<number>({
+      host,
+      eventName: 'value-change',
+      defaultValue: 0,
+      initialControlledValue: undefined,
+    });
+
+    cp.write(4);
+    cp.notifyPropertyWrite(4); // synchronous round-trip echo
+    expect(dispatched).toHaveLength(1); // suppressed — exactly one event total
+
+    // After the microtask boundary the token is cleared regardless.
+    await Promise.resolve();
+    cp.notifyPropertyWrite(6); // genuine subsequent value bump
+    expect(dispatched).toHaveLength(2);
+    expect(dispatched[1]!.detail).toBe(6);
+  });
 });

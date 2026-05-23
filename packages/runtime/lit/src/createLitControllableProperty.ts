@@ -141,7 +141,19 @@ export function createLitControllableProperty<T>(
   const currentValue = (): T => _state.value;
 
   const dispatchChange = (next: T): void => {
-    pendingRoundTripValue = { v: next };
+    // WR-04: scope the round-trip suppression token to the SAME synchronous
+    // task. Previously the token was set indefinitely and only cleared by
+    // the consuming `notifyPropertyWrite`. If an EXTERNAL imperative write
+    // (e.g. vanilla JS doing `el.prop = sameValue`) landed BEFORE the async
+    // parent re-bind round-trip, it would silently match the token and the
+    // external write's change event would be swallowed. A microtask boundary
+    // is enough to expire the token: the synchronous round-trip (producer
+    // write → CustomEvent → SYNCHRONOUS parent setter → notifyPropertyWrite)
+    // runs entirely before the microtask fires; any LATER write — including
+    // an async parent re-bind that arrives after a microtask, OR an external
+    // same-value write — sees a cleared token and dispatches correctly.
+    const token: { v: T } = { v: next };
+    pendingRoundTripValue = token;
     host.dispatchEvent(
       new CustomEvent(eventName, {
         detail: next,
@@ -150,6 +162,9 @@ export function createLitControllableProperty<T>(
         cancelable: false,
       }),
     );
+    queueMicrotask(() => {
+      if (pendingRoundTripValue === token) pendingRoundTripValue = undefined;
+    });
   };
 
   return {
