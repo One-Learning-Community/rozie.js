@@ -97,6 +97,14 @@ export const EXAMPLES = [
   // attributes on the rendered <button>s; the cross-target class/style merge
   // applied — auto and manual modes produce equivalent DOM).
   'ThemedButtonConsumer',
+  // Phase 15 — listener-side sibling wrappers + ROnProbe (D-04 / D-05 / D-07).
+  // ThemedButtonListenersManual / ThemedButtonAllManual are PRODUCER fixtures
+  // mounted in isolation (no inner consumer). ROnProbe is a single-file probe
+  // exercising the literal modifier-bearing `r-on`, dynamic spread, and R6
+  // same-event source-order merge codegen across the 6 targets.
+  'ThemedButtonListenersManual',
+  'ThemedButtonAllManual',
+  'ROnProbe',
 ] as const;
 
 export type Example = (typeof EXAMPLES)[number];
@@ -142,6 +150,10 @@ export const LIT_TAGS: Record<Example, string> = {
   // present; ThemedButtonConsumer is a base example (no `<Name>Demo` sibling),
   // so the loader resolves directly to `examples/ThemedButtonConsumer.rozie`.
   ThemedButtonConsumer: 'rozie-themed-button-consumer',
+  // Phase 15 — kebab tags for the three new dogfood fixtures.
+  ThemedButtonListenersManual: 'rozie-themed-button-listeners-manual',
+  ThemedButtonAllManual: 'rozie-themed-button-all-manual',
+  ROnProbe: 'rozie-r-on-probe',
 };
 
 export interface HostQuery {
@@ -214,6 +226,12 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // data-*, type, style="--btn-bg: …", extra class). No parent-side props
   // are needed.
   ThemedButtonConsumer: {},
+  // Phase 15 listener-side wrappers + R6 probe. ThemedButtonListenersManual
+  // and ThemedButtonAllManual are PRODUCER fixtures (no consumer); each takes
+  // a `label` prop. ROnProbe takes no props (single-file probe).
+  ThemedButtonListenersManual: { label: 'Listeners Manual' },
+  ThemedButtonAllManual: { label: 'All Manual' },
+  ROnProbe: {},
 };
 
 /**

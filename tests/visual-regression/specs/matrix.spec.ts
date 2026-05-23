@@ -102,7 +102,31 @@ const EXAMPLES = [
   // targets diff against the same shared `ThemedButtonConsumer.png` baseline.
   // Baseline-gates to test.fixme via `baselineExists()` below until a
   // Linux-Docker baseline regen lands the PNG (`feedback_vr_linux_baselines`).
+  //
+  // Phase 15 extended Plan 15-06 added two new sibling wrappers covering the
+  // listener-side of the four-corner matrix: ThemedButtonListenersManual
+  // (`inherit-listeners="false"` + manual `r-on="$listeners"` on the inner
+  // <button>) and ThemedButtonAllManual (both flags `false` + both manual
+  // directives). The extended ThemedButtonConsumer composes all FOUR wrappers,
+  // so its baseline now covers the full four-corner R11 matrix.
   'ThemedButtonConsumer',
+  // Phase 15 — listener-side sibling wrappers (D-04 / D-05). These are the
+  // PRODUCER fixtures (not consumer-composed). Render output for each producer
+  // in isolation is more interesting as a structural sanity check than as a
+  // visual probe, but per the matrix convention every dogfood producer gets a
+  // cell here. The baseline-gate keeps the cells fixme until a Linux-Docker
+  // baseline regen lands the PNG. Per D-10 shared-baseline.
+  'ThemedButtonListenersManual',
+  'ThemedButtonAllManual',
+  // Phase 15 — ROnProbe literal modifier-bearing + dynamic + R6 same-event
+  // source-order merge probe (D-07). Three elements: literal modifier-bearing
+  // `r-on={'click.stop': fn, 'input.debounce(300)': onInput}`, dynamic
+  // `r-on="someObj"`, and R6 same-event merge `@click="f1" r-on="{ click: f2 }"`.
+  // Each target's R6 merge produces different DOM structures (per-target
+  // merge-dispatcher emit shapes diverge), but the rendered VISUAL is just
+  // three short span labels in an inline-flex row — the same across targets.
+  // Per D-10 shared-baseline; baseline-gated below.
+  'ROnProbe',
 ] as const;
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'] as const;
 
