@@ -1,0 +1,67 @@
+<!--
+  ThemedButtonAllManual.rozie — Phase 15 sibling variant of ThemedButton with
+  BOTH `inherit-attrs="false"` AND `inherit-listeners="false"` on the
+  <rozie> block, and BOTH manual directives (`r-bind="$attrs"` +
+  `r-on="$listeners"`) on the root <button>.
+
+  This is the attrs-manual / listeners-manual corner of the four-corner
+  matrix (SPEC R11c — closes the matrix). Both auto-fallthrough
+  synthesizers are off and both attribute and listener clusters are
+  author-placed; neither ROZ971 (`ATTR_DOUBLE_APPLY`) nor ROZ974
+  (`LISTENER_DOUBLE_APPLY`) is emitted because neither auto-fallthrough
+  would fire — the validator emits the warnings only when auto-fallthrough
+  AND a manual spread coexist on the same element.
+
+  Demonstrates SPEC R5 — fully orthogonal flag independence: both opt-outs
+  are explicit, both manual spreads coexist on one element, and the emit
+  pipeline routes the consumer's attribute cluster through Phase 14's
+  `spreadBinding` IR + the consumer's listener cluster through Phase 15's
+  `ListenerSpreadIR` IR. The two IR paths operate independently per SPEC
+  R2 (listener spreads do NOT lower into attribute IR).
+
+  Single root, single-file. Composed alongside ThemedButton,
+  ThemedButtonManual, and ThemedButtonListenersManual by
+  ThemedButtonConsumer.rozie.
+-->
+
+<rozie name="ThemedButtonAllManual" inherit-attrs="false" inherit-listeners="false">
+
+<props>
+{
+  label:   { type: String,  default: 'Click me' },
+  variant: { type: String,  default: 'primary' },
+}
+</props>
+
+<template>
+<button
+  class="btn"
+  :class="$props.variant"
+  :style="{ '--btn-bg': '#3b82f6', '--btn-fg': '#ffffff' }"
+  r-bind="$attrs"
+  r-on="$listeners"
+>
+  {{ $props.label }}
+</button>
+</template>
+
+<style>
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 0.25rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: var(--btn-bg, #3b82f6);
+  color: var(--btn-fg, #ffffff);
+  font: inherit;
+  cursor: pointer;
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+</style>
+
+</rozie>

@@ -1,24 +1,49 @@
 <!--
-  ThemedButtonConsumer.rozie — Phase 14 dist-parity consumer dogfood
-  for the ThemedButton + ThemedButtonManual sibling pair.
+  ThemedButtonConsumer.rozie — Phase 14 + Phase 15 dist-parity consumer
+  dogfood for the FULL four-corner ThemedButton matrix.
 
-  The consumer forwards consumer-passed attributes (`id`, `aria-*`,
-  `data-*`, `type`, `disabled`, plus an extra `class` and a `style="--btn-bg: …"`
-  CSS-custom-property override) onto the wrappers. ThemedButton uses
-  auto-fallthrough (default `inherit-attrs`); ThemedButtonManual uses the
-  `inherit-attrs="false"` opt-out + manual `r-bind="$attrs"`. The consumer
-  exercises:
+  Composes ALL FOUR wrapper variants and passes the SAME consumer-passed
+  attribute + listener set to each. One single consumer fixture exercises
+  the full `(inherit-attrs ∈ {auto, manual}) × (inherit-listeners ∈ {auto,
+  manual})` matrix across all six targets via the dist-parity gate.
 
-    - SPEC R4: auto-fallthrough lands consumer attrs on the wrapper's root
-      <button> (ThemedButton).
-    - SPEC R5: manual `r-bind="$attrs"` lands the same set explicitly with
-      no ROZ971 (ThemedButtonManual).
+  Corner mapping (SPEC R11):
+    - ThemedButton                 — attrs-auto    / listeners-auto    (D-02 / R11a)
+    - ThemedButtonManual           — attrs-manual  / listeners-auto    (D-03 / unchanged Phase 14 sibling)
+    - ThemedButtonListenersManual  — attrs-auto    / listeners-manual  (D-04 / R11b)
+    - ThemedButtonAllManual        — attrs-manual  / listeners-manual  (D-05 / R11c)
+
+  Consumer-passed surface forwarded to each wrapper:
+    - Attribute cluster: `id` (per-instance), `type="button"`, `aria-label`
+      (per-instance), `data-testid` (per-instance — disambiguates cells for
+      Plan 15-07's e2e click-through probe), `class="extra-variant"`,
+      `style="--btn-bg: …"` (CSS-custom-property override; R6 style-merge),
+      `:label="'…'"` (declared prop — bypasses fallthrough).
+    - Listener cluster: `@click="onClick"` + `@mouseenter="onMouseEnter"` —
+      Phase 15 R4 consumer-passed listener-fallthrough exercise.
+
+  Exercises:
+    - SPEC R4: auto-fallthrough lands consumer attrs + listeners on the
+      wrapper's root <button> (ThemedButton, ThemedButtonListenersManual for
+      attrs only — see below).
+    - SPEC R5: manual `r-bind="$attrs"` / `r-on="$listeners"` land the same
+      sets explicitly with no ROZ971/ROZ974
+      (ThemedButtonManual / ThemedButtonListenersManual / ThemedButtonAllManual).
+    - SPEC R5 independence: flipping `inherit-listeners="false"` does NOT
+      affect `inherit-attrs` (ThemedButtonListenersManual still
+      auto-fallthrough's the consumer's attr cluster); flipping
+      `inherit-attrs="false"` does NOT affect `inherit-listeners`
+      (ThemedButtonManual still auto-fallthrough's the consumer's listener
+      cluster — newly exercised in Phase 15).
     - SPEC R6 class-always-merge: consumer's `class="extra-variant"` merges
       with the wrapper's `btn` + `:class="$props.variant"`.
+    - SPEC R6 listener all-fire merge: if a wrapper also bound a same-name
+      `@click` internally (it does not, in this fixture), all handlers
+      would fire in source order.
     - D-06 style-always-merge via CSS custom properties: consumer's
-      `style="--btn-bg: …"` shallow-merges with the wrapper's `:style` object.
+      `style="--btn-bg: …"` shallow-merges with the wrapper's `:style`.
 
-  Multi-rozie fixture: references the two producers via <components>;
+  Multi-rozie fixture: references the four producers via <components>;
   registered in EXAMPLES_NEEDING_RESOLVER_ROOT in bootstrap-fixtures.mjs.
 -->
 
@@ -28,8 +53,25 @@
 {
   ThemedButton: './ThemedButton.rozie',
   ThemedButtonManual: './ThemedButtonManual.rozie',
+  ThemedButtonListenersManual: './ThemedButtonListenersManual.rozie',
+  ThemedButtonAllManual: './ThemedButtonAllManual.rozie',
 }
 </components>
+
+<data>
+{
+  // Sentinel consumer-passed listener handlers. Kept as no-op arrow
+  // functions so the compiled output is byte-identical across all six
+  // targets — no closure over signals, no per-target reactive-runtime
+  // divergence. The consumer's purpose is to PROVE the listener cluster
+  // arrives at the wrapper's <button> root via the synthesized
+  // ListenerSpreadIR (auto-fallthrough corners) or the manual
+  // `r-on="$listeners"` directive (manual corners); the handler body
+  // is intentionally trivial.
+  onClick:       () => {},
+  onMouseEnter:  () => {},
+}
+</data>
 
 <template>
 <div class="themed-button-consumer">
@@ -41,6 +83,8 @@
     class="extra-variant"
     style="--btn-bg: #ef4444"
     :label="'Auto'"
+    @click="onClick"
+    @mouseenter="onMouseEnter"
   />
 
   <ThemedButtonManual
@@ -51,6 +95,32 @@
     class="extra-variant"
     style="--btn-bg: #10b981"
     :label="'Manual'"
+    @click="onClick"
+    @mouseenter="onMouseEnter"
+  />
+
+  <ThemedButtonListenersManual
+    id="listeners-manual-btn"
+    type="button"
+    aria-label="Listeners-manual fallthrough button"
+    data-testid="listeners-manual-themed-button"
+    class="extra-variant"
+    style="--btn-bg: #f59e0b"
+    :label="'Listeners Manual'"
+    @click="onClick"
+    @mouseenter="onMouseEnter"
+  />
+
+  <ThemedButtonAllManual
+    id="all-manual-btn"
+    type="button"
+    aria-label="All-manual fallthrough button"
+    data-testid="all-manual-themed-button"
+    class="extra-variant"
+    style="--btn-bg: #8b5cf6"
+    :label="'All Manual'"
+    @click="onClick"
+    @mouseenter="onMouseEnter"
   />
 </div>
 </template>

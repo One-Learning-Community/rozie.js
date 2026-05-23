@@ -1,21 +1,33 @@
 <!--
-  ThemedButton.rozie — Phase 14 dist-parity proving fixture for the
-  attribute-fallthrough feature (D-05 / D-06).
+  ThemedButton.rozie — Phase 14 + Phase 15 dist-parity proving fixture for
+  cross-framework attribute + listener fallthrough (D-05 / D-06 / D-02).
 
   Design-system-flavored wrapper around a native <button>:
-    - Default <rozie> block (no `inherit-attrs="false"`) — auto-fallthrough
-      lands consumer-passed undeclared attributes (`id`, `aria-*`, `data-*`,
-      `type`, `disabled`, …) onto the root `<button>`.
+    - Default <rozie> block (no `inherit-attrs="false"`, no
+      `inherit-listeners="false"`) — both auto-fallthrough synthesizers fire
+      and the consumer's undeclared attributes AND consumer-passed event
+      listeners land on the root `<button>`.
+        * Phase 14 R4 attribute fallthrough lands consumer-passed undeclared
+          attributes (`id`, `aria-*`, `data-*`, `type`, `disabled`, …) onto
+          the root <button> via the synthesized `r-bind="$attrs"`.
+        * Phase 15 R4 listener fallthrough lands consumer-passed event
+          listeners (`@click`, `@mouseenter`, …) onto the same root <button>
+          via the synthesized `r-on="$listeners"` — this is the D-02 corner
+          (attrs-auto / listeners-auto) of the four-corner matrix.
+        * Per SPEC R11a — this is the "both default" corner; the consumer
+          dogfood (ThemedButtonConsumer.rozie) gains `@click` and
+          `@mouseenter` bindings on this wrapper instance.
     - Owns a `btn` class so the consumer can layer a variant class on top
       via the R6 class-always-merge rule.
     - Owns a `:style` object declaring CSS custom properties (D-06) so the
       consumer can pass `style="--btn-bg: …"` which shallow-merges with the
       component's own style object (R6 style-always-merge).
-    - Single root element — auto-fallthrough has an unambiguous target and
-      no R8 `ATTR_FALLTHROUGH_MULTI_ROOT` warning is emitted.
+    - Single root element — both auto-fallthrough synthesizers have an
+      unambiguous target and neither ROZ970 (`ATTR_FALLTHROUGH_MULTI_ROOT`)
+      nor ROZ973 (`LISTENER_FALLTHROUGH_MULTI_ROOT`) is emitted.
 
   Single-file (no sibling .rozie producers from this fixture's own side; it
-  IS the producer that ThemedButtonConsumer.rozie composes).
+  IS one of the four producers that ThemedButtonConsumer.rozie composes).
 -->
 
 <rozie name="ThemedButton">

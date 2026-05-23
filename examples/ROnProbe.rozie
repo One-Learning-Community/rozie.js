@@ -1,0 +1,80 @@
+<!--
+  ROnProbe.rozie — Phase 15 dist-parity literal modifier-bearing `r-on` +
+  dynamic spread + R6 same-event source-order merge probe.
+
+  Single-file (no sibling .rozie producers). Mirrors RBindProbe's shape: a
+  minimal, single-concern probe whose committed per-target output is the
+  byte-locked proof that the literal `r-on` lowering path (with modifier-
+  bearing keys), the dynamic `r-on` runtime-helper path, and the R6 all-fire
+  source-order merge all lower cross-target-equivalent across all 6 targets
+  × 4 entrypoints (CLI / Babel / unplugin direct / unplugin dev).
+
+  Exercises:
+    - SPEC R1 LITERAL modifier-bearing `r-on` keys — the keys 'click.stop'
+      and 'input.debounce(300)' MUST appear LITERALLY in this source (per
+      15-RESEARCH §Specifics). Lowers identically to `@click.stop="fn"` +
+      `@input.debounce(300)="onInput"` written by hand; routes through the
+      existing peggy modifier grammar at lower time (D-15).
+    - SPEC R7 DYNAMIC `r-on="someObj"` — exercises the per-target runtime
+      helper path (normalizeListeners / applyListeners / rozieListeners /
+      Renderer2.listen — D-08..D-13).
+    - SPEC R6 ALL-FIRE same-event SOURCE-ORDER MERGE — one element with
+      BOTH a literal `@click="f1"` AND an `r-on="{ click: f2 }"` binding;
+      both handlers MUST fire in source order. This is Pitfall 1 of the
+      15-RESEARCH (the single genuinely new piece of codegen this phase).
+
+  Both `inherit-attrs="false"` and `inherit-listeners="false"` are set on
+  the <rozie> block. The probe tests R1/R6/R7 literal/dynamic/merge paths,
+  NOT fallthrough behavior — silencing ROZ971 and ROZ974 keeps the
+  snapshot diagnostic-quiet. The template remains SINGLE-ROOT: three
+  child <span> elements wrapped in a single `.r-on-probe` <div>.
+
+  Three template elements:
+    1. <span r-on="{ 'click.stop': fn, 'input.debounce(300)': onInput }">
+       — literal modifier-bearing: exercises Plan 15-02 D-15 modifier
+       resolution + per-target literal-compile + modifier-pipeline routing.
+    2. <span r-on="someObj">
+       — dynamic: exercises per-target dynamic-runtime helper.
+    3. <span @click="f1" r-on="{ click: f2 }">
+       — R6 same-event merge: exercises Pitfall 1 source-order all-fire
+       dispatcher emit across all six targets.
+-->
+
+<rozie name="ROnProbe" inherit-attrs="false" inherit-listeners="false">
+
+<data>
+{
+  // Sentinel handlers — no-op arrow functions. Byte-identical across
+  // targets (no closure over signals, no framework-specific API calls).
+  // The probe's purpose is to byte-lock the EMIT shape (modifier
+  // pipeline, dynamic-helper routing, R6 merge dispatcher), not to
+  // exercise runtime semantics.
+  fn:        () => {},
+  onInput:   () => {},
+  f1:        () => {},
+  f2:        () => {},
+  someObj:   { click: () => {}, mouseenter: () => {} },
+}
+</data>
+
+<template>
+<div class="r-on-probe">
+  <span r-on="{ 'click.stop': fn, 'input.debounce(300)': onInput }">literal modifier-bearing</span>
+  <span r-on="someObj">dynamic</span>
+  <span @click="f1" r-on="{ click: f2 }">R6 source-order merge</span>
+</div>
+</template>
+
+<style>
+.r-on-probe {
+  display: inline-flex;
+  gap: 0.5rem;
+  padding: 0.25rem;
+}
+.r-on-probe span {
+  display: inline-block;
+  padding: 0.125rem 0.25rem;
+}
+</style>
+
+</rozie>
