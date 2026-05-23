@@ -180,21 +180,29 @@ runner('lit rozieListeners AsyncDirective: disconnected() removes every attached
     return obs.removes.filter((r) => r.tag === 'span');
   });
 
-  // Each (event, tag) pair that was added on a span must be removed on
-  // disconnect — the leak-defense invariant. Construct a multiset over the
-  // event names and assert remove-set is a superset of add-set. (Lit may
-  // call removeEventListener more than addEventListener if the same listener
-  // is re-attached across updates; we don't gate on equality, only on
-  // "every add was eventually balanced by at least one remove on disconnect").
+  // Each event that rozieListeners REGISTERED must be removed on disconnect
+  // — the leak-defense invariant. Scope: ROnProbe has rozieListeners on Span
+  // 2 ONLY (the `r-on="someObj"` dynamic-spread span), and `someObj` carries
+  // exactly `{ click, mouseenter }`. Spans 1 and 3 use Lit's native `@event=`
+  // syntax (EventPart), which by design does NOT call removeEventListener on
+  // disconnect — Lit relies on element disposal there, not on active
+  // teardown. The page-level addEventListener spy captures both paths
+  // indiscriminately, so we filter the add-set down to the events that
+  // rozieListeners actually owns before asserting parity with the remove-set.
   //
   // This is the D-14 / T-15-V5-04 leak-defense gate: WITHOUT the
   // AsyncDirective `disconnected()` hook the prevListenersByElement WeakMap
   // entry would stay populated and removeEventListener would never fire on
-  // disconnect — addedEventNames would have entries that removedEventNames
-  // didn't, and the assertion would fail.
-  const addedEventNames = new Set(addsBeforeDisconnect.map((a) => a.event));
+  // disconnect — `click` and `mouseenter` would be missing from
+  // removedEventNames and the assertion would fail.
+  const ROZIE_LISTENERS_OWNED = new Set(['click', 'mouseenter']);
+  const ownedAdds = addsBeforeDisconnect.filter((a) => ROZIE_LISTENERS_OWNED.has(a.event));
+  expect(
+    new Set(ownedAdds.map((a) => a.event)).size,
+    'rozieListeners should have registered both click and mouseenter on the dynamic-spread <span> after initial render',
+  ).toBeGreaterThanOrEqual(2);
   const removedEventNames = new Set(removesAfterDisconnect.map((r) => r.event));
-  for (const evName of addedEventNames) {
+  for (const evName of ROZIE_LISTENERS_OWNED) {
     expect(
       removedEventNames.has(evName),
       `rozieListeners.disconnected() must call removeEventListener('${evName}', ...) on the host element to clear the prevListenersByElement WeakMap entry (T-15-V5-04 leak defense)`,
