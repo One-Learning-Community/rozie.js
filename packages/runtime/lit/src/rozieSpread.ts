@@ -64,22 +64,33 @@ class RozieSpreadDirective extends Directive {
     }
   }
 
-  override update(part: ElementPart, [obj]: [Record<string, unknown>]): symbol {
+  override update(
+    part: ElementPart,
+    [obj]: [Record<string, unknown> | null | undefined],
+  ): symbol {
     const el = part.element as Element;
+    // CR-03: a manual `r-bind` whose expression resolves to null/undefined
+    // at runtime (e.g. `$data.maybeNull`, an inline `cond ? attrs : null`)
+    // previously crashed inside `for (const k of prevKeys) if (!(k in obj))`
+    // and `Object.entries(obj)` — both throw on `null`. Coerce nullish to
+    // `{}` so the path becomes a clean remove-all-then-no-op, matching the
+    // silent-no-op semantics of Vue `v-bind=null`, React `{...null}`, and
+    // Svelte `{...null}`.
+    const safeObj: Record<string, unknown> = obj ?? {};
     const prevKeys = prevKeysByElement.get(el) ?? [];
     // Remove keys that disappeared since the previous render.
     for (const k of prevKeys) {
-      if (!(k in obj)) el.removeAttribute(k);
+      if (!(k in safeObj)) el.removeAttribute(k);
     }
     // Apply current keys: null/false → remove; else → setAttribute(String(v)).
-    for (const [k, v] of Object.entries(obj)) {
+    for (const [k, v] of Object.entries(safeObj)) {
       if (v === null || v === false) {
         el.removeAttribute(k);
       } else {
         el.setAttribute(k, String(v));
       }
     }
-    prevKeysByElement.set(el, Object.keys(obj));
+    prevKeysByElement.set(el, Object.keys(safeObj));
     return noChange;
   }
 
@@ -90,7 +101,7 @@ class RozieSpreadDirective extends Directive {
    * to signal "no template-tree changes" (the side effect is the DOM mutation
    * performed in `update`).
    */
-  render(_obj: Record<string, unknown>): symbol {
+  render(_obj: Record<string, unknown> | null | undefined): symbol {
     return noChange;
   }
 }

@@ -107,6 +107,40 @@ describe('rozieSpread — runtime-lit element-position directive', () => {
     }).toThrow(/element position/i);
   });
 
+  it('(7-CR-03) null / undefined obj is treated as no-attributes (no throw, prior keys removed)', () => {
+    // CR-03 regression: a manual r-bind whose expression goes null/undefined
+    // at runtime previously threw on `k in null` / `Object.entries(null)` /
+    // `Object.keys(null)`. The fix coerces nullish → `{}` so the diff path
+    // is a clean remove-all-prev-keys (matching Vue/React/Svelte semantics).
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    // First render seeds prevKeys with { id, title }.
+    render(
+      html`<button ${rozieSpread({ id: 'x', title: 't' })}></button>`,
+      container,
+    );
+    expect(container.querySelector('button')!.getAttribute('title')).toBe('t');
+    // Re-render with null — must NOT throw and MUST remove the prior keys.
+    expect(() => {
+      render(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        html`<button ${rozieSpread(null as any)}></button>`,
+        container,
+      );
+    }).not.toThrow();
+    const btnAfter = container.querySelector('button')!;
+    expect(btnAfter.getAttribute('id')).toBeNull();
+    expect(btnAfter.getAttribute('title')).toBeNull();
+    // Same for undefined.
+    expect(() => {
+      render(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        html`<button ${rozieSpread(undefined as any)}></button>`,
+        container,
+      );
+    }).not.toThrow();
+  });
+
   it('(6) numeric / string values coerce to String for setAttribute', () => {
     const container = document.createElement('div');
     document.body.appendChild(container);
