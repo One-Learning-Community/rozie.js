@@ -17,7 +17,7 @@ export default class Consumer extends SignalWatcher(LitElement) {
 
   render() {
     return html`
-<rozie-producer .header=${(scope: { close: unknown }) => html`
+<rozie-producer data-rozie-s-bd0c3708 .header=${(scope: { close: unknown }) => html`
     <button @click=${scope.close} data-rozie-s-bd0c3708>×</button>
   `} ${ref((el: Element | undefined) => el && adoptConsumerStyles(el, (this.constructor as { styles?: unknown }).styles))}>
   Body text

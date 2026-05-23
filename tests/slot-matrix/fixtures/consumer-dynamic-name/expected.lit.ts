@@ -17,7 +17,7 @@ export default class Consumer extends SignalWatcher(LitElement) {
 
   render() {
     return html`
-<rozie-producer><div slot="${this._slotName.value}">Dynamic fill</div></rozie-producer>
+<rozie-producer data-rozie-s-bd0c3708><div slot="${this._slotName.value}">Dynamic fill</div></rozie-producer>
 `;
   }
 }

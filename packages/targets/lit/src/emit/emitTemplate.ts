@@ -1015,14 +1015,25 @@ function emitElementOpenTag(
 
   if (refAttr) parts.push(refAttr);
 
-  // Phase 07.6 — producer-side CSS scope stamp. Only `tagKind === 'html'`
-  // elements get the marker; composed custom elements (`component`) own
-  // their own internal shadow scope, and the implicit host ('self') is the
-  // producer custom element itself (CSS uses `:host` to target it, exempted
-  // in scopeCss). Consumer property-fill body elements flow through this
-  // path too — they carry the CONSUMER's scope hash, NOT the producer's,
-  // so producer-CSS rules never match them across the shadow boundary.
-  if (node.tagKind === 'html' && opts.scopeHash) {
+  // Phase 07.6 — producer-side CSS scope stamp on `tagKind === 'html'`
+  // elements: composed custom elements (`component`) own their own internal
+  // shadow scope, and the implicit host ('self') is the producer custom
+  // element itself (CSS uses `:host` to target it, exempted in scopeCss).
+  // Consumer property-fill body elements flow through this path too —
+  // they carry the CONSUMER's scope hash, NOT the producer's, so
+  // producer-CSS rules never match them across the shadow boundary.
+  //
+  // Phase 14.1 — ALSO stamp on `tagKind === 'component'` invocations so the
+  // consumer's scope attr lands on the child custom element's HOST. Inside
+  // the consumer's own shadow root, consumer-authored CSS like
+  // `.extra-variant[data-rozie-s-CONSUMER] { font-weight: 600 }` now matches
+  // the host custom element (which carries `class="extra-variant"` from the
+  // consumer's invocation), and the inner button inherits via `font: inherit`.
+  // Mirrors the cross-target scope propagation applied to React + Solid.
+  if (
+    (node.tagKind === 'html' || node.tagKind === 'component') &&
+    opts.scopeHash
+  ) {
     parts.push(`data-rozie-s-${opts.scopeHash}`);
   }
 

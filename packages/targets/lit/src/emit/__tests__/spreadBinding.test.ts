@@ -103,9 +103,12 @@ describe('emitTemplateAttribute (Lit) — spreadBinding (Plan 14-05 Task 1)', ()
     const out = emitTemplateAttribute(spread('$attrs'), ir, 'button', state);
     // Plan 14-05 — Lit has no native template-side `$attrs` proxy; the bare
     // `$attrs` Identifier is rewritten (in rewriteTemplateExpression) to
-    // `this.$attrs`, a synthesised getter (declared by emitLit when
-    // `rozieSpreadUsed && inheritAttrs !== false`) that reads the host
-    // custom element's attributes per call. The rozieSpread directive does
+    // `this.$attrs`, a synthesised getter (declared by emitLit whenever
+    // `rozieSpreadUsed` is true — Phase 14.1 WR-fix: gate no longer ANDs on
+    // `inheritAttrs !== false` because an author-written `r-bind="$attrs"`
+    // must still resolve `this.$attrs` to the host-attribute snapshot even
+    // when auto-fallthrough is opted out) that reads the host custom
+    // element's attributes per call. The rozieSpread directive does
     // cross-render diffing downstream.
     expect(out).toMatchInlineSnapshot(`"\${rozieSpread(this.$attrs)}"`);
     expect(out).toContain('this.$attrs');

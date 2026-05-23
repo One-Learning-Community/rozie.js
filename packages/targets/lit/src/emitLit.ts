@@ -152,12 +152,16 @@ export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResu
   // onto the TEMPLATE-ROOT element (CONTEXT.md A1) via `${rozieSpread($attrs)}`.
   // Synthesise a getter that reads `this.attributes` on each call so a
   // consumer-side bound attribute (`?disabled=${...}`) flows through on the
-  // next render. Only emitted when `inheritAttrs !== false` AND at least one
-  // `spreadBinding` was lowered (a manual `r-bind="$attrs"` fixture would
-  // also need the getter even if `inheritAttrs === false`, but that combo is
-  // unusual; the gating below favours synthesis-driven emit).
+  // next render. Emitted whenever at least one `spreadBinding` was lowered —
+  // either via auto-fallthrough synthesis OR via an explicit author-written
+  // `r-bind="$attrs"` (Phase 14.1 WR-fix: `inherit-attrs="false"` only opts
+  // out of auto-fallthrough; it must not strip the getter when the author
+  // references `$attrs` manually, otherwise the `${rozieSpread(this.$attrs)}`
+  // call site would resolve `this.$attrs` to `undefined` and the directive
+  // would throw at render time, aborting the lit-html render and leaving the
+  // shadow root empty).
   const litAttrsGetter =
-    templateResult.rozieSpreadUsed && ir.inheritAttrs !== false
+    templateResult.rozieSpreadUsed
       ? [
           '  /**',
           '   * Plan 14-05 — cross-framework attribute fallthrough source. Reads the',

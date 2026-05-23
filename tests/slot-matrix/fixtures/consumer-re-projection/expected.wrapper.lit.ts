@@ -56,7 +56,7 @@ export default class Wrapper extends SignalWatcher(LitElement) {
 
   render() {
     return html`
-<rozie-inner><slot name="title" slot="header">default title</slot><slot>default body</slot></rozie-inner>
+<rozie-inner data-rozie-s-ac96baae><slot name="title" slot="header">default title</slot><slot>default body</slot></rozie-inner>
 `;
   }
 }

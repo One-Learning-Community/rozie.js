@@ -15,7 +15,7 @@ export default class Consumer extends SignalWatcher(LitElement) {
 
   render() {
     return html`
-<rozie-producer><h2 data-rozie-s-bd0c3708 slot="header">Custom Header</h2>
+<rozie-producer data-rozie-s-bd0c3708><h2 data-rozie-s-bd0c3708 slot="header">Custom Header</h2>
   Custom body content
 </rozie-producer>
 `;

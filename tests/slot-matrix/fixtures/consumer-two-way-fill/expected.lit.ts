@@ -21,8 +21,8 @@ export default class Consumer extends SignalWatcher(LitElement) {
 
   render() {
     return html`
-<rozie-producer .open=${this._outerOpen.value} @open-change=${($event: CustomEvent) => { this._outerOpen.value = $event.detail; }} .footer=${(scope: { close: unknown }) => html`
-    <rozie-inner .open=${this._outerOpen.value} @open-change=${($event: CustomEvent) => { this._outerOpen.value = $event.detail; }}></rozie-inner>
+<rozie-producer .open=${this._outerOpen.value} @open-change=${($event: CustomEvent) => { this._outerOpen.value = $event.detail; }} data-rozie-s-bd0c3708 .footer=${(scope: { close: unknown }) => html`
+    <rozie-inner .open=${this._outerOpen.value} @open-change=${($event: CustomEvent) => { this._outerOpen.value = $event.detail; }} data-rozie-s-bd0c3708></rozie-inner>
     <button @click=${scope.close} data-rozie-s-bd0c3708>×</button>
   `} ${ref((el: Element | undefined) => el && adoptConsumerStyles(el, (this.constructor as { styles?: unknown }).styles))}></rozie-producer>
 `;

@@ -52,7 +52,7 @@ export default class Card extends SignalWatcher(LitElement) {
   render() {
     return html`
 <article class="card" ${rozieSpread(this.$attrs)} data-rozie-s-a88c221e>
-  <rozie-card-header .title=${this.title} .onClose=${this.onClose}></rozie-card-header>
+  <rozie-card-header .title=${this.title} .onClose=${this.onClose} data-rozie-s-a88c221e></rozie-card-header>
   <div class="card__body" data-rozie-s-a88c221e>
     <slot></slot>
   </div>
