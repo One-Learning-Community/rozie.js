@@ -27,8 +27,7 @@
         <code>.</code> in an <code>@event</code> / <code>r-on:event</code> /
         <code>r-model</code> attribute now offers the event composition
         modifiers, the key/button filters (on keyboard events), and the three
-        <code>r-model</code> modifiers; the <code>r-on:</code> longhand also
-        completes DOM event names. SFC block folding: <code>&lt;template&gt;</code>,
+        <code>r-model</code> modifiers. SFC block folding: <code>&lt;template&gt;</code>,
         <code>&lt;script&gt;</code>, <code>&lt;style&gt;</code> and the other
         blocks collapse to a one-line placeholder. Quick documentation:
         Ctrl-Q / hover on an <code>r-*</code> directive, a modifier, or a

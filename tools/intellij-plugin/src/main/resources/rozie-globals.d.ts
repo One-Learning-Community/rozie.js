@@ -1,10 +1,12 @@
-// rozie-globals.d.ts — synthetic ambient declarations for the 14 Rozie
+// rozie-globals.d.ts — synthetic ambient declarations for the 16 Rozie
 // magic identifiers. Source of truth: Plan 13's
 // `tools/intellij-plugin/src/main/kotlin/js/rozie/intellij/completion/RozieMagicIdentifiers.kt`
 // `MAGIC_IDENTIFIERS` registry. v0.2.0 ships permissive `any`-typed shapes;
 // per-component prop interface synthesis is deferred to a v0.3.0 follow-up
 // (captured in Plan 08.2-16 SUMMARY "Known Stubs" section). Phase 14 (2026-
-// 05-22) added `$attrs` as the 14th magic identifier.
+// 05-22) added `$attrs` as the 14th magic identifier; WR-06 of the same phase
+// added `$event` as the 15th. Phase 15 (2026-05-23) added `$listeners` as the
+// 16th — the consumer-passed event-listener cluster paired with `$attrs`.
 //
 // =============================================================================
 // Strategy chosen: B (ambient-decl prefix injected into every Rozie JS fragment)
@@ -111,6 +113,18 @@ declare function $classSelector(className: string): string;
  * host-element-attribute getters. Phase 14.
  */
 declare const $attrs: Record<string, unknown>;
+/**
+ * Consumer-passed event-listener cluster minus declared events. Available
+ * as a bare identifier in `<template>` for `r-on="$listeners"` manual
+ * placement (typically paired with `<rozie inherit-listeners="false">`),
+ * and as a member-accessor for individual reads (`$listeners.click?.(e)`,
+ * `$listeners['custom-event']`). Per-target lowering follows the
+ * `$attrs`/Phase 14 pattern: React/Solid use a `props`-derived rest; Vue
+ * keeps the native template accessor; Svelte rewrites to `__rozieAttrs`-
+ * equivalent; Angular/Lit synthesize host-element-listener accessors.
+ * Phase 15 R3 / D-19.
+ */
+declare const $listeners: Record<string, EventListener>;
 /**
  * The active event closure parameter inside an `@event` / `r-on:event`
  * handler. Scoped to event-handler contexts; reserved in

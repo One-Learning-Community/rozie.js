@@ -55,8 +55,14 @@ object RozieDocs {
             "manually lands the consumer-passed attribute cluster (typically " +
             "paired with <code>&lt;rozie inherit-attrs=\"false\"&gt;</code>).",
         "r-on" to
-            "Attach an event listener. Usually written in the shorthand form " +
-            "<code>@event</code>. Supports modifier chains.",
+            "Object spread — bind an object of event listeners onto an " +
+            "element. <code>r-on=\"obj\"</code> spreads every key of " +
+            "<code>obj</code> as an event listener on this element. Object " +
+            "form only — there is no <code>r-on:event</code> colon form (use " +
+            "the <code>@event</code> shorthand for a single named listener). " +
+            "<code>r-on=\"\$listeners\"</code> manually lands the consumer-" +
+            "passed listener cluster (typically paired with " +
+            "<code>&lt;rozie inherit-listeners=\"false\"&gt;</code>).",
         "r-match" to
             "Switch-style conditional. The <code>r-match</code> expression is " +
             "compared against each child <code>r-case</code>; the first match " +
