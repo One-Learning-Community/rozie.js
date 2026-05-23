@@ -34,7 +34,11 @@ import { lowerProps } from './lowerers/lowerProps.js';
 import { lowerData } from './lowerers/lowerData.js';
 import { lowerScript } from './lowerers/lowerScript.js';
 import { lowerListeners } from './lowerers/lowerListeners.js';
-import { lowerTemplate, synthesizeAttrsFallthrough } from './lowerers/lowerTemplate.js';
+import {
+  lowerTemplate,
+  synthesizeAttrsFallthrough,
+  synthesizeListenersFallthrough,
+} from './lowerers/lowerTemplate.js';
 import { lowerComponents } from './lowerers/lowerComponents.js';
 import { lowerSlots } from './lowerers/lowerSlots.js';
 import { lowerStyles } from './lowerers/lowerStyles.js';
@@ -42,6 +46,7 @@ import { typeNeutralizeScript } from '../codegen/typeNeutralizeScript.js';
 import { lowerRootElementRef } from './lowerers/lowerRootElementRef.js';
 import { validateClassSelector } from './validateClassSelector.js';
 import { validateAttrFallthrough } from './validateAttrFallthrough.js';
+import { validateListenerFallthrough } from './validateListenerFallthrough.js';
 import * as t from '@babel/types';
 
 /**
@@ -225,6 +230,16 @@ export function lowerToIR(ast: RozieAST, opts: LowerOptions): LowerResult {
   // (multi-root error) / ROZ971 (double-apply warning); never mutates `ir`.
   validateAttrFallthrough(ir, diagnostics);
 
+  // Phase 15 — validate cross-framework LISTENER fallthrough (R8/R9). The
+  // parallel-functions sibling of validateAttrFallthrough per D-17. ROZ973
+  // (multi-root error) and ROZ974 (double-apply warning) are INDEPENDENT of
+  // ROZ970/ROZ971 per SPEC R8/R9 — the attrs-side and listeners-side checks
+  // fire separately. Wired BEFORE synthesizeListenersFallthrough so the
+  // synthesized bare-`\$listeners` spread is invisible to the validator (no
+  // false-positive ROZ974 self-warning). Collected-not-thrown (D-08); never
+  // mutates `ir`.
+  validateListenerFallthrough(ir, diagnostics);
+
   // Phase 14 R4 / Plan 14-05 / RESEARCH.md Pattern 5 — synthesize the `$attrs`
   // auto-fallthrough `spreadBinding` onto the single root element when
   // `inheritAttrs !== false`. By the time this code runs, all six target
@@ -246,6 +261,15 @@ export function lowerToIR(ast: RozieAST, opts: LowerOptions): LowerResult {
   // 14-05-PLAN.md cross-plan instructions for the full rationale.
   if (ir.template !== null) {
     synthesizeAttrsFallthrough(ir.template, ir.inheritAttrs);
+    // Phase 15 R4 — listener-side mirror of synthesizeAttrsFallthrough.
+    // Appends a bare-`\$listeners` ListenerSpreadIR onto the single
+    // html-kind root when `inheritListeners !== false`. Multi-root and
+    // `inherit-listeners="false"` skip synthesis (handled inside the
+    // synthesizer); R8 (multi-root + inheritListeners default) emits
+    // ROZ973 via validateListenerFallthrough above (which ran BEFORE this
+    // synthesizer so the synthesized spread is not observed and the
+    // ROZ974 R9 walk does not self-warn).
+    synthesizeListenersFallthrough(ir.template, ir.inheritListeners);
   }
 
   return { ir, diagnostics, depGraph, bindings };

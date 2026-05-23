@@ -1790,7 +1790,20 @@
           null,
           null
         ],
-        "listenerSpreads": [],
+        "listenerSpreads": [
+          {
+            "type": "ListenerSpread",
+            "expression": {
+              "type": "Identifier",
+              "name": "$listeners"
+            },
+            "deps": [],
+            "sourceLoc": {
+              "start": 1016,
+              "end": 1390
+            }
+          }
+        ],
         "children": [
           {
             "type": "TemplateStaticText",

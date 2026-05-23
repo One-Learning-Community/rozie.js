@@ -61,11 +61,16 @@ function lowerOk(source: string): TemplateElementIR {
 }
 
 describe('lowerTemplate r-on branch (Phase 15 Wave 1)', () => {
+  // These three cases use `inherit-listeners="false"` to suppress the
+  // auto-synthesis pass so the assertions isolate r-on lowering ONLY.
+  // The four synthesizer cases at the bottom of this file cover the
+  // auto-fallthrough behavior independently.
   it('dynamic expression — Identifier expression, no literalKeys', () => {
     const el = lowerOk(
       rozie(
         'const someObj = { click: () => {} }',
         '<div r-on="someObj"></div>',
+        { rozieAttrs: 'inherit-listeners="false"' },
       ),
     );
     expect(el.listenerSpreads.length).toBe(1);
@@ -81,6 +86,7 @@ describe('lowerTemplate r-on branch (Phase 15 Wave 1)', () => {
       rozie(
         'const fn = (_e) => {}',
         '<div r-on="{ click: fn }"></div>',
+        { rozieAttrs: 'inherit-listeners="false"' },
       ),
     );
     expect(el.listenerSpreads.length).toBe(1);
@@ -98,6 +104,7 @@ describe('lowerTemplate r-on branch (Phase 15 Wave 1)', () => {
       rozie(
         'const fn = (_e) => {}\nconst onInput = (_e) => {}',
         `<div r-on="{ 'click.stop': fn, 'input.debounce(300)': onInput }"></div>`,
+        { rozieAttrs: 'inherit-listeners="false"' },
       ),
     );
     expect(el.listenerSpreads.length).toBe(1);

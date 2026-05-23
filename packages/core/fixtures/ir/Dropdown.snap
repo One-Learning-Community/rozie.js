@@ -2834,7 +2834,20 @@
           }
         ],
         "events": [],
-        "listenerSpreads": [],
+        "listenerSpreads": [
+          {
+            "type": "ListenerSpread",
+            "expression": {
+              "type": "Identifier",
+              "name": "$listeners"
+            },
+            "deps": [],
+            "sourceLoc": {
+              "start": 2518,
+              "end": 2775
+            }
+          }
+        ],
         "children": [
           {
             "type": "TemplateStaticText",

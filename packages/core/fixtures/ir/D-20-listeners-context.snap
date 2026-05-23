@@ -7,22 +7,22 @@
         "kind": "refExpr",
         "ref": "a",
         "loc": {
-          "start": 204,
-          "end": 211
+          "start": 230,
+          "end": 237
         }
       },
       {
         "kind": "refExpr",
         "ref": "b",
         "loc": {
-          "start": 212,
-          "end": 219
+          "start": 238,
+          "end": 245
         }
       }
     ],
     "sourceLoc": {
-      "start": 195,
-      "end": 220
+      "start": 221,
+      "end": 246
     }
   },
   {
@@ -30,8 +30,8 @@
     "modifier": "stop",
     "args": [],
     "sourceLoc": {
-      "start": 220,
-      "end": 225
+      "start": 246,
+      "end": 251
     }
   }
 ]

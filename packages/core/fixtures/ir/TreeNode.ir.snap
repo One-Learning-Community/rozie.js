@@ -120,7 +120,20 @@
           }
         ],
         "events": [],
-        "listenerSpreads": [],
+        "listenerSpreads": [
+          {
+            "type": "ListenerSpread",
+            "expression": {
+              "type": "Identifier",
+              "name": "$listeners"
+            },
+            "deps": [],
+            "sourceLoc": {
+              "start": 184,
+              "end": 273
+            }
+          }
+        ],
         "children": [
           {
             "type": "TemplateStaticText",

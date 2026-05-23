@@ -54,7 +54,20 @@
           }
         ],
         "events": [],
-        "listenerSpreads": [],
+        "listenerSpreads": [
+          {
+            "type": "ListenerSpread",
+            "expression": {
+              "type": "Identifier",
+              "name": "$listeners"
+            },
+            "deps": [],
+            "sourceLoc": {
+              "start": 32,
+              "end": 46
+            }
+          }
+        ],
         "children": [],
         "sourceLoc": {
           "start": 32,

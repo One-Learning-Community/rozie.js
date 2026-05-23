@@ -79,7 +79,20 @@
           }
         ],
         "events": [],
-        "listenerSpreads": [],
+        "listenerSpreads": [
+          {
+            "type": "ListenerSpread",
+            "expression": {
+              "type": "Identifier",
+              "name": "$listeners"
+            },
+            "deps": [],
+            "sourceLoc": {
+              "start": 82,
+              "end": 131
+            }
+          }
+        ],
         "children": [
           {
             "type": "TemplateInterpolation",

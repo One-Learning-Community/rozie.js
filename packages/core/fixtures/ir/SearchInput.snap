@@ -1538,7 +1538,20 @@
           }
         ],
         "events": [],
-        "listenerSpreads": [],
+        "listenerSpreads": [
+          {
+            "type": "ListenerSpread",
+            "expression": {
+              "type": "Identifier",
+              "name": "$listeners"
+            },
+            "deps": [],
+            "sourceLoc": {
+              "start": 1266,
+              "end": 1928
+            }
+          }
+        ],
         "children": [
           {
             "type": "TemplateStaticText",
