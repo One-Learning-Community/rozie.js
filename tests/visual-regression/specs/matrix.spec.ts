@@ -316,73 +316,46 @@ async function settleExample(
 // All 6 TipTap cells now render byte-identical to the shared baseline.
 const KNOWN_CROSS_TARGET_DIVERGENCE = new Set<string>([]);
 
-// Phase 14.1 follow-up — scheduled bug fixes (NOT accepted divergence).
+// Phase-N.M follow-up gate — scheduled per-target bug fixes (NOT accepted
+// divergence). Distinct from KNOWN_CROSS_TARGET_DIVERGENCE: that set documents
+// cells that provably cannot match (e.g. macOS-kerning drift); this set names
+// REAL render-time emit regressions that the dist-parity byte-equality gate
+// cannot catch (it proves entrypoint parity, not render correctness). Each
+// entry MUST be paired with an inline comment naming the offending file/symptom
+// AND a scheduled phase that closes it; if the closing phase ships and the
+// entry is still here, that is a process failure.
 //
-// The set below quarantines the 5 non-Vue ThemedButtonConsumer cells. Unlike
-// KNOWN_CROSS_TARGET_DIVERGENCE above (which documents cells that provably
-// cannot match, e.g. macOS-kerning drift), every entry in this set names a
-// REAL per-target spreadBinding-emit regression in the feature code shipped by
-// Plans 14-03 / 14-04 / 14-05 that the dist-parity byte-equality gate cannot
-// catch (it proves entrypoint parity, not render correctness). Each entry
-// MUST be fixed by Phase 14.1; if Phase 14.1 ships and the entry is still
-// here, it is a process failure.
-//
-// The Vue ThemedButtonConsumer cell is intentionally NOT in this set — the
-// Vue baseline was rendered and committed in commit 0032ec1, and the Vue
-// render IS the D-10 reference for this example. Once each non-Vue target's
-// regression below is fixed in Phase 14.1, its entry comes out of this set
-// and the cell un-gates against the existing baseline.
-//
-// Full divergence catalog (with diagnostic signals and compiled-artifact
-// excerpts): .planning/phases/14-cross-framework-attribute-fallthrough/
-// 14-06-SUMMARY.md § Cross-Target Divergence Catalog. The catalog also
-// preserves absolute paths to the actual/expected/diff PNGs from the
-// containerised matrix run that produced this gate.
+// Phase 14.1 closed 3 of 5 ThemedButtonConsumer entries (react / angular /
+// lit) via per-target emit fixes — see git history. Two remain, carried
+// forward as Phase 14.2 follow-ups:
 const PHASE_14_1_FOLLOWUP = new Set<string>([
-  // Tracked in Phase 14.1: React's `style` prop must be an object —
-  // ThemedButtonConsumer.rozie passes `style="--btn-bg: #ef4444"` which the
-  // React emitter passes through verbatim into JSX as `style:"--btn-bg: ..."`.
-  // React throws "Style prop value must be an object" at runtime and the whole
-  // component tree dies (mount renders 1×1). Fix lives in
-  // packages/targets/react/src/emit/emitTemplateAttribute.ts — needs literal
-  // string-style parsing into an object (`'--btn-bg: #ef4444'` →
-  // `{'--btn-bg': '#ef4444'}`).
-  'ThemedButtonConsumer::react',
-  // Tracked in Phase 14.1: Svelte 5 bundle is camelCasing kebab-case HTML
-  // attributes into component props at the consumer boundary — emits
-  // `ariaLabel:"…", dataTestid:"…"` instead of preserving the HTML attr form.
-  // When the wrapper spreads `__rozieAttrs` onto the inner button, those
-  // camelCased keys are not HTML attributes, so `aria-label` / `data-testid`
-  // are missing on the rendered element. Likely also has the
-  // literal-string-style issue. Fix lives in
-  // packages/targets/svelte/src/emit/* (the consumer-side prop emission).
-  'ThemedButtonConsumer::svelte',
-  // Tracked in Phase 14.1: Solid's R6 class-always-merge is broken on the
-  // consumer-side fallthrough path — the spreadBinding's `class` field
-  // REPLACES the wrapper's `btn` class rather than merging. The inner
-  // <button> ends up with `class="extra-variant"` only, missing `btn`. Fix
-  // lives in packages/targets/solid/src/emit/emitTemplateAttribute.ts —
-  // R6 merge logic needs to apply to spreadBinding's class field.
+  // Tracked in Phase 14.2 (cross-target scope-attr propagation, Solid arm):
+  // the Solid consumer-side emit DOES place `data-rozie-s-CONSUMER=""` on
+  // each child-component invocation (verified in compiled artifact), but
+  // the rendered button does not carry the consumer's scope attr at
+  // runtime — the auto-fallthrough chain
+  // `mergeProps(defaults, l) → splitProps(n, [...]) → spread(el, mergeProps(rest, {…}))`
+  // appears to drop kebab-case `data-*` keys somewhere between consumer
+  // props and the rendered element. Cell lands at 177×52 vs 184×52 baseline
+  // (597 px diff) — `.btn` styles apply, but consumer's `.extra-variant`
+  // (font-weight: 600) does not. Next step: instrument the runtime to find
+  // where the attr is dropped, or pre-emit it as a literal at the wrapper
+  // emit layer (bypassing the spread).
   'ThemedButtonConsumer::solid',
-  // Tracked in Phase 14.1: Angular cell renders Auto + Manual but the
-  // consumer's `style="--btn-bg: ..."` override does NOT apply — the
-  // background stays the wrapper's default blue. Either Angular's
-  // spreadBinding effect() is not replaying merged-style updates, or the
-  // consumer's literal-string `style` isn't being merged into the wrapper's
-  // :style object. Note: the dual-presence (host element + inner button
-  // both carry consumer attrs) is BY DESIGN per the 14-05 SUMMARY; the
-  // structural smoke spec was narrowed to `button[data-testid=…]` to dodge
-  // it. The style-merge bug is the load-bearing issue.
-  'ThemedButtonConsumer::angular',
-  // Tracked in Phase 14.1: Lit's Auto pill renders dual-presence (host +
-  // inner button, by design) but unstyled; the Manual variant renders ONLY
-  // the host element with NO inner <button> in the shadow DOM. The compiled
-  // artifact has `${rozieSpread(this.$attrs)}` for the Manual case, but the
-  // synthesized `private get $attrs()` getter likely gates on
-  // `rozieSpreadUsed && inheritAttrs !== false` — too narrow for the
-  // explicit-manual `r-bind="$attrs"` + `inherit-attrs="false"` case. Fix
-  // lives in packages/targets/lit/src/emit/emitLit.ts (the synthesis gate).
-  'ThemedButtonConsumer::lit',
+  // Tracked in Phase 14.2 (Svelte-specific scope mechanism):
+  // Svelte uses native class-hash CSS scoping (`.foo.svelte-XXX`). The
+  // consumer's `.extra-variant.svelte-1v25g67` rule requires
+  // `svelte-1v25g67` on the rendered element — but Svelte's compiler only
+  // adds its hash class to elements within the same SFC compile unit.
+  // The wrapper's inner `<button>` carries the wrapper's `svelte-z6j08b`,
+  // not the consumer's `svelte-1v25g67`, so the rule never matches.
+  // Cell lands at 177×52 (the class-clobber reorder fix shipped this phase
+  // fixed the `.btn` path); 2753 px diff is the missing font-weight: 600.
+  // Phase 14.2 needs either (a) emit consumer's class-on-component rules
+  // as `:global()` to escape Svelte scope, or (b) switch Rozie's Svelte
+  // CSS pipeline off Svelte's native scoper onto Rozie's own
+  // `data-rozie-s-*` mechanism.
+  'ThemedButtonConsumer::svelte',
 ]);
 
 for (const example of EXAMPLES) {

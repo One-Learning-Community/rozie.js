@@ -50,49 +50,18 @@ const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'] as const;
 const AUTO_TESTID = 'auto-themed-button';
 const MANUAL_TESTID = 'manual-themed-button';
 
-// Phase 14.1 follow-up — scheduled bug fixes (NOT accepted divergence).
-//
-// The 5 non-Vue targets currently fail this spec because of real per-target
-// spreadBinding-emit regressions in feature code shipped by Plans 14-03 /
-// 14-04 / 14-05. The Vue render IS correct (Vue cell passes here and lands
-// the matrix baseline in matrix.spec.ts). Each entry below is paired with
-// the same per-target hypothesis comment used in matrix.spec.ts's
-// PHASE_14_1_FOLLOWUP set, so a Phase 14.1 fix to one target lifts BOTH the
-// matrix gate AND this structural-smoke gate together.
-//
-// Full divergence catalog with diagnostic signals and compiled-artifact
-// excerpts in .planning/phases/14-cross-framework-attribute-fallthrough/
-// 14-06-SUMMARY.md § Cross-Target Divergence Catalog.
+// Phase-N.M follow-up gate — companion to matrix.spec.ts's PHASE_14_1_FOLLOWUP
+// set. Phase 14.1 closed 3 of 5 ThemedButtonConsumer entries (react / angular
+// / lit). Two remain, carried forward as Phase 14.2 follow-ups — full
+// hypothesis in matrix.spec.ts's set.
 const PHASE_14_1_FOLLOWUP_TARGETS = new Set<string>([
-  // Tracked in Phase 14.1: React's `style` prop must be an object — literal
-  // `style="--btn-bg: #ef4444"` passes through as `style:"--btn-bg: ..."` into
-  // JSX, React throws "Style prop value must be an object", whole tree dies
-  // (1×1 mount). Fix: packages/targets/react/src/emit/emitTemplateAttribute.ts.
-  'react',
-  // Tracked in Phase 14.1: Svelte 5 bundle camelCases kebab-case HTML attrs
-  // (`ariaLabel`, `dataTestid`) at the consumer boundary — wrapper's
-  // `__rozieAttrs` spread carries the wrong key shape so the inner button
-  // never gets `aria-label` / `data-testid`. Fix: packages/targets/svelte/
-  // src/emit/* (consumer-side prop emission).
-  'svelte',
-  // Tracked in Phase 14.1: Solid R6 class-always-merge not applied to
-  // spreadBinding's class field — wrapper's `btn` is REPLACED by the
-  // consumer's `extra-variant` instead of merged. Fix: packages/targets/
-  // solid/src/emit/emitTemplateAttribute.ts.
+  // Solid: scope-attr emit lands in compiled output but doesn't reach the
+  // rendered button at runtime — splitProps/mergeProps/spread chain drops
+  // kebab-case data-* keys somewhere.
   'solid',
-  // Tracked in Phase 14.1: Angular consumer-side `style="--btn-bg: ..."`
-  // override doesn't apply — either spreadBinding effect() not replaying
-  // merged-style updates, or literal-string style not merging into wrapper's
-  // :style object. (Dual-presence host+inner button IS by design, dodged
-  // here by the `button[data-testid=…]` locator narrowing.)
-  'angular',
-  // Tracked in Phase 14.1: Lit Manual variant has NO inner <button> in
-  // shadow DOM — `${rozieSpread(this.$attrs)}` runs but the synthesized
-  // `private get $attrs()` getter likely gates on
-  // `rozieSpreadUsed && inheritAttrs !== false` (too narrow for the
-  // explicit-manual `r-bind="$attrs"` + `inherit-attrs="false"` case).
-  // Fix: packages/targets/lit/src/emit/emitLit.ts (synthesis gate).
-  'lit',
+  // Svelte: native class-hash scoping (.foo.svelte-XXX) blocks consumer's
+  // .extra-variant rule from matching the wrapper's inner button.
+  'svelte',
 ]);
 
 for (const target of TARGETS) {
