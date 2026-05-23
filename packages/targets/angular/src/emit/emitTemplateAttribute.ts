@@ -459,19 +459,32 @@ const APPLY_ATTRS_FIELD_NAME = '__rozieApplyAttrs';
 const HOST_ATTRS_GETTER_NAME = '__rozieGetHostAttrs';
 
 function applyAttrsHelperDecl(): string {
+  // Per-element `prevKeys` snapshot keyed by host Element. A single
+  // closure-scoped `let prevKeys` (the previous shape) was per-COMPONENT,
+  // not per-ELEMENT — two `r-bind` spreads on distinct elements would
+  // cross-contaminate the key-removal diff (CR-02). Mirrors the Lit
+  // `rozieSpread` directive's `WeakMap<Element, string[]>` pattern.
+  //
+  // Null/undefined `obj` is coerced to `{}` so a nullable spread expression
+  // (`r-bind="$data.maybeNull"`) is a clean removeAll-then-no-op rather
+  // than a TypeError on `Object.entries(null)` / `k in null` (CR-04).
+  // Matches the silent-no-op contract of Vue `v-bind="null"`, React
+  // `{...null}`, and Svelte `{...null}`.
   return [
     `private ${APPLY_ATTRS_FIELD_NAME} = (() => {`,
     `  const renderer = inject(Renderer2);`,
-    `  let prevKeys: string[] = [];`,
-    `  return (el: HTMLElement, obj: Record<string, unknown>) => {`,
+    `  const prevKeysByElement = new WeakMap<HTMLElement, string[]>();`,
+    `  return (el: HTMLElement, obj: Record<string, unknown> | null | undefined) => {`,
+    `    const safeObj: Record<string, unknown> = obj ?? {};`,
+    `    const prevKeys = prevKeysByElement.get(el) ?? [];`,
     `    for (const k of prevKeys) {`,
-    `      if (!(k in obj)) renderer.removeAttribute(el, k);`,
+    `      if (!(k in safeObj)) renderer.removeAttribute(el, k);`,
     `    }`,
-    `    for (const [k, v] of Object.entries(obj)) {`,
+    `    for (const [k, v] of Object.entries(safeObj)) {`,
     `      if (v === null || v === false) renderer.removeAttribute(el, k);`,
     `      else renderer.setAttribute(el, k, String(v));`,
     `    }`,
-    `    prevKeys = Object.keys(obj);`,
+    `    prevKeysByElement.set(el, Object.keys(safeObj));`,
     `  };`,
     `})();`,
   ].join('\n');

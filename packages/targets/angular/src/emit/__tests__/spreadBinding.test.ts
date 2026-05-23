@@ -137,6 +137,48 @@ describe('emitAngular — spreadBinding (Plan 14-05 Task 2 / D-01)', () => {
     expect(helperDecls).toBe(1);
   });
 
+  it('(4-CR-02) __rozieApplyAttrs keys prevKeys per element (WeakMap), not a shared closure-scoped let', () => {
+    // CR-02 regression: a single closure-scoped `let prevKeys` shared
+    // across sibling spreads would cross-contaminate the key-removal diff
+    // between elements. The fix uses `WeakMap<HTMLElement, string[]>`.
+    const code = compileAngular(`<rozie name="Test">
+<template>
+  <div>
+    <button r-bind="{ id: 'a' }"></button>
+    <button r-bind="{ id: 'b' }"></button>
+  </div>
+</template>
+</rozie>`);
+    // Per-element WeakMap is present, the previous shared `let prevKeys`
+    // module-level state is NOT.
+    expect(code).toContain('prevKeysByElement');
+    expect(code).toContain('WeakMap<HTMLElement, string[]>');
+    expect(code).not.toMatch(/let prevKeys: string\[\] = \[\];/);
+    // The new shape reads via WeakMap.get and writes via WeakMap.set.
+    expect(code).toMatch(/prevKeysByElement\.get\(el\)/);
+    expect(code).toMatch(/prevKeysByElement\.set\(el,/);
+  });
+
+  it('(4-CR-04) __rozieApplyAttrs coerces null/undefined obj to {} (no TypeError)', () => {
+    // CR-04 regression: a manual `r-bind="$data.maybeNull"` where the
+    // expression resolves to null at runtime previously crashed inside the
+    // IIFE on Object.entries(null) / `k in null` / Object.keys(null). The
+    // fix coerces null/undefined to `{}` so the path becomes a clean
+    // remove-all-prev-keys (matching Vue/React/Svelte v-bind=null semantics).
+    const code = compileAngular(`<rozie name="Test">
+<data>{ maybe: null }</data>
+<template>
+  <button r-bind="$data.maybe"></button>
+</template>
+</rozie>`);
+    // The applyAttrs callback signature accepts null/undefined.
+    expect(code).toMatch(
+      /\(el: HTMLElement, obj: Record<string, unknown> \| null \| undefined\)/,
+    );
+    // `safeObj` is the nullish-coalesced binding actually iterated.
+    expect(code).toContain('const safeObj: Record<string, unknown> = obj ?? {};');
+  });
+
   it('(5) R6 LITERAL class merge: explicit :class + literal class merges via Angular class path; only `id` goes through applyAttrs', () => {
     const code = compileAngular(`<rozie name="Test">
 <data>{ active: true }</data>
