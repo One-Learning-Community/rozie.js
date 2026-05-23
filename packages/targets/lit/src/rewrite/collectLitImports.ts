@@ -133,7 +133,17 @@ export type RuntimeLitImport =
    * `EmitTemplateResult.rozieSpreadUsed` is true (i.e., at least one
    * `r-bind`/`$attrs` `spreadBinding` was lowered to `${rozieSpread(...)}`).
    */
-  | 'rozieSpread';
+  | 'rozieSpread'
+  /**
+   * Plan 15-05 / D-12 — `rozieListeners` lit-html element-position
+   * AsyncDirective, shipped from `@rozie/runtime-lit`. Added by emitLit
+   * conditionally when `EmitTemplateResult.rozieListenersUsed` is true (i.e.,
+   * at least one `r-on`/`$listeners` `ListenerSpreadIR` was lowered to
+   * `${rozieListeners(...)}`). Extends `AsyncDirective` (NOT regular
+   * `Directive` — Pitfall 7 / A2 LOCKED) so `disconnected()` removes every
+   * attached listener (T-15-V5-04 leak defense).
+   */
+  | 'rozieListeners';
 
 export class RuntimeLitImportCollector {
   private symbols = new Set<RuntimeLitImport>();

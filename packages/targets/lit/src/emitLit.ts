@@ -146,6 +146,16 @@ export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResu
     runtimeImports.add('rozieSpread');
   }
 
+  // Plan 15-05 / D-12 — register the `rozieListeners` AsyncDirective import
+  // from `@rozie/runtime-lit` when emitTemplate lowered at least one dynamic
+  // `ListenerSpreadIR` via `${rozieListeners(<expr>)}`. Mirrors the rozieSpread
+  // conditional plumbing above. The directive extends `AsyncDirective` (NOT
+  // regular `Directive`) so `disconnected()` removes listeners on element
+  // disposal (T-15-V5-04 leak defense — Pitfall 7 / A2 LOCKED).
+  if (templateResult.rozieListenersUsed) {
+    runtimeImports.add('rozieListeners');
+  }
+
   // Plan 14-05 — `$attrs` getter for Lit. Lit has no native template-side
   // `$attrs` proxy (cf. Vue's magic accessor); the consumer's attributes land
   // on the host custom element (`<rozie-foo id="x">`) and we re-project them

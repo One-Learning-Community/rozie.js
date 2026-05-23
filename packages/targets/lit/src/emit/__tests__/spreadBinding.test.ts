@@ -63,7 +63,7 @@ function spread(exprSrc: string): AttributeBinding {
 }
 
 function freshState(): EmitTemplateAttributeState {
-  return { styleMapUsed: false, rozieSpreadUsed: false };
+  return { styleMapUsed: false, rozieSpreadUsed: false, rozieListenersUsed: false };
 }
 
 describe('emitTemplateAttribute (Lit) — spreadBinding (Plan 14-05 Task 1)', () => {

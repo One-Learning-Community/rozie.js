@@ -15,7 +15,11 @@
  * @experimental — shape may change before v1.0
  */
 import * as bt from '@babel/types';
-import type { AttributeBinding, IRComponent } from '../../../../core/src/ir/types.js';
+import type {
+  AttributeBinding,
+  IRComponent,
+  ListenerSpreadIR,
+} from '../../../../core/src/ir/types.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
 import { kebabize, resolveLitSetterText } from './resolveLitSetterText.js';
 
@@ -41,6 +45,14 @@ export interface EmitTemplateAttributeState {
    * plumbing.
    */
   rozieSpreadUsed: boolean;
+  /**
+   * Plan 15-05 / D-12 — set true whenever a `ListenerSpreadIR` is emitted via
+   * `${rozieListeners(<expr>)}` element-position AsyncDirective. The emitLit
+   * shell reads this off the `EmitTemplateResult` and conditionally adds
+   * `import { rozieListeners } from '@rozie/runtime-lit';` to the shell
+   * imports block (mirrors the `rozieSpreadUsed` plumbing).
+   */
+  rozieListenersUsed: boolean;
 }
 
 const BOOLEAN_ATTRS = new Set([
@@ -140,4 +152,40 @@ export function emitTemplateAttribute(
     return `${attr.name}="${parts.join('')}"`;
   }
   return '';
+}
+
+/**
+ * Plan 15-05 / D-12 — emit a single dynamic `ListenerSpreadIR` for Lit as a
+ * `${rozieListeners(<expr>)}` element-position AsyncDirective binding. The
+ * directive owns the per-Element WeakMap diff (cross-render add/remove/
+ * replace), the FORBIDDEN_KEYS prototype-pollution skip (T-15-V5-03), AND
+ * the `disconnected()` cleanup that prevents listener leaks across element
+ * disposal (T-15-V5-04 — the load-bearing reason `rozieListeners` extends
+ * `AsyncDirective` instead of regular `Directive`; Pitfall 7 / A2 LOCKED).
+ *
+ * The LITERAL path is NOT routed through this helper — literal-key spreads
+ * are decomposed into synthetic `Listener` entries spliced into the events
+ * list (so modifier-bearing keys like `'click.stop'` reuse Lit's existing
+ * `emitTemplateEvent.ts`/`buildEventParts` modifier-pipeline emit; the per-
+ * element walker's same-event grouping handles R6 collision merge
+ * automatically). The real emit chokepoint lives in `emitTemplate.ts`'s
+ * `emitElementOpenTag` — this wrapper is the unit-test surface (Phase 14
+ * Pitfall 6 — the standalone wrapper is the test decoy; the real walker is
+ * in emitTemplate.ts).
+ *
+ * D-19 bare `$listeners`: the bare Identifier passes through
+ * `rewriteTemplateExpression` unchanged (registered in STABLE_IDENTIFIERS)
+ * and resolves to `undefined` at runtime; the directive's `obj ?? {}`
+ * coercion makes that a clean no-op. The directive still runs because Lit
+ * has no native object-form listener directive — the AsyncDirective IS the
+ * lowering for ALL dynamic shapes including bare `$listeners`.
+ */
+export function emitListenerSpread(
+  spread: ListenerSpreadIR,
+  ir: IRComponent,
+  state?: EmitTemplateAttributeState,
+): string {
+  const expr = rewriteTemplateExpression(spread.expression, ir);
+  if (state) state.rozieListenersUsed = true;
+  return `\${rozieListeners(${expr})}`;
 }

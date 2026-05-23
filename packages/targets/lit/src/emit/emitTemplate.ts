@@ -40,6 +40,7 @@ import type {
   TemplateStaticTextIR,
   AttributeBinding,
   Listener,
+  ListenerSpreadIR,
 } from '../../../../core/src/ir/types.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import type { ModifierRegistry, LitEmissionDescriptor } from '@rozie/core';
@@ -124,6 +125,15 @@ export interface EmitTemplateOpts {
      */
     rozieSpreadUsed: boolean;
     /**
+     * Plan 15-05 / D-12 — true when at least one `ListenerSpreadIR` was
+     * lowered via the `${rozieListeners(<expr>)}` lit-html element-position
+     * AsyncDirective. emitLit reads this off `EmitTemplateResult` and
+     * conditionally adds `import { rozieListeners } from '@rozie/runtime-lit';`
+     * to the shell imports block (mirrors the existing `rozieSpreadUsed` /
+     * `styleMapUsed` plumbing).
+     */
+    rozieListenersUsed: boolean;
+    /**
      * True when at least one consumer-side property-fill (function-prop
      * scoped destructured or portal fill) was emitted onto a producer
      * component's open tag. Triggers a single `ref()` directive per parent
@@ -187,6 +197,14 @@ export interface EmitTemplateResult {
    * based on this flag (same plumbing as `styleMapUsed`/`repeatUsed`).
    */
   rozieSpreadUsed: boolean;
+  /**
+   * Plan 15-05 / D-12 — true when at least one `ListenerSpreadIR` was lowered
+   * via the `${rozieListeners(<expr>)}` element-position AsyncDirective.
+   * emitLit conditionally wires
+   * `import { rozieListeners } from '@rozie/runtime-lit';` based on this flag
+   * (same plumbing as `rozieSpreadUsed`).
+   */
+  rozieListenersUsed: boolean;
   /**
    * True when at least one consumer-side property-fill was emitted onto a
    * producer component's open tag. emitLit conditionally wires
@@ -860,6 +878,34 @@ function mergeHandlerBodies(bodies: string[], evtType: string = 'Event'): string
   return `($event: ${evtType}) => { ${invocations} }`;
 }
 
+/**
+ * Plan 15-05 — synthesize a virtual `Listener` from a `ListenerSpreadIR`'s
+ * `literalKeys[i]` entry. Each literal-key entry carries
+ * `{ eventName, modifierPipeline, valueExpr }` — enough to fabricate a
+ * Listener with the same shape `buildEventParts` already consumes from
+ * `el.events`. `target` is `'self'` (the element this spread lives on);
+ * `when` is null; `deps` inherits the parent spread's deps; `source` is
+ * `'template-event'` (codegen path treats both sources identically).
+ *
+ * Mirror of the Vue/Svelte/React/Solid targets' `listenerFromLiteralKey`.
+ */
+function listenerFromLiteralKey(
+  spread: ListenerSpreadIR,
+  literalKey: NonNullable<ListenerSpreadIR['literalKeys']>[number],
+): Listener {
+  return {
+    type: 'Listener',
+    target: { kind: 'self', el: '$el' },
+    event: literalKey.eventName,
+    modifierPipeline: literalKey.modifierPipeline,
+    when: null,
+    handler: literalKey.valueExpr,
+    deps: spread.deps,
+    source: 'template-event',
+    sourceLoc: spread.sourceLoc,
+  };
+}
+
 function emitElementOpenTag(
   node: TemplateElementIR,
   ir: IRComponent,
@@ -970,7 +1016,37 @@ function emitElementOpenTag(
     }
   }
 
-  for (const event of node.events) {
+  // Phase 15 — partition `node.listenerSpreads` into literal-key entries
+  // (synthesized into virtual Listeners spliced alongside `node.events` so
+  // R6 same-event merge fires through the existing event-grouping below)
+  // and dynamic spreads (emitted as separate element-position
+  // `${rozieListeners(<expr>)}` bindings — Lit has no native object-form
+  // listener directive, so the AsyncDirective is the ONLY correct lowering
+  // path for the dynamic case).
+  //
+  // Defensive `?? []`: synthetic test-IR may omit `listenerSpreads`; the real
+  // lowered IR always sets `[]` by construction (Plan 15-01 made the field
+  // non-optional on TemplateElementIR).
+  const syntheticListenerEvents: Listener[] = [];
+  const dynamicListenerSpreads: ListenerSpreadIR[] = [];
+  for (const spread of node.listenerSpreads ?? []) {
+    const literalKeys = spread.literalKeys;
+    if (literalKeys !== undefined && literalKeys.length > 0) {
+      for (const lk of literalKeys) {
+        syntheticListenerEvents.push(listenerFromLiteralKey(spread, lk));
+      }
+    } else {
+      dynamicListenerSpreads.push(spread);
+    }
+  }
+
+  // Combine real events + synthetic listener-from-literal-key Listeners.
+  // The existing same-event grouping further down folds R6 collisions into
+  // a single `@event=${dispatcher}` binding (Lit forbids duplicate attribute
+  // names; same-event merge is mandatory for correctness).
+  const combinedEvents: Listener[] = [...node.events, ...syntheticListenerEvents];
+
+  for (const event of combinedEvents) {
     const parts1 = buildEventParts(event, ir, opts);
     if (parts1.optionParts.length > 0) {
       optionEvents.push(parts1);
@@ -1011,6 +1087,37 @@ function emitElementOpenTag(
     parts.push(
       `@${ev.eventName}=\${{ handleEvent: ${ev.handlerBody}, ${optsText} }}`,
     );
+  }
+
+  // Phase 15 — dynamic `ListenerSpreadIR` entries emit as element-position
+  // `${rozieListeners(<expr>)}` AsyncDirective bindings. The directive owns
+  // the per-Element WeakMap diff (cross-render add/remove/replace), the
+  // FORBIDDEN_KEYS prototype-pollution skip (T-15-V5-03), AND the
+  // `disconnected()` cleanup that prevents listener leaks across element
+  // disposal (T-15-V5-04 — the load-bearing reason `rozieListeners` extends
+  // `AsyncDirective` instead of regular `Directive`).
+  //
+  // D-19 bare `$listeners`: the bare Identifier passes through
+  // `rewriteTemplateExpression` unchanged (registered in STABLE_IDENTIFIERS
+  // — see Plan 15-01) and resolves to `undefined` at runtime; the directive's
+  // `obj ?? {}` coercion (CR-03 mirror) makes that a clean no-op rather than
+  // a TypeError. The directive still runs because Lit has no native
+  // object-form listener directive — the AsyncDirective IS the lowering for
+  // ALL dynamic shapes including bare `$listeners`.
+  //
+  // Mixed dynamic + literal/explicit: dynamic spreads emit as a SEPARATE
+  // `${rozieListeners(...)}` element-position binding; the literal/explicit
+  // half rides the `@event=${...}` template-binding path (folded above into
+  // a single binding per event name via the same-event grouping). Both
+  // attach via DOM-level `addEventListener` (lit-html's `@event` directive
+  // and the AsyncDirective's per-key `addEventListener` calls), so the all-
+  // fire R6 semantic is preserved automatically at the DOM layer (no runtime
+  // `mergeListeners` helper needed for Lit; same divergence from React/Solid
+  // that Vue/Svelte exhibit).
+  for (const spread of dynamicListenerSpreads) {
+    const expr = rewriteTemplateExpression(spread.expression, ir);
+    if (opts._state) opts._state.rozieListenersUsed = true;
+    parts.push(`\${rozieListeners(${expr})}`);
   }
 
   if (refAttr) parts.push(refAttr);
@@ -1528,6 +1635,7 @@ export function emitTemplate(
     repeatUsed: false,
     styleMapUsed: false,
     rozieSpreadUsed: false,
+    rozieListenersUsed: false,
     refUsed: false,
     debouncedFieldDecls: [] as string[],
     debounceCleanupWiring: [] as string[],
@@ -1553,6 +1661,7 @@ export function emitTemplate(
       repeatUsed: state.repeatUsed,
       styleMapUsed: state.styleMapUsed,
       rozieSpreadUsed: state.rozieSpreadUsed,
+      rozieListenersUsed: state.rozieListenersUsed,
       refUsed: state.refUsed,
       debouncedFieldDecls: state.debouncedFieldDecls,
       slotFillerClassFields: state.slotFillerClassFields,
@@ -1574,6 +1683,7 @@ export function emitTemplate(
     repeatUsed: state.repeatUsed,
     styleMapUsed: state.styleMapUsed,
     rozieSpreadUsed: state.rozieSpreadUsed,
+    rozieListenersUsed: state.rozieListenersUsed,
     refUsed: state.refUsed,
     debouncedFieldDecls: state.debouncedFieldDecls,
     slotFillerClassFields: state.slotFillerClassFields,

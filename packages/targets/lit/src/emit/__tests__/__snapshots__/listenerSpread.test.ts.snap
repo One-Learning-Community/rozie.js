@@ -1,0 +1,43 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`emit (Lit) — ListenerSpreadIR (Plan 15-05 Task 1) > (1) literal-only no-merge: r-on="{ click: fn }" → @click=\${fn} 1`] = `
+"
+  <button @click=\${this.fn} data-rozie-s-8fd6d49e>go</button>
+"
+`;
+
+exports[`emit (Lit) — ListenerSpreadIR (Plan 15-05 Task 1) > (2) literal-with-merge: @click + r-on literal → R6 source-order dispatcher 1`] = `
+"
+  <button @click=\${($event: MouseEvent) => { (this.f1)($event); (this.f2)($event); }} data-rozie-s-8fd6d49e>go</button>
+"
+`;
+
+exports[`emit (Lit) — ListenerSpreadIR (Plan 15-05 Task 1) > (3) literal modifier-bearing: r-on="{ 'click.stop': fn }" → @click=\${($event) => { stopPropagation; fn; }} 1`] = `
+"
+  <button @click=\${($event: MouseEvent) => { $event.stopPropagation(); ((this.fn) as (...args: any[]) => any)($event); }} data-rozie-s-8fd6d49e>go</button>
+"
+`;
+
+exports[`emit (Lit) — ListenerSpreadIR (Plan 15-05 Task 1) > (4) dynamic no-merge: r-on="someObj" → \${rozieListeners(this.someObj)} 1`] = `
+"
+  <button \${rozieListeners(someObj)} data-rozie-s-8fd6d49e>go</button>
+"
+`;
+
+exports[`emit (Lit) — ListenerSpreadIR (Plan 15-05 Task 1) > (5) dynamic with-merge: @click + r-on dynamic → @click=\${f1} \${rozieListeners(...)} 1`] = `
+"
+  <button @click=\${this.f1} \${rozieListeners(someObj)} data-rozie-s-8fd6d49e>go</button>
+"
+`;
+
+exports[`emit (Lit) — ListenerSpreadIR (Plan 15-05 Task 1) > (6) bare $listeners (D-19 exempt): r-on="$listeners" → \${rozieListeners($listeners)} 1`] = `
+"
+  <button \${rozieListeners($listeners)} data-rozie-s-8fd6d49e>go</button>
+"
+`;
+
+exports[`emit (Lit) — ListenerSpreadIR (Plan 15-05 Task 1) > (7) bare $listeners + @click (R6 + D-19): @click=\${f1} \${rozieListeners($listeners)} 1`] = `
+"
+  <button @click=\${this.f1} \${rozieListeners($listeners)} data-rozie-s-8fd6d49e>go</button>
+"
+`;
