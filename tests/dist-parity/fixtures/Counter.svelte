@@ -1,4 +1,6 @@
 <script lang="ts">
+import { applyListeners } from '@rozie/runtime-svelte';
+
 interface Props {
   value?: number;
   step?: number;
@@ -30,7 +32,7 @@ const canDecrement = $derived(value - step >= min);
 </script>
 
 
-<div {...__rozieAttrs} class={["counter", { hovering: hovering }, (__rozieAttrs)?.class]} onmouseenter={($event) => { hovering = true; }} onmouseleave={($event) => { hovering = false; }}>
+<div {...__rozieAttrs} class={["counter", { hovering: hovering }, (__rozieAttrs)?.class]} onmouseenter={($event) => { hovering = true; }} onmouseleave={($event) => { hovering = false; }} use:applyListeners={__rozieAttrs}>
   <button disabled={!canDecrement} aria-label="Decrement" onclick={decrement}>−</button>
   <span class="value">{value}</span>
   <button disabled={!canIncrement} aria-label="Increment" onclick={increment}>+</button>

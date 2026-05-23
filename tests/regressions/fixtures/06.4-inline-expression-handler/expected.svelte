@@ -1,4 +1,6 @@
 <script lang="ts">
+import { applyListeners } from '@rozie/runtime-svelte';
+
 interface Props {
   closeOnBackdrop?: boolean;
   [key: string]: unknown;
@@ -14,7 +16,7 @@ const close = () => {
 </script>
 
 
-<div {...__rozieAttrs} class={["backdrop", (__rozieAttrs)?.class]} onclick={($event) => { closeOnBackdrop && close(); }}>
+<div {...__rozieAttrs} class={["backdrop", (__rozieAttrs)?.class]} onclick={($event) => { closeOnBackdrop && close(); }} use:applyListeners={__rozieAttrs}>
   
   <button onclick={close}>Close</button>
 </div>

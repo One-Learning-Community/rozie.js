@@ -27,7 +27,7 @@ export default function SpikeImportEl(_props: SpikeImportElProps): JSX.Element {
 
   return (
     <>
-    <div ref={(el) => { __rozieRootRef = el as HTMLElement; }} {...attrs} class={"spike-root" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-f590f443="">
+    <div ref={(el) => { __rozieRootRef = el as HTMLElement; }} {...attrs} class={"spike-root" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} {...attrs} data-rozie-s-f590f443="">
       {resolved()}
     </div>
     </>

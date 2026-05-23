@@ -1,4 +1,6 @@
 <script lang="ts">
+import { applyListeners } from '@rozie/runtime-svelte';
+
 import { onMount } from 'svelte';
 
 interface Props {
@@ -20,7 +22,7 @@ onMount(() => {
 </script>
 
 
-<div data-handle={".panel"} data-grip={gripSelector} {...__rozieAttrs} class={["panel", (__rozieAttrs)?.class]}>
+<div data-handle={".panel"} data-grip={gripSelector} {...__rozieAttrs} class={["panel", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs}>
   <span class="grip" aria-hidden="true">⋮⋮</span>
   {#if ready}<span>ready</span>{/if}</div>
 

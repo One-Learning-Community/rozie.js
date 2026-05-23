@@ -1,4 +1,6 @@
 <script lang="ts">
+import { applyListeners } from '@rozie/runtime-svelte';
+
 interface Props {
   title?: string;
   onClose?: ((...args: any[]) => any) | null;
@@ -13,7 +15,7 @@ let {
 </script>
 
 
-<header {...__rozieAttrs} class={["card-header", (__rozieAttrs)?.class]}>
+<header {...__rozieAttrs} class={["card-header", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs}>
   <h3 class="card-header__title">{title}</h3>
   {#if onClose}<button class="card-header__close" onclick={($event) => { (onClose)($event); }}>×</button>{/if}</header>
 

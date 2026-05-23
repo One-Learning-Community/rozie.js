@@ -1,4 +1,6 @@
 <script lang="ts">
+import { applyListeners } from '@rozie/runtime-svelte';
+
 interface Props {
   [key: string]: unknown;
 }
@@ -9,7 +11,7 @@ let draft = $state('');
 </script>
 
 
-<div {...__rozieAttrs} class={["rmodel-lazy", (__rozieAttrs)?.class]}>
+<div {...__rozieAttrs} class={["rmodel-lazy", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs}>
   <input type="text" value={draft} onchange={($event) => draft = $event.currentTarget.value} placeholder="Commit on blur" />
   <p class="echo">Committed: {draft}</p>
 </div>

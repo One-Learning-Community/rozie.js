@@ -236,17 +236,22 @@ const f1 = () => undefined;
     expect(template).toMatchSnapshot();
     // Same dynamic-Renderer2 path — Angular has no magic $listeners accessor,
     // so the bare `$listeners` Identifier in the spread expression lowers to
-    // the safe `undefined` literal at compile time (see emitTemplateAttribute.ts
-    // emitListenerSpread D-19 handling). The downstream `?? {}` coercion then
-    // makes the effect()'s for-loop a clean no-op rather than a ReferenceError
-    // at runtime on class-body lookup of `$listeners`.
+    // a typed empty-object literal at compile time (see emitTemplateAttribute.ts
+    // emitListenerSpread D-19 handling). The empty object makes the effect()'s
+    // for-loop a clean no-op rather than a ReferenceError at runtime on
+    // class-body lookup of `$listeners`. The empty-object form (vs the
+    // earlier `(undefined) ?? {}` shape) is required for TS strict mode —
+    // TS2871 flags `undefined ?? X` as always-nullish; consumer-side Angular
+    // projects with `strict: true` failed typecheck on the prior emit.
     expect(template).toMatch(/#rozieListenersTarget_\d+/);
     expect(code).toContain('Renderer2');
-    expect(code).toContain('const obj = (undefined) ?? {};');
+    expect(code).toContain('const obj: Record<string, unknown> = {};');
     // The bare `$listeners` Identifier must NOT appear in the emitted code —
     // it's a runtime ReferenceError at class scope and the D-19 lowering
-    // replaces it with `undefined` at compile time.
+    // replaces it with an empty-object literal at compile time.
     expect(code).not.toMatch(/\(\$listeners\)/);
+    // The prior nullish-coalescing form must not leak back in.
+    expect(code).not.toContain('(undefined) ?? {}');
   });
 
   it('(7) Phase 13 coordination — $onMount paired-cleanup + dynamic r-on emits ONE __rozieDestroyRef', () => {

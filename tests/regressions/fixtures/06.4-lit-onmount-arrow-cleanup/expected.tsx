@@ -20,7 +20,7 @@ export default function OnMountArrowCleanup(props: OnMountArrowCleanupProps): JS
 
   return (
     <>
-    <div {...attrs} className={clsx(styles.ticker, (attrs.className as string | undefined))} data-rozie-s-722b58d1="">{ticks}</div>
+    <div {...attrs} className={clsx(styles.ticker, (attrs.className as string | undefined))} {...attrs} data-rozie-s-722b58d1="">{ticks}</div>
     </>
   );
 }

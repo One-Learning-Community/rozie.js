@@ -1677,6 +1677,9 @@ importers:
       '@rozie/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@rozie/runtime-svelte':
+        specifier: workspace:*
+        version: link:../../packages/runtime/svelte
       '@rozie/target-svelte':
         specifier: workspace:*
         version: link:../../packages/targets/svelte
@@ -1720,6 +1723,9 @@ importers:
       '@rozie/runtime-react':
         specifier: workspace:*
         version: link:../../packages/runtime/react
+      '@rozie/runtime-svelte':
+        specifier: workspace:*
+        version: link:../../packages/runtime/svelte
       '@rozie/runtime-vue':
         specifier: workspace:*
         version: link:../../packages/runtime/vue

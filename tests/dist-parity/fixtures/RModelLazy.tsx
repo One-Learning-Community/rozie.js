@@ -10,7 +10,7 @@ export default function RModelLazy(props: RModelLazyProps): JSX.Element {
 
   return (
     <>
-    <div {...attrs} className={clsx(styles["rmodel-lazy"], (attrs.className as string | undefined))} data-rozie-s-34fe9f5a="">
+    <div {...attrs} className={clsx(styles["rmodel-lazy"], (attrs.className as string | undefined))} {...attrs} data-rozie-s-34fe9f5a="">
       <input type="text" placeholder="Commit on blur" defaultValue={draft} onBlur={e => setDraft(e.target.value)} data-rozie-s-34fe9f5a="" />
       <p className={styles.echo} data-rozie-s-34fe9f5a="">Committed: {draft}</p>
     </div>

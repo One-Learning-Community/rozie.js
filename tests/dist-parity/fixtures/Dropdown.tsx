@@ -93,7 +93,7 @@ export default function Dropdown(_props: DropdownProps): JSX.Element {
 
   return (
     <>
-    <div {...attrs} className={clsx(styles.dropdown, (attrs.className as string | undefined))} data-rozie-s-6d6bd882="">
+    <div {...attrs} className={clsx(styles.dropdown, (attrs.className as string | undefined))} {...attrs} data-rozie-s-6d6bd882="">
       <div ref={triggerEl} onClick={toggle} data-rozie-s-6d6bd882="">
         {(props.renderTrigger ?? props.slots?.['trigger'])?.({ open, toggle })}
       </div>

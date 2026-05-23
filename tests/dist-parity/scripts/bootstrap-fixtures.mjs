@@ -83,6 +83,22 @@ const FIXTURES_DIR = resolve(HERE, '../fixtures');
 // compile() them across all six targets — the dist-parity proof that
 // `spreadBinding` (the new D-07 IR variant) lowers byte-identically across
 // all four entrypoints and all six targets.
+// Phase 15 — EXAMPLES extended 20 → 23 with the three new listener-
+// fallthrough proving fixtures: ThemedButtonListenersManual (D-04 attrs-
+// auto / listeners-manual corner — inherit-listeners="false" + manual
+// r-on="$listeners"), ThemedButtonAllManual (D-05 attrs-manual /
+// listeners-manual corner — both flags false + both manual directives),
+// and ROnProbe (D-07 literal modifier-bearing + dynamic + R6 same-event
+// source-order merge single-file probe). The existing ThemedButtonConsumer
+// entry stays in EXAMPLES_NEEDING_RESOLVER_ROOT — it now composes all
+// four wrappers via <components>. ThemedButtonListenersManual and
+// ThemedButtonAllManual are LEAF producers (no <components> blocks) and
+// do NOT need resolver-root. Registering all three here makes the
+// bootstrap compile() them across all six targets — the dist-parity
+// proof that `ListenerSpreadIR` (the new Phase 15 IR variant) lowers
+// byte-identically across all four entrypoints and all six targets, and
+// that the Plan 15-03/04/05 emitter changes propagate cleanly through
+// every pre-existing fixture as well (master rebless wave).
 const EXAMPLES = [
   'Counter',
   'SearchInput',
@@ -105,12 +121,21 @@ const EXAMPLES = [
   'ThemedButtonManual',
   'ThemedButtonConsumer',
   'RBindProbe',
+  // Phase 15 listener-fallthrough proving fixtures.
+  'ThemedButtonListenersManual',
+  'ThemedButtonAllManual',
+  'ROnProbe',
 ];
 
 const EXAMPLES_NEEDING_RESOLVER_ROOT = new Set([
   'ModalConsumer',
   'WrapperModal',
   // Phase 14 — references ThemedButton + ThemedButtonManual via <components>.
+  // Phase 15 — extended to reference all four ThemedButton variants via
+  // <components> (ThemedButton + ThemedButtonManual +
+  // ThemedButtonListenersManual + ThemedButtonAllManual). The two new
+  // Phase 15 producers are LEAF single-rozie components and stay OUT of
+  // RESOLVER_ROOT; only the multi-rozie Consumer needs it.
   'ThemedButtonConsumer',
 ]);
 // Phase 06.4 P3 (D-LIT-22): TARGETS extended with 'lit' — additive only.

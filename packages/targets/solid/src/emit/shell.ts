@@ -64,6 +64,19 @@ export interface SolidShellParts {
    */
   splitPropsCall: string;
   /**
+   * Phase 15 D-19 — `const $listeners: Record<string, unknown> = attrs;\n` line
+   * (or empty string when the template references neither auto-fallthrough nor
+   * explicit `r-on="$listeners"`). Mirrors React's `$listeners` declaration:
+   * the consumer-passed listener cluster is the rest-of-props minus the
+   * declared `<props>` set — same source as `attrs` (the splitProps rest
+   * binding). Without this, tsc on the emitted .solid.tsx reports TS2304
+   * (Cannot find name '$listeners') for every default-fallthrough single-root
+   * component. The decl is GATED so a `inherit-listeners="false"` +
+   * no-`r-on="$listeners"` component does NOT emit the line (avoids unused
+   * binding noise).
+   */
+  listenersDecl?: string;
+  /**
    * When true, emits `const resolved = children(() => local.children);\n`
    * immediately after `splitPropsCall` (D-131 default slot accessor).
    */
@@ -202,6 +215,13 @@ export function buildShell(parts: SolidShellParts): BuildShellResult {
   // splitPropsCall immediately after function open (D-141).
   moduleParts.push('  ' + parts.splitPropsCall);
 
+  // Phase 15 D-19 — $listeners alias of attrs (when referenced; gated by
+  // emitSolid.ts to avoid unused-binding noise for components that don't
+  // reference the bare identifier).
+  if (parts.listenersDecl && parts.listenersDecl.length > 0) {
+    moduleParts.push('  ' + parts.listenersDecl);
+  }
+
   // children() accessor for default slot (D-131).
   if (parts.hasDefaultSlot) {
     moduleParts.push('  const resolved = children(() => local.children);\n');
@@ -331,6 +351,11 @@ function buildShellLegacy(parts: SolidShellParts): BuildShellResult {
   }
   // splitPropsCall (D-141).
   ms.append('  ' + parts.splitPropsCall);
+
+  // Phase 15 D-19 — $listeners alias of attrs (mirrors moduleParts branch above).
+  if (parts.listenersDecl && parts.listenersDecl.length > 0) {
+    ms.append('  ' + parts.listenersDecl);
+  }
 
   // children() accessor (D-131).
   if (parts.hasDefaultSlot) {

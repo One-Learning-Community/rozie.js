@@ -1,0 +1,75 @@
+import { LitElement, css, html } from 'lit';
+import { customElement } from 'lit/decorators.js';
+import { SignalWatcher, signal } from '@lit-labs/preact-signals';
+import { debounce, rozieListeners } from '@rozie/runtime-lit';
+
+@customElement('rozie-ron-probe')
+export default class ROnProbe extends SignalWatcher(LitElement) {
+  static styles = css`
+.r-on-probe[data-rozie-s-c4bd99aa] {
+  display: inline-flex;
+  gap: 0.5rem;
+  padding: 0.25rem;
+}
+.r-on-probe[data-rozie-s-c4bd99aa] span[data-rozie-s-c4bd99aa] {
+  display: inline-block;
+  padding: 0.125rem 0.25rem;
+}
+`;
+
+  private _fn = signal(() => {});
+  private _onInput = signal(() => {});
+  private _f1 = signal(() => {});
+  private _f2 = signal(() => {});
+  private _someObj = signal({
+  click: () => {},
+  mouseenter: () => {}
+});
+
+  private _tw0 = debounce(($event: Event) => ((onInput) as (...args: any[]) => any)($event), 300);
+
+  private _disconnectCleanups: Array<() => void> = [];
+
+  private _armListeners(): void {
+    this._disconnectCleanups.push(() => this._tw0.cancel());
+  }
+
+  connectedCallback(): void {
+    super.connectedCallback();
+    if (this.hasUpdated) this._armListeners();
+  }
+
+  firstUpdated(): void {
+    this._armListeners();
+  }
+
+  disconnectedCallback(): void {
+    super.disconnectedCallback();
+    for (const fn of this._disconnectCleanups) fn();
+    this._disconnectCleanups = [];
+  }
+
+  render() {
+    return html`
+<div class="r-on-probe" data-rozie-s-c4bd99aa>
+  <span @click=${($event: MouseEvent) => { $event.stopPropagation(); ((fn) as (...args: any[]) => any)($event); }} @input=${this._tw0} data-rozie-s-c4bd99aa>literal modifier-bearing</span>
+  <span ${rozieListeners(someObj)} data-rozie-s-c4bd99aa>dynamic</span>
+  <span @click=${($event: MouseEvent) => { (f1)($event); (f2)($event); }} data-rozie-s-c4bd99aa>R6 source-order merge</span>
+</div>
+`;
+  }
+
+  /**
+   * Phase 15 D-19 — consumer-passed listener cluster placeholder.
+   * Lit attaches event listeners directly on the host element via
+   * `addEventListener` (no per-instance prop rest binding), so the
+   * runtime value is undefined; the `rozieListeners` directive's
+   * nullish coercion (`obj ?? {}`) handles the no-op cleanly.
+   * The declaration exists to satisfy `tsc --noEmit` on consumer
+   * projects with strict mode — bare `$listeners` in `render()`
+   * would otherwise raise TS2304 (Cannot find name).
+   */
+  private get $listeners(): Record<string, EventListener> | undefined {
+    return undefined;
+  }
+}

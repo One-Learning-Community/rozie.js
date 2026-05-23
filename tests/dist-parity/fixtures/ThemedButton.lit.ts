@@ -1,7 +1,7 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { SignalWatcher } from '@lit-labs/preact-signals';
-import { rozieSpread } from '@rozie/runtime-lit';
+import { rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 import { styleMap } from 'lit/directives/style-map.js';
 
 @customElement('rozie-themed-button')
@@ -38,7 +38,7 @@ export default class ThemedButton extends SignalWatcher(LitElement) {
 
   render() {
     return html`
-<button class="btn ${(this.variant)}" style=${styleMap({ '--btn-bg': '#3b82f6', '--btn-fg': '#ffffff' })} ${rozieSpread(this.$attrs)} data-rozie-s-7914ecaa>
+<button class="btn ${(this.variant)}" style=${styleMap({ '--btn-bg': '#3b82f6', '--btn-fg': '#ffffff' })} ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-s-7914ecaa>
   ${this.label}
 </button>
 `;
@@ -54,5 +54,19 @@ export default class ThemedButton extends SignalWatcher(LitElement) {
     const out: Record<string, string> = {};
     for (const a of Array.from(this.attributes)) out[a.name] = a.value;
     return out;
+  }
+
+  /**
+   * Phase 15 D-19 — consumer-passed listener cluster placeholder.
+   * Lit attaches event listeners directly on the host element via
+   * `addEventListener` (no per-instance prop rest binding), so the
+   * runtime value is undefined; the `rozieListeners` directive's
+   * nullish coercion (`obj ?? {}`) handles the no-op cleanly.
+   * The declaration exists to satisfy `tsc --noEmit` on consumer
+   * projects with strict mode — bare `$listeners` in `render()`
+   * would otherwise raise TS2304 (Cannot find name).
+   */
+  private get $listeners(): Record<string, EventListener> | undefined {
+    return undefined;
   }
 }

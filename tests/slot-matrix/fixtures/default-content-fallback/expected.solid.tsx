@@ -11,7 +11,7 @@ export default function DefaultContentFallbackFixture(_props: DefaultContentFall
 
   return (
     <>
-    <div {...attrs} class={"default-content-fallback-fixture" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-62104151="">
+    <div {...attrs} class={"default-content-fallback-fixture" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} {...attrs} data-rozie-s-62104151="">
       {(_props.statusSlot ?? _props.slots?.['status']?.({})) ?? <span class={"fallback"} data-rozie-s-62104151="">No status provided.</span>}
     </div>
     </>

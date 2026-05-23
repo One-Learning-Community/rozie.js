@@ -1,7 +1,7 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { SignalWatcher } from '@lit-labs/preact-signals';
-import { createLitControllableProperty, rozieSpread } from '@rozie/runtime-lit';
+import { createLitControllableProperty, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 
 @customElement('rozie-counter')
 export default class Counter extends SignalWatcher(LitElement) {
@@ -27,7 +27,7 @@ export default class Counter extends SignalWatcher(LitElement) {
 
   render() {
     return html`
-<button class="counter" ${rozieSpread(this.$attrs)} @click=${this.bump} data-rozie-s-80d69145>${this.value}</button>
+<button class="counter" ${rozieSpread(this.$attrs)} @click=${this.bump} ${rozieListeners(this.$listeners)} data-rozie-s-80d69145>${this.value}</button>
 `;
   }
 
@@ -48,5 +48,19 @@ export default class Counter extends SignalWatcher(LitElement) {
     const out: Record<string, string> = {};
     for (const a of Array.from(this.attributes)) out[a.name] = a.value;
     return out;
+  }
+
+  /**
+   * Phase 15 D-19 — consumer-passed listener cluster placeholder.
+   * Lit attaches event listeners directly on the host element via
+   * `addEventListener` (no per-instance prop rest binding), so the
+   * runtime value is undefined; the `rozieListeners` directive's
+   * nullish coercion (`obj ?? {}`) handles the no-op cleanly.
+   * The declaration exists to satisfy `tsc --noEmit` on consumer
+   * projects with strict mode — bare `$listeners` in `render()`
+   * would otherwise raise TS2304 (Cannot find name).
+   */
+  private get $listeners(): Record<string, EventListener> | undefined {
+    return undefined;
   }
 }

@@ -1,5 +1,5 @@
 <>
-<div {...attrs} className={clsx(styles.dropdown, (attrs.className as string | undefined))} {...$listeners}>
+<div {...attrs} className={clsx(styles.dropdown, (attrs.className as string | undefined))} {...attrs}>
   <div ref={triggerEl} onClick={toggle}>
     {(props.renderTrigger ?? props.slots?.['trigger'])?.({ open, toggle })}
   </div>

@@ -1,4 +1,6 @@
 <script lang="ts">
+import { applyListeners } from '@rozie/runtime-svelte';
+
 import type { Snippet } from 'svelte';
 
 interface Props {
@@ -20,7 +22,7 @@ const inner = $derived(__innerProp ?? snippets?.inner);
 </script>
 
 
-<div {...__rozieAttrs} class={["outer", (__rozieAttrs)?.class]}>
+<div {...__rozieAttrs} class={["outer", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs}>
   
   {#if wrapper}{@render wrapper()}{:else}
     <div class="wrapper-fallback">

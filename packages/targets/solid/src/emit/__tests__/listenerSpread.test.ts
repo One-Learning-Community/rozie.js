@@ -146,7 +146,7 @@ const f1 = () => undefined;
     expect(code).toMatch(/import\s*\{[^}]*\bnormalizeListeners\b/);
   });
 
-  it('(6) bare $listeners (D-19 exempt): r-on="$listeners" → {...$listeners}', () => {
+  it('(6) bare $listeners (D-19 exempt): r-on="$listeners" → {...attrs}', () => {
     const src = `${PROLOGUE}
 <template>
   <button r-on="$listeners">go</button>
@@ -155,12 +155,18 @@ const f1 = () => undefined;
     const code = compile(src);
     const jsx = extractJsx(code);
     expect(jsx).toMatchSnapshot();
-    expect(jsx).toContain('{...$listeners}');
+    // Phase 15-06 — bare `$listeners` rewrites to bare `attrs` at template-
+    // expression rewrite time (mirror of `$attrs` — same splitProps rest
+    // binding). The emitted JSX spreads `attrs`, not `$listeners`. This
+    // closes the solid-lint `solid/reactivity` warning that fired on the
+    // earlier separate-decl approach AND the consumer-side tsc TS2304.
+    expect(jsx).toContain('{...attrs}');
+    expect(jsx).not.toContain('$listeners');
     expect(jsx).not.toContain('normalizeListeners');
     expect(jsx).not.toContain('mergeListeners');
   });
 
-  it('(7) bare $listeners + @click (R6 + D-19): mergeListeners({ onClick: ... }, $listeners)', () => {
+  it('(7) bare $listeners + @click (R6 + D-19): mergeListeners({ onClick: ... }, attrs)', () => {
     const src = `${PROLOGUE}
 <template>
   <button @click="f1" r-on="$listeners">go</button>
@@ -173,8 +179,9 @@ const f1 = () => undefined;
     const jsx = extractJsx(code);
     expect(jsx).toMatchSnapshot();
     expect(jsx).toContain('mergeListeners(');
-    expect(jsx).toContain('$listeners');
+    expect(jsx).toContain('attrs');
     expect(jsx).toContain('onClick:');
-    expect(jsx).not.toContain('normalizeListeners($listeners)');
+    expect(jsx).not.toContain('$listeners');
+    expect(jsx).not.toContain('normalizeListeners(attrs)');
   });
 });

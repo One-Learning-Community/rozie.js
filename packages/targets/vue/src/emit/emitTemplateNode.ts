@@ -305,7 +305,12 @@ function emitElementWithExtraDirective(
       scriptInjections: ctx.scriptInjections,
     };
     for (const spread of dynamicSpreads) {
-      spreadTexts.push(emitListenerSpread(spread, attrCtx));
+      const text = emitListenerSpread(spread, attrCtx);
+      // Phase 15 D-19 — Vue's bare-$listeners path emits empty string (Vue 3
+      // folds listeners into $attrs; emit suppressed to avoid TS2339 +
+      // runtime warning). Skip empty strings so partsHead.join(' ') doesn't
+      // produce double-spaces in the emitted template attribute slot.
+      if (text.length > 0) spreadTexts.push(text);
     }
   }
   // Phase 15 — `hasDynamicListenerSpread` is read here only for its side-

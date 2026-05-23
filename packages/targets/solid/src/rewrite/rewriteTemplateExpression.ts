@@ -302,7 +302,17 @@ export function rewriteTemplateExpression(
       // turns `{...$attrs}` into the lowered `{...attrs}`. `attrs` is the
       // synthesised binding the per-target shell will introduce when synthesis
       // is un-gated in Plan 14-05.
-      if (name === '$attrs') {
+      //
+      // Phase 15 D-19 — `$listeners` lowers to bare `attrs` as well (Solid's
+      // listener cluster is the SAME rest-of-props bucket as `$attrs`;
+      // splitProps yields ONE bucket and both `$attrs` + `$listeners`
+      // resolve to it). Routing the rewrite directly into `attrs` avoids
+      // declaring a separate `const $listeners = attrs` line — that decl
+      // would read `attrs` outside JSX and trip eslint-plugin-solid's
+      // `solid/reactivity` rule (every reactive variable must be consumed
+      // inside JSX / createEffect / event handlers). Inlining at the JSX
+      // call site keeps the reactivity check satisfied.
+      if (name === '$attrs' || name === '$listeners') {
         const parent = path.parent;
         if (
           (t.isMemberExpression(parent) || t.isOptionalMemberExpression(parent)) &&

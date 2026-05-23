@@ -1,4 +1,4 @@
-import { Component, ElementRef, Renderer2, TemplateRef, ViewChild, ViewEncapsulation, afterRenderEffect, inject, input, signal, viewChild } from '@angular/core';
+import { Component, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewChild, ViewEncapsulation, afterRenderEffect, effect, inject, input, signal, viewChild } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 
 import { Modal } from './Modal';
@@ -10,7 +10,7 @@ import { WrapperModal } from './WrapperModal';
   imports: [NgTemplateOutlet, Modal, WrapperModal],
   template: `
 
-    <div class="modal-consumer" #rozieSpread_0>
+    <div class="modal-consumer" #rozieSpread_0 #rozieListenersTarget_1>
       <rozie-modal [open]="open1()" (openChange)="open1.set($event)"><ng-template #header let-close="close">
           <h2>{{ title() }}</h2>
           <button class="close" (click)="close($event)">×</button>
@@ -53,6 +53,8 @@ export class ModalConsumer {
   onConfirm = () => {
     this.open1.set(false);
   };
+
+  private __rozieDestroyRef = inject(DestroyRef);
 
   private rozieSpread_0 = viewChild<ElementRef>('rozieSpread_0');
 
@@ -144,6 +146,36 @@ export class ModalConsumer {
     const el = this.rozieSpread_0()?.nativeElement;
     if (!el) return;
     this.__rozieApplyAttrs(el, this.__rozieGetHostAttrs());
+  });
+
+  private rozieListenersTarget_1 = viewChild<ElementRef>('rozieListenersTarget_1');
+
+  private __rozieListenersRenderer = inject(Renderer2);
+
+  private __rozieListenersDisposers_1: Array<() => void> = [];
+
+  private __rozieListenersDestroyRegistered_1 = false;
+
+  private __rozieListenersEffect_1 = effect(() => {
+    const el = this.rozieListenersTarget_1()?.nativeElement;
+    if (!el) return;
+    for (const off of this.__rozieListenersDisposers_1) off();
+    this.__rozieListenersDisposers_1 = [];
+    const obj: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(obj)) {
+      if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
+      if (typeof v !== 'function') continue;
+      const norm = k.startsWith('on') ? k.slice(2).toLowerCase() : k;
+      const dispose = this.__rozieListenersRenderer.listen(el, norm, v as EventListener);
+      this.__rozieListenersDisposers_1.push(dispose);
+    }
+    if (!this.__rozieListenersDestroyRegistered_1) {
+      this.__rozieListenersDestroyRegistered_1 = true;
+      this.__rozieDestroyRef.onDestroy(() => {
+        for (const off of this.__rozieListenersDisposers_1) off();
+        this.__rozieListenersDisposers_1 = [];
+      });
+    }
   });
 
   @ViewChild('__dynSlot_0', { static: true }) __dynSlot_0?: TemplateRef<unknown>;

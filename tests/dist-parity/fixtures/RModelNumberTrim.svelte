@@ -1,4 +1,6 @@
 <script lang="ts">
+import { applyListeners } from '@rozie/runtime-svelte';
+
 interface Props {
   [key: string]: unknown;
 }
@@ -9,7 +11,7 @@ let quantity = $state(0);
 </script>
 
 
-<div {...__rozieAttrs} class={["rmodel-number-trim", (__rozieAttrs)?.class]}>
+<div {...__rozieAttrs} class={["rmodel-number-trim", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs}>
   <input type="text" value={quantity} oninput={($event) => quantity = (Number.isNaN(Number.parseFloat((($event.currentTarget.value).trim()))) ? (($event.currentTarget.value).trim()) : Number.parseFloat((($event.currentTarget.value).trim())))} placeholder="Enter a quantity" />
   <p class="echo">Quantity: {quantity}</p>
 </div>

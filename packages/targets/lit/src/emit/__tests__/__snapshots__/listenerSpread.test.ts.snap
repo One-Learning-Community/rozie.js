@@ -32,12 +32,12 @@ exports[`emit (Lit) — ListenerSpreadIR (Plan 15-05 Task 1) > (5) dynamic with-
 
 exports[`emit (Lit) — ListenerSpreadIR (Plan 15-05 Task 1) > (6) bare $listeners (D-19 exempt): r-on="$listeners" → \${rozieListeners($listeners)} 1`] = `
 "
-  <button \${rozieListeners($listeners)} data-rozie-s-8fd6d49e>go</button>
+  <button \${rozieListeners(this.$listeners)} data-rozie-s-8fd6d49e>go</button>
 "
 `;
 
 exports[`emit (Lit) — ListenerSpreadIR (Plan 15-05 Task 1) > (7) bare $listeners + @click (R6 + D-19): @click=\${f1} \${rozieListeners($listeners)} 1`] = `
 "
-  <button @click=\${this.f1} \${rozieListeners($listeners)} data-rozie-s-8fd6d49e>go</button>
+  <button @click=\${this.f1} \${rozieListeners(this.$listeners)} data-rozie-s-8fd6d49e>go</button>
 "
 `;

@@ -1,7 +1,7 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, property, query } from 'lit/decorators.js';
 import { SignalWatcher, signal } from '@lit-labs/preact-signals';
-import { debounce, rozieSpread } from '@rozie/runtime-lit';
+import { debounce, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 
 @customElement('rozie-search-input')
 export default class SearchInput extends SignalWatcher(LitElement) {
@@ -52,7 +52,7 @@ input[data-rozie-s-8bbc4a60] { padding: 0.25rem 0.5rem; }
 
   render() {
     return html`
-<div class="search-input" ${rozieSpread(this.$attrs)} data-rozie-s-8bbc4a60>
+<div class="search-input" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-s-8bbc4a60>
   
   <input type="search" placeholder=${this.placeholder} .value=${this._query.value} @input=${($event: InputEvent) => { (($event) => this._query.value = ($event.target as HTMLInputElement).value)($event); (this._tw0)($event); }} @keydown=${($event: KeyboardEvent) => { (($event: KeyboardEvent) => { if ($event.key !== 'Enter') return; ((this.onSearch) as (...args: any[]) => any)($event); })($event); (($event: KeyboardEvent) => { if ($event.key !== 'Escape') return; ((this.clear) as (...args: any[]) => any)($event); })($event); }} data-rozie-ref="inputEl" data-rozie-s-8bbc4a60 />
 
@@ -91,5 +91,19 @@ input[data-rozie-s-8bbc4a60] { padding: 0.25rem 0.5rem; }
     const out: Record<string, string> = {};
     for (const a of Array.from(this.attributes)) out[a.name] = a.value;
     return out;
+  }
+
+  /**
+   * Phase 15 D-19 — consumer-passed listener cluster placeholder.
+   * Lit attaches event listeners directly on the host element via
+   * `addEventListener` (no per-instance prop rest binding), so the
+   * runtime value is undefined; the `rozieListeners` directive's
+   * nullish coercion (`obj ?? {}`) handles the no-op cleanly.
+   * The declaration exists to satisfy `tsc --noEmit` on consumer
+   * projects with strict mode — bare `$listeners` in `render()`
+   * would otherwise raise TS2304 (Cannot find name).
+   */
+  private get $listeners(): Record<string, EventListener> | undefined {
+    return undefined;
   }
 }

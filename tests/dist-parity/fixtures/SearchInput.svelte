@@ -1,4 +1,6 @@
 <script lang="ts">
+import { applyListeners } from '@rozie/runtime-svelte';
+
 import { onMount } from 'svelte';
 
 interface Props {
@@ -53,7 +55,7 @@ const debouncedOnSearch = (() => {
 </script>
 
 
-<div {...__rozieAttrs} class={["search-input", (__rozieAttrs)?.class]}>
+<div {...__rozieAttrs} class={["search-input", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs}>
   
   <input bind:this={inputEl} type="search" placeholder={placeholder} bind:value={query} oninput={debouncedOnSearch} onkeydown={($event) => { (() => { (($event) => { if ($event.key !== 'Enter') return; (onSearch as (...a: any[]) => any)($event); })($event); })(); (() => { (($event) => { if ($event.key !== 'Escape') return; (clear as (...a: any[]) => any)($event); })($event); })(); }} />
 

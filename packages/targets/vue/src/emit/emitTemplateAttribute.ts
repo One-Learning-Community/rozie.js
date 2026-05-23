@@ -570,10 +570,15 @@ function isListenersIdentifier(expr: t.Expression): boolean {
  *
  * Two cases (the literal third case is handled at the per-element walker):
  *
- *   - bare `$listeners` (D-19 exempt) → `v-on="$listeners"` — no
- *     `normalizeListeners` wrap (consumer's `$listeners` already carries
- *     target-native lowercase keys; A1 / Pitfall 8 — Vue native-element
- *     `v-on` is lowercase).
+ *   - bare `$listeners` (D-19 exempt) → empty string (Vue 3 has no
+ *     `$listeners` instance property — that was Vue 2). Vue 3 folds the
+ *     consumer's listener cluster into `$attrs` automatically (its
+ *     auto-attr-fallthrough flows BOTH attributes AND listeners through
+ *     the root element via `v-bind="$attrs"`). Emitting `v-on="$listeners"`
+ *     produces `TS2339: Property '$listeners' does not exist on type` under
+ *     vue-tsc strict mode AND a runtime warning. The synthesized
+ *     auto-fallthrough is therefore a no-op for Vue — the attribute-side
+ *     spread (`v-bind="$attrs"`) carries the listener cluster too.
  *
  *   - DYNAMIC expression                → `v-on="normalizeListeners(<expr>)"`,
  *     plus a `ScriptInjection` pushed onto `ctx.scriptInjections` so the
@@ -590,9 +595,14 @@ export function emitListenerSpread(
   ctx: EmitAttrCtx,
 ): string {
   if (isListenersIdentifier(spread.expression)) {
-    // D-19 — bare $listeners; pass through unwrapped.
-    const expr = rewriteTemplateExpression(spread.expression, ctx.ir);
-    return `v-on="${expr}"`;
+    // D-19 — bare $listeners; Vue 3 folds listeners into $attrs (no
+    // separate $listeners instance property). The attribute-side
+    // v-bind="$attrs" emit already covers cross-framework listener
+    // pass-through; emit nothing for this path so the per-element walker
+    // skips the empty attribute slot. Mirrors the Lit-side $listeners
+    // getter that returns undefined (rozieListeners(undefined) ?? {} =
+    // no-op) — both targets normalize bare $listeners to a benign no-op.
+    return '';
   }
   // Dynamic spread — runtime key-pass-through (FORBIDDEN_KEYS skip).
   if (ctx.scriptInjections) {

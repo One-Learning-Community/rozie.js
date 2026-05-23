@@ -60,14 +60,6 @@
 
 <data>
 {
-  // Sentinel consumer-passed listener handlers. Kept as no-op arrow
-  // functions so the compiled output is byte-identical across all six
-  // targets — no closure over signals, no per-target reactive-runtime
-  // divergence. The consumer's purpose is to PROVE the listener cluster
-  // arrives at the wrapper's <button> root via the synthesized
-  // ListenerSpreadIR (auto-fallthrough corners) or the manual
-  // `r-on="$listeners"` directive (manual corners); the handler body
-  // is intentionally trivial.
   onClick:       () => {},
   onMouseEnter:  () => {},
 }

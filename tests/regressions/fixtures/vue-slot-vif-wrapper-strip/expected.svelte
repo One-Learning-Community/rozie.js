@@ -1,4 +1,6 @@
 <script lang="ts">
+import { applyListeners } from '@rozie/runtime-svelte';
+
 import type { Snippet } from 'svelte';
 
 interface Props {
@@ -22,7 +24,7 @@ const children = $derived(__childrenProp ?? snippets?.children);
 </script>
 
 
-<section {...__rozieAttrs} class={["panel", (__rozieAttrs)?.class]}>
+<section {...__rozieAttrs} class={["panel", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs}>
   {#if header || title}<header>
     
     {#if header}{@render header()}{:else}{title}{/if}

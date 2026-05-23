@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { clsx } from '@rozie/runtime-react';
+import { clsx, mergeListeners } from '@rozie/runtime-react';
 import styles from './InlineExprHandler.module.css';
 
 interface InlineExprHandlerProps {
@@ -24,7 +24,7 @@ export default function InlineExprHandler(_props: InlineExprHandlerProps): JSX.E
 
   return (
     <>
-    <div {...attrs} className={clsx(styles.backdrop, (attrs.className as string | undefined))} onClick={($event) => { props.closeOnBackdrop && close(); }} data-rozie-s-8ec7623e="">
+    <div {...attrs} className={clsx(styles.backdrop, (attrs.className as string | undefined))} {...mergeListeners({ onClick: ($event) => { props.closeOnBackdrop && close(); } }, attrs)} data-rozie-s-8ec7623e="">
       
       <button onClick={close} data-rozie-s-8ec7623e="">Close</button>
     </div>

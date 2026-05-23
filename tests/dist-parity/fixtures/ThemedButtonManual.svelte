@@ -1,4 +1,6 @@
 <script lang="ts">
+import { applyListeners } from '@rozie/runtime-svelte';
+
 interface Props {
   label?: string;
   variant?: string;
@@ -13,7 +15,7 @@ let {
 </script>
 
 
-<button style:--btn-bg={'#3b82f6'} style:--btn-fg={'#ffffff'} {...__rozieAttrs} class={["btn", variant, (__rozieAttrs)?.class]}>
+<button style:--btn-bg={'#3b82f6'} style:--btn-fg={'#ffffff'} {...__rozieAttrs} class={["btn", variant, (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs}>
   {label}
 </button>
 

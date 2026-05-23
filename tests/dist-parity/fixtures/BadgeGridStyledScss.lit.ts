@@ -1,7 +1,7 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { SignalWatcher } from '@lit-labs/preact-signals';
-import { rozieSpread } from '@rozie/runtime-lit';
+import { rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 import { repeat } from 'lit/directives/repeat.js';
 
 @customElement('rozie-badge-grid-styled-scss')
@@ -60,7 +60,7 @@ export default class BadgeGridStyledScss extends SignalWatcher(LitElement) {
 
   render() {
     return html`
-<div class="badge-grid" ${rozieSpread(this.$attrs)} data-rozie-s-44801268>
+<div class="badge-grid" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-s-44801268>
   ${repeat<any>(this.badges, (badge, _idx) => badge, (badge, _idx) => html`<span class="badge badge--neutral" key=${badge} data-rozie-s-44801268>
     ${badge}
   </span>`)}
@@ -78,5 +78,19 @@ export default class BadgeGridStyledScss extends SignalWatcher(LitElement) {
     const out: Record<string, string> = {};
     for (const a of Array.from(this.attributes)) out[a.name] = a.value;
     return out;
+  }
+
+  /**
+   * Phase 15 D-19 — consumer-passed listener cluster placeholder.
+   * Lit attaches event listeners directly on the host element via
+   * `addEventListener` (no per-instance prop rest binding), so the
+   * runtime value is undefined; the `rozieListeners` directive's
+   * nullish coercion (`obj ?? {}`) handles the no-op cleanly.
+   * The declaration exists to satisfy `tsc --noEmit` on consumer
+   * projects with strict mode — bare `$listeners` in `render()`
+   * would otherwise raise TS2304 (Cannot find name).
+   */
+  private get $listeners(): Record<string, EventListener> | undefined {
+    return undefined;
   }
 }

@@ -1,7 +1,7 @@
 import { LitElement, css, html, nothing } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { SignalWatcher } from '@lit-labs/preact-signals';
-import { rozieSpread } from '@rozie/runtime-lit';
+import { rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 import { repeat } from 'lit/directives/repeat.js';
 
 @customElement('rozie-tree-node')
@@ -28,7 +28,7 @@ export default class TreeNode extends SignalWatcher(LitElement) {
 
   render() {
     return html`
-<div class="tree-node" ${rozieSpread(this.$attrs)} data-rozie-s-a7176a6e>
+<div class="tree-node" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-s-a7176a6e>
   <span class="tree-node__label" data-rozie-s-a7176a6e>${this.node.label}</span>
   ${this.node.children && this.node.children.length > 0 ? html`<ul class="tree-node__children" data-rozie-s-a7176a6e>
     ${repeat<any>(this.node.children, (child, childIndex) => child.id, (child, childIndex) => html`<li key=${child.id} data-index=${childIndex} data-rozie-s-a7176a6e>
@@ -48,5 +48,19 @@ export default class TreeNode extends SignalWatcher(LitElement) {
     const out: Record<string, string> = {};
     for (const a of Array.from(this.attributes)) out[a.name] = a.value;
     return out;
+  }
+
+  /**
+   * Phase 15 D-19 — consumer-passed listener cluster placeholder.
+   * Lit attaches event listeners directly on the host element via
+   * `addEventListener` (no per-instance prop rest binding), so the
+   * runtime value is undefined; the `rozieListeners` directive's
+   * nullish coercion (`obj ?? {}`) handles the no-op cleanly.
+   * The declaration exists to satisfy `tsc --noEmit` on consumer
+   * projects with strict mode — bare `$listeners` in `render()`
+   * would otherwise raise TS2304 (Cannot find name).
+   */
+  private get $listeners(): Record<string, EventListener> | undefined {
+    return undefined;
   }
 }

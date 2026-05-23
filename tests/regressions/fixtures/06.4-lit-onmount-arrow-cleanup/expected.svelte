@@ -1,4 +1,6 @@
 <script lang="ts">
+import { applyListeners } from '@rozie/runtime-svelte';
+
 import { onMount } from 'svelte';
 
 interface Props {
@@ -27,7 +29,7 @@ onMount(() => {
 </script>
 
 
-<div {...__rozieAttrs} class={["ticker", (__rozieAttrs)?.class]}>{ticks}</div>
+<div {...__rozieAttrs} class={["ticker", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs}>{ticks}</div>
 
 
 <style>

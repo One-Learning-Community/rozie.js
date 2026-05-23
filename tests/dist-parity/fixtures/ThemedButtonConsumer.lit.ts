@@ -1,9 +1,11 @@
 import { LitElement, css, html } from 'lit';
 import { customElement } from 'lit/decorators.js';
-import { SignalWatcher } from '@lit-labs/preact-signals';
-import { rozieSpread } from '@rozie/runtime-lit';
+import { SignalWatcher, signal } from '@lit-labs/preact-signals';
+import { rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 import './ThemedButton.rozie';
 import './ThemedButtonManual.rozie';
+import './ThemedButtonListenersManual.rozie';
+import './ThemedButtonAllManual.rozie';
 
 @customElement('rozie-themed-button-consumer')
 export default class ThemedButtonConsumer extends SignalWatcher(LitElement) {
@@ -18,6 +20,9 @@ export default class ThemedButtonConsumer extends SignalWatcher(LitElement) {
 }
 `;
 
+  private _onClick = signal(() => {});
+  private _onMouseEnter = signal(() => {});
+
   private _disconnectCleanups: Array<() => void> = [];
 
   disconnectedCallback(): void {
@@ -28,10 +33,14 @@ export default class ThemedButtonConsumer extends SignalWatcher(LitElement) {
 
   render() {
     return html`
-<div class="themed-button-consumer" ${rozieSpread(this.$attrs)} data-rozie-s-14b8cbaa>
-  <rozie-themed-button class="extra-variant" id="auto-btn" type="button" aria-label="Auto-fallthrough button" data-testid="auto-themed-button" style="--btn-bg: #ef4444" .label=${'Auto'} data-rozie-s-14b8cbaa></rozie-themed-button>
+<div class="themed-button-consumer" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-s-14b8cbaa>
+  <rozie-themed-button class="extra-variant" id="auto-btn" type="button" aria-label="Auto-fallthrough button" data-testid="auto-themed-button" style="--btn-bg: #ef4444" .label=${'Auto'} @click=${onClick} @mouseenter=${onMouseEnter} data-rozie-s-14b8cbaa></rozie-themed-button>
 
-  <rozie-themed-button-manual class="extra-variant" id="manual-btn" type="button" aria-label="Manual fallthrough button" data-testid="manual-themed-button" style="--btn-bg: #10b981" .label=${'Manual'} data-rozie-s-14b8cbaa></rozie-themed-button-manual>
+  <rozie-themed-button-manual class="extra-variant" id="manual-btn" type="button" aria-label="Manual fallthrough button" data-testid="manual-themed-button" style="--btn-bg: #10b981" .label=${'Manual'} @click=${onClick} @mouseenter=${onMouseEnter} data-rozie-s-14b8cbaa></rozie-themed-button-manual>
+
+  <rozie-themed-button-listeners-manual class="extra-variant" id="listeners-manual-btn" type="button" aria-label="Listeners-manual fallthrough button" data-testid="listeners-manual-themed-button" style="--btn-bg: #f59e0b" .label=${'Listeners Manual'} @click=${onClick} @mouseenter=${onMouseEnter} data-rozie-s-14b8cbaa></rozie-themed-button-listeners-manual>
+
+  <rozie-themed-button-all-manual class="extra-variant" id="all-manual-btn" type="button" aria-label="All-manual fallthrough button" data-testid="all-manual-themed-button" style="--btn-bg: #8b5cf6" .label=${'All Manual'} @click=${onClick} @mouseenter=${onMouseEnter} data-rozie-s-14b8cbaa></rozie-themed-button-all-manual>
 </div>
 `;
   }
@@ -46,5 +55,19 @@ export default class ThemedButtonConsumer extends SignalWatcher(LitElement) {
     const out: Record<string, string> = {};
     for (const a of Array.from(this.attributes)) out[a.name] = a.value;
     return out;
+  }
+
+  /**
+   * Phase 15 D-19 — consumer-passed listener cluster placeholder.
+   * Lit attaches event listeners directly on the host element via
+   * `addEventListener` (no per-instance prop rest binding), so the
+   * runtime value is undefined; the `rozieListeners` directive's
+   * nullish coercion (`obj ?? {}`) handles the no-op cleanly.
+   * The declaration exists to satisfy `tsc --noEmit` on consumer
+   * projects with strict mode — bare `$listeners` in `render()`
+   * would otherwise raise TS2304 (Cannot find name).
+   */
+  private get $listeners(): Record<string, EventListener> | undefined {
+    return undefined;
   }
 }

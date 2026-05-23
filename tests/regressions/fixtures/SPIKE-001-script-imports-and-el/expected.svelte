@@ -1,4 +1,6 @@
 <script lang="ts">
+import { applyListeners } from '@rozie/runtime-svelte';
+
 import type { Snippet } from 'svelte';
 import { onMount } from 'svelte';
 
@@ -30,7 +32,7 @@ onMount(() => {
 </script>
 
 
-<div bind:this={__rozieRoot} {...__rozieAttrs} class={["spike-root", (__rozieAttrs)?.class]}>
+<div bind:this={__rozieRoot} {...__rozieAttrs} class={["spike-root", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs}>
   {@render children?.()}
 </div>
 

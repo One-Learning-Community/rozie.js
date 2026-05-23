@@ -1,4 +1,6 @@
 <script lang="ts">
+import { applyListeners } from '@rozie/runtime-svelte';
+
 import type { Snippet } from 'svelte';
 import { mount, unmount } from 'svelte';
 import PortalHost from '@rozie/runtime-svelte/PortalHost.svelte';
@@ -96,7 +98,7 @@ onMount(() => {
 </script>
 
 
-<div bind:this={__rozieRoot} {...__rozieAttrs} class={["rozie-portal-list", (__rozieAttrs)?.class]}>
+<div bind:this={__rozieRoot} {...__rozieAttrs} class={["rozie-portal-list", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs}>
   
 </div>
 

@@ -1,4 +1,4 @@
-import { Component, ContentChild, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, inject, input, viewChild } from '@angular/core';
+import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, effect, inject, input, viewChild } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 
 import { CardHeader } from './CardHeader';
@@ -11,7 +11,7 @@ interface DefaultCtx {}
   imports: [NgTemplateOutlet, CardHeader],
   template: `
 
-    <article class="card" #rozieSpread_0>
+    <article class="card" #rozieSpread_0 #rozieListenersTarget_1>
       <rozie-card-header [title]="title()" [onClose]="onClose()"></rozie-card-header>
       <div class="card__body">
         <ng-container *ngTemplateOutlet="(defaultTpl ?? templates()?.['defaultSlot'])" />
@@ -36,6 +36,8 @@ export class Card {
   ): _ctx is DefaultCtx {
     return true;
   }
+
+  private __rozieDestroyRef = inject(DestroyRef);
 
   private rozieSpread_0 = viewChild<ElementRef>('rozieSpread_0');
 
@@ -127,6 +129,36 @@ export class Card {
     const el = this.rozieSpread_0()?.nativeElement;
     if (!el) return;
     this.__rozieApplyAttrs(el, this.__rozieGetHostAttrs());
+  });
+
+  private rozieListenersTarget_1 = viewChild<ElementRef>('rozieListenersTarget_1');
+
+  private __rozieListenersRenderer = inject(Renderer2);
+
+  private __rozieListenersDisposers_1: Array<() => void> = [];
+
+  private __rozieListenersDestroyRegistered_1 = false;
+
+  private __rozieListenersEffect_1 = effect(() => {
+    const el = this.rozieListenersTarget_1()?.nativeElement;
+    if (!el) return;
+    for (const off of this.__rozieListenersDisposers_1) off();
+    this.__rozieListenersDisposers_1 = [];
+    const obj: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(obj)) {
+      if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
+      if (typeof v !== 'function') continue;
+      const norm = k.startsWith('on') ? k.slice(2).toLowerCase() : k;
+      const dispose = this.__rozieListenersRenderer.listen(el, norm, v as EventListener);
+      this.__rozieListenersDisposers_1.push(dispose);
+    }
+    if (!this.__rozieListenersDestroyRegistered_1) {
+      this.__rozieListenersDestroyRegistered_1 = true;
+      this.__rozieDestroyRef.onDestroy(() => {
+        for (const off of this.__rozieListenersDisposers_1) off();
+        this.__rozieListenersDisposers_1 = [];
+      });
+    }
   });
 }
 

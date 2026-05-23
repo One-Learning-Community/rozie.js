@@ -187,6 +187,48 @@ export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResu
         ].join('\n')
       : '';
 
+  // Phase 15 D-19 — `$listeners` magic-accessor declaration for Lit.
+  //
+  // Lit custom-element consumers attach event listeners via
+  // `addEventListener` from OUTSIDE the element (a `<my-elem
+  // @click=${...}>` lit-html binding compiles to an addEventListener on the
+  // host element). Unlike React/Solid/Vue/Svelte's props rest binding, Lit
+  // has no per-instance bag of "consumer-passed listeners" — the bare
+  // `$listeners` Identifier in the synthesized auto-fallthrough lowers to
+  // undefined at render time, and the `rozieListeners` directive's nullish
+  // coercion (`obj ?? {}`) handles undefined as a clean no-op.
+  //
+  // Without this declaration, TS reports TS2304 (Cannot find name
+  // '$listeners') on every default-fallthrough single-root component when
+  // the typed-fixture lit-typecheck gate runs `tsc --noEmit`. The
+  // dist-parity byte-equality gate doesn't tsc-check the emit so the bug
+  // hid until the consumer-side typecheck gate caught it.
+  //
+  // Synthesise the getter whenever `rozieListenersUsed` is true — covers
+  // both the synthesized auto-fallthrough push (which emits a bare
+  // `$listeners` Identifier in the spread expression) AND author-written
+  // `r-on="$listeners"`. Dynamic `r-on="someObj"` does NOT trigger the
+  // getter (its emit shape is `${rozieListeners(this.someObj)}` — no
+  // bare `$listeners` reference).
+  const litListenersGetter =
+    templateResult.rozieListenersUsed
+      ? [
+          '  /**',
+          '   * Phase 15 D-19 — consumer-passed listener cluster placeholder.',
+          '   * Lit attaches event listeners directly on the host element via',
+          '   * `addEventListener` (no per-instance prop rest binding), so the',
+          '   * runtime value is undefined; the `rozieListeners` directive\'s',
+          '   * nullish coercion (`obj ?? {}`) handles the no-op cleanly.',
+          '   * The declaration exists to satisfy `tsc --noEmit` on consumer',
+          '   * projects with strict mode — bare `$listeners` in `render()`',
+          '   * would otherwise raise TS2304 (Cannot find name).',
+          '   */',
+          '  private get $listeners(): Record<string, EventListener> | undefined {',
+          '    return undefined;',
+          '  }',
+        ].join('\n')
+      : '';
+
   // 6. Compose class body.
   // Insertion order:
   //   - static styles field
@@ -238,7 +280,7 @@ export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResu
     slotFillerDisconnectReset: templateResult.slotFillerDisconnectReset.join('\n'),
     updatedBody: composedUpdatedBody,
     renderBody: templateResult.renderBody,
-    userMethods: [scriptResult.methodDecls, litAttrsGetter]
+    userMethods: [scriptResult.methodDecls, litAttrsGetter, litListenersGetter]
       .filter((s) => s.trim().length > 0)
       .join('\n\n'),
     attributeChangedBody: scriptResult.attributeChangedBody,

@@ -200,6 +200,75 @@ function templateUsesSpreadBinding(
 }
 
 /**
+ * Phase 15 D-19 mirror of `templateUsesSpreadBinding`. Returns true if any
+ * descendant `TemplateElement` carries a `listenerSpreads` entry whose
+ * `expression` is a bare `$listeners` Identifier — that bare reference lands
+ * verbatim in the emitted JSX (`{...$listeners}` or `mergeListeners(..., $listeners)`),
+ * so the function shell must declare `$listeners` for the reference to
+ * type-check (otherwise tsc reports TS2304 `Cannot find name '$listeners'`,
+ * which the react-typecheck / vue-typecheck / svelte-typecheck gates trip on
+ * the typed fixture set even when dist-parity byte-equality is green).
+ *
+ * The synthesized auto-fallthrough push (lowerTemplate.ts
+ * `synthesizeListenersFallthrough`) AND author-written `r-on="$listeners"`
+ * both lower to the bare-identifier shape, so this single scan covers both
+ * cases. A dynamic `r-on="someObj"` spread routes through the runtime
+ * `normalizeListeners(someObj)` wrap — no `$listeners` declaration is needed
+ * for that path.
+ */
+function templateUsesListenersSpread(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  node: any,
+): boolean {
+  if (node === null || node === undefined) return false;
+  if (node.type === 'TemplateElement') {
+    for (const s of node.listenerSpreads ?? []) {
+      const expr = s.expression;
+      if (
+        expr !== null &&
+        expr !== undefined &&
+        expr.type === 'Identifier' &&
+        expr.name === '$listeners'
+      ) {
+        return true;
+      }
+    }
+    for (const c of node.children ?? []) {
+      if (templateUsesListenersSpread(c)) return true;
+    }
+    return false;
+  }
+  if (node.type === 'TemplateConditional' || node.type === 'TemplateMatch') {
+    for (const branch of node.branches ?? []) {
+      for (const c of branch.body ?? []) {
+        if (templateUsesListenersSpread(c)) return true;
+      }
+    }
+    if (node.hostElement && templateUsesListenersSpread(node.hostElement)) return true;
+    return false;
+  }
+  if (node.type === 'TemplateLoop') {
+    for (const c of node.body ?? []) {
+      if (templateUsesListenersSpread(c)) return true;
+    }
+    return false;
+  }
+  if (node.type === 'TemplateFragment') {
+    for (const c of node.children ?? []) {
+      if (templateUsesListenersSpread(c)) return true;
+    }
+    return false;
+  }
+  if (node.type === 'TemplateSlotInvocation') {
+    for (const c of node.fallback ?? []) {
+      if (templateUsesListenersSpread(c)) return true;
+    }
+    return false;
+  }
+  return false;
+}
+
+/**
  * Emit `() => body` for an Expression or BlockStatement body.
  *
  * Why not `\`() => ${genCode(body)}\``? When `body` is an ObjectExpression
@@ -1592,7 +1661,19 @@ export function emitScript(
   // without this destructure that reference dangles and React throws at
   // render, killing the whole tree. Mirrors the Lit fix at
   // `emitLit.ts:160` (same gate-widening for the explicit-manual case).
-  if (ir.inheritAttrs !== false || templateUsesSpreadBinding(ir.template)) {
+  // Phase 15 D-19 gate widening — also trigger the `attrs` IIFE when the
+  // template references `$listeners` (synthesized auto-fallthrough OR
+  // explicit `r-on="$listeners"`). React lowers `$listeners` to bare
+  // `attrs` at template-expression rewrite time, so the IIFE must emit
+  // even when `inherit-attrs="false"` AND no `r-bind="$attrs"` — without
+  // this widening the lowered `attrs` reference would dangle and tsc
+  // reports TS2304 (Cannot find name 'attrs').
+  if (
+    ir.inheritAttrs !== false ||
+    templateUsesSpreadBinding(ir.template) ||
+    ir.inheritListeners !== false ||
+    templateUsesListenersSpread(ir.template)
+  ) {
     const propsParam = defaultedNonModelProps.length > 0 ? '_props' : 'props';
     // `declaredNames` reads ONLY from `ir.props` — `ir.emits` does not enter
     // the destructure list. When `ir.props.length === 0` the destructure is
@@ -1648,6 +1729,7 @@ export function emitScript(
       );
     }
   }
+
 
   // 5a-bis. Portal-slot stable-renderer refs (Spike 003 FullCalendar React fix).
   //

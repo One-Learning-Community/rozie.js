@@ -12,7 +12,7 @@ export default function NamedSlotsFixture(props: NamedSlotsFixtureProps): JSX.El
 
   return (
     <>
-    <div {...attrs} className={clsx("named-slots-fixture", (attrs.className as string | undefined))} data-rozie-s-a30182bc="">
+    <div {...attrs} className={clsx("named-slots-fixture", (attrs.className as string | undefined))} {...attrs} data-rozie-s-a30182bc="">
       <header data-rozie-s-a30182bc="">
         {(props.renderHeader ?? props.slots?.['header'])?.()}
       </header>

@@ -13,7 +13,7 @@ export default function NestedSlotDeclared(props: NestedSlotDeclaredProps): JSX.
 
   return (
     <>
-    <div {...attrs} className={clsx(styles.outer, (attrs.className as string | undefined))} data-rozie-s-3bc5be6c="">
+    <div {...attrs} className={clsx(styles.outer, (attrs.className as string | undefined))} {...attrs} data-rozie-s-3bc5be6c="">
       
       {(props.renderWrapper ?? props.slots?.['wrapper']) ? ((props.renderWrapper ?? props.slots?.['wrapper']) as Function)() : <div className={styles["wrapper-fallback"]} data-rozie-s-3bc5be6c="">
           {(props.renderInner ?? props.slots?.['inner'])?.()}

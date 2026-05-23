@@ -875,18 +875,30 @@ function emitListenerSpread(
   // D-19 / Plan 15-05 — bare `$listeners` Identifier: Angular has no native
   // `$listeners` magic accessor (unlike Vue's template-side `$listeners` or
   // Svelte's `__rozieAttrs` rest binding). The consumer's `$listeners`
-  // cluster is opaque at compile time, so we emit the safe `undefined`
-  // literal which the `?? {}` coercion downstream maps to a clean no-op
-  // loop. Without this, the emitted effect() body would reference a bare
+  // cluster is opaque at compile time, so the bare identifier resolves to
+  // an empty listener cluster — the effect()'s for-loop iterates zero
+  // entries and the per-render teardown remains a clean no-op. Without
+  // this special-case, the emitted effect() body would reference a bare
   // `$listeners` at class scope and throw `ReferenceError: $listeners is
   // not defined` at runtime — the synthesized auto-fallthrough
   // (`r-on="$listeners"` on every default-fallthrough single-root template)
   // would crash every Angular component on instantiation. Mirrors the
   // Lit-side runtime nullish coercion (Lit's directive's `obj ?? {}` handles
   // the equivalent undefined case) and Svelte's `__rozieAttrs` rewrite.
+  //
+  // The D-19 form emits `const obj: Record<string, unknown> = {};`
+  // directly (NOT `const obj = (undefined) ?? {};`) — TS strict mode flags
+  // the nullish-coalescing form as TS2871 ("This expression is always
+  // nullish") because `undefined ?? {}` is statically always `{}`. The
+  // explicit empty-object form is byte-shorter, type-safe under strict
+  // tsconfig (consumer-side Angular projects with `strict: true` typecheck
+  // clean), and produces the same runtime behavior — zero loop iterations,
+  // zero listener attachments.
+  let isDashListenersBare = false;
   let exprText: string;
   if (t.isIdentifier(spread.expression, { name: '$listeners' })) {
-    exprText = 'undefined';
+    isDashListenersBare = true;
+    exprText = '';
   } else {
     exprText = rewriteTemplateExpression(spread.expression, ctx.ir, {
       collisionRenames: ctx.collisionRenames,
@@ -933,13 +945,16 @@ function emitListenerSpread(
     // detaches the prior listeners; the one-time onDestroy registration
     // fires the same teardown on component disposal (cross-target D-14
     // contract — Angular leg).
+    const objDecl = isDashListenersBare
+      ? `  const obj: Record<string, unknown> = {};`
+      : `  const obj = (${exprText}) ?? {};`;
     const effectDecl = [
       `private ${effectFieldName} = effect(() => {`,
       `  const el = this.${refName}()?.nativeElement;`,
       `  if (!el) return;`,
       `  for (const off of this.${disposersFieldName}) off();`,
       `  this.${disposersFieldName} = [];`,
-      `  const obj = (${exprText}) ?? {};`,
+      objDecl,
       `  for (const [k, v] of Object.entries(obj)) {`,
       `    ${LISTENERS_FORBIDDEN_KEYS_GUARD}`,
       `    if (typeof v !== 'function') continue;`,

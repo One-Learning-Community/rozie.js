@@ -259,7 +259,13 @@ export function rewriteTemplateExpression(
       // declared in emitLit.ts that reads the host custom element's
       // attributes). Skip property-position occurrences (handled by Member /
       // OptionalMember visitors above) and object-literal key positions.
-      if (name === '$attrs') {
+      // Plan 15-06 / D-19 — `$listeners` lowers to `this.$listeners`
+      // (the synthesised getter declared in emitLit.ts that returns
+      // undefined; the `rozieListeners` directive's nullish coercion
+      // handles the no-op). Mirror of the `$attrs` rewrite. Without this
+      // the bare `$listeners` Identifier raises TS2304 on consumer-side
+      // strict tsc — the same class of bug `$attrs` had pre-Phase 14.1.
+      if (name === '$attrs' || name === '$listeners') {
         const parentPath = path.parentPath;
         if (parentPath) {
           if (
@@ -273,7 +279,7 @@ export function rewriteTemplateExpression(
             return;
           }
         }
-        path.replaceWith(thisDot('$attrs'));
+        path.replaceWith(thisDot(name));
         path.skip();
         return;
       }

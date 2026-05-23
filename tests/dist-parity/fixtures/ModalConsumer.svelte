@@ -1,6 +1,7 @@
 <script lang="ts">
 import Modal from './Modal.svelte';
 import WrapperModal from './WrapperModal.svelte';
+import { applyListeners } from '@rozie/runtime-svelte';
 
 interface Props {
   title?: string;
@@ -20,7 +21,7 @@ function onConfirm() {
 </script>
 
 
-<div {...__rozieAttrs} class={["modal-consumer", (__rozieAttrs)?.class]}>
+<div {...__rozieAttrs} class={["modal-consumer", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs}>
   <Modal bind:open={open1}>{#snippet header({ close })}
       <h2>{title}</h2>
       <button class="close" onclick={close}>×</button>

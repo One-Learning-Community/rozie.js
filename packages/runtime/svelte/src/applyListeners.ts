@@ -79,9 +79,18 @@ const FORBIDDEN_KEYS: ReadonlySet<string> = new Set([
  */
 export function applyListeners(
   node: Element,
-  obj: Record<string, EventListener> | null | undefined,
+  // Plan 15-06 — relax the parameter type to `Record<string, unknown>`
+  // so the Svelte emit can pass the consumer's combined attrs+listeners
+  // cluster (`__rozieAttrs` — typed `Record<string, unknown>` because it
+  // carries both `id`/`aria-*` style scalars and `onclick`-style
+  // functions). The non-function values are silently skipped inside the
+  // attach + update walks (typeof check below), so the relaxed type is
+  // behaviorally identical to the narrower `Record<string, EventListener>`
+  // shape. svelte-check's strict mode reported the mismatch on the typed
+  // fixture set even though the dist-parity emit was byte-correct.
+  obj: Record<string, unknown> | null | undefined,
 ): {
-  update(next: Record<string, EventListener> | null | undefined): void;
+  update(next: Record<string, unknown> | null | undefined): void;
   destroy(): void;
 } {
   // Per-action-instance disposer snapshot. The Svelte runtime GCs the closure
@@ -89,12 +98,18 @@ export function applyListeners(
   const disposers = new Map<string, EventListener>();
 
   // Initial attach — walk obj ?? {}, skip FORBIDDEN_KEYS, capture handlers.
+  // Non-function values (mixed-in attribute scalars like `id: "x"`) are
+  // silently skipped — the consumer's combined attr+listener cluster
+  // (Svelte's `__rozieAttrs`) carries both shapes and only the function
+  // entries are listener candidates.
   const initial = obj ?? {};
   for (const [k, v] of Object.entries(initial)) {
     // SECURITY (T-15-V5-03) — never attach a pollution-vector key.
     if (FORBIDDEN_KEYS.has(k)) continue;
-    node.addEventListener(k, v);
-    disposers.set(k, v);
+    if (typeof v !== 'function') continue;
+    const fn = v as EventListener;
+    node.addEventListener(k, fn);
+    disposers.set(k, fn);
   }
 
   return {
@@ -113,14 +128,30 @@ export function applyListeners(
         }
       }
       // Pass 2: add new keys / re-bind changed-reference handlers.
+      // Non-function values are skipped (mirror of the initial-attach walk).
+      // If a key was previously a function and is now non-function (or
+      // vanished), the pass-1 loop already detached it; we only add/replace
+      // here when the new value is itself a function.
       for (const [k, v] of Object.entries(safeNext)) {
         // SECURITY (T-15-V5-03) — never attach a pollution-vector key.
         if (FORBIDDEN_KEYS.has(k)) continue;
+        if (typeof v !== 'function') {
+          // If the new value is non-function but a function was captured
+          // under this key previously, detach it (parallels the pass-1
+          // "key vanished" detach).
+          const prev = disposers.get(k);
+          if (prev !== undefined) {
+            node.removeEventListener(k, prev);
+            disposers.delete(k);
+          }
+          continue;
+        }
+        const fn = v as EventListener;
         const prev = disposers.get(k);
-        if (prev !== v) {
+        if (prev !== fn) {
           if (prev !== undefined) node.removeEventListener(k, prev);
-          node.addEventListener(k, v);
-          disposers.set(k, v);
+          node.addEventListener(k, fn);
+          disposers.set(k, fn);
         }
       }
     },

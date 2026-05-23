@@ -179,7 +179,7 @@ const f1 = () => undefined;
     expect(code).toContain("normalizeListeners");
   });
 
-  it('(6) bare $listeners (D-19 exempt): r-on="$listeners" → v-on="$listeners"', () => {
+  it('(6) bare $listeners (D-19 exempt): r-on="$listeners" → no-op (Vue 3 folds listeners into $attrs)', () => {
     const src = `${PROLOGUE}
 <template>
   <button r-on="$listeners">go</button>
@@ -188,16 +188,20 @@ const f1 = () => undefined;
     const code = compile(src);
     const tmpl = extractTemplate(code);
     expect(tmpl).toMatchSnapshot();
-    // D-19 exempt — bare $listeners passes through to Vue's native
-    // v-on="$listeners" with NO normalizeListeners wrap (consumer's
-    // $listeners cluster already carries lowercase target-native keys).
-    expect(tmpl).toContain('v-on="$listeners"');
+    // D-19 — Vue 3 has no `$listeners` instance property (that was Vue 2);
+    // listeners are folded into `$attrs` and flow through the existing
+    // `v-bind="$attrs"` auto-attribute-fallthrough. Plan 15-06 closed the
+    // vue-tsc TS2339 regression by suppressing the bare `$listeners` emit
+    // on the Vue side (the earlier `v-on="$listeners"` shape produced
+    // `Property '$listeners' does not exist on type` under vue-tsc strict
+    // mode AND a runtime warning).
+    expect(tmpl).not.toContain('v-on="$listeners"');
     expect(tmpl).not.toContain('normalizeListeners');
     // NO runtime helper imported.
     expect(code).not.toContain("import { normalizeListeners }");
   });
 
-  it('(7) bare $listeners + @click (R6 + D-19): both bind separately', () => {
+  it('(7) bare $listeners + @click (R6 + D-19): explicit @click stays; $listeners suppressed', () => {
     const src = `${PROLOGUE}
 <template>
   <button @click="f1" r-on="$listeners">go</button>
@@ -209,11 +213,12 @@ const f1 = () => undefined;
     const code = compile(src);
     const tmpl = extractTemplate(code);
     expect(tmpl).toMatchSnapshot();
-    // R6 + D-19 — both bind separately; DOM-level addEventListener stacking
-    // handles all-fire. NO normalizeListeners wrap on $listeners
-    // (consumer already wrote target-native keys).
+    // R6 + D-19 — the explicit `@click="f1"` stays; the bare-$listeners
+    // path is suppressed for Vue 3 (D-19 lowering — Vue folds listeners
+    // into $attrs). The author's @click binding fires; any consumer-passed
+    // click listener flows through `v-bind="$attrs"` automatically.
     expect(tmpl).toContain('@click="f1"');
-    expect(tmpl).toContain('v-on="$listeners"');
+    expect(tmpl).not.toContain('v-on="$listeners"');
     expect(tmpl).not.toContain('normalizeListeners');
   });
 });

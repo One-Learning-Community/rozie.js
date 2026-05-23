@@ -1,4 +1,6 @@
 <script lang="ts">
+import { applyListeners } from '@rozie/runtime-svelte';
+
 import type { Snippet } from 'svelte';
 
 interface Props {
@@ -21,7 +23,7 @@ const remaining = $derived(items.filter((i: any) => !i.done).length);
 </script>
 
 
-<ul {...__rozieAttrs} class={["list", (__rozieAttrs)?.class]}>
+<ul {...__rozieAttrs} class={["list", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs}>
   
   {#each items as item (item.id)}<li>
     {#if item}{@render item({ item, remaining })}{:else}

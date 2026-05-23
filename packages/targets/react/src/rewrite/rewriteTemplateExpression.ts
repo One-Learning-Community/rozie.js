@@ -119,8 +119,18 @@ export function rewriteTemplateExpression(
     // `attrs` is the synthesised binding the per-target shell will introduce
     // when synthesis is un-gated in Plan 14-05. Until then this rewrite is
     // observable only via manual `r-bind="$attrs"` fixtures (synthesis off).
+    //
+    // Phase 15 D-19 — `$listeners` lowers identically to bare `attrs`.
+    // React doesn't semantically separate listener props from attribute
+    // props (consumer-passed `onClick` lands in the same `_props` rest
+    // bucket as `id`); `attrs` IS the listener cluster. Rewriting at the
+    // template-expression layer (instead of declaring a `const $listeners
+    // = attrs` shell line) keeps the byte-shape consistent with `$attrs`
+    // and avoids a stale unused-decl warning for components that reference
+    // `$listeners` only in dead branches.
     Identifier(path) {
-      if (path.node.name !== '$attrs') return;
+      const ident = path.node.name;
+      if (ident !== '$attrs' && ident !== '$listeners') return;
       // Skip the LHS of a MemberExpression / OptionalMemberExpression (those
       // are handled by their own visitors when applicable). Skip property keys
       // on object literals (`{ $attrs: x }` is not a magic reference).

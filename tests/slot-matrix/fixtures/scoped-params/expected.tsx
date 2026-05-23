@@ -22,7 +22,7 @@ export default function ScopedParamsFixture(_props: ScopedParamsFixtureProps): J
 
   return (
     <>
-    <div {...attrs} className={clsx("scoped-params-fixture", (attrs.className as string | undefined))} data-rozie-s-94f3adc8="">
+    <div {...attrs} className={clsx("scoped-params-fixture", (attrs.className as string | undefined))} {...attrs} data-rozie-s-94f3adc8="">
       {(props.renderItem ?? props.slots?.['item'])?.({ value: props.label })}
     </div>
     </>

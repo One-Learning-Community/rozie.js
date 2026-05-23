@@ -21,7 +21,7 @@ export default function CheckboxRModel(props: CheckboxRModelProps): JSX.Element 
 
   return (
     <>
-    <label {...attrs} className={clsx(styles.toggle, (attrs.className as string | undefined))} data-rozie-s-5898a126="">
+    <label {...attrs} className={clsx(styles.toggle, (attrs.className as string | undefined))} {...attrs} data-rozie-s-5898a126="">
       
       <input type="checkbox" checked={checked} onChange={e => setChecked(e.target.checked)} data-rozie-s-5898a126="" />
       <span data-rozie-s-5898a126="">Enabled</span>

@@ -1,4 +1,6 @@
 <script lang="ts">
+import { applyListeners } from '@rozie/runtime-svelte';
+
 const throttledLReposition = (() => {
   let lastCall = 0;
   return (...args: any[]) => {
@@ -99,7 +101,7 @@ $effect(() => {
 </script>
 
 
-<div {...__rozieAttrs} class={["dropdown", (__rozieAttrs)?.class]}>
+<div {...__rozieAttrs} class={["dropdown", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs}>
   <div bind:this={triggerEl} onclick={toggle}>
     {@render trigger?.({ open, toggle })}
   </div>

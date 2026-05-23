@@ -159,6 +159,14 @@ export function emitSolid(ir: IRComponent, opts: EmitSolidOptions = {}): EmitSol
   // React/Solid `attrs`, Angular/Lit bespoke).
   const splitPropsCall = `const [local, attrs] = splitProps(${propsTarget}, [${propNames}]);\n`;
 
+  // Phase 15 D-19 — Solid rewrites `$listeners` directly to bare `attrs` at
+  // template-expression rewrite time (see rewriteTemplateExpression.ts —
+  // mirror of the `$attrs` rewrite). No separate `const $listeners = attrs`
+  // declaration is needed; the rewrite handles every JSX reference inline.
+  // The earlier separate-decl approach tripped eslint-plugin-solid's
+  // `solid/reactivity` rule (reactive `attrs` read outside JSX).
+  const listenersDecl = '';
+
   // 7. Compose shell.
   // Merge script injections: template-event wraps + listener wraps go after user arrows.
   const script = [
@@ -194,6 +202,7 @@ export function emitSolid(ir: IRComponent, opts: EmitSolidOptions = {}): EmitSol
     ctxInterfaces: slotResult.ctxInterfaces,
     mergePropsCall: scriptResult.mergePropsCall ?? undefined,
     splitPropsCall,
+    listenersDecl,
     hasDefaultSlot,
     script,
     hookSectionLines: scriptResult.hookSectionLines,
@@ -230,3 +239,4 @@ export function emitSolid(ir: IRComponent, opts: EmitSolidOptions = {}): EmitSol
 
   return { code: shell.ms.toString(), map: finalMap, diagnostics };
 }
+

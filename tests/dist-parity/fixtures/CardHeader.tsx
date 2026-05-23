@@ -19,7 +19,7 @@ export default function CardHeader(_props: CardHeaderProps): JSX.Element {
 
   return (
     <>
-    <header {...attrs} className={clsx(styles["card-header"], (attrs.className as string | undefined))} data-rozie-s-f3e60f5a="">
+    <header {...attrs} className={clsx(styles["card-header"], (attrs.className as string | undefined))} {...attrs} data-rozie-s-f3e60f5a="">
       <h3 className={styles["card-header__title"]} data-rozie-s-f3e60f5a="">{props.title}</h3>
       {(props.onClose) && <button className={styles["card-header__close"]} onClick={($event) => { ((props.onClose) as ((...args: any[]) => any) | undefined)?.($event); }} data-rozie-s-f3e60f5a="">×</button>}</header>
     </>

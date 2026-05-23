@@ -48,7 +48,7 @@ export default function TsPassthrough(_props: TsPassthroughProps): JSX.Element {
 
   return (
     <>
-      <button {...attrs} {...mergeListeners({ onClick: ($event) => { inc(1); } }, $listeners)} data-rozie-s-189ead9a="">{label}: {count}</button>
+      <button {...attrs} {...mergeListeners({ onClick: ($event) => { inc(1); } }, attrs)} data-rozie-s-189ead9a="">{label}: {count}</button>
     </>
   );
 }
@@ -95,7 +95,7 @@ export default function TsPassthrough(_props: TsPassthroughProps): JSX.Element {
 
   return (
     <>
-      <button {...attrs} {...mergeListeners({ onClick: ($event) => { inc(1); } }, $listeners)} data-rozie-s-189ead9a="">{label}: {count}</button>
+      <button {...attrs} {...mergeListeners({ onClick: ($event) => { inc(1); } }, attrs)} data-rozie-s-189ead9a="">{label}: {count}</button>
     </>
   );
 }

@@ -1,4 +1,6 @@
 <script lang="ts">
+import { applyListeners } from '@rozie/runtime-svelte';
+
 interface Props {
   [key: string]: unknown;
 }
@@ -19,7 +21,7 @@ const removeItem = (id: any) => {
 </script>
 
 
-<ul {...__rozieAttrs}>
+<ul {...__rozieAttrs} use:applyListeners={__rozieAttrs}>
   {#each items as e (e.id)}<li>
     <span>{e.label}</span>
     

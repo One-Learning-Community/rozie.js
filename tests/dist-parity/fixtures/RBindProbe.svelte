@@ -1,4 +1,6 @@
 <script lang="ts">
+import { applyListeners } from '@rozie/runtime-svelte';
+
 interface Props {
   [key: string]: unknown;
 }
@@ -7,7 +9,7 @@ let { ...__rozieAttrs }: Props = $props();
 </script>
 
 
-<div class="rbind-probe">
+<div class="rbind-probe" use:applyListeners={__rozieAttrs}>
   <span class={['a', 'b']} {...{ id: 'x' }}>canonical</span>
   <span {...{ id: 'y' }} class={['b', 'a']}>reordered</span>
 </div>

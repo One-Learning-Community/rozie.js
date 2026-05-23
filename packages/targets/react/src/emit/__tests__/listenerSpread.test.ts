@@ -181,7 +181,7 @@ const f1 = () => undefined;
     expect(code).toContain("normalizeListeners");
   });
 
-  it('(6) bare $listeners (D-19 exempt): r-on="$listeners" → {...$listeners}', () => {
+  it('(6) bare $listeners (D-19 exempt): r-on="$listeners" → {...attrs}', () => {
     const src = `${PROLOGUE}
 <template>
   <button r-on="$listeners">go</button>
@@ -191,12 +191,18 @@ const f1 = () => undefined;
     const jsx = extractJsx(code);
     expect(jsx).toMatchSnapshot();
     // D-19 exempt — no normalizeListeners wrap, no mergeListeners wrap.
-    expect(jsx).toContain('{...$listeners}');
+    // Phase 15-06 — the bare `$listeners` Identifier is rewritten to
+    // `attrs` at template-expression rewrite time (mirror of `$attrs` —
+    // both resolve to the splitProps-style rest binding). The emitted
+    // JSX spreads `attrs`, NOT `$listeners` literally. This closes the
+    // react-typecheck TS2304 (Cannot find name '$listeners') failure.
+    expect(jsx).toContain('{...attrs}');
+    expect(jsx).not.toContain('$listeners');
     expect(jsx).not.toContain('normalizeListeners');
     expect(jsx).not.toContain('mergeListeners');
   });
 
-  it('(7) bare $listeners + @click (R6 + D-19): mergeListeners({ onClick: ... }, $listeners)', () => {
+  it('(7) bare $listeners + @click (R6 + D-19): mergeListeners({ onClick: ... }, attrs)', () => {
     const src = `${PROLOGUE}
 <template>
   <button @click="f1" r-on="$listeners">go</button>
@@ -208,12 +214,13 @@ const f1 = () => undefined;
     const code = compile(src);
     const jsx = extractJsx(code);
     expect(jsx).toMatchSnapshot();
-    // R6 + D-19 — mergeListeners runs, but $listeners passes through
-    // UN-WRAPPED (no normalizeListeners around it).
+    // R6 + D-19 — mergeListeners runs; `$listeners` is rewritten to
+    // `attrs` at template-expression rewrite time. The emitted JSX
+    // merges `{ onClick: ... }` with `attrs` (NOT `$listeners`).
     expect(jsx).toContain('mergeListeners(');
-    expect(jsx).toContain('$listeners');
+    expect(jsx).toContain('attrs');
     expect(jsx).toContain('onClick:');
-    expect(jsx).not.toContain('normalizeListeners($listeners)');
-    expect(jsx).not.toContain('normalizeListeners(_$listeners)');
+    expect(jsx).not.toContain('$listeners');
+    expect(jsx).not.toContain('normalizeListeners(attrs)');
   });
 });

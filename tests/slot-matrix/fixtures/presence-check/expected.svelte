@@ -1,4 +1,6 @@
 <script lang="ts">
+import { applyListeners } from '@rozie/runtime-svelte';
+
 import type { Snippet } from 'svelte';
 
 interface Props {
@@ -17,7 +19,7 @@ const aside = $derived(__asideProp ?? snippets?.aside);
 </script>
 
 
-<div {...__rozieAttrs} class={["presence-check-fixture", (__rozieAttrs)?.class]}>
+<div {...__rozieAttrs} class={["presence-check-fixture", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs}>
   {#if aside}<aside>
     {#if aside}{@render aside()}{/if}
   </aside>{/if}</div>

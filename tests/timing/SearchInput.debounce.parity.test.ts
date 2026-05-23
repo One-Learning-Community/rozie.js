@@ -231,11 +231,18 @@ describe('Phase 5 success criterion #4 — @input.debounce(300) parity', () => {
     // Side-effect import — disclose-version sets a global flag for HMR.
     await import('svelte/internal/disclose-version');
     const svelte = await import('svelte');
+    // Phase 15-04 added `applyListeners` to the Svelte target emit (the
+    // synthesized auto-fallthrough lands `use:applyListeners={__rozieAttrs}`
+    // on the template root). The evalEsModule shim destructures the
+    // `applyListeners` named export at module init, so the @rozie/runtime-svelte
+    // module must be in the imports map.
+    const rozieRuntimeSvelte = await import('@rozie/runtime-svelte');
 
     const mod = await evalEsModule(compiled.js.code, {
       'svelte/internal/client': svelteInternalClient,
       'svelte/internal/disclose-version': {},
       svelte: svelte,
+      '@rozie/runtime-svelte': rozieRuntimeSvelte,
     });
     const Component = mod.default;
 

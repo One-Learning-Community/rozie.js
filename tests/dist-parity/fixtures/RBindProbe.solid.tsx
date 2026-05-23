@@ -16,7 +16,7 @@ export default function RBindProbe(_props: RBindProbeProps): JSX.Element {
     .a[data-rozie-s-8e2458d6] { color: #1f2937; }
     .b[data-rozie-s-8e2458d6] { font-weight: 700; }`}</style>
     <>
-    <div class={"rbind-probe"} data-rozie-s-8e2458d6="">
+    <div class={"rbind-probe"} {...attrs} data-rozie-s-8e2458d6="">
       <span class={'a' + " " + 'b'} {...{ id: 'x' }} data-rozie-s-8e2458d6="">canonical</span>
       <span {...{ id: 'y' }} class={'b' + " " + 'a'} data-rozie-s-8e2458d6="">reordered</span>
     </div>

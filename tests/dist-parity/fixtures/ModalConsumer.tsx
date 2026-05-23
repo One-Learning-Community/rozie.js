@@ -29,7 +29,7 @@ export default function ModalConsumer(_props: ModalConsumerProps): JSX.Element {
 
   return (
     <>
-    <div {...attrs} className={clsx(styles["modal-consumer"], (attrs.className as string | undefined))} data-rozie-s-5d081d3a="">
+    <div {...attrs} className={clsx(styles["modal-consumer"], (attrs.className as string | undefined))} {...attrs} data-rozie-s-5d081d3a="">
       <Modal open={open1} onOpenChange={setOpen1} data-rozie-s-5d081d3a="" renderHeader={({ close }) => (<>
           <h2 data-rozie-s-5d081d3a="">{props.title}</h2>
           <button className={styles.close} onClick={close} data-rozie-s-5d081d3a="">×</button>

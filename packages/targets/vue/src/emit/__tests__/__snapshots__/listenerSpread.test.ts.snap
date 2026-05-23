@@ -10,6 +10,6 @@ exports[`emitTemplateAttribute (Vue) — ListenerSpreadIR (Plan 15-04 Task 2) > 
 
 exports[`emitTemplateAttribute (Vue) — ListenerSpreadIR (Plan 15-04 Task 2) > (5) dynamic with-merge: @click + r-on dynamic → both bind separately (DOM-level stacking) 1`] = `"<button @click="f1" v-on="normalizeListeners(someObj)">go</button>"`;
 
-exports[`emitTemplateAttribute (Vue) — ListenerSpreadIR (Plan 15-04 Task 2) > (6) bare $listeners (D-19 exempt): r-on="$listeners" → v-on="$listeners" 1`] = `"<button v-on="$listeners">go</button>"`;
+exports[`emitTemplateAttribute (Vue) — ListenerSpreadIR (Plan 15-04 Task 2) > (6) bare $listeners (D-19 exempt): r-on="$listeners" → no-op (Vue 3 folds listeners into $attrs) 1`] = `"<button>go</button>"`;
 
-exports[`emitTemplateAttribute (Vue) — ListenerSpreadIR (Plan 15-04 Task 2) > (7) bare $listeners + @click (R6 + D-19): both bind separately 1`] = `"<button @click="f1" v-on="$listeners">go</button>"`;
+exports[`emitTemplateAttribute (Vue) — ListenerSpreadIR (Plan 15-04 Task 2) > (7) bare $listeners + @click (R6 + D-19): explicit @click stays; $listeners suppressed 1`] = `"<button @click="f1">go</button>"`;

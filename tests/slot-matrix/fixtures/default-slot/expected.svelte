@@ -1,4 +1,6 @@
 <script lang="ts">
+import { applyListeners } from '@rozie/runtime-svelte';
+
 import type { Snippet } from 'svelte';
 
 interface Props {
@@ -17,7 +19,7 @@ const children = $derived(__childrenProp ?? snippets?.children);
 </script>
 
 
-<div {...__rozieAttrs} class={["default-slot-fixture", (__rozieAttrs)?.class]}>
+<div {...__rozieAttrs} class={["default-slot-fixture", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs}>
   {@render children?.()}
 </div>
 

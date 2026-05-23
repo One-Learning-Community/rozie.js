@@ -18,7 +18,7 @@ export default function EventLoopVarShadow(props: EventLoopVarShadowProps): JSX.
 
   return (
     <>
-    <ul {...attrs} data-rozie-s-a955b18d="">
+    <ul {...attrs} {...attrs} data-rozie-s-a955b18d="">
       {items.map((e) => <li key={e.id} data-rozie-s-a955b18d="">
         <span data-rozie-s-a955b18d="">{e.label}</span>
         

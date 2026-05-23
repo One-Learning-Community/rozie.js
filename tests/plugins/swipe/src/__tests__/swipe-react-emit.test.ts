@@ -45,7 +45,17 @@ describe('MOD-05 — swipe compiles via Phase 4 emitReact (D-22b SemVer proof)',
     expect(result.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
     expect(result.code).toContain('swipe left guard');
     expect(result.code).toContain('clientX');
-    expect(result.code).toMatch(/onTouchStart=\{/);
+    // Phase 15-03 / R6 — when a `@touchstart` handler coexists with the
+    // synthesized listener auto-fallthrough on the same element, the React
+    // emit wraps both in a single `mergeListeners(...)` call instead of
+    // the bare `onTouchStart={...}` form the pre-Phase-15 emit produced.
+    // The synthesized auto-fallthrough is in scope on a fallthrough-default
+    // single-root template; the `mergeListeners` shape carries the
+    // touchstart handler as `{ onTouchStart: ($event) => {...} }` merged
+    // with `attrs` (the consumer-passed listener cluster). Assert the
+    // handler key + guard text still emit; the wrapping shape can be
+    // either form across Phase 15+.
+    expect(result.code).toMatch(/onTouchStart:|onTouchStart=\{/);
   });
 
   it("emits @touchstart.swipe('down') with clientY axis check", () => {

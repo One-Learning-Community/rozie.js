@@ -1,7 +1,7 @@
 import { LitElement, css, html, nothing } from 'lit';
 import { customElement } from 'lit/decorators.js';
 import { SignalWatcher, signal } from '@lit-labs/preact-signals';
-import { rozieSpread } from '@rozie/runtime-lit';
+import { rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 
 @customElement('rozie-class-selector-probe')
 export default class ClassSelectorProbe extends SignalWatcher(LitElement) {
@@ -34,7 +34,7 @@ export default class ClassSelectorProbe extends SignalWatcher(LitElement) {
 
   render() {
     return html`
-<div class="panel" data-handle=${".panel"} data-grip=${this.gripSelector} ${rozieSpread(this.$attrs)} data-rozie-s-899140be>
+<div class="panel" data-handle=${".panel"} data-grip=${this.gripSelector} ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-s-899140be>
   <span class="grip" aria-hidden="true" data-rozie-s-899140be>⋮⋮</span>
   ${this._ready.value ? html`<span data-rozie-s-899140be>ready</span>` : nothing}</div>
 `;
@@ -52,5 +52,19 @@ export default class ClassSelectorProbe extends SignalWatcher(LitElement) {
     const out: Record<string, string> = {};
     for (const a of Array.from(this.attributes)) out[a.name] = a.value;
     return out;
+  }
+
+  /**
+   * Phase 15 D-19 — consumer-passed listener cluster placeholder.
+   * Lit attaches event listeners directly on the host element via
+   * `addEventListener` (no per-instance prop rest binding), so the
+   * runtime value is undefined; the `rozieListeners` directive's
+   * nullish coercion (`obj ?? {}`) handles the no-op cleanly.
+   * The declaration exists to satisfy `tsc --noEmit` on consumer
+   * projects with strict mode — bare `$listeners` in `render()`
+   * would otherwise raise TS2304 (Cannot find name).
+   */
+  private get $listeners(): Record<string, EventListener> | undefined {
+    return undefined;
   }
 }

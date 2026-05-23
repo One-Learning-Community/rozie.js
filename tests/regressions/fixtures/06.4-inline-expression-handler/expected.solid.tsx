@@ -1,5 +1,6 @@
 import type { JSX } from 'solid-js';
 import { createSignal, mergeProps, splitProps } from 'solid-js';
+import { mergeListeners } from '@rozie/runtime-solid';
 
 interface InlineExprHandlerProps {
   closeOnBackdrop?: boolean;
@@ -19,7 +20,7 @@ export default function InlineExprHandler(_props: InlineExprHandlerProps): JSX.E
     <>
     <style>{`.backdrop[data-rozie-s-8ec7623e] { position: fixed; inset: 0; }`}</style>
     <>
-    <div {...attrs} class={"backdrop" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} onClick={($event) => { local.closeOnBackdrop && close(); }} data-rozie-s-8ec7623e="">
+    <div {...attrs} class={"backdrop" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} {...mergeListeners({ onClick: ($event) => { local.closeOnBackdrop && close(); } }, attrs)} data-rozie-s-8ec7623e="">
       
       <button onClick={close} data-rozie-s-8ec7623e="">Close</button>
     </div>

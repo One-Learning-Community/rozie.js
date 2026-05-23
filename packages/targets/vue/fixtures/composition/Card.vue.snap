@@ -1,6 +1,6 @@
 <template>
 
-  <div class="card" v-bind="$attrs" v-on="$listeners">
+  <div class="card" v-bind="$attrs">
     <CardHeader title="Hello"></CardHeader>
   </div>
 
