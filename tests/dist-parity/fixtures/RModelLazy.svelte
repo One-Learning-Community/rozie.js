@@ -9,7 +9,7 @@ let draft = $state('');
 </script>
 
 
-<div class="rmodel-lazy" {...__rozieAttrs}>
+<div {...__rozieAttrs} class={["rmodel-lazy", (__rozieAttrs)?.class]}>
   <input type="text" value={draft} onchange={($event) => draft = $event.currentTarget.value} placeholder="Commit on blur" />
   <p class="echo">Committed: {draft}</p>
 </div>

@@ -30,7 +30,7 @@ onMount(() => {
 </script>
 
 
-<div class="spike-root" bind:this={__rozieRoot} {...__rozieAttrs}>
+<div bind:this={__rozieRoot} {...__rozieAttrs} class={["spike-root", (__rozieAttrs)?.class]}>
   {@render children?.()}
 </div>
 

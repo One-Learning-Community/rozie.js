@@ -86,20 +86,59 @@ const BOOLEAN_HTML_ATTRS: ReadonlySet<string> = new Set([
 /**
  * Convert kebab-case to camelCase for component property bindings.
  *   `on-close` → `onClose`
- * `aria-label` and `data-*` are NEVER passed through this helper because
- * callers gate on tagKind: 'component'|'self'. HTML element bindings keep
- * kebab-case verbatim.
+ * HTML-natural kebab-case attribute names (`aria-*`, `data-*`) MUST stay
+ * kebab-case so they survive `$$restProps` and reach the wrapper's root
+ * element as proper HTML attributes — a wrapper's `$attrs` spread (= Svelte
+ * `$$restProps`) preserves the key shape verbatim, so a camelCased
+ * `ariaLabel` would land on the DOM as `arialabel` (or be dropped) rather
+ * than the desired `aria-label`. Same story for `data-*` and the locator
+ * tests that depend on `[data-testid="…"]`.
  */
+function isHtmlNaturalKebabName(name: string): boolean {
+  // Phase 14 — HTML-attribute-style kebab names that must NOT be camelCased
+  // when emitted on a Svelte component invocation. Producer-side, a wrapper
+  // using `inherit-attrs` (default) re-emits `$$restProps` onto its root
+  // element; receivers spread keys verbatim. Camel-mangling these would
+  // strand them as bogus camel-cased HTML attributes on the rendered DOM.
+  const lower = name.toLowerCase();
+  return (
+    lower.startsWith('aria-') ||
+    lower.startsWith('data-') ||
+    lower === 'role' ||
+    lower === 'class' ||
+    lower === 'style' ||
+    lower === 'id' ||
+    lower === 'title' ||
+    lower === 'lang' ||
+    lower === 'dir' ||
+    lower === 'tabindex'
+  );
+}
+
 function kebabToCamel(name: string): string {
   if (!name.includes('-')) return name;
   return name.replace(/-([a-z])/g, (_, ch: string) => ch.toUpperCase());
 }
 
-/** Resolve the emitted attribute name given the host tag kind. */
+/**
+ * Resolve the emitted attribute name given the host tag kind.
+ *
+ * On Svelte component invocations, only `on-foo`-style author-defined prop
+ * names get camelCased (so a `:on-close` binding lands on the producer's
+ * declared `onClose` prop). HTML-natural attribute names — `aria-*`,
+ * `data-*`, plus a small set of plain HTML attrs (`role`, `class`, `style`,
+ * etc.) — pass through unchanged so the producer's `$$restProps` spread
+ * reaches the root element as legal HTML attributes.
+ *
+ * Bare HTML element hosts ALWAYS keep kebab-case verbatim (the caller
+ * passes `elementTagKind: 'html'`).
+ */
 function resolveAttrName(name: string, ctx: EmitAttrCtx): string {
-  return ctx.elementTagKind === 'component' || ctx.elementTagKind === 'self'
-    ? kebabToCamel(name)
-    : name;
+  if (ctx.elementTagKind !== 'component' && ctx.elementTagKind !== 'self') {
+    return name;
+  }
+  if (isHtmlNaturalKebabName(name)) return name;
+  return kebabToCamel(name);
 }
 
 /** Minimal HTML attribute-value escape. */
@@ -324,6 +363,46 @@ function extractLiteralClassStyleFromSpread(
   );
   return { classValue, styleValue };
 }
+
+/**
+ * Phase 14 R6 — Svelte opaque-spread class merge.
+ *
+ * Svelte 5's compiled output for `<el class={[...]} {...spread}>` is a single
+ * props object `{ class: [...], ...spread }` — the spread is *last-wins* per
+ * key, so a consumer-passed `class="extra-variant"` inside the spread silently
+ * overwrites the wrapper's class array. For an OPAQUE spread (`$attrs` from
+ * auto-fallthrough, or a dynamic `r-bind="obj"`) we cannot extract the spread's
+ * `class` at compile time, so instead we append a read of the spread's `class`
+ * to the tail of the explicit class array — Svelte's array-class syntax filters
+ * falsy entries and joins truthy strings, so an absent consumer class is a
+ * harmless `undefined`.
+ *
+ * Returns the source-level expression code to read `class` from at runtime, or
+ * null for a LITERAL spread (handled by `extractLiteralClassStyleFromSpread`).
+ *
+ * `$attrs`             → `__rozieAttrs?.class`
+ * Dynamic `r-bind`     → `(<rewritten expr>)?.class`
+ * LITERAL `r-bind`     → null (literal class is extracted at compile time)
+ */
+function opaqueSpreadClassReadExpr(
+  attr: Extract<AttributeBinding, { kind: 'spreadBinding' }>,
+  ir: IRComponent,
+): string | null {
+  if (t.isObjectExpression(attr.expression)) return null;
+  // `rewriteTemplateExpression` rewrites bare `$attrs` → `__rozieAttrs`, and
+  // any other dynamic expression passes through with $data./$props. prefix
+  // stripping applied. We always wrap in parens + `?.class` so the read is
+  // null-safe whether the spread evaluates to undefined or an object.
+  const exprCode = rewriteTemplateExpression(attr.expression, ir);
+  return `(${exprCode})?.class`;
+}
+
+// NOTE on style: Svelte 5's compiled output places per-property `style:` directive
+// state under a Symbol-keyed slot (STYLES_KEY) AFTER any spread inside the
+// generated props object — i.e. `{ class: […], …spread, [STYLES_KEY]: { … } }`.
+// This means an opaque spread's `style` key is already last-wins-overwritten by
+// the per-property directives in our existing emit (see Spike 004 `:style`-as-
+// directives lowering). No opaque-style merge is needed.
 
 /**
  * Render interpolated segments as the inside of a JS template literal
@@ -649,8 +728,39 @@ export function emitAttributes(
     }
   }
 
+  // Phase 14 R6 — OPAQUE-spread class merge (Round 3, ThemedButton fix). When
+  // the host element carries BOTH an explicit `class` AND an OPAQUE spread
+  // (`$attrs` from auto-fallthrough, or any non-literal `r-bind="<expr>"`),
+  // Svelte 5's compiled props-object reorders to `{ class: […], …spread, … }`
+  // — the spread is *last-wins* per key, so the consumer's `class="extra"`
+  // silently overwrites the wrapper's class array. Compile-time class extraction
+  // is impossible for an opaque spread (keys unknown), so we append a runtime
+  // read of `(spread)?.class` to the tail of the explicit class array; Svelte's
+  // array-class syntax filters falsy entries and joins truthy strings, so a
+  // consumer who passed no class lands `undefined` (harmless).
+  const opaqueSpreadClassReads: string[] = [];
+  for (const a of attrs) {
+    if (a.kind !== 'spreadBinding') continue;
+    if (literalClassBindings.has(a)) continue; // LITERAL — class already extracted.
+    const readExpr = opaqueSpreadClassReadExpr(a, ctx.ir);
+    if (readExpr !== null) opaqueSpreadClassReads.push(readExpr);
+  }
+  const needsOpaqueSpreadClassMerge =
+    hasExplicitClass && opaqueSpreadClassReads.length > 0;
+
   const out: string[] = [];
   const consumed = new WeakSet<AttributeBinding>();
+
+  // Phase 14.1 — when an opaque spread sits alongside an explicit class
+  // (or style) that needs merging, the explicit attribute MUST emit AFTER
+  // the spread in source order. Svelte 5's compiled props object is built
+  // left-to-right, so `class={[…]} {...spread}` produces
+  // `{class:[…], …spread}` — and `…spread.class` (last key in the object
+  // literal) silently overrides the array. Deferring the merged class/style
+  // until after every other attribute emits inverts the compiled order to
+  // `{…spread, class:[merged + (spread)?.class]}`, which lets the array win.
+  // Mirrors the Solid R6 reorder shipped in round 3.
+  const deferredMergedClassStyle: string[] = [];
 
   for (const a of attrs) {
     if (consumed.has(a)) continue;
@@ -672,9 +782,10 @@ export function emitAttributes(
 
     if (a.name === 'class' || a.name === 'style') {
       const literalMap = a.name === 'class' ? literalClassBindings : literalStyleBindings;
-      const hasLiteralMerge = literalMap.size > 0;
+      const hasOpaqueMerge =
+        a.name === 'class' && needsOpaqueSpreadClassMerge;
       const totalCount = (counts.get(a.name) ?? 0) + literalMap.size;
-      if (totalCount > 1) {
+      if (totalCount > 1 || hasOpaqueMerge) {
         // Walk the FULL attrs list in source order, picking out the
         // same-named bindings + any synthesised binding extracted from an
         // `r-bind` LITERAL at its source position. Preserves positional
@@ -690,7 +801,24 @@ export function emitAttributes(
         }
         for (const x of merged) consumed.add(x);
         const segments = merged.map((x) => attrToArraySegment(x, ctx.ir));
-        out.push(`${a.name}={[${segments.join(', ')}]}`);
+        // R6 opaque-spread class merge: append a `(spread)?.class` read for
+        // every opaque spread to the array tail. Svelte's array-class syntax
+        // filters falsy entries, so a consumer who passed no class contributes
+        // a harmless `undefined`.
+        if (hasOpaqueMerge) {
+          for (const readExpr of opaqueSpreadClassReads) {
+            segments.push(readExpr);
+          }
+        }
+        // Phase 14.1 — defer the merged class output to AFTER every spread
+        // so the compiled props-object lands as `{…spread, class:[…]}` and
+        // the array (with the appended `(spread)?.class` read) wins. Without
+        // this reorder the round-3 fix is no-op against an opaque spread.
+        if (hasOpaqueMerge) {
+          deferredMergedClassStyle.push(`${a.name}={[${segments.join(', ')}]}`);
+        } else {
+          out.push(`${a.name}={[${segments.join(', ')}]}`);
+        }
         continue;
       }
     }
@@ -700,6 +828,7 @@ export function emitAttributes(
     consumed.add(a);
   }
 
+  out.push(...deferredMergedClassStyle);
   return out.join(' ');
 }
 

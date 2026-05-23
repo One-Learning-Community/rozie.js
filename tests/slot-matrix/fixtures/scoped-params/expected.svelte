@@ -19,7 +19,7 @@ const item = $derived(__itemProp ?? snippets?.item);
 </script>
 
 
-<div class="scoped-params-fixture" {...__rozieAttrs}>
+<div {...__rozieAttrs} class={["scoped-params-fixture", (__rozieAttrs)?.class]}>
   {@render item?.({ value: label })}
 </div>
 

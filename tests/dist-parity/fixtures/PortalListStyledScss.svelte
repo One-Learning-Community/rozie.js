@@ -96,7 +96,7 @@ onMount(() => {
 </script>
 
 
-<div class="rozie-portal-list" bind:this={__rozieRoot} {...__rozieAttrs}>
+<div bind:this={__rozieRoot} {...__rozieAttrs} class={["rozie-portal-list", (__rozieAttrs)?.class]}>
   
 </div>
 

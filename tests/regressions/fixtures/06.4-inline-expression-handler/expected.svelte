@@ -14,7 +14,7 @@ const close = () => {
 </script>
 
 
-<div class="backdrop" {...__rozieAttrs} onclick={($event) => { closeOnBackdrop && close(); }}>
+<div {...__rozieAttrs} class={["backdrop", (__rozieAttrs)?.class]} onclick={($event) => { closeOnBackdrop && close(); }}>
   
   <button onclick={close}>Close</button>
 </div>

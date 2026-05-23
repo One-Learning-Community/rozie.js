@@ -8,7 +8,7 @@ let { badges = (() => [])(), ...__rozieAttrs }: Props = $props();
 </script>
 
 
-<div class="badge-grid" {...__rozieAttrs}>
+<div {...__rozieAttrs} class={["badge-grid", (__rozieAttrs)?.class]}>
   {#each badges as badge (badge)}<span class="badge badge--neutral">
     {badge}
   </span>{/each}

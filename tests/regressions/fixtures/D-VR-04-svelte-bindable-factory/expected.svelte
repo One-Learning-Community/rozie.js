@@ -10,7 +10,7 @@ const remaining = $derived(items.filter((i: any) => !i.done).length);
 </script>
 
 
-<div class="count" {...__rozieAttrs}>{remaining}</div>
+<div {...__rozieAttrs} class={["count", (__rozieAttrs)?.class]}>{remaining}</div>
 
 
 <style>

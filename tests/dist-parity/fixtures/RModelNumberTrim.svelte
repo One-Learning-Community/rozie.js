@@ -9,7 +9,7 @@ let quantity = $state(0);
 </script>
 
 
-<div class="rmodel-number-trim" {...__rozieAttrs}>
+<div {...__rozieAttrs} class={["rmodel-number-trim", (__rozieAttrs)?.class]}>
   <input type="text" value={quantity} oninput={($event) => quantity = (Number.isNaN(Number.parseFloat((($event.currentTarget.value).trim()))) ? (($event.currentTarget.value).trim()) : Number.parseFloat((($event.currentTarget.value).trim())))} placeholder="Enter a quantity" />
   <p class="echo">Quantity: {quantity}</p>
 </div>

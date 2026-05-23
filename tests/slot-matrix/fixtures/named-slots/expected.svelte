@@ -20,7 +20,7 @@ const footer = $derived(__footerProp ?? snippets?.footer);
 </script>
 
 
-<div class="named-slots-fixture" {...__rozieAttrs}>
+<div {...__rozieAttrs} class={["named-slots-fixture", (__rozieAttrs)?.class]}>
   <header>
     {@render header?.()}
   </header>

@@ -14,7 +14,7 @@ let { node = (() => ({
 </script>
 
 
-<div class="tree-node" {...__rozieAttrs}>
+<div {...__rozieAttrs} class={["tree-node", (__rozieAttrs)?.class]}>
   <span class="tree-node__label">{node.label}</span>
   {#if node.children && node.children.length > 0}<ul class="tree-node__children">
     {#each node.children as child, childIndex (child.id)}<li data-index={childIndex}>

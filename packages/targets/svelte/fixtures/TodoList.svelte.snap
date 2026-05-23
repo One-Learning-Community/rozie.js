@@ -71,7 +71,7 @@ const remaining = $derived(items.filter((i: any) => !i.done).length);
 </script>
 
 
-<div class="todo-list" {...__rozieAttrs}>
+<div {...__rozieAttrs} class={["todo-list", (__rozieAttrs)?.class]}>
   <header>
     {#if header}{@render header({ remaining, total: items.length })}{:else}
       

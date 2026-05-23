@@ -8,5 +8,5 @@ let { title, ...__rozieAttrs }: Props = $props();
 </script>
 
 
-  <div class="card-header" {...__rozieAttrs}>{title}</div>
+  <div {...__rozieAttrs} class={["card-header", (__rozieAttrs)?.class]}>{title}</div>
 

@@ -9,7 +9,7 @@ let { ...__rozieAttrs }: Props = $props();
 </script>
 
 
-  <div class="modal" {...__rozieAttrs}>
+  <div {...__rozieAttrs} class={["modal", (__rozieAttrs)?.class]}>
     <Counter></Counter>
   </div>
 

@@ -20,7 +20,7 @@ function onConfirm() {
 </script>
 
 
-<div class="modal-consumer" {...__rozieAttrs}>
+<div {...__rozieAttrs} class={["modal-consumer", (__rozieAttrs)?.class]}>
   <Modal bind:open={open1}>{#snippet header({ close })}
       <h2>{title}</h2>
       <button class="close" onclick={close}>×</button>

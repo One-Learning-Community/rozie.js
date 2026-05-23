@@ -99,7 +99,7 @@ $effect(() => {
 </script>
 
 
-<div class="dropdown" {...__rozieAttrs}>
+<div {...__rozieAttrs} class={["dropdown", (__rozieAttrs)?.class]}>
   <div bind:this={triggerEl} onclick={toggle}>
     {@render trigger?.({ open, toggle })}
   </div>

@@ -17,7 +17,7 @@ const status = $derived(__statusProp ?? snippets?.status);
 </script>
 
 
-<div class="default-content-fallback-fixture" {...__rozieAttrs}>
+<div {...__rozieAttrs} class={["default-content-fallback-fixture", (__rozieAttrs)?.class]}>
   {#if status}{@render status()}{:else}
     <span class="fallback">No status provided.</span>
   {/if}

@@ -21,7 +21,7 @@ const remaining = $derived(items.filter((i: any) => !i.done).length);
 </script>
 
 
-<ul class="list" {...__rozieAttrs}>
+<ul {...__rozieAttrs} class={["list", (__rozieAttrs)?.class]}>
   
   {#each items as item (item.id)}<li>
     {#if item}{@render item({ item, remaining })}{:else}

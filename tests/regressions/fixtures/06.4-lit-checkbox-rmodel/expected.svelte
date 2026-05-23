@@ -8,7 +8,7 @@ let { checked = $bindable(false), ...__rozieAttrs }: Props = $props();
 </script>
 
 
-<label class="toggle" {...__rozieAttrs}>
+<label {...__rozieAttrs} class={["toggle", (__rozieAttrs)?.class]}>
   
   <input type="checkbox" bind:checked={checked} />
   <span>Enabled</span>

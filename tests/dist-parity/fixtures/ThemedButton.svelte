@@ -13,7 +13,7 @@ let {
 </script>
 
 
-<button class={["btn", variant]} style:--btn-bg={'#3b82f6'} style:--btn-fg={'#ffffff'} {...__rozieAttrs}>
+<button style:--btn-bg={'#3b82f6'} style:--btn-fg={'#ffffff'} {...__rozieAttrs} class={["btn", variant, (__rozieAttrs)?.class]}>
   {label}
 </button>
 

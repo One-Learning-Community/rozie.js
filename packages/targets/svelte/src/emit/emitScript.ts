@@ -79,6 +79,64 @@ function genCode(node: t.Node): string {
 }
 
 /**
+ * Phase 14.1 follow-up — does any element in the IR template carry a
+ * `spreadBinding` attribute? The Plan 14-05 gates at three sites in this
+ * module only synthesise the `...__rozieAttrs` destructure (and its
+ * accompanying Props interface index signature + the no-props-block
+ * short-circuit) when `inheritAttrs !== false`. That's correct for
+ * auto-fallthrough, but wrong for the explicit-manual case:
+ * `inherit-attrs="false"` plus author-written `r-bind="$attrs"` produces a
+ * `spreadBinding` whose template emit references `__rozieAttrs` — but the
+ * destructure that declares it is gated off, so the rendered component hits
+ * "__rozieAttrs is not defined" at runtime and the Svelte tree collapses.
+ *
+ * Mirrors the Lit + React fixes: `inherit-attrs="false"` only opts out of
+ * auto-fallthrough, not out of the author's right to reference `$attrs`
+ * explicitly via `r-bind="$attrs"`.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function templateUsesSpreadBinding(node: any): boolean {
+  if (node === null || node === undefined) return false;
+  if (node.type === 'TemplateElement') {
+    for (const a of node.attributes ?? []) {
+      if (a.kind === 'spreadBinding') return true;
+    }
+    for (const c of node.children ?? []) {
+      if (templateUsesSpreadBinding(c)) return true;
+    }
+    return false;
+  }
+  if (node.type === 'TemplateConditional' || node.type === 'TemplateMatch') {
+    for (const branch of node.branches ?? []) {
+      for (const c of branch.body ?? []) {
+        if (templateUsesSpreadBinding(c)) return true;
+      }
+    }
+    if (node.hostElement && templateUsesSpreadBinding(node.hostElement)) return true;
+    return false;
+  }
+  if (node.type === 'TemplateLoop') {
+    for (const c of node.body ?? []) {
+      if (templateUsesSpreadBinding(c)) return true;
+    }
+    return false;
+  }
+  if (node.type === 'TemplateFragment') {
+    for (const c of node.children ?? []) {
+      if (templateUsesSpreadBinding(c)) return true;
+    }
+    return false;
+  }
+  if (node.type === 'TemplateSlotInvocation') {
+    for (const c of node.fallback ?? []) {
+      if (templateUsesSpreadBinding(c)) return true;
+    }
+    return false;
+  }
+  return false;
+}
+
+/**
  * Emit `() => body` for an Expression or BlockStatement body.
  *
  * Building the arrow as a Babel node (rather than string-templating
@@ -228,7 +286,13 @@ function buildPropsInterfaceFields(ir: IRComponent): string[] {
   // above; only the rest bucket accepts arbitrary keys (mirrors Vue's
   // `$attrs: Record<string, unknown>` magic accessor / React's
   // `Omit<HTMLAttributes, …>` spread idiom).
-  if (ir.inheritAttrs !== false) {
+  //
+  // Phase 14.1 follow-up — the explicit-manual case (`inherit-attrs="false"`
+  // + author-written `r-bind="$attrs"`) ALSO destructures `...__rozieAttrs`
+  // via the gate-widen at `buildPropsDestructureEntries`; that destructure
+  // needs a matching `Record<string,unknown>` slot on the Props interface or
+  // svelte-check fails the rest pattern.
+  if (ir.inheritAttrs !== false || templateUsesSpreadBinding(ir.template)) {
     lines.push('  [key: string]: unknown;');
   }
 
@@ -329,7 +393,13 @@ function buildPropsDestructureEntries(ir: IRComponent): string[] {
   // in `rewriteTemplateExpression.ts` lowers `$attrs` → `__rozieAttrs` and
   // this entry binds the rest. When `inheritAttrs === false`, no entry is
   // added (and the synthesis pass skips the spread injection per R5).
-  if (ir.inheritAttrs !== false) {
+  //
+  // Phase 14.1 follow-up — also synthesise when the template carries an
+  // explicit `spreadBinding` (`r-bind="$attrs"`). Without this, the
+  // template emit references `__rozieAttrs` (via the `$attrs` → `__rozieAttrs`
+  // rewrite) while the destructure that declares it is gated off, so the
+  // component crashes with "__rozieAttrs is not defined" at runtime.
+  if (ir.inheritAttrs !== false || templateUsesSpreadBinding(ir.template)) {
     entries.push('...__rozieAttrs');
   }
 
@@ -369,7 +439,12 @@ function emitPropsBlock(ir: IRComponent): string {
   // template-root `{...$attrs}` spread (lower.ts `synthesizeAttrsFallthrough`)
   // resolves. The condition below therefore considers attr-fallthrough as a
   // gating signal alongside the legacy props/slots/emits trio.
-  const hasAttrsFallthrough = ir.inheritAttrs !== false;
+  //
+  // Phase 14.1 follow-up — also widen the gate to the explicit-manual case
+  // (`inherit-attrs="false"` + `r-bind="$attrs"`), which carries a
+  // `spreadBinding` in the IR template.
+  const hasAttrsFallthrough =
+    ir.inheritAttrs !== false || templateUsesSpreadBinding(ir.template);
   if (
     ir.props.length === 0 &&
     ir.slots.length === 0 &&

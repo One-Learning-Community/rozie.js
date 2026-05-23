@@ -27,7 +27,7 @@ onMount(() => {
 </script>
 
 
-<div class="ticker" {...__rozieAttrs}>{ticks}</div>
+<div {...__rozieAttrs} class={["ticker", (__rozieAttrs)?.class]}>{ticks}</div>
 
 
 <style>

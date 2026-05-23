@@ -17,7 +17,7 @@ const aside = $derived(__asideProp ?? snippets?.aside);
 </script>
 
 
-<div class="presence-check-fixture" {...__rozieAttrs}>
+<div {...__rozieAttrs} class={["presence-check-fixture", (__rozieAttrs)?.class]}>
   {#if aside}<aside>
     {#if aside}{@render aside()}{/if}
   </aside>{/if}</div>

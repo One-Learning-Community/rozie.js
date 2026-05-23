@@ -22,7 +22,7 @@ const children = $derived(__childrenProp ?? snippets?.children);
 </script>
 
 
-<section class="panel" {...__rozieAttrs}>
+<section {...__rozieAttrs} class={["panel", (__rozieAttrs)?.class]}>
   {#if header || title}<header>
     
     {#if header}{@render header()}{:else}{title}{/if}

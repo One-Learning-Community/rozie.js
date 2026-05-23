@@ -20,7 +20,7 @@ const inner = $derived(__innerProp ?? snippets?.inner);
 </script>
 
 
-<div class="outer" {...__rozieAttrs}>
+<div {...__rozieAttrs} class={["outer", (__rozieAttrs)?.class]}>
   
   {#if wrapper}{@render wrapper()}{:else}
     <div class="wrapper-fallback">

@@ -10,10 +10,10 @@ let { ...__rozieAttrs }: Props = $props();
 </script>
 
 
-<div class="themed-button-consumer" {...__rozieAttrs}>
-  <ThemedButton id="auto-btn" type="button" ariaLabel="Auto-fallthrough button" dataTestid="auto-themed-button" class="extra-variant" style="--btn-bg: #ef4444" label={'Auto'}></ThemedButton>
+<div {...__rozieAttrs} class={["themed-button-consumer", (__rozieAttrs)?.class]}>
+  <ThemedButton id="auto-btn" type="button" aria-label="Auto-fallthrough button" data-testid="auto-themed-button" class="extra-variant" style="--btn-bg: #ef4444" label={'Auto'}></ThemedButton>
 
-  <ThemedButtonManual id="manual-btn" type="button" ariaLabel="Manual fallthrough button" dataTestid="manual-themed-button" class="extra-variant" style="--btn-bg: #10b981" label={'Manual'}></ThemedButtonManual>
+  <ThemedButtonManual id="manual-btn" type="button" aria-label="Manual fallthrough button" data-testid="manual-themed-button" class="extra-variant" style="--btn-bg: #10b981" label={'Manual'}></ThemedButtonManual>
 </div>
 
 

@@ -1,5 +1,5 @@
 
-<div class="todo-list" {...__rozieAttrs}>
+<div {...__rozieAttrs} class={["todo-list", (__rozieAttrs)?.class]}>
   <header>
     {#if header}{@render header({ remaining, total: items.length })}{:else}
       

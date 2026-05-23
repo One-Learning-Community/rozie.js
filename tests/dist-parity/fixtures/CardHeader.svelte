@@ -13,7 +13,7 @@ let {
 </script>
 
 
-<header class="card-header" {...__rozieAttrs}>
+<header {...__rozieAttrs} class={["card-header", (__rozieAttrs)?.class]}>
   <h3 class="card-header__title">{title}</h3>
   {#if onClose}<button class="card-header__close" onclick={($event) => { (onClose)($event); }}>×</button>{/if}</header>
 

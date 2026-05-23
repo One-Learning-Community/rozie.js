@@ -1,5 +1,9 @@
 <script lang="ts">
+interface Props {
+  [key: string]: unknown;
+}
 
+let { ...__rozieAttrs }: Props = $props();
 </script>
 
 

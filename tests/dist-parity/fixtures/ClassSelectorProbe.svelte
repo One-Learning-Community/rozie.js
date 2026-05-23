@@ -20,7 +20,7 @@ onMount(() => {
 </script>
 
 
-<div class="panel" data-handle={".panel"} data-grip={gripSelector} {...__rozieAttrs}>
+<div data-handle={".panel"} data-grip={gripSelector} {...__rozieAttrs} class={["panel", (__rozieAttrs)?.class]}>
   <span class="grip" aria-hidden="true">⋮⋮</span>
   {#if ready}<span>ready</span>{/if}</div>
 

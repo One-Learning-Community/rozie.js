@@ -23,7 +23,7 @@ const children = $derived(__childrenProp ?? snippets?.children);
 </script>
 
 
-<article class="card" {...__rozieAttrs}>
+<article {...__rozieAttrs} class={["card", (__rozieAttrs)?.class]}>
   <CardHeader title={title} onClose={onClose}></CardHeader>
   <div class="card__body">
     {@render children?.()}

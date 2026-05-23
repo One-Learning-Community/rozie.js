@@ -17,7 +17,7 @@ const children = $derived(__childrenProp ?? snippets?.children);
 </script>
 
 
-<div class="default-slot-fixture" {...__rozieAttrs}>
+<div {...__rozieAttrs} class={["default-slot-fixture", (__rozieAttrs)?.class]}>
   {@render children?.()}
 </div>
 
