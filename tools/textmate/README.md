@@ -7,7 +7,7 @@ Syntax highlighting for `.rozie` Single-File Component files. Consumed by JetBra
 Search **Rozie** in the Extensions view, or install from a local `.vsix` via:
 
 ```
-code --install-extension rozie-textmate-0.2.0.vsix
+code --install-extension rozie-textmate-0.3.0.vsix
 ```
 
 The marketplace listing is pending — the bundle is publishable but has not yet been published. See **Marketplace publish** below for the package + publish workflow. Version history is in [`CHANGELOG.md`](CHANGELOG.md).
@@ -16,14 +16,14 @@ The marketplace listing is pending — the bundle is publishable but has not yet
 
 - SFC top-level blocks: `<template>`, `<script>` / `<script lang="ts">`, `<props>`, `<data>`, `<listeners>`, `<components>`, `<style>` / `<style lang="scss">`
 - Block content delegated to host grammars — JavaScript for `<script>`/`<props>`/`<data>`/`<listeners>`/`<components>`, TypeScript for `<script lang="ts">`, CSS for `<style>`, SCSS for `<style lang="scss">`, HTML for `<template>`
-- `r-*` directives — `r-for`, `r-if`, `r-else-if`, `r-else`, `r-show`, `r-model`, `r-html`, `r-text`, `r-bind`, `r-on`, plus the switch-style conditionals `r-match` / `r-case` / `r-default`
+- `r-*` directives — `r-for`, `r-if`, `r-else-if`, `r-else`, `r-show`, `r-model`, `r-html`, `r-text`, `r-bind`, `r-on`, plus the switch-style conditionals `r-match` / `r-case` / `r-default`. The object-spread forms `r-bind="obj"` and `r-on="obj"` carry no special scope — the value is a plain JS expression and routes to the embedded JavaScript grammar.
 - Directive argument-form `r-model:propName="$data.x"` — the directive name, `:`, and the propName are scoped distinctly (consumer-side two-way binding)
 - `r-model` modifier chains — `r-model.lazy.number.trim`, and the `r-model:propName.lazy` argument-plus-modifier form — scoped with the same modifier-chain treatment as event-modifier chains
 - Event bindings with arbitrary modifier chains and arguments: `@click.outside($refs.x).debounce(300).stop`
 - Prop binding shorthand `:propName="expr"` (kebab-case prop names supported)
 - Slot-fill shorthand on `<template>` tags: `#name`, `#default`, `#[$data.dynamicName]`, and the scoped-params form `#header="{ close }"`
 - Mustache interpolation `{{ expr }}` — supported in text content AND attribute values
-- Special `$`-identifiers: `$props`, `$data`, `$refs`, `$emit`, `$computed`, `$onMount`, `$onUnmount`, `$onUpdate`, `$watch`, `$slots`, `$el`, `$portals`, `$classSelector`
+- Special `$`-identifiers: `$props`, `$data`, `$refs`, `$emit`, `$event`, `$computed`, `$onMount`, `$onUnmount`, `$onUpdate`, `$watch`, `$slots`, `$el`, `$portals`, `$classSelector`, `$attrs`, `$listeners`
 - `ref="…"` template-ref attribute
 
 ## Bundle layout
@@ -98,7 +98,7 @@ Open the fixture files under `tools/textmate/fixtures/` — `Counter.rozie`, `Dr
 
 - `<style scoped>` highlights identically to `<style>` — there is no visual treatment for the `scoped` attribute itself.
 - The `.modifier` chain is matched on every `r-*` directive, not only `r-model` — e.g. `r-show.foo` colours `.foo` as if it were a valid modifier. This is intentional: the grammar is a colorizer, and the compiler rejects modifier misuse semantically (ROZ961 / ROZ962).
-- `$event` — the reserved event-handler closure parameter — is not highlighted. It is meaningful only inside `@event` handler expressions; the global magic-identifier rule would mis-scope it in `<script>` and elsewhere.
+- `$event` is scoped as a magic identifier globally, not only inside `@event` handlers. The grammar is forgiving — a reference to `$event` in `<script>` outside an event handler colours as if it were valid; the compiler raises the actual diagnostic (ROZ964).
 - No folding rules, no indentation rules, no brace-matching, no completion, no diagnostics. This is a colorizer only.
 - Modifier-arg lists tokenize their contents as a JS expression, but errors (mismatched parens, etc.) are not surfaced — the grammar is forgiving.
 - The top-level `<template>` SFC block is matched only when `<template>` (and the closing `</template>`) appear flush-left at column 0. This is what lets nested `<template #header>` slot-fill tags inside the block coexist with the block boundaries — TextMate has no stack-aware tag matching, so indentation is the only signal. If you indent the SFC's top-level block, slot-fill highlighting will appear correct but the outer block end will be detected at the FIRST `</template>` (the inner one), losing highlighting on whatever follows.
@@ -120,7 +120,7 @@ Open the fixture files under `tools/textmate/fixtures/` — `Counter.rozie`, `Dr
 2. From `tools/textmate/`:
 
    ```
-   pnpm package          # produces rozie-textmate-0.2.0.vsix
+   pnpm package          # produces rozie-textmate-0.3.0.vsix
    pnpm publish          # after `vsce login <publisher>`, publishes to the marketplace
    ```
 

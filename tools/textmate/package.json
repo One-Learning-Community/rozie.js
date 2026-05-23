@@ -2,7 +2,7 @@
   "name": "rozie-textmate",
   "displayName": "Rozie",
   "description": "Syntax highlighting for .rozie Single-File Component files",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "publisher": "onelearningcommunity",
   "license": "MIT",
   "repository": {

@@ -5,6 +5,20 @@ All notable changes to the Rozie TextMate / VS Code extension are documented in 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] — 2026-05-23
+
+### Added
+
+- `$attrs` magic identifier (Phase 14) — the consumer-passed attribute cluster minus declared props, used by the object-spread `r-bind` directive and root-element attribute fallthrough. Scoped alongside the existing `$props` / `$data` / `$refs` / `$slots` / `$portals` / `$classSelector` set.
+- `$listeners` magic identifier (Phase 15) — the consumer-passed event-listener cluster minus declared events, used by the object-spread `r-on` directive and root-element listener fallthrough. Scoped alongside `$attrs`.
+- `$event` magic identifier — the reserved event-handler closure parameter. Highlighted in `@event` handler expressions and `<listeners>` block bodies (added 2026-05-22 as WR-06).
+
+### Notes
+
+- The `r-bind` and `r-on` directives themselves were already in the `r-*` directive regex from 0.2.0; the object-spread form (`r-bind="obj"` / `r-on="obj"`) needs no additional grammar work — the value is a plain JS expression and routes to the embedded JavaScript grammar like every other attribute value.
+- The `inherit-attrs` and `inherit-listeners` boolean attributes on the `<rozie>` opening tag carry no special scope — they highlight as ordinary HTML attribute name / value pairs. The behavior is compiler-side.
+- Token regex now: `\$(props|data|refs|emit|event|computed|onMount|onUnmount|onUpdate|watch|slots|el|portals|classSelector|attrs|listeners)\b` (16 alternations).
+
 ## [0.2.0] — 2026-05-22
 
 ### Added
