@@ -365,6 +365,9 @@ importers:
       '@rozie/runtime-lit':
         specifier: workspace:*
         version: link:../../../packages/runtime/lit
+      '@rozie/runtime-svelte':
+        specifier: workspace:*
+        version: link:../../../packages/runtime/svelte
       '@rozie/unplugin':
         specifier: workspace:*
         version: link:../../../packages/unplugin
