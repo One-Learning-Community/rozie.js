@@ -26,3 +26,5 @@ export {
 } from './keyFilter.js';
 export { parseInlineStyle, toStyleObjectKey } from './parseInlineStyle.js';
 export { normalizeAttrs, SOLID_ATTR_KEY_MAP } from './normalizeAttrs.js';
+export { normalizeListeners, SOLID_LISTENER_KEY_MAP } from './normalizeListeners.js';
+export { mergeListeners } from './mergeListeners.js';
