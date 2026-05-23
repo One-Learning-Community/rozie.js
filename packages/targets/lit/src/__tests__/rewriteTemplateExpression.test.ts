@@ -281,7 +281,7 @@ describe('rewriteTemplateExpression — collectMethodNames (populated setupBody)
     expect(rewriteTemplateExpression(t.identifier('total'), ir)).toBe('total');
   });
 
-  it('a setupBody name colliding with a reserved IR name is NOT collected', () => {
+  it('a setupBody name colliding with a reserved IR name is NOT collected as a method', () => {
     const ir = buildIR({
       state: [state('count')],
       setupBody: {
@@ -290,9 +290,14 @@ describe('rewriteTemplateExpression — collectMethodNames (populated setupBody)
         annotations: [],
       },
     });
-    // `count` is reserved (state) — not a method name; a bare reference is
-    // left untouched (the $data sigil form is what rewrites state reads).
-    expect(rewriteTemplateExpression(t.identifier('count'), ir)).toBe('count');
+    // `count` is reserved (state) — not a method name. Phase 15 follow-up
+    // Bug C2 makes bare `<data>` references rewrite to the signal-read shape
+    // `this._<name>.value` (same shape as the `$data.<name>` sigil form),
+    // covering function-typed data fields used as bare callback identifiers
+    // (`@click="fn"` with `fn: () => {}` in `<data>`). Prior behavior left
+    // the bare reference unchanged, which raised ReferenceError at render
+    // time when the data field was referenced via a template-literal embed.
+    expect(rewriteTemplateExpression(t.identifier('count'), ir)).toBe('this._count.value');
   });
 });
 

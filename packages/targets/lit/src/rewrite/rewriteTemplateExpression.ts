@@ -283,6 +283,33 @@ export function rewriteTemplateExpression(
         path.skip();
         return;
       }
+      // Phase 15 follow-up Bug C2 — bare `<data>` identifier references inside
+      // template-literal embedded callback bodies (e.g. `@click="fn"` where
+      // `fn: () => {}` is declared in `<data>`) must lower to `this._<name>.value`
+      // — the same signal-read shape that `$data.<name>` already lowers to via
+      // the MemberExpression visitor above. Without this rewrite the generated
+      // template literal references the bare identifier (`fn`, `someObj`,
+      // `f1`, `f2`, etc.) which is undefined in the render() scope and throws
+      // ReferenceError at runtime. Detection follows the SAME parent-skip
+      // pattern as computed/method rewrites (skip property-position,
+      // object-literal-key, function-parameter positions).
+      if (dataNames.has(name)) {
+        const parentPath = path.parentPath;
+        if (parentPath) {
+          if (
+            (parentPath.isMemberExpression() || parentPath.isOptionalMemberExpression()) &&
+            (parentPath.node as t.MemberExpression | t.OptionalMemberExpression).property === path.node &&
+            !(parentPath.node as t.MemberExpression | t.OptionalMemberExpression).computed
+          ) return;
+          if (parentPath.isObjectProperty() && parentPath.node.key === path.node && !parentPath.node.computed) return;
+          if (parentPath.isFunctionExpression() || parentPath.isArrowFunctionExpression() || parentPath.isFunctionDeclaration()) {
+            if ((parentPath.node as t.Function).params.some((p) => p === path.node)) return;
+          }
+        }
+        path.replaceWith(thisSignalRead(name));
+        path.skip();
+        return;
+      }
       if (!computedNames.has(name) && !methodNames.has(name)) return;
 
       const parentPath = path.parentPath;

@@ -39,7 +39,7 @@ import { emitListeners } from './emit/emitListeners.js';
 import { emitSlotDecl } from './emit/emitSlotDecl.js';
 import { emitStyle } from './emit/emitStyle.js';
 import { buildShell } from './emit/shell.js';
-import { emitTagName } from './emit/emitDecorator.js';
+import { emitTagName, toKebabCase } from './emit/emitDecorator.js';
 import { computeScopeHash } from './emit/scopeHash.js';
 
 export interface EmitLitOptions {
@@ -170,21 +170,67 @@ export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResu
   // call site would resolve `this.$attrs` to `undefined` and the directive
   // would throw at render time, aborting the lit-html render and leaving the
   // shadow root empty).
+  //
+  // Phase 15 follow-up Bug A — filter declared-prop attribute names out of the
+  // `$attrs` getter result so it returns "rest after declared props" (semantic
+  // parity with React/Vue/Svelte/Solid/Angular). Without this filter the
+  // ${rozieSpread(this.$attrs)} call duplicates every reflected `@property`
+  // attribute (`value`, `step`, `min`, `max`, etc.) onto the inner template
+  // root, breaking consumers that rely on element uniqueness.
+  //
+  // Both attribute-name forms are folded into the skip set so the filter
+  // catches the two Lit attribute-naming paths:
+  //   - model props: explicit `attribute: '${toKebabCase(propName)}'`
+  //   - non-model props: Lit's default = property name lowercased
+  // For single-word props the two forms collapse to the same string; for
+  // multi-word props (e.g. `onClick`) we skip both `on-click` AND `onclick`.
+  // Empty-prop components fall through to the no-skip fast path so existing
+  // dist-parity fixtures with zero declared props (e.g. ROnProbe) stay
+  // byte-identical to the pre-fix output.
+  const declaredAttrSkipNames = Array.from(
+    new Set(
+      ir.props.flatMap((p) => [toKebabCase(p.name), p.name.toLowerCase()]),
+    ),
+  ).filter((n) => n.length > 0);
   const litAttrsGetter =
     templateResult.rozieSpreadUsed
-      ? [
-          '  /**',
-          '   * Plan 14-05 — cross-framework attribute fallthrough source. Reads the',
-          '   * host custom element\'s attributes on each call so a consumer-side bound',
-          '   * attribute flows through on every render. The `rozieSpread` directive',
-          '   * (D-02) does the cross-render diff downstream.',
-          '   */',
-          '  private get $attrs(): Record<string, string> {',
-          '    const out: Record<string, string> = {};',
-          '    for (const a of Array.from(this.attributes)) out[a.name] = a.value;',
-          '    return out;',
-          '  }',
-        ].join('\n')
+      ? (declaredAttrSkipNames.length > 0
+          ? [
+              '  /**',
+              '   * Plan 14-05 — cross-framework attribute fallthrough source. Reads the',
+              '   * host custom element\'s attributes on each call so a consumer-side bound',
+              '   * attribute flows through on every render. The `rozieSpread` directive',
+              '   * (D-02) does the cross-render diff downstream.',
+              '   *',
+              '   * Phase 15 follow-up Bug A — declared-prop attribute names are filtered',
+              '   * out so `$attrs` returns "rest after declared props" (semantic parity',
+              '   * with React/Vue/Svelte/Solid/Angular). Both Lit attribute-naming',
+              '   * forms are folded into the skip set: kebab-case for model props',
+              '   * (explicit `attribute:`) AND lowercased property name (Lit\'s default).',
+              '   */',
+              '  private get $attrs(): Record<string, string> {',
+              `    const __skip = new Set<string>([${declaredAttrSkipNames.map((n) => `'${n}'`).join(', ')}]);`,
+              '    const out: Record<string, string> = {};',
+              '    for (const a of Array.from(this.attributes)) {',
+              '      if (__skip.has(a.name)) continue;',
+              '      out[a.name] = a.value;',
+              '    }',
+              '    return out;',
+              '  }',
+            ].join('\n')
+          : [
+              '  /**',
+              '   * Plan 14-05 — cross-framework attribute fallthrough source. Reads the',
+              '   * host custom element\'s attributes on each call so a consumer-side bound',
+              '   * attribute flows through on every render. The `rozieSpread` directive',
+              '   * (D-02) does the cross-render diff downstream.',
+              '   */',
+              '  private get $attrs(): Record<string, string> {',
+              '    const out: Record<string, string> = {};',
+              '    for (const a of Array.from(this.attributes)) out[a.name] = a.value;',
+              '    return out;',
+              '  }',
+            ].join('\n'))
       : '';
 
   // Phase 15 D-19 — `$listeners` magic-accessor declaration for Lit.
