@@ -11,7 +11,7 @@ export default function DefaultContentFallbackFixture(props: DefaultContentFallb
 
   return (
     <>
-    <div {...attrs} className={clsx("default-content-fallback-fixture", (attrs.className as string | undefined))} {...attrs} data-rozie-s-62104151="">
+    <div {...attrs} className={clsx("default-content-fallback-fixture", (attrs.className as string | undefined))} data-rozie-s-62104151="">
       {(props.renderStatus ?? props.slots?.['status']) ? ((props.renderStatus ?? props.slots?.['status']) as Function)() : <span className={"fallback"} data-rozie-s-62104151="">No status provided.</span>}
     </div>
     </>

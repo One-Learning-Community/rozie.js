@@ -3,7 +3,7 @@ import { customElement } from 'lit/decorators.js';
 import { SignalWatcher, signal } from '@lit-labs/preact-signals';
 import { rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 
-@customElement('rozie-rmodel-lazy')
+@customElement('rozie-r-model-lazy')
 export default class RModelLazy extends SignalWatcher(LitElement) {
   static styles = css`
 .rmodel-lazy[data-rozie-s-34fe9f5a] { display: inline-flex; flex-direction: column; gap: 0.25rem; }

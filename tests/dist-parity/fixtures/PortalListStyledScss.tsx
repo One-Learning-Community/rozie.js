@@ -102,7 +102,7 @@ export default function PortalListStyledScss(_props: PortalListStyledScssProps):
 
   return (
     <>
-    <div ref={__rozieRoot} {...attrs} className={clsx(styles["rozie-portal-list"], (attrs.className as string | undefined))} {...attrs} data-rozie-s-860cc87e="">
+    <div ref={__rozieRoot} {...attrs} className={clsx(styles["rozie-portal-list"], (attrs.className as string | undefined))} data-rozie-s-860cc87e="">
       
     </div>
     </>

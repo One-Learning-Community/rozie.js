@@ -101,7 +101,7 @@ export default function PortalListStyled(_props: PortalListStyledProps): JSX.Ele
 
   return (
     <>
-    <div ref={__rozieRoot} {...attrs} className={clsx(styles["rozie-portal-list"], (attrs.className as string | undefined))} {...attrs} data-rozie-s-18e5aac6="">
+    <div ref={__rozieRoot} {...attrs} className={clsx(styles["rozie-portal-list"], (attrs.className as string | undefined))} data-rozie-s-18e5aac6="">
       
     </div>
     </>

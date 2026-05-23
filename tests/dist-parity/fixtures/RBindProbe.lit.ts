@@ -3,7 +3,7 @@ import { customElement } from 'lit/decorators.js';
 import { SignalWatcher } from '@lit-labs/preact-signals';
 import { rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 
-@customElement('rozie-rbind-probe')
+@customElement('rozie-r-bind-probe')
 export default class RBindProbe extends SignalWatcher(LitElement) {
   static styles = css`
 .rbind-probe[data-rozie-s-8e2458d6] {

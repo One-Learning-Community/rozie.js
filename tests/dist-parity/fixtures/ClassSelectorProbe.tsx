@@ -19,7 +19,7 @@ export default function ClassSelectorProbe(props: ClassSelectorProbeProps): JSX.
 
   return (
     <>
-    <div data-handle={'.' + styles.panel} data-grip={gripSelector} {...attrs} className={clsx(styles.panel, (attrs.className as string | undefined))} {...attrs} data-rozie-s-899140be="">
+    <div data-handle={'.' + styles.panel} data-grip={gripSelector} {...attrs} className={clsx(styles.panel, (attrs.className as string | undefined))} data-rozie-s-899140be="">
       <span className={styles.grip} aria-hidden="true" data-rozie-s-899140be="">⋮⋮</span>
       {(ready) && <span data-rozie-s-899140be="">ready</span>}</div>
     </>

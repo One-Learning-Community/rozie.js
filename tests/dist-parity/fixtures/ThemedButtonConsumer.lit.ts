@@ -34,13 +34,13 @@ export default class ThemedButtonConsumer extends SignalWatcher(LitElement) {
   render() {
     return html`
 <div class="themed-button-consumer" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-s-14b8cbaa>
-  <rozie-themed-button class="extra-variant" id="auto-btn" type="button" aria-label="Auto-fallthrough button" data-testid="auto-themed-button" style="--btn-bg: #ef4444" .label=${'Auto'} @click=${onClick} @mouseenter=${onMouseEnter} data-rozie-s-14b8cbaa></rozie-themed-button>
+  <rozie-themed-button class="extra-variant" id="auto-btn" type="button" aria-label="Auto-fallthrough button" data-testid="auto-themed-button" style="--btn-bg: #ef4444" .label=${'Auto'} @click=${this._onClick.value} @mouseenter=${this._onMouseEnter.value} data-rozie-s-14b8cbaa></rozie-themed-button>
 
-  <rozie-themed-button-manual class="extra-variant" id="manual-btn" type="button" aria-label="Manual fallthrough button" data-testid="manual-themed-button" style="--btn-bg: #10b981" .label=${'Manual'} @click=${onClick} @mouseenter=${onMouseEnter} data-rozie-s-14b8cbaa></rozie-themed-button-manual>
+  <rozie-themed-button-manual class="extra-variant" id="manual-btn" type="button" aria-label="Manual fallthrough button" data-testid="manual-themed-button" style="--btn-bg: #10b981" .label=${'Manual'} @click=${this._onClick.value} @mouseenter=${this._onMouseEnter.value} data-rozie-s-14b8cbaa></rozie-themed-button-manual>
 
-  <rozie-themed-button-listeners-manual class="extra-variant" id="listeners-manual-btn" type="button" aria-label="Listeners-manual fallthrough button" data-testid="listeners-manual-themed-button" style="--btn-bg: #f59e0b" .label=${'Listeners Manual'} @click=${onClick} @mouseenter=${onMouseEnter} data-rozie-s-14b8cbaa></rozie-themed-button-listeners-manual>
+  <rozie-themed-button-listeners-manual class="extra-variant" id="listeners-manual-btn" type="button" aria-label="Listeners-manual fallthrough button" data-testid="listeners-manual-themed-button" style="--btn-bg: #f59e0b" .label=${'Listeners Manual'} @click=${this._onClick.value} @mouseenter=${this._onMouseEnter.value} data-rozie-s-14b8cbaa></rozie-themed-button-listeners-manual>
 
-  <rozie-themed-button-all-manual class="extra-variant" id="all-manual-btn" type="button" aria-label="All-manual fallthrough button" data-testid="all-manual-themed-button" style="--btn-bg: #8b5cf6" .label=${'All Manual'} @click=${onClick} @mouseenter=${onMouseEnter} data-rozie-s-14b8cbaa></rozie-themed-button-all-manual>
+  <rozie-themed-button-all-manual class="extra-variant" id="all-manual-btn" type="button" aria-label="All-manual fallthrough button" data-testid="all-manual-themed-button" style="--btn-bg: #8b5cf6" .label=${'All Manual'} @click=${this._onClick.value} @mouseenter=${this._onMouseEnter.value} data-rozie-s-14b8cbaa></rozie-themed-button-all-manual>
 </div>
 `;
   }

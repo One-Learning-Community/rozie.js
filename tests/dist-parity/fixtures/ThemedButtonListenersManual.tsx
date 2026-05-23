@@ -20,7 +20,7 @@ export default function ThemedButtonListenersManual(_props: ThemedButtonListener
 
   return (
     <>
-    <button style={{ '--btn-bg': '#3b82f6', '--btn-fg': '#ffffff' }} {...attrs} className={clsx(clsx(styles.btn, props.variant), (attrs.className as string | undefined))} {...attrs} data-rozie-s-97e125bc="">
+    <button style={{ '--btn-bg': '#3b82f6', '--btn-fg': '#ffffff' }} {...attrs} className={clsx(clsx(styles.btn, props.variant), (attrs.className as string | undefined))} data-rozie-s-97e125bc="">
       {props.label}
     </button>
     </>

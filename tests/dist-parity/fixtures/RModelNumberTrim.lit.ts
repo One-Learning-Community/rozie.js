@@ -3,7 +3,7 @@ import { customElement } from 'lit/decorators.js';
 import { SignalWatcher, signal } from '@lit-labs/preact-signals';
 import { rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 
-@customElement('rozie-rmodel-number-trim')
+@customElement('rozie-r-model-number-trim')
 export default class RModelNumberTrim extends SignalWatcher(LitElement) {
   static styles = css`
 .rmodel-number-trim[data-rozie-s-dfdb7742] { display: inline-flex; flex-direction: column; gap: 0.25rem; }

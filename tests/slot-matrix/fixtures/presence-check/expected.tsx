@@ -11,7 +11,7 @@ export default function PresenceCheckFixture(props: PresenceCheckFixtureProps): 
 
   return (
     <>
-    <div {...attrs} className={clsx("presence-check-fixture", (attrs.className as string | undefined))} {...attrs} data-rozie-s-313bf282="">
+    <div {...attrs} className={clsx("presence-check-fixture", (attrs.className as string | undefined))} data-rozie-s-313bf282="">
       {((props.renderAside ?? props.slots?.['aside'])) && <aside data-rozie-s-313bf282="">
         {(props.renderAside ?? props.slots?.['aside'])?.()}
       </aside>}</div>

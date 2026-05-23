@@ -15,7 +15,7 @@ export default function ThemedButtonConsumer(props: ThemedButtonConsumerProps): 
 
   return (
     <>
-    <div {...attrs} className={clsx(styles["themed-button-consumer"], (attrs.className as string | undefined))} {...attrs} data-rozie-s-14b8cbaa="">
+    <div {...attrs} className={clsx(styles["themed-button-consumer"], (attrs.className as string | undefined))} data-rozie-s-14b8cbaa="">
       <ThemedButton id="auto-btn" type="button" aria-label="Auto-fallthrough button" data-testid="auto-themed-button" className={styles["extra-variant"]} style={{ "--btn-bg": "#ef4444" }} label={'Auto'} onClick={onClick} onMouseEnter={onMouseEnter} data-rozie-s-14b8cbaa="" />
 
       <ThemedButtonManual id="manual-btn" type="button" aria-label="Manual fallthrough button" data-testid="manual-themed-button" className={styles["extra-variant"]} style={{ "--btn-bg": "#10b981" }} label={'Manual'} onClick={onClick} onMouseEnter={onMouseEnter} data-rozie-s-14b8cbaa="" />

@@ -20,7 +20,7 @@ export default function ThemedButtonAllManual(_props: ThemedButtonAllManualProps
 
   return (
     <>
-    <button style={{ '--btn-bg': '#3b82f6', '--btn-fg': '#ffffff' }} {...attrs} className={clsx(clsx(styles.btn, props.variant), (attrs.className as string | undefined))} {...attrs} data-rozie-s-de172510="">
+    <button style={{ '--btn-bg': '#3b82f6', '--btn-fg': '#ffffff' }} {...attrs} className={clsx(clsx(styles.btn, props.variant), (attrs.className as string | undefined))} data-rozie-s-de172510="">
       {props.label}
     </button>
     </>

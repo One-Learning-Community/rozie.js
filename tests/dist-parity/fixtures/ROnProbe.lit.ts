@@ -3,7 +3,7 @@ import { customElement } from 'lit/decorators.js';
 import { SignalWatcher, signal } from '@lit-labs/preact-signals';
 import { debounce, rozieListeners } from '@rozie/runtime-lit';
 
-@customElement('rozie-ron-probe')
+@customElement('rozie-r-on-probe')
 export default class ROnProbe extends SignalWatcher(LitElement) {
   static styles = css`
 .r-on-probe[data-rozie-s-c4bd99aa] {
@@ -26,7 +26,7 @@ export default class ROnProbe extends SignalWatcher(LitElement) {
   mouseenter: () => {}
 });
 
-  private _tw0 = debounce(($event: Event) => ((onInput) as (...args: any[]) => any)($event), 300);
+  private _tw0 = debounce(($event: Event) => ((this._onInput.value) as (...args: any[]) => any)($event), 300);
 
   private _disconnectCleanups: Array<() => void> = [];
 
@@ -52,9 +52,9 @@ export default class ROnProbe extends SignalWatcher(LitElement) {
   render() {
     return html`
 <div class="r-on-probe" data-rozie-s-c4bd99aa>
-  <span @click=${($event: MouseEvent) => { $event.stopPropagation(); ((fn) as (...args: any[]) => any)($event); }} @input=${this._tw0} data-rozie-s-c4bd99aa>literal modifier-bearing</span>
-  <span ${rozieListeners(someObj)} data-rozie-s-c4bd99aa>dynamic</span>
-  <span @click=${($event: MouseEvent) => { (f1)($event); (f2)($event); }} data-rozie-s-c4bd99aa>R6 source-order merge</span>
+  <span @click=${($event: MouseEvent) => { $event.stopPropagation(); ((this._fn.value) as (...args: any[]) => any)($event); }} @input=${this._tw0} data-rozie-s-c4bd99aa>literal modifier-bearing</span>
+  <span ${rozieListeners(this._someObj.value)} data-rozie-s-c4bd99aa>dynamic</span>
+  <span @click=${($event: MouseEvent) => { (this._f1.value)($event); (this._f2.value)($event); }} data-rozie-s-c4bd99aa>R6 source-order merge</span>
 </div>
 `;
   }
