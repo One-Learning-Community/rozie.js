@@ -3217,6 +3217,7 @@
           }
         ],
         "events": [],
+        "listenerSpreads": [],
         "children": [
           {
             "type": "TemplateStaticText",
@@ -3231,6 +3232,7 @@
             "tagName": "header",
             "attributes": [],
             "events": [],
+            "listenerSpreads": [],
             "children": [
               {
                 "type": "TemplateStaticText",
@@ -3383,6 +3385,7 @@
                     "tagName": "h3",
                     "attributes": [],
                     "events": [],
+                    "listenerSpreads": [],
                     "children": [
                       {
                         "type": "TemplateInterpolation",
@@ -3545,6 +3548,7 @@
             "events": [
               null
             ],
+            "listenerSpreads": [],
             "children": [
               {
                 "type": "TemplateStaticText",
@@ -3632,6 +3636,7 @@
                   }
                 ],
                 "events": [],
+                "listenerSpreads": [],
                 "children": [],
                 "sourceLoc": {
                   "start": 1919,
@@ -3779,6 +3784,7 @@
                   }
                 ],
                 "events": [],
+                "listenerSpreads": [],
                 "children": [
                   {
                     "type": "TemplateStaticText",
@@ -3936,6 +3942,7 @@
                     "tagName": "ul",
                     "attributes": [],
                     "events": [],
+                    "listenerSpreads": [],
                     "children": [
                       {
                         "type": "TemplateStaticText",
@@ -4228,6 +4235,7 @@
                               }
                             ],
                             "events": [],
+                            "listenerSpreads": [],
                             "children": [
                               {
                                 "type": "TemplateStaticText",
@@ -4511,6 +4519,7 @@
                                     "tagName": "label",
                                     "attributes": [],
                                     "events": [],
+                                    "listenerSpreads": [],
                                     "children": [
                                       {
                                         "type": "TemplateElement",
@@ -4590,6 +4599,7 @@
                                         "events": [
                                           null
                                         ],
+                                        "listenerSpreads": [],
                                         "children": [],
                                         "sourceLoc": {
                                           "start": 2511,
@@ -4602,6 +4612,7 @@
                                         "tagName": "span",
                                         "attributes": [],
                                         "events": [],
+                                        "listenerSpreads": [],
                                         "children": [
                                           {
                                             "type": "TemplateInterpolation",
@@ -4702,6 +4713,7 @@
                                     "events": [
                                       null
                                     ],
+                                    "listenerSpreads": [],
                                     "children": [
                                       {
                                         "type": "TemplateStaticText",
@@ -4782,6 +4794,7 @@
                       }
                     ],
                     "events": [],
+                    "listenerSpreads": [],
                     "children": [
                       {
                         "type": "TemplateStaticText",
@@ -4848,6 +4861,7 @@
     }
   },
   "inheritAttrs": true,
+  "inheritListeners": true,
   "styles": {
     "type": "StyleSection",
     "scopedRules": [

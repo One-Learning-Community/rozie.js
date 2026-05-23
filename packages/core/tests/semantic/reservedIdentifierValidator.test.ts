@@ -39,15 +39,17 @@ function roz202(diags: { code: string }[]) {
 }
 
 describe('reservedIdentifierValidator — ROZ202', () => {
-  it('reserved set matches the 8 documented sigils', () => {
+  it('reserved set matches the 9 documented sigils', () => {
     expect([...RESERVED_SIGILS].sort()).toEqual(
       // Phase 14 added `$attrs` — consumer-passed attribute cluster.
+      // Phase 15 added `$listeners` — consumer-passed listener cluster.
       [
         '$attrs',
         '$data',
         '$el',
         '$emit',
         '$event',
+        '$listeners',
         '$props',
         '$refs',
         '$slots',

@@ -79,6 +79,7 @@
           }
         ],
         "events": [],
+        "listenerSpreads": [],
         "children": [
           {
             "type": "TemplateInterpolation",
@@ -164,6 +165,7 @@
     }
   },
   "inheritAttrs": true,
+  "inheritListeners": true,
   "styles": {
     "type": "StyleSection",
     "scopedRules": [],

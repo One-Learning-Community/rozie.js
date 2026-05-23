@@ -1538,6 +1538,7 @@
           }
         ],
         "events": [],
+        "listenerSpreads": [],
         "children": [
           {
             "type": "TemplateStaticText",
@@ -1705,6 +1706,7 @@
               null,
               null
             ],
+            "listenerSpreads": [],
             "children": [],
             "sourceLoc": {
               "start": 1539,
@@ -1859,6 +1861,7 @@
                     "events": [
                       null
                     ],
+                    "listenerSpreads": [],
                     "children": [
                       {
                         "type": "TemplateStaticText",
@@ -1896,6 +1899,7 @@
                       }
                     ],
                     "events": [],
+                    "listenerSpreads": [],
                     "children": [
                       {
                         "type": "TemplateInterpolation",
@@ -2000,6 +2004,7 @@
     }
   },
   "inheritAttrs": true,
+  "inheritListeners": true,
   "styles": {
     "type": "StyleSection",
     "scopedRules": [

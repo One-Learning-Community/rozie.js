@@ -120,6 +120,7 @@
           }
         ],
         "events": [],
+        "listenerSpreads": [],
         "children": [
           {
             "type": "TemplateStaticText",
@@ -134,6 +135,7 @@
             "tagName": "span",
             "attributes": [],
             "events": [],
+            "listenerSpreads": [],
             "children": [
               {
                 "type": "TemplateInterpolation",
@@ -281,6 +283,7 @@
               }
             ],
             "events": [],
+            "listenerSpreads": [],
             "children": [],
             "sourceLoc": {
               "start": 229,
@@ -318,6 +321,7 @@
     }
   },
   "inheritAttrs": true,
+  "inheritListeners": true,
   "styles": {
     "type": "StyleSection",
     "scopedRules": [],

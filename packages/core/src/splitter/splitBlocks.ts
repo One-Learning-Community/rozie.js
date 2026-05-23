@@ -109,6 +109,13 @@ export function splitBlocks(source: string, filename?: string): SplitBlocksResul
   // `null` = the attribute was not present on the opening tag at all (vs. an
   // empty-string value, which is a present-without-value boolean attribute).
   let savedInheritAttrsChunks: string[] | null = null;
+  // Phase 15: holds chunks for the `inherit-listeners` attr on the <rozie>
+  // tag. Same null-vs-empty discriminant as `savedInheritAttrsChunks`. Per
+  // Pitfall 6 this is a PARALLEL local variable to `savedInheritAttrsChunks`
+  // — deliberately NOT genericized into a flags-record (the attribute set is
+  // tiny and stable; the parallel form keeps the onattribend/onopentagend
+  // call-sites locally readable and matches the Phase 14 precedent).
+  let savedInheritListenersChunks: string[] | null = null;
   let collectingAttribValue = false;
   let unknownTagStart = -1; // tracks <` position of an unknown top-level block, -1 = none
 
@@ -139,6 +146,7 @@ export function splitBlocks(source: string, filename?: string): SplitBlocksResul
         savedNameChunks = [];
         savedLangChunks = [];
         savedInheritAttrsChunks = null;
+        savedInheritListenersChunks = null;
         collectingAttribValue = false;
       },
 
@@ -169,6 +177,13 @@ export function splitBlocks(source: string, filename?: string): SplitBlocksResul
           // distinct from `null` (attribute absent), which onopentagend treats
           // as "key omitted". onopentagend joins + parses these chunks.
           savedInheritAttrsChunks = [...pendingAttribValueChunks];
+        }
+        if (inRozieOpenTag && pendingAttribName === 'inherit-listeners') {
+          // Phase 15: save the `inherit-listeners` attribute chunks on the
+          // <rozie> tag. Same null-vs-empty discriminant + onopentagend
+          // parsing pattern as `inherit-attrs` (Phase 14). Per Pitfall 6 this
+          // is a PARALLEL save, not a flags-record refactor.
+          savedInheritListenersChunks = [...pendingAttribValueChunks];
         }
         if (inBlockOpenTag && pendingAttribName === 'lang') {
           // Phase 9: save the `lang` attribute chunks for the current block
@@ -215,9 +230,28 @@ export function splitBlocks(source: string, filename?: string): SplitBlocksResul
                 inheritAttrs = raw !== 'false';
               }
               savedInheritAttrsChunks = null;
+              // Phase 15: parse the `inherit-listeners` attribute. Same
+              // null/empty discriminant + WR-05 case-insensitive parse as
+              // `inherit-attrs`: `null` chunks = attribute absent (omit the
+              // key — exactOptionalPropertyTypes conditional spread, treated
+              // as `true` downstream); `"false"` (case-insensitive) → `false`;
+              // everything else (present-without-value `[]`, `"true"`, or any
+              // other value) → `true`, the safe default (threat T-15-V5-01).
+              // INDEPENDENT of `inherit-attrs` — both flags are stamped
+              // separately and downstream tracks them independently (SPEC R5).
+              let inheritListeners: boolean | undefined;
+              if (savedInheritListenersChunks !== null) {
+                const raw = savedInheritListenersChunks
+                  .join('')
+                  .trim()
+                  .toLowerCase();
+                inheritListeners = raw !== 'false';
+              }
+              savedInheritListenersChunks = null;
               result.rozie = {
                 name: nameValue,
                 ...(inheritAttrs !== undefined ? { inheritAttrs } : {}),
+                ...(inheritListeners !== undefined ? { inheritListeners } : {}),
                 // loc start = '<' of <rozie>; loc end is patched at onclosetag time
                 // to include the </rozie> close tag. Use endIndex+1 here as a conservative
                 // initial value; we update it when </rozie> fires.

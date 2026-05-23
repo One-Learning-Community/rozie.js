@@ -63,6 +63,7 @@
           }
         ],
         "events": [],
+        "listenerSpreads": [],
         "children": [
           {
             "type": "TemplateStaticText",
@@ -77,6 +78,7 @@
             "tagName": "Counter",
             "attributes": [],
             "events": [],
+            "listenerSpreads": [],
             "children": [],
             "sourceLoc": {
               "start": 114,
@@ -123,6 +125,7 @@
     }
   },
   "inheritAttrs": true,
+  "inheritListeners": true,
   "styles": {
     "type": "StyleSection",
     "scopedRules": [],

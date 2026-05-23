@@ -63,6 +63,7 @@
           }
         ],
         "events": [],
+        "listenerSpreads": [],
         "children": [
           {
             "type": "TemplateStaticText",
@@ -87,6 +88,7 @@
               }
             ],
             "events": [],
+            "listenerSpreads": [],
             "children": [],
             "sourceLoc": {
               "start": 118,
@@ -133,6 +135,7 @@
     }
   },
   "inheritAttrs": true,
+  "inheritListeners": true,
   "styles": {
     "type": "StyleSection",
     "scopedRules": [],

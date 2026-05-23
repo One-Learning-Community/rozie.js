@@ -2834,6 +2834,7 @@
           }
         ],
         "events": [],
+        "listenerSpreads": [],
         "children": [
           {
             "type": "TemplateStaticText",
@@ -2856,6 +2857,7 @@
             "events": [
               null
             ],
+            "listenerSpreads": [],
             "children": [
               {
                 "type": "TemplateStaticText",
@@ -3072,6 +3074,7 @@
                       }
                     ],
                     "events": [],
+                    "listenerSpreads": [],
                     "children": [
                       {
                         "type": "TemplateStaticText",
@@ -3159,6 +3162,7 @@
     }
   },
   "inheritAttrs": true,
+  "inheritListeners": true,
   "styles": {
     "type": "StyleSection",
     "scopedRules": [

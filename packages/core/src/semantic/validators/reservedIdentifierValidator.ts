@@ -14,6 +14,7 @@
  *             (`($event) => …`) across the React / Svelte / Solid / Lit
  *             targets and the Vue / Angular host-listener forms (Phase 07.6).
  *   $attrs  — consumer-passed attribute cluster minus declared props (Phase 14)
+ *   $listeners — consumer-passed event-listener cluster minus declared events (Phase 15)
  *
  * A user-authored identifier that shadows one of these — a `<data>` field
  * name or an `r-for` loop variable — would be silently captured by the
@@ -54,10 +55,11 @@ export const RESERVED_SIGILS: ReadonlySet<string> = new Set([
   '$emit',
   '$event',
   '$attrs',
+  '$listeners',
 ]);
 
 const RESERVED_SIGIL_LIST =
-  '$el, $props, $data, $refs, $slots, $emit, $event, $attrs';
+  '$el, $props, $data, $refs, $slots, $emit, $event, $attrs, $listeners';
 
 function emitCollision(
   name: string,

@@ -61,6 +61,12 @@ const MAGIC_ACCESSOR_NAMES = new Set([
   // member access is the unit the dep collector tracks, not the `$attrs`
   // identifier itself.
   '$attrs',
+  // Phase 15 — `$listeners.<event>` member reads (e.g. `$listeners.click?.(e)`)
+  // resolve to a per-instance entry on the consumer-passed listener cluster.
+  // Same shape as `$attrs` for the member-access skip — the member access is
+  // the unit the dep collector tracks, never the `$listeners` identifier
+  // itself. SPEC R3 locks member-accessor parity with `$attrs`.
+  '$listeners',
 ]);
 
 /**
@@ -98,6 +104,15 @@ const STABLE_IDENTIFIERS = new Set([
   // emits `[$attrs]` into a `useEffect` / `useMemo` dep array → runtime
   // `ReferenceError`.
   '$attrs',
+  // `$listeners` is a per-instance LISTENER cluster — conceptually like
+  // `$props` for the dep collector, not a reactive binding. Phase 15 Pitfall 4
+  // — the dominant author shape is the BARE-IDENTIFIER form `r-on="$listeners"`
+  // (mirror of `r-bind="$attrs"`); without this STABLE_IDENTIFIERS entry the
+  // React dep collector would treat the bare `$listeners` as a free closure
+  // identifier and emit `[$listeners]` into a `useEffect` / `useMemo` dep
+  // array → runtime `ReferenceError`. Same load-bearing role $attrs plays for
+  // attribute fallthrough.
+  '$listeners',
   'undefined',
   'null',
   'NaN',

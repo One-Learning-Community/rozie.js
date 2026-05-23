@@ -54,6 +54,7 @@
           }
         ],
         "events": [],
+        "listenerSpreads": [],
         "children": [],
         "sourceLoc": {
           "start": 32,
@@ -76,6 +77,7 @@
     }
   },
   "inheritAttrs": true,
+  "inheritListeners": true,
   "styles": {
     "type": "StyleSection",
     "scopedRules": [],
