@@ -1,7 +1,7 @@
 package js.rozie.intellij.completion
 
 /**
- * Single source of truth for the 14 canonical Rozie `$`-prefixed magic
+ * Single source of truth for the 15 canonical Rozie `$`-prefixed magic
  * identifiers + their one-line type-text doc hints (surfaced by
  * `LookupElementBuilder.withTypeText` in the completion popup per the
  * P1-UAT-09 acceptance prose).
@@ -23,7 +23,7 @@ package js.rozie.intellij.completion
  *    `RozieGlobalsLibraryTest` coverage assertion pins the two in lockstep.
  *
  * `RozieJsMagicCompletionTest.testBareDollarSurfacesAllMagicIdentifiers`
- * iterates [MAGIC_IDENTIFIERS] directly — adding a 14th magic name is a 1-line
+ * iterates [MAGIC_IDENTIFIERS] directly — adding a 15th magic name is a 1-line
  * append here (plus the matching `declare` in `rozie-globals.d.ts`); the
  * contributor, the annotator, and the test all pick it up automatically (DRY
  * contract, identical to Plan 02's [js.rozie.intellij.xml.RozieKnownAttributes]).
@@ -46,6 +46,9 @@ package js.rozie.intellij.completion
  *  - `$attrs`        — consumer-passed attribute cluster minus declared props
  *                      (Phase 14 — for `r-bind="$attrs"` manual placement and
  *                      member reads `$attrs.someAttr`)
+ *  - `$event`        — the active event closure parameter (Phase 07.6 — scoped
+ *                      to `@event` / `r-on:event` handler contexts; mirrors
+ *                      the reserved-sigil set in `RESERVED_SIGILS`)
  *
  * Pattern note: each entry is a `(name, typeText)` pair; the contributor
  * destructures the pair into `LookupElementBuilder.create(name).bold()
@@ -53,7 +56,7 @@ package js.rozie.intellij.completion
  */
 object RozieMagicIdentifiers {
     /**
-     * Ordered (name, typeText) pairs for the 14 canonical Rozie magic
+     * Ordered (name, typeText) pairs for the 15 canonical Rozie magic
      * identifiers. Order mirrors the TextMate grammar's `magic-identifier`
      * regex so the two artifacts diff trivially; the lookup popup does its
      * own alphabetical sort, so source order is purely for readability.
@@ -63,6 +66,7 @@ object RozieMagicIdentifiers {
         "\$data" to "(magic) reactive local state — declared in <data>",
         "\$refs" to "(magic) element refs — set via ref=\"name\" in <template>",
         "\$emit" to "(magic) emit a custom event",
+        "\$event" to "(magic) active event closure parameter inside an @event handler",
         "\$computed" to "(magic) derived reactive value — returns a computed signal",
         "\$onMount" to "(magic) lifecycle: runs after first render",
         "\$onUnmount" to "(magic) lifecycle: runs on teardown / cleanup",

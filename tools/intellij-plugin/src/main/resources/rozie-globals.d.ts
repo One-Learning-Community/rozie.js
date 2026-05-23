@@ -111,3 +111,10 @@ declare function $classSelector(className: string): string;
  * host-element-attribute getters. Phase 14.
  */
 declare const $attrs: Record<string, unknown>;
+/**
+ * The active event closure parameter inside an `@event` / `r-on:event`
+ * handler. Scoped to event-handler contexts; reserved in
+ * `RESERVED_SIGILS` so shadowing in `<data>` / `r-for` triggers ROZ202.
+ * Phase 07.6.
+ */
+declare const $event: Event;

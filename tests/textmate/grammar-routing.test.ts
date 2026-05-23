@@ -308,6 +308,25 @@ describe('Rozie TextMate grammar — directives & r-model modifier chains', () =
     );
     expect(tok, 'expected $attrs to carry the magic-identifier scope').toBeDefined();
   });
+
+  // WR-06: `$event` is reserved in RESERVED_SIGILS (ROZ202) but was missing
+  // from the magic-identifier regex — visual inconsistency between the
+  // validator and the editor's highlighting. Added 2026-05-22.
+  it('scopes $event as a magic identifier (WR-06)', () => {
+    const source = [
+      '<rozie name="X">',
+      '<template>',
+      '<button @click="handle($event)"></button>',
+      '</template>',
+      '</rozie>',
+    ].join('\n');
+    const tokens = tokenizeAll(source);
+
+    const tok = tokens.find(
+      (t) => t.text === '$event' && t.scopes.some((s) => s.includes('variable.language.rozie')),
+    );
+    expect(tok, 'expected $event to carry the magic-identifier scope').toBeDefined();
+  });
 });
 
 describe('Rozie TextMate grammar — <script lang="ts"> routing', () => {
