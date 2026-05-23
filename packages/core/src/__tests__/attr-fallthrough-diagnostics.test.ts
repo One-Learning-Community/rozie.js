@@ -101,4 +101,29 @@ describe('attribute-fallthrough diagnostics (Phase 14 R8/R9)', () => {
     );
     expect(doubleApply, JSON.stringify(doubleApply)).toEqual([]);
   });
+
+  it('R9 (WR-02): r-bind="$attrs" on a real-element r-match host emits ROZ971', () => {
+    // WR-02 regression: validateAttrFallthrough.walkTemplate previously
+    // visited TemplateMatch.branches[].body but ignored hostElement, so an
+    // explicit r-bind="$attrs" on a `<div r-match>` wrapper escaped R9
+    // detection. The fix walks the host so the spreadBinding on the
+    // wrapper is visited.
+    const diags = compileDiagnostics(
+      rozie(
+        '<rozie name="DoubleApplyMatch">',
+        `<div r-match="'a'" r-bind="$attrs">
+  <template r-case="'a'">a</template>
+  <template r-default>default</template>
+</div>`,
+      ),
+    );
+    const doubleApply = diags.filter(
+      (d) => d.code === RozieErrorCode.ATTR_DOUBLE_APPLY,
+    );
+    expect(
+      doubleApply.length,
+      `expected ROZ971 for r-bind="$attrs" on r-match host; got ${JSON.stringify(diags)}`,
+    ).toBe(1);
+    expect(doubleApply[0]!.severity).toBe('warning');
+  });
 });

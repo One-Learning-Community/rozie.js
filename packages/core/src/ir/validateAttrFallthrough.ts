@@ -101,6 +101,15 @@ function walkTemplate(
       for (const branch of node.branches) {
         for (const child of branch.body) walkTemplate(child, visit);
       }
+      // A `TemplateMatch` may carry a real-element wrapper (`<div r-match>`
+      // rather than `<template r-match>`) whose attributes include any
+      // `spreadBinding` entries the author wrote on the wrapper. Visit the
+      // host so R9 detection (`r-bind="$attrs"` on the wrapper) fires.
+      // (WR-02 — the wrapper for `TemplateConditional` does not carry
+      // attributes, so this only applies to `TemplateMatch.hostElement`.)
+      if (node.type === 'TemplateMatch' && node.hostElement) {
+        walkTemplate(node.hostElement, visit);
+      }
       break;
     case 'TemplateLoop':
       for (const child of node.body) walkTemplate(child, visit);
