@@ -470,19 +470,91 @@ function applyAttrsHelperDecl(): string {
   // than a TypeError on `Object.entries(null)` / `k in null` (CR-04).
   // Matches the silent-no-op contract of Vue `v-bind="null"`, React
   // `{...null}`, and Svelte `{...null}`.
+  //
+  // Phase 14.1 / WR-A1 — `class` and `style` are MERGE-keys (R6 always-
+  // merge), not REPLACE-keys. The naive `setAttribute(el, 'class', value)`
+  // / `setAttribute(el, 'style', value)` path used for all other attrs
+  // (a) wipes the wrapper-author's own `class="btn"` / static styles, and
+  // (b) loses to Angular's `[ngClass]` / `ɵɵstyleMap` instructions that
+  // re-apply on every CD cycle AFTER the effect runs. Handle them via
+  // `el.classList.add` (tokenised, additive) and `el.style.setProperty`
+  // with `'important'` priority (beats Angular's non-!important styleMap
+  // re-apply). Track the tokens/properties we applied per element so a
+  // consumer-side drop of `class`/`style` cleanly removes our additions
+  // on the next effect run without touching the wrapper's owned classes
+  // or styles. Other targets achieve the same "consumer wins" semantic
+  // via per-framework merge primitives (React: JSX style-object spread,
+  // Vue: mergeProps style merge, Svelte/Solid/Lit: target-native paths).
   return [
     `private ${APPLY_ATTRS_FIELD_NAME} = (() => {`,
     `  const renderer = inject(Renderer2);`,
     `  const prevKeysByElement = new WeakMap<HTMLElement, string[]>();`,
+    `  const prevClassTokensByElement = new WeakMap<HTMLElement, string[]>();`,
+    `  const prevStylePropsByElement = new WeakMap<HTMLElement, string[]>();`,
+    `  const parseClassTokens = (value: unknown): string[] => {`,
+    `    if (typeof value !== 'string') return [];`,
+    `    const out: string[] = [];`,
+    `    for (const tok of value.split(/\\s+/)) {`,
+    `      if (tok.length > 0) out.push(tok);`,
+    `    }`,
+    `    return out;`,
+    `  };`,
+    `  const parseStyleDecls = (value: unknown): Array<[string, string]> => {`,
+    `    if (typeof value !== 'string') return [];`,
+    `    const out: Array<[string, string]> = [];`,
+    `    for (const decl of value.split(';')) {`,
+    `      const colon = decl.indexOf(':');`,
+    `      if (colon < 0) continue;`,
+    `      const prop = decl.slice(0, colon).trim();`,
+    `      const val = decl.slice(colon + 1).trim();`,
+    `      if (prop.length > 0) out.push([prop, val]);`,
+    `    }`,
+    `    return out;`,
+    `  };`,
+    `  const applyClassMerge = (el: HTMLElement, value: unknown) => {`,
+    `    const next = parseClassTokens(value);`,
+    `    const prev = prevClassTokensByElement.get(el) ?? [];`,
+    `    const nextSet = new Set(next);`,
+    `    for (const tok of prev) {`,
+    `      if (!nextSet.has(tok)) el.classList.remove(tok);`,
+    `    }`,
+    `    for (const tok of next) el.classList.add(tok);`,
+    `    prevClassTokensByElement.set(el, next);`,
+    `  };`,
+    `  const applyStyleMerge = (el: HTMLElement, value: unknown) => {`,
+    `    const next = parseStyleDecls(value);`,
+    `    const prev = prevStylePropsByElement.get(el) ?? [];`,
+    `    const nextProps = next.map(([p]) => p);`,
+    `    const nextSet = new Set(nextProps);`,
+    `    for (const prop of prev) {`,
+    `      if (!nextSet.has(prop)) el.style.removeProperty(prop);`,
+    `    }`,
+    `    for (const [prop, val] of next) el.style.setProperty(prop, val, 'important');`,
+    `    prevStylePropsByElement.set(el, nextProps);`,
+    `  };`,
     `  return (el: HTMLElement, obj: Record<string, unknown> | null | undefined) => {`,
     `    const safeObj: Record<string, unknown> = obj ?? {};`,
     `    const prevKeys = prevKeysByElement.get(el) ?? [];`,
     `    for (const k of prevKeys) {`,
+    `      if (k === 'class' || k === 'style') continue;`,
     `      if (!(k in safeObj)) renderer.removeAttribute(el, k);`,
     `    }`,
+    `    if (!('class' in safeObj) && prevClassTokensByElement.has(el)) {`,
+    `      applyClassMerge(el, '');`,
+    `    }`,
+    `    if (!('style' in safeObj) && prevStylePropsByElement.has(el)) {`,
+    `      applyStyleMerge(el, '');`,
+    `    }`,
     `    for (const [k, v] of Object.entries(safeObj)) {`,
-    `      if (v === null || v === false) renderer.removeAttribute(el, k);`,
-    `      else renderer.setAttribute(el, k, String(v));`,
+    `      if (k === 'class') {`,
+    `        applyClassMerge(el, v);`,
+    `      } else if (k === 'style') {`,
+    `        applyStyleMerge(el, v);`,
+    `      } else if (v === null || v === false) {`,
+    `        renderer.removeAttribute(el, k);`,
+    `      } else {`,
+    `        renderer.setAttribute(el, k, String(v));`,
+    `      }`,
     `    }`,
     `    prevKeysByElement.set(el, Object.keys(safeObj));`,
     `  };`,
@@ -650,11 +722,24 @@ function emitSpreadBinding(
       }
     }
 
-    // Push the per-spread `effect()` field initializer. The guard
+    // Push the per-spread `afterRenderEffect()` field initializer. The guard
     // (`viewChild()?.nativeElement` is undefined before first render) makes
-    // the effect a no-op until the element exists (Pitfall 7).
+    // the hook a no-op until the element exists (Pitfall 7).
+    //
+    // Phase 14.1 / WR-A1 — switched from `effect()` to `afterRenderEffect()`.
+    // `effect()` schedules into the same render cycle that runs the wrapper's
+    // `[ngClass]` / `ɵɵstyleMap` bindings, and Angular's styleMap re-applies
+    // after the effect, clobbering the consumer-merged style declarations
+    // (including a `setProperty(prop, val, 'important')` priority — styleMap's
+    // re-call with empty priority strips it). `afterRenderEffect` runs
+    // reactively but in the post-render phase, AFTER every CD cycle's binding
+    // instructions have committed, so the merged class/style win against the
+    // wrapper-author's own `:class` / `:style` bindings (R6 always-merge
+    // last-wins). Subsequent CD cycles that re-call ɵɵstyleMap with the same
+    // map skip via reference-equality, then this hook re-asserts the consumer
+    // values to keep them durable.
     const effectDecl = [
-      `private ${effectFieldName} = effect(() => {`,
+      `private ${effectFieldName} = afterRenderEffect(() => {`,
       `  const el = this.${refName}()?.nativeElement;`,
       `  if (!el) return;`,
       `  this.${APPLY_ATTRS_FIELD_NAME}(el, ${exprText});`,

@@ -59,7 +59,7 @@ function compileAngular(src: string, filename = 'Test.rozie'): string {
 }
 
 describe('emitAngular — spreadBinding (Plan 14-05 Task 2 / D-01)', () => {
-  it('(1) plain LITERAL spread → #rozieSpread_<N> + applyAttrs IIFE + effect()', () => {
+  it('(1) plain LITERAL spread → #rozieSpread_<N> + applyAttrs IIFE + afterRenderEffect()', () => {
     const code = compileAngular(`<rozie name="Test">
 <template>
   <button r-bind="{ id: 'x', title: 't' }"></button>
@@ -72,8 +72,12 @@ describe('emitAngular — spreadBinding (Plan 14-05 Task 2 / D-01)', () => {
     // Shared applyAttrs IIFE diff helper (NO @rozie/runtime-angular import).
     expect(code).toContain('__rozieApplyAttrs');
     expect(code).not.toContain('@rozie/runtime-angular');
-    // effect() field initializer guards nativeElement (Pitfall 7).
-    expect(code).toContain('effect(() =>');
+    // Phase 14.1 / WR-A1 — afterRenderEffect() (not effect()) so the merged
+    // class/style runs AFTER Angular's `[ngClass]`/`ɵɵstyleMap` bindings
+    // commit; otherwise styleMap re-fires post-effect and clobbers the
+    // consumer-merged style declarations. Field initializer guards
+    // nativeElement (Pitfall 7).
+    expect(code).toContain('afterRenderEffect(() =>');
     expect(code).toMatch(/\?\.nativeElement/);
     // The diff helper sets/removes attributes via Renderer2.
     expect(code).toContain('Renderer2');
@@ -82,7 +86,7 @@ describe('emitAngular — spreadBinding (Plan 14-05 Task 2 / D-01)', () => {
     expect(code).toMatch(/import \{[^}]*\binject\b[^}]*\} from '@angular\/core'/);
     expect(code).toMatch(/import \{[^}]*\bRenderer2\b[^}]*\} from '@angular\/core'/);
     expect(code).toMatch(/import \{[^}]*\bElementRef\b[^}]*\} from '@angular\/core'/);
-    expect(code).toMatch(/import \{[^}]*\beffect\b[^}]*\} from '@angular\/core'/);
+    expect(code).toMatch(/import \{[^}]*\bafterRenderEffect\b[^}]*\} from '@angular\/core'/);
     expect(code).toMatch(/import \{[^}]*\bviewChild\b[^}]*\} from '@angular\/core'/);
   });
 

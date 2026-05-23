@@ -65,7 +65,18 @@ export type AngularCoreImport =
    * Angular components. emitAngular adds it via `imports.add('forwardRef')`
    * when `tagKind: 'self'` appears anywhere in the template.
    */
-  | 'forwardRef';
+  | 'forwardRef'
+  /**
+   * Phase 14.1 / WR-A1: `afterRenderEffect` — the post-render-phase reactive
+   * subscriber that drives the `$attrs` / `r-bind` spread's `__rozieApplyAttrs`
+   * call. Replaces the original `effect()` for spreadBinding because a plain
+   * effect schedules during change detection and Angular's `[ngClass]` /
+   * `ɵɵstyleMap` bindings re-fire AFTER the effect within the same CD pass,
+   * clobbering the consumer-merged class / style declarations. Running in the
+   * post-render phase guarantees the merge wins the last-write race for R6
+   * always-merge consumer-style override.
+   */
+  | 'afterRenderEffect';
 
 /** Forms-module import kind — separate import line from `@angular/forms`. */
 export type AngularFormsImport = 'FormsModule';

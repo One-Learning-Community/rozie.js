@@ -227,15 +227,18 @@ export function emitAngular(
   // (`r-bind="<expr>"` or the synthesized `$attrs` auto-fallthrough), the
   // emitted component needs `inject` (for the shared `__rozieApplyAttrs`
   // IIFE's `Renderer2` injection), `Renderer2` (the safe imperative DOM API),
-  // `ElementRef` (the `viewChild<ElementRef>(...)` generic), `effect` (the
-  // signal-based per-spread reactive subscriber), and `viewChild` (the
-  // signal-based template-ref query). Same conditional-import pattern as
-  // `hasDynamicSlotFiller`.
+  // `ElementRef` (the `viewChild<ElementRef>(...)` generic),
+  // `afterRenderEffect` (the post-render reactive subscriber — Phase 14.1 /
+  // WR-A1: post-render ordering is load-bearing so the merged class/style
+  // wins over the wrapper-author's own `[ngClass]` / `ɵɵstyleMap` bindings,
+  // which re-fire after a plain `effect()` and clobber the merge), and
+  // `viewChild` (the signal-based template-ref query). Same conditional-
+  // import pattern as `hasDynamicSlotFiller`.
   if (tmplResult.hasSpreadBinding) {
     imports.add('inject');
     imports.add('Renderer2');
     imports.add('ElementRef');
-    imports.add('effect');
+    imports.add('afterRenderEffect');
     imports.add('viewChild');
   }
 
