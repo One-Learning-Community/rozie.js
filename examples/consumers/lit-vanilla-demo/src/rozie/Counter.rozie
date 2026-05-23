@@ -11,7 +11,7 @@
   No lifecycle, no refs, no listeners — see Dropdown.rozie for those.
 -->
 
-<rozie name="Counter">
+<rozie name="Counter" inherit-attrs="false" inherit-listeners="false">
 
 <props>
 {

@@ -12,7 +12,7 @@
     - Conditional rendering with r-if / r-else
 -->
 
-<rozie name="SearchInput">
+<rozie name="SearchInput" inherit-attrs="false" inherit-listeners="false">
 
 <props>
 {
