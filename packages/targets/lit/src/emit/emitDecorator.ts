@@ -13,9 +13,12 @@
 
 /** Convert `Counter` / `TodoList` / `SearchInput` → `rozie-counter` / `rozie-todo-list` / `rozie-search-input`. */
 export function toKebabCase(name: string): string {
-  // Insert hyphen before any uppercase letter that follows a lowercase letter
-  // or a digit. Then lowercase the whole thing.
-  const hyphenated = name.replace(/([a-z0-9])([A-Z])/g, '$1-$2');
+  // Insert hyphen at every word boundary, then lowercase. Two boundary forms:
+  //   1. lowercase/digit → uppercase           (`Counter` → `counter`, `TodoList` → `todo-list`)
+  //   2. uppercase → uppercase-then-lowercase  (`URLPath` → `url-path`, `ROnProbe` → `r-on-probe`)
+  // Without (2), adjacent-uppercase runs collapse: `ROnProbe` mis-emits as `ron-probe`,
+  // mismatching the harness-expected custom-element tag `rozie-r-on-probe`.
+  const hyphenated = name.replace(/([a-z0-9]|[A-Z](?=[A-Z][a-z]))([A-Z])/g, '$1-$2');
   return hyphenated.toLowerCase();
 }
 
