@@ -398,6 +398,62 @@ function hasDynamicListenerSpread(node: TemplateElementIR): boolean {
 }
 
 /**
+ * Phase 15 follow-up Bug B — `$attrs` / `$listeners` collapse-to-`attrs`
+ * dedup. React doesn't syntactically separate listener props from attribute
+ * props (a consumer-passed `onClick` lands in the SAME `_props` rest bucket
+ * as `id`/`className`), so both `$attrs` and `$listeners` lower to the same
+ * bare `attrs` identifier (see `rewriteTemplateExpression` Identifier
+ * visitor — Phase 14 D-04 + Phase 15 D-19). When an element carries BOTH
+ * a bare-`$attrs` attribute-spread AND a bare-`$listeners` listener-spread,
+ * the naive emit produces a duplicate `{...attrs}` JSX spread — and JSX is
+ * last-write-wins per key, so the second spread silently re-applies
+ * `attrs.className` over the Phase 14.1 R6 className merge (and re-applies
+ * every other attrs key over any local attribute too). For the standard
+ * auto-fallthrough case (`<rozie>` defaults, no opt-outs) this drops
+ * locally-styled CSS module classes entirely — the ThemedButton fixture
+ * loses its `.btn` styling.
+ *
+ * Returns the source-order-preserving listenerSpreads list with bare
+ * `$listeners` entries DROPPED when the element has a bare-`$attrs`
+ * spreadBinding. The dropped listener cluster is already covered by the
+ * `$attrs` spread (same `attrs` identifier) — both carry the entire splitProps
+ * rest bucket, attrs + listeners alike. Returns the unchanged list when no
+ * collapse is needed.
+ *
+ * KNOWN LIMITATION — when an element carries `$attrs` + `$listeners` AND
+ * local `@event` handlers, dropping the listener-spread side means the
+ * per-key dispatcher merge (emitElementEvents) no longer captures the
+ * consumer's onClick (which lives inside attrs). The trailing `{...attrs}`
+ * spread then overrides the local `@click` with the consumer's onClick
+ * (last-wins). This is a known regression from the R6 listener all-fire
+ * intent for the narrow attrs-auto+listeners-auto+local-event case, but
+ * is the lesser-of-two-evils trade vs the className-clobber bug. A future
+ * fix could inline `attrs.onClick?.($event)` into the local event dispatcher
+ * to restore all-fire without re-spreading attrs.
+ */
+function isBareListenersSpread(spread: ListenerSpreadIR): boolean {
+  return t.isIdentifier(spread.expression, { name: '$listeners' });
+}
+
+function elementHasBareAttrsSpread(node: TemplateElementIR): boolean {
+  for (const a of node.attributes) {
+    if (a.kind !== 'spreadBinding') continue;
+    if (t.isIdentifier(a.expression, { name: '$attrs' })) return true;
+  }
+  return false;
+}
+
+function dedupListenersAgainstAttrs(
+  node: TemplateElementIR,
+): TemplateElementIR {
+  if (node.listenerSpreads.length === 0) return node;
+  if (!elementHasBareAttrsSpread(node)) return node;
+  const filtered = node.listenerSpreads.filter((s) => !isBareListenersSpread(s));
+  if (filtered.length === node.listenerSpreads.length) return node;
+  return { ...node, listenerSpreads: filtered };
+}
+
+/**
  * Phase 15 R6 — assemble the per-element listener emit.
  *
  * Returns `{ eventsJsx, extraSpreads }`:
@@ -438,9 +494,16 @@ function hasDynamicListenerSpread(node: TemplateElementIR): boolean {
  * native keys).
  */
 function emitElementListeners(
-  node: TemplateElementIR,
+  origNode: TemplateElementIR,
   ctx: EmitNodeCtx,
 ): { eventsJsx: string; extraSpreads: string[] } {
+  // Phase 15 follow-up Bug B — when a bare `$attrs` spread is already
+  // present on this element, drop any bare-`$listeners` listenerSpread
+  // (both lower to the same `attrs` identifier in React; the `$attrs`
+  // spread already carries the whole splitProps rest bucket, listeners
+  // included). Prevents the duplicate `{...attrs}` JSX spread that
+  // silently re-applies `attrs.className` over the R6 className merge.
+  const node = dedupListenersAgainstAttrs(origNode);
   const hasEvents = node.events.length > 0;
   const hasSpreads = node.listenerSpreads.length > 0;
 

@@ -13,7 +13,7 @@ export default function CardHeader(props: CardHeaderProps): JSX.Element {
 
   return (
     <>
-      <div {...attrs} className={clsx("card-header", (attrs.className as string | undefined))} {...attrs} data-rozie-s-f3e60f5a="">{props.title}</div>
+      <div {...attrs} className={clsx("card-header", (attrs.className as string | undefined))} data-rozie-s-f3e60f5a="">{props.title}</div>
     </>
   );
 }

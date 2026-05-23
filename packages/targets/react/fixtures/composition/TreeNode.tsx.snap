@@ -5,7 +5,7 @@ export default function TreeNode(props: TreeNodeProps): JSX.Element {
 
   return (
     <>
-      <li {...attrs} {...attrs} data-rozie-s-a7176a6e="">
+      <li {...attrs} data-rozie-s-a7176a6e="">
         <span data-rozie-s-a7176a6e="">{$props.label}</span>
         <TreeNode node={$props.children} data-rozie-s-a7176a6e="" />
       </li>

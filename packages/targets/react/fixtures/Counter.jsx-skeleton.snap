@@ -1,5 +1,5 @@
 <>
-<div {...attrs} className={clsx(clsx(styles.counter, { [styles.hovering]: hovering }), (attrs.className as string | undefined))} {...mergeListeners({ onMouseEnter: ($event) => { setHovering(true); }, onMouseLeave: ($event) => { setHovering(false); } }, attrs)}>
+<div {...attrs} className={clsx(clsx(styles.counter, { [styles.hovering]: hovering }), (attrs.className as string | undefined))} onMouseEnter={($event) => { setHovering(true); }} onMouseLeave={($event) => { setHovering(false); }}>
   <button disabled={!canDecrement} aria-label="Decrement" onClick={decrement}>−</button>
   <span className={styles.value}>{value}</span>
   <button disabled={!canIncrement} aria-label="Increment" onClick={increment}>+</button>
