@@ -71,6 +71,10 @@ export type {
   SetupAnnotation,
   TemplateNode as IRTemplateNode,
   TemplateElementIR,
+  // Phase 15 R2 — `r-on="<expr>"` lowering produces this on
+  // `TemplateElementIR.listenerSpreads`; per-target emitters (and downstream
+  // plugin authors) consume the shape via the public barrel.
+  ListenerSpreadIR,
   AttributeBinding,
   // Phase 12 (WR-02) — the resolved r-model modifier shape carried on the
   // `modifiers` field of an exported `AttributeBinding`; a third-party plugin

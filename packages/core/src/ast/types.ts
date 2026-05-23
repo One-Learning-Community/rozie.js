@@ -38,6 +38,14 @@ export interface BlockMap {
      * carried no `inherit-attrs` attribute — treated as `true` downstream.
      */
     inheritAttrs?: boolean;
+    /**
+     * Phase 15 — the `inherit-listeners` boolean attribute on the `<rozie>`
+     * tag. `false` opts the component out of cross-framework LISTENER
+     * fallthrough. INDEPENDENT of `inheritAttrs`. Absent (key omitted under
+     * `exactOptionalPropertyTypes`) when the tag carried no
+     * `inherit-listeners` attribute — treated as `true` downstream.
+     */
+    inheritListeners?: boolean;
     loc: SourceLoc;
   };
   props?: BlockEntry;

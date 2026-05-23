@@ -170,6 +170,12 @@ export function lowerToIR(ast: RozieAST, opts: LowerOptions): LowerResult {
     // `BlockMap.rozie.inheritAttrs`. An absent attribute (key omitted under
     // exactOptionalPropertyTypes) lowers to the `true` default.
     inheritAttrs: ast.blocks.rozie?.inheritAttrs ?? true,
+    // Phase 15 R5 — cross-framework LISTENER fallthrough. Threaded from the
+    // `<rozie inherit-listeners>` attribute captured by splitBlocks onto
+    // `BlockMap.rozie.inheritListeners`. INDEPENDENT of `inheritAttrs`. An
+    // absent attribute (key omitted under exactOptionalPropertyTypes) lowers
+    // to the `true` default.
+    inheritListeners: ast.blocks.rozie?.inheritListeners ?? true,
     styles,
     // Phase 06.2 P1 D-115 — populated from componentsTable.values() in source-order
     // (Map preserves insertion order per D-129).

@@ -90,6 +90,25 @@ export interface IRComponent {
    * lowers to `true` here.
    */
   inheritAttrs: boolean;
+  /**
+   * Phase 15 R5 — cross-framework LISTENER fallthrough.
+   *
+   * `true` (the default) enables auto-listener-fallthrough: consumer-passed
+   * event listeners (`@click`, `@mouseenter`, …) that are NOT handled inside
+   * the component are forwarded onto the component's single root element by
+   * each target emitter. `false` disables it — the author opts out via
+   * `<rozie inherit-listeners="false">` and is then responsible for placing
+   * `r-on="$listeners"` explicitly.
+   *
+   * INDEPENDENT of `inheritAttrs`. The two flags toggle separately — a
+   * component may auto-fallthrough listeners while opting out of attribute
+   * fallthrough, or vice versa (SPEC R5 four-corner matrix lock).
+   *
+   * Threaded from `BlockMap.rozie.inheritListeners` in `lower.ts`: an absent
+   * `<rozie>` attribute (key omitted under `exactOptionalPropertyTypes`)
+   * lowers to `true` here.
+   */
+  inheritListeners: boolean;
   styles: StyleSection;
   /**
    * Phase 06.2 P1 D-115 — declared via `<components>` block. Empty array
@@ -498,6 +517,55 @@ export type TemplateNode =
   | TemplateStaticTextIR;
 
 /**
+ * ListenerSpreadIR — Phase 15 R2 / D-16.
+ *
+ * The listener-side mirror of Phase 14's `AttributeBinding.spreadBinding` — the
+ * IR variant emitted for `r-on="<expr>"` (object-form only; the colon form
+ * `r-on:click="x"` is ROZ972). Lives in a STANDALONE interface on a NEW
+ * `TemplateElementIR.listenerSpreads` field (Pitfall 3), NOT as a 6th
+ * `AttributeBinding` kind: the `Listener` shape (D-20) stays LOCKED, and the
+ * `AttributeBinding` union stays at 5 kinds (Phase 14 `spreadBinding` is the
+ * 5th and final).
+ *
+ * Listener spreads do NOT lower into synthetic `Listener` entries (SPEC R2) —
+ * each emitter consumes `listenerSpreads` directly alongside `events: Listener[]`
+ * to produce hybrid output: literal-key object expressions compile to native
+ * single-event syntax at zero runtime cost (SPEC R7 literal half), while
+ * dynamic (non-literal) expressions route through a per-target runtime helper.
+ *
+ * `literalKeys` is populated by Wave 1 lowering ONLY when `expression.type ===
+ * 'ObjectExpression'` and at least one own key is parseable as
+ * `eventName[.modifier(args)]…` via the existing `peggy` modifier grammar
+ * (D-15). Dynamic-key spreads leave the field undefined — SPEC §Out-of-scope
+ * explicitly leaves dynamic-key modifiers undefined for v1.
+ *
+ * Wave 0 only adds the type; lowerTemplate populates the field in Wave 1.
+ *
+ * @experimental — shape may change before v1.0
+ */
+export interface ListenerSpreadIR {
+  type: 'ListenerSpread';
+  expression: Expression;
+  deps: SignalRef[];
+  sourceLoc: SourceLoc;
+  /**
+   * Per-key resolved-modifier metadata for literal-key `r-on` object
+   * expressions. Populated by Wave 1 (Plan 15-02) lowerTemplate's r-on branch
+   * when `expression` is an ObjectExpression and a key matches the
+   * `eventName[.modifier(args)]…` grammar; undefined otherwise (dynamic
+   * spreads). Each entry mirrors one parseable property of the object
+   * literal — `eventName` is the head (e.g. `'click'`), `modifierPipeline` is
+   * the resolved chain (potentially empty), `valueExpr` is the property
+   * value (the listener function expression).
+   */
+  literalKeys?: Array<{
+    eventName: string;
+    modifierPipeline: ModifierPipelineEntry[];
+    valueExpr: Expression;
+  }>;
+}
+
+/**
  * @experimental — shape may change before v1.0
  */
 export interface TemplateElementIR {
@@ -506,6 +574,14 @@ export interface TemplateElementIR {
   attributes: AttributeBinding[];
   /** Template @event bindings — D-20: same Listener shape as <listeners> entries. */
   events: Listener[];
+  /**
+   * Phase 15 R2 — `r-on="<expr>"` listener-spread bindings, parallel to
+   * `events: Listener[]`. Each emitter must iterate this field alongside
+   * `events` to produce listener-fallthrough output; TS exhaustiveness on the
+   * downstream consumers is the enforcement mechanism. Empty array `[]` is
+   * the no-spread default; Wave 1 (Plan 15-02) lowerTemplate populates it.
+   */
+  listenerSpreads: ListenerSpreadIR[];
   children: TemplateNode[];
   sourceLoc: SourceLoc;
   /**

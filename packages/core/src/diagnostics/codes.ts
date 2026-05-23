@@ -308,6 +308,19 @@ export const RozieErrorCode = {
   R_BIND_COLON_FORM: 'ROZ969',             // error — R1: `r-bind:foo="x"` colon form is not supported (use the `:foo` shorthand or the bare-spread `r-bind="obj"`)
   ATTR_FALLTHROUGH_MULTI_ROOT: 'ROZ970',   // error — R8: a multi-root template with auto-fallthrough enabled has no single root to receive inherited attributes
   ATTR_DOUBLE_APPLY: 'ROZ971',             // warning — R9: `$attrs` referenced (e.g. via `r-bind="$attrs"`) while auto-fallthrough is still on — attributes would be applied twice
+
+  // ---- Phase 15 listener fallthrough — ROZ972..ROZ974 ----
+  // Cross-framework listener fallthrough: the `r-on="<expr>"` object-spread
+  // form, the `$listeners` magic accessor, and `<rozie inherit-listeners>`
+  // auto-fallthrough. `ROZ971` is the verified current highest (Phase 14
+  // ATTR_DOUBLE_APPLY) — these do NOT collide. ROZ973/ROZ974 are deliberately
+  // SEPARATE codes from their Phase 14 attribute-side analogues (ROZ970 /
+  // ROZ971) per SPEC R8/R9: the two checks are INDEPENDENT — a multi-root
+  // component with `inherit-attrs="false"` but default `inherit-listeners`
+  // produces ROZ973 (not ROZ970), and vice versa.
+  R_ON_COLON_FORM: 'ROZ972',                  // error — R1: `r-on:click="x"` colon form is not supported (use the single-event `@click` syntax or the bare object-spread `r-on="{ click: fn }"`)
+  LISTENER_FALLTHROUGH_MULTI_ROOT: 'ROZ973',  // error — R8: a multi-root template with auto-listener-fallthrough enabled has no single root to receive inherited listeners (INDEPENDENT of ROZ970)
+  LISTENER_DOUBLE_APPLY: 'ROZ974',            // warning — R9: `$listeners` referenced (e.g. via `r-on="$listeners"`) while auto-listener-fallthrough is still on — listeners would be applied twice (INDEPENDENT of ROZ971)
 } as const;
 
 export type RozieErrorCode = (typeof RozieErrorCode)[keyof typeof RozieErrorCode];

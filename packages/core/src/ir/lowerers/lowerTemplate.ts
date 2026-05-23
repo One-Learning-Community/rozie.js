@@ -1001,6 +1001,10 @@ function lowerBareElement(
     tagName: el.tagName,
     attributes,
     events,
+    // Phase 15 R2 — `r-on="<expr>"` lowering lands in Wave 1 (Plan 15-02).
+    // Wave 0 stamps an empty array so the new TemplateElementIR field
+    // satisfies the type-system invariant without populating it.
+    listenerSpreads: [],
     children,
     sourceLoc: el.loc,
     tagKind: annotation.tagKind,
