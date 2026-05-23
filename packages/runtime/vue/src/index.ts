@@ -21,3 +21,7 @@ export {
   isShift,
   isMeta,
 } from './keyFilter.js';
+// Phase 15 (listener fallthrough) — Vue native-element `v-on="<obj>"` helper.
+// FORBIDDEN_KEYS-skipping identity over a null-prototype object (A1 / Pitfall 8
+// lock — Vue native-element v-on keys stay lowercase, no per-target key remap).
+export { normalizeListeners } from './normalizeListeners.js';

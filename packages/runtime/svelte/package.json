@@ -10,7 +10,11 @@
       "svelte": "./src/index.ts",
       "types": "./src/index.ts"
     },
-    "./PortalHost.svelte": "./src/PortalHost.svelte"
+    "./PortalHost.svelte": "./src/PortalHost.svelte",
+    "./applyListeners": {
+      "svelte": "./src/applyListeners.ts",
+      "types": "./src/applyListeners.ts"
+    }
   },
   "files": [
     "src"
