@@ -200,12 +200,18 @@ export function splitBlocks(source: string, filename?: string): SplitBlocksResul
               // Phase 14: parse the `inherit-attrs` attribute. `null` chunks =
               // the attribute was absent → omit the key entirely
               // (exactOptionalPropertyTypes — conditional spread → treated as
-              // `true` downstream). `"false"` → `false`; everything else
-              // (present-without-value `[]`, `"true"`, or any other value)
-              // → `true`, the safe default (threat T-14-01).
+              // `true` downstream). `"false"` (case-insensitive) → `false`;
+              // everything else (present-without-value `[]`, `"true"`, or any
+              // other value) → `true`, the safe default (threat T-14-01).
+              //
+              // WR-05: the comparison is case-insensitive so an author writing
+              // `inherit-attrs="False"` / `"FALSE"` (HTML conventions treat
+              // boolean-keyword attribute values as case-insensitive) gets the
+              // disable they plainly asked for, instead of silently falling
+              // through to the default-true.
               let inheritAttrs: boolean | undefined;
               if (savedInheritAttrsChunks !== null) {
-                const raw = savedInheritAttrsChunks.join('').trim();
+                const raw = savedInheritAttrsChunks.join('').trim().toLowerCase();
                 inheritAttrs = raw !== 'false';
               }
               savedInheritAttrsChunks = null;

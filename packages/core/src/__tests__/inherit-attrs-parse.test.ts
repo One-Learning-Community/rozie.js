@@ -53,4 +53,22 @@ describe('<rozie inherit-attrs> parse (Phase 14 R5)', () => {
     );
     expect(result.rozie!.inheritAttrs).toBe(true);
   });
+
+  it('R5 (WR-05): inherit-attrs="False" → inheritAttrs === false (case-insensitive)', () => {
+    // WR-05 regression: a case-mismatched `"False"` previously fell through
+    // to the default-true (no diagnostic, no opt-out). HTML treats
+    // boolean-keyword attribute values as case-insensitive; honour that
+    // convention.
+    const result = splitBlocks(
+      withRozieTag('<rozie name="X" inherit-attrs="False">'),
+    );
+    expect(result.rozie!.inheritAttrs).toBe(false);
+  });
+
+  it('R5 (WR-05): inherit-attrs="FALSE" → inheritAttrs === false (uppercase)', () => {
+    const result = splitBlocks(
+      withRozieTag('<rozie name="X" inherit-attrs="FALSE">'),
+    );
+    expect(result.rozie!.inheritAttrs).toBe(false);
+  });
 });
