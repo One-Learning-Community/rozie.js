@@ -1,5 +1,6 @@
 <script lang="ts">
 import TreeNode from './TreeNode.svelte';
+import { applyListeners } from '@rozie/runtime-svelte';
 
 interface Props {
   [key: string]: unknown;
@@ -9,7 +10,7 @@ let { ...__rozieAttrs }: Props = $props();
 </script>
 
 
-  <li {...__rozieAttrs}>
+  <li {...__rozieAttrs} use:applyListeners={__rozieAttrs}>
     <span>{$props.label}</span>
     <TreeNode node={$props.children}></TreeNode>
   </li>

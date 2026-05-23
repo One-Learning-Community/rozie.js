@@ -120,12 +120,21 @@ describe('emitSvelte — substring invariants (Plan 02a Task 3 acceptance criter
     );
   });
 
-  it('SearchInput.svelte.snap contains inline debounce IIFE (no @rozie/runtime-svelte import)', () => {
+  it('SearchInput.svelte.snap contains inline debounce IIFE (no debounce/throttle/useOutsideClick from @rozie/runtime-svelte)', () => {
     const { ir, src, filename } = loadExample('SearchInput');
     const { code } = emitSvelte(ir, { filename, source: src });
     expect(code).toMatch(/const debounced[A-Za-z_]* = \(\(\) => \{/);
     expect(code).toContain('setTimeout');
-    expect(code).not.toContain("from '@rozie/runtime-svelte'");
+    // RESEARCH OQ A8/A9 RESOLVED: debounce/throttle/useOutsideClick are
+    // inlined as IIFEs in the script — NOT imported from
+    // `@rozie/runtime-svelte`. Note: Phase 15 (Plan 15-04) DID add
+    // `applyListeners` as a legitimate runtime helper for dynamic r-on
+    // listener-spread handling, so the broad "no @rozie/runtime-svelte
+    // import" assertion was retired; this check now narrowly targets the
+    // three helpers A8/A9 explicitly inlined.
+    expect(code).not.toMatch(
+      /import\s*\{[^}]*\b(debounce|throttle|useOutsideClick)\b[^}]*\}\s*from\s*['"]@rozie\/runtime-svelte['"]/,
+    );
   });
 
   it('NO `on:event` Svelte-4 syntax in any of the 5 emitted SFCs (Pitfall 4 mitigation)', () => {

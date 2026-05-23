@@ -1,4 +1,6 @@
 <script lang="ts">
+import { applyListeners } from '@rozie/runtime-svelte';
+
 import type { Snippet } from 'svelte';
 
 interface Props {
@@ -71,7 +73,7 @@ const remaining = $derived(items.filter((i: any) => !i.done).length);
 </script>
 
 
-<div {...__rozieAttrs} class={["todo-list", (__rozieAttrs)?.class]}>
+<div {...__rozieAttrs} class={["todo-list", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs}>
   <header>
     {#if header}{@render header({ remaining, total: items.length })}{:else}
       

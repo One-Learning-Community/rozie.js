@@ -1,5 +1,5 @@
 
-<div class="search-input" v-bind="$attrs">
+<div class="search-input" v-bind="$attrs" v-on="$listeners">
   
   <input ref="inputElRef" type="search" :placeholder="props.placeholder" v-model="query" @input="debouncedOnSearch" @keydown.enter="onSearch" @keydown.esc="clear" />
 

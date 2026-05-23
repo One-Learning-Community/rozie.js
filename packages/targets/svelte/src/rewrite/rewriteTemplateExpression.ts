@@ -82,7 +82,18 @@ export function rewriteTemplateExpression(
     // calling rewrite; this visitor is what turns the bare `$attrs` Identifier
     // into the synthesised rest-binding name.
     Identifier(path) {
-      if (path.node.name !== '$attrs') return;
+      // Phase 14 D-04 — `$attrs` → `__rozieAttrs` (Svelte 5 runes-mode rest
+      // binding from `$props()`). Phase 15 D-19 — `$listeners` also maps to
+      // the same `__rozieAttrs` rest binding because Svelte 5 does NOT
+      // semantically separate attribute props from listener props: both
+      // arrive in the same `$props()` rest object (a consumer's
+      // `<Wrapper class="x" onclick={fn} />` lands `{ class: 'x', onclick: fn }`
+      // in `__rozieAttrs`). The Svelte runtime also rejects bare `$listeners`
+      // as an illegal `$`-prefixed identifier (CompileError
+      // `global_reference_invalid`), so the rewrite is load-bearing for the
+      // emit to compile. The dedicated `applyListeners` action's per-key
+      // attach loop spreads any `oncamelcase` handlers onto the node verbatim.
+      if (path.node.name !== '$attrs' && path.node.name !== '$listeners') return;
       // Skip the RHS-position of a MemberExpression / OptionalMemberExpression
       // (handled by their own visitors when applicable). Skip object-literal
       // property keys (`{ $attrs: x }` is not a magic reference).

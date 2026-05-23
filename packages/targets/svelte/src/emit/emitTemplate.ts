@@ -28,6 +28,15 @@ export interface EmitTemplateResult {
   template: string;
   scriptInjections: SvelteScriptInjection[];
   diagnostics: Diagnostic[];
+  /**
+   * Phase 15 — runtime-helper import names collected from the template
+   * walk. Currently only `'applyListeners'` (D-11 — emitted for every
+   * dynamic `r-on="<expr>"` listener spread + the D-19 bare `$listeners`
+   * exempt). The SFC shell threads
+   * `import { applyListeners } from '@rozie/runtime-svelte';` when this
+   * set is non-empty.
+   */
+  runtimeImports: Set<string>;
 }
 
 export function emitTemplate(
@@ -36,12 +45,14 @@ export function emitTemplate(
 ): EmitTemplateResult {
   const diagnostics: Diagnostic[] = [];
   const scriptInjections: SvelteScriptInjection[] = [];
+  const runtimeImports = new Set<string>();
 
   if (ir.template === null) {
     return {
       template: '<!-- empty template -->',
       scriptInjections,
       diagnostics,
+      runtimeImports,
     };
   }
 
@@ -51,9 +62,10 @@ export function emitTemplate(
     diagnostics,
     scriptInjections,
     injectionCounter: { next: 0 },
+    runtimeImports,
   };
 
   const template = emitNode(ir.template, ctx);
 
-  return { template, scriptInjections, diagnostics };
+  return { template, scriptInjections, diagnostics, runtimeImports };
 }

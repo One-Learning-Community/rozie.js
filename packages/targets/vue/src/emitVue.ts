@@ -311,7 +311,7 @@ export function emitVue(ir: IRComponent, opts: EmitVueOptions = {}): EmitVueResu
     .names()
     .map((name) => ({
       wrapName: name,
-      import: { from: '@rozie/runtime-vue', name: name as 'useOutsideClick' | 'debounce' | 'throttle' },
+      import: { from: '@rozie/runtime-vue', name: name as 'useOutsideClick' | 'debounce' | 'throttle' | 'normalizeListeners' },
       decl: '', // No decl — emitListeners renders its own block.
     }));
 

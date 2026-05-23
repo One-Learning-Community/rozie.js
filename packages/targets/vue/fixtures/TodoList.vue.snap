@@ -1,6 +1,6 @@
 <template>
 
-<div class="todo-list" v-bind="$attrs">
+<div class="todo-list" v-bind="$attrs" v-on="$listeners">
   <header>
     <slot name="header" :remaining="remaining" :total="items.length">
       

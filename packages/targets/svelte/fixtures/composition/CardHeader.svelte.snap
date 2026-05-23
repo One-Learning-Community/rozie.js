@@ -1,4 +1,6 @@
 <script lang="ts">
+import { applyListeners } from '@rozie/runtime-svelte';
+
 interface Props {
   title?: string;
   [key: string]: unknown;
@@ -8,5 +10,5 @@ let { title, ...__rozieAttrs }: Props = $props();
 </script>
 
 
-  <div {...__rozieAttrs} class={["card-header", (__rozieAttrs)?.class]}>{title}</div>
+  <div {...__rozieAttrs} class={["card-header", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs}>{title}</div>
 

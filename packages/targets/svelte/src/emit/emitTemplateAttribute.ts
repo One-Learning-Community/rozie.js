@@ -27,6 +27,7 @@ import * as t from '@babel/types';
 import type {
   IRComponent,
   AttributeBinding,
+  ListenerSpreadIR,
 } from '../../../../core/src/ir/types.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
 
@@ -830,6 +831,72 @@ export function emitAttributes(
 
   out.push(...deferredMergedClassStyle);
   return out.join(' ');
+}
+
+/**
+ * Phase 15 D-19 — bare `$listeners` Identifier predicate. Both the
+ * auto-fallthrough push (lowerTemplate.ts `synthesizeListenersFallthrough`)
+ * and an author-written `r-on="$listeners"` lower to a bare `$listeners`
+ * Identifier; the emitter cannot (and need not) distinguish them. Mirrors
+ * the Phase 14 `$attrs` D-04 exemption.
+ */
+function isListenersIdentifier(expr: t.Expression): boolean {
+  return t.isIdentifier(expr, { name: '$listeners' });
+}
+
+/**
+ * Phase 15 — emit a single `ListenerSpreadIR` for Svelte as a
+ * `use:applyListeners={<expr>}` action invocation. Svelte 5 has NO Vue-3-
+ * style `v-on="<obj>"` syntax — the only idiomatic way to attach a dynamic
+ * key-keyed event-listener object to a node is a Svelte 5 action (D-11
+ * lock). The action's `applyListeners` body provides the per-key
+ * attach/detach lifecycle + FORBIDDEN_KEYS prototype-pollution guard
+ * (T-15-V5-03) at runtime.
+ *
+ * The LITERAL path is NOT routed through this helper — literal-key spreads
+ * are decomposed into synthetic `Listener` entries spliced into the events
+ * list (so modifier-bearing keys like `'click.stop'` reuse Svelte's
+ * existing `emitTemplateEvent.ts` modifier-pipeline emit; the per-element
+ * walker's same-event grouping in `emitTemplateNode.ts::emitEvents` handles
+ * R6 collision merge automatically).
+ *
+ * Two cases handled here:
+ *
+ *   - bare `$listeners` (D-19): emits `use:applyListeners={$listeners}` —
+ *     the action still runs because Svelte has no object-form listener
+ *     directive (the action provides the lifecycle); the consumer's
+ *     $listeners object is passed UNWRAPPED, the action's per-instance
+ *     FORBIDDEN_KEYS skip is the runtime guard.
+ *
+ *   - DYNAMIC expression: emits `use:applyListeners={<expr>}` — same shape.
+ *
+ * `runtimeImports` (when provided) collects the `'applyListeners'` runtime-
+ * import marker so the SFC shell threads
+ * `import { applyListeners } from '@rozie/runtime-svelte';`.
+ */
+export function emitListenerSpread(
+  spread: ListenerSpreadIR,
+  ctx: EmitAttrCtx,
+  runtimeImports?: Set<string>,
+): string {
+  // Bare $listeners and dynamic expressions both lower to the same action-
+  // invocation shape — Svelte has no native object-form listener directive.
+  // The D-19 distinction is semantic, not syntactic; the
+  // `rewriteTemplateExpression` for a bare `$listeners` Identifier passes
+  // through unchanged (no $-prefix rewrite — `$listeners` is in the
+  // STABLE_IDENTIFIERS set per Plan 15-01).
+  if (runtimeImports !== undefined) {
+    runtimeImports.add('applyListeners');
+  }
+  if (isListenersIdentifier(spread.expression)) {
+    // D-19 — bare $listeners, passed unwrapped to the action (the consumer's
+    // $listeners already carries lowercase target-native keys; A1 / Pitfall 8).
+    const expr = rewriteTemplateExpression(spread.expression, ctx.ir);
+    return `use:applyListeners={${expr}}`;
+  }
+  // Dynamic spread — the action handles per-key attach/detach + cleanup.
+  const expr = rewriteTemplateExpression(spread.expression, ctx.ir);
+  return `use:applyListeners={${expr}}`;
 }
 
 /**

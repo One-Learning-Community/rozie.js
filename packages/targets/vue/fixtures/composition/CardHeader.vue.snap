@@ -1,6 +1,6 @@
 <template>
 
-  <div class="card-header" v-bind="$attrs">{{ props.title }}</div>
+  <div class="card-header" v-bind="$attrs" v-on="$listeners">{{ props.title }}</div>
 
 </template>
 

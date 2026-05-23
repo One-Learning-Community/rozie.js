@@ -32,11 +32,13 @@ import * as t from '@babel/types';
 import type {
   IRComponent,
   AttributeBinding,
+  ListenerSpreadIR,
 } from '../../../../core/src/ir/types.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
 import type { ModifierRegistry } from '@rozie/core';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
+import type { ScriptInjection } from './emitTemplateEvent.js';
 
 export interface EmitAttrCtx {
   ir: IRComponent;
@@ -57,6 +59,16 @@ export interface EmitAttrCtx {
    * host element instead of silently producing wrong output.
    */
   diagnostics?: Diagnostic[];
+  /**
+   * Phase 15 — optional script-injection sink for the dynamic
+   * `r-on="<expr>"` listener-spread path. When the emitter routes a
+   * non-literal listener spread through `v-on="normalizeListeners(<expr>)"`,
+   * it pushes a `ScriptInjection` with `import: { from: '@rozie/runtime-vue',
+   * name: 'normalizeListeners' }` here so the shell threads the import
+   * (zero `decl` — the import is the only contribution; `mergeScriptInjections`
+   * dedupes by `import.from + import.name`).
+   */
+  scriptInjections?: ScriptInjection[];
 }
 
 /**
@@ -534,6 +546,64 @@ function emitSingleAttr(attr: AttributeBinding, ctx: EmitAttrCtx): string {
   // but we preserve binding form because it came through interpolated.
   const lit = renderInterpolatedTemplateLiteralSafe(attr.segments, ir);
   return `:${name}="\`${lit}\`"`;
+}
+
+/**
+ * Phase 15 D-19 — bare `$listeners` Identifier predicate. The auto-fallthrough
+ * push (lowerTemplate.ts `synthesizeListenersFallthrough`) and an author-
+ * written `r-on="$listeners"` both lower to a bare `$listeners` Identifier;
+ * the emitter cannot (and need not) distinguish them. Mirrors the Phase 14
+ * `$attrs` D-04 exemption.
+ */
+function isListenersIdentifier(expr: t.Expression): boolean {
+  return t.isIdentifier(expr, { name: '$listeners' });
+}
+
+/**
+ * Phase 15 — emit a single `ListenerSpreadIR` for Vue as one Vue-template
+ * attribute string (the `v-on="..."` object form). The LITERAL path is NOT
+ * routed through this helper — literal-key spreads are decomposed into
+ * synthetic `Listener` entries and run through the existing per-event emit
+ * (so modifier-bearing keys like `'click.stop'` reuse `emitTemplateEvent`'s
+ * modifier-pipeline emit; Pitfall A5: Vue's `v-on="<obj>"` does NOT support
+ * modifiers).
+ *
+ * Two cases (the literal third case is handled at the per-element walker):
+ *
+ *   - bare `$listeners` (D-19 exempt) → `v-on="$listeners"` — no
+ *     `normalizeListeners` wrap (consumer's `$listeners` already carries
+ *     target-native lowercase keys; A1 / Pitfall 8 — Vue native-element
+ *     `v-on` is lowercase).
+ *
+ *   - DYNAMIC expression                → `v-on="normalizeListeners(<expr>)"`,
+ *     plus a `ScriptInjection` pushed onto `ctx.scriptInjections` so the
+ *     shell threads `import { normalizeListeners } from '@rozie/runtime-vue';`.
+ *
+ * R6 same-event merge for the mixed (literal + dynamic) case is handled by
+ * Vue's DOM-level `addEventListener` stacking — native `@click=` directives
+ * and `v-on="<obj>"` both attach via `addEventListener`, so both fire
+ * automatically (Vue divergence from React/Solid; no runtime `mergeListeners`
+ * helper for Vue).
+ */
+export function emitListenerSpread(
+  spread: ListenerSpreadIR,
+  ctx: EmitAttrCtx,
+): string {
+  if (isListenersIdentifier(spread.expression)) {
+    // D-19 — bare $listeners; pass through unwrapped.
+    const expr = rewriteTemplateExpression(spread.expression, ctx.ir);
+    return `v-on="${expr}"`;
+  }
+  // Dynamic spread — runtime key-pass-through (FORBIDDEN_KEYS skip).
+  if (ctx.scriptInjections) {
+    ctx.scriptInjections.push({
+      wrapName: 'normalizeListeners',
+      import: { from: '@rozie/runtime-vue', name: 'normalizeListeners' },
+      decl: '',
+    });
+  }
+  const expr = rewriteTemplateExpression(spread.expression, ctx.ir);
+  return `v-on="normalizeListeners(${expr})"`;
 }
 
 /**

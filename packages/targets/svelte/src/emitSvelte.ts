@@ -160,11 +160,14 @@ export function emitSvelte(
   } = emitScript(ir, scriptOpts);
 
   // 2. Template-side emission. Returns scriptInjections for any debounce/
-  //    throttle wrappers needed by template @event modifiers.
+  //    throttle wrappers needed by template @event modifiers, and
+  //    runtimeImports for any `@rozie/runtime-svelte` helpers consumed by
+  //    the template (Phase 15 — `applyListeners` for r-on dynamic spreads).
   const {
     template,
     scriptInjections: tmplInjections,
     diagnostics: tmplDiags,
+    runtimeImports: tmplRuntimeImports,
   } = emitTemplate(ir, registry);
 
   // 3. <listeners>-block emission. Returns its own scriptInjections for
@@ -229,6 +232,17 @@ export function emitSvelte(
     !components.some((c) => c.localName === ir.name)
   ) {
     componentImportsLines.push(`import ${ir.name} from './${ir.name}.svelte';`);
+  }
+  // Phase 15 — runtime-helper imports from the template walk. Currently
+  // only `applyListeners` (D-11 — Svelte 5 action attaching dynamic r-on
+  // listener-spread expressions). Emitted as a single sorted named-import
+  // line from `@rozie/runtime-svelte` and folded into the same
+  // `componentImportsBlock` prepended to the script body by `buildShell`.
+  if (tmplRuntimeImports.size > 0) {
+    const sorted = [...tmplRuntimeImports].sort();
+    componentImportsLines.push(
+      `import { ${sorted.join(', ')} } from '@rozie/runtime-svelte';`,
+    );
   }
   const componentImportsBlock =
     componentImportsLines.length > 0

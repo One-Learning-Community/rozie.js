@@ -1,5 +1,6 @@
 <script lang="ts">
 import Counter from './Counter.svelte';
+import { applyListeners } from '@rozie/runtime-svelte';
 
 interface Props {
   [key: string]: unknown;
@@ -9,7 +10,7 @@ let { ...__rozieAttrs }: Props = $props();
 </script>
 
 
-  <div {...__rozieAttrs} class={["modal", (__rozieAttrs)?.class]}>
+  <div {...__rozieAttrs} class={["modal", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs}>
     <Counter></Counter>
   </div>
 

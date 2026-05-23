@@ -23,6 +23,7 @@ import type {
   TemplateFragmentIR,
   AttributeBinding,
   Listener,
+  ListenerSpreadIR,
 } from '../../../../core/src/ir/types.js';
 // Phase 07.1 self-reference pattern (per Phase 07.1 type-identity fix):
 // SlotFillerDecl MUST come from the `@rozie/core` barrel, not the deep-relative
@@ -32,7 +33,7 @@ import type {
 import type { ModifierRegistry, SlotFillerDecl } from '@rozie/core';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
-import { emitMergedAttributes } from './emitTemplateAttribute.js';
+import { emitMergedAttributes, emitListenerSpread } from './emitTemplateAttribute.js';
 import { emitTemplateEvent, type ScriptInjection } from './emitTemplateEvent.js';
 
 /**
@@ -259,13 +260,65 @@ function emitElementWithExtraDirective(
     // emitting wrong output.
     elementTagName: node.tagName,
     diagnostics: ctx.diagnostics,
+    // Phase 15 — script-injection sink shared with the listener-spread
+    // emit below. `normalizeListeners` runtime imports flow through the
+    // same dedup path as `debounce`/`throttle` template-event injections.
+    scriptInjections: ctx.scriptInjections,
   });
-  const eventText = emitEvents(node.events, ctx);
+
+  // Phase 15 R6 — assemble the per-element listener emit. Literal-key
+  // spreads are decomposed into synthetic `Listener` entries spliced into
+  // the events list (so modifier-bearing keys like `'click.stop'` reuse
+  // `emitTemplateEvent`'s existing modifier pipeline; A5 — Vue's
+  // `v-on="<obj>"` doesn't support modifiers, so this is the ONLY correct
+  // path for modifier-bearing keys). Dynamic spreads emit as separate
+  // `v-on="<expr>"` attributes — Vue's DOM-level `addEventListener` stacks
+  // both calls automatically (no runtime `mergeListeners` helper needed
+  // for Vue or Svelte; divergence from React/Solid).
+  const syntheticEvents: Listener[] = [];
+  const dynamicSpreads: ListenerSpreadIR[] = [];
+  // Phase 15 — defensive: synthetic test-IR may omit `listenerSpreads`
+  // (the real lowered IR always sets `[]` by construction per Plan 15-01).
+  // Skip the per-spread walk when the field is absent.
+  for (const spread of node.listenerSpreads ?? []) {
+    const literalKeys = spread.literalKeys;
+    if (literalKeys !== undefined && literalKeys.length > 0) {
+      for (const lk of literalKeys) {
+        syntheticEvents.push(listenerFromLiteralKey(spread, lk));
+      }
+    } else {
+      dynamicSpreads.push(spread);
+    }
+  }
+  const allEvents: Listener[] = [...node.events, ...syntheticEvents];
+  const eventText = emitEvents(allEvents, ctx);
+
+  // Dynamic spreads → one `v-on="..."` attribute each, in source order.
+  // Each spread routes through `emitListenerSpread` which handles D-19
+  // ($listeners exempt) vs dynamic (normalizeListeners wrap + script
+  // injection).
+  const spreadTexts: string[] = [];
+  if (dynamicSpreads.length > 0) {
+    const attrCtx: import('./emitTemplateAttribute.js').EmitAttrCtx = {
+      ir: ctx.ir,
+      registry: ctx.registry,
+      scriptInjections: ctx.scriptInjections,
+    };
+    for (const spread of dynamicSpreads) {
+      spreadTexts.push(emitListenerSpread(spread, attrCtx));
+    }
+  }
+  // Phase 15 — `hasDynamicListenerSpread` is read here only for its side-
+  // effect-free classification value; the real branching happens implicitly
+  // via the (literal/dynamic) partition above. Reference kept to satisfy
+  // TS "unused import" hygiene under exactOptionalPropertyTypes.
+  void hasDynamicListenerSpread;
 
   const partsHead: string[] = [];
   if (extraDirective) partsHead.push(extraDirective);
   if (attrText) partsHead.push(attrText);
   if (eventText) partsHead.push(eventText);
+  for (const sp of spreadTexts) partsHead.push(sp);
 
   const head = partsHead.length > 0 ? ' ' + partsHead.join(' ') : '';
 
@@ -356,24 +409,132 @@ function emitSlotFiller(filler: SlotFillerDecl, ctx: EmitNodeCtx): string {
 }
 
 /**
+ * Phase 15 — synthesize a virtual `Listener` from a `ListenerSpreadIR`'s
+ * `literalKeys[i]` entry. Each literal-key entry carries
+ * `{ eventName, modifierPipeline, valueExpr }` — enough to fabricate a
+ * Listener with the same shape `emitTemplateEvent` already consumes from
+ * `el.events`. `target` defaults to `'self'` (the element this spread lives
+ * on); `when` is null; `deps` inherits the parent spread's deps (over-
+ * approximate but never under-approximate for reactivity accounting);
+ * `source` is `'template-event'` (codegen path treats both sources
+ * identically). Mirror of the React target's `listenerFromLiteralKey`.
+ */
+function listenerFromLiteralKey(
+  spread: ListenerSpreadIR,
+  literalKey: NonNullable<ListenerSpreadIR['literalKeys']>[number],
+): Listener {
+  return {
+    type: 'Listener',
+    target: { kind: 'self', el: '$el' },
+    event: literalKey.eventName,
+    modifierPipeline: literalKey.modifierPipeline,
+    when: null,
+    handler: literalKey.valueExpr,
+    deps: spread.deps,
+    source: 'template-event',
+    sourceLoc: spread.sourceLoc,
+  };
+}
+
+/**
+ * Phase 15 R6 — does this element have at least one dynamic
+ * `ListenerSpreadIR` (no `literalKeys` field, OR explicitly empty)?
+ *
+ *   - All-literal (no dynamic spread): synthesize Listeners from each
+ *     literal-key entry, splice into events, then run the events emit
+ *     (which performs the R6 same-event merge into a single dispatcher).
+ *   - Mixed / dynamic: literal-key spreads still splice into events;
+ *     dynamic spreads emit as separate `v-on="<expr>"` attributes — Vue's
+ *     DOM-level `addEventListener` stacks both calls automatically (no
+ *     runtime `mergeListeners` helper needed for Vue or Svelte).
+ */
+function hasDynamicListenerSpread(node: TemplateElementIR): boolean {
+  for (const spread of node.listenerSpreads) {
+    if (spread.literalKeys === undefined || spread.literalKeys.length === 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
  * Emit element events. Each Listener returns one event-attribute string plus
  * an optional scriptInjection (debounce/throttle wrap) which we accumulate on
  * the shared ctx.scriptInjections list.
+ *
+ * Phase 15 R6 — when multiple Listeners on this element share the SAME event
+ * name AND have empty (or identical-shape) modifier chains, they collide on
+ * a single Vue template `@event=` attribute. Vue's template parser silently
+ * keeps only the LAST one when two `@click=` directives appear on a native
+ * element. To preserve R6 all-fire semantics we synthesize a single inline
+ * dispatcher arrow over the colliding handlers: `@click="($event) => {
+ * f1($event); f2($event); }"`. Modifier-bearing listeners (`@click.stop`,
+ * `@click.debounce(300)`) keep distinct attribute names from Vue's POV
+ * (the modifier suffix is part of the binding) and emit separately —
+ * no merge needed there.
  */
 function emitEvents(events: Listener[], ctx: EmitNodeCtx): string {
   if (events.length === 0) return '';
-  const out: string[] = [];
+
+  // Pass 1: emit each Listener individually, capture the `@event[.mods]=` head
+  // and the handler-value body so we can re-group collisions.
+  type Emitted = { eventAttrHead: string; body: string; raw: string };
+  const emitted: Emitted[] = [];
   for (const ev of events) {
     const result = emitTemplateEvent(ev, {
       ir: ctx.ir,
       registry: ctx.registry,
       injectionCounter: ctx.injectionCounter,
     });
-    out.push(result.eventAttr);
     if (result.scriptInjection) {
       ctx.scriptInjections.push(result.scriptInjection);
     }
     for (const d of result.diagnostics) ctx.diagnostics.push(d);
+    // emitTemplateEvent emits `@event[.mods]="<body>"` — split on the first
+    // `="`. Quote-escape inside the body uses JS escapes via @babel/generator,
+    // not embedded HTML escapes, so the first `"` after `=` is always the
+    // closing wrap quote of the LAST handler attribute (since handler bodies
+    // never contain a bare `"` outside string literals which @babel/generator
+    // backslash-escapes).
+    const m = result.eventAttr.match(/^(@[^=]+)="(.*)"$/s);
+    if (!m) {
+      emitted.push({ eventAttrHead: '', body: result.eventAttr, raw: result.eventAttr });
+      continue;
+    }
+    emitted.push({ eventAttrHead: m[1]!, body: m[2]!, raw: result.eventAttr });
+  }
+
+  // Pass 2: group by eventAttrHead (`@click`, `@click.stop`, `@keydown.enter`).
+  // The head includes Vue native modifier suffixes, so two listeners with
+  // DIFFERENT modifier chains stay in separate groups (Vue keeps both bindings).
+  // Bare same-event collisions (`@click + @click`) merge into a dispatcher.
+  const groups = new Map<string, Emitted[]>();
+  const order: string[] = [];
+  for (const e of emitted) {
+    if (!groups.has(e.eventAttrHead)) {
+      groups.set(e.eventAttrHead, []);
+      order.push(e.eventAttrHead);
+    }
+    groups.get(e.eventAttrHead)!.push(e);
+  }
+
+  const out: string[] = [];
+  for (const head of order) {
+    const items = groups.get(head)!;
+    if (items.length === 1) {
+      out.push(items[0]!.raw);
+      continue;
+    }
+    // R6 same-event merge — synthesize a dispatcher arrow over the bodies.
+    // A bare-identifier body (`onSearch`) becomes `onSearch($event);`; any
+    // other shape (already-arrow, expression) is wrapped in a callable
+    // invocation `(...)($event);`.
+    const branches = items.map((it) =>
+      /^[A-Za-z_$][\w$]*$/.test(it.body)
+        ? `${it.body}($event);`
+        : `(${it.body})($event);`,
+    );
+    out.push(`${head}="($event) => { ${branches.join(' ')} }"`);
   }
   return out.join(' ');
 }

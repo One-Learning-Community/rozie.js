@@ -28,12 +28,17 @@ import type {
   TemplateStaticTextIR,
   TemplateFragmentIR,
   Listener,
+  ListenerSpreadIR,
 } from '../../../../core/src/ir/types.js';
 import type { ModifierRegistry } from '@rozie/core';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
-import { emitAttributes, findRHtml } from './emitTemplateAttribute.js';
+import {
+  emitAttributes,
+  emitListenerSpread,
+  findRHtml,
+} from './emitTemplateAttribute.js';
 import { emitTemplateEvent } from './emitTemplateEvent.js';
 import { emitSlotInvocation } from './emitSlotInvocation.js';
 // Phase 07.2 — consumer-side slot-fill emission for component-tag elements.
@@ -70,6 +75,14 @@ export interface EmitNodeCtx {
   scriptInjections: SvelteScriptInjection[];
   /** Per-component counter shared across all events for stable wrap-name suffixes. */
   injectionCounter: { next: number };
+  /**
+   * Phase 15 — runtime-helper import names. The Svelte template emit pushes
+   * `'applyListeners'` here for every dynamic `r-on="<expr>"` listener
+   * spread (including the D-19 bare `$listeners` form). The SFC shell
+   * threads `import { applyListeners } from '@rozie/runtime-svelte';` when
+   * this set is non-empty.
+   */
+  runtimeImports: Set<string>;
 }
 
 function emitStaticText(node: TemplateStaticTextIR): string {
@@ -157,6 +170,35 @@ function emitLoop(node: TemplateLoopIR, ctx: EmitNodeCtx): string {
 }
 
 /**
+ * Phase 15 — synthesize a virtual `Listener` from a `ListenerSpreadIR`'s
+ * `literalKeys[i]` entry so the per-key dispatcher merge in `emitEvents` can
+ * fold literal-key spread handlers in alongside `@event` handlers. Mirror
+ * of the React + Vue target's `listenerFromLiteralKey`.
+ *
+ * Each literal-key entry carries `{ eventName, modifierPipeline, valueExpr }`
+ * — enough to fabricate a Listener with the same shape `emitTemplateEvent`
+ * already consumes from `el.events`. `target` defaults to `'self'`; `when`
+ * is null; `deps` inherits the parent spread's deps; `source` is
+ * `'template-event'` (codegen path treats both sources identically).
+ */
+function listenerFromLiteralKey(
+  spread: ListenerSpreadIR,
+  literalKey: NonNullable<ListenerSpreadIR['literalKeys']>[number],
+): Listener {
+  return {
+    type: 'Listener',
+    target: { kind: 'self', el: '$el' },
+    event: literalKey.eventName,
+    modifierPipeline: literalKey.modifierPipeline,
+    when: null,
+    handler: literalKey.valueExpr,
+    deps: spread.deps,
+    source: 'template-event',
+    sourceLoc: spread.sourceLoc,
+  };
+}
+
+/**
  * Emit element events. Each Listener returns one event-attribute string plus
  * an optional scriptInjection (debounce/throttle wrap).
  *
@@ -166,6 +208,11 @@ function emitLoop(node: TemplateLoopIR, ctx: EmitNodeCtx): string {
  * synthesize a single arrow that runs each handler's inlineGuards + body in
  * sequence; the inlineGuards' early-returns (e.g., `if ($event.key !== 'Enter')
  * return`) naturally route the event to the correct user handler.
+ *
+ * Phase 15 R6 — this same merge path is reused for literal-key `r-on` spread
+ * entries (synthesized via `listenerFromLiteralKey`) — e.g.
+ * `@click="f1" r-on="{ click: f2 }"` produces a single
+ * `onclick={($event) => { f1($event); f2($event); }}` dispatcher.
  */
 function emitEvents(events: Listener[], ctx: EmitNodeCtx): string {
   if (events.length === 0) return '';
@@ -270,12 +317,57 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
     // explicit `inputType: undefined` against the optional `inputType?` field.
     ...(inputType !== undefined ? { inputType } : {}),
   });
-  const eventText = emitEvents(node.events, ctx);
+
+  // Phase 15 R6 — assemble the per-element listener emit. Literal-key
+  // spreads are decomposed into synthetic `Listener` entries spliced into
+  // the events list (so modifier-bearing keys like `'click.stop'` reuse
+  // the existing `emitTemplateEvent.ts` modifier-pipeline emit; the
+  // existing `emitEvents` same-event grouping handles R6 collision merge
+  // automatically — two listeners on the same lowercase event name fold
+  // into a single `oneventname={($event) => { f1($event); f2($event); }}`
+  // dispatcher). Dynamic spreads emit as separate `use:applyListeners=`
+  // directives — Svelte 5 has NO native object-form listener directive,
+  // so the action provides the attach/detach lifecycle (D-11 lock); the
+  // `addEventListener` calls inside the action stack with native
+  // `on:event=` directives on the same DOM event, so all-fire happens
+  // automatically (NO runtime `mergeListeners` helper for Svelte;
+  // divergence from React/Solid).
+  const syntheticEvents: Listener[] = [];
+  const dynamicSpreads: ListenerSpreadIR[] = [];
+  // Defensive: synthetic test-IR may omit `listenerSpreads` (the real
+  // lowered IR always sets `[]` by construction per Plan 15-01).
+  for (const spread of node.listenerSpreads ?? []) {
+    const literalKeys = spread.literalKeys;
+    if (literalKeys !== undefined && literalKeys.length > 0) {
+      for (const lk of literalKeys) {
+        syntheticEvents.push(listenerFromLiteralKey(spread, lk));
+      }
+    } else {
+      dynamicSpreads.push(spread);
+    }
+  }
+  const allEvents: Listener[] = [...node.events, ...syntheticEvents];
+  const eventText = emitEvents(allEvents, ctx);
+
+  // Dynamic spreads → one `use:applyListeners={<expr>}` action per spread.
+  // Each routes through `emitListenerSpread` which collects the
+  // `applyListeners` runtime-import marker.
+  const spreadTexts: string[] = [];
+  if (dynamicSpreads.length > 0) {
+    const attrCtx: import('./emitTemplateAttribute.js').EmitAttrCtx = {
+      ir: ctx.ir,
+    };
+    for (const spread of dynamicSpreads) {
+      spreadTexts.push(emitListenerSpread(spread, attrCtx, ctx.runtimeImports));
+    }
+  }
+
   const rHtml = findRHtml(node.attributes);
 
   const partsHead: string[] = [];
   if (attrText) partsHead.push(attrText);
   if (eventText) partsHead.push(eventText);
+  for (const sp of spreadTexts) partsHead.push(sp);
   const head = partsHead.length > 0 ? ' ' + partsHead.join(' ') : '';
 
   // r-html: ROZ620 when coexistent with children; emit `{@html expr}` content.

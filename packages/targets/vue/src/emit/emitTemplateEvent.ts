@@ -63,7 +63,7 @@ export interface ScriptInjection {
    * distinct `from`, so a `'vue'`-sourced `computed` flows through unchanged.
    */
   import:
-    | { from: '@rozie/runtime-vue'; name: 'debounce' | 'throttle' | 'useOutsideClick' }
+    | { from: '@rozie/runtime-vue'; name: 'debounce' | 'throttle' | 'useOutsideClick' | 'normalizeListeners' }
     | { from: 'vue'; name: 'computed' };
   /** Full `const wrapName = helper(handler, ...args);` declaration. */
   decl: string;
