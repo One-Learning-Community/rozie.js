@@ -510,6 +510,97 @@ Need a more specific selector — a descendant or compound selector? The escape 
 `$classSelector('drag-handle')` then resolves correctly on all six targets. The empty rule survives to the emitted CSS but produces no visual style — it exists purely so the class is a declared, scoped, hashable token.
 :::
 
+## `r-bind` / `r-on` — object-spread directives and root-element fallthrough
+
+Component-library wrappers usually want to forward "everything else" — every attribute the consumer set, every listener they bound — onto a real DOM element inside the component. That work today dominates the maintenance budget of cross-framework UI libraries: every wrapper hand-threads `id`, `aria-*`, `data-*`, styles, `class`, and event handlers through a different idiom in each target. Rozie collapses that into two object-spread directives plus two magic accessors.
+
+```rozie
+<rozie name="ThemedButton">
+
+<template>
+  <button class="btn">
+    <slot />
+  </button>
+</template>
+
+<style>
+.btn { padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer; }
+</style>
+```
+
+A consumer writes:
+
+```rozie
+<ThemedButton id="primary" aria-label="Save" :class="'wide'" :disabled="busy"
+              @click="save" @mouseenter="trackHover">
+  Save
+</ThemedButton>
+```
+
+Without any `r-bind` or `r-on` in the producer, the consumer's `id`, `aria-label`, `class`, `disabled`, `@click`, and `@mouseenter` all land on the wrapper's root `<button>`. **Attribute fallthrough** (`r-bind`) handles the props; **listener fallthrough** (`r-on`) handles the events. Both are on by default and orthogonal — toggling one does not affect the other.
+
+### Object spread on any element
+
+You don't have to rely on auto-fallthrough. Both directives accept any object expression and apply it to the element they're on:
+
+```rozie
+<template>
+  <div r-bind="{ id: $props.panelId, role: 'dialog' }">
+    <button r-on="{ click: open, mouseenter: prefetch }">Open</button>
+  </div>
+</template>
+```
+
+For a **literal** object whose keys are static event names, Rozie compiles to per-key native syntax — Vue `@click="open"`, React `onClick={open}`, Svelte `on:click={open}`, Angular `(click)="open($event)"`, Solid `onClick={open}`, Lit `@click=${open}` — at zero runtime cost. For a **dynamic** object — `r-on="someObj"` — Rozie routes through a per-target runtime helper (`normalizeListeners` on React/Solid/Vue, the `applyListeners` Svelte 5 action, an inline `Renderer2.listen()` loop on Angular, and the `rozieListeners` lit-html `AsyncDirective` on Lit) that diffs the listener cluster on each update and cleans up on unmount, so no listener ever leaks.
+
+Modifier suffixes on literal `r-on` keys work just like inline `@event`:
+
+```rozie
+<button r-on="{ 'click.stop': close, 'input.debounce(300)': onInput }">…</button>
+```
+
+Multiple handlers for the same event on the same element — `@click="f1"` plus `r-on="{ click: f2 }"`, or two `r-on`s — **all fire in source order**. Listeners are accumulative. (Silently dropping a handler is worse than calling two; the last-wins behavior that applies to non-`class`/`style` attributes in `r-bind` does **not** apply to listeners.)
+
+### `$attrs` and `$listeners` — the consumer-passed clusters
+
+`$attrs` and `$listeners` are magic accessors that expose what the consumer passed but the component did not declare:
+
+- `$attrs` — every attribute the consumer set that wasn't declared in `<props>`. Member access works (`$attrs.id`, `$attrs.class`).
+- `$listeners` — every `@event` the consumer bound. Member access works (`$listeners.click?.(e)`).
+
+Both are available in `<script>` and `<template>`, and both support `r-bind="$attrs"` / `r-on="$listeners"` to relocate the consumer-passed cluster onto a specific element by hand.
+
+### `inherit-attrs="false"` / `inherit-listeners="false"` — opt out of auto-fallthrough
+
+By default the consumer-passed clusters land on the component's single root element. To take manual control, flip the flag on the `<rozie>` opening tag and place the directive yourself:
+
+```rozie
+<rozie name="ThemedButtonAllManual" inherit-attrs="false" inherit-listeners="false">
+
+<template>
+  <span class="theme-wrap">
+    <button class="btn" r-bind="$attrs" r-on="$listeners">
+      <slot />
+    </button>
+  </span>
+</template>
+```
+
+Here the consumer-passed attrs and listeners apply to the inner `<button>`, not the outer `<span>` wrapper. The two flags are **fully independent** — turn off attribute fallthrough while keeping listener fallthrough on, or vice versa, and toggling one does not affect the other. The four-corner matrix is proven across all six targets via the `examples/ThemedButton*.rozie` fixtures:
+
+| Variant | `inherit-attrs` | `inherit-listeners` | Where the cluster lands |
+| --- | --- | --- | --- |
+| `ThemedButton` | default (`true`) | default (`true`) | Both auto-fall through to the root `<button>` |
+| `ThemedButtonManual` | `false` | default (`true`) | Attrs via explicit `r-bind="$attrs"`; listeners still auto-fall through |
+| `ThemedButtonListenersManual` | default (`true`) | `false` | Listeners via explicit `r-on="$listeners"`; attrs still auto-fall through |
+| `ThemedButtonAllManual` | `false` | `false` | Both placed explicitly via `r-bind="$attrs"` and `r-on="$listeners"` |
+
+A component with more than one root element and `inherit-attrs` / `inherit-listeners` not set to `false` is a compile error with a code frame (`ROZ970` for attrs, `ROZ973` for listeners) — the auto-fallthrough machinery has no unambiguous target. Reference `$attrs` or `$listeners` manually while leaving the flag on and you'll see a soft warning (`ROZ971` / `ROZ974`) nudging you toward the explicit opt-out, since double application is legal but usually a mistake.
+
+### When does this matter?
+
+Cross-framework wrappers around vanilla-JS engines — `flatpickr`, `Leaflet`, `Mapbox`, `TipTap`, `Chart.js`, `Sortable`, `FullCalendar`. Today you hand-write per-framework wrapper components, threading `id` / `aria-*` / `data-*` / styles / handlers / refs through a different idiom in each target. With Rozie you write the wrapper once: fallthrough handles the attribute and listener clusters, `$classSelector` handles class-name-as-selector strings (`handle: $classSelector('grip')`), `$refs` handles direct DOM access, and the same source ships React, Vue, Svelte, Angular, Solid, and Lit consumers.
+
 ## Slots with scoped params
 
 Slot content can receive parameters from the component, and consumers can destructure them with `#name="{ … }"`. Fallback content is just children of the `<slot>` tag — same shape as Vue, same emit semantics as Svelte snippets / React render props / Angular `*ngTemplateOutlet`:
