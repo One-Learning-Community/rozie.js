@@ -62,13 +62,18 @@ for (const target of TARGETS) {
     const mount = page.getByTestId('rozie-mount');
     await expect(mount).toBeVisible();
 
-    // Locate the auto-fallthrough button. `getByTestId` survives React/Solid
-    // CSS-Modules class hashing, Angular view-encapsulation attribute selectors,
-    // and Lit shadow-DOM boundaries — the `data-testid` attribute is verbatim
-    // across all 6 emitters when it falls through from the consumer onto the
-    // inner <button>. If fallthrough is broken, the locator finds nothing and
-    // the test fails fast.
-    const autoBtn = mount.getByTestId(AUTO_TESTID);
+    // Locate the auto-fallthrough button. We narrow to `button[data-testid=…]`
+    // (NOT `getByTestId`) because the Lit and Angular targets render a custom-
+    // element / component host wrapping the inner `<button>` — when the
+    // consumer-passed `data-testid` falls through onto BOTH the host element
+    // (via Lit's reflection layer / Angular's attribute pass-through) AND the
+    // inner button, `getByTestId` resolves to two elements and Playwright's
+    // strict-mode raises. Narrowing the locator to `button[data-testid=…]`
+    // dodges the host element while still verifying the testid landed on the
+    // rendered button. The attribute selector is verbatim across all 6 emitters
+    // (data-testid is never CSS-Modules-hashed). If fallthrough is broken, the
+    // locator finds nothing and the test fails fast.
+    const autoBtn = mount.locator(`button[data-testid="${AUTO_TESTID}"]`);
     await expect(autoBtn).toBeVisible();
 
     // (2) consumer-passed `id` lands on the inner <button>.
@@ -97,8 +102,9 @@ for (const target of TARGETS) {
     // The ThemedButtonManual sibling — `inherit-attrs="false"` + explicit
     // `r-bind="$attrs"` on the <button>. Produces equivalent DOM to the
     // auto-fallthrough path; this assertion proves the manual opt-out mode
-    // also works end-to-end (SPEC R5).
-    const manualBtn = mount.getByTestId(MANUAL_TESTID);
+    // also works end-to-end (SPEC R5). See the `button[data-testid=…]`
+    // rationale in the auto-fallthrough test above — same host-element dodge.
+    const manualBtn = mount.locator(`button[data-testid="${MANUAL_TESTID}"]`);
     await expect(manualBtn).toBeVisible();
 
     await expect(manualBtn).toHaveAttribute('id', 'manual-btn');
@@ -134,7 +140,9 @@ for (const target of TARGETS) {
     // implementations may differ (Vue's `:style` array merge vs JSX inline-
     // style object spread); the load-bearing proof is "consumer override
     // reached the rendered computed style at all."
-    const autoBtn = mount.getByTestId(AUTO_TESTID);
+    // Narrow to `button[data-testid=…]` for the same host-element-dodge
+    // rationale as the auto-fallthrough test above.
+    const autoBtn = mount.locator(`button[data-testid="${AUTO_TESTID}"]`);
     const autoBg = await autoBtn.evaluate(
       (el) => getComputedStyle(el).backgroundColor,
     );
@@ -142,7 +150,7 @@ for (const target of TARGETS) {
       'rgb(59, 130, 246)',
     );
 
-    const manualBtn = mount.getByTestId(MANUAL_TESTID);
+    const manualBtn = mount.locator(`button[data-testid="${MANUAL_TESTID}"]`);
     const manualBg = await manualBtn.evaluate(
       (el) => getComputedStyle(el).backgroundColor,
     );
