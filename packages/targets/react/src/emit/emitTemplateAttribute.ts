@@ -29,6 +29,7 @@ import postcss from 'postcss';
 import type {
   IRComponent,
   AttributeBinding,
+  ListenerSpreadIR,
   RefDecl,
 } from '../../../../core/src/ir/types.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
@@ -1020,6 +1021,81 @@ function emitSpread(
   // D-03 DYNAMIC — runtime key remap.
   ctx.collectors.runtime.add('normalizeAttrs');
   return `{...normalizeAttrs(${renderExpr(attr.expression, ctx.ir)})}`;
+}
+
+/**
+ * Phase 15 D-19 — the magic accessor whose `r-on` spread is EXEMPT from key
+ * normalization. A `$listeners` cluster already carries React JSX listener-
+ * prop names (the consumer wrote `onClick`, not `click`), so it is spread
+ * verbatim. Mirrors `isAttrsIdentifier` (Phase 14 D-04).
+ *
+ * Both the synthesized auto-fallthrough push (lowerTemplate.ts
+ * `synthesizeListenersFallthrough`) and an author-written
+ * `r-on="$listeners"` lower to a bare `$listeners` Identifier — the emitter
+ * cannot (and need not) distinguish them.
+ */
+function isListenersIdentifier(expr: t.Expression): boolean {
+  return t.isIdentifier(expr, { name: '$listeners' });
+}
+
+/**
+ * Phase 15 — emit a single `ListenerSpreadIR` as a standalone JSX spread.
+ *
+ * Used when the per-element R6 merge logic determines that no static handler
+ * collides with this spread (i.e. the spread reaches the DOM unwrapped).
+ * When collisions exist, the spread is instead routed through a single
+ * `mergeListeners(...)` call assembled by the per-element walker.
+ *
+ * Three cases:
+ *   - bare `$listeners` (D-19 exempt)  →  `{...$listeners}` — no remap
+ *   - LITERAL ObjectExpression         →  per-key dispatcher emit handles this
+ *                                          entirely (the spread does not emit
+ *                                          as `{...obj}`; it is fully consumed
+ *                                          by the per-key path)
+ *   - DYNAMIC expression               →  `{...normalizeListeners(<expr>)}`
+ *                                          + `normalizeListeners` runtime
+ *                                          import collected
+ */
+export function emitListenerSpread(
+  spread: ListenerSpreadIR,
+  ctx: EmitAttrCtx,
+): string {
+  if (isListenersIdentifier(spread.expression)) {
+    // D-19 — $listeners spread, no key normalization.
+    return `{...${renderExpr(spread.expression, ctx.ir)}}`;
+  }
+  // Dynamic spread — runtime key remap.
+  ctx.collectors.runtime.add('normalizeListeners');
+  return `{...normalizeListeners(${renderExpr(spread.expression, ctx.ir)})}`;
+}
+
+/**
+ * Phase 15 — produce the source-text expression that builds an
+ * `r-on` partial for inclusion in a `mergeListeners(...)` call (the
+ * mixed-literal-and-dynamic R6 merge path).
+ *
+ *   - bare `$listeners` (D-19 exempt) → `$listeners` (raw identifier;
+ *      consumer's $listeners cluster already carries target-native keys, so
+ *      it is passed without a normalizeListeners wrap)
+ *   - DYNAMIC expression              → `normalizeListeners(<expr>)`
+ *                                       (collects the runtime import)
+ *
+ * LITERAL ObjectExpression spreads do NOT go through this function — when
+ * literalKeys are present they participate in the per-key dispatcher emit
+ * directly.
+ */
+export function emitListenerSpreadAsMergePartial(
+  spread: ListenerSpreadIR,
+  ctx: EmitAttrCtx,
+): string {
+  if (isListenersIdentifier(spread.expression)) {
+    // D-19 — pass $listeners through unwrapped; consumer JSX already has
+    // target-native keys.
+    return renderExpr(spread.expression, ctx.ir);
+  }
+  // Dynamic — runtime key-remap.
+  ctx.collectors.runtime.add('normalizeListeners');
+  return `normalizeListeners(${renderExpr(spread.expression, ctx.ir)})`;
 }
 
 /**

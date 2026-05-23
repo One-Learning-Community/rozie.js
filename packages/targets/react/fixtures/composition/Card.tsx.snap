@@ -8,7 +8,7 @@ export default function Card(props: CardProps): JSX.Element {
 
   return (
     <>
-      <div {...attrs} className={clsx("card", (attrs.className as string | undefined))} data-rozie-s-a88c221e="">
+      <div {...attrs} className={clsx("card", (attrs.className as string | undefined))} {...$listeners} data-rozie-s-a88c221e="">
         <CardHeader title="Hello" data-rozie-s-a88c221e="" />
       </div>
     </>

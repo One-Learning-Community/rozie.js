@@ -22,6 +22,7 @@ import postcss from 'postcss';
 import type {
   IRComponent,
   AttributeBinding,
+  ListenerSpreadIR,
 } from '../../../../core/src/ir/types.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
@@ -615,6 +616,65 @@ function emitSpread(
   // D-03 DYNAMIC — runtime key remap.
   ctx.collectors.runtime.add('normalizeAttrs');
   return `{...normalizeAttrs(${renderExpr(attr.expression, ctx.ir, ctx.invokeAccessors)})}`;
+}
+
+/**
+ * Phase 15 D-19 — the magic accessor whose `r-on` spread is EXEMPT from key
+ * normalization. A `$listeners` cluster already carries Solid JSX listener-
+ * prop names (the consumer wrote `onClick`, not `click`), so it is spread
+ * verbatim. Mirrors `isAttrsIdentifier` (Phase 14 D-04).
+ *
+ * Both the synthesized auto-fallthrough push and an author-written
+ * `r-on="$listeners"` lower to a bare `$listeners` Identifier — the emitter
+ * cannot (and need not) distinguish them.
+ */
+function isListenersIdentifier(expr: t.Expression): boolean {
+  return t.isIdentifier(expr, { name: '$listeners' });
+}
+
+/**
+ * Phase 15 — emit a single `ListenerSpreadIR` as a standalone JSX spread.
+ *
+ * When the per-element R6 merge logic determines that no static handler
+ * collides with this spread, the spread reaches the DOM unwrapped (or
+ * remapped, for dynamic). When collisions exist, the spread is instead
+ * routed through a single `mergeListeners(...)` call assembled by the
+ * per-element walker.
+ *
+ *   - bare `$listeners` (D-19 exempt)  →  `{...$listeners}` — no remap
+ *   - LITERAL ObjectExpression         →  per-key dispatcher emit handles
+ *                                          this entirely
+ *   - DYNAMIC expression               →  `{...normalizeListeners(<expr>)}`
+ *                                          + runtime import collected
+ */
+export function emitListenerSpread(
+  spread: ListenerSpreadIR,
+  ctx: EmitAttrCtx,
+): string {
+  if (isListenersIdentifier(spread.expression)) {
+    return `{...${renderExpr(spread.expression, ctx.ir, ctx.invokeAccessors)}}`;
+  }
+  ctx.collectors.runtime.add('normalizeListeners');
+  return `{...normalizeListeners(${renderExpr(spread.expression, ctx.ir, ctx.invokeAccessors)})}`;
+}
+
+/**
+ * Phase 15 — produce the source-text expression that builds an `r-on`
+ * partial for inclusion in a `mergeListeners(...)` call.
+ *
+ *   - bare `$listeners` (D-19 exempt) → `$listeners` raw (consumer's
+ *      $listeners cluster already carries target-native keys)
+ *   - DYNAMIC expression              → `normalizeListeners(<expr>)`
+ */
+export function emitListenerSpreadAsMergePartial(
+  spread: ListenerSpreadIR,
+  ctx: EmitAttrCtx,
+): string {
+  if (isListenersIdentifier(spread.expression)) {
+    return renderExpr(spread.expression, ctx.ir, ctx.invokeAccessors);
+  }
+  ctx.collectors.runtime.add('normalizeListeners');
+  return `normalizeListeners(${renderExpr(spread.expression, ctx.ir, ctx.invokeAccessors)})`;
 }
 
 /**

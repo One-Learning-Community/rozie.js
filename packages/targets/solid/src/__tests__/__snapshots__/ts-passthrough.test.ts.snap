@@ -3,6 +3,7 @@
 exports[`Solid ts-passthrough — author annotation survival (Phase 09 Plan 03 Task 1) > compiles a typed .rozie to a .tsx preserving author annotations > typed-tsx 1`] = `
 "import type { JSX } from 'solid-js';
 import { mergeProps, onCleanup, onMount, splitProps } from 'solid-js';
+import { mergeListeners } from '@rozie/runtime-solid';
 import type { EditorOptions } from './editor-types';
 
 interface InternalShape {
@@ -36,7 +37,7 @@ export default function TsPassthrough(_props: TsPassthroughProps): JSX.Element {
 
   return (
     <>
-      <button {...attrs} onClick={($event) => { inc(1); }} data-rozie-s-189ead9a="">{label}: {count}</button>
+      <button {...attrs} {...mergeListeners({ onClick: ($event) => { inc(1); } }, $listeners)} data-rozie-s-189ead9a="">{label}: {count}</button>
     </>
   );
 }
@@ -46,6 +47,7 @@ export default function TsPassthrough(_props: TsPassthroughProps): JSX.Element {
 exports[`Solid ts-passthrough — untyped emit byte-identity anchor > untyped emit is byte-identical to today (snapshot anchor) > untyped-tsx-anchor 1`] = `
 "import type { JSX } from 'solid-js';
 import { mergeProps, onCleanup, onMount, splitProps } from 'solid-js';
+import { mergeListeners } from '@rozie/runtime-solid';
 
 interface TsPassthroughProps {
   label?: string;
@@ -71,7 +73,7 @@ export default function TsPassthrough(_props: TsPassthroughProps): JSX.Element {
 
   return (
     <>
-      <button {...attrs} onClick={($event) => { inc(1); }} data-rozie-s-189ead9a="">{label}: {count}</button>
+      <button {...attrs} {...mergeListeners({ onClick: ($event) => { inc(1); } }, $listeners)} data-rozie-s-189ead9a="">{label}: {count}</button>
     </>
   );
 }

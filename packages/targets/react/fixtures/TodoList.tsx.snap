@@ -67,7 +67,7 @@ export default function TodoList(_props: TodoListProps): JSX.Element {
 
   return (
     <>
-    <div {...attrs} className={clsx(styles["todo-list"], (attrs.className as string | undefined))} data-rozie-s-52bec3de="">
+    <div {...attrs} className={clsx(styles["todo-list"], (attrs.className as string | undefined))} {...$listeners} data-rozie-s-52bec3de="">
       <header data-rozie-s-52bec3de="">
         {(props.renderHeader ?? props.slots?.['header']) ? ((props.renderHeader ?? props.slots?.['header']) as Function)({ remaining, total: items.length }) : <h3 data-rozie-s-52bec3de="">{props.title} ({remaining} remaining)</h3>}
       </header>

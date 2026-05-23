@@ -1,0 +1,43 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`emitTemplateAttribute (Solid) — ListenerSpreadIR (Plan 15-03) > (1) literal-only no-merge: r-on="{ click: fn }" → onClick={fn} 1`] = `
+"<>
+      <button onClick={fn} data-rozie-s-8fd6d49e="">go</button>
+    </>"
+`;
+
+exports[`emitTemplateAttribute (Solid) — ListenerSpreadIR (Plan 15-03) > (2) literal-with-merge: @click + r-on literal → R6 all-fire inline dispatcher 1`] = `
+"<>
+      <button onClick={($event) => { f1($event); f2($event); }} data-rozie-s-8fd6d49e="">go</button>
+    </>"
+`;
+
+exports[`emitTemplateAttribute (Solid) — ListenerSpreadIR (Plan 15-03) > (3) literal modifier-bearing: r-on="{ 'click.stop': fn }" → onClick with stopPropagation 1`] = `
+"<>
+      <button onClick={($event) => { $event.stopPropagation(); fn(); }} data-rozie-s-8fd6d49e="">go</button>
+    </>"
+`;
+
+exports[`emitTemplateAttribute (Solid) — ListenerSpreadIR (Plan 15-03) > (4) dynamic no-merge: r-on="someObj" → {...normalizeListeners(someObj)} 1`] = `
+"<>
+      <button {...normalizeListeners(someObj)} data-rozie-s-8fd6d49e="">go</button>
+    </>"
+`;
+
+exports[`emitTemplateAttribute (Solid) — ListenerSpreadIR (Plan 15-03) > (5) dynamic with-merge: @click + r-on dynamic → mergeListeners(...) runtime call 1`] = `
+"<>
+      <button {...mergeListeners({ onClick: f1 }, normalizeListeners(someObj))} data-rozie-s-8fd6d49e="">go</button>
+    </>"
+`;
+
+exports[`emitTemplateAttribute (Solid) — ListenerSpreadIR (Plan 15-03) > (6) bare $listeners (D-19 exempt): r-on="$listeners" → {...$listeners} 1`] = `
+"<>
+      <button {...$listeners} data-rozie-s-8fd6d49e="">go</button>
+    </>"
+`;
+
+exports[`emitTemplateAttribute (Solid) — ListenerSpreadIR (Plan 15-03) > (7) bare $listeners + @click (R6 + D-19): mergeListeners({ onClick: ... }, $listeners) 1`] = `
+"<>
+      <button {...mergeListeners({ onClick: f1 }, $listeners)} data-rozie-s-8fd6d49e="">go</button>
+    </>"
+`;

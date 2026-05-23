@@ -36,13 +36,19 @@ import type {
   TemplateSlotInvocationIR,
   AttributeBinding,
   IRComponent,
+  Listener,
+  ListenerSpreadIR,
 } from '../../../../core/src/ir/types.js';
 import type { ModifierRegistry } from '@rozie/core';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import type { SolidImportCollector, RuntimeSolidImportCollector } from '../rewrite/collectSolidImports.js';
 import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
-import { emitAttributes } from './emitTemplateAttribute.js';
+import {
+  emitAttributes,
+  emitListenerSpread,
+  emitListenerSpreadAsMergePartial,
+} from './emitTemplateAttribute.js';
 import { emitConditional } from './emitConditional.js';
 import { emitTemplateEvent } from './emitTemplateEvent.js';
 import { emitRModel } from './emitRModel.js';
@@ -182,8 +188,163 @@ function scopeAttrForElement(node: TemplateElementIR, ctx: EmitNodeCtx): string 
 }
 
 /**
+ * Phase 15 — synthesize a virtual `Listener` from a `ListenerSpreadIR`'s
+ * `literalKeys[i]` entry so the per-key dispatcher merge in
+ * `emitElementEvents` can fold literal-key spread handlers in alongside
+ * `@event` handlers. Solid-side mirror of the React helper.
+ */
+function listenerFromLiteralKey(
+  spread: ListenerSpreadIR,
+  literalKey: NonNullable<ListenerSpreadIR['literalKeys']>[number],
+): Listener {
+  return {
+    type: 'Listener',
+    target: { kind: 'self', el: '$el' },
+    event: literalKey.eventName,
+    modifierPipeline: literalKey.modifierPipeline,
+    when: null,
+    handler: literalKey.valueExpr,
+    deps: spread.deps,
+    source: 'template-event',
+    sourceLoc: spread.sourceLoc,
+  };
+}
+
+/**
+ * Phase 15 R6 — does this element have at least one dynamic spread? See the
+ * React-side sibling for the merge-classification rationale.
+ */
+function hasDynamicListenerSpread(node: TemplateElementIR): boolean {
+  for (const spread of node.listenerSpreads) {
+    if (spread.literalKeys === undefined || spread.literalKeys.length === 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Phase 15 R6 — assemble the per-element listener emit for Solid. Mirrors
+ * the React structural logic line-for-line; Solid's JSX listener-prop
+ * convention (`onClick`, `onMouseEnter`) is identical to React's.
+ *
+ * Returns `{ eventsJsx, extraSpreads }` for placement alongside other JSX
+ * attributes / after attributes respectively. See the React sibling for the
+ * three-case algorithm: no-spreads / all-literal-merge / mixed-or-dynamic.
+ */
+function emitElementListeners(
+  node: TemplateElementIR,
+  ctx: EmitNodeCtx,
+): { eventsJsx: string; extraSpreads: string[] } {
+  const hasEvents = node.events.length > 0;
+  const hasSpreads = node.listenerSpreads.length > 0;
+
+  if (!hasEvents && !hasSpreads) {
+    return { eventsJsx: '', extraSpreads: [] };
+  }
+
+  if (!hasSpreads) {
+    return { eventsJsx: emitElementEvents(node, ctx), extraSpreads: [] };
+  }
+
+  const dynamic = hasDynamicListenerSpread(node);
+
+  // CASE: all-literal merge.
+  if (!dynamic) {
+    const syntheticEvents: Listener[] = [];
+    for (const spread of node.listenerSpreads) {
+      for (const lk of spread.literalKeys ?? []) {
+        syntheticEvents.push(listenerFromLiteralKey(spread, lk));
+      }
+    }
+    const merged: TemplateElementIR = {
+      ...node,
+      events: [...node.events, ...syntheticEvents],
+    };
+    return { eventsJsx: emitElementEvents(merged, ctx), extraSpreads: [] };
+  }
+
+  // CASE: single dynamic-spread, no events — direct emit with no runtime
+  // merge overhead. Covers `r-on="$listeners"` auto-fallthrough on elements
+  // with no `@event` handlers (the most common case).
+  if (!hasEvents && node.listenerSpreads.length === 1) {
+    const only = node.listenerSpreads[0]!;
+    const attrCtx: import('./emitTemplateAttribute.js').EmitAttrCtx = {
+      ir: ctx.ir,
+      collectors: ctx.collectors,
+      invokeAccessors: ctx.invokeAccessors,
+    };
+    return { eventsJsx: '', extraSpreads: [emitListenerSpread(only, attrCtx)] };
+  }
+
+  // CASE: mixed / dynamic merge — single runtime `mergeListeners(...)` call.
+  type EmittedAttr = { jsxName: string; body: string };
+  const emitted: EmittedAttr[] = [];
+  for (const ev of node.events) {
+    if (ev === null || ev === undefined) continue;
+    const result = emitTemplateEvent(ev, {
+      ir: ctx.ir,
+      registry: ctx.registry,
+      collectors: ctx.collectors,
+      injectionCounter: ctx.injectionCounter,
+      scriptInjections: ctx.scriptInjections,
+    });
+    for (const d of result.diagnostics) ctx.diagnostics.push(d);
+    const match = result.jsxAttr.match(/^([A-Za-z][\w]*)=\{(.*)\}$/s);
+    if (!match) continue;
+    emitted.push({ jsxName: match[1]!, body: match[2]! });
+  }
+  const eventGroups = new Map<string, EmittedAttr[]>();
+  const eventOrder: string[] = [];
+  for (const e of emitted) {
+    if (!eventGroups.has(e.jsxName)) {
+      eventGroups.set(e.jsxName, []);
+      eventOrder.push(e.jsxName);
+    }
+    eventGroups.get(e.jsxName)!.push(e);
+  }
+  const eventsPartialEntries: string[] = [];
+  for (const name of eventOrder) {
+    const items = eventGroups.get(name)!;
+    if (items.length === 1) {
+      eventsPartialEntries.push(`${name}: ${items[0]!.body}`);
+      continue;
+    }
+    const branches = items.map((it) =>
+      /^[A-Za-z_$][\w$]*$/.test(it.body)
+        ? `${it.body}($event);`
+        : `(${it.body})($event);`,
+    );
+    eventsPartialEntries.push(
+      `${name}: ($event) => { ${branches.join(' ')} }`,
+    );
+  }
+
+  const mergeArgs: string[] = [];
+  if (eventsPartialEntries.length > 0) {
+    mergeArgs.push(`{ ${eventsPartialEntries.join(', ')} }`);
+  }
+  const attrCtx: import('./emitTemplateAttribute.js').EmitAttrCtx = {
+    ir: ctx.ir,
+    collectors: ctx.collectors,
+    invokeAccessors: ctx.invokeAccessors,
+  };
+  for (const spread of node.listenerSpreads) {
+    mergeArgs.push(emitListenerSpreadAsMergePartial(spread, attrCtx));
+  }
+
+  ctx.collectors.runtime.add('mergeListeners');
+  const spreadToken = `{...mergeListeners(${mergeArgs.join(', ')})}`;
+  return { eventsJsx: '', extraSpreads: [spreadToken] };
+}
+
+/**
  * Emit all @event listeners on an element, merging multiple listeners that
  * map to the same JSX prop (e.g., @keydown.enter + @keydown.escape → onKeyDown).
+ *
+ * Phase 15 R6 extension: literal-key `r-on` spread entries synthesize virtual
+ * `Listener` entries (via `listenerFromLiteralKey`) and participate in the
+ * same per-key dispatcher merge as `@event` handlers.
  */
 function emitElementEvents(node: TemplateElementIR, ctx: EmitNodeCtx): string {
   if (node.events.length === 0) return '';
@@ -367,8 +528,13 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
     workingAttrs = workingAttrs.filter((a) => a !== rHtmlAttr);
     const attrsResult = emitAttributes(workingAttrs, { ir: ctx.ir, collectors: ctx.collectors, invokeAccessors: ctx.invokeAccessors });
     for (const d of attrsResult.diagnostics) ctx.diagnostics.push(d);
-    const eventsJsx = emitElementEvents(node, ctx);
-    const headParts = [attrsResult.jsx, eventsJsx, `innerHTML={${exprCode}}`].filter(Boolean);
+    const listenerResult = emitElementListeners(node, ctx);
+    const headParts = [
+      attrsResult.jsx,
+      listenerResult.eventsJsx,
+      ...listenerResult.extraSpreads,
+      `innerHTML={${exprCode}}`,
+    ].filter(Boolean);
     if (scopeAttrJsx) headParts.push(scopeAttrJsx);
     const head = headParts.length > 0 ? ' ' + headParts.join(' ') : '';
     return `<${node.tagName}${head} />`;
@@ -413,12 +579,19 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
   const attrsResult = emitAttributes(workingAttrs, { ir: ctx.ir, collectors: ctx.collectors, invokeAccessors: ctx.invokeAccessors });
   for (const d of attrsResult.diagnostics) ctx.diagnostics.push(d);
 
-  const eventsJsx = emitElementEvents(node, ctx);
+  const listenerResult = emitElementListeners(node, ctx);
 
   // Merge duplicate event props between attrs (r-model) and events (@event.modifier).
   // r-model generates onInput= as an attribute string; @input.debounce generates another
   // onInput= via emitElementEvents. Merging produces a single dispatcher arrow.
-  const headParts = [mergeEventAttributes(attrsResult.jsx, eventsJsx)];
+  // Phase 15: the runtime `{...mergeListeners(...)}` spread (when dynamic
+  // R6 merge is in play) does NOT collide with r-model's onInput attribute
+  // string — the spread is an opaque `...{}` token — so we append it after
+  // mergeEventAttributes finishes.
+  const headParts = [
+    mergeEventAttributes(attrsResult.jsx, listenerResult.eventsJsx),
+    ...listenerResult.extraSpreads,
+  ];
   if (rShowStyleAttr) headParts.push(rShowStyleAttr);
   if (scopeAttrJsx) headParts.push(scopeAttrJsx);
 

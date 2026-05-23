@@ -52,7 +52,9 @@ export type RuntimeSolidImport =
   | 'createDebouncedHandler'
   | 'createThrottledHandler'
   | 'parseInlineStyle'
-  | 'normalizeAttrs';
+  | 'normalizeAttrs'
+  | 'normalizeListeners'
+  | 'mergeListeners';
 
 export class RuntimeSolidImportCollector {
   private symbols = new Set<RuntimeSolidImport>();

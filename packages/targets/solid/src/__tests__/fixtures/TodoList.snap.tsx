@@ -66,7 +66,7 @@ export default function TodoList(_props: TodoListProps): JSX.Element {
     .empty[data-rozie-s-52bec3de] { color: rgba(0, 0, 0, 0.4); font-style: italic; }
     form[data-rozie-s-52bec3de] { display: flex; gap: 0.25rem; margin-block: 0.5rem; }`}</style>
     <>
-    <div {...attrs} class={"todo-list" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-52bec3de="">
+    <div {...attrs} class={"todo-list" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} {...$listeners} data-rozie-s-52bec3de="">
       <header data-rozie-s-52bec3de="">
         {(_props.headerSlot ?? _props.slots?.['header'])?.({ remaining: remaining(), total: items().length }) ?? <h3 data-rozie-s-52bec3de="">{local.title} ({remaining()} remaining)</h3>}
       </header>

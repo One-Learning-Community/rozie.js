@@ -45,8 +45,14 @@ function compileCounter(): string {
 describe('Counter createControllableSignal integration (SC #1)', () => {
   it('SC #1a: controlled mode — emitter generates createControllableSignal call with _props', () => {
     const code = compileCounter();
-    // createControllableSignal must be imported from @rozie/runtime-solid
-    expect(code).toContain("import { createControllableSignal } from '@rozie/runtime-solid'");
+    // createControllableSignal must be imported from @rozie/runtime-solid.
+    // After Phase 15 Counter's auto-fallthrough $listeners pulls in
+    // `mergeListeners` as a co-imported name, so the brittle exact-string
+    // match was relaxed to a regex that tolerates additional helpers in
+    // the same import block.
+    expect(code).toMatch(
+      /import\s*\{[^}]*\bcreateControllableSignal\b[^}]*\}\s*from\s*'@rozie\/runtime-solid'/,
+    );
     // The destructured pair follows [value, setValue] = createControllableSignal(_props as ..., 'value', ...) pattern
     // Type-param now threaded through so the resulting Signal<T> doesn't widen
     // to `never`/`unknown` for empty-default factory props (2026-05-18 tsc-gate

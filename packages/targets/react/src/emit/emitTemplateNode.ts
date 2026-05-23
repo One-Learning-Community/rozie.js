@@ -37,6 +37,8 @@ import type {
   TemplateStaticTextIR,
   TemplateFragmentIR,
   AttributeBinding,
+  Listener,
+  ListenerSpreadIR,
 } from '../../../../core/src/ir/types.js';
 import type { ModifierRegistry } from '@rozie/core';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
@@ -46,7 +48,11 @@ import {
   RuntimeReactImportCollector,
 } from '../rewrite/collectReactImports.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
-import { emitAttributes } from './emitTemplateAttribute.js';
+import {
+  emitAttributes,
+  emitListenerSpread,
+  emitListenerSpreadAsMergePartial,
+} from './emitTemplateAttribute.js';
 import { emitConditional } from './emitConditional.js';
 import { emitTemplateEvent } from './emitTemplateEvent.js';
 import { emitRModel } from './emitRModel.js';
@@ -221,8 +227,13 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
       collectors: ctx.collectors,
     });
     for (const d of attrsResult.diagnostics) ctx.diagnostics.push(d);
-    const eventsJsx = emitElementEvents(node, childCtx);
-    const headParts = [attrsResult.jsx, eventsJsx, `dangerouslySetInnerHTML={{ __html: ${exprCode} }}`].filter(Boolean);
+    const listenerResult = emitElementListeners(node, childCtx);
+    const headParts = [
+      attrsResult.jsx,
+      listenerResult.eventsJsx,
+      ...listenerResult.extraSpreads,
+      `dangerouslySetInnerHTML={{ __html: ${exprCode} }}`,
+    ].filter(Boolean);
     if (scopeAttrJsx) headParts.push(scopeAttrJsx);
     if (pendingKey !== null) headParts.unshift(`key={${pendingKey}}`);
     const head = headParts.length > 0 ? ' ' + headParts.join(' ') : '';
@@ -268,9 +279,13 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
   });
   for (const d of attrsResult.diagnostics) ctx.diagnostics.push(d);
 
-  const eventsJsx = emitElementEvents(node, childCtx);
+  const listenerResult = emitElementListeners(node, childCtx);
 
-  const headParts = [attrsResult.jsx, eventsJsx];
+  const headParts = [
+    attrsResult.jsx,
+    listenerResult.eventsJsx,
+    ...listenerResult.extraSpreads,
+  ];
   if (rShowStyleAttr) headParts.push(rShowStyleAttr);
   if (scopeAttrJsx) headParts.push(scopeAttrJsx);
   if (pendingKey !== null) headParts.unshift(`key={${pendingKey}}`);
@@ -330,6 +345,233 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
 }
 
 /**
+ * Phase 15 — synthesize a virtual `Listener` from a `ListenerSpreadIR`'s
+ * `literalKeys[i]` entry so the per-key dispatcher merge in
+ * `emitElementEvents` can fold literal-key spread handlers in alongside
+ * `@event` handlers.
+ *
+ * Each literal-key entry carries `{ eventName, modifierPipeline, valueExpr }`
+ * — enough to fabricate a Listener with the same shape `emitTemplateEvent`
+ * already consumes from `node.events`. `target` defaults to `'self'` (the
+ * element this spread lives on); `when` is null (template `@event` Listener
+ * lowering also leaves it null); `deps` is the parent spread's deps array
+ * (deps are over-approximate but never under-approximate for reactivity
+ * accounting); `source` is `'template-event'` (the codegen path treats both
+ * sources identically).
+ */
+function listenerFromLiteralKey(
+  spread: ListenerSpreadIR,
+  literalKey: NonNullable<ListenerSpreadIR['literalKeys']>[number],
+): Listener {
+  return {
+    type: 'Listener',
+    target: { kind: 'self', el: '$el' },
+    event: literalKey.eventName,
+    modifierPipeline: literalKey.modifierPipeline,
+    when: null,
+    handler: literalKey.valueExpr,
+    deps: spread.deps,
+    source: 'template-event',
+    sourceLoc: spread.sourceLoc,
+  };
+}
+
+/**
+ * Phase 15 R6 — does this element have at least one dynamic
+ * `ListenerSpreadIR` (no `literalKeys` field, OR explicitly empty)? Drives
+ * the per-element merge classification.
+ *
+ *   - All-literal (no dynamic spread): the per-key dispatcher emit in
+ *     `emitElementEvents` handles R6 via the existing same-name merge,
+ *     after we splice literal-key entries into the events list.
+ *   - Mixed / dynamic: a single `{...mergeListeners(...)}` runtime call
+ *     replaces the per-event JSX-prop emit so JSX last-wins cannot
+ *     silently drop one of the handlers.
+ */
+function hasDynamicListenerSpread(node: TemplateElementIR): boolean {
+  for (const spread of node.listenerSpreads) {
+    if (spread.literalKeys === undefined || spread.literalKeys.length === 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Phase 15 R6 — assemble the per-element listener emit.
+ *
+ * Returns `{ eventsJsx, extraSpreads }`:
+ *   - `eventsJsx`     — string for placement alongside other JSX attributes.
+ *                       In the all-literal merge case this includes per-key
+ *                       dispatcher emits for both `@event` and literal-key
+ *                       spread entries. In the mixed/dynamic merge case it
+ *                       is empty (events fold into the merged spread).
+ *   - `extraSpreads`  — JSX spread tokens (e.g. `{...$listeners}` or
+ *                       `{...mergeListeners(...)}` ) for placement after
+ *                       attributes / events. Empty when no spreads exist or
+ *                       all are folded into the merge.
+ *
+ * Three cases:
+ *
+ *   1. No spreads: classic Plan 04-04 dispatcher-merge over `node.events`.
+ *
+ *   2. All-literal (every spread has populated `literalKeys`): synthesize
+ *      virtual Listeners from each literal-key entry, splice into the events
+ *      list (preserving source order via the spread's index in
+ *      `node.listenerSpreads`), and run the existing per-key dispatcher
+ *      merge. Zero runtime cost — every collision resolves to an inline
+ *      arrow `(e) => { f1(e); f2(e); }` at compile time.
+ *
+ *   3. Mixed / dynamic (at least one spread is dynamic): emit a single
+ *      `{...mergeListeners(<events-partial>, <spread-1>, <spread-2>, ...)}`
+ *      spread — the runtime merge collapses all colliding keys into source-
+ *      order dispatchers at first-render time. Each partial is built using
+ *      the same key conventions: the events-partial uses target-native
+ *      `onClick` keys via `emitTemplateEvent`; each spread-partial is
+ *      `normalizeListeners(<expr>)` (or the raw `$listeners` identifier for
+ *      D-19 exempt spreads).
+ *
+ * D-19 bare-$listeners handling: a bare `$listeners` spread is emitted as
+ * `{...$listeners}` (no normalizeListeners wrap) when it does NOT participate
+ * in a runtime merge, and is passed through to `mergeListeners(...)` un-
+ * wrapped when it does (the consumer's $listeners already carries target-
+ * native keys).
+ */
+function emitElementListeners(
+  node: TemplateElementIR,
+  ctx: EmitNodeCtx,
+): { eventsJsx: string; extraSpreads: string[] } {
+  const hasEvents = node.events.length > 0;
+  const hasSpreads = node.listenerSpreads.length > 0;
+
+  if (!hasEvents && !hasSpreads) {
+    return { eventsJsx: '', extraSpreads: [] };
+  }
+
+  // No spreads → classic events-only path.
+  if (!hasSpreads) {
+    return { eventsJsx: emitElementEvents(node, ctx), extraSpreads: [] };
+  }
+
+  const dynamic = hasDynamicListenerSpread(node);
+
+  // CASE: all-literal merge — synthesize virtual Listeners from each
+  // literal-key entry, run the existing per-key dispatcher merge. Bare
+  // `$listeners` cannot have `literalKeys` populated (it's an Identifier,
+  // not an ObjectExpression), so it is always classified as dynamic; the
+  // all-literal branch implicitly excludes it.
+  if (!dynamic) {
+    const syntheticEvents: Listener[] = [];
+    for (const spread of node.listenerSpreads) {
+      for (const lk of spread.literalKeys ?? []) {
+        syntheticEvents.push(listenerFromLiteralKey(spread, lk));
+      }
+    }
+    const merged: TemplateElementIR = {
+      ...node,
+      events: [...node.events, ...syntheticEvents],
+    };
+    return { eventsJsx: emitElementEvents(merged, ctx), extraSpreads: [] };
+  }
+
+  // CASE: single dynamic-spread, no events, no other spreads — direct emit
+  // with no runtime merge overhead. Bare `$listeners` emits as
+  // `{...$listeners}` (D-19); dynamic expr emits as
+  // `{...normalizeListeners(expr)}`. This covers the `r-on="$listeners"`
+  // auto-fallthrough case (synthesized by lowerTemplate) on an element with
+  // no `@event` handlers — extremely common.
+  if (!hasEvents && node.listenerSpreads.length === 1) {
+    const only = node.listenerSpreads[0]!;
+    const attrCtx: import('./emitTemplateAttribute.js').EmitAttrCtx = {
+      ir: ctx.ir,
+      collectors: ctx.collectors,
+    };
+    return { eventsJsx: '', extraSpreads: [emitListenerSpread(only, attrCtx)] };
+  }
+
+  // CASE: mixed / dynamic merge — build a runtime `mergeListeners(...)` call.
+  // Walk node.attributes / events / listenerSpreads in source order to keep
+  // the dispatcher's invocation order matching the author's source order.
+  //
+  // The events-partial is an object literal whose keys are target-native
+  // JSX listener-prop names (`onClick`, `onMouseEnter`) and whose values
+  // are the handler expressions `emitTemplateEvent` produces. Each event
+  // emits independently; if two events on the element collide on the same
+  // JSX prop (e.g. two `@keydown` listeners), they pre-merge into a single
+  // dispatcher arrow via the existing Plan 04-04 per-key dispatcher emit
+  // BEFORE going into the partial — so the runtime mergeListeners never
+  // sees collisions inside the events-partial.
+
+  // 1. Emit each @event listener individually and group by JSX-prop name.
+  type EmittedAttr = { jsxName: string; body: string };
+  const emitted: EmittedAttr[] = [];
+  for (const ev of node.events) {
+    if (ev === null || ev === undefined) continue;
+    const result = emitTemplateEvent(ev, {
+      ir: ctx.ir,
+      registry: ctx.registry,
+      collectors: ctx.collectors,
+      injectionCounter: ctx.injectionCounter,
+    });
+    if (result.scriptInjection !== null) {
+      ctx.scriptInjections.push(result.scriptInjection);
+    }
+    for (const d of result.diagnostics) ctx.diagnostics.push(d);
+    const match = result.jsxAttr.match(/^([A-Za-z][\w]*)=\{(.*)\}$/s);
+    if (!match) continue;
+    emitted.push({ jsxName: match[1]!, body: match[2]! });
+  }
+  // 2. Same-JSX-name pre-merge inside the events-partial (so the runtime
+  // mergeListeners never receives a key collision INSIDE one partial).
+  const eventGroups = new Map<string, EmittedAttr[]>();
+  const eventOrder: string[] = [];
+  for (const e of emitted) {
+    if (!eventGroups.has(e.jsxName)) {
+      eventGroups.set(e.jsxName, []);
+      eventOrder.push(e.jsxName);
+    }
+    eventGroups.get(e.jsxName)!.push(e);
+  }
+
+  const eventsPartialEntries: string[] = [];
+  for (const name of eventOrder) {
+    const items = eventGroups.get(name)!;
+    if (items.length === 1) {
+      eventsPartialEntries.push(`${name}: ${items[0]!.body}`);
+      continue;
+    }
+    const branches = items.map((it) =>
+      /^[A-Za-z_$][\w$]*$/.test(it.body)
+        ? `${it.body}($event);`
+        : `(${it.body})($event);`,
+    );
+    eventsPartialEntries.push(
+      `${name}: ($event) => { ${branches.join(' ')} }`,
+    );
+  }
+
+  // 3. Build the mergeListeners argument list. Source-order traversal of
+  // node.listenerSpreads ensures the runtime merge dispatcher invokes
+  // handlers in source order across spreads.
+  const mergeArgs: string[] = [];
+  if (eventsPartialEntries.length > 0) {
+    mergeArgs.push(`{ ${eventsPartialEntries.join(', ')} }`);
+  }
+  const attrCtx: import('./emitTemplateAttribute.js').EmitAttrCtx = {
+    ir: ctx.ir,
+    collectors: ctx.collectors,
+  };
+  for (const spread of node.listenerSpreads) {
+    mergeArgs.push(emitListenerSpreadAsMergePartial(spread, attrCtx));
+  }
+
+  // 4. Single mergeListeners runtime helper call.
+  ctx.collectors.runtime.add('mergeListeners');
+  const spreadToken = `{...mergeListeners(${mergeArgs.join(', ')})}`;
+  return { eventsJsx: '', extraSpreads: [spreadToken] };
+}
+
+/**
  * Emit all template @event listeners on an element.
  *
  * **Plan 04-04 dispatcher-merge** (Plan 04-03 deferred limitation #2):
@@ -346,6 +588,11 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
  *
  * Without this merge, JSX silently keeps only the LAST attribute when keys
  * collide — losing the first listener and producing surprising behavior.
+ *
+ * Phase 15 R6 extension: when a literal-key `r-on` spread contributes
+ * synthetic Listener entries (via `listenerFromLiteralKey`), they participate
+ * in the same per-key merge — `@click` + `r-on="{ click: fn }"` collide on
+ * `onClick` and produce a single inline dispatcher arrow at compile time.
  */
 function emitElementEvents(node: TemplateElementIR, ctx: EmitNodeCtx): string {
   if (node.events.length === 0) return '';

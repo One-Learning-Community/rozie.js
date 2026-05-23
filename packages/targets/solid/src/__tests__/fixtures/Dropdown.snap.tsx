@@ -91,7 +91,7 @@ export default function Dropdown(_props: DropdownProps): JSX.Element {
       --rozie-dropdown-z: 1000;
     }`}</style>
     <>
-    <div {...attrs} class={"dropdown" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-6d6bd882="">
+    <div {...attrs} class={"dropdown" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} {...$listeners} data-rozie-s-6d6bd882="">
       <div ref={(el) => { triggerElRef = el as HTMLElement; }} onClick={toggle} data-rozie-s-6d6bd882="">
         {(_props.triggerSlot ?? _props.slots?.['trigger'])?.({ open: open(), toggle })}
       </div>

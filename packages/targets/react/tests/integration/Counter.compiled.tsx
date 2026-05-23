@@ -8,7 +8,14 @@
 // .snap and .compiled.tsx and fails if they diverge. If that test fails after
 // an emitter change, audit this file against the new .snap and update by hand.
 import { useMemo, useState } from 'react';
-import { clsx, useControllableState } from '@rozie/runtime-react';
+// `mergeListeners` is unused in this hand-tuned behavior fixture (the
+// integration tests do not exercise consumer-passed listeners / auto-
+// fallthrough), but the matching .snap imports it after Phase 15 added the
+// $listeners auto-fallthrough on Counter's root <div>. Mirroring the import
+// surface keeps the compiled-fixtures-drift gate green; the runtime import
+// is harmless when never referenced. eslint-disable noisy unused warning.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import { clsx, mergeListeners, useControllableState } from '@rozie/runtime-react';
 
 const styles: Record<string, string> = new Proxy({}, { get: (_t, k) => String(k) });
 

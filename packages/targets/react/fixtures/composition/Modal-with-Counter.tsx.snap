@@ -8,7 +8,7 @@ export default function Modal(props: ModalProps): JSX.Element {
 
   return (
     <>
-      <div {...attrs} className={clsx("modal", (attrs.className as string | undefined))} data-rozie-s-d24f9140="">
+      <div {...attrs} className={clsx("modal", (attrs.className as string | undefined))} {...$listeners} data-rozie-s-d24f9140="">
         <Counter data-rozie-s-d24f9140="" />
       </div>
     </>

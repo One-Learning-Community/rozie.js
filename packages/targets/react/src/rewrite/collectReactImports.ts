@@ -74,6 +74,8 @@ export type RuntimeReactImport =
   | 'clsx'
   | 'parseInlineStyle'
   | 'normalizeAttrs'
+  | 'normalizeListeners'
+  | 'mergeListeners'
   | 'isEnter'
   | 'isEscape'
   | 'isTab'
