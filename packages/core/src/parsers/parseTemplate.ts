@@ -134,6 +134,10 @@ export function parseTemplate(
       // `.modifier`-chain split below stays `r-model`-only — `r-bind` takes
       // no modifiers. The colon form `r-bind:foo` flows through the `else`
       // with `name='bind:foo'` and is rejected (ROZ969) in `lowerTemplate`.
+      //
+      // Phase 15 D-15 — r-on lands here for free as kind:'directive',
+      // name:'on'; literal-key modifier resolution runs at lower time, NOT
+      // here (Pitfall 2 — do NOT extend the r-model dotIdx split for r-on).
       const dotIdx = rest.indexOf('.');
       const colonIdx = rest.indexOf(':');
       const directiveBase =

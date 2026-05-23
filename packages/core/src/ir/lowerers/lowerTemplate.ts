@@ -53,9 +53,11 @@ import type {
   AttributeBinding,
   ComponentDecl,
   Listener,
+  ListenerSpreadIR,
   SlotFillerDecl,
   ResolvedModelModifier,
 } from '../types.js';
+import { parseModifierChain } from '../../modifier-grammar/parseModifierChain.js';
 import type { ModifierChain } from '../../modifier-grammar/parseModifierChain.js';
 
 /**
@@ -733,6 +735,9 @@ function lowerBareElement(
   // Lower attributes + collect template @event listeners.
   const attributes: AttributeBinding[] = [];
   const events: Listener[] = [];
+  // Phase 15 R2 — `r-on="<expr>"` listener-spread bindings, parallel to
+  // `events`. Populated by the r-on branch in the attribute loop below.
+  const listenerSpreads: ListenerSpreadIR[] = [];
 
   for (const attr of el.attributes) {
     if (attr.kind === 'event') {
@@ -884,6 +889,107 @@ function lowerBareElement(
         continue;
       }
 
+      // Phase 15 R2 / D-15 — the bare-spread `r-on="<expr>"` form. The
+      // expression evaluates to an object whose own enumerable keys are each
+      // applied as an event listener on the host element (listener
+      // fallthrough). Lowers to a `ListenerSpreadIR` on the NEW
+      // `listenerSpreads` field (Pitfall 3 — NOT a 6th AttributeBinding kind).
+      //
+      // Source order across `events` (`@event`) and `listenerSpreads` is the
+      // emitter's concern: SPEC R6 locks "all-fire-in-source-order" across the
+      // two arrays.
+      //
+      // Literal-key modifier resolution (D-15 steps 2-3): when `expr` is an
+      // ObjectExpression, walk own ObjectProperty keys. A key matching the
+      // PLAIN event re produces a `literalKeys` entry with empty
+      // modifierPipeline. A key matching the MODIFIER-bearing re splits on the
+      // first `.` and routes the suffix through `parseModifierChain` (the same
+      // peggy grammar `@event.modifier(args)` uses) then `resolveModifierPipeline`
+      // (the same registry-driven resolver `<listeners>` and template events
+      // use — D-20 invariant). Dynamic (non-ObjectExpression) expressions leave
+      // `literalKeys` undefined entirely; SPEC §Out-of-scope explicitly leaves
+      // dynamic-key modifiers undefined for v1.
+      if (attr.name === 'on') {
+        const expr = attr.value !== null ? tryParseExpression(attr.value) : null;
+        const listenerSpread: ListenerSpreadIR = {
+          type: 'ListenerSpread',
+          expression: expr ?? t.identifier('undefined'),
+          deps: expr ? computeExpressionDeps(expr, bindings) : [],
+          sourceLoc: attr.loc,
+        };
+        if (expr !== null && t.isObjectExpression(expr)) {
+          const literalKeys: NonNullable<ListenerSpreadIR['literalKeys']> = [];
+          // event slug = a single HTML-ish identifier token; modifier-bearing
+          // tail = at least one `.<modifier>` segment with optional `(args)`.
+          const PLAIN_EVENT_RE = /^[a-zA-Z][a-zA-Z0-9-]*$/;
+          const MODIFIER_BEARING_RE =
+            /^[a-zA-Z][a-zA-Z0-9-]*(\.[a-zA-Z][a-zA-Z0-9-]*(\([^)]*\))?)+$/;
+          for (const prop of expr.properties) {
+            if (!t.isObjectProperty(prop)) continue;
+            const key = prop.key;
+            // Accept both Identifier keys (`{ click: fn }` — the natural
+            // Vue-author idiom) AND StringLiteral keys (`{ 'click.stop': fn }`
+            // — required for modifier-bearing names because `.` is illegal in
+            // an identifier). Computed and numeric keys skip the literal path
+            // and fall onto the dynamic runtime-helper route at emit time.
+            let keyText: string;
+            if (t.isStringLiteral(key)) {
+              keyText = key.value;
+            } else if (t.isIdentifier(key) && !prop.computed) {
+              keyText = key.name;
+            } else {
+              continue;
+            }
+            const valueNode = prop.value;
+            if (!t.isExpression(valueNode)) continue;
+            if (PLAIN_EVENT_RE.test(keyText)) {
+              literalKeys.push({
+                eventName: keyText,
+                modifierPipeline: [],
+                valueExpr: valueNode,
+              });
+              continue;
+            }
+            if (MODIFIER_BEARING_RE.test(keyText)) {
+              const dotIdx = keyText.indexOf('.');
+              const eventName = keyText.slice(0, dotIdx);
+              const modifierChainText = keyText.slice(dotIdx);
+              // baseOffset is best-effort — the modifier chain text lives
+              // INSIDE the key string literal which itself sits inside the
+              // r-on attribute value; we anchor to the start of the attribute
+              // loc as a conservative source span (diagnostics from the
+              // modifier grammar still localise; downstream consumers do not
+              // depend on per-character key offsets).
+              const { chain } = parseModifierChain(
+                modifierChainText,
+                attr.loc.start,
+              );
+              const ctx: ModifierContext = {
+                source: 'template-event',
+                event: eventName,
+                sourceLoc: attr.loc,
+              };
+              const modifierPipeline = chain
+                ? resolveModifierPipeline(chain, ctx, registry, diagnostics)
+                : [];
+              literalKeys.push({
+                eventName,
+                modifierPipeline,
+                valueExpr: valueNode,
+              });
+              continue;
+            }
+            // Keys matching neither shape are SILENTLY SKIPPED per SPEC R1
+            // acceptance (only valid-key behavior is specified).
+          }
+          if (literalKeys.length > 0) {
+            listenerSpread.literalKeys = literalKeys;
+          }
+        }
+        listenerSpreads.push(listenerSpread);
+        continue;
+      }
+
       // Phase 12 — generic guard (ROZ962). The parser splits a `.modifier`
       // chain off `r-model` ONLY; for every other directive the dot stays
       // inside `attr.name` (`r-show.foo` → name `show.foo`). A `.` in a
@@ -1001,10 +1107,12 @@ function lowerBareElement(
     tagName: el.tagName,
     attributes,
     events,
-    // Phase 15 R2 — `r-on="<expr>"` lowering lands in Wave 1 (Plan 15-02).
-    // Wave 0 stamps an empty array so the new TemplateElementIR field
-    // satisfies the type-system invariant without populating it.
-    listenerSpreads: [],
+    // Phase 15 R2 — `r-on="<expr>"` lowering populates the array via the
+    // r-on branch in the attribute loop above. Stays empty when the element
+    // has no `r-on` attribute. `synthesizeListenersFallthrough` may append a
+    // bare `$listeners` spread later (only on the single root, gated on
+    // `inheritListeners !== false`).
+    listenerSpreads,
     children,
     sourceLoc: el.loc,
     tagKind: annotation.tagKind,
@@ -1561,6 +1669,78 @@ export function synthesizeAttrsFallthrough(
   rootEl.attributes.push({
     kind: 'spreadBinding',
     expression: t.identifier('$attrs'),
+    deps: [],
+    sourceLoc: { start: rootEl.sourceLoc.start, end: rootEl.sourceLoc.end },
+  });
+}
+
+/**
+ * synthesizeListenersFallthrough — Phase 15 R4 / D-17 parallel of
+ * `synthesizeAttrsFallthrough`. Mirrors the attrs synthesizer 1:1 with
+ * `inheritAttrs` → `inheritListeners`, `$attrs` → `$listeners`, and the
+ * push site retargeted from `rootEl.attributes` (`AttributeBinding`) to
+ * `rootEl.listenerSpreads` (`ListenerSpreadIR`).
+ *
+ * Appends a `ListenerSpreadIR` whose `expression` is a bare `$listeners`
+ * Identifier onto the SINGLE root `TemplateElement` whose `tagKind === 'html'`
+ * — the listener-side mirror of Phase 14's spread-attrs auto-fallthrough.
+ *
+ * No synthesis when:
+ *   - `inheritListeners === false` (the author opted out), OR
+ *   - the template is multi-root / not a single `TemplateElement` (R8 — the
+ *     `validateListenerFallthrough` pass errors ROZ973 instead), OR
+ *   - the single root's `tagKind !== 'html'` (Plan 14-05 nuance — a
+ *     component-tag root is itself a wrapper; its listener-fallthrough
+ *     surface is owned by the inner component).
+ *
+ * IMPORTANT — ORDERING vs `validateListenerFallthrough`: `lower.ts` invokes
+ * `validateListenerFallthrough` BEFORE this synthesizer so the validator
+ * does not see the synthesized bare-$listeners spread and emit a false
+ * ROZ974 self-warning. Mutates the passed template node in place; never
+ * throws (D-08).
+ *
+ * @param template          - the lowered template root (`LowerTemplateResult.template`)
+ * @param inheritListeners  - `IRComponent.inheritListeners`
+ */
+export function synthesizeListenersFallthrough(
+  template: IRTemplateNode | null,
+  inheritListeners: boolean,
+): void {
+  if (inheritListeners === false) return;
+  if (template === null) return;
+
+  // Resolve the single root TemplateElement (direct, or the sole element of a
+  // whitespace-padded TemplateFragment). Mirrors synthesizeAttrsFallthrough.
+  let rootEl: TemplateElementIR | null = null;
+  if (template.type === 'TemplateElement') {
+    rootEl = template;
+  } else if (template.type === 'TemplateFragment') {
+    for (const child of template.children) {
+      if (child.type === 'TemplateStaticText') continue; // cosmetic whitespace
+      if (child.type === 'TemplateElement') {
+        if (rootEl !== null) {
+          rootEl = null; // multiple structural elements — not single-root
+          break;
+        }
+        rootEl = child;
+        continue;
+      }
+      // Any non-element/non-text structural sibling disqualifies.
+      rootEl = null;
+      break;
+    }
+  }
+  if (rootEl === null) return;
+  if (rootEl.tagKind !== 'html') return;
+
+  // Append the synthesized `$listeners` spread LAST. `deps` is empty —
+  // `$listeners` is a stable identifier (registered in STABLE_IDENTIFIERS in
+  // Plan 15-01), so it never participates in a target's reactive dep
+  // accounting. CLONE the parent element's sourceLoc rather than reference it
+  // directly (same JSON snapshot dedup concern as synthesizeAttrsFallthrough).
+  rootEl.listenerSpreads.push({
+    type: 'ListenerSpread',
+    expression: t.identifier('$listeners'),
     deps: [],
     sourceLoc: { start: rootEl.sourceLoc.start, end: rootEl.sourceLoc.end },
   });

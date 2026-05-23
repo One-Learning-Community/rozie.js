@@ -159,6 +159,26 @@ function enrichAttr(attr: TemplateAttr, diagnostics: Diagnostic[]): TemplateAttr
     // Fall through — the attr keeps its shape so the downstream walk stays
     // uniform; `lowerTemplate` drops a `name:'bind:foo'` directive harmlessly.
   }
+  // Phase 15 R1 — `r-on:click="x"` colon form is not supported. The parser
+  // does not split a `:arg` off `r-on` (only `r-model` carries a colon
+  // argument), so the colon form arrives here as a `directive` attr whose
+  // `name` is `on:click`. Reject it with ROZ972 (R_ON_COLON_FORM) — the
+  // colon-argument shape is a `r-model:propName`-only feature; on `r-on` it
+  // is a compile error. Emitting here at the PARSE level (mirroring the
+  // Phase 14 ROZ969 site) means `parse()`-only callers see it AND `compile()`
+  // (which aggregates parse + lower diagnostics) does not double-report.
+  if (attr.kind === 'directive' && attr.name.startsWith('on:')) {
+    const directiveArg = attr.name.slice('on:'.length);
+    diagnostics.push({
+      code: RozieErrorCode.R_ON_COLON_FORM,
+      severity: 'error',
+      message: `'r-${attr.name}' is not supported — r-on has no colon-argument form.`,
+      loc: attr.loc,
+      hint: `Use '@${directiveArg}="<expr>"' for a single named listener, or the bare-spread 'r-on="<obj>"' to apply an object of listeners.`,
+    });
+    // Fall through — the attr keeps its shape so the downstream walk stays
+    // uniform; `lowerTemplate` drops a `name:'on:click'` directive harmlessly.
+  }
   // Phase 12 — `r-model` is the one directive that carries a modifier chain
   // (`r-model.lazy.number.trim`). The parser splits the chain text off only
   // for `r-model` (bare or the `r-model:propName` colon-arg form), so any
