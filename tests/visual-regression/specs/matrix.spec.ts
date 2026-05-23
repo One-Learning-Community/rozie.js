@@ -118,15 +118,16 @@ const EXAMPLES = [
   // baseline regen lands the PNG. Per D-10 shared-baseline.
   'ThemedButtonListenersManual',
   'ThemedButtonAllManual',
-  // Phase 15 — ROnProbe literal modifier-bearing + dynamic + R6 same-event
-  // source-order merge probe (D-07). Three elements: literal modifier-bearing
-  // `r-on={'click.stop': fn, 'input.debounce(300)': onInput}`, dynamic
-  // `r-on="someObj"`, and R6 same-event merge `@click="f1" r-on="{ click: f2 }"`.
-  // Each target's R6 merge produces different DOM structures (per-target
-  // merge-dispatcher emit shapes diverge), but the rendered VISUAL is just
-  // three short span labels in an inline-flex row — the same across targets.
-  // Per D-10 shared-baseline; baseline-gated below.
-  'ROnProbe',
+  // Phase 15 — ROnProbe (D-07) is INTENTIONALLY NOT in the VR matrix, mirroring
+  // the Phase 14 RBindProbe precedent. The probe's purpose is dist-parity byte-
+  // equality (compile + emit), not visual parity. On Lit, the emitted
+  // `<rozie-r-on-probe>` custom element has no `:host { display: ... }` rule
+  // (the fixture's `<style>` block targets the inner `.r-on-probe` div), so
+  // the host element collapses to inline-zero-size and breaks the D-10 byte-
+  // identity contract against Vue/React/Svelte/Angular/Solid renders. The
+  // probe is still bootstrapped by the matrix host (entry.<target>.ts +
+  // main.ts) so it remains inspectable via /compare.html; it's just not a
+  // committed VR cell. The dist-parity gate covers the byte-identity claim.
 ] as const;
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'] as const;
 
