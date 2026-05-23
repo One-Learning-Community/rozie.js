@@ -38,16 +38,18 @@ export class ClassSelectorProbe {
 
   private __rozieApplyAttrs = (() => {
     const renderer = inject(Renderer2);
-    let prevKeys: string[] = [];
-    return (el: HTMLElement, obj: Record<string, unknown>) => {
+    const prevKeysByElement = new WeakMap<HTMLElement, string[]>();
+    return (el: HTMLElement, obj: Record<string, unknown> | null | undefined) => {
+      const safeObj: Record<string, unknown> = obj ?? {};
+      const prevKeys = prevKeysByElement.get(el) ?? [];
       for (const k of prevKeys) {
-        if (!(k in obj)) renderer.removeAttribute(el, k);
+        if (!(k in safeObj)) renderer.removeAttribute(el, k);
       }
-      for (const [k, v] of Object.entries(obj)) {
+      for (const [k, v] of Object.entries(safeObj)) {
         if (v === null || v === false) renderer.removeAttribute(el, k);
         else renderer.setAttribute(el, k, String(v));
       }
-      prevKeys = Object.keys(obj);
+      prevKeysByElement.set(el, Object.keys(safeObj));
     };
   })();
 
