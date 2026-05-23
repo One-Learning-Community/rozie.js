@@ -9,7 +9,7 @@ export default function Consumer(_props: ConsumerProps): JSX.Element {
 
   return (
     <>
-    <Producer title={'Hello'}>Body text</Producer>
+    <Producer title={'Hello'} data-rozie-s-bd0c3708="">Body text</Producer>
     </>
   );
 }

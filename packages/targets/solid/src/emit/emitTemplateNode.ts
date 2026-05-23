@@ -164,12 +164,18 @@ function findAttribute(attrs: AttributeBinding[], name: string): AttributeBindin
 
 /**
  * Build the bare component-scope attribute JSX fragment (e.g.
- * `data-rozie-s-abc12345=""`). Returns `null` when the context has no scope
- * attr OR when the element is a child component (those carry their own scope).
+ * `data-rozie-s-abc12345=""`). Returns `null` only when the context has no
+ * scope attr. Applies to both host elements AND child-component invocations
+ * (Phase 14.1 cross-target scope propagation): the child's auto-fallthrough
+ * spread (or manual `r-bind="$attrs"`) carries the consumer's scope attr onto
+ * the child's root element, so the consumer's scoped CSS rules
+ * (`.foo[data-rozie-s-CONSUMER]`) match elements styled via consumer-passed
+ * `class=` on a child-component invocation. Mirrors Vue's `__scopeId`
+ * runtime propagation, baked into the consumer-side emit.
  */
 function scopeAttrForElement(node: TemplateElementIR, ctx: EmitNodeCtx): string | null {
   if (!ctx.scopeAttr) return null;
-  if (node.tagKind !== 'html') return null;
+  void node.tagKind;
   // Empty-string attribute value is the canonical "boolean attribute"
   // selector-friendly form. CSS `[data-rozie-s-xyz]` matches it.
   return `${ctx.scopeAttr}=""`;

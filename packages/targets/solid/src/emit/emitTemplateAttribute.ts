@@ -634,6 +634,47 @@ function extractLiteralClassStyle(
 }
 
 /**
+ * Phase 14 R6 — Solid-specific opaque-spread class-merge support.
+ *
+ * Solid's JSX `{...spread}` semantics are *last-wins* per key — a `class` key
+ * inside the spread silently overwrites an earlier explicit `class=` on the
+ * same element. For an OPAQUE spread (`$attrs` from auto-fallthrough, or a
+ * dynamic `r-bind="obj"`) we cannot extract the spread's `class` at compile
+ * time, so we instead need to:
+ *
+ *   1. Emit the spread FIRST (preserves all non-class keys reaching the DOM).
+ *   2. Re-emit `class=` AFTER the spread, with a runtime concat that reads
+ *      the spread's `class` and appends it to our base class string.
+ *
+ * Returns the source-level expression code to read `class` from at runtime, or
+ * null for a LITERAL spread (whose class is extracted at compile time elsewhere).
+ *
+ * `$attrs`            → `attrs.class`
+ * Dynamic `r-bind`    → `(<rewritten expr>).class`
+ * LITERAL `r-bind`    → null (handled by extractLiteralClassStyle path)
+ */
+function opaqueSpreadClassReadExpr(
+  attr: Extract<AttributeBinding, { kind: 'spreadBinding' }>,
+  ctx: EmitAttrCtx,
+): string | null {
+  if (t.isObjectExpression(attr.expression)) return null;
+  if (isAttrsIdentifier(attr.expression)) {
+    // `$attrs` lowers to `attrs` (the rest bucket from splitProps). Solid's
+    // splitProps types the rest as `Omit<TProps, …declared>` — which does
+    // NOT declare a `class` field on most wrappers, so a bare `attrs.class`
+    // read fails TS2339 under solid-lint. Cast through `Record<string,
+    // unknown>` then to `string | undefined` to keep the runtime read
+    // identical while satisfying solid-lint's `tsc --noEmit` gate.
+    return `((attrs as unknown as Record<string, unknown>).class as string | undefined)`;
+  }
+  // Dynamic — read `.class` off the source expression. `normalizeAttrs` does
+  // not alter the `class` key for Solid (SOLID_ATTR_KEY_MAP omits `class`),
+  // so reading from the raw expression matches the spread's `class` key.
+  const exprCode = renderExpr(attr.expression, ctx.ir, ctx.invokeAccessors);
+  return `((${exprCode}) as unknown as Record<string, unknown>)?.class as string | undefined`;
+}
+
+/**
  * Top-level entry: emit all attributes for an element.
  * Buckets `class` and `:class` together for composition.
  * Skips consumed (r-* / @event / :key) attributes.
@@ -648,6 +689,11 @@ export function emitAttributes(
   const buckets = bucket(attrs);
   const out: string[] = [];
   const consumed = new Set<AttributeBinding>();
+  /**
+   * R6 opaque-spread merge — when set, deferred `class={...}` emit appended
+   * after spreads so JSX last-write ordering keeps our (merged) class wins.
+   */
+  let pendingPostSpreadClass: string | null = null;
 
   // Phase 14 R6 — does the element have an explicit `class` binding?
   const hasExplicitClass = (buckets.get('class')?.length ?? 0) > 0;
@@ -671,6 +717,23 @@ export function emitAttributes(
       }
     }
   }
+
+  // Phase 14 R6 — OPAQUE-spread class-merge (Solid-specific). Solid's JSX
+  // `{...spread}` is last-wins per key, so a spread's `class` silently
+  // overwrites our explicit `class=` unless we re-emit `class=` AFTER the
+  // spread with a runtime concat. Collect the source-level "read class"
+  // expression for each opaque spread (in source order) so we can append it
+  // to the base class value, AND emit the class attribute AFTER the spreads.
+  const opaqueSpreadClassReads: string[] = [];
+  if (hasExplicitClass) {
+    for (const a of attrs) {
+      if (a.kind !== 'spreadBinding') continue;
+      if (literalClassBindings.has(a)) continue; // LITERAL — already extracted.
+      const readExpr = opaqueSpreadClassReadExpr(a, ctx);
+      if (readExpr !== null) opaqueSpreadClassReads.push(readExpr);
+    }
+  }
+  const needsPostSpreadClass = opaqueSpreadClassReads.length > 0;
 
   for (const a of attrs) {
     if (consumed.has(a)) continue;
@@ -716,8 +779,20 @@ export function emitAttributes(
       }
       // Emit `class=` for string/interpolated attrs.
       if (classStrAttrs.length > 0) {
-        const classValue = composeClassValue(classStrAttrs, ctx.ir, ctx.invokeAccessors);
-        out.push(`class={${classValue}}`);
+        let classValue = composeClassValue(classStrAttrs, ctx.ir, ctx.invokeAccessors);
+        if (needsPostSpreadClass) {
+          // R6 opaque-spread merge: append each opaque spread's class at the
+          // tail of the value so an `extra-variant` from `$attrs` joins our
+          // `btn primary` instead of overwriting it. The class attribute is
+          // also DEFERRED past the spread emission below — we hold it in
+          // `pendingPostSpreadClass` and append at the very end.
+          for (const readExpr of opaqueSpreadClassReads) {
+            classValue = `${classValue} + (${readExpr} ? " " + ${readExpr} : "")`;
+          }
+          pendingPostSpreadClass = `class={${classValue}}`;
+        } else {
+          out.push(`class={${classValue}}`);
+        }
       }
       // Emit `classList=` for each object-form `:class` binding.
       for (const cla of classListAttrs) {
@@ -731,6 +806,12 @@ export function emitAttributes(
     out.push(result.jsx);
     for (const d of result.diagnostics) diagnostics.push(d);
     consumed.add(a);
+  }
+
+  // R6 opaque-spread merge: emit the deferred `class=` AFTER all attrs/spreads
+  // so it wins JSX's last-write ordering.
+  if (pendingPostSpreadClass !== null) {
+    out.push(pendingPostSpreadClass);
   }
 
   return { jsx: out.join(' '), diagnostics };

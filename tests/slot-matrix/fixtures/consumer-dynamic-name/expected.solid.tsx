@@ -11,7 +11,7 @@ export default function Consumer(_props: ConsumerProps): JSX.Element {
 
   return (
     <>
-    <Producer slots={{ [slotName()]: () => (<>Dynamic fill</>) }} />
+    <Producer data-rozie-s-bd0c3708="" slots={{ [slotName()]: () => (<>Dynamic fill</>) }} />
     </>
   );
 }

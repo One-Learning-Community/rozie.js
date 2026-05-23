@@ -51,7 +51,7 @@ export default function BadgeGridStyledScss(_props: BadgeGridStyledScssProps): J
       gap: 12px;
     }`}</style>
     <>
-    <div class={"badge-grid"} {...attrs} data-rozie-s-44801268="">
+    <div {...attrs} class={"badge-grid" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-44801268="">
       <For each={local.badges}>{(badge) => <span class={"badge badge--neutral"} data-rozie-s-44801268="">
         {badge}
       </span>}</For>

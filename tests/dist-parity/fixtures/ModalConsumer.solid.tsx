@@ -26,8 +26,8 @@ export default function ModalConsumer(_props: ModalConsumerProps): JSX.Element {
     .close[data-rozie-s-5d081d3a] { background: none; border: none; cursor: pointer; font-size: 1.25rem; }
     .dynamic-fill[data-rozie-s-5d081d3a] { font-weight: bold; }`}</style>
     <>
-    <div class={"modal-consumer"} {...attrs} data-rozie-s-5d081d3a="">
-      <Modal open={open1()} onOpenChange={setOpen1} headerSlot={({ close }) => (<>
+    <div {...attrs} class={"modal-consumer" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-5d081d3a="">
+      <Modal open={open1()} onOpenChange={setOpen1} data-rozie-s-5d081d3a="" headerSlot={({ close }) => (<>
           <h2 data-rozie-s-5d081d3a="">{local.title}</h2>
           <button class={"close"} onClick={close} data-rozie-s-5d081d3a="">×</button>
         </>)} footerSlot={({ close }) => (<>
@@ -37,13 +37,13 @@ export default function ModalConsumer(_props: ModalConsumerProps): JSX.Element {
         Are you sure you want to proceed?
         </Modal>
 
-      <Modal open={open2()} onOpenChange={setOpen2} slots={{ [slotName()]: () => (<>
+      <Modal open={open2()} onOpenChange={setOpen2} data-rozie-s-5d081d3a="" slots={{ [slotName()]: () => (<>
           <span class={"dynamic-fill"} data-rozie-s-5d081d3a="">Dynamic header via slotName</span>
         </>) }}>
         Dynamic-name demo body
       </Modal>
 
-      <WrapperModal open={open3()} onOpenChange={setOpen3} title={local.title} brandSlot={() => (<>
+      <WrapperModal open={open3()} onOpenChange={setOpen3} title={local.title} data-rozie-s-5d081d3a="" brandSlot={() => (<>
           <h2 data-rozie-s-5d081d3a="">Re-projected brand</h2>
         </>)} actionsSlot={() => (<>
           <button data-rozie-s-5d081d3a="">Wrapper action</button>

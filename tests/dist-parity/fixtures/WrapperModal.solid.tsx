@@ -24,7 +24,7 @@ export default function WrapperModal(_props: WrapperModalProps): JSX.Element {
 
   return (
     <>
-    <Modal open={open()} onOpenChange={setOpen} title={local.title} headerSlot={() => (<>
+    <Modal open={open()} onOpenChange={setOpen} title={local.title} data-rozie-s-1efe6192="" headerSlot={() => (<>
         {(_props.brandSlot ?? _props.slots?.['brand']?.({})) ?? <h2 data-rozie-s-1efe6192="">{local.title}</h2>}
       </>)} footerSlot={() => (<>
         {(_props.actionsSlot ?? _props.slots?.['actions']?.({}))}

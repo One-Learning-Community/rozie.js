@@ -30,7 +30,7 @@ export default function OnMountArrowCleanup(_props: OnMountArrowCleanupProps): J
     <>
     <style>{`.ticker[data-rozie-s-722b58d1] { font-variant-numeric: tabular-nums; }`}</style>
     <>
-    <div class={"ticker"} {...attrs} data-rozie-s-722b58d1="">{ticks()}</div>
+    <div {...attrs} class={"ticker" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-722b58d1="">{ticks()}</div>
     </>
     </>
   );

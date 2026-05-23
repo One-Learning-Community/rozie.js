@@ -9,7 +9,7 @@ export default function Consumer(_props: ConsumerProps): JSX.Element {
 
   return (
     <>
-    <Producer headerSlot={() => (<>
+    <Producer data-rozie-s-bd0c3708="" headerSlot={() => (<>
         <h2 data-rozie-s-bd0c3708="">Custom Header</h2>
       </>)}>
       Custom body content

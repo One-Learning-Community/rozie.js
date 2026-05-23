@@ -19,7 +19,7 @@ export default function InlineExprHandler(_props: InlineExprHandlerProps): JSX.E
     <>
     <style>{`.backdrop[data-rozie-s-8ec7623e] { position: fixed; inset: 0; }`}</style>
     <>
-    <div {...attrs} class={"backdrop"} onClick={($event) => { local.closeOnBackdrop && close(); }} data-rozie-s-8ec7623e="">
+    <div {...attrs} class={"backdrop" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} onClick={($event) => { local.closeOnBackdrop && close(); }} data-rozie-s-8ec7623e="">
       
       <button onClick={close} data-rozie-s-8ec7623e="">Close</button>
     </div>
