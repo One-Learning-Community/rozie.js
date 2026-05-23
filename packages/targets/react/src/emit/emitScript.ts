@@ -1517,8 +1517,37 @@ export function emitScript(
   // whichever the shell named.
   if (ir.inheritAttrs !== false) {
     const propsParam = defaultedNonModelProps.length > 0 ? '_props' : 'props';
-    if (ir.props.length === 0 && ir.emits.length === 0) {
-      // No declared surface — every key on the param is a fallthrough attribute.
+    // `declaredNames` reads ONLY from `ir.props` — `ir.emits` does not enter
+    // the destructure list. When `ir.props.length === 0` the destructure is
+    // empty regardless of `ir.emits.length`; previously the guard
+    // `ir.props.length === 0 && ir.emits.length === 0` would emit
+    // `const { , ...rest } = ...` + `void ;` (both JS syntax errors) for a
+    // no-`<props>` + `$emit(...)` component. Compute the declared-names list
+    // first, then route on its emptiness — covering both no-props/no-emits
+    // and no-props/with-emits via the same simple path. (CR-01)
+    const declaredNames = [
+      ...ir.props.map((p) => p.name),
+      // model: true props add `defaultValue` + `onValueChange` consumer-side
+      // (useControllableState convention) — strip both so they never leak
+      // into the rest bucket. The model prop name itself (`value`) is in
+      // declaredNames already.
+      ...ir.props.flatMap((p) =>
+        p.isModel
+          ? [
+              'defaultValue',
+              `on${p.name[0]!.toUpperCase()}${p.name.slice(1)}Change`,
+              // Some model props use `default<Name>` (e.g. `defaultItems` for `items` model);
+              `default${p.name[0]!.toUpperCase()}${p.name.slice(1)}`,
+            ]
+          : [],
+      ),
+    ];
+    const declaredNamesUnique = Array.from(new Set(declaredNames));
+    if (declaredNamesUnique.length === 0) {
+      // No declared prop surface — every key on the param is a fallthrough
+      // attribute. (Includes the `ir.props.length === 0 && ir.emits.length > 0`
+      // case that previously fell into the IIFE branch and emitted invalid
+      // empty-destructure / empty-void code.)
       hookLines.push(
         `const attrs = ${propsParam} as Record<string, unknown>;`,
       );
@@ -1528,24 +1557,6 @@ export function emitScript(
       // an outer state hook (`const items` clashes with
       // `const [items, setItems] = useControllableState(...)`). The IIFE
       // returns ONLY the rest bucket; outer `attrs` carries no inner locals.
-      const declaredNames = [
-        ...ir.props.map((p) => p.name),
-        // model: true props add `defaultValue` + `onValueChange` consumer-side
-        // (useControllableState convention) — strip both so they never leak
-        // into the rest bucket. The model prop name itself (`value`) is in
-        // declaredNames already.
-        ...ir.props.flatMap((p) =>
-          p.isModel
-            ? [
-                'defaultValue',
-                `on${p.name[0]!.toUpperCase()}${p.name.slice(1)}Change`,
-                // Some model props use `default<Name>` (e.g. `defaultItems` for `items` model);
-                `default${p.name[0]!.toUpperCase()}${p.name.slice(1)}`,
-              ]
-            : [],
-        ),
-      ];
-      const declaredNamesUnique = Array.from(new Set(declaredNames));
       const propNameList = declaredNamesUnique.join(', ');
       // TypeScript flags unused destructured locals (TS6133) under strict
       // settings; the IIFE wrapper plus `void` short-circuits also silences
