@@ -1,0 +1,49 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`emit (Angular) — ListenerSpreadIR (Plan 15-05 Task 2) > (1) literal no-merge no-modifier: r-on="{ click: fn }" → (click)="fn($event)" 1`] = `
+"
+
+      <button (click)="fn()">go</button>
+
+  "
+`;
+
+exports[`emit (Angular) — ListenerSpreadIR (Plan 15-05 Task 2) > (2) R6 same-event merge (all-literal): @click + r-on { click } → single (click)="__merged_click_N($event)" 1`] = `
+"
+
+      <button (click)="_merged_click_0($event)">go</button>
+
+  "
+`;
+
+exports[`emit (Angular) — ListenerSpreadIR (Plan 15-05 Task 2) > (3) literal modifier-bearing: r-on="{ 'click.stop': fn }" → (click)= with stopPropagation 1`] = `
+"
+
+      <button (click)="_guardedFn($event)">go</button>
+
+  "
+`;
+
+exports[`emit (Angular) — ListenerSpreadIR (Plan 15-05 Task 2) > (4) dynamic no-merge: r-on="someObj" → #rozieListenersTarget_N + effect() + Renderer2.listen() 1`] = `
+"
+
+      <button #rozieListenersTarget_0>go</button>
+
+  "
+`;
+
+exports[`emit (Angular) — ListenerSpreadIR (Plan 15-05 Task 2) > (5) mixed dynamic + literal: @click + r-on dynamic → native (click) + separate #rozieListenersTarget_N 1`] = `
+"
+
+      <button (click)="f1()" #rozieListenersTarget_0>go</button>
+
+  "
+`;
+
+exports[`emit (Angular) — ListenerSpreadIR (Plan 15-05 Task 2) > (6) bare $listeners (D-19): r-on="$listeners" → dynamic-Renderer2 path 1`] = `
+"
+
+      <button #rozieListenersTarget_0>go</button>
+
+  "
+`;

@@ -1,4 +1,4 @@
-import { Component, ContentChild, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, computed, inject, input, model, output, signal, viewChild } from '@angular/core';
+import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, computed, effect, inject, input, model, output, signal, viewChild } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
@@ -23,7 +23,7 @@ interface EmptyCtx {}
   imports: [NgTemplateOutlet, FormsModule],
   template: `
 
-    <div class="todo-list" #rozieSpread_0>
+    <div class="todo-list" #rozieSpread_0 #rozieListenersTarget_1>
       <header>
         @if ((headerTpl ?? templates()?.['header'])) {
     <ng-container *ngTemplateOutlet="(headerTpl ?? templates()?.['header']); context: { $implicit: { remaining: remaining(), total: items().length }, remaining: remaining(), total: items().length }" />
@@ -35,7 +35,7 @@ interface EmptyCtx {}
     }
       </header>
 
-      <form (submit)="_guarded_add_1($event)">
+      <form (submit)="_guarded_add_2($event)">
         <input [ngModel]="draft()" (ngModelChange)="draft.set($event)" [ngModelOptions]="{standalone: true}" placeholder="What needs doing?" />
         <button type="submit" [disabled]="!draft().trim()">Add</button>
       </form>
@@ -46,7 +46,7 @@ interface EmptyCtx {}
     <li [class]="{ done: item.done }">
           
           @if ((defaultTpl ?? templates()?.['defaultSlot'])) {
-    <ng-container *ngTemplateOutlet="(defaultTpl ?? templates()?.['defaultSlot']); context: _defaultSlot_ctx_2(item)" />
+    <ng-container *ngTemplateOutlet="(defaultTpl ?? templates()?.['defaultSlot']); context: _defaultSlot_ctx_3(item)" />
     } @else {
 
             <label><input type="checkbox" [checked]="item.done" (change)="_toggle(item.id)" /><span>{{ item.text }}</span></label>
@@ -119,6 +119,8 @@ export class TodoList {
   ): _ctx is HeaderCtx | DefaultCtx | EmptyCtx {
     return true;
   }
+
+  private __rozieDestroyRef = inject(DestroyRef);
 
   private rozieSpread_0 = viewChild<ElementRef>('rozieSpread_0');
 
@@ -212,12 +214,42 @@ export class TodoList {
     this.__rozieApplyAttrs(el, this.__rozieGetHostAttrs());
   });
 
-  private _guarded_add_1 = ($event: any) => {
+  private rozieListenersTarget_1 = viewChild<ElementRef>('rozieListenersTarget_1');
+
+  private __rozieListenersRenderer = inject(Renderer2);
+
+  private __rozieListenersDisposers_1: Array<() => void> = [];
+
+  private __rozieListenersDestroyRegistered_1 = false;
+
+  private __rozieListenersEffect_1 = effect(() => {
+    const el = this.rozieListenersTarget_1()?.nativeElement;
+    if (!el) return;
+    for (const off of this.__rozieListenersDisposers_1) off();
+    this.__rozieListenersDisposers_1 = [];
+    const obj = (undefined) ?? {};
+    for (const [k, v] of Object.entries(obj)) {
+      if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
+      if (typeof v !== 'function') continue;
+      const norm = k.startsWith('on') ? k.slice(2).toLowerCase() : k;
+      const dispose = this.__rozieListenersRenderer.listen(el, norm, v as EventListener);
+      this.__rozieListenersDisposers_1.push(dispose);
+    }
+    if (!this.__rozieListenersDestroyRegistered_1) {
+      this.__rozieListenersDestroyRegistered_1 = true;
+      this.__rozieDestroyRef.onDestroy(() => {
+        for (const off of this.__rozieListenersDisposers_1) off();
+        this.__rozieListenersDisposers_1 = [];
+      });
+    }
+  });
+
+  private _guarded_add_2 = ($event: any) => {
     $event.preventDefault();
     this._add();
   };
 
-  private _defaultSlot_ctx_2 = (item: any) => ({ $implicit: { item: item, toggle: () => this._toggle(item.id), remove: () => this.removeItem(item.id) }, item: item, toggle: () => this._toggle(item.id), remove: () => this.removeItem(item.id) });
+  private _defaultSlot_ctx_3 = (item: any) => ({ $implicit: { item: item, toggle: () => this._toggle(item.id), remove: () => this.removeItem(item.id) }, item: item, toggle: () => this._toggle(item.id), remove: () => this.removeItem(item.id) });
 }
 
 export default TodoList;

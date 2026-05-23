@@ -23,6 +23,7 @@ import * as t from '@babel/types';
 import type {
   IRComponent,
   AttributeBinding,
+  ListenerSpreadIR,
 } from '../../../../core/src/ir/types.js';
 import {
   rewriteTemplateExpression,
@@ -76,6 +77,27 @@ export interface EmitAttrCtx {
    * uses to add `ViewChild`/`TemplateRef`/`NgTemplateOutlet`).
    */
   hasSpreadBinding?: { value: boolean } | undefined;
+  /**
+   * Plan 15-05 / D-13 — set to `true` by the listener-spread arm when at
+   * least one dynamic `ListenerSpreadIR` was lowered to the per-element
+   * `effect()` + `Renderer2.listen()` inline body. emitAngular reads this
+   * off `EmitTemplateResult` and conditionally adds `inject`/`Renderer2`/
+   * `ElementRef`/`effect`/`viewChild`/`DestroyRef` to the `@angular/core`
+   * import line (same pattern as `hasSpreadBinding`). Overlaps with
+   * `hasSpreadBinding` — emitAngular dedups imports via the collector's
+   * Set semantics.
+   */
+  hasListenerSpread?: { value: boolean } | undefined;
+  /**
+   * Plan 15-05 / Phase 13 coordination — set to `true` by the listener-spread
+   * arm when the emitted dynamic-Renderer2 effect() needs to register a
+   * `__rozieDestroyRef.onDestroy(...)` cleanup. emitScript reads this and
+   * unions it into `lifecycleNeedsDestroyRefField` so the
+   * `private __rozieDestroyRef = inject(DestroyRef);` field is hoisted
+   * EXACTLY ONCE per component regardless of how many lifecycle / portal /
+   * listener-spread sources signal the need.
+   */
+  needsDestroyRefField?: { value: boolean } | undefined;
 }
 
 /**
@@ -766,6 +788,204 @@ function emitSpreadBinding(
   // land on the inner element.
   return `#${refName}`;
 }
+
+/**
+ * Plan 15-05 / D-13 — the SHARED `__rozieListenersRenderer` private class
+ * field that holds the injected `Renderer2`. One per component, mirrors the
+ * Phase 14 `applyAttrsHelperDecl` pattern of sharing a single Renderer2
+ * injection across multiple per-element effect() bodies. The Phase 14 IIFE
+ * carries Renderer2 internally; for listeners we can hoist the field-level
+ * inject because the effect() body needs a direct call site for the disposer-
+ * returning `renderer.listen(el, event, fn)` form.
+ */
+const LISTENERS_RENDERER_FIELD_NAME = '__rozieListenersRenderer';
+
+function listenersRendererFieldDecl(): string {
+  return `private ${LISTENERS_RENDERER_FIELD_NAME} = inject(Renderer2);`;
+}
+
+/**
+ * Plan 15-05 / D-13 — keys that would either trigger prototype-pollution on
+ * iteration or attempt to invoke `Renderer2.listen` for non-DOM-event names.
+ * The latter is benign — no `__proto__` event fires — but the silent skip
+ * keeps the emitted code consistent with the other five Phase 15 runtime
+ * helpers' guard (T-15-V5-03 defence-in-depth across spec changes).
+ *
+ * Emitted inline inside each spread's effect() body via a single inline
+ * string check (not factored into a separate field — keeps the spread
+ * self-contained for snapshot legibility).
+ */
+const LISTENERS_FORBIDDEN_KEYS_GUARD =
+  `if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;`;
+
+/**
+ * Plan 15-05 / D-13 — emit the per-element machinery for ONE dynamic
+ * `ListenerSpreadIR`:
+ *   - a `#rozieListenersTarget_<N>` template-ref attribute (returned for
+ *     splicing onto the open tag),
+ *   - a `viewChild<ElementRef>('rozieListenersTarget_<N>')` private field
+ *     (pushed onto `ctx.scriptInjections`),
+ *   - the SHARED `__rozieListenersRenderer` field that injects `Renderer2`
+ *     once per component (pushed only on the first lowering),
+ *   - a `private __rozieListenersDisposers_<N>: Array<() => void> = [];`
+ *     per-spread disposer accumulator,
+ *   - a `private __rozieListenersEffect_<N> = effect(() => { ... });` field
+ *     initializer with `?.nativeElement` guard (Pitfall 9), per-effect-run
+ *     teardown of `__rozieListenersDisposers_<N>`, a re-attach loop with
+ *     normalizeKey + FORBIDDEN_KEYS skip + non-function skip, and a one-time
+ *     `__rozieDestroyRef.onDestroy(...)` registration gated by
+ *     `__listenerDestroyRegistered_<N>`.
+ *
+ * The `effect()` lives in a field initializer (a class-field initializer IS
+ * injection context — Phase 05 Pitfall 8 mitigation; mirrors the Phase 14
+ * `__rozieSpread_<N>_effect` shape).
+ *
+ * The `__rozieDestroyRef` field is NOT declared here — `needsDestroyRefField`
+ * is flipped on the emit-collector struct so `emitScript` hoists the single
+ * shared `private __rozieDestroyRef = inject(DestroyRef);` field exactly once
+ * (Phase 13 coordination — memory `project_rozie_angular_onmount_emit_bug`;
+ * the same flag the lifecycle path and portals path already union).
+ *
+ * D-19 bare `$listeners`: routed through this SAME path because the
+ * consumer's `$listeners` cluster is opaque at compile time. At runtime
+ * Angular has no `$listeners` magic accessor; the bare identifier resolves
+ * to undefined → the `obj ?? {}` coercion makes the loop a clean no-op.
+ *
+ * Key normalization: a leading `on` prefix is stripped (cheap cross-target
+ * authored-object compatibility per D-13 — handles `onClick` style keys
+ * from a consumer that wrote React-shape names by inheriting from a parent
+ * component's $listeners cluster).
+ */
+function emitListenerSpread(
+  spread: ListenerSpreadIR,
+  ctx: EmitAttrCtx,
+): string {
+  const counter = ctx.injectionCounter ?? { next: 0 };
+  const idx = counter.next++;
+  const refName = `rozieListenersTarget_${idx}`;
+  const disposersFieldName = `__rozieListenersDisposers_${idx}`;
+  const effectFieldName = `__rozieListenersEffect_${idx}`;
+  const destroyRegisteredFieldName = `__rozieListenersDestroyRegistered_${idx}`;
+
+  // The spread expression is evaluated inside a CLASS-FIELD INITIALIZER's
+  // `effect()` body, NOT inside an Angular template binding. Pass
+  // `prefixThis: true` so `$data.X` lowers to `this.X()` (signal call) etc.
+  // Mirror the Phase 14 emitSpreadBinding pattern.
+  //
+  // D-19 / Plan 15-05 — bare `$listeners` Identifier: Angular has no native
+  // `$listeners` magic accessor (unlike Vue's template-side `$listeners` or
+  // Svelte's `__rozieAttrs` rest binding). The consumer's `$listeners`
+  // cluster is opaque at compile time, so we emit the safe `undefined`
+  // literal which the `?? {}` coercion downstream maps to a clean no-op
+  // loop. Without this, the emitted effect() body would reference a bare
+  // `$listeners` at class scope and throw `ReferenceError: $listeners is
+  // not defined` at runtime — the synthesized auto-fallthrough
+  // (`r-on="$listeners"` on every default-fallthrough single-root template)
+  // would crash every Angular component on instantiation. Mirrors the
+  // Lit-side runtime nullish coercion (Lit's directive's `obj ?? {}` handles
+  // the equivalent undefined case) and Svelte's `__rozieAttrs` rewrite.
+  let exprText: string;
+  if (t.isIdentifier(spread.expression, { name: '$listeners' })) {
+    exprText = 'undefined';
+  } else {
+    exprText = rewriteTemplateExpression(spread.expression, ctx.ir, {
+      collisionRenames: ctx.collisionRenames,
+      loopBindings: ctx.loopBindings,
+      prefixThis: true,
+    });
+  }
+
+  // Push fields onto scriptInjections (one bucket per field, dedupe by name).
+  if (ctx.scriptInjections !== undefined) {
+    // Per-spread viewChild template-ref query.
+    ctx.scriptInjections.push({
+      name: refName,
+      decl: `private ${refName} = viewChild<ElementRef>('${refName}');`,
+    });
+
+    // Shared Renderer2 injection — once per component.
+    const rendererAlreadyPushed = ctx.scriptInjections.some(
+      (si) => si.name === LISTENERS_RENDERER_FIELD_NAME,
+    );
+    if (!rendererAlreadyPushed) {
+      ctx.scriptInjections.push({
+        name: LISTENERS_RENDERER_FIELD_NAME,
+        decl: listenersRendererFieldDecl(),
+      });
+    }
+
+    // Per-spread disposer accumulator.
+    ctx.scriptInjections.push({
+      name: disposersFieldName,
+      decl: `private ${disposersFieldName}: Array<() => void> = [];`,
+    });
+
+    // One-time destroy-registration gate.
+    ctx.scriptInjections.push({
+      name: destroyRegisteredFieldName,
+      decl: `private ${destroyRegisteredFieldName} = false;`,
+    });
+
+    // The effect() body — A8 / Pitfall 9: nativeElement guard early-returns
+    // before first render so a pre-render effect tick is a no-op. The
+    // per-effect-run teardown drains the disposer accumulator BEFORE the
+    // re-attach loop so a reference-changed listener-object cleanly
+    // detaches the prior listeners; the one-time onDestroy registration
+    // fires the same teardown on component disposal (cross-target D-14
+    // contract — Angular leg).
+    const effectDecl = [
+      `private ${effectFieldName} = effect(() => {`,
+      `  const el = this.${refName}()?.nativeElement;`,
+      `  if (!el) return;`,
+      `  for (const off of this.${disposersFieldName}) off();`,
+      `  this.${disposersFieldName} = [];`,
+      `  const obj = (${exprText}) ?? {};`,
+      `  for (const [k, v] of Object.entries(obj)) {`,
+      `    ${LISTENERS_FORBIDDEN_KEYS_GUARD}`,
+      `    if (typeof v !== 'function') continue;`,
+      `    const norm = k.startsWith('on') ? k.slice(2).toLowerCase() : k;`,
+      `    const dispose = this.${LISTENERS_RENDERER_FIELD_NAME}.listen(el, norm, v as EventListener);`,
+      `    this.${disposersFieldName}.push(dispose);`,
+      `  }`,
+      `  if (!this.${destroyRegisteredFieldName}) {`,
+      `    this.${destroyRegisteredFieldName} = true;`,
+      `    this.__rozieDestroyRef.onDestroy(() => {`,
+      `      for (const off of this.${disposersFieldName}) off();`,
+      `      this.${disposersFieldName} = [];`,
+      `    });`,
+      `  }`,
+      `});`,
+    ].join('\n');
+    ctx.scriptInjections.push({
+      name: effectFieldName,
+      decl: effectDecl,
+    });
+  }
+
+  // Flag the cross-cutting concerns for emitAngular + emitScript.
+  if (ctx.hasListenerSpread !== undefined) {
+    ctx.hasListenerSpread.value = true;
+  }
+  if (ctx.needsDestroyRefField !== undefined) {
+    ctx.needsDestroyRefField.value = true;
+  }
+
+  // The template attribute is the template-ref declaration `#refName`.
+  // AUTO-FALLTHROUGH TARGET (resolves CONTEXT.md A1 for Angular — listener
+  // half): the synthesized `$listeners` `ListenerSpreadIR` from Plan 15-02
+  // lowers through the SAME effect()+Renderer2.listen() path and lands on
+  // the template-root element (the `<button>` the author wrote), NOT the
+  // Angular host element.
+  return `#${refName}`;
+}
+
+/**
+ * Plan 15-05 — public re-export for the cross-cutting per-element walker
+ * in `emitTemplateNode.ts`, which needs to emit a dynamic `ListenerSpreadIR`
+ * as a sibling template-ref attribute alongside the per-event `(click)=`
+ * bindings.
+ */
+export { emitListenerSpread };
 
 /**
  * Emit a single attribute. Returns null when the attribute should be dropped

@@ -242,6 +242,25 @@ export function emitAngular(
     imports.add('viewChild');
   }
 
+  // Plan 15-05 / D-13 — when the template lowered at least one dynamic
+  // `ListenerSpreadIR`, the emitted component needs the same `inject` /
+  // `Renderer2` / `ElementRef` / `effect` / `viewChild` surface as the
+  // attribute spread, plus `DestroyRef` (for the per-spread one-time
+  // `__rozieDestroyRef.onDestroy(...)` cleanup registration — D-14 contract).
+  // `effect` (not `afterRenderEffect`) is sufficient here because listener
+  // attach/detach has no class/style binding race the post-render scheduling
+  // was solving for the attribute spread; standard `effect()` runs once per
+  // reactive read change and is the right schedule for `addEventListener`.
+  // Import overlap with `hasSpreadBinding` is deduped by the collector Set.
+  if (tmplResult.hasListenerSpread) {
+    imports.add('inject');
+    imports.add('Renderer2');
+    imports.add('ElementRef');
+    imports.add('effect');
+    imports.add('viewChild');
+    imports.add('DestroyRef');
+  }
+
   // Portal-slot primitive (Spike 003) — append `<ng-container #rozie_portalAnchor>`
   // to the rendered template so the ViewContainerRef query has an anchor to
   // read. The portal closure synthesized in ngAfterViewInit reads from this
@@ -293,10 +312,32 @@ export function emitAngular(
   // classBody string.
   let classBody = scriptResult.classBody;
 
+  // Plan 15-05 / Phase 13 coordination — when emitTemplate's dynamic
+  // listener-spread lowering needs the `__rozieDestroyRef.onDestroy(...)`
+  // cleanup registration AND the class body does NOT already declare the
+  // shared `private __rozieDestroyRef = inject(DestroyRef);` field (it would
+  // already be there when the component uses `$onMount` paired-cleanup OR
+  // portal slots — emitScript handles both of those sources directly via
+  // `lifecycleNeedsDestroyRefField`), prepend the field declaration to the
+  // template scriptInjections so the union site below produces exactly ONE
+  // field declaration per component (the regression to avoid per memory
+  // `project_rozie_angular_onmount_emit_bug`). The string-level "already
+  // declares" check uses a literal-substring match against the emitted shape;
+  // both emitScript's L895 emit and this synthesised emit use the same
+  // canonical text so the dedupe is exact.
+  const HOIST_DESTROY_REF_LINE =
+    'private __rozieDestroyRef = inject(DestroyRef);';
+  const destroyRefAlreadyEmitted = classBody.includes(HOIST_DESTROY_REF_LINE);
+  const destroyRefSynthesised: string[] = [];
+  if (tmplResult.needsDestroyRefField && !destroyRefAlreadyEmitted) {
+    destroyRefSynthesised.push(HOIST_DESTROY_REF_LINE);
+  }
+
   // Inject `const renderer = inject(Renderer2);` at the top of constructor
   // body when listener effect blocks are present. The fragment is spliced
   // right after `constructor() {\n` and before the existing body.
   const allFieldInjections: string[] = [
+    ...destroyRefSynthesised,
     ...listenersResult.fieldInitializers.map((fi) => fi.decl),
     ...tmplResult.scriptInjections.map((si) => si.decl),
     // Quick task 260520-w18 bug class 6(ii) — expose well-known JS global

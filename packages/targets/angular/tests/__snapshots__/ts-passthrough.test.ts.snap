@@ -1,14 +1,14 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`Angular <script lang="ts"> passthrough — Plan 09-04 > untyped Counter emit is byte-identical to today (anchor snapshot) 1`] = `
-"import { Component, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, computed, inject, input, model, signal, viewChild } from '@angular/core';
+"import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, computed, effect, inject, input, model, signal, viewChild } from '@angular/core';
 
 @Component({
   selector: 'rozie-counter',
   standalone: true,
   template: \`
 
-    <div class="counter" [ngClass]="{ hovering: hovering() }" #rozieSpread_0 (mouseenter)="hovering.set(true)" (mouseleave)="hovering.set(false)">
+    <div class="counter" [ngClass]="{ hovering: hovering() }" #rozieSpread_0 (mouseenter)="hovering.set(true)" (mouseleave)="hovering.set(false)" #rozieListenersTarget_1>
       <button [disabled]="!canDecrement()" aria-label="Decrement" (click)="decrement()">−</button>
       <span class="value">{{ value() }}</span>
       <button [disabled]="!canIncrement()" aria-label="Increment" (click)="increment()">+</button>
@@ -43,6 +43,8 @@ export class Counter {
   decrement = () => {
     if (this.canDecrement()) this.value.set(this.value() - this.step());
   };
+
+  private __rozieDestroyRef = inject(DestroyRef);
 
   private rozieSpread_0 = viewChild<ElementRef>('rozieSpread_0');
 
@@ -134,6 +136,36 @@ export class Counter {
     const el = this.rozieSpread_0()?.nativeElement;
     if (!el) return;
     this.__rozieApplyAttrs(el, this.__rozieGetHostAttrs());
+  });
+
+  private rozieListenersTarget_1 = viewChild<ElementRef>('rozieListenersTarget_1');
+
+  private __rozieListenersRenderer = inject(Renderer2);
+
+  private __rozieListenersDisposers_1: Array<() => void> = [];
+
+  private __rozieListenersDestroyRegistered_1 = false;
+
+  private __rozieListenersEffect_1 = effect(() => {
+    const el = this.rozieListenersTarget_1()?.nativeElement;
+    if (!el) return;
+    for (const off of this.__rozieListenersDisposers_1) off();
+    this.__rozieListenersDisposers_1 = [];
+    const obj = (undefined) ?? {};
+    for (const [k, v] of Object.entries(obj)) {
+      if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
+      if (typeof v !== 'function') continue;
+      const norm = k.startsWith('on') ? k.slice(2).toLowerCase() : k;
+      const dispose = this.__rozieListenersRenderer.listen(el, norm, v as EventListener);
+      this.__rozieListenersDisposers_1.push(dispose);
+    }
+    if (!this.__rozieListenersDestroyRegistered_1) {
+      this.__rozieListenersDestroyRegistered_1 = true;
+      this.__rozieDestroyRef.onDestroy(() => {
+        for (const off of this.__rozieListenersDisposers_1) off();
+        this.__rozieListenersDisposers_1 = [];
+      });
+    }
   });
 }
 

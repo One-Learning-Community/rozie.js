@@ -28,13 +28,19 @@ import type {
   TemplateStaticTextIR,
   TemplateFragmentIR,
   Listener,
+  ListenerSpreadIR,
   AttributeBinding,
 } from '../../../../core/src/ir/types.js';
 import type { ModifierRegistry } from '@rozie/core';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
-import { emitAttributes, findRHtml, findRShow } from './emitTemplateAttribute.js';
+import {
+  emitAttributes,
+  emitListenerSpread,
+  findRHtml,
+  findRShow,
+} from './emitTemplateAttribute.js';
 import { emitTemplateEvent, type AngularScriptInjection } from './emitTemplateEvent.js';
 import { emitSlotInvocation } from './emitSlotInvocation.js';
 import { emitConditional } from './emitConditional.js';
@@ -95,6 +101,26 @@ export interface EmitNodeCtx {
    */
   hasSpreadBinding?: { value: boolean };
   /**
+   * Plan 15-05 / D-13 — when the template lowers at least one dynamic
+   * `ListenerSpreadIR` (`r-on="<expr>"` non-literal, OR a literalKeys-empty
+   * spread, OR synthesized `$listeners` auto-fallthrough), set to
+   * `{ value: true }` so emitAngular adds the SAME `inject` / `Renderer2` /
+   * `ElementRef` / `effect` / `viewChild` / `DestroyRef` import surface (the
+   * overlap with `hasSpreadBinding` is deduped by the AngularImportCollector
+   * Set semantics).
+   */
+  hasListenerSpread?: { value: boolean };
+  /**
+   * Plan 15-05 — when the dynamic-listener-spread effect() body emits the
+   * one-time `__rozieDestroyRef.onDestroy(...)` registration, set to
+   * `{ value: true }`. emitScript reads this flag and unions it into
+   * `lifecycleNeedsDestroyRefField` alongside the existing portals + lifecycle
+   * sources so `private __rozieDestroyRef = inject(DestroyRef);` is hoisted
+   * EXACTLY ONCE per component (Phase 13 coordination — memory
+   * `project_rozie_angular_onmount_emit_bug`).
+   */
+  needsDestroyRefField?: { value: boolean };
+  /**
    * Whether the template has produced at least one [(ngModel)] binding —
    * drives FormsModule conditional import in emitDecorator.
    */
@@ -116,6 +142,33 @@ export interface EmitNodeCtx {
 
 function emitStaticText(node: TemplateStaticTextIR): string {
   return node.text;
+}
+
+/**
+ * Plan 15-05 — synthesize a virtual `Listener` from a `ListenerSpreadIR`'s
+ * `literalKeys[i]` entry. Each literal-key entry carries
+ * `{ eventName, modifierPipeline, valueExpr }` — enough to fabricate a
+ * Listener with the same shape `emitTemplateEvent` already consumes from
+ * `el.events`. `target` is `'self'`; `when` is null; `deps` inherits the
+ * parent spread's deps; `source` is `'template-event'` (codegen path treats
+ * both sources identically). Mirror of the Vue/Svelte/React/Solid/Lit
+ * targets' `listenerFromLiteralKey`.
+ */
+function listenerFromLiteralKey(
+  spread: ListenerSpreadIR,
+  literalKey: NonNullable<ListenerSpreadIR['literalKeys']>[number],
+): Listener {
+  return {
+    type: 'Listener',
+    target: { kind: 'self', el: '$el' },
+    event: literalKey.eventName,
+    modifierPipeline: literalKey.modifierPipeline,
+    when: null,
+    handler: literalKey.valueExpr,
+    deps: spread.deps,
+    source: 'template-event',
+    sourceLoc: spread.sourceLoc,
+  };
 }
 
 function emitInterpolation(
@@ -262,6 +315,15 @@ function emitEvents(events: Listener[], ctx: EmitNodeCtx): string {
       // inside class methods). Quick rewrite: bare identifier callees → `this.X`.
       // This is a v1 heuristic — works for the reference examples (handlers
       // are bare identifiers like `onSearch`, `clear`, `close`).
+      //
+      // Plan 15-05 [Rule 1 — bug] — the original regex required a literal
+      // `($event)` arg, but the 0-arity dropdown in emitTemplateEvent.ts:279
+      // emits `fn()` (no arg) when the original user handler is 0-arg.
+      // Without an arg the original pattern misses the call entirely,
+      // leaving bare `f1()` / `f2()` in the merger body which fails at
+      // runtime (`f1 is not defined` at class scope). Extended to also
+      // capture the 0-arg shape — bare `fn()` (no other chars between the
+      // parens) now also gets the `this.` prefix.
       inner = inner.replace(
         /\b([a-zA-Z_$][\w$]*)\(\$event\)/g,
         (_match, fn: string) => {
@@ -269,6 +331,13 @@ function emitEvents(events: Listener[], ctx: EmitNodeCtx): string {
           // The collision-renamed user methods already carry `_` prefix from
           // rewriteScript — keep that as-is, just add `this.`.
           return `this.${fn}($event)`;
+        },
+      );
+      inner = inner.replace(
+        /\b([a-zA-Z_$][\w$]*)\(\)/g,
+        (_match, fn: string) => {
+          if (fn === 'this') return _match;
+          return `this.${fn}()`;
         },
       );
       // Wrapper signature is `($event: any) => {...}` so user-side `$event`
@@ -342,7 +411,58 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
     // ElementRef/effect/viewChild to the @angular/core import line.
     hasSpreadBinding: ctx.hasSpreadBinding,
   }, node.tagName);
-  const eventText = emitEvents(node.events, ctx);
+
+  // Plan 15-05 — partition `node.listenerSpreads` into literal-key entries
+  // (synthesized into virtual Listeners spliced alongside `node.events` so
+  // the existing same-event grouping fires R6 collision merge AND modifier-
+  // bearing keys ride the existing `emitTemplateEvent.ts` modifier-pipeline
+  // emit — modifier-bearing literal keys produce the SAME
+  // `(click)="__wrapper($event)"` shape that an authored `@click.stop="fn"`
+  // would, so the dynamic-Renderer2 path is reserved for genuinely opaque
+  // listener objects) and dynamic spreads (emitted as separate per-element
+  // `effect()` + `Renderer2.listen()` bodies via `emitListenerSpread`).
+  //
+  // Defensive `?? []`: synthetic test-IR may omit `listenerSpreads`; the real
+  // lowered IR always sets `[]` by construction (Plan 15-01 made the field
+  // non-optional on TemplateElementIR).
+  const syntheticListenerEvents: Listener[] = [];
+  const dynamicListenerSpreads: ListenerSpreadIR[] = [];
+  for (const spread of node.listenerSpreads ?? []) {
+    const literalKeys = spread.literalKeys;
+    if (literalKeys !== undefined && literalKeys.length > 0) {
+      for (const lk of literalKeys) {
+        syntheticListenerEvents.push(listenerFromLiteralKey(spread, lk));
+      }
+    } else {
+      dynamicListenerSpreads.push(spread);
+    }
+  }
+  // Combine real events + synthetic listener-from-literal-key Listeners.
+  // The same-event grouping in emitEvents folds R6 collisions into a single
+  // `(click)="__merged_click_N($event)"` template binding (Angular forbids
+  // duplicate `(event)=` attributes on one element — Pitfall 1; mandatory).
+  const combinedEvents: Listener[] = [...node.events, ...syntheticListenerEvents];
+  const eventText = emitEvents(combinedEvents, ctx);
+
+  // Emit each dynamic ListenerSpreadIR as a per-element template-ref +
+  // effect()/Renderer2.listen() body. Returns the `#rozieListenersTarget_<N>`
+  // template-ref attribute string for splicing onto the open tag. The effect
+  // field declarations are pushed onto `ctx.scriptInjections` (consumed by
+  // emitAngular's class-body composer).
+  const dynamicListenerTexts: string[] = [];
+  for (const spread of dynamicListenerSpreads) {
+    const text = emitListenerSpread(spread, {
+      ir: ctx.ir,
+      collisionRenames: ctx.collisionRenames,
+      loopBindings: ctx.loopBindings,
+      elementTagKind: node.tagKind,
+      scriptInjections: ctx.scriptInjections,
+      injectionCounter: ctx.injectionCounter,
+      hasListenerSpread: ctx.hasListenerSpread,
+      needsDestroyRefField: ctx.needsDestroyRefField,
+    });
+    dynamicListenerTexts.push(text);
+  }
   const rHtml = findRHtml(node.attributes);
   const rShow = findRShow(node.attributes);
 
@@ -352,6 +472,7 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
   const partsHead: string[] = [];
   if (attrText) partsHead.push(attrText);
   if (eventText) partsHead.push(eventText);
+  for (const text of dynamicListenerTexts) partsHead.push(text);
 
   if (rShow !== null) {
     const expr = rewriteTemplateExpression(rShow.expression, ctx.ir, {

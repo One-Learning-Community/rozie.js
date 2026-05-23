@@ -7,9 +7,9 @@ import { FormsModule } from '@angular/forms';
   imports: [FormsModule],
   template: `
 
-    <div class="search-input" #rozieSpread_0>
+    <div class="search-input" #rozieSpread_0 #rozieListenersTarget_1>
       
-      <input #inputEl type="search" [placeholder]="placeholder()" [ngModel]="query()" (ngModelChange)="query.set($event)" [ngModelOptions]="{standalone: true}" (input)="debouncedOnSearch_1()" (keydown)="_merged_keydown_2($event)" />
+      <input #inputEl type="search" [placeholder]="placeholder()" [ngModel]="query()" (ngModelChange)="query.set($event)" [ngModelOptions]="{standalone: true}" (input)="debouncedOnSearch_2()" (keydown)="_merged_keydown_3($event)" />
 
       @if (query().length > 0) {
     <button class="clear-btn" aria-label="Clear" (click)="_clear()">
@@ -149,7 +149,37 @@ export class SearchInput {
     this.__rozieApplyAttrs(el, this.__rozieGetHostAttrs());
   });
 
-  private debouncedOnSearch_1 = (() => {
+  private rozieListenersTarget_1 = viewChild<ElementRef>('rozieListenersTarget_1');
+
+  private __rozieListenersRenderer = inject(Renderer2);
+
+  private __rozieListenersDisposers_1: Array<() => void> = [];
+
+  private __rozieListenersDestroyRegistered_1 = false;
+
+  private __rozieListenersEffect_1 = effect(() => {
+    const el = this.rozieListenersTarget_1()?.nativeElement;
+    if (!el) return;
+    for (const off of this.__rozieListenersDisposers_1) off();
+    this.__rozieListenersDisposers_1 = [];
+    const obj = (undefined) ?? {};
+    for (const [k, v] of Object.entries(obj)) {
+      if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
+      if (typeof v !== 'function') continue;
+      const norm = k.startsWith('on') ? k.slice(2).toLowerCase() : k;
+      const dispose = this.__rozieListenersRenderer.listen(el, norm, v as EventListener);
+      this.__rozieListenersDisposers_1.push(dispose);
+    }
+    if (!this.__rozieListenersDestroyRegistered_1) {
+      this.__rozieListenersDestroyRegistered_1 = true;
+      this.__rozieDestroyRef.onDestroy(() => {
+        for (const off of this.__rozieListenersDisposers_1) off();
+        this.__rozieListenersDisposers_1 = [];
+      });
+    }
+  });
+
+  private debouncedOnSearch_2 = (() => {
     let timer: ReturnType<typeof setTimeout> | null = null;
     return (...args: any[]) => {
       if (timer !== null) clearTimeout(timer);
@@ -157,19 +187,19 @@ export class SearchInput {
     };
   })();
 
-  private _guardedOnSearch_3 = ($event: any) => {
+  private _guardedOnSearch_4 = ($event: any) => {
     if ($event.key !== 'Enter') return;
     this.onSearch();
   };
 
-  private _guarded_clear_4 = ($event: any) => {
+  private _guarded_clear_5 = ($event: any) => {
     if ($event.key !== 'Escape') return;
     this._clear();
   };
 
-  private _merged_keydown_2 = ($event: any) => {
-    this._guardedOnSearch_3($event);
-    this._guarded_clear_4($event);
+  private _merged_keydown_3 = ($event: any) => {
+    this._guardedOnSearch_4($event);
+    this._guarded_clear_5($event);
   };
 }
 

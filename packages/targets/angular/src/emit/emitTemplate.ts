@@ -62,6 +62,23 @@ export interface EmitTemplateResult {
    */
   hasSpreadBinding: boolean;
   /**
+   * Plan 15-05 / D-13 — true when the template emitted at least one dynamic
+   * `ListenerSpreadIR` lowered through the per-element `effect()` +
+   * `Renderer2.listen()` body. emitAngular adds the same `inject` / `Renderer2`
+   * / `ElementRef` / `effect` / `viewChild` / `DestroyRef` import surface
+   * (overlap with `hasSpreadBinding` deduped by the collector Set semantics).
+   */
+  hasListenerSpread: boolean;
+  /**
+   * Plan 15-05 — true when the dynamic-listener-spread effect() emitted the
+   * one-time `__rozieDestroyRef.onDestroy(...)` registration. emitScript
+   * reads this and unions it into `lifecycleNeedsDestroyRefField` so the
+   * `private __rozieDestroyRef = inject(DestroyRef);` field is hoisted
+   * EXACTLY ONCE per component (Phase 13 coordination — memory
+   * `project_rozie_angular_onmount_emit_bug`).
+   */
+  needsDestroyRefField: boolean;
+  /**
    * Quick task 260520-w18 bug class 6(ii) — well-known JS global namespaces
    * (`Math`, `JSON`, …) referenced inside template expressions. Angular's
    * `strictTemplates` resolves bare template identifiers against the
@@ -115,6 +132,8 @@ export function emitTemplate(
   const hasNgModel = { value: false };
   const hasDynamicSlotFiller = { value: false };
   const hasSpreadBinding = { value: false };
+  const hasListenerSpread = { value: false };
+  const needsDestroyRefField = { value: false };
 
   if (ir.template === null) {
     return {
@@ -123,6 +142,8 @@ export function emitTemplate(
       hasNgModel: false,
       hasDynamicSlotFiller: false,
       hasSpreadBinding: false,
+      hasListenerSpread: false,
+      needsDestroyRefField: false,
       usedGlobals: [],
       diagnostics,
     };
@@ -137,6 +158,8 @@ export function emitTemplate(
     hasNgModel,
     hasDynamicSlotFiller,
     hasSpreadBinding,
+    hasListenerSpread,
+    needsDestroyRefField,
     collisionRenames: opts.collisionRenames,
     loopBindings: new Set(),
     handlerArity: opts.handlerArity,
@@ -151,6 +174,8 @@ export function emitTemplate(
     hasNgModel: hasNgModel.value,
     hasDynamicSlotFiller: hasDynamicSlotFiller.value,
     hasSpreadBinding: hasSpreadBinding.value,
+    hasListenerSpread: hasListenerSpread.value,
+    needsDestroyRefField: needsDestroyRefField.value,
     usedGlobals: detectUsedGlobals(template),
     diagnostics,
   };
