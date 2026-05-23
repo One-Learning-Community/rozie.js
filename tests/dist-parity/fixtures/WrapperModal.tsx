@@ -31,7 +31,7 @@ export default function WrapperModal(_props: WrapperModalProps): JSX.Element {
 
   return (
     <>
-    <Modal open={open} onOpenChange={setOpen} title={props.title} renderHeader={() => (<>
+    <Modal open={open} onOpenChange={setOpen} title={props.title} data-rozie-s-1efe6192="" renderHeader={() => (<>
         {(props.renderBrand ?? props.slots?.['brand']) ? ((props.renderBrand ?? props.slots?.['brand']) as Function)() : <h2 data-rozie-s-1efe6192="">{props.title}</h2>}
       </>)} renderFooter={() => (<>
         {(props.renderActions ?? props.slots?.['actions'])?.()}

@@ -14,6 +14,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import {
+  clsx,
   useControllableState,
   useOutsideClick,
   useThrottledCallback,
@@ -92,7 +93,11 @@ export default function Dropdown(props: DropdownProps): JSX.Element {
   }, [_rozieThrottledLReposition, open]);
 
   return (
-    <div className={styles.dropdown}>
+    // The hand-copied surface mirrors the .snap: explicit className wraps the
+    // base token via `clsx(...)` after R6 opaque-spread merge support — the
+    // surface comparator only checks the import list, but using `clsx` here
+    // keeps the runtime semantics aligned with the emitted output.
+    <div className={clsx(styles.dropdown)}>
       <div ref={triggerEl} onClick={toggle}>
         {props.renderTrigger?.({ open, toggle })}
       </div>

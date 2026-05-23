@@ -64,8 +64,12 @@ function emit(ir: IRComponent) {
 
 describe('className composition — Plan 04-03 Task 1', () => {
   it('Test 8: single static class → className={styles.X}', () => {
+    // `inherit-attrs="false"` opts out of the auto-fallthrough $attrs spread,
+    // keeping the assertion focused on the className-composition machinery in
+    // isolation (R6 opaque-spread merge wraps everything in clsx(..., attrs.className)
+    // when auto-fallthrough is on — covered by dedicated tests below).
     const ir = lowerInline(`
-<rozie name="X">
+<rozie name="X" inherit-attrs="false">
 <template>
 <div class="counter"></div>
 </template>
@@ -80,8 +84,9 @@ describe('className composition — Plan 04-03 Task 1', () => {
   });
 
   it('Test 9: multi static class → backtick template literal', () => {
+    // `inherit-attrs="false"` — see Test 8 rationale.
     const ir = lowerInline(`
-<rozie name="X">
+<rozie name="X" inherit-attrs="false">
 <template>
 <div class="counter card"></div>
 </template>
@@ -134,8 +139,9 @@ describe('className composition — Plan 04-03 Task 1', () => {
   });
 
   it('class= without <style> block → emits plain string literal (no styles ref)', () => {
+    // `inherit-attrs="false"` — see Test 8 rationale.
     const ir = lowerInline(`
-<rozie name="X">
+<rozie name="X" inherit-attrs="false">
 <template>
 <button class="trigger-error">click</button>
 </template>

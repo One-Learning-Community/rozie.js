@@ -131,6 +131,75 @@ function genBlockInner(block: t.BlockStatement, indent: string): string {
 }
 
 /**
+ * Phase 14.1 follow-up — does any element in the IR template carry a
+ * `spreadBinding` attribute? The Plan 14-05 gate at `emitScript` only
+ * synthesises `const attrs = ...` (the source for the `$attrs` rewrite at
+ * `rewriteTemplateExpression.ts:137`) when `inheritAttrs !== false`. That's
+ * correct for the auto-fallthrough wrapper (root element auto-spread), but
+ * wrong for the explicit-manual case: `inherit-attrs="false"` plus
+ * author-written `r-bind="$attrs"` produces a `spreadBinding` in the IR whose
+ * emit references `attrs` — but the destructure that declares `attrs` is
+ * gated off, so the rendered component hits ReferenceError and React unmounts
+ * the whole tree.
+ *
+ * Mirrors the Lit fix at `emitLit.ts:160` (`rozieSpreadUsed && inheritAttrs
+ * !== false` → `rozieSpreadUsed`). The semantic: `inherit-attrs="false"` only
+ * opts out of auto-fallthrough, not out of the author's right to reference
+ * `$attrs` explicitly via `r-bind="$attrs"`.
+ */
+function templateUsesSpreadBinding(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  node: any,
+): boolean {
+  if (node === null || node === undefined) return false;
+  // TemplateElementIR: scan its own attrs + recurse into children.
+  if (node.type === 'TemplateElement') {
+    for (const a of node.attributes ?? []) {
+      if (a.kind === 'spreadBinding') return true;
+    }
+    for (const c of node.children ?? []) {
+      if (templateUsesSpreadBinding(c)) return true;
+    }
+    // TemplateMatch hostElement is itself a TemplateElement, covered above
+    // when recursion reaches it via the parent's children.
+    return false;
+  }
+  // TemplateConditional / TemplateMatch — recurse into branch bodies.
+  if (node.type === 'TemplateConditional' || node.type === 'TemplateMatch') {
+    for (const branch of node.branches ?? []) {
+      for (const c of branch.body ?? []) {
+        if (templateUsesSpreadBinding(c)) return true;
+      }
+    }
+    if (node.hostElement && templateUsesSpreadBinding(node.hostElement)) return true;
+    return false;
+  }
+  // TemplateLoop — recurse into body.
+  if (node.type === 'TemplateLoop') {
+    for (const c of node.body ?? []) {
+      if (templateUsesSpreadBinding(c)) return true;
+    }
+    return false;
+  }
+  // TemplateFragment — recurse into children.
+  if (node.type === 'TemplateFragment') {
+    for (const c of node.children ?? []) {
+      if (templateUsesSpreadBinding(c)) return true;
+    }
+    return false;
+  }
+  // TemplateSlotInvocation — fallback body (no attrs of its own).
+  if (node.type === 'TemplateSlotInvocation') {
+    for (const c of node.fallback ?? []) {
+      if (templateUsesSpreadBinding(c)) return true;
+    }
+    return false;
+  }
+  // TemplateInterpolation / TemplateStaticText carry no spreadBinding.
+  return false;
+}
+
+/**
  * Emit `() => body` for an Expression or BlockStatement body.
  *
  * Why not `\`() => ${genCode(body)}\``? When `body` is an ObjectExpression
@@ -1515,7 +1584,15 @@ export function emitScript(
   // from `props` to `_props` (the rebinder block creates `props` as the
   // merged object). Both expose every consumer-passed key — read from
   // whichever the shell named.
-  if (ir.inheritAttrs !== false) {
+  //
+  // Phase 14.1 follow-up — also synthesise when the template carries an
+  // explicit `spreadBinding` (`r-bind="$attrs"`) even if `inherit-attrs="false"`
+  // suppresses auto-fallthrough. The `$attrs` rewrite at
+  // `rewriteTemplateExpression.ts:137` lowers the identifier to bare `attrs`;
+  // without this destructure that reference dangles and React throws at
+  // render, killing the whole tree. Mirrors the Lit fix at
+  // `emitLit.ts:160` (same gate-widening for the explicit-manual case).
+  if (ir.inheritAttrs !== false || templateUsesSpreadBinding(ir.template)) {
     const propsParam = defaultedNonModelProps.length > 0 ? '_props' : 'props';
     // `declaredNames` reads ONLY from `ir.props` — `ir.emits` does not enter
     // the destructure list. When `ir.props.length === 0` the destructure is

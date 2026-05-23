@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import type { ReactNode } from 'react';
-import { useControllableState } from '@rozie/runtime-react';
+import { clsx, useControllableState } from '@rozie/runtime-react';
 import styles from './ScopedSlotContext.module.css';
 
 interface ItemCtx { item: any; remaining: any; }
@@ -28,7 +28,7 @@ export default function ScopedSlotContext(props: ScopedSlotContextProps): JSX.El
 
   return (
     <>
-    <ul className={styles.list} {...attrs} data-rozie-s-5e6c469d="">
+    <ul {...attrs} className={clsx(styles.list, (attrs.className as string | undefined))} data-rozie-s-5e6c469d="">
       
       {items.map((item) => <li key={item.id} data-rozie-s-5e6c469d="">
         {(props.renderItem ?? props.slots?.['item']) ? ((props.renderItem ?? props.slots?.['item']) as Function)({ item, remaining }) : item.label}

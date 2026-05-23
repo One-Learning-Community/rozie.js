@@ -4,6 +4,8 @@ import styles from './RBindProbe.module.css';
 interface RBindProbeProps {}
 
 export default function RBindProbe(props: RBindProbeProps): JSX.Element {
+  const attrs = props as Record<string, unknown>;
+
   return (
     <>
     <div className={styles["rbind-probe"]} data-rozie-s-8e2458d6="">

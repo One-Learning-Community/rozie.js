@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
-import { useControllableState, useOutsideClick, useThrottledCallback } from '@rozie/runtime-react';
+import { clsx, useControllableState, useOutsideClick, useThrottledCallback } from '@rozie/runtime-react';
 import styles from './Dropdown.module.css';
 import './Dropdown.global.css';
 
@@ -93,7 +93,7 @@ export default function Dropdown(_props: DropdownProps): JSX.Element {
 
   return (
     <>
-    <div className={styles.dropdown} {...attrs} data-rozie-s-6d6bd882="">
+    <div {...attrs} className={clsx(styles.dropdown, (attrs.className as string | undefined))} data-rozie-s-6d6bd882="">
       <div ref={triggerEl} onClick={toggle} data-rozie-s-6d6bd882="">
         {(props.renderTrigger ?? props.slots?.['trigger'])?.({ open, toggle })}
       </div>

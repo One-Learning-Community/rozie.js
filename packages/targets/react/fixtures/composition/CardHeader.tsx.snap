@@ -1,3 +1,5 @@
+import { clsx } from '@rozie/runtime-react';
+
 interface CardHeaderProps {
   title?: string;
 }
@@ -11,7 +13,7 @@ export default function CardHeader(props: CardHeaderProps): JSX.Element {
 
   return (
     <>
-      <div className={"card-header"} {...attrs} data-rozie-s-f3e60f5a="">{props.title}</div>
+      <div {...attrs} className={clsx("card-header", (attrs.className as string | undefined))} data-rozie-s-f3e60f5a="">{props.title}</div>
     </>
   );
 }

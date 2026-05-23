@@ -7,7 +7,7 @@ export default function Consumer(props: ConsumerProps): JSX.Element {
 
   return (
     <>
-    <Producer renderHeader={({ close }) => (<>
+    <Producer data-rozie-s-bd0c3708="" renderHeader={({ close }) => (<>
         <button onClick={close} data-rozie-s-bd0c3708="">×</button>
       </>)} children={<>
       Body text

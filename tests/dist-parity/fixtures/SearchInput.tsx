@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useDebouncedCallback } from '@rozie/runtime-react';
+import { clsx, useDebouncedCallback } from '@rozie/runtime-react';
 import styles from './SearchInput.module.css';
 
 interface SearchInputProps {
@@ -50,7 +50,7 @@ export default function SearchInput(_props: SearchInputProps): JSX.Element {
 
   return (
     <>
-    <div className={styles["search-input"]} {...attrs} data-rozie-s-8bbc4a60="">
+    <div {...attrs} className={clsx(styles["search-input"], (attrs.className as string | undefined))} data-rozie-s-8bbc4a60="">
       
       <input ref={inputEl} type="search" placeholder={props.placeholder} value={query} onChange={e => setQuery(e.target.value)} onInput={_rozieDebouncedOnSearch} onKeyDown={($event) => { (($event) => { if ($event.key !== 'Enter') return; ((onSearch) as ((...args: any[]) => any))($event); })($event); (($event) => { if ($event.key !== 'Escape') return; ((clear) as ((...args: any[]) => any))($event); })($event); }} data-rozie-s-8bbc4a60="" />
 

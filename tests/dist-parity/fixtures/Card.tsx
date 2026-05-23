@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { clsx } from '@rozie/runtime-react';
 import styles from './Card.module.css';
 import CardHeader from './CardHeader';
 
@@ -22,8 +23,8 @@ export default function Card(_props: CardProps): JSX.Element {
 
   return (
     <>
-    <article className={styles.card} {...attrs} data-rozie-s-a88c221e="">
-      <CardHeader title={props.title} onClose={props.onClose} />
+    <article {...attrs} className={clsx(styles.card, (attrs.className as string | undefined))} data-rozie-s-a88c221e="">
+      <CardHeader title={props.title} onClose={props.onClose} data-rozie-s-a88c221e="" />
       <div className={styles.card__body} data-rozie-s-a88c221e="">
         {(typeof (props.children ?? props.slots?.['']) === 'function' ? ((props.children ?? props.slots?.['']) as Function)() : (props.children ?? props.slots?.['']))}
       </div>

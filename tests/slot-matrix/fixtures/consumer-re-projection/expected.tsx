@@ -7,7 +7,7 @@ export default function Consumer(props: ConsumerProps): JSX.Element {
 
   return (
     <>
-    <Wrapper renderTitle={() => (<>Hello from consumer</>)} />
+    <Wrapper data-rozie-s-bd0c3708="" renderTitle={() => (<>Hello from consumer</>)} />
     </>
   );
 }

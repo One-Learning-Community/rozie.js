@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
+import { clsx } from '@rozie/runtime-react';
 import DummyEngine from 'dummy-engine';
 
 interface SpikeImportElProps {
@@ -21,7 +22,7 @@ export default function SpikeImportEl(props: SpikeImportElProps): JSX.Element {
 
   return (
     <>
-    <div className={"spike-root"} ref={__rozieRoot} {...attrs} data-rozie-s-f590f443="">
+    <div ref={__rozieRoot} {...attrs} className={clsx("spike-root", (attrs.className as string | undefined))} data-rozie-s-f590f443="">
       {(typeof (props.children ?? props.slots?.['']) === 'function' ? ((props.children ?? props.slots?.['']) as Function)() : (props.children ?? props.slots?.['']))}
     </div>
     </>

@@ -7,7 +7,7 @@ export default function Consumer(props: ConsumerProps): JSX.Element {
 
   return (
     <>
-    <Producer title={'Hello'} children={<>Body text</>} />
+    <Producer title={'Hello'} data-rozie-s-bd0c3708="" children={<>Body text</>} />
     </>
   );
 }

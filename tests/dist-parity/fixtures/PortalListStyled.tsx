@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { flushSync } from 'react-dom';
+import { clsx } from '@rozie/runtime-react';
 import styles from './PortalListStyled.module.css';
 
 interface ItemCtx { item: any; }
@@ -100,7 +101,7 @@ export default function PortalListStyled(_props: PortalListStyledProps): JSX.Ele
 
   return (
     <>
-    <div className={styles["rozie-portal-list"]} ref={__rozieRoot} {...attrs} data-rozie-s-18e5aac6="">
+    <div ref={__rozieRoot} {...attrs} className={clsx(styles["rozie-portal-list"], (attrs.className as string | undefined))} data-rozie-s-18e5aac6="">
       
     </div>
     </>

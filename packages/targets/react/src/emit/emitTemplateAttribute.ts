@@ -789,17 +789,24 @@ function cssPropToStyleKey(prop: string): string {
 }
 
 /**
- * Lower a string-LITERAL `:style` value at compile time. PostCSS-parses the
+ * Lower a string-LITERAL `style` value at compile time. PostCSS-parses the
  * declaration list and renders a JSX object-expression — byte-identical in
  * shape to object-form `:style`. When a declaration carries `!important`,
  * a ROZ083 WARN is collected (React's object form silently drops it).
+ *
+ * Called from BOTH the `:style="'literal'"` binding path and the bare
+ * `style="literal"` static-attribute path — React requires `style` to be an
+ * object at runtime; a bare string-literal `style` attribute that survives
+ * to JSX throws "Style prop value must be an object" and unmounts the
+ * subtree (Phase 14-06 cross-target divergence: ThemedButtonConsumer's
+ * `style="--btn-bg: #ef4444"`).
  *
  * Spike 004 locked decision #8: v1 is syntactic-parse only — a malformed
  * style string surfaces as a ROZ080 diagnostic (caught here, never a raw
  * PostCSS throw); no CSS property-name validation.
  */
 function lowerStringLiteralStyle(
-  attr: Extract<AttributeBinding, { kind: 'binding' }>,
+  sourceLoc: AttributeBinding['sourceLoc'],
   literal: string,
 ): { jsx: string; diagnostics: Diagnostic[] } {
   const diagnostics: Diagnostic[] = [];
@@ -816,9 +823,9 @@ function lowerStringLiteralStyle(
       code: RozieErrorCode.STYLE_PARSE_ERROR,
       severity: 'error',
       message:
-        `Could not parse inline \`:style\` string ${JSON.stringify(literal)}: ` +
+        `Could not parse inline \`style\` string ${JSON.stringify(literal)}: ` +
         `${err instanceof Error ? err.message : String(err)}`,
-      loc: attr.sourceLoc,
+      loc: sourceLoc,
     });
     return { jsx: 'style={{}}', diagnostics };
   }
@@ -832,7 +839,7 @@ function lowerStringLiteralStyle(
         message:
           `\`!important\` on \`${decl.prop}\` is dropped by React's style-object form. ` +
           `React silently ignores \`!important\` in inline style objects.`,
-        loc: attr.sourceLoc,
+        loc: sourceLoc,
       });
     }
     props.push(`${keyOut}: ${JSON.stringify(decl.value)}`);
@@ -866,6 +873,14 @@ function emitNonClassAttribute(
   if (attr.kind === 'static' && attr.name === 'class') {
     return { jsx: `className="${escapeJsxAttrLiteral(attr.value)}"`, diagnostics };
   }
+  // bare `style="k1: v1; k2: v2"` static → object form. React requires `style`
+  // to be an object at runtime; a string-literal `style` JSX prop throws
+  // "Style prop value must be an object" and unmounts the subtree (Phase
+  // 14-06 ThemedButtonConsumer divergence). Mirror the `:style="'literal'"`
+  // binding-path lowering so a static and bound string literal emit identically.
+  if (attr.kind === 'static' && attr.name === 'style') {
+    return lowerStringLiteralStyle(attr.sourceLoc, attr.value);
+  }
   if (attr.kind === 'static') {
     // Apply HTML→JSX alias for special-cased names (tabindex → tabIndex, etc.)
     const jsxName = htmlAttrToJsxName(attr.name);
@@ -893,7 +908,7 @@ function emitNonClassAttribute(
     //     register the runtime helper import.
     if (attr.name === 'style') {
       if (t.isStringLiteral(attr.expression)) {
-        return lowerStringLiteralStyle(attr, attr.expression.value);
+        return lowerStringLiteralStyle(attr.sourceLoc, attr.expression.value);
       }
       if (!t.isObjectExpression(attr.expression)) {
         ctx.collectors.runtime.add('parseInlineStyle');
@@ -1026,6 +1041,54 @@ function extractLiteralClassStyle(
 }
 
 /**
+ * Phase 14 R6 — React-specific opaque-spread class-merge support.
+ *
+ * React's JSX `{...spread}` semantics are *last-wins* per key — a `className`
+ * key inside the spread silently overwrites an earlier explicit `className=`
+ * on the same element. For an OPAQUE spread (`$attrs` from auto-fallthrough,
+ * or a dynamic `r-bind="obj"`) we cannot extract the spread's `className` at
+ * compile time, so we instead need to:
+ *
+ *   1. Emit the spread FIRST (preserves all non-class keys reaching the DOM).
+ *   2. Re-emit `className=` AFTER the spread, with `clsx(<base>, <readExpr>)`
+ *      that reads the spread's `className` and appends it to our base class.
+ *
+ * Returns the source-level expression code to read `className` from at
+ * runtime, or null for a LITERAL spread (whose class is extracted at compile
+ * time elsewhere).
+ *
+ * `$attrs`            → `attrs.className`   (rewriteTemplateExpression already
+ *                                            lowers `$attrs` → `attrs`)
+ * Dynamic `r-bind`    → `normalizeAttrs(<expr>).className`  — the `class` key
+ *                       in the source is remapped to `className` by
+ *                       normalizeAttrs, so reading `.className` matches the
+ *                       key that the JSX spread emits.
+ * LITERAL `r-bind`    → null (handled by extractLiteralClassStyle path)
+ */
+function opaqueSpreadClassReadExpr(
+  attr: Extract<AttributeBinding, { kind: 'spreadBinding' }>,
+  ctx: EmitAttrCtx,
+): string | null {
+  if (t.isObjectExpression(attr.expression)) return null;
+  if (isAttrsIdentifier(attr.expression)) {
+    // `$attrs` lowers to `attrs` (the rest bucket synthesised by emitScript)
+    // typed as `Record<string, unknown>`. Cast the indexed read to
+    // `string | undefined` so `clsx(...)` accepts it directly — without
+    // the cast, `attrs.className` widens to `unknown` and fails TS2345
+    // under react-typecheck. The cast is conservative: practically every
+    // consumer-passed className is a string, and clsx is happy with that
+    // union without a cross-package import.
+    return `(attrs.className as string | undefined)`;
+  }
+  // Dynamic — read `.className` off the normalized expression. normalizeAttrs
+  // remaps `class` → `className` (HTML_TO_JSX_ATTR), matching the key that
+  // the JSX `{...normalizeAttrs(expr)}` spread reaches the DOM with.
+  ctx.collectors.runtime.add('normalizeAttrs');
+  const exprCode = renderExpr(attr.expression, ctx.ir);
+  return `(normalizeAttrs(${exprCode}).className as string | undefined)`;
+}
+
+/**
  * Top-level entry: emit all attributes for an element. Buckets `class` and
  * `:class` together for single-className composition, and emits other
  * attributes through emitNonClassAttribute.
@@ -1042,6 +1105,12 @@ export function emitAttributes(
   const buckets = bucket(attrs);
   const out: string[] = [];
   const consumed = new Set<AttributeBinding>();
+  /**
+   * R6 opaque-spread merge — when set, the deferred `className={...}` is
+   * appended AFTER any spreads so JSX last-write ordering keeps our
+   * (already-merged) `className` winning over the spread's `className` key.
+   */
+  let pendingPostSpreadClassName: string | null = null;
 
   // Phase 14 R6 — does the element have an explicit `class` binding? When so,
   // a `class`/`className` key inside an `r-bind` LITERAL must be folded into
@@ -1070,6 +1139,25 @@ export function emitAttributes(
       }
     }
   }
+
+  // Phase 14 R6 — OPAQUE-spread className-merge (React-specific). React's JSX
+  // `{...spread}` is last-wins per key, so a spread's `className` silently
+  // overwrites our explicit `className=` unless we re-emit `className=` AFTER
+  // the spread with a `clsx(<base>, attrs.className)` that reads the spread's
+  // `className` and appends it to the base class. Collect the source-level
+  // "read className" expression for each opaque spread (in source order) so we
+  // can append it to the base class value, AND emit the className attribute
+  // AFTER the spreads.
+  const opaqueSpreadClassReads: string[] = [];
+  if (hasExplicitClass) {
+    for (const a of attrs) {
+      if (a.kind !== 'spreadBinding') continue;
+      if (literalClassBindings.has(a)) continue; // LITERAL — already extracted.
+      const readExpr = opaqueSpreadClassReadExpr(a, ctx);
+      if (readExpr !== null) opaqueSpreadClassReads.push(readExpr);
+    }
+  }
+  const needsPostSpreadClassName = opaqueSpreadClassReads.length > 0;
 
   for (const a of attrs) {
     if (consumed.has(a)) continue;
@@ -1112,8 +1200,21 @@ export function emitAttributes(
         }
       }
       if (merged.length === 0) continue;
-      const classNameValue = composeClassName(merged, ctx);
-      out.push(`className={${classNameValue}}`);
+      let classNameValue = composeClassName(merged, ctx);
+      if (needsPostSpreadClassName) {
+        // R6 opaque-spread merge: wrap the base value in `clsx(<base>,
+        // <readExpr>...)` so an `extra-variant` className from `$attrs` (or a
+        // dynamic spread) joins the explicit `btn primary` instead of
+        // overwriting it. The className attribute is also DEFERRED past the
+        // spread emission below — we hold it in pendingPostSpreadClassName and
+        // append at the very end.
+        ctx.collectors.runtime.add('clsx');
+        const clsxArgs = [classNameValue, ...opaqueSpreadClassReads];
+        classNameValue = `clsx(${clsxArgs.join(', ')})`;
+        pendingPostSpreadClassName = `className={${classNameValue}}`;
+      } else {
+        out.push(`className={${classNameValue}}`);
+      }
       continue;
     }
 
@@ -1121,6 +1222,12 @@ export function emitAttributes(
     out.push(result.jsx);
     for (const d of result.diagnostics) diagnostics.push(d);
     consumed.add(a);
+  }
+
+  // R6 opaque-spread merge: emit the deferred `className=` AFTER all
+  // attrs/spreads so it wins JSX's last-write ordering.
+  if (pendingPostSpreadClassName !== null) {
+    out.push(pendingPostSpreadClassName);
   }
 
   return { jsx: out.join(' '), diagnostics };
