@@ -1,5 +1,10 @@
 import type { JSX } from 'solid-js';
 import { Show, createSignal, splitProps } from 'solid-js';
+import { __rozieInjectStyle } from '@rozie/runtime-solid';
+
+__rozieInjectStyle('ExpensiveDiscriminant-bb543ee0', `.passed[data-rozie-s-bb543ee0] { color: #15803d; }
+.failed[data-rozie-s-bb543ee0] { color: #b91c1c; }
+.unknown[data-rozie-s-bb543ee0] { opacity: 0.5; }`);
 
 interface ExpensiveDiscriminantProps {}
 
@@ -17,16 +22,11 @@ export default function ExpensiveDiscriminant(_props: ExpensiveDiscriminantProps
 
   return (
     <>
-    <style>{`.passed[data-rozie-s-bb543ee0] { color: #15803d; }
-    .failed[data-rozie-s-bb543ee0] { color: #b91c1c; }
-    .unknown[data-rozie-s-bb543ee0] { opacity: 0.5; }`}</style>
-    <>
     {(() => { const __rozieMatch_0 = classify(); return <Show when={__rozieMatch_0 === 'pass'} fallback={<Show when={__rozieMatch_0 === 'fail'} fallback={<span class={"unknown"} data-rozie-s-bb543ee0="">ungraded</span>}><span class={"failed"} data-rozie-s-bb543ee0="">did not pass</span></Show>}><>
         <div class={"passed"} data-rozie-s-bb543ee0="">
           {(() => { const __rozieMatch_1 = subClassify(); return <Show when={__rozieMatch_1 === 'distinction'} fallback={<Show when={__rozieMatch_1 === 'merit'} fallback={<span data-rozie-s-bb543ee0="">passed</span>}><span data-rozie-s-bb543ee0="">passed with merit</span></Show>}><strong data-rozie-s-bb543ee0="">passed with distinction</strong></Show>; })()}
         </div>
       </></Show>; })()}
-    </>
     </>
   );
 }

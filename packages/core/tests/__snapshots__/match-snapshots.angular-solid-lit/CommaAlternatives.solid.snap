@@ -1,5 +1,10 @@
 import type { JSX } from 'solid-js';
 import { Show, createSignal, splitProps } from 'solid-js';
+import { __rozieInjectStyle } from '@rozie/runtime-solid';
+
+__rozieInjectStyle('CommaAlternatives-65af5512', `.extremum[data-rozie-s-65af5512] { font-weight: 600; }
+.middle[data-rozie-s-65af5512] { opacity: 0.8; }
+.other[data-rozie-s-65af5512] { opacity: 0.5; }`);
 
 interface CommaAlternativesProps {}
 
@@ -10,12 +15,7 @@ export default function CommaAlternatives(_props: CommaAlternativesProps): JSX.E
 
   return (
     <>
-    <style>{`.extremum[data-rozie-s-65af5512] { font-weight: 600; }
-    .middle[data-rozie-s-65af5512] { opacity: 0.8; }
-    .other[data-rozie-s-65af5512] { opacity: 0.5; }`}</style>
-    <>
     {<Show when={bound() === 'max' || bound() === 'min'} fallback={<Show when={bound() === 'mid'} fallback={<span class={"other"} data-rozie-s-65af5512="">somewhere else</span>}><span class={"middle"} data-rozie-s-65af5512="">in the middle</span></Show>}><span class={"extremum"} data-rozie-s-65af5512="">at an extremum</span></Show>}
-    </>
     </>
   );
 }
