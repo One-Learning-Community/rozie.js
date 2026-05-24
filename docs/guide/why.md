@@ -24,14 +24,15 @@ Six targets of byte-identical parity required Rozie to quietly normalize a lot o
 
 That makes Rozie attractive to a second audience the original positioning understated:
 
-- An **Angular shop** that wants Vue-flavored SFC ergonomics but can't migrate the codebase — write your next component in Rozie, ship idiomatic Angular standalone-component output.
-- A **jQuery + plugins shop** maintaining engine glue across pages — wrap each engine (flatpickr, Sortable, Leaflet, TipTap, …) once in Rozie; the same wrapper drops into any of your apps regardless of framework.
-- A **React team** that wants Vue-style scoped CSS without paying the CSS-in-JS runtime tax.
-- A **Lit team** that wants slots, scoped-slot params, and consumer-CSS-bridge — Rozie's compose model fills exactly the gap Lit's Web Components leave open.
+- An **[Angular shop](/guide/for-angular-shops)** that wants Vue-flavored SFC ergonomics but can't migrate the codebase — write your next component in Rozie, ship idiomatic Angular standalone-component output.
+- A **[jQuery + plugins shop](/guide/for-vanilla-js-shops)** maintaining engine glue across pages — wrap each engine (flatpickr, Sortable, Leaflet, TipTap, …) once in Rozie; the same wrapper drops into any of your apps regardless of framework.
+- A **[React team](/guide/for-react-teams)** that wants Vue-style scoped CSS without paying the CSS-in-JS runtime tax.
+- A **[Lit / Web Components team](/guide/for-lit-teams)** that wants slots, scoped-slot params, and consumer-CSS-bridge — Rozie's compose model fills exactly the gap Lit's Web Components leave open.
+- An **[Astro / Stimulus / HTML-first shop](/guide/for-astro-and-html-first-shops)** that wants the smallest possible per-island runtime cost without giving up component authoring ergonomics.
 
 You don't have to migrate. You write **one new component this week** in Rozie, and the compiled output drops into your existing app as a native target-framework component. [Adopt incrementally](/guide/adopt-incrementally) walks through what that looks like per stack.
 
-See [Creature comforts](/guide/creature-comforts) for the full pain-point matrix, [For Angular shops](/guide/for-angular-shops) for the Angular-specific pitch, and [For vanilla-JS + plugin shops](/guide/for-vanilla-js-shops) for the jQuery / engine-wrapper pitch.
+See [Creature comforts](/guide/creature-comforts) for the full pain-point matrix.
 
 ## Compatibility bar
 
