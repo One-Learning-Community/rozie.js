@@ -1,6 +1,12 @@
 import type { JSX } from 'solid-js';
 import { createMemo, createSignal, mergeProps, splitProps } from 'solid-js';
-import { createControllableSignal, mergeListeners } from '@rozie/runtime-solid';
+import { __rozieInjectStyle, createControllableSignal, mergeListeners } from '@rozie/runtime-solid';
+
+__rozieInjectStyle('Counter-c72e01d0', `.counter[data-rozie-s-c72e01d0] { display: inline-flex; gap: 0.5rem; align-items: center; }
+.counter.hovering[data-rozie-s-c72e01d0] { background: rgba(0, 0, 0, 0.04); }
+.value[data-rozie-s-c72e01d0] { font-variant-numeric: tabular-nums; min-width: 3ch; text-align: center; }
+button[data-rozie-s-c72e01d0] { padding: 0.25rem 0.5rem; }
+button[data-rozie-s-c72e01d0]:disabled { opacity: 0.4; cursor: not-allowed; }`);
 
 interface CounterProps {
   value?: number;
@@ -30,18 +36,11 @@ export default function Counter(_props: CounterProps): JSX.Element {
 
   return (
     <>
-    <style>{`.counter[data-rozie-s-c72e01d0] { display: inline-flex; gap: 0.5rem; align-items: center; }
-    .counter.hovering[data-rozie-s-c72e01d0] { background: rgba(0, 0, 0, 0.04); }
-    .value[data-rozie-s-c72e01d0] { font-variant-numeric: tabular-nums; min-width: 3ch; text-align: center; }
-    button[data-rozie-s-c72e01d0] { padding: 0.25rem 0.5rem; }
-    button[data-rozie-s-c72e01d0]:disabled { opacity: 0.4; cursor: not-allowed; }`}</style>
-    <>
     <div classList={{ hovering: hovering() }} {...attrs} class={"counter" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} {...mergeListeners({ onMouseEnter: ($event) => { setHovering(true); }, onMouseLeave: ($event) => { setHovering(false); } }, attrs)} data-rozie-s-c72e01d0="">
       <button aria-label="Decrement" disabled={!canDecrement()} onClick={decrement} data-rozie-s-c72e01d0="">−</button>
       <span class={"value"} data-rozie-s-c72e01d0="">{value()}</span>
       <button aria-label="Increment" disabled={!canIncrement()} onClick={increment} data-rozie-s-c72e01d0="">+</button>
     </div>
-    </>
     </>
   );
 }

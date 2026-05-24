@@ -1,6 +1,32 @@
 import type { JSX } from 'solid-js';
 import { Show, children, createEffect, mergeProps, onCleanup, onMount, splitProps } from 'solid-js';
-import { createControllableSignal } from '@rozie/runtime-solid';
+import { __rozieInjectStyle, createControllableSignal } from '@rozie/runtime-solid';
+
+__rozieInjectStyle('Modal-fc45feb2', `.modal-backdrop[data-rozie-s-fc45feb2] {
+  position: fixed; inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex; align-items: center; justify-content: center;
+  z-index: var(--rozie-modal-z, 2000);
+}
+.modal-dialog[data-rozie-s-fc45feb2] {
+  background: white;
+  border-radius: 8px;
+  min-width: 20rem;
+  max-width: min(90vw, 40rem);
+  max-height: 90vh;
+  display: flex; flex-direction: column;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  outline: none;
+}
+header[data-rozie-s-fc45feb2], footer[data-rozie-s-fc45feb2] { padding: 1rem; display: flex; align-items: center; gap: 0.5rem; }
+header[data-rozie-s-fc45feb2] { border-bottom: 1px solid rgba(0, 0, 0, 0.08); }
+header[data-rozie-s-fc45feb2] h2[data-rozie-s-fc45feb2] { flex: 1; margin: 0; font-size: 1.1rem; }
+footer[data-rozie-s-fc45feb2] { border-top: 1px solid rgba(0, 0, 0, 0.08); justify-content: flex-end; }
+.modal-body[data-rozie-s-fc45feb2] { padding: 1rem; overflow: auto; }
+.close-btn[data-rozie-s-fc45feb2] { background: none; border: none; cursor: pointer; font-size: 1.5rem; line-height: 1; }
+:root {
+  --rozie-modal-z: 2000;
+}`);
 
 interface HeaderSlotCtx { close: any; }
 
@@ -71,32 +97,6 @@ export default function Modal(_props: ModalProps): JSX.Element {
 
   return (
     <>
-    <style>{`.modal-backdrop[data-rozie-s-fc45feb2] {
-      position: fixed; inset: 0;
-      background: rgba(0, 0, 0, 0.4);
-      display: flex; align-items: center; justify-content: center;
-      z-index: var(--rozie-modal-z, 2000);
-    }
-    .modal-dialog[data-rozie-s-fc45feb2] {
-      background: white;
-      border-radius: 8px;
-      min-width: 20rem;
-      max-width: min(90vw, 40rem);
-      max-height: 90vh;
-      display: flex; flex-direction: column;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
-      outline: none;
-    }
-    header[data-rozie-s-fc45feb2], footer[data-rozie-s-fc45feb2] { padding: 1rem; display: flex; align-items: center; gap: 0.5rem; }
-    header[data-rozie-s-fc45feb2] { border-bottom: 1px solid rgba(0, 0, 0, 0.08); }
-    header[data-rozie-s-fc45feb2] h2[data-rozie-s-fc45feb2] { flex: 1; margin: 0; font-size: 1.1rem; }
-    footer[data-rozie-s-fc45feb2] { border-top: 1px solid rgba(0, 0, 0, 0.08); justify-content: flex-end; }
-    .modal-body[data-rozie-s-fc45feb2] { padding: 1rem; overflow: auto; }
-    .close-btn[data-rozie-s-fc45feb2] { background: none; border: none; cursor: pointer; font-size: 1.5rem; line-height: 1; }`}</style>
-    <style>{`:root {
-      --rozie-modal-z: 2000;
-    }`}</style>
-    <>
     {<Show when={open()}><div class={"modal-backdrop"} ref={(el) => { backdropElRef = el as HTMLElement; }} onClick={($event) => { if ($event.target !== $event.currentTarget) return; local.closeOnBackdrop && close(); }} data-rozie-s-fc45feb2="">
       <div ref={(el) => { dialogElRef = el as HTMLElement; }} class={"modal-dialog"} role="dialog" aria-modal="true" aria-label={local.title || undefined} tabIndex={-1} data-rozie-s-fc45feb2="">
         {<Show when={local.title || (_props.headerSlot ?? _props.slots?.['header'])}><header data-rozie-s-fc45feb2="">
@@ -110,6 +110,5 @@ export default function Modal(_props: ModalProps): JSX.Element {
           {(_props.footerSlot ?? _props.slots?.['footer'])?.({ close })}
         </footer></Show>}</div>
     </div></Show>}</>
-    </>
   );
 }

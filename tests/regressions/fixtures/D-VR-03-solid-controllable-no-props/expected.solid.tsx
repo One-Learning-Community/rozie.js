@@ -1,6 +1,8 @@
 import type { JSX } from 'solid-js';
 import { splitProps } from 'solid-js';
-import { createControllableSignal, mergeListeners } from '@rozie/runtime-solid';
+import { __rozieInjectStyle, createControllableSignal, mergeListeners } from '@rozie/runtime-solid';
+
+__rozieInjectStyle('ControllableNoProps-141c4000', `.bump[data-rozie-s-141c4000] { font-variant-numeric: tabular-nums; }`);
 
 interface ControllableNoPropsProps {
   value?: number;
@@ -25,10 +27,7 @@ export default function ControllableNoProps(_props: ControllableNoPropsProps): J
 
   return (
     <>
-    <style>{`.bump[data-rozie-s-141c4000] { font-variant-numeric: tabular-nums; }`}</style>
-    <>
     <button {...attrs} class={"bump" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} {...mergeListeners({ onClick: bump }, attrs)} data-rozie-s-141c4000="">{value()}</button>
-    </>
     </>
   );
 }

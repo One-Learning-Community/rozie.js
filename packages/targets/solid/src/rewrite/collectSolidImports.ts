@@ -54,7 +54,16 @@ export type RuntimeSolidImport =
   | 'parseInlineStyle'
   | 'normalizeAttrs'
   | 'normalizeListeners'
-  | 'mergeListeners';
+  | 'mergeListeners'
+  /**
+   * Pre-Phase-16 Item-1-residual closure — `__rozieInjectStyle` runtime
+   * helper. Emitted at module top by the shell when `emitStyle` produced
+   * a non-empty `injectStatement`. Replaces the previous inline
+   * `<style>{...}</style>` JSX emit (which broke same-specificity cascade
+   * in cross-SFC composition because each wrapper INSTANCE rendered its
+   * own `<style>` element AFTER the consumer's in the DOM).
+   */
+  | '__rozieInjectStyle';
 
 export class RuntimeSolidImportCollector {
   private symbols = new Set<RuntimeSolidImport>();

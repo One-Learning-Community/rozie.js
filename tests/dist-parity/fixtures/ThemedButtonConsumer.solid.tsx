@@ -1,9 +1,19 @@
 import type { JSX } from 'solid-js';
 import { createSignal, splitProps } from 'solid-js';
+import { __rozieInjectStyle } from '@rozie/runtime-solid';
 import ThemedButton from './ThemedButton';
 import ThemedButtonManual from './ThemedButtonManual';
 import ThemedButtonListenersManual from './ThemedButtonListenersManual';
 import ThemedButtonAllManual from './ThemedButtonAllManual';
+
+__rozieInjectStyle('ThemedButtonConsumer-14b8cbaa', `.themed-button-consumer[data-rozie-s-14b8cbaa] {
+  display: inline-flex;
+  gap: 0.75rem;
+  padding: 0.5rem;
+}
+.extra-variant[data-rozie-s-14b8cbaa] {
+  font-weight: 600;
+}`);
 
 interface ThemedButtonConsumerProps {}
 
@@ -15,15 +25,6 @@ export default function ThemedButtonConsumer(_props: ThemedButtonConsumerProps):
 
   return (
     <>
-    <style>{`.themed-button-consumer[data-rozie-s-14b8cbaa] {
-      display: inline-flex;
-      gap: 0.75rem;
-      padding: 0.5rem;
-    }
-    .extra-variant[data-rozie-s-14b8cbaa] {
-      font-weight: 600;
-    }`}</style>
-    <>
     <div {...attrs} class={"themed-button-consumer" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-14b8cbaa="">
       <ThemedButton id="auto-btn" type="button" aria-label="Auto-fallthrough button" data-testid="auto-themed-button" class={"extra-variant"} style={{ "--btn-bg": "#ef4444" }} label={'Auto'} onClick={onClick} onMouseEnter={onMouseEnter} data-rozie-s-14b8cbaa="" />
 
@@ -33,7 +34,6 @@ export default function ThemedButtonConsumer(_props: ThemedButtonConsumerProps):
 
       <ThemedButtonAllManual id="all-manual-btn" type="button" aria-label="All-manual fallthrough button" data-testid="all-manual-themed-button" class={"extra-variant"} style={{ "--btn-bg": "#8b5cf6" }} label={'All Manual'} onClick={onClick} onMouseEnter={onMouseEnter} data-rozie-s-14b8cbaa="" />
     </div>
-    </>
     </>
   );
 }

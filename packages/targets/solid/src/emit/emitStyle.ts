@@ -1,32 +1,41 @@
 /**
- * emitStyle — Solid target (P2 complete implementation).
+ * emitStyle — Solid target.
  *
  * Pitfall 3 (Phase 06.3 RESEARCH.md): Solid has no CSS Modules pipeline
- * analogous to Vite's React CSS Modules. Instead, styles are emitted INLINE
- * as a `<style>` JSX element in the component's returned tree.
+ * analogous to Vite's React CSS Modules. Pre-pre-Phase-16 emitter inlined
+ * each component's scoped CSS as a sibling `<style>` JSX element in the
+ * rendered tree. That worked for in-isolation rendering but broke same-
+ * specificity cascade when a consumer composed a wrapper: the wrapper's
+ * inline `<style>` rendered AFTER the consumer's `<style>` (and once per
+ * wrapper INSTANCE), so source-order made the wrapper's same-specificity
+ * rules win — wiping consumer overrides like the `.extra-variant {
+ * font-weight: 600 }` rule in the `ThemedButtonConsumer · solid` matrix
+ * VR cell.
+ *
+ * Pre-Phase-16 Item-1-residual closure (2026-05-24) — switched to module-
+ * top `document.head` injection via the `__rozieInjectStyle` runtime
+ * helper. Wrapper modules are loaded BEFORE consumer modules (consumer's
+ * `import X from '...'` resolves wrapper first), so wrapper styles land
+ * in `<head>` first and consumer styles second — restoring the source-
+ * order cascade the other five targets already get via their respective
+ * per-framework style pipelines.
  *
  * Output:
- *   - Scoped rules → `<style>{scopedCss}</style>` (component-scoped styles).
- *     When a `scopeHash` is supplied, the rules are run through `scopeCss`
- *     first so every selector gets `[data-rozie-s-<hash>]` appended. The
- *     matching attribute is injected on every host element by
- *     `emitTemplateNode`. This delivers Vue/Svelte/Angular-equivalent
- *     per-component CSS isolation — without it, bare element selectors
- *     (`button { ... }`) would leak globally.
- *   - `:root { }` rules → `<style>{globalCss}</style>` (global escape-hatch
- *     rules, unscoped — same `:root` semantics as Svelte's `:global(:root)`).
- *   - `styleJsx`: JSX fragment containing the <style> element(s), or empty
- *     string when no styles exist.
- *
- * The returned `styleJsx` is inserted adjacent to the template JSX by the
- * shell's `buildShell()`, wrapped in a `<>...</>` fragment containing the
- * `<style>` block before the component template.
+ *   - Scoped rules → `__rozieInjectStyle(<scopeKey>, <css>)` side-effect
+ *     statement at module top. `<scopeKey>` is `'<componentName>-<hash>'`
+ *     so HMR replacements of the same component refresh the same `<style>`
+ *     element in-place (instead of appending duplicates).
+ *   - `:root { }` rules → folded into the SAME injection (separated by a
+ *     newline). Cascade order is identical (both live in `<head>`); v1
+ *     keeps one injection-per-component for simplicity.
+ *   - When the component has NO styles, no injection is emitted.
  *
  * CSS Rule Serialization:
- *   Same byte-slice approach as the React/Vue targets — slices each rule's
- *   bytes from the original .rozie source by absolute `loc.start..loc.end`.
- *   The slice goes through `scopeCss` when a hash is supplied (selector
- *   rewriting only — body bytes are preserved).
+ *   Same byte-slice approach as the React/Vue/Svelte/Lit targets — slices
+ *   each rule's bytes from the original `.rozie` source by absolute
+ *   `loc.start..loc.end`. Scoped slices route through `scopeCss` so every
+ *   selector gets `[data-rozie-s-<hash>]` appended; `:root` rules are
+ *   spliced verbatim (already-global by their own semantics).
  *
  * @experimental — shape may change before v1.0
  */
@@ -54,13 +63,21 @@ const PORTAL_SCOPE_REPEAT = 1;
 
 export interface EmitStyleResult {
   /**
-   * JSX fragment string (or empty string when no styles). Contains one or
-   * two <style>{css}</style> elements wrapped in a React Fragment `<>...</>`.
-   *
-   * When non-empty, the shell wraps the entire component return in a fragment
-   * that prepends this styleJsx before the user template JSX.
+   * Module-top side-effect statement that injects the component's CSS into
+   * `document.head`, e.g. `__rozieInjectStyle('ThemedButton-7914ecaa',
+   * '.btn[data-rozie-s-7914ecaa] { ... }');`. Empty string when the
+   * component has no styles. The shell splices this into the module
+   * preamble (after imports, before the component function declaration)
+   * so it runs ONCE at module-load time per component class.
    */
-  styleJsx: string;
+  injectStatement: string;
+  /**
+   * True when `injectStatement` references `__rozieInjectStyle` — the
+   * shell uses this signal to add the import to the runtime collector.
+   * (Cheaper than `injectStatement.includes(...)` and avoids the
+   * collector hearing about every empty-style component.)
+   */
+  needsInjectHelper: boolean;
   diagnostics: Diagnostic[];
 }
 
@@ -91,8 +108,11 @@ function escapeCssForTemplateLiteral(css: string): string {
 }
 
 /**
- * Re-stringify a StyleSection into Solid-target inline <style> JSX.
+ * Re-stringify a StyleSection into a module-top `__rozieInjectStyle(...)`
+ * side-effect statement.
  *
+ * @param componentName — IR component name, used as the human-readable half
+ *                        of the injection cache key (`'<name>-<hash>'`).
  * @param styles     — Phase 2 IR StyleSection (split by lowerStyles).
  * @param source     — original .rozie source text (for byte-slice serialization).
  * @param scopeHash  — per-component scope token (8-char hex). When provided,
@@ -102,6 +122,7 @@ function escapeCssForTemplateLiteral(css: string): string {
  *                     back-compat with old callers that don't thread a hash.
  */
 export function emitStyle(
+  componentName: string,
   styles: StyleSection,
   source: string,
   scopeHash: string = '',
@@ -116,35 +137,43 @@ export function emitStyle(
   const scopedCss = scopeHash.length > 0 && rawScopedCss.length > 0
     ? scopeCss(rawScopedCss, scopeHash)
     : rawScopedCss;
-  const globalCss = rootRules.length > 0 ? stringifyRules(rootRules, source) : null;
+  const globalCss = rootRules.length > 0 ? stringifyRules(rootRules, source) : '';
 
-  // Spike 004 — @portal rules emit as BARE attribute selectors into the SAME
-  // inline <style> JSX node as the scoped rules. Solid's CSS pipeline is
-  // unscoped-by-default (no class hashing), so the
+  // Spike 004 — @portal rules slot in alongside scoped rules. Solid's CSS
+  // pipeline is unscoped-by-default (no class hashing), so the
   // [data-rozie-portal-<NAME>="<hash>"] selectors slot in verbatim — the
   // portal attribute is their sole scoping.
   const portalCss = rewriteAllPortalBlocks(portalRules, source, scopeHash, PORTAL_SCOPE_REPEAT);
-  // Append portal CSS after the scoped CSS so both live in one <style> block.
-  const combinedScoped = portalCss.length > 0
-    ? (scopedCss.length > 0 ? `${scopedCss}\n${portalCss}` : portalCss)
-    : scopedCss;
 
-  if (!combinedScoped && !globalCss) {
-    return { styleJsx: '', diagnostics };
+  // Combine scoped + portal + :root sections. Order: scoped first, portal
+  // next, :root last (matches the pre-Item-1-residual two-`<style>`-element
+  // emit order — scoped/portal in element 1, :root in element 2). Putting
+  // them in a single injection keeps the head-injection cache key
+  // 1-per-component, which is enough for HMR granularity.
+  const sections: string[] = [];
+  if (scopedCss.length > 0) sections.push(scopedCss);
+  if (portalCss.length > 0) sections.push(portalCss);
+  if (globalCss.length > 0) sections.push(globalCss);
+
+  if (sections.length === 0) {
+    return { injectStatement: '', needsInjectHelper: false, diagnostics };
   }
 
-  const styleParts: string[] = [];
+  const combined = sections.join('\n');
+  // Cache key: '<componentName>-<scopeHash>'. The hash is content-derived
+  // via FNV-1a over the component name + filename basename, so different
+  // components compute different hashes naturally — but rename-without-
+  // content-change would collide. Including the human-readable name
+  // disambiguates and aids debugging in DevTools' Elements panel
+  // (`<style data-rozie-style="ThemedButton-7914ecaa">`).
+  const cacheKey = scopeHash.length > 0 ? `${componentName}-${scopeHash}` : componentName;
+  const escapedCss = escapeCssForTemplateLiteral(combined);
+  const escapedKey = cacheKey.replace(/'/g, "\\'");
+  const injectStatement = `__rozieInjectStyle('${escapedKey}', \`${escapedCss}\`);`;
 
-  if (combinedScoped) {
-    const escaped = escapeCssForTemplateLiteral(combinedScoped);
-    styleParts.push(`<style>{\`${escaped}\`}</style>`);
-  }
-  if (globalCss) {
-    const escaped = escapeCssForTemplateLiteral(globalCss);
-    styleParts.push(`<style>{\`${escaped}\`}</style>`);
-  }
-
-  const styleJsx = styleParts.join('\n');
-
-  return { styleJsx, diagnostics };
+  return {
+    injectStatement,
+    needsInjectHelper: true,
+    diagnostics,
+  };
 }

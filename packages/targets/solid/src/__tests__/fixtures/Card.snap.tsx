@@ -1,6 +1,10 @@
 import type { JSX } from 'solid-js';
 import { children, mergeProps, splitProps } from 'solid-js';
+import { __rozieInjectStyle } from '@rozie/runtime-solid';
 import CardHeader from './CardHeader';
+
+__rozieInjectStyle('Card-a88c221e', `.card[data-rozie-s-a88c221e] { border: 1px solid #ddd; border-radius: 6px; overflow: hidden; background: #fff; }
+.card__body[data-rozie-s-a88c221e] { padding: 1rem; }`);
 
 interface CardProps {
   title?: string;
@@ -17,16 +21,12 @@ export default function Card(_props: CardProps): JSX.Element {
 
   return (
     <>
-    <style>{`.card[data-rozie-s-a88c221e] { border: 1px solid #ddd; border-radius: 6px; overflow: hidden; background: #fff; }
-    .card__body[data-rozie-s-a88c221e] { padding: 1rem; }`}</style>
-    <>
     <article {...attrs} class={"card" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-a88c221e="">
       <CardHeader title={local.title} onClose={local.onClose} data-rozie-s-a88c221e="" />
       <div class={"card__body"} data-rozie-s-a88c221e="">
         {resolved()}
       </div>
     </article>
-    </>
     </>
   );
 }

@@ -136,10 +136,17 @@ export function emitSolid(ir: IRComponent, opts: EmitSolidOptions = {}): EmitSol
   );
   const listenersResult = emitListeners(ir, { solid: solidImports, runtime: runtimeImports }, registry);
   const styleResult = emitStyle(
+    ir.name,
     ir.styles ?? { scopedRules: [], rootRules: [] },
     opts.source ?? '',
     scopeHash,
   );
+  // Item-1-residual: register the `__rozieInjectStyle` runtime import when
+  // this component has any styles. The shell splices the side-effect
+  // statement at module top (after imports, before the component function).
+  if (styleResult.needsInjectHelper) {
+    runtimeImports.add('__rozieInjectStyle');
+  }
 
   // 6. splitPropsCall — D-141 universal.
   // D-131: when a default slot is present, 'children' must also be split so
@@ -207,7 +214,7 @@ export function emitSolid(ir: IRComponent, opts: EmitSolidOptions = {}): EmitSol
     script,
     hookSectionLines: scriptResult.hookSectionLines,
     listenerEffects: listenersResult.code,
-    styleJsx: styleResult.styleJsx,
+    styleInjectStatement: styleResult.injectStatement,
     jsx: templateResult.jsx,
     rozieSource: opts.source ?? '',
     blockOffsets: resolvedBlockOffsets,

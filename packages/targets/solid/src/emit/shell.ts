@@ -94,10 +94,17 @@ export interface SolidShellParts {
    */
   scriptInjections?: string[];
   /**
-   * Inline <style> JSX from emitStyle (Pitfall 3 — no CSS Modules for Solid).
-   * When non-empty, the JSX return is wrapped in a fragment: `<>{styleJsx}{jsx}</>`.
+   * Pre-Phase-16 Item-1-residual closure — module-top side-effect statement
+   * from emitStyle that injects the component's CSS into `document.head`
+   * via the `__rozieInjectStyle` runtime helper. Spliced into the module
+   * preamble (after imports, before the component function declaration) so
+   * it runs ONCE at module-load time per component class. Empty string
+   * when the component has no styles. Replaces the previous inline-
+   * `<style>` JSX emit, which broke same-specificity cascade when a
+   * consumer composed a wrapper (wrapper's `<style>` rendered AFTER
+   * consumer's because it lived in the rendered tree as a sibling).
    */
-  styleJsx?: string;
+  styleInjectStatement?: string;
   /** JSX body string (e.g., '<div>...</div>' or '(\n  <div>...</div>\n)') */
   jsx: string;
   /**
@@ -189,6 +196,16 @@ export function buildShell(parts: SolidShellParts): BuildShellResult {
     }
   }
 
+  // Item-1-residual closure — module-top style-injection side-effect.
+  // Splices `__rozieInjectStyle('<name>-<hash>', `<css>`);` so the CSS
+  // lands in `document.head` ONCE at module-load time (instead of being
+  // rendered as a sibling `<style>` element per wrapper instance, which
+  // broke same-specificity cascade in cross-SFC composition).
+  if (parts.styleInjectStatement && parts.styleInjectStatement.length > 0) {
+    moduleParts.push(parts.styleInjectStatement);
+    moduleParts.push('\n\n');
+  }
+
   // Slot-context interfaces — BEFORE the props interface.
   if (parts.ctxInterfaces && parts.ctxInterfaces.length > 0) {
     for (const iface of parts.ctxInterfaces) {
@@ -270,12 +287,11 @@ export function buildShell(parts: SolidShellParts): BuildShellResult {
     moduleParts.push('\n');
   }
 
-  // JSX body — wrap in `return ( ... );`.
-  // When styleJsx is present, wrap the return in a fragment.
-  const effectiveJsx = (parts.styleJsx && parts.styleJsx.length > 0)
-    ? `<>\n${parts.styleJsx}\n${parts.jsx}\n</>`
-    : parts.jsx;
-  const jsxIndented = effectiveJsx
+  // JSX body — wrap in `return ( ... );`. Item-1-residual closure: no
+  // longer wraps in a `<>…</>` fragment for a sibling `<style>` element;
+  // styles are injected into `document.head` at module top instead (see
+  // `styleInjectStatement` splice earlier in this composition path).
+  const jsxIndented = parts.jsx
     .split('\n')
     .map((line) => (line.length > 0 ? '    ' + line : line))
     .join('\n');
@@ -328,6 +344,13 @@ function buildShellLegacy(parts: SolidShellParts): BuildShellResult {
       ms.append(decl);
       ms.append('\n\n');
     }
+  }
+
+  // Item-1-residual closure — module-top style-injection side-effect
+  // (matches the moduleParts-based path above).
+  if (parts.styleInjectStatement && parts.styleInjectStatement.length > 0) {
+    ms.append(parts.styleInjectStatement);
+    ms.append('\n\n');
   }
 
   if (parts.ctxInterfaces && parts.ctxInterfaces.length > 0) {
@@ -394,10 +417,8 @@ function buildShellLegacy(parts: SolidShellParts): BuildShellResult {
     ms.append('\n');
   }
 
-  const effectiveJsx = (parts.styleJsx && parts.styleJsx.length > 0)
-    ? `<>\n${parts.styleJsx}\n${parts.jsx}\n</>`
-    : parts.jsx;
-  const jsxIndented = effectiveJsx
+  // Item-1-residual closure: no more fragment-wrap for inline `<style>`.
+  const jsxIndented = parts.jsx
     .split('\n')
     .map((line) => (line.length > 0 ? '    ' + line : line))
     .join('\n');

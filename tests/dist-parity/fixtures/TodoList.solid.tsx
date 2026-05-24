@@ -1,6 +1,13 @@
 import type { JSX } from 'solid-js';
 import { For, Show, children, createMemo, createSignal, mergeProps, splitProps } from 'solid-js';
-import { createControllableSignal } from '@rozie/runtime-solid';
+import { __rozieInjectStyle, createControllableSignal } from '@rozie/runtime-solid';
+
+__rozieInjectStyle('TodoList-52bec3de', `.todo-list[data-rozie-s-52bec3de] { font-family: system-ui, sans-serif; }
+ul[data-rozie-s-52bec3de] { list-style: none; padding: 0; }
+li[data-rozie-s-52bec3de] { display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0; }
+li.done[data-rozie-s-52bec3de] span[data-rozie-s-52bec3de] { text-decoration: line-through; opacity: 0.5; }
+.empty[data-rozie-s-52bec3de] { color: rgba(0, 0, 0, 0.4); font-style: italic; }
+form[data-rozie-s-52bec3de] { display: flex; gap: 0.25rem; margin-block: 0.5rem; }`);
 
 interface HeaderSlotCtx { remaining: any; total: any; }
 
@@ -59,13 +66,6 @@ export default function TodoList(_props: TodoListProps): JSX.Element {
 
   return (
     <>
-    <style>{`.todo-list[data-rozie-s-52bec3de] { font-family: system-ui, sans-serif; }
-    ul[data-rozie-s-52bec3de] { list-style: none; padding: 0; }
-    li[data-rozie-s-52bec3de] { display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0; }
-    li.done[data-rozie-s-52bec3de] span[data-rozie-s-52bec3de] { text-decoration: line-through; opacity: 0.5; }
-    .empty[data-rozie-s-52bec3de] { color: rgba(0, 0, 0, 0.4); font-style: italic; }
-    form[data-rozie-s-52bec3de] { display: flex; gap: 0.25rem; margin-block: 0.5rem; }`}</style>
-    <>
     <div {...attrs} class={"todo-list" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-52bec3de="">
       <header data-rozie-s-52bec3de="">
         {(_props.headerSlot ?? _props.slots?.['header'])?.({ remaining: remaining(), total: items().length }) ?? <h3 data-rozie-s-52bec3de="">{local.title} ({remaining()} remaining)</h3>}
@@ -84,7 +84,6 @@ export default function TodoList(_props: TodoListProps): JSX.Element {
           {typeof local.children === 'function' ? (local.children as (s: any) => any)({ item, toggle: () => toggle(item.id), remove: () => removeItem(item.id) }) : (resolved() ?? <><label data-rozie-s-52bec3de=""><input type="checkbox" checked={item.done} onChange={($event) => { toggle(item.id); }} data-rozie-s-52bec3de="" /><span data-rozie-s-52bec3de="">{item.text}</span></label><button aria-label="Remove" onClick={($event) => { removeItem(item.id); }} data-rozie-s-52bec3de="">×</button></>)}
         </li>}</For>
       </ul></Show>}</div>
-    </>
     </>
   );
 }

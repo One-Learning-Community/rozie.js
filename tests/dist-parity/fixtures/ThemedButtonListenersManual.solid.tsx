@@ -1,5 +1,23 @@
 import type { JSX } from 'solid-js';
 import { mergeProps, splitProps } from 'solid-js';
+import { __rozieInjectStyle } from '@rozie/runtime-solid';
+
+__rozieInjectStyle('ThemedButtonListenersManual-97e125bc', `.btn[data-rozie-s-97e125bc] {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 0.25rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: var(--btn-bg, #3b82f6);
+  color: var(--btn-fg, #ffffff);
+  font: inherit;
+  cursor: pointer;
+}
+.btn[data-rozie-s-97e125bc]:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}`);
 
 interface ThemedButtonListenersManualProps {
   label?: string;
@@ -12,27 +30,9 @@ export default function ThemedButtonListenersManual(_props: ThemedButtonListener
 
   return (
     <>
-    <style>{`.btn[data-rozie-s-97e125bc] {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.5rem 1rem;
-      border-radius: 0.25rem;
-      border: 1px solid rgba(0, 0, 0, 0.15);
-      background: var(--btn-bg, #3b82f6);
-      color: var(--btn-fg, #ffffff);
-      font: inherit;
-      cursor: pointer;
-    }
-    .btn[data-rozie-s-97e125bc]:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }`}</style>
-    <>
     <button style={{ '--btn-bg': '#3b82f6', '--btn-fg': '#ffffff' }} {...attrs} class={"btn" + " " + local.variant + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-97e125bc="">
       {local.label}
     </button>
-    </>
     </>
   );
 }

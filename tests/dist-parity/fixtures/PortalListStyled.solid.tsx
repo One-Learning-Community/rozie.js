@@ -1,6 +1,31 @@
 import type { JSX } from 'solid-js';
 import { mergeProps, onCleanup, onMount, splitProps } from 'solid-js';
 import { render } from 'solid-js/web';
+import { __rozieInjectStyle } from '@rozie/runtime-solid';
+
+__rozieInjectStyle('PortalListStyled-18e5aac6', `.rozie-portal-list[data-rozie-s-18e5aac6] {
+  display: block;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+[data-rozie-portal-item="18e5aac6"][data-rozie-portal-item="18e5aac6"] ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 6px;
+  overflow: hidden;
+}
+[data-rozie-portal-item="18e5aac6"][data-rozie-portal-item="18e5aac6"] li {
+  padding: 0.5rem 0.75rem;
+}
+[data-rozie-portal-item="18e5aac6"][data-rozie-portal-item="18e5aac6"] li + li {
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+[data-rozie-portal-item="18e5aac6"][data-rozie-portal-item="18e5aac6"] div {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}`);
 
 interface ItemSlotCtx { item: any; }
 
@@ -89,34 +114,9 @@ export default function PortalListStyled(_props: PortalListStyledProps): JSX.Ele
 
   return (
     <>
-    <style>{`.rozie-portal-list[data-rozie-s-18e5aac6] {
-      display: block;
-      font-family: system-ui, -apple-system, sans-serif;
-    }
-    [data-rozie-portal-item="18e5aac6"][data-rozie-portal-item="18e5aac6"] ul {
-      list-style: none;
-      margin: 0;
-      padding: 0;
-      border: 1px solid rgba(0, 0, 0, 0.12);
-      border-radius: 6px;
-      overflow: hidden;
-    }
-    [data-rozie-portal-item="18e5aac6"][data-rozie-portal-item="18e5aac6"] li {
-      padding: 0.5rem 0.75rem;
-    }
-    [data-rozie-portal-item="18e5aac6"][data-rozie-portal-item="18e5aac6"] li + li {
-      border-top: 1px solid rgba(0, 0, 0, 0.06);
-    }
-    [data-rozie-portal-item="18e5aac6"][data-rozie-portal-item="18e5aac6"] div {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }`}</style>
-    <>
     <div ref={(el) => { __rozieRootRef = el as HTMLElement; }} {...attrs} class={"rozie-portal-list" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-18e5aac6="">
       
     </div>
-    </>
     </>
   );
 }

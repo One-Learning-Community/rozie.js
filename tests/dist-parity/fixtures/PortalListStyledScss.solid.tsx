@@ -1,6 +1,44 @@
 import type { JSX } from 'solid-js';
 import { mergeProps, onCleanup, onMount, splitProps } from 'solid-js';
 import { render } from 'solid-js/web';
+import { __rozieInjectStyle } from '@rozie/runtime-solid';
+
+__rozieInjectStyle('PortalListStyledScss-860cc87e', `.rozie-portal-list[data-rozie-s-860cc87e] {
+  display: block;
+  font-family: system-ui, -apple-system, sans-serif;
+  color: var(--rozie-portal-list-fg);
+}
+.rozie-portal-list[data-rozie-s-860cc87e] ul[data-rozie-s-860cc87e] {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid #ededed;
+  border-radius: 6px;
+}
+[data-rozie-portal-item="860cc87e"][data-rozie-portal-item="860cc87e"] ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+[data-rozie-portal-item="860cc87e"][data-rozie-portal-item="860cc87e"] li {
+  padding: 0.5rem 0.75rem;
+}
+[data-rozie-portal-item="860cc87e"][data-rozie-portal-item="860cc87e"] li + li {
+  border-top: 1px solid #ededed;
+}
+[data-rozie-portal-item="860cc87e"][data-rozie-portal-item="860cc87e"] li:hover {
+  background: #f5f5f5;
+}
+[data-rozie-portal-item="860cc87e"][data-rozie-portal-item="860cc87e"] div {
+  display: flex;
+  align-items: center;
+  gap: var(--rozie-portal-list-gap);
+}
+:root {
+  --rozie-portal-list-gap: 8px;
+  --rozie-portal-list-fg: #1a1a1a;
+}`);
 
 interface ItemSlotCtx { item: any; }
 
@@ -89,47 +127,9 @@ export default function PortalListStyledScss(_props: PortalListStyledScssProps):
 
   return (
     <>
-    <style>{`.rozie-portal-list[data-rozie-s-860cc87e] {
-      display: block;
-      font-family: system-ui, -apple-system, sans-serif;
-      color: var(--rozie-portal-list-fg);
-    }
-    .rozie-portal-list[data-rozie-s-860cc87e] ul[data-rozie-s-860cc87e] {
-      list-style: none;
-      margin: 0;
-      padding: 0;
-      border: 1px solid #ededed;
-      border-radius: 6px;
-    }
-    [data-rozie-portal-item="860cc87e"][data-rozie-portal-item="860cc87e"] ul {
-      list-style: none;
-      margin: 0;
-      padding: 0;
-      overflow: hidden;
-    }
-    [data-rozie-portal-item="860cc87e"][data-rozie-portal-item="860cc87e"] li {
-      padding: 0.5rem 0.75rem;
-    }
-    [data-rozie-portal-item="860cc87e"][data-rozie-portal-item="860cc87e"] li + li {
-      border-top: 1px solid #ededed;
-    }
-    [data-rozie-portal-item="860cc87e"][data-rozie-portal-item="860cc87e"] li:hover {
-      background: #f5f5f5;
-    }
-    [data-rozie-portal-item="860cc87e"][data-rozie-portal-item="860cc87e"] div {
-      display: flex;
-      align-items: center;
-      gap: var(--rozie-portal-list-gap);
-    }`}</style>
-    <style>{`:root {
-      --rozie-portal-list-gap: 8px;
-      --rozie-portal-list-fg: #1a1a1a;
-    }`}</style>
-    <>
     <div ref={(el) => { __rozieRootRef = el as HTMLElement; }} {...attrs} class={"rozie-portal-list" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-860cc87e="">
       
     </div>
-    </>
     </>
   );
 }

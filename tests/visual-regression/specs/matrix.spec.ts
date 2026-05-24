@@ -351,64 +351,31 @@ const KNOWN_CROSS_TARGET_DIVERGENCE = new Set<string>([]);
 // entry is still here, that is a process failure.
 //
 // Phase 14.1 closed 3 of 5 ThemedButtonConsumer entries (react / angular /
-// lit) via per-target emit fixes — see git history. Two remain, carried
-// forward as Phase 14.2 follow-ups:
-const PHASE_14_1_FOLLOWUP = new Set<string>([
-  // RECAST 2026-05-23 (Phase-15-followup): the original gate hypothesis
-  // (scope-attr dropped in the mergeProps/splitProps chain) was WRONG. Static
-  // analysis + a fresh VR repro showed the consumer's scope attr DOES
-  // propagate; the actual root cause was a Phase-15 emit regression in
-  // `synthesizeListenersFallthrough` (Plan 15-06). Both `$attrs` and
-  // `$listeners` lower to the bare `attrs` identifier in Solid (see
-  // packages/targets/solid/src/rewrite/rewriteTemplateExpression.ts), and
-  // when both fallthrough synthesizers fired the emitter produced TWO
-  // consecutive `{...attrs}` spreads sandwiching the merged `class={...}`.
-  // Solid's `mergeProps` reverse-iter last-wins semantics made the second
-  // spread shadow the merged-class getter, so all 4 buttons rendered as
-  // plain native browsers (no `.btn`, no `.extra-variant`, no per-variant
-  // color) — 13 191 px diff (ratio 0.54).
-  //
-  // FIX (commit pending — Item 1 of pre-Phase-16 cleanup):
-  // packages/targets/solid/src/emit/emitTemplateNode.ts now skips the
-  // redundant listener spread when bare-$listeners aliases bare-$attrs on
-  // the same element. Post-fix the buttons render correctly (4 colored,
-  // bold text, per-variant overrides applied) and the diff drops to 3 108 px
-  // (ratio 0.13). The 5 themed-button.spec.ts × solid DOM-assertion cells
-  // now pass (see PHASE_14_1_FOLLOWUP_TARGETS in that spec — solid ungated).
-  //
-  // Item-1-residual closure attempt 1 (2026-05-24): the static-style →
-  // object-form lowering (mirror of React's existing path) was added to
-  // `packages/targets/solid/src/emit/emitTemplateAttribute.ts`. Consumer's
-  // `style="--btn-bg: #ef4444"` now lands as `style={{"--btn-bg": "#ef4444"}}`
-  // on the child invocation, so Solid's `style()` helper iterates and
-  // `setProperty`-per-key instead of `cssText`-replacing — wrapper's
-  // `--btn-fg: #ffffff` is now preserved on the inline style (correctness
-  // improvement). VR diff is unchanged at 3 108 px because the wrapper's
-  // `--btn-fg` was ALREADY rendering white via the CSS `var(--btn-fg, #fff)`
-  // fallback, so the fix moves no visible pixels. Still worth landing —
-  // future wrappers that depend on the precise inline-style cascade
-  // (rather than CSS fallback) now work correctly on Solid.
-  //
-  // RESIDUAL — Cell still 454×52 vs 474×52 baseline (~20 px width drift,
-  // unchanged). Static analysis ruled out the style-clobber theory; the
-  // candidates that remain are subtler cross-target rendering nuances:
-  //   - inter-element whitespace between flex children rendering
-  //     differently in Solid vs Vue (the baseline);
-  //   - Solid-unique inline `<style>{...}</style>` emit affecting flex
-  //     layout (the only target that emits styles inline as a sibling);
-  //   - per-target Linux Chromium font-kerning at text-node boundaries
-  //     (memory `feedback_vr_macos_text_node_kerning` suggests Linux
-  //     kerns identically, but a single specific case may not).
-  // None are blocking; carried into a deeper post-Phase-16 investigation.
-  'ThemedButtonConsumer::solid',
-  // Svelte arm FULLY CLOSED (2026-05-24) — Item 2 (cross-SFC CSS-scoping
-  // switch to `data-rozie-s-*`) + Item-2-residual (auto-fallthrough-aware
-  // `:style` string-form lowering, when active, instead of `style:<prop>=`
-  // directives that would otherwise win over spread `style`). All 12
-  // themed-button × svelte cells pass and the matrix VR cell lands on
-  // baseline. See commit history for the full path through the two-stage
-  // fix. No remaining svelte entries in this set.
-]);
+// lit) via per-target emit fixes — see git history. The pre-Phase-16 cleanup
+// closed the remaining two arms (solid and svelte). The set is empty;
+// preserved for future per-cell gate additions.
+//
+// Closure path (visible in commit history):
+//   - Solid arm: a three-stage fix —
+//     1. `synthesizeListenersFallthrough` dual-`{...attrs}` regression
+//        repaired (`emitTemplateNode.ts` skips redundant listener spread)
+//        — fixes 4-buttons-render-blank
+//     2. static `style="..."` → object form (`emitTemplateAttribute.ts`)
+//        — preserves wrapper's inline-style defaults instead of relying on
+//        the CSS `var(prop, fallback)` cascade
+//     3. inline `<style>` JSX → module-top `__rozieInjectStyle()`
+//        head-injection (`emitStyle.ts` + new `injectStyle.ts` runtime
+//        helper) — fixes same-specificity cascade in cross-SFC composition
+//        (wrapper instances were each rendering a sibling `<style>` AFTER
+//        the consumer's, so source-order made wrapper rules win — the
+//        `.btn { font: inherit }` shorthand was wiping
+//        `.extra-variant { font-weight: 600 }`)
+//   - Svelte arm: Item 2 (cross-SFC CSS-scoping switch to
+//     `data-rozie-s-*`, mirroring react/solid/lit, replacing Svelte's
+//     native class-hash scoper) + Item-2-residual (auto-fallthrough-aware
+//     `:style` string-form lowering when active, replacing `style:<prop>=`
+//     directives that would otherwise win over spread `style`).
+const PHASE_14_1_FOLLOWUP = new Set<string>([]);
 
 for (const example of EXAMPLES) {
   const hasBaseline = baselineExists(example);

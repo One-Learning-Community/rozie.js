@@ -1,6 +1,11 @@
 import type { JSX } from 'solid-js';
 import { Show, createMemo, createSignal, mergeProps, onCleanup, onMount, splitProps } from 'solid-js';
-import { createDebouncedHandler } from '@rozie/runtime-solid';
+import { __rozieInjectStyle, createDebouncedHandler } from '@rozie/runtime-solid';
+
+__rozieInjectStyle('SearchInput-8bbc4a60', `.search-input[data-rozie-s-8bbc4a60] { display: inline-flex; align-items: center; gap: 0.25rem; }
+input[data-rozie-s-8bbc4a60] { padding: 0.25rem 0.5rem; }
+.clear-btn[data-rozie-s-8bbc4a60] { background: none; border: none; cursor: pointer; font-size: 1.25rem; }
+.hint[data-rozie-s-8bbc4a60] { color: rgba(0, 0, 0, 0.4); font-size: 0.85em; }`);
 
 interface SearchInputProps {
   placeholder?: string;
@@ -42,11 +47,6 @@ export default function SearchInput(_props: SearchInputProps): JSX.Element {
 
   return (
     <>
-    <style>{`.search-input[data-rozie-s-8bbc4a60] { display: inline-flex; align-items: center; gap: 0.25rem; }
-    input[data-rozie-s-8bbc4a60] { padding: 0.25rem 0.5rem; }
-    .clear-btn[data-rozie-s-8bbc4a60] { background: none; border: none; cursor: pointer; font-size: 1.25rem; }
-    .hint[data-rozie-s-8bbc4a60] { color: rgba(0, 0, 0, 0.4); font-size: 0.85em; }`}</style>
-    <>
     <div {...attrs} class={"search-input" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-8bbc4a60="">
       
       <input type="search" ref={(el) => { inputElRef = el as HTMLElement; }} placeholder={local.placeholder} value={query()} onInput={($event) => { (e => setQuery(e.currentTarget.value))($event); _rozieDebouncedOnSearch($event); }} onKeyDown={($event) => { (($event) => { if ($event.key !== 'Enter') return; onSearch(); })($event); (($event) => { if ($event.key !== 'Escape') return; clear(); })($event); }} data-rozie-s-8bbc4a60="" />
@@ -54,7 +54,6 @@ export default function SearchInput(_props: SearchInputProps): JSX.Element {
       {<Show when={query().length > 0} fallback={<span class={"hint"} data-rozie-s-8bbc4a60="">{local.minLength}+ chars</span>}><button aria-label="Clear" class={"clear-btn"} onClick={clear} data-rozie-s-8bbc4a60="">
         ×
       </button></Show>}</div>
-    </>
     </>
   );
 }

@@ -1,5 +1,8 @@
 import type { JSX } from 'solid-js';
 import { Show, children, mergeProps, splitProps } from 'solid-js';
+import { __rozieInjectStyle } from '@rozie/runtime-solid';
+
+__rozieInjectStyle('PresenceSlotFallback-224e77e7', `.panel[data-rozie-s-224e77e7] { border: 1px solid rgba(0, 0, 0, 0.1); }`);
 
 interface PresenceSlotFallbackProps {
   title?: string;
@@ -16,8 +19,6 @@ export default function PresenceSlotFallback(_props: PresenceSlotFallbackProps):
 
   return (
     <>
-    <style>{`.panel[data-rozie-s-224e77e7] { border: 1px solid rgba(0, 0, 0, 0.1); }`}</style>
-    <>
     <section {...attrs} class={"panel" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-224e77e7="">
       {<Show when={(_props.headerSlot ?? _props.slots?.['header']) || local.title}><header data-rozie-s-224e77e7="">
         
@@ -26,7 +27,6 @@ export default function PresenceSlotFallback(_props: PresenceSlotFallbackProps):
         {resolved()}
       </div>
     </section>
-    </>
     </>
   );
 }

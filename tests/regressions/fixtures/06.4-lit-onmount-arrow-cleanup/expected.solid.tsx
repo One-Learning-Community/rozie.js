@@ -1,5 +1,8 @@
 import type { JSX } from 'solid-js';
 import { createSignal, onCleanup, onMount, splitProps } from 'solid-js';
+import { __rozieInjectStyle } from '@rozie/runtime-solid';
+
+__rozieInjectStyle('OnMountArrowCleanup-722b58d1', `.ticker[data-rozie-s-722b58d1] { font-variant-numeric: tabular-nums; }`);
 
 interface OnMountArrowCleanupProps {}
 
@@ -28,10 +31,7 @@ export default function OnMountArrowCleanup(_props: OnMountArrowCleanupProps): J
 
   return (
     <>
-    <style>{`.ticker[data-rozie-s-722b58d1] { font-variant-numeric: tabular-nums; }`}</style>
-    <>
     <div {...attrs} class={"ticker" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-722b58d1="">{ticks()}</div>
-    </>
     </>
   );
 }

@@ -1,6 +1,19 @@
 import type { JSX } from 'solid-js';
 import { Show, children, createEffect, mergeProps, onCleanup, onMount, splitProps, untrack } from 'solid-js';
-import { createControllableSignal, createOutsideClick, createThrottledHandler } from '@rozie/runtime-solid';
+import { __rozieInjectStyle, createControllableSignal, createOutsideClick, createThrottledHandler } from '@rozie/runtime-solid';
+
+__rozieInjectStyle('Dropdown-6d6bd882', `.dropdown[data-rozie-s-6d6bd882] { position: relative; display: inline-block; }
+.dropdown-panel[data-rozie-s-6d6bd882] {
+  position: fixed;
+  z-index: var(--rozie-dropdown-z, 1000);
+  background: white;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+:root {
+  --rozie-dropdown-z: 1000;
+}`);
 
 interface TriggerSlotCtx { open: any; toggle: any; }
 
@@ -78,19 +91,6 @@ export default function Dropdown(_props: DropdownProps): JSX.Element {
 
   return (
     <>
-    <style>{`.dropdown[data-rozie-s-6d6bd882] { position: relative; display: inline-block; }
-    .dropdown-panel[data-rozie-s-6d6bd882] {
-      position: fixed;
-      z-index: var(--rozie-dropdown-z, 1000);
-      background: white;
-      border: 1px solid rgba(0, 0, 0, 0.1);
-      border-radius: 6px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-    }`}</style>
-    <style>{`:root {
-      --rozie-dropdown-z: 1000;
-    }`}</style>
-    <>
     <div {...attrs} class={"dropdown" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-6d6bd882="">
       <div ref={(el) => { triggerElRef = el as HTMLElement; }} onClick={toggle} data-rozie-s-6d6bd882="">
         {(_props.triggerSlot ?? _props.slots?.['trigger'])?.({ open: open(), toggle })}
@@ -99,7 +99,6 @@ export default function Dropdown(_props: DropdownProps): JSX.Element {
       {<Show when={open()}><div ref={(el) => { panelElRef = el as HTMLElement; }} class={"dropdown-panel"} role="menu" data-rozie-s-6d6bd882="">
         {typeof local.children === 'function' ? (local.children as (s: any) => any)({ close }) : resolved()}
       </div></Show>}</div>
-    </>
     </>
   );
 }
