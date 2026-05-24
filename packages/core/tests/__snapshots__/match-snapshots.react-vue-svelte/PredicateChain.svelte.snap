@@ -9,11 +9,13 @@ let count = $state(5);
 </script>
 
 
-{#if count > 10}<strong class="high">plenty</strong>{:else if count > 0}<span class="some">a few</span>{:else}<span class="none">none</span>{/if}
+{#if count > 10}<strong class="high" data-rozie-s-e116a46e>plenty</strong>{:else if count > 0}<span class="some" data-rozie-s-e116a46e>a few</span>{:else}<span class="none" data-rozie-s-e116a46e>none</span>{/if}
 
 
 <style>
-.high { font-weight: 700; }
-.some { opacity: 0.85; }
-.none { opacity: 0.5; }
+:global {
+  .high[data-rozie-s-e116a46e] { font-weight: 700; }
+  .some[data-rozie-s-e116a46e] { opacity: 0.85; }
+  .none[data-rozie-s-e116a46e] { opacity: 0.5; }
+}
 </style>

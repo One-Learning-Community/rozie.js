@@ -73,37 +73,39 @@ const remaining = $derived(items.filter((i: any) => !i.done).length);
 </script>
 
 
-<div {...__rozieAttrs} class={["todo-list", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs}>
-  <header>
+<div {...__rozieAttrs} class={["todo-list", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-52bec3de>
+  <header data-rozie-s-52bec3de>
     {#if header}{@render header({ remaining, total: items.length })}{:else}
       
-      <h3>{title} ({remaining} remaining)</h3>
+      <h3 data-rozie-s-52bec3de>{title} ({remaining} remaining)</h3>
     {/if}
   </header>
 
-  <form onsubmit={($event) => { $event.preventDefault(); (add as (...a: any[]) => any)($event); }}>
-    <input bind:value={draft} placeholder="What needs doing?" />
-    <button type="submit" disabled={!draft.trim()}>Add</button>
+  <form onsubmit={($event) => { $event.preventDefault(); (add as (...a: any[]) => any)($event); }} data-rozie-s-52bec3de>
+    <input bind:value={draft} placeholder="What needs doing?" data-rozie-s-52bec3de />
+    <button type="submit" disabled={!draft.trim()} data-rozie-s-52bec3de>Add</button>
   </form>
 
-  {#if items.length > 0}<ul>
-    {#each items as item (item.id)}<li class={{ done: item.done }}>
+  {#if items.length > 0}<ul data-rozie-s-52bec3de>
+    {#each items as item (item.id)}<li class={{ done: item.done }} data-rozie-s-52bec3de>
       
       {#if children}{@render children({ item, toggle: () => toggle(item.id), remove: () => removeItem(item.id) })}{:else}
-        <label><input type="checkbox" checked={item.done} onchange={($event) => { toggle(item.id); }} /><span>{item.text}</span></label>
-        <button aria-label="Remove" onclick={($event) => { removeItem(item.id); }}>×</button>
+        <label data-rozie-s-52bec3de><input type="checkbox" checked={item.done} onchange={($event) => { toggle(item.id); }} data-rozie-s-52bec3de /><span data-rozie-s-52bec3de>{item.text}</span></label>
+        <button aria-label="Remove" onclick={($event) => { removeItem(item.id); }} data-rozie-s-52bec3de>×</button>
       {/if}
     </li>{/each}
-  </ul>{:else}<p class="empty">
+  </ul>{:else}<p class="empty" data-rozie-s-52bec3de>
     {#if empty}{@render empty()}{:else}Nothing to do. ✨{/if}
   </p>{/if}</div>
 
 
 <style>
-.todo-list { font-family: system-ui, sans-serif; }
-ul { list-style: none; padding: 0; }
-li { display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0; }
-li.done span { text-decoration: line-through; opacity: 0.5; }
-.empty { color: rgba(0, 0, 0, 0.4); font-style: italic; }
-form { display: flex; gap: 0.25rem; margin-block: 0.5rem; }
+:global {
+  .todo-list[data-rozie-s-52bec3de] { font-family: system-ui, sans-serif; }
+  ul[data-rozie-s-52bec3de] { list-style: none; padding: 0; }
+  li[data-rozie-s-52bec3de] { display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0; }
+  li.done[data-rozie-s-52bec3de] span[data-rozie-s-52bec3de] { text-decoration: line-through; opacity: 0.5; }
+  .empty[data-rozie-s-52bec3de] { color: rgba(0, 0, 0, 0.4); font-style: italic; }
+  form[data-rozie-s-52bec3de] { display: flex; gap: 0.25rem; margin-block: 0.5rem; }
+}
 </style>

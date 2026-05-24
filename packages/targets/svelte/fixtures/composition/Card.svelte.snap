@@ -10,7 +10,7 @@ let { ...__rozieAttrs }: Props = $props();
 </script>
 
 
-  <div {...__rozieAttrs} class={["card", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs}>
-    <CardHeader title="Hello"></CardHeader>
+  <div {...__rozieAttrs} class={["card", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-a88c221e>
+    <CardHeader title="Hello" data-rozie-s-a88c221e></CardHeader>
   </div>
 

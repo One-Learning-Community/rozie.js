@@ -1,15 +1,15 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`emitTemplateAttribute (Svelte) — ListenerSpreadIR (Plan 15-04 Task 2) > (1) literal-only no-merge: r-on="{ click: fn }" → onclick={fn} 1`] = `"<button onclick={fn}>go</button>"`;
+exports[`emitTemplateAttribute (Svelte) — ListenerSpreadIR (Plan 15-04 Task 2) > (1) literal-only no-merge: r-on="{ click: fn }" → onclick={fn} 1`] = `"<button onclick={fn} data-rozie-s-8fd6d49e>go</button>"`;
 
-exports[`emitTemplateAttribute (Svelte) — ListenerSpreadIR (Plan 15-04 Task 2) > (2) literal-with-merge: @click + r-on literal → R6 source-order dispatcher 1`] = `"<button onclick={($event) => { (() => { (f1 as (...a: any[]) => any)($event); })(); (() => { (f2 as (...a: any[]) => any)($event); })(); }}>go</button>"`;
+exports[`emitTemplateAttribute (Svelte) — ListenerSpreadIR (Plan 15-04 Task 2) > (2) literal-with-merge: @click + r-on literal → R6 source-order dispatcher 1`] = `"<button onclick={($event) => { (() => { (f1 as (...a: any[]) => any)($event); })(); (() => { (f2 as (...a: any[]) => any)($event); })(); }} data-rozie-s-8fd6d49e>go</button>"`;
 
-exports[`emitTemplateAttribute (Svelte) — ListenerSpreadIR (Plan 15-04 Task 2) > (3) literal modifier-bearing: r-on="{ 'click.stop': fn }" → onclick with stopPropagation 1`] = `"<button onclick={($event) => { $event.stopPropagation(); (fn as (...a: any[]) => any)($event); }}>go</button>"`;
+exports[`emitTemplateAttribute (Svelte) — ListenerSpreadIR (Plan 15-04 Task 2) > (3) literal modifier-bearing: r-on="{ 'click.stop': fn }" → onclick with stopPropagation 1`] = `"<button onclick={($event) => { $event.stopPropagation(); (fn as (...a: any[]) => any)($event); }} data-rozie-s-8fd6d49e>go</button>"`;
 
-exports[`emitTemplateAttribute (Svelte) — ListenerSpreadIR (Plan 15-04 Task 2) > (4) dynamic no-merge: r-on="someObj" → use:applyListeners={someObj} + shell import 1`] = `"<button use:applyListeners={someObj}>go</button>"`;
+exports[`emitTemplateAttribute (Svelte) — ListenerSpreadIR (Plan 15-04 Task 2) > (4) dynamic no-merge: r-on="someObj" → use:applyListeners={someObj} + shell import 1`] = `"<button use:applyListeners={someObj} data-rozie-s-8fd6d49e>go</button>"`;
 
-exports[`emitTemplateAttribute (Svelte) — ListenerSpreadIR (Plan 15-04 Task 2) > (5) dynamic with-merge: @click + r-on dynamic → both bind separately (DOM-level stacking) 1`] = `"<button onclick={f1} use:applyListeners={someObj}>go</button>"`;
+exports[`emitTemplateAttribute (Svelte) — ListenerSpreadIR (Plan 15-04 Task 2) > (5) dynamic with-merge: @click + r-on dynamic → both bind separately (DOM-level stacking) 1`] = `"<button onclick={f1} use:applyListeners={someObj} data-rozie-s-8fd6d49e>go</button>"`;
 
-exports[`emitTemplateAttribute (Svelte) — ListenerSpreadIR (Plan 15-04 Task 2) > (6) bare $listeners (D-19): r-on="$listeners" → use:applyListeners={__rozieAttrs} 1`] = `"<button use:applyListeners={__rozieAttrs}>go</button>"`;
+exports[`emitTemplateAttribute (Svelte) — ListenerSpreadIR (Plan 15-04 Task 2) > (6) bare $listeners (D-19): r-on="$listeners" → use:applyListeners={__rozieAttrs} 1`] = `"<button use:applyListeners={__rozieAttrs} data-rozie-s-8fd6d49e>go</button>"`;
 
-exports[`emitTemplateAttribute (Svelte) — ListenerSpreadIR (Plan 15-04 Task 2) > (7) bare $listeners + @click (R6 + D-19): both bind separately 1`] = `"<button onclick={f1} use:applyListeners={__rozieAttrs}>go</button>"`;
+exports[`emitTemplateAttribute (Svelte) — ListenerSpreadIR (Plan 15-04 Task 2) > (7) bare $listeners + @click (R6 + D-19): both bind separately 1`] = `"<button onclick={f1} use:applyListeners={__rozieAttrs} data-rozie-s-8fd6d49e>go</button>"`;

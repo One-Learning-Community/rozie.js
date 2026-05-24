@@ -143,10 +143,18 @@ export function emitSvelte(
 
   // 1. Script-side emission.
   // Phase 06.1 P2: thread filename for sourceFileName + capture scriptMap + preambleSectionLines.
-  // Spike 004 — per-component scope hash for `@portal` CSS scoping. Svelte
-  // has no native scope-hash infra (it class-hashes selectors); the shared
-  // helper gives the identical FNV-1a value the other targets compute.
+  // Spike 004 — per-component scope hash for `@portal` CSS scoping. Pre-
+  // Phase-16 Item 2 generalised the same value into the per-component scope
+  // attribute (`data-rozie-s-<hash>`) used by `scopeCss` + `emitTemplateNode`
+  // — Svelte previously delegated SFC-level scoping to its native class-hash
+  // compiler, which is correct for in-SFC selectors but does not propagate
+  // class-on-component CSS rules across SFC compile units (the consumer's
+  // `class="foo"` rule on a child component's root never matched because the
+  // child carried its own `.svelte-<hash>` class, not the consumer's). The
+  // FNV-1a hash from `computeScopeHash` is the identical value the other 5
+  // targets use; the attribute name follows the cross-target convention.
   const portalScopeHash = computeScopeHash(ir.name, opts.filename);
+  const scopeAttr = `data-rozie-s-${portalScopeHash}`;
   const scriptOpts: { filename?: string; portalScopeHash?: string } = {
     portalScopeHash,
   };
@@ -168,7 +176,7 @@ export function emitSvelte(
     scriptInjections: tmplInjections,
     diagnostics: tmplDiags,
     runtimeImports: tmplRuntimeImports,
-  } = emitTemplate(ir, registry);
+  } = emitTemplate(ir, registry, scopeAttr);
 
   // 3. <listeners>-block emission. Returns its own scriptInjections for
   //    debounce/throttle wrappers needed by Class C listeners.

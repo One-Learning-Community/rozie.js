@@ -21,7 +21,7 @@ const item = $derived(__itemProp ?? snippets?.item);
 </script>
 
 
-<div {...__rozieAttrs} class={["scoped-params-fixture", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs}>
+<div {...__rozieAttrs} class={["scoped-params-fixture", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-94f3adc8>
   {@render item?.({ value: label })}
 </div>
 

@@ -21,11 +21,11 @@ const removeItem = (id: any) => {
 </script>
 
 
-<ul {...__rozieAttrs} use:applyListeners={__rozieAttrs}>
-  {#each items as e (e.id)}<li>
-    <span>{e.label}</span>
+<ul {...__rozieAttrs} use:applyListeners={__rozieAttrs} data-rozie-s-a955b18d>
+  {#each items as e (e.id)}<li data-rozie-s-a955b18d>
+    <span data-rozie-s-a955b18d>{e.label}</span>
     
-    <button type="button" onclick={($event) => { removeItem(e.id); }}>×</button>
+    <button type="button" onclick={($event) => { removeItem(e.id); }} data-rozie-s-a955b18d>×</button>
   </li>{/each}
 </ul>
 

@@ -29,9 +29,11 @@ onMount(() => {
 </script>
 
 
-<div {...__rozieAttrs} class={["ticker", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs}>{ticks}</div>
+<div {...__rozieAttrs} class={["ticker", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-722b58d1>{ticks}</div>
 
 
 <style>
-.ticker { font-variant-numeric: tabular-nums; }
+:global {
+  .ticker[data-rozie-s-722b58d1] { font-variant-numeric: tabular-nums; }
+}
 </style>

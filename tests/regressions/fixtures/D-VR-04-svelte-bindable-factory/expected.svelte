@@ -12,9 +12,11 @@ const remaining = $derived(items.filter((i: any) => !i.done).length);
 </script>
 
 
-<div {...__rozieAttrs} class={["count", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs}>{remaining}</div>
+<div {...__rozieAttrs} class={["count", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-10572f51>{remaining}</div>
 
 
 <style>
-.count { font-variant-numeric: tabular-nums; }
+:global {
+  .count[data-rozie-s-10572f51] { font-variant-numeric: tabular-nums; }
+}
 </style>

@@ -22,20 +22,22 @@ onMount(() => {
 </script>
 
 
-<div data-handle={".panel"} data-grip={gripSelector} {...__rozieAttrs} class={["panel", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs}>
-  <span class="grip" aria-hidden="true">⋮⋮</span>
-  {#if ready}<span>ready</span>{/if}</div>
+<div data-handle={".panel"} data-grip={gripSelector} {...__rozieAttrs} class={["panel", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-899140be>
+  <span class="grip" aria-hidden="true" data-rozie-s-899140be>⋮⋮</span>
+  {#if ready}<span data-rozie-s-899140be>ready</span>{/if}</div>
 
 
 <style>
-.panel {
-  display: block;
-  padding: 0.5rem;
-  font-family: system-ui, -apple-system, sans-serif;
-}
-.grip {
-  cursor: grab;
-  user-select: none;
-  color: rgba(0, 0, 0, 0.35);
+:global {
+  .panel[data-rozie-s-899140be] {
+    display: block;
+    padding: 0.5rem;
+    font-family: system-ui, -apple-system, sans-serif;
+  }
+  .grip[data-rozie-s-899140be] {
+    cursor: grab;
+    user-select: none;
+    color: rgba(0, 0, 0, 0.35);
+  }
 }
 </style>

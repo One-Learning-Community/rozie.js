@@ -98,19 +98,21 @@ onMount(() => {
 </script>
 
 
-<div bind:this={__rozieRoot} {...__rozieAttrs} class={["rozie-portal-list", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs}>
+<div bind:this={__rozieRoot} {...__rozieAttrs} class={["rozie-portal-list", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-18e5aac6>
   
 </div>
 
 
 <style>
-.rozie-portal-list {
-  display: block;
-  font-family: system-ui, -apple-system, sans-serif;
+:global {
+  .rozie-portal-list[data-rozie-s-18e5aac6] {
+    display: block;
+    font-family: system-ui, -apple-system, sans-serif;
+  }
 }
 
 :global {
-  [data-rozie-portal-item="18e5aac6"][data-rozie-portal-item="18e5aac6"] ul {
+  [data-rozie-portal-item="18e5aac6"] ul {
     list-style: none;
     margin: 0;
     padding: 0;
@@ -118,13 +120,13 @@ onMount(() => {
     border-radius: 6px;
     overflow: hidden;
   }
-  [data-rozie-portal-item="18e5aac6"][data-rozie-portal-item="18e5aac6"] li {
+  [data-rozie-portal-item="18e5aac6"] li {
     padding: 0.5rem 0.75rem;
   }
-  [data-rozie-portal-item="18e5aac6"][data-rozie-portal-item="18e5aac6"] li + li {
+  [data-rozie-portal-item="18e5aac6"] li + li {
     border-top: 1px solid rgba(0, 0, 0, 0.06);
   }
-  [data-rozie-portal-item="18e5aac6"][data-rozie-portal-item="18e5aac6"] div {
+  [data-rozie-portal-item="18e5aac6"] div {
     display: flex;
     align-items: center;
     gap: 0.5rem;

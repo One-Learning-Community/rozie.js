@@ -83,6 +83,21 @@ export interface EmitNodeCtx {
    * this set is non-empty.
    */
   runtimeImports: Set<string>;
+  /**
+   * Pre-Phase-16 cleanup Item 2 — per-component scope attribute (e.g.
+   * `data-rozie-s-7914ecaa`). When non-empty, `emitElement` stamps it on
+   * EVERY emitted element AND on every component-tag invocation
+   * (`tagKind === 'component' | 'self'`). The component-invocation stamp is
+   * the cross-SFC propagation path: the child's auto-fallthrough machinery
+   * (`{...$$restProps}` / synthesized `$attrs` spread) carries the
+   * consumer's scope attribute onto the child's rendered root, so the
+   * consumer's class-on-component CSS rules match. Mirrors the react/solid/
+   * lit pattern; Svelte was the lone hold-out that previously relied on
+   * Svelte's native `.svelte-<hash>` class-hashing (which does NOT
+   * propagate across SFC compile units). Empty string = no stamping (the
+   * pre-Item-2 verbatim emit path, used by degenerate test-only callers).
+   */
+  scopeAttr: string;
 }
 
 function emitStaticText(node: TemplateStaticTextIR): string {
@@ -368,6 +383,18 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
   if (attrText) partsHead.push(attrText);
   if (eventText) partsHead.push(eventText);
   for (const sp of spreadTexts) partsHead.push(sp);
+  // Pre-Phase-16 Item 2: stamp the per-component scope attribute on every
+  // emitted element AND on every component-tag invocation. The element-side
+  // stamp matches the `[data-rozie-s-<hash>]` selector that `scopeCss`
+  // appended to every scoped rule. The component-tag stamp is the cross-SFC
+  // propagation path — the child's auto-fallthrough machinery delivers the
+  // consumer's scope attribute onto the child's rendered root, so the
+  // consumer's class-on-component CSS rules match. Mirrors react/solid/lit;
+  // see the EmitNodeCtx.scopeAttr docstring for why Svelte needed to switch
+  // off its native scoper for this to work.
+  if (ctx.scopeAttr.length > 0) {
+    partsHead.push(ctx.scopeAttr);
+  }
   const head = partsHead.length > 0 ? ' ' + partsHead.join(' ') : '';
 
   // r-html: ROZ620 when coexistent with children; emit `{@html expr}` content.

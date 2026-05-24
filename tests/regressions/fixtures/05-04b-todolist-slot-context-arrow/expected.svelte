@@ -23,9 +23,9 @@ const remaining = $derived(items.filter((i: any) => !i.done).length);
 </script>
 
 
-<ul {...__rozieAttrs} class={["list", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs}>
+<ul {...__rozieAttrs} class={["list", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-5e6c469d>
   
-  {#each items as item (item.id)}<li>
+  {#each items as item (item.id)}<li data-rozie-s-5e6c469d>
     {#if item}{@render item({ item, remaining })}{:else}
       {item.label}
     {/if}
@@ -34,5 +34,7 @@ const remaining = $derived(items.filter((i: any) => !i.done).length);
 
 
 <style>
-.list { list-style: none; padding: 0; }
+:global {
+  .list[data-rozie-s-5e6c469d] { list-style: none; padding: 0; }
+}
 </style>

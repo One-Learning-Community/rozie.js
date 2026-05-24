@@ -16,12 +16,14 @@ const close = () => {
 </script>
 
 
-<div {...__rozieAttrs} class={["backdrop", (__rozieAttrs)?.class]} onclick={($event) => { closeOnBackdrop && close(); }} use:applyListeners={__rozieAttrs}>
+<div {...__rozieAttrs} class={["backdrop", (__rozieAttrs)?.class]} onclick={($event) => { closeOnBackdrop && close(); }} use:applyListeners={__rozieAttrs} data-rozie-s-8ec7623e>
   
-  <button onclick={close}>Close</button>
+  <button onclick={close} data-rozie-s-8ec7623e>Close</button>
 </div>
 
 
 <style>
-.backdrop { position: fixed; inset: 0; }
+:global {
+  .backdrop[data-rozie-s-8ec7623e] { position: fixed; inset: 0; }
+}
 </style>

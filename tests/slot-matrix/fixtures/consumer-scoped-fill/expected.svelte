@@ -9,8 +9,8 @@ let { ...__rozieAttrs }: Props = $props();
 </script>
 
 
-<Producer>{#snippet header({ close })}
-    <button onclick={close}>×</button>
+<Producer data-rozie-s-bd0c3708>{#snippet header({ close })}
+    <button onclick={close} data-rozie-s-bd0c3708>×</button>
   {/snippet}
   Body text
 </Producer>

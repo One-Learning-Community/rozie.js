@@ -29,9 +29,9 @@ const actions = $derived(__actionsProp ?? snippets?.actions);
 </script>
 
 
-<Modal bind:open={open} title={title}>{#snippet header()}
+<Modal bind:open={open} title={title} data-rozie-s-1efe6192>{#snippet header()}
     {#if brand}{@render brand()}{:else}
-      <h2>{title}</h2>
+      <h2 data-rozie-s-1efe6192>{title}</h2>
     {/if}
   {/snippet}{#snippet footer()}
     {@render actions?.()}

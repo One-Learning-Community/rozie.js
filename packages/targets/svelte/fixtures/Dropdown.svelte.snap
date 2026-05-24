@@ -101,25 +101,27 @@ $effect(() => {
 </script>
 
 
-<div {...__rozieAttrs} class={["dropdown", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs}>
-  <div bind:this={triggerEl} onclick={toggle}>
+<div {...__rozieAttrs} class={["dropdown", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-6d6bd882>
+  <div bind:this={triggerEl} onclick={toggle} data-rozie-s-6d6bd882>
     {@render trigger?.({ open, toggle })}
   </div>
 
-  {#if open}<div bind:this={panelEl} class="dropdown-panel" role="menu">
+  {#if open}<div bind:this={panelEl} class="dropdown-panel" role="menu" data-rozie-s-6d6bd882>
     {@render children?.({ close })}
   </div>{/if}</div>
 
 
 <style>
-.dropdown { position: relative; display: inline-block; }
-.dropdown-panel {
-  position: fixed;
-  z-index: var(--rozie-dropdown-z, 1000);
-  background: white;
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  border-radius: 6px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+:global {
+  .dropdown[data-rozie-s-6d6bd882] { position: relative; display: inline-block; }
+  .dropdown-panel[data-rozie-s-6d6bd882] {
+    position: fixed;
+    z-index: var(--rozie-dropdown-z, 1000);
+    background: white;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  }
 }
 
 :global(:root) {

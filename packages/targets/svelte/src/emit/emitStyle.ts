@@ -1,20 +1,36 @@
 /**
- * emitStyle — Phase 5 Plan 02a Task 3.
+ * emitStyle — Phase 5 Plan 02a Task 3 + pre-Phase-16 cleanup Item 2.
  *
  * Re-stringifies the IR's StyleSection into ONE Svelte 5 `<style>` block.
- * Per RESEARCH Pattern 5:
  *
- *   - Scoped rules (StyleSection.scopedRules) → emitted verbatim. Svelte's
- *     compiler automatically class-hashes selectors at compile time; no
- *     `scoped` attribute needed.
+ * The original Phase-5 emit handed scoped rules to Svelte's native class-hash
+ * compiler verbatim. That mechanism only stamps its `.svelte-<hash>` class on
+ * elements that lexically live in the same SFC compile unit, breaking any
+ * consumer-side `class="foo"` rule that targets a child-component's root
+ * element (the child's root carries the CHILD's hash, not the consumer's).
+ * Item 2 of the pre-Phase-16 cleanup switches Svelte onto Rozie's own
+ * `data-rozie-s-*` scoping mechanism (mirroring react/solid/lit/angular's
+ * approach to the same problem), keeping the SFC-isolation guarantee while
+ * letting consumer-side class-on-component rules propagate cleanly through
+ * the auto-fallthrough machinery. The selector rewrite lives in
+ * `./scopeCss.ts`; this module wraps the rewritten source in Svelte 5's
+ * `:global { ... }` block so Svelte's compiler leaves the rewritten selectors
+ * alone (no `.svelte-<hash>` appending). The `:global { }` block-form
+ * opt-out is already the established pattern here for `@portal` blocks; the
+ * Item-2 switch generalises it to all scoped rules.
+ *
+ * Per the new pipeline:
+ *   - Scoped rules (StyleSection.scopedRules) → rewritten via `scopeCss` to
+ *     append `[data-rozie-s-<hash>]` to every compound selector, then wrapped
+ *     in `:global { ... }` to opt out of Svelte's native scoper.
  *   - Root rules (StyleSection.rootRules) — `:root { ... }` rules from
  *     Phase 1's parseStyle — wrap in `:global(:root) { ... }`. The
  *     `:global(...)` selector wrapper is Svelte's canonical idiom for "this
- *     rule should not be class-hashed."
+ *     rule should not be class-hashed." Unchanged from the Phase-5 emit.
+ *   - @portal rules — already opt out via `:global { ... }`. Unchanged.
  *
  * Single `<style>` block (Svelte uses ONE block, unlike Vue's two-block
- * scoped+global split). The :root rules inline inside the same block, just
- * wrapped with `:global(:root)`.
+ * scoped+global split).
  *
  * Wave 0 finding: Phase 1's lowerStyles populates `StyleSection.scopedRules`
  * and `StyleSection.rootRules` with `StyleRule` objects (`{ selector, loc,
@@ -27,20 +43,23 @@ import type { StyleSection } from '../../../../core/src/ir/types.js';
 import type { StyleRule } from '../../../../core/src/ast/blocks/StyleAST.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { rewriteAllPortalBlocks } from '../../../../core/src/codegen/portalCss.js';
+import { scopeCss } from './scopeCss.js';
 
 /**
  * Quick task 260520-bu7 — additional repeats of the portal scope attribute
  * selector for cross-target CSS-specificity compensation.
  *
- * Svelte: 1. A competing consumer scoped-CSS rule gets a `.svelte-<hash>`
- * scope class appended — one extra `(0,1,0)` specificity unit — so the
- * `@portal` scope attribute is repeated once to match.
+ * Pre-Item-2 (Phase-5 design): a competing consumer scoped-CSS rule got a
+ * `.svelte-<hash>` scope class appended — one extra `(0,1,0)` specificity
+ * unit — so the `@portal` scope attribute was repeated once to match.
  *
- * FIRST GUESS — the VR matrix D-10 byte-identity is the oracle (Task 2).
- * Svelte 5 MAY wrap the scope class in `:where()` (which contributes `(0,0,0)`);
- * if so this should drop to 0. The VR run confirms or corrects this value.
+ * Post-Item-2: scoped rules are now wrapped in `:global { ... }`, opting out
+ * of Svelte's native scoper entirely — there is no `.svelte-<hash>` class
+ * adding specificity to compete with. The repeat drops to 0 to match the
+ * react/solid/lit baseline; the VR matrix D-10 byte-identity gate is the
+ * empirical oracle (260520-bu7 Task 2).
  */
-const PORTAL_SCOPE_REPEAT = 1;
+const PORTAL_SCOPE_REPEAT = 0;
 
 export interface EmitStyleResult {
   /** Body of the single `<style>` block (joined scoped + :global(:root) + @portal rules). */
@@ -85,7 +104,23 @@ export function emitStyle(
   const parts: string[] = [];
 
   if (scopedRules.length > 0) {
-    parts.push(stringifyRules(scopedRules, source));
+    // Item-2: rewrite selectors via `scopeCss` to append the per-component
+    // `data-rozie-s-<hash>` attribute, then wrap in `:global { ... }` so
+    // Svelte's compiler leaves them alone (no `.svelte-<hash>` class append).
+    // When `scopeHash` is empty (caller did not thread one — degenerate
+    // test-only paths) fall back to verbatim emit; the cross-SFC propagation
+    // story is moot when there's no consumer either.
+    const scopedRaw = stringifyRules(scopedRules, source);
+    if (scopeHash.length > 0) {
+      const rewritten = scopeCss(scopedRaw, scopeHash);
+      const indented = rewritten
+        .split('\n')
+        .map((l) => (l.length > 0 ? `  ${l}` : l))
+        .join('\n');
+      parts.push(`:global {\n${indented}\n}`);
+    } else {
+      parts.push(scopedRaw);
+    }
   }
 
   // :root rules wrap inside :global(:root) { ... }

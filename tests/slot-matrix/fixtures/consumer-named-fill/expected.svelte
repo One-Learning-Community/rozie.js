@@ -9,8 +9,8 @@ let { ...__rozieAttrs }: Props = $props();
 </script>
 
 
-<Producer>{#snippet header()}
-    <h2>Custom Header</h2>
+<Producer data-rozie-s-bd0c3708>{#snippet header()}
+    <h2 data-rozie-s-bd0c3708>Custom Header</h2>
   {/snippet}
   Custom body content
 </Producer>

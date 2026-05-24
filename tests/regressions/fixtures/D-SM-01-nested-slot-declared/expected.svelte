@@ -22,10 +22,10 @@ const inner = $derived(__innerProp ?? snippets?.inner);
 </script>
 
 
-<div {...__rozieAttrs} class={["outer", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs}>
+<div {...__rozieAttrs} class={["outer", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-3bc5be6c>
   
   {#if wrapper}{@render wrapper()}{:else}
-    <div class="wrapper-fallback">
+    <div class="wrapper-fallback" data-rozie-s-3bc5be6c>
       {@render inner?.()}
     </div>
   {/if}
@@ -33,5 +33,7 @@ const inner = $derived(__innerProp ?? snippets?.inner);
 
 
 <style>
-.outer { display: block; }
+:global {
+  .outer[data-rozie-s-3bc5be6c] { display: block; }
+}
 </style>

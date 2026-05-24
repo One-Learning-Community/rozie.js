@@ -9,11 +9,13 @@ let bound = $state('max');
 </script>
 
 
-{#if bound === 'max' || bound === 'min'}<span class="extremum">at an extremum</span>{:else if bound === 'mid'}<span class="middle">in the middle</span>{:else}<span class="other">somewhere else</span>{/if}
+{#if bound === 'max' || bound === 'min'}<span class="extremum" data-rozie-s-65af5512>at an extremum</span>{:else if bound === 'mid'}<span class="middle" data-rozie-s-65af5512>in the middle</span>{:else}<span class="other" data-rozie-s-65af5512>somewhere else</span>{/if}
 
 
 <style>
-.extremum { font-weight: 600; }
-.middle { opacity: 0.8; }
-.other { opacity: 0.5; }
+:global {
+  .extremum[data-rozie-s-65af5512] { font-weight: 600; }
+  .middle[data-rozie-s-65af5512] { opacity: 0.8; }
+  .other[data-rozie-s-65af5512] { opacity: 0.5; }
+}
 </style>

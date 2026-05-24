@@ -55,18 +55,20 @@ const debouncedOnSearch = (() => {
 </script>
 
 
-<div {...__rozieAttrs} class={["search-input", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs}>
+<div {...__rozieAttrs} class={["search-input", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-8bbc4a60>
   
-  <input bind:this={inputEl} type="search" placeholder={placeholder} bind:value={query} oninput={debouncedOnSearch} onkeydown={($event) => { (() => { (($event) => { if ($event.key !== 'Enter') return; (onSearch as (...a: any[]) => any)($event); })($event); })(); (() => { (($event) => { if ($event.key !== 'Escape') return; (clear as (...a: any[]) => any)($event); })($event); })(); }} />
+  <input bind:this={inputEl} type="search" placeholder={placeholder} bind:value={query} oninput={debouncedOnSearch} onkeydown={($event) => { (() => { (($event) => { if ($event.key !== 'Enter') return; (onSearch as (...a: any[]) => any)($event); })($event); })(); (() => { (($event) => { if ($event.key !== 'Escape') return; (clear as (...a: any[]) => any)($event); })($event); })(); }} data-rozie-s-8bbc4a60 />
 
-  {#if query.length > 0}<button class="clear-btn" aria-label="Clear" onclick={clear}>
+  {#if query.length > 0}<button class="clear-btn" aria-label="Clear" onclick={clear} data-rozie-s-8bbc4a60>
     ×
-  </button>{:else}<span class="hint">{minLength}+ chars</span>{/if}</div>
+  </button>{:else}<span class="hint" data-rozie-s-8bbc4a60>{minLength}+ chars</span>{/if}</div>
 
 
 <style>
-.search-input { display: inline-flex; align-items: center; gap: 0.25rem; }
-input { padding: 0.25rem 0.5rem; }
-.clear-btn { background: none; border: none; cursor: pointer; font-size: 1.25rem; }
-.hint { color: rgba(0, 0, 0, 0.4); font-size: 0.85em; }
+:global {
+  .search-input[data-rozie-s-8bbc4a60] { display: inline-flex; align-items: center; gap: 0.25rem; }
+  input[data-rozie-s-8bbc4a60] { padding: 0.25rem 0.5rem; }
+  .clear-btn[data-rozie-s-8bbc4a60] { background: none; border: none; cursor: pointer; font-size: 1.25rem; }
+  .hint[data-rozie-s-8bbc4a60] { color: rgba(0, 0, 0, 0.4); font-size: 0.85em; }
+}
 </style>

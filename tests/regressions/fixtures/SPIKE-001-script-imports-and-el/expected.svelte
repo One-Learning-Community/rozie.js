@@ -32,7 +32,7 @@ onMount(() => {
 </script>
 
 
-<div bind:this={__rozieRoot} {...__rozieAttrs} class={["spike-root", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs}>
+<div bind:this={__rozieRoot} {...__rozieAttrs} class={["spike-root", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-f590f443>
   {@render children?.()}
 </div>
 

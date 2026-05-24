@@ -9,5 +9,5 @@ let { ...__rozieAttrs }: Props = $props();
 </script>
 
 
-<Producer title={'Hello'}>Body text</Producer>
+<Producer title={'Hello'} data-rozie-s-bd0c3708>Body text</Producer>
 

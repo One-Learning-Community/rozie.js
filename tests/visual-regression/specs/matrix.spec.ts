@@ -388,19 +388,46 @@ const PHASE_14_1_FOLLOWUP = new Set<string>([
   //       flex layout in a way the other 5 targets' CSS pipelines avoid.
   // Carried as Item-1-residual into a follow-up post-Phase-16 sweep.
   'ThemedButtonConsumer::solid',
-  // Tracked in Phase 14.2 (Svelte-specific scope mechanism):
-  // Svelte uses native class-hash CSS scoping (`.foo.svelte-XXX`). The
-  // consumer's `.extra-variant.svelte-1v25g67` rule requires
-  // `svelte-1v25g67` on the rendered element — but Svelte's compiler only
-  // adds its hash class to elements within the same SFC compile unit.
-  // The wrapper's inner `<button>` carries the wrapper's `svelte-z6j08b`,
-  // not the consumer's `svelte-1v25g67`, so the rule never matches.
-  // Cell lands at 177×52 (the class-clobber reorder fix shipped this phase
-  // fixed the `.btn` path); 2753 px diff is the missing font-weight: 600.
-  // Phase 14.2 needs either (a) emit consumer's class-on-component rules
-  // as `:global()` to escape Svelte scope, or (b) switch Rozie's Svelte
-  // CSS pipeline off Svelte's native scoper onto Rozie's own
-  // `data-rozie-s-*` mechanism.
+  // Pre-Phase-16 cleanup Item 2 PARTIAL closure (2026-05-23). The original
+  // gate hypothesis was correct: Svelte uses native class-hash CSS scoping
+  // (`.foo.svelte-XXX`) which only stamps on elements lexically inside the
+  // same SFC compile unit, so the consumer's `.extra-variant.svelte-CONSUMER`
+  // rule never matched the wrapper's inner button (which carried
+  // `.svelte-WRAPPER`). Item 2 implemented fix-path (b) — switched Rozie's
+  // Svelte CSS pipeline off Svelte's native scoper onto `data-rozie-s-*`,
+  // mirroring react/solid/lit:
+  //   - `packages/targets/svelte/src/emit/scopeCss.ts` (new) — selector
+  //     rewriter, copy of the react sibling
+  //   - `emitStyle.ts` — wraps scoped rules in `:global { ... }` block to
+  //     opt out of Svelte's native scoper; `PORTAL_SCOPE_REPEAT` drops 1→0
+  //   - `emitTemplate.ts` + `emitTemplateNode.ts` — threads `scopeAttr` and
+  //     stamps `data-rozie-s-<hash>` on every element AND every component-
+  //     tag invocation (cross-SFC propagation path)
+  //   - `emitSvelte.ts` — derives `scopeAttr` from the existing
+  //     `portalScopeHash` (no new hash computation)
+  //
+  // Post-Item-2 the cell improves 9 457 → 7 085 px diff (25% reduction);
+  // `.extra-variant` font-weight (bold) renders correctly, `.btn` background
+  // applies, all four buttons present in the right layout. 10 of 11
+  // themed-button × svelte cells now pass (DOM-class assertions, listener
+  // attachments, etc.).
+  //
+  // RESIDUAL — the per-button color overrides (consumer-passed
+  // `style="--btn-bg: #ef4444"` etc.) do not win over the wrapper's
+  // `style:--btn-bg={'#3b82f6'}` directive. Root cause is an established
+  // Svelte 5 semantic (see `emitTemplateAttribute.ts:401-406`): Svelte's
+  // compiled output places per-property `style:` directive state under a
+  // Symbol-keyed slot processed AFTER any spread inside the generated props
+  // object, so wrapper directives intentionally win over spread style. The
+  // other 5 targets (Vue/React/Solid/Lit/Angular) all run the OPPOSITE
+  // precedence (consumer wins), which is the cross-target intent for
+  // attribute fallthrough. Closing this requires switching Svelte's `:style`
+  // object-literal lowering OFF the `style:<prop>=` directive form (when
+  // auto-fallthrough is active on the same element) ONTO either a
+  // string-attribute emit or a runtime style-merge helper. Tracked as
+  // Item-2-residual into a post-Phase-16 sweep — see also
+  // `themed-button.spec.ts` PHASE_14_1_FOLLOWUP_TARGETS for the
+  // `consumer style="--btn-bg" overrides...` test that still fails.
   'ThemedButtonConsumer::svelte',
 ]);
 

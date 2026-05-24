@@ -13,8 +13,8 @@ let innerVal = $state('hello');
 </script>
 
 
-<Producer bind:open={outerOpen}>{#snippet footer({ close })}
-    <Inner bind:open={outerOpen}></Inner>
-    <button onclick={close}>×</button>
+<Producer bind:open={outerOpen} data-rozie-s-bd0c3708>{#snippet footer({ close })}
+    <Inner bind:open={outerOpen} data-rozie-s-bd0c3708></Inner>
+    <button onclick={close} data-rozie-s-bd0c3708>×</button>
   {/snippet}</Producer>
 

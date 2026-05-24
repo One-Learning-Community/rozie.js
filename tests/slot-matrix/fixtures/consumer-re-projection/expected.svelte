@@ -9,5 +9,5 @@ let { ...__rozieAttrs }: Props = $props();
 </script>
 
 
-<Wrapper>{#snippet title()}Hello from consumer{/snippet}</Wrapper>
+<Wrapper data-rozie-s-bd0c3708>{#snippet title()}Hello from consumer{/snippet}</Wrapper>
 

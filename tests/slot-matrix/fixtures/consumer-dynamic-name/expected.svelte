@@ -11,5 +11,5 @@ let slotName = $state('a');
 </script>
 
 
-<Producer snippets={{ [slotName]: __rozieDynSlot_0 }}>{#snippet __rozieDynSlot_0()}Dynamic fill{/snippet}</Producer>
+<Producer data-rozie-s-bd0c3708 snippets={{ [slotName]: __rozieDynSlot_0 }}>{#snippet __rozieDynSlot_0()}Dynamic fill{/snippet}</Producer>
 

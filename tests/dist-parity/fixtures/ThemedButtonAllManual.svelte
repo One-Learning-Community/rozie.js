@@ -15,26 +15,28 @@ let {
 </script>
 
 
-<button style:--btn-bg={'#3b82f6'} style:--btn-fg={'#ffffff'} {...__rozieAttrs} class={["btn", variant, (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs}>
+<button style:--btn-bg={'#3b82f6'} style:--btn-fg={'#ffffff'} {...__rozieAttrs} class={["btn", variant, (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-de172510>
   {label}
 </button>
 
 
 <style>
-.btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 1rem;
-  border-radius: 0.25rem;
-  border: 1px solid rgba(0, 0, 0, 0.15);
-  background: var(--btn-bg, #3b82f6);
-  color: var(--btn-fg, #ffffff);
-  font: inherit;
-  cursor: pointer;
-}
-.btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+:global {
+  .btn[data-rozie-s-de172510] {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border-radius: 0.25rem;
+    border: 1px solid rgba(0, 0, 0, 0.15);
+    background: var(--btn-bg, #3b82f6);
+    color: var(--btn-fg, #ffffff);
+    font: inherit;
+    cursor: pointer;
+  }
+  .btn[data-rozie-s-de172510]:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
 }
 </style>

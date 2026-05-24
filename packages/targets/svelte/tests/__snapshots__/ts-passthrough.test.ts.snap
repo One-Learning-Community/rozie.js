@@ -31,7 +31,7 @@ onMount(() => {
 </script>
 
 
-  <button {...__rozieAttrs} onclick={($event) => { inc(1); }} use:applyListeners={__rozieAttrs}>{label}: {count}</button>
+  <button {...__rozieAttrs} onclick={($event) => { inc(1); }} use:applyListeners={__rozieAttrs} data-rozie-s-189ead9a>{label}: {count}</button>
 
 "
 `;
@@ -61,7 +61,7 @@ onMount(() => {
 </script>
 
 
-  <button {...__rozieAttrs} onclick={($event) => { inc(1); }} use:applyListeners={__rozieAttrs}>{label}: {count}</button>
+  <button {...__rozieAttrs} onclick={($event) => { inc(1); }} use:applyListeners={__rozieAttrs} data-rozie-s-189ead9a>{label}: {count}</button>
 
 "
 `;

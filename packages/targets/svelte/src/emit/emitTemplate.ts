@@ -42,6 +42,7 @@ export interface EmitTemplateResult {
 export function emitTemplate(
   ir: IRComponent,
   registry: ModifierRegistry,
+  scopeAttr: string = '',
 ): EmitTemplateResult {
   const diagnostics: Diagnostic[] = [];
   const scriptInjections: SvelteScriptInjection[] = [];
@@ -63,6 +64,7 @@ export function emitTemplate(
     scriptInjections,
     injectionCounter: { next: 0 },
     runtimeImports,
+    scopeAttr,
   };
 
   const template = emitNode(ir.template, ctx);

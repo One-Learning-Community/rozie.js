@@ -10,13 +10,15 @@ let { checked = $bindable(false), ...__rozieAttrs }: Props = $props();
 </script>
 
 
-<label {...__rozieAttrs} class={["toggle", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs}>
+<label {...__rozieAttrs} class={["toggle", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-5898a126>
   
-  <input type="checkbox" bind:checked={checked} />
-  <span>Enabled</span>
+  <input type="checkbox" bind:checked={checked} data-rozie-s-5898a126 />
+  <span data-rozie-s-5898a126>Enabled</span>
 </label>
 
 
 <style>
-.toggle { display: inline-flex; gap: 0.25rem; align-items: center; }
+:global {
+  .toggle[data-rozie-s-5898a126] { display: inline-flex; gap: 0.25rem; align-items: center; }
+}
 </style>
