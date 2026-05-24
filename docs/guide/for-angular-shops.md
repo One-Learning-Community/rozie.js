@@ -17,45 +17,79 @@ your existing Angular app as a standalone component. Nothing else changes.
 
 ### Side by side — a debounced search input
 
-Hand-written Angular standalone component:
+This is the canonical `examples/SearchInput.rozie` file — the same one
+used as a working consumer in
+[`examples/consumers/angular-analogjs/`](https://github.com/One-Learning-Community/rozie.js/tree/main/examples/consumers/angular-analogjs/src),
+and the same one the [SearchInput example page](/examples/search-input)
+shows compiled to all six targets. The Angular output below is generated
+on every docs build by passing the Rozie source through the live
+compiler — it cannot drift.
+
+#### What an Angular dev typically writes today
 
 ```ts
-// SearchInput.ts (hand-written Angular)
-import { Component, signal, computed, effect, input, output, DestroyRef, inject } from '@angular/core';
+// SearchInput.ts (hand-written Angular standalone component)
+import {
+  Component, ElementRef, ViewEncapsulation,
+  computed, effect, inject, input, output, signal, viewChild,
+  DestroyRef, afterNextRender,
+} from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Subject, debounceTime } from 'rxjs';
 
 @Component({
   selector: 'rz-search-input',
   standalone: true,
+  imports: [FormsModule],
   template: `
-    <input
-      [value]="query()"
-      (input)="onInput($any($event.target).value)"
-      [placeholder]="placeholder()"
-    />
-    @if (query().length > 0) {
-      <button (click)="clear()">×</button>
-    }
+    <div class="search-input">
+      <input
+        #inputEl
+        type="search"
+        [placeholder]="placeholder()"
+        [ngModel]="query()"
+        (ngModelChange)="onInput($event)"
+        (keydown.enter)="onSearch()"
+        (keydown.escape)="onClear()"
+      />
+      @if (query().length > 0) {
+        <button class="clear-btn" (click)="onClear()" aria-label="Clear">×</button>
+      } @else {
+        <span class="hint">{{ minLength() }}+ chars</span>
+      }
+    </div>
   `,
   styles: [`
-    input { padding: 0.5rem; border: 1px solid #ddd; }
-    button { margin-left: 0.5rem; }
+    .search-input { display: inline-flex; align-items: center; gap: 0.25rem; }
+    input { padding: 0.25rem 0.5rem; }
+    .clear-btn { background: none; border: none; cursor: pointer; font-size: 1.25rem; }
+    .hint { color: rgba(0, 0, 0, 0.4); font-size: 0.85em; }
   `],
 })
 export class SearchInput {
   placeholder = input<string>('Search…');
+  minLength = input<number>(2);
+  autofocus = input<boolean>(false);
   search = output<string>();
+  clear = output<void>();
 
   protected query = signal('');
-  private debouncer = new Subject<string>();
+  protected isValid = computed(() => this.query().length >= this.minLength());
+  protected inputEl = viewChild<ElementRef<HTMLInputElement>>('inputEl');
+
   private destroyRef = inject(DestroyRef);
+  private debouncer = new Subject<string>();
 
   constructor() {
     this.debouncer.pipe(
       debounceTime(300),
       takeUntilDestroyed(this.destroyRef),
-    ).subscribe(v => this.search.emit(v));
+    ).subscribe(() => this.onSearch());
+
+    afterNextRender(() => {
+      if (this.autofocus()) this.inputEl()?.nativeElement?.focus();
+    });
   }
 
   protected onInput(value: string) {
@@ -63,69 +97,56 @@ export class SearchInput {
     this.debouncer.next(value);
   }
 
-  protected clear() {
+  protected onSearch() {
+    if (this.isValid()) this.search.emit(this.query());
+  }
+
+  protected onClear() {
     this.query.set('');
-    this.search.emit('');
+    this.clear.emit();
   }
 }
 ```
 
-The same component in Rozie:
+#### The same component in Rozie
 
-```rozie
-<rozie name="SearchInput">
-
-<props>
-{
-  placeholder: { type: String, default: 'Search…' },
-}
-</props>
-
-<data>
-{ query: '' }
-</data>
-
-<script>
-const clear = () => { $data.query = ''; $emit('search', '') }
-</script>
-
-<template>
-<input
-  :value="$data.query"
-  @input.debounce(300)="$data.query = $event.target.value; $emit('search', $data.query)"
-  :placeholder="$props.placeholder"
-/>
-<button r-if="$data.query.length > 0" @click="clear">×</button>
-</template>
-
-<style>
-input  { padding: 0.5rem; border: 1px solid #ddd; }
-button { margin-left: 0.5rem; }
-</style>
-
-</rozie>
+```rozie-src SearchInput
 ```
 
-The Rozie compiler emits an Angular standalone component that's
-**structurally equivalent** to the hand-written version above — the same
-`signal()` / `input()` / `output()` / `inject(DestroyRef)` / `effect()`
-machinery, with `@for` / `@if` blocks in the template. You don't see it
+#### What the Rozie compiler emits for the `angular` target
+
+This block is compiled live by `@rozie/core` on every docs build. The
+source above is the input; the code below is the verbatim output.
+
+```rozie-out SearchInput angular
+```
+
+The Rozie source is roughly a third the size and reads top-to-bottom. The
+compiled output is **structurally equivalent** to the hand-written
+version — the same `signal()` / `input()` / `output()` / `viewChild()` /
+`inject(DestroyRef)` / `ngAfterViewInit` machinery, with `@for` / `@if`
+blocks and `FormsModule`-backed `r-model` lowering. You don't see it
 during authoring. You import it normally:
 
 ```ts
 // app.component.ts
 import { Component } from '@angular/core';
-import { SearchInput } from './SearchInput'; // compiled from SearchInput.rozie
+import SearchInput from './SearchInput.rozie'; // .rozie → standalone component
 
 @Component({
   standalone: true,
   imports: [SearchInput],
-  template: `<rz-search-input (search)="onSearch($event)" />`,
+  template: `<rozie-search-input (search)="onSearch($event)" />`,
 })
 export class AppComponent {
   onSearch(query: string) { /* … */ }
 }
 ```
+
+The working consumer lives at
+[`examples/consumers/angular-analogjs/src/app/AppComponent.ts`](https://github.com/One-Learning-Community/rozie.js/tree/main/examples/consumers/angular-analogjs/src/app/AppComponent.ts)
+— it imports the same `SearchInput.rozie` shown above and runs the
+component inside a real Angular 19+ Application Builder bundle.
 
 ## What you don't have to write anymore
 
