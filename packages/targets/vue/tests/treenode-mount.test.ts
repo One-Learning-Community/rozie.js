@@ -33,6 +33,15 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defineComponent, h, resolveComponent } from 'vue';
 import { mount } from '@vue/test-utils';
+// Hoisted from per-test `await import(...)` 2026-05-24 — `await import()` of
+// these heavy modules inside the test body raced vitest's 5s timeout under
+// `turbo run test --force` CPU starvation (same flake class documented in
+// memory `feedback_turbo_parallel_test_flake`; first hit by dcfb717). Static
+// import resolves before the test starts; no race.
+import { parse } from '../../../core/src/parse.js';
+import { lowerToIR } from '../../../core/src/ir/lower.js';
+import { createDefaultRegistry } from '../../../core/src/modifiers/registerBuiltins.js';
+import { emitVue } from '../src/emitVue.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const TREE_NODE_ROZIE = resolve(__dirname, '../../../../examples/TreeNode.rozie');
@@ -57,14 +66,7 @@ const FIXTURE_3_LEVEL: TreeNodeData = {
 
 describe('TreeNode browser-mount (Vue) — Phase 06.2 P3 COMP-05', () => {
   // Stage 1 — emit-side canonical idiom assertions.
-  it('emitted Vue SFC carries the canonical self-reference idioms (D-117/D-118)', async () => {
-    const { parse } = await import('../../../core/src/parse.js');
-    const { lowerToIR } = await import('../../../core/src/ir/lower.js');
-    const { createDefaultRegistry } = await import(
-      '../../../core/src/modifiers/registerBuiltins.js'
-    );
-    const { emitVue } = await import('../src/emitVue.js');
-
+  it('emitted Vue SFC carries the canonical self-reference idioms (D-117/D-118)', () => {
     const src = readFileSync(TREE_NODE_ROZIE, 'utf8');
     const parsed = parse(src, { filename: 'TreeNode.rozie' });
     if (!parsed.ast) throw new Error('parse failed');
