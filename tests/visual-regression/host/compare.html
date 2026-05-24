@@ -130,6 +130,16 @@
         'Uppy',
         'Table',
         'ThemedButtonConsumer',
+        // Phase 15 — listener-side sibling producers (D-04 / D-05). Composed
+        // by ThemedButtonConsumer above, but each one is also a standalone
+        // producer worth inspecting in isolation when debugging fallthrough.
+        'ThemedButtonListenersManual',
+        'ThemedButtonAllManual',
+        // Phase 15 — ROnProbe (D-07). The bare `r-on` modifier probe.
+        // INTENTIONALLY not in the VR matrix (Lit's custom-element host has
+        // no `:host { display }` rule so the cell collapses to inline-zero),
+        // but the matrix host bootstraps it for /compare.html inspection.
+        'ROnProbe',
       ];
       const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'];
 
