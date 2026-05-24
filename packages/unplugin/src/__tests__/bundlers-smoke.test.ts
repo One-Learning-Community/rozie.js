@@ -227,12 +227,8 @@ describe('@rozie/unplugin/webpack — shape', () => {
     const webpack = (await import('webpack')).default;
     const rozieWebpack = (await import('../webpack.js')).default;
 
-    // Construct a minimal compiler with the rozie plugin attached. We do not
-    // actually run the build — that would require ts-loader + memfs config,
-    // which is significantly heavier. The smoke is "plugin.apply() runs
-    // against a real webpack compiler without throwing". This catches the
-    // 90% failure mode: a plugin export that fails to integrate with the
-    // bundler's plugin API.
+    // Phase 1 of the Webpack smoke: plugin.apply() against a real compiler
+    // without throwing. The full-bundle smoke is the next test below.
     const compiler = webpack({
       entry: resolve(__dirname, 'entry-does-not-need-to-exist.ts'),
       mode: 'production',
@@ -241,9 +237,120 @@ describe('@rozie/unplugin/webpack — shape', () => {
 
     expect(compiler).toBeDefined();
     expect(typeof compiler.run).toBe('function');
-    // Close the compiler immediately — we never called .run().
     await new Promise<void>((res) => compiler.close(() => res()));
   });
+
+  it('full programmatic build: webpack + rozie + esbuild-as-TS-loader → bundle contains compiled Rozie output', async () => {
+    const webpack = (await import('webpack')).default;
+    const { createFsFromVolume, Volume } = await import('memfs');
+    const esbuild = await import('esbuild');
+    const rozieWebpack = (await import('../webpack.js')).default;
+
+    const { dir, entry } = setupTmpProject('webpack-build');
+
+    try {
+      // In-memory output filesystem so we don't pollute the workspace.
+      const outFs = createFsFromVolume(new Volume());
+
+      // Inline TS loader: a tiny webpack loader that delegates to esbuild's
+      // transform API. Keeps the smoke self-contained — no dependency on
+      // ts-loader / esbuild-loader / @swc/loader. The loader is registered
+      // by path under `module.rules.use.loader`.
+      const inlineLoaderPath = resolve(dir, 'inline-ts-loader.cjs');
+      writeFileSync(
+        inlineLoaderPath,
+        `const esbuild = require('esbuild');
+module.exports = function (source) {
+  const callback = this.async();
+  esbuild.transform(source, {
+    loader: 'ts',
+    target: 'es2022',
+    format: 'esm',
+    sourcefile: this.resourcePath,
+  }).then(
+    (out) => callback(null, out.code, out.map ? JSON.parse(out.map) : undefined),
+    (err) => callback(err),
+  );
+};
+`,
+      );
+
+      const compiler = webpack({
+        entry,
+        mode: 'production',
+        // Tell webpack to treat the in-memory FS as the output destination.
+        output: {
+          path: '/dist',
+          filename: 'bundle.js',
+          library: { type: 'module' },
+        },
+        experiments: { outputModule: true },
+        resolve: {
+          extensions: ['.ts', '.js', '.rozie'],
+        },
+        module: {
+          rules: [
+            {
+              test: /\.ts$|\.rozie$/,
+              use: { loader: inlineLoaderPath },
+            },
+          ],
+        },
+        plugins: [rozieWebpack({ target: 'lit' }) as never],
+        // Mark Lit + Rozie runtime as external so we don't try to resolve
+        // them — the smoke is about the unplugin transform, not Lit's
+        // dependency graph.
+        externals: [
+          ({ request }, callback) => {
+            if (
+              request === 'lit' ||
+              (request && request.startsWith('lit/')) ||
+              (request && request.startsWith('@lit-labs/')) ||
+              (request && request.startsWith('@rozie/runtime-lit'))
+            ) {
+              return callback(null, 'module ' + request);
+            }
+            callback();
+          },
+        ],
+        optimization: {
+          minimize: false, // keep markers readable for the assertions below
+        },
+        // Suppress noisy warnings that don't affect the smoke.
+        ignoreWarnings: [() => true],
+      });
+
+      // Wire the in-memory output FS.
+      (compiler as unknown as { outputFileSystem: unknown }).outputFileSystem = outFs;
+
+      const stats = await new Promise<import('webpack').Stats | undefined>((res, rej) => {
+        compiler.run((err, statsArg) => {
+          if (err) return rej(err);
+          res(statsArg);
+        });
+      });
+
+      // Webpack may emit non-fatal errors for things like missing source
+      // maps from the inline loader; we only fail on a complete build failure
+      // (no output file produced).
+      const bundlePath = '/dist/bundle.js';
+      const bundleExists = outFs.existsSync(bundlePath);
+      expect(bundleExists).toBe(true);
+
+      const bundleText = outFs.readFileSync(bundlePath, 'utf8') as string;
+      // Same stable markers as the Rollup / esbuild / Rolldown smokes —
+      // these survive TS-decorator lowering across every bundler.
+      expect(bundleText).toMatch(/data-rozie-s-|rozieSpread|rozieListeners/);
+      expect(bundleText).toMatch(/rozie[-_]smoke|class Smoke/);
+
+      await new Promise<void>((res) => compiler.close(() => res()));
+      // stats is referenced to satisfy the linter; the actual gate is
+      // `bundleExists` + the marker assertions above.
+      void stats;
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }, 30_000); // webpack cold-start is slow; allow 30s
 });
 
 describe('@rozie/unplugin/rspack — shape', () => {
