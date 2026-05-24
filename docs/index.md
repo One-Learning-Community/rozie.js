@@ -23,7 +23,7 @@ features:
   - title: One file, six targets
     details: Author a single .rozie file. Rozie compiles it to idiomatic React, Vue, Svelte, Angular, and Solid components plus Lit web components — each using the target's native reactivity primitives.
   - title: Familiar Vue/Alpine syntax
-    details: Block-based SFCs with &lt;props&gt;, &lt;data&gt;, &lt;script&gt;, &lt;template&gt;, and &lt;style&gt;. r-* directives, @event modifiers, {{ }} interpolation. No JSX-isms.
+    details: Block-based SFCs with &lt;props&gt;, &lt;data&gt;, &lt;script&gt;, &lt;template&gt;, and &lt;style&gt;. r-* directives, @event modifiers, mustache interpolation. No JSX-isms.
   - title: Not a runtime framework
     details: Rozie compiles away. The heavy lifting still happens in your target — React, Vue, Svelte, Angular, Solid, or the browser's native custom-element runtime owns the rendering pipeline.
   - title: Built for component-library authors
