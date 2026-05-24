@@ -354,18 +354,39 @@ const KNOWN_CROSS_TARGET_DIVERGENCE = new Set<string>([]);
 // lit) via per-target emit fixes — see git history. Two remain, carried
 // forward as Phase 14.2 follow-ups:
 const PHASE_14_1_FOLLOWUP = new Set<string>([
-  // Tracked in Phase 14.2 (cross-target scope-attr propagation, Solid arm):
-  // the Solid consumer-side emit DOES place `data-rozie-s-CONSUMER=""` on
-  // each child-component invocation (verified in compiled artifact), but
-  // the rendered button does not carry the consumer's scope attr at
-  // runtime — the auto-fallthrough chain
-  // `mergeProps(defaults, l) → splitProps(n, [...]) → spread(el, mergeProps(rest, {…}))`
-  // appears to drop kebab-case `data-*` keys somewhere between consumer
-  // props and the rendered element. Cell lands at 177×52 vs 184×52 baseline
-  // (597 px diff) — `.btn` styles apply, but consumer's `.extra-variant`
-  // (font-weight: 600) does not. Next step: instrument the runtime to find
-  // where the attr is dropped, or pre-emit it as a literal at the wrapper
-  // emit layer (bypassing the spread).
+  // RECAST 2026-05-23 (Phase-15-followup): the original gate hypothesis
+  // (scope-attr dropped in the mergeProps/splitProps chain) was WRONG. Static
+  // analysis + a fresh VR repro showed the consumer's scope attr DOES
+  // propagate; the actual root cause was a Phase-15 emit regression in
+  // `synthesizeListenersFallthrough` (Plan 15-06). Both `$attrs` and
+  // `$listeners` lower to the bare `attrs` identifier in Solid (see
+  // packages/targets/solid/src/rewrite/rewriteTemplateExpression.ts), and
+  // when both fallthrough synthesizers fired the emitter produced TWO
+  // consecutive `{...attrs}` spreads sandwiching the merged `class={...}`.
+  // Solid's `mergeProps` reverse-iter last-wins semantics made the second
+  // spread shadow the merged-class getter, so all 4 buttons rendered as
+  // plain native browsers (no `.btn`, no `.extra-variant`, no per-variant
+  // color) — 13 191 px diff (ratio 0.54).
+  //
+  // FIX (commit pending — Item 1 of pre-Phase-16 cleanup):
+  // packages/targets/solid/src/emit/emitTemplateNode.ts now skips the
+  // redundant listener spread when bare-$listeners aliases bare-$attrs on
+  // the same element. Post-fix the buttons render correctly (4 colored,
+  // bold text, per-variant overrides applied) and the diff drops to 3 108 px
+  // (ratio 0.13). The 5 themed-button.spec.ts × solid DOM-assertion cells
+  // now pass (see PHASE_14_1_FOLLOWUP_TARGETS in that spec — solid ungated).
+  //
+  // RESIDUAL — Cell renders at 454×52 vs 474×52 baseline (~20px width drift,
+  // consistent ~5px per inter-button gap). Root cause unconfirmed; candidates:
+  //   (a) wrapper's `style={{...}}` defaults clobbered by consumer-passed
+  //       string-form `style="…"` via Solid's `nodeStyle.cssText =` path —
+  //       Agent S adjacent bug #2;
+  //   (b) inter-element whitespace handling between consumer's flex-child
+  //       <ThemedButton*> invocations rendering as anonymous flex items
+  //       differently in Solid vs the Vue baseline;
+  //   (c) Solid-unique inline `<style>{...}</style>` emit interacting with
+  //       flex layout in a way the other 5 targets' CSS pipelines avoid.
+  // Carried as Item-1-residual into a follow-up post-Phase-16 sweep.
   'ThemedButtonConsumer::solid',
   // Tracked in Phase 14.2 (Svelte-specific scope mechanism):
   // Svelte uses native class-hash CSS scoping (`.foo.svelte-XXX`). The

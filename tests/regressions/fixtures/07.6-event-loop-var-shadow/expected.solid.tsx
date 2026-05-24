@@ -20,7 +20,7 @@ export default function EventLoopVarShadow(_props: EventLoopVarShadowProps): JSX
 
   return (
     <>
-    <ul {...attrs} {...attrs} data-rozie-s-a955b18d="">
+    <ul {...attrs} data-rozie-s-a955b18d="">
       <For each={items()}>{(e) => <li data-rozie-s-a955b18d="">
         <span data-rozie-s-a955b18d="">{e.label}</span>
         

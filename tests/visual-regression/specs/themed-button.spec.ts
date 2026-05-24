@@ -72,15 +72,12 @@ const FOUR_CORNERS = [
 
 // Phase-N.M follow-up gate — companion to matrix.spec.ts's PHASE_14_1_FOLLOWUP
 // set. Phase 14.1 closed 3 of 5 ThemedButtonConsumer entries (react / angular
-// / lit). Two remain, carried forward as Phase 14.2 follow-ups — full
-// hypothesis in matrix.spec.ts's set.
+// / lit). Pre-Phase-16 cleanup closed the Solid arm here (DOM-assertion cells
+// pass after the emit-redundancy fix — see commit history). Svelte remains.
 const PHASE_14_1_FOLLOWUP_TARGETS = new Set<string>([
-  // Solid: scope-attr emit lands in compiled output but doesn't reach the
-  // rendered button at runtime — splitProps/mergeProps/spread chain drops
-  // kebab-case data-* keys somewhere.
-  'solid',
   // Svelte: native class-hash scoping (.foo.svelte-XXX) blocks consumer's
-  // .extra-variant rule from matching the wrapper's inner button.
+  // .extra-variant rule from matching the wrapper's inner button. Full
+  // hypothesis + chosen fix-path in matrix.spec.ts PHASE_14_1_FOLLOWUP set.
   'svelte',
 ]);
 

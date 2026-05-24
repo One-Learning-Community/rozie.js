@@ -24,7 +24,7 @@ export default function ThemedButtonConsumer(_props: ThemedButtonConsumerProps):
       font-weight: 600;
     }`}</style>
     <>
-    <div {...attrs} class={"themed-button-consumer" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} {...attrs} data-rozie-s-14b8cbaa="">
+    <div {...attrs} class={"themed-button-consumer" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-14b8cbaa="">
       <ThemedButton id="auto-btn" type="button" aria-label="Auto-fallthrough button" data-testid="auto-themed-button" style="--btn-bg: #ef4444" class={"extra-variant"} label={'Auto'} onClick={onClick} onMouseEnter={onMouseEnter} data-rozie-s-14b8cbaa="" />
 
       <ThemedButtonManual id="manual-btn" type="button" aria-label="Manual fallthrough button" data-testid="manual-themed-button" style="--btn-bg: #10b981" class={"extra-variant"} label={'Manual'} onClick={onClick} onMouseEnter={onMouseEnter} data-rozie-s-14b8cbaa="" />

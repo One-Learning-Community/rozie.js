@@ -113,7 +113,7 @@ export default function PortalListStyled(_props: PortalListStyledProps): JSX.Ele
       gap: 0.5rem;
     }`}</style>
     <>
-    <div ref={(el) => { __rozieRootRef = el as HTMLElement; }} {...attrs} class={"rozie-portal-list" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} {...attrs} data-rozie-s-18e5aac6="">
+    <div ref={(el) => { __rozieRootRef = el as HTMLElement; }} {...attrs} class={"rozie-portal-list" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-18e5aac6="">
       
     </div>
     </>

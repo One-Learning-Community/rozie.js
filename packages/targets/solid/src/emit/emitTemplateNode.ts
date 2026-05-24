@@ -224,6 +224,38 @@ function hasDynamicListenerSpread(node: TemplateElementIR): boolean {
 }
 
 /**
+ * Phase 16 — bare-identifier name match for spread-expression de-duplication.
+ * Returns true when `expr` is an Identifier with the given name (e.g. `$attrs`,
+ * `$listeners`). Mirrors the duck-typed `obj['type'] === 'Identifier'` form
+ * used elsewhere in this file (no @babel/types import needed; the IR field is
+ * declared as `Expression` which already narrows via the discriminator).
+ */
+function isBareIdentifierExpr(
+  expr: ListenerSpreadIR['expression'],
+  name: string,
+): boolean {
+  return (
+    (expr as { type?: string }).type === 'Identifier' &&
+    (expr as { name?: string }).name === name
+  );
+}
+
+/**
+ * Phase 16 — true when `attrs` carries at least one `spreadBinding` whose
+ * expression is the bare `$attrs` Identifier. Used by the listener-emit fast
+ * path to recognise the Solid-specific spread-redundancy condition (see the
+ * `emitElementListeners` early-return below for the rationale).
+ */
+function hasBareAttrsSpread(attrs: AttributeBinding[]): boolean {
+  for (const a of attrs) {
+    if (a.kind === 'spreadBinding' && isBareIdentifierExpr(a.expression, '$attrs')) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
  * Phase 15 R6 — assemble the per-element listener emit for Solid. Mirrors
  * the React structural logic line-for-line; Solid's JSX listener-prop
  * convention (`onClick`, `onMouseEnter`) is identical to React's.
@@ -269,6 +301,28 @@ function emitElementListeners(
   // with no `@event` handlers (the most common case).
   if (!hasEvents && node.listenerSpreads.length === 1) {
     const only = node.listenerSpreads[0]!;
+    // Phase 16 — Solid-specific spread-redundancy elimination. Both `$attrs`
+    // and `$listeners` lower to the bare identifier `attrs` in Solid (see
+    // `packages/targets/solid/src/rewrite/rewriteTemplateExpression.ts` —
+    // they resolve to the SAME rest-of-props bucket because Solid's
+    // splitProps produces one bucket and both sigils route through it). When
+    // both a `spreadBinding($attrs)` and a bare-`$listeners` listener spread
+    // land on the same element, the emit would produce two consecutive
+    // `{...attrs}` spreads sandwiching the merged `class={...}` attribute.
+    // Solid's `mergeProps` reverse-iter last-wins semantics then make the
+    // second spread shadow the merged-class getter (the regression that took
+    // all 5 `ThemedButtonConsumer · solid` VR cells off-baseline in Phase
+    // 15 — see matrix.spec.ts gate comments + ThemedButton.solid.tsx fixture
+    // history). Skip the redundant listener spread: the attribute-side
+    // `{...attrs}` already delivers every key (Solid's rest-of-props bucket
+    // holds attribute keys AND `on*` listener keys together; the listener
+    // spread emits exactly the same set).
+    if (
+      isBareIdentifierExpr(only.expression, '$listeners') &&
+      hasBareAttrsSpread(node.attributes)
+    ) {
+      return { eventsJsx: '', extraSpreads: [] };
+    }
     const attrCtx: import('./emitTemplateAttribute.js').EmitAttrCtx = {
       ir: ctx.ir,
       collectors: ctx.collectors,

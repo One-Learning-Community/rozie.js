@@ -18,7 +18,7 @@ export default function PresenceSlotFallback(_props: PresenceSlotFallbackProps):
     <>
     <style>{`.panel[data-rozie-s-224e77e7] { border: 1px solid rgba(0, 0, 0, 0.1); }`}</style>
     <>
-    <section {...attrs} class={"panel" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} {...attrs} data-rozie-s-224e77e7="">
+    <section {...attrs} class={"panel" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-224e77e7="">
       {<Show when={(_props.headerSlot ?? _props.slots?.['header']) || local.title}><header data-rozie-s-224e77e7="">
         
         {(_props.headerSlot ?? _props.slots?.['header']?.({})) ?? local.title}

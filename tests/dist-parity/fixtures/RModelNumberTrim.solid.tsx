@@ -13,7 +13,7 @@ export default function RModelNumberTrim(_props: RModelNumberTrimProps): JSX.Ele
     <style>{`.rmodel-number-trim[data-rozie-s-dfdb7742] { display: inline-flex; flex-direction: column; gap: 0.25rem; }
     .echo[data-rozie-s-dfdb7742] { color: rgba(0, 0, 0, 0.55); font-size: 0.85em; }`}</style>
     <>
-    <div {...attrs} class={"rmodel-number-trim" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} {...attrs} data-rozie-s-dfdb7742="">
+    <div {...attrs} class={"rmodel-number-trim" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-dfdb7742="">
       <input type="text" placeholder="Enter a quantity" value={quantity()} onInput={e => setQuantity(Number.isNaN(Number.parseFloat(e.currentTarget.value.trim())) ? e.currentTarget.value.trim() : Number.parseFloat(e.currentTarget.value.trim()))} data-rozie-s-dfdb7742="" />
       <p class={"echo"} data-rozie-s-dfdb7742="">Quantity: {quantity()}</p>
     </div>

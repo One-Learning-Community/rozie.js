@@ -14,7 +14,7 @@ export default function NestedSlotDeclared(_props: NestedSlotDeclaredProps): JSX
     <>
     <style>{`.outer[data-rozie-s-3bc5be6c] { display: block; }`}</style>
     <>
-    <div {...attrs} class={"outer" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} {...attrs} data-rozie-s-3bc5be6c="">
+    <div {...attrs} class={"outer" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-3bc5be6c="">
       
       {(_props.wrapperSlot ?? _props.slots?.['wrapper']?.({})) ?? <div class={"wrapper-fallback"} data-rozie-s-3bc5be6c="">
           {(_props.innerSlot ?? _props.slots?.['inner']?.({}))}

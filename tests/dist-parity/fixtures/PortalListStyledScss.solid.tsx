@@ -126,7 +126,7 @@ export default function PortalListStyledScss(_props: PortalListStyledScssProps):
       --rozie-portal-list-fg: #1a1a1a;
     }`}</style>
     <>
-    <div ref={(el) => { __rozieRootRef = el as HTMLElement; }} {...attrs} class={"rozie-portal-list" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} {...attrs} data-rozie-s-860cc87e="">
+    <div ref={(el) => { __rozieRootRef = el as HTMLElement; }} {...attrs} class={"rozie-portal-list" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-860cc87e="">
       
     </div>
     </>

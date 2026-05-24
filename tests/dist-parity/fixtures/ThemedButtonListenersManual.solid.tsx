@@ -29,7 +29,7 @@ export default function ThemedButtonListenersManual(_props: ThemedButtonListener
       cursor: not-allowed;
     }`}</style>
     <>
-    <button style={{ '--btn-bg': '#3b82f6', '--btn-fg': '#ffffff' }} {...attrs} class={"btn" + " " + local.variant + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} {...attrs} data-rozie-s-97e125bc="">
+    <button style={{ '--btn-bg': '#3b82f6', '--btn-fg': '#ffffff' }} {...attrs} class={"btn" + " " + local.variant + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-97e125bc="">
       {local.label}
     </button>
     </>

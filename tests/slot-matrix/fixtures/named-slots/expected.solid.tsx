@@ -12,7 +12,7 @@ export default function NamedSlotsFixture(_props: NamedSlotsFixtureProps): JSX.E
 
   return (
     <>
-    <div {...attrs} class={"named-slots-fixture" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} {...attrs} data-rozie-s-a30182bc="">
+    <div {...attrs} class={"named-slots-fixture" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-a30182bc="">
       <header data-rozie-s-a30182bc="">
         {(_props.headerSlot ?? _props.slots?.['header']?.({}))}
       </header>

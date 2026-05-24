@@ -15,7 +15,7 @@ export default function ScopedParamsFixture(_props: ScopedParamsFixtureProps): J
 
   return (
     <>
-    <div {...attrs} class={"scoped-params-fixture" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} {...attrs} data-rozie-s-94f3adc8="">
+    <div {...attrs} class={"scoped-params-fixture" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-94f3adc8="">
       {(_props.itemSlot ?? _props.slots?.['item'])?.({ value: local.label })}
     </div>
     </>

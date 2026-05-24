@@ -13,7 +13,7 @@ export default function DefaultSlotFixture(_props: DefaultSlotFixtureProps): JSX
 
   return (
     <>
-    <div {...attrs} class={"default-slot-fixture" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} {...attrs} data-rozie-s-61728cb8="">
+    <div {...attrs} class={"default-slot-fixture" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-61728cb8="">
       {resolved()}
     </div>
     </>

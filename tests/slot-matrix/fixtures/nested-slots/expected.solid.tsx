@@ -12,7 +12,7 @@ export default function NestedSlotsFixture(_props: NestedSlotsFixtureProps): JSX
 
   return (
     <>
-    <div {...attrs} class={"nested-slots-fixture" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} {...attrs} data-rozie-s-4d5488e4="">
+    <div {...attrs} class={"nested-slots-fixture" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-4d5488e4="">
       {(_props.wrapperSlot ?? _props.slots?.['wrapper']?.({})) ?? <div class={"wrapper-fallback"} data-rozie-s-4d5488e4="">
           {(_props.innerSlot ?? _props.slots?.['inner']?.({}))}
         </div>}

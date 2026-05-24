@@ -26,7 +26,7 @@ export default function ModalConsumer(_props: ModalConsumerProps): JSX.Element {
     .close[data-rozie-s-5d081d3a] { background: none; border: none; cursor: pointer; font-size: 1.25rem; }
     .dynamic-fill[data-rozie-s-5d081d3a] { font-weight: bold; }`}</style>
     <>
-    <div {...attrs} class={"modal-consumer" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} {...attrs} data-rozie-s-5d081d3a="">
+    <div {...attrs} class={"modal-consumer" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-5d081d3a="">
       <Modal open={open1()} onOpenChange={setOpen1} data-rozie-s-5d081d3a="" headerSlot={({ close }) => (<>
           <h2 data-rozie-s-5d081d3a="">{local.title}</h2>
           <button class={"close"} onClick={close} data-rozie-s-5d081d3a="">×</button>
