@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "build": "astro build",
-    "test": "vitest run --passWithNoTests"
+    "test:smoke": "vitest run --passWithNoTests"
   },
   "dependencies": {
     "@lit-labs/preact-signals": "^1.0.0",

@@ -73,14 +73,18 @@ jobs:
       - name: Build all packages
         run: pnpm turbo run build
 
-      # Next.js 15 + Webpack + @rozie/unplugin/webpack
+      # Next.js 15 + Webpack + @rozie/unplugin/webpack.
+      # Run as `test:smoke` (not `test`) so `turbo run test` in the
+      # everything-test pre-push gate doesn't trigger this heavy build
+      # in parallel with the rest of the suite (matches react-vite-demo's
+      # `test:e2e` carve-out pattern).
       - name: Next.js adoption smoke (App Router + Webpack)
-        run: pnpm --filter nextjs-rozie-demo run test
+        run: pnpm --filter nextjs-rozie-demo run test:smoke
         env:
           NEXT_TELEMETRY_DISABLED: '1'
 
-      # Astro 5 + Vite + @rozie/unplugin/vite, target: 'lit'
+      # Astro 5 + Vite + @rozie/unplugin/vite, target: 'lit'.
       - name: Astro adoption smoke (target: lit + Vite plugin slot)
-        run: pnpm --filter astro-rozie-demo run test
+        run: pnpm --filter astro-rozie-demo run test:smoke
         env:
           ASTRO_TELEMETRY_DISABLED: '1'

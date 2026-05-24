@@ -16,8 +16,10 @@ Mirrors what `npx create-next-app@latest --typescript --app` produces, plus the 
 ```bash
 pnpm install
 pnpm build       # next build
-pnpm test        # build smoke (vitest)
+pnpm test:smoke  # build smoke (vitest re-runs next build + asserts on output)
 ```
+
+The script is `test:smoke` (not `test`) so the everything-test pre-push gate (`turbo run test`) doesn't trigger this heavy build in parallel with the rest of the suite — `next build` is CPU-heavy and would starve other tests. The CI workflow at `.github/workflows/adoption-smokes.yml` runs it on its own runner.
 
 ## What the smoke proves
 

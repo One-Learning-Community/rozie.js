@@ -5,7 +5,7 @@
   "description": "Smoke test: Rozie compiled inside a Next.js 15 App Router app via the Webpack adapter. Mirrors what 'npx create-next-app' produces, with the Rozie unplugin wired in per docs/guide/adopt-incrementally.md.",
   "scripts": {
     "build": "next build",
-    "test": "vitest run --passWithNoTests"
+    "test:smoke": "vitest run --passWithNoTests"
   },
   "dependencies": {
     "@rozie/runtime-react": "workspace:*",

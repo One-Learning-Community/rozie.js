@@ -15,9 +15,11 @@ Mirrors what `npm create astro@latest` produces, plus the documented Rozie wirin
 
 ```bash
 pnpm install
-pnpm build       # astro build
-pnpm test        # build smoke (vitest)
+pnpm build        # astro build
+pnpm test:smoke   # build smoke (vitest re-runs astro build + asserts on output)
 ```
+
+The script is `test:smoke` (not `test`) so the everything-test pre-push gate (`turbo run test`) doesn't trigger this build in parallel with the rest of the suite. The CI workflow at `.github/workflows/adoption-smokes.yml` runs it on its own runner.
 
 ## What the smoke proves
 
