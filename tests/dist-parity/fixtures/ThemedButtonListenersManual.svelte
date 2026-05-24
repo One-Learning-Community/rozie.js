@@ -15,7 +15,7 @@ let {
 </script>
 
 
-<button style:--btn-bg={'#3b82f6'} style:--btn-fg={'#ffffff'} {...__rozieAttrs} class={["btn", variant, (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-97e125bc>
+<button style="--btn-bg: #3b82f6; --btn-fg: #ffffff" {...__rozieAttrs} class={["btn", variant, (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-97e125bc>
   {label}
 </button>
 

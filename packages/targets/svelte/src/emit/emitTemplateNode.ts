@@ -325,12 +325,29 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
       }
     }
   }
+  // Pre-Phase-16 Item-2-residual — detect a bare-`$attrs` spreadBinding on
+  // the same element. When present, `:style="{...}"` object-literal lowering
+  // routes through the string-form `style="..."` path so the consumer's
+  // spread `style` value can overwrite the wrapper's defaults (the
+  // cross-target consumer-wins precedence). See EmitAttrCtx.hasFallthroughSpread.
+  let hasFallthroughSpread = false;
+  for (const a of node.attributes) {
+    if (
+      a.kind === 'spreadBinding' &&
+      a.expression.type === 'Identifier' &&
+      a.expression.name === '$attrs'
+    ) {
+      hasFallthroughSpread = true;
+      break;
+    }
+  }
   const attrText = emitAttributes(node.attributes, {
     ir: ctx.ir,
     elementTagKind: node.tagKind,
     // Spread only when defined — `exactOptionalPropertyTypes` rejects an
     // explicit `inputType: undefined` against the optional `inputType?` field.
     ...(inputType !== undefined ? { inputType } : {}),
+    ...(hasFallthroughSpread ? { hasFallthroughSpread: true } : {}),
   });
 
   // Phase 15 R6 — assemble the per-element listener emit. Literal-key

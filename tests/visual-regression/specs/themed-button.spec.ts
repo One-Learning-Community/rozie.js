@@ -72,23 +72,11 @@ const FOUR_CORNERS = [
 
 // Phase-N.M follow-up gate — companion to matrix.spec.ts's PHASE_14_1_FOLLOWUP
 // set. Phase 14.1 closed 3 of 5 ThemedButtonConsumer entries (react / angular
-// / lit). Pre-Phase-16 cleanup closed the Solid arm here (DOM-assertion cells
-// pass after the emit-redundancy fix — see commit history). Svelte remains.
-const PHASE_14_1_FOLLOWUP_TARGETS = new Set<string>([
-  // Svelte: pre-Phase-16 Item 2 closed the cross-SFC CSS-scoping gap (the
-  // 10 class/listener/attribute assertion cells below now pass), but the
-  // `consumer style="--btn-bg" overrides the wrapper's default` test still
-  // fails on a residual issue: Svelte's `style:<prop>=` directive (used to
-  // emit the wrapper's `:style="{...}"` defaults) wins over consumer-
-  // passed `style="..."` strings inside the auto-fallthrough spread. This
-  // is the OPPOSITE precedence the other 5 targets implement. Closing it
-  // requires switching Svelte's :style lowering off the `style:` directive
-  // form when auto-fallthrough is active. Tracked as Item-2-residual; see
-  // matrix.spec.ts PHASE_14_1_FOLLOWUP gate for the full rationale. Whole
-  // svelte arm stays gated because the test-list here is a binary
-  // per-target set; switching to per-test gating is a separate refactor.
-  'svelte',
-]);
+// / lit). Pre-Phase-16 cleanup closed the remaining two arms — Solid via the
+// dual-spread emit fix (Item 1) and Svelte via the cross-SFC CSS-scoping
+// switch (Item 2) + auto-fallthrough-aware `:style` lowering (Item-2-residual).
+// Set is empty; preserved for future per-target gate additions.
+const PHASE_14_1_FOLLOWUP_TARGETS = new Set<string>([]);
 
 for (const target of TARGETS) {
   const built = existsSync(

@@ -52,6 +52,23 @@ export interface EmitAttrCtx {
    * `<input>` to text — `bind:value` is correct there).
    */
   inputType?: string;
+  /**
+   * Pre-Phase-16 cleanup Item-2-residual — true when the host element ALSO
+   * carries a bare-`$attrs` `spreadBinding` (attribute auto-fallthrough is
+   * active). When this is set, `:style="{...}"` object-literal lowering
+   * switches from `style:<prop>={value}` directives to a string-form
+   * `style="prop: value; ..."` attribute. Background: Svelte's compiled
+   * output places per-property `style:` directive state under a Symbol-keyed
+   * slot processed AFTER any spread inside the generated props object, so
+   * `style:` directives intentionally win over spread `style` — the OPPOSITE
+   * precedence the other 5 targets implement for the auto-fallthrough case.
+   * Re-emitting the wrapper's `:style` defaults as a string attribute lets
+   * the consumer's spread `style="..."` value overwrite them via
+   * `setAttribute('style', ...)`, restoring cross-target parity. Wrapper's
+   * un-overridden defaults survive via the `var(--prop, fallback)` CSS
+   * fallback the wrappers idiomatically already declare.
+   */
+  hasFallthroughSpread?: boolean;
 }
 
 /**
@@ -260,10 +277,51 @@ function objectPropertyKeyAsString(
 function tryEmitStyleObjectLiteral(
   attr: AttributeBinding,
   ir: IRComponent,
+  ctx?: EmitAttrCtx,
 ): string | null {
   if (attr.kind !== 'binding') return null;
   if (attr.name !== 'style') return null;
   if (!t.isObjectExpression(attr.expression)) return null;
+
+  // Pre-Phase-16 Item-2-residual — when auto-fallthrough is active on this
+  // element, the consumer's spread `style="..."` value would otherwise lose
+  // to the wrapper's `style:<prop>=` directives (Svelte's STYLES_KEY runs
+  // after spread by design). Emit the wrapper's defaults as a string-form
+  // `style="prop: value; ..."` attribute instead — the spread's
+  // setAttribute then overwrites it cleanly, restoring cross-target
+  // consumer-wins precedence. Bail to null (caller falls through to the
+  // generic `style={<expr>}` passthrough) if any property value is too
+  // complex to safely serialise to a CSS declaration string.
+  if (ctx?.hasFallthroughSpread) {
+    const parts: string[] = [];
+    for (const prop of attr.expression.properties) {
+      if (!t.isObjectProperty(prop)) return null;
+      const keyName = objectPropertyKeyAsString(prop);
+      if (keyName === null) return null;
+      if (!t.isExpression(prop.value)) return null;
+      const cssProp = kebabizeStyleKey(keyName);
+      // String-literal value → splice the value text verbatim (no quoting in
+      // CSS — declarations are not JS).
+      if (t.isStringLiteral(prop.value)) {
+        parts.push(`${cssProp}: ${prop.value.value}`);
+        continue;
+      }
+      // Numeric-literal value → splice as bare number (matches Svelte's
+      // implicit `${n}px`-less serialization; for CSS custom properties the
+      // value is a number-literal which is valid).
+      if (t.isNumericLiteral(prop.value)) {
+        parts.push(`${cssProp}: ${prop.value.value}`);
+        continue;
+      }
+      // Dynamic value → Svelte template-literal interpolation in the
+      // attribute string: `style="--btn-bg: {bgExpr}"`. Reuse the standard
+      // template-expression rewriter (handles $props.X, $data.X, etc.).
+      const exprCode = rewriteTemplateExpression(prop.value, ir);
+      parts.push(`${cssProp}: {${exprCode}}`);
+    }
+    if (parts.length === 0) return 'style=""';
+    return `style="${parts.join('; ')}"`;
+  }
 
   const directives: string[] = [];
   for (const prop of attr.expression.properties) {
@@ -585,7 +643,7 @@ export function emitSingleAttr(
     // serialize the object via toString() to `[object Object]`. Falls
     // through to the default attribute emit for non-literal-object exprs
     // (string form is handled natively by Svelte).
-    const styleObjectLowered = tryEmitStyleObjectLiteral(attr, ir);
+    const styleObjectLowered = tryEmitStyleObjectLiteral(attr, ir, ctx);
     if (styleObjectLowered !== null) return styleObjectLowered;
     const expr = rewriteTemplateExpression(attr.expression, ir);
     const outName = resolveAttrName(attr.name, ctx);

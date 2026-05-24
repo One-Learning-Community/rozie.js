@@ -28,8 +28,16 @@ function lowerInline(src: string, filename = 'Test.rozie'): IRComponent {
 }
 
 describe('emitTemplateAttribute — `:style` literal-object lowering (Svelte / Spike 004 subset)', () => {
+  // `inherit-attrs="false"` on each of these literal-object `:style` tests
+  // opts the single-root element OUT of `synthesizeAttrsFallthrough`. Without
+  // the opt-out, pre-Phase-16 cleanup Item-2-residual routes `:style="{...}"`
+  // through the new string-form path so the consumer's spread `style="..."`
+  // value can overwrite the wrapper's defaults (cross-target consumer-wins
+  // precedence). These three tests isolate the pre-residual `style:` directive
+  // lowering; the dedicated `…interacts with auto-fallthrough` test below
+  // covers the new string-form path.
   it('single-key literal object: `:style="{ background: \'#f00\' }"` → `style:background={\'#f00\'}`', () => {
-    const ir = lowerInline(`<rozie name="Test">
+    const ir = lowerInline(`<rozie name="Test" inherit-attrs="false">
 <template>
   <span :style="{ background: '#f00' }"></span>
 </template>
@@ -44,7 +52,7 @@ describe('emitTemplateAttribute — `:style` literal-object lowering (Svelte / S
   });
 
   it('multi-key literal object: `:style="{ background: x, color: y }"` → two style: directives', () => {
-    const ir = lowerInline(`<rozie name="Test">
+    const ir = lowerInline(`<rozie name="Test" inherit-attrs="false">
 <data>{ x: '#f00', y: '#0f0' }</data>
 <template>
   <span :style="{ background: $data.x, color: $data.y }"></span>
@@ -58,7 +66,7 @@ describe('emitTemplateAttribute — `:style` literal-object lowering (Svelte / S
   });
 
   it('camelCase key kebabizes: `:style="{ backgroundColor: x }"` → `style:background-color={x}`', () => {
-    const ir = lowerInline(`<rozie name="Test">
+    const ir = lowerInline(`<rozie name="Test" inherit-attrs="false">
 <data>{ x: '#f00' }</data>
 <template>
   <span :style="{ backgroundColor: $data.x }"></span>
@@ -67,6 +75,51 @@ describe('emitTemplateAttribute — `:style` literal-object lowering (Svelte / S
     const { template, diagnostics } = emitTemplate(ir, REGISTRY);
     expect(diagnostics).toEqual([]);
     expect(template).toContain('style:background-color={x}');
+  });
+
+  it('Item-2-residual: literal-object `:style` switches to string-form `style="..."` when auto-fallthrough is active on the same element', () => {
+    // Pre-Phase-16 cleanup Item-2-residual — when a single-root html element
+    // is `synthesizeAttrsFallthrough`-eligible (the default — `inherit-attrs`
+    // is true), the lowering swaps `style:<prop>={value}` directives for a
+    // string-form `style="prop: value"` attribute. Background: Svelte's
+    // compiled output places per-property `style:` directive state under a
+    // Symbol-keyed slot processed AFTER any spread inside the generated props
+    // object, so directives win over spread `style` — the OPPOSITE precedence
+    // the other 5 targets implement. String-form lets the consumer's spread
+    // `style` value overwrite the wrapper's defaults via `setAttribute`,
+    // restoring cross-target parity. The wrapper's un-overridden defaults
+    // survive via the wrapper's `var(--prop, fallback)` CSS fallback.
+    const ir = lowerInline(`<rozie name="Test">
+<template>
+  <button :style="{ '--btn-bg': '#3b82f6', '--btn-fg': '#ffffff' }"></button>
+</template>
+</rozie>`);
+    const { template, diagnostics } = emitTemplate(ir, REGISTRY);
+    expect(diagnostics).toEqual([]);
+    // String-form style attribute with both custom properties spliced.
+    expect(template).toContain('style="--btn-bg: #3b82f6; --btn-fg: #ffffff"');
+    // No `style:` directives (the Item-2-residual switch suppresses them).
+    expect(template).not.toMatch(/\bstyle:--btn-bg=/);
+    expect(template).not.toMatch(/\bstyle:--btn-fg=/);
+    // Auto-fallthrough fired (sanity check).
+    expect(template).toContain('{...__rozieAttrs}');
+  });
+
+  it('Item-2-residual: dynamic-value literal-object `:style` interpolates expressions into the string', () => {
+    // Same fallthrough condition as above, but the object values are
+    // identifiers/expressions rather than string literals. The rewriter
+    // splices each value via Svelte template-literal interpolation in the
+    // attribute string: `style="prop: {expr}; prop2: {expr2}"`.
+    const ir = lowerInline(`<rozie name="Test">
+<data>{ bg: '#3b82f6', fg: '#ffffff' }</data>
+<template>
+  <button :style="{ '--btn-bg': $data.bg, '--btn-fg': $data.fg }"></button>
+</template>
+</rozie>`);
+    const { template, diagnostics } = emitTemplate(ir, REGISTRY);
+    expect(diagnostics).toEqual([]);
+    expect(template).toContain('style="--btn-bg: {bg}; --btn-fg: {fg}"');
+    expect(template).not.toMatch(/\bstyle:--btn-bg=/);
   });
 
   it('non-object binding falls through to existing passthrough: `:style="$data.s"` → `style={s}`', () => {
