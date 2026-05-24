@@ -13,8 +13,8 @@ hero:
       text: Why Rozie?
       link: /guide/why
     - theme: alt
-      text: Features
-      link: /guide/features
+      text: Adopt incrementally
+      link: /guide/adopt-incrementally
     - theme: alt
       text: See examples
       link: /examples/
@@ -28,4 +28,8 @@ features:
     details: Rozie compiles away. The heavy lifting still happens in your target — React, Vue, Svelte, Angular, Solid, or the browser's native custom-element runtime owns the rendering pipeline.
   - title: Built for component-library authors
     details: If you maintain manual cross-framework wrappers today, Rozie eliminates that work. One source of truth, six working consumer packages.
+  - title: Stuck on one framework? Use Rozie for ONE new component this week
+    details: Drop a single .rozie file into your existing Next.js / Nuxt / Angular CLI / SvelteKit / Astro app. Get Vue-flavored SFC authoring, scoped CSS without runtime tax, automatic attribute fallthrough, and engine-wrapper escape hatches that fix pain your stack can't fix for you.
+  - title: Quietly fixes cross-framework grit
+    details: Scoped CSS that survives composition on every target. $reconcileAfterDomMutation() for engines that mutate DOM under the reconciler's feet. $classSelector() for React's CSS-Modules class hashing. The creature-comforts matrix flips the compatibility table on its head.
 ---

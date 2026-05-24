@@ -14,7 +14,24 @@ A runtime framework. Rozie doesn't try to be a "better React" or own the renderi
 
 ## Who Rozie is for
 
-Component-library and design-system authors. If you're shipping React/Vue/Svelte/Angular/Solid bindings for a vanilla-JS core (date pickers, dropdown menus, modal primitives, headless behaviors), Rozie collapses that to a single source. The Lit target widens that further — a single `.rozie` file also ships a framework-agnostic web component that drops into any HTML page.
+### Component-library and design-system authors (the original audience)
+
+If you're shipping React/Vue/Svelte/Angular/Solid bindings for a vanilla-JS core (date pickers, dropdown menus, modal primitives, headless behaviors), Rozie collapses that to a single source. The Lit target widens that further — a single `.rozie` file also ships a framework-agnostic web component that drops into any HTML page.
+
+### Also: ordinary devs stuck on a single stack
+
+Six targets of byte-identical parity required Rozie to quietly normalize a lot of cross-framework behavioral grit. The creature comforts that fell out — scoped CSS without CSS-in-JS, automatic attribute fallthrough, the `$reconcileAfterDomMutation()` escape hatch for engine-vs-keyed-reconciler desync, the `$classSelector()` bridge for React's CSS-Modules class hashing, `:style` precedence that behaves the same on every target — aren't just plumbing for cross-framework authors. They're **fixes for genuine pain points each framework's locked-in users feel every day** and can't escape without leaving the stack.
+
+That makes Rozie attractive to a second audience the original positioning understated:
+
+- An **Angular shop** that wants Vue-flavored SFC ergonomics but can't migrate the codebase — write your next component in Rozie, ship idiomatic Angular standalone-component output.
+- A **jQuery + plugins shop** maintaining engine glue across pages — wrap each engine (flatpickr, Sortable, Leaflet, TipTap, …) once in Rozie; the same wrapper drops into any of your apps regardless of framework.
+- A **React team** that wants Vue-style scoped CSS without paying the CSS-in-JS runtime tax.
+- A **Lit team** that wants slots, scoped-slot params, and consumer-CSS-bridge — Rozie's compose model fills exactly the gap Lit's Web Components leave open.
+
+You don't have to migrate. You write **one new component this week** in Rozie, and the compiled output drops into your existing app as a native target-framework component. [Adopt incrementally](/guide/adopt-incrementally) walks through what that looks like per stack.
+
+See [Creature comforts](/guide/creature-comforts) for the full pain-point matrix, [For Angular shops](/guide/for-angular-shops) for the Angular-specific pitch, and [For vanilla-JS + plugin shops](/guide/for-vanilla-js-shops) for the jQuery / engine-wrapper pitch.
 
 ## Compatibility bar
 

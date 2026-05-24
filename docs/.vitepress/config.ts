@@ -69,6 +69,15 @@ export default defineConfig({
             { text: 'Cross-Framework Parity', link: '/parity' },
           ],
         },
+        {
+          text: 'Adoption',
+          items: [
+            { text: 'Adopt incrementally', link: '/guide/adopt-incrementally' },
+            { text: 'Creature comforts', link: '/guide/creature-comforts' },
+            { text: 'For Angular shops', link: '/guide/for-angular-shops' },
+            { text: 'For vanilla-JS + plugin shops', link: '/guide/for-vanilla-js-shops' },
+          ],
+        },
       ],
       '/compatibility': [
         {

@@ -1,0 +1,73 @@
+# Creature comforts
+
+Six-target cross-framework parity forced Rozie to quietly normalize a lot of
+behavioral grit. The list below is the side effect: a catalog of papercuts
+each framework's users feel daily — and what Rozie does to make them go away.
+
+The framing flips the [compatibility matrix](/compatibility). That page asks
+"does feature X work on target Y?" — every answer is ✅. This page asks "what
+does Rozie quietly fix that I'd otherwise hand-roll?"
+
+## Cross-framework normalizations
+
+| Pain point | What your framework does today | What Rozie gives you |
+| --- | --- | --- |
+| **Scoped CSS without CSS-in-JS** | React: CSS-in-JS runtime tax (Emotion, styled-components) or CSS Modules class-hash boilerplate. Lit: bring-your-own scoping. Solid: no native scoper. | `<style>` is scoped by default on every target via `data-rozie-s-<hash>` selector rewriting + head-injection. `:root { … }` is the unscoped escape hatch. |
+| **`querySelector('.cls')` survives React CSS Modules** | React hashes class names at build time, so engine code that calls `el.querySelector('.grip')` against an authored class silently breaks on React only. | `$classSelector('grip')` lowers per target — React → `"." + styles.grip`, every other target → `".grip"` literal. ROZ965-968 catch typos at compile time. |
+| **Attribute fallthrough** | Vue: `inheritAttrs` exists. React/Solid: hand-roll `{...rest}`. Svelte: `$$restProps` (Svelte 4) or `$$rest` (runes). Angular: no native equivalent — `HostBinding` per attr. Lit: explicit `@property` per attr. | Auto-fallthrough is on by default. `$attrs` is reactive; opt out via `<rozie inherit-attrs="false">`; explicit `r-bind="$attrs"` placement supported. R8 multi-root + R9 double-apply diagnostics. |
+| **Listener fallthrough** | Each framework's idiom is different (`$listeners` was Vue 2-only; React passes through; Svelte forwards explicit; Angular nope). | `$listeners` magic accessor lowers per target. Auto-fallthrough on by default. |
+| **Two-way binding for non-React stacks** | Vue: `v-model`. Svelte: `bind:`. Angular: `[(ngModel)]`. React: render-prop callback pair. Solid: `createControllableSignal`. Lit: property/attribute pair + `*-change` event. | `model: true` on a prop; `r-model:propName="…"` on a consumer. Compiles to each target's native machinery — including the React controllable-state pattern. |
+| **`:style="{...}"` precedence** | Svelte 5's `STYLES_KEY` runs after spread — `style:<prop>` directives win over spread `style`, the opposite of every other framework. Solid: object-form clobbers if a consumer passes string-form. | `:style="{...}"` lowers consistently. Svelte switches to string-form when auto-fallthrough is active to restore consumer-wins precedence. Solid normalizes static string `style="…"` to object form. |
+| **Cross-SFC style cascade** | Per-target style emit that puts `<style>` in the render tree (vs hoisting to `<head>`) silently loses same-specificity cascade when wrappers compose. | Head-injection on every target including Solid (`__rozieInjectStyle` module-top, Map-cached, HMR-safe). Consumer rules win same-specificity races everywhere. |
+| **Engine-DOM vs framework reconciler desync** | Vanilla-JS engines (SortableJS, FullCalendar, TipTap, Uppy) mutate DOM directly; lit-html's `repeat` directive caches part identity by sentinel-comment node, so engine-mutated DOM desyncs the cache and renders garbled. Other targets diff against live `parent.children` and survive. | `$reconcileAfterDomMutation()` sigil — no-op on five targets, `render(nothing, host) + requestUpdate()` on Lit. Call it once after writing the new array, before emitting the change event. |
+| **`<listeners>` for `document` / `window`** | Each framework reinvents lifecycle-bound `addEventListener` cleanup. React: `useEffect`. Vue: `watchEffect`. Svelte: `$effect`. Angular: `Renderer2.listen` + `DestroyRef`. Solid: `createEffect`. Lit: `connectedCallback` + `disconnectedCallback`. | One `<listeners>` block with a declarative `when:` predicate gates attach/detach reactively. Same grammar on every target. |
+| **Parameterized event modifiers** | Vue's modifiers are unparameterized. React et al.: no modifier system. | `@click.debounce(300)`, `@click.outside($refs.a, $refs.b)`, `.throttle(100)`. Same grammar in `<listeners>` and template `@event` bindings. Custom modifiers via the public `registerModifier()` API. |
+| **Static compile error on prop mutation** | React: silent broken state. Vue: dev-mode warning. Svelte: silent. Angular: silent. | `$props.foo = x` where `foo` isn't `model: true` is **ROZ010** at compile time. Caught before the bug lands. |
+| **`r-for` without a key** | React: console warning at runtime. Vue: dev warning. Svelte: silent. Angular: silent. | `r-for` without `:key` is a compile-time warning. `:key` set to the loop index is a separate warning. |
+| **Mustache interpolation in plain attribute values** | Vue forbids `class="card card--{{ variant }}"`. React/Solid: template-literal JSX. Svelte: `{var}` directly. Angular: `[class]` binding. | Rozie permits `class="card card--{{ variant }}"`, `aria-label="Close {{ $props.title }}"` directly. Compiles to each target's natural form. |
+| **Inline expressions in handlers** | Most frameworks force a method or arrow-function wrap. | `@click="$props.closeOnBackdrop && close()"` — inline JS in handler attributes is a first-class authoring path. |
+| **Lifecycle hooks colocated, not funneled** | React: one `useEffect` per body, dep arrays. Vue: one `onMounted` block. Svelte: `$effect` blocks. | Multiple `$onMount` / `$onUnmount` / `$onUpdate` calls in source order. Colocate setup with the logic it serves. |
+| **`$onMount` may return a cleanup** | React-style; alien to Vue/Angular/Lit authors. | Both forms work and compose. Pick the one that reads better case by case. |
+
+## Per-target pain points Rozie hides
+
+Some of these are framework-specific landmines that the locked-in user can't
+escape without leaving the framework. Rozie absorbs them.
+
+| Target | What bites locked-in users | What Rozie does behind the scenes |
+| --- | --- | --- |
+| **React** | CSS Modules hashes class names ⇒ engine `querySelector('.x')` breaks silently. | `$classSelector('x')` lowers to `"." + styles.x` on React, `".x"` everywhere else. |
+| **React** | `useEffect` dep arrays are an exhaustive-deps minefield. | Compiler computes the dep array statically from auto-tracked signal reads. Output passes `eslint-plugin-react-hooks/exhaustive-deps` cleanly. |
+| **React** | StrictMode double-fires mount effects. | All reference examples + engine-wrapper demos validated under `<React.StrictMode>`. Paired `$onMount`/`$onUnmount` lower to one `useEffect` with a cleanup return. |
+| **Vue** | `defineModel`, `defineProps`, `defineEmits`, `defineSlots` — macro soup. | Rozie emits these for you from `<props>`, `<emits>`, `<slots>` declarations. |
+| **Svelte** | Svelte 5's `STYLES_KEY` runs after spread (consumer `style:<prop>` directives win over spread `style`) — opposite of every other framework. | Compiler detects auto-fallthrough and emits string-form `style="…"` to restore consumer-wins precedence. |
+| **Svelte** | Native CSS scoper uses class-hash stamping that doesn't reach component-tag invocations. | Rozie's `data-rozie-s-<hash>` selector rewrite + `:global { … }` block opts out of Svelte's scoper; consumer rules targeting child-component roots match correctly. |
+| **Angular** | Template DSL ceremony — `*ngFor`, decorator boilerplate, `[(ngModel)]`. | Author in Rozie's Vue-flavored SFC syntax; compiler emits `@for`/`@if` blocks, signals, `model<T>()` inputs, standalone components. |
+| **Angular** | `viewChild()` signals empty in constructor; `$el`-touching code must run in `ngAfterViewInit`. | `$onMount` lowers to `ngAfterViewInit()` automatically. Paired cleanups register via hoisted `DestroyRef`. |
+| **Angular** | `template` parser rejects arrow functions in `*ngTemplateOutlet context` bindings. | Compiler pre-binds slot-context closures and passes the bound reference. |
+| **Solid** | `<For>` exposes `index` as `Accessor<number>`, not a scalar — bare references silently break. | Identifier rewriter auto-invokes `index` references in the loop body; shorthand object props expand correctly. |
+| **Solid** | Inline `<style>` JSX renders after consumer styles, wiping same-specificity cascade. | Head-injection via `__rozieInjectStyle()` runtime helper. |
+| **Lit** | lit-html's `repeat()` caches by sentinel-comment node identity → engine DOM mutation garbles the part tree. | `$reconcileAfterDomMutation()` escape hatch. |
+| **Lit** | Web Components have no scoped-CSS bridge to consumer styles. | `adoptConsumerStyles` runtime helper + `data-rozie-s-<hash>` stamping reaches into shadow roots correctly. |
+| **Lit** | No native slot parameter API — consumer-side scoped-slot fill needs a transport. | `@property({attribute:false}) X?: (scope) => unknown` + template invocation; consumer-side `.X=${(scope) => html\`…\`}` splice. |
+
+## What's not on the list
+
+Rozie does **not** try to paper over differences in the rendering pipeline
+itself. Hydration semantics, SSR boundaries, transitions, suspense, server
+components — those are the target framework's concerns and Rozie stays out
+of them.
+
+It also doesn't unify what each ecosystem already does well — testing, form
+libraries, routing, state management — beyond the surface that a single
+component definition needs.
+
+## How to read this page
+
+If you're considering Rozie because you're stuck on one stack, scan the table
+for your framework's row and ask: "How many of these am I working around
+today?" If the answer is more than two, the [adopt-incrementally walkthrough](/guide/adopt-incrementally)
+is the natural next stop.
+
+If you maintain a cross-framework library, the table is the rough shape of
+the boilerplate Rozie deletes from your maintenance budget.
