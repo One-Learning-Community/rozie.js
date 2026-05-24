@@ -87,6 +87,13 @@ Webpack plugins yet. The cleanest path is the pre-compile escape hatch —
 emit `.tsx` files alongside your `.rozie` sources and check them in. The
 [CLI section](#cli-pre-compile) below covers this.
 
+A working end-to-end smoke lives at
+[`examples/consumers/nextjs-rozie/`](https://github.com/One-Learning-Community/rozie.js/tree/main/examples/consumers/nextjs-rozie) —
+mirrors what `npx create-next-app@latest --typescript --app` produces,
+with the Rozie unplugin wired in exactly as above. The CI smoke runs a
+real `next build` on every push touching `packages/unplugin/**` and
+asserts the produced bundle contains compiled Rozie markers.
+
 ### Angular CLI (Application Builder / esbuild)
 
 Angular's modern Application Builder (Angular 17+ default) is esbuild under
@@ -184,6 +191,14 @@ The Lit target is a particularly natural fit for Astro: emitted Web
 Components run inside Astro's static islands without an island-bridge
 runtime, and the same `.rozie` source can be reused in your React /
 Svelte / Vue islands by changing the target flag in another `vite` slot.
+
+A working end-to-end smoke lives at
+[`examples/consumers/astro-rozie/`](https://github.com/One-Learning-Community/rozie.js/tree/main/examples/consumers/astro-rozie) —
+mirrors what `npm create astro@latest` produces, with the Rozie unplugin
+wired in exactly as above. The CI smoke runs a real `astro build` on
+every push touching `packages/unplugin/**` and asserts (a) the rendered
+HTML contains the `<rozie-counter>` custom-element tag and (b) the
+client-side JS bundle contains compiled Rozie markers.
 
 ### Babel-only (legacy build pipelines, no Vite/esbuild/Webpack 5)
 

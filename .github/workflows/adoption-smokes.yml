@@ -1,0 +1,86 @@
+name: Adoption Smokes
+
+# End-to-end build smokes against real scaffolded apps — the cheapest
+# practical proof that the per-stack walkthroughs in
+# docs/guide/adopt-incrementally.md actually work in production-shape
+# scenarios (not just inside vitest).
+#
+# Stacks covered:
+#   - Next.js 15 App Router via @rozie/unplugin/webpack
+#   - Astro 5 + target: 'lit' via @rozie/unplugin/vite
+#
+# Each smoke runs a real `next build` / `astro build` and asserts the
+# produced bundle contains Rozie's stable compile-time markers
+# (`data-rozie-s-<hash>` scope attribute / runtime helper imports).
+#
+# Triggered on changes to the relevant packages OR the demos themselves.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'packages/unplugin/**'
+      - 'packages/core/**'
+      - 'packages/targets/react/**'
+      - 'packages/targets/lit/**'
+      - 'packages/runtime/react/**'
+      - 'packages/runtime/lit/**'
+      - 'examples/consumers/nextjs-rozie/**'
+      - 'examples/consumers/astro-rozie/**'
+      - '.github/workflows/adoption-smokes.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'packages/unplugin/**'
+      - 'packages/core/**'
+      - 'packages/targets/react/**'
+      - 'packages/targets/lit/**'
+      - 'packages/runtime/react/**'
+      - 'packages/runtime/lit/**'
+      - 'examples/consumers/nextjs-rozie/**'
+      - 'examples/consumers/astro-rozie/**'
+      - '.github/workflows/adoption-smokes.yml'
+
+jobs:
+  adoption-smokes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Cache turbo build output
+        uses: actions/cache@v5
+        with:
+          path: .turbo
+          key: ${{ runner.os }}-turbo-${{ github.job }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-turbo-${{ github.job }}-
+            ${{ runner.os }}-turbo-
+
+      # The two demos import from @rozie/unplugin and @rozie/runtime-*
+      # via workspace links, which resolve to those packages' dist/.
+      # A repo-wide build via turbo populates dist/ for every package.
+      - name: Build all packages
+        run: pnpm turbo run build
+
+      # Next.js 15 + Webpack + @rozie/unplugin/webpack
+      - name: Next.js adoption smoke (App Router + Webpack)
+        run: pnpm --filter nextjs-rozie-demo run test
+        env:
+          NEXT_TELEMETRY_DISABLED: '1'
+
+      # Astro 5 + Vite + @rozie/unplugin/vite, target: 'lit'
+      - name: Astro adoption smoke (target: lit + Vite plugin slot)
+        run: pnpm --filter astro-rozie-demo run test
+        env:
+          ASTRO_TELEMETRY_DISABLED: '1'

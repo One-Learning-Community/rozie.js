@@ -1,0 +1,42 @@
+---
+// Astro page that includes a Rozie-compiled Web Component.
+//
+// `target: 'lit'` (set in astro.config.mjs) emits Counter.rozie as a custom
+// element that self-registers via @customElement('rozie-counter'). The
+// import lives in a CLIENT-SIDE <script> tag below — Astro hoists and
+// bundles those, then runs them only in the browser where `customElements`
+// and `HTMLElement` exist. A frontmatter import would run during static
+// generation in Node and crash on browser-only globals.
+//
+// Astro auto-detects custom-element tags in the rendered markup; once the
+// client script registers the element, the browser hydrates the
+// <rozie-counter> tag natively. No `client:*` directive needed for plain
+// Web Components.
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Rozie + Astro Smoke</title>
+  </head>
+  <body>
+    <main style="padding: 2rem; font-family: system-ui, sans-serif;">
+      <h1>Rozie + Astro</h1>
+      <p>
+        This page imports a .rozie file that compiled to a Lit Web Component
+        via @rozie/unplugin/vite. Astro server-rendered the static markup;
+        the browser hydrated the interactive bits as a native custom element.
+      </p>
+      <rozie-counter value="0" step="2"></rozie-counter>
+    </main>
+
+    <script>
+      // Client-side side-effect import — registers <rozie-counter> with the
+      // browser's CustomElementRegistry. Astro bundles this script as a
+      // separate JS chunk and ships it to the browser only.
+      import '../components/Counter.rozie';
+    </script>
+  </body>
+</html>
