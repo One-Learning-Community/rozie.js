@@ -54,44 +54,30 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  *     wrapper-authored class; React hashes it to `_rozie-sortable-item_<hash>`
  *     which still contains the original token as a substring.
  *
- * ── KNOWN_FAILING: lit ───────────────────────────────────────────────────────
- * See the `KNOWN_FAILING` set below — the Lit cell carries a per-cell
- * `test.fixme` with a documented reason; the suite is NOT marked fixme-wide
- * and no assertion is weakened to pass trivially.
+ * ── KNOWN_FAILING (closed 2026-05-24) ────────────────────────────────────────
+ * The Lit cell previously carried a per-cell `test.fixme` because lit-html's
+ * `repeat` directive uses a sentinel-comment-keyed `oldParts` cache (NOT a
+ * live `parent.children` scan at patch time, like Vue/React/Svelte/Solid/
+ * Angular's keyed reconcilers). SortableJS's physical DOM mutation moved
+ * rendered `<div>`s relative to those sentinel markers, desynchronising the
+ * cache; the in-source `e.item.remove() + $el.insertBefore(...)` DOM-restore
+ * dance the engine wrappers all implement could not fix it because the cache
+ * was already stale by the time `onUpdate` ran. Pre-Phase-16 cleanup Item 3
+ * introduced the `$reconcileAfterDomMutation()` sigil for exactly this
+ * engine-wrapper-vs-keyed-reconciler class of bug: a per-target lowering
+ * that no-ops on the other 5 targets and on Lit lowers to a runtime helper
+ * (`render(nothing, host.renderRoot)` + `host.requestUpdate()`) that tears
+ * down the part tree and schedules a fresh build. SortableList.rozie now
+ * calls the sigil after writing the new array, and the Lit cell passes.
+ *
+ * KNOWN_FAILING is kept as an empty ReadonlySet — preserved so future
+ * per-cell gate additions follow the same shape — but no entries remain.
  */
 
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'] as const;
 type Target = (typeof TARGETS)[number];
 
-/**
- * Per-cell known-failing set (mirrors `full-calendar.spec.ts`'s per-cell gate).
- *
- * `lit` — the synthetic drag DOES drive a real SortableJS reorder on Lit (the
- * dragged row visibly moves during the `dragover` burst, and the reordered
- * array propagates back through the two-way `r-model:items` binding — the
- * demo's `<ol class="state-list">` updates correctly). BUT after `drop`, the
- * displayed `[class*="rozie-sortable-item"]` list reverts to the pre-drag
- * order while the bound state stays reordered — a genuine displayed/bound
- * DESYNC, the very thing this spec asserts against.
- *
- * Root cause (not a `$classSelector` regression): `SortableList.rozie`'s
- * `onUpdate` handler does `e.item.remove()` + `$el.insertBefore(...)` to
- * restore the pre-drag DOM before writing the new array — the cross-framework
- * reconciler workaround that works for Vue/React/Svelte/Solid/Angular. On Lit
- * that manual node removal/reinsertion corrupts `lit-html`'s part tree (it
- * tracks the identity of the nodes it rendered), so the subsequent keyed
- * re-render against the reordered `items` cannot reconcile and the displayed
- * list stays stale. The Lit cell's NORMAL data path (the demo's Add button) is
- * unaffected — only the `onUpdate` DOM-restore path collides with lit-html.
- *
- * TODO(rozie-lit-sortable-reconcile): fix `SortableList.rozie`'s `onUpdate`
- * reconciler for the Lit target — either skip the manual DOM restore on Lit
- * (let lit-html own the nodes) or force a full keyed re-render after the
- * splice. Tracked as a post-Phase-13 follow-up; out of scope for the
- * `$classSelector` phase (which is test + docs only). Un-fixme this cell once
- * the Lit reconciler path is fixed.
- */
-const KNOWN_FAILING: ReadonlySet<Target> = new Set<Target>(['lit']);
+const KNOWN_FAILING: ReadonlySet<Target> = new Set<Target>();
 
 // SortableListDemo seeds 5 items via `$onMount(() => reset())`. `settleExample`
 // in matrix.spec.ts already waits for exactly 5 `.rozie-sortable-item`.

@@ -637,6 +637,15 @@ export function rewriteRozieIdentifiers(
         return;
       }
 
+      // $reconcileAfterDomMutation() → `void 0` (no-op). Pre-Phase-16 Item 3:
+      // the sigil exists for the Lit target only — React's keyed reconciler
+      // diffs against live DOM at patch time, so the in-source DOM-restore
+      // dance the engine wrappers all implement is sufficient.
+      if (callee.name === '$reconcileAfterDomMutation') {
+        path.replaceWith(t.unaryExpression('void', t.numericLiteral(0)));
+        return;
+      }
+
       // $classSelector('grip') → "." + styles.grip — React runs class names
       // through CSS Modules, so a literal ".grip" never matches the hashed
       // DOM. Shared with rewriteTemplateExpression.ts via lowerClassSelectorCall

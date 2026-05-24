@@ -333,6 +333,18 @@ export function rewriteRozieIdentifiers(
         return;
       }
 
+      // $reconcileAfterDomMutation() → `void 0` (no-op). Pre-Phase-16 Item 3:
+      // the sigil exists for the Lit target only, where lit-html's
+      // sentinel-comment-keyed `repeat` cache desynchronises when a third-
+      // party engine (SortableJS, …) mutates the DOM directly. Vue's keyed
+      // reconciler diffs against live `parent.children` at patch time, so the
+      // in-source DOM-restore dance the engine wrappers all implement is
+      // sufficient — this sigil has nothing to do here.
+      if (callee.name === '$reconcileAfterDomMutation') {
+        path.replaceWith(t.unaryExpression('void', t.numericLiteral(0)));
+        return;
+      }
+
       // $classSelector('grip') → ".grip" — Vue keeps authored class names
       // literal in the DOM, so the engine receives a selector that matches as
       // written. Shared with rewriteTemplateExpression.ts via

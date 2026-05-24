@@ -655,11 +655,12 @@ function lifecycleHookBody(
   hook: LifecycleHook,
   ir: IRComponent,
   methodNames: Set<string>,
+  runtime: RuntimeLitImportCollector,
 ): { body: string; cleanup: string } {
   let body = '';
   if (t.isBlockStatement(hook.setup)) {
     const wrapper = t.file(t.program([...hook.setup.body]));
-    const rewritten = rewriteScript(wrapper, ir, { methodNamesOverride: methodNames });
+    const rewritten = rewriteScript(wrapper, ir, { methodNamesOverride: methodNames, runtime });
     body = rewritten.file.program.body.map((s) => generate(s, GEN_OPTS).code).join('\n');
   } else if (t.isExpression(hook.setup)) {
     // A bare callable reference (`$onMount(reset)` → Identifier;
@@ -679,7 +680,7 @@ function lifecycleHookBody(
       ? t.expressionStatement(t.callExpression(cloned, []))
       : t.expressionStatement(cloned);
     const wrapper = t.file(t.program([stmt]));
-    const rewritten = rewriteScript(wrapper, ir, { methodNamesOverride: methodNames });
+    const rewritten = rewriteScript(wrapper, ir, { methodNamesOverride: methodNames, runtime });
     body = rewritten.file.program.body.map((s) => generate(s, GEN_OPTS).code).join('\n');
   }
 
@@ -690,7 +691,7 @@ function lifecycleHookBody(
     // over a wrapper file + multi-line generator instead.
     const cleanupClone = t.cloneNode(hook.cleanup, true, false);
     const wrapper = t.file(t.program([t.expressionStatement(cleanupClone)]));
-    const rewritten = rewriteScript(wrapper, ir, { methodNamesOverride: methodNames });
+    const rewritten = rewriteScript(wrapper, ir, { methodNamesOverride: methodNames, runtime });
     const stmt = rewritten.file.program.body[0]!;
     if (t.isExpressionStatement(stmt)) {
       cleanup = generate(stmt.expression, GEN_OPTS).code;
@@ -739,7 +740,9 @@ export function emitScript(
 
   // 2. Rewrite the script Babel AST so $props.X / $data.X / etc. become this.X
   // before we render statements out.
-  const rewritten = rewriteScript(ir.setupBody.scriptProgram, ir);
+  const rewritten = rewriteScript(ir.setupBody.scriptProgram, ir, {
+    runtime: opts.runtime,
+  });
 
   // 2b. Spike 001 B1 + Phase 9 Plan 09-04 — partition user-authored top-level
   //     ImportDeclarations AND statement-position `interface`/`type`
@@ -804,7 +807,7 @@ export function emitScript(
   const methodNames = collectMethodNamesFromProgram(ir.setupBody.scriptProgram, ir);
   if (ir.lifecycle && ir.lifecycle.length > 0) {
     for (const hook of ir.lifecycle) {
-      const { body, cleanup } = lifecycleHookBody(hook, ir, methodNames);
+      const { body, cleanup } = lifecycleHookBody(hook, ir, methodNames, opts.runtime);
       if (hook.phase === 'mount') {
         if (body.trim()) mountBodies.push(body);
         if (cleanup) {
@@ -878,9 +881,11 @@ export function emitScript(
       const cbWrapper = t.file(t.program([t.expressionStatement(w.callback)]));
       const getterRewritten = rewriteScript(getterWrapper, ir, {
         methodNamesOverride: methodNames,
+        runtime: opts.runtime,
       });
       const cbRewritten = rewriteScript(cbWrapper, ir, {
         methodNamesOverride: methodNames,
+        runtime: opts.runtime,
       });
       const getterStmt = getterRewritten.file.program.body[0]!;
       const cbStmt = cbRewritten.file.program.body[0]!;

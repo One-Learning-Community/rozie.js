@@ -53,13 +53,19 @@ import { scopeCss } from './scopeCss.js';
  * `.svelte-<hash>` scope class appended — one extra `(0,1,0)` specificity
  * unit — so the `@portal` scope attribute was repeated once to match.
  *
- * Post-Item-2: scoped rules are now wrapped in `:global { ... }`, opting out
- * of Svelte's native scoper entirely — there is no `.svelte-<hash>` class
- * adding specificity to compete with. The repeat drops to 0 to match the
- * react/solid/lit baseline; the VR matrix D-10 byte-identity gate is the
- * empirical oracle (260520-bu7 Task 2).
+ * Post-Item-2 (kept at 1): scoped rules are now wrapped in `:global { ... }`
+ * to opt out of Svelte's native scoper, but the `scopeCss` rewriter still
+ * appends `[data-rozie-s-<hash>]` to every compound selector — same
+ * `(0,1,0)` specificity unit, just under a different name. The portal
+ * scope attribute repeat must therefore remain 1 to match. (Initial Item-2
+ * implementation dropped this to 0 reasoning that "no more svelte-hash =
+ * no more competing unit"; the regression surfaced on PortalListStyled ·
+ * svelte where the `@portal item div { display: flex }` rule started
+ * losing to the consumer's `.row` rule and broke a layout-dependent test.
+ * Reverted in the same Item-2 follow-up.) VR matrix D-10 byte-identity is
+ * still the empirical oracle.
  */
-const PORTAL_SCOPE_REPEAT = 0;
+const PORTAL_SCOPE_REPEAT = 1;
 
 export interface EmitStyleResult {
   /** Body of the single `<style>` block (joined scoped + :global(:root) + @portal rules). */

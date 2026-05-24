@@ -850,6 +850,15 @@ export function rewriteRozieIdentifiers(
         return;
       }
 
+      // $reconcileAfterDomMutation() → `void 0` (no-op). Pre-Phase-16 Item 3:
+      // the sigil exists for the Lit target only — Angular's keyed reconciler
+      // diffs against live DOM at patch time, so the in-source DOM-restore
+      // dance the engine wrappers all implement is sufficient.
+      if (callee.name === '$reconcileAfterDomMutation') {
+        path.replaceWith(t.unaryExpression('void', t.numericLiteral(0)));
+        return;
+      }
+
       // $classSelector('grip') → ".grip" — Angular keeps authored class names
       // literal in the emitted DOM (style isolation via [data-rozie-s-<hash>]),
       // so the compile-time literal is correct. Shared with

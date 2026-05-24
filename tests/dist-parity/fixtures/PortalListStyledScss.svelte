@@ -125,22 +125,22 @@ onMount(() => {
 }
 
 :global {
-  [data-rozie-portal-item="860cc87e"] ul {
+  [data-rozie-portal-item="860cc87e"][data-rozie-portal-item="860cc87e"] ul {
     list-style: none;
     margin: 0;
     padding: 0;
     overflow: hidden;
   }
-  [data-rozie-portal-item="860cc87e"] li {
+  [data-rozie-portal-item="860cc87e"][data-rozie-portal-item="860cc87e"] li {
     padding: 0.5rem 0.75rem;
   }
-  [data-rozie-portal-item="860cc87e"] li + li {
+  [data-rozie-portal-item="860cc87e"][data-rozie-portal-item="860cc87e"] li + li {
     border-top: 1px solid #ededed;
   }
-  [data-rozie-portal-item="860cc87e"] li:hover {
+  [data-rozie-portal-item="860cc87e"][data-rozie-portal-item="860cc87e"] li:hover {
     background: #f5f5f5;
   }
-  [data-rozie-portal-item="860cc87e"] div {
+  [data-rozie-portal-item="860cc87e"][data-rozie-portal-item="860cc87e"] div {
     display: flex;
     align-items: center;
     gap: var(--rozie-portal-list-gap);

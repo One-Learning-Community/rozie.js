@@ -143,7 +143,18 @@ export type RuntimeLitImport =
    * `Directive` — Pitfall 7 / A2 LOCKED) so `disconnected()` removes every
    * attached listener (T-15-V5-04 leak defense).
    */
-  | 'rozieListeners';
+  | 'rozieListeners'
+  /**
+   * Pre-Phase-16 cleanup Item 3 — `__rozieReconcileAfterDomMutation` runtime
+   * helper, shipped from `@rozie/runtime-lit`. Added by `rewriteScript` when
+   * the user calls the `$reconcileAfterDomMutation()` sigil from a
+   * `<script>` or listener-callback body. Tears down lit-html's part tree
+   * and schedules a fresh update — the engine-wrapper escape hatch for
+   * third-party DOM mutations (SortableJS, FullCalendar, …) that
+   * desynchronise lit-html's sentinel-comment-keyed `oldParts` cache.
+   * No-op on every non-Lit target.
+   */
+  | '__rozieReconcileAfterDomMutation';
 
 export class RuntimeLitImportCollector {
   private symbols = new Set<RuntimeLitImport>();

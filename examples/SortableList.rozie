@@ -75,6 +75,19 @@ $onMount(() => {
       const [moved] = next.splice(e.oldIndex, 1)
       next.splice(e.newIndex, 0, moved)
       $props.items = next
+      // Pre-Phase-16 cleanup Item 3 — engine-wrapper escape hatch.
+      // SortableJS mutated the DOM directly before this handler ran. On
+      // Vue/React/Svelte/Solid/Angular the in-source DOM-restore above
+      // suffices: those reconcilers diff against live `parent.children` at
+      // patch time, see a clean array shift, and perform idiomatic keyed
+      // moves. On Lit, lit-html's `repeat` directive caches its part array
+      // by sentinel-comment node identity; SortableJS's physical relocation
+      // of `<div>`s relative to those sentinel markers leaves the cache
+      // desynchronised, and subsequent renders garble the output. The
+      // sigil lowers to `__rozieReconcileAfterDomMutation(this)` on Lit
+      // (tears down the part tree + schedules a fresh update) and to
+      // `void 0` on every other target (no-op).
+      $reconcileAfterDomMutation()
       $emit('change', { oldIndex: e.oldIndex, newIndex: e.newIndex, item: moved })
     },
   })

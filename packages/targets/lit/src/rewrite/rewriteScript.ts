@@ -31,6 +31,7 @@ import {
   isInBindingPosition,
 } from './scopeAwareSkip.js';
 import { lowerClassSelectorCall } from './lowerClassSelectorCall.js';
+import type { RuntimeLitImportCollector } from './collectLitImports.js';
 
 // CJS interop normalization.
 type GenerateFn = typeof import('@babel/generator').default;
@@ -188,6 +189,16 @@ export interface RewriteScriptOpts {
    * program so identifiers like `lockScroll` are still rewritten to `this.lockScroll`.
    */
   methodNamesOverride?: Set<string>;
+  /**
+   * Optional runtime-import collector. When provided, the CallExpression
+   * visitor registers `__rozieReconcileAfterDomMutation` from
+   * `@rozie/runtime-lit` whenever a `$reconcileAfterDomMutation()` call is
+   * lowered (pre-Phase-16 cleanup Item 3). When undefined, the call is still
+   * rewritten — but the caller is responsible for ensuring the import line
+   * lands in the emitted SFC. emitScript.ts always passes the collector;
+   * test-only callers may omit it.
+   */
+  runtime?: RuntimeLitImportCollector;
 }
 
 export function rewriteScript(
@@ -526,6 +537,26 @@ export function rewriteScript(
       // hooks cannot drift (Pitfall 4).
       if (callee.name === '$classSelector') {
         lowerClassSelectorCall(path);
+        return;
+      }
+
+      // $reconcileAfterDomMutation() → __rozieReconcileAfterDomMutation(this)
+      // — pre-Phase-16 cleanup Item 3 escape hatch for engine wrappers whose
+      // third-party DOM mutation has desynchronised lit-html's `repeat`
+      // directive cache. The helper tears down the part tree via
+      // `render(nothing, host.renderRoot)` and schedules a fresh update.
+      // Non-Lit targets lower this call to `void 0` (no-op); Lit is the only
+      // target that needs the runtime helper because lit-html's `repeat`
+      // is uniquely sentinel-comment-cache-keyed in the matrix (every other
+      // target's reconciler diffs against live `parent.children` at patch
+      // time, so the in-source DOM-restore dance suffices).
+      if (callee.name === '$reconcileAfterDomMutation') {
+        path.replaceWith(
+          t.callExpression(t.identifier('__rozieReconcileAfterDomMutation'), [
+            t.thisExpression(),
+          ]),
+        );
+        opts.runtime?.add('__rozieReconcileAfterDomMutation');
         return;
       }
 

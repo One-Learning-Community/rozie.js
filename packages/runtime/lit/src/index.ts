@@ -32,3 +32,7 @@ export {
   isShift,
   isMeta,
 } from './keyFilter.js';
+export {
+  __rozieReconcileAfterDomMutation,
+  type ReconcilableHost,
+} from './reconcileAfterDomMutation.js';
