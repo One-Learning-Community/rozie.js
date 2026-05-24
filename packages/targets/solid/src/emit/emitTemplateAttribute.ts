@@ -415,7 +415,7 @@ function cssPropToStyleKey(prop: string): string {
  * PostCSS throw).
  */
 function lowerStringLiteralStyle(
-  attr: Extract<AttributeBinding, { kind: 'binding' }>,
+  sourceLoc: AttributeBinding['sourceLoc'],
   literal: string,
 ): { jsx: string; diagnostics: Diagnostic[] } {
   const diagnostics: Diagnostic[] = [];
@@ -432,9 +432,9 @@ function lowerStringLiteralStyle(
       code: RozieErrorCode.STYLE_PARSE_ERROR,
       severity: 'error',
       message:
-        `Could not parse inline \`:style\` string ${JSON.stringify(literal)}: ` +
+        `Could not parse inline \`style\` string ${JSON.stringify(literal)}: ` +
         `${err instanceof Error ? err.message : String(err)}`,
-      loc: attr.sourceLoc,
+      loc: sourceLoc,
     });
     return { jsx: 'style={{}}', diagnostics };
   }
@@ -448,7 +448,7 @@ function lowerStringLiteralStyle(
         message:
           `\`!important\` on \`${decl.prop}\` is dropped by Solid's style-object form. ` +
           `Solid silently ignores \`!important\` in inline style objects.`,
-        loc: attr.sourceLoc,
+        loc: sourceLoc,
       });
     }
     props.push(`${keyOut}: ${JSON.stringify(decl.value)}`);
@@ -475,6 +475,24 @@ function emitNonClassAttribute(
     // Unknown ref — pass through as static
   }
 
+  // bare `style="k1: v1; k2: v2"` static → object form. Mirrors React's
+  // matching emit path (Phase 14-06 ThemedButtonConsumer divergence): when a
+  // child component is invoked with a string-form `style="..."` attribute,
+  // the consumer's prop reaches the child as a STRING. The child's auto-
+  // fallthrough spread (`{...attrs}`) then routes the string through Solid's
+  // dom-expressions `style()` helper, which for string values does
+  // `nodeStyle.cssText = value` — REPLACING the entire inline style and
+  // wiping any wrapper-set `style={{...}}` defaults (the
+  // `ThemedButtonConsumer · solid` matrix VR cell residual after Item 1:
+  // wrapper's `--btn-fg: #ffffff` survived only via the `var(...)` fallback,
+  // not via the inline style). Converting the string to an object literal
+  // here ensures the child receives `props.style` as an object; Solid's
+  // `style()` helper then iterates and `setProperty`s per key, MERGING with
+  // the wrapper's defaults instead of clobbering them.
+  if (attr.kind === 'static' && attr.name === 'style') {
+    return lowerStringLiteralStyle(attr.sourceLoc, attr.value);
+  }
+
   if (attr.kind === 'static') {
     const jsxName = htmlAttrToSolidName(attr.name);
     if (NUMERIC_HTML_ATTRS.has(attr.name.toLowerCase()) && /^-?\d+(?:\.\d+)?$/.test(attr.value)) {
@@ -493,7 +511,7 @@ function emitNonClassAttribute(
     //     register the runtime helper import.
     if (attr.name === 'style') {
       if (t.isStringLiteral(attr.expression)) {
-        return lowerStringLiteralStyle(attr, attr.expression.value);
+        return lowerStringLiteralStyle(attr.sourceLoc, attr.expression.value);
       }
       if (!t.isObjectExpression(attr.expression)) {
         ctx.collectors.runtime.add('parseInlineStyle');

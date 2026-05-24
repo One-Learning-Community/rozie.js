@@ -376,17 +376,30 @@ const PHASE_14_1_FOLLOWUP = new Set<string>([
   // (ratio 0.13). The 5 themed-button.spec.ts × solid DOM-assertion cells
   // now pass (see PHASE_14_1_FOLLOWUP_TARGETS in that spec — solid ungated).
   //
-  // RESIDUAL — Cell renders at 454×52 vs 474×52 baseline (~20px width drift,
-  // consistent ~5px per inter-button gap). Root cause unconfirmed; candidates:
-  //   (a) wrapper's `style={{...}}` defaults clobbered by consumer-passed
-  //       string-form `style="…"` via Solid's `nodeStyle.cssText =` path —
-  //       Agent S adjacent bug #2;
-  //   (b) inter-element whitespace handling between consumer's flex-child
-  //       <ThemedButton*> invocations rendering as anonymous flex items
-  //       differently in Solid vs the Vue baseline;
-  //   (c) Solid-unique inline `<style>{...}</style>` emit interacting with
-  //       flex layout in a way the other 5 targets' CSS pipelines avoid.
-  // Carried as Item-1-residual into a follow-up post-Phase-16 sweep.
+  // Item-1-residual closure attempt 1 (2026-05-24): the static-style →
+  // object-form lowering (mirror of React's existing path) was added to
+  // `packages/targets/solid/src/emit/emitTemplateAttribute.ts`. Consumer's
+  // `style="--btn-bg: #ef4444"` now lands as `style={{"--btn-bg": "#ef4444"}}`
+  // on the child invocation, so Solid's `style()` helper iterates and
+  // `setProperty`-per-key instead of `cssText`-replacing — wrapper's
+  // `--btn-fg: #ffffff` is now preserved on the inline style (correctness
+  // improvement). VR diff is unchanged at 3 108 px because the wrapper's
+  // `--btn-fg` was ALREADY rendering white via the CSS `var(--btn-fg, #fff)`
+  // fallback, so the fix moves no visible pixels. Still worth landing —
+  // future wrappers that depend on the precise inline-style cascade
+  // (rather than CSS fallback) now work correctly on Solid.
+  //
+  // RESIDUAL — Cell still 454×52 vs 474×52 baseline (~20 px width drift,
+  // unchanged). Static analysis ruled out the style-clobber theory; the
+  // candidates that remain are subtler cross-target rendering nuances:
+  //   - inter-element whitespace between flex children rendering
+  //     differently in Solid vs Vue (the baseline);
+  //   - Solid-unique inline `<style>{...}</style>` emit affecting flex
+  //     layout (the only target that emits styles inline as a sibling);
+  //   - per-target Linux Chromium font-kerning at text-node boundaries
+  //     (memory `feedback_vr_macos_text_node_kerning` suggests Linux
+  //     kerns identically, but a single specific case may not).
+  // None are blocking; carried into a deeper post-Phase-16 investigation.
   'ThemedButtonConsumer::solid',
   // Pre-Phase-16 cleanup Item 2 PARTIAL closure (2026-05-23). The original
   // gate hypothesis was correct: Svelte uses native class-hash CSS scoping
