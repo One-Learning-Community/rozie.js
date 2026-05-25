@@ -83,8 +83,8 @@ jobs:
         env:
           NEXT_TELEMETRY_DISABLED: '1'
 
-      # Astro 5 + Vite + @rozie/unplugin/vite, target: 'lit'.
-      - name: Astro adoption smoke (target: lit + Vite plugin slot)
+      # Astro 5 + Vite + @rozie/unplugin/vite, target='lit'.
+      - name: "Astro adoption smoke (target='lit' + Vite plugin slot)"
         run: pnpm --filter astro-rozie-demo run test:smoke
         env:
           ASTRO_TELEMETRY_DISABLED: '1'
