@@ -37,14 +37,21 @@ echo "  ci-prepush — cold-cache typecheck + test (CI-mirror)"
 echo "═══════════════════════════════════════════════════════════════════"
 echo ""
 
-echo "▶ turbo run typecheck --force --continue"
+echo "▶ turbo run typecheck --force --continue --concurrency=4"
 echo ""
-turbo run typecheck --force --continue
+turbo run typecheck --force --continue --concurrency=4
 
 echo ""
-echo "▶ turbo run test --force --continue"
+echo "▶ turbo run test --force --continue --concurrency=4"
 echo ""
-turbo run test --force --continue
+# --concurrency=4 keeps the gate stable. Without a cap, turbo runs every
+# task in parallel; on a 10-core box that's fine, but the heavier suites
+# (target-react/vue/svelte/angular + dist-parity, all running vitest with
+# its own per-test process budget) race vitest's 5s default timeout under
+# CPU starvation. Failed packages varied between runs — classic
+# turbo-parallel-CPU-starvation flake (memory turbo_parallel_test_flake).
+# At --concurrency=4 the gate is reliably green at ~36s cold cache.
+turbo run test --force --continue --concurrency=4
 
 end=$(date +%s)
 elapsed=$((end - start))
