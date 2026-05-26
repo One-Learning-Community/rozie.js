@@ -12,7 +12,7 @@ interface CounterProps {
 }
 
 export default function Counter(_props: CounterProps): JSX.Element {
-  const props: CounterProps & { step: number; min: number; max: number } = {
+  const props: Omit<CounterProps, 'step' | 'min' | 'max'> & { step: number; min: number; max: number } = {
     ..._props,
     step: _props.step ?? 1,
     min: _props.min ?? -Infinity,

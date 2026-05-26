@@ -40,12 +40,6 @@
 <data>
 {
   observed: null,
-  // Identity probes — set ONCE on first read and never reassigned. Used by
-  // Task 3 runtime probes to verify (a) within-mount factory results are
-  // stable (`===`) across consecutive renders, (b) across-mount factory
-  // results differ in identity (NOT shared across instances).
-  __lastE: null,
-  __lastF: null,
 }
 </data>
 
@@ -59,19 +53,25 @@ $onMount(() => {
     e: $props.e,
     f: $props.f,
   }
-  // Capture the e/f factory references on first read (mount). Later renders
-  // compare $props.e === $data.__lastE — should remain true on every target
-  // per D-02 once-per-instance.
-  $data.__lastE = $props.e
-  $data.__lastF = $props.f
 })
 </script>
 
 <template>
 <div class="pdc">
   <pre data-rozie-pdc-output>{{ JSON.stringify($data.observed) }}</pre>
-  <span data-rozie-pdc-e-identity>{{ String($props.e === $data.__lastE) }}</span>
-  <span data-rozie-pdc-f-identity>{{ String($props.f === $data.__lastF) }}</span>
+  <!--
+    D-02 once-per-instance factory identity probe. Two consecutive reads of
+    `$props.e` (or `$props.f`) within the same expression MUST return the
+    same reference: if the per-target emitter caches the factory result once
+    per instance, both reads yield the cached value and the strict-equality
+    check is `true`. If the emitter re-invokes the factory per access, the
+    two reads return distinct array/object literals and the check is `false`.
+    This sidesteps the framework-specific state-proxy wrapping that breaks a
+    cross-render-comparison probe (Svelte 5's `$state` wraps arrays on
+    assignment; Vue's reactive proxy similarly).
+  -->
+  <span data-rozie-pdc-e-identity>{{ $props.e === $props.e ? 'true' : 'false' }}</span>
+  <span data-rozie-pdc-f-identity>{{ $props.f === $props.f ? 'true' : 'false' }}</span>
 </div>
 </template>
 

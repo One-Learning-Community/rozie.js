@@ -5,15 +5,16 @@ import CardHeader from './CardHeader';
 
 interface CardProps {
   title?: string;
-  onClose?: (...args: any[]) => any;
+  onClose?: ((...args: any[]) => any) | null;
   children?: ReactNode;
   slots?: Record<string, () => import('react').ReactNode>;
 }
 
 export default function Card(_props: CardProps): JSX.Element {
-  const props: CardProps & { title: string } = {
+  const props: Omit<CardProps, 'title' | 'onClose'> & { title: string; onClose: ((...args: any[]) => any) | null } = {
     ..._props,
     title: _props.title ?? '',
+    onClose: _props.onClose ?? null,
   };
   const attrs: Record<string, unknown> = (() => {
     const { title, onClose, ...rest } = _props as CardProps & Record<string, unknown>;

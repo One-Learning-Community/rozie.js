@@ -8,7 +8,7 @@ __rozieInjectStyle('CardHeader-f3e60f5a', `.card-header[data-rozie-s-f3e60f5a] {
 
 interface CardHeaderProps {
   title?: string;
-  onClose?: (...args: unknown[]) => unknown;
+  onClose?: ((...args: unknown[]) => unknown) | null;
 }
 
 export default function CardHeader(_props: CardHeaderProps): JSX.Element {

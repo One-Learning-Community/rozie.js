@@ -3,13 +3,14 @@ import styles from './CardHeader.module.css';
 
 interface CardHeaderProps {
   title?: string;
-  onClose?: (...args: any[]) => any;
+  onClose?: ((...args: any[]) => any) | null;
 }
 
 export default function CardHeader(_props: CardHeaderProps): JSX.Element {
-  const props: CardHeaderProps & { title: string } = {
+  const props: Omit<CardHeaderProps, 'title' | 'onClose'> & { title: string; onClose: ((...args: any[]) => any) | null } = {
     ..._props,
     title: _props.title ?? '',
+    onClose: _props.onClose ?? null,
   };
   const attrs: Record<string, unknown> = (() => {
     const { title, onClose, ...rest } = _props as CardHeaderProps & Record<string, unknown>;

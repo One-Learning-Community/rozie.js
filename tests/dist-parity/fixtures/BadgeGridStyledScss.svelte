@@ -6,7 +6,9 @@ interface Props {
   [key: string]: unknown;
 }
 
-let { badges = (() => [])(), ...__rozieAttrs }: Props = $props();
+let __defaultBadges = (() => [])();
+
+let { badges = __defaultBadges, ...__rozieAttrs }: Props = $props();
 </script>
 
 

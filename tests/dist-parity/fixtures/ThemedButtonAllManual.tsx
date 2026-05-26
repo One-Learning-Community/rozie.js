@@ -7,7 +7,7 @@ interface ThemedButtonAllManualProps {
 }
 
 export default function ThemedButtonAllManual(_props: ThemedButtonAllManualProps): JSX.Element {
-  const props: ThemedButtonAllManualProps & { label: string; variant: string } = {
+  const props: Omit<ThemedButtonAllManualProps, 'label' | 'variant'> & { label: string; variant: string } = {
     ..._props,
     label: _props.label ?? 'Click me',
     variant: _props.variant ?? 'primary',

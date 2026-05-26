@@ -14,6 +14,7 @@
  *
  * @experimental — shape may change before v1.0
  */
+import * as t from '@babel/types';
 import type { IRComponent, PropTypeAnnotation } from '../../../../core/src/ir/types.js';
 
 export function renderType(ann: PropTypeAnnotation): string {
@@ -109,7 +110,14 @@ export function emitPropsInterface(ir: IRComponent, slotPropFields?: string[]): 
   // other prop keeps the optional `name?: T` form. The model `default`/
   // `on…Change` companion fields STAY optional regardless of `required`.
   for (const p of ir.props) {
-    const tsType = renderType(p.typeAnnotation);
+    let tsType = renderType(p.typeAnnotation);
+    // Phase 16 R1 — widen with `| null` for null-default props so consumers
+    // (including sub-component composition) see the accurate type contract.
+    // Mirrors the React + Svelte widening; without it `<Card onClose={
+    // props.onClose} />` chains fail TS2322 across the consumer tree.
+    if (p.defaultValue !== null && t.isNullLiteral(p.defaultValue)) {
+      tsType = `(${tsType}) | null`;
+    }
     const opt = p.required ? '' : '?';
     if (p.isModel) {
       // 3-field synthesis per D-135 Solid analog.

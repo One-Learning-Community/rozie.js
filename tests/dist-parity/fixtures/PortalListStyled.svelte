@@ -13,8 +13,10 @@ interface Props {
   [key: string]: unknown;
 }
 
+let __defaultItems = (() => [])();
+
 let {
-  items = (() => [])(),
+  items = __defaultItems,
   item: __itemProp,
   snippets,
   ...__rozieAttrs

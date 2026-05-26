@@ -26,7 +26,7 @@ interface ModalProps {
 }
 
 export default function Modal(_props: ModalProps): JSX.Element {
-  const props: ModalProps & { closeOnEscape: boolean; closeOnBackdrop: boolean; lockBodyScroll: boolean; title: string } = {
+  const props: Omit<ModalProps, 'closeOnEscape' | 'closeOnBackdrop' | 'lockBodyScroll' | 'title'> & { closeOnEscape: boolean; closeOnBackdrop: boolean; lockBodyScroll: boolean; title: string } = {
     ..._props,
     closeOnEscape: _props.closeOnEscape ?? true,
     closeOnBackdrop: _props.closeOnBackdrop ?? true,

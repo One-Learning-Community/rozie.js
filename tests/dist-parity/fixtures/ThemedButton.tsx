@@ -7,7 +7,7 @@ interface ThemedButtonProps {
 }
 
 export default function ThemedButton(_props: ThemedButtonProps): JSX.Element {
-  const props: ThemedButtonProps & { label: string; variant: string } = {
+  const props: Omit<ThemedButtonProps, 'label' | 'variant'> & { label: string; variant: string } = {
     ..._props,
     label: _props.label ?? 'Click me',
     variant: _props.variant ?? 'primary',

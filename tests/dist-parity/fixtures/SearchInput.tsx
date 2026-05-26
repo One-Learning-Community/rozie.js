@@ -11,7 +11,7 @@ interface SearchInputProps {
 }
 
 export default function SearchInput(_props: SearchInputProps): JSX.Element {
-  const props: SearchInputProps & { placeholder: string; minLength: number; autofocus: boolean } = {
+  const props: Omit<SearchInputProps, 'placeholder' | 'minLength' | 'autofocus'> & { placeholder: string; minLength: number; autofocus: boolean } = {
     ..._props,
     placeholder: _props.placeholder ?? 'Search…',
     minLength: _props.minLength ?? 2,

@@ -1648,7 +1648,7 @@ export function emitScript(
     });
     // 2026-05-18 — Override defaulted fields as REQUIRED in the merged `props`
     // type so downstream `props.step` reads don't fire TS18048 ("possibly
-    // undefined"). The intersection narrows just the defaulted slots; other
+    // undefined"). The override narrows just the defaulted slots; other
     // fields keep the interface's optional-marker. Without this override, the
     // declared type was bare `${ir.name}Props` and TS treated `..._props` spread
     // as "still optional" → every `props.step + 1` arithmetic was an error.
@@ -1659,6 +1659,14 @@ export function emitScript(
     // emit/emitScript.ts:232). Without this widening,
     // `{ a: ((...args)=>any) | null }` would fail to narrow from
     // `_props.a ?? null` for `((...args)=>any) | undefined` slots.
+    //
+    // Use `Omit<XProps, 'defaulted...'> & { ... }` rather than `XProps & { ... }`:
+    // a plain intersection narrows to the COMMON subtype of the original
+    // optional field and the override (`string | undefined` ∩ `string | null`
+    // = `string`), which strips the `| null` widening and the coalesce write
+    // `field: _props.field ?? null` fails to assign back. `Omit` cleanly
+    // removes the original field type so the override stands alone.
+    const defaultedNames = defaultedNonModelProps.map((p) => `'${p.name}'`);
     const requiredOverride = defaultedNonModelProps
       .map((p) => {
         const tsTypeForOverride = renderPropTypeForOverride(p);
@@ -1668,7 +1676,8 @@ export function emitScript(
         return `${p.name}: ${widened}`;
       })
       .join('; ');
-    const mergedType = `${ir.name}Props & { ${requiredOverride} }`;
+    const mergedType =
+      `Omit<${ir.name}Props, ${defaultedNames.join(' | ')}> & { ${requiredOverride} }`;
     // Spread first so user-supplied values come through, then explicit
     // `X: _props.X ?? <default>` lines override any missing/undefined values
     // with the declared default.

@@ -96,6 +96,12 @@ const FIXTURES_DIR = resolve(HERE, 'fixtures');
 // EXAMPLE_SIBLING_ROZIE below), and RBindProbe (R11d literal `r-bind`
 // class-merge + reordered probe; single-file). 17 × 6 × 4 = 408 cells
 // (+ React .d.ts/.module.css sidecars).
+// Phase 16 prop-default coercion — extended 17 → 18 with PropDefaultCoercion
+// (SPEC R1/R5 cross-target prop-default conformance probe; single-file —
+// the six default shapes null / 0 / '' / false / () => [] / () => ({k:1})
+// MUST coerce undefined→declaredDefault uniformly across all 6 targets,
+// with D-02 once-per-instance factory invocation). +1 × 6 × 4 = 24 new
+// cells: 408 → 432 cells (+ React .d.ts/.module.css sidecars).
 const EXAMPLES = [
   'Counter',
   'SearchInput',
@@ -114,6 +120,7 @@ const EXAMPLES = [
   'ThemedButtonManual',
   'ThemedButtonConsumer',
   'RBindProbe',
+  'PropDefaultCoercion',
 ] as const;
 
 // Phase 07.2 Plan 06 — siblings ModalConsumer reaches via `<components>`.
@@ -348,7 +355,7 @@ describe('DIST-05 strict-bytes parity gate — consumer-side 96-cell subset (Pha
   });
 });
 
-describe('DIST-05 strict-bytes parity gate (D-93) — 17 examples × 6 targets × 4 entrypoints = 408 cells', () => {
+describe('DIST-05 strict-bytes parity gate (D-93) — 18 examples × 6 targets × 4 entrypoints = 432 cells', () => {
   describe.each(EXAMPLES)('%s', (name) => {
     const rozieSourcePath = resolve(ROOT, `examples/${name}.rozie`);
     const rozieSource = readFileSync(rozieSourcePath, 'utf8');

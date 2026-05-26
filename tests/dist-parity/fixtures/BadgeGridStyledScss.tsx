@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { clsx } from '@rozie/runtime-react';
 import styles from './BadgeGridStyledScss.module.css';
 
@@ -6,9 +7,10 @@ interface BadgeGridStyledScssProps {
 }
 
 export default function BadgeGridStyledScss(_props: BadgeGridStyledScssProps): JSX.Element {
-  const props: BadgeGridStyledScssProps & { badges: any[] } = {
+  const __defaultBadges = useState(() => (() => [])())[0];
+  const props: Omit<BadgeGridStyledScssProps, 'badges'> & { badges: any[] } = {
     ..._props,
-    badges: _props.badges ?? (() => [])(),
+    badges: _props.badges ?? __defaultBadges,
   };
   const attrs: Record<string, unknown> = (() => {
     const { badges, ...rest } = _props as BadgeGridStyledScssProps & Record<string, unknown>;

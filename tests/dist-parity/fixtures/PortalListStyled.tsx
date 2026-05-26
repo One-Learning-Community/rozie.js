@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { flushSync } from 'react-dom';
@@ -15,9 +15,10 @@ interface PortalListStyledProps {
 
 export default function PortalListStyled(_props: PortalListStyledProps): JSX.Element {
   const portalRoots = useRef<Set<Root>>(new Set());
-  const props: PortalListStyledProps & { items: any[] } = {
+  const __defaultItems = useState(() => (() => [])())[0];
+  const props: Omit<PortalListStyledProps, 'items'> & { items: any[] } = {
     ..._props,
-    items: _props.items ?? (() => [])(),
+    items: _props.items ?? __defaultItems,
   };
   const attrs: Record<string, unknown> = (() => {
     const { items, ...rest } = _props as PortalListStyledProps & Record<string, unknown>;

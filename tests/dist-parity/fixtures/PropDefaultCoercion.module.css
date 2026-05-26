@@ -1,0 +1,10 @@
+.pdc[data-rozie-s-109e595c] {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  font-family: ui-monospace, monospace;
+}
+.pdc[data-rozie-s-109e595c] pre[data-rozie-s-109e595c] {
+  margin: 0;
+}

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { clsx } from '@rozie/runtime-react';
 import styles from './TreeNode.module.css';
 
@@ -6,13 +7,14 @@ interface TreeNodeProps {
 }
 
 export default function TreeNode(_props: TreeNodeProps): JSX.Element {
-  const props: TreeNodeProps & { node: Record<string, any> } = {
-    ..._props,
-    node: _props.node ?? (() => ({
+  const __defaultNode = useState(() => (() => ({
     id: '',
     label: '',
     children: []
-  }))(),
+  }))())[0];
+  const props: Omit<TreeNodeProps, 'node'> & { node: Record<string, any> } = {
+    ..._props,
+    node: _props.node ?? __defaultNode,
   };
   const attrs: Record<string, unknown> = (() => {
     const { node, ...rest } = _props as TreeNodeProps & Record<string, unknown>;

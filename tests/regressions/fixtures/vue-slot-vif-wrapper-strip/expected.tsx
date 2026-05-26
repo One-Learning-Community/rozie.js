@@ -10,7 +10,7 @@ interface PresenceSlotFallbackProps {
 }
 
 export default function PresenceSlotFallback(_props: PresenceSlotFallbackProps): JSX.Element {
-  const props: PresenceSlotFallbackProps & { title: string } = {
+  const props: Omit<PresenceSlotFallbackProps, 'title'> & { title: string } = {
     ..._props,
     title: _props.title ?? '',
   };

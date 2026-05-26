@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { flushSync } from 'react-dom';
@@ -16,9 +16,10 @@ interface PortalListStyledScssProps {
 
 export default function PortalListStyledScss(_props: PortalListStyledScssProps): JSX.Element {
   const portalRoots = useRef<Set<Root>>(new Set());
-  const props: PortalListStyledScssProps & { items: any[] } = {
+  const __defaultItems = useState(() => (() => [])())[0];
+  const props: Omit<PortalListStyledScssProps, 'items'> & { items: any[] } = {
     ..._props,
-    items: _props.items ?? (() => [])(),
+    items: _props.items ?? __defaultItems,
   };
   const attrs: Record<string, unknown> = (() => {
     const { items, ...rest } = _props as PortalListStyledScssProps & Record<string, unknown>;

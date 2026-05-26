@@ -20,6 +20,7 @@
  *
  * @experimental — shape may change before v1.0
  */
+import * as t from '@babel/types';
 import type { IRComponent, PropTypeAnnotation } from '../../../../core/src/ir/types.js';
 
 /**
@@ -99,7 +100,18 @@ export function emitPropsInterface(
   // other prop keeps the optional `name?: T` form. The model `default`/
   // `on…Change` companion fields STAY optional regardless of `required`.
   for (const p of ir.props) {
-    const tsType = renderType(p.typeAnnotation);
+    let tsType = renderType(p.typeAnnotation);
+    // Phase 16 R1 — when the prop declares `default: null`, widen the
+    // interface field type with `| null` so all consumers (including
+    // sub-component composition where one Rozie component passes its
+    // null-defaulted prop into another Rozie component's slot) see the
+    // accurate type contract. Without this, downstream `<Card onClose={
+    // props.onClose} />` invocations fail TS2322 because `Card.onClose`
+    // is typed `((...args:any[]) => any) | undefined` but the parent's
+    // merged props now expose it as `... | null`.
+    if (p.defaultValue !== null && t.isNullLiteral(p.defaultValue)) {
+      tsType = `(${tsType}) | null`;
+    }
     const opt = p.required ? '' : '?';
     if (p.isModel) {
       // 3-field synthesis per D-31/D-56 React analog. All three are keyed to

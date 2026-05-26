@@ -16,7 +16,7 @@ interface TsPassthroughProps {
 }
 
 export default function TsPassthrough(_props: TsPassthroughProps): JSX.Element {
-  const props: TsPassthroughProps & { label: string } = {
+  const props: Omit<TsPassthroughProps, 'label'> & { label: string } = {
     ..._props,
     label: _props.label ?? 'Count',
   };
@@ -62,7 +62,7 @@ interface TsPassthroughProps {
 }
 
 export default function TsPassthrough(_props: TsPassthroughProps): JSX.Element {
-  const props: TsPassthroughProps & { label: string } = {
+  const props: Omit<TsPassthroughProps, 'label'> & { label: string } = {
     ..._props,
     label: _props.label ?? 'Count',
   };

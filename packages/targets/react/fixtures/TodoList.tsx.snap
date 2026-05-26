@@ -22,7 +22,7 @@ interface TodoListProps {
 }
 
 export default function TodoList(_props: TodoListProps): JSX.Element {
-  const props: TodoListProps & { title: string } = {
+  const props: Omit<TodoListProps, 'title'> & { title: string } = {
     ..._props,
     title: _props.title ?? 'Todo',
   };

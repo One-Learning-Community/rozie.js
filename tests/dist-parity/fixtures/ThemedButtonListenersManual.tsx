@@ -7,7 +7,7 @@ interface ThemedButtonListenersManualProps {
 }
 
 export default function ThemedButtonListenersManual(_props: ThemedButtonListenersManualProps): JSX.Element {
-  const props: ThemedButtonListenersManualProps & { label: string; variant: string } = {
+  const props: Omit<ThemedButtonListenersManualProps, 'label' | 'variant'> & { label: string; variant: string } = {
     ..._props,
     label: _props.label ?? 'Click me',
     variant: _props.variant ?? 'primary',

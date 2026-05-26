@@ -102,7 +102,16 @@ export function emitReactTypes(
   lines.push(`export interface ${ir.name}Props${generics} {`);
 
   for (const prop of ir.props) {
-    const tsType = renderPropType(prop.typeAnnotation);
+    let tsType = renderPropType(prop.typeAnnotation);
+    // Phase 16 R1 — widen the prop type with `| null` when `default: null`
+    // is declared, so the published `.d.ts` matches the inline Props
+    // interface in emitPropsInterface.ts (which carries the same widening).
+    // Without this the `.d.ts` and inline interface drift and consumers
+    // pulling types via the package's `.d.ts` see a different contract
+    // from what the inline interface offers.
+    if (prop.defaultValue !== null && t.isNullLiteral(prop.defaultValue)) {
+      tsType = `(${tsType}) | null`;
+    }
     if (prop.isModel) {
       // D-84 model:true triplet, named after the actual prop identifier.
       const baseName = prop.name;

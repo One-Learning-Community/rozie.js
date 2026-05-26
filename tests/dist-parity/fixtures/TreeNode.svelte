@@ -7,11 +7,13 @@ interface Props {
   [key: string]: unknown;
 }
 
-let { node = (() => ({
+let __defaultNode = (() => ({
   id: '',
   label: '',
   children: []
-}))(), ...__rozieAttrs }: Props = $props();
+}))();
+
+let { node = __defaultNode, ...__rozieAttrs }: Props = $props();
 </script>
 
 

@@ -20,7 +20,7 @@ interface DropdownProps {
 }
 
 export default function Dropdown(_props: DropdownProps): JSX.Element {
-  const props: DropdownProps & { closeOnOutsideClick: boolean; closeOnEscape: boolean } = {
+  const props: Omit<DropdownProps, 'closeOnOutsideClick' | 'closeOnEscape'> & { closeOnOutsideClick: boolean; closeOnEscape: boolean } = {
     ..._props,
     closeOnOutsideClick: _props.closeOnOutsideClick ?? true,
     closeOnEscape: _props.closeOnEscape ?? true,

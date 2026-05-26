@@ -14,7 +14,7 @@ interface WrapperModalProps {
 }
 
 export default function WrapperModal(_props: WrapperModalProps): JSX.Element {
-  const props: WrapperModalProps & { title: string } = {
+  const props: Omit<WrapperModalProps, 'title'> & { title: string } = {
     ..._props,
     title: _props.title ?? 'Wrapped',
   };

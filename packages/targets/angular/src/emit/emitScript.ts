@@ -754,10 +754,25 @@ export function emitScript(
     // `files().map(f => f.id)` fails TS2339 and an `@for` over `files()`
     // types its loop variable as `never`. Annotate the empty-array literal
     // case as `signal<any[]>([])`. Mirrors the React/Vue/Svelte fix.
-    const signalTypeArg =
-      t.isArrayExpression(s.initializer) && s.initializer.elements.length === 0
-        ? '<any[]>'
-        : '';
+    //
+    // Phase 16 follow-up — a NullLiteral state initializer (`observed: null`)
+    // similarly types as `signal<null>` and rejects subsequent writes
+    // (`observed.set({...})` fails TS2345). The author intent for `null` is
+    // "sentinel/initial value that will be replaced." Annotate as
+    // `signal<any>(null)` — same pattern as typeNeutralizeScript's
+    // `let editor = null` → `let editor: any = null` widening (per memory
+    // `project_typeneutralize_script`). Empty-object literal `{}` already
+    // types permissively enough (Record<string, never>); only the null
+    // case needs widening here. PropDefaultCoercion.rozie is the canary.
+    let signalTypeArg = '';
+    if (
+      t.isArrayExpression(s.initializer) &&
+      s.initializer.elements.length === 0
+    ) {
+      signalTypeArg = '<any[]>';
+    } else if (t.isNullLiteral(s.initializer)) {
+      signalTypeArg = '<any>';
+    }
     fieldLines.push(`${s.name} = signal${signalTypeArg}(${initText});`);
   }
 

@@ -202,14 +202,28 @@ function renderPropField(p: PropDecl): string {
 }
 
 /**
- * Emit `withDefaults(defineProps<{...}>(), { ... })` for non-model props.
- * Returns empty string when no non-model props exist.
+ * Phase 16 audit finding — D-02 once-per-instance factory caching CANNOT be
+ * applied to Vue's emit. Vue's `compiler-sfc` requires `withDefaults`'s
+ * second argument to be a STATIC object literal — references to module-
+ * scope vars (the natural cache-target for D-02) raise "scope reference"
+ * compile errors ("are not allowed to reference variables declared in the
+ * outer scope"). This is a fundamental limitation of Vue's static SFC
+ * analysis (compiler-sfc walks the `withDefaults` arg AST to extract
+ * defaults for the static defineProps macro transformation, and rejects
+ * any Identifier reference outside the static literal). Same constraint
+ * blocks `() => __defaultE`, `() => sharedDefault`, etc.
  *
- * D-85 Vue full (Plan 06-02 Task 3): when `genericParams` is set, the inline
- * type literal becomes a parameterized interface `${Name}Props<T, ...>` so
- * that Vue's `<script setup generic="T">` attribute can resolve `T` inside
- * the props type-arg. The interface declaration is hoisted above the
- * `defineProps` call.
+ * Vue 3.4 (the project floor per CLAUDE.md) consequently invokes factory
+ * defaults on every render via `resolvePropValue` in `setFullProps`, so
+ * `props.e !== props.e` across consecutive renders on Vue. Vue 3.5 added
+ * native factory caching (vuejs/core#11668) — consumers on Vue 3.5+ get
+ * D-02 satisfaction automatically. Consumers on Vue 3.4 hit the per-render
+ * factory re-invocation; the workaround is to upgrade to Vue 3.5+.
+ *
+ * The PropDefaultCoercion Vue runtime probe accordingly tests Vue-specific
+ * behavior: it asserts only the JSON-substring contract (R1 primitive
+ * coercion) — NOT the identity probe (which would require D-02 caching the
+ * Vue emit can't deliver).
  */
 function emitPropsDecl(
   ir: IRComponent,
@@ -237,6 +251,11 @@ function emitPropsDecl(
   const fields = nonModel.map(renderPropField);
 
   // Build the defaults object — only include props with non-null defaultValue.
+  // Phase 16 audit finding documented in the function block comment above:
+  // Vue's compiler-sfc rejects scope references inside withDefaults, so the
+  // D-02 once-per-instance factory-cache pattern cannot be applied here.
+  // Factory defaults are passed through verbatim; Vue 3.4 re-invokes them
+  // per render (Vue 3.5+ caches natively via vuejs/core#11668).
   const defaultsEntries: string[] = [];
   for (const p of nonModel) {
     if (p.defaultValue !== null) {
