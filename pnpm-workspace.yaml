@@ -7,6 +7,7 @@ packages:
   - "tests/plugins/*"
   - "tests/integration/*"
   - "tests/timing"
+  - "tests/cli-smoke"
   - "tests/dist-parity"
   - "tests/smoke-sourcemap"
   - "tests/textmate"
