@@ -45,6 +45,8 @@
     "magic-string": "^0.30.21",
     "picocolors": "^1.1.0",
     "postcss": "^8.5.13",
+    "prettier": "^3.8.3",
+    "prettier-plugin-svelte": "^3.4.0",
     "sass": "^1.97.3"
   },
   "devDependencies": {

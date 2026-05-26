@@ -34,6 +34,7 @@ interface BuildCliOpts {
   out?: string;
   sourceMap?: boolean;
   types?: boolean;
+  pretty?: boolean;
 }
 
 /**
@@ -76,12 +77,21 @@ export async function runCli(argv: readonly string[]): Promise<void> {
       '--no-types',
       'skip .d.ts emission (React-only — no-op for inline-typed Vue/Svelte/Angular)',
     )
+    // PROJECT.md "Out of Scope" carve-out: --pretty IS in scope for the
+    // CLI specifically; just not v1's default. Off by default so the
+    // dist-parity byte-equal gate (which routes through runBuildMatrix
+    // without --pretty) stays inert.
+    .option(
+      '--pretty',
+      'format emitted artefacts with prettier before write (off by default)',
+    )
     .action(async (inputs: string[], opts: BuildCliOpts) => {
       const ext: BuildOptionsExt = {
         target: opts.target,
         ...(opts.out !== undefined ? { out: opts.out } : {}),
         ...(opts.sourceMap === true ? { sourceMap: true } : {}),
         ...(opts.types === false ? { types: false } : {}),
+        ...(opts.pretty === true ? { pretty: true } : {}),
       };
       await runBuildMatrix(inputs, ext);
     });
@@ -113,12 +123,17 @@ export async function runCli(argv: readonly string[]): Promise<void> {
       '--no-types',
       'skip .d.ts emission (React-only — no-op for inline-typed Vue/Svelte/Angular)',
     )
+    .option(
+      '--pretty',
+      'format emitted artefacts with prettier before write (off by default)',
+    )
     .action(async (inputs: string[], opts: BuildCliOpts) => {
       const ext: WatchOptions = {
         target: opts.target,
         ...(opts.out !== undefined ? { out: opts.out } : {}),
         ...(opts.sourceMap === true ? { sourceMap: true } : {}),
         ...(opts.types === false ? { types: false } : {}),
+        ...(opts.pretty === true ? { pretty: true } : {}),
       };
       await runWatch(inputs, ext);
     });

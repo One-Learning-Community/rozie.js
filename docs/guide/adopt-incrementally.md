@@ -239,6 +239,16 @@ pnpm rozie build src/components/ \
 `.d.ts` files are emitted by default; pass `--no-types` to disable. Source
 maps are off by default; pass `--source-map` to enable.
 
+Pass `--pretty` to pipe every emitted artefact through prettier before
+write. Off by default (v1's bar is "just works", not "pretty output");
+useful when you check the compiled output into git for code review.
+Covers `.tsx` / `.ts` / `.d.ts` / `.vue` / `.css` via prettier core, and
+`.svelte` via `prettier-plugin-svelte` (bundled). Source maps are never
+reformatted (spec-required field ordering). If prettier fails for any
+single file, the raw (correct) compile output still lands on disk and a
+warning prints to stderr — `--pretty` is cosmetic and never blocks a
+build.
+
 For iterative work — editing a `.rozie` file while a live framework dev
 server in another terminal consumes the emit — there's a `watch`
 subcommand that mirrors the same flags:

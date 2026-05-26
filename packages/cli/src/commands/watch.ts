@@ -33,6 +33,7 @@ import { renderDiagnostic } from '../../../core/src/diagnostics/frame.js';
 import { expandInputs } from '../utils/expandInputs.js';
 import { computeOutputPath } from '../utils/outputPath.js';
 import type { Target } from '../utils/parseTargets.js';
+import { prettyFormat } from '../utils/prettyFormat.js';
 
 export interface WatchOptions {
   target?: Target | Target[];
@@ -43,6 +44,12 @@ export interface WatchOptions {
   types?: boolean;
   /** Project root for source-rel-path computation; defaults to process.cwd(). */
   root?: string;
+  /**
+   * Off by default per PROJECT.md "Out of Scope" carve-out. Pipes the
+   * per-change emit through prettier before write. Failures degrade
+   * gracefully — raw output still lands on disk + a stderr warning fires.
+   */
+  pretty?: boolean;
 }
 
 export interface RunWatchContext {
@@ -123,6 +130,7 @@ export async function runWatch(
   const rootDir = opts.root ?? process.cwd();
   const wantTypes = opts.types !== false;
   const wantSourceMap = opts.sourceMap === true;
+  const wantPretty = opts.pretty === true;
 
   // ----- Initial expansion + build -------------------------------------
   let inputs: string[];
@@ -140,7 +148,7 @@ export async function runWatch(
   }
 
   for (const input of inputs) {
-    await compileOne(input, targets, outDir, rootDir, wantTypes, wantSourceMap, stderrWrite, stdoutWrite);
+    await compileOne(input, targets, outDir, rootDir, wantTypes, wantSourceMap, wantPretty, stderrWrite, stdoutWrite);
   }
 
   stdoutWrite(
@@ -175,7 +183,7 @@ export async function runWatch(
   const onUpsert = async (changedPath: string): Promise<void> => {
     if (!changedPath.endsWith('.rozie')) return;
     const abs = pathResolve(changedPath);
-    await compileOne(abs, targets, outDir, rootDir, wantTypes, wantSourceMap, stderrWrite, stdoutWrite);
+    await compileOne(abs, targets, outDir, rootDir, wantTypes, wantSourceMap, wantPretty, stderrWrite, stdoutWrite);
   };
 
   watcher.on('add', onUpsert);
@@ -231,9 +239,23 @@ async function compileOne(
   rootDir: string,
   wantTypes: boolean,
   wantSourceMap: boolean,
+  wantPretty: boolean,
   stderrWrite: (s: string) => void,
   stdoutWrite: (s: string) => void,
 ): Promise<void> {
+  // Local helper — matches the one in build.ts's runBuildMatrix loop. Kept
+  // inline since the two write paths still diverge slightly (watch logs
+  // a per-file summary line; build aggregates failure counts).
+  const maybePretty = async (text: string, name: string): Promise<string> => {
+    if (!wantPretty) return text;
+    const r = await prettyFormat(text, name);
+    if (!r.ok) {
+      stderrWrite(
+        pc.yellow(`[warning] --pretty failed for ${name}: ${r.error}; emitting unformatted\n`),
+      );
+    }
+    return r.formatted;
+  };
   const startedAt = Date.now();
   let source: string;
   try {
@@ -270,22 +292,25 @@ async function compileOne(
 
     const outPath = computeOutputPath(inputAbs, target, outDir, rootDir);
     mkdirSync(pathDirname(outPath), { recursive: true });
-    writeFileSync(outPath, result.code, 'utf8');
+    writeFileSync(outPath, await maybePretty(result.code, outPath), 'utf8');
 
     // D-90: React .d.ts sidecar. Other targets emit '' per D-84.
     if (wantTypes && target === 'react' && result.types) {
-      writeFileSync(outPath.replace(/\.tsx$/, '.d.ts'), result.types, 'utf8');
+      const dtsPath = outPath.replace(/\.tsx$/, '.d.ts');
+      writeFileSync(dtsPath, await maybePretty(result.types, dtsPath), 'utf8');
     }
     // D-53/D-54: React .module.css / .global.css sidecars.
     if (target === 'react') {
       if (result.css !== undefined && result.css.length > 0) {
-        writeFileSync(outPath.replace(/\.tsx$/, '.module.css'), result.css, 'utf8');
+        const modPath = outPath.replace(/\.tsx$/, '.module.css');
+        writeFileSync(modPath, await maybePretty(result.css, modPath), 'utf8');
       }
       if (result.globalCss !== undefined && result.globalCss.length > 0) {
-        writeFileSync(outPath.replace(/\.tsx$/, '.global.css'), result.globalCss, 'utf8');
+        const globPath = outPath.replace(/\.tsx$/, '.global.css');
+        writeFileSync(globPath, await maybePretty(result.globalCss, globPath), 'utf8');
       }
     }
-    // D-91: .map sibling.
+    // D-91: .map sibling. NEVER prettied (source-map spec field ordering).
     if (wantSourceMap && result.map) {
       writeFileSync(`${outPath}.map`, result.map.toString(), 'utf8');
     }

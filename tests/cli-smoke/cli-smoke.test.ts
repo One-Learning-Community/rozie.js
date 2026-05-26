@@ -296,3 +296,73 @@ describe('CLI watch mode (long-running)', () => {
     expect(r.stderr).toMatch(/ROZ856/);
   });
 });
+
+describe('CLI --pretty flag (opt-in prettier pass)', () => {
+  // The byte-equal contract that dist-parity enforces routes through
+  // runBuildMatrix WITHOUT --pretty, so this test pair just needs to
+  // prove (a) default output is the same as it always was and (b)
+  // --pretty produces an OBJECTIVELY different artefact. Specific
+  // prettier formatting choices aren't worth pinning here — prettier's
+  // own versioning policy covers that — we only need to confirm the
+  // flag is wired and applies SOMETHING.
+  skipOnWindows('--pretty produces output different from the default unpretty path', () => {
+    const tmpPlain = mkdtempSync(join(tmpdir(), 'rozie-cli-pretty-off-'));
+    const tmpPretty = mkdtempSync(join(tmpdir(), 'rozie-cli-pretty-on-'));
+    try {
+      const r1 = rozie(['build', FIXTURE, '--target', 'vue,react,svelte', '--out', tmpPlain], {
+        cwd: tmpPlain,
+      });
+      const r2 = rozie(
+        ['build', FIXTURE, '--target', 'vue,react,svelte', '--out', tmpPretty, '--pretty'],
+        { cwd: tmpPretty },
+      );
+      expect(r1.status).toBe(0);
+      expect(r2.status).toBe(0);
+
+      // For each target, --pretty output should differ from the default
+      // (prettier reformats quotes, line breaks, etc. — at least ONE byte
+      // changes for a non-trivial component like Counter).
+      for (const [target, ext] of [
+        ['vue', 'vue'],
+        ['react', 'tsx'],
+        ['svelte', 'svelte'],
+      ] as const) {
+        const plain = readFileSync(join(tmpPlain, target, `Counter.${ext}`), 'utf8');
+        const pretty = readFileSync(join(tmpPretty, target, `Counter.${ext}`), 'utf8');
+        expect(plain).not.toBe(pretty);
+        // Both non-empty.
+        expect(plain.length).toBeGreaterThan(0);
+        expect(pretty.length).toBeGreaterThan(0);
+      }
+    } finally {
+      rmSync(tmpPlain, { recursive: true, force: true });
+      rmSync(tmpPretty, { recursive: true, force: true });
+    }
+  });
+
+  // Inverse: default build (no --pretty) is byte-deterministic — running
+  // build twice produces identical files. This is the invariant
+  // dist-parity ultimately depends on; if it ever fails here, dist-parity
+  // would too. Cheap canary.
+  skipOnWindows('default build is byte-deterministic across runs (no --pretty churn)', () => {
+    const tmp1 = mkdtempSync(join(tmpdir(), 'rozie-cli-determ-a-'));
+    const tmp2 = mkdtempSync(join(tmpdir(), 'rozie-cli-determ-b-'));
+    try {
+      const r1 = rozie(['build', FIXTURE, '--target', 'vue,react', '--out', tmp1], { cwd: tmp1 });
+      const r2 = rozie(['build', FIXTURE, '--target', 'vue,react', '--out', tmp2], { cwd: tmp2 });
+      expect(r1.status).toBe(0);
+      expect(r2.status).toBe(0);
+      for (const [target, ext] of [
+        ['vue', 'vue'],
+        ['react', 'tsx'],
+      ] as const) {
+        const a = readFileSync(join(tmp1, target, `Counter.${ext}`), 'utf8');
+        const b = readFileSync(join(tmp2, target, `Counter.${ext}`), 'utf8');
+        expect(a).toBe(b);
+      }
+    } finally {
+      rmSync(tmp1, { recursive: true, force: true });
+      rmSync(tmp2, { recursive: true, force: true });
+    }
+  });
+});

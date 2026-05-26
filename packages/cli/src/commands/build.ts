@@ -30,6 +30,7 @@ import pc from 'picocolors';
 import { expandInputs } from '../utils/expandInputs.js';
 import { computeOutputPath } from '../utils/outputPath.js';
 import type { Target } from '../utils/parseTargets.js';
+import { prettyFormat } from '../utils/prettyFormat.js';
 
 /**
  * Legacy single-target options shape — preserved for `runBuild` /
@@ -55,6 +56,16 @@ export interface BuildOptionsExt {
   types?: boolean;
   /** Project root used for source-rel-path computation; defaults to process.cwd(). */
   root?: string;
+  /**
+   * Opt-in: format emitted artefacts through prettier before write.
+   * Off by default per PROJECT.md "Out of Scope" — v1's bar is "just
+   * works", not "pretty output". When ON, applies prettier core to .tsx /
+   * .ts / .d.ts / .vue / .css sidecars, and prettier-plugin-svelte to
+   * .svelte. Source-map sidecars (.map) are never reformatted (spec-
+   * required field ordering). Prettier failures degrade gracefully:
+   * raw output is written and a warning prints to stderr.
+   */
+  pretty?: boolean;
 }
 
 /**
@@ -85,6 +96,21 @@ export interface RunBuildContext {
 }
 
 const VALID_TARGETS = new Set<Target>(['vue', 'react', 'svelte', 'angular', 'solid', 'lit']);
+
+/**
+ * Per-target extension used to derive a synthetic filename for the stdout
+ * code path when --pretty is on. Mirrors TARGET_EXTENSIONS from
+ * outputPath.ts but kept local to avoid coupling the build command to a
+ * specific helper for a one-line need.
+ */
+const TARGET_STDOUT_EXT: Record<Target, string> = {
+  vue: '.vue',
+  react: '.tsx',
+  svelte: '.svelte',
+  angular: '.ts',
+  solid: '.tsx',
+  lit: '.ts',
+};
 
 /**
  * Phase 6 D-87/D-88/D-89/D-90/D-91/D-93 — the canonical build coordinator.
@@ -166,6 +192,7 @@ export async function runBuildMatrix(
   const rootDir = opts.root ?? process.cwd();
   const wantTypes = opts.types !== false; // D-90 default true
   const wantSourceMap = opts.sourceMap === true; // D-91 default false
+  const wantPretty = opts.pretty === true; // off by default per PROJECT.md
 
   // ----- DIST-04 React-stdout sidecar guard ----------------------------
   // React emits .d.ts + .module.css + .global.css sidecars; these CANNOT
@@ -219,31 +246,53 @@ export async function runBuildMatrix(
       stderrWrite(renderAll(warnings, source));
     }
 
+    // Helper — opt-in prettier pass; degrades to raw output on failure
+    // so a prettier hiccup never blocks an otherwise-correct compile.
+    // Captured in this scope so it can read wantPretty + stderrWrite.
+    const maybePretty = async (text: string, name: string): Promise<string> => {
+      if (!wantPretty) return text;
+      const r = await prettyFormat(text, name);
+      if (!r.ok) {
+        stderrWrite(
+          pc.yellow(`[warning] --pretty failed for ${name}: ${r.error}; emitting unformatted\n`),
+        );
+      }
+      return r.formatted;
+    };
+
     if (outDir === null) {
       // Single-target single-input non-React case routed through stdout
       // (preserves runBuild backward-compat for vue/svelte/angular).
-      stdoutWrite(result.code);
+      // For stdout, derive the parser hint from the target ext so --pretty
+      // still picks the right parser even though no file is written.
+      const stdoutName = `stdout${TARGET_STDOUT_EXT[target]}`;
+      stdoutWrite(await maybePretty(result.code, stdoutName));
       continue;
     }
 
     const outPath = computeOutputPath(input, target, outDir, rootDir);
     mkdirSync(pathDirname(outPath), { recursive: true });
-    writeFileSync(outPath, result.code, 'utf8');
+    writeFileSync(outPath, await maybePretty(result.code, outPath), 'utf8');
 
     // D-90: .d.ts sibling for React (other targets emit '' per D-84)
     if (wantTypes && target === 'react' && result.types) {
-      writeFileSync(outPath.replace(/\.tsx$/, '.d.ts'), result.types, 'utf8');
+      const dtsPath = outPath.replace(/\.tsx$/, '.d.ts');
+      writeFileSync(dtsPath, await maybePretty(result.types, dtsPath), 'utf8');
     }
     // React .module.css / .global.css siblings (D-53/D-54)
     if (target === 'react') {
       if (result.css !== undefined && result.css.length > 0) {
-        writeFileSync(outPath.replace(/\.tsx$/, '.module.css'), result.css, 'utf8');
+        const modPath = outPath.replace(/\.tsx$/, '.module.css');
+        writeFileSync(modPath, await maybePretty(result.css, modPath), 'utf8');
       }
       if (result.globalCss !== undefined && result.globalCss.length > 0) {
-        writeFileSync(outPath.replace(/\.tsx$/, '.global.css'), result.globalCss, 'utf8');
+        const globPath = outPath.replace(/\.tsx$/, '.global.css');
+        writeFileSync(globPath, await maybePretty(result.globalCss, globPath), 'utf8');
       }
     }
-    // D-91: .map sibling
+    // D-91: .map sibling. NEVER prettied — source-map spec requires the
+    // `mappings` VLQ field stay in a specific order that prettier-json
+    // would rearrange. prettyFormat() also skips .map defensively.
     if (wantSourceMap && result.map) {
       writeFileSync(`${outPath}.map`, result.map.toString(), 'utf8');
     }
