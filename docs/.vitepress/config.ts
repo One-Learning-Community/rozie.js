@@ -81,6 +81,12 @@ export default defineConfig({
             { text: 'For vanilla-JS + plugin shops', link: '/guide/for-vanilla-js-shops' },
           ],
         },
+        {
+          text: 'Comparisons',
+          items: [
+            { text: 'Sortable libraries', link: '/guide/sortable-comparison' },
+          ],
+        },
       ],
       '/compatibility': [
         {
