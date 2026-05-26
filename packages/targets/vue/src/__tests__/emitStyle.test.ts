@@ -131,6 +131,49 @@ describe('emitStyle — 5 example .style.snap fixtures locked', () => {
   }
 });
 
+/**
+ * Quick task 260526-mk4 — verify the Vue target's byte-slice emit preserves
+ * `:deep(...)` selectors verbatim. Vue 3.4+ `<style scoped>` understands
+ * `:deep()` natively and lowers it downstream; the compiler-side
+ * responsibility here is "do nothing — just pass it through."
+ */
+describe('emitStyle — :deep() byte-slice fidelity (Vue 3.4+ native)', () => {
+  it(':deep(.inner) is preserved verbatim in the scoped block', () => {
+    const src = [
+      '<rozie name="X">',
+      '<template><div /></template>',
+      '<style>',
+      '.outer :deep(.inner) { color: red; }',
+      '</style>',
+      '</rozie>',
+    ].join('\n');
+    const result = parse(src, { filename: 'X.rozie' });
+    if (!result.ast) throw new Error('parse() returned null AST');
+    const lowered = lowerToIR(result.ast, { modifierRegistry: createDefaultRegistry() });
+    if (!lowered.ir) throw new Error('lowerToIR() returned null IR');
+    const out = emitStyle(lowered.ir.styles, src);
+    expect(out.scoped).toContain(':deep(.inner)');
+    expect(out.scoped).toContain('.outer');
+  });
+
+  it('top-level :deep(.x) is preserved verbatim', () => {
+    const src = [
+      '<rozie name="X">',
+      '<template><div /></template>',
+      '<style>',
+      ':deep(.x) { color: red; }',
+      '</style>',
+      '</rozie>',
+    ].join('\n');
+    const result = parse(src, { filename: 'X.rozie' });
+    if (!result.ast) throw new Error('parse() returned null AST');
+    const lowered = lowerToIR(result.ast, { modifierRegistry: createDefaultRegistry() });
+    if (!lowered.ir) throw new Error('lowerToIR() returned null IR');
+    const out = emitStyle(lowered.ir.styles, src);
+    expect(out.scoped).toContain(':deep(.x)');
+  });
+});
+
 describe('emitStyle — Pitfall 6 documentation', () => {
   // Acceptance check that none of the 5 reference examples exercise
   // `@media (...) { :root { ... } }`. If a future example introduces this,
