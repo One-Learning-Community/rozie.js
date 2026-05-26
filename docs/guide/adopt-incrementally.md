@@ -239,6 +239,21 @@ pnpm rozie build src/components/ \
 `.d.ts` files are emitted by default; pass `--no-types` to disable. Source
 maps are off by default; pass `--source-map` to enable.
 
+For iterative work — editing a `.rozie` file while a live framework dev
+server in another terminal consumes the emit — there's a `watch`
+subcommand that mirrors the same flags:
+
+```bash
+pnpm rozie watch src/components/ --target react,vue --out dist/
+```
+
+It runs one initial build of the matched input set, then recompiles
+per-file on every change. Behaves like `tsc --watch` / `vite build
+--watch`: timestamped per-change log lines, debounced (editors fire
+multiple events per save), compile errors render as full code frames
+but don't tear the watcher down, Ctrl-C exits cleanly. `--out` is
+required (no sense streaming to stdout from a long-running watcher).
+
 This is also the right path when:
 
 - Your bundler isn't covered by `unplugin` (Bun, Deno, Parcel as of v2).

@@ -19,8 +19,18 @@
  * runs under the default `turbo run test` task with no test:smoke carve-out.
  */
 import { describe, expect, it } from 'vitest';
-import { spawnSync } from 'node:child_process';
-import { existsSync, lstatSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { spawn, spawnSync, type ChildProcessWithoutNullStreams } from 'node:child_process';
+import {
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -170,5 +180,119 @@ describe('CLI error paths (diagnostic surfacing)', () => {
     const r = rozie(['build', FIXTURE, '--target', 'vue,react']);
     expect(r.status).not.toBe(0);
     expect(r.stderr).toMatch(/ROZ852/);
+  });
+});
+
+/**
+ * Async helper — poll a predicate every 50ms up to `timeoutMs`, resolve
+ * when it returns true, reject otherwise. Used by the watch tests to wait
+ * for specific log lines or filesystem state to appear without busy-loops.
+ */
+async function waitFor(
+  pred: () => boolean,
+  timeoutMs: number,
+  label: string,
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (pred()) return;
+    await new Promise((r) => setTimeout(r, 50));
+  }
+  throw new Error(`waitFor(${label}) timed out after ${timeoutMs}ms`);
+}
+
+describe('CLI watch mode (long-running)', () => {
+  skipOnWindows(
+    'watch produces initial build, recompiles on change, exits cleanly on SIGINT',
+    async () => {
+      // realpathSync defangs the macOS /tmp → /private/tmp symlink:
+      // mkdtempSync returns the symlinked form, but the spawned process's
+      // cwd resolves to the canonical form, and outputPath.ts's relative-
+      // path computation gets a `..` prefix that flattens the source-rel
+      // layout. Resolving up front keeps the assertions stable on Mac & Linux.
+      const tmp = realpathSync(mkdtempSync(join(tmpdir(), 'rozie-cli-watch-')));
+      const srcDir = join(tmp, 'src');
+      const outDir = join(tmp, 'out');
+      mkdirSync(srcDir, { recursive: true });
+      const watchedFile = join(srcDir, 'WatchMe.rozie');
+      writeFileSync(watchedFile, readFileSync(FIXTURE, 'utf8'), 'utf8');
+
+      // Spawn the watcher detached enough that we can stream its output
+      // but still kill it. cwd=tmp keeps the source-rel path layout
+      // predictable (rootDir=tmp, sourceRel='src').
+      const proc: ChildProcessWithoutNullStreams = spawn(
+        ROOT_BIN,
+        ['watch', srcDir, '--target', 'vue,react', '--out', outDir],
+        { cwd: tmp, env: process.env },
+      );
+
+      let stdoutBuf = '';
+      let stderrBuf = '';
+      proc.stdout.on('data', (chunk) => {
+        stdoutBuf += chunk.toString();
+      });
+      proc.stderr.on('data', (chunk) => {
+        stderrBuf += chunk.toString();
+      });
+
+      const exited = new Promise<number | null>((resolveCode) => {
+        proc.on('exit', (code) => resolveCode(code));
+      });
+
+      try {
+        // 1) Initial build line + "watching" line both surface promptly.
+        await waitFor(
+          () => /compiled.+WatchMe\.rozie/.test(stdoutBuf),
+          5000,
+          'initial compile log',
+        );
+        await waitFor(
+          () => stdoutBuf.includes('watching'),
+          5000,
+          'watcher armed log',
+        );
+
+        // 2) Both per-target artefacts emitted from the initial build.
+        expect(existsSync(join(outDir, 'vue', 'src', 'WatchMe.vue'))).toBe(true);
+        expect(existsSync(join(outDir, 'react', 'src', 'WatchMe.tsx'))).toBe(true);
+
+        // 3) Mutate the source file and assert a second compile log fires.
+        // Capture a fingerprint of stdout so we know the NEW compile line is
+        // distinct from the initial one.
+        const initialLen = stdoutBuf.length;
+        // Append a trailing newline — semantically a no-op for the compiler,
+        // but bumps mtime + triggers a chokidar 'change' event.
+        writeFileSync(watchedFile, readFileSync(watchedFile, 'utf8') + '\n', 'utf8');
+
+        await waitFor(
+          () => stdoutBuf.length > initialLen && /compiled.+WatchMe\.rozie/.test(stdoutBuf.slice(initialLen)),
+          5000,
+          'recompile after change',
+        );
+
+        // 4) Graceful shutdown on SIGINT — process exits 0, "stopped" line prints.
+        proc.kill('SIGINT');
+        const exitCode = await Promise.race([
+          exited,
+          new Promise<null>((_, reject) =>
+            setTimeout(() => reject(new Error('watch did not exit within 5s of SIGINT')), 5000),
+          ),
+        ]);
+        expect(exitCode).toBe(0);
+        expect(stdoutBuf).toMatch(/stopped/);
+        // No accumulated stderr noise from a clean run.
+        expect(stderrBuf).toBe('');
+      } finally {
+        if (proc.exitCode === null) proc.kill('SIGKILL');
+        rmSync(tmp, { recursive: true, force: true });
+      }
+    },
+    20000, // generous per-test timeout — chokidar startup + signal handshake
+  );
+
+  skipOnWindows('watch without --out exits non-zero with ROZ856', () => {
+    const r = rozie(['watch', FIXTURE]);
+    expect(r.status).not.toBe(0);
+    expect(r.stderr).toMatch(/ROZ856/);
   });
 });

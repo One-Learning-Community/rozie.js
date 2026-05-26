@@ -17,10 +17,11 @@ import {
   type BuildOptions,
   type BuildOptionsExt,
 } from './commands/build.js';
+import { runWatch, type WatchOptions } from './commands/watch.js';
 import { parseTargets, type Target } from './utils/parseTargets.js';
 
-export { runBuild, runBuildMany, runBuildMatrix };
-export type { BuildOptions, BuildOptionsExt };
+export { runBuild, runBuildMany, runBuildMatrix, runWatch };
+export type { BuildOptions, BuildOptionsExt, WatchOptions };
 
 /**
  * Internal — the parsed shape of `rozie build`'s opts after commander applies
@@ -83,6 +84,43 @@ export async function runCli(argv: readonly string[]): Promise<void> {
         ...(opts.types === false ? { types: false } : {}),
       };
       await runBuildMatrix(inputs, ext);
+    });
+
+  // `rozie watch <inputs...>` — chokidar-driven incremental recompile.
+  // Mirrors the build flag surface but is long-running. --out is required
+  // here (no sense streaming to stdout from a daemon); the watch command
+  // surfaces that as ROZ856 at the action layer, not via commander.
+  program
+    .command('watch <inputs...>')
+    .description(
+      'Watch .rozie files and recompile on change (long-running; tsc --watch style)',
+    )
+    .option(
+      '-t, --target <names>',
+      'target framework(s); comma-separated (vue|react|svelte|angular|solid|lit)',
+      parseTargets,
+      ['vue'] as Target[],
+    )
+    .option(
+      '-o, --out <path>',
+      'output directory (required for watch mode)',
+    )
+    .option(
+      '--source-map',
+      'emit .map sidecar files (default off per D-91)',
+    )
+    .option(
+      '--no-types',
+      'skip .d.ts emission (React-only — no-op for inline-typed Vue/Svelte/Angular)',
+    )
+    .action(async (inputs: string[], opts: BuildCliOpts) => {
+      const ext: WatchOptions = {
+        target: opts.target,
+        ...(opts.out !== undefined ? { out: opts.out } : {}),
+        ...(opts.sourceMap === true ? { sourceMap: true } : {}),
+        ...(opts.types === false ? { types: false } : {}),
+      };
+      await runWatch(inputs, ext);
     });
 
   // commander 14 returns a promise from parseAsync; await so any thrown errors

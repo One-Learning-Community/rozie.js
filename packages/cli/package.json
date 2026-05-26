@@ -38,6 +38,7 @@
     "@rozie/target-svelte": "workspace:*",
     "@rozie/target-vue": "workspace:*",
     "@vue/compiler-sfc": "^3.5.33",
+    "chokidar": "^4.0.3",
     "commander": "^14.0.0",
     "fast-glob": "^3.3.3",
     "htmlparser2": "^12.0.0",
