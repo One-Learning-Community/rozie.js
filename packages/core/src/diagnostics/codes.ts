@@ -321,6 +321,15 @@ export const RozieErrorCode = {
   R_ON_COLON_FORM: 'ROZ972',                  // error — R1: `r-on:click="x"` colon form is not supported (use the single-event `@click` syntax or the bare object-spread `r-on="{ click: fn }"`)
   LISTENER_FALLTHROUGH_MULTI_ROOT: 'ROZ973',  // error — R8: a multi-root template with auto-listener-fallthrough enabled has no single root to receive inherited listeners (INDEPENDENT of ROZ970)
   LISTENER_DOUBLE_APPLY: 'ROZ974',            // warning — R9: `$listeners` referenced (e.g. via `r-on="$listeners"`) while auto-listener-fallthrough is still on — listeners would be applied twice (INDEPENDENT of ROZ971)
+
+  // ---- Phase 16 $restoreFocus — ROZ975..ROZ976 ----
+  // The `$restoreFocus(selector, idx)` sigil restores focus to a keyed-list row
+  // after a state mutation that reorders the list. The validator (modeled after
+  // validateClassSelector) enforces literal-selector + arity rules at compile
+  // time, wired into `lowerToIR` so both `compile()` and `@rozie/unplugin`
+  // catch errors. SPEC R9/R10.
+  RESTORE_FOCUS_NON_LITERAL_SELECTOR: 'ROZ975', // error — SPEC R9: $restoreFocus first arg is not a string literal
+  RESTORE_FOCUS_BAD_ARITY:            'ROZ976', // error — SPEC R9: $restoreFocus called with wrong number of arguments
 } as const;
 
 export type RozieErrorCode = (typeof RozieErrorCode)[keyof typeof RozieErrorCode];

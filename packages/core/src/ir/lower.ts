@@ -45,6 +45,7 @@ import { lowerStyles } from './lowerers/lowerStyles.js';
 import { typeNeutralizeScript } from '../codegen/typeNeutralizeScript.js';
 import { lowerRootElementRef } from './lowerers/lowerRootElementRef.js';
 import { validateClassSelector } from './validateClassSelector.js';
+import { validateRestoreFocus } from './validateRestoreFocus.js';
 import { validateAttrFallthrough } from './validateAttrFallthrough.js';
 import { validateListenerFallthrough } from './validateListenerFallthrough.js';
 import * as t from '@babel/types';
@@ -222,6 +223,12 @@ export function lowerToIR(ast: RozieAST, opts: LowerOptions): LowerResult {
   // Collected-not-thrown (D-08): pushes ROZ965/966/967 diagnostics; never
   // mutates `ir`.
   validateClassSelector(ir, diagnostics);
+
+  // Phase 16 — validate every `$restoreFocus('.sel', idx)` call (SPEC R9/R10).
+  // Same chokepoint covers compile() AND @rozie/unplugin entrypoints.
+  // Collected-not-thrown (D-08): pushes ROZ975/ROZ976 diagnostics; never
+  // mutates `ir`.
+  validateRestoreFocus(ir, diagnostics);
 
   // Phase 14 — validate cross-framework attribute fallthrough (R8/R9). Wired
   // directly after validateClassSelector — the same lowerToIR chokepoint both

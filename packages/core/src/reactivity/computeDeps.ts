@@ -113,6 +113,12 @@ const STABLE_IDENTIFIERS = new Set([
   // array → runtime `ReferenceError`. Same load-bearing role $attrs plays for
   // attribute fallthrough.
   '$listeners',
+  // Phase 16 — `$restoreFocus(sel, idx)` is a target-rewritten callable
+  // (no-op on React/Vue/Angular; queueMicrotask form on Svelte/Solid/Lit).
+  // Like `$classSelector`, it is not itself a reactive binding — without this
+  // entry React's dep collector treats it as a free identifier and emits
+  // `[$restoreFocus]` into a useEffect dep array → runtime ReferenceError.
+  '$restoreFocus',
   'undefined',
   'null',
   'NaN',
