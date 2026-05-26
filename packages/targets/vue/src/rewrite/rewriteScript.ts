@@ -345,6 +345,14 @@ export function rewriteRozieIdentifiers(
         return;
       }
 
+      // Phase 16 — $restoreFocus(sel, idx) → `void 0` (no-op). Vue's keyed
+      // reconciler MOVES the existing DOM element on reorder; focus survives
+      // natively. SPEC R4 lowering table.
+      if (callee.name === '$restoreFocus') {
+        path.replaceWith(t.unaryExpression('void', t.numericLiteral(0)));
+        return;
+      }
+
       // $classSelector('grip') → ".grip" — Vue keeps authored class names
       // literal in the DOM, so the engine receives a selector that matches as
       // written. Shared with rewriteTemplateExpression.ts via

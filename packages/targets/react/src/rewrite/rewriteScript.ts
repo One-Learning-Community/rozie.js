@@ -646,6 +646,14 @@ export function rewriteRozieIdentifiers(
         return;
       }
 
+      // Phase 16 — $restoreFocus(sel, idx) → `void 0` (no-op). React's keyed
+      // reconciler MOVES the existing DOM element on reorder; focus survives
+      // natively. SPEC R4 lowering table.
+      if (callee.name === '$restoreFocus') {
+        path.replaceWith(t.unaryExpression('void', t.numericLiteral(0)));
+        return;
+      }
+
       // $classSelector('grip') → "." + styles.grip — React runs class names
       // through CSS Modules, so a literal ".grip" never matches the hashed
       // DOM. Shared with rewriteTemplateExpression.ts via lowerClassSelectorCall

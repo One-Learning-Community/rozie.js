@@ -859,6 +859,14 @@ export function rewriteRozieIdentifiers(
         return;
       }
 
+      // Phase 16 — $restoreFocus(sel, idx) → `void 0` (no-op). Angular's
+      // keyed reconciler (*ngFor; trackBy) MOVES the existing DOM element on
+      // reorder; focus survives natively. SPEC R4 lowering table.
+      if (callee.name === '$restoreFocus') {
+        path.replaceWith(t.unaryExpression('void', t.numericLiteral(0)));
+        return;
+      }
+
       // $classSelector('grip') → ".grip" — Angular keeps authored class names
       // literal in the emitted DOM (style isolation via [data-rozie-s-<hash>]),
       // so the compile-time literal is correct. Shared with

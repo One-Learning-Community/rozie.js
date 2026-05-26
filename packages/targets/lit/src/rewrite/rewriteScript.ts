@@ -560,6 +560,48 @@ export function rewriteScript(
         return;
       }
 
+      // Phase 16 — $restoreFocus(sel, idx) → queueMicrotask(() =>
+      //   this.renderRoot.querySelectorAll(sel)[idx]?.focus()). lit-html's
+      //   keyed reconciler (`repeat` directive) recreates row DOM on reorder;
+      //   restore focus scoped to the host's renderRoot. SPEC R4 lowering
+      //   table. NO runtime helper — pure DOM API. D-04 permits upgrading to
+      //   `this.updateComplete.then(...)` if VR exposes a flake.
+      if (callee.name === '$restoreFocus') {
+        const callArgs = path.node.arguments;
+        const selArg = callArgs[0];
+        const idxArg = callArgs[1];
+        if (!selArg || !idxArg) return; // validator ROZ976 already caught this
+        if (!t.isExpression(selArg) || !t.isExpression(idxArg)) return;
+        const arrow = t.arrowFunctionExpression(
+          [],
+          t.callExpression(
+            t.memberExpression(
+              t.optionalMemberExpression(
+                t.callExpression(
+                  t.memberExpression(
+                    t.memberExpression(
+                      t.thisExpression(),
+                      t.identifier('renderRoot'),
+                    ),
+                    t.identifier('querySelectorAll'),
+                  ),
+                  [selArg],
+                ),
+                idxArg,
+                /* optional */ true,
+                /* computed */ true,
+              ),
+              t.identifier('focus'),
+            ),
+            [],
+          ),
+        );
+        path.replaceWith(
+          t.callExpression(t.identifier('queueMicrotask'), [arrow]),
+        );
+        return;
+      }
+
       if (callee.name === '$emit' && args.length > 0) {
         const firstArg = args[0]!;
         if (!t.isStringLiteral(firstArg)) return;

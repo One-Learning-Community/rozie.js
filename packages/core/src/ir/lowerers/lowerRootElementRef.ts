@@ -123,31 +123,77 @@ function nodeContainsFreeEl(node: t.Node): boolean {
 }
 
 /**
+ * Phase 16 — detect a `$restoreFocus(...)` CallExpression anywhere reachable
+ * from `node`. Svelte and Solid lower `$restoreFocus` to
+ * `queueMicrotask(() => $el.querySelectorAll(sel)[idx]?.focus())`, where the
+ * synthesised `$el` identifier flows through the per-target `rewriteScript`
+ * Identifier handler (→ `$refs.__rozieRoot`). Without the matching
+ * `__rozieRoot` RefDecl synthesised here, the lowering references a ref that
+ * does not exist; this function lets `lowerRootElementRef` synthesise the ref
+ * even when the user's source never explicitly mentions `$el`. Lit uses
+ * `this.renderRoot` inline so it does not depend on `__rozieRoot`;
+ * React/Vue/Angular lower to `void 0` so the question is moot — but the
+ * detection is target-agnostic (one ref-synthesis pass covers all six).
+ */
+function nodeContainsRestoreFocusCall(node: t.Node): boolean {
+  let stmts: t.Statement[];
+  if (t.isBlockStatement(node)) {
+    stmts = [node];
+  } else if (t.isStatement(node)) {
+    stmts = [node];
+  } else if (t.isExpression(node)) {
+    stmts = [t.expressionStatement(node)];
+  } else {
+    return false;
+  }
+  const file = t.file(t.program(stmts));
+
+  let found = false;
+  traverse(file, {
+    CallExpression(path) {
+      if (found) return;
+      const callee = path.node.callee;
+      if (t.isIdentifier(callee) && callee.name === '$restoreFocus') {
+        found = true;
+        path.stop();
+      }
+    },
+  });
+  return found;
+}
+
+/**
  * Scan every script/lifecycle/watcher/listener body in the IR for a free
- * `$el` read. Listeners' `target` field (the "this listener is bound to the
- * root element" sentinel) is unrelated — `lowerListeners.ts` already handles
- * that. Here we only care about `$el` as a value Identifier inside expressions.
+ * `$el` read, OR a `$restoreFocus(...)` call (Phase 16 — the per-target
+ * Svelte/Solid lowering synthesises a `$el` identifier that needs the
+ * `__rozieRoot` ref to resolve). Listeners' `target` field (the "this listener
+ * is bound to the root element" sentinel) is unrelated — `lowerListeners.ts`
+ * already handles that. Here we only care about `$el` as a value Identifier
+ * inside expressions and `$restoreFocus(...)` calls.
  */
 function irHasScriptContextEl(ir: IRComponent): boolean {
+  const triggers = (node: t.Node): boolean =>
+    nodeContainsFreeEl(node) || nodeContainsRestoreFocusCall(node);
+
   // 1. Top-level script body.
   for (const stmt of ir.setupBody.scriptProgram.program.body) {
-    if (nodeContainsFreeEl(stmt)) return true;
+    if (triggers(stmt)) return true;
   }
   // 2. Lifecycle hooks — setup + cleanup bodies.
   for (const hook of ir.lifecycle) {
-    if (nodeContainsFreeEl(hook.setup)) return true;
-    if (hook.cleanup && nodeContainsFreeEl(hook.cleanup)) return true;
+    if (triggers(hook.setup)) return true;
+    if (hook.cleanup && triggers(hook.cleanup)) return true;
   }
   // 3. Watcher hooks — getter + callback bodies.
   for (const wh of ir.watchers) {
-    if (nodeContainsFreeEl(wh.getter)) return true;
-    if (nodeContainsFreeEl(wh.callback)) return true;
+    if (triggers(wh.getter)) return true;
+    if (triggers(wh.callback)) return true;
   }
   // 4. Listener bodies — `handler` and `when` (the value-position reads inside
   //    expressions, NOT the listener's `target` field which is a sentinel).
   for (const listener of ir.listeners) {
-    if (nodeContainsFreeEl(listener.handler)) return true;
-    if (listener.when && nodeContainsFreeEl(listener.when)) return true;
+    if (triggers(listener.handler)) return true;
+    if (listener.when && triggers(listener.when)) return true;
   }
   return false;
 }
