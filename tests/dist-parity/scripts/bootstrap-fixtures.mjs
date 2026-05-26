@@ -125,6 +125,12 @@ const EXAMPLES = [
   'ThemedButtonListenersManual',
   'ThemedButtonAllManual',
   'ROnProbe',
+  // Phase 16 R5 — prop-default coercion conformance fixture.
+  // Six-shape PRIMITIVE / FACTORY default probe whose committed per-target
+  // bytes are the dist-parity contract for the D-01 / D-02 per-target
+  // emit-side coercion of `undefined → declaredDefault`. Single-file; no
+  // sibling .rozie producers — does NOT go into RESOLVER_ROOT.
+  'PropDefaultCoercion',
 ];
 
 const EXAMPLES_NEEDING_RESOLVER_ROOT = new Set([

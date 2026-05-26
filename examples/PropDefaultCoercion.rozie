@@ -1,0 +1,91 @@
+<!--
+  PropDefaultCoercion.rozie — Phase 16 R1/R5 cross-target prop-default
+  coercion conformance probe.
+
+  Single-file (no sibling .rozie producers). Mirrors ClassSelectorProbe /
+  RBindProbe / ROnProbe shape: minimal single-concern probe whose committed
+  per-target output is the byte-locked proof that the per-target emit-side
+  coercion of `undefined → declaredDefault` lowers cross-target-equivalent
+  across all 6 targets × 4 entrypoints.
+
+  Exercises the SPEC R1 acceptance shape:
+    Six props (a..f) covering the six canonical default-clause shapes —
+      a: { default: null }          PRIMITIVE-null
+      b: { default: 0 }             PRIMITIVE-number
+      c: { default: '' }            PRIMITIVE-string
+      d: { default: false }         PRIMITIVE-boolean
+      e: { default: () => [] }      FACTORY-array
+      f: { default: () => ({k:1}) } FACTORY-object
+
+  An empty consumer call (no props passed) MUST render the JSON substring
+    "a":null,"b":0,"c":"","d":false,"e":[],"f":{"k":1}
+  on every target. Per D-02 the factory defaults (e, f) MUST be invoked
+  ONCE per component instance (NOT once per render). The identity probes
+  e/f-identity render the per-render reference-equality result.
+-->
+
+<rozie name="PropDefaultCoercion">
+
+<props>
+{
+  a: { type: Object,   default: null },
+  b: { type: Number,   default: 0 },
+  c: { type: String,   default: '' },
+  d: { type: Boolean,  default: false },
+  e: { type: Array,    default: () => [] },
+  f: { type: Object,   default: () => ({ k: 1 }) },
+}
+</props>
+
+<data>
+{
+  observed: null,
+  // Identity probes — set ONCE on first read and never reassigned. Used by
+  // Task 3 runtime probes to verify (a) within-mount factory results are
+  // stable (`===`) across consecutive renders, (b) across-mount factory
+  // results differ in identity (NOT shared across instances).
+  __lastE: null,
+  __lastF: null,
+}
+</data>
+
+<script>
+$onMount(() => {
+  $data.observed = {
+    a: $props.a,
+    b: $props.b,
+    c: $props.c,
+    d: $props.d,
+    e: $props.e,
+    f: $props.f,
+  }
+  // Capture the e/f factory references on first read (mount). Later renders
+  // compare $props.e === $data.__lastE — should remain true on every target
+  // per D-02 once-per-instance.
+  $data.__lastE = $props.e
+  $data.__lastF = $props.f
+})
+</script>
+
+<template>
+<div class="pdc">
+  <pre data-rozie-pdc-output>{{ JSON.stringify($data.observed) }}</pre>
+  <span data-rozie-pdc-e-identity>{{ String($props.e === $data.__lastE) }}</span>
+  <span data-rozie-pdc-f-identity>{{ String($props.f === $data.__lastF) }}</span>
+</div>
+</template>
+
+<style>
+.pdc {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  font-family: ui-monospace, monospace;
+}
+.pdc pre {
+  margin: 0;
+}
+</style>
+
+</rozie>
