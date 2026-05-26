@@ -607,6 +607,29 @@ export interface TemplateElementIR {
    * default-slot content (R3 / D-03).
    */
   slotFillers?: SlotFillerDecl[];
+  /**
+   * `r-external` marker — the author has declared that third-party code may
+   * mutate the DOM INSIDE this element (e.g. a SortableJS-bound list, a
+   * TipTap-bound editor, a Leaflet-bound map container). Combined with the
+   * `$reconcileAfterDomMutation()` sigil, this lets per-target emitters apply
+   * a target-specific rebuild strategy for the marked element's children
+   * WITHOUT touching the marked element itself — so third-party event
+   * listeners attached to the marked element survive the rebuild.
+   *
+   * Per-target meaning:
+   *   - Lit: emitter wraps the marked element's children in
+   *     `keyed(this._rozieReconcileSeq ?? 0, …)`. The runtime helper
+   *     `__rozieReconcileAfterDomMutation` bumps the seq, lit-html disposes
+   *     the inner DOM (orphan elements left by external mutation, stale
+   *     sentinel-comment positions) and rebuilds children with a fresh
+   *     sentinel layout. The outer marked element is preserved by
+   *     template-instance reuse.
+   *   - Vue / React / Svelte / Solid / Angular: no emit effect; their
+   *     keyed reconcilers diff against live `parent.children` at patch time
+   *     and already cope with engine DOM mutation natively. The marker is
+   *     a hint for editor tooling and a forward-compatible hook.
+   */
+  isExternal?: boolean;
 }
 
 /**

@@ -148,6 +148,17 @@ export interface EmitTemplateOpts {
     refUsed: boolean;
     debouncedFieldDecls: string[];
     debounceCleanupWiring: string[];
+    /**
+     * `r-external` engine-wrapper marker — set true when at least one
+     * `TemplateElementIR` with `isExternal === true` was emitted. emitLit
+     * reads this off `EmitTemplateResult` and conditionally adds
+     * `import { keyed } from 'lit/directives/keyed.js';` plus the
+     * `private _rozieReconcileSeq = 0;` class field. The seq is bumped by
+     * `__rozieReconcileAfterDomMutation` (runtime helper) to invalidate
+     * `keyed`-wrapped subtrees while preserving the marked element's own
+     * DOM identity (and any third-party listeners attached to it).
+     */
+    keyedUsed: boolean;
     diagnostics: Diagnostic[];
     /**
      * Phase 07.2 Plan 03 — class-field declarations storing captured
@@ -212,6 +223,16 @@ export interface EmitTemplateResult {
    * (same plumbing as `repeatUsed`/`styleMapUsed`).
    */
   refUsed: boolean;
+  /**
+   * True when at least one `r-external`-marked element was emitted. emitLit
+   * conditionally wires `import { keyed } from 'lit/directives/keyed.js';`
+   * AND declares a `private _rozieReconcileSeq = 0;` class field based on
+   * this flag. The seq is bumped by `__rozieReconcileAfterDomMutation`;
+   * `keyed(seq, …)` then disposes the children of the marked element on
+   * the next render, leaving the marked element itself (and any
+   * third-party listeners attached to it) untouched.
+   */
+  keyedUsed: boolean;
   /**
    * Class-field declarations for template-event `.debounce`/`.throttle`
    * wrappers (WR-15). emitLit splices these into the class body alongside the
@@ -1292,6 +1313,16 @@ function emitElement(
   const children = node.children
     .map((c) => emitNode(c, ir, hostListenerWiring, opts))
     .join('');
+  // `r-external` engine-wrapper marker — wrap the marked element's children
+  // in `keyed(this._rozieReconcileSeq ?? 0, html\`…\`)` so that the runtime
+  // helper `__rozieReconcileAfterDomMutation` can dispose orphan DOM and
+  // rebuild a fresh sentinel-comment structure WITHOUT disturbing the
+  // marked element itself (and any third-party listeners attached to it —
+  // SortableJS et al.). The seq is bumped by the helper; `keyed` reacts.
+  if (node.isExternal === true) {
+    if (opts._state) opts._state.keyedUsed = true;
+    return `${open}\${keyed(this._rozieReconcileSeq ?? 0, html\`${children}\`)}</${tagName}>`;
+  }
   return `${open}${children}</${tagName}>`;
 }
 
@@ -1637,6 +1668,7 @@ export function emitTemplate(
     rozieSpreadUsed: false,
     rozieListenersUsed: false,
     refUsed: false,
+    keyedUsed: false,
     debouncedFieldDecls: [] as string[],
     debounceCleanupWiring: [] as string[],
     slotFillerClassFields: [] as string[],
@@ -1663,6 +1695,7 @@ export function emitTemplate(
       rozieSpreadUsed: state.rozieSpreadUsed,
       rozieListenersUsed: state.rozieListenersUsed,
       refUsed: state.refUsed,
+      keyedUsed: state.keyedUsed,
       debouncedFieldDecls: state.debouncedFieldDecls,
       slotFillerClassFields: state.slotFillerClassFields,
       slotFillerUpdatedBody: state.slotFillerUpdatedBody,
@@ -1685,6 +1718,7 @@ export function emitTemplate(
     rozieSpreadUsed: state.rozieSpreadUsed,
     rozieListenersUsed: state.rozieListenersUsed,
     refUsed: state.refUsed,
+    keyedUsed: state.keyedUsed,
     debouncedFieldDecls: state.debouncedFieldDecls,
     slotFillerClassFields: state.slotFillerClassFields,
     slotFillerUpdatedBody: state.slotFillerUpdatedBody,

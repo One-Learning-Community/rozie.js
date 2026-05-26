@@ -63,12 +63,19 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  * cache; the in-source `e.item.remove() + $el.insertBefore(...)` DOM-restore
  * dance the engine wrappers all implement could not fix it because the cache
  * was already stale by the time `onUpdate` ran. Pre-Phase-16 cleanup Item 3
- * introduced the `$reconcileAfterDomMutation()` sigil for exactly this
- * engine-wrapper-vs-keyed-reconciler class of bug: a per-target lowering
- * that no-ops on the other 5 targets and on Lit lowers to a runtime helper
- * (`render(nothing, host.renderRoot)` + `host.requestUpdate()`) that tears
- * down the part tree and schedules a fresh build. SortableList.rozie now
- * calls the sigil after writing the new array, and the Lit cell passes.
+ * introduced the `$reconcileAfterDomMutation()` sigil for this class of
+ * engine-wrapper-vs-keyed-reconciler bug; SortableList.rozie calls it after
+ * writing the new array, and the Lit cell passes.
+ *
+ * The mechanism behind the sigil was hardened 2026-05-25 (companion spec
+ * `sortable-drag-multi.spec.ts`): the original `render(nothing,
+ * host.renderRoot)` approach passed a single drag but stranded SortableJS
+ * on the OLD detached root element on every reconcile, so a SECOND drag
+ * could not start. Replaced with the `r-external` marker (template-side)
+ * + `keyed(this._rozieReconcileSeq ?? 0, …)` wrap (Lit emit) + seq-bump
+ * runtime helper. Effect: the marked element survives the reconcile (so
+ * engine attachments survive), but its children are torn down and
+ * re-rendered from scratch with a fresh sentinel-comment structure.
  *
  * KNOWN_FAILING is kept as an empty ReadonlySet — preserved so future
  * per-cell gate additions follow the same shape — but no entries remain.

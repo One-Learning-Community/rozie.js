@@ -103,7 +103,7 @@ $watch(() => $props.handle,   (v) => instance?.option('handle',   v))
 </script>
 
 <template>
-<div class="rozie-sortable-list">
+<div class="rozie-sortable-list" r-external>
   <div r-for="item, index in $props.items" :key="keyFor(item, index)" class="rozie-sortable-item">
     <slot :item="item" :index="index" />
   </div>

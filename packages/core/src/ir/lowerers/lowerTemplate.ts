@@ -738,6 +738,13 @@ function lowerBareElement(
   // Phase 15 R2 — `r-on="<expr>"` listener-spread bindings, parallel to
   // `events`. Populated by the r-on branch in the attribute loop below.
   const listenerSpreads: ListenerSpreadIR[] = [];
+  // `r-external` marker — third-party code may mutate this element's
+  // contents (engine-wrapper pattern: SortableJS/TipTap/Leaflet/…). The
+  // bare directive form (`<div r-external>`, no value) sets this flag;
+  // any value is currently ignored. Per-target emitters consult the flag
+  // to apply target-specific rebuild strategies that preserve the marked
+  // element's identity across `$reconcileAfterDomMutation()` calls.
+  let isExternal = false;
 
   for (const attr of el.attributes) {
     if (attr.kind === 'event') {
@@ -1010,6 +1017,18 @@ function lowerBareElement(
         continue;
       }
 
+      // `r-external` — boolean marker for engine-wrapper hosting. Stripped
+      // here (not added to `attributes`) and flagged on the IR element so
+      // per-target emitters can apply rebuild strategies that preserve the
+      // marked element's DOM identity across `$reconcileAfterDomMutation()`.
+      // Only the bare-attribute form sets the flag; any value is currently
+      // ignored (forward-compatible: a future `r-external="false"` could
+      // re-set it via a conditional expression).
+      if (attr.name === 'external') {
+        isExternal = true;
+        continue;
+      }
+
       // r-model / r-show / r-html / r-text are preserved as binding
       // attributes (named with the `r-` prefix) for downstream emitters to
       // expand into target-specific output. r-if/r-else/r-else-if/r-for
@@ -1121,6 +1140,10 @@ function lowerBareElement(
       ? { componentRef: annotation.componentRef }
       : {}),
     ...(slotFillers !== undefined ? { slotFillers } : {}),
+    // `r-external` engine-wrapper marker. Spread only when set so non-marked
+    // elements stay byte-identical to the pre-change IR (and dist-parity
+    // strict-bytes assertions don't drift).
+    ...(isExternal ? { isExternal: true } : {}),
   };
   return result;
 }

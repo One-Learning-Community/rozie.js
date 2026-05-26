@@ -320,6 +320,15 @@ export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResu
       .join('\n'),
     slotFields: slotResult.fields,
     cleanupField: '  private _disconnectCleanups: Array<() => void> = [];',
+    // `r-external` engine-wrapper marker — `_rozieReconcileSeq` is the
+    // cache-invalidation counter consumed by `keyed(seq, …)` wrappers
+    // emitted around marked-element children. Bumped by
+    // `__rozieReconcileAfterDomMutation`; declared ONLY when the template
+    // actually uses an `r-external` marker so unmarked components stay
+    // byte-identical to the pre-change emit.
+    reconcileSeqField: templateResult.keyedUsed
+      ? '  private _rozieReconcileSeq = 0;'
+      : '',
     listenerWiringBody: listenerWiring,
     mountHookBody: scriptResult.mountHookBody,
     disconnectedBody: scriptResult.unmountHookBody,
@@ -362,6 +371,14 @@ export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResu
     // producer's shadow boundary via `adoptedStyleSheets`. Same conditional
     // pattern as `repeat`/`styleMap`.
     templateResult.refUsed ? `import { ref } from 'lit/directives/ref.js';\n` : '',
+    // `r-external` engine-wrapper marker — when at least one marked element
+    // was emitted, wire `import { keyed } from 'lit/directives/keyed.js';`.
+    // `keyed(this._rozieReconcileSeq ?? 0, …)` lets
+    // `__rozieReconcileAfterDomMutation` (runtime helper) dispose stale
+    // child DOM via a seq bump while preserving the marked element itself,
+    // so third-party DOM-mutating engines (SortableJS, TipTap, …) stay
+    // attached across reconciliations.
+    templateResult.keyedUsed ? `import { keyed } from 'lit/directives/keyed.js';\n` : '',
   ].filter((s) => s.length > 0).join('');
 
   // Phase 9 Plan 09-04 — author-declared `<script lang="ts">` `interface`/`type`
@@ -436,6 +453,13 @@ interface ComposeClassBodyParts {
   slotFields: string;
   cleanupField: string;
   /**
+   * `r-external` engine-wrapper marker — class-field decl for the seq
+   * counter consumed by emitted `keyed(seq, …)` wrappers. Empty string
+   * when no `r-external` is in use (no field emitted, byte-identical to
+   * pre-change output).
+   */
+  reconcileSeqField: string;
+  /**
    * D-SH-02: re-armable listener wiring (listeners + host listeners +
    * slotchange). Emitted into `_armListeners()`, called from `firstUpdated()`
    * and from `connectedCallback()` on reconnect.
@@ -483,6 +507,9 @@ function composeClassBody(parts: ComposeClassBodyParts): string {
     sections.push(parts.slotFields);
   }
   sections.push(parts.cleanupField);
+  if (parts.reconcileSeqField.trim().length > 0) {
+    sections.push(parts.reconcileSeqField);
+  }
 
   const hasListenerWiring = parts.listenerWiringBody.trim().length > 0;
   const hasMountHook = parts.mountHookBody.trim().length > 0;
