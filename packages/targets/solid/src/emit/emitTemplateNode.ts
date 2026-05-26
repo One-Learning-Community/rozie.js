@@ -342,6 +342,9 @@ function emitElementListeners(
       collectors: ctx.collectors,
       injectionCounter: ctx.injectionCounter,
       scriptInjections: ctx.scriptInjections,
+      // Phase 16 R2 / D-03 — thread the For-body loop-accessor set into
+      // event-handler lowering so call-arg index references emit as `index()`.
+      invokeAccessors: ctx.invokeAccessors,
     });
     for (const d of result.diagnostics) ctx.diagnostics.push(d);
     const match = result.jsxAttr.match(/^([A-Za-z][\w]*)=\{(.*)\}$/s);
@@ -414,6 +417,9 @@ function emitElementEvents(node: TemplateElementIR, ctx: EmitNodeCtx): string {
       collectors: ctx.collectors,
       injectionCounter: ctx.injectionCounter,
       scriptInjections: ctx.scriptInjections,
+      // Phase 16 R2 / D-03 — thread the For-body loop-accessor set into
+      // event-handler lowering so call-arg index references emit as `index()`.
+      invokeAccessors: ctx.invokeAccessors,
     });
     for (const d of result.diagnostics) ctx.diagnostics.push(d);
 

@@ -45,6 +45,18 @@ export interface EmitEventCtx {
   injectionCounter: { next: number };
   /** Accumulated script injection lines (top-of-body const wrappers). */
   scriptInjections: string[];
+  /**
+   * Phase 16 R2 / D-03 — loop-accessor identifiers that resolve to a Solid
+   * `Accessor<T>` (`() => T`) at runtime and must be invoked when they appear
+   * inside an event-handler expression (interpolation / attribute binding
+   * paths consult the same set via `EmitNodeCtx.invokeAccessors`). Populated
+   * by `emitTemplateNode.ts` inside `<For>` bodies (see the
+   * `EmitNodeCtx.invokeAccessors` thread there); threaded through
+   * `renderHandler` into `rewriteTemplateExpression`'s `Identifier` visitor
+   * which already handles the call-arg branch via
+   * `invokeAccessors?.has(name)`.
+   */
+  invokeAccessors?: ReadonlySet<string> | undefined;
 }
 
 export interface EmitTemplateEventResult {
@@ -180,8 +192,18 @@ function makeWrapName(
   return N === 0 ? `${prefix}${cap}` : `${prefix}${cap}_${N}`;
 }
 
-function renderHandler(handler: t.Expression, ir: IRComponent): string {
-  return rewriteTemplateExpression(handler, ir);
+function renderHandler(
+  handler: t.Expression,
+  ir: IRComponent,
+  invokeAccessors?: ReadonlySet<string> | undefined,
+): string {
+  // Phase 16 R2 / D-03 — thread the loop-accessor unwrap set into the
+  // template-expression rewriter. The set is sourced from `EmitEventCtx`
+  // at each call site and originates in `emitTemplateNode.ts`'s `<For>`
+  // body branch. Without it, an `index` alias passed as a CallExpression
+  // argument (e.g. `@keydown="fn($event, index)"`) emits the bare accessor
+  // function instead of invoking it — the bug SPEC R2 closes.
+  return rewriteTemplateExpression(handler, ir, { invokeAccessors });
 }
 
 /**
@@ -299,7 +321,7 @@ export function emitTemplateEvent(
     if (desc.helperName === 'createDebouncedHandler' || desc.helperName === 'createThrottledHandler') {
       const solidHelper = desc.helperName;
       ctx.collectors.runtime.add(solidHelper);
-      const originalHandlerCode = renderHandler(listener.handler, ctx.ir);
+      const originalHandlerCode = renderHandler(listener.handler, ctx.ir, ctx.invokeAccessors);
       const wrapName = makeWrapName(solidHelper, listener.handler, ctx.injectionCounter);
       const argList = desc.args.map(renderModifierArg).join(', ');
       // Solid createDebouncedHandler(fn, ms) — no dep array needed (Solid auto-tracks).
@@ -326,7 +348,7 @@ export function emitTemplateEvent(
     // Pure helper-wrap: reference the wrapper name directly.
     handlerExpr = handlerRef;
   } else if (inlineGuards.length === 0) {
-    const code = renderHandler(listener.handler, ctx.ir);
+    const code = renderHandler(listener.handler, ctx.ir, ctx.invokeAccessors);
     if (handlerKind === 'identifier') {
       handlerExpr = code;
     } else if (handlerKind === 'callable') {
@@ -350,12 +372,12 @@ export function emitTemplateEvent(
     } else if (handlerKind === 'identifier') {
       // Bare identifier (e.g. `onSearch`) — call without args so handlers typed
       // `() => void` don't complain about the synthetic event parameter.
-      handlerInvocation = `${renderHandler(listener.handler, ctx.ir)}()`;
+      handlerInvocation = `${renderHandler(listener.handler, ctx.ir, ctx.invokeAccessors)}()`;
     } else if (handlerKind === 'callable') {
       // Optional-call so optional callback props don't TS2722.
-      handlerInvocation = `(${renderHandler(listener.handler, ctx.ir)})?.($event)`;
+      handlerInvocation = `(${renderHandler(listener.handler, ctx.ir, ctx.invokeAccessors)})?.($event)`;
     } else {
-      handlerInvocation = renderHandler(listener.handler, ctx.ir);
+      handlerInvocation = renderHandler(listener.handler, ctx.ir, ctx.invokeAccessors);
     }
     handlerExpr = `($event) => { ${guardLines} ${handlerInvocation}; }`;
   }
