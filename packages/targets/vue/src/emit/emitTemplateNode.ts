@@ -390,9 +390,12 @@ function emitSlotFiller(filler: SlotFillerDecl, ctx: EmitNodeCtx): string {
   }
 
   // Scoped-param attribute string. Empty when no params.
+  // Rename support (quick 260526-ljo): `{ item: column }` emits as
+  // `<template #default="{ item: column }">` — Vue's template parser accepts
+  // identifier-rename inside the destructure pattern natively.
   const paramsAttr =
     filler.params.length > 0
-      ? `="{ ${filler.params.map((p) => p.name).join(', ')} }"`
+      ? `="{ ${filler.params.map((p) => (p.bindAs ? `${p.name}: ${p.bindAs}` : p.name)).join(', ')} }"`
       : '';
 
   // Dynamic-name form `<template #[expr]>`. Vue's compiler-sfc handles the

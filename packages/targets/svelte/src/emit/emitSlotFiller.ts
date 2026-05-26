@@ -67,14 +67,14 @@ function snippetKey(slotName: string): string {
 
 /**
  * Render the snippet-arg destructure for a scoped fill.
- *   - []                → ''             (snippet takes no args)
- *   - [{name:'close'}]  → '{ close }'
- *   - [{name:'a'},{name:'b'}]
- *                       → '{ a, b }'
+ *   - []                                 → ''
+ *   - [{name:'close'}]                   → '{ close }'
+ *   - [{name:'a'},{name:'b'}]            → '{ a, b }'
+ *   - [{name:'item', bindAs:'column'}]   → '{ item: column }'  (rename)
  */
 function paramsDestructure(filler: SlotFillerDecl): string {
   if (filler.params.length === 0) return '';
-  return `{ ${filler.params.map((p) => p.name).join(', ')} }`;
+  return `{ ${filler.params.map((p) => (p.bindAs ? `${p.name}: ${p.bindAs}` : p.name)).join(', ')} }`;
 }
 
 /**

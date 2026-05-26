@@ -138,9 +138,16 @@ export interface EmitSlotFillerCtx {
 /**
  * Pre-transform: walk every Expression inside the SlotFillerDecl.body and
  * rewrite bare Identifier references to scoped-fill params into
- * `this.<ctxField>?.<name>` MemberExpressions. The recursive emit then
+ * `this.<ctxField>?.<slotKey>` MemberExpressions. The recursive emit then
  * passes those MemberExpressions through verbatim — rewriteTemplateExpression
  * has no special handling for `this.foo.bar`, so no double-rewrite.
+ *
+ * Param map shape (quick 260526-ljo): `Map<localBinding, slotKey>`. For the
+ * common shorthand `{ key }` form, localBinding === slotKey === `key`. For
+ * the rename form `{ key: localName }`, localBinding === `localName` and
+ * slotKey === `key`. The identifier scan matches on `localBinding` (the name
+ * the body actually references) and rewrites to `this.<ctxField>?.<slotKey>`
+ * (the field under which the ctx object stores the value).
  *
  * Mutates the IR nodes in place — callers MUST clone the body subtree first
  * if they need to preserve the original (the consumer-side emit consumes the
@@ -164,18 +171,18 @@ export interface EmitSlotFillerCtx {
 function rewriteScopedParamRefs(
   nodes: TemplateNode[],
   ctxField: string,
-  params: ReadonlySet<string>,
+  paramMap: ReadonlyMap<string, string>,
 ): void {
-  if (params.size === 0) return;
+  if (paramMap.size === 0) return;
   for (const node of nodes) {
-    rewriteScopedParamRefsInNode(node, ctxField, params);
+    rewriteScopedParamRefsInNode(node, ctxField, paramMap);
   }
 }
 
 function rewriteScopedParamRefsInNode(
   node: TemplateNode,
   ctxField: string,
-  params: ReadonlySet<string>,
+  params: ReadonlyMap<string, string>,
 ): void {
   switch (node.type) {
     case 'TemplateStaticText':
@@ -237,22 +244,27 @@ function rewriteScopedParamRefsInNode(
 
 /**
  * Walk one Expression and rewrite Identifier-matches-param into
- * `this.<ctxField>?.<name>`. Returns the (possibly-replaced) expression.
+ * `this.<ctxField>?.<slotKey>`. Returns the (possibly-replaced) expression.
  * Handles the root-identifier case explicitly because @babel/traverse's
  * `replaceWith` mutates the wrapper tree but doesn't propagate back to
  * the caller's reference.
+ *
+ * `params` is `Map<localBinding, slotKey>`. The matcher checks
+ * `params.has(name)` against the LOCAL binding (what the body wrote);
+ * the rewrite target uses the SLOT KEY (what the ctx field stores).
+ * For shorthand fills, local === slotKey; for rename fills, they differ.
  */
 function rewriteExpr(
   expr: t.Expression,
   ctxField: string,
-  params: ReadonlySet<string>,
+  params: ReadonlyMap<string, string>,
 ): t.Expression {
   // Root-identifier shortcut: when the entire expression is a bare
   // Identifier matching a param, return the MemberExpression directly.
   if (t.isIdentifier(expr) && params.has(expr.name)) {
     return t.optionalMemberExpression(
       t.memberExpression(t.thisExpression(), t.identifier(ctxField)),
-      t.identifier(expr.name),
+      t.identifier(params.get(expr.name)!),
       false,
       true,
     );
@@ -298,7 +310,7 @@ function rewriteExpr(
       path.replaceWith(
         t.optionalMemberExpression(
           t.memberExpression(t.thisExpression(), t.identifier(ctxField)),
-          t.identifier(name),
+          t.identifier(params.get(name)!),
           false,
           true,
         ),
@@ -311,28 +323,32 @@ function rewriteExpr(
 
 /**
  * Phase 07.5 — sibling of `rewriteScopedParamRefs` but the rewriting target
- * is `scope.<name>` (plain MemberExpression on a `scope` identifier) instead
- * of `this.<ctxField>?.<name>` (OptionalMemberExpression). Used by the new
+ * is `scope.<slotKey>` (plain MemberExpression on a `scope` identifier) instead
+ * of `this.<ctxField>?.<slotKey>` (OptionalMemberExpression). Used by the new
  * function-prop emit path where the consumer's destructured fill body runs
  * inside an arrow function whose first parameter (`scope`) is guaranteed
  * defined by the consumer's destructure — so no optional chaining is needed.
+ *
+ * `params` is `Map<localBinding, slotKey>` (quick 260526-ljo). Matcher
+ * compares against local binding (body wrote it); rewrite target uses slot
+ * key (producer supplied `scope[slotKey]`).
  *
  * Same skip-conditions as the original helper (MemberExpression property keys,
  * ObjectProperty keys, function param bindings).
  */
 function rewriteScopedParamRefsToScope(
   nodes: TemplateNode[],
-  params: ReadonlySet<string>,
+  paramMap: ReadonlyMap<string, string>,
 ): void {
-  if (params.size === 0) return;
+  if (paramMap.size === 0) return;
   for (const node of nodes) {
-    rewriteScopedParamRefsInNodeToScope(node, params);
+    rewriteScopedParamRefsInNodeToScope(node, paramMap);
   }
 }
 
 function rewriteScopedParamRefsInNodeToScope(
   node: TemplateNode,
-  params: ReadonlySet<string>,
+  params: ReadonlyMap<string, string>,
 ): void {
   switch (node.type) {
     case 'TemplateStaticText':
@@ -401,20 +417,23 @@ function rewriteScopedParamRefsInNodeToScope(
 
 /**
  * Walk one Expression and rewrite Identifier-matches-param into
- * `scope.<name>`. Returns the (possibly-replaced) expression. Mirrors
+ * `scope.<slotKey>`. Returns the (possibly-replaced) expression. Mirrors
  * rewriteExpr's structure (same skip-conditions, same root-identifier
  * shortcut, same `@babel/traverse` wrapper pattern), but the rewriting
  * target is a plain MemberExpression on a `scope` identifier rather than
  * an OptionalMemberExpression on `this.<ctxField>`.
+ *
+ * `params` is `Map<localBinding, slotKey>`. Matcher compares against local
+ * binding (body wrote it); rewrite target uses slot key.
  */
 function rewriteExprToScope(
   expr: t.Expression,
-  params: ReadonlySet<string>,
+  params: ReadonlyMap<string, string>,
 ): t.Expression {
   if (t.isIdentifier(expr) && params.has(expr.name)) {
     return t.memberExpression(
       t.identifier('scope'),
-      t.identifier(expr.name),
+      t.identifier(params.get(expr.name)!),
       false,
       false,
     );
@@ -456,7 +475,7 @@ function rewriteExprToScope(
       path.replaceWith(
         t.memberExpression(
           t.identifier('scope'),
-          t.identifier(name),
+          t.identifier(params.get(name)!),
           false,
           false,
         ),
@@ -543,18 +562,20 @@ export function emitSlotFiller(
       (filler.producerSlotParamCount ?? 0) > 0);
 
   if (useFunctionPropPath) {
-    // Rewrite param Identifiers in body → `scope.<name>` MemberExpressions
+    // Rewrite param Identifiers in body → `scope.<slotKey>` MemberExpressions
     // BEFORE rendering, so the recursive emitChildren passes them through
-    // verbatim.
-    const paramSet = new Set(filler.params.map((p) => p.name));
-    rewriteScopedParamRefsToScope(filler.body, paramSet);
+    // verbatim. Quick 260526-ljo: Map<localBinding, slotKey> handles rename.
+    const paramMap = new Map<string, string>(
+      filler.params.map((p) => [p.bindAs ?? p.name, p.name] as const),
+    );
+    rewriteScopedParamRefsToScope(filler.body, paramMap);
 
     const body = ctx.emitChildren(filler.body);
 
     // Scope-type TS annotation: `{ p1: unknown; p2: unknown; ... }`.
-    // Uses filler.params (consumer's destructured names) — guaranteed to be
-    // a subset of producer's declared params after threadParamTypes
-    // SCOPED_PARAM_MISMATCH validation.
+    // Uses filler.params.name (producer slot keys) — the scope object is keyed
+    // by slot key, NOT consumer-local rename. threadParamTypes validates the
+    // names against producer.SlotDecl.params for ROZ947.
     const scopeTypeStr =
       filler.params.length > 0
         ? `{ ${filler.params.map((p) => `${p.name}: unknown`).join('; ')} }`
@@ -607,8 +628,12 @@ export function emitSlotFiller(
   // for malformed/unthreaded IRs.
   if (filler.params.length > 0 && filler.name !== '') {
     const ctxField = `_${filler.name}Ctx`;
-    const paramSet = new Set(filler.params.map((p) => p.name));
-    rewriteScopedParamRefs(filler.body, ctxField, paramSet);
+    // Map<localBinding, slotKey>. Shorthand fills: local === slotKey === name.
+    // Rename fills `{ key: localName }`: local === bindAs, slotKey === name.
+    const paramMap = new Map<string, string>(
+      filler.params.map((p) => [p.bindAs ?? p.name, p.name] as const),
+    );
+    rewriteScopedParamRefs(filler.body, ctxField, paramMap);
   }
 
   const body = ctx.emitChildren(filler.body);

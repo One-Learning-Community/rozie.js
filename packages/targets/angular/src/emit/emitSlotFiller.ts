@@ -90,13 +90,21 @@ function templateRefName(slotName: string): string {
 }
 
 /**
- * Build the `let-<param>="<param>"` binding list for a scoped fill.
+ * Build the `let-<localVar>="<slotKey>"` binding list for a scoped fill.
  * Returns leading-space-prefixed text suitable for direct concatenation
  * after the `#<refName>` token, or '' when there are no params.
+ *
+ * Rename support (quick 260526-ljo): when `bindAs` is set, the LHS uses the
+ * local binding name (`let-column=...`) while the RHS still references the
+ * producer's slot key (`...="item"`). Angular's `ngTemplateOutletContext`
+ * dispatches by RHS (slot key), so this preserves producer-side contract.
+ *
+ *   - [{name:'item'}]                    → ' let-item="item"'
+ *   - [{name:'item', bindAs:'column'}]   → ' let-column="item"'
  */
 function letBindings(filler: SlotFillerDecl): string {
   if (filler.params.length === 0) return '';
-  const parts = filler.params.map((p) => `let-${p.name}="${p.name}"`);
+  const parts = filler.params.map((p) => `let-${p.bindAs ?? p.name}="${p.name}"`);
   return ' ' + parts.join(' ');
 }
 
