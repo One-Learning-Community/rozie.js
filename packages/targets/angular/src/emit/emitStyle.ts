@@ -23,6 +23,8 @@
  *
  * @experimental — shape may change before v1.0
  */
+import postcss from 'postcss';
+import selectorParser from 'postcss-selector-parser';
 import type { StyleSection } from '../../../../core/src/ir/types.js';
 import type { StyleRule } from '../../../../core/src/ast/blocks/StyleAST.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
@@ -139,7 +141,119 @@ function wrapPortalSelectors(css: string): string {
 
 function stringifyRules(rules: StyleRule[], source: string): string {
   if (rules.length === 0) return '';
-  return rules.map((r) => source.slice(r.loc.start, r.loc.end)).join('\n');
+  return rules
+    .map((r) => {
+      const slice = source.slice(r.loc.start, r.loc.end);
+      // Quick task 260526-mk4 — Angular `:deep(X)` → `::ng-deep X` lowering.
+      // Byte-slice preservation is the floor (Risk 5); we only invoke the
+      // postcss reparse when the slice actually contains `:deep(`, paying the
+      // reformat cost only for rules that need it.
+      return slice.includes(':deep(') ? lowerDeepToNgDeep(slice) : slice;
+    })
+    .join('\n');
+}
+
+/**
+ * Lower every `:deep(X)` pseudo to `::ng-deep X` — Angular's deprecated-but-
+ * supported view-encapsulation pierce. Quick task 260526-mk4.
+ *
+ * Trade-off: postcss reparses the rule source, so the output will be
+ * canonicalized formatting rather than byte-identical to the original. We
+ * only pay this cost when `:deep(` appears in the slice, leaving every
+ * other rule untouched.
+ *
+ * Per-selector behavior:
+ *   `.outer :deep(.inner)`   → `.outer ::ng-deep .inner`
+ *   `:deep(.x)`              → `::ng-deep .x`
+ *   `:deep(.a, .b)`          → distributes via parent-selector cloning;
+ *                              each branch is rewritten independently.
+ */
+function lowerDeepToNgDeep(css: string): string {
+  const root = postcss.parse(css);
+  const transformer = selectorParser((selectors) => {
+    expandDeepDistribution(selectors);
+    selectors.each((sel) => {
+      rewriteDeepInSelector(sel);
+    });
+  });
+  root.walkRules((rule) => {
+    rule.selector = transformer.processSync(rule.selector);
+  });
+  return root.toString();
+}
+
+/**
+ * Same distribution pass as the other targets' scopeCss — expand
+ * `:deep(a, b)` into two parent selectors so each carries a single inner.
+ */
+function expandDeepDistribution(root: selectorParser.Root): void {
+  let changed = true;
+  while (changed) {
+    changed = false;
+    const selectors = root.nodes.slice();
+    for (const sel of selectors) {
+      if (sel.type !== 'selector') continue;
+      const distIdx = sel.nodes.findIndex(
+        (n) =>
+          n.type === 'pseudo' &&
+          (n as selectorParser.Pseudo).value === ':deep' &&
+          (n as selectorParser.Pseudo).nodes.length > 1,
+      );
+      if (distIdx === -1) continue;
+      const pseudo = sel.nodes[distIdx] as selectorParser.Pseudo;
+      const inners = pseudo.nodes.filter(
+        (n) => n.type === 'selector',
+      ) as selectorParser.Selector[];
+      const expanded: selectorParser.Selector[] = inners.map((inner) => {
+        const cloned = sel.clone({}) as selectorParser.Selector;
+        const clonedPseudo = cloned.nodes[distIdx] as selectorParser.Pseudo;
+        clonedPseudo.nodes = [inner.clone({}) as selectorParser.Selector];
+        return cloned;
+      });
+      const selIdx = root.nodes.indexOf(sel);
+      root.nodes.splice(selIdx, 1, ...expanded);
+      changed = true;
+      break;
+    }
+  }
+}
+
+/**
+ * Walk a single selector and replace each `:deep(X)` with a `::ng-deep`
+ * pseudo-element followed by a descendant combinator and the inner
+ * contents. Insertion preserves the surrounding combinator structure:
+ *   `.outer :deep(.a > .b)` → `.outer ::ng-deep .a > .b`
+ *   `:deep(.x)` at the start → `::ng-deep .x`
+ */
+function rewriteDeepInSelector(selector: selectorParser.Selector): void {
+  for (let i = selector.nodes.length - 1; i >= 0; i--) {
+    const node = selector.nodes[i];
+    if (
+      !node ||
+      node.type !== 'pseudo' ||
+      (node as selectorParser.Pseudo).value !== ':deep'
+    ) {
+      continue;
+    }
+    const pseudo = node as selectorParser.Pseudo;
+    const inner = pseudo.nodes[0];
+    if (!inner || inner.type !== 'selector') continue;
+    const innerNodes = (inner as selectorParser.Selector).nodes;
+
+    // Build the replacement nodes: `::ng-deep` followed by the inner
+    // selector contents. The descendant combinator between `::ng-deep`
+    // and the inner already exists implicitly when the inner starts with
+    // a non-combinator node — but we always insert a descendant space
+    // combinator so the output is unambiguous.
+    const ngDeep = selectorParser.pseudo({ value: '::ng-deep' });
+    const sep = selectorParser.combinator({ value: ' ' });
+
+    // If the slot before the pseudo is a non-combinator node (e.g. `.outer`
+    // followed by descendant space and then `:deep(...)`), postcss-selector-
+    // parser already represents the descendant space as a combinator node
+    // at index i-1, so the splice replaces just the pseudo.
+    selector.nodes.splice(i, 1, ngDeep, sep, ...innerNodes);
+  }
 }
 
 function sliceRuleBody(rule: StyleRule, source: string): string {
