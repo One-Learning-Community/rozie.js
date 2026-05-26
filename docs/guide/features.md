@@ -704,6 +704,37 @@ Rozie's compatibility bar is "high percentage" parity, not 100%. Slots are the a
 
 Each target picks the right escape hatch: Vue gets a sibling unscoped `<style>` block, Svelte gets `:global(:root)`, Angular gets `::ng-deep :root`, React/Solid get a separate `.global.css` file imported next to the module CSS, and Lit — whose `static styles` are shadow-DOM-scoped by default — gets the `:root` rules injected into the document via an `injectGlobalStyles` runtime call.
 
+## `:deep()` — reaching into child components from scoped styles
+
+`:root` is the global escape hatch; `:deep()` is the **cross-component** one. Because `<style>` is scoped per component, a parent's selector like `.board > .rozie-sortable-list` can never match the child SortableList's rendered DOM — every component has its own scope attribute and the parent's selector goes looking for the parent's marker on the child's elements. `:deep(...)` lifts the inner selector out of the scope so it reaches the child's DOM directly:
+
+```rozie
+<template>
+  <div class="board">
+    <SortableList :items="$data.columns">…</SortableList>
+  </div>
+</template>
+
+<style>
+/* Reach into SortableList to lay its outer wrapper out as a grid of columns. */
+.board :deep(.rozie-sortable-list) {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+}
+</style>
+```
+
+The outer compound (`.board`) stays scoped to this component; only what's inside `:deep(...)` is hoisted out. Combinators inside the parentheses (`.a > .b`) and comma-separated branches (`:deep(.a, .b)`) work the way Vue's `<style scoped>` handles them.
+
+Each target picks the right translation:
+
+- **React / Solid**: scope attribute appended to the outer compound only — `.board[data-rozie-s-<hash>] .rozie-sortable-list { … }`.
+- **Vue**: `:deep()` is passed through verbatim. Vue 3.4+ `<style scoped>` understands the selector natively and applies its `[data-v-<hash>]` lowering downstream.
+- **Svelte**: same compound-scope rewrite as React/Solid, wrapped in Svelte 5's `:global { … }` so Svelte's native scoper doesn't interfere.
+- **Angular**: lowered to `::ng-deep` — `.board ::ng-deep .rozie-sortable-list { … }`. Angular's view encapsulation honors `::ng-deep` as the supported pierce mechanism (marked deprecated in the docs, but still the standard idiom for this exact case).
+- **Lit**: the scope attribute is lifted exactly like React/Solid, so the selector works **within one shadow root**. It does **not** cross shadow-DOM boundaries — each Lit producer renders in its own shadow root, and shadow boundaries are opaque to outside CSS. Cross-shadow styling is `::part()` territory (planned, not yet shipped); for today, parent-side CSS variables are the working alternative when you need to influence a Lit child's appearance.
+
 ## `<style lang="scss">` — SCSS, compiled at build time
 
 A `<style>` block opts into SCSS with `lang="scss"`. Rozie compiles it to plain CSS at build time — nesting, `$variables`, `@mixin`/`@include`, `&` parent-refs, `@if`/`@each`/`@for`, `@function`, `%placeholder`/`@extend`, `#{}` interpolation and the built-in `sass:` modules all resolve away before emit:
