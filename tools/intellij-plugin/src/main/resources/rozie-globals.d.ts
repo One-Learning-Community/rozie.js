@@ -1,4 +1,4 @@
-// rozie-globals.d.ts — synthetic ambient declarations for the 16 Rozie
+// rozie-globals.d.ts — synthetic ambient declarations for the 17 Rozie
 // magic identifiers. Source of truth: Plan 13's
 // `tools/intellij-plugin/src/main/kotlin/js/rozie/intellij/completion/RozieMagicIdentifiers.kt`
 // `MAGIC_IDENTIFIERS` registry. v0.2.0 ships permissive `any`-typed shapes;
@@ -7,6 +7,8 @@
 // 05-22) added `$attrs` as the 14th magic identifier; WR-06 of the same phase
 // added `$event` as the 15th. Phase 15 (2026-05-23) added `$listeners` as the
 // 16th — the consumer-passed event-listener cluster paired with `$attrs`.
+// Phase 16 (2026-05-26) added `$restoreFocus` as the 17th — keyed-list focus
+// restoration sigil (Lit/Solid/Svelte do work; React/Vue/Angular no-op).
 //
 // =============================================================================
 // Strategy chosen: B (ambient-decl prefix injected into every Rozie JS fragment)
@@ -125,6 +127,14 @@ declare const $attrs: Record<string, unknown>;
  * Phase 15 R3 / D-19.
  */
 declare const $listeners: Record<string, EventListener>;
+/**
+ * After a state mutation that reorders a keyed `r-for` list, restore focus to
+ * the row matching `selector` at index `idx`. Lit/Solid/Svelte lower to a
+ * deferred (microtask) `querySelector` + `.focus()`; React/Vue/Angular lower
+ * to `void 0` (no-op — their keyed reconcilers preserve DOM identity natively).
+ * Phase 16.
+ */
+declare function $restoreFocus(selector: string, idx: number): void;
 /**
  * The active event closure parameter inside an `@event` / `r-on:event`
  * handler. Scoped to event-handler contexts; reserved in

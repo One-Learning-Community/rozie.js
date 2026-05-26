@@ -1,7 +1,7 @@
 package js.rozie.intellij.completion
 
 /**
- * Single source of truth for the 16 canonical Rozie `$`-prefixed magic
+ * Single source of truth for the 17 canonical Rozie `$`-prefixed magic
  * identifiers + their one-line type-text doc hints (surfaced by
  * `LookupElementBuilder.withTypeText` in the completion popup per the
  * P1-UAT-09 acceptance prose).
@@ -23,7 +23,7 @@ package js.rozie.intellij.completion
  *    `RozieGlobalsLibraryTest` coverage assertion pins the two in lockstep.
  *
  * `RozieJsMagicCompletionTest.testBareDollarSurfacesAllMagicIdentifiers`
- * iterates [MAGIC_IDENTIFIERS] directly — adding a 16th magic name is a 1-line
+ * iterates [MAGIC_IDENTIFIERS] directly — adding a 17th magic name is a 1-line
  * append here (plus the matching `declare` in `rozie-globals.d.ts`); the
  * contributor, the annotator, and the test all pick it up automatically (DRY
  * contract, identical to Plan 02's [js.rozie.intellij.xml.RozieKnownAttributes]).
@@ -49,6 +49,10 @@ package js.rozie.intellij.completion
  *  - `$listeners`    — consumer-passed event-listener cluster minus declared
  *                      events (Phase 15 — for `r-on="$listeners"` manual
  *                      placement and member reads `$listeners.click?.(e)`)
+ *  - `$restoreFocus` — restore focus to a keyed-list row by selector + index
+ *                      after a state mutation reorders the list (Phase 16 —
+ *                      Lit/Solid/Svelte lower to queueMicrotask + focus();
+ *                      React/Vue/Angular no-op)
  *  - `$event`        — the active event closure parameter (Phase 07.6 — scoped
  *                      to `@event` / `r-on:event` handler contexts; mirrors
  *                      the reserved-sigil set in `RESERVED_SIGILS`)
@@ -59,7 +63,7 @@ package js.rozie.intellij.completion
  */
 object RozieMagicIdentifiers {
     /**
-     * Ordered (name, typeText) pairs for the 16 canonical Rozie magic
+     * Ordered (name, typeText) pairs for the 17 canonical Rozie magic
      * identifiers. Order mirrors the TextMate grammar's `magic-identifier`
      * regex so the two artifacts diff trivially; the lookup popup does its
      * own alphabetical sort, so source order is purely for readability.
@@ -81,6 +85,7 @@ object RozieMagicIdentifiers {
         "\$classSelector" to "(magic) authored class → emitted CSS selector string",
         "\$attrs" to "(magic) consumer-passed attributes minus declared props",
         "\$listeners" to "(magic) consumer-passed event listeners minus declared events",
+        "\$restoreFocus" to "(magic) restore focus to a keyed-list row by selector + index (Lit/Solid/Svelte do work; React/Vue/Angular no-op)",
     )
 
     /**
