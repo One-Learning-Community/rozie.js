@@ -35,8 +35,13 @@ export function scopeCss(css: string, scopeHash: string): string {
   const root = postcss.parse(css);
 
   const transformer = selectorParser((selectors) => {
+    const deepLifted = new WeakSet<selectorParser.Node>();
+    expandDeepDistribution(selectors);
     selectors.each((sel) => {
-      addScopeAttrToCompound(sel, attr);
+      hoistDeep(sel, deepLifted);
+    });
+    selectors.each((sel) => {
+      addScopeAttrToCompound(sel, attr, deepLifted);
     });
   });
 
@@ -46,6 +51,73 @@ export function scopeCss(css: string, scopeHash: string): string {
   });
 
   return root.toString();
+}
+
+/**
+ * Distribute `:deep(a, b)` by cloning the parent selector once per inner
+ * branch. Quick task 260526-mk4 — mirrors react/solid/svelte handling.
+ *
+ * NOTE: `:deep()` on Lit works WITHIN one shadow root — lifting the scope
+ * attr unlocks parent-to-child selectors inside the same shadow tree, but
+ * does NOT cross shadow-DOM boundaries. Cross-shadow styling is `::part`
+ * territory, out of scope here. See docs/guide/features.md.
+ */
+function expandDeepDistribution(root: selectorParser.Root): void {
+  let changed = true;
+  while (changed) {
+    changed = false;
+    const selectors = root.nodes.slice();
+    for (const sel of selectors) {
+      if (sel.type !== 'selector') continue;
+      const distIdx = sel.nodes.findIndex(
+        (n) =>
+          n.type === 'pseudo' &&
+          (n as selectorParser.Pseudo).value === ':deep' &&
+          (n as selectorParser.Pseudo).nodes.length > 1,
+      );
+      if (distIdx === -1) continue;
+      const pseudo = sel.nodes[distIdx] as selectorParser.Pseudo;
+      const inners = pseudo.nodes.filter(
+        (n) => n.type === 'selector',
+      ) as selectorParser.Selector[];
+      const expanded: selectorParser.Selector[] = inners.map((inner) => {
+        const cloned = sel.clone({}) as selectorParser.Selector;
+        const clonedPseudo = cloned.nodes[distIdx] as selectorParser.Pseudo;
+        clonedPseudo.nodes = [inner.clone({}) as selectorParser.Selector];
+        return cloned;
+      });
+      const selIdx = root.nodes.indexOf(sel);
+      root.nodes.splice(selIdx, 1, ...expanded);
+      changed = true;
+      break;
+    }
+  }
+}
+
+/**
+ * Splice the inner contents of each `:deep(X)` into the parent selector and
+ * tag those spliced nodes as deep-lifted so the compound walk skips them.
+ */
+function hoistDeep(
+  selector: selectorParser.Selector,
+  deepLifted: WeakSet<selectorParser.Node>,
+): void {
+  for (let i = selector.nodes.length - 1; i >= 0; i--) {
+    const node = selector.nodes[i];
+    if (
+      node &&
+      node.type === 'pseudo' &&
+      (node as selectorParser.Pseudo).value === ':deep'
+    ) {
+      const pseudo = node as selectorParser.Pseudo;
+      const inner = pseudo.nodes[0];
+      if (inner && inner.type === 'selector') {
+        const innerNodes = (inner as selectorParser.Selector).nodes;
+        innerNodes.forEach((n) => deepLifted.add(n));
+        selector.nodes.splice(i, 1, ...innerNodes);
+      }
+    }
+  }
 }
 
 /**
@@ -67,6 +139,7 @@ function selectorIsShadowExempt(selectorText: string): boolean {
 function addScopeAttrToCompound(
   selector: selectorParser.Selector,
   attr: string,
+  deepLifted: WeakSet<selectorParser.Node>,
 ): void {
   const nodes = selector.nodes;
 
@@ -76,7 +149,17 @@ function addScopeAttrToCompound(
     const isBoundary = !node || node.type === 'combinator';
     if (isBoundary) {
       if (i > compoundStart) {
-        appendScopeToOneCompound(selector, compoundStart, i, attr);
+        let allLifted = true;
+        for (let j = compoundStart; j < i; j++) {
+          const n = nodes[j];
+          if (n && !deepLifted.has(n)) {
+            allLifted = false;
+            break;
+          }
+        }
+        if (!allLifted) {
+          appendScopeToOneCompound(selector, compoundStart, i, attr, deepLifted);
+        }
       }
       compoundStart = i + 1;
     }
@@ -88,6 +171,7 @@ function appendScopeToOneCompound(
   start: number,
   end: number,
   attr: string,
+  deepLifted: WeakSet<selectorParser.Node>,
 ): void {
   // Recurse into nested-list pseudos first so e.g. `:not(.x)` becomes
   // `:not(.x[attr])`.
@@ -97,7 +181,7 @@ function appendScopeToOneCompound(
       const pseudoNode = node as selectorParser.Pseudo;
       pseudoNode.nodes.forEach((innerSel) => {
         if (innerSel.type === 'selector') {
-          addScopeAttrToCompound(innerSel as selectorParser.Selector, attr);
+          addScopeAttrToCompound(innerSel as selectorParser.Selector, attr, deepLifted);
         }
       });
     }

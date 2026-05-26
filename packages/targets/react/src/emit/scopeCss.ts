@@ -19,6 +19,12 @@
  * them into `rootRules` and they go to the sibling `.global.css` file
  * unchanged (the documented unscoped escape hatch).
  *
+ * `:deep(...)` is the cross-component scoping escape hatch (quick task
+ * 260526-mk4). The inner selector is HOISTED into the outer selector and
+ * the scope attribute is NOT appended to any node that came from inside
+ * a `:deep(...)`. Vue 3.4+ understands `:deep()` natively; this pass
+ * mirrors those semantics for targets that do their own scope rewriting.
+ *
  * Hash derivation: see `scopeHash.ts`.
  *
  * Examples:
@@ -27,6 +33,8 @@
  *   `.parent .child { ... }` → `.parent[data-rozie-s-abc] .child[data-rozie-s-abc] { ... }`
  *   `.a, .b { ... }` → `.a[data-rozie-s-abc], .b[data-rozie-s-abc] { ... }`
  *   `:root { ... }` → NOT touched (handled by isRootEscape branch upstream).
+ *   `.outer :deep(.inner) { ... }` → `.outer[data-rozie-s-abc] .inner { ... }`
+ *   `:deep(.x) { ... }` → `.x { ... }`
  *
  * @experimental — shape may change before v1.0
  */
@@ -49,8 +57,17 @@ export function scopeCss(css: string, scopeHash: string): string {
 
   // Build a single selector-parser processor we can reuse.
   const transformer = selectorParser((selectors) => {
+    // Phase 0: distribute `:deep(.a, .b)` and hoist inner selectors out
+    // of every `:deep(...)` wrapper. The hoisted nodes are tagged in
+    // `deepLifted` so the scope-attr pass skips them.
+    const deepLifted = new WeakSet<selectorParser.Node>();
+    expandDeepDistribution(selectors, deepLifted);
     selectors.each((sel) => {
-      addScopeAttrToCompound(sel, attr);
+      hoistDeep(sel, deepLifted);
+    });
+    // Phase 1: scope every compound that isn't fully deep-lifted.
+    selectors.each((sel) => {
+      addScopeAttrToCompound(sel, attr, deepLifted);
     });
   });
 
@@ -60,6 +77,83 @@ export function scopeCss(css: string, scopeHash: string): string {
 
   // Re-stringify. postcss preserves comments/formatting reasonably well.
   return root.toString();
+}
+
+/**
+ * If any top-level selector in the list contains a `:deep(a, b, ...)` with
+ * MULTIPLE inner selectors, expand the parent by cloning it once per inner
+ * selector — matching Vue's distributive semantics:
+ *   `.outer :deep(.a, .b)` → `.outer :deep(.a), .outer :deep(.b)`
+ * The subsequent hoist pass then unwraps each single-arg `:deep()`.
+ *
+ * Only handles the FIRST multi-arg `:deep()` per selector per iteration; we
+ * re-scan after each expansion. Nested `:deep(:deep(...))` is undefined
+ * behavior (postcss-selector-parser would yield it as a `pseudo` whose inner
+ * selector contains another `pseudo` — we don't recurse here).
+ */
+function expandDeepDistribution(
+  root: selectorParser.Root,
+  deepLifted: WeakSet<selectorParser.Node>,
+): void {
+  void deepLifted; // tagging happens during the subsequent hoist pass
+  let changed = true;
+  while (changed) {
+    changed = false;
+    const selectors = root.nodes.slice();
+    for (const sel of selectors) {
+      if (sel.type !== 'selector') continue;
+      const distIdx = sel.nodes.findIndex(
+        (n) =>
+          n.type === 'pseudo' &&
+          (n as selectorParser.Pseudo).value === ':deep' &&
+          (n as selectorParser.Pseudo).nodes.length > 1,
+      );
+      if (distIdx === -1) continue;
+      const pseudo = sel.nodes[distIdx] as selectorParser.Pseudo;
+      const inners = pseudo.nodes.filter(
+        (n) => n.type === 'selector',
+      ) as selectorParser.Selector[];
+      const expanded: selectorParser.Selector[] = inners.map((inner) => {
+        const cloned = sel.clone({}) as selectorParser.Selector;
+        const clonedPseudo = cloned.nodes[distIdx] as selectorParser.Pseudo;
+        clonedPseudo.nodes = [inner.clone({}) as selectorParser.Selector];
+        return cloned;
+      });
+      const selIdx = root.nodes.indexOf(sel);
+      root.nodes.splice(selIdx, 1, ...expanded);
+      changed = true;
+      break;
+    }
+  }
+}
+
+/**
+ * For each `:deep(X)` pseudo in `selector` (where X is a single inner
+ * selector — post-`expandDeepDistribution`), splice X's nodes into the
+ * parent selector at the pseudo's position, replacing the pseudo. Every
+ * spliced node is tagged in `deepLifted` so the compound walk skips
+ * appending the scope attribute to it.
+ */
+function hoistDeep(
+  selector: selectorParser.Selector,
+  deepLifted: WeakSet<selectorParser.Node>,
+): void {
+  for (let i = selector.nodes.length - 1; i >= 0; i--) {
+    const node = selector.nodes[i];
+    if (
+      node &&
+      node.type === 'pseudo' &&
+      (node as selectorParser.Pseudo).value === ':deep'
+    ) {
+      const pseudo = node as selectorParser.Pseudo;
+      const inner = pseudo.nodes[0];
+      if (inner && inner.type === 'selector') {
+        const innerNodes = (inner as selectorParser.Selector).nodes;
+        innerNodes.forEach((n) => deepLifted.add(n));
+        selector.nodes.splice(i, 1, ...innerNodes);
+      }
+    }
+  }
 }
 
 /**
@@ -81,6 +175,7 @@ export function scopeCss(css: string, scopeHash: string): string {
 function addScopeAttrToCompound(
   selector: selectorParser.Selector,
   attr: string,
+  deepLifted: WeakSet<selectorParser.Node>,
 ): void {
   const nodes = selector.nodes;
 
@@ -93,7 +188,19 @@ function addScopeAttrToCompound(
     if (isBoundary) {
       // Process the [compoundStart, i) compound.
       if (i > compoundStart) {
-        appendScopeToOneCompound(selector, compoundStart, i, attr);
+        // Skip the scope-attr append if EVERY non-combinator node in this
+        // compound came from inside a `:deep(...)` wrapper.
+        let allLifted = true;
+        for (let j = compoundStart; j < i; j++) {
+          const n = nodes[j];
+          if (n && !deepLifted.has(n)) {
+            allLifted = false;
+            break;
+          }
+        }
+        if (!allLifted) {
+          appendScopeToOneCompound(selector, compoundStart, i, attr, deepLifted);
+        }
       }
       compoundStart = i + 1; // skip the combinator itself
     }
@@ -113,6 +220,7 @@ function appendScopeToOneCompound(
   start: number,
   end: number,
   attr: string,
+  deepLifted: WeakSet<selectorParser.Node>,
 ): void {
   // First pass: recurse into nested selector-list pseudos so the scope reaches
   // their inner selectors too (matches Vue scoped behavior).
@@ -122,7 +230,7 @@ function appendScopeToOneCompound(
       const pseudoNode = node as selectorParser.Pseudo;
       pseudoNode.nodes.forEach((innerSel) => {
         if (innerSel.type === 'selector') {
-          addScopeAttrToCompound(innerSel as selectorParser.Selector, attr);
+          addScopeAttrToCompound(innerSel as selectorParser.Selector, attr, deepLifted);
         }
       });
     }
