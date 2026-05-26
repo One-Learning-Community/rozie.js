@@ -1,0 +1,29 @@
+<rozie name="SolidCallArgUnwrap">
+
+<data>
+{
+  rows: ['a', 'b', 'c'],
+  log: [],
+}
+</data>
+
+<script>
+const onRowKeyDown = ($event, idx) => {
+  // Phase 16 R2 — `idx + 1` is the canary expression. If `idx` is the bare
+  // Solid `<For>` index accessor (a `() => number`), then `idx + 1` coerces
+  // the function to a string (`"() => number1"`) instead of producing the
+  // expected `number`. The Solid emitter MUST unwrap the alias to `index()`
+  // at the call-arg site so the handler receives a number.
+  $data.log = [...$data.log, idx + 1];
+}
+</script>
+
+<template>
+<ul>
+  <li r-for="(row, index) in $data.rows" :key="row" @keydown="onRowKeyDown($event, index)">
+    {{ row }}
+  </li>
+</ul>
+</template>
+
+</rozie>
