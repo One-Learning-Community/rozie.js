@@ -132,12 +132,19 @@ header code {
   border-radius: 3px;
 }
 
-/* Each rendered column lands inside SortableList's outer wrapper
-   (`<div class="rozie-sortable-list">`). Lay the columns side-by-side
-   on the OUTER list — the inner SortableList(s) inside each KanbanColumn
-   stay vertically stacked (their own `.rozie-sortable-list` re-acquires
-   `display: block` via the inner cascade). */
-.board > .rozie-sortable-list { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; }
+/* Reach into the producer SortableList to lay its outer list out as a
+   grid of columns. `:deep()` is the cross-component CSS escape hatch
+   (quick task 260526-mk4): the outer compound (`.board`) is scoped to
+   this demo, but `.rozie-sortable-list` is lifted OUT of the scope so
+   it matches the SortableList-rendered DOM directly. The inner
+   SortableList(s) inside each KanbanColumn keep their own
+   `display: block` cascade.
+
+   Lit consumers render columns stacked rather than gridded because
+   each <rozie-sortable-list> custom element lives in its own shadow
+   root, and `:deep()` does not cross shadow-DOM boundaries. Cross-
+   shadow styling is `::part()` territory (planned, not v1). */
+.board :deep(.rozie-sortable-list) { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; }
 
 .controls {
   display: flex;
