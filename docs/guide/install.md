@@ -46,6 +46,14 @@ pnpm rozie build src/Counter.rozie --target vue --out dist/Counter.vue
 
 The CLI accepts `--target vue | react | svelte | angular | solid | lit` and supports `--source-map` for emitting sourcemaps alongside the output file.
 
+`--pretty` (off by default) pipes each emitted artefact through prettier before write. Prettier core covers `.tsx` / `.ts` / `.d.ts` / `.vue` / `.css` natively — you don't need any extra dependency. To pretty-format `.svelte` output, install `prettier-plugin-svelte` alongside `@rozie/cli`:
+
+```bash
+pnpm add -D prettier-plugin-svelte
+```
+
+It's declared as an optional peer of `@rozie/cli`, so React/Vue/Angular/Solid/Lit users don't pay for the install. Without the plugin, `rozie build --pretty --target svelte` falls back to the raw (correct) compile output and prints a `[warning] --pretty failed for ...svelte: prettier-plugin-svelte is not installed ...` line.
+
 ## Versions
 
 | Target | Supported version |

@@ -46,10 +46,18 @@
     "picocolors": "^1.1.0",
     "postcss": "^8.5.13",
     "prettier": "^3.8.3",
-    "prettier-plugin-svelte": "^3.4.0",
     "sass": "^1.97.3"
   },
+  "peerDependencies": {
+    "prettier-plugin-svelte": "^3.4.0"
+  },
+  "peerDependenciesMeta": {
+    "prettier-plugin-svelte": {
+      "optional": true
+    }
+  },
   "devDependencies": {
+    "prettier-plugin-svelte": "^3.4.0",
     "vitest": "^4.1.5"
   }
 }
