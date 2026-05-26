@@ -11,6 +11,8 @@ import CardHeaderPage from './pages/CardHeaderPage';
 // Phase 07.2 Plan 06 — ModalConsumer dogfood page (Wave 2 close-out).
 import ModalConsumerPage from './pages/ModalConsumerPage';
 import LitInteropPage from './pages/LitInteropPage';
+// Phase 16 — PropDefaultCoercion runtime probe (SPEC R1/R5 D-05 runtime arm).
+import PropDefaultCoercionPage from './pages/PropDefaultCoercionPage';
 
 /**
  * Page-routing shell. Each Playwright e2e test navigates by clicking
@@ -32,7 +34,8 @@ type PageKey =
   | 'card'
   | 'card-header'
   | 'modal-consumer'
-  | 'lit-interop';
+  | 'lit-interop'
+  | 'prop-default-coercion';
 
 const PAGES: Record<PageKey, () => JSX.Element> = {
   counter: CounterPage,
@@ -45,6 +48,7 @@ const PAGES: Record<PageKey, () => JSX.Element> = {
   'card-header': CardHeaderPage,
   'modal-consumer': ModalConsumerPage,
   'lit-interop': LitInteropPage,
+  'prop-default-coercion': PropDefaultCoercionPage,
 };
 
 const PAGE_KEYS: ReadonlyArray<PageKey> = [
@@ -58,6 +62,7 @@ const PAGE_KEYS: ReadonlyArray<PageKey> = [
   'card-header',
   'modal-consumer',
   'lit-interop',
+  'prop-default-coercion',
 ];
 
 export default function App(): JSX.Element {

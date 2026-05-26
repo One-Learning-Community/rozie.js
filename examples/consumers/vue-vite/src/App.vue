@@ -28,6 +28,8 @@ import Card from './pages/Card.vue';
 import CardHeader from './pages/CardHeader.vue';
 // Phase 07.2 Plan 06 — ModalConsumer dogfood page (Wave 2 close-out).
 import ModalConsumer from './pages/ModalConsumer.vue';
+// Phase 16 — PropDefaultCoercion runtime probe (SPEC R1/R5 D-05 runtime arm).
+import PropDefaultCoercion from './pages/PropDefaultCoercion.vue';
 import { litInteropRoute } from './router';
 
 const pages = [
@@ -40,6 +42,7 @@ const pages = [
   'Card',
   'CardHeader',
   'ModalConsumer',
+  'PropDefaultCoercion',
   'lit-interop',
 ] as const;
 type Page = typeof pages[number];
@@ -54,6 +57,7 @@ const pageComponents: Record<Page, unknown> = {
   Card,
   CardHeader,
   ModalConsumer,
+  PropDefaultCoercion,
   'lit-interop': litInteropRoute.component,
 };
 

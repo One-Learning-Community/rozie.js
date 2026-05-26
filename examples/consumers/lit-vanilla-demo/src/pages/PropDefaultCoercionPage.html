@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Rozie PropDefaultCoercion (Lit)</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        max-width: 720px;
+        margin: 2rem auto;
+        padding: 0 1rem;
+      }
+      .pdc-nav {
+        display: flex;
+        gap: 0.25rem;
+        margin-bottom: 0.5rem;
+      }
+      .pdc-nav button {
+        padding: 0.25rem 0.5rem;
+        font: inherit;
+        border: 1px solid rgba(0, 0, 0, 0.15);
+        background: white;
+        cursor: pointer;
+        border-radius: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>PropDefaultCoercion</h1>
+    <p>
+      <a href="/">&larr; back</a> — Lit custom element
+      <code>&lt;rozie-prop-default-coercion&gt;</code> exercising the SPEC
+      R1/R5 cross-target prop-default coercion contract.
+    </p>
+    <div class="pdc-nav">
+      <button data-testid="pdc-mode-instance1" id="mode-instance1">instance1</button>
+      <button data-testid="pdc-mode-instance2" id="mode-instance2">instance2</button>
+      <button data-testid="pdc-mode-override" id="mode-override">override</button>
+    </div>
+    <p>Mode: <span data-testid="pdc-mode" id="mode-label">instance1</span></p>
+    <div id="mount"></div>
+    <script type="module">
+      import '../rozie/PropDefaultCoercion.rozie';
+
+      const mount = document.getElementById('mount');
+      const modeLabel = document.getElementById('mode-label');
+
+      function render(mode) {
+        modeLabel.textContent = mode;
+        // Clear + re-mount to force a fresh instance per D-02 once-per-
+        // instance verification.
+        mount.innerHTML = '';
+        const el = document.createElement('rozie-prop-default-coercion');
+        if (mode === 'override') {
+          // Lit attributes are strings — set as property for non-string values.
+          // The @property attribute coercion handles the string-to-type conversion
+          // for primitive types; for objects/arrays we set as a property directly.
+          el.a = 'override';
+          el.e = [1, 2];
+        }
+        mount.appendChild(el);
+      }
+
+      render('instance1');
+
+      document.getElementById('mode-instance1').addEventListener('click', () => render('instance1'));
+      document.getElementById('mode-instance2').addEventListener('click', () => render('instance2'));
+      document.getElementById('mode-override').addEventListener('click', () => render('override'));
+    </script>
+  </body>
+</html>

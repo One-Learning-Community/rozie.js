@@ -22,6 +22,8 @@ import CardHeader from '../CardHeader.rozie';
 import { LitInteropPageComponent } from './pages/lit-interop.page';
 // Phase 07.2 Plan 06 — ModalConsumer dogfood page (Wave 2 close-out).
 import { ModalConsumerPageComponent } from './modal-consumer/modal-consumer.component';
+// Phase 16 — PropDefaultCoercion runtime probe (SPEC R1/R5 D-05 runtime arm).
+import PropDefaultCoercion from '../PropDefaultCoercion.rozie';
 
 interface TodoItem {
   id: string;
@@ -45,7 +47,10 @@ type PageKey =
   | 'card'
   | 'card-header'
   | 'modal-consumer'
-  | 'lit-interop';
+  | 'lit-interop'
+  | 'prop-default-coercion';
+
+type PdcMode = 'instance1' | 'instance2' | 'override';
 
 @Component({
   selector: 'rozie-app',
@@ -62,6 +67,7 @@ type PageKey =
     CardHeader,
     LitInteropPageComponent,
     ModalConsumerPageComponent,
+    PropDefaultCoercion,
   ],
   template: `
     <header class="app-header">
@@ -180,6 +186,23 @@ type PageKey =
         </section>
       } @else if (current() === 'modal-consumer') {
         <rozie-modal-consumer-page />
+      } @else if (current() === 'prop-default-coercion') {
+        <section>
+          <h2>PropDefaultCoercion</h2>
+          <div style="display:flex;gap:0.25rem;margin-bottom:0.5rem;">
+            <button data-testid="pdc-mode-instance1" (click)="pdcMode.set('instance1')">instance1</button>
+            <button data-testid="pdc-mode-instance2" (click)="pdcMode.set('instance2')">instance2</button>
+            <button data-testid="pdc-mode-override" (click)="pdcMode.set('override')">override</button>
+          </div>
+          <p>Mode: <span data-testid="pdc-mode">{{ pdcMode() }}</span></p>
+          @if (pdcMode() === 'instance1') {
+            <rozie-prop-default-coercion />
+          } @else if (pdcMode() === 'instance2') {
+            <rozie-prop-default-coercion />
+          } @else {
+            <rozie-prop-default-coercion [a]="pdcAOverride" [e]="pdcEOverride" />
+          }
+        </section>
       } @else if (current() === 'lit-interop') {
         <rozie-lit-interop-page />
       }
@@ -230,10 +253,16 @@ export class AppComponent {
     'card',
     'card-header',
     'modal-consumer',
+    'prop-default-coercion',
     'lit-interop',
   ];
 
   current = signal<PageKey>('counter');
+
+  // Phase 16 PropDefaultCoercion runtime probe state.
+  pdcMode = signal<PdcMode>('instance1');
+  pdcAOverride: Record<string, unknown> = 'override' as unknown as Record<string, unknown>;
+  pdcEOverride: unknown[] = [1, 2];
 
   // Counter state
   counterValue = signal(0);

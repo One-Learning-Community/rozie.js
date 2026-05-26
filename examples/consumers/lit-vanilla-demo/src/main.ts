@@ -19,3 +19,5 @@ import './rozie/CardHeader.rozie';
 // Phase 07.2 Plan 06 — ModalConsumer dogfood (transitively imports
 // Modal.rozie + WrapperModal.rozie via <components>).
 import './rozie/ModalConsumer.rozie';
+// Phase 16 — PropDefaultCoercion runtime probe (SPEC R1/R5 D-05 runtime arm).
+import './rozie/PropDefaultCoercion.rozie';

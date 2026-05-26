@@ -22,6 +22,8 @@
   // Phase 07.2 Plan 06 — ModalConsumer dogfood page (Wave 2 close-out).
   import ModalConsumerPage from './pages/ModalConsumer.svelte';
   import LitInterop from './routes/lit-interop/+page.svelte';
+  // Phase 16 — PropDefaultCoercion runtime probe (SPEC R1/R5 D-05 runtime arm).
+  import PropDefaultCoercion from './PropDefaultCoercion.rozie';
 
   type PageKey =
     | 'counter'
@@ -33,7 +35,8 @@
     | 'card'
     | 'card-header'
     | 'modal-consumer'
-    | 'lit-interop';
+    | 'lit-interop'
+    | 'prop-default-coercion';
   const PAGE_KEYS: ReadonlyArray<PageKey> = [
     'counter',
     'search-input',
@@ -45,9 +48,14 @@
     'card-header',
     'modal-consumer',
     'lit-interop',
+    'prop-default-coercion',
   ];
 
   let current = $state<PageKey>('counter');
+
+  // PropDefaultCoercion runtime-probe mode (Phase 16).
+  type PdcMode = 'instance1' | 'instance2' | 'override';
+  let pdcMode = $state<PdcMode>('instance1');
 
   // Counter state
   let counterValue = $state(0);
@@ -220,6 +228,23 @@
     </section>
   {:else if current === 'modal-consumer'}
     <ModalConsumerPage />
+  {:else if current === 'prop-default-coercion'}
+    <section>
+      <h2>PropDefaultCoercion</h2>
+      <div style="display:flex;gap:0.25rem;margin-bottom:0.5rem;">
+        <button data-testid="pdc-mode-instance1" onclick={() => (pdcMode = 'instance1')}>instance1</button>
+        <button data-testid="pdc-mode-instance2" onclick={() => (pdcMode = 'instance2')}>instance2</button>
+        <button data-testid="pdc-mode-override" onclick={() => (pdcMode = 'override')}>override</button>
+      </div>
+      <p>Mode: <span data-testid="pdc-mode">{pdcMode}</span></p>
+      {#if pdcMode === 'instance1'}
+        {#key 'instance1'}<PropDefaultCoercion />{/key}
+      {:else if pdcMode === 'instance2'}
+        {#key 'instance2'}<PropDefaultCoercion />{/key}
+      {:else}
+        {#key 'override'}<PropDefaultCoercion a={'override'} e={[1, 2]} />{/key}
+      {/if}
+    </section>
   {:else if current === 'lit-interop'}
     <LitInterop />
   {/if}

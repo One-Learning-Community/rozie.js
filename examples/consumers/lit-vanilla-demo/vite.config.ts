@@ -36,6 +36,8 @@ export default defineConfig({
         cardHeader: resolve(__dirname, 'src/pages/CardHeaderPage.html'),
         // Phase 07.2 Plan 06 — ModalConsumer dogfood page.
         modalConsumer: resolve(__dirname, 'src/modal-consumer.html'),
+        // Phase 16 — PropDefaultCoercion runtime probe (SPEC R1/R5 D-05 runtime arm).
+        propDefaultCoercion: resolve(__dirname, 'src/pages/PropDefaultCoercionPage.html'),
       },
     },
   },
