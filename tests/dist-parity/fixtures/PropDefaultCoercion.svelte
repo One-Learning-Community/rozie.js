@@ -28,7 +28,7 @@ let {
   ...__rozieAttrs
 }: Props = $props();
 
-let observed = $state(null);
+let observed: any = $state(null);
 
 onMount(() => {
   observed = {

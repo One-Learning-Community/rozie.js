@@ -69,10 +69,13 @@ describe('$restoreFocus emit (Solid) [Phase 16]', () => {
     const { code } = compileProbe();
     expect(code).toContain('queueMicrotask');
     // Solid's emit may force single quotes; tolerate either quote style. The
-    // lowering emits `querySelectorAll(sel)?.[idx]).focus()` — optional-
-    // computed access on the NodeList result, then a plain `.focus()` call.
+    // lowering emits `(querySelectorAll(sel)?.[idx] as HTMLElement |
+    // undefined)?.focus?.()` — optional-computed access on the NodeList
+    // result, cast to HTMLElement for typecheck, optional-chained focus call.
+    // Phase 16-04 widened the cast for svelte-check / vue-tsc parity.
     expect(code).toMatch(/querySelectorAll\(\s*['"]\.row['"]\s*\)\s*\?\.\s*\[\s*2\s*\]/);
-    expect(code).toMatch(/\.focus\s*\(\s*\)/);
+    expect(code).toMatch(/as\s+HTMLElement\s*\|\s*undefined/);
+    expect(code).toMatch(/\.focus\??\s*\.?\(\s*\)/);
     // The raw helper call must NOT survive into emitted output.
     expect(code).not.toContain('$restoreFocus');
   });

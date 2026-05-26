@@ -30,7 +30,7 @@ export default function PropDefaultCoercion(_props: PropDefaultCoercionProps): J
     void a; void b; void c; void d; void e; void f;
     return rest;
   })();
-  const [observed, setObserved] = useState(null);
+  const [observed, setObserved] = useState<any>(null);
 
   useEffect(() => {
     setObserved({

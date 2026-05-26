@@ -561,41 +561,55 @@ export function rewriteScript(
       }
 
       // Phase 16 — $restoreFocus(sel, idx) → queueMicrotask(() =>
-      //   this.renderRoot.querySelectorAll(sel)[idx]?.focus()). lit-html's
-      //   keyed reconciler (`repeat` directive) recreates row DOM on reorder;
-      //   restore focus scoped to the host's renderRoot. SPEC R4 lowering
-      //   table. NO runtime helper — pure DOM API. D-04 permits upgrading to
-      //   `this.updateComplete.then(...)` if VR exposes a flake.
+      //   (this.renderRoot.querySelectorAll(sel)?.[idx] as HTMLElement |
+      //     undefined)?.focus()). lit-html's keyed reconciler (`repeat`
+      //   directive) recreates row DOM on reorder; restore focus scoped to
+      //   the host's renderRoot. SPEC R4 lowering table. NO runtime helper —
+      //   pure DOM API. D-04 permits upgrading to `this.updateComplete.then(...)`
+      //   if VR exposes a flake.
+      //
+      //   Phase 16-04 typecheck — `querySelectorAll(...)` returns
+      //   `NodeListOf<Element>`; `Element` lacks `.focus()`. Cast the indexed
+      //   result so the optional-chained `.focus?.()` typechecks cleanly.
       if (callee.name === '$restoreFocus') {
         const callArgs = path.node.arguments;
         const selArg = callArgs[0];
         const idxArg = callArgs[1];
         if (!selArg || !idxArg) return; // validator ROZ976 already caught this
         if (!t.isExpression(selArg) || !t.isExpression(idxArg)) return;
-        const arrow = t.arrowFunctionExpression(
-          [],
+        const indexedAccess = t.optionalMemberExpression(
           t.callExpression(
             t.memberExpression(
-              t.optionalMemberExpression(
-                t.callExpression(
-                  t.memberExpression(
-                    t.memberExpression(
-                      t.thisExpression(),
-                      t.identifier('renderRoot'),
-                    ),
-                    t.identifier('querySelectorAll'),
-                  ),
-                  [selArg],
-                ),
-                idxArg,
-                /* optional */ true,
-                /* computed */ true,
+              t.memberExpression(
+                t.thisExpression(),
+                t.identifier('renderRoot'),
               ),
-              t.identifier('focus'),
+              t.identifier('querySelectorAll'),
             ),
-            [],
+            [selArg],
           ),
+          idxArg,
+          /* optional */ true,
+          /* computed */ true,
         );
+        const asHtmlElement = t.tsAsExpression(
+          indexedAccess,
+          t.tsUnionType([
+            t.tsTypeReference(t.identifier('HTMLElement')),
+            t.tsUndefinedKeyword(),
+          ]),
+        );
+        const focusCall = t.optionalCallExpression(
+          t.optionalMemberExpression(
+            asHtmlElement,
+            t.identifier('focus'),
+            /* computed */ false,
+            /* optional */ true,
+          ),
+          [],
+          /* optional */ true,
+        );
+        const arrow = t.arrowFunctionExpression([], focusCall);
         path.replaceWith(
           t.callExpression(t.identifier('queueMicrotask'), [arrow]),
         );

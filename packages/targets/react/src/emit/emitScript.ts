@@ -1938,10 +1938,18 @@ export function emitScript(
     // fails TS2339 ("Property 'id' does not exist on type 'never'"). Engine
     // wrappers routinely seed a `$data` array empty and let the engine
     // populate it. Annotate the empty-array literal case as `any[]`.
-    const stateTypeArg =
-      t.isArrayExpression(s.initializer) && s.initializer.elements.length === 0
-        ? '<any[]>'
-        : '';
+    //
+    // Phase 16-04 — a `<data>` initializer of `null` types as `useState<null>`,
+    // so a later `setX(<number>)` fails TS2345. The SortableList keyboard
+    // re-land uses `liftedIndex: null` and writes `liftedIndex.set(index)`
+    // where `index` is a number. Same widening intent as Angular's
+    // `signal<any>(null)` (Plan 16-01) — annotate the bare-null case as `any`.
+    let stateTypeArg = '';
+    if (t.isArrayExpression(s.initializer) && s.initializer.elements.length === 0) {
+      stateTypeArg = '<any[]>';
+    } else if (t.isNullLiteral(s.initializer)) {
+      stateTypeArg = '<any>';
+    }
     hookLines.push(
       `const [${s.name}, ${setterName}] = useState${stateTypeArg}(${genCode(s.initializer)});`,
     );

@@ -87,9 +87,16 @@ for (const target of TARGETS) {
       const mount = page.getByTestId('rozie-mount');
       await expect(mount).toBeVisible();
 
-      // Settle: SortableListDemo seeds 5 rows on $onMount.
+      // Settle: SortableListDemo seeds 5 rows on $onMount. Wait for both
+      // the row count AND a stable role="listitem" attribute on the first
+      // row — confirms the keyboard handler is wired (handler is on rows
+      // carrying role+tabindex; if the row template hasn't rendered with
+      // those attributes, focus + keydown will fire on body / a parent and
+      // the handler won't run).
       const items = mount.locator(ITEM);
       await expect(items).toHaveCount(SEED_ITEM_COUNT);
+      await expect(items.first()).toHaveAttribute('role', 'listitem');
+      await expect(items.first()).toHaveAttribute('tabindex', '0');
 
       // Capture the pre-move displayed order.
       const before = await displayedLabels(items);
@@ -99,6 +106,25 @@ for (const target of TARGETS) {
       // (each `[class*="rozie-sortable-item"]` carries role="listitem" +
       // tabindex="0" + @keydown after the Phase 16-04 SortableList re-land).
       await items.first().focus();
+      // Confirm focus landed on the row before the first keystroke — Angular's
+      // initial CD can race the focus call; assert before pressing keys. Walks
+      // through shadow roots for the Lit cell (where document.activeElement
+      // returns the host custom element, not the focused row inside).
+      await expect.poll(
+        () =>
+          page.evaluate(() => {
+            let a: Element | null = document.activeElement;
+            while (
+              a &&
+              (a as HTMLElement).shadowRoot &&
+              (a as HTMLElement).shadowRoot!.activeElement
+            ) {
+              a = (a as HTMLElement).shadowRoot!.activeElement;
+            }
+            return a?.getAttribute('role') === 'listitem';
+          }),
+        { timeout: 2000 },
+      ).toBe(true);
 
       // Space LIFTS the focused row.
       await page.keyboard.press('Space');
@@ -106,9 +132,14 @@ for (const target of TARGETS) {
       // (c-lift) aria-live announces the lift.
       await expect(mount.locator(ARIA_LIVE)).toContainText(/lift/i);
 
-      // ArrowDown twice MOVES the lifted row two slots down.
+      // ArrowDown twice MOVES the lifted row two slots down. Wait between
+      // arrow presses for the move announcement so each Angular CD cycle
+      // completes (and the moved row's tabindex/role re-applies on the
+      // DOM that was either reused (track) or re-created (other engines)).
       await page.keyboard.press('ArrowDown');
+      await expect(mount.locator(ARIA_LIVE)).toContainText(/moved/i);
       await page.keyboard.press('ArrowDown');
+      await expect(mount.locator(ARIA_LIVE)).toContainText(/position 3/i);
 
       // Space DROPS the lift (committing the move).
       await page.keyboard.press('Space');
@@ -137,16 +168,33 @@ for (const target of TARGETS) {
       // (b) Focused element is the MOVED row at its new index — not <body>.
       // Walk through shadow roots (Lit) to find the deepest active element,
       // then assert its text contains the moved label (`b0`).
-      const focusedText = await page.evaluate(() => {
-        let active: Element | null = document.activeElement;
-        while (active && (active as HTMLElement).shadowRoot && (active as HTMLElement).shadowRoot!.activeElement) {
-          active = (active as HTMLElement).shadowRoot!.activeElement;
-        }
-        if (!active || active.tagName === 'BODY') return '<body>';
-        return (active.textContent ?? '').trim();
-      });
-      expect(focusedText, 'focus must survive reorder and land on the moved row').not.toBe('<body>');
-      expect(focusedText).toContain(b0);
+      //
+      // Angular's CD is asynchronous: after a signal write, the keyed-list
+      // reorder + DOM move happens on the next microtask flush. Reading
+      // `document.activeElement` synchronously can race that flush and
+      // observe a transient `<body>` state. Use Playwright's `toPass` helper
+      // to poll up to a generous timeout — each pass cycle re-reads the
+      // active element; the first reading that returns the moved row's
+      // label wins. Other targets settle synchronously and pass on iteration 1.
+      await expect.poll(
+        () =>
+          page.evaluate(() => {
+            let active: Element | null = document.activeElement;
+            while (
+              active &&
+              (active as HTMLElement).shadowRoot &&
+              (active as HTMLElement).shadowRoot!.activeElement
+            ) {
+              active = (active as HTMLElement).shadowRoot!.activeElement;
+            }
+            if (!active || active.tagName === 'BODY') return '<body>';
+            return (active.textContent ?? '').trim();
+          }),
+        {
+          message: 'focus must survive reorder and land on the moved row',
+          timeout: 5000,
+        },
+      ).toContain(b0);
     },
   );
 }

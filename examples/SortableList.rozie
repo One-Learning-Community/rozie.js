@@ -30,15 +30,23 @@
 
 <props>
 {
-  items:     { type: Array,   default: () => [],  model: true },
-  itemKey:   { type: String,  default: null },
-  handle:    { type: String,  default: null },
-  group:     { type: String,  default: null },
-  animation: { type: Number,  default: 150 },
-  disabled:  { type: Boolean, default: false },
-  options:   { type: Object,  default: () => ({}) },
+  items:     { type: Array,    default: () => [],  model: true },
+  itemKey:   { type: String,   default: null },
+  handle:    { type: String,   default: null },
+  group:     { type: String,   default: null },
+  animation: { type: Number,   default: 150 },
+  disabled:  { type: Boolean,  default: false },
+  options:   { type: Object,   default: () => ({}) },
+  labelFor:  { type: Function, default: null },
 }
 </props>
+
+<data>
+{
+  liftedIndex: null,
+  ariaLiveText: '',
+}
+</data>
 
 <script>
 import SortableJS from 'sortablejs'
@@ -52,8 +60,76 @@ const keyFor = (item, index) => {
   return item ?? index
 }
 
+// Read the display label for an item — used by the aria-live announcer.
+// Phase 16 R7 / D-08: $props.labelFor reads as `null` on all 6 targets when
+// the consumer omits it (Plan 16-01 prop-default coercion fix); the check is
+// a plain null compare — NO runtime callable-type coercion.
+const getLabel = (idx) => {
+  const item = $props.items[idx]
+  if ($props.labelFor !== null) return $props.labelFor(item, idx)
+  if (item !== null && typeof item === 'object' && 'label' in item) return item.label
+  return String(item)
+}
+
+// Keyboard handler (Phase 16 R7): Space lifts/drops, ArrowDown/ArrowUp move
+// the lifted row, Escape cancels, Enter is an alternate drop trigger. After
+// any array-reorder write, $restoreFocus('[role="listitem"]', newIdx) keeps
+// focus on the moved row across the React/Vue/Angular vs Svelte/Solid/Lit
+// keyed-reconciler divide (Plan 16-03 sigil — no-op on the first three;
+// queueMicrotask + querySelectorAll + .focus() on the latter three).
+//
+// Note: `index` is passed directly as a number. Plan 16-02 (Solid call-arg
+// accessor unwrap) ensures Solid's <For> alias unwraps to `index()` at the
+// call site — no runtime callable-type coercion needed in user source.
+const onRowKeyDown = ($event, index) => {
+  const key = $event.key
+  // Space (' ' on browsers; KeyboardEvent.key === ' ') OR Enter — lift/drop.
+  if (key === ' ' || key === 'Spacebar' || key === 'Enter') {
+    $event.preventDefault()
+    if ($data.liftedIndex === null) {
+      // LIFT
+      $data.liftedIndex = index
+      $data.ariaLiveText = 'Lifted ' + getLabel(index)
+      return
+    }
+    // DROP
+    const dropped = getLabel($data.liftedIndex)
+    const at = $data.liftedIndex
+    $data.liftedIndex = null
+    $data.ariaLiveText = 'Dropped ' + dropped + ' at position ' + (at + 1)
+    return
+  }
+  if (key === 'Escape') {
+    if ($data.liftedIndex === null) return
+    $event.preventDefault()
+    const cancelled = getLabel($data.liftedIndex)
+    $data.liftedIndex = null
+    $data.ariaLiveText = 'Cancelled lift of ' + cancelled
+    return
+  }
+  if (key === 'ArrowDown' || key === 'ArrowUp') {
+    if ($data.liftedIndex === null) return
+    $event.preventDefault()
+    const dir = key === 'ArrowDown' ? 1 : -1
+    const from = $data.liftedIndex
+    const to = from + dir
+    if (to < 0 || to >= $props.items.length) return
+    const next = [...$props.items]
+    const [moved] = next.splice(from, 1)
+    next.splice(to, 0, moved)
+    $props.items = next
+    $data.liftedIndex = to
+    $data.ariaLiveText = 'Moved ' + getLabel(to) + ' to position ' + (to + 1)
+    // After the keyed reorder write, restore focus to the moved row. No-op
+    // on React/Vue/Angular (DOM identity preserved); queueMicrotask +
+    // querySelectorAll + .focus() on Svelte/Solid/Lit (DOM re-created).
+    $restoreFocus('[role="listitem"]', to)
+    $emit('change', { oldIndex: from, newIndex: to, item: moved })
+  }
+}
+
 $onMount(() => {
-  instance = new SortableJS($el, {
+  instance = new SortableJS($refs.listEl, {
     animation: $props.animation,
     disabled:  $props.disabled,
     group:     $props.group,
@@ -85,7 +161,7 @@ $onMount(() => {
     // moving keyed nodes to their new positions with proper transitions.
     onUpdate: (e) => {
       e.item.remove()
-      $el.insertBefore(e.item, $el.children[e.oldIndex] ?? null)
+      $refs.listEl.insertBefore(e.item, $refs.listEl.children[e.oldIndex] ?? null)
       const next = [...$props.items]
       const [moved] = next.splice(e.oldIndex, 1)
       next.splice(e.newIndex, 0, moved)
@@ -127,7 +203,7 @@ $onMount(() => {
     // can remove it cleanly, and (b) splice the item out of our model at
     // e.oldIndex.
     onRemove: (e) => {
-      $el.insertBefore(e.item, $el.children[e.oldIndex] ?? null)
+      $refs.listEl.insertBefore(e.item, $refs.listEl.children[e.oldIndex] ?? null)
       const next = [...$props.items]
       const [removed] = next.splice(e.oldIndex, 1)
       $props.items = next
@@ -147,16 +223,50 @@ $watch(() => $props.handle,   (v) => instance?.option('handle',   v))
 </script>
 
 <template>
-<div class="rozie-sortable-list" r-external>
-  <div r-for="item, index in $props.items" :key="keyFor(item, index)" class="rozie-sortable-item">
-    <slot :item="item" :index="index" />
+<div class="rozie-sortable-wrap">
+  <div class="rozie-sortable-list" ref="listEl" r-external>
+    <div
+      r-for="item, index in $props.items"
+      :key="keyFor(item, index)"
+      class="rozie-sortable-item"
+      :class="{ 'rozie-sortable-item-lifted': $data.liftedIndex === index }"
+      role="listitem"
+      tabindex="0"
+      @keydown="onRowKeyDown($event, index)"
+    >
+      <slot :item="item" :index="index" />
+    </div>
   </div>
+  <div
+    class="rozie-sortable-aria-live"
+    data-rozie-sortable-aria-live
+    aria-live="polite"
+    aria-atomic="true"
+  >{{ $data.ariaLiveText }}</div>
 </div>
 </template>
 
 <style>
+.rozie-sortable-wrap { display: block; }
 .rozie-sortable-list { display: block; }
-.rozie-sortable-item { display: block; }
+.rozie-sortable-item { display: block; outline: none; }
+.rozie-sortable-item:focus { outline: 2px solid rgba(0, 102, 204, 0.6); outline-offset: -2px; }
+.rozie-sortable-item-lifted {
+  background: rgba(0, 102, 204, 0.08);
+  box-shadow: 0 0 0 2px rgba(0, 102, 204, 0.4) inset;
+}
+/* aria-live announcer — visually hidden, accessible to screen readers. */
+.rozie-sortable-aria-live {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
 </style>
 
 </rozie>

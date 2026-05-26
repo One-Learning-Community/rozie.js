@@ -19,7 +19,7 @@ const props = withDefaults(
 }) }
 );
 
-const observed = ref(null);
+const observed = ref<any>(null);
 
 onMounted(() => {
   observed.value = {

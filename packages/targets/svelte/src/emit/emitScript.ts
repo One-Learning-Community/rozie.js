@@ -540,10 +540,18 @@ function emitStateDecls(ir: IRComponent): string[] {
     // type 'never'"). Engine wrappers routinely seed a `$data` array empty
     // and let the engine populate it. Annotate the empty-array literal case
     // with an explicit `: any[]` type annotation on the `let` binding.
-    const typeAnnotation =
-      t.isArrayExpression(s.initializer) && s.initializer.elements.length === 0
-        ? ': any[]'
-        : '';
+    //
+    // Phase 16-04 — `<data>` `null` initializer types as `let x = $state(null)`
+    // → `null`, so `x = <number>` fails TS2322. SortableList keyboard re-land
+    // uses `liftedIndex: null` and assigns a number. Mirrors Angular's
+    // `signal<any>(null)` widening (Plan 16-01) and React's `useState<any>(null)`
+    // widening — annotate the bare-null case with `: any`.
+    let typeAnnotation = '';
+    if (t.isArrayExpression(s.initializer) && s.initializer.elements.length === 0) {
+      typeAnnotation = ': any[]';
+    } else if (t.isNullLiteral(s.initializer)) {
+      typeAnnotation = ': any';
+    }
     lines.push(`let ${s.name}${typeAnnotation} = $state(${genCode(s.initializer)});`);
   }
   return lines;

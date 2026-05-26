@@ -371,10 +371,17 @@ function emitDataRefs(ir: IRComponent, imports: VueImportCollector): string[] {
     // fails TS2339 ("Property 'id' does not exist on type 'never'"). Engine
     // wrappers routinely seed a `$data` array empty and let the engine
     // populate it. Annotate the empty-array literal case as `any[]`.
-    const refTypeArg =
-      t.isArrayExpression(s.initializer) && s.initializer.elements.length === 0
-        ? '<any[]>'
-        : '';
+    //
+    // Phase 16-04 — `<data>` `null` initializer types as `ref<null>`, so
+    // `x.value = <number>` fails TS2322. SortableList keyboard re-land uses
+    // `liftedIndex: null` and assigns a number. Mirrors the Angular signal +
+    // React useState + Svelte $state widenings — annotate as `<any>`.
+    let refTypeArg = '';
+    if (t.isArrayExpression(s.initializer) && s.initializer.elements.length === 0) {
+      refTypeArg = '<any[]>';
+    } else if (t.isNullLiteral(s.initializer)) {
+      refTypeArg = '<any>';
+    }
     lines.push(`const ${s.name} = ref${refTypeArg}(${genCode(s.initializer)});`);
   }
   return lines;
