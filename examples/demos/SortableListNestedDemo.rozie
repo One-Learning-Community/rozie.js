@@ -1,0 +1,166 @@
+<!--
+  SortableListNestedDemo.rozie — nested SortableList (Kanban board).
+
+  Two layers of drag:
+    - The OUTER SortableList reorders the columns themselves (sharing
+      `group="kanban-columns"`).
+    - Each column hosts an inner SortableList (via the KanbanColumn
+      wrapper) over its own `cards` array. The inner lists share
+      `group="kanban-cards"` so cards drag freely within and between
+      columns; the distinct group from the outer list prevents a column
+      from accidentally landing inside another column.
+
+  KanbanColumn exists for a v1 lvalue reason: `r-model:items="column.cards"`
+  from a slot scope param is a deep member chain that fails ROZ951. The
+  wrapper takes `cards` as a top-level model prop (legal lvalue) and emits
+  `cards-change` when its bound array changes; this consumer listens for
+  the event and immutably updates `$data.columns[columnIndex].cards`.
+
+  The handler closes the cross-component sync loop: when SortableJS moves
+  a card from column A to column B, BOTH columns' KanbanColumns emit
+  `cards-change` (A loses an item, B gains one), and this consumer
+  applies both updates in source order to keep `$data.columns` consistent.
+-->
+
+<rozie name="SortableListNestedDemo">
+
+<components>
+{
+  SortableList: '../SortableList.rozie',
+  KanbanColumn: '../KanbanColumn.rozie',
+}
+</components>
+
+<data>
+{
+  columns: [],
+}
+</data>
+
+<script>
+const SEED_COLUMNS = [
+  {
+    id: 'todo',
+    title: 'To do',
+    cards: [
+      { id: 'c1', label: 'Draft README' },
+      { id: 'c2', label: 'Sketch wireframes' },
+      { id: 'c3', label: 'Spec out the API' },
+    ],
+  },
+  {
+    id: 'doing',
+    title: 'Doing',
+    cards: [
+      { id: 'c4', label: 'Wire up CI' },
+      { id: 'c5', label: 'Build prototype' },
+    ],
+  },
+  {
+    id: 'done',
+    title: 'Done',
+    cards: [
+      { id: 'c6', label: 'Pick a name' },
+    ],
+  },
+];
+
+const reset = () => {
+  // Deep-clone so re-resets restore the seed exactly (cross-column drag
+  // mutates the column objects' cards arrays; without the clone, a second
+  // reset would hand back already-mutated SEED references).
+  $data.columns = SEED_COLUMNS.map((c) => ({ ...c, cards: c.cards.map((card) => ({ ...card })) }))
+}
+
+// Apply a cards-change emit from one column. KanbanColumn's `cards`
+// model:true prop fires this event with the new array each time its
+// SortableList commits a reorder (in-list move OR cross-column add/remove).
+// We update `$data.columns` IMMUTABLY at the matching column index — a
+// top-level $data assignment, which is the allowed write surface in v1.
+const updateColumnCards = (columnId, nextCards) => {
+  $data.columns = $data.columns.map((c) => c.id === columnId ? { ...c, cards: nextCards } : c)
+}
+
+const totalCards = () => $data.columns.reduce((sum, c) => sum + c.cards.length, 0)
+
+$onMount(() => reset());
+</script>
+
+<template>
+<div class="nested-demo">
+  <header>
+    <h3>Nested drag — Kanban</h3>
+    <p class="hint">Drag <em>columns</em> by their title bar to reorder. Drag <em>cards</em> by their handle (⋮⋮) within or between columns. Outer list uses <code>group="kanban-columns"</code>; inner lists share <code>group="kanban-cards"</code>.</p>
+  </header>
+
+  <div class="board">
+    <SortableList r-model:items="$data.columns" group="kanban-columns" itemKey="id">
+      <template #default="{ item: column }">
+        <KanbanColumn
+          :cards="column.cards"
+          :title="column.title"
+          group="kanban-cards"
+          @cards-change="updateColumnCards(column.id, $event)"
+        />
+      </template>
+    </SortableList>
+  </div>
+
+  <footer class="controls">
+    <span class="totals">{{ $data.columns.length }} columns · {{ totalCards() }} cards</span>
+    <button type="button" @click="reset">Reset</button>
+  </footer>
+</div>
+</template>
+
+<style>
+.nested-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  max-width: 960px;
+}
+
+header h3 { margin: 0 0 0.25rem; font-size: 1.125rem; }
+header .hint { margin: 0 0 1rem; color: rgba(0, 0, 0, 0.55); font-size: 0.875rem; }
+header em { font-style: normal; font-weight: 600; color: rgba(0, 0, 0, 0.75); }
+header code {
+  font-family: ui-monospace, monospace;
+  font-size: 0.8125rem;
+  background: rgba(0, 0, 0, 0.04);
+  padding: 0.0625rem 0.25rem;
+  border-radius: 3px;
+}
+
+/* Each rendered column lands inside SortableList's outer wrapper
+   (`<div class="rozie-sortable-list">`). Lay the columns side-by-side
+   on the OUTER list — the inner SortableList(s) inside each KanbanColumn
+   stay vertically stacked (their own `.rozie-sortable-list` re-acquires
+   `display: block` via the inner cascade). */
+.board > .rozie-sortable-list { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; }
+
+.controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 0.75rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.totals {
+  font-size: 0.8125rem;
+  color: rgba(0, 0, 0, 0.5);
+}
+
+.controls button {
+  padding: 0.25rem 0.625rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+}
+</style>
+
+</rozie>

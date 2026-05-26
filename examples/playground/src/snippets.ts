@@ -100,6 +100,28 @@ const BUNDLE_DECLS: readonly BundleDecl[] = [
     dependencyGlobPaths: ['../../SortableList.rozie'],
   },
   {
+    // SortableListPairDemo — two SortableList instances sharing a group;
+    // drag between to move items, both bound arrays update via SortableList's
+    // onAdd / onRemove cluster + module-level transfer slot.
+    key: 'bundle/SortableListPairDemo',
+    label: 'bundle/SortableListPairDemo',
+    entryGlobPath: '../../demos/SortableListPairDemo.rozie',
+    dependencyGlobPaths: ['../../SortableList.rozie'],
+  },
+  {
+    // SortableListNestedDemo — Kanban-style board. Outer SortableList of
+    // columns hosts inner KanbanColumn wrappers, each owning its own
+    // SortableList of cards. Outer + inner use distinct groups so column
+    // reorder and card reorder don't bleed into each other.
+    key: 'bundle/SortableListNestedDemo',
+    label: 'bundle/SortableListNestedDemo',
+    entryGlobPath: '../../demos/SortableListNestedDemo.rozie',
+    dependencyGlobPaths: [
+      '../../SortableList.rozie',
+      '../../KanbanColumn.rozie',
+    ],
+  },
+  {
     key: 'bundle/FlatpickrDemo',
     label: 'bundle/FlatpickrDemo',
     entryGlobPath: '../../demos/FlatpickrDemo.rozie',

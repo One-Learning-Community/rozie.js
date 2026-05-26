@@ -82,6 +82,13 @@ export const EXAMPLES = [
   // behavioral-only (live OSM tiles are non-deterministic — see
   // leaflet-map.spec.ts). All 6 build clean on all 6 targets.
   'SortableList',
+  // SortableList family — drag-between (`SortableListPair`) and Kanban-nesting
+  // (`SortableListNested`) demos paired with the canonical reorder demo. They
+  // exercise SortableList's onAdd/onRemove + module-level transfer slot
+  // (cross-list drag) and SortableList composing with itself + the
+  // KanbanColumn wrapper (cross-column card drag with reorderable columns).
+  'SortableListPair',
+  'SortableListNested',
   'Flatpickr',
   'LeafletMap',
   'TipTap',
@@ -140,6 +147,8 @@ export const LIT_TAGS: Record<Example, string> = {
   PortalListStyled: 'rozie-portal-list-styled',
   // Engine-wrapper demos — canonical kebab tag; the lit entry appends `-demo`.
   SortableList: 'rozie-sortable-list',
+  SortableListPair: 'rozie-sortable-list-pair',
+  SortableListNested: 'rozie-sortable-list-nested',
   Flatpickr: 'rozie-flatpickr',
   LeafletMap: 'rozie-leaflet-map',
   TipTap: 'rozie-tip-tap',
@@ -216,6 +225,8 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // <data> (and seeds it in `$onMount` where needed); the wrappers themselves
   // expose props, but the demo consumers are self-contained, so `{}`.
   SortableList: {},
+  SortableListPair: {},
+  SortableListNested: {},
   Flatpickr: {},
   LeafletMap: {},
   TipTap: {},

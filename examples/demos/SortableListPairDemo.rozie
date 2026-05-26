@@ -1,0 +1,275 @@
+<!--
+  SortableListPairDemo.rozie — two SortableList instances, cross-list drag.
+
+  Companion to SortableListDemo.rozie (which exercises in-list reorder
+  only). This demo proves the cross-list cluster — SortableList's onAdd
+  and onRemove handlers, the module-level transfer slot in
+  examples/sortable-transfer.js, and the host-side state sync — across
+  every target.
+
+  Two lists share `group="kanban"` so SortableJS lets items move between
+  them. Each list two-way-binds its own `$data` array; the demo renders
+  both arrays' state on the right so the cross-list state sync is visible.
+  The same handle ($classSelector('grip')) and item keying as the simpler
+  demo, so the per-target idiom map stays consistent between the two.
+
+  How cross-list state sync works:
+   - SortableJS hands event handlers DOM nodes, not bound data. SortableList
+     stashes the dragged item DATA on `e.item` via `__rozieItem` at drag
+     start; the property rides the element across lists, and the destination
+     list reads it back in `onAdd`.
+   - SortableJS fires `onRemove` on the source and `onAdd` on the dest as
+     two distinct events. Each instance updates its own bound array via
+     the `r-model:items` two-way binding — no central state-management glue
+     needed.
+-->
+
+<rozie name="SortableListPairDemo">
+
+<components>
+{
+  SortableList: '../SortableList.rozie',
+}
+</components>
+
+<data>
+{
+  todo:  [],
+  doing: [],
+}
+</data>
+
+<script>
+const SEED_TODO = [
+  { id: 'a', label: 'Write spec' },
+  { id: 'b', label: 'Build prototype' },
+  { id: 'c', label: 'Sketch UI' },
+];
+
+const SEED_DOING = [
+  { id: 'd', label: 'Ship the demo' },
+  { id: 'e', label: 'Review PR' },
+];
+
+const reset = () => {
+  $data.todo = SEED_TODO
+  $data.doing = SEED_DOING
+}
+
+$onMount(() => reset());
+</script>
+
+<template>
+<div class="pair-demo">
+  <header>
+    <h3>Drag between two lists</h3>
+    <p class="hint">Both lists share <code>group="kanban"</code>. Grab a row by its handle and drop it on the other list — both bound arrays update.</p>
+  </header>
+
+  <div class="grid">
+    <section class="list-pane">
+      <h4 class="list-title">To do <span class="count">({{ $data.todo.length }})</span></h4>
+      <SortableList r-model:items="$data.todo" group="kanban" itemKey="id" :handle="$classSelector('grip')">
+        <template #default="{ item }">
+          <div class="row">
+            <span class="grip" aria-label="Drag handle">⋮⋮</span>
+            <span class="label">{{ item.label }}</span>
+          </div>
+        </template>
+      </SortableList>
+    </section>
+
+    <section class="list-pane">
+      <h4 class="list-title">Doing <span class="count">({{ $data.doing.length }})</span></h4>
+      <SortableList r-model:items="$data.doing" group="kanban" itemKey="id" :handle="$classSelector('grip')">
+        <template #default="{ item }">
+          <div class="row row--doing">
+            <span class="grip" aria-label="Drag handle">⋮⋮</span>
+            <span class="label">{{ item.label }}</span>
+          </div>
+        </template>
+      </SortableList>
+    </section>
+  </div>
+
+  <footer class="controls">
+    <button type="button" @click="reset">Reset</button>
+  </footer>
+
+  <section class="state-pane">
+    <h4>Bound state</h4>
+    <div class="state-grid">
+      <div>
+        <h5>$data.todo</h5>
+        <ol r-if="$data.todo.length > 0" class="state-list">
+          <li r-for="item, index in $data.todo" :key="item.id">
+            <span class="state-index">{{ index + 1 }}.</span>
+            <code>{{ item.id }}</code>
+            <span>{{ item.label }}</span>
+          </li>
+        </ol>
+        <p r-else class="empty">Empty.</p>
+      </div>
+      <div>
+        <h5>$data.doing</h5>
+        <ol r-if="$data.doing.length > 0" class="state-list">
+          <li r-for="item, index in $data.doing" :key="item.id">
+            <span class="state-index">{{ index + 1 }}.</span>
+            <code>{{ item.id }}</code>
+            <span>{{ item.label }}</span>
+          </li>
+        </ol>
+        <p r-else class="empty">Empty.</p>
+      </div>
+    </div>
+  </section>
+</div>
+</template>
+
+<style>
+.pair-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  max-width: 720px;
+}
+
+header h3 { margin: 0 0 0.25rem; font-size: 1.125rem; }
+header .hint { margin: 0 0 1rem; color: rgba(0, 0, 0, 0.55); font-size: 0.875rem; }
+header code {
+  font-family: ui-monospace, monospace;
+  font-size: 0.8125rem;
+  background: rgba(0, 0, 0, 0.04);
+  padding: 0.0625rem 0.25rem;
+  border-radius: 3px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  align-items: start;
+  margin-bottom: 0.75rem;
+}
+
+.list-pane { min-width: 0; }
+
+.list-title {
+  margin: 0 0 0.5rem;
+  font-size: 0.875rem;
+  color: rgba(0, 0, 0, 0.55);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.list-title .count {
+  color: rgba(0, 0, 0, 0.35);
+  font-weight: normal;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: #f5f5f7;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 6px;
+  margin: 0.25rem 0;
+}
+.row--doing { background: #eef4ff; }
+
+.grip {
+  color: rgba(0, 0, 0, 0.35);
+  cursor: grab;
+  user-select: none;
+  font-family: monospace;
+}
+.grip:active { cursor: grabbing; }
+
+.label { flex: 1; }
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+.controls button {
+  padding: 0.25rem 0.625rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.state-pane {
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  padding-top: 0.75rem;
+}
+.state-pane h4 {
+  margin: 0 0 0.5rem;
+  font-size: 0.875rem;
+  color: rgba(0, 0, 0, 0.55);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.state-pane h5 {
+  margin: 0 0 0.25rem;
+  font-size: 0.75rem;
+  font-family: ui-monospace, monospace;
+  color: rgba(0, 0, 0, 0.55);
+  font-weight: normal;
+}
+
+.state-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.state-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.state-list li {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.375rem 0.625rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+}
+.state-list li:last-child { border-bottom: none; }
+.state-index {
+  color: rgba(0, 0, 0, 0.35);
+  font-variant-numeric: tabular-nums;
+  min-width: 1.5rem;
+}
+.state-list code {
+  font-family: ui-monospace, monospace;
+  font-size: 0.75rem;
+  color: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.04);
+  padding: 0.0625rem 0.25rem;
+  border-radius: 2px;
+}
+
+.empty {
+  margin: 0;
+  padding: 0.5rem;
+  color: rgba(0, 0, 0, 0.4);
+  font-style: italic;
+  text-align: center;
+  border: 1px dashed rgba(0, 0, 0, 0.1);
+  border-radius: 6px;
+  font-size: 0.875rem;
+}
+</style>
+
+</rozie>

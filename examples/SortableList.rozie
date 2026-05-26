@@ -59,8 +59,23 @@ $onMount(() => {
     group:     $props.group,
     handle:    $props.handle,
     ...$props.options,
-    onStart: (e) => $emit('start', e),
-    onEnd:   (e) => $emit('end',   e),
+    // Cross-list drag needs to pass the bound DATA — not just the DOM
+    // node — from the source list to the destination. SortableJS hands
+    // event handlers only DOM nodes, so we stash the dragged item DATA
+    // on the dragged element itself via a custom property at drag start.
+    // SortableJS physically moves the same `e.item` element between
+    // lists, so the property travels with it: `onAdd(e)` on the
+    // destination reads `e.item.__rozieItem` to recover the data.
+    onStart: (e) => {
+      e.item.__rozieItem = $props.items[e.oldIndex]
+      $emit('start', e)
+    },
+    onEnd: (e) => {
+      // Clear the stash so a future drag of the SAME DOM element (lit
+      // reuses keyed nodes across renders) can't leak a stale data ref.
+      delete e.item.__rozieItem
+      $emit('end', e)
+    },
     // SortableJS mutates the DOM directly when a drop completes. Every
     // framework reconciler (React/Vue/Svelte/Solid/Lit/Angular) then notices
     // the DOM doesn't match its model on the next render and fights it —
@@ -89,6 +104,35 @@ $onMount(() => {
       // `void 0` on every other target (no-op).
       $reconcileAfterDomMutation()
       $emit('change', { oldIndex: e.oldIndex, newIndex: e.newIndex, item: moved })
+    },
+    // Cross-list — an item from ANOTHER SortableList landed in THIS one.
+    // Same DOM-revert + state-update pattern as onUpdate: remove the
+    // SortableJS-inserted node (the framework re-renders the row from the
+    // new bound state), then splice the dragged item into our model at
+    // e.newIndex. The item DATA was stashed on e.item by the source list's
+    // onStart and traveled with the element when SortableJS moved it.
+    onAdd: (e) => {
+      const moved = e.item.__rozieItem
+      if (moved === undefined) return
+      e.item.remove()
+      const next = [...$props.items]
+      next.splice(e.newIndex, 0, moved)
+      $props.items = next
+      $reconcileAfterDomMutation()
+      $emit('add', { newIndex: e.newIndex, item: moved })
+    },
+    // Cross-list — an item from THIS list moved to another SortableList.
+    // The destination's onAdd handles the insert; THIS handler only needs
+    // to (a) put the dragged DOM node back so the framework's re-render
+    // can remove it cleanly, and (b) splice the item out of our model at
+    // e.oldIndex.
+    onRemove: (e) => {
+      $el.insertBefore(e.item, $el.children[e.oldIndex] ?? null)
+      const next = [...$props.items]
+      const [removed] = next.splice(e.oldIndex, 1)
+      $props.items = next
+      $reconcileAfterDomMutation()
+      $emit('remove', { oldIndex: e.oldIndex, item: removed })
     },
   })
   return () => instance?.destroy()
