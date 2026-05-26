@@ -231,72 +231,100 @@ export async function runBuildMatrix(
     }),
   );
 
-  // ----- Write phase + diagnostic surfacing ----------------------------
-  let failed = 0;
-  for (const { input, target, source, result } of results) {
-    const errors = result.diagnostics.filter((d) => d.severity === 'error');
-    const warnings = result.diagnostics.filter((d) => d.severity === 'warning');
-
-    if (errors.length > 0) {
-      stderrWrite(renderAll(result.diagnostics, source));
-      failed++;
-      continue;
+  // Opt-in prettier pass — degrades to raw output on failure so a
+  // prettier hiccup never blocks an otherwise-correct compile. Captured
+  // in the outer scope so both the parallel matrix loop and the stdout
+  // path can call it without re-allocating per tuple.
+  const maybePretty = async (text: string, name: string): Promise<string> => {
+    if (!wantPretty) return text;
+    const r = await prettyFormat(text, name);
+    if (!r.ok) {
+      stderrWrite(
+        pc.yellow(`[warning] --pretty failed for ${name}: ${r.error}; emitting unformatted\n`),
+      );
     }
-    if (warnings.length > 0) {
-      stderrWrite(renderAll(warnings, source));
-    }
+    return r.formatted;
+  };
 
-    // Helper — opt-in prettier pass; degrades to raw output on failure
-    // so a prettier hiccup never blocks an otherwise-correct compile.
-    // Captured in this scope so it can read wantPretty + stderrWrite.
-    const maybePretty = async (text: string, name: string): Promise<string> => {
-      if (!wantPretty) return text;
-      const r = await prettyFormat(text, name);
-      if (!r.ok) {
-        stderrWrite(
-          pc.yellow(`[warning] --pretty failed for ${name}: ${r.error}; emitting unformatted\n`),
-        );
+  // ----- Write phase (parallel across tuples + parallel per sidecar) ---
+  // The compile phase above is already in Promise.all. Without --pretty,
+  // the write loop is sync filesystem work and parallelism doesn't help
+  // (Node's libuv pool is small). WITH --pretty, every tuple has 1-4
+  // prettier calls that ARE worth parallelizing — at 6 targets × N inputs,
+  // sequential awaiting would dominate. Promise.all both layers so an
+  // N-file × 6-target matrix gets the full benefit.
+  //
+  // Diagnostic-stderr ordering is preserved per-tuple but interleaves
+  // across tuples; that matches the existing compile-phase Promise.all
+  // shape and isn't a regression.
+  const writeResults = await Promise.all(
+    results.map(async ({ input, target, source, result }): Promise<boolean> => {
+      const errors = result.diagnostics.filter((d) => d.severity === 'error');
+      const warnings = result.diagnostics.filter((d) => d.severity === 'warning');
+
+      if (errors.length > 0) {
+        stderrWrite(renderAll(result.diagnostics, source));
+        return true; // failed
       }
-      return r.formatted;
-    };
-
-    if (outDir === null) {
-      // Single-target single-input non-React case routed through stdout
-      // (preserves runBuild backward-compat for vue/svelte/angular).
-      // For stdout, derive the parser hint from the target ext so --pretty
-      // still picks the right parser even though no file is written.
-      const stdoutName = `stdout${TARGET_STDOUT_EXT[target]}`;
-      stdoutWrite(await maybePretty(result.code, stdoutName));
-      continue;
-    }
-
-    const outPath = computeOutputPath(input, target, outDir, rootDir);
-    mkdirSync(pathDirname(outPath), { recursive: true });
-    writeFileSync(outPath, await maybePretty(result.code, outPath), 'utf8');
-
-    // D-90: .d.ts sibling for React (other targets emit '' per D-84)
-    if (wantTypes && target === 'react' && result.types) {
-      const dtsPath = outPath.replace(/\.tsx$/, '.d.ts');
-      writeFileSync(dtsPath, await maybePretty(result.types, dtsPath), 'utf8');
-    }
-    // React .module.css / .global.css siblings (D-53/D-54)
-    if (target === 'react') {
-      if (result.css !== undefined && result.css.length > 0) {
-        const modPath = outPath.replace(/\.tsx$/, '.module.css');
-        writeFileSync(modPath, await maybePretty(result.css, modPath), 'utf8');
+      if (warnings.length > 0) {
+        stderrWrite(renderAll(warnings, source));
       }
-      if (result.globalCss !== undefined && result.globalCss.length > 0) {
-        const globPath = outPath.replace(/\.tsx$/, '.global.css');
-        writeFileSync(globPath, await maybePretty(result.globalCss, globPath), 'utf8');
+
+      if (outDir === null) {
+        // Single-target single-input non-React case routed through stdout
+        // (preserves runBuild backward-compat for vue/svelte/angular).
+        // Derive the parser hint from the target ext so --pretty still
+        // picks the right parser even though no file is written.
+        const stdoutName = `stdout${TARGET_STDOUT_EXT[target]}`;
+        stdoutWrite(await maybePretty(result.code, stdoutName));
+        return false;
       }
-    }
-    // D-91: .map sibling. NEVER prettied — source-map spec requires the
-    // `mappings` VLQ field stay in a specific order that prettier-json
-    // would rearrange. prettyFormat() also skips .map defensively.
-    if (wantSourceMap && result.map) {
-      writeFileSync(`${outPath}.map`, result.map.toString(), 'utf8');
-    }
-  }
+
+      const outPath = computeOutputPath(input, target, outDir, rootDir);
+      mkdirSync(pathDirname(outPath), { recursive: true });
+
+      // Pre-compute sidecar paths + content so we can fire all prettier
+      // calls for this tuple in parallel.
+      const dtsPath =
+        wantTypes && target === 'react' && result.types
+          ? outPath.replace(/\.tsx$/, '.d.ts')
+          : null;
+      const modPath =
+        target === 'react' && result.css !== undefined && result.css.length > 0
+          ? outPath.replace(/\.tsx$/, '.module.css')
+          : null;
+      const globPath =
+        target === 'react' && result.globalCss !== undefined && result.globalCss.length > 0
+          ? outPath.replace(/\.tsx$/, '.global.css')
+          : null;
+
+      const [mainText, dtsText, modText, globText] = await Promise.all([
+        maybePretty(result.code, outPath),
+        dtsPath ? maybePretty(result.types ?? '', dtsPath) : Promise.resolve(null),
+        modPath ? maybePretty(result.css ?? '', modPath) : Promise.resolve(null),
+        globPath ? maybePretty(result.globalCss ?? '', globPath) : Promise.resolve(null),
+      ]);
+
+      // writeFileSync is sync — fine, libuv-bound work would queue here
+      // anyway. Keeping these in source order also keeps the disk-write
+      // failure mode predictable (main artefact lands before sidecars).
+      writeFileSync(outPath, mainText, 'utf8');
+      // D-90: React .d.ts sibling (other targets emit '' per D-84).
+      if (dtsPath !== null && dtsText !== null) writeFileSync(dtsPath, dtsText, 'utf8');
+      // D-53 / D-54: React .module.css / .global.css siblings.
+      if (modPath !== null && modText !== null) writeFileSync(modPath, modText, 'utf8');
+      if (globPath !== null && globText !== null) writeFileSync(globPath, globText, 'utf8');
+      // D-91: .map sibling. NEVER prettied — source-map spec requires the
+      // `mappings` VLQ field stay in a specific order that prettier-json
+      // would rearrange. prettyFormat() also skips .map defensively.
+      if (wantSourceMap && result.map) {
+        writeFileSync(`${outPath}.map`, result.map.toString(), 'utf8');
+      }
+      return false;
+    }),
+  );
+
+  const failed = writeResults.filter(Boolean).length;
 
   if (failed > 0) {
     const msg = pc.red(`rozie build: ${failed} of ${tuples.length} compilation(s) failed\n`);

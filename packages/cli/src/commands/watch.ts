@@ -267,55 +267,72 @@ async function compileOne(
     return;
   }
 
-  const emitted: Target[] = [];
-  let totalErrors = 0;
+  // Parallelize across targets — at 6 simultaneous --target invocations
+  // with --pretty on, sequential await would dominate the per-change
+  // latency. Each target's compile + write is independent (single source
+  // file, target-private output paths). Use Promise.all to fan them out;
+  // collect (target, errorCount) results back into ordered logging.
+  const perTarget = await Promise.all(
+    targets.map(async (target): Promise<{ target: Target; errors: number; emitted: boolean }> => {
+      const result = compile(source, {
+        target,
+        filename: inputAbs,
+        types: wantTypes,
+        sourceMap: wantSourceMap,
+      });
 
-  for (const target of targets) {
-    const result = compile(source, {
-      target,
-      filename: inputAbs,
-      types: wantTypes,
-      sourceMap: wantSourceMap,
-    });
+      const errors = result.diagnostics.filter((d) => d.severity === 'error');
+      const warnings = result.diagnostics.filter((d) => d.severity === 'warning');
 
-    const errors = result.diagnostics.filter((d) => d.severity === 'error');
-    const warnings = result.diagnostics.filter((d) => d.severity === 'warning');
-
-    if (errors.length > 0) {
-      stderrWrite(errors.map((d) => `${renderDiagnostic(d, source)}\n`).join(''));
-      totalErrors += errors.length;
-      continue;
-    }
-    if (warnings.length > 0) {
-      stderrWrite(warnings.map((d) => `${renderDiagnostic(d, source)}\n`).join(''));
-    }
-
-    const outPath = computeOutputPath(inputAbs, target, outDir, rootDir);
-    mkdirSync(pathDirname(outPath), { recursive: true });
-    writeFileSync(outPath, await maybePretty(result.code, outPath), 'utf8');
-
-    // D-90: React .d.ts sidecar. Other targets emit '' per D-84.
-    if (wantTypes && target === 'react' && result.types) {
-      const dtsPath = outPath.replace(/\.tsx$/, '.d.ts');
-      writeFileSync(dtsPath, await maybePretty(result.types, dtsPath), 'utf8');
-    }
-    // D-53/D-54: React .module.css / .global.css sidecars.
-    if (target === 'react') {
-      if (result.css !== undefined && result.css.length > 0) {
-        const modPath = outPath.replace(/\.tsx$/, '.module.css');
-        writeFileSync(modPath, await maybePretty(result.css, modPath), 'utf8');
+      if (errors.length > 0) {
+        stderrWrite(errors.map((d) => `${renderDiagnostic(d, source)}\n`).join(''));
+        return { target, errors: errors.length, emitted: false };
       }
-      if (result.globalCss !== undefined && result.globalCss.length > 0) {
-        const globPath = outPath.replace(/\.tsx$/, '.global.css');
-        writeFileSync(globPath, await maybePretty(result.globalCss, globPath), 'utf8');
+      if (warnings.length > 0) {
+        stderrWrite(warnings.map((d) => `${renderDiagnostic(d, source)}\n`).join(''));
       }
-    }
-    // D-91: .map sibling. NEVER prettied (source-map spec field ordering).
-    if (wantSourceMap && result.map) {
-      writeFileSync(`${outPath}.map`, result.map.toString(), 'utf8');
-    }
-    emitted.push(target);
-  }
+
+      const outPath = computeOutputPath(inputAbs, target, outDir, rootDir);
+      mkdirSync(pathDirname(outPath), { recursive: true });
+
+      // Pre-compute sidecar paths so we can fire all per-tuple prettier
+      // calls in parallel (mirrors the build.ts shape).
+      const dtsPath =
+        wantTypes && target === 'react' && result.types
+          ? outPath.replace(/\.tsx$/, '.d.ts')
+          : null;
+      const modPath =
+        target === 'react' && result.css !== undefined && result.css.length > 0
+          ? outPath.replace(/\.tsx$/, '.module.css')
+          : null;
+      const globPath =
+        target === 'react' && result.globalCss !== undefined && result.globalCss.length > 0
+          ? outPath.replace(/\.tsx$/, '.global.css')
+          : null;
+
+      const [mainText, dtsText, modText, globText] = await Promise.all([
+        maybePretty(result.code, outPath),
+        dtsPath ? maybePretty(result.types ?? '', dtsPath) : Promise.resolve(null),
+        modPath ? maybePretty(result.css ?? '', modPath) : Promise.resolve(null),
+        globPath ? maybePretty(result.globalCss ?? '', globPath) : Promise.resolve(null),
+      ]);
+
+      writeFileSync(outPath, mainText, 'utf8');
+      if (dtsPath !== null && dtsText !== null) writeFileSync(dtsPath, dtsText, 'utf8');
+      if (modPath !== null && modText !== null) writeFileSync(modPath, modText, 'utf8');
+      if (globPath !== null && globText !== null) writeFileSync(globPath, globText, 'utf8');
+      if (wantSourceMap && result.map) {
+        writeFileSync(`${outPath}.map`, result.map.toString(), 'utf8');
+      }
+      return { target, errors: 0, emitted: true };
+    }),
+  );
+
+  // Aggregate ordered by the original target list so the log line is
+  // stable across runs (Promise.all preserves array index order in its
+  // result, so perTarget[i].target === targets[i]).
+  const emitted: Target[] = perTarget.filter((r) => r.emitted).map((r) => r.target);
+  const totalErrors = perTarget.reduce((acc, r) => acc + r.errors, 0);
 
   const ms = Date.now() - startedAt;
   const path = displayPath(inputAbs, rootDir);
