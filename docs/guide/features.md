@@ -510,6 +510,62 @@ Need a more specific selector — a descendant or compound selector? The escape 
 `$classSelector('drag-handle')` then resolves correctly on all six targets. The empty rule survives to the emitted CSS but produces no visual style — it exists purely so the class is a declared, scoped, hashable token.
 :::
 
+## `r-external` and `$reconcileAfterDomMutation()` — DOM the framework doesn't own
+
+Engine wrappers — SortableJS, TipTap, Leaflet, FullCalendar, Mapbox, Uppy, … — share an awkward property: the engine physically mutates the DOM (moves nodes, swaps subtrees, paints over a `<canvas>`) under the same `<div>` the framework thinks it controls. The two pictures of the DOM diverge, and the framework's keyed reconciler picks a fight with the engine's node moves on the next render.
+
+Five of the six targets (Vue, React, Svelte, Solid, Angular) cope with this natively — their reconcilers diff against `parent.children` at patch time, so an `e.item.remove() + parent.insertBefore(e.item, …)` "revert the engine's move before writing the new model state" dance is enough. Lit is the exception: lit-html's `repeat` directive keys its parts cache by sentinel-comment node identity, not by a live DOM scan, and the engine's mutations move rendered elements relative to those sentinels in a way the in-source revert can't unwind. Two complementary mechanisms close that gap:
+
+```rozie
+<template>
+  <div class="rozie-sortable-list" r-external>
+    <div r-for="item in $props.items" :key="item.id">
+      <slot :item="item" />
+    </div>
+  </div>
+</template>
+
+<script>
+import SortableJS from 'sortablejs'
+
+let instance = null
+
+$onMount(() => {
+  instance = new SortableJS($el, {
+    onUpdate: (e) => {
+      e.item.remove()
+      $el.insertBefore(e.item, $el.children[e.oldIndex] ?? null)
+      const next = [...$props.items]
+      const [moved] = next.splice(e.oldIndex, 1)
+      next.splice(e.newIndex, 0, moved)
+      $props.items = next
+      $reconcileAfterDomMutation()
+    },
+  })
+  return () => instance?.destroy()
+})
+</script>
+```
+
+**`r-external`** is a template-side marker. It tells the compiler "third-party code may mutate the children of this element — when something asks to rebuild, rebuild the children but leave THIS element alone." The marker goes on the DOM container the engine binds to. Authors apply it once where the engine attaches; the rest of the template is unaffected.
+
+**`$reconcileAfterDomMutation()`** is the script-side trigger. Call it once at the end of any handler that runs after the engine mutated the DOM (the canonical pattern is the SortableJS `onUpdate` handler, after `$props.items = next`). It tells the framework "the DOM I just touched is out of sync with what you think it is — rebuild now."
+
+The pair is intentional separation: `r-external` is the **location** ("rebuild HERE"); the sigil is the **trigger** ("rebuild NOW"). Without the marker the sigil has nowhere to act; without the sigil the marker never fires.
+
+Per-target lowering:
+
+| Target | `r-external` emit effect | `$reconcileAfterDomMutation()` |
+| --- | --- | --- |
+| Vue / React / Svelte / Solid / Angular | none — marker stripped during lowering | `void 0` (no-op) |
+| Lit | children wrapped in `keyed(this._rozieReconcileSeq ?? 0, …)`; the marked element itself stays outside the wrap | bumps `_rozieReconcileSeq`, calls `requestUpdate()` — `keyed` then disposes stale children and rebuilds with a fresh sentinel structure |
+
+Authors targeting only one framework can leave the marker and sigil in place at zero cost — Lit-specific behavior is gated entirely on the marker's presence, and the other five targets emit byte-identically with or without it.
+
+::: warning When NOT to reach for this
+The marker and sigil are escape hatches, not a default. Use them only when a third-party engine actually mutates DOM your component owns. Calling the sigil on every state change on Lit forces a child-tree rebuild and defeats lit-html's keyed diffing; the marker by itself is cheap, but the pairing has a real per-call cost. If you're not integrating with an engine that touches the DOM, you don't need either.
+:::
+
 ## `r-bind` / `r-on` — object-spread directives and root-element fallthrough
 
 Component-library wrappers usually want to forward "everything else" — every attribute the consumer set, every listener they bound — onto a real DOM element inside the component. That work today dominates the maintenance budget of cross-framework UI libraries: every wrapper hand-threads `id`, `aria-*`, `data-*`, styles, `class`, and event handlers through a different idiom in each target. Rozie collapses that into two object-spread directives plus two magic accessors.

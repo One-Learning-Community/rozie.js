@@ -347,6 +347,32 @@ describe('Rozie TextMate grammar — directives & r-model modifier chains', () =
     );
     expect(tok, 'expected $listeners to carry the magic-identifier scope').toBeDefined();
   });
+
+  // `r-external` (2026-05-25) — engine-wrapper host marker. Bare directive
+  // form (no value); the grammar's optional `(?:(=)(\"|'))?` quote group
+  // skips when the attribute carries no `=` token, so the directive name
+  // still tokenizes with the directive scope. Inline-tokenized for the
+  // same reason as $attrs / $listeners / $event above — the assertion is
+  // "the regex matches" and adding a new fixture would be over-spec'd.
+  it('scopes r-external as a directive (engine-wrapper host marker)', () => {
+    const source = [
+      '<rozie name="X">',
+      '<template>',
+      '<div class="host" r-external>',
+      '  <div r-for="item in $props.items" :key="item">{{ item }}</div>',
+      '</div>',
+      '</template>',
+      '</rozie>',
+    ].join('\n');
+    const tokens = tokenizeAll(source);
+
+    const tok = tokens.find(
+      (t) =>
+        t.text === 'r-external' &&
+        t.scopes.some((s) => s.includes('entity.other.attribute-name.directive.rozie')),
+    );
+    expect(tok, 'expected r-external to carry the directive scope').toBeDefined();
+  });
 });
 
 describe('Rozie TextMate grammar — <script lang="ts"> routing', () => {

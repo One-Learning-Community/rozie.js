@@ -355,8 +355,8 @@
       }
     },
     "directive-attribute": {
-      "comment": "Captures: 1=directive name (`r-model`), 2=`:`, 3=argument propName (`open` in `r-model:open`), 4=`.modifier` chain (`r-model.lazy.number.trim`, Phase 12), 5=`=`, 6=opening quote. `r-match`/`r-case`/`r-default` are the Phase 11 switch-style conditionals. The argument-form (`r-model:propName=`, Phase 07.3 consumer-side two-way binding) and the modifier chain are semantically `r-model`-only, but the regex permits both on any directive — the parser rejects unsupported pairings semantically (ROZ961/ROZ962). The chain regex mirrors #event-binding so `.modifier(args)` forms tokenize identically.",
-      "begin": "\\b(r-(?:for|if|else-if|else|show|model|html|text|bind|on|match|case|default))(?:(:)([A-Za-z][\\w-]*))?((?:\\.[A-Za-z][\\w-]*(?:\\([^)]*\\))?)*)(?:(=)(\"|'))?",
+      "comment": "Captures: 1=directive name (`r-model`), 2=`:`, 3=argument propName (`open` in `r-model:open`), 4=`.modifier` chain (`r-model.lazy.number.trim`, Phase 12), 5=`=`, 6=opening quote. `r-match`/`r-case`/`r-default` are the Phase 11 switch-style conditionals. `r-external` (2026-05-25) is the engine-wrapper host marker — valueless bare directive that the optional `(?:(=)(\"|'))?` group permits via match-as-no-value. The argument-form (`r-model:propName=`, Phase 07.3 consumer-side two-way binding) and the modifier chain are semantically `r-model`-only, but the regex permits both on any directive — the parser rejects unsupported pairings semantically (ROZ961/ROZ962). The chain regex mirrors #event-binding so `.modifier(args)` forms tokenize identically.",
+      "begin": "\\b(r-(?:for|if|else-if|else|show|model|html|text|bind|on|match|case|default|external))(?:(:)([A-Za-z][\\w-]*))?((?:\\.[A-Za-z][\\w-]*(?:\\([^)]*\\))?)*)(?:(=)(\"|'))?",
       "end": "(?:(\\6)|(?<=[^=])(?=\\s|/?>))",
       "beginCaptures": {
         "1": { "name": "entity.other.attribute-name.directive.rozie" },

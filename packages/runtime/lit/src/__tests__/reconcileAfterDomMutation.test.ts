@@ -21,12 +21,18 @@ import {
   type ReconcilableHost,
 } from '../reconcileAfterDomMutation.js';
 
-function mockHost(initialSeq?: number): ReconcilableHost & {
-  requestUpdate: ReturnType<typeof vi.fn>;
-} {
+interface MockHost extends ReconcilableHost {
+  requestUpdate: ReturnType<typeof vi.fn<() => void>>;
+}
+
+function mockHost(initialSeq?: number): MockHost {
+  // `exactOptionalPropertyTypes: true` forbids assigning `undefined` to an
+  // optional field — spread the key in only when present so the
+  // initial-seq=undefined case matches the "field absent" runtime shape the
+  // helper expects.
   return {
-    _rozieReconcileSeq: initialSeq,
-    requestUpdate: vi.fn(),
+    ...(initialSeq !== undefined ? { _rozieReconcileSeq: initialSeq } : {}),
+    requestUpdate: vi.fn<() => void>(),
   };
 }
 
@@ -60,14 +66,19 @@ describe('__rozieReconcileAfterDomMutation', () => {
     // drain any cleanups, or otherwise mutate the host beyond the documented
     // surface. A future change that adds side effects would need an explicit
     // test update — preventing a silent regression of the contract.
-    const host = mockHost(5) as ReconcilableHost & Record<string, unknown>;
-    host.disconnectedCallback = vi.fn();
-    host.connectedCallback = vi.fn();
+    const base = mockHost(5);
+    const host = base as unknown as MockHost & {
+      disconnectedCallback: ReturnType<typeof vi.fn<() => void>>;
+      connectedCallback: ReturnType<typeof vi.fn<() => void>>;
+      renderRoot: HTMLElement;
+    };
+    host.disconnectedCallback = vi.fn<() => void>();
+    host.connectedCallback = vi.fn<() => void>();
     host.renderRoot = document.createElement('div');
     __rozieReconcileAfterDomMutation(host);
     expect(host.disconnectedCallback).not.toHaveBeenCalled();
     expect(host.connectedCallback).not.toHaveBeenCalled();
-    expect((host.renderRoot as HTMLElement).childNodes.length).toBe(0);
+    expect(host.renderRoot.childNodes.length).toBe(0);
     expect(host._rozieReconcileSeq).toBe(6);
   });
 });
