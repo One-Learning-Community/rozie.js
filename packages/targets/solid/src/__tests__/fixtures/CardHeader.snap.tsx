@@ -12,7 +12,7 @@ interface CardHeaderProps {
 }
 
 export default function CardHeader(_props: CardHeaderProps): JSX.Element {
-  const _merged = mergeProps({ title: '' }, _props);
+  const _merged = mergeProps({ title: '', onClose: null }, _props);
   const [local, attrs] = splitProps(_merged, ['title', 'onClose']);
 
   return (

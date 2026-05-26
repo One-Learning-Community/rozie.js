@@ -290,11 +290,20 @@ export function emitScript(
   // 1. createControllableSignal for model:true props (D-135).
   // 1b. mergeProps call for non-model props with declared defaults.
   //     Must be emitted in shell BEFORE splitPropsCall so `local.*` gets defaults.
-  // Exclude NullLiteral defaults (`default: null`) — `null` and `undefined` are
-  // both falsy; including `null` in mergeProps would cause TypeScript type
-  // mismatches for optional function props typed as `T | undefined`.
+  //
+  // Phase 16 R1 / D-01 / D-02 — include null/NullLiteral defaults. The prior
+  // `!t.isNullLiteral(p.defaultValue)` exclusion dropped `default: null` props
+  // from mergeProps, leaving them as `undefined` for an empty consumer call.
+  // SPEC R1 requires `undefined → declaredDefault` uniform across all 6
+  // targets including for `default: null`. mergeProps preserves null as a
+  // distinct value from undefined (mergeProps's right-hand `_props` wins ONLY
+  // when its key is defined; an absent key falls through to the left-hand
+  // defaults object). Factory invocation `(${raw})()` already gives D-02
+  // once-per-instance behavior because mergeProps runs ONCE at component
+  // setup — no additional caching needed (verified Plan 16-01 RESEARCH §
+  // Standard Stack Solid finding).
   const nonModelDefaultProps = ir.props.filter(
-    (p) => !p.isModel && p.defaultValue !== null && !t.isNullLiteral(p.defaultValue),
+    (p) => !p.isModel && p.defaultValue !== null,
   );
   let mergePropsCall: string | null = null;
   if (nonModelDefaultProps.length > 0) {

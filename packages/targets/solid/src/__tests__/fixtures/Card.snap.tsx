@@ -15,7 +15,7 @@ interface CardProps {
 }
 
 export default function Card(_props: CardProps): JSX.Element {
-  const _merged = mergeProps({ title: '' }, _props);
+  const _merged = mergeProps({ title: '', onClose: null }, _props);
   const [local, attrs] = splitProps(_merged, ['title', 'onClose', 'children']);
   const resolved = children(() => local.children);
 

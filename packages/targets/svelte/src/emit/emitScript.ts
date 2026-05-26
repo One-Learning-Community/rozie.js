@@ -79,6 +79,14 @@ function genCode(node: t.Node): string {
 }
 
 /**
+ * Phase 16 D-02 — Capitalize the first letter for `__default<Capitalized>`
+ * factory-default cache name (e.g. prop `items` → `__defaultItems`).
+ */
+function capitalize(name: string): string {
+  return name.length === 0 ? name : name[0]!.toUpperCase() + name.slice(1);
+}
+
+/**
  * Phase 14.1 follow-up — does any element in the IR template carry a
  * `spreadBinding` attribute? The Plan 14-05 gates at three sites in this
  * module only synthesise the `...__rozieAttrs` destructure (and its
@@ -334,17 +342,24 @@ function buildPropsDestructureEntries(ir: IRComponent): string[] {
       }
       entries.push(`${p.name} = $bindable(${inner})`);
     } else if (dflt !== null) {
-      // Mirror the React/Vue idiom: a `default: () => ({...})` factory MUST be
-      // invoked at destructure time so the prop value is the produced object,
-      // not the function itself. Without this, `node = () => ({...})` typed
-      // as `Object` makes `node.label` fail under svelte-check (the local is
-      // the factory, not the value). Literal/identifier defaults pass through
-      // verbatim.
+      // Phase 16 D-02 — for factory defaults (() => [], () => ({...})), use the
+      // module-init cached value `__default<Capitalized>` rather than re-
+      // invoking the factory at every props re-read. The cache prelude lines
+      // are emitted by `buildPropsFactoryDefaultPrelude` and inserted before
+      // the destructure in `emitPropsBlock`. This is the once-per-instance
+      // contract (mirrors Vue 3's withDefaults factory-default semantics).
+      //
+      // Without this change the destructure `let { e = (() => [])() } = $props()`
+      // re-runs the factory on every render, breaking `props.e === props.e`
+      // reference-equality across renders — the SortableList canary surface
+      // for SPEC R1 D-02.
+      //
+      // Literal/identifier/null/primitive defaults pass through verbatim.
       const isFactory =
         p.defaultValue !== null &&
         (t.isArrowFunctionExpression(p.defaultValue) ||
           t.isFunctionExpression(p.defaultValue));
-      const value = isFactory ? `(${dflt})()` : dflt;
+      const value = isFactory ? `__default${capitalize(p.name)}` : dflt;
       entries.push(`${p.name} = ${value}`);
     } else {
       // No default — bare destructure (Svelte will leave undefined).
@@ -430,6 +445,33 @@ function emitSlotDerivedMerges(ir: IRComponent): string[] {
 }
 
 /**
+ * Phase 16 D-02 — Build module-init factory-default cache prelude lines.
+ *
+ * For each non-model prop whose `default:` is an arrow / function expression,
+ * emit `let __default<Capitalized> = (<factory>)();` so the destructure can
+ * reference the cached value rather than re-invoking the factory on every
+ * props re-read. This is the once-per-instance contract — `props.e ===
+ * props.e` across consecutive renders (matches Vue 3's withDefaults
+ * factory-default semantics).
+ *
+ * Empty array when no factory-default props are present.
+ */
+function buildPropsFactoryDefaultPrelude(ir: IRComponent): string[] {
+  const lines: string[] = [];
+  for (const p of ir.props) {
+    if (p.isModel) continue;
+    if (p.defaultValue === null) continue;
+    if (
+      !t.isArrowFunctionExpression(p.defaultValue) &&
+      !t.isFunctionExpression(p.defaultValue)
+    ) continue;
+    const raw = genCode(p.defaultValue);
+    lines.push(`let __default${capitalize(p.name)} = (${raw})();`);
+  }
+  return lines;
+}
+
+/**
  * Emit the Props interface + destructure block. Returns an empty string when
  * there are no props AND no slots.
  */
@@ -458,6 +500,10 @@ function emitPropsBlock(ir: IRComponent): string {
   const entries = buildPropsDestructureEntries(ir);
   // Phase 07.3.1 D-SV-16 — per-slot merge lines spliced after the destructure.
   const mergeLines = emitSlotDerivedMerges(ir);
+  // Phase 16 D-02 — factory-default cache prelude (`let __defaultX =
+  // (<factory>)();` per factory-default prop). Emitted BEFORE the destructure
+  // so the destructure can reference the cached name.
+  const factoryDefaultPrelude = buildPropsFactoryDefaultPrelude(ir);
 
   const interfaceBlock = `interface Props {\n${fields.join('\n')}\n}`;
 
@@ -474,8 +520,12 @@ function emitPropsBlock(ir: IRComponent): string {
     destructure = `let {\n  ${entries.join(',\n  ')}\n}: Props = $props();`;
   }
 
+  const preludeBlock =
+    factoryDefaultPrelude.length > 0
+      ? `${factoryDefaultPrelude.join('\n')}\n\n`
+      : '';
   const mergeBlock = mergeLines.length > 0 ? `\n\n${mergeLines.join('\n')}` : '';
-  return `${interfaceBlock}\n\n${destructure}${mergeBlock}`;
+  return `${interfaceBlock}\n\n${preludeBlock}${destructure}${mergeBlock}`;
 }
 
 /**

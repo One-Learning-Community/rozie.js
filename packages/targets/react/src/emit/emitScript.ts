@@ -1591,26 +1591,59 @@ export function emitScript(
   //     `default<Name>` seed prop rather than this rebind. shell.ts uses the function
   //     parameter name `_props` whenever `propsDefaultsBlock` is non-empty.
   //
-  // 2026-05-18 — `null`-default props are filtered out (mirrors Solid commit
-  // 536575a). `default: null` in a Rozie <props> block is a "no default; treat
-  // as optional null sentinel" form; emitting `name: _props.name ?? null` here
-  // would assign `null` to a `((...args)=>any)|undefined` slot and trip TS2322
-  // under tests/react-typecheck. The prop stays bound to `_props.name` (the
-  // spread copies it through unchanged).
+  // Phase 16 R1 / D-01 / D-02 — include `default: null` and all primitive
+  // defaults (0 / '' / false). The prior `!t.isNullLiteral` filter dropped
+  // null-default props so an empty consumer call read `undefined` (not the
+  // declared `null`) — divergent from Vue/Angular. Null IS the declared
+  // default; assigning null is the intended semantic. For factory defaults
+  // (() => [] / () => ({})) emit a `useRef(() => (<factory>)()).current`
+  // hoist line BEFORE the merged-`props` block so the cached value is
+  // referenced by the coalesce. This is the D-02 once-per-instance contract
+  // (matches Vue 3's withDefaults factory-default behavior). The previous
+  // inline `(<factory>)()` form re-invoked the factory on every render,
+  // breaking referential equality across renders.
   const defaultedNonModelProps = ir.props.filter(
-    (p) => !p.isModel && p.defaultValue !== null && !t.isNullLiteral(p.defaultValue),
+    (p) => !p.isModel && p.defaultValue !== null,
   );
   let propsDefaultsBlock = '';
   if (defaultedNonModelProps.length > 0) {
+    // Step 1 — for FACTORY defaults, emit `const __default<X> = useRef(() =>
+    // (<factory>)()).current;` BEFORE the merged-`props` block. The ref's
+    // initializer arg is invoked exactly once at mount time and the cached
+    // value is reused across the instance's lifetime (D-02 once-per-instance).
+    const factoryDefaultProps = defaultedNonModelProps.filter(
+      (p) =>
+        t.isArrowFunctionExpression(p.defaultValue!) ||
+        t.isFunctionExpression(p.defaultValue!),
+    );
+    if (factoryDefaultProps.length > 0) {
+      collectors.react.add('useState');
+      for (const p of factoryDefaultProps) {
+        const raw = genCode(p.defaultValue!);
+        const cachedName = `__default${capitalize(p.name)}`;
+        // `useState(() => factory())[0]` is the React-idiomatic once-per-
+        // instance lazy-init pattern (React docs: "If you pass a function to
+        // useState, React will only call it during the initial render").
+        // The setter is dropped because the cached value never changes.
+        // useRef(() => factory()) would NOT work — useRef stores its first
+        // arg verbatim (the factory function), not its invocation result.
+        hookLines.push(
+          `const ${cachedName} = useState(() => (${raw})())[0];`,
+        );
+      }
+    }
     const defaultLines = defaultedNonModelProps.map((p) => {
-      // Reuse the same arrow-factory invocation logic as the model branch:
-      // `() => []` defaults are factory-invoked to avoid shared-mutable state.
-      const raw = genCode(p.defaultValue!);
-      const isFactoryArrow =
-        t.isArrowFunctionExpression(p.defaultValue!) &&
-        (t.isArrayExpression(p.defaultValue!.body) ||
-          t.isObjectExpression(p.defaultValue!.body));
-      const dflt = isFactoryArrow ? `(${raw})()` : raw;
+      const isFactory =
+        t.isArrowFunctionExpression(p.defaultValue!) ||
+        t.isFunctionExpression(p.defaultValue!);
+      let dflt: string;
+      if (isFactory) {
+        dflt = `__default${capitalize(p.name)}`;
+      } else {
+        // Primitive default — emit the literal expression in the coalesce
+        // operand (null / 0 / '' / false / identifier / member expr / etc.).
+        dflt = genCode(p.defaultValue!);
+      }
       return `  ${p.name}: _props.${p.name} ?? ${dflt},`;
     });
     // 2026-05-18 — Override defaulted fields as REQUIRED in the merged `props`
@@ -1619,10 +1652,20 @@ export function emitScript(
     // fields keep the interface's optional-marker. Without this override, the
     // declared type was bare `${ir.name}Props` and TS treated `..._props` spread
     // as "still optional" → every `props.step + 1` arithmetic was an error.
+    //
+    // Phase 16 — for `default: null` props, widen the override type with
+    // `| null` so the merged-props type accepts null as a legal value
+    // (mirrors Svelte's `(${typeText}) | null` widening at svelte/
+    // emit/emitScript.ts:232). Without this widening,
+    // `{ a: ((...args)=>any) | null }` would fail to narrow from
+    // `_props.a ?? null` for `((...args)=>any) | undefined` slots.
     const requiredOverride = defaultedNonModelProps
       .map((p) => {
         const tsTypeForOverride = renderPropTypeForOverride(p);
-        return `${p.name}: ${tsTypeForOverride}`;
+        const widened = t.isNullLiteral(p.defaultValue!)
+          ? `(${tsTypeForOverride}) | null`
+          : tsTypeForOverride;
+        return `${p.name}: ${widened}`;
       })
       .join('; ');
     const mergedType = `${ir.name}Props & { ${requiredOverride} }`;
