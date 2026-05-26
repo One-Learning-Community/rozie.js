@@ -357,6 +357,19 @@ export interface SlotFillerDecl {
 export interface ParamDecl {
   type: 'ParamDecl';
   name: string;
+  /**
+   * Local-binding rename: when the consumer wrote `{ key: localName }`,
+   * `name === 'key'` and `bindAs === 'localName'`. Absent for the shorthand
+   * `{ key }` form (where the local binding IS `key`).
+   *
+   * Emitters honor `bindAs` when rendering destructure patterns:
+   *   - JS-destructure shape (React/Vue/Svelte/Solid/Lit): `{ name: bindAs }`
+   *   - Angular `let-` shape: `let-<bindAs>="<name>"`
+   *
+   * Producer-side validation (threadParamTypes ROZ947) continues to match
+   * against `name` (the producer's slot-key), NOT `bindAs` (consumer-local).
+   */
+  bindAs?: string;
   valueExpression: Expression;
   sourceLoc: SourceLoc;
 }

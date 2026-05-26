@@ -129,15 +129,17 @@ function parseFillDirectiveName(
  * binding identifier.
  *
  * Wraps the raw value in parens to coerce object-pattern context for the
- * Babel parser. Bindings that aren't simple object-properties (e.g., spreads,
- * computed keys, renamed shorthands like `{ close: closeModal }`) are silently
- * skipped — the consumer's intent is unambiguous only for the simple `{ a, b }`
- * shorthand shape; threadParamTypes later validates the param names against
- * the producer SlotDecl.params for ROZ947.
+ * Babel parser. Two supported shapes:
  *
- * When properties are present but ALL of them are non-simple (i.e. none
- * survived the filter), ROZ948 `SCOPED_PARAMS_ALL_DROPPED` is emitted so the
- * author gets actionable feedback rather than a silent empty-params result.
+ *   - Shorthand `{ key }`           → ParamDecl{ name: 'key', bindAs: undefined }
+ *   - Identifier rename `{ key: localName }`
+ *                                   → ParamDecl{ name: 'key', bindAs: 'localName' }
+ *
+ * Bindings with non-Identifier values (object/array patterns, computed keys,
+ * spreads, default expressions) are silently dropped and contribute to the
+ * ROZ948 `SCOPED_PARAMS_ALL_DROPPED` diagnostic when every property is
+ * non-simple. Producer-side validation (threadParamTypes ROZ947) matches on
+ * `name` only.
  */
 function parseScopedParams(
   rawValue: string | null,
@@ -153,9 +155,25 @@ function parseScopedParams(
       if (prop.type !== 'ObjectProperty') continue;
       if (prop.computed) continue;
       if (!t.isIdentifier(prop.key)) continue;
+      // Rename shape `{ key: localName }`: prop.shorthand === false AND
+      // value is a plain Identifier. Capture `localName` as bindAs.
+      // Non-identifier values (object pattern, default expression) fall
+      // through to the drop path → contributes to ROZ948.
+      let bindAs: string | undefined;
+      if (prop.shorthand === false) {
+        if (t.isIdentifier(prop.value)) {
+          bindAs = prop.value.name;
+        } else {
+          // Non-identifier value → drop the param entirely (consumer wrote
+          // something we can't faithfully thread through, e.g. nested
+          // destructure `{ item: { nested } }` or default `{ item = 0 }`).
+          continue;
+        }
+      }
       params.push({
         type: 'ParamDecl',
         name: prop.key.name,
+        ...(bindAs !== undefined ? { bindAs } : {}),
         // Identity binding — the param's value-expression in scope is itself.
         // threadParamTypes attaches paramTypes; emitters generate `{ a, b }` /
         // `({ a, b }) => …` per target.
@@ -164,7 +182,7 @@ function parseScopedParams(
       });
     }
     // ROZ948: non-empty destructure where every property was non-simple (spread,
-    // computed key, or renamed shorthand like `{ close: closeModal }`). The
+    // computed key, nested destructure value, or default expression). The
     // author wrote a params expression but will get zero bindings — warn so the
     // failure is visible rather than silent.
     if (expr.properties.length > 0 && params.length === 0) {
@@ -172,10 +190,9 @@ function parseScopedParams(
         code: RozieErrorCode.SCOPED_PARAMS_ALL_DROPPED,
         severity: 'warning',
         message:
-          `Scoped-slot params "${rawValue}" contains no simple shorthand bindings ` +
-          `(e.g. spreads, computed keys, or renamed properties like { close: closeModal } are not supported). ` +
-          `Only simple destructure bindings { a, b } are threaded through to emitters. ` +
-          `Rename the binding to use the slot param name directly (e.g. \`#header="{ close }"\`).`,
+          `Scoped-slot params "${rawValue}" contains no simple bindings ` +
+          `(spreads, computed keys, nested destructure values, or default expressions are not supported). ` +
+          `Only simple destructure bindings { a, b } or identifier renames { a: localA } are threaded through to emitters.`,
         loc: valueLoc,
       });
     }
