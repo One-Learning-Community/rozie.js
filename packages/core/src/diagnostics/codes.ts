@@ -330,6 +330,16 @@ export const RozieErrorCode = {
   // catch errors. SPEC R9/R10.
   RESTORE_FOCUS_NON_LITERAL_SELECTOR: 'ROZ975', // error — SPEC R9: $restoreFocus first arg is not a string literal
   RESTORE_FOCUS_BAD_ARITY:            'ROZ976', // error — SPEC R9: $restoreFocus called with wrong number of arguments
+
+  // ---- compile() empty-code guard — ROZ977 ----
+  // Fail-loud sentinel for the "silent compile failure" anti-pattern: if
+  // `compile()` is about to return `code: ''` with NO error-level diagnostics
+  // already in the bag, emit this code so consumers see an explicit signal
+  // instead of an empty string. The trigger surfaced in 260526-uj3: a parser
+  // bug silently dropped a required block, downstream emit produced empty
+  // output, and the failure was invisible until the docs build crashed with
+  // a generic ROZ500. This is the safety net.
+  COMPILE_EMPTY_CODE_NO_DIAGNOSTICS:  'ROZ977', // error — internal: compile() emit produced empty code with no error diagnostics (parser/lowerer/emitter internal failure)
 } as const;
 
 export type RozieErrorCode = (typeof RozieErrorCode)[keyof typeof RozieErrorCode];

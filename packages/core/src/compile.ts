@@ -197,6 +197,34 @@ export function compile(source: string, opts: CompileOptions): CompileResult {
     diagnostics,
   });
 
+  /**
+   * Final-return guard (ROZ977). When a per-target emitter returns `code: ''`
+   * but no error-level diagnostic was recorded along the way, the consumer
+   * has no signal that the compile failed — surfaced as silent docs/build
+   * failures during 260526-uj3. This guard appends an explicit ROZ977 so
+   * the failure is loud and consumers (CLI, unplugin, docs builds) get a
+   * diagnostic they can print or fail-build on. Cheap O(N) scan over the
+   * accumulator on a path that runs at most once per compile.
+   */
+  const guardEmpty = (result: CompileResult): CompileResult => {
+    if (result.code !== '') return result;
+    if (result.diagnostics.some((d) => d.severity === 'error')) return result;
+    return {
+      ...result,
+      diagnostics: [
+        ...result.diagnostics,
+        {
+          code: 'ROZ977',
+          severity: 'error',
+          message:
+            'compile() produced empty code with no error diagnostics — likely an internal parser/lowerer/emitter failure. Common cause: malformed `.rozie` source (unmatched block tags, missing <template>, etc).',
+          loc: { start: 0, end: 0 },
+          ...(filename !== undefined ? { filename } : {}),
+        },
+      ],
+    };
+  };
+
   // 1. parse
   // exactOptionalPropertyTypes:true — conditional spread on `filename` (Phase 1 convention).
   const { ast, diagnostics: parseDiags } = parse(
@@ -218,7 +246,10 @@ export function compile(source: string, opts: CompileOptions): CompileResult {
   // re-runs the compile to discover ROZ950 below it — the classic "fix one
   // error, hit the next" loop. Fail-fast still applies on a missing IR.
   if (!ir) {
-    return fail(acc);
+    // Route through guardEmpty so a no-IR-no-diagnostic path (e.g.
+    // `<rozie></rozie>` with no body — lowerToIR returns no IR but emits
+    // no diagnostic) still surfaces ROZ977 instead of silently empty output.
+    return guardEmpty(fail(acc));
   }
 
   // 2.5. Phase 07.2 — thread producer paramTypes onto consumer SlotFillerDecl.
@@ -287,13 +318,13 @@ export function compile(source: string, opts: CompileOptions): CompileResult {
   switch (opts.target) {
     case 'vue': {
       const r = emitVue(ir, emitOpts);
-      return {
+      return guardEmpty({
         code: r.code,
         map: wantSourceMap ? r.map : null,
         types: '', // D-84 inline-typed via defineProps<T>()
         componentDeps, // D-120
         diagnostics: [...acc, ...r.diagnostics],
-      };
+      });
     }
     case 'react': {
       const r = emitReact(ir, emitOpts);
@@ -311,47 +342,47 @@ export function compile(source: string, opts: CompileOptions): CompileResult {
       if (r.globalCss !== undefined) {
         result.globalCss = r.globalCss;
       }
-      return result;
+      return guardEmpty(result);
     }
     case 'svelte': {
       const r = emitSvelte(ir, emitOpts);
-      return {
+      return guardEmpty({
         code: r.code,
         map: wantSourceMap ? r.map : null,
         types: '', // D-84 inline-typed via $props<T>()
         componentDeps, // D-120
         diagnostics: [...acc, ...r.diagnostics],
-      };
+      });
     }
     case 'angular': {
       const r = emitAngular(ir, emitOpts);
-      return {
+      return guardEmpty({
         code: r.code,
         map: wantSourceMap ? r.map : null,
         types: '', // D-84 inline-typed via @Input() decorators
         componentDeps, // D-120
         diagnostics: [...acc, ...r.diagnostics],
-      };
+      });
     }
     case 'solid': {
       const r = emitSolid(ir, emitOpts);
-      return {
+      return guardEmpty({
         code: r.code,
         map: wantSourceMap ? r.map : null,
         types: '', // inline-typed via splitProps + TypeScript inference
         componentDeps, // D-120
         diagnostics: [...acc, ...r.diagnostics],
-      };
+      });
     }
     case 'lit': {
       const r = emitLit(ir, emitOpts);
-      return {
+      return guardEmpty({
         code: r.code,
         map: wantSourceMap ? r.map : null,
         types: '', // inline-typed via @property decorators + TypeScript inference
         componentDeps, // D-120
         diagnostics: [...acc, ...r.diagnostics],
-      };
+      });
     }
     default: {
       // Exhaustiveness check — TypeScript narrows opts.target to `never` here.

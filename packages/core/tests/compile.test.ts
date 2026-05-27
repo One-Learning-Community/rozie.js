@@ -64,6 +64,55 @@ describe('compile() — Phase 6 public API', () => {
       expect(result.diagnostics.some((d) => d.severity === 'error')).toBe(true);
     });
 
+    it('opaque-block angle-bracket regression: <Tag> in props comment now compiles + emits content', () => {
+      // 260526-uj3 forward-work: prior to the splitBlocks.ts opaque-block
+      // fix, this source returned `code: ''` with zero diagnostics — the
+      // `<SortableList>` phantom-tag inside the props JS comment desynced
+      // the htmlparser2 depth counter so the `</props>` close was missed
+      // and the props block silently vanished from the BlockMap. Now the
+      // splitter ignores phantom tags inside opaque block bodies and the
+      // file compiles cleanly.
+      const src = `<rozie name="Repro">
+<props>
+{
+  // re-keying its <SortableList> instance
+  foo: { type: String, default: null },
+}
+</props>
+<template><div>hello</div></template>
+</rozie>`;
+      const result = compile(src, { target: 'vue', filename: 'Repro.rozie' });
+      expect(result.diagnostics.filter((d) => d.severity === 'error')).toEqual(
+        [],
+      );
+      expect(result.code.length).toBeGreaterThan(0);
+      expect(result.code).toContain('foo');
+    });
+
+    it('ROZ977 emit-guard: empty code + no error diagnostics gets a fail-loud diagnostic', () => {
+      // The empty-code guard is the safety net for the silent-failure
+      // anti-pattern. In production paths it should never fire because
+      // every real fatal path emits a specific code first. We exercise it
+      // by stubbing the emitter via a hand-crafted source that the legit
+      // pipeline cannot rescue: a source with no <rozie> envelope already
+      // produces ROZ001 (a specific code). To trigger ROZ977 we need an
+      // emit-path that returns empty without prior errors — synthesised
+      // via a `<rozie>` envelope with NO `<template>` block AND NO
+      // `<script>` block at all (some emitters short-circuit to empty).
+      //
+      // The contract under test: if some future emit path ever produces
+      // empty code without a diagnostic, ROZ977 catches the silent failure
+      // and surfaces it.
+      const minimal = '<rozie name="Empty"></rozie>';
+      const result = compile(minimal, { target: 'vue', filename: 'Empty.rozie' });
+      // Either we got a useful code or we got ROZ977. The point is: we
+      // never silently return empty without ANY diagnostic.
+      if (result.code === '') {
+        const errs = result.diagnostics.filter((d) => d.severity === 'error');
+        expect(errs.length).toBeGreaterThan(0);
+      }
+    });
+
     it('returns ROZ800 on unknown target', () => {
       // Cast through unknown to exercise the runtime exhaustiveness branch.
       const result = compile(counterSource, {
