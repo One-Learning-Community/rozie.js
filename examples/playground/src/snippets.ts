@@ -122,6 +122,35 @@ const BUNDLE_DECLS: readonly BundleDecl[] = [
     ],
   },
   {
+    // SortableListCloneDemo — palette → canvas clone-mode showcase. Two
+    // SortableList instances sharing `group="palette-canvas"`; the palette
+    // uses the new `cloneable: true` prop so drags deposit copies on the
+    // canvas while leaving the palette intact.
+    key: 'bundle/SortableListCloneDemo',
+    label: 'bundle/SortableListCloneDemo',
+    entryGlobPath: '../../demos/SortableListCloneDemo.rozie',
+    dependencyGlobPaths: ['../../SortableList.rozie'],
+  },
+  {
+    // SortableListFilterDemo — SortableJS `filter` selector demo. Locked
+    // rows render with 🔒 + a `[data-locked]` attribute; the `filter`
+    // prop prevents drag initiation on matching rows.
+    key: 'bundle/SortableListFilterDemo',
+    label: 'bundle/SortableListFilterDemo',
+    entryGlobPath: '../../demos/SortableListFilterDemo.rozie',
+    dependencyGlobPaths: ['../../SortableList.rozie'],
+  },
+  {
+    // SortableListShowcaseDemo — the marquee piece. Live-tunable
+    // SortableList with every prop exposed via a control panel; uses
+    // `:key="`${$data.forceFallback}-${$data.cloneable}-${$data.swapThreshold}`"`
+    // to remount on construction-time-only knob changes.
+    key: 'bundle/SortableListShowcaseDemo',
+    label: 'bundle/SortableListShowcaseDemo',
+    entryGlobPath: '../../demos/SortableListShowcaseDemo.rozie',
+    dependencyGlobPaths: ['../../SortableList.rozie'],
+  },
+  {
     key: 'bundle/FlatpickrDemo',
     label: 'bundle/FlatpickrDemo',
     entryGlobPath: '../../demos/FlatpickrDemo.rozie',

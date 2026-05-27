@@ -92,6 +92,14 @@ const EXAMPLES = [
   // behavioral-only spec instead (`leaflet-map.spec.ts`).
   'Table',
   'SortableList',
+  // SortableList showcase trio (added 2026-05-27, quick-task 260526-uj3) —
+  // headline marketing surface. Per D-10, all 6 targets diff against the
+  // same shared `<Name>.png` baseline. These cells baseline-gate to
+  // `test.fixme` via `baselineExists()` below until a Linux-Docker baseline
+  // regen lands the PNGs (`feedback_vr_linux_baselines`).
+  'SortableListClone',
+  'SortableListFilter',
+  'SortableListShowcase',
   'Flatpickr',
   'Uppy',
   'TipTap',
@@ -214,6 +222,23 @@ async function settleExample(
   // Modules' localIdentName default). Same rationale as the Table branch below.
   if (example === 'SortableList') {
     await expect(page.locator('[class*="rozie-sortable-item"]')).toHaveCount(5);
+  }
+  // SortableListClone (quick-task 260526-uj3): palette seeds 4 widget
+  // templates in $onMount via seedPalette(); canvas starts empty (no
+  // rozie-sortable-item rows on the canvas side). Total across both
+  // SortableList instances = 4 (palette only).
+  if (example === 'SortableListClone') {
+    await expect(page.locator('[class*="rozie-sortable-item"]')).toHaveCount(4);
+  }
+  // SortableListFilter (quick-task 260526-uj3): reset() seeds 5 items, 2
+  // of which carry data-locked='true'. Wait for the row count to settle.
+  if (example === 'SortableListFilter') {
+    await expect(page.locator('[class*="rozie-sortable-item"]')).toHaveCount(5);
+  }
+  // SortableListShowcase (quick-task 260526-uj3): reset() seeds 8 items.
+  // Wait for the row count to settle before the screenshot clip.
+  if (example === 'SortableListShowcase') {
+    await expect(page.locator('[class*="rozie-sortable-item"]')).toHaveCount(8);
   }
   // Flatpickr: the Flatpickr wrapper renders `<input class="rozie-flatpickr">`;
   // the flatpickr engine attaches to it on `$onMount`. Wait for the input to

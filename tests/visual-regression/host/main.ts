@@ -89,6 +89,19 @@ export const EXAMPLES = [
   // KanbanColumn wrapper (cross-column card drag with reorderable columns).
   'SortableListPair',
   'SortableListNested',
+  // SortableList showcase trio (added 2026-05-27, quick-task 260526-uj3) —
+  // dedicated marketing surface for the SortableList family.
+  // SortableListClone exercises the new `cloneable: true` prop +
+  // useSortableJS's onClone stash bridge + handleCommit pullMode='clone'
+  // short-circuit (palette → canvas, source stays intact). SortableListFilter
+  // exercises the new `filter` pass-through prop with a `[data-locked]`
+  // attribute-selector pattern (data-* survives all 6 targets identically).
+  // SortableListShowcase is the marquee piece — every prop wired into a
+  // live control panel, construction-time knobs (forceFallback/swapThreshold/
+  // cloneable) trigger remount via `:key` recomputation.
+  'SortableListClone',
+  'SortableListFilter',
+  'SortableListShowcase',
   'Flatpickr',
   'LeafletMap',
   'TipTap',
@@ -149,6 +162,9 @@ export const LIT_TAGS: Record<Example, string> = {
   SortableList: 'rozie-sortable-list',
   SortableListPair: 'rozie-sortable-list-pair',
   SortableListNested: 'rozie-sortable-list-nested',
+  SortableListClone: 'rozie-sortable-list-clone',
+  SortableListFilter: 'rozie-sortable-list-filter',
+  SortableListShowcase: 'rozie-sortable-list-showcase',
   Flatpickr: 'rozie-flatpickr',
   LeafletMap: 'rozie-leaflet-map',
   TipTap: 'rozie-tip-tap',
@@ -227,6 +243,13 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   SortableList: {},
   SortableListPair: {},
   SortableListNested: {},
+  // SortableList showcase trio — each Demo carries its reactive state in
+  // <data> (palette/canvas arrays for Clone, filter+items for Filter, the
+  // full control-panel state for Showcase); the wrappers themselves expose
+  // props, but the demo consumers are self-contained, so `{}`.
+  SortableListClone: {},
+  SortableListFilter: {},
+  SortableListShowcase: {},
   Flatpickr: {},
   LeafletMap: {},
   TipTap: {},
