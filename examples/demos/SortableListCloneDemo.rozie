@@ -1,0 +1,220 @@
+<!--
+  SortableListCloneDemo.rozie — palette → canvas drag-to-clone.
+
+  The clone-mode showcase. Left list is a PALETTE of widget templates;
+  drags FROM it leave the original behind and deposit a copy on the
+  canvas. Right list is the CANVAS — drops accumulate; clear button
+  resets it to empty.
+
+  SortableJS wiring (via SortableList's `cloneable: true` prop):
+    - Palette → group becomes `{ name: 'palette-canvas', pull: 'clone', put: true }`
+    - Canvas  → group is the plain string `'palette-canvas'` (no clone)
+    - Both share the group name so cross-list drag works in both directions
+
+  Helper machinery (in @rozie/runtime-engine-helpers/useSortableJS):
+    - onClone bridges `__rozieItem` from original DOM node → cloned node
+    - handleCommit short-circuits on `e.pullMode === 'clone'` so the
+      palette's items array stays intact across drags
+
+  Demo intentionally simple — single-source-file CSS, no per-target
+  overrides, byte-identical render across all 6 targets.
+-->
+
+<rozie name="SortableListCloneDemo">
+
+<components>
+{
+  SortableList: '../SortableList.rozie',
+}
+</components>
+
+<data>
+{
+  palette: [],
+  canvas: [],
+  nextDropId: 1,
+}
+</data>
+
+<script>
+// The palette never changes — these are the "stamps" you drag onto the
+// canvas. `id` is the widget kind, used by SortableList's itemKey.
+const PALETTE_TEMPLATES = [
+  { id: 'button',  icon: '▭', label: 'Button'  },
+  { id: 'input',   icon: '☐', label: 'Input'   },
+  { id: 'card',    icon: '▤', label: 'Card'    },
+  { id: 'heading', icon: 'H', label: 'Heading' },
+];
+
+const seedPalette = () => {
+  // Deep-clone so reseeding restores the original templates even after
+  // SortableJS's clone-mode `e.item` properties have been written to.
+  $data.palette = PALETTE_TEMPLATES.map((t) => ({ ...t }))
+}
+
+const clearCanvas = () => {
+  $data.canvas = []
+}
+
+$onMount(() => seedPalette());
+</script>
+
+<template>
+<div class="sortable-clone-demo">
+  <header>
+    <h3>Clone-mode drag</h3>
+    <p class="hint">Drag widgets from the <em>palette</em> onto the <em>canvas</em>. Each drag deposits a copy — the palette stays intact. Drop a widget back onto the palette (or shuffle within either list) to see the symmetric paths.</p>
+  </header>
+
+  <div class="grid">
+    <section class="pane palette-pane">
+      <h4>Palette</h4>
+      <SortableList
+        r-model:items="$data.palette"
+        itemKey="id"
+        group="palette-canvas"
+        :cloneable="true"
+        :handle="$classSelector('grip')"
+      >
+        <template #default="{ item }">
+          <div class="row palette-row">
+            <span class="grip" aria-label="Drag handle">⋮⋮</span>
+            <span class="icon" aria-hidden="true">{{ item.icon }}</span>
+            <span class="label">{{ item.label }}</span>
+          </div>
+        </template>
+      </SortableList>
+      <p class="footnote">Source list never shrinks.</p>
+    </section>
+
+    <section class="pane canvas-pane">
+      <div class="canvas-head">
+        <h4>Canvas <span class="count">({{ $data.canvas.length }})</span></h4>
+        <button type="button" @click="clearCanvas" :disabled="$data.canvas.length === 0">Clear</button>
+      </div>
+      <SortableList
+        r-model:items="$data.canvas"
+        itemKey="id"
+        group="palette-canvas"
+        :handle="$classSelector('grip')"
+      >
+        <template #default="{ item }">
+          <div class="row canvas-row">
+            <span class="grip" aria-label="Drag handle">⋮⋮</span>
+            <span class="icon" aria-hidden="true">{{ item.icon }}</span>
+            <span class="label">{{ item.label }}</span>
+          </div>
+        </template>
+      </SortableList>
+      <p r-if="$data.canvas.length === 0" class="empty">Drop widgets here.</p>
+    </section>
+  </div>
+</div>
+</template>
+
+<style>
+.sortable-clone-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  max-width: 720px;
+}
+
+header h3 { margin: 0 0 0.25rem; font-size: 1.125rem; }
+header .hint { margin: 0 0 1rem; color: rgba(0, 0, 0, 0.55); font-size: 0.875rem; }
+header em { font-style: normal; font-weight: 600; color: rgba(0, 0, 0, 0.75); }
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+  align-items: start;
+}
+
+.pane { min-width: 0; }
+.pane h4 {
+  margin: 0 0 0.5rem;
+  font-size: 0.8125rem;
+  color: rgba(0, 0, 0, 0.55);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.canvas-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+.canvas-head h4 { margin: 0; }
+.canvas-head .count {
+  font-weight: 400;
+  color: rgba(0, 0, 0, 0.4);
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.75rem;
+}
+.canvas-head button {
+  padding: 0.25rem 0.625rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8125rem;
+}
+.canvas-head button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: #f5f5f7;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 6px;
+  margin: 0.25rem 0;
+}
+.palette-row { background: #eef2f7; }
+.canvas-row { background: #f5f5f7; }
+
+.grip {
+  color: rgba(0, 0, 0, 0.35);
+  cursor: grab;
+  user-select: none;
+  font-family: monospace;
+}
+.grip:active { cursor: grabbing; }
+
+.icon {
+  display: inline-block;
+  width: 1.25rem;
+  text-align: center;
+  color: rgba(0, 0, 0, 0.6);
+  font-family: ui-monospace, monospace;
+}
+
+.label { flex: 1; }
+
+.footnote {
+  margin: 0.375rem 0 0;
+  font-size: 0.75rem;
+  color: rgba(0, 0, 0, 0.4);
+  font-style: italic;
+}
+
+.empty {
+  margin: 0.25rem 0 0;
+  padding: 0.75rem;
+  color: rgba(0, 0, 0, 0.4);
+  font-style: italic;
+  text-align: center;
+  border: 1px dashed rgba(0, 0, 0, 0.15);
+  border-radius: 6px;
+}
+</style>
+
+</rozie>
