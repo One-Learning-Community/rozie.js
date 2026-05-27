@@ -162,8 +162,7 @@ export function useSortableJS<T>(
   const handleStart = (e: SortableEvent): void => {
     const current = opts.items();
     // `e.oldIndex` is the source index in the source list (this list,
-    // since onStart fires from the source). Use it if numeric; fall back
-    // to -1 stash (a no-op identifier — `indexOf(undefined)` returns -1).
+    // since onStart fires from the source).
     const fromIdx = typeof e.oldIndex === 'number' ? e.oldIndex : -1;
     if (fromIdx >= 0 && fromIdx < current.length) {
       const item = e.item as unknown as Record<string, unknown> | null;
@@ -174,18 +173,31 @@ export function useSortableJS<T>(
     opts.onStart?.(e);
   };
 
-  /** The single point of truth for committed drags. Replaces the inline
-   * onUpdate + onAdd + onRemove triplet. Disambiguates via `e.from` and
-   * `e.to`. */
-  const handleEnd = (e: SortableEvent): void => {
+  /** The single point of truth for committed drags. Disambiguates via
+   * `e.from` and `e.to`.
+   *
+   * SortableJS's event lifecycle is asymmetric across lists: `onEnd` fires
+   * ONLY on the source list (the one that owned `e.item` at drag start).
+   * The destination list of a cross-list move receives an `onAdd` event,
+   * NOT an `onEnd`. We register this handler against BOTH:
+   *   - source-list `onEnd` — handles same-list reorder + cross-list source
+   *   - destination-list `onAdd` — handles cross-list destination
+   *
+   * The single function services both event names because the
+   * `from === listEl` / `to === listEl` disambiguation is sufficient to
+   * determine our role; SortableJS's event name doesn't carry additional
+   * information we need. Registering both is the load-bearing fix — the
+   * inline-handlers design DID register onAdd; collapsing to onEnd-only
+   * would lose the destination-side commit entirely. */
+  const handleCommit = (e: SortableEvent): void => {
     try {
       const fromUs = e.from === listEl;
       const toUs = e.to === listEl;
       const sameList = fromUs && toUs;
 
       if (!fromUs && !toUs) {
-        // Not our event. Defensive — SortableJS shouldn't fire onEnd on
-        // our instance for unrelated drags, but guard anyway.
+        // Not our event. Defensive — guards against the rare case where
+        // SortableJS would re-dispatch.
         return;
       }
 
@@ -293,28 +305,58 @@ export function useSortableJS<T>(
         newIndex = targetIdx;
       }
 
-      // Commit the new array to the framework. This is the load-bearing
-      // line that the prior inline-handler design lost under fragile
-      // events because `_dispatchEvent` would catch the insertBefore
-      // throw and never reach this point.
-      opts.onCommit(next);
-      opts.afterCommit?.();
-      opts.onChange?.({ kind, oldIndex, newIndex, item: moved });
+      // SortableJS-internal-state hazard: calling `opts.onCommit(next)`
+      // SYNCHRONOUSLY here triggers framework re-renders (Solid/React/Vue/
+      // etc.) that may unmount sibling SortableList instances mid-drop.
+      // When the framework destroys a sibling SortableJS, that instance's
+      // `destroy()` calls `_onDrop()` which calls `_nulling()`, setting
+      // `Sortable.active = null` on the SortableJS module. The source
+      // list's pending `end` event is then guarded by `if (Sortable.active)`
+      // and skipped — losing the source-side commit on cross-list moves.
+      //
+      // Defer to a microtask so SortableJS's `_onDrop` can complete
+      // uninterrupted (both `add` and `end` events fire in their natural
+      // order) before any framework re-render runs. The DOM-restore step
+      // above has already happened synchronously, so the DOM and the
+      // model are kept in sync.
+      queueMicrotask(() => {
+        opts.onCommit(next);
+        opts.afterCommit?.();
+        opts.onChange?.({ kind, oldIndex, newIndex, item: moved });
+      });
     } finally {
-      // Clear the stash so a future drag of the SAME DOM element (Lit
-      // reuses keyed nodes across renders) can't leak a stale data ref.
-      const item = e.item as unknown as Record<string, unknown> | null;
-      if (item !== null && typeof item === 'object') {
-        delete item[ROZIE_ITEM_STASH_KEY];
+      // The user's `onEnd` callback only fires from a true `onEnd` event
+      // (source-side). The destination's `onAdd` invocation routes
+      // through the same handler but should NOT fire `onEnd` again — the
+      // source list already will.
+      //
+      // Cleanup of the `__rozieItem` stash happens in the source's `onEnd`
+      // (`fromUs === true`) because that's the last guaranteed event in
+      // the SortableJS lifecycle for any drag. Cross-list `onAdd` runs
+      // BEFORE source `onEnd`, so the stash must remain readable on
+      // `e.item` until the source side completes.
+      const fromUs = e.from === listEl;
+      if (fromUs) {
+        const item = e.item as unknown as Record<string, unknown> | null;
+        if (item !== null && typeof item === 'object') {
+          delete item[ROZIE_ITEM_STASH_KEY];
+        }
+        opts.onEnd?.(e);
       }
-      opts.onEnd?.(e);
     }
   };
 
   const instance = new SortableJS(listEl, {
     ...baseOptions,
     onStart: handleStart,
-    onEnd: handleEnd,
+    // SortableJS event lifecycle is asymmetric: `onEnd` fires only on the
+    // source list; cross-list destination receives `onAdd`. Wiring the
+    // same handler to both keeps the helper's "single handler with from/to
+    // disambiguation" contract consistent across same-list reorder
+    // (source onEnd), cross-list source (source onEnd), and cross-list
+    // destination (destination onAdd).
+    onEnd: handleCommit,
+    onAdd: handleCommit,
   });
 
   return {

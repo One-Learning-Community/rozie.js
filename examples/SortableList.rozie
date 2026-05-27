@@ -165,12 +165,11 @@ $onMount(() => {
     onEnd: (e) => $emit('end', e),
   })
   instance = sortable.instance
-  // $onMount's cleanup-return must be an Identifier or function expression
-  // (compiler limitation — `return sortable.destroy` is a MemberExpression
-  // and would emit ROZ108). Aliasing to a local Identifier keeps the return
-  // statically detectable as a cleanup function across all 6 targets.
-  const destroy = sortable.destroy
-  return destroy
+  // $onMount's cleanup-return: closing over a setup-local (`sortable`) does
+  // not survive the Solid emitter's setup/cleanup split — it scopes cleanup
+  // outside the setup IIFE. Closing over `instance` (a module-scope `let`)
+  // works on every target.
+  return () => instance?.destroy()
 })
 
 // Reconcile prop changes into the live SortableJS instance without

@@ -110,8 +110,18 @@ beforeEach(() => {
   resetSortable();
 });
 
+/** Drain queued microtasks so deferred `onCommit` / `afterCommit` /
+ * `onChange` callbacks observable in tests. The helper defers these via
+ * `queueMicrotask` to avoid disrupting SortableJS's internal `_onDrop`
+ * sequencing — see useSortableJS.ts for the cross-instance
+ * `Sortable.active` nulling hazard. */
+async function flushMicrotasks(): Promise<void> {
+  await Promise.resolve();
+  await Promise.resolve();
+}
+
 describe('useSortableJS', () => {
-  it('same-list reorder: onCommit fires with reordered array; onChange kind=reorder', () => {
+  it('same-list reorder: onCommit fires with reordered array; onChange kind=reorder', async () => {
     const items: Item[] = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
     const listEl = buildList(items);
     const commits: Item[][] = [];
@@ -144,6 +154,7 @@ describe('useSortableJS', () => {
       from: listEl,
       to: listEl,
     });
+    await flushMicrotasks();
 
     expect(commits.length).toBe(1);
     expect(commits[0]!.map((x) => x.id)).toEqual(['b', 'c', 'a']);
@@ -159,7 +170,7 @@ describe('useSortableJS', () => {
     handle.destroy();
   });
 
-  it('cross-list source side: splices item OUT; onChange kind=remove', () => {
+  it('cross-list source side: splices item OUT; onChange kind=remove', async () => {
     const sourceItems: Item[] = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
     const sourceListEl = buildList(sourceItems);
     const destListEl = buildList([]);
@@ -196,6 +207,7 @@ describe('useSortableJS', () => {
       from: sourceListEl,
       to: destListEl,
     });
+    await flushMicrotasks();
 
     expect(commits.length).toBe(1);
     expect(commits[0]!.map((x) => x.id)).toEqual(['a', 'c']);
@@ -204,7 +216,7 @@ describe('useSortableJS', () => {
     expect(changes[0]!.item?.id).toBe('b');
   });
 
-  it('cross-list destination side: splices item IN at newIndex; onChange kind=add', () => {
+  it('cross-list destination side: splices item IN at newIndex; onChange kind=add (fires from onAdd, not onEnd)', async () => {
     const destItems: Item[] = [{ id: 'x' }, { id: 'y' }];
     const sourceListEl = buildList([{ id: 'movedItem' }]);
     const destListEl = buildList(destItems);
@@ -231,22 +243,31 @@ describe('useSortableJS', () => {
     (dragged as unknown as Record<string, unknown>).__rozieItem = movedData;
     // SortableJS moves dragged into destListEl at position 1.
     destListEl.insertBefore(dragged, destListEl.children[1] ?? null);
-    rec.options.onEnd?.({
+    // Destination side receives `onAdd` (not `onEnd`). `onEnd` only fires
+    // on the source list in cross-list moves.
+    (rec.options as { onAdd?: (e: unknown) => void }).onAdd?.({
       item: dragged,
       oldIndex: 0,
       newIndex: 1,
       from: sourceListEl,
       to: destListEl,
     });
+    await flushMicrotasks();
 
     expect(commits.length).toBe(1);
     expect(commits[0]!.map((x) => x.id)).toEqual(['x', 'movedItem', 'y']);
     expect(changes[0]!.kind).toBe('add');
     expect(changes[0]!.newIndex).toBe(1);
     expect(changes[0]!.item?.id).toBe('movedItem');
+
+    // Critical invariant: `__rozieItem` stash MUST remain readable on
+    // `e.item` after the destination's onAdd fires — the source's later
+    // onEnd still needs to read it (or at least: it shouldn't have been
+    // cleared yet). Source-side `onEnd` clears in its own finally block.
+    expect((dragged as unknown as Record<string, unknown>).__rozieItem).toBe(movedData);
   });
 
-  it('fragile event (e.oldIndex is null) — identity-match via __rozieItem locates the moved item', () => {
+  it('fragile event (e.oldIndex is null) — identity-match via __rozieItem locates the moved item', async () => {
     const items: Item[] = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
     const listEl = buildList(items);
     const commits: Item[][] = [];
@@ -270,6 +291,7 @@ describe('useSortableJS', () => {
       from: listEl,
       to: listEl,
     });
+    await flushMicrotasks();
 
     // With null indices and identity-match, we recover the source index
     // (1, since items[1] === stashedItem). With null newIndex, we append
@@ -278,7 +300,7 @@ describe('useSortableJS', () => {
     expect(commits[0]!.map((x) => x.id)).toEqual(['a', 'c', 'b']);
   });
 
-  it('fragile event (DOM-restore throws): onCommit STILL fires; no throw escapes', () => {
+  it('fragile event (DOM-restore throws): onCommit STILL fires; no throw escapes', async () => {
     const items: Item[] = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
     const listEl = buildList(items);
     const commits: Item[][] = [];
@@ -315,6 +337,7 @@ describe('useSortableJS', () => {
         to: listEl,
       });
     }).not.toThrow();
+    await flushMicrotasks();
     // Restore the original method (avoids test pollution).
     (listEl as unknown as { insertBefore: typeof listEl.insertBefore }).insertBefore = origInsertBefore;
 
@@ -344,7 +367,7 @@ describe('useSortableJS', () => {
     expect(rec.optionCalls).toEqual([{ name: 'disabled', value: true }]);
   });
 
-  it('afterCommit fires after onCommit on every commit (Lit $reconcileAfterDomMutation hook)', () => {
+  it('afterCommit fires after onCommit on every commit (Lit $reconcileAfterDomMutation hook)', async () => {
     const items: Item[] = [{ id: 'a' }, { id: 'b' }];
     const listEl = buildList(items);
     const callOrder: string[] = [];
@@ -370,6 +393,7 @@ describe('useSortableJS', () => {
       from: listEl,
       to: listEl,
     });
+    await flushMicrotasks();
 
     expect(callOrder).toEqual(['commit', 'after']);
   });
@@ -401,16 +425,19 @@ describe('useSortableJS', () => {
     // Non-handler options pass through verbatim.
     expect(rec.options.animation).toBe(150);
     expect(rec.options.group).toBe('foo');
-    // User handlers were not registered as constructor options (the helper's
-    // own handleStart/handleEnd are).
+    // User onUpdate / onRemove handlers are stripped — we collapse them into
+    // the single handleCommit path.
     expect(rec.options.onUpdate).toBeUndefined();
-    expect(rec.options.onAdd).toBeUndefined();
     expect(rec.options.onRemove).toBeUndefined();
-    // onStart/onEnd ARE registered, but they are the HELPER's, not the user's.
+    // onStart / onEnd / onAdd ARE registered, but they are the HELPER's, not
+    // the user's (the helper wires onEnd for source-side commits + onAdd for
+    // cross-list destination commits).
     expect(typeof rec.options.onStart).toBe('function');
     expect(rec.options.onStart).not.toBe(userHandler);
     expect(typeof rec.options.onEnd).toBe('function');
     expect(rec.options.onEnd).not.toBe(userHandler);
+    expect(typeof (rec.options as { onAdd?: unknown }).onAdd).toBe('function');
+    expect((rec.options as { onAdd?: unknown }).onAdd).not.toBe(userHandler);
   });
 
   it('onStart and onEnd user callbacks fire on the right events', () => {
