@@ -1,0 +1,326 @@
+/**
+ * useSortableJS — framework-agnostic SortableJS-vs-reconciler bridge.
+ *
+ * Why this exists
+ * ---------------
+ * Wrapping SortableJS for cross-framework consumption (Rozie's
+ * `examples/SortableList.rozie`) has four recurring fragilities every wrapper
+ * library independently re-discovers:
+ *
+ * 1. **Three-handler ambiguity.** SortableJS fires distinct `onUpdate`,
+ *    `onAdd`, and `onRemove` events for the same logical drag in cross-list
+ *    moves. Inline handlers in user code can ONLY disambiguate by reading
+ *    `e.from === listEl` / `e.to === listEl`, which is the same disambiguation
+ *    `onEnd` can perform in a SINGLE handler. Collapsing to one onEnd path
+ *    removes the per-handler boilerplate.
+ *
+ * 2. **Fragile event shapes.** When SortableJS falls back to the mouse-event
+ *    drag path (Playwright's mouse.move/down/up sequence; some touch devices;
+ *    HTML5 DnD aborts), `e.item` may not be a valid Node by the time the
+ *    handler runs (the source-side `onRemove` fires AFTER the destination
+ *    has already detached the element). Inline
+ *    `listEl.insertBefore(e.item, …)` throws inside SortableJS's
+ *    `_dispatchEvent`. SortableJS catches and swallows the throw silently —
+ *    the model writeback never runs, leaving the framework's view stale.
+ *    THIS is the root cause of the duplicate-on-drop bug surfaced by the
+ *    `sortable-nested-solid-deeper` VR spec.
+ *
+ * 3. **`e.oldIndex` is occasionally null.** Fallback-mode events lose the
+ *    index. Identity-based item lookup (`items().indexOf(stashedItem)`) is
+ *    strictly more reliable.
+ *
+ * 4. **Lit lit-html `repeat`-cache desync.** Every reconciler EXCEPT Lit
+ *    handles the SortableJS DOM-restore + model writeback dance cleanly.
+ *    Lit needs `$reconcileAfterDomMutation()` (a Rozie sigil that lowers to
+ *    `__rozieReconcileAfterDomMutation(this)` on Lit + `void 0` elsewhere).
+ *    The helper invokes the `afterCommit` callback after each `onCommit`;
+ *    users wire `afterCommit: () => $reconcileAfterDomMutation()` to honour
+ *    the Lit requirement without leaking lit-html internals into user code.
+ *
+ * Cross-target API contract
+ * -------------------------
+ * The helper is vanilla JS. It has NO framework imports. The same exported
+ * symbol resolves identically across React, Vue, Svelte, Angular, Solid and
+ * Lit consumer builds via the workspace dep on `@rozie/runtime-engine-helpers`.
+ *
+ * Caller contract:
+ *   - `items: () => T[]` is called fresh on every event. Wire it to the
+ *     current snapshot (`$props.items` etc.).
+ *   - `onCommit(next)` is called once per successful drag commit with the
+ *     new items array. The caller writes it to whatever reactive surface
+ *     drives re-renders.
+ *   - `afterCommit?()` is called immediately after each `onCommit`. Used on
+ *     Lit to invoke `$reconcileAfterDomMutation()`.
+ *
+ * Returns `{ destroy, instance }`. The caller wires
+ *   - teardown via `return handle.destroy` from `$onMount`
+ *   - runtime option updates via `instance.option('disabled', v)` from
+ *     `$watch(() => $props.disabled, ...)`.
+ *
+ * @public
+ */
+
+import SortableJS, { type Options as SortableOptions, type SortableEvent } from 'sortablejs';
+
+/** Symbol stashed on `e.item` between `onStart` and `onEnd` to ferry the
+ * dragged item DATA (not just the DOM node) across cross-list moves and
+ * survive `e.oldIndex` going null in fallback-mode events. The double
+ * underscore prefix signals "Rozie-internal, do not collide with user
+ * data". */
+const ROZIE_ITEM_STASH_KEY = '__rozieItem';
+
+/** Disambiguated event kind, exposed via `onChange`. */
+export type SortableEventKind = 'reorder' | 'add' | 'remove';
+
+/** Argument shape for the disambiguated onChange callback. */
+export interface SortableChange<T> {
+  kind: SortableEventKind;
+  /** Source index. `-1` if it could not be determined (fragile-event path). */
+  oldIndex: number;
+  /** Destination index. `-1` if it could not be determined. */
+  newIndex: number;
+  /** The moved item. May be `undefined` only when both the stash AND the
+   * source list's snapshot lost track of it (extreme fallback path). */
+  item: T | undefined;
+}
+
+export interface UseSortableJSOptions<T> {
+  /** Current items getter. Called fresh on every event for reactivity-safety. */
+  items: () => readonly T[];
+  /** Fires once per successful drag commit with the new items array. */
+  onCommit: (next: T[]) => void;
+  /** Optional: forwarded verbatim to SortableJS constructor.
+   * Any handler keys (`onStart`, `onEnd`, `onUpdate`, `onAdd`, `onRemove`)
+   * are silently ignored — the helper owns the event-handling path. Use
+   * `onStart` / `onEnd` / `onChange` on this options object instead. */
+  options?: SortableOptions;
+  /** Optional: fires on drag start. The dragged item DATA has already been
+   * stashed on `e.item.__rozieItem` by the time this fires. */
+  onStart?: (e: SortableEvent) => void;
+  /** Optional: fires on drag end after `onCommit` + `afterCommit`. */
+  onEnd?: (e: SortableEvent) => void;
+  /** Optional: fires once per commit with the disambiguated event kind. */
+  onChange?: (info: SortableChange<T>) => void;
+  /** Optional: called immediately after `onCommit`. Used on Lit to invoke
+   * `$reconcileAfterDomMutation()`. No-op on the other 5 targets. */
+  afterCommit?: () => void;
+}
+
+export interface UseSortableJSResult {
+  /** Teardown — call from `$onMount` return. */
+  destroy: () => void;
+  /** Live SortableJS instance — exposed for runtime
+   * `instance.option('disabled', v)` updates from `$watch`. */
+  instance: SortableJS;
+}
+
+/** Read the stashed item, falling back to a `null`/`undefined` when the
+ * element doesn't have the property. Centralised so the cast lives in
+ * exactly one place. */
+function readStash<T>(item: unknown): T | undefined {
+  if (item === null || typeof item !== 'object') return undefined;
+  return (item as Record<string, unknown>)[ROZIE_ITEM_STASH_KEY] as T | undefined;
+}
+
+/** Try-catch wrapper for DOM operations that may throw on fragile event
+ * paths. Returning `false` lets the caller proceed to the model writeback
+ * — the framework's re-render off the new model brings the DOM back into
+ * sync (may flicker briefly, but vastly better than today's silent drop). */
+function safeDom(op: () => void): boolean {
+  try {
+    op();
+    return true;
+  } catch {
+    // The DOM-restore is best-effort. Proceed to model writeback regardless.
+    return false;
+  }
+}
+
+/**
+ * Wire a SortableJS instance to a reactive items array. See module doc
+ * for the full rationale + cross-target contract.
+ */
+export function useSortableJS<T>(
+  listEl: HTMLElement,
+  opts: UseSortableJSOptions<T>,
+): UseSortableJSResult {
+  // Defensive merge: strip user-supplied handler keys from the verbatim
+  // `options` blob — we own those paths. We deliberately do NOT splat
+  // `opts.options` straight into the constructor argument unmodified, since
+  // a user-supplied `onUpdate` would silently bypass our reconciler dance.
+  const baseOptions: SortableOptions = { ...(opts.options ?? {}) };
+  // Build the explicit handler set — these always win over anything the
+  // caller passed in via `options`.
+  delete (baseOptions as Record<string, unknown>).onStart;
+  delete (baseOptions as Record<string, unknown>).onEnd;
+  delete (baseOptions as Record<string, unknown>).onUpdate;
+  delete (baseOptions as Record<string, unknown>).onAdd;
+  delete (baseOptions as Record<string, unknown>).onRemove;
+
+  /** Stash dragged item DATA on `e.item` so cross-list moves can recover
+   * it on the destination side. */
+  const handleStart = (e: SortableEvent): void => {
+    const current = opts.items();
+    // `e.oldIndex` is the source index in the source list (this list,
+    // since onStart fires from the source). Use it if numeric; fall back
+    // to -1 stash (a no-op identifier — `indexOf(undefined)` returns -1).
+    const fromIdx = typeof e.oldIndex === 'number' ? e.oldIndex : -1;
+    if (fromIdx >= 0 && fromIdx < current.length) {
+      const item = e.item as unknown as Record<string, unknown> | null;
+      if (item !== null && typeof item === 'object') {
+        item[ROZIE_ITEM_STASH_KEY] = current[fromIdx];
+      }
+    }
+    opts.onStart?.(e);
+  };
+
+  /** The single point of truth for committed drags. Replaces the inline
+   * onUpdate + onAdd + onRemove triplet. Disambiguates via `e.from` and
+   * `e.to`. */
+  const handleEnd = (e: SortableEvent): void => {
+    try {
+      const fromUs = e.from === listEl;
+      const toUs = e.to === listEl;
+      const sameList = fromUs && toUs;
+
+      if (!fromUs && !toUs) {
+        // Not our event. Defensive — SortableJS shouldn't fire onEnd on
+        // our instance for unrelated drags, but guard anyway.
+        return;
+      }
+
+      const current = opts.items();
+
+      // Disambiguate kind for the onChange callback + computing the next array.
+      const kind: SortableEventKind = sameList ? 'reorder' : fromUs ? 'remove' : 'add';
+
+      // Identity-based item lookup beats fragile `e.oldIndex`. The stash was
+      // set on `onStart` and travels with `e.item` across lists (SortableJS
+      // physically moves the same node between lists).
+      const stashedItem = readStash<T>(e.item);
+
+      const oldIndexHint =
+        typeof e.oldIndex === 'number' ? e.oldIndex : -1;
+      const newIndexHint =
+        typeof e.newIndex === 'number' ? e.newIndex : -1;
+
+      let next: T[];
+      let oldIndex: number;
+      let newIndex: number;
+      let moved: T | undefined;
+
+      if (sameList) {
+        // SAME-LIST REORDER
+        // Locate the moved item by identity first; fall back to the index hint.
+        const movedFromIdx =
+          stashedItem !== undefined && current.indexOf(stashedItem) !== -1
+            ? current.indexOf(stashedItem)
+            : oldIndexHint;
+        if (movedFromIdx < 0 || movedFromIdx >= current.length) {
+          // Lost the source item entirely. Bail out cleanly.
+          return;
+        }
+        moved = current[movedFromIdx] as T;
+        // Restore the moved DOM node back to its original position so the
+        // framework reconciler sees a clean model-vs-DOM shift. If the
+        // restore throws (fragile event), proceed to the model writeback —
+        // the re-render off the new model will reconcile.
+        safeDom(() => {
+          const ref = listEl.children[movedFromIdx] ?? null;
+          listEl.insertBefore(e.item, ref);
+        });
+        next = [...current];
+        next.splice(movedFromIdx, 1);
+        const targetIdx =
+          newIndexHint >= 0 && newIndexHint <= next.length
+            ? newIndexHint
+            : next.length;
+        next.splice(targetIdx, 0, moved);
+        oldIndex = movedFromIdx;
+        newIndex = targetIdx;
+      } else if (fromUs) {
+        // SOURCE SIDE of cross-list move — splice out of our items.
+        // Locate the moved item by identity (stash) first; fall back to oldIndex hint.
+        const movedFromIdx =
+          stashedItem !== undefined && current.indexOf(stashedItem) !== -1
+            ? current.indexOf(stashedItem)
+            : oldIndexHint;
+        if (movedFromIdx < 0 || movedFromIdx >= current.length) {
+          // Lost the source item entirely. Bail.
+          return;
+        }
+        moved = current[movedFromIdx] as T;
+        // Put the dragged DOM node back so our framework's re-render off
+        // the new (shorter) model removes it cleanly. If restore throws
+        // (fragile event — common path here when destination's onAdd
+        // already detached e.item), proceed to writeback anyway.
+        safeDom(() => {
+          const ref = listEl.children[movedFromIdx] ?? null;
+          listEl.insertBefore(e.item, ref);
+        });
+        next = [...current];
+        next.splice(movedFromIdx, 1);
+        oldIndex = movedFromIdx;
+        newIndex = -1; // not applicable on the source side
+      } else {
+        // DESTINATION SIDE of cross-list move — splice INTO our items.
+        // Prefer the stash (the source list's item data); fall back to
+        // attempting to read it from the moved DOM if the stash was lost
+        // (extreme fallback — should not happen in practice).
+        moved = stashedItem;
+        if (moved === undefined) {
+          // Without a moved item we have nothing to insert. Remove the
+          // SortableJS-inserted node so the framework re-render is clean.
+          safeDom(() => {
+            const node = e.item as { remove?: () => void } | null;
+            node?.remove?.();
+          });
+          return;
+        }
+        // Remove the SortableJS-inserted node — the framework re-render
+        // from the new (longer) model recreates the row properly.
+        safeDom(() => {
+          const node = e.item as { remove?: () => void } | null;
+          node?.remove?.();
+        });
+        next = [...current];
+        const targetIdx =
+          newIndexHint >= 0 && newIndexHint <= next.length
+            ? newIndexHint
+            : next.length;
+        next.splice(targetIdx, 0, moved);
+        oldIndex = -1; // not applicable on the destination side
+        newIndex = targetIdx;
+      }
+
+      // Commit the new array to the framework. This is the load-bearing
+      // line that the prior inline-handler design lost under fragile
+      // events because `_dispatchEvent` would catch the insertBefore
+      // throw and never reach this point.
+      opts.onCommit(next);
+      opts.afterCommit?.();
+      opts.onChange?.({ kind, oldIndex, newIndex, item: moved });
+    } finally {
+      // Clear the stash so a future drag of the SAME DOM element (Lit
+      // reuses keyed nodes across renders) can't leak a stale data ref.
+      const item = e.item as unknown as Record<string, unknown> | null;
+      if (item !== null && typeof item === 'object') {
+        delete item[ROZIE_ITEM_STASH_KEY];
+      }
+      opts.onEnd?.(e);
+    }
+  };
+
+  const instance = new SortableJS(listEl, {
+    ...baseOptions,
+    onStart: handleStart,
+    onEnd: handleEnd,
+  });
+
+  return {
+    destroy: () => {
+      instance.destroy();
+    },
+    instance,
+  };
+}
