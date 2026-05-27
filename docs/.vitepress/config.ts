@@ -85,6 +85,7 @@ export default defineConfig({
           text: 'Comparisons',
           items: [
             { text: 'Sortable libraries', link: '/guide/sortable-comparison' },
+            { text: 'SortableList — showcase', link: '/guide/sortable-list' },
           ],
         },
       ],
