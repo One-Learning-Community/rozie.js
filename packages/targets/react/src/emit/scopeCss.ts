@@ -33,8 +33,20 @@
  *   `.parent .child { ... }` → `.parent[data-rozie-s-abc] .child[data-rozie-s-abc] { ... }`
  *   `.a, .b { ... }` → `.a[data-rozie-s-abc], .b[data-rozie-s-abc] { ... }`
  *   `:root { ... }` → NOT touched (handled by isRootEscape branch upstream).
- *   `.outer :deep(.inner) { ... }` → `.outer[data-rozie-s-abc] .inner { ... }`
- *   `:deep(.x) { ... }` → `.x { ... }`
+ *   `.outer :deep(.inner) { ... }` → `.outer[data-rozie-s-abc] :global(.inner) { ... }`
+ *   `:deep(.x) { ... }` → `:global(.x) { ... }`
+ *
+ * React-specific note (quick task 260526-no7): the deep-lifted compound is
+ * wrapped in CSS Modules' `:global(...)` pseudo because React's bundler
+ * pipeline runs the emitted `.module.css` through CSS Modules, which hashes
+ * every bare class selector. Without `:global`, a lifted `.rozie-sortable-list`
+ * gets hashed to (e.g.) `.rozie-sortable-list_abc123` — but the producer
+ * component lives in a DIFFERENT CSS Module and ends up with a different
+ * hash, so the selector never matches the actual DOM. `:global(...)` opts the
+ * lifted inner out of CSS Modules hashing so the bare class name survives.
+ * Solid/Svelte/Lit do not need this — Solid injects CSS at runtime with literal
+ * class names; Svelte already wraps its scoped output in `:global { ... }`;
+ * Lit is shadow-DOM and doesn't cross boundaries anyway.
  *
  * @experimental — shape may change before v1.0
  */
@@ -129,10 +141,21 @@ function expandDeepDistribution(
 
 /**
  * For each `:deep(X)` pseudo in `selector` (where X is a single inner
- * selector — post-`expandDeepDistribution`), splice X's nodes into the
- * parent selector at the pseudo's position, replacing the pseudo. Every
- * spliced node is tagged in `deepLifted` so the compound walk skips
- * appending the scope attribute to it.
+ * selector — post-`expandDeepDistribution`), replace it with a single
+ * `:global(X)` pseudo wrapping the original inner selector. The
+ * `:global(...)` node itself is tagged in `deepLifted` so the compound
+ * walk skips appending the scope attribute to it.
+ *
+ * Why `:global(...)` wrap (React-only, quick task 260526-no7): React's
+ * `.module.css` output is processed by CSS Modules at bundle time, which
+ * hashes bare class selectors. The producer's `.rozie-sortable-list` lives
+ * in a DIFFERENT CSS Module with a different hash, so a raw lifted
+ * `.rozie-sortable-list` selector wouldn't match the producer's DOM.
+ * `:global(...)` opts the inner out of CSS Modules hashing.
+ *
+ * Combinators inside the original `:deep()` payload are preserved INSIDE
+ * the `:global()` wrap — `:deep(.a > .b)` becomes `:global(.a > .b)`, not
+ * `:global(.a) > :global(.b)`.
  */
 function hoistDeep(
   selector: selectorParser.Selector,
@@ -148,9 +171,13 @@ function hoistDeep(
       const pseudo = node as selectorParser.Pseudo;
       const inner = pseudo.nodes[0];
       if (inner && inner.type === 'selector') {
-        const innerNodes = (inner as selectorParser.Selector).nodes;
-        innerNodes.forEach((n) => deepLifted.add(n));
-        selector.nodes.splice(i, 1, ...innerNodes);
+        // Build `:global(<inner selector>)`. The original inner Selector
+        // node is reused so combinators inside the deep payload survive
+        // intact within the :global() wrap.
+        const globalPseudo = selectorParser.pseudo({ value: ':global' });
+        globalPseudo.append(inner as selectorParser.Selector);
+        deepLifted.add(globalPseudo);
+        selector.nodes.splice(i, 1, globalPseudo);
       }
     }
   }
