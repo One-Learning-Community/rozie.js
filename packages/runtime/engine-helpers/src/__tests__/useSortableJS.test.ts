@@ -415,6 +415,7 @@ describe('useSortableJS', () => {
         onRemove: userHandler,
         onStart: userHandler,
         onEnd: userHandler,
+        onClone: userHandler,
         // Non-handler options should pass through.
         animation: 150,
         group: 'foo',
@@ -429,15 +430,200 @@ describe('useSortableJS', () => {
     // the single handleCommit path.
     expect(rec.options.onUpdate).toBeUndefined();
     expect(rec.options.onRemove).toBeUndefined();
-    // onStart / onEnd / onAdd ARE registered, but they are the HELPER's, not
-    // the user's (the helper wires onEnd for source-side commits + onAdd for
-    // cross-list destination commits).
+    // onStart / onEnd / onAdd / onClone ARE registered, but they are the
+    // HELPER's, not the user's (the helper wires onEnd for source-side
+    // commits, onAdd for cross-list destination commits, and onClone for
+    // the clone-mode __rozieItem stash bridge).
     expect(typeof rec.options.onStart).toBe('function');
     expect(rec.options.onStart).not.toBe(userHandler);
     expect(typeof rec.options.onEnd).toBe('function');
     expect(rec.options.onEnd).not.toBe(userHandler);
     expect(typeof (rec.options as { onAdd?: unknown }).onAdd).toBe('function');
     expect((rec.options as { onAdd?: unknown }).onAdd).not.toBe(userHandler);
+    expect(typeof (rec.options as { onClone?: unknown }).onClone).toBe(
+      'function',
+    );
+    expect((rec.options as { onClone?: unknown }).onClone).not.toBe(
+      userHandler,
+    );
+  });
+
+  // ── clone-mode ────────────────────────────────────────────────────
+  //
+  // SortableJS clone mode (`group.pull === 'clone'`) keeps the original
+  // DOM node in the source and clones it for transfer to the destination.
+  // The helper:
+  //   - registers `onClone` to bridge `__rozieItem` from original → clone
+  //     so the destination's `onAdd` can recover the dragged item DATA
+  //     off the cloned node (`e.item === clone` on the destination side).
+  //   - short-circuits the source-side `onEnd` when `e.pullMode === 'clone'`
+  //     so the source's items array stays unchanged and no spurious
+  //     `kind: 'remove'` change is fired.
+  // Together these make clone mode "the destination receives a copy; the
+  // source keeps the original" without per-list bookkeeping in user code.
+
+  it('clone mode: source-side `e.pullMode === "clone"` SHORT-CIRCUITS — source items array unchanged, no `kind: "remove"` change', async () => {
+    const sourceItems: Item[] = [
+      { id: 'btn' },
+      { id: 'input' },
+      { id: 'card' },
+    ];
+    const sourceListEl = buildList(sourceItems);
+    const destListEl = buildList([]);
+
+    const commits: Item[][] = [];
+    const changes: Array<SortableChange<Item>> = [];
+
+    useSortableJS<Item>(sourceListEl, {
+      items: () => sourceItems,
+      onCommit: (next) => {
+        commits.push(next);
+      },
+      onChange: (info) => {
+        changes.push(info);
+      },
+    });
+
+    const rec = getLastConstructed();
+    const dragged = sourceListEl.children[1] as HTMLElement;
+    rec.options.onStart?.({
+      item: dragged,
+      oldIndex: 1,
+      from: sourceListEl,
+      to: sourceListEl,
+    });
+    // Source-side onEnd in clone mode: e.from === source, e.to === dest,
+    // e.pullMode === 'clone'. The original node stayed in the source —
+    // SortableJS does NOT move it. Per SortableJS docs: the cloned node is
+    // what travels to the destination.
+    rec.options.onEnd?.({
+      item: dragged,
+      oldIndex: 1,
+      newIndex: 0,
+      from: sourceListEl,
+      to: destListEl,
+      pullMode: 'clone',
+    });
+    await flushMicrotasks();
+
+    // Source's onCommit MUST NOT have fired — nothing was removed.
+    expect(commits.length).toBe(0);
+    // No onChange either — the helper's contract is "fires per commit"
+    // and there is no commit on the source side in clone mode.
+    expect(changes.length).toBe(0);
+    // The stash is cleaned up by the source's finally block as on any
+    // other source-side onEnd.
+    expect(
+      (dragged as unknown as Record<string, unknown>).__rozieItem,
+    ).toBeUndefined();
+  });
+
+  it('clone mode: `onClone` bridges __rozieItem from original to clone so destination `onAdd` recovers the item DATA', async () => {
+    const destItems: Item[] = [{ id: 'x' }];
+    const destListEl = buildList(destItems);
+
+    const commits: Item[][] = [];
+    const changes: Array<SortableChange<Item>> = [];
+
+    useSortableJS<Item>(destListEl, {
+      items: () => destItems,
+      onCommit: (next) => {
+        commits.push(next);
+      },
+      onChange: (info) => {
+        changes.push(info);
+      },
+    });
+
+    const rec = getLastConstructed();
+    // `onClone` is a helper-owned handler — assert it was registered.
+    expect(typeof (rec.options as { onClone?: unknown }).onClone).toBe(
+      'function',
+    );
+
+    // Simulate the cross-list clone-mode flow from the destination's POV.
+    // The source list (which we don't construct here) fired onStart and
+    // stashed `__rozieItem` on `original`. SortableJS then cloned the
+    // node; the helper's onClone bridged the stash from original → clone.
+    const sourceListEl = buildList([{ id: 'palette-btn' }]);
+    const original = sourceListEl.children[0] as HTMLElement;
+    const clone = document.createElement('div');
+    clone.setAttribute('data-id', 'palette-btn');
+    const stashedData: Item = { id: 'palette-btn' };
+    (original as unknown as Record<string, unknown>).__rozieItem = stashedData;
+    // Fire the helper's onClone — bridges the stash.
+    (
+      rec.options as {
+        onClone?: (e: { item: HTMLElement; clone: HTMLElement }) => void;
+      }
+    ).onClone?.({ item: original, clone });
+    // Stash is now on BOTH original (still — onClone copies, doesn't move)
+    // AND clone.
+    expect(
+      (original as unknown as Record<string, unknown>).__rozieItem,
+    ).toBe(stashedData);
+    expect(
+      (clone as unknown as Record<string, unknown>).__rozieItem,
+    ).toBe(stashedData);
+
+    // SortableJS appends the CLONE (not the original) to the destination.
+    destListEl.appendChild(clone);
+    // Destination's onAdd fires with e.item === clone.
+    (rec.options as { onAdd?: (e: unknown) => void }).onAdd?.({
+      item: clone,
+      oldIndex: 0,
+      newIndex: 1,
+      from: sourceListEl,
+      to: destListEl,
+      pullMode: 'clone',
+    });
+    await flushMicrotasks();
+
+    // Destination's onCommit fires with the cloned item appended.
+    expect(commits.length).toBe(1);
+    expect(commits[0]!.map((x) => x.id)).toEqual(['x', 'palette-btn']);
+    // onChange fires with kind: 'add' (this is the destination side).
+    expect(changes.length).toBe(1);
+    expect(changes[0]!.kind).toBe('add');
+    expect(changes[0]!.item?.id).toBe('palette-btn');
+  });
+
+  it('clone mode: source-side onEnd USER CALLBACK still fires even though no commit happens', async () => {
+    const sourceItems: Item[] = [{ id: 'a' }, { id: 'b' }];
+    const sourceListEl = buildList(sourceItems);
+    const destListEl = buildList([]);
+    const endCalls: unknown[] = [];
+
+    useSortableJS<Item>(sourceListEl, {
+      items: () => sourceItems,
+      onCommit: () => {
+        // ignore
+      },
+      onEnd: (e) => endCalls.push(e),
+    });
+
+    const rec = getLastConstructed();
+    const dragged = sourceListEl.children[0] as HTMLElement;
+    rec.options.onStart?.({
+      item: dragged,
+      oldIndex: 0,
+      from: sourceListEl,
+      to: sourceListEl,
+    });
+    const endEv = {
+      item: dragged,
+      oldIndex: 0,
+      newIndex: 0,
+      from: sourceListEl,
+      to: destListEl,
+      pullMode: 'clone',
+    };
+    rec.options.onEnd?.(endEv);
+    await flushMicrotasks();
+
+    // The user's onEnd callback still fires from the finally block —
+    // the drag DID end on the source side, even if no commit happened.
+    expect(endCalls).toEqual([endEv]);
   });
 
   it('onStart and onEnd user callbacks fire on the right events', () => {

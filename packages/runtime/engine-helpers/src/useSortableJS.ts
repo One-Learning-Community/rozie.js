@@ -156,6 +156,11 @@ export function useSortableJS<T>(
   delete (baseOptions as Record<string, unknown>).onUpdate;
   delete (baseOptions as Record<string, unknown>).onAdd;
   delete (baseOptions as Record<string, unknown>).onRemove;
+  // `onClone` is owned by the helper: we use it to bridge the
+  // `__rozieItem` stash from the original DOM node to the cloned node
+  // so the destination's `onAdd` can recover the dragged item DATA on
+  // a clone-mode drag. See `handleClone` below.
+  delete (baseOptions as Record<string, unknown>).onClone;
 
   /** Stash dragged item DATA on `e.item` so cross-list moves can recover
    * it on the destination side. */
@@ -251,6 +256,19 @@ export function useSortableJS<T>(
         oldIndex = movedFromIdx;
         newIndex = targetIdx;
       } else if (fromUs) {
+        // CLONE MODE — short-circuit. When SortableJS is in clone mode
+        // (`group.pull === 'clone'`), `e.pullMode === 'clone'` on cross-
+        // list events; the original DOM node STAYS in place and a fresh
+        // clone is what travels to the destination. The source list's
+        // items array is unchanged — no splice, no DOM-restore, and no
+        // `onChange({ kind: 'remove' })` (nothing was removed). The
+        // `__rozieItem` stash on the original is still cleaned up in
+        // the `finally` block below (`fromUs === true`), and the user's
+        // `onEnd` callback still fires from the finally — the drag did
+        // end on the source side.
+        if (e.pullMode === 'clone') {
+          return;
+        }
         // SOURCE SIDE of cross-list move — splice out of our items.
         // Locate the moved item by identity (stash) first; fall back to oldIndex hint.
         const movedFromIdx =
@@ -346,6 +364,42 @@ export function useSortableJS<T>(
     }
   };
 
+  /** Bridge the `__rozieItem` stash from the original DOM node to its
+   * clone when SortableJS is in clone mode (`group.pull === 'clone'`).
+   *
+   * Clone-mode lifecycle:
+   *   1. `onStart` fires on the source — we stash the dragged item DATA
+   *      on `e.item.__rozieItem`.
+   *   2. SortableJS clones the node — `clone` is the new DOM element
+   *      that physically travels to the destination.
+   *   3. `onClone` fires with `{ item, clone }` — THIS HOOK — we copy
+   *      the stash from `item` to `clone` so step 4 can find it.
+   *   4. `onAdd` fires on the destination with `e.item === clone`
+   *      (NOT the original). Destination-side `handleCommit` reads
+   *      `__rozieItem` off the clone via `readStash` → recovers the
+   *      dragged item DATA, splices it into its array.
+   *   5. `onEnd` fires on the source with `e.item === original`.
+   *      `handleCommit` (clone-mode short-circuit) returns early so
+   *      no spurious `remove` change is fired; the `finally` cleans
+   *      up the stash on the original.
+   *
+   * The `clone` DOM property is not in SortableJS's strict d.ts for
+   * `SortableEvent` (it's documented in their JS source but not the
+   * exported types), so we widen the parameter type locally. */
+  const handleClone = (e: SortableEvent & { clone: HTMLElement }): void => {
+    const original = e.item as unknown as Record<string, unknown> | null;
+    const clone = e.clone as unknown as Record<string, unknown> | null;
+    if (
+      original !== null &&
+      typeof original === 'object' &&
+      clone !== null &&
+      typeof clone === 'object' &&
+      ROZIE_ITEM_STASH_KEY in original
+    ) {
+      clone[ROZIE_ITEM_STASH_KEY] = original[ROZIE_ITEM_STASH_KEY];
+    }
+  };
+
   const instance = new SortableJS(listEl, {
     ...baseOptions,
     onStart: handleStart,
@@ -357,6 +411,10 @@ export function useSortableJS<T>(
     // destination (destination onAdd).
     onEnd: handleCommit,
     onAdd: handleCommit,
+    // Clone-mode stash bridge (see `handleClone` doc above). No-op on
+    // non-cloneable drags — SortableJS doesn't fire `onClone` outside
+    // clone mode.
+    onClone: handleClone,
   });
 
   return {
