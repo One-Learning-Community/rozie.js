@@ -1,0 +1,150 @@
+<!--
+  SortableListFilterDemo.rozie — SortableJS `filter` selector showcase.
+
+  Locked items (🔒) cannot be dragged. Implemented via the new
+  `:filter=".item-locked"` prop on SortableList — SortableJS skips drag
+  initiation on any element matching the selector.
+
+  CSS-class-as-selector caveat: the filter string is handed verbatim to
+  SortableJS's `new Sortable(el, { filter: '.item-locked' })`. On React
+  (CSS Modules) the class would normally be hashed to `_item-locked_xxxx`
+  and the literal selector would never match, but this fixture STYLES
+  `.item-locked` in the consumer's own `<style>` block (not via $classSelector)
+  AND the SortableList template applies the class via `:class="{...}"` on
+  the slot row — which IS subject to CSS-Modules hashing on React.
+
+  For full correctness across all 6 targets here we use a `data-*`
+  attribute as the filter selector (`[data-locked]`) instead of a class
+  selector. `data-*` attributes survive every target's class-hashing /
+  scoping / shadow-DOM transformations identically.
+-->
+
+<rozie name="SortableListFilterDemo">
+
+<components>
+{
+  SortableList: '../SortableList.rozie',
+}
+</components>
+
+<data>
+{
+  items: [],
+}
+</data>
+
+<script>
+const SEED_ITEMS = [
+  { id: '1', label: 'Inbox',     locked: true  },
+  { id: '2', label: 'Drafts',    locked: false },
+  { id: '3', label: 'Sent',      locked: false },
+  { id: '4', label: 'Archive',   locked: false },
+  { id: '5', label: 'Trash',     locked: true  },
+];
+
+const reset = () => {
+  $data.items = SEED_ITEMS.map((it) => ({ ...it }))
+}
+
+$onMount(() => reset());
+</script>
+
+<template>
+<div class="sortable-filter-demo">
+  <header>
+    <h3>Filtered drag — locked items</h3>
+    <p class="hint">Items marked 🔒 cannot be dragged. SortableList's <code>:filter="[data-locked]"</code> prop forwards to SortableJS's filter selector.</p>
+  </header>
+
+  <SortableList
+    r-model:items="$data.items"
+    itemKey="id"
+    filter="[data-locked]"
+    :handle="$classSelector('grip')"
+  >
+    <template #default="{ item }">
+      <div class="row" :data-locked="item.locked ? 'true' : null">
+        <span class="grip" :class="{ 'grip-disabled': item.locked }" aria-label="Drag handle">⋮⋮</span>
+        <span r-if="item.locked" class="lock-icon" aria-label="Locked">🔒</span>
+        <span class="label">{{ item.label }}</span>
+      </div>
+    </template>
+  </SortableList>
+
+  <footer class="controls">
+    <button type="button" @click="reset">Reset</button>
+  </footer>
+</div>
+</template>
+
+<style>
+.sortable-filter-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  max-width: 480px;
+}
+
+header h3 { margin: 0 0 0.25rem; font-size: 1.125rem; }
+header .hint { margin: 0 0 1rem; color: rgba(0, 0, 0, 0.55); font-size: 0.875rem; }
+header code {
+  font-family: ui-monospace, monospace;
+  font-size: 0.8125rem;
+  background: rgba(0, 0, 0, 0.04);
+  padding: 0.0625rem 0.25rem;
+  border-radius: 3px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: #f5f5f7;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 6px;
+  margin: 0.25rem 0;
+}
+
+.row[data-locked] {
+  background: #fafafa;
+  border-style: dashed;
+  color: rgba(0, 0, 0, 0.5);
+  cursor: not-allowed;
+}
+
+.grip {
+  color: rgba(0, 0, 0, 0.35);
+  cursor: grab;
+  user-select: none;
+  font-family: monospace;
+}
+.grip:active { cursor: grabbing; }
+.grip-disabled {
+  color: rgba(0, 0, 0, 0.15);
+  cursor: not-allowed;
+}
+
+.lock-icon {
+  font-size: 0.875rem;
+}
+
+.label { flex: 1; }
+
+.controls {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 0.75rem;
+}
+.controls button {
+  padding: 0.25rem 0.625rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8125rem;
+}
+</style>
+
+</rozie>
