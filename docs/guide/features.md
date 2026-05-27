@@ -566,6 +566,36 @@ Authors targeting only one framework can leave the marker and sigil in place at 
 The marker and sigil are escape hatches, not a default. Use them only when a third-party engine actually mutates DOM your component owns. Calling the sigil on every state change on Lit forces a child-tree rebuild and defeats lit-html's keyed diffing; the marker by itself is cheap, but the pairing has a real per-call cost. If you're not integrating with an engine that touches the DOM, you don't need either.
 :::
 
+## `$restoreFocus(selector, idx)` — keep focus on a row across keyed-reconciler re-renders
+
+When user source rewrites an array that drives an `r-for`, the framework's keyed reconciler decides what to do with the existing DOM. React, Vue, and Angular preserve identity for items whose key didn't change — focus survives the rewrite naturally. Svelte, Solid, and Lit's keyed reconcilers re-create the row DOM on reorder, dropping focus to `<body>`. That's a real accessibility gap for keyboard-driven reorder UIs — Space-lift / ArrowDown-move / Space-drop is unusable if focus disappears the moment you commit a move.
+
+`$restoreFocus(selector, idx)` closes the gap. After any array write that moves a row, call the sigil with a CSS selector that matches the row elements and the new index the focus should land on:
+
+```rozie
+<script>
+const onArrowDown = (oldIdx) => {
+  const newIdx = oldIdx + 1
+  const next = [...$props.items]
+  const [moved] = next.splice(oldIdx, 1)
+  next.splice(newIdx, 0, moved)
+  $props.items = next
+  $restoreFocus('[role="listitem"]', newIdx)
+}
+</script>
+```
+
+Per-target lowering:
+
+| Target | Expansion |
+| --- | --- |
+| React / Vue / Angular | `void 0` — no-op; the keyed reconciler preserves DOM identity, focus survives the rewrite |
+| Svelte / Solid / Lit | `queueMicrotask(() => root.querySelectorAll(selector)?.[idx]?.focus?.())` — runs after the framework's microtask reconciliation paint, locates the row at its new index, and re-focuses it |
+
+The first argument is validated at compile time as a string-literal CSS selector — non-literal arguments or unparseable selectors are diagnostic errors with a code frame (ROZ975 / ROZ976). The second argument is any expression evaluating to a non-negative integer; the sigil falls through silently when the resolved element is missing (the row was deleted, the selector didn't match), so it's safe to call after writes that may or may not produce a focus target.
+
+Authors targeting only React, Vue, or Angular can leave the sigil in place at zero cost — it lowers to `void 0`. The cross-target safety net is one of the closing pieces in the keyboard-accessibility story for `examples/SortableList.rozie` and any future engine-wrapper that exposes keyboard reorder.
+
 ## `r-bind` / `r-on` — object-spread directives and root-element fallthrough
 
 Component-library wrappers usually want to forward "everything else" — every attribute the consumer set, every listener they bound — onto a real DOM element inside the component. That work today dominates the maintenance budget of cross-framework UI libraries: every wrapper hand-threads `id`, `aria-*`, `data-*`, styles, `class`, and event handlers through a different idiom in each target. Rozie collapses that into two object-spread directives plus two magic accessors.
@@ -678,6 +708,20 @@ Slot content can receive parameters from the component, and consumers can destru
 </template>
 ```
 
+Consumers can rename the destructured params to match local naming — Vue's `<template #default="{ item: row }">` form works identically:
+
+```rozie
+<template>
+  <SortableList r-model:items="$data.columns" itemKey="id">
+    <template #default="{ item: column }">
+      <KanbanColumn :cards="column.cards" :title="column.title" />
+    </template>
+  </SortableList>
+</template>
+```
+
+The slot key on the producer (`item`) stays the binding point; `column` is the local name the consumer sees inside the fill body. Each target gets the right destructure shape — React, Vue, Svelte, and Solid emit JS-style `({ item: column }) =>` rename; Angular emits `<ng-template let-column="item">` (local var on the left, slot key on the right); Lit's shadow-DOM ctx accessor rewrites body references from the local binding (`column`) to the slot key (`item`).
+
 ::: tip Documented divergence
 Rozie's compatibility bar is "high percentage" parity, not 100%. Slots are the area with the largest documented divergence — React consumers see a render-prop-flavored API (`children?: (ctx) => ReactNode`, `renderHeader?: (ctx) => ReactNode`) rather than children-as-JSX. This is called out in [`docs/guide/why.md`](/guide/why) and is accepted as a v1 trade-off.
 :::
@@ -729,9 +773,10 @@ The outer compound (`.board`) stays scoped to this component; only what's inside
 
 Each target picks the right translation:
 
-- **React / Solid**: scope attribute appended to the outer compound only — `.board[data-rozie-s-<hash>] .rozie-sortable-list { … }`.
+- **React**: scope attribute appended to the outer compound only, AND the deep-lifted part wrapped in `:global(...)` so it survives CSS Modules — `.board[data-rozie-s-<hash>] :global(.rozie-sortable-list) { … }`. Without the `:global` wrap the inner class name would be module-hashed at build time and never match the producer-rendered class. (Class names *inside* `:global()` are left literal; the `:global` wrap is a CSS Modules convention, not a CSS spec pseudo, so it's invisible at runtime.)
+- **Solid**: scope attribute appended to the outer compound only — `.board[data-rozie-s-<hash>] .rozie-sortable-list { … }`. Solid emits CSS via a runtime style-inject (no CSS Modules pipeline), so the inner class name survives literally and needs no extra wrap.
 - **Vue**: `:deep()` is passed through verbatim. Vue 3.4+ `<style scoped>` understands the selector natively and applies its `[data-v-<hash>]` lowering downstream.
-- **Svelte**: same compound-scope rewrite as React/Solid, wrapped in Svelte 5's `:global { … }` so Svelte's native scoper doesn't interfere.
+- **Svelte**: same compound-scope rewrite as React, wrapped in Svelte 5's `:global { … }` so Svelte's native scoper doesn't interfere.
 - **Angular**: lowered to `::ng-deep` — `.board ::ng-deep .rozie-sortable-list { … }`. Angular's view encapsulation honors `::ng-deep` as the supported pierce mechanism (marked deprecated in the docs, but still the standard idiom for this exact case).
 - **Lit**: the scope attribute is lifted exactly like React/Solid, so the selector works **within one shadow root**. It does **not** cross shadow-DOM boundaries — each Lit producer renders in its own shadow root, and shadow boundaries are opaque to outside CSS. Cross-shadow styling is `::part()` territory (planned, not yet shipped); for today, parent-side CSS variables are the working alternative when you need to influence a Lit child's appearance.
 
