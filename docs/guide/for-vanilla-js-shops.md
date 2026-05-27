@@ -170,30 +170,28 @@ import { SortableList } from '@your-org/components';
 
 ## The compiler invariants that make this work
 
-A handful of engine-wrapper-specific compiler features have already shipped
+A handful of engine-wrapper-specific compiler features have shipped
 specifically because vanilla-JS engines are common Rozie use cases. You
 can rely on them:
 
-- **`$el` lowers to the right per-target host element** — `this._ref__rozieRoot`
-  on Lit, `el.nativeElement` on Angular, the root JSX ref on
-  React/Solid/Svelte, `getCurrentInstance()?.vnode.el` on Vue.
+- **`$el` lowers to the right per-target host element** so engine
+  constructors that take a DOM node always get the right one.
 - **`$onMount` returning a cleanup function** is the right shape on every
   target. No `useEffect` ceremony, no `DestroyRef` boilerplate.
 - **`$watch(() => $props.x, (v) => …)`** lowers to each target's idiomatic
-  reactive primitive (`watch` / `useEffect` / `$effect` / `effect` /
-  `createEffect` / `updated()`). The callback param is correctly bound on
-  all six targets.
+  reactive primitive. The callback fires when the watched expression
+  changes and the new value is bound correctly on all six targets.
 - **`$reconcileAfterDomMutation()`** is the escape hatch when the engine
   mutates DOM under the framework's feet — no-op on five targets,
-  Lit-specific `render(nothing, host) + requestUpdate()` on Lit.
-- **`$classSelector('grip')`** survives React's CSS-Modules class hashing —
-  lowers to `"." + styles.grip` on React, `".grip"` literal on every other
-  target. Engines that take a `handle: '.grip'` option Just Work.
-- **Round-trip guards on two-way bound engine state**: when the engine
-  fires its change event you write `$props.x = newValue`; the wrapper's own
-  `$watch` then sees the change and would push it back. Common pattern:
-  guard with `if (newValue !== getCurrentEngineValue()) updateEngine(newValue)`
-  inside the `$watch`. Documented in [the SortableList example](/examples/sortable-list).
+  active on Lit where lit-html's `repeat` cache needs the nudge.
+- **`$classSelector('grip')`** survives React's CSS-Modules class hashing.
+  Engines that take a `handle: '.grip'` option Just Work everywhere.
+- **Round-trip guards on two-way bound engine state.** When the engine
+  fires its change event you write `$props.x = newValue`; the wrapper's
+  own `$watch` then sees the change and would push it back. Common
+  pattern: guard with `if (newValue !== getCurrentEngineValue())
+  updateEngine(newValue)` inside the `$watch`. Documented in
+  [the SortableList example](/examples/sortable-list).
 - **TypeScript `as` / `satisfies` annotations** in `<data>` block
   initializers — `selected: null as Item | null` keeps the field
   discriminated instead of degrading to `null` / `any`.
@@ -213,9 +211,9 @@ test of the compiler's engine-wrapper substrate:
 | **Uppy** | Multi-event emit chain, streaming progress, engine-state snapshotting |
 | **FullCalendar** | Date-typed array elements, object spread inside engine calls, structured-payload multi-emit, portal-slot fills |
 
-All seven are gated by
-`packages/core/tests/engine-examples.compile.test.ts` — 14 `.rozie` files ×
-6 targets = 84 byte-identical compiled outputs on every commit.
+Each wrapper compiles to byte-identical output across all six targets on
+every commit — the engine-wrapper substrate is the most heavily-pinned
+surface in the test suite.
 
 ## Cross-framework leverage — the math
 

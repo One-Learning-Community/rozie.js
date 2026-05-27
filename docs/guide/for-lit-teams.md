@@ -22,50 +22,9 @@ Lit's `<slot>` element projects light-DOM children into shadow DOM by name. It d
 
 Community workarounds: serialize params as JSON into `data-*` attributes, hand-roll a "fillSlot" property API, or expose imperative methods the consumer queries. Each is a bespoke surface in every Lit component.
 
-Rozie's compiler emits the canonical version of one of these (the typed property-fill bridge) on your behalf:
-
-```rozie
-<rozie name="ItemList">
-<props>
-{ items: { type: Array, default: () => [] } }
-</props>
-<template>
-<ul>
-  <li r-for="item in $props.items" :key="item.id">
-    <slot name="row" :item="item" />
-  </li>
-</ul>
-</template>
-</rozie>
-```
-
-What the compiler emits:
-
-```ts
-// Producer-side (simplified):
-@property({ attribute: false })
-row?: (scope: { item: Item }) => unknown;
-
-render() {
-  return html`
-    <ul>
-      ${repeat(this.items, (item) => item.id, (item) =>
-        this.row !== undefined
-          ? html`<li>${this.row({ item })}</li>`
-          : html`<li><slot name="row"></slot></li>`
-      )}
-    </ul>
-  `;
-}
-```
-
-The consumer authors a typed render function:
-
-```html
-<item-list .items=${items} .row=${({ item }) => html`<strong>${item.name}</strong>`}></item-list>
-```
-
-Or, for a Rozie-authored consumer, the standard slot-fill syntax — Rozie compiles the bridge call automatically:
+Rozie compiles a typed property-fill bridge on your behalf. The producer
+declares its slot the normal way; the consumer fills it with the same
+syntax used on any other target:
 
 ```rozie
 <ItemList :items="$data.items">
@@ -73,7 +32,10 @@ Or, for a Rozie-authored consumer, the standard slot-fill syntax — Rozie compi
 </ItemList>
 ```
 
-Same authoring shape as a Vue scoped slot. Same emitted compose surface as a hand-rolled Lit fill-API. Zero boilerplate either side.
+Same authoring shape as a Vue scoped slot. Same emitted compose surface as
+a hand-rolled Lit fill-API. Zero boilerplate either side. Plain-HTML
+consumers fill the slot via the corresponding `.row=${(scope) => html`…`}`
+property splice — fully typed off the producer's `.d.ts`.
 
 ### Consumer CSS doesn't reach into shadow DOM
 
@@ -127,19 +89,15 @@ Rozie's compile-time dispatch handles dynamic slot names on every target includi
 
 ## What you write vs. what Lit sees
 
-The canonical `examples/SearchInput.rozie` compiles to a working Lit Web Component. Below is the source + the verbatim Lit emit produced by `@rozie/core` on every docs build.
-
-### The Rozie source
+The canonical `examples/SearchInput.rozie` compiles to a working Lit Web Component:
 
 ```rozie-src SearchInput
 ```
 
-### What the Rozie compiler emits for the `lit` target
-
-```rozie-out SearchInput lit
-```
-
-Note the canonical Lit shape: `@customElement('rozie-search-input')` decorator, `SignalWatcher(LitElement)` from `@lit-labs/preact-signals` for reactivity, `@property` decorators on each declared prop (with `reflect: true` where appropriate), `render()` returning a lit-html template, paired `disconnectedCallback()` cleanup. The `rozieSpread` and `rozieListeners` directives are tiny runtime helpers (~30 LOC each) that handle attribute fallthrough and listener fallthrough at lit-html part level — the same machinery your hand-written components would replicate.
+The compiled output is a canonical `LitElement` subclass — `@customElement`
+decorator, `@property`-declared reactive properties, `render()` returning a
+lit-html template, paired `disconnectedCallback()` cleanup. See the
+[SearchInput example page](/examples/search-input) for the full Lit emit.
 
 The compiled file is a valid, ready-to-`customElements.define`, fully-typed Lit component. You import it like any Web Component:
 
@@ -214,11 +172,11 @@ Three audiences in particular:
 
 ## Documented edges
 
-The Lit target has a few v1 edges, documented in the [Cross-Framework Parity](/parity) page:
-
-- **Scoped-slot params transport via a property-fill bridge** (vs. native template slots on the other targets). Same authoring shape via the `<template #name="{ … }">` syntax; the bridge is invisible to authors. The bridge uses `data-rozie-s-<hash>` scoping for consumer-CSS reach (documented above).
-- **`$onMount` / `$onUnmount` on always-rendered components**: see [the parity note](/parity#lit-solid-—-lifecycle-hooks-colocated-with-an-always-rendered-component) — `connectedCallback` / `disconnectedCallback` semantics differ from React `useEffect`-style mount/unmount in edge cases (a component that's removed from the DOM and re-attached fires both, where React's mount-once contract holds across StrictMode but breaks across portal-detach-and-reattach).
-- **Engine DOM mutation** needs `$reconcileAfterDomMutation()` — documented escape hatch.
+A few small Lit-target edges (scoped-slot params travel via a property-fill
+bridge rather than native template slots; `$onMount` / `$onUnmount` timing
+on always-rendered components differs slightly from React; engine DOM
+mutation needs the `$reconcileAfterDomMutation()` escape hatch) are
+described in [Cross-Framework Parity](/parity).
 
 ## Next steps
 

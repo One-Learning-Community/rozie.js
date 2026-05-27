@@ -113,20 +113,12 @@ export class SearchInput {
 ```rozie-src SearchInput
 ```
 
-#### What the Rozie compiler emits for the `angular` target
-
-This block is compiled live by `@rozie/core` on every docs build. The
-source above is the input; the code below is the verbatim output.
-
-```rozie-out SearchInput angular
-```
-
-The Rozie source is roughly a third the size and reads top-to-bottom. The
-compiled output is **structurally equivalent** to the hand-written
-version — the same `signal()` / `input()` / `output()` / `viewChild()` /
-`inject(DestroyRef)` / `ngAfterViewInit` machinery, with `@for` / `@if`
-blocks and `FormsModule`-backed `r-model` lowering. You don't see it
-during authoring. You import it normally:
+Roughly a third the size, reads top-to-bottom, no decorator soup. The
+compiler emits an idiomatic Angular standalone component using the same
+`signal()` / `input()` / `output()` / `viewChild()` / `inject(DestroyRef)`
+machinery you'd write by hand — see the
+[SearchInput example page](/examples/search-input) for the full Angular
+output. You don't see it during authoring. You import it normally:
 
 ```ts
 // app.component.ts
@@ -227,17 +219,13 @@ delete the `.rozie` source, and the `.ts` works on its own. Zero lock-in.
   reference + engine-wrapper examples)
 - ChangeDetection: signal-driven, no zone.js round-trips for state updates
 
-### Not in v1 (documented edge)
+### Documented edges
 
-- **Modifier `valueTransform` must be a pure expression**, not a statement
-  block — Angular's template parser splices the fragment verbatim into a
-  binding expression. (`registerModifier()` plugins targeting Angular
-  should keep the `valueTransform` short and expression-shaped.)
-- **`$watch` vs `$onMount` ordering**: immediate `$watch` fires *before*
-  `$onMount` on Angular (and Vue). React/Svelte/Solid/Lit fire it after.
-  Engine-wrapper reconcilers should be idempotent no-ops to stay safe.
-- **TypeScript floor 5.6+** — Angular 19's own peer dep is `>=5.5.0 <5.9.0`,
-  which sits inside our floor. Older TS isn't tested.
+A handful of small Angular-specific edges (custom modifier value-transforms
+must be pure expressions; immediate `$watch` fires before `$onMount` on
+Angular and Vue but after on the other targets; TypeScript 5.6+ required)
+are described in [Cross-Framework Parity](/parity) and
+[Compatibility](/compatibility).
 
 ## Why Angular shops in particular
 

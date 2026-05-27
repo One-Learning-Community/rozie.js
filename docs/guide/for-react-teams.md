@@ -132,11 +132,11 @@ CSS Modules hashes class names at build time. That means any code that reference
 
 ### Statically-computed `useEffect` dep arrays
 
-`eslint-plugin-react-hooks/exhaustive-deps` is the lint rule everyone respects and quietly hates. With Rozie, you don't write the dep array — the compiler walks the auto-tracked signal reads inside `$onMount`, `$watch`, and `<listeners>` blocks and emits the correct array. Every reference example passes `exhaustive-deps` cleanly on output.
+`eslint-plugin-react-hooks/exhaustive-deps` is the lint rule everyone respects and quietly hates. With Rozie, you don't write the dep array — the compiler emits the correct one from the lifecycle hook's body. Output passes `exhaustive-deps` cleanly.
 
 ### StrictMode double-fire safety
 
-`$onMount` returning a cleanup function lowers to one `useEffect` with a cleanup return — the canonical React 18 StrictMode-safe pattern. All reference examples + engine-wrapper demos validated under `<React.StrictMode>`.
+`$onMount` returning a cleanup function lowers to one `useEffect` with a cleanup return — the canonical React 18 StrictMode-safe pattern.
 
 ### Static error on prop mutation
 
@@ -150,21 +150,7 @@ The single most common React-component bug class (mutating a prop instead of cal
 
 ### Two-way binding that doesn't require a state-management library
 
-The React `useControllableState` pattern lives in every component library that does headlessly-controllable components (Radix, Headless UI, React Aria, etc.) — each implementation is a hand-rolled bit of glue. Rozie compiles `model: true` to the canonical hybrid:
-
-```ts
-// What you write:
-// <props>{ open: { type: Boolean, default: false, model: true } }</props>
-
-// What Rozie emits for React (simplified):
-const [open, setOpen] = useControllableState({
-  value: props.open,
-  defaultValue: false,
-  onChange: props.onOpenChange,
-});
-```
-
-Consumer code stays vanilla React:
+The React `useControllableState` pattern lives in every component library that does headlessly-controllable components (Radix, Headless UI, React Aria) — each one re-implements the same glue. Declare `model: true` on a `<props>` member and Rozie emits the canonical controllable-state pair for you. Consumer code stays vanilla React:
 
 ```tsx
 // Controlled
