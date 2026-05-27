@@ -33,10 +33,6 @@ Portal slots are NOT reactive after mount in v1. They re-render only when the wr
 The `MiniListEngine` styles its row containers and `<ul>` via inline `el.style.foo = …` assignments rather than referencing classes from the wrapper's `<style>` block. The reason: every target scopes the wrapper's CSS — React/Solid via CSS Modules hashed class names, Vue/Svelte/Angular via attribute-selector rewrites bound to declared template elements. Engine-created elements are NOT in the static template, so the scoped class names / attribute selectors never reach them. Inline styles bypass scoping uniformly across all 6 targets, which is the portable contract for engines that own their own DOM. The consumer's `<template #item>` content still flows through normal scoped CSS — that's the slot author's surface.
 :::
 
-::: tip Lit consumer-side bridge — CLOSED 2026-05-19 (Phase 07.5)
-Phase 07.5 closed the Lit consumer-side portal-slot bridge. `emitSlotFiller` (Lit) now branches on producer-side `SlotDecl.isPortal === true` (and on scoped slots whose consumer destructures scope params) and emits the fill as ``<rozie-foo .item=${(scope) => html`…`}>`` function-prop form on the parent component's open tag — exactly the shape the producer's portal closure expects. The producer-side companion change in `emitSlot` (commit `6fce2de`, CR-01 fix) wraps the slot output in ``${this.<X> !== undefined ? this.<X>({…scope…}) : html`<slot…>fallback</slot>`}`` so the consumer's function actually fires at render time. `LIT_PORTAL_GAP` was removed from `tests/visual-regression/specs/portal-list.spec.ts`; the Lit cell now renders the consumer's fragments inside the engine-owned containers like the other 5 targets. Dynamic-slot-name dispatch was carved into a follow-up Phase 07.6 — see `07.5-CARVE.md` for the architectural rationale.
-:::
-
 ## Authoring surface
 
 The PortalList wrapper boils down to three pieces. The `<template>` block declares the portal slot:

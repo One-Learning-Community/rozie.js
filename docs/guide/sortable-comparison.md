@@ -33,19 +33,19 @@ column.
 
 - **Mouse drag.** SortableList wraps the battle-tested
   [SortableJS](https://sortablejs.github.io/Sortable/) engine; Rozie's per-target
-  emit handles the cross-framework DOM-reconciler workaround
-  (`$reconcileAfterDomMutation()`, [Phase 14](/guide/features)) so the engine's
-  direct DOM mutation doesn't fight the framework's keyed list on any of the
-  six targets. The
+  emit reconciles the engine's direct DOM mutation with each framework's
+  keyed-list reconciler via the
+  [`$reconcileAfterDomMutation()`](/guide/features#r-external-and-reconcileafterdommutation-—-dom-the-framework-doesn-t-own)
+  sigil so it doesn't fight on any of the six targets. The
   [sortable-drag VR spec](https://github.com/One-Learning-Community/rozie.js/blob/main/tests/visual-regression/specs/sortable-drag.spec.ts)
   pins this for every target cell.
 - **Keyboard drag.** A Space-lift / ArrowDown-move / Space-drop / Escape-cancel
   keymap with aria-live announcements lives in user source — but the
   cross-target focus-restoration leak (Svelte / Solid / Lit's keyed
   reconcilers re-create row DOM on reorder, dropping focus to `<body>`) is
-  closed by Rozie's `$restoreFocus(selector, idx)` sigil
-  ([Phase 16](https://github.com/One-Learning-Community/rozie.js/blob/main/.planning/phases/16-cross-target-emit-conformance/16-SPEC.md)).
-  No per-target user-source workarounds needed.
+  closed by Rozie's
+  [`$restoreFocus(selector, idx)`](/guide/features#restorefocus-selector-idx-—-keep-focus-on-a-row-across-keyed-reconciler-re-renders)
+  sigil. No per-target user-source workarounds needed.
 - **Nested droppables.** `SortableListNested` composes `SortableList` with
   itself (a Kanban-column demo) and via `KanbanColumn` wrapper, exercising
   cross-column card drag with reorderable columns. The same source compiles

@@ -48,17 +48,14 @@ import Modal from '@my-design-system/modal';
 <Modal renderHeader={({ close }) => <button onClick={close}>×</button>} />
 ```
 
-The `renderHeader` prop signature is exported via the `.d.ts` sidecar
-(Phase 7 producer-side emit), so the `close` param is fully typed — the only
-ergonomic friction is the function-prop authoring shape (vs Vue's
-`<template #header="{ close }">`). This is the documented v1 acceptable edge
-case per the project's "high-percentage parity, not 100%" stance; an RFC for a
-render-prop ergonomic improvement (e.g., a small JSX-element wrapper that
-compiles to render-prop dispatch) is a candidate v2 enhancement.
+The `renderHeader` prop signature is exported via the `.d.ts` sidecar, so
+the `close` param is fully typed — the only ergonomic friction is the
+function-prop authoring shape (vs Vue's `<template #header="{ close }">`).
+This is the documented v1 acceptable edge case per Rozie's "high-percentage
+parity, not 100%" stance.
 
-The canonical example is `tests/slot-matrix/fixtures/consumer-dynamic-name/expected.tsx`
-and the Phase 07.2 Plan 06 dogfood at `examples/ModalConsumer.rozie` →
-`tests/dist-parity/fixtures/ModalConsumer.tsx`.
+The canonical example is `examples/ModalConsumer.rozie` and its compiled
+output at `tests/dist-parity/fixtures/ModalConsumer.*`.
 
 ### Dynamic slot names (R5) — per-target consumer-side divergences
 
@@ -79,9 +76,8 @@ evaluates at runtime to the slot name) dispatches differently per target:
 For Vue + Lit a Rozie author writing `<template #[name]>` will get correct
 runtime dispatch out of the box. For React / Solid / Svelte / Angular, the
 **producer-side acceptance of the slots/snippets/templates input prop** is the
-hand-off contract — see the per-target dispatch chains documented in Plan
-07.2-04 SUMMARY for the recommended runtime dispatch order
-(`slots?.[name]?.(ctx) ?? renderNamed?.(ctx) ?? defaultContent`).
+hand-off contract; the recommended runtime dispatch order is
+`slots?.[name]?.(ctx) ?? renderNamed?.(ctx) ?? defaultContent`.
 
 ### Lit — scoped slot params arrive via a data attribute
 
@@ -91,8 +87,8 @@ slot params are exposed on the projected `<slot>` element via a
 the consumer side with the small `observeRozieSlotCtx` helper. Default and
 named slots without params use native `<slot>` projection unchanged.
 
-Phase 07.2 Plan 03 added a first-paint smoke check
-(`tests/visual-regression/specs/lit-scoped-fill-firstpaint.spec.ts`) that
+A first-paint smoke check
+(`tests/visual-regression/specs/lit-scoped-fill-firstpaint.spec.ts`)
 verifies the observed ctx is wired correctly on the first paint — no flicker,
 no `undefined` reference in the body's `this._headerCtx?.close` access.
 
@@ -102,9 +98,9 @@ A producer prop declared `model: true` emits the per-target two-way machinery
 (`defineModel`, `$bindable`, `useControllableState`, `model<T>()`,
 `createControllableSignal`, Lit custom-event pair) on the **producer** side.
 The consumer side opts in to the matching two-way wiring via the
-**`r-model:propName="<writable-lvalue>"` directive** (Phase 07.3 — Vue 3
+**`r-model:propName="<writable-lvalue>"` directive** — the Vue 3
 `v-model:argName=` analog, parallel to the existing form-input
-`r-model="$data.draft"` sugar).
+`r-model="$data.draft"` sugar.
 
 ```rozie
 <!-- consumer.rozie — engaging the producer's model: true machinery -->
@@ -134,7 +130,7 @@ and the matching forwarding-pattern fixtures live at
 `tests/dist-parity/fixtures/WrapperModal.*`. All 6 × 4 entrypoints
 (compile / cli / babel-plugin / unplugin) emit byte-identical output.
 
-#### LHS rules (D-03 permissive)
+#### LHS rules
 
 The right-hand-side expression must be a **writable lvalue**:
 
@@ -155,7 +151,7 @@ Literals, ternaries, function calls, `$computed` refs, `$refs.X`, and
 | ---- | ------- | ----- |
 | **ROZ949** | `r-model:propName=` on a component whose producer prop lacks `model: true` | Dual-frame diagnostic — consumer site + producer decl site, so authors see exactly which prop on which producer needs the `model: true` toggle |
 | **ROZ950** | `r-model:` with empty arg (e.g. `r-model:="..."`), OR `r-model:propName=` applied to a non-component HTML tag | Single combined code — both cases share "the directive cannot be applied here" semantics |
-| **ROZ951** | RHS is not a writable lvalue per the D-03 rules above | Hint suggests bind to `$data.X` or, in a wrapper component, `$props.X` declared with `model: true` |
+| **ROZ951** | RHS is not a writable lvalue per the rules above | Hint suggests bind to `$data.X` or, in a wrapper component, `$props.X` declared with `model: true` |
 
 #### WrapperModal forwarding pattern
 
@@ -185,17 +181,16 @@ each target. The wrapper's `useControllableState` (React) /
 instance becomes the bridge between the parent's two-way bind and the inner
 Modal's matching machinery.
 
-### Lit — scoped + dynamic slot names (deferred combination)
+### Lit — scoped + dynamic slot names (unsupported combination)
 
-The Lit static-name scoped fill IR pre-transform (`rewriteScopedParamRefs`)
-requires a stable `_<name>Ctx` class field name derived from the slot's name.
-For a dynamic name (only known at runtime), there's no stable name to
-synthesise the field from. Mixing scoped + dynamic in Lit (e.g.,
+The Lit static-name scoped fill IR pre-transform requires a stable
+`_<name>Ctx` class field name derived from the slot's name. For a dynamic
+name (only known at runtime), there's no stable name to synthesise the field
+from. Mixing scoped + dynamic in Lit (e.g.,
 `<template #[someName]="{ ctx }">…</template>`) is therefore a documented v1
-limitation. No fixture exercises the combination, and no consumer pattern in
-the dogfood examples needs it. If real-world usage surfaces a need, the
-resolution path is a Map-keyed ctx observer + class-body Map field instead of
-the per-name field shape — a candidate v2 RFC.
+limitation. If real-world usage surfaces a need, the resolution path is a
+Map-keyed ctx observer + class-body Map field instead of the per-name field
+shape — slated as a future enhancement.
 
 ## Target-framework lifecycle semantics
 

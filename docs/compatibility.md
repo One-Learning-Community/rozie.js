@@ -82,7 +82,7 @@ Producer + consumer emit shapes per target are documented in
 | Scoped slot params (`<slot :ctx="x">` + `#name="{ ctx }"`) | [⚠︎](/parity#react-—-scoped-slots-are-render-prop-function-props) | ✅ | ✅ | ✅ | ✅ | [⚠︎](/parity#lit-—-scoped-slot-params-arrive-via-a-data-attribute) |
 | Third-party (non-Rozie) consumer slot fill | [⚠︎](/parity#consumer-side-slot-fill-—-third-party-react-consumers-of-compiled-rozie-components) | ✅ | ✅ | ✅ | ✅ | [⚠︎](/parity#lit-—-scoped-slot-params-arrive-via-a-data-attribute) |
 | Dynamic slot names (`#[expr]`) | [⚠︎](/parity#dynamic-slot-names-r5-—-per-target-consumer-side-divergences) | ✅ | [⚠︎](/parity#dynamic-slot-names-r5-—-per-target-consumer-side-divergences) | [⚠︎](/parity#dynamic-slot-names-r5-—-per-target-consumer-side-divergences) | [⚠︎](/parity#dynamic-slot-names-r5-—-per-target-consumer-side-divergences) | ✅ |
-| Scoped + dynamic slot name combination | [⚠︎](/parity#dynamic-slot-names-r5-—-per-target-consumer-side-divergences) | ✅ | [⚠︎](/parity#dynamic-slot-names-r5-—-per-target-consumer-side-divergences) | [⚠︎](/parity#dynamic-slot-names-r5-—-per-target-consumer-side-divergences) | [⚠︎](/parity#dynamic-slot-names-r5-—-per-target-consumer-side-divergences) | [❌](/parity#lit-—-scoped-dynamic-slot-names-deferred-combination) |
+| Scoped + dynamic slot name combination | [⚠︎](/parity#dynamic-slot-names-r5-—-per-target-consumer-side-divergences) | ✅ | [⚠︎](/parity#dynamic-slot-names-r5-—-per-target-consumer-side-divergences) | [⚠︎](/parity#dynamic-slot-names-r5-—-per-target-consumer-side-divergences) | [⚠︎](/parity#dynamic-slot-names-r5-—-per-target-consumer-side-divergences) | [❌](/parity#lit-—-scoped-dynamic-slot-names-unsupported-combination) |
 
 ## Tooling
 
@@ -101,7 +101,7 @@ The pattern across them is consistent:
 - **`r-model` modifiers ⚠︎ (React only)** — `.number`/`.trim`/custom value transforms are byte-identical across all six targets. The one divergence is React's `.lazy`: React has no true `change` event, so `r-model.lazy` emits an **uncontrolled `defaultValue` + `onBlur`** input (the idiomatic React deferred-commit pattern) instead of a controlled `value` + `onChange`. The trade-off — programmatic writes to the bound state mid-edit are not reflected by the uncontrolled input — is a documented parity gap, consistent with the render-prop-slot precedent. See [`r-model` modifiers](/guide/features#r-model-modifiers-lazy-number-trim).
 
 The only `❌` in the matrix is the Lit-specific scoped + dynamic slot name
-combination — a deferred v1 limitation pending a Map-keyed ctx-observer RFC.
+combination — a documented v1 limitation.
 
 Everything else — props, `<data>`, `<listeners>`, `$computed`, `$watch`,
 modifier grammar, two-way binding machinery, default + named slots, refs,
