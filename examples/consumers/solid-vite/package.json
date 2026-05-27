@@ -15,7 +15,8 @@
   "dependencies": {
     "@rozie/runtime-solid": "workspace:*",
     "@rozie/unplugin": "workspace:*",
-    "solid-js": "^1.9.12"
+    "solid-js": "^1.9.12",
+    "sortablejs": "^1.15"
   },
   "devDependencies": {
     "@playwright/test": "^1",

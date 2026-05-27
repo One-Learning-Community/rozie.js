@@ -11,6 +11,8 @@ import TreeNodePage from './pages/TreeNodePage';
 import ModalConsumerPage from './pages/ModalConsumer';
 // Phase 16 — PropDefaultCoercion runtime probe (SPEC R1/R5 D-05 runtime arm).
 import PropDefaultCoercionPage from './pages/PropDefaultCoercionPage';
+// 260526 triage — SortableListNestedDemo on real vite-plugin-solid stack.
+import SortableListNestedPage from './pages/SortableListNestedPage';
 
 /**
  * Page-routing shell for the Solid Vite demo.
@@ -64,6 +66,8 @@ export function App() {
           <a href="#/modal-consumer" data-testid="nav-modal-consumer">ModalConsumer</a>
           {' | '}
           <a href="#/prop-default-coercion" data-testid="nav-prop-default-coercion">PropDefaultCoercion</a>
+          {' | '}
+          <a href="#/sortable-nested" data-testid="nav-sortable-nested">SortableNested</a>
         </nav>
       </header>
       <main style={{ padding: '1rem', 'font-family': 'system-ui, sans-serif' }}>
@@ -77,6 +81,7 @@ export function App() {
         <Show when={route() === '/treenode'}><TreeNodePage /></Show>
         <Show when={route() === '/modal-consumer'}><ModalConsumerPage /></Show>
         <Show when={route() === '/prop-default-coercion'}><PropDefaultCoercionPage /></Show>
+        <Show when={route() === '/sortable-nested'}><SortableListNestedPage /></Show>
       </main>
     </div>
   );
