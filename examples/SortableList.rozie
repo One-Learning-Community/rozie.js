@@ -31,14 +31,35 @@
 
 <props>
 {
-  items:     { type: Array,    default: () => [],  model: true },
-  itemKey:   { type: String,   default: null },
-  handle:    { type: String,   default: null },
-  group:     { type: String,   default: null },
-  animation: { type: Number,   default: 150 },
-  disabled:  { type: Boolean,  default: false },
-  options:   { type: Object,   default: () => ({}) },
-  labelFor:  { type: Function, default: null },
+  items:          { type: Array,    default: () => [],  model: true },
+  itemKey:        { type: String,   default: null },
+  handle:         { type: String,   default: null },
+  group:          { type: String,   default: null },
+  animation:      { type: Number,   default: 150 },
+  disabled:       { type: Boolean,  default: false },
+  options:        { type: Object,   default: () => ({}) },
+  labelFor:       { type: Function, default: null },
+  // Runtime-updatable SortableJS pass-through props (forwarded via the
+  // inline options literal in $onMount + reapplied through $watch +
+  // instance.option(name, v) on change).
+  ghostClass:     { type: String,   default: null },
+  chosenClass:    { type: String,   default: null },
+  dragClass:      { type: String,   default: null },
+  filter:         { type: String,   default: null },
+  easing:         { type: String,   default: null },
+  // Construction-time-only SortableJS knobs — changing these at runtime
+  // requires destroying and recreating the SortableJS instance. The
+  // SortableListShowcaseDemo bridges this by re-keying its <SortableList>
+  // on a string of these values; consumers wanting per-knob runtime
+  // updates must do the same.
+  forceFallback:  { type: Boolean,  default: false },
+  swapThreshold:  { type: Number,   default: 1 },
+  // High-level prop that REPLACES a string `group` with the SortableJS
+  // clone-mode object form `{ name, pull: 'clone', put: true }`. When
+  // `cloneable: true` AND `$props.group` is null, the group is left
+  // untouched (a `cloneable` flag without a `group` name is not
+  // meaningful — see docs/guide/sortable-list.md).
+  cloneable:      { type: Boolean,  default: false },
 }
 </props>
 
@@ -145,10 +166,25 @@ $onMount(() => {
     items: () => $props.items,
     onCommit: (next) => { $props.items = next },
     options: {
-      animation: $props.animation,
-      disabled:  $props.disabled,
-      group:     $props.group,
-      handle:    $props.handle,
+      animation:     $props.animation,
+      disabled:      $props.disabled,
+      // `cloneable` is a high-level Rozie prop that REPLACES a string
+      // `group` with SortableJS's `{ name, pull: 'clone', put: true }`
+      // object form. When `cloneable:false`, pass `$props.group` through
+      // verbatim. When `cloneable:true` AND `$props.group` is null,
+      // leave it null — a clone-mode list without a group name is not
+      // meaningful (no peer list can join the cross-list flow).
+      group:         $props.cloneable && typeof $props.group === 'string'
+                       ? { name: $props.group, pull: 'clone', put: true }
+                       : $props.group,
+      handle:        $props.handle,
+      ghostClass:    $props.ghostClass,
+      chosenClass:   $props.chosenClass,
+      dragClass:     $props.dragClass,
+      filter:        $props.filter,
+      forceFallback: $props.forceFallback,
+      swapThreshold: $props.swapThreshold,
+      easing:        $props.easing,
       ...$props.options,
     },
     // Lit lit-html `repeat` directive caches its part array by sentinel-
@@ -175,9 +211,20 @@ $onMount(() => {
 // Reconcile prop changes into the live SortableJS instance without
 // re-creating it. instance.option(name, value) is SortableJS's supported
 // runtime update path for these fields.
-$watch(() => $props.disabled, (v) => instance?.option('disabled', v))
-$watch(() => $props.group,    (v) => instance?.option('group',    v))
-$watch(() => $props.handle,   (v) => instance?.option('handle',   v))
+//
+// Construction-time-only knobs (forceFallback, swapThreshold, cloneable)
+// are NOT reapplied here — changing them at runtime would require
+// destroying and recreating the SortableJS instance. Consumers that need
+// per-knob runtime updates should re-key the <SortableList> on those
+// values (see SortableListShowcaseDemo for the canonical pattern).
+$watch(() => $props.disabled,    (v) => instance?.option('disabled',    v))
+$watch(() => $props.group,       (v) => instance?.option('group',       v))
+$watch(() => $props.handle,      (v) => instance?.option('handle',      v))
+$watch(() => $props.ghostClass,  (v) => instance?.option('ghostClass',  v))
+$watch(() => $props.chosenClass, (v) => instance?.option('chosenClass', v))
+$watch(() => $props.dragClass,   (v) => instance?.option('dragClass',   v))
+$watch(() => $props.filter,      (v) => instance?.option('filter',      v))
+$watch(() => $props.easing,      (v) => instance?.option('easing',      v))
 </script>
 
 <template>
