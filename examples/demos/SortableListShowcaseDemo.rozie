@@ -1,0 +1,327 @@
+<!--
+  SortableListShowcaseDemo.rozie — the marquee piece.
+
+  Live-tunable SortableList with every prop exposed via a control panel
+  on top, an 8-item list below. Demonstrates the runtime-update path
+  (instance.option(name, v) via $watch) for ghostClass/chosenClass/
+  dragClass/filter/easing AND the construction-time remount path (via
+  `:key` recomputation) for forceFallback/swapThreshold/cloneable.
+
+  The `:key` strategy:
+  Re-keying a child component on the framework reconciler unmounts the
+  old SortableList instance and mounts a fresh one. SortableJS itself
+  has no `option()` path for forceFallback/swapThreshold/cloneable, so
+  changing those props ON A LIVE INSTANCE silently no-ops; remount is
+  the only correct path. This is documented in
+  docs/guide/sortable-list.md § Gotchas as the standard pattern.
+-->
+
+<rozie name="SortableListShowcaseDemo">
+
+<components>
+{
+  SortableList: '../SortableList.rozie',
+}
+</components>
+
+<data>
+{
+  items: [],
+  nextId: 9,
+  disabled: false,
+  forceFallback: false,
+  cloneable: false,
+  animation: 150,
+  swapThreshold: 1,
+  easing: '',
+  ghostPreset: 'subtle',
+  chosenPreset: 'chosen-subtle',
+  filter: '',
+}
+</data>
+
+<script>
+const SEED_ITEMS = [
+  { id: '1', label: 'Strawberry',   kind: 'fruit'     },
+  { id: '2', label: 'Tomato',       kind: 'vegetable' },
+  { id: '3', label: 'Cilantro',     kind: 'herb'      },
+  { id: '4', label: 'Cucumber',     kind: 'vegetable' },
+  { id: '5', label: 'Mango',        kind: 'fruit'     },
+  { id: '6', label: 'Mint',         kind: 'herb'      },
+  { id: '7', label: 'Bell pepper',  kind: 'vegetable' },
+  { id: '8', label: 'Blueberry',    kind: 'fruit'     },
+];
+
+const reset = () => {
+  $data.items = SEED_ITEMS.map((it) => ({ ...it }))
+  $data.disabled = false
+  $data.forceFallback = false
+  $data.cloneable = false
+  $data.animation = 150
+  $data.swapThreshold = 1
+  $data.easing = ''
+  $data.ghostPreset = 'subtle'
+  $data.chosenPreset = 'chosen-subtle'
+  $data.filter = ''
+  $data.nextId = 9
+}
+
+$onMount(() => reset());
+</script>
+
+<template>
+<div class="sortable-showcase-demo">
+  <header>
+    <h3>SortableList — live showcase</h3>
+    <p class="hint">Twiddle the knobs. Runtime-updatable knobs (animation, easing, ghostClass, chosenClass, dragClass, filter, disabled) reapply via <code>instance.option()</code>. Construction-time-only knobs (forceFallback, swapThreshold, cloneable) trigger a remount via <code>:key</code>.</p>
+  </header>
+
+  <section class="controls">
+    <div class="row">
+      <label><input type="checkbox" r-model="$data.disabled"      /> Disabled</label>
+      <label><input type="checkbox" r-model="$data.forceFallback" /> Force fallback <span class="note">(remounts)</span></label>
+      <label><input type="checkbox" r-model="$data.cloneable"     /> Cloneable <span class="note">(remounts)</span></label>
+    </div>
+
+    <div class="row">
+      <label class="slider-label">
+        <span>Animation</span>
+        <input type="range" min="0" max="500" step="10" r-model="$data.animation" />
+        <span class="value">{{ $data.animation }}ms</span>
+      </label>
+      <label class="slider-label">
+        <span>Swap threshold <span class="note">(remounts)</span></span>
+        <input type="range" min="0" max="1" step="0.1" r-model="$data.swapThreshold" />
+        <span class="value">{{ $data.swapThreshold }}</span>
+      </label>
+    </div>
+
+    <div class="row">
+      <label>
+        Easing
+        <select r-model="$data.easing">
+          <option value="">none</option>
+          <option value="ease">ease</option>
+          <option value="ease-in">ease-in</option>
+          <option value="ease-out">ease-out</option>
+          <option value="cubic-bezier(0.4, 0, 0.2, 1)">cubic-bezier(0.4, 0, 0.2, 1)</option>
+        </select>
+      </label>
+      <label>
+        Ghost
+        <select r-model="$data.ghostPreset">
+          <option value="subtle">subtle</option>
+          <option value="highlight">highlight</option>
+          <option value="wireframe">wireframe</option>
+        </select>
+      </label>
+      <label>
+        Chosen
+        <select r-model="$data.chosenPreset">
+          <option value="chosen-subtle">subtle</option>
+          <option value="chosen-highlight">highlight</option>
+          <option value="chosen-bold">bold</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="row">
+      <label class="filter-label">
+        Filter
+        <input type="text" r-model="$data.filter" placeholder="e.g. .item-locked or [data-locked]" />
+      </label>
+      <button type="button" @click="reset">Reset all</button>
+    </div>
+  </section>
+
+  <section class="list-wrap">
+    <SortableList
+      :key="`${$data.forceFallback}-${$data.cloneable}-${$data.swapThreshold}`"
+      r-model:items="$data.items"
+      itemKey="id"
+      :handle="$classSelector('grip')"
+      :disabled="$data.disabled"
+      :animation="$data.animation"
+      :easing="$data.easing"
+      :ghostClass="$data.ghostPreset"
+      :chosenClass="$data.chosenPreset"
+      :filter="$data.filter"
+      :forceFallback="$data.forceFallback"
+      :swapThreshold="Number($data.swapThreshold)"
+      :cloneable="$data.cloneable"
+    >
+      <template #default="{ item }">
+        <div class="item-row" :class="`kind-${item.kind}`">
+          <span class="grip" aria-label="Drag handle">⋮⋮</span>
+          <span class="kind-pill">{{ item.kind }}</span>
+          <span class="label">{{ item.label }}</span>
+        </div>
+      </template>
+    </SortableList>
+  </section>
+</div>
+</template>
+
+<style>
+.sortable-showcase-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  max-width: 720px;
+}
+
+header h3 { margin: 0 0 0.25rem; font-size: 1.125rem; }
+header .hint { margin: 0 0 1rem; color: rgba(0, 0, 0, 0.55); font-size: 0.875rem; }
+header code {
+  font-family: ui-monospace, monospace;
+  font-size: 0.8125rem;
+  background: rgba(0, 0, 0, 0.04);
+  padding: 0.0625rem 0.25rem;
+  border-radius: 3px;
+}
+
+.controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  background: #fafafa;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 6px;
+  margin-bottom: 0.75rem;
+  font-size: 0.875rem;
+}
+
+.controls .row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+}
+
+.controls label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.controls .slider-label {
+  flex: 1;
+  min-width: 200px;
+}
+.controls .slider-label input[type="range"] { flex: 1; }
+.controls .slider-label .value {
+  font-variant-numeric: tabular-nums;
+  color: rgba(0, 0, 0, 0.5);
+  min-width: 3rem;
+  text-align: right;
+}
+
+.controls .filter-label {
+  flex: 1;
+  min-width: 240px;
+}
+.controls .filter-label input[type="text"] {
+  flex: 1;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+  font: inherit;
+  font-size: 0.8125rem;
+}
+
+.controls select {
+  font: inherit;
+  font-size: 0.8125rem;
+  padding: 0.125rem 0.25rem;
+}
+
+.controls button {
+  padding: 0.25rem 0.625rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8125rem;
+}
+
+.controls .note {
+  color: rgba(0, 0, 0, 0.4);
+  font-size: 0.75rem;
+  font-style: italic;
+}
+
+.list-wrap { min-height: 4rem; }
+
+.item-row {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.5rem 0.75rem;
+  background: #f5f5f7;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 6px;
+  margin: 0.25rem 0;
+}
+
+.grip {
+  color: rgba(0, 0, 0, 0.35);
+  cursor: grab;
+  user-select: none;
+  font-family: monospace;
+}
+.grip:active { cursor: grabbing; }
+
+.kind-pill {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.125rem 0.375rem;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.05);
+  color: rgba(0, 0, 0, 0.6);
+  min-width: 4rem;
+  text-align: center;
+}
+.kind-fruit .kind-pill     { background: #ffe2e6; color: #b8243d; }
+.kind-vegetable .kind-pill { background: #e2ffe6; color: #28793c; }
+.kind-herb .kind-pill      { background: #e6ecff; color: #2a3fa0; }
+
+.label { flex: 1; }
+
+/* ── ghost / chosen / drag CSS-class presets ─────────────────────── */
+/* These class names are what get passed to SortableJS as ghostClass /
+   chosenClass / dragClass. The values are defined here so the runtime
+   toggles below have a visible effect.
+
+   For React (CSS Modules) — these classes are also styled in this
+   component's <style> block, so the React target's PostCSS-Modules
+   pipeline scopes them. SortableJS attaches the ORIGINAL class name
+   though (passed via `ghostClass` etc.), not the scoped name, which
+   means the ghost element renders unstyled on React. This is a known
+   `$classSelector`-shaped gap for SortableJS's class-as-class-name
+   props (it isn't a selector — SortableJS calls
+   `el.classList.add(name)` — so $classSelector doesn't apply).
+   Documented in docs/guide/sortable-list.md § Gotchas. */
+.subtle {
+  background: rgba(0, 0, 0, 0.03);
+  border-color: rgba(0, 0, 0, 0.1);
+  color: rgba(0, 0, 0, 0.3);
+}
+.highlight {
+  background: #fff8b8;
+  border-color: #d4be00;
+}
+.wireframe {
+  background: transparent;
+  border-style: dashed;
+  border-color: rgba(0, 102, 204, 0.5);
+}
+.chosen-subtle  { box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15); }
+.chosen-highlight { box-shadow: 0 0 0 2px rgba(0, 102, 204, 0.5); }
+.chosen-bold    { box-shadow: 0 0 0 3px rgba(204, 0, 102, 0.6); }
+</style>
+
+</rozie>
