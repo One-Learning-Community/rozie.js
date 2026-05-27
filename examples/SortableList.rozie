@@ -49,13 +49,13 @@
   easing:         { type: String,   default: null },
   // Construction-time-only SortableJS knobs — changing these at runtime
   // requires destroying and recreating the SortableJS instance. The
-  // SortableListShowcaseDemo bridges this by re-keying its <SortableList>
-  // on a string of these values; consumers wanting per-knob runtime
-  // updates must do the same.
+  // SortableListShowcaseDemo bridges this by re-keying its SortableList
+  // instance on a string of these values; consumers wanting per-knob
+  // runtime updates must do the same.
   forceFallback:  { type: Boolean,  default: false },
   swapThreshold:  { type: Number,   default: 1 },
   // High-level prop that REPLACES a string `group` with the SortableJS
-  // clone-mode object form `{ name, pull: 'clone', put: true }`. When
+  // clone-mode object form { name, pull: 'clone', put: true }. When
   // `cloneable: true` AND `$props.group` is null, the group is left
   // untouched (a `cloneable` flag without a `group` name is not
   // meaningful — see docs/guide/sortable-list.md).
