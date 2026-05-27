@@ -40,6 +40,34 @@ const BLOCK_NAMES = new Set([
   'components',
 ] as const);
 
+/**
+ * Block bodies that contain JS or CSS source (NOT HTML) and must be treated
+ * as opaque text by the splitter. A `<` inside a JS comment / string / type
+ * annotation in one of these bodies must NOT be tokenized as a nested HTML
+ * tag — otherwise htmlparser2 fires phantom `onopentagend` / `onclosetag`
+ * events that desync the `depth` counter so the matching `</block>` close
+ * tag is skipped and the block silently vanishes from the BlockMap (260526-uj3).
+ *
+ * `<script>` and `<style>` are NOT in this set because htmlparser2's
+ * Tokenizer already auto-enters RAWTEXT mode for them (hardcoded internally
+ * in v12 — `specialStartSequences` map). Their bodies are scanned linearly
+ * for the literal `</script>` / `</style>` close sequence; nested open tags
+ * never fire. The four blocks here have no htmlparser2-side raw-text
+ * treatment, so the splitter applies the equivalent opaque-body discipline
+ * itself via the `inOpaqueBlock` flag below.
+ *
+ * `<template>` is intentionally EXCLUDED — its body is real HTML and must
+ * be tokenized normally so nested-element / consumer-side-fill detection in
+ * the downstream parsers (e.g. ROZ050 attribute checks, slot-fill scoping)
+ * sees the correct events.
+ */
+const OPAQUE_BLOCK_NAMES = new Set<string>([
+  'props',
+  'data',
+  'listeners',
+  'components',
+]);
+
 type BlockName =
   | 'props'
   | 'data'
@@ -118,6 +146,14 @@ export function splitBlocks(source: string, filename?: string): SplitBlocksResul
   let savedInheritListenersChunks: string[] | null = null;
   let collectingAttribValue = false;
   let unknownTagStart = -1; // tracks <` position of an unknown top-level block, -1 = none
+  // Opaque-block mode: true between the opening and closing tag of a block
+  // whose body is JS/CSS source (not HTML). See OPAQUE_BLOCK_NAMES above.
+  // While set, all `onopentagend`/`onclosetag` events EXCEPT the matching
+  // `</currentBlock>` close are ignored — phantom tags from `<` in JS
+  // comments/strings/type annotations do not corrupt the `depth` counter.
+  // (260526-uj3 forward-work — fixes silent block-vanish on angle-bracket
+  // content in props/data/listeners/components bodies.)
+  let inOpaqueBlock = false;
 
   const pushDiag = (d: Diagnostic): void => {
     if (result.diagnostics.length < MAX_DIAGNOSTICS) {
@@ -130,6 +166,11 @@ export function splitBlocks(source: string, filename?: string): SplitBlocksResul
     {
       onopentagname(start, endIndex) {
         const name = source.slice(start, endIndex).toLowerCase();
+        // Inside an opaque block, any opening-tag event is a phantom from JS
+        // content (`<SortableList>` in a comment, `if (x<y)` etc). Ignore the
+        // event entirely so attribute-collection state is not clobbered, and
+        // so the matching `onopentagend` is also a no-op via the guard below.
+        if (inOpaqueBlock) return;
         pendingTagName = name;
         // '<' is one byte before the name start for opening tags.
         lastOpenTagStart = start - 1;
@@ -196,6 +237,11 @@ export function splitBlocks(source: string, filename?: string): SplitBlocksResul
 
       onopentagend(endIndex) {
         // endIndex = position of '>'
+        // Inside an opaque block, the matching `onopentagname` was a no-op
+        // (see guard above), so this paired event is a phantom too. Do NOT
+        // increment depth — that would force the matching `</block>` close
+        // to arrive at the wrong depth and silently drop the block.
+        if (inOpaqueBlock) return;
         if (depth === 0) {
           if (pendingTagName === 'rozie') {
             // Entering envelope. Capture name attribute.
@@ -294,6 +340,17 @@ export function splitBlocks(source: string, filename?: string): SplitBlocksResul
             // any nested opening tag resets `savedLangChunks`. `null` when the
             // block carried no `lang` attribute → BlockEntry.lang stays absent.
             blockLang = savedLangChunks.length > 0 ? savedLangChunks.join('') : null;
+            // Enter opaque-body mode for blocks whose contents are JS/CSS
+            // source (not HTML). Subsequent open/close events fired by
+            // htmlparser2 from phantom angle-brackets in the body (JS
+            // comments, generic type params like `Array<X>`, etc.) are
+            // ignored until the matching `</blockName>` close fires.
+            // `<script>` and `<style>` are NOT opaque here because
+            // htmlparser2's own RAWTEXT mode already swallows their bodies.
+            // `<template>` stays in normal HTML mode (real nested elements).
+            if (OPAQUE_BLOCK_NAMES.has(blockName)) {
+              inOpaqueBlock = true;
+            }
           } else {
             // Unknown top-level block — ROZ003.
             const isRefs = pendingTagName === 'refs';
@@ -326,8 +383,17 @@ export function splitBlocks(source: string, filename?: string): SplitBlocksResul
 
       onclosetag(start, endIndex) {
         // start = name start; '</' is at start - 2; '>' is at endIndex; full close-tag span is [start-2, endIndex+1)
-        depth--;
         const tagName = source.slice(start, endIndex).toLowerCase();
+        // Inside an opaque block, the only close event we honour is the
+        // matching `</blockName>` close. Phantom closes from `<` in JS
+        // bodies (`</something>` text inside a string literal, etc.) are
+        // ignored. Once the real close fires, leave opaque mode and fall
+        // through to the normal close-handling logic below.
+        if (inOpaqueBlock) {
+          if (tagName !== currentBlock) return;
+          inOpaqueBlock = false;
+        }
+        depth--;
 
         // Phase 07.2 fix: only close `currentBlock` when this close-tag returns
         // us to envelope-top level (depth === 1 after the decrement). Without

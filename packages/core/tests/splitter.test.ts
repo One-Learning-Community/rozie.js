@@ -165,6 +165,110 @@ describe('splitBlocks (PARSE-01)', () => {
     });
   });
 
+  describe('opaque-block bodies (260526-uj3 forward-work fix)', () => {
+    // `<props>`, `<data>`, `<listeners>`, `<components>` bodies are JS/CSS
+    // source — not HTML. The splitter must treat angle brackets inside these
+    // bodies (JS comments, generic type params, string literals) as opaque
+    // text so phantom-tag events from htmlparser2 do not desync the depth
+    // counter and silently drop the block from the BlockMap. Regression
+    // surfaced when a `<SortableList>` reference in a `<props>` JS-comment
+    // caused `compile()` to return `code: ''` with zero diagnostics.
+
+    it('<props> body with `<Tag>` in a JS comment still parses cleanly', () => {
+      const src = `<rozie name="X">
+<props>
+{
+  // re-keying its <SortableList> instance
+  foo: { type: String, default: null },
+}
+</props>
+<template><div>x</div></template>
+</rozie>`;
+      const result = splitBlocks(src, 'X.rozie');
+      expect(result.diagnostics).toEqual([]);
+      expect(result.props).toBeDefined();
+      expect(result.props?.content).toContain('foo:');
+      expect(result.props?.content).toContain('<SortableList>');
+      expect(result.template).toBeDefined();
+    });
+
+    it('<data> body with `<Tag>` in a JS comment still parses cleanly', () => {
+      const src = `<rozie name="X">
+<data>
+{
+  // we used to call this <OldName> but renamed
+  count: 0,
+}
+</data>
+<template><div>x</div></template>
+</rozie>`;
+      const result = splitBlocks(src, 'X.rozie');
+      expect(result.diagnostics).toEqual([]);
+      expect(result.data).toBeDefined();
+      expect(result.data?.content).toContain('count:');
+      expect(result.template).toBeDefined();
+    });
+
+    it('<components> body with `<Tag>` in a JS comment still parses cleanly', () => {
+      const src = `<rozie name="X">
+<components>
+{
+  // we extracted this from <App> when growing past
+  Card: './Card.rozie',
+}
+</components>
+<template><div>x</div></template>
+</rozie>`;
+      const result = splitBlocks(src, 'X.rozie');
+      expect(result.diagnostics).toEqual([]);
+      expect(result.components).toBeDefined();
+      expect(result.components?.content).toContain('Card:');
+      expect(result.template).toBeDefined();
+    });
+
+    it('<listeners> body with `<Tag>` in a JS comment still parses cleanly', () => {
+      const src = `<rozie name="X">
+<listeners>
+{
+  // bubbles from inner <ChildButton>
+  click: () => {},
+}
+</listeners>
+<template><div>x</div></template>
+</rozie>`;
+      const result = splitBlocks(src, 'X.rozie');
+      expect(result.diagnostics).toEqual([]);
+      expect(result.listeners).toBeDefined();
+      expect(result.listeners?.content).toContain('click:');
+      expect(result.template).toBeDefined();
+    });
+
+    it('opaque body with a phantom-looking `</close>` in a string still finds the real block close', () => {
+      // A literal `</props>` substring inside a JS string would, with naive
+      // matching, prematurely close the block. The Tokenizer's close-tag
+      // detection still relies on the actual byte sequence, but the close
+      // matches `currentBlock` and the splitter honours it — that is the
+      // documented v1 limitation (mirrors htmlparser2's own RAWTEXT
+      // handling for <script>/<style>). This test pins that behaviour so
+      // we notice if it changes.
+      const src = `<rozie name="X">
+<props>
+{
+  // weird: '</data>' appears in a string but it's NOT the props close
+  msg: { type: String, default: '</data>' },
+}
+</props>
+<template><div>x</div></template>
+</rozie>`;
+      const result = splitBlocks(src, 'X.rozie');
+      expect(result.diagnostics).toEqual([]);
+      // The body must include the literal `</data>` substring intact —
+      // a phantom close-tag for a DIFFERENT block must not exit opaque mode.
+      expect(result.props?.content).toContain("'</data>'");
+      expect(result.template).toBeDefined();
+    });
+  });
+
   it('emits ROZ001 when <rozie> envelope is missing (collected, not thrown)', () => {
     // Per D-08: function does NOT throw on malformed input.
     const result = splitBlocks('<props>{}</props>');
