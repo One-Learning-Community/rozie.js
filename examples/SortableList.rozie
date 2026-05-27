@@ -10,9 +10,10 @@
   Why this is a worthwhile demo:
     - Replaces four hand-maintained wrapper libraries (react-sortablejs,
       vuedraggable, ngx-sortablejs, svelte-sortablejs) with a single source.
-    - Encapsulates the cross-framework DOM-reconciler workaround (see the
-      onUpdate handler below) that every wrapper library has to solve
-      independently — and gets it for free on all 6 targets.
+    - The SortableJS-vs-framework-reconciler dance — and the hardening
+      against SortableJS's fragile fallback-mode event shapes — is
+      encapsulated in `useSortableJS()` (`@rozie/runtime-engine-helpers`).
+      Producer code below stays purely declarative.
     - Two-way binds the underlying array so consumers don't manually wire
       `onChange → setState → re-render`. Use `r-model:items="$data.list"`.
 
@@ -49,7 +50,7 @@
 </data>
 
 <script>
-import SortableJS from 'sortablejs'
+import { useSortableJS } from '@rozie/runtime-engine-helpers'
 
 let instance = null
 
@@ -128,90 +129,48 @@ const onRowKeyDown = ($event, index) => {
   }
 }
 
+// SortableJS wiring lives in `useSortableJS()` (@rozie/runtime-engine-helpers).
+// The helper owns the SortableJS-vs-reconciler dance — DOM-restore hardening
+// against fragile-event paths, identity-based item lookup over fragile
+// `e.oldIndex`, and the single-onEnd disambiguation that collapses
+// onUpdate / onAdd / onRemove into one handler.
+//
+// What stays here is purely declarative: which array to read, what to write
+// back, what to emit, and how to bridge `afterCommit` to the Lit-only
+// `$reconcileAfterDomMutation()` sigil.
 $onMount(() => {
-  instance = new SortableJS($refs.listEl, {
-    animation: $props.animation,
-    disabled:  $props.disabled,
-    group:     $props.group,
-    handle:    $props.handle,
-    ...$props.options,
-    // Cross-list drag needs to pass the bound DATA — not just the DOM
-    // node — from the source list to the destination. SortableJS hands
-    // event handlers only DOM nodes, so we stash the dragged item DATA
-    // on the dragged element itself via a custom property at drag start.
-    // SortableJS physically moves the same `e.item` element between
-    // lists, so the property travels with it: `onAdd(e)` on the
-    // destination reads `e.item.__rozieItem` to recover the data.
-    onStart: (e) => {
-      e.item.__rozieItem = $props.items[e.oldIndex]
-      $emit('start', e)
+  // Named `sortable` (not `handle`) to avoid shadowing `$props.handle`
+  // when the options object below references it.
+  const sortable = useSortableJS($refs.listEl, {
+    items: () => $props.items,
+    onCommit: (next) => { $props.items = next },
+    options: {
+      animation: $props.animation,
+      disabled:  $props.disabled,
+      group:     $props.group,
+      handle:    $props.handle,
+      ...$props.options,
     },
-    onEnd: (e) => {
-      // Clear the stash so a future drag of the SAME DOM element (lit
-      // reuses keyed nodes across renders) can't leak a stale data ref.
-      delete e.item.__rozieItem
-      $emit('end', e)
+    // Lit lit-html `repeat` directive caches its part array by sentinel-
+    // comment node identity; SortableJS's physical DOM mutation desyncs
+    // that cache. The sigil lowers to `__rozieReconcileAfterDomMutation(this)`
+    // on Lit (real call) and `void 0` on the other 5 targets (no-op).
+    afterCommit: () => $reconcileAfterDomMutation(),
+    onChange: ({ kind, oldIndex, newIndex, item }) => {
+      if (kind === 'reorder') $emit('change', { oldIndex, newIndex, item })
+      else if (kind === 'add') $emit('add', { newIndex, item })
+      else if (kind === 'remove') $emit('remove', { oldIndex, item })
     },
-    // SortableJS mutates the DOM directly when a drop completes. Every
-    // framework reconciler (React/Vue/Svelte/Solid/Lit/Angular) then notices
-    // the DOM doesn't match its model on the next render and fights it —
-    // flash, snap-back, lost focus, broken animations. The fix is to RESTORE
-    // the pre-drag DOM order before updating the model: the framework then
-    // sees a model change against an unchanged DOM and reconciles cleanly,
-    // moving keyed nodes to their new positions with proper transitions.
-    onUpdate: (e) => {
-      e.item.remove()
-      $refs.listEl.insertBefore(e.item, $refs.listEl.children[e.oldIndex] ?? null)
-      const next = [...$props.items]
-      const [moved] = next.splice(e.oldIndex, 1)
-      next.splice(e.newIndex, 0, moved)
-      $props.items = next
-      // Pre-Phase-16 cleanup Item 3 — engine-wrapper escape hatch.
-      // SortableJS mutated the DOM directly before this handler ran. On
-      // Vue/React/Svelte/Solid/Angular the in-source DOM-restore above
-      // suffices: those reconcilers diff against live `parent.children` at
-      // patch time, see a clean array shift, and perform idiomatic keyed
-      // moves. On Lit, lit-html's `repeat` directive caches its part array
-      // by sentinel-comment node identity; SortableJS's physical relocation
-      // of `<div>`s relative to those sentinel markers leaves the cache
-      // desynchronised, and subsequent renders garble the output. The
-      // sigil lowers to `__rozieReconcileAfterDomMutation(this)` on Lit
-      // (tears down the part tree + schedules a fresh update) and to
-      // `void 0` on every other target (no-op).
-      $reconcileAfterDomMutation()
-      $emit('change', { oldIndex: e.oldIndex, newIndex: e.newIndex, item: moved })
-    },
-    // Cross-list — an item from ANOTHER SortableList landed in THIS one.
-    // Same DOM-revert + state-update pattern as onUpdate: remove the
-    // SortableJS-inserted node (the framework re-renders the row from the
-    // new bound state), then splice the dragged item into our model at
-    // e.newIndex. The item DATA was stashed on e.item by the source list's
-    // onStart and traveled with the element when SortableJS moved it.
-    onAdd: (e) => {
-      const moved = e.item.__rozieItem
-      if (moved === undefined) return
-      e.item.remove()
-      const next = [...$props.items]
-      next.splice(e.newIndex, 0, moved)
-      $props.items = next
-      $reconcileAfterDomMutation()
-      $emit('add', { newIndex: e.newIndex, item: moved })
-    },
-    // Cross-list — an item from THIS list moved to another SortableList.
-    // The destination's onAdd handles the insert; THIS handler only needs
-    // to (a) put the dragged DOM node back so the framework's re-render
-    // can remove it cleanly, and (b) splice the item out of our model at
-    // e.oldIndex.
-    onRemove: (e) => {
-      $refs.listEl.insertBefore(e.item, $refs.listEl.children[e.oldIndex] ?? null)
-      const next = [...$props.items]
-      const [removed] = next.splice(e.oldIndex, 1)
-      $props.items = next
-      $reconcileAfterDomMutation()
-      $emit('remove', { oldIndex: e.oldIndex, item: removed })
-    },
+    onStart: (e) => $emit('start', e),
+    onEnd: (e) => $emit('end', e),
   })
-  return () => instance?.destroy()
+  instance = sortable.instance
+  // $onMount's cleanup-return must be an Identifier or function expression
+  // (compiler limitation — `return sortable.destroy` is a MemberExpression
+  // and would emit ROZ108). Aliasing to a local Identifier keeps the return
+  // statically detectable as a cleanup function across all 6 targets.
+  const destroy = sortable.destroy
+  return destroy
 })
 
 // Reconcile prop changes into the live SortableJS instance without

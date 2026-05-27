@@ -10,7 +10,10 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // non-trivial .rozie file imports from `@rozie/runtime-<framework>` (for
 // model:true props, slot helpers, etc.) and the iframes need a URL to map
 // those bare specifiers to from their importmaps.
-const RUNTIME_FRAMEWORKS = ['react', 'solid', 'vue', 'lit'] as const;
+// Per-target runtime bundles (one each for react/solid/vue/lit) plus
+// `engine-helpers` — the framework-agnostic engine-wrapper helper bundle
+// (introduced 260526-q7s; consumed by SortableList.rozie's useSortableJS).
+const RUNTIME_FRAMEWORKS = ['react', 'solid', 'vue', 'lit', 'engine-helpers'] as const;
 function runtimeFile(name: string): string {
   return resolve(__dirname, `../../packages/runtime/${name}/dist/index.mjs`);
 }
@@ -22,7 +25,7 @@ function roziePreviewRuntimes(): Plugin {
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
         if (!req.url?.startsWith(URL_PREFIX)) return next();
-        const match = req.url.slice(URL_PREFIX.length).match(/^([a-z]+)\.mjs(\?.*)?$/);
+        const match = req.url.slice(URL_PREFIX.length).match(/^([a-z-]+)\.mjs(\?.*)?$/);
         if (!match) return next();
         const file = runtimeFile(match[1]);
         if (!existsSync(file)) {

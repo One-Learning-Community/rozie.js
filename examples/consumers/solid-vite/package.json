@@ -13,6 +13,7 @@
     "test:e2e:install": "playwright install chromium"
   },
   "dependencies": {
+    "@rozie/runtime-engine-helpers": "workspace:*",
     "@rozie/runtime-solid": "workspace:*",
     "@rozie/unplugin": "workspace:*",
     "solid-js": "^1.9.12",

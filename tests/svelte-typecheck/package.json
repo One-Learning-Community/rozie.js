@@ -8,8 +8,9 @@
   },
   "dependencies": {
     "@rozie/core": "workspace:*",
-    "@rozie/target-svelte": "workspace:*",
-    "@rozie/runtime-svelte": "workspace:*"
+    "@rozie/runtime-engine-helpers": "workspace:*",
+    "@rozie/runtime-svelte": "workspace:*",
+    "@rozie/target-svelte": "workspace:*"
   },
   "devDependencies": {
     "@tsconfig/svelte": "^5",

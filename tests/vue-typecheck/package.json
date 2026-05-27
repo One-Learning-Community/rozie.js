@@ -8,6 +8,7 @@
   },
   "dependencies": {
     "@rozie/core": "workspace:*",
+    "@rozie/runtime-engine-helpers": "workspace:*",
     "@rozie/runtime-vue": "workspace:*",
     "@rozie/target-vue": "workspace:*"
   },

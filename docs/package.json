@@ -10,6 +10,7 @@
   },
   "devDependencies": {
     "@rozie/core": "workspace:*",
+    "@rozie/runtime-engine-helpers": "workspace:*",
     "@rozie/runtime-vue": "workspace:*",
     "@rozie/unplugin": "workspace:*",
     "chart.js": "^4.5.1",

@@ -17,11 +17,13 @@
 // engages SortableJS's fallback mode). Whether real-user HTML5 DnD also
 // triggers the throw is open; some browsers/touch devices definitely do.
 //
-// Marked `test.fixme` until SortableList.rozie's onAdd/onRemove/onUpdate
-// are hardened with try/catch + identity-based item identification.
+// Closed 2026-05-26 (quick task 260526-q7s): the SortableJS-vs-reconciler
+// dance moved into `useSortableJS()` (`@rozie/runtime-engine-helpers`).
+// The helper wraps the DOM-restore step in try/catch and uses identity-
+// based item lookup over fragile `e.oldIndex` — both required hardenings.
 import { test, expect } from '@playwright/test';
 
-test.fixme('VR Solid SortableListNested — multi-drag sequence + column reorder', async ({ page }) => {
+test('VR Solid SortableListNested — multi-drag sequence + column reorder', async ({ page }) => {
   await page.goto('/solid/host/entry.solid.html?example=SortableListNested');
   await page.waitForSelector('.rozie-sortable-list', { timeout: 15_000 });
 
