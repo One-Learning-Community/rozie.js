@@ -138,3 +138,44 @@ describe('component-tag features', () => {
     expect(items[0]?.detail).toBe('./Modal.rozie');
   });
 });
+
+const MODAL_PRODUCER = [
+  '<rozie name="Modal">',
+  '<props>{ open: { type: Boolean }, title: { type: String } }</props>',
+  '<script>function close() { $emit("close"); }</script>',
+  '<template><div><slot name="header" /><slot /></div></template>',
+  '</rozie>',
+].join('\n');
+
+const CTX = { readDoc: (uri: string) => (uri === 'file:///abs/dir/Modal.rozie' ? MODAL_PRODUCER : null) };
+
+describe('cross-file component attribute completion', () => {
+  function attrDoc(injectedTag: string): { d: TextDocument; pos: number } {
+    const text = COMP_SOURCE.replace('<Modal :open="true">', `<Modal ${injectedTag}>`);
+    return { d: compDoc(text), pos: text.indexOf(injectedTag) + injectedTag.length };
+  }
+
+  it('offers the producer props after `:`, filtered by the partial', () => {
+    const { d, pos } = attrDoc(':t');
+    const items = computeCompletions(d, d.positionAt(pos), CTX);
+    expect(items.map((i) => i.label)).toEqual(['title']);
+    expect(items[0]?.detail).toBe('String');
+  });
+
+  it('offers events after `@` and slots after `#`', () => {
+    const ev = attrDoc('@');
+    expect(computeCompletions(ev.d, ev.d.positionAt(ev.pos), CTX).map((i) => i.label)).toEqual([
+      'close',
+    ]);
+    const sl = attrDoc('#');
+    expect(computeCompletions(sl.d, sl.d.positionAt(sl.pos), CTX).map((i) => i.label).sort()).toEqual([
+      'default',
+      'header',
+    ]);
+  });
+
+  it('yields nothing without a readDoc resolver', () => {
+    const { d, pos } = attrDoc(':t');
+    expect(computeCompletions(d, d.positionAt(pos))).toEqual([]);
+  });
+});

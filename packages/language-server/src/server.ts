@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import {
   createConnection,
   type InitializeResult,
@@ -10,6 +12,7 @@ import { computeDiagnostics } from './diagnostics.js';
 import {
   computeCompletions,
   computeDefinition,
+  type FeatureContext,
   computeHover,
   computePrepareRename,
   computeReferences,
@@ -52,9 +55,23 @@ export function startServer(): void {
     return doc && doc.uri.endsWith(ROZIE_EXTENSION) ? doc : undefined;
   };
 
+  // Cross-file source resolver: prefer the open (possibly unsaved) document,
+  // else read from disk. Returns null when neither is available.
+  const featureContext: FeatureContext = {
+    readDoc(uri) {
+      const open = documents.get(uri);
+      if (open) return open.getText();
+      try {
+        return readFileSync(fileURLToPath(uri), 'utf8');
+      } catch {
+        return null;
+      }
+    },
+  };
+
   connection.onCompletion((params) => {
     const doc = rozieDoc(params.textDocument.uri);
-    return doc ? computeCompletions(doc, params.position) : [];
+    return doc ? computeCompletions(doc, params.position, featureContext) : [];
   });
 
   connection.onDefinition((params) => {

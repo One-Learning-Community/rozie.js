@@ -69,6 +69,50 @@ export function resolveComponentUri(path: string, baseUri: string): string | nul
   }
 }
 
+export interface TagAttributeContext {
+  /** The enclosing open tag's name (caller checks it against `<components>`). */
+  tagName: string;
+  /** Attribute prefix being typed: ':' prop, '@' event, '#' slot, '' plain. */
+  prefix: '' | ':' | '@' | '#';
+  /** The attribute-name chars typed after the prefix (may be empty). */
+  partial: string;
+  /** Absolute byte offset where `partial` begins (where a replace edit starts). */
+  partialStart: number;
+}
+
+const ATTR_TOKEN_AT_END = /([:@#]?)([A-Za-z][\w-]*)?$/;
+
+/**
+ * Detect an attribute-name position inside an open tag: the cursor sits after
+ * `<Tag ` (optionally mid-attribute), not inside an attribute value. Scans back
+ * to the nearest `<`; bails if a `>` (tag already closed) or quote (inside a
+ * value) intervenes — erring toward no completion rather than a wrong one.
+ */
+export function tagAttributeContext(text: string, offset: number): TagAttributeContext | null {
+  // Walk back to the opening `<`, rejecting if we leave the tag first.
+  let i = offset - 1;
+  let sawWhitespace = false;
+  while (i >= 0) {
+    const ch = text[i]!;
+    if (ch === '>' || ch === '"' || ch === "'") return null; // outside the tag / in a value
+    if (ch === '<') break;
+    if (ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r') sawWhitespace = true;
+    i -= 1;
+  }
+  if (i < 0) return null;
+  // Must be past the tag name (at least one whitespace between `<Tag` and cursor).
+  if (!sawWhitespace) return null;
+
+  const tagMatch = /^<([A-Za-z][\w.-]*)/.exec(text.slice(i, offset));
+  if (!tagMatch) return null;
+  const tagName = tagMatch[1]!;
+
+  const attrMatch = ATTR_TOKEN_AT_END.exec(text.slice(0, offset));
+  const prefix = (attrMatch?.[1] ?? '') as '' | ':' | '@' | '#';
+  const partial = attrMatch?.[2] ?? '';
+  return { tagName, prefix, partial, partialStart: offset - partial.length };
+}
+
 export interface ComponentTagCompletionContext {
   /** Partial PascalCase name already typed after `<` (may be empty). */
   partial: string;

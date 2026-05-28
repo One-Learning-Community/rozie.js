@@ -31,8 +31,13 @@ export {
   componentTagAt,
   componentTagCompletionContext,
   resolveComponentUri,
+  tagAttributeContext,
 } from './componentNav.js';
 export type {
   ComponentTagHit,
   ComponentTagCompletionContext,
+  TagAttributeContext,
 } from './componentNav.js';
+export { extractProducerSurface } from './producers.js';
+export type { ProducerSurface, ProducerEvent, ProducerSlot } from './producers.js';
+export type { FeatureContext } from './features.js';

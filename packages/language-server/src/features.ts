@@ -16,7 +16,9 @@ import {
   componentTagAt,
   componentTagCompletionContext,
   resolveComponentUri,
+  tagAttributeContext,
 } from './componentNav.js';
+import { extractProducerSurface, type ProducerSurface } from './producers.js';
 import { findSigilMemberUsages, resolveSigilMemberAt, sigilCompletionContext } from './sigil.js';
 import {
   extractSymbols,
@@ -40,11 +42,37 @@ interface Analysis {
   symbols: RozieSymbols;
 }
 
+/**
+ * Cross-file resolution hook. The server passes a resolver backed by open
+ * documents + the filesystem; tests pass an in-memory map. Absent → cross-file
+ * features (producer-surface completion, slot-fill nav) degrade to silence.
+ */
+export interface FeatureContext {
+  readDoc?: (uri: string) => string | null;
+}
+
 function analyze(doc: TextDocument): Analysis | null {
   const source = doc.getText();
   const { ast } = parse(source, { filename: uriToFilename(doc.uri) });
   if (!ast) return null;
   return { ast, symbols: extractSymbols(ast, source) };
+}
+
+/** Resolve + parse the producer behind a component name, via the read hook. */
+function producerSurfaceFor(
+  doc: TextDocument,
+  symbols: RozieSymbols,
+  componentName: string,
+  ctx: FeatureContext | undefined,
+): ProducerSurface | null {
+  if (!ctx?.readDoc) return null;
+  const comp = symbols.components.find((c) => c.name === componentName);
+  if (!comp) return null;
+  const uri = resolveComponentUri(comp.path, doc.uri);
+  if (!uri) return null;
+  const source = ctx.readDoc(uri);
+  if (source == null) return null;
+  return extractProducerSurface(source);
 }
 
 function toRange(doc: TextDocument, loc: SourceLoc): Range {
@@ -61,7 +89,11 @@ function completionKind(sigil: SigilKind): CompletionItemKind {
  * Completion for `$props.`/`$data.`/`$refs.` members and composed-component
  * tag names (`<Modal`).
  */
-export function computeCompletions(doc: TextDocument, position: Position): CompletionItem[] {
+export function computeCompletions(
+  doc: TextDocument,
+  position: Position,
+  ctx?: FeatureContext,
+): CompletionItem[] {
   const text = doc.getText();
   const offset = doc.offsetAt(position);
 
@@ -94,7 +126,47 @@ export function computeCompletions(doc: TextDocument, position: Position): Compl
       }));
   }
 
+  const attrCtx = tagAttributeContext(text, offset);
+  if (attrCtx) {
+    const analysis = analyze(doc);
+    if (!analysis) return [];
+    const surface = producerSurfaceFor(doc, analysis.symbols, attrCtx.tagName, ctx);
+    if (!surface) return [];
+    const replaceRange: Range = { start: doc.positionAt(attrCtx.partialStart), end: position };
+    const items = producerAttributeItems(surface, attrCtx.prefix, replaceRange);
+    return items.filter((i) => i.label.startsWith(attrCtx.partial));
+  }
+
   return [];
+}
+
+/** Completion items for a child component's surface, by attribute prefix. */
+function producerAttributeItems(
+  surface: ProducerSurface,
+  prefix: '' | ':' | '@' | '#',
+  range: Range,
+): CompletionItem[] {
+  if (prefix === '@') {
+    return surface.events.map((e) => ({
+      label: e.name,
+      kind: CompletionItemKind.Event,
+      textEdit: { range, newText: e.name },
+    }));
+  }
+  if (prefix === '#') {
+    return surface.slots.map((s) => ({
+      label: s.name,
+      kind: CompletionItemKind.Interface,
+      textEdit: { range, newText: s.name },
+    }));
+  }
+  // '' or ':' → the component's props.
+  return surface.props.map((p) => ({
+    label: p.name,
+    kind: CompletionItemKind.Field,
+    ...(p.detail ? { detail: p.detail } : {}),
+    textEdit: { range, newText: p.name },
+  }));
 }
 
 /**
