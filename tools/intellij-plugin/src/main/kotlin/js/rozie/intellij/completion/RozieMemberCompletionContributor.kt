@@ -32,9 +32,9 @@ import js.rozie.intellij.xml.RozieContextCheck
  * the `<template>` `ref="…"` attributes, reusing [RoziePropsReference]'s host /
  * block-range / injected-file helpers, so it can never drift from what resolves.
  *
- * Registered for `language="JavaScript"` (the [JSReferenceExpression] PSI lives
- * in injected JS, not host Rozie PSI — same reasoning as
- * [RozieJsMagicIdentifierCompletionContributor]). Pitfall-2 guarded via
+ * Registered for `language="JavaScript"` because the [JSReferenceExpression]
+ * PSI lives in injected JS, not host Rozie PSI (same reasoning the cross-block
+ * [RoziePropsReference] documents). Pitfall-2 guarded via
  * [RozieContextCheck.isRozieContext] so it stays inert in non-Rozie JS files.
  */
 class RozieMemberCompletionContributor : CompletionContributor() {

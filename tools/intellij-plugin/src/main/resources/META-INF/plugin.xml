@@ -301,9 +301,6 @@
              RozieContextCheck.isRozieContext short-circuit so non-Rozie
              .js / .ts / .tsx files anywhere in the user's project stay
              unaffected. -->
-        <completion.contributor language="JavaScript"
-            implementationClass="js.rozie.intellij.completion.RozieJsMagicIdentifierCompletionContributor"/>
-
         <!-- Member-access autocomplete for $props.<member> / $data.<member> /
              $refs.<member>, enumerated live from the sibling <props>/<data> JS
              keys and the <template> ref="…" attributes (companion to the

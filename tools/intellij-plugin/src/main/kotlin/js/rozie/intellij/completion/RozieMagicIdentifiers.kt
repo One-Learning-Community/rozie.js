@@ -15,7 +15,9 @@ package js.rozie.intellij.completion
  * `unknownRefValidator.LIFECYCLE_NAMES`).
  *
  * Consumed by:
- *  - [RozieJsMagicIdentifierCompletionContributor] (Plan 13) — completion popup.
+ *  - `rozie-globals.d.ts` — the synthetic ambient-declaration twin, which is
+ *    what now drives `$`-prefix completion (the bespoke completion contributor
+ *    was removed in the round-1 GUI fixes as a duplicate of the ambient decls).
  *  - [js.rozie.intellij.highlighting.RozieJsAnnotator] (Plan 04) — sigil
  *    coloring; reads [NAMES] so the painted set and the offered set are
  *    provably identical (one registry, two consumers).

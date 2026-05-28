@@ -4,19 +4,24 @@ import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import js.rozie.intellij.completion.RozieMagicIdentifiers
 
 /**
- * SC-6 contract test for [js.rozie.intellij.completion.RozieJsMagicIdentifierCompletionContributor]:
- * typing `$` (or a `$X` prefix) in JS identifier position inside ANY Rozie-injected
- * JS fragment (`<script>` / `<listeners>` / `<props>` / `<data>` / `<components>`)
- * surfaces the canonical magic-identifier list from [RozieMagicIdentifiers] (the
- * DRY single-source-of-truth — Plan 02's RozieKnownAttributes pattern mirrored
- * for the JS surface).
+ * Contract test for magic-identifier completion: typing `$` (or a `$X` prefix)
+ * in JS identifier position inside ANY Rozie-injected JS fragment (`<script>` /
+ * `<listeners>` / `<props>` / `<data>` / `<components>`) surfaces the canonical
+ * magic-identifier list.
+ *
+ * As of the round-1 GUI fixes, this is served by the **ambient `declare const`
+ * prefix** (`rozie-globals.d.ts`, one decl per [RozieMagicIdentifiers] entry,
+ * injected ahead of every Rozie JS fragment) — NOT a dedicated completion
+ * contributor. The bespoke RozieJsMagicIdentifierCompletionContributor was
+ * removed because it merely duplicated the ambient-decl completion, producing
+ * two lookup entries per sigil (the "(magic)" + "any" duplicate Dan reported);
+ * these tests passing without it prove the ambient decls fully cover the
+ * surface (names, unique-prefix auto-insert, and the plain-`.js` negative guard).
  *
  * Behavior 3 asserts against the registry itself (not a hard-coded copy of the
- * names), which proves the DRY contract: Plan 13's completion contributor reads
- * the same source the test reads. Adding a 14th magic identifier needs a
- * 1-line append to [RozieMagicIdentifiers.MAGIC_IDENTIFIERS] and zero edits to
- * the contributor or this test — the assertion picks up the new name
- * automatically.
+ * names), which proves the DRY contract — the ambient `.d.ts` is generated 1:1
+ * from [RozieMagicIdentifiers] (enforced by RozieGlobalsLibraryTest). Adding a
+ * magic identifier is a 1-line registry append; this assertion picks it up.
  *
  * Behavior 4 is the Pitfall 2 regression guard: a plain `.js` file (NOT `.rozie`)
  * MUST NOT see magic-identifier suggestions, because the contributor is gated by
