@@ -155,3 +155,51 @@ tasks.register<GenerateLexerTask>("generateRozieLexer") {
 
 tasks.named("compileKotlin") { dependsOn("generateRozieLexer") }
 tasks.named("compileJava") { dependsOn("generateRozieLexer") }
+
+// ---------------------------------------------------------------------------
+// Zero-config language-server bundling (Option C).
+//
+// The plugin can ship the standalone @rozie/language-server bundle inside its
+// resources at /language-server/server-standalone.cjs; RozieLanguageServerProvider
+// extracts and spawns it with no user setup. The bundle is a build artifact of
+// the `@rozie/language-server` package (pnpm), so we copy the prebuilt file into
+// a generated resources dir that's wired into the main resource set.
+//
+// Graceful by design (preserves the Node-free CI plugin build): the copy is
+// `onlyIf` the prebuilt bundle exists, and the pnpm (re)build runs only under
+// `-PbuildServer`. When no bundle is present the plugin simply ships without a
+// server and the provider disables the LSP — exactly today's behavior.
+// ---------------------------------------------------------------------------
+val repoRoot = layout.projectDirectory.dir("../..")
+val serverBundleFile =
+    repoRoot.file("packages/language-server/dist-standalone/server-standalone.cjs")
+val generatedResourcesDir = layout.buildDirectory.dir("generated-resources")
+
+val buildLanguageServerBundle =
+    tasks.register<Exec>("buildLanguageServerBundle") {
+        description = "Build the standalone @rozie/language-server bundle via pnpm (opt-in: -PbuildServer)."
+        workingDir = repoRoot.asFile
+        commandLine("pnpm", "--filter", "@rozie/language-server", "build:standalone")
+        // Opt-in only — keeps `node`/`pnpm` off the default (CI) build's path.
+        onlyIf { project.hasProperty("buildServer") }
+    }
+
+val bundleLanguageServer =
+    tasks.register<Copy>("bundleLanguageServer") {
+        description = "Stage the language-server bundle into plugin resources (no-op when absent)."
+        dependsOn(buildLanguageServerBundle)
+        from(serverBundleFile)
+        into(generatedResourcesDir.map { it.dir("language-server") })
+        // No bundle (Node-free CI) → copy nothing → plugin ships server-less.
+        onlyIf { serverBundleFile.asFile.exists() }
+    }
+
+sourceSets {
+    main {
+        resources {
+            srcDir(generatedResourcesDir)
+        }
+    }
+}
+
+tasks.named("processResources") { dependsOn(bundleLanguageServer) }
