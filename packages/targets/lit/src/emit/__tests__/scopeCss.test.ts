@@ -121,6 +121,37 @@ describe('scopeCss (lit) — ::part() cross-shadow styling bridge (Phase 17)', (
     expect(out).not.toMatch(/^rozie-part-card::part\(body\)/);
   });
 
+  it('PascalCase PartCard::part(body) — component tag lowered to custom-element tag', () => {
+    // scopeCss receives the author-form PascalCase component tag; liftPartName
+    // lowers it to the emitted custom-element tag so the rule matches the DOM.
+    const out = scopeCss('PartCard::part(body) { color: red; }', HASH);
+    expect(out).toMatch(/rozie-part-card\[data-rozie-s-abc123\]::part\(body\)/);
+    expect(out).not.toContain('PartCard');
+  });
+
+  it('CR-01 — intervening :hover/.class/[attr] between tag and ::part still lowers the tag', () => {
+    // Regression: liftPartName must walk back through the whole compound, not
+    // just the node immediately before ::part. A pseudo-class / class /
+    // attribute selector can sit between the PascalCase tag and ::part; if the
+    // tag is left PascalCase the emitted selector matches NO element.
+    for (const sel of [
+      'PartCard:hover::part(body)',
+      'PartCard.active::part(body)',
+      'PartCard[data-open]::part(body)',
+    ]) {
+      const out = scopeCss(`${sel} { color: red; }`, HASH);
+      // The PascalCase tag is lowered to the custom-element tag (the CR-01 fix).
+      expect(out, sel).toContain('rozie-part-card');
+      expect(out, sel).not.toContain('PartCard');
+      // The compound still carries the scope attr (position within the compound
+      // varies — before a trailing pseudo like :hover, after a class/attr — but
+      // it is always present and confines the rule). ::part name stays literal.
+      expect(out, sel).toContain(SCOPE_ATTR);
+      expect(out, sel).toContain('::part(body)');
+      expect(out, sel).not.toMatch(/::part\(body[^)]*data-rozie-s/);
+    }
+  });
+
   it(':deep() regression — ::part branch does NOT perturb :deep output (SPEC-R5)', () => {
     // Byte-identical guard: this is the exact assertion shape from the :deep
     // suite above; it must keep holding after the ::part branch lands.

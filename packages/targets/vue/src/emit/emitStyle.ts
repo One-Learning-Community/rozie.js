@@ -110,8 +110,10 @@ function stringifyRules(rules: StyleRule[], source: string): string {
     // each rule verbatim into `<style scoped>`, where a `::part` selector would
     // be inert/broken CSS. Skip the rule entirely so it is omitted from the
     // joined output (no stray empty line). Silent no-op — no diagnostic.
-    // Independent of the `:deep` byte-slice path (SPEC-R5).
-    if (slice.includes('::part(')) continue;
+    // Independent of the `:deep` byte-slice path (SPEC-R5). Match only the
+    // selector portion (before the first `{`) so a `::part(` appearing in a
+    // declaration value or comment cannot false-drop an unrelated rule.
+    if (slice.split('{', 1)[0]!.includes('::part(')) continue;
     parts.push(slice);
   }
   return parts.join('\n');

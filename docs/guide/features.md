@@ -835,6 +835,10 @@ They solve different problems and are **not** interchangeable:
 
 In short: use `:deep()` to reach a child's DOM that lives in the same shadow tree; use `::part()` to reach across a Lit child's shadow boundary into an element the producer has explicitly exposed.
 
+::: warning Give a `::part()` rule its own selector
+Write a `::part()` selector as its own rule — do **not** combine it with non-`::part()` selectors in a single comma-separated list (e.g. `Child::part(body), .fallback { … }`). Because the five non-Lit targets drop any rule whose selector contains `::part()` as a whole, a sibling `.fallback` branch in the same rule would be dropped along with it on those targets. Splitting them into two rules keeps the non-`::part()` branch on every target.
+:::
+
 ## `<style lang="scss">` — SCSS, compiled at build time
 
 A `<style>` block opts into SCSS with `lang="scss"`. Rozie compiles it to plain CSS at build time — nesting, `$variables`, `@mixin`/`@include`, `&` parent-refs, `@if`/`@each`/`@for`, `@function`, `%placeholder`/`@extend`, `#{}` interpolation and the built-in `sass:` modules all resolve away before emit:

@@ -119,11 +119,20 @@ function liftPartName(
       }
     });
 
-    // (2) Lower the immediately-preceding tag compound from its author-form
-    // PascalCase component name to the emitted custom-element tag.
-    const prev = selector.nodes[i - 1];
-    if (prev && prev.type === 'tag' && isComponentTag(prev.value)) {
-      (prev as selectorParser.Tag).value = `rozie-${toKebabCase(prev.value)}`;
+    // (2) Lower the component tag in THIS compound from its author-form
+    // PascalCase name to the emitted custom-element tag. The tag is not
+    // necessarily the immediately-preceding node — pseudo-classes, attribute
+    // selectors, or classes can sit between it and `::part`
+    // (e.g. `PartCard:hover::part(body)`, `PartCard.active::part(body)`).
+    // Walk backwards to the start of the current compound (stop at the first
+    // combinator) and rewrite the first PascalCase tag found.
+    for (let j = i - 1; j >= 0; j--) {
+      const cand = selector.nodes[j];
+      if (!cand || cand.type === 'combinator') break;
+      if (cand.type === 'tag' && isComponentTag((cand as selectorParser.Tag).value)) {
+        (cand as selectorParser.Tag).value = `rozie-${toKebabCase((cand as selectorParser.Tag).value)}`;
+        break;
+      }
     }
   }
 }

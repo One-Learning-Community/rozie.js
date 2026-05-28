@@ -149,8 +149,9 @@ function stringifyRules(rules: StyleRule[], source: string): string {
     // ::part rule is never passed to `lowerDeepToNgDeep` and is filtered out of
     // the array entirely (not mapped to '', which would leak a stray empty
     // line). Silent no-op — no diagnostic. Independent of the `:deep` path
-    // (SPEC-R5).
-    .filter((slice) => !slice.includes('::part('))
+    // (SPEC-R5). Match only the selector portion (before the first `{`) so a
+    // `::part(` in a declaration value or comment cannot false-drop a rule.
+    .filter((slice) => !slice.split('{', 1)[0]!.includes('::part('))
     .map((slice) => {
       // Quick task 260526-mk4 — Angular `:deep(X)` → `::ng-deep X` lowering.
       // Byte-slice preservation is the floor (Risk 5); we only invoke the
