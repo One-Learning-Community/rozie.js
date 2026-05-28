@@ -402,3 +402,46 @@ describe('multi-root slot-fill spread (Phase 07.3.1 D-LIT-18)', () => {
     expect(code).not.toContain('<div slot="header">');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Phase 17 Plan 01 Task 2 — producer `part="body"` passthrough (SPEC-R3).
+//
+// A producer-authored static `part="..."` attribute must survive verbatim
+// into the Lit shadow template so a consumer's `::part(body)` rule can pierce
+// the child's shadow boundary and address the element. `part` is a standard
+// HTML static attribute and flows through the static-attr branch
+// (emitTemplate.ts:355-358) with no allowlist or transform. The part name is
+// the LITERAL `body` — never scope-hashed (SPEC-R6).
+// ---------------------------------------------------------------------------
+describe('part= passthrough (SPEC-R3/R4b)', () => {
+  function compileInline(source: string, name = 'PartProducer'): string {
+    const { ast } = parse(source, { filename: `${name}.rozie` });
+    if (!ast) throw new Error('parse() returned null');
+    const registry = createDefaultRegistry();
+    const { ir } = lowerToIR(ast, { modifierRegistry: registry });
+    if (!ir) throw new Error('lowerToIR() returned null');
+    ir.name = name;
+    return emitLit(ir, { filename: `${name}.rozie`, source, modifierRegistry: registry }).code;
+  }
+
+  const PRODUCER = `<rozie name="PartProducer">
+<template>
+<div class="card-body" part="body">
+  <slot/>
+</div>
+</template>
+</rozie>
+`;
+
+  it('emits the producer part="body" attribute verbatim into the Lit shadow template', () => {
+    const code = compileInline(PRODUCER);
+    expect(code).toContain('part="body"');
+  });
+
+  it('does NOT scope-hash the part name (literal `body`, SPEC-R6)', () => {
+    const code = compileInline(PRODUCER);
+    // The part name itself must never carry a data-rozie-s hash suffix.
+    expect(code).not.toMatch(/part="body-rozie-s/);
+    expect(code).not.toMatch(/part="[^"]*data-rozie-s[^"]*"/);
+  });
+});

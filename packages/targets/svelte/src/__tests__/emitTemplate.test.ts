@@ -156,3 +156,36 @@ describe('emitTemplate — per-block fixture snapshots (Plan 05-02a Task 2)', ()
     });
   }
 });
+
+// ---------------------------------------------------------------------------
+// Phase 17 Plan 01 Task 2 — producer `part="body"` passthrough (SPEC-R4b).
+//
+// `part` is a standard HTML static attribute and flows through the Svelte
+// static-attr branch verbatim into the emitted markup. On Svelte the
+// cross-shadow rule itself is a no-op (no shadow boundary) — only the
+// producer attribute survives as a benign attr. Part name literal (SPEC-R6).
+// ---------------------------------------------------------------------------
+describe('part= passthrough (SPEC-R3/R4b)', () => {
+  function lowerInline(source: string, name = 'PartProducer'): IRComponent {
+    const result = parse(source, { filename: `${name}.rozie` });
+    if (!result.ast) throw new Error('parse() returned null AST');
+    const lowered = lowerToIR(result.ast, { modifierRegistry: createDefaultRegistry() });
+    if (!lowered.ir) throw new Error('lowerToIR() returned null IR');
+    return lowered.ir;
+  }
+
+  const PRODUCER = `<rozie name="PartProducer">
+<template>
+<div class="card-body" part="body">
+  <slot/>
+</div>
+</template>
+</rozie>
+`;
+
+  it('emits the producer part="body" attribute verbatim into the Svelte template', () => {
+    const { template, diagnostics } = emitTemplate(lowerInline(PRODUCER), REGISTRY);
+    expect(diagnostics).toEqual([]);
+    expect(template).toContain('part="body"');
+  });
+});

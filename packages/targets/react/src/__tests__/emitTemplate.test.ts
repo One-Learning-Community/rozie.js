@@ -394,3 +394,31 @@ describe('SlotDecl IR shape — Phase 4 finalization gate', () => {
     expect(src).toMatch(/nestedSlots: SlotDecl\[\]/);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Phase 17 Plan 01 Task 2 — producer `part="body"` passthrough (SPEC-R4b).
+//
+// `part` is a standard HTML static attribute. React's JSX-attr remap map
+// (HTML_TO_JSX_ATTR) does NOT contain `part`, so it passes through as the
+// lowercase DOM attribute `part="body"` (NOT remapped to a camelCase or
+// alternate name). On React the cross-shadow rule itself is a no-op (no
+// shadow boundary) — only the producer attribute survives as a benign attr.
+// ---------------------------------------------------------------------------
+describe('part= passthrough (SPEC-R3/R4b)', () => {
+  const PRODUCER = `<rozie name="PartProducer">
+<template>
+<div class="card-body" part="body">
+  <slot/>
+</div>
+</template>
+</rozie>
+`;
+
+  it('emits the producer part="body" attribute in JSX (lowercase, not remapped)', () => {
+    const ir = lowerInline(PRODUCER);
+    const { code } = emitReact(ir, { filename: 'PartProducer.rozie', source: PRODUCER });
+    expect(code).toContain('part="body"');
+    // Confirms no JSX-attr remap to a camelCase/alternate form.
+    expect(code).not.toMatch(/\bpartName=/i);
+  });
+});
