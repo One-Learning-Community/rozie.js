@@ -497,6 +497,32 @@ class RozieScriptDeclResolutionTest : BasePlatformTestCase() {
         }
     }
 
+    // === CR-01 regression: a `.method(args)` call inside a listeners VALUE (not a ===
+    // === key) must NOT receive a modifier-arg JS sub-injection. The value sits     ===
+    // === inside the wholesale JS string literal; the bare identifier in it must    ===
+    // === not falsely resolve to a same-named <script> decl.                        ===
+    fun testListenersValueMethodCallNotInjected() {
+        myFixture.configureByFile("script-decl-listeners-value-method-not-injected.rozie")
+        // Caret is on `helper` inside the VALUE `"$refs.list.scrollTo(helper)"`. Before
+        // the CR-01 fix, LISTENERS_KEY_STRING matched the value string too, MODIFIER_ARG
+        // matched `.scrollTo(helper)`, and `helper` got a spurious JS sub-injection that
+        // resolved to the <script> `const helper`. After the fix, only key-position
+        // strings (followed by `:`) are scanned, so the value stays an opaque JS string
+        // literal and `helper` does NOT resolve to the script decl.
+        val ref = myFixture.file.findReferenceAt(myFixture.caretOffset)
+        val resolved = ref?.resolve()
+        if (resolved != null) {
+            assertFalse(
+                "CR-01 regression: a `.method(arg)` call inside a listeners VALUE must not " +
+                    "resolve `${resolvedKeyName(resolved)}` to the <script> `const helper` decl. " +
+                    "The modifier-arg sub-injection must fire on KEY-position strings only; " +
+                    "values are opaque JS string-literal content.",
+                resolved is PsiNamedElement && (resolved as PsiNamedElement).name == "helper",
+            )
+        }
+        // resolved == null is the expected happy path (no JS injection over value text).
+    }
+
     /**
      * Pull the "key name" string off whichever shape the resolver returned. Extended from
      * [RozieReferenceTest]'s analog helper to cover the 5 new producer kinds (Plan 08.3-01):

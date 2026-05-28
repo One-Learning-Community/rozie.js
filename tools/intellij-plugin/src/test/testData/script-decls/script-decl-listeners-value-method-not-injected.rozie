@@ -1,0 +1,5 @@
+<rozie name="ScriptDeclListenersValueMethodNotInjected">
+<script>const helper = 1;</script>
+<refs>{ list: null }</refs>
+<listeners>{ "click": "$refs.list.scrollTo(hel<caret>per)" }</listeners>
+</rozie>

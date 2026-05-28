@@ -105,9 +105,15 @@ class RozieScriptDeclReference(
      * producer decl); we bound at 6 parents for safety.
      */
     override fun isReferenceTo(target: PsiElement): Boolean {
+        // Validity guards (WR-03): Find-Usages invokes isReferenceTo during edits,
+        // so both `target` and cached multiResolve leaves can be stale/invalidated.
+        // areElementsEquivalent on an invalid element throws
+        // PsiInvalidElementAccessException — guard before touching either.
+        if (!target.isValid) return false
         val manager = target.manager
         for (result in multiResolve(false)) {
             val resolved = result.element ?: continue
+            if (!resolved.isValid) continue
             var walker: PsiElement? = resolved
             var depth = 0
             while (walker != null && depth < 6) {

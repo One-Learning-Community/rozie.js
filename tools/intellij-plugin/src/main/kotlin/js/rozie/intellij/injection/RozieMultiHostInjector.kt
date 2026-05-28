@@ -534,11 +534,10 @@ class RozieMultiHostInjector : MultiHostInjector {
             val keyContentsText = keyContents.value
 
             // Inner scan: walk each modifier-arg suffix inside the key contents.
-            // Pattern matches `.modifierName(args)` where args is a balanced
-            // single-paren-pair body (the surface Rozie listeners grammar does not
-            // permit nested `(` `)` inside modifier args at parse time — Plan 04
-            // compiler PEG enforces this; the `[^)]*` simple body is sufficient).
-            // Group 1 is the args substring (parens excluded).
+            // Pattern matches `.modifierName(args)` where args tolerates one level
+            // of nested parens — the happy-path key `click.outside($refs.x,
+            // helper())` already nests a call inside the args (WR-01). Group 1 is
+            // the args substring (outer parens excluded).
             MODIFIER_ARG.findAll(keyContentsText).forEach { argMatch ->
                 val argGroup = argMatch.groups[1] ?: return@forEach
                 // Skip empty / whitespace-only args (e.g., `.outside()`).
@@ -750,30 +749,41 @@ class RozieMultiHostInjector : MultiHostInjector {
          * prematurely terminating the match. The non-greedy `*?` is unnecessary
          * because the character class explicitly excludes the closing-quote.
          *
+         * The trailing `\s*:` anchor restricts the match to strings in JSON-KEY
+         * position (followed by the `key: value` separator). Without it the scan
+         * matched string VALUES too — any listeners value carrying a `.method(args)`
+         * call (e.g. `"$refs.x.focus()"`) would get a spurious JS sub-injection
+         * layered over value-interior text, corrupting the listeners-body PSI shape
+         * the magic-ident resolvers + JS inspectors rely on (CR-01). Values are never
+         * in key position, so the `:` anchor excludes them.
+         *
          * Used by [injectListenersModifierArgJs] to locate each modifier-bearing
          * listeners key; the inner [MODIFIER_ARG] scan then walks the key contents
          * for `.modifier(args)` suffixes.
          */
         private val LISTENERS_KEY_STRING: Regex =
-            """"((?:[^"\\]|\\.)*)"""".toRegex()
+            """"((?:[^"\\]|\\.)*)"\s*:""".toRegex()
 
         /**
          * Plan 08.3-04 — inner scan for a modifier suffix carrying parenthesised
-         * args inside a listeners JSON-key. Group 1 is the args substring (parens
-         * excluded). Pattern `\.\w+\(([^)]*)\)` matches `.modifierName(...)` where
-         * `[^)]*` consumes the args body without nesting.
+         * args inside a listeners JSON-key. Group 1 is the args substring (outer
+         * parens excluded). Pattern `\.\w+\(((?:[^()]|\([^()]*\))*)\)` matches
+         * `.modifierName(...)` where the body tolerates ONE level of nested
+         * parens.
          *
-         * The simple non-nesting body is sufficient because the surface Rozie
-         * listeners grammar (Plan 04 compiler PEG) does not permit nested `(` `)`
-         * inside modifier args at parse time. A future grammar extension that
-         * allows nested calls (e.g., `helper(fn())`) would need a balanced-paren
-         * scanner here. Until then this regex matches every valid modifier-arg
-         * shape the compiler accepts.
+         * The single-nesting body is required because the documented happy-path key
+         * already nests a call inside the modifier args — `click.outside($refs.x,
+         * helper())` (the SPEC Req 3 fixture). A flat `[^)]*` body stopped at the
+         * first inner `)`, capturing the unbalanced fragment `$refs.x, helper(` and
+         * emitting a syntactically-broken JS sub-injection (WR-01). One nesting
+         * level covers every modifier-arg shape the surface listeners grammar
+         * accepts (a single call-expression argument); deeper nesting would need a
+         * balanced-paren hand-scanner.
          *
          * Used by [injectListenersModifierArgJs] to emit per-args JS sub-injections
          * inside listeners modifier suffixes.
          */
         private val MODIFIER_ARG: Regex =
-            """\.\w+\(([^)]*)\)""".toRegex()
+            """\.\w+\(((?:[^()]|\([^()]*\))*)\)""".toRegex()
     }
 }
