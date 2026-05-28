@@ -132,27 +132,38 @@ const ATTR_TOKEN_AT_END = /([:@#]?)([A-Za-z][\w-]*)?$/;
 /**
  * Detect an attribute-name position inside an open tag: the cursor sits after
  * `<Tag ` (optionally mid-attribute), not inside an attribute value. Scans back
- * to the nearest `<`; bails if a `>` (tag already closed) or quote (inside a
- * value) intervenes — erring toward no completion rather than a wrong one.
+ * to the opening `<`, skipping fully-quoted prior attribute values as pairs (so
+ * `<Modal :open="x" @cl|`* still resolves), and bails if the cursor is inside an
+ * unterminated value or the tag is already closed — erring toward no completion
+ * rather than a wrong one.
  */
 export function tagAttributeContext(text: string, offset: number): TagAttributeContext | null {
-  // Walk back to the opening `<`, rejecting if we leave the tag first.
   let i = offset - 1;
-  let sawWhitespace = false;
   while (i >= 0) {
     const ch = text[i]!;
-    if (ch === '>' || ch === '"' || ch === "'") return null; // outside the tag / in a value
+    if (ch === '"' || ch === "'") {
+      // Closing quote of a completed prior value — skip left to its opener.
+      const quote = ch;
+      i -= 1;
+      while (i >= 0 && text[i] !== quote) i -= 1;
+      if (i < 0) return null; // unbalanced ⇒ cursor was inside a value
+      i -= 1; // step past the opening quote
+      continue;
+    }
+    if (ch === '>') return null; // tag already closed before the cursor
     if (ch === '<') break;
-    if (ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r') sawWhitespace = true;
     i -= 1;
   }
   if (i < 0) return null;
-  // Must be past the tag name (at least one whitespace between `<Tag` and cursor).
-  if (!sawWhitespace) return null;
 
   const tagMatch = /^<([A-Za-z][\w.-]*)/.exec(text.slice(i, offset));
   if (!tagMatch) return null;
   const tagName = tagMatch[1]!;
+
+  // Must be in attribute territory: whitespace immediately follows the tag name,
+  // and the cursor is past it (rules out the still-typing-the-tag-name case).
+  const afterName = i + 1 + tagName.length;
+  if (offset <= afterName || !/\s/.test(text[afterName] ?? '')) return null;
 
   const attrMatch = ATTR_TOKEN_AT_END.exec(text.slice(0, offset));
   const prefix = (attrMatch?.[1] ?? '') as '' | ':' | '@' | '#';

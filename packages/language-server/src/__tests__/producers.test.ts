@@ -51,4 +51,20 @@ describe('tagAttributeContext', () => {
     expect(tagAttributeContext('<Mod', '<Mod'.length)).toBeNull(); // no whitespace yet
     expect(tagAttributeContext('<Modal>text', '<Modal>text'.length)).toBeNull(); // tag closed
   });
+
+  it('resolves past completed prior quoted attributes', () => {
+    // Realistic multi-attribute tag — prior `="..."` pairs must be skipped.
+    const text = `<Modal :open="$data.show" :title="'Hi'" @cl`;
+    const ctx = tagAttributeContext(text, text.length);
+    expect(ctx?.tagName).toBe('Modal');
+    expect(ctx?.prefix).toBe('@');
+    expect(ctx?.partial).toBe('cl');
+  });
+
+  it('handles a value that itself contains < or >', () => {
+    const text = `<Modal :title="a > b" :`;
+    const ctx = tagAttributeContext(text, text.length);
+    expect(ctx?.tagName).toBe('Modal');
+    expect(ctx?.prefix).toBe(':');
+  });
 });
