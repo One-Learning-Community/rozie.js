@@ -22,6 +22,7 @@
   ],
   "scripts": {
     "build": "tsdown",
+    "build:standalone": "tsdown --config tsdown.standalone.config.ts",
     "test": "vitest run --passWithNoTests",
     "lint": "biome lint src",
     "typecheck": "tsc --noEmit"

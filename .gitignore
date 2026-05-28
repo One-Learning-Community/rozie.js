@@ -4,6 +4,7 @@
 # Node + monorepo
 node_modules/
 dist/
+dist-standalone/
 .turbo/
 *.log
 .DS_Store

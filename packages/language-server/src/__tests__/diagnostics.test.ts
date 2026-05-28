@@ -66,4 +66,19 @@ describe('computeDiagnostics (end-to-end through @rozie/core parse)', () => {
     const doc = rozieDoc('<rozie><template>{{ }}</template></rozie>');
     expect(computeDiagnostics(doc)).toEqual([]);
   });
+
+  it('surfaces the semantic ROZ200 (assignment to a non-model prop)', () => {
+    // ROZ200 is produced during IR lowering, not parse() — this asserts the
+    // LSP runs the full pipeline (compile()), which is what lets the IntelliJ
+    // plugin retire its native RoziePropAssignmentInspection in favor of the
+    // shared brain.
+    const doc = rozieDoc(
+      '<rozie name="X"><props>{ count: { type: Number } }</props>' +
+        '<script>$props.count = 5;</script><template><div></div></template></rozie>',
+    );
+    const diags = computeDiagnostics(doc);
+    expect(diags.some((d) => d.code === 'ROZ200' && d.severity === DiagnosticSeverity.Error)).toBe(
+      true,
+    );
+  });
 });
