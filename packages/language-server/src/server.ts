@@ -7,6 +7,7 @@ import {
 } from 'vscode-languageserver/node';
 import { TextDocument } from 'vscode-languageserver-textdocument';
 import { computeDiagnostics } from './diagnostics.js';
+import { computeCompletions, computeDefinition, computeHover } from './features.js';
 
 const ROZIE_EXTENSION = '.rozie';
 
@@ -27,9 +28,34 @@ export function startServer(): void {
     (): InitializeResult => ({
       capabilities: {
         textDocumentSync: TextDocumentSyncKind.Incremental,
+        // `.` after a `$props`/`$data`/`$refs` sigil triggers member completion.
+        completionProvider: { triggerCharacters: ['.'] },
+        definitionProvider: true,
+        hoverProvider: true,
       },
     }),
   );
+
+  // Resolve a request's target document, guarding to .rozie files only.
+  const rozieDoc = (uri: string): TextDocument | undefined => {
+    const doc = documents.get(uri);
+    return doc && doc.uri.endsWith(ROZIE_EXTENSION) ? doc : undefined;
+  };
+
+  connection.onCompletion((params) => {
+    const doc = rozieDoc(params.textDocument.uri);
+    return doc ? computeCompletions(doc, params.position) : [];
+  });
+
+  connection.onDefinition((params) => {
+    const doc = rozieDoc(params.textDocument.uri);
+    return doc ? computeDefinition(doc, params.position) : null;
+  });
+
+  connection.onHover((params) => {
+    const doc = rozieDoc(params.textDocument.uri);
+    return doc ? computeHover(doc, params.position) : null;
+  });
 
   const publish = (doc: TextDocument): void => {
     // Only diagnose .rozie documents — the client registers us for the Rozie
