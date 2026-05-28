@@ -12,6 +12,7 @@ import {
   computeDefinition,
   computeHover,
   computePrepareRename,
+  computeReferences,
   computeRename,
 } from './features.js';
 
@@ -39,6 +40,7 @@ export function startServer(): void {
         completionProvider: { triggerCharacters: ['.', '<'] },
         definitionProvider: true,
         hoverProvider: true,
+        referencesProvider: true,
         renameProvider: { prepareProvider: true },
       },
     }),
@@ -63,6 +65,11 @@ export function startServer(): void {
   connection.onHover((params) => {
     const doc = rozieDoc(params.textDocument.uri);
     return doc ? computeHover(doc, params.position) : null;
+  });
+
+  connection.onReferences((params) => {
+    const doc = rozieDoc(params.textDocument.uri);
+    return doc ? computeReferences(doc, params.position, params.context.includeDeclaration) : [];
   });
 
   connection.onPrepareRename((params) => {

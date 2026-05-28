@@ -10,6 +10,7 @@ export {
   computeDefinition,
   computeHover,
   computePrepareRename,
+  computeReferences,
   computeRename,
 } from './features.js';
 export { startServer } from './server.js';

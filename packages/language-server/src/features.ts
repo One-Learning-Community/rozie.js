@@ -170,10 +170,10 @@ function resolveSigilSymbol(
 
 const IDENTIFIER = /^[A-Za-z_$][\w$]*$/;
 
-interface RenameTarget {
+interface SigilSymbolHit {
   sigil: SigilKind;
   sym: RozieSymbol;
-  /** Range the editor highlights for the inline rename. */
+  /** The span under the cursor — the usage member, or the declaration name. */
   anchor: SourceLoc;
 }
 
@@ -182,32 +182,28 @@ function within(loc: SourceLoc, offset: number): boolean {
 }
 
 /**
- * The renameable Rozie symbol at [offset] — resolved whether the cursor is on a
+ * The Rozie sigil symbol at [offset] — resolved whether the cursor is on a
  * `$sigil.X` usage OR on the declaration itself (a `<props>`/`<data>` key or a
- * `ref="..."` value). Rename is offered only when the declaration text is a
- * bare identifier (not a quoted string-literal key), so one new name replaces
- * both declaration and every usage verbatim.
+ * `ref="..."` value). Shared by find-references and rename.
  */
-function renameTargetAt(
+function sigilSymbolAt(
   doc: TextDocument,
   symbols: RozieSymbols,
   offset: number,
-): RenameTarget | null {
+): SigilSymbolHit | null {
   const text = doc.getText();
 
   // 1. Cursor on a `$sigil.member` usage.
   const ref = resolveSigilMemberAt(text, offset);
   if (ref && ref.member.length > 0) {
     const sym = symbolsForSigil(symbols, ref.sigil).find((s) => s.name === ref.member);
-    if (sym && bareDecl(text, sym)) return { sigil: ref.sigil, sym, anchor: ref.memberLoc };
+    if (sym) return { sigil: ref.sigil, sym, anchor: ref.memberLoc };
   }
 
   // 2. Cursor on a declaration site.
   for (const sigil of ['props', 'data', 'refs'] as const) {
     for (const sym of symbolsForSigil(symbols, sigil)) {
-      if (within(sym.loc, offset) && bareDecl(text, sym)) {
-        return { sigil, sym, anchor: sym.loc };
-      }
+      if (within(sym.loc, offset)) return { sigil, sym, anchor: sym.loc };
     }
   }
   return null;
@@ -219,6 +215,24 @@ function bareDecl(text: string, sym: RozieSymbol): boolean {
 }
 
 /**
+ * Find-references for a `$props.X`/`$data.X`/`$refs.X` symbol: the declaration
+ * (when [includeDeclaration]) plus every `$sigil.X` usage across all blocks.
+ */
+export function computeReferences(
+  doc: TextDocument,
+  position: Position,
+  includeDeclaration: boolean,
+): Location[] {
+  const analysis = analyze(doc);
+  if (!analysis) return [];
+  const hit = sigilSymbolAt(doc, analysis.symbols, doc.offsetAt(position));
+  if (!hit) return [];
+  const usages = findSigilMemberUsages(doc.getText(), hit.sigil, hit.sym.name);
+  const locs = includeDeclaration ? [hit.sym.loc, ...usages] : usages;
+  return locs.map((loc) => ({ uri: doc.uri, range: toRange(doc, loc) }));
+}
+
+/**
  * Validate the rename target — `prepareRename`. Returns the range the editor
  * should select for the inline rename, or null when the cursor is not on a
  * renameable Rozie symbol.
@@ -226,8 +240,9 @@ function bareDecl(text: string, sym: RozieSymbol): boolean {
 export function computePrepareRename(doc: TextDocument, position: Position): Range | null {
   const analysis = analyze(doc);
   if (!analysis) return null;
-  const found = renameTargetAt(doc, analysis.symbols, doc.offsetAt(position));
-  return found ? toRange(doc, found.anchor) : null;
+  const found = sigilSymbolAt(doc, analysis.symbols, doc.offsetAt(position));
+  if (!found || !bareDecl(doc.getText(), found.sym)) return null;
+  return toRange(doc, found.anchor);
 }
 
 /**
@@ -243,8 +258,8 @@ export function computeRename(
   if (!IDENTIFIER.test(newName)) return null;
   const analysis = analyze(doc);
   if (!analysis) return null;
-  const found = renameTargetAt(doc, analysis.symbols, doc.offsetAt(position));
-  if (!found) return null;
+  const found = sigilSymbolAt(doc, analysis.symbols, doc.offsetAt(position));
+  if (!found || !bareDecl(doc.getText(), found.sym)) return null;
 
   const text = doc.getText();
   const locs: SourceLoc[] = [
