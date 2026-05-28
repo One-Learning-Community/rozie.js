@@ -44,6 +44,17 @@ class RozieJSReferenceContributor : PsiReferenceContributor() {
             JSPatterns.jsReferenceExpression(),
             RozieMagicAccessReferenceProvider(),
         )
+
+        // Bare-ident dispatch — resolves `fmt` / `helper` / `onClick` / `format`
+        // (5 producer kinds: let/const/function/class/import) from injected JS
+        // ranges back to top-level <script> decls. Disjoint with the magic-ident
+        // provider above (D-09); each early-returns on the cases the other
+        // handles (magic-ident on bare refs, script-decl on qualified refs).
+        // Ordering is immaterial — the two providers target disjoint shapes.
+        registrar.registerReferenceProvider(
+            JSPatterns.jsReferenceExpression(),
+            RozieScriptDeclReferenceProvider(),
+        )
     }
 
     private class RozieMagicAccessReferenceProvider : PsiReferenceProvider() {

@@ -151,9 +151,14 @@ class RozieScriptDeclReference(
  * Co-located in the same file as the reference it constructs to keep the
  * walker, the reference, and the dispatch logic in one auditable unit
  * (mirrors the `RozieMagicAccessReferenceProvider` co-location inside
- * `RozieJSReferenceContributor.kt`).
+ * `RozieJSReferenceContributor.kt`). Marked `internal` (not `private`) so
+ * [RozieJSReferenceContributor] can construct it from the sibling file —
+ * Kotlin top-level `private` is file-scoped, not package-scoped, so the
+ * sibling cannot see it under `private`. Module visibility (`internal`) is
+ * the right tool: the class stays out of the plugin's public Kotlin surface
+ * but the contributor can still register it.
  */
-private class RozieScriptDeclReferenceProvider : PsiReferenceProvider() {
+internal class RozieScriptDeclReferenceProvider : PsiReferenceProvider() {
     override fun getReferencesByElement(
         element: PsiElement,
         context: ProcessingContext,
