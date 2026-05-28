@@ -1,0 +1,12 @@
+<scheme name="Light" version="142" parent_scheme="Light">
+    <attributes>
+        <!-- New-UI "Light" scheme companion to RozieDefault.xml. The new UI's
+             light editor color scheme is "Light" (distinct from classic
+             "Default"/Classic Light) and does NOT inherit the Default override.
+             Empty <value/> clears the INJECTED_LANGUAGE_FRAGMENT backdrop so the
+             editor's normal background applies. -->
+        <option name="INJECTED_LANGUAGE_FRAGMENT">
+            <value/>
+        </option>
+    </attributes>
+</scheme>

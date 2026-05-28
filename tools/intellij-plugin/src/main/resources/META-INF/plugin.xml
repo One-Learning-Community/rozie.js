@@ -315,9 +315,17 @@
              background tint on .rozie files.  Every SFC block is a language-
              injection target (HTML/JS/CSS), so without these overrides each
              block paints a distracting backdrop.  Vue's plugin uses the same
-             additionalTextAttributes pattern. -->
+             additionalTextAttributes pattern.
+
+             One entry per BUNDLED editor color scheme — the override applies
+             only to the scheme it names (and schemes deriving from it), NOT
+             across all themes. The new UI defaults to "Dark"/"Light" (distinct
+             base schemes from classic "Darcula"/"Default"), so those need their
+             own entries or the backdrop shows on the default theme. -->
         <additionalTextAttributes scheme="Default" file="colorSchemes/RozieDefault.xml"/>
         <additionalTextAttributes scheme="Darcula" file="colorSchemes/RozieDarcula.xml"/>
+        <additionalTextAttributes scheme="Dark" file="colorSchemes/RozieDark.xml"/>
+        <additionalTextAttributes scheme="Light" file="colorSchemes/RozieLight.xml"/>
     </extensions>
 
     <!-- Option C — the shared @rozie/core brain over LSP. The server (a Node

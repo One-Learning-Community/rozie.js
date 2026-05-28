@@ -1,0 +1,14 @@
+<scheme name="Dark" version="142" parent_scheme="Dark">
+    <attributes>
+        <!-- New-UI "Dark" scheme companion to RozieDarcula.xml. The new UI
+             defaults to the "Dark" editor color scheme (a distinct scheme from
+             classic "Darcula"), which does NOT inherit the Darcula override —
+             so without this entry every .rozie block shows the
+             INJECTED_LANGUAGE_FRAGMENT backdrop on the default dark theme.
+             Empty <value/> clears the attribute so the editor's normal
+             background applies. -->
+        <option name="INJECTED_LANGUAGE_FRAGMENT">
+            <value/>
+        </option>
+    </attributes>
+</scheme>
