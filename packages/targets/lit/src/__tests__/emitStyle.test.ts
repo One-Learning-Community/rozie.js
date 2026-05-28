@@ -70,3 +70,23 @@ describe('emitStyle — D-LIT-15 / D-LIT-16 split', () => {
     expect(result.globalStyleCall).toBe('');
   });
 });
+
+describe('emitStyle — ::part() cross-shadow styling bridge (Phase 17, SPEC-R1/R2/R6)', () => {
+  it('PartCardConsumer: consumer ::part rule lowers to <child-tag>[scope]::part(body)', () => {
+    const code = compile('PartCardConsumer');
+    // The consumer's `PartCard::part(body)` rule must reach the child's
+    // `part="body"` shadow element: tag lowered to the custom-element tag
+    // `rozie-part-card`, scope attr stamped on the child-tag compound BEFORE
+    // `::part`, part name literal (SPEC-R2 + SPEC-R6).
+    expect(code).toMatch(
+      /rozie-part-card\[data-rozie-s-[a-z0-9]+\]::part\(body\)/,
+    );
+    // Scope attr lands BEFORE ::part, never after.
+    expect(code).not.toMatch(/::part\(body\)\[data-rozie-s/);
+    // Part name `body` is literal — no scope hash adjacent to the name.
+    expect(code).not.toMatch(/::part\(body\[data-rozie-s/);
+    // The author-form PascalCase `PartCard` tag must NOT survive in the emitted
+    // selector (it would never match the emitted <rozie-part-card> element).
+    expect(code).not.toMatch(/PartCard\[data-rozie-s-[a-z0-9]+\]::part/);
+  });
+});

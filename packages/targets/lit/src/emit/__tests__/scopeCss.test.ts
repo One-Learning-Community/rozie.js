@@ -79,3 +79,57 @@ describe('scopeCss (lit) — :deep() cross-component escape hatch', () => {
     expect(() => scopeCss(':deep { color: red; }', HASH)).not.toThrow();
   });
 });
+
+describe('scopeCss (lit) — ::part() cross-shadow styling bridge (Phase 17)', () => {
+  it('child::part(body) — scope attr BEFORE ::part; part name literal/un-hashed', () => {
+    const out = scopeCss('rozie-part-card::part(body) { color: red; }', HASH);
+    // Scope attr lands BETWEEN the child-tag compound and ::part (SPEC-R2).
+    expect(out).toMatch(/rozie-part-card\[data-rozie-s-abc123\]::part\(body\)/);
+    // The child-tag compound KEEPS its scope attr (cross-shadow match key).
+    expect(out).toContain(`rozie-part-card${SCOPE_ATTR}`);
+    // Part name `body` is literal: NO hash inside/after the part name (SPEC-R6).
+    expect(out).not.toMatch(/::part\(body\[data-rozie-s/);
+    expect(out).not.toMatch(/::part\(body\)\[data-rozie-s/);
+    expect(out).not.toMatch(/body\[data-rozie-s-abc123\]/);
+    // ::part pseudo survives verbatim (it is NOT stripped like :deep).
+    expect(out).toContain('::part(body)');
+  });
+
+  it('.wrap child::part(body) — both compounds scoped, ::part literal at tail', () => {
+    const out = scopeCss('.wrap rozie-part-card::part(body) { color: red; }', HASH);
+    expect(out).toMatch(
+      /\.wrap\[data-rozie-s-abc123\]\s+rozie-part-card\[data-rozie-s-abc123\]::part\(body\)/,
+    );
+    // Part name still literal — no hash on `body`.
+    expect(out).not.toMatch(/body\[data-rozie-s-abc123\]/);
+  });
+
+  it('::part name carries no adjacent scope hash (SPEC-R6 literal name)', () => {
+    const out = scopeCss('rozie-part-card::part(body) { color: red; }', HASH);
+    // The only `[data-rozie-s-...]` occurrence must be on the child-tag compound,
+    // not inside the part-name pseudo.
+    const occurrences = out.match(/\[data-rozie-s-abc123\]/g) ?? [];
+    expect(occurrences.length).toBe(1);
+    expect(out).toMatch(/rozie-part-card\[data-rozie-s-abc123\]::part\(body\)/);
+  });
+
+  it('::part is NOT routed through whole-rule shadow exemption (keeps scope attr)', () => {
+    // Pitfall 2: if ::part went through selectorIsShadowExempt, the child-tag
+    // compound would lose its scope attr and match every child instance.
+    const out = scopeCss('rozie-part-card::part(body) { color: red; }', HASH);
+    expect(out).toContain(SCOPE_ATTR);
+    expect(out).not.toMatch(/^rozie-part-card::part\(body\)/);
+  });
+
+  it(':deep() regression — ::part branch does NOT perturb :deep output (SPEC-R5)', () => {
+    // Byte-identical guard: this is the exact assertion shape from the :deep
+    // suite above; it must keep holding after the ::part branch lands.
+    const out = scopeCss('.board :deep(.inner) { color: red; }', HASH);
+    expect(out).toContain(`.board${SCOPE_ATTR}`);
+    expect(out).toContain('.inner');
+    expect(out).not.toContain(`.inner${SCOPE_ATTR}`);
+    expect(out).not.toContain(':deep');
+    expect(out).not.toContain('::part');
+    expect(out).toMatch(/\.board\[data-rozie-s-abc123\]\s+\.inner/);
+  });
+});
