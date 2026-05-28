@@ -90,3 +90,49 @@ describe('scopeCss — :deep() cross-component escape hatch', () => {
     expect(() => scopeCss(':deep { color: red; }', HASH)).not.toThrow();
   });
 });
+
+/**
+ * Phase 17 Plan 03 (SPEC-R1 non-Lit arm / SPEC-R4a) — `::part(name)` consumer
+ * rules are a CROSS-SHADOW mechanism that only has meaning on Lit. On React
+ * (and Solid/Svelte) they must be DROPPED in `scopeCss` — not scope-mangled
+ * into a `[data-rozie-s-<hash>]` selector that would leak broken/global CSS.
+ * The drop is INDEPENDENT of the `:deep` code path (SPEC-R5 byte-identity).
+ */
+describe('scopeCss — ::part() cross-shadow no-op strip (SPEC-R4a)', () => {
+  it('drops a `<child>::part(body)` rule entirely — no ::part, no scope-attr leakage', () => {
+    const out = scopeCss('rozie-part-card::part(body) { color: red; }', HASH);
+    expect(out).not.toContain('::part');
+    // The dropped rule must NOT survive scope-mangled.
+    expect(out).not.toContain(`rozie-part-card${SCOPE_ATTR}`);
+    expect(out).not.toContain('color: red');
+  });
+
+  it('drops ONLY the ::part rule — a co-present ordinary rule still gets scoped', () => {
+    const out = scopeCss(
+      'rozie-part-card::part(body) { color: red; }\n.card-body { padding: 1rem; }',
+      HASH,
+    );
+    // ::part rule gone.
+    expect(out).not.toContain('::part');
+    expect(out).not.toContain('color: red');
+    // Ordinary co-present rule survives, scoped as usual.
+    expect(out).toMatch(/\.card-body\[data-rozie-s-abc123\]/);
+    expect(out).toContain('padding: 1rem');
+  });
+
+  it(':deep regression guard — a sibling :deep rule still lowers to :global, ::part rule gone', () => {
+    const out = scopeCss(
+      '.outer :deep(.inner) { color: red; }\nrozie-part-card::part(body) { color: blue; }',
+      HASH,
+    );
+    // :deep lowering unchanged (SPEC-R5).
+    expect(out).toMatch(/\.outer\[data-rozie-s-abc123\]\s+:global\(\.inner\)/);
+    // ::part rule dropped.
+    expect(out).not.toContain('::part');
+    expect(out).not.toContain('color: blue');
+  });
+
+  it('does not throw on a ::part rule (no diagnostic surfaced from the strip)', () => {
+    expect(() => scopeCss('rozie-part-card::part(body) { color: red; }', HASH)).not.toThrow();
+  });
+});

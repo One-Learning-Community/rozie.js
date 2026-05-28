@@ -64,3 +64,44 @@ describe('scopeCss (solid) — :deep() cross-component escape hatch', () => {
     expect(() => scopeCss(':deep { color: red; }', HASH)).not.toThrow();
   });
 });
+
+/**
+ * Phase 17 Plan 03 (SPEC-R1 non-Lit arm / SPEC-R4a) — `::part(name)` consumer
+ * rules are a cross-shadow mechanism with meaning only on Lit. On Solid they
+ * must be DROPPED in `scopeCss` rather than scope-mangled. The drop is
+ * independent of the `:deep` code path (SPEC-R5 byte-identity).
+ */
+describe('scopeCss (solid) — ::part() cross-shadow no-op strip (SPEC-R4a)', () => {
+  it('drops a `<child>::part(body)` rule entirely — no ::part, no scope-attr leakage', () => {
+    const out = scopeCss('rozie-part-card::part(body) { color: red; }', HASH);
+    expect(out).not.toContain('::part');
+    expect(out).not.toContain(`rozie-part-card${SCOPE_ATTR}`);
+    expect(out).not.toContain('color: red');
+  });
+
+  it('drops ONLY the ::part rule — a co-present ordinary rule still gets scoped', () => {
+    const out = scopeCss(
+      'rozie-part-card::part(body) { color: red; }\n.card-body { padding: 1rem; }',
+      HASH,
+    );
+    expect(out).not.toContain('::part');
+    expect(out).not.toContain('color: red');
+    expect(out).toMatch(/\.card-body\[data-rozie-s-abc123\]/);
+    expect(out).toContain('padding: 1rem');
+  });
+
+  it(':deep regression guard — a sibling :deep rule still lowers (inner unscoped), ::part rule gone', () => {
+    const out = scopeCss(
+      '.outer :deep(.inner) { color: red; }\nrozie-part-card::part(body) { color: blue; }',
+      HASH,
+    );
+    expect(out).toMatch(/\.outer\[data-rozie-s-abc123\]\s+\.inner/);
+    expect(out).not.toContain(`.inner${SCOPE_ATTR}`);
+    expect(out).not.toContain('::part');
+    expect(out).not.toContain('color: blue');
+  });
+
+  it('does not throw on a ::part rule (no diagnostic surfaced from the strip)', () => {
+    expect(() => scopeCss('rozie-part-card::part(body) { color: red; }', HASH)).not.toThrow();
+  });
+});

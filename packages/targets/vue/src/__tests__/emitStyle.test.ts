@@ -174,6 +174,67 @@ describe('emitStyle — :deep() byte-slice fidelity (Vue 3.4+ native)', () => {
   });
 });
 
+/**
+ * Phase 17 Plan 03 (SPEC-R1 non-Lit arm / SPEC-R4a) — `::part(name)` consumer
+ * rules are a cross-shadow mechanism with meaning only on Lit. Vue byte-slices
+ * each scoped rule verbatim into `<style scoped>`, so without intervention a
+ * `<child>::part(body)` rule would survive as meaningless/broken global CSS.
+ * `stringifyRules` must SKIP any rule whose slice contains `::part(` so it is
+ * omitted entirely (no stray empty line). The drop is independent of the
+ * `:deep` byte-slice path (SPEC-R5).
+ */
+function compileStyle(css: string): ReturnType<typeof emitStyle> {
+  const src = [
+    '<rozie name="X">',
+    '<template><div /></template>',
+    '<style>',
+    css,
+    '</style>',
+    '</rozie>',
+  ].join('\n');
+  const result = parse(src, { filename: 'X.rozie' });
+  if (!result.ast) throw new Error('parse() returned null AST');
+  const lowered = lowerToIR(result.ast, { modifierRegistry: createDefaultRegistry() });
+  if (!lowered.ir) throw new Error('lowerToIR() returned null IR');
+  return emitStyle(lowered.ir.styles, src);
+}
+
+describe('emitStyle (vue) — ::part() cross-shadow no-op strip (SPEC-R4a)', () => {
+  it('omits a `<child>::part(body)` rule from the scoped block', () => {
+    const out = compileStyle('rozie-part-card::part(body) { color: red; }');
+    expect(out.scoped).not.toContain('::part(');
+    expect(out.scoped).not.toContain('color: red');
+    expect(out.diagnostics).toEqual([]);
+  });
+
+  it('drops ONLY the ::part rule — a co-present ordinary rule still survives', () => {
+    const out = compileStyle(
+      'rozie-part-card::part(body) { color: red; }\n.card-body { padding: 1rem; }',
+    );
+    expect(out.scoped).not.toContain('::part(');
+    expect(out.scoped).not.toContain('color: red');
+    // Co-present ordinary rule survives.
+    expect(out.scoped).toContain('.card-body');
+    expect(out.scoped).toContain('padding: 1rem');
+    // No stray empty line left where the ::part rule was.
+    expect(out.scoped).not.toMatch(/\n\n\n/);
+    expect(out.diagnostics).toEqual([]);
+  });
+
+  it(':deep regression guard — a sibling :deep rule still byte-slices verbatim, ::part rule gone', () => {
+    const out = compileStyle(
+      '.outer :deep(.inner) { color: red; }\nrozie-part-card::part(body) { color: blue; }',
+    );
+    // Vue passes :deep through verbatim (SPEC-R5).
+    expect(out.scoped).toContain(':deep(.inner)');
+    expect(out.scoped).toContain('.outer');
+    // ::part rule dropped.
+    expect(out.scoped).not.toContain('::part(');
+    expect(out.scoped).not.toContain('color: blue');
+    expect(out.diagnostics).toEqual([]);
+  });
+});
+
 describe('emitStyle — Pitfall 6 documentation', () => {
   // Acceptance check that none of the 5 reference examples exercise
   // `@media (...) { :root { ... } }`. If a future example introduces this,
