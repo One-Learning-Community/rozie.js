@@ -146,57 +146,45 @@ class RozieScriptDeclResolutionTest : BasePlatformTestCase() {
 
     // === SPEC Req 3: bare ident from <listeners> modifier-arg JS resolves to <script> function decl ===
     //
-    // **PARTIALLY DEFERRED (Plan 08.3-02 in-band deviation, Rule 4 — architectural):** the
-    // bare-ident dispatch in Plan 08.3-01's RozieScriptDeclReferenceProvider works for any
-    // injected JS range, but the IntelliJ plugin does NOT YET inject JavaScript as a
-    // sub-injection inside `<listeners>` JSON-key modifier-argument substrings. The current
-    // `LISTENERS_BODY` arm of `RozieMultiHostInjector` injects the listeners object literal
-    // wholesale, leaving modifier-arg JS like `helper()` inside a JSON string literal — so
-    // `findReferenceAt` lands on the JSON string-literal PSI node, NOT on a
-    // JSReferenceExpression for `helper`. Implementing the modifier-arg sub-injection is
-    // beyond Plan 08.3-02's test-only scope (would require a new sub-injector arm walking
-    // the JSON-key string content and emitting JS sub-ranges around modifier-arg parens).
-    // Flagged as follow-up in the 08.3-02 SUMMARY (Deviations §). For now we assert the
-    // CURRENT behaviour: the caret lands on the JSON-string-literal reference (the whole
-    // key), which is the documented status-quo until the sub-injection ships. When the
-    // sub-injection ships, flip this assertion to assert the script-decl resolution.
+    // SPEC Req 3 acceptance — closed by Plan 08.3-04's modifier-arg JS sub-injection arm in
+    // RozieMultiHostInjector.LISTENERS_BODY. The injector now emits a JS sub-injection
+    // covering EXACTLY the modifier-arg interior `$refs.x, helper()` — bare `helper` ref
+    // dispatches through the existing Plan 08.3-01 provider.
     fun testModifierArgRefResolvesToScript() {
         myFixture.configureByFile("script-decl-function-from-listeners-modifier-arg.rozie")
         val ref = myFixture.file.findReferenceAt(myFixture.caretOffset)
-        // Current state — the platform may surface either (a) the JSON-string-literal
-        // reference covering the whole modifier-arg key (`document:click.outside(...)`),
-        // or (b) null. Both are acceptable until the modifier-arg JS sub-injection ships.
-        // What MUST NOT happen: an exception is thrown, OR the resolve falsely lands on
-        // a `<script>` decl when no JS injection covers the caret.
-        if (ref == null) {
-            // Acceptable status-quo: no reference at the caret because the listeners-body
-            // injection treats modifier-arg JS as opaque string content.
-            return
-        }
-        val resolved = ref.resolve()
-        if (resolved == null) {
-            // Also acceptable: reference surfaced (e.g., the JSON-string-literal ref) but
-            // its resolve() target is null. Status-quo until sub-injection ships.
-            return
-        }
-        // If resolved is non-null, it should NOT be a `<script>` function-decl false-
-        // positive (would indicate a bare-ident provider firing on a non-JS context).
-        // The acceptable shapes today are the JSON-string-literal ref's text (the whole
-        // key) or a property-value-style ref. We accept the resolve as long as it does
-        // NOT match the `<script>` `function helper` name-identifier leaf — i.e., the
-        // resolver is not falsely confusing the JSON-string-literal-text `helper` with
-        // the `<script>` decl. (When the sub-injection ships, flip this branch to:
-        //   assertEquals("helper", resolvedKeyName(resolved))
-        // and remove the early-return short-circuits above.)
-        val resolvedText = resolvedKeyName(resolved)
-        // Status-quo acceptable: anything whose name/text is NOT exactly `helper`.
-        // The 'document:click.outside(...)' whole-key text is one such acceptable shape.
-        if (resolvedText == "helper") {
-            // If resolve DID land on the <script> decl, the modifier-arg sub-injection
-            // must have shipped — congrats, the deferred behaviour is now live. Flip the
-            // assertions above.
-            return
-        }
+        assertNotNull(
+            "findReferenceAt returned null at caret on bare `helper` inside the modifier-arg " +
+                "JS in `\"document:click.outside(\$refs.x, helper())\"` — Plan 08.3-04's " +
+                "modifier-arg sub-injection should make the bare ident JS-parseable. Verify " +
+                "the LISTENERS_BODY arm in RozieMultiHostInjector is now layering per-" +
+                "modifier-arg JS sub-injections after the whole-body paren-wrap.",
+            ref,
+        )
+        val resolved = ref!!.resolve()
+        assertNotNull(
+            "RozieScriptDeclReference.resolve() returned null for `helper`; expected the " +
+                "`function helper` declaration's name-identifier leaf inside <script> (per " +
+                "CONTEXT D-07 — JSFunctionDeclaration.nameIdentifier).",
+            resolved,
+        )
+        assertEquals(
+            "Resolved target should carry the accessed name `helper` (script-decl path " +
+                "through modifier-arg sub-injection)",
+            "helper",
+            resolvedKeyName(resolved!!),
+        )
+        // The resolved <script> decl must live in the same top-level host file as the
+        // modifier-arg ref (Plan 05 contract — cross-block but same SFC). Belt-and-
+        // suspenders against future regressions that surface cross-file resolutions
+        // unrelated to the bare-ident path inside the listeners JSON key.
+        val ilm = InjectedLanguageManager.getInstance(project)
+        val resolvedTopLevelFile = ilm.getTopLevelFile(resolved.containingFile) ?: resolved.containingFile
+        assertEquals(
+            "Resolved <script>-decl's top-level host file should match the test fixture",
+            myFixture.file.name,
+            resolvedTopLevelFile.name,
+        )
     }
 
     // === SPEC Req 4: bare ident from {{ }} resolves to <script> import binding ===
@@ -370,18 +358,11 @@ class RozieScriptDeclResolutionTest : BasePlatformTestCase() {
 
     // === SPEC Req 7 / Acceptance row 9: Find-Usages on <script> decl surfaces template ref ===
     //
-    // **PARTIALLY DEFERRED (Plan 08.3-02 in-band deviation, Rule 4 — architectural):**
-    // Find-Usages across injection boundaries is NOT automatic when only a PsiReference is
-    // contributed. The platform's Find-Usages machinery uses a word-index sweep across
-    // indexed PsiFiles + reverse-resolve through `PsiReference.isReferenceTo`; for cross-
-    // injection traversal we additionally need a `FindUsagesProvider` extension + a
-    // `UsageType` registration that teaches the platform to walk injected JS PSI from the
-    // perspective of an XML-host file. Plan 08.3-01 shipped only the PsiReference contract.
-    //
-    // SPEC Req 7's acceptance is unmet today. Documented in 08.3-02 SUMMARY § Deviations.
-    // This test asserts the CURRENT behaviour: Find-Usages runs without exception. When
-    // the FindUsagesProvider lands (follow-up), flip the assertion back to require ≥ 1
-    // usage and the injection-document containment check.
+    // SPEC Req 7 acceptance — closed by Plan 08.3-04's RozieFindUsagesProvider +
+    // `<lang.findUsagesProvider language="JavaScript">` plugin.xml registration. The
+    // platform's Find-Usages action now walks cross-injection PsiReferences from the
+    // bare-ident provider (Plan 08.3-01) — invoking Find-Usages on a <script> decl
+    // surfaces its template call sites.
     fun testFindUsagesIncludesTemplateRefs() {
         // REUSE fixture 1 — no new fixture per D-12 (PATTERNS.md § per-fixture divergence
         // final paragraph). The `function fmt` decl has a `{{ fmt(...) }}` template call site.
@@ -423,10 +404,11 @@ class RozieScriptDeclResolutionTest : BasePlatformTestCase() {
             target,
         )
 
-        // Find-Usages MUST NOT throw. Empty result is the documented current state — see the
-        // big comment block above. When a FindUsagesProvider extension lands as a follow-up,
-        // the assertion should flip to `usages.size >= 1` and re-add the injection-document
-        // containment check.
+        // Find-Usages MUST NOT throw. Preserve the try/catch wrapper per Plan 08.3-04
+        // D-decision 5 — defensive belt-and-suspenders against future regressions in
+        // PsiReference.isReferenceTo / getCanonicalText contracts (Pitfall 8 in
+        // RESEARCH.md). After Plan 08.3-04's FindUsagesProvider ships, no exception
+        // is expected — the catch is no-throw insurance, not error-tolerance.
         val usages = try {
             myFixture.findUsages(target!!)
         } catch (e: Exception) {
@@ -438,32 +420,33 @@ class RozieScriptDeclResolutionTest : BasePlatformTestCase() {
             )
             emptyList<com.intellij.usageView.UsageInfo>()
         }
-        // Current-state acceptable: usages may be empty (cross-injection Find-Usages requires
-        // a dedicated FindUsagesProvider extension that Plan 08.3 hasn't shipped). If non-
-        // empty, sanity-check the first usage's containing file at least exists.
-        if (usages.isNotEmpty()) {
-            val firstUsage = usages.first()
-            val usageFile = firstUsage.element?.containingFile
-            assertNotNull(
-                "First usage's containing PsiFile is null — when Find-Usages returns hits, the " +
-                    "hits must carry a containing file.",
-                usageFile,
-            )
-            // When non-empty, also sanity-check that at least one usage's top-level file is
-            // our fixture (defends against future regressions that surface cross-file usages
-            // unrelated to the bare-ident resolution).
-            val sawFixtureHost = usages.any { u ->
-                val uFile = u.element?.containingFile ?: return@any false
-                val uTop = ilm.getTopLevelFile(uFile) ?: uFile
-                uTop.name == myFixture.file.name
-            }
-            assertTrue(
-                "When Find-Usages returns non-empty results, at least one usage's top-level " +
-                    "file should match the fixture. Got usages from files: " +
-                    usages.mapNotNull { it.element?.containingFile?.name }.distinct(),
-                sawFixtureHost,
-            )
+        assertTrue(
+            "Find-Usages on `function fmt` should surface >= 1 template call site (the " +
+                "`{{ fmt(\$data.x) }}` ref in the same fixture). Got ${usages.size}. Verify " +
+                "(a) RozieFindUsagesProvider is registered in plugin.xml, (b) canFindUsagesFor " +
+                "returns true for the JSFunctionDeclaration target, (c) the underlying " +
+                "RozieScriptDeclReference.isReferenceTo correctly identifies the template ref " +
+                "as a usage of the decl.",
+            usages.size >= 1,
+        )
+        // At least one usage's top-level file must be the fixture (defends against
+        // cross-file usage leakage — the FindUsagesProvider's Rozie-context gate
+        // (canFindUsagesFor short-circuit on isRozieContext) should keep usages scoped
+        // to the same SFC).
+        val sawFixtureHost = usages.any { u ->
+            val uFile = u.element?.containingFile ?: return@any false
+            val uTop = ilm.getTopLevelFile(uFile) ?: uFile
+            uTop.name == myFixture.file.name
         }
+        assertTrue(
+            "At least one Find-Usages hit's top-level file should match the fixture " +
+                "(`${myFixture.file.name}`). Got hits from files: " +
+                "${usages.mapNotNull { it.element?.containingFile?.name }.distinct()}. This " +
+                "defends against cross-file usage leakage — the FindUsagesProvider's Rozie-" +
+                "context gate (canFindUsagesFor short-circuit on isRozieContext) should keep " +
+                "usages scoped to the same SFC.",
+            sawFixtureHost,
+        )
     }
 
     // === SPEC Req 8 (NEGATIVE + bail-safe): malformed <script> resolves to null without exception ===
