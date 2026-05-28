@@ -44,12 +44,24 @@ describe('extractSymbols', () => {
     expect(rootEl.detail).toBe('template ref');
   });
 
+  it('collects <components> entries with name + import path', () => {
+    const source =
+      '<rozie name="W"><components>{ Modal: "./Modal.rozie" }</components>' +
+      '<template><Modal /></template></rozie>';
+    const { ast } = parse(source);
+    const { components } = extractSymbols(ast!, source);
+    expect(components.map((c) => c.name)).toEqual(['Modal']);
+    expect(components[0]?.path).toBe('./Modal.rozie');
+    expect(source.slice(components[0]!.loc.start, components[0]!.loc.end)).toBe('Modal');
+  });
+
   it('returns empty arrays for blocks that are absent', () => {
     const { ast } = parse('<rozie name="X"><template><div /></template></rozie>');
     const symbols = extractSymbols(ast!, '');
     expect(symbols.props).toEqual([]);
     expect(symbols.data).toEqual([]);
     expect(symbols.refs).toEqual([]);
+    expect(symbols.components).toEqual([]);
   });
 });
 

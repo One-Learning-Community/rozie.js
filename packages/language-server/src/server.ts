@@ -28,8 +28,9 @@ export function startServer(): void {
     (): InitializeResult => ({
       capabilities: {
         textDocumentSync: TextDocumentSyncKind.Incremental,
-        // `.` after a `$props`/`$data`/`$refs` sigil triggers member completion.
-        completionProvider: { triggerCharacters: ['.'] },
+        // `.` after a `$props`/`$data`/`$refs` sigil triggers member completion;
+        // `<` triggers composed-component tag-name completion.
+        completionProvider: { triggerCharacters: ['.', '<'] },
         definitionProvider: true,
         hoverProvider: true,
       },

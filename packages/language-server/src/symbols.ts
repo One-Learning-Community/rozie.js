@@ -28,10 +28,24 @@ export interface RozieSymbol {
   detail: string;
 }
 
+/**
+ * A `<components>` entry: a PascalCase tag bound to a sibling `.rozie` import
+ * path (`{ Modal: './Modal.rozie' }`). Powers component-tag go-to-definition,
+ * hover, and tag-name completion in `<template>`.
+ */
+export interface RozieComponentSymbol {
+  name: string;
+  /** Absolute byte span of the PascalCase key in `<components>`. */
+  loc: SourceLoc;
+  /** The import-path string value, e.g. `./Modal.rozie`. */
+  path: string;
+}
+
 export interface RozieSymbols {
   props: RozieSymbol[];
   data: RozieSymbol[];
   refs: RozieSymbol[];
+  components: RozieComponentSymbol[];
 }
 
 /** Minimal structural view of a Babel node's absolute offsets. */
@@ -165,7 +179,32 @@ export function extractSymbols(ast: RozieAST, source: string): RozieSymbols {
     ? collectObjectKeys(ast.data.expression, source, (v) => sliceNode(source, v))
     : [];
   const refs = ast.template ? collectRefs(ast.template) : [];
-  return { props, data, refs };
+  const components = ast.components ? collectComponents(ast.components.expression) : [];
+  return { props, data, refs, components };
+}
+
+function collectComponents(expression: { properties?: unknown[] }): RozieComponentSymbol[] {
+  const out: RozieComponentSymbol[] = [];
+  const seen = new Set<string>();
+  for (const prop of (expression.properties ?? []) as Array<
+    OffsetNode & {
+      type: string;
+      key?: { type: string; name?: string; value?: unknown } & OffsetNode;
+      value?: { type: string; value?: unknown };
+    }
+  >) {
+    if (prop.type !== 'ObjectProperty' || !prop.key) continue;
+    const info = keyInfo(prop.key);
+    if (!info || seen.has(info.name)) continue;
+    const path =
+      prop.value?.type === 'StringLiteral' && typeof prop.value.value === 'string'
+        ? prop.value.value
+        : '';
+    if (!path) continue;
+    seen.add(info.name);
+    out.push({ name: info.name, loc: info.loc, path });
+  }
+  return out;
 }
 
 /** Look up the declared symbols for a given sigil. */

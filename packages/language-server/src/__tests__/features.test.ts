@@ -98,3 +98,43 @@ describe('computeHover', () => {
     expect(computeHover(d, d.positionAt(usageOffset))).toBeNull();
   });
 });
+
+const COMP_SOURCE = [
+  '<rozie name="WrapperModal">',
+  '<components>{ Modal: "./Modal.rozie" }</components>',
+  '<template>',
+  '  <Modal :open="true"><span>hi</span></Modal>',
+  '</template>',
+  '</rozie>',
+].join('\n');
+
+function compDoc(text = COMP_SOURCE, uri = 'file:///abs/dir/WrapperModal.rozie'): TextDocument {
+  return TextDocument.create(uri, 'rozie', 1, text);
+}
+
+describe('component-tag features', () => {
+  it('navigates a <Modal> tag to its sibling .rozie file', () => {
+    const d = compDoc();
+    const offset = COMP_SOURCE.indexOf('<Modal') + 3;
+    const loc = computeDefinition(d, d.positionAt(offset));
+    expect(loc?.uri).toBe('file:///abs/dir/Modal.rozie');
+    expect(loc?.range.start).toEqual({ line: 0, character: 0 });
+  });
+
+  it('hovers a component tag with its import path', () => {
+    const d = compDoc();
+    const offset = COMP_SOURCE.indexOf('<Modal') + 3;
+    const value = (computeHover(d, d.positionAt(offset))!.contents as { value: string }).value;
+    expect(value).toContain('Modal');
+    expect(value).toContain('./Modal.rozie');
+  });
+
+  it('completes component tag names after `<`', () => {
+    const text = COMP_SOURCE.replace('<Modal :open', '<Mo :open');
+    const d = compDoc(text);
+    const pos = d.positionAt(text.indexOf('<Mo :open') + '<Mo'.length);
+    const items = computeCompletions(d, pos);
+    expect(items.map((i) => i.label)).toEqual(['Modal']);
+    expect(items[0]?.detail).toBe('./Modal.rozie');
+  });
+});
