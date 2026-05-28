@@ -28,14 +28,36 @@
     "vscode": "^1.80.0"
   },
   "categories": ["Programming Languages"],
+  "main": "./dist/extension.js",
+  "activationEvents": ["onLanguage:rozie"],
   "scripts": {
-    "package": "vsce package",
-    "publish": "vsce publish"
+    "build": "node build.mjs",
+    "typecheck": "tsc --noEmit",
+    "bundle:server": "node ./scripts/bundle-server.mjs",
+    "package": "pnpm bundle:server && pnpm build && vsce package --no-dependencies",
+    "publish": "pnpm bundle:server && pnpm build && vsce publish --no-dependencies"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
   },
   "devDependencies": {
-    "@vscode/vsce": "^3.0.0"
+    "@types/node": "^22.0.0",
+    "@types/vscode": "^1.80.0",
+    "@vscode/vsce": "^3.0.0",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.6.0"
   },
   "contributes": {
+    "configuration": {
+      "title": "Rozie",
+      "properties": {
+        "rozie.languageServer.path": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Absolute path to the Rozie language server bundle (`server-standalone.cjs`). Leave empty to use the bundled server. For monorepo development, point this at `packages/language-server/dist-standalone/server-standalone.cjs`."
+        }
+      }
+    },
     "languages": [
       {
         "id": "rozie",

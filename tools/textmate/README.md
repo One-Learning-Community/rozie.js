@@ -1,6 +1,9 @@
-# Rozie TextMate Grammar
+# Rozie for VS Code (grammar + language server)
 
-Syntax highlighting for `.rozie` Single-File Component files. Consumed by JetBrains IDEs (PhpStorm, WebStorm, IDEA, RubyMine, etc.) via the built-in TextMate-bundle host, and reusable as a VSCode `contributes.grammars` entry.
+Two layers for `.rozie` Single-File Components:
+
+- **Syntactic** — a TextMate grammar (`syntaxes/rozie.tmLanguage.json`). Consumed by JetBrains IDEs via the built-in TextMate-bundle host, by the **Shiki**-powered docs site, and by this VS Code extension's `contributes.grammars` entry.
+- **Semantic** — a `vscode-languageclient` that starts the shared [`@rozie/language-server`](../../packages/language-server) (the same Option-C "brain" the IntelliJ plugin consumes via LSP4IJ). It provides diagnostics (ROZ codes), `$props`/`$data`/`$refs` member completion + go-to-definition + hover + find-references + rename, cross-file component prop/event/slot completion, component-tag and slot-fill navigation, `lang=` value completion, and the document outline. See **[Language server](#language-server-semantic-features)** below.
 
 ## Install — VS Code (marketplace)
 
@@ -99,9 +102,42 @@ Open the fixture files under `tools/textmate/fixtures/` — `Counter.rozie`, `Dr
 - `<style scoped>` highlights identically to `<style>` — there is no visual treatment for the `scoped` attribute itself.
 - The `.modifier` chain is matched on every `r-*` directive, not only `r-model` — e.g. `r-show.foo` colours `.foo` as if it were a valid modifier. This is intentional: the grammar is a colorizer, and the compiler rejects modifier misuse semantically (ROZ961 / ROZ962).
 - `$event` is scoped as a magic identifier globally, not only inside `@event` handlers. The grammar is forgiving — a reference to `$event` in `<script>` outside an event handler colours as if it were valid; the compiler raises the actual diagnostic (ROZ964).
-- No folding rules, no indentation rules, no brace-matching, no completion, no diagnostics. This is a colorizer only.
+- The **grammar itself** has no folding/indentation/brace-matching rules — it is a colorizer. Completion, diagnostics, navigation, and rename are provided separately by the bundled language server (see below), not by the grammar.
 - Modifier-arg lists tokenize their contents as a JS expression, but errors (mismatched parens, etc.) are not surfaced — the grammar is forgiving.
 - The top-level `<template>` SFC block is matched only when `<template>` (and the closing `</template>`) appear flush-left at column 0. This is what lets nested `<template #header>` slot-fill tags inside the block coexist with the block boundaries — TextMate has no stack-aware tag matching, so indentation is the only signal. If you indent the SFC's top-level block, slot-fill highlighting will appear correct but the outer block end will be detected at the FIRST `</template>` (the inner one), losing highlighting on whatever follows.
+
+## Language server (semantic features)
+
+The extension activates on the first `.rozie` file and starts the Rozie language
+server. The server script is resolved in this order:
+
+1. the `rozie.languageServer.path` setting,
+2. the `ROZIE_LANGUAGE_SERVER` environment variable,
+3. the bundle shipped inside the `.vsix` at `server/server-standalone.cjs`.
+
+If none resolve, the extension stays **grammar-only** — syntax highlighting
+still works, semantic features are simply absent (no errors).
+
+### Building from source
+
+`tools/textmate/` is a standalone package (not a pnpm workspace member), so
+install its deps in isolation, then build:
+
+```
+cd tools/textmate
+pnpm install --ignore-workspace
+pnpm bundle:server     # builds @rozie/language-server and stages it into server/
+pnpm build             # esbuild-bundles src/extension.ts → dist/extension.js
+pnpm typecheck         # tsc --noEmit
+```
+
+For **monorepo development**, skip `bundle:server` and point the setting at the
+live build instead:
+
+```jsonc
+// .vscode/settings.json
+{ "rozie.languageServer.path": "<repo>/packages/language-server/dist-standalone/server-standalone.cjs" }
+```
 
 ## Marketplace publish
 

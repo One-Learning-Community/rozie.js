@@ -1,5 +1,11 @@
 fixtures/**
 .planning/**
 node_modules/**
+src/**
+scripts/**
+build.mjs
+tsconfig.json
+pnpm-lock.yaml
 *.vsix
 **/.DS_Store
+**/*.map
