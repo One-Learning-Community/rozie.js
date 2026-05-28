@@ -84,6 +84,16 @@ export function scopeCss(css: string, scopeHash: string): string {
   });
 
   root.walkRules((rule) => {
+    // Phase 17 (SPEC-R1 non-Lit arm / SPEC-R4a): `::part(name)` is a
+    // cross-shadow-DOM mechanism that only has meaning on Lit. Outside a shadow
+    // boundary the selector is inert, so DROP the whole rule rather than
+    // scope-mangle it into a `[data-rozie-s-<hash>]::part(...)` selector that
+    // would leak broken/global CSS. Silent no-op — no diagnostic. This is
+    // independent of the `:deep` lowering above (SPEC-R5 byte-identity).
+    if (rule.selector.includes('::part(')) {
+      rule.remove();
+      return;
+    }
     rule.selector = transformer.processSync(rule.selector);
   });
 

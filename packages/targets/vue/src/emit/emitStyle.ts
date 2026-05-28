@@ -105,6 +105,13 @@ function stringifyRules(rules: StyleRule[], source: string): string {
   const parts: string[] = [];
   for (const rule of rules) {
     const slice = source.slice(rule.loc.start, rule.loc.end);
+    // Phase 17 (SPEC-R1 non-Lit arm / SPEC-R4a): `::part(name)` is a
+    // cross-shadow-DOM mechanism that only has meaning on Lit. Vue byte-slices
+    // each rule verbatim into `<style scoped>`, where a `::part` selector would
+    // be inert/broken CSS. Skip the rule entirely so it is omitted from the
+    // joined output (no stray empty line). Silent no-op — no diagnostic.
+    // Independent of the `:deep` byte-slice path (SPEC-R5).
+    if (slice.includes('::part(')) continue;
     parts.push(slice);
   }
   return parts.join('\n');

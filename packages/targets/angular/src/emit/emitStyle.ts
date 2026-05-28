@@ -142,8 +142,16 @@ function wrapPortalSelectors(css: string): string {
 function stringifyRules(rules: StyleRule[], source: string): string {
   if (rules.length === 0) return '';
   return rules
-    .map((r) => {
-      const slice = source.slice(r.loc.start, r.loc.end);
+    .map((r) => source.slice(r.loc.start, r.loc.end))
+    // Phase 17 (SPEC-R1 non-Lit arm / SPEC-R4a): `::part(name)` is a
+    // cross-shadow-DOM mechanism that only has meaning on Lit. Drop any rule
+    // whose slice contains `::part(` BEFORE the `:deep(` lowering branch — so a
+    // ::part rule is never passed to `lowerDeepToNgDeep` and is filtered out of
+    // the array entirely (not mapped to '', which would leak a stray empty
+    // line). Silent no-op — no diagnostic. Independent of the `:deep` path
+    // (SPEC-R5).
+    .filter((slice) => !slice.includes('::part('))
+    .map((slice) => {
       // Quick task 260526-mk4 — Angular `:deep(X)` → `::ng-deep X` lowering.
       // Byte-slice preservation is the floor (Risk 5); we only invoke the
       // postcss reparse when the slice actually contains `:deep(`, paying the
