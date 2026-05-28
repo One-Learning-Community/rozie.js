@@ -209,6 +209,52 @@
         <lang.findUsagesProvider language="JavaScript"
                                  implementationClass="js.rozie.intellij.references.RozieFindUsagesProvider"/>
 
+        <!-- Plan 08.3-04: companion provider for the HOST Rozie-language scan
+             pass. The platform picks a WordsScanner per scanned file via
+             LanguageFindUsages.INSTANCE.forLanguage(file.language); without a
+             provider registered for language="Rozie" the host file is silently
+             skipped by the Find-Usages word-index sweep, even with the
+             RozieUseScopeEnlarger enlarging scope to include it. The provider's
+             only behavior is getWordsScanner -> SimpleWordsScanner (the
+             platform's stock identifier-split scanner). canFindUsagesFor
+             returns false because Rozie PSI elements are never themselves
+             Find-Usages targets — the bare-ident path through Plan 08.3-01 +
+             the JS-language RozieFindUsagesProvider above handles that role. -->
+        <lang.findUsagesProvider language="Rozie"
+                                 implementationClass="js.rozie.intellij.references.RozieHostFindUsagesProvider"/>
+
+        <!-- Plan 08.3-04: SPEC Req 7 — enlarge Find-Usages text-search scope so
+             the platform's word-index sweep visits the Rozie host file for
+             targets that live inside injected JS (the <script> top-level decls).
+             Without this enlarger, a JSFunctionDeclaration's default useScope is
+             a LocalSearchScope of the injected JS file alone — the template /
+             listener / handler / colon-bind text in sibling SFC blocks is
+             outside scope, so Find-Usages returns zero hits even when the
+             RozieScriptDeclReference would resolve correctly. Vue's plugin uses
+             the same useScopeEnlarger EP for the same reason (VueUseScopeEnlarger).
+             Pitfall 2 mitigation lives in getAdditionalUseScope via
+             RozieContextCheck.isRozieContext; the enlarger stays inert on every
+             non-Rozie .js / .ts / .tsx file (T-08.3-04-01). -->
+        <useScopeEnlarger
+            implementation="js.rozie.intellij.references.RozieUseScopeEnlarger"/>
+
+        <!-- Plan 08.3-04: SPEC Req 7 — ReferencesSearch bridge. The JS plugin's
+             JSReferenceExpression.getReferences() returns ONLY its built-in
+             self-reference (verified empirically — see RozieReferenceSearcher
+             KDoc); it does NOT include PsiReferenceContributor-contributed refs
+             like RozieScriptDeclReference. So the platform's ReferencesSearch
+             pipeline never sees our contributed refs when walking candidate
+             reference sites. This searcher participates directly in the
+             ReferencesSearch pipeline: walks the search scope via
+             PsiSearchHelper.processElementsWithWord, asks
+             ReferenceProvidersRegistry for contributed refs at each candidate
+             offset, and checks each via isReferenceTo(target). Vue's plugin
+             uses the same referencesSearch EP for the same reason
+             (VueReferenceSearcher). Pitfall 2 mitigation: the searcher's outer
+             guard short-circuits on `target not in Rozie SFC`. -->
+        <referencesSearch
+            implementation="js.rozie.intellij.references.RozieReferenceSearcher"/>
+
         <!-- Plan 08.2-06: SC-6 prefix-aware attribute-name autocomplete —
              typing r- / @ / : / # in HTML attribute position inside a .rozie
              <template> surfaces the canonical name lists from

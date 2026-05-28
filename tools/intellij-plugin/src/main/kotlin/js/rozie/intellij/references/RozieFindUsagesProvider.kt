@@ -1,5 +1,6 @@
 package js.rozie.intellij.references
 
+import com.intellij.lang.cacheBuilder.SimpleWordsScanner
 import com.intellij.lang.cacheBuilder.WordsScanner
 import com.intellij.lang.findUsages.FindUsagesProvider
 import com.intellij.lang.javascript.findUsages.JavaScriptFindUsagesProvider
@@ -77,4 +78,53 @@ class RozieFindUsagesProvider : FindUsagesProvider {
 
     override fun getNodeText(element: PsiElement, useFullName: Boolean): String =
         delegate.getNodeText(element, useFullName)
+}
+
+/**
+ * Companion FindUsagesProvider registered for `language="Rozie"` (the HOST
+ * language of `.rozie` files) so the platform's word-index sweep visits Rozie
+ * files when looking for template / listener / colon-bind / handler call sites
+ * of a `<script>` decl.
+ *
+ * **Why this companion is required** (Plan 08.3-04 Rule-2 in-band gap closure,
+ * surfaced during Task 3 verification): the platform's Find-Usages text-search
+ * pipeline picks a `WordsScanner` per scanned file by calling
+ * `LanguageFindUsages.INSTANCE.forLanguage(file.language).getWordsScanner()`.
+ * For host `.rozie` files (language="Rozie"), there was no registered provider
+ * before Plan 08.3-04 — the scanner was null and the file was silently skipped
+ * by the word-index sweep, even with the [RozieUseScopeEnlarger] enlarging the
+ * search scope to include the host file. Without word-scanning on the host
+ * file, the template `{{ fmt(...) }}` text occurrences are never discovered and
+ * `ReferencesSearch` is never dispatched at those offsets.
+ *
+ * This companion provides a [SimpleWordsScanner] (the platform's stock
+ * "split on identifier chars" implementation — adequate for finding the `fmt`
+ * word inside `{{ fmt($data.x) }}` in the host file's character stream).
+ * [canFindUsagesFor] returns false unconditionally — Rozie PSI elements are
+ * never themselves Find-Usages targets; the bare-ident provider (Plan 08.3-01)
+ * + JS-host [RozieFindUsagesProvider] handle that role for injected JS decls.
+ *
+ * **Cohabits with [RozieFindUsagesProvider]:** the two providers are sibling
+ * registrations at different language scopes. The JS-language registration
+ * teaches the platform that JS decls in Rozie context are findable; the
+ * Rozie-language registration teaches the platform how to scan Rozie host files
+ * for word occurrences. Both are required for cross-injection Find-Usages to
+ * surface template call sites.
+ */
+class RozieHostFindUsagesProvider : FindUsagesProvider {
+
+    override fun getWordsScanner(): WordsScanner = SimpleWordsScanner()
+
+    // Rozie PSI elements are not themselves Find-Usages targets — the bare-ident
+    // path through Plan 08.3-01 + the JS-host RozieFindUsagesProvider handles
+    // the only "findable" elements (injected-JS <script> decls).
+    override fun canFindUsagesFor(psiElement: PsiElement): Boolean = false
+
+    override fun getHelpId(psiElement: PsiElement): String? = null
+
+    override fun getType(element: PsiElement): String = ""
+
+    override fun getDescriptiveName(element: PsiElement): String = ""
+
+    override fun getNodeText(element: PsiElement, useFullName: Boolean): String = ""
 }

@@ -78,6 +78,47 @@ class RozieScriptDeclReference(
         }
     }
 
+    /**
+     * Plan 08.3-04 in-band gap closure (Rule-2 critical functionality for Find-
+     * Usages contract): the default [PsiReferenceBase.Poly.isReferenceTo] checks
+     * `areElementsEquivalent(resolveResult.element, target)`. Our [multiResolve]
+     * returns the `nameIdentifier` LEAF of the producer declaration (CONTEXT
+     * D-07 — places the rename / navigation cursor on the name itself), but
+     * Find-Usages typically passes the PARENT declaration (e.g.,
+     * `JSFunctionDeclaration`) as the target. The leaf is NOT equivalent to its
+     * parent under [PsiManager.areElementsEquivalent], so the default
+     * `isReferenceTo` would return false and Find-Usages would silently report
+     * zero hits despite a valid contributor-contributed reference.
+     *
+     * The fix: also accept the case where the target IS or CONTAINS any of the
+     * multiResolve result leaves. Concretely: for each multiResolve result, walk
+     * the parent chain of the resolved leaf upward looking for an element
+     * equivalent to the target. This correctly accepts:
+     *
+     *   - target == nameIdentifier leaf (the default case)
+     *   - target == the producer decl whose nameIdentifier the leaf is
+     *     (JSFunctionDeclaration / JSVariable / JSClass / ES6ImportSpecifier /
+     *     ES6ImportedBinding — all 5 producer kinds Plan 08.3-01's walker
+     *     returns the nameIdentifier of)
+     *
+     * The walk bound is tight (typically the leaf's direct parent IS the
+     * producer decl); we bound at 6 parents for safety.
+     */
+    override fun isReferenceTo(target: PsiElement): Boolean {
+        val manager = target.manager
+        for (result in multiResolve(false)) {
+            val resolved = result.element ?: continue
+            var walker: PsiElement? = resolved
+            var depth = 0
+            while (walker != null && depth < 6) {
+                if (manager.areElementsEquivalent(walker, target)) return true
+                walker = walker.parent
+                depth++
+            }
+        }
+        return false
+    }
+
     private fun doResolve(): Array<ResolveResult> {
         val host = RoziePropsReference.resolveHost(element) ?: return ResolveResult.EMPTY_ARRAY
         val targetRange = RoziePropsReference.findBlockBodyRange(host, RozieTokenTypes.SCRIPT_BODY)
