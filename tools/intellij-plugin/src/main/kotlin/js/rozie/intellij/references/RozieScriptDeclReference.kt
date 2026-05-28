@@ -104,6 +104,18 @@ class RozieScriptDeclReference(
          * top-level-only invariant).
          */
         internal fun findScriptDeclByName(jsFile: PsiFile, name: String): PsiElement? {
+            // Guard: bail out on synthetic-ambient names (Plan 16 Strategy-B prepends
+            // `declare const $props: any` and friends as the JS-injection prefix). Any name
+            // starting with `$` is a Rozie magic-identifier (sigil-prefixed) and resolves
+            // through either Plan 05's magic-ident provider (`$props.X`, `$data.X`, `$refs.X`)
+            // or stock JS lookup against the synthetic ambient decls. The bare-ident walker
+            // here is only authoritative for user-authored top-level decls (let/const/function/
+            // class/import) — none of which can legally start with `$` in idiomatic Rozie
+            // source. Without this guard, the walker would steal `$props` / `$data` / etc.
+            // resolutions away from the platform-native JS resolver and return the
+            // synthetic-ambient JSVariable's `.nameIdentifier` leaf instead of the JSVariable
+            // itself, breaking RozieGlobalsLibraryTest. (08.3-02 in-band fix.)
+            if (name.startsWith("\$")) return null
             for (child in jsFile.children) {
                 val match = matchTopLevelDecl(child, name)
                 if (match != null) return match
