@@ -1,0 +1,55 @@
+<!--
+  PartCardConsumer.rozie — Phase 17 proving-fixture CONSUMER for the Lit
+  `::part()` cross-shadow-DOM styling bridge (SPEC-R1 / SPEC-R2 / SPEC-R8).
+
+  Embeds the <PartCard> producer via a <components> block and styles the
+  producer's `part="body"` shadow element across the shadow boundary with a
+  single `PartCard::part(body)` rule in its own <style>.
+
+  Per the SPEC "Emit-shape correction" (research phase, W3C-grounded): the
+  WORKING consumer shape is the PLAIN child-selector prefix `PartCard::part(body)`
+  — NOT `:host(...)::part(...)` (`:host()` matches the consumer's own host, not
+  the child — RESEARCH Pitfall 1). On the Lit target Plan 02 lowers this to
+  `<child-tag>[data-rozie-s-<consumerHash>]::part(body)`, confining the rule to
+  THIS consumer's scoped child invocation; the scope attr is stamped on the
+  child invocation already (emitTemplate.ts:1161-1166) and the consumer's
+  scoped CSS lands in the consumer's own `static styles` — the same shadow root
+  the child renders into. On the 5 non-Lit targets Plan 03 drops the rule
+  (a cross-shadow selector is meaningless without a shadow boundary — SPEC-R4a).
+
+  The part name is the LITERAL `body` — it MUST match the producer's
+  `part="body"` byte-for-byte (SPEC-R6); never scope-hashed adjacent to the
+  part name on either side.
+
+  Multi-rozie fixture: references the producer via <components>; Plan 04
+  registers it in EXAMPLES_NEEDING_RESOLVER_ROOT (compile-only here).
+-->
+
+<rozie name="PartCardConsumer">
+
+<components>
+{
+  PartCard: './PartCard.rozie',
+}
+</components>
+
+<template>
+<div class="part-card-consumer">
+  <PartCard :title="'Hello'">
+    Cross-shadow styled body content.
+  </PartCard>
+</div>
+</template>
+
+<style>
+.part-card-consumer {
+  display: inline-flex;
+  padding: 0.5rem;
+}
+PartCard::part(body) {
+  background: #fde68a;
+  border: 2px solid #b45309;
+}
+</style>
+
+</rozie>

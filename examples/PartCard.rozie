@@ -1,0 +1,50 @@
+<!--
+  PartCard.rozie — Phase 17 proving-fixture PRODUCER for the Lit
+  `::part()` cross-shadow-DOM styling bridge (SPEC-R3 / SPEC-R8).
+
+  A trivial single-file leaf whose template root is a styled card body
+  tagged with the standard HTML `part="body"` shadow-part attribute. The
+  `part="body"` is the PRODUCER side of the cross-shadow contract (SPEC-R3):
+  on the Lit target it is emitted verbatim into the shadow template so a
+  consumer's `::part(body)` selector can pierce the child's one shadow
+  boundary and address this element; on the other 5 targets it is a benign
+  standard HTML attribute (SPEC-R4b).
+
+  The part name is the LITERAL `body` — never scope-hashed (SPEC-R6); it is
+  the public-API contract a consumer's `::part(body)` must match byte-for-byte.
+
+  Deliberately a PLAIN styled child (no scoped-slot property-fill) so the
+  cross-shadow rule reaches it through the consumer's own `static styles`
+  without requiring the Phase 07.6 `adoptConsumerStyles` runtime bridge
+  (17-RESEARCH Open Question 2).
+-->
+
+<rozie name="PartCard">
+
+<props>
+{
+  title: { type: String, default: 'Card' },
+}
+</props>
+
+<template>
+<div class="card-body" part="body">
+  <h3 class="card-title">{{ $props.title }}</h3>
+  <slot/>
+</div>
+</template>
+
+<style>
+.card-body {
+  padding: 1rem;
+  border-radius: 0.5rem;
+  background: #f3f4f6;
+}
+.card-title {
+  margin: 0 0 0.5rem;
+  font: inherit;
+  font-weight: 600;
+}
+</style>
+
+</rozie>
