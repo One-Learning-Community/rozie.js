@@ -197,6 +197,18 @@
         <psi.referenceContributor language="JavaScript"
                                   implementation="js.rozie.intellij.references.RozieJSReferenceContributor"/>
 
+        <!-- Plan 08.3-04: SPEC Req 7 — Find-Usages walks cross-injection PsiReferences.
+             The platform's Find-Usages action requires a FindUsagesProvider extension
+             in addition to the PsiReference contract (Plan 08.3-01 shipped only the
+             PsiReference). Registered for language="JavaScript" because the <script>
+             decl targets and their template / directive / handler / colon-bind /
+             modifier-arg call sites all live in injected JS PSI — same registration
+             scope as the psi.referenceContributor above. Pitfall 2 mitigation lives
+             in canFindUsagesFor via RozieContextCheck.isRozieContext. Heavy lifting
+             delegates to the JS plugin's stock JavaScriptFindUsagesProvider. -->
+        <lang.findUsagesProvider language="JavaScript"
+                                 implementationClass="js.rozie.intellij.references.RozieFindUsagesProvider"/>
+
         <!-- Plan 08.2-06: SC-6 prefix-aware attribute-name autocomplete —
              typing r- / @ / : / # in HTML attribute position inside a .rozie
              <template> surfaces the canonical name lists from
