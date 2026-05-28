@@ -96,21 +96,43 @@ class RozieMultiHostInjector : MultiHostInjector {
                     i = j + 1
                 }
 
-                // PROPS_BODY / DATA_BODY / COMPONENTS_BODY / LISTENERS_BODY are by-design
+                // PROPS_BODY / DATA_BODY / COMPONENTS_BODY are by-design
                 // object literals. Paren-wrap via addPlace prefix=`(\n` + suffix=`\n)`
                 // so the JS parser sees `({ key: value })` (an expression) instead of
-                // `{ key: value }` (a label-statement). Closes P1-UAT-04 (Plan 08.2-11)
-                // + P1-UAT-10 (Plan 08.2-15 — added LISTENERS_BODY to the wrap set after
-                // UAT re-run #3 confirmed the noise surfaces in populated <listeners>
-                // blocks; Plan 11 had left LISTENERS_BODY on the unwrapped arm as a
-                // conservative stance and explicitly anticipated the planner discretion
-                // to extend the wrap set in a follow-up plan).
+                // `{ key: value }` (a label-statement). Closes P1-UAT-04 (Plan 08.2-11).
                 // See injectJsAsExpression KDoc for full rationale + Vue/Svelte precedent.
                 RozieTokenTypes.PROPS_BODY,
                 RozieTokenTypes.DATA_BODY,
                 RozieTokenTypes.COMPONENTS_BODY,
-                RozieTokenTypes.LISTENERS_BODY,
                 -> { injectJsAsExpression(registrar, host, tok.range); i++ }
+
+                // LISTENERS_BODY is ALSO an object literal — same paren-wrap base layer
+                // as PROPS_BODY / DATA_BODY / COMPONENTS_BODY (Plan 08.2-15 added the
+                // wrap to close P1-UAT-10). Plan 08.3-04 layers an additional per-
+                // modifier-arg JS sub-injection on top so bare identifiers inside
+                // modifier-arg parens (e.g., `helper` in
+                // `"document:click.outside($refs.x, helper())"`) become resolvable
+                // JSReferenceExpressions instead of opaque JSON-string-literal text.
+                //
+                // Layering order matters per the platform's last-registered-wins rule
+                // (documented at lines 138–146 of the TEMPLATE_BODY arm above): register
+                // the whole-body paren-wrap FIRST so it forms the base parse layer for
+                // the listeners JSON object literal (keys, values, structure), THEN
+                // layer the per-modifier-arg JS sub-injections so they take precedence
+                // at the offsets they cover. Bare-ident resolution through Plan 08.3-01's
+                // RozieScriptDeclReferenceProvider auto-fires on the resulting
+                // JSReferenceExpression with zero extra wiring (closes SPEC Req 3).
+                RozieTokenTypes.LISTENERS_BODY,
+                -> {
+                    injectJsAsExpression(registrar, host, tok.range)
+                    injectListenersModifierArgJs(
+                        registrar,
+                        host,
+                        host.text.substring(tok.range.startOffset, tok.range.endOffset),
+                        tok.range.startOffset,
+                    )
+                    i++
+                }
 
                 RozieTokenTypes.TEMPLATE_BODY,
                 -> {
@@ -450,6 +472,91 @@ class RozieMultiHostInjector : MultiHostInjector {
     }
 
     /**
+     * Plan 08.3-04 — closes SPEC Req 3 (modifier-arg JS sub-injection).
+     *
+     * **Architectural why:** Plan 08.3-02's SUMMARY (Deviations § "[Rule 4 -
+     * Architectural - DEFERRED] SPEC Req 3") documents that bare identifiers
+     * inside `<listeners>` modifier-arg JS — e.g. `helper` in
+     * `"document:click.outside($refs.x, helper())"` — were not resolvable by
+     * Plan 08.3-01's bare-ident provider because the JS PSI did not exist at
+     * those offsets. The whole-listeners-body paren-wrap injection treats
+     * modifier-arg text as opaque JSON string-literal content; `findReferenceAt`
+     * lands on the JSON-string-literal PSI node, not on a JSReferenceExpression.
+     * This helper layers a second injection on top: for each JSON-key string
+     * shaped `"event[:selector]?(.modifier[(args)]?)*"`, emit one JS sub-
+     * injection covering EXACTLY the modifier-arg `(args)` interior.
+     *
+     * **Layering with the whole-body paren-wrap:** the caller registers the
+     * whole-body paren-wrap injection FIRST (so listeners still parses as a
+     * JSObjectLiteralExpression — keys, values, structure intact), THEN calls
+     * this helper. The platform's last-registered-injection-wins rule
+     * (documented on the TEMPLATE_BODY arm above) routes the offsets covered by
+     * sub-injections to the JS sub-range; every other listeners-body offset
+     * remains on the whole-body injection. Same pattern as TEMPLATE_BODY's
+     * [injectExpressionsInTemplateRun].
+     *
+     * **Byte-range invariants:** the emitted sub-injection range covers EXACTLY
+     * the args interior — outer JSON-key quote excluded, modifier outer `(`
+     * excluded, modifier outer `)` excluded. Matches the quote-exclusion
+     * invariant from [injectExpressionsInTemplateRun] — the JS parser rejects a
+     * leading `"` or `(` at expression-position fragment start.
+     *
+     * **Compositional benefit:** bare-ident resolution through Plan 08.3-01's
+     * existing [RozieScriptDeclReferenceProvider] auto-fires on the resulting
+     * JSReferenceExpression — zero new provider wiring required. Magic-ident
+     * resolution (`$refs.x` inside the args) ALSO works for the same reason:
+     * the sub-injection uses the standard [injectJs] helper, which prepends the
+     * same `ROZIE_GLOBALS_PREFIX` as every other JS injection.
+     *
+     * **Defensive bounds:** skips empty / whitespace-only args (e.g.,
+     * `.outside()` with no args, or `.stop` with no parens at all). Skips
+     * degenerate ranges (start >= end). Listeners modifier-args MAY legitimately
+     * be empty; silently skipping is correct.
+     */
+    private fun injectListenersModifierArgJs(
+        registrar: MultiHostRegistrar,
+        host: RozieRootBlock,
+        bodyText: String,
+        bodyStartOffset: Int,
+    ) {
+        // Outer scan: find each JSON-key string literal in the body. Group 1 is the
+        // key contents (between the surrounding double-quotes; quotes themselves
+        // excluded from the capture). The character class `[^"\\]|\\.` permits
+        // backslash-escaped characters inside the key (e.g., a key containing an
+        // escaped quote) without prematurely terminating the match.
+        LISTENERS_KEY_STRING.findAll(bodyText).forEach { keyMatch ->
+            val keyContents = keyMatch.groups[1] ?: return@forEach
+            // The opening-quote sits one char before the captured key contents.
+            // Absolute host offset of the key contents' first char = bodyStartOffset
+            // + keyContents.range.first (the regex's group range is relative to the
+            // input bodyText, NOT to the host file — bodyStartOffset bridges the gap).
+            val keyContentsHostStart = bodyStartOffset + keyContents.range.first
+            val keyContentsText = keyContents.value
+
+            // Inner scan: walk each modifier-arg suffix inside the key contents.
+            // Pattern matches `.modifierName(args)` where args is a balanced
+            // single-paren-pair body (the surface Rozie listeners grammar does not
+            // permit nested `(` `)` inside modifier args at parse time — Plan 04
+            // compiler PEG enforces this; the `[^)]*` simple body is sufficient).
+            // Group 1 is the args substring (parens excluded).
+            MODIFIER_ARG.findAll(keyContentsText).forEach { argMatch ->
+                val argGroup = argMatch.groups[1] ?: return@forEach
+                // Skip empty / whitespace-only args (e.g., `.outside()`).
+                if (argGroup.value.isBlank()) return@forEach
+
+                val absStart = keyContentsHostStart + argGroup.range.first
+                val absEnd = keyContentsHostStart + argGroup.range.last + 1
+
+                // Defensive guard against degenerate ranges (should not happen given
+                // the isBlank check above, but cheap belt-and-suspenders).
+                if (absStart >= absEnd) return@forEach
+
+                injectJs(registrar, host, TextRange(absStart, absEnd))
+            }
+        }
+    }
+
+    /**
      * Plan 08.2-18 — P1-UAT-14 heuristic. Returns true if the trimmed [value]
      * matches `^\{.*\}$` (starts with `{`, ends with `}`, ignoring whitespace
      * inside the surrounding quotes). When true, the value is an object literal
@@ -632,5 +739,41 @@ class RozieMultiHostInjector : MultiHostInjector {
         // inside the capture group.
         private val MUSTACHE_INTERP: Regex =
             """\{\{(.*?)\}\}""".toRegex(RegexOption.DOT_MATCHES_ALL)
+
+        /**
+         * Plan 08.3-04 — outer scan for a double-quoted JSON-key string inside a
+         * `<listeners>` body. Group 1 is the key contents (between the surrounding
+         * double-quotes; the quotes themselves are excluded from the capture).
+         *
+         * Character class `[^"\\]|\\.` permits backslash-escaped characters inside
+         * the key (e.g., a key containing an escaped quote `\"`) without
+         * prematurely terminating the match. The non-greedy `*?` is unnecessary
+         * because the character class explicitly excludes the closing-quote.
+         *
+         * Used by [injectListenersModifierArgJs] to locate each modifier-bearing
+         * listeners key; the inner [MODIFIER_ARG] scan then walks the key contents
+         * for `.modifier(args)` suffixes.
+         */
+        private val LISTENERS_KEY_STRING: Regex =
+            """"((?:[^"\\]|\\.)*)"""".toRegex()
+
+        /**
+         * Plan 08.3-04 — inner scan for a modifier suffix carrying parenthesised
+         * args inside a listeners JSON-key. Group 1 is the args substring (parens
+         * excluded). Pattern `\.\w+\(([^)]*)\)` matches `.modifierName(...)` where
+         * `[^)]*` consumes the args body without nesting.
+         *
+         * The simple non-nesting body is sufficient because the surface Rozie
+         * listeners grammar (Plan 04 compiler PEG) does not permit nested `(` `)`
+         * inside modifier args at parse time. A future grammar extension that
+         * allows nested calls (e.g., `helper(fn())`) would need a balanced-paren
+         * scanner here. Until then this regex matches every valid modifier-arg
+         * shape the compiler accepts.
+         *
+         * Used by [injectListenersModifierArgJs] to emit per-args JS sub-injections
+         * inside listeners modifier suffixes.
+         */
+        private val MODIFIER_ARG: Regex =
+            """\.\w+\(([^)]*)\)""".toRegex()
     }
 }
