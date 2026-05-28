@@ -778,7 +778,62 @@ Each target picks the right translation:
 - **Vue**: `:deep()` is passed through verbatim. Vue 3.4+ `<style scoped>` understands the selector natively and applies its `[data-v-<hash>]` lowering downstream.
 - **Svelte**: same compound-scope rewrite as React, wrapped in Svelte 5's `:global { … }` so Svelte's native scoper doesn't interfere.
 - **Angular**: lowered to `::ng-deep` — `.board ::ng-deep .rozie-sortable-list { … }`. Angular's view encapsulation honors `::ng-deep` as the supported pierce mechanism (marked deprecated in the docs, but still the standard idiom for this exact case).
-- **Lit**: the scope attribute is lifted exactly like React/Solid, so the selector works **within one shadow root**. It does **not** cross shadow-DOM boundaries — each Lit producer renders in its own shadow root, and shadow boundaries are opaque to outside CSS. Cross-shadow styling is `::part()` territory (planned, not yet shipped); for today, parent-side CSS variables are the working alternative when you need to influence a Lit child's appearance.
+- **Lit**: the scope attribute is lifted exactly like React/Solid, so the selector works **within one shadow root**. It does **not** cross shadow-DOM boundaries — each Lit producer renders in its own shadow root, and shadow boundaries are opaque to outside CSS. Reaching *across* a Lit child's shadow boundary is [`::part()`](#part-—-cross-shadow-styling-for-lit-children) territory (see the next section); for influencing a Lit child's appearance without exposing a part, parent-side CSS variables remain a working alternative.
+
+## `::part()` — cross-shadow styling for Lit children
+
+`:deep()` reaches into a child's DOM **within one shadow root**. On Lit, where each component renders inside its *own* shadow root, `:deep()` stops at the child's shadow boundary — shadow boundaries are opaque to outside CSS. `::part()` is the W3C standards-track mechanism ([CSS Shadow Parts L1](https://www.w3.org/TR/css-shadow-parts-1/)) for the one thing `:deep()` cannot do on Lit: style an element **across** a child's shadow boundary. It is the only cross-shadow-piercing selector that is not on a deprecation track (`::shadow`, `/deep/`, `>>>` were removed; `::ng-deep` is deprecated).
+
+It is a two-sided producer/consumer contract:
+
+- **Producer** — tag the shadow element you want to expose with the standard HTML <span v-pre>`part="<name>"`</span> attribute. Part names are a **public API**: they are emitted **literally**, never scope-hashed.
+- **Consumer** — style the exposed element with `<child-selector>::part(<name>)`. The part name on the consumer side must match the producer's `part=` name byte-for-byte.
+
+```rozie
+<!-- Producer: PartCard.rozie -->
+<template>
+  <div class="card-body" part="body">
+    <slot/>
+  </div>
+</template>
+```
+
+```rozie
+<!-- Consumer: PartCardConsumer.rozie -->
+<template>
+  <PartCard>Cross-shadow styled body content.</PartCard>
+</template>
+
+<style>
+/* Reaches the child's part="body" element across the Lit shadow boundary. */
+PartCard::part(body) {
+  background: #fde68a;
+  border: 2px solid #b45309;
+}
+</style>
+```
+
+### Cross-target translation
+
+`::part()` only has meaning across a shadow boundary, so it is **load-bearing on Lit and a no-op everywhere else** — the other five targets have no shadow boundary, so a cross-shadow rule would be meaningless (and emitting it unscoped would leak broken global CSS). The rule is therefore dropped on those targets, and the child renders with its own producer styles only.
+
+| Target | Consumer `::part()` rule | Producer `part="..."` attribute |
+| --- | --- | --- |
+| **Lit** | Emitted as the cross-shadow rule `<child-tag>[data-rozie-s-<hash>]::part(<name>)` — e.g. `rozie-part-card[data-rozie-s-7f4fb92a]::part(body)`. The scope attribute lands on the child-tag compound **before** `::part` so the rule is confined to *this* consumer's scoped child invocation; `::part` then pierces the child's one shadow boundary. The consumer's `static styles` already reach the child (it renders inside the consumer's shadow root), so no extra runtime is needed. | Emitted verbatim into the shadow template — addressable by the consumer's `::part(<name>)`. |
+| **React** | Dropped (no-op). | Benign standard HTML attribute (`part="body"`). |
+| **Solid** | Dropped (no-op). | Benign standard HTML attribute. |
+| **Vue** | Dropped (no-op). | Benign standard HTML attribute. |
+| **Svelte** | Dropped (no-op). | Benign standard HTML attribute. |
+| **Angular** | Dropped (no-op). | Benign standard HTML attribute. |
+
+### `::part()` vs `:deep()`
+
+They solve different problems and are **not** interchangeable:
+
+- `:deep()` is the **intra-scope** reach. It lifts the inner selector out of the parent's scope attribute so a parent styles a child's rendered DOM *within the same shadow root* — and it matches the child element **and its descendants** like any ordinary selector. On Lit it works inside one shadow root but cannot cross a shadow boundary. `:deep()` keeps its existing six-target behavior unchanged.
+- `::part()` is the **only cross-shadow-boundary** reach. On Lit it pierces the child's shadow boundary to style the exposed part — but it matches **only** the element the producer tagged with `part=`, not that element's descendants (the part name is a flat, explicit, literal contract — there is no auto-derivation from class names). It is Lit-only-visible; the other five targets strip it.
+
+In short: use `:deep()` to reach a child's DOM that lives in the same shadow tree; use `::part()` to reach across a Lit child's shadow boundary into an element the producer has explicitly exposed.
 
 ## `<style lang="scss">` — SCSS, compiled at build time
 

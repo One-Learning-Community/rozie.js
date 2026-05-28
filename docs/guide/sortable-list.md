@@ -284,7 +284,20 @@ The fix depends on whether the prop is a *selector* or a *class name to add*:
 
 ### Lit shadow-DOM cross-component styling
 
-A consumer trying to style child-component-rendered DOM via [`:deep(.rozie-sortable-list)`](/guide/features#deep-reaching-into-child-components-from-scoped-styles) crosses a shadow-DOM boundary on Lit. The selector won't reach the inner DOM. `::part()` is the future fix; today the workaround is to apply layout styles inside the `SortableList`'s own `<style>` or to use the Lit-specific styling-instance API directly. The other five targets handle `:deep(.rozie-sortable-list)` natively (per-target lowering; React/Solid use `:global()`).
+A consumer trying to style child-component-rendered DOM via [`:deep(.rozie-sortable-list)`](/guide/features#deep-reaching-into-child-components-from-scoped-styles) crosses a shadow-DOM boundary on Lit, so `:deep()` (an intra-scope reach) cannot reach the inner DOM there. The working cross-shadow pattern is [`::part()`](/guide/features#part-—-cross-shadow-styling-for-lit-children): the `SortableList` producer exposes the element with the standard HTML `part="<name>"` attribute, and the consumer styles it with `SortableList::part(<name>)`.
+
+```rozie
+<!-- Consumer styling the SortableList's exposed part across the Lit shadow boundary. -->
+<style>
+SortableList::part(list) {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+}
+</style>
+```
+
+On Lit this lowers to the confined cross-shadow rule `rozie-sortable-list[data-rozie-s-<hash>]::part(list)`, which pierces the child's shadow boundary and styles the element the producer tagged `part="list"`. The other five targets have no shadow boundary, so the `::part()` rule is dropped as a no-op there and they handle their own scoping natively (and `:deep(.rozie-sortable-list)` still works on those five via per-target lowering — React/Solid use `:global()`). See the [`::part()` vs `:deep()`](/guide/features#part-vs-deep) distinction in the features guide for when to reach for each.
 
 ## Cross-references
 
