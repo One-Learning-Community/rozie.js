@@ -40,6 +40,11 @@ dependencies {
         intellijIdeaUltimate(providers.gradleProperty("platformVersion").orElse("2024.2.5"))
         bundledPlugin("JavaScript")
         bundledPlugin("com.intellij.css")
+        // LSP4IJ (Red Hat) — the LSP client the plugin uses to consume the
+        // shared @rozie/language-server brain (Option C). 0.19.4 declares
+        // since-build 242 with no upper bound, so it spans both platform legs
+        // (2024.2.5 / 2025.3).
+        plugin("com.redhat.devtools.lsp4ij", "0.19.4")
         testFramework(TestFrameworkType.Platform)
     }
     testImplementation("junit:junit:4.13.2")

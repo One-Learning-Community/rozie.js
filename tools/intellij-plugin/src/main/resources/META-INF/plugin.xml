@@ -59,6 +59,11 @@
     <depends>com.intellij.modules.xml</depends>
     <depends>JavaScript</depends>
     <depends>com.intellij.css</depends>
+    <!-- LSP4IJ (Red Hat) — the LSP client used to consume the shared
+         @rozie/language-server brain (Option C). Semantic features (ROZ
+         diagnostics, and later cross-block nav / member completion / rename)
+         are served by @rozie/core over LSP rather than re-implemented here. -->
+    <depends>com.redhat.devtools.lsp4ij</depends>
 
     <extensions defaultExtensionNs="com.intellij">
         <fileType
@@ -167,19 +172,14 @@
             level="WARNING"
             implementationClass="js.rozie.intellij.inspection.RozieTemplateAttributeInspection"/>
 
-        <!-- 0.3.0: flag `$props.x = …` assignments where x is a declared prop
-             not marked `model: true` — props are read-only (compiler ROZ200).
-             JavaScript-registered (the writes live in injected JS); prop
-             metadata via the reusable RoziePropsModel; RozieContextCheck
-             guards non-Rozie .js files. -->
-        <localInspection
-            language="JavaScript"
-            shortName="RoziePropAssignment"
-            displayName="Assignment to a non-model Rozie prop"
-            groupName="Rozie"
-            enabledByDefault="true"
-            level="ERROR"
-            implementationClass="js.rozie.intellij.inspection.RoziePropAssignmentInspection"/>
+        <!-- RETIRED (Option C): the `$props.x = …` non-model-prop write check
+             (ROZ200) is now produced by @rozie/core and surfaced via the LSP
+             server below — single source of truth, no Kotlin re-implementation.
+             RozieTemplateAttributeInspection (the directive-typo "did you mean")
+             is KEPT: unknown r-* directives are NOT a compiler ROZ diagnostic
+             (the compiler passes them through), so it has no LSP equivalent
+             yet. Adding directive validation to @rozie/core would let it move
+             server-side too. -->
 
         <xml.attributeDescriptorsProvider
             implementation="js.rozie.intellij.xml.RozieAttributeDescriptorsProvider"/>
@@ -311,6 +311,24 @@
              additionalTextAttributes pattern. -->
         <additionalTextAttributes scheme="Default" file="colorSchemes/RozieDefault.xml"/>
         <additionalTextAttributes scheme="Darcula" file="colorSchemes/RozieDarcula.xml"/>
+    </extensions>
+
+    <!-- Option C — the shared @rozie/core brain over LSP. The server (a Node
+         process running @rozie/language-server) receives the host .rozie file
+         and publishes ROZ diagnostics in host coordinates. The factory disables
+         the server when its Node script can't be resolved, so this stays inert
+         in headless tests and in CI-built plugins that ship without the
+         bundle. -->
+    <extensions defaultExtensionNs="com.redhat.devtools.lsp4ij">
+        <server id="rozie"
+                name="Rozie Language Server"
+                factoryClass="js.rozie.intellij.lsp.RozieLanguageServerFactory">
+            <description><![CDATA[
+                Diagnostics (ROZ codes) for <code>.rozie</code> files, served by
+                the shared <code>@rozie/core</code> analyzer over LSP.
+            ]]></description>
+        </server>
+        <languageMapping language="Rozie" serverId="rozie"/>
     </extensions>
 
     <actions>
