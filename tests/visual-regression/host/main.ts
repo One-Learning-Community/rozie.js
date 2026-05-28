@@ -125,6 +125,15 @@ export const EXAMPLES = [
   'ThemedButtonListenersManual',
   'ThemedButtonAllManual',
   'ROnProbe',
+  // Phase 17 — PartCardConsumer is the `::part()` cross-shadow-DOM dogfood.
+  // A multi-rozie consumer (precedent: ThemedButtonConsumer) that embeds
+  // <PartCard> via a <components> block and styles the child's `part="body"`
+  // shadow element across the boundary with a `PartCard::part(body)` rule.
+  // Base example — loader resolves directly to examples/PartCardConsumer.rozie
+  // (no demo sibling); its <components> import of PartCard.rozie is resolved
+  // by the unplugin at build time. On Lit the styled effect is visible across
+  // the shadow boundary; on the 5 non-Lit targets the rule is a no-op.
+  'PartCardConsumer',
 ] as const;
 
 export type Example = (typeof EXAMPLES)[number];
@@ -179,6 +188,8 @@ export const LIT_TAGS: Record<Example, string> = {
   ThemedButtonListenersManual: 'rozie-themed-button-listeners-manual',
   ThemedButtonAllManual: 'rozie-themed-button-all-manual',
   ROnProbe: 'rozie-r-on-probe',
+  // Phase 17 — base example, loader resolves examples/PartCardConsumer.rozie.
+  PartCardConsumer: 'rozie-part-card-consumer',
 };
 
 export interface HostQuery {
@@ -266,6 +277,10 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   ThemedButtonListenersManual: { label: 'Listeners Manual' },
   ThemedButtonAllManual: { label: 'All Manual' },
   ROnProbe: {},
+  // PartCardConsumer is self-contained — its template hardcodes
+  // `<PartCard :title="'Hello'">` and styles it via `PartCard::part(body)`.
+  // No parent-side props needed.
+  PartCardConsumer: {},
 };
 
 /**
