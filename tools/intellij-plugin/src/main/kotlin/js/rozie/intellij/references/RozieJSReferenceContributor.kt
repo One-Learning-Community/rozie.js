@@ -72,7 +72,9 @@ class RozieJSReferenceContributor : PsiReferenceContributor() {
             // else (bare references, member chains deeper than one level, calls).
             val qualifier = ref.qualifier as? JSReferenceExpression ?: return PsiReference.EMPTY_ARRAY
             val qualifierName = qualifier.referenceName ?: return PsiReference.EMPTY_ARRAY
-            val accessedName = ref.referenceName ?: return PsiReference.EMPTY_ARRAY
+            // Require a resolvable member name; the reference re-derives it from
+            // the element at resolve time (so the cache provider captures no field).
+            ref.referenceName ?: return PsiReference.EMPTY_ARRAY
 
             // NOTE: the RozieRootBlock host is intentionally NOT looked up here
             // and NOT passed into the reference constructor. The reference's
@@ -90,9 +92,9 @@ class RozieJSReferenceContributor : PsiReferenceContributor() {
                 ?: return PsiReference.EMPTY_ARRAY
 
             return when (qualifierName) {
-                "\$props" -> arrayOf(RoziePropsReference(ref, rangeInElement, accessedName))
-                "\$data" -> arrayOf(RozieDataReference(ref, rangeInElement, accessedName))
-                "\$refs" -> arrayOf(RozieRefsReference(ref, rangeInElement, accessedName))
+                "\$props" -> arrayOf(RoziePropsReference(ref, rangeInElement))
+                "\$data" -> arrayOf(RozieDataReference(ref, rangeInElement))
+                "\$refs" -> arrayOf(RozieRefsReference(ref, rangeInElement))
                 else -> PsiReference.EMPTY_ARRAY
             }
         }

@@ -23,29 +23,31 @@ import js.rozie.intellij.lexer.RozieTokenTypes
 class RozieDataReference(
     element: JSReferenceExpression,
     rangeInElement: TextRange,
-    private val accessedName: String,
 ) : PsiReferenceBase.Poly<JSReferenceExpression>(element, rangeInElement, false) {
 
     override fun multiResolve(incompleteCode: Boolean): Array<ResolveResult> {
-        // PSI-leak avoidance: the cache lambda MUST NOT close over a PSI field.
-        // See [RoziePropsReference.multiResolve] for the full rationale.
-        return CachedValuesManager.getCachedValue(element) {
-            val resolved = doResolve()
+        // Capture only the element (the cache key), never `this` — see the crash
+        // note in [RoziePropsReference.multiResolve].
+        val el = element
+        return CachedValuesManager.getCachedValue(el) {
             CachedValueProvider.Result.create(
-                resolved,
+                doResolve(el),
                 PsiModificationTracker.MODIFICATION_COUNT,
             )
         }
     }
 
-    private fun doResolve(): Array<ResolveResult> {
-        val host = RoziePropsReference.resolveHost(element) ?: return ResolveResult.EMPTY_ARRAY
-        val targetRange = RoziePropsReference.findBlockBodyRange(host, RozieTokenTypes.DATA_BODY)
-            ?: return ResolveResult.EMPTY_ARRAY
-        val targetJsFile = RoziePropsReference.findInjectedFile(host, targetRange, "JavaScript")
-            ?: return ResolveResult.EMPTY_ARRAY
-        val target = RoziePropsReference.findJsKeyByName(targetJsFile, accessedName)
-            ?: return ResolveResult.EMPTY_ARRAY
-        return arrayOf(PsiElementResolveResult(target))
+    companion object {
+        private fun doResolve(el: JSReferenceExpression): Array<ResolveResult> {
+            val name = el.referenceName ?: return ResolveResult.EMPTY_ARRAY
+            val host = RoziePropsReference.resolveHost(el) ?: return ResolveResult.EMPTY_ARRAY
+            val targetRange = RoziePropsReference.findBlockBodyRange(host, RozieTokenTypes.DATA_BODY)
+                ?: return ResolveResult.EMPTY_ARRAY
+            val targetJsFile = RoziePropsReference.findInjectedFile(host, targetRange, "JavaScript")
+                ?: return ResolveResult.EMPTY_ARRAY
+            val target = RoziePropsReference.findJsKeyByName(targetJsFile, name)
+                ?: return ResolveResult.EMPTY_ARRAY
+            return arrayOf(PsiElementResolveResult(target))
+        }
     }
 }

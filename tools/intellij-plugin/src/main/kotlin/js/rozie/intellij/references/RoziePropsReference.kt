@@ -45,39 +45,45 @@ import js.rozie.intellij.parser.RozieRootBlock
 class RoziePropsReference(
     element: JSReferenceExpression,
     rangeInElement: TextRange,
-    private val accessedName: String,
 ) : PsiReferenceBase.Poly<JSReferenceExpression>(element, rangeInElement, false) {
 
     override fun multiResolve(incompleteCode: Boolean): Array<ResolveResult> {
-        // CRITICAL: the cache lambda MUST NOT close over a PSI field on the
-        // outer reference — IntelliJ's PSI-leak detector flags any
-        // CachedValueProvider that retains a reachable PsiElement through its
-        // closure (PsiElement instances can be invalidated on file edits;
-        // retained references then access stale PSI). Recompute the host on
-        // every resolve via [resolveHost]; the host walk is microseconds-cheap.
-        // The cache key is `element` (a long-lived PsiReference target via
-        // CachedValuesManager); per-key invalidation rides on
-        // PsiModificationTracker.MODIFICATION_COUNT.
-        return CachedValuesManager.getCachedValue(element) {
-            val resolved = doResolve()
+        // CRITICAL: the cache provider must capture NOTHING instance-specific.
+        // A lambda calling the instance `doResolve()` captures `this`; two
+        // distinct references for the same JSReferenceExpression then register
+        // non-equivalent captured context under the same cache key, which is the
+        // "Incorrect CachedValue use: ... different captured context" crash that
+        // fired during rename/find-usages. Bind the element to a local and
+        // resolve through the companion so the provider closes over only `el`
+        // (the cache key itself — equivalent across instances). Per-key
+        // invalidation rides on PsiModificationTracker.MODIFICATION_COUNT.
+        val el = element
+        return CachedValuesManager.getCachedValue(el) {
             CachedValueProvider.Result.create(
-                resolved,
+                doResolve(el),
                 PsiModificationTracker.MODIFICATION_COUNT,
             )
         }
     }
 
-    private fun doResolve(): Array<ResolveResult> {
-        val host = resolveHost(element) ?: return ResolveResult.EMPTY_ARRAY
-        val targetRange = findBlockBodyRange(host, RozieTokenTypes.PROPS_BODY)
-            ?: return ResolveResult.EMPTY_ARRAY
-        val targetJsFile = findInjectedFile(host, targetRange, "JavaScript")
-            ?: return ResolveResult.EMPTY_ARRAY
-        val target = findJsKeyByName(targetJsFile, accessedName) ?: return ResolveResult.EMPTY_ARRAY
-        return arrayOf(PsiElementResolveResult(target))
-    }
-
     companion object {
+        /**
+         * Resolve a `$props.X` access for [el] to the `X` key in the sibling
+         * `<props>` block. In the companion (not an instance method) so the
+         * cache provider captures only [el], never the reference — see the crash
+         * note in [multiResolve]. The accessed name is re-derived from [el].
+         */
+        private fun doResolve(el: JSReferenceExpression): Array<ResolveResult> {
+            val name = el.referenceName ?: return ResolveResult.EMPTY_ARRAY
+            val host = resolveHost(el) ?: return ResolveResult.EMPTY_ARRAY
+            val targetRange = findBlockBodyRange(host, RozieTokenTypes.PROPS_BODY)
+                ?: return ResolveResult.EMPTY_ARRAY
+            val targetJsFile = findInjectedFile(host, targetRange, "JavaScript")
+                ?: return ResolveResult.EMPTY_ARRAY
+            val target = findJsKeyByName(targetJsFile, name) ?: return ResolveResult.EMPTY_ARRAY
+            return arrayOf(PsiElementResolveResult(target))
+        }
+
         /**
          * Walk back from the injected [element] to its [RozieRootBlock] host,
          * combining the primary [InjectedLanguageManager.getInjectionHost] path

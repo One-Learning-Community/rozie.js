@@ -56,23 +56,27 @@ import js.rozie.intellij.xml.RozieContextCheck
 class RozieScriptDeclReference(
     element: JSReferenceExpression,
     rangeInElement: TextRange,
-    private val accessedName: String,
 ) : PsiReferenceBase.Poly<JSReferenceExpression>(element, rangeInElement, false) {
 
     override fun multiResolve(incompleteCode: Boolean): Array<ResolveResult> {
-        // CRITICAL: the cache lambda MUST NOT close over a PSI field on the
-        // outer reference — IntelliJ's PSI-leak detector flags any
-        // CachedValueProvider that retains a reachable PsiElement through its
-        // closure (PsiElement instances can be invalidated on file edits;
-        // retained references then access stale PSI). Recompute the host on
-        // every resolve via [RoziePropsReference.resolveHost]; the host walk is
-        // microseconds-cheap. The cache key is `element` (a long-lived
-        // PsiReference target via CachedValuesManager); per-key invalidation
-        // rides on PsiModificationTracker.MODIFICATION_COUNT.
-        return CachedValuesManager.getCachedValue(element) {
-            val resolved = doResolve()
+        // CRITICAL: the cache provider must capture NOTHING instance-specific.
+        // `getCachedValue(element, provider)` stores the provider in `element`'s
+        // user data keyed by the provider lambda's class; IntelliJ's stability
+        // checker then asserts the provider's captured context is equivalent
+        // across every reference instance for that element. A lambda that calls
+        // the instance method `doResolve()` captures `this` — and two distinct
+        // RozieScriptDeclReference instances for the same JSReferenceExpression
+        // capture non-equivalent `this` values, which is the
+        // "Incorrect CachedValue use: ... different captured context" crash.
+        //
+        // Fix: bind the element to a local and resolve through the companion
+        // function, so the provider closes over only `el` (the cache key
+        // itself — equivalent across instances) and never the reference. The
+        // accessed name is re-derived from `el` inside, not read off a field.
+        val el = element
+        return CachedValuesManager.getCachedValue(el) {
             CachedValueProvider.Result.create(
-                resolved,
+                doResolve(el),
                 PsiModificationTracker.MODIFICATION_COUNT,
             )
         }
@@ -125,18 +129,28 @@ class RozieScriptDeclReference(
         return false
     }
 
-    private fun doResolve(): Array<ResolveResult> {
-        val host = RoziePropsReference.resolveHost(element) ?: return ResolveResult.EMPTY_ARRAY
-        val targetRange = RoziePropsReference.findBlockBodyRange(host, RozieTokenTypes.SCRIPT_BODY)
-            ?: return ResolveResult.EMPTY_ARRAY
-        val targetJsFile = RoziePropsReference.findInjectedFile(host, targetRange, "JavaScript")
-            ?: return ResolveResult.EMPTY_ARRAY
-        val target = findScriptDeclByName(targetJsFile, accessedName)
-            ?: return ResolveResult.EMPTY_ARRAY
-        return arrayOf(PsiElementResolveResult(target))
-    }
-
     companion object {
+        /**
+         * Resolve the script-block declaration for [el]'s bare identifier.
+         * Lives in the companion (not as an instance method) so the
+         * [multiResolve] cache provider can call it while capturing only [el],
+         * never the enclosing reference instance — see the crash note in
+         * [multiResolve]. The accessed name is re-derived from [el] here rather
+         * than read off the reference's `accessedName` field, for the same
+         * reason.
+         */
+        private fun doResolve(el: JSReferenceExpression): Array<ResolveResult> {
+            val name = el.referenceName ?: return ResolveResult.EMPTY_ARRAY
+            val host = RoziePropsReference.resolveHost(el) ?: return ResolveResult.EMPTY_ARRAY
+            val targetRange = RoziePropsReference.findBlockBodyRange(host, RozieTokenTypes.SCRIPT_BODY)
+                ?: return ResolveResult.EMPTY_ARRAY
+            val targetJsFile = RoziePropsReference.findInjectedFile(host, targetRange, "JavaScript")
+                ?: return ResolveResult.EMPTY_ARRAY
+            val target = findScriptDeclByName(targetJsFile, name)
+                ?: return ResolveResult.EMPTY_ARRAY
+            return arrayOf(PsiElementResolveResult(target))
+        }
+
         /**
          * Walk **top-level children only** of [jsFile] looking for a producer
          * declaration whose name matches [name]. Returns the name-identifier
@@ -231,7 +245,9 @@ internal class RozieScriptDeclReferenceProvider : PsiReferenceProvider() {
         // (CONTEXT D-09; this is the INVERSE of the analog's qualifier filter).
         if (ref.qualifier != null) return PsiReference.EMPTY_ARRAY
 
-        val accessedName = ref.referenceName ?: return PsiReference.EMPTY_ARRAY
+        // Require a resolvable name, but the reference re-derives it from the
+        // element at resolve time (so the cache provider captures no field).
+        ref.referenceName ?: return PsiReference.EMPTY_ARRAY
 
         // The reference's TextRange is the accessed-name leaf relative to the
         // outer JSReferenceExpression element. For a bare-ident expression,
@@ -240,6 +256,6 @@ internal class RozieScriptDeclReferenceProvider : PsiReferenceProvider() {
         val rangeInElement = ref.referenceNameElement?.textRangeInParent
             ?: return PsiReference.EMPTY_ARRAY
 
-        return arrayOf(RozieScriptDeclReference(ref, rangeInElement, accessedName))
+        return arrayOf(RozieScriptDeclReference(ref, rangeInElement))
     }
 }
