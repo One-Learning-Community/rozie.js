@@ -393,7 +393,30 @@ async function settleExample(
 // `if (!editor) return` guard short-circuits) — hence the 4-vs-2 split. Fixed
 // by changing the call to the v3 form `setContent(v, { emitUpdate: false })`.
 // All 6 TipTap cells now render byte-identical to the shared baseline.
-const KNOWN_CROSS_TARGET_DIVERGENCE = new Set<string>([]);
+// Phase 17 — PartCardConsumer is the ONE cell that provably CANNOT share a
+// single 6-target baseline, by design. `::part()` is the cross-shadow-DOM
+// styling mechanism: it is load-bearing on Lit (the consumer's
+// `PartCard::part(body)` rule pierces the child's shadow boundary and paints
+// the amber `background:#fde68a; border:2px solid #b45309` onto the child's
+// `part="body"` element) and a deliberate NO-OP on the 5 non-Lit targets
+// (no shadow boundary exists, so the rule is stripped and the child renders
+// with its own producer styles only). The shared baseline is therefore the
+// LIT render (amber); the Lit cell asserts the working cross-shadow effect
+// (the SPEC-R8 proof), and the 5 non-Lit cells are documented-divergent here
+// — they render byte-identically to EACH OTHER (grey producer styles) but
+// cannot match the amber Lit baseline. Their correctness (the no-op strip +
+// `part=` passthrough) is fully regression-protected by dist-parity (584
+// byte-equal assertions) and the per-target unit tests — not by a screenshot.
+// This is the documented capability difference, NOT a bug (project bar:
+// "documented edge cases acceptable"; engine-demo precedent
+// `project_vr_engine_demo_divergences`).
+const KNOWN_CROSS_TARGET_DIVERGENCE = new Set<string>([
+  'PartCardConsumer::vue',
+  'PartCardConsumer::react',
+  'PartCardConsumer::svelte',
+  'PartCardConsumer::angular',
+  'PartCardConsumer::solid',
+]);
 
 // Phase-N.M follow-up gate — scheduled per-target bug fixes (NOT accepted
 // divergence). Distinct from KNOWN_CROSS_TARGET_DIVERGENCE: that set documents
