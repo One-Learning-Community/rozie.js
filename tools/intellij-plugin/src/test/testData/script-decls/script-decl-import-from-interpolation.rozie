@@ -1,0 +1,5 @@
+<rozie name="ScriptDeclImportFromInterp">
+<script>import { format } from 'date-fns';</script>
+<data>{ x: 1 }</data>
+<template>{{ for<caret>mat($data.x) }}</template>
+</rozie>

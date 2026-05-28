@@ -1,0 +1,5 @@
+<rozie name="ScriptDeclNameCollision">
+<script>const fmt = '%d';</script>
+<data>{ fmt: '%s', x: 1 }</data>
+<template><span>{{ fm<caret>t($data.x) }}</span><span>{{ $data.fmt }}</span></template>
+</rozie>

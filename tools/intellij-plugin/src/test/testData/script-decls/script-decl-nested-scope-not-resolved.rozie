@@ -1,0 +1,4 @@
+<rozie name="ScriptDeclNestedScope">
+<script>function outer(){ const inner = 1; return inner; }</script>
+<template>{{ in<caret>ner() }}</template>
+</rozie>

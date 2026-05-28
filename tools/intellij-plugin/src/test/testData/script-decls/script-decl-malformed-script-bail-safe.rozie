@@ -1,0 +1,5 @@
+<rozie name="ScriptDeclMalformed">
+<script>function fmt(x { return x }</script>
+<data>{ x: 1 }</data>
+<template>{{ fm<caret>t($data.x) }}</template>
+</rozie>

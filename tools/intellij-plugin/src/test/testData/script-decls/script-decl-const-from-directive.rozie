@@ -1,0 +1,4 @@
+<rozie name="ScriptDeclConstFromDirective">
+<script>const helper = () => true;</script>
+<template><div r-if="he<caret>lper()">x</div></template>
+</rozie>

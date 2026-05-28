@@ -1,0 +1,4 @@
+<rozie name="ScriptDeclLetFromColonBind">
+<script>let counter = 0;</script>
+<template><span :class="coun<caret>ter > 0 ? 'on' : 'off'">x</span></template>
+</rozie>

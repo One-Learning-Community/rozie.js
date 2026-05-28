@@ -1,0 +1,5 @@
+<rozie name="ScriptDeclFnFromInterp">
+<script>function fmt(n){return String(n);}</script>
+<data>{ x: 10 }</data>
+<template>{{ fm<caret>t($data.x) }}</template>
+</rozie>

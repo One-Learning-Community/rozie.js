@@ -1,0 +1,4 @@
+<rozie name="ScriptDeclFnFromEvent">
+<script>function onClick(e){return e;}</script>
+<template><button @click="onC<caret>lick($event)">x</button></template>
+</rozie>
