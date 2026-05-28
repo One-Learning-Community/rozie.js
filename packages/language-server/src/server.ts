@@ -7,7 +7,13 @@ import {
 } from 'vscode-languageserver/node';
 import { TextDocument } from 'vscode-languageserver-textdocument';
 import { computeDiagnostics } from './diagnostics.js';
-import { computeCompletions, computeDefinition, computeHover } from './features.js';
+import {
+  computeCompletions,
+  computeDefinition,
+  computeHover,
+  computePrepareRename,
+  computeRename,
+} from './features.js';
 
 const ROZIE_EXTENSION = '.rozie';
 
@@ -33,6 +39,7 @@ export function startServer(): void {
         completionProvider: { triggerCharacters: ['.', '<'] },
         definitionProvider: true,
         hoverProvider: true,
+        renameProvider: { prepareProvider: true },
       },
     }),
   );
@@ -56,6 +63,16 @@ export function startServer(): void {
   connection.onHover((params) => {
     const doc = rozieDoc(params.textDocument.uri);
     return doc ? computeHover(doc, params.position) : null;
+  });
+
+  connection.onPrepareRename((params) => {
+    const doc = rozieDoc(params.textDocument.uri);
+    return doc ? computePrepareRename(doc, params.position) : null;
+  });
+
+  connection.onRenameRequest((params) => {
+    const doc = rozieDoc(params.textDocument.uri);
+    return doc ? computeRename(doc, params.position, params.newName) : null;
   });
 
   const publish = (doc: TextDocument): void => {

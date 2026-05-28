@@ -5,7 +5,13 @@
 // stay thin; semantics live here.
 
 export { computeDiagnostics, toLspDiagnostic } from './diagnostics.js';
-export { computeCompletions, computeDefinition, computeHover } from './features.js';
+export {
+  computeCompletions,
+  computeDefinition,
+  computeHover,
+  computePrepareRename,
+  computeRename,
+} from './features.js';
 export { startServer } from './server.js';
 export { extractSymbols, symbolsForSigil } from './symbols.js';
 export type {
@@ -14,7 +20,11 @@ export type {
   RozieComponentSymbol,
   SigilKind,
 } from './symbols.js';
-export { resolveSigilMemberAt, sigilCompletionContext } from './sigil.js';
+export {
+  findSigilMemberUsages,
+  resolveSigilMemberAt,
+  sigilCompletionContext,
+} from './sigil.js';
 export type { SigilMemberRef, SigilCompletionContext } from './sigil.js';
 export {
   componentTagAt,

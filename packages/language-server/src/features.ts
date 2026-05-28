@@ -8,6 +8,8 @@ import {
   MarkupKind,
   type Position,
   type Range,
+  type TextEdit,
+  type WorkspaceEdit,
 } from 'vscode-languageserver';
 import type { TextDocument } from 'vscode-languageserver-textdocument';
 import {
@@ -15,7 +17,7 @@ import {
   componentTagCompletionContext,
   resolveComponentUri,
 } from './componentNav.js';
-import { resolveSigilMemberAt, sigilCompletionContext } from './sigil.js';
+import { findSigilMemberUsages, resolveSigilMemberAt, sigilCompletionContext } from './sigil.js';
 import {
   extractSymbols,
   type RozieSymbol,
@@ -164,6 +166,101 @@ function resolveSigilSymbol(
   const ref = resolveSigilMemberAt(doc.getText(), offset);
   if (!ref || ref.member.length === 0) return null;
   return symbolsForSigil(symbols, ref.sigil).find((s) => s.name === ref.member) ?? null;
+}
+
+const IDENTIFIER = /^[A-Za-z_$][\w$]*$/;
+
+interface RenameTarget {
+  sigil: SigilKind;
+  sym: RozieSymbol;
+  /** Range the editor highlights for the inline rename. */
+  anchor: SourceLoc;
+}
+
+function within(loc: SourceLoc, offset: number): boolean {
+  return offset >= loc.start && offset <= loc.end;
+}
+
+/**
+ * The renameable Rozie symbol at [offset] — resolved whether the cursor is on a
+ * `$sigil.X` usage OR on the declaration itself (a `<props>`/`<data>` key or a
+ * `ref="..."` value). Rename is offered only when the declaration text is a
+ * bare identifier (not a quoted string-literal key), so one new name replaces
+ * both declaration and every usage verbatim.
+ */
+function renameTargetAt(
+  doc: TextDocument,
+  symbols: RozieSymbols,
+  offset: number,
+): RenameTarget | null {
+  const text = doc.getText();
+
+  // 1. Cursor on a `$sigil.member` usage.
+  const ref = resolveSigilMemberAt(text, offset);
+  if (ref && ref.member.length > 0) {
+    const sym = symbolsForSigil(symbols, ref.sigil).find((s) => s.name === ref.member);
+    if (sym && bareDecl(text, sym)) return { sigil: ref.sigil, sym, anchor: ref.memberLoc };
+  }
+
+  // 2. Cursor on a declaration site.
+  for (const sigil of ['props', 'data', 'refs'] as const) {
+    for (const sym of symbolsForSigil(symbols, sigil)) {
+      if (within(sym.loc, offset) && bareDecl(text, sym)) {
+        return { sigil, sym, anchor: sym.loc };
+      }
+    }
+  }
+  return null;
+}
+
+/** True when the declaration text is exactly the name (rules out quoted keys). */
+function bareDecl(text: string, sym: RozieSymbol): boolean {
+  return text.slice(sym.loc.start, sym.loc.end) === sym.name;
+}
+
+/**
+ * Validate the rename target — `prepareRename`. Returns the range the editor
+ * should select for the inline rename, or null when the cursor is not on a
+ * renameable Rozie symbol.
+ */
+export function computePrepareRename(doc: TextDocument, position: Position): Range | null {
+  const analysis = analyze(doc);
+  if (!analysis) return null;
+  const found = renameTargetAt(doc, analysis.symbols, doc.offsetAt(position));
+  return found ? toRange(doc, found.anchor) : null;
+}
+
+/**
+ * Cross-block rename of a `$props.X`/`$data.X`/`$refs.X` symbol: rewrites the
+ * declaration (the `<props>`/`<data>` key or the `ref="..."` value) and every
+ * `$sigil.X` usage across all blocks in one `WorkspaceEdit`.
+ */
+export function computeRename(
+  doc: TextDocument,
+  position: Position,
+  newName: string,
+): WorkspaceEdit | null {
+  if (!IDENTIFIER.test(newName)) return null;
+  const analysis = analyze(doc);
+  if (!analysis) return null;
+  const found = renameTargetAt(doc, analysis.symbols, doc.offsetAt(position));
+  if (!found) return null;
+
+  const text = doc.getText();
+  const locs: SourceLoc[] = [
+    found.sym.loc,
+    ...findSigilMemberUsages(text, found.sigil, found.sym.name),
+  ];
+  // Dedupe by start offset (the declaration may coincide with nothing, but
+  // guard against overlap) and emit one TextEdit per site.
+  const seen = new Set<number>();
+  const edits: TextEdit[] = [];
+  for (const loc of locs) {
+    if (seen.has(loc.start)) continue;
+    seen.add(loc.start);
+    edits.push({ range: toRange(doc, loc), newText: newName });
+  }
+  return { changes: { [doc.uri]: edits } };
 }
 
 function uriToFilename(uri: string): string {

@@ -46,6 +46,29 @@ export function resolveSigilMemberAt(text: string, offset: number): SigilMemberR
   return null;
 }
 
+/**
+ * Enumerate every `$<sigil>.<member>` usage of one member across the whole
+ * document, returning the byte span of just the member name in each. The
+ * declaration site lives in `<props>`/`<data>` (or a `ref="..."` attr) and is
+ * NOT a sigil usage, so it is never included here — callers add it separately.
+ * Powers cross-block rename and find-usages.
+ */
+export function findSigilMemberUsages(
+  text: string,
+  sigil: SigilKind,
+  member: string,
+): SourceLoc[] {
+  const out: SourceLoc[] = [];
+  SIGIL_MEMBER.lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = SIGIL_MEMBER.exec(text)) !== null) {
+    if (match[1] !== sigil || match[2] !== member) continue;
+    const tokenEnd = match.index + match[0].length;
+    out.push({ start: tokenEnd - member.length, end: tokenEnd });
+  }
+  return out;
+}
+
 export interface SigilCompletionContext {
   sigil: SigilKind;
   /** Member chars already typed after the dot (may be empty right after `.`). */
