@@ -1,0 +1,14 @@
+<rozie name="MemberPropsCompletion">
+<props>
+{ count: { type: Number }, label: { type: String } }
+</props>
+<data>
+{ hovering: false }
+</data>
+<script>
+const x = $props.<caret>
+</script>
+<template>
+<div ref="rootEl"></div>
+</template>
+</rozie>

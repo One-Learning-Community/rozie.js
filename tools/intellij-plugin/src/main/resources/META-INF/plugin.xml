@@ -304,6 +304,16 @@
         <completion.contributor language="JavaScript"
             implementationClass="js.rozie.intellij.completion.RozieJsMagicIdentifierCompletionContributor"/>
 
+        <!-- Member-access autocomplete for $props.<member> / $data.<member> /
+             $refs.<member>, enumerated live from the sibling <props>/<data> JS
+             keys and the <template> ref="…" attributes (companion to the
+             cross-block RozieJSReferenceContributor navigation). Native because
+             LSP4IJ completion does not reach carets inside injected fragments,
+             so the IntelliJ LSP is scoped to diagnostics-only — see
+             RozieLanguageServerFactory.createClientFeatures. -->
+        <completion.contributor language="JavaScript"
+            implementationClass="js.rozie.intellij.completion.RozieMemberCompletionContributor"/>
+
         <!-- P1-UAT-07: neutralize JetBrains' default INJECTED_LANGUAGE_FRAGMENT
              background tint on .rozie files.  Every SFC block is a language-
              injection target (HTML/JS/CSS), so without these overrides each
