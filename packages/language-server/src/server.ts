@@ -9,6 +9,7 @@ import {
 } from 'vscode-languageserver/node';
 import { TextDocument } from 'vscode-languageserver-textdocument';
 import { computeDiagnostics } from './diagnostics.js';
+import { computeDocumentSymbols } from './outline.js';
 import {
   computeCompletions,
   computeDefinition,
@@ -45,6 +46,7 @@ export function startServer(): void {
         hoverProvider: true,
         referencesProvider: true,
         renameProvider: { prepareProvider: true },
+        documentSymbolProvider: true,
       },
     }),
   );
@@ -82,6 +84,11 @@ export function startServer(): void {
   connection.onHover((params) => {
     const doc = rozieDoc(params.textDocument.uri);
     return doc ? computeHover(doc, params.position) : null;
+  });
+
+  connection.onDocumentSymbol((params) => {
+    const doc = rozieDoc(params.textDocument.uri);
+    return doc ? computeDocumentSymbols(doc) : [];
   });
 
   connection.onReferences((params) => {

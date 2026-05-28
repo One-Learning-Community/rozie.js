@@ -180,6 +180,22 @@ describe('cross-file component attribute completion', () => {
   });
 });
 
+describe('lang= completion', () => {
+  it('offers ts on <script lang="', () => {
+    const text = '<rozie name="X"><script lang="></script></rozie>';
+    const d = TextDocument.create('file:///X.rozie', 'rozie', 1, text);
+    const pos = d.positionAt(text.indexOf('lang="') + 'lang="'.length);
+    expect(computeCompletions(d, pos).map((i) => i.label)).toEqual(['ts']);
+  });
+
+  it('offers css preprocessors on <style lang=", filtered by partial', () => {
+    const text = '<rozie name="X"><style lang="s></style></rozie>';
+    const d = TextDocument.create('file:///X.rozie', 'rozie', 1, text);
+    const pos = d.positionAt(text.indexOf('lang="s') + 'lang="s'.length);
+    expect(computeCompletions(d, pos).map((i) => i.label)).toEqual(['scss']);
+  });
+});
+
 describe('slot-fill go-to-definition', () => {
   const CONSUMER = [
     '<rozie name="W">',

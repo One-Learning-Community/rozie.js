@@ -127,6 +127,9 @@ export function computeCompletions(
       }));
   }
 
+  const langItems = langCompletion(text, offset, doc, position);
+  if (langItems) return langItems;
+
   const attrCtx = tagAttributeContext(text, offset);
   if (attrCtx) {
     const analysis = analyze(doc);
@@ -139,6 +142,32 @@ export function computeCompletions(
   }
 
   return [];
+}
+
+// `lang="..."` value completion on the `<script>` / `<style>` opening tag.
+const LANG_AT_END = /<(script|style)\b[^>]*\blang="([^"<>]*)$/;
+const LANG_VALUES: Record<string, string[]> = {
+  script: ['ts'],
+  style: ['scss', 'less', 'css'],
+};
+
+function langCompletion(
+  text: string,
+  offset: number,
+  doc: TextDocument,
+  position: Position,
+): CompletionItem[] | null {
+  const match = LANG_AT_END.exec(text.slice(0, offset));
+  if (!match) return null;
+  const partial = match[2]!;
+  const range: Range = { start: doc.positionAt(offset - partial.length), end: position };
+  return LANG_VALUES[match[1]!]!
+    .filter((v) => v.startsWith(partial))
+    .map((v) => ({
+      label: v,
+      kind: CompletionItemKind.Value,
+      textEdit: { range, newText: v },
+    }));
 }
 
 /** Completion items for a child component's surface, by attribute prefix. */

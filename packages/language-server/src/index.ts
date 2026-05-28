@@ -13,6 +13,7 @@ export {
   computeReferences,
   computeRename,
 } from './features.js';
+export { computeDocumentSymbols } from './outline.js';
 export { startServer } from './server.js';
 export { extractSymbols, symbolsForSigil } from './symbols.js';
 export type {
