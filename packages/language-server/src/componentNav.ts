@@ -55,6 +55,53 @@ export function componentTagAt(
   return hit;
 }
 
+export interface SlotFillHit {
+  /** The component whose slot is being filled (the enclosing component tag). */
+  component: RozieComponentSymbol;
+  /** Slot name (the `#name` without the hash; `default` for bare `#`). */
+  slotName: string;
+  /** Byte span of the `#name` token in the consumer source. */
+  nameLoc: SourceLoc;
+}
+
+/**
+ * Find a slot-fill (`#slotName`, as on `<template #header>` or `<Modal #x>`) at
+ * [offset], paired with the component it fills — the nearest enclosing
+ * registered component (the bearing element itself when that is the component).
+ * Returns null when the cursor is not on a slot-fill of a known component.
+ */
+export function slotFillAt(
+  children: TemplateNode[],
+  components: RozieComponentSymbol[],
+  offset: number,
+): SlotFillHit | null {
+  if (components.length === 0) return null;
+  const byName = new Map(components.map((c) => [c.name, c]));
+
+  let hit: SlotFillHit | null = null;
+  const visit = (node: TemplateNode, enclosing: RozieComponentSymbol | null): void => {
+    if (hit || node.type !== 'TemplateElement') return;
+    const el = node as TemplateElement;
+    const self = byName.get(el.tagName) ?? null;
+    const owning = self ?? enclosing;
+
+    if (owning) {
+      for (const attr of el.attributes) {
+        if (!attr.rawName.startsWith('#')) continue;
+        const nameLoc: SourceLoc = { start: attr.loc.start, end: attr.loc.start + attr.rawName.length };
+        if (offset >= nameLoc.start && offset <= nameLoc.end) {
+          const slotName = attr.rawName.slice(1) || 'default';
+          hit = { component: owning, slotName, nameLoc };
+          return;
+        }
+      }
+    }
+    for (const child of el.children) visit(child, self ?? enclosing);
+  };
+  for (const child of children) visit(child, null);
+  return hit;
+}
+
 /**
  * Resolve a `<components>` import path (e.g. `./Modal.rozie`) to an absolute
  * file URI, relative to the host document's URI. Returns null for paths the

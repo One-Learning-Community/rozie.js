@@ -4,6 +4,7 @@ import {
   componentTagAt,
   componentTagCompletionContext,
   resolveComponentUri,
+  slotFillAt,
 } from '../componentNav.js';
 import { extractSymbols } from '../symbols.js';
 
@@ -44,6 +45,34 @@ describe('componentTagAt', () => {
     // The `:open` attribute is not a tag name.
     const attrOffset = SOURCE.indexOf(':open');
     expect(componentTagAt(ast.template!.children, symbols.components, attrOffset)).toBeNull();
+  });
+});
+
+describe('slotFillAt', () => {
+  const CONSUMER = [
+    '<rozie name="W"><components>{ Modal: "./Modal.rozie" }</components>',
+    '<template><Modal><template #header="{ x }">hi</template><template #footer>f</template></Modal></template>',
+    '</rozie>',
+  ].join('\n');
+
+  function parsed() {
+    const { ast } = parse(CONSUMER);
+    if (!ast) throw new Error('expected AST');
+    return { ast, symbols: extractSymbols(ast, CONSUMER) };
+  }
+
+  it('pairs a #slot fill with its enclosing component', () => {
+    const { ast, symbols } = parsed();
+    const offset = CONSUMER.indexOf('#header') + 2;
+    const hit = slotFillAt(ast.template!.children, symbols.components, offset);
+    expect(hit?.component.name).toBe('Modal');
+    expect(hit?.slotName).toBe('header');
+    expect(CONSUMER.slice(hit!.nameLoc.start, hit!.nameLoc.end)).toBe('#header');
+  });
+
+  it('returns null off any slot-fill attribute', () => {
+    const { ast, symbols } = parsed();
+    expect(slotFillAt(ast.template!.children, symbols.components, CONSUMER.indexOf('<Modal') + 3)).toBeNull();
   });
 });
 

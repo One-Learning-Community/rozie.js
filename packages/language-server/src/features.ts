@@ -11,11 +11,12 @@ import {
   type TextEdit,
   type WorkspaceEdit,
 } from 'vscode-languageserver';
-import type { TextDocument } from 'vscode-languageserver-textdocument';
+import { TextDocument } from 'vscode-languageserver-textdocument';
 import {
   componentTagAt,
   componentTagCompletionContext,
   resolveComponentUri,
+  slotFillAt,
   tagAttributeContext,
 } from './componentNav.js';
 import { extractProducerSurface, type ProducerSurface } from './producers.js';
@@ -173,7 +174,11 @@ function producerAttributeItems(
  * Go-to-definition from a `$props.X`/`$data.X`/`$refs.X` usage (to its
  * declaration) or a composed-component tag (to its `.rozie` file).
  */
-export function computeDefinition(doc: TextDocument, position: Position): Location | null {
+export function computeDefinition(
+  doc: TextDocument,
+  position: Position,
+  ctx?: FeatureContext,
+): Location | null {
   const analysis = analyze(doc);
   if (!analysis) return null;
   const offset = doc.offsetAt(position);
@@ -181,8 +186,34 @@ export function computeDefinition(doc: TextDocument, position: Position): Locati
   const sym = resolveSigilSymbol(doc, analysis.symbols, offset);
   if (sym) return { uri: doc.uri, range: toRange(doc, sym.loc) };
 
-  const tag = analysis.ast.template
-    ? componentTagAt(analysis.ast.template.children, analysis.symbols.components, offset)
+  const children = analysis.ast.template?.children;
+
+  // Slot fill (`#header`) → the producer's matching `<slot name="header">`.
+  if (children) {
+    const slot = slotFillAt(children, analysis.symbols.components, offset);
+    if (slot) {
+      const uri = resolveComponentUri(slot.component.path, doc.uri);
+      const source = uri && ctx?.readDoc ? ctx.readDoc(uri) : null;
+      if (uri && source != null) {
+        const producerSlot = extractProducerSurface(source).slots.find(
+          (s) => s.name === slot.slotName,
+        );
+        if (producerSlot) {
+          // Map the producer-source byte span to a position via a transient doc.
+          const pdoc = TextDocument.create(uri, 'rozie', 0, source);
+          return {
+            uri,
+            range: { start: pdoc.positionAt(producerSlot.loc.start), end: pdoc.positionAt(producerSlot.loc.end) },
+          };
+        }
+        // Slot name unknown in producer — fall through to the component tag check.
+      }
+    }
+  }
+
+  // Component tag (`<Modal>`) → the producer `.rozie` file.
+  const tag = children
+    ? componentTagAt(children, analysis.symbols.components, offset)
     : null;
   if (tag) {
     const uri = resolveComponentUri(tag.symbol.path, doc.uri);

@@ -31,11 +31,13 @@ export {
   componentTagAt,
   componentTagCompletionContext,
   resolveComponentUri,
+  slotFillAt,
   tagAttributeContext,
 } from './componentNav.js';
 export type {
   ComponentTagHit,
   ComponentTagCompletionContext,
+  SlotFillHit,
   TagAttributeContext,
 } from './componentNav.js';
 export { extractProducerSurface } from './producers.js';

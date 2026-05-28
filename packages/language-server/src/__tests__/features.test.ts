@@ -179,3 +179,31 @@ describe('cross-file component attribute completion', () => {
     expect(computeCompletions(d, d.positionAt(pos))).toEqual([]);
   });
 });
+
+describe('slot-fill go-to-definition', () => {
+  const CONSUMER = [
+    '<rozie name="W">',
+    '<components>{ Modal: "./Modal.rozie" }</components>',
+    '<template>',
+    '  <Modal><template #header="{ x }">hi</template></Modal>',
+    '</template>',
+    '</rozie>',
+  ].join('\n');
+
+  it('navigates #header to the producer <slot name="header">', () => {
+    const d = compDoc(CONSUMER);
+    const offset = CONSUMER.indexOf('#header') + 2;
+    const loc = computeDefinition(d, d.positionAt(offset), CTX);
+    expect(loc?.uri).toBe('file:///abs/dir/Modal.rozie');
+    const start = TextDocument.create(loc!.uri, 'rozie', 0, MODAL_PRODUCER).offsetAt(loc!.range.start);
+    expect(MODAL_PRODUCER.slice(start, start + 'header'.length)).toBe('header');
+  });
+
+  it('returns null when the producer has no such slot', () => {
+    const text = CONSUMER.replace('#header', '#missing');
+    const d = compDoc(text);
+    const offset = text.indexOf('#missing') + 2;
+    // No matching slot, and a <template> tag is not itself a component → null.
+    expect(computeDefinition(d, d.positionAt(offset), CTX)).toBeNull();
+  });
+});

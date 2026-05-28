@@ -76,7 +76,7 @@ export function startServer(): void {
 
   connection.onDefinition((params) => {
     const doc = rozieDoc(params.textDocument.uri);
-    return doc ? computeDefinition(doc, params.position) : null;
+    return doc ? computeDefinition(doc, params.position, featureContext) : null;
   });
 
   connection.onHover((params) => {
