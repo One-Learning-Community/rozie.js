@@ -121,6 +121,11 @@ const EXAMPLES = [
   'ThemedButtonConsumer',
   'RBindProbe',
   'PropDefaultCoercion',
+  // Phase 17 — Lit ::part() cross-shadow bridge proving fixtures. PartCard is a
+  // single-file producer leaf; PartCardConsumer references it via <components>
+  // (sibling staged below). Byte-parity across all 4 entrypoints × 6 targets.
+  'PartCard',
+  'PartCardConsumer',
 ] as const;
 
 // Phase 07.2 Plan 06 — siblings ModalConsumer reaches via `<components>`.
@@ -135,6 +140,10 @@ const EXAMPLE_SIBLING_ROZIE: Record<string, string[]> = {
   // via `<components>`; the babel-plugin Leg 3 needs both siblings staged
   // in tmpDir so the producer resolver can find them.
   ThemedButtonConsumer: ['ThemedButton.rozie', 'ThemedButtonManual.rozie'],
+  // Phase 17 — PartCardConsumer reaches PartCard.rozie via <components>; the
+  // babel-plugin Leg 3 needs the sibling staged in tmpDir so the producer
+  // resolver can find it (same pattern as ThemedButtonConsumer).
+  PartCardConsumer: ['PartCard.rozie'],
 };
 // Phase 06.4 P3 (D-LIT-22): TARGETS extended with 'lit' — additive only.
 // 8 examples × 1 target × 3 entrypoints excl. babel-plugin sidecar parity
