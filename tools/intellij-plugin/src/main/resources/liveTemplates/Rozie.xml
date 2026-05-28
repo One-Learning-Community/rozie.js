@@ -1,0 +1,67 @@
+<templateSet group="Rozie">
+  <template name="rcomponent"
+            value="&lt;rozie name=&quot;$NAME$&quot;&gt;&#10;&lt;template&gt;&#10;  $END$&#10;&lt;/template&gt;&#10;&lt;script&gt;&#10;&lt;/script&gt;&#10;&lt;/rozie&gt;"
+            description="Rozie SFC skeleton (rozie + template + script)"
+            toReformat="false" toShortenFQNames="false">
+    <variable name="NAME" expression="" defaultValue="&quot;MyComponent&quot;" alwaysStopAt="true"/>
+    <context>
+      <option name="ROZIE" value="true"/>
+    </context>
+  </template>
+  <template name="rtemplate"
+            value="&lt;template&gt;&#10;  $END$&#10;&lt;/template&gt;"
+            description="Rozie &lt;template&gt; block"
+            toReformat="false" toShortenFQNames="false">
+    <context>
+      <option name="ROZIE" value="true"/>
+    </context>
+  </template>
+  <template name="rscript"
+            value="&lt;script&gt;&#10;$END$&#10;&lt;/script&gt;"
+            description="Rozie &lt;script&gt; block"
+            toReformat="false" toShortenFQNames="false">
+    <context>
+      <option name="ROZIE" value="true"/>
+    </context>
+  </template>
+  <template name="rprops"
+            value="&lt;props&gt;{ $END$ }&lt;/props&gt;"
+            description="Rozie &lt;props&gt; block"
+            toReformat="false" toShortenFQNames="false">
+    <context>
+      <option name="ROZIE" value="true"/>
+    </context>
+  </template>
+  <template name="rdata"
+            value="&lt;data&gt;{ $END$ }&lt;/data&gt;"
+            description="Rozie &lt;data&gt; block"
+            toReformat="false" toShortenFQNames="false">
+    <context>
+      <option name="ROZIE" value="true"/>
+    </context>
+  </template>
+  <template name="rcomponents"
+            value="&lt;components&gt;{ $END$ }&lt;/components&gt;"
+            description="Rozie &lt;components&gt; block"
+            toReformat="false" toShortenFQNames="false">
+    <context>
+      <option name="ROZIE" value="true"/>
+    </context>
+  </template>
+  <template name="rlisteners"
+            value="&lt;listeners&gt;{ $END$ }&lt;/listeners&gt;"
+            description="Rozie &lt;listeners&gt; block"
+            toReformat="false" toShortenFQNames="false">
+    <context>
+      <option name="ROZIE" value="true"/>
+    </context>
+  </template>
+  <template name="rstyle"
+            value="&lt;style&gt;&#10;$END$&#10;&lt;/style&gt;"
+            description="Rozie &lt;style&gt; block"
+            toReformat="false" toShortenFQNames="false">
+    <context>
+      <option name="ROZIE" value="true"/>
+    </context>
+  </template>
+</templateSet>

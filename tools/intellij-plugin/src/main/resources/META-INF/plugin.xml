@@ -93,6 +93,24 @@
             language="Rozie"
             implementationClass="js.rozie.intellij.structure.RozieStructureViewFactory"/>
 
+        <!-- 0.4.0: host-level commenter (Ctrl-/ , Ctrl-Shift-/) for SFC
+             structural positions. In-block commenting is handled by the
+             injected language's own commenter (JS // , CSS, HTML); this governs
+             the XML/HTML-shaped structural level, mirroring Vue SFC behavior. -->
+        <lang.commenter
+            language="Rozie"
+            implementationClass="js.rozie.intellij.editor.RozieCommenter"/>
+
+        <!-- 0.4.0: live-template scaffolding snippets for .rozie files —
+             rcomponent (full SFC skeleton), rtemplate / rscript / rprops /
+             rdata / rcomponents / rlisteners / rstyle (individual blocks). The
+             ROZIE context (gated on RozieContextCheck.isRozieContext) keeps the
+             snippet set out of the user's other files. -->
+        <liveTemplateContext
+            contextId="ROZIE"
+            implementation="js.rozie.intellij.editor.RozieTemplateContextType"/>
+        <defaultLiveTemplates file="/liveTemplates/Rozie.xml"/>
+
         <!-- 0.3.0: skeleton for the "New > Rozie Component" action. Content
              lives in resources/fileTemplates/internal/Rozie Component.ft. -->
         <internalFileTemplate name="Rozie Component"/>
