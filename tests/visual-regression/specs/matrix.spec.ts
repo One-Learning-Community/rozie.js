@@ -126,6 +126,24 @@ const EXAMPLES = [
   // baseline regen lands the PNG. Per D-10 shared-baseline.
   'ThemedButtonListenersManual',
   'ThemedButtonAllManual',
+  // Phase 17 — PartCardConsumer (::part() cross-shadow-DOM styling dogfood,
+  // SPEC-R8). A multi-rozie consumer (precedent: ThemedButtonConsumer) that
+  // embeds <PartCard> via a <components> block and styles the child's
+  // `part="body"` shadow element across the boundary with a
+  // `PartCard::part(body)` rule. On Lit the rule reaches the child
+  // (`rozie-part-card[data-rozie-s-<hash>]::part(body)`); on the 5 non-Lit
+  // targets the rule is dropped as a no-op (no shadow boundary). Because
+  // `::part` is INTENTIONALLY a Lit-only-visible effect, strict D-10
+  // byte-identity across all 6 targets is NOT expected for the part-styled
+  // region — this cell is treated like the engine-demo cells (memory
+  // `project_vr_engine_demo_divergences` / `project_modalconsumer_png_invariant`):
+  // layout parity is asserted, per-target byte-identity for the `::part`-styled
+  // region is relaxed, and the final pixel sign-off is tracked as a HUMAN-UAT
+  // partial deferral (17-HUMAN-UAT.md). Cell baseline-gates to test.fixme via
+  // `baselineExists()` until a Linux-Docker baseline regen lands the PNG
+  // (`feedback_vr_linux_baselines`) — the ORCHESTRATOR owns that generation;
+  // no macOS-rendered PNG is committed here.
+  'PartCardConsumer',
   // Phase 15 — ROnProbe (D-07) is INTENTIONALLY NOT in the VR matrix, mirroring
   // the Phase 14 RBindProbe precedent. The probe's purpose is dist-parity byte-
   // equality (compile + emit), not visual parity. On Lit, the emitted
@@ -273,6 +291,17 @@ async function settleExample(
   // the `[class*="fc-event-title"]` rationale in full-calendar.spec.ts.
   if (example === 'Table') {
     await expect(page.locator('[class*="rozie-table"]').first()).toBeVisible();
+  }
+  // PartCardConsumer (Phase 17 ::part dogfood): the consumer embeds <PartCard>,
+  // whose template root is `<div class="card-body" part="body">`. The
+  // `part="body"` attribute is emitted verbatim into the child across all 6
+  // targets (SPEC-R3/R4b) — on Lit into the shadow template, elsewhere as a
+  // benign standard HTML attribute. A `[part="body"]` attribute locator
+  // therefore survives React CSS-Modules class hashing, Angular view
+  // encapsulation, and Lit shadow DOM identically (Playwright's locator pierces
+  // shadow roots), proving the child painted before the screenshot clip.
+  if (example === 'PartCardConsumer') {
+    await expect(page.locator('[part="body"]').first()).toBeVisible();
   }
 }
 

@@ -131,6 +131,22 @@ const EXAMPLES = [
   // emit-side coercion of `undefined → declaredDefault`. Single-file; no
   // sibling .rozie producers — does NOT go into RESOLVER_ROOT.
   'PropDefaultCoercion',
+  // Phase 17 ::part() cross-shadow-DOM styling proving PAIR (SPEC-R8). PartCard
+  // is the LEAF producer (template root tagged `part="body"` — SPEC-R3); on Lit
+  // the `part="body"` is emitted into the shadow template, on the other 5
+  // targets it is a benign standard HTML attribute. PartCardConsumer embeds
+  // <PartCard> via a <components> block and styles its part across the shadow
+  // boundary with a `PartCard::part(body)` rule — on Lit Plan 02 lowers this to
+  // `rozie-part-card[data-rozie-s-<hash>]::part(body)` (the W3C-correct working
+  // shape), on the 5 non-Lit targets Plan 03 drops it as a no-op (SPEC-R4a).
+  // Registering both here makes the bootstrap compile() them across all six
+  // targets (throwing on any error diagnostic) — the SPEC-R8 six-target compile
+  // proof. PartCardConsumer is added to EXAMPLES_NEEDING_RESOLVER_ROOT below
+  // (it references ./PartCard.rozie via <components>); PartCard is a LEAF
+  // single-rozie producer and stays OUT of RESOLVER_ROOT (the same
+  // ThemedButton-vs-ThemedButtonConsumer split).
+  'PartCard',
+  'PartCardConsumer',
 ];
 
 const EXAMPLES_NEEDING_RESOLVER_ROOT = new Set([
@@ -143,6 +159,10 @@ const EXAMPLES_NEEDING_RESOLVER_ROOT = new Set([
   // Phase 15 producers are LEAF single-rozie components and stay OUT of
   // RESOLVER_ROOT; only the multi-rozie Consumer needs it.
   'ThemedButtonConsumer',
+  // Phase 17 — references ./PartCard.rozie via <components>; needs resolver
+  // root so the IR cache + ProducerResolver locate the sibling producer at
+  // compile time. The leaf producer PartCard stays OUT of RESOLVER_ROOT.
+  'PartCardConsumer',
 ]);
 // Phase 06.4 P3 (D-LIT-22): TARGETS extended with 'lit' — additive only.
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'];
