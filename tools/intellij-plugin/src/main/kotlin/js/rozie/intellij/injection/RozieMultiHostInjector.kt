@@ -8,9 +8,13 @@ import com.intellij.lang.injection.MultiHostRegistrar
 import com.intellij.openapi.util.TextRange
 import com.intellij.psi.PsiElement
 import com.intellij.psi.tree.IElementType
+import com.intellij.psi.util.CachedValueProvider
+import com.intellij.psi.util.CachedValuesManager
+import com.intellij.psi.util.PsiModificationTracker
 import js.rozie.intellij.lexer.RozieLexerAdapter
 import js.rozie.intellij.lexer.RozieTokenTypes
 import js.rozie.intellij.parser.RozieRootBlock
+import js.rozie.intellij.xml.RozieComponentRegistry
 
 /**
  * Walks every [RozieRootBlock]'s token stream and registers JavaScript / HTML / CSS
@@ -225,7 +229,7 @@ class RozieMultiHostInjector : MultiHostInjector {
     private fun injectJs(registrar: MultiHostRegistrar, host: RozieRootBlock, range: TextRange) {
         val js = Language.findLanguageByID("JavaScript") ?: return
         registrar.startInjecting(js)
-            .addPlace(ROZIE_GLOBALS_PREFIX, null, host, range)
+            .addPlace(globalsPrefixFor(host), null, host, range)
             .doneInjecting()
     }
 
@@ -310,7 +314,7 @@ class RozieMultiHostInjector : MultiHostInjector {
         //
         // See [injectJs] KDoc for the strategy rationale and Pitfall 2 mitigation.
         registrar.startInjecting(js)
-            .addPlace(ROZIE_GLOBALS_PREFIX + "(\n", "\n)", host, range)
+            .addPlace(globalsPrefixFor(host) + "(\n", "\n)", host, range)
             .doneInjecting()
     }
 
@@ -714,6 +718,36 @@ class RozieMultiHostInjector : MultiHostInjector {
             RozieMultiHostInjector::class.java.getResourceAsStream("/rozie-globals.d.ts")
                 ?.bufferedReader()?.use { it.readText() + "\n" }
                 ?: ""
+
+        /** The generic `$props` line in [ROZIE_GLOBALS_PREFIX], replaced per-file. */
+        private const val PROPS_ANY_DECL = "declare const \$props: any;"
+
+        /**
+         * Per-file globals prefix: [ROZIE_GLOBALS_PREFIX] with the generic
+         * `declare const $props: any;` specialised to the host's actual prop
+         * shape (e.g. `declare const $props: { title: string; open: boolean };`),
+         * so the JS resolver types `$props.title` as `string` instead of the prop
+         * DESCRIPTOR object. Files with no `<props>` block (or an unparseable one)
+         * keep the generic `any`. Cached on the host file, invalidated on any PSI
+         * change; the provider closes over only [file] (its own cache key), never
+         * a reparse-varying element — avoiding the "different captured context"
+         * CachedValue crash.
+         */
+        internal fun globalsPrefixFor(host: RozieRootBlock): String {
+            val file = host.containingFile ?: return ROZIE_GLOBALS_PREFIX
+            return CachedValuesManager.getCachedValue(file) {
+                CachedValueProvider.Result.create(
+                    computeGlobalsPrefix(file.text),
+                    PsiModificationTracker.MODIFICATION_COUNT,
+                )
+            }
+        }
+
+        private fun computeGlobalsPrefix(hostText: String): String {
+            val propsBody = RozieComponentRegistry.blockBodyText(hostText, RozieTokenTypes.PROPS_BODY)
+            val propsType = RoziePropTypeModel.propsObjectType(propsBody) ?: return ROZIE_GLOBALS_PREFIX
+            return ROZIE_GLOBALS_PREFIX.replace(PROPS_ANY_DECL, "declare const \$props: $propsType;")
+        }
 
         // r-for="…": value captured in group 1. Paren-wrap dispatch.
         private val R_FOR_ATTR: Regex =
