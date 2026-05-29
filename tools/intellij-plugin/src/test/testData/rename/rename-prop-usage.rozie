@@ -1,0 +1,11 @@
+<rozie name="RenameProp">
+<props>
+{
+  tit<caret>le: { type: String, default: '' },
+}
+</props>
+<template>
+<h1>{{ $props.title }}</h1>
+<p :data-x="$props.title"></p>
+</template>
+</rozie>

@@ -1,0 +1,13 @@
+<rozie name="RenameData">
+<data>
+{
+  cou<caret>nt: 0,
+}
+</data>
+<script>
+const inc = () => { $data.count = $data.count + 1 }
+</script>
+<template>
+<button @click="inc()">{{ $data.count }}</button>
+</template>
+</rozie>

@@ -273,6 +273,16 @@
         <referencesSearch
             implementation="js.rozie.intellij.references.RozieReferenceSearcher"/>
 
+        <!-- Custom rename for <props>/<data> sigil keys. Registered order="first"
+             so it wins over the JS plugin's JSDefaultRenameProcessor, which
+             cannot rename a key across the multi-injection RozieRootBlock host
+             (injected smart-pointer restore failure + missing ElementManipulator
+             on the raw TEMPLATE_BODY leaf). This processor edits the host
+             document directly, touching neither the injected pointer nor the
+             manipulator path. See RozieSigilRenameProcessor. -->
+        <renamePsiElementProcessor order="first"
+            implementation="js.rozie.intellij.refactoring.RozieSigilRenameProcessor"/>
+
         <!-- Plan 08.2-06: SC-6 prefix-aware attribute-name autocomplete —
              typing r- / @ / : / # in HTML attribute position inside a .rozie
              <template> surfaces the canonical name lists from
