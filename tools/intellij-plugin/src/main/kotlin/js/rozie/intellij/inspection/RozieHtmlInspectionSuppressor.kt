@@ -40,7 +40,14 @@ class RozieHtmlInspectionSuppressor : XmlSuppressionProvider() {
     override fun isSuppressedFor(element: PsiElement, inspectionId: String): Boolean {
         // Only the HTML attribute-name inspections are in scope. Other HTML inspections
         // (e.g., HtmlExtraClosingTag) keep firing — that's a real authoring error.
-        if (inspectionId != "HtmlUnknownAttribute" && inspectionId != "RequiredAttributes") {
+        //  - HtmlUnknownBooleanAttribute ("Incorrect boolean attribute"): a value-less
+        //    Rozie attribute (`#header` slot-fill shorthand, `r-else`) is INTENTIONAL,
+        //    but its descriptor makes it "known", so this inspection demands a value
+        //    ("#header requires value"). Rozie sigil attrs are legitimately boolean-shaped.
+        if (inspectionId != "HtmlUnknownAttribute" &&
+            inspectionId != "RequiredAttributes" &&
+            inspectionId != "HtmlUnknownBooleanAttribute"
+        ) {
             return false
         }
         val attr = (element as? XmlAttribute) ?: element.parent as? XmlAttribute ?: return false
@@ -61,5 +68,6 @@ class RozieHtmlInspectionSuppressor : XmlSuppressionProvider() {
         name.startsWith("r-") ||
             name.startsWith("@") ||
             name.startsWith(":") ||
+            name.startsWith("#") ||
             name == "ref"
 }

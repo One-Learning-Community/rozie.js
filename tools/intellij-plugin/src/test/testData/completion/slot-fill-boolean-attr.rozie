@@ -1,0 +1,11 @@
+<rozie name="SlotFill">
+<components>
+{ Modal: './Modal.rozie' }
+</components>
+<template>
+<Modal>
+  <template #header>Title</template>
+  <template #footer>Footer</template>
+</Modal>
+</template>
+</rozie>
