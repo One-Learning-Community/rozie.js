@@ -6,8 +6,7 @@ import com.intellij.codeInsight.completion.CompletionProvider
 import com.intellij.codeInsight.completion.CompletionResultSet
 import com.intellij.codeInsight.completion.CompletionType
 import com.intellij.codeInsight.lookup.LookupElementBuilder
-import com.intellij.lang.javascript.psi.JSLabeledStatement
-import com.intellij.lang.javascript.psi.JSProperty
+import com.intellij.lang.javascript.psi.JSObjectLiteralExpression
 import com.intellij.lang.javascript.psi.JSReferenceExpression
 import com.intellij.patterns.PlatformPatterns
 import com.intellij.psi.PsiFile
@@ -21,21 +20,24 @@ import js.rozie.intellij.xml.RozieContextCheck
 /**
  * Member-access autocomplete for `$props.<member>` / `$data.<member>` /
  * `$refs.<member>` inside `.rozie` injected JS fragments — the companion to the
- * cross-block [RoziePropsReference] navigation. Where the reference resolves ONE
- * member to its declaration, this contributor enumerates ALL of a sigil's
- * declared members from the sibling block and offers them at the caret.
+ * cross-block [RoziePropsReference] navigation.
  *
  * Why native (not LSP): LSP4IJ completion does not reach carets inside injected
- * language fragments, so `$props.` member completion can only be served from the
- * IntelliJ side (see RozieLanguageServerFactory's diagnostics-only scoping). The
- * member set is derived live from the sibling `<props>` / `<data>` JS keys and
- * the `<template>` `ref="…"` attributes, reusing [RoziePropsReference]'s host /
- * block-range / injected-file helpers, so it can never drift from what resolves.
+ * language fragments, so this can only be served from the IntelliJ side (the
+ * LSP is scoped to diagnostics-only — see RozieLanguageServerFactory).
  *
- * Registered for `language="JavaScript"` because the [JSReferenceExpression]
- * PSI lives in injected JS, not host Rozie PSI (same reasoning the cross-block
- * [RoziePropsReference] documents). Pitfall-2 guarded via
- * [RozieContextCheck.isRozieContext] so it stays inert in non-Rozie JS files.
+ * Two correctness rules this enforces (both surfaced in GUI testing):
+ *   1. **Top-level only.** The member set is the *direct* properties of the
+ *      `<props>`/`<data>` object — NOT a recursive walk, which would also list
+ *      each prop descriptor's inner `type`/`default` keys.
+ *   2. **Own the position.** Because the sigils are typed `any` (ambient decl),
+ *      stock JS completion floods a `$props.` caret with `any`-member guesses
+ *      and postfix templates (`if`, `dforof`, …). At a magic-member position the
+ *      ONLY valid completions are the declared members, so we register
+ *      `order="first"`, add them, and `stopHere()` to suppress the noise.
+ *
+ * The declared type (`{ type: String }` → `String`) rides along as the lookup's
+ * type-text hint, so the popup is self-documenting.
  */
 class RozieMemberCompletionContributor : CompletionContributor() {
 
@@ -52,19 +54,15 @@ class RozieMemberCompletionContributor : CompletionContributor() {
                     val pos = parameters.position
                     if (!RozieContextCheck.isRozieContext(pos)) return
 
-                    // The caret sits on the member leaf of `$sigil.<member>`
-                    // (IntelliJ inserts a dummy identifier there during
-                    // completion). Walk up to that member expression and read
-                    // its qualifier — the sigil.
                     val memberExpr = PsiTreeUtil.getParentOfType(pos, JSReferenceExpression::class.java)
                         ?: return
                     val qualifier = memberExpr.qualifier as? JSReferenceExpression ?: return
                     val sigil = qualifier.referenceName ?: return
 
-                    val (token, typeText, lang) = when (sigil) {
-                        "\$props" -> Triple(RozieTokenTypes.PROPS_BODY, "prop", "JavaScript")
-                        "\$data" -> Triple(RozieTokenTypes.DATA_BODY, "data", "JavaScript")
-                        "\$refs" -> Triple(RozieTokenTypes.TEMPLATE_BODY, "ref", "HTML")
+                    val (token, lang) = when (sigil) {
+                        "\$props" -> RozieTokenTypes.PROPS_BODY to "JavaScript"
+                        "\$data" -> RozieTokenTypes.DATA_BODY to "JavaScript"
+                        "\$refs" -> RozieTokenTypes.TEMPLATE_BODY to "HTML"
                         else -> return
                     }
 
@@ -72,30 +70,58 @@ class RozieMemberCompletionContributor : CompletionContributor() {
                     val range = RoziePropsReference.findBlockBodyRange(host, token) ?: return
                     val injected = RoziePropsReference.findInjectedFile(host, range, lang) ?: return
 
-                    val names = if (sigil == "\$refs") refNames(injected) else jsKeyNames(injected)
-                    names.forEach { name ->
+                    val members = when (sigil) {
+                        "\$refs" -> refMembers(injected)
+                        "\$data" -> objectKeyMembers(injected, valueAsType = false, fallbackType = "data")
+                        else -> objectKeyMembers(injected, valueAsType = false, fallbackType = "prop")
+                    }
+                    if (members.isEmpty()) return
+
+                    for ((name, typeText) in members) {
                         result.addElement(LookupElementBuilder.create(name).withTypeText(typeText))
                     }
+                    // Own this position: a `$sigil.` caret has no valid completion
+                    // other than these members, so suppress stock JS member guesses
+                    // + postfix/live templates that would otherwise flood the popup.
+                    result.stopHere()
                 }
             },
         )
     }
 
     private companion object {
-        /** Declared `<props>` / `<data>` key names (both PSI shapes the body parses into). */
-        fun jsKeyNames(jsFile: PsiFile): List<String> {
-            val properties = PsiTreeUtil.findChildrenOfType(jsFile, JSProperty::class.java)
-                .mapNotNull { it.name }
-            val labels = PsiTreeUtil.findChildrenOfType(jsFile, JSLabeledStatement::class.java)
-                .mapNotNull { it.label }
-            return (properties + labels).distinct()
+        /**
+         * Direct (top-level) keys of the first object literal in [jsFile] — the
+         * paren-wrapped `({ … })` `<props>`/`<data>` body. For each prop the
+         * declared `type:` (e.g. `String`) becomes the type-text hint; falls
+         * back to [fallbackType] when there's no `{ type: … }` descriptor.
+         */
+        fun objectKeyMembers(
+            jsFile: PsiFile,
+            @Suppress("SameParameterValue") valueAsType: Boolean,
+            fallbackType: String,
+        ): List<Pair<String, String>> {
+            val obj = PsiTreeUtil.findChildOfType(jsFile, JSObjectLiteralExpression::class.java)
+                ?: return emptyList()
+            return obj.properties.mapNotNull { prop ->
+                val name = prop.name ?: return@mapNotNull null
+                val descriptor = prop.value as? JSObjectLiteralExpression
+                val declaredType = descriptor?.findProperty("type")?.value?.text
+                val typeText = when {
+                    declaredType != null -> declaredType
+                    valueAsType -> prop.value?.text ?: fallbackType
+                    else -> fallbackType
+                }
+                name to typeText
+            }
         }
 
         /** Template `ref="…"` attribute values. */
-        fun refNames(htmlFile: PsiFile): List<String> =
+        fun refMembers(htmlFile: PsiFile): List<Pair<String, String>> =
             PsiTreeUtil.findChildrenOfType(htmlFile, XmlAttribute::class.java)
                 .filter { it.name == "ref" }
                 .mapNotNull { it.value }
                 .distinct()
+                .map { it to "ref" }
     }
 }

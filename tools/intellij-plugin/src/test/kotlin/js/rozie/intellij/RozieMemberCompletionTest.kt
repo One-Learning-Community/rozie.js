@@ -26,5 +26,13 @@ class RozieMemberCompletionTest : BasePlatformTestCase() {
         assertTrue("Expected `label` from <props>; got: $lookups", "label" in lookups)
         // The $data member must NOT leak into a $props.* completion.
         assertFalse("`hovering` is a <data> key, not a prop; got: $lookups", "hovering" in lookups)
+        // Top-level only — the nested descriptor keys must NOT appear.
+        assertFalse("`type` is a nested descriptor key, not a prop; got: $lookups", "type" in lookups)
+        assertFalse("`default` is a nested descriptor key, not a prop; got: $lookups", "default" in lookups)
+        // We own the position (stopHere) — stock JS postfix/live templates suppressed.
+        assertFalse("postfix template `if` leaked; got: $lookups", "if" in lookups)
+        assertFalse("postfix template `dforof` leaked; got: $lookups", "dforof" in lookups)
+        // Exactly the two declared props, no duplicates.
+        assertEquals("Expected exactly [count, label]; got: $lookups", 2, lookups.size)
     }
 }
