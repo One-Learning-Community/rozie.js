@@ -53,18 +53,15 @@ class RozieSigilRenameProcessor : RenamePsiElementProcessor() {
         if (element !is PsiNamedElement) return false
         val containing = element.containingFile ?: return false
         val ilm = InjectedLanguageManager.getInstance(element.project)
-        val host = ilm.getInjectionHost(element) as? RozieRootBlock
-            ?: (containing.context as? RozieRootBlock)
-            ?: return false
+        val host = rootBlock(element, ilm) ?: return false
         if (ilm.getTopLevelFile(containing)?.fileType?.name != "Rozie") return false
 
         // Confine to keys whose injected decl falls inside the <props>/<data>
         // block body — those are the only decls reached cross-block as $props.X /
         // $data.X (and thus the only ones the JS rename path mishandles).
         val declHost = declHostRange(element, ilm) ?: return false
-        return listOf(RozieTokenTypes.PROPS_BODY, RozieTokenTypes.DATA_BODY).any { token ->
-            RoziePropsReference.findBlockBodyRange(host, token)?.contains(declHost.startOffset) == true
-        }
+        return blockContains(host, RozieTokenTypes.PROPS_BODY, declHost.startOffset) ||
+            blockContains(host, RozieTokenTypes.DATA_BODY, declHost.startOffset)
     }
 
     /**
@@ -89,10 +86,20 @@ class RozieSigilRenameProcessor : RenamePsiElementProcessor() {
     }
 
     /**
-     * Rename by editing the host document directly: collect every host-absolute
-     * occurrence range (the declaration plus each host-anchored usage), then
-     * replace them in descending offset order so earlier edits never invalidate
-     * later ranges. No PSI manipulator / injected pointer is involved.
+     * Rename by editing the host document directly.
+     *
+     * Usage ranges are recovered by SCANNING THE HOST TEXT for `$sigil.<oldName>`
+     * — NOT from the platform's [usages] / [ReferencesSearch]. That search resolves
+     * each occurrence by walking into its injected JS fragment, and on a cold
+     * injection cache (e.g. the very first rename after opening the file) those
+     * fragments aren't built yet, so it finds zero usages and only the declaration
+     * gets renamed — undo-and-retry then "works" because the first pass primed the
+     * cache. A lexical host scan has no such dependency: it renames every usage on
+     * the first try, every time. The declaration key is added from its
+     * injected→host mapping (its fragment is always primed — the rename target was
+     * resolved from it). All edits apply in descending offset order so earlier
+     * edits never shift later ranges; no PSI manipulator / injected pointer is
+     * touched.
      */
     override fun renameElement(
         element: PsiElement,
@@ -101,20 +108,34 @@ class RozieSigilRenameProcessor : RenamePsiElementProcessor() {
         listener: RefactoringElementListener?,
     ) {
         val ilm = InjectedLanguageManager.getInstance(element.project)
-        val hostFile = ilm.getTopLevelFile(element.containingFile ?: return) ?: return
+        val containing = element.containingFile ?: return
+        val host = rootBlock(element, ilm) ?: return
+        val hostFile = ilm.getTopLevelFile(containing) ?: return
         val docManager = PsiDocumentManager.getInstance(element.project)
         val document = docManager.getDocument(hostFile) ?: return
+        val oldName = (element as? PsiNamedElement)?.name ?: return
 
-        val ranges = sortedSetOf<TextRange>(compareByDescending { it.startOffset })
-        declHostRange(element, ilm)?.let { ranges.add(it) }
-        for (usage in usages) {
-            val ref = (usage as? UsageInfo)?.reference ?: continue
-            val el = ref.element
-            val abs = ref.rangeInElement.shiftRight(el.textRange.startOffset)
-            ranges.add(abs)
+        val declHost = declHostRange(element, ilm) ?: return
+        val sigil = when {
+            blockContains(host, RozieTokenTypes.PROPS_BODY, declHost.startOffset) -> "\$props"
+            blockContains(host, RozieTokenTypes.DATA_BODY, declHost.startOffset) -> "\$data"
+            else -> return
         }
 
-        for (range in ranges) { // already descending — later edits don't shift earlier ones
+        val ranges = sortedSetOf(compareByDescending<TextRange> { it.startOffset })
+        ranges.add(declHost)
+        // `$props . oldName` (optional whitespace / optional `?.`), name not part
+        // of a longer identifier. Sigil not preceded by an identifier/`$` char.
+        val usagePattern = Regex(
+            "(?<![\\w$])" + Regex.escape(sigil) + "\\s*\\??\\s*\\.\\s*(" +
+                Regex.escape(oldName) + ")(?![\\w$])",
+        )
+        for (match in usagePattern.findAll(document.text)) {
+            val g = match.groups[1]!!.range
+            ranges.add(TextRange(g.first, g.last + 1))
+        }
+
+        for (range in ranges) { // descending — earlier edits don't shift later ranges
             document.replaceString(range.startOffset, range.endOffset, newName)
         }
         docManager.commitDocument(document)
@@ -123,6 +144,15 @@ class RozieSigilRenameProcessor : RenamePsiElementProcessor() {
     }
 
     private companion object {
+        /** Resolve the [RozieRootBlock] host of an injected [element]. */
+        fun rootBlock(element: PsiElement, ilm: InjectedLanguageManager): RozieRootBlock? =
+            ilm.getInjectionHost(element) as? RozieRootBlock
+                ?: element.containingFile?.context as? RozieRootBlock
+
+        /** True when [host]'s [token] block body covers host offset [offset]. */
+        fun blockContains(host: RozieRootBlock, token: com.intellij.psi.tree.IElementType, offset: Int): Boolean =
+            RoziePropsReference.findBlockBodyRange(host, token)?.contains(offset) == true
+
         /**
          * Host-absolute range of [element]'s name identifier (the declaration
          * key), mapping its injected coordinates back to the host document.
