@@ -285,6 +285,14 @@
         <completion.contributor language="HTML"
             implementationClass="js.rozie.intellij.completion.RozieAttributeNameCompletionContributor"/>
 
+        <!-- Cross-file component-tag attribute completion: `<Modal :|` / `@|` / `#|`
+             offers the producer Modal.rozie's real props / emits / slots (resolved
+             via the consumer's <components> import path), additive to stock DOM
+             attrs. IntelliJ-native analog of the LSP cross-file surface (LSP4IJ
+             completion doesn't reach injected HTML carets). -->
+        <completion.contributor language="HTML"
+            implementationClass="js.rozie.intellij.completion.RozieComponentAttributeCompletionContributor"/>
+
         <!-- Plan 08.2-13: closes P1-UAT-09. SC-6 extended to the JS surface —
              typing `$` (or a `$X` prefix) in any Rozie-injected JS fragment
              (<script> / <listeners> / <props> / <data> / <components>)

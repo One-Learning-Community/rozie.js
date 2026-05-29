@@ -3,6 +3,7 @@ package js.rozie.intellij.xml
 import com.intellij.lang.injection.InjectedLanguageManager
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
+import com.intellij.psi.tree.IElementType
 import com.intellij.psi.util.CachedValueProvider
 import com.intellij.psi.util.CachedValuesManager
 import js.rozie.intellij.lexer.RozieLexerAdapter
@@ -83,6 +84,38 @@ object RozieComponentRegistry {
     }
 
     /**
+     * Map of PascalCase component name → import-path string declared in [file]'s
+     * `<components>` block (e.g. `Modal` → `./Modal.rozie`). Returns an empty map
+     * under the same conditions as [declaredComponents]. The key set is exactly
+     * [declaredComponents]; entries whose value is not a quoted string literal
+     * are dropped (a `<components>` value is always an import-path string).
+     *
+     * Used by cross-file component-tag attribute completion
+     * ([js.rozie.intellij.completion.RozieComponentAttributeCompletionContributor])
+     * to resolve a consumed `<Modal>` back to its producer `.rozie` source so the
+     * producer's real props / emits / slots can be offered — instead of the stock
+     * HTML DOM defaults. Results are cached per [file] modification stamp.
+     */
+    fun declaredComponentImports(file: PsiFile): Map<String, String> {
+        if (file.fileType.name != "Rozie") return emptyMap()
+
+        return CachedValuesManager.getCachedValue(file) {
+            CachedValueProvider.Result.create(
+                extractTopLevelEntries(componentsBodyText(file.text)),
+                file,
+            )
+        }
+    }
+
+    /** Injected-fragment overload of [declaredComponentImports]; mirrors [declaredComponents]. */
+    fun declaredComponentImports(element: PsiElement): Map<String, String> {
+        val containing = element.containingFile ?: return emptyMap()
+        val project = containing.project
+        val host = InjectedLanguageManager.getInstance(project).getTopLevelFile(containing) ?: containing
+        return declaredComponentImports(host)
+    }
+
+    /**
      * Walk the host file text via [RozieLexerAdapter] to locate the first
      * [RozieTokenTypes.COMPONENTS_BODY] token; return its substring (raw body
      * text including the surrounding braces / whitespace).
@@ -90,10 +123,23 @@ object RozieComponentRegistry {
      * Returns `null` when the file has no `<components>` block — the caller
      * treats `null` as `emptySet()`.
      */
-    private fun componentsBodyText(text: String): String? {
+    private fun componentsBodyText(text: String): String? =
+        blockBodyText(text, RozieTokenTypes.COMPONENTS_BODY)
+
+    /**
+     * Walk [text] via [RozieLexerAdapter] and return the raw substring of the
+     * first [token]-typed block body (e.g. [RozieTokenTypes.COMPONENTS_BODY] or
+     * [RozieTokenTypes.PROPS_BODY]). Returns `null` when no such block exists.
+     *
+     * Exposed `internal` so cross-file introspection
+     * ([js.rozie.intellij.completion.RozieProducerSurface]) can pull the
+     * `<props>` body out of a producer file's raw text (which is not necessarily
+     * the open editor file) using the same lexer-backed boundary detection.
+     */
+    internal fun blockBodyText(text: String, token: IElementType): String? {
         val lexer = RozieLexerAdapter().apply { start(text) }
         while (lexer.tokenType != null) {
-            if (lexer.tokenType == RozieTokenTypes.COMPONENTS_BODY) {
+            if (lexer.tokenType == token) {
                 return text.substring(lexer.tokenStart, lexer.tokenEnd)
             }
             lexer.advance()
@@ -116,7 +162,7 @@ object RozieComponentRegistry {
      *   - whether the previous non-whitespace char was `{` or `,` (the only
      *     positions where a key can start)
      */
-    internal fun extractTopLevelKeys(body: String?): Set<String> {
+    internal fun extractTopLevelKeys(body: String?, requireUpper: Boolean = true): Set<String> {
         if (body == null) return emptySet()
         val keys = LinkedHashSet<String>()
         var depth = 0
@@ -160,8 +206,11 @@ object RozieComponentRegistry {
                     i++
                 }
                 c.isWhitespace() -> { i++ }
-                atKeyPosition && c.isUpperCase() && (c.isLetter() || c == '_') -> {
-                    // PascalCase identifier candidate. Scan to end of identifier.
+                atKeyPosition && (c.isLetter() || c == '_' || c == '$') && (!requireUpper || c.isUpperCase()) -> {
+                    // Identifier-key candidate. `requireUpper` keeps the
+                    // `<components>` path PascalCase-only; props/data keys
+                    // (camelCase) pass `requireUpper = false`. Scan to end of
+                    // identifier.
                     val start = i
                     while (i < body.length) {
                         val ic = body[i]
@@ -187,4 +236,30 @@ object RozieComponentRegistry {
         }
         return keys
     }
+
+    /**
+     * Like [extractTopLevelKeys] but also captures each top-level key's
+     * string-literal value (the import path). A `<components>` entry is always
+     * `Name: '<path>'`, so we reuse [extractTopLevelKeys] for the robust,
+     * brace-/string-aware top-level key detection, then pull each key's quoted
+     * value with a targeted regex restricted to those keys — a value that
+     * happens to contain `Word: 'x'` therefore can't introduce a phantom entry.
+     * Keys without a quoted string value are omitted.
+     */
+    internal fun extractTopLevelEntries(body: String?): Map<String, String> {
+        if (body == null) return emptyMap()
+        val topKeys = extractTopLevelKeys(body)
+        if (topKeys.isEmpty()) return emptyMap()
+        val out = LinkedHashMap<String, String>()
+        for (m in ENTRY_REGEX.findAll(body)) {
+            val key = m.groupValues[1]
+            if (key in topKeys && key !in out) {
+                out[key] = m.groupValues[2]
+            }
+        }
+        return out
+    }
+
+    /** `Name: 'path'` / `Name: "path"` — PascalCase key bound to a quoted string. */
+    private val ENTRY_REGEX = Regex("""([A-Z][A-Za-z0-9_]*)\s*:\s*['"]([^'"]+)['"]""")
 }

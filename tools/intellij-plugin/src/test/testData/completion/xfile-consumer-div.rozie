@@ -1,0 +1,10 @@
+<rozie name="XfileConsumerDiv">
+<components>
+{
+  Modal: './xfile-producer.rozie',
+}
+</components>
+<template>
+  <div :<caret>></div>
+</template>
+</rozie>

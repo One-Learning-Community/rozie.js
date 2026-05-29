@@ -1,0 +1,19 @@
+<rozie name="XfileProducer">
+<props>
+{
+  title: { type: String, default: '' },
+  open:  { type: Boolean, default: false, model: true },
+}
+</props>
+<script>
+const close = () => { $props.open = false; $emit('close') }
+const confirm = () => { $emit('confirm', $props.title) }
+</script>
+<template>
+<div class="dialog">
+  <slot name="header"></slot>
+  <slot name="footer"></slot>
+  <slot name="sidebar"></slot>
+</div>
+</template>
+</rozie>
