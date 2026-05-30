@@ -1,0 +1,10 @@
+<rozie name="SlotScopeConsumer">
+<components>
+{ Panel: './slot-producer.rozie' }
+</components>
+<template>
+<Panel>
+  <template #header="{ <caret> }">Hi</template>
+</Panel>
+</template>
+</rozie>

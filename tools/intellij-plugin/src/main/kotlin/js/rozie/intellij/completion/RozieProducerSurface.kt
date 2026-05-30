@@ -102,9 +102,45 @@ object RozieProducerSurface {
         return if (current?.isDirectory == false) current else null
     }
 
+    /**
+     * The scope props a producer's slot exposes — the names a consumer can
+     * destructure in `#slotName="{ a, b }"`. A producer declares them as `:a` /
+     * `:b` bindings on the `<slot>` tag (`<slot name="header" :close="close"
+     * :title="title">`); the default slot is `<slot :item="item" …>`.
+     *
+     * [slotName] `"default"` (or empty) matches the producer's unnamed slot.
+     * Returns empty when the component, file, or matching slot can't be resolved.
+     * `:params` (the portal-slot param array, not a destructurable scope prop) is
+     * excluded.
+     */
+    fun slotProps(consumerHost: PsiFile, componentName: String, slotName: String): List<String> {
+        val vf = resolveProducerFile(consumerHost, componentName) ?: return emptyList()
+        val text = PsiManager.getInstance(consumerHost.project).findFile(vf)?.text ?: return emptyList()
+        val wantDefault = slotName.isEmpty() || slotName == "default"
+        for (m in SLOT_TAG.findAll(text)) {
+            val attrs = m.groupValues[1]
+            val name = SLOT_NAME_ATTR.find(attrs)?.groupValues?.get(1) ?: ""
+            if (wantDefault != name.isEmpty()) continue
+            if (!wantDefault && name != slotName) continue
+            return SLOT_SCOPE_PROP.findAll(attrs).map { it.groupValues[1] }
+                .filter { it != "params" }
+                .distinct().toList()
+        }
+        return emptyList()
+    }
+
     /** `$emit('name'` / `$emit("name"` — the canonical event declaration. */
     private val EMIT_CALL = Regex("\\\$emit\\(\\s*['\"]([^'\"]+)['\"]")
 
     /** `<slot name="…">` / `<slot name='…'>` — a named producer slot. */
     private val SLOT_NAME = Regex("<slot\\b[^>]*\\bname\\s*=\\s*[\"']([^\"']+)[\"']")
+
+    /** A whole `<slot …>` open tag; group 1 is its attribute span. */
+    private val SLOT_TAG = Regex("<slot\\b([^>]*?)/?>")
+
+    /** The literal `name="…"` attribute (NOT `:name` — negative lookbehind). */
+    private val SLOT_NAME_ATTR = Regex("""(?<![:\w])name\s*=\s*["']([^"']+)["']""")
+
+    /** A `:prop=` scope binding on a `<slot>` tag. */
+    private val SLOT_SCOPE_PROP = Regex(""":([A-Za-z_][A-Za-z0-9_]*)\s*=""")
 }

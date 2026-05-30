@@ -1,0 +1,8 @@
+<rozie name="SlotProducer">
+<template>
+<div>
+  <slot name="header" :close="close" :title="title">Default header</slot>
+  <slot :item="item" :index="index" />
+</div>
+</template>
+</rozie>

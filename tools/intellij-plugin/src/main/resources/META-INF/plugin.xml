@@ -313,6 +313,14 @@
         <completion.contributor language="HTML"
             implementationClass="js.rozie.intellij.completion.RozieComponentAttributeCompletionContributor"/>
 
+        <!-- Slot-scope param completion: inside `<template #header="{ |}">` offers
+             the scope props the producer's `<slot name="header" :close :title>`
+             exposes. `#slot` values stay HTML (not injected JS), so this is a
+             plain HTML-side contributor; component + slot resolved via
+             RozieProducerSurface, same path as the cross-file attr completion. -->
+        <completion.contributor language="HTML"
+            implementationClass="js.rozie.intellij.completion.RozieSlotScopeCompletionContributor"/>
+
         <!-- Authoring convenience: typing in a static `class="…"` attribute value
              offers the class names declared in the same file's <style> block
              (Vue-plugin parity). Lightweight text scan of the style body — works
