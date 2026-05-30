@@ -361,6 +361,14 @@
         <completion.contributor language="JavaScript" order="first"
             implementationClass="js.rozie.intellij.completion.RoziePropsDescriptorCompletionContributor"/>
 
+        <!-- Path completion for <components> import strings: `Modal: './|'` offers
+             sibling .rozie file paths (the completion companion to component-tag /
+             import-path go-to-definition). Confined to a string literal in the
+             <components> block so <script> import strings stay with the JS plugin's
+             module resolution. -->
+        <completion.contributor language="JavaScript" order="first"
+            implementationClass="js.rozie.intellij.completion.RozieComponentImportPathCompletionContributor"/>
+
         <!-- P1-UAT-07: neutralize JetBrains' default INJECTED_LANGUAGE_FRAGMENT
              background tint on .rozie files.  Every SFC block is a language-
              injection target (HTML/JS/CSS), so without these overrides each

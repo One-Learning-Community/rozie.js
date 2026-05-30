@@ -6,17 +6,13 @@ import com.intellij.codeInsight.completion.CompletionProvider
 import com.intellij.codeInsight.completion.CompletionResultSet
 import com.intellij.codeInsight.completion.CompletionType
 import com.intellij.codeInsight.lookup.LookupElementBuilder
-import com.intellij.lang.injection.InjectedLanguageManager
 import com.intellij.lang.javascript.psi.JSObjectLiteralExpression
 import com.intellij.lang.javascript.psi.JSProperty
 import com.intellij.patterns.PlatformPatterns
-import com.intellij.psi.PsiElement
-import com.intellij.psi.tree.IElementType
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.util.ProcessingContext
 import js.rozie.intellij.lexer.RozieTokenTypes
-import js.rozie.intellij.parser.RozieRootBlock
-import js.rozie.intellij.references.RoziePropsReference
+import js.rozie.intellij.xml.RozieBlockScope
 import js.rozie.intellij.xml.RozieContextCheck
 
 /**
@@ -67,7 +63,7 @@ class RoziePropsDescriptorCompletionContributor : CompletionContributor() {
                     // Only inside the <props> block — <script>/<data>/<listeners>
                     // also inject JavaScript, so a bare "in injected JS" check
                     // would leak descriptor keys into plain script object literals.
-                    if (!injectedCaretInBlock(pos, parameters.offset, RozieTokenTypes.PROPS_BODY)) return
+                    if (!RozieBlockScope.injectedCaretInBlock(pos, parameters.offset, RozieTokenTypes.PROPS_BODY)) return
 
                     val descriptor = PsiTreeUtil.getParentOfType(pos, JSObjectLiteralExpression::class.java)
                         ?: return
@@ -134,22 +130,6 @@ class RoziePropsDescriptorCompletionContributor : CompletionContributor() {
             val parentProp = obj.parent as? JSProperty ?: return false
             val outer = parentProp.parent as? JSObjectLiteralExpression ?: return false
             return outer.parent !is JSProperty
-        }
-
-        /**
-         * True iff the injected [pos] (with caret at injected-doc offset
-         * [caretInInjected]) maps back to a host range covered by the
-         * [token]-typed SFC block body. Reuses [RoziePropsReference]'s
-         * lexer-backed block-range detection and the `injectedToHost` mapping.
-         */
-        fun injectedCaretInBlock(pos: PsiElement, caretInInjected: Int, token: IElementType): Boolean {
-            val ilm = InjectedLanguageManager.getInstance(pos.project)
-            val host = (ilm.getInjectionHost(pos) as? RozieRootBlock)
-                ?: (pos.containingFile?.context as? RozieRootBlock)
-                ?: return false
-            val hostOffset = ilm.injectedToHost(pos, caretInInjected)
-            val range = RoziePropsReference.findBlockBodyRange(host, token) ?: return false
-            return range.containsOffset(hostOffset)
         }
     }
 }

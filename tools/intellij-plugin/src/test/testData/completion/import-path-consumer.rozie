@@ -1,0 +1,8 @@
+<rozie name="ImportPathConsumer">
+<components>
+{ Modal: './<caret>' }
+</components>
+<template>
+<div></div>
+</template>
+</rozie>

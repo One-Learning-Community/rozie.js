@@ -1,0 +1,5 @@
+<rozie name="OtherComponent">
+<template>
+<div>other</div>
+</template>
+</rozie>
