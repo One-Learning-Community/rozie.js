@@ -1,0 +1,9 @@
+<rozie name="ClassNameBind">
+<template>
+<div :class="<caret>"></div>
+</template>
+<style>
+.is-open { display: block; }
+.is-closed { display: none; }
+</style>
+</rozie>

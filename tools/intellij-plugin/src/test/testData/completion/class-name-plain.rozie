@@ -1,0 +1,10 @@
+<rozie name="ClassNamePlain">
+<template>
+<div class="<caret>"></div>
+</template>
+<style>
+.card { color: red; }
+.card--active { font-weight: bold; }
+.icon-lg { width: 2rem; }
+</style>
+</rozie>

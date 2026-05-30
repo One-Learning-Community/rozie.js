@@ -303,6 +303,16 @@
         <completion.contributor language="HTML"
             implementationClass="js.rozie.intellij.completion.RozieComponentAttributeCompletionContributor"/>
 
+        <!-- Authoring convenience: typing in a static `class="…"` attribute value
+             offers the class names declared in the same file's <style> block
+             (Vue-plugin parity). Lightweight text scan of the style body — works
+             across plain CSS / SCSS / LESS without depending on the injected CSS
+             fragment. Bound `:class`/`r-bind:class` are excluded (their value is a
+             JS expression, not HTML text). Native + RozieContextCheck guard, same
+             rationale as the other HTML-side contributors. -->
+        <completion.contributor language="HTML"
+            implementationClass="js.rozie.intellij.completion.RozieClassNameCompletionContributor"/>
+
         <!-- Plan 08.2-13: closes P1-UAT-09. SC-6 extended to the JS surface —
              typing `$` (or a `$X` prefix) in any Rozie-injected JS fragment
              (<script> / <listeners> / <props> / <data> / <components>)

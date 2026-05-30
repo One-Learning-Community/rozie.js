@@ -1,0 +1,10 @@
+<rozie name="ClassNameMulti">
+<template>
+<div class="card ca<caret>"></div>
+</template>
+<style>
+.card { color: red; }
+.card--active { font-weight: bold; }
+.panel { padding: 1rem; }
+</style>
+</rozie>
