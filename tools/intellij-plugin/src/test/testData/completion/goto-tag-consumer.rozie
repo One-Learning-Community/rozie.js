@@ -1,0 +1,8 @@
+<rozie name="GotoTagConsumer">
+<components>
+{ Modal: './xfile-producer.rozie' }
+</components>
+<template>
+<Mod<caret>al></Modal>
+</template>
+</rozie>

@@ -215,6 +215,16 @@
         <psi.referenceContributor language="JavaScript"
                                   implementation="js.rozie.intellij.references.RozieJSReferenceContributor"/>
 
+        <!-- Go-to-definition for composed components: Ctrl/Cmd-click a PascalCase
+             <Modal> tag in <template>, or its `Modal: './Modal.rozie'` import path
+             string in <components>, jumps to the producer .rozie file. Native
+             because LSP4IJ doesn't serve definition inside injected fragments (the
+             tag is injected HTML, the path injected JS) and the LSP client disables
+             `definition`; VS Code gets the same nav from the LSP brain. Resolution
+             reuses RozieProducerSurface (shared with cross-file attr completion). -->
+        <gotoDeclarationHandler
+            implementation="js.rozie.intellij.navigation.RozieComponentGotoDeclarationHandler"/>
+
         <!-- Plan 08.3-04: SPEC Req 7 — Find-Usages walks cross-injection PsiReferences.
              The platform's Find-Usages action requires a FindUsagesProvider extension
              in addition to the PsiReference contract (Plan 08.3-01 shipped only the

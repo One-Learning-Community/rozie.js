@@ -45,13 +45,7 @@ object RozieProducerSurface {
      * read.
      */
     fun forComponent(consumerHost: PsiFile, componentName: String): Surface? {
-        val importPath = RozieComponentRegistry.declaredComponentImports(consumerHost)[componentName]
-            ?: return null
-        // `originalFile` unwraps the in-memory completion copy (whose
-        // LightVirtualFile has no real parent) back to the on-disk file; for a
-        // non-copy it returns the file itself, so direct callers are unaffected.
-        val baseDir = consumerHost.originalFile.virtualFile?.parent ?: return null
-        val producerVf = resolveRelative(baseDir, importPath) ?: return null
+        val producerVf = resolveProducerFile(consumerHost, componentName) ?: return null
         // Read via PSI so unsaved edits in an open producer editor are reflected.
         val producerText = PsiManager.getInstance(consumerHost.project).findFile(producerVf)?.text
             ?: return null
@@ -63,6 +57,29 @@ object RozieProducerSurface {
         val events = EMIT_CALL.findAll(producerText).map { it.groupValues[1] }.distinct().toList()
         val slots = SLOT_NAME.findAll(producerText).map { it.groupValues[1] }.distinct().toList()
         return Surface(props = props, events = events, slots = slots)
+    }
+
+    /**
+     * Resolve [componentName] against [consumerHost]'s `<components>` block to the
+     * producer `.rozie` [VirtualFile] (no introspection). Shared by [forComponent]
+     * and component-tag go-to-definition. Returns null when the name isn't a
+     * registered component or its import path can't be resolved to a real file.
+     */
+    fun resolveProducerFile(consumerHost: PsiFile, componentName: String): VirtualFile? {
+        val importPath = RozieComponentRegistry.declaredComponentImports(consumerHost)[componentName]
+            ?: return null
+        return resolveImportPath(consumerHost, importPath)
+    }
+
+    /**
+     * Resolve a raw `<components>` import [path] against [consumerHost]'s directory
+     * to the target [VirtualFile]. Powers go-to-definition on the import-path
+     * string literal itself. `originalFile` unwraps any in-memory copy (whose
+     * LightVirtualFile has no real parent) back to the on-disk file.
+     */
+    fun resolveImportPath(consumerHost: PsiFile, path: String): VirtualFile? {
+        val baseDir = consumerHost.originalFile.virtualFile?.parent ?: return null
+        return resolveRelative(baseDir, path)
     }
 
     /**

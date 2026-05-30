@@ -1,0 +1,8 @@
+<rozie name="GotoImportConsumer">
+<components>
+{ Modal: './xfile-prod<caret>ucer.rozie' }
+</components>
+<template>
+<Modal></Modal>
+</template>
+</rozie>
