@@ -1,9 +1,10 @@
-<rozie name="ClassNameBind">
+<rozie name="BoundClassObject">
 <template>
-<div :class="<caret>"></div>
+<div :class="{ '<caret>': open }"></div>
 </template>
 <style>
 .is-open { display: block; }
 .is-closed { display: none; }
+.panel { padding: 1rem; }
 </style>
 </rozie>

@@ -6,16 +6,13 @@ import com.intellij.codeInsight.completion.CompletionProvider
 import com.intellij.codeInsight.completion.CompletionResultSet
 import com.intellij.codeInsight.completion.CompletionType
 import com.intellij.codeInsight.lookup.LookupElementBuilder
-import com.intellij.lang.injection.InjectedLanguageManager
 import com.intellij.patterns.PlatformPatterns
-import com.intellij.psi.PsiElement
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.psi.xml.XmlAttribute
 import com.intellij.psi.xml.XmlAttributeValue
 import com.intellij.util.ProcessingContext
-import js.rozie.intellij.lexer.RozieTokenTypes
-import js.rozie.intellij.xml.RozieComponentRegistry
 import js.rozie.intellij.xml.RozieContextCheck
+import js.rozie.intellij.xml.RozieStyleClasses
 
 /**
  * Class-name autocomplete inside a `.rozie` `<template>` — typing in a static
@@ -59,7 +56,7 @@ class RozieClassNameCompletionContributor : CompletionContributor() {
                     val attr = PsiTreeUtil.getParentOfType(pos, XmlAttribute::class.java) ?: return
                     if (attr.name !in CLASS_ATTRS) return
 
-                    val classes = classSelectors(pos)
+                    val classes = RozieStyleClasses.forElement(pos)
                     if (classes.isEmpty()) return
 
                     // Narrow the prefix to the word under the caret so a populated
@@ -81,23 +78,5 @@ class RozieClassNameCompletionContributor : CompletionContributor() {
 
     private companion object {
         val CLASS_ATTRS = setOf("class")
-
-        /** Class-selector token: a `.` followed by a CSS identifier. */
-        private val CLASS_REGEX = Regex("""\.(-?[_a-zA-Z][-_a-zA-Z0-9]*)""")
-
-        /**
-         * Distinct class names declared in the first `<style>` block of [element]'s
-         * host `.rozie` file. Returns empty for non-Rozie files or files without a
-         * `<style>` block.
-         */
-        fun classSelectors(element: PsiElement): List<String> {
-            val containing = element.containingFile ?: return emptyList()
-            val ilm = InjectedLanguageManager.getInstance(containing.project)
-            val host = ilm.getTopLevelFile(containing) ?: containing
-            if (host.fileType.name != "Rozie") return emptyList()
-            val body = RozieComponentRegistry.blockBodyText(host.text, RozieTokenTypes.STYLE_BODY)
-                ?: return emptyList()
-            return CLASS_REGEX.findAll(body).map { it.groupValues[1] }.distinct().toList()
-        }
     }
 }

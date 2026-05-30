@@ -1,0 +1,9 @@
+<rozie name="BoundClassArray">
+<template>
+<div :class="['<caret>']"></div>
+</template>
+<style>
+.is-open { display: block; }
+.panel { padding: 1rem; }
+</style>
+</rozie>

@@ -34,13 +34,4 @@ class RozieClassNameCompletionTest : BasePlatformTestCase() {
         assertFalse("`panel` should be filtered by prefix `ca`; got: $lookups", "panel" in lookups)
     }
 
-    fun testBoundClassAttributeIsExpressionContextNotClassNames() {
-        // `:class="…"` injects a JS expression — the contributor must stay out of
-        // it (bare class identifiers would read as undefined variables). The popup
-        // is JS completion, NOT our css-class list.
-        myFixture.configureByFile("class-name-bind.rozie")
-        myFixture.completeBasic()
-        val lookups = myFixture.lookupElementStrings ?: emptyList()
-        assertFalse("`is-open` must NOT be offered in a bound :class expression; got: $lookups", "is-open" in lookups)
-    }
 }

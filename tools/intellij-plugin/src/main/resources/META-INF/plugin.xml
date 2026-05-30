@@ -323,6 +323,14 @@
         <completion.contributor language="HTML"
             implementationClass="js.rozie.intellij.completion.RozieClassNameCompletionContributor"/>
 
+        <!-- Class-name completion inside the STRING LITERALS of a bound class
+             attribute (`:class="{ 'is-o|': open }"`, `r-bind:class="['x']"`). The
+             bound value is injected JS, so this is the JavaScript-side companion
+             to the static class= contributor above; it reads the owning attribute
+             name by mapping the JS fragment's host range back to the template. -->
+        <completion.contributor language="JavaScript" order="first"
+            implementationClass="js.rozie.intellij.completion.RozieBoundClassCompletionContributor"/>
+
         <!-- Plan 08.2-13: closes P1-UAT-09. SC-6 extended to the JS surface —
              typing `$` (or a `$X` prefix) in any Rozie-injected JS fragment
              (<script> / <listeners> / <props> / <data> / <components>)
