@@ -8,5 +8,14 @@
         <option name="INJECTED_LANGUAGE_FRAGMENT">
             <value/>
         </option>
+        <!-- Component reference (PascalCase tag) — bold dark teal, distinct from
+             the light theme's HTML tag-name color. User-overridable via Settings →
+             Editor → Color Scheme → Rozie. -->
+        <option name="ROZIE_COMPONENT_REF">
+            <value>
+                <option name="FOREGROUND" value="267f99"/>
+                <option name="FONT_TYPE" value="1"/>
+            </value>
+        </option>
     </attributes>
 </scheme>

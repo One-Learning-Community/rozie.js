@@ -35,7 +35,33 @@ class RozieColorSettingsPage : ColorSettingsPage {
             RozieSyntaxHighlighter.BAD_CHARACTER
         ),
         AttributesDescriptor(msg("rozie.color.r.directive"), RozieSyntaxHighlighter.R_DIRECTIVE),
-        AttributesDescriptor(msg("rozie.color.magic.ident"), RozieSyntaxHighlighter.MAGIC_IDENT)
+        AttributesDescriptor(msg("rozie.color.magic.ident"), RozieSyntaxHighlighter.MAGIC_IDENT),
+        // Annotator-painted template scopes (RozieAnnotator over the injected HTML
+        // PSI). Registered here so users can recolor them in Settings → Editor →
+        // Color Scheme → Rozie. Component reference ships a bold, distinct default
+        // in the bundled scheme XMLs (colorSchemes/Rozie*.xml).
+        AttributesDescriptor(msg("rozie.color.component.ref"), RozieSyntaxHighlighter.COMPONENT_REF),
+        AttributesDescriptor(msg("rozie.color.event.at"), RozieSyntaxHighlighter.EVENT_AT),
+        AttributesDescriptor(msg("rozie.color.prop.binding"), RozieSyntaxHighlighter.PROP_BINDING_NAME),
+        AttributesDescriptor(msg("rozie.color.slot.fill"), RozieSyntaxHighlighter.SLOT_FILL_MARKER),
+        AttributesDescriptor(msg("rozie.color.ref.attr"), RozieSyntaxHighlighter.REF_ATTR),
+    )
+
+    /**
+     * Maps the marker tags embedded in [getDemoText] to their [TextAttributesKey]
+     * so the live-preview pane actually colors the Annotator-painted scopes —
+     * which otherwise wouldn't render in the preview (it runs only the host
+     * SyntaxHighlighter, not RozieAnnotator). Lets the user SEE the component-tag
+     * color (and the sigils) while customizing it.
+     */
+    private val tagToDescriptor: Map<String, TextAttributesKey> = mapOf(
+        "comp" to RozieSyntaxHighlighter.COMPONENT_REF,
+        "magic" to RozieSyntaxHighlighter.MAGIC_IDENT,
+        "dir" to RozieSyntaxHighlighter.R_DIRECTIVE,
+        "evt" to RozieSyntaxHighlighter.EVENT_AT,
+        "prop" to RozieSyntaxHighlighter.PROP_BINDING_NAME,
+        "slot" to RozieSyntaxHighlighter.SLOT_FILL_MARKER,
+        "ref" to RozieSyntaxHighlighter.REF_ATTR,
     )
 
     override fun getAttributeDescriptors(): Array<AttributesDescriptor> = descriptors
@@ -48,8 +74,8 @@ class RozieColorSettingsPage : ColorSettingsPage {
 
     override fun getHighlighter(): SyntaxHighlighter = RozieSyntaxHighlighter()
 
-    override fun getAdditionalHighlightingTagToDescriptorMap(): Map<String, TextAttributesKey>? =
-        null
+    override fun getAdditionalHighlightingTagToDescriptorMap(): Map<String, TextAttributesKey> =
+        tagToDescriptor
 
     /**
      * Demo `.rozie` snippet shown in the live-preview pane. Exercises the
@@ -73,10 +99,15 @@ class RozieColorSettingsPage : ColorSettingsPage {
         }
         </props>
         <script>
-        const initial = ${'$'}props.value
+        const initial = <magic>${'$'}props</magic>.value
         </script>
         <template>
-          <button r-if="initial > 0">Above zero</button>
+          <<comp>Card</comp> <ref>ref</ref>="root">
+            <button <dir>r-if</dir>="initial > 0" <evt>@click</evt>="inc()" <prop>:disabled</prop>="busy">
+              Above zero
+            </button>
+            <template <slot>#footer</slot>>Done</template>
+          </<comp>Card</comp>>
         </template>
         <style lang="scss">
         .counter { padding: 1rem; }

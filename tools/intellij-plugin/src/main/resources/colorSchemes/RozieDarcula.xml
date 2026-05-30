@@ -5,5 +5,15 @@
         <option name="INJECTED_LANGUAGE_FRAGMENT">
             <value/>
         </option>
+        <!-- Component reference (PascalCase tag) — bold teal, clearly distinct
+             from Darcula's yellow HTML tag-name color so <Modal>/<Card> read as
+             components, not plain markup. User-overridable via Settings → Editor
+             → Color Scheme → Rozie. -->
+        <option name="ROZIE_COMPONENT_REF">
+            <value>
+                <option name="FOREGROUND" value="4ec9b0"/>
+                <option name="FONT_TYPE" value="1"/>
+            </value>
+        </option>
     </attributes>
 </scheme>
