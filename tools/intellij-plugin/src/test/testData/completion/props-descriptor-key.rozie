@@ -1,0 +1,8 @@
+<rozie name="DescriptorKey">
+<props>
+{ title: { type: String }, count: { <caret> } }
+</props>
+<template>
+<div></div>
+</template>
+</rozie>

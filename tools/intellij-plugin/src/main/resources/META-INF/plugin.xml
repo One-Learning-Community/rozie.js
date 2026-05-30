@@ -329,6 +329,18 @@
         <completion.contributor language="JavaScript" order="first"
             implementationClass="js.rozie.intellij.completion.RozieMemberCompletionContributor"/>
 
+        <!-- Authoring convenience: inside a <props> descriptor object literal
+             (`title: { | }`) offer the four valid descriptor keys (type / default
+             / model / required); in a `type: |` value offer the six recognised
+             type tokens (String / Number / Boolean / Array / Object / Function).
+             Confined to the PROPS_BODY injected JS fragment (script/data/listeners
+             also inject JS). Key/token sets are kept in lockstep with the
+             compiler's own lowerProps.ts. Native for the same reason as the
+             member contributor — LSP4IJ completion doesn't reach injected JS
+             carets. -->
+        <completion.contributor language="JavaScript" order="first"
+            implementationClass="js.rozie.intellij.completion.RoziePropsDescriptorCompletionContributor"/>
+
         <!-- P1-UAT-07: neutralize JetBrains' default INJECTED_LANGUAGE_FRAGMENT
              background tint on .rozie files.  Every SFC block is a language-
              injection target (HTML/JS/CSS), so without these overrides each

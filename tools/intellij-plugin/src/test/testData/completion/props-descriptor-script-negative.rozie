@@ -1,0 +1,11 @@
+<rozie name="DescriptorScriptNegative">
+<props>
+{ title: { type: String } }
+</props>
+<script>
+const config = { outer: { <caret> } }
+</script>
+<template>
+<div></div>
+</template>
+</rozie>

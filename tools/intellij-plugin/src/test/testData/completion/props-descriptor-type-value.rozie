@@ -1,0 +1,8 @@
+<rozie name="DescriptorTypeValue">
+<props>
+{ title: { type: <caret> } }
+</props>
+<template>
+<div></div>
+</template>
+</rozie>
