@@ -44,7 +44,7 @@ class RozieCompletionTest : BasePlatformTestCase() {
         }
     }
 
-    // === Behavior 2: typing `@` surfaces all 10 EVENT_SIGILS ===
+    // === Behavior 2: typing `@` surfaces every EVENT_SIGILS entry ===
 
     fun testAtPrefixCompletion() {
         myFixture.configureByFile("template-at-prefix.rozie")

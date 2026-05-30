@@ -9,8 +9,12 @@ package js.rozie.intellij.xml
  * The five lists are deliberately split by sigil family:
  *  - [R_DIRECTIVES]      : `r-*` directives whose full name is fixed (e.g. `r-if`).
  *  - [EVENT_SIGILS]      : `@event` listener names — the "@" prefix is the sigil,
- *                          the suffix varies but here we enumerate the most-common
- *                          DOM events for completion seeding.
+ *                          the suffix varies but here we enumerate the common
+ *                          DOM events (mouse/pointer, keyboard, form, focus,
+ *                          clipboard, drag, touch, scroll/animation) for
+ *                          completion seeding. The descriptor provider still
+ *                          resolves arbitrary `@<name>` by prefix, so this list
+ *                          is a suggestion seed, not an allow-list.
  *  - [PROP_SIGIL_HINTS]  : `:prop` binding hints — same shape; the descriptor
  *                          provider also resolves arbitrary `:<name>` by prefix
  *                          (`getAttributeDescriptor` returns non-null for any
@@ -34,8 +38,27 @@ object RozieKnownAttributes {
     )
 
     val EVENT_SIGILS: List<String> = listOf(
-        "@click", "@input", "@change", "@submit", "@keydown",
-        "@keyup", "@focus", "@blur", "@mouseenter", "@mouseleave",
+        // Mouse / pointer
+        "@click", "@dblclick", "@mousedown", "@mouseup", "@mousemove",
+        "@mouseenter", "@mouseleave", "@mouseover", "@mouseout",
+        "@contextmenu", "@wheel",
+        "@pointerdown", "@pointerup", "@pointermove",
+        "@pointerenter", "@pointerleave", "@pointercancel",
+        // Keyboard
+        "@keydown", "@keyup", "@keypress",
+        // Form / input
+        "@input", "@change", "@submit", "@reset", "@invalid",
+        // Focus
+        "@focus", "@blur", "@focusin", "@focusout",
+        // Clipboard
+        "@copy", "@cut", "@paste",
+        // Drag & drop
+        "@drag", "@dragstart", "@dragend",
+        "@dragenter", "@dragleave", "@dragover", "@drop",
+        // Touch
+        "@touchstart", "@touchend", "@touchmove", "@touchcancel",
+        // Scroll / animation / lifecycle
+        "@scroll", "@animationend", "@transitionend", "@load", "@error",
     )
 
     val PROP_SIGIL_HINTS: List<String> = listOf(":class", ":style", ":disabled", ":value")
