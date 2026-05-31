@@ -35,4 +35,31 @@ class RozieMemberCompletionTest : BasePlatformTestCase() {
         // Exactly the two declared props, no duplicates.
         assertEquals("Expected exactly [count, label]; got: $lookups", 2, lookups.size)
     }
+
+    // === Phase 18: $model.<member> offers ONLY the model:true subset of <props> ===
+    //
+    // `$model` is the producer-side two-way-write accessor (SPEC Req 9). Its
+    // valid keys are exactly the props declared `model: true`. The completion
+    // contributor reuses the SAME PROPS_BODY machinery as `$props` but applies a
+    // `modelOnly` descriptor filter (`{ … model: true }`) — the model-only path
+    // (A3 preferred), not the all-props cosmetic fallback, because the `model:`
+    // flag is read off the same descriptor object the `type:` hint comes from.
+    fun testModelMemberCompletionOffersOnlyModelProps() {
+        myFixture.configureByFile("member-model-completion.rozie")
+        myFixture.completeBasic()
+        val lookups = myFixture.lookupElementStrings ?: emptyList()
+        // `value` is `model: true` — it MUST appear.
+        assertTrue("Expected model prop `value`; got: $lookups", "value" in lookups)
+        // `step` is a declared prop WITHOUT `model: true` — it MUST NOT appear
+        // ($model's keys are the model:true subset only).
+        assertFalse("`step` is not a model prop; got: $lookups", "step" in lookups)
+        // <data> keys + nested descriptor keys must not leak.
+        assertFalse("`hovering` is a <data> key, not a model prop; got: $lookups", "hovering" in lookups)
+        assertFalse("`type` is a nested descriptor key; got: $lookups", "type" in lookups)
+        assertFalse("`model` is a nested descriptor key; got: $lookups", "model" in lookups)
+        // We own the position (stopHere) — stock JS postfix templates suppressed.
+        assertFalse("postfix template `if` leaked; got: $lookups", "if" in lookups)
+        // Exactly the one model prop, no duplicates.
+        assertEquals("Expected exactly [value]; got: $lookups", 1, lookups.size)
+    }
 }

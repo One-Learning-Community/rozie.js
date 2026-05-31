@@ -6,7 +6,7 @@
 }
 </props>
 <script>
-const close = () => { $props.open = false; $emit('close') }
+const close = () => { $model.open = false; $emit('close') }
 const confirm = () => { $emit('confirm', $props.title) }
 </script>
 <template>

@@ -1,0 +1,16 @@
+<rozie name="MemberModelCompletion">
+<props>
+{ value: { type: Number, model: true }, step: { type: Number } }
+</props>
+<data>
+{ hovering: false }
+</data>
+<script>
+function bump() {
+  $model.<caret>
+}
+</script>
+<template>
+<div ref="rootEl"></div>
+</template>
+</rozie>

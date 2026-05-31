@@ -348,6 +348,27 @@ describe('Rozie TextMate grammar — directives & r-model modifier chains', () =
     expect(tok, 'expected $listeners to carry the magic-identifier scope').toBeDefined();
   });
 
+  // Phase 18: `$model` joined the magic-identifier set — the producer-side
+  // two-way-write accessor whose valid keys are the `model: true` subset of
+  // `<props>`. Inline-tokenized (same rationale as $attrs / $listeners / $event):
+  // the assertion is purely "the regex matches this identifier and emits the
+  // magic scope," so a dedicated fixture file would be over-spec'd.
+  it('scopes $model as a magic identifier (Phase 18)', () => {
+    const source = [
+      '<rozie name="X">',
+      '<script>',
+      'const bump = () => { $model.value += 1 }',
+      '</script>',
+      '</rozie>',
+    ].join('\n');
+    const tokens = tokenizeAll(source);
+
+    const tok = tokens.find(
+      (t) => t.text === '$model' && t.scopes.some((s) => s.includes('variable.language.rozie')),
+    );
+    expect(tok, 'expected $model to carry the magic-identifier scope').toBeDefined();
+  });
+
   // `r-external` (2026-05-25) — engine-wrapper host marker. Bare directive
   // form (no value); the grammar's optional `(?:(=)(\"|'))?` quote group
   // skips when the attribute carries no `=` token, so the directive name

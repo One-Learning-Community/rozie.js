@@ -60,7 +60,10 @@ class RozieMemberCompletionContributor : CompletionContributor() {
                     val sigil = qualifier.referenceName ?: return
 
                     val (token, lang) = when (sigil) {
-                        "\$props" -> RozieTokenTypes.PROPS_BODY to "JavaScript"
+                        // `$model` resolves against the SAME `<props>` block as
+                        // `$props` — its valid keys are the `model: true` subset
+                        // (Phase 18). Reuse the PROPS_BODY/JavaScript injection.
+                        "\$props", "\$model" -> RozieTokenTypes.PROPS_BODY to "JavaScript"
                         "\$data" -> RozieTokenTypes.DATA_BODY to "JavaScript"
                         "\$refs" -> RozieTokenTypes.TEMPLATE_BODY to "HTML"
                         else -> return
@@ -73,6 +76,12 @@ class RozieMemberCompletionContributor : CompletionContributor() {
                     val members = when (sigil) {
                         "\$refs" -> refMembers(injected)
                         "\$data" -> objectKeyMembers(injected, valueAsType = false, fallbackType = "data")
+                        // `$model.` offers ONLY the `model: true` props — the
+                        // descriptor parse `objectKeyMembers` already does for
+                        // `{ type: … }` reads the sibling `model:` flag, so the
+                        // model-only filter is statically reachable (A3: the
+                        // preferred path — not the all-props cosmetic fallback).
+                        "\$model" -> objectKeyMembers(injected, valueAsType = false, fallbackType = "model", modelOnly = true)
                         else -> objectKeyMembers(injected, valueAsType = false, fallbackType = "prop")
                     }
                     if (members.isEmpty()) return
@@ -95,17 +104,29 @@ class RozieMemberCompletionContributor : CompletionContributor() {
          * paren-wrapped `({ … })` `<props>`/`<data>` body. For each prop the
          * declared `type:` (e.g. `String`) becomes the type-text hint; falls
          * back to [fallbackType] when there's no `{ type: … }` descriptor.
+         *
+         * When [modelOnly] is true (the `$model.` completion path, Phase 18),
+         * only props whose `{ … }` descriptor carries `model: true` are kept —
+         * `$model`'s valid keys are exactly the `model: true` subset of
+         * `<props>`. The `model:` flag is read off the same descriptor object
+         * the `type:` hint already comes from, so the filter is statically
+         * reachable (A3 preferred path); a bare prop (no descriptor object, or
+         * `model:` absent / not literal-`true`) is excluded.
          */
         fun objectKeyMembers(
             jsFile: PsiFile,
             @Suppress("SameParameterValue") valueAsType: Boolean,
             fallbackType: String,
+            modelOnly: Boolean = false,
         ): List<Pair<String, String>> {
             val obj = PsiTreeUtil.findChildOfType(jsFile, JSObjectLiteralExpression::class.java)
                 ?: return emptyList()
             return obj.properties.mapNotNull { prop ->
                 val name = prop.name ?: return@mapNotNull null
                 val descriptor = prop.value as? JSObjectLiteralExpression
+                if (modelOnly && descriptor?.findProperty("model")?.value?.text != "true") {
+                    return@mapNotNull null
+                }
                 val declaredType = descriptor?.findProperty("type")?.value?.text
                 val typeText = when {
                     declaredType != null -> declaredType
