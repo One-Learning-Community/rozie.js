@@ -89,6 +89,13 @@ export const RozieErrorCode = {
   UNKNOWN_MODIFIER: 'ROZ110', // .escspe (typo) — name not registered in ModifierRegistry
   MODIFIER_ARITY_MISMATCH: 'ROZ111', // .debounce() (missing required ms arg)
   MODIFIER_ARG_SHAPE: 'ROZ112', // .outside('not-a-ref') — refExpr expected, got literal
+  // Phase 18 (D-08): `$model.<x>` where `x` is not a declared prop at all.
+  // Sibling of UNKNOWN_PROPS_REF (ROZ100) in the 100 semantic-binding cluster.
+  // NOTE: the 1-0-4 slot is TAKEN (LIFECYCLE_OUTSIDE_SCRIPT) and ROZ100..ROZ112
+  // are all allocated — ROZ113 is the next free 100-cluster code (RESEARCH
+  // §"Free ROZ Codes", Pitfall 1). Emitted from unknownRefValidator's `scope === 'model'`
+  // branch; codeframe; never throws.
+  UNKNOWN_MODEL_REF: 'ROZ113', // $model.bogus — 'bogus' is not a declared prop
 
   // ---- Compile-time correctness errors (Phase 2 Plan 02) — ROZ200..ROZ299 ----
   WRITE_TO_NON_MODEL_PROP: 'ROZ200', // SEM-02: $props.foo = … where foo lacks model: true (Phase 2 success criterion 2)
@@ -105,6 +112,20 @@ export const RozieErrorCode = {
   // updateExpressionValidator.ts, wired into analyzeAST so it fires once for
   // both compile() and @rozie/unplugin (both route through lowerToIR).
   UPDATE_EXPRESSION_VALUE_CONSUMED: 'ROZ203', // error — expression-context ++/-- on reactive state isn't lowerable
+  // Phase 18 (D-07): a write to `$props.<x>` where `x` IS a `model: true` prop.
+  // `$props` is read-only universally (SPEC Req 3) — a model prop is written via
+  // the new producer-side `$model.<x>` sigil, never `$props.<x>`. Replaces the
+  // old `if (decl.isModel) return;` early-return in propWriteValidator. ROZ200
+  // (WRITE_TO_NON_MODEL_PROP) stays unchanged for the non-model case — two
+  // distinct author mistakes, two distinct messages. The message names
+  // `$model.<x>` as the fix; codeframe + related decl pointer (makeRoz200 shape).
+  WRITE_TO_MODEL_PROP_VIA_PROPS: 'ROZ204', // error — $props.<modelProp> = … ; use $model.<x>
+  // Phase 18 (D-08): `$model.<x>` where `x` IS a declared prop but lacks
+  // `model: true`. `$model`'s valid keys are exactly the model-prop subset of
+  // <props> (SPEC Req 4). Emitted from unknownRefValidator's `scope === 'model'`
+  // branch; hint: add `model: true` to the prop or use `$data`. Names the prop;
+  // codeframe; never throws.
+  MODEL_ACCESS_NON_MODEL_PROP: 'ROZ205', // error — $model.<nonModelProp>
 
   // ---- Warnings (Phase 2 Plan 02) — ROZ300..ROZ399 ----
   RFOR_MISSING_KEY: 'ROZ300', // SEM-03: r-for without :key
