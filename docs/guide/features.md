@@ -4,7 +4,7 @@ Rozie tries to be the syntax a Vue developer would design if they wanted React, 
 
 ## Parameterized event modifiers
 
-Every `@event` in a `<template>` (and every key in a `<listeners>` block) supports a chainable modifier suffix. Unlike Vue, modifiers can take arguments — `.debounce(300)`, `.throttle(100)`, `.outside($refs.a, $refs.b)` — and they compose:
+Every `@event` in a `<template>` (and every `@event` on a `<listener>` in a `<listeners>` block) supports a chainable modifier suffix. Unlike Vue, modifiers can take arguments — `.debounce(300)`, `.throttle(100)`, `.outside($refs.a,$refs.b)` — and they compose:
 
 ```rozie
 <template>
@@ -16,13 +16,13 @@ Every `@event` in a `<template>` (and every key in a `<listeners>` block) suppor
 </template>
 
 <listeners>
-{
-  // The modifier grammar handles chains of mixed args and bare modifiers:
-  "window:resize.throttle(100).passive": { handler: reposition }
-}
+  <!-- The modifier grammar handles chains of mixed args and bare modifiers: -->
+  <listener :target="window" @resize.throttle(100).passive="reposition" />
 </listeners>
 
 ```
+
+> Modifier-arg lists on a `<listener>` `@event` must not contain internal whitespace — write `.outside($refs.a,$refs.b)`, not `.outside($refs.a, $refs.b)`. The attribute *name* (everything before `=`) ends at the first space, so a space inside the parens would truncate the modifier chain. (Inside a `<template>` attribute the same rule applies.)
 
 The grammar is a small dedicated PEG (`packages/core/src/modifier-grammar/modifier-grammar.peggy`), so the syntax is fixed and predictable across every target. Built-ins:
 
@@ -123,30 +123,35 @@ A model modifier declares **one descriptor**, not six per-target methods — `.t
 
 The `tests/plugins/phone` dogfood is a worked end-to-end example — a custom `.phone` US-phone-number reformatter (a `kind: 'model'` value-transform modifier) that compiles across all six targets using only `@rozie/core`'s public barrel.
 
-## `<listeners>` block with reactive `when`
+## `<listeners>` block — declarative `<listener>` elements
 
-Document-level and window-level listeners belong outside the markup, so Rozie gives them their own block. Each entry is a key (`scope:event.modifier(...).modifier`), an optional `when` predicate, and a handler:
+Document-level and window-level listeners belong outside the markup, so Rozie gives them their own block. The `<listeners>` block is a *wiring* block of `<listener>` elements — one element per target-and-condition. Each `<listener>` carries:
+
+- `:target` — where to attach. Currently `window` or `document` (see the `$refs` note below). Omit it and the listener attaches to the component's root element (`$el`).
+- one or more `@event.modifier(args)` attributes — the events to subscribe to, with the same chainable modifier grammar that template `@event` handlers use.
+- an optional `r-if` — the reactive *conditional attach/detach* predicate.
 
 ```rozie
 <listeners>
-{
-  "document:click.outside($refs.triggerEl, $refs.panelEl)": {
-    when:    "$props.open && $props.closeOnOutsideClick",
-    handler: close,
-  },
-  "document:keydown.escape": {
-    when:    "$props.open && $props.closeOnEscape",
-    handler: close,
-  },
-  "window:resize.throttle(100).passive": {
-    when:    "$props.open",
-    handler: reposition,
-  },
-}
+  <listener :target="document" @click.outside($refs.triggerEl,$refs.panelEl)="close" r-if="$props.open && $props.closeOnOutsideClick" />
+  <listener :target="document" @keydown.escape="close" r-if="$props.open && $props.closeOnEscape" />
+  <listener :target="window" @resize.throttle(100).passive="reposition" r-if="$props.open" />
 </listeners>
 ```
 
-The `when` predicate is reactive — when it flips false, the listener is removed; when it flips true again, it's re-attached. No `addEventListener` / `removeEventListener` boilerplate, no missed teardown on unmount. This single block in `Dropdown.rozie` collapses roughly 30 lines of per-framework wiring that would otherwise be written once per target.
+**Multiple `@event` per tag.** One `<listener>` is a target + a condition + the events on it. A tag with several `@event` attributes fans out to one subscription per event, all sharing that tag's `:target` and `r-if`:
+
+```rozie
+<listeners>
+  <listener :target="window" @resize.throttle(100).passive="reposition" @scroll.passive="reposition" r-if="$props.open" />
+</listeners>
+```
+
+**`r-if` is conditional attach, not conditional render.** On a `<listener>`, `r-if` means "subscribed while the condition holds." When it flips false the listener is removed; when it flips true again it is re-attached. This is distinct from `r-if` inside a `<template>`, which mounts/unmounts DOM. (It is also why `<listener>` only lives in `<listeners>` — a `<listener>` in a `<template>` is a compile error.) No `addEventListener` / `removeEventListener` boilerplate, no missed teardown on unmount. This single block in `Dropdown.rozie` collapses roughly 30 lines of per-framework wiring that would otherwise be written once per target.
+
+::: tip `:target` today accepts `window` / `document`; `$refs` targets are planned
+`:target` currently resolves only to `window`, `document`, or (omitted) the component root `$el`. Attaching a listener to a `$refs`-named element — e.g. `:target="$refs.panelEl"` — is **planned but not yet supported**. The hard part is *not* the syntax: it is the *conditional re-attach* problem. A `$refs` element can itself be `r-if`-gated (rendered only when some condition holds), so at the moment the listener wants to attach, the ref'd element may not be mounted yet — and when the element later mounts (or remounts), the subscription has to re-attach to the new node and tear down cleanly when it unmounts. Getting that lifecycle right across all six targets' reconcilers is the open design question. Until then, reach a specific element from a `window`/`document` listener via the event target, or wire it imperatively in `$onMount` through `$refs`.
+:::
 
 ## `<components>` block, including self-recursion
 

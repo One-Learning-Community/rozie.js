@@ -7,11 +7,11 @@ const dropdownOpen = ref(false);
 
 # Dropdown
 
-The marquee `<listeners>` example. Shows the `.outside(...$refs)` modifier eliminating hand-rolled outside-click detection, `.throttle(100).passive` on a window resize, reactive `when` predicates that auto-attach/detach listeners, `$watch(() => $props.open, ...)` re-firing reposition when the panel mounts (the panel is `r-if`-gated, so `$refs.panelEl` is undefined at initial `$onMount`), multiple `$onMount` hooks colocated with their setup, named slots with scoped params (`#trigger="{ open, toggle }"`), and `$props` writes flowing through to each target's two-way pattern because `open` is declared `model: true`.
+The marquee `<listeners>` example — three `<listener>` elements. Shows the `.outside(...$refs)` modifier eliminating hand-rolled outside-click detection, `.throttle(100).passive` on a window resize, reactive `r-if` conditions that auto-attach/detach each listener, `$watch(() => $props.open, ...)` re-firing reposition when the panel mounts (the panel is `r-if`-gated, so `$refs.panelEl` is undefined at initial `$onMount`), multiple `$onMount` hooks colocated with their setup, named slots with scoped params (`#trigger="{ open, toggle }"`), and `$model` writes flowing through to each target's two-way pattern because `open` is declared `model: true`.
 
 ## Live demo
 
-Click the trigger to open. Then try: clicking outside the panel (closes via `.outside($refs.triggerEl, $refs.panelEl)`), pressing Escape (closes via `document:keydown.escape`), or resizing the window with the panel open (the panel's position updates, throttled to 100ms via `.throttle(100).passive`).
+Click the trigger to open. Then try: clicking outside the panel (closes via the `@click.outside($refs.triggerEl,$refs.panelEl)` listener on `document`), pressing Escape (closes via the `@keydown.escape` listener on `document`), or resizing the window with the panel open (the panel's position updates, throttled to 100ms via `@resize.throttle(100).passive` on `window`).
 
 <div class="rozie-demo">
   <ClientOnly>

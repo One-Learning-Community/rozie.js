@@ -8,7 +8,7 @@ const closeCount = ref(0);
 
 # Modal
 
-The heaviest example in this set. Demonstrates the `<listeners>` block, the `.self` modifier on a template-level backdrop click, multiple colocated `$onMount` / `$onUnmount` hooks, `$emit` for parent-controlled close, named slots with scoped params, and `r-if` (full unmount, not just hidden).
+The heaviest example in this set. Demonstrates the `<listeners>` block (a `<listener :target="document" @keydown.escape="close" r-if="..." />` element), the `.self` modifier on a template-level backdrop click, multiple colocated `$onMount` / `$onUnmount` hooks, `$emit` for parent-controlled close, named slots with scoped params, and `r-if` (full unmount, not just hidden — distinct from the `r-if` *conditional-attach* on the `<listener>`).
 
 ## Live demo
 
