@@ -299,6 +299,33 @@ function buildSetterCall(
 }
 
 /**
+ * Phase 18 (Req 2) — normalize the producer-side two-way-write sigil `$model`
+ * to `$props` across the cloned Program, in place.
+ *
+ * `$model.X` is the producer-side sigil for writing a `model: true` prop. By
+ * contract it is model-only: Wave 1's core semantic pass already emitted
+ * ROZ205 / ROZ113 for `$model.<nonModelProp>` / `$model.<nonExistent>` BEFORE
+ * lowering, so every `$model.X` reaching the emitter is a declared model prop.
+ * `$model` is ALWAYS a member-expression object (it is deliberately NOT in
+ * STABLE_IDENTIFIERS, D-03), so renaming the object Identifier of every
+ * non-computed Member/OptionalMember expression from `$model` → `$props` routes
+ * the read/write through the IDENTICAL `$props.<modelProp>` lowering and yields
+ * byte-identical emit. Reuse, not reimplement.
+ */
+function normalizeModelAccessor(program: File): void {
+  traverse(program, {
+    MemberExpression(path) {
+      const obj = path.node.object;
+      if (t.isIdentifier(obj) && obj.name === '$model') obj.name = '$props';
+    },
+    OptionalMemberExpression(path) {
+      const obj = path.node.object;
+      if (t.isIdentifier(obj) && obj.name === '$model') obj.name = '$props';
+    },
+  });
+}
+
+/**
  * Detect whether a MemberExpression LHS represents a NESTED write
  * (e.g., `$data.todo.title = X`). Returns the root `$data`/`$props`
  * Identifier name when so; null otherwise.
@@ -357,6 +384,19 @@ export function rewriteRozieIdentifiers(
   const stateByName = new Map(ir.state.map((s) => [s.name, s]));
   const refByName = new Map(ir.refs.map((r) => [r.name, r]));
   const propByName = new Map(ir.props.map((p) => [p.name, p]));
+
+  // Phase 18 (Req 2) — producer-side two-way-write sigil `$model.X`.
+  // `$model` is model-only by contract: Wave 1's core semantic pass already
+  // rejected `$model.<nonModelProp>` (ROZ205) and `$model.<nonExistent>`
+  // (ROZ113) BEFORE lowering, so every `$model.X` that survives to here is a
+  // declared model prop. We normalize the accessor identifier `$model` → `$props`
+  // in a single pre-pass over the cloned Program so EVERY downstream write/read
+  // site (AssignmentExpression, UpdateExpression, MemberExpression,
+  // OptionalMemberExpression — AND the RHS self-read detection inside
+  // buildSetterCall) routes through the IDENTICAL `$props.<modelProp>` path.
+  // This is "reuse, not reimplement" (SPEC Req 2) in its purest form: the emit
+  // is byte-identical to the prior `$props.X` model form, proven in Wave 3.
+  normalizeModelAccessor(program);
 
   traverse(program, {
     AssignmentExpression(path) {

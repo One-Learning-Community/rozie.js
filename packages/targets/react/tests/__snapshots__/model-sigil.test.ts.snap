@@ -1,0 +1,44 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`React $model producer-side two-way-write sigil > emitted model fixture matches snapshot 1`] = `
+"import { useControllableState } from '@rozie/runtime-react';
+
+interface ModelSigilProps {
+  value?: number;
+  defaultValue?: number;
+  onValueChange?: (value: number) => void;
+}
+
+export default function ModelSigil(props: ModelSigilProps): JSX.Element {
+  const attrs: Record<string, unknown> = (() => {
+    const { value, defaultValue, onValueChange, ...rest } = props as ModelSigilProps & Record<string, unknown>;
+    void value; void defaultValue; void onValueChange;
+    return rest;
+  })();
+  const [value, setValue] = useControllableState({
+    value: props.value,
+    defaultValue: props.defaultValue ?? 0,
+    onValueChange: props.onValueChange,
+  });
+
+  function bump() {
+    setValue(prev => prev + 1);
+  }
+  function reset() {
+    setValue(0);
+  }
+  function step() {
+    setValue(prev => prev + 1);
+  }
+  function doubled() {
+    return value * 2;
+  }
+
+  return (
+    <>
+      <button {...attrs} onClick={($event) => { setValue(prev => prev + 1); }} data-rozie-s-78a54232="">{value}</button>
+    </>
+  );
+}
+"
+`;
