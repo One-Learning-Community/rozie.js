@@ -332,7 +332,28 @@ One flag in `<props>`. Six different two-way-binding expansions, each one the ta
 | Solid | `createControllableSignal(_props, 'value', 0)` from `@rozie/runtime-solid` |
 | Lit | `createLitControllableProperty({ host, eventName: 'value-change', defaultValue: 0 })` from `@rozie/runtime-lit` — a `value` property/attribute pair plus a `value-change` CustomEvent |
 
-Inside the component you just write `$props.value = newValue` — Rozie rewrites the assignment to the target's emit-or-setter form.
+### Reading vs. writing a model prop: `$props.x` and `$model.x`
+
+A `model: true` prop has two faces inside the component, just like React's `value` / `setValue` pair:
+
+- **Read** the current value through `$props.x` — `{{ $props.open }}`, `if ($props.value > 0)`.
+- **Write** the new value through the `$model.x` sigil — `$model.open = false`, `$model.value += step`, `$model.value++`.
+
+Rozie rewrites the `$model.x` assignment to the target's native emit-or-setter form (Vue `emit('update:value', …)`, React `onValueChange`, Svelte `$bindable` write, Angular `valueChange.emit`, Solid controllable setter, Lit `value-change` CustomEvent). It's a write sigil, not a separate object — there's no `$model.x` *read*.
+
+```rozie
+<script>
+const increment = () => { $model.value += $props.step }
+const close     = () => { $model.open = false }
+</script>
+```
+
+The mnemonic pairs with the consumer-side `r-model:value="…"` directive: `r-model:` on the outside, `$model.` on the inside.
+
+**Writing a prop through `$props` is a compile error**, caught before the bug ships:
+
+- `$props.x = …` where `x` is **not** `model: true` → **ROZ200** (`WRITE_TO_NON_MODEL_PROP`). Props are read-only inputs; mutating one is the single most common cross-framework component bug.
+- `$props.x = …` where `x` **is** `model: true` → **ROZ204** (`WRITE_TO_MODEL_PROP_VIA_PROPS`), whose message points you at the fix: use `$model.x`.
 
 ## `$onMount` returning a teardown
 
@@ -543,7 +564,7 @@ $onMount(() => {
       const next = [...$props.items]
       const [moved] = next.splice(e.oldIndex, 1)
       next.splice(e.newIndex, 0, moved)
-      $props.items = next
+      $model.items = next
       $reconcileAfterDomMutation()
     },
   })
@@ -554,7 +575,7 @@ $onMount(() => {
 
 **`r-external`** is a template-side marker. It tells the compiler "third-party code may mutate the children of this element — when something asks to rebuild, rebuild the children but leave THIS element alone." The marker goes on the DOM container the engine binds to. Authors apply it once where the engine attaches; the rest of the template is unaffected.
 
-**`$reconcileAfterDomMutation()`** is the script-side trigger. Call it once at the end of any handler that runs after the engine mutated the DOM (the canonical pattern is the SortableJS `onUpdate` handler, after `$props.items = next`). It tells the framework "the DOM I just touched is out of sync with what you think it is — rebuild now."
+**`$reconcileAfterDomMutation()`** is the script-side trigger. Call it once at the end of any handler that runs after the engine mutated the DOM (the canonical pattern is the SortableJS `onUpdate` handler, after `$model.items = next`). It tells the framework "the DOM I just touched is out of sync with what you think it is — rebuild now."
 
 The pair is intentional separation: `r-external` is the **location** ("rebuild HERE"); the sigil is the **trigger** ("rebuild NOW"). Without the marker the sigil has nowhere to act; without the sigil the marker never fires.
 
@@ -584,7 +605,7 @@ const onArrowDown = (oldIdx) => {
   const next = [...$props.items]
   const [moved] = next.splice(oldIdx, 1)
   next.splice(newIdx, 0, moved)
-  $props.items = next
+  $model.items = next
   $restoreFocus('[role="listitem"]', newIdx)
 }
 </script>

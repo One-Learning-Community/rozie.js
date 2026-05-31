@@ -152,7 +152,7 @@ Rozie quietly does the Angular ceremony you'd otherwise hand-roll:
 | `output<T>()` + emitting | `$emit('eventname', payload)` |
 | `inject(DestroyRef)` + paired cleanup | `$onMount` returning a cleanup fn — Rozie hoists `private __rozieDestroyRef = inject(DestroyRef)` automatically. |
 | `ngAfterViewInit` for `$el`-touching code | `$onMount` lowers to `ngAfterViewInit()` so `viewChild()` signals are populated when your code runs. |
-| `Renderer2.listen` + global event cleanup | `<listeners>` block with reactive `when:` predicate. Auto-cleanup on destroy. |
+| `Renderer2.listen` + global event cleanup | `<listeners>` block of `<listener>` elements, each gated by a reactive `r-if`. Auto-cleanup on destroy. |
 | `*ngTemplateOutlet` + context-guard ceremony | `<slot name="x" :value="…" />` — typed scoped slots with one declaration. |
 | Inline arrow functions in `*ngTemplateOutlet context` (Angular template parser rejects them) | Rozie pre-binds slot-context closures. |
 | `:host` + `::ng-deep` for global rules | `:root { … }` inside `<style>`. |

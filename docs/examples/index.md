@@ -7,7 +7,7 @@ Fourteen example pages, each kept live against the compiler: every source listin
 - [Counter](/examples/counter) — `<props>` with `model: true`, `<data>`, `$computed`, template event handlers. The smallest example that's still interesting.
 - [SearchInput](/examples/search-input) — `.debounce(300)` modifier, `$emit`, `$onMount` with a teardown return, `r-if` / `r-else`, `$refs`. Single-component scope with rich event-handling.
 - [Modal](/examples/modal) — `<listeners>` block with side-effect handlers (body-scroll lock, focus), `.self` modifier on a backdrop click, multiple colocated lifecycle hooks, slots with scoped params, `<components>` embed. The heaviest single-file example.
-- [Dropdown](/examples/dropdown) — `.outside(...$refs)`, `.throttle(100).passive`, reactive `when` predicates, `$watch` on a prop transition, named slot with scoped params. The marquee `<listeners>` showcase.
+- [Dropdown](/examples/dropdown) — `.outside(...$refs)`, `.throttle(100).passive`, reactive `r-if` conditional-attach on each `<listener>`, `$watch` on a prop transition, named slot with scoped params. The marquee `<listeners>` showcase.
 - [TreeNode](/examples/tree-node) — self-recursion via `<components>` self-import; minimal `<props>`-only component. Demonstrates the per-target self-reference idioms.
 - [Card (with CardHeader)](/examples/card) — wrapper-pair composition. Two `.rozie` files; shows the kebab/camel prop bridge and the per-target child-component import + selector rewrite (notably Angular's `<rozie-card-header>`).
 - [TodoList](/examples/todo-list) — `r-for` with `:key`, multiple `$emit` channels, named + default slots with per-item scoped params, fallback content, `r-if` / `r-else` empty state. Calls out the documented React render-prop divergence in slot consumer ergonomics.
@@ -45,7 +45,7 @@ If you're looking for a specific authoring feature:
 | Multiple `$onMount` hooks | [Modal](/examples/modal), [Dropdown](/examples/dropdown) |
 | `$watch(() => getter, cb)` | [Dropdown](/examples/dropdown), [Flatpickr](/examples/flatpickr), [LineChart](/examples/line-chart), [SortableList](/examples/sortable-list) |
 | `$snapshot` (Svelte `$state`-proxy interop) | [LineChart](/examples/line-chart) |
-| `<listeners>` block with reactive `when` | [Modal](/examples/modal), [Dropdown](/examples/dropdown) |
+| `<listeners>` block (`<listener>` elements with reactive `r-if` attach) | [Modal](/examples/modal), [Dropdown](/examples/dropdown) |
 | `.debounce(ms)` modifier | [SearchInput](/examples/search-input) |
 | `.throttle(ms).passive` modifier chain | [Dropdown](/examples/dropdown) |
 | `.outside(...$refs)` modifier | [Dropdown](/examples/dropdown) |

@@ -142,11 +142,11 @@ CSS Modules hashes class names at build time. That means any code that reference
 
 ```rozie
 <script>
-const close = () => { $props.open = false }  // ROZ010: writes to non-model props are static errors
+const rename = () => { $props.title = 'Untitled' }  // ROZ200: writing a non-model prop is a static error
 </script>
 ```
 
-The single most common React-component bug class (mutating a prop instead of calling the parent callback) is caught at compile time. `model: true` on the prop declaration enables two-way binding (lowers to a controllable-state pair: `value` + `onValueChange`).
+The single most common React-component bug class (mutating a prop instead of calling the parent callback) is caught at compile time. A prop that isn't `model: true` can't be written at all — `$props.title = …` is **ROZ200**. A prop that *is* `model: true` is read via `$props.x` and written via the `$model.x` sigil (`$model.open = false`); writing it through `$props` instead is its own diagnostic, **ROZ204**, which points you at `$model`. `model: true` enables two-way binding (lowers to a controllable-state pair: `value` + `onValueChange`).
 
 ### Two-way binding that doesn't require a state-management library
 

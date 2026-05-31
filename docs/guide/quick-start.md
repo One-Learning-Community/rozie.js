@@ -24,7 +24,7 @@ Create `Counter.rozie`:
 
 <script>
 const canIncrement = $computed(() => $props.value + $props.step <= Infinity)
-const increment = () => { if (canIncrement) $props.value += $props.step }
+const increment = () => { if (canIncrement) $model.value += $props.step }
 </script>
 
 <template>

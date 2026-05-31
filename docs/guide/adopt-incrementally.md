@@ -353,7 +353,7 @@ The fastest smoke is the Counter example. Drop this file in your repo:
 <rozie name="Counter">
 <props>{ value: { type: Number, default: 0, model: true } }</props>
 <template>
-  <button @click="$props.value += 1">{{ $props.value }}</button>
+  <button @click="$model.value += 1">{{ $props.value }}</button>
 </template>
 </rozie>
 ```

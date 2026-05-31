@@ -94,7 +94,7 @@ $onMount(() => {
       const next = [...$props.items]
       const [moved] = next.splice(e.oldIndex, 1)
       next.splice(e.newIndex, 0, moved)
-      $props.items = next
+      $model.items = next
       // Lit's lit-html `repeat` caches part identity by sentinel-comment
       // node. Engine DOM mutation desyncs it. No-op on every other target.
       $reconcileAfterDomMutation()
@@ -187,7 +187,7 @@ can rely on them:
 - **`$classSelector('grip')`** survives React's CSS-Modules class hashing.
   Engines that take a `handle: '.grip'` option Just Work everywhere.
 - **Round-trip guards on two-way bound engine state.** When the engine
-  fires its change event you write `$props.x = newValue`; the wrapper's
+  fires its change event you write `$model.x = newValue`; the wrapper's
   own `$watch` then sees the change and would push it back. Common
   pattern: guard with `if (newValue !== getCurrentEngineValue())
   updateEngine(newValue)` inside the `$watch`. Documented in

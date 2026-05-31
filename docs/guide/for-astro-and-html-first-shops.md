@@ -88,16 +88,14 @@ With Rozie, you maintain one `.rozie` source. The compiler produces the right pe
 { open: { type: Boolean, default: false, model: true } }
 </props>
 <script>
-const close = () => $props.open = false
+const close = () => $model.open = false
 </script>
 <listeners>
-{
-  'document:click.outside($refs.menu)': { handler: close, when: () => $props.open },
-}
+  <listener :target="document" @click.outside($refs.menu)="close" r-if="$props.open" />
 </listeners>
 <template>
 <div>
-  <button @click="$props.open = !$props.open">Menu</button>
+  <button @click="$model.open = !$props.open">Menu</button>
   <ul r-if="$props.open" ref="menu" class="menu">
     <slot />
   </ul>

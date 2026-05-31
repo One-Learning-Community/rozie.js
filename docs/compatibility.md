@@ -20,7 +20,7 @@ For the narrative behind each ⚠︎, follow the link to the matching section in
 | `<props>` with JS expression values | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `<data>` reactive state | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `<components>` block (incl. self-recursion) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `<listeners>` block with reactive `when` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `<listeners>` block of `<listener>` elements (reactive `r-if` conditional attach) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `<style>` scoped + `:root { }` global escape hatch | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `<style lang="scss">` SCSS preprocessing | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `<script lang="ts">` TypeScript in the `<script>` block | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
@@ -67,6 +67,7 @@ For the narrative behind each ⚠︎, follow the link to the matching section in
 | Feature | React | Vue | Svelte | Angular | Solid | Lit |
 | --- | :---: | :---: | :---: | :---: | :---: | :---: |
 | Producer-side `model: true` → idiomatic two-way machinery | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Producer-side `$model.x` two-way write sigil | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Consumer-side `r-model:propName="…"` directive | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 
 Producer + consumer emit shapes per target are documented in

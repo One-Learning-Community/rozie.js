@@ -69,7 +69,7 @@ $onMount(() => {
   instance = new SortableJS($el, {
     onUpdate: (e) => {
       // Restore pre-drag DOM order, update bound state…
-      $props.items = next
+      $model.items = next
       $reconcileAfterDomMutation()  // ← here
       $emit('change', e)
     },

@@ -228,6 +228,6 @@ The reference `Modal.rozie` already follows this pattern for its
 These are the *complete* set of documented limitations as of v1. Everything
 else — props, **producer-side** `model:` two-way machinery, **consumer-side**
 two-way binding (`r-model:propName=`), `<data>` reactive state, `$computed`,
-`<listeners>` with modifiers, `r-for` / `r-if` / form-input `r-model`,
+`<listeners>` (`<listener>` elements with modifiers + `r-if` conditional attach), `r-for` / `r-if` / form-input `r-model`,
 default + named slots, `$emit`, refs — behaves identically across all six
 targets.
