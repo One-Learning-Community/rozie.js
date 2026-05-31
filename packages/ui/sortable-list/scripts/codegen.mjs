@@ -97,6 +97,19 @@ function main() {
     mkdirSync(leafSrc, { recursive: true });
     writeFileSync(resolve(leafSrc, cfg.file), r.code);
 
+    // Bundled leaves (tsdown) entry on src/index.ts. The emitted component is
+    // a DEFAULT export (`export default function|class SortableList`), so the
+    // barrel must re-export the default under the named `SortableList` the
+    // READMEs/consumers import. `export *` would NOT forward a default — that
+    // is why the 20-01 stub barrel produced an empty bundle. Regenerating the
+    // barrel here keeps it in lockstep with the emitted export shape.
+    if (cfg.build === 'tsdown') {
+      writeFileSync(
+        resolve(leafSrc, 'index.ts'),
+        `export { default as SortableList } from './SortableList';\nexport { default } from './SortableList';\n`,
+      );
+    }
+
     // React-only sidecars.
     if (target === 'react') {
       if (r.css) writeFileSync(resolve(leafSrc, 'SortableList.module.css'), r.css);
