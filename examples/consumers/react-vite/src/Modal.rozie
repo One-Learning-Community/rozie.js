@@ -62,15 +62,12 @@ $onMount(() => {
 </script>
 
 <listeners>
-{
-  // Backdrop click. .self ensures we only close when the click target IS the
-  // backdrop element itself, not a child (the dialog panel) that bubbled up.
-  // Bound to a template ref via the implicit `target:` form — see notes below.
-  "document:keydown.escape": {
-    when:    "$props.open && $props.closeOnEscape",
-    handler: close,
-  },
-}
+  <!--
+    Backdrop click. .self ensures we only close when the click target IS the
+    backdrop element itself, not a child (the dialog panel) that bubbled up.
+    r-if here means conditional attach/detach, not conditional render.
+  -->
+  <listener :target="document" @keydown.escape="close" r-if="$props.open && $props.closeOnEscape" />
 </listeners>
 
 <template>

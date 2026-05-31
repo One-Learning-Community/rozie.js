@@ -4,12 +4,7 @@
 const noop = () => {}
 </script>
 <listeners>
-{
-  "document:click.outside($refs.a,$refs.b).stop": {
-    when:    "true",
-    handler: noop,
-  },
-}
+  <listener :target="document" @click.outside($refs.a,$refs.b).stop="noop" r-if="true" />
 </listeners>
 <template>
   <div ref="a"></div>

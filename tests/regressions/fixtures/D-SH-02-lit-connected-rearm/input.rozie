@@ -11,18 +11,17 @@ const onKey = () => { $data.pressed += 1 }
 </script>
 
 <listeners>
-{
-  // D-SH-02 reproduction: the Lit emitter wired ALL listener setup into
-  // firstUpdated() — which Lit runs exactly once. disconnectedCallback()
-  // correctly drained _disconnectCleanups, but there was NO connectedCallback()
-  // override to re-arm the listener after a disconnect → reconnect cycle, so a
-  // reconnected element was left with zero listeners. The fix lifts listener
-  // wiring into _armListeners(), called from firstUpdated() (first render) AND
-  // connectedCallback() (every reconnect, guarded by this.hasUpdated).
-  "document:keydown": {
-    handler: onKey,
-  },
-}
+  <!--
+    D-SH-02 reproduction: the Lit emitter wired ALL listener setup into
+    firstUpdated() — which Lit runs exactly once. disconnectedCallback()
+    correctly drained _disconnectCleanups, but there was NO connectedCallback()
+    override to re-arm the listener after a disconnect → reconnect cycle, so a
+    reconnected element was left with zero listeners. The fix lifts listener
+    wiring into _armListeners(), called from firstUpdated() (first render) AND
+    connectedCallback() (every reconnect, guarded by this.hasUpdated).
+    No r-if → always-attached (when=null) path.
+  -->
+  <listener :target="document" @keydown="onKey" />
 </listeners>
 
 <template>

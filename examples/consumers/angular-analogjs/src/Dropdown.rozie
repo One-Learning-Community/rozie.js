@@ -56,23 +56,15 @@ $onMount(() => {
 </script>
 
 <listeners>
-{
-  // .outside takes ref args; fires only when the click target is outside ALL listed refs.
-  // Compiler emits the per-target wiring (Vue watchEffect, React useEffect with auto-deps,
-  // Svelte $effect, Angular effect + Renderer2.listen + DestroyRef cleanup).
-  "document:click.outside($refs.triggerEl, $refs.panelEl)": {
-    when:    "$props.open && $props.closeOnOutsideClick",
-    handler: close,
-  },
-  "document:keydown.escape": {
-    when:    "$props.open && $props.closeOnEscape",
-    handler: close,
-  },
-  "window:resize.throttle(100).passive": {
-    when:    "$props.open",
-    handler: reposition,
-  },
-}
+  <!--
+    .outside takes ref args; fires only when the click target is outside ALL listed refs.
+    Compiler emits the per-target wiring (Vue watchEffect, React useEffect with auto-deps,
+    Svelte $effect, Angular effect + Renderer2.listen + DestroyRef cleanup).
+    r-if here means conditional attach/detach, not conditional render.
+  -->
+  <listener :target="document" @click.outside($refs.triggerEl, $refs.panelEl)="close" r-if="$props.open && $props.closeOnOutsideClick" />
+  <listener :target="document" @keydown.escape="close" r-if="$props.open && $props.closeOnEscape" />
+  <listener :target="window" @resize.throttle(100).passive="reposition" r-if="$props.open" />
 </listeners>
 
 <template>
