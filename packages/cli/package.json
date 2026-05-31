@@ -33,10 +33,6 @@
     "@babel/traverse": "^7.29.0",
     "@babel/types": "^7.29.0",
     "@rozie/core": "workspace:*",
-    "@rozie/target-angular": "workspace:*",
-    "@rozie/target-react": "workspace:*",
-    "@rozie/target-svelte": "workspace:*",
-    "@rozie/target-vue": "workspace:*",
     "@vue/compiler-sfc": "^3.5.33",
     "chokidar": "^4.0.3",
     "commander": "^14.0.0",
@@ -57,6 +53,12 @@
     }
   },
   "devDependencies": {
+    "@rozie/target-angular": "workspace:*",
+    "@rozie/target-lit": "workspace:*",
+    "@rozie/target-react": "workspace:*",
+    "@rozie/target-solid": "workspace:*",
+    "@rozie/target-svelte": "workspace:*",
+    "@rozie/target-vue": "workspace:*",
     "prettier-plugin-svelte": "^3.4.0",
     "vitest": "^4.1.5"
   }

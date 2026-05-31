@@ -69,6 +69,25 @@ describe('runBuildMatrix — multi-target single input (M1)', () => {
   });
 });
 
+describe('runBuildMatrix — solid + lit targets emit end-to-end (M1b)', () => {
+  // Guards the full 6-target surface: parseTargets/VALID_TARGETS already accept
+  // solid|lit, but M1/M2 only exercise the 4 reference targets. This drives
+  // runBuildMatrix → compile() for solid (.tsx) and lit (.ts) so a regression
+  // in either emitter is caught at the CLI boundary, matching @rozie/unplugin's
+  // 6-target coverage.
+  it('M1b: solid + lit × 1 input → primary files in target-subdirs', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'rozie-cli-m1b-'));
+    const { ctx } = makeBufs();
+    await runBuildMatrix(
+      [COUNTER_PATH],
+      { target: ['solid', 'lit'], out: tmp, root: REPO_ROOT },
+      ctx,
+    );
+    expect(existsSync(join(tmp, 'solid', 'examples', 'Counter.tsx'))).toBe(true);
+    expect(existsSync(join(tmp, 'lit', 'examples', 'Counter.ts'))).toBe(true);
+  });
+});
+
 describe('runBuildMatrix — multi-target multi-input (M2)', () => {
   it('M2: 5 examples × 4 targets = 20 primary files; React adds 5 .d.ts (D-90 default)', async () => {
     const tmp = mkdtempSync(join(tmpdir(), 'rozie-cli-m2-'));
