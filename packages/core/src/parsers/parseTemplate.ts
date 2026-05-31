@@ -50,6 +50,7 @@ import type {
   TemplateInterpolation,
 } from '../ast/blocks/TemplateAST.js';
 import { RozieErrorCode } from '../diagnostics/codes.js';
+import { parseEventAttrName } from './parseEventAttr.js';
 
 export interface ParseTemplateResult {
   node: TemplateAST | null;
@@ -108,15 +109,14 @@ export function parseTemplate(
       name = rawName.slice(1);
     } else if (rawName.startsWith('@')) {
       kind = 'event';
-      const dotIdx = rawName.indexOf('.');
-      if (dotIdx >= 0) {
-        name = rawName.slice(1, dotIdx);
-        modifierChainText = rawName.slice(dotIdx);
-        // The leading '.' lives at `a.nameStart + dotIdx`.
-        modifierChainBaseOffset = a.nameStart + dotIdx;
-      } else {
-        name = rawName.slice(1);
-      }
+      // Phase 19 D-02 — the @event-attr-name parse is now the shared helper
+      // `parseEventAttrName`, also called by parseListeners. Behavior is
+      // byte-identical to the prior inline branch (incl. the no-modifier
+      // base-offset = end-of-name default seeded above as `a.nameEnd`).
+      const parts = parseEventAttrName(rawName, a.nameStart);
+      name = parts.name;
+      modifierChainText = parts.modifierChainText;
+      modifierChainBaseOffset = parts.modifierChainBaseOffset;
     } else if (rawName.startsWith('r-')) {
       kind = 'directive';
       const rest = rawName.slice(2);
