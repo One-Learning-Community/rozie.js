@@ -15,6 +15,20 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // (introduced 260526-q7s; consumed by SortableList.rozie's useSortableJS).
 const RUNTIME_FRAMEWORKS = ['react', 'solid', 'vue', 'lit', 'engine-helpers'] as const;
 function runtimeFile(name: string): string {
+  // KEEP-THE-URL (Phase 20-03, OQ1): the `engine-helpers` runtime package was
+  // retired — its sole export (`useSortableJS`) is now colocated in the
+  // `@rozie-ui/sortable-list` package source. The importmap key and the served
+  // `/preview/runtimes/engine-helpers.mjs` URL stay stable; only the on-disk
+  // file the URL maps to moves to the new helper location. SortableList.rozie's
+  // emitted output still bundles a relative `./internal/useSortableJS` import,
+  // so this URL is consumed only by the legacy importmap entry — pointing it at
+  // the moved helper keeps the URL resolvable (no iframe 404).
+  if (name === 'engine-helpers') {
+    return resolve(
+      __dirname,
+      '../../packages/ui/sortable-list/src/internal/useSortableJS.ts',
+    );
+  }
   return resolve(__dirname, `../../packages/runtime/${name}/dist/index.mjs`);
 }
 

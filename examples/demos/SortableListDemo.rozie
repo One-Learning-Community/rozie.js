@@ -22,7 +22,7 @@
 
 <components>
 {
-  SortableList: '../SortableList.rozie',
+  SortableList: '../../packages/ui/sortable-list/src/SortableList.rozie',
 }
 </components>
 

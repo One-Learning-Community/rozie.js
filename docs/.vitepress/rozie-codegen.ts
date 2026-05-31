@@ -56,6 +56,18 @@ export function rozieCodegen(
   // `TypedCard` lives only under `typed/`, so it falls through to the last
   // branch. This lets docs pages show producer, consumer, and typed sources.
   const resolveExample = (name: string): string => {
+    // Package-source branch — must precede the examples/ root branch (root
+    // wins). `@rozie-ui` products live under `packages/ui/<product>/src/`;
+    // `SortableList` moved there in Phase 20-01, so docs resolve its canonical
+    // producer from the package source rather than the (now-removed)
+    // `examples/SortableList.rozie`.
+    const pkgSrc = resolve(
+      opts.examplesDir,
+      '..',
+      'packages/ui/sortable-list/src',
+      `${name}.rozie`,
+    );
+    if (existsSync(pkgSrc)) return pkgSrc;
     const root = resolve(opts.examplesDir, `${name}.rozie`);
     if (existsSync(root)) return root;
     const demo = resolve(opts.examplesDir, 'demos', `${name}.rozie`);

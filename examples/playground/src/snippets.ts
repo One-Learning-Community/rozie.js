@@ -38,6 +38,17 @@ const matchFiles = import.meta.glob('../../match/*.rozie', {
   import: 'default',
 }) as Record<string, string>;
 
+// packages/ui/<product>/src/*.rozie — canonical `@rozie-ui` product sources.
+// `SortableList` moved here from `examples/` in Phase 20-01, so the six
+// `bundle/SortableList*` dependency globs resolve their `SortableList.rozie`
+// dependency from this map (keyed by the package-source path) — covered by
+// NEITHER the examples/*.rozie nor examples/demos/*.rozie glob.
+const uiPackageFiles = import.meta.glob('../../../packages/ui/*/src/*.rozie', {
+  eager: true,
+  query: '?raw',
+  import: 'default',
+}) as Record<string, string>;
+
 export interface Snippet {
   /** Display label shown in the dropdown. */
   label: string;
@@ -97,7 +108,7 @@ const BUNDLE_DECLS: readonly BundleDecl[] = [
     key: 'bundle/SortableListDemo',
     label: 'bundle/SortableListDemo',
     entryGlobPath: '../../demos/SortableListDemo.rozie',
-    dependencyGlobPaths: ['../../SortableList.rozie'],
+    dependencyGlobPaths: ['../../../packages/ui/sortable-list/src/SortableList.rozie'],
   },
   {
     // SortableListPairDemo — two SortableList instances sharing a group;
@@ -106,7 +117,7 @@ const BUNDLE_DECLS: readonly BundleDecl[] = [
     key: 'bundle/SortableListPairDemo',
     label: 'bundle/SortableListPairDemo',
     entryGlobPath: '../../demos/SortableListPairDemo.rozie',
-    dependencyGlobPaths: ['../../SortableList.rozie'],
+    dependencyGlobPaths: ['../../../packages/ui/sortable-list/src/SortableList.rozie'],
   },
   {
     // SortableListNestedDemo — Kanban-style board. Outer SortableList of
@@ -117,7 +128,7 @@ const BUNDLE_DECLS: readonly BundleDecl[] = [
     label: 'bundle/SortableListNestedDemo',
     entryGlobPath: '../../demos/SortableListNestedDemo.rozie',
     dependencyGlobPaths: [
-      '../../SortableList.rozie',
+      '../../../packages/ui/sortable-list/src/SortableList.rozie',
       '../../KanbanColumn.rozie',
     ],
   },
@@ -129,7 +140,7 @@ const BUNDLE_DECLS: readonly BundleDecl[] = [
     key: 'bundle/SortableListCloneDemo',
     label: 'bundle/SortableListCloneDemo',
     entryGlobPath: '../../demos/SortableListCloneDemo.rozie',
-    dependencyGlobPaths: ['../../SortableList.rozie'],
+    dependencyGlobPaths: ['../../../packages/ui/sortable-list/src/SortableList.rozie'],
   },
   {
     // SortableListFilterDemo — SortableJS `filter` selector demo. Locked
@@ -138,7 +149,7 @@ const BUNDLE_DECLS: readonly BundleDecl[] = [
     key: 'bundle/SortableListFilterDemo',
     label: 'bundle/SortableListFilterDemo',
     entryGlobPath: '../../demos/SortableListFilterDemo.rozie',
-    dependencyGlobPaths: ['../../SortableList.rozie'],
+    dependencyGlobPaths: ['../../../packages/ui/sortable-list/src/SortableList.rozie'],
   },
   {
     // SortableListShowcaseDemo — the marquee piece. Live-tunable
@@ -148,7 +159,7 @@ const BUNDLE_DECLS: readonly BundleDecl[] = [
     key: 'bundle/SortableListShowcaseDemo',
     label: 'bundle/SortableListShowcaseDemo',
     entryGlobPath: '../../demos/SortableListShowcaseDemo.rozie',
-    dependencyGlobPaths: ['../../SortableList.rozie'],
+    dependencyGlobPaths: ['../../../packages/ui/sortable-list/src/SortableList.rozie'],
   },
   {
     key: 'bundle/FlatpickrDemo',
@@ -195,7 +206,7 @@ const BUNDLE_DECLS: readonly BundleDecl[] = [
 // entry lives under demos/ — like FullCalendarDemo and LineChartDemo —
 // resolves regardless of where future demos land.
 function lookupRozieSource(path: string): string | undefined {
-  return exampleFiles[path] ?? demoFiles[path];
+  return exampleFiles[path] ?? demoFiles[path] ?? uiPackageFiles[path];
 }
 
 function bundleSnippetFromDecl(decl: BundleDecl): Snippet | null {
