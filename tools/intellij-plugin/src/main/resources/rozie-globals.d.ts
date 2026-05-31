@@ -1,4 +1,4 @@
-// rozie-globals.d.ts — synthetic ambient declarations for the 17 Rozie
+// rozie-globals.d.ts — synthetic ambient declarations for the 18 Rozie
 // magic identifiers. Source of truth: Plan 13's
 // `tools/intellij-plugin/src/main/kotlin/js/rozie/intellij/completion/RozieMagicIdentifiers.kt`
 // `MAGIC_IDENTIFIERS` registry. v0.2.0 ships permissive `any`-typed shapes;
@@ -9,6 +9,11 @@
 // 16th — the consumer-passed event-listener cluster paired with `$attrs`.
 // Phase 16 (2026-05-26) added `$restoreFocus` as the 17th — keyed-list focus
 // restoration sigil (Lit/Solid/Svelte do work; React/Vue/Angular no-op).
+// Phase 18 (2026-05-30) added `$model` as the 18th — the producer-side
+// two-way-write accessor whose valid keys are the `model: true` subset of
+// `<props>`; `$model.x` writes lower to the same per-target two-way setter the
+// old `$props.x` model-write used, and `$props.x` is now read-only for every
+// prop.
 //
 // =============================================================================
 // Strategy chosen: B (ambient-decl prefix injected into every Rozie JS fragment)
@@ -142,3 +147,14 @@ declare function $restoreFocus(selector: string, idx: number): void;
  * Phase 07.6.
  */
 declare const $event: Event;
+/**
+ * Producer-side two-way-write accessor. Its valid keys are exactly the
+ * `model: true` subset of the `<props>` block. Writing `$model.x` (`=`,
+ * compound assign, `++`/`--`) lowers to the same per-target two-way setter the
+ * legacy `$props.x` model-write used (React `setValue`/`onValueChange`, Vue
+ * `defineModel`/`emit('update:x')`, Svelte `$bindable`, Angular `model()`/
+ * `valueChange.emit`, Solid `createControllableSignal`, Lit custom-event pair);
+ * reads lower to the same getter as `$props.x`. As of Phase 18 `$props.x` is
+ * read-only for every prop — model-prop writes go through `$model.x`.
+ */
+declare const $model: any;

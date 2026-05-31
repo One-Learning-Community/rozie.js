@@ -1,7 +1,7 @@
 package js.rozie.intellij.completion
 
 /**
- * Single source of truth for the 17 canonical Rozie `$`-prefixed magic
+ * Single source of truth for the 18 canonical Rozie `$`-prefixed magic
  * identifiers + their one-line type-text doc hints (surfaced by
  * `LookupElementBuilder.withTypeText` in the completion popup per the
  * P1-UAT-09 acceptance prose).
@@ -25,7 +25,7 @@ package js.rozie.intellij.completion
  *    `RozieGlobalsLibraryTest` coverage assertion pins the two in lockstep.
  *
  * `RozieJsMagicCompletionTest.testBareDollarSurfacesAllMagicIdentifiers`
- * iterates [MAGIC_IDENTIFIERS] directly — adding a 17th magic name is a 1-line
+ * iterates [MAGIC_IDENTIFIERS] directly — adding an 18th magic name is a 1-line
  * append here (plus the matching `declare` in `rozie-globals.d.ts`); the
  * contributor, the annotator, and the test all pick it up automatically (DRY
  * contract, identical to Plan 02's [js.rozie.intellij.xml.RozieKnownAttributes]).
@@ -58,6 +58,10 @@ package js.rozie.intellij.completion
  *  - `$event`        — the active event closure parameter (Phase 07.6 — scoped
  *                      to `@event` / `r-on:event` handler contexts; mirrors
  *                      the reserved-sigil set in `RESERVED_SIGILS`)
+ *  - `$model`        — producer-side two-way-write accessor whose valid keys are
+ *                      the `model: true` subset of `<props>` (Phase 18 — write
+ *                      `$model.x` lowers to the same per-target two-way setter
+ *                      `$props.x = …` used today; `$props.x` is now read-only)
  *
  * Pattern note: each entry is a `(name, typeText)` pair; the contributor
  * destructures the pair into `LookupElementBuilder.create(name).bold()
@@ -65,7 +69,7 @@ package js.rozie.intellij.completion
  */
 object RozieMagicIdentifiers {
     /**
-     * Ordered (name, typeText) pairs for the 17 canonical Rozie magic
+     * Ordered (name, typeText) pairs for the 18 canonical Rozie magic
      * identifiers. Order mirrors the TextMate grammar's `magic-identifier`
      * regex so the two artifacts diff trivially; the lookup popup does its
      * own alphabetical sort, so source order is purely for readability.
@@ -88,6 +92,7 @@ object RozieMagicIdentifiers {
         "\$attrs" to "(magic) consumer-passed attributes minus declared props",
         "\$listeners" to "(magic) consumer-passed event listeners minus declared events",
         "\$restoreFocus" to "(magic) restore focus to a keyed-list row by selector + index (Lit/Solid/Svelte do work; React/Vue/Angular no-op)",
+        "\$model" to "(magic) producer-side two-way write — keys are the model:true props (\$model.x = … lowers like the old \$props.x write)",
     )
 
     /**
