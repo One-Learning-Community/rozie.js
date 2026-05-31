@@ -57,6 +57,7 @@ import { partitionUserImports } from '../rewrite/partitionUserImports.js';
 import {
   rewriteRozieIdentifiers,
   hoistDoubleReadAccessors,
+  normalizeModelAccessor,
 } from '../rewrite/rewriteScript.js';
 import { sanitizeEventName } from '../rewrite/sanitizeEventName.js';
 import {
@@ -666,6 +667,17 @@ export function emitScript(
     userImportNodes.length > 0
       ? userImportNodes.map((imp) => genCode(imp)).join('\n') + '\n'
       : '';
+
+  // 1b-bis. Phase 18 (Req 2) — normalize the producer-side two-way-write sigil
+  //     `$model.X` → `$props.X` at the EARLIEST point, BEFORE the double-read
+  //     hoist + lifecycle pairing + the identifier rewrite. Every Angular
+  //     script-side classification site (hoistDoubleReadAccessors keys on
+  //     `$props`/`$data`; A2) and lowering site keys on `$props`, so a single
+  //     normalization here routes `$model` model writes/reads through the
+  //     IDENTICAL `$props.<modelProp>` lowering — byte-identical emit (reuse,
+  //     not reimplement). `$model` is model-only by contract (Wave 1) and always
+  //     a member-expression object (D-03).
+  normalizeModelAccessor(cloned);
 
   // 1c. Quick task 260520-w18 bug class 5 — hoist double-read $props/$data
   //     accessors to a single signal-read local. MUST run BEFORE

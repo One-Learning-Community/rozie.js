@@ -136,6 +136,25 @@ export function rewriteListenerExpression(
 
   const wrapper = t.file(t.program([t.expressionStatement(cloned)]));
 
+  // Phase 18 (Req 2) — producer-side two-way-write sigil `$model.X` inside a
+  // <listeners>-block body (e.g. an inline `handler: () => { $model.x = … }`).
+  // This is the SEPARATE listener-body lowering path (RESEARCH Pitfall 2 /
+  // Angular listener guard sites): patching only rewriteScript/rewriteTemplate
+  // would leave a literal `$model.x` in the emitted listener block. Normalize
+  // the accessor `$model` → `$props` before the main traversal so every
+  // downstream write/read routes through the IDENTICAL `$props.<modelProp>`
+  // Angular lowering → same signal setter/getter, byte-identical emit.
+  traverse(wrapper, {
+    MemberExpression(path) {
+      const obj = path.node.object;
+      if (t.isIdentifier(obj) && obj.name === '$model') obj.name = '$props';
+    },
+    OptionalMemberExpression(path) {
+      const obj = path.node.object;
+      if (t.isIdentifier(obj) && obj.name === '$model') obj.name = '$props';
+    },
+  });
+
   traverse(wrapper, {
     MemberExpression(path) {
       const obj = path.node.object;

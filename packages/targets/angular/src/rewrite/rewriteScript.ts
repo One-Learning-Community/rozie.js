@@ -500,6 +500,38 @@ export function hoistDoubleReadAccessors(program: File): void {
  * use `path.replaceWith` and DO NOT call `path.skip()` — letting traversal
  * descend into the replacement node ensures nested rewrites apply.
  */
+/**
+ * Phase 18 (Req 2) — normalize the producer-side two-way-write sigil `$model`
+ * to `$props` across a cloned Program, in place.
+ *
+ * `$model.X` is the producer-side sigil for writing a `model: true` prop. By
+ * contract it is model-only: Wave 1's core semantic pass already emitted
+ * ROZ205 / ROZ113 for `$model.<nonModelProp>` / `$model.<nonExistent>` BEFORE
+ * lowering, so every `$model.X` reaching the emitter is a declared model prop.
+ * `$model` is ALWAYS a member-expression object (deliberately NOT in
+ * STABLE_IDENTIFIERS, D-03), so renaming the object Identifier `$model` →
+ * `$props` routes the read/write through the IDENTICAL `$props.<modelProp>`
+ * lowering and yields byte-identical emit.
+ *
+ * On Angular this MUST run at the EARLIEST point in emitScript — BEFORE
+ * `hoistDoubleReadAccessors` (a classification site that collects `$props`/
+ * `$data` double-reads, A2) and BEFORE `rewriteRozieIdentifiers` — so every
+ * downstream classification + lowering pass sees `$props`. Reuse, not
+ * reimplement (SPEC Req 2).
+ */
+export function normalizeModelAccessor(program: File): void {
+  traverse(program, {
+    MemberExpression(path) {
+      const obj = path.node.object;
+      if (t.isIdentifier(obj) && obj.name === '$model') obj.name = '$props';
+    },
+    OptionalMemberExpression(path) {
+      const obj = path.node.object;
+      if (t.isIdentifier(obj) && obj.name === '$model') obj.name = '$props';
+    },
+  });
+}
+
 export function rewriteRozieIdentifiers(
   program: File,
   ir: IRComponent,
@@ -657,6 +689,13 @@ export function rewriteRozieIdentifiers(
     }
     return true;
   }
+
+  // Phase 18 (Req 2) — normalize `$model` → `$props` before the lowering
+  // traversal. emitScript already runs this earlier (before the double-read
+  // hoist classification, A2), but doing it here too makes rewriteRozieIdentifiers
+  // self-contained for any direct caller (e.g. emitAngular's preview rewrite).
+  // Idempotent: a second pass finds no `$model`.
+  normalizeModelAccessor(program);
 
   traverse(program, {
     AssignmentExpression(path) {

@@ -142,6 +142,31 @@ export interface RewriteTemplateOpts {
 }
 
 /**
+ * Phase 18 (Req 2) — return a CLONE of `expr` with the producer-side
+ * two-way-write sigil `$model` renamed to `$props` on every member-expression
+ * object. Never mutates the input (IR-04 referential preservation). `$model` is
+ * model-only by contract (Wave 1 rejected non-model/non-existent before
+ * lowering) and always a member-expression object (D-03), so the rename routes
+ * the read/write through the IDENTICAL `$props.<modelProp>` Angular lowering →
+ * byte-identical emit. Reuse, not reimplement (SPEC Req 2).
+ */
+function normalizeTemplateModelAccessor(expr: t.Expression): t.Expression {
+  const clone = t.cloneNode(expr, true, false);
+  const wrapper = t.file(t.program([t.expressionStatement(clone)]));
+  traverse(wrapper, {
+    MemberExpression(path) {
+      const obj = path.node.object;
+      if (t.isIdentifier(obj) && obj.name === '$model') obj.name = '$props';
+    },
+    OptionalMemberExpression(path) {
+      const obj = path.node.object;
+      if (t.isIdentifier(obj) && obj.name === '$model') obj.name = '$props';
+    },
+  });
+  return clone;
+}
+
+/**
  * Render a Babel Expression as an Angular-template-friendly string.
  */
 export function rewriteTemplateExpression(
@@ -176,6 +201,22 @@ export function rewriteTemplateExpression(
   ]);
 
   const wrapper = t.file(t.program([t.expressionStatement(cloned)]));
+
+  // Phase 18 (Req 2) — producer-side two-way-write sigil `$model.X` in template
+  // event handlers (`@click="$model.open = false"`) and bindings. Normalize the
+  // accessor `$model` → `$props` before the main traversal so every downstream
+  // write/read site routes through the IDENTICAL `$props.<modelProp>` Angular
+  // lowering → same signal setter/getter, byte-identical emit.
+  traverse(wrapper, {
+    MemberExpression(path) {
+      const obj = path.node.object;
+      if (t.isIdentifier(obj) && obj.name === '$model') obj.name = '$props';
+    },
+    OptionalMemberExpression(path) {
+      const obj = path.node.object;
+      if (t.isIdentifier(obj) && obj.name === '$model') obj.name = '$props';
+    },
+  });
 
   const COMPOUND_OP_MAP: Record<string, t.BinaryExpression['operator']> = {
     '+=': '+', '-=': '-', '*=': '*', '/=': '/', '%=': '%', '**=': '**',
@@ -570,6 +611,14 @@ export function hoistTemplateDoubleReadAccessor(
   takenNames: ReadonlySet<string>,
   opts: RewriteTemplateOpts = {},
 ): TemplateAccessorHoist | null {
+  // Phase 18 (Req 2) — normalize the producer-side two-way-write sigil
+  // `$model.X` → `$props.X` on a CLONE (never mutate the caller's IR-referenced
+  // node — IR-04) before the double-read classification below keys on `$props`/
+  // `$data` (A2: this classification site would otherwise miss `$model` reads
+  // and skip the hoist, diverging from the byte-identical `$props.X` form).
+  // `$model` is model-only by contract (Wave 1) and always a member-expression
+  // object (D-03).
+  expr = normalizeTemplateModelAccessor(expr);
   // A synthesised getter lives in class scope and cannot see loop-local
   // bindings (`f` from `r-for="f in $data.files"`). If the expression
   // references ANY loop binding, lifting it into a class member would emit a
