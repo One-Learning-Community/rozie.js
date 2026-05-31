@@ -44,9 +44,20 @@ class RozieInjectionTest : BasePlatformTestCase() {
         assertInjectedLanguageAt("injection-smoke.rozie", "count: 0", "JavaScript")
     }
 
-    fun testListenersBodyIsJavaScriptInjectedAsWholeObjectLiteral() {
-        // D-12: the entire <listeners> object literal is a single JS-injected range.
-        assertInjectedLanguageAt("injection-smoke.rozie", "window:resize", "JavaScript")
+    fun testListenersBodyIsHtmlInjected() {
+        // Phase 19: <listeners> is now a markup block of <listener> elements (like
+        // <template>), so its body is HTML-injected — JetBrains' HTML PSI parses
+        // `<listener :target="window" @resize="..." r-if="..." />` into XmlTag /
+        // XmlAttribute nodes. Anchor at "<listener" inside the LISTENERS_BODY run.
+        assertInjectedLanguageAt("injection-smoke.rozie", "<listener :target", "HTML")
+    }
+
+    fun testListenerEventHandlerValueIsJavaScriptInjected() {
+        // Phase 19: the @event handler value on a <listener> is JS-injected (the
+        // same per-handler-value injection the template @event handlers get), so
+        // the Phase 08.3 @event resolver can go-to-def through it. Anchor at the
+        // handler-value interior `$data.count++`.
+        assertInjectedLanguageAt("injection-smoke.rozie", "\$data.count++", "JavaScript")
     }
 
     fun testTemplateBodyIsHtmlInjected() {
@@ -198,49 +209,21 @@ class RozieInjectionTest : BasePlatformTestCase() {
         )
     }
 
-    // Plan 08.2-15 — extend Plan 11's paren-wrap to LISTENERS_BODY (closes P1-UAT-10).
-    // Mirrors the 3 Plan 11 paren-wrap regression methods verbatim — same
-    // configureAndGetInjectedJs helper, same JSObjectLiteralExpression + JSProperty
-    // assertions, same defence-in-depth ZERO-JSLabeledStatement check. The only diffs
-    // are the fixture path (object-literal-listeners.rozie), the anchor string
-    // (`click: {` — first property key inside the listeners body), and the expected
-    // JSProperty names (`click` / `hover` instead of the props body's `value` /
-    // `step` / `label`).
-    fun testListenersBodyParsesAsObjectLiteralUnderParenWrap() {
-        val injectedFile = configureAndGetInjectedJs("object-literal-listeners.rozie", "click: {")
-        // With paren-wrap: ( { click: {...}, hover: {...} } ) parses as a
-        // JSObjectLiteralExpression containing 2 JSProperty children (`click`, `hover`).
-        // Without paren-wrap: the top-level body parses as a JSLabeledStatement tree
-        // (label `click:` carrying a JSBlockStatement value) and
-        // PsiTreeUtil.findChildrenOfType(file, JSObjectLiteralExpression) would be empty.
-        val objLits = PsiTreeUtil.findChildrenOfType(injectedFile, JSObjectLiteralExpression::class.java)
-        assertTrue(
-            "Expected at least one JSObjectLiteralExpression in paren-wrapped <listeners> body; " +
-                "without paren-wrap the JS parser produces JSLabeledStatement (Statement-expected). " +
-                "Found: ${objLits.map { it.text }}",
-            objLits.isNotEmpty(),
-        )
-        val propNames = PsiTreeUtil.findChildrenOfType(injectedFile, JSProperty::class.java)
-            .mapNotNull { it.name }.toSet()
-        assertTrue(
-            "Expected JSProperty 'click' inside paren-wrapped <listeners>; found: $propNames",
-            "click" in propNames,
-        )
-        assertTrue(
-            "Expected JSProperty 'hover' inside paren-wrapped <listeners>; found: $propNames",
-            "hover" in propNames,
-        )
-        // Defence-in-depth: assert NO labeled-statement tree is present at top-level
-        // within the injected file. If paren-wrap were missing, the event-name keys
-        // (`click:`, `hover:`) would each parse as a JSLabeledStatement; the assertion
-        // below would fail.
-        val labels = PsiTreeUtil.findChildrenOfType(injectedFile, JSLabeledStatement::class.java)
-        assertTrue(
-            "Expected ZERO JSLabeledStatement nodes in paren-wrapped <listeners> body; " +
-                "presence indicates the paren-wrap did not take effect. " +
-                "Labels found: ${labels.map { it.label }}",
-            labels.isEmpty(),
-        )
+    // Phase 19 — `<listeners>` is now a markup block of `<listener>` elements, so its
+    // body HTML-injects (like <template>) rather than JS-object-literal-injects. The
+    // old paren-wrap regression (P1-UAT-10) no longer applies — there is no object
+    // literal to wrap. Repurposed (element-form-listeners.rozie, formerly
+    // object-literal-listeners.rozie) to assert the element-form injection contract:
+    //   (1) the <listener> body HTML-injects into a real XmlTag PSI tree, and
+    //   (2) each @event handler value JS-injects so the Phase 08.3 @event resolver
+    //       can dispatch through it.
+    fun testListenersBodyHtmlInjectsElementForm() {
+        // (1) The `<listener` tag offset must resolve to an HTML injection.
+        assertInjectedLanguageAt("element-form-listeners.rozie", "<listener :target", "HTML")
+        // (2) The @event handler value `() => {}` must resolve to a JS injection.
+        //     Anchor at the arrow body so the offset sits inside the handler value,
+        //     not the attribute name.
+        assertInjectedLanguageAt("element-form-listeners.rozie", "() => {}", "JavaScript")
     }
 
     fun testScriptBodyRemainsUnwrappedAsStatementList() {

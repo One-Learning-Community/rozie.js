@@ -1,7 +1,5 @@
 <rozie name="ListenersMagicDollarPrefix">
 <listeners>
-{
-  "click": $da<caret>
-}
+  <listener :target="document" @click="x($da<caret>)" />
 </listeners>
 </rozie>

@@ -8,12 +8,7 @@ $onMount(() => {
 })
 </script>
 <listeners>
-{
-  "window:resize": {
-    when: "true",
-    handler: "() => { $data.count++ }"
-  }
-}
+  <listener :target="window" @resize="$data.count++" r-if="true" />
 </listeners>
 <components>
 {

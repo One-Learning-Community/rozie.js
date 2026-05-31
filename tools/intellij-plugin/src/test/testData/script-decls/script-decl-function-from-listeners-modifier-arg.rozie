@@ -1,5 +1,7 @@
 <rozie name="ScriptDeclFnFromModifierArg">
 <script>function helper(){return null;}</script>
 <refs>{ x: null }</refs>
-<listeners>{ "document:click.outside($refs.x, hel<caret>per())": "close" }</listeners>
+<listeners>
+  <listener :target="document" @click.outside($refs.x,hel<caret>per())="close" />
+</listeners>
 </rozie>

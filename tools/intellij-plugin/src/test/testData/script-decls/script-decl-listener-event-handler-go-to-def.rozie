@@ -1,0 +1,9 @@
+<rozie name="ScriptDeclListenerEventHandlerGoToDef">
+<props>{ open: { type: Boolean, default: false } }</props>
+<script>
+function close() { return null }
+</script>
+<listeners>
+  <listener :target="document" @keydown.escape="clo<caret>se" r-if="$props.open" />
+</listeners>
+</rozie>

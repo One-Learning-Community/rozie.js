@@ -1,0 +1,7 @@
+<rozie name="ScriptDeclListenersHandlerValueResolves">
+<script>const helper = 1;</script>
+<refs>{ list: null }</refs>
+<listeners>
+  <listener :target="document" @click="$refs.list.scrollTo(hel<caret>per)" />
+</listeners>
+</rozie>

@@ -144,21 +144,23 @@ class RozieScriptDeclResolutionTest : BasePlatformTestCase() {
         )
     }
 
-    // === SPEC Req 3: bare ident from <listeners> modifier-arg JS resolves to <script> function decl ===
+    // === SPEC Req 3 (element form): bare ident from a <listener> @event modifier-arg JS ===
+    // === resolves to its <script> function decl.                                        ===
     //
-    // SPEC Req 3 acceptance — closed by Plan 08.3-04's modifier-arg JS sub-injection arm in
-    // RozieMultiHostInjector.LISTENERS_BODY. The injector now emits a JS sub-injection
-    // covering EXACTLY the modifier-arg interior `$refs.x, helper()` — bare `helper` ref
-    // dispatches through the existing Plan 08.3-01 provider.
+    // Phase 19 moved `<listeners>` to element form, so the modifier args live in the
+    // `@event` ATTRIBUTE NAME (`@click.outside($refs.x,helper())`) rather than a JSON-key
+    // string. RozieMultiHostInjector.injectEventModifierArgJs sub-injects each `(args)`
+    // interior as JS — bare `helper` dispatches through the existing Plan 08.3-01
+    // RozieScriptDeclReferenceProvider, exactly as it did in the object-literal form.
     fun testModifierArgRefResolvesToScript() {
         myFixture.configureByFile("script-decl-function-from-listeners-modifier-arg.rozie")
         val ref = myFixture.file.findReferenceAt(myFixture.caretOffset)
         assertNotNull(
             "findReferenceAt returned null at caret on bare `helper` inside the modifier-arg " +
-                "JS in `\"document:click.outside(\$refs.x, helper())\"` — Plan 08.3-04's " +
-                "modifier-arg sub-injection should make the bare ident JS-parseable. Verify " +
-                "the LISTENERS_BODY arm in RozieMultiHostInjector is now layering per-" +
-                "modifier-arg JS sub-injections after the whole-body paren-wrap.",
+                "JS in `@click.outside(\$refs.x,helper())` — RozieMultiHostInjector." +
+                "injectEventModifierArgJs should make the bare ident JS-parseable. Verify " +
+                "the LISTENERS_BODY arm layers per-@event-modifier-arg JS sub-injections " +
+                "after the whole-body HTML injection.",
             ref,
         )
         val resolved = ref!!.resolve()
@@ -177,7 +179,47 @@ class RozieScriptDeclResolutionTest : BasePlatformTestCase() {
         // The resolved <script> decl must live in the same top-level host file as the
         // modifier-arg ref (Plan 05 contract — cross-block but same SFC). Belt-and-
         // suspenders against future regressions that surface cross-file resolutions
-        // unrelated to the bare-ident path inside the listeners JSON key.
+        // unrelated to the bare-ident path inside the @event modifier args.
+        val ilm = InjectedLanguageManager.getInstance(project)
+        val resolvedTopLevelFile = ilm.getTopLevelFile(resolved.containingFile) ?: resolved.containingFile
+        assertEquals(
+            "Resolved <script>-decl's top-level host file should match the test fixture",
+            myFixture.file.name,
+            resolvedTopLevelFile.name,
+        )
+    }
+
+    // === SPEC Req 9 (element form): go-to-def on a <listener> @event HANDLER ===
+    // === resolves to its <script> decl, REUSING the Phase 08.3 @event resolver. ===
+    //
+    // The acceptance criterion for Phase 19 Req 9: the IntelliJ plugin recognizes
+    // `<listener>` and its `@event` handler expression is go-to-def-resolvable.
+    // Because the LISTENERS_BODY arm now HTML-injects the body and JS-injects each
+    // `@event` handler VALUE (the same per-handler-value path the template `@event`
+    // handlers use), the bare-Identifier handler `close` dispatches through the
+    // SAME RozieScriptDeclReferenceProvider — no new resolver, just a new host.
+    fun testListenerEventHandlerResolvesToScript() {
+        myFixture.configureByFile("script-decl-listener-event-handler-go-to-def.rozie")
+        val ref = myFixture.file.findReferenceAt(myFixture.caretOffset)
+        assertNotNull(
+            "findReferenceAt returned null at caret on `close` inside the <listener> " +
+                "@event handler `@keydown.escape=\"close\"` — the LISTENERS_BODY HTML " +
+                "injection + per-handler-value JS injection should surface a " +
+                "RozieScriptDeclReference (the reused Phase 08.3 @event resolver).",
+            ref,
+        )
+        val resolved = ref!!.resolve()
+        assertNotNull(
+            "RozieScriptDeclReference.resolve() returned null for `close`; expected the " +
+                "<script> `function close` declaration's name-identifier leaf.",
+            resolved,
+        )
+        assertEquals(
+            "Resolved target should carry the accessed name `close` (the <listener> " +
+                "@event handler go-to-def reuses the template @event resolver)",
+            "close",
+            resolvedKeyName(resolved!!),
+        )
         val ilm = InjectedLanguageManager.getInstance(project)
         val resolvedTopLevelFile = ilm.getTopLevelFile(resolved.containingFile) ?: resolved.containingFile
         assertEquals(
@@ -497,30 +539,40 @@ class RozieScriptDeclResolutionTest : BasePlatformTestCase() {
         }
     }
 
-    // === CR-01 regression: a `.method(args)` call inside a listeners VALUE (not a ===
-    // === key) must NOT receive a modifier-arg JS sub-injection. The value sits     ===
-    // === inside the wholesale JS string literal; the bare identifier in it must    ===
-    // === not falsely resolve to a same-named <script> decl.                        ===
-    fun testListenersValueMethodCallNotInjected() {
-        myFixture.configureByFile("script-decl-listeners-value-method-not-injected.rozie")
-        // Caret is on `helper` inside the VALUE `"$refs.list.scrollTo(helper)"`. Before
-        // the CR-01 fix, LISTENERS_KEY_STRING matched the value string too, MODIFIER_ARG
-        // matched `.scrollTo(helper)`, and `helper` got a spurious JS sub-injection that
-        // resolved to the <script> `const helper`. After the fix, only key-position
-        // strings (followed by `:`) are scanned, so the value stays an opaque JS string
-        // literal and `helper` does NOT resolve to the script decl.
+    // === Phase 19: a bare ident inside a <listener> @event HANDLER VALUE resolves ===
+    // === to its <script> decl — the same JS-injection-over-handler-value path the ===
+    // === template @event handlers use. (Repurposed from the pre-Phase-19 CR-01    ===
+    // === negative test: in the object-literal world a `.method(args)` call inside  ===
+    // === a listeners VALUE-string had to be EXCLUDED from modifier-arg            ===
+    // === sub-injection. Element form has no JSON keys/values — the handler value   ===
+    // === IS a real JS expression, so `helper` in `@click="...scrollTo(helper)"`    ===
+    // === is a genuine reference that SHOULD resolve.)                              ===
+    fun testListenersHandlerValueResolvesToScript() {
+        myFixture.configureByFile("script-decl-listeners-handler-value-resolves.rozie")
+        // Caret is on `helper` inside the @event handler value
+        // `@click="$refs.list.scrollTo(helper)"`. The LISTENERS_BODY → HTML
+        // injection + the per-handler-value EVENT_ATTR JS injection makes the
+        // value a real JS fragment; `helper` resolves to the <script> `const helper`.
         val ref = myFixture.file.findReferenceAt(myFixture.caretOffset)
-        val resolved = ref?.resolve()
-        if (resolved != null) {
-            assertFalse(
-                "CR-01 regression: a `.method(arg)` call inside a listeners VALUE must not " +
-                    "resolve `${resolvedKeyName(resolved)}` to the <script> `const helper` decl. " +
-                    "The modifier-arg sub-injection must fire on KEY-position strings only; " +
-                    "values are opaque JS string-literal content.",
-                resolved is PsiNamedElement && (resolved as PsiNamedElement).name == "helper",
-            )
-        }
-        // resolved == null is the expected happy path (no JS injection over value text).
+        assertNotNull(
+            "findReferenceAt returned null at caret on bare `helper` inside the @event " +
+                "handler value `@click=\"\$refs.list.scrollTo(helper)\"` — the LISTENERS_BODY " +
+                "HTML injection + EVENT_ATTR handler-value JS injection should make the bare " +
+                "ident JS-parseable (same path as template @event handlers).",
+            ref,
+        )
+        val resolved = ref!!.resolve()
+        assertNotNull(
+            "RozieScriptDeclReference.resolve() returned null for `helper`; expected the " +
+                "<script> `const helper` declaration (JSVariable name-identifier leaf).",
+            resolved,
+        )
+        assertEquals(
+            "Resolved target should carry the accessed name `helper` (script-decl path " +
+                "through the @event handler-value JS injection)",
+            "helper",
+            resolvedKeyName(resolved!!),
+        )
     }
 
     /**

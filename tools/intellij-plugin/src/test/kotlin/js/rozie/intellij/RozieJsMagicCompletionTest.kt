@@ -55,12 +55,18 @@ class RozieJsMagicCompletionTest : BasePlatformTestCase() {
         )
     }
 
-    // === Behavior 2: typing `$da` in <listeners> surfaces $data (cross-block-type positive) ===
+    // === Behavior 2: typing `$da` in a <listener> @event handler surfaces $data ===
     //
-    // `$da` is also unique-match (only `$data` starts with it) — same
-    // auto-insert path assertion as Behavior 1, just inside the second
-    // JS-injected block type to confirm the contributor fires uniformly across
-    // RozieMultiHostInjector's injection targets.
+    // Phase 19: `<listeners>` is now element form, so the magic-ident completion
+    // fires inside a `<listener>` `@event` handler VALUE (which is JS-injected just
+    // like a template `@event` handler). `$da` is unique-match (only `$data` starts
+    // with it) — same auto-insert path assertion as Behavior 1, confirming the
+    // contributor fires uniformly across RozieMultiHostInjector's JS-injection
+    // targets (now including <listener> @event handler values). The handler is
+    // `x($da)` rather than a bare `$da` so the injected JS fragment carries enough
+    // surrounding expression context for the platform completion lookup (a bare
+    // trailing `$da` at the fragment edge trips a platform smart-pointer-restore
+    // assertion unrelated to the contributor under test).
 
     fun testDollarPrefixSurfacesDataInListeners() {
         myFixture.configureByFile("listeners-magic-dollar-prefix.rozie")
@@ -72,6 +78,20 @@ class RozieJsMagicCompletionTest : BasePlatformTestCase() {
             "\$data" in docText,
         )
     }
+
+    // === Behavior 2b (Phase 19 Req 9): :target on a <listener> completes window/document ===
+    //
+    // `:target` is a `:bind` attribute, so its value is JS-injected; `window` and
+    // `document` are ambient JS globals, so the platform JS completion offers them
+    // natively (no bespoke descriptor needed). This is MANUALLY verified (SPEC Req 9
+    // VALIDATION manual-only entry) rather than asserted here: a bare trailing-edge
+    // reference inside the tiny `:target="…"` injection (`:target="wind|"`) trips a
+    // platform `JSLookupContext` smart-pointer-restore assertion in the test harness
+    // (`Cannot restore JSReferenceExpression … restored=null`) that is unrelated to
+    // the completion behavior under test and order-dependent across the suite. The
+    // sibling Behavior-2 test (`x($da)`) shows the completion path itself works when
+    // the injected fragment carries surrounding expression context — which a bare
+    // `:target` value cannot naturally provide. Verified by hand in the running IDE.
 
     // === Behavior 3: typing bare `$` surfaces all 14 magic identifiers (DRY assertion) ===
 

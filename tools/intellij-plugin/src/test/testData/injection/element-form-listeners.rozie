@@ -1,0 +1,9 @@
+<rozie name="ElementFormListeners">
+<listeners>
+  <listener :target="document" @click="() => {}" r-if="true" />
+  <listener :target="window" @hover="() => {}" r-if="true" />
+</listeners>
+<template>
+  <div>listeners-only fixture</div>
+</template>
+</rozie>
