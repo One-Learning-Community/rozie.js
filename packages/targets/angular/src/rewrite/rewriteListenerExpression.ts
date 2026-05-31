@@ -40,6 +40,63 @@ function flattenInlineCode(code: string): string {
 }
 
 /**
+ * Mirror of rewriteScript.ts's COMPOUND_OP_MAP / buildAngularSetterCall.
+ *
+ * Phase 18 follow-up — an inline model/data WRITE inside a `<listeners>` body
+ * (e.g. `@keydown.escape="$model.open = false"` or
+ * `@resize="$data.n = $data.n + 1"`) must lower to the SAME Angular signal
+ * setter the <script> path emits. The read-rewrite traversal below turns
+ * `$props.X` / `$data.X` into a `this.X()` GETTER call unconditionally, which
+ * Babel rejects as an assignment LHS (`this.X() = false`). The
+ * AssignmentExpression / UpdateExpression visitors added to that same traversal
+ * intercept the WRITE shape first and route it through this setter builder —
+ * byte-identical to the script path ("reuse, not reimplement").
+ */
+const COMPOUND_OP_MAP: Record<string, t.BinaryExpression['operator']> = {
+  '+=': '+',
+  '-=': '-',
+  '*=': '*',
+  '/=': '/',
+  '%=': '%',
+  '**=': '**',
+  '<<=': '<<',
+  '>>=': '>>',
+  '>>>=': '>>>',
+  '&=': '&',
+  '|=': '|',
+  '^=': '^',
+};
+
+/**
+ * Build `this.foo.set(rhs)` for a plain `=`, or
+ * `this.foo.set(this.foo() OP rhs)` for compound operators. Behaviour-identical
+ * to rewriteScript.ts's buildAngularSetterCall.
+ */
+function buildAngularSetterCall(
+  signalName: string,
+  operator: string,
+  rhs: t.Expression,
+): t.CallExpression {
+  const setterCallee = t.memberExpression(
+    t.memberExpression(t.thisExpression(), t.identifier(signalName)),
+    t.identifier('set'),
+  );
+  if (operator === '=') {
+    return t.callExpression(setterCallee, [rhs]);
+  }
+  const binOp = COMPOUND_OP_MAP[operator];
+  /* v8 ignore next 3 -- defensive: COMPOUND_OP_MAP covers every compound operator @babel/parser produces */
+  if (!binOp) {
+    return t.callExpression(setterCallee, [rhs]);
+  }
+  const innerRead = t.callExpression(
+    t.memberExpression(t.thisExpression(), t.identifier(signalName)),
+    [],
+  );
+  return t.callExpression(setterCallee, [t.binaryExpression(binOp, innerRead, rhs)]);
+}
+
+/**
  * Phase 07.3.2 Plan 10 — listener-context `$slots.X` merge with dynamic-name
  * fallback. Produces `(this.<X>Tpl ?? this.templates()?.['<x>'])`. Listener
  * bodies run in class context so both operands carry the `this.` prefix.
@@ -156,6 +213,66 @@ export function rewriteListenerExpression(
   });
 
   traverse(wrapper, {
+    /**
+     * Inline WRITE inside a listener body — mirror of rewriteScript.ts's
+     * AssignmentExpression visitor. `$model.X` has already been normalized to
+     * `$props.X` by the first traversal, so only the `$props.<modelProp>` and
+     * `$data.<dataName>` write shapes are lowered here. Lowering replaces the
+     * whole assignment with `this.X.set(...)` BEFORE the MemberExpression read
+     * visitor descends into the now-replaced subtree, so the RHS's own
+     * `$props`/`$data` reads (e.g. `$data.n` in `$data.n = $data.n + 1`) still
+     * lower to `this.n()` on re-traversal. Non-model `$props` writes are
+     * ROZ200/ROZ204 semantic errors that never reach emit; `$refs`/`$slots`
+     * writes are not lowered.
+     */
+    AssignmentExpression(path) {
+      const node = path.node;
+      const left = node.left;
+      if (!t.isMemberExpression(left)) return;
+      if (left.computed) return;
+      const obj = left.object;
+      const prop = left.property;
+      if (!t.isIdentifier(obj)) return;
+      /* v8 ignore next -- defensive: a non-computed MemberExpression LHS always has an Identifier property */
+      if (!t.isIdentifier(prop)) return;
+
+      if (obj.name === '$data') {
+        if (!dataNames.has(prop.name)) return;
+        path.replaceWith(buildAngularSetterCall(prop.name, node.operator, node.right));
+        return;
+      }
+      if (obj.name === '$props') {
+        if (!modelProps.has(prop.name)) return;
+        path.replaceWith(buildAngularSetterCall(prop.name, node.operator, node.right));
+        return;
+      }
+    },
+
+    /**
+     * `$data.x++` / `$data.x--` (and the model `$props.x` forms) inside a
+     * listener body — mirror of rewriteScript.ts's UpdateExpression visitor.
+     * `this.x` is a signal GETTER, so `this.x()++` is invalid; route through
+     * the setter: `++` → `+= 1`, `--` → `-= 1`. Statement-context only, matching
+     * the script path's restriction.
+     */
+    UpdateExpression(path) {
+      const node = path.node;
+      const arg = node.argument;
+      if (!t.isMemberExpression(arg) || arg.computed) return;
+      const obj = arg.object;
+      const prop = arg.property;
+      if (!t.isIdentifier(obj) || !t.isIdentifier(prop)) return;
+
+      const isData = obj.name === '$data' && dataNames.has(prop.name);
+      const isModel = obj.name === '$props' && modelProps.has(prop.name);
+      if (!isData && !isModel) return;
+
+      if (!path.parentPath?.isExpressionStatement()) return;
+
+      const op = node.operator === '++' ? '+=' : '-=';
+      path.replaceWith(buildAngularSetterCall(prop.name, op, t.numericLiteral(1)));
+    },
+
     MemberExpression(path) {
       const obj = path.node.object;
       if (!t.isIdentifier(obj)) return;

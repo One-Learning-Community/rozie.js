@@ -76,11 +76,11 @@ function doubled() {
 <listeners>
   <!--
     A <listeners>-body model READ (the realistic supported Angular pattern —
-    see Modal.rozie's r-if="$props.open && ..."). An inline model WRITE from an
-    Angular <listeners> body is a PRE-EXISTING unsupported pattern (the Angular
-    listener rewrite has no AssignmentExpression visitor — a write crashes
-    identically for the $props form; out of scope for this plan). This READ
-    exercises the SEPARATE listener-body lowering path for $model.
+    see Modal.rozie's r-if="$props.open && ..."). Inline model/data WRITES from
+    an Angular <listeners> body are also supported now (the listener rewrite
+    gained Assignment/Update visitors mirroring the script path — see
+    listener-write.test.ts). This READ exercises the SEPARATE listener-body
+    lowering path for $model.
   -->
   <listener :target="document" @keydown="() => {}" r-if="${writeSigil}.value > 0" />
 </listeners>
