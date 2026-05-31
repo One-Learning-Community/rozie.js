@@ -88,10 +88,13 @@ function makeRoz204(
   decl: PropDeclEntry,
   operator: string,
 ): Diagnostic {
+  // Verb selection mirrors makeRoz200 (lowercase 'write to' / 'mutate') so the
+  // two prop-write diagnostics read consistently when both appear (WR-03).
   const isPlainAssign = operator.length === 1;
-  const verb = isPlainAssign ? 'Write to' : 'Mutation of';
+  const verb = isPlainAssign ? 'write to' : 'mutate';
+  const operatorPhrase = isPlainAssign ? '' : ` with ${operator}`;
   const message =
-    `${verb} '$props.${member}' is not allowed — '${member}' is a model prop, so write it via ` +
+    `Cannot ${verb} '$props.${member}'${operatorPhrase} — '${member}' is a model prop; write it via ` +
     `'$model.${member}', not '$props.${member}'. '$props' is read-only for every prop.`;
   return {
     code: RozieErrorCode.WRITE_TO_MODEL_PROP_VIA_PROPS,
@@ -132,10 +135,13 @@ function checkLHSForPropWrite(
     // two-way, but it must be written via `$model.<x>`, never `$props.<x>`.
     // ROZ204 names `$model.<x>` as the fix. Inherits the operator-agnostic
     // path (AssignmentExpression + UpdateExpression), so `$props.open = false`
-    // and `$props.count++` (model) both error. Exactly one diagnostic per site
-    // — ROZ203 (updateExpressionValidator) only fires when the value is
-    // CONSUMED, a distinct shape; statement-context model `$props` writes are
-    // owned solely here (D-09 / Pitfall 6).
+    // and `$props.count++` (model) both error. Statement-context model `$props`
+    // writes are owned solely here: exactly one diagnostic fires (SPEC Req 3
+    // acceptance). The ONE overlap is a CONSUMED model update — `const y =
+    // $props.count++` — which legitimately co-emits ROZ203 (value-consumed,
+    // updateExpressionValidator) alongside ROZ204 (illegal `$props` write):
+    // two genuinely distinct authoring mistakes, not a double-emit of the same
+    // one (D-09 / Pitfall 6; covered by the consumed-case test).
     diagnostics.push(makeRoz204(parentNode, access.member, decl, operator));
     return;
   }

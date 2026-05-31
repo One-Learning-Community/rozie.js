@@ -89,16 +89,6 @@ function buildSetterCall(
 }
 
 /**
- * Rewrite $props/$data/$refs in a single expression node (cloned from IR).
- *
- * Used by emitScript.ts to rewrite computed body expressions that live in
- * ir.computed[i].body — these are Babel AST nodes separate from the main
- * script body, so they need their own rewrite pass. The node is cloned first
- * to avoid mutating the shared IR.
- *
- * @experimental — shape may change before v1.0
- */
-/**
  * Phase 18 (Req 2) — normalize the producer-side two-way-write sigil `$model`
  * to `$props` across a cloned File, in place. See the call-site comment in
  * `rewriteRozieIdentifiers` for the full contract; `$model.X` is model-only and
@@ -119,6 +109,16 @@ function normalizeModelAccessor(file: File): void {
   });
 }
 
+/**
+ * Rewrite $props/$data/$refs in a single expression node (cloned from IR).
+ *
+ * Used by emitScript.ts to rewrite computed body expressions that live in
+ * ir.computed[i].body — these are Babel AST nodes separate from the main
+ * script body, so they need their own rewrite pass. The node is cloned first
+ * to avoid mutating the shared IR.
+ *
+ * @experimental — shape may change before v1.0
+ */
 export function rewriteRozieExpressionNode(
   expr: t.Expression | t.BlockStatement,
   ir: IRComponent,

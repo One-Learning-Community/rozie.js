@@ -83,6 +83,25 @@ const f = () => { $props.step = 1 }
     expect(filterByCode(diagnostics, 'ROZ200').length).toBe(1);
     expect(filterByCode(diagnostics, 'ROZ204')).toEqual([]);
   });
+
+  // WR-01: the single overlap case. A CONSUMED model update (`const y =
+  // $props.count++`) is two genuinely distinct authoring mistakes — an illegal
+  // `$props` model-write (ROZ204) AND consuming an update-expression value
+  // (ROZ203). Both legitimately fire; this is NOT a double-emit of one error.
+  // Statement-context writes (above) stay exactly-one-ROZ204 (SPEC Req 3).
+  it('consumed `const y = $props.count++` (model) co-emits ROZ204 + ROZ203', () => {
+    const src = `<rozie name="Counter">
+<props>{ count: { type: Number, default: 0, model: true } }</props>
+<script>
+const f = () => { const y = $props.count++; return y }
+</script>
+</rozie>`;
+    const { diagnostics } = analyzeSource(src, 'Counter.rozie');
+    expect(filterByCode(diagnostics, 'ROZ204').length).toBe(1);
+    expect(filterByCode(diagnostics, 'ROZ203').length).toBe(1);
+    // Still no ROZ200 — count is a model prop.
+    expect(filterByCode(diagnostics, 'ROZ200')).toEqual([]);
+  });
 });
 
 describe('$model sigil — Req 4 ($model.<nonModelProp> = ROZ205)', () => {
