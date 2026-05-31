@@ -63,7 +63,7 @@ export default class SortableList extends SignalWatcher(LitElement) {
 
   private _disconnectCleanups: Array<() => void> = [];
 
-  private _rozieReconcileSeq = 0;
+  _rozieReconcileSeq = 0;
 
   private _armListeners(): void {
     {

@@ -153,7 +153,7 @@ export interface EmitTemplateOpts {
      * `TemplateElementIR` with `isExternal === true` was emitted. emitLit
      * reads this off `EmitTemplateResult` and conditionally adds
      * `import { keyed } from 'lit/directives/keyed.js';` plus the
-     * `private _rozieReconcileSeq = 0;` class field. The seq is bumped by
+     * `_rozieReconcileSeq = 0;` class field. The seq is bumped by
      * `__rozieReconcileAfterDomMutation` (runtime helper) to invalidate
      * `keyed`-wrapped subtrees while preserving the marked element's own
      * DOM identity (and any third-party listeners attached to it).
@@ -226,7 +226,7 @@ export interface EmitTemplateResult {
   /**
    * True when at least one `r-external`-marked element was emitted. emitLit
    * conditionally wires `import { keyed } from 'lit/directives/keyed.js';`
-   * AND declares a `private _rozieReconcileSeq = 0;` class field based on
+   * AND declares a `_rozieReconcileSeq = 0;` class field based on
    * this flag. The seq is bumped by `__rozieReconcileAfterDomMutation`;
    * `keyed(seq, …)` then disposes the children of the marked element on
    * the next render, leaving the marked element itself (and any

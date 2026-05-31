@@ -325,9 +325,12 @@ export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResu
     // emitted around marked-element children. Bumped by
     // `__rozieReconcileAfterDomMutation`; declared ONLY when the template
     // actually uses an `r-external` marker so unmarked components stay
-    // byte-identical to the pre-change emit.
+    // byte-identical to the pre-change emit. Emitted WITHOUT `private` so the
+    // component instance satisfies the runtime `ReconcilableHost` interface
+    // (TS forbids a `private` member from satisfying an interface member);
+    // surfaced by the @rozie-ui/sortable-list-lit strict typecheck gate.
     reconcileSeqField: templateResult.keyedUsed
-      ? '  private _rozieReconcileSeq = 0;'
+      ? '  _rozieReconcileSeq = 0;'
       : '',
     listenerWiringBody: listenerWiring,
     mountHookBody: scriptResult.mountHookBody,

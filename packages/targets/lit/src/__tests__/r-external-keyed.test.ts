@@ -7,7 +7,8 @@
  *   1. wraps the marked element's children in
  *      `${keyed(this._rozieReconcileSeq ?? 0, html\`…\`)}`
  *   2. emits `import { keyed } from 'lit/directives/keyed.js';`
- *   3. emits a `private _rozieReconcileSeq = 0;` class field
+ *   3. emits a `_rozieReconcileSeq = 0;` class field (non-`private` so the
+ *      instance satisfies the runtime `ReconcilableHost` interface)
  *
  * The seq is bumped by the runtime helper
  * `__rozieReconcileAfterDomMutation` (called from the lowered
@@ -70,7 +71,7 @@ describe('r-external — Lit emit gates the keyed wrapper', () => {
 
   it('declares the `_rozieReconcileSeq` counter when `r-external` is used', () => {
     const code = compile(SRC_MARKED);
-    expect(code).toContain('private _rozieReconcileSeq = 0;');
+    expect(code).toContain('_rozieReconcileSeq = 0;');
   });
 
   it('wraps the marked element\'s children in `keyed(this._rozieReconcileSeq ?? 0, html`…`)`', () => {
