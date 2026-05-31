@@ -63,11 +63,7 @@ function doubled() {
 }
 </script>
 <listeners>
-{
-  "document:keydown": {
-    handler: () => { ${writeSigil}.value += 1 },
-  },
-}
+  <listener :target="document" @keydown="() => { ${writeSigil}.value += 1 }" />
 </listeners>
 <template>
   <button @click="${writeSigil}.value += 1">{{ ${writeSigil}.value }}</button>

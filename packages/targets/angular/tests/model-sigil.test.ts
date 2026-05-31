@@ -74,18 +74,15 @@ function doubled() {
 }
 </script>
 <listeners>
-{
-  // A <listeners>-body model READ (the realistic supported Angular pattern —
-  // see Modal.rozie's when: "$props.open && ..."). An inline model WRITE from an
-  // Angular <listeners> body is a PRE-EXISTING unsupported pattern (the Angular
-  // listener rewrite has no AssignmentExpression visitor — a write crashes
-  // identically for the $props form; out of scope for this plan). This READ
-  // exercises the SEPARATE listener-body lowering path for $model.
-  "document:keydown": {
-    when:    "${writeSigil}.value > 0",
-    handler: () => {},
-  },
-}
+  <!--
+    A <listeners>-body model READ (the realistic supported Angular pattern —
+    see Modal.rozie's r-if="$props.open && ..."). An inline model WRITE from an
+    Angular <listeners> body is a PRE-EXISTING unsupported pattern (the Angular
+    listener rewrite has no AssignmentExpression visitor — a write crashes
+    identically for the $props form; out of scope for this plan). This READ
+    exercises the SEPARATE listener-body lowering path for $model.
+  -->
+  <listener :target="document" @keydown="() => {}" r-if="${writeSigil}.value > 0" />
 </listeners>
 <template>
   <button :title="${writeSigil}.value ? ${writeSigil}.value + 'x' : 'none'" @click="${writeSigil}.value += 1">{{ ${writeSigil}.value }}</button>

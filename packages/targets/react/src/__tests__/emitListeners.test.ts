@@ -117,9 +117,7 @@ describe('emitListeners 4-class classification (Plan 04-04 Task 2)', () => {
 const close = () => { $props.open = false }
 </script>
 <listeners>
-{
-  "document:keydown.escape": { when: "$props.open && $props.closeOnEscape", handler: close },
-}
+  <listener :target="document" @keydown.escape="close" r-if="$props.open && $props.closeOnEscape" />
 </listeners>
 </rozie>
 `);
@@ -146,9 +144,7 @@ const close = () => { $props.open = false }
 </div>
 </template>
 <listeners>
-{
-  "document:click.outside($refs.triggerEl, $refs.panelEl)": { when: "$props.open", handler: close },
-}
+  <listener :target="document" @click.outside($refs.triggerEl,$refs.panelEl)="close" r-if="$props.open" />
 </listeners>
 </rozie>
 `);
@@ -167,9 +163,7 @@ const close = () => { $props.open = false }
 const reposition = () => {}
 </script>
 <listeners>
-{
-  "window:resize.throttle(100).passive": { when: "$props.open", handler: reposition },
-}
+  <listener :target="window" @resize.throttle(100).passive="reposition" r-if="$props.open" />
 </listeners>
 </rozie>
 `);
@@ -188,9 +182,7 @@ const reposition = () => {}
 const onClick = () => {}
 </script>
 <listeners>
-{
-  "document:click.stop": { when: "true", handler: onClick },
-}
+  <listener :target="document" @click.stop="onClick" r-if="true" />
 </listeners>
 </rozie>
 `);

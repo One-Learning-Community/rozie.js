@@ -34,12 +34,7 @@ describe('WR-03 — .outside inline-expression handler emits as statement', () =
     const src = `<rozie name="WR03Inline">
 <data>{ open: true }</data>
 <listeners>
-{
-  "document:click.outside($refs.box)": {
-    when:    "$data.open",
-    handler: "$data.open = false",
-  },
-}
+  <listener :target="document" @click.outside($refs.box)="$data.open = false" r-if="$data.open" />
 </listeners>
 <template><div ref="box">box</div></template>
 </rozie>`;
@@ -58,12 +53,7 @@ describe('WR-03 — .outside inline-expression handler emits as statement', () =
 function close() { $data.open = false }
 </script>
 <listeners>
-{
-  "document:click.outside($refs.box)": {
-    when:    "$data.open",
-    handler: close,
-  },
-}
+  <listener :target="document" @click.outside($refs.box)="close" r-if="$data.open" />
 </listeners>
 <template><div ref="box">box</div></template>
 </rozie>`;
