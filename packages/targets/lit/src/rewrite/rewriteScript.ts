@@ -274,6 +274,37 @@ export function rewriteScript(
       }
     },
 
+    /**
+     * `$props.x++` / `$props.x--` (model) — the UpdateExpression mutation.
+     *
+     * `$data.x++` does NOT need handling here: the MemberExpression visitor
+     * lowers `$data.x` to the settable signal property `this._x.value`, and
+     * `this._x.value++` is valid. But a MODEL `$props.x` lowers to the public
+     * getter `this.x`, and `this.x++` would route through the public setter
+     * (`notifyPropertyWrite`, the external-parent / controlled-mode entry) —
+     * the SAME bug the AssignmentExpression visitor avoids by going through
+     * `_<name>Controllable.write(...)`. So we intercept the model `++`/`--`
+     * here and route it through the SAME `buildModelWriteCall` path the
+     * compound-assignment case uses: `++` → `write(prev => prev + 1)`.
+     *
+     * Statement-context only — see the React target's UpdateExpression visitor
+     * for the postfix-expression-value rationale.
+     */
+    UpdateExpression(path) {
+      const node = path.node;
+      const arg = node.argument;
+      if (!t.isMemberExpression(arg) || arg.computed) return;
+      const obj = arg.object;
+      const prop = arg.property;
+      if (!t.isIdentifier(obj) || !t.isIdentifier(prop)) return;
+      if (obj.name !== '$props' || !modelProps.has(prop.name)) return;
+
+      if (!path.parentPath?.isExpressionStatement()) return;
+
+      const op = node.operator === '++' ? '+=' : '-=';
+      path.replaceWith(buildModelWriteCall(prop.name, op, t.numericLiteral(1)));
+    },
+
     MemberExpression(path) {
       // WR-02 (Phase 9) — skip member expressions in TS type position
       // (`let x: typeof $data.foo`). Without this the `$data.foo` rewrite

@@ -1,0 +1,63 @@
+<!--
+  UpdateExpressionProbe.rozie
+
+  Regression probe for the `++` / `--` (UpdateExpression) mutation of reactive
+  state. Before the fix, the UpdateExpression passed through verbatim, producing
+  uncompilable output in the setter-based targets:
+    - React  `count++`        — assignment-to-`const` (count is `useState`)
+    - Solid  `count()++`      — invalid (count is a `createSignal` getter)
+    - Angular `this.count()++` — invalid (signal getter)
+
+  Each `$data.X++` / model `$props.X++` must route through the SAME setter path
+  as `+= 1` / `-= 1`:
+    - React  → setCount(prev => prev + 1)
+    - Solid  → setCount(count() + 1)
+    - Angular→ this.count.set(this.count() + 1)
+    - Vue    → count.value++           (valid as-is)
+    - Svelte → count++                 (valid on $state)
+    - Lit    → this._count.value++     (valid signal `.value`)
+  Model `$props.X++` routes through each target's model-setter (React
+  onValueChange / Lit controllable.write / Angular model.set / etc.).
+
+  Single-file; no sibling .rozie producers.
+-->
+
+<rozie name="UpdateExpressionProbe">
+
+<props>
+{
+  value: { type: Number, default: 0, model: true },
+}
+</props>
+
+<data>
+{
+  count: 0,
+}
+</data>
+
+<script>
+const incCount = () => { $data.count++ }
+const decCount = () => { $data.count-- }
+const incValue = () => { $props.value++ }
+const decValue = () => { $props.value-- }
+</script>
+
+<template>
+<div class="probe">
+  <button @click="decCount" aria-label="Decrement count">−</button>
+  <span class="count">{{ $data.count }}</span>
+  <button @click="incCount" aria-label="Increment count">+</button>
+  <button @click="decValue" aria-label="Decrement value">−</button>
+  <span class="value">{{ $props.value }}</span>
+  <button @click="incValue" aria-label="Increment value">+</button>
+</div>
+</template>
+
+<style>
+.probe { display: inline-flex; gap: 0.5rem; align-items: center; }
+.count, .value { font-variant-numeric: tabular-nums; min-width: 3ch; text-align: center; }
+button { padding: 0.25rem 0.5rem; }
+</style>
+
+</rozie>

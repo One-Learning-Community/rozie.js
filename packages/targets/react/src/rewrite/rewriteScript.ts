@@ -419,6 +419,49 @@ export function rewriteRozieIdentifiers(
       }
     },
 
+    /**
+     * `$data.x++` / `$data.x--` (and the `$props.x` model forms) — the
+     * UpdateExpression mutation. `count` is `const [count, setCount] =
+     * useState(...)`, so the bare `count++` that would otherwise pass through
+     * is an assignment-to-const and will not compile. Route through the SAME
+     * `buildSetterCall` path the compound-assignment case uses: `++` becomes
+     * `+= 1`, `--` becomes `-= 1`, yielding `setCount(prev => prev + 1)`.
+     *
+     * Statement-context only: in `arr[i++]` / `const y = x++` the postfix
+     * pre-increment VALUE matters, and a functional-updater setter call returns
+     * the SETTER's result, not the prior value — semantically different. We
+     * only rewrite when the UpdateExpression sits directly under an
+     * ExpressionStatement (the `inc = () => { $data.count++ }` common case);
+     * any expression-context `$data.x++` is left unchanged (it would already
+     * be broken on a bare local, but we do not silently mis-lower it).
+     */
+    UpdateExpression(path) {
+      const node = path.node;
+      const arg = node.argument;
+      if (!t.isMemberExpression(arg) || arg.computed) return;
+      const obj = arg.object;
+      const prop = arg.property;
+      if (!t.isIdentifier(obj) || !t.isIdentifier(prop)) return;
+      if (obj.name !== '$data' && obj.name !== '$props') return;
+
+      const isData = obj.name === '$data';
+      if (isData && !dataNames.has(prop.name)) return;
+      if (!isData && !modelProps.has(prop.name)) return;
+
+      // Only rewrite in statement context, where prefix/postfix are equivalent
+      // and the returned value is discarded.
+      if (!path.parentPath?.isExpressionStatement()) return;
+
+      const op = node.operator === '++' ? '+=' : '-=';
+      const setterCall = buildSetterCall(
+        prop.name,
+        op,
+        t.numericLiteral(1),
+        isData ? '$data' : '$props',
+      );
+      path.replaceWith(setterCall);
+    },
+
     Identifier(path) {
       // Spike 001 B2 — script-context `$el` lowers to
       // `MemberExpression($refs, __rozieRoot)`. The IR pass `lowerRootElementRef`

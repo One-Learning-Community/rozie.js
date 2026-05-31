@@ -686,6 +686,37 @@ export function rewriteRozieIdentifiers(
       }
     },
 
+    /**
+     * `$data.x++` / `$data.x--` (and the model `$props.x` forms) — the
+     * UpdateExpression mutation. `this.count` is a `signal()` GETTER, so the
+     * verbatim `this.count()++` is invalid. Route through the SAME
+     * `buildAngularSetterCall` path the compound-assignment case uses: `++`
+     * becomes `+= 1` → `this.count.set(this.count() + 1)`, `--` becomes `-= 1`
+     * → `this.count.set(this.count() - 1)`.
+     *
+     * Statement-context only — see the React target's UpdateExpression visitor
+     * for the postfix-expression-value rationale. Expression-context
+     * `$data.x++` is left unchanged rather than mis-lowered.
+     */
+    UpdateExpression(path) {
+      const node = path.node;
+      const arg = node.argument;
+      if (!t.isMemberExpression(arg) || arg.computed) return;
+      const obj = arg.object;
+      const prop = arg.property;
+      if (!t.isIdentifier(obj) || !t.isIdentifier(prop)) return;
+
+      const isData = obj.name === '$data' && dataNames.has(prop.name);
+      const isModel = obj.name === '$props' && modelProps.has(prop.name);
+      if (!isData && !isModel) return;
+
+      if (!path.parentPath?.isExpressionStatement()) return;
+
+      const op = node.operator === '++' ? '+=' : '-=';
+      const setterCall = buildAngularSetterCall(prop.name, op, t.numericLiteral(1));
+      path.replaceWith(setterCall);
+    },
+
     MemberExpression(path) {
       // WR-02 (Phase 9) — skip member expressions in TS type position.
       // Defensive: `typeof X.Y` parses its entity name as a TSQualifiedName,

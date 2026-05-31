@@ -147,6 +147,14 @@ const EXAMPLES = [
   // ThemedButton-vs-ThemedButtonConsumer split).
   'PartCard',
   'PartCardConsumer',
+  // UpdateExpression (`++`/`--`) regression probe. Exercises `$data.X++/--` and
+  // model `$props.X++/--`; the committed per-target bytes are the dist-parity
+  // contract that the UpdateExpression mutation routes through each target's
+  // setter path (React setCount(prev => prev + 1), Solid setCount(count() + 1),
+  // Angular this.count.set(this.count() + 1), Lit model write(prev => prev + 1))
+  // identically across all four entrypoints. Single-file; no sibling .rozie
+  // producers — stays OUT of RESOLVER_ROOT.
+  'UpdateExpressionProbe',
 ];
 
 const EXAMPLES_NEEDING_RESOLVER_ROOT = new Set([

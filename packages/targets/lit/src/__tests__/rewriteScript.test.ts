@@ -214,6 +214,29 @@ describe('rewriteScript — sigil rewrites', () => {
     expect(out).toContain('this._countControllable.write(prev => prev + 3);');
   });
 
+  it('$data.X++ → this._X.value++  (signal `.value` is settable — passes through valid)', () => {
+    const ir = buildIR({ state: [state('count')] });
+    expect(rewrite('$data.count++;', ir)).toContain('this._count.value++;');
+  });
+
+  it('$props.X++ (model) → write(prev => prev + 1) — NOT the public-setter `this.X++`', () => {
+    // The model `++` must route through the controllable's write(), same as the
+    // compound-assignment case. `this.value++` would hit the public setter
+    // (notifyPropertyWrite → controlled-mode entry) — the exact bug the
+    // AssignmentExpression visitor avoids.
+    const ir = buildIR({ props: [prop('value', true)] });
+    const out = rewrite('$props.value++;', ir);
+    expect(out).toContain('this._valueControllable.write(prev => prev + 1);');
+    expect(out).not.toContain('this.value++');
+  });
+
+  it('$props.X-- (model) → write(prev => prev - 1)', () => {
+    const ir = buildIR({ props: [prop('value', true)] });
+    expect(rewrite('$props.value--;', ir)).toContain(
+      'this._valueControllable.write(prev => prev - 1);',
+    );
+  });
+
   it('$props.X = y (non-model) → this.X = y (best-effort runtime-error path)', () => {
     // A non-model prop write stays as a plain member assignment — it never has
     // a controllable backing.

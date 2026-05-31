@@ -151,6 +151,16 @@ describe('rewriteRozieIdentifiers — $props', () => {
     const ir = buildIR({ props: [prop('value', true)] });
     expect(rewrite('$props.value += 2;', ir).code).toContain('setValue(value() + 2);');
   });
+
+  it('$props.X++ (model) → setX(X() + 1)', () => {
+    const ir = buildIR({ props: [prop('value', true)] });
+    expect(rewrite('$props.value++;', ir).code).toContain('setValue(value() + 1);');
+  });
+
+  it('$props.X-- (model) → setX(X() - 1)', () => {
+    const ir = buildIR({ props: [prop('value', true)] });
+    expect(rewrite('$props.value--;', ir).code).toContain('setValue(value() - 1);');
+  });
 });
 
 describe('rewriteRozieIdentifiers — $data', () => {
@@ -172,6 +182,38 @@ describe('rewriteRozieIdentifiers — $data', () => {
   it('$data.X *= n compound → setX(X() * n)', () => {
     const ir = buildIR({ state: [state('count')] });
     expect(rewrite('$data.count *= 4;', ir).code).toContain('setCount(count() * 4);');
+  });
+
+  it('$data.X++ → setX(X() + 1)  (regression: was `count()++` — invalid)', () => {
+    const ir = buildIR({ state: [state('count')] });
+    const code = rewrite('$data.count++;', ir).code;
+    expect(code).toContain('setCount(count() + 1);');
+    expect(code).not.toContain('++');
+  });
+
+  it('$data.X-- → setX(X() - 1)', () => {
+    const ir = buildIR({ state: [state('count')] });
+    const code = rewrite('$data.count--;', ir).code;
+    expect(code).toContain('setCount(count() - 1);');
+    expect(code).not.toContain('--');
+  });
+
+  it('prefix `++$data.X` → setX(X() + 1)  (statement context: prefix ≡ postfix)', () => {
+    const ir = buildIR({ state: [state('count')] });
+    expect(rewrite('++$data.count;', ir).code).toContain('setCount(count() + 1);');
+  });
+
+  it('`++` on a plain non-reactive local passes through verbatim', () => {
+    const ir = buildIR({ state: [state('count')] });
+    expect(rewrite('let tmp = 0; tmp++;', ir).code).toContain('tmp++;');
+  });
+
+  it('expression-context `$data.X++` (value used) is left unchanged (deferred edge case)', () => {
+    const ir = buildIR({ state: [state('count')] });
+    // Postfix value matters here; lowering to a setter call would change
+    // semantics, so the visitor only fires in statement context.
+    const code = rewrite('const y = $data.count++;', ir).code;
+    expect(code).toContain('++');
   });
 
   it('$data.X ??= n (operator not in COMPOUND_OP_MAP) → simple setX(n) fallback', () => {

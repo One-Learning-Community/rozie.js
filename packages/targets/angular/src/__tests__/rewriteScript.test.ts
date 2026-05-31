@@ -422,6 +422,46 @@ describe('rewriteRozieIdentifiers — AssignmentExpression model/data setters', 
   });
 });
 
+describe('rewriteRozieIdentifiers — UpdateExpression (++/--) on reactive state', () => {
+  it('$data.X++ → this.X.set(this.X() + 1)  (regression: was `this.count()++`)', () => {
+    const ir = buildIR({ state: [mkState('count')] });
+    const code = rewrite('$data.count++;', ir).code;
+    expect(code).toContain('this.count.set(this.count() + 1)');
+    expect(code).not.toContain('++');
+  });
+
+  it('$data.X-- → this.X.set(this.X() - 1)', () => {
+    const ir = buildIR({ state: [mkState('count')] });
+    const code = rewrite('$data.count--;', ir).code;
+    expect(code).toContain('this.count.set(this.count() - 1)');
+    expect(code).not.toContain('--');
+  });
+
+  it('prefix `++$data.X` → this.X.set(this.X() + 1)  (statement context)', () => {
+    const ir = buildIR({ state: [mkState('count')] });
+    expect(rewrite('++$data.count;', ir).code).toContain(
+      'this.count.set(this.count() + 1)',
+    );
+  });
+
+  it('$props.X++ (model) → this.X.set(this.X() + 1)', () => {
+    const ir = buildIR({ props: [mkProp('value', true)] });
+    expect(rewrite('$props.value++;', ir).code).toContain(
+      'this.value.set(this.value() + 1)',
+    );
+  });
+
+  it('`++` on a plain non-reactive local passes through verbatim', () => {
+    const ir = buildIR({ state: [mkState('count')] });
+    expect(rewrite('let tmp = 0; tmp++;', ir).code).toContain('tmp++');
+  });
+
+  it('expression-context `$data.X++` (value used) is left unchanged (deferred edge case)', () => {
+    const ir = buildIR({ state: [mkState('count')] });
+    expect(rewrite('const y = $data.count++;', ir).code).toContain('++');
+  });
+});
+
 describe('rewriteRozieIdentifiers — $emit / $snapshot CallExpression', () => {
   it("$emit('change', x) → this.change.emit(x)", () => {
     const ir = buildIR();

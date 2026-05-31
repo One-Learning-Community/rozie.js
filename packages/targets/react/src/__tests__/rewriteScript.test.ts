@@ -129,6 +129,74 @@ const pushPoint = () => { $data.points = [...$data.points.slice(-19), $data.next
     expect(code).not.toContain('$data.');
   });
 
+  // ---------------------------------------------------------------------------
+  // UpdateExpression (`++`/`--`) on reactive state. Regression guard for the
+  // bug where `$data.count++` passed through verbatim as `count++` — an
+  // assignment-to-const since `count` is `const [count, setCount] = useState`.
+  // Must route through the SAME setter path as `+= 1` / `-= 1`.
+  // ---------------------------------------------------------------------------
+  it('UpdateExpression: `$data.count++` / `$data.count--` → setCount(prev => prev ± 1)', () => {
+    const src = `<rozie name="UpdSynth">
+<data>{ count: 0 }</data>
+<script>
+const inc = () => { $data.count++ }
+const dec = () => { $data.count-- }
+</script>
+<template><div /></template>
+</rozie>`;
+    const ir = lowerToIR(parse(src, { filename: 'UpdSynth.rozie' }).ast!, {
+      modifierRegistry: createDefaultRegistry(),
+    }).ir!;
+    const cloned = cloneScriptProgram(ir.setupBody.scriptProgram);
+    rewriteRozieIdentifiers(cloned, ir);
+    const code = generate(cloned).code;
+    expect(code).toMatch(/setCount\s*\(\s*prev\s*=>\s*prev\s*\+\s*1\s*\)/);
+    expect(code).toMatch(/setCount\s*\(\s*prev\s*=>\s*prev\s*-\s*1\s*\)/);
+    // The broken verbatim form must NOT survive.
+    expect(code).not.toMatch(/count\s*\+\+/);
+    expect(code).not.toMatch(/count\s*--/);
+    expect(code).not.toContain('$data.');
+  });
+
+  it('UpdateExpression: model `$props.value++` → setValue(prev => prev + 1)', () => {
+    const src = `<rozie name="UpdModel">
+<props>{ value: { type: Number, default: 0, model: true } }</props>
+<script>
+const inc = () => { $props.value++ }
+const dec = () => { $props.value-- }
+</script>
+<template><div /></template>
+</rozie>`;
+    const ir = lowerToIR(parse(src, { filename: 'UpdModel.rozie' }).ast!, {
+      modifierRegistry: createDefaultRegistry(),
+    }).ir!;
+    const cloned = cloneScriptProgram(ir.setupBody.scriptProgram);
+    rewriteRozieIdentifiers(cloned, ir);
+    const code = generate(cloned).code;
+    expect(code).toMatch(/setValue\s*\(\s*prev\s*=>\s*prev\s*\+\s*1\s*\)/);
+    expect(code).toMatch(/setValue\s*\(\s*prev\s*=>\s*prev\s*-\s*1\s*\)/);
+    expect(code).not.toContain('$props.');
+  });
+
+  it('UpdateExpression: `++` on a plain non-reactive local is left untouched', () => {
+    const src = `<rozie name="UpdLocal">
+<data>{ count: 0 }</data>
+<script>
+const bump = () => { let tmp = 0; tmp++; $data.count = tmp }
+</script>
+<template><div /></template>
+</rozie>`;
+    const ir = lowerToIR(parse(src, { filename: 'UpdLocal.rozie' }).ast!, {
+      modifierRegistry: createDefaultRegistry(),
+    }).ir!;
+    const cloned = cloneScriptProgram(ir.setupBody.scriptProgram);
+    rewriteRozieIdentifiers(cloned, ir);
+    const code = generate(cloned).code;
+    // Plain local `tmp++` is NOT a reactive target — passes through verbatim.
+    expect(code).toMatch(/tmp\+\+/);
+    expect(code).toMatch(/setCount\s*\(\s*tmp\s*\)/);
+  });
+
   it('SearchInput: $emit("search", q) → props.onSearch && props.onSearch(q) (Plan 04-04 lint fix)', () => {
     // Plan 04-04 changed $emit emission from optional chain to logical-AND
     // guard so eslint-plugin-react-hooks v5 narrows the deps[] entry
