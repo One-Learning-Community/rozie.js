@@ -911,3 +911,5 @@ A grab-bag of little decisions that add up:
 ## Next
 
 See [Examples](/examples/) for the full gallery — seven reference components, each with byte-verbatim output across all six targets, plus a feature index for jumping straight to whichever idiom you want to see in action.
+
+Hit a `ROZxxx` code in your terminal? The [Diagnostics reference](/reference/diagnostics) lists every diagnostic code — generated from the compiler source, so it's always current — with its severity and cause.

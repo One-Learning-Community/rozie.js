@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitepress';
 import Rozie from '@rozie/unplugin/vite';
 import { rozieCodegen } from './rozie-codegen';
+import { diagnosticsCodegen } from './diagnostics-codegen';
 
 const rozieGrammar = JSON.parse(
   readFileSync(
@@ -13,6 +14,12 @@ const rozieGrammar = JSON.parse(
 
 // Repo-root `examples/` dir — source for the live-compiled example pages.
 const examplesDir = fileURLToPath(new URL('../../examples', import.meta.url));
+
+// The compiler's diagnostic-code registry — source for the generated
+// ROZ-code reference page (`/reference/diagnostics`).
+const codesPath = fileURLToPath(
+  new URL('../../packages/core/src/diagnostics/codes.ts', import.meta.url),
+);
 
 export default defineConfig({
   title: 'Rozie.js',
@@ -40,6 +47,7 @@ export default defineConfig({
     // every build, so the docs can never drift from the compiler.
     config(md) {
       rozieCodegen(md, { examplesDir });
+      diagnosticsCodegen(md, { codesPath });
     },
   },
   // Dogfood the project: compile .rozie files inline through the unplugin so
@@ -96,6 +104,7 @@ export default defineConfig({
           items: [
             { text: 'Compatibility', link: '/compatibility' },
             { text: 'Cross-Framework Parity', link: '/parity' },
+            { text: 'Diagnostics (ROZ codes)', link: '/reference/diagnostics' },
           ],
         },
       ],
@@ -105,6 +114,17 @@ export default defineConfig({
           items: [
             { text: 'Compatibility', link: '/compatibility' },
             { text: 'Cross-Framework Parity', link: '/parity' },
+            { text: 'Diagnostics (ROZ codes)', link: '/reference/diagnostics' },
+          ],
+        },
+      ],
+      '/reference/': [
+        {
+          text: 'Reference',
+          items: [
+            { text: 'Compatibility', link: '/compatibility' },
+            { text: 'Cross-Framework Parity', link: '/parity' },
+            { text: 'Diagnostics (ROZ codes)', link: '/reference/diagnostics' },
           ],
         },
       ],
