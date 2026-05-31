@@ -171,11 +171,14 @@ describe('Negative tests by ROZ-code range (at least one per range)', () => {
     expect(diagnostics.map((d) => d.code)).toContain('ROZ011');
   });
 
-  it('ROZ012 — listener key is not a string literal', () => {
-    const content = '{ [event]: { handler: foo } }';
+  it('ROZ015 — <listener> element with no @event', () => {
+    // Element form: a <listener> with a :target but zero @event attrs is malformed.
+    // (ROZ012 LISTENER_KEY_NOT_STRING is now dormant — the object-walk that emitted it
+    //  was retired in Phase 19 Wave 1; its definition is retained in codes.ts.)
+    const content = '<listener :target="document" r-if="true" />';
     const contentLoc = { start: 0, end: content.length };
     const { diagnostics } = parseListeners(content, contentLoc, content);
-    expect(diagnostics.map((d) => d.code)).toContain('ROZ012');
+    expect(diagnostics.map((d) => d.code)).toContain('ROZ015');
   });
 
   it('ROZ050 — unclosed template element', () => {

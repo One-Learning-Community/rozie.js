@@ -191,13 +191,16 @@ describe('Off-by-one source-location regression (D-12 / Phase 1 Success Criterio
     expect(decl.id.loc.start.index).toBe(source.indexOf('toggle'));
   });
 
-  it('Dropdown.rozie — <listeners> first entry rawKey + rawKeyLoc byte-accurate', () => {
+  it('Dropdown.rozie — <listener> first entry target/event + modifierChainBaseOffset byte-accurate', () => {
     const source = loadExample('Dropdown');
     const { ast } = parse(source);
     const entry = ast!.listeners!.entries[0]!;
-    expect(entry.rawKey).toBe('document:click.outside($refs.triggerEl, $refs.panelEl)');
-    // rawKeyLoc skips the opening quote (rawKeyLoc.start = position of 'd' in "document...").
-    expect(entry.rawKeyLoc.start).toBe(source.indexOf('document:click'));
+    // Element form: target from `:target="document"`, event from `@click...`.
+    expect(entry.target).toBe('document');
+    expect(entry.event).toBe('click');
+    // modifierChainBaseOffset is the absolute byte offset of the leading '.' of
+    // the `.outside(...)` chain on the `@click.outside(...)` attribute name.
+    expect(source.slice(entry.modifierChainBaseOffset, entry.modifierChainBaseOffset + 8)).toBe('.outside');
   });
 
   it('Dropdown.rozie — post-PEG ".outside" modifier loc.start === modifierChainBaseOffset', () => {
@@ -317,12 +320,15 @@ describe('Off-by-one source-location regression (D-12 / Phase 1 Success Criterio
     expect(decl.id.loc.start.index).toBe(source.indexOf('const close =') + 'const '.length);
   });
 
-  it('Modal.rozie — <listeners> first entry rawKey === "document:keydown.escape"', () => {
+  it('Modal.rozie — <listener> first entry target/event from :target + @event', () => {
     const source = loadExample('Modal');
     const { ast } = parse(source);
     const entry = ast!.listeners!.entries[0]!;
-    expect(entry.rawKey).toBe('document:keydown.escape');
-    expect(entry.rawKeyLoc.start).toBe(source.indexOf('document:keydown.escape'));
+    // Element form: `:target="document" @keydown.escape="close"`.
+    expect(entry.target).toBe('document');
+    expect(entry.event).toBe('keydown');
+    // modifierChainBaseOffset points at the `.escape` chain on the @event attr name.
+    expect(source.slice(entry.modifierChainBaseOffset, entry.modifierChainBaseOffset + 7)).toBe('.escape');
   });
 
   it('Modal.rozie — post-PEG .escape modifier on keydown listener byte-accurate', () => {

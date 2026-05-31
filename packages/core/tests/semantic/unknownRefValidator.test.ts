@@ -226,21 +226,17 @@ const value = $props.value
     expect(filterByCode(diagnostics, 'ROZ100')).toEqual([]);
   });
 
-  it('emits ROZ100 when listener `when` references unknown prop', () => {
-    // Dropdown's `when: "$props.open && $props.closeOnOutsideClick"` — synthetic case
-    // where `closeOnOutsideClick` is renamed to a typo in <props>.
+  it('emits ROZ100 when listener `r-if` references unknown prop', () => {
+    // Dropdown's `r-if="$props.open && $props.closeOnOutsideClick"` — synthetic case
+    // where `closeOnOutsideClick` is renamed to a typo in <props>. Phase 19 element form:
+    // r-if populates the synthesized `when`, so unknownRefValidator still walks it.
     const src = `<rozie name="X">
 <props>{ open: { type: Boolean, default: false, model: true } }</props>
 <script>
 const close = () => { $props.open = false }
 </script>
 <listeners>
-{
-  "document:click": {
-    when: "$props.open && $props.bogusPropName",
-    handler: close,
-  },
-}
+  <listener :target="document" @click="close" r-if="$props.open && $props.bogusPropName" />
 </listeners>
 </rozie>`;
     const { diagnostics } = analyzeSource(src);

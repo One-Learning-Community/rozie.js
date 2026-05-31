@@ -4,7 +4,7 @@
     "name": "Dropdown",
     "loc": {
       "start": 587,
-      "end": 3198
+      "end": 3253
     }
   },
   "props": {
@@ -30,36 +30,36 @@
     }
   },
   "listeners": {
-    "content": "\n{\n  // .outside takes ref args; fires only when the click target is outside ALL listed refs.\n  // Compiler emits the per-target wiring (Vue watchEffect, React useEffect with auto-deps,\n  // Svelte $effect, Angular effect + Renderer2.listen + DestroyRef cleanup).\n  \"document:click.outside($refs.triggerEl, $refs.panelEl)\": {\n    when:    \"$props.open && $props.closeOnOutsideClick\",\n    handler: close,\n  },\n  \"document:keydown.escape\": {\n    when:    \"$props.open && $props.closeOnEscape\",\n    handler: close,\n  },\n  \"window:resize.throttle(100).passive\": {\n    when:    \"$props.open\",\n    handler: reposition,\n  },\n}\n",
+    "content": "\n  <!--\n    .outside takes ref args; fires only when the click target is outside ALL listed refs.\n    Compiler emits the per-target wiring (Vue watchEffect, React useEffect with auto-deps,\n    Svelte $effect, Angular effect + Renderer2.listen + DestroyRef cleanup).\n    r-if here means conditional attach/detach, not conditional render.\n  -->\n  <listener :target=\"document\" @click.outside($refs.triggerEl,$refs.panelEl)=\"close\" r-if=\"$props.open && $props.closeOnOutsideClick\" />\n  <listener :target=\"document\" @keydown.escape=\"close\" r-if=\"$props.open && $props.closeOnEscape\" />\n  <listener :target=\"window\" @resize.throttle(100).passive=\"reposition\" r-if=\"$props.open\" />\n",
     "contentLoc": {
       "start": 1873,
-      "end": 2493
+      "end": 2548
     },
     "loc": {
       "start": 1862,
-      "end": 2505
+      "end": 2560
     }
   },
   "template": {
     "content": "\n<div class=\"dropdown\">\n  <div ref=\"triggerEl\" @click=\"toggle\">\n    <slot name=\"trigger\" :open=\"$props.open\" :toggle=\"toggle\" />\n  </div>\n\n  <div r-if=\"$props.open\" ref=\"panelEl\" class=\"dropdown-panel\" role=\"menu\">\n    <slot :close=\"close\" />\n  </div>\n</div>\n",
     "contentLoc": {
-      "start": 2517,
-      "end": 2776
+      "start": 2572,
+      "end": 2831
     },
     "loc": {
-      "start": 2507,
-      "end": 2787
+      "start": 2562,
+      "end": 2842
     }
   },
   "style": {
     "content": "\n.dropdown { position: relative; display: inline-block; }\n.dropdown-panel {\n  position: fixed;\n  z-index: var(--rozie-dropdown-z, 1000);\n  background: white;\n  border: 1px solid rgba(0, 0, 0, 0.1);\n  border-radius: 6px;\n  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);\n}\n\n/* Unscoped escape hatch — anything inside :root { } is emitted globally. */\n:root {\n  --rozie-dropdown-z: 1000;\n}\n",
     "contentLoc": {
-      "start": 2796,
-      "end": 3180
+      "start": 2851,
+      "end": 3235
     },
     "loc": {
-      "start": 2789,
-      "end": 3188
+      "start": 2844,
+      "end": 3243
     }
   }
 }
