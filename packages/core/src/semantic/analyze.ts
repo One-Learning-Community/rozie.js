@@ -34,6 +34,7 @@ import { runPropWriteValidator } from './validators/propWriteValidator.js';
 import { runUpdateExpressionValidator } from './validators/updateExpressionValidator.js';
 import { runRForKeyValidator } from './validators/rForKeyValidator.js';
 import { runReservedIdentifierValidator } from './validators/reservedIdentifierValidator.js';
+import { runListenerElementValidator } from './validators/listenerElementValidator.js';
 
 export interface AnalyzeResult {
   bindings: BindingsTable;
@@ -57,5 +58,8 @@ export function analyzeAST(ast: RozieAST): AnalyzeResult {
   runUpdateExpressionValidator(ast, bindings, diagnostics);
   runRForKeyValidator(ast, diagnostics);
   runReservedIdentifierValidator(ast, bindings, diagnostics);
+  // Phase 19 (D-08) — final pass: a <listener> placed inside <template> is a
+  // misplaced element (ROZ206). No binding dependency.
+  runListenerElementValidator(ast, diagnostics);
   return { bindings, diagnostics };
 }
