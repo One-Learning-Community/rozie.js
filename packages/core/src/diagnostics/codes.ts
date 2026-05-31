@@ -42,6 +42,9 @@ export const RozieErrorCode = {
   // inside `<listeners>`; ROZ017 = a `<listener>` left unterminated (no `/>` or
   // close tag).
   LISTENERS_UNEXPECTED_ELEMENT: 'ROZ016',
+  // Phase 19 (code-review WR-01): a `<listener>` element is left unterminated —
+  // no self-closing `/>` and no closing tag. Error severity; the malformed tag
+  // produces no listener and parsing recovers at the next element.
   LISTENER_ELEMENT_UNTERMINATED: 'ROZ017',
 
   // ---- Script parse (Plan 03) — ROZ030..ROZ049 ----
