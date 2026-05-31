@@ -11,7 +11,8 @@
     - Canvas  → group is the plain string `'palette-canvas'` (no clone)
     - Both share the group name so cross-list drag works in both directions
 
-  Helper machinery (in @rozie/runtime-engine-helpers/useSortableJS):
+  Helper machinery (in ./internal/useSortableJS, colocated in the
+  @rozie-ui/sortable-list package):
     - onClone bridges `__rozieItem` from original DOM node → cloned node
     - handleCommit short-circuits on `e.pullMode === 'clone'` so the
       palette's items array stays intact across drags

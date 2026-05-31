@@ -8,7 +8,6 @@
   },
   "dependencies": {
     "@rozie/core": "workspace:*",
-    "@rozie/runtime-engine-helpers": "workspace:*",
     "@rozie/runtime-svelte": "workspace:*",
     "@rozie/target-svelte": "workspace:*"
   },

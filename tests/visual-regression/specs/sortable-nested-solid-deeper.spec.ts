@@ -18,7 +18,8 @@
 // triggers the throw is open; some browsers/touch devices definitely do.
 //
 // Closed 2026-05-26 (quick task 260526-q7s): the SortableJS-vs-reconciler
-// dance moved into `useSortableJS()` (`@rozie/runtime-engine-helpers`).
+// dance moved into `useSortableJS()` (colocated at
+// packages/ui/sortable-list/src/internal/useSortableJS.ts).
 // The helper wraps the DOM-restore step in try/catch and uses identity-
 // based item lookup over fragile `e.oldIndex` — both required hardenings.
 import { test, expect } from '@playwright/test';
