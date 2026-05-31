@@ -1,169 +1,232 @@
-// PARSE-05 — <listeners> block parser tests (D-15 stage 1).
-// Implementation: packages/core/src/parsers/parseListeners.ts (Plan 03 Task 1).
-// Anchors paths per RESEARCH.md Pitfall 8.
+// Phase 19 — <listeners> element-walk parser tests.
+// Implementation: packages/core/src/parsers/parseListeners.ts
 //
-// D-15 stage 1 contract: modifier-chain TEXT preserved verbatim. Stage 2 (the
-// peggy modifier grammar) lands in Plan 04.
+// The block is now markup: a sequence of <listener> elements. Each tag's
+// :target / r-if / @event attributes fan out to N ListenerEntry records whose
+// `value` is a SYNTHESIZED `{ when?, handler }` ObjectExpression (Req 6 bridge)
+// so downstream lowering/validation/dep-graph run unchanged.
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, resolve } from 'node:path';
-import { splitBlocks } from '../../src/splitter/splitBlocks.js';
+import * as t from '@babel/types';
 import { parseListeners } from '../../src/parsers/parseListeners.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const EXAMPLES_DIR = resolve(__dirname, '../../../../examples');
-
-function loadExampleListeners(name: string) {
-  const source = readFileSync(resolve(EXAMPLES_DIR, `${name}.rozie`), 'utf8');
-  const blocks = splitBlocks(source, `${name}.rozie`);
-  if (!blocks.listeners) throw new Error(`${name}.rozie has no <listeners> block`);
-  return {
-    source,
-    content: blocks.listeners.content,
-    contentLoc: blocks.listeners.contentLoc,
-  };
+/** Parse a standalone <listeners> body string (loc offsets relative to it). */
+function parse(body: string) {
+  return parseListeners(body, { start: 0, end: body.length }, body, 'test.rozie');
 }
 
-describe('parseListeners (PARSE-05 / D-15 stage 1)', () => {
-  it('Dropdown.rozie listeners parses to three entries with verbatim modifier-chain text including .outside($refs.triggerEl, $refs.panelEl)', () => {
-    const { source, content, contentLoc } = loadExampleListeners('Dropdown');
-    const { node, diagnostics } = parseListeners(content, contentLoc, source, 'Dropdown.rozie');
+/** Pull the synthesized `when`/`handler` object properties off an entry.value. */
+function objProps(value: t.Expression) {
+  if (!t.isObjectExpression(value)) throw new Error('entry.value is not an ObjectExpression');
+  const out: Record<string, t.Expression | null> = {};
+  for (const p of value.properties) {
+    if (!t.isObjectProperty(p)) continue;
+    const k = t.isIdentifier(p.key) ? p.key.name : t.isStringLiteral(p.key) ? p.key.value : null;
+    if (k && t.isExpression(p.value)) out[k] = p.value;
+    else if (k) out[k] = null;
+  }
+  return out;
+}
+
+describe('parseListeners (Phase 19 — element-walk + synthesis bridge)', () => {
+  it('parses a single <listener> with :target=document, @keydown.escape, r-if', () => {
+    const body = '<listener :target="document" @keydown.escape="close()" r-if="$props.open" />';
+    const { node, diagnostics } = parse(body);
     expect(diagnostics).toEqual([]);
     expect(node).not.toBeNull();
-    expect(node!.entries.length).toBe(3);
-
-    // Entry 0: document:click.outside($refs.triggerEl, $refs.panelEl)
-    const e0 = node!.entries[0]!;
-    expect(e0.rawKey).toBe('document:click.outside($refs.triggerEl, $refs.panelEl)');
-    expect(e0.target).toBe('document');
-    expect(e0.event).toBe('click');
-    expect(e0.modifierChainText).toBe('.outside($refs.triggerEl, $refs.panelEl)');
-    // Verify byte offset of the leading '.' lands on '.outside' in the source.
-    expect(source.slice(e0.modifierChainBaseOffset, e0.modifierChainBaseOffset + 8)).toBe('.outside');
-    expect(e0.value.type).toBe('ObjectExpression');
-
-    // Entry 1: document:keydown.escape
-    const e1 = node!.entries[1]!;
-    expect(e1.rawKey).toBe('document:keydown.escape');
-    expect(e1.target).toBe('document');
-    expect(e1.event).toBe('keydown');
-    expect(e1.modifierChainText).toBe('.escape');
-    expect(source.slice(e1.modifierChainBaseOffset, e1.modifierChainBaseOffset + 7)).toBe('.escape');
-
-    // Entry 2: window:resize.throttle(100).passive
-    const e2 = node!.entries[2]!;
-    expect(e2.rawKey).toBe('window:resize.throttle(100).passive');
-    expect(e2.target).toBe('window');
-    expect(e2.event).toBe('resize');
-    expect(e2.modifierChainText).toBe('.throttle(100).passive');
-  });
-
-  it('Modal.rozie listeners parses to single entry with .escape modifier', () => {
-    const { source, content, contentLoc } = loadExampleListeners('Modal');
-    const { node, diagnostics } = parseListeners(content, contentLoc, source, 'Modal.rozie');
-    expect(diagnostics).toEqual([]);
     expect(node!.entries.length).toBe(1);
+
     const e = node!.entries[0]!;
     expect(e.target).toBe('document');
     expect(e.event).toBe('keydown');
     expect(e.modifierChainText).toBe('.escape');
+    expect(e.value.type).toBe('ObjectExpression');
+
+    const props = objProps(e.value);
+    expect(props.when).toBeDefined();
+    expect((props.when as t.StringLiteral).value).toBe('$props.open');
+    expect(props.handler).toBeDefined();
   });
 
-  it("defaults target to '$el' when no target prefix in key", () => {
-    const synthetic = '{ "click.outside": { handler: () => {} } }';
-    const { node, diagnostics } = parseListeners(
-      synthetic,
-      { start: 0, end: synthetic.length },
-      synthetic,
-    );
+  it('value=ObjectExpression always present; synthesized when StringLiteral carries r-if text', () => {
+    const body = '<listener :target="window" @resize="reposition()" r-if="$props.open" />';
+    const { node } = parse(body);
+    const props = objProps(node!.entries[0]!.value);
+    expect((props.when as t.StringLiteral).value).toBe('$props.open');
+  });
+
+  // ---- Req 3: multi-@event fan-out ----
+  it('fans one tag with 2 @event attributes out to 2 entries sharing target + when', () => {
+    const body =
+      '<listener :target="window" r-if="$props.open" @resize.throttle(100).passive="reposition()" @scroll.passive="reposition()" />';
+    const { node, diagnostics } = parse(body);
     expect(diagnostics).toEqual([]);
-    expect(node!.entries.length).toBe(1);
+    expect(node!.entries.length).toBe(2);
+
+    const [a, b] = node!.entries;
+    expect(a!.target).toBe('window');
+    expect(b!.target).toBe('window');
+    // distinct events + distinct modifier chains
+    expect(a!.event).toBe('resize');
+    expect(b!.event).toBe('scroll');
+    expect(a!.modifierChainText).toBe('.throttle(100).passive');
+    expect(b!.modifierChainText).toBe('.passive');
+    // shared r-if condition
+    expect((objProps(a!.value).when as t.StringLiteral).value).toBe('$props.open');
+    expect((objProps(b!.value).when as t.StringLiteral).value).toBe('$props.open');
+  });
+
+  // ---- Req 2: :target resolution ----
+  it("defaults target to '$el' when :target is omitted", () => {
+    const body = '<listener @click="onClick()" />';
+    const { node, diagnostics } = parse(body);
+    expect(diagnostics).toEqual([]);
     expect(node!.entries[0]!.target).toBe('$el');
-    expect(node!.entries[0]!.event).toBe('click');
-    expect(node!.entries[0]!.modifierChainText).toBe('.outside');
   });
 
-  it('emits empty modifierChainText with end-of-key offset when no modifiers present', () => {
-    const synthetic = '{ "document:click": { handler: x } }';
-    const { node, diagnostics } = parseListeners(
-      synthetic,
-      { start: 0, end: synthetic.length },
-      synthetic,
-    );
-    expect(diagnostics).toEqual([]);
-    const e = node!.entries[0]!;
-    expect(e.modifierChainText).toBe('');
-    // Offset points to the byte right after the last char of "document:click"
-    // (i.e., the closing quote position in the source).
-    expect(synthetic.charAt(e.modifierChainBaseOffset)).toBe('"');
+  it('passes :target="window" and :target="document" through verbatim', () => {
+    const win = parse('<listener :target="window" @resize="r()" />');
+    expect(win.node!.entries[0]!.target).toBe('window');
+    const doc = parse('<listener :target="document" @keydown="k()" />');
+    expect(doc.node!.entries[0]!.target).toBe('document');
   });
 
-  it('emits ROZ012 when listener key is not a string literal (computed key)', () => {
-    const synthetic = '{ [someExpr]: { handler: x } }';
-    const { node, diagnostics } = parseListeners(
-      synthetic,
-      { start: 0, end: synthetic.length },
-      synthetic,
-    );
-    // Node returns with empty entries (computed key skipped); diag emitted.
-    expect(node).not.toBeNull();
-    expect(diagnostics.some(d => d.code === 'ROZ012')).toBe(true);
+  it('emits exactly one ROZ114 for :target="$refs.foo" and produces no entry', () => {
+    const body = '<listener :target="$refs.foo" @click="onClick()" />';
+    const { node, diagnostics } = parse(body);
+    const roz114 = diagnostics.filter((d) => d.code === 'ROZ114');
+    expect(roz114.length).toBe(1);
     expect(node!.entries.length).toBe(0);
   });
 
-  it('emits ROZ012 when key is an Identifier (bare key, not a string literal)', () => {
-    const synthetic = '{ click: { handler: x } }';
-    const { node, diagnostics } = parseListeners(
-      synthetic,
-      { start: 0, end: synthetic.length },
-      synthetic,
-    );
-    expect(node).not.toBeNull();
-    expect(diagnostics.some(d => d.code === 'ROZ012')).toBe(true);
+  it('emits exactly one ROZ114 for an arbitrary :target expression and produces no entry', () => {
+    const body = '<listener :target="someExpr" @click="onClick()" />';
+    const { node, diagnostics } = parse(body);
+    expect(diagnostics.filter((d) => d.code === 'ROZ114').length).toBe(1);
+    expect(node!.entries.length).toBe(0);
   });
 
-  it('emits ROZ011 when <listeners> block is not an object literal', () => {
-    const synthetic = '42';
-    const { node, diagnostics } = parseListeners(
-      synthetic,
-      { start: 0, end: synthetic.length },
-      synthetic,
-    );
-    expect(node).toBeNull();
-    expect(diagnostics.some(d => d.code === 'ROZ011')).toBe(true);
+  // ---- Req 1: ROZ015 zero-@event ----
+  it('emits exactly one ROZ015 for a <listener> with zero @event attributes', () => {
+    const body = '<listener :target="document" r-if="$props.open" />';
+    const { node, diagnostics } = parse(body);
+    const roz015 = diagnostics.filter((d) => d.code === 'ROZ015');
+    expect(roz015.length).toBe(1);
+    expect(node!.entries.length).toBe(0);
   });
 
-  it('emits ROZ010 on invalid JS expression in <listeners>', () => {
-    const synthetic = '{ "click": ??? }';
-    const { node, diagnostics } = parseListeners(
-      synthetic,
-      { start: 0, end: synthetic.length },
-      synthetic,
-    );
-    // Either ROZ010 surfaces (Babel collected error) or recovery shapes oddly;
-    // the contract is that at least one diagnostic appears and we never throw.
-    expect(diagnostics.length).toBeGreaterThan(0);
-    expect(diagnostics.some(d => d.code === 'ROZ010')).toBe(true);
-    // Should not throw regardless of node shape.
-    void node;
+  // ---- Req 4: absent r-if → no `when` property (→ when=null downstream) ----
+  it('OMITS the when property when r-if is absent (always-attached path)', () => {
+    const body = '<listener :target="document" @keydown="onKey()" />';
+    const { node, diagnostics } = parse(body);
+    expect(diagnostics).toEqual([]);
+    const props = objProps(node!.entries[0]!.value);
+    expect('when' in props).toBe(false);
+    expect(props.handler).toBeDefined();
   });
 
-  it('preserves entry source order', () => {
-    const { source, content, contentLoc } = loadExampleListeners('Dropdown');
-    const { node } = parseListeners(content, contentLoc, source, 'Dropdown.rozie');
-    const events = node!.entries.map(e => `${e.target}:${e.event}`);
-    expect(events).toEqual(['document:click', 'document:keydown', 'window:resize']);
+  // ---- self-close == paired ----
+  it('parses self-closing and paired forms identically', () => {
+    const selfClose = parse('<listener :target="document" @keydown.escape="close()" r-if="$props.open" />');
+    const paired = parse('<listener :target="document" @keydown.escape="close()" r-if="$props.open"></listener>');
+    expect(selfClose.diagnostics).toEqual([]);
+    expect(paired.diagnostics).toEqual([]);
+    expect(selfClose.node!.entries.length).toBe(1);
+    expect(paired.node!.entries.length).toBe(1);
+    const a = selfClose.node!.entries[0]!;
+    const b = paired.node!.entries[0]!;
+    expect(b.target).toBe(a.target);
+    expect(b.event).toBe(a.event);
+    expect(b.modifierChainText).toBe(a.modifierChainText);
   });
 
-  it('does NOT throw on hostile input — D-08 collected-not-thrown', () => {
-    const synthetic = '<<<<';
+  // ---- WARNING-2 / RESEARCH A4: synthesized `when` loc accuracy ----
+  it('sets synthesized when StringLiteral .start to the r-if value byte offset MINUS 1', () => {
+    // unknownRefValidator re-parses `when` at `(member.value.start ?? 0) + 1`
+    // (the +1 skips a real opening quote). Our synthetic literal has no quote,
+    // so .start must be (real value offset − 1) so the +1 lands on the real
+    // first byte.
+    const body = '<listener :target="document" @keydown="close()" r-if="$props.open" />';
+    const { node } = parse(body);
+    const whenLit = objProps(node!.entries[0]!.value).when as t.StringLiteral;
+    // The real r-if value text "$props.open" starts right after the opening "
+    const realValueStart = body.indexOf('$props.open');
+    expect(whenLit.start).toBe(realValueStart - 1);
+    // Sanity: validator's +1 lands on '$'.
+    expect(body.charAt((whenLit.start ?? 0) + 1)).toBe('$');
+  });
+
+  // ---- D-08 never-throw + stray markup ----
+  it('emits a clean diagnostic (never throws) for a non-<listener> element', () => {
+    const body = '<div @click="x()" />';
     let threw = false;
+    let result;
     try {
-      parseListeners(synthetic, { start: 0, end: synthetic.length }, synthetic);
+      result = parse(body);
     } catch {
       threw = true;
     }
     expect(threw).toBe(false);
+    expect(result!.node!.entries.length).toBe(0);
+    expect(result!.diagnostics.length).toBeGreaterThan(0);
+  });
+
+  it('emits a clean diagnostic (never throws) for a bare unterminated <listener>', () => {
+    const body = '<listener :target="document" @keydown="close()"';
+    let threw = false;
+    let result;
+    try {
+      result = parse(body);
+    } catch {
+      threw = true;
+    }
+    expect(threw).toBe(false);
+    expect(result!.diagnostics.length).toBeGreaterThan(0);
+  });
+
+  it('does NOT throw on hostile input — D-08 collected-not-thrown', () => {
+    let threw = false;
+    try {
+      parse('<<<<');
+    } catch {
+      threw = true;
+    }
+    expect(threw).toBe(false);
+  });
+
+  // ---- prototype-pollution-shaped attribute names are inert (T-19-02) ----
+  it('treats __proto__-shaped attribute names as inert text (no pollution)', () => {
+    const body = '<listener :target="document" @click="x()" __proto__="y" />';
+    let threw = false;
+    try {
+      const { node } = parse(body);
+      // Still produces the @click entry; the bogus attr is ignored.
+      expect(node!.entries.length).toBe(1);
+    } catch {
+      threw = true;
+    }
+    expect(threw).toBe(false);
+  });
+
+  // ---- migrated Dropdown shape: 3 distinct tags ----
+  it('parses three <listener> tags (Dropdown-shaped) to three entries in source order', () => {
+    // NB: modifier args carry NO inner space — the @event lives in the
+    // attribute NAME, which htmlparser2 terminates at whitespace (same as
+    // template @event; matches the D-20 fixture's `$refs.a,$refs.b` form). The
+    // Wave 2 migration writes the no-space form.
+    const body = [
+      '<listener :target="document" @click.outside($refs.triggerEl,$refs.panelEl)="close()" r-if="$props.open && $props.closeOnOutsideClick" />',
+      '<listener :target="document" @keydown.escape="close()" r-if="$props.open && $props.closeOnEscape" />',
+      '<listener :target="window" @resize.throttle(100).passive="reposition()" r-if="$props.open" />',
+    ].join('\n');
+    const { node, diagnostics } = parse(body);
+    expect(diagnostics).toEqual([]);
+    expect(node!.entries.length).toBe(3);
+    expect(node!.entries.map((e) => `${e.target}:${e.event}`)).toEqual([
+      'document:click',
+      'document:keydown',
+      'window:resize',
+    ]);
+    expect(node!.entries[0]!.modifierChainText).toBe('.outside($refs.triggerEl,$refs.panelEl)');
+    expect(node!.entries[2]!.modifierChainText).toBe('.throttle(100).passive');
   });
 });

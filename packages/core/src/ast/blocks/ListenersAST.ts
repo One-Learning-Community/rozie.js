@@ -10,10 +10,19 @@ import type { SourceLoc } from '../types.js';
 import type { ModifierChain } from '../../modifier-grammar/parseModifierChain.js';
 
 export interface ListenerEntry {
-  /** Original key text (e.g., "document:click.outside($refs.triggerEl, $refs.panelEl)"). */
-  rawKey: string;
-  /** Loc of the rawKey string within the .rozie file (excluding surrounding quotes). */
-  rawKeyLoc: SourceLoc;
+  /**
+   * Original key text (e.g., "document:click.outside($refs.triggerEl, $refs.panelEl)").
+   *
+   * Phase 19 (D-01): OPTIONAL. The legacy object-literal form set this from the
+   * string-literal key; the new `<listener>` element form has no string key
+   * (target/event/modifiers come from `:target` + `@event` attributes), so it is
+   * absent. No non-test downstream consumer reads it (verified: lowerListeners /
+   * buildDepGraph / unknownRefValidator / enrichListeners read only
+   * modifierChainText/modifierChainBaseOffset + value.{when,handler}).
+   */
+  rawKey?: string;
+  /** Loc of the rawKey string within the .rozie file (excluding surrounding quotes). Phase 19: optional (element form has no string key). */
+  rawKeyLoc?: SourceLoc;
   /** Target identifier — text before the ':' in rawKey, or '$el' if absent. */
   target: string;
   /** Event identifier — between ':' and the first '.' (or end of rawKey). */

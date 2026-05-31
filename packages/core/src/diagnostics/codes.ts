@@ -30,6 +30,12 @@ export const RozieErrorCode = {
   // the default can never fire (a required prop is always passed), so Rozie
   // drops the default. Warning severity (260521-oao).
   REQUIRED_PROP_HAS_DEFAULT: 'ROZ014',
+  // Phase 19 (D-06): a `<listener>` element carries zero `@event` attributes —
+  // it wires nothing. The element form replaces the object-literal `<listeners>`
+  // walk (which emitted ROZ010/011/012/013 — those DEFINITIONS are kept below
+  // but their emission is retired from parseListeners). Error severity; the tag
+  // is skipped. Next free code after ROZ014 in the block-parse cluster.
+  LISTENER_ELEMENT_NO_EVENT: 'ROZ015',
 
   // ---- Script parse (Plan 03) — ROZ030..ROZ049 ----
   SCRIPT_PARSE_ERROR: 'ROZ030',
@@ -96,6 +102,14 @@ export const RozieErrorCode = {
   // §"Free ROZ Codes", Pitfall 1). Emitted from unknownRefValidator's `scope === 'model'`
   // branch; codeframe; never throws.
   UNKNOWN_MODEL_REF: 'ROZ113', // $model.bogus — 'bogus' is not a declared prop
+  // Phase 19 (D-04/D-06): a `<listener :target="...">` whose target is neither
+  // `window` nor `document` (nor omitted → `$el`). `$refs.x` and arbitrary
+  // expressions are DEFERRED (the IR `decodeTarget` already supports
+  // `{kind:'ref'}`, so widening is purely additive). The restriction is enforced
+  // at the parser layer, NOT by crippling `decodeTarget`. Error severity; the
+  // offending tag produces NO ListenerEntry and never throws. Next free code
+  // after ROZ113 in the 100 semantic-binding cluster.
+  UNSUPPORTED_LISTENER_TARGET: 'ROZ114',
 
   // ---- Compile-time correctness errors (Phase 2 Plan 02) — ROZ200..ROZ299 ----
   WRITE_TO_NON_MODEL_PROP: 'ROZ200', // SEM-02: $props.foo = … where foo lacks model: true (Phase 2 success criterion 2)
@@ -126,6 +140,14 @@ export const RozieErrorCode = {
   // branch; hint: add `model: true` to the prop or use `$data`. Names the prop;
   // codeframe; never throws.
   MODEL_ACCESS_NON_MODEL_PROP: 'ROZ205', // error — $model.<nonModelProp>
+  // Phase 19 (D-08): a `<listener>` element placed inside `<template>` instead
+  // of the `<listeners>` block. `r-if` on a `<listener>` means conditional
+  // attach/detach (not conditional render like a `<template>` `r-if`), so the
+  // tag is forbidden in `<template>`. Detected by the dedicated
+  // `listenerElementValidator` over `walkTemplateElements` (case-folded so both
+  // `<listener>` and PascalCase `<Listener>` trip it, never routed to component
+  // resolution). Error severity; never throws. Next free code after ROZ205.
+  LISTENER_ELEMENT_MISPLACED: 'ROZ206',
 
   // ---- Warnings (Phase 2 Plan 02) — ROZ300..ROZ399 ----
   RFOR_MISSING_KEY: 'ROZ300', // SEM-03: r-for without :key
