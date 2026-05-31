@@ -46,7 +46,8 @@ A minimal Counter component in `.rozie`:
 <props>{ value: { type: Number, default: 0, model: true }, step: { type: Number, default: 1 } }</props>
 <script>
 const canIncrement = $computed(() => $props.value + $props.step <= Infinity)
-const increment = () => { if (canIncrement) $props.value += $props.step }
+// Read a prop with $props; write a two-way (model) prop with $model.
+const increment = () => { if (canIncrement) $model.value += $props.step }
 </script>
 <template>
   <button @click="increment">{{ $props.value }}</button>
@@ -87,7 +88,7 @@ packages/
   babel-plugin/                        Babel-plugin path for non-Vite consumers
 examples/
   *.rozie                              Reference components (Counter, SearchInput,
-                                       Dropdown, Modal, TreeNode, Card/CardHeader, TodoList)
+                                       Modal, Dropdown, TreeNode, Card/CardHeader, TodoList)
   consumers/                           Live Vite demos + Playwright e2e per target
 docs/                                  VitePress documentation site
 tools/
