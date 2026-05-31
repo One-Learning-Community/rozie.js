@@ -1,0 +1,21 @@
+{
+  "name": "@rozie-ui/sortable-list",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "build": "node scripts/codegen.mjs",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@rozie/core": "workspace:*",
+    "@types/sortablejs": "^1.15.8",
+    "happy-dom": "^15.0.0",
+    "sortablejs": "^1.15.7",
+    "tsdown": "^0.21.10",
+    "typescript": "~5.6.0",
+    "vitest": "^4.1.0"
+  }
+}

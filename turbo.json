@@ -9,6 +9,22 @@
       "dependsOn": ["^build"],
       "outputs": []
     },
+    "@rozie-ui/sortable-list#build": {
+      "dependsOn": ["^build"],
+      "outputs": []
+    },
+    "@rozie-ui/sortable-list-vue#build": {
+      "dependsOn": ["^build"],
+      "outputs": []
+    },
+    "@rozie-ui/sortable-list-svelte#build": {
+      "dependsOn": ["^build"],
+      "outputs": []
+    },
+    "@rozie-ui/sortable-list-angular#build": {
+      "dependsOn": ["^build"],
+      "outputs": []
+    },
     "test": {
       "dependsOn": ["^build"],
       "outputs": []
