@@ -1302,9 +1302,9 @@
                                     "index": 896
                                   },
                                   "filename": "Counter.rozie",
-                                  "identifierName": "$props"
+                                  "identifierName": "$model"
                                 },
-                                "name": "$props"
+                                "name": "$model"
                               },
                               "computed": false,
                               "property": {
@@ -1533,9 +1533,9 @@
                                     "index": 970
                                   },
                                   "filename": "Counter.rozie",
-                                  "identifierName": "$props"
+                                  "identifierName": "$model"
                                 },
-                                "name": "$props"
+                                "name": "$model"
                               },
                               "computed": false,
                               "property": {

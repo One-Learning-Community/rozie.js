@@ -28,7 +28,7 @@
 
 <script>
 function handleSelect(item) {
-  $props.selected = item
+  $model.selected = item
 }
 </script>
 

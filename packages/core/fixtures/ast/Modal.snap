@@ -1005,9 +1005,9 @@
                                     "index": 1106
                                   },
                                   "filename": "Modal.rozie",
-                                  "identifierName": "$props"
+                                  "identifierName": "$model"
                                 },
-                                "name": "$props"
+                                "name": "$model"
                               },
                               "computed": false,
                               "property": {
@@ -3280,7 +3280,7 @@
         }
       },
       "script": {
-        "content": "\nconst close = () => { $props.open = false; $emit('close') }\n\n// Body-scroll-lock state lives outside reactive data because it tracks DOM\n// rather than UI; managed entirely via lifecycle and listeners.\nlet savedBodyOverflow = ''\n\nconst lockScroll = () => {\n  if (!$props.lockBodyScroll) return\n  savedBodyOverflow = document.body.style.overflow\n  document.body.style.overflow = 'hidden'\n}\n\nconst unlockScroll = () => {\n  if (!$props.lockBodyScroll) return\n  document.body.style.overflow = savedBodyOverflow\n}\n\n// Colocated lifecycle pair — runs in source order alongside other hooks.\n$onMount(lockScroll)\n$onUnmount(unlockScroll)\n\n// Colocated focus management — separate hook, separate concern.\n$onMount(() => {\n  $refs.dialogEl?.focus()\n})\n",
+        "content": "\nconst close = () => { $model.open = false; $emit('close') }\n\n// Body-scroll-lock state lives outside reactive data because it tracks DOM\n// rather than UI; managed entirely via lifecycle and listeners.\nlet savedBodyOverflow = ''\n\nconst lockScroll = () => {\n  if (!$props.lockBodyScroll) return\n  savedBodyOverflow = document.body.style.overflow\n  document.body.style.overflow = 'hidden'\n}\n\nconst unlockScroll = () => {\n  if (!$props.lockBodyScroll) return\n  document.body.style.overflow = savedBodyOverflow\n}\n\n// Colocated lifecycle pair — runs in source order alongside other hooks.\n$onMount(lockScroll)\n$onUnmount(unlockScroll)\n\n// Colocated focus management — separate hook, separate concern.\n$onMount(() => {\n  $refs.dialogEl?.focus()\n})\n",
         "loc": {
           "start": 1069,
           "end": 1829

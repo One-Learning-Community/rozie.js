@@ -696,9 +696,9 @@
                                     "index": 857
                                   },
                                   "filename": "Dropdown.rozie",
-                                  "identifierName": "$props"
+                                  "identifierName": "$model"
                                 },
-                                "name": "$props"
+                                "name": "$model"
                               },
                               "computed": false,
                               "property": {
@@ -908,9 +908,9 @@
                                     "index": 909
                                   },
                                   "filename": "Dropdown.rozie",
-                                  "identifierName": "$props"
+                                  "identifierName": "$model"
                                 },
-                                "name": "$props"
+                                "name": "$model"
                               },
                               "computed": false,
                               "property": {
@@ -3359,7 +3359,7 @@
         }
       },
       "script": {
-        "content": "\nconst toggle = () => { $props.open = !$props.open }\nconst close  = () => { $props.open = false }\n\nconst reposition = () => {\n  if (!$refs.panelEl || !$refs.triggerEl) return\n  const rect = $refs.triggerEl.getBoundingClientRect()\n  Object.assign($refs.panelEl.style, {\n    top:  `${rect.bottom}px`,\n    left: `${rect.left}px`,\n  })\n}\n\n// Re-fire reposition() whenever the open transition flips on. The panel\n// element is r-if-gated, so $refs.panelEl is undefined at mount time — $watch\n// is the primitive that re-runs the effect after panel mount.\n$watch(() => $props.open, () => {\n  if ($props.open) reposition()\n})\n\n// Multiple $onMount calls run in source order. Useful for colocating setup\n// with the logic it serves.\n$onMount(() => {\n  // Initial reposition only if the panel is open at mount time.\n  if ($props.open) reposition()\n})\n\n$onMount(() => {\n  // Example of integrating a vanilla JS library — $refs gives direct DOM access.\n  // new Popper($refs.triggerEl, $refs.panelEl, { placement: 'bottom-start' })\n})\n",
+        "content": "\nconst toggle = () => { $model.open = !$props.open }\nconst close  = () => { $model.open = false }\n\nconst reposition = () => {\n  if (!$refs.panelEl || !$refs.triggerEl) return\n  const rect = $refs.triggerEl.getBoundingClientRect()\n  Object.assign($refs.panelEl.style, {\n    top:  `${rect.bottom}px`,\n    left: `${rect.left}px`,\n  })\n}\n\n// Re-fire reposition() whenever the open transition flips on. The panel\n// element is r-if-gated, so $refs.panelEl is undefined at mount time — $watch\n// is the primitive that re-runs the effect after panel mount.\n$watch(() => $props.open, () => {\n  if ($props.open) reposition()\n})\n\n// Multiple $onMount calls run in source order. Useful for colocating setup\n// with the logic it serves.\n$onMount(() => {\n  // Initial reposition only if the panel is open at mount time.\n  if ($props.open) reposition()\n})\n\n$onMount(() => {\n  // Example of integrating a vanilla JS library — $refs gives direct DOM access.\n  // new Popper($refs.triggerEl, $refs.panelEl, { placement: 'bottom-start' })\n})\n",
         "loc": {
           "start": 819,
           "end": 1860

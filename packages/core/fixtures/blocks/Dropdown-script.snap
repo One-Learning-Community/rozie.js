@@ -154,9 +154,9 @@
                                   "index": 857
                                 },
                                 "filename": "Dropdown.rozie",
-                                "identifierName": "$props"
+                                "identifierName": "$model"
                               },
-                              "name": "$props"
+                              "name": "$model"
                             },
                             "computed": false,
                             "property": {
@@ -366,9 +366,9 @@
                                   "index": 909
                                 },
                                 "filename": "Dropdown.rozie",
-                                "identifierName": "$props"
+                                "identifierName": "$model"
                               },
-                              "name": "$props"
+                              "name": "$model"
                             },
                             "computed": false,
                             "property": {

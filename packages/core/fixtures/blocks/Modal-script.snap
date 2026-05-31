@@ -159,9 +159,9 @@
                                   "index": 1106
                                 },
                                 "filename": "Modal.rozie",
-                                "identifierName": "$props"
+                                "identifierName": "$model"
                               },
-                              "name": "$props"
+                              "name": "$model"
                             },
                             "computed": false,
                             "property": {

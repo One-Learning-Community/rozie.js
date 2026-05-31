@@ -14,7 +14,7 @@
 // an emitter bug; the fix namespaced the Lit interop fixture to
 // `rozie-lit-counter`. This fixture guards that the emitter's selector
 // derivation stays stable.
-const bump = () => { $props.value += 1 }
+const bump = () => { $model.value += 1 }
 </script>
 
 <template>

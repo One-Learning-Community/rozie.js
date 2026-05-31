@@ -13,7 +13,7 @@
 // `_props === undefined` and crashed with "Cannot read properties of undefined
 // (reading 'defaultValue')". The runtime helper must tolerate an absent props
 // object and fall back to the declared default.
-const bump = () => { $props.value += 1 }
+const bump = () => { $model.value += 1 }
 </script>
 
 <template>

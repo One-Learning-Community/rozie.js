@@ -7,7 +7,7 @@
 </props>
 
 <script>
-const close = () => { $props.open = false }
+const close = () => { $model.open = false }
 </script>
 
 <template>

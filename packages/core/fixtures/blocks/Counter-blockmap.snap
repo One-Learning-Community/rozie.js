@@ -30,7 +30,7 @@
     }
   },
   "script": {
-    "content": "\nconsole.log(\"hello from rozie\")\n\nconst canIncrement = $computed(() => $props.value + $props.step <= $props.max)\nconst canDecrement = $computed(() => $props.value - $props.step >= $props.min)\n\nconst increment = () => { if (canIncrement) $props.value += $props.step }\nconst decrement = () => { if (canDecrement) $props.value -= $props.step }\n",
+    "content": "\nconsole.log(\"hello from rozie\")\n\nconst canIncrement = $computed(() => $props.value + $props.step <= $props.max)\nconst canDecrement = $computed(() => $props.value - $props.step >= $props.min)\n\nconst increment = () => { if (canIncrement) $model.value += $props.step }\nconst decrement = () => { if (canDecrement) $model.value -= $props.step }\n",
     "contentLoc": {
       "start": 653,
       "end": 994

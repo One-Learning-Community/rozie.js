@@ -1466,9 +1466,9 @@
                                   "index": 852
                                 },
                                 "filename": "TodoList.rozie",
-                                "identifierName": "$props"
+                                "identifierName": "$model"
                               },
-                              "name": "$props"
+                              "name": "$model"
                             },
                             "computed": false,
                             "property": {
@@ -2091,9 +2091,9 @@
                                   "index": 1003
                                 },
                                 "filename": "TodoList.rozie",
-                                "identifierName": "$props"
+                                "identifierName": "$model"
                               },
-                              "name": "$props"
+                              "name": "$model"
                             },
                             "computed": false,
                             "property": {
@@ -2831,9 +2831,9 @@
                                   "index": 1524
                                 },
                                 "filename": "TodoList.rozie",
-                                "identifierName": "$props"
+                                "identifierName": "$model"
                               },
-                              "name": "$props"
+                              "name": "$model"
                             },
                             "computed": false,
                             "property": {

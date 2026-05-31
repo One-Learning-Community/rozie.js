@@ -1157,9 +1157,9 @@
                                     "index": 852
                                   },
                                   "filename": "TodoList.rozie",
-                                  "identifierName": "$props"
+                                  "identifierName": "$model"
                                 },
-                                "name": "$props"
+                                "name": "$model"
                               },
                               "computed": false,
                               "property": {
@@ -1776,9 +1776,9 @@
                                     "index": 1003
                                   },
                                   "filename": "TodoList.rozie",
-                                  "identifierName": "$props"
+                                  "identifierName": "$model"
                                 },
-                                "name": "$props"
+                                "name": "$model"
                               },
                               "computed": false,
                               "property": {
@@ -2504,9 +2504,9 @@
                                     "index": 1524
                                   },
                                   "filename": "TodoList.rozie",
-                                  "identifierName": "$props"
+                                  "identifierName": "$model"
                                 },
-                                "name": "$props"
+                                "name": "$model"
                               },
                               "computed": false,
                               "property": {
@@ -3803,7 +3803,7 @@
         }
       },
       "script": {
-        "content": "\nconst remaining = $computed(() => $props.items.filter(i => !i.done).length)\n\nconst add = () => {\n  const text = $data.draft.trim()\n  if (!text) return\n  $props.items = [...$props.items, { id: crypto.randomUUID(), text, done: false }]\n  $data.draft = ''\n  $emit('add', text)\n}\n\nconst toggle = (id) => {\n  $props.items = $props.items.map(i =>\n    i.id === id ? { ...i, done: !i.done } : i\n  )\n  $emit('toggle', id)\n}\n\n// Internal method renamed from `remove` to `removeItem` to avoid colliding\n// with `HTMLElement.prototype.remove()` on the Lit target — Lit emits user\n// methods as class fields and the resulting `remove(id)` signature is\n// incompatible with the inherited `remove(): void`. Public API is unchanged:\n// the slot param is still `:remove`, the emitted event is still `'remove'`.\nconst removeItem = (id) => {\n  $props.items = $props.items.filter(i => i.id !== id)\n  $emit('remove', id)\n}\n",
+        "content": "\nconst remaining = $computed(() => $props.items.filter(i => !i.done).length)\n\nconst add = () => {\n  const text = $data.draft.trim()\n  if (!text) return\n  $model.items = [...$props.items, { id: crypto.randomUUID(), text, done: false }]\n  $data.draft = ''\n  $emit('add', text)\n}\n\nconst toggle = (id) => {\n  $model.items = $props.items.map(i =>\n    i.id === id ? { ...i, done: !i.done } : i\n  )\n  $emit('toggle', id)\n}\n\n// Internal method renamed from `remove` to `removeItem` to avoid colliding\n// with `HTMLElement.prototype.remove()` on the Lit target — Lit emits user\n// methods as class fields and the resulting `remove(id)` signature is\n// incompatible with the inherited `remove(): void`. Public API is unchanged:\n// the slot param is still `:remove`, the emitted event is still `'remove'`.\nconst removeItem = (id) => {\n  $model.items = $props.items.filter(i => i.id !== id)\n  $emit('remove', id)\n}\n",
         "loc": {
           "start": 684,
           "end": 1604
