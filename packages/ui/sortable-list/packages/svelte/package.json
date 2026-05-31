@@ -1,0 +1,40 @@
+{
+  "name": "@rozie-ui/sortable-list-svelte",
+  "version": "0.1.0",
+  "type": "module",
+  "private": false,
+  "license": "MIT",
+  "exports": {
+    ".": {
+      "svelte": "./src/SortableList.svelte",
+      "types": "./src/SortableList.svelte",
+      "import": "./src/SortableList.svelte",
+      "default": "./src/SortableList.svelte"
+    }
+  },
+  "files": [
+    "src"
+  ],
+  "dependencies": {
+    "@rozie/runtime-svelte": "workspace:*"
+  },
+  "peerDependencies": {
+    "svelte": "^5",
+    "sortablejs": "^1.15"
+  },
+  "peerDependenciesMeta": {
+    "svelte": {
+      "optional": false
+    },
+    "sortablejs": {
+      "optional": false
+    }
+  },
+  "scripts": {
+    "build": "echo 'ships source; no build'",
+    "typecheck": "echo 'source-only, no typecheck'"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

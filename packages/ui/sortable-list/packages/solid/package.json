@@ -1,0 +1,44 @@
+{
+  "name": "@rozie-ui/sortable-list-solid",
+  "version": "0.1.0",
+  "type": "module",
+  "private": false,
+  "license": "MIT",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "dependencies": {
+    "@rozie/runtime-solid": "workspace:*"
+  },
+  "peerDependencies": {
+    "solid-js": "^1.8",
+    "sortablejs": "^1.15"
+  },
+  "peerDependenciesMeta": {
+    "solid-js": {
+      "optional": false
+    },
+    "sortablejs": {
+      "optional": false
+    }
+  },
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome lint src"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

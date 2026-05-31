@@ -1,0 +1,40 @@
+{
+  "name": "@rozie-ui/sortable-list-angular",
+  "version": "0.1.0",
+  "type": "module",
+  "private": false,
+  "license": "MIT",
+  "exports": {
+    ".": {
+      "types": "./src/SortableList.ts",
+      "import": "./src/SortableList.ts",
+      "default": "./src/SortableList.ts"
+    }
+  },
+  "files": [
+    "src"
+  ],
+  "peerDependencies": {
+    "@angular/core": "^19",
+    "@angular/common": "^19",
+    "sortablejs": "^1.15"
+  },
+  "peerDependenciesMeta": {
+    "@angular/core": {
+      "optional": false
+    },
+    "@angular/common": {
+      "optional": false
+    },
+    "sortablejs": {
+      "optional": false
+    }
+  },
+  "scripts": {
+    "build": "echo 'ships source; no build'",
+    "typecheck": "echo 'source-only, no typecheck'"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
