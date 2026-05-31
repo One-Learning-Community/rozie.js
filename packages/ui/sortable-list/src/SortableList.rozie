@@ -12,7 +12,7 @@
       vuedraggable, ngx-sortablejs, svelte-sortablejs) with a single source.
     - The SortableJS-vs-framework-reconciler dance — and the hardening
       against SortableJS's fragile fallback-mode event shapes — is
-      encapsulated in `useSortableJS()` (`@rozie/runtime-engine-helpers`).
+      encapsulated in `useSortableJS()` (`./internal/useSortableJS`).
       Producer code below stays purely declarative.
     - Two-way binds the underlying array so consumers don't manually wire
       `onChange → setState → re-render`. Use `r-model:items="$data.list"`.
@@ -71,7 +71,7 @@
 </data>
 
 <script>
-import { useSortableJS } from '@rozie/runtime-engine-helpers'
+import { useSortableJS } from './internal/useSortableJS'
 
 let instance = null
 
@@ -150,7 +150,7 @@ const onRowKeyDown = ($event, index) => {
   }
 }
 
-// SortableJS wiring lives in `useSortableJS()` (@rozie/runtime-engine-helpers).
+// SortableJS wiring lives in `useSortableJS()` (./internal/useSortableJS).
 // The helper owns the SortableJS-vs-reconciler dance — DOM-restore hardening
 // against fragile-event paths, identity-based item lookup over fragile
 // `e.oldIndex`, and the single-onEnd disambiguation that collapses

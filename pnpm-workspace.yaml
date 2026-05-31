@@ -2,6 +2,8 @@ packages:
   - "packages/*"
   - "packages/targets/*"
   - "packages/runtime/*"
+  - "packages/ui/*"
+  - "packages/ui/*/packages/*"
   - "examples/consumers/*"
   - "examples/playground"
   - "tests/plugins/*"

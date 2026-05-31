@@ -65,7 +65,7 @@ vi.mock('sortablejs', () => {
 });
 
 // Late import so the mock is in place.
-import { useSortableJS, type SortableChange } from '../useSortableJS.js';
+import { useSortableJS, type SortableChange } from './useSortableJS.js';
 // Late import of the mock helpers for inspection.
 import * as SortableJSMock from 'sortablejs';
 
