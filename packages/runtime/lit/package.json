@@ -1,8 +1,8 @@
 {
   "name": "@rozie/runtime-lit",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
-  "private": true,
+  "private": false,
   "license": "MIT",
   "author": "Rozie maintainers",
   "main": "./dist/index.cjs",
@@ -53,5 +53,8 @@
     "build": "tsdown",
     "lint": "biome lint src",
     "typecheck": "tsc --noEmit"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

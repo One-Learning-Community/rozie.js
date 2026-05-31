@@ -1,6 +1,6 @@
 {
   "name": "@rozie/core",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
@@ -50,5 +50,10 @@
     "@types/babel__traverse": "^7.28.0",
     "peggy": "^5.1.0",
     "sass": "1.97.3"
+  },
+  "private": false,
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
   }
 }

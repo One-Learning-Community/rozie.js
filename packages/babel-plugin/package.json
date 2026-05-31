@@ -1,8 +1,8 @@
 {
   "name": "@rozie/babel-plugin",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
-  "private": true,
+  "private": false,
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.mts",
@@ -37,5 +37,9 @@
     "@types/babel__helper-plugin-utils": "^7.10.3",
     "tsdown": "^0.21.10",
     "vitest": "^4.1.0"
+  },
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
   }
 }

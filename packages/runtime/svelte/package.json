@@ -1,8 +1,8 @@
 {
   "name": "@rozie/runtime-svelte",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
-  "private": true,
+  "private": false,
   "license": "MIT",
   "author": "Rozie maintainers",
   "exports": {
@@ -39,5 +39,8 @@
     "test": "vitest run --passWithNoTests",
     "build": "echo 'svelte runtime ships source; no build'",
     "typecheck": "echo 'svelte runtime: source-only, no typecheck'"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
