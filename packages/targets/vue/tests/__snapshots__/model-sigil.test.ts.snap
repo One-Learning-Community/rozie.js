@@ -1,0 +1,37 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Vue $model producer-side two-way-write sigil > emitted model fixture matches snapshot 1`] = `
+"<template>
+
+  <button v-bind="$attrs" @click="value += 1">{{ value }}</button>
+
+</template>
+
+<script setup lang="ts">
+import { watchEffect } from 'vue';
+
+const value = defineModel<number>('value', { default: 0 });
+
+function bump() {
+  value.value += 1;
+}
+function reset() {
+  value.value = 0;
+}
+function step() {
+  value.value++;
+}
+function doubled() {
+  return value.value * 2;
+}
+
+watchEffect((onCleanup) => {
+  const handler = ($event: KeyboardEvent) => {
+    (() => { value.value += 1; })($event);
+  };
+  document.addEventListener('keydown', handler);
+  onCleanup(() => document.removeEventListener('keydown', handler));
+});
+</script>
+"
+`;

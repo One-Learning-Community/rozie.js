@@ -130,6 +130,24 @@ export interface RewriteRozieIdentifiersResult {
   slotsUsed: boolean;
 }
 
+/**
+ * Phase 18 (Req 2) — normalize the producer-side two-way-write sigil `$model`
+ * to `$props` across the cloned Program, in place. See the call site in
+ * rewriteRozieIdentifiers for the contract rationale.
+ */
+function normalizeModelAccessor(program: t.File): void {
+  traverse(program, {
+    MemberExpression(path) {
+      const obj = path.node.object;
+      if (t.isIdentifier(obj) && obj.name === '$model') obj.name = '$props';
+    },
+    OptionalMemberExpression(path) {
+      const obj = path.node.object;
+      if (t.isIdentifier(obj) && obj.name === '$model') obj.name = '$props';
+    },
+  });
+}
+
 export function rewriteRozieIdentifiers(
   program: t.File,
   ir: IRComponent,
@@ -177,6 +195,18 @@ export function rewriteRozieIdentifiers(
       });
     }
   }
+
+  // Phase 18 (Req 2) — producer-side two-way-write sigil `$model.X`.
+  // `$model` is model-only by contract: Wave 1's core semantic pass already
+  // rejected `$model.<nonModelProp>` (ROZ205) and `$model.<nonExistent>`
+  // (ROZ113) BEFORE lowering, so every `$model.X` reaching here is a declared
+  // model prop. `$model` is ALWAYS a member-expression object (deliberately NOT
+  // in STABLE_IDENTIFIERS, D-03). We normalize the accessor `$model` → `$props`
+  // in a single pre-pass so EVERY downstream write/read site (Assignment,
+  // Update, Member, OptionalMember — AND the RHS self-read detection) routes
+  // through the IDENTICAL `$props.<modelProp>` Vue lowering and yields
+  // byte-identical emit. Reuse, not reimplement (SPEC Req 2).
+  normalizeModelAccessor(program);
 
   traverse(program, {
     MemberExpression(path) {

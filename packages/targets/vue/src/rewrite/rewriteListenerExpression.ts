@@ -69,6 +69,26 @@ export function rewriteScriptExpression(
 
   const wrapper = t.file(t.program([t.expressionStatement(cloned)]));
 
+  // Phase 18 (Req 2) — producer-side two-way-write sigil `$model.X` inside a
+  // <listeners>-block body (e.g. an inline `handler: () => { $model.x = … }`).
+  // This is the SEPARATE listener-body lowering path (RESEARCH Pitfall 2 / Vue
+  // listener guard sites 80/120): patching only rewriteScript/rewriteTemplate
+  // would leave a literal `$model.x` in the emitted listener block. `$model` is
+  // model-only by contract and always a member-expression object (D-03), so we
+  // normalize the accessor `$model` → `$props` before the main traversal; every
+  // downstream write/read then routes through the IDENTICAL `$props.<modelProp>`
+  // Vue lowering → same setter, byte-identical emit. Reuse, not reimplement.
+  traverse(wrapper, {
+    MemberExpression(path) {
+      const obj = path.node.object;
+      if (t.isIdentifier(obj) && obj.name === '$model') obj.name = '$props';
+    },
+    OptionalMemberExpression(path) {
+      const obj = path.node.object;
+      if (t.isIdentifier(obj) && obj.name === '$model') obj.name = '$props';
+    },
+  });
+
   traverse(wrapper, {
     MemberExpression(path) {
       const obj = path.node.object;

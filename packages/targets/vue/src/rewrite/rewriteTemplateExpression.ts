@@ -71,6 +71,24 @@ export function rewriteTemplateExpression(
   // Wrap in a Program shell so traverse() works on a top-level Node.
   const wrapper = t.file(t.program([t.expressionStatement(cloned)]));
 
+  // Phase 18 (Req 2) — producer-side two-way-write sigil `$model.X` in template
+  // event handlers (`@click="$model.open = false"`) and bindings. `$model` is
+  // model-only by contract (Wave 1 semantic pass rejected non-model/non-existent
+  // `$model.X` before lowering) and is always a member-expression object (D-03),
+  // so we normalize the accessor `$model` → `$props` before the main traversal.
+  // Every downstream write/read site then routes through the IDENTICAL
+  // `$props.<modelProp>` Vue lowering → same setter, byte-identical emit.
+  traverse(wrapper, {
+    MemberExpression(path) {
+      const obj = path.node.object;
+      if (t.isIdentifier(obj) && obj.name === '$model') obj.name = '$props';
+    },
+    OptionalMemberExpression(path) {
+      const obj = path.node.object;
+      if (t.isIdentifier(obj) && obj.name === '$model') obj.name = '$props';
+    },
+  });
+
   traverse(wrapper, {
     MemberExpression(path) {
       const obj = path.node.object;
