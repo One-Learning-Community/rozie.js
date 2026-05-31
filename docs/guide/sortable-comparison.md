@@ -64,7 +64,7 @@ column.
 
 - **The keyboard cell is a feature of Rozie's SortableList example**, not a
   property of every library that wraps SortableJS. The keyboard map +
-  aria-live announcements live in `examples/SortableList.rozie`; the
+  aria-live announcements live in `packages/ui/sortable-list/src/SortableList.rozie`; the
   cross-target focus restoration is Rozie's `$restoreFocus` sigil. Library
   authors who fork SortableList and want the same keyboard contract get it
   for free.
@@ -82,3 +82,8 @@ The [SortableList example page](/examples/sortable-list) lives in the
 documentation; the [SortableListDemo source](https://github.com/One-Learning-Community/rozie.js/blob/main/examples/demos/SortableListDemo.rozie)
 is the same `.rozie` file that powers every target cell in the matrix above —
 including the screen-reader-driven keyboard contract.
+
+Ready to ship it? The [`SortableList` showcase + API reference](/guide/sortable-list)
+documents the `@rozie-ui/sortable-list-*` packages — one pre-compiled,
+per-framework install (`npm i @rozie-ui/sortable-list-react`, etc.) with no
+Rozie toolchain required.

@@ -6,6 +6,21 @@ This page is the **show-and-tell**: API reference, live demos, and the recipes t
 
 The full source for `SortableList.rozie` lives in [the canonical example page](/examples/sortable-list).
 
+## The `@rozie-ui/sortable-list` packages
+
+`SortableList` ships as the first `@rozie-ui` product: six pre-compiled, per-framework packages generated from a single `SortableList.rozie` source via the package's `codegen.mjs` doc-automation engine. Consumers install only the one for their framework — no Rozie toolchain, no build-time compile step, no `@rozie/*` runtime dependency:
+
+| Package | Install | README |
+| --- | --- | --- |
+| `@rozie-ui/sortable-list-react` | `npm i @rozie-ui/sortable-list-react` | [react/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/sortable-list/packages/react/README.md) |
+| `@rozie-ui/sortable-list-vue` | `npm i @rozie-ui/sortable-list-vue` | [vue/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/sortable-list/packages/vue/README.md) |
+| `@rozie-ui/sortable-list-svelte` | `npm i @rozie-ui/sortable-list-svelte` | [svelte/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/sortable-list/packages/svelte/README.md) |
+| `@rozie-ui/sortable-list-angular` | `npm i @rozie-ui/sortable-list-angular` | [angular/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/sortable-list/packages/angular/README.md) |
+| `@rozie-ui/sortable-list-solid` | `npm i @rozie-ui/sortable-list-solid` | [solid/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/sortable-list/packages/solid/README.md) |
+| `@rozie-ui/sortable-list-lit` | `npm i @rozie-ui/sortable-list-lit` | [lit/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/sortable-list/packages/lit/README.md) |
+
+Each package carries `sortablejs ^1.15` plus its framework peer (`react + react-dom`, `vue`, `svelte`, `@angular/core + @angular/common`, `solid-js`, or `lit`). The per-leaf READMEs above and the **Props** table below are generated from the same IR parse of `SortableList.rozie`, so they cannot drift from the compiled output (the package's `codegen.mjs` asserts the structural columns of this page against `ir.props` on every run). This page documents the API surface shared by all six packages; the [comparison page](/guide/sortable-comparison) frames the cross-framework wedge, and the [example page](/examples/sortable-list) shows the per-target compiled output side by side.
+
 ## Quick start
 
 The minimal consumer is a `<components>` block, a bound array, and the default scoped slot:
@@ -306,5 +321,5 @@ On Lit this lowers to the confined cross-shadow rule `rozie-sortable-list[data-r
 - [`$restoreFocus()` — keep focus on a row across keyed-reconciler re-renders](/guide/features#restorefocus-selector-idx-keep-focus-on-a-row-across-keyed-reconciler-re-renders)
 - [`r-external` and `$reconcileAfterDomMutation()` — DOM the framework doesn't own](/guide/features#r-external-and-reconcileafterdommutation-dom-the-framework-doesn-t-own)
 - [Sortable libraries comparison](/guide/sortable-comparison) — feature matrix vs react-sortablejs, dnd-kit, Vue.Draggable, svelte-dnd-action, Angular CDK
-- [`SortableList.rozie` source on GitHub](https://github.com/One-Learning-Community/rozie.js/blob/main/examples/SortableList.rozie) — the canonical wrapper
-- [`useSortableJS()` source on GitHub](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/runtime/engine-helpers/src/useSortableJS.ts) — the framework-agnostic SortableJS-vs-reconciler bridge (dedicated docs page coming)
+- [`SortableList.rozie` source on GitHub](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/sortable-list/src/SortableList.rozie) — the canonical wrapper (now colocated in the `@rozie-ui/sortable-list` package)
+- [`useSortableJS()` source on GitHub](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/sortable-list/src/internal/useSortableJS.ts) — the framework-agnostic SortableJS-vs-reconciler bridge (colocated + vendored into each leaf package's `src/internal/`)

@@ -20,7 +20,9 @@
  *        (React only: also write SortableList.module.css + SortableList.d.ts)
  *   4. copy src/internal/ → each leaf src/internal/ (excluding *.test.ts)
  *   5. render each leaf README from the IR + the hand-kept event manifest
- *   6. dry-run validateDocsPropsTable against docs/guide/sortable-list.md (log only)
+ *   6. ENFORCE validateDocsPropsTable against docs/guide/sortable-list.md
+ *      (THROWS on drift of the IR-derivable structural columns — prop name,
+ *      type, default — but NEVER rewrites the hand-authored prose; Plan 20-04)
  */
 import {
   cpSync,
@@ -128,24 +130,32 @@ function main() {
     console.log(`codegen: ${target.padEnd(8)} → ${cfg.dir}/src/${cfg.file}${sidecars}  ✓`);
   }
 
-  // (6) dry-run docs props-table validation (log only this plan; Plan 20-04 enforces).
+  // (6) ENFORCE docs props-table validation (Plan 20-04): the IR-derivable
+  // structural columns (prop name + type + default) in docs/guide/sortable-list.md
+  // MUST match ir.props or this script THROWS. It does NOT overwrite the
+  // hand-authored prose (the Runtime-updatable? column + Descriptions stay) —
+  // VALIDATE-NOT-OVERWRITE (OQ2). The docs file is the single-source-of-truth
+  // surface for the structural columns; reconcile the table (not the validator)
+  // if it drifts.
   const docsPath = resolve(REPO_ROOT, 'docs/guide/sortable-list.md');
-  if (existsSync(docsPath)) {
-    const docs = readFileSync(docsPath, 'utf8');
-    const result = validateDocsPropsTable(ir, docs);
-    if (result.ok) {
-      console.log(
-        `codegen: docs props-table validation PASS — ${result.checkedRows} rows match ir.props (dry-run; enforcement is Plan 20-04)`,
-      );
-    } else {
-      console.log(
-        `codegen: docs props-table validation DRIFT (dry-run, non-fatal this plan):\n` +
-          result.errors.map((e) => `  - ${e}`).join('\n'),
-      );
-    }
-  } else {
-    console.log(`codegen: docs props-table validation SKIPPED — ${docsPath} not found`);
+  if (!existsSync(docsPath)) {
+    throw new Error(
+      `codegen: docs props-table validation FAILED — ${docsPath} not found (the docs page is the single-source-of-truth surface and must exist)`,
+    );
   }
+  const docs = readFileSync(docsPath, 'utf8');
+  const result = validateDocsPropsTable(ir, docs);
+  if (!result.ok) {
+    throw new Error(
+      `codegen: docs props-table validation DRIFT — the IR-derivable structural columns in ${docsPath} ` +
+        `do not match ir.props. Fix ONLY the structural columns in the docs table (preserve the ` +
+        `Runtime-updatable? + Description prose); do NOT weaken this validator:\n` +
+        result.errors.map((e) => `  - ${e}`).join('\n'),
+    );
+  }
+  console.log(
+    `codegen: docs props-table validation PASS — ${result.checkedRows} rows match ir.props (ENFORCING; throws on drift)`,
+  );
 
   console.log('codegen: done — 6 targets emitted, internal/ vendored, 6 READMEs rendered.');
 }

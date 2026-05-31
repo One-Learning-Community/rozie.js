@@ -91,10 +91,11 @@ export default defineConfig({
           ],
         },
         {
-          text: 'Comparisons',
+          text: '@rozie-ui/sortable-list',
           items: [
-            { text: 'Sortable libraries', link: '/guide/sortable-comparison' },
-            { text: 'SortableList — showcase', link: '/guide/sortable-list' },
+            { text: 'SortableList — showcase & API', link: '/guide/sortable-list' },
+            { text: 'Sortable libraries comparison', link: '/guide/sortable-comparison' },
+            { text: 'SortableList example & output', link: '/examples/sortable-list' },
           ],
         },
       ],
