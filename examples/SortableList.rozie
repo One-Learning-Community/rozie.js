@@ -139,7 +139,7 @@ const onRowKeyDown = ($event, index) => {
     const next = [...$props.items]
     const [moved] = next.splice(from, 1)
     next.splice(to, 0, moved)
-    $props.items = next
+    $model.items = next
     $data.liftedIndex = to
     $data.ariaLiveText = 'Moved ' + getLabel(to) + ' to position ' + (to + 1)
     // After the keyed reorder write, restore focus to the moved row. No-op
@@ -164,7 +164,7 @@ $onMount(() => {
   // when the options object below references it.
   const sortable = useSortableJS($refs.listEl, {
     items: () => $props.items,
-    onCommit: (next) => { $props.items = next },
+    onCommit: (next) => { $model.items = next },
     options: {
       animation:     $props.animation,
       disabled:      $props.disabled,

@@ -34,8 +34,8 @@ console.log("hello from rozie")
 const canIncrement = $computed(() => $props.value + $props.step <= $props.max)
 const canDecrement = $computed(() => $props.value - $props.step >= $props.min)
 
-const increment = () => { if (canIncrement) $props.value += $props.step }
-const decrement = () => { if (canDecrement) $props.value -= $props.step }
+const increment = () => { if (canIncrement) $model.value += $props.step }
+const decrement = () => { if (canDecrement) $model.value -= $props.step }
 </script>
 
 <template>

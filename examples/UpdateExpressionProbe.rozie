@@ -8,7 +8,7 @@
     - Solid  `count()++`      — invalid (count is a `createSignal` getter)
     - Angular `this.count()++` — invalid (signal getter)
 
-  Each `$data.X++` / model `$props.X++` must route through the SAME setter path
+  Each `$data.X++` / model `$model.X++` must route through the SAME setter path
   as `+= 1` / `-= 1`:
     - React  → setCount(prev => prev + 1)
     - Solid  → setCount(count() + 1)
@@ -16,7 +16,7 @@
     - Vue    → count.value++           (valid as-is)
     - Svelte → count++                 (valid on $state)
     - Lit    → this._count.value++     (valid signal `.value`)
-  Model `$props.X++` routes through each target's model-setter (React
+  Model `$model.X++` routes through each target's model-setter (React
   onValueChange / Lit controllable.write / Angular model.set / etc.).
 
   Single-file; no sibling .rozie producers.
@@ -39,8 +39,8 @@
 <script>
 const incCount = () => { $data.count++ }
 const decCount = () => { $data.count-- }
-const incValue = () => { $props.value++ }
-const decValue = () => { $props.value-- }
+const incValue = () => { $model.value++ }
+const decValue = () => { $model.value-- }
 </script>
 
 <template>

@@ -37,8 +37,8 @@ console.log("hello from rozie")
 const canIncrement: boolean = $computed(() => $props.value + $props.step <= $props.max)
 const canDecrement: boolean = $computed(() => $props.value - $props.step >= $props.min)
 
-const increment: () => void = () => { if (canIncrement) $props.value += $props.step }
-const decrement: () => void = () => { if (canDecrement) $props.value -= $props.step }
+const increment: () => void = () => { if (canIncrement) $model.value += $props.step }
+const decrement: () => void = () => { if (canDecrement) $model.value -= $props.step }
 </script>
 
 <template>

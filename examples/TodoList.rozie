@@ -33,13 +33,13 @@ const remaining = $computed(() => $props.items.filter(i => !i.done).length)
 const add = () => {
   const text = $data.draft.trim()
   if (!text) return
-  $props.items = [...$props.items, { id: crypto.randomUUID(), text, done: false }]
+  $model.items = [...$props.items, { id: crypto.randomUUID(), text, done: false }]
   $data.draft = ''
   $emit('add', text)
 }
 
 const toggle = (id) => {
-  $props.items = $props.items.map(i =>
+  $model.items = $props.items.map(i =>
     i.id === id ? { ...i, done: !i.done } : i
   )
   $emit('toggle', id)
@@ -51,7 +51,7 @@ const toggle = (id) => {
 // incompatible with the inherited `remove(): void`. Public API is unchanged:
 // the slot param is still `:remove`, the emitted event is still `'remove'`.
 const removeItem = (id) => {
-  $props.items = $props.items.filter(i => i.id !== id)
+  $model.items = $props.items.filter(i => i.id !== id)
   $emit('remove', id)
 }
 </script>

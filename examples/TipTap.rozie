@@ -102,7 +102,7 @@ $onMount(() => {
       const next = editor.getHTML()
       lastHtml = next
       // Round-trip guard — see Flatpickr for the same shape.
-      if (next !== $props.html) $props.html = next
+      if (next !== $props.html) $model.html = next
       $emit('update', next)
     },
     onSelectionUpdate: () => refreshActive(),

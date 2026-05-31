@@ -76,7 +76,7 @@ const buildState = (doc) => EditorState.create({
       if (suppressEmit) return
       // Push the new doc out through the model:true emit path. Consumers
       // bound via `r-model:value="$data.x"` receive the change.
-      $props.value = update.state.doc.toString()
+      $model.value = update.state.doc.toString()
     }),
   ],
 })

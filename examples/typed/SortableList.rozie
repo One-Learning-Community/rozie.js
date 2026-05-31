@@ -69,7 +69,7 @@ $onMount(() => {
       for (const it of $props.items) next.push(it)
       const [moved] = next.splice(e.oldIndex, 1)
       next.splice(e.newIndex, 0, moved)
-      $props.items = next
+      $model.items = next
       $emit('change', { oldIndex: e.oldIndex, newIndex: e.newIndex, item: moved })
     },
   })

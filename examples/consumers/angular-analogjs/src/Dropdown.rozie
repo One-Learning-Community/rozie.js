@@ -23,8 +23,8 @@
 </props>
 
 <script>
-const toggle = () => { $props.open = !$props.open }
-const close  = () => { $props.open = false }
+const toggle = () => { $model.open = !$props.open }
+const close  = () => { $model.open = false }
 
 const reposition = () => {
   if (!$refs.panelEl || !$refs.triggerEl) return

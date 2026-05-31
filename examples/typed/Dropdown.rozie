@@ -23,8 +23,8 @@
 </props>
 
 <script lang="ts">
-const toggle: () => void = () => { $props.open = !$props.open }
-const close:  () => void = () => { $props.open = false }
+const toggle: () => void = () => { $model.open = !$props.open }
+const close:  () => void = () => { $model.open = false }
 
 const reposition: () => void = () => {
   if (!$refs.panelEl || !$refs.triggerEl) return

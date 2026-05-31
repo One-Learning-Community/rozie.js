@@ -82,10 +82,10 @@ $onMount(() => {
     const c = instance.getCenter()
     const next = [c.lat, c.lng]
     if (next[0] !== $props.center[0] || next[1] !== $props.center[1]) {
-      $props.center = next
+      $model.center = next
     }
     const z = instance.getZoom()
-    if (z !== $props.zoom) $props.zoom = z
+    if (z !== $props.zoom) $model.zoom = z
   })
 
   instance.on('click', (e) => {

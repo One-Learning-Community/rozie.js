@@ -103,7 +103,7 @@ $onMount(() => {
       // viewDidMount fires both on initial mount AND on changeView calls.
       // Same round-trip guard pattern as Flatpickr / LeafletMap.
       if (suppressViewSync) { suppressViewSync = false; return }
-      if (info.view.type !== $props.view) $props.view = info.view.type
+      if (info.view.type !== $props.view) $model.view = info.view.type
     },
   }
 

@@ -27,7 +27,7 @@
 </props>
 
 <script>
-const close = () => { $props.open = false; $emit('close') }
+const close = () => { $model.open = false; $emit('close') }
 
 // Body-scroll-lock state lives outside reactive data because it tracks DOM
 // rather than UI; managed entirely via lifecycle and listeners.

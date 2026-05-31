@@ -54,7 +54,7 @@ $onMount(() => {
       // flatpickr emits onChange for every selection step (in range/multiple
       // modes, two clicks = two events). The string form is always the
       // authoritative public value, so we forward it verbatim.
-      if (dateStr !== $props.date) $props.date = dateStr
+      if (dateStr !== $props.date) $model.date = dateStr
       $emit('change', dateStr)
     },
     onOpen:  () => $emit('open'),
