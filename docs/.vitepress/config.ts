@@ -62,6 +62,7 @@ export default defineConfig({
           text: 'Guide',
           items: [
             { text: 'Why Rozie?', link: '/guide/why' },
+            { text: 'Why Rozie looks this way', link: '/guide/design-rationale' },
             { text: 'Install', link: '/guide/install' },
             { text: 'Quick Start', link: '/guide/quick-start' },
             { text: 'Features & design choices', link: '/guide/features' },
