@@ -1,5 +1,6 @@
 package js.rozie.intellij
 
+import com.intellij.testFramework.LoggedErrorProcessor
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import js.rozie.intellij.completion.RozieMagicIdentifiers
 
@@ -70,7 +71,36 @@ class RozieJsMagicCompletionTest : BasePlatformTestCase() {
 
     fun testDollarPrefixSurfacesDataInListeners() {
         myFixture.configureByFile("listeners-magic-dollar-prefix.rozie")
-        myFixture.completeBasic()
+        // Flake guard (not a behavior change): the platform's JSLookupContext
+        // smart-pointer restore over the injected JS fragment can emit a benign,
+        // order-dependent LOG.error during completeBasic() —
+        //   "Cannot restore JSReferenceExpression … restored=null"
+        //   (com.intellij.lang.javascript.completion.JSLookupContext.<init>)
+        // — when a sibling test's injected-fragment SmartPsiFileRangePointer leaks
+        // into this light fixture. IntelliJ's test harness converts ANY logged error
+        // into a teardown failure (TestLoggerFactory$TestLoggerAssertionError), which
+        // made THIS test flake on CI (red on push, green on a no-op re-run). The
+        // completion behavior under test is unaffected — it's asserted below.
+        //
+        // Swallow ONLY that one known platform assertion via the platform-blessed
+        // LoggedErrorProcessor; every other logged error still fails the test.
+        LoggedErrorProcessor.executeWith<RuntimeException>(
+            object : LoggedErrorProcessor() {
+                override fun processError(
+                    category: String,
+                    message: String,
+                    details: Array<String>,
+                    t: Throwable?,
+                ): Set<Action> =
+                    if ("Cannot restore" in message && "restored=null" in message) {
+                        Action.NONE // benign JSLookupContext smart-pointer-restore leak
+                    } else {
+                        Action.ALL // any other logged error must still fail the test
+                    }
+            },
+        ) {
+            myFixture.completeBasic()
+        }
         val docText = myFixture.editor.document.text
         assertTrue(
             "Expected `\$data` to be auto-completed from `\$da` prefix in <listeners>; " +
