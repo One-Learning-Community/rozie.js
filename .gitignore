@@ -64,6 +64,16 @@ examples/consumers/svelte-vite/src/WrapperModal.ts
 # subdirectories.
 examples/*.ts
 
+# Phase 20 — @rozie-ui/sortable-list moved SortableList.rozie into the package
+# source dir. When any consumer/docs/VR build compiles the Angular target with
+# `prebuildExtraRoots` reaching this package, the prebuild emits a transient
+# `// @rozie-cross-rozie-shim` re-export `SortableList.ts` next to the .rozie
+# source (KanbanColumn composes SortableList via <components>). It is a
+# regenerated build artefact — never commit. Same per-location convention as
+# the consumer-demo shims above (bare `.ts` can't be ignored package-wide
+# without sweeping the codegen-emitted leaf sources).
+packages/ui/sortable-list/src/SortableList.ts
+
 # IntelliJ plugin subproject (Phase 8)
 tools/intellij-plugin/build/
 tools/intellij-plugin/.gradle/
