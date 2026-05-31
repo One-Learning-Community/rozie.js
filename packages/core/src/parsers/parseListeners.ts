@@ -149,7 +149,7 @@ export function parseListeners(
     // not a <listener> inside <listeners> is malformed/stray markup.
     if (tagName.toLowerCase() !== 'listener') {
       diagnostics.push({
-        code: RozieErrorCode.LISTENER_ELEMENT_NO_EVENT,
+        code: RozieErrorCode.LISTENERS_UNEXPECTED_ELEMENT,
         severity: 'error',
         message: `<listeners> may only contain <listener> elements — found <${tagName}>.`,
         loc: tagLoc,
@@ -160,17 +160,22 @@ export function parseListeners(
     }
 
     // Resolve :target. Omitted → '$el'. window/document → verbatim. Otherwise → ROZ114.
-    const targetAttr = pendingAttrs.find((a) => a.rawName === ':target');
+    // Directive attribute names are matched case-insensitively (WR-02) — `<listeners>`
+    // is markup, where HTML attribute names are case-insensitive; this matches the
+    // already-case-folded tag name. The value is trimmed (WR-03) so a stray-space
+    // typo (`:target=" window "`) resolves rather than mis-firing ROZ114.
+    const targetAttr = pendingAttrs.find((a) => a.rawName.toLowerCase() === ':target');
+    const targetValue = targetAttr?.value != null ? targetAttr.value.trim() : null;
     let target: string;
-    if (!targetAttr || targetAttr.value === null) {
+    if (!targetAttr || targetValue === null || targetValue === '') {
       target = '$el';
-    } else if (targetAttr.value === 'window' || targetAttr.value === 'document') {
-      target = targetAttr.value;
+    } else if (targetValue === 'window' || targetValue === 'document') {
+      target = targetValue;
     } else {
       diagnostics.push({
         code: RozieErrorCode.UNSUPPORTED_LISTENER_TARGET,
         severity: 'error',
-        message: `<listener :target="${targetAttr.value}"> is not supported — only "window" and "document" are valid targets in v1.`,
+        message: `<listener :target="${targetValue}"> is not supported — only "window" and "document" are valid targets in v1.`,
         loc: targetAttr.valueLoc ?? tagLoc,
         ...withFilename,
         hint: 'Use :target="window" or :target="document", or omit :target to bind on the component root ($el). Element/$refs targets are planned for a future release.',
@@ -179,7 +184,7 @@ export function parseListeners(
     }
 
     // Resolve r-if (the conditional-attach expression; null if absent).
-    const rIfAttr = pendingAttrs.find((a) => a.rawName === 'r-if');
+    const rIfAttr = pendingAttrs.find((a) => a.rawName.toLowerCase() === 'r-if');
     const rIfText = rIfAttr && rIfAttr.value !== null ? rIfAttr.value : null;
     const rIfValueStart = rIfAttr?.valueLoc?.start ?? null;
 
@@ -319,7 +324,7 @@ export function parseListeners(
         // Emit a clean diagnostic rather than silently swallowing it (Open Q2).
         if (pendingTagName !== '') {
           diagnostics.push({
-            code: RozieErrorCode.LISTENER_ELEMENT_NO_EVENT,
+            code: RozieErrorCode.LISTENER_ELEMENT_UNTERMINATED,
             severity: 'error',
             message: `Unterminated <${pendingTagName}> in <listeners> — close it with \`/>\` or \`</${pendingTagName}>\`.`,
             loc: {

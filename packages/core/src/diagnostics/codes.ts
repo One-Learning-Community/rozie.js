@@ -36,6 +36,13 @@ export const RozieErrorCode = {
   // but their emission is retired from parseListeners). Error severity; the tag
   // is skipped. Next free code after ROZ014 in the block-parse cluster.
   LISTENER_ELEMENT_NO_EVENT: 'ROZ015',
+  // Phase 19 (code-review WR-01): distinct codes for the two OTHER element-walk
+  // failure modes, split out of ROZ015 so consumers (IDE suppressors,
+  // lint-as-code) can target each precisely. ROZ016 = a non-`<listener>` element
+  // inside `<listeners>`; ROZ017 = a `<listener>` left unterminated (no `/>` or
+  // close tag).
+  LISTENERS_UNEXPECTED_ELEMENT: 'ROZ016',
+  LISTENER_ELEMENT_UNTERMINATED: 'ROZ017',
 
   // ---- Script parse (Plan 03) — ROZ030..ROZ049 ----
   SCRIPT_PARSE_ERROR: 'ROZ030',

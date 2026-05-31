@@ -90,6 +90,17 @@ describe('parseListeners (Phase 19 — element-walk + synthesis bridge)', () => 
     expect(doc.node!.entries[0]!.target).toBe('document');
   });
 
+  it('resolves :target case-insensitively (WR-02) and trims its value (WR-03)', () => {
+    // HTML attribute names are case-insensitive; a stray-space typo should not
+    // mis-fire ROZ114. Both resolve cleanly with no diagnostic.
+    const cased = parse('<listener :TARGET="window" @resize="r()" />');
+    expect(cased.node!.entries[0]!.target).toBe('window');
+    expect(cased.diagnostics.filter((d) => d.code === 'ROZ114')).toHaveLength(0);
+    const spaced = parse('<listener :target=" document " @keydown="k()" />');
+    expect(spaced.node!.entries[0]!.target).toBe('document');
+    expect(spaced.diagnostics.filter((d) => d.code === 'ROZ114')).toHaveLength(0);
+  });
+
   it('emits exactly one ROZ114 for :target="$refs.foo" and produces no entry', () => {
     const body = '<listener :target="$refs.foo" @click="onClick()" />';
     const { node, diagnostics } = parse(body);
@@ -168,6 +179,9 @@ describe('parseListeners (Phase 19 — element-walk + synthesis bridge)', () => 
     expect(threw).toBe(false);
     expect(result!.node!.entries.length).toBe(0);
     expect(result!.diagnostics.length).toBeGreaterThan(0);
+    // WR-01: stray non-<listener> element has its own code, distinct from
+    // zero-@event (ROZ015) and unterminated (ROZ017).
+    expect(result!.diagnostics.map((d) => d.code)).toContain('ROZ016');
   });
 
   it('emits a clean diagnostic (never throws) for a bare unterminated <listener>', () => {
@@ -181,6 +195,8 @@ describe('parseListeners (Phase 19 — element-walk + synthesis bridge)', () => 
     }
     expect(threw).toBe(false);
     expect(result!.diagnostics.length).toBeGreaterThan(0);
+    // WR-01: unterminated tag has its own code (ROZ017), not ROZ015.
+    expect(result!.diagnostics.map((d) => d.code)).toContain('ROZ017');
   });
 
   it('does NOT throw on hostile input — D-08 collected-not-thrown', () => {
