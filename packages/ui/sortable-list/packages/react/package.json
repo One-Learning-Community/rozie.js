@@ -37,6 +37,10 @@
       "optional": false
     }
   },
+  "devDependencies": {
+    "@types/react": "^18",
+    "@types/react-dom": "^18"
+  },
   "scripts": {
     "build": "tsdown",
     "typecheck": "tsc --noEmit",
