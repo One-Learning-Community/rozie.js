@@ -190,10 +190,30 @@
         "2": { "name": "entity.name.tag.rozie.block.listeners" },
         "3": { "name": "punctuation.definition.tag.end.rozie" }
       },
-      "contentName": "meta.embedded.block.listeners.rozie source.js",
+      "contentName": "meta.embedded.block.listeners.rozie",
+      "comment": "Phase 19 — `<listeners>` is now a WIRING (markup) block of `<listener>` elements, not a JS object literal. Its body is highlighted as markup: `<listener>` tags via #listener-tag (scoping :target / @event / r-if through the shared #prop-binding / #event-binding / #directive-attribute patterns the template uses), HTML comments, and a fallback to text.html.basic for any stray markup. The old `source.js` object-literal body was removed in lockstep with the compiler's object-walk → element-walk parser swap (Phase 19 Wave 1).",
       "patterns": [
-        { "include": "#magic-identifier" },
-        { "include": "source.js" }
+        { "include": "#html-comment" },
+        { "include": "#listener-tag" },
+        { "include": "text.html.basic" }
+      ]
+    },
+    "listener-tag": {
+      "comment": "A `<listener>` element inside the `<listeners>` block. Mirrors #rozie-tag-open but pins the tag name `listener` so the editor highlights it distinctly. Its attributes route through the same shared patterns as template tags: `:target` → #prop-binding, `@event.modifier(args)` → #event-binding, `r-if` → #directive-attribute. Self-closing (`/>`) and paired forms both terminate on the `>`.",
+      "begin": "(<)(listener)\\b",
+      "end": "(/?>)",
+      "beginCaptures": {
+        "1": { "name": "punctuation.definition.tag.begin.rozie" },
+        "2": { "name": "entity.name.tag.rozie.listener" }
+      },
+      "endCaptures": {
+        "1": { "name": "punctuation.definition.tag.end.rozie" }
+      },
+      "patterns": [
+        { "include": "#directive-attribute" },
+        { "include": "#event-binding" },
+        { "include": "#prop-binding" },
+        { "include": "#html-attribute" }
       ]
     },
     "block-components": {

@@ -396,6 +396,95 @@ describe('Rozie TextMate grammar — directives & r-model modifier chains', () =
   });
 });
 
+describe('Rozie TextMate grammar — <listener> element form (Phase 19)', () => {
+  // Phase 19 swapped the `<listeners>` block from a JS object literal to a
+  // wiring block of `<listener>` elements. The grammar now highlights the
+  // `<listener>` tag name plus its `:target` / `@event.modifier(args)` / `r-if`
+  // attributes via the same shared #prop-binding / #event-binding /
+  // #directive-attribute patterns the template uses. Dropdown.rozie is the
+  // migrated parity fixture (3 `<listener>` tags).
+  const FIXTURE = 'Dropdown.rozie';
+
+  it('scopes the <listener> tag name as a Rozie tag', () => {
+    const tokens = tokenizeAll(readFileSync(join(FIXTURES_DIR, FIXTURE), 'utf8'));
+    const tok = tokens.find(
+      (t) =>
+        t.text === 'listener' &&
+        t.scopes.some((s) => s.includes('entity.name.tag.rozie.listener')),
+    );
+    expect(tok, 'expected the <listener> tag name to carry the listener tag scope').toBeDefined();
+  });
+
+  it('scopes :target as a prop-binding attribute', () => {
+    const tokens = tokenizeAll(readFileSync(join(FIXTURES_DIR, FIXTURE), 'utf8'));
+    const tok = tokens.find(
+      (t) =>
+        t.text === 'target' &&
+        t.scopes.some((s) => s.includes('entity.other.attribute-name.prop-binding.rozie')),
+    );
+    expect(tok, 'expected :target to carry the prop-binding attribute scope').toBeDefined();
+  });
+
+  it('scopes @event names on a <listener> as event bindings', () => {
+    const tokens = tokenizeAll(readFileSync(join(FIXTURES_DIR, FIXTURE), 'utf8'));
+    // The migrated Dropdown uses @click / @keydown / @resize on its listeners.
+    for (const event of ['click', 'keydown', 'resize']) {
+      const tok = tokens.find(
+        (t) =>
+          t.text === event &&
+          t.scopes.some((s) => s.includes('entity.name.function.event.rozie')),
+      );
+      expect(tok, `expected @${event} on a <listener> to carry the event scope`).toBeDefined();
+    }
+  });
+
+  it('scopes the @event modifier chain on a <listener> (.outside / .throttle / .passive)', () => {
+    const tokens = tokenizeAll(readFileSync(join(FIXTURES_DIR, FIXTURE), 'utf8'));
+    for (const modifier of ['outside', 'throttle', 'passive']) {
+      const tok = tokens.find(
+        (t) =>
+          t.text === modifier &&
+          t.scopes.some((s) => s.includes('support.function.modifier.rozie')),
+      );
+      expect(
+        tok,
+        `expected the .${modifier} listener modifier to carry support.function.modifier.rozie`,
+      ).toBeDefined();
+    }
+  });
+
+  it('scopes r-if on a <listener> as an r-* directive', () => {
+    const tokens = tokenizeAll(readFileSync(join(FIXTURES_DIR, FIXTURE), 'utf8'));
+    const tok = tokens.find(
+      (t) =>
+        t.text === 'r-if' &&
+        t.scopes.some((s) => s.includes('entity.other.attribute-name.directive.rozie')),
+    );
+    expect(tok, 'expected r-if on a <listener> to carry the directive scope').toBeDefined();
+  });
+
+  it('no longer routes the <listeners> body to source.js (object-literal form retired)', () => {
+    const tokens = tokenizeAll(readFileSync(join(FIXTURES_DIR, FIXTURE), 'utf8'));
+    // The listeners body now carries meta.embedded.block.listeners.rozie WITHOUT
+    // the trailing `source.js` scope the object-literal form used. Find tokens
+    // inside the listeners block and assert none carry source.js.
+    const listenersBodyTokens = tokens.filter((t) =>
+      t.scopes.some((s) => s.includes('meta.embedded.block.listeners.rozie')),
+    );
+    expect(
+      listenersBodyTokens.length,
+      'expected tokens inside the <listeners> body',
+    ).toBeGreaterThan(0);
+    const jsScoped = listenersBodyTokens.filter((t) =>
+      t.scopes.some((s) => s.split(' ').includes('source.js')),
+    );
+    expect(
+      jsScoped,
+      'the element-form <listeners> body must not carry the source.js object-literal scope',
+    ).toEqual([]);
+  });
+});
+
 describe('Rozie TextMate grammar — <script lang="ts"> routing', () => {
   // #block-script-ts is listed FIRST in the grammar's top-level patterns with
   // a lang="ts" lookahead, so a `<script lang="ts">` opener routes its body to
