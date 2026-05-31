@@ -1,0 +1,321 @@
+import { LitElement, css, html } from 'lit';
+import { customElement, property, query, queryAssignedElements, state } from 'lit/decorators.js';
+import { SignalWatcher, signal } from '@lit-labs/preact-signals';
+import { __rozieReconcileAfterDomMutation, createLitControllableProperty, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
+import { repeat } from 'lit/directives/repeat.js';
+import { keyed } from 'lit/directives/keyed.js';
+import { useSortableJS } from './internal/useSortableJS';
+
+interface RozieDefaultSlotCtx {
+  item: unknown;
+  index: unknown;
+}
+
+@customElement('rozie-sortable-list')
+export default class SortableList extends SignalWatcher(LitElement) {
+  static styles = css`
+.rozie-sortable-wrap[data-rozie-s-0af24eae] { display: block; }
+.rozie-sortable-list[data-rozie-s-0af24eae] { display: block; }
+.rozie-sortable-item[data-rozie-s-0af24eae] { display: block; outline: none; }
+.rozie-sortable-item[data-rozie-s-0af24eae]:focus { outline: 2px solid rgba(0, 102, 204, 0.6); outline-offset: -2px; }
+.rozie-sortable-item-lifted[data-rozie-s-0af24eae] {
+  background: rgba(0, 102, 204, 0.08);
+  box-shadow: 0 0 0 2px rgba(0, 102, 204, 0.4) inset;
+}
+.rozie-sortable-aria-live[data-rozie-s-0af24eae] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+`;
+
+  @property({ type: Array, attribute: 'items' }) _items_attr: any[] = [];
+  private _itemsControllable = createLitControllableProperty<any[]>({ host: this, eventName: 'items-change', defaultValue: [], initialControlledValue: undefined });
+  @property({ type: String, reflect: true }) itemKey: string = null;
+  @property({ type: String, reflect: true }) handle: string = null;
+  @property({ type: String, reflect: true }) group: string = null;
+  @property({ type: Number, reflect: true }) animation: number = 150;
+  @property({ type: Boolean, reflect: true }) disabled: boolean = false;
+  @property({ type: Object }) options: any = {};
+  @property({ type: Function }) labelFor: ((...args: unknown[]) => unknown) | null = null;
+  @property({ type: String, reflect: true }) ghostClass: string = null;
+  @property({ type: String, reflect: true }) chosenClass: string = null;
+  @property({ type: String, reflect: true }) dragClass: string = null;
+  @property({ type: String, reflect: true }) filter: string = null;
+  @property({ type: String, reflect: true }) easing: string = null;
+  @property({ type: Boolean, reflect: true }) forceFallback: boolean = false;
+  @property({ type: Number, reflect: true }) swapThreshold: number = 1;
+  @property({ type: Boolean, reflect: true }) cloneable: boolean = false;
+  private _liftedIndex = signal(null);
+  private _ariaLiveText = signal('');
+  @query('[data-rozie-ref="listEl"]') private _refListEl!: HTMLElement;
+  @query('[data-rozie-ref="__rozieRoot"]') private _ref__rozieRoot!: HTMLElement;
+
+  @state() private _hasSlotDefault = false;
+  @queryAssignedElements({ flatten: true }) private _slotDefaultElements!: Element[];
+  @property({ attribute: false }) __rozieDefaultSlot__?: (scope: { item: unknown; index: unknown }) => unknown;
+
+  private _disconnectCleanups: Array<() => void> = [];
+
+  private _rozieReconcileSeq = 0;
+
+  private _armListeners(): void {
+    {
+      const slotEl = this.shadowRoot?.querySelector('slot:not([name])');
+      if (slotEl !== null && slotEl !== undefined) {
+        const update = () => { this._hasSlotDefault = this._slotDefaultElements.length > 0; };
+        slotEl.addEventListener('slotchange', update);
+        // CR-05 fix: push cleanup so the listener is removed on disconnectedCallback.
+        this._disconnectCleanups.push(() => slotEl.removeEventListener('slotchange', update));
+        update();
+      }
+    }
+  }
+
+  connectedCallback(): void {
+    // Phase 07.3.1 D-LIT-15 — pre-seed _hasSlot<X> from light DOM so first render isn't deadlocked.
+    this._hasSlotDefault = Array.from(this.children).some((el) => !el.hasAttribute('slot') && (el.nodeType !== 3 || (el.textContent?.trim().length ?? 0) > 0));
+    super.connectedCallback();
+    if (this.hasUpdated) this._armListeners();
+  }
+
+  firstUpdated(): void {
+    this._armListeners();
+
+    this._disconnectCleanups.push((() => this.instance?.destroy()));
+
+    // Named `sortable` (not `handle`) to avoid shadowing `$props.handle`
+    // when the options object below references it.
+    const sortable = useSortableJS(this._refListEl, {
+      items: () => this.items,
+      onCommit: (next: any) => {
+        this._itemsControllable.write(next);
+      },
+      options: {
+        animation: this.animation,
+        disabled: this.disabled,
+        // `cloneable` is a high-level Rozie prop that REPLACES a string
+        // `group` with SortableJS's `{ name, pull: 'clone', put: true }`
+        // object form. When `cloneable:false`, pass `$props.group` through
+        // verbatim. When `cloneable:true` AND `$props.group` is null,
+        // leave it null — a clone-mode list without a group name is not
+        // meaningful (no peer list can join the cross-list flow).
+        group: this.cloneable && typeof this.group === 'string' ? {
+          name: this.group,
+          pull: 'clone',
+          put: true
+        } : this.group,
+        handle: this.handle,
+        ghostClass: this.ghostClass,
+        chosenClass: this.chosenClass,
+        dragClass: this.dragClass,
+        filter: this.filter,
+        forceFallback: this.forceFallback,
+        swapThreshold: this.swapThreshold,
+        easing: this.easing,
+        ...this.options
+      },
+      // Lit lit-html `repeat` directive caches its part array by sentinel-
+      // comment node identity; SortableJS's physical DOM mutation desyncs
+      // that cache. The sigil lowers to `__rozieReconcileAfterDomMutation(this)`
+      // on Lit (real call) and `void 0` on the other 5 targets (no-op).
+      afterCommit: () => __rozieReconcileAfterDomMutation(this),
+      onChange: ({
+        kind,
+        oldIndex,
+        newIndex,
+        item
+      }: any) => {
+        if (kind === 'reorder') this.dispatchEvent(new CustomEvent("change", {
+          detail: {
+            oldIndex,
+            newIndex,
+            item
+          },
+          bubbles: true,
+          composed: true
+        }));else if (kind === 'add') this.dispatchEvent(new CustomEvent("add", {
+          detail: {
+            newIndex,
+            item
+          },
+          bubbles: true,
+          composed: true
+        }));else if (kind === 'remove') this.dispatchEvent(new CustomEvent("remove", {
+          detail: {
+            oldIndex,
+            item
+          },
+          bubbles: true,
+          composed: true
+        }));
+      },
+      onStart: (e: any) => this.dispatchEvent(new CustomEvent("start", {
+        detail: e,
+        bubbles: true,
+        composed: true
+      })),
+      onEnd: (e: any) => this.dispatchEvent(new CustomEvent("end", {
+        detail: e,
+        bubbles: true,
+        composed: true
+      }))
+    });
+    this.instance = sortable.instance;
+    // $onMount's cleanup-return: closing over a setup-local (`sortable`) does
+    // not survive the Solid emitter's setup/cleanup split — it scopes cleanup
+    // outside the setup IIFE. Closing over `instance` (a module-scope `let`)
+    // works on every target.
+  }
+
+  updated(changedProperties: Map<string, unknown>): void {
+    if (changedProperties.has('disabled')) { const __watchVal = (() => this.disabled)(); ((v: any) => this.instance?.option('disabled', v))(__watchVal); }
+    if (changedProperties.has('group')) { const __watchVal = (() => this.group)(); ((v: any) => this.instance?.option('group', v))(__watchVal); }
+    if (changedProperties.has('handle')) { const __watchVal = (() => this.handle)(); ((v: any) => this.instance?.option('handle', v))(__watchVal); }
+    if (changedProperties.has('ghostClass')) { const __watchVal = (() => this.ghostClass)(); ((v: any) => this.instance?.option('ghostClass', v))(__watchVal); }
+    if (changedProperties.has('chosenClass')) { const __watchVal = (() => this.chosenClass)(); ((v: any) => this.instance?.option('chosenClass', v))(__watchVal); }
+    if (changedProperties.has('dragClass')) { const __watchVal = (() => this.dragClass)(); ((v: any) => this.instance?.option('dragClass', v))(__watchVal); }
+    if (changedProperties.has('filter')) { const __watchVal = (() => this.filter)(); ((v: any) => this.instance?.option('filter', v))(__watchVal); }
+    if (changedProperties.has('easing')) { const __watchVal = (() => this.easing)(); ((v: any) => this.instance?.option('easing', v))(__watchVal); }
+  }
+
+  disconnectedCallback(): void {
+    super.disconnectedCallback();
+    for (const fn of this._disconnectCleanups) fn();
+    this._disconnectCleanups = [];
+  }
+
+  attributeChangedCallback(name: string, old: string | null, value: string | null): void {
+    super.attributeChangedCallback(name, old, value);
+    if (name === 'items') this._itemsControllable.notifyAttributeChange(value as unknown as any[]);
+  }
+
+  render() {
+    return html`
+<div class="rozie-sortable-wrap" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-ref="__rozieRoot" data-rozie-s-0af24eae>
+  <div class="rozie-sortable-list" data-rozie-ref="listEl" data-rozie-s-0af24eae>${keyed(this._rozieReconcileSeq ?? 0, html`
+    ${repeat<any>(this.items, (item, index) => this.keyFor(item, index), (item, index) => html`<div class="${Object.entries({ "rozie-sortable-item": true, 'rozie-sortable-item-lifted': this._liftedIndex.value === index }).filter(([, v]) => v).map(([k]) => k).join(' ')}" key=${this.keyFor(item, index)} role="listitem" tabindex="0" @keydown=${($event: Event) => { this.onRowKeyDown($event, index); }} data-rozie-s-0af24eae>
+      ${this.__rozieDefaultSlot__ !== undefined ? this.__rozieDefaultSlot__({item: item, index: index}) : html`<slot data-rozie-params=${(() => { try { return JSON.stringify({item: item, index: index}); } catch { return '{}'; } })()}></slot>`}
+    </div>`)}
+  `)}</div>
+  <div class="rozie-sortable-aria-live" data-rozie-sortable-aria-live="" aria-live="polite" aria-atomic="true" data-rozie-s-0af24eae>${this._ariaLiveText.value}</div>
+</div>
+`;
+  }
+
+  instance: any = null;
+
+  keyFor = (item: any, index: any) => {
+  if (this.itemKey && item !== null && typeof item === 'object') {
+    return item[this.itemKey] ?? index;
+  }
+  return item ?? index;
+};
+
+  getLabel = (idx: any) => {
+  const item = this.items[idx];
+  if (this.labelFor !== null) return this.labelFor(item, idx);
+  if (item !== null && typeof item === 'object' && 'label' in item) return item.label;
+  return String(item);
+};
+
+  onRowKeyDown = ($event: any, index: any) => {
+  const key = $event.key;
+  // Space (' ' on browsers; KeyboardEvent.key === ' ') OR Enter — lift/drop.
+  if (key === ' ' || key === 'Spacebar' || key === 'Enter') {
+    $event.preventDefault();
+    if (this._liftedIndex.value === null) {
+      // LIFT
+      this._liftedIndex.value = index;
+      this._ariaLiveText.value = 'Lifted ' + this.getLabel(index);
+      return;
+    }
+    // DROP
+    const dropped = this.getLabel(this._liftedIndex.value);
+    const at = this._liftedIndex.value;
+    this._liftedIndex.value = null;
+    this._ariaLiveText.value = 'Dropped ' + dropped + ' at position ' + (at + 1);
+    return;
+  }
+  if (key === 'Escape') {
+    if (this._liftedIndex.value === null) return;
+    $event.preventDefault();
+    const cancelled = this.getLabel(this._liftedIndex.value);
+    this._liftedIndex.value = null;
+    this._ariaLiveText.value = 'Cancelled lift of ' + cancelled;
+    return;
+  }
+  if (key === 'ArrowDown' || key === 'ArrowUp') {
+    if (this._liftedIndex.value === null) return;
+    $event.preventDefault();
+    const dir = key === 'ArrowDown' ? 1 : -1;
+    const from = this._liftedIndex.value;
+    const to = from + dir;
+    if (to < 0 || to >= this.items.length) return;
+    const next = [...this.items];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    this._itemsControllable.write(next);
+    this._liftedIndex.value = to;
+    this._ariaLiveText.value = 'Moved ' + this.getLabel(to) + ' to position ' + (to + 1);
+    // After the keyed reorder write, restore focus to the moved row. No-op
+    // on React/Vue/Angular (DOM identity preserved); queueMicrotask +
+    // querySelectorAll + .focus() on Svelte/Solid/Lit (DOM re-created).
+    queueMicrotask(() => (this.renderRoot.querySelectorAll('[role="listitem"]')?.[to] as HTMLElement | undefined)?.focus?.());
+    this.dispatchEvent(new CustomEvent("change", {
+      detail: {
+        oldIndex: from,
+        newIndex: to,
+        item: moved
+      },
+      bubbles: true,
+      composed: true
+    }));
+  }
+};
+
+  get items(): any[] { return this._itemsControllable.read(); }
+  set items(v: any[]) { this._itemsControllable.notifyPropertyWrite(v); }
+
+  /**
+   * Plan 14-05 — cross-framework attribute fallthrough source. Reads the
+   * host custom element's attributes on each call so a consumer-side bound
+   * attribute flows through on every render. The `rozieSpread` directive
+   * (D-02) does the cross-render diff downstream.
+   *
+   * Phase 15 follow-up Bug A — declared-prop attribute names are filtered
+   * out so `$attrs` returns "rest after declared props" (semantic parity
+   * with React/Vue/Svelte/Solid/Angular). Both Lit attribute-naming
+   * forms are folded into the skip set: kebab-case for model props
+   * (explicit `attribute:`) AND lowercased property name (Lit's default).
+   */
+  private get $attrs(): Record<string, string> {
+    const __skip = new Set<string>(['items', 'item-key', 'itemkey', 'handle', 'group', 'animation', 'disabled', 'options', 'label-for', 'labelfor', 'ghost-class', 'ghostclass', 'chosen-class', 'chosenclass', 'drag-class', 'dragclass', 'filter', 'easing', 'force-fallback', 'forcefallback', 'swap-threshold', 'swapthreshold', 'cloneable']);
+    const out: Record<string, string> = {};
+    for (const a of Array.from(this.attributes)) {
+      if (__skip.has(a.name)) continue;
+      out[a.name] = a.value;
+    }
+    return out;
+  }
+
+  /**
+   * Phase 15 D-19 — consumer-passed listener cluster placeholder.
+   * Lit attaches event listeners directly on the host element via
+   * `addEventListener` (no per-instance prop rest binding), so the
+   * runtime value is undefined; the `rozieListeners` directive's
+   * nullish coercion (`obj ?? {}`) handles the no-op cleanly.
+   * The declaration exists to satisfy `tsc --noEmit` on consumer
+   * projects with strict mode — bare `$listeners` in `render()`
+   * would otherwise raise TS2304 (Cannot find name).
+   */
+  private get $listeners(): Record<string, EventListener> | undefined {
+    return undefined;
+  }
+}

@@ -1,0 +1,19 @@
+.rozie-sortable-wrap[data-rozie-s-0af24eae] { display: block; }
+.rozie-sortable-list[data-rozie-s-0af24eae] { display: block; }
+.rozie-sortable-item[data-rozie-s-0af24eae] { display: block; outline: none; }
+.rozie-sortable-item[data-rozie-s-0af24eae]:focus { outline: 2px solid rgba(0, 102, 204, 0.6); outline-offset: -2px; }
+.rozie-sortable-item-lifted[data-rozie-s-0af24eae] {
+  background: rgba(0, 102, 204, 0.08);
+  box-shadow: 0 0 0 2px rgba(0, 102, 204, 0.4) inset;
+}
+.rozie-sortable-aria-live[data-rozie-s-0af24eae] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
