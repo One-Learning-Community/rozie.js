@@ -176,6 +176,26 @@ export function rewriteRozieIdentifiers(
     }
   }
 
+  // Phase 18 (Req 2) — producer-side two-way-write sigil `$model.X`.
+  // `$model` is model-only by contract: Wave 1's core semantic pass already
+  // rejected `$model.<nonModelProp>` (ROZ205) and `$model.<nonExistent>`
+  // (ROZ113) BEFORE lowering, so every `$model.X` reaching here is a declared
+  // model prop. `$model` is ALWAYS a member-expression object (deliberately NOT
+  // in STABLE_IDENTIFIERS, D-03). We normalize the accessor `$model` → `$props`
+  // in a single pre-pass so EVERY downstream write/read site routes through the
+  // IDENTICAL `$props.<modelProp>` Svelte lowering (the `$bindable` rune local)
+  // and yields byte-identical emit. Reuse, not reimplement (SPEC Req 2).
+  traverse(program, {
+    MemberExpression(path) {
+      const obj = path.node.object;
+      if (t.isIdentifier(obj) && obj.name === '$model') obj.name = '$props';
+    },
+    OptionalMemberExpression(path) {
+      const obj = path.node.object;
+      if (t.isIdentifier(obj) && obj.name === '$model') obj.name = '$props';
+    },
+  });
+
   traverse(program, {
     Identifier(path) {
       // WR-02 (Phase 9) — skip identifiers in TS type position. `$el` is a

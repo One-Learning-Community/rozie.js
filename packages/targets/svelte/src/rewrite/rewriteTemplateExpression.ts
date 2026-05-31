@@ -64,6 +64,26 @@ export function rewriteTemplateExpression(
 
   const wrapper = t.file(t.program([t.expressionStatement(cloned)]));
 
+  // Phase 18 (Req 2) — producer-side two-way-write sigil `$model.X` in template
+  // event handlers (`@click="$model.open = false"`), bindings, AND <listeners>-
+  // body inline handlers (this file is re-exported as rewriteListenerExpression
+  // — Svelte has NO separate listener-write path; A1 conclusion). `$model` is
+  // model-only by contract (Wave 1 rejected non-model/non-existent before
+  // lowering) and always a member-expression object (D-03), so we normalize the
+  // accessor `$model` → `$props` before the main traversal; every downstream
+  // write/read then routes through the IDENTICAL `$props.<modelProp>` Svelte
+  // lowering → same bare local, byte-identical emit. Reuse, not reimplement.
+  traverse(wrapper, {
+    MemberExpression(path) {
+      const obj = path.node.object;
+      if (t.isIdentifier(obj) && obj.name === '$model') obj.name = '$props';
+    },
+    OptionalMemberExpression(path) {
+      const obj = path.node.object;
+      if (t.isIdentifier(obj) && obj.name === '$model') obj.name = '$props';
+    },
+  });
+
   traverse(wrapper, {
     // Phase 14 D-04 / Plan 14-05 — the `$attrs` magic accessor lowers to a
     // synthesised `__rozieAttrs` rest binding produced by Svelte 5's runes-
