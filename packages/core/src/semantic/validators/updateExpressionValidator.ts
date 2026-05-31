@@ -81,6 +81,17 @@ function reactiveTargetLabel(
     if (!decl.isModel) return null; // non-model → ROZ200 owns this
     return `$props.${access.member}`;
   }
+  if (access.scope === 'model') {
+    // Phase 18 (D-10): `$model.<x>` value-consumed (e.g. `const y = $model.x++`)
+    // trips ROZ203 exactly as a model `$props.<x>` does — the value can't be
+    // read back from a setter-based target. Only valid (declared + model) refs
+    // reach this label; non-model / undeclared `$model.x` are owned by
+    // unknownRefValidator (ROZ205 / ROZ113), so guard the same way.
+    const decl = bindings.props.get(access.member);
+    if (!decl) return null; // unknown → ROZ113 (unknownRefValidator)
+    if (!decl.isModel) return null; // non-model → ROZ205 (unknownRefValidator)
+    return `$model.${access.member}`;
+  }
   return null;
 }
 

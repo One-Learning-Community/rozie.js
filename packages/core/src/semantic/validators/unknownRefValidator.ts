@@ -60,7 +60,7 @@ const traverse: TraverseFn =
     ? _traverse
     : (_traverse as unknown as { default: TraverseFn }).default;
 
-const MAGIC_ACCESSORS = new Set(['$props', '$data', '$refs', '$slots']);
+const MAGIC_ACCESSORS = new Set(['$props', '$data', '$refs', '$slots', '$model']);
 // `$watch` is also handled by checkLifecycleSiting (must be at Program top
 // level) but uses ROZ109 for argument-shape errors instead of ROZ104.
 // Quick plan 260515-u2b.
@@ -84,6 +84,50 @@ function locFromNodeOffset(node: t.Node, baseOffset: number): SourceLoc {
     start: (node.start ?? 0) + baseOffset,
     end: (node.end ?? 0) + baseOffset,
   };
+}
+
+/**
+ * Phase 18 (D-08): emit the right `$model.<x>` diagnostic.
+ *
+ * `$model`'s valid keys are exactly the `model: true` subset of <props>:
+ *   - declared prop but NOT model: true  → ROZ205 (MODEL_ACCESS_NON_MODEL_PROP)
+ *   - not a declared prop at all         → ROZ113 (UNKNOWN_MODEL_REF)
+ *
+ * Handled in its OWN branch (before the generic props/data/refs/slots
+ * codeMap path) so the union-widen of `detectMagicAccess` does not break the
+ * `Record<scope,…>` exhaustiveness there — and so each `$model` ref is owned by
+ * exactly one validator/code (D-09 / Pitfall 6). Never throws.
+ */
+function pushModelDiagnostic(
+  ctx: ValidatorContext,
+  member: string,
+  loc: SourceLoc,
+): void {
+  const decl = ctx.bindings.props.get(member);
+  if (decl && !decl.isModel) {
+    // Declared prop, but not model: true — ROZ205.
+    ctx.diagnostics.push({
+      code: RozieErrorCode.MODEL_ACCESS_NON_MODEL_PROP,
+      severity: 'error',
+      message: `'$model.${member}' is invalid — '${member}' is a prop but is not declared with model: true. '$model' only addresses model props.`,
+      loc,
+      hint: `Add 'model: true' to the '${member}' prop declaration if two-way binding is intended, or use $data for component-local state.`,
+      related: [{ message: 'Prop declared here', loc: decl.sourceLoc }],
+    });
+    return;
+  }
+  if (!decl) {
+    // Not a declared prop at all — ROZ113.
+    ctx.diagnostics.push({
+      code: RozieErrorCode.UNKNOWN_MODEL_REF,
+      severity: 'error',
+      message: `Unknown reference '$model.${member}' — '${member}' is not a declared prop.`,
+      loc,
+      hint: `Declare '${member}' in <props> with 'model: true' if a model prop is intended.`,
+    });
+    return;
+  }
+  // decl exists AND is a model prop — valid $model ref, no diagnostic.
 }
 
 function pushUnknownMagicDiagnostic(
@@ -146,6 +190,16 @@ function checkMemberExpression(
   if (!access) return; // shape mismatch (e.g., $props.<something-not-ident>) — skip
 
   const { scope, member } = access;
+
+  // Phase 18 (D-08): `$model.<x>` is owned by its own branch — ROZ205 (declared
+  // non-model prop) / ROZ113 (undeclared) / valid (model prop). Handled BEFORE
+  // the props/data/refs/slots chain so the narrow 4-scope union flows into
+  // pushUnknownMagicDiagnostic unchanged (no codeMap exhaustiveness break).
+  if (scope === 'model') {
+    pushModelDiagnostic(ctx, member, locFromNodeOffset(node, baseOffset));
+    return;
+  }
+
   let known = false;
   if (scope === 'props') known = ctx.bindings.props.has(member);
   else if (scope === 'data') known = ctx.bindings.data.has(member);

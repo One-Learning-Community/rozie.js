@@ -13,10 +13,13 @@
  *   - $props.foo = 5   → ROZ200 (if foo lacks model: true)
  *   - $props.foo += 1  → ROZ200 (any compound operator)
  *   - $props.foo++     → ROZ200 (UpdateExpression)
- *   - const { foo } = $props; foo = 5  → NO ROZ200 (foo is a NEW local)
- *   - $props.bogus = 5 → NO ROZ200 (defer to ROZ100; no decl to check
+ *   - $props.bar = 5   → ROZ204 (if bar HAS model: true — Phase 18 / D-07;
+ *     `$props` is read-only universally, write via `$model.bar`)
+ *   - $props.bar++     → ROZ204 (model prop, UpdateExpression)
+ *   - const { foo } = $props; foo = 5  → NO ROZ200/ROZ204 (foo is a NEW local)
+ *   - $props.bogus = 5 → NO ROZ200/ROZ204 (defer to ROZ100; no decl to check
  *     isModel against)
- *   - $props['foo'] = 5 → NO ROZ200 (defer to ROZ106 from
+ *   - $props['foo'] = 5 → NO ROZ200/ROZ204 (defer to ROZ106 from
  *     unknownRefValidator)
  *
  * Per Phase 2 success criterion 2: Counter.rozie's `$props.value += $props.step`
@@ -73,6 +76,34 @@ function makeRoz200(
 }
 
 /**
+ * Build the ROZ204 diagnostic for a write to a `model: true` prop via
+ * `$props.<x>` (Phase 18 / D-07). `$props` is read-only universally — a model
+ * prop is written through the producer-side `$model.<x>` sigil. Mirrors
+ * `makeRoz200`'s shape (message + accurate byte-offset loc + related decl
+ * pointer); the message names `$model.<x>` as the fix (SPEC Req 3 acceptance).
+ */
+function makeRoz204(
+  offendingNode: t.Node,
+  member: string,
+  decl: PropDeclEntry,
+  operator: string,
+): Diagnostic {
+  const isPlainAssign = operator.length === 1;
+  const verb = isPlainAssign ? 'Write to' : 'Mutation of';
+  const message =
+    `${verb} '$props.${member}' is not allowed — '${member}' is a model prop, so write it via ` +
+    `'$model.${member}', not '$props.${member}'. '$props' is read-only for every prop.`;
+  return {
+    code: RozieErrorCode.WRITE_TO_MODEL_PROP_VIA_PROPS,
+    severity: 'error',
+    message,
+    loc: locFromNode(offendingNode),
+    hint: `Use '$model.${member}' (e.g. '$model.${member} = …' / '$model.${member}++') — the producer-side two-way-write sigil for model props.`,
+    related: [{ message: 'Prop declared here', loc: decl.sourceLoc }],
+  };
+}
+
+/**
  * For an LHS node (left-hand side of AssignmentExpression OR argument of
  * UpdateExpression), inspect whether it's a write to a non-model prop.
  * If so, push a ROZ200 diagnostic. Returns true if the LHS targeted
@@ -96,7 +127,18 @@ function checkLHSForPropWrite(
     // Unknown prop — unknownRefValidator emits ROZ100; don't double-emit.
     return;
   }
-  if (decl.isModel) return; // Two-way binding allowed.
+  if (decl.isModel) {
+    // Phase 18 (D-07): `$props` is read-only universally. A model prop is
+    // two-way, but it must be written via `$model.<x>`, never `$props.<x>`.
+    // ROZ204 names `$model.<x>` as the fix. Inherits the operator-agnostic
+    // path (AssignmentExpression + UpdateExpression), so `$props.open = false`
+    // and `$props.count++` (model) both error. Exactly one diagnostic per site
+    // — ROZ203 (updateExpressionValidator) only fires when the value is
+    // CONSUMED, a distinct shape; statement-context model `$props` writes are
+    // owned solely here (D-09 / Pitfall 6).
+    diagnostics.push(makeRoz204(parentNode, access.member, decl, operator));
+    return;
+  }
   diagnostics.push(makeRoz200(parentNode, access.member, decl, operator));
 }
 
