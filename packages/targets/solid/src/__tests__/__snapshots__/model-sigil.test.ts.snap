@@ -1,0 +1,39 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Solid $model producer-side two-way-write sigil > emitted model fixture matches snapshot 1`] = `
+"import type { JSX } from 'solid-js';
+import { splitProps } from 'solid-js';
+import { createControllableSignal, mergeListeners } from '@rozie/runtime-solid';
+
+interface ModelSigilProps {
+  value?: number;
+  defaultValue?: number;
+  onValueChange?: (value: number) => void;
+}
+
+export default function ModelSigil(_props: ModelSigilProps): JSX.Element {
+  const [local, attrs] = splitProps(_props, ['value']);
+
+  const [value, setValue] = createControllableSignal<number>(_props as unknown as Record<string, unknown>, 'value', 0);
+
+  function bump() {
+    setValue(value() + 1);
+  }
+  function reset() {
+    setValue(0);
+  }
+  function step() {
+    setValue(value() + 1);
+  }
+  function doubled() {
+    return value() * 2;
+  }
+
+  return (
+    <>
+      <button {...attrs} {...mergeListeners({ onClick: ($event) => { setValue(prev => prev + 1); } }, attrs)} data-rozie-s-78a54232="">{value()}</button>
+    </>
+  );
+}
+"
+`;

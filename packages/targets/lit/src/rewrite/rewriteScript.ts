@@ -201,6 +201,26 @@ export interface RewriteScriptOpts {
   runtime?: RuntimeLitImportCollector;
 }
 
+/**
+ * Phase 18 (Req 2) — normalize the producer-side two-way-write sigil `$model`
+ * to `$props` across a cloned File, in place. See the call-site comment in
+ * `rewriteScript` for the full contract; `$model.X` is model-only and always a
+ * member-expression object, so the object-Identifier rename routes read/write
+ * through the IDENTICAL `$props.<modelProp>` lowering. Reuse, not reimplement.
+ */
+function normalizeModelAccessor(file: File): void {
+  traverse(file, {
+    MemberExpression(path) {
+      const obj = path.node.object;
+      if (t.isIdentifier(obj) && obj.name === '$model') obj.name = '$props';
+    },
+    OptionalMemberExpression(path) {
+      const obj = path.node.object;
+      if (t.isIdentifier(obj) && obj.name === '$model') obj.name = '$props';
+    },
+  });
+}
+
 export function rewriteScript(
   fileIn: File,
   ir: IRComponent,
@@ -228,6 +248,18 @@ export function rewriteScript(
   );
   const methodNames =
     opts.methodNamesOverride ?? collectMethodNamesFromProgram(cloned, ir);
+
+  // Phase 18 (Req 2) — producer-side two-way-write sigil `$model.X`.
+  // `$model` is model-only by contract: Wave 1's core semantic pass already
+  // rejected `$model.<nonModelProp>` (ROZ205) / `$model.<nonExistent>` (ROZ113)
+  // BEFORE lowering, so every `$model.X` reaching the emitter is a declared
+  // model prop. `$model` is always a member-expression object (D-03), so we
+  // normalize the accessor `$model` → `$props` in a single pre-pass; every
+  // downstream write/read site then routes through the IDENTICAL
+  // `$props.<modelProp>` lowering (same `_<name>Controllable.write(...)` on
+  // write, same `this.<name>` getter on read) → byte-identical emit. Reuse,
+  // not reimplement (SPEC Req 2).
+  normalizeModelAccessor(cloned);
 
   traverse(cloned, {
     AssignmentExpression(path) {

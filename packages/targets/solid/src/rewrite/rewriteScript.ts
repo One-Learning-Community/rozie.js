@@ -98,6 +98,27 @@ function buildSetterCall(
  *
  * @experimental — shape may change before v1.0
  */
+/**
+ * Phase 18 (Req 2) — normalize the producer-side two-way-write sigil `$model`
+ * to `$props` across a cloned File, in place. See the call-site comment in
+ * `rewriteRozieIdentifiers` for the full contract; `$model.X` is model-only and
+ * always a member-expression object, so the object-Identifier rename routes
+ * read/write through the IDENTICAL `$props.<modelProp>` lowering. Reuse, not
+ * reimplement.
+ */
+function normalizeModelAccessor(file: File): void {
+  traverse(file, {
+    MemberExpression(path: NodePath<t.MemberExpression>) {
+      const obj = path.node.object;
+      if (t.isIdentifier(obj) && obj.name === '$model') obj.name = '$props';
+    },
+    OptionalMemberExpression(path: NodePath<t.OptionalMemberExpression>) {
+      const obj = path.node.object;
+      if (t.isIdentifier(obj) && obj.name === '$model') obj.name = '$props';
+    },
+  });
+}
+
 export function rewriteRozieExpressionNode(
   expr: t.Expression | t.BlockStatement,
   ir: IRComponent,
@@ -157,6 +178,18 @@ export function rewriteRozieIdentifiers(
     ir.slots.filter((s) => s.isPortal === true).map((s) => s.name),
   );
   const allSlotNames = new Set(ir.slots.map((s) => s.name));
+
+  // Phase 18 (Req 2) — producer-side two-way-write sigil `$model.X`.
+  // `$model` is model-only by contract: Wave 1's core semantic pass already
+  // rejected `$model.<nonModelProp>` (ROZ205) / `$model.<nonExistent>` (ROZ113)
+  // BEFORE lowering, so every `$model.X` reaching the emitter is a declared
+  // model prop. `$model` is always a member-expression object (D-03), so we
+  // normalize the accessor `$model` → `$props` in a single pre-pass; every
+  // downstream write/read site then routes through the IDENTICAL
+  // `$props.<modelProp>` lowering (same createControllableSignal setter on
+  // write, same `value()` accessor on read) → byte-identical emit. Reuse, not
+  // reimplement (SPEC Req 2).
+  normalizeModelAccessor(cloned);
 
   traverse(cloned, {
     // Rewrite bare computed-memo references to getter calls: canIncrement → canIncrement().

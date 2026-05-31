@@ -137,6 +137,23 @@ export function rewriteTemplateExpression(
 
   const wrapper = t.file(t.program([t.expressionStatement(cloned)]));
 
+  // Phase 18 (Req 2) — producer-side two-way-write sigil `$model.X` in template
+  // event handlers / bindings. `$model` is model-only by contract (Wave 1
+  // rejected non-model/non-existent `$model.X` before lowering) and always a
+  // member-expression object (D-03); normalize `$model` → `$props` before the
+  // main traversal so every write/read routes through the IDENTICAL
+  // `$props.<modelProp>` lowering → byte-identical emit. Reuse, not reimplement.
+  traverse(wrapper, {
+    MemberExpression(path) {
+      const obj = path.node.object;
+      if (t.isIdentifier(obj) && obj.name === '$model') obj.name = '$props';
+    },
+    OptionalMemberExpression(path) {
+      const obj = path.node.object;
+      if (t.isIdentifier(obj) && obj.name === '$model') obj.name = '$props';
+    },
+  });
+
   traverse(wrapper, {
     AssignmentExpression(path) {
       const node = path.node;
