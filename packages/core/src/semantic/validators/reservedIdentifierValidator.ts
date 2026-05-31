@@ -57,10 +57,11 @@ export const RESERVED_SIGILS: ReadonlySet<string> = new Set([
   '$attrs',
   '$listeners',
   '$restoreFocus', // Phase 16
+  '$model', // Phase 18 — producer-side two-way-write sigil
 ]);
 
 const RESERVED_SIGIL_LIST =
-  '$el, $props, $data, $refs, $slots, $emit, $event, $attrs, $listeners, $restoreFocus';
+  '$el, $props, $data, $refs, $slots, $emit, $event, $attrs, $listeners, $restoreFocus, $model';
 
 function emitCollision(
   name: string,

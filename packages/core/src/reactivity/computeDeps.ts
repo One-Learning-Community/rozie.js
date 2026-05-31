@@ -67,6 +67,14 @@ const MAGIC_ACCESSOR_NAMES = new Set([
   // the unit the dep collector tracks, never the `$listeners` identifier
   // itself. SPEC R3 locks member-accessor parity with `$attrs`.
   '$listeners',
+  // Phase 18 (D-02) — `$model.<x>` member reads resolve against the model-prop
+  // subset of <props>. Handled in the MemberExpression visitor like `$props`,
+  // and normalized to a `scope:'props'` SignalRef at the push site (D-04) so
+  // `$model.value` lands in the React/Solid dep set exactly where `$props.value`
+  // would. Listed here so the bare `$model` identifier is never emitted as a
+  // free closure dep. NOT in STABLE_IDENTIFIERS (D-03) — `$model` only ever
+  // appears as a member-expression object, never a bare identifier.
+  '$model',
 ]);
 
 /**
@@ -249,7 +257,14 @@ export function computeExpressionDeps(
 
         // Skip nested traversal — we've already handled the chain via its root.
         path.skip();
-        push({ scope: access.scope, path: [access.member] } as SignalRef);
+        // Phase 18 (D-04 / Pitfall 3, load-bearing): `$model.x` reads ARE prop
+        // reads — normalize the `'model'` scope to `'props'` BEFORE constructing
+        // the SignalRef so `$model.value` produces a byte-identical dep to
+        // `$props.value`. The SignalRef.scope union is deliberately NOT widened
+        // to 5 scopes — ~20 downstream emitter switches consume it with no
+        // 'model' case; widening would force a 'model' case into every one.
+        const sigScope = access.scope === 'model' ? 'props' : access.scope;
+        push({ scope: sigScope, path: [access.member] } as SignalRef);
       },
 
       Identifier(path: NodePath<t.Identifier>) {

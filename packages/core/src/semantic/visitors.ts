@@ -15,9 +15,9 @@
 import * as t from '@babel/types';
 
 /**
- * Detect access pattern $props.foo / $data.foo / $refs.foo / $slots.foo.
- * Returns the scope + member name, or null if the node is not a magic
- * accessor read.
+ * Detect access pattern $props.foo / $data.foo / $refs.foo / $slots.foo /
+ * $model.foo (Phase 18). Returns the scope + member name, or null if the node
+ * is not a magic accessor read.
  *
  * Computed access (`$props['foo']`) returns null — Plan 02
  * unknownRefValidator emits ROZ106 separately for that pattern; this
@@ -25,7 +25,7 @@ import * as t from '@babel/types';
  */
 export function detectMagicAccess(
   node: t.Node,
-): { scope: 'props' | 'data' | 'refs' | 'slots'; member: string } | null {
+): { scope: 'props' | 'data' | 'refs' | 'slots' | 'model'; member: string } | null {
   if (!t.isMemberExpression(node)) return null;
   const obj = node.object;
   if (!t.isIdentifier(obj)) return null;
@@ -33,11 +33,21 @@ export function detectMagicAccess(
   if (node.computed) return null;
   const prop = node.property;
   if (!t.isIdentifier(prop)) return null;
-  const map: Record<string, 'props' | 'data' | 'refs' | 'slots'> = {
+  // Phase 18 (D-01): `$model` is the producer-side two-way-write sigil. It is a
+  // first-class scope here — every validator (propWrite, updateExpression,
+  // unknownRef) and the dep collector route through this one resolver, so the
+  // `'model'` scope flows to all call sites. Its valid keys are the `model:
+  // true` subset of <props>; non-model / non-existent `$model.x` are rejected
+  // by unknownRefValidator (ROZ205 / ROZ113). NOTE: this return-union widening
+  // is the SMALL union consumed by the 3 validators + computeDeps; the
+  // SignalRef.scope union is deliberately NOT widened (D-04 / Pitfall 3) — at
+  // the computeDeps push site `$model` reads normalize to scope:'props'.
+  const map: Record<string, 'props' | 'data' | 'refs' | 'slots' | 'model'> = {
     $props: 'props',
     $data: 'data',
     $refs: 'refs',
     $slots: 'slots',
+    $model: 'model',
   };
   const scope = map[obj.name];
   return scope ? { scope, member: prop.name } : null;

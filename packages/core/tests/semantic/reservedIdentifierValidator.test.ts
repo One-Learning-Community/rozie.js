@@ -39,11 +39,12 @@ function roz202(diags: { code: string }[]) {
 }
 
 describe('reservedIdentifierValidator — ROZ202', () => {
-  it('reserved set matches the 10 documented sigils', () => {
+  it('reserved set matches the 11 documented sigils', () => {
     expect([...RESERVED_SIGILS].sort()).toEqual(
       // Phase 14 added `$attrs` — consumer-passed attribute cluster.
       // Phase 15 added `$listeners` — consumer-passed listener cluster.
       // Phase 16 added `$restoreFocus` — keyed-list focus-restoration sigil.
+      // Phase 18 added `$model` — producer-side two-way-write sigil.
       [
         '$attrs',
         '$data',
@@ -51,6 +52,7 @@ describe('reservedIdentifierValidator — ROZ202', () => {
         '$emit',
         '$event',
         '$listeners',
+        '$model',
         '$props',
         '$refs',
         '$restoreFocus',
