@@ -21,6 +21,21 @@ const ROOT = resolve(HERE, '..');
 // → tests → repo.
 const REPO_ROOT = resolve(HERE, '..', '..', '..');
 const EXAMPLES_DIR = resolve(REPO_ROOT, 'examples');
+// Phase 20: SortableList.rozie moved out of examples/ into the
+// @rozie-ui/sortable-list package. The Angular sub-build now walks this dir via
+// `prebuildExtraRoots` (vite.config.ts) and emits the same cross-tree disk-cache
+// artefacts here (`SortableList.rozie.ts` + the `SortableList.ts` composition
+// shim) that it drops in examples/. They must be swept after the Angular build
+// for the same reason — the @angular/core-importing files poison the later
+// solid/lit sub-builds (and unrelated workspace typechecks). See
+// cleanupCrossTreeAngularArtifacts().
+const SORTABLE_LIST_SRC = resolve(
+  REPO_ROOT,
+  'packages',
+  'ui',
+  'sortable-list',
+  'src',
+);
 const REFERENCE_BASENAMES = [
   'Counter',
   'SearchInput',
@@ -120,6 +135,24 @@ function cleanupCrossTreeAngularArtifacts() {
   } catch {
     // demos dir may not exist in some checkouts — ignore
   }
+  // Phase 20: the Angular sub-build also walks `packages/ui/sortable-list/src/`
+  // (the moved SortableList canonical source) via `prebuildExtraRoots`. It emits
+  // `SortableList.rozie.ts` (D-70 disk-cache, imports @angular/core) and the
+  // `SortableList.ts` cross-rozie composition shim there. Without sweeping them
+  // between sub-builds, the later solid/lit `vite build` resolves the leftover
+  // `.rozie.ts` (it shadows the `.rozie` virtual module) and fails with
+  // "Rollup failed to resolve import 'lit'/'solid-js'" — the same cross-tree
+  // contamination the examples/ + demos/ sweeps above prevent.
+  try {
+    for (const entry of readdirSync(SORTABLE_LIST_SRC)) {
+      if (entry.endsWith('.rozie.ts')) {
+        rmSync(resolve(SORTABLE_LIST_SRC, entry), { force: true });
+      }
+    }
+  } catch {
+    // sortable-list src always exists post-Phase-20 — defensive only
+  }
+  rmSync(resolve(SORTABLE_LIST_SRC, 'SortableList.ts'), { force: true });
 }
 
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'];

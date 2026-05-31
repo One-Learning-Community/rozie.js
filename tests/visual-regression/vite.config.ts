@@ -108,6 +108,24 @@ async function frameworkPlugins(target: Target) {
 
 export default defineConfig(async () => {
   const examplesRoot = resolve(__dirname, '..', '..', 'examples');
+  // Phase 20: SortableList.rozie moved out of `examples/` into the
+  // `@rozie-ui/sortable-list` package. The Angular AOT prebuild + NgtscProgram
+  // must also walk the package src so the moved component's `.rozie.ts`
+  // disk-cache artifact is generated and type-resolved — otherwise the demo's
+  // `imports: [SortableList]` collapses to `any[]`, `ɵcmp` is skipped, and the
+  // cell falls back to JIT → empty mount. The matching disk-cache sweep lives
+  // in scripts/build-cells.mjs `cleanupCrossTreeAngularArtifacts()` so the
+  // emitted `.rozie.ts` here doesn't poison the later solid/lit sub-builds.
+  // See DEBUG.md "vr Angular JIT compiler unavailable".
+  const sortableListSrc = resolve(
+    __dirname,
+    '..',
+    '..',
+    'packages',
+    'ui',
+    'sortable-list',
+    'src',
+  );
   return {
   // Sub-builds are served from dist/<target>/; the host router lives at dist root.
   base: `/${TARGET}/`,
@@ -147,10 +165,10 @@ export default defineConfig(async () => {
     // The other targets' `.rozie.ts/.tsx` virtual modules go through Vite's
     // own resolver, which honors `browser` via vite-plugin-solid's
     // `configEnvironment` hook (and the equivalent for other plugins).
-    ...(TARGET === 'angular' ? [resolveCrossTreeBareImports([examplesRoot])] : []),
+    ...(TARGET === 'angular' ? [resolveCrossTreeBareImports([examplesRoot, sortableListSrc])] : []),
     Rozie({
       target: TARGET,
-      ...(TARGET === 'angular' ? { prebuildExtraRoots: [examplesRoot] } : {}),
+      ...(TARGET === 'angular' ? { prebuildExtraRoots: [examplesRoot, sortableListSrc] } : {}),
     }),
     ...(await frameworkPlugins(TARGET)),
   ],
