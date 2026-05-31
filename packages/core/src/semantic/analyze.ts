@@ -11,9 +11,12 @@
  *   2. runUnknownRefValidator — ROZ100..ROZ106 (SEM-01).
  *   3. runPropWriteValidator — ROZ200 (SEM-02). Stubbed in Task 1; Task 2
  *      replaces with the live implementation.
- *   4. runRForKeyValidator — ROZ300/ROZ301/ROZ302 (SEM-03). Stubbed in
+ *   4. runUpdateExpressionValidator — ROZ203 (260530). Expression-context
+ *      `++`/`--`/compound/plain mutation of reactive state ($data.<key> or a
+ *      model:true $props.<key>) where the value is consumed — unlowerable.
+ *   5. runRForKeyValidator — ROZ300/ROZ301/ROZ302 (SEM-03). Stubbed in
  *      Task 1; Task 3 replaces.
- *   5. runReservedIdentifierValidator — ROZ202. Flags <data> fields and
+ *   6. runReservedIdentifierValidator — ROZ202. Flags <data> fields and
  *      r-for loop variables that shadow a reserved `$`-sigil.
  *
  * Per D-08 collected-not-thrown: NEVER throws. A malformed AST (e.g., empty
@@ -28,6 +31,7 @@ import type { Diagnostic } from '../diagnostics/Diagnostic.js';
 import { collectAllDeclarations } from './bindings.js';
 import { runUnknownRefValidator } from './validators/unknownRefValidator.js';
 import { runPropWriteValidator } from './validators/propWriteValidator.js';
+import { runUpdateExpressionValidator } from './validators/updateExpressionValidator.js';
 import { runRForKeyValidator } from './validators/rForKeyValidator.js';
 import { runReservedIdentifierValidator } from './validators/reservedIdentifierValidator.js';
 
@@ -50,6 +54,7 @@ export function analyzeAST(ast: RozieAST): AnalyzeResult {
   const diagnostics: Diagnostic[] = [];
   runUnknownRefValidator(ast, bindings, diagnostics);
   runPropWriteValidator(ast, bindings, diagnostics);
+  runUpdateExpressionValidator(ast, bindings, diagnostics);
   runRForKeyValidator(ast, diagnostics);
   runReservedIdentifierValidator(ast, bindings, diagnostics);
   return { bindings, diagnostics };

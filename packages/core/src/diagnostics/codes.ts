@@ -94,6 +94,17 @@ export const RozieErrorCode = {
   WRITE_TO_NON_MODEL_PROP: 'ROZ200', // SEM-02: $props.foo = … where foo lacks model: true (Phase 2 success criterion 2)
   WRITE_TO_REF: 'ROZ201', // $refs.foo = … (refs are read-only DOM-element wrappers)
   RESERVED_IDENTIFIER_COLLISION: 'ROZ202', // <data> field or r-for loop var named $el / $props / $data / $refs / $slots / $emit / $event. ($event is the closure-param name for event-handler emits — see emitTemplate's `($event) =>` convention in target-{react,svelte,solid,lit}.) Wired in semantic/validators/reservedIdentifierValidator.ts — keep RESERVED_SIGILS there in sync with this list.
+  // 260530: expression-context `++`/`--` on reactive state ($data.<key> or a
+  // model:true $props.<key>) where the UpdateExpression's value is CONSUMED
+  // (parent is not an ExpressionStatement). Such reads can't be satisfied by a
+  // functional-updater setter (the setter returns the NEW value, not the
+  // postfix pre-increment value), so the setter-based targets (React/Solid/
+  // Angular) would otherwise emit uncompilable code. Statement-context
+  // `$data.x++` is fine (lowered through the setter by cb341f12) — only the
+  // value-consumed form trips this. Detected by semantic/validators/
+  // updateExpressionValidator.ts, wired into analyzeAST so it fires once for
+  // both compile() and @rozie/unplugin (both route through lowerToIR).
+  UPDATE_EXPRESSION_VALUE_CONSUMED: 'ROZ203', // error — expression-context ++/-- on reactive state isn't lowerable
 
   // ---- Warnings (Phase 2 Plan 02) — ROZ300..ROZ399 ----
   RFOR_MISSING_KEY: 'ROZ300', // SEM-03: r-for without :key
