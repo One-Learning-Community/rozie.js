@@ -19,6 +19,19 @@ import { compile, type CompileTarget } from '../src/compile.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const EXAMPLES_DIR = resolve(__dirname, '../../../examples');
+const REPO_ROOT = resolve(__dirname, '../../..');
+
+// SortableList graduated from an example into the @rozie-ui/sortable-list
+// package (Phase 20-01 git-mv'd examples/SortableList.rozie ->
+// packages/ui/sortable-list/src/SortableList.rozie). It is still the canonical
+// engine-wrapper exhibit for this compile gate, so resolve it from the package
+// path. All other wrappers still live under examples/.
+function resolveEngineWrapper(file: string): string {
+  if (file === 'SortableList.rozie') {
+    return resolve(REPO_ROOT, 'packages/ui/sortable-list/src/SortableList.rozie');
+  }
+  return resolve(EXAMPLES_DIR, file);
+}
 
 const TARGETS: CompileTarget[] = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'];
 
@@ -58,7 +71,7 @@ const ENGINE_DEMOS = [
 
 describe('engine-wrapper examples — cross-target compile gate', () => {
   describe.each(ENGINE_WRAPPERS)('%s (engine wrapper)', (file) => {
-    const path = resolve(EXAMPLES_DIR, file);
+    const path = resolveEngineWrapper(file);
     const source = readFileSync(path, 'utf8');
     it.each(TARGETS)('compiles to %s with zero errors', (target) => {
       const result = compile(source, { target, filename: path });

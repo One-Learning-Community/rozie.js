@@ -26,6 +26,12 @@ declare module 'sortablejs' {
   export interface Options {
     [key: string]: any;
   }
+  // `SortableEvent` is imported (type-only) by the @rozie-ui/sortable-list
+  // package's internal `useSortableJS` helper, staged into the tmp dir for the
+  // SortableList engine-wrapper case.
+  export interface SortableEvent {
+    [key: string]: any;
+  }
   export default class Sortable {
     constructor(el: any, options?: Options);
     destroy(): void;

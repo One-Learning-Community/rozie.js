@@ -22,7 +22,14 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, '../../../../..');
 
 function compile(name: string): string {
-  const source = readFileSync(resolve(ROOT, `examples/${name}.rozie`), 'utf8');
+  // SortableList graduated from examples/ into the @rozie-ui/sortable-list
+  // package (Phase 20-01 git-mv). Resolve it from its package path; all other
+  // fixtures still live under examples/.
+  const path =
+    name === 'SortableList'
+      ? resolve(ROOT, 'packages/ui/sortable-list/src/SortableList.rozie')
+      : resolve(ROOT, `examples/${name}.rozie`);
+  const source = readFileSync(path, 'utf8');
   const { ast } = parse(source, { filename: `${name}.rozie` });
   const registry = createDefaultRegistry();
   const { ir } = lowerToIR(ast!, { modifierRegistry: registry });

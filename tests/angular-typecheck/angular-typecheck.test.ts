@@ -30,7 +30,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync, rmSync, copyFileSync, symlinkSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, rmSync, copyFileSync, symlinkSync, mkdirSync } from 'node:fs';
 import { readFileSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -81,7 +81,14 @@ describe('ANGULAR-TSC — tsc --noEmit clean over emitted Angular standalone com
     const tmpDir = mkdtempSync(join(tmpdir(), 'rozie-angular-tsc-'));
     try {
       for (const name of EXAMPLES) {
-        const source = readFileSync(resolve(ROOT, 'examples/' + name + '.rozie'), 'utf8');
+        // SortableList graduated from examples/ into the @rozie-ui/sortable-list
+        // package (Phase 20-01 git-mv). Resolve it from its package path; all
+        // other reference examples still live under examples/.
+        const srcPath =
+          name === 'SortableList'
+            ? resolve(ROOT, 'packages/ui/sortable-list/src/SortableList.rozie')
+            : resolve(ROOT, 'examples/' + name + '.rozie');
+        const source = readFileSync(srcPath, 'utf8');
         const result = compile(source, {
           target: 'angular',
           filename: name + '.rozie',
@@ -90,6 +97,18 @@ describe('ANGULAR-TSC — tsc --noEmit clean over emitted Angular standalone com
         const errors = result.diagnostics.filter((d) => d.severity === 'error');
         expect(errors).toEqual([]);
         writeFileSync(join(tmpDir, name + '.ts'), result.code, 'utf8');
+      }
+
+      // The emitted SortableList component imports the relative
+      // `./internal/useSortableJS` helper. The harness writes emitted files flat
+      // into tmpDir, so stage the helper under tmpDir/internal/ for tsc to
+      // resolve it. Only needed when SortableList is in the EXAMPLES set.
+      if (EXAMPLES.includes('SortableList')) {
+        mkdirSync(join(tmpDir, 'internal'), { recursive: true });
+        copyFileSync(
+          resolve(ROOT, 'packages/ui/sortable-list/src/internal/useSortableJS.ts'),
+          join(tmpDir, 'internal', 'useSortableJS.ts'),
+        );
       }
 
       copyFileSync(join(HERE, 'tsconfig.json'), join(tmpDir, 'tsconfig.json'));
