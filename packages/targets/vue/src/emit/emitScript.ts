@@ -348,6 +348,20 @@ function emitDefineEmitsCall(ir: IRComponent): string {
 }
 
 /**
+ * Phase 21 (REQ-4) — emit `defineExpose({ reset, focus });` if ir.expose is
+ * non-empty, mirroring `emitDefineEmitsCall`. `defineExpose` is a Vue compiler
+ * macro (NO import). The names are joined in source order; Vue infers the handle
+ * types from the referenced function declarations (D-04 — no explicit interface).
+ * Byte-identical-when-empty: returns '' (and emitVue assembly appends nothing)
+ * so non-`$expose` Vue output is unchanged.
+ */
+function emitDefineExposeCall(ir: IRComponent): string {
+  if (ir.expose.length === 0) return '';
+  const names = ir.expose.map((e) => e.name).join(', ');
+  return `defineExpose({ ${names} });`;
+}
+
+/**
  * Emit `defineSlots<...>()` if ir.slots is non-empty. Plan 03 refines from the
  * Plan 02 `props: any` stub to per-param `{ paramName: any; ... }` literals via
  * `buildSlotTypeBlock` (refineSlotTypes.ts). Param value types remain `any` for
@@ -766,7 +780,12 @@ function emitResidualScriptBody(
           callee.name === '$onUnmount' ||
           callee.name === '$onUpdate' ||
           // Quick plan 260515-u2b — $watch is consumed by emitWatcherHooks.
-          callee.name === '$watch'
+          callee.name === '$watch' ||
+          // Phase 21 — `$expose({...})` is a COMPILE-TIME directive consumed via
+          // ir.expose and re-emitted as a `defineExpose({...})` macro (see
+          // emitDefineExposeCall). It MUST be stripped from the residual script
+          // body — otherwise it leaks as an undefined-`$expose` runtime reference.
+          callee.name === '$expose'
         ) {
           continue;
         }
@@ -889,6 +908,12 @@ export function emitScript(
     emitWatcherHooks(cloned, imports);
   for (const idx of watcherConsumed) consumedIndices.add(idx);
 
+  // Phase 21 (REQ-4) — `defineExpose({...})` macro. Emitted LAST in the
+  // <script setup> body (SPEC Req 4: "after the setup body"), after the user
+  // script + defineEmits/defineSlots + lifecycle/refs/watchers, so every
+  // referenced function is already in scope. '' when ir.expose is empty.
+  const exposeLine = emitDefineExposeCall(ir);
+
   const { code: residualCode, stmts: residualStmts } = emitResidualScriptBody(cloned, consumedIndices);
 
   // 4. Assemble in canonical order with blank-line separators between sections.
@@ -932,6 +957,9 @@ export function emitScript(
   // helpers referenced inside the watch callback (declared in residual body)
   // are in scope. watch() registration order doesn't matter for correctness.
   if (watcherLines.length > 0) sections.push(watcherLines.join('\n'));
+  // Phase 21 — append `defineExpose({...})` LAST so the handle is registered
+  // after every exposed function is declared in the setup body.
+  if (exposeLine) sections.push(exposeLine);
 
   const script = sections.join('\n\n');
 

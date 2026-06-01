@@ -153,6 +153,62 @@ $watch(() => $props.q, () => { console.log('B') })
     expect(idxB).toBeGreaterThan(idxA);
   });
 
+  // Phase 21 (REQ-4) — Vue `$expose` emit → `defineExpose({...})` macro.
+  const EXPOSE_SRC = `<rozie name="ExposeProbe">
+<data>{ value: '' }</data>
+<script>
+function reset() { $data.value = '' }
+function focus() { $refs.field.focus() }
+$expose({ reset, focus })
+</script>
+<template><input ref="field" r-model="value" /></template>
+</rozie>`;
+
+  it('Phase 21 — $expose({ reset, focus }) emits `defineExpose({ reset, focus });`', () => {
+    const ir = lowerSource(EXPOSE_SRC, 'ExposeProbe.rozie');
+    const { script } = emitScript(ir);
+    expect(script).toContain('defineExpose({ reset, focus });');
+  });
+
+  it('Phase 21 — the `$expose(...)` call is STRIPPED from the script body (no bare `$expose(`)', () => {
+    const ir = lowerSource(EXPOSE_SRC, 'ExposeProbe.rozie');
+    const { script } = emitScript(ir);
+    // The compile-time directive must NOT leak as a runtime `$expose(...)` call.
+    expect(script).not.toMatch(/\$expose\s*\(/);
+  });
+
+  it('Phase 21 — defineExpose is a Vue macro: no import emitted for it', () => {
+    const ir = lowerSource(EXPOSE_SRC, 'ExposeProbe.rozie');
+    const { script } = emitScript(ir);
+    expect(script).not.toMatch(/import \{[^}]*\bdefineExpose\b[^}]*\}/);
+  });
+
+  it('Phase 21 — defineExpose line appears LAST in the assembled script body', () => {
+    const src = `<rozie name="ExposeAfter">
+<props>{ open: { type: Boolean, default: false } }</props>
+<data>{ value: '' }</data>
+<script>
+function reset() { $data.value = '' }
+$watch(() => $props.open, () => { console.log('w') })
+$expose({ reset })
+</script>
+<template><input ref="field" r-model="value" /></template>
+</rozie>`;
+    const ir = lowerSource(src, 'ExposeAfter.rozie');
+    const { script } = emitScript(ir);
+    const exposeIdx = script.indexOf('defineExpose(');
+    const watchIdx = script.indexOf('watch(');
+    expect(exposeIdx).toBeGreaterThan(0);
+    expect(watchIdx).toBeGreaterThan(0);
+    // defineExpose is appended after the watch() registration (last in body).
+    expect(exposeIdx).toBeGreaterThan(watchIdx);
+  });
+
+  it('Phase 21 — byte-identity: no `$expose` means NO defineExpose (Counter unchanged)', () => {
+    const { script } = emitScript(lowerExample('Counter'));
+    expect(script).not.toContain('defineExpose');
+  });
+
   // VUE-TSC gate (commit reference: vue-tsc --noEmit gate rollout):
   // Function-typed props with `default: null` (Card.rozie / CardHeader.rozie)
   // must render the TS type as `((...args: any[]) => any) | null` so the
