@@ -155,6 +155,16 @@ const EXAMPLES = [
   // identically across all four entrypoints. Single-file; no sibling .rozie
   // producers — stays OUT of RESOLVER_ROOT.
   'UpdateExpressionProbe',
+  // Phase 21 $expose dogfood (REQ-11). Typed input exposing reset()/focus() via
+  // $expose({ reset, focus }). Its committed per-target bytes are the dist-parity
+  // contract that each target lowers the imperative handle in its native idiom
+  // (React forwardRef + useImperativeHandle + .types handle interface, Vue
+  // defineExpose, Svelte instance exports, Solid callback ref, Angular/Lit public
+  // methods) while STRIPPING the top-level $expose(...) directive. The D-03
+  // byte-identity proof: registering ExposeProbe must drift ONLY the new
+  // ExposeProbe.* fixtures — every non-$expose fixture stays byte-for-byte
+  // unchanged. Single-file; composes nothing — stays OUT of RESOLVER_ROOT.
+  'ExposeProbe',
 ];
 
 const EXAMPLES_NEEDING_RESOLVER_ROOT = new Set([

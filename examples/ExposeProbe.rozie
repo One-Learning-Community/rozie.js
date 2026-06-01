@@ -1,0 +1,47 @@
+<!--
+  ExposeProbe.rozie
+
+  The Phase-21 $expose dogfood (REQ-11). A trivial typed input that exposes an
+  imperative handle:
+    - reset(): void  — clears the bound input value
+    - focus(): void  — focuses the input via $refs
+
+  Typed <script lang="ts"> so the synthesized per-target handle interface
+  carries the real method signatures (REQ-10's typed-handle path), not the
+  (...args: any[]) => any fallback.
+-->
+
+<rozie name="ExposeProbe">
+
+<data>
+{
+  value: '',
+}
+</data>
+
+<script lang="ts">
+function reset(): void {
+  $data.value = '';
+}
+
+function focus(): void {
+  $refs.field.focus();
+}
+
+$expose({ reset, focus });
+</script>
+
+<template>
+<div class="expose-probe">
+  <input ref="field" type="text" r-model="$data.value" placeholder="Type something" />
+  <span class="echo">{{ $data.value }}</span>
+</div>
+</template>
+
+<style>
+.expose-probe { display: inline-flex; align-items: center; gap: 0.5rem; }
+input { padding: 0.25rem 0.5rem; }
+.echo { font-variant-numeric: tabular-nums; color: rgba(0, 0, 0, 0.6); }
+</style>
+
+</rozie>

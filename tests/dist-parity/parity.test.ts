@@ -126,6 +126,11 @@ const EXAMPLES = [
   // (sibling staged below). Byte-parity across all 4 entrypoints × 6 targets.
   'PartCard',
   'PartCardConsumer',
+  // Phase 21 $expose dogfood (REQ-11). Typed input exposing reset()/focus().
+  // Byte-parity across all 4 entrypoints × 6 targets; the D-03 proof that
+  // registering it drifts ONLY the new ExposeProbe.* fixtures. Single-file
+  // producer — no <components>, no resolver-root.
+  'ExposeProbe',
 ] as const;
 
 // Phase 07.2 Plan 06 — siblings ModalConsumer reaches via `<components>`.
