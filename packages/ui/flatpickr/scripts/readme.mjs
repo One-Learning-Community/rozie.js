@@ -228,10 +228,12 @@ export class DemoComponent {
   },
   solid: {
     lang: 'tsx',
-    code: `let handle;
+    code: `import { Flatpickr, type FlatpickrHandle } from '@rozie-ui/flatpickr-solid';
+
+let handle: FlatpickrHandle | undefined;
 // The ref callback receives the HANDLE object (not the DOM node).
 <Flatpickr ref={(h) => (handle = h)} />;
-handle.openPicker();`,
+handle?.openPicker();`,
   },
   lit: {
     lang: 'ts',

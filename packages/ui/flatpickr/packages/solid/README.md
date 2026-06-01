@@ -67,10 +67,12 @@ export function Demo() {
 Beyond props/events, the component exposes imperative methods (declared once in the Rozie source via `$expose`). Grab a handle with the native ref mechanism and call them directly:
 
 ```tsx
-let handle;
+import { Flatpickr, type FlatpickrHandle } from '@rozie-ui/flatpickr-solid';
+
+let handle: FlatpickrHandle | undefined;
 // The ref callback receives the HANDLE object (not the DOM node).
 <Flatpickr ref={(h) => (handle = h)} />;
-handle.openPicker();
+handle?.openPicker();
 ```
 
 | Method | Description |

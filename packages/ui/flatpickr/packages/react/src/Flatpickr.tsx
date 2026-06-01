@@ -31,7 +31,7 @@ interface FlatpickrProps {
   onDayCreate?: (...args: any[]) => void;
 }
 
-interface FlatpickrHandle {
+export interface FlatpickrHandle {
   clear: (...args: any[]) => any;
   openPicker: (...args: any[]) => any;
   closePicker: (...args: any[]) => any;

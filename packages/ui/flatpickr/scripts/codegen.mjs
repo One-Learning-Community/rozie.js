@@ -99,24 +99,22 @@ function main() {
     // `Flatpickr` the READMEs/consumers import (an `export *` would NOT forward
     // a default).
     if (cfg.build === 'tsdown') {
-      // React: also export a named `FlatpickrHandle` type so consumers can
-      // write `useRef<FlatpickrHandle>(null)`. The emitter keeps its handle
-      // interface module-private inside the .tsx (the exported copy lives in
-      // the Flatpickr.d.ts sidecar, which tsc does NOT resolve for a
-      // './Flatpickr' import) — so derive it from the forwardRef component
-      // type instead. Solid/lit get no named type: solid's interface is
-      // likewise module-private (callback-ref param is inferred), and lit's
-      // handle is the custom element itself.
+      // React AND Solid: re-export the named `FlatpickrHandle` type directly
+      // from the component module. The React/Solid emitters now emit the
+      // synthesized handle interface as `export interface FlatpickrHandle`
+      // in the .tsx itself (Phase 21 REQ-10 follow-up), so consumers can
+      // `import type { FlatpickrHandle }` and the barrel forwards it verbatim
+      // — no ComponentRef derivation, no module-private caveat. Lit gets no
+      // named type: its handle is the custom element itself, so the plain
+      // barrel is correct there.
       const barrel =
-        target === 'react' && ir.expose.length > 0
-          ? `import type { ComponentRef } from 'react';\n` +
-            `import Flatpickr from './Flatpickr';\n\n` +
-            `export { Flatpickr };\n` +
+        (target === 'react' || target === 'solid') && ir.expose.length > 0
+          ? `export { default as Flatpickr } from './Flatpickr';\n` +
             `export { default } from './Flatpickr';\n\n` +
             `/** The \`$expose\` imperative handle received via \`ref\` — { ${ir.expose
               .map((m) => m.name)
               .join(', ')} }. */\n` +
-            `export type FlatpickrHandle = ComponentRef<typeof Flatpickr>;\n`
+            `export type { FlatpickrHandle } from './Flatpickr';\n`
           : `export { default as Flatpickr } from './Flatpickr';\nexport { default } from './Flatpickr';\n`;
       writeFileSync(resolve(leafSrc, 'index.ts'), barrel);
     }
