@@ -1,39 +1,61 @@
 <!--
   Flatpickr.rozie — data-bound port of flatpickr (chmln/flatpickr).
 
-  The "killer demo" companion that does for date pickers what
-  SortableList does for drag-and-drop: replace five hand-maintained
-  per-framework wrapper libraries (react-flatpickr, vue-flatpickr-
-  component, ngx-flatpickr-wrapper, svelte-flatpickr, plus a few
-  Solid/Lit forks) with ONE Rozie source.
+  The "killer demo" companion that does for date pickers what SortableList does
+  for drag-and-drop: replace five hand-maintained, stale, feature-incomplete
+  per-framework wrappers (react-flatpickr, vue-flatpickr-component,
+  angularx-flatpickr [~2yr stale], svelte-flatpickr [no Svelte-5 runes],
+  lit-flatpickr [a divergent reimplementation], and NO Solid wrapper at all)
+  with ONE Rozie source.
 
-  Two-way binds the picked date(s) as a string so consumers write the
-  same idiom regardless of target:
+  This is the expanded surface validated 2026-06 (compiles clean to all 6
+  targets). Design decisions locked here:
 
-    <Flatpickr r-model:date="$data.selected" :options="{ minDate: 'today' }" />
+    • Value contract — `r-model:date` (the formatted STRING is the authoritative
+      two-way value) PLUS `selectedDates: Date[]` delivered on the `change`
+      event payload. Consumers that want the Date objects read them off the
+      event; the two-way bind stays a simple string, sidestepping the awkward
+      Date[]-two-way that trips up every existing wrapper.
 
-  Why this is a worthwhile demo:
-    - Scalar `r-model:date` two-way bind — a different exercise from
-      SortableList's array two-way bind.
-    - $watch reconciles prop changes (mode/options) into the live
-      instance rather than re-creating it — same pattern as SortableList.
-    - flatpickr owns an input element and a popover the framework never
-      sees; we just hand it an empty input and let it take over. Same
-      problem every per-framework wrapper has had to solve since 2016.
+    • Range-commit semantics — flatpickr fires onChange on the FIRST click in
+      range mode (a partial range). Committing then is the bug every wrapper
+      ships. We commit the string only when the range is COMPLETE (2 dates),
+      unless the consumer opts into `commitOn: 'change'`.
+
+    • Round-trip-guarded reconcile — the #1 bug class (React "can't be
+      controlled", Vue "infinite loop") fixed uniformly: write back only when
+      the value actually differs from the live input.
+
+  KNOWN GAP (tracked, intentionally not here yet): a consumer-callable
+  imperative handle (clear()/open()/setDate()). Rozie has no `$expose` sigil
+  today; delivering imperative methods uniformly across all 6 targets is a
+  separate cross-cutting compiler feature. Until it lands, drive everything via
+  `r-model:date` + events (clear ≈ set the bound value to '').
+
+  Construction-time-only options (altInput / enableTime / noCalendar) are NOT
+  runtime-settable via flatpickr.set(); to retune them live, re-key the
+  component (`<Flatpickr :key="…">`) — the same documented idiom as SortableList.
 -->
 
 <rozie name="Flatpickr">
 
 <props>
 {
-  date:        { type: String,  default: '',                 model: true },
-  placeholder: { type: String,  default: 'Select a date…' },
-  mode:        { type: String,  default: 'single' },
-  dateFormat:  { type: String,  default: 'Y-m-d' },
-  minDate:     { type: String,  default: null },
-  maxDate:     { type: String,  default: null },
-  disabled:    { type: Boolean, default: false },
-  options:     { type: Object,  default: () => ({}) },
+  date:          { type: String,  default: '', model: true },
+  mode:          { type: String,  default: 'single' },
+  dateFormat:    { type: String,  default: 'Y-m-d' },
+  altInput:      { type: Boolean, default: false },
+  altFormat:     { type: String,  default: 'F j, Y' },
+  enableTime:    { type: Boolean, default: false },
+  enableSeconds: { type: Boolean, default: false },
+  time24hr:      { type: Boolean, default: false },
+  noCalendar:    { type: Boolean, default: false },
+  minDate:       { type: String,  default: null },
+  maxDate:       { type: String,  default: null },
+  placeholder:   { type: String,  default: 'Select a date…' },
+  disabled:      { type: Boolean, default: false },
+  commitOn:      { type: String,  default: 'complete' },
+  options:       { type: Object,  default: () => ({}) },
 }
 </props>
 
@@ -44,21 +66,39 @@ let instance = null
 
 $onMount(() => {
   instance = flatpickr($refs.inputEl, {
-    mode:        $props.mode,
-    dateFormat:  $props.dateFormat,
-    minDate:     $props.minDate,
-    maxDate:     $props.maxDate,
-    defaultDate: $props.date || null,
+    mode:          $props.mode,
+    dateFormat:    $props.dateFormat,
+    altInput:      $props.altInput,
+    altFormat:     $props.altFormat,
+    enableTime:    $props.enableTime,
+    enableSeconds: $props.enableSeconds,
+    time_24hr:     $props.time24hr,
+    noCalendar:    $props.noCalendar,
+    minDate:       $props.minDate,
+    maxDate:       $props.maxDate,
+    defaultDate:   $props.date || null,
     ...$props.options,
-    onChange: (_dates, dateStr) => {
-      // flatpickr emits onChange for every selection step (in range/multiple
-      // modes, two clicks = two events). The string form is always the
-      // authoritative public value, so we forward it verbatim.
-      if (dateStr !== $props.date) $model.date = dateStr
-      $emit('change', dateStr)
+    onChange: (selectedDates, dateStr) => {
+      // Value contract + range-commit semantics. In range mode flatpickr fires
+      // onChange on the FIRST click (partial range) — committing then is the
+      // bug every wrapper ships. Commit the string only when the range is
+      // complete (2 dates) unless the consumer opted into commitOn:'change'.
+      const isRange = $props.mode === 'range'
+      const complete = !isRange || selectedDates.length === 2
+      if (($props.commitOn === 'change' || complete) && dateStr !== $props.date) {
+        $model.date = dateStr
+      }
+      // Always surface BOTH the formatted string and the Date[] so consumers
+      // that need the parsed objects (range bounds, multi-select) get them.
+      $emit('change', { value: dateStr, selectedDates })
     },
-    onOpen:  () => $emit('open'),
-    onClose: () => $emit('close'),
+    onReady:       (d, s) => $emit('ready', { value: s, selectedDates: d }),
+    onOpen:        () => $emit('open'),
+    onClose:       () => $emit('close'),
+    onMonthChange: () => $emit('monthChange'),
+    onYearChange:  () => $emit('yearChange'),
+    onValueUpdate: (d, s) => $emit('valueUpdate', { value: s, selectedDates: d }),
+    onDayCreate:   (_d, _s, _fp, dayElem) => $emit('dayCreate', dayElem),
   })
 
   if ($props.disabled) instance.input.disabled = true
@@ -66,16 +106,16 @@ $onMount(() => {
   return () => instance?.destroy()
 })
 
-// Reconcile prop changes into the live instance without re-creating it.
-// flatpickr's set(name, value) is the supported runtime-update path.
-$watch(() => $props.date,       (v) => {
-  // Guard against the round-trip: when the user picks a date, flatpickr
-  // fires onChange → we write $props.date → $watch sees the change → we
-  // would call setDate, which would re-fire onChange. Skip if already in sync.
+// Round-trip-guarded two-way reconcile (the #1 bug class, fixed uniformly).
+// When the user picks a date, flatpickr fires onChange → we write $model.date
+// → $watch sees the change → without this guard we'd call setDate and re-fire
+// onChange. Skip when already in sync.
+$watch(() => $props.date, (v) => {
   if (!instance) return
-  const current = instance.input.value
-  if (v !== current) instance.setDate(v, false)
+  if (v !== instance.input.value) instance.setDate(v, false)
 })
+
+// Runtime-settable options via flatpickr's supported set() path.
 $watch(() => $props.mode,       (v) => instance?.set('mode',       v))
 $watch(() => $props.minDate,    (v) => instance?.set('minDate',    v))
 $watch(() => $props.maxDate,    (v) => instance?.set('maxDate',    v))
