@@ -378,5 +378,13 @@ describe('$expose ROZ121 — compile-level + repo-wide sweep (Quick 260601-jsy)'
     // A non-empty offenders list is a STOP-and-report finding (a real latent
     // collision in a shipped example) — surfaced via the assertion message.
     expect(offenders, `latent ROZ121 collisions in: ${offenders.join(', ')}`).toEqual([]);
-  });
+    // 30s deadline: this sweep end-to-end-compiles every committed .rozie file
+    // (dozens of them) in one synchronous test. The default 5s timeout is a
+    // failsafe, not an assertion of compile speed; under `turbo run test`
+    // parallel CPU starvation the sweep races past 5s and flakes (observed
+    // 2026-06-01: timed out at 5664ms in a full battery). Raised to 30s — same
+    // load-tolerant philosophy as commit 112352c5 (cli-smoke deadlines) and the
+    // rozie-timing-tests testTimeout. Does NOT weaken the check: the offenders
+    // assertion still genuinely fails on any real latent ROZ121 collision.
+  }, 30_000);
 });

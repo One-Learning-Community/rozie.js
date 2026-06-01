@@ -44,13 +44,21 @@ turbo run typecheck --force --continue --concurrency=4
 echo ""
 echo "▶ turbo run test --force --continue --concurrency=4"
 echo ""
-# --concurrency=4 keeps the gate stable. Without a cap, turbo runs every
-# task in parallel; on a 10-core box that's fine, but the heavier suites
+# --concurrency=4 caps parallelism so the heavier suites
 # (target-react/vue/svelte/angular + dist-parity, all running vitest with
-# its own per-test process budget) race vitest's 5s default timeout under
-# CPU starvation. Failed packages varied between runs — classic
-# turbo-parallel-CPU-starvation flake (memory turbo_parallel_test_flake).
-# At --concurrency=4 the gate is reliably green at ~36s cold cache.
+# its own per-test process budget) don't all run at once. Without a cap, turbo
+# runs every task in parallel and the heavy suites race vitest's per-test
+# timeout under CPU starvation — classic turbo-parallel-CPU-starvation flake
+# (memory turbo_parallel_test_flake).
+#
+# The cap REDUCES but does not eliminate the flake class on its own: individual
+# heavy tests still flake if their own per-test deadline is too tight for a
+# loaded box. The durable fix is per-test, not concurrency-wide — hoist
+# in-it() dynamic imports to static top-level imports (commits dcfb717,
+# 86ef214, and tests/timing/SearchInput.debounce.parity.test.ts) and raise
+# load-tolerant deadlines on genuinely heavy single tests (commit 112352c5
+# cli-smoke; exposeValidator ROZ121 SWEEP). Treat any remaining cross-package
+# failure under this gate as a not-yet-hardened heavy test, not a c=4 problem.
 turbo run test --force --continue --concurrency=4
 
 end=$(date +%s)

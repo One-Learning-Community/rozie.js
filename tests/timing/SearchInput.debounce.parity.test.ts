@@ -14,6 +14,21 @@
 //
 // The test exercises the debounce wiring path (a pure JS timer wrapper) —
 // no full SSR/hydration needed. Feasible in pure jsdom for all 4 targets.
+//
+// IMPORTANT — all framework toolchain modules are imported STATICALLY at the
+// top of this file, NOT lazily inside the `it()` bodies. A per-test
+// `await import()` of a heavy module graph (e.g. `@babel/core`,
+// `@vue/compiler-sfc`, `svelte/compiler`, `@angular/compiler`, `zone.js`)
+// counts that module's cold transform/resolution cost against vitest's
+// per-test timeout. Under `turbo run test` — which runs ~20 vitest processes
+// in parallel — that cost starves for CPU and the test intermittently exceeds
+// the timeout, failing only in full batteries while passing standalone (the
+// classic turbo-parallel-CPU-starvation flake signature; see commits dcfb717
+// and 86ef214). Hoisting to static top-level imports moves the transform cost
+// into the file-collection phase, where no per-test timeout cap applies, so
+// the timeout mechanism is structurally removed from the hot path. This is
+// behavior-preserving: the test bodies still drive the exact same
+// real-fake-timer debounce scenario and the exact same assertions.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -25,6 +40,56 @@ import { emitVue } from '@rozie/target-vue';
 import { emitReact } from '@rozie/target-react';
 import { emitSvelte } from '@rozie/target-svelte';
 import { emitAngular } from '@rozie/target-angular';
+
+// --- Shared toolchain (hoisted; see header note) -------------------------
+import * as babel from '@babel/core';
+import presetTypeScriptDefault from '@babel/preset-typescript';
+const presetTypeScript = (presetTypeScriptDefault as { default?: unknown }).default
+  ?? presetTypeScriptDefault;
+
+// --- Vue toolchain -------------------------------------------------------
+import * as sfc from '@vue/compiler-sfc';
+import * as vueRuntime from 'vue';
+import * as testUtils from '@vue/test-utils';
+import * as runtimeVue from '@rozie/runtime-vue';
+
+// --- React toolchain -----------------------------------------------------
+import presetReactDefault from '@babel/preset-react';
+const presetReact = (presetReactDefault as { default?: unknown }).default
+  ?? presetReactDefault;
+import * as reactRuntime from 'react';
+import * as reactJsxRuntime from 'react/jsx-runtime';
+import * as reactDom from 'react-dom';
+import * as reactDomClient from 'react-dom/client';
+import * as tlr from '@testing-library/react';
+import * as runtimeReact from '@rozie/runtime-react';
+
+// --- Svelte toolchain ----------------------------------------------------
+import * as svelteCompiler from 'svelte/compiler';
+import * as svelteInternalClient from 'svelte/internal/client';
+// Side-effect import — disclose-version sets a global flag for HMR.
+import 'svelte/internal/disclose-version';
+import * as svelte from 'svelte';
+import * as rozieRuntimeSvelte from '@rozie/runtime-svelte';
+
+// --- Angular toolchain ---------------------------------------------------
+// Ordering matters: zone.js must run before any Angular module, and
+// @angular/compiler must be imported BEFORE @angular/core for JIT support.
+// Static ESM imports execute in source order, so these side-effect imports
+// come first.
+import 'zone.js';
+import '@angular/compiler';
+import * as ngCore from '@angular/core';
+import * as ngCommon from '@angular/common';
+import * as ngForms from '@angular/forms';
+import * as ngTesting from '@angular/core/testing';
+import * as ngBrowserDynamicTesting from '@angular/platform-browser-dynamic/testing';
+import decoratorsPluginDefault from '@babel/plugin-proposal-decorators';
+const decoratorsPlugin = (decoratorsPluginDefault as { default?: unknown }).default
+  ?? decoratorsPluginDefault;
+import classPropsPluginDefault from '@babel/plugin-transform-class-properties';
+const classPropsPlugin = (classPropsPluginDefault as { default?: unknown }).default
+  ?? classPropsPluginDefault;
 
 const __dirname = resolve(fileURLToPath(import.meta.url), '..');
 const SEARCH_INPUT_ROZIE = resolve(__dirname, '../../examples/SearchInput.rozie');
@@ -76,11 +141,6 @@ describe('Phase 5 success criterion #4 — @input.debounce(300) parity', () => {
   it('vue: SearchInput.rozie debounce(300) fires once with final value after 350ms quiescence', async () => {
     const { ir, src } = loadIR();
     const { code } = emitVue(ir, { filename: 'SearchInput.rozie', source: src });
-
-    const sfc = await import('@vue/compiler-sfc');
-    const vueRuntime = await import('vue');
-    const testUtils = await import('@vue/test-utils');
-    const runtimeVue = await import('@rozie/runtime-vue');
 
     const { descriptor } = sfc.parse(code, { filename: 'SearchInput.vue' });
     if (!descriptor.scriptSetup) throw new Error('No <script setup> block');
@@ -145,9 +205,6 @@ describe('Phase 5 success criterion #4 — @input.debounce(300) parity', () => {
       'const styles = new Proxy({}, { get: () => "" });\n',
     );
 
-    const babel = await import('@babel/core');
-    const presetTypeScript = (await import('@babel/preset-typescript')).default;
-    const presetReact = (await import('@babel/preset-react')).default;
     const transformed = await babel.transformAsync(codeNoCss, {
       presets: [
         // automatic JSX runtime → no `React` global needed; jsx-runtime
@@ -161,13 +218,6 @@ describe('Phase 5 success criterion #4 — @input.debounce(300) parity', () => {
       configFile: false,
     });
     if (!transformed?.code) throw new Error('Babel transform failed for React');
-
-    const reactRuntime = await import('react');
-    const reactJsxRuntime = await import('react/jsx-runtime');
-    const reactDom = await import('react-dom');
-    const reactDomClient = await import('react-dom/client');
-    const tlr = await import('@testing-library/react');
-    const runtimeReact = await import('@rozie/runtime-react');
 
     const mod = await evalEsModule(transformed.code, {
       react: reactRuntime,
@@ -220,24 +270,17 @@ describe('Phase 5 success criterion #4 — @input.debounce(300) parity', () => {
     const { ir, src } = loadIR();
     const { code } = emitSvelte(ir, { filename: 'SearchInput.rozie', source: src });
 
-    const compiler = await import('svelte/compiler');
-    const compiled = compiler.compile(code, {
+    const compiled = svelteCompiler.compile(code, {
       generate: 'client',
       filename: 'SearchInput.svelte',
       runes: true,
     });
 
-    const svelteInternalClient = await import('svelte/internal/client');
-    // Side-effect import — disclose-version sets a global flag for HMR.
-    await import('svelte/internal/disclose-version');
-    const svelte = await import('svelte');
     // Phase 15-04 added `applyListeners` to the Svelte target emit (the
     // synthesized auto-fallthrough lands `use:applyListeners={__rozieAttrs}`
     // on the template root). The evalEsModule shim destructures the
     // `applyListeners` named export at module init, so the @rozie/runtime-svelte
     // module must be in the imports map.
-    const rozieRuntimeSvelte = await import('@rozie/runtime-svelte');
-
     const mod = await evalEsModule(compiled.js.code, {
       'svelte/internal/client': svelteInternalClient,
       'svelte/internal/disclose-version': {},
@@ -283,23 +326,6 @@ describe('Phase 5 success criterion #4 — @input.debounce(300) parity', () => {
     const { ir, src } = loadIR();
     const { code } = emitAngular(ir, { filename: 'SearchInput.rozie', source: src });
 
-    // Side-effect imports needed before any Angular module runs.
-    await import('zone.js');
-    // @angular/compiler must be imported BEFORE @angular/core for JIT support.
-    await import('@angular/compiler');
-
-    const ngCore = await import('@angular/core');
-    const ngCommon = await import('@angular/common');
-    const ngForms = await import('@angular/forms');
-    const ngTesting = await import('@angular/core/testing');
-    const ngBrowserDynamicTesting = await import(
-      '@angular/platform-browser-dynamic/testing'
-    );
-
-    const babel = await import('@babel/core');
-    const presetTypeScript = (await import('@babel/preset-typescript')).default;
-    const decoratorsPlugin = (await import('@babel/plugin-proposal-decorators')).default;
-    const classPropsPlugin = (await import('@babel/plugin-transform-class-properties')).default;
     const transformed = await babel.transformAsync(code, {
       presets: [presetTypeScript],
       plugins: [
@@ -393,8 +419,6 @@ describe('Phase 5 success criterion #4 — @input.debounce(300) parity', () => {
  * transform applied — input is expected to be JS-with-types).
  */
 async function stripTypeScript(source: string): Promise<string> {
-  const babel = await import('@babel/core');
-  const presetTypeScript = (await import('@babel/preset-typescript')).default;
   const out = await babel.transformAsync(source, {
     presets: [[presetTypeScript, { onlyRemoveTypeImports: false }]],
     filename: 'inline.ts',
