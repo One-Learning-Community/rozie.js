@@ -58,3 +58,27 @@ const date = ref('2026-05-17');
 | `yearChange` | Fired when the displayed year changes. |
 | `valueUpdate` | Fired on every internal value update (including partial range clicks), before the `change` commit. Payload `{ value, selectedDates }`. |
 | `dayCreate` | Fired for each day cell as the calendar renders. Payload is the day `HTMLElement`, for per-day decoration. |
+
+## Imperative handle
+
+Beyond props/events, the component exposes imperative methods (declared once in the Rozie source via `$expose`). Grab a handle with the native ref mechanism and call them directly:
+
+```vue
+<script setup>
+import { ref } from 'vue';
+const fp = ref();          // template ref
+</script>
+
+<template>
+  <Flatpickr ref="fp" />
+  <button @click="fp.openPicker()">Open</button>
+</template>
+```
+
+| Method | Description |
+| --- | --- |
+| `clear` | Clear the selected date(s) and the bound input. |
+| `openPicker` | Open the calendar popover. |
+| `closePicker` | Close the calendar popover. |
+| `selectDate` | Set the selected date programmatically — `selectDate(date, triggerChange?)`. Pass `true` as the second argument to also fire `change`. |
+| `jumpToDate` | Navigate the calendar view to a date — `jumpToDate(date)` — without changing the selection. |

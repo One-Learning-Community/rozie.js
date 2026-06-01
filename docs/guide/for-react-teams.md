@@ -128,7 +128,7 @@ CSS Modules hashes class names at build time. That means any code that reference
 </SortableList>
 ```
 
-`$classSelector('grip')` lowers to `"." + styles.grip` on React, `".grip"` literal on every other target. The class is validated against the component's `<style>` scope at compile time — typos are caught with `ROZ966` did-you-mean diagnostics. See the [`$classSelector()` features guide](/guide/features#classselector-handing-a-class-name-to-a-vanilla-js-engine).
+`$classSelector('grip')` lowers to `"." + styles.grip` on React, `".grip"` literal on every other target. The class is validated against the component's `<style>` scope at compile time — typos are caught with `ROZ966` did-you-mean diagnostics. See the [`$classSelector()` features guide](/guide/features#classselector-—-handing-a-class-name-to-a-vanilla-js-engine).
 
 ### Statically-computed `useEffect` dep arrays
 
@@ -235,6 +235,6 @@ If the team likes it, expand. If not, the compiled `.tsx` is a normal React comp
 - [Quick Start](/guide/quick-start) — write your first `.rozie` file.
 - [Adopt incrementally](/guide/adopt-incrementally) — full per-stack install
   walkthrough including Next.js, Astro, Babel-only.
-- [`$classSelector()` features guide](/guide/features#classselector-handing-a-class-name-to-a-vanilla-js-engine) — the React-specific bridge.
+- [`$classSelector()` features guide](/guide/features#classselector-—-handing-a-class-name-to-a-vanilla-js-engine) — the React-specific bridge.
 - [Creature comforts](/guide/creature-comforts) — the full matrix of cross-framework normalizations.
 - [Examples](/examples/) — full source + per-target output, including the React emit, for every reference component.

@@ -182,10 +182,70 @@ const FRAMEWORK_PEER_LABEL = {
 };
 
 // ---------------------------------------------------------------------------
+// Per-framework "how to obtain the imperative handle" snippets (Phase 21
+// `$expose`). Each shows the framework's NATIVE ref mechanism — there is no
+// Rozie-level consumer directive for calling a child's method.
+// ---------------------------------------------------------------------------
+
+const HANDLE_USAGE = {
+  react: {
+    lang: 'tsx',
+    code: `import { useRef } from 'react';
+import { Flatpickr, type FlatpickrHandle } from '@rozie-ui/flatpickr-react';
+
+const fp = useRef<FlatpickrHandle>(null);
+// <Flatpickr ref={fp} ... />
+fp.current?.openPicker();`,
+  },
+  vue: {
+    lang: 'vue',
+    code: `<script setup>
+import { ref } from 'vue';
+const fp = ref();          // template ref
+</script>
+
+<template>
+  <Flatpickr ref="fp" />
+  <button @click="fp.openPicker()">Open</button>
+</template>`,
+  },
+  svelte: {
+    lang: 'svelte',
+    code: `<script>
+  let fp;                  // component instance via bind:this
+</script>
+
+<Flatpickr bind:this={fp} />
+<button onclick={() => fp.openPicker()}>Open</button>`,
+  },
+  angular: {
+    lang: 'ts',
+    code: `@Component({ /* ... */ })
+export class DemoComponent {
+  @ViewChild(Flatpickr) fp!: Flatpickr;  // or the viewChild() signal
+  open() { this.fp.openPicker(); }
+}`,
+  },
+  solid: {
+    lang: 'tsx',
+    code: `let handle;
+// The ref callback receives the HANDLE object (not the DOM node).
+<Flatpickr ref={(h) => (handle = h)} />;
+handle.openPicker();`,
+  },
+  lit: {
+    lang: 'ts',
+    code: `// The custom element IS the handle — its exposed methods are public
+// element methods.
+document.querySelector('rozie-flatpickr').openPicker();`,
+  },
+};
+
+// ---------------------------------------------------------------------------
 // README rendering.
 // ---------------------------------------------------------------------------
 
-export function renderReadme(target, ir, eventManifest, pkgName) {
+export function renderReadme(target, ir, eventManifest, pkgName, handleManifest = {}) {
   const usage = USAGE[target];
   if (!usage) throw new Error(`renderReadme: no usage snippet for target "${target}"`);
 
@@ -247,6 +307,37 @@ export function renderReadme(target, ir, eventManifest, pkgName) {
     lines.push(`| \`${ev}\` | ${desc} |`);
   }
   lines.push('');
+
+  // Imperative handle — driven by ir.expose (Phase 21 `$expose`); emit the
+  // section only if the source exposes methods.
+  if (ir.expose && ir.expose.length > 0) {
+    const handleUsage = HANDLE_USAGE[target];
+    if (!handleUsage) {
+      throw new Error(`renderReadme: no handle-usage snippet for target "${target}"`);
+    }
+    lines.push('## Imperative handle');
+    lines.push('');
+    lines.push(
+      'Beyond props/events, the component exposes imperative methods (declared once in the ' +
+        'Rozie source via `$expose`). Grab a handle with the native ref mechanism and call ' +
+        'them directly:',
+    );
+    lines.push('');
+    lines.push('```' + handleUsage.lang);
+    lines.push(handleUsage.code);
+    lines.push('```');
+    lines.push('');
+    lines.push('| Method | Description |');
+    lines.push('| --- | --- |');
+    for (const m of ir.expose) {
+      const desc = handleManifest[m.name];
+      if (!desc) {
+        throw new Error(`renderReadme: exposed method "${m.name}" missing from handle-manifest`);
+      }
+      lines.push(`| \`${m.name}\` | ${desc} |`);
+    }
+    lines.push('');
+  }
 
   // Slots — Flatpickr has none; emit the section only if the source declares any.
   if (ir.slots && ir.slots.length > 0) {

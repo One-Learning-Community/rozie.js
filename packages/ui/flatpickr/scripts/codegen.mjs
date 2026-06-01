@@ -30,6 +30,7 @@ import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { compile, createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
 import { eventManifest } from './event-manifest.mjs';
+import { handleManifest } from './handle-manifest.mjs';
 import { renderReadme, validateDocsPropsTable } from './readme.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..'); // packages/ui/flatpickr
@@ -69,6 +70,15 @@ function main() {
     }
   }
 
+  // Keep the hand-kept handle manifest in lockstep with ir.expose (Phase 21).
+  for (const m of ir.expose) {
+    if (!handleManifest[m.name]) {
+      throw new Error(
+        `codegen: method "${m.name}" is exposed by the source but has no entry in handle-manifest.mjs`,
+      );
+    }
+  }
+
   // (3)(4) per-target emit + README.
   for (const [target, cfg] of Object.entries(TARGETS)) {
     const r = compile(source, { target, filename: FILENAME });
@@ -89,10 +99,26 @@ function main() {
     // `Flatpickr` the READMEs/consumers import (an `export *` would NOT forward
     // a default).
     if (cfg.build === 'tsdown') {
-      writeFileSync(
-        resolve(leafSrc, 'index.ts'),
-        `export { default as Flatpickr } from './Flatpickr';\nexport { default } from './Flatpickr';\n`,
-      );
+      // React: also export a named `FlatpickrHandle` type so consumers can
+      // write `useRef<FlatpickrHandle>(null)`. The emitter keeps its handle
+      // interface module-private inside the .tsx (the exported copy lives in
+      // the Flatpickr.d.ts sidecar, which tsc does NOT resolve for a
+      // './Flatpickr' import) — so derive it from the forwardRef component
+      // type instead. Solid/lit get no named type: solid's interface is
+      // likewise module-private (callback-ref param is inferred), and lit's
+      // handle is the custom element itself.
+      const barrel =
+        target === 'react' && ir.expose.length > 0
+          ? `import type { ComponentRef } from 'react';\n` +
+            `import Flatpickr from './Flatpickr';\n\n` +
+            `export { Flatpickr };\n` +
+            `export { default } from './Flatpickr';\n\n` +
+            `/** The \`$expose\` imperative handle received via \`ref\` — { ${ir.expose
+              .map((m) => m.name)
+              .join(', ')} }. */\n` +
+            `export type FlatpickrHandle = ComponentRef<typeof Flatpickr>;\n`
+          : `export { default as Flatpickr } from './Flatpickr';\nexport { default } from './Flatpickr';\n`;
+      writeFileSync(resolve(leafSrc, 'index.ts'), barrel);
     }
 
     // React-only sidecars.
@@ -103,7 +129,7 @@ function main() {
 
     // (4) README from the single IR parse.
     const pkgName = leafPkgName(cfg.dir);
-    const readme = renderReadme(target, ir, eventManifest, pkgName);
+    const readme = renderReadme(target, ir, eventManifest, pkgName, handleManifest);
     writeFileSync(resolve(ROOT, 'packages', cfg.dir, 'README.md'), readme);
 
     const sidecars = target === 'react' ? ' (+ .module.css + .d.ts)' : '';

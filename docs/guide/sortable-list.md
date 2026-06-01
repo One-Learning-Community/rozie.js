@@ -58,7 +58,7 @@ The minimal consumer is a `<components>` block, a bound array, and the default s
 </style>
 ```
 
-`r-model:items` is Rozie's [two-way bind on an array](/guide/features#r-model-bindable-props) — the consumer hands SortableList an array, SortableList writes the reordered array back, and the framework reconciler picks up the change without any `onChange → setState` wiring.
+`r-model:items` is Rozie's [two-way bind on an array](/guide/features#model-true-→-idiomatic-two-way-binding-everywhere) — the consumer hands SortableList an array, SortableList writes the reordered array back, and the framework reconciler picks up the change without any `onChange → setState` wiring.
 
 To see what each target's emitted code looks like, visit the [SortableList example page](/examples/sortable-list) — it ships the live source plus the per-target compiled output for all six targets.
 
@@ -70,7 +70,7 @@ To see what each target's emitted code looks like, visit the [SortableList examp
 | --- | --- | --- | :---: | --- |
 | `items` | `Array` | `[]` | yes (via `r-model`) | The bound items array. `model: true` — reorders write back through the two-way path. |
 | `itemKey` | `String` | `null` | yes | Property name to use as the per-row key (e.g. `'id'`). Improves keyed-reconciler behavior on Vue / Svelte / React. |
-| `handle` | `String` | `null` | yes | CSS selector identifying the per-row drag handle. Use `$classSelector('grip')` to survive React's CSS-Modules class hashing — see [`$classSelector`](/guide/features#classselector-handing-a-class-name-to-a-vanilla-js-engine). |
+| `handle` | `String` | `null` | yes | CSS selector identifying the per-row drag handle. Use `$classSelector('grip')` to survive React's CSS-Modules class hashing — see [`$classSelector`](/guide/features#classselector-—-handing-a-class-name-to-a-vanilla-js-engine). |
 | `group` | `String \| Object` | `null` | yes | SortableJS group name (cross-list drag) or full object form. Use `cloneable: true` to flip a string group into clone-mode. |
 | `animation` | `Number` | `150` | yes | Animation duration in ms. `0` disables. |
 | `disabled` | `Boolean` | `false` | yes | Temporarily disable drag without unmounting. |
@@ -105,7 +105,7 @@ The default slot receives `{ item, index }`:
 </template>
 ```
 
-To rename a slot param to a more readable local name in nested-template contexts, use the slot-param rename form `{ item: column }` — see [scoped slot params](/guide/features#scoped-slot-params).
+To rename a slot param to a more readable local name in nested-template contexts, use the slot-param rename form `{ item: column }` — see [scoped slot params](/guide/features#slots-with-scoped-params).
 
 ## Recipes
 
@@ -124,7 +124,7 @@ The default behavior is "grab anywhere in the row." To require a specific drag h
 </SortableList>
 ```
 
-`$classSelector` is load-bearing on React because of CSS Modules class hashing — see [the dedicated `$classSelector` doc](/guide/features#classselector-handing-a-class-name-to-a-vanilla-js-engine). On the other five targets it lowers to the bare literal selector.
+`$classSelector` is load-bearing on React because of CSS Modules class hashing — see [the dedicated `$classSelector` doc](/guide/features#classselector-—-handing-a-class-name-to-a-vanilla-js-engine). On the other five targets it lowers to the bare literal selector.
 
 The canonical example is [`SortableListDemo`](https://github.com/One-Learning-Community/rozie.js/blob/main/examples/demos/SortableListDemo.rozie).
 
@@ -286,7 +286,7 @@ When any of those values change, the framework reconciler unmounts the old `<Sor
 
 ### Engine DOM mutation and the keyed reconciler
 
-SortableJS physically moves DOM nodes on drop. Five of six target reconcilers cope with this natively (their diff-against-`parent.children` patch path tolerates the engine's mutations); Lit's `lit-html` `repeat` directive keys its parts cache by sentinel-comment node identity and needs an explicit reconcile signal. The wrapper handles this for you via the [`r-external` + `$reconcileAfterDomMutation()`](/guide/features#r-external-and-reconcileafterdommutation-dom-the-framework-doesn-t-own) pair — you don't need to wire these yourself unless you fork the wrapper.
+SortableJS physically moves DOM nodes on drop. Five of six target reconcilers cope with this natively (their diff-against-`parent.children` patch path tolerates the engine's mutations); Lit's `lit-html` `repeat` directive keys its parts cache by sentinel-comment node identity and needs an explicit reconcile signal. The wrapper handles this for you via the [`r-external` + `$reconcileAfterDomMutation()`](/guide/features#r-external-and-reconcileafterdommutation-—-dom-the-framework-doesn-t-own) pair — you don't need to wire these yourself unless you fork the wrapper.
 
 ### React CSS Modules and class-name props
 
@@ -294,12 +294,12 @@ SortableJS reads `handle`, `filter`, `ghostClass`, `chosenClass`, and `dragClass
 
 The fix depends on whether the prop is a *selector* or a *class name to add*:
 
-- **Selectors** (`handle`, `filter`): use [`$classSelector('grip')`](/guide/features#classselector-handing-a-class-name-to-a-vanilla-js-engine) on `handle` (per-target lowering; React resolves the hash at runtime). `filter` has no equivalent — prefer a `data-*` attribute selector.
+- **Selectors** (`handle`, `filter`): use [`$classSelector('grip')`](/guide/features#classselector-—-handing-a-class-name-to-a-vanilla-js-engine) on `handle` (per-target lowering; React resolves the hash at runtime). `filter` has no equivalent — prefer a `data-*` attribute selector.
 - **Class names to add** (`ghostClass`, `chosenClass`, `dragClass`): on React, declare the class in a `:global { … }` block in the consumer's `<style>` to opt it out of CSS-Modules hashing. SortableJS then attaches the unhashed class name to the live ghost/chosen/drag element, and the global rule matches.
 
 ### Lit shadow-DOM cross-component styling
 
-A consumer trying to style child-component-rendered DOM via [`:deep(.rozie-sortable-list)`](/guide/features#deep-reaching-into-child-components-from-scoped-styles) crosses a shadow-DOM boundary on Lit, so `:deep()` (an intra-scope reach) cannot reach the inner DOM there. The working cross-shadow pattern is [`::part()`](/guide/features#part-—-cross-shadow-styling-for-lit-children): the `SortableList` producer exposes the element with the standard HTML `part="<name>"` attribute, and the consumer styles it with `SortableList::part(<name>)`.
+A consumer trying to style child-component-rendered DOM via [`:deep(.rozie-sortable-list)`](/guide/features#deep-—-reaching-into-child-components-from-scoped-styles) crosses a shadow-DOM boundary on Lit, so `:deep()` (an intra-scope reach) cannot reach the inner DOM there. The working cross-shadow pattern is [`::part()`](/guide/features#part-—-cross-shadow-styling-for-lit-children): the `SortableList` producer exposes the element with the standard HTML `part="<name>"` attribute, and the consumer styles it with `SortableList::part(<name>)`.
 
 ```rozie
 <!-- Consumer styling the SortableList's exposed part across the Lit shadow boundary. -->
@@ -316,10 +316,10 @@ On Lit this lowers to the confined cross-shadow rule `rozie-sortable-list[data-r
 
 ## Cross-references
 
-- [`:deep()` — cross-component scoped CSS](/guide/features#deep-reaching-into-child-components-from-scoped-styles)
-- [`$classSelector()` — class-name-as-selector for vanilla-JS engines](/guide/features#classselector-handing-a-class-name-to-a-vanilla-js-engine)
-- [`$restoreFocus()` — keep focus on a row across keyed-reconciler re-renders](/guide/features#restorefocus-selector-idx-keep-focus-on-a-row-across-keyed-reconciler-re-renders)
-- [`r-external` and `$reconcileAfterDomMutation()` — DOM the framework doesn't own](/guide/features#r-external-and-reconcileafterdommutation-dom-the-framework-doesn-t-own)
+- [`:deep()` — cross-component scoped CSS](/guide/features#deep-—-reaching-into-child-components-from-scoped-styles)
+- [`$classSelector()` — class-name-as-selector for vanilla-JS engines](/guide/features#classselector-—-handing-a-class-name-to-a-vanilla-js-engine)
+- [`$restoreFocus()` — keep focus on a row across keyed-reconciler re-renders](/guide/features#restorefocus-selector-idx-—-keep-focus-on-a-row-across-keyed-reconciler-re-renders)
+- [`r-external` and `$reconcileAfterDomMutation()` — DOM the framework doesn't own](/guide/features#r-external-and-reconcileafterdommutation-—-dom-the-framework-doesn-t-own)
 - [Sortable libraries comparison](/guide/sortable-comparison) — feature matrix vs react-sortablejs, dnd-kit, Vue.Draggable, svelte-dnd-action, Angular CDK
 - [`SortableList.rozie` source on GitHub](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/sortable-list/src/SortableList.rozie) — the canonical wrapper (now colocated in the `@rozie-ui/sortable-list` package)
 - [`useSortableJS()` source on GitHub](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/sortable-list/src/internal/useSortableJS.ts) — the framework-agnostic SortableJS-vs-reconciler bridge (colocated + vendored into each leaf package's `src/internal/`)
