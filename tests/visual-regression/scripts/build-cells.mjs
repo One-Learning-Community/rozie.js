@@ -36,6 +36,17 @@ const SORTABLE_LIST_SRC = resolve(
   'sortable-list',
   'src',
 );
+// Same packaging move for @rozie-ui/flatpickr: Flatpickr.rozie lives in the
+// package src; the Angular sub-build walks it via `prebuildExtraRoots` and drops
+// the same cross-tree `.rozie.ts` + `Flatpickr.ts` shim artefacts that must be
+// swept after the Angular build (see cleanupCrossTreeAngularArtifacts).
+const FLATPICKR_SRC = resolve(
+  REPO_ROOT,
+  'packages',
+  'ui',
+  'flatpickr',
+  'src',
+);
 const REFERENCE_BASENAMES = [
   'Counter',
   'SearchInput',
@@ -153,6 +164,19 @@ function cleanupCrossTreeAngularArtifacts() {
     // sortable-list src always exists post-Phase-20 — defensive only
   }
   rmSync(resolve(SORTABLE_LIST_SRC, 'SortableList.ts'), { force: true });
+  // Same sweep for @rozie-ui/flatpickr's package src (FlatpickrDemo composes
+  // Flatpickr via <components>, so the Angular sub-build emits Flatpickr.rozie.ts
+  // + the Flatpickr.ts shim here). Leftovers poison the later solid/lit builds.
+  try {
+    for (const entry of readdirSync(FLATPICKR_SRC)) {
+      if (entry.endsWith('.rozie.ts')) {
+        rmSync(resolve(FLATPICKR_SRC, entry), { force: true });
+      }
+    }
+  } catch {
+    // flatpickr src always exists post-port — defensive only
+  }
+  rmSync(resolve(FLATPICKR_SRC, 'Flatpickr.ts'), { force: true });
 }
 
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'];

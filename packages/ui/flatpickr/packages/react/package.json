@@ -1,0 +1,52 @@
+{
+  "name": "@rozie-ui/flatpickr-react",
+  "version": "0.1.0",
+  "type": "module",
+  "private": false,
+  "license": "MIT",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "dependencies": {
+    "@rozie/runtime-react": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": "^18.2 || ^19",
+    "react-dom": "^18.2 || ^19",
+    "flatpickr": "^4.6"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": false
+    },
+    "react-dom": {
+      "optional": false
+    },
+    "flatpickr": {
+      "optional": false
+    }
+  },
+  "devDependencies": {
+    "@types/react": "^18",
+    "@types/react-dom": "^18"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome lint src"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

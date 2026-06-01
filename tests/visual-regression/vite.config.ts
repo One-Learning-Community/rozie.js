@@ -126,6 +126,18 @@ export default defineConfig(async () => {
     'sortable-list',
     'src',
   );
+  // Same move as sortable-list: Flatpickr.rozie lives in @rozie-ui/flatpickr.
+  // The Angular sub-build must walk it too (FlatpickrDemo's
+  // `imports: [Flatpickr]` would otherwise collapse to `any[]` → empty mount).
+  const flatpickrSrc = resolve(
+    __dirname,
+    '..',
+    '..',
+    'packages',
+    'ui',
+    'flatpickr',
+    'src',
+  );
   return {
   // Sub-builds are served from dist/<target>/; the host router lives at dist root.
   base: `/${TARGET}/`,
@@ -165,10 +177,10 @@ export default defineConfig(async () => {
     // The other targets' `.rozie.ts/.tsx` virtual modules go through Vite's
     // own resolver, which honors `browser` via vite-plugin-solid's
     // `configEnvironment` hook (and the equivalent for other plugins).
-    ...(TARGET === 'angular' ? [resolveCrossTreeBareImports([examplesRoot, sortableListSrc])] : []),
+    ...(TARGET === 'angular' ? [resolveCrossTreeBareImports([examplesRoot, sortableListSrc, flatpickrSrc])] : []),
     Rozie({
       target: TARGET,
-      ...(TARGET === 'angular' ? { prebuildExtraRoots: [examplesRoot, sortableListSrc] } : {}),
+      ...(TARGET === 'angular' ? { prebuildExtraRoots: [examplesRoot, sortableListSrc, flatpickrSrc] } : {}),
     }),
     ...(await frameworkPlugins(TARGET)),
   ],

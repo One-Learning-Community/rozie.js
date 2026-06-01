@@ -21,15 +21,17 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const EXAMPLES_DIR = resolve(__dirname, '../../../examples');
 const REPO_ROOT = resolve(__dirname, '../../..');
 
-// SortableList graduated from an example into the @rozie-ui/sortable-list
-// package (Phase 20-01 git-mv'd examples/SortableList.rozie ->
-// packages/ui/sortable-list/src/SortableList.rozie). It is still the canonical
-// engine-wrapper exhibit for this compile gate, so resolve it from the package
-// path. All other wrappers still live under examples/.
+// SortableList + Flatpickr graduated from examples into their @rozie-ui/<product>
+// packages (git-mv'd examples/<Name>.rozie -> packages/ui/<product>/src/<Name>.rozie).
+// They are still the canonical engine-wrapper exhibits for this compile gate, so
+// resolve them from the package path. All other wrappers still live under examples/.
+const PKG_WRAPPER_SRC: Record<string, string> = {
+  'SortableList.rozie': 'packages/ui/sortable-list/src/SortableList.rozie',
+  'Flatpickr.rozie': 'packages/ui/flatpickr/src/Flatpickr.rozie',
+};
 function resolveEngineWrapper(file: string): string {
-  if (file === 'SortableList.rozie') {
-    return resolve(REPO_ROOT, 'packages/ui/sortable-list/src/SortableList.rozie');
-  }
+  const pkg = PKG_WRAPPER_SRC[file];
+  if (pkg) return resolve(REPO_ROOT, pkg);
   return resolve(EXAMPLES_DIR, file);
 }
 

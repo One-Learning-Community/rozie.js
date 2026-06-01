@@ -74,6 +74,15 @@ examples/*.ts
 # without sweeping the codegen-emitted leaf sources).
 packages/ui/sortable-list/src/SortableList.ts
 
+# @rozie-ui/flatpickr — same Phase-20 packaging move as sortable-list above:
+# Flatpickr.rozie lives in the package source dir, and the Angular prebuild
+# (reaching this package via `prebuildExtraRoots`) emits a transient
+# `// @rozie-cross-rozie-shim` re-export `Flatpickr.ts` next to the .rozie
+# source when a consumer composes it via <components> (FlatpickrDemo). It is a
+# regenerated build artefact — never commit. (The sibling `Flatpickr.rozie.ts`
+# disk-cache is already covered by the global `*.rozie.ts` rule above.)
+packages/ui/flatpickr/src/Flatpickr.ts
+
 # IntelliJ plugin subproject (Phase 8)
 tools/intellij-plugin/build/
 tools/intellij-plugin/.gradle/

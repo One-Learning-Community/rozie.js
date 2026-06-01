@@ -20,7 +20,7 @@
 
 <components>
 {
-  Flatpickr: '../Flatpickr.rozie',
+  Flatpickr: '../../packages/ui/flatpickr/src/Flatpickr.rozie',
 }
 </components>
 

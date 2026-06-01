@@ -64,13 +64,16 @@ describe('SVELTE-CHECK — svelte-check --threshold error clean over emitted Sve
     const tmpDir = mkdtempSync(join(tmpdir(), 'rozie-svelte-check-'));
     try {
       for (const name of EXAMPLES) {
-        // SortableList graduated from examples/ into the @rozie-ui/sortable-list
-        // package (Phase 20-01 git-mv). Resolve it from its package path; all
-        // other reference examples still live under examples/.
-        const srcPath =
-          name === 'SortableList'
-            ? resolve(ROOT, 'packages/ui/sortable-list/src/SortableList.rozie')
-            : resolve(ROOT, 'examples/' + name + '.rozie');
+        // SortableList + Flatpickr graduated from examples/ into their
+        // @rozie-ui/<product> packages (git-mv). Resolve those from the package
+        // src; all other reference examples still live under examples/.
+        const PKG_SRC: Record<string, string> = {
+          SortableList: 'packages/ui/sortable-list/src/SortableList.rozie',
+          Flatpickr: 'packages/ui/flatpickr/src/Flatpickr.rozie',
+        };
+        const srcPath = PKG_SRC[name]
+          ? resolve(ROOT, PKG_SRC[name])
+          : resolve(ROOT, 'examples/' + name + '.rozie');
         const source = readFileSync(srcPath, 'utf8');
         const result = compile(source, {
           target: 'svelte',

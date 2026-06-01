@@ -130,8 +130,8 @@ $watch(() => $props.html, (v) => {
 // setEditable's 2nd arg is `emitUpdate` (defaults to true in TipTap v3).
 // Pass `false` — toggling editability is not a content change and must NOT
 // emit an `update`, which would round-trip ProseMirror's normalized HTML
-// back into the bound model. (See examples/Flatpickr.rozie for the same
-// "engine setters emit by default" guard.)
+// back into the bound model. (See packages/ui/flatpickr/src/Flatpickr.rozie for
+// the same "engine setters emit by default" guard.)
 $watch(() => $props.editable, (v) => editor?.setEditable(v, false))
 </script>
 

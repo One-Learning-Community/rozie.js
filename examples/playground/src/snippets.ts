@@ -165,7 +165,9 @@ const BUNDLE_DECLS: readonly BundleDecl[] = [
     key: 'bundle/FlatpickrDemo',
     label: 'bundle/FlatpickrDemo',
     entryGlobPath: '../../demos/FlatpickrDemo.rozie',
-    dependencyGlobPaths: ['../../Flatpickr.rozie'],
+    // `Flatpickr` moved into the @rozie-ui/flatpickr package; resolve its
+    // canonical `.rozie` from the package src (cf. the SortableList* bundles).
+    dependencyGlobPaths: ['../../../packages/ui/flatpickr/src/Flatpickr.rozie'],
   },
   {
     key: 'bundle/LeafletMapDemo',

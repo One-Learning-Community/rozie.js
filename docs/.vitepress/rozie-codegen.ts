@@ -58,16 +58,18 @@ export function rozieCodegen(
   const resolveExample = (name: string): string => {
     // Package-source branch — must precede the examples/ root branch (root
     // wins). `@rozie-ui` products live under `packages/ui/<product>/src/`;
-    // `SortableList` moved there in Phase 20-01, so docs resolve its canonical
-    // producer from the package source rather than the (now-removed)
-    // `examples/SortableList.rozie`.
-    const pkgSrc = resolve(
-      opts.examplesDir,
-      '..',
-      'packages/ui/sortable-list/src',
-      `${name}.rozie`,
-    );
-    if (existsSync(pkgSrc)) return pkgSrc;
+    // `SortableList` moved there in Phase 20-01 and `Flatpickr` in the
+    // flatpickr port, so docs resolve their canonical producer from the
+    // package source rather than the (now-removed) `examples/<Name>.rozie`.
+    for (const product of ['sortable-list', 'flatpickr']) {
+      const pkgSrc = resolve(
+        opts.examplesDir,
+        '..',
+        `packages/ui/${product}/src`,
+        `${name}.rozie`,
+      );
+      if (existsSync(pkgSrc)) return pkgSrc;
+    }
     const root = resolve(opts.examplesDir, `${name}.rozie`);
     if (existsSync(root)) return root;
     const demo = resolve(opts.examplesDir, 'demos', `${name}.rozie`);

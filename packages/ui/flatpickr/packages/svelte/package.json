@@ -1,0 +1,40 @@
+{
+  "name": "@rozie-ui/flatpickr-svelte",
+  "version": "0.1.0",
+  "type": "module",
+  "private": false,
+  "license": "MIT",
+  "exports": {
+    ".": {
+      "svelte": "./src/Flatpickr.svelte",
+      "types": "./src/Flatpickr.svelte",
+      "import": "./src/Flatpickr.svelte",
+      "default": "./src/Flatpickr.svelte"
+    }
+  },
+  "files": [
+    "src"
+  ],
+  "dependencies": {
+    "@rozie/runtime-svelte": "workspace:*"
+  },
+  "peerDependencies": {
+    "svelte": "^5",
+    "flatpickr": "^4.6"
+  },
+  "peerDependenciesMeta": {
+    "svelte": {
+      "optional": false
+    },
+    "flatpickr": {
+      "optional": false
+    }
+  },
+  "scripts": {
+    "build": "echo 'ships source; no build'",
+    "typecheck": "echo 'source-only, no typecheck'"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

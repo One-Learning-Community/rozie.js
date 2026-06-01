@@ -1,0 +1,36 @@
+{
+  "name": "@rozie-ui/flatpickr-vue",
+  "version": "0.1.0",
+  "type": "module",
+  "private": false,
+  "license": "MIT",
+  "exports": {
+    ".": {
+      "import": "./src/Flatpickr.vue",
+      "types": "./src/Flatpickr.vue",
+      "default": "./src/Flatpickr.vue"
+    }
+  },
+  "files": [
+    "src"
+  ],
+  "peerDependencies": {
+    "vue": "^3.4",
+    "flatpickr": "^4.6"
+  },
+  "peerDependenciesMeta": {
+    "vue": {
+      "optional": false
+    },
+    "flatpickr": {
+      "optional": false
+    }
+  },
+  "scripts": {
+    "build": "echo 'ships source; no build'",
+    "typecheck": "echo 'source-only, no typecheck'"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
