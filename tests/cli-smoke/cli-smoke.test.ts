@@ -241,14 +241,19 @@ describe('CLI watch mode (long-running)', () => {
 
       try {
         // 1) Initial build line + "watching" line both surface promptly.
+        // Deadlines are failsafes, not expectations — each step is sub-second
+        // standalone, but under a full `turbo run test` battery the spawned
+        // watcher competes with 49 other suites for CPU and 5s deadlines
+        // flake (memory: turbo_parallel_test_flake). 20s keeps the specific
+        // waitFor label as the failure message when something truly hangs.
         await waitFor(
           () => /compiled.+WatchMe\.rozie/.test(stdoutBuf),
-          5000,
+          20000,
           'initial compile log',
         );
         await waitFor(
           () => stdoutBuf.includes('watching'),
-          5000,
+          20000,
           'watcher armed log',
         );
 
@@ -266,7 +271,7 @@ describe('CLI watch mode (long-running)', () => {
 
         await waitFor(
           () => stdoutBuf.length > initialLen && /compiled.+WatchMe\.rozie/.test(stdoutBuf.slice(initialLen)),
-          5000,
+          20000,
           'recompile after change',
         );
 
@@ -275,7 +280,7 @@ describe('CLI watch mode (long-running)', () => {
         const exitCode = await Promise.race([
           exited,
           new Promise<null>((_, reject) =>
-            setTimeout(() => reject(new Error('watch did not exit within 5s of SIGINT')), 5000),
+            setTimeout(() => reject(new Error('watch did not exit within 20s of SIGINT')), 20000),
           ),
         ]);
         expect(exitCode).toBe(0);
@@ -287,7 +292,7 @@ describe('CLI watch mode (long-running)', () => {
         rmSync(tmp, { recursive: true, force: true });
       }
     },
-    20000, // generous per-test timeout — chokidar startup + signal handshake
+    90000, // generous per-test timeout — chokidar startup + signal handshake under full-battery CPU load
   );
 
   skipOnWindows('watch without --out exits non-zero with ROZ856', () => {
