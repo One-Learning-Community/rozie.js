@@ -8,7 +8,7 @@
  * `.rozie` files; `@rozie/unplugin` (target: vue) + `@vitejs/plugin-vue` compile
  * each to a Vue SFC. The runtime mount is plain `createApp`.
  */
-import { createApp } from 'vue';
+import { createApp, h, ref } from 'vue';
 import { parseQuery, mountWrapper, DEFAULT_PROPS } from './main';
 
 // Two glob roots: an EXPLICIT brace-list of matrix-relevant canonical examples
@@ -22,8 +22,11 @@ import { parseQuery, mountWrapper, DEFAULT_PROPS } from './main';
 // compile gate (engine-examples.compile.test.ts) but NOT in the
 // visual-regression matrix. When BOTH globs match (demos/ vs base), the
 // demos/ entry wins per the loader below.
-const baseModules = import.meta.glob('../../../examples/{Counter,SearchInput,Dropdown,TodoList,Modal,TreeNode,Card,CardHeader,ModalConsumer,WrapperModal,PortalList,PortalListStyled,FullCalendar,LineChart,CodeMirror,ThemedButton,ThemedButtonManual,ThemedButtonListenersManual,ThemedButtonAllManual,ThemedButtonConsumer,ROnProbe,PartCard,PartCardConsumer}.rozie');
+const baseModules = import.meta.glob('../../../examples/{Counter,SearchInput,Dropdown,TodoList,Modal,TreeNode,Card,CardHeader,ModalConsumer,WrapperModal,PortalList,PortalListStyled,FullCalendar,LineChart,CodeMirror,ThemedButton,ThemedButtonManual,ThemedButtonListenersManual,ThemedButtonAllManual,ThemedButtonConsumer,ROnProbe,PartCard,PartCardConsumer,ExposeProbe}.rozie');
 const demoModules = import.meta.glob('../../../examples/demos/*.rozie');
+
+// Phase 21 D-07 — the external-caller harness button label/testid (shared).
+const RESET_BTN_TESTID = 'reset-via-handle';
 
 async function main(): Promise<void> {
   const { example } = parseQuery();
@@ -36,6 +39,28 @@ async function main(): Promise<void> {
       `visual-regression host: no module for ${example} (checked ${demoKey} and ${baseKey})`,
     );
   const mod = (await loader()) as { default: unknown };
+
+  // Phase 21 D-07 — ExposeProbe external-caller harness. Render the component
+  // through a render function so a template `ref` captures the instance, whose
+  // `defineExpose({ reset, focus })` surface is exposed on `probeRef.value`.
+  // A "reset via handle" button calls probeRef.value.reset().
+  if (example === 'ExposeProbe') {
+    const probeRef = ref<{ reset: () => void; focus: () => void } | null>(null);
+    const app = createApp({
+      render: () =>
+        h(mod.default as Parameters<typeof h>[0], { ref: probeRef }),
+    });
+    app.config.compilerOptions.isCustomElement = (tag: string) =>
+      tag.startsWith('rozie-');
+    app.mount(mountWrapper());
+    const btn = document.createElement('button');
+    btn.textContent = 'reset via handle';
+    btn.setAttribute('data-testid', RESET_BTN_TESTID);
+    btn.addEventListener('click', () => probeRef.value?.reset());
+    mountWrapper().appendChild(btn);
+    return;
+  }
+
   // `createApp(rootComponent, rootProps)` — passing DEFAULT_PROPS[example]
   // drives each component into a visible state for the screenshot. Without
   // these, Modal/Dropdown stay closed (1×1 baseline), TreeNode/Card/

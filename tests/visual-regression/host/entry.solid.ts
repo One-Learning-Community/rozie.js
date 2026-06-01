@@ -5,13 +5,16 @@
  * `.rozie` files; `@rozie/unplugin` (target: solid) + `vite-plugin-solid`
  * compile each to a Solid component. The runtime mount is Solid's `render`.
  */
-import { createComponent } from 'solid-js';
+import { createComponent, type Component } from 'solid-js';
 import { render } from 'solid-js/web';
 import { parseQuery, mountWrapper, DEFAULT_PROPS, toUncontrolledProps } from './main';
 
 // Two glob roots — see entry.vue.ts for rationale; demos/ wins over root.
-const baseModules = import.meta.glob('../../../examples/{Counter,SearchInput,Dropdown,TodoList,Modal,TreeNode,Card,CardHeader,ModalConsumer,WrapperModal,PortalList,PortalListStyled,FullCalendar,LineChart,CodeMirror,ThemedButton,ThemedButtonManual,ThemedButtonListenersManual,ThemedButtonAllManual,ThemedButtonConsumer,ROnProbe,PartCard,PartCardConsumer}.rozie');
+const baseModules = import.meta.glob('../../../examples/{Counter,SearchInput,Dropdown,TodoList,Modal,TreeNode,Card,CardHeader,ModalConsumer,WrapperModal,PortalList,PortalListStyled,FullCalendar,LineChart,CodeMirror,ThemedButton,ThemedButtonManual,ThemedButtonListenersManual,ThemedButtonAllManual,ThemedButtonConsumer,ROnProbe,PartCard,PartCardConsumer,ExposeProbe}.rozie');
 const demoModules = import.meta.glob('../../../examples/demos/*.rozie');
+
+// Phase 21 D-07 — the external-caller harness button label/testid (shared).
+const RESET_BTN_TESTID = 'reset-via-handle';
 
 async function main(): Promise<void> {
   const { example } = parseQuery();
@@ -24,6 +27,34 @@ async function main(): Promise<void> {
       `visual-regression host: no module for ${example} (checked ${demoKey} and ${baseKey})`,
     );
   const mod = (await loader()) as { default: (props: unknown) => unknown };
+
+  // Phase 21 D-07 — ExposeProbe external-caller harness. Solid's $expose emit is
+  // a callback `ref` prop invoked once after mount with the handle. Pass a
+  // capturing `ref` callback to grab it, then wire a "reset via handle" button
+  // that calls handle.reset().
+  if (example === 'ExposeProbe') {
+    let handle: { reset: () => void; focus: () => void } | undefined;
+    const exposeProps: Record<string, unknown> = {
+      ref: (h: { reset: () => void; focus: () => void }) => {
+        handle = h;
+      },
+    };
+    render(
+      () =>
+        createComponent(
+          mod.default as unknown as Component<Record<string, unknown>>,
+          exposeProps,
+        ) as Node,
+      mountWrapper(),
+    );
+    const btn = document.createElement('button');
+    btn.textContent = 'reset via handle';
+    btn.setAttribute('data-testid', RESET_BTN_TESTID);
+    btn.addEventListener('click', () => handle?.reset());
+    mountWrapper().appendChild(btn);
+    return;
+  }
+
   // Solid's `render(fn, target)` evaluates `fn` inside a reactive root and
   // mounts the returned JSX. `createComponent(C, props)` is Solid's runtime
   // helper for instantiating a component with props (the JSX equivalent

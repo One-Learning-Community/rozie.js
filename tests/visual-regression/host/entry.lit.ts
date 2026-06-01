@@ -13,8 +13,11 @@
 import { parseQuery, mountWrapper, LIT_TAGS, DEFAULT_PROPS } from './main';
 
 // Two glob roots — see entry.vue.ts for rationale; demos/ wins over root.
-const baseModules = import.meta.glob('../../../examples/{Counter,SearchInput,Dropdown,TodoList,Modal,TreeNode,Card,CardHeader,ModalConsumer,WrapperModal,PortalList,PortalListStyled,FullCalendar,LineChart,CodeMirror,ThemedButton,ThemedButtonManual,ThemedButtonListenersManual,ThemedButtonAllManual,ThemedButtonConsumer,ROnProbe,PartCard,PartCardConsumer}.rozie');
+const baseModules = import.meta.glob('../../../examples/{Counter,SearchInput,Dropdown,TodoList,Modal,TreeNode,Card,CardHeader,ModalConsumer,WrapperModal,PortalList,PortalListStyled,FullCalendar,LineChart,CodeMirror,ThemedButton,ThemedButtonManual,ThemedButtonListenersManual,ThemedButtonAllManual,ThemedButtonConsumer,ROnProbe,PartCard,PartCardConsumer,ExposeProbe}.rozie');
 const demoModules = import.meta.glob('../../../examples/demos/*.rozie');
+
+// Phase 21 D-07 — the external-caller harness button label/testid (shared).
+const RESET_BTN_TESTID = 'reset-via-handle';
 
 async function main(): Promise<void> {
   const { example } = parseQuery();
@@ -45,6 +48,20 @@ async function main(): Promise<void> {
     Object.assign(el, DEFAULT_PROPS[example] as Record<string, unknown>);
   }
   mountWrapper().appendChild(el);
+
+  // Phase 21 D-07 — ExposeProbe external-caller harness. The Lit element itself
+  // IS the handle: the exposed reset()/focus() are public element methods (the
+  // `document.querySelector('rozie-expose-probe')` query equivalent — here we
+  // already hold `el`). A "reset via handle" button calls el.reset().
+  if (example === 'ExposeProbe') {
+    const handle = el as unknown as { reset: () => void; focus: () => void };
+    const btn = document.createElement('button');
+    btn.textContent = 'reset via handle';
+    btn.setAttribute('data-testid', RESET_BTN_TESTID);
+    btn.addEventListener('click', () => handle.reset());
+    mountWrapper().appendChild(btn);
+  }
+
   // Lit components render into shadow DOM, so the host-level reset.css
   // cannot reach `.dropdown-panel` / `.modal-backdrop` inside them. After
   // the entire tree (including nested rozie-* children) reaches first-render

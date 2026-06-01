@@ -134,6 +134,14 @@ export const EXAMPLES = [
   // by the unplugin at build time. On Lit the styled effect is visible across
   // the shadow boundary; on the 5 non-Lit targets the rule is a no-op.
   'PartCardConsumer',
+  // Phase 21 — ExposeProbe is the $expose imperative-handle dogfood. A typed
+  // input exposing reset()/focus(); base example, loader resolves directly to
+  // examples/ExposeProbe.rozie (no demo sibling). The per-target entry shims
+  // grab the native handle (React ref / Vue template ref / Svelte bind:this /
+  // Angular viewChild / Solid ref callback / Lit element query) and render a
+  // "reset via handle" button — the external-caller harness (D-07) the
+  // expose-probe.spec drives to assert the exposed method clears the input.
+  'ExposeProbe',
 ] as const;
 
 export type Example = (typeof EXAMPLES)[number];
@@ -190,6 +198,9 @@ export const LIT_TAGS: Record<Example, string> = {
   ROnProbe: 'rozie-r-on-probe',
   // Phase 17 — base example, loader resolves examples/PartCardConsumer.rozie.
   PartCardConsumer: 'rozie-part-card-consumer',
+  // Phase 21 — $expose dogfood. The Lit cell queries this tag to grab the
+  // element handle and call reset() (the external-caller harness).
+  ExposeProbe: 'rozie-expose-probe',
 };
 
 export interface HostQuery {
@@ -281,6 +292,10 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // `<PartCard :title="'Hello'">` and styles it via `PartCard::part(body)`.
   // No parent-side props needed.
   PartCardConsumer: {},
+  // ExposeProbe is self-contained — its <data> value drives the input; no
+  // parent-side props. The exposed reset()/focus() handle is driven by the
+  // per-target VR external-caller shim, not props.
+  ExposeProbe: {},
 };
 
 /**

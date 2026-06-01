@@ -154,6 +154,17 @@ const EXAMPLES = [
   // probe is still bootstrapped by the matrix host (entry.<target>.ts +
   // main.ts) so it remains inspectable via /compare.html; it's just not a
   // committed VR cell. The dist-parity gate covers the byte-identity claim.
+  //
+  // Phase 21 — ExposeProbe ($expose imperative-handle dogfood). A typed input
+  // exposing reset()/focus(); the per-target VR shim grabs the native handle and
+  // renders a "reset via handle" button. Per D-10 all 6 targets diff against the
+  // SAME shared `ExposeProbe.png` baseline. This cell baseline-gates to
+  // `test.fixme` via `baselineExists()` below until a Linux-Docker baseline regen
+  // lands the PNG — the ORCHESTRATOR owns that generation (`tools/ci-repro/vr.sh
+  // -u -g 'ExposeProbe'`); no macOS-rendered PNG is committed here. The
+  // BEHAVIORAL external-caller flow (type → click reset-via-handle → input
+  // clears) lives in specs/expose-probe.spec.ts and is NOT baseline-gated.
+  'ExposeProbe',
 ] as const;
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'] as const;
 
@@ -302,6 +313,15 @@ async function settleExample(
   // shadow roots), proving the child painted before the screenshot clip.
   if (example === 'PartCardConsumer') {
     await expect(page.locator('[part="body"]').first()).toBeVisible();
+  }
+  // ExposeProbe (Phase 21 $expose dogfood): the probe renders an <input> plus
+  // the per-target rig's "reset via handle" button. Wait for the button (the
+  // external-caller harness shim) to be present so the screenshot clips after
+  // both the component and the handle-driven button have laid out. The
+  // `[data-testid="reset-via-handle"]` locator is rig-injected identically
+  // across all 6 targets.
+  if (example === 'ExposeProbe') {
+    await expect(page.locator('[data-testid="reset-via-handle"]')).toBeVisible();
   }
 }
 

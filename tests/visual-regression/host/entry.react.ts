@@ -9,7 +9,7 @@
  * host renders the production-shaped output for pixel comparison; StrictMode
  * double-invoke coverage is QA-03's separate dev-mode stress harness.
  */
-import { createElement } from 'react';
+import { createElement, createRef } from 'react';
 import { createRoot } from 'react-dom/client';
 import { parseQuery, mountWrapper, DEFAULT_PROPS, toUncontrolledProps } from './main';
 
@@ -18,8 +18,21 @@ import { parseQuery, mountWrapper, DEFAULT_PROPS, toUncontrolledProps } from './
 // canonical for visual-regression purposes (e.g. demos/Dropdown.rozie fills
 // the default panel slot so the screenshot captures menu items instead of
 // an empty 1×18 box). When both globs match, the demos/ entry wins.
-const baseModules = import.meta.glob('../../../examples/{Counter,SearchInput,Dropdown,TodoList,Modal,TreeNode,Card,CardHeader,ModalConsumer,WrapperModal,PortalList,PortalListStyled,FullCalendar,LineChart,CodeMirror,ThemedButton,ThemedButtonManual,ThemedButtonListenersManual,ThemedButtonAllManual,ThemedButtonConsumer,ROnProbe,PartCard,PartCardConsumer}.rozie');
+const baseModules = import.meta.glob('../../../examples/{Counter,SearchInput,Dropdown,TodoList,Modal,TreeNode,Card,CardHeader,ModalConsumer,WrapperModal,PortalList,PortalListStyled,FullCalendar,LineChart,CodeMirror,ThemedButton,ThemedButtonManual,ThemedButtonListenersManual,ThemedButtonAllManual,ThemedButtonConsumer,ROnProbe,PartCard,PartCardConsumer,ExposeProbe}.rozie');
 const demoModules = import.meta.glob('../../../examples/demos/*.rozie');
+
+// Phase 21 D-07 — the external-caller harness button label/testid is shared by
+// the per-target entry shims and the expose-probe.spec assertion.
+const RESET_BTN_TESTID = 'reset-via-handle';
+
+/** Append a "reset via handle" button that invokes the grabbed handle. */
+function appendResetButton(onClick: () => void): void {
+  const btn = document.createElement('button');
+  btn.textContent = 'reset via handle';
+  btn.setAttribute('data-testid', RESET_BTN_TESTID);
+  btn.addEventListener('click', onClick);
+  mountWrapper().appendChild(btn);
+}
 
 async function main(): Promise<void> {
   const { example } = parseQuery();
@@ -34,6 +47,20 @@ async function main(): Promise<void> {
   const mod = (await loader()) as {
     default: Parameters<typeof createElement>[0];
   };
+
+  // Phase 21 D-07 — ExposeProbe external-caller harness. ExposeProbe is a
+  // forwardRef component; pass a ref to grab the imperative handle, then wire a
+  // "reset via handle" button that calls handle.reset() so the spec can click
+  // it and assert the input clears.
+  if (example === 'ExposeProbe') {
+    const handleRef = createRef<{ reset: () => void; focus: () => void }>();
+    createRoot(mountWrapper()).render(
+      createElement(mod.default, { ref: handleRef }),
+    );
+    appendResetButton(() => handleRef.current?.reset());
+    return;
+  }
+
   // `createElement(component, props)` — passing DEFAULT_PROPS[example]
   // drives the component into a visible state for the screenshot. See
   // DEFAULT_PROPS in main.ts. Demo wrappers hardcode their state inline

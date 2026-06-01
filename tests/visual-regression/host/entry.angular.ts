@@ -17,8 +17,11 @@ import { createComponent, type Type } from '@angular/core';
 import { parseQuery, mountWrapper, DEFAULT_PROPS } from './main';
 
 // Two glob roots — see entry.vue.ts for rationale; demos/ wins over root.
-const baseModules = import.meta.glob('../../../examples/{Counter,SearchInput,Dropdown,TodoList,Modal,TreeNode,Card,CardHeader,ModalConsumer,WrapperModal,PortalList,PortalListStyled,FullCalendar,LineChart,CodeMirror,ThemedButton,ThemedButtonManual,ThemedButtonListenersManual,ThemedButtonAllManual,ThemedButtonConsumer,ROnProbe,PartCard,PartCardConsumer}.rozie');
+const baseModules = import.meta.glob('../../../examples/{Counter,SearchInput,Dropdown,TodoList,Modal,TreeNode,Card,CardHeader,ModalConsumer,WrapperModal,PortalList,PortalListStyled,FullCalendar,LineChart,CodeMirror,ThemedButton,ThemedButtonManual,ThemedButtonListenersManual,ThemedButtonAllManual,ThemedButtonConsumer,ROnProbe,PartCard,PartCardConsumer,ExposeProbe}.rozie');
 const demoModules = import.meta.glob('../../../examples/demos/*.rozie');
+
+// Phase 21 D-07 — the external-caller harness button label/testid (shared).
+const RESET_BTN_TESTID = 'reset-via-handle';
 
 /**
  * Read the component's own selector tag off its compiled `ɵcmp` definition.
@@ -80,6 +83,22 @@ async function main(): Promise<void> {
   // Full application tick — `detectChanges()` alone did not paint the initial
   // standalone-component render in the bare `createApplication()` platform.
   appRef.tick();
+
+  // Phase 21 D-07 — ExposeProbe external-caller harness. The exposed
+  // reset()/focus() are public component-class methods (the Angular @ViewChild
+  // equivalent is just `componentRef.instance`). A "reset via handle" button
+  // calls instance.reset() then ticks so the cleared value repaints.
+  if (example === 'ExposeProbe') {
+    const instance = componentRef.instance as { reset: () => void; focus: () => void };
+    const btn = document.createElement('button');
+    btn.textContent = 'reset via handle';
+    btn.setAttribute('data-testid', RESET_BTN_TESTID);
+    btn.addEventListener('click', () => {
+      instance.reset();
+      appRef.tick();
+    });
+    wrapper.appendChild(btn);
+  }
 }
 
 void main();
