@@ -38,6 +38,10 @@ const EXAMPLES = [
   'TreeNode',
   'Card',
   'CardHeader',
+  // Phase 21 $expose dogfood — typed reset()/focus() handle. The Svelte instance
+  // `export function reset(): void` / `export function focus(): void` exports
+  // must svelte-check clean.
+  'ExposeProbe',
   // Engine-wrapper examples — non-trivial `<script>` logic (an engine instance
   // held in `let editor = null`, untyped callback params). This is the shape
   // the untyped-`<script>` type-broken-emit bug regresses; covering it here is

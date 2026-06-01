@@ -41,6 +41,10 @@ const EXAMPLES = [
   'TreeNode',
   'Card',
   'CardHeader',
+  // Phase 21 $expose dogfood — typed reset()/focus() handle. Exercises REQ-10's
+  // typed-handle tsc path: forwardRef + useImperativeHandle + the typed
+  // ExposeProbeHandle interface must tsc clean.
+  'ExposeProbe',
   // Engine-wrapper examples — non-trivial `<script>` logic (an engine instance
   // held in `let editor = null`, untyped callback params). This is the shape
   // the untyped-`<script>` type-broken-emit bug regresses; covering it here is

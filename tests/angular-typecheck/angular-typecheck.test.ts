@@ -49,6 +49,9 @@ const EXAMPLES = [
   'TreeNode',
   'Card',
   'CardHeader',
+  // Phase 21 $expose dogfood — typed reset()/focus() handle. The public
+  // component-class methods (`reset = (): void => {...}`) must tsc clean.
+  'ExposeProbe',
   // Engine-wrapper examples — non-trivial `<script>` logic (an engine instance
   // held in `let editor = null`, untyped callback params). This is the shape
   // the untyped-`<script>` type-broken-emit bug regresses; covering it here is

@@ -35,6 +35,9 @@ const EXAMPLES = [
   'TreeNode',
   'Card',
   'CardHeader',
+  // Phase 21 $expose dogfood — typed reset()/focus() handle. defineExpose({...})
+  // must vue-tsc clean (Vue infers the handle from the method refs).
+  'ExposeProbe',
   // Engine-wrapper examples — non-trivial `<script>` logic (an engine instance
   // held in `let editor = null`, untyped callback params). This is the shape
   // the untyped-`<script>` type-broken-emit bug regresses; covering it here is
