@@ -132,6 +132,25 @@ export const RozieErrorCode = {
   EXPOSE_VALUE_NOT_FUNCTION: 'ROZ118', // $expose({ a: 1 }) / { a: notInScope } / { a: someComputed } — value is not an in-scope <script> function nor an inline arrow/function
   EXPOSE_DUPLICATE_CALL: 'ROZ119', // two top-level $expose(...) calls — only one is allowed
   EXPOSE_NOT_TOP_LEVEL: 'ROZ120', // $expose(...) called inside a nested function (not <script> Program top level)
+  // Quick 260601-jsy — an `$expose`'d method name collides with an emitted event
+  // (`$emit('name', ...)`) OR, on class-based targets (Angular), a same-named
+  // declared prop (`<props>` field, model or not). On class-based targets the
+  // event/prop materializes as a class field (`open = output()` / `date =
+  // input()`/`model()`) and the exposed method materializes as a class method —
+  // two members cannot share a name, so the Angular emitter silently renames the
+  // method (`_open`) or emits a duplicate member, quietly breaking the uniform
+  // imperative handle on 1 of 6 targets. Error severity; case-sensitive
+  // (`Open` ≠ `open`); fires once per colliding property, code-framed at the
+  // `$expose` property; suppressed when the `$expose` call is structurally
+  // malformed (ROZ115–117). The diagnostic makes the collision unrepresentable —
+  // it is the fix; the emitters are deliberately untouched. Rename the exposed
+  // method (events/props keep their public consumer-facing names). Structurally
+  // identical to ROZ524 (React auto-setter `set<X>` vs user `setX`), the
+  // model-setter-collision precedent. Investigation 260601-jsy confirmed: both a
+  // model and a non-model `<props>` field break Angular the same way events do,
+  // and ROZ524 does NOT cover the Angular direct-name (`$expose({ date })` vs
+  // prop `date`) field-vs-method case — only the React `setX` setter form.
+  EXPOSE_EVENT_NAME_COLLISION: 'ROZ121', // $expose({ open }) where 'open' is an emitted event, or (on class-based targets) a same-named declared prop — field/method name clash
 
   // ---- Compile-time correctness errors (Phase 2 Plan 02) — ROZ200..ROZ299 ----
   WRITE_TO_NON_MODEL_PROP: 'ROZ200', // SEM-02: $props.foo = … where foo lacks model: true (Phase 2 success criterion 2)

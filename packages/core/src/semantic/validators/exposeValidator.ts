@@ -21,6 +21,16 @@
  *   ROZ119 — two top-level `$expose(...)` calls
  *   ROZ120 — `$expose(...)` inside a nested function (not Program top level)
  *
+ * Plus one NAME-COLLISION code (Quick 260601-jsy):
+ *   ROZ121 — an exposed method name collides with an emitted event
+ *            (`bindings.emits`) OR a declared `<props>` field. On class-based
+ *            targets (Angular) the event/prop is a class field and the exposed
+ *            method is a class method — they cannot share a name, so the emitter
+ *            silently renames the method (`_open`) or emits a duplicate member.
+ *            The diagnostic makes the collision unrepresentable (the fix); the
+ *            emitters are deliberately untouched. Case-sensitive; fires once per
+ *            colliding property; suppressed under malformed $expose (ROZ115–117).
+ *
  * At most ONE diagnostic per offending site; all error severity (D-08
  * collected-not-thrown: never throws — `compile()` never throws on malformed
  * `$expose`). Reads `bindings.exposeCalls` (every call site, populated by
@@ -203,5 +213,78 @@ export function runExposeValidator(
         hint: 'Reference a top-level <script> function by name, or pass an inline arrow function.',
       });
     }
+  }
+
+  // ROZ121 — name-collision check (Quick 260601-jsy). An exposed method name
+  // that ALSO names an emitted event (`bindings.emits`) or a declared `<props>`
+  // field collides with a class-member of the same name on class-based targets
+  // (Angular): the event/prop is a class FIELD (`open = output()` / `date =
+  // input()`/`model()`), the exposed method is a class METHOD — they cannot share
+  // a name, so the emitter silently renames the method (`_open`) or emits a
+  // duplicate member, breaking the uniform handle on 1 of 6 targets. The
+  // diagnostic makes the collision unrepresentable; the emitters stay untouched.
+  //
+  // SUPPRESSION: this loop runs ONLY over the SAME well-formed canonical object
+  // (`arg`) — the early `return` after ROZ115 already bails on a non-object arg,
+  // so a structurally-malformed `$expose` (ROZ115/116/117 territory) never
+  // reaches here with trustworthy names. We additionally skip spread / computed
+  // properties per-prop below (mirroring the shape loop) so a single bad property
+  // cannot fabricate a collision name.
+  //
+  // CASE-SENSITIVE (`Open` ≠ `open`); fires once per colliding property; code-
+  // framed at the `$expose` property; CAN co-fire with other diagnostics. Never
+  // throws (D-08).
+  const propNames = new Set(bindings.props.keys());
+  for (const prop of arg.properties) {
+    // Skip the structurally-malformed shapes (already diagnosed above); only
+    // well-formed `{ name }` / `{ name: ref }` / `{ name() {} }` carry a
+    // trustworthy key to collision-check.
+    if (t.isSpreadElement(prop)) continue;
+    if (prop.computed) continue;
+
+    let key: t.Expression | t.PrivateName;
+    if (t.isObjectMethod(prop)) {
+      key = prop.key;
+    } else if (t.isObjectProperty(prop)) {
+      key = prop.key;
+    } else {
+      continue;
+    }
+
+    // Canonical exposed name = the (non-computed) property key.
+    let name: string | null = null;
+    if (t.isIdentifier(key)) name = key.name;
+    else if (t.isStringLiteral(key)) name = key.value;
+    if (name === null) continue;
+
+    const collidesEvent = bindings.emits.has(name);
+    const collidesProp = propNames.has(name);
+    if (!collidesEvent && !collidesProp) continue;
+
+    // Name the colliding surface. Event takes precedence in the message when
+    // both collide (event surface is the universal break; the prop surface is
+    // class-based-target-only).
+    const surface = collidesEvent
+      ? `the '${name}' event this component emits`
+      : `the '${name}' prop`;
+    const classNote = collidesEvent
+      ? "on class-based targets (Angular) the event field and the method cannot share a name"
+      : 'on class-based targets (Angular) the prop field and the method cannot share a name';
+
+    // Suggested renames. Guard the capitalized form against an empty-string key
+    // (`$expose({ '': fn })` + `$emit('')` is parseable, pathological input —
+    // D-08 says collect a diagnostic, never throw).
+    const suggestions =
+      name.length > 0
+        ? `'${name}Picker' / 'do${name[0]!.toUpperCase()}${name.slice(1)}'`
+        : 'a non-empty, non-colliding name';
+
+    diagnostics.push({
+      code: RozieErrorCode.EXPOSE_EVENT_NAME_COLLISION,
+      severity: 'error',
+      message: `$expose({ ${name} }) collides with ${surface} — ${classNote}. Rename the method (e.g. '${name}Picker'); ${collidesEvent ? 'events' : 'props'} keep their public names for consumers.`,
+      loc: locFromNode(prop),
+      hint: `Rename the exposed method so it does not match ${surface} (e.g. ${suggestions}).`,
+    });
   }
 }

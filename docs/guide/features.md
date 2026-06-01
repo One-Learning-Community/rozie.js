@@ -375,7 +375,7 @@ $expose({ clear, open, close, setDate })
 </script>
 ```
 
-`$expose` exposes **only functions** — bare references to in-scope `<script>` function/arrow declarations (or inline arrows). To expose a *value*, expose a getter method: `$expose({ getValue: () => $data.x })`. Malformed forms are caught at compile time (ROZ115–ROZ120): a non-object argument, a spread, a computed key, a non-function value, a duplicate `$expose` call, or an `$expose` outside `<script>` top level each produce a distinct diagnostic.
+`$expose` exposes **only functions** — bare references to in-scope `<script>` function/arrow declarations (or inline arrows). To expose a *value*, expose a getter method: `$expose({ getValue: () => $data.x })`. Malformed forms are caught at compile time (ROZ115–ROZ120): a non-object argument, a spread, a computed key, a non-function value, a duplicate `$expose` call, or an `$expose` outside `<script>` top level each produce a distinct diagnostic. Exposing a method whose name collides with an emitted event — or, on class-based targets like Angular, a same-named declared prop — is also rejected (`ROZ121`): the event/prop and the method would share a class-member name, so rename the method (events and props keep their public consumer-facing names).
 
 Each target lowers the one declaration to its native handle idiom. When a component has no `$expose`, none of this is emitted — output is byte-for-byte unchanged (React, notably, is **not** wrapped in `forwardRef`):
 
