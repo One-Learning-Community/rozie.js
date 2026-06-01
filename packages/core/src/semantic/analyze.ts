@@ -35,6 +35,7 @@ import { runUpdateExpressionValidator } from './validators/updateExpressionValid
 import { runRForKeyValidator } from './validators/rForKeyValidator.js';
 import { runReservedIdentifierValidator } from './validators/reservedIdentifierValidator.js';
 import { runListenerElementValidator } from './validators/listenerElementValidator.js';
+import { runExposeValidator } from './validators/exposeValidator.js';
 
 export interface AnalyzeResult {
   bindings: BindingsTable;
@@ -58,6 +59,9 @@ export function analyzeAST(ast: RozieAST): AnalyzeResult {
   runUpdateExpressionValidator(ast, bindings, diagnostics);
   runRForKeyValidator(ast, diagnostics);
   runReservedIdentifierValidator(ast, bindings, diagnostics);
+  // Phase 21 — $expose methods-only validation (ROZ115–ROZ120). Reads
+  // bindings.exposeCalls; emits at most one diagnostic per offending site.
+  runExposeValidator(ast, bindings, diagnostics);
   // Phase 19 (D-08) — final pass: a <listener> placed inside <template> is a
   // misplaced element (ROZ206). No binding dependency.
   runListenerElementValidator(ast, diagnostics);

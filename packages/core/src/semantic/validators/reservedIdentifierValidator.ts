@@ -15,6 +15,7 @@
  *             targets and the Vue / Angular host-listener forms (Phase 07.6).
  *   $attrs  — consumer-passed attribute cluster minus declared props (Phase 14)
  *   $listeners — consumer-passed event-listener cluster minus declared events (Phase 15)
+ *   $expose — producer-side imperative-handle sigil (Phase 21)
  *
  * A user-authored identifier that shadows one of these — a `<data>` field
  * name or an `r-for` loop variable — would be silently captured by the
@@ -58,10 +59,11 @@ export const RESERVED_SIGILS: ReadonlySet<string> = new Set([
   '$listeners',
   '$restoreFocus', // Phase 16
   '$model', // Phase 18 — producer-side two-way-write sigil
+  '$expose', // Phase 21 — producer-side imperative-handle sigil
 ]);
 
 const RESERVED_SIGIL_LIST =
-  '$el, $props, $data, $refs, $slots, $emit, $event, $attrs, $listeners, $restoreFocus, $model';
+  '$el, $props, $data, $refs, $slots, $emit, $event, $attrs, $listeners, $restoreFocus, $model, $expose';
 
 function emitCollision(
   name: string,

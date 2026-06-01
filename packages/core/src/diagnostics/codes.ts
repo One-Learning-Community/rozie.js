@@ -120,11 +120,23 @@ export const RozieErrorCode = {
   // offending tag produces NO ListenerEntry and never throws. Next free code
   // after ROZ113 in the 100 semantic-binding cluster.
   UNSUPPORTED_LISTENER_TARGET: 'ROZ114',
+  // Phase 21 ($expose imperative-handle sigil) — six distinct malformed-form
+  // codes in the 100 semantic-binding cluster (ROZ114 was the last allocated;
+  // ROZ115–120 were free). `runExposeValidator` emits at most ONE of these per
+  // offending site; all error severity; compile() never throws (D-08). Each
+  // malformed `$expose` shape gets its own code so IDE suppressors / lint-as-
+  // code can target it precisely.
+  EXPOSE_ARG_NOT_OBJECT: 'ROZ115', // $expose(x) — argument is not an object literal
+  EXPOSE_SPREAD_PROPERTY: 'ROZ116', // $expose({ ...o }) — a property is a spread
+  EXPOSE_COMPUTED_KEY: 'ROZ117', // $expose({ [k]: v }) — a property has a computed key
+  EXPOSE_VALUE_NOT_FUNCTION: 'ROZ118', // $expose({ a: 1 }) / { a: notInScope } / { a: someComputed } — value is not an in-scope <script> function nor an inline arrow/function
+  EXPOSE_DUPLICATE_CALL: 'ROZ119', // two top-level $expose(...) calls — only one is allowed
+  EXPOSE_NOT_TOP_LEVEL: 'ROZ120', // $expose(...) called inside a nested function (not <script> Program top level)
 
   // ---- Compile-time correctness errors (Phase 2 Plan 02) — ROZ200..ROZ299 ----
   WRITE_TO_NON_MODEL_PROP: 'ROZ200', // SEM-02: $props.foo = … where foo lacks model: true (Phase 2 success criterion 2)
   WRITE_TO_REF: 'ROZ201', // $refs.foo = … (refs are read-only DOM-element wrappers)
-  RESERVED_IDENTIFIER_COLLISION: 'ROZ202', // <data> field or r-for loop var named $el / $props / $data / $refs / $slots / $emit / $event / $attrs / $listeners / $restoreFocus / $model. ($event is the closure-param name for event-handler emits — see emitTemplate's `($event) =>` convention in target-{react,svelte,solid,lit}.) Wired in semantic/validators/reservedIdentifierValidator.ts — keep RESERVED_SIGILS there in sync with this list.
+  RESERVED_IDENTIFIER_COLLISION: 'ROZ202', // <data> field or r-for loop var named $el / $props / $data / $refs / $slots / $emit / $event / $attrs / $listeners / $restoreFocus / $model / $expose. ($event is the closure-param name for event-handler emits — see emitTemplate's `($event) =>` convention in target-{react,svelte,solid,lit}.) Wired in semantic/validators/reservedIdentifierValidator.ts — keep RESERVED_SIGILS there in sync with this list.
   // 260530: expression-context `++`/`--` on reactive state ($data.<key> or a
   // model:true $props.<key>) where the UpdateExpression's value is CONSUMED
   // (parent is not an ExpressionStatement). Such reads can't be satisfied by a
