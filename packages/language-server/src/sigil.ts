@@ -29,8 +29,7 @@ export interface SigilMemberRef {
  */
 export function resolveSigilMemberAt(text: string, offset: number): SigilMemberRef | null {
   SIGIL_MEMBER.lastIndex = 0;
-  let match: RegExpExecArray | null;
-  while ((match = SIGIL_MEMBER.exec(text)) !== null) {
+  for (let match = SIGIL_MEMBER.exec(text); match !== null; match = SIGIL_MEMBER.exec(text)) {
     const tokenStart = match.index;
     const tokenEnd = tokenStart + match[0].length;
     if (offset < tokenStart || offset > tokenEnd) continue;
@@ -60,8 +59,7 @@ export function findSigilMemberUsages(
 ): SourceLoc[] {
   const out: SourceLoc[] = [];
   SIGIL_MEMBER.lastIndex = 0;
-  let match: RegExpExecArray | null;
-  while ((match = SIGIL_MEMBER.exec(text)) !== null) {
+  for (let match = SIGIL_MEMBER.exec(text); match !== null; match = SIGIL_MEMBER.exec(text)) {
     if (match[1] !== sigil || match[2] !== member) continue;
     const tokenEnd = match.index + match[0].length;
     out.push({ start: tokenEnd - member.length, end: tokenEnd });

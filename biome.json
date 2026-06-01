@@ -8,6 +8,7 @@
       "!**/.claude",
       "!**/generated.js",
       "!**/fixtures/**",
+      "!**/packages/ui/*/packages/*/src/**",
       "!**/docs/.vitepress/cache",
       "!**/docs/.vitepress/dist"
     ]

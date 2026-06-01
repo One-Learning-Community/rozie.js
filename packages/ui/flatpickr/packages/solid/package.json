@@ -35,8 +35,7 @@
   },
   "scripts": {
     "build": "tsdown",
-    "typecheck": "tsc --noEmit",
-    "lint": "biome lint src"
+    "typecheck": "tsc --noEmit"
   },
   "publishConfig": {
     "access": "public"

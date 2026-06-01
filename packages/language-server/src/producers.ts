@@ -35,8 +35,7 @@ function collectEvents(source: string): ProducerEvent[] {
   const seen = new Set<string>();
   const out: ProducerEvent[] = [];
   EMIT_CALL.lastIndex = 0;
-  let m: RegExpExecArray | null;
-  while ((m = EMIT_CALL.exec(source)) !== null) {
+  for (let m = EMIT_CALL.exec(source); m !== null; m = EMIT_CALL.exec(source)) {
     const name = m[1]!;
     if (seen.has(name)) continue;
     seen.add(name);

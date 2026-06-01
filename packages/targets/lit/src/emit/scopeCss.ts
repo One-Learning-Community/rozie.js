@@ -113,9 +113,9 @@ function liftPartName(
     deepLifted.add(pseudo);
     pseudo.nodes.forEach((inner) => {
       if (inner.type === 'selector') {
-        (inner as selectorParser.Selector).nodes.forEach((n) =>
-          deepLifted.add(n),
-        );
+        (inner as selectorParser.Selector).nodes.forEach((n) => {
+          deepLifted.add(n);
+        });
       }
     });
 
@@ -208,7 +208,9 @@ function hoistDeep(
       const inner = pseudo.nodes[0];
       if (inner && inner.type === 'selector') {
         const innerNodes = (inner as selectorParser.Selector).nodes;
-        innerNodes.forEach((n) => deepLifted.add(n));
+        innerNodes.forEach((n) => {
+          deepLifted.add(n);
+        });
         selector.nodes.splice(i, 1, ...innerNodes);
       }
     }
