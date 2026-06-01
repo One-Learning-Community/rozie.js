@@ -553,3 +553,176 @@ describe('emitSlotInvocation — §slots-merge invocation (Phase 07.3.2 D-02 sta
     expect(code).toContain("(props.children ?? props.slots?.[''])");
   });
 });
+
+// Phase 21 Plan 02 ($expose) — React forwardRef + useImperativeHandle + typed
+// <Name>Handle in BOTH the inline .tsx AND the hand-rolled emitTypes.ts .d.ts.
+// D-03 is the hardest constraint: when ir.expose is empty, BOTH surfaces are
+// byte-for-byte unchanged (no forwardRef, no Handle interface, no import change,
+// the `declare function` form preserved).
+const EXPOSE_PROBE_SRC = `<rozie name="ExposeProbe">
+<template>
+  <input :ref="inputEl" :value="text" @input="onInput" />
+</template>
+<data>
+{ text: "" }
+</data>
+<script>
+function reset() { $data.text = ""; }
+function focus() { $refs.inputEl.focus(); }
+function onInput(e) { $data.text = e.target.value; }
+$expose({ reset, focus });
+</script>
+</rozie>`;
+
+// A typed (`<script lang="ts">`) $expose source so the synthesized handle
+// interface carries the author signatures rather than the untyped fallback.
+const EXPOSE_PROBE_TS_SRC = `<rozie name="ExposeProbeTs">
+<template>
+  <input :ref="inputEl" :value="text" @input="onInput" />
+</template>
+<data>
+{ text: "" }
+</data>
+<script lang="ts">
+function reset(): void { $data.text = ""; }
+function setText(next: string): void { $data.text = next; }
+function onInput(e: any) { $data.text = e.target.value; }
+$expose({ reset, setText });
+</script>
+</rozie>`;
+
+// A non-$expose source built from the SAME template/data/script shape minus the
+// `$expose(...)` line — its emitted .tsx / .d.ts is the byte-identity baseline.
+const NO_EXPOSE_SRC = `<rozie name="ExposeProbe">
+<template>
+  <input :ref="inputEl" :value="text" @input="onInput" />
+</template>
+<data>
+{ text: "" }
+</data>
+<script>
+function reset() { $data.text = ""; }
+function focus() { $refs.inputEl.focus(); }
+function onInput(e) { $data.text = e.target.value; }
+</script>
+</rozie>`;
+
+describe('emitReact — $expose forwardRef framing (Phase 21 Plan 02, REQ-5, D-03)', () => {
+  it('exposed source wraps the component in forwardRef + emits useImperativeHandle with the exposed names', () => {
+    const ir = lowerInline(EXPOSE_PROBE_SRC, 'ExposeProbe');
+    expect(ir.expose.map((e) => e.name)).toEqual(['reset', 'focus']);
+    const { code } = emitReact(ir, { filename: 'ExposeProbe.rozie', source: EXPOSE_PROBE_SRC });
+
+    // forwardRef framing: const Foo = forwardRef<FooHandle, FooProps>(...); export default Foo;
+    expect(code).toContain(
+      'const ExposeProbe = forwardRef<ExposeProbeHandle, ExposeProbeProps>(function ExposeProbe(props: ExposeProbeProps, ref): JSX.Element {',
+    );
+    expect(code).toContain('export default ExposeProbe;');
+    // The plain `export default function` shape is gone for the exposed case.
+    expect(code).not.toContain('export default function ExposeProbe(');
+
+    // useImperativeHandle with the exposed names + [] deps.
+    expect(code).toContain('useImperativeHandle(ref, () => ({ reset, focus }), []);');
+
+    // inline interface adjacent to the props interface.
+    expect(code).toContain('interface ExposeProbeHandle {');
+
+    // The raw `$expose({...})` call is stripped from the emitted body.
+    expect(code).not.toContain('$expose(');
+  });
+
+  it('forwardRef + useImperativeHandle imports from `react` appear only when exposed', () => {
+    const exposed = lowerInline(EXPOSE_PROBE_SRC, 'ExposeProbe');
+    const exposedOut = emitReact(exposed, { filename: 'ExposeProbe.rozie', source: EXPOSE_PROBE_SRC }).code;
+    expect(exposedOut).toMatch(/import \{[^}]*\bforwardRef\b[^}]*\} from 'react';/);
+    expect(exposedOut).toMatch(/import \{[^}]*\buseImperativeHandle\b[^}]*\} from 'react';/);
+
+    const plain = lowerInline(NO_EXPOSE_SRC, 'ExposeProbe');
+    const plainOut = emitReact(plain, { filename: 'ExposeProbe.rozie', source: NO_EXPOSE_SRC }).code;
+    expect(plainOut).not.toContain('forwardRef');
+    expect(plainOut).not.toContain('useImperativeHandle');
+  });
+
+  it('typed <script lang="ts"> exposed methods carry their author signatures in the inline handle interface', () => {
+    const ir = lowerInline(EXPOSE_PROBE_TS_SRC, 'ExposeProbeTs');
+    const { code } = emitReact(ir, { filename: 'ExposeProbeTs.rozie', source: EXPOSE_PROBE_TS_SRC });
+    expect(code).toContain('interface ExposeProbeTsHandle {');
+    expect(code).toContain('reset(): void;');
+    expect(code).toContain('setText(next: string): void;');
+    expect(code).toContain('useImperativeHandle(ref, () => ({ reset, setText }), []);');
+  });
+
+  it('byte-identity: a non-$expose source emits the EXACT plain function shape (no forwardRef, no Handle, no useImperativeHandle)', () => {
+    const ir = lowerInline(NO_EXPOSE_SRC, 'ExposeProbe');
+    expect(ir.expose).toEqual([]);
+    const { code } = emitReact(ir, { filename: 'ExposeProbe.rozie', source: NO_EXPOSE_SRC });
+
+    // The current canonical plain shape is preserved verbatim.
+    expect(code).toContain('export default function ExposeProbe(props: ExposeProbeProps): JSX.Element {');
+    expect(code).not.toContain('forwardRef');
+    expect(code).not.toContain('useImperativeHandle');
+    expect(code).not.toContain('Handle');
+    expect(code).not.toContain('const ExposeProbe = forwardRef');
+  });
+
+  it('byte-identity (legacy fallback path): a non-$expose source with no opts.source emits the plain function shape', () => {
+    const ir = lowerInline(NO_EXPOSE_SRC, 'ExposeProbe');
+    // No `source` → buildShellLegacy path. Must also stay byte-identical.
+    const { code } = emitReact(ir, {});
+    expect(code).toContain('export default function ExposeProbe(props: ExposeProbeProps): JSX.Element {');
+    expect(code).not.toContain('forwardRef');
+    expect(code).not.toContain('useImperativeHandle');
+  });
+
+  it('legacy fallback path also wraps in forwardRef when exposed', () => {
+    const ir = lowerInline(EXPOSE_PROBE_SRC, 'ExposeProbe');
+    // No `source` → buildShellLegacy path. Must still carry the forwardRef framing.
+    const { code } = emitReact(ir, {});
+    expect(code).toContain('const ExposeProbe = forwardRef<ExposeProbeHandle, ExposeProbeProps>(function ExposeProbe(props: ExposeProbeProps, ref): JSX.Element {');
+    expect(code).toContain('export default ExposeProbe;');
+    expect(code).toContain('useImperativeHandle(ref, () => ({ reset, focus }), []);');
+  });
+});
+
+describe('emitReactTypes — $expose .d.ts handle interface (Phase 21 Plan 02, REQ-10, D-03)', () => {
+  it('exposed source emits `export interface <Name>Handle` and a ForwardRefExoticComponent declaration', () => {
+    const ir = lowerInline(EXPOSE_PROBE_SRC, 'ExposeProbe');
+    const dts = emitReactTypes(ir);
+    expect(dts).toContain('export interface ExposeProbeHandle {');
+    expect(dts).toContain(
+      'declare const ExposeProbe: React.ForwardRefExoticComponent<ExposeProbeProps & React.RefAttributes<ExposeProbeHandle>>;',
+    );
+    // The plain `declare function` form is replaced for the exposed case.
+    expect(dts).not.toContain('declare function ExposeProbe(');
+    expect(dts).toContain('export default ExposeProbe;');
+  });
+
+  it('the ForwardRefExoticComponent/RefAttributes import is present only when exposed', () => {
+    const exposed = emitReactTypes(lowerInline(EXPOSE_PROBE_SRC, 'ExposeProbe'));
+    expect(exposed).toMatch(/import type \{[^}]*ForwardRefExoticComponent[^}]*\} from 'react';/);
+    expect(exposed).toMatch(/import type \{[^}]*RefAttributes[^}]*\} from 'react';/);
+
+    const plain = emitReactTypes(lowerInline(NO_EXPOSE_SRC, 'ExposeProbe'));
+    expect(plain).not.toContain('ForwardRefExoticComponent');
+    expect(plain).not.toContain('RefAttributes');
+  });
+
+  it('typed exposed methods carry their author signatures in the .d.ts handle interface', () => {
+    const ir = lowerInline(EXPOSE_PROBE_TS_SRC, 'ExposeProbeTs');
+    const dts = emitReactTypes(ir);
+    expect(dts).toContain('export interface ExposeProbeTsHandle {');
+    expect(dts).toContain('reset(): void;');
+    expect(dts).toContain('setText(next: string): void;');
+  });
+
+  it('byte-identity: a non-$expose source emits the EXACT current `declare function` .d.ts (no Handle, no import change)', () => {
+    const ir = lowerInline(NO_EXPOSE_SRC, 'ExposeProbe');
+    const dts = emitReactTypes(ir);
+    expect(dts).toContain('declare function ExposeProbe(props: ExposeProbeProps): JSX.Element;');
+    expect(dts).not.toContain('Handle');
+    expect(dts).not.toContain('ForwardRefExoticComponent');
+    expect(dts).not.toContain('RefAttributes');
+    // import line unchanged (only ReactNode).
+    expect(dts.split('\n')[0]).toBe("import type { ReactNode } from 'react';");
+  });
+});

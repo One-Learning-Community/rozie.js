@@ -41,6 +41,7 @@ import type {
   PropTypeAnnotation,
   ParamDecl,
 } from '../../../../core/src/ir/types.js';
+import { synthesizeHandleType } from '../../../../core/src/codegen/synthesizeHandleType.js';
 
 /**
  * Options controlling .d.ts emission.
@@ -89,8 +90,30 @@ export function emitReactTypes(
   // suppresses unused-locals warnings without consuming it.
   void opts.linkedComponents;
 
+  // Phase 21 ($expose, REQ-10, D-03) — synthesize the `<Name>Handle` interface
+  // and switch the component declaration to a forwardRef-typed `declare const`
+  // ONLY when ir.expose is non-empty. When empty, the import line + the
+  // `declare function` form below stay BYTE-FOR-BYTE unchanged.
+  // Defensive `?? []` guards pre-Phase-21 hand-rolled IRs (legacy emitTypes
+  // tests construct minimal IRs without the `expose` field; real lowered IRs
+  // always carry `expose: []`). Mirrors the `ir.components ?? []` guard in
+  // emitReact.ts.
+  const exposed = (ir.expose ?? []).length > 0;
+  const handleInterface = exposed
+    ? synthesizeHandleType(ir, `${ir.name}Handle`)
+    : null;
+
   const lines: string[] = [];
   lines.push(`import type { ReactNode } from 'react';`);
+  if (exposed) {
+    // `ForwardRefExoticComponent` / `RefAttributes` are referenced via the
+    // `React.` namespace in the declaration below (matching the SPEC Req 10
+    // shape); import them as named types AND bring the `React` namespace into
+    // scope so both `React.ForwardRefExoticComponent` and the named forms
+    // resolve regardless of how downstream tooling reads the declaration.
+    lines.push(`import type { ForwardRefExoticComponent, RefAttributes } from 'react';`);
+    lines.push(`import type * as React from 'react';`);
+  }
   lines.push('');
 
   const generics =
@@ -194,9 +217,23 @@ export function emitReactTypes(
 
   lines.push(`}`);
   lines.push('');
-  lines.push(
-    `declare function ${ir.name}${generics}(props: ${ir.name}Props${generics}): JSX.Element;`,
-  );
+
+  // Phase 21 ($expose, REQ-10) — the exported handle interface + the
+  // forwardRef-typed component declaration. When NOT exposed, emit the
+  // unchanged `declare function` form (D-03 byte-identity).
+  if (exposed && handleInterface) {
+    // synthesizeHandleType returns the interface WITHOUT `export`; prepend it
+    // for the `.d.ts` surface.
+    lines.push(`export ${handleInterface}`);
+    lines.push('');
+    lines.push(
+      `declare const ${ir.name}: React.ForwardRefExoticComponent<${ir.name}Props${generics} & React.RefAttributes<${ir.name}Handle>>;`,
+    );
+  } else {
+    lines.push(
+      `declare function ${ir.name}${generics}(props: ${ir.name}Props${generics}): JSX.Element;`,
+    );
+  }
   lines.push(`export default ${ir.name};`);
   lines.push('');
   return lines.join('\n');
