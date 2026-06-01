@@ -250,7 +250,8 @@ export function emitReact(
   // ir.expose.length. When empty, none of these parts are passed and the shell
   // emits the byte-for-byte unchanged plain-function shape. When non-empty:
   //   - add `forwardRef` + `useImperativeHandle` to the `react` import line,
-  //   - synthesize the inline `interface <Name>Handle {...}` (no `export`),
+  //   - synthesize the exported `export interface <Name>Handle {...}` so leaf
+  //     barrels and consumers can `import type` it directly from the `.tsx`,
   //   - build the `useImperativeHandle(ref, () => ({ a, b }), []);` block.
   let exposeNames: string[] | undefined;
   let handleInterface: string | undefined;
@@ -261,7 +262,12 @@ export function emitReact(
     reactImports.add('forwardRef');
     reactImports.add('useImperativeHandle');
     exposeNames = exposeMethods.map((e) => e.name);
-    handleInterface = synthesizeHandleType(ir, `${ir.name}Handle`) ?? undefined;
+    // synthesizeHandleType returns the bare `interface <Name>Handle {...}` (or
+    // null); prepend `export ` so the named handle type is importable from the
+    // emitted `.tsx`. The `.d.ts` sidecar (emitTypes.ts) prepends its own
+    // export, so this only affects the `.tsx` surface — no double-export.
+    const synthesized = synthesizeHandleType(ir, `${ir.name}Handle`);
+    handleInterface = synthesized != null ? `export ${synthesized}` : undefined;
     // `[]` deps: the handle is registered once; the exposed functions are the
     // same in-scope references for the component's lifetime (those that close
     // over reactive state are already `useCallback`-stabilized by the emitter,

@@ -30,7 +30,7 @@ interface DropdownProps {
   ref?: (h: DropdownHandle) => void;
 }
 
-interface DropdownHandle {
+export interface DropdownHandle {
   toggle: (...args: any[]) => any;
   close: (...args: any[]) => any;
 }

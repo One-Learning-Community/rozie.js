@@ -117,7 +117,7 @@ export function emitSolid(ir: IRComponent, opts: EmitSolidOptions = {}): EmitSol
 
   // Phase 21 ($expose, REQ-8 / REQ-10, D-05) — branch STRICTLY on
   // ir.expose.length. When empty, NONE of the three parts (splitProps 'ref'
-  // push, the inline <Name>Handle interface + ref?: prop field, the onMount
+  // push, the exported <Name>Handle interface + ref?: prop field, the onMount
   // invoke) are emitted and the Solid output stays byte-identical (D-05).
   const exposeMethods = ir.expose ?? [];
   const hasExpose = exposeMethods.length > 0;
@@ -126,7 +126,12 @@ export function emitSolid(ir: IRComponent, opts: EmitSolidOptions = {}): EmitSol
   let exposeOnMount: string | undefined;
   if (hasExpose) {
     const handleName = `${ir.name}Handle`;
-    handleInterface = synthesizeHandleType(ir, handleName) ?? undefined;
+    // synthesizeHandleType returns the bare `interface <Name>Handle {...}` (or
+    // null); prepend `export ` so the named handle type is importable from the
+    // emitted `.tsx` (leaf barrels re-export it). The `.d.ts` sidecar prepends
+    // its own export, so this only affects the `.tsx` surface — no double-export.
+    const synthesized = synthesizeHandleType(ir, handleName);
+    handleInterface = synthesized != null ? `export ${synthesized}` : undefined;
     exposeRefField = `ref?: (h: ${handleName}) => void;`;
     const names = exposeMethods.map((e) => e.name).join(', ');
     // local.ref is the splitProps-renamed `ref` prop (pushed into propKeys

@@ -404,12 +404,12 @@ describe('emitSolid — $expose callback ref prop (Phase 21 Plan 05, REQ-8/REQ-1
     expect(code).toMatch(/import \{[^}]*\bonMount\b[^}]*\} from 'solid-js';/);
   });
 
-  it('types the ref prop + emits the inline <Name>Handle interface', () => {
+  it('types the ref prop + emits the exported <Name>Handle interface', () => {
     const code = compileExposeSolid(EXPOSE_SOURCE, 'ExposeProbe.rozie');
     expect(code).toContain('ref?: (h: ExposeProbeHandle) => void;');
-    expect(code).toContain('interface ExposeProbeHandle {');
-    // Inline — NOT exported (callers add export; Solid emits inline).
-    expect(code).not.toContain('export interface ExposeProbeHandle');
+    // Exported so leaf barrels can `export type { FooHandle } from './Foo'`
+    // and consumers can `import type { FooHandle }` from the emitted `.tsx`.
+    expect(code).toContain('export interface ExposeProbeHandle {');
   });
 
   it('strips the top-level $expose(...) call from the residual body (no bare $expose( leaks)', () => {

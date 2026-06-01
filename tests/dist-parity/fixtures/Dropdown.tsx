@@ -19,7 +19,7 @@ interface DropdownProps {
   slots?: Record<string, () => import('react').ReactNode>;
 }
 
-interface DropdownHandle {
+export interface DropdownHandle {
   toggle: (...args: any[]) => any;
   close: (...args: any[]) => any;
 }

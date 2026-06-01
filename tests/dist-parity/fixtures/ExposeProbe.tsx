@@ -4,7 +4,7 @@ import styles from './ExposeProbe.module.css';
 
 interface ExposeProbeProps {}
 
-interface ExposeProbeHandle {
+export interface ExposeProbeHandle {
   reset(): void;
   focus(): void;
 }

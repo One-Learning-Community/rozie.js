@@ -10,7 +10,7 @@ interface ExposeProbeProps {
   ref?: (h: ExposeProbeHandle) => void;
 }
 
-interface ExposeProbeHandle {
+export interface ExposeProbeHandle {
   reset(): void;
   focus(): void;
 }
