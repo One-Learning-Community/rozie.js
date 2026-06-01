@@ -318,6 +318,7 @@
   "emits": [
     "close"
   ],
+  "expose": [],
   "lifecycle": [
     {
       "type": "LifecycleHook",

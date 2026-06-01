@@ -30,6 +30,7 @@ import type {
   WatchHook,
   SetupBody,
   SetupAnnotation,
+  ExposedMethod,
 } from '../types.js';
 
 export interface LowerScriptResult {
@@ -39,6 +40,8 @@ export interface LowerScriptResult {
   watchers: WatchHook[];
   setupBody: SetupBody;
   emits: string[];
+  /** Phase 21 — `$expose({...})` names in source order; `[]` when no $expose. */
+  expose: ExposedMethod[];
 }
 
 /**
@@ -298,5 +301,13 @@ export function lowerScript(
   // discovery handled by lowerTemplate via $emit() walk).
   const emits = [...bindings.emits];
 
-  return { computed, lifecycle, watchers, setupBody, emits };
+  // 5. expose — Phase 21. Map the collected $expose names (source order; NOT
+  // Set-deduped — per-name sourceLoc must survive) into ExposedMethod IR nodes.
+  const expose: ExposedMethod[] = bindings.expose.map((e) => ({
+    type: 'ExposedMethod',
+    name: e.name,
+    sourceLoc: e.sourceLoc,
+  }));
+
+  return { computed, lifecycle, watchers, setupBody, emits, expose };
 }

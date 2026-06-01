@@ -264,6 +264,7 @@
     }
   ],
   "emits": [],
+  "expose": [],
   "lifecycle": [
     {
       "type": "LifecycleHook",

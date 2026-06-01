@@ -27,6 +27,8 @@ export type {
   ComputedDeclEntry,
   LifecycleHookEntry,
   WatchEntry,
+  ExposedMethodEntry,
+  ExposeCallSite,
 } from './types.js';
 
 export function createEmptyBindings(): BindingsTable {
@@ -37,6 +39,8 @@ export function createEmptyBindings(): BindingsTable {
     slots: new Map(),
     computeds: new Map(),
     emits: new Set(),
+    expose: [],
+    exposeCalls: [],
     lifecycle: [],
     watchers: [],
   };

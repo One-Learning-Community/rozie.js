@@ -572,6 +572,7 @@
   "refs": [],
   "slots": [],
   "emits": [],
+  "expose": [],
   "lifecycle": [],
   "watchers": [],
   "listeners": [

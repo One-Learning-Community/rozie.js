@@ -63,6 +63,14 @@ export interface IRComponent {
   refs: RefDecl[];
   slots: SlotDecl[];
   emits: string[];
+  /**
+   * Phase 21 — `$expose({...})` method names in source order; `[]` when no
+   * `$expose` call. NOT deduped via Set — `{ name, sourceLoc }` objects survive
+   * in source order so emitters + the handle-type synthesizer can resolve each
+   * name back to its `<script>` declaration. Every emitter branches on
+   * `expose.length === 0` for a byte-identical-when-empty guarantee (D-02).
+   */
+  expose: ExposedMethod[];
   /** D-19: ordered + paired. Each $onMount/$onUnmount/$onUpdate is one node. */
   lifecycle: LifecycleHook[];
   /**
@@ -403,6 +411,24 @@ export interface LifecycleHook {
   setup: BlockStatement | Expression;
   cleanup?: Expression;
   setupDeps: SignalRef[];
+  sourceLoc: SourceLoc;
+}
+
+/**
+ * ExposedMethod — Phase 21 ($expose imperative-handle sigil).
+ *
+ * One node per property key of a top-level `$expose({ a, b, ... })` call, in
+ * source order. `name` is the canonical method name (shorthand `{ clear }` and
+ * explicit `{ clear: clear }` both yield `'clear'`); `sourceLoc` points at the
+ * `ObjectProperty` in the `$expose` argument so emitters + diagnostics can map
+ * back to source. Each name references an in-scope `<script>` function (or an
+ * inline arrow/function-expression value) — validated by `runExposeValidator`.
+ *
+ * @experimental — shape may change before v1.0
+ */
+export interface ExposedMethod {
+  type: 'ExposedMethod';
+  name: string;
   sourceLoc: SourceLoc;
 }
 

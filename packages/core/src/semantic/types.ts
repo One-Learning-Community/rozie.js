@@ -22,6 +22,7 @@ import type {
   Expression,
   ArrowFunctionExpression,
   FunctionExpression,
+  CallExpression,
 } from '@babel/types';
 import type { SourceLoc } from '../ast/types.js';
 
@@ -123,6 +124,29 @@ export interface WatchEntry {
   sourceLoc: SourceLoc;
 }
 
+/**
+ * Phase 21 ($expose) — one entry per well-formed property key of the canonical
+ * top-level `$expose({...})` call, in source order. The collector extracts only
+ * the canonical names (shorthand + explicit); ALL malformed-shape detection is
+ * left to `runExposeValidator` (collectors stay silent per the Plan 02-01
+ * contract). `__proto__` / `constructor` / `prototype` keys are filtered.
+ */
+export interface ExposedMethodEntry {
+  name: string;
+  sourceLoc: SourceLoc;
+}
+
+/**
+ * Phase 21 ($expose) — every `$expose(...)` call site, recorded for the
+ * validator's duplicate + nested-scope checks. `atTopLevel` is true for a call
+ * that is an `ExpressionStatement` at `<script>` Program top level (the only
+ * valid placement), false for any call nested inside a function / block.
+ */
+export interface ExposeCallSite {
+  call: CallExpression;
+  atTopLevel: boolean;
+}
+
 export interface BindingsTable {
   props: Map<string, PropDeclEntry>;
   data: Map<string, DataDeclEntry>;
@@ -134,6 +158,16 @@ export interface BindingsTable {
    * @event handler expressions are also walked (RESEARCH.md A4).
    */
   emits: Set<string>;
+  /**
+   * Phase 21 — extracted `$expose({...})` key names from the canonical
+   * top-level call, in source order. `[]` when no `$expose` call.
+   */
+  expose: ExposedMethodEntry[];
+  /**
+   * Phase 21 — every `$expose(...)` call site (incl. nested) for the validator's
+   * duplicate (ROZ119) + nested-scope (ROZ120) checks. `[]` when no `$expose`.
+   */
+  exposeCalls: ExposeCallSite[];
   /** Ordered (source order) per REACT-04. */
   lifecycle: LifecycleHookEntry[];
   /**

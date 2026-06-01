@@ -750,6 +750,7 @@
     "toggle",
     "remove"
   ],
+  "expose": [],
   "lifecycle": [],
   "watchers": [],
   "listeners": [

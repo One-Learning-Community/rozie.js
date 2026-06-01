@@ -30,7 +30,15 @@ import type {
   ComputedDeclEntry,
   LifecycleHookEntry,
   WatchEntry,
+  ExposedMethodEntry,
 } from '../types.js';
+
+/**
+ * Phase 21 ($expose) — prototype-pollution guard. Mirrors the FORBIDDEN_KEYS
+ * filter in collectPropDecls / collectDataDecls (T-2-01-01): a `$expose` key
+ * named `__proto__` / `constructor` / `prototype` is SKIPPED, never recorded.
+ */
+const FORBIDDEN_EXPOSE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 
 // Default export interop: @babel/traverse ships a CJS default export that
 // some bundlers (incl. Vitest's ESM resolver) wrap into { default: fn }.
@@ -112,6 +120,46 @@ function extractWatchFromExpression(expr: t.Expression): WatchEntry | null {
   };
 }
 
+/**
+ * Phase 21 ($expose) — read the canonical `$expose({...})` argument object and
+ * return its property key names as ExposedMethodEntry items in source order.
+ *
+ * Mirrors `extractWatchFromExpression`'s guard shape. Returns `null` when the
+ * expression is not a top-level `$expose(...)` call. Returns `[]` when the call
+ * exists but its argument is not an ObjectExpression (malformed — the VALIDATOR
+ * emits ROZ115; the collector stays silent). Each well-formed property (both
+ * shorthand `{ clear }` and explicit `{ clear: clear }`) yields one entry keyed
+ * by its property name; spread / computed-key / non-identifier-key properties
+ * are skipped here (the validator emits ROZ116/ROZ117). `__proto__` /
+ * `constructor` / `prototype` keys are filtered (FORBIDDEN_EXPOSE_KEYS).
+ */
+function extractExposeFromExpression(
+  expr: t.Expression,
+): ExposedMethodEntry[] | null {
+  if (!t.isCallExpression(expr)) return null;
+  if (!t.isIdentifier(expr.callee)) return null;
+  if (expr.callee.name !== '$expose') return null;
+  const arg = expr.arguments[0];
+  if (!arg || !t.isObjectExpression(arg)) return [];
+  const entries: ExposedMethodEntry[] = [];
+  for (const prop of arg.properties) {
+    // SpreadElement / computed key / non-identifier key are malformed shapes
+    // owned by the validator (ROZ116/ROZ117) — skip them silently here.
+    if (!t.isObjectProperty(prop)) continue;
+    if (prop.computed) continue;
+    let name: string | null = null;
+    if (t.isIdentifier(prop.key)) name = prop.key.name;
+    else if (t.isStringLiteral(prop.key)) name = prop.key.value;
+    if (name === null) continue;
+    if (FORBIDDEN_EXPOSE_KEYS.has(name)) continue;
+    entries.push({
+      name,
+      sourceLoc: { start: prop.start ?? 0, end: prop.end ?? 0 },
+    });
+  }
+  return entries;
+}
+
 export function collectScriptDecls(script: ScriptAST, bindings: BindingsTable): void {
   const programBody = script.program.program.body;
 
@@ -136,6 +184,16 @@ export function collectScriptDecls(script: ScriptAST, bindings: BindingsTable): 
       // Quick plan 260515-u2b: top-level $watch(getter, cb) collection.
       const watcher = extractWatchFromExpression(stmt.expression);
       if (watcher) bindings.watchers.push(watcher);
+
+      // Phase 21: top-level $expose({...}) — extract the canonical method names.
+      // Only the FIRST top-level call contributes names (duplicate calls are a
+      // validator error, ROZ119). Once `bindings.expose` is populated, later
+      // top-level calls do not overwrite it; the validator inspects
+      // `bindings.exposeCalls` for the duplicate.
+      const exposed = extractExposeFromExpression(stmt.expression);
+      if (exposed && bindings.expose.length === 0) {
+        bindings.expose.push(...exposed);
+      }
     }
   }
 
@@ -145,10 +203,25 @@ export function collectScriptDecls(script: ScriptAST, bindings: BindingsTable): 
   traverse(script.program, {
     CallExpression(path) {
       const callee = path.node.callee;
-      if (!t.isIdentifier(callee) || callee.name !== '$emit') return;
-      const firstArg = path.node.arguments[0];
-      if (firstArg && t.isStringLiteral(firstArg)) {
-        bindings.emits.add(firstArg.value);
+      if (!t.isIdentifier(callee)) return;
+      if (callee.name === '$emit') {
+        const firstArg = path.node.arguments[0];
+        if (firstArg && t.isStringLiteral(firstArg)) {
+          bindings.emits.add(firstArg.value);
+        }
+        return;
+      }
+      // Phase 21: record EVERY $expose call site for the validator. A call is
+      // "at top level" iff it is the expression of an ExpressionStatement whose
+      // parent is the Program body (the only valid placement). Anything nested
+      // inside a function / block is atTopLevel:false → the validator emits
+      // ROZ120. Duplicate top-level calls (>1) → ROZ119.
+      if (callee.name === '$expose') {
+        const parent = path.parent;
+        const grandparent = path.parentPath?.parent;
+        const atTopLevel =
+          t.isExpressionStatement(parent) && t.isProgram(grandparent);
+        bindings.exposeCalls.push({ call: path.node, atTopLevel });
       }
     },
   });
