@@ -156,6 +156,26 @@ export default class Flatpickr extends SignalWatcher(LitElement) {
 
   instance: any = null;
 
+  clear() {
+    this.instance?.clear();
+  }
+
+  openPicker() {
+    this.instance?.open();
+  }
+
+  closePicker() {
+    this.instance?.close();
+  }
+
+  selectDate(date: any, triggerChange: any) {
+    this.instance?.setDate(date, triggerChange);
+  }
+
+  jumpToDate(date: any) {
+    this.instance?.jumpToDate(date);
+  }
+
   get date(): string { return this._dateControllable.read(); }
   set date(v: string) { this._dateControllable.notifyPropertyWrite(v); }
 

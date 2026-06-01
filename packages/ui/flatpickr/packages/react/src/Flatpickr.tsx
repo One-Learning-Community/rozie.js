@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { clsx, useControllableState } from '@rozie/runtime-react';
 import styles from './Flatpickr.module.css';
 import flatpickr from 'flatpickr';
@@ -31,7 +31,15 @@ interface FlatpickrProps {
   onDayCreate?: (...args: any[]) => void;
 }
 
-export default function Flatpickr(_props: FlatpickrProps): JSX.Element {
+interface FlatpickrHandle {
+  clear: (...args: any[]) => any;
+  openPicker: (...args: any[]) => any;
+  closePicker: (...args: any[]) => any;
+  selectDate: (...args: any[]) => any;
+  jumpToDate: (...args: any[]) => any;
+}
+
+const Flatpickr = forwardRef<FlatpickrHandle, FlatpickrProps>(function Flatpickr(_props: FlatpickrProps, ref): JSX.Element {
   const __defaultOptions = useState(() => (() => ({}))())[0];
   const props: Omit<FlatpickrProps, 'mode' | 'dateFormat' | 'altInput' | 'altFormat' | 'enableTime' | 'enableSeconds' | 'time24hr' | 'noCalendar' | 'minDate' | 'maxDate' | 'placeholder' | 'disabled' | 'commitOn' | 'options'> & { mode: string; dateFormat: string; altInput: boolean; altFormat: string; enableTime: boolean; enableSeconds: boolean; time24hr: boolean; noCalendar: boolean; minDate: (string) | null; maxDate: (string) | null; placeholder: string; disabled: boolean; commitOn: string; options: Record<string, any> } = {
     ..._props,
@@ -74,6 +82,47 @@ export default function Flatpickr(_props: FlatpickrProps): JSX.Element {
   const _dateRef = useRef(date);
   _dateRef.current = date;
   const inputEl = useRef<HTMLInputElement | null>(null);
+
+  // Imperative handle (Phase 21 $expose). The five flatpickr instance methods a
+  // consumer can't drive through props alone — exposed uniformly to all 6 targets
+  // (Vue defineExpose / React useImperativeHandle / Svelte instance export /
+  // Angular+Lit public method / Solid callback ref). Each guards on `instance`
+  // (null before $onMount and after destroy). selectDate forwards flatpickr's own
+  // triggerChange arg; leaving it undefined keeps flatpickr's default (no
+  // onChange refire), so a programmatic selectDate does not bounce through the
+  // round-trip-guarded $watch above.
+  //
+  // Two method names are deliberately NOT flatpickr's own, to avoid collisions
+  // with this component's emitted surface (a real cross-target footgun — see the
+  // Step-4 gap report):
+  //   - `selectDate` (not `setDate`): the `date` prop is `model: true`, so React's
+  //     emitter auto-generates a `setDate` setter for it (useControllableState
+  //     destructure). A user `setDate` collides — ROZ524 ("already declared" +
+  //     infinite-recursion of the model-write rewrite). selectDate wraps
+  //     flatpickr's instance.setDate.
+  //   - `openPicker` / `closePicker` (not `open` / `close`): this component emits
+  //     `open` and `close` EVENTS (onOpen/onClose -> $emit). On targets that
+  //     materialize events as named members (Angular `output()`), a method named
+  //     `open`/`close` collides with the event member and the emitter silently
+  //     renames the method to `_open`/`_close` — breaking the uniform handle. No
+  //     diagnostic fires today (unlike the model-setter ROZ524); flagged for a
+  //     future ROZ "expose-name vs event-name collision" check. Prefixing the
+  //     methods sidesteps it.
+  function clear() {
+    instance.current?.clear();
+  }
+  function openPicker() {
+    instance.current?.open();
+  }
+  function closePicker() {
+    instance.current?.close();
+  }
+  function selectDate(date: any, triggerChange: any) {
+    instance.current?.setDate(date, triggerChange);
+  }
+  function jumpToDate(date: any) {
+    instance.current?.jumpToDate(date);
+  }
 
   useEffect(() => {
     instance.current = flatpickr(inputEl.current!, {
@@ -149,9 +198,12 @@ export default function Flatpickr(_props: FlatpickrProps): JSX.Element {
     if (instance.current) instance.current.input.disabled = v;
   }, [props.disabled]);
 
+  useImperativeHandle(ref, () => ({ clear, openPicker, closePicker, selectDate, jumpToDate }), []);
+
   return (
     <>
     <input ref={inputEl} type="text" placeholder={props.placeholder} {...attrs} className={clsx(styles["rozie-flatpickr"], (attrs.className as string | undefined))} data-rozie-s-159070d4="" />
     </>
   );
-}
+});
+export default Flatpickr;

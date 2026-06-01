@@ -116,6 +116,21 @@ export class Flatpickr {
   }
 
   instance: any = null;
+  clear = () => {
+    this.instance?.clear();
+  };
+  openPicker = () => {
+    this.instance?.open();
+  };
+  closePicker = () => {
+    this.instance?.close();
+  };
+  selectDate = (date: any, triggerChange: any) => {
+    this.instance?.setDate(date, triggerChange);
+  };
+  jumpToDate = (date: any) => {
+    this.instance?.jumpToDate(date);
+  };
 
   private rozieSpread_0 = viewChild<ElementRef>('rozieSpread_0');
 

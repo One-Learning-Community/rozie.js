@@ -1,4 +1,6 @@
 import type { ReactNode } from 'react';
+import type { ForwardRefExoticComponent, RefAttributes } from 'react';
+import type * as React from 'react';
 
 export interface FlatpickrProps {
   date?: string;
@@ -28,5 +30,13 @@ export interface FlatpickrProps {
   onDayCreate?: (...args: unknown[]) => void;
 }
 
-declare function Flatpickr(props: FlatpickrProps): JSX.Element;
+export interface FlatpickrHandle {
+  clear: (...args: any[]) => any;
+  openPicker: (...args: any[]) => any;
+  closePicker: (...args: any[]) => any;
+  selectDate: (...args: any[]) => any;
+  jumpToDate: (...args: any[]) => any;
+}
+
+declare const Flatpickr: React.ForwardRefExoticComponent<FlatpickrProps & React.RefAttributes<FlatpickrHandle>>;
 export default Flatpickr;
