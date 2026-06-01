@@ -85,7 +85,7 @@ module.exports = {
 For Turbopack (Next 15+ App Router): Turbopack doesn't accept arbitrary
 Webpack plugins yet. The cleanest path is the pre-compile escape hatch —
 emit `.tsx` files alongside your `.rozie` sources and check them in. The
-[CLI section](#cli-pre-compile) below covers this.
+[CLI section](#cli-pre-compile-any-bundler-no-transform-plugin) below covers this.
 
 A working end-to-end smoke lives at
 [`examples/consumers/nextjs-rozie/`](https://github.com/One-Learning-Community/rozie.js/tree/main/examples/consumers/nextjs-rozie) —

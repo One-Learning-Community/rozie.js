@@ -77,7 +77,7 @@ To see what each target's emitted code looks like, visit the [SortableList examp
 | `ghostClass` | `String` | `null` | yes | Class name applied to the drop-placeholder element. See [Custom ghost / chosen / drag styling](#custom-ghost-chosen-drag-styling). |
 | `chosenClass` | `String` | `null` | yes | Class name applied to the currently-chosen item. |
 | `dragClass` | `String` | `null` | yes | Class name applied to the dragging element. |
-| `filter` | `String` | `null` | yes | CSS selector that prevents drag initiation on matching rows. See [Filter — locked items](#filter-locked-items). |
+| `filter` | `String` | `null` | yes | CSS selector that prevents drag initiation on matching rows. See [Filter — locked items](#filter-—-locked-items). |
 | `easing` | `String` | `null` | yes | CSS easing function for the animation (e.g. `'ease-in'`, `'cubic-bezier(0.4, 0, 0.2, 1)'`). |
 | `forceFallback` | `Boolean` | `false` | **NO** | Force SortableJS's mouse-event drag path (over HTML5 DnD). Useful for touch testing and consistent cross-browser behavior. **Construction-time only** — see [Remount on construction-time-only changes](#remount-on-construction-time-only-changes). |
 | `swapThreshold` | `Number` | `1` | **NO** | SortableJS swap-threshold (0..1). Lower = swap earlier. **Construction-time only**. |
