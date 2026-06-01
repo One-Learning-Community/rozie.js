@@ -905,6 +905,7 @@ function emitLifecycleHooks(
 function emitResidualScriptBody(
   clonedProgram: t.File,
   consumedLifecycleIndices: Set<number>,
+  exposeNames: Set<string>,
 ): { code: string; stmts: t.Statement[] } {
   const stmts: t.Statement[] = [];
   const body = clonedProgram.program.body;
@@ -937,7 +938,14 @@ function emitResidualScriptBody(
           callee.name === '$onUnmount' ||
           callee.name === '$onUpdate' ||
           // Quick plan 260515-u2b — $watch is consumed by emitWatcherHooks.
-          callee.name === '$watch'
+          callee.name === '$watch' ||
+          // Phase 21 Plan 04 (REQ-6) — `$expose({...})` is a COMPILE-TIME
+          // directive consumed via `ir.expose`; the matching `<script>`
+          // functions are re-emitted below with an `export` modifier (Svelte 5
+          // instance export). The `$expose(...)` call itself MUST be stripped
+          // from the residual body — otherwise it leaks as an undefined-`$expose`
+          // runtime reference. Mirrors the Vue + React strip.
+          callee.name === '$expose'
         ) {
           continue;
         }
@@ -947,8 +955,52 @@ function emitResidualScriptBody(
     stmts.push(stmt);
   }
 
-  const code = stmts.map((s) => genCode(s)).join('\n');
+  // Phase 21 Plan 04 (REQ-6) — mark-and-export (RESEARCH §B.Svelte option b):
+  // a top-level user function whose name is in the `$expose` set becomes a
+  // Svelte 5 instance export by prepending `export `. Applies ONLY to matching
+  // top-level declarations:
+  //   - `function name(...) {...}`         → `export function name(...) {...}`
+  //   - `const name = (...) => {...}` / fn → `export const name = ...`
+  // svelte-check infers the instance-export handle types from the function
+  // signature (D-04, no explicit interface). When `exposeNames` is empty no
+  // statement matches, so output is byte-identical to today.
+  const code = stmts
+    .map((s) => {
+      const generated = genCode(s);
+      return exposeNames.size > 0 && isExposedTopLevelDecl(s, exposeNames)
+        ? `export ${generated}`
+        : generated;
+    })
+    .join('\n');
   return { code, stmts };
+}
+
+/**
+ * Phase 21 Plan 04 (REQ-6) — true when `stmt` is a top-level user declaration
+ * whose declared name is in the `$expose` set:
+ *   - a `FunctionDeclaration` `function name(...) {...}`, or
+ *   - a single-declarator `const/let name = <arrow|function-expression>`.
+ *
+ * The locked accept-set (21-01) guarantees every exposed name resolves to a
+ * top-level `<script>` `FunctionDeclaration` or an arrow/function-valued
+ * `const` (or an inline arrow, which carries no name and is never matched
+ * here). Only those forms are eligible for the instance-export prefix.
+ */
+function isExposedTopLevelDecl(stmt: t.Statement, exposeNames: Set<string>): boolean {
+  if (t.isFunctionDeclaration(stmt) && stmt.id && t.isIdentifier(stmt.id)) {
+    return exposeNames.has(stmt.id.name);
+  }
+  if (t.isVariableDeclaration(stmt) && stmt.declarations.length === 1) {
+    const d = stmt.declarations[0]!;
+    if (
+      t.isIdentifier(d.id) &&
+      d.init &&
+      (t.isArrowFunctionExpression(d.init) || t.isFunctionExpression(d.init))
+    ) {
+      return exposeNames.has(d.id.name);
+    }
+  }
+  return false;
 }
 
 /**
@@ -1051,7 +1103,15 @@ export function emitScript(
     needsUntrack,
   } = emitWatcherHooks(cloned);
   for (const idx of watcherConsumed) consumedIndices.add(idx);
-  const { code: residualCode, stmts: residualStmts } = emitResidualScriptBody(cloned, consumedIndices);
+  // Phase 21 Plan 04 (REQ-6) — the set of `$expose`d names; drives both the
+  // `$expose(...)` call strip and the `export ` instance-export prefix in
+  // emitResidualScriptBody. Empty set → byte-identical residual body.
+  const exposeNames = new Set(ir.expose.map((e) => e.name));
+  const { code: residualCode, stmts: residualStmts } = emitResidualScriptBody(
+    cloned,
+    consumedIndices,
+    exposeNames,
+  );
 
   // Bug B fix (260519 linechart-watch-recreate) — assemble the `'svelte'`
   // value-import line. `onMount` / `onDestroy` are emitted by emitLifecycleHooks

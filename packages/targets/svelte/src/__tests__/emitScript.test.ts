@@ -298,3 +298,72 @@ describe('snippets-merge (Phase 07.3.1 D-SV-16)', () => {
     expect(scriptBlock).not.toMatch(/\$derived\(__\w+Prop \?\? snippets/);
   });
 });
+
+describe('$expose — Svelte instance exports (Phase 21 Plan 04, REQ-6)', () => {
+  const EXPOSE_SRC = `<rozie name="ExposeProbe">
+<data>
+  count: 0
+</data>
+<script>
+  function reset() {
+    count = 0;
+  }
+  function focus() {
+    inputEl?.focus();
+  }
+  function untouched() {
+    count = count + 1;
+  }
+  $expose({ reset, focus })
+</script>
+<template>
+  <div>{{ count }}</div>
+</template>
+</rozie>`;
+
+  it('emits `export function` for each exposed top-level function', () => {
+    const scriptBlock = emitScriptFromSrc(EXPOSE_SRC, 'ExposeProbe');
+    expect(scriptBlock).toMatch(/export function reset\(/);
+    expect(scriptBlock).toMatch(/export function focus\(/);
+  });
+
+  it('does NOT export a non-exposed top-level function', () => {
+    const scriptBlock = emitScriptFromSrc(EXPOSE_SRC, 'ExposeProbe');
+    // `untouched` is declared but not in $expose — stays a bare declaration.
+    expect(scriptBlock).toMatch(/(?<!export )function untouched\(/);
+    expect(scriptBlock).not.toMatch(/export function untouched\(/);
+  });
+
+  it('strips the `$expose(...)` call from the residual script body (no leak)', () => {
+    const scriptBlock = emitScriptFromSrc(EXPOSE_SRC, 'ExposeProbe');
+    // The compile-time directive must NOT survive as a runtime reference.
+    expect(scriptBlock).not.toContain('$expose(');
+  });
+
+  it('exported functions retain their original signature (svelte-check infers — D-04)', () => {
+    const src = `<rozie name="ExposeArgs">
+<data>
+  value: ""
+</data>
+<script>
+  function setValue(next) {
+    value = next;
+  }
+  $expose({ setValue })
+</script>
+<template>
+  <div>{{ value }}</div>
+</template>
+</rozie>`;
+    const scriptBlock = emitScriptFromSrc(src, 'ExposeArgs');
+    // The exported function keeps its `next` param (typeNeutralizeScript fills
+    // the untyped param with `: any`); svelte-check infers the handle type.
+    expect(scriptBlock).toMatch(/export function setValue\(next: any\)/);
+  });
+
+  it('byte-identity: a non-$expose source gains no `export function`', () => {
+    // Counter has user-authored helpers but no $expose — nothing exported.
+    const scriptBlock = emitScript(lowerExample('Counter')).scriptBlock;
+    expect(scriptBlock).not.toMatch(/export function/);
+  });
+});
