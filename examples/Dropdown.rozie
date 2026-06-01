@@ -53,6 +53,16 @@ $onMount(() => {
   // Example of integrating a vanilla JS library — $refs gives direct DOM access.
   // new Popper($refs.triggerEl, $refs.panelEl, { placement: 'bottom-start' })
 })
+
+// Imperative handle (Phase 21 $expose). A consumer holding a ref/handle can
+// drive the dropdown imperatively without owning the `open` model state:
+// toggle() flips it, close() forces it shut. Both are the same functions the
+// template and <listeners> use internally — exposed verbatim to all 6 targets
+// (Vue defineExpose / React useImperativeHandle / Svelte instance export /
+// Angular+Lit public method / Solid callback ref). The `open` value is still
+// the two-way `r-model:open` contract for consumers that prefer declarative
+// control; the handle is the imperative complement.
+$expose({ toggle, close })
 </script>
 
 <listeners>

@@ -40,10 +40,10 @@ const children = $derived(__childrenProp ?? snippets?.children);
 let triggerEl = $state<HTMLElement | undefined>(undefined);
 let panelEl = $state<HTMLElement | undefined>(undefined);
 
-const toggle = () => {
+export const toggle = () => {
   open = !open;
 };
-const close = () => {
+export const close = () => {
   open = false;
 };
 const reposition = () => {

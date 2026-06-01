@@ -48,6 +48,8 @@ watch(() => open.value, () => {
   if (open.value) reposition();
 }, { immediate: true });
 
+defineExpose({ toggle, close });
+
 useOutsideClick(
   [triggerElRef, panelElRef],
   () => close(),

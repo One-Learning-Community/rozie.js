@@ -4,7 +4,7 @@
     "name": "Dropdown",
     "loc": {
       "start": 587,
-      "end": 3253
+      "end": 3873
     }
   },
   "props": {
@@ -19,47 +19,47 @@
     }
   },
   "script": {
-    "content": "\nconst toggle = () => { $model.open = !$props.open }\nconst close  = () => { $model.open = false }\n\nconst reposition = () => {\n  if (!$refs.panelEl || !$refs.triggerEl) return\n  const rect = $refs.triggerEl.getBoundingClientRect()\n  Object.assign($refs.panelEl.style, {\n    top:  `${rect.bottom}px`,\n    left: `${rect.left}px`,\n  })\n}\n\n// Re-fire reposition() whenever the open transition flips on. The panel\n// element is r-if-gated, so $refs.panelEl is undefined at mount time — $watch\n// is the primitive that re-runs the effect after panel mount.\n$watch(() => $props.open, () => {\n  if ($props.open) reposition()\n})\n\n// Multiple $onMount calls run in source order. Useful for colocating setup\n// with the logic it serves.\n$onMount(() => {\n  // Initial reposition only if the panel is open at mount time.\n  if ($props.open) reposition()\n})\n\n$onMount(() => {\n  // Example of integrating a vanilla JS library — $refs gives direct DOM access.\n  // new Popper($refs.triggerEl, $refs.panelEl, { placement: 'bottom-start' })\n})\n",
+    "content": "\nconst toggle = () => { $model.open = !$props.open }\nconst close  = () => { $model.open = false }\n\nconst reposition = () => {\n  if (!$refs.panelEl || !$refs.triggerEl) return\n  const rect = $refs.triggerEl.getBoundingClientRect()\n  Object.assign($refs.panelEl.style, {\n    top:  `${rect.bottom}px`,\n    left: `${rect.left}px`,\n  })\n}\n\n// Re-fire reposition() whenever the open transition flips on. The panel\n// element is r-if-gated, so $refs.panelEl is undefined at mount time — $watch\n// is the primitive that re-runs the effect after panel mount.\n$watch(() => $props.open, () => {\n  if ($props.open) reposition()\n})\n\n// Multiple $onMount calls run in source order. Useful for colocating setup\n// with the logic it serves.\n$onMount(() => {\n  // Initial reposition only if the panel is open at mount time.\n  if ($props.open) reposition()\n})\n\n$onMount(() => {\n  // Example of integrating a vanilla JS library — $refs gives direct DOM access.\n  // new Popper($refs.triggerEl, $refs.panelEl, { placement: 'bottom-start' })\n})\n\n// Imperative handle (Phase 21 $expose). A consumer holding a ref/handle can\n// drive the dropdown imperatively without owning the `open` model state:\n// toggle() flips it, close() forces it shut. Both are the same functions the\n// template and <listeners> use internally — exposed verbatim to all 6 targets\n// (Vue defineExpose / React useImperativeHandle / Svelte instance export /\n// Angular+Lit public method / Solid callback ref). The `open` value is still\n// the two-way `r-model:open` contract for consumers that prefer declarative\n// control; the handle is the imperative complement.\n$expose({ toggle, close })\n",
     "contentLoc": {
       "start": 827,
-      "end": 1851
+      "end": 2471
     },
     "loc": {
       "start": 819,
-      "end": 1860
+      "end": 2480
     }
   },
   "listeners": {
     "content": "\n  <!--\n    .outside takes ref args; fires only when the click target is outside ALL listed refs.\n    Compiler emits the per-target wiring (Vue watchEffect, React useEffect with auto-deps,\n    Svelte $effect, Angular effect + Renderer2.listen + DestroyRef cleanup).\n    r-if here means conditional attach/detach, not conditional render.\n  -->\n  <listener :target=\"document\" @click.outside($refs.triggerEl,$refs.panelEl)=\"close\" r-if=\"$props.open && $props.closeOnOutsideClick\" />\n  <listener :target=\"document\" @keydown.escape=\"close\" r-if=\"$props.open && $props.closeOnEscape\" />\n  <listener :target=\"window\" @resize.throttle(100).passive=\"reposition\" r-if=\"$props.open\" />\n",
     "contentLoc": {
-      "start": 1873,
-      "end": 2548
+      "start": 2493,
+      "end": 3168
     },
     "loc": {
-      "start": 1862,
-      "end": 2560
+      "start": 2482,
+      "end": 3180
     }
   },
   "template": {
     "content": "\n<div class=\"dropdown\">\n  <div ref=\"triggerEl\" @click=\"toggle\">\n    <slot name=\"trigger\" :open=\"$props.open\" :toggle=\"toggle\" />\n  </div>\n\n  <div r-if=\"$props.open\" ref=\"panelEl\" class=\"dropdown-panel\" role=\"menu\">\n    <slot :close=\"close\" />\n  </div>\n</div>\n",
     "contentLoc": {
-      "start": 2572,
-      "end": 2831
+      "start": 3192,
+      "end": 3451
     },
     "loc": {
-      "start": 2562,
-      "end": 2842
+      "start": 3182,
+      "end": 3462
     }
   },
   "style": {
     "content": "\n.dropdown { position: relative; display: inline-block; }\n.dropdown-panel {\n  position: fixed;\n  z-index: var(--rozie-dropdown-z, 1000);\n  background: white;\n  border: 1px solid rgba(0, 0, 0, 0.1);\n  border-radius: 6px;\n  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);\n}\n\n/* Unscoped escape hatch — anything inside :root { } is emitted globally. */\n:root {\n  --rozie-dropdown-z: 1000;\n}\n",
     "contentLoc": {
-      "start": 2851,
-      "end": 3235
+      "start": 3471,
+      "end": 3855
     },
     "loc": {
-      "start": 2844,
-      "end": 3243
+      "start": 3464,
+      "end": 3863
     }
   }
 }

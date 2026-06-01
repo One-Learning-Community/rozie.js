@@ -2,16 +2,16 @@
   "node": {
     "type": "TemplateAST",
     "loc": {
-      "start": 2572,
-      "end": 2831
+      "start": 3192,
+      "end": 3451
     },
     "children": [
       {
         "type": "TemplateText",
         "text": "\n",
         "loc": {
-          "start": 2572,
-          "end": 2573
+          "start": 3192,
+          "end": 3193
         }
       },
       {
@@ -23,16 +23,16 @@
             "rawName": "class",
             "name": "class",
             "modifierChainText": "",
-            "modifierChainBaseOffset": 2583,
+            "modifierChainBaseOffset": 3203,
             "chain": [],
             "value": "dropdown",
             "valueLoc": {
-              "start": 2585,
-              "end": 2593
+              "start": 3205,
+              "end": 3213
             },
             "loc": {
-              "start": 2578,
-              "end": 2594
+              "start": 3198,
+              "end": 3214
             }
           }
         ],
@@ -41,8 +41,8 @@
             "type": "TemplateText",
             "text": "\n  ",
             "loc": {
-              "start": 2595,
-              "end": 2598
+              "start": 3215,
+              "end": 3218
             }
           },
           {
@@ -54,16 +54,16 @@
                 "rawName": "ref",
                 "name": "ref",
                 "modifierChainText": "",
-                "modifierChainBaseOffset": 2606,
+                "modifierChainBaseOffset": 3226,
                 "chain": [],
                 "value": "triggerEl",
                 "valueLoc": {
-                  "start": 2608,
-                  "end": 2617
+                  "start": 3228,
+                  "end": 3237
                 },
                 "loc": {
-                  "start": 2603,
-                  "end": 2618
+                  "start": 3223,
+                  "end": 3238
                 }
               },
               {
@@ -71,16 +71,16 @@
                 "rawName": "@click",
                 "name": "click",
                 "modifierChainText": "",
-                "modifierChainBaseOffset": 2625,
+                "modifierChainBaseOffset": 3245,
                 "chain": [],
                 "value": "toggle",
                 "valueLoc": {
-                  "start": 2627,
-                  "end": 2633
+                  "start": 3247,
+                  "end": 3253
                 },
                 "loc": {
-                  "start": 2619,
-                  "end": 2634
+                  "start": 3239,
+                  "end": 3254
                 }
               }
             ],
@@ -89,8 +89,8 @@
                 "type": "TemplateText",
                 "text": "\n    ",
                 "loc": {
-                  "start": 2635,
-                  "end": 2640
+                  "start": 3255,
+                  "end": 3260
                 }
               },
               {
@@ -102,16 +102,16 @@
                     "rawName": "name",
                     "name": "name",
                     "modifierChainText": "",
-                    "modifierChainBaseOffset": 2650,
+                    "modifierChainBaseOffset": 3270,
                     "chain": [],
                     "value": "trigger",
                     "valueLoc": {
-                      "start": 2652,
-                      "end": 2659
+                      "start": 3272,
+                      "end": 3279
                     },
                     "loc": {
-                      "start": 2646,
-                      "end": 2660
+                      "start": 3266,
+                      "end": 3280
                     }
                   },
                   {
@@ -119,16 +119,16 @@
                     "rawName": ":open",
                     "name": "open",
                     "modifierChainText": "",
-                    "modifierChainBaseOffset": 2666,
+                    "modifierChainBaseOffset": 3286,
                     "chain": [],
                     "value": "$props.open",
                     "valueLoc": {
-                      "start": 2668,
-                      "end": 2679
+                      "start": 3288,
+                      "end": 3299
                     },
                     "loc": {
-                      "start": 2661,
-                      "end": 2680
+                      "start": 3281,
+                      "end": 3300
                     }
                   },
                   {
@@ -136,47 +136,47 @@
                     "rawName": ":toggle",
                     "name": "toggle",
                     "modifierChainText": "",
-                    "modifierChainBaseOffset": 2688,
+                    "modifierChainBaseOffset": 3308,
                     "chain": [],
                     "value": "toggle",
                     "valueLoc": {
-                      "start": 2690,
-                      "end": 2696
+                      "start": 3310,
+                      "end": 3316
                     },
                     "loc": {
-                      "start": 2681,
-                      "end": 2697
+                      "start": 3301,
+                      "end": 3317
                     }
                   }
                 ],
                 "children": [],
                 "selfClosing": true,
                 "loc": {
-                  "start": 2640,
-                  "end": 2700
+                  "start": 3260,
+                  "end": 3320
                 }
               },
               {
                 "type": "TemplateText",
                 "text": "\n  ",
                 "loc": {
-                  "start": 2700,
-                  "end": 2703
+                  "start": 3320,
+                  "end": 3323
                 }
               }
             ],
             "selfClosing": false,
             "loc": {
-              "start": 2598,
-              "end": 2709
+              "start": 3218,
+              "end": 3329
             }
           },
           {
             "type": "TemplateText",
             "text": "\n\n  ",
             "loc": {
-              "start": 2709,
-              "end": 2713
+              "start": 3329,
+              "end": 3333
             }
           },
           {
@@ -188,16 +188,16 @@
                 "rawName": "r-if",
                 "name": "if",
                 "modifierChainText": "",
-                "modifierChainBaseOffset": 2722,
+                "modifierChainBaseOffset": 3342,
                 "chain": [],
                 "value": "$props.open",
                 "valueLoc": {
-                  "start": 2724,
-                  "end": 2735
+                  "start": 3344,
+                  "end": 3355
                 },
                 "loc": {
-                  "start": 2718,
-                  "end": 2736
+                  "start": 3338,
+                  "end": 3356
                 }
               },
               {
@@ -205,16 +205,16 @@
                 "rawName": "ref",
                 "name": "ref",
                 "modifierChainText": "",
-                "modifierChainBaseOffset": 2740,
+                "modifierChainBaseOffset": 3360,
                 "chain": [],
                 "value": "panelEl",
                 "valueLoc": {
-                  "start": 2742,
-                  "end": 2749
+                  "start": 3362,
+                  "end": 3369
                 },
                 "loc": {
-                  "start": 2737,
-                  "end": 2750
+                  "start": 3357,
+                  "end": 3370
                 }
               },
               {
@@ -222,16 +222,16 @@
                 "rawName": "class",
                 "name": "class",
                 "modifierChainText": "",
-                "modifierChainBaseOffset": 2756,
+                "modifierChainBaseOffset": 3376,
                 "chain": [],
                 "value": "dropdown-panel",
                 "valueLoc": {
-                  "start": 2758,
-                  "end": 2772
+                  "start": 3378,
+                  "end": 3392
                 },
                 "loc": {
-                  "start": 2751,
-                  "end": 2773
+                  "start": 3371,
+                  "end": 3393
                 }
               },
               {
@@ -239,16 +239,16 @@
                 "rawName": "role",
                 "name": "role",
                 "modifierChainText": "",
-                "modifierChainBaseOffset": 2778,
+                "modifierChainBaseOffset": 3398,
                 "chain": [],
                 "value": "menu",
                 "valueLoc": {
-                  "start": 2780,
-                  "end": 2784
+                  "start": 3400,
+                  "end": 3404
                 },
                 "loc": {
-                  "start": 2774,
-                  "end": 2785
+                  "start": 3394,
+                  "end": 3405
                 }
               }
             ],
@@ -257,8 +257,8 @@
                 "type": "TemplateText",
                 "text": "\n    ",
                 "loc": {
-                  "start": 2786,
-                  "end": 2791
+                  "start": 3406,
+                  "end": 3411
                 }
               },
               {
@@ -270,62 +270,62 @@
                     "rawName": ":close",
                     "name": "close",
                     "modifierChainText": "",
-                    "modifierChainBaseOffset": 2803,
+                    "modifierChainBaseOffset": 3423,
                     "chain": [],
                     "value": "close",
                     "valueLoc": {
-                      "start": 2805,
-                      "end": 2810
+                      "start": 3425,
+                      "end": 3430
                     },
                     "loc": {
-                      "start": 2797,
-                      "end": 2811
+                      "start": 3417,
+                      "end": 3431
                     }
                   }
                 ],
                 "children": [],
                 "selfClosing": true,
                 "loc": {
-                  "start": 2791,
-                  "end": 2814
+                  "start": 3411,
+                  "end": 3434
                 }
               },
               {
                 "type": "TemplateText",
                 "text": "\n  ",
                 "loc": {
-                  "start": 2814,
-                  "end": 2817
+                  "start": 3434,
+                  "end": 3437
                 }
               }
             ],
             "selfClosing": false,
             "loc": {
-              "start": 2713,
-              "end": 2823
+              "start": 3333,
+              "end": 3443
             }
           },
           {
             "type": "TemplateText",
             "text": "\n",
             "loc": {
-              "start": 2823,
-              "end": 2824
+              "start": 3443,
+              "end": 3444
             }
           }
         ],
         "selfClosing": false,
         "loc": {
-          "start": 2573,
-          "end": 2830
+          "start": 3193,
+          "end": 3450
         }
       },
       {
         "type": "TemplateText",
         "text": "\n",
         "loc": {
-          "start": 2830,
-          "end": 2831
+          "start": 3450,
+          "end": 3451
         }
       }
     ]

@@ -540,16 +540,16 @@
       "name": "triggerEl",
       "elementTag": "div",
       "sourceLoc": {
-        "start": 2603,
-        "end": 2618
+        "start": 3223,
+        "end": 3238
       }
     },
     "panelEl": {
       "name": "panelEl",
       "elementTag": "div",
       "sourceLoc": {
-        "start": 2737,
-        "end": 2750
+        "start": 3357,
+        "end": 3370
       }
     }
   },
@@ -562,22 +562,22 @@
           "name": "open",
           "valueExpressionRaw": "$props.open",
           "sourceLoc": {
-            "start": 2661,
-            "end": 2680
+            "start": 3281,
+            "end": 3300
           }
         },
         {
           "name": "toggle",
           "valueExpressionRaw": "toggle",
           "sourceLoc": {
-            "start": 2681,
-            "end": 2697
+            "start": 3301,
+            "end": 3317
           }
         }
       ],
       "sourceLoc": {
-        "start": 2640,
-        "end": 2700
+        "start": 3260,
+        "end": 3320
       }
     },
     "": {
@@ -588,14 +588,14 @@
           "name": "close",
           "valueExpressionRaw": "close",
           "sourceLoc": {
-            "start": 2797,
-            "end": 2811
+            "start": 3417,
+            "end": 3431
           }
         }
       ],
       "sourceLoc": {
-        "start": 2791,
-        "end": 2814
+        "start": 3411,
+        "end": 3434
       }
     }
   },

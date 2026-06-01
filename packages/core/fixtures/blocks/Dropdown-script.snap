@@ -3,12 +3,12 @@
     "type": "ScriptAST",
     "loc": {
       "start": 827,
-      "end": 1851
+      "end": 2471
     },
     "program": {
       "type": "File",
       "start": 827,
-      "end": 1851,
+      "end": 2471,
       "loc": {
         "start": {
           "line": 25,
@@ -16,16 +16,16 @@
           "index": 827
         },
         "end": {
-          "line": 56,
+          "line": 66,
           "column": 0,
-          "index": 1851
+          "index": 2471
         },
         "filename": "Dropdown.rozie"
       },
       "program": {
         "type": "Program",
         "start": 827,
-        "end": 1851,
+        "end": 2471,
         "loc": {
           "filename": "Dropdown.rozie"
         },
@@ -1901,6 +1901,297 @@
                   }
                 }
               ]
+            },
+            "trailingComments": [
+              {
+                "type": "CommentLine",
+                "value": " Imperative handle (Phase 21 $expose). A consumer holding a ref/handle can",
+                "start": 1852,
+                "end": 1928,
+                "loc": {
+                  "start": {
+                    "line": 57,
+                    "column": 0,
+                    "index": 1852
+                  },
+                  "end": {
+                    "line": 57,
+                    "column": 76,
+                    "index": 1928
+                  },
+                  "filename": "Dropdown.rozie"
+                }
+              },
+              {
+                "type": "CommentLine",
+                "value": " drive the dropdown imperatively without owning the `open` model state:",
+                "start": 1929,
+                "end": 2002,
+                "loc": {
+                  "start": {
+                    "line": 58,
+                    "column": 0,
+                    "index": 1929
+                  },
+                  "end": {
+                    "line": 58,
+                    "column": 73,
+                    "index": 2002
+                  },
+                  "filename": "Dropdown.rozie"
+                }
+              },
+              {
+                "type": "CommentLine",
+                "value": " toggle() flips it, close() forces it shut. Both are the same functions the",
+                "start": 2003,
+                "end": 2080,
+                "loc": {
+                  "start": {
+                    "line": 59,
+                    "column": 0,
+                    "index": 2003
+                  },
+                  "end": {
+                    "line": 59,
+                    "column": 77,
+                    "index": 2080
+                  },
+                  "filename": "Dropdown.rozie"
+                }
+              },
+              {
+                "type": "CommentLine",
+                "value": " template and <listeners> use internally — exposed verbatim to all 6 targets",
+                "start": 2081,
+                "end": 2159,
+                "loc": {
+                  "start": {
+                    "line": 60,
+                    "column": 0,
+                    "index": 2081
+                  },
+                  "end": {
+                    "line": 60,
+                    "column": 78,
+                    "index": 2159
+                  },
+                  "filename": "Dropdown.rozie"
+                }
+              },
+              {
+                "type": "CommentLine",
+                "value": " (Vue defineExpose / React useImperativeHandle / Svelte instance export /",
+                "start": 2160,
+                "end": 2235,
+                "loc": {
+                  "start": {
+                    "line": 61,
+                    "column": 0,
+                    "index": 2160
+                  },
+                  "end": {
+                    "line": 61,
+                    "column": 75,
+                    "index": 2235
+                  },
+                  "filename": "Dropdown.rozie"
+                }
+              },
+              {
+                "type": "CommentLine",
+                "value": " Angular+Lit public method / Solid callback ref). The `open` value is still",
+                "start": 2236,
+                "end": 2313,
+                "loc": {
+                  "start": {
+                    "line": 62,
+                    "column": 0,
+                    "index": 2236
+                  },
+                  "end": {
+                    "line": 62,
+                    "column": 77,
+                    "index": 2313
+                  },
+                  "filename": "Dropdown.rozie"
+                }
+              },
+              {
+                "type": "CommentLine",
+                "value": " the two-way `r-model:open` contract for consumers that prefer declarative",
+                "start": 2314,
+                "end": 2390,
+                "loc": {
+                  "start": {
+                    "line": 63,
+                    "column": 0,
+                    "index": 2314
+                  },
+                  "end": {
+                    "line": 63,
+                    "column": 76,
+                    "index": 2390
+                  },
+                  "filename": "Dropdown.rozie"
+                }
+              },
+              {
+                "type": "CommentLine",
+                "value": " control; the handle is the imperative complement.",
+                "start": 2391,
+                "end": 2443,
+                "loc": {
+                  "start": {
+                    "line": 64,
+                    "column": 0,
+                    "index": 2391
+                  },
+                  "end": {
+                    "line": 64,
+                    "column": 52,
+                    "index": 2443
+                  },
+                  "filename": "Dropdown.rozie"
+                }
+              }
+            ]
+          },
+          {
+            "type": "ExpressionStatement",
+            "start": 2444,
+            "end": 2470,
+            "loc": {
+              "start": {
+                "line": 65,
+                "column": 0,
+                "index": 2444
+              },
+              "end": {
+                "line": 65,
+                "column": 26,
+                "index": 2470
+              },
+              "filename": "Dropdown.rozie"
+            },
+            "expression": {
+              "type": "CallExpression",
+              "start": 2444,
+              "end": 2470,
+              "loc": {
+                "filename": "Dropdown.rozie"
+              },
+              "callee": {
+                "type": "Identifier",
+                "start": 2444,
+                "end": 2451,
+                "loc": {
+                  "end": {
+                    "line": 65,
+                    "column": 7,
+                    "index": 2451
+                  },
+                  "filename": "Dropdown.rozie",
+                  "identifierName": "$expose"
+                },
+                "name": "$expose"
+              },
+              "arguments": [
+                {
+                  "type": "ObjectExpression",
+                  "start": 2452,
+                  "end": 2469,
+                  "loc": {
+                    "start": {
+                      "line": 65,
+                      "column": 8,
+                      "index": 2452
+                    },
+                    "end": {
+                      "line": 65,
+                      "column": 25,
+                      "index": 2469
+                    },
+                    "filename": "Dropdown.rozie"
+                  },
+                  "properties": [
+                    {
+                      "type": "ObjectProperty",
+                      "start": 2454,
+                      "end": 2460,
+                      "loc": {
+                        "start": {
+                          "line": 65,
+                          "column": 10,
+                          "index": 2454
+                        },
+                        "end": {
+                          "line": 65,
+                          "column": 16,
+                          "index": 2460
+                        },
+                        "filename": "Dropdown.rozie"
+                      },
+                      "method": false,
+                      "key": {
+                        "type": "Identifier",
+                        "start": 2454,
+                        "end": 2460,
+                        "loc": {
+                          "filename": "Dropdown.rozie",
+                          "identifierName": "toggle"
+                        },
+                        "name": "toggle"
+                      },
+                      "computed": false,
+                      "shorthand": true,
+                      "value": {
+                        "type": "Identifier",
+                        "start": 2454,
+                        "end": 2460,
+                        "name": "toggle"
+                      }
+                    },
+                    {
+                      "type": "ObjectProperty",
+                      "start": 2462,
+                      "end": 2467,
+                      "loc": {
+                        "start": {
+                          "line": 65,
+                          "column": 18,
+                          "index": 2462
+                        },
+                        "end": {
+                          "line": 65,
+                          "column": 23,
+                          "index": 2467
+                        },
+                        "filename": "Dropdown.rozie"
+                      },
+                      "method": false,
+                      "key": {
+                        "type": "Identifier",
+                        "start": 2462,
+                        "end": 2467,
+                        "loc": {
+                          "filename": "Dropdown.rozie",
+                          "identifierName": "close"
+                        },
+                        "name": "close"
+                      },
+                      "computed": false,
+                      "shorthand": true,
+                      "value": {
+                        "type": "Identifier",
+                        "start": 2462,
+                        "end": 2467,
+                        "name": "close"
+                      }
+                    }
+                  ]
+                }
+              ]
             }
           }
         ],
@@ -1950,7 +2241,15 @@
             },
             "filename": "Dropdown.rozie"
           }
-        }
+        },
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
       ]
     }
   },

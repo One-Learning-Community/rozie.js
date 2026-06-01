@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { clsx, useControllableState, useOutsideClick, useThrottledCallback } from '@rozie/runtime-react';
 import styles from './Dropdown.module.css';
@@ -19,7 +19,12 @@ interface DropdownProps {
   slots?: Record<string, () => import('react').ReactNode>;
 }
 
-export default function Dropdown(_props: DropdownProps): JSX.Element {
+interface DropdownHandle {
+  toggle: (...args: any[]) => any;
+  close: (...args: any[]) => any;
+}
+
+const Dropdown = forwardRef<DropdownHandle, DropdownProps>(function Dropdown(_props: DropdownProps, ref): JSX.Element {
   const props: Omit<DropdownProps, 'closeOnOutsideClick' | 'closeOnEscape'> & { closeOnOutsideClick: boolean; closeOnEscape: boolean } = {
     ..._props,
     closeOnOutsideClick: _props.closeOnOutsideClick ?? true,
@@ -91,6 +96,8 @@ export default function Dropdown(_props: DropdownProps): JSX.Element {
     return () => window.removeEventListener('resize', _rozieThrottledLReposition);
   }, [_rozieThrottledLReposition, open, reposition]);
 
+  useImperativeHandle(ref, () => ({ toggle, close }), []); // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <>
     <div {...attrs} className={clsx(styles.dropdown, (attrs.className as string | undefined))} data-rozie-s-6d6bd882="">
@@ -103,4 +110,5 @@ export default function Dropdown(_props: DropdownProps): JSX.Element {
       </div>}</div>
     </>
   );
-}
+});
+export default Dropdown;

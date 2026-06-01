@@ -110,8 +110,8 @@
       "name": "triggerEl",
       "elementTag": "div",
       "sourceLoc": {
-        "start": 2603,
-        "end": 2618
+        "start": 3223,
+        "end": 3238
       }
     },
     {
@@ -119,8 +119,8 @@
       "name": "panelEl",
       "elementTag": "div",
       "sourceLoc": {
-        "start": 2737,
-        "end": 2750
+        "start": 3357,
+        "end": 3370
       }
     }
   ],
@@ -181,8 +181,8 @@
             "comments": []
           },
           "sourceLoc": {
-            "start": 2661,
-            "end": 2680
+            "start": 3281,
+            "end": 3300
           }
         },
         {
@@ -209,16 +209,16 @@
             "comments": []
           },
           "sourceLoc": {
-            "start": 2681,
-            "end": 2697
+            "start": 3301,
+            "end": 3317
           }
         }
       ],
       "presence": "always",
       "nestedSlots": [],
       "sourceLoc": {
-        "start": 2640,
-        "end": 2700
+        "start": 3260,
+        "end": 3320
       }
     },
     {
@@ -250,21 +250,38 @@
             "comments": []
           },
           "sourceLoc": {
-            "start": 2797,
-            "end": 2811
+            "start": 3417,
+            "end": 3431
           }
         }
       ],
       "presence": "always",
       "nestedSlots": [],
       "sourceLoc": {
-        "start": 2791,
-        "end": 2814
+        "start": 3411,
+        "end": 3434
       }
     }
   ],
   "emits": [],
-  "expose": [],
+  "expose": [
+    {
+      "type": "ExposedMethod",
+      "name": "toggle",
+      "sourceLoc": {
+        "start": 2454,
+        "end": 2460
+      }
+    },
+    {
+      "type": "ExposedMethod",
+      "name": "close",
+      "sourceLoc": {
+        "start": 2462,
+        "end": 2467
+      }
+    }
+  ],
   "lifecycle": [
     {
       "type": "LifecycleHook",
@@ -673,22 +690,22 @@
               "kind": "refExpr",
               "ref": "triggerEl",
               "loc": {
-                "start": 2262,
-                "end": 2277
+                "start": 2882,
+                "end": 2897
               }
             },
             {
               "kind": "refExpr",
               "ref": "panelEl",
               "loc": {
-                "start": 2278,
-                "end": 2291
+                "start": 2898,
+                "end": 2911
               }
             }
           ],
           "sourceLoc": {
-            "start": 2253,
-            "end": 2292
+            "start": 2873,
+            "end": 2912
           }
         }
       ],
@@ -795,18 +812,18 @@
       },
       "handler": {
         "type": "Identifier",
-        "start": 2294,
-        "end": 2299,
+        "start": 2914,
+        "end": 2919,
         "loc": {
           "start": {
-            "line": 65,
+            "line": 75,
             "column": 78,
-            "index": 2294
+            "index": 2914
           },
           "end": {
-            "line": 65,
+            "line": 75,
             "column": 83,
-            "index": 2299
+            "index": 2919
           },
           "filename": "Dropdown.rozie",
           "identifierName": "close"
@@ -834,8 +851,8 @@
       ],
       "source": "listeners-block",
       "sourceLoc": {
-        "start": 2218,
-        "end": 2352
+        "start": 2838,
+        "end": 2972
       }
     },
     {
@@ -851,8 +868,8 @@
           "modifier": "escape",
           "args": [],
           "sourceLoc": {
-            "start": 2392,
-            "end": 2399
+            "start": 3012,
+            "end": 3019
           }
         }
       ],
@@ -959,18 +976,18 @@
       },
       "handler": {
         "type": "Identifier",
-        "start": 2401,
-        "end": 2406,
+        "start": 3021,
+        "end": 3026,
         "loc": {
           "start": {
-            "line": 66,
+            "line": 76,
             "column": 48,
-            "index": 2401
+            "index": 3021
           },
           "end": {
-            "line": 66,
+            "line": 76,
             "column": 53,
-            "index": 2406
+            "index": 3026
           },
           "filename": "Dropdown.rozie",
           "identifierName": "close"
@@ -998,8 +1015,8 @@
       ],
       "source": "listeners-block",
       "sourceLoc": {
-        "start": 2355,
-        "end": 2453
+        "start": 2975,
+        "end": 3073
       }
     },
     {
@@ -1018,22 +1035,22 @@
               "kind": "literal",
               "value": 100,
               "loc": {
-                "start": 2500,
-                "end": 2503
+                "start": 3120,
+                "end": 3123
               }
             }
           ],
           "sourceLoc": {
-            "start": 2490,
-            "end": 2504
+            "start": 3110,
+            "end": 3124
           }
         },
         {
           "kind": "listenerOption",
           "option": "passive",
           "sourceLoc": {
-            "start": 2504,
-            "end": 2512
+            "start": 3124,
+            "end": 3132
           }
         }
       ],
@@ -1086,18 +1103,18 @@
       },
       "handler": {
         "type": "Identifier",
-        "start": 2514,
-        "end": 2524,
+        "start": 3134,
+        "end": 3144,
         "loc": {
           "start": {
-            "line": 67,
+            "line": 77,
             "column": 60,
-            "index": 2514
+            "index": 3134
           },
           "end": {
-            "line": 67,
+            "line": 77,
             "column": 70,
-            "index": 2524
+            "index": 3144
           },
           "filename": "Dropdown.rozie",
           "identifierName": "reposition"
@@ -1119,8 +1136,8 @@
       ],
       "source": "listeners-block",
       "sourceLoc": {
-        "start": 2456,
-        "end": 2547
+        "start": 3076,
+        "end": 3167
       }
     },
     {
@@ -1160,8 +1177,8 @@
       ],
       "source": "template-event",
       "sourceLoc": {
-        "start": 2619,
-        "end": 2634
+        "start": 3239,
+        "end": 3254
       }
     }
   ],
@@ -1170,7 +1187,7 @@
     "scriptProgram": {
       "type": "File",
       "start": 827,
-      "end": 1851,
+      "end": 2471,
       "loc": {
         "start": {
           "line": 25,
@@ -1178,16 +1195,16 @@
           "index": 827
         },
         "end": {
-          "line": 56,
+          "line": 66,
           "column": 0,
-          "index": 1851
+          "index": 2471
         },
         "filename": "Dropdown.rozie"
       },
       "program": {
         "type": "Program",
         "start": 827,
-        "end": 1851,
+        "end": 2471,
         "loc": {
           "filename": "Dropdown.rozie"
         },
@@ -2721,6 +2738,297 @@
                   "params": []
                 }
               ]
+            },
+            "trailingComments": [
+              {
+                "type": "CommentLine",
+                "value": " Imperative handle (Phase 21 $expose). A consumer holding a ref/handle can",
+                "start": 1852,
+                "end": 1928,
+                "loc": {
+                  "start": {
+                    "line": 57,
+                    "column": 0,
+                    "index": 1852
+                  },
+                  "end": {
+                    "line": 57,
+                    "column": 76,
+                    "index": 1928
+                  },
+                  "filename": "Dropdown.rozie"
+                }
+              },
+              {
+                "type": "CommentLine",
+                "value": " drive the dropdown imperatively without owning the `open` model state:",
+                "start": 1929,
+                "end": 2002,
+                "loc": {
+                  "start": {
+                    "line": 58,
+                    "column": 0,
+                    "index": 1929
+                  },
+                  "end": {
+                    "line": 58,
+                    "column": 73,
+                    "index": 2002
+                  },
+                  "filename": "Dropdown.rozie"
+                }
+              },
+              {
+                "type": "CommentLine",
+                "value": " toggle() flips it, close() forces it shut. Both are the same functions the",
+                "start": 2003,
+                "end": 2080,
+                "loc": {
+                  "start": {
+                    "line": 59,
+                    "column": 0,
+                    "index": 2003
+                  },
+                  "end": {
+                    "line": 59,
+                    "column": 77,
+                    "index": 2080
+                  },
+                  "filename": "Dropdown.rozie"
+                }
+              },
+              {
+                "type": "CommentLine",
+                "value": " template and <listeners> use internally — exposed verbatim to all 6 targets",
+                "start": 2081,
+                "end": 2159,
+                "loc": {
+                  "start": {
+                    "line": 60,
+                    "column": 0,
+                    "index": 2081
+                  },
+                  "end": {
+                    "line": 60,
+                    "column": 78,
+                    "index": 2159
+                  },
+                  "filename": "Dropdown.rozie"
+                }
+              },
+              {
+                "type": "CommentLine",
+                "value": " (Vue defineExpose / React useImperativeHandle / Svelte instance export /",
+                "start": 2160,
+                "end": 2235,
+                "loc": {
+                  "start": {
+                    "line": 61,
+                    "column": 0,
+                    "index": 2160
+                  },
+                  "end": {
+                    "line": 61,
+                    "column": 75,
+                    "index": 2235
+                  },
+                  "filename": "Dropdown.rozie"
+                }
+              },
+              {
+                "type": "CommentLine",
+                "value": " Angular+Lit public method / Solid callback ref). The `open` value is still",
+                "start": 2236,
+                "end": 2313,
+                "loc": {
+                  "start": {
+                    "line": 62,
+                    "column": 0,
+                    "index": 2236
+                  },
+                  "end": {
+                    "line": 62,
+                    "column": 77,
+                    "index": 2313
+                  },
+                  "filename": "Dropdown.rozie"
+                }
+              },
+              {
+                "type": "CommentLine",
+                "value": " the two-way `r-model:open` contract for consumers that prefer declarative",
+                "start": 2314,
+                "end": 2390,
+                "loc": {
+                  "start": {
+                    "line": 63,
+                    "column": 0,
+                    "index": 2314
+                  },
+                  "end": {
+                    "line": 63,
+                    "column": 76,
+                    "index": 2390
+                  },
+                  "filename": "Dropdown.rozie"
+                }
+              },
+              {
+                "type": "CommentLine",
+                "value": " control; the handle is the imperative complement.",
+                "start": 2391,
+                "end": 2443,
+                "loc": {
+                  "start": {
+                    "line": 64,
+                    "column": 0,
+                    "index": 2391
+                  },
+                  "end": {
+                    "line": 64,
+                    "column": 52,
+                    "index": 2443
+                  },
+                  "filename": "Dropdown.rozie"
+                }
+              }
+            ]
+          },
+          {
+            "type": "ExpressionStatement",
+            "start": 2444,
+            "end": 2470,
+            "loc": {
+              "start": {
+                "line": 65,
+                "column": 0,
+                "index": 2444
+              },
+              "end": {
+                "line": 65,
+                "column": 26,
+                "index": 2470
+              },
+              "filename": "Dropdown.rozie"
+            },
+            "expression": {
+              "type": "CallExpression",
+              "start": 2444,
+              "end": 2470,
+              "loc": {
+                "filename": "Dropdown.rozie"
+              },
+              "callee": {
+                "type": "Identifier",
+                "start": 2444,
+                "end": 2451,
+                "loc": {
+                  "end": {
+                    "line": 65,
+                    "column": 7,
+                    "index": 2451
+                  },
+                  "filename": "Dropdown.rozie",
+                  "identifierName": "$expose"
+                },
+                "name": "$expose"
+              },
+              "arguments": [
+                {
+                  "type": "ObjectExpression",
+                  "start": 2452,
+                  "end": 2469,
+                  "loc": {
+                    "start": {
+                      "line": 65,
+                      "column": 8,
+                      "index": 2452
+                    },
+                    "end": {
+                      "line": 65,
+                      "column": 25,
+                      "index": 2469
+                    },
+                    "filename": "Dropdown.rozie"
+                  },
+                  "properties": [
+                    {
+                      "type": "ObjectProperty",
+                      "start": 2454,
+                      "end": 2460,
+                      "loc": {
+                        "start": {
+                          "line": 65,
+                          "column": 10,
+                          "index": 2454
+                        },
+                        "end": {
+                          "line": 65,
+                          "column": 16,
+                          "index": 2460
+                        },
+                        "filename": "Dropdown.rozie"
+                      },
+                      "method": false,
+                      "key": {
+                        "type": "Identifier",
+                        "start": 2454,
+                        "end": 2460,
+                        "loc": {
+                          "filename": "Dropdown.rozie",
+                          "identifierName": "toggle"
+                        },
+                        "name": "toggle"
+                      },
+                      "computed": false,
+                      "shorthand": true,
+                      "value": {
+                        "type": "Identifier",
+                        "start": 2454,
+                        "end": 2460,
+                        "name": "toggle"
+                      }
+                    },
+                    {
+                      "type": "ObjectProperty",
+                      "start": 2462,
+                      "end": 2467,
+                      "loc": {
+                        "start": {
+                          "line": 65,
+                          "column": 18,
+                          "index": 2462
+                        },
+                        "end": {
+                          "line": 65,
+                          "column": 23,
+                          "index": 2467
+                        },
+                        "filename": "Dropdown.rozie"
+                      },
+                      "method": false,
+                      "key": {
+                        "type": "Identifier",
+                        "start": 2462,
+                        "end": 2467,
+                        "loc": {
+                          "filename": "Dropdown.rozie",
+                          "identifierName": "close"
+                        },
+                        "name": "close"
+                      },
+                      "computed": false,
+                      "shorthand": true,
+                      "value": {
+                        "type": "Identifier",
+                        "start": 2462,
+                        "end": 2467,
+                        "name": "close"
+                      }
+                    }
+                  ]
+                }
+              ]
             }
           }
         ],
@@ -2770,7 +3078,15 @@
             },
             "filename": "Dropdown.rozie"
           }
-        }
+        },
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
       ]
     },
     "annotations": [
@@ -2797,6 +3113,10 @@
       {
         "nodeId": "script.program.body[5]",
         "kind": "lifecycle"
+      },
+      {
+        "nodeId": "script.program.body[6]",
+        "kind": "plain-decl"
       }
     ]
   },
@@ -2807,8 +3127,8 @@
         "type": "TemplateStaticText",
         "text": "\n",
         "sourceLoc": {
-          "start": 2572,
-          "end": 2573
+          "start": 3192,
+          "end": 3193
         }
       },
       {
@@ -2820,8 +3140,8 @@
             "name": "class",
             "value": "dropdown",
             "sourceLoc": {
-              "start": 2578,
-              "end": 2594
+              "start": 3198,
+              "end": 3214
             }
           },
           {
@@ -2832,8 +3152,8 @@
             },
             "deps": [],
             "sourceLoc": {
-              "start": 2573,
-              "end": 2830
+              "start": 3193,
+              "end": 3450
             }
           }
         ],
@@ -2847,8 +3167,8 @@
             },
             "deps": [],
             "sourceLoc": {
-              "start": 2573,
-              "end": 2830
+              "start": 3193,
+              "end": 3450
             }
           }
         ],
@@ -2857,8 +3177,8 @@
             "type": "TemplateStaticText",
             "text": "\n  ",
             "sourceLoc": {
-              "start": 2595,
-              "end": 2598
+              "start": 3215,
+              "end": 3218
             }
           },
           {
@@ -2880,8 +3200,8 @@
                 "type": "TemplateStaticText",
                 "text": "\n    ",
                 "sourceLoc": {
-                  "start": 2635,
-                  "end": 2640
+                  "start": 3255,
+                  "end": 3260
                 }
               },
               {
@@ -2983,14 +3303,14 @@
                 "type": "TemplateStaticText",
                 "text": "\n  ",
                 "sourceLoc": {
-                  "start": 2700,
-                  "end": 2703
+                  "start": 3320,
+                  "end": 3323
                 }
               }
             ],
             "sourceLoc": {
-              "start": 2598,
-              "end": 2709
+              "start": 3218,
+              "end": 3329
             },
             "tagKind": "html"
           },
@@ -2998,8 +3318,8 @@
             "type": "TemplateStaticText",
             "text": "\n\n  ",
             "sourceLoc": {
-              "start": 2709,
-              "end": 2713
+              "start": 3329,
+              "end": 3333
             }
           },
           {
@@ -3076,8 +3396,8 @@
                         "name": "class",
                         "value": "dropdown-panel",
                         "sourceLoc": {
-                          "start": 2751,
-                          "end": 2773
+                          "start": 3371,
+                          "end": 3393
                         }
                       },
                       {
@@ -3085,8 +3405,8 @@
                         "name": "role",
                         "value": "menu",
                         "sourceLoc": {
-                          "start": 2774,
-                          "end": 2785
+                          "start": 3394,
+                          "end": 3405
                         }
                       }
                     ],
@@ -3097,8 +3417,8 @@
                         "type": "TemplateStaticText",
                         "text": "\n    ",
                         "sourceLoc": {
-                          "start": 2786,
-                          "end": 2791
+                          "start": 3406,
+                          "end": 3411
                         }
                       },
                       {
@@ -3142,14 +3462,14 @@
                         "type": "TemplateStaticText",
                         "text": "\n  ",
                         "sourceLoc": {
-                          "start": 2814,
-                          "end": 2817
+                          "start": 3434,
+                          "end": 3437
                         }
                       }
                     ],
                     "sourceLoc": {
-                      "start": 2713,
-                      "end": 2823
+                      "start": 3333,
+                      "end": 3443
                     },
                     "tagKind": "html"
                   }
@@ -3159,8 +3479,8 @@
           }
         ],
         "sourceLoc": {
-          "start": 2573,
-          "end": 2830
+          "start": 3193,
+          "end": 3450
         },
         "tagKind": "html"
       },
@@ -3168,14 +3488,14 @@
         "type": "TemplateStaticText",
         "text": "\n",
         "sourceLoc": {
-          "start": 2830,
-          "end": 2831
+          "start": 3450,
+          "end": 3451
         }
       }
     ],
     "sourceLoc": {
-      "start": 2572,
-      "end": 2831
+      "start": 3192,
+      "end": 3451
     }
   },
   "inheritAttrs": true,
@@ -3187,8 +3507,8 @@
         "kind": "rule",
         "selector": ".dropdown",
         "loc": {
-          "start": 2852,
-          "end": 2908
+          "start": 3472,
+          "end": 3528
         },
         "isRootEscape": false
       },
@@ -3196,8 +3516,8 @@
         "kind": "rule",
         "selector": ".dropdown-panel",
         "loc": {
-          "start": 2909,
-          "end": 3118
+          "start": 3529,
+          "end": 3738
         },
         "isRootEscape": false
       }
@@ -3207,21 +3527,21 @@
         "kind": "rule",
         "selector": ":root",
         "loc": {
-          "start": 3197,
-          "end": 3234
+          "start": 3817,
+          "end": 3854
         },
         "isRootEscape": true
       }
     ],
     "portalRules": [],
     "sourceLoc": {
-      "start": 2851,
-      "end": 3235
+      "start": 3471,
+      "end": 3855
     }
   },
   "components": [],
   "sourceLoc": {
     "start": 587,
-    "end": 3253
+    "end": 3873
   }
 }

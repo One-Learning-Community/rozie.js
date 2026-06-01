@@ -3,6 +3,8 @@ import type { JSX } from 'react';
 import CounterPage from './pages/CounterPage';
 import SearchInputPage from './pages/SearchInputPage';
 import DropdownPage from './pages/DropdownPage';
+// Phase 21 — Dropdown imperative handle ($expose) consumer demo.
+import DropdownImperativePage from './pages/DropdownImperativePage';
 import TodoListPage from './pages/TodoListPage';
 import ModalPage from './pages/ModalPage';
 import TreeNodePage from './pages/TreeNodePage';
@@ -28,6 +30,7 @@ type PageKey =
   | 'counter'
   | 'search-input'
   | 'dropdown'
+  | 'dropdown-imperative'
   | 'todo-list'
   | 'modal'
   | 'tree-node'
@@ -41,6 +44,7 @@ const PAGES: Record<PageKey, () => JSX.Element> = {
   counter: CounterPage,
   'search-input': SearchInputPage,
   dropdown: DropdownPage,
+  'dropdown-imperative': DropdownImperativePage,
   'todo-list': TodoListPage,
   modal: ModalPage,
   'tree-node': TreeNodePage,
@@ -55,6 +59,7 @@ const PAGE_KEYS: ReadonlyArray<PageKey> = [
   'counter',
   'search-input',
   'dropdown',
+  'dropdown-imperative',
   'todo-list',
   'modal',
   'tree-node',

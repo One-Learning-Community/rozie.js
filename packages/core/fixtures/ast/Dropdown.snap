@@ -4,7 +4,7 @@
     "name": "Dropdown",
     "loc": {
       "start": 587,
-      "end": 3253
+      "end": 3873
     },
     "props": {
       "type": "PropsAST",
@@ -545,12 +545,12 @@
       "type": "ScriptAST",
       "loc": {
         "start": 827,
-        "end": 1851
+        "end": 2471
       },
       "program": {
         "type": "File",
         "start": 827,
-        "end": 1851,
+        "end": 2471,
         "loc": {
           "start": {
             "line": 25,
@@ -558,16 +558,16 @@
             "index": 827
           },
           "end": {
-            "line": 56,
+            "line": 66,
             "column": 0,
-            "index": 1851
+            "index": 2471
           },
           "filename": "Dropdown.rozie"
         },
         "program": {
           "type": "Program",
           "start": 827,
-          "end": 1851,
+          "end": 2471,
           "loc": {
             "filename": "Dropdown.rozie"
           },
@@ -2443,6 +2443,297 @@
                     }
                   }
                 ]
+              },
+              "trailingComments": [
+                {
+                  "type": "CommentLine",
+                  "value": " Imperative handle (Phase 21 $expose). A consumer holding a ref/handle can",
+                  "start": 1852,
+                  "end": 1928,
+                  "loc": {
+                    "start": {
+                      "line": 57,
+                      "column": 0,
+                      "index": 1852
+                    },
+                    "end": {
+                      "line": 57,
+                      "column": 76,
+                      "index": 1928
+                    },
+                    "filename": "Dropdown.rozie"
+                  }
+                },
+                {
+                  "type": "CommentLine",
+                  "value": " drive the dropdown imperatively without owning the `open` model state:",
+                  "start": 1929,
+                  "end": 2002,
+                  "loc": {
+                    "start": {
+                      "line": 58,
+                      "column": 0,
+                      "index": 1929
+                    },
+                    "end": {
+                      "line": 58,
+                      "column": 73,
+                      "index": 2002
+                    },
+                    "filename": "Dropdown.rozie"
+                  }
+                },
+                {
+                  "type": "CommentLine",
+                  "value": " toggle() flips it, close() forces it shut. Both are the same functions the",
+                  "start": 2003,
+                  "end": 2080,
+                  "loc": {
+                    "start": {
+                      "line": 59,
+                      "column": 0,
+                      "index": 2003
+                    },
+                    "end": {
+                      "line": 59,
+                      "column": 77,
+                      "index": 2080
+                    },
+                    "filename": "Dropdown.rozie"
+                  }
+                },
+                {
+                  "type": "CommentLine",
+                  "value": " template and <listeners> use internally — exposed verbatim to all 6 targets",
+                  "start": 2081,
+                  "end": 2159,
+                  "loc": {
+                    "start": {
+                      "line": 60,
+                      "column": 0,
+                      "index": 2081
+                    },
+                    "end": {
+                      "line": 60,
+                      "column": 78,
+                      "index": 2159
+                    },
+                    "filename": "Dropdown.rozie"
+                  }
+                },
+                {
+                  "type": "CommentLine",
+                  "value": " (Vue defineExpose / React useImperativeHandle / Svelte instance export /",
+                  "start": 2160,
+                  "end": 2235,
+                  "loc": {
+                    "start": {
+                      "line": 61,
+                      "column": 0,
+                      "index": 2160
+                    },
+                    "end": {
+                      "line": 61,
+                      "column": 75,
+                      "index": 2235
+                    },
+                    "filename": "Dropdown.rozie"
+                  }
+                },
+                {
+                  "type": "CommentLine",
+                  "value": " Angular+Lit public method / Solid callback ref). The `open` value is still",
+                  "start": 2236,
+                  "end": 2313,
+                  "loc": {
+                    "start": {
+                      "line": 62,
+                      "column": 0,
+                      "index": 2236
+                    },
+                    "end": {
+                      "line": 62,
+                      "column": 77,
+                      "index": 2313
+                    },
+                    "filename": "Dropdown.rozie"
+                  }
+                },
+                {
+                  "type": "CommentLine",
+                  "value": " the two-way `r-model:open` contract for consumers that prefer declarative",
+                  "start": 2314,
+                  "end": 2390,
+                  "loc": {
+                    "start": {
+                      "line": 63,
+                      "column": 0,
+                      "index": 2314
+                    },
+                    "end": {
+                      "line": 63,
+                      "column": 76,
+                      "index": 2390
+                    },
+                    "filename": "Dropdown.rozie"
+                  }
+                },
+                {
+                  "type": "CommentLine",
+                  "value": " control; the handle is the imperative complement.",
+                  "start": 2391,
+                  "end": 2443,
+                  "loc": {
+                    "start": {
+                      "line": 64,
+                      "column": 0,
+                      "index": 2391
+                    },
+                    "end": {
+                      "line": 64,
+                      "column": 52,
+                      "index": 2443
+                    },
+                    "filename": "Dropdown.rozie"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "ExpressionStatement",
+              "start": 2444,
+              "end": 2470,
+              "loc": {
+                "start": {
+                  "line": 65,
+                  "column": 0,
+                  "index": 2444
+                },
+                "end": {
+                  "line": 65,
+                  "column": 26,
+                  "index": 2470
+                },
+                "filename": "Dropdown.rozie"
+              },
+              "expression": {
+                "type": "CallExpression",
+                "start": 2444,
+                "end": 2470,
+                "loc": {
+                  "filename": "Dropdown.rozie"
+                },
+                "callee": {
+                  "type": "Identifier",
+                  "start": 2444,
+                  "end": 2451,
+                  "loc": {
+                    "end": {
+                      "line": 65,
+                      "column": 7,
+                      "index": 2451
+                    },
+                    "filename": "Dropdown.rozie",
+                    "identifierName": "$expose"
+                  },
+                  "name": "$expose"
+                },
+                "arguments": [
+                  {
+                    "type": "ObjectExpression",
+                    "start": 2452,
+                    "end": 2469,
+                    "loc": {
+                      "start": {
+                        "line": 65,
+                        "column": 8,
+                        "index": 2452
+                      },
+                      "end": {
+                        "line": 65,
+                        "column": 25,
+                        "index": 2469
+                      },
+                      "filename": "Dropdown.rozie"
+                    },
+                    "properties": [
+                      {
+                        "type": "ObjectProperty",
+                        "start": 2454,
+                        "end": 2460,
+                        "loc": {
+                          "start": {
+                            "line": 65,
+                            "column": 10,
+                            "index": 2454
+                          },
+                          "end": {
+                            "line": 65,
+                            "column": 16,
+                            "index": 2460
+                          },
+                          "filename": "Dropdown.rozie"
+                        },
+                        "method": false,
+                        "key": {
+                          "type": "Identifier",
+                          "start": 2454,
+                          "end": 2460,
+                          "loc": {
+                            "filename": "Dropdown.rozie",
+                            "identifierName": "toggle"
+                          },
+                          "name": "toggle"
+                        },
+                        "computed": false,
+                        "shorthand": true,
+                        "value": {
+                          "type": "Identifier",
+                          "start": 2454,
+                          "end": 2460,
+                          "name": "toggle"
+                        }
+                      },
+                      {
+                        "type": "ObjectProperty",
+                        "start": 2462,
+                        "end": 2467,
+                        "loc": {
+                          "start": {
+                            "line": 65,
+                            "column": 18,
+                            "index": 2462
+                          },
+                          "end": {
+                            "line": 65,
+                            "column": 23,
+                            "index": 2467
+                          },
+                          "filename": "Dropdown.rozie"
+                        },
+                        "method": false,
+                        "key": {
+                          "type": "Identifier",
+                          "start": 2462,
+                          "end": 2467,
+                          "loc": {
+                            "filename": "Dropdown.rozie",
+                            "identifierName": "close"
+                          },
+                          "name": "close"
+                        },
+                        "computed": false,
+                        "shorthand": true,
+                        "value": {
+                          "type": "Identifier",
+                          "start": 2462,
+                          "end": 2467,
+                          "name": "close"
+                        }
+                      }
+                    ]
+                  }
+                ]
               }
             }
           ],
@@ -2492,22 +2783,30 @@
               },
               "filename": "Dropdown.rozie"
             }
-          }
+          },
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
         ]
       }
     },
     "listeners": {
       "type": "ListenersAST",
       "loc": {
-        "start": 1873,
-        "end": 2548
+        "start": 2493,
+        "end": 3168
       },
       "entries": [
         {
           "target": "document",
           "event": "click",
           "modifierChainText": ".outside($refs.triggerEl,$refs.panelEl)",
-          "modifierChainBaseOffset": 2253,
+          "modifierChainBaseOffset": 2873,
           "chain": [
             {
               "name": "outside",
@@ -2516,22 +2815,22 @@
                   "kind": "refExpr",
                   "ref": "triggerEl",
                   "loc": {
-                    "start": 2262,
-                    "end": 2277
+                    "start": 2882,
+                    "end": 2897
                   }
                 },
                 {
                   "kind": "refExpr",
                   "ref": "panelEl",
                   "loc": {
-                    "start": 2278,
-                    "end": 2291
+                    "start": 2898,
+                    "end": 2911
                   }
                 }
               ],
               "loc": {
-                "start": 2253,
-                "end": 2292
+                "start": 2873,
+                "end": 2912
               }
             }
           ],
@@ -2547,8 +2846,8 @@
                 "value": {
                   "type": "StringLiteral",
                   "value": "$props.open && $props.closeOnOutsideClick",
-                  "start": 2306,
-                  "end": 2349
+                  "start": 2926,
+                  "end": 2969
                 },
                 "computed": false,
                 "shorthand": false,
@@ -2562,18 +2861,18 @@
                 },
                 "value": {
                   "type": "Identifier",
-                  "start": 2294,
-                  "end": 2299,
+                  "start": 2914,
+                  "end": 2919,
                   "loc": {
                     "start": {
-                      "line": 65,
+                      "line": 75,
                       "column": 78,
-                      "index": 2294
+                      "index": 2914
                     },
                     "end": {
-                      "line": 65,
+                      "line": 75,
                       "column": 83,
-                      "index": 2299
+                      "index": 2919
                     },
                     "filename": "Dropdown.rozie",
                     "identifierName": "close"
@@ -2588,22 +2887,22 @@
             ]
           },
           "loc": {
-            "start": 2218,
-            "end": 2352
+            "start": 2838,
+            "end": 2972
           }
         },
         {
           "target": "document",
           "event": "keydown",
           "modifierChainText": ".escape",
-          "modifierChainBaseOffset": 2392,
+          "modifierChainBaseOffset": 3012,
           "chain": [
             {
               "name": "escape",
               "args": [],
               "loc": {
-                "start": 2392,
-                "end": 2399
+                "start": 3012,
+                "end": 3019
               }
             }
           ],
@@ -2619,8 +2918,8 @@
                 "value": {
                   "type": "StringLiteral",
                   "value": "$props.open && $props.closeOnEscape",
-                  "start": 2413,
-                  "end": 2450
+                  "start": 3033,
+                  "end": 3070
                 },
                 "computed": false,
                 "shorthand": false,
@@ -2634,18 +2933,18 @@
                 },
                 "value": {
                   "type": "Identifier",
-                  "start": 2401,
-                  "end": 2406,
+                  "start": 3021,
+                  "end": 3026,
                   "loc": {
                     "start": {
-                      "line": 66,
+                      "line": 76,
                       "column": 48,
-                      "index": 2401
+                      "index": 3021
                     },
                     "end": {
-                      "line": 66,
+                      "line": 76,
                       "column": 53,
-                      "index": 2406
+                      "index": 3026
                     },
                     "filename": "Dropdown.rozie",
                     "identifierName": "close"
@@ -2660,15 +2959,15 @@
             ]
           },
           "loc": {
-            "start": 2355,
-            "end": 2453
+            "start": 2975,
+            "end": 3073
           }
         },
         {
           "target": "window",
           "event": "resize",
           "modifierChainText": ".throttle(100).passive",
-          "modifierChainBaseOffset": 2490,
+          "modifierChainBaseOffset": 3110,
           "chain": [
             {
               "name": "throttle",
@@ -2677,22 +2976,22 @@
                   "kind": "literal",
                   "value": 100,
                   "loc": {
-                    "start": 2500,
-                    "end": 2503
+                    "start": 3120,
+                    "end": 3123
                   }
                 }
               ],
               "loc": {
-                "start": 2490,
-                "end": 2504
+                "start": 3110,
+                "end": 3124
               }
             },
             {
               "name": "passive",
               "args": [],
               "loc": {
-                "start": 2504,
-                "end": 2512
+                "start": 3124,
+                "end": 3132
               }
             }
           ],
@@ -2708,8 +3007,8 @@
                 "value": {
                   "type": "StringLiteral",
                   "value": "$props.open",
-                  "start": 2531,
-                  "end": 2544
+                  "start": 3151,
+                  "end": 3164
                 },
                 "computed": false,
                 "shorthand": false,
@@ -2723,18 +3022,18 @@
                 },
                 "value": {
                   "type": "Identifier",
-                  "start": 2514,
-                  "end": 2524,
+                  "start": 3134,
+                  "end": 3144,
                   "loc": {
                     "start": {
-                      "line": 67,
+                      "line": 77,
                       "column": 60,
-                      "index": 2514
+                      "index": 3134
                     },
                     "end": {
-                      "line": 67,
+                      "line": 77,
                       "column": 70,
-                      "index": 2524
+                      "index": 3144
                     },
                     "filename": "Dropdown.rozie",
                     "identifierName": "reposition"
@@ -2749,8 +3048,8 @@
             ]
           },
           "loc": {
-            "start": 2456,
-            "end": 2547
+            "start": 3076,
+            "end": 3167
           }
         }
       ]
@@ -2758,16 +3057,16 @@
     "template": {
       "type": "TemplateAST",
       "loc": {
-        "start": 2572,
-        "end": 2831
+        "start": 3192,
+        "end": 3451
       },
       "children": [
         {
           "type": "TemplateText",
           "text": "\n",
           "loc": {
-            "start": 2572,
-            "end": 2573
+            "start": 3192,
+            "end": 3193
           }
         },
         {
@@ -2779,16 +3078,16 @@
               "rawName": "class",
               "name": "class",
               "modifierChainText": "",
-              "modifierChainBaseOffset": 2583,
+              "modifierChainBaseOffset": 3203,
               "chain": [],
               "value": "dropdown",
               "valueLoc": {
-                "start": 2585,
-                "end": 2593
+                "start": 3205,
+                "end": 3213
               },
               "loc": {
-                "start": 2578,
-                "end": 2594
+                "start": 3198,
+                "end": 3214
               }
             }
           ],
@@ -2797,8 +3096,8 @@
               "type": "TemplateText",
               "text": "\n  ",
               "loc": {
-                "start": 2595,
-                "end": 2598
+                "start": 3215,
+                "end": 3218
               }
             },
             {
@@ -2810,16 +3109,16 @@
                   "rawName": "ref",
                   "name": "ref",
                   "modifierChainText": "",
-                  "modifierChainBaseOffset": 2606,
+                  "modifierChainBaseOffset": 3226,
                   "chain": [],
                   "value": "triggerEl",
                   "valueLoc": {
-                    "start": 2608,
-                    "end": 2617
+                    "start": 3228,
+                    "end": 3237
                   },
                   "loc": {
-                    "start": 2603,
-                    "end": 2618
+                    "start": 3223,
+                    "end": 3238
                   }
                 },
                 {
@@ -2827,16 +3126,16 @@
                   "rawName": "@click",
                   "name": "click",
                   "modifierChainText": "",
-                  "modifierChainBaseOffset": 2625,
+                  "modifierChainBaseOffset": 3245,
                   "chain": [],
                   "value": "toggle",
                   "valueLoc": {
-                    "start": 2627,
-                    "end": 2633
+                    "start": 3247,
+                    "end": 3253
                   },
                   "loc": {
-                    "start": 2619,
-                    "end": 2634
+                    "start": 3239,
+                    "end": 3254
                   }
                 }
               ],
@@ -2845,8 +3144,8 @@
                   "type": "TemplateText",
                   "text": "\n    ",
                   "loc": {
-                    "start": 2635,
-                    "end": 2640
+                    "start": 3255,
+                    "end": 3260
                   }
                 },
                 {
@@ -2858,16 +3157,16 @@
                       "rawName": "name",
                       "name": "name",
                       "modifierChainText": "",
-                      "modifierChainBaseOffset": 2650,
+                      "modifierChainBaseOffset": 3270,
                       "chain": [],
                       "value": "trigger",
                       "valueLoc": {
-                        "start": 2652,
-                        "end": 2659
+                        "start": 3272,
+                        "end": 3279
                       },
                       "loc": {
-                        "start": 2646,
-                        "end": 2660
+                        "start": 3266,
+                        "end": 3280
                       }
                     },
                     {
@@ -2875,16 +3174,16 @@
                       "rawName": ":open",
                       "name": "open",
                       "modifierChainText": "",
-                      "modifierChainBaseOffset": 2666,
+                      "modifierChainBaseOffset": 3286,
                       "chain": [],
                       "value": "$props.open",
                       "valueLoc": {
-                        "start": 2668,
-                        "end": 2679
+                        "start": 3288,
+                        "end": 3299
                       },
                       "loc": {
-                        "start": 2661,
-                        "end": 2680
+                        "start": 3281,
+                        "end": 3300
                       }
                     },
                     {
@@ -2892,47 +3191,47 @@
                       "rawName": ":toggle",
                       "name": "toggle",
                       "modifierChainText": "",
-                      "modifierChainBaseOffset": 2688,
+                      "modifierChainBaseOffset": 3308,
                       "chain": [],
                       "value": "toggle",
                       "valueLoc": {
-                        "start": 2690,
-                        "end": 2696
+                        "start": 3310,
+                        "end": 3316
                       },
                       "loc": {
-                        "start": 2681,
-                        "end": 2697
+                        "start": 3301,
+                        "end": 3317
                       }
                     }
                   ],
                   "children": [],
                   "selfClosing": true,
                   "loc": {
-                    "start": 2640,
-                    "end": 2700
+                    "start": 3260,
+                    "end": 3320
                   }
                 },
                 {
                   "type": "TemplateText",
                   "text": "\n  ",
                   "loc": {
-                    "start": 2700,
-                    "end": 2703
+                    "start": 3320,
+                    "end": 3323
                   }
                 }
               ],
               "selfClosing": false,
               "loc": {
-                "start": 2598,
-                "end": 2709
+                "start": 3218,
+                "end": 3329
               }
             },
             {
               "type": "TemplateText",
               "text": "\n\n  ",
               "loc": {
-                "start": 2709,
-                "end": 2713
+                "start": 3329,
+                "end": 3333
               }
             },
             {
@@ -2944,16 +3243,16 @@
                   "rawName": "r-if",
                   "name": "if",
                   "modifierChainText": "",
-                  "modifierChainBaseOffset": 2722,
+                  "modifierChainBaseOffset": 3342,
                   "chain": [],
                   "value": "$props.open",
                   "valueLoc": {
-                    "start": 2724,
-                    "end": 2735
+                    "start": 3344,
+                    "end": 3355
                   },
                   "loc": {
-                    "start": 2718,
-                    "end": 2736
+                    "start": 3338,
+                    "end": 3356
                   }
                 },
                 {
@@ -2961,16 +3260,16 @@
                   "rawName": "ref",
                   "name": "ref",
                   "modifierChainText": "",
-                  "modifierChainBaseOffset": 2740,
+                  "modifierChainBaseOffset": 3360,
                   "chain": [],
                   "value": "panelEl",
                   "valueLoc": {
-                    "start": 2742,
-                    "end": 2749
+                    "start": 3362,
+                    "end": 3369
                   },
                   "loc": {
-                    "start": 2737,
-                    "end": 2750
+                    "start": 3357,
+                    "end": 3370
                   }
                 },
                 {
@@ -2978,16 +3277,16 @@
                   "rawName": "class",
                   "name": "class",
                   "modifierChainText": "",
-                  "modifierChainBaseOffset": 2756,
+                  "modifierChainBaseOffset": 3376,
                   "chain": [],
                   "value": "dropdown-panel",
                   "valueLoc": {
-                    "start": 2758,
-                    "end": 2772
+                    "start": 3378,
+                    "end": 3392
                   },
                   "loc": {
-                    "start": 2751,
-                    "end": 2773
+                    "start": 3371,
+                    "end": 3393
                   }
                 },
                 {
@@ -2995,16 +3294,16 @@
                   "rawName": "role",
                   "name": "role",
                   "modifierChainText": "",
-                  "modifierChainBaseOffset": 2778,
+                  "modifierChainBaseOffset": 3398,
                   "chain": [],
                   "value": "menu",
                   "valueLoc": {
-                    "start": 2780,
-                    "end": 2784
+                    "start": 3400,
+                    "end": 3404
                   },
                   "loc": {
-                    "start": 2774,
-                    "end": 2785
+                    "start": 3394,
+                    "end": 3405
                   }
                 }
               ],
@@ -3013,8 +3312,8 @@
                   "type": "TemplateText",
                   "text": "\n    ",
                   "loc": {
-                    "start": 2786,
-                    "end": 2791
+                    "start": 3406,
+                    "end": 3411
                   }
                 },
                 {
@@ -3026,62 +3325,62 @@
                       "rawName": ":close",
                       "name": "close",
                       "modifierChainText": "",
-                      "modifierChainBaseOffset": 2803,
+                      "modifierChainBaseOffset": 3423,
                       "chain": [],
                       "value": "close",
                       "valueLoc": {
-                        "start": 2805,
-                        "end": 2810
+                        "start": 3425,
+                        "end": 3430
                       },
                       "loc": {
-                        "start": 2797,
-                        "end": 2811
+                        "start": 3417,
+                        "end": 3431
                       }
                     }
                   ],
                   "children": [],
                   "selfClosing": true,
                   "loc": {
-                    "start": 2791,
-                    "end": 2814
+                    "start": 3411,
+                    "end": 3434
                   }
                 },
                 {
                   "type": "TemplateText",
                   "text": "\n  ",
                   "loc": {
-                    "start": 2814,
-                    "end": 2817
+                    "start": 3434,
+                    "end": 3437
                   }
                 }
               ],
               "selfClosing": false,
               "loc": {
-                "start": 2713,
-                "end": 2823
+                "start": 3333,
+                "end": 3443
               }
             },
             {
               "type": "TemplateText",
               "text": "\n",
               "loc": {
-                "start": 2823,
-                "end": 2824
+                "start": 3443,
+                "end": 3444
               }
             }
           ],
           "selfClosing": false,
           "loc": {
-            "start": 2573,
-            "end": 2830
+            "start": 3193,
+            "end": 3450
           }
         },
         {
           "type": "TemplateText",
           "text": "\n",
           "loc": {
-            "start": 2830,
-            "end": 2831
+            "start": 3450,
+            "end": 3451
           }
         }
       ]
@@ -3089,8 +3388,8 @@
     "style": {
       "type": "StyleAST",
       "loc": {
-        "start": 2851,
-        "end": 3235
+        "start": 3471,
+        "end": 3855
       },
       "cssText": "\n.dropdown { position: relative; display: inline-block; }\n.dropdown-panel {\n  position: fixed;\n  z-index: var(--rozie-dropdown-z, 1000);\n  background: white;\n  border: 1px solid rgba(0, 0, 0, 0.1);\n  border-radius: 6px;\n  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);\n}\n\n/* Unscoped escape hatch — anything inside :root { } is emitted globally. */\n:root {\n  --rozie-dropdown-z: 1000;\n}\n",
       "rules": [
@@ -3098,8 +3397,8 @@
           "kind": "rule",
           "selector": ".dropdown",
           "loc": {
-            "start": 2852,
-            "end": 2908
+            "start": 3472,
+            "end": 3528
           },
           "isRootEscape": false
         },
@@ -3107,8 +3406,8 @@
           "kind": "rule",
           "selector": ".dropdown-panel",
           "loc": {
-            "start": 2909,
-            "end": 3118
+            "start": 3529,
+            "end": 3738
           },
           "isRootEscape": false
         },
@@ -3116,8 +3415,8 @@
           "kind": "rule",
           "selector": ":root",
           "loc": {
-            "start": 3197,
-            "end": 3234
+            "start": 3817,
+            "end": 3854
           },
           "isRootEscape": true
         }
@@ -3137,31 +3436,31 @@
         }
       },
       "script": {
-        "content": "\nconst toggle = () => { $model.open = !$props.open }\nconst close  = () => { $model.open = false }\n\nconst reposition = () => {\n  if (!$refs.panelEl || !$refs.triggerEl) return\n  const rect = $refs.triggerEl.getBoundingClientRect()\n  Object.assign($refs.panelEl.style, {\n    top:  `${rect.bottom}px`,\n    left: `${rect.left}px`,\n  })\n}\n\n// Re-fire reposition() whenever the open transition flips on. The panel\n// element is r-if-gated, so $refs.panelEl is undefined at mount time — $watch\n// is the primitive that re-runs the effect after panel mount.\n$watch(() => $props.open, () => {\n  if ($props.open) reposition()\n})\n\n// Multiple $onMount calls run in source order. Useful for colocating setup\n// with the logic it serves.\n$onMount(() => {\n  // Initial reposition only if the panel is open at mount time.\n  if ($props.open) reposition()\n})\n\n$onMount(() => {\n  // Example of integrating a vanilla JS library — $refs gives direct DOM access.\n  // new Popper($refs.triggerEl, $refs.panelEl, { placement: 'bottom-start' })\n})\n",
+        "content": "\nconst toggle = () => { $model.open = !$props.open }\nconst close  = () => { $model.open = false }\n\nconst reposition = () => {\n  if (!$refs.panelEl || !$refs.triggerEl) return\n  const rect = $refs.triggerEl.getBoundingClientRect()\n  Object.assign($refs.panelEl.style, {\n    top:  `${rect.bottom}px`,\n    left: `${rect.left}px`,\n  })\n}\n\n// Re-fire reposition() whenever the open transition flips on. The panel\n// element is r-if-gated, so $refs.panelEl is undefined at mount time — $watch\n// is the primitive that re-runs the effect after panel mount.\n$watch(() => $props.open, () => {\n  if ($props.open) reposition()\n})\n\n// Multiple $onMount calls run in source order. Useful for colocating setup\n// with the logic it serves.\n$onMount(() => {\n  // Initial reposition only if the panel is open at mount time.\n  if ($props.open) reposition()\n})\n\n$onMount(() => {\n  // Example of integrating a vanilla JS library — $refs gives direct DOM access.\n  // new Popper($refs.triggerEl, $refs.panelEl, { placement: 'bottom-start' })\n})\n\n// Imperative handle (Phase 21 $expose). A consumer holding a ref/handle can\n// drive the dropdown imperatively without owning the `open` model state:\n// toggle() flips it, close() forces it shut. Both are the same functions the\n// template and <listeners> use internally — exposed verbatim to all 6 targets\n// (Vue defineExpose / React useImperativeHandle / Svelte instance export /\n// Angular+Lit public method / Solid callback ref). The `open` value is still\n// the two-way `r-model:open` contract for consumers that prefer declarative\n// control; the handle is the imperative complement.\n$expose({ toggle, close })\n",
         "loc": {
           "start": 819,
-          "end": 1860
+          "end": 2480
         }
       },
       "listeners": {
         "content": "\n  <!--\n    .outside takes ref args; fires only when the click target is outside ALL listed refs.\n    Compiler emits the per-target wiring (Vue watchEffect, React useEffect with auto-deps,\n    Svelte $effect, Angular effect + Renderer2.listen + DestroyRef cleanup).\n    r-if here means conditional attach/detach, not conditional render.\n  -->\n  <listener :target=\"document\" @click.outside($refs.triggerEl,$refs.panelEl)=\"close\" r-if=\"$props.open && $props.closeOnOutsideClick\" />\n  <listener :target=\"document\" @keydown.escape=\"close\" r-if=\"$props.open && $props.closeOnEscape\" />\n  <listener :target=\"window\" @resize.throttle(100).passive=\"reposition\" r-if=\"$props.open\" />\n",
         "loc": {
-          "start": 1862,
-          "end": 2560
+          "start": 2482,
+          "end": 3180
         }
       },
       "template": {
         "content": "\n<div class=\"dropdown\">\n  <div ref=\"triggerEl\" @click=\"toggle\">\n    <slot name=\"trigger\" :open=\"$props.open\" :toggle=\"toggle\" />\n  </div>\n\n  <div r-if=\"$props.open\" ref=\"panelEl\" class=\"dropdown-panel\" role=\"menu\">\n    <slot :close=\"close\" />\n  </div>\n</div>\n",
         "loc": {
-          "start": 2562,
-          "end": 2842
+          "start": 3182,
+          "end": 3462
         }
       },
       "style": {
         "content": "\n.dropdown { position: relative; display: inline-block; }\n.dropdown-panel {\n  position: fixed;\n  z-index: var(--rozie-dropdown-z, 1000);\n  background: white;\n  border: 1px solid rgba(0, 0, 0, 0.1);\n  border-radius: 6px;\n  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);\n}\n\n/* Unscoped escape hatch — anything inside :root { } is emitted globally. */\n:root {\n  --rozie-dropdown-z: 1000;\n}\n",
         "loc": {
-          "start": 2844,
-          "end": 3243
+          "start": 3464,
+          "end": 3863
         }
       }
     }

@@ -53,6 +53,11 @@ $onMount(() => {
   // Example of integrating a vanilla JS library — $refs gives direct DOM access.
   // new Popper($refs.triggerEl, $refs.panelEl, { placement: 'bottom-start' })
 })
+
+// Imperative handle (Phase 21 $expose) — kept in sync with examples/Dropdown.rozie.
+// A consumer holding a ref can drive the dropdown without owning the `open`
+// model state. The DropdownImperativePage demo + dropdown-imperative e2e use it.
+$expose({ toggle, close })
 </script>
 
 <listeners>

@@ -27,12 +27,19 @@ interface DropdownProps {
   // D-131: default slot resolved via children() at body top
   children?: JSX.Element;
   slots?: Record<string, (ctx: any) => JSX.Element>;
+  ref?: (h: DropdownHandle) => void;
+}
+
+interface DropdownHandle {
+  toggle: (...args: any[]) => any;
+  close: (...args: any[]) => any;
 }
 
 export default function Dropdown(_props: DropdownProps): JSX.Element {
   const _merged = mergeProps({ closeOnOutsideClick: true, closeOnEscape: true }, _props);
-  const [local, attrs] = splitProps(_merged, ['open', 'closeOnOutsideClick', 'closeOnEscape', 'children']);
+  const [local, attrs] = splitProps(_merged, ['open', 'closeOnOutsideClick', 'closeOnEscape', 'children', 'ref']);
   const resolved = children(() => local.children);
+  onMount(() => { local.ref?.({ toggle, close }); });
 
   const [open, setOpen] = createControllableSignal<boolean>(_props as unknown as Record<string, unknown>, 'open', false);
   onMount(() => {
