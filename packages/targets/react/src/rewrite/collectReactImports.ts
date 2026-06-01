@@ -20,7 +20,11 @@ export type ReactImport =
   | 'useMemo'
   | 'useEffect'
   | 'useRef'
-  | 'useCallback';
+  | 'useCallback'
+  // Phase 21 ($expose) — emitted only when ir.expose is non-empty so a
+  // non-$expose component's `react` import line stays byte-identical (D-03).
+  | 'forwardRef'
+  | 'useImperativeHandle';
 
 export class ReactImportCollector {
   private symbols = new Set<ReactImport>();

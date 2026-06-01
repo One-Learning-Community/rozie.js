@@ -2515,6 +2515,14 @@ export function emitScript(
         // Safety net — should already have been consumed by lifecyclePairing.
         continue;
       }
+      // Phase 21 ($expose) — the top-level `$expose({...})` call is a compiler
+      // directive, not runtime code: its contract is lowered into `ir.expose`
+      // and re-emitted as the React `useImperativeHandle` handle. Strip the raw
+      // call from the body so it never reaches the output (a bare `$expose(...)`
+      // would be an undefined-identifier ReferenceError at runtime).
+      if (t.isIdentifier(callee) && callee.name === '$expose') {
+        continue;
+      }
     }
 
     // Try the useCallback escape-wrap first; falls back to function-decl

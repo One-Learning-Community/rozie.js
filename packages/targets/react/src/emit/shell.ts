@@ -98,6 +98,26 @@ export interface ShellParts {
    * emitScript sets this whenever any non-model prop has a declared default.
    */
   hasPropsDefaults?: boolean;
+  /**
+   * Phase 21 ($expose, REQ-5, D-03) — names of the exposed `<script>`
+   * functions, in source order. PRESENCE (length > 0) is the gate that flips
+   * the function framing from `export default function Foo(props)` to the
+   * `const Foo = forwardRef<FooHandle, FooProps>(function Foo(props, ref) {...});
+   * export default Foo;` shape. Empty/undefined → byte-identical plain shape.
+   */
+  exposeNames?: string[] | undefined;
+  /**
+   * Phase 21 ($expose, REQ-10) — the inline `interface <Name>Handle {...}`
+   * (from `synthesizeHandleType`, WITHOUT `export`), rendered immediately after
+   * the props interface. Present iff `exposeNames` is non-empty.
+   */
+  handleInterface?: string | undefined;
+  /**
+   * Phase 21 ($expose) — the `useImperativeHandle(ref, () => ({ a, b }), []);`
+   * line, appended inside the function body after the script + listenerEffects
+   * but BEFORE `return (`. Present iff `exposeNames` is non-empty.
+   */
+  imperativeHandleBlock?: string | undefined;
   /** JSX body string (e.g., '<div>...</div>' or '(\n  <div>...</div>\n)') */
   jsx: string;
   /**
@@ -237,6 +257,16 @@ export function buildShell(parts: ShellParts): BuildShellResult {
   moduleParts.push(parts.propsInterface);
   moduleParts.push('\n\n');
 
+  // Phase 21 ($expose, REQ-10) — inline `interface <Name>Handle {...}`,
+  // rendered immediately after the props interface so the
+  // `forwardRef<<Name>Handle, <Name>Props>` generic + the useImperativeHandle
+  // factory both resolve it. Only present when exposeNames is non-empty.
+  const hasExpose = (parts.exposeNames?.length ?? 0) > 0;
+  if (hasExpose && parts.handleInterface && parts.handleInterface.length > 0) {
+    moduleParts.push(parts.handleInterface);
+    moduleParts.push('\n\n');
+  }
+
   // Top-of-file scriptInjections that are NOT hooks (default-content lifts).
   if (parts.scriptInjections && parts.scriptInjections.length > 0) {
     const moduleTop = parts.scriptInjections.filter((s) =>
@@ -252,7 +282,14 @@ export function buildShell(parts: ShellParts): BuildShellResult {
   // function body (after `export default function Name(...): JSX.Element {\n`)
   // for P2 composeMaps consumption.
   const propsParam = parts.hasPropsDefaults ? '_props' : 'props';
-  const functionSignature = `export default function ${parts.componentName}(${propsParam}: ${parts.componentName}Props): JSX.Element {\n`;
+  // Phase 21 ($expose, REQ-5, D-03) — when exposed, wrap in forwardRef:
+  //   const Foo = forwardRef<FooHandle, FooProps>(function Foo(props, ref): JSX.Element {
+  // and emit `export default Foo;` as the closing line (see JSX-body section).
+  // When NOT exposed, the plain `export default function Foo(props): JSX.Element {`
+  // shape is emitted BYTE-FOR-BYTE unchanged.
+  const functionSignature = hasExpose
+    ? `const ${parts.componentName} = forwardRef<${parts.componentName}Handle, ${parts.componentName}Props>(function ${parts.componentName}(${propsParam}: ${parts.componentName}Props, ref): JSX.Element {\n`
+    : `export default function ${parts.componentName}(${propsParam}: ${parts.componentName}Props): JSX.Element {\n`;
 
   const preBodyLength = moduleParts.join('').length;
   moduleParts.push(functionSignature);
@@ -302,6 +339,14 @@ export function buildShell(parts: ShellParts): BuildShellResult {
     moduleParts.push('\n\n');
   }
 
+  // Phase 21 ($expose) — `useImperativeHandle(ref, () => ({ a, b }), []);`,
+  // appended after the script body + any listenerEffects but BEFORE `return (`.
+  // The exposed functions are user `<script>` arrows/functions already emitted
+  // into the body above, so they are in scope here.
+  if (hasExpose && parts.imperativeHandleBlock && parts.imperativeHandleBlock.length > 0) {
+    moduleParts.push('  ' + parts.imperativeHandleBlock + '\n\n');
+  }
+
   // JSX body — wrap in `return ( ... );`.
   const jsxIndented = parts.jsx
     .split('\n')
@@ -309,7 +354,14 @@ export function buildShell(parts: ShellParts): BuildShellResult {
     .join('\n');
   moduleParts.push('  return (\n');
   moduleParts.push(jsxIndented);
-  moduleParts.push('\n  );\n}\n');
+  // Phase 21 ($expose) — close the forwardRef call + emit the default export
+  // when exposed; otherwise close the plain function declaration byte-for-byte.
+  if (hasExpose) {
+    moduleParts.push('\n  );\n});\n');
+    moduleParts.push(`export default ${parts.componentName};\n`);
+  } else {
+    moduleParts.push('\n  );\n}\n');
+  }
 
   const moduleSource = moduleParts.join('');
 
@@ -384,6 +436,14 @@ function buildShellLegacy(parts: ShellParts): BuildShellResult {
   ms.append(parts.propsInterface);
   ms.append('\n\n');
 
+  // Phase 21 ($expose, REQ-10) — inline handle interface after the props
+  // interface (legacy path mirror).
+  const hasExpose = (parts.exposeNames?.length ?? 0) > 0;
+  if (hasExpose && parts.handleInterface && parts.handleInterface.length > 0) {
+    ms.append(parts.handleInterface);
+    ms.append('\n\n');
+  }
+
   if (parts.scriptInjections && parts.scriptInjections.length > 0) {
     const moduleTop = parts.scriptInjections.filter((s) => s.startsWith('function '));
     for (const inj of moduleTop) {
@@ -393,8 +453,12 @@ function buildShellLegacy(parts: ShellParts): BuildShellResult {
   }
 
   const propsParam = parts.hasPropsDefaults ? '_props' : 'props';
+  // Phase 21 ($expose, REQ-5, D-03) — forwardRef framing when exposed (legacy
+  // path mirror); plain `export default function` shape byte-identical otherwise.
   ms.append(
-    `export default function ${parts.componentName}(${propsParam}: ${parts.componentName}Props): JSX.Element {\n`,
+    hasExpose
+      ? `const ${parts.componentName} = forwardRef<${parts.componentName}Handle, ${parts.componentName}Props>(function ${parts.componentName}(${propsParam}: ${parts.componentName}Props, ref): JSX.Element {\n`
+      : `export default function ${parts.componentName}(${propsParam}: ${parts.componentName}Props): JSX.Element {\n`,
   );
 
   if (parts.script.trim().length > 0) {
@@ -428,13 +492,24 @@ function buildShellLegacy(parts: ShellParts): BuildShellResult {
     ms.append('\n\n');
   }
 
+  // Phase 21 ($expose) — useImperativeHandle before `return (` (legacy mirror).
+  if (hasExpose && parts.imperativeHandleBlock && parts.imperativeHandleBlock.length > 0) {
+    ms.append('  ' + parts.imperativeHandleBlock + '\n\n');
+  }
+
   const jsxIndented = parts.jsx
     .split('\n')
     .map((line) => (line.length > 0 ? '    ' + line : line))
     .join('\n');
   ms.append('  return (\n');
   ms.append(jsxIndented);
-  ms.append('\n  );\n}\n');
+  // Phase 21 ($expose) — close forwardRef + default export when exposed.
+  if (hasExpose) {
+    ms.append('\n  );\n});\n');
+    ms.append(`export default ${parts.componentName};\n`);
+  } else {
+    ms.append('\n  );\n}\n');
+  }
 
   return { ms, scriptOutputOffset: 0, userCodeLineOffset: 0, scriptMap: parts.scriptMap ?? null };
 }

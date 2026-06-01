@@ -40,6 +40,7 @@ import { componentUsesClassSelector } from '../../../core/src/ir/validateClassSe
 import { splitBlocks } from '../../../core/src/splitter/splitBlocks.js';
 import { createDefaultRegistry } from '../../../core/src/modifiers/registerBuiltins.js';
 import { rewriteRozieImport } from '../../../core/src/codegen/rewriteRozieImport.js';
+import { synthesizeHandleType } from '../../../core/src/codegen/synthesizeHandleType.js';
 import { emitScript } from './emit/emitScript.js';
 import { emitPropsInterface } from './emit/emitPropsInterface.js';
 import { emitTemplate } from './emit/emitTemplate.js';
@@ -245,6 +246,25 @@ export function emitReact(
       ? componentImportsLines.join('\n') + '\n'
       : '';
 
+  // Phase 21 ($expose, REQ-5 / REQ-10, D-03) — branch STRICTLY on
+  // ir.expose.length. When empty, none of these parts are passed and the shell
+  // emits the byte-for-byte unchanged plain-function shape. When non-empty:
+  //   - add `forwardRef` + `useImperativeHandle` to the `react` import line,
+  //   - synthesize the inline `interface <Name>Handle {...}` (no `export`),
+  //   - build the `useImperativeHandle(ref, () => ({ a, b }), []);` block.
+  let exposeNames: string[] | undefined;
+  let handleInterface: string | undefined;
+  let imperativeHandleBlock: string | undefined;
+  // Defensive `?? []` guards pre-Phase-21 hand-rolled IRs (legacy tests).
+  const exposeMethods = ir.expose ?? [];
+  if (exposeMethods.length > 0) {
+    reactImports.add('forwardRef');
+    reactImports.add('useImperativeHandle');
+    exposeNames = exposeMethods.map((e) => e.name);
+    handleInterface = synthesizeHandleType(ir, `${ir.name}Handle`) ?? undefined;
+    imperativeHandleBlock = `useImperativeHandle(ref, () => ({ ${exposeNames.join(', ')} }), []);`;
+  }
+
   const { ms, scriptOutputOffset, userCodeLineOffset, scriptMap: shellScriptMap } = buildShell({
     componentName: ir.name,
     propsInterface,
@@ -267,6 +287,9 @@ export function emitReact(
     blockOffsets: resolvedBlockOffsets,
     scriptMap,
     componentImportsBlock,
+    exposeNames,
+    handleInterface,
+    imperativeHandleBlock,
   });
 
   const code = ms.toString();
