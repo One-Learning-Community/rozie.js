@@ -18,5 +18,13 @@ export default defineConfig({
     include: ['src/**/*.test.ts', 'tests/**/*.test.ts'],
     root: __dirname,
     snapshotFormat: { printBasicPrototype: false },
+    // bundlers-smoke runs full programmatic builds through Rollup, esbuild,
+    // Rolldown, Webpack and Rspack (each bundler lazily imported per `it()` by
+    // design, so one test doesn't drag in all five). Those real builds easily
+    // exceed vitest's 5s default under `turbo run test` parallel CPU
+    // starvation — flaking only in full batteries, passing standalone. A 30s
+    // ceiling is a load-tolerant FAILSAFE, not an assertion (same philosophy
+    // as tests/cli-smoke + tests/timing).
+    testTimeout: 30000,
   },
 });

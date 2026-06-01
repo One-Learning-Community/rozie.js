@@ -13,5 +13,10 @@ export default defineConfig({
     environment: 'node',
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
     root: __dirname,
+    // Per-target emit tests run full .rozie → framework compiles across six
+    // targets. Under `turbo run test` parallel CPU starvation that work can
+    // exceed vitest's 5s default and flake only in full batteries (passes
+    // standalone). A 30s ceiling is a load-tolerant FAILSAFE, not an assertion.
+    testTimeout: 30000,
   },
 });

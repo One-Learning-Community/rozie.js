@@ -21,5 +21,11 @@ export default defineConfig({
     include: ['src/**/*.test.ts', 'tests/**/*.test.ts'],
     root: __dirname,
     snapshotFormat: { printBasicPrototype: false },
+    // Behavioral tests compile .rozie → Angular standalone components and mount
+    // them with zone.js + @angular/compiler — a heavy module graph. Under
+    // `turbo run test` parallel CPU starvation that work can exceed vitest's 5s
+    // default and flake only in full batteries (passes standalone). A 30s
+    // ceiling is a load-tolerant FAILSAFE, not an assertion.
+    testTimeout: 30000,
   },
 });

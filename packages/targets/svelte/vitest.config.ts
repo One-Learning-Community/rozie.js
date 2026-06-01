@@ -21,6 +21,12 @@ export default defineConfig({
     include: ['src/**/*.test.ts', 'tests/**/*.test.ts'],
     root: __dirname,
     snapshotFormat: { printBasicPrototype: false },
+    // Behavioral tests compile .rozie → .svelte and mount via svelte/compiler +
+    // svelte's client runtime — a heavy module graph. Under `turbo run test`
+    // parallel CPU starvation that work can exceed vitest's 5s default and
+    // flake only in full batteries (passes standalone). A 30s ceiling is a
+    // load-tolerant FAILSAFE, not an assertion.
+    testTimeout: 30000,
     // Phase 06.2 P3 — TreeNode browser-mount test imports svelte's `mount()`
     // API which only exists on the client export. Inline svelte so the
     // `browser`/`svelte` resolve conditions below take effect.
