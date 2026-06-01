@@ -44,6 +44,7 @@
     "lit": "^3.2.0",
     "source-map-js": "^1.2.1",
     "tsdown": "^0.21.10",
+    "typescript": "^5.6",
     "vitest": "^4.1.0"
   },
   "scripts": {
