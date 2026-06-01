@@ -710,6 +710,9 @@ importers:
       '@types/babel__code-frame':
         specifier: ^7.0.6
         version: 7.27.0
+      '@types/babel__generator':
+        specifier: ^7
+        version: 7.27.0
       '@types/babel__traverse':
         specifier: ^7.28.0
         version: 7.28.0
