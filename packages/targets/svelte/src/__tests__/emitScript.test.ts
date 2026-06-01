@@ -366,4 +366,39 @@ describe('$expose — Svelte instance exports (Phase 21 Plan 04, REQ-6)', () => 
     const scriptBlock = emitScript(lowerExample('Counter')).scriptBlock;
     expect(scriptBlock).not.toMatch(/export function/);
   });
+
+  it('exports an exposed function that carries a LEADING COMMENT (regression)', () => {
+    // Regression: prepending a bare `export ` string to @babel/generator output
+    // orphaned the keyword when the declaration had leading comments —
+    // `export // comment\nfunction clear()` left `clear` UNexported. The AST-level
+    // ExportNamedDeclaration wrap keeps `export` adjacent to the keyword.
+    // Surfaced by @rozie-ui/flatpickr's commented clear()/openPicker() handle.
+    const src = `<rozie name="ExposeCommented">
+<data>
+  value: ""
+</data>
+<script>
+  // A leading comment block above the exposed function — must not orphan
+  // the export keyword.
+  function clear() {
+    value = "";
+  }
+  function plain() {
+    value = "x";
+  }
+  $expose({ clear, plain })
+</script>
+<template>
+  <div>{{ value }}</div>
+</template>
+</rozie>`;
+    const scriptBlock = emitScriptFromSrc(src, 'ExposeCommented');
+    // Both must be instance-exported; the comment must precede `export`, never
+    // sit between `export` and `function`.
+    expect(scriptBlock).toMatch(/export function clear\(/);
+    expect(scriptBlock).toMatch(/export function plain\(/);
+    // The broken form (orphaned export before a comment) must NOT appear.
+    expect(scriptBlock).not.toMatch(/export\s*\n\s*\/\//);
+    expect(scriptBlock).not.toMatch(/export \/\//);
+  });
 });

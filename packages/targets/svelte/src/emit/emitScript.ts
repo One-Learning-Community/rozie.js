@@ -966,10 +966,21 @@ function emitResidualScriptBody(
   // statement matches, so output is byte-identical to today.
   const code = stmts
     .map((s) => {
-      const generated = genCode(s);
-      return exposeNames.size > 0 && isExposedTopLevelDecl(s, exposeNames)
-        ? `export ${generated}`
-        : generated;
+      if (exposeNames.size > 0 && isExposedTopLevelDecl(s, exposeNames)) {
+        // Emit the instance export at the AST level rather than string-prepending
+        // `export ` to `genCode(s)`. A bare `export ${generated}` orphans the
+        // keyword when the declaration carries LEADING COMMENTS: @babel/generator
+        // emits the comment block before the `function`/`const` keyword, so the
+        // prefix produces the invalid `export // comment\nfunction name()` (the
+        // declaration is then NOT exported). Wrapping in an ExportNamedDeclaration
+        // and moving the leading comments onto the wrapper keeps `export` adjacent
+        // to the keyword: `// comment\nexport function name()`.
+        const exportDecl = t.exportNamedDeclaration(s as t.Declaration);
+        exportDecl.leadingComments = s.leadingComments ?? null;
+        s.leadingComments = null;
+        return genCode(exportDecl);
+      }
+      return genCode(s);
     })
     .join('\n');
   return { code, stmts };
