@@ -9,7 +9,7 @@
  * host renders the production-shaped output for pixel comparison; StrictMode
  * double-invoke coverage is QA-03's separate dev-mode stress harness.
  */
-import { createElement, createRef } from 'react';
+import { createElement, createRef, Fragment } from 'react';
 import { createRoot } from 'react-dom/client';
 import { parseQuery, mountWrapper, DEFAULT_PROPS, toUncontrolledProps } from './main';
 
@@ -22,17 +22,11 @@ const baseModules = import.meta.glob('../../../examples/{Counter,SearchInput,Dro
 const demoModules = import.meta.glob('../../../examples/demos/*.rozie');
 
 // Phase 21 D-07 — the external-caller harness button label/testid is shared by
-// the per-target entry shims and the expose-probe.spec assertion.
+// the per-target entry shims and the expose-probe.spec assertion. React renders
+// the button inside its own tree (see the ExposeProbe block below) rather than
+// appending to mountWrapper(), because createRoot clears non-React container
+// children on commit.
 const RESET_BTN_TESTID = 'reset-via-handle';
-
-/** Append a "reset via handle" button that invokes the grabbed handle. */
-function appendResetButton(onClick: () => void): void {
-  const btn = document.createElement('button');
-  btn.textContent = 'reset via handle';
-  btn.setAttribute('data-testid', RESET_BTN_TESTID);
-  btn.addEventListener('click', onClick);
-  mountWrapper().appendChild(btn);
-}
 
 async function main(): Promise<void> {
   const { example } = parseQuery();
@@ -52,12 +46,32 @@ async function main(): Promise<void> {
   // forwardRef component; pass a ref to grab the imperative handle, then wire a
   // "reset via handle" button that calls handle.reset() so the spec can click
   // it and assert the input clears.
+  //
+  // The button MUST render INSIDE the React tree (a Fragment), NOT be appended
+  // to mountWrapper() after `.render()`: React 18's createRoot commits
+  // asynchronously and clears non-React children of its container on commit, so
+  // a post-render `appendChild` button is wiped before the screenshot/spec sees
+  // it. Rendering it in the Fragment makes React own it (survives commit) and
+  // produces the same DOM order (component, then button) as the other 5 targets,
+  // keeping the shared ExposeProbe.png baseline valid. The onClick closure reads
+  // handleRef.current at click time, by which point the forwardRef handle is set.
   if (example === 'ExposeProbe') {
     const handleRef = createRef<{ reset: () => void; focus: () => void }>();
     createRoot(mountWrapper()).render(
-      createElement(mod.default, { ref: handleRef }),
+      createElement(
+        Fragment,
+        null,
+        createElement(mod.default, { ref: handleRef }),
+        createElement(
+          'button',
+          {
+            'data-testid': RESET_BTN_TESTID,
+            onClick: () => handleRef.current?.reset(),
+          },
+          'reset via handle',
+        ),
+      ),
     );
-    appendResetButton(() => handleRef.current?.reset());
     return;
   }
 
