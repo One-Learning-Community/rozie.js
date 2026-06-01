@@ -9,9 +9,15 @@
  * host renders the production-shaped output for pixel comparison; StrictMode
  * double-invoke coverage is QA-03's separate dev-mode stress harness.
  */
-import { createElement, createRef, Fragment } from 'react';
+import { createElement, createRef } from 'react';
 import { createRoot } from 'react-dom/client';
-import { parseQuery, mountWrapper, DEFAULT_PROPS, toUncontrolledProps } from './main';
+import {
+  parseQuery,
+  mountWrapper,
+  DEFAULT_PROPS,
+  toUncontrolledProps,
+  appendExternalCallerButton,
+} from './main';
 
 // Two glob roots: `examples/*.rozie` is the canonical reference set;
 // `examples/demos/*.rozie` provides per-example wrappers that override the
@@ -20,13 +26,6 @@ import { parseQuery, mountWrapper, DEFAULT_PROPS, toUncontrolledProps } from './
 // an empty 1×18 box). When both globs match, the demos/ entry wins.
 const baseModules = import.meta.glob('../../../examples/{Counter,SearchInput,Dropdown,TodoList,Modal,TreeNode,Card,CardHeader,ModalConsumer,WrapperModal,PortalList,PortalListStyled,FullCalendar,LineChart,CodeMirror,ThemedButton,ThemedButtonManual,ThemedButtonListenersManual,ThemedButtonAllManual,ThemedButtonConsumer,ROnProbe,PartCard,PartCardConsumer,ExposeProbe}.rozie');
 const demoModules = import.meta.glob('../../../examples/demos/*.rozie');
-
-// Phase 21 D-07 — the external-caller harness button label/testid is shared by
-// the per-target entry shims and the expose-probe.spec assertion. React renders
-// the button inside its own tree (see the ExposeProbe block below) rather than
-// appending to mountWrapper(), because createRoot clears non-React container
-// children on commit.
-const RESET_BTN_TESTID = 'reset-via-handle';
 
 async function main(): Promise<void> {
   const { example } = parseQuery();
@@ -44,34 +43,16 @@ async function main(): Promise<void> {
 
   // Phase 21 D-07 — ExposeProbe external-caller harness. ExposeProbe is a
   // forwardRef component; pass a ref to grab the imperative handle, then wire a
-  // "reset via handle" button that calls handle.reset() so the spec can click
-  // it and assert the input clears.
-  //
-  // The button MUST render INSIDE the React tree (a Fragment), NOT be appended
-  // to mountWrapper() after `.render()`: React 18's createRoot commits
-  // asynchronously and clears non-React children of its container on commit, so
-  // a post-render `appendChild` button is wiped before the screenshot/spec sees
-  // it. Rendering it in the Fragment makes React own it (survives commit) and
-  // produces the same DOM order (component, then button) as the other 5 targets,
-  // keeping the shared ExposeProbe.png baseline valid. The onClick closure reads
-  // handleRef.current at click time, by which point the forwardRef handle is set.
+  // "reset via handle" button (appended OUTSIDE rozie-mount by the shared
+  // helper) that calls handle.reset() so the spec can click it and assert the
+  // input clears. The button lives outside the screenshot-clipped mount so the
+  // matrix cell stays byte-identical across targets (see appendExternalCallerButton).
   if (example === 'ExposeProbe') {
     const handleRef = createRef<{ reset: () => void; focus: () => void }>();
     createRoot(mountWrapper()).render(
-      createElement(
-        Fragment,
-        null,
-        createElement(mod.default, { ref: handleRef }),
-        createElement(
-          'button',
-          {
-            'data-testid': RESET_BTN_TESTID,
-            onClick: () => handleRef.current?.reset(),
-          },
-          'reset via handle',
-        ),
-      ),
+      createElement(mod.default, { ref: handleRef }),
     );
+    appendExternalCallerButton(() => handleRef.current?.reset());
     return;
   }
 

@@ -7,14 +7,17 @@
  */
 import { createComponent, type Component } from 'solid-js';
 import { render } from 'solid-js/web';
-import { parseQuery, mountWrapper, DEFAULT_PROPS, toUncontrolledProps } from './main';
+import {
+  parseQuery,
+  mountWrapper,
+  DEFAULT_PROPS,
+  toUncontrolledProps,
+  appendExternalCallerButton,
+} from './main';
 
 // Two glob roots — see entry.vue.ts for rationale; demos/ wins over root.
 const baseModules = import.meta.glob('../../../examples/{Counter,SearchInput,Dropdown,TodoList,Modal,TreeNode,Card,CardHeader,ModalConsumer,WrapperModal,PortalList,PortalListStyled,FullCalendar,LineChart,CodeMirror,ThemedButton,ThemedButtonManual,ThemedButtonListenersManual,ThemedButtonAllManual,ThemedButtonConsumer,ROnProbe,PartCard,PartCardConsumer,ExposeProbe}.rozie');
 const demoModules = import.meta.glob('../../../examples/demos/*.rozie');
-
-// Phase 21 D-07 — the external-caller harness button label/testid (shared).
-const RESET_BTN_TESTID = 'reset-via-handle';
 
 async function main(): Promise<void> {
   const { example } = parseQuery();
@@ -47,11 +50,7 @@ async function main(): Promise<void> {
         ) as Node,
       mountWrapper(),
     );
-    const btn = document.createElement('button');
-    btn.textContent = 'reset via handle';
-    btn.setAttribute('data-testid', RESET_BTN_TESTID);
-    btn.addEventListener('click', () => handle?.reset());
-    mountWrapper().appendChild(btn);
+    appendExternalCallerButton(() => handle?.reset());
     return;
   }
 

@@ -10,14 +10,17 @@
  * matching `<rozie-*>` element, append it to the chrome-reset wrapper. Modeled
  * on examples/consumers/lit-vanilla-demo's per-page HTML host.
  */
-import { parseQuery, mountWrapper, LIT_TAGS, DEFAULT_PROPS } from './main';
+import {
+  parseQuery,
+  mountWrapper,
+  LIT_TAGS,
+  DEFAULT_PROPS,
+  appendExternalCallerButton,
+} from './main';
 
 // Two glob roots — see entry.vue.ts for rationale; demos/ wins over root.
 const baseModules = import.meta.glob('../../../examples/{Counter,SearchInput,Dropdown,TodoList,Modal,TreeNode,Card,CardHeader,ModalConsumer,WrapperModal,PortalList,PortalListStyled,FullCalendar,LineChart,CodeMirror,ThemedButton,ThemedButtonManual,ThemedButtonListenersManual,ThemedButtonAllManual,ThemedButtonConsumer,ROnProbe,PartCard,PartCardConsumer,ExposeProbe}.rozie');
 const demoModules = import.meta.glob('../../../examples/demos/*.rozie');
-
-// Phase 21 D-07 — the external-caller harness button label/testid (shared).
-const RESET_BTN_TESTID = 'reset-via-handle';
 
 async function main(): Promise<void> {
   const { example } = parseQuery();
@@ -55,11 +58,7 @@ async function main(): Promise<void> {
   // already hold `el`). A "reset via handle" button calls el.reset().
   if (example === 'ExposeProbe') {
     const handle = el as unknown as { reset: () => void; focus: () => void };
-    const btn = document.createElement('button');
-    btn.textContent = 'reset via handle';
-    btn.setAttribute('data-testid', RESET_BTN_TESTID);
-    btn.addEventListener('click', () => handle.reset());
-    mountWrapper().appendChild(btn);
+    appendExternalCallerButton(() => handle.reset());
   }
 
   // Lit components render into shadow DOM, so the host-level reset.css

@@ -375,3 +375,25 @@ export function mountWrapper(): HTMLElement {
   }
   return el;
 }
+
+/**
+ * Phase 21 D-07 — append the ExposeProbe external-caller harness button OUTSIDE
+ * `rozie-mount`. The button is VR scaffolding (it drives the grabbed imperative
+ * handle), NOT component output, so it MUST live outside the screenshot-clipped
+ * mount: keeping it inside coupled the shared matrix baseline to the button's
+ * cross-target rendering, and Lit's shadow-DOM custom-element host sized the
+ * button row 4px wider than the other 5 targets, breaking the D-10 byte-identity
+ * matcher. Appending to `document.body` (a sibling of rozie-mount) keeps it
+ * clickable + locatable-by-testid for the behavioral expose-probe.spec while
+ * excluding it from `toHaveScreenshot(rozie-mount)`, so the ExposeProbe matrix
+ * cell now renders byte-identical across all 6 targets (like SearchInput).
+ * Shared across all 6 entry shims so the handle-grab differs per target but the
+ * button is identical everywhere.
+ */
+export function appendExternalCallerButton(onClick: () => void): void {
+  const btn = document.createElement('button');
+  btn.textContent = 'reset via handle';
+  btn.setAttribute('data-testid', 'reset-via-handle');
+  btn.addEventListener('click', onClick);
+  document.body.appendChild(btn);
+}

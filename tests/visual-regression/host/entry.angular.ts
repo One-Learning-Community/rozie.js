@@ -14,14 +14,16 @@
 import 'zone.js';
 import { createApplication } from '@angular/platform-browser';
 import { createComponent, type Type } from '@angular/core';
-import { parseQuery, mountWrapper, DEFAULT_PROPS } from './main';
+import {
+  parseQuery,
+  mountWrapper,
+  DEFAULT_PROPS,
+  appendExternalCallerButton,
+} from './main';
 
 // Two glob roots — see entry.vue.ts for rationale; demos/ wins over root.
 const baseModules = import.meta.glob('../../../examples/{Counter,SearchInput,Dropdown,TodoList,Modal,TreeNode,Card,CardHeader,ModalConsumer,WrapperModal,PortalList,PortalListStyled,FullCalendar,LineChart,CodeMirror,ThemedButton,ThemedButtonManual,ThemedButtonListenersManual,ThemedButtonAllManual,ThemedButtonConsumer,ROnProbe,PartCard,PartCardConsumer,ExposeProbe}.rozie');
 const demoModules = import.meta.glob('../../../examples/demos/*.rozie');
-
-// Phase 21 D-07 — the external-caller harness button label/testid (shared).
-const RESET_BTN_TESTID = 'reset-via-handle';
 
 /**
  * Read the component's own selector tag off its compiled `ɵcmp` definition.
@@ -90,14 +92,10 @@ async function main(): Promise<void> {
   // calls instance.reset() then ticks so the cleared value repaints.
   if (example === 'ExposeProbe') {
     const instance = componentRef.instance as { reset: () => void; focus: () => void };
-    const btn = document.createElement('button');
-    btn.textContent = 'reset via handle';
-    btn.setAttribute('data-testid', RESET_BTN_TESTID);
-    btn.addEventListener('click', () => {
+    appendExternalCallerButton(() => {
       instance.reset();
       appRef.tick();
     });
-    wrapper.appendChild(btn);
   }
 }
 
