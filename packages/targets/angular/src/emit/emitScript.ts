@@ -1108,6 +1108,20 @@ export function emitScript(
 
     // ExpressionStatements (console.log, $emit calls, etc.) → constructor body.
     if (t.isExpressionStatement(stmt)) {
+      // Phase 21 (REQ-7) — a top-level `$expose({...})` call is a COMPILE-TIME
+      // directive consumed via `ir.expose`. Angular re-emits the named user
+      // functions as public class methods (Section 9 lifting); the `$expose(...)`
+      // CALL itself must be STRIPPED here, not lifted into the constructor —
+      // otherwise it leaks as an undefined-`$expose` runtime reference (mirrors
+      // the Vue/React residual-body strip). Skip ONLY the top-level call form.
+      const callExpr = stmt.expression;
+      if (
+        t.isCallExpression(callExpr) &&
+        t.isIdentifier(callExpr.callee) &&
+        callExpr.callee.name === '$expose'
+      ) {
+        continue;
+      }
       // Already filtered $onMount/$onUnmount/$onUpdate above (consumed).
       // Remaining ExpressionStatements: e.g., `console.log("hello from rozie")`.
       constructorExpressionLines.push(genCode(stmt));
