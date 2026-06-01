@@ -340,3 +340,98 @@ describe('emitScript — helper hoisting (260520-hus #2, TipTap·solid TDZ)', ()
     expect(result.code).toContain('createMemo');
   });
 });
+
+// =============================================================================
+// Phase 21 Plan 05 ($expose) — Solid callback `ref` prop (REQ-8, REQ-10, D-05)
+// =============================================================================
+//
+// $expose({ reset, focus }) on Solid emits a callback `ref` prop:
+//   1. `'ref'` is pushed into the splitProps key list so it routes to
+//      `local.ref` (NOT the `attrs` rest bucket → NOT spread onto the DOM).
+//   2. `onMount(() => { local.ref?.({ reset, focus }); });` invokes the handle
+//      once after mount; `onMount` is imported.
+//   3. `ref?: (h: <Name>Handle) => void` is added to the props interface and an
+//      inline `interface <Name>Handle { ... }` is emitted.
+//   4. The top-level `$expose(...)` call is STRIPPED from the residual body
+//      (no bare `$expose(` reference leaks).
+// When ir.expose is empty NONE of this is emitted — byte-identical output.
+
+const EXPOSE_SOURCE = `<rozie name="ExposeProbe">
+<data>{ count: 0 }</data>
+<script>
+function reset() { $data.count = 0 }
+function focus() { $data.count = 1 }
+$expose({ reset, focus })
+</script>
+<template><div /></template>
+</rozie>`;
+
+// Same component MINUS the `$expose(...)` line — the byte-identity baseline.
+const NO_EXPOSE_SOURCE = `<rozie name="ExposeProbe">
+<data>{ count: 0 }</data>
+<script>
+function reset() { $data.count = 0 }
+function focus() { $data.count = 1 }
+</script>
+<template><div /></template>
+</rozie>`;
+
+function compileExposeSolid(source: string, filename: string): string {
+  const { ast } = parse(source, { filename });
+  expect(ast).not.toBeNull();
+  const { ir } = lowerToIR(ast!, { modifierRegistry: createDefaultRegistry() });
+  expect(ir).not.toBeNull();
+  const result = emitSolid(ir!, { filename, source });
+  expect(result.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+  return result.code;
+}
+
+describe('emitSolid — $expose callback ref prop (Phase 21 Plan 05, REQ-8/REQ-10, D-05)', () => {
+  it("pushes 'ref' into the splitProps key list (routes to local.ref, NOT the attrs spread)", () => {
+    const code = compileExposeSolid(EXPOSE_SOURCE, 'ExposeProbe.rozie');
+    expect(code).toContain("splitProps(_props, ['ref']);");
+    // local destructure carries `ref`, attrs is the rest minus ref.
+    expect(code).toContain('const [local, attrs] = splitProps');
+  });
+
+  it('invokes local.ref?.({ reset, focus }) once after mount via onMount', () => {
+    const code = compileExposeSolid(EXPOSE_SOURCE, 'ExposeProbe.rozie');
+    expect(code).toContain('onMount(() => { local.ref?.({ reset, focus }); });');
+  });
+
+  it('imports onMount when exposed', () => {
+    const code = compileExposeSolid(EXPOSE_SOURCE, 'ExposeProbe.rozie');
+    expect(code).toMatch(/import \{[^}]*\bonMount\b[^}]*\} from 'solid-js';/);
+  });
+
+  it('types the ref prop + emits the inline <Name>Handle interface', () => {
+    const code = compileExposeSolid(EXPOSE_SOURCE, 'ExposeProbe.rozie');
+    expect(code).toContain('ref?: (h: ExposeProbeHandle) => void;');
+    expect(code).toContain('interface ExposeProbeHandle {');
+    // Inline — NOT exported (callers add export; Solid emits inline).
+    expect(code).not.toContain('export interface ExposeProbeHandle');
+  });
+
+  it('strips the top-level $expose(...) call from the residual body (no bare $expose( leaks)', () => {
+    const code = compileExposeSolid(EXPOSE_SOURCE, 'ExposeProbe.rozie');
+    expect(code).not.toContain('$expose(');
+  });
+
+  it('does NOT spread ref onto the rendered root element (Pitfall 2)', () => {
+    const code = compileExposeSolid(EXPOSE_SOURCE, 'ExposeProbe.rozie');
+    // `ref` is in the splitProps locals, so the JSX `{...attrs}` spread (or any
+    // template ref attribute) never carries it.
+    expect(code).not.toContain('ref={attrs');
+    expect(code).not.toContain('ref={_props.ref}');
+  });
+
+  it('byte-identity: a non-$expose Solid source emits unchanged (no ref push, no onMount-ref, no Handle interface)', () => {
+    const code = compileExposeSolid(NO_EXPOSE_SOURCE, 'ExposeProbe.rozie');
+    expect(code).not.toContain("'ref'");
+    expect(code).not.toContain('local.ref');
+    expect(code).not.toContain('ExposeProbeHandle');
+    expect(code).not.toContain('ref?:');
+    // splitProps key list is empty (no declared props, no slot, no ref).
+    expect(code).toContain('splitProps(_props, []);');
+  });
+});

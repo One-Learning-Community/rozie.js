@@ -101,7 +101,17 @@ function toPascalCase(eventName: string): string {
   return parts.map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join('');
 }
 
-export function emitPropsInterface(ir: IRComponent, slotPropFields?: string[]): string {
+export function emitPropsInterface(
+  ir: IRComponent,
+  slotPropFields?: string[],
+  /**
+   * Phase 21 ($expose, REQ-8 / REQ-10, D-05) — the callback-`ref` prop line
+   * `ref?: (h: <Name>Handle) => void`. Passed (non-empty) only when
+   * `ir.expose` is non-empty; emitted LAST so a non-$expose component's props
+   * interface stays byte-identical (D-05 byte-identity-when-empty).
+   */
+  exposeRefField?: string,
+): string {
   const fields: string[] = [];
 
   // Props (split by isModel).
@@ -163,6 +173,12 @@ export function emitPropsInterface(ir: IRComponent, slotPropFields?: string[]): 
   // (D-05). Per-slot merge happens in emitSlotInvocation.ts.
   if (ir.slots.length > 0) {
     fields.push(`  slots?: Record<string, (ctx: any) => JSX.Element>;`);
+  }
+
+  // Phase 21 ($expose, D-05) — the typed callback `ref` prop, emitted last.
+  // Only present when ir.expose is non-empty (caller passes the field then).
+  if (exposeRefField !== undefined && exposeRefField.length > 0) {
+    fields.push(`  ${exposeRefField}`);
   }
 
   if (fields.length === 0) {

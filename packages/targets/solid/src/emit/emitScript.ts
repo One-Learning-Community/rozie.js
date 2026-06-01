@@ -540,7 +540,11 @@ export function emitScript(
           callee.name === '$onUnmount' ||
           callee.name === '$onUpdate' ||
           // Quick plan 260515-u2b — $watch is consumed by the watcher loop above.
-          callee.name === '$watch')
+          callee.name === '$watch' ||
+          // Phase 21 ($expose, REQ-8) — `$expose({...})` is a compile-time
+          // directive consumed via `ir.expose`; STRIP it from the residual
+          // body or it leaks as an undefined-`$expose` runtime reference.
+          callee.name === '$expose')
       ) {
         continue;
       }

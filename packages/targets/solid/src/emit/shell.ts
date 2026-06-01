@@ -132,6 +132,21 @@ export interface SolidShellParts {
    * source map can be line-adjusted correctly.
    */
   hookSectionLines?: number;
+  /**
+   * Phase 21 ($expose, REQ-8 / REQ-10, D-05) — the inline
+   * `interface <Name>Handle {...}` string, emitted at MODULE scope immediately
+   * AFTER the props interface (so the `ref?: (h: <Name>Handle) => void` field
+   * resolves). Present (non-empty) ONLY when ir.expose is non-empty; absent →
+   * byte-identical output.
+   */
+  handleInterface?: string | undefined;
+  /**
+   * Phase 21 ($expose, D-05) — the `onMount(() => { local.ref?.({ a, b }); });`
+   * invocation, emitted inside the function body alongside the other lifecycle
+   * hooks (after splitProps + user script). Present ONLY when ir.expose is
+   * non-empty.
+   */
+  exposeOnMount?: string | undefined;
 }
 
 /**
@@ -218,6 +233,14 @@ export function buildShell(parts: SolidShellParts): BuildShellResult {
   moduleParts.push(parts.propsInterface);
   moduleParts.push('\n\n');
 
+  // Phase 21 ($expose, REQ-10) — inline `interface <Name>Handle {...}` right
+  // after the props interface so the `ref?: (h: <Name>Handle) => void` field
+  // resolves it. Present only when ir.expose is non-empty.
+  if (parts.handleInterface && parts.handleInterface.length > 0) {
+    moduleParts.push(parts.handleInterface);
+    moduleParts.push('\n\n');
+  }
+
   // Function declaration. Always uses `_props` parameter (D-141 universal splitProps).
   const functionSignature = `export default function ${parts.componentName}(_props: ${parts.componentName}Props): JSX.Element {\n`;
 
@@ -242,6 +265,11 @@ export function buildShell(parts: SolidShellParts): BuildShellResult {
   // children() accessor for default slot (D-131).
   if (parts.hasDefaultSlot) {
     moduleParts.push('  const resolved = children(() => local.children);\n');
+  }
+
+  // Phase 21 ($expose, D-05) — invoke the callback ref once after mount.
+  if (parts.exposeOnMount && parts.exposeOnMount.length > 0) {
+    moduleParts.push('  ' + parts.exposeOnMount + '\n');
   }
 
   moduleParts.push('\n');
@@ -363,6 +391,13 @@ function buildShellLegacy(parts: SolidShellParts): BuildShellResult {
   ms.append(parts.propsInterface);
   ms.append('\n\n');
 
+  // Phase 21 ($expose, REQ-10) — inline <Name>Handle interface (mirrors the
+  // moduleParts path above).
+  if (parts.handleInterface && parts.handleInterface.length > 0) {
+    ms.append(parts.handleInterface);
+    ms.append('\n\n');
+  }
+
   // Always _props (D-141).
   ms.append(
     `export default function ${parts.componentName}(_props: ${parts.componentName}Props): JSX.Element {\n`,
@@ -383,6 +418,11 @@ function buildShellLegacy(parts: SolidShellParts): BuildShellResult {
   // children() accessor (D-131).
   if (parts.hasDefaultSlot) {
     ms.append('  const resolved = children(() => local.children);\n');
+  }
+
+  // Phase 21 ($expose, D-05) — invoke the callback ref once after mount.
+  if (parts.exposeOnMount && parts.exposeOnMount.length > 0) {
+    ms.append('  ' + parts.exposeOnMount + '\n');
   }
 
   ms.append('\n');

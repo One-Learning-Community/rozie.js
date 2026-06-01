@@ -26,6 +26,7 @@ import type { SourceMap } from 'magic-string';
 import { splitBlocks } from '../../../core/src/splitter/splitBlocks.js';
 import { createDefaultRegistry } from '../../../core/src/modifiers/registerBuiltins.js';
 import { rewriteRozieImport } from '../../../core/src/codegen/rewriteRozieImport.js';
+import { synthesizeHandleType } from '../../../core/src/codegen/synthesizeHandleType.js';
 import { SolidImportCollector, RuntimeSolidImportCollector } from './rewrite/collectSolidImports.js';
 import { emitScript } from './emit/emitScript.js';
 import { emitTemplate } from './emit/emitTemplate.js';
@@ -114,9 +115,29 @@ export function emitSolid(ir: IRComponent, opts: EmitSolidOptions = {}): EmitSol
     componentImportsBlock = componentImportLines.join('\n') + '\n';
   }
 
+  // Phase 21 ($expose, REQ-8 / REQ-10, D-05) — branch STRICTLY on
+  // ir.expose.length. When empty, NONE of the three parts (splitProps 'ref'
+  // push, the inline <Name>Handle interface + ref?: prop field, the onMount
+  // invoke) are emitted and the Solid output stays byte-identical (D-05).
+  const exposeMethods = ir.expose ?? [];
+  const hasExpose = exposeMethods.length > 0;
+  let handleInterface: string | undefined;
+  let exposeRefField: string | undefined;
+  let exposeOnMount: string | undefined;
+  if (hasExpose) {
+    const handleName = `${ir.name}Handle`;
+    handleInterface = synthesizeHandleType(ir, handleName) ?? undefined;
+    exposeRefField = `ref?: (h: ${handleName}) => void;`;
+    const names = exposeMethods.map((e) => e.name).join(', ');
+    // local.ref is the splitProps-renamed `ref` prop (pushed into propKeys
+    // below) — equivalent to D-05's `_props.ref?.(handle)` after the rename.
+    exposeOnMount = `onMount(() => { local.ref?.({ ${names} }); });`;
+    solidImports.add('onMount');
+  }
+
   // 5. Per-segment emit.
   const slotResult = emitSlotDecl(ir);
-  const propsInterface = emitPropsInterface(ir, slotResult.fields);
+  const propsInterface = emitPropsInterface(ir, slotResult.fields, exposeRefField);
   // Spike 004 — reuse the per-component `scopeHash` (already computed above)
   // for the `@portal` CSS scope so the portal closure's setAttribute value
   // matches the emitted `@portal` CSS selectors.
@@ -154,6 +175,13 @@ export function emitSolid(ir: IRComponent, opts: EmitSolidOptions = {}): EmitSol
   const propKeys = (ir.props ?? []).map((p) => `'${p.name}'`);
   if (hasDefaultSlot && !propKeys.includes("'children'")) {
     propKeys.push("'children'");
+  }
+  // Phase 21 ($expose, D-05, Pitfall 2) — when exposed, route the callback
+  // `ref` prop through splitProps locals so it is NEVER spread onto the DOM
+  // (Phase-14 `$attrs` fallthrough spreads the `attrs` rest bucket to the root
+  // element). Mirrors the conditional `'children'` push above.
+  if (hasExpose && !propKeys.includes("'ref'")) {
+    propKeys.push("'ref'");
   }
   const propNames = propKeys.join(', ');
   // When non-model defaults exist, emitScript emits `const _merged = mergeProps({...}, _props)`.
@@ -211,6 +239,8 @@ export function emitSolid(ir: IRComponent, opts: EmitSolidOptions = {}): EmitSol
     splitPropsCall,
     listenersDecl,
     hasDefaultSlot,
+    handleInterface,
+    exposeOnMount,
     script,
     hookSectionLines: scriptResult.hookSectionLines,
     listenerEffects: listenersResult.code,
