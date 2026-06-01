@@ -418,6 +418,24 @@ function partitionScript(program: t.File): PartitionedScript {
       else if (hook.hookName === '$onUpdate') updateHooks.push(entry);
       continue;
     }
+    // Phase 21 (REQ-9) — a top-level `$expose({...})` call is a COMPILE-TIME
+    // directive consumed via `ir.expose`. Lit re-emits the named user functions
+    // as PUBLIC element methods (they lift through classBodyFromStatements); the
+    // `$expose(...)` CALL itself must be STRIPPED here, not lifted into
+    // firstUpdated() — otherwise it leaks as an undefined-`$expose` runtime
+    // reference (mirrors the Vue/React residual-body strip). Drop ONLY the
+    // top-level call form; non-$expose statements flow through unchanged so
+    // byte-identity holds when ir.expose is empty.
+    if (t.isExpressionStatement(stmt)) {
+      const callExpr = stmt.expression;
+      if (
+        t.isCallExpression(callExpr) &&
+        t.isIdentifier(callExpr.callee) &&
+        callExpr.callee.name === '$expose'
+      ) {
+        continue;
+      }
+    }
     // Quick plan 260515-u2b — top-level $watch call detection.
     if (t.isExpressionStatement(stmt)) {
       const expr = stmt.expression;

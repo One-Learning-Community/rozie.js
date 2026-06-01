@@ -36,6 +36,79 @@ function compile(name: string): string {
   return emitLit(ir!, { filename: `${name}.rozie`, source, modifierRegistry: registry }).code;
 }
 
+// Phase 21 Plan 06 (REQ-9, REQ-10) — compile inline .rozie source (no on-disk
+// fixture) so each $expose case is self-contained.
+function emitFromSource(source: string): string {
+  const { ast } = parse(source, { filename: 'ExposeProbe.rozie' });
+  if (!ast) throw new Error('parse() returned null AST for inline source');
+  const registry = createDefaultRegistry();
+  const { ir } = lowerToIR(ast, { modifierRegistry: registry });
+  if (!ir) throw new Error('lowerToIR() returned null IR for inline source');
+  return emitLit(ir, { filename: 'ExposeProbe.rozie', source, modifierRegistry: registry }).code;
+}
+
+const EXPOSE_PROBE_SRC = `<rozie name="ExposeProbe">
+<template>
+  <input :ref="inputEl" :value="text" @input="onInput" />
+</template>
+<data>
+{ text: "" }
+</data>
+<script>
+function reset() { $data.text = ""; }
+function focus() { $refs.inputEl.focus(); }
+function onInput(e) { $data.text = e.target.value; }
+$expose({ reset, focus });
+</script>
+</rozie>`;
+
+// Exposed-ONLY: `unusedReset` is referenced nowhere except $expose.
+const EXPOSE_ONLY_SRC = `<rozie name="ExposeOnly">
+<template>
+  <input :value="text" @input="onInput" />
+</template>
+<data>
+{ text: "" }
+</data>
+<script>
+function unusedReset() { $data.text = ""; }
+function onInput(e) { $data.text = e.target.value; }
+$expose({ unusedReset });
+</script>
+</rozie>`;
+
+describe('emitScript — $expose public element methods (REQ-9)', () => {
+  it('exposed functions emit as PUBLIC element members (no private/#-private)', () => {
+    const code = emitFromSource(EXPOSE_PROBE_SRC);
+    // Both exposed names appear as element methods …
+    expect(code).toMatch(/\breset\s*\(/);
+    expect(code).toMatch(/\bfocus\s*\(/);
+    // … and are NOT private/#-private.
+    expect(code).not.toMatch(/private\s+reset\b/);
+    expect(code).not.toMatch(/private\s+focus\b/);
+    expect(code).not.toContain('#reset');
+    expect(code).not.toContain('#focus');
+  });
+
+  it('strips the top-level $expose(...) call — no bare `$expose(` leaks', () => {
+    const code = emitFromSource(EXPOSE_PROBE_SRC);
+    expect(code).not.toContain('$expose(');
+  });
+
+  it('retains an exposed-ONLY function (not referenced by template)', () => {
+    const code = emitFromSource(EXPOSE_ONLY_SRC);
+    expect(code).toMatch(/\bunusedReset\s*\(/);
+    expect(code).not.toContain('$expose(');
+  });
+
+  it('byte-identical when ir.expose is empty (Counter unchanged)', () => {
+    const a = compile('Counter');
+    const b = compile('Counter');
+    expect(a).toBe(b);
+    expect(a).not.toContain('$expose(');
+  });
+});
+
 describe('emitScript — Lit class-body assembly', () => {
   it('emits @property() class fields in declaration order', () => {
     const code = compile('Counter');
