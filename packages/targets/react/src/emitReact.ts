@@ -262,7 +262,16 @@ export function emitReact(
     reactImports.add('useImperativeHandle');
     exposeNames = exposeMethods.map((e) => e.name);
     handleInterface = synthesizeHandleType(ir, `${ir.name}Handle`) ?? undefined;
-    imperativeHandleBlock = `useImperativeHandle(ref, () => ({ ${exposeNames.join(', ')} }), []);`;
+    // `[]` deps: the handle is registered once; the exposed functions are the
+    // same in-scope references for the component's lifetime (those that close
+    // over reactive state are already `useCallback`-stabilized by the emitter,
+    // so `[]` carries no stale-closure risk). The factory references the
+    // exposed names while the dep array is empty, so `react-hooks/exhaustive-deps`
+    // would flag them — emit the same targeted `eslint-disable-line` the emitter
+    // already uses on its mount-once `useEffect`/`useThrottledCallback` lines
+    // (D-62-relaxed: a justified, rule-specific disable). Always used (the
+    // factory always references >=1 exposed name), so no unused-directive risk.
+    imperativeHandleBlock = `useImperativeHandle(ref, () => ({ ${exposeNames.join(', ')} }), []); // eslint-disable-line react-hooks/exhaustive-deps`;
   }
 
   const { ms, scriptOutputOffset, userCodeLineOffset, scriptMap: shellScriptMap } = buildShell({

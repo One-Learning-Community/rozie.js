@@ -53,7 +53,13 @@ interface ParsedSurface {
 }
 
 function parseSurface(src: string): ParsedSurface {
-  const componentMatch = src.match(/export\s+default\s+function\s+(\w+)\s*\(/);
+  // Phase 21 ($expose): a component that exposes an imperative handle is emitted
+  // as `const <Name> = forwardRef<...>(function <Name>(...))` + `export default
+  // <Name>` instead of `export default function <Name>(`. Recognize both shapes
+  // so the surface comparator extracts the component name either way.
+  const componentMatch =
+    src.match(/export\s+default\s+function\s+(\w+)\s*\(/) ??
+    src.match(/const\s+(\w+)\s*=\s*forwardRef\b/);
   const propsInterfaceMatch = src.match(/interface\s+(\w*Props)\s*\{([\s\S]*?)\n\}/);
   const propsFields: string[] = [];
   if (propsInterfaceMatch) {

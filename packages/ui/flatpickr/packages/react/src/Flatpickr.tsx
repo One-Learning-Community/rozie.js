@@ -198,7 +198,7 @@ const Flatpickr = forwardRef<FlatpickrHandle, FlatpickrProps>(function Flatpickr
     if (instance.current) instance.current.input.disabled = v;
   }, [props.disabled]);
 
-  useImperativeHandle(ref, () => ({ clear, openPicker, closePicker, selectDate, jumpToDate }), []);
+  useImperativeHandle(ref, () => ({ clear, openPicker, closePicker, selectDate, jumpToDate }), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <>

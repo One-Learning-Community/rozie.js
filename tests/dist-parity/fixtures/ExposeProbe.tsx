@@ -21,7 +21,7 @@ const ExposeProbe = forwardRef<ExposeProbeHandle, ExposeProbeProps>(function Exp
     field.current!.focus();
   }
 
-  useImperativeHandle(ref, () => ({ reset, focus }), []);
+  useImperativeHandle(ref, () => ({ reset, focus }), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <>
