@@ -36,6 +36,7 @@ import { runRForKeyValidator } from './validators/rForKeyValidator.js';
 import { runReservedIdentifierValidator } from './validators/reservedIdentifierValidator.js';
 import { runListenerElementValidator } from './validators/listenerElementValidator.js';
 import { runExposeValidator } from './validators/exposeValidator.js';
+import { runEmitNameValidator } from './validators/emitNameValidator.js';
 
 export interface AnalyzeResult {
   bindings: BindingsTable;
@@ -62,6 +63,8 @@ export function analyzeAST(ast: RozieAST): AnalyzeResult {
   // Phase 21 — $expose methods-only validation (ROZ115–ROZ120). Reads
   // bindings.exposeCalls; emits at most one diagnostic per offending site.
   runExposeValidator(ast, bindings, diagnostics);
+  // Quick 260601-l2u — ROZ122: reject empty/whitespace-only $emit event names (script + template + listeners). No binding dependency.
+  runEmitNameValidator(ast, diagnostics);
   // Phase 19 (D-08) — final pass: a <listener> placed inside <template> is a
   // misplaced element (ROZ206). No binding dependency.
   runListenerElementValidator(ast, diagnostics);

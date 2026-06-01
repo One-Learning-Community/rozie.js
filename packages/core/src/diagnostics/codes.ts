@@ -151,6 +151,19 @@ export const RozieErrorCode = {
   // and ROZ524 does NOT cover the Angular direct-name (`$expose({ date })` vs
   // prop `date`) field-vs-method case — only the React `setX` setter form.
   EXPOSE_EVENT_NAME_COLLISION: 'ROZ121', // $expose({ open }) where 'open' is an emitted event, or (on class-based targets) a same-named declared prop — field/method name clash
+  // Quick 260601-l2u — a `$emit` call whose first argument is a STRING LITERAL
+  // whose `.value.trim() === ''` (empty OR whitespace-only). An empty event name
+  // is meaningless on every target — Angular emits a class field with an empty
+  // name; consumers cannot bind it — so this mirrors the ROZ121 collision work:
+  // it makes a structurally-meaningless `$emit` shape an explicit compile error
+  // instead of broken codegen on 1-of-6 targets. Error severity; emitted from the
+  // emitNameValidator across all three expression contexts (<script> + template
+  // handlers + <listeners>); fires once per offending call, code-framed at the
+  // `$emit` call site; never throws (D-08). Non-string-literal first args
+  // (dynamic names — `$emit(name)`, template literals, member exprs) are OUT OF
+  // SCOPE — no false positive. ROZ122 is the next free code after ROZ121 in the
+  // 100 semantic-binding cluster.
+  EMIT_EMPTY_EVENT_NAME: 'ROZ122', // $emit('') / $emit('   ') — empty/whitespace-only string-literal event name
 
   // ---- Compile-time correctness errors (Phase 2 Plan 02) — ROZ200..ROZ299 ----
   WRITE_TO_NON_MODEL_PROP: 'ROZ200', // SEM-02: $props.foo = … where foo lacks model: true (Phase 2 success criterion 2)
