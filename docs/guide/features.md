@@ -355,6 +355,54 @@ The mnemonic pairs with the consumer-side `r-model:value="…"` directive: `r-mo
 - `$props.x = …` where `x` is **not** `model: true` → **ROZ200** (`WRITE_TO_NON_MODEL_PROP`). Props are read-only inputs; mutating one is the single most common cross-framework component bug.
 - `$props.x = …` where `x` **is** `model: true` → **ROZ204** (`WRITE_TO_MODEL_PROP_VIA_PROPS`), whose message points you at the fix: use `$model.x`.
 
+## `$expose({ ... })` → a consumer-callable imperative handle everywhere
+
+Some components have to offer imperative methods — a date picker's `clear()` / `open()`, an editor's `focus()` / `setContent()`, a map's `flyTo()`. Re-implementing "expose an imperative method" once per framework (`useImperativeHandle`, `defineExpose`, instance exports, public methods, ref-forwarding…) is exactly the per-framework wrapper work Rozie exists to delete.
+
+Declare the handle once. List the in-scope `<script>` functions you want to expose:
+
+```rozie
+<script lang="ts">
+let instance = null
+$onMount(() => { instance = flatpickr($refs.inputEl, { /* … */ }); return () => instance?.destroy() })
+
+function clear()      { instance?.clear() }
+function open()       { instance?.open() }
+function close()      { instance?.close() }
+function setDate(d)   { instance?.setDate(d) }
+
+$expose({ clear, open, close, setDate })
+</script>
+```
+
+`$expose` exposes **only functions** — bare references to in-scope `<script>` function/arrow declarations (or inline arrows). To expose a *value*, expose a getter method: `$expose({ getValue: () => $data.x })`. Malformed forms are caught at compile time (ROZ115–ROZ120): a non-object argument, a spread, a computed key, a non-function value, a duplicate `$expose` call, or an `$expose` outside `<script>` top level each produce a distinct diagnostic.
+
+Each target lowers the one declaration to its native handle idiom. When a component has no `$expose`, none of this is emitted — output is byte-for-byte unchanged (React, notably, is **not** wrapped in `forwardRef`):
+
+| Target | Emitted handle |
+| --- | --- |
+| Vue | `defineExpose({ clear, open, close, setDate })` after the setup body |
+| React | the component is wrapped in `forwardRef`, with `useImperativeHandle(ref, () => ({ clear, open, close, setDate }), [])`; a typed `FooHandle` interface ships in the emitted `.d.ts` |
+| Svelte 5 | each exposed function becomes an instance `export function clear() { … }` |
+| Angular | the exposed functions are guaranteed **public** methods on the `@Component` class |
+| Solid | a callback `ref` prop — `props.ref?.({ clear, open, close, setDate })` invoked once after mount; the `ref` prop is typed `(h: FooHandle) => void` and kept out of the DOM spread |
+| Lit | the exposed functions are guaranteed **public** methods on the `LitElement` subclass, callable on the element |
+
+### Getting the handle from the consumer side
+
+Producer-side only: a consumer grabs the handle with each framework's **native** ref mechanism (there is no `.rozie`-level "call a child's method" directive — you write the consumer in the consumer's own framework). Given a component compiled from `Flatpickr.rozie`:
+
+| Target | How the consumer obtains and calls the handle |
+| --- | --- |
+| Vue | template ref — `<Flatpickr ref="fp" />`, then `fp.value.clear()` |
+| React | `const fp = useRef<FlatpickrHandle>(null)`, `<Flatpickr ref={fp} />`, then `fp.current?.clear()` |
+| Svelte 5 | `let fp; <Flatpickr bind:this={fp} />`, then `fp.clear()` |
+| Angular | `@ViewChild(Flatpickr) fp!: Flatpickr` (or the `viewChild()` signal), then `this.fp.clear()` |
+| Solid | callback ref — `<Flatpickr ref={(h) => (handle = h)} />`, then `handle.clear()` (the ref receives the handle object, not the DOM node) |
+| Lit | the custom element **is** the handle — `document.querySelector('rozie-flatpickr').clear()`, or hold the element reference |
+
+The handle methods are typed from your `<script>` function signatures: a `<script lang="ts">` function contributes its real signature to the synthesized `FooHandle`; an untyped function becomes `(...args: any[]) => any`.
+
 ## `$onMount` returning a teardown
 
 `$onMount` is a hook; its return value, if a function, runs at unmount. The pattern is identical to React's `useEffect`, but `$onUnmount` is also available as a standalone hook for clarity. Multiple of either colocate with their logic:
