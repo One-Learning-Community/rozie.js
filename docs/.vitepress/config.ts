@@ -58,6 +58,14 @@ export default defineConfig({
     plugins: [Rozie({ target: 'vue' })],
   },
   themeConfig: {
+    // Built-in minisearch-backed local search — index is generated at build
+    // time, no external service required.
+    search: {
+      provider: 'local',
+      options: {
+        detailedView: true,
+      },
+    },
     nav: [
       { text: 'Guide', link: '/guide/why' },
       { text: 'Examples', link: '/examples/' },
