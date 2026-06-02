@@ -20,9 +20,10 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  *   - GAP-3 `:locale` — an English ⇄ French switch (static `French` import).
  *     Switching runs the locale reconciler (`set('locale', merged)`); flatpickr
  *     re-renders the month label in French.
- *   - GAP-4 `:plugins` — a two-input range via `rangePlugin` (selector form,
- *     `input: '#fp-range-end'`). rangePlugin mirrors the end date into the second
- *     input — the defining rangePlugin behavior.
+ *   - GAP-4 `:plugins` — a two-input range via `rangePlugin` (element-ref form,
+ *     `input: $refs.rangeEnd`, constructed in $onMount — shadow-DOM-safe on lit).
+ *     rangePlugin mirrors the end date into the second input — the defining
+ *     rangePlugin behavior.
  *
  * WHY THIS SPEC IS BEHAVIORAL-ONLY (no toHaveScreenshot):
  *
@@ -60,36 +61,18 @@ for (const target of TARGETS) {
   const built = existsSync(
     resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
   );
-  // 260602-9lw — the $watch lazy-by-default normalization fixes GAP-2
-  // disable/enable AND GAP-3 locale on ALL 6 targets, lit included. The lit
-  // props-route gate originally used `this.hasUpdated`, but
-  // @lit/reactive-element 2.1.2 sets `hasUpdated = true` BEFORE invoking
-  // updated() on the first cycle (reactive-element.js:943-946), so that gate
-  // never skipped the mount fire — the disable/enable reconcilers ran at mount
-  // against the not-yet-reconciled instance, stamping all 42 day-cells
-  // `.flatpickr-disabled` (CR-01). The corrected gate is a dedicated
-  // `__rozieFirstUpdateDone` class field that flips at the end of the watcher
-  // segment of updated(), skipping exactly the initial cycle. With that fix the
-  // lit cell now PASSES GAP-2 (zero disabled cells at mount; ~12 weekend cells
-  // after toggle) and GAP-3 (French locale reconciles) — verified
-  // 2026-06-02 (gate-logs/13-cr01-acceptance.log).
-  //
-  // A SEPARATE, narrower lit-only failure remains in GAP-4 (rangePlugin): after
-  // picking a start+end date in the range picker, the second input
-  // (`#fp-range-end`) stays empty on lit only — the spec's final
-  // `expect(endInput).not.toHaveValue('')` times out (24× resolved to
-  // value=""), while vue/react/svelte/angular/solid all mirror the end date
-  // correctly. No console.error / pageerror is emitted. This is a lit-shadow-DOM
-  // rangePlugin issue: rangePlugin is configured with `input: '#fp-range-end'`,
-  // a document-level selector, but lit renders the wrapper input inside shadow
-  // DOM, so flatpickr's rangePlugin cannot resolve / write back to the
-  // light-DOM second input. It is NOT a $watch-emit defect (GAP-2/3 prove the
-  // watcher route is correct on lit) and NOT fixable by touching
-  // packages/ui/flatpickr (the `:plugins` passthrough is byte-identical to the
-  // 5 passing targets). Pre-approved 5/6 fixme fallback (CONTEXT) — follow-up:
-  // /gsd-debug the lit-shadow-DOM rangePlugin selector-resolution path.
-  const LIT_GAP4_RANGEPLUGIN_SHADOW_DOM = target === 'lit';
-  const runner = built && !LIT_GAP4_RANGEPLUGIN_SHADOW_DOM ? test : test.fixme;
+  // All 6 targets pass. History of the two lit-only failures that were fixed:
+  //   - GAP-2/3 (disable/enable, locale): fixed by the 260602-9lw $watch lazy
+  //     normalization + the CR-01 `__rozieFirstUpdateDone` props-route gate
+  //     (lit's `hasUpdated` is already true during the first updated() —
+  //     reactive-element.js:943-946 — so it can't serve as a first-cycle skip).
+  //   - GAP-4 (rangePlugin end input stayed empty): fixed in debug session
+  //     lit-rangeplugin-shadow-dom — rangePlugin resolves a selector-string
+  //     `input` via window.document.querySelector, which can't pierce the lit
+  //     demo's shadow root (and only console.WARNs on failure). The demo now
+  //     passes the element itself (`$refs.rangeEnd`), hitting rangePlugin's
+  //     shadow-DOM-safe `input instanceof Element` branch on all 6 targets.
+  const runner = built ? test : test.fixme;
   runner(`flatpickr-behavior [${target}]: disable + locale + rangePlugin`, async ({
     page,
   }) => {
