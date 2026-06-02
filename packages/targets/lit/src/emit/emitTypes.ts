@@ -6,10 +6,12 @@
  * core-shared `renderPropsInterface` for the framework-AGNOSTIC props body, but
  * swaps the default-export idiom to Lit's NOVEL shape (PATTERNS Pattern 2):
  *
- *   - `export default class <Name> extends LitElement { … }` — Lit consumers
- *     `import './Foo.rozie'` for side-effect (the module registers the custom
- *     element); the value they care about typing is the ELEMENT class, not a
- *     `Component<Props>` prop bag.
+ *   - `export declare class <Name> extends LitElement { … }` + a separate
+ *     `export default <Name>;` (WR-07: mirrors Angular's `declare` form so the
+ *     declaration never relies on declaration-file ambient-context leniency) —
+ *     Lit consumers `import './Foo.rozie'` for side-effect (the module registers
+ *     the custom element); the value they care about typing is the ELEMENT
+ *     class, not a `Component<Props>` prop bag.
  *   - the exposed methods (`ir.expose`) declared as PUBLIC class members
  *     (mirroring the Phase 21 21-06 public-element-method guarantee), and
  *   - a `declare global { interface HTMLElementTagNameMap { 'rozie-<kebab>':
@@ -26,8 +28,9 @@
  *     step?: number;
  *   }
  *
- *   export default class Counter extends LitElement {
+ *   export declare class Counter extends LitElement {
  *   }
+ *   export default Counter;
  *
  *   declare global {
  *     interface HTMLElementTagNameMap {
@@ -117,13 +120,26 @@ export function emitLitTypes(
 
   // Lit default-export idiom: the element class. Exposed methods become PUBLIC
   // class members (Phase 21 21-06 public-element-method guarantee).
-  lines.push(`export default class ${ir.name} extends LitElement {`);
+  //
+  // WR-07 (Phase 22 review): emit `export declare class` (mirroring Angular's
+  // emitTypes.ts), NOT a non-`declare` `export default class`. The file is a
+  // `.d.rozie.ts` declaration file, so a value-bearing class with a runtime
+  // `extends LitElement` heritage clause and no `declare` keyword relied on the
+  // ambient-context leniency of declaration files — a brittle posture that
+  // risks TS1183 ("An implementation cannot be declared in ambient contexts")
+  // and was only ever validated by a substring assertion, never by `tsc` over
+  // the emitted sidecar. The `declare` form is the safe, explicit shape and
+  // still carries the `extends LitElement` heritage so the HTMLElementTagNameMap
+  // entry types correctly. A separate `export default <Name>;` keeps the
+  // side-effect `import './Foo.rozie'` default-import working (matching Angular).
+  lines.push(`export declare class ${ir.name} extends LitElement {`);
   if (exposed && handleInterface) {
     for (const member of exposeMemberLines(handleInterface)) {
       lines.push(member);
     }
   }
   lines.push(`}`);
+  lines.push(`export default ${ir.name};`);
   lines.push('');
 
   // The novel Lit value-add: typed `document.querySelector('rozie-<kebab>')`.
