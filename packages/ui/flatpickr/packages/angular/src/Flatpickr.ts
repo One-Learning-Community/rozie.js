@@ -7,7 +7,7 @@ import flatpickr from 'flatpickr';
   standalone: true,
   template: `
 
-    <input #inputEl type="text" class="rozie-flatpickr" [placeholder]="placeholder()" #rozieSpread_0 #rozieListenersTarget_1 />
+    <input #inputEl type="text" class="rozie-flatpickr" [name]="name()" [placeholder]="placeholder()" #rozieSpread_0 #rozieListenersTarget_1 />
 
   `,
   styles: [`
@@ -41,6 +41,17 @@ export class Flatpickr {
   disabled = input<boolean>(false);
   commitOn = input<string>('complete');
   options = input<Record<string, any>>((() => ({}))());
+  name = input<string>('');
+  inline = input<boolean>(false);
+  static = input<boolean>(false);
+  position = input<string>('auto');
+  appendTo = input<(Record<string, any>) | null>(null);
+  showMonths = input<number>(1);
+  weekNumbers = input<boolean>(false);
+  monthSelectorType = input<string>('dropdown');
+  prevArrow = input<(string) | null>(null);
+  nextArrow = input<(string) | null>(null);
+  allowInput = input<boolean>(false);
   inputEl = viewChild<ElementRef<HTMLInputElement>>('inputEl');
   change = output<unknown>();
   ready = output<unknown>();
@@ -79,6 +90,17 @@ export class Flatpickr {
       minDate: this.minDate(),
       maxDate: this.maxDate(),
       defaultDate: this.date() || null,
+      // GAP-5 UI passthrough (construction-time only) + GAP-6a allowInput.
+      inline: this.inline(),
+      static: this.static(),
+      position: this.position(),
+      appendTo: this.appendTo(),
+      showMonths: this.showMonths(),
+      weekNumbers: this.weekNumbers(),
+      monthSelectorType: this.monthSelectorType(),
+      prevArrow: this.prevArrow(),
+      nextArrow: this.nextArrow(),
+      allowInput: this.allowInput(),
       ...this.options(),
       onChange: (selectedDates: any, dateStr: any) => {
         // Value contract + range-commit semantics. In range mode flatpickr fires

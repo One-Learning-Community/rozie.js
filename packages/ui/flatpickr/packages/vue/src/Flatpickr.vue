@@ -1,6 +1,6 @@
 <template>
 
-<input ref="inputElRef" type="text" class="rozie-flatpickr" :placeholder="props.placeholder" v-bind="$attrs" />
+<input ref="inputElRef" type="text" class="rozie-flatpickr" :name="props.name" :placeholder="props.placeholder" v-bind="$attrs" />
 
 </template>
 
@@ -8,8 +8,8 @@
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 const props = withDefaults(
-  defineProps<{ mode?: string; dateFormat?: string; altInput?: boolean; altFormat?: string; enableTime?: boolean; enableSeconds?: boolean; time24hr?: boolean; noCalendar?: boolean; minDate?: string | null; maxDate?: string | null; placeholder?: string; disabled?: boolean; commitOn?: string; options?: Record<string, any> }>(),
-  { mode: 'single', dateFormat: 'Y-m-d', altInput: false, altFormat: 'F j, Y', enableTime: false, enableSeconds: false, time24hr: false, noCalendar: false, minDate: null, maxDate: null, placeholder: 'Select a date…', disabled: false, commitOn: 'complete', options: () => ({}) }
+  defineProps<{ mode?: string; dateFormat?: string; altInput?: boolean; altFormat?: string; enableTime?: boolean; enableSeconds?: boolean; time24hr?: boolean; noCalendar?: boolean; minDate?: string | null; maxDate?: string | null; placeholder?: string; disabled?: boolean; commitOn?: string; options?: Record<string, any>; name?: string; inline?: boolean; static?: boolean; position?: string; appendTo?: Record<string, any> | null; showMonths?: number; weekNumbers?: boolean; monthSelectorType?: string; prevArrow?: string | null; nextArrow?: string | null; allowInput?: boolean }>(),
+  { mode: 'single', dateFormat: 'Y-m-d', altInput: false, altFormat: 'F j, Y', enableTime: false, enableSeconds: false, time24hr: false, noCalendar: false, minDate: null, maxDate: null, placeholder: 'Select a date…', disabled: false, commitOn: 'complete', options: () => ({}), name: '', inline: false, static: false, position: 'auto', appendTo: null, showMonths: 1, weekNumbers: false, monthSelectorType: 'dropdown', prevArrow: null, nextArrow: null, allowInput: false }
 );
 
 const date = defineModel<string>('date', { default: '' });
@@ -84,6 +84,17 @@ onMounted(() => {
     minDate: props.minDate,
     maxDate: props.maxDate,
     defaultDate: date.value || null,
+    // GAP-5 UI passthrough (construction-time only) + GAP-6a allowInput.
+    inline: props.inline,
+    static: props.static,
+    position: props.position,
+    appendTo: props.appendTo,
+    showMonths: props.showMonths,
+    weekNumbers: props.weekNumbers,
+    monthSelectorType: props.monthSelectorType,
+    prevArrow: props.prevArrow,
+    nextArrow: props.nextArrow,
+    allowInput: props.allowInput,
     ...props.options,
     onChange: (selectedDates: any, dateStr: any) => {
       // Value contract + range-commit semantics. In range mode flatpickr fires

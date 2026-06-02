@@ -37,6 +37,17 @@ export default class Flatpickr extends SignalWatcher(LitElement) {
   @property({ type: Boolean, reflect: true }) disabled: boolean = false;
   @property({ type: String, reflect: true }) commitOn: string = 'complete';
   @property({ type: Object }) options: any = {};
+  @property({ type: String, reflect: true }) name: string = '';
+  @property({ type: Boolean, reflect: true }) inline: boolean = false;
+  @property({ type: Boolean, reflect: true }) static: boolean = false;
+  @property({ type: String, reflect: true }) position: string = 'auto';
+  @property({ type: Object }) appendTo: any = null;
+  @property({ type: Number, reflect: true }) showMonths: number = 1;
+  @property({ type: Boolean, reflect: true }) weekNumbers: boolean = false;
+  @property({ type: String, reflect: true }) monthSelectorType: string = 'dropdown';
+  @property({ type: String, reflect: true }) prevArrow: string = null;
+  @property({ type: String, reflect: true }) nextArrow: string = null;
+  @property({ type: Boolean, reflect: true }) allowInput: boolean = false;
   @query('[data-rozie-ref="inputEl"]') private _refInputEl!: HTMLElement;
 
   private _disconnectCleanups: Array<() => void> = [];
@@ -56,6 +67,17 @@ export default class Flatpickr extends SignalWatcher(LitElement) {
       minDate: this.minDate,
       maxDate: this.maxDate,
       defaultDate: this.date || null,
+      // GAP-5 UI passthrough (construction-time only) + GAP-6a allowInput.
+      inline: this.inline,
+      static: this.static,
+      position: this.position,
+      appendTo: this.appendTo,
+      showMonths: this.showMonths,
+      weekNumbers: this.weekNumbers,
+      monthSelectorType: this.monthSelectorType,
+      prevArrow: this.prevArrow,
+      nextArrow: this.nextArrow,
+      allowInput: this.allowInput,
       ...this.options,
       onChange: (selectedDates: any, dateStr: any) => {
         // Value contract + range-commit semantics. In range mode flatpickr fires
@@ -150,7 +172,7 @@ export default class Flatpickr extends SignalWatcher(LitElement) {
 
   render() {
     return html`
-<input class="rozie-flatpickr" type="text" placeholder=${this.placeholder} ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-ref="inputEl" data-rozie-s-159070d4 />
+<input class="rozie-flatpickr" type="text" name=${this.name} placeholder=${this.placeholder} ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-ref="inputEl" data-rozie-s-159070d4 />
 `;
   }
 
@@ -192,7 +214,7 @@ export default class Flatpickr extends SignalWatcher(LitElement) {
    * (explicit `attribute:`) AND lowercased property name (Lit's default).
    */
   private get $attrs(): Record<string, string> {
-    const __skip = new Set<string>(['date', 'mode', 'date-format', 'dateformat', 'alt-input', 'altinput', 'alt-format', 'altformat', 'enable-time', 'enabletime', 'enable-seconds', 'enableseconds', 'time24hr', 'no-calendar', 'nocalendar', 'min-date', 'mindate', 'max-date', 'maxdate', 'placeholder', 'disabled', 'commit-on', 'commiton', 'options']);
+    const __skip = new Set<string>(['date', 'mode', 'date-format', 'dateformat', 'alt-input', 'altinput', 'alt-format', 'altformat', 'enable-time', 'enabletime', 'enable-seconds', 'enableseconds', 'time24hr', 'no-calendar', 'nocalendar', 'min-date', 'mindate', 'max-date', 'maxdate', 'placeholder', 'disabled', 'commit-on', 'commiton', 'options', 'name', 'inline', 'static', 'position', 'append-to', 'appendto', 'show-months', 'showmonths', 'week-numbers', 'weeknumbers', 'month-selector-type', 'monthselectortype', 'prev-arrow', 'prevarrow', 'next-arrow', 'nextarrow', 'allow-input', 'allowinput']);
     const out: Record<string, string> = {};
     for (const a of Array.from(this.attributes)) {
       if (__skip.has(a.name)) continue;

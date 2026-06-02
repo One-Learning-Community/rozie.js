@@ -19,6 +19,17 @@ interface Props {
   disabled?: boolean;
   commitOn?: string;
   options?: any;
+  name?: string;
+  inline?: boolean;
+  static?: boolean;
+  position?: string;
+  appendTo?: (any) | null;
+  showMonths?: number;
+  weekNumbers?: boolean;
+  monthSelectorType?: string;
+  prevArrow?: (string) | null;
+  nextArrow?: (string) | null;
+  allowInput?: boolean;
   onchange?: (...args: unknown[]) => void;
   onready?: (...args: unknown[]) => void;
   onopen?: (...args: unknown[]) => void;
@@ -48,6 +59,17 @@ let {
   disabled = false,
   commitOn = 'complete',
   options = __defaultOptions,
+  name = '',
+  inline = false,
+  static = false,
+  position = 'auto',
+  appendTo = null,
+  showMonths = 1,
+  weekNumbers = false,
+  monthSelectorType = 'dropdown',
+  prevArrow = null,
+  nextArrow = null,
+  allowInput = false,
   onchange,
   onready,
   onopen,
@@ -117,6 +139,17 @@ onMount(() => {
     minDate: minDate,
     maxDate: maxDate,
     defaultDate: date || null,
+    // GAP-5 UI passthrough (construction-time only) + GAP-6a allowInput.
+    inline: inline,
+    static: static,
+    position: position,
+    appendTo: appendTo,
+    showMonths: showMonths,
+    weekNumbers: weekNumbers,
+    monthSelectorType: monthSelectorType,
+    prevArrow: prevArrow,
+    nextArrow: nextArrow,
+    allowInput: allowInput,
     ...options,
     onChange: (selectedDates: any, dateStr: any) => {
       // Value contract + range-commit semantics. In range mode flatpickr fires
@@ -167,7 +200,7 @@ $effect(() => { const __watchVal = (() => disabled)(); untrack(() => ((v: any) =
 </script>
 
 
-<input bind:this={inputEl} type="text" placeholder={placeholder} {...__rozieAttrs} class={["rozie-flatpickr", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-159070d4 />
+<input bind:this={inputEl} type="text" name={name} placeholder={placeholder} {...__rozieAttrs} class={["rozie-flatpickr", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-159070d4 />
 
 
 <style>

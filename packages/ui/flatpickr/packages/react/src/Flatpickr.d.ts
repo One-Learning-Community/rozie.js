@@ -20,6 +20,17 @@ export interface FlatpickrProps {
   disabled?: boolean;
   commitOn?: string;
   options?: Record<string, unknown>;
+  name?: string;
+  inline?: boolean;
+  static?: boolean;
+  position?: string;
+  appendTo?: (Record<string, unknown>) | null;
+  showMonths?: number;
+  weekNumbers?: boolean;
+  monthSelectorType?: string;
+  prevArrow?: (string) | null;
+  nextArrow?: (string) | null;
+  allowInput?: boolean;
   onChange?: (...args: unknown[]) => void;
   onReady?: (...args: unknown[]) => void;
   onOpen?: (...args: unknown[]) => void;

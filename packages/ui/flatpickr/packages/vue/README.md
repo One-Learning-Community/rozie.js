@@ -45,6 +45,17 @@ const date = ref('2026-05-17');
 | `disabled` | `Boolean` | `false` |  |  |
 | `commitOn` | `String` | `"complete"` |  |  |
 | `options` | `Object` | `{}` |  |  |
+| `name` | `String` | `""` |  |  |
+| `inline` | `Boolean` | `false` |  |  |
+| `static` | `Boolean` | `false` |  |  |
+| `position` | `String` | `"auto"` |  |  |
+| `appendTo` | `Object` | `null` |  |  |
+| `showMonths` | `Number` | `1` |  |  |
+| `weekNumbers` | `Boolean` | `false` |  |  |
+| `monthSelectorType` | `String` | `"dropdown"` |  |  |
+| `prevArrow` | `String` | `null` |  |  |
+| `nextArrow` | `String` | `null` |  |  |
+| `allowInput` | `Boolean` | `false` |  |  |
 
 ## Events
 

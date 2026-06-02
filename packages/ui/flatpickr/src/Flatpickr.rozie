@@ -63,6 +63,30 @@
   disabled:      { type: Boolean, default: false },
   commitOn:      { type: String,  default: 'complete' },
   options:       { type: Object,  default: () => ({}) },
+
+  // GAP-1 — forms drop-in. Forwarded onto the rendered input so the component
+  // submits like a native form control (RHF `register`, Angular reactive
+  // forms `formControlName`). When `altInput` is on, flatpickr creates a
+  // hidden mirror input and MOVES the original's `name` onto it, so the
+  // submitted value carries `name` for both altInput on/off.
+  name:              { type: String,  default: '' },
+
+  // GAP-5 — common UI knobs promoted out of the `options` escape hatch to
+  // first-class typed props. All construction-time only (no flatpickr.set()
+  // path) — to retune live, re-key the component (see the guide's `:key`
+  // idiom). Mapped 1:1 to the flatpickr option of the same name.
+  inline:            { type: Boolean, default: false },
+  static:            { type: Boolean, default: false },
+  position:          { type: String,  default: 'auto' },
+  appendTo:          { type: Object,  default: null },
+  showMonths:        { type: Number,  default: 1 },
+  weekNumbers:       { type: Boolean, default: false },
+  monthSelectorType: { type: String,  default: 'dropdown' },
+  prevArrow:         { type: String,  default: null },
+  nextArrow:         { type: String,  default: null },
+
+  // GAP-6a — allow typed entry directly in the input. Construction-time only.
+  allowInput:        { type: Boolean, default: false },
 }
 </props>
 
@@ -84,6 +108,17 @@ $onMount(() => {
     minDate:       $props.minDate,
     maxDate:       $props.maxDate,
     defaultDate:   $props.date || null,
+    // GAP-5 UI passthrough (construction-time only) + GAP-6a allowInput.
+    inline:            $props.inline,
+    static:            $props.static,
+    position:          $props.position,
+    appendTo:          $props.appendTo,
+    showMonths:        $props.showMonths,
+    weekNumbers:       $props.weekNumbers,
+    monthSelectorType: $props.monthSelectorType,
+    prevArrow:         $props.prevArrow,
+    nextArrow:         $props.nextArrow,
+    allowInput:        $props.allowInput,
     ...$props.options,
     onChange: (selectedDates, dateStr) => {
       // Value contract + range-commit semantics. In range mode flatpickr fires
@@ -170,6 +205,7 @@ $expose({ clear, openPicker, closePicker, selectDate, jumpToDate })
   ref="inputEl"
   type="text"
   class="rozie-flatpickr"
+  :name="$props.name"
   :placeholder="$props.placeholder"
 />
 </template>
