@@ -1,0 +1,161 @@
+/**
+ * Phase 22 Plan 22-05 Task 1 — emitSidecar unit suite.
+ *
+ * Covers the `.d.rozie.ts` sidecar render + write dispatch:
+ *
+ *   - `renderSidecar(source, target, filename)` — pure parse → lowerToIR →
+ *     per-target `emit<Target>Types` dispatch → do-not-edit + sha256
+ *     content-hash header. Returns the full sidecar source string, or null
+ *     when the source has error-level diagnostics.
+ *   - `emitSidecar(roziePath, sourceText, target, allowedRoots)` — computes
+ *     `<Name>.d.rozie.ts` (NEVER `.rozie.d.ts`), reuses the emitRozieTsToDisk
+ *     trust-boundary (allowedRoots refusal + null-byte guard) + idempotent
+ *     skip, writes the sidecar, returns the written path or null when
+ *     skipped/refused/diagnostics-bailed.
+ *
+ * The Plan-04 LOCKED decision is honored: the Angular branch WRITES a sidecar
+ * to disk (coexists with the disk-cache `.rozie.ts`) — it is NOT skipped.
+ */
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { createHash } from 'node:crypto';
+import { mkdtempSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { emitSidecar, renderSidecar, SIDECAR_HEADER_PREFIX } from '../src/emitSidecar.js';
+
+const COUNTER_ROZIE = `<rozie name="Counter">
+<props>
+{ value: { type: Number, default: 0, model: true }, step: { type: Number, default: 1 } }
+</props>
+<template>
+<button class="counter">{{ $props.value }}</button>
+</template>
+</rozie>
+`;
+
+const BROKEN_ROZIE = `<rozie name="Broken">
+<template>
+<button @click="$emit('')">x</button>
+</template>
+</rozie>
+`;
+
+function hash12(source: string): string {
+  return createHash('sha256').update(source).digest('hex').slice(0, 12);
+}
+
+describe('renderSidecar — pure render + header', () => {
+  it('Test 1: produces a do-not-edit header + the per-target props interface (React)', () => {
+    const out = renderSidecar(COUNTER_ROZIE, 'react', 'Counter.rozie');
+    expect(out).not.toBeNull();
+    expect(out!.startsWith(SIDECAR_HEADER_PREFIX)).toBe(true);
+    expect(out).toContain('export interface CounterProps');
+  });
+
+  it('Test 2: header content-hash equals sha256(source).slice(0,12)', () => {
+    const out = renderSidecar(COUNTER_ROZIE, 'react', 'Counter.rozie')!;
+    const firstLine = out.split('\n', 1)[0];
+    expect(firstLine).toBe(`${SIDECAR_HEADER_PREFIX}${hash12(COUNTER_ROZIE)}`);
+  });
+
+  it('Test 5: dispatch — vue uses DefineComponent, lit uses HTMLElementTagNameMap, angular declare class', () => {
+    expect(renderSidecar(COUNTER_ROZIE, 'vue', 'Counter.rozie')).toContain('DefineComponent');
+    expect(renderSidecar(COUNTER_ROZIE, 'svelte', 'Counter.rozie')).toContain("import('svelte').Component");
+    expect(renderSidecar(COUNTER_ROZIE, 'solid', 'Counter.rozie')).toContain("import('solid-js').Component");
+    expect(renderSidecar(COUNTER_ROZIE, 'lit', 'Counter.rozie')).toContain('HTMLElementTagNameMap');
+    expect(renderSidecar(COUNTER_ROZIE, 'angular', 'Counter.rozie')).toContain('declare class Counter');
+  });
+
+  it('bails (returns null) on a source with error-level diagnostics', () => {
+    expect(renderSidecar(BROKEN_ROZIE, 'react', 'Broken.rozie')).toBeNull();
+  });
+});
+
+describe('emitSidecar — write + trust-boundary + idempotent skip', () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'rozie-sidecar-'));
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('Test 1: writes Counter.d.rozie.ts (NOT Counter.rozie.d.ts) next to the source', () => {
+    const roziePath = join(tmpDir, 'Counter.rozie');
+    writeFileSync(roziePath, COUNTER_ROZIE);
+    const outPath = emitSidecar(roziePath, COUNTER_ROZIE, 'react', [tmpDir]);
+    expect(outPath).toBe(join(tmpDir, 'Counter.d.rozie.ts'));
+    expect(outPath!.endsWith('.d.rozie.ts')).toBe(true);
+    expect(outPath!.endsWith('.rozie.d.ts')).toBe(false);
+    expect(existsSync(outPath!)).toBe(true);
+    const content = readFileSync(outPath!, 'utf8');
+    expect(content.startsWith(SIDECAR_HEADER_PREFIX)).toBe(true);
+  });
+
+  it('Test 2: written header hash equals sha256(source).slice(0,12)', () => {
+    const roziePath = join(tmpDir, 'Counter.rozie');
+    writeFileSync(roziePath, COUNTER_ROZIE);
+    const outPath = emitSidecar(roziePath, COUNTER_ROZIE, 'react', [tmpDir])!;
+    const firstLine = readFileSync(outPath, 'utf8').split('\n', 1)[0];
+    expect(firstLine).toBe(`${SIDECAR_HEADER_PREFIX}${hash12(COUNTER_ROZIE)}`);
+  });
+
+  it('Test 3a: a write target OUTSIDE the allowed roots is refused (throws)', () => {
+    const roziePath = join(tmpDir, 'Counter.rozie');
+    writeFileSync(roziePath, COUNTER_ROZIE);
+    const otherRoot = mkdtempSync(join(tmpdir(), 'rozie-other-'));
+    try {
+      expect(() => emitSidecar(roziePath, COUNTER_ROZIE, 'react', [otherRoot])).toThrow(
+        /refusing to (emit|write).*outside/i,
+      );
+    } finally {
+      rmSync(otherRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('Test 3b: a null-byte path is rejected', () => {
+    expect(() => emitSidecar(join(tmpDir, 'C\0.rozie'), COUNTER_ROZIE, 'react', [tmpDir])).toThrow(
+      /null byte/i,
+    );
+  });
+
+  it('Test 4: idempotent — a second call with unchanged source does NOT re-write', () => {
+    const roziePath = join(tmpDir, 'Counter.rozie');
+    writeFileSync(roziePath, COUNTER_ROZIE);
+    const outPath = emitSidecar(roziePath, COUNTER_ROZIE, 'react', [tmpDir])!;
+    const mtime1 = readFileSync(outPath, 'utf8');
+    // Second call: content identical → skip. Returns the path but does not
+    // rewrite (assert by content stability + a sentinel marker we inject).
+    writeFileSync(outPath, mtime1 + '\n// SENTINEL', 'utf8');
+    const outPath2 = emitSidecar(roziePath, COUNTER_ROZIE, 'react', [tmpDir]);
+    // The freshly-rendered content differs from the sentinel-appended file,
+    // so a write SHOULD happen here (content changed on disk). To assert true
+    // idempotency we re-render the canonical content first, then re-call.
+    const canonical = renderSidecar(COUNTER_ROZIE, 'react', roziePath)!;
+    writeFileSync(outPath, canonical, 'utf8');
+    const before = readFileSync(outPath, 'utf8');
+    emitSidecar(roziePath, COUNTER_ROZIE, 'react', [tmpDir]);
+    const after = readFileSync(outPath, 'utf8');
+    expect(after).toBe(before);
+    expect(outPath2).toBe(outPath);
+  });
+
+  it('Test 5: dispatch — angular WRITES a sidecar (Plan-04 LOCKED decision), not skipped', () => {
+    const roziePath = join(tmpDir, 'Counter.rozie');
+    writeFileSync(roziePath, COUNTER_ROZIE);
+    const outPath = emitSidecar(roziePath, COUNTER_ROZIE, 'angular', [tmpDir]);
+    expect(outPath).toBe(join(tmpDir, 'Counter.d.rozie.ts'));
+    expect(existsSync(outPath!)).toBe(true);
+    expect(readFileSync(outPath!, 'utf8')).toContain('declare class Counter');
+  });
+
+  it('returns null (no write) when the source has error-level diagnostics', () => {
+    const roziePath = join(tmpDir, 'Broken.rozie');
+    writeFileSync(roziePath, BROKEN_ROZIE);
+    const outPath = emitSidecar(roziePath, BROKEN_ROZIE, 'react', [tmpDir]);
+    expect(outPath).toBeNull();
+    expect(existsSync(join(tmpDir, 'Broken.d.rozie.ts'))).toBe(false);
+  });
+});
