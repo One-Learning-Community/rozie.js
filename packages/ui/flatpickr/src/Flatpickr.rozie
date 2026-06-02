@@ -92,6 +92,38 @@
 
   // GAP-6a — allow typed entry directly in the input. Construction-time only.
   allowInput:        { type: Boolean, default: false },
+
+  // GAP-2 — disabled/enabled date sets. Each accepts an
+  // `Array<Date | string | { from, to } | (date: Date) => boolean>`: explicit
+  // dates, "Y-m-d" strings, {from,to} ranges, and/or predicate functions.
+  // RUNTIME-UPDATABLE via flatpickr `set('disable'|'enable', …)` (see $watch).
+  // Render-neutral: an empty array is NEVER passed at construction (flatpickr
+  // treats `enable: []` as "nothing enabled"), so the default leaves the
+  // baseline render untouched (see the conditional spreads in $onMount).
+  disable:        { type: Array,    default: () => [] },
+  enable:         { type: Array,    default: () => [] },
+
+  // GAP-3 — internationalization. `locale` takes a flatpickr locale OBJECT;
+  // the consumer lazy-imports it themselves (`flatpickr/dist/l10n/<x>.js` — the
+  // wrapper adds no locale dependency). `firstDayOfWeek` FOLDS INTO the locale
+  // option (flatpickr's locale carries `firstDayOfWeek`); when both are set,
+  // firstDayOfWeek overrides the locale's own. Both RUNTIME-UPDATABLE via
+  // `set('locale', mergedLocale)`. flatpickr's default firstDayOfWeek is 0
+  // (Sunday) — render-neutral, so it is only passed when non-zero.
+  locale:         { type: Object,   default: null },
+  firstDayOfWeek: { type: Number,   default: 0 },
+
+  // GAP-6b — custom parse/format functions. CONSTRUCTION-TIME only (no
+  // flatpickr.set() path) — re-key the component to retune live. null default
+  // is render-neutral (omitted from the options object when unset).
+  parseDate:      { type: Function, default: null },
+  formatDate:     { type: Function, default: null },
+
+  // GAP-4 — plugins. An array of flatpickr plugin INSTANCES (consumer imports
+  // from `flatpickr/dist/plugins/…`; headline: `rangePlugin` for two-input
+  // ranges). CONSTRUCTION-TIME only — re-key to swap plugins live. Empty array
+  // is render-neutral (never passed at construction).
+  plugins:        { type: Array,    default: () => [] },
 }
 </props>
 
@@ -129,6 +161,23 @@ $onMount(() => {
     ...($props.appendTo  != null ? { appendTo:  $props.appendTo  } : {}),
     ...($props.prevArrow != null ? { prevArrow: $props.prevArrow } : {}),
     ...($props.nextArrow != null ? { nextArrow: $props.nextArrow } : {}),
+    // GAP-2/3/4/6b conditional-spread passthrough. NEVER pass an empty array /
+    // null / default-0, because flatpickr treats `enable: []` as "nothing
+    // enabled" and a null locale/parseDate/formatDate breaks construction —
+    // each guard keeps the default render byte-identical to before.
+    ...($props.disable.length    ? { disable:  $props.disable  } : {}),
+    ...($props.enable.length     ? { enable:   $props.enable   } : {}),
+    ...($props.parseDate  != null ? { parseDate:  $props.parseDate  } : {}),
+    ...($props.formatDate != null ? { formatDate: $props.formatDate } : {}),
+    ...($props.plugins.length    ? { plugins:  $props.plugins  } : {}),
+    // locale + firstDayOfWeek merge: emit a single `locale` entry present when
+    // EITHER a locale object is set OR firstDayOfWeek is non-default (0). The
+    // merge folds firstDayOfWeek INTO the locale object so it overrides the
+    // locale's own. Kept a PURE expression (no statements) so Angular can splice
+    // it into a binding context safely.
+    ...(($props.locale != null || $props.firstDayOfWeek !== 0)
+        ? { locale: { ...($props.locale ?? {}), ...($props.firstDayOfWeek !== 0 ? { firstDayOfWeek: $props.firstDayOfWeek } : {}) } }
+        : {}),
     ...$props.options,
     onChange: (selectedDates, dateStr) => {
       // Value contract + range-commit semantics. In range mode flatpickr fires
@@ -175,6 +224,25 @@ $watch(() => $props.dateFormat, (v) => instance?.set('dateFormat', v))
 $watch(() => $props.disabled,   (v) => {
   if (instance) instance.input.disabled = v
 })
+
+// GAP-2 runtime reconcilers. flatpickr's set() honors live disable/enable
+// changes. NOTE: we pass the live value VERBATIM — even an empty array — on a
+// runtime CHANGE, because `set('enable', [])` is the legitimate "disable
+// everything" and `set('disable', [])` clears the disabled set. The empty-array
+// guard only applies to the CONSTRUCTION-time spread in $onMount (where a bare
+// `enable: []` at init means "nothing enabled"); a deliberate runtime clear is
+// a different, valid intent.
+$watch(() => $props.disable, (v) => instance?.set('disable', v))
+$watch(() => $props.enable,  (v) => instance?.set('enable',  v))
+
+// GAP-3 runtime reconcilers. locale + firstDayOfWeek both fold into the single
+// `locale` option; two watchers each recompute the SAME merge as $onMount and
+// re-set it, so a live change to either reconciles. (plugins/parseDate/
+// formatDate are construction-time and intentionally have NO reconciler.)
+$watch(() => $props.locale, (v) =>
+  instance?.set('locale', { ...(v ?? {}), ...($props.firstDayOfWeek !== 0 ? { firstDayOfWeek: $props.firstDayOfWeek } : {}) }))
+$watch(() => $props.firstDayOfWeek, (v) =>
+  instance?.set('locale', { ...($props.locale ?? {}), ...(v !== 0 ? { firstDayOfWeek: v } : {}) }))
 
 // Imperative handle (Phase 21 $expose). The five flatpickr instance methods a
 // consumer can't drive through props alone — exposed uniformly to all 6 targets
