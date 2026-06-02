@@ -7,10 +7,12 @@
     "dev": "vite",
     "build": "vite build",
     "build:swc": "vite build --config vite.config.swc.ts",
+    "build:preact": "vite build --config vite.config.preact.ts",
     "preview": "vite preview --port 4174",
     "typecheck": "tsc --noEmit",
     "test:e2e": "playwright test",
     "test:e2e:swc": "VITE_USE_SWC=1 playwright test",
+    "test:e2e:preact": "VITE_USE_PREACT=1 playwright test",
     "test:e2e:hmr": "playwright test --config playwright.hmr.config.ts",
     "test:e2e:install": "playwright install chromium"
   },
@@ -21,6 +23,7 @@
     "@rozie/runtime-react": "workspace:*",
     "@rozie/unplugin": "workspace:*",
     "lit": "^3.2.0",
+    "preact": "^10",
     "react": "^19.2.6",
     "react-dom": "^19.2.6"
   },
