@@ -609,6 +609,27 @@ importers:
       '@rozie/core':
         specifier: workspace:*
         version: link:../core
+      '@rozie/target-angular':
+        specifier: workspace:*
+        version: link:../targets/angular
+      '@rozie/target-lit':
+        specifier: workspace:*
+        version: link:../targets/lit
+      '@rozie/target-react':
+        specifier: workspace:*
+        version: link:../targets/react
+      '@rozie/target-solid':
+        specifier: workspace:*
+        version: link:../targets/solid
+      '@rozie/target-svelte':
+        specifier: workspace:*
+        version: link:../targets/svelte
+      '@rozie/target-vue':
+        specifier: workspace:*
+        version: link:../targets/vue
+      '@rozie/unplugin':
+        specifier: workspace:*
+        version: link:../unplugin
       '@vue/compiler-sfc':
         specifier: ^3.5.33
         version: 3.5.33
@@ -640,24 +661,6 @@ importers:
         specifier: ^1.97.3
         version: 1.97.3
     devDependencies:
-      '@rozie/target-angular':
-        specifier: workspace:*
-        version: link:../targets/angular
-      '@rozie/target-lit':
-        specifier: workspace:*
-        version: link:../targets/lit
-      '@rozie/target-react':
-        specifier: workspace:*
-        version: link:../targets/react
-      '@rozie/target-solid':
-        specifier: workspace:*
-        version: link:../targets/solid
-      '@rozie/target-svelte':
-        specifier: workspace:*
-        version: link:../targets/svelte
-      '@rozie/target-vue':
-        specifier: workspace:*
-        version: link:../targets/vue
       prettier-plugin-svelte:
         specifier: ^3.4.0
         version: 3.5.2(prettier@3.8.3)(svelte@5.55.5(@typescript-eslint/types@8.59.2))
