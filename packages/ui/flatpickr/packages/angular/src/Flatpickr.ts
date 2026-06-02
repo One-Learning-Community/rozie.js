@@ -52,6 +52,13 @@ export class Flatpickr {
   prevArrow = input<(string) | null>(null);
   nextArrow = input<(string) | null>(null);
   allowInput = input<boolean>(false);
+  disable = input<any[]>((() => [])());
+  enable = input<any[]>((() => [])());
+  locale = input<(Record<string, any>) | null>(null);
+  firstDayOfWeek = input<number>(0);
+  parseDate = input<((...args: unknown[]) => unknown) | null>(null);
+  formatDate = input<((...args: unknown[]) => unknown) | null>(null);
+  plugins = input<any[]>((() => [])());
   inputEl = viewChild<ElementRef<HTMLInputElement>>('inputEl');
   change = output<unknown>();
   ready = output<unknown>();
@@ -75,12 +82,33 @@ export class Flatpickr {
     effect(() => { const __watchVal = (() => this.disabled())(); untracked(() => ((v: any) => {
       if (this.instance) this.instance.input.disabled = v;
     })(__watchVal)); });
+    effect(() => { const __watchVal = (() => this.disable())(); untracked(() => ((v: any) => this.instance?.set('disable', v))(__watchVal)); });
+    effect(() => { const __watchVal = (() => this.enable())(); untracked(() => ((v: any) => this.instance?.set('enable', v))(__watchVal)); });
+    effect(() => { const __watchVal = (() => this.locale())(); untracked(() => ((v: any) => this.instance?.set('locale', {
+      ...(v ?? {}),
+      ...(this.firstDayOfWeek() !== 0 ? {
+        firstDayOfWeek: this.firstDayOfWeek()
+      } : {})
+    }))(__watchVal)); });
+    effect(() => { const __watchVal = (() => this.firstDayOfWeek())(); untracked(() => ((v: any) => this.instance?.set('locale', {
+      ...(this.locale() ?? {}),
+      ...(v !== 0 ? {
+        firstDayOfWeek: v
+      } : {})
+    }))(__watchVal)); });
   }
 
   ngAfterViewInit() {
     const __appendTo = this.appendTo();
     const __prevArrow = this.prevArrow();
     const __nextArrow = this.nextArrow();
+    const __disable = this.disable();
+    const __enable = this.enable();
+    const __parseDate = this.parseDate();
+    const __formatDate = this.formatDate();
+    const __plugins = this.plugins();
+    const __locale = this.locale();
+    const __firstDayOfWeek = this.firstDayOfWeek();
     this.instance = flatpickr(this.inputEl()!.nativeElement, {
       mode: this.mode(),
       dateFormat: this.dateFormat(),
@@ -114,6 +142,38 @@ export class Flatpickr {
       } : {}),
       ...(__nextArrow != null ? {
         nextArrow: __nextArrow
+      } : {}),
+      // GAP-2/3/4/6b conditional-spread passthrough. NEVER pass an empty array /
+      // null / default-0, because flatpickr treats `enable: []` as "nothing
+      // enabled" and a null locale/parseDate/formatDate breaks construction —
+      // each guard keeps the default render byte-identical to before.
+      ...(__disable.length ? {
+        disable: __disable
+      } : {}),
+      ...(__enable.length ? {
+        enable: __enable
+      } : {}),
+      ...(__parseDate != null ? {
+        parseDate: __parseDate
+      } : {}),
+      ...(__formatDate != null ? {
+        formatDate: __formatDate
+      } : {}),
+      ...(__plugins.length ? {
+        plugins: __plugins
+      } : {}),
+      // locale + firstDayOfWeek merge: emit a single `locale` entry present when
+      // EITHER a locale object is set OR firstDayOfWeek is non-default (0). The
+      // merge folds firstDayOfWeek INTO the locale object so it overrides the
+      // locale's own. Kept a PURE expression (no statements) so Angular can splice
+      // it into a binding context safely.
+      ...(__locale != null || __firstDayOfWeek !== 0 ? {
+        locale: {
+          ...(__locale ?? {}),
+          ...(__firstDayOfWeek !== 0 ? {
+            firstDayOfWeek: __firstDayOfWeek
+          } : {})
+        }
       } : {}),
       ...this.options(),
       onChange: (selectedDates: any, dateStr: any) => {

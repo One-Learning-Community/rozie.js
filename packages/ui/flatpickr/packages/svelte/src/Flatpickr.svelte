@@ -30,6 +30,13 @@ interface Props {
   prevArrow?: (string) | null;
   nextArrow?: (string) | null;
   allowInput?: boolean;
+  disable?: any[];
+  enable?: any[];
+  locale?: (any) | null;
+  firstDayOfWeek?: number;
+  parseDate?: ((...args: any[]) => any) | null;
+  formatDate?: ((...args: any[]) => any) | null;
+  plugins?: any[];
   onchange?: (...args: unknown[]) => void;
   onready?: (...args: unknown[]) => void;
   onopen?: (...args: unknown[]) => void;
@@ -42,6 +49,9 @@ interface Props {
 }
 
 let __defaultOptions = (() => ({}))();
+let __defaultDisable = (() => [])();
+let __defaultEnable = (() => [])();
+let __defaultPlugins = (() => [])();
 
 let {
   date = $bindable(''),
@@ -70,6 +80,13 @@ let {
   prevArrow = null,
   nextArrow = null,
   allowInput = false,
+  disable = __defaultDisable,
+  enable = __defaultEnable,
+  locale = null,
+  firstDayOfWeek = 0,
+  parseDate = null,
+  formatDate = null,
+  plugins = __defaultPlugins,
   onchange,
   onready,
   onopen,
@@ -161,6 +178,38 @@ onMount(() => {
     ...(nextArrow != null ? {
       nextArrow: nextArrow
     } : {}),
+    // GAP-2/3/4/6b conditional-spread passthrough. NEVER pass an empty array /
+    // null / default-0, because flatpickr treats `enable: []` as "nothing
+    // enabled" and a null locale/parseDate/formatDate breaks construction —
+    // each guard keeps the default render byte-identical to before.
+    ...(disable.length ? {
+      disable: disable
+    } : {}),
+    ...(enable.length ? {
+      enable: enable
+    } : {}),
+    ...(parseDate != null ? {
+      parseDate: parseDate
+    } : {}),
+    ...(formatDate != null ? {
+      formatDate: formatDate
+    } : {}),
+    ...(plugins.length ? {
+      plugins: plugins
+    } : {}),
+    // locale + firstDayOfWeek merge: emit a single `locale` entry present when
+    // EITHER a locale object is set OR firstDayOfWeek is non-default (0). The
+    // merge folds firstDayOfWeek INTO the locale object so it overrides the
+    // locale's own. Kept a PURE expression (no statements) so Angular can splice
+    // it into a binding context safely.
+    ...(locale != null || firstDayOfWeek !== 0 ? {
+      locale: {
+        ...(locale ?? {}),
+        ...(firstDayOfWeek !== 0 ? {
+          firstDayOfWeek: firstDayOfWeek
+        } : {})
+      }
+    } : {}),
     ...options,
     onChange: (selectedDates: any, dateStr: any) => {
       // Value contract + range-commit semantics. In range mode flatpickr fires
@@ -208,6 +257,20 @@ $effect(() => { const __watchVal = (() => dateFormat)(); untrack(() => ((v: any)
 $effect(() => { const __watchVal = (() => disabled)(); untrack(() => ((v: any) => {
   if (instance) instance.input.disabled = v;
 })(__watchVal)); });
+$effect(() => { const __watchVal = (() => disable)(); untrack(() => ((v: any) => instance?.set('disable', v))(__watchVal)); });
+$effect(() => { const __watchVal = (() => enable)(); untrack(() => ((v: any) => instance?.set('enable', v))(__watchVal)); });
+$effect(() => { const __watchVal = (() => locale)(); untrack(() => ((v: any) => instance?.set('locale', {
+  ...(v ?? {}),
+  ...(firstDayOfWeek !== 0 ? {
+    firstDayOfWeek: firstDayOfWeek
+  } : {})
+}))(__watchVal)); });
+$effect(() => { const __watchVal = (() => firstDayOfWeek)(); untrack(() => ((v: any) => instance?.set('locale', {
+  ...(locale ?? {}),
+  ...(v !== 0 ? {
+    firstDayOfWeek: v
+  } : {})
+}))(__watchVal)); });
 </script>
 
 

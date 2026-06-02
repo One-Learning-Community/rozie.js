@@ -32,6 +32,13 @@ interface FlatpickrProps {
   prevArrow?: (string) | null;
   nextArrow?: (string) | null;
   allowInput?: boolean;
+  disable?: any[];
+  enable?: any[];
+  locale?: (Record<string, any>) | null;
+  firstDayOfWeek?: number;
+  parseDate?: ((...args: any[]) => any) | null;
+  formatDate?: ((...args: any[]) => any) | null;
+  plugins?: any[];
   onChange?: (...args: any[]) => void;
   onReady?: (...args: any[]) => void;
   onOpen?: (...args: any[]) => void;
@@ -52,7 +59,10 @@ export interface FlatpickrHandle {
 
 const Flatpickr = forwardRef<FlatpickrHandle, FlatpickrProps>(function Flatpickr(_props: FlatpickrProps, ref): JSX.Element {
   const __defaultOptions = useState(() => (() => ({}))())[0];
-  const props: Omit<FlatpickrProps, 'mode' | 'dateFormat' | 'altInput' | 'altFormat' | 'enableTime' | 'enableSeconds' | 'time24hr' | 'noCalendar' | 'minDate' | 'maxDate' | 'placeholder' | 'disabled' | 'commitOn' | 'options' | 'name' | 'inline' | 'staticPosition' | 'position' | 'appendTo' | 'showMonths' | 'weekNumbers' | 'monthSelectorType' | 'prevArrow' | 'nextArrow' | 'allowInput'> & { mode: string; dateFormat: string; altInput: boolean; altFormat: string; enableTime: boolean; enableSeconds: boolean; time24hr: boolean; noCalendar: boolean; minDate: (string) | null; maxDate: (string) | null; placeholder: string; disabled: boolean; commitOn: string; options: Record<string, any>; name: string; inline: boolean; staticPosition: boolean; position: string; appendTo: (Record<string, any>) | null; showMonths: number; weekNumbers: boolean; monthSelectorType: string; prevArrow: (string) | null; nextArrow: (string) | null; allowInput: boolean } = {
+  const __defaultDisable = useState(() => (() => [])())[0];
+  const __defaultEnable = useState(() => (() => [])())[0];
+  const __defaultPlugins = useState(() => (() => [])())[0];
+  const props: Omit<FlatpickrProps, 'mode' | 'dateFormat' | 'altInput' | 'altFormat' | 'enableTime' | 'enableSeconds' | 'time24hr' | 'noCalendar' | 'minDate' | 'maxDate' | 'placeholder' | 'disabled' | 'commitOn' | 'options' | 'name' | 'inline' | 'staticPosition' | 'position' | 'appendTo' | 'showMonths' | 'weekNumbers' | 'monthSelectorType' | 'prevArrow' | 'nextArrow' | 'allowInput' | 'disable' | 'enable' | 'locale' | 'firstDayOfWeek' | 'parseDate' | 'formatDate' | 'plugins'> & { mode: string; dateFormat: string; altInput: boolean; altFormat: string; enableTime: boolean; enableSeconds: boolean; time24hr: boolean; noCalendar: boolean; minDate: (string) | null; maxDate: (string) | null; placeholder: string; disabled: boolean; commitOn: string; options: Record<string, any>; name: string; inline: boolean; staticPosition: boolean; position: string; appendTo: (Record<string, any>) | null; showMonths: number; weekNumbers: boolean; monthSelectorType: string; prevArrow: (string) | null; nextArrow: (string) | null; allowInput: boolean; disable: any[]; enable: any[]; locale: (Record<string, any>) | null; firstDayOfWeek: number; parseDate: ((...args: any[]) => any) | null; formatDate: ((...args: any[]) => any) | null; plugins: any[] } = {
     ..._props,
     mode: _props.mode ?? 'single',
     dateFormat: _props.dateFormat ?? 'Y-m-d',
@@ -79,10 +89,17 @@ const Flatpickr = forwardRef<FlatpickrHandle, FlatpickrProps>(function Flatpickr
     prevArrow: _props.prevArrow ?? null,
     nextArrow: _props.nextArrow ?? null,
     allowInput: _props.allowInput ?? false,
+    disable: _props.disable ?? __defaultDisable,
+    enable: _props.enable ?? __defaultEnable,
+    locale: _props.locale ?? null,
+    firstDayOfWeek: _props.firstDayOfWeek ?? 0,
+    parseDate: _props.parseDate ?? null,
+    formatDate: _props.formatDate ?? null,
+    plugins: _props.plugins ?? __defaultPlugins,
   };
   const attrs: Record<string, unknown> = (() => {
-    const { date, mode, dateFormat, altInput, altFormat, enableTime, enableSeconds, time24hr, noCalendar, minDate, maxDate, placeholder, disabled, commitOn, options, name, inline, staticPosition, position, appendTo, showMonths, weekNumbers, monthSelectorType, prevArrow, nextArrow, allowInput, defaultValue, onDateChange, defaultDate, ...rest } = _props as FlatpickrProps & Record<string, unknown>;
-    void date; void mode; void dateFormat; void altInput; void altFormat; void enableTime; void enableSeconds; void time24hr; void noCalendar; void minDate; void maxDate; void placeholder; void disabled; void commitOn; void options; void name; void inline; void staticPosition; void position; void appendTo; void showMonths; void weekNumbers; void monthSelectorType; void prevArrow; void nextArrow; void allowInput; void defaultValue; void onDateChange; void defaultDate;
+    const { date, mode, dateFormat, altInput, altFormat, enableTime, enableSeconds, time24hr, noCalendar, minDate, maxDate, placeholder, disabled, commitOn, options, name, inline, staticPosition, position, appendTo, showMonths, weekNumbers, monthSelectorType, prevArrow, nextArrow, allowInput, disable, enable, locale, firstDayOfWeek, parseDate, formatDate, plugins, defaultValue, onDateChange, defaultDate, ...rest } = _props as FlatpickrProps & Record<string, unknown>;
+    void date; void mode; void dateFormat; void altInput; void altFormat; void enableTime; void enableSeconds; void time24hr; void noCalendar; void minDate; void maxDate; void placeholder; void disabled; void commitOn; void options; void name; void inline; void staticPosition; void position; void appendTo; void showMonths; void weekNumbers; void monthSelectorType; void prevArrow; void nextArrow; void allowInput; void disable; void enable; void locale; void firstDayOfWeek; void parseDate; void formatDate; void plugins; void defaultValue; void onDateChange; void defaultDate;
     return rest;
   })();
   const instance = useRef<any>(null);
@@ -93,8 +110,16 @@ const Flatpickr = forwardRef<FlatpickrHandle, FlatpickrProps>(function Flatpickr
   });
   const _dateFormatRef = useRef(props.dateFormat);
   _dateFormatRef.current = props.dateFormat;
+  const _disableRef = useRef(props.disable);
+  _disableRef.current = props.disable;
   const _disabledRef = useRef(props.disabled);
   _disabledRef.current = props.disabled;
+  const _enableRef = useRef(props.enable);
+  _enableRef.current = props.enable;
+  const _firstDayOfWeekRef = useRef(props.firstDayOfWeek);
+  _firstDayOfWeekRef.current = props.firstDayOfWeek;
+  const _localeRef = useRef(props.locale);
+  _localeRef.current = props.locale;
   const _maxDateRef = useRef(props.maxDate);
   _maxDateRef.current = props.maxDate;
   const _minDateRef = useRef(props.minDate);
@@ -181,6 +206,38 @@ const Flatpickr = forwardRef<FlatpickrHandle, FlatpickrProps>(function Flatpickr
       ...(props.nextArrow != null ? {
         nextArrow: props.nextArrow
       } : {}),
+      // GAP-2/3/4/6b conditional-spread passthrough. NEVER pass an empty array /
+      // null / default-0, because flatpickr treats `enable: []` as "nothing
+      // enabled" and a null locale/parseDate/formatDate breaks construction —
+      // each guard keeps the default render byte-identical to before.
+      ...(_disableRef.current.length ? {
+        disable: _disableRef.current
+      } : {}),
+      ...(_enableRef.current.length ? {
+        enable: _enableRef.current
+      } : {}),
+      ...(props.parseDate != null ? {
+        parseDate: props.parseDate
+      } : {}),
+      ...(props.formatDate != null ? {
+        formatDate: props.formatDate
+      } : {}),
+      ...(props.plugins.length ? {
+        plugins: props.plugins
+      } : {}),
+      // locale + firstDayOfWeek merge: emit a single `locale` entry present when
+      // EITHER a locale object is set OR firstDayOfWeek is non-default (0). The
+      // merge folds firstDayOfWeek INTO the locale object so it overrides the
+      // locale's own. Kept a PURE expression (no statements) so Angular can splice
+      // it into a binding context safely.
+      ...(_localeRef.current != null || _firstDayOfWeekRef.current !== 0 ? {
+        locale: {
+          ...(_localeRef.current ?? {}),
+          ...(_firstDayOfWeekRef.current !== 0 ? {
+            firstDayOfWeek: _firstDayOfWeekRef.current
+          } : {})
+        }
+      } : {}),
       ...props.options,
       onChange: (selectedDates: any, dateStr: any) => {
         // Value contract + range-commit semantics. In range mode flatpickr fires
@@ -241,6 +298,32 @@ const Flatpickr = forwardRef<FlatpickrHandle, FlatpickrProps>(function Flatpickr
     const v = props.disabled;
     if (instance.current) instance.current.input.disabled = v;
   }, [props.disabled]);
+  useEffect(() => {
+    const v = props.disable;
+    instance.current?.set('disable', v);
+  }, [props.disable]);
+  useEffect(() => {
+    const v = props.enable;
+    instance.current?.set('enable', v);
+  }, [props.enable]);
+  useEffect(() => {
+    const v = props.locale;
+    instance.current?.set('locale', {
+    ...(v ?? {}),
+    ...(props.firstDayOfWeek !== 0 ? {
+      firstDayOfWeek: props.firstDayOfWeek
+    } : {})
+  });
+  }, [props.locale]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const v = props.firstDayOfWeek;
+    instance.current?.set('locale', {
+    ...(props.locale ?? {}),
+    ...(v !== 0 ? {
+      firstDayOfWeek: v
+    } : {})
+  });
+  }, [props.firstDayOfWeek]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useImperativeHandle(ref, () => ({ clear, openPicker, closePicker, selectDate, jumpToDate }), []); // eslint-disable-line react-hooks/exhaustive-deps
 

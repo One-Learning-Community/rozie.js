@@ -45,6 +45,13 @@ interface FlatpickrProps {
   prevArrow?: (string) | null;
   nextArrow?: (string) | null;
   allowInput?: boolean;
+  disable?: any[];
+  enable?: any[];
+  locale?: (Record<string, any>) | null;
+  firstDayOfWeek?: number;
+  parseDate?: ((...args: unknown[]) => unknown) | null;
+  formatDate?: ((...args: unknown[]) => unknown) | null;
+  plugins?: any[];
   onChange?: (...args: unknown[]) => void;
   onReady?: (...args: unknown[]) => void;
   onOpen?: (...args: unknown[]) => void;
@@ -65,8 +72,8 @@ export interface FlatpickrHandle {
 }
 
 export default function Flatpickr(_props: FlatpickrProps): JSX.Element {
-  const _merged = mergeProps({ mode: 'single', dateFormat: 'Y-m-d', altInput: false, altFormat: 'F j, Y', enableTime: false, enableSeconds: false, time24hr: false, noCalendar: false, minDate: null, maxDate: null, placeholder: 'Select a date…', disabled: false, commitOn: 'complete', options: (() => ({}))(), name: '', inline: false, staticPosition: false, position: 'auto', appendTo: null, showMonths: 1, weekNumbers: false, monthSelectorType: 'dropdown', prevArrow: null, nextArrow: null, allowInput: false }, _props);
-  const [local, attrs] = splitProps(_merged, ['date', 'mode', 'dateFormat', 'altInput', 'altFormat', 'enableTime', 'enableSeconds', 'time24hr', 'noCalendar', 'minDate', 'maxDate', 'placeholder', 'disabled', 'commitOn', 'options', 'name', 'inline', 'staticPosition', 'position', 'appendTo', 'showMonths', 'weekNumbers', 'monthSelectorType', 'prevArrow', 'nextArrow', 'allowInput', 'ref']);
+  const _merged = mergeProps({ mode: 'single', dateFormat: 'Y-m-d', altInput: false, altFormat: 'F j, Y', enableTime: false, enableSeconds: false, time24hr: false, noCalendar: false, minDate: null, maxDate: null, placeholder: 'Select a date…', disabled: false, commitOn: 'complete', options: (() => ({}))(), name: '', inline: false, staticPosition: false, position: 'auto', appendTo: null, showMonths: 1, weekNumbers: false, monthSelectorType: 'dropdown', prevArrow: null, nextArrow: null, allowInput: false, disable: (() => [])(), enable: (() => [])(), locale: null, firstDayOfWeek: 0, parseDate: null, formatDate: null, plugins: (() => [])() }, _props);
+  const [local, attrs] = splitProps(_merged, ['date', 'mode', 'dateFormat', 'altInput', 'altFormat', 'enableTime', 'enableSeconds', 'time24hr', 'noCalendar', 'minDate', 'maxDate', 'placeholder', 'disabled', 'commitOn', 'options', 'name', 'inline', 'staticPosition', 'position', 'appendTo', 'showMonths', 'weekNumbers', 'monthSelectorType', 'prevArrow', 'nextArrow', 'allowInput', 'disable', 'enable', 'locale', 'firstDayOfWeek', 'parseDate', 'formatDate', 'plugins', 'ref']);
   onMount(() => { local.ref?.({ clear, openPicker, closePicker, selectDate, jumpToDate }); });
 
   const [date, setDate] = createControllableSignal<string>(_props as unknown as Record<string, unknown>, 'date', '');
@@ -105,6 +112,38 @@ export default function Flatpickr(_props: FlatpickrProps): JSX.Element {
       } : {}),
       ...(local.nextArrow != null ? {
         nextArrow: local.nextArrow
+      } : {}),
+      // GAP-2/3/4/6b conditional-spread passthrough. NEVER pass an empty array /
+      // null / default-0, because flatpickr treats `enable: []` as "nothing
+      // enabled" and a null locale/parseDate/formatDate breaks construction —
+      // each guard keeps the default render byte-identical to before.
+      ...(local.disable.length ? {
+        disable: local.disable
+      } : {}),
+      ...(local.enable.length ? {
+        enable: local.enable
+      } : {}),
+      ...(local.parseDate != null ? {
+        parseDate: local.parseDate
+      } : {}),
+      ...(local.formatDate != null ? {
+        formatDate: local.formatDate
+      } : {}),
+      ...(local.plugins.length ? {
+        plugins: local.plugins
+      } : {}),
+      // locale + firstDayOfWeek merge: emit a single `locale` entry present when
+      // EITHER a locale object is set OR firstDayOfWeek is non-default (0). The
+      // merge folds firstDayOfWeek INTO the locale object so it overrides the
+      // locale's own. Kept a PURE expression (no statements) so Angular can splice
+      // it into a binding context safely.
+      ...(local.locale != null || local.firstDayOfWeek !== 0 ? {
+        locale: {
+          ...(local.locale ?? {}),
+          ...(local.firstDayOfWeek !== 0 ? {
+            firstDayOfWeek: local.firstDayOfWeek
+          } : {})
+        }
       } : {}),
       ...local.options,
       onChange: (selectedDates: any, dateStr: any) => {
@@ -154,6 +193,20 @@ export default function Flatpickr(_props: FlatpickrProps): JSX.Element {
   createEffect(() => { const __watchVal = (() => local.disabled)(); untrack(() => ((v: any) => {
     if (instance) instance.input.disabled = v;
   })(__watchVal)); });
+  createEffect(() => { const __watchVal = (() => local.disable)(); untrack(() => ((v: any) => instance?.set('disable', v))(__watchVal)); });
+  createEffect(() => { const __watchVal = (() => local.enable)(); untrack(() => ((v: any) => instance?.set('enable', v))(__watchVal)); });
+  createEffect(() => { const __watchVal = (() => local.locale)(); untrack(() => ((v: any) => instance?.set('locale', {
+    ...(v ?? {}),
+    ...(local.firstDayOfWeek !== 0 ? {
+      firstDayOfWeek: local.firstDayOfWeek
+    } : {})
+  }))(__watchVal)); });
+  createEffect(() => { const __watchVal = (() => local.firstDayOfWeek)(); untrack(() => ((v: any) => instance?.set('locale', {
+    ...(local.locale ?? {}),
+    ...(v !== 0 ? {
+      firstDayOfWeek: v
+    } : {})
+  }))(__watchVal)); });
   let inputElRef: HTMLElement | null = null;
 
   let instance: any = null;

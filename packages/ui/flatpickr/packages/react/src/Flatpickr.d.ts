@@ -31,6 +31,13 @@ export interface FlatpickrProps {
   prevArrow?: (string) | null;
   nextArrow?: (string) | null;
   allowInput?: boolean;
+  disable?: unknown[];
+  enable?: unknown[];
+  locale?: (Record<string, unknown>) | null;
+  firstDayOfWeek?: number;
+  parseDate?: ((...args: unknown[]) => unknown) | null;
+  formatDate?: ((...args: unknown[]) => unknown) | null;
+  plugins?: unknown[];
   onChange?: (...args: unknown[]) => void;
   onReady?: (...args: unknown[]) => void;
   onOpen?: (...args: unknown[]) => void;

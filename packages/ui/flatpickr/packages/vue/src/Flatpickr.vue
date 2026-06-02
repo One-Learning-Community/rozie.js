@@ -8,8 +8,8 @@
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 const props = withDefaults(
-  defineProps<{ mode?: string; dateFormat?: string; altInput?: boolean; altFormat?: string; enableTime?: boolean; enableSeconds?: boolean; time24hr?: boolean; noCalendar?: boolean; minDate?: string | null; maxDate?: string | null; placeholder?: string; disabled?: boolean; commitOn?: string; options?: Record<string, any>; name?: string; inline?: boolean; staticPosition?: boolean; position?: string; appendTo?: Record<string, any> | null; showMonths?: number; weekNumbers?: boolean; monthSelectorType?: string; prevArrow?: string | null; nextArrow?: string | null; allowInput?: boolean }>(),
-  { mode: 'single', dateFormat: 'Y-m-d', altInput: false, altFormat: 'F j, Y', enableTime: false, enableSeconds: false, time24hr: false, noCalendar: false, minDate: null, maxDate: null, placeholder: 'Select a date…', disabled: false, commitOn: 'complete', options: () => ({}), name: '', inline: false, staticPosition: false, position: 'auto', appendTo: null, showMonths: 1, weekNumbers: false, monthSelectorType: 'dropdown', prevArrow: null, nextArrow: null, allowInput: false }
+  defineProps<{ mode?: string; dateFormat?: string; altInput?: boolean; altFormat?: string; enableTime?: boolean; enableSeconds?: boolean; time24hr?: boolean; noCalendar?: boolean; minDate?: string | null; maxDate?: string | null; placeholder?: string; disabled?: boolean; commitOn?: string; options?: Record<string, any>; name?: string; inline?: boolean; staticPosition?: boolean; position?: string; appendTo?: Record<string, any> | null; showMonths?: number; weekNumbers?: boolean; monthSelectorType?: string; prevArrow?: string | null; nextArrow?: string | null; allowInput?: boolean; disable?: any[]; enable?: any[]; locale?: Record<string, any> | null; firstDayOfWeek?: number; parseDate?: ((...args: any[]) => any) | null; formatDate?: ((...args: any[]) => any) | null; plugins?: any[] }>(),
+  { mode: 'single', dateFormat: 'Y-m-d', altInput: false, altFormat: 'F j, Y', enableTime: false, enableSeconds: false, time24hr: false, noCalendar: false, minDate: null, maxDate: null, placeholder: 'Select a date…', disabled: false, commitOn: 'complete', options: () => ({}), name: '', inline: false, staticPosition: false, position: 'auto', appendTo: null, showMonths: 1, weekNumbers: false, monthSelectorType: 'dropdown', prevArrow: null, nextArrow: null, allowInput: false, disable: () => [], enable: () => [], locale: null, firstDayOfWeek: 0, parseDate: null, formatDate: null, plugins: () => [] }
 );
 
 const date = defineModel<string>('date', { default: '' });
@@ -106,6 +106,38 @@ onMounted(() => {
     ...(props.nextArrow != null ? {
       nextArrow: props.nextArrow
     } : {}),
+    // GAP-2/3/4/6b conditional-spread passthrough. NEVER pass an empty array /
+    // null / default-0, because flatpickr treats `enable: []` as "nothing
+    // enabled" and a null locale/parseDate/formatDate breaks construction —
+    // each guard keeps the default render byte-identical to before.
+    ...(props.disable.length ? {
+      disable: props.disable
+    } : {}),
+    ...(props.enable.length ? {
+      enable: props.enable
+    } : {}),
+    ...(props.parseDate != null ? {
+      parseDate: props.parseDate
+    } : {}),
+    ...(props.formatDate != null ? {
+      formatDate: props.formatDate
+    } : {}),
+    ...(props.plugins.length ? {
+      plugins: props.plugins
+    } : {}),
+    // locale + firstDayOfWeek merge: emit a single `locale` entry present when
+    // EITHER a locale object is set OR firstDayOfWeek is non-default (0). The
+    // merge folds firstDayOfWeek INTO the locale object so it overrides the
+    // locale's own. Kept a PURE expression (no statements) so Angular can splice
+    // it into a binding context safely.
+    ...(props.locale != null || props.firstDayOfWeek !== 0 ? {
+      locale: {
+        ...(props.locale ?? {}),
+        ...(props.firstDayOfWeek !== 0 ? {
+          firstDayOfWeek: props.firstDayOfWeek
+        } : {})
+      }
+    } : {}),
     ...props.options,
     onChange: (selectedDates: any, dateStr: any) => {
       // Value contract + range-commit semantics. In range mode flatpickr fires
@@ -154,6 +186,20 @@ watch(() => props.dateFormat, (v: any) => instance?.set('dateFormat', v), { imme
 watch(() => props.disabled, (v: any) => {
   if (instance) instance.input.disabled = v;
 }, { immediate: true });
+watch(() => props.disable, (v: any) => instance?.set('disable', v), { immediate: true });
+watch(() => props.enable, (v: any) => instance?.set('enable', v), { immediate: true });
+watch(() => props.locale, (v: any) => instance?.set('locale', {
+  ...(v ?? {}),
+  ...(props.firstDayOfWeek !== 0 ? {
+    firstDayOfWeek: props.firstDayOfWeek
+  } : {})
+}), { immediate: true });
+watch(() => props.firstDayOfWeek, (v: any) => instance?.set('locale', {
+  ...(props.locale ?? {}),
+  ...(v !== 0 ? {
+    firstDayOfWeek: v
+  } : {})
+}), { immediate: true });
 
 defineExpose({ clear, openPicker, closePicker, selectDate, jumpToDate });
 </script>

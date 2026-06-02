@@ -63,6 +63,13 @@ export class DemoComponent {
 | `prevArrow` | `String` | `null` |  |  |
 | `nextArrow` | `String` | `null` |  |  |
 | `allowInput` | `Boolean` | `false` |  |  |
+| `disable` | `Array` | `[]` |  |  |
+| `enable` | `Array` | `[]` |  |  |
+| `locale` | `Object` | `null` |  |  |
+| `firstDayOfWeek` | `Number` | `0` |  |  |
+| `parseDate` | `Function` | `null` |  |  |
+| `formatDate` | `Function` | `null` |  |  |
+| `plugins` | `Array` | `[]` |  |  |
 
 ## Events
 

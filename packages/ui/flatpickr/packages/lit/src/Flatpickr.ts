@@ -48,6 +48,13 @@ export default class Flatpickr extends SignalWatcher(LitElement) {
   @property({ type: String, reflect: true }) prevArrow: string = null;
   @property({ type: String, reflect: true }) nextArrow: string = null;
   @property({ type: Boolean, reflect: true }) allowInput: boolean = false;
+  @property({ type: Array }) disable: any[] = [];
+  @property({ type: Array }) enable: any[] = [];
+  @property({ type: Object }) locale: any = null;
+  @property({ type: Number, reflect: true }) firstDayOfWeek: number = 0;
+  @property({ type: Function }) parseDate: ((...args: unknown[]) => unknown) | null = null;
+  @property({ type: Function }) formatDate: ((...args: unknown[]) => unknown) | null = null;
+  @property({ type: Array }) plugins: any[] = [];
   @query('[data-rozie-ref="inputEl"]') private _refInputEl!: HTMLElement;
 
   private _disconnectCleanups: Array<() => void> = [];
@@ -88,6 +95,38 @@ export default class Flatpickr extends SignalWatcher(LitElement) {
       } : {}),
       ...(this.nextArrow != null ? {
         nextArrow: this.nextArrow
+      } : {}),
+      // GAP-2/3/4/6b conditional-spread passthrough. NEVER pass an empty array /
+      // null / default-0, because flatpickr treats `enable: []` as "nothing
+      // enabled" and a null locale/parseDate/formatDate breaks construction —
+      // each guard keeps the default render byte-identical to before.
+      ...(this.disable.length ? {
+        disable: this.disable
+      } : {}),
+      ...(this.enable.length ? {
+        enable: this.enable
+      } : {}),
+      ...(this.parseDate != null ? {
+        parseDate: this.parseDate
+      } : {}),
+      ...(this.formatDate != null ? {
+        formatDate: this.formatDate
+      } : {}),
+      ...(this.plugins.length ? {
+        plugins: this.plugins
+      } : {}),
+      // locale + firstDayOfWeek merge: emit a single `locale` entry present when
+      // EITHER a locale object is set OR firstDayOfWeek is non-default (0). The
+      // merge folds firstDayOfWeek INTO the locale object so it overrides the
+      // locale's own. Kept a PURE expression (no statements) so Angular can splice
+      // it into a binding context safely.
+      ...(this.locale != null || this.firstDayOfWeek !== 0 ? {
+        locale: {
+          ...(this.locale ?? {}),
+          ...(this.firstDayOfWeek !== 0 ? {
+            firstDayOfWeek: this.firstDayOfWeek
+          } : {})
+        }
       } : {}),
       ...this.options,
       onChange: (selectedDates: any, dateStr: any) => {
@@ -168,6 +207,20 @@ export default class Flatpickr extends SignalWatcher(LitElement) {
     if (changedProperties.has('disabled')) { const __watchVal = (() => this.disabled)(); ((v: any) => {
       if (this.instance) this.instance.input.disabled = v;
     })(__watchVal); }
+    if (changedProperties.has('disable')) { const __watchVal = (() => this.disable)(); ((v: any) => this.instance?.set('disable', v))(__watchVal); }
+    if (changedProperties.has('enable')) { const __watchVal = (() => this.enable)(); ((v: any) => this.instance?.set('enable', v))(__watchVal); }
+    if (changedProperties.has('locale')) { const __watchVal = (() => this.locale)(); ((v: any) => this.instance?.set('locale', {
+      ...(v ?? {}),
+      ...(this.firstDayOfWeek !== 0 ? {
+        firstDayOfWeek: this.firstDayOfWeek
+      } : {})
+    }))(__watchVal); }
+    if (changedProperties.has('firstDayOfWeek')) { const __watchVal = (() => this.firstDayOfWeek)(); ((v: any) => this.instance?.set('locale', {
+      ...(this.locale ?? {}),
+      ...(v !== 0 ? {
+        firstDayOfWeek: v
+      } : {})
+    }))(__watchVal); }
   }
 
   disconnectedCallback(): void {
@@ -225,7 +278,7 @@ export default class Flatpickr extends SignalWatcher(LitElement) {
    * (explicit `attribute:`) AND lowercased property name (Lit's default).
    */
   private get $attrs(): Record<string, string> {
-    const __skip = new Set<string>(['date', 'mode', 'date-format', 'dateformat', 'alt-input', 'altinput', 'alt-format', 'altformat', 'enable-time', 'enabletime', 'enable-seconds', 'enableseconds', 'time24hr', 'no-calendar', 'nocalendar', 'min-date', 'mindate', 'max-date', 'maxdate', 'placeholder', 'disabled', 'commit-on', 'commiton', 'options', 'name', 'inline', 'static-position', 'staticposition', 'position', 'append-to', 'appendto', 'show-months', 'showmonths', 'week-numbers', 'weeknumbers', 'month-selector-type', 'monthselectortype', 'prev-arrow', 'prevarrow', 'next-arrow', 'nextarrow', 'allow-input', 'allowinput']);
+    const __skip = new Set<string>(['date', 'mode', 'date-format', 'dateformat', 'alt-input', 'altinput', 'alt-format', 'altformat', 'enable-time', 'enabletime', 'enable-seconds', 'enableseconds', 'time24hr', 'no-calendar', 'nocalendar', 'min-date', 'mindate', 'max-date', 'maxdate', 'placeholder', 'disabled', 'commit-on', 'commiton', 'options', 'name', 'inline', 'static-position', 'staticposition', 'position', 'append-to', 'appendto', 'show-months', 'showmonths', 'week-numbers', 'weeknumbers', 'month-selector-type', 'monthselectortype', 'prev-arrow', 'prevarrow', 'next-arrow', 'nextarrow', 'allow-input', 'allowinput', 'disable', 'enable', 'locale', 'first-day-of-week', 'firstdayofweek', 'parse-date', 'parsedate', 'format-date', 'formatdate', 'plugins']);
     const out: Record<string, string> = {};
     for (const a of Array.from(this.attributes)) {
       if (__skip.has(a.name)) continue;
