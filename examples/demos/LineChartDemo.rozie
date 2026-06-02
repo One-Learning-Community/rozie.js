@@ -103,7 +103,7 @@ $watch(() => $data.liveFeed, (on) => {
       timerId = null
     }
   }
-})
+}, { immediate: true })
 </script>
 
 <template>

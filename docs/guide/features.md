@@ -469,20 +469,58 @@ $watch(() => $props.open, () => {
 </script>
 ```
 
-It's the right tool when `$onMount` is too early. A common case: an element gated by `r-if` is undefined at mount time, but the consumer toggles the gate later — `$watch` fires after the transition, when the ref is finally populated.
+### Lazy by default — never fires with the initial value
 
-Each target compiles this to its native effect primitive:
+`$watch(getter, cb)` is **lazy**: the callback runs **only when the watched value changes** after mount, and is **never** invoked with the initial value. This mirrors Vue's default `watch()`, and Rozie holds it uniform across all six targets — react, vue, svelte, angular, solid, and lit all skip the first run.
 
-| Target | Expansion |
+This is the right tool when `$onMount` is too early. A common case: an element gated by `r-if` is undefined at mount time, but the consumer toggles the gate later — `$watch` fires after the transition, when the ref is finally populated. Because the initial value is skipped, engine-wrapper reconcilers (`instance?.set(...)`) never fire against a not-yet-constructed engine at mount.
+
+Each target compiles the lazy form to its native effect primitive, skipping the first callback invocation:
+
+| Target | Expansion (lazy default) |
 | --- | --- |
-| Vue | `watch(() => open.value, () => { /* cb */ })` |
-| React | `useEffect(() => { /* cb */ }, [open, /* closure refs */])` — getter deps + callback closure refs unioned to satisfy `react-hooks/exhaustive-deps` |
-| Svelte 5 | `$effect(() => { (() => open)(); (() => { /* cb */ })(); })` — getter IIFE inside `$effect` registers the subscription via reactive read tracking |
-| Angular | `effect(() => { (() => this.open())(); (() => { /* cb */ })(); })` |
-| Solid | `createEffect(() => { (() => props.open)(); (() => { /* cb */ })(); })` |
-| Lit | `effect(() => { (() => this.open)(); (() => { /* cb */ })(); })` from `@lit-labs/preact-signals`; the unsubscribe handle is pushed onto the disconnect-cleanup drain |
+| Vue | `watch(() => open.value, () => { /* cb */ })` — Vue's native lazy `watch` |
+| React | `useEffect(() => { if (_watch0First.current) { _watch0First.current = false; return; } /* cb */ }, [open, /* closure refs */])` — a `useRef(true)` first-run skip; the ref stays **out** of the dep array (refs are exempt from `react-hooks/exhaustive-deps`) |
+| Svelte 5 | `$effect(() => { const __v = (() => open)(); untrack(() => { if (__rozieWatchInitial_0) { __rozieWatchInitial_0 = false; return; } (() => { /* cb */ })(__v); }); })` — the first-run flag is read/written inside `untrack` so it does not self-subscribe |
+| Angular | `effect(() => { const __v = (() => this.open())(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } /* cb */ }); })` |
+| Solid | `createEffect(on(() => (() => props.open)(), (v) => untrack(() => (/* cb */)(v)), { defer: true }))` — Solid's idiomatic `on(..., { defer: true })` runs the getter to establish tracking but skips the first callback |
+| Lit | props route → `if (this.hasUpdated && changedProperties.has('open')) { /* cb */ }` inside `updated()` (`hasUpdated` is `false` on the first cycle); effect route → `effect(...)` from `@lit-labs/preact-signals` with a class-field first-run flag inside `untracked`, handle pushed onto the disconnect-cleanup drain |
 
-Single-getter form only — array-of-getters, `oldValue` callback parameter, and `flush` / `immediate` options are not in scope. Malformed calls emit a soft `ROZ109` diagnostic and are skipped rather than crashing the compiler.
+### `{ immediate: true }` — opt back into the eager initial fire
+
+Pass `{ immediate: true }` as the third argument to restore an eager fire with the initial value at watcher-setup time (Vue's `{ immediate: true }` semantic):
+
+```rozie
+<script>
+// Live feed defaults on — start the interval at mount, then re-evaluate
+// every time the toggle flips.
+$watch(() => $data.liveFeed, (on) => {
+  if (on) start() else stop()
+}, { immediate: true })
+</script>
+```
+
+::: warning Ordering relative to `$onMount` is target-dependent
+The `immediate` initial fire happens at watcher-setup time, which lands **before** `$onMount` on vue/angular and **after** it on react/svelte/solid/lit. Do **not** use `{ immediate: true }` for engine-instance reconciliation that depends on the engine already existing — that's exactly what the lazy default plus an `$onMount` build is for. Reserve `immediate` for self-contained side effects (timers, derived-state sync) that don't touch an engine handle.
+:::
+
+### Change detection is reference equality (`!==`)
+
+The watcher fires when the getter's return value is `!==` its previous value. A getter that returns a **fresh object or array reference every run** therefore fires on **every** reactive tick:
+
+```rozie
+<script>
+// ⚠️ returns a new object each evaluation → fires every tick
+$watch(() => ({ ...$data.config }), cb)
+
+// ✅ watch a stable reference, or a primitive derived from it
+$watch(() => $data.config, cb)
+</script>
+```
+
+This matches Vue's documented `watch` behavior — it's an author-controlled getter shape, not a compiler defect.
+
+Single-getter form only — array-of-getters and the `oldValue` callback parameter are not in scope, and the only supported third-arg option is `{ immediate: true }`. Malformed calls emit a soft `ROZ109` diagnostic and are skipped rather than crashing the compiler.
 
 ## `$refs` derived from `ref="..."`
 

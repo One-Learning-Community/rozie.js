@@ -106,7 +106,7 @@ $watch(() => $props.data, (v) => {
   live.datasets.length = nextSets.length
 
   instance.update($props.updateMode)
-})
+}, { immediate: true })
 
 $watch(() => $props.options, (v) => {
   if (!instance) return
@@ -115,7 +115,7 @@ $watch(() => $props.options, (v) => {
   // animation rather than rescale-flicker on every options tick.
   instance.options = { ...instance.options, ...v }
   instance.update('none')
-})
+}, { immediate: true })
 
 // Chart.js doesn't expose a "change type at runtime" path that's stable
 // across versions, so we re-create the instance when type changes. Rare
