@@ -44,7 +44,10 @@ import {
   emitRozieTsToDisk,
   prebuildAngularRozieFiles,
   transformIncludeRozie,
+  walkRozieFiles,
 } from './transform.js';
+import { emitSidecar } from './emitSidecar.js';
+import { readFileSync } from 'node:fs';
 
 export type { RozieOptions };
 export { validateOptions } from './options.js';
@@ -93,6 +96,51 @@ export const unplugin = createUnpluginV3<Partial<RozieOptions>>((rawOptions) => 
   const resolveId = createResolveIdHook(options.target);
   const load = createLoadHook(registry, options.target);
 
+  // Phase 22 Plan 22-05 — `.d.rozie.ts` sidecar generation.
+  //
+  // Walk the project roots and emit a `<Name>.d.rozie.ts` sidecar next to each
+  // `.rozie` source, dispatching by `options.target` to the matching
+  // `emit<Target>Types` renderer (via emitSidecar). The trust boundary is the
+  // union of (root + consumer `prebuildExtraRoots`), mirroring the Angular
+  // disk-cache prebuild allowlist — a file discovered under any root may write
+  // its sidecar inside that root.
+  //
+  // This is wired to the SHARED `buildStart` hook (below) so Rollup/Webpack/
+  // esbuild/Rolldown/Rspack adapters emit sidecars too — NOT a Vite-only API
+  // (RESEARCH Anti-Pattern: "Vite-only API for generation"). `handleHotUpdate`
+  // adds a Vite-only single-file refresh ON TOP of this primary path.
+  const emitSidecarsForRoot = (root: string): void => {
+    const allowedRoots = [root, ...(options.prebuildExtraRoots ?? [])];
+    for (const rootDir of allowedRoots) {
+      for (const roziePath of walkRozieFiles(rootDir)) {
+        try {
+          const source = readFileSync(roziePath, 'utf8');
+          emitSidecar(roziePath, source, options.target, allowedRoots);
+        } catch (err) {
+          // A single bad `.rozie` must not abort the whole scan — the
+          // request-time transform of THIS file will surface a precise
+          // Vite-shaped error. Mirror prebuildAngularRozieFiles' warn-don't-throw.
+          const msg = err instanceof Error ? err.message : String(err);
+          // biome-ignore lint/suspicious/noConsole: build-time diagnostic
+          console.warn(`[@rozie/unplugin] sidecar emit failed for ${roziePath} → ${msg}`);
+        }
+      }
+    }
+  };
+
+  // Single-file sidecar refresh (Vite HMR optimization — see handleHotUpdate).
+  const emitSidecarFor = (roziePath: string, root: string): void => {
+    const allowedRoots = [root, ...(options.prebuildExtraRoots ?? [])];
+    try {
+      const source = readFileSync(roziePath, 'utf8');
+      emitSidecar(roziePath, source, options.target, allowedRoots);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      // biome-ignore lint/suspicious/noConsole: HMR-time diagnostic
+      console.warn(`[@rozie/unplugin] sidecar HMR refresh failed for ${roziePath} → ${msg}`);
+    }
+  };
+
   // NOTE: we do NOT register a `transform` hook in the production plugin.
   // The path-virtual chain is resolveId → load (returns target source) →
   // downstream framework plugin. A `transform` hook here would double-fire
@@ -105,6 +153,17 @@ export const unplugin = createUnpluginV3<Partial<RozieOptions>>((rawOptions) => 
     resolveId,
     load,
     transformInclude: transformIncludeRozie,
+    // Phase 22 Plan 22-05 — SHARED hook (present across Vite/Rollup/Webpack/
+    // esbuild/Rolldown/Rspack adapters). Generate `.d.rozie.ts` sidecars
+    // BEFORE downstream tsc resolution. `enforce: 'pre'` already orders Rozie
+    // ahead of the framework plugins; running the sidecar walk here means a
+    // fresh checkout's first build writes all sidecars before the consumer's
+    // tsc resolves any `.rozie` import (SPEC-R5/R6). The walk root is the
+    // process cwd (the bundler's invocation dir) unioned with the consumer's
+    // optional `prebuildExtraRoots` allowlist.
+    buildStart(): void {
+      emitSidecarsForRoot(process.cwd());
+    },
     // Vite-only: the dep-scan step (`vite:dep-scan`) runs esbuild ahead of
     // the regular plugin pipeline. esbuild calls our resolveId, gets back
     // `<abs>/Foo.rozie.{vue,tsx}`, and then tries to fs.readFile that
@@ -163,6 +222,15 @@ export const unplugin = createUnpluginV3<Partial<RozieOptions>>((rawOptions) => 
       // biome-ignore lint/suspicious/noExplicitAny: Vite HMR context type varies by version
       handleHotUpdate({ file, server }: { file: string; server: any }) {
         if (!file.endsWith('.rozie')) return;
+        // Phase 22 Plan 22-05 — Vite-only sidecar refresh OPTIMIZATION on top
+        // of the shared buildStart primary path: when a `.rozie` source changes
+        // in dev, re-emit its `<Name>.d.rozie.ts` so the consumer's tsc/IDE
+        // sees fresh types without a full rebuild. The idempotent skip inside
+        // emitSidecar means an unchanged source is a no-op (no HMR loop).
+        {
+          const hmrRoot = server?.config?.root ?? process.cwd();
+          emitSidecarFor(file, hmrRoot);
+        }
         // D-70 disk-cache HMR support: when a `.rozie` source file changes,
         // re-emit the sibling `.rozie.ts` on disk so analogjs's downstream
         // HMR machinery (which watches the .ts file) picks up the new

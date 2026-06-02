@@ -1414,7 +1414,7 @@ function runAngularEmitForDisk(
  *
  * Yields absolute paths.
  */
-function* walkRozieFiles(rootDir: string): Generator<string> {
+export function* walkRozieFiles(rootDir: string): Generator<string> {
   const SKIP_DIRS = new Set([
     'node_modules',
     'dist',
