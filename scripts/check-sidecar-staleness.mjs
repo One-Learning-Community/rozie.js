@@ -234,9 +234,8 @@ function runGate(requireComplete) {
     if (!result.ok) stale.push(result.reason);
   }
 
-  // Missing-declaration gap: a `.rozie` that lives next to OTHER sidecar'd
-  // siblings (i.e. in a directory that already participates in sidecar
-  // generation) but has NO sidecar of its own.
+  // Missing-declaration gap: a `.rozie` consumer source with NO sidecar of its
+  // own.
   //
   // Default (dev / pre-push): on a fresh checkout this is expected (sidecars
   // are gitignored), and that case is handled by CI ordering (generate before
@@ -249,14 +248,22 @@ function runGate(requireComplete) {
   // per-file error in emitSidecarsForRoot) — the consumer's tsc would fall
   // back to the wildcard and type-lie, the exact failure this gate exists to
   // catch. With the flag, a missing sidecar is a HARD failure (exit 1).
-  const sidecarDirs = new Set(sidecars.map((p) => dirname(p)));
+  //
+  // The walk here MUST be independent of which sidecars exist. The previous
+  // implementation derived the directory set FROM existing sidecars
+  // (`new Set(sidecars.map(dirname))`), which passed VACUOUSLY when the build
+  // produced ZERO sidecars — exactly what happened in the 2026-06-02 incident:
+  // a turbo cache replay restored `dist/**` (the declared outputs) but not the
+  // src/ sidecars, buildStart never ran, this gate said "0 sidecar(s) OK", and
+  // the downstream tsc failed with a wall of TS2307s. Walking the consumer
+  // tree directly (every `.rozie` under examples/consumers/ except the
+  // ANGULAR-EXCEPTION tree, which must NEVER have sidecars) makes a
+  // zero-sidecar build fail HERE, loudly, with the right message.
   const missing = [];
-  for (const dir of sidecarDirs) {
-    const roziesHere = walk(dir, (n) => n.endsWith('.rozie'));
-    for (const r of roziesHere) {
-      const expected = r.replace(/\.rozie$/, '.d.rozie.ts');
-      if (!existsSync(expected)) missing.push(`${r} (expected ${expected})`);
-    }
+  const consumerRozies = walk(CONSUMERS_DIR, (n) => n.endsWith('.rozie'), [], ['angular-analogjs']);
+  for (const r of consumerRozies) {
+    const expected = r.replace(/\.rozie$/, '.d.rozie.ts');
+    if (!existsSync(expected)) missing.push(`${r} (expected ${expected})`);
   }
 
   if (stale.length > 0) {

@@ -3,7 +3,7 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": ["dist/**"]
+      "outputs": ["dist/**", "src/**/*.d.rozie.ts", "app/**/*.d.rozie.ts"]
     },
     "@rozie/runtime-svelte#build": {
       "dependsOn": ["^build"],
