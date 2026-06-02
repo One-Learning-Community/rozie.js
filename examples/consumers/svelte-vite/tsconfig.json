@@ -13,7 +13,8 @@
     "experimentalDecorators": true,
     "emitDecoratorMetadata": false,
     "useDefineForClassFields": false,
-    "verbatimModuleSyntax": true
+    "verbatimModuleSyntax": true,
+    "allowArbitraryExtensions": true
   },
   "include": ["src/**/*.ts", "src/**/*.svelte", "tests/**/*.ts"]
 }

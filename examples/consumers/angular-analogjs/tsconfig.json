@@ -10,7 +10,8 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "lib": ["ES2022", "DOM"],
-    "types": ["vite/client", "node"]
+    "types": ["vite/client", "node"],
+    "allowArbitraryExtensions": true
   },
   "include": ["src/**/*.ts"]
 }

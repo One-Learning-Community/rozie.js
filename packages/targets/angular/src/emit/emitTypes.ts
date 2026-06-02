@@ -23,7 +23,7 @@
  *     step?: number;
  *   }
  *
- *   declare class Counter {
+ *   export declare class Counter {
  *     value?: number;
  *     step?: number;
  *   }
@@ -131,9 +131,25 @@ export function emitAngularTypes(
   );
   lines.push('');
 
-  // Angular default-export idiom: the component class + its DI-token const.
-  // The class declares the typed prop members + PUBLIC ir.expose methods.
-  lines.push(`declare class ${ir.name} {`);
+  // Angular default-export idiom: the component class is BOTH the default
+  // export AND a NAMED export. The class declares the typed prop members +
+  // PUBLIC ir.expose methods.
+  //
+  // Phase 22 (cross-rozie shim shadowing fix): the class is emitted as
+  // `export declare class <Name>` — a NAMED export — not a bare
+  // `declare class`. The Angular target writes a `<Name>.ts` cross-rozie
+  // re-export shim (`export * from './<Name>.rozie'`) for `<components>`
+  // composition. Once this sidecar exists, TS resolves the shim's
+  // `./<Name>.rozie` specifier to THIS sidecar (over the disk-cache
+  // `<Name>.rozie.ts`), so the consumer's `import { <Name> }` (the named class)
+  // is satisfied by `export *` ONLY if the class is a named export here. A bare
+  // `declare class` (default-only) made `export *` re-export nothing → TS2614
+  // on every cross-rozie composition cell (the Plan-05 known-red entry
+  // condition). The named `export declare class` closes it WITHOUT touching the
+  // runtime AOT path (the shim still resolves `./<Name>.rozie` → the disk-cache
+  // VALUE class at bundle time; the sidecar is type-only). `export default`
+  // remains so direct `import <Name> from './<Name>.rozie'` keeps working.
+  lines.push(`export declare class ${ir.name} {`);
   for (const member of classPropMembers(ir)) {
     lines.push(member);
   }

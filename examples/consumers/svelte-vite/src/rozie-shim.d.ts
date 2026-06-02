@@ -1,17 +1,14 @@
-// TypeScript shim for `.rozie` imports — informs svelte-check / tsc that a
-// `.rozie` import resolves to a Svelte component. The actual compiled SFC
-// type-checks via svelte-check against the synthesized `.rozie.svelte`
-// virtual module produced by @rozie/unplugin's resolveId. This shim exists
-// for the consumer-side `import Counter from '../../../../Counter.rozie'`
-// syntax to type-check.
+// Phase 22 (REQ-1/R3/R4/R9): this demo now consumes the per-module
+// `<Name>.d.rozie.ts` sidecars emitted by @rozie/unplugin's buildStart hook —
+// `import Foo, { type FooProps } from './Foo.rozie'` gets REAL Svelte types
+// (`Component<FooProps>` + event callbacks).
 //
-// @rozie/unplugin's path-virtual chain rewrites the `.rozie` id to a
-// `.svelte` id at build-time, but TS-only typecheck (svelte-check) does not
-// run the resolveId hook — so we declare the module shape here. Plan 05-02
-// finalises this to a more useful Component<Props> shape via Phase 6
-// TYPES-01..03.
-declare module '*.rozie' {
-  import type { Component } from 'svelte';
-  const component: Component;
-  export default component;
-}
+// The former broad `declare module '*.rozie'` wildcard is DEMOTED (deleted for
+// this demo, which migrates 100% cleanly — every `.rozie` import here is
+// in-`src` and has a sidecar). Per SPIKE-FINDINGS, Svelte (`tsc` + svelte-check)
+// honors the sidecar ONLY with `allowArbitraryExtensions: true` (set in
+// tsconfig.json); WITHOUT the flag the wildcard SHADOWS the sidecar (TS2614 /
+// silent type-lying — REQ-6's concern, the typo-probe's `@ts-expect-error`
+// would be reported UNUSED). The flag flip + wildcard demotion land together.
+// Do NOT re-add a broad wildcard — it reintroduces the shadowing.
+export {};

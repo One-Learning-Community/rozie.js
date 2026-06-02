@@ -52,7 +52,11 @@ describe('emitAngularTypes — Phase 22 Plan 22-04', () => {
   it('Test 1: Counter — declare class + typed props surface (non-empty)', () => {
     const out = emitAngularTypes(load('Counter'));
     expect(out.length).toBeGreaterThan(0);
-    expect(out).toContain(`declare class Counter {`);
+    // Phase 22: the class is a NAMED export (`export declare class`) so the
+    // cross-rozie re-export shim's `export *` re-exports the named class — this
+    // closes the cross-rozie-shim-vs-sidecar TS2614 shadowing (Plan-05 entry
+    // condition). `declare class Counter {` is still a substring.
+    expect(out).toContain(`export declare class Counter {`);
     // Default export is the component class (value + type).
     expect(out).toContain(`export default Counter;`);
   });
