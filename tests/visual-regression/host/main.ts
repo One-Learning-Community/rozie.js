@@ -142,6 +142,14 @@ export const EXAMPLES = [
   // "reset via handle" button — the external-caller harness (D-07) the
   // expose-probe.spec drives to assert the exposed method clears the input.
   'ExposeProbe',
+  // Quick 260601-x2p — FlatpickrBehavior is the behavioral-only gap-2/3/4 demo.
+  // Loader resolves to examples/demos/FlatpickrBehaviorDemo.rozie (which imports
+  // ../../packages/ui/flatpickr/src/Flatpickr.rozie). Built for all 6 targets
+  // but NOT a screenshot cell — covered by flatpickr-behavior.spec.ts
+  // (structural assertions for :disable / :locale / :plugins), deliberately NOT
+  // in matrix.spec.ts EXAMPLES. Distinct from the existing 'Flatpickr' wrapper
+  // screenshot cell (FlatpickrDemo.rozie), which stays byte-untouched.
+  'FlatpickrBehavior',
 ] as const;
 
 export type Example = (typeof EXAMPLES)[number];
@@ -201,6 +209,9 @@ export const LIT_TAGS: Record<Example, string> = {
   // Phase 21 — $expose dogfood. The Lit cell queries this tag to grab the
   // element handle and call reset() (the external-caller harness).
   ExposeProbe: 'rozie-expose-probe',
+  // Quick 260601-x2p — the lit entry appends '-demo' → tag
+  // 'rozie-flatpickr-behavior-demo' = kebab of FlatpickrBehaviorDemo.
+  FlatpickrBehavior: 'rozie-flatpickr-behavior',
 };
 
 export interface HostQuery {
@@ -296,6 +307,9 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // parent-side props. The exposed reset()/focus() handle is driven by the
   // per-target VR external-caller shim, not props.
   ExposeProbe: {},
+  // Quick 260601-x2p — self-contained; all reactive state lives in the demo's
+  // <data> (picked / disableWeekends / lang / rangeValue / rangeEnabled).
+  FlatpickrBehavior: {},
 };
 
 /**
