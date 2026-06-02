@@ -68,9 +68,10 @@ onMount(() => {
   // new Popper($refs.triggerEl, $refs.panelEl, { placement: 'bottom-start' })
 });
 
-$effect(() => { (() => open)(); untrack(() => (() => {
+let __rozieWatchInitial_0 = true;
+$effect(() => { (() => open)(); untrack(() => { if (__rozieWatchInitial_0) { __rozieWatchInitial_0 = false; return; } (() => {
   if (open) reposition();
-})()); });
+})(); }); });
 
 $effect(() => {
   if (!(open && closeOnOutsideClick)) return;

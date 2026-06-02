@@ -44,6 +44,7 @@ const Dropdown = forwardRef<DropdownHandle, DropdownProps>(function Dropdown(_pr
   _openRef.current = open;
   const triggerEl = useRef<HTMLDivElement | null>(null);
   const panelEl = useRef<HTMLDivElement | null>(null);
+  const _watch0First = useRef(true);
 
   const toggle = useCallback(() => {
     setOpen(prev => !prev);
@@ -69,6 +70,7 @@ const Dropdown = forwardRef<DropdownHandle, DropdownProps>(function Dropdown(_pr
     // new Popper($refs.triggerEl, $refs.panelEl, { placement: 'bottom-start' })
   }, []);
   useEffect(() => {
+    if (_watch0First.current) { _watch0First.current = false; return; }
     if (open) reposition();
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 

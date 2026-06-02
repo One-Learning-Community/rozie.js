@@ -239,14 +239,22 @@ onMount(() => {
   return () => instance?.destroy();
 });
 
-$effect(() => { const __watchVal = (() => disabled)(); untrack(() => ((v: any) => instance?.option('disabled', v))(__watchVal)); });
-$effect(() => { const __watchVal = (() => group)(); untrack(() => ((v: any) => instance?.option('group', v))(__watchVal)); });
-$effect(() => { const __watchVal = (() => handle)(); untrack(() => ((v: any) => instance?.option('handle', v))(__watchVal)); });
-$effect(() => { const __watchVal = (() => ghostClass)(); untrack(() => ((v: any) => instance?.option('ghostClass', v))(__watchVal)); });
-$effect(() => { const __watchVal = (() => chosenClass)(); untrack(() => ((v: any) => instance?.option('chosenClass', v))(__watchVal)); });
-$effect(() => { const __watchVal = (() => dragClass)(); untrack(() => ((v: any) => instance?.option('dragClass', v))(__watchVal)); });
-$effect(() => { const __watchVal = (() => filter)(); untrack(() => ((v: any) => instance?.option('filter', v))(__watchVal)); });
-$effect(() => { const __watchVal = (() => easing)(); untrack(() => ((v: any) => instance?.option('easing', v))(__watchVal)); });
+let __rozieWatchInitial_0 = true;
+$effect(() => { const __watchVal = (() => disabled)(); untrack(() => { if (__rozieWatchInitial_0) { __rozieWatchInitial_0 = false; return; } ((v: any) => instance?.option('disabled', v))(__watchVal); }); });
+let __rozieWatchInitial_1 = true;
+$effect(() => { const __watchVal = (() => group)(); untrack(() => { if (__rozieWatchInitial_1) { __rozieWatchInitial_1 = false; return; } ((v: any) => instance?.option('group', v))(__watchVal); }); });
+let __rozieWatchInitial_2 = true;
+$effect(() => { const __watchVal = (() => handle)(); untrack(() => { if (__rozieWatchInitial_2) { __rozieWatchInitial_2 = false; return; } ((v: any) => instance?.option('handle', v))(__watchVal); }); });
+let __rozieWatchInitial_3 = true;
+$effect(() => { const __watchVal = (() => ghostClass)(); untrack(() => { if (__rozieWatchInitial_3) { __rozieWatchInitial_3 = false; return; } ((v: any) => instance?.option('ghostClass', v))(__watchVal); }); });
+let __rozieWatchInitial_4 = true;
+$effect(() => { const __watchVal = (() => chosenClass)(); untrack(() => { if (__rozieWatchInitial_4) { __rozieWatchInitial_4 = false; return; } ((v: any) => instance?.option('chosenClass', v))(__watchVal); }); });
+let __rozieWatchInitial_5 = true;
+$effect(() => { const __watchVal = (() => dragClass)(); untrack(() => { if (__rozieWatchInitial_5) { __rozieWatchInitial_5 = false; return; } ((v: any) => instance?.option('dragClass', v))(__watchVal); }); });
+let __rozieWatchInitial_6 = true;
+$effect(() => { const __watchVal = (() => filter)(); untrack(() => { if (__rozieWatchInitial_6) { __rozieWatchInitial_6 = false; return; } ((v: any) => instance?.option('filter', v))(__watchVal); }); });
+let __rozieWatchInitial_7 = true;
+$effect(() => { const __watchVal = (() => easing)(); untrack(() => { if (__rozieWatchInitial_7) { __rozieWatchInitial_7 = false; return; } ((v: any) => instance?.option('easing', v))(__watchVal); }); });
 </script>
 
 

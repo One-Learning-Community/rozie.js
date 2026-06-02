@@ -69,33 +69,43 @@ export class Flatpickr {
   valueUpdate = output<unknown>();
   dayCreate = output<unknown>();
   private __rozieDestroyRef = inject(DestroyRef);
+  private __rozieWatchInitial_0 = true;
+  private __rozieWatchInitial_1 = true;
+  private __rozieWatchInitial_2 = true;
+  private __rozieWatchInitial_3 = true;
+  private __rozieWatchInitial_4 = true;
+  private __rozieWatchInitial_5 = true;
+  private __rozieWatchInitial_6 = true;
+  private __rozieWatchInitial_7 = true;
+  private __rozieWatchInitial_8 = true;
+  private __rozieWatchInitial_9 = true;
 
   constructor() {
-    effect(() => { const __watchVal = (() => this.date())(); untracked(() => ((v: any) => {
+    effect(() => { const __watchVal = (() => this.date())(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } ((v: any) => {
       if (!this.instance) return;
       if (v !== this.instance.input.value) this.instance.setDate(v, false);
-    })(__watchVal)); });
-    effect(() => { const __watchVal = (() => this.mode())(); untracked(() => ((v: any) => this.instance?.set('mode', v))(__watchVal)); });
-    effect(() => { const __watchVal = (() => this.minDate())(); untracked(() => ((v: any) => this.instance?.set('minDate', v))(__watchVal)); });
-    effect(() => { const __watchVal = (() => this.maxDate())(); untracked(() => ((v: any) => this.instance?.set('maxDate', v))(__watchVal)); });
-    effect(() => { const __watchVal = (() => this.dateFormat())(); untracked(() => ((v: any) => this.instance?.set('dateFormat', v))(__watchVal)); });
-    effect(() => { const __watchVal = (() => this.disabled())(); untracked(() => ((v: any) => {
+    })(__watchVal); }); });
+    effect(() => { const __watchVal = (() => this.mode())(); untracked(() => { if (this.__rozieWatchInitial_1) { this.__rozieWatchInitial_1 = false; return; } ((v: any) => this.instance?.set('mode', v))(__watchVal); }); });
+    effect(() => { const __watchVal = (() => this.minDate())(); untracked(() => { if (this.__rozieWatchInitial_2) { this.__rozieWatchInitial_2 = false; return; } ((v: any) => this.instance?.set('minDate', v))(__watchVal); }); });
+    effect(() => { const __watchVal = (() => this.maxDate())(); untracked(() => { if (this.__rozieWatchInitial_3) { this.__rozieWatchInitial_3 = false; return; } ((v: any) => this.instance?.set('maxDate', v))(__watchVal); }); });
+    effect(() => { const __watchVal = (() => this.dateFormat())(); untracked(() => { if (this.__rozieWatchInitial_4) { this.__rozieWatchInitial_4 = false; return; } ((v: any) => this.instance?.set('dateFormat', v))(__watchVal); }); });
+    effect(() => { const __watchVal = (() => this.disabled())(); untracked(() => { if (this.__rozieWatchInitial_5) { this.__rozieWatchInitial_5 = false; return; } ((v: any) => {
       if (this.instance) this.instance.input.disabled = v;
-    })(__watchVal)); });
-    effect(() => { const __watchVal = (() => this.disable())(); untracked(() => ((v: any) => this.instance?.set('disable', v))(__watchVal)); });
-    effect(() => { const __watchVal = (() => this.enable())(); untracked(() => ((v: any) => this.instance?.set('enable', v))(__watchVal)); });
-    effect(() => { const __watchVal = (() => this.locale())(); untracked(() => ((v: any) => this.instance?.set('locale', {
+    })(__watchVal); }); });
+    effect(() => { const __watchVal = (() => this.disable())(); untracked(() => { if (this.__rozieWatchInitial_6) { this.__rozieWatchInitial_6 = false; return; } ((v: any) => this.instance?.set('disable', v))(__watchVal); }); });
+    effect(() => { const __watchVal = (() => this.enable())(); untracked(() => { if (this.__rozieWatchInitial_7) { this.__rozieWatchInitial_7 = false; return; } ((v: any) => this.instance?.set('enable', v))(__watchVal); }); });
+    effect(() => { const __watchVal = (() => this.locale())(); untracked(() => { if (this.__rozieWatchInitial_8) { this.__rozieWatchInitial_8 = false; return; } ((v: any) => this.instance?.set('locale', {
       ...(v ?? {}),
       ...(this.firstDayOfWeek() !== 0 ? {
         firstDayOfWeek: this.firstDayOfWeek()
       } : {})
-    }))(__watchVal)); });
-    effect(() => { const __watchVal = (() => this.firstDayOfWeek())(); untracked(() => ((v: any) => this.instance?.set('locale', {
+    }))(__watchVal); }); });
+    effect(() => { const __watchVal = (() => this.firstDayOfWeek())(); untracked(() => { if (this.__rozieWatchInitial_9) { this.__rozieWatchInitial_9 = false; return; } ((v: any) => this.instance?.set('locale', {
       ...(this.locale() ?? {}),
       ...(v !== 0 ? {
         firstDayOfWeek: v
       } : {})
-    }))(__watchVal)); });
+    }))(__watchVal); }); });
   }
 
   ngAfterViewInit() {

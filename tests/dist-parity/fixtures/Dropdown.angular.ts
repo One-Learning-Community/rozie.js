@@ -55,6 +55,7 @@ export class Dropdown {
   @ContentChild('trigger', { read: TemplateRef }) triggerTpl?: TemplateRef<TriggerCtx>;
   @ContentChild('defaultSlot', { read: TemplateRef }) defaultTpl?: TemplateRef<DefaultCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
+  private __rozieWatchInitial_0 = true;
 
   constructor() {
       const renderer = inject(Renderer2);
@@ -86,9 +87,9 @@ export class Dropdown {
         onCleanup(unlisten);
       });
 
-    effect(() => { const __watchVal = (() => this.open())(); untracked(() => (() => {
+    effect(() => { const __watchVal = (() => this.open())(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } (() => {
       if (this.open()) this.reposition();
-    })()); });
+    })(); }); });
   }
 
   ngAfterViewInit() {

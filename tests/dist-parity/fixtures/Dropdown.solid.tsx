@@ -1,5 +1,5 @@
 import type { JSX } from 'solid-js';
-import { Show, children, createEffect, mergeProps, onCleanup, onMount, splitProps, untrack } from 'solid-js';
+import { Show, children, createEffect, mergeProps, on, onCleanup, onMount, splitProps, untrack } from 'solid-js';
 import { __rozieInjectStyle, createControllableSignal, createOutsideClick, createThrottledHandler } from '@rozie/runtime-solid';
 
 __rozieInjectStyle('Dropdown-6d6bd882', `.dropdown[data-rozie-s-6d6bd882] { position: relative; display: inline-block; }
@@ -47,9 +47,9 @@ export default function Dropdown(_props: DropdownProps): JSX.Element {
     if (open()) reposition();
   });
   onMount(() => {});
-  createEffect(() => { const __watchVal = (() => open())(); untrack(() => (() => {
+  createEffect(on(() => (() => open())(), (v) => untrack(() => (() => {
     if (open()) reposition();
-  })()); });
+  })()), { defer: true }));
   let triggerElRef: HTMLElement | null = null;
   let panelElRef: HTMLElement | null = null;
 

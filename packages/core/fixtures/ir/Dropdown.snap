@@ -667,6 +667,7 @@
           ]
         }
       ],
+      "immediate": false,
       "sourceLoc": {
         "start": 1377,
         "end": 1445

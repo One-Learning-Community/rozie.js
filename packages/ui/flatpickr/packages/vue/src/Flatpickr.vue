@@ -178,28 +178,28 @@ onBeforeUnmount(() => { _cleanup_0?.(); });
 watch(() => date.value, (v: any) => {
   if (!instance) return;
   if (v !== instance.input.value) instance.setDate(v, false);
-}, { immediate: true });
-watch(() => props.mode, (v: any) => instance?.set('mode', v), { immediate: true });
-watch(() => props.minDate, (v: any) => instance?.set('minDate', v), { immediate: true });
-watch(() => props.maxDate, (v: any) => instance?.set('maxDate', v), { immediate: true });
-watch(() => props.dateFormat, (v: any) => instance?.set('dateFormat', v), { immediate: true });
+});
+watch(() => props.mode, (v: any) => instance?.set('mode', v));
+watch(() => props.minDate, (v: any) => instance?.set('minDate', v));
+watch(() => props.maxDate, (v: any) => instance?.set('maxDate', v));
+watch(() => props.dateFormat, (v: any) => instance?.set('dateFormat', v));
 watch(() => props.disabled, (v: any) => {
   if (instance) instance.input.disabled = v;
-}, { immediate: true });
-watch(() => props.disable, (v: any) => instance?.set('disable', v), { immediate: true });
-watch(() => props.enable, (v: any) => instance?.set('enable', v), { immediate: true });
+});
+watch(() => props.disable, (v: any) => instance?.set('disable', v));
+watch(() => props.enable, (v: any) => instance?.set('enable', v));
 watch(() => props.locale, (v: any) => instance?.set('locale', {
   ...(v ?? {}),
   ...(props.firstDayOfWeek !== 0 ? {
     firstDayOfWeek: props.firstDayOfWeek
   } : {})
-}), { immediate: true });
+}));
 watch(() => props.firstDayOfWeek, (v: any) => instance?.set('locale', {
   ...(props.locale ?? {}),
   ...(v !== 0 ? {
     firstDayOfWeek: v
   } : {})
-}), { immediate: true });
+}));
 
 defineExpose({ clear, openPicker, closePicker, selectDate, jumpToDate });
 </script>

@@ -246,31 +246,41 @@ onMount(() => {
   return () => instance?.destroy();
 });
 
-$effect(() => { const __watchVal = (() => date)(); untrack(() => ((v: any) => {
+let __rozieWatchInitial_0 = true;
+$effect(() => { const __watchVal = (() => date)(); untrack(() => { if (__rozieWatchInitial_0) { __rozieWatchInitial_0 = false; return; } ((v: any) => {
   if (!instance) return;
   if (v !== instance.input.value) instance.setDate(v, false);
-})(__watchVal)); });
-$effect(() => { const __watchVal = (() => mode)(); untrack(() => ((v: any) => instance?.set('mode', v))(__watchVal)); });
-$effect(() => { const __watchVal = (() => minDate)(); untrack(() => ((v: any) => instance?.set('minDate', v))(__watchVal)); });
-$effect(() => { const __watchVal = (() => maxDate)(); untrack(() => ((v: any) => instance?.set('maxDate', v))(__watchVal)); });
-$effect(() => { const __watchVal = (() => dateFormat)(); untrack(() => ((v: any) => instance?.set('dateFormat', v))(__watchVal)); });
-$effect(() => { const __watchVal = (() => disabled)(); untrack(() => ((v: any) => {
+})(__watchVal); }); });
+let __rozieWatchInitial_1 = true;
+$effect(() => { const __watchVal = (() => mode)(); untrack(() => { if (__rozieWatchInitial_1) { __rozieWatchInitial_1 = false; return; } ((v: any) => instance?.set('mode', v))(__watchVal); }); });
+let __rozieWatchInitial_2 = true;
+$effect(() => { const __watchVal = (() => minDate)(); untrack(() => { if (__rozieWatchInitial_2) { __rozieWatchInitial_2 = false; return; } ((v: any) => instance?.set('minDate', v))(__watchVal); }); });
+let __rozieWatchInitial_3 = true;
+$effect(() => { const __watchVal = (() => maxDate)(); untrack(() => { if (__rozieWatchInitial_3) { __rozieWatchInitial_3 = false; return; } ((v: any) => instance?.set('maxDate', v))(__watchVal); }); });
+let __rozieWatchInitial_4 = true;
+$effect(() => { const __watchVal = (() => dateFormat)(); untrack(() => { if (__rozieWatchInitial_4) { __rozieWatchInitial_4 = false; return; } ((v: any) => instance?.set('dateFormat', v))(__watchVal); }); });
+let __rozieWatchInitial_5 = true;
+$effect(() => { const __watchVal = (() => disabled)(); untrack(() => { if (__rozieWatchInitial_5) { __rozieWatchInitial_5 = false; return; } ((v: any) => {
   if (instance) instance.input.disabled = v;
-})(__watchVal)); });
-$effect(() => { const __watchVal = (() => disable)(); untrack(() => ((v: any) => instance?.set('disable', v))(__watchVal)); });
-$effect(() => { const __watchVal = (() => enable)(); untrack(() => ((v: any) => instance?.set('enable', v))(__watchVal)); });
-$effect(() => { const __watchVal = (() => locale)(); untrack(() => ((v: any) => instance?.set('locale', {
+})(__watchVal); }); });
+let __rozieWatchInitial_6 = true;
+$effect(() => { const __watchVal = (() => disable)(); untrack(() => { if (__rozieWatchInitial_6) { __rozieWatchInitial_6 = false; return; } ((v: any) => instance?.set('disable', v))(__watchVal); }); });
+let __rozieWatchInitial_7 = true;
+$effect(() => { const __watchVal = (() => enable)(); untrack(() => { if (__rozieWatchInitial_7) { __rozieWatchInitial_7 = false; return; } ((v: any) => instance?.set('enable', v))(__watchVal); }); });
+let __rozieWatchInitial_8 = true;
+$effect(() => { const __watchVal = (() => locale)(); untrack(() => { if (__rozieWatchInitial_8) { __rozieWatchInitial_8 = false; return; } ((v: any) => instance?.set('locale', {
   ...(v ?? {}),
   ...(firstDayOfWeek !== 0 ? {
     firstDayOfWeek: firstDayOfWeek
   } : {})
-}))(__watchVal)); });
-$effect(() => { const __watchVal = (() => firstDayOfWeek)(); untrack(() => ((v: any) => instance?.set('locale', {
+}))(__watchVal); }); });
+let __rozieWatchInitial_9 = true;
+$effect(() => { const __watchVal = (() => firstDayOfWeek)(); untrack(() => { if (__rozieWatchInitial_9) { __rozieWatchInitial_9 = false; return; } ((v: any) => instance?.set('locale', {
   ...(locale ?? {}),
   ...(v !== 0 ? {
     firstDayOfWeek: v
   } : {})
-}))(__watchVal)); });
+}))(__watchVal); }); });
 </script>
 
 

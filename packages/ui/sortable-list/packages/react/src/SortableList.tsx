@@ -87,6 +87,14 @@ export default function SortableList(_props: SortableListProps): JSX.Element {
   const [ariaLiveText, setAriaLiveText] = useState('');
   const listEl = useRef<HTMLDivElement | null>(null);
   const __rozieRoot = useRef<HTMLDivElement | null>(null);
+  const _watch0First = useRef(true);
+  const _watch1First = useRef(true);
+  const _watch2First = useRef(true);
+  const _watch3First = useRef(true);
+  const _watch4First = useRef(true);
+  const _watch5First = useRef(true);
+  const _watch6First = useRef(true);
+  const _watch7First = useRef(true);
 
   function keyFor(item: any, index: any) {
     if (props.itemKey && item !== null && typeof item === 'object') {
@@ -218,34 +226,42 @@ export default function SortableList(_props: SortableListProps): JSX.Element {
     return () => instance.current?.destroy();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
+    if (_watch0First.current) { _watch0First.current = false; return; }
     const v = props.disabled;
     instance.current?.option('disabled', v);
   }, [props.disabled]);
   useEffect(() => {
+    if (_watch1First.current) { _watch1First.current = false; return; }
     const v = props.group;
     instance.current?.option('group', v);
   }, [props.group]);
   useEffect(() => {
+    if (_watch2First.current) { _watch2First.current = false; return; }
     const v = props.handle;
     instance.current?.option('handle', v);
   }, [props.handle]);
   useEffect(() => {
+    if (_watch3First.current) { _watch3First.current = false; return; }
     const v = props.ghostClass;
     instance.current?.option('ghostClass', v);
   }, [props.ghostClass]);
   useEffect(() => {
+    if (_watch4First.current) { _watch4First.current = false; return; }
     const v = props.chosenClass;
     instance.current?.option('chosenClass', v);
   }, [props.chosenClass]);
   useEffect(() => {
+    if (_watch5First.current) { _watch5First.current = false; return; }
     const v = props.dragClass;
     instance.current?.option('dragClass', v);
   }, [props.dragClass]);
   useEffect(() => {
+    if (_watch6First.current) { _watch6First.current = false; return; }
     const v = props.filter;
     instance.current?.option('filter', v);
   }, [props.filter]);
   useEffect(() => {
+    if (_watch7First.current) { _watch7First.current = false; return; }
     const v = props.easing;
     instance.current?.option('easing', v);
   }, [props.easing]);

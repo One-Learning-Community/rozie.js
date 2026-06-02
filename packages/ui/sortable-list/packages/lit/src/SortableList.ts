@@ -175,14 +175,14 @@ export default class SortableList extends SignalWatcher(LitElement) {
   }
 
   updated(changedProperties: Map<string, unknown>): void {
-    if (changedProperties.has('disabled')) { const __watchVal = (() => this.disabled)(); ((v: any) => this.instance?.option('disabled', v))(__watchVal); }
-    if (changedProperties.has('group')) { const __watchVal = (() => this.group)(); ((v: any) => this.instance?.option('group', v))(__watchVal); }
-    if (changedProperties.has('handle')) { const __watchVal = (() => this.handle)(); ((v: any) => this.instance?.option('handle', v))(__watchVal); }
-    if (changedProperties.has('ghostClass')) { const __watchVal = (() => this.ghostClass)(); ((v: any) => this.instance?.option('ghostClass', v))(__watchVal); }
-    if (changedProperties.has('chosenClass')) { const __watchVal = (() => this.chosenClass)(); ((v: any) => this.instance?.option('chosenClass', v))(__watchVal); }
-    if (changedProperties.has('dragClass')) { const __watchVal = (() => this.dragClass)(); ((v: any) => this.instance?.option('dragClass', v))(__watchVal); }
-    if (changedProperties.has('filter')) { const __watchVal = (() => this.filter)(); ((v: any) => this.instance?.option('filter', v))(__watchVal); }
-    if (changedProperties.has('easing')) { const __watchVal = (() => this.easing)(); ((v: any) => this.instance?.option('easing', v))(__watchVal); }
+    if (this.hasUpdated && (changedProperties.has('disabled'))) { const __watchVal = (() => this.disabled)(); ((v: any) => this.instance?.option('disabled', v))(__watchVal); }
+    if (this.hasUpdated && (changedProperties.has('group'))) { const __watchVal = (() => this.group)(); ((v: any) => this.instance?.option('group', v))(__watchVal); }
+    if (this.hasUpdated && (changedProperties.has('handle'))) { const __watchVal = (() => this.handle)(); ((v: any) => this.instance?.option('handle', v))(__watchVal); }
+    if (this.hasUpdated && (changedProperties.has('ghostClass'))) { const __watchVal = (() => this.ghostClass)(); ((v: any) => this.instance?.option('ghostClass', v))(__watchVal); }
+    if (this.hasUpdated && (changedProperties.has('chosenClass'))) { const __watchVal = (() => this.chosenClass)(); ((v: any) => this.instance?.option('chosenClass', v))(__watchVal); }
+    if (this.hasUpdated && (changedProperties.has('dragClass'))) { const __watchVal = (() => this.dragClass)(); ((v: any) => this.instance?.option('dragClass', v))(__watchVal); }
+    if (this.hasUpdated && (changedProperties.has('filter'))) { const __watchVal = (() => this.filter)(); ((v: any) => this.instance?.option('filter', v))(__watchVal); }
+    if (this.hasUpdated && (changedProperties.has('easing'))) { const __watchVal = (() => this.easing)(); ((v: any) => this.instance?.option('easing', v))(__watchVal); }
   }
 
   disconnectedCallback(): void {

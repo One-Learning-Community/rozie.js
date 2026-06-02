@@ -89,7 +89,7 @@ export default class Dropdown extends SignalWatcher(LitElement) {
   }
 
   updated(changedProperties: Map<string, unknown>): void {
-    if (changedProperties.has('open')) { const __watchVal = (() => this.open)(); (() => {
+    if (this.hasUpdated && (changedProperties.has('open'))) { const __watchVal = (() => this.open)(); (() => {
       if (this.open) this.reposition();
     })(); }
   }

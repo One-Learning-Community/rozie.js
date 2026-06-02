@@ -129,6 +129,16 @@ const Flatpickr = forwardRef<FlatpickrHandle, FlatpickrProps>(function Flatpickr
   const _dateRef = useRef(date);
   _dateRef.current = date;
   const inputEl = useRef<HTMLInputElement | null>(null);
+  const _watch0First = useRef(true);
+  const _watch1First = useRef(true);
+  const _watch2First = useRef(true);
+  const _watch3First = useRef(true);
+  const _watch4First = useRef(true);
+  const _watch5First = useRef(true);
+  const _watch6First = useRef(true);
+  const _watch7First = useRef(true);
+  const _watch8First = useRef(true);
+  const _watch9First = useRef(true);
 
   // Imperative handle (Phase 21 $expose). The five flatpickr instance methods a
   // consumer can't drive through props alone — exposed uniformly to all 6 targets
@@ -274,39 +284,48 @@ const Flatpickr = forwardRef<FlatpickrHandle, FlatpickrProps>(function Flatpickr
     return () => instance.current?.destroy();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
+    if (_watch0First.current) { _watch0First.current = false; return; }
     const v = date;
     if (!instance.current) return;
     if (v !== instance.current.input.value) instance.current.setDate(v, false);
   }, [date]);
   useEffect(() => {
+    if (_watch1First.current) { _watch1First.current = false; return; }
     const v = props.mode;
     instance.current?.set('mode', v);
   }, [props.mode]);
   useEffect(() => {
+    if (_watch2First.current) { _watch2First.current = false; return; }
     const v = props.minDate;
     instance.current?.set('minDate', v);
   }, [props.minDate]);
   useEffect(() => {
+    if (_watch3First.current) { _watch3First.current = false; return; }
     const v = props.maxDate;
     instance.current?.set('maxDate', v);
   }, [props.maxDate]);
   useEffect(() => {
+    if (_watch4First.current) { _watch4First.current = false; return; }
     const v = props.dateFormat;
     instance.current?.set('dateFormat', v);
   }, [props.dateFormat]);
   useEffect(() => {
+    if (_watch5First.current) { _watch5First.current = false; return; }
     const v = props.disabled;
     if (instance.current) instance.current.input.disabled = v;
   }, [props.disabled]);
   useEffect(() => {
+    if (_watch6First.current) { _watch6First.current = false; return; }
     const v = props.disable;
     instance.current?.set('disable', v);
   }, [props.disable]);
   useEffect(() => {
+    if (_watch7First.current) { _watch7First.current = false; return; }
     const v = props.enable;
     instance.current?.set('enable', v);
   }, [props.enable]);
   useEffect(() => {
+    if (_watch8First.current) { _watch8First.current = false; return; }
     const v = props.locale;
     instance.current?.set('locale', {
     ...(v ?? {}),
@@ -316,6 +335,7 @@ const Flatpickr = forwardRef<FlatpickrHandle, FlatpickrProps>(function Flatpickr
   });
   }, [props.locale]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
+    if (_watch9First.current) { _watch9First.current = false; return; }
     const v = props.firstDayOfWeek;
     instance.current?.set('locale', {
     ...(props.locale ?? {}),

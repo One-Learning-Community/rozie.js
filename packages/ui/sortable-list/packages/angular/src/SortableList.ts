@@ -78,16 +78,24 @@ export class SortableList {
   @ContentChild('defaultSlot', { read: TemplateRef }) defaultTpl?: TemplateRef<DefaultCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
   private __rozieDestroyRef = inject(DestroyRef);
+  private __rozieWatchInitial_0 = true;
+  private __rozieWatchInitial_1 = true;
+  private __rozieWatchInitial_2 = true;
+  private __rozieWatchInitial_3 = true;
+  private __rozieWatchInitial_4 = true;
+  private __rozieWatchInitial_5 = true;
+  private __rozieWatchInitial_6 = true;
+  private __rozieWatchInitial_7 = true;
 
   constructor() {
-    effect(() => { const __watchVal = (() => this.disabled())(); untracked(() => ((v: any) => this.instance?.option('disabled', v))(__watchVal)); });
-    effect(() => { const __watchVal = (() => this.group())(); untracked(() => ((v: any) => this.instance?.option('group', v))(__watchVal)); });
-    effect(() => { const __watchVal = (() => this.handle())(); untracked(() => ((v: any) => this.instance?.option('handle', v))(__watchVal)); });
-    effect(() => { const __watchVal = (() => this.ghostClass())(); untracked(() => ((v: any) => this.instance?.option('ghostClass', v))(__watchVal)); });
-    effect(() => { const __watchVal = (() => this.chosenClass())(); untracked(() => ((v: any) => this.instance?.option('chosenClass', v))(__watchVal)); });
-    effect(() => { const __watchVal = (() => this.dragClass())(); untracked(() => ((v: any) => this.instance?.option('dragClass', v))(__watchVal)); });
-    effect(() => { const __watchVal = (() => this.filter())(); untracked(() => ((v: any) => this.instance?.option('filter', v))(__watchVal)); });
-    effect(() => { const __watchVal = (() => this.easing())(); untracked(() => ((v: any) => this.instance?.option('easing', v))(__watchVal)); });
+    effect(() => { const __watchVal = (() => this.disabled())(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } ((v: any) => this.instance?.option('disabled', v))(__watchVal); }); });
+    effect(() => { const __watchVal = (() => this.group())(); untracked(() => { if (this.__rozieWatchInitial_1) { this.__rozieWatchInitial_1 = false; return; } ((v: any) => this.instance?.option('group', v))(__watchVal); }); });
+    effect(() => { const __watchVal = (() => this.handle())(); untracked(() => { if (this.__rozieWatchInitial_2) { this.__rozieWatchInitial_2 = false; return; } ((v: any) => this.instance?.option('handle', v))(__watchVal); }); });
+    effect(() => { const __watchVal = (() => this.ghostClass())(); untracked(() => { if (this.__rozieWatchInitial_3) { this.__rozieWatchInitial_3 = false; return; } ((v: any) => this.instance?.option('ghostClass', v))(__watchVal); }); });
+    effect(() => { const __watchVal = (() => this.chosenClass())(); untracked(() => { if (this.__rozieWatchInitial_4) { this.__rozieWatchInitial_4 = false; return; } ((v: any) => this.instance?.option('chosenClass', v))(__watchVal); }); });
+    effect(() => { const __watchVal = (() => this.dragClass())(); untracked(() => { if (this.__rozieWatchInitial_5) { this.__rozieWatchInitial_5 = false; return; } ((v: any) => this.instance?.option('dragClass', v))(__watchVal); }); });
+    effect(() => { const __watchVal = (() => this.filter())(); untracked(() => { if (this.__rozieWatchInitial_6) { this.__rozieWatchInitial_6 = false; return; } ((v: any) => this.instance?.option('filter', v))(__watchVal); }); });
+    effect(() => { const __watchVal = (() => this.easing())(); untracked(() => { if (this.__rozieWatchInitial_7) { this.__rozieWatchInitial_7 = false; return; } ((v: any) => this.instance?.option('easing', v))(__watchVal); }); });
   }
 
   ngAfterViewInit() {

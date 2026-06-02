@@ -1,5 +1,5 @@
 import type { JSX } from 'solid-js';
-import { createEffect, mergeProps, onCleanup, onMount, splitProps, untrack } from 'solid-js';
+import { createEffect, mergeProps, on, onCleanup, onMount, splitProps, untrack } from 'solid-js';
 import { __rozieInjectStyle, createControllableSignal } from '@rozie/runtime-solid';
 import flatpickr from 'flatpickr';
 
@@ -182,31 +182,31 @@ export default function Flatpickr(_props: FlatpickrProps): JSX.Element {
     if (_cleanup) onCleanup(_cleanup as () => void);
     onCleanup(() => instance?.destroy());
   });
-  createEffect(() => { const __watchVal = (() => date())(); untrack(() => ((v: any) => {
+  createEffect(on(() => (() => date())(), (v) => untrack(() => ((v: any) => {
     if (!instance) return;
     if (v !== instance.input.value) instance.setDate(v, false);
-  })(__watchVal)); });
-  createEffect(() => { const __watchVal = (() => local.mode)(); untrack(() => ((v: any) => instance?.set('mode', v))(__watchVal)); });
-  createEffect(() => { const __watchVal = (() => local.minDate)(); untrack(() => ((v: any) => instance?.set('minDate', v))(__watchVal)); });
-  createEffect(() => { const __watchVal = (() => local.maxDate)(); untrack(() => ((v: any) => instance?.set('maxDate', v))(__watchVal)); });
-  createEffect(() => { const __watchVal = (() => local.dateFormat)(); untrack(() => ((v: any) => instance?.set('dateFormat', v))(__watchVal)); });
-  createEffect(() => { const __watchVal = (() => local.disabled)(); untrack(() => ((v: any) => {
+  })(v)), { defer: true }));
+  createEffect(on(() => (() => local.mode)(), (v) => untrack(() => ((v: any) => instance?.set('mode', v))(v)), { defer: true }));
+  createEffect(on(() => (() => local.minDate)(), (v) => untrack(() => ((v: any) => instance?.set('minDate', v))(v)), { defer: true }));
+  createEffect(on(() => (() => local.maxDate)(), (v) => untrack(() => ((v: any) => instance?.set('maxDate', v))(v)), { defer: true }));
+  createEffect(on(() => (() => local.dateFormat)(), (v) => untrack(() => ((v: any) => instance?.set('dateFormat', v))(v)), { defer: true }));
+  createEffect(on(() => (() => local.disabled)(), (v) => untrack(() => ((v: any) => {
     if (instance) instance.input.disabled = v;
-  })(__watchVal)); });
-  createEffect(() => { const __watchVal = (() => local.disable)(); untrack(() => ((v: any) => instance?.set('disable', v))(__watchVal)); });
-  createEffect(() => { const __watchVal = (() => local.enable)(); untrack(() => ((v: any) => instance?.set('enable', v))(__watchVal)); });
-  createEffect(() => { const __watchVal = (() => local.locale)(); untrack(() => ((v: any) => instance?.set('locale', {
+  })(v)), { defer: true }));
+  createEffect(on(() => (() => local.disable)(), (v) => untrack(() => ((v: any) => instance?.set('disable', v))(v)), { defer: true }));
+  createEffect(on(() => (() => local.enable)(), (v) => untrack(() => ((v: any) => instance?.set('enable', v))(v)), { defer: true }));
+  createEffect(on(() => (() => local.locale)(), (v) => untrack(() => ((v: any) => instance?.set('locale', {
     ...(v ?? {}),
     ...(local.firstDayOfWeek !== 0 ? {
       firstDayOfWeek: local.firstDayOfWeek
     } : {})
-  }))(__watchVal)); });
-  createEffect(() => { const __watchVal = (() => local.firstDayOfWeek)(); untrack(() => ((v: any) => instance?.set('locale', {
+  }))(v)), { defer: true }));
+  createEffect(on(() => (() => local.firstDayOfWeek)(), (v) => untrack(() => ((v: any) => instance?.set('locale', {
     ...(local.locale ?? {}),
     ...(v !== 0 ? {
       firstDayOfWeek: v
     } : {})
-  }))(__watchVal)); });
+  }))(v)), { defer: true }));
   let inputElRef: HTMLElement | null = null;
 
   let instance: any = null;

@@ -1,5 +1,5 @@
 import type { JSX } from 'solid-js';
-import { For, children, createEffect, createSignal, mergeProps, onCleanup, onMount, splitProps, untrack } from 'solid-js';
+import { For, children, createEffect, createSignal, mergeProps, on, onCleanup, onMount, splitProps, untrack } from 'solid-js';
 import { __rozieInjectStyle, createControllableSignal } from '@rozie/runtime-solid';
 import { useSortableJS } from './internal/useSortableJS';
 
@@ -128,14 +128,14 @@ export default function SortableList(_props: SortableListProps): JSX.Element {
     if (_cleanup) onCleanup(_cleanup as () => void);
     onCleanup(() => instance?.destroy());
   });
-  createEffect(() => { const __watchVal = (() => local.disabled)(); untrack(() => ((v: any) => instance?.option('disabled', v))(__watchVal)); });
-  createEffect(() => { const __watchVal = (() => local.group)(); untrack(() => ((v: any) => instance?.option('group', v))(__watchVal)); });
-  createEffect(() => { const __watchVal = (() => local.handle)(); untrack(() => ((v: any) => instance?.option('handle', v))(__watchVal)); });
-  createEffect(() => { const __watchVal = (() => local.ghostClass)(); untrack(() => ((v: any) => instance?.option('ghostClass', v))(__watchVal)); });
-  createEffect(() => { const __watchVal = (() => local.chosenClass)(); untrack(() => ((v: any) => instance?.option('chosenClass', v))(__watchVal)); });
-  createEffect(() => { const __watchVal = (() => local.dragClass)(); untrack(() => ((v: any) => instance?.option('dragClass', v))(__watchVal)); });
-  createEffect(() => { const __watchVal = (() => local.filter)(); untrack(() => ((v: any) => instance?.option('filter', v))(__watchVal)); });
-  createEffect(() => { const __watchVal = (() => local.easing)(); untrack(() => ((v: any) => instance?.option('easing', v))(__watchVal)); });
+  createEffect(on(() => (() => local.disabled)(), (v) => untrack(() => ((v: any) => instance?.option('disabled', v))(v)), { defer: true }));
+  createEffect(on(() => (() => local.group)(), (v) => untrack(() => ((v: any) => instance?.option('group', v))(v)), { defer: true }));
+  createEffect(on(() => (() => local.handle)(), (v) => untrack(() => ((v: any) => instance?.option('handle', v))(v)), { defer: true }));
+  createEffect(on(() => (() => local.ghostClass)(), (v) => untrack(() => ((v: any) => instance?.option('ghostClass', v))(v)), { defer: true }));
+  createEffect(on(() => (() => local.chosenClass)(), (v) => untrack(() => ((v: any) => instance?.option('chosenClass', v))(v)), { defer: true }));
+  createEffect(on(() => (() => local.dragClass)(), (v) => untrack(() => ((v: any) => instance?.option('dragClass', v))(v)), { defer: true }));
+  createEffect(on(() => (() => local.filter)(), (v) => untrack(() => ((v: any) => instance?.option('filter', v))(v)), { defer: true }));
+  createEffect(on(() => (() => local.easing)(), (v) => untrack(() => ((v: any) => instance?.option('easing', v))(v)), { defer: true }));
   let listElRef: HTMLElement | null = null;
   let __rozieRootRef: HTMLElement | null = null;
 

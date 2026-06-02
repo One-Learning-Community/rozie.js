@@ -212,14 +212,14 @@ onMounted(() => {
 });
 onBeforeUnmount(() => { _cleanup_0?.(); });
 
-watch(() => props.disabled, (v: any) => instance?.option('disabled', v), { immediate: true });
-watch(() => props.group, (v: any) => instance?.option('group', v), { immediate: true });
-watch(() => props.handle, (v: any) => instance?.option('handle', v), { immediate: true });
-watch(() => props.ghostClass, (v: any) => instance?.option('ghostClass', v), { immediate: true });
-watch(() => props.chosenClass, (v: any) => instance?.option('chosenClass', v), { immediate: true });
-watch(() => props.dragClass, (v: any) => instance?.option('dragClass', v), { immediate: true });
-watch(() => props.filter, (v: any) => instance?.option('filter', v), { immediate: true });
-watch(() => props.easing, (v: any) => instance?.option('easing', v), { immediate: true });
+watch(() => props.disabled, (v: any) => instance?.option('disabled', v));
+watch(() => props.group, (v: any) => instance?.option('group', v));
+watch(() => props.handle, (v: any) => instance?.option('handle', v));
+watch(() => props.ghostClass, (v: any) => instance?.option('ghostClass', v));
+watch(() => props.chosenClass, (v: any) => instance?.option('chosenClass', v));
+watch(() => props.dragClass, (v: any) => instance?.option('dragClass', v));
+watch(() => props.filter, (v: any) => instance?.option('filter', v));
+watch(() => props.easing, (v: any) => instance?.option('easing', v));
 </script>
 
 <style scoped>
