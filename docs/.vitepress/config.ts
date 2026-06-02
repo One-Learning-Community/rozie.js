@@ -111,6 +111,7 @@ export default defineConfig({
           text: '@rozie-ui/flatpickr',
           items: [
             { text: 'Flatpickr — showcase & API', link: '/guide/flatpickr' },
+            { text: 'Flatpickr libraries comparison', link: '/guide/flatpickr-comparison' },
             { text: 'Flatpickr example & output', link: '/examples/flatpickr' },
           ],
         },
