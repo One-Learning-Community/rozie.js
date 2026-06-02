@@ -550,6 +550,34 @@ This is the integration story for component libraries that wrap vanilla-JS engin
 
 Because `$refs` are only populated after mount, reading them in an eagerly-evaluated position — inside a `$computed(...)` body or `$watch` getter, or in a template binding / `{{ }}` interpolation / `r-if` / `r-show` / `r-for` iterable expression — is a compile error (`ROZ123`); read `$refs` inside `$onMount` (or any callback that runs after mount) instead.
 
+### Element-dependent config: the `$onMount` + `r-if` pattern
+
+Some vanilla-JS engines take a DOM element in their *configuration* (not just as their mount target) — flatpickr's `rangePlugin` second input, a Popper anchor element, a focus-trap container. The config has to be built **after** the element exists, and whatever consumes it has to wait for it:
+
+```rozie
+<data>{ plugins: null }</data>
+
+<script>
+import rangePlugin from 'flatpickr/dist/plugins/rangePlugin'
+
+// ❌ ROZ123 — $refs is not populated yet when a $computed first evaluates:
+// const plugins = $computed(() => [rangePlugin({ input: $refs.endInput })])
+
+// ✅ Build element-dependent config in $onMount, where $refs are live:
+$onMount(() => {
+  $data.plugins = [rangePlugin({ input: $refs.endInput })]
+})
+</script>
+
+<template>
+  <!-- r-if gates the consumer until the config exists -->
+  <Flatpickr r-if="$data.plugins" :plugins="$data.plugins" mode="range" />
+  <input ref="endInput" />
+</template>
+```
+
+Prefer passing **elements** over selector strings to third-party libraries wherever their API allows it. Libraries that resolve selector strings internally (flatpickr's `rangePlugin` does `document.querySelector(...)`) cannot see inside shadow DOM — so a selector that works on five targets silently finds nothing on Lit, where your component's template renders into a shadow root. Passing the `$refs` element sidesteps the lookup entirely and behaves identically on all six targets.
+
 ## `$snapshot()` — crossing into untyped JS
 
 `$snapshot(x)` is the escape hatch for handing a reactive value to a library that mutates the value's property descriptors. The canonical case is Chart.js's data config: Chart.js internally calls `Object.defineProperty(data, ...)` to install reactive getters, and Svelte 5's `$state` Proxy raises `state_descriptors_fixed` rather than allowing the mutation. The other five targets unwrap to plain values at read time and don't have this problem.

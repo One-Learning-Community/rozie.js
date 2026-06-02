@@ -350,6 +350,10 @@ onMounted(() => {
 
 `plugins` is **construction-time only** — flatpickr reads it once at init. To swap plugins live, re-key the component (see [Remount on construction-time-only changes](#remount-on-construction-time-only-changes)).
 
+::: warning Pass the element, not a selector string
+`rangePlugin` also accepts a selector string (`input: '#second-input'`), but it resolves it with `document.querySelector(...)` — which **cannot see inside shadow DOM** and fails silently (a `console.warn`, not an error) when it finds nothing. A selector that works in a light-DOM app finds nothing when the inputs render inside a shadow root — the Lit build of any component, or any custom-element context. Constructing the plugin **after mount with the element itself** (as shown above) behaves identically everywhere. The same advice applies to any third-party option that accepts an element-or-selector.
+:::
+
 ### Custom parse/format
 
 `parseDate` and `formatDate` hand flatpickr custom string↔Date functions — useful for formats flatpickr's token grammar can't express:
