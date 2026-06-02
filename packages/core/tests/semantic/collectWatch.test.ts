@@ -38,6 +38,60 @@ ${SHELL_TAIL}`;
     expect(t.isArrowFunctionExpression(entry.callback)).toBe(true);
     expect(entry.sourceLoc.start).toBeGreaterThan(0);
     expect(entry.sourceLoc.end).toBeGreaterThan(entry.sourceLoc.start);
+    // Quick plan 260602-9lw: no 3rd arg ⇒ immediate defaults false.
+    expect(entry.immediate).toBe(false);
+  });
+
+  // Quick plan 260602-9lw — parse the optional 3rd-arg `{ immediate: true }`.
+  it('Test 1a: $watch(arrow, arrow, { immediate: true }) sets entry.immediate = true', () => {
+    const src = `${SHELL_HEAD}
+$watch(() => $props.open, () => {}, { immediate: true })
+${SHELL_TAIL}`;
+    const bindings = bindingsFor(src);
+    expect(bindings.watchers).toHaveLength(1);
+    expect(bindings.watchers[0]!.immediate).toBe(true);
+  });
+
+  it('Test 1b: { immediate: false } 3rd arg keeps entry.immediate = false', () => {
+    const src = `${SHELL_HEAD}
+$watch(() => $props.open, () => {}, { immediate: false })
+${SHELL_TAIL}`;
+    const bindings = bindingsFor(src);
+    expect(bindings.watchers).toHaveLength(1);
+    expect(bindings.watchers[0]!.immediate).toBe(false);
+  });
+
+  it('Test 1c: absent 3rd arg ⇒ entry.immediate = false (lazy default)', () => {
+    const src = `${SHELL_HEAD}
+$watch(() => $props.open, () => {})
+${SHELL_TAIL}`;
+    const bindings = bindingsFor(src);
+    expect(bindings.watchers).toHaveLength(1);
+    expect(bindings.watchers[0]!.immediate).toBe(false);
+  });
+
+  it('Test 1d: malformed 3rd arg (non-object / non-boolean value / string-keyed false) ⇒ immediate stays false, collector silent', () => {
+    // Non-object 3rd arg.
+    const nonObj = bindingsFor(`${SHELL_HEAD}
+$watch(() => $props.open, () => {}, true)
+${SHELL_TAIL}`);
+    expect(nonObj.watchers).toHaveLength(1);
+    expect(nonObj.watchers[0]!.immediate).toBe(false);
+
+    // immediate present but value is not a boolean literal `true`.
+    const dynVal = bindingsFor(`${SHELL_HEAD}
+const flag = true
+$watch(() => $props.open, () => {}, { immediate: flag })
+${SHELL_TAIL}`);
+    expect(dynVal.watchers).toHaveLength(1);
+    expect(dynVal.watchers[0]!.immediate).toBe(false);
+
+    // String-literal key with true value still parses to true (allowed shape).
+    const strKeyTrue = bindingsFor(`${SHELL_HEAD}
+$watch(() => $props.open, () => {}, { 'immediate': true })
+${SHELL_TAIL}`);
+    expect(strKeyTrue.watchers).toHaveLength(1);
+    expect(strKeyTrue.watchers[0]!.immediate).toBe(true);
   });
 
   it('Test 2a: $watch(arrow) (missing callback) appends NO WatchEntry', () => {

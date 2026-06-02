@@ -468,6 +468,13 @@ export interface WatchHook {
   callbackParams: Array<Identifier | Pattern | RestElement>;
   /** SignalRef[] computed from the getter body (NOT the callback). */
   getterDeps: SignalRef[];
+  /**
+   * Quick plan 260602-9lw: `true` when the author opted into the eager initial
+   * fire via `$watch(getter, cb, { immediate: true })`. When `false` (the
+   * default), every target SKIPS the first callback invocation at mount and
+   * fires only on subsequent reference-`!==` changes of the getter value.
+   */
+  immediate: boolean;
   sourceLoc: SourceLoc;
 }
 

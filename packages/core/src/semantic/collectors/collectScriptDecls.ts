@@ -113,9 +113,31 @@ function extractWatchFromExpression(expr: t.Expression): WatchEntry | null {
   ) {
     return null;
   }
+  // Quick plan 260602-9lw: parse the optional third-arg `{ immediate: true }`.
+  // Accept ONLY a literal object with an `immediate` property whose value is the
+  // boolean literal `true` (non-computed Identifier or StringLiteral key). Any
+  // other shape (missing arg, non-object, computed key, dynamic value, false)
+  // defaults to `immediate = false`. The collector stays silent on malformed
+  // input (Plan 02-01 contract); no eval / dynamic-key execution.
+  let immediate = false;
+  const optionsArg = expr.arguments[2];
+  if (optionsArg && t.isObjectExpression(optionsArg)) {
+    for (const prop of optionsArg.properties) {
+      if (!t.isObjectProperty(prop)) continue;
+      if (prop.computed) continue;
+      let key: string | null = null;
+      if (t.isIdentifier(prop.key)) key = prop.key.name;
+      else if (t.isStringLiteral(prop.key)) key = prop.key.value;
+      if (key !== 'immediate') continue;
+      if (t.isBooleanLiteral(prop.value) && prop.value.value === true) {
+        immediate = true;
+      }
+    }
+  }
   return {
     getter,
     callback,
+    immediate,
     sourceLoc: { start: expr.start ?? 0, end: expr.end ?? 0 },
   };
 }

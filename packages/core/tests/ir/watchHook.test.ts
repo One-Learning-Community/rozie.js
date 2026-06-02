@@ -46,6 +46,29 @@ ${SHELL_TAIL}`;
       (d) => d.scope === 'props' && d.path[0] === 'open',
     );
     expect(propsDep).toBeDefined();
+    // Quick plan 260602-9lw: WatchHook carries `immediate`, defaulting false.
+    expect(wh.immediate).toBe(false);
+  });
+
+  // Quick plan 260602-9lw — `immediate` plumbs through to the WatchHook.
+  it('WatchHook.immediate is true when the $watch carries { immediate: true } 3rd arg', () => {
+    const src = `${SHELL_HEAD}
+$watch(() => $props.open, () => {}, { immediate: true })
+${SHELL_TAIL}`;
+    const lowered = ir(src);
+    expect(lowered.ir!.watchers).toHaveLength(1);
+    expect(lowered.ir!.watchers[0]!.immediate).toBe(true);
+  });
+
+  it('WatchHook.immediate defaults false when the 3rd arg is absent or { immediate: false }', () => {
+    const src = `${SHELL_HEAD}
+$watch(() => $props.open, () => {})
+$watch(() => $data.count, () => {}, { immediate: false })
+${SHELL_TAIL}`;
+    const lowered = ir(src);
+    expect(lowered.ir!.watchers).toHaveLength(2);
+    expect(lowered.ir!.watchers[0]!.immediate).toBe(false);
+    expect(lowered.ir!.watchers[1]!.immediate).toBe(false);
   });
 
   it('Two $watch calls produce ir.watchers of length 2 in source order with independent getterDeps', () => {

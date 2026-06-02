@@ -201,6 +201,7 @@ function buildWatchers(
       callback: entry.callback.body,
       callbackParams: [...entry.callback.params] as WatchHook['callbackParams'],
       getterDeps: [...depGraph.forNodeOrEmpty(`watch.${idx}.getter`)],
+      immediate: entry.immediate,
       sourceLoc: entry.sourceLoc,
     });
   });

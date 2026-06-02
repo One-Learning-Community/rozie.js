@@ -114,13 +114,25 @@ export interface LifecycleHookEntry {
  * collector skips malformed calls silently; the validator emits ROZ109.
  *
  * Single-getter form ONLY for v1; array-of-getters / oldValue param /
- * flush/immediate options are out of scope.
+ * flush options are out of scope.
+ *
+ * Quick plan 260602-9lw: `$watch` is now LAZY by default on all 6 targets — the
+ * callback fires only when the watched value CHANGES (reference `!==`) after
+ * mount, NEVER with the initial value. The optional third argument
+ * `{ immediate: true }` opts back into the eager initial fire (Vue-style). This
+ * REVERSES the 260519 "immediate-by-default" contract. `immediate` defaults to
+ * `false`; the collector stays silent on a malformed third arg.
  */
 export interface WatchEntry {
   /** The raw arrow/function expression passed as the first arg to $watch. */
   getter: ArrowFunctionExpression | FunctionExpression;
   /** The raw arrow/function expression passed as the second arg to $watch. */
   callback: ArrowFunctionExpression | FunctionExpression;
+  /**
+   * `true` when the call carries a literal `{ immediate: true }` third arg —
+   * restores the eager initial fire. Defaults to `false` (lazy / fire-on-change).
+   */
+  immediate: boolean;
   sourceLoc: SourceLoc;
 }
 
