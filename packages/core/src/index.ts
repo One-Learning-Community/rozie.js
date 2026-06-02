@@ -145,6 +145,20 @@ export { registerBuiltins, createDefaultRegistry } from './modifiers/registerBui
 export { lowerToIR } from './ir/lower.js';
 export type { LowerOptions, LowerResult } from './ir/lower.js';
 
+// Codegen — Phase 22 Plan 22-02. The framework-AGNOSTIC props-interface body
+// renderer + its prop→TS-type and slot-param-inference helpers. Hoisted out of
+// React's emitTypes.ts so the five Wave-2 per-target type renderers (Vue /
+// Svelte / Solid / Angular / Lit) share ONE non-drifting source for the
+// prop/event/slot type mapping. The React-specific slot-children token
+// (`ReactNode`) is parameterized via `slotChildrenType`.
+// @experimental — shape may change before v1.0
+export {
+  renderPropsInterface,
+  renderPropType,
+  inferParamType,
+} from './codegen/renderPropsInterface.js';
+export type { RenderPropsInterfaceOptions } from './codegen/renderPropsInterface.js';
+
 // Optional-`sass` resolver — Phase 10 Plan 01. `loadSass()` synchronously
 // resolves the optional `sass` peer dependency for the `<style lang="scss">`
 // branch of parseStyle (Plan 10-03); returns `null` when `sass` is absent.
