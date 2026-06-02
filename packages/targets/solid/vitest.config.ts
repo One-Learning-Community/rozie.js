@@ -16,5 +16,9 @@ export default defineConfig({
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
     root: __dirname,
     snapshotFormat: { printBasicPrototype: false },
+    // Turbo-parallel runs contend for CPU during heavy core-src imports
+    // (parse/lowerToIR in emitTypes.test.ts); 5s default flakes under load.
+    // Mirrors the repo-wide fix in ef7e11b6 / 6c0644fd.
+    testTimeout: 30000,
   },
 });
