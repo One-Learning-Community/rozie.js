@@ -548,6 +548,8 @@ $onMount(() => {
 
 This is the integration story for component libraries that wrap vanilla-JS engines (focus-trap, popper, downshift-style state machines): one `$refs.x` access, idiomatic per-target ref handling on the emit side.
 
+Because `$refs` are only populated after mount, reading them in an eagerly-evaluated position — inside a `$computed(...)` body or `$watch` getter, or in a template binding / `{{ }}` interpolation / `r-if` / `r-show` / `r-for` iterable expression — is a compile error (`ROZ123`); read `$refs` inside `$onMount` (or any callback that runs after mount) instead.
+
 ## `$snapshot()` — crossing into untyped JS
 
 `$snapshot(x)` is the escape hatch for handing a reactive value to a library that mutates the value's property descriptors. The canonical case is Chart.js's data config: Chart.js internally calls `Object.defineProperty(data, ...)` to install reactive getters, and Svelte 5's `$state` Proxy raises `state_descriptors_fixed` rather than allowing the mutation. The other five targets unwrap to plain values at read time and don't have this problem.
