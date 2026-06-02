@@ -279,6 +279,17 @@ $watch(() => $props.open, () => { if ($props.open) reposition() })
     }).code;
     // updated() override with the prop-name branch.
     expect(code).toMatch(/updated\(changedProperties:[\s\S]+?\):\s*void\s*\{[\s\S]*?changedProperties\.has\('open'\)/);
+    // 260602-9lw — the props route is LAZY by default. The gate is our own
+    // `__rozieFirstUpdateDone` class field, NOT `this.hasUpdated`:
+    // ReactiveElement sets `hasUpdated = true` BEFORE invoking updated() on
+    // the first cycle (reactive-element.js:943-946), so hasUpdated cannot
+    // skip the mount fire (code-review CR-01).
+    expect(code).toMatch(/private __rozieFirstUpdateDone = false;/);
+    expect(code).toMatch(/if \(this\.__rozieFirstUpdateDone && \(changedProperties\.has\('open'\)\)\)/);
+    // The flag flips at the END of the watcher segment of updated().
+    expect(code).toMatch(/this\.__rozieFirstUpdateDone = true;/);
+    // The broken hasUpdated gate must never come back.
+    expect(code).not.toMatch(/this\.hasUpdated &&/);
     // No effect()-based watcher push for a $props-only getter.
     expect(code).not.toMatch(/this\._disconnectCleanups\.push\(effect\(/);
     // And `effect` is NOT imported from preact-signals when no $data

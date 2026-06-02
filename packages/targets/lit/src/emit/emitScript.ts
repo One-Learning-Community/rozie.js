@@ -884,6 +884,9 @@ export function emitScript(
   if (partition.watcherHooks.length > 0) {
     // We may add 'effect' below depending on classification — accumulate.
     let needsEffectImport = false;
+    // Set when any LAZY props-route watcher exists — those need the
+    // __rozieFirstUpdateDone class-field gate (see the props-route comment).
+    let needsFirstUpdateDoneFlag = false;
     const watcherCount = Math.min(
       partition.watcherHooks.length,
       ir.watchers.length,
@@ -939,18 +942,25 @@ export function emitScript(
         // (REVERSES the 260519 immediate-by-default contract). Lit's
         // `updated(changedProperties)` ALSO runs on the FIRST render cycle, and
         // on that cycle `changedProperties` contains every property that was
-        // set — so a bare `changedProperties.has('X')` would fire at mount. For
-        // the default (`!irWatcher.immediate`) we additionally gate on
-        // `this.hasUpdated`, which Lit sets to `true` only AFTER the first
-        // `updated()` (it is `false` during the first call) — skipping exactly
-        // the initial cycle. `{ immediate: true }` drops the `hasUpdated` guard
-        // and keeps the eager mount fire.
+        // set — so a bare `changedProperties.has('X')` would fire at mount.
+        //
+        // NOTE: `this.hasUpdated` CANNOT serve as the first-cycle gate.
+        // ReactiveElement sets `hasUpdated = true` BEFORE invoking `updated()`
+        // on the first cycle (@lit/reactive-element 2.1.2,
+        // reactive-element.js:943-946 — `hasUpdated = true; firstUpdated(...);`
+        // then `updated(...)`), so it is already `true` during the first
+        // `updated()` call. Instead we gate on our own class field
+        // `__rozieFirstUpdateDone`, which flips to `true` only at the END of
+        // the watcher segment of `updated()` — skipping exactly the initial
+        // cycle. `{ immediate: true }` drops the gate and keeps the eager
+        // mount fire.
         const propChecks = classification.propNames
           .map((n) => `changedProperties.has('${n}')`)
           .join(' || ');
+        if (!irWatcher.immediate) needsFirstUpdateDoneFlag = true;
         const guard = irWatcher.immediate
           ? propChecks
-          : `this.hasUpdated && (${propChecks})`;
+          : `this.__rozieFirstUpdateDone && (${propChecks})`;
         watcherUpdatedBranches.push(
           `if (${guard}) { const __watchVal = (${getterCode})(); (${cbCode})(${callArg}); }`,
         );
@@ -994,6 +1004,15 @@ export function emitScript(
       // `untracked` is re-exported by @lit-labs/preact-signals (via
       // `export * from '@preact/signals-core'`) — same import source as `effect`.
       opts.signals.add('untracked');
+    }
+    if (needsFirstUpdateDoneFlag) {
+      // Lazy props-route watchers gate on this field instead of
+      // `this.hasUpdated` (which is already `true` during the first
+      // `updated()` — see the props-route comment above). The flag flips at
+      // the end of the watcher segment so every lazy branch in the same
+      // cycle sees the pre-flip value.
+      fieldLines.push('private __rozieFirstUpdateDone = false;');
+      watcherUpdatedBranches.push('this.__rozieFirstUpdateDone = true;');
     }
   }
 

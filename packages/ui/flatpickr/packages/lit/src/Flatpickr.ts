@@ -56,6 +56,7 @@ export default class Flatpickr extends SignalWatcher(LitElement) {
   @property({ type: Function }) formatDate: ((...args: unknown[]) => unknown) | null = null;
   @property({ type: Array }) plugins: any[] = [];
   @query('[data-rozie-ref="inputEl"]') private _refInputEl!: HTMLElement;
+private __rozieFirstUpdateDone = false;
 
   private _disconnectCleanups: Array<() => void> = [];
 
@@ -196,31 +197,32 @@ export default class Flatpickr extends SignalWatcher(LitElement) {
   }
 
   updated(changedProperties: Map<string, unknown>): void {
-    if (this.hasUpdated && (changedProperties.has('date'))) { const __watchVal = (() => this.date)(); ((v: any) => {
+    if (this.__rozieFirstUpdateDone && (changedProperties.has('date'))) { const __watchVal = (() => this.date)(); ((v: any) => {
       if (!this.instance) return;
       if (v !== this.instance.input.value) this.instance.setDate(v, false);
     })(__watchVal); }
-    if (this.hasUpdated && (changedProperties.has('mode'))) { const __watchVal = (() => this.mode)(); ((v: any) => this.instance?.set('mode', v))(__watchVal); }
-    if (this.hasUpdated && (changedProperties.has('minDate'))) { const __watchVal = (() => this.minDate)(); ((v: any) => this.instance?.set('minDate', v))(__watchVal); }
-    if (this.hasUpdated && (changedProperties.has('maxDate'))) { const __watchVal = (() => this.maxDate)(); ((v: any) => this.instance?.set('maxDate', v))(__watchVal); }
-    if (this.hasUpdated && (changedProperties.has('dateFormat'))) { const __watchVal = (() => this.dateFormat)(); ((v: any) => this.instance?.set('dateFormat', v))(__watchVal); }
-    if (this.hasUpdated && (changedProperties.has('disabled'))) { const __watchVal = (() => this.disabled)(); ((v: any) => {
+    if (this.__rozieFirstUpdateDone && (changedProperties.has('mode'))) { const __watchVal = (() => this.mode)(); ((v: any) => this.instance?.set('mode', v))(__watchVal); }
+    if (this.__rozieFirstUpdateDone && (changedProperties.has('minDate'))) { const __watchVal = (() => this.minDate)(); ((v: any) => this.instance?.set('minDate', v))(__watchVal); }
+    if (this.__rozieFirstUpdateDone && (changedProperties.has('maxDate'))) { const __watchVal = (() => this.maxDate)(); ((v: any) => this.instance?.set('maxDate', v))(__watchVal); }
+    if (this.__rozieFirstUpdateDone && (changedProperties.has('dateFormat'))) { const __watchVal = (() => this.dateFormat)(); ((v: any) => this.instance?.set('dateFormat', v))(__watchVal); }
+    if (this.__rozieFirstUpdateDone && (changedProperties.has('disabled'))) { const __watchVal = (() => this.disabled)(); ((v: any) => {
       if (this.instance) this.instance.input.disabled = v;
     })(__watchVal); }
-    if (this.hasUpdated && (changedProperties.has('disable'))) { const __watchVal = (() => this.disable)(); ((v: any) => this.instance?.set('disable', v))(__watchVal); }
-    if (this.hasUpdated && (changedProperties.has('enable'))) { const __watchVal = (() => this.enable)(); ((v: any) => this.instance?.set('enable', v))(__watchVal); }
-    if (this.hasUpdated && (changedProperties.has('locale'))) { const __watchVal = (() => this.locale)(); ((v: any) => this.instance?.set('locale', {
+    if (this.__rozieFirstUpdateDone && (changedProperties.has('disable'))) { const __watchVal = (() => this.disable)(); ((v: any) => this.instance?.set('disable', v))(__watchVal); }
+    if (this.__rozieFirstUpdateDone && (changedProperties.has('enable'))) { const __watchVal = (() => this.enable)(); ((v: any) => this.instance?.set('enable', v))(__watchVal); }
+    if (this.__rozieFirstUpdateDone && (changedProperties.has('locale'))) { const __watchVal = (() => this.locale)(); ((v: any) => this.instance?.set('locale', {
       ...(v ?? {}),
       ...(this.firstDayOfWeek !== 0 ? {
         firstDayOfWeek: this.firstDayOfWeek
       } : {})
     }))(__watchVal); }
-    if (this.hasUpdated && (changedProperties.has('firstDayOfWeek'))) { const __watchVal = (() => this.firstDayOfWeek)(); ((v: any) => this.instance?.set('locale', {
+    if (this.__rozieFirstUpdateDone && (changedProperties.has('firstDayOfWeek'))) { const __watchVal = (() => this.firstDayOfWeek)(); ((v: any) => this.instance?.set('locale', {
       ...(this.locale ?? {}),
       ...(v !== 0 ? {
         firstDayOfWeek: v
       } : {})
     }))(__watchVal); }
+    this.__rozieFirstUpdateDone = true;
   }
 
   disconnectedCallback(): void {

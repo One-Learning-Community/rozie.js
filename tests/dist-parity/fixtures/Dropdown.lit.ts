@@ -28,6 +28,7 @@ export default class Dropdown extends SignalWatcher(LitElement) {
   @property({ type: Boolean, reflect: true }) closeOnEscape: boolean = true;
   @query('[data-rozie-ref="triggerEl"]') private _refTriggerEl!: HTMLElement;
   @query('[data-rozie-ref="panelEl"]') private _refPanelEl!: HTMLElement;
+private __rozieFirstUpdateDone = false;
 
   @state() private _hasSlotTrigger = false;
   @queryAssignedElements({ slot: 'trigger', flatten: true }) private _slotTriggerElements!: Element[];
@@ -89,9 +90,10 @@ export default class Dropdown extends SignalWatcher(LitElement) {
   }
 
   updated(changedProperties: Map<string, unknown>): void {
-    if (this.hasUpdated && (changedProperties.has('open'))) { const __watchVal = (() => this.open)(); (() => {
+    if (this.__rozieFirstUpdateDone && (changedProperties.has('open'))) { const __watchVal = (() => this.open)(); (() => {
       if (this.open) this.reposition();
     })(); }
+    this.__rozieFirstUpdateDone = true;
   }
 
   disconnectedCallback(): void {
