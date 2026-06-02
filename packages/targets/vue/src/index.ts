@@ -4,3 +4,6 @@
 // @experimental — shape may change before v1.0
 export { emitVue } from './emitVue.js';
 export type { EmitVueOptions, EmitVueResult } from './emitVue.js';
+// Phase 22 Plan 22-03 — Vue `.d.rozie.ts` renderer (typed `.rozie` imports).
+export { emitVueTypes } from './emit/emitTypes.js';
+export type { EmitVueTypesOptions } from './emit/emitTypes.js';
