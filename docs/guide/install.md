@@ -104,6 +104,12 @@ Generated `*.d.rozie.ts` sidecars are **build artefacts** — they are matched b
 
 If a `.rozie` file ever lacks a sidecar at typecheck time, run the build first — do **not** re-add a broad wildcard fallback, which reintroduces the shadowing.
 
+### Sidecar generation stops at nested-package boundaries
+
+The sidecar walk **does not descend into nested workspace packages**. When it encounters a directory containing its own `package.json`, it stops — it treats that directory as a separate package that owns its own build. A parent-root build will therefore **not** emit sidecars for `.rozie` files living inside a nested package under the build root.
+
+This is intentional: the model is **one plugin instance per package**, so each package generates the sidecars for its own `.rozie` files during its own build. If your project nests packages, make sure each nested package runs the unplugin (or `rozie build`) so its `.rozie` files get sidecars — a single parent build will not cover them. In CI, pass `--require-complete` to the staleness gate (`node scripts/check-sidecar-staleness.mjs --require-complete`) after each package's build to turn a missing sidecar into a hard failure instead of a silent gap.
+
 ### CLI fallback (no bundler)
 
 If you compile ahead-of-time with the standalone CLI instead of a bundler, `rozie build` and `rozie watch` emit the same `<Name>.d.rozie.ts` sidecars (the CLI and the unplugin share one renderer, so the bytes are identical):
