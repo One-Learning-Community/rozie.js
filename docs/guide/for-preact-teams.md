@@ -22,9 +22,10 @@ export default defineConfig({
     react(),
   ],
   resolve: {
-    // Array form, MOST-SPECIFIC FIRST so subpaths resolve before the bare
-    // `react` / `react-dom` fallbacks. These are exact-string finds (not
-    // regex), which avoids prefix ambiguity (e.g. `react` matching `react-dom`).
+    // Array form, MOST-SPECIFIC FIRST. Vite string finds match exactly OR as
+    // a prefix followed by `/` — so the bare `react` entry would also match
+    // `react/jsx-runtime`. Listing subpaths first keeps them on their
+    // dedicated aliases.
     alias: [
       { find: 'react/jsx-runtime', replacement: 'preact/jsx-runtime' },
       { find: 'react/jsx-dev-runtime', replacement: 'preact/jsx-runtime' },
@@ -41,7 +42,7 @@ export default defineConfig({
 
 Two things matter here:
 
-- **Most-specific-first ordering.** The subpath finds (`react/jsx-runtime`, `react/jsx-dev-runtime`, `react-dom/client`) must come *before* the bare `react-dom` and `react` fallbacks. Because these are exact-string finds, listing the bare `react` first would shadow the subpaths and they would never resolve. `@vitejs/plugin-react`'s automatic runtime emits `react/jsx-runtime` imports — the first alias redirects those to `preact/jsx-runtime`.
+- **Most-specific-first ordering.** Vite string finds match exactly *or* as a prefix followed by `/` — the bare `react` find therefore also matches `react/jsx-runtime` (though never `react-dom`; there is no `/` boundary). The subpath finds (`react/jsx-runtime`, `react/jsx-dev-runtime`, `react-dom/client`) must come *before* the bare `react-dom` and `react` fallbacks so they hit their dedicated replacements instead of falling through. `@vitejs/plugin-react`'s automatic runtime emits `react/jsx-runtime` imports — the first alias redirects those to `preact/jsx-runtime`.
 - **`dedupe`.** Without it, your app and its workspace dependencies (notably `@rozie/runtime-react`) can each resolve their own `react` copy. `dedupe: ['preact', 'preact/compat']` forces every resolution onto one `preact/compat` instance, so hooks state and context live in a single runtime.
 
 That is the whole setup. Keep your existing `@vitejs/plugin-react`; it is the simpler of the two JSX options and its automatic-runtime output is handled by the first alias.

@@ -28,9 +28,11 @@ export default defineConfig({
     react(),
   ],
   resolve: {
-    // Array form, MOST-SPECIFIC FIRST so subpaths resolve before the bare
-    // `react` / `react-dom` fallbacks. Exact-string finds (not regex) avoid
-    // prefix ambiguity (e.g. `react` matching `react-dom`).
+    // Array form, MOST-SPECIFIC FIRST. Vite string finds match exactly OR as
+    // a prefix followed by `/` — so the bare `react` entry would also match
+    // `react/jsx-runtime` (though never `react-dom`; no `/` boundary).
+    // Listing subpaths first ensures they hit their dedicated aliases instead
+    // of falling through to the bare `react` / `react-dom` fallbacks.
     alias: [
       { find: 'react/jsx-runtime', replacement: 'preact/jsx-runtime' },
       { find: 'react/jsx-dev-runtime', replacement: 'preact/jsx-runtime' },
