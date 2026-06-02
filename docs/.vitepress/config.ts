@@ -106,6 +106,13 @@ export default defineConfig({
             { text: 'SortableList example & output', link: '/examples/sortable-list' },
           ],
         },
+        {
+          text: '@rozie-ui/flatpickr',
+          items: [
+            { text: 'Flatpickr — showcase & API', link: '/guide/flatpickr' },
+            { text: 'Flatpickr example & output', link: '/examples/flatpickr' },
+          ],
+        },
       ],
       '/compatibility': [
         {
