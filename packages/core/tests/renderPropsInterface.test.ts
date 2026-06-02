@@ -182,4 +182,48 @@ describe('renderPropsInterface — Task 1 behavior', () => {
     };
     expect(inferParamType(param, ir)).toBe('boolean');
   });
+
+  it('Test 7 (CR-01): model prop `value` + emit `value-change` does NOT duplicate onValueChange', () => {
+    const ir = emptyIR('Picker');
+    ir.props = [
+      {
+        type: 'PropDecl',
+        name: 'value',
+        typeAnnotation: { kind: 'identifier', name: 'String' },
+        defaultValue: null,
+        isModel: true,
+        required: false,
+        sourceLoc: { start: 0, end: 0 },
+      },
+    ];
+    ir.emits = ['value-change'];
+    const out = renderPropsInterface(ir, { slotChildrenType: 'ReactNode' });
+    // The model triplet owns `onValueChange?`; the colliding emit must be skipped.
+    const occurrences = out.split('\n').filter((l) => l.includes('onValueChange?'));
+    expect(occurrences).toHaveLength(1);
+    // The surviving member is the model triplet's typed form, not the emit's loose form.
+    expect(out).toContain('  onValueChange?: (next: string) => void;');
+    expect(out).not.toContain('  onValueChange?: (...args: unknown[]) => void;');
+  });
+
+  it('Test 8 (CR-01): literal `onSelect` prop + emit `select` does NOT duplicate onSelect', () => {
+    const ir = emptyIR('Menu');
+    ir.props = [
+      {
+        type: 'PropDecl',
+        name: 'onSelect',
+        typeAnnotation: { kind: 'identifier', name: 'Function' },
+        defaultValue: null,
+        isModel: false,
+        required: true,
+        sourceLoc: { start: 0, end: 0 },
+      },
+    ];
+    ir.emits = ['select'];
+    const out = renderPropsInterface(ir, { slotChildrenType: 'ReactNode' });
+    const occurrences = out.split('\n').filter((l) => l.includes('onSelect'));
+    expect(occurrences).toHaveLength(1);
+    // The surviving member is the literal prop, not the emit-derived handler.
+    expect(out).toContain('  onSelect: (...args: unknown[]) => unknown;');
+  });
 });

@@ -112,7 +112,27 @@ export function renderPropsInterface(
   // declarations on the props interface — invalid TypeScript or silently
   // last-write-wins. The IR validator should already reject empty emit names;
   // the empty-string guard here is defense-in-depth.
+  //
+  // CR-01 (Phase 22 review): the dedupe set must ALSO be pre-seeded with the
+  // names already emitted by the props loop above, otherwise an emit can
+  // collide with (1) the model triplet's `on<Pascal>Change` key, or (2) a
+  // literal `on<Event>` prop name. Concrete failures: model prop `value`
+  // (→ `onValueChange?`) plus emit `value-change` (→ `onValueChange?`); or a
+  // literal prop `onSelect` plus emit `select` (→ `onSelect?`). Both would
+  // land a duplicate member on the interface (TS2300) — a non-compiling
+  // type-lie in the very sidecar this phase exists to make trustworthy. Seed
+  // first, then skip collisions in the loop below.
+  //
+  // FOLLOW-UP: a lowering-time ROZ diagnostic that surfaces emit-vs-prop /
+  // emit-vs-model collisions at compile time (rather than silently dropping
+  // the emit from the type surface) is deferred — it needs its own design
+  // pass against the existing ROZ code allocation.
   const emittedHandlers = new Set<string>();
+  for (const prop of ir.props) {
+    if (prop.isModel) emittedHandlers.add(`on${capitalize(prop.name)}Change`);
+    // Literal `on<Event>` props (e.g. `onSelect`) occupy the same name space.
+    emittedHandlers.add(prop.name);
+  }
   for (const e of ir.emits) {
     const eventPascal = toPascalCase(e);
     if (eventPascal.length === 0) continue;
