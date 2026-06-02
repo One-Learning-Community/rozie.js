@@ -39,7 +39,7 @@ export default class Flatpickr extends SignalWatcher(LitElement) {
   @property({ type: Object }) options: any = {};
   @property({ type: String, reflect: true }) name: string = '';
   @property({ type: Boolean, reflect: true }) inline: boolean = false;
-  @property({ type: Boolean, reflect: true }) static: boolean = false;
+  @property({ type: Boolean, reflect: true }) staticPosition: boolean = false;
   @property({ type: String, reflect: true }) position: string = 'auto';
   @property({ type: Object }) appendTo: any = null;
   @property({ type: Number, reflect: true }) showMonths: number = 1;
@@ -68,16 +68,27 @@ export default class Flatpickr extends SignalWatcher(LitElement) {
       maxDate: this.maxDate,
       defaultDate: this.date || null,
       // GAP-5 UI passthrough (construction-time only) + GAP-6a allowInput.
+      // These match flatpickr's own defaults so passing them is render-neutral.
       inline: this.inline,
-      static: this.static,
+      static: this.staticPosition,
       position: this.position,
-      appendTo: this.appendTo,
       showMonths: this.showMonths,
       weekNumbers: this.weekNumbers,
       monthSelectorType: this.monthSelectorType,
-      prevArrow: this.prevArrow,
-      nextArrow: this.nextArrow,
       allowInput: this.allowInput,
+      // `appendTo` / `prevArrow` / `nextArrow` default to null here but flatpickr
+      // expects them ABSENT (its own defaults are `undefined` for appendTo and
+      // built-in SVG strings for the arrows). Passing an explicit null breaks
+      // construction, so include each ONLY when the consumer set a real value.
+      ...(this.appendTo != null ? {
+        appendTo: this.appendTo
+      } : {}),
+      ...(this.prevArrow != null ? {
+        prevArrow: this.prevArrow
+      } : {}),
+      ...(this.nextArrow != null ? {
+        nextArrow: this.nextArrow
+      } : {}),
       ...this.options,
       onChange: (selectedDates: any, dateStr: any) => {
         // Value contract + range-commit semantics. In range mode flatpickr fires
@@ -214,7 +225,7 @@ export default class Flatpickr extends SignalWatcher(LitElement) {
    * (explicit `attribute:`) AND lowercased property name (Lit's default).
    */
   private get $attrs(): Record<string, string> {
-    const __skip = new Set<string>(['date', 'mode', 'date-format', 'dateformat', 'alt-input', 'altinput', 'alt-format', 'altformat', 'enable-time', 'enabletime', 'enable-seconds', 'enableseconds', 'time24hr', 'no-calendar', 'nocalendar', 'min-date', 'mindate', 'max-date', 'maxdate', 'placeholder', 'disabled', 'commit-on', 'commiton', 'options', 'name', 'inline', 'static', 'position', 'append-to', 'appendto', 'show-months', 'showmonths', 'week-numbers', 'weeknumbers', 'month-selector-type', 'monthselectortype', 'prev-arrow', 'prevarrow', 'next-arrow', 'nextarrow', 'allow-input', 'allowinput']);
+    const __skip = new Set<string>(['date', 'mode', 'date-format', 'dateformat', 'alt-input', 'altinput', 'alt-format', 'altformat', 'enable-time', 'enabletime', 'enable-seconds', 'enableseconds', 'time24hr', 'no-calendar', 'nocalendar', 'min-date', 'mindate', 'max-date', 'maxdate', 'placeholder', 'disabled', 'commit-on', 'commiton', 'options', 'name', 'inline', 'static-position', 'staticposition', 'position', 'append-to', 'appendto', 'show-months', 'showmonths', 'week-numbers', 'weeknumbers', 'month-selector-type', 'monthselectortype', 'prev-arrow', 'prevarrow', 'next-arrow', 'nextarrow', 'allow-input', 'allowinput']);
     const out: Record<string, string> = {};
     for (const a of Array.from(this.attributes)) {
       if (__skip.has(a.name)) continue;

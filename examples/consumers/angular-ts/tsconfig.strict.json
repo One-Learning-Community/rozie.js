@@ -12,5 +12,5 @@
     "useDefineForClassFields": false,
     "emitDecoratorMetadata": true
   },
-  "include": ["test.ts", "fixtures/**/*.ts"]
+  "include": ["test.ts", "flatpickr-forms.probe.ts", "fixtures/**/*.ts"]
 }

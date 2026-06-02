@@ -43,7 +43,7 @@ export class Flatpickr {
   options = input<Record<string, any>>((() => ({}))());
   name = input<string>('');
   inline = input<boolean>(false);
-  static = input<boolean>(false);
+  staticPosition = input<boolean>(false);
   position = input<string>('auto');
   appendTo = input<(Record<string, any>) | null>(null);
   showMonths = input<number>(1);
@@ -78,6 +78,9 @@ export class Flatpickr {
   }
 
   ngAfterViewInit() {
+    const __appendTo = this.appendTo();
+    const __prevArrow = this.prevArrow();
+    const __nextArrow = this.nextArrow();
     this.instance = flatpickr(this.inputEl()!.nativeElement, {
       mode: this.mode(),
       dateFormat: this.dateFormat(),
@@ -91,16 +94,27 @@ export class Flatpickr {
       maxDate: this.maxDate(),
       defaultDate: this.date() || null,
       // GAP-5 UI passthrough (construction-time only) + GAP-6a allowInput.
+      // These match flatpickr's own defaults so passing them is render-neutral.
       inline: this.inline(),
-      static: this.static(),
+      static: this.staticPosition(),
       position: this.position(),
-      appendTo: this.appendTo(),
       showMonths: this.showMonths(),
       weekNumbers: this.weekNumbers(),
       monthSelectorType: this.monthSelectorType(),
-      prevArrow: this.prevArrow(),
-      nextArrow: this.nextArrow(),
       allowInput: this.allowInput(),
+      // `appendTo` / `prevArrow` / `nextArrow` default to null here but flatpickr
+      // expects them ABSENT (its own defaults are `undefined` for appendTo and
+      // built-in SVG strings for the arrows). Passing an explicit null breaks
+      // construction, so include each ONLY when the consumer set a real value.
+      ...(__appendTo != null ? {
+        appendTo: __appendTo
+      } : {}),
+      ...(__prevArrow != null ? {
+        prevArrow: __prevArrow
+      } : {}),
+      ...(__nextArrow != null ? {
+        nextArrow: __nextArrow
+      } : {}),
       ...this.options(),
       onChange: (selectedDates: any, dateStr: any) => {
         // Value contract + range-commit semantics. In range mode flatpickr fires

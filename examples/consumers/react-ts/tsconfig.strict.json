@@ -10,5 +10,5 @@
     "lib": ["ES2022", "DOM"],
     "types": ["react"]
   },
-  "include": ["test.ts", "fixtures/**/*"]
+  "include": ["test.ts", "flatpickr-forms.probe.tsx", "fixtures/**/*"]
 }

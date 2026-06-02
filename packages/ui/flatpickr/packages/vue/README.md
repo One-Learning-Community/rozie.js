@@ -47,7 +47,7 @@ const date = ref('2026-05-17');
 | `options` | `Object` | `{}` |  |  |
 | `name` | `String` | `""` |  |  |
 | `inline` | `Boolean` | `false` |  |  |
-| `static` | `Boolean` | `false` |  |  |
+| `staticPosition` | `Boolean` | `false` |  |  |
 | `position` | `String` | `"auto"` |  |  |
 | `appendTo` | `Object` | `null` |  |  |
 | `showMonths` | `Number` | `1` |  |  |

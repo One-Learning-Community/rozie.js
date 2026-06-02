@@ -44,7 +44,7 @@ Peer dependencies: `flatpickr ^4.6` + `svelte`. Install them alongside this pack
 | `options` | `Object` | `{}` |  |  |
 | `name` | `String` | `""` |  |  |
 | `inline` | `Boolean` | `false` |  |  |
-| `static` | `Boolean` | `false` |  |  |
+| `staticPosition` | `Boolean` | `false` |  |  |
 | `position` | `String` | `"auto"` |  |  |
 | `appendTo` | `Object` | `null` |  |  |
 | `showMonths` | `Number` | `1` |  |  |

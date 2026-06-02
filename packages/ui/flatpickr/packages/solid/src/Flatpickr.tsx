@@ -36,7 +36,7 @@ interface FlatpickrProps {
   options?: Record<string, any>;
   name?: string;
   inline?: boolean;
-  static?: boolean;
+  staticPosition?: boolean;
   position?: string;
   appendTo?: (Record<string, any>) | null;
   showMonths?: number;
@@ -65,8 +65,8 @@ export interface FlatpickrHandle {
 }
 
 export default function Flatpickr(_props: FlatpickrProps): JSX.Element {
-  const _merged = mergeProps({ mode: 'single', dateFormat: 'Y-m-d', altInput: false, altFormat: 'F j, Y', enableTime: false, enableSeconds: false, time24hr: false, noCalendar: false, minDate: null, maxDate: null, placeholder: 'Select a date…', disabled: false, commitOn: 'complete', options: (() => ({}))(), name: '', inline: false, static: false, position: 'auto', appendTo: null, showMonths: 1, weekNumbers: false, monthSelectorType: 'dropdown', prevArrow: null, nextArrow: null, allowInput: false }, _props);
-  const [local, attrs] = splitProps(_merged, ['date', 'mode', 'dateFormat', 'altInput', 'altFormat', 'enableTime', 'enableSeconds', 'time24hr', 'noCalendar', 'minDate', 'maxDate', 'placeholder', 'disabled', 'commitOn', 'options', 'name', 'inline', 'static', 'position', 'appendTo', 'showMonths', 'weekNumbers', 'monthSelectorType', 'prevArrow', 'nextArrow', 'allowInput', 'ref']);
+  const _merged = mergeProps({ mode: 'single', dateFormat: 'Y-m-d', altInput: false, altFormat: 'F j, Y', enableTime: false, enableSeconds: false, time24hr: false, noCalendar: false, minDate: null, maxDate: null, placeholder: 'Select a date…', disabled: false, commitOn: 'complete', options: (() => ({}))(), name: '', inline: false, staticPosition: false, position: 'auto', appendTo: null, showMonths: 1, weekNumbers: false, monthSelectorType: 'dropdown', prevArrow: null, nextArrow: null, allowInput: false }, _props);
+  const [local, attrs] = splitProps(_merged, ['date', 'mode', 'dateFormat', 'altInput', 'altFormat', 'enableTime', 'enableSeconds', 'time24hr', 'noCalendar', 'minDate', 'maxDate', 'placeholder', 'disabled', 'commitOn', 'options', 'name', 'inline', 'staticPosition', 'position', 'appendTo', 'showMonths', 'weekNumbers', 'monthSelectorType', 'prevArrow', 'nextArrow', 'allowInput', 'ref']);
   onMount(() => { local.ref?.({ clear, openPicker, closePicker, selectDate, jumpToDate }); });
 
   const [date, setDate] = createControllableSignal<string>(_props as unknown as Record<string, unknown>, 'date', '');
@@ -85,16 +85,27 @@ export default function Flatpickr(_props: FlatpickrProps): JSX.Element {
       maxDate: local.maxDate,
       defaultDate: date() || null,
       // GAP-5 UI passthrough (construction-time only) + GAP-6a allowInput.
+      // These match flatpickr's own defaults so passing them is render-neutral.
       inline: local.inline,
-      static: local.static,
+      static: local.staticPosition,
       position: local.position,
-      appendTo: local.appendTo,
       showMonths: local.showMonths,
       weekNumbers: local.weekNumbers,
       monthSelectorType: local.monthSelectorType,
-      prevArrow: local.prevArrow,
-      nextArrow: local.nextArrow,
       allowInput: local.allowInput,
+      // `appendTo` / `prevArrow` / `nextArrow` default to null here but flatpickr
+      // expects them ABSENT (its own defaults are `undefined` for appendTo and
+      // built-in SVG strings for the arrows). Passing an explicit null breaks
+      // construction, so include each ONLY when the consumer set a real value.
+      ...(local.appendTo != null ? {
+        appendTo: local.appendTo
+      } : {}),
+      ...(local.prevArrow != null ? {
+        prevArrow: local.prevArrow
+      } : {}),
+      ...(local.nextArrow != null ? {
+        nextArrow: local.nextArrow
+      } : {}),
       ...local.options,
       onChange: (selectedDates: any, dateStr: any) => {
         // Value contract + range-commit semantics. In range mode flatpickr fires

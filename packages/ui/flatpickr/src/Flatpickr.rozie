@@ -76,7 +76,12 @@
   // path) — to retune live, re-key the component (see the guide's `:key`
   // idiom). Mapped 1:1 to the flatpickr option of the same name.
   inline:            { type: Boolean, default: false },
-  static:            { type: Boolean, default: false },
+  // flatpickr's option is `static`, but `static` is a JS reserved word — the
+  // React emitter's props-passthrough destructure emits it as a binding
+  // identifier (`const { …, static, … } = _props`), which TS rejects in
+  // strict-mode modules (TS1214). Expose it under the valid identifier
+  // `staticPosition` and map it to flatpickr's `static` option in $onMount.
+  staticPosition:    { type: Boolean, default: false },
   position:          { type: String,  default: 'auto' },
   appendTo:          { type: Object,  default: null },
   showMonths:        { type: Number,  default: 1 },
@@ -109,16 +114,21 @@ $onMount(() => {
     maxDate:       $props.maxDate,
     defaultDate:   $props.date || null,
     // GAP-5 UI passthrough (construction-time only) + GAP-6a allowInput.
+    // These match flatpickr's own defaults so passing them is render-neutral.
     inline:            $props.inline,
-    static:            $props.static,
+    static:            $props.staticPosition,
     position:          $props.position,
-    appendTo:          $props.appendTo,
     showMonths:        $props.showMonths,
     weekNumbers:       $props.weekNumbers,
     monthSelectorType: $props.monthSelectorType,
-    prevArrow:         $props.prevArrow,
-    nextArrow:         $props.nextArrow,
     allowInput:        $props.allowInput,
+    // `appendTo` / `prevArrow` / `nextArrow` default to null here but flatpickr
+    // expects them ABSENT (its own defaults are `undefined` for appendTo and
+    // built-in SVG strings for the arrows). Passing an explicit null breaks
+    // construction, so include each ONLY when the consumer set a real value.
+    ...($props.appendTo  != null ? { appendTo:  $props.appendTo  } : {}),
+    ...($props.prevArrow != null ? { prevArrow: $props.prevArrow } : {}),
+    ...($props.nextArrow != null ? { nextArrow: $props.nextArrow } : {}),
     ...$props.options,
     onChange: (selectedDates, dateStr) => {
       // Value contract + range-commit semantics. In range mode flatpickr fires

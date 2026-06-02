@@ -21,7 +21,7 @@ interface Props {
   options?: any;
   name?: string;
   inline?: boolean;
-  static?: boolean;
+  staticPosition?: boolean;
   position?: string;
   appendTo?: (any) | null;
   showMonths?: number;
@@ -61,7 +61,7 @@ let {
   options = __defaultOptions,
   name = '',
   inline = false,
-  static = false,
+  staticPosition = false,
   position = 'auto',
   appendTo = null,
   showMonths = 1,
@@ -140,16 +140,27 @@ onMount(() => {
     maxDate: maxDate,
     defaultDate: date || null,
     // GAP-5 UI passthrough (construction-time only) + GAP-6a allowInput.
+    // These match flatpickr's own defaults so passing them is render-neutral.
     inline: inline,
-    static: static,
+    static: staticPosition,
     position: position,
-    appendTo: appendTo,
     showMonths: showMonths,
     weekNumbers: weekNumbers,
     monthSelectorType: monthSelectorType,
-    prevArrow: prevArrow,
-    nextArrow: nextArrow,
     allowInput: allowInput,
+    // `appendTo` / `prevArrow` / `nextArrow` default to null here but flatpickr
+    // expects them ABSENT (its own defaults are `undefined` for appendTo and
+    // built-in SVG strings for the arrows). Passing an explicit null breaks
+    // construction, so include each ONLY when the consumer set a real value.
+    ...(appendTo != null ? {
+      appendTo: appendTo
+    } : {}),
+    ...(prevArrow != null ? {
+      prevArrow: prevArrow
+    } : {}),
+    ...(nextArrow != null ? {
+      nextArrow: nextArrow
+    } : {}),
     ...options,
     onChange: (selectedDates: any, dateStr: any) => {
       // Value contract + range-commit semantics. In range mode flatpickr fires
