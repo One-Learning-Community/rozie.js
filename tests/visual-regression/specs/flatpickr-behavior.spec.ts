@@ -60,25 +60,36 @@ for (const target of TARGETS) {
   const built = existsSync(
     resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
   );
-  // 260602-9lw — the $watch lazy-by-default normalization fixed GAP-2
-  // disable/enable on react/svelte/solid/angular/vue (5/6 now green) and
-  // ELIMINATED the lit-only `s.set is not a function` mount crash (the
-  // `hasUpdated` guard means the prop-route disable watcher no longer fires
-  // against the not-yet-built instance at mount).
+  // 260602-9lw — the $watch lazy-by-default normalization fixes GAP-2
+  // disable/enable AND GAP-3 locale on ALL 6 targets, lit included. The lit
+  // props-route gate originally used `this.hasUpdated`, but
+  // @lit/reactive-element 2.1.2 sets `hasUpdated = true` BEFORE invoking
+  // updated() on the first cycle (reactive-element.js:943-946), so that gate
+  // never skipped the mount fire — the disable/enable reconcilers ran at mount
+  // against the not-yet-reconciled instance, stamping all 42 day-cells
+  // `.flatpickr-disabled` (CR-01). The corrected gate is a dedicated
+  // `__rozieFirstUpdateDone` class field that flips at the end of the watcher
+  // segment of updated(), skipping exactly the initial cycle. With that fix the
+  // lit cell now PASSES GAP-2 (zero disabled cells at mount; ~12 weekend cells
+  // after toggle) and GAP-3 (French locale reconciles) — verified
+  // 2026-06-02 (gate-logs/13-cr01-acceptance.log).
   //
-  // A SEPARATE, pre-existing lit-only runtime bug remains: at MOUNT the lit
-  // calendar opens with all 42 day-cells `.flatpickr-disabled` even though
-  // `disableSet` is `[]` (weekends-disable defaults OFF) and `.disable` is
-  // bound as a property (`.disable=${this.disableSet}`), so flatpickr should
-  // construct with nothing disabled. No console.error / pageerror is emitted —
-  // this is a lit lifecycle/property-timing issue in how `this.disable` reads
-  // at `firstUpdated`, NOT a $watch-emit defect and NOT fixable by touching
-  // packages/ui/flatpickr (the wrapper source is correct; the 5 sibling
-  // targets pass with byte-identical wrapper semantics). Pre-approved fixme
-  // (CONTEXT) — follow-up: /gsd-debug the lit firstUpdated disable-construction
-  // path (TIPTAP_SOLID_KNOWN_RUNTIME_BUG pattern from matrix.spec.ts).
-  const LIT_GAP2_KNOWN_RUNTIME_BUG = target === 'lit';
-  const runner = built && !LIT_GAP2_KNOWN_RUNTIME_BUG ? test : test.fixme;
+  // A SEPARATE, narrower lit-only failure remains in GAP-4 (rangePlugin): after
+  // picking a start+end date in the range picker, the second input
+  // (`#fp-range-end`) stays empty on lit only — the spec's final
+  // `expect(endInput).not.toHaveValue('')` times out (24× resolved to
+  // value=""), while vue/react/svelte/angular/solid all mirror the end date
+  // correctly. No console.error / pageerror is emitted. This is a lit-shadow-DOM
+  // rangePlugin issue: rangePlugin is configured with `input: '#fp-range-end'`,
+  // a document-level selector, but lit renders the wrapper input inside shadow
+  // DOM, so flatpickr's rangePlugin cannot resolve / write back to the
+  // light-DOM second input. It is NOT a $watch-emit defect (GAP-2/3 prove the
+  // watcher route is correct on lit) and NOT fixable by touching
+  // packages/ui/flatpickr (the `:plugins` passthrough is byte-identical to the
+  // 5 passing targets). Pre-approved 5/6 fixme fallback (CONTEXT) — follow-up:
+  // /gsd-debug the lit-shadow-DOM rangePlugin selector-resolution path.
+  const LIT_GAP4_RANGEPLUGIN_SHADOW_DOM = target === 'lit';
+  const runner = built && !LIT_GAP4_RANGEPLUGIN_SHADOW_DOM ? test : test.fixme;
   runner(`flatpickr-behavior [${target}]: disable + locale + rangePlugin`, async ({
     page,
   }) => {
