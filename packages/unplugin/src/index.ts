@@ -111,20 +111,43 @@ export const unplugin = createUnpluginV3<Partial<RozieOptions>>((rawOptions) => 
   // adds a Vite-only single-file refresh ON TOP of this primary path.
   const emitSidecarsForRoot = (root: string): void => {
     const allowedRoots = [root, ...(options.prebuildExtraRoots ?? [])];
+    // WR-05: dedupe discovered paths across roots. When `prebuildExtraRoots`
+    // overlaps the primary root (or roots nest), the same `.rozie` would
+    // otherwise be discovered and re-rendered once per containing root — the
+    // idempotent skip inside emitSidecar suppresses the redundant WRITE but not
+    // the redundant read+render. Walk each unique root and emit each unique
+    // path once per buildStart.
+    const seen = new Set<string>();
+    // WR-04: distinguish failure classes. A `renderSidecar` returning null is a
+    // source-diagnostic bail (warn + skip — correct; the request-time transform
+    // of that file surfaces a precise error). A THROWN error is a different
+    // class — a renderer bug or a trust-boundary write refusal — which must NOT
+    // be silently swallowed, or a systemic break stays invisible (combined with
+    // WR-03's soft missing-sidecar note). Accumulate thrown failures and raise a
+    // single aggregated error at the end so the build fails loudly.
+    const failures: string[] = [];
     for (const rootDir of allowedRoots) {
       for (const roziePath of walkRozieFiles(rootDir)) {
+        if (seen.has(roziePath)) continue;
+        seen.add(roziePath);
         try {
           const source = readFileSync(roziePath, 'utf8');
           emitSidecar(roziePath, source, options.target, allowedRoots);
         } catch (err) {
-          // A single bad `.rozie` must not abort the whole scan — the
-          // request-time transform of THIS file will surface a precise
-          // Vite-shaped error. Mirror prebuildAngularRozieFiles' warn-don't-throw.
+          // Renderer threw / write refused — a systemic failure class. Record
+          // it; the aggregated throw below makes the whole build fail.
           const msg = err instanceof Error ? err.message : String(err);
           // biome-ignore lint/suspicious/noConsole: build-time diagnostic
           console.warn(`[@rozie/unplugin] sidecar emit failed for ${roziePath} → ${msg}`);
+          failures.push(`${roziePath} → ${msg}`);
         }
       }
+    }
+    if (failures.length > 0) {
+      throw new Error(
+        `[@rozie/unplugin] ${failures.length} sidecar(s) failed to generate (renderer threw / write refused):\n` +
+          failures.map((f) => `  - ${f}`).join('\n'),
+      );
     }
   };
 

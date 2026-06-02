@@ -18,10 +18,11 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { createHash } from 'node:crypto';
-import { mkdtempSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { emitSidecar, renderSidecar, SIDECAR_HEADER_PREFIX } from '../src/emitSidecar.js';
+import { unplugin } from '../src/index.js';
 
 const COUNTER_ROZIE = `<rozie name="Counter">
 <props>
@@ -157,5 +158,61 @@ describe('emitSidecar — write + trust-boundary + idempotent skip', () => {
     const outPath = emitSidecar(roziePath, BROKEN_ROZIE, 'react', [tmpDir]);
     expect(outPath).toBeNull();
     expect(existsSync(join(tmpDir, 'Broken.d.rozie.ts'))).toBe(false);
+  });
+});
+
+describe('emitSidecarsForRoot (buildStart) — WR-04 failure aggregation + WR-05 dedupe', () => {
+  let tmpDir: string;
+  let prevCwd: string;
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'rozie-buildstart-'));
+    prevCwd = process.cwd();
+  });
+
+  afterEach(() => {
+    process.chdir(prevCwd);
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  /**
+   * The buildStart sidecar walk roots at `process.cwd()`. Drive it via the
+   * rollup-shaped plugin (vue target — warn-only peer-dep checks, no throw at
+   * factory-call time) with cwd chdir'd into a temp project.
+   */
+  function runBuildStart(): void {
+    const plugin = unplugin.rollup({ target: 'vue' });
+    const first = Array.isArray(plugin) ? plugin[0] : plugin;
+    process.chdir(tmpDir);
+    // Rollup buildStart is a (this, options) method; we don't need either here.
+    (first as { buildStart: () => void }).buildStart();
+  }
+
+  it('WR-04: a renderer-throw / write-refused failure aggregates into a thrown build error', () => {
+    // Valid source that renders fine — so the failure is purely the WRITE.
+    writeFileSync(join(tmpDir, 'Counter.rozie'), COUNTER_ROZIE);
+    // Force the write to fail: make the target sidecar path a DIRECTORY, so
+    // writeFileSync('Counter.d.rozie.ts', ...) throws EISDIR. This is a
+    // "write refused / failed" class — exactly what WR-04 says must NOT be
+    // silently swallowed.
+    mkdirSync(join(tmpDir, 'Counter.d.rozie.ts'));
+
+    expect(() => runBuildStart()).toThrow(
+      /sidecar\(s\) failed to generate.*Counter\.rozie/s,
+    );
+  });
+
+  it('WR-04: a source-diagnostic bail does NOT throw (warn + skip stays correct)', () => {
+    // A broken source renderSidecar()-nulls — that is the source-diagnostic
+    // class, which must remain a non-fatal skip (no sidecar, no throw).
+    writeFileSync(join(tmpDir, 'Broken.rozie'), BROKEN_ROZIE);
+    expect(() => runBuildStart()).not.toThrow();
+    expect(existsSync(join(tmpDir, 'Broken.d.rozie.ts'))).toBe(false);
+  });
+
+  it('WR-05: a valid project emits each sidecar once and does not throw', () => {
+    writeFileSync(join(tmpDir, 'Counter.rozie'), COUNTER_ROZIE);
+    expect(() => runBuildStart()).not.toThrow();
+    expect(existsSync(join(tmpDir, 'Counter.d.rozie.ts'))).toBe(true);
   });
 });
