@@ -53,6 +53,14 @@ jobs:
       - name: Build all packages (generates .d.rozie.ts sidecars before typecheck — REQ-6)
         run: pnpm turbo run build
 
+      # WR-03: after the build has generated every in-root sidecar, a `.rozie`
+      # with NO sidecar means buildStart silently failed to emit it (the
+      # consumer's tsc would fall back to the wildcard and type-lie). With
+      # --require-complete that becomes a hard CI failure. Runs after the build
+      # above and before the per-version typecheck steps below.
+      - name: Verify every demo .rozie has a fresh sidecar (WR-03)
+        run: node scripts/check-sidecar-staleness.mjs --require-complete
+
       - name: Run unit tests (core + target-vue + runtime-vue + unplugin)
         run: |
           pnpm exec vitest run --root packages/core

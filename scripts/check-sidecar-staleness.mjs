@@ -18,11 +18,17 @@
 // It ALSO fails if a `.rozie` file that a demo consumes via a sidecar-resolving
 // import has NO sidecar on disk (the fresh-checkout / missing-declaration gap).
 //
-// `--self-test` AUTOMATES the negative path: it copies a real sidecar to an OS
-// temp dir, tampers its header hash, runs the same re-hash check against the
-// tampered copy, and asserts the check REJECTS it. This replaces the
-// manual-only negative-path proof — the gate proves it can actually catch a
-// stale sidecar.
+// `--self-test` AUTOMATES both paths against a SYNTHESIZED source+sidecar pair
+// (WR-02): it writes a tiny fake `.rozie` source to an OS temp dir, computes its
+// hash, writes a sidecar carrying that hash, asserts the gate ACCEPTS it, then
+// flips the hash and asserts the gate REJECTS it. It needs NO real on-disk
+// sidecar, so it runs cleanly on a fresh checkout (sidecars are gitignored) and
+// before any demo build (ci-prepush.sh ordering).
+//
+// `--require-complete` (WR-03): turns a `.rozie` file with NO sidecar from a
+// soft note into a HARD failure. CI passes this AFTER the demo build, where a
+// missing sidecar means generation silently failed. The default (no flag) keeps
+// the soft-note behavior for the dev / pre-push path.
 //
 // Structure mirrors scripts/check-runtime-isolation.mjs (the repo's other gate).
 import { createHash } from 'node:crypto';
@@ -113,58 +119,58 @@ function roziePathForSidecar(sidecarPath) {
 }
 
 /**
- * `--self-test`: prove the gate REJECTS a tampered sidecar. Copy a real sidecar
- * to a temp dir alongside a copy of its `.rozie` source, flip the header hash to
- * a deliberately-wrong value, run checkSidecarFreshness against it, and assert it
- * returns ok=false. Exit 0 only if the gate correctly rejected the tamper.
+ * `--self-test`: prove the gate ACCEPTS a fresh sidecar and REJECTS a tampered
+ * one. SYNTHESIZES its own known source+sidecar pair in a temp dir (WR-02): it
+ * no longer requires any real on-disk demo sidecar (sidecars are gitignored, so
+ * a fresh checkout has none — and ci-prepush.sh runs this before any demo
+ * build). The self-test writes a tiny fake `.rozie` source, computes its hash,
+ * writes a sidecar carrying that hash, asserts the gate ACCEPTS it, then flips
+ * the hash and asserts the gate REJECTS it. Exit 0 only if BOTH hold.
  */
 function runSelfTest() {
-  const allSidecars = walk(CONSUMERS_DIR, (n) => n.endsWith('.d.rozie.ts'));
-  const sample = allSidecars.find((p) => existsSync(roziePathForSidecar(p)));
-  if (!sample) {
-    console.error(
-      '✗ self-test: no demo sidecar with a matching .rozie source found — run a demo build first (e.g. `pnpm turbo run build`) so the buildStart hook emits sidecars.',
-    );
-    process.exit(1);
-  }
-  const sampleRozie = roziePathForSidecar(sample);
   const tmp = mkdtempSync(join(tmpdir(), 'rozie-sidecar-selftest-'));
   try {
     const tmpRozie = join(tmp, 'Sample.rozie');
     const tmpSidecar = join(tmp, 'Sample.d.rozie.ts');
-    const sourceText = readFileSync(sampleRozie, 'utf8');
-    const sidecarText = readFileSync(sample, 'utf8');
-    writeFileSync(tmpRozie, sourceText, 'utf8');
 
-    // Tamper: replace the real header hash with a deliberately-wrong one.
-    const realHash = parseHeaderHash(sidecarText);
-    const tamperedHash = realHash === '000000000000' ? '111111111111' : '000000000000';
-    const tamperedText = sidecarText.replace(
-      `${SIDECAR_HEADER_PREFIX}${realHash}`,
-      `${SIDECAR_HEADER_PREFIX}${tamperedHash}`,
-    );
-    if (tamperedText === sidecarText) {
-      console.error('✗ self-test: failed to construct a tampered sidecar (header not found).');
+    // Synthesize a known source and the matching sidecar header from scratch.
+    const sourceText = '<rozie name="Sample"></rozie>\n';
+    writeFileSync(tmpRozie, sourceText, 'utf8');
+    const realHash = sidecarSourceHash(sourceText);
+    const freshSidecar = `${SIDECAR_HEADER_PREFIX}${realHash}\nexport interface SampleProps {}\n`;
+    writeFileSync(tmpSidecar, freshSidecar, 'utf8');
+
+    // Positive path: a header whose hash matches the source MUST be accepted.
+    const accept = checkSidecarFreshness(tmpRozie, tmpSidecar);
+    if (!accept.ok) {
+      console.error(
+        '✗ self-test FAILED: the gate REJECTED a fresh sidecar whose header hash matches its source — the staleness check is over-eager.',
+      );
+      console.error(`    ${accept.reason}`);
       process.exit(1);
     }
-    writeFileSync(tmpSidecar, tamperedText, 'utf8');
 
-    const result = checkSidecarFreshness(tmpRozie, tmpSidecar);
-    if (result.ok) {
+    // Negative path: flip the header hash and the gate MUST reject it.
+    const tamperedHash = realHash === '000000000000' ? '111111111111' : '000000000000';
+    const tamperedSidecar = `${SIDECAR_HEADER_PREFIX}${tamperedHash}\nexport interface SampleProps {}\n`;
+    writeFileSync(tmpSidecar, tamperedSidecar, 'utf8');
+
+    const reject = checkSidecarFreshness(tmpRozie, tmpSidecar);
+    if (reject.ok) {
       console.error(
         '✗ self-test FAILED: the gate ACCEPTED a tampered sidecar (header hash flipped) — the staleness check is not actually catching stale sidecars.',
       );
       process.exit(1);
     }
-    console.log('✓ self-test passed — the gate rejected a tampered sidecar:');
-    console.log(`    ${result.reason}`);
+    console.log('✓ self-test passed — the gate accepted a fresh sidecar and rejected a tampered one:');
+    console.log(`    ${reject.reason}`);
     process.exit(0);
   } finally {
     rmSync(tmp, { recursive: true, force: true });
   }
 }
 
-function runGate() {
+function runGate(requireComplete) {
   const sidecars = walk(CONSUMERS_DIR, (n) => n.endsWith('.d.rozie.ts'));
   const stale = [];
   let checked = 0;
@@ -182,11 +188,19 @@ function runGate() {
 
   // Missing-declaration gap: a `.rozie` that lives next to OTHER sidecar'd
   // siblings (i.e. in a directory that already participates in sidecar
-  // generation) but has NO sidecar of its own. On a fresh checkout this is
-  // expected (sidecars are gitignored) — that case is handled by CI ordering
-  // (generate before typecheck), so we only flag it as a WARNING here, not a
-  // hard failure, to keep this gate purely about staleness of EXISTING
-  // sidecars.
+  // generation) but has NO sidecar of its own.
+  //
+  // Default (dev / pre-push): on a fresh checkout this is expected (sidecars
+  // are gitignored), and that case is handled by CI ordering (generate before
+  // typecheck), so we only flag it as a soft WARNING — keeping this gate
+  // purely about staleness of EXISTING sidecars.
+  //
+  // `--require-complete` (WR-03): CI passes this AFTER the demo build has run,
+  // where every in-root `.rozie` MUST have a sidecar. A missing sidecar then
+  // means the buildStart hook silently failed to generate it (e.g. a swallowed
+  // per-file error in emitSidecarsForRoot) — the consumer's tsc would fall
+  // back to the wildcard and type-lie, the exact failure this gate exists to
+  // catch. With the flag, a missing sidecar is a HARD failure (exit 1).
   const sidecarDirs = new Set(sidecars.map((p) => dirname(p)));
   const missing = [];
   for (const dir of sidecarDirs) {
@@ -205,6 +219,18 @@ function runGate() {
     process.exit(1);
   }
 
+  if (requireComplete && missing.length > 0) {
+    console.error(
+      `✗ --require-complete: ${missing.length} .rozie file(s) have NO sidecar on disk after the`,
+    );
+    console.error('  build step — the buildStart sidecar generation silently failed for these');
+    console.error('  files (type-lying / wildcard-fallback risk, WR-03). Investigate the demo');
+    console.error('  build / emitSidecarsForRoot before retrying:');
+    for (const m of missing.slice(0, 20)) console.error(`  - ${m}`);
+    if (missing.length > 20) console.error(`  … and ${missing.length - 20} more`);
+    process.exit(1);
+  }
+
   console.log(`✓ sidecar staleness OK — ${checked} sidecar(s) match their .rozie source hash.`);
   if (missing.length > 0) {
     console.log(
@@ -220,5 +246,5 @@ function runGate() {
 if (process.argv.includes('--self-test')) {
   runSelfTest();
 } else {
-  runGate();
+  runGate(process.argv.includes('--require-complete'));
 }
