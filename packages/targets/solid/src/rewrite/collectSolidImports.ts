@@ -15,6 +15,10 @@ export type SolidImport =
   | 'createSignal'
   | 'createMemo'
   | 'createEffect'
+  // 260602-9lw — `on(deps, fn, { defer: true })` is the idiomatic Solid lazy
+  // `$watch` form (skips the first `fn` run). Added to the allowlist alongside
+  // `createEffect`/`untrack`. `on` is a first-class `solid-js` export.
+  | 'on'
   | 'untrack'
   | 'mergeProps'
   | 'onMount'

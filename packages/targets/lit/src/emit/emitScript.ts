@@ -934,11 +934,25 @@ export function emitScript(
         //
         // changedProperties.has() check union: `(changedProperties.has('a') || changedProperties.has('b'))`.
         // For the single-prop common case, this collapses to one check.
+        //
+        // 260602-9lw — `$watch` is now LAZY by default on all six targets
+        // (REVERSES the 260519 immediate-by-default contract). Lit's
+        // `updated(changedProperties)` ALSO runs on the FIRST render cycle, and
+        // on that cycle `changedProperties` contains every property that was
+        // set — so a bare `changedProperties.has('X')` would fire at mount. For
+        // the default (`!irWatcher.immediate`) we additionally gate on
+        // `this.hasUpdated`, which Lit sets to `true` only AFTER the first
+        // `updated()` (it is `false` during the first call) — skipping exactly
+        // the initial cycle. `{ immediate: true }` drops the `hasUpdated` guard
+        // and keeps the eager mount fire.
         const propChecks = classification.propNames
           .map((n) => `changedProperties.has('${n}')`)
           .join(' || ');
+        const guard = irWatcher.immediate
+          ? propChecks
+          : `this.hasUpdated && (${propChecks})`;
         watcherUpdatedBranches.push(
-          `if (${propChecks}) { const __watchVal = (${getterCode})(); (${cbCode})(${callArg}); }`,
+          `if (${guard}) { const __watchVal = (${getterCode})(); (${cbCode})(${callArg}); }`,
         );
       } else {
         // effect()-based route (data/computed/slots/closure-touching, OR
@@ -953,10 +967,26 @@ export function emitScript(
         // `watch(getter, cb)`, Solid's untrack-wrapped callback (e57df14), and
         // Angular's `untracked`-wrapped callback. The `updated()`-route
         // branch above is `changedProperties`-gated and needs no untrack.
+        //
+        // 260602-9lw — `$watch` is now LAZY by default on all six targets
+        // (REVERSES the 260519 immediate-by-default contract). preact-signals
+        // `effect()` fires on its first run, so for the default
+        // (`!irWatcher.immediate`) we add a class-field first-run flag read/
+        // written INSIDE `untracked(...)` (mirroring Angular/Svelte) so it does
+        // not join the effect's dependency set; the callback is skipped on the
+        // first run. `{ immediate: true }` keeps today's eager shape.
         needsEffectImport = true;
-        watcherCleanupPushes.push(
-          `this._disconnectCleanups.push(effect(() => { const __watchVal = (${getterCode})(); untracked(() => (${cbCode})(${callArg})); }));`,
-        );
+        if (irWatcher.immediate) {
+          watcherCleanupPushes.push(
+            `this._disconnectCleanups.push(effect(() => { const __watchVal = (${getterCode})(); untracked(() => (${cbCode})(${callArg})); }));`,
+          );
+        } else {
+          const flag = `__rozieWatchInitial_${i}`;
+          fieldLines.push(`private ${flag} = true;`);
+          watcherCleanupPushes.push(
+            `this._disconnectCleanups.push(effect(() => { const __watchVal = (${getterCode})(); untracked(() => { if (this.${flag}) { this.${flag} = false; return; } (${cbCode})(${callArg}); }); }));`,
+          );
+        }
       }
     }
     if (needsEffectImport) {

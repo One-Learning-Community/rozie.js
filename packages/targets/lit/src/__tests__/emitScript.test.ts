@@ -316,7 +316,12 @@ $watch(() => $data.count, (v) => { onChange(v) })
     // runs inside `untracked(...)` so its reads (and transitive helper reads)
     // DON'T join the effect's dependency set; only the getter defines re-runs.
     // `untracked` is re-exported by @lit-labs/preact-signals.
-    expect(code).toMatch(/effect\(\(\) => \{ const __watchVal = \([\s\S]+?\)\(\); untracked\(\(\) => \([\s\S]+?\)\([\s\S]*?\)\); \}\)/);
+    //
+    // 260602-9lw — the effect route is now LAZY by default: a class-field
+    // first-run flag (`this.__rozieWatchInitial_N`) is read/written INSIDE
+    // `untracked(...)` and the callback is skipped on the first run.
+    expect(code).toMatch(/private __rozieWatchInitial_0 = true;/);
+    expect(code).toMatch(/effect\(\(\) => \{ const __watchVal = \([\s\S]+?\)\(\); untracked\(\(\) => \{ if \(this\.__rozieWatchInitial_0\) \{ this\.__rozieWatchInitial_0 = false; return; \} \([\s\S]+?\)\([\s\S]*?\); \}\); \}\)/);
     expect(code).toMatch(/import \{[^}]*\buntracked\b[^}]*\} from '@lit-labs\/preact-signals'/);
   });
 });

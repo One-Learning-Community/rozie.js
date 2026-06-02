@@ -97,9 +97,16 @@ $watch(() => $props.open, (v) => { console.log(v) })
     // createEffect's dependency set; only the getter defines what re-runs it.
     // `v` carries a `: any` annotation from typeNeutralizeScript (untyped
     // `<script>` callback param) — the watcher binding is otherwise unchanged.
-    expect(result.hookSection).toMatch(/createEffect\(\(\) => \{[\s\S]*?const __watchVal = \(\(\) =>[\s\S]*?\)\(\);[\s\S]*?untrack\(\(\) => \((?:v|\(v: any\)) => \{[\s\S]*?\}\)\(__watchVal\)\);[\s\S]*?\}\);/);
+    //
+    // 260602-9lw — `$watch` is now LAZY by default: the idiomatic Solid lazy
+    // form is `createEffect(on(() => (getter)(), (v) => untrack(...), { defer: true }))`.
+    // `on(deps, fn, { defer: true })` runs `deps` once to establish tracking but
+    // skips `fn` on the first run; the new value arrives as `fn`'s first param
+    // `v`, which is bound into the user callback when it declares a param.
+    expect(result.hookSection).toMatch(/createEffect\(on\(\(\) => \(\(\) =>[\s\S]*?\)\(\), \(v\) => untrack\(\(\) => \((?:v|\(v: any\)) => \{[\s\S]*?\}\)\(v\)\), \{ defer: true \}\)\);/);
     expect(solidImports.has('createEffect')).toBe(true);
     expect(solidImports.has('untrack')).toBe(true);
+    expect(solidImports.has('on')).toBe(true);
   });
 
   it('Quick 260515-u2b — $watch with `() => ...` callback omits __watchVal arg (tsc TS2554-safe)', () => {
@@ -121,8 +128,14 @@ $watch(() => $props.open, () => { console.log('fired') })
     const result = emitScript(ir, { solidImports, runtimeImports });
     // Bug B fix (260519 linechart-watch-recreate) — the zero-param callback is
     // wrapped in `untrack(...)`; the inner IIFE takes no argument.
-    expect(result.hookSection).toMatch(/untrack\(\(\) => \(\(\) => \{[\s\S]*?\}\)\(\)\);/);
+    //
+    // 260602-9lw — lazy-by-default: `on(..., (v) => untrack(() => (cb)()), { defer: true })`.
+    // The 0-param callback drops `v` from the inner call (TS2554-safe).
+    expect(result.hookSection).toMatch(/createEffect\(on\(\(\) => \(\(\) =>[\s\S]*?\)\(\), \(v\) => untrack\(\(\) => \(\(\) => \{[\s\S]*?\}\)\(\)\), \{ defer: true \}\)\);/);
     expect(result.hookSection).not.toContain(`)(__watchVal)`);
+    // The inner user-callback IIFE takes NO argument (0-param callback): the
+    // emitted inner call is `)()` not `)(v)`.
+    expect(result.hookSection).not.toContain(`})(v))`);
   });
 
   it('lifecycle concise-arrow body: `$onMount(() => method())` wraps the body in an arrow (no eager call, no TDZ)', () => {

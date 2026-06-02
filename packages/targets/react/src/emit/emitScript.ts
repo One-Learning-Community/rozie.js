@@ -2392,13 +2392,32 @@ export function emitScript(
           : `${d.scope}::${d.path.join('.')}`;
       return !getterDepKeys.has(key);
     });
+    // 260602-9lw — `$watch` is now LAZY by default on all six targets (REVERSES
+    // the 260519 immediate-by-default contract). `useEffect` fires on mount, so
+    // for the default (`!wh.immediate`) we hoist a stable `useRef(true)` skip
+    // flag and bail out of the effect body on the first run — the callback then
+    // fires only on subsequent re-runs (driven by `depsArr` reference-`!==`
+    // changes). `{ immediate: true }` keeps today's eager shape (no guard).
+    //
+    // The skip ref is a `useRef` (stable identity) and is read ONLY inside the
+    // body — it MUST NOT enter `depsArr` (exhaustive-deps exempts refs), and the
+    // body read does not change `callbackBodyDeps` (computed from `cbCloned`
+    // above, before this guard is prepended), so `watcherNeedsDisable` is
+    // unaffected.
+    let effectBody = `${paramBinding}${cbInvocation}`;
+    if (!wh.immediate) {
+      collectors.react.add('useRef');
+      const firstRefName = `_watch${idx}First`;
+      hookLines.push(`const ${firstRefName} = useRef(true);`);
+      effectBody = `if (${firstRefName}.current) { ${firstRefName}.current = false; return; }\n  ${effectBody}`;
+    }
     if (watcherNeedsDisable) {
       lifecycleEffectLines.push(
-        `useEffect(() => {\n  ${paramBinding}${cbInvocation}\n}, ${depsArr}); // eslint-disable-line react-hooks/exhaustive-deps`,
+        `useEffect(() => {\n  ${effectBody}\n}, ${depsArr}); // eslint-disable-line react-hooks/exhaustive-deps`,
       );
     } else {
       lifecycleEffectLines.push(
-        `useEffect(() => {\n  ${paramBinding}${cbInvocation}\n}, ${depsArr});`,
+        `useEffect(() => {\n  ${effectBody}\n}, ${depsArr});`,
       );
     }
   });

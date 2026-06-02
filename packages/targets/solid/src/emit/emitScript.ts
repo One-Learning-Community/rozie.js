@@ -499,14 +499,29 @@ export function emitScript(
     const rewrittenCb = rewriteNode(cbArrow, ir);
     const getterCode = genCode(rewrittenGetter);
     const cbCode = genCode(rewrittenCb);
-    // Only pass __watchVal when the callback declares a param to receive it —
-    // passing an arg to a 0-param arrow is runtime-safe (JS drops extras) but
-    // tsc flags TS2554 "Expected 0 arguments, but got 1". Conditional bind keeps
-    // both `(v) => ...` and `() => ...` shapes type-clean.
-    const callArg = wh.callbackParams.length > 0 ? '__watchVal' : '';
-    hookLines.push(
-      `createEffect(() => { const __watchVal = (${getterCode})(); untrack(() => (${cbCode})(${callArg})); });`,
-    );
+    // 260602-9lw — `$watch` is now LAZY by default on all six targets (REVERSES
+    // the 260519 immediate-by-default contract). Solid's idiomatic lazy form is
+    // `on(deps, fn, { defer: true })`: `deps` runs once to establish tracking
+    // but `fn` is skipped on the first run, then fires on each reference-`!==`
+    // change. The new value arrives as `fn`'s first param, which we bind to `v`.
+    // `{ immediate: true }` opts back into the eager initial fire via the
+    // original `createEffect(() => {...})` shape (fires on registration).
+    //
+    // 0-param discipline (preserved): passing an arg to a 0-param callback is
+    // runtime-safe but tsc flags TS2554 ("Expected 0 arguments, but got 1"), so
+    // only bind the value into the call when the callback declares a param.
+    if (wh.immediate) {
+      const callArg = wh.callbackParams.length > 0 ? '__watchVal' : '';
+      hookLines.push(
+        `createEffect(() => { const __watchVal = (${getterCode})(); untrack(() => (${cbCode})(${callArg})); });`,
+      );
+    } else {
+      collectors.solidImports.add('on');
+      const callArg = wh.callbackParams.length > 0 ? 'v' : '';
+      hookLines.push(
+        `createEffect(on(() => (${getterCode})(), (v) => untrack(() => (${cbCode})(${callArg})), { defer: true }));`,
+      );
+    }
   }
 
   // 4b. Ref variable declarations: `let fooRef: HTMLElement | null = null;`

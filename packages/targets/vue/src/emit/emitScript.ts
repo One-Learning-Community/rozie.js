@@ -526,6 +526,29 @@ function findClonedComputedBodies(
  * Locates each $watch call by source-order, then synthesizes the arrow
  * wrappers around the original rewritten function-body nodes.
  */
+/**
+ * 260602-9lw — detect a literal `{ immediate: true }` third argument on a cloned
+ * `$watch(...)` call. Mirrors the collector's parse discipline (Identifier or
+ * StringLiteral key `immediate`, BooleanLiteral `true` value; any other shape
+ * defaults to lazy). The collector already validated this at the IR layer; we
+ * re-read it from the cloned AST here because emitWatcherHooks walks the cloned
+ * Program by source order rather than consuming `ir.watchers`.
+ */
+function watchCallIsImmediate(expr: t.CallExpression): boolean {
+  const optionsArg = expr.arguments[2];
+  if (!optionsArg || !t.isObjectExpression(optionsArg)) return false;
+  for (const prop of optionsArg.properties) {
+    if (!t.isObjectProperty(prop)) continue;
+    if (prop.computed) continue;
+    let key: string | null = null;
+    if (t.isIdentifier(prop.key)) key = prop.key.name;
+    else if (t.isStringLiteral(prop.key)) key = prop.key.value;
+    if (key !== 'immediate') continue;
+    if (t.isBooleanLiteral(prop.value) && prop.value.value === true) return true;
+  }
+  return false;
+}
+
 function emitWatcherHooks(
   clonedProgram: t.File,
   imports: VueImportCollector,
@@ -561,15 +584,17 @@ function emitWatcherHooks(
     // emit them verbatim — no body-extraction needed.
     const getterCode = genCode(getterArg as t.Node);
     const cbCode = genCode(cbArg as t.Node);
-    // 260519 linechart-watch-recreate step 6 — `$watch` is immediate-by-default
-    // across all six targets. Vue's `watch(getter, cb)` is LAZY (first run on
-    // the next change, not on registration), so we pass `{ immediate: true }`.
-    // React / Angular / Solid / Lit already fire their watcher callback on the
-    // initial run; Svelte's emit drops its skip-initial gate in the same
-    // change. LineChartDemo's `$watch(() => $data.liveFeed, ...)` needs the
-    // init fire to START the simulated feed (liveFeed defaults to true) — a
-    // lazy watcher would leave the feed dead until the user toggled it.
-    lines.push(`watch(${getterCode}, ${cbCode}, { immediate: true });`);
+    // 260602-9lw — `$watch` is now LAZY by default on all six targets (REVERSES
+    // the 260519 immediate-by-default contract). Vue's `watch(getter, cb)` is
+    // natively lazy (first callback on the next change, not on registration), so
+    // the default emit is the bare lazy form. The author opts into the eager
+    // initial fire with `$watch(getter, cb, { immediate: true })`, which we
+    // detect from the cloned call's third argument (literal `{ immediate: true }`).
+    if (watchCallIsImmediate(expr)) {
+      lines.push(`watch(${getterCode}, ${cbCode}, { immediate: true });`);
+    } else {
+      lines.push(`watch(${getterCode}, ${cbCode});`);
+    }
   }
   return { lines, consumedIndices: consumed };
 }

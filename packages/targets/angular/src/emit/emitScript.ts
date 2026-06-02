@@ -624,6 +624,27 @@ export interface EmitScriptOptions {
   portalScopeHash?: string;
 }
 
+/**
+ * 260602-9lw — detect a literal `{ immediate: true }` third argument on a cloned
+ * `$watch(...)` call. Mirrors the core collector's parse discipline; any other
+ * shape defaults to lazy. Re-read here because the watcher loop walks the cloned
+ * Program by source order rather than consuming `ir.watchers`.
+ */
+function watchCallIsImmediate(expr: t.CallExpression): boolean {
+  const optionsArg = expr.arguments[2];
+  if (!optionsArg || !t.isObjectExpression(optionsArg)) return false;
+  for (const prop of optionsArg.properties) {
+    if (!t.isObjectProperty(prop)) continue;
+    if (prop.computed) continue;
+    let key: string | null = null;
+    if (t.isIdentifier(prop.key)) key = prop.key.name;
+    else if (t.isStringLiteral(prop.key)) key = prop.key.value;
+    if (key !== 'immediate') continue;
+    if (t.isBooleanLiteral(prop.value) && prop.value.value === true) return true;
+  }
+  return false;
+}
+
 export function emitScript(
   ir: IRComponent,
   opts: EmitScriptOptions = {},
@@ -930,6 +951,7 @@ export function emitScript(
   // The `effect` symbol is already on the @angular/core import list when
   // lifecycle.update or watchers exist.
   const watcherConsumedIndices = new Set<number>();
+  let watchIdx = 0;
   for (let i = 0; i < cloned.program.body.length; i++) {
     if (lifecyclePairing.consumedIndices.has(i)) continue;
     const stmt = cloned.program.body[i];
@@ -968,6 +990,8 @@ export function emitScript(
         ? cbArg.params.length
         : 0;
     const callArg = cbParamCount > 0 ? '__watchVal' : '';
+    const idx = watchIdx++;
+    const immediate = watchCallIsImmediate(expr);
     // Bug B fix (260519 linechart-watch-recreate) — the callback runs inside
     // `untracked(...)` (from @angular/core) so its reads — including transitive
     // ones via a helper call like `buildConfig()` reading `$props.data` — do
@@ -975,9 +999,25 @@ export function emitScript(
     // in the tracking scope so its reads subscribe the effect; only those reads
     // define what re-runs the watcher — matching Vue's `watch(getter, cb)` and
     // Solid's untrack-wrapped $watch callback (commit e57df14).
-    lifecycleConstructorLines.push(
-      `effect(() => { const __watchVal = (${getterCode})(); untracked(() => (${cbCode})(${callArg})); });`,
-    );
+    //
+    // 260602-9lw — `$watch` is now LAZY by default on all six targets (REVERSES
+    // the 260519 immediate-by-default contract). Angular's `effect()` runs once
+    // initially to establish tracking — that initial run IS the eager fire. For
+    // the default (`!immediate`) we make the skip EXPLICIT via a class-field
+    // first-run flag read/written INSIDE `untracked(...)` (so it does not join
+    // the effect's dependency set); the callback fires only on subsequent
+    // changes. `{ immediate: true }` keeps today's eager shape.
+    if (immediate) {
+      lifecycleConstructorLines.push(
+        `effect(() => { const __watchVal = (${getterCode})(); untracked(() => (${cbCode})(${callArg})); });`,
+      );
+    } else {
+      const flag = `__rozieWatchInitial_${idx}`;
+      fieldLines.push(`private ${flag} = true;`);
+      lifecycleConstructorLines.push(
+        `effect(() => { const __watchVal = (${getterCode})(); untracked(() => { if (this.${flag}) { this.${flag} = false; return; } (${cbCode})(${callArg}); }); });`,
+      );
+    }
   }
   // Ensure `effect` is on the @angular/core import list when at least one
   // watcher exists (covers the case where the IR has no $onUpdate hook).

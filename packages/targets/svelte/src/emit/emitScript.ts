@@ -660,12 +660,34 @@ function emitDerivedDecls(
  * Walks the cloned program; rewriteRozieIdentifiers already normalized
  * `$props.x` → `x` (post-destructure) and `$data.x` → bare-let-read.
  */
+/**
+ * 260602-9lw — detect a literal `{ immediate: true }` third argument on a cloned
+ * `$watch(...)` call. Mirrors the core collector's parse discipline; any other
+ * shape defaults to lazy. Re-read here because emitWatcherHooks walks the cloned
+ * Program by source order rather than consuming `ir.watchers`.
+ */
+function watchCallIsImmediate(expr: t.CallExpression): boolean {
+  const optionsArg = expr.arguments[2];
+  if (!optionsArg || !t.isObjectExpression(optionsArg)) return false;
+  for (const prop of optionsArg.properties) {
+    if (!t.isObjectProperty(prop)) continue;
+    if (prop.computed) continue;
+    let key: string | null = null;
+    if (t.isIdentifier(prop.key)) key = prop.key.name;
+    else if (t.isStringLiteral(prop.key)) key = prop.key.value;
+    if (key !== 'immediate') continue;
+    if (t.isBooleanLiteral(prop.value) && prop.value.value === true) return true;
+  }
+  return false;
+}
+
 function emitWatcherHooks(
   clonedProgram: t.File,
 ): { lines: string[]; consumedIndices: Set<number>; needsUntrack: boolean } {
   const lines: string[] = [];
   const consumed = new Set<number>();
   let needsUntrack = false;
+  let watchIdx = 0;
   const body = clonedProgram.program.body;
   for (let i = 0; i < body.length; i++) {
     const stmt = body[i];
@@ -691,39 +713,50 @@ function emitWatcherHooks(
     const getterCode = genCode(getterArg as t.Node);
     const cbCode = genCode(cbArg as t.Node);
     needsUntrack = true;
+    const idx = watchIdx++;
+    const immediate = watchCallIsImmediate(expr);
     // Wrap each in parens so the genCode emits a parenthesized arrow we can
     // immediately invoke as an IIFE inside the $effect block. Bind the
     // getter's evaluated value as the callback's first argument WHEN the
     // user-authored callback declares a parameter — otherwise svelte-check
     // flags "Expected 0 arguments, but got 1" for the `(() => {...})()` form.
     //
-    // $watch immediate-fire contract (260519 linechart-watch-recreate step 6):
-    // $watch is immediate-by-default across all six targets. In Svelte 5,
-    // `$effect` already fires once at registration — the getter read subscribes
-    // and the callback runs — which IS the immediate fire. There is no
-    // skip-initial gate: a $watch that toggles an interval (LineChartDemo's
-    // liveFeed feed) needs the init fire so the feed auto-starts.
-    //
-    // The earlier skip-initial `__rozieWatchInitial_N` gate was added to dodge
-    // a LineChart Chart.js race, but that race was Bug B — the mount/callback
-    // dependency leakage — now fixed structurally (mount hooks lower to the
-    // non-tracking `onMount`, and the callback below runs inside `untrack`).
-    // With Bug B fixed the gate is no longer load-bearing, and removing it
-    // makes Svelte's $watch consistent with Vue's `{ immediate: true }` and
-    // React/Solid/Angular/Lit's already-immediate watcher emit.
+    // 260602-9lw — `$watch` is now LAZY by default on all six targets (REVERSES
+    // the 260519 immediate-by-default contract). In Svelte 5 `$effect` fires
+    // once at registration, so for the default (`!immediate`) we restore a
+    // component-scope first-run gate (the `__rozieWatchInitial_N` flag that was
+    // deleted in 260519). The getter still runs in tracking scope (subscribes);
+    // the flag is read/written INSIDE `untrack(...)` so it does not subscribe
+    // the effect to itself, and the callback is skipped on the first run.
+    // `{ immediate: true }` keeps today's eager shape (callback fires at
+    // registration).
     //
     // Bug B fix — the callback runs inside `untrack(...)` so transitive
     // reactive reads (a helper like `buildConfig()` reading `$props.data`) do
     // NOT subscribe the watcher. Only the getter defines the watcher's
     // dependency set — matching Vue/Solid/Angular/Lit.
-    if (cbParamCount(cbArg) > 0) {
-      lines.push(
-        `$effect(() => { const __watchVal = (${getterCode})(); untrack(() => (${cbCode})(__watchVal)); });`,
-      );
+    if (immediate) {
+      if (cbParamCount(cbArg) > 0) {
+        lines.push(
+          `$effect(() => { const __watchVal = (${getterCode})(); untrack(() => (${cbCode})(__watchVal)); });`,
+        );
+      } else {
+        lines.push(
+          `$effect(() => { (${getterCode})(); untrack(() => (${cbCode})()); });`,
+        );
+      }
     } else {
-      lines.push(
-        `$effect(() => { (${getterCode})(); untrack(() => (${cbCode})()); });`,
-      );
+      const flag = `__rozieWatchInitial_${idx}`;
+      lines.push(`let ${flag} = true;`);
+      if (cbParamCount(cbArg) > 0) {
+        lines.push(
+          `$effect(() => { const __watchVal = (${getterCode})(); untrack(() => { if (${flag}) { ${flag} = false; return; } (${cbCode})(__watchVal); }); });`,
+        );
+      } else {
+        lines.push(
+          `$effect(() => { (${getterCode})(); untrack(() => { if (${flag}) { ${flag} = false; return; } (${cbCode})(); }); });`,
+        );
+      }
     }
   }
   return { lines, consumedIndices: consumed, needsUntrack };
