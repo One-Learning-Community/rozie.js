@@ -93,6 +93,7 @@ export default defineConfig({
             { text: 'Creature comforts', link: '/guide/creature-comforts' },
             { text: 'For Angular shops', link: '/guide/for-angular-shops' },
             { text: 'For React teams', link: '/guide/for-react-teams' },
+            { text: 'For Preact teams', link: '/guide/for-preact-teams' },
             { text: 'For Lit / Web Components teams', link: '/guide/for-lit-teams' },
             { text: 'For Astro / HTML-first shops', link: '/guide/for-astro-and-html-first-shops' },
             { text: 'For vanilla-JS + plugin shops', link: '/guide/for-vanilla-js-shops' },
