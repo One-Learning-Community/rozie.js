@@ -81,8 +81,14 @@ for (const target of TARGETS) {
     await expect(mount).toBeVisible();
 
     // MOUNT — the wrapper's flatpickr input renders. There are two flatpickr
-    // instances (main + range); the main picker is the FIRST input.
-    const mainInput = mount.locator('input.rozie-flatpickr').first();
+    // instances (main + range); the main picker is the FIRST input. Target
+    // flatpickr's own `.flatpickr-input` class (which flatpickr stamps onto the
+    // input it manages) rather than the wrapper's `.rozie-flatpickr` class:
+    // React CSS-Modules-hashes the wrapper's authored class name
+    // (`_rozie-flatpickr_…`), so `.rozie-flatpickr` would not match on React
+    // (cf. project_react_classhash_breaks_selectors). `.flatpickr-input` is
+    // stable across all six targets.
+    const mainInput = mount.locator('input.flatpickr-input').first();
     await expect(mainInput).toBeVisible({ timeout: 10_000 });
 
     // CALENDAR OPENS — clicking the main input opens its calendar; flatpickr
@@ -93,44 +99,73 @@ for (const target of TARGETS) {
     await expect(openCalendar).toBeVisible({ timeout: 10_000 });
 
     // GAP-2 — DISABLE PREDICATE. With weekends-disable OFF, the open calendar
-    // has zero disabled day cells. Toggle it ON → the wrapper's set('disable')
-    // reconciler re-renders day cells, stamping `.flatpickr-disabled` on
-    // Saturdays/Sundays. Assert at least one disabled cell appears.
+    // has zero disabled day cells.
     await expect(
       page.locator('.flatpickr-calendar.open .flatpickr-day.flatpickr-disabled'),
     ).toHaveCount(0);
 
+    // Close the calendar before clicking the toggle: the open popup overlays
+    // the picker-pane controls and would otherwise intercept the click.
+    await page.keyboard.press('Escape');
+    await expect(openCalendar).toBeHidden({ timeout: 5_000 });
+
+    // Toggle weekends ON → the wrapper's set('disable') reconciler updates the
+    // live picker. Re-open and assert ONLY weekend cells are disabled. There
+    // are exactly 12 weekend cells (Sat/Sun) across a 6-week (42-cell) grid;
+    // asserting the count is in the weekend band (not the whole grid) proves
+    // the predicate is honored rather than the disable set being misapplied.
     await page.getByTestId('toggle-weekends').click();
-    // The disable reconcile re-renders the live calendar in place (no remount).
-    await expect(
-      page
-        .locator('.flatpickr-calendar.open .flatpickr-day.flatpickr-disabled')
-        .first(),
-    ).toBeVisible({ timeout: 10_000 });
+    await mainInput.click();
+    await expect(openCalendar).toBeVisible({ timeout: 10_000 });
+    const disabledDays = page.locator(
+      '.flatpickr-calendar.open .flatpickr-day.flatpickr-disabled',
+    );
+    await expect(disabledDays.first()).toBeVisible({ timeout: 10_000 });
+    const disabledCount = await disabledDays.count();
     expect(
-      await page
-        .locator('.flatpickr-calendar.open .flatpickr-day.flatpickr-disabled')
-        .count(),
+      disabledCount,
+      `expected only weekend cells disabled (~12 in a 42-cell grid), got ${disabledCount}`,
     ).toBeGreaterThan(0);
+    expect(
+      disabledCount,
+      `disabling ALL ${disabledCount} cells means the predicate was not honored`,
+    ).toBeLessThan(20);
 
     // GAP-3 — LOCALE. Switch to French → the locale reconciler re-renders the
-    // month label in French. flatpickr renders the current month name into
-    // `.flatpickr-current-month .cur-month`.
+    // calendar in French. flatpickr's default `monthSelectorType: 'dropdown'`
+    // renders the month as a `<select class="flatpickr-monthDropdown-months">`
+    // whose <option> labels are the LOCALIZED month names — so French locale
+    // means the options read "janvier"/"février"/… The localized weekday
+    // headers (`.flatpickr-weekday`: lun/mar/mer/…) are a second proof. Close +
+    // reopen so the control click is not intercepted by the popup.
+    await page.keyboard.press('Escape');
+    await expect(openCalendar).toBeHidden({ timeout: 5_000 });
     await page.getByTestId('lang-fr').click();
-    const monthLabel = page
-      .locator('.flatpickr-calendar.open .flatpickr-current-month .cur-month')
+    await mainInput.click();
+    await expect(openCalendar).toBeVisible({ timeout: 10_000 });
+    const monthOptions = openCalendar
+      .locator('select.flatpickr-monthDropdown-months option')
       .first();
-    await expect(monthLabel).toHaveText(FRENCH_MONTHS, { timeout: 10_000 });
+    await expect(monthOptions).toHaveText(FRENCH_MONTHS, { timeout: 10_000 });
+    // Second proof: the weekday header row is localized to French.
+    const weekdays = await openCalendar
+      .locator('.flatpickr-weekday')
+      .allTextContents();
+    expect(
+      weekdays.map((w) => w.trim()).join(' '),
+      `weekday headers should be French (lun/mar/…), got: ${weekdays.join(',')}`,
+    ).toMatch(/lun|mar|mer|jeu|ven|sam|dim/i);
+    await page.keyboard.press('Escape');
 
     // GAP-4 — RANGEPLUGIN two-input range. The second input exists and
     // rangePlugin mirrors the picked end date into it.
     const endInput = page.locator('#fp-range-end');
     await expect(endInput).toBeVisible();
 
-    // Open the range (start) picker. It is the SECOND .rozie-flatpickr input
+    // Open the range (start) picker. It is the SECOND .flatpickr-input
     // (the main picker is the first). rangePlugin binds the start picker to
     // #fp-range-end; picking two days fills BOTH inputs.
-    const rangeStartInput = mount.locator('input.rozie-flatpickr').nth(1);
+    const rangeStartInput = mount.locator('input.flatpickr-input').nth(1);
     await expect(rangeStartInput).toBeVisible();
     await rangeStartInput.click();
 
