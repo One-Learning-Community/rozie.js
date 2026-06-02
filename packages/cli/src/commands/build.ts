@@ -24,8 +24,16 @@
 import { compile } from '../../../core/src/compile.js';
 import { renderDiagnostic } from '../../../core/src/diagnostics/frame.js';
 import type { Diagnostic } from '../../../core/src/diagnostics/Diagnostic.js';
+// Phase 22 Plan 22-05 — CLI sidecar fallback (REQ-5). The `.d.rozie.ts`
+// per-module declaration is rendered by the SAME `renderSidecar` the unplugin
+// uses (parse → lowerToIR → per-target emit<Target>Types dispatch → do-not-edit
+// + sha256 hash header), so the unplugin and CLI sidecar bytes cannot drift.
+// Relative import into the sibling workspace package (the CLI's established
+// pattern; tsdown inlines it at bundle time).
+import { renderSidecar } from '../../../unplugin/src/emitSidecar.js';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname as pathDirname, resolve as pathResolve } from 'node:path';
+import { TARGET_EXTENSIONS } from '../utils/outputPath.js';
 import pc from 'picocolors';
 import { expandInputs } from '../utils/expandInputs.js';
 import { computeOutputPath } from '../utils/outputPath.js';
@@ -283,6 +291,22 @@ export async function runBuildMatrix(
       const outPath = computeOutputPath(input, target, outDir, rootDir);
       mkdirSync(pathDirname(outPath), { recursive: true });
 
+      // Phase 22 Plan 22-05 — `.d.rozie.ts` sidecar (REQ-5/REQ-7). Emitted for
+      // ALL six targets via the same `renderSidecar` the unplugin uses, so a
+      // CLI build and a bundler build produce byte-identical sidecars (ONE
+      // convention for consumers). React ALSO keeps its existing `result.types`
+      // `.d.ts` below (backward-compat) — the `.d.rozie.ts` is the cross-target
+      // convention that `allowArbitraryExtensions` resolves for `./Foo.rozie`.
+      //
+      // REQ-7 (LOCKED GITIGNORED): `*.d.rozie.ts` is already matched by the
+      // existing `.gitignore:29 *.rozie.ts` rule — these are generated artefacts,
+      // ignore-not-commit. NO new gitignore rule is added.
+      const sidecarText = wantTypes ? renderSidecar(source, target, input) : null;
+      const sidecarPath =
+        sidecarText !== null
+          ? outPath.slice(0, outPath.length - TARGET_EXTENSIONS[target].length) + '.d.rozie.ts'
+          : null;
+
       // Pre-compute sidecar paths + content so we can fire all prettier
       // calls for this tuple in parallel.
       const dtsPath =
@@ -309,6 +333,12 @@ export async function runBuildMatrix(
       // anyway. Keeping these in source order also keeps the disk-write
       // failure mode predictable (main artefact lands before sidecars).
       writeFileSync(outPath, mainText, 'utf8');
+      // Phase 22 Plan 22-05: `.d.rozie.ts` sidecar — written RAW (never
+      // prettied) so the bytes stay identical to the unplugin's emitSidecar
+      // output (the do-not-edit hash header must match for the staleness gate).
+      if (sidecarPath !== null && sidecarText !== null) {
+        writeFileSync(sidecarPath, sidecarText, 'utf8');
+      }
       // D-90: React .d.ts sibling (other targets emit '' per D-84).
       if (dtsPath !== null && dtsText !== null) writeFileSync(dtsPath, dtsText, 'utf8');
       // D-53 / D-54: React .module.css / .global.css siblings.

@@ -30,8 +30,12 @@ import { dirname as pathDirname, resolve as pathResolve } from 'node:path';
 import pc from 'picocolors';
 import { compile } from '../../../core/src/compile.js';
 import { renderDiagnostic } from '../../../core/src/diagnostics/frame.js';
+// Phase 22 Plan 22-05 — CLI sidecar fallback (REQ-5): refresh the
+// `.d.rozie.ts` per changed file via the SAME renderer the unplugin + build
+// command use, so the watch-mode sidecar bytes don't drift.
+import { renderSidecar } from '../../../unplugin/src/emitSidecar.js';
 import { expandInputs } from '../utils/expandInputs.js';
-import { computeOutputPath } from '../utils/outputPath.js';
+import { computeOutputPath, TARGET_EXTENSIONS } from '../utils/outputPath.js';
 import type { Target } from '../utils/parseTargets.js';
 import { prettyFormat } from '../utils/prettyFormat.js';
 
@@ -295,6 +299,16 @@ async function compileOne(
       const outPath = computeOutputPath(inputAbs, target, outDir, rootDir);
       mkdirSync(pathDirname(outPath), { recursive: true });
 
+      // Phase 22 Plan 22-05 — `.d.rozie.ts` sidecar refresh per changed file
+      // (REQ-5). Same `renderSidecar` dispatch as build.ts / the unplugin, so
+      // a watch-driven re-emit produces byte-identical sidecars. Written RAW
+      // (never prettied) to preserve the do-not-edit hash header.
+      const sidecarText = wantTypes ? renderSidecar(source, target, inputAbs) : null;
+      const sidecarPath =
+        sidecarText !== null
+          ? outPath.slice(0, outPath.length - TARGET_EXTENSIONS[target].length) + '.d.rozie.ts'
+          : null;
+
       // Pre-compute sidecar paths so we can fire all per-tuple prettier
       // calls in parallel (mirrors the build.ts shape).
       const dtsPath =
@@ -318,6 +332,11 @@ async function compileOne(
       ]);
 
       writeFileSync(outPath, mainText, 'utf8');
+      // Phase 22 Plan 22-05: `.d.rozie.ts` sidecar — RAW write (never prettied)
+      // so the hash header bytes match the unplugin/build output.
+      if (sidecarPath !== null && sidecarText !== null) {
+        writeFileSync(sidecarPath, sidecarText, 'utf8');
+      }
       if (dtsPath !== null && dtsText !== null) writeFileSync(dtsPath, dtsText, 'utf8');
       if (modPath !== null && modText !== null) writeFileSync(modPath, modText, 'utf8');
       if (globPath !== null && globText !== null) writeFileSync(globPath, globText, 'utf8');
