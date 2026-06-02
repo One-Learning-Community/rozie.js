@@ -170,6 +170,14 @@ const BUNDLE_DECLS: readonly BundleDecl[] = [
     dependencyGlobPaths: ['../../../packages/ui/flatpickr/src/Flatpickr.rozie'],
   },
   {
+    key: 'bundle/FlatpickrBehaviorDemo',
+    label: 'bundle/FlatpickrBehaviorDemo',
+    entryGlobPath: '../../demos/FlatpickrBehaviorDemo.rozie',
+    // Same `Flatpickr` package-src resolution as bundle/FlatpickrDemo — the
+    // behavioral demo exercises GAP-2/3/4 (:disable / :locale / :plugins).
+    dependencyGlobPaths: ['../../../packages/ui/flatpickr/src/Flatpickr.rozie'],
+  },
+  {
     key: 'bundle/LeafletMapDemo',
     label: 'bundle/LeafletMapDemo',
     entryGlobPath: '../../demos/LeafletMapDemo.rozie',

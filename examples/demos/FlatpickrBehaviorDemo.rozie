@@ -1,0 +1,277 @@
+<!--
+  FlatpickrBehaviorDemo.rozie — behavioral companion for Flatpickr.
+
+  Where FlatpickrDemo.rozie shows the value-contract (r-model:date) + mode
+  reconcile, THIS demo proves the GAP-2/3/4 props BEHAVE at runtime — not just
+  compile. One .rozie source compiles to six per-framework consumers, each
+  driving the SAME live flatpickr instance through the wrapper's $watch
+  reconcilers.
+
+  Exercises:
+    - GAP-2 :disable — a weekends predicate (pure top-level `isWeekend`
+      function) toggled at runtime; flipping the toggle re-runs the wrapper's
+      $watch → set('disable', v) reconciler on the LIVE picker WITHOUT remount.
+    - GAP-3 :locale — an English ⇄ French switcher (static `French` import,
+      compiler-hoisted) driving live re-render through the wrapper's locale
+      reconciler ($watch → set('locale', merged)).
+    - GAP-4 :plugins — a two-input range via rangePlugin (selector-form, no
+      $refs ref-ordering risk); plugins are construction-time only, so the
+      range picker is re-keyed via :key to demonstrate the swap idiom.
+-->
+
+<rozie name="FlatpickrBehaviorDemo">
+
+<components>
+{
+  Flatpickr: '../../packages/ui/flatpickr/src/Flatpickr.rozie',
+}
+</components>
+
+<data>
+{
+  picked: '2026-05-17',
+  disableWeekends: false,
+  lang: 'en',
+  rangeValue: '',
+  rangeEnabled: true,
+}
+</data>
+
+<script>
+// Consumer-side vendor-CSS import — the .rozie file's scoped <style> can't ship
+// flatpickr's global .flatpickr-* selectors, so the consuming app pulls the
+// engine's stylesheet itself. Resolved + code-split per VR cell.
+import 'flatpickr/dist/flatpickr.css'
+
+// GAP-3 — static locale import. The compiler hoists static <script> imports
+// (Spike 001 B1), so this is safe; DO NOT use dynamic import().
+import { French } from 'flatpickr/dist/l10n/fr.js'
+
+// GAP-4 — rangePlugin factory (call it, do NOT `new` it).
+import rangePlugin from 'flatpickr/dist/plugins/rangePlugin.js'
+
+// GAP-2 — a PURE, top-level predicate (survives cross-target lowering as a
+// plain function reference). Sundays (0) and Saturdays (6) are weekends.
+const isWeekend = (date) => date.getDay() === 0 || date.getDay() === 6
+
+// Toggling disableWeekends swaps the disable array between [isWeekend] and [];
+// the wrapper's GAP-2 reconciler ($watch → set('disable', v)) updates the LIVE
+// picker without remount.
+const disableSet = $computed(() => $data.disableWeekends ? [isWeekend] : [])
+
+// GAP-3 — English (null = flatpickr's built-in default; the wrapper omits a
+// null locale, so this is render-neutral) ⇄ French (the imported locale object).
+const localeObj = $computed(() => $data.lang === 'fr' ? French : null)
+
+// GAP-4 — rangePlugin in SELECTOR form (pass the second input's id string).
+// This sidesteps the $refs ref-ordering risk entirely — flatpickr resolves the
+// selector at construction. Plugins are CONSTRUCTION-TIME only (no reconciler),
+// so swapping plugin config requires a remount via :key (see template).
+const rangePluginSet = $computed(() => [rangePlugin({ input: '#fp-range-end' })])
+
+const toggleWeekends = () => { $data.disableWeekends = !$data.disableWeekends }
+const setEnglish = () => { $data.lang = 'en' }
+const setFrench = () => { $data.lang = 'fr' }
+</script>
+
+<template>
+<div class="flatpickr-behavior-demo">
+  <header>
+    <h3>Flatpickr behavioral demo</h3>
+    <p class="hint">Proves the GAP-2/3/4 props <em>behave</em> at runtime: a disable predicate, a locale switch, and a two-input range plugin — all driving live flatpickr instances through the wrapper.</p>
+  </header>
+
+  <div class="grid">
+    <section class="picker-pane">
+      <label class="field">
+        <span class="field-label">Date</span>
+        <Flatpickr
+          r-model:date="$data.picked"
+          :disable="disableSet"
+          :locale="localeObj"
+          placeholder="Click to pick…"
+        />
+      </label>
+
+      <div class="control-row">
+        <span class="row-label">Disable</span>
+        <button
+          type="button"
+          data-testid="toggle-weekends"
+          :class="{ active: $data.disableWeekends }"
+          @click="toggleWeekends"
+        >Weekends</button>
+      </div>
+
+      <div class="control-row">
+        <span class="row-label">Locale</span>
+        <button
+          type="button"
+          data-testid="lang-en"
+          :class="{ active: $data.lang === 'en' }"
+          @click="setEnglish"
+        >English</button>
+        <button
+          type="button"
+          data-testid="lang-fr"
+          :class="{ active: $data.lang === 'fr' }"
+          @click="setFrench"
+        >Français</button>
+      </div>
+    </section>
+
+    <aside class="state-pane">
+      <h4>Bound state</h4>
+      <dl class="state">
+        <dt>Picked</dt>
+        <dd><code>{{ $data.picked || '(none)' }}</code></dd>
+        <dt>Disable weekends</dt>
+        <dd><code>{{ $data.disableWeekends }}</code></dd>
+        <dt>Locale</dt>
+        <dd><code>{{ $data.lang }}</code></dd>
+      </dl>
+    </aside>
+  </div>
+
+  <!--
+    GAP-4 — two-input range via rangePlugin. The wrapper's <input> is the START
+    input; #fp-range-end is the END input the plugin mirrors into. Plugins are
+    construction-time only, so the picker is re-keyed (`:key`) to swap plugin
+    config live — keyed on rangeEnabled here (a stable value that changes only
+    when plugin config would change).
+  -->
+  <section class="range-pane">
+    <h4>Range (rangePlugin)</h4>
+    <div class="range-inputs">
+      <label class="field">
+        <span class="field-label">Start</span>
+        <Flatpickr
+          r-model:date="$data.rangeValue"
+          mode="range"
+          :plugins="rangePluginSet"
+          :key="'range-' + ($data.rangeEnabled ? 'on' : 'off')"
+          placeholder="Start date…"
+        />
+      </label>
+      <label class="field">
+        <span class="field-label">End</span>
+        <input id="fp-range-end" type="text" placeholder="End date" />
+      </label>
+    </div>
+  </section>
+</div>
+</template>
+
+<style>
+.flatpickr-behavior-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  max-width: 720px;
+}
+
+header h3 { margin: 0 0 0.25rem; font-size: 1.125rem; }
+header .hint { margin: 0 0 1rem; color: rgba(0, 0, 0, 0.55); font-size: 0.875rem; }
+header em { font-style: italic; color: rgba(0, 0, 0, 0.7); }
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.picker-pane, .state-pane { min-width: 0; }
+
+.field { display: flex; flex-direction: column; gap: 0.25rem; }
+.field-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: rgba(0, 0, 0, 0.55);
+}
+
+.control-row {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin: 0.75rem 0 0;
+}
+.row-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: rgba(0, 0, 0, 0.55);
+  min-width: 4rem;
+}
+.control-row button {
+  padding: 0.375rem 0.75rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.875rem;
+}
+.control-row button.active {
+  background: #1a1a1a;
+  color: white;
+  border-color: #1a1a1a;
+}
+
+.state-pane h4 {
+  margin: 0 0 0.5rem;
+  font-size: 0.875rem;
+  color: rgba(0, 0, 0, 0.55);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.state {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.375rem 0.75rem;
+  margin: 0;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 6px;
+  font-size: 0.875rem;
+}
+.state dt { color: rgba(0, 0, 0, 0.55); font-weight: 500; }
+.state dd { margin: 0; }
+.state code {
+  font-family: ui-monospace, monospace;
+  font-size: 0.85em;
+  background: rgba(0, 0, 0, 0.04);
+  padding: 0.0625rem 0.25rem;
+  border-radius: 2px;
+}
+
+.range-pane {
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+.range-pane h4 {
+  margin: 0 0 0.5rem;
+  font-size: 0.875rem;
+  color: rgba(0, 0, 0, 0.55);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.range-inputs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+.range-inputs input {
+  padding: 0.375rem 0.5rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+  font: inherit;
+  width: 100%;
+  box-sizing: border-box;
+}
+</style>
+
+</rozie>
