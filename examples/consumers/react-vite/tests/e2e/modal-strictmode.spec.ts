@@ -26,25 +26,32 @@ test('Modal under StrictMode preserves body.style.overflow across mount/unmount 
   const initialOverflow = await page.evaluate(() => document.body.style.overflow);
   expect(initialOverflow).toBe('');
 
+  // NOTE: the overflow assertions below poll rather than read-once. React
+  // flushes passive effects before a discrete-event update yields, but
+  // preact/compat (the preact-compat matrix leg consumes this same suite)
+  // defers them to after paint via rAF scheduling — an immediate read races
+  // the effect. Polling asserts the same Pitfall-3 contract (lock applies,
+  // releases, and cycles symmetrically — never left stuck) without binding
+  // the test to renderer-specific effect-flush timing.
+  const bodyOverflow = () => page.evaluate(() => document.body.style.overflow);
+
   // Open modal → backdrop visible → body locked.
   await page.getByTestId('open-modal').click();
   await expect(page.getByTestId('modal-backdrop')).toBeVisible();
-  const lockedOverflow = await page.evaluate(() => document.body.style.overflow);
-  expect(lockedOverflow).toBe('hidden');
+  await expect.poll(bodyOverflow).toBe('hidden');
 
   // Close via × button.
   await page.getByRole('button', { name: 'Close' }).click();
   await expect(page.getByTestId('modal-backdrop')).toBeHidden();
-  const restoredOverflow = await page.evaluate(() => document.body.style.overflow);
-  expect(restoredOverflow).toBe('');
+  await expect.poll(bodyOverflow).toBe('');
 
   // Re-open + close again — body.style.overflow must still cycle correctly.
   await page.getByTestId('open-modal').click();
   await expect(page.getByTestId('modal-backdrop')).toBeVisible();
-  expect(await page.evaluate(() => document.body.style.overflow)).toBe('hidden');
+  await expect.poll(bodyOverflow).toBe('hidden');
   await page.getByRole('button', { name: 'Close' }).click();
   await expect(page.getByTestId('modal-backdrop')).toBeHidden();
-  expect(await page.evaluate(() => document.body.style.overflow)).toBe('');
+  await expect.poll(bodyOverflow).toBe('');
 
   // OQ4 anchor: Modal is parent-controlled (open prop) — works WITHOUT $expose.
   // If this test passes, OQ4 disposition is RESOLVED Phase 4.

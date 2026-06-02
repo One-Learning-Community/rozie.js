@@ -91,28 +91,34 @@ test.describe('StrictMode lifecycle-symmetry matrix (QA-03)', () => {
     // Initial state: body.style.overflow is '' (unset).
     expect(await page.evaluate(() => document.body.style.overflow)).toBe('');
 
+    // NOTE: the overflow assertions below poll rather than read-once. React
+    // flushes passive effects before a discrete-event update yields, but
+    // preact/compat (the preact-compat matrix leg consumes this same suite)
+    // defers them to after paint via rAF scheduling — an immediate read races
+    // the effect. Polling asserts the same Pitfall-3 contract (lock applies,
+    // releases, and cycles symmetrically — never left stuck) without binding
+    // the test to renderer-specific effect-flush timing.
+    const bodyOverflow = () =>
+      page.evaluate(() => document.body.style.overflow);
+
     // Open modal → backdrop visible → body locked.
     await page.getByTestId('open-modal').click();
     await expect(page.getByTestId('modal-backdrop')).toBeVisible();
-    expect(await page.evaluate(() => document.body.style.overflow)).toBe(
-      'hidden',
-    );
+    await expect.poll(bodyOverflow).toBe('hidden');
 
     // Close via × button → body restored.
     await page.getByRole('button', { name: 'Close' }).click();
     await expect(page.getByTestId('modal-backdrop')).toBeHidden();
-    expect(await page.evaluate(() => document.body.style.overflow)).toBe('');
+    await expect.poll(bodyOverflow).toBe('');
 
     // Re-open + close again — body.style.overflow must still cycle correctly,
     // proving no StrictMode double-invoke state corruption.
     await page.getByTestId('open-modal').click();
     await expect(page.getByTestId('modal-backdrop')).toBeVisible();
-    expect(await page.evaluate(() => document.body.style.overflow)).toBe(
-      'hidden',
-    );
+    await expect.poll(bodyOverflow).toBe('hidden');
     await page.getByRole('button', { name: 'Close' }).click();
     await expect(page.getByTestId('modal-backdrop')).toBeHidden();
-    expect(await page.evaluate(() => document.body.style.overflow)).toBe('');
+    await expect.poll(bodyOverflow).toBe('');
 
     const closeCount = await page.getByTestId('close-count').textContent();
     expect(closeCount).toMatch(/Closed 2 time/);
