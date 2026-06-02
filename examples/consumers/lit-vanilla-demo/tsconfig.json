@@ -15,7 +15,8 @@
     "useDefineForClassFields": false,
     "allowImportingTsExtensions": false,
     "resolveJsonModule": true,
-    "verbatimModuleSyntax": false
+    "verbatimModuleSyntax": false,
+    "allowArbitraryExtensions": true
   },
   "include": ["src/**/*", "tests/**/*"]
 }

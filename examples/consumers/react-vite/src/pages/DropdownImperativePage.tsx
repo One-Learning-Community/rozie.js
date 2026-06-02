@@ -1,6 +1,6 @@
 import { useRef } from 'react';
-import type { JSX, ForwardRefExoticComponent, RefAttributes } from 'react';
-import Dropdown from '../Dropdown.rozie';
+import type { JSX } from 'react';
+import Dropdown, { type DropdownHandle } from '../Dropdown.rozie';
 
 /**
  * DropdownImperativePage — demonstrates the Phase 21 `$expose` imperative
@@ -16,19 +16,16 @@ import Dropdown from '../Dropdown.rozie';
  * it shut. (Consumer-side handle acquisition uses React's native `useRef` — the
  * `$expose` contract is producer-side only; there is no .rozie-level grammar
  * for a consumer to call a child's handle.)
+ *
+ * Phase 22 (REQ-2): the `DropdownHandle` interface is now imported BY NAME from
+ * the per-module `Dropdown.d.rozie.ts` sidecar — `import Dropdown, { type
+ * DropdownHandle } from '../Dropdown.rozie'` — so the compiled `$expose` handle
+ * type drives the consumer's `useRef<DropdownHandle>`. The local re-declaration
+ * + `as ForwardRefExoticComponent<...>` cast was deleted; the sidecar already
+ * types `Dropdown` as a `ForwardRefExoticComponent<DropdownProps &
+ * RefAttributes<DropdownHandle>>`, so `<Dropdown ref={handleRef} />` typechecks
+ * directly.
  */
-
-// The `*.rozie` ambient module is typed generically (see rozie-shim.d.ts);
-// re-type the imperative-handle surface locally to match the emitted
-// `DropdownHandle` interface in Dropdown.d.ts. Runtime is a real forwardRef
-// component, so the ref is wired correctly.
-interface DropdownHandle {
-  toggle: () => void;
-  close: () => void;
-}
-const RefDropdown = Dropdown as unknown as ForwardRefExoticComponent<
-  Record<string, unknown> & RefAttributes<DropdownHandle>
->;
 
 export default function DropdownImperativePage(): JSX.Element {
   const handleRef = useRef<DropdownHandle>(null);
@@ -54,7 +51,7 @@ export default function DropdownImperativePage(): JSX.Element {
         Close via handle
       </button>
 
-      <RefDropdown
+      <Dropdown
         ref={handleRef}
         closeOnOutsideClick={true}
         closeOnEscape={true}
@@ -69,7 +66,7 @@ export default function DropdownImperativePage(): JSX.Element {
             <li>Item C</li>
           </ul>
         )}
-      </RefDropdown>
+      </Dropdown>
     </div>
   );
 }

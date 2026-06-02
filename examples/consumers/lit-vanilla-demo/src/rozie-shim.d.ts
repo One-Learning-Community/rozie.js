@@ -1,15 +1,18 @@
-// Lit-vanilla-demo .rozie module shim.
+// Lit-vanilla-demo .rozie module shim — Phase 22 (REQ-1/R4/R9).
 //
-// `src/main.ts` imports each `./rozie/Foo.rozie` for its side effect — the
-// compiled Lit class's `@customElement('rozie-foo')` decorator runs at module
-// load and registers the custom element via `customElements.define`. Without
-// this ambient declaration `tsc --noEmit` reports "Cannot find module
-// './rozie/Foo.rozie'" because TypeScript's bundler-mode resolver can't
-// follow the unplugin's `.rozie → Foo.rozie.ts → Lit class` chain at
-// pure-typecheck time (no Vite plugin pipeline runs).
+// This demo now consumes the per-module `<Name>.d.rozie.ts` sidecars emitted
+// by @rozie/unplugin's buildStart hook. For Lit the payoff is the
+// `declare global { interface HTMLElementTagNameMap { 'rozie-<name>': <Name> } }`
+// entry each sidecar carries: `import './rozie/Counter.rozie'` (a side-effect
+// import that registers the custom element) ALSO loads that global
+// augmentation, so `document.querySelector('rozie-counter')` is typed as the
+// `Counter` element (NOT `Element | null`). Resolution requires
+// `allowArbitraryExtensions: true` (set in tsconfig.json): TS resolves
+// `./rozie/Foo.rozie` → `rozie/Foo.d.rozie.ts`.
 //
-// Empty declaration is enough: main.ts uses these as side-effect imports only;
-// they don't expose a default export that consumers reference by type. The
-// equivalent shim for the Lit type-check fixture workspace lives at
-// `examples/consumers/lit-ts/fixtures/rozie-shim.d.ts`.
-declare module '*.rozie';
+// The former bare `declare module '*.rozie';` wildcard is DEMOTED (deleted —
+// this demo migrates 100% cleanly; every `.rozie` import here is in-`src` and
+// has a sidecar). A broad active wildcard SHADOWS the per-module sidecars,
+// suppressing the `HTMLElementTagNameMap` typing (the typo-probe's
+// `@ts-expect-error` would be reported UNUSED — T-22-06-01). Do NOT re-add it.
+export {};

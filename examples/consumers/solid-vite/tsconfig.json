@@ -13,7 +13,8 @@
     "isolatedModules": true,
     "strict": true,
     "allowImportingTsExtensions": false,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "allowArbitraryExtensions": true
   },
   "include": ["src/**/*", "src/**/*.tsx", "tests/**/*"]
 }

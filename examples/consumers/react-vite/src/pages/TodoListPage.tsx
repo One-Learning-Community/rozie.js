@@ -26,7 +26,10 @@ export default function TodoListPage(): JSX.Element {
       <h2>TodoList</h2>
       <TodoList
         items={items}
-        onItemsChange={(next: TodoItem[]) => setItems(next)}
+        // TodoList.rozie types `items` as `type: Array` (no element type), so the
+        // sidecar's `onItemsChange` is `(next: unknown[]) => void`. The consumer
+        // narrows back to its known `TodoItem[]` shape at the boundary.
+        onItemsChange={(next: unknown[]) => setItems(next as TodoItem[])}
         title="My Todos"
       />
     </div>
