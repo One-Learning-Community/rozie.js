@@ -37,6 +37,7 @@ import { runReservedIdentifierValidator } from './validators/reservedIdentifierV
 import { runListenerElementValidator } from './validators/listenerElementValidator.js';
 import { runExposeValidator } from './validators/exposeValidator.js';
 import { runEmitNameValidator } from './validators/emitNameValidator.js';
+import { runRefsPreMountValidator } from './validators/refsPreMountValidator.js';
 
 export interface AnalyzeResult {
   bindings: BindingsTable;
@@ -65,6 +66,8 @@ export function analyzeAST(ast: RozieAST): AnalyzeResult {
   runExposeValidator(ast, bindings, diagnostics);
   // Quick 260601-l2u — ROZ122: reject empty/whitespace-only $emit event names (script + template + listeners). No binding dependency.
   runEmitNameValidator(ast, diagnostics);
+  // Quick 260602-dv1 — ROZ123: $refs read in a pre-mount eval position ($computed body / $watch getter / template binding/interpolation/r-if/r-show/r-for-iterable expr). No binding dependency.
+  runRefsPreMountValidator(ast, diagnostics);
   // Phase 19 (D-08) — final pass: a <listener> placed inside <template> is a
   // misplaced element (ROZ206). No binding dependency.
   runListenerElementValidator(ast, diagnostics);

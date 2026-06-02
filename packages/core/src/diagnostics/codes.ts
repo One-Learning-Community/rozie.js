@@ -164,6 +164,38 @@ export const RozieErrorCode = {
   // SCOPE — no false positive. ROZ122 is the next free code after ROZ121 in the
   // 100 semantic-binding cluster.
   EMIT_EMPTY_EVENT_NAME: 'ROZ122', // $emit('') / $emit('   ') — empty/whitespace-only string-literal event name
+  // Quick 260602-dv1 — a `$refs.<member>` read in a PRE-MOUNT evaluation position.
+  // `$refs` are only populated AFTER the component mounts, so reading one in a
+  // position that is evaluated during setup/render is a silent cross-target
+  // divergence: on solid the eager memo / `$watch` effect reads `$refs` at setup
+  // (before the ref callback assigns the element) → TDZ crash / null; on lit and
+  // the other targets it simply yields null. This exact shape — `$computed(() =>
+  // [rangePlugin({ input: $refs.rangeEnd })])` — was falsified in debug session
+  // lit-rangeplugin-shadow-dom (the $computed crashed solid and silently no-op'd
+  // lit), and Dan blessed turning the divergence into a LOUD compile error.
+  //
+  // FLAGGED (the two pre-mount eval contexts), emitted by refsPreMountValidator:
+  //   - inside a `$computed(...)` argument body in <script>;
+  //   - inside the `$watch(getter, cb)` GETTER (argument[0]) in <script> — the
+  //     getter is EAGER on solid: it lowers to `createEffect(on(() => getter(),
+  //     …))`, whose deps-fn runs at setup BEFORE the `let elRef = null` ref
+  //     binding is assigned (empirically confirmed, 260602-dv1 probe), the same
+  //     hazard as a `$computed` body;
+  //   - inside a <template> binding (`:plugins="…"`), a `{{ }}` interpolation,
+  //     or an `r-if` / `r-show` / `r-for`-iterable expression (all render-time).
+  // DO-NOT-FLAG (all run post-mount when invoked): `$onMount`/`$onUnmount`/
+  // `$onUpdate` bodies; the `$watch` CALLBACK (argument[1]); `@event` handler
+  // expressions (`@click="$refs.x.focus()"`); `<listeners>` handlers; r-model
+  // targets; r-for LHS aliases (not a JS expr); and plain function/method bodies
+  // (and a `$refs` read at <script> Program top level — a separate concern, not
+  // this validator's).
+  // OUT OF SCOPE: computed `$refs['x']` is ROZ106's concern (detectMagicAccess
+  // returns null for it); non-`$refs` magic accessors are unaffected.
+  // Error severity; fires once per offending `$refs` read, code-framed at the
+  // read, naming the member. Never throws (D-08): all template re-parses are
+  // try/catch-wrapped. ROZ123 is the next free code after ROZ122 in the 100
+  // semantic-binding cluster.
+  REFS_READ_BEFORE_MOUNT: 'ROZ123', // $refs.x read in a $computed body / $watch getter / template binding|interpolation|r-if|r-show|r-for-iterable — evaluated before mount
 
   // ---- Compile-time correctness errors (Phase 2 Plan 02) — ROZ200..ROZ299 ----
   WRITE_TO_NON_MODEL_PROP: 'ROZ200', // SEM-02: $props.foo = … where foo lacks model: true (Phase 2 success criterion 2)
