@@ -161,6 +161,13 @@ el.addEventListener('change', (e) => {
 | `prevArrow` | `String` | `null` | | HTML string for the previous-month arrow (overrides flatpickr's built-in SVG). **Construction-time**. |
 | `nextArrow` | `String` | `null` | | HTML string for the next-month arrow. **Construction-time**. |
 | `allowInput` | `Boolean` | `false` | | Allow the user to type a date directly into the input. **Construction-time**. |
+| `disable` | `Array` | `[]` | | Dates to disable: an array of `Date`/`"Y-m-d"` strings, `{ from, to }` range objects, and/or predicate functions `(date: Date) => boolean`. Runtime-updatable via `set()`. See [Disabled dates & predicates](#disabled-dates-predicates). |
+| `enable` | `Array` | `[]` | | Allow-list (inverse of `disable`): when non-empty, ONLY these dates/ranges/predicates are selectable. Same element shape as `disable`. Runtime-updatable. |
+| `locale` | `Object` | `null` | | A flatpickr locale object (e.g. `import fr from 'flatpickr/dist/l10n/fr.js'`). Runtime-updatable via `set('locale', …)`. See [Internationalization](#internationalization). |
+| `firstDayOfWeek` | `Number` | `0` | | First weekday (0 = Sunday … 1 = Monday). Folded into the `locale` option; overrides the locale's own `firstDayOfWeek` when set. Runtime-updatable. |
+| `parseDate` | `Function` | `null` | | Custom parser `(dateStr: string, format: string) => Date`. **Construction-time**. See [Custom parse/format](#custom-parse-format). |
+| `formatDate` | `Function` | `null` | | Custom formatter `(date: Date, format: string, locale) => string`. **Construction-time**. |
+| `plugins` | `Array` | `[]` | | Array of flatpickr plugin instances (import from `flatpickr/dist/plugins/…`). Headline: `rangePlugin` for two-input ranges. **Construction-time**. See [Two-input range via rangePlugin](#two-input-range-via-rangeplugin). |
 
 ### Emits
 
@@ -248,6 +255,115 @@ You can also override flatpickr's CSS custom properties / class rules in your ow
 
 **Lit shadow-DOM caveat:** flatpickr's calendar popup renders in the **light DOM** (it appends to `<body>` or `appendTo`), so global theme CSS reaches it even on Lit. The `<input>` itself, however, lives inside the Lit element's **shadow DOM** — style it with `::part()` or by importing the theme CSS into the element's shadow root, not via a global input selector.
 
+### Disabled dates & predicates
+
+The `disable` prop takes a **mixed array** of `Date` objects, `"Y-m-d"` strings, `{ from, to }` range objects, and/or predicate functions `(date: Date) => boolean`. flatpickr applies them as an exclusion set:
+
+```vue
+<Flatpickr
+  v-model:date="picked"
+  :disable="[
+    '2026-07-04',                       // a specific date string
+    { from: '2026-12-24', to: '2026-12-26' },  // a closed range
+    (date) => date.getDay() === 0,      // a predicate — disable every Sunday
+  ]"
+/>
+```
+
+`enable` is the **inverse** allow-list: when non-empty, ONLY the listed dates/ranges/predicates are selectable (everything else is disabled). It accepts the same element shapes:
+
+```vue
+<!-- only weekdays in a window are selectable -->
+<Flatpickr
+  v-model:date="picked"
+  :enable="[{ from: '2026-08-01', to: '2026-08-31' }, (d) => d.getDay() !== 0 && d.getDay() !== 6]"
+/>
+```
+
+Both `disable` and `enable` are **runtime-updatable** — changing the prop reconciles the live picker via flatpickr's `set()` (no re-key needed). A runtime `enable: []` legitimately means "disable everything", and `disable: []` clears the exclusion set.
+
+### Internationalization
+
+flatpickr ships 25+ locale modules under `flatpickr/dist/l10n/`. **Lazy-loading the locale module is the consumer's job** — the wrapper adds no locale dependency; it just passes the resulting locale OBJECT through to flatpickr. Pair it with `firstDayOfWeek` (folded into the locale option; it overrides the locale's own first weekday).
+
+**React:**
+
+```tsx
+import { useState, useEffect } from 'react';
+import { Flatpickr } from '@rozie-ui/flatpickr-react';
+
+function FrenchPicker() {
+  const [date, setDate] = useState('');
+  const [locale, setLocale] = useState<object | null>(null);
+  useEffect(() => {
+    import('flatpickr/dist/l10n/fr.js').then((m) => setLocale(m.French));
+  }, []);
+  return <Flatpickr date={date} onDateChange={setDate} locale={locale} firstDayOfWeek={1} />;
+}
+```
+
+**Vue:**
+
+```vue
+<script setup lang="ts">
+import { ref, onMounted } from 'vue';
+import Flatpickr from '@rozie-ui/flatpickr-vue';
+
+const date = ref('');
+const locale = ref<object | null>(null);
+onMounted(async () => {
+  const { French } = await import('flatpickr/dist/l10n/fr.js');
+  locale.value = French;
+});
+</script>
+
+<template>
+  <Flatpickr v-model:date="date" :locale="locale" :firstDayOfWeek="1" />
+</template>
+```
+
+Both `locale` and `firstDayOfWeek` are **runtime-updatable** via `set('locale', …)`.
+
+### Two-input range via rangePlugin
+
+flatpickr's `rangePlugin` drives a range with **two separate inputs** (a start input and an end input). Import the plugin instance and pass it through `plugins`, with `mode="range"`:
+
+```vue
+<script setup lang="ts">
+import { ref, onMounted } from 'vue';
+import Flatpickr from '@rozie-ui/flatpickr-vue';
+import rangePlugin from 'flatpickr/dist/plugins/rangePlugin';
+
+const picked = ref('');
+const secondInput = ref<HTMLInputElement>();
+const plugins = ref<unknown[]>([]);
+onMounted(() => {
+  plugins.value = [new rangePlugin({ input: secondInput.value! })];
+});
+</script>
+
+<template>
+  <Flatpickr v-model:date="picked" mode="range" :plugins="plugins" />
+  <input ref="secondInput" />
+</template>
+```
+
+`plugins` is **construction-time only** — flatpickr reads it once at init. To swap plugins live, re-key the component (see [Remount on construction-time-only changes](#remount-on-construction-time-only-changes)).
+
+### Custom parse/format
+
+`parseDate` and `formatDate` hand flatpickr custom string↔Date functions — useful for formats flatpickr's token grammar can't express:
+
+```vue
+<Flatpickr
+  v-model:date="picked"
+  :parseDate="(str) => new Date(str)"
+  :formatDate="(date) => date.toISOString().slice(0, 10)"
+/>
+```
+
+Both are **construction-time only** — re-key the component to change them live.
+
 ## Remount on construction-time-only changes
 
 flatpickr reads the following options **once at construction** and exposes no `set()` path for them. To make them runtime-tunable from the consumer side, re-key the component on a string built from the values so the framework reconciler rebuilds the engine instance:
@@ -255,6 +371,7 @@ flatpickr reads the following options **once at construction** and exposes no `s
 - `altInput`, `enableTime`, `noCalendar`
 - `inline`, `staticPosition`, `position`, `appendTo`, `showMonths`, `weekNumbers`, `monthSelectorType`, `prevArrow`, `nextArrow`
 - `allowInput`
+- `plugins`, `parseDate`, `formatDate`
 
 ```vue
 <Flatpickr
@@ -266,7 +383,7 @@ flatpickr reads the following options **once at construction** and exposes no `s
 />
 ```
 
-When any of those values change, the reconciler unmounts the old `<Flatpickr>` and mounts a fresh one. The bound `date` survives the remount (it's bound to the parent's state), so only the engine instance is rebuilt. `mode`, `minDate`, `maxDate`, `dateFormat`, and `disabled` are runtime-updatable via flatpickr's `set()` path and need no re-key.
+When any of those values change, the reconciler unmounts the old `<Flatpickr>` and mounts a fresh one. The bound `date` survives the remount (it's bound to the parent's state), so only the engine instance is rebuilt. `mode`, `minDate`, `maxDate`, `dateFormat`, `disabled`, `disable`, `enable`, `locale`, and `firstDayOfWeek` are runtime-updatable via flatpickr's `set()` path and need no re-key.
 
 ## Gotchas
 
