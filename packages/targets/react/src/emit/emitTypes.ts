@@ -35,13 +35,14 @@
  *
  * @experimental — shape may change before v1.0
  */
-import * as t from '@babel/types';
-import type {
-  IRComponent,
-  PropTypeAnnotation,
-  ParamDecl,
-} from '../../../../core/src/ir/types.js';
+import type { IRComponent } from '../../../../core/src/ir/types.js';
 import { synthesizeHandleType } from '../../../../core/src/codegen/synthesizeHandleType.js';
+// Phase 22 Plan 22-02 — the framework-agnostic props-interface body is now
+// rendered by a single core-shared function so the five Wave-2 per-target
+// renderers cannot drift from the React prop→TS-type mapping. React passes its
+// own slot-children token (`ReactNode`); the per-target default-export
+// declaration below stays React-specific.
+import { renderPropsInterface } from '../../../../core/src/codegen/renderPropsInterface.js';
 
 /**
  * Options controlling .d.ts emission.
@@ -121,101 +122,21 @@ export function emitReactTypes(
       ? `<${opts.genericParams.join(', ')}>`
       : '';
 
-  // Props interface (parameterized when generics present per D-85).
-  lines.push(`export interface ${ir.name}Props${generics} {`);
-
-  for (const prop of ir.props) {
-    let tsType = renderPropType(prop.typeAnnotation);
-    // Phase 16 R1 — widen the prop type with `| null` when `default: null`
-    // is declared, so the published `.d.ts` matches the inline Props
-    // interface in emitPropsInterface.ts (which carries the same widening).
-    // Without this the `.d.ts` and inline interface drift and consumers
-    // pulling types via the package's `.d.ts` see a different contract
-    // from what the inline interface offers.
-    if (prop.defaultValue !== null && t.isNullLiteral(prop.defaultValue)) {
-      tsType = `(${tsType}) | null`;
-    }
-    if (prop.isModel) {
-      // D-84 model:true triplet, named after the actual prop identifier.
-      const baseName = prop.name;
-      const Pascal = capitalize(baseName);
-      lines.push(`  ${baseName}?: ${tsType};`);
-      lines.push(`  default${Pascal}?: ${tsType};`);
-      lines.push(`  on${Pascal}Change?: (next: ${tsType}) => void;`);
-    } else {
-      // Required when no default present; optional when a default is set.
-      // WR-02: exclude both null AND undefined — the IR convention uses
-      // `defaultValue: null` to mean "no default", but a partial IR
-      // construction or JSON round-trip that drops the field entirely would
-      // surface as `undefined`. Treating those identically prevents silent
-      // required → optional drift if the IR shape evolves.
-      const hasDefault =
-        prop.defaultValue !== null && prop.defaultValue !== undefined;
-      const optional = hasDefault ? '?' : '';
-      lines.push(`  ${prop.name}${optional}: ${tsType};`);
-    }
-  }
-
-  // Emits → optional `on<EventPascal>` props.
-  // Dedupe handler names to avoid PascalCase collisions (WR-01): two distinct
-  // emit identifiers that PascalCase to the same key (e.g. `add` + `Add`, or
-  // `value-change` + `valueChange`) would otherwise produce duplicate property
-  // declarations on the props interface — invalid TypeScript or silently
-  // last-write-wins. The IR validator should already reject empty emit names;
-  // the empty-string guard here is defense-in-depth.
-  const emittedHandlers = new Set<string>();
-  for (const e of ir.emits) {
-    const eventPascal = toPascalCase(e);
-    if (eventPascal.length === 0) continue;
-    const handlerName = `on${eventPascal}`;
-    if (emittedHandlers.has(handlerName)) continue;
-    emittedHandlers.add(handlerName);
-    lines.push(`  ${handlerName}?: (...args: unknown[]) => void;`);
-  }
-
-  // Slots per D-84 + D-86.
-  for (const slot of ir.slots) {
-    const isDefault = slot.name === ''; // D-18 default-slot sentinel
-    const renderName = isDefault ? 'children' : `render${capitalize(slot.name)}`;
-    if (slot.params.length === 0) {
-      if (isDefault) {
-        lines.push(`  children?: ReactNode;`);
-      } else {
-        lines.push(`  ${renderName}?: () => ReactNode;`);
-      }
-    } else {
-      const paramFields = slot.params
-        .map((p) => `${p.name}: ${inferParamType(p, ir)}`)
-        .join('; ');
-      const sig = `(params: { ${paramFields} }) => ReactNode`;
-      if (isDefault) {
-        // TS1385: function-type notation in a union MUST be parenthesised.
-        // `ReactNode | (params: …) => ReactNode` is a parse error; wrap the
-        // arrow form in parens to disambiguate the union member.
-        lines.push(`  children?: ReactNode | (${sig});`);
-      } else {
-        lines.push(`  ${renderName}?: ${sig};`);
-      }
-    }
-  }
-
-  // Phase 07.3.2 — mirror inline Props interface (emitPropsInterface.ts).
-  // Public .d.ts MUST declare the same slots?: field so consumer typecheck
-  // passes when they pass `slots={{ ... }}` from a `<template #[dynamic]>`
-  // fill. Pitfall 1 — drift between the inline TSX Props interface and the
-  // public .d.ts is the same class of bug Plan 04 fixes for ReactNode/() =>
-  // ReactNode; mitigate by updating BOTH atomically. `ReactNode` is already
-  // in scope at file top — no `import('react')` namespace prefix needed
-  // (contrast with emitPropsInterface.ts which uses the verbose form).
-  //
-  // Phase 07.3.2 Plan 07 (CR-01 fix) — value type aligned with the no-args
-  // invocation form at emitSlotInvocation.ts:302. See the sibling note in
-  // emitPropsInterface.ts for the contract rationale.
-  if (ir.slots.length > 0) {
-    lines.push(`  slots?: Record<string, () => ReactNode>;`);
-  }
-
-  lines.push(`}`);
+  // Phase 22 Plan 22-02 — the entire `export interface ${ir.name}Props { … }`
+  // body (model-triplet, required/optional gating, ir.emits→on<Event>, slot
+  // params, the slots?: mirror field) is now rendered by the core-shared
+  // `renderPropsInterface`. React passes its own slot-children token
+  // (`ReactNode`). The output is BYTE-IDENTICAL to the prior inline loop — the
+  // existing emitTypes snapshot suite is the byte-identity guard (NO rebless).
+  lines.push(
+    renderPropsInterface(ir, {
+      // Spread the optional generics only when present — the core option type
+      // is `exactOptionalPropertyTypes`-clean (an explicit `undefined` is
+      // rejected; omit the key instead).
+      ...(opts.genericParams ? { genericParams: opts.genericParams } : {}),
+      slotChildrenType: 'ReactNode',
+    }),
+  );
   lines.push('');
 
   // Phase 21 ($expose, REQ-10) — the exported handle interface + the
@@ -237,117 +158,4 @@ export function emitReactTypes(
   lines.push(`export default ${ir.name};`);
   lines.push('');
   return lines.join('\n');
-}
-
-/**
- * Map a `PropTypeAnnotation` to its TypeScript surface string.
- *
- * Mirrors the rules used by `emitPropsInterface.ts` (Plan 04-02) so the
- * inline interface in the `.tsx` body and the published `.d.ts` agree.
- */
-function renderPropType(ann: PropTypeAnnotation): string {
-  if (ann.kind === 'identifier') {
-    switch (ann.name) {
-      case 'Number':
-        return 'number';
-      case 'String':
-        return 'string';
-      case 'Boolean':
-        return 'boolean';
-      case 'Array':
-        return 'unknown[]';
-      case 'Object':
-        return 'Record<string, unknown>';
-      case 'Function':
-        return '(...args: unknown[]) => unknown';
-      default:
-        // Pass through user-defined identifiers verbatim — covers generic
-        // type-parameter names (e.g., 'T') and consumer-declared interfaces.
-        return ann.name;
-    }
-  }
-  if (ann.kind === 'literal') {
-    switch (ann.value) {
-      case 'function':
-        return '(...args: unknown[]) => unknown';
-      case 'object':
-        return 'Record<string, unknown>';
-      case 'array':
-        return 'unknown[]';
-      case 'string':
-        return 'string';
-      case 'number':
-        return 'number';
-      case 'boolean':
-        return 'boolean';
-      default:
-        return 'unknown';
-    }
-  }
-  if (ann.kind === 'union') {
-    return ann.members.map(renderPropType).join(' | ');
-  }
-  return 'unknown';
-}
-
-/**
- * D-86 best-effort param-type inference.
- *
- *   1. Bare Identifier (`<slot :open="open">`) — look up in ir.props by name.
- *      (Note: Phase 2 IR's StateDecl does NOT carry a typeAnnotation field,
- *      so $data identifiers fall through to the function-fallback below;
- *      v2 may extend StateDecl with inferred types.)
- *   2. MemberExpression (`<slot :open="$props.open">` / `$data.open`) — resolve
- *      the property name and look up in `ir.props` (and reach state-decl
- *      existence-check for callable-vs-value disambiguation).
- *   3. Bare Identifier that doesn't resolve to a prop and isn't in ir.state →
- *      treat as a residual-script function reference, emit `() => void` as
- *      the canonical-Dropdown `toggle: () => void` shape (documented v1
- *      heuristic per plan §<action> Note on D-86 inference scope).
- *   4. Genuine fallback: `'unknown'` per CONTEXT.md D-86.
- */
-function inferParamType(param: ParamDecl, ir: IRComponent): string {
-  const expr = param.valueExpression;
-
-  // Case 1 — bare Identifier; look up in props by name. State decls have no
-  // typeAnnotation in v1 IR, so they cannot be resolved beyond existence.
-  if (t.isIdentifier(expr)) {
-    const name = expr.name;
-    const propDecl = ir.props.find((p) => p.name === name);
-    if (propDecl) return renderPropType(propDecl.typeAnnotation);
-
-    // Case 3 — identifier present in ir.state is a known reactive value but
-    // we have no v1 type info — fall through to the callable fallback below.
-    // Identifier NOT in state OR props is treated as a residual-script
-    // function reference per the canonical Dropdown `toggle` shape.
-    return '() => void';
-  }
-
-  // Case 2 — MemberExpression (`$props.foo`, `$data.bar`, etc.).
-  if (t.isMemberExpression(expr) && t.isIdentifier(expr.property)) {
-    const propName = expr.property.name;
-    if (t.isIdentifier(expr.object)) {
-      const objName = expr.object.name;
-      if (objName === '$props' || objName === '_props') {
-        const propDecl = ir.props.find((p) => p.name === propName);
-        if (propDecl) return renderPropType(propDecl.typeAnnotation);
-      }
-      // `$data.x` / `_data.x` — StateDecl carries no typeAnnotation in v1
-      // IR. Fall through to ultimate `'unknown'` fallback below; v2 IR
-      // expansion would resolve this branch.
-    }
-  }
-
-  // Case 4 — genuine fallback per D-86.
-  return 'unknown';
-}
-
-function capitalize(s: string): string {
-  if (s.length === 0) return s;
-  return s.charAt(0).toUpperCase() + s.slice(1);
-}
-
-function toPascalCase(eventName: string): string {
-  const parts = eventName.split(/[-_]/).filter(Boolean);
-  return parts.map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join('');
 }
