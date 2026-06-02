@@ -13,7 +13,7 @@
  */
 import 'zone.js';
 import { createApplication } from '@angular/platform-browser';
-import { createComponent, type Type } from '@angular/core';
+import { createComponent, NgZone, type Type } from '@angular/core';
 import {
   parseQuery,
   mountWrapper,
@@ -43,7 +43,49 @@ function selectorTag(componentType: Type<unknown>): string {
   return typeof first === 'string' && first.length > 0 ? first : 'div';
 }
 
+/**
+ * SPIKE 005/006 (Angular CVA forms integration) — `?cvaProbe=<key>` mounts a
+ * hand-written Angular forms probe host instead of a .rozie demo. Spike-only
+ * branch; bypasses parseQuery (the probe keys are not in main.ts EXAMPLES).
+ * See host/cva-probe.ts + specs/flatpickr-cva.spec.ts.
+ */
+async function mountCvaProbe(probeKey: string): Promise<boolean> {
+  const { CVA_PROBES } = await import('./cva-probe');
+  const cls = (CVA_PROBES as Record<string, Type<unknown>>)[probeKey];
+  if (!cls) return false;
+  const appRef = await createApplication();
+  const wrapper = mountWrapper();
+  const hostEl = document.createElement(selectorTag(cls));
+  wrapper.appendChild(hostEl);
+  // SPIKE FINDING (006-A run 2): mount INSIDE NgZone.run(). The default VR
+  // mount path creates components outside the Angular zone, so template event
+  // listeners register in the ROOT zone — plain-property mutations in click
+  // handlers then never schedule change detection (only signal writes do, via
+  // the hybrid scheduler). NgModel's model→view path (ngOnChanges +
+  // resolvedPromise.then) is exactly such a zone-dependent flow. Real Angular
+  // apps (bootstrapApplication) create components inside the zone; the forms
+  // probes must match that to be representative.
+  const ngZone = appRef.injector.get(NgZone);
+  ngZone.run(() => {
+    const componentRef = createComponent(cls, {
+      environmentInjector: appRef.injector,
+      hostElement: hostEl,
+    });
+    appRef.attachView(componentRef.hostView);
+    appRef.tick();
+  });
+  return true;
+}
+
 async function main(): Promise<void> {
+  // SPIKE 005/006 branch — must run before parseQuery (probe keys are not EXAMPLES).
+  const cvaProbe = new URLSearchParams(location.search).get('cvaProbe');
+  if (cvaProbe) {
+    const mounted = await mountCvaProbe(cvaProbe);
+    if (mounted) return;
+    throw new Error(`visual-regression host: unknown cvaProbe '${cvaProbe}'`);
+  }
+
   const { example } = parseQuery();
   const demoKey = `../../../examples/demos/${example}Demo.rozie`;
   const baseKey = `../../../examples/${example}.rozie`;
