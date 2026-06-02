@@ -41,6 +41,23 @@ echo "▶ turbo run typecheck --force --continue --concurrency=4"
 echo ""
 turbo run typecheck --force --continue --concurrency=4
 
+# Phase 22 / REQ-6 (T-22-07-01): a generated `<Name>.d.rozie.ts` sidecar that
+# lags its `.rozie` source is a type lie — tsc trusts a declaration that no
+# longer matches the component. This gate re-hashes every demo `.rozie` source
+# and fails if any sidecar header hash is stale. The typecheck above already ran
+# `turbo run typecheck` (which `^build`s the upstream packages); the demo
+# sidecars are regenerated on each `vite build`. `--self-test` first proves the
+# gate can actually catch a tampered sidecar (negative path, automated).
+echo ""
+echo "▶ node scripts/check-sidecar-staleness.mjs --self-test (negative-path proof)"
+echo ""
+node scripts/check-sidecar-staleness.mjs --self-test
+
+echo ""
+echo "▶ node scripts/check-sidecar-staleness.mjs (sidecar staleness gate — REQ-6)"
+echo ""
+node scripts/check-sidecar-staleness.mjs
+
 echo ""
 echo "▶ turbo run test --force --continue --concurrency=4"
 echo ""

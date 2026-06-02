@@ -41,7 +41,16 @@ jobs:
       # (Plan 07.1-03) import every target's dist/, and the dts-identity test
       # reads every target's dist/index.d.mts — so all 6 targets must be built
       # even on Vue-only CI runs.
-      - name: Build all packages
+      #
+      # Phase 22 / REQ-6: `turbo run build` includes `vue-vite-demo#build`
+      # (`vite build`), whose @rozie/unplugin `buildStart` hook emits the
+      # per-module `<Name>.d.rozie.ts` sidecars. Sidecars are gitignored (REQ-7),
+      # absent on a fresh checkout — this step generates them BEFORE the per-Vue
+      # "install + typecheck + build + e2e" steps below (each of which runs
+      # `vue-vite-demo run typecheck`), closing the cold-checkout race. Vue
+      # honors the sidecar under the `moduleResolution: bundler` default (no
+      # `allowArbitraryExtensions` flag needed — SPIKE-FINDINGS).
+      - name: Build all packages (generates .d.rozie.ts sidecars before typecheck — REQ-6)
         run: pnpm turbo run build
 
       - name: Run unit tests (core + target-vue + runtime-vue + unplugin)
