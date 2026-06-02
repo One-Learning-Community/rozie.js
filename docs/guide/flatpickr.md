@@ -210,12 +210,22 @@ const field = register('birthday');
 
 (`register`'s `onChange`/`onBlur`/`ref` collide with this component's own `onChange` emit-prop, so prefer wiring the value through `date`/`onDateChange` and forwarding only `name`.)
 
-**Angular reactive forms** — bind `[name]` (or drive it from a `formControlName`) without a custom CVA:
+**Angular** — bind the value with `[(date)]` and forward a form-control `[name]` for native form submission:
 
 ```ts
 // the name input is a typed signal: name = input<string>('')
 <Flatpickr [(date)]="date" [name]="'birthday'" />
 ```
+
+::: warning Angular forms directives are not supported yet
+Do **not** put `[(ngModel)]` or `formControlName` directly on the component — it
+does not implement Angular's `ControlValueAccessor`, and the binding fails at
+runtime (in production builds with a cryptic
+`Cannot read properties of null (reading 'writeValue')` TypeError rather than the
+dev-mode `NG01203`). Wire the value through `[(date)]` as shown above. Full
+CVA / reactive-forms integration is a known gap — see the
+[comparison page caveats](/guide/flatpickr-comparison#caveats).
+:::
 
 When `altInput` is on, flatpickr creates a hidden mirror input and **moves** the `name` onto it automatically, so the submitted value carries `name` whether `altInput` is on or off.
 
