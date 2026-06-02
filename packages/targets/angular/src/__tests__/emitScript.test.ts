@@ -241,7 +241,14 @@ $watch(() => $props.open, () => { console.log('fired') })
     // Bug B fix (260519 linechart-watch-recreate) — the callback runs inside
     // `untracked(...)` so its reads (and transitive helper reads) DON'T join
     // the watcher effect's dependency set; only the getter defines re-runs.
-    expect(classBody).toMatch(/effect\(\(\) => \{ const __watchVal = \([\s\S]+?\)\(\); untracked\(\(\) => \([\s\S]+?\)\(\)\); \}\);/);
+    //
+    // 260602-9lw — $watch is now LAZY by default: an explicit class-field
+    // first-run flag (`private __rozieWatchInitial_0 = true;`) is checked
+    // INSIDE `untracked(...)` and bails on the first effect run.
+    expect(classBody).toContain('private __rozieWatchInitial_0 = true;');
+    expect(classBody).toMatch(
+      /effect\(\(\) => \{ const __watchVal = \([\s\S]+?\)\(\); untracked\(\(\) => \{ if \(this\.__rozieWatchInitial_0\) \{ this\.__rozieWatchInitial_0 = false; return; \} \([\s\S]+?\)\(\); \}\); \}\);/,
+    );
     expect(imports.has('effect')).toBe(true);
     expect(imports.has('untracked')).toBe(true);
   });
@@ -261,7 +268,13 @@ $watch(() => $props.open, (v) => { console.log('fired', v) })
     // Bug B fix (260519 linechart-watch-recreate) — the callback is invoked
     // with __watchVal as its first arg, inside an `untracked(...)` wrapper so
     // its reads don't subscribe the watcher effect; only the getter does.
-    expect(classBody).toMatch(/effect\(\(\) => \{ const __watchVal = \([\s\S]+?\)\(\); untracked\(\(\) => \([\s\S]+?\)\(__watchVal\)\); \}\);/);
+    //
+    // 260602-9lw — lazy-by-default: the class-field first-run flag bails on
+    // the first effect run before invoking the callback with __watchVal.
+    expect(classBody).toContain('private __rozieWatchInitial_0 = true;');
+    expect(classBody).toMatch(
+      /effect\(\(\) => \{ const __watchVal = \([\s\S]+?\)\(\); untracked\(\(\) => \{ if \(this\.__rozieWatchInitial_0\) \{ this\.__rozieWatchInitial_0 = false; return; \} \([\s\S]+?\)\(__watchVal\); \}\); \}\);/,
+    );
     expect(imports.has('effect')).toBe(true);
     expect(imports.has('untracked')).toBe(true);
   });

@@ -232,7 +232,16 @@ $watch(() => $props.open, () => { fire() })
     // (`fire`) change identity. The closure-body union was removed because it
     // pulled unstable `useCallback` identities into the array and re-fired
     // engine recreation every tick. Matches all five sibling targets.
-    expect(lifecycleEffectsSection).toMatch(/useEffect\(\(\) => \{\s*fire\(\);\s*\}, \[props\.open\]\);/);
+    //
+    // 260602-9lw — $watch is now LAZY by default: the effect body is prefixed
+    // with a `useRef(true)` first-run guard that bails on mount. The skip ref
+    // (`_watch0First`) stays OUT of the dep array (refs are exempt from
+    // exhaustive-deps) — the deps remain `[props.open]`.
+    expect(lifecycleEffectsSection).toMatch(
+      /useEffect\(\(\) => \{\s*if \(_watch0First\.current\) \{ _watch0First\.current = false; return; \}\s*fire\(\);\s*\}, \[props\.open\]\);/,
+    );
+    // The skip ref must never enter the dep array.
+    expect(lifecycleEffectsSection).not.toMatch(/\[[^\]]*_watch0First[^\]]*\]/);
   });
 
   // Regression R1e — debug session `linechart-watch-recreate` (round 1, commit

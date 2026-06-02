@@ -141,15 +141,18 @@ $watch(() => $props.open, (v) => { if (v) reposition() })
     // `v` binds to the new value (regression: the bare `(cb)()` form left
     // `v` undefined — Svelte/Angular/Lit silent no-op, Solid ReferenceError).
     //
-    // $watch immediate-fire (260519 linechart-watch-recreate step 6): no
-    // skip-initial gate — Svelte 5's `$effect` fires once at registration,
-    // which IS the immediate fire. The callback runs inside `untrack(...)`.
+    // 260602-9lw — $watch is now LAZY by default (reverses 260519): the
+    // deleted `__rozieWatchInitial_N` skip-initial gate is RESTORED. A
+    // component-scope `let __rozieWatchInitial_0 = true;` is read/written
+    // INSIDE `untrack(...)` (so it does not self-subscribe); the getter still
+    // runs in tracking scope. The callback (`(v) => ...`) is invoked with
+    // `__watchVal` only after the first run is skipped.
     // `v` carries a `: any` annotation from typeNeutralizeScript (untyped
-    // `<script>` callback param) — the watcher binding is otherwise unchanged.
+    // `<script>` callback param).
+    expect(scriptBlock).toContain('let __rozieWatchInitial_0 = true;');
     expect(scriptBlock).toMatch(
-      /\$effect\(\(\) => \{\s*const __watchVal = \(\(\) => open\)\(\);\s*untrack\(\(\) => \((?:v|\(v: any\)) => \{[\s\S]*?\}\)\(__watchVal\)\);\s*\}\);/,
+      /\$effect\(\(\) => \{\s*const __watchVal = \(\(\) => open\)\(\);\s*untrack\(\(\) => \{\s*if \(__rozieWatchInitial_0\) \{ __rozieWatchInitial_0 = false; return; \}\s*\((?:v|\(v: any\)) => \{[\s\S]*?\}\)\(__watchVal\);\s*\}\);\s*\}\);/,
     );
-    expect(scriptBlock).not.toContain('__rozieWatchInitial');
   });
 
   it('Quick 260515-u2b — WatchHook with zero-param callback omits __watchVal (svelte-check arity gate)', () => {
@@ -167,11 +170,14 @@ $watch(() => $props.open, () => { if ($props.open) reposition() })
     const parsed = parse(src, { filename: 'WatchSynthNoArg.rozie' });
     const ir = lowerToIR(parsed.ast!, { modifierRegistry: createDefaultRegistry() }).ir!;
     const { scriptBlock } = emitScript(ir);
+    // 260602-9lw — lazy-by-default restores the `__rozieWatchInitial_0` gate
+    // inside `untrack`; the zero-param callback is still invoked with no args
+    // (svelte-check arity gate), only after the first run is skipped.
+    expect(scriptBlock).toContain('let __rozieWatchInitial_0 = true;');
     expect(scriptBlock).toMatch(
-      /\$effect\(\(\) => \{\s*\(\(\) => open\)\(\);\s*untrack\(\(\) => \(\(\) => \{[\s\S]*?\}\)\(\)\);\s*\}\);/,
+      /\$effect\(\(\) => \{\s*\(\(\) => open\)\(\);\s*untrack\(\(\) => \{\s*if \(__rozieWatchInitial_0\) \{ __rozieWatchInitial_0 = false; return; \}\s*\(\(\) => \{[\s\S]*?\}\)\(\);\s*\}\);\s*\}\);/,
     );
     expect(scriptBlock).not.toContain('__watchVal');
-    expect(scriptBlock).not.toContain('__rozieWatchInitial');
   });
 
   it('Quick 260515-u2b — Counter (no watchers) emits no extra $effect lines beyond lifecycle', () => {

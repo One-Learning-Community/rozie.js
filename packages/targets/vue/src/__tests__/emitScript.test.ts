@@ -122,12 +122,14 @@ $watch(() => $props.open, () => { if ($props.open) reposition() })
     const ir = lowerSource(src, 'WatchSynth.rozie');
     const { script } = emitScript(ir);
     expect(script).toMatch(/import \{[^}]*\bwatch\b[^}]*\} from 'vue'/);
-    // 260519 linechart-watch-recreate step 6 — $watch is immediate-by-default;
-    // Vue's lazy `watch(getter, cb)` needs `{ immediate: true }` to fire on
-    // registration like the other five targets.
+    // 260602-9lw — $watch is now LAZY by default (reverses 260519): Vue emits
+    // the native lazy `watch(getter, cb)` with NO `{ immediate: true }` unless
+    // the author opts in via the third arg. Lazy-by-default is uniform across
+    // all six targets.
     expect(script).toMatch(
-      /watch\(\(\) => props\.open, \(\) => \{[\s\S]*?\}, \{ immediate: true \}\);/,
+      /watch\(\(\) => props\.open, \(\) => \{[\s\S]*?\}\);/,
     );
+    expect(script).not.toMatch(/\{ immediate: true \}/);
   });
 
   it('Quick 260515-u2b — zero watchers means no `watch(` call AND no `watch` import', () => {
@@ -151,6 +153,21 @@ $watch(() => $props.q, () => { console.log('B') })
     const idxB = script.indexOf("'B'");
     expect(idxA).toBeGreaterThan(0);
     expect(idxB).toBeGreaterThan(idxA);
+  });
+
+  it('260602-9lw — `$watch(g, cb, { immediate: true })` restores the eager `{ immediate: true }` emit', () => {
+    const src = `<rozie name="WatchImmediate">
+<props>{ open: { type: Boolean, default: false } }</props>
+<script>
+$watch(() => $props.open, () => { console.log('w') }, { immediate: true })
+</script>
+<template><div /></template>
+</rozie>`;
+    const ir = lowerSource(src, 'WatchImmediate.rozie');
+    const { script } = emitScript(ir);
+    expect(script).toMatch(
+      /watch\(\(\) => props\.open, \(\) => \{[\s\S]*?\}, \{ immediate: true \}\);/,
+    );
   });
 
   // Phase 21 (REQ-4) — Vue `$expose` emit → `defineExpose({...})` macro.
