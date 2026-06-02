@@ -29,21 +29,30 @@
  *   }
  *   export default Counter;
  *
- * ── SPIKE-FINDINGS Angular disk-cache verdict (BINDING for Plan 05) ──────────
+ * ── SPIKE-FINDINGS Angular verdict — REVISED 2026-06-02 (regression fix) ─────
  * Angular is the one target that ALSO writes a compiled `<Name>.rozie.ts`
  * disk-cache (unplugin's `emitRozieTsToDisk`). The Wave-0 spike (22-01,
- * SPIKE-FINDINGS.md) empirically proved the sidecar `<Name>.d.rozie.ts` and the
- * disk-cache `<Name>.rozie.ts` COEXIST under `include: src/**\/*.ts` with ZERO
- * duplicate-identifier / module-resolution ambiguity — they are DISTINCT
- * modules (the sidecar declares the `./Foo.rozie` specifier; the disk-cache is
- * the separate `./Foo.rozie.ts` / `./Foo` module). The sidecar is NOT redundant
- * with the disk-cache: the disk-cache exposes only the DEFAULT-export class
- * type, while the sidecar adds the named `<Name>Props` / handle exports.
+ * SPIKE-FINDINGS.md) claimed the sidecar `<Name>.d.rozie.ts` and the disk-cache
+ * `<Name>.rozie.ts` coexist with "zero module-resolution ambiguity" — that
+ * verdict was validated under PLAIN tsc only and is WRONG for ngtsc:
  *
- * ⇒ DECISION (recorded for Plan 05): Wave-3 WRITES the Angular sidecar to disk
- * like every other target (the demo additionally needs
- * `allowArbitraryExtensions: true` in its tsconfig, per SPIKE-FINDINGS); the
- * existing disk-cache `.rozie.ts` is KEPT (complementary, non-conflicting).
+ * TS module resolution prefers the arbitrary-extension declaration
+ * `<Name>.d.rozie.ts` over extension-appending to `<Name>.rozie.ts` when
+ * resolving `./<Name>.rozie` (regardless of `allowArbitraryExtensions`). ngtsc
+ * (inside @analogjs/vite-plugin-angular) uses that same resolution to validate
+ * standalone `imports: [...]` entries; a type-only `declare class` carries no
+ * ɵcmp metadata, so ngtsc silently skips AOT for every class importing a
+ * `.rozie` module → runtime "JIT compiler unavailable" (the 2026-06-02 Angular
+ * matrix + VR matrix regression).
+ *
+ * ⇒ REVISED DECISION: no `.d.rozie.ts` is ever placed next to a `.rozie` source
+ * for the Angular target (the unplugin heals/deletes them — see
+ * packages/unplugin/src/emitSidecar.ts ANGULAR EXCEPTION). The disk-cache
+ * `.rozie.ts` class IS the Angular typed-import surface. This renderer is kept
+ * for the CLI path only (sidecars next to compiled OUTPUT files, where no
+ * `.rozie` sibling exists). A future ngtsc-valid sidecar must declare
+ * `static ɵcmp: ɵɵComponentDeclaration<...>` the way compiled Angular libraries
+ * do.
  *
  * Slot idiom (Angular): slots are projected via `<ng-template>`; the slot-props
  * surface is not part of the typed-class consumer contract, so the shared props

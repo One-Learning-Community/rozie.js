@@ -417,17 +417,20 @@ import Dropdown, { type DropdownHandle } from './Dropdown.rozie';
 
 `DropdownHandle` is the synthesized interface for the methods the component exposed (see [Getting the handle from the consumer side](#getting-the-handle-from-the-consumer-side) above).
 
-One tsconfig flag governs whether `tsc` honors the sidecar. **Vue's `vue-tsc` honors it under the `moduleResolution: bundler` default; every other target's `tsc` requires `"allowArbitraryExtensions": true`** explicitly:
+One tsconfig flag governs whether `tsc` honors the sidecar. **Vue's `vue-tsc` honors it under the `moduleResolution: bundler` default; the other sidecar targets' `tsc` requires `"allowArbitraryExtensions": true`** explicitly:
 
 | Target | Typecheck tool | `allowArbitraryExtensions` |
 | --- | --- | --- |
 | Vue | `vue-tsc` | not needed (bundler default) |
-| React / Solid / Lit / Angular | `tsc` | **required** |
+| React / Solid / Lit | `tsc` | **required** |
 | Svelte | `tsc` + `svelte-check` | **required** |
+| Angular | `tsc` | **N/A — no sidecars** (the disk-cache `.rozie.ts` class is the typed surface) |
 
-Without the flag (on the five non-Vue targets), `tsc` either emits `TS6263` or silently falls back to a broad `declare module '*.rozie'` wildcard that types every prop as `unknown` — a silent type-lie. The full per-framework setup, the wildcard-shim migration, and the gitignore policy live in [Install → Typed `.rozie` imports](/guide/install#typed-rozie-imports-per-framework-setup).
+Without the flag (on the four non-Vue sidecar targets), `tsc` either emits `TS6263` or silently falls back to a broad `declare module '*.rozie'` wildcard that types every prop as `unknown` — a silent type-lie. The full per-framework setup, the wildcard-shim migration, the gitignore policy, and the Angular exception live in [Install → Typed `.rozie` imports](/guide/install#typed-rozie-imports-per-framework-setup).
 
-Each consumer demo in the repo is the byte-tested proof of its framework's setup: `examples/consumers/react-vite` (React, flag set, wildcard deleted), `vue-vite` (Vue, no flag, `@deprecated` cross-root fallback kept), `svelte-vite` / `lit-vanilla-demo` / `angular-analogjs` (flag set, wildcard deleted), and `solid-vite` (flag set, `@deprecated` cross-root fallback kept). Each ships a `typed-import.probe` that asserts a correct prop usage compiles and a wrong-typed prop is a genuine error.
+**Angular is the exception**: a `.d.rozie.ts` next to a `.rozie` source would shadow the AOT-compiled `.rozie.ts` disk-cache in ngtsc's module resolution and silently break AOT (runtime `JIT compiler unavailable`), so Rozie never writes one there. Angular imports are typed by the disk-cache class itself — props are typed signal inputs, and `$expose` methods are typed public class methods reachable via `@ViewChild`. See [Install → The Angular exception](/guide/install#the-angular-exception-no-sidecars).
+
+Each consumer demo in the repo is the byte-tested proof of its framework's setup: `examples/consumers/react-vite` (React, flag set, wildcard deleted), `vue-vite` (Vue, no flag, `@deprecated` cross-root fallback kept), `svelte-vite` / `lit-vanilla-demo` (flag set, wildcard deleted), `solid-vite` (flag set, `@deprecated` cross-root fallback kept), and `angular-analogjs` (no sidecars — disk-cache types + wildcard fresh-checkout fallback). The sidecar demos each ship a `typed-import.probe` that asserts a correct prop usage compiles and a wrong-typed prop is a genuine error.
 
 ## `$onMount` returning a teardown
 

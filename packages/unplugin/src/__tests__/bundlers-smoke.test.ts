@@ -19,13 +19,35 @@
 // pipeline is exercised end-to-end by `vite.test.ts`; what's load-bearing
 // here is that each per-bundler entrypoint factory produces a working
 // plugin shape.
-import { describe, it, expect } from 'vitest';
+import { afterAll, beforeAll, describe, it, expect } from 'vitest';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const TMP_ROOT = resolve(__dirname, '..', '..', '.tmp-bundlers-smoke-' + Date.now());
+
+// ── cwd ISOLATION (load-bearing — do not remove) ────────────────────────────
+// The build smokes below run REAL bundler builds (rollup.rollup / esbuild.build
+// / rolldown / webpack), each of which invokes the plugin's `buildStart` hook.
+// That hook's sidecar walk roots at `process.cwd()`. Without chdir'ing into
+// this suite's tmp root, running the suite from the repo root walks the ENTIRE
+// repo and litters every non-package tree (examples/, examples/demos/, …) with
+// lit-flavored `.d.rozie.ts` sidecars — which then break the solid demo's
+// typecheck (its cross-root `../../../../Counter.rozie` imports resolve to the
+// wrong target's sidecar) and would break Angular AOT in any angular build that
+// consumes those trees. All test fixture paths below are absolute, so the
+// chdir is transparent to them.
+let prevCwd: string;
+beforeAll(() => {
+  prevCwd = process.cwd();
+  mkdirSync(TMP_ROOT, { recursive: true });
+  process.chdir(TMP_ROOT);
+});
+afterAll(() => {
+  process.chdir(prevCwd);
+  rmSync(TMP_ROOT, { recursive: true, force: true });
+});
 
 // Minimal `.rozie` source we point each bundler at. `target: 'lit'` because:
 //   - It emits plain TypeScript (no JSX) — every bundler in this matrix has

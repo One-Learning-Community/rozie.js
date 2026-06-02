@@ -96,6 +96,19 @@ export const unplugin = createUnpluginV3<Partial<RozieOptions>>((rawOptions) => 
   const resolveId = createResolveIdHook(options.target);
   const load = createLoadHook(registry, options.target);
 
+  // Captured by the Vite adapter's configResolved (the only adapter with a
+  // first-class project-root concept). The shared buildStart sidecar walk
+  // prefers this over process.cwd() so its scope matches the consumer's actual
+  // Vite project — NOT whatever directory the host process happens to run in.
+  // Without this, a Vite consumer whose `root` differs from cwd (programmatic
+  // createServer/build with `root: …`, monorepo tooling, test runners invoked
+  // from the repo root) walks the WRONG tree: too narrow (missing sidecars) or
+  // far too wide (littering a whole monorepo with this target's sidecars —
+  // which, cross-target, type-lies to sibling projects and breaks Angular AOT).
+  // Non-Vite adapters have no root concept; they keep the process.cwd()
+  // convention.
+  let viteResolvedRoot: string | null = null;
+
   // Phase 22 Plan 22-05 — `.d.rozie.ts` sidecar generation.
   //
   // Walk the project roots and emit a `<Name>.d.rozie.ts` sidecar next to each
@@ -104,6 +117,12 @@ export const unplugin = createUnpluginV3<Partial<RozieOptions>>((rawOptions) => 
   // union of (root + consumer `prebuildExtraRoots`), mirroring the Angular
   // disk-cache prebuild allowlist — a file discovered under any root may write
   // its sidecar inside that root.
+  //
+  // ANGULAR EXCEPTION: for `target: 'angular'` the walk DELETES sidecars
+  // instead of writing them (emitSidecar heals + skips internally) — a
+  // type-only `.d.rozie.ts` next to a `.rozie` source shadows the disk-cache
+  // `.rozie.ts` in ngtsc's module resolution and silently kills AOT
+  // ("JIT compiler unavailable"). See emitSidecar.ts ANGULAR EXCEPTION.
   //
   // This is wired to the SHARED `buildStart` hook (below) so Rollup/Webpack/
   // esbuild/Rolldown/Rspack adapters emit sidecars too — NOT a Vite-only API
@@ -181,11 +200,12 @@ export const unplugin = createUnpluginV3<Partial<RozieOptions>>((rawOptions) => 
     // BEFORE downstream tsc resolution. `enforce: 'pre'` already orders Rozie
     // ahead of the framework plugins; running the sidecar walk here means a
     // fresh checkout's first build writes all sidecars before the consumer's
-    // tsc resolves any `.rozie` import (SPEC-R5/R6). The walk root is the
-    // process cwd (the bundler's invocation dir) unioned with the consumer's
+    // tsc resolves any `.rozie` import (SPEC-R5/R6). The walk root is the Vite
+    // resolved root when available (see viteResolvedRoot above), else the
+    // process cwd (the bundler's invocation dir), unioned with the consumer's
     // optional `prebuildExtraRoots` allowlist.
     buildStart(): void {
-      emitSidecarsForRoot(process.cwd());
+      emitSidecarsForRoot(viteResolvedRoot ?? process.cwd());
     },
     // Vite-only: the dep-scan step (`vite:dep-scan`) runs esbuild ahead of
     // the regular plugin pipeline. esbuild calls our resolveId, gets back
@@ -228,6 +248,9 @@ export const unplugin = createUnpluginV3<Partial<RozieOptions>>((rawOptions) => 
       // chain and don't need the disk-cache.
       // biome-ignore lint/suspicious/noExplicitAny: Vite ResolvedConfig type varies by version
       configResolved(resolvedConfig: any) {
+        // Capture the Vite project root for ALL targets — the shared buildStart
+        // sidecar walk scopes itself to this instead of process.cwd().
+        viteResolvedRoot = resolvedConfig?.root ?? null;
         if (options.target !== 'angular') return;
         const root = resolvedConfig?.root ?? process.cwd();
         // Quick task 260515-1y4 — pass through the consumer's optional
@@ -250,6 +273,8 @@ export const unplugin = createUnpluginV3<Partial<RozieOptions>>((rawOptions) => 
         // in dev, re-emit its `<Name>.d.rozie.ts` so the consumer's tsc/IDE
         // sees fresh types without a full rebuild. The idempotent skip inside
         // emitSidecar means an unchanged source is a no-op (no HMR loop).
+        // (For target:'angular' this is a heal/no-op — see emitSidecar.ts
+        // ANGULAR EXCEPTION.)
         {
           const hmrRoot = server?.config?.root ?? process.cwd();
           emitSidecarFor(file, hmrRoot);

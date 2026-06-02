@@ -1,20 +1,36 @@
-// Phase 22 (REQ-1/R3/R4/R9): this demo now consumes the per-module
-// `<Name>.d.rozie.ts` sidecars emitted by @rozie/unplugin's buildStart hook —
-// `import Foo, { type FooProps } from './Foo.rozie'` gets REAL Angular types
-// (a typed `declare class Foo` + named `FooProps` + `$expose` handle methods).
+// TypeScript shim for `.rozie` imports — informs tsc / Angular's strict
+// templates that a `.rozie` import resolves to an Angular standalone
+// component class.
 //
-// The former broad `declare module '*.rozie'` wildcard is DEMOTED (deleted for
-// this demo, which migrates 100% cleanly — every `.rozie` import here is
-// in-`src` and has a sidecar). Per SPIKE-FINDINGS, Angular (`tsc`, typescript
-// ~5.9.3) honors the sidecar ONLY with `allowArbitraryExtensions: true` (set in
-// tsconfig.json); WITHOUT the flag the wildcard SHADOWS the sidecar (TS2614).
+// ANGULAR TYPED-IMPORT POSTURE (post-Phase-22 regression fix, 2026-06-02):
+// Angular does NOT use `.d.rozie.ts` sidecars. The typed import surface is the
+// disk-cache `<Name>.rozie.ts` that @rozie/unplugin's configResolved prebuild
+// writes next to each `.rozie` source — a real, fully-typed standalone
+// component class that both tsc AND ngtsc resolve via standard
+// extension-appending (`./Counter.rozie` → `Counter.rozie.ts`).
 //
-// CROSS-ROZIE COMPOSITION (Card → CardHeader, ModalConsumer → Modal/WrapperModal):
-// the unplugin's prebuild emits a `<Name>.ts` re-export shim that now points at
-// the disk-cache `<Name>.rozie.ts` via its `.rozie.js` specifier — NOT the bare
-// `./<Name>.rozie` — so the `.d.rozie.ts` sidecar does NOT shadow the runtime
-// VALUE class the `imports: [...]` metadata needs (this closes the Plan-05
-// known-red TS2614 entry condition). The sidecar adds the named Props/handle
-// type exports the disk-cache lacks; the disk-cache provides the value class.
-// Do NOT re-add a broad wildcard — it reintroduces the shadowing.
-export {};
+// Why no sidecar: TS module resolution prefers an arbitrary-extension
+// declaration file (`Counter.d.rozie.ts`) over the appended-extension
+// implementation (`Counter.rozie.ts`) — regardless of
+// `allowArbitraryExtensions`. ngtsc (inside @analogjs/vite-plugin-angular) uses
+// that same resolution to validate standalone `imports: [...]` entries; a
+// type-only `declare class` has no ɵcmp metadata, so ngtsc silently skips AOT
+// for every class importing a `.rozie` module → runtime "JIT compiler
+// unavailable" (the 2026-06-02 Angular + VR matrix regression). See
+// packages/unplugin/src/emitSidecar.ts ANGULAR EXCEPTION.
+//
+// This wildcard is the FRESH-CHECKOUT FALLBACK only: before the demo's first
+// build (no disk-cache on disk yet; sidecars are never written for Angular),
+// `tsc --noEmit` still needs `.rozie` imports to resolve. Once the disk-cache
+// exists, file resolution wins over the ambient wildcard and imports get the
+// real class types.
+//
+// Known limitation (accepted): unlike the other 5 targets, Angular consumers
+// have no named `<Name>Props` type export to import. A future ngtsc-valid
+// sidecar (declaring `static ɵcmp: ɵɵComponentDeclaration<...>` the way
+// compiled Angular libraries do) can restore it.
+declare module '*.rozie' {
+  import type { Type } from '@angular/core';
+  const component: Type<unknown>;
+  export default component;
+}

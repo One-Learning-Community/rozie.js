@@ -13,8 +13,13 @@
  *     skip, writes the sidecar, returns the written path or null when
  *     skipped/refused/diagnostics-bailed.
  *
- * The Plan-04 LOCKED decision is honored: the Angular branch WRITES a sidecar
- * to disk (coexists with the disk-cache `.rozie.ts`) — it is NOT skipped.
+ * ANGULAR EXCEPTION (reverses the Plan-04 LOCKED decision): `emitSidecar` never
+ * writes an Angular sidecar next to a `.rozie` source — a type-only
+ * `.d.rozie.ts` shadows the disk-cache `.rozie.ts` in ngtsc's module resolution
+ * and silently kills AOT ("JIT compiler unavailable", the 2026-06-02 Angular +
+ * VR matrix regression). For `target: 'angular'` it deletes any stale sidecar
+ * (heal) and returns null. `renderSidecar` still renders Angular (CLI output
+ * trees only).
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { createHash } from 'node:crypto';
@@ -143,13 +148,24 @@ describe('emitSidecar — write + trust-boundary + idempotent skip', () => {
     expect(outPath2).toBe(outPath);
   });
 
-  it('Test 5: dispatch — angular WRITES a sidecar (Plan-04 LOCKED decision), not skipped', () => {
+  it('Test 5: dispatch — angular NEVER writes a sidecar next to a .rozie source (ngtsc AOT shadowing)', () => {
     const roziePath = join(tmpDir, 'Counter.rozie');
     writeFileSync(roziePath, COUNTER_ROZIE);
     const outPath = emitSidecar(roziePath, COUNTER_ROZIE, 'angular', [tmpDir]);
-    expect(outPath).toBe(join(tmpDir, 'Counter.d.rozie.ts'));
-    expect(existsSync(outPath!)).toBe(true);
-    expect(readFileSync(outPath!, 'utf8')).toContain('declare class Counter');
+    expect(outPath).toBeNull();
+    expect(existsSync(join(tmpDir, 'Counter.d.rozie.ts'))).toBe(false);
+  });
+
+  it('Test 5b: angular HEALS — a stale .d.rozie.ts left by a pre-fix build is deleted', () => {
+    const roziePath = join(tmpDir, 'Counter.rozie');
+    const stalePath = join(tmpDir, 'Counter.d.rozie.ts');
+    writeFileSync(roziePath, COUNTER_ROZIE);
+    // Simulate a pre-fix build (or a different-target build over a shared
+    // tree) having left a type-only sidecar behind.
+    writeFileSync(stalePath, '// AUTO-GENERATED stale sidecar\nexport declare class Counter {}\n');
+    const outPath = emitSidecar(roziePath, COUNTER_ROZIE, 'angular', [tmpDir]);
+    expect(outPath).toBeNull();
+    expect(existsSync(stalePath)).toBe(false);
   });
 
   it('returns null (no write) when the source has error-level diagnostics', () => {

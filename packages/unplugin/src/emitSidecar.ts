@@ -25,15 +25,41 @@
  *      the idempotent `existsSync && existing === content` skip so a no-op
  *      re-emit doesn't trigger an HMR/chokidar write loop (T-22-05-03).
  *
- * The Angular branch follows the Plan-04 LOCKED decision: it WRITES a sidecar
- * to disk like every other target (it coexists with the disk-cache
- * `<Name>.rozie.ts` with zero duplicate-identifier; the sidecar adds the named
- * `<Name>Props`/handle exports the disk-cache lacks — SPIKE-FINDINGS §Angular).
+ * ── ANGULAR EXCEPTION (post-22 regression fix; REVERSES the Plan-04 LOCKED
+ * decision) ──────────────────────────────────────────────────────────────────
+ * The writer NEVER writes a sidecar next to a `.rozie` source for
+ * `target: 'angular'` — it instead DELETES any stale one it finds (heal).
+ *
+ * Why: TypeScript module resolution tries the arbitrary-extension declaration
+ * file `<Name>.d.rozie.ts` BEFORE extension-appending finds the disk-cache
+ * implementation `<Name>.rozie.ts` (and it does so regardless of
+ * `allowArbitraryExtensions` — the flag only gates whether plain tsc reports an
+ * error for the resolution, not whether it happens). Angular is the one target
+ * that runs a TS program INSIDE the bundler: ngtsc (via
+ * @analogjs/vite-plugin-angular) uses that same resolution to validate every
+ * entry of a standalone component's `imports: [...]`. A type-only
+ * `declare class` carries no `ɵcmp`/`ɵɵComponentDeclaration` metadata, so ngtsc
+ * rejects it as a component and SILENTLY SKIPS AOT for every class that imports
+ * a `.rozie` module → those classes ship raw decorators → runtime
+ * "JIT compiler unavailable" (the 2026-06-02 Angular matrix + VR matrix
+ * regression). The Plan 22-01 spike validated sidecar/disk-cache coexistence
+ * under plain tsc only and missed this ngtsc path.
+ *
+ * The disk-cache `<Name>.rozie.ts` IS the typed import surface for Angular (a
+ * real, fully-typed component class). A future ngtsc-valid sidecar (one that
+ * declares `static ɵcmp: ɵɵComponentDeclaration<...>`, the way compiled Angular
+ * libraries do) may restore named `<Name>Props` exports for Angular — until
+ * then, no `.d.rozie.ts` may sit next to a `.rozie` an Angular build consumes.
+ *
+ * `renderSidecar` itself still supports `target: 'angular'`: the CLI
+ * (`rozie build`/`watch`) writes Angular sidecars next to its OUTPUT files
+ * (compiled `.ts`, no `.rozie` siblings), where the shadowing hazard cannot
+ * arise.
  *
  * @experimental — shape may change before v1.0
  */
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { isAbsolute, relative as pathRelative } from 'node:path';
 import { parse } from '../../core/src/parse.js';
 import { lowerToIR } from '../../core/src/ir/lower.js';
@@ -99,8 +125,9 @@ function renderTypesFor(
     case 'lit':
       return emitLitTypes(ir);
     case 'angular':
-      // Plan-04 LOCKED decision: Angular WRITES a sidecar (coexists with the
-      // disk-cache .rozie.ts; adds the named Props/handle exports it lacks).
+      // NOTE: kept for the CLI path only (sidecars next to compiled OUTPUT
+      // files). `emitSidecar` below refuses to place an Angular sidecar next to
+      // a `.rozie` source — see the ANGULAR EXCEPTION block in the module doc.
       return emitAngularTypes(ir);
     default: {
       // Exhaustiveness guard — a new target must extend this switch.
@@ -160,9 +187,11 @@ function assertWritable(roziePath: string, allowedRoots: readonly string[]): voi
  * Render + write a `<Name>.d.rozie.ts` sidecar next to its `.rozie` source.
  *
  * @returns the written sidecar path, or `null` when the source bailed on
- *   diagnostics (no sidecar for a broken source) OR the write was an idempotent
- *   skip (content unchanged) — in the skip case the path string the caller
- *   would have written is returned so callers can log/track it consistently.
+ *   diagnostics (no sidecar for a broken source), the target is `'angular'`
+ *   (ANGULAR EXCEPTION — heal + skip, see module doc), OR the write was an
+ *   idempotent skip (content unchanged) — in the skip case the path string the
+ *   caller would have written is returned so callers can log/track it
+ *   consistently.
  *
  *   NOTE on the skip return: an idempotent skip returns the SAME `outPath`
  *   string as a fresh write (the file is already correct on disk); only the
@@ -178,6 +207,25 @@ export function emitSidecar(
   // Trust boundary FIRST — refuse an out-of-root / null-byte path before any
   // render work (and so the null-byte test never reaches the `.replace`).
   assertWritable(roziePath, allowedRoots);
+
+  // ANGULAR EXCEPTION (see module doc): never place a type-only `.d.rozie.ts`
+  // next to a `.rozie` an Angular build consumes — ngtsc's module resolution
+  // prefers it over the disk-cache `.rozie.ts` value class, killing AOT
+  // ("JIT compiler unavailable"). HEAL instead: delete any stale sidecar a
+  // pre-fix build (or a different-target build over a shared tree) left behind,
+  // then bail. Deletion failures propagate (the buildStart walker aggregates
+  // them via WR-04).
+  if (target === 'angular') {
+    const stalePath = roziePath.replace(/\.rozie$/, '.d.rozie.ts');
+    if (existsSync(stalePath)) {
+      unlinkSync(stalePath);
+      // biome-ignore lint/suspicious/noConsole: build-time heal diagnostic
+      console.warn(
+        `[@rozie/unplugin] removed stale Angular sidecar ${stalePath} (a .d.rozie.ts next to a .rozie source breaks ngtsc AOT — see emitSidecar.ts ANGULAR EXCEPTION)`,
+      );
+    }
+    return null;
+  }
 
   const content = renderSidecar(sourceText, target, roziePath);
   if (content === null) return null; // broken source — never write a type-lie

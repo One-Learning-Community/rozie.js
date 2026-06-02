@@ -15,13 +15,16 @@ import Rozie from '@rozie/unplugin/vite';
 // Vite 6+ floor: @analogjs/vite-plugin-angular@2.5.0 peerDeps require
 // vite ^6 || ^7 || ^8 (RESEARCH.md OQ6 RESOLVED).
 //
-// Known limitation (Plan 05-04b deviation): AppComponent.ts AOT-compilation
-// in this monorepo's pnpm subgraph hits an analogjs/Angular interaction
-// where NgCompiler.fromTicket fails with "Cannot read properties of
-// undefined (reading 'flags')" during TS Program initialization. The .rozie
-// virtual ids ARE successfully AOT-compiled (5 ɵcmp markers in the bundle),
-// but the consumer AppComponent.ts is not, leading to "JIT compiler
-// unavailable" at runtime. Tracked as deferred — see SUMMARY.md.
+// HISTORICAL NOTE (stale "known limitation" removed 2026-06-02): an old
+// Plan 05-04b comment here described AppComponent.ts failing AOT with
+// "JIT compiler unavailable" as a deferred limitation. That limitation was
+// FIXED long ago (the May 2026 dual-TS-version pin, see angular-matrix.yml) —
+// the full app AOT-compiles and all 17 e2e tests pass. The stale comment
+// misled the Phase 22 executor into dismissing a REAL regression (type-only
+// .d.rozie.ts sidecars shadowing the disk-cache in ngtsc resolution — see
+// packages/unplugin/src/emitSidecar.ts ANGULAR EXCEPTION). If this demo ever
+// throws "JIT compiler unavailable" again, it is a real, new regression:
+// check for stray *.d.rozie.ts files next to the .rozie sources first.
 export default defineConfig({
   plugins: [
     Rozie({ target: 'angular' }),

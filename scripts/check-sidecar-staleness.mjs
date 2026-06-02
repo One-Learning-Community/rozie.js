@@ -30,6 +30,14 @@
 // missing sidecar means generation silently failed. The default (no flag) keeps
 // the soft-note behavior for the dev / pre-push path.
 //
+// ANGULAR EXCEPTION (post-Phase-22 regression fix, 2026-06-02): Angular
+// consumers never have sidecars — a type-only `.d.rozie.ts` next to a `.rozie`
+// source shadows the disk-cache `.rozie.ts` in ngtsc's module resolution and
+// silently kills AOT ("JIT compiler unavailable"). The unplugin skips + heals
+// them (see packages/unplugin/src/emitSidecar.ts ANGULAR EXCEPTION). This gate
+// ENFORCES the inverse invariant for Angular consumer dirs: any sidecar found
+// there is a hard failure in every mode.
+//
 // Structure mirrors scripts/check-runtime-isolation.mjs (the repo's other gate).
 import { createHash } from 'node:crypto';
 import {
@@ -48,6 +56,22 @@ import { fileURLToPath } from 'node:url';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const CONSUMERS_DIR = join(ROOT, 'examples', 'consumers');
 
+// ANGULAR-EXCLUSIVE trees: only Angular builds ever run over these, and an
+// Angular build never writes a sidecar (it heals/deletes instead). A
+// `.d.rozie.ts` here therefore means a regression in the unplugin's ANGULAR
+// EXCEPTION (or a pre-fix leftover) — the gate fails hard if one exists.
+//
+// Deliberately NOT listed: the SHARED trees (examples/, examples/demos/,
+// packages/ui/*/src) that the VR angular cell walks via `prebuildExtraRoots`.
+// Non-angular VR sub-builds litter those with their own sidecars (their
+// buildStart walks from the repo root — build-cells.mjs cwd), which is benign:
+// the angular sub-build deletes them at its own buildStart BEFORE its ngtsc
+// runs, so Angular AOT never sees them.
+const ANGULAR_FORBIDDEN_SIDECAR_ROOTS = [
+  { dir: join(CONSUMERS_DIR, 'angular-analogjs'), skip: [] },
+  { dir: join(ROOT, 'tests', 'integration', 'angular-analogjs'), skip: [] },
+];
+
 // The single source of truth for the header — must match
 // packages/unplugin/src/emitSidecar.ts SIDECAR_HEADER_PREFIX exactly.
 const SIDECAR_HEADER_PREFIX =
@@ -65,8 +89,12 @@ function parseHeaderHash(sidecarText) {
   return firstLine.slice(SIDECAR_HEADER_PREFIX.length).trim();
 }
 
-/** Recursively collect every file matching `predicate` under `dir`. */
-function walk(dir, predicate, out = []) {
+/**
+ * Recursively collect every file matching `predicate` under `dir`.
+ * `skipDirs` (top-level names) lets a caller stop at package boundaries the
+ * way the unplugin's walker does (ANGULAR EXCEPTION check).
+ */
+function walk(dir, predicate, out = [], skipDirs = []) {
   let entries;
   try {
     entries = readdirSync(dir);
@@ -75,6 +103,7 @@ function walk(dir, predicate, out = []) {
   }
   for (const name of entries) {
     if (name === 'node_modules' || name === 'dist' || name === '.turbo') continue;
+    if (skipDirs.includes(name)) continue;
     const full = join(dir, name);
     let s;
     try {
@@ -82,7 +111,7 @@ function walk(dir, predicate, out = []) {
     } catch {
       continue;
     }
-    if (s.isDirectory()) walk(full, predicate, out);
+    if (s.isDirectory()) walk(full, predicate, out, skipDirs);
     else if (predicate(name)) out.push(full);
   }
   return out;
@@ -171,7 +200,26 @@ function runSelfTest() {
 }
 
 function runGate(requireComplete) {
-  const sidecars = walk(CONSUMERS_DIR, (n) => n.endsWith('.d.rozie.ts'));
+  // ANGULAR EXCEPTION (hard failure in every mode): no `.d.rozie.ts` may exist
+  // in any tree an Angular build consumes — its presence shadows the disk-cache
+  // `.rozie.ts` in ngtsc's resolution and silently breaks AOT ("JIT compiler
+  // unavailable"). The unplugin heals these on build; one surviving here means
+  // a build wrote it (regression) or it predates the fix (run the angular demo
+  // build, or delete it manually).
+  const forbidden = [];
+  for (const { dir, skip } of ANGULAR_FORBIDDEN_SIDECAR_ROOTS) {
+    walk(dir, (n) => n.endsWith('.d.rozie.ts'), forbidden, skip);
+  }
+  if (forbidden.length > 0) {
+    console.error('✗ ANGULAR EXCEPTION violated — .d.rozie.ts sidecar(s) found in tree(s) an Angular');
+    console.error('  build consumes. These shadow the disk-cache .rozie.ts in ngtsc resolution and');
+    console.error('  silently break AOT (runtime "JIT compiler unavailable"). Delete them (the');
+    console.error('  angular demo/VR build heals this automatically):');
+    for (const f of forbidden) console.error(`  - ${f}`);
+    process.exit(1);
+  }
+
+  const sidecars = walk(CONSUMERS_DIR, (n) => n.endsWith('.d.rozie.ts'), [], ['angular-analogjs']);
   const stale = [];
   let checked = 0;
   for (const sidecar of sidecars) {
