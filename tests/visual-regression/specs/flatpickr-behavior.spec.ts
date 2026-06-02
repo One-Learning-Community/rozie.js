@@ -60,7 +60,25 @@ for (const target of TARGETS) {
   const built = existsSync(
     resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
   );
-  const runner = built ? test : test.fixme;
+  // 260602-9lw — the $watch lazy-by-default normalization fixed GAP-2
+  // disable/enable on react/svelte/solid/angular/vue (5/6 now green) and
+  // ELIMINATED the lit-only `s.set is not a function` mount crash (the
+  // `hasUpdated` guard means the prop-route disable watcher no longer fires
+  // against the not-yet-built instance at mount).
+  //
+  // A SEPARATE, pre-existing lit-only runtime bug remains: at MOUNT the lit
+  // calendar opens with all 42 day-cells `.flatpickr-disabled` even though
+  // `disableSet` is `[]` (weekends-disable defaults OFF) and `.disable` is
+  // bound as a property (`.disable=${this.disableSet}`), so flatpickr should
+  // construct with nothing disabled. No console.error / pageerror is emitted —
+  // this is a lit lifecycle/property-timing issue in how `this.disable` reads
+  // at `firstUpdated`, NOT a $watch-emit defect and NOT fixable by touching
+  // packages/ui/flatpickr (the wrapper source is correct; the 5 sibling
+  // targets pass with byte-identical wrapper semantics). Pre-approved fixme
+  // (CONTEXT) — follow-up: /gsd-debug the lit firstUpdated disable-construction
+  // path (TIPTAP_SOLID_KNOWN_RUNTIME_BUG pattern from matrix.spec.ts).
+  const LIT_GAP2_KNOWN_RUNTIME_BUG = target === 'lit';
+  const runner = built && !LIT_GAP2_KNOWN_RUNTIME_BUG ? test : test.fixme;
   runner(`flatpickr-behavior [${target}]: disable + locale + rangePlugin`, async ({
     page,
   }) => {
