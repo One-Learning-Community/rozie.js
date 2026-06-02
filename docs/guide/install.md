@@ -35,6 +35,84 @@ Import `.rozie` files as normal components:
 import Counter from './Counter.rozie';
 ```
 
+## Typed `.rozie` imports (per-framework setup)
+
+Rozie gives your `.rozie` imports **real, per-module TypeScript types** — the props interface, event callbacks, and the `$expose` handle — so `import Counter from './Counter.rozie'` is as type-safe as importing a hand-written component. There is no `.rozie`-aware language plugin to install: the types come from a generated **sidecar declaration file**.
+
+### How it works
+
+When the unplugin builds your project, its `buildStart` hook writes a per-module `<Name>.d.rozie.ts` sidecar next to each `<Name>.rozie` source — for example `Counter.rozie` → `Counter.d.rozie.ts`. TypeScript resolves `import Counter from './Counter.rozie'` to that sidecar (the `.d.<ext>.ts` declaration-for-an-arbitrary-extension form), so your editor and `tsc` see the component's true props and handle types. **You never write or edit the sidecar** — it carries a `do-not-edit` header and is regenerated on every build.
+
+Generation is automatic: any `vite build` / `vite dev` (or any other unplugin host — Rollup, Webpack, esbuild, Rolldown, Rspack) emits the sidecars. You do not run a separate codegen command.
+
+### The one tsconfig flag: `allowArbitraryExtensions`
+
+TypeScript only resolves a `.d.<ext>.ts` sidecar for a non-standard extension (like `.rozie`) when `allowArbitraryExtensions` is enabled. **Whether you need to set it explicitly depends on your target framework's typecheck tool:**
+
+| Target | Typecheck tool | `allowArbitraryExtensions` |
+| --- | --- | --- |
+| Vue | `vue-tsc` | Not needed — honored under the `moduleResolution: bundler` default |
+| React | `tsc` | **Required** — add `"allowArbitraryExtensions": true` |
+| Svelte | `tsc` + `svelte-check` | **Required** |
+| Solid | `tsc` | **Required** |
+| Lit | `tsc` | **Required** |
+| Angular | `tsc` | **Required** |
+
+So for every target except Vue, add the flag to your `tsconfig.json`:
+
+```json
+{
+  "compilerOptions": {
+    "moduleResolution": "bundler",
+    "allowArbitraryExtensions": true
+  }
+}
+```
+
+Plain `tsc` (and `vue-tsc`) 5.x does **not** auto-enable `allowArbitraryExtensions` under `moduleResolution: bundler` — Vue is the only target whose toolchain honors the sidecar without the flag. Without the flag on the other five, `tsc` reports `TS6263: … but '--allowArbitraryExtensions' is not set` (or silently falls back to a broad `*.rozie` wildcard that types every prop as `unknown` — see migration below).
+
+### Named handle imports
+
+If a component declares `$expose({ ... })`, the sidecar also exports a typed handle interface you can import **by name** alongside the default component import:
+
+```ts
+import Dropdown, { type DropdownHandle } from './Dropdown.rozie';
+
+const ref = useRef<DropdownHandle>(null);
+// <Dropdown ref={ref} />  →  ref.current?.open()
+```
+
+The handle methods are typed from your `<script>` function signatures. See [`$expose` → Getting the handle from the consumer side](/guide/features#getting-the-handle-from-the-consumer-side) for the per-framework ref idiom.
+
+### Migrating from the `declare module '*.rozie'` wildcard
+
+Earlier setups used a broad ambient shim:
+
+```ts
+// rozie-shim.d.ts — the OLD wildcard fallback (now deprecated)
+declare module '*.rozie' {
+  const component: unknown;
+  export default component;
+}
+```
+
+A broad active wildcard **shadows** the per-module sidecars: every prop resolves to `unknown` and you lose all type safety (this is the exact silent type-lie the typed-import work removes). Migrate by **deleting** the wildcard for any project whose `.rozie` files are all sidecar-generated (i.e. live where the build emits sidecars), then add `allowArbitraryExtensions: true` if your target isn't Vue. The recommendation is **deprecate-don't-delete** only when you genuinely have `.rozie` imports that get no sidecar (e.g. files outside the build's emit roots) — keep a narrow, `@deprecated`-commented fallback for those; with the flag set, a present per-module sidecar always takes precedence over the wildcard.
+
+### The sidecars are gitignored (REQ-7)
+
+Generated `*.d.rozie.ts` sidecars are **build artefacts** — they are matched by the repo-wide `*.rozie.ts` gitignore rule and should **not** be committed. They are regenerated on every build, so a fresh checkout produces them as soon as you run `vite build` / `vite dev` (or `rozie build` / `rozie watch`). In CI, run your build step **before** your typecheck step so `tsc` never resolves a `.rozie` import before its sidecar exists.
+
+If a `.rozie` file ever lacks a sidecar at typecheck time, run the build first — do **not** re-add a broad wildcard fallback, which reintroduces the shadowing.
+
+### CLI fallback (no bundler)
+
+If you compile ahead-of-time with the standalone CLI instead of a bundler, `rozie build` and `rozie watch` emit the same `<Name>.d.rozie.ts` sidecars (the CLI and the unplugin share one renderer, so the bytes are identical):
+
+```bash
+pnpm rozie build src/Counter.rozie --target react   # writes Counter.d.rozie.ts alongside
+pnpm rozie watch src/                                # refreshes sidecars on change
+```
+
 ## Standalone CLI
 
 For one-shot codegen (CI, doc builds, ahead-of-time emit):

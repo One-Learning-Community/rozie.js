@@ -403,6 +403,32 @@ Producer-side only: a consumer grabs the handle with each framework's **native**
 
 The handle methods are typed from your `<script>` function signatures: a `<script lang="ts">` function contributes its real signature to the synthesized `FooHandle`; an untyped function becomes `(...args: any[]) => any`.
 
+## Typed `.rozie` imports — per-module declaration sidecars
+
+`import Counter from './Counter.rozie'` is fully typed: the props interface, the `on<Event>?` callbacks, and (when present) the `$expose` handle all flow through to your editor and `tsc`. Rozie does this **without** a `.rozie`-aware TypeScript language plugin — it generates a per-module declaration sidecar.
+
+When the unplugin builds your project, its `buildStart` hook writes a `<Name>.d.rozie.ts` sidecar next to each `<Name>.rozie` (e.g. `Counter.rozie` → `Counter.d.rozie.ts`). TypeScript resolves the `.rozie` import to that sidecar, so you get the component's real types. Generation is automatic on any `vite build` / `vite dev`; the standalone CLI (`rozie build` / `rozie watch`) emits the same sidecars for ahead-of-time pipelines. You never hand-write or edit a sidecar — it carries a `do-not-edit` source-hash header and is regenerated on every build.
+
+Importing the handle type by name is the typed-import payoff for `$expose` components:
+
+```ts
+import Dropdown, { type DropdownHandle } from './Dropdown.rozie';
+```
+
+`DropdownHandle` is the synthesized interface for the methods the component exposed (see [Getting the handle from the consumer side](#getting-the-handle-from-the-consumer-side) above).
+
+One tsconfig flag governs whether `tsc` honors the sidecar. **Vue's `vue-tsc` honors it under the `moduleResolution: bundler` default; every other target's `tsc` requires `"allowArbitraryExtensions": true`** explicitly:
+
+| Target | Typecheck tool | `allowArbitraryExtensions` |
+| --- | --- | --- |
+| Vue | `vue-tsc` | not needed (bundler default) |
+| React / Solid / Lit / Angular | `tsc` | **required** |
+| Svelte | `tsc` + `svelte-check` | **required** |
+
+Without the flag (on the five non-Vue targets), `tsc` either emits `TS6263` or silently falls back to a broad `declare module '*.rozie'` wildcard that types every prop as `unknown` — a silent type-lie. The full per-framework setup, the wildcard-shim migration, and the gitignore policy live in [Install → Typed `.rozie` imports](/guide/install#typed-rozie-imports-per-framework-setup).
+
+Each consumer demo in the repo is the byte-tested proof of its framework's setup: `examples/consumers/react-vite` (React, flag set, wildcard deleted), `vue-vite` (Vue, no flag, `@deprecated` cross-root fallback kept), `svelte-vite` / `lit-vanilla-demo` / `angular-analogjs` (flag set, wildcard deleted), and `solid-vite` (flag set, `@deprecated` cross-root fallback kept). Each ships a `typed-import.probe` that asserts a correct prop usage compiles and a wrong-typed prop is a genuine error.
+
 ## `$onMount` returning a teardown
 
 `$onMount` is a hook; its return value, if a function, runs at unmount. The pattern is identical to React's `useEffect`, but `$onUnmount` is also available as a standalone hook for clarity. Multiple of either colocate with their logic:
