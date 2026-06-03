@@ -274,8 +274,12 @@ for (const name of EXAMPLES) {
         writeFileSync(fixturePath(name, target, '.d.ts'), normalize(result.types), 'utf8');
         written++;
       }
+      // Phase 25 de-CSS-Modules: React emits a side-effect `import './X.css'`,
+      // so the scoped-CSS sidecar fixture is written to a PLAIN `.css` path
+      // (was `.module.css`) — keeps the corpus consistent with the emitted
+      // import + lets behavior tests that execute the .tsx resolve the sibling.
       if (result.css && result.css.length > 0) {
-        writeFileSync(fixturePath(name, target, '.module.css'), normalize(result.css), 'utf8');
+        writeFileSync(fixturePath(name, target, '.css'), normalize(result.css), 'utf8');
         written++;
       }
       if (result.globalCss && result.globalCss.length > 0) {

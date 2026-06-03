@@ -265,7 +265,7 @@ describe('Battery 1 — {{ }} text-safe positive assertion (SPEC req 5, D-03)', 
     // the rendered value-display line marker
     lineMarker: string;
   }> = [
-    { target: 'react', file: 'Counter.tsx', textSafe: '{value}', lineMarker: 'className={styles.value}' },
+    { target: 'react', file: 'Counter.tsx', textSafe: '{value}', lineMarker: 'className={"value"}' },
     { target: 'vue', file: 'Counter.vue', textSafe: '{{ value }}', lineMarker: 'class="value"' },
     { target: 'svelte', file: 'Counter.svelte', textSafe: '{value}', lineMarker: 'class="value"' },
     { target: 'angular', file: 'Counter.angular.ts', textSafe: '{{ value() }}', lineMarker: 'class="value"' },

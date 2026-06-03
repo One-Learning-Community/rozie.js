@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { clsx } from '@rozie/runtime-react';
-import styles from './InlineExprHandler.module.css';
+import './InlineExprHandler.css';
 
 interface InlineExprHandlerProps {
   closeOnBackdrop?: boolean;
@@ -24,7 +24,7 @@ export default function InlineExprHandler(_props: InlineExprHandlerProps): JSX.E
 
   return (
     <>
-    <div {...attrs} className={clsx(styles.backdrop, (attrs.className as string | undefined))} onClick={($event) => { props.closeOnBackdrop && close(); }} data-rozie-s-8ec7623e="">
+    <div {...attrs} className={clsx("backdrop", (attrs.className as string | undefined))} onClick={($event) => { props.closeOnBackdrop && close(); }} data-rozie-s-8ec7623e="">
       
       <button onClick={close} data-rozie-s-8ec7623e="">Close</button>
     </div>

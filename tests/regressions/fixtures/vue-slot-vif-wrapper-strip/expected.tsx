@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { clsx } from '@rozie/runtime-react';
-import styles from './PresenceSlotFallback.module.css';
+import './PresenceSlotFallback.css';
 
 interface PresenceSlotFallbackProps {
   title?: string;
@@ -22,11 +22,11 @@ export default function PresenceSlotFallback(_props: PresenceSlotFallbackProps):
 
   return (
     <>
-    <section {...attrs} className={clsx(styles.panel, (attrs.className as string | undefined))} data-rozie-s-224e77e7="">
+    <section {...attrs} className={clsx("panel", (attrs.className as string | undefined))} data-rozie-s-224e77e7="">
       {((props.renderHeader ?? props.slots?.['header']) || props.title) && <header data-rozie-s-224e77e7="">
         
         {(props.renderHeader ?? props.slots?.['header']) ? ((props.renderHeader ?? props.slots?.['header']) as Function)() : props.title}
-      </header>}<div className={styles.body} data-rozie-s-224e77e7="">
+      </header>}<div className={"body"} data-rozie-s-224e77e7="">
         {(typeof (props.children ?? props.slots?.['']) === 'function' ? ((props.children ?? props.slots?.['']) as Function)() : (props.children ?? props.slots?.['']))}
       </div>
     </section>

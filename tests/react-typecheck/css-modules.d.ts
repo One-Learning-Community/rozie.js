@@ -1,15 +1,15 @@
 /**
- * Ambient module declarations so emitted .tsx files can `import styles from
- * './Foo.module.css'` and `import './Foo.global.css'` without tripping TS2307.
+ * Ambient module declaration so emitted .tsx files can side-effect-import
+ * `import './Foo.css'` (and `import './Foo.global.css'`) without tripping
+ * TS2307.
  *
- * The React target emits CSS module bindings as part of every component (it's
- * the same path Vue/Svelte/Angular/Solid/Lit use), but our gate test doesn't
- * actually run a CSS-aware bundler — it just hands the .tsx files to tsc.
- * Without these declarations tsc treats the import as a missing module.
+ * Phase 25 de-CSS-Modules: React now emits plain `className="x"` strings + a
+ * side-effect `import './Foo.css'` — it NO LONGER emits a CSS-Modules default
+ * binding. The former CSS-Modules ambient default-export shim is therefore
+ * removed: keeping it would mask a stray CSS-Modules import regression (a
+ * surviving stale import would resolve against the dead shim instead of
+ * failing). The `*.css` side-effect declaration is all the emitted output
+ * needs. Our gate test hands the .tsx files to tsc without a CSS-aware
+ * bundler, so without this declaration tsc treats the import as missing.
  */
-declare module '*.module.css' {
-  const classes: { readonly [key: string]: string };
-  export default classes;
-}
-
 declare module '*.css';
