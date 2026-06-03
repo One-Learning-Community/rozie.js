@@ -16,7 +16,7 @@
  *
  * @experimental — shape may change before v1.0
  */
-import type { IRComponent, ComponentDecl } from '../../../../core/src/ir/types.js';
+import type { IRComponent, ComponentDecl, PropDecl } from '../../../../core/src/ir/types.js';
 import { AngularImportCollector } from '../rewrite/collectAngularImports.js';
 
 /** Convert `Counter` / `TodoList` / `SearchInput` → `rozie-counter` / `rozie-todo-list` / `rozie-search-input`. */
@@ -74,6 +74,20 @@ export interface EmitDecoratorOpts {
    * import line.
    */
   selfReferenced?: boolean;
+  /**
+   * Phase 23 (angular-cva-forms-integration) — the single `model: true` prop
+   * the auto-`ControlValueAccessor` wraps, or `null` when CVA is off. When
+   * non-null, the decorator gains:
+   *   - `providers: [{ provide: NG_VALUE_ACCESSOR, useExisting:
+   *     forwardRef(() => <Class>), multi: true }]`
+   *   - `host: { '(focusout)': '__rozieCvaOnTouched()' }`
+   * The decorator branches ONLY on `cvaModelProp !== null`. The caller
+   * (emitAngular) MUST also register `NG_VALUE_ACCESSOR` (@angular/forms) and
+   * `forwardRef` (@angular/core) on the import collector. The prop itself is
+   * not otherwise read here — a boolean would suffice, but we keep the prop for
+   * symmetry with emitScript's gate and to allow future host-binding extension.
+   */
+  cvaModelProp?: PropDecl | null;
 }
 
 /**
@@ -206,6 +220,26 @@ export function emitDecorator(
     lines.push(`  \`,`);
     lines.push(`  ],`);
   }
+
+  // Phase 23 (angular-cva-forms-integration) — auto-CVA decorator entries,
+  // gated on the single cvaModelProp. First use of both `providers:` and
+  // `host:` in emitDecorator (verified no prior host-attribute fallthrough emits
+  // a host: entry — the D-05/D-06 spread copies host attributes onto the inner
+  // element, not via a decorator host: map). The host fragment is a fixed pure
+  // method-call literal (T-23-02-AOT: satisfies the AOT pure-expression
+  // constraint, Pitfall 6); the providers literal self-references the emitted
+  // class via forwardRef (the class is in scope of its own decorator).
+  if (opts.cvaModelProp != null) {
+    lines.push(`  providers: [`);
+    lines.push(`    {`);
+    lines.push(`      provide: NG_VALUE_ACCESSOR,`);
+    lines.push(`      useExisting: forwardRef(() => ${opts.componentName}),`);
+    lines.push(`      multi: true,`);
+    lines.push(`    },`);
+    lines.push(`  ],`);
+    lines.push(`  host: { '(focusout)': '__rozieCvaOnTouched()' },`);
+  }
+
   lines.push('})');
 
   return lines.join('\n');
