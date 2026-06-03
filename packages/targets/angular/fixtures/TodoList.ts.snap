@@ -1,6 +1,6 @@
-import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, computed, effect, inject, input, model, output, signal, viewChild } from '@angular/core';
+import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, computed, effect, forwardRef, inject, input, model, output, signal, viewChild } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
-import { FormsModule } from '@angular/forms';
+import { FormsModule, NG_VALUE_ACCESSOR } from '@angular/forms';
 
 interface HeaderCtx {
   $implicit: { remaining: any; total: any };
@@ -75,6 +75,14 @@ interface EmptyCtx {}
     .empty { color: rgba(0, 0, 0, 0.4); font-style: italic; }
     form { display: flex; gap: 0.25rem; margin-block: 0.5rem; }
   `],
+  providers: [
+    {
+      provide: NG_VALUE_ACCESSOR,
+      useExisting: forwardRef(() => TodoList),
+      multi: true,
+    },
+  ],
+  host: { '(focusout)': '__rozieCvaOnTouched()' },
 })
 export class TodoList {
   items = model<any[]>((() => [])());
@@ -97,6 +105,10 @@ export class TodoList {
       id: crypto.randomUUID(),
       text,
       done: false
+    }]), this.__rozieCvaOnChange([...this.items(), {
+      id: crypto.randomUUID(),
+      text,
+      done: false
     }]);
     this.draft.set('');
     this.add.emit(text);
@@ -105,13 +117,36 @@ export class TodoList {
     this.items.set(this.items().map((i: any) => i.id === id ? {
       ...i,
       done: !i.done
+    } : i)), this.__rozieCvaOnChange(this.items().map((i: any) => i.id === id ? {
+      ...i,
+      done: !i.done
     } : i));
     this.toggle.emit(id);
   };
   removeItem = (id: any) => {
-    this.items.set(this.items().filter((i: any) => i.id !== id));
+    this.items.set(this.items().filter((i: any) => i.id !== id)), this.__rozieCvaOnChange(this.items().filter((i: any) => i.id !== id));
     this.remove.emit(id);
   };
+
+  private __rozieCvaOnChange: (v: any[]) => void = () => {};
+  private __rozieCvaOnTouchedFn: () => void = () => {};
+  private __rozieCvaDisabled = signal(false);
+
+  writeValue(v: any[] | null): void {
+    this.items.set(v ?? (() => [])());
+  }
+  registerOnChange(fn: (v: any[]) => void): void {
+    this.__rozieCvaOnChange = fn;
+  }
+  registerOnTouched(fn: () => void): void {
+    this.__rozieCvaOnTouchedFn = fn;
+  }
+  setDisabledState(isDisabled: boolean): void {
+    this.__rozieCvaDisabled.set(isDisabled);
+  }
+  __rozieCvaOnTouched(): void {
+    this.__rozieCvaOnTouchedFn();
+  }
 
   static ngTemplateContextGuard(
     _dir: TodoList,

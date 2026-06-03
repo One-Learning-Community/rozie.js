@@ -1,4 +1,5 @@
-import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, computed, effect, inject, input, model, signal, viewChild } from '@angular/core';
+import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, computed, effect, forwardRef, inject, input, model, signal, viewChild } from '@angular/core';
+import { NG_VALUE_ACCESSOR } from '@angular/forms';
 
 @Component({
   selector: 'rozie-counter',
@@ -19,6 +20,14 @@ import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterR
     button { padding: 0.25rem 0.5rem; }
     button:disabled { opacity: 0.4; cursor: not-allowed; }
   `],
+  providers: [
+    {
+      provide: NG_VALUE_ACCESSOR,
+      useExisting: forwardRef(() => Counter),
+      multi: true,
+    },
+  ],
+  host: { '(focusout)': '__rozieCvaOnTouched()' },
 })
 export class Counter {
   value = model<number>(0);
@@ -35,11 +44,31 @@ export class Counter {
   canDecrement = computed(() => this.value() - this.step() >= this.min());
 
   increment = () => {
-    if (this.canIncrement()) this.value.set(this.value() + this.step());
+    if (this.canIncrement()) this.value.set(this.value() + this.step()), this.__rozieCvaOnChange(this.value() + this.step());
   };
   decrement = () => {
-    if (this.canDecrement()) this.value.set(this.value() - this.step());
+    if (this.canDecrement()) this.value.set(this.value() - this.step()), this.__rozieCvaOnChange(this.value() - this.step());
   };
+
+  private __rozieCvaOnChange: (v: number) => void = () => {};
+  private __rozieCvaOnTouchedFn: () => void = () => {};
+  private __rozieCvaDisabled = signal(false);
+
+  writeValue(v: number | null): void {
+    this.value.set(v ?? 0);
+  }
+  registerOnChange(fn: (v: number) => void): void {
+    this.__rozieCvaOnChange = fn;
+  }
+  registerOnTouched(fn: () => void): void {
+    this.__rozieCvaOnTouchedFn = fn;
+  }
+  setDisabledState(isDisabled: boolean): void {
+    this.__rozieCvaDisabled.set(isDisabled);
+  }
+  __rozieCvaOnTouched(): void {
+    this.__rozieCvaOnTouchedFn();
+  }
 
   private __rozieDestroyRef = inject(DestroyRef);
 

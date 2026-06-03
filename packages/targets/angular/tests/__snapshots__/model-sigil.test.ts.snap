@@ -1,16 +1,25 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`Angular $model producer-side two-way-write sigil > emitted model fixture matches snapshot 1`] = `
-"import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, effect, inject, model, viewChild } from '@angular/core';
+"import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, effect, forwardRef, inject, model, signal, viewChild } from '@angular/core';
+import { NG_VALUE_ACCESSOR } from '@angular/forms';
 
 @Component({
   selector: 'rozie-model-sigil',
   standalone: true,
   template: \`
 
-      <button [title]="__title" #rozieSpread_0 (click)="value.set(value() + 1)" #rozieListenersTarget_1>{{ value() }}</button>
+      <button [title]="__title" #rozieSpread_0 (click)="value.set(value() + 1), __rozieCvaOnChange(value() + 1)" #rozieListenersTarget_1>{{ value() }}</button>
 
   \`,
+  providers: [
+    {
+      provide: NG_VALUE_ACCESSOR,
+      useExisting: forwardRef(() => ModelSigil),
+      multi: true,
+    },
+  ],
+  host: { '(focusout)': '__rozieCvaOnTouched()' },
 })
 export class ModelSigil {
   constructor() {
@@ -29,19 +38,40 @@ export class ModelSigil {
   value = model<number>(0);
 
   bump = () => {
-    this.value.set(this.value() + 1);
+    this.value.set(this.value() + 1), this.__rozieCvaOnChange(this.value() + 1);
   };
   reset = () => {
-    this.value.set(0);
+    this.value.set(0), this.__rozieCvaOnChange(0);
   };
   step = () => {
     this.value.set(this.value() + 1);
+    this.__rozieCvaOnChange(this.value() + 1);
   };
   doubled = () => {
     const __value = this.value();
     // Double-read in one scope — exercises hoistDoubleReadAccessors (A2).
     return __value + __value;
   };
+
+  private __rozieCvaOnChange: (v: number) => void = () => {};
+  private __rozieCvaOnTouchedFn: () => void = () => {};
+  private __rozieCvaDisabled = signal(false);
+
+  writeValue(v: number | null): void {
+    this.value.set(v ?? 0);
+  }
+  registerOnChange(fn: (v: number) => void): void {
+    this.__rozieCvaOnChange = fn;
+  }
+  registerOnTouched(fn: () => void): void {
+    this.__rozieCvaOnTouchedFn = fn;
+  }
+  setDisabledState(isDisabled: boolean): void {
+    this.__rozieCvaDisabled.set(isDisabled);
+  }
+  __rozieCvaOnTouched(): void {
+    this.__rozieCvaOnTouchedFn();
+  }
 
   private __rozieDestroyRef = inject(DestroyRef);
 

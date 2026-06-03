@@ -1,5 +1,6 @@
-import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, computed, effect, inject, input, model, viewChild } from '@angular/core';
+import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, computed, effect, forwardRef, inject, input, model, signal, viewChild } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
+import { NG_VALUE_ACCESSOR } from '@angular/forms';
 
 interface ItemCtx {
   $implicit: { item: any; remaining: any };
@@ -32,6 +33,14 @@ interface ItemCtx {
   styles: [`
     .list { list-style: none; padding: 0; }
   `],
+  providers: [
+    {
+      provide: NG_VALUE_ACCESSOR,
+      useExisting: forwardRef(() => ScopedSlotContext),
+      multi: true,
+    },
+  ],
+  host: { '(focusout)': '__rozieCvaOnTouched()' },
 })
 export class ScopedSlotContext {
   items = model<any[]>((() => [])());
@@ -39,6 +48,26 @@ export class ScopedSlotContext {
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
 
   remaining = computed(() => this.items().filter((i: any) => !i.done).length);
+
+  private __rozieCvaOnChange: (v: any[]) => void = () => {};
+  private __rozieCvaOnTouchedFn: () => void = () => {};
+  private __rozieCvaDisabled = signal(false);
+
+  writeValue(v: any[] | null): void {
+    this.items.set(v ?? (() => [])());
+  }
+  registerOnChange(fn: (v: any[]) => void): void {
+    this.__rozieCvaOnChange = fn;
+  }
+  registerOnTouched(fn: () => void): void {
+    this.__rozieCvaOnTouchedFn = fn;
+  }
+  setDisabledState(isDisabled: boolean): void {
+    this.__rozieCvaDisabled.set(isDisabled);
+  }
+  __rozieCvaOnTouched(): void {
+    this.__rozieCvaOnTouchedFn();
+  }
 
   static ngTemplateContextGuard(
     _dir: ScopedSlotContext,

@@ -258,17 +258,25 @@ function renderDefault(prop: PropDecl): string {
 function buildCvaClassShape(prop: PropDecl): string {
   const tsType = renderType(prop.typeAnnotation);
   const rendered = renderDefault(prop);
-  // renderDefault returns '' for the no-declared-default sentinel; in that case
-  // coerce to `null` (the value param is already `T | null`). Otherwise coerce
-  // to the rendered default literal (e.g. '' for the String date default).
-  const defaultLiteral = rendered.length > 0 ? rendered : 'null';
+  // renderDefault returns '' for the no-declared-default sentinel. NgModel's
+  // very first call is `writeValue(null)` (006-A journal), so the coercion is
+  // load-bearing — but it MUST stay typed `T`, never `T | null`, or a
+  // `model.required<T>()` setter (a required prop with no default) rejects the
+  // `?? null` fallback at tsc (TS2345: 'T | null' not assignable to 'T').
+  //   - declared default present → coerce to that literal (e.g. '' for the
+  //     String `date` default; flatpickr's `this.date.set(v ?? '')`).
+  //   - no declared default (e.g. a `required: true` model prop) → coerce to
+  //     the signal's CURRENT value `this.<name>()`, a type-`T` no-op on the
+  //     leading `writeValue(null)` that keeps the setter argument non-null.
+  const nullCoercion =
+    rendered.length > 0 ? rendered : `this.${prop.name}()`;
   return [
     `private __rozieCvaOnChange: (v: ${tsType}) => void = () => {};`,
     `private __rozieCvaOnTouchedFn: () => void = () => {};`,
     `private __rozieCvaDisabled = signal(false);`,
     ``,
     `writeValue(v: ${tsType} | null): void {`,
-    `  this.${prop.name}.set(v ?? ${defaultLiteral});`,
+    `  this.${prop.name}.set(v ?? ${nullCoercion});`,
     `}`,
     `registerOnChange(fn: (v: ${tsType}) => void): void {`,
     `  this.__rozieCvaOnChange = fn;`,

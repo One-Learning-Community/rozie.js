@@ -1,5 +1,6 @@
-import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, effect, inject, input, model, output, viewChild } from '@angular/core';
+import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, effect, forwardRef, inject, input, model, output, signal, viewChild } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
+import { NG_VALUE_ACCESSOR } from '@angular/forms';
 
 interface HeaderCtx {
   $implicit: { close: any };
@@ -78,6 +79,14 @@ interface FooterCtx {
     --rozie-modal-z: 2000;
     }
   `],
+  providers: [
+    {
+      provide: NG_VALUE_ACCESSOR,
+      useExisting: forwardRef(() => Modal),
+      multi: true,
+    },
+  ],
+  host: { '(focusout)': '__rozieCvaOnTouched()' },
 })
 export class Modal {
   constructor() {
@@ -115,7 +124,7 @@ export class Modal {
   }
 
   _close = () => {
-    this.open.set(false);
+    this.open.set(false), this.__rozieCvaOnChange(false);
     this.close.emit();
   };
   savedBodyOverflow = '';
@@ -128,6 +137,26 @@ export class Modal {
     if (!this.lockBodyScroll()) return;
     document.body.style.overflow = this.savedBodyOverflow;
   };
+
+  private __rozieCvaOnChange: (v: boolean) => void = () => {};
+  private __rozieCvaOnTouchedFn: () => void = () => {};
+  private __rozieCvaDisabled = signal(false);
+
+  writeValue(v: boolean | null): void {
+    this.open.set(v ?? false);
+  }
+  registerOnChange(fn: (v: boolean) => void): void {
+    this.__rozieCvaOnChange = fn;
+  }
+  registerOnTouched(fn: () => void): void {
+    this.__rozieCvaOnTouchedFn = fn;
+  }
+  setDisabledState(isDisabled: boolean): void {
+    this.__rozieCvaDisabled.set(isDisabled);
+  }
+  __rozieCvaOnTouched(): void {
+    this.__rozieCvaOnTouchedFn();
+  }
 
   static ngTemplateContextGuard(
     _dir: Modal,

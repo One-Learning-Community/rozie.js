@@ -1,5 +1,5 @@
-import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, effect, inject, model, viewChild } from '@angular/core';
-import { FormsModule } from '@angular/forms';
+import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, effect, forwardRef, inject, model, signal, viewChild } from '@angular/core';
+import { FormsModule, NG_VALUE_ACCESSOR } from '@angular/forms';
 
 @Component({
   selector: 'rozie-checkbox-rmodel',
@@ -17,9 +17,37 @@ import { FormsModule } from '@angular/forms';
   styles: [`
     .toggle { display: inline-flex; gap: 0.25rem; align-items: center; }
   `],
+  providers: [
+    {
+      provide: NG_VALUE_ACCESSOR,
+      useExisting: forwardRef(() => CheckboxRModel),
+      multi: true,
+    },
+  ],
+  host: { '(focusout)': '__rozieCvaOnTouched()' },
 })
 export class CheckboxRModel {
   checked = model<boolean>(false);
+
+  private __rozieCvaOnChange: (v: boolean) => void = () => {};
+  private __rozieCvaOnTouchedFn: () => void = () => {};
+  private __rozieCvaDisabled = signal(false);
+
+  writeValue(v: boolean | null): void {
+    this.checked.set(v ?? false);
+  }
+  registerOnChange(fn: (v: boolean) => void): void {
+    this.__rozieCvaOnChange = fn;
+  }
+  registerOnTouched(fn: () => void): void {
+    this.__rozieCvaOnTouchedFn = fn;
+  }
+  setDisabledState(isDisabled: boolean): void {
+    this.__rozieCvaDisabled.set(isDisabled);
+  }
+  __rozieCvaOnTouched(): void {
+    this.__rozieCvaOnTouchedFn();
+  }
 
   private __rozieDestroyRef = inject(DestroyRef);
 

@@ -1,4 +1,5 @@
-import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, effect, inject, model, viewChild } from '@angular/core';
+import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, effect, forwardRef, inject, model, signal, viewChild } from '@angular/core';
+import { NG_VALUE_ACCESSOR } from '@angular/forms';
 
 @Component({
   selector: 'rozie-counter',
@@ -11,13 +12,41 @@ import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterR
   styles: [`
     .counter { font-variant-numeric: tabular-nums; }
   `],
+  providers: [
+    {
+      provide: NG_VALUE_ACCESSOR,
+      useExisting: forwardRef(() => Counter),
+      multi: true,
+    },
+  ],
+  host: { '(focusout)': '__rozieCvaOnTouched()' },
 })
 export class Counter {
   value = model<number>(0);
 
   bump = () => {
-    this.value.set(this.value() + 1);
+    this.value.set(this.value() + 1), this.__rozieCvaOnChange(this.value() + 1);
   };
+
+  private __rozieCvaOnChange: (v: number) => void = () => {};
+  private __rozieCvaOnTouchedFn: () => void = () => {};
+  private __rozieCvaDisabled = signal(false);
+
+  writeValue(v: number | null): void {
+    this.value.set(v ?? 0);
+  }
+  registerOnChange(fn: (v: number) => void): void {
+    this.__rozieCvaOnChange = fn;
+  }
+  registerOnTouched(fn: () => void): void {
+    this.__rozieCvaOnTouchedFn = fn;
+  }
+  setDisabledState(isDisabled: boolean): void {
+    this.__rozieCvaDisabled.set(isDisabled);
+  }
+  __rozieCvaOnTouched(): void {
+    this.__rozieCvaOnTouchedFn();
+  }
 
   private __rozieDestroyRef = inject(DestroyRef);
 
