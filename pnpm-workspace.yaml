@@ -11,6 +11,7 @@ packages:
   - "tests/timing"
   - "tests/cli-smoke"
   - "tests/dist-parity"
+  - "tests/security"
   - "tests/smoke-sourcemap"
   - "tests/textmate"
   - "tests/solid-lint"
