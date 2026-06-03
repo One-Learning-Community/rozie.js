@@ -99,3 +99,64 @@ examples/demos/*.ts
 # Local-only act + pnpm-store artifacts (see memory feedback-act-local-workflow-runs)
 .actrc
 .pnpm-store/
+
+# AUTO-SYNCED canonical examples/*.rozie materialized by scripts/sync-example-rozie.mjs
+# (per-demo rozie-sync.manifest.json drives the copy; turbo `sync` task is the producer).
+# One line per dest — git does NOT expand brace syntax. Demo-local SourceMapTrigger.rozie
+# and the canonical examples/*.rozie sources are intentionally NOT listed.
+examples/consumers/react-vite/src/Card.rozie
+examples/consumers/react-vite/src/CardHeader.rozie
+examples/consumers/react-vite/src/Counter.rozie
+examples/consumers/react-vite/src/Dropdown.rozie
+examples/consumers/react-vite/src/Modal.rozie
+examples/consumers/react-vite/src/ModalConsumer.rozie
+examples/consumers/react-vite/src/PropDefaultCoercion.rozie
+examples/consumers/react-vite/src/SearchInput.rozie
+examples/consumers/react-vite/src/TodoList.rozie
+examples/consumers/react-vite/src/TreeNode.rozie
+examples/consumers/react-vite/src/WrapperModal.rozie
+examples/consumers/svelte-vite/src/Card.rozie
+examples/consumers/svelte-vite/src/CardHeader.rozie
+examples/consumers/svelte-vite/src/Counter.rozie
+examples/consumers/svelte-vite/src/Dropdown.rozie
+examples/consumers/svelte-vite/src/Modal.rozie
+examples/consumers/svelte-vite/src/ModalConsumer.rozie
+examples/consumers/svelte-vite/src/PropDefaultCoercion.rozie
+examples/consumers/svelte-vite/src/SearchInput.rozie
+examples/consumers/svelte-vite/src/TodoList.rozie
+examples/consumers/svelte-vite/src/TreeNode.rozie
+examples/consumers/svelte-vite/src/WrapperModal.rozie
+examples/consumers/vue-vite/src/Modal.rozie
+examples/consumers/vue-vite/src/ModalConsumer.rozie
+examples/consumers/vue-vite/src/WrapperModal.rozie
+examples/consumers/solid-vite/src/Modal.rozie
+examples/consumers/solid-vite/src/ModalConsumer.rozie
+examples/consumers/solid-vite/src/WrapperModal.rozie
+examples/consumers/lit-vanilla-demo/src/rozie/Card.rozie
+examples/consumers/lit-vanilla-demo/src/rozie/CardHeader.rozie
+examples/consumers/lit-vanilla-demo/src/rozie/Counter.rozie
+examples/consumers/lit-vanilla-demo/src/rozie/Dropdown.rozie
+examples/consumers/lit-vanilla-demo/src/rozie/Modal.rozie
+examples/consumers/lit-vanilla-demo/src/rozie/ModalConsumer.rozie
+examples/consumers/lit-vanilla-demo/src/rozie/PropDefaultCoercion.rozie
+examples/consumers/lit-vanilla-demo/src/rozie/SearchInput.rozie
+examples/consumers/lit-vanilla-demo/src/rozie/TodoList.rozie
+examples/consumers/lit-vanilla-demo/src/rozie/TreeNode.rozie
+examples/consumers/lit-vanilla-demo/src/rozie/WrapperModal.rozie
+examples/consumers/angular-analogjs/src/Card.rozie
+examples/consumers/angular-analogjs/src/CardHeader.rozie
+examples/consumers/angular-analogjs/src/Counter.rozie
+examples/consumers/angular-analogjs/src/Dropdown.rozie
+examples/consumers/angular-analogjs/src/Modal.rozie
+examples/consumers/angular-analogjs/src/ModalConsumer.rozie
+examples/consumers/angular-analogjs/src/PropDefaultCoercion.rozie
+examples/consumers/angular-analogjs/src/SearchInput.rozie
+examples/consumers/angular-analogjs/src/TodoList.rozie
+examples/consumers/angular-analogjs/src/TreeNode.rozie
+examples/consumers/angular-analogjs/src/WrapperModal.rozie
+examples/consumers/nextjs-rozie/app/Counter.rozie
+examples/consumers/astro-rozie/src/components/Counter.rozie
+examples/consumers/astro-rozie/src/components/react/Counter.rozie
+examples/consumers/astro-rozie/src/components/vue/Counter.rozie
+examples/consumers/astro-rozie/src/components/svelte/Counter.rozie
+examples/consumers/astro-rozie/src/components/solid/Counter.rozie

@@ -5,6 +5,7 @@
   "description": "Multi-target Rozie island matrix on Astro 5: one Counter.rozie mounted as an interactive island across React, Vue, Svelte, Solid (via @astrojs/* integrations) plus Lit (native web component), with a Playwright runtime hydration spec. Angular is the documented exception (no first-party @astrojs/angular).",
   "type": "module",
   "scripts": {
+    "sync": "node ../../../scripts/sync-example-rozie.mjs --manifest rozie-sync.manifest.json",
     "build": "astro build",
     "preview": "astro preview --port 4178",
     "test:smoke": "vitest run --passWithNoTests",

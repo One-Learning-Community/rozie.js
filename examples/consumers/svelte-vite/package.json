@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "sync": "node ../../../scripts/sync-example-rozie.mjs --manifest rozie-sync.manifest.json",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview --port 4174",

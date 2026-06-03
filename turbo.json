@@ -1,8 +1,12 @@
 {
   "$schema": "https://turborepo.dev/schema.json",
   "tasks": {
+    "sync": {
+      "inputs": ["rozie-sync.manifest.json", "$TURBO_ROOT$/examples/*.rozie"],
+      "outputs": ["src/**/*.rozie", "app/**/*.rozie"]
+    },
     "build": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["^build", "sync"],
       "outputs": ["dist/**", "src/**/*.d.rozie.ts", "app/**/*.d.rozie.ts"]
     },
     "@rozie/runtime-svelte#build": {
@@ -26,7 +30,7 @@
       "outputs": []
     },
     "test": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["^build", "sync"],
       "outputs": []
     },
     "test:visual": {
@@ -37,11 +41,11 @@
       "dependsOn": []
     },
     "typecheck": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["^build", "sync"],
       "outputs": []
     },
     "dev": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["^build", "sync"],
       "cache": false,
       "persistent": true
     }

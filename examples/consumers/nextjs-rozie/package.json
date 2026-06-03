@@ -4,6 +4,7 @@
   "private": true,
   "description": "Smoke test: Rozie compiled inside a Next.js 15 App Router app via the Webpack adapter. Mirrors what 'npx create-next-app' produces, with the Rozie unplugin wired in per docs/guide/adopt-incrementally.md.",
   "scripts": {
+    "sync": "node ../../../scripts/sync-example-rozie.mjs --manifest rozie-sync.manifest.json",
     "build": "next build",
     "test:smoke": "vitest run --passWithNoTests"
   },
