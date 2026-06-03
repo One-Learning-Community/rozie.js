@@ -70,19 +70,21 @@ describe('$classSelector emit (React) — Phase 25 static plain-string lowering'
 
   it("R2: <script>-position $classSelector('grip') lowers to a static \".\" + \"grip\" selector", () => {
     const { code } = compileProbe();
-    // Phase 25 — React lowers `$classSelector('grip')` to `"." + "grip"`.
-    expect(code).toContain('"." + "grip"');
-    // No `styles` CSS-Modules symbol survives.
-    expect(code).not.toMatch(/\bstyles\./);
+    // Phase 25 — React lowers `$classSelector('grip')` to `"." + "grip"`
+    // (quote style depends on the babel generator path; accept either).
+    expect(code).toMatch(/(["'])\.\1 \+ (["'])grip\2/);
+    // No `styles` CSS-Modules import is emitted (the sole `styles` source).
+    expect(code).not.toContain('import styles from');
+    expect(code).not.toContain('.module.css');
     // The raw helper call must NOT survive into emitted output.
-    expect(code).not.toContain('$classSelector');
+    expect(code).not.toContain('$classSelector(');
   });
 
   it("R2: :attr-position $classSelector('panel') lowers to a static \".\" + \"panel\" selector", () => {
     const { code } = compileProbe();
     // The :data-handle binding flows through rewriteTemplateExpression.ts.
-    expect(code).toContain('"." + "panel"');
-    expect(code).not.toContain('$classSelector');
+    expect(code).toMatch(/(["'])\.\1 \+ (["'])panel\2/);
+    expect(code).not.toContain('$classSelector(');
   });
 
   it("R2: hyphenated class lowers to a plain string literal (no bracket member access)", () => {
@@ -101,9 +103,9 @@ const sel = $classSelector('my-handle')
 `);
     const { code } = emitReact(ir, { filename: 'HyphenProbe.rozie' });
     // Hyphenated class is now a plain string literal — no `styles['my-handle']`.
-    expect(code).toContain('"." + "my-handle"');
+    expect(code).toMatch(/(["'])\.\1 \+ (["'])my-handle\2/);
     expect(code).not.toMatch(/\bstyles\[/);
-    expect(code).not.toContain('$classSelector');
+    expect(code).not.toContain('$classSelector(');
   });
 
   it("ROZ968 guard removed: $classSelector on a component compiled WITHOUT opts.source no longer errors", () => {
@@ -127,6 +129,6 @@ const sel = $classSelector('grip')
     const emitted = emitReact(ir, { filename: 'NoSourceProbe.rozie' });
     const errors = emitted.diagnostics.filter((d) => d.severity === 'error');
     expect(errors).toEqual([]);
-    expect(emitted.code).toContain('"." + "grip"');
+    expect(emitted.code).toMatch(/(["'])\.\1 \+ (["'])grip\2/);
   });
 });

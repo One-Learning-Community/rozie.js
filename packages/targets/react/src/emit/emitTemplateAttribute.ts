@@ -5,14 +5,18 @@
  * Implements:
  *
  *   - D-55 — `class=` rewrites to `className=` (React idiom)
- *   - D-53 — single static class → `className={styles.X}` (CSS Module lookup)
- *   - D-54 — multi-static class → backtick template literal with styles[X] lookups
- *   - D-37 — mustache-in-attribute → backtick template literal with bracket lookups
+ *   - D-53 — single static class → `className={"x"}` (plain string literal)
+ *   - D-54 — multi-static class → `className={"x y"}` (plain string literal)
+ *   - D-37 — mustache-in-attribute → backtick template literal (plain tokens)
  *   - Pitfall 7 carryover — class + :class on same element merge into one className
- *   - Object-form `:class="{ active: x }"` → `className={clsx({ [styles.active]: x })}`
+ *   - Object-form `:class="{ active: x }"` → `className={clsx({ active: x })}`
  *     (auto-imports clsx from @rozie/runtime-react)
- *   - Pure-binding `:class="someExpr"` → `className={someExpr}` (NO styles lookup,
- *     NO clsx — emitted as-is for v1)
+ *   - Pure-binding `:class="someExpr"` → `className={someExpr}` (emitted as-is for v1)
+ *
+ * Phase 25 — React no longer routes scoped `<style>` through CSS Modules; class
+ * tokens emit as PLAIN string literals (never `styles.X` lookups). Attribute
+ * scoping (`[data-rozie-s-HASH]`, applied by scopeCss) is the sole isolation
+ * layer, matching the other five targets' native scoping.
  *   - kebab-case `:prop` → camelCase JSX attribute
  *   - r-* directives (r-if/r-else/r-else-if/r-for/r-show/r-html/r-text/r-model)
  *     are CONSUMED by emitTemplateElement, NOT emitted as attributes
@@ -57,15 +61,6 @@ function flattenInlineCode(code: string): string {
 export interface EmitAttrCtx {
   ir: IRComponent;
   collectors: { react: ReactImportCollector; runtime: RuntimeReactImportCollector };
-}
-
-/**
- * Whether the component has a scoped <style> block. When false, `styles` is
- * not imported in the .tsx output and class tokens must be emitted as plain
- * string literals (not `styles.X` lookups, which would be runtime ReferenceErrors).
- */
-function hasModuleCss(ir: IRComponent): boolean {
-  return (ir.styles?.scopedRules?.length ?? 0) > 0;
 }
 
 /**
@@ -368,10 +363,13 @@ function splitClassStyleFromLiteral(obj: t.ObjectExpression): {
 
 /**
  * Render an object-literal expression's properties as a clsx-compatible
- * object expression that maps `styles.X` for known CSS module class keys.
+ * object expression with PLAIN class keys.
  *
- *   { hovering: $data.hovering }  →  { [styles.hovering]: hovering }
- *   { 'foo-bar': x }              →  { [styles['foo-bar']]: x }
+ * Phase 25 — React no longer hashes class names, so keys are emitted verbatim
+ * (quoted only when non-identifier), never as `[styles.X]` computed lookups:
+ *
+ *   { hovering: $data.hovering }  →  { hovering: hovering }
+ *   { 'foo-bar': x }              →  { "foo-bar": x }
  */
 function renderObjectFormForClsx(
   expr: t.ObjectExpression,
@@ -406,39 +404,28 @@ function renderObjectFormForClsx(
     }
     const valueText = renderExpr(prop.value, ir);
 
-    // When a scoped <style> block exists, use computed-key form
-    // `[styles.<key>]: value`. For keys with hyphens, bracket-quote:
-    // `[styles['key-name']]`. When no scoped block exists, emit the
-    // plain key (quoted if non-identifier) without a styles lookup.
-    if (!hasModuleCss(ir)) {
-      const keyOut = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(keyText)
-        ? keyText
-        : JSON.stringify(keyText);
-      propStrings.push(`${keyOut}: ${valueText}`);
-    } else {
-      const stylesLookup = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(keyText)
-        ? `styles.${keyText}`
-        : `styles[${JSON.stringify(keyText)}]`;
-      propStrings.push(`[${stylesLookup}]: ${valueText}`);
-    }
+    // Phase 25 — React no longer hashes class names via CSS Modules, so the
+    // clsx object emits the plain key (quoted if non-identifier) directly
+    // (`{ active: cond }`), never a `[styles.active]: cond` lookup. Attribute
+    // scoping (`[data-rozie-s-HASH]`) is the sole isolation layer.
+    const keyOut = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(keyText)
+      ? keyText
+      : JSON.stringify(keyText);
+    propStrings.push(`${keyOut}: ${valueText}`);
   }
   return `{ ${propStrings.join(', ')} }`;
 }
 
 /**
- * Render a value as `styles.X` lookup (single static class) or as a
- * template literal segment for multi-static / interpolated classes.
+ * Render a single class token as a plain JSON string literal.
+ *
+ * Phase 25 — React class names are no longer hashed via CSS Modules, so every
+ * class token emits as a plain string literal (`"counter"`) rather than a
+ * `styles.counter` lookup. Attribute scoping (`[data-rozie-s-HASH]`) does the
+ * isolation. The `ir` parameter is retained for call-site signature stability.
  */
-function renderStaticClassLookup(className: string, ir: IRComponent): string {
-  // No scoped <style> block → emit plain string literal (no `styles` symbol in scope).
-  if (!hasModuleCss(ir)) {
-    return JSON.stringify(className);
-  }
-  // Identifier-safe class name → `styles.X`; else bracket-quote.
-  if (/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(className)) {
-    return `styles.${className}`;
-  }
-  return `styles[${JSON.stringify(className)}]`;
+function renderStaticClassLookup(className: string, _ir: IRComponent): string {
+  return JSON.stringify(className);
 }
 
 /**
@@ -448,12 +435,12 @@ function renderStaticClassLookup(className: string, ir: IRComponent): string {
  * Returns the JSX expression contents WITHOUT surrounding `{...}` braces;
  * caller wraps as `className={...}`.
  *
- * Cases (per RESEARCH Pattern 6 lines 699-718):
- *   - 1 static, 1 token   → styles.X
- *   - 1 static, N tokens  → `${styles.X} ${styles.Y}`
- *   - 1 binding (object)  → clsx({ [styles.X]: cond, ... })
- *   - 1 binding (other)   → expr (passthrough; no styles lookup)
- *   - 1 interpolated      → backtick template literal w/ bracket lookup
+ * Cases (Phase 25 — plain string class tokens, no `styles` lookups):
+ *   - 1 static, 1 token   → "x"
+ *   - 1 static, N tokens  → "x y"
+ *   - 1 binding (object)  → clsx({ x: cond, ... })
+ *   - 1 binding (other)   → expr (passthrough)
+ *   - 1 interpolated      → backtick template literal (plain tokens)
  *   - mixed (static + bind/etc.) → clsx(...)
  */
 function composeClassName(
@@ -511,13 +498,10 @@ function composeClassName(
     if (seg.tokens.length === 1) {
       return renderStaticClassLookup(seg.tokens[0]!, ir);
     }
-    // No styles → emit as a single quoted string literal.
-    if (!hasModuleCss(ir)) {
-      return JSON.stringify(seg.tokens.join(' '));
-    }
-    // Multi static → backtick template literal
-    const parts = seg.tokens.map((tok) => '${' + renderStaticClassLookup(tok, ir) + '}').join(' ');
-    return '`' + parts + '`';
+    // Phase 25 — multi-static class emits as a single plain quoted string
+    // literal (`"counter card"`); React no longer hashes class names so there
+    // is no per-token `styles.X` lookup to interpolate.
+    return JSON.stringify(seg.tokens.join(' '));
   }
 
   // CASE B: Single object-form binding
@@ -532,15 +516,11 @@ function composeClassName(
     const seg = segments[0]! as { kind: 'plainBinding'; expr: t.Expression };
     // A plain-binding `:class` whose expression is a statically-shaped string
     // — a string literal or a template literal — IS tokenisable at compile
-    // time, so route each class token through the CSS-Modules `styles` lookup.
-    // Without this, `:class="`badge badge-${x}`"` emits the verbatim literal
-    // `className={`badge badge-${x}`}`, which never matches the hashed
-    // `._badge_<hash>` selector in the sibling `.module.css` — the consumer
-    // styling is silently dropped. (React is the only target affected: it
-    // hashes class NAMES via CSS Modules; Vue/Svelte/Angular/Solid/Lit use
-    // attribute-scoping, which preserves literal class names so a dynamic
-    // class string just works.) Non-decomposable expressions (identifiers,
-    // calls, members) still pass through as-is — a documented v1 limitation.
+    // time, so it is routed through `renderInterpolatedClass` for consistent
+    // per-token rendering (Phase 25: each token is now a plain string literal,
+    // not a `styles.X` lookup — React no longer hashes class names). Non-
+    // decomposable expressions (identifiers, calls, members) still pass through
+    // as-is — a documented v1 limitation.
     const staticSegs = decomposeStaticClassExpr(seg.expr);
     if (staticSegs) {
       return renderInterpolatedClass(staticSegs, ir);
@@ -565,7 +545,7 @@ function composeClassName(
   const clsxArgs: string[] = [];
   for (const s of segments) {
     if (s.kind === 'staticTokens') {
-      // Each static token becomes a styles.X arg (or a string literal when no <style>).
+      // Each static token becomes a plain string-literal clsx arg (Phase 25).
       for (const tok of s.tokens) {
         clsxArgs.push(renderStaticClassLookup(tok, ir));
       }
@@ -631,20 +611,17 @@ function decomposeStaticClassExpr(
 
 /**
  * Render an interpolated attribute's segments for a class attribute. Static
- * text is split on whitespace and each token becomes a styles[token] lookup;
- * binding segments interpolate as `styles[<expr>]` IF the surrounding static
- * text indicates a class-name context (e.g., `card--{{variant}}` becomes
- * `styles[\`card--\${variant}\`]`).
+ * text is split on whitespace and each token is rendered as a plain class
+ * string; binding segments interpolate inline as part of the surrounding
+ * class-name token (e.g., `card--{{variant}}` becomes `card--${variant}`).
  *
- * For the v1 simple case we render the entire segment list as a backtick
- * template literal where each non-bound static token is wrapped in
- * `${styles.X}` and each bound segment is interpolated as a bracket lookup
- * if it appears as part of a class-name token, else inlined.
+ * Phase 25 — React no longer hashes class names via CSS Modules, so every
+ * token renders plainly (a pure-static token as `${"card"}`, a composite token
+ * as a verbatim backtick segment `card--${variant}`). Attribute scoping
+ * (`[data-rozie-s-HASH]`) is the sole isolation layer; there is no `styles`
+ * lookup to interpolate.
  *
- * Strategy: split static segments on whitespace; for each token, if it
- * contains a `${...}` placeholder (i.e., the token spans static + binding
- * segments), render the FULL token as `styles[\`<token-template>\`]`;
- * otherwise render as `styles.X`.
+ * The whole segment list is rendered as a single backtick template literal.
  */
 function renderInterpolatedClass(
   segments: Array<
@@ -697,15 +674,14 @@ function renderInterpolatedClass(
 
   if (tokens.length === 0) return '""';
 
-  const noStyles = !hasModuleCss(ir);
-
-  // Build template-literal-friendly representations
+  // Build template-literal-friendly representations. Phase 25 — every token is
+  // rendered plainly (no `styles` lookup); React class names are un-hashed.
   const renderedTokens = tokens.map((tok) => {
-    // Pure-static token → styles.X lookup (or plain text when no <style>).
+    // Pure-static token → plain string literal embedded as `${"card"}`.
     if (tok.parts.length === 1 && tok.parts[0]!.kind === 'static') {
       return '${' + renderStaticClassLookup(tok.parts[0]!.text, ir) + '}';
     }
-    // Composite token (mix of static + binding).
+    // Composite token (mix of static + binding) → verbatim backtick segment.
     const inner = tok.parts
       .map((p) => {
         if (p.kind === 'static') {
@@ -718,8 +694,7 @@ function renderInterpolatedClass(
         return '${' + p.code + '}';
       })
       .join('');
-    // No <style> → emit the composite token as a plain backtick segment.
-    return noStyles ? inner : '${styles[`' + inner + '`]}';
+    return inner;
   });
 
   // Join tokens with single spaces

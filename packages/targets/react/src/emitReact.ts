@@ -9,10 +9,13 @@
  *
  * Public surface (D-67): emitReact(ir, opts) → { code, css, globalCss?, map, diagnostics }.
  *
- * The CSS routing per D-53 + D-54 (Plan 04-05):
- *   - moduleCss → emitted alongside `.tsx` as a sibling `.module.css` file
- *     by `@rozie/unplugin`'s React-branch load hook. The `.tsx` body imports
- *     it via `import styles from './${name}.module.css';`.
+ * The CSS routing (Plan 04-05; Phase 25 de-CSS-Modules):
+ *   - moduleCss → emitted alongside `.tsx` as a plain sibling `.css` file by
+ *     `@rozie/unplugin`'s React-branch load hook. The `.tsx` body imports it
+ *     for side effect via `import './${name}.css';` (NO `styles` binding —
+ *     class names are un-hashed; `[data-rozie-s-HASH]` attribute scoping is the
+ *     sole isolation layer). The `css` result field name is retained (it is
+ *     simply "the scoped CSS string"); only its destination extension changed.
  *   - globalCss → emitted alongside `.tsx` as a sibling `.global.css` file
  *     when the .rozie has `:root` rules. The `.tsx` body imports it for
  *     side effect via `import './${name}.global.css';`.
@@ -35,8 +38,6 @@ import type { Diagnostic } from '../../../core/src/diagnostics/Diagnostic.js';
 import type { ModifierRegistry } from '@rozie/core';
 import type { BlockMap } from '../../../core/src/ast/types.js';
 import type { SourceMap } from 'magic-string';
-import { RozieErrorCode } from '../../../core/src/diagnostics/codes.js';
-import { componentUsesClassSelector } from '../../../core/src/ir/validateClassSelector.js';
 import { splitBlocks } from '../../../core/src/splitter/splitBlocks.js';
 import { createDefaultRegistry } from '../../../core/src/modifiers/registerBuiltins.js';
 import { rewriteRozieImport } from '../../../core/src/codegen/rewriteRozieImport.js';
@@ -171,33 +172,17 @@ export function emitReact(
     ? "import type { ReactNode } from 'react';\n"
     : '';
 
-  // Plan 04-05: synthesize CSS Module + global CSS sibling-file imports.
-  // Path 2 chosen per 04-05-SPIKE.md (synthetic `.module.css` extension that
-  // Vite's CSS-Modules pipeline detects automatically).
+  // Phase 25 — synthesize the scoped CSS sibling import as a PLAIN side-effect
+  // import (`import './X.css';`), NOT a CSS-Modules default import. React class
+  // names are no longer hashed; attribute scoping (`[data-rozie-s-HASH]`,
+  // applied by scopeCss/emitStyle) is the sole isolation layer, matching the
+  // other five targets. `$classSelector` lowers to a static `"." + "x"` string
+  // with no `styles` dependency, so the obsolete ROZ968 (no-`source`) guard is
+  // gone — a `$classSelector` call is now safe on every emit path.
   const cssModuleImport =
-    moduleCss.length > 0 ? `import styles from './${ir.name}.module.css';` : null;
+    moduleCss.length > 0 ? `import './${ir.name}.css';` : null;
   const globalCssImport =
     globalCss !== null ? `import './${ir.name}.global.css';` : null;
-
-  // WR-04 guard: React lowers `$classSelector('x')` to a runtime
-  // `"." + styles.x` expression. `styles` is the CSS-Modules import emitted
-  // above — but ONLY when `moduleCss` is non-empty, which itself requires
-  // `opts.source` (emitStyle slices rule bodies by absolute byte offset). On
-  // the back-compat no-`source` emit path `cssModuleImport` is null, so a
-  // lowered `$classSelector` call would reference an unimported `styles`
-  // (`ReferenceError` at runtime / `Cannot find name 'styles'` in TS). Detect
-  // the call up front and refuse with ROZ968 rather than emitting broken code.
-  const classSelectorDiags: Diagnostic[] = [];
-  if (cssModuleImport === null && componentUsesClassSelector(ir)) {
-    classSelectorDiags.push({
-      code: RozieErrorCode.CLASS_SELECTOR_REACT_NO_SOURCE,
-      severity: 'error',
-      message:
-        '$classSelector() in a React component requires emitReact to be called with `opts.source`: the React lowering emits a runtime `"." + styles.<class>` expression, and the `styles` CSS-Modules import it depends on is only emitted on the source-supplied path.',
-      loc: { start: 0, end: 0 },
-      hint: 'Call emitReact(ir, { source, filename }) — the back-compat no-`source` path does not support $classSelector.',
-    });
-  }
 
   // Plan 04-04 composition order (Wave 0 spike Variant A):
   //   hookSection (state hooks)
@@ -332,7 +317,6 @@ export function emitReact(
       ...tmpl.diagnostics,
       ...listeners.diagnostics,
       ...styleDiags,
-      ...classSelectorDiags,
     ],
   };
   if (globalCss !== null) {

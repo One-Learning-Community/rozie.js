@@ -1,10 +1,10 @@
 <>
-<div {...attrs} className={clsx(styles.dropdown, (attrs.className as string | undefined))}>
+<div {...attrs} className={clsx("dropdown", (attrs.className as string | undefined))}>
   <div ref={triggerEl} onClick={toggle}>
     {(props.renderTrigger ?? props.slots?.['trigger'])?.({ open, toggle })}
   </div>
 
-  {(open) && <div ref={panelEl} className={styles["dropdown-panel"]} role="menu">
+  {(open) && <div ref={panelEl} className={"dropdown-panel"} role="menu">
     {typeof (props.children ?? props.slots?.['']) === 'function' ? ((props.children ?? props.slots?.['']) as Function)({ close }) : (props.children ?? props.slots?.[''])}
   </div>}</div>
 </>

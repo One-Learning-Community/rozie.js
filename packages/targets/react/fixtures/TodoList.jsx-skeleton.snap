@@ -1,5 +1,5 @@
 <>
-<div {...attrs} className={clsx(styles["todo-list"], (attrs.className as string | undefined))}>
+<div {...attrs} className={clsx("todo-list", (attrs.className as string | undefined))}>
   <header>
     {(props.renderHeader ?? props.slots?.['header']) ? ((props.renderHeader ?? props.slots?.['header']) as Function)({ remaining, total: items.length }) : <h3>{props.title} ({remaining} remaining)</h3>}
   </header>
@@ -10,11 +10,11 @@
   </form>
 
   {(items.length > 0) ? <ul>
-    {items.map((item) => <li key={item.id} className={clsx({ [styles.done]: item.done })}>
+    {items.map((item) => <li key={item.id} className={clsx({ done: item.done })}>
       
       {typeof (props.children ?? props.slots?.['']) === 'function' ? ((props.children ?? props.slots?.['']) as Function)({ item, toggle: () => toggle(item.id), remove: () => removeItem(item.id) }) : ((props.children ?? props.slots?.['']) ?? <><label><input type="checkbox" checked={item.done} onChange={($event) => { toggle(item.id); }} /><span>{item.text}</span></label><button aria-label="Remove" onClick={($event) => { removeItem(item.id); }}>×</button></>)}
     </li>)}
-  </ul> : <p className={styles.empty}>
+  </ul> : <p className={"empty"}>
     {(props.renderEmpty ?? props.slots?.['empty']) ? ((props.renderEmpty ?? props.slots?.['empty']) as Function)() : "Nothing to do. ✨"}
   </p>}</div>
 </>

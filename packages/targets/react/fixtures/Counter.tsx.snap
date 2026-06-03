@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { clsx, useControllableState } from '@rozie/runtime-react';
-import styles from './Counter.module.css';
+import './Counter.css';
 
 interface CounterProps {
   value?: number;
@@ -42,9 +42,9 @@ export default function Counter(_props: CounterProps): JSX.Element {
 
   return (
     <>
-    <div {...attrs} className={clsx(clsx(styles.counter, { [styles.hovering]: hovering }), (attrs.className as string | undefined))} onMouseEnter={($event) => { setHovering(true); }} onMouseLeave={($event) => { setHovering(false); }} data-rozie-s-c72e01d0="">
+    <div {...attrs} className={clsx(clsx("counter", { hovering: hovering }), (attrs.className as string | undefined))} onMouseEnter={($event) => { setHovering(true); }} onMouseLeave={($event) => { setHovering(false); }} data-rozie-s-c72e01d0="">
       <button disabled={!canDecrement} aria-label="Decrement" onClick={decrement} data-rozie-s-c72e01d0="">−</button>
-      <span className={styles.value} data-rozie-s-c72e01d0="">{value}</span>
+      <span className={"value"} data-rozie-s-c72e01d0="">{value}</span>
       <button disabled={!canIncrement} aria-label="Increment" onClick={increment} data-rozie-s-c72e01d0="">+</button>
     </div>
     </>
