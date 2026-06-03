@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { clsx } from '@rozie/runtime-react';
-import styles from './BadgeGridStyledScss.module.css';
+import './BadgeGridStyledScss.css';
 
 interface BadgeGridStyledScssProps {
   badges?: any[];
@@ -20,8 +20,8 @@ export default function BadgeGridStyledScss(_props: BadgeGridStyledScssProps): J
 
   return (
     <>
-    <div {...attrs} className={clsx(styles["badge-grid"], (attrs.className as string | undefined))} data-rozie-s-44801268="">
-      {props.badges.map((badge) => <span key={badge} className={`${styles.badge} ${styles["badge--neutral"]}`} data-rozie-s-44801268="">
+    <div {...attrs} className={clsx("badge-grid", (attrs.className as string | undefined))} data-rozie-s-44801268="">
+      {props.badges.map((badge) => <span key={badge} className={"badge badge--neutral"} data-rozie-s-44801268="">
         {badge}
       </span>)}
     </div>

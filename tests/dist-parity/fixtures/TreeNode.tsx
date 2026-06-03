@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { clsx } from '@rozie/runtime-react';
-import styles from './TreeNode.module.css';
+import './TreeNode.css';
 
 interface TreeNodeProps {
   node?: Record<string, any>;
@@ -24,9 +24,9 @@ export default function TreeNode(_props: TreeNodeProps): JSX.Element {
 
   return (
     <>
-    <div {...attrs} className={clsx(styles["tree-node"], (attrs.className as string | undefined))} data-rozie-s-a7176a6e="">
-      <span className={styles["tree-node__label"]} data-rozie-s-a7176a6e="">{props.node.label}</span>
-      {(props.node.children && props.node.children.length > 0) && <ul className={styles["tree-node__children"]} data-rozie-s-a7176a6e="">
+    <div {...attrs} className={clsx("tree-node", (attrs.className as string | undefined))} data-rozie-s-a7176a6e="">
+      <span className={"tree-node__label"} data-rozie-s-a7176a6e="">{props.node.label}</span>
+      {(props.node.children && props.node.children.length > 0) && <ul className={"tree-node__children"} data-rozie-s-a7176a6e="">
         {props.node.children.map((child, childIndex) => <li key={child.id} data-index={childIndex} data-rozie-s-a7176a6e="">
           <TreeNode node={child} data-rozie-s-a7176a6e="" />
         </li>)}

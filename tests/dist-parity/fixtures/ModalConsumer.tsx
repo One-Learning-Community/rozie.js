@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { clsx } from '@rozie/runtime-react';
-import styles from './ModalConsumer.module.css';
+import './ModalConsumer.css';
 import Modal from './Modal';
 import WrapperModal from './WrapperModal';
 
@@ -29,10 +29,10 @@ export default function ModalConsumer(_props: ModalConsumerProps): JSX.Element {
 
   return (
     <>
-    <div {...attrs} className={clsx(styles["modal-consumer"], (attrs.className as string | undefined))} data-rozie-s-5d081d3a="">
+    <div {...attrs} className={clsx("modal-consumer", (attrs.className as string | undefined))} data-rozie-s-5d081d3a="">
       <Modal open={open1} onOpenChange={setOpen1} data-rozie-s-5d081d3a="" renderHeader={({ close }) => (<>
           <h2 data-rozie-s-5d081d3a="">{props.title}</h2>
-          <button className={styles.close} onClick={close} data-rozie-s-5d081d3a="">×</button>
+          <button className={"close"} onClick={close} data-rozie-s-5d081d3a="">×</button>
         </>)} renderFooter={({ close }) => (<>
           <button onClick={close} data-rozie-s-5d081d3a="">Cancel</button>
           <button onClick={($event) => { onConfirm(); }} data-rozie-s-5d081d3a="">OK</button>
@@ -43,7 +43,7 @@ export default function ModalConsumer(_props: ModalConsumerProps): JSX.Element {
       <Modal open={open2} onOpenChange={setOpen2} data-rozie-s-5d081d3a="" children={<>
         Dynamic-name demo body
       </>} slots={{ [slotName]: () => (<>
-          <span className={styles["dynamic-fill"]} data-rozie-s-5d081d3a="">Dynamic header via slotName</span>
+          <span className={"dynamic-fill"} data-rozie-s-5d081d3a="">Dynamic header via slotName</span>
         </>) }} />
 
       <WrapperModal open={open3} onOpenChange={setOpen3} title={props.title} data-rozie-s-5d081d3a="" renderBrand={() => (<>

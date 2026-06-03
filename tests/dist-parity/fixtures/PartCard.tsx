@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { clsx } from '@rozie/runtime-react';
-import styles from './PartCard.module.css';
+import './PartCard.css';
 
 interface PartCardProps {
   title?: string;
@@ -21,8 +21,8 @@ export default function PartCard(_props: PartCardProps): JSX.Element {
 
   return (
     <>
-    <div part="body" {...attrs} className={clsx(styles["card-body"], (attrs.className as string | undefined))} data-rozie-s-1462f7ea="">
-      <h3 className={styles["card-title"]} data-rozie-s-1462f7ea="">{props.title}</h3>
+    <div part="body" {...attrs} className={clsx("card-body", (attrs.className as string | undefined))} data-rozie-s-1462f7ea="">
+      <h3 className={"card-title"} data-rozie-s-1462f7ea="">{props.title}</h3>
       {(typeof (props.children ?? props.slots?.['']) === 'function' ? ((props.children ?? props.slots?.['']) as Function)() : (props.children ?? props.slots?.['']))}
     </div>
     </>

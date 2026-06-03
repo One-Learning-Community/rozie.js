@@ -1,6 +1,6 @@
 import { forwardRef, useImperativeHandle, useRef, useState } from 'react';
 import { clsx } from '@rozie/runtime-react';
-import styles from './ExposeProbe.module.css';
+import './ExposeProbe.css';
 
 interface ExposeProbeProps {}
 
@@ -25,9 +25,9 @@ const ExposeProbe = forwardRef<ExposeProbeHandle, ExposeProbeProps>(function Exp
 
   return (
     <>
-    <div {...attrs} className={clsx(styles["expose-probe"], (attrs.className as string | undefined))} data-rozie-s-dd2b93b0="">
+    <div {...attrs} className={clsx("expose-probe", (attrs.className as string | undefined))} data-rozie-s-dd2b93b0="">
       <input ref={field} type="text" placeholder="Type something" value={value} onChange={e => setValue(e.target.value)} data-rozie-s-dd2b93b0="" />
-      <span className={styles.echo} data-rozie-s-dd2b93b0="">{value}</span>
+      <span className={"echo"} data-rozie-s-dd2b93b0="">{value}</span>
     </div>
     </>
   );

@@ -1,5 +1,5 @@
 import { clsx, useControllableState } from '@rozie/runtime-react';
-import styles from './CvaOffState.module.css';
+import './CvaOffState.css';
 
 interface CvaOffStateProps {
   value?: string;
@@ -29,9 +29,9 @@ export default function CvaOffState(props: CvaOffStateProps): JSX.Element {
 
   return (
     <>
-    <div {...attrs} className={clsx(styles["cva-off-state"], (attrs.className as string | undefined))} data-rozie-s-a2873aa8="">
+    <div {...attrs} className={clsx("cva-off-state", (attrs.className as string | undefined))} data-rozie-s-a2873aa8="">
       <input type="text" value={value} placeholder="Type a value" onInput={onInput} data-rozie-s-a2873aa8="" />
-      <span className={styles.echo} data-rozie-s-a2873aa8="">{value}</span>
+      <span className={"echo"} data-rozie-s-a2873aa8="">{value}</span>
     </div>
     </>
   );

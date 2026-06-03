@@ -481,7 +481,11 @@ describe('DIST-05 strict-bytes parity gate (D-93) — 18 examples × 6 targets �
             }
             const cssFix = loadSidecarOrNull(name, '.module.css');
             if (cssFix !== null) {
-              const cliCss = readFileSync(outPath.replace(/\.tsx$/, '.module.css'), 'utf8');
+              // Phase 25 de-CSS-Modules: React now writes a PLAIN `.css`
+              // sibling (was `.module.css`). The parity-corpus fixture keeps
+              // the `.module.css` filename (it holds `result.css` content,
+              // which is unchanged — only the on-disk sibling extension moved).
+              const cliCss = readFileSync(outPath.replace(/\.tsx$/, '.css'), 'utf8');
               expect(normalizeCss(cliCss)).toBe(cssFix);
             }
             const globalFix = loadSidecarOrNull(name, '.global.css');
@@ -550,7 +554,11 @@ describe('DIST-05 strict-bytes parity gate (D-93) — 18 examples × 6 targets �
             }
             const cssFix = loadSidecarOrNull(name, '.module.css');
             if (cssFix !== null) {
-              const babelCss = readFileSync(sibling.replace(/\.tsx$/, '.module.css'), 'utf8');
+              // Phase 25 de-CSS-Modules: React now writes a PLAIN `.css`
+              // sibling (was `.module.css`). The parity-corpus fixture keeps
+              // the `.module.css` filename (it holds `result.css` content,
+              // which is unchanged — only the on-disk sibling extension moved).
+              const babelCss = readFileSync(sibling.replace(/\.tsx$/, '.css'), 'utf8');
               expect(normalizeCss(babelCss)).toBe(cssFix);
             }
             const globalFix = loadSidecarOrNull(name, '.global.css');

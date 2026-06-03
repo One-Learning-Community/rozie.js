@@ -9,11 +9,12 @@
  *   The .compiled.tsx variants intentionally diverge from the .snap output
  *   in three documented ways:
  *
- *     1. CSS-module imports → Proxy<string> shim. The behavior tests run
- *        under happy-dom/vitest with no CSS-module loader, so the
- *        `import styles from './X.module.css'` line in the snap can't be
- *        executed; .compiled.tsx replaces it with a Proxy that returns the
- *        key as the class string.
+ *     1. CSS side-effect import → dropped/shimmed. The behavior tests run
+ *        under happy-dom/vitest with no CSS loader, so the side-effect
+ *        `import './X.css'` line in the snap can't be executed (Phase 25
+ *        de-CSS-Modules: React now emits plain `className="x"` strings + a
+ *        side-effect `import './X.css'`, not `import styles from
+ *        './X.module.css'`); .compiled.tsx omits or shims it.
  *     2. Test-only data-testid attributes (e.g. Modal's backdrop testid).
  *     3. Behavioral hand-corrections that work around bugs the emitter
  *        currently produces (e.g. Modal's lockScroll effect needs an

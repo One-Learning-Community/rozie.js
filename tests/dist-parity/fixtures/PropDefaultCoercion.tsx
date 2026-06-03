@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { clsx } from '@rozie/runtime-react';
-import styles from './PropDefaultCoercion.module.css';
+import './PropDefaultCoercion.css';
 
 interface PropDefaultCoercionProps {
   a?: (Record<string, any>) | null;
@@ -45,7 +45,7 @@ export default function PropDefaultCoercion(_props: PropDefaultCoercionProps): J
 
   return (
     <>
-    <div {...attrs} className={clsx(styles.pdc, (attrs.className as string | undefined))} data-rozie-s-109e595c="">
+    <div {...attrs} className={clsx("pdc", (attrs.className as string | undefined))} data-rozie-s-109e595c="">
       <pre data-rozie-pdc-output="" data-rozie-s-109e595c="">{JSON.stringify(observed)}</pre>
       
       <span data-rozie-pdc-e-identity="" data-rozie-s-109e595c="">{props.e === props.e ? 'true' : 'false'}</span>

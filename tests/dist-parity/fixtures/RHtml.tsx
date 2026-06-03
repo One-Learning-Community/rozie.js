@@ -1,5 +1,5 @@
 import { clsx } from '@rozie/runtime-react';
-import styles from './RHtml.module.css';
+import './RHtml.css';
 
 interface RHtmlProps {
   content?: string;
@@ -18,7 +18,7 @@ export default function RHtml(_props: RHtmlProps): JSX.Element {
 
   return (
     <>
-    <div {...attrs} className={clsx(styles.rhtml, (attrs.className as string | undefined))} dangerouslySetInnerHTML={{ __html: props.content }} data-rozie-s-09a5f2a6="" />
+    <div {...attrs} className={clsx("rhtml", (attrs.className as string | undefined))} dangerouslySetInnerHTML={{ __html: props.content }} data-rozie-s-09a5f2a6="" />
     </>
   );
 }

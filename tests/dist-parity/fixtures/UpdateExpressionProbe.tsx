@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { clsx, useControllableState } from '@rozie/runtime-react';
-import styles from './UpdateExpressionProbe.module.css';
+import './UpdateExpressionProbe.css';
 
 interface UpdateExpressionProbeProps {
   value?: number;
@@ -36,12 +36,12 @@ export default function UpdateExpressionProbe(props: UpdateExpressionProbeProps)
 
   return (
     <>
-    <div {...attrs} className={clsx(styles.probe, (attrs.className as string | undefined))} data-rozie-s-0fceff7a="">
+    <div {...attrs} className={clsx("probe", (attrs.className as string | undefined))} data-rozie-s-0fceff7a="">
       <button aria-label="Decrement count" onClick={decCount} data-rozie-s-0fceff7a="">−</button>
-      <span className={styles.count} data-rozie-s-0fceff7a="">{count}</span>
+      <span className={"count"} data-rozie-s-0fceff7a="">{count}</span>
       <button aria-label="Increment count" onClick={incCount} data-rozie-s-0fceff7a="">+</button>
       <button aria-label="Decrement value" onClick={decValue} data-rozie-s-0fceff7a="">−</button>
-      <span className={styles.value} data-rozie-s-0fceff7a="">{value}</span>
+      <span className={"value"} data-rozie-s-0fceff7a="">{value}</span>
       <button aria-label="Increment value" onClick={incValue} data-rozie-s-0fceff7a="">+</button>
     </div>
     </>

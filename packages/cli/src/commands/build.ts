@@ -327,9 +327,14 @@ export async function runBuildMatrix(
         wantTypes && target === 'react' && result.types
           ? outPath.replace(/\.tsx$/, '.d.ts')
           : null;
+      // Phase 25 de-CSS-Modules: React emits a side-effect `import './X.css'`
+      // (was `import styles from './X.module.css'`), so the scoped-CSS sibling
+      // is written to a PLAIN `.css` path — `[data-rozie-s-*]` attribute
+      // scoping is the sole isolation layer. (Matches babel-plugin writeSibling
+      // + unplugin `.rozie.css` routing.)
       const modPath =
         target === 'react' && result.css !== undefined && result.css.length > 0
-          ? outPath.replace(/\.tsx$/, '.module.css')
+          ? outPath.replace(/\.tsx$/, '.css')
           : null;
       const globPath =
         target === 'react' && result.globalCss !== undefined && result.globalCss.length > 0

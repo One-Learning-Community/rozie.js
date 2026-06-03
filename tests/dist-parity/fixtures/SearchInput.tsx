@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { clsx, useDebouncedCallback } from '@rozie/runtime-react';
-import styles from './SearchInput.module.css';
+import './SearchInput.css';
 
 interface SearchInputProps {
   placeholder?: string;
@@ -50,13 +50,13 @@ export default function SearchInput(_props: SearchInputProps): JSX.Element {
 
   return (
     <>
-    <div {...attrs} className={clsx(styles["search-input"], (attrs.className as string | undefined))} data-rozie-s-8bbc4a60="">
+    <div {...attrs} className={clsx("search-input", (attrs.className as string | undefined))} data-rozie-s-8bbc4a60="">
       
       <input ref={inputEl} type="search" placeholder={props.placeholder} value={query} onChange={e => setQuery(e.target.value)} onInput={_rozieDebouncedOnSearch} onKeyDown={($event) => { (($event) => { if ($event.key !== 'Enter') return; ((onSearch) as ((...args: any[]) => any))($event); })($event); (($event) => { if ($event.key !== 'Escape') return; ((clear) as ((...args: any[]) => any))($event); })($event); }} data-rozie-s-8bbc4a60="" />
 
-      {(query.length > 0) ? <button className={styles["clear-btn"]} aria-label="Clear" onClick={clear} data-rozie-s-8bbc4a60="">
+      {(query.length > 0) ? <button className={"clear-btn"} aria-label="Clear" onClick={clear} data-rozie-s-8bbc4a60="">
         ×
-      </button> : <span className={styles.hint} data-rozie-s-8bbc4a60="">{props.minLength}+ chars</span>}</div>
+      </button> : <span className={"hint"} data-rozie-s-8bbc4a60="">{props.minLength}+ chars</span>}</div>
     </>
   );
 }

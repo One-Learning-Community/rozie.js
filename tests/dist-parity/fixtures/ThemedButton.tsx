@@ -1,5 +1,5 @@
 import { clsx } from '@rozie/runtime-react';
-import styles from './ThemedButton.module.css';
+import './ThemedButton.css';
 
 interface ThemedButtonProps {
   label?: string;
@@ -20,7 +20,7 @@ export default function ThemedButton(_props: ThemedButtonProps): JSX.Element {
 
   return (
     <>
-    <button style={{ '--btn-bg': '#3b82f6', '--btn-fg': '#ffffff' }} {...attrs} className={clsx(clsx(styles.btn, props.variant), (attrs.className as string | undefined))} data-rozie-s-7914ecaa="">
+    <button style={{ '--btn-bg': '#3b82f6', '--btn-fg': '#ffffff' }} {...attrs} className={clsx(clsx("btn", props.variant), (attrs.className as string | undefined))} data-rozie-s-7914ecaa="">
       {props.label}
     </button>
     </>

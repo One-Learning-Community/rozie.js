@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { clsx } from '@rozie/runtime-react';
-import styles from './ClassSelectorProbe.module.css';
+import './ClassSelectorProbe.css';
 
 interface ClassSelectorProbeProps {}
 
@@ -11,7 +11,7 @@ export default function ClassSelectorProbe(props: ClassSelectorProbeProps): JSX.
   // script-position class-selector helper call — exercises the rewriteScript.ts
   // hook. Lowers per-target: ".grip" literal (Vue/Svelte/Solid/Angular/Lit) or
   // "." + styles.grip (React).
-  const gripSelector = "." + styles.grip;
+  const gripSelector = "." + "grip";
 
   useEffect(() => {
     setReady(true);
@@ -19,8 +19,8 @@ export default function ClassSelectorProbe(props: ClassSelectorProbeProps): JSX.
 
   return (
     <>
-    <div data-handle={'.' + styles.panel} data-grip={gripSelector} {...attrs} className={clsx(styles.panel, (attrs.className as string | undefined))} data-rozie-s-899140be="">
-      <span className={styles.grip} aria-hidden="true" data-rozie-s-899140be="">⋮⋮</span>
+    <div data-handle={'.' + 'panel'} data-grip={gripSelector} {...attrs} className={clsx("panel", (attrs.className as string | undefined))} data-rozie-s-899140be="">
+      <span className={"grip"} aria-hidden="true" data-rozie-s-899140be="">⋮⋮</span>
       {(ready) && <span data-rozie-s-899140be="">ready</span>}</div>
     </>
   );

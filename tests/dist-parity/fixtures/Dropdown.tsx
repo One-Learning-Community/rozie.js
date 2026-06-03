@@ -1,7 +1,7 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { clsx, useControllableState, useOutsideClick, useThrottledCallback } from '@rozie/runtime-react';
-import styles from './Dropdown.module.css';
+import './Dropdown.css';
 import './Dropdown.global.css';
 
 interface TriggerCtx { open: any; toggle: any; }
@@ -102,12 +102,12 @@ const Dropdown = forwardRef<DropdownHandle, DropdownProps>(function Dropdown(_pr
 
   return (
     <>
-    <div {...attrs} className={clsx(styles.dropdown, (attrs.className as string | undefined))} data-rozie-s-6d6bd882="">
+    <div {...attrs} className={clsx("dropdown", (attrs.className as string | undefined))} data-rozie-s-6d6bd882="">
       <div ref={triggerEl} onClick={toggle} data-rozie-s-6d6bd882="">
         {(props.renderTrigger ?? props.slots?.['trigger'])?.({ open, toggle })}
       </div>
 
-      {(open) && <div ref={panelEl} className={styles["dropdown-panel"]} role="menu" data-rozie-s-6d6bd882="">
+      {(open) && <div ref={panelEl} className={"dropdown-panel"} role="menu" data-rozie-s-6d6bd882="">
         {typeof (props.children ?? props.slots?.['']) === 'function' ? ((props.children ?? props.slots?.['']) as Function)({ close }) : (props.children ?? props.slots?.[''])}
       </div>}</div>
     </>
