@@ -2,7 +2,19 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "outDir": "./dist",
-    "rootDir": "./src"
+    "baseUrl": ".",
+    // WR-03 — no `rootDir` (matching @rozie/cli): writeSibling.ts imports
+    // @rozie/core via a RELATIVE source path (../../core/src/compile.js) so it
+    // bundles the live source rather than a potentially-stale built dist/. A
+    // `rootDir: ./src` would reject the cross-package source import (TS6059).
+    // The `paths` map forces every TRANSITIVE `@rozie/core` package-name import
+    // (compile.ts pulls in the target emitters, which import @rozie/core by
+    // name) to resolve to the SAME core SOURCE — without it, the relative
+    // compile.ts and the package-name target imports yield a dual-identity
+    // ModifierRegistry (source vs dist). Mirrors the @rozie/cli tsconfig.
+    "paths": {
+      "@rozie/core": ["../core/src/index.ts"]
+    }
   },
   "include": ["src/**/*"],
   "exclude": ["dist", "node_modules", "tests", "fixtures"]

@@ -17,7 +17,15 @@
 // Foo.global.css alongside the primary Foo.tsx. Other targets only
 // receive the primary artifact (D-84 inline-typed).
 import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
-import { compile } from '@rozie/core';
+// WR-03 — import compile() via RELATIVE path into the sibling workspace package,
+// matching every other compile() entrypoint (compile.ts, unplugin/transform.ts,
+// cli/commands/*, dist-parity). The package-name form (`@rozie/core`) can
+// resolve to a stale built dist/ while the others resolve to live source —
+// under which the Phase 23 dist-parity byte-equality contract
+// (FIXTURE_ANGULAR_CVA_OFF across all four entrypoints) could pass in CI yet
+// drift in a real babel consumer build. tsdown inlines the workspace sibling
+// when bundling (the strategy proven by @rozie/unplugin — see compile.ts:30-37).
+import { compile } from '../../core/src/compile.js';
 
 /** Editor atomic-save jitter window per RESEARCH Pitfall 1. */
 const MTIME_TOLERANCE_MS = 100;
