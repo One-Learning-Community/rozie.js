@@ -2,7 +2,7 @@
   "name": "astro-rozie-demo",
   "version": "0.0.0",
   "private": true,
-  "description": "Smoke test: Rozie compiled inside an Astro 5 project via the Vite plugin slot. Targets Lit so islands ship as native Web Components with the smallest per-island runtime. Mirrors what 'npm create astro@latest' produces, with the Rozie unplugin wired in per docs/guide/adopt-incrementally.md.",
+  "description": "Multi-target Rozie island matrix on Astro 5: one Counter.rozie mounted as an interactive island across React, Vue, Svelte, Solid (via @astrojs/* integrations) plus Lit (native web component), with a Playwright runtime hydration spec. Angular is the documented exception (no first-party @astrojs/angular).",
   "type": "module",
   "scripts": {
     "build": "astro build",
