@@ -12,18 +12,19 @@
  *   - The `transform` hook is exported for direct use (tests + symmetry with
  *     Plan 02-04 ScriptInjection split), but production wiring uses load.
  *
- * Plan 04-05 Task 2 — React branch (D-58):
+ * Plan 04-05 Task 2 — React branch (D-58); Phase 25 de-CSS-Modules:
  *   - Suffix `.rozie.tsx` for the JSX shell.
- *   - Sibling `Foo.rozie.module.css` and `Foo.rozie.global.css` virtual ids
- *     handled by separate load branches that run emitStyle and return only
- *     the CSS body (no map). Vite's CSS-Modules pipeline picks up the
- *     `.module.css` extension naturally and applies hashing — see
- *     04-05-SPIKE.md (Path 2) for the rationale.
- *   - The compiled `.tsx` body emits `import styles from './Foo.module.css'`
- *     (NOT `./Foo.rozie.module.css`) so the consumer's import path stays
- *     human-friendly. resolveId rewrites the `Foo.module.css` request back
- *     to the `Foo.rozie.module.css` virtual id when a sibling `.rozie` file
- *     exists at the importer's path.
+ *   - Sibling `Foo.rozie.css` (plain scoped CSS) and `Foo.rozie.global.css`
+ *     virtual ids handled by separate load branches that run emitStyle and
+ *     return only the CSS body (no map). The bundler treats the plain `.css`
+ *     as a GLOBAL stylesheet — NO CSS-Modules hashing. Class isolation is the
+ *     `[data-rozie-s-HASH]` attribute selector that scopeCss appends to every
+ *     rule; CSS Modules was a redundant second isolation layer and is removed.
+ *   - The compiled `.tsx` body emits a plain side-effect `import './Foo.css'`
+ *     (NOT `./Foo.rozie.css`) so the consumer's import path stays
+ *     human-friendly. resolveId rewrites the `Foo.css` request back to the
+ *     `Foo.rozie.css` virtual id when a sibling `.rozie` file exists at the
+ *     importer's path (excluding `.global.css`, which routes separately).
  *
  * Errors throw Vite-shaped objects with `loc`, `frame`, `plugin`, `code` per
  * D-28 — Vite's dev-overlay renders them with the offending .rozie line
@@ -75,10 +76,17 @@ const VIRTUAL_SUFFIX_VUE = '.rozie.vue';
 
 /**
  * React-target synthetic suffixes. The `.tsx` carries the JSX shell;
- * `.module.css` and `.global.css` carry the styles produced by emitStyle.
+ * `.css` and `.global.css` carry the styles produced by emitStyle.
+ *
+ * Phase 25 — the scoped-CSS sibling is a PLAIN `.css` (not `.module.css`).
+ * React no longer routes scoped `<style>` through CSS Modules: class names are
+ * un-hashed and `[data-rozie-s-HASH]` attribute scoping (applied by scopeCss)
+ * is the sole isolation layer. The bundler treats `.css` as a global stylesheet
+ * (no CSS-Modules hashing / pure-selector rejection), which is exactly what we
+ * want — it fixes the Next.js/webpack `button[data-rozie-s-…]` build break.
  */
 const VIRTUAL_SUFFIX_REACT = '.rozie.tsx';
-const VIRTUAL_SUFFIX_REACT_MODULE_CSS = '.rozie.module.css';
+const VIRTUAL_SUFFIX_REACT_CSS = '.rozie.css';
 const VIRTUAL_SUFFIX_REACT_GLOBAL_CSS = '.rozie.global.css';
 
 /**
@@ -161,7 +169,10 @@ export function transformIncludeRozie(id: string): boolean {
   return (
     id.endsWith(VIRTUAL_SUFFIX_VUE) ||
     id.endsWith(VIRTUAL_SUFFIX_REACT) || // VIRTUAL_SUFFIX_REACT === VIRTUAL_SUFFIX_SOLID by construction; both targets share the .rozie.tsx suffix.
-    id.endsWith(VIRTUAL_SUFFIX_REACT_MODULE_CSS) ||
+    // Phase 25 — `.rozie.css` plain scoped-CSS virtual id. Guard ordering: a
+    // `.rozie.global.css` id does NOT end with `.rozie.css` (tail is
+    // `global.css`), so the two endsWith checks are mutually exclusive.
+    id.endsWith(VIRTUAL_SUFFIX_REACT_CSS) ||
     id.endsWith(VIRTUAL_SUFFIX_REACT_GLOBAL_CSS) ||
     id.includes(VIRTUAL_SUFFIX_REACT + QUERY_STYLE_MODULE) ||
     id.includes(VIRTUAL_SUFFIX_REACT + QUERY_STYLE_GLOBAL) ||
@@ -215,8 +226,8 @@ type AnyContext = any;
  * `load` and `transform`.
  *
  * @param target  — RozieOptions.target. Vue path uses `.rozie.vue` suffix;
- *   React path uses `.rozie.tsx` plus sibling `.rozie.module.css` /
- *   `.rozie.global.css` rewrites.
+ *   React path uses `.rozie.tsx` plus sibling `.rozie.css` (plain scoped CSS) /
+ *   `.rozie.global.css` rewrites (Phase 25 — no `.module.css` route survives).
  */
 export function createResolveIdHook(
   target: TargetValue = 'vue',
@@ -330,19 +341,10 @@ export function createResolveIdHook(
         const abs = absolutize(id, importer);
         return abs + '.tsx';
       }
-      // 2) The compiled `.tsx` body emits `import styles from './Foo.module.css'`.
-      //    Rewrite to the synthetic `.rozie.module.css` id ONLY when there is a
-      //    sibling `.rozie` file on disk (so we don't clobber consumer-authored
-      //    .module.css imports).
-      if (id.endsWith('.module.css') && !id.endsWith(VIRTUAL_SUFFIX_REACT_MODULE_CSS)) {
-        const abs = absolutize(id, importer);
-        const base = abs.slice(0, -'.module.css'.length); // <abs>/Foo
-        if (existsSync(base + '.rozie')) {
-          return base + VIRTUAL_SUFFIX_REACT_MODULE_CSS;
-        }
-        return null;
-      }
-      // 3) Same dance for sibling `.global.css`.
+      // 2) The `:root` escape hatch sibling `.global.css`. This MUST be matched
+      //    BEFORE the plain `.css` branch below — `Foo.global.css` also ends in
+      //    `.css`, so the plain-`.css` branch explicitly excludes it (and this
+      //    branch runs first as a belt-and-suspenders).
       if (id.endsWith('.global.css') && !id.endsWith(VIRTUAL_SUFFIX_REACT_GLOBAL_CSS)) {
         const abs = absolutize(id, importer);
         const base = abs.slice(0, -'.global.css'.length);
@@ -351,11 +353,30 @@ export function createResolveIdHook(
         }
         return null;
       }
+      // 3) Phase 25 — the compiled `.tsx` body emits a plain side-effect
+      //    `import './Foo.css'`. Rewrite to the synthetic `.rozie.css` id ONLY
+      //    when there is a sibling `.rozie` file on disk (so we don't clobber
+      //    consumer-authored `.css` imports). CRITICAL guard ordering: exclude
+      //    `.global.css` (handled above) and the already-synthetic `.rozie.css`
+      //    id, or this branch would hijack the `:root` global-CSS request and
+      //    break the escape hatch.
+      if (
+        id.endsWith('.css') &&
+        !id.endsWith('.global.css') &&
+        !id.endsWith(VIRTUAL_SUFFIX_REACT_CSS)
+      ) {
+        const abs = absolutize(id, importer);
+        const base = abs.slice(0, -'.css'.length); // <abs>/Foo
+        if (existsSync(base + '.rozie')) {
+          return base + VIRTUAL_SUFFIX_REACT_CSS;
+        }
+        return null;
+      }
       // 4) Pass-through for the synthetic ids themselves and the query-form
       //    fallbacks — load handles them.
       if (
         id.endsWith(VIRTUAL_SUFFIX_REACT) ||
-        id.endsWith(VIRTUAL_SUFFIX_REACT_MODULE_CSS) ||
+        id.endsWith(VIRTUAL_SUFFIX_REACT_CSS) ||
         id.endsWith(VIRTUAL_SUFFIX_REACT_GLOBAL_CSS) ||
         id.includes(VIRTUAL_SUFFIX_REACT + QUERY_STYLE_MODULE) ||
         id.includes(VIRTUAL_SUFFIX_REACT + QUERY_STYLE_GLOBAL)
@@ -515,14 +536,10 @@ export function createLoadHook(
         bareId = bareId.slice(0, -QUERY_STYLE_GLOBAL.length);
       }
 
-      // Module CSS path (file-extension form).
-      if (bareId.endsWith(VIRTUAL_SUFFIX_REACT_MODULE_CSS)) {
-        const filePath = bareId.slice(0, -VIRTUAL_SUFFIX_REACT_MODULE_CSS.length) + '.rozie';
-        const source = readFileSync(filePath, 'utf8');
-        const result = runReactPipeline.call(this, source, filePath, registry);
-        return { code: result.css, map: null };
-      }
-      // Global CSS path.
+      // Global CSS path (`.rozie.global.css`). MUST be checked BEFORE the plain
+      // scoped-CSS branch below — the two suffix tests are mutually exclusive by
+      // `endsWith` (a `.rozie.global.css` id does not end with `.rozie.css`), but
+      // global-first keeps the `:root` escape hatch unambiguous.
       if (bareId.endsWith(VIRTUAL_SUFFIX_REACT_GLOBAL_CSS)) {
         const filePath = bareId.slice(0, -VIRTUAL_SUFFIX_REACT_GLOBAL_CSS.length) + '.rozie';
         const source = readFileSync(filePath, 'utf8');
@@ -531,6 +548,16 @@ export function createLoadHook(
         // would cause an unnecessary import-side-effect noop).
         if (result.globalCss === undefined || result.globalCss === '') return null;
         return { code: result.globalCss, map: null };
+      }
+      // Phase 25 — plain scoped-CSS path (`.rozie.css`). Serve `result.css` as a
+      // plain global stylesheet string (no CSS-Modules signalling needed — the
+      // bundler treats a `.css` import as a global stylesheet). Attribute
+      // scoping (`[data-rozie-s-HASH]`) inside the CSS is the isolation layer.
+      if (bareId.endsWith(VIRTUAL_SUFFIX_REACT_CSS)) {
+        const filePath = bareId.slice(0, -VIRTUAL_SUFFIX_REACT_CSS.length) + '.rozie';
+        const source = readFileSync(filePath, 'utf8');
+        const result = runReactPipeline.call(this, source, filePath, registry);
+        return { code: result.css, map: null };
       }
       // .tsx shell — also handles ?style=module / ?style=global query forms
       // by routing back through the CSS branches.

@@ -13,9 +13,11 @@
 // stable ROZ823 diagnostic carrying the offending path.
 //
 // React-only sidecars: when target='react' and compile() populated
-// result.types/css/globalCss, write Foo.d.ts / Foo.module.css /
-// Foo.global.css alongside the primary Foo.tsx. Other targets only
-// receive the primary artifact (D-84 inline-typed).
+// result.types/css/globalCss, write Foo.d.ts / Foo.css / Foo.global.css
+// alongside the primary Foo.tsx (Phase 25 — the scoped-CSS sibling is a plain
+// stylesheet, not a CSS-Modules sidecar; React no longer routes scoped <style>
+// through CSS Modules). Other targets only receive the primary artifact
+// (D-84 inline-typed).
 import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 // WR-03 — import compile() via RELATIVE path into the sibling workspace package,
 // matching every other compile() entrypoint (compile.ts, unplugin/transform.ts,
@@ -100,7 +102,13 @@ export function writeSiblingIfStale(
         writeFileSync(`${stem}.d.ts`, result.types, 'utf8');
       }
       if (result.css) {
-        writeFileSync(`${stem}.module.css`, result.css, 'utf8');
+        // Phase 25 — plain `.css` sidecar (no longer a CSS-Modules sidecar).
+        // React no longer routes scoped `<style>` through CSS Modules; the
+        // emitted `.tsx` body imports it for side effect via `import './Foo.css'`,
+        // and class isolation is the `[data-rozie-s-HASH]` attribute selector
+        // inside the CSS. The bundler treats the plain `.css` as a global
+        // stylesheet.
+        writeFileSync(`${stem}.css`, result.css, 'utf8');
       }
       if (result.globalCss) {
         writeFileSync(`${stem}.global.css`, result.globalCss, 'utf8');

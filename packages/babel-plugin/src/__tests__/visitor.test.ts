@@ -57,7 +57,7 @@ describe('rozieBabelPlugin visitor — happy paths (DIST-03)', () => {
     expect(sibling).toContain('<script setup');
   });
 
-  it('V2: react target — writes .tsx + .d.ts + .module.css siblings; rewrites import to .tsx', async () => {
+  it('V2: react target — writes .tsx + .d.ts + .css siblings; rewrites import to .tsx (Phase 25 plain .css)', async () => {
     copyFileSync(resolve(EXAMPLES_DIR, 'Counter.rozie'), join(tmpDir, 'Counter.rozie'));
     const importer = join(tmpDir, 'consumer.ts');
     writeFileSync(importer, "import Counter from './Counter.rozie';\n", 'utf8');
@@ -73,13 +73,15 @@ describe('rozieBabelPlugin visitor — happy paths (DIST-03)', () => {
     // Primary artifact + sidecars (D-84 React-only)
     expect(existsSync(join(tmpDir, 'Counter.tsx'))).toBe(true);
     expect(existsSync(join(tmpDir, 'Counter.d.ts'))).toBe(true);
-    expect(existsSync(join(tmpDir, 'Counter.module.css'))).toBe(true);
+    // Phase 25 — plain `.css` sidecar, NOT `.module.css`.
+    expect(existsSync(join(tmpDir, 'Counter.css'))).toBe(true);
+    expect(existsSync(join(tmpDir, 'Counter.module.css'))).toBe(false);
     // .d.ts has the canonical CounterProps interface (Plan 06-02)
     const dts = readFileSync(join(tmpDir, 'Counter.d.ts'), 'utf8');
     expect(dts).toContain('export interface CounterProps');
     expect(dts).toContain('onValueChange');
-    // .module.css carries the scoped style block bytes (non-empty)
-    const css = readFileSync(join(tmpDir, 'Counter.module.css'), 'utf8');
+    // .css carries the scoped style block bytes (non-empty)
+    const css = readFileSync(join(tmpDir, 'Counter.css'), 'utf8');
     expect(css.length).toBeGreaterThan(0);
   });
 

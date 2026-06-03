@@ -1,12 +1,16 @@
 /**
  * Plan 04-05 Task 2 — D-58 React-branch resolveId + load tests.
  *
- * Tests 3-6 from plan §<behavior>:
+ * Tests 3-6 from plan §<behavior>; Phase 25 de-CSS-Modules rebless:
  *   3. resolveId target='react' rewrites Foo.rozie → <abs>/Foo.rozie.tsx
  *   4. load target='react' .tsx — happy path returns { code, map }
  *   5. load target='react' ?style=module → CSS body, map: null
- *   6. load target='react' .rozie.module.css sibling → CSS body, map: null
+ *   6. load target='react' .rozie.css sibling → plain CSS body, map: null
  *      load returns null for .rozie.global.css when no :root rules
+ *
+ * Phase 25 — React emits a plain `.css` scoped-CSS sibling (not `.module.css`);
+ * the virtual id is `.rozie.css` and the `.tsx` body imports it for side effect
+ * via `import './Foo.css'`.
  */
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -36,8 +40,8 @@ describe('transformInclude — Plan 04-05 React surface', () => {
     expect(transformIncludeRozie('/abs/Counter.rozie.tsx')).toBe(true);
   });
 
-  it('matches *.rozie.module.css and *.rozie.global.css sibling ids', () => {
-    expect(transformIncludeRozie('/abs/Counter.rozie.module.css')).toBe(true);
+  it('matches *.rozie.css and *.rozie.global.css sibling ids', () => {
+    expect(transformIncludeRozie('/abs/Counter.rozie.css')).toBe(true);
     expect(transformIncludeRozie('/abs/Modal.rozie.global.css')).toBe(true);
   });
 
@@ -62,13 +66,13 @@ describe('resolveId target="react" — D-58 path-virtual', () => {
     expect(out).toBe(resolve(EXAMPLES, 'Counter.rozie.tsx'));
   });
 
-  it('rewrites sibling .module.css to .rozie.module.css when sibling .rozie exists', () => {
+  it('rewrites sibling .css to .rozie.css when sibling .rozie exists (Phase 25)', () => {
     const resolveHook = createResolveIdHook('react');
-    // Importer is the synthetic .tsx; the import inside emits `./Counter.module.css`.
-    const id = './Counter.module.css';
+    // Importer is the synthetic .tsx; the import inside emits `./Counter.css`.
+    const id = './Counter.css';
     const importer = resolve(EXAMPLES, 'Counter.rozie.tsx');
     const out = resolveHook(id, importer);
-    expect(out).toBe(resolve(EXAMPLES, 'Counter.rozie.module.css'));
+    expect(out).toBe(resolve(EXAMPLES, 'Counter.rozie.css'));
   });
 
   it('rewrites sibling .global.css to .rozie.global.css when sibling .rozie exists', () => {
@@ -79,17 +83,17 @@ describe('resolveId target="react" — D-58 path-virtual', () => {
     expect(out).toBe(resolve(EXAMPLES, 'Dropdown.rozie.global.css'));
   });
 
-  it('returns null for plain .module.css / .global.css when no sibling .rozie exists', () => {
+  it('returns null for plain .css / .global.css when no sibling .rozie exists', () => {
     const resolveHook = createResolveIdHook('react');
-    // /tmp/no-rozie-here.module.css has no sibling .rozie.
-    expect(resolveHook('./no-rozie-here.module.css', '/tmp/main.tsx')).toBeNull();
+    // /tmp/no-rozie-here.css has no sibling .rozie.
+    expect(resolveHook('./no-rozie-here.css', '/tmp/main.tsx')).toBeNull();
     expect(resolveHook('./other.global.css', '/tmp/main.tsx')).toBeNull();
   });
 
-  it('passes through synthetic .rozie.tsx / .rozie.module.css ids', () => {
+  it('passes through synthetic .rozie.tsx / .rozie.css ids', () => {
     const resolveHook = createResolveIdHook('react');
     expect(resolveHook('/abs/Foo.rozie.tsx', undefined)).toBe('/abs/Foo.rozie.tsx');
-    expect(resolveHook('/abs/Foo.rozie.module.css', undefined)).toBe('/abs/Foo.rozie.module.css');
+    expect(resolveHook('/abs/Foo.rozie.css', undefined)).toBe('/abs/Foo.rozie.css');
   });
 
   it('returns null for non-.rozie ids', () => {
@@ -137,8 +141,9 @@ describe('load target="react" — happy path + style routing', () => {
     expect(typeof code).toBe('string');
     // D-67: emitReact emits `export default function Counter`.
     expect(code).toContain('export default function Counter');
-    // Plan 04-05: CSS Module sibling import at top.
-    expect(code).toContain("import styles from './Counter.module.css';");
+    // Phase 25: plain side-effect CSS sibling import at top.
+    expect(code).toContain("import './Counter.css';");
+    expect(code).not.toContain('import styles from');
     // D-68: NEVER imports React default.
     expect(code).not.toMatch(/import React from ['"]react['"]/);
     // Source map points back at the .rozie file.
@@ -146,16 +151,32 @@ describe('load target="react" — happy path + style routing', () => {
     expect(map.sources[0]).toMatch(/Counter\.rozie$/);
   });
 
-  it('loads Counter.rozie.module.css → returns scoped CSS body, map=null', () => {
+  it('loads Counter.rozie.css → returns plain scoped CSS body, map=null (Phase 25)', () => {
     const loadHook = createLoadHook(makeRegistry(), 'react');
-    const id = resolve(EXAMPLES, 'Counter.rozie.module.css');
+    const id = resolve(EXAMPLES, 'Counter.rozie.css');
     const result = loadHook.call(ctx as any, id);
     expect(result).not.toBeNull();
     const { code, map } = result as { code: string; map: any };
     expect(typeof code).toBe('string');
     expect(code).toContain('.counter');
+    // Scoped CSS carries the attribute-scope selector (sole isolation layer).
+    expect(code).toContain('data-rozie-s-');
     expect(code).not.toContain(':root');
     expect(map).toBeNull();
+  });
+
+  it('does NOT hijack Dropdown.rozie.global.css with the plain .css branch (Phase 25 guard)', () => {
+    // CRITICAL: `Foo.global.css` also ends in `.css`. The plain-.css load
+    // branch must NOT serve the scoped CSS for a `.global.css` request — the
+    // global branch (`:root` escape hatch) must win.
+    const loadHook = createLoadHook(makeRegistry(), 'react');
+    const id = resolve(EXAMPLES, 'Dropdown.rozie.global.css');
+    const result = loadHook.call(ctx as any, id);
+    expect(result).not.toBeNull();
+    const { code } = result as { code: string };
+    expect(code).toContain(':root');
+    // The scoped attribute selector must NOT appear in the global stylesheet.
+    expect(code).not.toContain('data-rozie-s-');
   });
 
   it('loads Dropdown.rozie.global.css → returns :root CSS body', () => {
