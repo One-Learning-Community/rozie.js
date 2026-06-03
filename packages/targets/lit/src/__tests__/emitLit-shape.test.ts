@@ -82,15 +82,24 @@ describe('emitLit — shape contract', () => {
   });
 
   // ---- P2 invariants (T-06.4-03 + D-LIT-14) ----
-  it('T-06.4-03: NO emitter source file imports lit/directives/unsafe-html.js', () => {
-    // Scan every .ts file under packages/targets/lit/src/ to ensure that
-    // the emitter NEVER imports the unsafe-html directive. lit-html's `html``
-    // tagged template literal auto-escapes by default; importing unsafeHTML
-    // would create an XSS bypass surface (consumer .rozie templates flow
-    // straight through), so we lock the import-free invariant.
+  it('T-06.4-03: emitter source emits unsafe-html ONLY CONDITIONALLY (Phase 24 req 2)', () => {
+    // RELAXED for Phase 24 (req 2). The original invariant was "NO emitter
+    // source imports/uses unsafe-html at all" — lit-html's `html`` auto-
+    // escapes, so an UNCONDITIONAL unsafeHTML would be a blanket XSS surface.
+    // Phase 24 introduces `r-html` → `${unsafeHTML(<expr>)}`, a CONDITIONAL,
+    // opt-in raw-HTML sink (mirrors React `dangerouslySetInnerHTML`, Svelte
+    // `{@html}`). The invariant therefore becomes: any unsafe-html import or
+    // `unsafeHTML(` reference in emitter source MUST be guarded by the
+    // `unsafeHtmlUsed` flag (the import line in emitLit.ts) or live inside an
+    // emitted output template-literal (the `${unsafeHTML(...)}` in
+    // emitTemplate.ts). No emitter source may emit unsafe-html
+    // UNCONDITIONALLY into every component.
+    // Scan EMITTER source only — skip `__tests__` (test files legitimately
+    // assert on emitted-output strings containing the unsafe-html import).
     function walk(dir: string): string[] {
       const out: string[] = [];
       for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        if (entry.isDirectory() && entry.name === '__tests__') continue;
         const full = resolve(dir, entry.name);
         if (entry.isDirectory()) out.push(...walk(full));
         else if (entry.name.endsWith('.ts')) out.push(full);
@@ -102,13 +111,16 @@ describe('emitLit — shape contract', () => {
     expect(files.length).toBeGreaterThan(0);
     for (const file of files) {
       const text = readFileSync(file, 'utf8');
-      // Source files NEVER import the unsafe-html directive.
-      expect(text, `${file} must not import unsafe-html`).not.toMatch(
-        /from\s+['"]lit\/directives\/unsafe-html\.js['"]/,
-      );
-      // Source files NEVER reference the unsafeHTML directive symbol.
-      // (Tests and snapshots are scanned separately by the integration tests.)
-      expect(text, `${file} must not use unsafeHTML`).not.toMatch(/\bunsafeHTML\s*\(/);
+      // An unsafe-html import is permitted ONLY when gated by the
+      // `unsafeHtmlUsed` flag on the same line (the emitLit.ts conditional).
+      const importLines = text
+        .split('\n')
+        .filter((l) => /from\s+['"]lit\/directives\/unsafe-html\.js['"]/.test(l));
+      for (const line of importLines) {
+        expect(line, `${file} unsafe-html import must be unsafeHtmlUsed-gated`).toMatch(
+          /unsafeHtmlUsed/,
+        );
+      }
     }
   });
 

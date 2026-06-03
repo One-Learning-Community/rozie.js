@@ -159,6 +159,13 @@ export interface EmitTemplateOpts {
      * DOM identity (and any third-party listeners attached to it).
      */
     keyedUsed: boolean;
+    /**
+     * Phase 24 (req 2) — set true when at least one `r-html` directive was
+     * lowered to the unsafeHTML element-content directive. emitLit reads this
+     * off `EmitTemplateResult` and conditionally adds the unsafe-html
+     * directive import (same plumbing as `keyedUsed`).
+     */
+    unsafeHtmlUsed: boolean;
     diagnostics: Diagnostic[];
     /**
      * Phase 07.2 Plan 03 — class-field declarations storing captured
@@ -233,6 +240,13 @@ export interface EmitTemplateResult {
    * third-party listeners attached to it) untouched.
    */
   keyedUsed: boolean;
+  /**
+   * Phase 24 (req 2) — true when at least one `r-html` directive was lowered
+   * to the unsafeHTML element-content directive. emitLit conditionally wires
+   * the unsafe-html directive import based on this flag (same plumbing as
+   * `keyedUsed`).
+   */
+  unsafeHtmlUsed: boolean;
   /**
    * Class-field declarations for template-event `.debounce`/`.throttle`
    * wrappers (WR-15). emitLit splices these into the class body alongside the
@@ -327,6 +341,17 @@ function attributeIsRModel(attr: AttributeBinding): boolean {
   // Phase 14 — `spreadBinding` is the name-less kind; it is never `r-model`.
   if (attr.kind === 'spreadBinding') return false;
   return attr.name === 'r-model';
+}
+
+/**
+ * Phase 24 (req 2) — true for a `binding`-kind `r-html` attribute. Used to
+ * (a) skip it inside the open-tag attribute loop so no literal `r-html=`
+ * leaks (Pitfall 2) and (b) drive the `${unsafeHTML(<expr>)}` element-content
+ * emit in `emitElement` (D-13 mirrors Svelte's element-content form).
+ */
+function attributeIsRHtml(attr: AttributeBinding): boolean {
+  if (attr.kind === 'spreadBinding') return false;
+  return attr.kind === 'binding' && attr.name === 'r-html';
 }
 
 /**
@@ -1005,6 +1030,9 @@ function emitElementOpenTag(
         continue;
       }
       if (attributeIsRModel(attr)) continue;
+      // Phase 24 (req 2) — strip r-html from the open tag; emitElement emits
+      // it as `${unsafeHTML(<expr>)}` element content (Pitfall 2).
+      if (attributeIsRHtml(attr)) continue;
     }
     const emitted = emitAttribute(attr, ir, node.tagName, node.tagKind, opts);
     if (emitted) parts.push(emitted);
@@ -1218,6 +1246,28 @@ function emitElement(
   const tagName = resolveTagName(node, ir.name);
   const { open, selfClose } = emitElementOpenTag(node, ir, ir.name, opts);
   if (selfClose) return open;
+
+  // Phase 24 (req 2) — r-html → `${unsafeHTML(<expr>)}` element content
+  // (D-13 mirrors Svelte's element-content form). r-html was already stripped
+  // from the open tag (emitElementOpenTag attribute loop), so `open` carries
+  // no literal `r-html=` (Pitfall 2). Raise ROZ833 (severity error) when
+  // children coexist; flag `unsafeHtmlUsed` so emitLit wires the conditional
+  // `unsafe-html` import.
+  const rHtml = node.attributes.find((a) => attributeIsRHtml(a));
+  if (rHtml && rHtml.kind === 'binding') {
+    if (node.children.length > 0) {
+      opts._state?.diagnostics.push({
+        code: RozieErrorCode.TARGET_LIT_RHTML_WITH_CHILDREN,
+        severity: 'error',
+        message:
+          'r-html cannot coexist with template children on the same element. Move r-html to a child element or remove the children.',
+        loc: node.sourceLoc,
+      });
+    }
+    if (opts._state) opts._state.unsafeHtmlUsed = true;
+    const expr = rewriteTemplateExpression(rHtml.expression, ir);
+    return `${open}\${unsafeHTML(${expr})}</${tagName}>`;
+  }
 
   // Phase 07.2 Plan 03 — Lit consumer-side slot-fill emit (R3 + R4).
   //
@@ -1669,6 +1719,7 @@ export function emitTemplate(
     rozieListenersUsed: false,
     refUsed: false,
     keyedUsed: false,
+    unsafeHtmlUsed: false,
     debouncedFieldDecls: [] as string[],
     debounceCleanupWiring: [] as string[],
     slotFillerClassFields: [] as string[],
@@ -1696,6 +1747,7 @@ export function emitTemplate(
       rozieListenersUsed: state.rozieListenersUsed,
       refUsed: state.refUsed,
       keyedUsed: state.keyedUsed,
+      unsafeHtmlUsed: state.unsafeHtmlUsed,
       debouncedFieldDecls: state.debouncedFieldDecls,
       slotFillerClassFields: state.slotFillerClassFields,
       slotFillerUpdatedBody: state.slotFillerUpdatedBody,
@@ -1719,6 +1771,7 @@ export function emitTemplate(
     rozieListenersUsed: state.rozieListenersUsed,
     refUsed: state.refUsed,
     keyedUsed: state.keyedUsed,
+    unsafeHtmlUsed: state.unsafeHtmlUsed,
     debouncedFieldDecls: state.debouncedFieldDecls,
     slotFillerClassFields: state.slotFillerClassFields,
     slotFillerUpdatedBody: state.slotFillerUpdatedBody,

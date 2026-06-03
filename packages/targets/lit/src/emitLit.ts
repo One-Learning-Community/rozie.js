@@ -382,6 +382,13 @@ export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResu
     // so third-party DOM-mutating engines (SortableJS, TipTap, …) stay
     // attached across reconciliations.
     templateResult.keyedUsed ? `import { keyed } from 'lit/directives/keyed.js';\n` : '',
+    // Phase 24 (req 2) — conditional `unsafeHTML` import. emitTemplate marks
+    // `unsafeHtmlUsed` on EmitTemplateResult when any `r-html` was lowered to
+    // `${unsafeHTML(<expr>)}`. `lit/directives/unsafe-html.js` is a subpath of
+    // the already-present `lit` dependency — no new package. Threaded the SAME
+    // way as `keyed`/`repeat` (concurrency-safe — read off templateResult, no
+    // module singleton).
+    templateResult.unsafeHtmlUsed ? `import { unsafeHTML } from 'lit/directives/unsafe-html.js';\n` : '',
   ].filter((s) => s.length > 0).join('');
 
   // Phase 9 Plan 09-04 — author-declared `<script lang="ts">` `interface`/`type`

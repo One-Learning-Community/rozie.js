@@ -38,6 +38,13 @@ function compileToLit(name: string): string {
 }
 
 describe('emitLit fixtures — Plan 06.4-02 locked snapshots', () => {
+  // Phase 24 (req 2) COUPLING NOTE: the per-fixture
+  // `.not.toMatch(/unsafe-html|unsafeHTML/)` assertions below stay GREEN
+  // because NONE of these fixtures use `r-html`. Phase 24 introduces
+  // conditional `${unsafeHTML(<expr>)}` emit for `r-html` only; a FUTURE
+  // fixture here that adds an `r-html` element is EXPECTED to flip its
+  // corresponding `not.toMatch` to a positive `toMatch` (the unsafe-html
+  // import + element-content will appear, by design).
   it('Counter.lit.ts.snap', async () => {
     const code = compileToLit('Counter');
     // SC1 invariants (Phase 06.4 success criterion 1).
