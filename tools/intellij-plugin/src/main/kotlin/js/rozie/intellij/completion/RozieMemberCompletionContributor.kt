@@ -105,6 +105,16 @@ class RozieMemberCompletionContributor : CompletionContributor() {
          * declared `type:` (e.g. `String`) becomes the type-text hint; falls
          * back to [fallbackType] when there's no `{ type: … }` descriptor.
          *
+         * LOAD-BEARING INVARIANT: "first object literal" is only correct
+         * because the Strategy-B globals prefix (`rozie-globals.d.ts`,
+         * prepended to every injection) contains NO construct that
+         * error-recovers into a `JSObjectLiteralExpression` under the plain-JS
+         * injected parse. A brace-delimited inline type in any ambient declare
+         * (e.g. `options?: { immediate?: boolean }`) would be found here
+         * INSTEAD of the author's body. The matching warning lives in the
+         * `rozie-globals.d.ts` header; `RozieMemberCompletionTest` catches a
+         * violation.
+         *
          * When [modelOnly] is true (the `$model.` completion path, Phase 18),
          * only props whose `{ … }` descriptor carries `model: true` are kept —
          * `$model`'s valid keys are exactly the `model: true` subset of

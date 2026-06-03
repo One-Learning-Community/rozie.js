@@ -1,7 +1,7 @@
 package js.rozie.intellij.completion
 
 /**
- * Single source of truth for the 18 canonical Rozie `$`-prefixed magic
+ * Single source of truth for the 20 canonical Rozie `$`-prefixed magic
  * identifiers + their one-line type-text doc hints (surfaced by
  * `LookupElementBuilder.withTypeText` in the completion popup per the
  * P1-UAT-09 acceptance prose).
@@ -25,7 +25,7 @@ package js.rozie.intellij.completion
  *    `RozieGlobalsLibraryTest` coverage assertion pins the two in lockstep.
  *
  * `RozieJsMagicCompletionTest.testBareDollarSurfacesAllMagicIdentifiers`
- * iterates [MAGIC_IDENTIFIERS] directly — adding an 18th magic name is a 1-line
+ * iterates [MAGIC_IDENTIFIERS] directly — adding a new magic name is a 1-line
  * append here (plus the matching `declare` in `rozie-globals.d.ts`); the
  * contributor, the annotator, and the test all pick it up automatically (DRY
  * contract, identical to Plan 02's [js.rozie.intellij.xml.RozieKnownAttributes]).
@@ -39,7 +39,10 @@ package js.rozie.intellij.completion
  *  - `$onMount`      — lifecycle: runs after first render
  *  - `$onUnmount`    — lifecycle: runs on teardown / cleanup
  *  - `$onUpdate`     — lifecycle: runs after every reactive update
- *  - `$watch`        — reactive `$watch(() => getter, callback)`
+ *  - `$watch`        — lazy change-watcher `$watch(() => getter, callback)`;
+ *                      optional `{ immediate: true }` third arg opts into the
+ *                      eager initial fire (quick 260602-9lw made lazy the
+ *                      default on all 6 targets)
  *  - `$slots`        — named slot fills passed by the consumer
  *  - `$el`           — the component's root DOM element
  *  - `$portals`      — render a slot into an external container (Spike 003)
@@ -62,6 +65,16 @@ package js.rozie.intellij.completion
  *                      the `model: true` subset of `<props>` (Phase 18 — write
  *                      `$model.x` lowers to the same per-target two-way setter
  *                      `$props.x = …` used today; `$props.x` is now read-only)
+ *  - `$expose`       — expose imperative methods to the consumer as a callable
+ *                      handle (Phase 21 — `$expose({ reset, focus })` lowers to
+ *                      React forwardRef/useImperativeHandle, Vue defineExpose,
+ *                      Svelte exported consts, Solid callback-ref prop,
+ *                      Angular/Lit public class/element methods)
+ *  - `$reconcileAfterDomMutation` — Lit-only escape hatch: re-key an
+ *                      `r-external`-marked container after a third-party engine
+ *                      mutates its DOM, so lit-html's repeat cache disposes
+ *                      stale DOM instead of desyncing (no-op on the other 5
+ *                      targets; shipped 2026-05-24 pre-Phase-16 cleanup)
  *
  * Pattern note: each entry is a `(name, typeText)` pair; the contributor
  * destructures the pair into `LookupElementBuilder.create(name).bold()
@@ -69,7 +82,7 @@ package js.rozie.intellij.completion
  */
 object RozieMagicIdentifiers {
     /**
-     * Ordered (name, typeText) pairs for the 18 canonical Rozie magic
+     * Ordered (name, typeText) pairs for the 20 canonical Rozie magic
      * identifiers. Order mirrors the TextMate grammar's `magic-identifier`
      * regex so the two artifacts diff trivially; the lookup popup does its
      * own alphabetical sort, so source order is purely for readability.
@@ -84,7 +97,7 @@ object RozieMagicIdentifiers {
         "\$onMount" to "(magic) lifecycle: runs after first render",
         "\$onUnmount" to "(magic) lifecycle: runs on teardown / cleanup",
         "\$onUpdate" to "(magic) lifecycle: runs after every reactive update",
-        "\$watch" to "(magic) react to a getter — \$watch(() => expr, callback)",
+        "\$watch" to "(magic) lazy change-watcher — \$watch(() => expr, cb, { immediate: true }?)",
         "\$slots" to "(magic) named slot fills passed by the consumer",
         "\$el" to "(magic) the component's root DOM element",
         "\$portals" to "(magic) render a slot into a container — \$portals.X(el, scope)",
@@ -93,6 +106,8 @@ object RozieMagicIdentifiers {
         "\$listeners" to "(magic) consumer-passed event listeners minus declared events",
         "\$restoreFocus" to "(magic) restore focus to a keyed-list row by selector + index (Lit/Solid/Svelte do work; React/Vue/Angular no-op)",
         "\$model" to "(magic) producer-side two-way write — keys are the model:true props (\$model.x = … lowers like the old \$props.x write)",
+        "\$expose" to "(magic) expose imperative methods to the consumer — \$expose({ reset, focus })",
+        "\$reconcileAfterDomMutation" to "(magic) Lit-only: re-key an r-external container after engine DOM mutation (no-op on other targets)",
     )
 
     /**

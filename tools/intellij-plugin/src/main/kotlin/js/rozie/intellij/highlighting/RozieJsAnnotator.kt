@@ -10,10 +10,10 @@ import js.rozie.intellij.xml.RozieContextCheck
 
 /**
  * RESEARCH Open Question 4 resolved Option A — paint every canonical Rozie
- * `$`-magic identifier (`$props`/`$data`/`$refs`/`$emit`/`$computed`/
- * `$onMount`/`$onUnmount`/`$onUpdate`/`$watch`/`$slots`/`$el`/`$portals`/
- * `$classSelector`) with `ROZIE_MAGIC_IDENT` inside any `.rozie`-hosted
- * injected JS. Restores the visual cue that retired from the JFlex side
+ * `$`-magic identifier (the [RozieMagicIdentifiers.NAMES] set — `$props`,
+ * `$data`, `$watch`, `$expose`, … — one registry, never enumerated here so
+ * this comment cannot drift) with `ROZIE_MAGIC_IDENT` inside any
+ * `.rozie`-hosted injected JS. Restores the visual cue that retired from the JFlex side
  * (Plan 01 removed
  * MAGIC_IDENT JFlex emission rules to keep `IN_TEMPLATE_BODY` contiguous —
  * any token-fragmenting carve-out would break HTML injection per Pitfall 1).

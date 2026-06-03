@@ -80,6 +80,17 @@ intellijPlatform {
         // contract — both surfaces must stay in lockstep so the IDE shows the
         // same release summary regardless of which descriptor it reads).
         changeNotes = """
+            <p><strong>0.3.0</strong> (sigil sync, 2026-06-02) — <code>${'$'}expose</code>
+            is now a recognised magic identifier — completion, coloring, ambient
+            declaration, and Ctrl-Q docs. Phase 21 shipped the imperative-handle
+            sigil to the compiler, superseding the earlier "deferred v2 feature"
+            drop noted below. <code>${'$'}reconcileAfterDomMutation</code> (the
+            Lit-only <code>r-external</code> re-key escape hatch) added to the
+            same surfaces. The <code>${'$'}watch</code> ambient declaration now
+            matches the compiler's lazy-by-default contract (quick 260602-9lw):
+            the optional <code>{ immediate: true }</code> third argument is
+            accepted, and the unsupported <code>oldValue</code> callback
+            parameter is removed.</p>
             <p><strong>0.3.0</strong> — Language constructs synced to Rozie grammar
             v0.2.0. New directives recognised in &lt;template&gt;:
             <code>r-match</code> / <code>r-case</code> / <code>r-default</code>

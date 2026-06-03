@@ -1,4 +1,4 @@
-// rozie-globals.d.ts — synthetic ambient declarations for the 18 Rozie
+// rozie-globals.d.ts — synthetic ambient declarations for the 20 Rozie
 // magic identifiers. Source of truth: Plan 13's
 // `tools/intellij-plugin/src/main/kotlin/js/rozie/intellij/completion/RozieMagicIdentifiers.kt`
 // `MAGIC_IDENTIFIERS` registry. v0.2.0 ships permissive `any`-typed shapes;
@@ -13,7 +13,24 @@
 // two-way-write accessor whose valid keys are the `model: true` subset of
 // `<props>`; `$model.x` writes lower to the same per-target two-way setter the
 // old `$props.x` model-write used, and `$props.x` is now read-only for every
-// prop.
+// prop. The 2026-06-02 sigil sync added `$expose` as the 19th (Phase 21,
+// 2026-06-01 — the imperative-handle sigil) and `$reconcileAfterDomMutation`
+// as the 20th (shipped 2026-05-24 in the pre-Phase-16 cleanup but never
+// surfaced to the editor), and updated `$watch` to the lazy-by-default
+// contract of quick 260602-9lw (optional `{ immediate: true }` third arg;
+// no `oldValue` callback param).
+//
+// *** INVARIANT — NO BRACE-DELIMITED TYPES IN THIS FILE ***
+// This file is injected VERBATIM as the prefix of every Rozie JS injection,
+// and the injected language is plain JavaScript (error-tolerant parse), NOT
+// TypeScript. An inline object type like `options?: { immediate?: boolean }`
+// error-recovers into a real JSObjectLiteralExpression PSI node inside the
+// prefix — which breaks RozieMemberCompletionContributor.objectKeyMembers
+// (it resolves the AUTHOR's `<props>`/`<data>` body as "the first object
+// literal in the injected file"; a brace-typed declare here shadows it and
+// `$props.` / `$model.` member completion silently returns garbage — caught
+// by RozieMemberCompletionTest). Use `any`, named types (`Record<…>`,
+// `EventListener`), or function types — never `{ … }`.
 //
 // =============================================================================
 // Strategy chosen: B (ambient-decl prefix injected into every Rozie JS fragment)
@@ -100,8 +117,18 @@ declare function $onMount(callback: () => void | (() => void)): void;
 declare function $onUnmount(callback: () => void): void;
 /** Lifecycle hook — runs after every reactive update. */
 declare function $onUpdate(callback: () => void | (() => void)): void;
-/** React to a getter — `$watch(() => expr, (next, prev) => {})`. */
-declare function $watch<T>(getter: () => T, callback: (newValue: T, oldValue: T) => void): void;
+/**
+ * React to getter changes — LAZY by default: the callback fires only when the
+ * watched value changes after mount, never with the initial value. Pass
+ * `{ immediate: true }` as the third argument to opt into the eager initial
+ * fire (Vue-style). The callback receives only the new value — the compiler's
+ * single-getter form has no `oldValue` parameter. Quick 260602-9lw.
+ *
+ * NOTE: `options` is typed `any` ON PURPOSE — see the "NO BRACE-DELIMITED
+ * TYPES" warning in this file's header before "improving" it to an inline
+ * object type.
+ */
+declare function $watch<T>(getter: () => T, callback: (newValue: T) => void, options?: any): void;
 /** Named slot fills passed by the consumer. */
 declare const $slots: any;
 /** The component's root DOM element. */
@@ -158,3 +185,19 @@ declare const $event: Event;
  * read-only for every prop — model-prop writes go through `$model.x`.
  */
 declare const $model: any;
+/**
+ * Expose imperative methods to the consumer as a callable handle. The single
+ * argument must be an object literal whose values are `<script>`-declared
+ * functions: `$expose({ reset, focus })`. Lowers per target to React
+ * `forwardRef` + `useImperativeHandle`, Vue `defineExpose`, Svelte exported
+ * consts, Solid callback-ref prop, Angular/Lit public class/element methods.
+ * At most one top-level `$expose(...)` call per component (ROZ119). Phase 21.
+ */
+declare function $expose(methods: Record<string, (...args: any[]) => unknown>): void;
+/**
+ * Lit-only escape hatch: after a third-party engine mutates the DOM inside an
+ * `r-external`-marked container, bump the container's key so lit-html's
+ * `repeat` cache disposes stale DOM instead of desyncing with it. No-op on
+ * the other 5 targets. Shipped 2026-05-24 (pre-Phase-16 cleanup).
+ */
+declare function $reconcileAfterDomMutation(): void;

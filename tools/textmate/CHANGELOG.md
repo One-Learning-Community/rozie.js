@@ -5,6 +5,19 @@ All notable changes to the Rozie TextMate / VS Code extension are documented in 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- `$expose` magic identifier (Phase 21, 2026-06-01) — the imperative-handle sigil. `$expose({ reset, focus })` exposes consumer-callable methods on all 6 targets (React `forwardRef`/`useImperativeHandle`, Vue `defineExpose`, Svelte exported consts, Solid callback-ref prop, Angular/Lit public class/element methods). Added 2026-06-02.
+- `$reconcileAfterDomMutation` magic identifier — the Lit-only `r-external` re-key escape hatch for third-party-engine DOM mutations (no-op on the other 5 targets). Shipped in the compiler 2026-05-24; added to highlighting 2026-06-02.
+
+### Notes
+
+- Post-0.3.0 grammar drift, now changelogged: `$restoreFocus` (Phase 16, added to the grammar 2026-05-26) and `$model` (Phase 18, added 2026-05-30) were committed to the grammar after the 0.3.0 package was cut but never recorded here.
+- `$watch` behavior changed compiler-side (quick 260602-9lw, 2026-06-02): lazy by default, optional `{ immediate: true }` third argument. No grammar impact — `watch` was already in the sigil regex and the options object is a plain JS expression — but noted here because the LSP-served diagnostics (bundled in the extension's language server) reflect the new contract.
+- Token regex now: `\$(props|data|refs|model|emit|event|computed|onMount|onUnmount|onUpdate|watch|slots|el|portals|classSelector|attrs|listeners|restoreFocus|expose|reconcileAfterDomMutation)\b` (20 alternations).
+
 ## [0.3.0] — 2026-05-23
 
 ### Added
