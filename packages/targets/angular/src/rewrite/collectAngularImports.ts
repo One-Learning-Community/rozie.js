@@ -78,8 +78,15 @@ export type AngularCoreImport =
    */
   | 'afterRenderEffect';
 
-/** Forms-module import kind — separate import line from `@angular/forms`. */
-export type AngularFormsImport = 'FormsModule';
+/**
+ * Forms-module import kind — separate import line from `@angular/forms`.
+ *
+ * Phase 23 (angular-cva-forms-integration): `NG_VALUE_ACCESSOR` joins
+ * `FormsModule` — it is the DI provider token the auto-CVA decorator references
+ * (`providers: [{ provide: NG_VALUE_ACCESSOR, ... }]`). Added by emitAngular via
+ * `imports.addForms('NG_VALUE_ACCESSOR')` when the CVA gate is active.
+ */
+export type AngularFormsImport = 'FormsModule' | 'NG_VALUE_ACCESSOR';
 
 /** Common-module import kind — separate import line from `@angular/common`. */
 export type AngularCommonImport = 'NgTemplateOutlet';

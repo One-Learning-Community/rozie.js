@@ -25,7 +25,7 @@
  *
  * @experimental — shape may change before v1.0
  */
-import type { IRComponent, TemplateNode } from '../../../core/src/ir/types.js';
+import type { IRComponent, TemplateNode, PropDecl } from '../../../core/src/ir/types.js';
 import type { Diagnostic } from '../../../core/src/diagnostics/Diagnostic.js';
 import type { ModifierRegistry } from '@rozie/core';
 import type { BlockMap } from '../../../core/src/ast/types.js';
@@ -132,6 +132,20 @@ export interface EmitAngularOptions {
    * derived from `opts.source` via splitBlocks() if available.
    */
   blockOffsets?: BlockMap | undefined;
+  /**
+   * Phase 23 (angular-cva-forms-integration) — compiler-config gate for the
+   * auto-`ControlValueAccessor` emit. DEFAULT IS ON IN THE EMITTER
+   * (`opts.cva ?? true`): when omitted, a component with exactly one
+   * `model: true` prop auto-emits the CVA class shape + `NG_VALUE_ACCESSOR`
+   * provider + `(focusout)` host binding. Set `false` to suppress CVA on a
+   * single-model component (Plan 04 threads this from the compiler config).
+   *
+   * The default-ON-in-the-emitter rule is load-bearing for the dist-parity
+   * byte-equality contract (Pitfall 2): compile()'s emitOpts and unplugin's two
+   * direct emitAngular calls all omit `cva`, so they must all behave identically
+   * — i.e. ON — without coordination.
+   */
+  cva?: boolean | undefined;
 }
 
 export interface EmitAngularResult {
@@ -160,14 +174,41 @@ export function emitAngular(
   const classMembers = previewRewrite.classMembers;
   const signalMembers = previewRewrite.signalMembers;
 
+  // Phase 23 (angular-cva-forms-integration) — compute the auto-CVA gate ONCE,
+  // here, mirroring the previewRewrite single-source precedent. Every downstream
+  // CVA decision (emitScript's methods/members, emitDecorator's providers/host)
+  // branches on `cvaModelProp !== null`, NOT on a re-derived model-prop count —
+  // this single-gate discipline is what keeps zero-model and ≥2-model components
+  // byte-identical to today (Pitfall 5).
+  //
+  //   - cva omitted        → ON  (opts.cva ?? true — the dist-parity default)
+  //   - cva === false      → OFF (cvaModelProp === null regardless of count)
+  //   - exactly one model  → that prop (CVA emitted)
+  //   - zero or ≥2 models  → null (no single-control accessor; Plan 03 fires
+  //                                ROZ125 for the ≥2 case)
+  const cvaEnabled = opts.cva ?? true;
+  const modelProps = ir.props.filter((p) => p.isModel);
+  const cvaModelProp =
+    cvaEnabled && modelProps.length === 1 ? modelProps[0]! : null;
+  // Plan 03 populates this with ROZ124/125/126 diagnostics; reserved here so the
+  // aggregation spread below has a stable slot. Intentionally empty in Plan 02.
+  const cvaDiagnostics: Diagnostic[] = [];
+
   // 1. Script-side emission.
   // Phase 06.1 P2: thread filename for sourceFileName + capture scriptMap.
   // Spike 004 — per-component scope hash for `@portal` CSS scoping. Angular
   // has no native scope-hash infra (it uses `_ngcontent-*`); the shared
   // helper gives the identical FNV-1a value the other targets compute.
   const portalScopeHash = computeScopeHash(ir.name, opts.filename);
-  const scriptOpts: { filename?: string; portalScopeHash?: string } = {
+  const scriptOpts: {
+    filename?: string;
+    portalScopeHash?: string;
+    cvaModelProp?: PropDecl | null;
+  } = {
     portalScopeHash,
+    // Phase 23 — thread the single CVA gate so emitScript appends the four CVA
+    // methods + three private members when (and only when) it is non-null.
+    cvaModelProp,
   };
   if (opts.filename !== undefined) scriptOpts.filename = opts.filename;
   const scriptResult = emitScript(ir, scriptOpts);
@@ -208,6 +249,21 @@ export function emitAngular(
   const selfReferenced = templateContainsSelfReference(ir.template);
   if (selfReferenced) {
     imports.add('forwardRef');
+  }
+
+  // Phase 23 — when the CVA gate is active the emitted class needs:
+  //   - `signal`     for the `private __rozieCvaDisabled = signal(false)` member
+  //                  (NOT guaranteed present: collectAngularImports only adds
+  //                  `signal` when `ir.state.length > 0`).
+  //   - `forwardRef` for the self-referencing `useExisting: forwardRef(() => X)`
+  //                  in the NG_VALUE_ACCESSOR provider (the collector adds it for
+  //                  the `tagKind: 'self'` template case, not for CVA — add
+  //                  unconditionally here; the import Set dedupes).
+  //   - `NG_VALUE_ACCESSOR` from @angular/forms — the provider token.
+  if (cvaModelProp !== null) {
+    imports.add('signal');
+    imports.add('forwardRef');
+    imports.addForms('NG_VALUE_ACCESSOR');
   }
 
   // Phase 07.2 Plan 04 (R5 dynamic-name): when the consumer's template emits
@@ -282,6 +338,9 @@ export function emitAngular(
     hasDynamicSlotFiller: tmplResult.hasDynamicSlotFiller,
     componentDecls: components,
     selfReferenced,
+    // Phase 23 — gate providers: NG_VALUE_ACCESSOR + host: (focusout) on the
+    // single CVA prop. Decorator branches on `cvaModelProp !== null`.
+    cvaModelProp,
   });
 
   // 7. Compose the class body. Insertion order:
@@ -456,6 +515,7 @@ export function emitAngular(
       ...tmplResult.diagnostics,
       ...listenersResult.diagnostics,
       ...styleResult.diagnostics,
+      ...cvaDiagnostics,
     ],
   };
 }
