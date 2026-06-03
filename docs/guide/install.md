@@ -35,6 +35,16 @@ Import `.rozie` files as normal components:
 import Counter from './Counter.rozie';
 ```
 
+### Per-target options: `angular: { cva }`
+
+On the Angular target, components with exactly one `model: true` prop automatically implement `ControlValueAccessor` so they bind to `[(ngModel)]` / `formControlName` like native form controls (see [the forms-integration contract](/guide/features#angular-a-single-model-component-is-a-real-form-control)). This is **on by default**. To turn it off:
+
+```ts
+Rozie({ target: 'angular', angular: { cva: false } }),
+```
+
+A malformed `angular` option (non-object, or non-boolean `cva`) fails fast at plugin-construction time with **ROZ405** — before any build hook runs. The option is a no-op for the other five targets.
+
 ## Typed `.rozie` imports (per-framework setup)
 
 Rozie gives your `.rozie` imports **real, per-module TypeScript types** — the props interface, event callbacks, and the `$expose` handle — so `import Counter from './Counter.rozie'` is as type-safe as importing a hand-written component. There is no `.rozie`-aware language plugin to install: the types come from a generated **sidecar declaration file**.
@@ -143,6 +153,8 @@ pnpm rozie build src/Counter.rozie --target vue --out dist/Counter.vue
 ```
 
 The CLI accepts `--target vue | react | svelte | angular | solid | lit` and supports `--source-map` for emitting sourcemaps alongside the output file.
+
+`--no-cva` (Angular target only) turns off the automatic `ControlValueAccessor` emit for single-`model: true` components — the same switch as the plugin's `angular: { cva: false }` option. Both `rozie build` and `rozie watch` accept it.
 
 `--pretty` (off by default) pipes each emitted artefact through prettier before write. Prettier core covers `.tsx` / `.ts` / `.d.ts` / `.vue` / `.css` natively — you don't need any extra dependency. To pretty-format `.svelte` output, install `prettier-plugin-svelte` alongside `@rozie/cli`:
 

@@ -149,6 +149,7 @@ Rozie quietly does the Angular ceremony you'd otherwise hand-roll:
 | `signal()` / `computed()` / `effect()` | `<data>` → `signal()`, `$computed` → `computed()`, `$watch` → `effect()` |
 | `input.required<T>()` vs `input<T>()` | `required: true` on a `<props>` member — single source of truth across all six targets. |
 | `model<T>()` for two-way binding | `model: true` on a `<props>` member; consumer-side `r-model:propName="…"` |
+| `ControlValueAccessor` + `NG_VALUE_ACCESSOR` provider for custom form controls | A component with exactly **one** `model: true` prop auto-implements `ControlValueAccessor` — `[(ngModel)]`, `[formControl]`, and `formControlName` bind to it like a native control. Touched-on-focusout, `writeValue(null)` → prop default, and disabled-merge wiring included. Opt out with `angular: { cva: false }`. |
 | `output<T>()` + emitting | `$emit('eventname', payload)` |
 | `inject(DestroyRef)` + paired cleanup | `$onMount` returning a cleanup fn — Rozie hoists `private __rozieDestroyRef = inject(DestroyRef)` automatically. |
 | `ngAfterViewInit` for `$el`-touching code | `$onMount` lowers to `ngAfterViewInit()` so `viewChild()` signals are populated when your code runs. |
@@ -212,6 +213,9 @@ delete the `.rozie` source, and the `.ts` works on its own. Zero lock-in.
 
 - `signal()` / `computed()` / `effect()` / `inject(DestroyRef)`
 - `input()` / `input.required()` / `model()` / `output()` / `viewChild()`
+- `ControlValueAccessor` auto-implemented for single-`model: true`
+  components — your Rozie component is a real Angular form control
+  (`[(ngModel)]` / `formControlName` bind directly)
 - Standalone components, no NgModule
 - `@for` / `@if` block syntax (not `*ngFor` / `*ngIf`)
 - `Renderer2.listen` for `<listeners>` block

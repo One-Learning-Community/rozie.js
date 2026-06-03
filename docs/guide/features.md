@@ -355,6 +355,33 @@ The mnemonic pairs with the consumer-side `r-model:value="…"` directive: `r-mo
 - `$props.x = …` where `x` is **not** `model: true` → **ROZ200** (`WRITE_TO_NON_MODEL_PROP`). Props are read-only inputs; mutating one is the single most common cross-framework component bug.
 - `$props.x = …` where `x` **is** `model: true` → **ROZ204** (`WRITE_TO_MODEL_PROP_VIA_PROPS`), whose message points you at the fix: use `$model.x`.
 
+### Angular: a single-model component is a real form control
+
+When a component has **exactly one** `model: true` prop, the Angular emitter goes one step further than `model<T>()`: the generated class also implements `ControlValueAccessor` and registers the `NG_VALUE_ACCESSOR` provider. The component plugs straight into Angular's forms system — template-driven or reactive — with no wrapper directive and nothing to hand-write:
+
+```html
+<!-- Template-driven -->
+<rozie-flatpickr [(ngModel)]="birthday" name="birthday" />
+
+<!-- Reactive forms -->
+<rozie-flatpickr [formControl]="birthday" />
+<rozie-flatpickr formControlName="birthday" />
+```
+
+The generated accessor follows a fixed contract:
+
+- **View→model, never an echo.** Only a real internal write — a `$model.x` assignment, an `r-model` input event, an engine callback — notifies the form control. A programmatic `writeValue` from the form updates the view but never echoes back through `registerOnChange`, so there is no value-echo loop.
+- **`writeValue(null)` coerces to the prop's declared `default:`.** Resetting a form clears the component instead of crashing it. A `required: true` model prop with no default ignores the initial `null` write.
+- **Touched on `(focusout)`.** The control is marked touched when focus leaves the component.
+- **Disabled is a merge.** `setDisabledState` OR-merges with a declared **Boolean** `disabled` prop — either source disables the component. Without a Boolean `disabled` prop it's a no-op (info diagnostic **ROZ126**).
+- **Two-way binding and the form control coexist.** `r-model:x="…"` and a forms directive can both bind the same component. Writes through the two-way binding update the view but do **not** dirty the form control — the same convention Angular Material follows.
+
+Components with **zero or multiple** `model: true` props don't get an accessor — there is no single value for a form control to own (**ROZ125** explains this on multi-model components). Exposing an `$expose` method named `writeValue` / `registerOnChange` / `registerOnTouched` / `setDisabledState` on a CVA component is a compile error (**ROZ124**) — it would collide with the generated accessor.
+
+This is on by default. To opt out, pass `angular: { cva: false }` to `@rozie/unplugin` or `compile()`, or `--no-cva` on the CLI — the emitted class is then byte-identical to the pre-CVA output. The other five targets are untouched either way; CVA is an Angular-only forms contract.
+
+See the [Flatpickr forms recipe](/guide/flatpickr#forms-drop-in) for a worked example against a real engine-wrapper component.
+
 ## `$expose({ ... })` → a consumer-callable imperative handle everywhere
 
 Some components have to offer imperative methods — a date picker's `clear()` / `open()`, an editor's `focus()` / `setContent()`, a map's `flyTo()`. Re-implementing "expose an imperative method" once per framework (`useImperativeHandle`, `defineExpose`, instance exports, public methods, ref-forwarding…) is exactly the per-framework wrapper work Rozie exists to delete.
