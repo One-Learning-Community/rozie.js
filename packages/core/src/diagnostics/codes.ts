@@ -301,6 +301,7 @@ export const RozieErrorCode = {
   // ---- @rozie/target-vue lowering errors (Phase 3 D-52) — ROZ420..ROZ449 ----
   // (Reserved as safety net per CONTEXT D-52 — none anticipated for v1.)
   TARGET_VUE_RESERVED: 'ROZ420', // RESERVED placeholder; emitter throws this only on internal-invariant violation
+  TARGET_VUE_RHTML_WITH_CHILDREN: 'ROZ421', // r-html via v-html cannot coexist with children; mirrors ROZ620/721
 
   // ---- Phase 3 emitter warnings — ROZ450..ROZ499 (Phase 7 hardening) ----
 
@@ -374,7 +375,8 @@ export const RozieErrorCode = {
   UNPLUGIN_LIT_SIGNALS_PEER_DEP_MISSING: 'ROZ831', // @lit-labs/preact-signals (^1) not resolvable from cwd
   // ---- @rozie/target-lit lowering errors (Phase 07.1) — ROZ832..ROZ839 ----
   TARGET_LIT_RESERVED: 'ROZ832', // internal-invariant placeholder; mirrors TARGET_SVELTE_RESERVED/TARGET_ANGULAR_RESERVED. Lit emitter raises this when a modifier has no lit() hook.
-  // ROZ833..ROZ839 reserved for future Lit-emitter diagnostics
+  TARGET_LIT_RHTML_WITH_CHILDREN: 'ROZ833', // r-html via unsafeHTML cannot coexist with children; mirrors ROZ620/721
+  // ROZ834..ROZ839 reserved for future Lit-emitter diagnostics
   RUNTIME_LIT_CONTROLLABLE_MODE_FLIP: 'ROZ840', // createLitControllableProperty parent-flip warning (D-LIT-10)
   // ROZ841..ROZ849 reserved for future @rozie/runtime-lit warnings
   // ---- @rozie/cli argv parsing + filesystem errors (Plan 06-03) — ROZ850..ROZ879 ----
