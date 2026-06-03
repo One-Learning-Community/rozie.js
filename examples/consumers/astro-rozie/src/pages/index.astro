@@ -4,8 +4,13 @@
 // ONE Rozie `Counter.rozie` (byte-identical per-target copies under
 // src/components/{react,vue,svelte,solid}/) is mounted as an interactive Astro
 // island for each framework that genuinely hydrates, plus the Lit native
-// web-component path. Each island starts at Count: 0 and — proving REAL
-// hydration, not static tag presence — increments by step (2) on click.
+// web-component path. The Counter is the canonical rich component: plus/minus
+// buttons, min/max bounds, a `$computed`-driven `:disabled` on each button at
+// its bound, and a `:class` hover effect. Each island starts at value 0 with
+// min=0 — so Decrement is disabled at load (a visible bounds proof) and only
+// becomes enabled AFTER a click increments past the floor, which can only
+// happen if the reactive `$computed` re-ran in the browser (REAL hydration,
+// not static tag presence).
 //
 // ── COVERAGE EXCEPTIONS ──────────────────────────────────────────────────────
 //   • Angular — NO first-party @astrojs/angular exists (only the community
@@ -35,37 +40,44 @@ import SolidCounter from '../components/solid/Counter.rozie';
       <h1>Rozie + Astro — Multi-Target Island Matrix</h1>
       <p>
         One <code>Counter.rozie</code>, compiled to every target Rozie supports,
-        mounted as an interactive Astro island. Each counter starts at
-        <strong>Count: 0</strong> and increments by 2 on click — proving runtime
-        hydration across frameworks, not just tag presence.
+        mounted as an interactive Astro island. Each counter has
+        <strong>plus / minus</strong> buttons bounded to
+        <code>min=0, max=10</code>, with a <code>$computed</code>-driven
+        <code>:disabled</code> on each button at its bound and a hover
+        background effect. Every island starts at <strong>0</strong>, so
+        Decrement is disabled at load and only enables after a click — proving
+        runtime <code>$computed</code> reactivity across frameworks, not just
+        tag presence.
       </p>
 
       <!--
-        Each island passes ONLY `step={2}` and lets `value` use its <props>
-        default (0). `value` is a `model: true` prop, so passing it explicitly
-        makes the island a CONTROLLED component bound to a parent that does not
-        exist here — its internal state would be frozen at the passed value and
-        clicks would never increment. Omitting it keeps each island uncontrolled
-        and self-interactive (the honest single-island demo shape).
+        Each island passes `step={1} min={0} max={10}` but OMITS `value`, letting
+        it use its <props> default (0). `value` is a `model: true` prop, so
+        passing it explicitly makes the island a CONTROLLED component bound to a
+        parent that does not exist here — its internal state would be frozen at
+        the passed value and clicks would never move it. Omitting it keeps each
+        island uncontrolled and self-interactive (the honest single-island demo
+        shape). With value=0 and min=0, Decrement is disabled at load
+        (canDecrement = 0 - 1 >= 0 → false) — a visible bounds proof.
       -->
       <section data-target="react">
         <h2>React island (@astrojs/react, client:load)</h2>
-        <ReactCounter client:load step={2} />
+        <ReactCounter client:load step={1} min={0} max={10} />
       </section>
 
       <section data-target="vue">
         <h2>Vue island (@astrojs/vue, client:load)</h2>
-        <VueCounter client:load step={2} />
+        <VueCounter client:load step={1} min={0} max={10} />
       </section>
 
       <section data-target="svelte">
         <h2>Svelte island (@astrojs/svelte, client:load)</h2>
-        <SvelteCounter client:load step={2} />
+        <SvelteCounter client:load step={1} min={0} max={10} />
       </section>
 
       <section data-target="solid">
         <h2>Solid island (@astrojs/solid-js, client:load)</h2>
-        <SolidCounter client:load step={2} />
+        <SolidCounter client:load step={1} min={0} max={10} />
       </section>
 
       <section data-target="lit">
@@ -75,7 +87,7 @@ import SolidCounter from '../components/solid/Counter.rozie';
           The client <script> below registers it; the browser hydrates the tag
           natively. No island directive needed.
         -->
-        <rozie-counter step="2"></rozie-counter>
+        <rozie-counter step="1" min="0" max="10"></rozie-counter>
       </section>
     </main>
 
