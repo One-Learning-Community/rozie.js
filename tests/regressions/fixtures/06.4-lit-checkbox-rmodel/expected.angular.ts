@@ -9,7 +9,7 @@ import { FormsModule, NG_VALUE_ACCESSOR } from '@angular/forms';
 
     <label class="toggle" #rozieSpread_0 #rozieListenersTarget_1>
       
-      <input type="checkbox" [ngModel]="checked()" (ngModelChange)="checked.set($event)" [ngModelOptions]="{standalone: true}" />
+      <input type="checkbox" [ngModel]="checked()" (ngModelChange)="checked.set($event); __rozieCvaOnChange($event)" [ngModelOptions]="{standalone: true}" />
       <span>Enabled</span>
     </label>
 
