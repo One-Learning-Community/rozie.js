@@ -108,6 +108,57 @@ describe('Vue r-html → v-html (Phase 24 req 1)', () => {
     expect(diag!.severity).toBe('error');
   });
 
+  it('Test 5 (WR-01): r-html on a component tag whose only children are slot-fillers does NOT raise ROZ421', () => {
+    // The Phase 07.2 parallel-array invariant keeps `node.children` populated
+    // even when those children are consumed as slot-fillers (which emit via the
+    // slotFillers branch, never as raw HTML content). The children-coexistence
+    // guard must therefore exclude the slotFiller-only case — otherwise a valid
+    // component-tag source false-fires ROZ421.
+    const ir = emptyIR();
+    const slotChild: TemplateNode = {
+      type: 'TemplateStaticText',
+      text: 'hi',
+      sourceLoc: LOC,
+    };
+    const componentEl: TemplateNode = {
+      type: 'TemplateElement',
+      tagName: 'Child',
+      attributes: [
+        {
+          kind: 'binding',
+          name: 'r-html',
+          expression: parseExpression('$props.content'),
+          deps: [],
+          sourceLoc: LOC,
+        },
+      ],
+      events: [],
+      // Parallel array: children mirror the slot-filler body (lowerSlotFillers).
+      children: [slotChild],
+      slotFillers: [
+        {
+          type: 'SlotFillerDecl',
+          name: 'header',
+          params: [],
+          body: [slotChild],
+          sourceLoc: LOC,
+        },
+      ],
+      tagKind: 'component',
+      sourceLoc: LOC,
+    } as TemplateNode;
+    ir.template = componentEl;
+    const { template, diagnostics } = emitTemplate(ir, registry);
+    expect(
+      diagnostics.some(
+        (d) => d.code === RozieErrorCode.TARGET_VUE_RHTML_WITH_CHILDREN,
+      ),
+      'ROZ421 false-fired on a slotFiller-only component tag',
+    ).toBe(false);
+    // The element still emits via the slotFillers path with v-html attached.
+    expect(template).toContain('v-html="props.content"');
+  });
+
   it('Test 4: an element with no r-html attribute emits unchanged (no v-html, no diagnostic)', () => {
     const ir = emptyIR();
     ir.template = {

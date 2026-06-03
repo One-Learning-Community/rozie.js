@@ -340,7 +340,22 @@ function emitElementWithExtraDirective(
   // RESEARCH "emit forms" reference). The `r-html` binding was stripped from
   // the attribute set above, so it can no longer leak into `attrText`.
   if (rHtml) {
-    if (node.children.length > 0) {
+    // WR-01 (24-REVIEW) — narrow the children-coexistence guard so it does NOT
+    // false-fire on a component-tag element whose only "children" are
+    // slot-fillers. The Phase 07.2 parallel-array invariant
+    // (lowerSlotFillers.ts) means `node.children` mirrors the slot-filler body,
+    // so a component tag carrying both `r-html` AND `<template #name>` fills has
+    // a non-empty `node.children` even though those children NEVER emit as raw
+    // HTML content — emit routes through the `slotFillers` branch below (L367),
+    // not the `node.children` content branch. Because `extractSlotFillers`
+    // consumes ALL meaningful children into fillers (named or a synthesized
+    // default), a populated `slotFillers` guarantees no real markup children
+    // render here, so the genuine "r-html clobbers real children" guard is
+    // preserved for the non-slotFiller case.
+    const hasRealChildren =
+      node.children.length > 0 &&
+      (node.slotFillers === undefined || node.slotFillers.length === 0);
+    if (hasRealChildren) {
       ctx.diagnostics.push({
         code: RozieErrorCode.TARGET_VUE_RHTML_WITH_CHILDREN,
         severity: 'error',
