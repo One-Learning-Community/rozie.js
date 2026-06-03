@@ -175,6 +175,38 @@ describe('emitAngular CVA — Task 2: disabled OR-merge', () => {
     // value is a model prop, not the disabled prop — never OR-merged.
     expect(code).not.toMatch(/value\(\)\s*\|\|\s*this\.__rozieCvaDisabled/);
   });
+
+  it('OR-merges the disabled read inside an $onMount-paired handler (ngAfterViewInit seed)', () => {
+    // The $onMount handler body is sliced into ngAfterViewInit by
+    // pairClonedLifecycle on the SAME nodes rewriteRozieIdentifiers rewrites, so
+    // a disabled read in the seed also OR-merges.
+    const SEED = `<rozie name="SeedDisabledProbe">
+<props>
+{
+  value: { type: String, default: '', model: true },
+  disabled: { type: Boolean, default: false },
+}
+</props>
+<script>
+function seed() {
+  if ($props.disabled) return
+  $model.value = 'seeded'
+}
+$onMount(seed)
+</script>
+<template>
+  <input class="sd" :value="$props.value" />
+</template>
+</rozie>`;
+    const { code: seedCode } = compileAngular(SEED, 'SeedDisabledProbe.rozie');
+    expect(seedCode).toMatch(
+      /ngAfterViewInit[\s\S]*this\.disabled\(\)\s*\|\|\s*this\.__rozieCvaDisabled\(\)/,
+    );
+    // The seed write also bridges to the form.
+    expect(seedCode).toContain(
+      "this.value.set('seeded'), this.__rozieCvaOnChange('seeded')",
+    );
+  });
 });
 
 describe('emitAngular CVA — Task 2: no-disabled CVA component', () => {
