@@ -572,8 +572,9 @@ function composeClassName(
  * template literal — into the `{ static | binding }` segment stream consumed
  * by `renderInterpolatedClass`. This lets a plain-binding `:class` whose
  * value is a template literal (e.g. `` `badge badge-${value}` ``) route its
- * class tokens through the CSS-Modules `styles` lookup, identically to a
- * `{{ }}`-interpolated `class` attribute.
+ * class tokens through the plain-string per-token renderer, identically to a
+ * `{{ }}`-interpolated `class` attribute. (Post-Phase-25: tokens are emitted
+ * as plain strings — there is no CSS-Modules `styles` lookup.)
  *
  * Returns null for any other expression shape (identifier, member, call, …)
  * which cannot be statically tokenised — those keep the as-is passthrough.

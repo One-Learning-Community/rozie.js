@@ -5,15 +5,16 @@
  * by Phase 1's parseStyle / Phase 2's lowerStyles) into TWO CSS strings
  * keyed by sibling-file routing for the React target:
  *
- *   - moduleCss → consumer-side imported as `import styles from './Foo.module.css'`
+ *   - moduleCss → consumer-side imported for side effect as `import './Foo.css'`
+ *     (plain attribute-scoped stylesheet — NOT a CSS Module; Phase 25)
  *   - globalCss → consumer-side imported as `import './Foo.global.css'` for side effect
  *
  * Mirrors Phase 3's `packages/targets/vue/src/emit/emitStyle.ts` algorithm
- * for byte-slice serialisation. Unlike Vue, the React target then runs the
+ * for byte-slice serialisation. Like Vue, the React target then runs the
  * scoped slice through `scopeCss` (component-scoped attribute rewriter) to
- * obtain Vue-equivalent component-scope semantics — Vite's CSS Modules
- * pipeline only hashes class names, so bare element selectors (`button { … }`)
- * would otherwise leak globally.
+ * obtain Vue-equivalent component-scope semantics: every selector gets a
+ * `[data-rozie-s-<hash>]` attribute appended, so bare element selectors
+ * (`button { … }`) are component-scoped and do not leak globally.
  *
  * Wave 0 finding (Plan 03's Wave 0 / RESEARCH A5): the IR's StyleSection
  * does NOT carry the postcss AST or raw cssText — only `StyleRule` references
@@ -28,11 +29,13 @@
  *     stays global, mirroring Svelte's `:global(:root)` and Angular's
  *     `::ng-deep :root` patterns.
  *
- * Note: CSS class hashing still happens at Vite bundle time (CSS Modules
- * pipeline); class-name tokens emitted here are un-hashed. The synthetic
- * `Foo.rozie.module.css` virtual id routed by `@rozie/unplugin` triggers
- * Vite's hashing pass on those class names. `scopeCss` adds an additional
- * attribute-selector layer that survives Vite's pipeline untouched.
+ * Note (Phase 25): class-name tokens emitted here are plain strings — there is
+ * NO CSS-Modules hashing. `@rozie/unplugin` routes the scoped slice as a plain
+ * `Foo.rozie.css` stylesheet; isolation comes solely from the
+ * `[data-rozie-s-<hash>]` attribute selectors `scopeCss` appends (matching the
+ * other five targets). React was de-CSS-Modules'd because the `.module.css`
+ * routing was redundant with attribute scoping and broke webpack css-loader's
+ * pure-selector rule on bare-element selectors.
  *
  * Pitfall 6 v1 acceptable simplification: nested `@media (...) { :root {} }`
  * is NOT lifted to global because Phase 1's parseStyle only flags top-level
@@ -64,7 +67,7 @@ import { rewriteAllPortalBlocks } from '../../../../core/src/codegen/portalCss.j
 const PORTAL_SCOPE_REPEAT = 1;
 
 export interface EmitStyleResult {
-  /** CSS body for the sibling `.module.css` file (D-53). Empty string when no scoped rules. */
+  /** CSS body for the sibling plain `.css` file (D-53). Empty string when no scoped rules. */
   moduleCss: string;
   /** CSS body for the sibling `.global.css` file (D-54), or null when no `:root` rules. */
   globalCss: string | null;

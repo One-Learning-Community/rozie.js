@@ -20,9 +20,11 @@
  *     when the .rozie has `:root` rules. The `.tsx` body imports it for
  *     side effect via `import './${name}.global.css';`.
  *
- * Class hashing happens at Vite bundle time; emitStyle outputs UN-hashed
- * class names. The synthetic `.module.css` extension triggers Vite's
- * CSS-Modules pipeline naturally (see 04-05-SPIKE.md Path 2).
+ * No class hashing (Phase 25): emitStyle outputs plain class-name strings and
+ * `@rozie/unplugin` routes the scoped slice as a plain `.css` stylesheet. The
+ * `[data-rozie-s-<hash>]` attribute selectors below are the sole isolation
+ * layer — the prior `.module.css`/CSS-Modules routing was redundant and was
+ * removed (it also broke webpack css-loader's pure-selector rule).
  *
  * Component-scope attribute rewriting (paired with the always-scoped Vue
  * model): every scoped CSS selector is rewritten to append
@@ -70,7 +72,7 @@ export interface EmitReactOptions {
 
 export interface EmitReactResult {
   code: string;
-  /** CSS body for the sibling `.module.css` file (D-53). Empty string when no scoped rules. */
+  /** CSS body for the sibling plain `.css` file (D-53). Empty string when no scoped rules. */
   css: string;
   /** CSS body for the sibling `.global.css` file (D-54). Undefined when no `:root` rules. */
   globalCss?: string;

@@ -21,7 +21,7 @@
 // The compile + write phase intentionally duplicates a small slice of
 // build.ts (~30 lines) instead of refactoring out a shared writer.
 // Drift risk is low (both call the same `compile()` core; the only
-// per-target sidecar logic is React's .d.ts / .module.css / .global.css,
+// per-target sidecar logic is React's .d.ts / .css / .global.css,
 // which is stable). If the per-target sidecar matrix grows, the next
 // editor of either file should hoist the shared helper.
 import chokidar from 'chokidar';

@@ -212,7 +212,7 @@ export async function runBuildMatrix(
   const wantPretty = opts.pretty === true; // off by default per PROJECT.md
 
   // ----- DIST-04 React-stdout sidecar guard ----------------------------
-  // React emits .d.ts + .module.css + .global.css sidecars; these CANNOT
+  // React emits .d.ts + .css + .global.css sidecars; these CANNOT
   // be streamed to stdout (no filename to attach to). When target=react and
   // --out is null, error with ROZ855 BEFORE any pipeline work runs.
   if (outDir === null) {
@@ -220,7 +220,7 @@ export async function runBuildMatrix(
       if (t === 'react') {
         const msg = pc.red(
           `[ROZ855] rozie build: target 'react' requires --out <dir> ` +
-            `(cannot stream sidecar files .d.ts/.module.css/.global.css to stdout). ` +
+            `(cannot stream sidecar files .d.ts/.css/.global.css to stdout). ` +
             `Set --out <dir> to emit React components.\n`,
         );
         stderrWrite(msg);
