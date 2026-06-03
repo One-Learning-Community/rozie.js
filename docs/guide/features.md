@@ -679,11 +679,11 @@ If you skip it where you do need it, you'll see the Svelte runtime error [`state
 
 ## `$classSelector()` — handing a class name to a vanilla-JS engine
 
-`$classSelector('grip')` turns an authored class name into a CSS selector that matches the class **as it actually renders at runtime** — on every target. It exists because one of the six targets renames your class names behind your back.
+`$classSelector('grip')` turns an authored class name into a CSS selector and **validates it against the component's `<style>` scope at compile time**. It is a convenience: a class that doesn't exist in the component's `<style>` is a compile error with a did-you-mean suggestion, so engine config like `handle: $classSelector('grip')` can't silently reference a class you never declared.
 
-Five targets (Vue, Svelte, Solid, Angular, Lit) keep authored class names literal in the emitted DOM and isolate styles with a scoping attribute, so a class written `grip` renders as `class="grip"`. The React target is the exception: it runs class names through CSS Modules, so `class="grip"` is emitted as `className={styles.grip}` and renders as a hashed class like `_grip_17x98_26`.
+All six targets — React included — keep authored class names literal in the emitted DOM and isolate styles with a scoping attribute, so a class written `grip` renders as `class="grip"`. (React scopes via `[data-rozie-s-<hash>]`, the same model as Vue's `<style scoped>`; it no longer hashes class names.) That means a plain `el.querySelector('.grip')` already works on every target.
 
-That breaks any string that references a class as a *selector* passed to a third-party engine. The triggering case: a SortableJS wrapper that hands `handle: '.grip'` into `new Sortable(el, { handle })`. SortableJS queries `.grip`; React's DOM only has `_grip_17x98_26`, so the handle never matches and React cannot start a drag. The other five targets keep the literal `grip` class and work. `$classSelector` closes that gap — author once, get a correct selector on all six.
+`$classSelector` therefore isn't required for correctness — it's a compile-time-checked way to author the same selector. The motivating case: a SortableJS wrapper that hands `handle: $classSelector('grip')` into `new Sortable(el, { handle })`. The class is verified to exist before the engine ever queries it, and `$classSelector('grip')` resolves to the literal `".grip"` selector that matches the rendered DOM on all six targets.
 
 ```rozie
 <components>
@@ -717,10 +717,10 @@ Per-target lowering:
 | Solid | `".grip"` — compile-time literal |
 | Angular | `".grip"` — compile-time literal |
 | Lit | `".grip"` — compile-time literal |
-| React | `"." + styles.grip` — runtime expression (the CSS-Modules hash is only known at build time) |
+| React | `".grip"` — compile-time literal (classes stay literal in the DOM; React scopes via `[data-rozie-s-<hash>]`) |
 
 ::: warning Single class token only
-The argument must be **one bare CSS class identifier** — `$classSelector('grip')`. It is validated at compile time: a non-string-literal argument, a class that has no rule in the component's own `<style>` scope, or a value containing whitespace, a leading `.` / `#`, or a combinator (`$classSelector('a b')`, `$classSelector('.grip')`, `$classSelector('a > b')`) is a compile error with a code-frame. Referencing an undeclared class also fails — React would otherwise silently emit `".undefined"` — and the diagnostic suggests a near-match class name when one exists.
+The argument must be **one bare CSS class identifier** — `$classSelector('grip')`. It is validated at compile time: a non-string-literal argument, a class that has no rule in the component's own `<style>` scope, or a value containing whitespace, a leading `.` / `#`, or a combinator (`$classSelector('a b')`, `$classSelector('.grip')`, `$classSelector('a > b')`) is a compile error with a code-frame. Referencing an undeclared class also fails at compile time — catching the typo before it ships a selector that matches nothing — and the diagnostic suggests a near-match class name when one exists.
 
 Need a more specific selector — a descendant or compound selector? The escape hatch is to **declare a dedicated marker class** and `$classSelector` that. An even-empty CSS rule registers the class:
 
@@ -997,7 +997,7 @@ The outer compound (`.board`) stays scoped to this component; only what's inside
 
 Each target picks the right translation:
 
-- **React**: scope attribute appended to the outer compound only, AND the deep-lifted part wrapped in `:global(...)` so it survives CSS Modules — `.board[data-rozie-s-<hash>] :global(.rozie-sortable-list) { … }`. Without the `:global` wrap the inner class name would be module-hashed at build time and never match the producer-rendered class. (Class names *inside* `:global()` are left literal; the `:global` wrap is a CSS Modules convention, not a CSS spec pseudo, so it's invisible at runtime.)
+- **React**: scope attribute appended to the outer compound only, with the deep-lifted part wrapped in `:global(...)` — `.board[data-rozie-s-<hash>] :global(.rozie-sortable-list) { … }`. (The `:global()` wrap is historical: it originally opted the lifted inner selector out of CSS Modules hashing. React now emits a plain `.css` file scoped purely by `[data-rozie-s-<hash>]` attributes, so the wrap is inert-but-kept — class names *inside* `:global()` are already literal in the DOM and match the producer-rendered class directly.)
 - **Solid**: scope attribute appended to the outer compound only — `.board[data-rozie-s-<hash>] .rozie-sortable-list { … }`. Solid emits CSS via a runtime style-inject (no CSS Modules pipeline), so the inner class name survives literally and needs no extra wrap.
 - **Vue**: `:deep()` is passed through verbatim. Vue 3.4+ `<style scoped>` understands the selector natively and applies its `[data-v-<hash>]` lowering downstream.
 - **Svelte**: same compound-scope rewrite as React, wrapped in Svelte 5's `:global { … }` so Svelte's native scoper doesn't interfere.
