@@ -124,6 +124,75 @@ describe('emitAngular CVA — Task 1: non-CVA components are untouched', () => {
 });
 
 // ---------------------------------------------------------------------------
+// CR-01 (Phase 23 review) — the view→model bridge on the two-way binding emit
+// path. The idiomatic single-form-control shape is a wrapped native <input> with
+// `r-model="$model.value"` (or a consumer-side `r-model:value=`). These emit
+// `(...Change)="value.set($event)"` directly in emitTemplateAttribute and
+// previously BYPASSED the __rozieCvaOnChange notify entirely, so user input never
+// reached the FormControl. The fix folds the notify into the change handler when
+// the bound signal IS the single CVA model prop.
+// ---------------------------------------------------------------------------
+
+// Native form-input r-model on the single CVA model prop (the most natural CVA
+// shape — a wrapped <input>). The lvalue is `$props.value` — the signal-target
+// form resolveSignalNameForLValue recognizes for a model:true prop.
+const RMODEL_NATIVE_SRC = `<rozie name="RModelNativeProbe">
+<props>{ value: { type: String, default: '', model: true } }</props>
+<template>
+  <input class="rm" r-model="$props.value" />
+</template>
+</rozie>`;
+const RMODEL_NATIVE_FILE = 'RModelNativeProbe.rozie';
+
+// Consumer-side r-model:value= two-way binding onto a child component whose
+// `value` is the single CVA model prop.
+const RMODEL_CONSUMER_SRC = `<rozie name="RModelConsumerProbe">
+<props>{ value: { type: String, default: '', model: true } }</props>
+<template>
+  <div r-model:value="$props.value"></div>
+</template>
+</rozie>`;
+const RMODEL_CONSUMER_FILE = 'RModelConsumerProbe.rozie';
+
+describe('emitAngular CVA — CR-01: view→model bridge on the two-way r-model path', () => {
+  it('native r-model on the CVA prop notifies __rozieCvaOnChange in the change handler', () => {
+    const { code } = compileAngular(RMODEL_NATIVE_SRC, RMODEL_NATIVE_FILE);
+    // (ngModelChange)="value.set($event); __rozieCvaOnChange($event)"
+    expect(code).toContain('value.set($event)');
+    expect(code).toContain('__rozieCvaOnChange($event)');
+    expect(code).toMatch(
+      /\(ngModelChange\)="value\.set\(\$event\); __rozieCvaOnChange\(\$event\)"/,
+    );
+  });
+
+  it('native r-model on the CVA prop emits NO notify under cva:false', () => {
+    const { code } = compileAngular(RMODEL_NATIVE_SRC, RMODEL_NATIVE_FILE, {
+      cva: false,
+    });
+    expect(code).toContain('value.set($event)');
+    expect(code).not.toContain('__rozieCvaOnChange');
+  });
+
+  it('consumer-side r-model:value= on the CVA prop notifies __rozieCvaOnChange', () => {
+    const { code } = compileAngular(RMODEL_CONSUMER_SRC, RMODEL_CONSUMER_FILE);
+    // (valueChange)="value.set($event); __rozieCvaOnChange($event)"
+    expect(code).toContain('value.set($event)');
+    expect(code).toContain('__rozieCvaOnChange($event)');
+    expect(code).toMatch(
+      /\(valueChange\)="value\.set\(\$event\); __rozieCvaOnChange\(\$event\)"/,
+    );
+  });
+
+  it('consumer-side r-model:value= on the CVA prop emits NO notify under cva:false', () => {
+    const { code } = compileAngular(RMODEL_CONSUMER_SRC, RMODEL_CONSUMER_FILE, {
+      cva: false,
+    });
+    expect(code).toContain('value.set($event)');
+    expect(code).not.toContain('__rozieCvaOnChange');
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Task 2 — disabled OR-merge.
 // ---------------------------------------------------------------------------
 
@@ -174,6 +243,37 @@ describe('emitAngular CVA — Task 2: disabled OR-merge', () => {
   it('does NOT merge a non-disabled prop read', () => {
     // value is a model prop, not the disabled prop — never OR-merged.
     expect(code).not.toMatch(/value\(\)\s*\|\|\s*this\.__rozieCvaDisabled/);
+  });
+
+  // WR-05 — a NON-Boolean `disabled` prop must NOT be OR-merged (the merge
+  // would be truthy-broken: `'no' || false` is `'no'`, so setDisabledState(false)
+  // could never re-enable the control). Instead the non-Boolean disabled leaves
+  // setDisabledState a no-op and ROZ126 fires.
+  it('does NOT OR-merge a non-Boolean (String) disabled prop, and fires ROZ126', () => {
+    const STRING_DISABLED_SRC = `<rozie name="StringDisabledProbe">
+<props>
+{
+  value: { type: String, default: '', model: true },
+  disabled: { type: String, default: '' },
+}
+</props>
+<template>
+  <input class="sd" :disabled="$props.disabled" :value="$props.value" />
+</template>
+</rozie>`;
+    const { code: sd, diagnostics } = compileAngular(
+      STRING_DISABLED_SRC,
+      'StringDisabledProbe.rozie',
+    );
+    expect(sd).not.toContain('__rozieCvaDisabled()');
+    // The non-Boolean disabled leaves setDisabledState a no-op → ROZ126 fires.
+    expect(diagnostics.filter((d) => d.code === 'ROZ126')).toHaveLength(1);
+  });
+
+  // WR-05 control — a Boolean disabled prop still OR-merges and suppresses ROZ126.
+  it('a Boolean disabled prop still OR-merges and suppresses ROZ126', () => {
+    const { diagnostics } = compileAngular(DISABLED_SRC, DISABLED_FILE);
+    expect(diagnostics.filter((d) => d.code === 'ROZ126')).toHaveLength(0);
   });
 
   it('OR-merges the disabled read inside an $onMount-paired handler (ngAfterViewInit seed)', () => {
@@ -232,6 +332,18 @@ describe('emitAngular CVA — Task 3: ROZ125 multi-model info', () => {
     expect(roz125).toHaveLength(1);
     expect(roz125[0]!.severity).toBe('info');
     expect(code).not.toContain('NG_VALUE_ACCESSOR');
+  });
+
+  // WR-01 — when the user explicitly opted out via cva:false, ROZ125 (which
+  // blames the model count for the missing accessor) is misleading and must NOT
+  // fire; the model count is no longer the reason no CVA exists.
+  it('a ≥2-model component with cva:false fires NO ROZ125', () => {
+    const { diagnostics } = compileAngular(
+      fixture('MultiModelProbe'),
+      'MultiModelProbe.rozie',
+      { cva: false },
+    );
+    expect(diagnostics.filter((d) => d.code === 'ROZ125')).toHaveLength(0);
   });
 });
 

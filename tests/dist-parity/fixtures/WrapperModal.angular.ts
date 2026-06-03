@@ -16,7 +16,7 @@ interface ActionsCtx {}
   imports: [NgTemplateOutlet, Modal],
   template: `
 
-    <rozie-modal [open]="open()" (openChange)="open.set($event)" [title]="title()"><ng-template #header>
+    <rozie-modal [open]="open()" (openChange)="open.set($event); __rozieCvaOnChange($event)" [title]="title()"><ng-template #header>
         @if ((brandTpl ?? templates()?.['brand'])) {
     <ng-container *ngTemplateOutlet="(brandTpl ?? templates()?.['brand'])" />
     } @else {

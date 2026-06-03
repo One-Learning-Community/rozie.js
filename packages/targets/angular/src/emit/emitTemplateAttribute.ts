@@ -1060,7 +1060,22 @@ export function emitSingleAttr(
     const signalName = resolveSignalNameForLValue(attr.expression, ctx.ir);
     const bindingName = resolveBindingName(attr.name, ctx);
     if (signalName !== null) {
-      return `[${bindingName}]="${signalName}()" (${bindingName}Change)="${signalName}.set($event)"`;
+      // Phase 23 CR-01 — the view→model bridge. When the bound signal IS the
+      // single CVA model prop, the change-output half must also notify Angular's
+      // form machinery via `__rozieCvaOnChange($event)` — otherwise consumer-side
+      // `r-model:value=` updates the internal signal but never reaches the
+      // FormControl (silently broken forms integration). The bare
+      // `__rozieCvaOnChange(...)` resolves against `this` in the template event
+      // scope, matching the `signalName.set(...)` setter convention. We emit a
+      // SequenceExpression (`a; b`) so the change handler stays a single
+      // expression. The notify is appended ONLY when CVA is active for this prop
+      // (`signalName === ctx.cvaModelProp`); `cva:false` (cvaModelProp === null)
+      // emits the bare setter unchanged, preserving dist-parity byte-equality.
+      const change =
+        signalName === ctx.cvaModelProp
+          ? `${signalName}.set($event); __rozieCvaOnChange($event)`
+          : `${signalName}.set($event)`;
+      return `[${bindingName}]="${signalName}()" (${bindingName}Change)="${change}"`;
     }
     // Non-signal fallback — rare-case degrade to one-way binding (the
     // change-output half is lost). Per Plan 07.3-05 task: "lossy on the
@@ -1120,11 +1135,26 @@ export function emitSingleAttr(
           valueTransforms,
         );
         const eventBinding = isLazy ? 'change' : 'ngModelChange';
+        // Phase 23 CR-01 — the view→model bridge for the native `r-model` form
+        // input (the most natural single-form-control shape, and exactly what a
+        // CVA is for). When the bound signal IS the single CVA model prop, the
+        // change handler must also notify Angular's form machinery via
+        // `__rozieCvaOnChange(<committedValue>)` — otherwise keystrokes update
+        // the internal signal but the FormControl stays pristine/empty. We feed
+        // the SAME `committedValue` (post-`.number`/`.trim` transform) to both
+        // the setter and the notify so the form receives the committed value, not
+        // the raw event. Appended ONLY when `signalName === ctx.cvaModelProp`;
+        // `cva:false` (cvaModelProp === null) emits the bare setter unchanged,
+        // preserving dist-parity byte-equality.
+        const modelSetExpr =
+          signalName === ctx.cvaModelProp
+            ? `${signalName}.set(${committedValue}); __rozieCvaOnChange(${committedValue})`
+            : `${signalName}.set(${committedValue})`;
         // [ngModelOptions]="{standalone:true}" prevents NG01352 when this input
         // is nested inside a <form> — Angular would otherwise require a `name`
         // attribute to register the control with the parent FormGroup. Rozie
         // manages state via signals, so we always opt out of the forms model.
-        return `[ngModel]="${signalName}()" (${eventBinding})="${signalName}.set(${committedValue})" [ngModelOptions]="{standalone: true}"`;
+        return `[ngModel]="${signalName}()" (${eventBinding})="${modelSetExpr}" [ngModelOptions]="{standalone: true}"`;
       }
       // Non-signal target — fall back to bare [(ngModel)] with rewritten expression.
       const expr = rewriteTemplateExpression(attr.expression, ctx.ir, {
