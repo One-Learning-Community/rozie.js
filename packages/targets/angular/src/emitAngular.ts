@@ -91,6 +91,7 @@ import { buildShell } from './emit/shell.js';
 import { composeSourceMap } from './sourcemap/compose.js';
 import { cloneScriptProgram } from './rewrite/cloneProgram.js';
 import { rewriteRozieIdentifiers } from './rewrite/rewriteScript.js';
+import { cvaDiagnostics as computeCvaDiagnostics } from './cvaDiagnostics.js';
 
 /**
  * Bug 5: build a handler-name → parameter-count map from the (un-rewritten)
@@ -190,9 +191,14 @@ export function emitAngular(
   const modelProps = ir.props.filter((p) => p.isModel);
   const cvaModelProp =
     cvaEnabled && modelProps.length === 1 ? modelProps[0]! : null;
-  // Plan 03 populates this with ROZ124/125/126 diagnostics; reserved here so the
-  // aggregation spread below has a stable slot. Intentionally empty in Plan 02.
-  const cvaDiagnostics: Diagnostic[] = [];
+  // Phase 23 Plan 03 — populate the reserved slot with ROZ124 (collision error),
+  // ROZ125 (≥2-model info), and ROZ126 (no-disabled info). Computed from the IR +
+  // the single resolved gate; never throws (D-08). Flows through the diagnostics
+  // aggregation spread at the bottom of emitAngular.
+  const cvaDiagnostics: Diagnostic[] = computeCvaDiagnostics(
+    ir,
+    cvaModelProp !== null ? cvaModelProp.name : null,
+  );
 
   // 1. Script-side emission.
   // Phase 06.1 P2: thread filename for sourceFileName + capture scriptMap.
