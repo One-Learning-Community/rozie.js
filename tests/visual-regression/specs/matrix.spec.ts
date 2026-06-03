@@ -165,6 +165,14 @@ const EXAMPLES = [
   // BEHAVIORAL external-caller flow (type → click reset-via-handle → input
   // clears) lives in specs/expose-probe.spec.ts and is NOT baseline-gated.
   'ExposeProbe',
+  // Phase 24 (security-self-test-battery) D-11 — the single r-html fixture.
+  // A String `content` prop with a non-empty static-HTML default renders raw via
+  // r-html (the VR cell shows the bold "safe"). Per D-10 all 6 targets diff
+  // against the SAME shared `RHtml.png` baseline. The Linux-Docker baseline is
+  // owned by Plan 24-03 Task 3 (vr.sh update-snapshots, RHtml-filtered); until it
+  // lands the cell baseline-gates to `test.fixme` via `baselineExists()` (never
+  // red) — no macOS-rendered PNG is committed here.
+  'RHtml',
 ] as const;
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'] as const;
 

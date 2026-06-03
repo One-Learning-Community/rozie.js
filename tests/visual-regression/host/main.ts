@@ -150,6 +150,11 @@ export const EXAMPLES = [
   // in matrix.spec.ts EXAMPLES. Distinct from the existing 'Flatpickr' wrapper
   // screenshot cell (FlatpickrDemo.rozie), which stays byte-untouched.
   'FlatpickrBehavior',
+  // Phase 24 (security-self-test-battery) D-11 — base example; the loader
+  // resolves directly to examples/RHtml.rozie (no demo sibling). Its String
+  // `content` prop has a non-empty static-HTML default, so the cell renders raw
+  // HTML (the bold "safe") without a parent supplying props.
+  'RHtml',
 ] as const;
 
 export type Example = (typeof EXAMPLES)[number];
@@ -212,6 +217,9 @@ export const LIT_TAGS: Record<Example, string> = {
   // Quick 260601-x2p — the lit entry appends '-demo' → tag
   // 'rozie-flatpickr-behavior-demo' = kebab of FlatpickrBehaviorDemo.
   FlatpickrBehavior: 'rozie-flatpickr-behavior',
+  // Phase 24 — kebab tag for the r-html fixture (matches the Lit-emitted
+  // @customElement('rozie-r-html') in RHtml.lit.ts).
+  RHtml: 'rozie-r-html',
 };
 
 export interface HostQuery {
@@ -310,6 +318,10 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // Quick 260601-x2p — self-contained; all reactive state lives in the demo's
   // <data> (picked / disableWeekends / lang / rangeValue / rangeEnabled).
   FlatpickrBehavior: {},
+  // Phase 24 — RHtml is self-contained: its `content` String prop has a
+  // non-empty static-HTML default ('<strong>safe</strong>'), so no parent props
+  // are needed for the cell to render visible raw HTML.
+  RHtml: {},
 };
 
 /**
