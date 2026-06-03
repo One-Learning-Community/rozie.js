@@ -84,9 +84,11 @@ describe('emitScript — behavior', () => {
     // TDZ limitation #1.
     const useEffectMatches = lifecycleEffectsSection.match(/useEffect\(/g) ?? [];
     expect(useEffectMatches.length).toBeGreaterThanOrEqual(1);
-    // Modal has 2 lifecycle hooks: paired (lockScroll, unlockScroll) and
-    // standalone $onMount(arrow with $refs.dialogEl?.focus()).
-    expect(useEffectMatches.length).toBe(2);
+    // Modal has 3 lifecycle hooks: the paired $onMount(lockScroll)/
+    // $onUnmount(unlockScroll), a standalone $onMount(arrow with
+    // $refs.dialogEl?.focus()), and a $watch(() => $props.open) that drives
+    // lock/unlock on every `open` toggle (the cross-target scroll-lock primitive).
+    expect(useEffectMatches.length).toBe(3);
 
     // Cleanup is wired via `return () => unlockScroll();` inside the paired useEffect
     expect(lifecycleEffectsSection).toMatch(/return\s*\(\s*\)\s*=>\s*unlockScroll\(\)/);

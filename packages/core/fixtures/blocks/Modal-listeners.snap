@@ -2,15 +2,15 @@
   "node": {
     "type": "ListenersAST",
     "loc": {
-      "start": 1842,
-      "end": 2182
+      "start": 2154,
+      "end": 2494
     },
     "entries": [
       {
         "target": "document",
         "event": "keydown",
         "modifierChainText": ".escape",
-        "modifierChainBaseOffset": 2120,
+        "modifierChainBaseOffset": 2432,
         "chain": [],
         "value": {
           "type": "ObjectExpression",
@@ -24,8 +24,8 @@
               "value": {
                 "type": "StringLiteral",
                 "value": "$props.open && $props.closeOnEscape",
-                "start": 2141,
-                "end": 2178
+                "start": 2453,
+                "end": 2490
               },
               "computed": false,
               "shorthand": false,
@@ -39,18 +39,18 @@
               },
               "value": {
                 "type": "Identifier",
-                "start": 2129,
-                "end": 2134,
+                "start": 2441,
+                "end": 2446,
                 "loc": {
                   "start": {
-                    "line": 63,
+                    "line": 70,
                     "column": 48,
-                    "index": 2129
+                    "index": 2441
                   },
                   "end": {
-                    "line": 63,
+                    "line": 70,
                     "column": 53,
-                    "index": 2134
+                    "index": 2446
                   },
                   "filename": "Modal.rozie",
                   "identifierName": "close"
@@ -65,8 +65,8 @@
           ]
         },
         "loc": {
-          "start": 2083,
-          "end": 2181
+          "start": 2395,
+          "end": 2493
         }
       }
     ]

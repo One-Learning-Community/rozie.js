@@ -1,4 +1,4 @@
-import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, effect, forwardRef, inject, input, model, output, signal, viewChild } from '@angular/core';
+import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, effect, forwardRef, inject, input, model, output, signal, untracked, viewChild } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
 
@@ -89,20 +89,6 @@ interface FooterCtx {
   host: { '(focusout)': '__rozieCvaOnTouched()' },
 })
 export class Modal {
-  constructor() {
-      const renderer = inject(Renderer2);
-
-      effect((onCleanup) => {
-        if (!(this.open() && this.closeOnEscape())) return;
-        const handler = ($event: KeyboardEvent) => {
-          if ($event.key !== 'Escape') return;
-          this._close();
-        };
-        const unlisten = renderer.listen('document', 'keydown', handler);
-        onCleanup(unlisten);
-      });
-  }
-
   open = model<boolean>(false);
   closeOnEscape = input<boolean>(true);
   closeOnBackdrop = input<boolean>(true);
@@ -116,6 +102,25 @@ export class Modal {
   @ContentChild('footer', { read: TemplateRef }) footerTpl?: TemplateRef<FooterCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
   private __rozieDestroyRef = inject(DestroyRef);
+  private __rozieWatchInitial_0 = true;
+
+  constructor() {
+      const renderer = inject(Renderer2);
+
+      effect((onCleanup) => {
+        if (!(this.open() && this.closeOnEscape())) return;
+        const handler = ($event: KeyboardEvent) => {
+          if ($event.key !== 'Escape') return;
+          this._close();
+        };
+        const unlisten = renderer.listen('document', 'keydown', handler);
+        onCleanup(unlisten);
+      });
+
+    effect(() => { const __watchVal = (() => this.open())(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } ((isOpen: any) => {
+      if (isOpen) this.lockScroll();else this.unlockScroll();
+    })(__watchVal); }); });
+  }
 
   ngAfterViewInit() {
     this.lockScroll();
@@ -129,7 +134,7 @@ export class Modal {
   };
   savedBodyOverflow = '';
   lockScroll = () => {
-    if (!this.lockBodyScroll()) return;
+    if (!this.lockBodyScroll() || !this.open()) return;
     this.savedBodyOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
   };

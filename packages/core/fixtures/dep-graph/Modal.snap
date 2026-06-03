@@ -113,5 +113,13 @@
         "title"
       ]
     }
+  ],
+  "watch.0.getter": [
+    {
+      "scope": "props",
+      "path": [
+        "open"
+      ]
+    }
   ]
 }

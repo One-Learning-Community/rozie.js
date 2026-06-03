@@ -2,16 +2,16 @@
   "node": {
     "type": "TemplateAST",
     "loc": {
-      "start": 2206,
-      "end": 2890
+      "start": 2518,
+      "end": 3202
     },
     "children": [
       {
         "type": "TemplateText",
         "text": "\n",
         "loc": {
-          "start": 2206,
-          "end": 2207
+          "start": 2518,
+          "end": 2519
         }
       },
       {
@@ -23,16 +23,16 @@
             "rawName": "r-if",
             "name": "if",
             "modifierChainText": "",
-            "modifierChainBaseOffset": 2216,
+            "modifierChainBaseOffset": 2528,
             "chain": [],
             "value": "$props.open",
             "valueLoc": {
-              "start": 2218,
-              "end": 2229
+              "start": 2530,
+              "end": 2541
             },
             "loc": {
-              "start": 2212,
-              "end": 2230
+              "start": 2524,
+              "end": 2542
             }
           },
           {
@@ -40,16 +40,16 @@
             "rawName": "class",
             "name": "class",
             "modifierChainText": "",
-            "modifierChainBaseOffset": 2236,
+            "modifierChainBaseOffset": 2548,
             "chain": [],
             "value": "modal-backdrop",
             "valueLoc": {
-              "start": 2238,
-              "end": 2252
+              "start": 2550,
+              "end": 2564
             },
             "loc": {
-              "start": 2231,
-              "end": 2253
+              "start": 2543,
+              "end": 2565
             }
           },
           {
@@ -57,16 +57,16 @@
             "rawName": "ref",
             "name": "ref",
             "modifierChainText": "",
-            "modifierChainBaseOffset": 2257,
+            "modifierChainBaseOffset": 2569,
             "chain": [],
             "value": "backdropEl",
             "valueLoc": {
-              "start": 2259,
-              "end": 2269
+              "start": 2571,
+              "end": 2581
             },
             "loc": {
-              "start": 2254,
-              "end": 2270
+              "start": 2566,
+              "end": 2582
             }
           },
           {
@@ -74,16 +74,16 @@
             "rawName": "@click.self",
             "name": "click",
             "modifierChainText": ".self",
-            "modifierChainBaseOffset": 2277,
+            "modifierChainBaseOffset": 2589,
             "chain": [],
             "value": "$props.closeOnBackdrop && close()",
             "valueLoc": {
-              "start": 2284,
-              "end": 2317
+              "start": 2596,
+              "end": 2629
             },
             "loc": {
-              "start": 2271,
-              "end": 2318
+              "start": 2583,
+              "end": 2630
             }
           }
         ],
@@ -92,8 +92,8 @@
             "type": "TemplateText",
             "text": "\n  ",
             "loc": {
-              "start": 2319,
-              "end": 2322
+              "start": 2631,
+              "end": 2634
             }
           },
           {
@@ -105,16 +105,16 @@
                 "rawName": "ref",
                 "name": "ref",
                 "modifierChainText": "",
-                "modifierChainBaseOffset": 2334,
+                "modifierChainBaseOffset": 2646,
                 "chain": [],
                 "value": "dialogEl",
                 "valueLoc": {
-                  "start": 2336,
-                  "end": 2344
+                  "start": 2648,
+                  "end": 2656
                 },
                 "loc": {
-                  "start": 2331,
-                  "end": 2345
+                  "start": 2643,
+                  "end": 2657
                 }
               },
               {
@@ -122,16 +122,16 @@
                 "rawName": "class",
                 "name": "class",
                 "modifierChainText": "",
-                "modifierChainBaseOffset": 2355,
+                "modifierChainBaseOffset": 2667,
                 "chain": [],
                 "value": "modal-dialog",
                 "valueLoc": {
-                  "start": 2357,
-                  "end": 2369
+                  "start": 2669,
+                  "end": 2681
                 },
                 "loc": {
-                  "start": 2350,
-                  "end": 2370
+                  "start": 2662,
+                  "end": 2682
                 }
               },
               {
@@ -139,16 +139,16 @@
                 "rawName": "role",
                 "name": "role",
                 "modifierChainText": "",
-                "modifierChainBaseOffset": 2379,
+                "modifierChainBaseOffset": 2691,
                 "chain": [],
                 "value": "dialog",
                 "valueLoc": {
-                  "start": 2381,
-                  "end": 2387
+                  "start": 2693,
+                  "end": 2699
                 },
                 "loc": {
-                  "start": 2375,
-                  "end": 2388
+                  "start": 2687,
+                  "end": 2700
                 }
               },
               {
@@ -156,16 +156,16 @@
                 "rawName": "aria-modal",
                 "name": "aria-modal",
                 "modifierChainText": "",
-                "modifierChainBaseOffset": 2403,
+                "modifierChainBaseOffset": 2715,
                 "chain": [],
                 "value": "true",
                 "valueLoc": {
-                  "start": 2405,
-                  "end": 2409
+                  "start": 2717,
+                  "end": 2721
                 },
                 "loc": {
-                  "start": 2393,
-                  "end": 2410
+                  "start": 2705,
+                  "end": 2722
                 }
               },
               {
@@ -173,16 +173,16 @@
                 "rawName": ":aria-label",
                 "name": "aria-label",
                 "modifierChainText": "",
-                "modifierChainBaseOffset": 2426,
+                "modifierChainBaseOffset": 2738,
                 "chain": [],
                 "value": "$props.title || undefined",
                 "valueLoc": {
-                  "start": 2428,
-                  "end": 2453
+                  "start": 2740,
+                  "end": 2765
                 },
                 "loc": {
-                  "start": 2415,
-                  "end": 2454
+                  "start": 2727,
+                  "end": 2766
                 }
               },
               {
@@ -190,16 +190,16 @@
                 "rawName": "tabindex",
                 "name": "tabindex",
                 "modifierChainText": "",
-                "modifierChainBaseOffset": 2467,
+                "modifierChainBaseOffset": 2779,
                 "chain": [],
                 "value": "-1",
                 "valueLoc": {
-                  "start": 2469,
-                  "end": 2471
+                  "start": 2781,
+                  "end": 2783
                 },
                 "loc": {
-                  "start": 2459,
-                  "end": 2472
+                  "start": 2771,
+                  "end": 2784
                 }
               }
             ],
@@ -208,8 +208,8 @@
                 "type": "TemplateText",
                 "text": "\n    ",
                 "loc": {
-                  "start": 2476,
-                  "end": 2481
+                  "start": 2788,
+                  "end": 2793
                 }
               },
               {
@@ -221,16 +221,16 @@
                     "rawName": "r-if",
                     "name": "if",
                     "modifierChainText": "",
-                    "modifierChainBaseOffset": 2493,
+                    "modifierChainBaseOffset": 2805,
                     "chain": [],
                     "value": "$props.title || $slots.header",
                     "valueLoc": {
-                      "start": 2495,
-                      "end": 2524
+                      "start": 2807,
+                      "end": 2836
                     },
                     "loc": {
-                      "start": 2489,
-                      "end": 2525
+                      "start": 2801,
+                      "end": 2837
                     }
                   }
                 ],
@@ -239,8 +239,8 @@
                     "type": "TemplateText",
                     "text": "\n      ",
                     "loc": {
-                      "start": 2526,
-                      "end": 2533
+                      "start": 2838,
+                      "end": 2845
                     }
                   },
                   {
@@ -252,16 +252,16 @@
                         "rawName": "name",
                         "name": "name",
                         "modifierChainText": "",
-                        "modifierChainBaseOffset": 2543,
+                        "modifierChainBaseOffset": 2855,
                         "chain": [],
                         "value": "header",
                         "valueLoc": {
-                          "start": 2545,
-                          "end": 2551
+                          "start": 2857,
+                          "end": 2863
                         },
                         "loc": {
-                          "start": 2539,
-                          "end": 2552
+                          "start": 2851,
+                          "end": 2864
                         }
                       },
                       {
@@ -269,16 +269,16 @@
                         "rawName": ":close",
                         "name": "close",
                         "modifierChainText": "",
-                        "modifierChainBaseOffset": 2559,
+                        "modifierChainBaseOffset": 2871,
                         "chain": [],
                         "value": "close",
                         "valueLoc": {
-                          "start": 2561,
-                          "end": 2566
+                          "start": 2873,
+                          "end": 2878
                         },
                         "loc": {
-                          "start": 2553,
-                          "end": 2567
+                          "start": 2865,
+                          "end": 2879
                         }
                       }
                     ],
@@ -287,8 +287,8 @@
                         "type": "TemplateText",
                         "text": "\n        ",
                         "loc": {
-                          "start": 2568,
-                          "end": 2577
+                          "start": 2880,
+                          "end": 2889
                         }
                       },
                       {
@@ -300,38 +300,38 @@
                             "type": "TemplateInterpolation",
                             "rawExpr": " $props.title ",
                             "loc": {
-                              "start": 2581,
-                              "end": 2599
+                              "start": 2893,
+                              "end": 2911
                             }
                           }
                         ],
                         "selfClosing": false,
                         "loc": {
-                          "start": 2577,
-                          "end": 2604
+                          "start": 2889,
+                          "end": 2916
                         }
                       },
                       {
                         "type": "TemplateText",
                         "text": "\n      ",
                         "loc": {
-                          "start": 2604,
-                          "end": 2611
+                          "start": 2916,
+                          "end": 2923
                         }
                       }
                     ],
                     "selfClosing": false,
                     "loc": {
-                      "start": 2533,
-                      "end": 2618
+                      "start": 2845,
+                      "end": 2930
                     }
                   },
                   {
                     "type": "TemplateText",
                     "text": "\n      ",
                     "loc": {
-                      "start": 2618,
-                      "end": 2625
+                      "start": 2930,
+                      "end": 2937
                     }
                   },
                   {
@@ -343,16 +343,16 @@
                         "rawName": "class",
                         "name": "class",
                         "modifierChainText": "",
-                        "modifierChainBaseOffset": 2638,
+                        "modifierChainBaseOffset": 2950,
                         "chain": [],
                         "value": "close-btn",
                         "valueLoc": {
-                          "start": 2640,
-                          "end": 2649
+                          "start": 2952,
+                          "end": 2961
                         },
                         "loc": {
-                          "start": 2633,
-                          "end": 2650
+                          "start": 2945,
+                          "end": 2962
                         }
                       },
                       {
@@ -360,16 +360,16 @@
                         "rawName": "@click",
                         "name": "click",
                         "modifierChainText": "",
-                        "modifierChainBaseOffset": 2657,
+                        "modifierChainBaseOffset": 2969,
                         "chain": [],
                         "value": "close",
                         "valueLoc": {
-                          "start": 2659,
-                          "end": 2664
+                          "start": 2971,
+                          "end": 2976
                         },
                         "loc": {
-                          "start": 2651,
-                          "end": 2665
+                          "start": 2963,
+                          "end": 2977
                         }
                       },
                       {
@@ -377,16 +377,16 @@
                         "rawName": "aria-label",
                         "name": "aria-label",
                         "modifierChainText": "",
-                        "modifierChainBaseOffset": 2676,
+                        "modifierChainBaseOffset": 2988,
                         "chain": [],
                         "value": "Close",
                         "valueLoc": {
-                          "start": 2678,
-                          "end": 2683
+                          "start": 2990,
+                          "end": 2995
                         },
                         "loc": {
-                          "start": 2666,
-                          "end": 2684
+                          "start": 2978,
+                          "end": 2996
                         }
                       }
                     ],
@@ -395,38 +395,38 @@
                         "type": "TemplateText",
                         "text": "×",
                         "loc": {
-                          "start": 2685,
-                          "end": 2686
+                          "start": 2997,
+                          "end": 2998
                         }
                       }
                     ],
                     "selfClosing": false,
                     "loc": {
-                      "start": 2625,
-                      "end": 2695
+                      "start": 2937,
+                      "end": 3007
                     }
                   },
                   {
                     "type": "TemplateText",
                     "text": "\n    ",
                     "loc": {
-                      "start": 2695,
-                      "end": 2700
+                      "start": 3007,
+                      "end": 3012
                     }
                   }
                 ],
                 "selfClosing": false,
                 "loc": {
-                  "start": 2481,
-                  "end": 2709
+                  "start": 2793,
+                  "end": 3021
                 }
               },
               {
                 "type": "TemplateText",
                 "text": "\n\n    ",
                 "loc": {
-                  "start": 2709,
-                  "end": 2715
+                  "start": 3021,
+                  "end": 3027
                 }
               },
               {
@@ -438,16 +438,16 @@
                     "rawName": "class",
                     "name": "class",
                     "modifierChainText": "",
-                    "modifierChainBaseOffset": 2725,
+                    "modifierChainBaseOffset": 3037,
                     "chain": [],
                     "value": "modal-body",
                     "valueLoc": {
-                      "start": 2727,
-                      "end": 2737
+                      "start": 3039,
+                      "end": 3049
                     },
                     "loc": {
-                      "start": 2720,
-                      "end": 2738
+                      "start": 3032,
+                      "end": 3050
                     }
                   }
                 ],
@@ -456,8 +456,8 @@
                     "type": "TemplateText",
                     "text": "\n      ",
                     "loc": {
-                      "start": 2739,
-                      "end": 2746
+                      "start": 3051,
+                      "end": 3058
                     }
                   },
                   {
@@ -469,47 +469,47 @@
                         "rawName": ":close",
                         "name": "close",
                         "modifierChainText": "",
-                        "modifierChainBaseOffset": 2758,
+                        "modifierChainBaseOffset": 3070,
                         "chain": [],
                         "value": "close",
                         "valueLoc": {
-                          "start": 2760,
-                          "end": 2765
+                          "start": 3072,
+                          "end": 3077
                         },
                         "loc": {
-                          "start": 2752,
-                          "end": 2766
+                          "start": 3064,
+                          "end": 3078
                         }
                       }
                     ],
                     "children": [],
                     "selfClosing": true,
                     "loc": {
-                      "start": 2746,
-                      "end": 2769
+                      "start": 3058,
+                      "end": 3081
                     }
                   },
                   {
                     "type": "TemplateText",
                     "text": "\n    ",
                     "loc": {
-                      "start": 2769,
-                      "end": 2774
+                      "start": 3081,
+                      "end": 3086
                     }
                   }
                 ],
                 "selfClosing": false,
                 "loc": {
-                  "start": 2715,
-                  "end": 2780
+                  "start": 3027,
+                  "end": 3092
                 }
               },
               {
                 "type": "TemplateText",
                 "text": "\n\n    ",
                 "loc": {
-                  "start": 2780,
-                  "end": 2786
+                  "start": 3092,
+                  "end": 3098
                 }
               },
               {
@@ -521,16 +521,16 @@
                     "rawName": "r-if",
                     "name": "if",
                     "modifierChainText": "",
-                    "modifierChainBaseOffset": 2798,
+                    "modifierChainBaseOffset": 3110,
                     "chain": [],
                     "value": "$slots.footer",
                     "valueLoc": {
-                      "start": 2800,
-                      "end": 2813
+                      "start": 3112,
+                      "end": 3125
                     },
                     "loc": {
-                      "start": 2794,
-                      "end": 2814
+                      "start": 3106,
+                      "end": 3126
                     }
                   }
                 ],
@@ -539,8 +539,8 @@
                     "type": "TemplateText",
                     "text": "\n      ",
                     "loc": {
-                      "start": 2815,
-                      "end": 2822
+                      "start": 3127,
+                      "end": 3134
                     }
                   },
                   {
@@ -552,16 +552,16 @@
                         "rawName": "name",
                         "name": "name",
                         "modifierChainText": "",
-                        "modifierChainBaseOffset": 2832,
+                        "modifierChainBaseOffset": 3144,
                         "chain": [],
                         "value": "footer",
                         "valueLoc": {
-                          "start": 2834,
-                          "end": 2840
+                          "start": 3146,
+                          "end": 3152
                         },
                         "loc": {
-                          "start": 2828,
-                          "end": 2841
+                          "start": 3140,
+                          "end": 3153
                         }
                       },
                       {
@@ -569,77 +569,77 @@
                         "rawName": ":close",
                         "name": "close",
                         "modifierChainText": "",
-                        "modifierChainBaseOffset": 2848,
+                        "modifierChainBaseOffset": 3160,
                         "chain": [],
                         "value": "close",
                         "valueLoc": {
-                          "start": 2850,
-                          "end": 2855
+                          "start": 3162,
+                          "end": 3167
                         },
                         "loc": {
-                          "start": 2842,
-                          "end": 2856
+                          "start": 3154,
+                          "end": 3168
                         }
                       }
                     ],
                     "children": [],
                     "selfClosing": true,
                     "loc": {
-                      "start": 2822,
-                      "end": 2859
+                      "start": 3134,
+                      "end": 3171
                     }
                   },
                   {
                     "type": "TemplateText",
                     "text": "\n    ",
                     "loc": {
-                      "start": 2859,
-                      "end": 2864
+                      "start": 3171,
+                      "end": 3176
                     }
                   }
                 ],
                 "selfClosing": false,
                 "loc": {
-                  "start": 2786,
-                  "end": 2873
+                  "start": 3098,
+                  "end": 3185
                 }
               },
               {
                 "type": "TemplateText",
                 "text": "\n  ",
                 "loc": {
-                  "start": 2873,
-                  "end": 2876
+                  "start": 3185,
+                  "end": 3188
                 }
               }
             ],
             "selfClosing": false,
             "loc": {
-              "start": 2322,
-              "end": 2882
+              "start": 2634,
+              "end": 3194
             }
           },
           {
             "type": "TemplateText",
             "text": "\n",
             "loc": {
-              "start": 2882,
-              "end": 2883
+              "start": 3194,
+              "end": 3195
             }
           }
         ],
         "selfClosing": false,
         "loc": {
-          "start": 2207,
-          "end": 2889
+          "start": 2519,
+          "end": 3201
         }
       },
       {
         "type": "TemplateText",
         "text": "\n",
         "loc": {
-          "start": 2889,
-          "end": 2890
+          "start": 3201,
+          "end": 3202
         }
       }
     ]
