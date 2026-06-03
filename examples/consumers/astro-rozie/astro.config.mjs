@@ -154,5 +154,20 @@ export default defineConfig({
   ],
   vite: {
     plugins: [reactRozie, vueRozie, svelteRozie, solidRozie, litScoped],
+    // The Lit target emits TS legacy decorators (`@customElement`,
+    // `@property`). Astro's default esbuild transform does NOT transpile
+    // decorators unless told to, so the raw `@customElement(...)` leaks into the
+    // bundle and crashes the browser ("Invalid or unexpected token"). Enabling
+    // experimentalDecorators here makes esbuild lower the decorators for the
+    // `.rozie.ts` (Lit) virtual module — the same setting the lit-vite consumer
+    // demo carries in its tsconfig. (No effect on the other targets' output.)
+    esbuild: {
+      tsconfigRaw: {
+        compilerOptions: {
+          experimentalDecorators: true,
+          useDefineForClassFields: false,
+        },
+      },
+    },
   },
 });

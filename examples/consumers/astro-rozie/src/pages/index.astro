@@ -40,24 +40,32 @@ import SolidCounter from '../components/solid/Counter.rozie';
         hydration across frameworks, not just tag presence.
       </p>
 
+      <!--
+        Each island passes ONLY `step={2}` and lets `value` use its <props>
+        default (0). `value` is a `model: true` prop, so passing it explicitly
+        makes the island a CONTROLLED component bound to a parent that does not
+        exist here — its internal state would be frozen at the passed value and
+        clicks would never increment. Omitting it keeps each island uncontrolled
+        and self-interactive (the honest single-island demo shape).
+      -->
       <section data-target="react">
         <h2>React island (@astrojs/react, client:load)</h2>
-        <ReactCounter client:load value={0} step={2} />
+        <ReactCounter client:load step={2} />
       </section>
 
       <section data-target="vue">
         <h2>Vue island (@astrojs/vue, client:load)</h2>
-        <VueCounter client:load value={0} step={2} />
+        <VueCounter client:load step={2} />
       </section>
 
       <section data-target="svelte">
         <h2>Svelte island (@astrojs/svelte, client:load)</h2>
-        <SvelteCounter client:load value={0} step={2} />
+        <SvelteCounter client:load step={2} />
       </section>
 
       <section data-target="solid">
         <h2>Solid island (@astrojs/solid-js, client:load)</h2>
-        <SolidCounter client:load value={0} step={2} />
+        <SolidCounter client:load step={2} />
       </section>
 
       <section data-target="lit">
@@ -67,7 +75,7 @@ import SolidCounter from '../components/solid/Counter.rozie';
           The client <script> below registers it; the browser hydrates the tag
           natively. No island directive needed.
         -->
-        <rozie-counter value="0" step="2"></rozie-counter>
+        <rozie-counter step="2"></rozie-counter>
       </section>
     </main>
 
