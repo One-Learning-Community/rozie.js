@@ -1,5 +1,5 @@
 import type { JSX } from 'solid-js';
-import { Show, children, createEffect, mergeProps, onCleanup, onMount, splitProps } from 'solid-js';
+import { Show, children, createEffect, mergeProps, on, onCleanup, onMount, splitProps, untrack } from 'solid-js';
 import { __rozieInjectStyle, createControllableSignal } from '@rozie/runtime-solid';
 
 __rozieInjectStyle('Modal-fc45feb2', `.modal-backdrop[data-rozie-s-fc45feb2] {
@@ -62,6 +62,9 @@ export default function Modal(_props: ModalProps): JSX.Element {
   onMount(() => {
     dialogElRef?.focus();
   });
+  createEffect(on(() => (() => open())(), (v) => untrack(() => ((isOpen: any) => {
+    if (isOpen) lockScroll();else unlockScroll();
+  })(v)), { defer: true }));
   let backdropElRef: HTMLElement | null = null;
   let dialogElRef: HTMLElement | null = null;
 
@@ -74,7 +77,7 @@ export default function Modal(_props: ModalProps): JSX.Element {
   // rather than UI; managed entirely via lifecycle and listeners.
   let savedBodyOverflow = '';
   function lockScroll() {
-    if (!local.lockBodyScroll) return;
+    if (!local.lockBodyScroll || !open()) return;
     savedBodyOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
   }
@@ -83,7 +86,10 @@ export default function Modal(_props: ModalProps): JSX.Element {
     document.body.style.overflow = savedBodyOverflow;
   }
 
-  // Colocated lifecycle pair — runs in source order alongside other hooks.
+  // $watch re-fires on every `open` toggle — the cross-target primitive for
+  // reacting to a prop change. The $onMount/$onUnmount pair anchors the
+  // unmount-time restore; $onMount runs exactly once on every target (a
+  // guarded no-op here) and must not be relied on to re-fire.
 
   createEffect(() => {
     if (!(open() && local.closeOnEscape)) return;

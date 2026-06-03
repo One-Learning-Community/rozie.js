@@ -38,6 +38,7 @@ footer[data-rozie-s-fc45feb2] { border-top: 1px solid rgba(0, 0, 0, 0.08); justi
   @property({ type: String, reflect: true }) title: string = '';
   @query('[data-rozie-ref="backdropEl"]') private _refBackdropEl!: HTMLElement;
   @query('[data-rozie-ref="dialogEl"]') private _refDialogEl!: HTMLElement;
+private __rozieFirstUpdateDone = false;
 
   @state() private _hasSlotHeader = false;
   @queryAssignedElements({ slot: 'header', flatten: true }) private _slotHeaderElements!: Element[];
@@ -109,6 +110,13 @@ footer[data-rozie-s-fc45feb2] { border-top: 1px solid rgba(0, 0, 0, 0.08); justi
     this._refDialogEl?.focus();
   }
 
+  updated(changedProperties: Map<string, unknown>): void {
+    if (this.__rozieFirstUpdateDone && (changedProperties.has('open'))) { const __watchVal = (() => this.open)(); ((isOpen: any) => {
+      if (isOpen) this.lockScroll();else this.unlockScroll();
+    })(__watchVal); }
+    this.__rozieFirstUpdateDone = true;
+  }
+
   disconnectedCallback(): void {
     super.disconnectedCallback();
     for (const fn of this._disconnectCleanups) fn();
@@ -151,7 +159,7 @@ ${this.open ? html`<div class="modal-backdrop" @click=${($event: MouseEvent) => 
   savedBodyOverflow = '';
 
   lockScroll = () => {
-  if (!this.lockBodyScroll) return;
+  if (!this.lockBodyScroll || !this.open) return;
   this.savedBodyOverflow = document.body.style.overflow;
   document.body.style.overflow = 'hidden';
 };

@@ -46,6 +46,7 @@ export default function Modal(_props: ModalProps): JSX.Element {
   });
   const backdropEl = useRef<HTMLDivElement | null>(null);
   const dialogEl = useRef<HTMLDivElement | null>(null);
+  const _watch0First = useRef(true);
 
   const { onClose: _rozieProp_onClose } = props;
     const close = useCallback(() => {
@@ -53,10 +54,10 @@ export default function Modal(_props: ModalProps): JSX.Element {
     _rozieProp_onClose && _rozieProp_onClose();
   }, [_rozieProp_onClose, setOpen]);
   const lockScroll = useCallback(() => {
-    if (!props.lockBodyScroll) return;
+    if (!props.lockBodyScroll || !open) return;
     savedBodyOverflow.current = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-  }, [props.lockBodyScroll]);
+  }, [open, props.lockBodyScroll]);
   const unlockScroll = useCallback(() => {
     if (!props.lockBodyScroll) return;
     document.body.style.overflow = savedBodyOverflow.current;
@@ -69,6 +70,11 @@ export default function Modal(_props: ModalProps): JSX.Element {
   useEffect(() => {
     dialogEl.current?.focus();
   }, []);
+  useEffect(() => {
+    if (_watch0First.current) { _watch0First.current = false; return; }
+    const isOpen = open;
+    if (isOpen) lockScroll();else unlockScroll();
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!(open && props.closeOnEscape)) return;

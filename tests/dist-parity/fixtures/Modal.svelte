@@ -1,6 +1,6 @@
 <script lang="ts">
 import type { Snippet } from 'svelte';
-import { onMount } from 'svelte';
+import { onMount, untrack } from 'svelte';
 
 interface Props {
   open?: boolean;
@@ -48,7 +48,7 @@ const close = () => {
 // rather than UI; managed entirely via lifecycle and listeners.
 let savedBodyOverflow = '';
 const lockScroll = () => {
-  if (!lockBodyScroll) return;
+  if (!lockBodyScroll || !open) return;
   savedBodyOverflow = document.body.style.overflow;
   document.body.style.overflow = 'hidden';
 };
@@ -57,7 +57,10 @@ const unlockScroll = () => {
   document.body.style.overflow = savedBodyOverflow;
 };
 
-// Colocated lifecycle pair — runs in source order alongside other hooks.
+// $watch re-fires on every `open` toggle — the cross-target primitive for
+// reacting to a prop change. The $onMount/$onUnmount pair anchors the
+// unmount-time restore; $onMount runs exactly once on every target (a
+// guarded no-op here) and must not be relied on to re-fire.
 
 onMount(() => {
   lockScroll();
@@ -66,6 +69,11 @@ onMount(() => {
 onMount(() => {
   dialogEl?.focus();
 });
+
+let __rozieWatchInitial_0 = true;
+$effect(() => { const __watchVal = (() => open)(); untrack(() => { if (__rozieWatchInitial_0) { __rozieWatchInitial_0 = false; return; } ((isOpen: any) => {
+  if (isOpen) lockScroll();else unlockScroll();
+})(__watchVal); }); });
 
 $effect(() => {
   if (!(open && closeOnEscape)) return;
