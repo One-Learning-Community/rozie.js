@@ -155,6 +155,14 @@ const EXAMPLES = [
   // identically across all four entrypoints. Single-file; no sibling .rozie
   // producers — stays OUT of RESOLVER_ROOT.
   'UpdateExpressionProbe',
+  // Phase 23 (angular-cva-forms-integration) off-state byte-equality probe.
+  // Single-model (one `value` String `model: true` prop). Registered now as an
+  // ORDINARY fixture so the bootstrap generates the PRE-CVA baseline across all
+  // six targets × four entrypoints; Plan 23-04 will switch its Angular leg to
+  // `cva: false` and rebless, then assert the cva:false Angular output is
+  // byte-identical to this baseline (the off-state proof). Single-file; no
+  // sibling .rozie producers — stays OUT of RESOLVER_ROOT.
+  'CvaOffState',
   // Phase 21 $expose dogfood (REQ-11). Typed input exposing reset()/focus() via
   // $expose({ reset, focus }). Its committed per-target bytes are the dist-parity
   // contract that each target lowers the imperative handle in its native idiom

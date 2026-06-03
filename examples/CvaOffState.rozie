@@ -1,0 +1,51 @@
+<!--
+  CvaOffState.rozie — Phase 23 (angular-cva-forms-integration) off-state
+  byte-equality probe.
+
+  Single-model component (exactly ONE `model: true` prop: `value`) with a
+  trivial read/write template — the minimal single-file producer shape
+  (mirrors PropDefaultCoercion / ExposeProbe: no <components>, no resolver
+  root).
+
+  Plan-04 off-state probe: Plan 23-04 will switch THIS fixture's Angular leg
+  to `cva: false` and rebless, then assert the cva:false Angular output is
+  BYTE-IDENTICAL to the pre-CVA baseline (proving the CVA feature is fully
+  off-by-... / opt-in and adds zero bytes when disabled). For now (Plan 23-01)
+  it is registered as an ORDINARY fixture so the bootstrap can generate the
+  pre-CVA baseline across all six targets × four entrypoints; Plan 04 owns the
+  cva:false harness wiring + rebless. Until then it produces no meaningful diff
+  vs any other single-model fixture.
+-->
+
+<rozie name="CvaOffState">
+
+<props>
+{
+  value: { type: String, default: '', model: true },
+}
+</props>
+
+<script>
+// Producer-side write to the `value` model prop: writing `$model.value`
+// lowers to each target's two-way emit (Vue `emit('update:value', …)`,
+// React `onValueChange?.(…)`, Angular `valueChange.emit(…)`, etc.). This is
+// the single-model shape Phase 23's CVA auto-wires the Angular accessor onto.
+function onInput(e) {
+  $model.value = e.target.value
+}
+</script>
+
+<template>
+<div class="cva-off-state">
+  <input type="text" :value="$props.value" @input="onInput" placeholder="Type a value" />
+  <span class="echo">{{ $props.value }}</span>
+</div>
+</template>
+
+<style>
+.cva-off-state { display: inline-flex; align-items: center; gap: 0.5rem; }
+input { padding: 0.25rem 0.5rem; }
+.echo { color: rgba(0, 0, 0, 0.6); }
+</style>
+
+</rozie>

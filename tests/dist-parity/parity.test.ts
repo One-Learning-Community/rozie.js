@@ -131,6 +131,10 @@ const EXAMPLES = [
   // registering it drifts ONLY the new ExposeProbe.* fixtures. Single-file
   // producer — no <components>, no resolver-root.
   'ExposeProbe',
+  // Phase 23 (angular-cva-forms-integration) off-state byte-equality probe.
+  // Single-model (`value` String model:true). Registered now as an ordinary
+  // fixture; Plan 23-04 owns the cva:false Angular-leg wiring + rebless.
+  'CvaOffState',
 ] as const;
 
 // Phase 07.2 Plan 06 — siblings ModalConsumer reaches via `<components>`.
