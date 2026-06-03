@@ -196,6 +196,40 @@ export const RozieErrorCode = {
   // try/catch-wrapped. ROZ123 is the next free code after ROZ122 in the 100
   // semantic-binding cluster.
   REFS_READ_BEFORE_MOUNT: 'ROZ123', // $refs.x read in a $computed body / $watch getter / template binding|interpolation|r-if|r-show|r-for-iterable — evaluated before mount
+  // Phase 23 (angular-cva-forms-integration) — a `$expose`d name that collides
+  // with a reserved Angular ControlValueAccessor method name (`writeValue` /
+  // `registerOnChange` / `registerOnTouched` / `setDisabledState`) on a
+  // component that WILL receive the CVA emit (i.e. its single `model: true`
+  // prop is the auto-wired cvaModelProp — cvaModelProp !== null). When CVA is
+  // active the Angular component IS the ControlValueAccessor, so a public
+  // method with one of those four names would be silently overwritten by (or
+  // collide with) the generated accessor method, quietly breaking either the
+  // imperative handle OR the forms integration on the Angular target alone.
+  // Structurally identical to ROZ121 (EXPOSE_EVENT_NAME_COLLISION): error
+  // severity; case-sensitive (`WriteValue` ≠ `writeValue`); fires once per
+  // colliding exposed property, code-framed at the `$expose` property;
+  // suppressed when the `$expose` call is structurally malformed (ROZ115–117);
+  // never throws (D-08). Does NOT fire when CVA is inactive (cva:false, or a
+  // non-single-model component) — without an auto-emitted accessor there is no
+  // method to collide with. The code definition lives here in core's central
+  // registry; the emission logic lives in the Angular package (per
+  // 23-RESEARCH.md). ROZ124 is the next free code after ROZ123 in the 100
+  // semantic-binding cluster.
+  EXPOSE_CVA_NAME_COLLISION: 'ROZ124', // $expose({ writeValue }) (or registerOnChange/registerOnTouched/setDisabledState) on a single-model CVA-receiving Angular component — collides with the auto-emitted ControlValueAccessor method
+  // Phase 23 — info diagnostic: a component declares ≥2 `model: true` props, so
+  // Angular's single-control ControlValueAccessor contract cannot be satisfied
+  // (a CVA wraps exactly ONE form value). No accessor is auto-emitted; the
+  // multi-model two-way binding still works via the standard per-prop
+  // `valueChange.emit(...)` outputs, just without ngModel/formControl forms
+  // integration. Info severity (NOT an error — this is a legitimate,
+  // documented shape, e.g. LeafletMap's center+zoom); collected, never throws.
+  CVA_MULTI_MODEL_NO_ACCESSOR: 'ROZ125', // ≥2 model:true props — no single-control ControlValueAccessor auto-emitted on the Angular target
+  // Phase 23 — info diagnostic: a single-model CVA component declares NO
+  // `disabled` prop, so the generated `setDisabledState(isDisabled)` accessor
+  // method has no prop to write and is emitted as a documented no-op. Info
+  // severity; the component still integrates with Angular forms — it just
+  // ignores the disabled state Angular forwards. Collected, never throws.
+  CVA_NO_DISABLED_PROP: 'ROZ126', // single-model CVA component with no `disabled` prop — setDisabledState is a no-op on the Angular target
 
   // ---- Compile-time correctness errors (Phase 2 Plan 02) — ROZ200..ROZ299 ----
   WRITE_TO_NON_MODEL_PROP: 'ROZ200', // SEM-02: $props.foo = … where foo lacks model: true (Phase 2 success criterion 2)
