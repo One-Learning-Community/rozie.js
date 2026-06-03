@@ -1,0 +1,15 @@
+{
+  "entries": [
+    { "component": "Card", "dest": "src/Card.rozie" },
+    { "component": "CardHeader", "dest": "src/CardHeader.rozie" },
+    { "component": "Counter", "dest": "src/Counter.rozie" },
+    { "component": "Dropdown", "dest": "src/Dropdown.rozie" },
+    { "component": "Modal", "dest": "src/Modal.rozie" },
+    { "component": "ModalConsumer", "dest": "src/ModalConsumer.rozie" },
+    { "component": "PropDefaultCoercion", "dest": "src/PropDefaultCoercion.rozie" },
+    { "component": "SearchInput", "dest": "src/SearchInput.rozie" },
+    { "component": "TodoList", "dest": "src/TodoList.rozie" },
+    { "component": "TreeNode", "dest": "src/TreeNode.rozie" },
+    { "component": "WrapperModal", "dest": "src/WrapperModal.rozie" }
+  ]
+}

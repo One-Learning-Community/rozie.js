@@ -1,0 +1,7 @@
+{
+  "entries": [
+    { "component": "Modal", "dest": "src/Modal.rozie" },
+    { "component": "ModalConsumer", "dest": "src/ModalConsumer.rozie" },
+    { "component": "WrapperModal", "dest": "src/WrapperModal.rozie" }
+  ]
+}

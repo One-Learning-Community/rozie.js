@@ -1,0 +1,9 @@
+{
+  "entries": [
+    { "component": "Counter", "dest": "src/components/Counter.rozie" },
+    { "component": "Counter", "dest": "src/components/react/Counter.rozie" },
+    { "component": "Counter", "dest": "src/components/vue/Counter.rozie" },
+    { "component": "Counter", "dest": "src/components/svelte/Counter.rozie" },
+    { "component": "Counter", "dest": "src/components/solid/Counter.rozie" }
+  ]
+}

@@ -1,0 +1,5 @@
+{
+  "entries": [
+    { "component": "Counter", "dest": "app/Counter.rozie" }
+  ]
+}
