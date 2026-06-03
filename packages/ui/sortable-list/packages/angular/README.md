@@ -36,6 +36,41 @@ export class DemoComponent {
 }
 ```
 
+## Angular forms
+
+The generated class implements `ControlValueAccessor` — the `items` model prop is the control value — so it binds to template-driven and reactive forms directives directly, with no wrapper directive:
+
+```ts
+import { Component } from '@angular/core';
+import { ReactiveFormsModule, FormControl } from '@angular/forms';
+import { SortableList } from '@rozie-ui/sortable-list-angular';
+
+@Component({
+  selector: 'app-ranking-form',
+  standalone: true,
+  imports: [SortableList, ReactiveFormsModule],
+  template: `
+    <!-- The user's drag-ordering IS the form value -->
+    <SortableList [formControl]="ranking" itemKey="id">
+      <ng-template #default let-item="item">
+        <span>{{ item.label }}</span>
+      </ng-template>
+    </SortableList>
+  `,
+})
+export class RankingFormComponent {
+  ranking = new FormControl([
+    { id: '1', label: 'Apple' },
+    { id: '2', label: 'Banana' },
+  ]);
+}
+
+// Template-driven forms work the same way:
+//   <SortableList [(ngModel)]="ranking" name="ranking" itemKey="id">...</SortableList>
+```
+
+The accessor contract: only real user interaction dirties the control — programmatic writes (form `setValue` / `reset`, or the `[(items)]` two-way binding) update the view without echoing back into the form; `writeValue(null)` resets to the prop default (`[]`); the control is marked touched on focusout; and `setDisabledState` OR-merges with the `disabled` prop, so either source disables the component.
+
 ## Props
 
 | Name | Type | Default | Two-way (model) | Required |

@@ -33,6 +33,34 @@ export class DemoComponent {
 }
 ```
 
+## Angular forms
+
+The generated class implements `ControlValueAccessor` — the `date` model prop is the control value — so it binds to template-driven and reactive forms directives directly, with no wrapper directive:
+
+```ts
+import { Component } from '@angular/core';
+import { ReactiveFormsModule, FormControl } from '@angular/forms';
+import { Flatpickr } from '@rozie-ui/flatpickr-angular';
+
+@Component({
+  selector: 'app-birthday-form',
+  standalone: true,
+  imports: [Flatpickr, ReactiveFormsModule],
+  template: `
+    <!-- Reactive forms — [formControl] / formControlName bind directly -->
+    <Flatpickr [formControl]="birthday" />
+  `,
+})
+export class BirthdayFormComponent {
+  birthday = new FormControl('');
+}
+
+// Template-driven forms work the same way:
+//   <Flatpickr [(ngModel)]="birthday" name="birthday" />
+```
+
+The accessor contract: only real user interaction dirties the control — programmatic writes (form `setValue` / `reset`, or the `[(date)]` two-way binding) update the view without echoing back into the form; `writeValue(null)` resets to the prop default (`""`); the control is marked touched on focusout; and `setDisabledState` OR-merges with the `disabled` prop, so either source disables the component.
+
 ## Props
 
 | Name | Type | Default | Two-way (model) | Required |
