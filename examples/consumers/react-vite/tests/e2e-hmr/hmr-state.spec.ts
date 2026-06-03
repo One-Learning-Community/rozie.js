@@ -21,9 +21,10 @@
 //
 // React is one of the two targets where BOTH halves of the QA-04 contract hold
 // (the other is Solid): the unplugin's `handleHotUpdate` invalidates React's
-// `.module.css` / `.global.css` CSS sidecars, so the `<style>` edit hot-applies
-// AND component state survives. For Vue / Svelte / Lit only the state-survival
-// half holds — see D-SH-03 in 07-DIVERGENCES.md.
+// plain `.css` / `.global.css` CSS sidecars (Phase 25 — was `.module.css`
+// before de-CSS-Modules), so the `<style>` edit hot-applies AND component state
+// survives. For Vue / Svelte / Lit only the state-survival half holds — see
+// D-SH-03 in 07-DIVERGENCES.md.
 import { test, expect } from '@playwright/test';
 import { readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -46,10 +47,10 @@ test('HMR preserves Counter state across a <style> edit (QA-04)', async ({
     await page.goto('/');
     await page.getByTestId('nav-counter').click();
 
-    // The React target emits the `.counter` class through CSS Modules, so the
-    // rendered DOM class is hashed — locate the counter container via the
-    // Increment button's parent (the button is a direct child of `.counter`),
-    // which is stable across the CSS-Modules hash.
+    // Phase 25: the React target emits the plain `.counter` class (no CSS
+    // Modules hashing). Locate the counter container via the Increment button's
+    // parent (the button is a direct child of `.counter`) — a stable locator
+    // either way.
     const increment = page.getByLabel('Increment');
     await expect(increment).toBeVisible();
     const counter = increment.locator('..');
