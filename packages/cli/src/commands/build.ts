@@ -74,6 +74,15 @@ export interface BuildOptionsExt {
    * raw output is written and a warning prints to stderr.
    */
   pretty?: boolean;
+  /**
+   * Phase 23 — Angular-only opt-out for the auto `ControlValueAccessor` emit.
+   * Default ON (undefined/true): single-model Angular components auto-emit the
+   * CVA shape. `false` maps to `compile({ angular: { cva: false } })` and
+   * suppresses ALL CVA emit. Omitting it entirely exercises the emitter-side
+   * `opts.cva ?? true` default — byte-identical to the unplugin/babel-plugin
+   * default-ON path (dist-parity contract). No-op for non-Angular targets.
+   */
+  cva?: boolean;
 }
 
 /**
@@ -233,6 +242,11 @@ export async function runBuildMatrix(
         filename: input,
         types: wantTypes,
         sourceMap: wantSourceMap,
+        // Phase 23 — only attach the `angular` namespace when the user opted
+        // OUT (cva === false). Omitting it preserves the emitter-side
+        // `opts.cva ?? true` default-ON path, keeping the CLI byte-identical
+        // to unplugin/babel-plugin when --no-cva is absent.
+        ...(opts.cva === false ? { angular: { cva: false } } : {}),
       };
       const result = compile(source, compileOpts);
       return { input, target, source, result };

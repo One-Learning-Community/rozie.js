@@ -116,6 +116,19 @@ export interface CompileOptions {
    * truth to preserve byte-identical dist-parity (RESEARCH Pitfall 1).
    */
   resolverRoot?: string;
+  /**
+   * Phase 23 — the FIRST per-target emit-semantics config namespace. Each
+   * `<target>: { ... }` key carries options that affect ONLY that target's
+   * emit, threaded into the matching emitter's `Emit*Options`. Omission
+   * preserves the emitter-side default (Angular CVA defaults ON via
+   * `opts.cva ?? true`), so CLI / babel-plugin / unplugin all behave
+   * identically when the namespace is absent (dist-parity byte-equality).
+   *
+   * `angular.cva` (default ON): when `false`, suppresses the auto
+   * `ControlValueAccessor` emit (static shape + dynamic write-site hookup +
+   * disabled merge) on single-model Angular components.
+   */
+  angular?: { cva?: boolean };
 }
 
 /**
@@ -355,7 +368,15 @@ export function compile(source: string, opts: CompileOptions): CompileResult {
       });
     }
     case 'angular': {
-      const r = emitAngular(ir, emitOpts);
+      // Phase 23 — thread the per-target `angular.cva` emit-semantics option
+      // into emitAngular ONLY for the angular branch (non-angular targets keep
+      // the shared `emitOpts` untouched). Conditional-spread per
+      // exactOptionalPropertyTypes so omission preserves the emitter-side
+      // `opts.cva ?? true` default — byte-identical to today.
+      const r = emitAngular(ir, {
+        ...emitOpts,
+        ...(opts.angular?.cva !== undefined ? { cva: opts.angular.cva } : {}),
+      });
       return guardEmpty({
         code: r.code,
         map: wantSourceMap ? r.map : null,

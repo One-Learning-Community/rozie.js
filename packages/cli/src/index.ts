@@ -35,6 +35,12 @@ interface BuildCliOpts {
   sourceMap?: boolean;
   types?: boolean;
   pretty?: boolean;
+  /**
+   * Phase 23 — Angular-only. Commander's `--no-cva` inverted boolean: present
+   * on argv → `opts.cva === false`; absent → `opts.cva === true` (default ON).
+   * Maps to `compile({ angular: { cva: false } })` when false.
+   */
+  cva?: boolean;
 }
 
 /**
@@ -85,6 +91,13 @@ export async function runCli(argv: readonly string[]): Promise<void> {
       '--pretty',
       'format emitted artefacts with prettier before write (off by default)',
     )
+    // Phase 23 — Angular-only opt-out for the auto ControlValueAccessor emit.
+    // Default ON; --no-cva → opts.cva === false → angular: { cva: false }.
+    // Commander auto-creates the inverted boolean from the `--no-` prefix.
+    .option(
+      '--no-cva',
+      'Angular-only: suppress the auto ControlValueAccessor emit on single-model components (no-op for other targets)',
+    )
     .action(async (inputs: string[], opts: BuildCliOpts) => {
       const ext: BuildOptionsExt = {
         target: opts.target,
@@ -92,6 +105,7 @@ export async function runCli(argv: readonly string[]): Promise<void> {
         ...(opts.sourceMap === true ? { sourceMap: true } : {}),
         ...(opts.types === false ? { types: false } : {}),
         ...(opts.pretty === true ? { pretty: true } : {}),
+        ...(opts.cva === false ? { cva: false } : {}),
       };
       await runBuildMatrix(inputs, ext);
     });
@@ -127,6 +141,11 @@ export async function runCli(argv: readonly string[]): Promise<void> {
       '--pretty',
       'format emitted artefacts with prettier before write (off by default)',
     )
+    // Phase 23 — Angular-only opt-out, mirrors `rozie build` (default ON).
+    .option(
+      '--no-cva',
+      'Angular-only: suppress the auto ControlValueAccessor emit on single-model components (no-op for other targets)',
+    )
     .action(async (inputs: string[], opts: BuildCliOpts) => {
       const ext: WatchOptions = {
         target: opts.target,
@@ -134,6 +153,7 @@ export async function runCli(argv: readonly string[]): Promise<void> {
         ...(opts.sourceMap === true ? { sourceMap: true } : {}),
         ...(opts.types === false ? { types: false } : {}),
         ...(opts.pretty === true ? { pretty: true } : {}),
+        ...(opts.cva === false ? { cva: false } : {}),
       };
       await runWatch(inputs, ext);
     });

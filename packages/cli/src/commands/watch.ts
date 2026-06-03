@@ -54,6 +54,12 @@ export interface WatchOptions {
    * gracefully — raw output still lands on disk + a stderr warning fires.
    */
   pretty?: boolean;
+  /**
+   * Phase 23 — Angular-only opt-out for the auto `ControlValueAccessor` emit.
+   * Default ON; `false` maps to `compile({ angular: { cva: false } })`.
+   * Mirrors the `rozie build` flag. No-op for non-Angular targets.
+   */
+  cva?: boolean;
 }
 
 export interface RunWatchContext {
@@ -135,6 +141,7 @@ export async function runWatch(
   const wantTypes = opts.types !== false;
   const wantSourceMap = opts.sourceMap === true;
   const wantPretty = opts.pretty === true;
+  const cvaOff = opts.cva === false; // Phase 23 — Angular CVA opt-out
 
   // ----- Initial expansion + build -------------------------------------
   let inputs: string[];
@@ -152,7 +159,7 @@ export async function runWatch(
   }
 
   for (const input of inputs) {
-    await compileOne(input, targets, outDir, rootDir, wantTypes, wantSourceMap, wantPretty, stderrWrite, stdoutWrite);
+    await compileOne(input, targets, outDir, rootDir, wantTypes, wantSourceMap, wantPretty, cvaOff, stderrWrite, stdoutWrite);
   }
 
   stdoutWrite(
@@ -187,7 +194,7 @@ export async function runWatch(
   const onUpsert = async (changedPath: string): Promise<void> => {
     if (!changedPath.endsWith('.rozie')) return;
     const abs = pathResolve(changedPath);
-    await compileOne(abs, targets, outDir, rootDir, wantTypes, wantSourceMap, wantPretty, stderrWrite, stdoutWrite);
+    await compileOne(abs, targets, outDir, rootDir, wantTypes, wantSourceMap, wantPretty, cvaOff, stderrWrite, stdoutWrite);
   };
 
   watcher.on('add', onUpsert);
@@ -244,6 +251,7 @@ async function compileOne(
   wantTypes: boolean,
   wantSourceMap: boolean,
   wantPretty: boolean,
+  cvaOff: boolean,
   stderrWrite: (s: string) => void,
   stdoutWrite: (s: string) => void,
 ): Promise<void> {
@@ -283,6 +291,9 @@ async function compileOne(
         filename: inputAbs,
         types: wantTypes,
         sourceMap: wantSourceMap,
+        // Phase 23 — attach the `angular` namespace only on opt-out, so the
+        // default-ON path stays byte-identical to unplugin/babel-plugin.
+        ...(cvaOff ? { angular: { cva: false } } : {}),
       });
 
       const errors = result.diagnostics.filter((d) => d.severity === 'error');
