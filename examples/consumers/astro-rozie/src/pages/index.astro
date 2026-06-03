@@ -1,17 +1,26 @@
 ---
-// Astro page that includes a Rozie-compiled Web Component.
+// Multi-target Rozie island matrix.
 //
-// `target: 'lit'` (set in astro.config.mjs) emits Counter.rozie as a custom
-// element that self-registers via @customElement('rozie-counter'). The
-// import lives in a CLIENT-SIDE <script> tag below — Astro hoists and
-// bundles those, then runs them only in the browser where `customElements`
-// and `HTMLElement` exist. A frontmatter import would run during static
-// generation in Node and crash on browser-only globals.
+// ONE Rozie `Counter.rozie` (byte-identical per-target copies under
+// src/components/{react,vue,svelte,solid}/) is mounted as an interactive Astro
+// island for each framework that genuinely hydrates, plus the Lit native
+// web-component path. Each island starts at Count: 0 and — proving REAL
+// hydration, not static tag presence — increments by step (2) on click.
 //
-// Astro auto-detects custom-element tags in the rendered markup; once the
-// client script registers the element, the browser hydrates the
-// <rozie-counter> tag natively. No `client:*` directive needed for plain
-// Web Components.
+// ── COVERAGE EXCEPTIONS ──────────────────────────────────────────────────────
+//   • Angular — NO first-party @astrojs/angular exists (only the community
+//     @analogjs/astro-angular). Intentionally NOT wired. Documented exception.
+//   • Any island framework whose Rozie emit cannot SSR/hydrate under its
+//     @astrojs/* renderer is dropped to an exception in README.md with the real
+//     root cause — never faked green.
+//
+// See astro.config.mjs for the per-target path-scoped Rozie wiring (Mechanism B)
+// and README.md for the full coverage matrix.
+
+import ReactCounter from '../components/react/Counter.rozie';
+import VueCounter from '../components/vue/Counter.rozie';
+import SvelteCounter from '../components/svelte/Counter.rozie';
+import SolidCounter from '../components/solid/Counter.rozie';
 ---
 
 <!doctype html>
@@ -19,23 +28,53 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Rozie + Astro Smoke</title>
+    <title>Rozie + Astro — Multi-Target Island Matrix</title>
   </head>
   <body>
-    <main style="padding: 2rem; font-family: system-ui, sans-serif;">
-      <h1>Rozie + Astro</h1>
+    <main style="padding: 2rem; font-family: system-ui, sans-serif; display: grid; gap: 1.5rem; max-width: 40rem;">
+      <h1>Rozie + Astro — Multi-Target Island Matrix</h1>
       <p>
-        This page imports a .rozie file that compiled to a Lit Web Component
-        via @rozie/unplugin/vite. Astro server-rendered the static markup;
-        the browser hydrated the interactive bits as a native custom element.
+        One <code>Counter.rozie</code>, compiled to every target Rozie supports,
+        mounted as an interactive Astro island. Each counter starts at
+        <strong>Count: 0</strong> and increments by 2 on click — proving runtime
+        hydration across frameworks, not just tag presence.
       </p>
-      <rozie-counter value="0" step="2"></rozie-counter>
+
+      <section data-target="react">
+        <h2>React island (@astrojs/react, client:load)</h2>
+        <ReactCounter client:load value={0} step={2} />
+      </section>
+
+      <section data-target="vue">
+        <h2>Vue island (@astrojs/vue, client:load)</h2>
+        <VueCounter client:load value={0} step={2} />
+      </section>
+
+      <section data-target="svelte">
+        <h2>Svelte island (@astrojs/svelte, client:load)</h2>
+        <SvelteCounter client:load value={0} step={2} />
+      </section>
+
+      <section data-target="solid">
+        <h2>Solid island (@astrojs/solid-js, client:load)</h2>
+        <SolidCounter client:load value={0} step={2} />
+      </section>
+
+      <section data-target="lit">
+        <h2>Lit native web component (no client:* directive)</h2>
+        <!--
+          Lit ships as a native custom element via @customElement('rozie-counter').
+          The client <script> below registers it; the browser hydrates the tag
+          natively. No island directive needed.
+        -->
+        <rozie-counter value="0" step="2"></rozie-counter>
+      </section>
     </main>
 
     <script>
       // Client-side side-effect import — registers <rozie-counter> with the
-      // browser's CustomElementRegistry. Astro bundles this script as a
-      // separate JS chunk and ships it to the browser only.
+      // browser's CustomElementRegistry (the root src/components/Counter.rozie,
+      // compiled by the Lit-scoped Rozie instance).
       import '../components/Counter.rozie';
     </script>
   </body>

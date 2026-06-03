@@ -1,0 +1,31 @@
+<rozie name="Counter">
+
+<props>
+{
+  value: { type: Number, default: 0, model: true },
+  step:  { type: Number, default: 1 },
+}
+</props>
+
+<script>
+const increment = () => { $model.value += $props.step }
+</script>
+
+<template>
+<button @click="increment">
+  Count: {{ $props.value }}
+</button>
+</template>
+
+<style>
+button {
+  padding: 0.5rem 1rem;
+  border: 1px solid #ddd;
+  background: white;
+  cursor: pointer;
+  border-radius: 4px;
+  font-family: system-ui, sans-serif;
+}
+</style>
+
+</rozie>
