@@ -1,0 +1,42 @@
+<!--
+  ExposeCvaCollision.rozie — Phase 23 (angular-cva-forms-integration) TEST INPUT.
+
+  Exactly ONE `model: true` prop (`value`) PLUS a top-level
+  `$expose({ writeValue })` whose key collides with a reserved Angular
+  ControlValueAccessor method name (`writeValue`). On a single-model
+  CVA-RECEIVING Angular component the auto-emitted accessor owns `writeValue`,
+  so exposing a method of the same name must fire ROZ124
+  (EXPOSE_CVA_NAME_COLLISION) — proving SPEC-8. Under cva:false (no accessor
+  emitted) the same source compiles clean.
+
+  Test INPUT only — the assertions live in Plan 23-03 (the ROZ124 error path
+  when CVA-receiving) and Plan 23-02 (clean under cva:false). Keep minimal and
+  valid.
+-->
+
+<rozie name="ExposeCvaCollision">
+
+<props>
+{
+  value: { type: String, default: '', model: true },
+}
+</props>
+
+<script>
+// `writeValue` collides with the reserved Angular CVA method name — when this
+// component is CVA-receiving (single-model, cva active) the auto-emitted
+// accessor already owns `writeValue`, so this $expose must trip ROZ124.
+function writeValue(v) {
+  $model.value = v
+}
+
+$expose({ writeValue })
+</script>
+
+<template>
+<div class="expose-cva-collision">
+  <span class="echo">{{ $props.value }}</span>
+</div>
+</template>
+
+</rozie>

@@ -1,0 +1,40 @@
+<!--
+  MultiModelProbe.rozie — Phase 23 (angular-cva-forms-integration) TEST INPUT.
+
+  Two `model: true` props (center + zoom, mirroring LeafletMap). A single
+  ControlValueAccessor wraps exactly ONE form value, so a ≥2-model component
+  CANNOT auto-emit a CVA — proving SPEC-7: no accessor is generated and exactly
+  one ROZ125 (CVA_MULTI_MODEL_NO_ACCESSOR) info diagnostic fires. The two-way
+  binding still works via the standard per-prop valueChange.emit(...) outputs.
+
+  Test INPUT only — the assertion that consumes it lives in Plan 23-03
+  (diagnostics) / 23-02 (emit). Keep minimal and valid.
+-->
+
+<rozie name="MultiModelProbe">
+
+<props>
+{
+  center: { type: Array,  default: () => [0, 0], model: true },
+  zoom:   { type: Number, default: 1,           model: true },
+}
+</props>
+
+<script>
+function setCenter(c) {
+  $model.center = c
+}
+
+function setZoom(z) {
+  $model.zoom = z
+}
+</script>
+
+<template>
+<div class="multi-model-probe">
+  <span class="center">{{ $props.center }}</span>
+  <span class="zoom">{{ $props.zoom }}</span>
+</div>
+</template>
+
+</rozie>

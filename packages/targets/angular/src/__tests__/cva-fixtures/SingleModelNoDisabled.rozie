@@ -1,0 +1,35 @@
+<!--
+  SingleModelNoDisabled.rozie — Phase 23 (angular-cva-forms-integration) TEST INPUT.
+
+  Exactly ONE `model: true` prop (`value`) and NO `disabled` prop. The
+  single-model shape DOES auto-emit an Angular ControlValueAccessor, but with
+  no `disabled` prop the generated `setDisabledState(isDisabled)` accessor
+  method has nothing to write — it is emitted as a documented no-op and one
+  ROZ126 (CVA_NO_DISABLED_PROP) info diagnostic fires. Proves SPEC-4
+  acceptance: compiles, info-only, no-op setDisabledState.
+
+  Test INPUT only — the assertions live in Plan 23-02 (no-op accessor emit) /
+  23-03 (ROZ126 info). Keep minimal and valid.
+-->
+
+<rozie name="SingleModelNoDisabled">
+
+<props>
+{
+  value: { type: String, default: '', model: true },
+}
+</props>
+
+<script>
+function setValue(v) {
+  $model.value = v
+}
+</script>
+
+<template>
+<div class="single-model-no-disabled">
+  <span class="echo">{{ $props.value }}</span>
+</div>
+</template>
+
+</rozie>
