@@ -1,4 +1,5 @@
-import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, effect, inject, model, signal, viewChild } from '@angular/core';
+import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, effect, forwardRef, inject, model, signal, viewChild } from '@angular/core';
+import { NG_VALUE_ACCESSOR } from '@angular/forms';
 
 @Component({
   selector: 'rozie-update-expression-probe',
@@ -20,6 +21,14 @@ import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterR
     .count, .value { font-variant-numeric: tabular-nums; min-width: 3ch; text-align: center; }
     button { padding: 0.25rem 0.5rem; }
   `],
+  providers: [
+    {
+      provide: NG_VALUE_ACCESSOR,
+      useExisting: forwardRef(() => UpdateExpressionProbe),
+      multi: true,
+    },
+  ],
+  host: { '(focusout)': '__rozieCvaOnTouched()' },
 })
 export class UpdateExpressionProbe {
   value = model<number>(0);
@@ -33,10 +42,32 @@ export class UpdateExpressionProbe {
   };
   incValue = () => {
     this.value.set(this.value() + 1);
+    this.__rozieCvaOnChange(this.value() + 1);
   };
   decValue = () => {
     this.value.set(this.value() - 1);
+    this.__rozieCvaOnChange(this.value() - 1);
   };
+
+  private __rozieCvaOnChange: (v: number) => void = () => {};
+  private __rozieCvaOnTouchedFn: () => void = () => {};
+  private __rozieCvaDisabled = signal(false);
+
+  writeValue(v: number | null): void {
+    this.value.set(v ?? 0);
+  }
+  registerOnChange(fn: (v: number) => void): void {
+    this.__rozieCvaOnChange = fn;
+  }
+  registerOnTouched(fn: () => void): void {
+    this.__rozieCvaOnTouchedFn = fn;
+  }
+  setDisabledState(isDisabled: boolean): void {
+    this.__rozieCvaDisabled.set(isDisabled);
+  }
+  __rozieCvaOnTouched(): void {
+    this.__rozieCvaOnTouchedFn();
+  }
 
   private __rozieDestroyRef = inject(DestroyRef);
 

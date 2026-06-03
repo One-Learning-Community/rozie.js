@@ -1,5 +1,6 @@
-import { Component, ContentChild, TemplateRef, ViewEncapsulation, input, model } from '@angular/core';
+import { Component, ContentChild, TemplateRef, ViewEncapsulation, forwardRef, input, model, signal } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
+import { NG_VALUE_ACCESSOR } from '@angular/forms';
 
 import { Modal } from './Modal';
 
@@ -28,6 +29,14 @@ interface ActionsCtx {}
       </ng-template><ng-template #defaultSlot><ng-container *ngTemplateOutlet="(defaultTpl ?? templates()?.['defaultSlot'])" /></ng-template></rozie-modal>
 
   `,
+  providers: [
+    {
+      provide: NG_VALUE_ACCESSOR,
+      useExisting: forwardRef(() => WrapperModal),
+      multi: true,
+    },
+  ],
+  host: { '(focusout)': '__rozieCvaOnTouched()' },
 })
 export class WrapperModal {
   title = input<string>('Wrapped');
@@ -36,6 +45,26 @@ export class WrapperModal {
   @ContentChild('defaultSlot', { read: TemplateRef }) defaultTpl?: TemplateRef<DefaultCtx>;
   @ContentChild('actions', { read: TemplateRef }) actionsTpl?: TemplateRef<ActionsCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
+
+  private __rozieCvaOnChange: (v: boolean) => void = () => {};
+  private __rozieCvaOnTouchedFn: () => void = () => {};
+  private __rozieCvaDisabled = signal(false);
+
+  writeValue(v: boolean | null): void {
+    this.open.set(v ?? false);
+  }
+  registerOnChange(fn: (v: boolean) => void): void {
+    this.__rozieCvaOnChange = fn;
+  }
+  registerOnTouched(fn: () => void): void {
+    this.__rozieCvaOnTouchedFn = fn;
+  }
+  setDisabledState(isDisabled: boolean): void {
+    this.__rozieCvaDisabled.set(isDisabled);
+  }
+  __rozieCvaOnTouched(): void {
+    this.__rozieCvaOnTouchedFn();
+  }
 
   static ngTemplateContextGuard(
     _dir: WrapperModal,

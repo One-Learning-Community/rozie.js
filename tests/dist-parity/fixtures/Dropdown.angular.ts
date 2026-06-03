@@ -1,5 +1,6 @@
-import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, effect, inject, input, model, untracked, viewChild } from '@angular/core';
+import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, effect, forwardRef, inject, input, model, signal, untracked, viewChild } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
+import { NG_VALUE_ACCESSOR } from '@angular/forms';
 
 interface TriggerCtx {
   $implicit: { open: any; toggle: any };
@@ -45,6 +46,14 @@ interface DefaultCtx {
     --rozie-dropdown-z: 1000;
     }
   `],
+  providers: [
+    {
+      provide: NG_VALUE_ACCESSOR,
+      useExisting: forwardRef(() => Dropdown),
+      multi: true,
+    },
+  ],
+  host: { '(focusout)': '__rozieCvaOnTouched()' },
 })
 export class Dropdown {
   open = model<boolean>(false);
@@ -99,10 +108,10 @@ export class Dropdown {
   }
 
   toggle = () => {
-    this.open.set(!this.open());
+    this.open.set(!this.open()), this.__rozieCvaOnChange(!this.open());
   };
   close = () => {
-    this.open.set(false);
+    this.open.set(false), this.__rozieCvaOnChange(false);
   };
   reposition = () => {
     if (!this.panelEl()?.nativeElement || !this.triggerEl()?.nativeElement) return;
@@ -112,6 +121,26 @@ export class Dropdown {
       left: `${rect.left}px`
     });
   };
+
+  private __rozieCvaOnChange: (v: boolean) => void = () => {};
+  private __rozieCvaOnTouchedFn: () => void = () => {};
+  private __rozieCvaDisabled = signal(false);
+
+  writeValue(v: boolean | null): void {
+    this.open.set(v ?? false);
+  }
+  registerOnChange(fn: (v: boolean) => void): void {
+    this.__rozieCvaOnChange = fn;
+  }
+  registerOnTouched(fn: () => void): void {
+    this.__rozieCvaOnTouchedFn = fn;
+  }
+  setDisabledState(isDisabled: boolean): void {
+    this.__rozieCvaDisabled.set(isDisabled);
+  }
+  __rozieCvaOnTouched(): void {
+    this.__rozieCvaOnTouchedFn();
+  }
 
   static ngTemplateContextGuard(
     _dir: Dropdown,
