@@ -47,6 +47,7 @@ import {
 } from './scopeAwareSkip.js';
 import { sanitizeEventName } from './sanitizeEventName.js';
 import { lowerClassSelectorCall } from './lowerClassSelectorCall.js';
+import { hasBooleanDisabledProp } from '../cvaDiagnostics.js';
 
 // CJS interop normalization (Phase 2 D-T-2-01-04 pattern).
 type TraverseFn = typeof import('@babel/traverse').default;
@@ -603,11 +604,14 @@ export function rewriteRozieIdentifiers(
   const modelProps = new Set(ir.props.filter((p) => p.isModel).map((p) => p.name));
   const nonModelProps = new Set(ir.props.filter((p) => !p.isModel).map((p) => p.name));
   // Phase 23 — Task 2: OR-merge `this.__rozieCvaDisabled()` into the `disabled`
-  // read ONLY when the component is CVA-receiving AND literally declares a
-  // `disabled` prop. A CVA component with no `disabled` prop (ROZ126) has no
-  // read to merge; a non-CVA component is never merged.
+  // read ONLY when the component is CVA-receiving AND declares a BOOLEAN
+  // `disabled` prop (WR-05). A CVA component with no Boolean `disabled` prop
+  // (ROZ126) has no read to merge; a non-Boolean `disabled` prop is NOT merged
+  // (the merge would be truthy-broken — `'no' || false` is `'no'`). The shared
+  // `hasBooleanDisabledProp` helper keeps this in lockstep with the
+  // emitAngular-level gate and ROZ126.
   const cvaMergeDisabled =
-    cvaModelProp !== null && ir.props.some((p) => p.name === 'disabled');
+    cvaModelProp !== null && hasBooleanDisabledProp(ir.props);
   const dataNames = new Set(ir.state.map((s) => s.name));
   const refNames = new Set(ir.refs.map((r) => r.name));
   const slotNames = new Set(ir.slots.map((s) => (s.name === '' ? '' : s.name)));

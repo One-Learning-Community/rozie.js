@@ -91,7 +91,10 @@ import { buildShell } from './emit/shell.js';
 import { composeSourceMap } from './sourcemap/compose.js';
 import { cloneScriptProgram } from './rewrite/cloneProgram.js';
 import { rewriteRozieIdentifiers } from './rewrite/rewriteScript.js';
-import { cvaDiagnostics as computeCvaDiagnostics } from './cvaDiagnostics.js';
+import {
+  cvaDiagnostics as computeCvaDiagnostics,
+  hasBooleanDisabledProp,
+} from './cvaDiagnostics.js';
 
 /**
  * Bug 5: build a handler-name → parameter-count map from the (un-rewritten)
@@ -198,6 +201,10 @@ export function emitAngular(
   const cvaDiagnostics: Diagnostic[] = computeCvaDiagnostics(
     ir,
     cvaModelProp !== null ? cvaModelProp.name : null,
+    // WR-01 — thread the resolved `cva` flag so ROZ125 (multi-model info) is
+    // suppressed when the user explicitly opted out via `cva:false`; the info
+    // should only fire when the model count is the actual reason no CVA exists.
+    cvaEnabled,
   );
 
   // 1. Script-side emission.
@@ -222,10 +229,14 @@ export function emitAngular(
   // 2. Template-side emission.
   // Phase 23 — thread the resolved CVA gate so template model-writes inject
   // __rozieCvaOnChange (Task 1) and `disabled` reads OR-merge __rozieCvaDisabled
-  // (Task 2). cvaMergeDisabled is true only when CVA-receiving AND a `disabled`
-  // prop is declared.
+  // (Task 2). cvaMergeDisabled is true only when CVA-receiving AND a BOOLEAN
+  // `disabled` prop is declared (WR-05). A non-Boolean `disabled` prop is NOT
+  // OR-merged — `(this.disabled() || this.__rozieCvaDisabled())` mixing e.g. a
+  // string with a boolean is truthy-broken (`'no' || false` is `'no'`), so
+  // setDisabledState(false) could never re-enable the control. The shared
+  // `hasBooleanDisabledProp` helper keeps this gate in lockstep with ROZ126.
   const cvaMergeDisabled =
-    cvaModelProp !== null && ir.props.some((p) => p.name === 'disabled');
+    cvaModelProp !== null && hasBooleanDisabledProp(ir.props);
   const tmplResult = emitTemplate(ir, registry, {
     collisionRenames,
     handlerArity,
