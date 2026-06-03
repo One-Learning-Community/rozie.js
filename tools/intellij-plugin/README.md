@@ -52,7 +52,7 @@ cd tools/intellij-plugin
 
 # Build the distributable .zip
 ./gradlew buildPlugin
-# Output: build/distributions/Rozie.js-0.2.0.zip
+# Output: build/distributions/Rozie.js-0.3.0.zip
 
 # Regenerate the JFlex-driven lexer (after editing src/main/jflex/Rozie.flex)
 ./gradlew generateRozieLexer
@@ -62,23 +62,22 @@ cd tools/intellij-plugin
 
 **Prerequisites for local dev:** JDK 21 (Temurin or Zulu) on PATH. The Gradle wrapper handles everything else (Gradle 9.5, IntelliJ Platform Gradle Plugin 2.16, IDEA Ultimate 2024.2.5 SDK).
 
-## v1 Limitations
+## Limitations
 
-These are intentional v1 deferrals — captured here so dogfood users don't trip over them and file dupe issues:
+These are intentional deferrals — captured here so dogfood users don't trip over them and file dupe issues:
 
-- **`<style lang="scss">` / `<style lang="less">` is editor-only in v1 (per [D-11](../../.planning/phases/08-intellij-platform-plugin-v1-internal-dogfooding/08-CONTEXT.md)).** The plugin will syntax-highlight SCSS/Less correctly inside `<style lang="scss">` (via the bundled SCSS/Less plugin), and authoring works fine in the IDE — but the **`.rozie` compiler does NOT yet parse SCSS/Less**. The `lang` attribute is currently treated as an editor hint only; the compiler still hands the body to PostCSS as plain CSS, and SCSS-specific syntax (variables, nesting beyond CSS-nesting-spec, mixins) will fail to compile to JS targets. Authoring SCSS in `.rozie` files is therefore not a recommended workflow until v2 ships compiler-side `<style lang>` parsing. See [`.planning/todos/pending/style-lang-compiler-followup.md`](../../.planning/todos/pending/style-lang-compiler-followup.md) for the v2 backlog item.
-- **Mustache `{{ }}` interpolation is not JS-injected in v1** — autocomplete/go-to-def inside `{{ … }}` won't fire (per D-09 deferral; revisit if dogfood reveals demand).
-- **No cross-block reference resolution.** `$props.foo` in `<template>` does NOT navigate back to the `<props>` declaration (v2; depends on a custom reference contributor).
-- **No compiler-driven diagnostics.** Errors from `@rozie/core` (e.g., reading a non-`model: true` `$props` field) will not surface in the IDE; you'll see them at compile time only (v2 milestone).
+- **`<style lang="less">` is editor-only.** The IDE highlights Less inside `<style lang="less">` (via the bundled CSS plugins), but the `.rozie` compiler only supports `lang="scss"` (compiled at build time via dart-sass — see `docs/guide/features.md`); any other `lang` value is a compile error. (Compiler-side SCSS shipped in Phase 10; the old "compiler does not parse SCSS" limitation no longer applies.)
 - **IDEA Community / PyCharm CE are unsupported.** They don't bundle the JS plugin, so language injection is a no-op. Use the [TextMate grammar](../textmate/) for color-only support on those IDEs.
+
+Former v1 limitations that have since shipped: mustache `{{ }}` JS injection (Phase 08.2, Plan 08.2-14), cross-block reference resolution / `$props.foo` → `<props>` navigation + Find-Usages (Phases 08.2/08.3), and compiler-driven `@rozie/core` diagnostics in the editor (Option C LSP, via LSP4IJ).
 
 ## Architecture
 
-See [`.planning/notes/intellij-plugin-architecture.md`](../../.planning/notes/intellij-plugin-architecture.md) for the load-bearing v1 decisions:
+The original v1 architecture decisions live in [`.planning/notes/intellij-plugin-architecture.md`](../../.planning/notes/intellij-plugin-architecture.md) (pre-dates the Phase 08.2 injection-first pivot). The current load-bearing decisions:
 
-- **Thin host + language injection** (not full PSI / no LSP)
-- Built on the **Astro IntelliJ plugin pattern**, not Vue's (which is LSP-routed and several orders of magnitude larger)
-- **Out of v1 scope**: cross-block reference resolution, compiler-driven diagnostics, refactoring across blocks, Marketplace listing — all v2 milestones
+- **Injection-first + standard JetBrains extension points** (Phase 08.2 pivot) — the lexer's only job is SFC block boundaries; block bodies are handed to the bundled JS/HTML/CSS plugins, and Rozie intelligence is layered on top via reference contributors, annotators, and completion contributors
+- **Compiler-driven diagnostics via LSP4IJ** (Option C) — the shared `@rozie/language-server` (`packages/language-server/`) serves `@rozie/core` diagnostics over LSP; completion/navigation inside injected fragments stays PSI-native because LSP4IJ doesn't reach injected carets
+- **Out of scope**: Marketplace listing (internal dogfooding build)
 
 The plugin is a single Kotlin/Gradle subproject at `tools/intellij-plugin/`, intentionally isolated from the main pnpm/Turborepo task graph (no JVM bleed into the JS workflow). It ships a JFlex-generated lexer (`_RozieLexer.java`) that emits 41 distinct `IElementType` values, a `MultiHostInjector` that hands block bodies to bundled JS / HTML / CSS plugins, an `XmlSuppressionProvider` that carves Rozie attribute names out of HTML inspections, and a `ColorSettingsPage` exposing 15 user-themable token slots.
 
