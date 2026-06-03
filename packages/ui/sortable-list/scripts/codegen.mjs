@@ -17,7 +17,7 @@
  *   1. read src/SortableList.rozie
  *   2. parse() + lowerToIR() ONCE → ir (props/slots/emits) for docs tables
  *   3. for each of the 6 targets: compile() → write leaf src/<file>
- *        (React only: also write SortableList.module.css + SortableList.d.ts)
+ *        (React only: also write SortableList.css + SortableList.d.ts)
  *   4. copy src/internal/ → each leaf src/internal/ (excluding *.test.ts)
  *   5. render each leaf README from the IR + the hand-kept event manifest
  *   6. ENFORCE validateDocsPropsTable against docs/guide/sortable-list.md
@@ -114,7 +114,7 @@ function main() {
 
     // React-only sidecars.
     if (target === 'react') {
-      if (r.css) writeFileSync(resolve(leafSrc, 'SortableList.module.css'), r.css);
+      if (r.css) writeFileSync(resolve(leafSrc, 'SortableList.css'), r.css);
       if (r.types) writeFileSync(resolve(leafSrc, 'SortableList.d.ts'), r.types);
     }
 
@@ -126,7 +126,7 @@ function main() {
     const readme = renderReadme(target, ir, eventManifest, pkgName);
     writeFileSync(resolve(ROOT, 'packages', cfg.dir, 'README.md'), readme);
 
-    const sidecars = target === 'react' ? ' (+ .module.css + .d.ts)' : '';
+    const sidecars = target === 'react' ? ' (+ .css + .d.ts)' : '';
     console.log(`codegen: ${target.padEnd(8)} → ${cfg.dir}/src/${cfg.file}${sidecars}  ✓`);
   }
 

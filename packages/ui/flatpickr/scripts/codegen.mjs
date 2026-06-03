@@ -21,7 +21,7 @@
  *   1. read src/Flatpickr.rozie
  *   2. parse() + lowerToIR() ONCE → ir (props/slots/emits) for docs tables
  *   3. for each of the 6 targets: compile() → write leaf src/<file>
- *        (React only: also write Flatpickr.module.css + Flatpickr.d.ts)
+ *        (React only: also write Flatpickr.css + Flatpickr.d.ts)
  *   4. render each leaf README from the IR + the hand-kept event manifest
  *   5. (optional) ENFORCE validateDocsPropsTable IF a guide page with a
  *      "### Props" table exists (none ships for flatpickr today — skipped).
@@ -121,7 +121,7 @@ function main() {
 
     // React-only sidecars.
     if (target === 'react') {
-      if (r.css) writeFileSync(resolve(leafSrc, 'Flatpickr.module.css'), r.css);
+      if (r.css) writeFileSync(resolve(leafSrc, 'Flatpickr.css'), r.css);
       if (r.types) writeFileSync(resolve(leafSrc, 'Flatpickr.d.ts'), r.types);
     }
 
@@ -130,7 +130,7 @@ function main() {
     const readme = renderReadme(target, ir, eventManifest, pkgName, handleManifest);
     writeFileSync(resolve(ROOT, 'packages', cfg.dir, 'README.md'), readme);
 
-    const sidecars = target === 'react' ? ' (+ .module.css + .d.ts)' : '';
+    const sidecars = target === 'react' ? ' (+ .css + .d.ts)' : '';
     console.log(`codegen: ${target.padEnd(8)} → ${cfg.dir}/src/${cfg.file}${sidecars}  ✓`);
   }
 

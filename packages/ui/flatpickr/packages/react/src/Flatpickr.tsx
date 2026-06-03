@@ -1,6 +1,6 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { clsx, useControllableState } from '@rozie/runtime-react';
-import styles from './Flatpickr.module.css';
+import './Flatpickr.css';
 import flatpickr from 'flatpickr';
 
 interface FlatpickrProps {
@@ -349,7 +349,7 @@ const Flatpickr = forwardRef<FlatpickrHandle, FlatpickrProps>(function Flatpickr
 
   return (
     <>
-    <input ref={inputEl} type="text" name={props.name} placeholder={props.placeholder} {...attrs} className={clsx(styles["rozie-flatpickr"], (attrs.className as string | undefined))} data-rozie-s-159070d4="" />
+    <input ref={inputEl} type="text" name={props.name} placeholder={props.placeholder} {...attrs} className={clsx("rozie-flatpickr", (attrs.className as string | undefined))} data-rozie-s-159070d4="" />
     </>
   );
 });
