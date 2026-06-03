@@ -21,16 +21,17 @@ walkthroughs.
 | Vue     | `@astrojs/vue`                      | `client:load` | ✓ covered   | Full rich behavior verified: bounds, `$computed`-driven `:disabled` at min/max, hover background. SSR-renders the static markup too. |
 | Svelte  | `@astrojs/svelte`                   | `client:load` | ✓ covered   | Full rich behavior verified: bounds, `$computed`-driven `:disabled`, hover background. SSR-renders the static markup too. |
 | Solid   | `@astrojs/solid-js`                 | `client:load` | ✓ covered   | Full rich behavior verified under Solid's babel/jsx-dom-expressions pipeline. |
-| Lit     | native Web Component (no integration)| none         | ✓ covered   | `<rozie-counter>` self-registers via a client `<script>` import; shadow-DOM controls hydrate (open shadow root, so Playwright's `.value`/role locators pierce it). Full rich behavior verified. |
-| React   | `@astrojs/react`                    | `client:load` | ✗ exception | Island **hydrates and styles apply**, but the React emit **CSS-Modules-hashes author class names** (`counter`→`_counter_1d11t_1`, `value`→`_value_1d11t_3`, `hovering`→`_hovering_…`). The spec's `.value`/`.counter` literal-class locators therefore cannot match the React subtree. Documented repo gotcha `project_react_classhash_breaks_selectors`; the component-internal cure is `$classSelector('cls')`, which does not help an **external** test locator. Not weakened to force green. |
+| React   | `@astrojs/react`                    | `client:load` | ✓ covered   | Full rich behavior verified. The React emit CSS-Modules-hashes author class names (`counter`→`_counter_1d11t_1`, `value`→`_value_1d11t_3`), so the spec locates elements by **role / structure / effect** (button `aria-label`, the lone `<span>`, the nearest `<div>` ancestor, the rendered hover background) — never by class name. See `project_react_classhash_breaks_selectors`. |
+| Lit     | native Web Component (no integration)| none         | ✓ covered   | `<rozie-counter>` self-registers via a client `<script>` import; shadow-DOM controls hydrate (open shadow root, so Playwright's role/structural locators pierce it). Full rich behavior verified. |
 | Angular | —                                   | N/A           | ✗ exception | **No first-party `@astrojs/angular`** — only the community `@analogjs/astro-angular`. Intentionally not wired. |
 
-Four island/web-component targets (Vue, Svelte, Solid, Lit) genuinely hydrate
-**and** pass the full rich-behavior runtime spec (bounds + `$computed`-driven
-`:disabled` reactivity + hover effect), verified by Playwright. React is a real
-exception at the **test-locator** layer (class-name hashing breaks CSS-selector
-locators — the island itself still works); Angular is the wiring exception (no
-first-party integration).
+All five island/web-component targets (React, Vue, Svelte, Solid, Lit) genuinely
+hydrate **and** pass the full rich-behavior runtime spec (bounds + `$computed`-driven
+`:disabled` reactivity + hover effect), verified by Playwright. The spec tests by
+role / structure / effect rather than by author class name, so React's class
+hashing is a non-issue (it would only break class-selector locators, not the
+island). Angular is the sole exception — the wiring gap (no first-party
+integration), not a Rozie-emit failure.
 
 ## The target-selection mechanism (Mechanism B)
 
@@ -104,16 +105,17 @@ rest of the suite.
 
 A single canonical rich Rozie component definition — plus/minus buttons,
 `min`/`max` bounds, a `$computed`-driven `:disabled` at each bound, and a hover
-effect — mounts as a working, **interactive** island across Vue, Svelte, and
-Solid (via `@astrojs/*` integrations) plus Lit (native web component) on one
+effect — mounts as a working, **interactive** island across React, Vue, Svelte,
+and Solid (via `@astrojs/*` integrations) plus Lit (native web component) on one
 Astro page, with the full reactive behavior verified at runtime (not just
-build/tag presence). Two documented exceptions:
+build/tag presence). One documented exception:
 
-- **React** — the island hydrates and its styles apply, but the React emit
-  CSS-Modules-hashes author class names, so the spec's `.value`/`.counter`
-  literal-class locators can't match the React subtree (the
-  `project_react_classhash_breaks_selectors` gotcha). This is a test-locator
-  limitation, not an island failure; the in-component cure is `$classSelector`,
-  which doesn't reach an external Playwright locator.
 - **Angular** — no first-party `@astrojs/angular` (only the community
   `@analogjs/astro-angular`); intentionally not wired.
+
+> Note on React: its emit CSS-Modules-hashes author class names, so the runtime
+> spec deliberately locates elements by role / structure / effect (button
+> `aria-label`, the lone `<span>`, the nearest `<div>` ancestor, the rendered
+> hover background) rather than by class name. That's standard resilient-locator
+> practice and makes React's hashing a non-issue — the island hydrates and
+> reacts identically to the others.
