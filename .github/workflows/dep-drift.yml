@@ -14,12 +14,18 @@ on:
       - 'scripts/dep-allowlist.txt'
       - 'scripts/check-dep-drift.mjs'
       - '.github/workflows/dep-drift.yml'
+      # WR-02 (24-REVIEW): also trigger on any package.json change so a dep
+      # added WITHOUT a regenerated lockfile still fires the gate (the gate
+      # reads the committed lockfile; a stale lockfile is the reviewer's job to
+      # regenerate — see runGate() note in check-dep-drift.mjs).
+      - '**/package.json'
   pull_request:
     paths:
       - 'pnpm-lock.yaml'
       - 'scripts/dep-allowlist.txt'
       - 'scripts/check-dep-drift.mjs'
       - '.github/workflows/dep-drift.yml'
+      - '**/package.json'
   workflow_dispatch:
 
 permissions:
