@@ -24,7 +24,7 @@ test('SC2 — value-change CustomEvent on programmatic write (bubbles + composed
   page,
 }) => {
   await page.goto('/src/pages/CounterPage.html');
-  const counter = page.locator('#counter');
+  const counter = page.locator('rozie-counter#counter');
 
   // Install a listener that records each value-change event's detail,
   // bubbles, and composed flags. We do this in the page so the listener

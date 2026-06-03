@@ -27,7 +27,7 @@ import { test, expect } from '@playwright/test';
 test.describe('SC4 — <rozie-counter> attribute reactivity in vanilla HTML', () => {
   test('renders initial state', async ({ page }) => {
     await page.goto('/src/pages/CounterPage.html');
-    const counter = page.locator('#counter');
+    const counter = page.locator('rozie-counter#counter');
     await expect(counter).toHaveAttribute('value', '0');
 
     // Shadow-DOM piercing — verify the button-rendered value is "0".
@@ -40,7 +40,7 @@ test.describe('SC4 — <rozie-counter> attribute reactivity in vanilla HTML', ()
 
   test('shadow-rooted Increment click bumps value', async ({ page }) => {
     await page.goto('/src/pages/CounterPage.html');
-    const counter = page.locator('#counter');
+    const counter = page.locator('rozie-counter#counter');
 
     // Click the Increment button inside the shadow root.
     await counter.evaluate((el: Element) => {
@@ -58,7 +58,7 @@ test.describe('SC4 — <rozie-counter> attribute reactivity in vanilla HTML', ()
     page,
   }) => {
     await page.goto('/src/pages/CounterPage.html');
-    const counter = page.locator('#counter');
+    const counter = page.locator('rozie-counter#counter');
 
     await counter.evaluate((el: Element) => {
       el.setAttribute('value', '42');

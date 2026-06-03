@@ -16,7 +16,7 @@ test('SearchInput typing dispatches search event to host', async ({ page }) => {
     () => customElements.get('rozie-search-input') !== undefined,
   );
 
-  const search = page.locator('#search');
+  const search = page.locator('rozie-search-input#search');
   const lastQuery = page.locator('#last-query');
 
   // Type into the shadow-rooted input.
