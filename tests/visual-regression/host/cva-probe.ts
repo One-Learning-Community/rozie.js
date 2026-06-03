@@ -42,6 +42,11 @@ import {
 import Flatpickr from '../../../packages/ui/flatpickr/src/Flatpickr.rozie';
 import 'flatpickr/dist/flatpickr.css';
 
+// WR-04 runtime probe fixture (23-HUMAN-UAT item 2): required-no-default
+// single-model component. Lives under the VR project root, so the Angular
+// D-70 disk-cache prebuild walks it without a prebuildExtraRoots entry.
+import RequiredCvaProbe from './RequiredCvaProbe.rozie';
+
 /* ════════════════════════════════════════════════════════════════════════
  * 005 (INVERTED) — forms directives bound directly to the emitted CVA
  * ════════════════════════════════════════════════════════════════════════ */
@@ -193,6 +198,53 @@ export class CvaEchoHost {
   ctrl = new FormControl<string>('2026-06-02');
 }
 
+/* ════════════════════════════════════════════════════════════════════════
+ * 007 — WR-04 runtime probes: required-no-default model prop + forms
+ * (23-HUMAN-UAT item 2 — NG0950-free writeValue(null) confirmation)
+ * ════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * 007-A: required-no-default model prop + [formControl] with a NON-NULL
+ * initial value. NgForms' leading writeValue('seeded-by-form') must seed the
+ * required signal (the WR-04 `if (v != null)` guard passes the value through)
+ * — no NG0950, the value renders.
+ */
+@Component({
+  selector: 'cva-required-seeded-host',
+  standalone: true,
+  imports: [ReactiveFormsModule, RequiredCvaProbe],
+  template: `
+    <h3>007-A: required-no-default + seeded [formControl]</h3>
+    <rozie-required-cva-probe [formControl]="ctrl" />
+    <p data-testid="required-seeded-value">{{ ctrl.value === null ? 'NULL' : ctrl.value }}</p>
+  `,
+})
+export class CvaRequiredSeededHost {
+  ctrl = new FormControl<string>('seeded-by-form');
+}
+
+/**
+ * 007-B: required-no-default model prop + [formControl] starting NULL.
+ * The WR-04 guard means the leading writeValue(null) itself must NOT throw
+ * (no re-read of the unbound required signal inside the accessor). Whatever
+ * Angular then does about the never-seeded required input when the TEMPLATE
+ * reads it is Angular's own required-input contract (NG0950 by design) — the
+ * spec captures it as documentation, it is not a WR-04 failure.
+ */
+@Component({
+  selector: 'cva-required-null-host',
+  standalone: true,
+  imports: [ReactiveFormsModule, RequiredCvaProbe],
+  template: `
+    <h3>007-B: required-no-default + null [formControl]</h3>
+    <rozie-required-cva-probe [formControl]="ctrl" />
+    <p data-testid="required-null-value">{{ ctrl.value === null ? 'NULL' : ctrl.value }}</p>
+  `,
+})
+export class CvaRequiredNullHost {
+  ctrl = new FormControl<string>(null);
+}
+
 /* ──────────────────────────────────────────────────────────────────────────
  * Probe registry — consumed by entry.angular.ts (?cvaProbe=<key>)
  * ────────────────────────────────────────────────────────────────────────── */
@@ -205,6 +257,8 @@ export const CVA_PROBES = {
   Reactive: CvaReactiveHost,
   Coexist: CvaCoexistHost,
   Echo: CvaEchoHost,
+  RequiredSeeded: CvaRequiredSeededHost,
+  RequiredNull: CvaRequiredNullHost,
 } as const;
 
 export type CvaProbeKey = keyof typeof CVA_PROBES;

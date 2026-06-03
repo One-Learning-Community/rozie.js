@@ -1,0 +1,45 @@
+<!--
+  RequiredCvaProbe.rozie — Phase 23 WR-04 runtime probe (23-HUMAN-UAT item 2).
+
+  Single-model component whose model prop is `required: true` with NO
+  `default:` — the shape WR-04's writeValue(null) guard exists for. On the
+  Angular target this emits `value = model.required<string>()` and the CVA
+  `writeValue` emits `if (v != null) this.value.set(v)` instead of re-reading
+  the not-yet-bound required signal.
+
+  Consumed ONLY by tests/visual-regression/host/cva-probe.ts (007-A/B probes).
+  Lives under the VR project root so the Angular D-70 disk-cache prebuild walks
+  it without any prebuildExtraRoots entry. NOT registered in dist-parity,
+  examples/, or the core compile-gate globs.
+-->
+
+<rozie name="RequiredCvaProbe">
+
+<props>
+{
+  value: { type: String, required: true, model: true },
+}
+</props>
+
+<script>
+// Producer-side write to the required `value` model prop — the internal
+// write-site the CVA hooks __rozieCvaOnChange onto.
+function onInput(e) {
+  $model.value = e.target.value
+}
+</script>
+
+<template>
+<div class="required-cva-probe">
+  <input type="text" class="probe-input" :value="$props.value" @input="onInput" placeholder="Required value" />
+  <span class="echo">{{ $props.value }}</span>
+</div>
+</template>
+
+<style>
+.required-cva-probe { display: inline-flex; align-items: center; gap: 0.5rem; }
+.probe-input { padding: 0.25rem 0.5rem; }
+.echo { color: rgba(0, 0, 0, 0.6); }
+</style>
+
+</rozie>
