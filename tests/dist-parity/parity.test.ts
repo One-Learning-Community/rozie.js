@@ -142,6 +142,19 @@ const EXAMPLES = [
 // `root: ROOT`).
 // Phase 07.3 Plan 09 — WrapperModal references Modal.rozie via <components>;
 // its compile likewise needs Modal.rozie staged alongside.
+// Phase 23 (angular-cva-forms-integration) — per-fixture Angular CVA opt-out
+// (must mirror bootstrap-fixtures.mjs's FIXTURE_ANGULAR_CVA_OFF). Fixtures in
+// this set assert their Angular leg with `cva: false` across ALL FOUR
+// entrypoints — proving cva:false suppresses CVA byte-equally end-to-end
+// (Pitfall 2: a default/threading divergence between compile()'s emitOpts and
+// the three other legs would fail byte-equality here). Each leg below threads
+// the opt-out into its native option surface:
+//   Leg 1 (compile)      → angular: { cva: false }
+//   Leg 2 (CLI)          → BuildOptionsExt.cva = false (--no-cva)
+//   Leg 3 (babel-plugin) → plugin option angular: { cva: false }
+//   Leg 4 (unplugin)     → createTransformHook(registry, target, /* cva */ false)
+const FIXTURE_ANGULAR_CVA_OFF = new Set(['CvaOffState']);
+
 const EXAMPLE_SIBLING_ROZIE: Record<string, string[]> = {
   ModalConsumer: ['Modal.rozie', 'WrapperModal.rozie', 'Counter.rozie'],
   WrapperModal: ['Modal.rozie', 'Counter.rozie'],
@@ -390,10 +403,13 @@ describe('DIST-05 strict-bytes parity gate (D-93) — 18 examples × 6 targets �
         // to the relative form (verified empirically — all 192 baselines
         // unchanged after the switch), so we use the same shape uniformly.
         const hasSiblings = name in EXAMPLE_SIBLING_ROZIE;
+        // Phase 23 — off-state probe asserts its Angular leg with cva:false.
+        const cvaOff = target === 'angular' && FIXTURE_ANGULAR_CVA_OFF.has(name);
         const result = compile(rozieSource, {
           target,
           filename: hasSiblings ? rozieSourcePath : `${name}.rozie`,
           ...(hasSiblings ? { resolverRoot: dirname(rozieSourcePath) } : {}),
+          ...(cvaOff ? { angular: { cva: false } } : {}),
           types: true,
           sourceMap: false,
         });
@@ -425,6 +441,9 @@ describe('DIST-05 strict-bytes parity gate (D-93) — 18 examples × 6 targets �
       it('Leg 2 — CLI runBuildMatrix produces fixture bytes', async () => {
         const tmpDir = mkdtempSync(join(tmpdir(), 'rozie-parity-cli-'));
         try {
+          // Phase 23 — off-state probe drives the CLI with --no-cva (cva:false)
+          // for its Angular leg.
+          const cvaOff = target === 'angular' && FIXTURE_ANGULAR_CVA_OFF.has(name);
           await runBuildMatrix(
             [rozieSourcePath],
             {
@@ -433,6 +452,7 @@ describe('DIST-05 strict-bytes parity gate (D-93) — 18 examples × 6 targets �
               types: true,
               sourceMap: false,
               root: ROOT,
+              ...(cvaOff ? { cva: false } : {}),
             },
             { exit: 'throw' },
           );
@@ -493,9 +513,12 @@ describe('DIST-05 strict-bytes parity gate (D-93) — 18 examples × 6 targets �
           // Slight pad so a same-millisecond write still satisfies > start.
           await new Promise((r) => setTimeout(r, 5));
 
+          // Phase 23 — off-state probe drives the babel-plugin with the
+          // angular: { cva: false } namespace for its Angular leg.
+          const cvaOff = target === 'angular' && FIXTURE_ANGULAR_CVA_OFF.has(name);
           await transformAsync(readFileSync(importer, 'utf8'), {
             filename: importer,
-            plugins: [[rozieBabelPlugin, { target }]],
+            plugins: [[rozieBabelPlugin, { target, ...(cvaOff ? { angular: { cva: false } } : {}) }]],
             babelrc: false,
             configFile: false,
           });
@@ -535,7 +558,10 @@ describe('DIST-05 strict-bytes parity gate (D-93) — 18 examples × 6 targets �
       it('Leg 4 — unplugin createTransformHook produces fixture bytes', () => {
         const registry = new ModifierRegistry();
         registerBuiltins(registry);
-        const hook = createTransformHook(registry, target);
+        // Phase 23 — off-state probe threads cva:false into the unplugin hook
+        // (the third createTransformHook arg) for its Angular leg.
+        const cvaOff = target === 'angular' && FIXTURE_ANGULAR_CVA_OFF.has(name);
+        const hook = createTransformHook(registry, target, cvaOff ? false : undefined);
         // Invoke with an empty `this` — the production plugin context carries
         // `addWatchFile` / `warn` / `error`; the hook tolerates their absence
         // (existing transform.test cases verify this).
@@ -556,6 +582,123 @@ describe('DIST-05 strict-bytes parity gate (D-93) — 18 examples × 6 targets �
         // mappings only, ignoring file/sources fields. v1 omits.
       });
     });
+  });
+});
+
+/**
+ * Phase 23 (angular-cva-forms-integration) Plan 04 — off-state byte-equality
+ * gate (SPEC-6 / Pitfall 2).
+ *
+ * The CvaOffState fixture's Angular leg is emitted with `cva: false` by ALL
+ * FOUR entrypoints (asserted byte-equal by the main parity block above via the
+ * FIXTURE_ANGULAR_CVA_OFF set). This block adds the SEMANTIC off-state
+ * assertions on top of byte-equality:
+ *
+ *   1. The cva:false Angular output contains NO CVA surface (no
+ *      NG_VALUE_ACCESSOR provider, no writeValue / the other accessor methods).
+ *   2. All four entrypoints produce byte-IDENTICAL cva:false Angular output
+ *      for it (re-asserted directly here for a focused failure message — the
+ *      main block asserts each leg == the committed fixture, which transitively
+ *      proves cross-leg equality).
+ *   3. The default-ON emit DOES contain the CVA surface (the off-state is a
+ *      real suppression, not a fixture that never had CVA).
+ *
+ * This is the load-bearing dist-parity proof that the emitter-side
+ * `opts.cva ?? true` default + identical threading across compile() /
+ * CLI / babel-plugin / unplugin cannot diverge.
+ */
+describe('Phase 23 — CvaOffState off-state cva:false byte-equality across four entrypoints', () => {
+  const name = 'CvaOffState';
+  const rozieSourcePath = resolve(ROOT, `examples/${name}.rozie`);
+  const rozieSource = readFileSync(rozieSourcePath, 'utf8');
+
+  // Leg 1 (compile) cva:false output — the reference for the off-state checks.
+  const offResult = compile(rozieSource, {
+    target: 'angular',
+    filename: `${name}.rozie`,
+    angular: { cva: false },
+    types: true,
+    sourceMap: false,
+  });
+
+  it('cva:false Angular emit contains NO CVA surface', () => {
+    expect(offResult.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+    expect(offResult.code).not.toContain('NG_VALUE_ACCESSOR');
+    expect(offResult.code).not.toContain('writeValue');
+    expect(offResult.code).not.toContain('registerOnChange');
+    expect(offResult.code).not.toContain('setDisabledState');
+    expect(offResult.code).not.toContain('__rozieCvaOnChange');
+  });
+
+  it('default-ON Angular emit DOES contain the CVA surface (off-state is a real suppression)', () => {
+    const onResult = compile(rozieSource, {
+      target: 'angular',
+      filename: `${name}.rozie`,
+      types: true,
+      sourceMap: false,
+    });
+    expect(onResult.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+    expect(onResult.code).toContain('NG_VALUE_ACCESSOR');
+    expect(onResult.code).toContain('writeValue');
+  });
+
+  it('cva:false Angular output is byte-identical across all four entrypoints', async () => {
+    // Leg 1 — compile() (already computed as offResult above).
+    const leg1 = offResult.code;
+
+    // Leg 2 — CLI runBuildMatrix with --no-cva (cva:false).
+    const cliTmp = mkdtempSync(join(tmpdir(), 'rozie-parity-cvaoff-cli-'));
+    let leg2: string;
+    try {
+      await runBuildMatrix(
+        [rozieSourcePath],
+        { target: ['angular'], out: cliTmp, types: true, sourceMap: false, root: ROOT, cva: false },
+        { exit: 'throw' },
+      );
+      leg2 = readFileSync(resolve(cliTmp, 'angular', 'examples', `${name}.ts`), 'utf8');
+    } finally {
+      rmSync(cliTmp, { recursive: true, force: true });
+    }
+
+    // Leg 3 — babel-plugin with angular: { cva: false }.
+    const babelTmp = mkdtempSync(join(tmpdir(), 'rozie-parity-cvaoff-babel-'));
+    let leg3: string;
+    try {
+      const tmpRozie = join(babelTmp, `${name}.rozie`);
+      writeFileSync(tmpRozie, rozieSource, 'utf8');
+      const importer = join(babelTmp, 'consumer.ts');
+      writeFileSync(importer, `import X from './${name}.rozie';`, 'utf8');
+      await transformAsync(readFileSync(importer, 'utf8'), {
+        filename: importer,
+        plugins: [[rozieBabelPlugin, { target: 'angular', angular: { cva: false } }]],
+        babelrc: false,
+        configFile: false,
+      });
+      leg3 = readFileSync(join(babelTmp, `${name}.ts`), 'utf8');
+    } finally {
+      rmSync(babelTmp, { recursive: true, force: true });
+    }
+
+    // Leg 4 — unplugin createTransformHook(registry, 'angular', false).
+    const registry = new ModifierRegistry();
+    registerBuiltins(registry);
+    const hook = createTransformHook(registry, 'angular', false);
+    const leg4Result = hook.call({}, rozieSource, `${name}.rozie`);
+    expect(leg4Result).not.toBeNull();
+    const leg4 = leg4Result!.code;
+
+    // Cross-leg byte-equality (trim only the trailing-newline divergence that
+    // the CLI/babel raw-write vs compile()-direct paths may differ on — the
+    // main parity block already asserts each leg == the LF-terminated fixture).
+    expect(leg2.trim()).toBe(leg1.trim());
+    expect(leg3.trim()).toBe(leg1.trim());
+    expect(leg4.trim()).toBe(leg1.trim());
+
+    // And none of the legs carry CVA surface.
+    for (const code of [leg1, leg2, leg3, leg4]) {
+      expect(code).not.toContain('NG_VALUE_ACCESSOR');
+      expect(code).not.toContain('writeValue');
+    }
   });
 });
 

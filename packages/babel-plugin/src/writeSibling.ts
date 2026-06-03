@@ -41,6 +41,9 @@ export function writeSiblingIfStale(
   roziePath: string,
   siblingPath: string,
   target: RozieBabelTarget,
+  // Phase 23 — Angular CVA opt-out. Undefined → emitter default-ON path,
+  // byte-identical to compile()/CLI/unplugin when omitted.
+  cva?: boolean,
 ): void {
   // Idempotency check — if sibling is fresher than .rozie (or within the
   // 100ms tolerance window), skip. Saves the compile() cost on hot paths
@@ -55,7 +58,13 @@ export function writeSiblingIfStale(
 
   // Compile via the @rozie/core single source of truth (D-93 byte-identical).
   const source = readFileSync(roziePath, 'utf8');
-  const result = compile(source, { target, filename: roziePath });
+  const result = compile(source, {
+    target,
+    filename: roziePath,
+    // Phase 23 — attach the `angular` namespace only on opt-out so the
+    // default-ON path stays byte-identical to the other entrypoints.
+    ...(cva === false ? { angular: { cva: false } } : {}),
+  });
   const errors = result.diagnostics.filter((d) => d.severity === 'error');
   if (errors.length > 0) {
     const detail = errors.map((d) => `[${d.code}] ${d.message}`).join('; ');

@@ -31,6 +31,14 @@ import type { RozieBabelTarget } from './writeSibling.js';
 export interface RozieBabelPluginOptions {
   /** Required: target framework. Selects emit branch + sibling extension. */
   target: RozieBabelTarget;
+  /**
+   * Phase 23 — per-target emit-semantics namespace (mirrors
+   * `CompileOptions.angular`). `angular.cva` (default ON) opts out of the auto
+   * `ControlValueAccessor` emit when `false`. Omitting it preserves the
+   * emitter default-ON path byte-identically to the other entrypoints.
+   * No-op for non-Angular targets.
+   */
+  angular?: { cva?: boolean };
 }
 
 /** D-92 sibling-extension dispatch table. */
@@ -49,6 +57,9 @@ export default declare((api, options: RozieBabelPluginOptions): PluginObj => {
   api.assertVersion(7);
 
   const { target } = options;
+  // Phase 23 — Angular CVA opt-out forwarded into the compile chain. Undefined
+  // when omitted → emitter default-ON (byte-identical to the other entrypoints).
+  const cva = options.angular?.cva;
   if (!target || !(target in TARGET_EXTENSIONS)) {
     // ROZ820 — invalid target option. Thrown at plugin instantiation so
     // misconfigurations fail fast (before any visitor runs).
@@ -79,7 +90,7 @@ export default declare((api, options: RozieBabelPluginOptions): PluginObj => {
         const siblingPath = roziePath.slice(0, -ROZIE_EXT.length) + ext;
 
         try {
-          compileImport(roziePath, siblingPath, target);
+          compileImport(roziePath, siblingPath, target, cva);
         } catch (err) {
           // Re-shape any error from compileImport (ROZ822 compile error
           // or ROZ823 fs error) as a Babel error with code-frame per D-97.

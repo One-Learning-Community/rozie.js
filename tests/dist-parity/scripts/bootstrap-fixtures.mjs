@@ -175,6 +175,15 @@ const EXAMPLES = [
   'ExposeProbe',
 ];
 
+// Phase 23 (angular-cva-forms-integration) — per-fixture Angular CVA opt-out.
+// Fixtures in this set are emitted with `angular: { cva: false }` for the
+// Angular target ONLY, across all four entrypoints. The CvaOffState off-state
+// probe proves cva:false suppresses ALL CVA emit byte-equally (and, per Plan
+// 23-01, byte-identical to its pre-CVA baseline). Other fixtures stay on the
+// default-ON path (their CVA rebless is Plan 23-05). The map is keyed by
+// fixture name; the value is the per-target options applied at compile time.
+const FIXTURE_ANGULAR_CVA_OFF = new Set(['CvaOffState']);
+
 const EXAMPLES_NEEDING_RESOLVER_ROOT = new Set([
   'ModalConsumer',
   'WrapperModal',
@@ -234,10 +243,14 @@ for (const name of EXAMPLES) {
     // .rozie producers (verified empirically that absolute-filename for
     // single-file examples is byte-equal to the relative form).
     const needsResolver = EXAMPLES_NEEDING_RESOLVER_ROOT.has(name);
+    // Phase 23 — the off-state probe emits its Angular leg with cva:false so
+    // the committed baseline is the suppressed-CVA shape. No-op on other targets.
+    const cvaOff = target === 'angular' && FIXTURE_ANGULAR_CVA_OFF.has(name);
     const result = compile(source, {
       target,
       filename: needsResolver ? sourcePath : `${name}.rozie`,
       ...(needsResolver ? { resolverRoot: resolve(ROOT, 'examples') } : {}),
+      ...(cvaOff ? { angular: { cva: false } } : {}),
       types: true,
       sourceMap: false,
     });

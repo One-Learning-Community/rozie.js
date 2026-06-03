@@ -15,6 +15,8 @@ export function compileImport(
   roziePath: string,
   siblingPath: string,
   target: RozieBabelTarget,
+  // Phase 23 — Angular CVA opt-out forwarded to writeSiblingIfStale → compile().
+  cva?: boolean,
 ): void {
-  writeSiblingIfStale(roziePath, siblingPath, target);
+  writeSiblingIfStale(roziePath, siblingPath, target, cva);
 }
