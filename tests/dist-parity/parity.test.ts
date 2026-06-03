@@ -132,8 +132,10 @@ const EXAMPLES = [
   // producer — no <components>, no resolver-root.
   'ExposeProbe',
   // Phase 23 (angular-cva-forms-integration) off-state byte-equality probe.
-  // Single-model (`value` String model:true). Registered now as an ordinary
-  // fixture; Plan 23-04 owns the cva:false Angular-leg wiring + rebless.
+  // Single-model (`value` String model:true). Its Angular leg is compiled with
+  // cva:false (live FIXTURE_ANGULAR_CVA_OFF set); the committed Angular fixture
+  // is the suppressed-CVA shape and the off-state byte-equality block below
+  // asserts it byte-identical across all four entrypoints.
   'CvaOffState',
 ] as const;
 

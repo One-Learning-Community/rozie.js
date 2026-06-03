@@ -156,12 +156,13 @@ const EXAMPLES = [
   // producers — stays OUT of RESOLVER_ROOT.
   'UpdateExpressionProbe',
   // Phase 23 (angular-cva-forms-integration) off-state byte-equality probe.
-  // Single-model (one `value` String `model: true` prop). Registered now as an
-  // ORDINARY fixture so the bootstrap generates the PRE-CVA baseline across all
-  // six targets × four entrypoints; Plan 23-04 will switch its Angular leg to
-  // `cva: false` and rebless, then assert the cva:false Angular output is
-  // byte-identical to this baseline (the off-state proof). Single-file; no
-  // sibling .rozie producers — stays OUT of RESOLVER_ROOT.
+  // Single-model (one `value` String `model: true` prop). Its Angular leg is
+  // compiled with `cva: false` (see FIXTURE_ANGULAR_CVA_OFF below + the cvaOff
+  // spread in the compile loop), so the committed Angular fixture is the
+  // suppressed-CVA shape and the parity test asserts it byte-identical across
+  // all four entrypoints (the off-state proof). The other five targets are
+  // unaffected by the flag. Single-file; no sibling .rozie producers — stays OUT
+  // of RESOLVER_ROOT.
   'CvaOffState',
   // Phase 21 $expose dogfood (REQ-11). Typed input exposing reset()/focus() via
   // $expose({ reset, focus }). Its committed per-target bytes are the dist-parity
@@ -178,10 +179,10 @@ const EXAMPLES = [
 // Phase 23 (angular-cva-forms-integration) — per-fixture Angular CVA opt-out.
 // Fixtures in this set are emitted with `angular: { cva: false }` for the
 // Angular target ONLY, across all four entrypoints. The CvaOffState off-state
-// probe proves cva:false suppresses ALL CVA emit byte-equally (and, per Plan
-// 23-01, byte-identical to its pre-CVA baseline). Other fixtures stay on the
-// default-ON path (their CVA rebless is Plan 23-05). The map is keyed by
-// fixture name; the value is the per-target options applied at compile time.
+// probe proves cva:false suppresses ALL CVA emit byte-equally across the four
+// entrypoints. Other single-model fixtures stay on the default-ON path. The set
+// is keyed by fixture name; membership applies the cva:false option at compile
+// time for the Angular target only.
 const FIXTURE_ANGULAR_CVA_OFF = new Set(['CvaOffState']);
 
 const EXAMPLES_NEEDING_RESOLVER_ROOT = new Set([

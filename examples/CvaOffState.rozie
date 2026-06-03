@@ -7,14 +7,14 @@
   (mirrors PropDefaultCoercion / ExposeProbe: no <components>, no resolver
   root).
 
-  Plan-04 off-state probe: Plan 23-04 will switch THIS fixture's Angular leg
-  to `cva: false` and rebless, then assert the cva:false Angular output is
-  BYTE-IDENTICAL to the pre-CVA baseline (proving the CVA feature is fully
-  off-by-... / opt-in and adds zero bytes when disabled). For now (Plan 23-01)
-  it is registered as an ORDINARY fixture so the bootstrap can generate the
-  pre-CVA baseline across all six targets × four entrypoints; Plan 04 owns the
-  cva:false harness wiring + rebless. Until then it produces no meaningful diff
-  vs any other single-model fixture.
+  Off-state byte-equality probe (LIVE): the dist-parity harness compiles this
+  fixture's Angular leg with `cva: false` (the `FIXTURE_ANGULAR_CVA_OFF` set +
+  the `...(cvaOff ? { angular: { cva: false } } : {})` spread in
+  bootstrap-fixtures.mjs / parity.test.ts) and asserts the suppressed-CVA
+  Angular output is BYTE-IDENTICAL across all four entrypoints — proving the CVA
+  feature is opt-in and adds zero bytes when disabled. The committed Angular
+  fixture is therefore the suppressed-CVA shape, NOT a pre-CVA baseline. The
+  realized off-state byte-equality proof lives in parity.test.ts.
 -->
 
 <rozie name="CvaOffState">
