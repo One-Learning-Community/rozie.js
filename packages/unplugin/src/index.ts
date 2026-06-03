@@ -94,7 +94,10 @@ export const unplugin = createUnpluginV3<Partial<RozieOptions>>((rawOptions) => 
   registerBuiltins(registry);
 
   const resolveId = createResolveIdHook(options.target);
-  const load = createLoadHook(registry, options.target);
+  // Phase 23 — thread the Angular CVA opt-out into the Vite-runtime load path.
+  // `options.angular?.cva` is undefined when the consumer omits the namespace,
+  // which exercises the emitter default-ON path byte-identically to compile().
+  const load = createLoadHook(registry, options.target, options.angular?.cva);
 
   // Captured by the Vite adapter's configResolved (the only adapter with a
   // first-class project-root concept). The shared buildStart sidecar walk
@@ -257,7 +260,9 @@ export const unplugin = createUnpluginV3<Partial<RozieOptions>>((rawOptions) => 
         // `prebuildExtraRoots` allowlist so the prebuild walker covers
         // filesystem trees outside the single Vite project root (e.g.
         // `tests/visual-regression/` needs to walk `<repo>/examples/`).
-        prebuildAngularRozieFiles(root, registry, options.prebuildExtraRoots ?? []);
+        // Phase 23 — forward the CVA opt-out into the disk-prebuild leg so it
+        // stays byte-identical to the Vite-runtime leg (Pitfall 2).
+        prebuildAngularRozieFiles(root, registry, options.prebuildExtraRoots ?? [], options.angular?.cva);
       },
       // When a .rozie file changes on disk, Vite's HMR lookup finds no module
       // graph entry for it (the graph entry is the synthetic .rozie.vue/.tsx id).
@@ -293,7 +298,8 @@ export const unplugin = createUnpluginV3<Partial<RozieOptions>>((rawOptions) => 
             // tripping the WR-01/T-05-04b-03 outside-root refusal.
             const hmrRoot = server?.config?.root ?? process.cwd();
             const allowed = [hmrRoot, ...(options.prebuildExtraRoots ?? [])];
-            emitRozieTsToDisk(file, registry, allowed);
+            // Phase 23 — HMR re-emit must honor the same CVA opt-out.
+            emitRozieTsToDisk(file, registry, allowed, options.angular?.cva);
           } catch (err) {
             // Surface as a warning rather than aborting HMR. Closes WR-02:
             // delete the stale .rozie.ts so Vite gets a module-not-found

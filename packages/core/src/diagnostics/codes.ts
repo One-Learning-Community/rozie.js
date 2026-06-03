@@ -282,6 +282,7 @@ export const RozieErrorCode = {
   UNPLUGIN_TARGET_NOT_YET_SUPPORTED: 'ROZ402', // Phase 3 only ships 'vue'; react/svelte/angular ROZ402 until later phases
   UNPLUGIN_PEER_DEP_MISSING: 'ROZ403', // @rozie/runtime-vue or @vitejs/plugin-vue not resolvable (Pitfall 8)
   UNPLUGIN_PLUGIN_CHAIN_MISORDER: 'ROZ404', // detected vite-plugin-vue lacking; D-25 chain broken
+  UNPLUGIN_ANGULAR_OPTIONS_INVALID: 'ROZ405', // Phase 23 — malformed `angular` config shape (e.g. angular.cva not boolean); thrown at factory-call time before Vite hooks (T-23-04-OPT)
 
   // ---- @rozie/target-vue lowering errors (Phase 3 D-52) — ROZ420..ROZ449 ----
   // (Reserved as safety net per CONTEXT D-52 — none anticipated for v1.)

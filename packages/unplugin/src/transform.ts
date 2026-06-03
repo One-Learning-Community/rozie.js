@@ -431,7 +431,13 @@ function absolutize(id: string, importer: string | undefined): string {
  * pipeline, returns `{ code, map }`. Throws Vite-shaped errors on parse /
  * lowering / emission failures; calls `this.warn` on non-fatal warnings.
  */
-export function createLoadHook(registry: ModifierRegistry, target: TargetValue = 'vue') {
+export function createLoadHook(
+  registry: ModifierRegistry,
+  target: TargetValue = 'vue',
+  // Phase 23 — Angular CVA opt-out forwarded into the Vite-runtime fallback
+  // pipeline. Defaults undefined → emitter default-ON (byte-identical when omitted).
+  cva?: boolean,
+) {
   if (target === 'angular') {
     return function loadAngular(
       this: AnyContext,
@@ -454,7 +460,7 @@ export function createLoadHook(registry: ModifierRegistry, target: TargetValue =
       const filePath = id.slice(0, -'.ts'.length);
       if (!existsSync(filePath)) return null;
       const source = readFileSync(filePath, 'utf8');
-      return runAngularPipeline.call(this, source, filePath, registry);
+      return runAngularPipeline.call(this, source, filePath, registry, cva);
     };
   }
   if (target === 'svelte') {
@@ -562,14 +568,20 @@ export function createLoadHook(registry: ModifierRegistry, target: TargetValue =
  * `.rozie` source already loaded by Vite's pipeline. Used by transform.test
  * to exercise the parse/lower/emit chain without going through resolveId.
  */
-export function createTransformHook(registry: ModifierRegistry, target: TargetValue = 'vue') {
+export function createTransformHook(
+  registry: ModifierRegistry,
+  target: TargetValue = 'vue',
+  // Phase 23 — Angular CVA opt-out forwarded into the request-time transform
+  // pipeline. Defaults undefined → emitter default-ON (byte-identical when omitted).
+  cva?: boolean,
+) {
   if (target === 'angular') {
     return function transformAngular(
       this: AnyContext,
       code: string,
       id: string,
     ): { code: string; map: EmitAngularResult['map'] } | null {
-      return runAngularPipeline.call(this, code, id, registry);
+      return runAngularPipeline.call(this, code, id, registry, cva);
     };
   }
   if (target === 'svelte') {
@@ -1051,6 +1063,12 @@ function runAngularPipeline(
   source: string,
   filePath: string,
   registry: ModifierRegistry,
+  // Phase 23 — Angular CVA opt-out. Defaults undefined so the emitter-side
+  // `opts.cva ?? true` default-ON path is exercised when omitted (direct
+  // callers / tests stay byte-identical). Threaded IDENTICALLY into the
+  // disk-prebuild leg (runAngularEmitForDisk) so the two legs cannot diverge
+  // (Pitfall 2).
+  cva?: boolean,
 ): { code: string; map: EmitAngularResult['map'] } {
   this?.addWatchFile?.(filePath);
   // 1. parse
@@ -1095,6 +1113,9 @@ function runAngularPipeline(
     source: emitSource,
     modifierRegistry: registry,
     blockOffsets,
+    // Phase 23 — conditional-spread the CVA opt-out (Vite-runtime leg).
+    // MUST stay byte-identical to the disk-prebuild leg below.
+    ...(cva !== undefined ? { cva } : {}),
   });
   const emitErrors = result.diagnostics.filter((d) => d.severity === 'error');
   if (emitErrors.length > 0) {
@@ -1145,6 +1166,9 @@ export function prebuildAngularRozieFiles(
   rootDir: string,
   registry: ModifierRegistry,
   extraRoots: readonly string[] = [],
+  // Phase 23 — Angular CVA opt-out, forwarded to every emitRozieTsToDisk call
+  // in the prebuild walk so the disk-cache leg honors cva:false uniformly.
+  cva?: boolean,
 ): string[] {
   const processed: string[] = [];
   // Filter extraRoots: refuse symlinks / non-directories with a console.warn
@@ -1186,7 +1210,7 @@ export function prebuildAngularRozieFiles(
   for (const root of allowedRoots) {
     for (const roziePath of walkRozieFiles(root)) {
       try {
-        emitRozieTsToDisk(roziePath, registry, allowedRoots);
+        emitRozieTsToDisk(roziePath, registry, allowedRoots, cva);
         processed.push(roziePath);
       } catch (err) {
         // Surface as a console warning rather than aborting the whole scan —
@@ -1212,6 +1236,8 @@ export function emitRozieTsToDisk(
   roziePath: string,
   registry: ModifierRegistry,
   rootDirOrAllowedRoots?: string | readonly string[],
+  // Phase 23 — Angular CVA opt-out, forwarded to runAngularEmitForDisk.
+  cva?: boolean,
 ): string {
   // When the third arg is supplied (configResolved + HMR paths), refuse writes
   // that would land outside ALL of the listed roots. Closes T-05-04b-03 +
@@ -1241,7 +1267,7 @@ export function emitRozieTsToDisk(
     }
   }
   const source = readFileSync(roziePath, 'utf8');
-  const result = runAngularEmitForDisk(source, roziePath, registry);
+  const result = runAngularEmitForDisk(source, roziePath, registry, cva);
 
   // Phase 06.1 Plan 01 Pitfall 6 mitigation: analogjs's downstream transform
   // reads `.rozie.ts` from disk and produces its own sourcemap (it uses
@@ -1360,6 +1386,9 @@ function runAngularEmitForDisk(
   source: string,
   filePath: string,
   registry: ModifierRegistry,
+  // Phase 23 — Angular CVA opt-out (disk-prebuild leg). Threaded IDENTICALLY
+  // to runAngularPipeline (Vite-runtime leg) so both legs are byte-equal.
+  cva?: boolean,
 ): {
   code: string;
   map: EmitAngularResult['map'];
@@ -1392,6 +1421,9 @@ function runAngularEmitForDisk(
     source: emitSource,
     modifierRegistry: registry,
     blockOffsets,
+    // Phase 23 — conditional-spread the CVA opt-out (disk-prebuild leg).
+    // MUST stay byte-identical to the Vite-runtime leg in runAngularPipeline.
+    ...(cva !== undefined ? { cva } : {}),
   });
   const emitError = result.diagnostics.find((d) => d.severity === 'error');
   if (emitError) {

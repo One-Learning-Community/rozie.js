@@ -60,6 +60,23 @@ export interface RozieOptions {
    * @experimental
    */
   prebuildExtraRoots?: readonly string[];
+  /**
+   * Phase 23 — per-target emit-semantics config namespace (the FIRST such
+   * `<target>: { ... }` key). Mirrors `CompileOptions.angular` in @rozie/core
+   * so unplugin and compile() expose an identical surface.
+   *
+   * `angular.cva` (default ON): when `false`, suppresses the auto
+   * `ControlValueAccessor` emit on single-model Angular components. The
+   * emitter-side default is `opts.cva ?? true`, so OMITTING this namespace is
+   * byte-identical to compile()/CLI omitting it (dist-parity Pitfall 2). The
+   * shape is validated at factory-call time (ROZ405) — a malformed `angular`
+   * or non-boolean `cva` throws a code-bearing Error BEFORE any Vite hook runs.
+   *
+   * No-op for non-Angular targets.
+   *
+   * @experimental
+   */
+  angular?: { cva?: boolean };
 }
 
 export type TargetValue = RozieOptions['target'];
@@ -134,12 +151,37 @@ export function validateOptions(options: Partial<RozieOptions> | undefined): Roz
       `Unknown target '${target}'. Valid targets: ${SUPPORTED_TARGETS_PHASE_5.join(', ')}.`,
     );
   }
+  // Phase 23 — validate the `angular` per-target emit-semantics namespace at
+  // factory-call time (T-23-04-OPT): a malformed shape (non-object `angular`,
+  // or non-boolean `angular.cva`) throws a code-bearing ROZ405 BEFORE any Vite
+  // hook runs, alongside the existing ROZ400/700 fail-fast checks. A valid or
+  // absent namespace is preserved through via conditional-spread (the exact
+  // prebuildExtraRoots precedent) so omission stays byte-identical to compile().
+  if (options.angular !== undefined) {
+    const ang = options.angular as unknown;
+    if (typeof ang !== 'object' || ang === null || Array.isArray(ang)) {
+      throw rozieError(
+        RozieErrorCode.UNPLUGIN_ANGULAR_OPTIONS_INVALID,
+        `The 'angular' option must be an object (e.g. { cva: false }). Received ${Array.isArray(ang) ? 'array' : typeof ang}.`,
+      );
+    }
+    const cva = (ang as { cva?: unknown }).cva;
+    if (cva !== undefined && typeof cva !== 'boolean') {
+      throw rozieError(
+        RozieErrorCode.UNPLUGIN_ANGULAR_OPTIONS_INVALID,
+        `The 'angular.cva' option must be a boolean (received ${typeof cva}). Use { angular: { cva: false } } to opt out of the auto ControlValueAccessor emit.`,
+      );
+    }
+  }
+
   // Quick task 260515-1y4: preserve prebuildExtraRoots through validation.
   // Shape is intentionally NOT validated here — runtime safety lives in
   // emitRozieTsToDisk's trust-boundary check. Pass-through only.
+  // Phase 23: `angular` is shape-validated above, then preserved verbatim.
   return {
     target,
     ...(options.prebuildExtraRoots ? { prebuildExtraRoots: options.prebuildExtraRoots } : {}),
+    ...(options.angular !== undefined ? { angular: options.angular } : {}),
   };
 }
 
