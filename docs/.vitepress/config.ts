@@ -84,6 +84,7 @@ export default defineConfig({
             { text: 'Features & design choices', link: '/guide/features' },
             { text: 'Compatibility', link: '/compatibility' },
             { text: 'Cross-Framework Parity', link: '/parity' },
+            { text: 'Security & supply chain', link: '/guide/security' },
           ],
         },
         {
