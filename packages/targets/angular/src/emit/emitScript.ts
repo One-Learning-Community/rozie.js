@@ -238,6 +238,54 @@ function renderDefault(prop: PropDecl): string {
 }
 
 /**
+ * Phase 23 (angular-cva-forms-integration) — build the static CVA class shape
+ * (three private members + four ControlValueAccessor methods + the
+ * `__rozieCvaOnTouched` host callback) for the single `model: true` prop the
+ * accessor wraps. Returns a single string ready to push into `classBodyParts`.
+ *
+ * The shape is the Spike 006 contract (`.planning/spikes/006-...`):
+ *   - `writeValue(v: T | null)` coerces null → the prop's declared default
+ *     literal (via the shared `renderDefault`), matching flatpickr's
+ *     `this.date.set(v ?? '')` — null-coercion is load-bearing from NgModel's
+ *     very first `writeValue(null)` call (006-A journal), not just `reset()`.
+ *   - the value parameter is typed `<T> | null` reusing the prop's TS type the
+ *     same way the `model()` initializer does (renderType).
+ *
+ * This emits ONLY the static shape. The dynamic view→model hookup at the
+ * internal write site (`this.__rozieCvaOnChange(...)`) and the disabled-read
+ * merge are Plan 03 — NOT here.
+ */
+function buildCvaClassShape(prop: PropDecl): string {
+  const tsType = renderType(prop.typeAnnotation);
+  const rendered = renderDefault(prop);
+  // renderDefault returns '' for the no-declared-default sentinel; in that case
+  // coerce to `null` (the value param is already `T | null`). Otherwise coerce
+  // to the rendered default literal (e.g. '' for the String date default).
+  const defaultLiteral = rendered.length > 0 ? rendered : 'null';
+  return [
+    `private __rozieCvaOnChange: (v: ${tsType}) => void = () => {};`,
+    `private __rozieCvaOnTouchedFn: () => void = () => {};`,
+    `private __rozieCvaDisabled = signal(false);`,
+    ``,
+    `writeValue(v: ${tsType} | null): void {`,
+    `  this.${prop.name}.set(v ?? ${defaultLiteral});`,
+    `}`,
+    `registerOnChange(fn: (v: ${tsType}) => void): void {`,
+    `  this.__rozieCvaOnChange = fn;`,
+    `}`,
+    `registerOnTouched(fn: () => void): void {`,
+    `  this.__rozieCvaOnTouchedFn = fn;`,
+    `}`,
+    `setDisabledState(isDisabled: boolean): void {`,
+    `  this.__rozieCvaDisabled.set(isDisabled);`,
+    `}`,
+    `__rozieCvaOnTouched(): void {`,
+    `  this.__rozieCvaOnTouchedFn();`,
+    `}`,
+  ].join('\n');
+}
+
+/**
  * Find the cloned `body` for each ComputedDecl by name. Matches
  * VariableDeclarators with `init = $computed(arrow|fn)`.
  */
@@ -622,6 +670,18 @@ export interface EmitScriptOptions {
    * string / omitted when the caller has no portal slots to scope.
    */
   portalScopeHash?: string;
+  /**
+   * Phase 23 (angular-cva-forms-integration) — the single `model: true` prop
+   * the auto-`ControlValueAccessor` wraps, or `null` when CVA is off (zero/≥2
+   * model props OR `cva: false`). Computed once in emitAngular() and threaded
+   * here. When non-null, emitScript appends the four CVA methods
+   * (`writeValue` / `registerOnChange` / `registerOnTouched` /
+   * `setDisabledState`) + the `__rozieCvaOnTouched` host-callback + three
+   * private members (`__rozieCvaOnChange` / `__rozieCvaOnTouchedFn` /
+   * `__rozieCvaDisabled`) to the class body. When null, NOTHING is appended —
+   * byte-identical to the pre-CVA output.
+   */
+  cvaModelProp?: PropDecl | null;
 }
 
 /**
@@ -1226,6 +1286,13 @@ export function emitScript(
   }
   if (classMethodLines.length > 0) {
     classBodyParts.push(classMethodLines.join('\n'));
+  }
+
+  // Phase 23 — auto-CVA static class shape, gated on the single cvaModelProp.
+  // Null (zero/≥2 model props OR cva:false) → nothing appended → byte-identical
+  // to the pre-CVA output. The dynamic write-site/disabled-read hookup is Plan 03.
+  if (opts.cvaModelProp != null) {
+    classBodyParts.push(buildCvaClassShape(opts.cvaModelProp));
   }
 
   // ngTemplateContextGuard static method (only if slots present).
