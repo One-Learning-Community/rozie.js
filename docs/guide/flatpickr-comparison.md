@@ -29,7 +29,7 @@ evidence of absence.)
 
 | Wrapper | Frameworks | Last maintained | Latest-framework support | Two-way binding | Runtime reconcile | Imperative handle | Angular CVA | rangePlugin |
 | ------- | ---------- | --------------- | ------------------------ | :-------------: | :---------------: | :---------------: | :---------: | :---------: |
-| **[Rozie @rozie-ui/flatpickr](/examples/flatpickr)** | **6 — React + Vue + Svelte + Angular + Solid + Lit** | this repo (2026-06) | R18+ / V3.4+ / Sv5 / Ng19+ / Solid / Lit | ✓ `r-model:date` | ✓ managed | ✓ `$expose` | **✗** | ✓ |
+| **[Rozie @rozie-ui/flatpickr](/examples/flatpickr)** | **6 — React + Vue + Svelte + Angular + Solid + Lit** | this repo (2026-06) | R18+ / V3.4+ / Sv5 / Ng19+ / Solid / Lit | ✓ `r-model:date` | ✓ managed | ✓ `$expose` | **✓** | ✓ |
 | [react-flatpickr](https://github.com/haoxins/react-flatpickr) | React | 2025-07 | React 19 (peer `>= 16 <= 19`) | ✓ value + onChange | **~** `useMemo` | ✓ `.flatpickr` ref | n/a | ~ |
 | [vue-flatpickr-component](https://github.com/ankurk91/vue-flatpickr-component) | Vue 3 | **✗ archived 2025-03** | Vue 3 only | ✓ v-model | ✓ watches config | ~ not documented | n/a | ~ |
 | [angularx-flatpickr](https://github.com/mattlewis92/angularx-flatpickr) | Angular | 2024-11 | "Angular 17+" (19 in range) | ✓ ngModel / CVA | ~ not documented | ~ via directive | **✓** | ~ |
@@ -113,13 +113,21 @@ targets and says nothing measured about the competitors' behavior.
 This page concedes where the standalone wrappers genuinely win — that's what
 keeps the comparison credible.
 
-- **Angular reactive-forms CVA gap.** angularx-flatpickr ships a real
+- **Angular reactive-forms CVA — at parity.** angularx-flatpickr ships a real
   `ControlValueAccessor` plus `NG_VALUE_ACCESSOR` registration (confirmed in its
-  `flatpickr.directive.ts`), giving full `ngModel` / reactive-forms
-  integration. **Rozie's wrapper does not** — it forwards `[name]` only (the
-  [forms drop-in](/guide/flatpickr#forms-drop-in)), with a CVA decision still
-  pending. angularx-flatpickr wins the Angular-forms cell; Rozie's column is an
-  honest ✗ there.
+  `flatpickr.directive.ts`), giving full `ngModel` / reactive-forms integration.
+  **Rozie's wrapper now does too** — the Angular compile target auto-generates a
+  `ControlValueAccessor` from the single two-way `date` model (registered via
+  `NG_VALUE_ACCESSOR` on the component, no wrapper directive), so `[(ngModel)]`,
+  `[formControl]`, and `formControlName` bind directly. See the
+  [`formControlName` recipe + coexistence semantics](/guide/flatpickr#forms-drop-in).
+  The two wrappers reach the same Angular-forms cell; Rozie additionally ships
+  the *same* source to five other frameworks. The behavior is proven at runtime
+  by [`flatpickr-cva.spec.ts`](https://github.com/One-Learning-Community/rozie.js/blob/main/tests/visual-regression/specs/flatpickr-cva.spec.ts)
+  (7/7 green: null-default round-trip, the `setValue`/`reset`/`disable`/`enable`/
+  `touched`/zero-echo battery, `[(date)]`-vs-form coexistence, and the
+  no-crash baselines — all binding forms directives directly to the emitted
+  component, with zero hand-written CVA in the harness).
 
 - **react-hook-form spread limitation.** You cannot spread the full
   `register('field')` object onto the component — `register`'s `onChange`,

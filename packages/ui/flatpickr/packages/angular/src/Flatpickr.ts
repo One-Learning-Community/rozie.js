@@ -1,4 +1,5 @@
-import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, effect, inject, input, model, output, untracked, viewChild } from '@angular/core';
+import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, effect, forwardRef, inject, input, model, output, signal, untracked, viewChild } from '@angular/core';
+import { NG_VALUE_ACCESSOR } from '@angular/forms';
 
 import flatpickr from 'flatpickr';
 
@@ -24,6 +25,14 @@ import flatpickr from 'flatpickr';
       outline-offset: -1px;
     }
   `],
+  providers: [
+    {
+      provide: NG_VALUE_ACCESSOR,
+      useExisting: forwardRef(() => Flatpickr),
+      multi: true,
+    },
+  ],
+  host: { '(focusout)': '__rozieCvaOnTouched()' },
 })
 export class Flatpickr {
   date = model<string>('');
@@ -89,7 +98,7 @@ export class Flatpickr {
     effect(() => { const __watchVal = (() => this.minDate())(); untracked(() => { if (this.__rozieWatchInitial_2) { this.__rozieWatchInitial_2 = false; return; } ((v: any) => this.instance?.set('minDate', v))(__watchVal); }); });
     effect(() => { const __watchVal = (() => this.maxDate())(); untracked(() => { if (this.__rozieWatchInitial_3) { this.__rozieWatchInitial_3 = false; return; } ((v: any) => this.instance?.set('maxDate', v))(__watchVal); }); });
     effect(() => { const __watchVal = (() => this.dateFormat())(); untracked(() => { if (this.__rozieWatchInitial_4) { this.__rozieWatchInitial_4 = false; return; } ((v: any) => this.instance?.set('dateFormat', v))(__watchVal); }); });
-    effect(() => { const __watchVal = (() => this.disabled())(); untracked(() => { if (this.__rozieWatchInitial_5) { this.__rozieWatchInitial_5 = false; return; } ((v: any) => {
+    effect(() => { const __watchVal = (() => (this.disabled() || this.__rozieCvaDisabled()))(); untracked(() => { if (this.__rozieWatchInitial_5) { this.__rozieWatchInitial_5 = false; return; } ((v: any) => {
       if (this.instance) this.instance.input.disabled = v;
     })(__watchVal); }); });
     effect(() => { const __watchVal = (() => this.disable())(); untracked(() => { if (this.__rozieWatchInitial_6) { this.__rozieWatchInitial_6 = false; return; } ((v: any) => this.instance?.set('disable', v))(__watchVal); }); });
@@ -194,7 +203,7 @@ export class Flatpickr {
         const isRange = this.mode() === 'range';
         const complete = !isRange || selectedDates.length === 2;
         if ((this.commitOn() === 'change' || complete) && dateStr !== this.date()) {
-          this.date.set(dateStr);
+          this.date.set(dateStr), this.__rozieCvaOnChange(dateStr);
         }
         // Always surface BOTH the formatted string and the Date[] so consumers
         // that need the parsed objects (range bounds, multi-select) get them.
@@ -217,7 +226,7 @@ export class Flatpickr {
       }),
       onDayCreate: (_d: any, _s: any, _fp: any, dayElem: any) => this.dayCreate.emit(dayElem)
     });
-    if (this.disabled()) this.instance.input.disabled = true;
+    if ((this.disabled() || this.__rozieCvaDisabled())) this.instance.input.disabled = true;
     this.__rozieDestroyRef.onDestroy(() => this.instance?.destroy());
   }
 
@@ -237,6 +246,26 @@ export class Flatpickr {
   jumpToDate = (date: any) => {
     this.instance?.jumpToDate(date);
   };
+
+  private __rozieCvaOnChange: (v: string) => void = () => {};
+  private __rozieCvaOnTouchedFn: () => void = () => {};
+  private __rozieCvaDisabled = signal(false);
+
+  writeValue(v: string | null): void {
+    this.date.set(v ?? '');
+  }
+  registerOnChange(fn: (v: string) => void): void {
+    this.__rozieCvaOnChange = fn;
+  }
+  registerOnTouched(fn: () => void): void {
+    this.__rozieCvaOnTouchedFn = fn;
+  }
+  setDisabledState(isDisabled: boolean): void {
+    this.__rozieCvaDisabled.set(isDisabled);
+  }
+  __rozieCvaOnTouched(): void {
+    this.__rozieCvaOnTouchedFn();
+  }
 
   private rozieSpread_0 = viewChild<ElementRef>('rozieSpread_0');
 

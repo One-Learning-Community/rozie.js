@@ -1,5 +1,6 @@
-import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, effect, inject, input, model, output, signal, untracked, viewChild } from '@angular/core';
+import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, effect, forwardRef, inject, input, model, output, signal, untracked, viewChild } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
+import { NG_VALUE_ACCESSOR } from '@angular/forms';
 
 import { useSortableJS } from './internal/useSortableJS';
 
@@ -48,6 +49,14 @@ interface DefaultCtx {
       border: 0;
     }
   `],
+  providers: [
+    {
+      provide: NG_VALUE_ACCESSOR,
+      useExisting: forwardRef(() => SortableList),
+      multi: true,
+    },
+  ],
+  host: { '(focusout)': '__rozieCvaOnTouched()' },
 })
 export class SortableList {
   items = model<any[]>((() => [])());
@@ -88,7 +97,7 @@ export class SortableList {
   private __rozieWatchInitial_7 = true;
 
   constructor() {
-    effect(() => { const __watchVal = (() => this.disabled())(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } ((v: any) => this.instance?.option('disabled', v))(__watchVal); }); });
+    effect(() => { const __watchVal = (() => (this.disabled() || this.__rozieCvaDisabled()))(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } ((v: any) => this.instance?.option('disabled', v))(__watchVal); }); });
     effect(() => { const __watchVal = (() => this.group())(); untracked(() => { if (this.__rozieWatchInitial_1) { this.__rozieWatchInitial_1 = false; return; } ((v: any) => this.instance?.option('group', v))(__watchVal); }); });
     effect(() => { const __watchVal = (() => this.handle())(); untracked(() => { if (this.__rozieWatchInitial_2) { this.__rozieWatchInitial_2 = false; return; } ((v: any) => this.instance?.option('handle', v))(__watchVal); }); });
     effect(() => { const __watchVal = (() => this.ghostClass())(); untracked(() => { if (this.__rozieWatchInitial_3) { this.__rozieWatchInitial_3 = false; return; } ((v: any) => this.instance?.option('ghostClass', v))(__watchVal); }); });
@@ -105,11 +114,11 @@ export class SortableList {
     const sortable = useSortableJS(this.listEl()!.nativeElement, {
       items: () => this.items(),
       onCommit: (next: any) => {
-        this.items.set(next);
+        this.items.set(next), this.__rozieCvaOnChange(next);
       },
       options: {
         animation: this.animation(),
-        disabled: this.disabled(),
+        disabled: (this.disabled() || this.__rozieCvaDisabled()),
         // `cloneable` is a high-level Rozie prop that REPLACES a string
         // `group` with SortableJS's `{ name, pull: 'clone', put: true }`
         // object form. When `cloneable:false`, pass `$props.group` through
@@ -216,7 +225,7 @@ export class SortableList {
       const next = [...this.items()];
       const [moved] = next.splice(from, 1);
       next.splice(to, 0, moved);
-      this.items.set(next);
+      this.items.set(next), this.__rozieCvaOnChange(next);
       this.liftedIndex.set(to);
       this.ariaLiveText.set('Moved ' + this.getLabel(to) + ' to position ' + (to + 1));
       // After the keyed reorder write, restore focus to the moved row. No-op
@@ -230,6 +239,26 @@ export class SortableList {
       });
     }
   };
+
+  private __rozieCvaOnChange: (v: any[]) => void = () => {};
+  private __rozieCvaOnTouchedFn: () => void = () => {};
+  private __rozieCvaDisabled = signal(false);
+
+  writeValue(v: any[] | null): void {
+    this.items.set(v ?? (() => [])());
+  }
+  registerOnChange(fn: (v: any[]) => void): void {
+    this.__rozieCvaOnChange = fn;
+  }
+  registerOnTouched(fn: () => void): void {
+    this.__rozieCvaOnTouchedFn = fn;
+  }
+  setDisabledState(isDisabled: boolean): void {
+    this.__rozieCvaDisabled.set(isDisabled);
+  }
+  __rozieCvaOnTouched(): void {
+    this.__rozieCvaOnTouchedFn();
+  }
 
   static ngTemplateContextGuard(
     _dir: SortableList,

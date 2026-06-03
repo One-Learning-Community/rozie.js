@@ -210,22 +210,58 @@ const field = register('birthday');
 
 (`register`'s `onChange`/`onBlur`/`ref` collide with this component's own `onChange` emit-prop, so prefer wiring the value through `date`/`onDateChange` and forwarding only `name`.)
 
-**Angular** — bind the value with `[(date)]` and forward a form-control `[name]` for native form submission:
+**Angular** — the compiled component **is** a `ControlValueAccessor`, so it drops
+straight into Angular forms. Use `[(ngModel)]`, a reactive `[formControl]`, or
+`formControlName` directly on the component — no wrapper directive, no controller
+shim:
 
 ```ts
-// the name input is a typed signal: name = input<string>('')
-<Flatpickr [(date)]="date" [name]="'birthday'" />
+// Reactive forms (formControlName)
+@Component({
+  imports: [ReactiveFormsModule, Flatpickr],
+  template: `
+    <form [formGroup]="form">
+      <rozie-flatpickr formControlName="birthday" />
+    </form>
+  `,
+})
+export class BirthdayForm {
+  form = new FormGroup({ birthday: new FormControl('') });
+}
 ```
 
-::: warning Angular forms directives are not supported yet
-Do **not** put `[(ngModel)]` or `formControlName` directly on the component — it
-does not implement Angular's `ControlValueAccessor`, and the binding fails at
-runtime (in production builds with a cryptic
-`Cannot read properties of null (reading 'writeValue')` TypeError rather than the
-dev-mode `NG01203`). Wire the value through `[(date)]` as shown above. Full
-CVA / reactive-forms integration is a known gap — see the
-[comparison page caveats](/guide/flatpickr-comparison#caveats).
-:::
+```ts
+// Template-driven forms (ngModel)
+<rozie-flatpickr [(ngModel)]="birthday" name="birthday" />
+```
+
+The accessor is generated automatically by the Rozie compiler from the single
+two-way `date` model — there is nothing to hand-write. `writeValue` coerces a
+`null` form value to the empty-string default; `registerOnChange` fires on every
+real selection (never on a programmatic `writeValue`, so there is no value-echo
+loop); `(focusout)` marks the control touched; and `setDisabledState` OR-merges
+with the `disabled` prop so either source disables the picker.
+
+#### `[(date)]` vs. the form control — coexistence semantics
+
+You can bind **both** `[(date)]` and a form control on the same element. They
+share the underlying value, but they have a deliberate, Angular-Material-aligned
+split of responsibility:
+
+- Writes through **`[(date)]`** (or a programmatic `writeValue` from the form)
+  update the **view only** — they do **not** mark the form control dirty. This
+  matches `@angular/material`, where setting a control's value programmatically
+  never dirties it.
+- Only a **real user selection** flows through `registerOnChange`, marking the
+  control dirty and pushing the value into the form.
+- `null`/empty form values coerce to the component's default (`''`) via
+  `writeValue`, so resetting the form clears the picker without a crash.
+
+This means `[(date)]` is the right tool for app-driven value updates, and the
+form control is the right tool for user-edited form state — they coexist without
+fighting. Standard `ng-touched` / `ng-dirty` / `ng-invalid` status classes
+fall through to the host element cosmetically; style them as you would any
+native control.
 
 When `altInput` is on, flatpickr creates a hidden mirror input and **moves** the `name` onto it automatically, so the submitted value carries `name` whether `altInput` is on or off.
 
