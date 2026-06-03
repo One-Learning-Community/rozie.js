@@ -1,9 +1,14 @@
 # Rozie + Astro — Multi-Target Island Matrix
 
 Proves Rozie's cross-framework value proposition holds inside **Astro's island
-architecture at runtime**: one `Counter.rozie`, compiled to every target Rozie
-supports, mounted as an interactive island on a single page — each starting at
-`Count: 0` and incrementing on click (real hydration, not just tag presence).
+architecture at runtime**: one canonical rich `Counter.rozie`, compiled to every
+target Rozie supports, mounted as an interactive island on a single page. The
+Counter has **plus / minus** buttons bounded to `min=0, max=10`, a
+`$computed`-driven `:disabled` on each button at its bound, and a `:class` hover
+background effect. Each island starts at `0` — so Decrement is **disabled at
+load** (a visible bounds proof) and only enables after a click, a transition
+that can only happen if the reactive `$computed` re-ran in the browser (real
+hydration + reactivity, not just static tag presence).
 
 Builds on the [adopt-incrementally guide § Astro](../../../docs/guide/adopt-incrementally.md)
 and [for-astro-and-html-first-shops](../../../docs/guide/for-astro-and-html-first-shops.md)
@@ -13,15 +18,19 @@ walkthroughs.
 
 | Target  | Integration                         | Directive     | Status      | Notes / exception reason |
 | ------- | ----------------------------------- | ------------- | ----------- | ------------------------ |
-| React   | `@astrojs/react`                    | `client:load` | ✓ covered   | Island hydrates; click increments. |
-| Vue     | `@astrojs/vue`                      | `client:load` | ✓ covered   | Island hydrates; also SSR-renders `Count: 0` in static markup. |
-| Svelte  | `@astrojs/svelte`                   | `client:load` | ✓ covered   | Island hydrates; also SSR-renders `Count: 0` in static markup. |
-| Solid   | `@astrojs/solid-js`                 | `client:load` | ✓ covered   | Island hydrates under Solid's babel/jsx-dom-expressions pipeline; click increments. |
-| Lit     | native Web Component (no integration)| none         | ✓ covered   | `<rozie-counter>` self-registers via a client `<script>` import; shadow-DOM button hydrates. |
+| Vue     | `@astrojs/vue`                      | `client:load` | ✓ covered   | Full rich behavior verified: bounds, `$computed`-driven `:disabled` at min/max, hover background. SSR-renders the static markup too. |
+| Svelte  | `@astrojs/svelte`                   | `client:load` | ✓ covered   | Full rich behavior verified: bounds, `$computed`-driven `:disabled`, hover background. SSR-renders the static markup too. |
+| Solid   | `@astrojs/solid-js`                 | `client:load` | ✓ covered   | Full rich behavior verified under Solid's babel/jsx-dom-expressions pipeline. |
+| Lit     | native Web Component (no integration)| none         | ✓ covered   | `<rozie-counter>` self-registers via a client `<script>` import; shadow-DOM controls hydrate (open shadow root, so Playwright's `.value`/role locators pierce it). Full rich behavior verified. |
+| React   | `@astrojs/react`                    | `client:load` | ✗ exception | Island **hydrates and styles apply**, but the React emit **CSS-Modules-hashes author class names** (`counter`→`_counter_1d11t_1`, `value`→`_value_1d11t_3`, `hovering`→`_hovering_…`). The spec's `.value`/`.counter` literal-class locators therefore cannot match the React subtree. Documented repo gotcha `project_react_classhash_breaks_selectors`; the component-internal cure is `$classSelector('cls')`, which does not help an **external** test locator. Not weakened to force green. |
 | Angular | —                                   | N/A           | ✗ exception | **No first-party `@astrojs/angular`** — only the community `@analogjs/astro-angular`. Intentionally not wired. |
 
-All five island/web-component targets genuinely hydrate (verified by the
-Playwright runtime spec). Angular is the single documented coverage exception.
+Four island/web-component targets (Vue, Svelte, Solid, Lit) genuinely hydrate
+**and** pass the full rich-behavior runtime spec (bounds + `$computed`-driven
+`:disabled` reactivity + hover effect), verified by Playwright. React is a real
+exception at the **test-locator** layer (class-name hashing breaks CSS-selector
+locators — the island itself still works); Angular is the wiring exception (no
+first-party integration).
 
 ## The target-selection mechanism (Mechanism B)
 
@@ -59,12 +68,18 @@ renderer is additionally `include:`-scoped to its subdir to resolve Astro's
 - `tests/build.test.ts` — build smoke (vitest): `astro build` then assert the
   rendered HTML has `<rozie-counter>` and the JS bundle has Rozie markers.
 - `tests/hydrate.spec.ts` — runtime hydration spec (Playwright): every covered
-  island starts at `Count: 0` and shows `Count: 2` after one click.
+  island asserts the full rich behavior — initial `0`, Decrement disabled at
+  the `min=0` floor / Increment enabled, click→`1` re-enables Decrement
+  (proving `$computed` re-ran in the browser), climb to `max=10` disables
+  Increment, step back re-enables it, and the hover background resolves to
+  `rgba(0, 0, 0, 0.04)` (asserted as the rendered effect, hashing-agnostic).
 
-Each island passes only `step={2}` and lets `value` use its `<props>` default
-(0). `value` is a `model: true` prop; passing it explicitly would make the
-island a *controlled* component bound to a parent that doesn't exist, freezing
-the count. Omitting it keeps each island uncontrolled and self-interactive.
+Each island passes `step={1} min={0} max={10}` but OMITS `value`, letting it use
+its `<props>` default (0). `value` is a `model: true` prop; passing it
+explicitly would make the island a *controlled* component bound to a parent that
+doesn't exist, freezing the count. Omitting it keeps each island uncontrolled
+and self-interactive. With `value=0` and `min=0`, Decrement is disabled at load
+(`canDecrement = 0 - 1 >= 0 → false`) — a visible bounds proof on every island.
 
 ## Run
 
@@ -75,7 +90,7 @@ pnpm build              # astro build — multi-target island matrix
 pnpm test:smoke         # build smoke (vitest: astro build + tag/marker asserts)
 
 pnpm test:e2e:install   # one-time: playwright install chromium
-pnpm test:e2e           # runtime hydration: every covered island 0 → 2 on click
+pnpm test:e2e           # runtime hydration: rich Counter behavior per covered island
 ```
 
 `test:smoke` (vitest, `*.test.ts`) and `test:e2e` (Playwright, `*.spec.ts`) are
@@ -87,8 +102,18 @@ rest of the suite.
 
 ## What this proves
 
-A single Rozie component definition mounts as a working, **interactive** island
-across React, Vue, Svelte, and Solid (via `@astrojs/*` integrations) plus Lit
-(native web component) on one Astro page — runtime hydration verified, not just
-build/tag presence. Angular is the documented exception pending a first-party
-`@astrojs/angular`.
+A single canonical rich Rozie component definition — plus/minus buttons,
+`min`/`max` bounds, a `$computed`-driven `:disabled` at each bound, and a hover
+effect — mounts as a working, **interactive** island across Vue, Svelte, and
+Solid (via `@astrojs/*` integrations) plus Lit (native web component) on one
+Astro page, with the full reactive behavior verified at runtime (not just
+build/tag presence). Two documented exceptions:
+
+- **React** — the island hydrates and its styles apply, but the React emit
+  CSS-Modules-hashes author class names, so the spec's `.value`/`.counter`
+  literal-class locators can't match the React subtree (the
+  `project_react_classhash_breaks_selectors` gotcha). This is a test-locator
+  limitation, not an island failure; the in-component cure is `$classSelector`,
+  which doesn't reach an external Playwright locator.
+- **Angular** — no first-party `@astrojs/angular` (only the community
+  `@analogjs/astro-angular`); intentionally not wired.
