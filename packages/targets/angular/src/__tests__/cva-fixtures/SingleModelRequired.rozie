@@ -1,0 +1,34 @@
+<!--
+  SingleModelRequired.rozie — Phase 23 (angular-cva-forms-integration) TEST INPUT.
+
+  Exactly ONE `model: true` prop (`value`) that is `required: true` with NO
+  declared default. This is the WR-04 regression shape: with no default,
+  `writeValue`'s null path must NOT re-read the not-yet-bound required signal
+  (which throws NG0950 during the forms binding window). The emitted accessor
+  must guard the write — `if (v != null) this.value.set(v)` — so the leading
+  `writeValue(null)` is a true no-op that reads nothing.
+
+  Test INPUT only — assertions live in cva-emit.test.ts (WR-04 block).
+-->
+
+<rozie name="SingleModelRequired">
+
+<props>
+{
+  value: { type: String, required: true, model: true },
+}
+</props>
+
+<script>
+function setValue(v) {
+  $model.value = v
+}
+</script>
+
+<template>
+<div class="single-model-required">
+  <span class="echo">{{ $props.value }}</span>
+</div>
+</template>
+
+</rozie>

@@ -259,24 +259,34 @@ function buildCvaClassShape(prop: PropDecl): string {
   const tsType = renderType(prop.typeAnnotation);
   const rendered = renderDefault(prop);
   // renderDefault returns '' for the no-declared-default sentinel. NgModel's
-  // very first call is `writeValue(null)` (006-A journal), so the coercion is
+  // very first call is `writeValue(null)` (006-A journal), so the null path is
   // load-bearing — but it MUST stay typed `T`, never `T | null`, or a
   // `model.required<T>()` setter (a required prop with no default) rejects the
   // `?? null` fallback at tsc (TS2345: 'T | null' not assignable to 'T').
-  //   - declared default present → coerce to that literal (e.g. '' for the
-  //     String `date` default; flatpickr's `this.date.set(v ?? '')`).
-  //   - no declared default (e.g. a `required: true` model prop) → coerce to
-  //     the signal's CURRENT value `this.<name>()`, a type-`T` no-op on the
-  //     leading `writeValue(null)` that keeps the setter argument non-null.
-  const nullCoercion =
-    rendered.length > 0 ? rendered : `this.${prop.name}()`;
+  //
+  // Two shapes (WR-04):
+  //   - declared default present → coerce null to that literal (e.g. '' for the
+  //     String `date` default; flatpickr's `this.date.set(v ?? '')`). The setter
+  //     argument is always a non-null `T`.
+  //   - no declared default (e.g. a `required: true` model prop) → GUARD the
+  //     write so `writeValue(null)` is a true no-op: `if (v != null) set(v)`.
+  //     The original `v ?? this.<name>()` form RE-READ the signal on the leading
+  //     `writeValue(null)` — but a required signal input that the consumer has
+  //     not bound yet throws NG0950 ("Input is required but no value is
+  //     available yet") when read during the forms binding window. The guard
+  //     never reads the not-yet-available required signal, and `v` narrows to
+  //     `T` inside the `!= null` branch so the `.set` argument stays type-`T`.
+  const writeValueBody =
+    rendered.length > 0
+      ? `  this.${prop.name}.set(v ?? ${rendered});`
+      : `  if (v != null) this.${prop.name}.set(v);`;
   return [
     `private __rozieCvaOnChange: (v: ${tsType}) => void = () => {};`,
     `private __rozieCvaOnTouchedFn: () => void = () => {};`,
     `private __rozieCvaDisabled = signal(false);`,
     ``,
     `writeValue(v: ${tsType} | null): void {`,
-    `  this.${prop.name}.set(v ?? ${nullCoercion});`,
+    writeValueBody,
     `}`,
     `registerOnChange(fn: (v: ${tsType}) => void): void {`,
     `  this.__rozieCvaOnChange = fn;`,

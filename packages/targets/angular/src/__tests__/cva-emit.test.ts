@@ -95,6 +95,21 @@ describe('emitAngular CVA — Task 2: methods + members (single-model)', () => {
     expect(code).toContain("this.value.set(v ?? '')");
   });
 
+  // WR-04 — a required-no-default model prop must NOT re-read its required
+  // signal inside writeValue(null) (NG0950 risk during the forms binding
+  // window). The emitted accessor guards the write so writeValue(null) is a
+  // no-op that reads nothing.
+  it('writeValue guards (no signal re-read) for a required-no-default model prop', () => {
+    const reqCode = compileAngular(
+      fixture('SingleModelRequired'),
+      'SingleModelRequired.rozie',
+    );
+    // The required-no-default shape emits the guard, not a `?? this.value()`
+    // re-read of the not-yet-bound required signal.
+    expect(reqCode).toContain('if (v != null) this.value.set(v);');
+    expect(reqCode).not.toContain('this.value.set(v ?? this.value())');
+  });
+
   it('registerOnChange / registerOnTouched store the framework callbacks', () => {
     expect(code).toContain('this.__rozieCvaOnChange = fn;');
     expect(code).toContain('this.__rozieCvaOnTouchedFn = fn;');
