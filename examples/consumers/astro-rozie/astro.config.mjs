@@ -87,11 +87,14 @@ function scopeRozie(plugin, scopeDir) {
         if (!under(id)) return null;
         return origResolveId.call(this, id, importer, options);
       }
-      // The React emit's `import styles from './Counter.module.css'` (and
-      // `.global.css`) — these are NOT `.rozie` ids, but the React-scoped
-      // instance must rewrite them to the synthetic `.rozie.module.css` form.
-      // Scope by the IMPORTER (the emitted `.rozie.tsx` under scopeDir).
-      if (id.endsWith('.module.css') || id.endsWith('.global.css')) {
+      // The React emit's side-effect `import './Counter.css'` (and the
+      // `:root` escape-hatch `.global.css`) — these are NOT `.rozie` ids, but
+      // the React-scoped instance must rewrite them to the synthetic
+      // `.rozie.css` / `.rozie.global.css` virtual form. Phase 25 dropped CSS
+      // Modules, so the scoped sibling is now a plain `.css` (was
+      // `.module.css`). Scope by the IMPORTER (the emitted `.rozie.tsx` under
+      // scopeDir). `.css` covers both the plain scoped sibling and `.global.css`.
+      if (id.endsWith('.css')) {
         if (!under(importer)) return null;
         return origResolveId.call(this, id, importer, options);
       }
