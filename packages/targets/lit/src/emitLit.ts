@@ -15,9 +15,12 @@
  * IMPORTANT INVARIANTS (Plan 06.4-02):
  *   - Uses @queryAssignedElements; the legacy Nodes variant is intentionally
  *     excluded per D-LIT-14 (2026-05-13 correction).
- *   - Locked invariant: lit-html's auto-escape is the only escaping surface
- *     for emitted html``; emitter NEVER imports the unsafe escape-bypass
- *     directive (T-06.4-03 mitigation; enforced by emitLit-shape.test.ts).
+ *   - Invariant (T-06.4-03 mitigation; enforced by emitLit-shape.test.ts):
+ *     the `unsafeHTML` escape-bypass directive is imported ONLY CONDITIONALLY —
+ *     when a component uses `r-html` (Phase 24 req 2), gated by the
+ *     `unsafeHtmlUsed` flag. Components that do NOT use `r-html` never import
+ *     `lit/directives/unsafe-html.js`; for all other template expressions
+ *     lit-html's `html`` auto-escape remains the only escaping surface.
  *
  * @experimental — shape may change before v1.0
  */
