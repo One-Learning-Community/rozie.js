@@ -20,6 +20,20 @@ export const RozieErrorCode = {
   MULTIPLE_ROZIE_ENVELOPES: 'ROZ002',
   UNKNOWN_TOP_LEVEL_BLOCK: 'ROZ003',
   DUPLICATE_BLOCK: 'ROZ004',
+  // 260603 — error: a literal close sequence (e.g. `</script>` inside a JS
+  // string or comment in the `<script>` block) terminated its own block early.
+  // Block bodies end at the first literal `</blockname>` sequence regardless of
+  // JS/CSS context — exactly like HTML itself, and like Vue/Svelte SFCs
+  // (htmlparser2 RAWTEXT for <script>/<style>; the splitter's opaque-block
+  // discipline for <props>/<data>/<listeners>/<components>). Without this code
+  // the failure surfaced as a misleading cascade (ROZ031 unterminated-string +
+  // ROZ003 unknown-block pointing at the author's own template content). The
+  // splitter detects the signature — a SECOND `</blockname>` close tag arriving
+  // after the block already closed, while no block is open — and reports the
+  // real cause, code-framed at the premature close, with the standard HTML
+  // escape (`<\/script>`) as the hint. Collateral ROZ002/003/004 noise located
+  // after the premature close is suppressed.
+  PREMATURE_BLOCK_CLOSE: 'ROZ005', // error — literal `</script>` (or other block close sequence) inside the block's own body ended the block early; escape it as `<\/script>`
 
   // ---- Block parse — declarative <props>/<data>/<listeners> (Plan 03) — ROZ010..ROZ029 ----
   INVALID_DECLARATIVE_EXPRESSION: 'ROZ010',

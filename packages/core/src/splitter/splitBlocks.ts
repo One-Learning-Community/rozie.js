@@ -13,6 +13,7 @@
  *  - ROZ002  Multiple <rozie> envelopes
  *  - ROZ003  Unknown top-level block (e.g., <refs>)
  *  - ROZ004  Duplicate block (e.g., two <props> blocks)
+ *  - ROZ005  Premature block close (literal `</script>` inside the block body)
  *
  * Tag-start offset inference (Pitfall 1 — see RESEARCH.md §"Pitfall 1"):
  * htmlparser2's `onopentagname(start, endIndex)` gives the tag NAME span — the
@@ -154,6 +155,22 @@ export function splitBlocks(source: string, filename?: string): SplitBlocksResul
   // (260526-uj3 forward-work — fixes silent block-vanish on angle-bracket
   // content in props/data/listeners/components bodies.)
   let inOpaqueBlock = false;
+  // Premature-close detection (ROZ005, 260603). A block body containing the
+  // literal close sequence of its OWN tag (`'</script>'` inside a JS string or
+  // comment in <script>, `'</props>'` inside <props>, …) terminates the block
+  // at that sequence — htmlparser2's RAWTEXT scan (for <script>/<style>) and
+  // the opaque-block discipline above both end at the first literal close,
+  // exactly like HTML itself (and Vue/Svelte SFCs). The reliable signature of
+  // that failure: the REAL close tag then arrives as a stray — a close event
+  // for an already-populated block while no block is open. We report the root
+  // cause once per block (code-framed at the premature close, where the author
+  // needs to edit) instead of letting the desynced tokenizer state surface as
+  // a misleading ROZ003/ROZ031 cascade.
+  const prematurelyClosedBlocks = new Set<BlockName>();
+  // Offset of the FIRST premature close — every envelope-structure diagnostic
+  // (ROZ002/003/004) located after this point is desync noise and is filtered
+  // out in a post-pass.
+  let firstPrematureCloseOffset = -1;
 
   const pushDiag = (d: Diagnostic): void => {
     if (result.diagnostics.length < MAX_DIAGNOSTICS) {
@@ -393,6 +410,39 @@ export function splitBlocks(source: string, filename?: string): SplitBlocksResul
           if (tagName !== currentBlock) return;
           inOpaqueBlock = false;
         }
+
+        // ROZ005 — stray close of an already-populated block while no block is
+        // open: the signature of a premature close (literal `</tagName>` inside
+        // the block's own body). Report the ROOT cause, pointed at the
+        // premature close tag (the spot the author must escape), not at this
+        // stray close. Once per block.
+        if (
+          currentBlock === null &&
+          tagName !== 'rozie' &&
+          BLOCK_NAMES.has(tagName as 'rozie') &&
+          result[tagName as BlockName] !== undefined &&
+          !prematurelyClosedBlocks.has(tagName as BlockName)
+        ) {
+          const blockName = tagName as BlockName;
+          const entry = result[blockName];
+          if (entry !== undefined) {
+            prematurelyClosedBlocks.add(blockName);
+            if (firstPrematureCloseOffset === -1) {
+              firstPrematureCloseOffset = entry.contentLoc.end;
+            }
+            pushDiag({
+              code: RozieErrorCode.PREMATURE_BLOCK_CLOSE,
+              severity: 'error',
+              message: `Literal '</${blockName}>' inside the <${blockName}> block body terminated the block early. Block bodies end at the first '</${blockName}>' close sequence — regardless of JS/CSS strings or comments — exactly like HTML.`,
+              // The premature close tag spans [contentLoc.end, loc.end) —
+              // contentLoc.end is the '<' of the close that cut the block short.
+              loc: { start: entry.contentLoc.end, end: entry.loc.end },
+              hint: `Escape the forward slash so the sequence no longer matches the closing tag: '<\\/${blockName}>'. This is the same escape HTML, Vue, and Svelte require.`,
+              ...(filename !== undefined ? { filename } : {}),
+            });
+          }
+        }
+
         depth--;
 
         // Phase 07.2 fix: only close `currentBlock` when this close-tag returns
@@ -455,6 +505,26 @@ export function splitBlocks(source: string, filename?: string): SplitBlocksResul
 
   tokenizer.write(source);
   tokenizer.end();
+
+  // Post-pass: collateral-noise suppression for premature block closes (ROZ005).
+  // Once a block has been cut short, everything the tokenizer saw AFTER the
+  // premature close is desynced — the leftover block body re-tokenizes as
+  // top-level HTML, so envelope-structure diagnostics (ROZ002/003/004) located
+  // past that point report phantom problems in content that is actually fine
+  // (e.g. "Unknown top-level block: <button>" for an element inside the
+  // author's own <template>). Keep only the diagnostics that describe real
+  // structure: everything before the first premature close, plus ROZ005 itself.
+  if (firstPrematureCloseOffset !== -1) {
+    const STRUCTURE_NOISE_CODES = new Set<string>([
+      RozieErrorCode.MULTIPLE_ROZIE_ENVELOPES,
+      RozieErrorCode.UNKNOWN_TOP_LEVEL_BLOCK,
+      RozieErrorCode.DUPLICATE_BLOCK,
+    ]);
+    result.diagnostics = result.diagnostics.filter(
+      (d) =>
+        !(STRUCTURE_NOISE_CODES.has(d.code) && d.loc.start >= firstPrematureCloseOffset),
+    );
+  }
 
   // Post-pass: missing <rozie> envelope (ROZ001).
   if (!result.rozie) {

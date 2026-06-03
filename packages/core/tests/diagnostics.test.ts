@@ -30,6 +30,7 @@ describe('RozieErrorCode registry (D-07)', () => {
     expect(RozieErrorCode.MULTIPLE_ROZIE_ENVELOPES).toBe('ROZ002');
     expect(RozieErrorCode.UNKNOWN_TOP_LEVEL_BLOCK).toBe('ROZ003');
     expect(RozieErrorCode.DUPLICATE_BLOCK).toBe('ROZ004');
+    expect(RozieErrorCode.PREMATURE_BLOCK_CLOSE).toBe('ROZ005');
     expect(RozieErrorCode.INVALID_DECLARATIVE_EXPRESSION).toBe('ROZ010');
     expect(RozieErrorCode.NOT_OBJECT_LITERAL).toBe('ROZ011');
     expect(RozieErrorCode.LISTENER_KEY_NOT_STRING).toBe('ROZ012');

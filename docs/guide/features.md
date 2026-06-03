@@ -281,6 +281,32 @@ type Variant = 'a' | 'b'
 
 See `examples/typed/PropsCustomType.rozie` for a worked reference covering both a string-literal union alias and a custom `interface` flowing into prop-type position across all six targets.
 
+### One HTML rule survives: escape a literal `</script>`
+
+Block bodies are real JS (or CSS), but the `.rozie` file itself is still HTML-shaped — and Rozie keeps HTML's one parsing rule about that: **a block ends at the first literal close sequence of its own tag**, even when that sequence sits inside a JS string or comment. This is exactly how `<script>` behaves in plain HTML, in `.vue` SFCs, and in `.svelte` files.
+
+So this breaks — the string's `</script>` ends the block early:
+
+```rozie
+<script>
+// ✗ ROZ005 — the string contains the block's own close sequence
+const embedCode = '<script src="https://cdn.example.com/widget.js"></script>';
+</script>
+```
+
+Rozie reports `ROZ005` with a code frame pointing at the offending sequence. The fix is the same escape HTML requires:
+
+```rozie
+<script>
+// ✓ the escaped form is the identical JS string value
+const embedCode = '<script src="https://cdn.example.com/widget.js"><\/script>';
+</script>
+```
+
+`'<\/script>'` is byte-for-byte the same runtime string (`\/` is just `/` in JS), the block parses correctly, and the escape survives verbatim into the emitted Vue and Svelte SFCs — which need it for exactly the same reason.
+
+The rule applies to every block uniformly: `</style>` inside `<style>`, `</props>` inside `<props>`, and so on. Other angle-bracket content — `<div>` in template literals, `a < b` comparisons, `Array<Item>` generics — is fine.
+
 ## `required: true` → one prop contract, not six guesses
 
 A `<props>` entry can declare `required: true`. It is the **sole** determinant of whether the prop is required — `default:` is orthogonal, mirroring Vue's Options-API model. Three states:

@@ -269,6 +269,121 @@ describe('splitBlocks (PARSE-01)', () => {
     });
   });
 
+  describe('premature block close — ROZ005 (260603)', () => {
+    // A block body containing the literal close sequence of its OWN tag
+    // (`'</script>'` inside a JS string/comment, `'</props>'` inside <props>)
+    // terminates the block at that sequence — htmlparser2 RAWTEXT (script/style)
+    // and the opaque-block discipline both scan for the first literal close,
+    // exactly like HTML / Vue / Svelte. The splitter must report the ROOT cause
+    // (ROZ005, pointed at the premature close, with the `<\/script>` escape
+    // hint) instead of the old misleading cascade: ROZ031 unterminated-string +
+    // phantom ROZ003 "Unknown top-level block: <button>" from the desynced
+    // remainder of the file.
+
+    const mkScript = (scriptBody: string): string => `<rozie name="EmbedSnippet">
+<script>
+${scriptBody}
+</script>
+<template>
+  <button @click="copyEmbed()">Copy</button>
+</template>
+</rozie>`;
+
+    it('reports ROZ005 for a literal </script> inside a JS string', () => {
+      const src = mkScript(
+        `const embedCode = '<script src="https://cdn.example.com/w.js"></script>';\nconst copyEmbed = () => navigator.clipboard.writeText(embedCode);`,
+      );
+      const result = splitBlocks(src, 'EmbedSnippet.rozie');
+      const roz005 = result.diagnostics.filter((d) => d.code === 'ROZ005');
+      expect(roz005).toHaveLength(1);
+      expect(roz005[0]?.severity).toBe('error');
+      expect(roz005[0]?.message).toMatch(/terminated the <script> block|terminated the block early/);
+      // Hint teaches the standard HTML escape.
+      expect(roz005[0]?.hint).toContain('<\\/script>');
+      // loc points at the PREMATURE close (inside the JS string), not the real one.
+      expect(src.slice(roz005[0]!.loc.start, roz005[0]!.loc.end)).toBe('</script>');
+      expect(roz005[0]!.loc.start).toBe(src.indexOf('</script>'));
+    });
+
+    it('reports ROZ005 for a literal </script> inside a JS comment', () => {
+      const src = mkScript(
+        `// renders the user-facing snippet, e.g. <script>...</script>\nconst copyEmbed = () => {};`,
+      );
+      const result = splitBlocks(src, 'EmbedSnippet.rozie');
+      expect(result.diagnostics.some((d) => d.code === 'ROZ005')).toBe(true);
+    });
+
+    it('suppresses the phantom ROZ003 cascade from the desynced remainder', () => {
+      // Before this fix, the desynced tokenizer re-read the rest of the file as
+      // top-level HTML and reported "Unknown top-level block: <button>" for an
+      // element inside the author's own <template>.
+      const src = mkScript(
+        `const embedCode = '<script src="x"></script>';\nconst copyEmbed = () => {};`,
+      );
+      const result = splitBlocks(src, 'EmbedSnippet.rozie');
+      expect(result.diagnostics.some((d) => d.code === 'ROZ003')).toBe(false);
+      // ROZ005 is the FIRST diagnostic — root cause leads.
+      expect(result.diagnostics[0]?.code).toBe('ROZ005');
+    });
+
+    it('does NOT suppress legitimate structure diagnostics located BEFORE the premature close', () => {
+      // An unknown <refs> block before the broken <script> is a real problem
+      // in well-synced territory — it must survive the post-pass filter.
+      const src = `<rozie name="X">
+<refs></refs>
+<script>
+const s = '</script>';
+</script>
+<template><div>x</div></template>
+</rozie>`;
+      const result = splitBlocks(src, 'X.rozie');
+      expect(result.diagnostics.some((d) => d.code === 'ROZ003')).toBe(true);
+      expect(result.diagnostics.some((d) => d.code === 'ROZ005')).toBe(true);
+    });
+
+    it('JS-escaped <\\/script> compiles clean — the documented workaround', () => {
+      const src = mkScript(
+        `const embedCode = '<script src="https://cdn.example.com/w.js"><\\/script>';\nconst copyEmbed = () => navigator.clipboard.writeText(embedCode);`,
+      );
+      const result = splitBlocks(src, 'EmbedSnippet.rozie');
+      expect(result.diagnostics).toEqual([]);
+      expect(result.script).toBeDefined();
+      expect(result.script?.content).toContain('<\\/script>');
+      expect(result.template).toBeDefined();
+    });
+
+    it('reports ROZ005 for a literal </style> inside a <style> body', () => {
+      // Same RAWTEXT mechanism as <script>; proves the detection is generic.
+      const src = `<rozie name="X">
+<style>
+/* the engine injects its own </style> tag at runtime */
+.a { color: red; }
+</style>
+<template><div>x</div></template>
+</rozie>`;
+      const result = splitBlocks(src, 'X.rozie');
+      const roz005 = result.diagnostics.find((d) => d.code === 'ROZ005');
+      expect(roz005).toBeDefined();
+      expect(roz005?.message).toContain('</style>');
+    });
+
+    it('reports ROZ005 for a literal </props> inside a <props> body (opaque-block path)', () => {
+      const src = `<rozie name="X">
+<props>
+{
+  // the close sequence of the block itself: </props>
+  foo: { type: String, default: null },
+}
+</props>
+<template><div>x</div></template>
+</rozie>`;
+      const result = splitBlocks(src, 'X.rozie');
+      const roz005 = result.diagnostics.find((d) => d.code === 'ROZ005');
+      expect(roz005).toBeDefined();
+      expect(roz005?.message).toContain('</props>');
+    });
+  });
+
   it('emits ROZ001 when <rozie> envelope is missing (collected, not thrown)', () => {
     // Per D-08: function does NOT throw on malformed input.
     const result = splitBlocks('<props>{}</props>');
