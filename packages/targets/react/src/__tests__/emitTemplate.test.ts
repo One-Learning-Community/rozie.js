@@ -42,7 +42,13 @@ function lowerExample(name: string): IRComponent {
 
 /**
  * Plan 04-05: snapshot tests pass source through so emitStyle wires the
- * `import styles from './X.module.css';` line at the top of each .tsx fixture.
+ * CSS sibling import at the top of each .tsx fixture.
+ *
+ * Phase 25 Plan 25-01: React no longer routes scoped `<style>` through CSS
+ * Modules. The sibling import is now a plain side-effect `import './X.css';`
+ * (NOT `import styles from './X.module.css';`), and class tokens emit as plain
+ * string literals (NOT `styles.X` lookups) — attribute scoping
+ * (`[data-rozie-s-HASH]`) is the sole isolation layer.
  */
 function lowerExampleWithSource(name: string): { ir: IRComponent; src: string } {
   const src = readFileSync(resolve(EXAMPLES, `${name}.rozie`), 'utf8');
@@ -63,7 +69,7 @@ function emit(ir: IRComponent) {
 }
 
 describe('className composition — Plan 04-03 Task 1', () => {
-  it('Test 8: single static class → className={styles.X}', () => {
+  it('Test 8: single static class → plain string className (Phase 25: no styles ref)', () => {
     // `inherit-attrs="false"` opts out of the auto-fallthrough $attrs spread,
     // keeping the assertion focused on the className-composition machinery in
     // isolation (R6 opaque-spread merge wraps everything in clsx(..., attrs.className)
@@ -79,11 +85,12 @@ describe('className composition — Plan 04-03 Task 1', () => {
 </rozie>
 `);
     const { jsx, collectors } = emit(ir);
-    expect(jsx).toContain('className={styles.counter}');
+    expect(jsx).toContain('className={"counter"}');
+    expect(jsx).not.toMatch(/\bstyles\./);
     expect(collectors.runtime.has('clsx')).toBe(false);
   });
 
-  it('Test 9: multi static class → backtick template literal', () => {
+  it('Test 9: multi static class → plain string literal (Phase 25: no styles ref)', () => {
     // `inherit-attrs="false"` — see Test 8 rationale.
     const ir = lowerInline(`
 <rozie name="X" inherit-attrs="false">
@@ -97,11 +104,12 @@ describe('className composition — Plan 04-03 Task 1', () => {
 </rozie>
 `);
     const { jsx, collectors } = emit(ir);
-    expect(jsx).toContain('className={`${styles.counter} ${styles.card}`}');
+    expect(jsx).toContain('className={"counter card"}');
+    expect(jsx).not.toMatch(/\bstyles\./);
     expect(collectors.runtime.has('clsx')).toBe(false);
   });
 
-  it('Test 10: object-form :class → clsx({ [styles.X]: cond }) and adds clsx import', () => {
+  it('Test 10: object-form :class → clsx({ X: cond }) (Phase 25: plain key, no styles) and adds clsx import', () => {
     const ir = lowerInline(`
 <rozie name="X">
 <data>{ active: false }</data>
@@ -114,11 +122,12 @@ describe('className composition — Plan 04-03 Task 1', () => {
 </rozie>
 `);
     const { jsx, collectors } = emit(ir);
-    expect(jsx).toMatch(/clsx\(\{ \[styles\.active\]: active \}\)/);
+    expect(jsx).toMatch(/clsx\(\{ active: active \}\)/);
+    expect(jsx).not.toMatch(/\bstyles\./);
     expect(collectors.runtime.has('clsx')).toBe(true);
   });
 
-  it('Test 13: class + :class on same element → clsx merge', () => {
+  it('Test 13: class + :class on same element → clsx merge (Phase 25: plain tokens)', () => {
     const ir = lowerInline(`
 <rozie name="X">
 <data>{ on: false }</data>
@@ -133,8 +142,9 @@ describe('className composition — Plan 04-03 Task 1', () => {
 `);
     const { jsx, collectors } = emit(ir);
     expect(jsx).toMatch(/className=\{clsx\(/);
-    expect(jsx).toContain('styles.x');
-    expect(jsx).toContain('[styles.on]: on');
+    expect(jsx).not.toMatch(/\bstyles\./);
+    expect(jsx).toContain('"x"');
+    expect(jsx).toContain('on: on');
     expect(collectors.runtime.has('clsx')).toBe(true);
   });
 
@@ -157,12 +167,10 @@ describe('className composition — Plan 04-03 Task 1', () => {
     expect(collectors.runtime.has('clsx')).toBe(false);
   });
 
-  it('template-literal :class WITH <style> → tokens routed through styles (260520-hus #1)', () => {
-    // Regression: a plain-binding `:class` whose value is a JS template
-    // literal was emitted verbatim — `className={`badge badge-${kind}`}` —
-    // bypassing the CSS-Modules `styles` lookup, so the hashed `._badge_<h>`
-    // selector in the sibling `.module.css` never matched and the styling
-    // silently dropped (the React-target Table VR divergence).
+  it('template-literal :class WITH <style> → plain tokens, no styles ref (Phase 25)', () => {
+    // Phase 25: React no longer hashes class names via CSS Modules, so a
+    // template-literal `:class` emits plain class tokens (attribute scoping
+    // `[data-rozie-s-HASH]` does the isolation). No `styles` lookup survives.
     const ir = lowerInline(`
 <rozie name="X">
 <data>{ kind: 'active' }</data>
@@ -176,11 +184,10 @@ describe('className composition — Plan 04-03 Task 1', () => {
 </rozie>
 `);
     const { jsx } = emit(ir);
-    // Pure-static token → styles.X; composite token → styles[`...`].
-    expect(jsx).toContain('${styles.badge}');
-    expect(jsx).toContain('${styles[`badge-${kind}`]}');
-    // The verbatim un-routed literal must NOT survive.
-    expect(jsx).not.toContain('className={`badge badge-${kind}`}');
+    // Plain tokens — pure-static `badge`, composite `badge-${kind}`.
+    expect(jsx).not.toMatch(/\bstyles[.[]/);
+    expect(jsx).toContain('${"badge"}');
+    expect(jsx).toContain('badge-${kind}');
   });
 
   it('template-literal :class WITHOUT <style> → plain backtick literal, no styles ref', () => {
@@ -197,7 +204,7 @@ describe('className composition — Plan 04-03 Task 1', () => {
     expect(jsx).toContain('badge-${kind}');
   });
 
-  it('string-literal :class WITH <style> → token routed through styles', () => {
+  it('string-literal :class WITH <style> → plain token, no styles ref (Phase 25)', () => {
     const ir = lowerInline(`
 <rozie name="X">
 <template>
@@ -209,7 +216,8 @@ describe('className composition — Plan 04-03 Task 1', () => {
 </rozie>
 `);
     const { jsx } = emit(ir);
-    expect(jsx).toContain('${styles.badge}');
+    expect(jsx).not.toMatch(/\bstyles[.[]/);
+    expect(jsx).toContain('${"badge"}');
   });
 
   it('Test 17: emitted code uses className= NOT class=', () => {
@@ -329,8 +337,9 @@ describe('Whole-tsx fixture snapshots — Plan 04-03 Task 3 + Plan 04-05 CSS imp
     expect(code).toContain('className=');
     expect(code).not.toContain('return null;');
     expect(code).toContain('return (');
-    // Plan 04-05: CSS Module sibling import emitted because Counter has scoped rules.
-    expect(code).toContain("import styles from './Counter.module.css';");
+    // Phase 25: plain side-effect CSS sibling import (Counter has scoped rules).
+    expect(code).toContain("import './Counter.css';");
+    expect(code).not.toContain("import styles from");
     // Counter has NO :root → no global CSS sibling import.
     expect(code).not.toContain("import './Counter.global.css';");
     await expect(code).toMatchFileSnapshot(resolve(FIXTURES, 'Counter.tsx.snap'));
@@ -341,7 +350,7 @@ describe('Whole-tsx fixture snapshots — Plan 04-03 Task 3 + Plan 04-05 CSS imp
     const { code } = emitReact(ir, { filename: 'SearchInput.rozie', source: src });
     expect(code).toContain('value={query}');
     expect(code).toContain('onChange=');
-    expect(code).toContain("import styles from './SearchInput.module.css';");
+    expect(code).toContain("import './SearchInput.css';");
     await expect(code).toMatchFileSnapshot(resolve(FIXTURES, 'SearchInput.tsx.snap'));
   });
 
@@ -349,8 +358,8 @@ describe('Whole-tsx fixture snapshots — Plan 04-03 Task 3 + Plan 04-05 CSS imp
     const { ir, src } = lowerExampleWithSource('Dropdown');
     const { code } = emitReact(ir, { filename: 'Dropdown.rozie', source: src });
     expect(code).toContain('renderTrigger');
-    // Plan 04-05: Dropdown has both scoped rules AND :root rules → both imports.
-    expect(code).toContain("import styles from './Dropdown.module.css';");
+    // Phase 25: Dropdown has both scoped rules AND :root rules → both imports.
+    expect(code).toContain("import './Dropdown.css';");
     expect(code).toContain("import './Dropdown.global.css';");
     await expect(code).toMatchFileSnapshot(resolve(FIXTURES, 'Dropdown.tsx.snap'));
   });
@@ -359,15 +368,15 @@ describe('Whole-tsx fixture snapshots — Plan 04-03 Task 3 + Plan 04-05 CSS imp
     const { ir, src } = lowerExampleWithSource('TodoList');
     const { code } = emitReact(ir, { filename: 'TodoList.rozie', source: src });
     expect(code).toMatch(/\.map\(/);
-    expect(code).toContain("import styles from './TodoList.module.css';");
+    expect(code).toContain("import './TodoList.css';");
     await expect(code).toMatchFileSnapshot(resolve(FIXTURES, 'TodoList.tsx.snap'));
   });
 
   it('Modal.tsx snapshot', async () => {
     const { ir, src } = lowerExampleWithSource('Modal');
     const { code } = emitReact(ir, { filename: 'Modal.rozie', source: src });
-    // Plan 04-05: Modal has both scoped rules AND :root rules → both imports.
-    expect(code).toContain("import styles from './Modal.module.css';");
+    // Phase 25: Modal has both scoped rules AND :root rules → both imports.
+    expect(code).toContain("import './Modal.css';");
     expect(code).toContain("import './Modal.global.css';");
     await expect(code).toMatchFileSnapshot(resolve(FIXTURES, 'Modal.tsx.snap'));
   });
