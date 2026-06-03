@@ -5,18 +5,16 @@ import Modal from '../Modal.rozie';
 /**
  * ModalPage — wraps Modal.rozie with parent-controlled `open` state. Anchor
  * for both the modal-strictmode Playwright e2e (REACT-T-06 + Pitfall 3 —
- * body.style.overflow correctness across mount/unmount under StrictMode) and
+ * body.style.overflow correctness across open/close under StrictMode) and
  * the OQ4 disposition test (Modal works WITHOUT $expose).
  *
- * Phase 25 (canonical-wins drift): canonical Modal.rozie locks body scroll in a
- * `$onMount(lockScroll)` / `$onUnmount(unlockScroll)` pair — the lock fires when
- * the Modal COMPONENT mounts, not when `open` flips (the old demo copy used a
- * `$watch(() => $props.open)`). To preserve the symmetric "locked only while
- * open" contract the Pitfall-3 specs assert, the page now CONDITIONALLY MOUNTS
- * the Modal (`{open && <Modal .../>}`): opening mounts it → `$onMount` locks;
- * closing unmounts it → `$onUnmount` restores. This is a demo-wrapper change
- * faithful to canonical Modal's mount-scoped lifecycle (canonical source is the
- * single source of truth and is NOT edited).
+ * The Modal is ALWAYS MOUNTED and driven by the controlled `open` prop —
+ * the natural usage for a two-way-bound (`open: { model: true }`) component.
+ * Canonical Modal.rozie reacts to `open` toggling via `$watch(() => $props.open)`
+ * (the cross-target primitive): opening locks body scroll, closing restores it.
+ * The `$onUnmount(unlockScroll)` pair only anchors the unmount-time restore.
+ * The Pitfall-3 "locked only while open" body.style.overflow contract therefore
+ * holds without conditionally mounting the component.
  */
 export default function ModalPage(): JSX.Element {
   const [open, setOpen] = useState(false);
@@ -28,21 +26,19 @@ export default function ModalPage(): JSX.Element {
       <button data-testid="open-modal" onClick={() => setOpen(true)}>
         Open Modal
       </button>
-      {open && (
-        <Modal
-          open={open}
-          onOpenChange={setOpen}
-          closeOnEscape={true}
-          closeOnBackdrop={true}
-          lockBodyScroll={true}
-          title="Hello from Modal.rozie"
-          onClose={() => setCloseCount((c) => c + 1)}
-        >
-          {() => (
-            <p>Modal body content. Close via Escape, backdrop click, or the × button.</p>
-          )}
-        </Modal>
-      )}
+      <Modal
+        open={open}
+        onOpenChange={setOpen}
+        closeOnEscape={true}
+        closeOnBackdrop={true}
+        lockBodyScroll={true}
+        title="Hello from Modal.rozie"
+        onClose={() => setCloseCount((c) => c + 1)}
+      >
+        {() => (
+          <p>Modal body content. Close via Escape, backdrop click, or the × button.</p>
+        )}
+      </Modal>
       {closeCount > 0 && (
         <p data-testid="close-count">Closed {closeCount} time(s)</p>
       )}
