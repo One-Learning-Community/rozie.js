@@ -37,20 +37,20 @@ test('Modal under StrictMode preserves body.style.overflow across mount/unmount 
 
   // Open modal → backdrop visible → body locked.
   await page.getByTestId('open-modal').click();
-  await expect(page.getByTestId('modal-backdrop')).toBeVisible();
+  await expect(page.locator('.modal-backdrop')).toBeVisible();
   await expect.poll(bodyOverflow).toBe('hidden');
 
   // Close via × button.
   await page.getByRole('button', { name: 'Close' }).click();
-  await expect(page.getByTestId('modal-backdrop')).toBeHidden();
+  await expect(page.locator('.modal-backdrop')).toBeHidden();
   await expect.poll(bodyOverflow).toBe('');
 
   // Re-open + close again — body.style.overflow must still cycle correctly.
   await page.getByTestId('open-modal').click();
-  await expect(page.getByTestId('modal-backdrop')).toBeVisible();
+  await expect(page.locator('.modal-backdrop')).toBeVisible();
   await expect.poll(bodyOverflow).toBe('hidden');
   await page.getByRole('button', { name: 'Close' }).click();
-  await expect(page.getByTestId('modal-backdrop')).toBeHidden();
+  await expect(page.locator('.modal-backdrop')).toBeHidden();
   await expect.poll(bodyOverflow).toBe('');
 
   // OQ4 anchor: Modal is parent-controlled (open prop) — works WITHOUT $expose.

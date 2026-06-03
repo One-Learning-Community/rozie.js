@@ -103,21 +103,21 @@ test.describe('StrictMode lifecycle-symmetry matrix (QA-03)', () => {
 
     // Open modal → backdrop visible → body locked.
     await page.getByTestId('open-modal').click();
-    await expect(page.getByTestId('modal-backdrop')).toBeVisible();
+    await expect(page.locator('.modal-backdrop')).toBeVisible();
     await expect.poll(bodyOverflow).toBe('hidden');
 
     // Close via × button → body restored.
     await page.getByRole('button', { name: 'Close' }).click();
-    await expect(page.getByTestId('modal-backdrop')).toBeHidden();
+    await expect(page.locator('.modal-backdrop')).toBeHidden();
     await expect.poll(bodyOverflow).toBe('');
 
     // Re-open + close again — body.style.overflow must still cycle correctly,
     // proving no StrictMode double-invoke state corruption.
     await page.getByTestId('open-modal').click();
-    await expect(page.getByTestId('modal-backdrop')).toBeVisible();
+    await expect(page.locator('.modal-backdrop')).toBeVisible();
     await expect.poll(bodyOverflow).toBe('hidden');
     await page.getByRole('button', { name: 'Close' }).click();
-    await expect(page.getByTestId('modal-backdrop')).toBeHidden();
+    await expect(page.locator('.modal-backdrop')).toBeHidden();
     await expect.poll(bodyOverflow).toBe('');
 
     const closeCount = await page.getByTestId('close-count').textContent();
