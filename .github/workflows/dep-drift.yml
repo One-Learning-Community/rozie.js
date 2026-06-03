@@ -1,0 +1,54 @@
+name: Dependency Drift
+
+# Phase 24 / SPEC req 8 (T-24-SC1, supply-chain tampering): fail CI on any NEW
+# resolved (transitive) package name in pnpm-lock.yaml that is not in the
+# checked-in allowlist (scripts/dep-allowlist.txt). Names only — a version bump
+# of an allowlisted package does not fail. The gate is dependency-free Node
+# (a packages:-block text slice), so this job just installs and runs it.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'pnpm-lock.yaml'
+      - 'scripts/dep-allowlist.txt'
+      - 'scripts/check-dep-drift.mjs'
+      - '.github/workflows/dep-drift.yml'
+  pull_request:
+    paths:
+      - 'pnpm-lock.yaml'
+      - 'scripts/dep-allowlist.txt'
+      - 'scripts/check-dep-drift.mjs'
+      - '.github/workflows/dep-drift.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dep-drift:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: pnpm
+
+      # --frozen-lockfile guarantees the committed pnpm-lock.yaml is the one the
+      # gate reads (no resolution drift between the lockfile and what installs).
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Prove the gate is not vacuous, then run it for real.
+      - name: Self-test (negative-path proof)
+        run: node scripts/check-dep-drift.mjs --self-test
+
+      - name: Dependency-drift gate
+        run: node scripts/check-dep-drift.mjs

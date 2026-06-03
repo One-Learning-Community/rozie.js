@@ -58,6 +58,25 @@ echo "▶ node scripts/check-sidecar-staleness.mjs (sidecar staleness gate — R
 echo ""
 node scripts/check-sidecar-staleness.mjs
 
+# Phase 24 / SPEC req 8 (T-24-SC1): a dependency update can pull in a NEW
+# transitive package — a typosquat or freshly-injected payload — and the
+# lockfile is where it first becomes visible. This gate fails on any resolved
+# package NAME in pnpm-lock.yaml that is not in scripts/dep-allowlist.txt
+# (names only — a version bump of an allowlisted name does not fail). It is
+# dependency-free (a packages:-block text slice) and fast, so it runs EARLY —
+# before the long `turbo run test` — to surface a supply-chain change quickly.
+# `--self-test` first proves the gate is not vacuous (rejects a removed name,
+# ignores a version bump).
+echo ""
+echo "▶ node scripts/check-dep-drift.mjs --self-test (negative-path proof)"
+echo ""
+node scripts/check-dep-drift.mjs --self-test
+
+echo ""
+echo "▶ node scripts/check-dep-drift.mjs (dependency-drift gate — SPEC req 8)"
+echo ""
+node scripts/check-dep-drift.mjs
+
 echo ""
 echo "▶ turbo run test --force --continue --concurrency=4"
 echo ""
