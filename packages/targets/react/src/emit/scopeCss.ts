@@ -37,24 +37,24 @@
  *   `.parent .child { ... }` → `.parent[data-rozie-s-abc] .child[data-rozie-s-abc] { ... }`
  *   `.a, .b { ... }` → `.a[data-rozie-s-abc], .b[data-rozie-s-abc] { ... }`
  *   `:root { ... }` → NOT touched (handled by isRootEscape branch upstream).
- *   `.outer :deep(.inner) { ... }` → `.outer[data-rozie-s-abc] :global(.inner) { ... }`
- *   `:deep(.x) { ... }` → `:global(.x) { ... }`
+ *   `.outer :deep(.inner) { ... }` → `.outer[data-rozie-s-abc] .inner { ... }`
+ *   `:deep(.x) { ... }` → `.x { ... }`
  *
- * React-specific note (quick task 260526-no7) — HISTORICAL, inert-but-kept:
- * the deep-lifted compound is wrapped in CSS Modules' `:global(...)` pseudo.
- * This ORIGINALLY existed because React's bundler ran the emitted `.module.css`
- * through CSS Modules, which hashes every bare class selector — without
- * `:global`, a lifted `.rozie-sortable-list` got hashed to (e.g.)
- * `.rozie-sortable-list_abc123` and never matched the producer's DOM (the
- * producer lived in a DIFFERENT CSS Module with a different hash). As of
- * Phase 25 React no longer uses CSS Modules — it emits a plain `.css` file
- * scoped solely by `[data-rozie-s-<hash>]` attributes — so the `:global(...)`
- * wrap is now INERT (a no-op on plain CSS). It is KEPT deliberately: removing it
- * is zero-behavior-risk but touches the rebless surface, so it's left as a
- * clean-up candidate for a future phase. Solid/Svelte/Lit never needed it —
- * Solid injects CSS at runtime with literal class names; Svelte already wraps
- * its scoped output in `:global { ... }`; Lit is shadow-DOM and doesn't cross
- * boundaries anyway.
+ * React `:deep()` lowering (quick task 260526-no7, corrected in Phase 25): the
+ * deep-lifted inner selector is UNWRAPPED to a bare selector — NOT wrapped in
+ * CSS Modules' `:global(...)`. The `:global(...)` wrap originally opted the
+ * lifted class out of CSS Modules hashing, back when React's `.module.css`
+ * output ran through CSS Modules at bundle time. Phase 25 removed CSS Modules
+ * (plain `.css`, scoped solely by `[data-rozie-s-<hash>]`), and in plain CSS
+ * `:global(...)` is NOT a real selector — a non-CSS-Modules pipeline emits it
+ * verbatim and the browser DROPS the whole rule, silently killing the
+ * cross-component `:deep()` rule (e.g. the nested-Kanban grid). The bare
+ * descendant selector crosses freely in React's light DOM, matching Vue /
+ * Svelte / Angular / Solid. Solid injects CSS at runtime with literal class
+ * names; Svelte wraps its scoped output in `:global { ... }` (valid Svelte
+ * syntax its compiler understands); Lit is shadow-DOM and `:deep()` cannot
+ * cross into a child component's shadow root (documented v1 parity gap —
+ * `::part()` territory).
  *
  * @experimental — shape may change before v1.0
  */
@@ -159,24 +159,27 @@ function expandDeepDistribution(
 
 /**
  * For each `:deep(X)` pseudo in `selector` (where X is a single inner
- * selector — post-`expandDeepDistribution`), replace it with a single
- * `:global(X)` pseudo wrapping the original inner selector. The
- * `:global(...)` node itself is tagged in `deepLifted` so the compound
- * walk skips appending the scope attribute to it.
+ * selector — post-`expandDeepDistribution`), UNWRAP it to the bare inner
+ * selector nodes spliced into the parent in place. Each lifted node is tagged
+ * in `deepLifted` so the compound walk skips appending the scope attribute to
+ * it — the deep payload matches a CHILD component's DOM, which does NOT carry
+ * this component's `[data-rozie-s-<hash>]` attribute.
  *
- * Why `:global(...)` wrap (React-only, quick task 260526-no7) — HISTORICAL:
- * this originally opted the lifted inner out of CSS Modules hashing, back when
- * React's `.module.css` output was processed by CSS Modules at bundle time
- * (the producer's `.rozie-sortable-list` lived in a DIFFERENT CSS Module with
- * a different hash, so a raw lifted selector wouldn't have matched the
- * producer's DOM). As of Phase 25 React emits a plain `.css` file scoped only
- * by `[data-rozie-s-<hash>]` attributes — class names are never hashed — so the
- * `:global(...)` wrap is now INERT-but-kept (zero behavior change; removal is a
- * future-phase clean-up, see the file header).
+ * Plain bare unwrap, NO `:global(...)` wrapper (Phase 25). Earlier (quick task
+ * 260526-no7) the inner was wrapped in CSS Modules' `:global(...)` to opt it out
+ * of class-name hashing, back when React's `.module.css` output ran through CSS
+ * Modules at bundle time. Phase 25 removed CSS Modules — React emits a plain
+ * `.css` file scoped solely by `[data-rozie-s-<hash>]` attributes. In plain CSS
+ * `:global(...)` is NOT a real selector: a non-CSS-Modules pipeline emits it
+ * verbatim and the browser DROPS the whole rule (it never matches), silently
+ * killing every `:deep()` cross-component rule (e.g. the nested-Kanban grid
+ * layout). Unwrapping to the bare selector produces a standard descendant
+ * selector that crosses freely in React's light DOM, matching what Vue / Svelte
+ * / Angular / Solid already do.
  *
- * Combinators inside the original `:deep()` payload are preserved INSIDE
- * the `:global()` wrap — `:deep(.a > .b)` becomes `:global(.a > .b)`, not
- * `:global(.a) > :global(.b)`.
+ * Combinators inside the original `:deep()` payload are spliced in verbatim:
+ * `.outer > :deep(.a > .b)` becomes `.outer[scope] > .a > .b` — every lifted
+ * compound opts out of the scope attr.
  */
 function hoistDeep(
   selector: selectorParser.Selector,
@@ -192,13 +195,15 @@ function hoistDeep(
       const pseudo = node as selectorParser.Pseudo;
       const inner = pseudo.nodes[0];
       if (inner && inner.type === 'selector') {
-        // Build `:global(<inner selector>)`. The original inner Selector
-        // node is reused so combinators inside the deep payload survive
-        // intact within the :global() wrap.
-        const globalPseudo = selectorParser.pseudo({ value: ':global' });
-        globalPseudo.append(inner as selectorParser.Selector);
-        deepLifted.add(globalPseudo);
-        selector.nodes.splice(i, 1, globalPseudo);
+        // Splice the inner selector's child nodes in place of the `:deep(...)`
+        // pseudo (clone so the moved nodes don't keep a stale parent pointer),
+        // tagging each as deep-lifted so the scope-attr pass skips it.
+        const lifted = (inner as selectorParser.Selector).nodes.map((n) => {
+          const cloned = n.clone({}) as selectorParser.Node;
+          deepLifted.add(cloned);
+          return cloned;
+        });
+        selector.nodes.splice(i, 1, ...lifted);
       }
     }
   }
