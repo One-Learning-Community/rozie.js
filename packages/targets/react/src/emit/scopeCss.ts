@@ -2,11 +2,15 @@
  * scopeCss — rewrite a single CSS rule's selector list to scope each compound
  * selector to a component-specific attribute (e.g. `button` → `button[data-rozie-s-<hash>]`).
  *
- * Why this exists: React's CSS Modules pipeline only hashes class names. Bare
- * element selectors (`button { ... }`) survive un-prefixed and apply globally
- * across the page. That breaks the cross-target parity promise — Vue, Svelte,
- * Angular, and Lit all isolate each component's styles via framework-native
- * mechanisms (`<style scoped>`, class-hashing, `_ngcontent-*`, shadow DOM).
+ * Why this exists: React emits a plain sibling `.css` file with no native
+ * scoping of its own — bare element selectors (`button { ... }`) would apply
+ * globally across the page. That breaks the cross-target parity promise — Vue,
+ * Svelte, Angular, and Lit all isolate each component's styles via
+ * framework-native mechanisms (`<style scoped>`, class-hashing, `_ngcontent-*`,
+ * shadow DOM). This pass gives React the same isolation via an attribute
+ * selector appended to every compound — `[data-rozie-s-<hash>]` is React's
+ * SOLE isolation layer (Phase 25 removed the redundant CSS-Modules routing;
+ * React no longer hashes class names).
  *
  * This helper mirrors Vue's `<style scoped>` semantics manually: every
  * compound selector in every rule's selector list gets an attribute
@@ -36,17 +40,21 @@
  *   `.outer :deep(.inner) { ... }` → `.outer[data-rozie-s-abc] :global(.inner) { ... }`
  *   `:deep(.x) { ... }` → `:global(.x) { ... }`
  *
- * React-specific note (quick task 260526-no7): the deep-lifted compound is
- * wrapped in CSS Modules' `:global(...)` pseudo because React's bundler
- * pipeline runs the emitted `.module.css` through CSS Modules, which hashes
- * every bare class selector. Without `:global`, a lifted `.rozie-sortable-list`
- * gets hashed to (e.g.) `.rozie-sortable-list_abc123` — but the producer
- * component lives in a DIFFERENT CSS Module and ends up with a different
- * hash, so the selector never matches the actual DOM. `:global(...)` opts the
- * lifted inner out of CSS Modules hashing so the bare class name survives.
- * Solid/Svelte/Lit do not need this — Solid injects CSS at runtime with literal
- * class names; Svelte already wraps its scoped output in `:global { ... }`;
- * Lit is shadow-DOM and doesn't cross boundaries anyway.
+ * React-specific note (quick task 260526-no7) — HISTORICAL, inert-but-kept:
+ * the deep-lifted compound is wrapped in CSS Modules' `:global(...)` pseudo.
+ * This ORIGINALLY existed because React's bundler ran the emitted `.module.css`
+ * through CSS Modules, which hashes every bare class selector — without
+ * `:global`, a lifted `.rozie-sortable-list` got hashed to (e.g.)
+ * `.rozie-sortable-list_abc123` and never matched the producer's DOM (the
+ * producer lived in a DIFFERENT CSS Module with a different hash). As of
+ * Phase 25 React no longer uses CSS Modules — it emits a plain `.css` file
+ * scoped solely by `[data-rozie-s-<hash>]` attributes — so the `:global(...)`
+ * wrap is now INERT (a no-op on plain CSS). It is KEPT deliberately: removing it
+ * is zero-behavior-risk but touches the rebless surface, so it's left as a
+ * clean-up candidate for a future phase. Solid/Svelte/Lit never needed it —
+ * Solid injects CSS at runtime with literal class names; Svelte already wraps
+ * its scoped output in `:global { ... }`; Lit is shadow-DOM and doesn't cross
+ * boundaries anyway.
  *
  * @experimental — shape may change before v1.0
  */
@@ -156,12 +164,15 @@ function expandDeepDistribution(
  * `:global(...)` node itself is tagged in `deepLifted` so the compound
  * walk skips appending the scope attribute to it.
  *
- * Why `:global(...)` wrap (React-only, quick task 260526-no7): React's
- * `.module.css` output is processed by CSS Modules at bundle time, which
- * hashes bare class selectors. The producer's `.rozie-sortable-list` lives
- * in a DIFFERENT CSS Module with a different hash, so a raw lifted
- * `.rozie-sortable-list` selector wouldn't match the producer's DOM.
- * `:global(...)` opts the inner out of CSS Modules hashing.
+ * Why `:global(...)` wrap (React-only, quick task 260526-no7) — HISTORICAL:
+ * this originally opted the lifted inner out of CSS Modules hashing, back when
+ * React's `.module.css` output was processed by CSS Modules at bundle time
+ * (the producer's `.rozie-sortable-list` lived in a DIFFERENT CSS Module with
+ * a different hash, so a raw lifted selector wouldn't have matched the
+ * producer's DOM). As of Phase 25 React emits a plain `.css` file scoped only
+ * by `[data-rozie-s-<hash>]` attributes — class names are never hashed — so the
+ * `:global(...)` wrap is now INERT-but-kept (zero behavior change; removal is a
+ * future-phase clean-up, see the file header).
  *
  * Combinators inside the original `:deep()` payload are preserved INSIDE
  * the `:global()` wrap — `:deep(.a > .b)` becomes `:global(.a > .b)`, not

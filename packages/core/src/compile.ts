@@ -164,7 +164,7 @@ export interface CompileResult {
   map: SourceMap | null;
   /** `.d.ts` text. Empty for inline-typed targets (Vue/Svelte/Angular). React-only per Plan 06-02 D-84. */
   types: string;
-  /** React-only: scoped module CSS body for the sibling `.module.css` file. */
+  /** React-only: scoped CSS body for the sibling `.css` file (attribute-scoped via `[data-rozie-s-<hash>]`; plain CSS, not CSS Modules). */
   css?: string;
   /** React-only: `:root`-scoped global CSS body for the sibling `.global.css` file. */
   globalCss?: string;
@@ -191,7 +191,7 @@ export interface CompileResult {
  *   }
  *   writeFileSync('Counter.tsx', result.code);
  *   if (result.types) writeFileSync('Counter.d.ts', result.types);
- *   if (result.css)   writeFileSync('Counter.module.css', result.css);
+ *   if (result.css)   writeFileSync('Counter.css', result.css);
  */
 export function compile(source: string, opts: CompileOptions): CompileResult {
   const filename = opts.filename;
