@@ -107,26 +107,37 @@ function isAllowed(pattern: SinkPattern, target: Target, fixtureName: string): b
  * a `.d.ts` / CSS sidecar) and never allowlisted.
  */
 function classify(filename: string): { target: Target; fixtureName: string } {
-  const fixtureName = filename.slice(0, filename.indexOf('.'));
-  let target: Target;
-  if (filename.endsWith('.d.ts') || filename.endsWith('.module.css') || filename.endsWith('.global.css')) {
-    target = 'sidecar';
-  } else if (filename.endsWith('.solid.tsx')) {
-    target = 'solid';
-  } else if (filename.endsWith('.angular.ts')) {
-    target = 'angular';
-  } else if (filename.endsWith('.lit.ts')) {
-    target = 'lit';
-  } else if (filename.endsWith('.tsx')) {
-    target = 'react';
-  } else if (filename.endsWith('.vue')) {
-    target = 'vue';
-  } else if (filename.endsWith('.svelte')) {
-    target = 'svelte';
-  } else {
-    target = 'sidecar';
+  // WR-03 (24-REVIEW): derive the fixture name by stripping the KNOWN
+  // target/sidecar suffix from the RIGHT, not by slicing at the first `.`.
+  // `indexOf('.')` mis-extracts any future fixture whose component name
+  // contains a dot (e.g. `My.Component.vue` → `My`); right-anchored
+  // suffix-stripping is deterministic regardless of dots in the base name.
+  // Order matters: multi-segment suffixes (`.solid.tsx`, `.angular.ts`,
+  // `.lit.ts`, the `.d.ts`/CSS sidecars) MUST precede the bare single-segment
+  // ones (`.tsx`, `.ts`, `.vue`, `.svelte`) so they win the match.
+  const SUFFIX_TARGETS: ReadonlyArray<readonly [string, Target]> = [
+    ['.d.ts', 'sidecar'],
+    ['.module.css', 'sidecar'],
+    ['.global.css', 'sidecar'],
+    ['.solid.tsx', 'solid'],
+    ['.angular.ts', 'angular'],
+    ['.lit.ts', 'lit'],
+    ['.tsx', 'react'],
+    ['.vue', 'vue'],
+    ['.svelte', 'svelte'],
+  ];
+  for (const [suffix, target] of SUFFIX_TARGETS) {
+    if (filename.endsWith(suffix)) {
+      return { target, fixtureName: filename.slice(0, -suffix.length) };
+    }
   }
-  return { target, fixtureName };
+  // Unrecognized extension — classify as sidecar; fixture name is the segment
+  // before the first dot as a last resort (still scanned, never allowlisted).
+  const dotIdx = filename.indexOf('.');
+  return {
+    target: 'sidecar',
+    fixtureName: dotIdx === -1 ? filename : filename.slice(0, dotIdx),
+  };
 }
 
 interface Violation {
