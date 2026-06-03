@@ -193,6 +193,54 @@ function buildScriptSlotsMerge(
 }
 
 /**
+ * Phase 23 (angular-cva-forms-integration) — build the resolved NEW-VALUE
+ * expression the setter writes, for handing to `this.__rozieCvaOnChange(...)`.
+ *
+ *   - plain `=`         → the rhs verbatim.
+ *   - compound `OP=`    → `this.foo() OP rhs` (the same binary the setter writes).
+ *   - `++` / `--`       → modelled as `+= 1` / `-= 1` by the caller, so they
+ *                         flow through the compound branch.
+ *
+ * Used so the onChange callback receives the value the model signal will hold
+ * AFTER the write — never the pre-write value (006-B contract). Cloning the rhs
+ * keeps the setter's own node referentially independent from the onChange arg
+ * (both subtrees are later re-traversed for nested accessor lowering).
+ */
+function buildCvaNewValueExpr(
+  signalName: string,
+  operator: string,
+  rhs: t.Expression,
+): t.Expression {
+  if (operator === '=') {
+    return t.cloneNode(rhs, true, false);
+  }
+  const binOp = COMPOUND_OP_MAP[operator];
+  /* v8 ignore next 3 -- defensive: COMPOUND_OP_MAP covers every compound operator @babel/parser produces */
+  if (!binOp) {
+    return t.cloneNode(rhs, true, false);
+  }
+  const innerRead = t.callExpression(
+    t.memberExpression(t.thisExpression(), t.identifier(signalName)),
+    [],
+  );
+  return t.binaryExpression(binOp, innerRead, t.cloneNode(rhs, true, false));
+}
+
+/**
+ * Phase 23 — `this.__rozieCvaOnChange(<newValue>)` call. The view→model bridge:
+ * every internal write to the single CVA model prop notifies Angular's form
+ * machinery via the registered onChange callback. NEVER wired via `effect()`
+ * (proven echo bug 006-D — an effect re-fires on `writeValue`'s own `.set`,
+ * looping the value back into the form control).
+ */
+function buildCvaOnChangeCall(newValue: t.Expression): t.CallExpression {
+  return t.callExpression(
+    t.memberExpression(t.thisExpression(), t.identifier('__rozieCvaOnChange')),
+    [newValue],
+  );
+}
+
+/**
  * Build `this.foo.set(rhs)` for a plain `=`, or
  * `this.foo.set(this.foo() OP rhs)` for compound operators.
  */
@@ -535,6 +583,15 @@ export function normalizeModelAccessor(program: File): void {
 export function rewriteRozieIdentifiers(
   program: File,
   ir: IRComponent,
+  /**
+   * Phase 23 — the single CVA model prop name (or null when the component is
+   * not CVA-receiving: zero/≥2 model props, or `cva:false`). When non-null,
+   * every internal write to this prop additionally emits
+   * `this.__rozieCvaOnChange(<newValue>)` (Task 1), and every internal read of a
+   * declared `disabled` prop is OR-merged with `this.__rozieCvaDisabled()`
+   * (Task 2). When null, the rewrite is byte-identical to the pre-CVA path.
+   */
+  cvaModelProp: string | null = null,
 ): RewriteScriptResult {
   const diagnostics: Diagnostic[] = [];
 
@@ -545,6 +602,12 @@ export function rewriteRozieIdentifiers(
 
   const modelProps = new Set(ir.props.filter((p) => p.isModel).map((p) => p.name));
   const nonModelProps = new Set(ir.props.filter((p) => !p.isModel).map((p) => p.name));
+  // Phase 23 — Task 2: OR-merge `this.__rozieCvaDisabled()` into the `disabled`
+  // read ONLY when the component is CVA-receiving AND literally declares a
+  // `disabled` prop. A CVA component with no `disabled` prop (ROZ126) has no
+  // read to merge; a non-CVA component is never merged.
+  const cvaMergeDisabled =
+    cvaModelProp !== null && ir.props.some((p) => p.name === 'disabled');
   const dataNames = new Set(ir.state.map((s) => s.name));
   const refNames = new Set(ir.refs.map((r) => r.name));
   const slotNames = new Set(ir.slots.map((s) => (s.name === '' ? '' : s.name)));
@@ -720,6 +783,22 @@ export function rewriteRozieIdentifiers(
       if (obj.name === '$props') {
         if (!modelProps.has(prop.name)) return;
         const setterCall = buildAngularSetterCall(prop.name, node.operator, node.right);
+        // Phase 23 — Task 1: the CVA view→model bridge. When this write targets
+        // the single CVA model prop, additionally notify Angular's form
+        // machinery via `this.__rozieCvaOnChange(<newValue>)`. The
+        // AssignmentExpression visitor has NO statement-context guard — model
+        // writes legally appear in expression position (a ternary arm, an arrow
+        // body) — so the replacement must stay a SINGLE expression node:
+        // a SequenceExpression `(setter, onChange)` evaluates both and yields
+        // the onChange call's value in expression position (Pitfall 1). The
+        // onChange arg is the resolved post-write value, NOT the live signal.
+        if (prop.name === cvaModelProp) {
+          const newValue = buildCvaNewValueExpr(prop.name, node.operator, node.right);
+          path.replaceWith(
+            t.sequenceExpression([setterCall, buildCvaOnChangeCall(newValue)]),
+          );
+          return;
+        }
         path.replaceWith(setterCall);
         return;
       }
@@ -753,6 +832,17 @@ export function rewriteRozieIdentifiers(
 
       const op = node.operator === '++' ? '+=' : '-=';
       const setterCall = buildAngularSetterCall(prop.name, op, t.numericLiteral(1));
+      // Phase 23 — Task 1: a statement-context `$props.<cvaProp>++` is the model
+      // write. Because the parent is an ExpressionStatement (guarded above), we
+      // can emit TWO statements: the setter then the onChange. The onChange arg
+      // is the resolved new value `this.X() + 1` / `this.X() - 1`.
+      if (isModel && prop.name === cvaModelProp) {
+        const newValue = buildCvaNewValueExpr(prop.name, op, t.numericLiteral(1));
+        const onChangeStmt = t.expressionStatement(buildCvaOnChangeCall(newValue));
+        path.replaceWith(setterCall);
+        path.parentPath.insertAfter(onChangeStmt);
+        return;
+      }
       path.replaceWith(setterCall);
     },
 
@@ -783,6 +873,30 @@ export function rewriteRozieIdentifiers(
             [],
           );
           if (propDecl) synthCall.loc = propDecl.sourceLoc as any;
+          // Phase 23 — Task 2: the disabled OR-merge. On a CVA component
+          // declaring a `disabled` prop, every internal `$props.disabled` read
+          // lowers to `(this.disabled() || this.__rozieCvaDisabled())` so a
+          // `setDisabledState(true)` from a parent form disables the control
+          // even when the author's own `disabled` prop is false. Parenthesized
+          // so the `||` binds correctly wherever the read is interpolated.
+          if (cvaMergeDisabled && prop.name === 'disabled') {
+            const merged = t.parenthesizedExpression(
+              t.logicalExpression(
+                '||',
+                synthCall,
+                t.callExpression(
+                  t.memberExpression(
+                    t.thisExpression(),
+                    t.identifier('__rozieCvaDisabled'),
+                  ),
+                  [],
+                ),
+              ),
+            );
+            path.replaceWith(merged);
+            path.skip();
+            return;
+          }
           path.replaceWith(synthCall);
           return;
         }

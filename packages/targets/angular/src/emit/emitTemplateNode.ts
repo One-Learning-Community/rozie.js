@@ -138,6 +138,20 @@ export interface EmitNodeCtx {
    * EmitTemplateOpts.classMembers docstring for rationale.
    */
   classMembers?: ReadonlySet<string> | undefined;
+  /**
+   * Phase 23 (angular-cva-forms-integration) — the resolved single CVA model
+   * prop name (or null when not CVA-receiving). Threaded into every
+   * `rewriteTemplateExpression` call so a template model-write to the CVA prop
+   * also emits `__rozieCvaOnChange(<newValue>)` (Task 1). Set ONCE in
+   * emitTemplate from emitAngular's single gate.
+   */
+  cvaModelProp?: string | null | undefined;
+  /**
+   * Phase 23 — Task 2: when true, a template `$props.disabled` read OR-merges
+   * `this.__rozieCvaDisabled()`. Set when CVA-receiving AND a `disabled` prop is
+   * declared.
+   */
+  cvaMergeDisabled?: boolean | undefined;
 }
 
 function emitStaticText(node: TemplateStaticTextIR): string {
@@ -178,6 +192,8 @@ function emitInterpolation(
   const expr = rewriteTemplateExpression(node.expression, ctx.ir, {
     collisionRenames: ctx.collisionRenames,
     loopBindings: ctx.loopBindings,
+    cvaModelProp: ctx.cvaModelProp,
+    cvaMergeDisabled: ctx.cvaMergeDisabled,
   });
   return `{{ ${expr} }}`;
 }
@@ -208,6 +224,8 @@ function emitLoop(node: TemplateLoopIR, ctx: EmitNodeCtx): string {
   const iter = rewriteTemplateExpression(node.iterableExpression, ctx.ir, {
     collisionRenames: ctx.collisionRenames,
     loopBindings: ctx.loopBindings,
+    cvaModelProp: ctx.cvaModelProp,
+    cvaMergeDisabled: ctx.cvaMergeDisabled,
   });
 
   let trackExpr: string;
@@ -224,6 +242,8 @@ function emitLoop(node: TemplateLoopIR, ctx: EmitNodeCtx): string {
     trackExpr = rewriteTemplateExpression(node.keyExpression, ctx.ir, {
       collisionRenames: ctx.collisionRenames,
       loopBindings: childBindings,
+      cvaModelProp: ctx.cvaModelProp,
+      cvaMergeDisabled: ctx.cvaMergeDisabled,
     });
   }
 
@@ -281,6 +301,8 @@ function emitEvents(events: Listener[], ctx: EmitNodeCtx): string {
         collisionRenames: ctx.collisionRenames,
         loopBindings: ctx.loopBindings,
         handlerArity: ctx.handlerArity,
+        cvaModelProp: ctx.cvaModelProp,
+        cvaMergeDisabled: ctx.cvaMergeDisabled,
       });
       out.push(result.eventAttr);
       if (result.scriptInjection) ctx.scriptInjections.push(result.scriptInjection);
@@ -301,6 +323,8 @@ function emitEvents(events: Listener[], ctx: EmitNodeCtx): string {
         collisionRenames: ctx.collisionRenames,
         loopBindings: ctx.loopBindings,
         handlerArity: ctx.handlerArity,
+        cvaModelProp: ctx.cvaModelProp,
+        cvaMergeDisabled: ctx.cvaMergeDisabled,
       });
       if (sub.scriptInjection) ctx.scriptInjections.push(sub.scriptInjection);
       for (const d of sub.diagnostics) ctx.diagnostics.push(d);
@@ -410,6 +434,10 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
     // Plan 14-05 — flag that emitAngular reads to add inject/Renderer2/
     // ElementRef/effect/viewChild to the @angular/core import line.
     hasSpreadBinding: ctx.hasSpreadBinding,
+    // Phase 23 — Task 2: thread the CVA gate so a bound `:disabled` read
+    // OR-merges `this.__rozieCvaDisabled()`.
+    cvaModelProp: ctx.cvaModelProp,
+    cvaMergeDisabled: ctx.cvaMergeDisabled,
   }, node.tagName);
 
   // Plan 15-05 — partition `node.listenerSpreads` into literal-key entries
@@ -478,6 +506,8 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
     const expr = rewriteTemplateExpression(rShow.expression, ctx.ir, {
       collisionRenames: ctx.collisionRenames,
       loopBindings: ctx.loopBindings,
+      cvaModelProp: ctx.cvaModelProp,
+      cvaMergeDisabled: ctx.cvaMergeDisabled,
     });
     partsHead.push(`[style.display]="(${expr}) ? '' : 'none'"`);
   }
@@ -497,6 +527,8 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
     const expr = rewriteTemplateExpression(rHtml.expression, ctx.ir, {
       collisionRenames: ctx.collisionRenames,
       loopBindings: ctx.loopBindings,
+      cvaModelProp: ctx.cvaModelProp,
+      cvaMergeDisabled: ctx.cvaMergeDisabled,
     });
     // Phase 06.2 P2: tagKind: 'component'/'self' → rozie-kebab selector.
     const tagOut = resolveAngularTagName(node);
@@ -740,6 +772,8 @@ function emitMatchNode(node: TemplateMatchIR, ctx: EmitNodeCtx): string {
     const rewritten = rewriteTemplateExpression(node.discriminant, ctx.ir, {
       collisionRenames: ctx.collisionRenames,
       loopBindings: ctx.loopBindings,
+      cvaModelProp: ctx.cvaModelProp,
+      cvaMergeDisabled: ctx.cvaMergeDisabled,
     });
     letLine = `@let ${node.tempName} = ${rewritten};\n`;
   }

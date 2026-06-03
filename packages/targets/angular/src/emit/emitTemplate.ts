@@ -40,6 +40,16 @@ export interface EmitTemplateOpts {
    * inside a class field, which tsc flags TS2663.
    */
   classMembers?: ReadonlySet<string> | undefined;
+  /**
+   * Phase 23 (angular-cva-forms-integration) — the resolved single CVA model
+   * prop name (or null). emitAngular computes the gate ONCE and threads it here;
+   * emitTemplate puts it on the EmitNodeCtx so every `rewriteTemplateExpression`
+   * call injects `__rozieCvaOnChange(...)` at a CVA-prop write (Task 1) and
+   * OR-merges `this.__rozieCvaDisabled()` at a `disabled` read (Task 2).
+   */
+  cvaModelProp?: string | null | undefined;
+  /** Phase 23 — true when CVA-receiving AND a `disabled` prop is declared. */
+  cvaMergeDisabled?: boolean | undefined;
 }
 
 export interface EmitTemplateResult {
@@ -164,6 +174,8 @@ export function emitTemplate(
     loopBindings: new Set(),
     handlerArity: opts.handlerArity,
     classMembers: opts.classMembers,
+    cvaModelProp: opts.cvaModelProp ?? null,
+    cvaMergeDisabled: opts.cvaMergeDisabled ?? false,
   };
 
   const template = emitNode(ir.template, ctx);

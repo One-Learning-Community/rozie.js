@@ -40,6 +40,8 @@ export function emitConditional(
         ? rewriteTemplateExpression(branch.test, ctx.ir, {
             collisionRenames: ctx.collisionRenames,
             loopBindings: ctx.loopBindings,
+            cvaModelProp: ctx.cvaModelProp,
+            cvaMergeDisabled: ctx.cvaMergeDisabled,
           })
         : 'true';
       parts.push(`@if (${test}) {`);
@@ -52,6 +54,8 @@ export function emitConditional(
       const test = rewriteTemplateExpression(branch.test, ctx.ir, {
         collisionRenames: ctx.collisionRenames,
         loopBindings: ctx.loopBindings,
+        cvaModelProp: ctx.cvaModelProp,
+        cvaMergeDisabled: ctx.cvaMergeDisabled,
       });
       parts.push(`} @else if (${test}) {`);
       parts.push(body);

@@ -56,6 +56,13 @@ export interface EmitEventCtx {
    * event arg to a zero-arg handler. Keyed by the ORIGINAL user handler name.
    */
   handlerArity?: ReadonlyMap<string, number> | undefined;
+  /**
+   * Phase 23 — Task 1: the single CVA model prop name (or null). Threaded into
+   * the handler `rewriteTemplateExpression` call so an inline model write
+   * (`@input="$model.value = x"`) also emits `__rozieCvaOnChange(<newValue>)`.
+   */
+  cvaModelProp?: string | null | undefined;
+  cvaMergeDisabled?: boolean | undefined;
 }
 
 export interface EmitTemplateEventResult {
@@ -160,6 +167,8 @@ export function emitTemplateEvent(
   let handlerRef: string = rewriteTemplateExpression(listener.handler, ctx.ir, {
     collisionRenames: ctx.collisionRenames,
     loopBindings: ctx.loopBindings,
+    cvaModelProp: ctx.cvaModelProp,
+    cvaMergeDisabled: ctx.cvaMergeDisabled,
   });
 
   for (const entry of listener.modifierPipeline) {
@@ -227,6 +236,8 @@ export function emitTemplateEvent(
       const origHandlerCode = rewriteTemplateExpression(listener.handler, ctx.ir, {
         collisionRenames: ctx.collisionRenames,
         loopBindings: ctx.loopBindings,
+        cvaModelProp: ctx.cvaModelProp,
+        cvaMergeDisabled: ctx.cvaMergeDisabled,
       });
       // Inside the field initializer, the handler-call references `this.X`
       // class members. Rewrite the original handler code through a "this-prefix"

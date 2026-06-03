@@ -214,13 +214,23 @@ export function emitAngular(
   const scriptResult = emitScript(ir, scriptOpts);
 
   // 2. Template-side emission.
+  // Phase 23 — thread the resolved CVA gate so template model-writes inject
+  // __rozieCvaOnChange (Task 1) and `disabled` reads OR-merge __rozieCvaDisabled
+  // (Task 2). cvaMergeDisabled is true only when CVA-receiving AND a `disabled`
+  // prop is declared.
+  const cvaMergeDisabled =
+    cvaModelProp !== null && ir.props.some((p) => p.name === 'disabled');
   const tmplResult = emitTemplate(ir, registry, {
     collisionRenames,
     handlerArity,
     classMembers,
+    cvaModelProp: cvaModelProp !== null ? cvaModelProp.name : null,
+    cvaMergeDisabled,
   });
 
   // 3. Listeners-block emission.
+  // Phase 23 — thread the resolved CVA gate (Task 1 write-site / Task 2 disabled
+  // merge) into the <listeners>-block lowering.
   const listenersResult = emitListeners(
     ir.listeners,
     ir,
@@ -228,6 +238,10 @@ export function emitAngular(
     collisionRenames,
     classMembers,
     signalMembers,
+    {
+      cvaModelProp: cvaModelProp !== null ? cvaModelProp.name : null,
+      cvaMergeDisabled,
+    },
   );
 
   // 4. Style emission.

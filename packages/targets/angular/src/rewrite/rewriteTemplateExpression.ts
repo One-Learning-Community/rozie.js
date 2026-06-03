@@ -116,6 +116,26 @@ function buildTemplateSetterCall(
   return t.callExpression(setterCallee, [t.binaryExpression(binOp, innerRead, rhs)]);
 }
 
+/**
+ * Phase 23 (angular-cva-forms-integration) — the resolved post-write value handed
+ * to `__rozieCvaOnChange(...)` from a TEMPLATE-context model write. Mirrors
+ * rewriteScript.ts:buildCvaNewValueExpr but the compound inner-read uses the
+ * template signal-call shape (`name()`, no `this.`). Plain `=` → rhs clone;
+ * compound → `name() OP rhs`.
+ */
+function buildTemplateCvaNewValue(
+  signalName: string,
+  operator: string,
+  rhs: t.Expression,
+  compoundOpMap: Record<string, t.BinaryExpression['operator']>,
+): t.Expression {
+  if (operator === '=') return t.cloneNode(rhs, true, false);
+  const binOp = compoundOpMap[operator];
+  if (!binOp) return t.cloneNode(rhs, true, false);
+  const innerRead = t.callExpression(t.identifier(signalName), []);
+  return t.binaryExpression(binOp, innerRead, t.cloneNode(rhs, true, false));
+}
+
 export interface RewriteTemplateOpts {
   /**
    * Names of identifiers that are loop-local bindings within this expression's
@@ -139,6 +159,21 @@ export interface RewriteTemplateOpts {
    * Default false (template-binding context).
    */
   prefixThis?: boolean;
+  /**
+   * Phase 23 (angular-cva-forms-integration) — the single CVA model prop name
+   * (or null when the component is not CVA-receiving). When non-null, a template
+   * model-write to this prop (`@input="$model.value = x"`) additionally emits
+   * `this.__rozieCvaOnChange(<newValue>)` (Task 1). When undefined (the default
+   * for direct callers/tests), the rewrite is byte-identical to the pre-CVA path
+   * — emitAngular threads the RESOLVED gate (honoring `cva:false`).
+   */
+  cvaModelProp?: string | null | undefined;
+  /**
+   * Phase 23 — Task 2: when true, a template read of `$props.disabled` lowers to
+   * `(disabled() || this.__rozieCvaDisabled())`. Set only when the component is
+   * CVA-receiving AND declares a `disabled` prop.
+   */
+  cvaMergeDisabled?: boolean | undefined;
 }
 
 /**
@@ -178,6 +213,8 @@ export function rewriteTemplateExpression(
   const loopBindings = opts.loopBindings ?? new Set<string>();
   const collisionRenames = opts.collisionRenames ?? new Map<string, string>();
   const prefixThis = opts.prefixThis ?? false;
+  const cvaModelProp = opts.cvaModelProp ?? null;
+  const cvaMergeDisabled = opts.cvaMergeDisabled ?? false;
   const mkRef = (name: string): t.Expression =>
     prefixThis
       ? t.memberExpression(t.thisExpression(), t.identifier(name))
@@ -246,6 +283,29 @@ export function rewriteTemplateExpression(
       }
       if (obj.name === '$props' && modelProps.has(prop.name)) {
         const setterCall = buildTemplateSetterCall(prop.name, node.operator, node.right, COMPOUND_OP_MAP);
+        // Phase 23 — Task 1: a TEMPLATE model write to the single CVA prop
+        // (`@input="$model.value = x"`) also notifies the form via
+        // `__rozieCvaOnChange(<newValue>)`. Template event bindings run in the
+        // component instance scope, so the bare `__rozieCvaOnChange(...)` resolves
+        // against `this` — matching the bare `value.set(...)` setter convention.
+        // A SequenceExpression keeps the replacement a single expression node
+        // (template event expressions are not statement-context).
+        if (prop.name === cvaModelProp) {
+          const newValue = buildTemplateCvaNewValue(
+            prop.name,
+            node.operator,
+            node.right,
+            COMPOUND_OP_MAP,
+          );
+          path.replaceWith(
+            t.sequenceExpression([
+              setterCall,
+              t.callExpression(t.identifier('__rozieCvaOnChange'), [newValue]),
+            ]),
+          );
+          path.skip();
+          return;
+        }
         path.replaceWith(setterCall);
         path.skip();
         return;
@@ -262,7 +322,33 @@ export function rewriteTemplateExpression(
       if (obj.name === '$props') {
         if (modelProps.has(prop.name) || nonModelProps.has(prop.name)) {
           // $props.value → value()  (signal call; no `this.` prefix in templates)
-          path.replaceWith(t.callExpression(mkRef(prop.name), []));
+          const read = t.callExpression(mkRef(prop.name), []);
+          // Phase 23 — Task 2: OR-merge the CVA disabled signal into every
+          // internal `disabled` read on a CVA component declaring a `disabled`
+          // prop → `(disabled() || this.__rozieCvaDisabled())`. The
+          // `__rozieCvaDisabled` private member is referenced via `this.` so the
+          // read is unambiguous in both template and class-body (prefixThis)
+          // contexts.
+          if (cvaMergeDisabled && prop.name === 'disabled') {
+            path.replaceWith(
+              t.parenthesizedExpression(
+                t.logicalExpression(
+                  '||',
+                  read,
+                  t.callExpression(
+                    t.memberExpression(
+                      t.thisExpression(),
+                      t.identifier('__rozieCvaDisabled'),
+                    ),
+                    [],
+                  ),
+                ),
+              ),
+            );
+            path.skip();
+            return;
+          }
+          path.replaceWith(read);
           path.skip();
         }
         return;

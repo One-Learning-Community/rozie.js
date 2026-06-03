@@ -783,7 +783,14 @@ export function emitScript(
   const emitsWithPayload = collectEmitsWithPayload(cloned);
 
   // 3. Rewrite identifiers on the clone.
-  const rewriteResult = rewriteRozieIdentifiers(cloned, ir);
+  // Phase 23 — thread the single CVA model prop NAME (or null) so the rewrite
+  // injects `this.__rozieCvaOnChange(...)` at the model-write site (Task 1) and
+  // OR-merges `this.__rozieCvaDisabled()` into the `disabled` read (Task 2).
+  const rewriteResult = rewriteRozieIdentifiers(
+    cloned,
+    ir,
+    opts.cvaModelProp != null ? opts.cvaModelProp.name : null,
+  );
   diagnostics.push(...rewriteResult.diagnostics);
 
   // 4. Compute Angular imports based on IR shape.

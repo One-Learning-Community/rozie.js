@@ -97,6 +97,34 @@ function buildAngularSetterCall(
 }
 
 /**
+ * Phase 23 (angular-cva-forms-integration) — resolved post-write value for the
+ * `this.__rozieCvaOnChange(...)` notify in a listener body. Mirrors
+ * rewriteScript.ts:buildCvaNewValueExpr (class-context `this.X()` inner read).
+ */
+function buildListenerCvaNewValue(
+  signalName: string,
+  operator: string,
+  rhs: t.Expression,
+): t.Expression {
+  if (operator === '=') return t.cloneNode(rhs, true, false);
+  const binOp = COMPOUND_OP_MAP[operator];
+  if (!binOp) return t.cloneNode(rhs, true, false);
+  const innerRead = t.callExpression(
+    t.memberExpression(t.thisExpression(), t.identifier(signalName)),
+    [],
+  );
+  return t.binaryExpression(binOp, innerRead, t.cloneNode(rhs, true, false));
+}
+
+/** Phase 23 — `this.__rozieCvaOnChange(<newValue>)` for a listener-body write. */
+function buildListenerCvaOnChange(newValue: t.Expression): t.CallExpression {
+  return t.callExpression(
+    t.memberExpression(t.thisExpression(), t.identifier('__rozieCvaOnChange')),
+    [newValue],
+  );
+}
+
+/**
  * Phase 07.3.2 Plan 10 — listener-context `$slots.X` merge with dynamic-name
  * fallback. Produces `(this.<X>Tpl ?? this.templates()?.['<x>'])`. Listener
  * bodies run in class context so both operands carry the `this.` prefix.
@@ -131,6 +159,18 @@ function buildListenerSlotsMerge(
 export interface RewriteListenerOpts {
   collisionRenames?: ReadonlyMap<string, string> | undefined;
   /**
+   * Phase 23 (angular-cva-forms-integration) — the single CVA model prop name
+   * (or null). When non-null, a `<listeners>`-block model write to this prop
+   * also emits `this.__rozieCvaOnChange(<newValue>)` (Task 1). When undefined
+   * (direct callers/tests), the rewrite is byte-identical to the pre-CVA path.
+   */
+  cvaModelProp?: string | null | undefined;
+  /**
+   * Phase 23 — Task 2: when true, a listener read of `$props.disabled` lowers to
+   * `(this.disabled() || this.__rozieCvaDisabled())`.
+   */
+  cvaMergeDisabled?: boolean | undefined;
+  /**
    * Class members from rewriteScript (includes user method names like
    * `toggle`, `close`, `reposition`). Bare identifier references to these
    * get `this.` prefix.
@@ -162,6 +202,8 @@ export function rewriteListenerExpression(
 ): string {
   const cloned = t.cloneNode(expr, true, false);
   const collisionRenames = opts.collisionRenames ?? new Map<string, string>();
+  const cvaModelProp = opts.cvaModelProp ?? null;
+  const cvaMergeDisabled = opts.cvaMergeDisabled ?? false;
 
   const modelProps = new Set(ir.props.filter((p) => p.isModel).map((p) => p.name));
   const nonModelProps = new Set(ir.props.filter((p) => !p.isModel).map((p) => p.name));
@@ -243,7 +285,19 @@ export function rewriteListenerExpression(
       }
       if (obj.name === '$props') {
         if (!modelProps.has(prop.name)) return;
-        path.replaceWith(buildAngularSetterCall(prop.name, node.operator, node.right));
+        const setterCall = buildAngularSetterCall(prop.name, node.operator, node.right);
+        // Phase 23 — Task 1: a <listeners>-block write to the single CVA model
+        // prop also notifies the form via `this.__rozieCvaOnChange(<newValue>)`.
+        // A SequenceExpression keeps the replacement valid in expression position
+        // (listener handler bodies can place a write inside a ternary/arrow).
+        if (prop.name === cvaModelProp) {
+          const newValue = buildListenerCvaNewValue(prop.name, node.operator, node.right);
+          path.replaceWith(
+            t.sequenceExpression([setterCall, buildListenerCvaOnChange(newValue)]),
+          );
+          return;
+        }
+        path.replaceWith(setterCall);
         return;
       }
     },
@@ -270,7 +324,18 @@ export function rewriteListenerExpression(
       if (!path.parentPath?.isExpressionStatement()) return;
 
       const op = node.operator === '++' ? '+=' : '-=';
-      path.replaceWith(buildAngularSetterCall(prop.name, op, t.numericLiteral(1)));
+      const setterCall = buildAngularSetterCall(prop.name, op, t.numericLiteral(1));
+      // Phase 23 — Task 1: statement-context `$props.<cvaProp>++` in a listener
+      // body → setter + onChange as two statements.
+      if (isModel && prop.name === cvaModelProp) {
+        const newValue = buildListenerCvaNewValue(prop.name, op, t.numericLiteral(1));
+        path.replaceWith(setterCall);
+        path.parentPath.insertAfter(
+          t.expressionStatement(buildListenerCvaOnChange(newValue)),
+        );
+        return;
+      }
+      path.replaceWith(setterCall);
     },
 
     MemberExpression(path) {
@@ -283,12 +348,32 @@ export function rewriteListenerExpression(
 
       if (obj.name === '$props') {
         if (modelProps.has(prop.name) || nonModelProps.has(prop.name)) {
-          path.replaceWith(
-            t.callExpression(
-              t.memberExpression(t.thisExpression(), t.identifier(prop.name)),
-              [],
-            ),
+          const read = t.callExpression(
+            t.memberExpression(t.thisExpression(), t.identifier(prop.name)),
+            [],
           );
+          // Phase 23 — Task 2: OR-merge the CVA disabled signal into a listener
+          // read of `$props.disabled` → `(this.disabled() || this.__rozieCvaDisabled())`.
+          if (cvaMergeDisabled && prop.name === 'disabled') {
+            path.replaceWith(
+              t.parenthesizedExpression(
+                t.logicalExpression(
+                  '||',
+                  read,
+                  t.callExpression(
+                    t.memberExpression(
+                      t.thisExpression(),
+                      t.identifier('__rozieCvaDisabled'),
+                    ),
+                    [],
+                  ),
+                ),
+              ),
+            );
+            path.skip();
+            return;
+          }
+          path.replaceWith(read);
           path.skip();
         }
         return;

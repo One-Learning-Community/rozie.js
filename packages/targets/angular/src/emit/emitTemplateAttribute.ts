@@ -98,6 +98,14 @@ export interface EmitAttrCtx {
    * listener-spread sources signal the need.
    */
   needsDestroyRefField?: { value: boolean } | undefined;
+  /**
+   * Phase 23 — Task 2 disabled OR-merge gate. The single CVA model prop name (or
+   * null) + whether a `disabled` prop is declared. Threaded into every bound-attr
+   * `rewriteTemplateExpression` call so `:disabled="$props.disabled"` merges with
+   * `this.__rozieCvaDisabled()`.
+   */
+  cvaModelProp?: string | null | undefined;
+  cvaMergeDisabled?: boolean | undefined;
 }
 
 /**
@@ -242,6 +250,8 @@ function renderInterpolatedTemplateLiteral(
       out += '${' + rewriteTemplateExpression(seg.expression, ctx.ir, {
         collisionRenames: ctx.collisionRenames,
         loopBindings: ctx.loopBindings,
+        cvaModelProp: ctx.cvaModelProp,
+        cvaMergeDisabled: ctx.cvaMergeDisabled,
       }) + '}';
     }
   }
@@ -373,6 +383,8 @@ function lowerBoundAttrExpression(
     const hoist = hoistTemplateDoubleReadAccessor(expr, ctx.ir, attrName, taken, {
       collisionRenames: ctx.collisionRenames,
       loopBindings: ctx.loopBindings,
+      cvaModelProp: ctx.cvaModelProp,
+      cvaMergeDisabled: ctx.cvaMergeDisabled,
     });
     if (hoist !== null) {
       ctx.scriptInjections.push({ name: hoist.memberName, decl: hoist.decl });
@@ -382,6 +394,8 @@ function lowerBoundAttrExpression(
   return rewriteTemplateExpression(expr, ctx.ir, {
     collisionRenames: ctx.collisionRenames,
     loopBindings: ctx.loopBindings,
+    cvaModelProp: ctx.cvaModelProp,
+    cvaMergeDisabled: ctx.cvaMergeDisabled,
   });
 }
 
@@ -709,6 +723,8 @@ function emitSpreadBinding(
       collisionRenames: ctx.collisionRenames,
       loopBindings: ctx.loopBindings,
       prefixThis: true,
+      cvaModelProp: ctx.cvaModelProp,
+      cvaMergeDisabled: ctx.cvaMergeDisabled,
     });
   }
 
@@ -904,6 +920,8 @@ function emitListenerSpread(
       collisionRenames: ctx.collisionRenames,
       loopBindings: ctx.loopBindings,
       prefixThis: true,
+      cvaModelProp: ctx.cvaModelProp,
+      cvaMergeDisabled: ctx.cvaMergeDisabled,
     });
   }
 
@@ -1050,6 +1068,8 @@ export function emitSingleAttr(
     const expr = rewriteTemplateExpression(attr.expression, ctx.ir, {
       collisionRenames: ctx.collisionRenames,
       loopBindings: ctx.loopBindings,
+      cvaModelProp: ctx.cvaModelProp,
+      cvaMergeDisabled: ctx.cvaMergeDisabled,
     });
     return `[${bindingName}]="${expr}"`;
   }
@@ -1110,6 +1130,8 @@ export function emitSingleAttr(
       const expr = rewriteTemplateExpression(attr.expression, ctx.ir, {
         collisionRenames: ctx.collisionRenames,
         loopBindings: ctx.loopBindings,
+        cvaModelProp: ctx.cvaModelProp,
+        cvaMergeDisabled: ctx.cvaMergeDisabled,
       });
       return `[(ngModel)]="${expr}" [ngModelOptions]="{standalone: true}"`;
     }
@@ -1155,6 +1177,8 @@ function attrToArraySegment(attr: AttributeBinding, ctx: EmitAttrCtx): string {
     return rewriteTemplateExpression(attr.expression, ctx.ir, {
       collisionRenames: ctx.collisionRenames,
       loopBindings: ctx.loopBindings,
+      cvaModelProp: ctx.cvaModelProp,
+      cvaMergeDisabled: ctx.cvaMergeDisabled,
     });
   }
   if (attr.kind === 'spreadBinding') {
@@ -1170,6 +1194,8 @@ function attrToArraySegment(attr: AttributeBinding, ctx: EmitAttrCtx): string {
     return rewriteTemplateExpression(seg.expression, ctx.ir, {
       collisionRenames: ctx.collisionRenames,
       loopBindings: ctx.loopBindings,
+      cvaModelProp: ctx.cvaModelProp,
+      cvaMergeDisabled: ctx.cvaMergeDisabled,
     });
   }
   return '`' + renderInterpolatedTemplateLiteral(attr.segments, ctx) + '`';

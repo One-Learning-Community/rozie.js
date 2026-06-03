@@ -264,6 +264,7 @@ function renderListener(
   collisionRenames: ReadonlyMap<string, string>,
   classMembers: ReadonlySet<string>,
   signalMembers: ReadonlySet<string>,
+  cva: { cvaModelProp: string | null; cvaMergeDisabled: boolean },
 ): string {
   const evtType = eventTypeFor(listener.event);
   const targetExpr = renderTargetExpr(listener.target, diagnostics, listener.sourceLoc);
@@ -272,6 +273,8 @@ function renderListener(
     collisionRenames,
     classMembers,
     signalMembers,
+    cvaModelProp: cva.cvaModelProp,
+    cvaMergeDisabled: cva.cvaMergeDisabled,
   });
   // Also match signal-typed members rewritten to `this.X()` by
   // rewriteListenerExpression — without this, signal handlers fall through to
@@ -285,7 +288,7 @@ function renderListener(
   const whenGuard =
     listener.when === null
       ? ''
-      : `      if (!(${rewriteListenerExpression(listener.when, ir, { collisionRenames, classMembers, signalMembers })})) return;\n`;
+      : `      if (!(${rewriteListenerExpression(listener.when, ir, { collisionRenames, classMembers, signalMembers, cvaModelProp: cva.cvaModelProp, cvaMergeDisabled: cva.cvaMergeDisabled })})) return;\n`;
 
   // Class B: .outside collapse — handler body adds contains-checks against
   // each listed ref BEFORE the user-handler invocation.
@@ -377,6 +380,16 @@ export function emitListeners(
   collisionRenames: ReadonlyMap<string, string>,
   classMembers: ReadonlySet<string>,
   signalMembers: ReadonlySet<string>,
+  /**
+   * Phase 23 — the resolved CVA gate: model prop name (or null) + whether to
+   * OR-merge a `disabled` read. Threaded to rewriteListenerExpression so
+   * <listeners>-block model writes inject __rozieCvaOnChange (Task 1) and
+   * `disabled` reads merge __rozieCvaDisabled (Task 2).
+   */
+  cva: { cvaModelProp: string | null; cvaMergeDisabled: boolean } = {
+    cvaModelProp: null,
+    cvaMergeDisabled: false,
+  },
 ): EmitListenersResult {
   const diagnostics: Diagnostic[] = [];
   const fieldInitializers: AngularListenerInjection[] = [];
@@ -405,6 +418,7 @@ export function emitListeners(
         collisionRenames,
         classMembers,
         signalMembers,
+        cva,
       ),
     );
   }
