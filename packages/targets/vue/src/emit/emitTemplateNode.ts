@@ -32,8 +32,9 @@ import type {
 // type-identity bug Phase 07.1 fixed.
 import type { ModifierRegistry, SlotFillerDecl } from '@rozie/core';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
+import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
-import { emitMergedAttributes, emitListenerSpread } from './emitTemplateAttribute.js';
+import { emitMergedAttributes, emitListenerSpread, findRHtml } from './emitTemplateAttribute.js';
 import { emitTemplateEvent, type ScriptInjection } from './emitTemplateEvent.js';
 
 /**
@@ -251,7 +252,20 @@ function emitElementWithExtraDirective(
   extraDirective: string | null,
   ctx: EmitNodeCtx,
 ): string {
-  const attrText = emitMergedAttributes(node.attributes, {
+  // Phase 24 (req 1) — r-html intercept. Vue's `v-html` is an ATTRIBUTE
+  // directive (NOT element-content like Svelte/Lit). We must compute the
+  // r-html expression AND strip the `r-html` binding from the attribute set
+  // BEFORE `emitMergedAttributes` runs, otherwise the literal `:r-html=`
+  // leaks into `attrText` alongside the new `v-html=` (Pitfall 2). Mirrors
+  // React's strip-before-emit discipline (react emitTemplateNode.ts:224).
+  const rHtml = findRHtml(node.attributes);
+  const effectiveAttributes = rHtml
+    ? node.attributes.filter(
+        (a) => !(a.kind === 'binding' && a.name === 'r-html'),
+      )
+    : node.attributes;
+
+  const attrText = emitMergedAttributes(effectiveAttributes, {
     ir: ctx.ir,
     registry: ctx.registry,
     // WR-03 (12-REVIEW) — thread the host element's tag name + diagnostics
@@ -321,6 +335,23 @@ function emitElementWithExtraDirective(
 
   const partsHead: string[] = [];
   if (extraDirective) partsHead.push(extraDirective);
+  // Phase 24 (req 1) — r-html → `v-html="<expr>"` attribute directive. Emit
+  // BEFORE the other attributes so the directive leads the head (mirrors the
+  // RESEARCH "emit forms" reference). The `r-html` binding was stripped from
+  // the attribute set above, so it can no longer leak into `attrText`.
+  if (rHtml) {
+    if (node.children.length > 0) {
+      ctx.diagnostics.push({
+        code: RozieErrorCode.TARGET_VUE_RHTML_WITH_CHILDREN,
+        severity: 'error',
+        message:
+          'r-html cannot coexist with template children on the same element. Move r-html to a child element or remove the children.',
+        loc: node.sourceLoc,
+      });
+    }
+    const htmlExpr = rewriteTemplateExpression(rHtml.expression, ctx.ir);
+    partsHead.push(`v-html="${htmlExpr}"`);
+  }
   if (attrText) partsHead.push(attrText);
   if (eventText) partsHead.push(eventText);
   for (const sp of spreadTexts) partsHead.push(sp);

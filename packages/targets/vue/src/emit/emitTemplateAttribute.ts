@@ -753,3 +753,22 @@ export function emitMergedAttributes(
 
   return out.join(' ');
 }
+
+/**
+ * Detect whether the element has an `r-html` attribute (used by
+ * emitTemplateNode to emit a `v-html="<expr>"` attribute directive + raise
+ * ROZ421 if children coexist). Mirror of Svelte's `findRHtml`
+ * (emitTemplateAttribute.ts:965-975); the returned `{ expression }` shape is
+ * what the Vue emit branch consumes.
+ */
+export function findRHtml(
+  attrs: AttributeBinding[],
+): { expression: t.Expression } | null {
+  for (const a of attrs) {
+    // Phase 14 — `spreadBinding` is the name-less kind; skip before `.name`.
+    if (a.kind === 'spreadBinding') continue;
+    if (a.name !== 'r-html') continue;
+    if (a.kind === 'binding') return { expression: a.expression };
+  }
+  return null;
+}
