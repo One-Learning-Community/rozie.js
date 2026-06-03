@@ -12,10 +12,10 @@
  * Plan 04-05 — React branch (D-58):
  *   - Suffix `.rozie.tsx` for the JSX shell (vite-plugin-react picks it up
  *     by extension).
- *   - Sibling `Foo.rozie.module.css` and `Foo.rozie.global.css` virtual ids
- *     for the styles produced by emitStyle (Vite's CSS-Modules pipeline
- *     hashes the `.module.css` form by extension — see 04-05-SPIKE.md
- *     Path 2).
+ *   - Sibling `Foo.rozie.css` (plain scoped CSS) and `Foo.rozie.global.css`
+ *     virtual ids for the styles produced by emitStyle (Phase 25: plain
+ *     attribute-scoped `.css`, NOT CSS Modules — isolation is the
+ *     `[data-rozie-s-<hash>]` selector, not class hashing).
  *   - `enforce: 'pre'` keeps @rozie/unplugin running BEFORE plugin-react /
  *     plugin-react-swc / plugin-vue (D-58 / D-25 plugin-chain ordering).
  *
@@ -326,8 +326,11 @@ export const unplugin = createUnpluginV3<Partial<RozieOptions>>((rawOptions) => 
           // Solid emits styles inline, Pitfall 3).
           candidates = [file + '.tsx'];
         } else {
-          // react
-          candidates = [file + '.tsx', file + '.module.css', file + '.global.css'];
+          // react — Phase 25: scoped CSS virtual id is plain `.rozie.css`
+          // (VIRTUAL_SUFFIX_REACT_CSS), no longer `.rozie.module.css`. The HMR
+          // invalidation candidate MUST match the registered virtual id or a
+          // `<style>` edit silently fails to hot-reload in Vite dev.
+          candidates = [file + '.tsx', file + '.css', file + '.global.css'];
         }
         // biome-ignore lint/suspicious/noExplicitAny: ModuleNode type from vite
         const mods: any[] = candidates
