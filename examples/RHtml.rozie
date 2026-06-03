@@ -1,0 +1,33 @@
+<!--
+  RHtml.rozie
+
+  Minimal r-html fixture (Phase 24 D-11). A single String prop is rendered raw
+  via `r-html`, exercising each target's raw-HTML sink in ONE source:
+    - React  dangerouslySetInnerHTML
+    - Vue    v-html
+    - Svelte {@html …}
+    - Angular [innerHTML] (runtime-sanitized)
+    - Solid  innerHTML
+    - Lit    ${unsafeHTML(…)}
+
+  The `content` default is non-empty static HTML so the VR cell renders without a
+  Demo wrapper. The r-html element has NO children (children trip ROZ421/ROZ833).
+-->
+
+<rozie name="RHtml">
+
+<props>
+{
+  content: { type: String, default: '<strong>safe</strong>' },
+}
+</props>
+
+<template>
+<div class="rhtml" r-html="$props.content"></div>
+</template>
+
+<style>
+.rhtml { font: 1rem/1.4 system-ui; }
+</style>
+
+</rozie>

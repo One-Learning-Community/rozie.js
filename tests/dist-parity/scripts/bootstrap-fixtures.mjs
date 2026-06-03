@@ -174,6 +174,11 @@ const EXAMPLES = [
   // ExposeProbe.* fixtures — every non-$expose fixture stays byte-for-byte
   // unchanged. Single-file; composes nothing — stays OUT of RESOLVER_ROOT.
   'ExposeProbe',
+  // Phase 24 (security-self-test-battery) D-11 — the single r-html enabling
+  // fixture. One String `content` prop rendered raw via `r-html`; the committed
+  // per-target bytes are the corpus the Plan-04 security batteries scan. Single
+  // file; no sibling .rozie producers — stays OUT of RESOLVER_ROOT.
+  'RHtml',
 ];
 
 // Phase 23 (angular-cva-forms-integration) — per-fixture Angular CVA opt-out.

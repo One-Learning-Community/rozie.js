@@ -137,6 +137,13 @@ const EXAMPLES = [
   // is the suppressed-CVA shape and the off-state byte-equality block below
   // asserts it byte-identical across all four entrypoints.
   'CvaOffState',
+  // Phase 24 (security-self-test-battery) D-11 — the single r-html enabling
+  // fixture. One String `content` prop rendered raw via `r-html` exercises every
+  // target's raw-HTML sink (React dangerouslySetInnerHTML, Vue v-html, Svelte
+  // {@html}, Angular [innerHTML], Solid innerHTML, Lit ${unsafeHTML(...)}) from
+  // ONE source. The committed bytes are the corpus the Plan-04 security batteries
+  // scan. Single-file; no sibling .rozie producers — stays OUT of RESOLVER_ROOT.
+  'RHtml',
 ] as const;
 
 // Phase 07.2 Plan 06 — siblings ModalConsumer reaches via `<components>`.
