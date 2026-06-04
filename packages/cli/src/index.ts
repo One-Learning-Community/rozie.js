@@ -41,6 +41,14 @@ interface BuildCliOpts {
    * Maps to `compile({ angular: { cva: false } })` when false.
    */
   cva?: boolean;
+  /**
+   * Phase 26 (D-11) — the GLOBAL safe-interpolation opt-out. Commander's
+   * `--no-safe-interpolation` inverted boolean: present on argv →
+   * `opts.safeInterpolation === false`; absent → `true` (default ON). Maps to
+   * `compile({ safeInterpolation: false })` when false (cross-target — applies
+   * to the five non-Vue targets).
+   */
+  safeInterpolation?: boolean;
 }
 
 /**
@@ -98,6 +106,14 @@ export async function runCli(argv: readonly string[]): Promise<void> {
       '--no-cva',
       'Angular-only: suppress the auto ControlValueAccessor emit on single-model components (no-op for other targets)',
     )
+    // Phase 26 — GLOBAL opt-out for the safe-interpolation wrap (default ON).
+    // --no-safe-interpolation → opts.safeInterpolation === false →
+    // compile({ safeInterpolation: false }). Commander auto-creates the
+    // inverted boolean from the `--no-` prefix. No-op for the Vue target.
+    .option(
+      '--no-safe-interpolation',
+      'suppress the safe-interpolation rozieDisplay wrap (raw per-target emit; re-exposes the React object-child crash if a non-primitive is interpolated; no-op for Vue)',
+    )
     .action(async (inputs: string[], opts: BuildCliOpts) => {
       const ext: BuildOptionsExt = {
         target: opts.target,
@@ -106,6 +122,7 @@ export async function runCli(argv: readonly string[]): Promise<void> {
         ...(opts.types === false ? { types: false } : {}),
         ...(opts.pretty === true ? { pretty: true } : {}),
         ...(opts.cva === false ? { cva: false } : {}),
+        ...(opts.safeInterpolation === false ? { safeInterpolation: false } : {}),
       };
       await runBuildMatrix(inputs, ext);
     });
@@ -146,6 +163,11 @@ export async function runCli(argv: readonly string[]): Promise<void> {
       '--no-cva',
       'Angular-only: suppress the auto ControlValueAccessor emit on single-model components (no-op for other targets)',
     )
+    // Phase 26 — GLOBAL safe-interpolation opt-out, mirrors `rozie build`.
+    .option(
+      '--no-safe-interpolation',
+      'suppress the safe-interpolation rozieDisplay wrap (raw per-target emit; re-exposes the React object-child crash if a non-primitive is interpolated; no-op for Vue)',
+    )
     .action(async (inputs: string[], opts: BuildCliOpts) => {
       const ext: WatchOptions = {
         target: opts.target,
@@ -154,6 +176,7 @@ export async function runCli(argv: readonly string[]): Promise<void> {
         ...(opts.types === false ? { types: false } : {}),
         ...(opts.pretty === true ? { pretty: true } : {}),
         ...(opts.cva === false ? { cva: false } : {}),
+        ...(opts.safeInterpolation === false ? { safeInterpolation: false } : {}),
       };
       await runWatch(inputs, ext);
     });

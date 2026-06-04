@@ -458,6 +458,11 @@ export function createLoadHook(
   // Phase 23 — Angular CVA opt-out forwarded into the Vite-runtime fallback
   // pipeline. Defaults undefined → emitter default-ON (byte-identical when omitted).
   cva?: boolean,
+  // Phase 26 (D-11) — GLOBAL safe-interpolation opt-out forwarded into the five
+  // non-Vue pipelines' lowerToIR call. Defaults undefined → lowerer default-ON
+  // (`?? true`), byte-identical when omitted. No-op for the Vue target (Vue is
+  // never wrapped).
+  safeInterpolation?: boolean,
 ) {
   if (target === 'angular') {
     return function loadAngular(
@@ -481,7 +486,7 @@ export function createLoadHook(
       const filePath = id.slice(0, -'.ts'.length);
       if (!existsSync(filePath)) return null;
       const source = readFileSync(filePath, 'utf8');
-      return runAngularPipeline.call(this, source, filePath, registry, cva);
+      return runAngularPipeline.call(this, source, filePath, registry, cva, safeInterpolation);
     };
   }
   if (target === 'svelte') {
@@ -493,7 +498,7 @@ export function createLoadHook(
       // Strip `.svelte` only — leaves `.rozie`.
       const filePath = id.slice(0, -'.svelte'.length);
       const source = readFileSync(filePath, 'utf8');
-      return runSveltePipeline.call(this, source, filePath, registry);
+      return runSveltePipeline.call(this, source, filePath, registry, safeInterpolation);
     };
   }
   if (target === 'solid') {
@@ -505,7 +510,7 @@ export function createLoadHook(
       // Strip `.tsx` only — leaves `.rozie`.
       const filePath = id.slice(0, -'.tsx'.length);
       const source = readFileSync(filePath, 'utf8');
-      return runSolidPipeline.call(this, source, filePath, registry);
+      return runSolidPipeline.call(this, source, filePath, registry, safeInterpolation);
     };
   }
   if (target === 'lit') {
@@ -517,7 +522,7 @@ export function createLoadHook(
       // Strip `.ts` only — leaves `.rozie`.
       const filePath = id.slice(0, -'.ts'.length);
       const source = readFileSync(filePath, 'utf8');
-      return runLitPipeline.call(this, source, filePath, registry);
+      return runLitPipeline.call(this, source, filePath, registry, safeInterpolation);
     };
   }
   if (target === 'react') {
@@ -543,7 +548,7 @@ export function createLoadHook(
       if (bareId.endsWith(VIRTUAL_SUFFIX_REACT_GLOBAL_CSS)) {
         const filePath = bareId.slice(0, -VIRTUAL_SUFFIX_REACT_GLOBAL_CSS.length) + '.rozie';
         const source = readFileSync(filePath, 'utf8');
-        const result = runReactPipeline.call(this, source, filePath, registry);
+        const result = runReactPipeline.call(this, source, filePath, registry, safeInterpolation);
         // No :root rules → return null so Vite emits no module (empty file
         // would cause an unnecessary import-side-effect noop).
         if (result.globalCss === undefined || result.globalCss === '') return null;
@@ -556,7 +561,7 @@ export function createLoadHook(
       if (bareId.endsWith(VIRTUAL_SUFFIX_REACT_CSS)) {
         const filePath = bareId.slice(0, -VIRTUAL_SUFFIX_REACT_CSS.length) + '.rozie';
         const source = readFileSync(filePath, 'utf8');
-        const result = runReactPipeline.call(this, source, filePath, registry);
+        const result = runReactPipeline.call(this, source, filePath, registry, safeInterpolation);
         return { code: result.css, map: null };
       }
       // .tsx shell — also handles ?style=module / ?style=global query forms
@@ -564,7 +569,7 @@ export function createLoadHook(
       if (bareId.endsWith(VIRTUAL_SUFFIX_REACT)) {
         const filePath = bareId.slice(0, -'.tsx'.length); // strip `.tsx` only — leaves `.rozie`
         const source = readFileSync(filePath, 'utf8');
-        const result = runReactPipeline.call(this, source, filePath, registry);
+        const result = runReactPipeline.call(this, source, filePath, registry, safeInterpolation);
         if (queryStyle === 'module') {
           return { code: result.css, map: null };
         }
@@ -601,6 +606,9 @@ export function createTransformHook(
   // Phase 23 — Angular CVA opt-out forwarded into the request-time transform
   // pipeline. Defaults undefined → emitter default-ON (byte-identical when omitted).
   cva?: boolean,
+  // Phase 26 (D-11) — GLOBAL safe-interpolation opt-out forwarded into the five
+  // non-Vue pipelines' lowerToIR call. Defaults undefined → lowerer default-ON.
+  safeInterpolation?: boolean,
 ) {
   if (target === 'angular') {
     return function transformAngular(
@@ -608,7 +616,7 @@ export function createTransformHook(
       code: string,
       id: string,
     ): { code: string; map: EmitAngularResult['map'] } | null {
-      return runAngularPipeline.call(this, code, id, registry, cva);
+      return runAngularPipeline.call(this, code, id, registry, cva, safeInterpolation);
     };
   }
   if (target === 'svelte') {
@@ -617,7 +625,7 @@ export function createTransformHook(
       code: string,
       id: string,
     ): { code: string; map: EmitSvelteResult['map'] } | null {
-      return runSveltePipeline.call(this, code, id, registry);
+      return runSveltePipeline.call(this, code, id, registry, safeInterpolation);
     };
   }
   if (target === 'solid') {
@@ -626,7 +634,7 @@ export function createTransformHook(
       code: string,
       id: string,
     ): { code: string; map: EmitSolidResult['map'] } | null {
-      return runSolidPipeline.call(this, code, id, registry);
+      return runSolidPipeline.call(this, code, id, registry, safeInterpolation);
     };
   }
   if (target === 'lit') {
@@ -635,7 +643,7 @@ export function createTransformHook(
       code: string,
       id: string,
     ): { code: string; map: EmitLitResult['map'] } | null {
-      return runLitPipeline.call(this, code, id, registry);
+      return runLitPipeline.call(this, code, id, registry, safeInterpolation);
     };
   }
   if (target === 'react') {
@@ -644,7 +652,7 @@ export function createTransformHook(
       code: string,
       id: string,
     ): { code: string; map: EmitReactResult['map'] } | null {
-      const result = runReactPipeline.call(this, code, id, registry);
+      const result = runReactPipeline.call(this, code, id, registry, safeInterpolation);
       return { code: result.code, map: result.map };
     };
   }
@@ -810,6 +818,11 @@ function runReactPipeline(
   source: string,
   filePath: string,
   registry: ModifierRegistry,
+  // Phase 26 (D-11) — the GLOBAL safe-interpolation opt-out. Defaults undefined
+  // so the lowerer's effective-flag default (`?? true`) is exercised when
+  // omitted (direct callers / tests stay byte-identical). Conditional-spread
+  // into lowerToIR — NEVER pass `safeInterpolation: undefined`.
+  safeInterpolation?: boolean,
 ): EmitReactResult {
   this?.addWatchFile?.(filePath);
   // 1. parse
@@ -819,7 +832,10 @@ function runReactPipeline(
   }
 
   // 2. lowerToIR
-  const { ir, diagnostics: irDiags } = lowerToIR(ast, { modifierRegistry: registry });
+  const { ir, diagnostics: irDiags } = lowerToIR(ast, {
+    modifierRegistry: registry,
+    ...(safeInterpolation !== undefined ? { safeInterpolation } : {}),
+  });
   const warnings: Diagnostic[] = [
     ...parseDiags.filter((d) => d.severity === 'warning'),
     ...irDiags.filter((d) => d.severity === 'warning'),
@@ -878,6 +894,8 @@ function runSveltePipeline(
   source: string,
   filePath: string,
   registry: ModifierRegistry,
+  // Phase 26 (D-11) — GLOBAL safe-interpolation opt-out (see runReactPipeline).
+  safeInterpolation?: boolean,
 ): { code: string; map: EmitSvelteResult['map'] } {
   this?.addWatchFile?.(filePath);
   // 1. parse
@@ -887,7 +905,10 @@ function runSveltePipeline(
   }
 
   // 2. lowerToIR
-  const { ir, diagnostics: irDiags } = lowerToIR(ast, { modifierRegistry: registry });
+  const { ir, diagnostics: irDiags } = lowerToIR(ast, {
+    modifierRegistry: registry,
+    ...(safeInterpolation !== undefined ? { safeInterpolation } : {}),
+  });
   const warnings: Diagnostic[] = [
     ...parseDiags.filter((d) => d.severity === 'warning'),
     ...irDiags.filter((d) => d.severity === 'warning'),
@@ -948,6 +969,8 @@ function runSolidPipeline(
   source: string,
   filePath: string,
   registry: ModifierRegistry,
+  // Phase 26 (D-11) — GLOBAL safe-interpolation opt-out (see runReactPipeline).
+  safeInterpolation?: boolean,
 ): { code: string; map: EmitSolidResult['map'] } {
   this?.addWatchFile?.(filePath);
   // 1. parse
@@ -957,7 +980,10 @@ function runSolidPipeline(
   }
 
   // 2. lowerToIR
-  const { ir, diagnostics: irDiags } = lowerToIR(ast, { modifierRegistry: registry });
+  const { ir, diagnostics: irDiags } = lowerToIR(ast, {
+    modifierRegistry: registry,
+    ...(safeInterpolation !== undefined ? { safeInterpolation } : {}),
+  });
   const warnings: Diagnostic[] = [
     ...parseDiags.filter((d) => d.severity === 'warning'),
     ...irDiags.filter((d) => d.severity === 'warning'),
@@ -1017,6 +1043,8 @@ function runLitPipeline(
   source: string,
   filePath: string,
   registry: ModifierRegistry,
+  // Phase 26 (D-11) — GLOBAL safe-interpolation opt-out (see runReactPipeline).
+  safeInterpolation?: boolean,
 ): { code: string; map: EmitLitResult['map'] } {
   this?.addWatchFile?.(filePath);
   // 1. parse
@@ -1026,7 +1054,10 @@ function runLitPipeline(
   }
 
   // 2. lowerToIR
-  const { ir, diagnostics: irDiags } = lowerToIR(ast, { modifierRegistry: registry });
+  const { ir, diagnostics: irDiags } = lowerToIR(ast, {
+    modifierRegistry: registry,
+    ...(safeInterpolation !== undefined ? { safeInterpolation } : {}),
+  });
   const warnings: Diagnostic[] = [
     ...parseDiags.filter((d) => d.severity === 'warning'),
     ...irDiags.filter((d) => d.severity === 'warning'),
@@ -1096,6 +1127,9 @@ function runAngularPipeline(
   // disk-prebuild leg (runAngularEmitForDisk) so the two legs cannot diverge
   // (Pitfall 2).
   cva?: boolean,
+  // Phase 26 (D-11) — GLOBAL safe-interpolation opt-out (see runReactPipeline).
+  // Threaded into lowerToIR; INDEPENDENT of `cva` (which is an emitter option).
+  safeInterpolation?: boolean,
 ): { code: string; map: EmitAngularResult['map'] } {
   this?.addWatchFile?.(filePath);
   // 1. parse
@@ -1105,7 +1139,10 @@ function runAngularPipeline(
   }
 
   // 2. lowerToIR
-  const { ir, diagnostics: irDiags } = lowerToIR(ast, { modifierRegistry: registry });
+  const { ir, diagnostics: irDiags } = lowerToIR(ast, {
+    modifierRegistry: registry,
+    ...(safeInterpolation !== undefined ? { safeInterpolation } : {}),
+  });
   const warnings: Diagnostic[] = [
     ...parseDiags.filter((d) => d.severity === 'warning'),
     ...irDiags.filter((d) => d.severity === 'warning'),

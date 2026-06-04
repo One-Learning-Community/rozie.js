@@ -60,6 +60,12 @@ export interface WatchOptions {
    * Mirrors the `rozie build` flag. No-op for non-Angular targets.
    */
   cva?: boolean;
+  /**
+   * Phase 26 (D-11) — the GLOBAL safe-interpolation opt-out. Default ON;
+   * `false` maps to `compile({ safeInterpolation: false })`. Mirrors the
+   * `rozie build` flag. No-op for the Vue target.
+   */
+  safeInterpolation?: boolean;
 }
 
 export interface RunWatchContext {
@@ -142,6 +148,7 @@ export async function runWatch(
   const wantSourceMap = opts.sourceMap === true;
   const wantPretty = opts.pretty === true;
   const cvaOff = opts.cva === false; // Phase 23 — Angular CVA opt-out
+  const safeInterpOff = opts.safeInterpolation === false; // Phase 26 — opt-out
 
   // ----- Initial expansion + build -------------------------------------
   let inputs: string[];
@@ -159,7 +166,7 @@ export async function runWatch(
   }
 
   for (const input of inputs) {
-    await compileOne(input, targets, outDir, rootDir, wantTypes, wantSourceMap, wantPretty, cvaOff, stderrWrite, stdoutWrite);
+    await compileOne(input, targets, outDir, rootDir, wantTypes, wantSourceMap, wantPretty, cvaOff, safeInterpOff, stderrWrite, stdoutWrite);
   }
 
   stdoutWrite(
@@ -194,7 +201,7 @@ export async function runWatch(
   const onUpsert = async (changedPath: string): Promise<void> => {
     if (!changedPath.endsWith('.rozie')) return;
     const abs = pathResolve(changedPath);
-    await compileOne(abs, targets, outDir, rootDir, wantTypes, wantSourceMap, wantPretty, cvaOff, stderrWrite, stdoutWrite);
+    await compileOne(abs, targets, outDir, rootDir, wantTypes, wantSourceMap, wantPretty, cvaOff, safeInterpOff, stderrWrite, stdoutWrite);
   };
 
   watcher.on('add', onUpsert);
@@ -252,6 +259,7 @@ async function compileOne(
   wantSourceMap: boolean,
   wantPretty: boolean,
   cvaOff: boolean,
+  safeInterpOff: boolean,
   stderrWrite: (s: string) => void,
   stdoutWrite: (s: string) => void,
 ): Promise<void> {
@@ -294,6 +302,9 @@ async function compileOne(
         // Phase 23 — attach the `angular` namespace only on opt-out, so the
         // default-ON path stays byte-identical to unplugin/babel-plugin.
         ...(cvaOff ? { angular: { cva: false } } : {}),
+        // Phase 26 (D-11) — attach `safeInterpolation` only on opt-out, so the
+        // default-ON path stays byte-identical (dist-parity).
+        ...(safeInterpOff ? { safeInterpolation: false } : {}),
       });
 
       const errors = result.diagnostics.filter((d) => d.severity === 'error');

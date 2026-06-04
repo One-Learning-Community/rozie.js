@@ -97,7 +97,15 @@ export const unplugin = createUnpluginV3<Partial<RozieOptions>>((rawOptions) => 
   // Phase 23 — thread the Angular CVA opt-out into the Vite-runtime load path.
   // `options.angular?.cva` is undefined when the consumer omits the namespace,
   // which exercises the emitter default-ON path byte-identically to compile().
-  const load = createLoadHook(registry, options.target, options.angular?.cva);
+  // Phase 26 (D-11) — also thread the GLOBAL safe-interpolation opt-out.
+  // `options.safeInterpolation` is undefined when the consumer omits it, which
+  // exercises the lowerer's default-ON path byte-identically to compile().
+  const load = createLoadHook(
+    registry,
+    options.target,
+    options.angular?.cva,
+    options.safeInterpolation,
+  );
 
   // Captured by the Vite adapter's configResolved (the only adapter with a
   // first-class project-root concept). The shared buildStart sidecar walk

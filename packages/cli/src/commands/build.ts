@@ -83,6 +83,15 @@ export interface BuildOptionsExt {
    * default-ON path (dist-parity contract). No-op for non-Angular targets.
    */
   cva?: boolean;
+  /**
+   * Phase 26 (D-11) — the GLOBAL safe-interpolation opt-out. Default ON
+   * (undefined/true): non-provably-primitive interpolations are wrapped in the
+   * injected `rozieDisplay` helper on the five non-Vue targets. `false` maps to
+   * `compile({ safeInterpolation: false })` and reverts to raw per-target emit.
+   * Omitting it entirely exercises the lowerer-side `?? true` default —
+   * byte-identical to the unplugin/babel-plugin default-ON path. No-op for Vue.
+   */
+  safeInterpolation?: boolean;
 }
 
 /**
@@ -247,6 +256,10 @@ export async function runBuildMatrix(
         // `opts.cva ?? true` default-ON path, keeping the CLI byte-identical
         // to unplugin/babel-plugin when --no-cva is absent.
         ...(opts.cva === false ? { angular: { cva: false } } : {}),
+        // Phase 26 (D-11) — only attach `safeInterpolation` when the user opted
+        // OUT (--no-safe-interpolation → false). Omitting it preserves the
+        // lowerer-side `?? true` default-ON path (dist-parity byte-identity).
+        ...(opts.safeInterpolation === false ? { safeInterpolation: false } : {}),
       };
       const result = compile(source, compileOpts);
       return { input, target, source, result };

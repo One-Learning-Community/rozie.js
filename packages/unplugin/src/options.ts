@@ -77,6 +77,24 @@ export interface RozieOptions {
    * @experimental
    */
   angular?: { cva?: boolean };
+  /**
+   * Phase 26 (D-11) — the GLOBAL, cross-target safe-interpolation opt-out.
+   * Mirrors `CompileOptions.safeInterpolation` in @rozie/core so unplugin and
+   * compile() expose an identical surface. Default ON: non-provably-primitive
+   * interpolations are wrapped in the injected `rozieDisplay` helper on the five
+   * non-Vue targets (Vue is untouched). When `false`, interpolation reverts to
+   * RAW per-target emit (re-exposes React's object-child crash if a non-primitive
+   * is interpolated — the author's informed choice). OMITTING this is byte-identical
+   * to compile()/CLI omitting it (dist-parity). The shape is validated at
+   * factory-call time (ROZ405-style) — a non-boolean value throws a code-bearing
+   * Error BEFORE any Vite hook runs. The per-component `<rozie safe-interpolation>`
+   * envelope attribute wins over this global. ROZ978 is unaffected (always-on).
+   *
+   * No-op for the `vue` target.
+   *
+   * @experimental
+   */
+  safeInterpolation?: boolean;
 }
 
 export type TargetValue = RozieOptions['target'];
@@ -174,6 +192,18 @@ export function validateOptions(options: Partial<RozieOptions> | undefined): Roz
     }
   }
 
+  // Phase 26 (D-11) — validate the flat top-level `safeInterpolation` opt-out at
+  // factory-call time (T-26-06-OPTINJECT, mirror the angular.cva check above): a
+  // non-boolean value throws a code-bearing ROZ405 BEFORE any Vite hook runs. A
+  // valid or absent value is preserved through via conditional-spread so omission
+  // stays byte-identical to compile().
+  if (options.safeInterpolation !== undefined && typeof options.safeInterpolation !== 'boolean') {
+    throw rozieError(
+      RozieErrorCode.UNPLUGIN_ANGULAR_OPTIONS_INVALID,
+      `The 'safeInterpolation' option must be a boolean (received ${typeof options.safeInterpolation}). Use { safeInterpolation: false } to opt out of the safe-interpolation wrap on the five non-Vue targets.`,
+    );
+  }
+
   // Quick task 260515-1y4: preserve prebuildExtraRoots through validation.
   // Shape is intentionally NOT validated here — runtime safety lives in
   // emitRozieTsToDisk's trust-boundary check. Pass-through only.
@@ -182,6 +212,9 @@ export function validateOptions(options: Partial<RozieOptions> | undefined): Roz
     target,
     ...(options.prebuildExtraRoots ? { prebuildExtraRoots: options.prebuildExtraRoots } : {}),
     ...(options.angular !== undefined ? { angular: options.angular } : {}),
+    ...(options.safeInterpolation !== undefined
+      ? { safeInterpolation: options.safeInterpolation }
+      : {}),
   };
 }
 

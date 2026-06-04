@@ -97,6 +97,21 @@ export interface CompileOptions {
   /** Default true. Set false to drop the SourceMap (emitter still pays the compute cost in v1 — Pitfall 6). */
   sourceMap?: boolean;
   /**
+   * Phase 26 (D-11) — the GLOBAL, cross-target safe-interpolation opt-out.
+   * Default ON. When `true` (or omitted), non-provably-primitive `{{ }}`,
+   * `:attr`, and class interpolations are wrapped in the injected `rozieDisplay`
+   * helper on the five non-Vue targets so a plain object/array renders identical
+   * JSON everywhere (avoiding React's "Objects are not valid as a React child"
+   * crash and the `[object Object]` divergence). When `false`, interpolation
+   * reverts to RAW per-target emit (pre-phase behavior — re-exposes that crash if
+   * a non-primitive is interpolated; the author's informed choice). Threaded into
+   * `lowerToIR` via conditional-spread so OMITTING it is byte-identical to today.
+   * Per-component override: the `<rozie safe-interpolation="…">` envelope attribute
+   * wins over this global (force-OFF or force-ON). The bare-sigil diagnostic
+   * (ROZ978) is unaffected — it is always-on (D-14).
+   */
+  safeInterpolation?: boolean;
+  /**
    * Phase 07.2 D-01 — optional pre-built per-compiler-instance IR cache. When
    * omitted, `compile()` builds a fresh per-call instance. Pass a shared cache
    * across multiple `compile()` calls (e.g., from `@rozie/unplugin`) to
@@ -249,7 +264,18 @@ export function compile(source: string, opts: CompileOptions): CompileResult {
   }
 
   // 2. lowerToIR
-  const { ir, diagnostics: irDiags } = lowerToIR(ast, { modifierRegistry: registry });
+  // Phase 26 (D-11) — thread the GLOBAL `safeInterpolation` opt-out into the
+  // lowerer via conditional-spread (mirror the `angular.cva` spread below) so
+  // OMITTING the option passes nothing → the lowerer's effective-flag default
+  // (`?? true`) keeps dist-parity byte-identical to today. The per-component
+  // `<rozie safe-interpolation="…">` envelope attr (captured by the splitter,
+  // Plan 06) wins over this in lower.ts. NEVER pass `safeInterpolation: undefined`.
+  const { ir, diagnostics: irDiags } = lowerToIR(ast, {
+    modifierRegistry: registry,
+    ...(opts.safeInterpolation !== undefined
+      ? { safeInterpolation: opts.safeInterpolation }
+      : {}),
+  });
   const acc: Diagnostic[] = [...parseDiags, ...irDiags];
   // Phase 07.3 Plan 02 — defer the irDiags-error gate until AFTER validators
   // run. lowerToIR may have surfaced an error (e.g. ROZ920 unknown component),
