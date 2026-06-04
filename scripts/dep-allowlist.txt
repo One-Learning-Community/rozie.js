@@ -1366,6 +1366,7 @@ strip-final-newline
 strip-indent
 strip-json-comments
 style-mod
+style-to-js
 style-to-object
 styled-jsx
 superjson
