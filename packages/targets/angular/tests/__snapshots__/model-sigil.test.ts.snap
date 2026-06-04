@@ -4,12 +4,19 @@ exports[`Angular $model producer-side two-way-write sigil > emitted model fixtur
 "import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, effect, forwardRef, inject, model, signal, viewChild } from '@angular/core';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
 
+function __rozieDisplay(v: unknown): string {
+  if (v == null) return '';
+  if (typeof v === 'string') return v;
+  if (typeof v === 'object') return JSON.stringify(v, null, 2);
+  return String(v);
+}
+
 @Component({
   selector: 'rozie-model-sigil',
   standalone: true,
   template: \`
 
-      <button [title]="__title" #rozieSpread_0 (click)="value.set(value() + 1), __rozieCvaOnChange(value() + 1)" #rozieListenersTarget_1>{{ value() }}</button>
+      <button [title]="rozieDisplay(__title)" #rozieSpread_0 (click)="value.set(value() + 1), __rozieCvaOnChange(value() + 1)" #rozieListenersTarget_1>{{ value() }}</button>
 
   \`,
   providers: [
@@ -201,6 +208,8 @@ export class ModelSigil {
       });
     }
   });
+
+  rozieDisplay(v: unknown): string { return __rozieDisplay(v); }
 }
 
 export default ModelSigil;

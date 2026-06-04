@@ -17,6 +17,13 @@ interface DefaultCtx {
 
 interface EmptyCtx {}
 
+function __rozieDisplay(v: unknown): string {
+  if (v == null) return '';
+  if (typeof v === 'string') return v;
+  if (typeof v === 'object') return JSON.stringify(v, null, 2);
+  return String(v);
+}
+
 @Component({
   selector: 'rozie-todo-list',
   standalone: true,
@@ -30,7 +37,7 @@ interface EmptyCtx {}
     } @else {
 
           
-          <h3>{{ title() }} ({{ remaining() }} remaining)</h3>
+          <h3>{{ title() }} ({{ rozieDisplay(remaining()) }} remaining)</h3>
         
     }
       </header>
@@ -49,7 +56,7 @@ interface EmptyCtx {}
     <ng-container *ngTemplateOutlet="(defaultTpl ?? templates()?.['defaultSlot']); context: _defaultSlot_ctx_3(item)" />
     } @else {
 
-            <label><input type="checkbox" [checked]="item.done" (change)="_toggle(item.id)" /><span>{{ item.text }}</span></label>
+            <label><input type="checkbox" [checked]="item.done" (change)="_toggle(item.id)" /><span>{{ rozieDisplay(item.text) }}</span></label>
             <button aria-label="Remove" (click)="removeItem(item.id)">×</button>
           
     }
@@ -285,6 +292,8 @@ export class TodoList {
   };
 
   private _defaultSlot_ctx_3 = (item: any) => ({ $implicit: { item: item, toggle: () => this._toggle(item.id), remove: () => this.removeItem(item.id) }, item: item, toggle: () => this._toggle(item.id), remove: () => this.removeItem(item.id) });
+
+  rozieDisplay(v: unknown): string { return __rozieDisplay(v); }
 }
 
 export default TodoList;

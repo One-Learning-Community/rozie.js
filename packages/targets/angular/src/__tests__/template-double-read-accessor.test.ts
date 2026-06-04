@@ -93,8 +93,13 @@ describe('Angular template double-read accessor — Uppy :accept', () => {
     const { code } = emitAngular(ir, { filename, source: src });
     const template = templateOf(code);
 
-    // Attribute now binds to the getter, not an inline ternary.
-    expect(template).toContain('[accept]="__accept"');
+    // Attribute now binds to the getter, not an inline ternary. Phase 26
+    // (SPEC-4): `accept` is an Array-typed (`any` element) ternary value, not
+    // provably primitive, so the binding additionally wraps the getter read in
+    // the synthesized `rozieDisplay` class method — matching React's landed
+    // `accept={rozieDisplay(...)}` cross-target behavior. The double-read
+    // getter hoist (`__accept`) is unaffected; the wrap composes over it.
+    expect(template).toContain('[accept]="rozieDisplay(__accept)"');
 
     // The getter exists, reads the signal exactly once into a local, and
     // performs the guard-and-use against the narrowed local.

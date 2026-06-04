@@ -6,7 +6,7 @@
 } @else {
 
       
-      <h3>{{ title() }} ({{ remaining() }} remaining)</h3>
+      <h3>{{ title() }} ({{ rozieDisplay(remaining()) }} remaining)</h3>
     
 }
   </header>
@@ -25,7 +25,7 @@
 <ng-container *ngTemplateOutlet="(defaultTpl ?? templates()?.['defaultSlot']); context: _defaultSlot_ctx_3(item)" />
 } @else {
 
-        <label><input type="checkbox" [checked]="item.done" (change)="toggle(item.id)" /><span>{{ item.text }}</span></label>
+        <label><input type="checkbox" [checked]="item.done" (change)="toggle(item.id)" /><span>{{ rozieDisplay(item.text) }}</span></label>
         <button aria-label="Remove" (click)="removeItem(item.id)">×</button>
       
 }

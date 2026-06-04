@@ -158,6 +158,49 @@ export interface EmitAngularResult {
   diagnostics: Diagnostic[];
 }
 
+/**
+ * Phase 26 (SPEC-1/SPEC-2/SPEC-4, D-01/D-02 via RESEARCH Pitfall 4) — the
+ * INLINED, module-scope `rozieDisplay` helper for the Angular target.
+ *
+ * There is NO `@rozie/runtime-angular` package and project convention forbids
+ * one (`emitAngular.ts` header + `collectAngularImports`; `spreadBinding.test.ts`
+ * asserts `not.toContain('@rozie/runtime-angular')`). So unlike the other four
+ * non-Vue targets — which import `rozieDisplay` from their `@rozie/runtime-*`
+ * package — Angular emits the helper body verbatim at module scope.
+ *
+ * The body is algorithmically byte-equivalent to the runtime-package helper
+ * (`packages/runtime/{react,solid,svelte,lit}/src/rozieDisplay.ts`): null/
+ * undefined → '', string passthrough, object (incl. arrays) → 2-space JSON,
+ * else `String(v)`.
+ *
+ * Angular templates cannot call a module-scope free function (AOT resolves
+ * interpolation/binding identifiers against the COMPONENT instance), so the
+ * template never calls `__rozieDisplay` directly — it calls the delegating
+ * CLASS METHOD synthesized in `DISPLAY_CLASS_METHOD`, which forwards to this fn.
+ *
+ * Both are emitted ONLY when at least one interpolation actually wrapped
+ * (`tmplResult.hasDisplayWrap`), keeping non-wrapping components byte-identical
+ * to pre-phase (SPEC-3).
+ */
+const INLINE_DISPLAY_FN = [
+  'function __rozieDisplay(v: unknown): string {',
+  "  if (v == null) return '';",
+  "  if (typeof v === 'string') return v;",
+  "  if (typeof v === 'object') return JSON.stringify(v, null, 2);",
+  '  return String(v);',
+  '}',
+].join('\n');
+
+/**
+ * Phase 26 (D-02) — the delegating class method synthesized into the component
+ * body (via the `allFieldInjections` / classBodyParts mechanism, the same path
+ * the `$expose` methods + listener field initializers use). The template calls
+ * `rozieDisplay(expr)` against `this`; this method forwards to the inlined
+ * module-scope `__rozieDisplay`. Gated on `tmplResult.hasDisplayWrap`.
+ */
+const DISPLAY_CLASS_METHOD =
+  'rozieDisplay(v: unknown): string { return __rozieDisplay(v); }';
+
 export function emitAngular(
   ir: IRComponent,
   opts: EmitAngularOptions = {},
@@ -435,6 +478,12 @@ export function emitAngular(
     // as component members so Angular's `strictTemplates` resolves them
     // against the class instead of failing TS2339.
     ...tmplResult.usedGlobals.map((g) => `protected readonly ${g} = ${g};`),
+    // Phase 26 (D-02) — the delegating `rozieDisplay` class method, synthesized
+    // ONLY when an interpolation wrapped. The template calls it against `this`;
+    // it forwards to the inlined module-scope `__rozieDisplay` (emitted below
+    // via the interfaceDecls bucket). Both gated on the same flag so a
+    // non-wrapping component stays byte-identical to pre-phase (SPEC-3).
+    ...(tmplResult.hasDisplayWrap ? [DISPLAY_CLASS_METHOD] : []),
   ];
 
   // Find the constructor block and splice the listener effects + renderer
@@ -508,9 +557,19 @@ export function emitAngular(
       ? componentImportsLines.join('\n') + '\n'
       : '';
 
+  // Phase 26 (D-01-correction/D-02) — when any interpolation wrapped, append the
+  // inlined module-scope `function __rozieDisplay(v)` to the module-scope decls
+  // bucket (rendered above the @Component class by the shell). NO
+  // `@rozie/runtime-angular` import is emitted (the package does not exist;
+  // convention forbids it). When nothing wrapped, the bucket is unchanged so the
+  // emitted file is byte-identical to pre-phase (SPEC-3).
+  const moduleDecls = tmplResult.hasDisplayWrap
+    ? [...scriptResult.interfaceDecls, INLINE_DISPLAY_FN]
+    : scriptResult.interfaceDecls;
+
   const { ms, scriptOutputOffset, scriptMap: shellScriptMap, userCodeLineOffset } = buildShell({
     importLines: imports.render(),
-    interfaceDecls: scriptResult.interfaceDecls,
+    interfaceDecls: moduleDecls,
     decorator,
     componentName: ir.name,
     classBody,
