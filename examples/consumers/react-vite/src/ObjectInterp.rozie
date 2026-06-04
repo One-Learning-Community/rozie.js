@@ -16,8 +16,9 @@
   crash and the [object Object] divergence on Svelte/Angular/Solid/Lit). Vue
   stays raw — its native toDisplayString already JSON-prints plain Array/Object.
 
-  Downstream: Plan 07 owns dist-parity registration + the cold-gate rebless;
-  this fixture is intentionally NOT registered there here.
+  Dist-parity registration landed in Plan 07: this fixture is registered in
+  tests/dist-parity/scripts/bootstrap-fixtures.mjs + tests/dist-parity/parity.test.ts
+  and in the react-vite consumer manifest, and is covered by the cold-gate rebless.
 -->
 
 <rozie name="ObjectInterp">
