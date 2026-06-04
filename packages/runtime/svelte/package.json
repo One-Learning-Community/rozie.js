@@ -2,6 +2,7 @@
   "name": "@rozie/runtime-svelte",
   "version": "0.1.0",
   "type": "module",
+  "sideEffects": false,
   "private": false,
   "license": "MIT",
   "author": "Rozie maintainers",
