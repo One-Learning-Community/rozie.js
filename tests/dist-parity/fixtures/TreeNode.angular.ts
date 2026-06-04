@@ -1,5 +1,12 @@
 import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, effect, forwardRef, inject, input, viewChild } from '@angular/core';
 
+function __rozieDisplay(v: unknown): string {
+  if (v == null) return '';
+  if (typeof v === 'string') return v;
+  if (typeof v === 'object') return JSON.stringify(v, null, 2);
+  return String(v);
+}
+
 @Component({
   selector: 'rozie-tree-node',
   standalone: true,
@@ -7,11 +14,11 @@ import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterR
   template: `
 
     <div class="tree-node" #rozieSpread_0 #rozieListenersTarget_1>
-      <span class="tree-node__label">{{ node().label }}</span>
+      <span class="tree-node__label">{{ rozieDisplay(node().label) }}</span>
       @if (node().children && node().children.length > 0) {
     <ul class="tree-node__children">
         @for (child of node().children; track child.id; let childIndex = $index) {
-    <li [attr.data-index]="childIndex">
+    <li [attr.data-index]="rozieDisplay(childIndex)">
           <rozie-tree-node [node]="child"></rozie-tree-node>
         </li>
     }
@@ -155,6 +162,8 @@ export class TreeNode {
       });
     }
   });
+
+  rozieDisplay(v: unknown): string { return __rozieDisplay(v); }
 }
 
 export default TreeNode;

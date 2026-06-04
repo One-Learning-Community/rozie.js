@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import { rozieDisplay } from '@rozie/runtime-react';
 
 interface EventLoopVarShadowProps {}
 
@@ -20,7 +21,7 @@ export default function EventLoopVarShadow(props: EventLoopVarShadowProps): JSX.
     <>
     <ul {...attrs} data-rozie-s-a955b18d="">
       {items.map((e) => <li key={e.id} data-rozie-s-a955b18d="">
-        <span data-rozie-s-a955b18d="">{e.label}</span>
+        <span data-rozie-s-a955b18d="">{rozieDisplay(e.label)}</span>
         
         <button type="button" onClick={($event) => { removeItem(e.id); }} data-rozie-s-a955b18d="">×</button>
       </li>)}

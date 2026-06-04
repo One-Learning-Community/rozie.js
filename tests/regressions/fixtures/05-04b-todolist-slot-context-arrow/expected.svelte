@@ -1,5 +1,5 @@
 <script lang="ts">
-import { applyListeners } from '@rozie/runtime-svelte';
+import { applyListeners, rozieDisplay } from '@rozie/runtime-svelte';
 
 import type { Snippet } from 'svelte';
 
@@ -27,7 +27,7 @@ const remaining = $derived(items.filter((i: any) => !i.done).length);
   
   {#each items as item (item.id)}<li data-rozie-s-5e6c469d>
     {#if item}{@render item({ item, remaining })}{:else}
-      {item.label}
+      {rozieDisplay(item.label)}
     {/if}
   </li>{/each}
 </ul>

@@ -1,5 +1,5 @@
 <script lang="ts">
-import { applyListeners } from '@rozie/runtime-svelte';
+import { applyListeners, rozieDisplay } from '@rozie/runtime-svelte';
 
 interface Props {
   items?: any[];
@@ -12,7 +12,7 @@ const remaining = $derived(items.filter((i: any) => !i.done).length);
 </script>
 
 
-<div {...__rozieAttrs} class={["count", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-10572f51>{remaining}</div>
+<div {...__rozieAttrs} class={["count", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-10572f51>{rozieDisplay(remaining)}</div>
 
 
 <style>

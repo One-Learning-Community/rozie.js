@@ -1,11 +1,18 @@
 import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, effect, inject, signal, viewChild } from '@angular/core';
 
+function __rozieDisplay(v: unknown): string {
+  if (v == null) return '';
+  if (typeof v === 'string') return v;
+  if (typeof v === 'object') return JSON.stringify(v, null, 2);
+  return String(v);
+}
+
 @Component({
   selector: 'rozie-class-selector-probe',
   standalone: true,
   template: `
 
-    <div class="panel" [attr.data-handle]="'.panel'" [attr.data-grip]="gripSelector" #rozieSpread_0 #rozieListenersTarget_1>
+    <div class="panel" [attr.data-handle]="rozieDisplay('.panel')" [attr.data-grip]="rozieDisplay(gripSelector)" #rozieSpread_0 #rozieListenersTarget_1>
       <span class="grip" aria-hidden="true">⋮⋮</span>
       @if (ready()) {
     <span>ready</span>
@@ -157,6 +164,8 @@ export class ClassSelectorProbe {
       });
     }
   });
+
+  rozieDisplay(v: unknown): string { return __rozieDisplay(v); }
 }
 
 export default ClassSelectorProbe;

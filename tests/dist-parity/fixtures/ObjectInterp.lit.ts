@@ -2,17 +2,13 @@ import { LitElement, html } from 'lit';
 import { customElement } from 'lit/decorators.js';
 import { SignalWatcher, signal } from '@lit-labs/preact-signals';
 import { rozieDisplay, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
-import { repeat } from 'lit/directives/repeat.js';
 
-@customElement('rozie-event-loop-var-shadow')
-export default class EventLoopVarShadow extends SignalWatcher(LitElement) {
-  private _items = signal([{
-  id: 'a',
-  label: 'A'
-}, {
-  id: 'b',
-  label: 'B'
-}]);
+@customElement('rozie-object-interp')
+export default class ObjectInterp extends SignalWatcher(LitElement) {
+  private _obj = signal({
+  a: 1,
+  b: [2, 3]
+});
 
   private _disconnectCleanups: Array<() => void> = [];
 
@@ -24,19 +20,11 @@ export default class EventLoopVarShadow extends SignalWatcher(LitElement) {
 
   render() {
     return html`
-<ul ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-s-a955b18d>
-  ${repeat<any>(this._items.value, (e, _idx) => e.id, (e, _idx) => html`<li key=${rozieDisplay(e.id)} data-rozie-s-a955b18d>
-    <span data-rozie-s-a955b18d>${rozieDisplay(e.label)}</span>
-    
-    <button type="button" @click=${($event: Event) => { this.removeItem(e.id); }} data-rozie-s-a955b18d>×</button>
-  </li>`)}
-</ul>
+<div class="object-interp" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-s-aca60b6e>
+  <p class="card--${rozieDisplay(this._obj.value)}" data-x=${rozieDisplay(this._obj.value)} data-rozie-s-aca60b6e>${rozieDisplay(this._obj.value)}</p>
+</div>
 `;
   }
-
-  removeItem = (id: any) => {
-  this._items.value = this._items.value.filter((x: any) => x.id !== id);
-};
 
   /**
    * Plan 14-05 — cross-framework attribute fallthrough source. Reads the

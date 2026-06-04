@@ -1,5 +1,12 @@
 import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, effect, inject, signal, viewChild } from '@angular/core';
 
+function __rozieDisplay(v: unknown): string {
+  if (v == null) return '';
+  if (typeof v === 'string') return v;
+  if (typeof v === 'object') return JSON.stringify(v, null, 2);
+  return String(v);
+}
+
 @Component({
   selector: 'rozie-event-loop-var-shadow',
   standalone: true,
@@ -8,7 +15,7 @@ import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterR
     <ul #rozieSpread_0 #rozieListenersTarget_1>
       @for (e of items(); track e.id) {
     <li>
-        <span>{{ e.label }}</span>
+        <span>{{ rozieDisplay(e.label) }}</span>
         
         <button type="button" (click)="removeItem(e.id)">×</button>
       </li>
@@ -153,6 +160,8 @@ export class EventLoopVarShadow {
       });
     }
   });
+
+  rozieDisplay(v: unknown): string { return __rozieDisplay(v); }
 }
 
 export default EventLoopVarShadow;

@@ -1,5 +1,6 @@
 import type { JSX } from 'solid-js';
 import { For, createSignal, splitProps } from 'solid-js';
+import { rozieDisplay } from '@rozie/runtime-solid';
 
 interface EventLoopVarShadowProps {}
 
@@ -22,7 +23,7 @@ export default function EventLoopVarShadow(_props: EventLoopVarShadowProps): JSX
     <>
     <ul {...attrs} data-rozie-s-a955b18d="">
       <For each={items()}>{(e) => <li data-rozie-s-a955b18d="">
-        <span data-rozie-s-a955b18d="">{e.label}</span>
+        <span data-rozie-s-a955b18d="">{rozieDisplay(e.label)}</span>
         
         <button type="button" onClick={($event) => { removeItem(e.id); }} data-rozie-s-a955b18d="">×</button>
       </li>}</For>

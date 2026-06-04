@@ -1,15 +1,22 @@
 import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, effect, inject, input, signal, viewChild } from '@angular/core';
 
+function __rozieDisplay(v: unknown): string {
+  if (v == null) return '';
+  if (typeof v === 'string') return v;
+  if (typeof v === 'object') return JSON.stringify(v, null, 2);
+  return String(v);
+}
+
 @Component({
   selector: 'rozie-prop-default-coercion',
   standalone: true,
   template: `
 
     <div class="pdc" #rozieSpread_0 #rozieListenersTarget_1>
-      <pre data-rozie-pdc-output="">{{ JSON.stringify(observed()) }}</pre>
+      <pre data-rozie-pdc-output="">{{ rozieDisplay(JSON.stringify(observed())) }}</pre>
       
-      <span data-rozie-pdc-e-identity="">{{ e() === e() ? 'true' : 'false' }}</span>
-      <span data-rozie-pdc-f-identity="">{{ f() === f() ? 'true' : 'false' }}</span>
+      <span data-rozie-pdc-e-identity="">{{ rozieDisplay(e() === e() ? 'true' : 'false') }}</span>
+      <span data-rozie-pdc-f-identity="">{{ rozieDisplay(f() === f() ? 'true' : 'false') }}</span>
     </div>
 
   `,
@@ -173,6 +180,8 @@ export class PropDefaultCoercion {
   });
 
   protected readonly JSON = JSON;
+
+  rozieDisplay(v: unknown): string { return __rozieDisplay(v); }
 }
 
 export default PropDefaultCoercion;

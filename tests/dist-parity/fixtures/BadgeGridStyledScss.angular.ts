@@ -1,5 +1,12 @@
 import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, effect, inject, input, viewChild } from '@angular/core';
 
+function __rozieDisplay(v: unknown): string {
+  if (v == null) return '';
+  if (typeof v === 'string') return v;
+  if (typeof v === 'object') return JSON.stringify(v, null, 2);
+  return String(v);
+}
+
 @Component({
   selector: 'rozie-badge-grid-styled-scss',
   standalone: true,
@@ -8,7 +15,7 @@ import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterR
     <div class="badge-grid" #rozieSpread_0 #rozieListenersTarget_1>
       @for (badge of badges(); track badge) {
     <span class="badge badge--neutral">
-        {{ badge }}
+        {{ rozieDisplay(badge) }}
       </span>
     }
     </div>
@@ -182,6 +189,8 @@ export class BadgeGridStyledScss {
       });
     }
   });
+
+  rozieDisplay(v: unknown): string { return __rozieDisplay(v); }
 }
 
 export default BadgeGridStyledScss;

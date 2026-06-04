@@ -17,6 +17,13 @@ interface FooterCtx {
   close: any;
 }
 
+function __rozieDisplay(v: unknown): string {
+  if (v == null) return '';
+  if (typeof v === 'string') return v;
+  if (typeof v === 'object') return JSON.stringify(v, null, 2);
+  return String(v);
+}
+
 @Component({
   selector: 'rozie-modal',
   standalone: true,
@@ -25,7 +32,7 @@ interface FooterCtx {
 
     @if (open()) {
     <div class="modal-backdrop" #backdropEl (click)="_guardedHandler0($event)">
-      <div #dialogEl class="modal-dialog" role="dialog" aria-modal="true" [attr.aria-label]="title() || undefined" tabindex="-1">
+      <div #dialogEl class="modal-dialog" role="dialog" aria-modal="true" [attr.aria-label]="rozieDisplay(title() || undefined)" tabindex="-1">
         @if (title() || (headerTpl ?? templates()?.['header'])) {
     <header>
           @if ((headerTpl ?? templates()?.['header'])) {
@@ -174,6 +181,8 @@ export class Modal {
     if ($event.target !== $event.currentTarget) return;
     this.closeOnBackdrop() && this._close();
   };
+
+  rozieDisplay(v: unknown): string { return __rozieDisplay(v); }
 }
 
 export default Modal;
