@@ -11,6 +11,7 @@ dist-standalone/
 coverage/
 
 .mcp.json
+.rtk/
 
 # Per RESEARCH.md Open Question 2 — peggy generated file regenerates on prepare
 packages/core/src/modifier-grammar/generated.js
