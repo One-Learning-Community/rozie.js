@@ -1,7 +1,7 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, property, query, queryAssignedElements, state } from 'lit/decorators.js';
 import { SignalWatcher, signal } from '@lit-labs/preact-signals';
-import { __rozieReconcileAfterDomMutation, createLitControllableProperty, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
+import { __rozieReconcileAfterDomMutation, createLitControllableProperty, rozieDisplay, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 import { repeat } from 'lit/directives/repeat.js';
 import { keyed } from 'lit/directives/keyed.js';
 import { useSortableJS } from './internal/useSortableJS';
@@ -202,7 +202,7 @@ private __rozieFirstUpdateDone = false;
     return html`
 <div class="rozie-sortable-wrap" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-ref="__rozieRoot" data-rozie-s-0af24eae>
   <div class="rozie-sortable-list" data-rozie-ref="listEl" data-rozie-s-0af24eae>${keyed(this._rozieReconcileSeq ?? 0, html`
-    ${repeat<any>(this.items, (item, index) => this.keyFor(item, index), (item, index) => html`<div class="${Object.entries({ "rozie-sortable-item": true, 'rozie-sortable-item-lifted': this._liftedIndex.value === index }).filter(([, v]) => v).map(([k]) => k).join(' ')}" key=${this.keyFor(item, index)} role="listitem" tabindex="0" @keydown=${($event: Event) => { this.onRowKeyDown($event, index); }} data-rozie-s-0af24eae>
+    ${repeat<any>(this.items, (item, index) => this.keyFor(item, index), (item, index) => html`<div class="${Object.entries({ "rozie-sortable-item": true, 'rozie-sortable-item-lifted': this._liftedIndex.value === index }).filter(([, v]) => v).map(([k]) => k).join(' ')}" key=${rozieDisplay(this.keyFor(item, index))} role="listitem" tabindex="0" @keydown=${($event: Event) => { this.onRowKeyDown($event, index); }} data-rozie-s-0af24eae>
       ${this.__rozieDefaultSlot__ !== undefined ? this.__rozieDefaultSlot__({item: item, index: index}) : html`<slot data-rozie-params=${(() => { try { return JSON.stringify({item: item, index: index}); } catch { return '{}'; } })()}></slot>`}
     </div>`)}
   `)}</div>
