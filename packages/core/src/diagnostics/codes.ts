@@ -531,6 +531,17 @@ export const RozieErrorCode = {
   // output, and the failure was invisible until the docs build crashed with
   // a generic ROZ500. This is the safety net.
   COMPILE_EMPTY_CODE_NO_DIAGNOSTICS:  'ROZ977', // error — internal: compile() emit produced empty code with no error diagnostics (parser/lowerer/emitter internal failure)
+
+  // ---- Phase 26 bare-sigil rejection — ROZ978 ----
+  // A bare whole-object `$props`/`$data`/`$refs`/`$slots` identifier (NOT a
+  // member access like `$data.columns`, and NOT `$attrs`/`$listeners` whose
+  // whole-object fallthrough use is legitimate) has no portable representation
+  // in v1. Six targets diverge inconsistently today (Svelte hard build-error,
+  // React/Solid/Lit runtime "not defined", Angular empty render, Vue renders).
+  // One shared pre-IR semantic validator (always-on, independent of the
+  // safeInterpolation flag — D-14) replaces that with a uniform compile error +
+  // a member-access hint. SPEC-5, extended by CONTEXT D-04/D-05.
+  BARE_OBJECT_SIGIL:                  'ROZ978', // error — bare $props/$data/$refs/$slots used as a whole-object value (not a member access). No portable representation in v1.
 } as const;
 
 export type RozieErrorCode = (typeof RozieErrorCode)[keyof typeof RozieErrorCode];

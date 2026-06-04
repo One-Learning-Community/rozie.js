@@ -38,6 +38,7 @@ import { runListenerElementValidator } from './validators/listenerElementValidat
 import { runExposeValidator } from './validators/exposeValidator.js';
 import { runEmitNameValidator } from './validators/emitNameValidator.js';
 import { runRefsPreMountValidator } from './validators/refsPreMountValidator.js';
+import { runBareSigilValidator } from './validators/bareSigilValidator.js';
 
 export interface AnalyzeResult {
   bindings: BindingsTable;
@@ -68,6 +69,11 @@ export function analyzeAST(ast: RozieAST): AnalyzeResult {
   runEmitNameValidator(ast, diagnostics);
   // Quick 260602-dv1 — ROZ123: $refs read in a pre-mount eval position ($computed body / $watch getter / template binding/interpolation/r-if/r-show/r-for-iterable expr). No binding dependency.
   runRefsPreMountValidator(ast, diagnostics);
+  // Phase 26 (SPEC-5, D-04/D-05/D-14) — ROZ978: a bare whole-object
+  // $props/$data/$refs/$slots identifier (not a member access; $attrs/$listeners
+  // exempt) used across template/script/listeners expressions. Always-on,
+  // independent of safeInterpolation. No binding dependency.
+  runBareSigilValidator(ast, diagnostics);
   // Phase 19 (D-08) — final pass: a <listener> placed inside <template> is a
   // misplaced element (ROZ206). No binding dependency.
   runListenerElementValidator(ast, diagnostics);
