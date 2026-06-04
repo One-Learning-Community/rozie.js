@@ -15,6 +15,8 @@ import ModalConsumerPage from './pages/ModalConsumerPage';
 import LitInteropPage from './pages/LitInteropPage';
 // Phase 16 — PropDefaultCoercion runtime probe (SPEC R1/R5 D-05 runtime arm).
 import PropDefaultCoercionPage from './pages/PropDefaultCoercionPage';
+// Phase 26 — ObjectInterp object-interpolation no-crash probe (D-08/D-09).
+import ObjectInterpPage from './pages/ObjectInterpPage';
 
 /**
  * Page-routing shell. Each Playwright e2e test navigates by clicking
@@ -38,7 +40,8 @@ type PageKey =
   | 'card-header'
   | 'modal-consumer'
   | 'lit-interop'
-  | 'prop-default-coercion';
+  | 'prop-default-coercion'
+  | 'object-interp';
 
 const PAGES: Record<PageKey, () => JSX.Element> = {
   counter: CounterPage,
@@ -53,6 +56,7 @@ const PAGES: Record<PageKey, () => JSX.Element> = {
   'modal-consumer': ModalConsumerPage,
   'lit-interop': LitInteropPage,
   'prop-default-coercion': PropDefaultCoercionPage,
+  'object-interp': ObjectInterpPage,
 };
 
 const PAGE_KEYS: ReadonlyArray<PageKey> = [
@@ -68,6 +72,7 @@ const PAGE_KEYS: ReadonlyArray<PageKey> = [
   'modal-consumer',
   'lit-interop',
   'prop-default-coercion',
+  'object-interp',
 ];
 
 export default function App(): JSX.Element {

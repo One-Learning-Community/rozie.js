@@ -179,6 +179,17 @@ const EXAMPLES = [
   // per-target bytes are the corpus the Plan-04 security batteries scan. Single
   // file; no sibling .rozie producers — stays OUT of RESOLVER_ROOT.
   'RHtml',
+  // Phase 26 (portable-template-interpolation) D-08 — the dedicated object-
+  // interpolation parity fixture. An untyped <data> object ({ a: 1, b: [2, 3] })
+  // is interpolated in three positions (text node, :data-x attribute binding,
+  // class interpolation). The Phase 26 annotateDisplayWrap gate (D-06/D-07)
+  // WRAPs all three on the five non-Vue targets so each renders identical
+  // 2-space pretty-printed JSON via rozieDisplay; Vue stays raw (native
+  // toDisplayString already JSON-prints plain Array/Object). Registering it here
+  // makes the bootstrap compile() it across all six targets — the SPEC-1/SPEC-4
+  // byte-exact cross-target JSON-parity proof across all four entrypoints.
+  // Single-file; no sibling .rozie producers — stays OUT of RESOLVER_ROOT.
+  'ObjectInterp',
 ];
 
 // Phase 23 (angular-cva-forms-integration) — per-fixture Angular CVA opt-out.

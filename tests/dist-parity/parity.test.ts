@@ -144,6 +144,17 @@ const EXAMPLES = [
   // ONE source. The committed bytes are the corpus the Plan-04 security batteries
   // scan. Single-file; no sibling .rozie producers — stays OUT of RESOLVER_ROOT.
   'RHtml',
+  // Phase 26 (portable-template-interpolation) D-08 — the dedicated object-
+  // interpolation parity fixture. An untyped <data> object ({ a: 1, b: [2, 3] })
+  // interpolated in a text node, a :data-x attribute binding, and a class
+  // interpolation. The Phase 26 annotateDisplayWrap gate WRAPs all three on the
+  // five non-Vue targets (identical 2-space JSON via rozieDisplay); Vue stays
+  // raw. The committed per-target bytes are the SPEC-1/SPEC-4 byte-exact cross-
+  // target JSON-parity contract across all four entrypoints — a STRONGER
+  // precision proof than VR for JSON text (D-09; the Linux-Docker VR cell is
+  // SKIPPED for this fixture). Single-file; no sibling .rozie producers — stays
+  // OUT of RESOLVER_ROOT.
+  'ObjectInterp',
 ] as const;
 
 // Phase 07.2 Plan 06 — siblings ModalConsumer reaches via `<components>`.
