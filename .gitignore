@@ -10,6 +10,8 @@ dist-standalone/
 .DS_Store
 coverage/
 
+.mcp.json
+
 # Per RESEARCH.md Open Question 2 — peggy generated file regenerates on prepare
 packages/core/src/modifier-grammar/generated.js
 
@@ -160,3 +162,4 @@ examples/consumers/astro-rozie/src/components/react/Counter.rozie
 examples/consumers/astro-rozie/src/components/vue/Counter.rozie
 examples/consumers/astro-rozie/src/components/svelte/Counter.rozie
 examples/consumers/astro-rozie/src/components/solid/Counter.rozie
+
