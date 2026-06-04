@@ -39,6 +39,39 @@ export interface EmitAttrCtx {
    * inside a `<For>` loop body where `index` is a Solid Accessor.
    */
   invokeAccessors?: ReadonlySet<string> | undefined;
+  /**
+   * Phase 26 — host element tagKind + tagName. The `rozieDisplay` wrap (SPEC-4)
+   * applies ONLY where a binding renders as attribute TEXT on an HTML host.
+   * Component/self-tag prop bindings pass the value structurally (no wrap), and
+   * `value`/`checked` on a form input are controlled-input props (no wrap).
+   */
+  elementTagKind?: 'html' | 'component' | 'self';
+  tagName?: string;
+}
+
+/** Form-input tags whose `value`/`checked` are controlled-input PROPERTIES. */
+const FORM_INPUT_TAGS = new Set(['input', 'textarea', 'select']);
+
+/**
+ * Phase 26 — does a `wrapForDisplay`-flagged attribute binding render as
+ * attribute TEXT (where `[object Object]` would surface)? See the React twin.
+ */
+function shouldWrapAttrBinding(name: string, expr: t.Expression, ctx: EmitAttrCtx): boolean {
+  if (ctx.elementTagKind === 'component' || ctx.elementTagKind === 'self') return false;
+  if (
+    (name === 'value' || name === 'checked') &&
+    ctx.tagName !== undefined &&
+    FORM_INPUT_TAGS.has(ctx.tagName)
+  ) {
+    return false;
+  }
+  // `style` is a structural OBJECT prop in Solid (not attribute text) — wrapping
+  // would JSON-stringify the style object and break it.
+  if (name === 'style') return false;
+  // An object-expression binding (`:style="{...}"`, `:class="{...}"`) is
+  // structural, not display text — never wrap.
+  if (t.isObjectExpression(expr)) return false;
+  return true;
 }
 
 /**
@@ -539,10 +572,12 @@ function emitNonClassAttribute(
     }
     const jsxName = colonPropToSolidName(attr.name);
     const exprCode = renderExpr(attr.expression, ctx.ir, ctx.invokeAccessors);
-    // Phase 26 (D-06/SPEC-4) — attribute-binding wrap. A non-primitive value
-    // renders portable JSON instead of `[object Object]`. Raw otherwise (SPEC-3).
-    // The wrap sits inside the JSX `{}` so the accessor read stays tracked (A4).
-    if (attr.wrapForDisplay) {
+    // Phase 26 (D-06/SPEC-4) — attribute-binding wrap on an HTML host attribute
+    // text position only (structural component props / controlled-input props
+    // are exempt). A non-primitive value renders portable JSON; raw otherwise
+    // (SPEC-3). The wrap sits inside the JSX `{}` so the accessor read stays
+    // tracked (A4).
+    if (attr.wrapForDisplay && shouldWrapAttrBinding(attr.name, attr.expression, ctx)) {
       ctx.collectors.runtime.add('rozieDisplay');
       return { jsx: `${jsxName}={rozieDisplay(${exprCode})}`, diagnostics };
     }

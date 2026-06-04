@@ -65,6 +65,12 @@ import type {
 /** The reserved-object sigils whose `.member` reads the gate type-resolves. */
 const SIGIL_PROPS = '$props';
 const SIGIL_DATA = '$data';
+// `$model` is the producer-side writable alias of a `model: true` <props>
+// entry — `$model.x` reads the SAME declared prop as `$props.x`, so it must
+// type-resolve identically (otherwise a `$model.value` Number read would
+// false-WRAP while the byte-identical `$props.value` form stays raw, breaking
+// the producer-side two-way-write byte-identity invariant — Phase 26 Plan 04).
+const SIGIL_MODEL = '$model';
 
 /** Comparison operators whose BinaryExpression result is provably a boolean. */
 const COMPARISON_OPERATORS = new Set([
@@ -166,7 +172,8 @@ function provablyPrimitive(
       !expr.computed &&
       t.isIdentifier(property)
     ) {
-      if (object.name === SIGIL_PROPS) {
+      if (object.name === SIGIL_PROPS || object.name === SIGIL_MODEL) {
+        // `$model.x` reads the same declared prop as `$props.x` (model alias).
         const decl = props.get(property.name);
         return decl ? isPrimitivePropAnnotation(decl.typeAnnotation) : false;
       }

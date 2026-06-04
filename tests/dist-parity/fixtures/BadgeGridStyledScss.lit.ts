@@ -1,7 +1,7 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { SignalWatcher } from '@lit-labs/preact-signals';
-import { rozieListeners, rozieSpread } from '@rozie/runtime-lit';
+import { rozieDisplay, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 import { repeat } from 'lit/directives/repeat.js';
 
 @customElement('rozie-badge-grid-styled-scss')
@@ -61,8 +61,8 @@ export default class BadgeGridStyledScss extends SignalWatcher(LitElement) {
   render() {
     return html`
 <div class="badge-grid" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-s-44801268>
-  ${repeat<any>(this.badges, (badge, _idx) => badge, (badge, _idx) => html`<span class="badge badge--neutral" key=${badge} data-rozie-s-44801268>
-    ${badge}
+  ${repeat<any>(this.badges, (badge, _idx) => badge, (badge, _idx) => html`<span class="badge badge--neutral" key=${rozieDisplay(badge)} data-rozie-s-44801268>
+    ${rozieDisplay(badge)}
   </span>`)}
 </div>
 `;

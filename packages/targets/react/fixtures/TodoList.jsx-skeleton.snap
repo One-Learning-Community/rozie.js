@@ -1,7 +1,7 @@
 <>
 <div {...attrs} className={clsx("todo-list", (attrs.className as string | undefined))}>
   <header>
-    {(props.renderHeader ?? props.slots?.['header']) ? ((props.renderHeader ?? props.slots?.['header']) as Function)({ remaining, total: items.length }) : <h3>{props.title} ({remaining} remaining)</h3>}
+    {(props.renderHeader ?? props.slots?.['header']) ? ((props.renderHeader ?? props.slots?.['header']) as Function)({ remaining, total: items.length }) : <h3>{props.title} ({rozieDisplay(remaining)} remaining)</h3>}
   </header>
 
   <form onSubmit={($event) => { $event.preventDefault(); ((add) as ((...args: any[]) => any))($event); }}>
@@ -12,7 +12,7 @@
   {(items.length > 0) ? <ul>
     {items.map((item) => <li key={item.id} className={clsx({ done: item.done })}>
       
-      {typeof (props.children ?? props.slots?.['']) === 'function' ? ((props.children ?? props.slots?.['']) as Function)({ item, toggle: () => toggle(item.id), remove: () => removeItem(item.id) }) : ((props.children ?? props.slots?.['']) ?? <><label><input type="checkbox" checked={item.done} onChange={($event) => { toggle(item.id); }} /><span>{item.text}</span></label><button aria-label="Remove" onClick={($event) => { removeItem(item.id); }}>×</button></>)}
+      {typeof (props.children ?? props.slots?.['']) === 'function' ? ((props.children ?? props.slots?.['']) as Function)({ item, toggle: () => toggle(item.id), remove: () => removeItem(item.id) }) : ((props.children ?? props.slots?.['']) ?? <><label><input type="checkbox" checked={item.done} onChange={($event) => { toggle(item.id); }} /><span>{rozieDisplay(item.text)}</span></label><button aria-label="Remove" onClick={($event) => { removeItem(item.id); }}>×</button></>)}
     </li>)}
   </ul> : <p className={"empty"}>
     {(props.renderEmpty ?? props.slots?.['empty']) ? ((props.renderEmpty ?? props.slots?.['empty']) as Function)() : "Nothing to do. ✨"}

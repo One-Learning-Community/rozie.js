@@ -326,8 +326,19 @@ function resolveTagName(node: TemplateElementIR, irName: string): string {
 function emitInterpolation(
   node: TemplateInterpolationIR,
   ir: IRComponent,
+  opts: EmitTemplateOpts,
 ): string {
   const code = rewriteTemplateExpression(node.expression, ir);
+  // Phase 26 (D-06/D-07) — gate on the IR-precomputed wrap decision. A
+  // non-primitive value renders portable JSON instead of `[object Object]`;
+  // raw when provably string|number|boolean or safeInterpolation is off
+  // (SPEC-3, byte-identical to pre-phase). `rozieDisplay(...)` is injected
+  // INSIDE the `${ }` lit-html binding so the value is still part of the
+  // reactive template part.
+  if (node.wrapForDisplay) {
+    opts.runtime.add('rozieDisplay');
+    return `\${rozieDisplay(${code})}`;
+  }
   return `\${${code}}`;
 }
 
@@ -490,6 +501,19 @@ function emitAttribute(
     }
 
     // Default: attribute binding (Lit auto-coerces values to string).
+    // Phase 26 (D-06/SPEC-4) — a non-primitive value would auto-coerce to
+    // `[object Object]`; wrap in `rozieDisplay` to render portable JSON. Raw
+    // otherwise (SPEC-3). Property bindings (`.prop=`) above are exempt — they
+    // pass the value through structurally, not as attribute text. `style` and
+    // object-expression bindings are structural too — never wrap.
+    if (
+      attr.wrapForDisplay &&
+      attr.name !== 'style' &&
+      !bt.isObjectExpression(attr.expression)
+    ) {
+      opts?.runtime.add('rozieDisplay');
+      return `${attr.name}=\${rozieDisplay(${expr})}`;
+    }
     return `${attr.name}=\${${expr}}`;
   }
 
@@ -499,6 +523,11 @@ function emitAttribute(
     const parts = attr.segments.map((seg) => {
       if (seg.kind === 'static') return seg.text;
       const code = rewriteTemplateExpression(seg.expression, ir);
+      // Phase 26 (D-06/SPEC-4) — wrap a non-primitive interpolated segment.
+      if (seg.wrapForDisplay) {
+        opts?.runtime.add('rozieDisplay');
+        return `\${rozieDisplay(${code})}`;
+      }
       return `\${${code}}`;
     });
     return `${attr.name}="${parts.join('')}"`;
@@ -1009,8 +1038,16 @@ function emitElementOpenTag(
       const staticPart = staticClassValues.length > 0
         ? `${staticClassValues.join(' ')} `
         : '';
+      // Phase 26 (D-06/SPEC-4) — wrap a non-primitive plain `:class` binding so
+      // the class token renders portable JSON instead of `[object Object]`. Raw
+      // otherwise (SPEC-3).
+      let classExpr = expr;
+      if (bindingClass.wrapForDisplay) {
+        opts.runtime.add('rozieDisplay');
+        classExpr = `rozieDisplay(${expr})`;
+      }
       // Use quoted attribute — lit-html requires quotes for mixed static+dynamic values (CR-01 fix).
-      parts.push(`class="${staticPart}\${(${expr})}"`);
+      parts.push(`class="${staticPart}\${(${classExpr})}"`);
     } else if (bindingClass.kind === 'interpolated') {
       const emitted = emitAttribute(bindingClass, ir, node.tagName, 'html', opts);
       if (emitted) parts.push(emitted);
@@ -1217,7 +1254,7 @@ function emitNode(
 ): string {
   switch (node.type) {
     case 'TemplateInterpolation':
-      return emitInterpolation(node, ir);
+      return emitInterpolation(node, ir, opts);
     case 'TemplateStaticText':
       return emitStaticText(node);
     case 'TemplateElement':

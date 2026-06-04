@@ -53,6 +53,13 @@ export interface EmitTemplateAttributeState {
    * imports block (mirrors the `rozieSpreadUsed` plumbing).
    */
   rozieListenersUsed: boolean;
+  /**
+   * Phase 26 (D-06/SPEC-4) — set true whenever an attribute-binding or class
+   * interpolation is wrapped in `rozieDisplay(...)`. The real walker in
+   * `emitTemplate.ts` registers the import on `opts.runtime` directly; this
+   * flag is the observable signal for the standalone unit-test surface.
+   */
+  rozieDisplayUsed?: boolean;
 }
 
 const BOOLEAN_ATTRS = new Set([
@@ -142,12 +149,24 @@ export function emitTemplateAttribute(
     ) {
       return `.${attr.name}=\${${expr}}`;
     }
+    // Phase 26 (D-06/SPEC-4) — wrap a non-primitive default attribute binding
+    // so it renders portable JSON instead of `[object Object]`. Raw otherwise.
+    if (attr.wrapForDisplay) {
+      if (state) state.rozieDisplayUsed = true;
+      return `${attr.name}=\${rozieDisplay(${expr})}`;
+    }
     return `${attr.name}=\${${expr}}`;
   }
   if (attr.kind === 'interpolated') {
     const parts = attr.segments.map((seg) => {
       if (seg.kind === 'static') return seg.text;
-      return `\${${rewriteTemplateExpression(seg.expression, ir)}}`;
+      const code = rewriteTemplateExpression(seg.expression, ir);
+      // Phase 26 (D-06/SPEC-4) — wrap a non-primitive interpolated segment.
+      if (seg.wrapForDisplay) {
+        if (state) state.rozieDisplayUsed = true;
+        return `\${rozieDisplay(${code})}`;
+      }
+      return `\${${code}}`;
     });
     return `${attr.name}="${parts.join('')}"`;
   }

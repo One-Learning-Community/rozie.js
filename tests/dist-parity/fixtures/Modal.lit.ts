@@ -1,7 +1,7 @@
 import { LitElement, css, html, nothing } from 'lit';
 import { customElement, property, query, queryAssignedElements, state } from 'lit/decorators.js';
 import { SignalWatcher } from '@lit-labs/preact-signals';
-import { createLitControllableProperty, injectGlobalStyles } from '@rozie/runtime-lit';
+import { createLitControllableProperty, injectGlobalStyles, rozieDisplay } from '@rozie/runtime-lit';
 
 @customElement('rozie-modal')
 export default class Modal extends SignalWatcher(LitElement) {
@@ -131,7 +131,7 @@ private __rozieFirstUpdateDone = false;
   render() {
     return html`
 ${this.open ? html`<div class="modal-backdrop" @click=${($event: MouseEvent) => { if ($event.target !== $event.currentTarget) return; this.closeOnBackdrop && this.close(); }} data-rozie-ref="backdropEl" data-rozie-s-fc45feb2>
-  <div class="modal-dialog" role="dialog" aria-modal="true" aria-label=${this.title || undefined} tabindex="-1" data-rozie-ref="dialogEl" data-rozie-s-fc45feb2>
+  <div class="modal-dialog" role="dialog" aria-modal="true" aria-label=${rozieDisplay(this.title || undefined)} tabindex="-1" data-rozie-ref="dialogEl" data-rozie-s-fc45feb2>
     ${this.title || this._hasSlotHeader || this.header !== undefined ? html`<header data-rozie-s-fc45feb2>
       ${this.header !== undefined ? this.header({close: this.close}) : html`<slot name="header" @rozie-header-close=${($event: CustomEvent) => ((this.close) as (...args: any[]) => any)($event.detail)}>
         <h2 data-rozie-s-fc45feb2>${this.title}</h2>

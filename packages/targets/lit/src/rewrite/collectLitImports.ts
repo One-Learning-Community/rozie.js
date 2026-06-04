@@ -154,7 +154,16 @@ export type RuntimeLitImport =
    * desynchronise lit-html's sentinel-comment-keyed `oldParts` cache.
    * No-op on every non-Lit target.
    */
-  | '__rozieReconcileAfterDomMutation';
+  | '__rozieReconcileAfterDomMutation'
+  /**
+   * Phase 26 (D-01/D-06) — portable display helper, shipped from
+   * `@rozie/runtime-lit`. Added by the template emitters ONLY when a
+   * `wrapForDisplay` interpolation actually wraps, so a primitive-only
+   * component's `@rozie/runtime-lit` import line stays byte-identical to
+   * pre-phase (SPEC-3). A non-primitive value renders portable pretty-printed
+   * JSON instead of lit-html's `[object Object]` auto-coercion.
+   */
+  | 'rozieDisplay';
 
 export class RuntimeLitImportCollector {
   private symbols = new Set<RuntimeLitImport>();

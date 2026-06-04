@@ -1,5 +1,5 @@
 <script lang="ts">
-import { applyListeners } from '@rozie/runtime-svelte';
+import { applyListeners, rozieDisplay } from '@rozie/runtime-svelte';
 
 import { onMount } from 'svelte';
 
@@ -44,10 +44,10 @@ onMount(() => {
 
 
 <div {...__rozieAttrs} class={["pdc", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-109e595c>
-  <pre data-rozie-pdc-output="" data-rozie-s-109e595c>{JSON.stringify(observed)}</pre>
+  <pre data-rozie-pdc-output="" data-rozie-s-109e595c>{rozieDisplay(JSON.stringify(observed))}</pre>
   
-  <span data-rozie-pdc-e-identity="" data-rozie-s-109e595c>{e === e ? 'true' : 'false'}</span>
-  <span data-rozie-pdc-f-identity="" data-rozie-s-109e595c>{f === f ? 'true' : 'false'}</span>
+  <span data-rozie-pdc-e-identity="" data-rozie-s-109e595c>{rozieDisplay(e === e ? 'true' : 'false')}</span>
+  <span data-rozie-pdc-f-identity="" data-rozie-s-109e595c>{rozieDisplay(f === f ? 'true' : 'false')}</span>
 </div>
 
 

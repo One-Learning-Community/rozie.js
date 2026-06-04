@@ -1,4 +1,6 @@
 <script lang="ts">
+import { rozieDisplay } from '@rozie/runtime-svelte';
+
 import type { Snippet } from 'svelte';
 import { onMount, untrack } from 'svelte';
 
@@ -88,7 +90,7 @@ $effect(() => {
 
 
 {#if open}<div class="modal-backdrop" bind:this={backdropEl} onclick={($event) => { if ($event.target !== $event.currentTarget) return; closeOnBackdrop && close(); }} data-rozie-s-fc45feb2>
-  <div bind:this={dialogEl} class="modal-dialog" role="dialog" aria-modal="true" aria-label={title || undefined} tabindex="-1" data-rozie-s-fc45feb2>
+  <div bind:this={dialogEl} class="modal-dialog" role="dialog" aria-modal="true" aria-label={rozieDisplay(title || undefined)} tabindex="-1" data-rozie-s-fc45feb2>
     {#if title || header}<header data-rozie-s-fc45feb2>
       {#if header}{@render header({ close })}{:else}
         <h2 data-rozie-s-fc45feb2>{title}</h2>

@@ -1,7 +1,7 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, property, queryAssignedElements, state } from 'lit/decorators.js';
 import { SignalWatcher, signal } from '@lit-labs/preact-signals';
-import { createLitControllableProperty, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
+import { createLitControllableProperty, rozieDisplay, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 import { repeat } from 'lit/directives/repeat.js';
 
 interface RozieHeaderSlotCtx {
@@ -107,7 +107,7 @@ form[data-rozie-s-52bec3de] { display: flex; gap: 0.25rem; margin-block: 0.5rem;
   <header data-rozie-s-52bec3de>
     ${this.header !== undefined ? this.header({remaining: this.remaining, total: this.items.length}) : html`<slot name="header" data-rozie-params=${(() => { try { return JSON.stringify({remaining: this.remaining, total: this.items.length}); } catch { return '{}'; } })()}>
       
-      <h3 data-rozie-s-52bec3de>${this.title} (${this.remaining} remaining)</h3>
+      <h3 data-rozie-s-52bec3de>${this.title} (${rozieDisplay(this.remaining)} remaining)</h3>
     </slot>`}
   </header>
 
@@ -117,10 +117,10 @@ form[data-rozie-s-52bec3de] { display: flex; gap: 0.25rem; margin-block: 0.5rem;
   </form>
 
   ${this.items.length > 0 ? html`<ul data-rozie-s-52bec3de>
-    ${repeat<any>(this.items, (item, _idx) => item.id, (item, _idx) => html`<li class="${Object.entries({ done: item.done }).filter(([, v]) => v).map(([k]) => k).join(' ')}" key=${item.id} data-rozie-s-52bec3de>
+    ${repeat<any>(this.items, (item, _idx) => item.id, (item, _idx) => html`<li class="${Object.entries({ done: item.done }).filter(([, v]) => v).map(([k]) => k).join(' ')}" key=${rozieDisplay(item.id)} data-rozie-s-52bec3de>
       
       ${this.__rozieDefaultSlot__ !== undefined ? this.__rozieDefaultSlot__({item: item, toggle: () => this.toggle(item.id), remove: () => this.removeItem(item.id)}) : html`<slot data-rozie-params=${(() => { try { return JSON.stringify({item: item}); } catch { return '{}'; } })()} @rozie-default-toggle=${($event: CustomEvent) => ((() => this.toggle(item.id)) as (...args: any[]) => any)($event.detail)} @rozie-default-remove=${($event: CustomEvent) => ((() => this.removeItem(item.id)) as (...args: any[]) => any)($event.detail)}>
-        <label data-rozie-s-52bec3de><input type="checkbox" ?checked=${item.done} @change=${($event: Event) => { this.toggle(item.id); }} data-rozie-s-52bec3de /><span data-rozie-s-52bec3de>${item.text}</span></label>
+        <label data-rozie-s-52bec3de><input type="checkbox" ?checked=${item.done} @change=${($event: Event) => { this.toggle(item.id); }} data-rozie-s-52bec3de /><span data-rozie-s-52bec3de>${rozieDisplay(item.text)}</span></label>
         <button aria-label="Remove" @click=${($event: Event) => { this.removeItem(item.id); }} data-rozie-s-52bec3de>×</button>
       </slot>`}
     </li>`)}

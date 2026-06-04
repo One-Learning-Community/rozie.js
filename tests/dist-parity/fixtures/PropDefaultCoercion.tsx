@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { clsx } from '@rozie/runtime-react';
+import { clsx, rozieDisplay } from '@rozie/runtime-react';
 import './PropDefaultCoercion.css';
 
 interface PropDefaultCoercionProps {
@@ -46,10 +46,10 @@ export default function PropDefaultCoercion(_props: PropDefaultCoercionProps): J
   return (
     <>
     <div {...attrs} className={clsx("pdc", (attrs.className as string | undefined))} data-rozie-s-109e595c="">
-      <pre data-rozie-pdc-output="" data-rozie-s-109e595c="">{JSON.stringify(observed)}</pre>
+      <pre data-rozie-pdc-output="" data-rozie-s-109e595c="">{rozieDisplay(JSON.stringify(observed))}</pre>
       
-      <span data-rozie-pdc-e-identity="" data-rozie-s-109e595c="">{props.e === props.e ? 'true' : 'false'}</span>
-      <span data-rozie-pdc-f-identity="" data-rozie-s-109e595c="">{props.f === props.f ? 'true' : 'false'}</span>
+      <span data-rozie-pdc-e-identity="" data-rozie-s-109e595c="">{rozieDisplay(props.e === props.e ? 'true' : 'false')}</span>
+      <span data-rozie-pdc-f-identity="" data-rozie-s-109e595c="">{rozieDisplay(props.f === props.f ? 'true' : 'false')}</span>
     </div>
     </>
   );

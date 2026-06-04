@@ -235,6 +235,8 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
     const attrsResult = emitAttributes(workingAttrs, {
       ir: ctx.ir,
       collectors: ctx.collectors,
+      elementTagKind: node.tagKind,
+      tagName: node.tagName,
     });
     for (const d of attrsResult.diagnostics) ctx.diagnostics.push(d);
     const listenerResult = emitElementListeners(node, childCtx);
@@ -286,6 +288,8 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
   const attrsResult = emitAttributes(workingAttrs, {
     ir: ctx.ir,
     collectors: ctx.collectors,
+    elementTagKind: node.tagKind,
+    tagName: node.tagName,
   });
   for (const d of attrsResult.diagnostics) ctx.diagnostics.push(d);
 

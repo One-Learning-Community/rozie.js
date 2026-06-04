@@ -1,5 +1,5 @@
 <script lang="ts">
-import { applyListeners } from '@rozie/runtime-svelte';
+import { applyListeners, rozieDisplay } from '@rozie/runtime-svelte';
 
 interface Props {
   badges?: any[];
@@ -14,7 +14,7 @@ let { badges = __defaultBadges, ...__rozieAttrs }: Props = $props();
 
 <div {...__rozieAttrs} class={["badge-grid", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-44801268>
   {#each badges as badge (badge)}<span class="badge badge--neutral" data-rozie-s-44801268>
-    {badge}
+    {rozieDisplay(badge)}
   </span>{/each}
 </div>
 

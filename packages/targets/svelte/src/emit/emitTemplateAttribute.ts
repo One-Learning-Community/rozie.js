@@ -69,6 +69,14 @@ export interface EmitAttrCtx {
    * fallback the wrappers idiomatically already declare.
    */
   hasFallthroughSpread?: boolean;
+  /**
+   * Phase 26 (D-01/D-06) — the template walk's `@rozie/runtime-svelte` import
+   * accumulator. When an attribute-binding or class interpolation wraps in
+   * `rozieDisplay` (`wrapForDisplay` true), the emitter adds `'rozieDisplay'`
+   * here so `emitSvelte` folds the runtime import line in. Optional so legacy
+   * call sites (no wrap possible) stay unaffected.
+   */
+  runtimeImports?: Set<string>;
 }
 
 /**
@@ -80,6 +88,32 @@ export interface EmitAttrCtx {
  * React/Vue, but Svelte hits the identical mismatch). Emit the bare valueless
  * attribute `multiple` instead.
  */
+/** Form-input value/checked attrs that are controlled-input props (no wrap). */
+const FORM_INPUT_VALUE_ATTRS: ReadonlySet<string> = new Set(['value', 'checked']);
+
+/**
+ * Phase 26 — does a `wrapForDisplay`-flagged attribute binding render as
+ * attribute TEXT (where `[object Object]` would surface)? Component/self-tag
+ * prop bindings and form-input value/checked props are exempt (twin of React's
+ * `shouldWrapAttrBinding`). `inputType` is only set for `<input>` hosts.
+ */
+function shouldWrapSvelteAttrBinding(
+  name: string,
+  expr: t.Expression,
+  ctx: EmitAttrCtx,
+): boolean {
+  if (ctx.elementTagKind === 'component' || ctx.elementTagKind === 'self') return false;
+  if (ctx.inputType !== undefined && FORM_INPUT_VALUE_ATTRS.has(name)) return false;
+  // `style` is structural (Svelte lowers `:style` objects to `style:` directives
+  // / handles string style natively) — never display text.
+  if (name === 'style') return false;
+  // An object-form binding (`:class="{ active: x }"`) is a clsx-style structural
+  // object Svelte handles natively — never display text. Wrapping would
+  // JSON-stringify it and break the conditional class/attr.
+  if (t.isObjectExpression(expr)) return false;
+  return true;
+}
+
 const BOOLEAN_HTML_ATTRS: ReadonlySet<string> = new Set([
   'multiple',
   'disabled',
@@ -471,9 +505,12 @@ function opaqueSpreadClassReadExpr(
 function renderInterpolatedTemplateLiteral(
   segments: Array<
     | { kind: 'static'; text: string }
-    | { kind: 'binding'; expression: t.Expression; deps: unknown }
+    | { kind: 'binding'; expression: t.Expression; deps: unknown; wrapForDisplay?: boolean }
   >,
   ir: IRComponent,
+  // Phase 26 — runtime-import accumulator so a wrapped class/attr interpolation
+  // can register `rozieDisplay` (SPEC-4).
+  runtimeImports?: Set<string>,
 ): string {
   let out = '';
   for (const seg of segments) {
@@ -484,7 +521,14 @@ function renderInterpolatedTemplateLiteral(
         .replace(/`/g, '\\`')
         .replace(/\$\{/g, '\\${');
     } else {
-      out += '${' + rewriteTemplateExpression(seg.expression, ir) + '}';
+      // Phase 26 (D-06/SPEC-4) — wrap a non-primitive interpolated segment.
+      const segCode = rewriteTemplateExpression(seg.expression, ir);
+      if (seg.wrapForDisplay) {
+        runtimeImports?.add('rozieDisplay');
+        out += '${rozieDisplay(' + segCode + ')}';
+      } else {
+        out += '${' + segCode + '}';
+      }
     }
   }
   return out;
@@ -647,6 +691,15 @@ export function emitSingleAttr(
     if (styleObjectLowered !== null) return styleObjectLowered;
     const expr = rewriteTemplateExpression(attr.expression, ir);
     const outName = resolveAttrName(attr.name, ctx);
+    // Phase 26 (D-06/SPEC-4) — attribute-binding wrap on an HTML host attribute
+    // text position only. Component/self-tag prop bindings pass the value
+    // structurally (no wrap), and `value`/`checked` on a form input are
+    // controlled-input props (no wrap). A non-primitive value renders portable
+    // JSON; raw otherwise (SPEC-3).
+    if (attr.wrapForDisplay && shouldWrapSvelteAttrBinding(attr.name, attr.expression, ctx)) {
+      ctx.runtimeImports?.add('rozieDisplay');
+      return `${outName}={rozieDisplay(${expr})}`;
+    }
     return `${outName}={${expr}}`;
   }
 
@@ -669,13 +722,26 @@ export function emitSingleAttr(
 
   // interpolated: if exactly one binding segment, simplify to `name={<expr>}`.
   if (attr.segments.length === 1 && attr.segments[0]!.kind === 'binding') {
-    const seg = attr.segments[0]! as { kind: 'binding'; expression: t.Expression; deps: unknown };
+    const seg = attr.segments[0]! as {
+      kind: 'binding';
+      expression: t.Expression;
+      deps: unknown;
+      wrapForDisplay?: boolean;
+    };
     const outName = resolveAttrName(attr.name, ctx);
-    return `${outName}={${rewriteTemplateExpression(seg.expression, ir)}}`;
+    const segCode = rewriteTemplateExpression(seg.expression, ir);
+    // Phase 26 (D-06/SPEC-4) — wrap a non-primitive single-segment attribute
+    // interpolation on an HTML host attribute text position only. Raw otherwise
+    // (SPEC-3).
+    if (seg.wrapForDisplay && shouldWrapSvelteAttrBinding(attr.name, seg.expression, ctx)) {
+      ctx.runtimeImports?.add('rozieDisplay');
+      return `${outName}={rozieDisplay(${segCode})}`;
+    }
+    return `${outName}={${segCode}}`;
   }
 
   // Multi-segment — render as Svelte template literal: `name={`...${...}...`}`.
-  const lit = renderInterpolatedTemplateLiteral(attr.segments, ir);
+  const lit = renderInterpolatedTemplateLiteral(attr.segments, ir, ctx.runtimeImports);
   const outName = resolveAttrName(attr.name, ctx);
   return `${outName}={\`${lit}\`}`;
 }
@@ -684,7 +750,11 @@ export function emitSingleAttr(
  * Convert a single AttributeBinding into a JS expression string suitable for
  * inclusion in an array (used by class/style merge below).
  */
-function attrToArraySegment(attr: AttributeBinding, ir: IRComponent): string {
+function attrToArraySegment(
+  attr: AttributeBinding,
+  ir: IRComponent,
+  runtimeImports?: Set<string>,
+): string {
   if (attr.kind === 'twoWayBinding') {
     // Phase 07.3 Wave 3 stub — twoWayBinding never valid in class/style merge.
     throw new Error(
@@ -695,7 +765,17 @@ function attrToArraySegment(attr: AttributeBinding, ir: IRComponent): string {
     return JSON.stringify(attr.value);
   }
   if (attr.kind === 'binding') {
-    return rewriteTemplateExpression(attr.expression, ir);
+    const code = rewriteTemplateExpression(attr.expression, ir);
+    // Phase 26 (D-06/SPEC-4) — wrap a non-primitive plain `:class` binding so a
+    // class merge entry renders portable JSON instead of `[object Object]`.
+    // EXCEPTION: an object-form `:class="{ active: x }"` is a clsx-style
+    // class-condition object that Svelte's array-class syntax handles natively
+    // — wrapping it would JSON-stringify the conditions and break the toggle.
+    if (attr.wrapForDisplay && !t.isObjectExpression(attr.expression)) {
+      runtimeImports?.add('rozieDisplay');
+      return `rozieDisplay(${code})`;
+    }
+    return code;
   }
   if (attr.kind === 'spreadBinding') {
     // Phase 14 — `spreadBinding` is the name-less kind: it never reaches a
@@ -707,10 +787,20 @@ function attrToArraySegment(attr: AttributeBinding, ir: IRComponent): string {
   }
   // interpolated
   if (attr.segments.length === 1 && attr.segments[0]!.kind === 'binding') {
-    const seg = attr.segments[0]! as { kind: 'binding'; expression: t.Expression; deps: unknown };
-    return rewriteTemplateExpression(seg.expression, ir);
+    const seg = attr.segments[0]! as {
+      kind: 'binding';
+      expression: t.Expression;
+      deps: unknown;
+      wrapForDisplay?: boolean;
+    };
+    const code = rewriteTemplateExpression(seg.expression, ir);
+    if (seg.wrapForDisplay) {
+      runtimeImports?.add('rozieDisplay');
+      return `rozieDisplay(${code})`;
+    }
+    return code;
   }
-  return '`' + renderInterpolatedTemplateLiteral(attr.segments, ir) + '`';
+  return '`' + renderInterpolatedTemplateLiteral(attr.segments, ir, runtimeImports) + '`';
 }
 
 /**
@@ -859,7 +949,7 @@ export function emitAttributes(
           }
         }
         for (const x of merged) consumed.add(x);
-        const segments = merged.map((x) => attrToArraySegment(x, ctx.ir));
+        const segments = merged.map((x) => attrToArraySegment(x, ctx.ir, ctx.runtimeImports));
         // R6 opaque-spread class merge: append a `(spread)?.class` read for
         // every opaque spread to the array tail. Svelte's array-class syntax
         // filters falsy entries, so a consumer who passed no class contributes

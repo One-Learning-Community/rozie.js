@@ -1,6 +1,6 @@
 <>
 {(open) && <div className={"modal-backdrop"} ref={backdropEl} onClick={($event) => { if ($event.target !== $event.currentTarget) return; props.closeOnBackdrop && close(); }}>
-  <div ref={dialogEl} className={"modal-dialog"} role="dialog" aria-modal="true" aria-label={props.title || undefined} tabIndex={-1}>
+  <div ref={dialogEl} className={"modal-dialog"} role="dialog" aria-modal="true" aria-label={rozieDisplay(props.title || undefined)} tabIndex={-1}>
     {(props.title || (props.renderHeader ?? props.slots?.['header'])) && <header>
       {(props.renderHeader ?? props.slots?.['header']) ? ((props.renderHeader ?? props.slots?.['header']) as Function)({ close }) : <h2>{props.title}</h2>}
       <button className={"close-btn"} aria-label="Close" onClick={close}>×</button>

@@ -1,7 +1,7 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { SignalWatcher, signal } from '@lit-labs/preact-signals';
-import { rozieListeners, rozieSpread } from '@rozie/runtime-lit';
+import { rozieDisplay, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 
 @customElement('rozie-prop-default-coercion')
 export default class PropDefaultCoercion extends SignalWatcher(LitElement) {
@@ -50,10 +50,10 @@ export default class PropDefaultCoercion extends SignalWatcher(LitElement) {
   render() {
     return html`
 <div class="pdc" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-s-109e595c>
-  <pre data-rozie-pdc-output="" data-rozie-s-109e595c>${JSON.stringify(this._observed.value)}</pre>
+  <pre data-rozie-pdc-output="" data-rozie-s-109e595c>${rozieDisplay(JSON.stringify(this._observed.value))}</pre>
   
-  <span data-rozie-pdc-e-identity="" data-rozie-s-109e595c>${this.e === this.e ? 'true' : 'false'}</span>
-  <span data-rozie-pdc-f-identity="" data-rozie-s-109e595c>${this.f === this.f ? 'true' : 'false'}</span>
+  <span data-rozie-pdc-e-identity="" data-rozie-s-109e595c>${rozieDisplay(this.e === this.e ? 'true' : 'false')}</span>
+  <span data-rozie-pdc-f-identity="" data-rozie-s-109e595c>${rozieDisplay(this.f === this.f ? 'true' : 'false')}</span>
 </div>
 `;
   }

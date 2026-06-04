@@ -1,6 +1,6 @@
 import type { JSX } from 'solid-js';
 import { Show, children, createEffect, mergeProps, on, onCleanup, onMount, splitProps, untrack } from 'solid-js';
-import { __rozieInjectStyle, createControllableSignal } from '@rozie/runtime-solid';
+import { __rozieInjectStyle, createControllableSignal, rozieDisplay } from '@rozie/runtime-solid';
 
 __rozieInjectStyle('Modal-fc45feb2', `.modal-backdrop[data-rozie-s-fc45feb2] {
   position: fixed; inset: 0;
@@ -104,7 +104,7 @@ export default function Modal(_props: ModalProps): JSX.Element {
   return (
     <>
     {<Show when={open()}><div class={"modal-backdrop"} ref={(el) => { backdropElRef = el as HTMLElement; }} onClick={($event) => { if ($event.target !== $event.currentTarget) return; local.closeOnBackdrop && close(); }} data-rozie-s-fc45feb2="">
-      <div ref={(el) => { dialogElRef = el as HTMLElement; }} class={"modal-dialog"} role="dialog" aria-modal="true" aria-label={local.title || undefined} tabIndex={-1} data-rozie-s-fc45feb2="">
+      <div ref={(el) => { dialogElRef = el as HTMLElement; }} class={"modal-dialog"} role="dialog" aria-modal="true" aria-label={rozieDisplay(local.title || undefined)} tabIndex={-1} data-rozie-s-fc45feb2="">
         {<Show when={local.title || (_props.headerSlot ?? _props.slots?.['header'])}><header data-rozie-s-fc45feb2="">
           {(_props.headerSlot ?? _props.slots?.['header'])?.({ close }) ?? <h2 data-rozie-s-fc45feb2="">{local.title}</h2>}
           <button aria-label="Close" class={"close-btn"} onClick={close} data-rozie-s-fc45feb2="">×</button>

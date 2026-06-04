@@ -2,7 +2,7 @@
 
 exports[`Svelte ts-passthrough — author annotation survival (Phase 09 Plan 03 Task 2) > compiles a typed .rozie to a .svelte whose <script> carries lang="ts" > typed-svelte 1`] = `
 "<script lang="ts">
-import { applyListeners } from '@rozie/runtime-svelte';
+import { applyListeners, rozieDisplay } from '@rozie/runtime-svelte';
 
 import { onMount } from 'svelte';
 
@@ -31,14 +31,14 @@ onMount(() => {
 </script>
 
 
-  <button {...__rozieAttrs} onclick={($event) => { inc(1); }} use:applyListeners={__rozieAttrs} data-rozie-s-189ead9a>{label}: {count}</button>
+  <button {...__rozieAttrs} onclick={($event) => { inc(1); }} use:applyListeners={__rozieAttrs} data-rozie-s-189ead9a>{rozieDisplay(label)}: {rozieDisplay(count)}</button>
 
 "
 `;
 
 exports[`Svelte ts-passthrough — untyped emit byte-identity anchor > untyped emit is byte-identical to today (snapshot anchor) > untyped-svelte-anchor 1`] = `
 "<script lang="ts">
-import { applyListeners } from '@rozie/runtime-svelte';
+import { applyListeners, rozieDisplay } from '@rozie/runtime-svelte';
 
 import { onMount } from 'svelte';
 
@@ -61,7 +61,7 @@ onMount(() => {
 </script>
 
 
-  <button {...__rozieAttrs} onclick={($event) => { inc(1); }} use:applyListeners={__rozieAttrs} data-rozie-s-189ead9a>{label}: {count}</button>
+  <button {...__rozieAttrs} onclick={($event) => { inc(1); }} use:applyListeners={__rozieAttrs} data-rozie-s-189ead9a>{rozieDisplay(label)}: {rozieDisplay(count)}</button>
 
 "
 `;

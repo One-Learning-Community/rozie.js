@@ -1,6 +1,6 @@
 import type { JSX } from 'solid-js';
 import { For, Show, mergeProps, splitProps } from 'solid-js';
-import { __rozieInjectStyle } from '@rozie/runtime-solid';
+import { __rozieInjectStyle, rozieDisplay } from '@rozie/runtime-solid';
 
 __rozieInjectStyle('TreeNode-a7176a6e', `.tree-node[data-rozie-s-a7176a6e] { font-family: system-ui; padding-left: 0.5rem; }
 .tree-node__label[data-rozie-s-a7176a6e] { display: inline-block; }
@@ -21,9 +21,9 @@ export default function TreeNode(_props: TreeNodeProps): JSX.Element {
   return (
     <>
     <div {...attrs} class={"tree-node" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-a7176a6e="">
-      <span class={"tree-node__label"} data-rozie-s-a7176a6e="">{local.node.label}</span>
+      <span class={"tree-node__label"} data-rozie-s-a7176a6e="">{rozieDisplay(local.node.label)}</span>
       {<Show when={local.node.children && local.node.children.length > 0}><ul class={"tree-node__children"} data-rozie-s-a7176a6e="">
-        <For each={local.node.children}>{(child, childIndex) => <li data-index={childIndex()} data-rozie-s-a7176a6e="">
+        <For each={local.node.children}>{(child, childIndex) => <li data-index={rozieDisplay(childIndex())} data-rozie-s-a7176a6e="">
           <TreeNode node={child} data-rozie-s-a7176a6e="" />
         </li>}</For>
       </ul></Show>}</div>

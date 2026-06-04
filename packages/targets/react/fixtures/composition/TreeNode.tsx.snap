@@ -1,3 +1,5 @@
+import { rozieDisplay } from '@rozie/runtime-react';
+
 interface TreeNodeProps {}
 
 export default function TreeNode(props: TreeNodeProps): JSX.Element {
@@ -6,7 +8,7 @@ export default function TreeNode(props: TreeNodeProps): JSX.Element {
   return (
     <>
       <li {...attrs} data-rozie-s-a7176a6e="">
-        <span data-rozie-s-a7176a6e="">{$props.label}</span>
+        <span data-rozie-s-a7176a6e="">{rozieDisplay($props.label)}</span>
         <TreeNode node={$props.children} data-rozie-s-a7176a6e="" />
       </li>
     </>

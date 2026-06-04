@@ -594,7 +594,7 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
       invokeAccessors: ctx.invokeAccessors,
     });
     workingAttrs = workingAttrs.filter((a) => a !== rHtmlAttr);
-    const attrsResult = emitAttributes(workingAttrs, { ir: ctx.ir, collectors: ctx.collectors, invokeAccessors: ctx.invokeAccessors });
+    const attrsResult = emitAttributes(workingAttrs, { ir: ctx.ir, collectors: ctx.collectors, invokeAccessors: ctx.invokeAccessors, elementTagKind: node.tagKind, tagName: node.tagName });
     for (const d of attrsResult.diagnostics) ctx.diagnostics.push(d);
     const listenerResult = emitElementListeners(node, ctx);
     const headParts = [
@@ -644,7 +644,7 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
   }
 
   // Standard attribute emission
-  const attrsResult = emitAttributes(workingAttrs, { ir: ctx.ir, collectors: ctx.collectors, invokeAccessors: ctx.invokeAccessors });
+  const attrsResult = emitAttributes(workingAttrs, { ir: ctx.ir, collectors: ctx.collectors, invokeAccessors: ctx.invokeAccessors, elementTagKind: node.tagKind, tagName: node.tagName });
   for (const d of attrsResult.diagnostics) ctx.diagnostics.push(d);
 
   const listenerResult = emitElementListeners(node, ctx);

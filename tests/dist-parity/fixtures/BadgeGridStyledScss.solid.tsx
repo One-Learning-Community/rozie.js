@@ -1,6 +1,6 @@
 import type { JSX } from 'solid-js';
 import { For, mergeProps, splitProps } from 'solid-js';
-import { __rozieInjectStyle } from '@rozie/runtime-solid';
+import { __rozieInjectStyle, rozieDisplay } from '@rozie/runtime-solid';
 
 __rozieInjectStyle('BadgeGridStyledScss-44801268', `.badge[data-rozie-s-44801268] {
   display: inline-flex;
@@ -54,7 +54,7 @@ export default function BadgeGridStyledScss(_props: BadgeGridStyledScssProps): J
     <>
     <div {...attrs} class={"badge-grid" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-44801268="">
       <For each={local.badges}>{(badge) => <span class={"badge badge--neutral"} data-rozie-s-44801268="">
-        {badge}
+        {rozieDisplay(badge)}
       </span>}</For>
     </div>
     </>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { clsx } from '@rozie/runtime-react';
+import { clsx, rozieDisplay } from '@rozie/runtime-react';
 import './ClassSelectorProbe.css';
 
 interface ClassSelectorProbeProps {}
@@ -19,7 +19,7 @@ export default function ClassSelectorProbe(props: ClassSelectorProbeProps): JSX.
 
   return (
     <>
-    <div data-handle={'.' + 'panel'} data-grip={gripSelector} {...attrs} className={clsx("panel", (attrs.className as string | undefined))} data-rozie-s-899140be="">
+    <div data-handle={rozieDisplay('.' + 'panel')} data-grip={rozieDisplay(gripSelector)} {...attrs} className={clsx("panel", (attrs.className as string | undefined))} data-rozie-s-899140be="">
       <span className={"grip"} aria-hidden="true" data-rozie-s-899140be="">⋮⋮</span>
       {(ready) && <span data-rozie-s-899140be="">ready</span>}</div>
     </>

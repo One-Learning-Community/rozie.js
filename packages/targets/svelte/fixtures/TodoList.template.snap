@@ -3,7 +3,7 @@
   <header>
     {#if header}{@render header({ remaining, total: items.length })}{:else}
       
-      <h3>{title} ({remaining} remaining)</h3>
+      <h3>{title} ({rozieDisplay(remaining)} remaining)</h3>
     {/if}
   </header>
 
@@ -16,7 +16,7 @@
     {#each items as item (item.id)}<li class={{ done: item.done }}>
       
       {#if children}{@render children({ item, toggle: () => toggle(item.id), remove: () => removeItem(item.id) })}{:else}
-        <label><input type="checkbox" checked={item.done} onchange={($event) => { toggle(item.id); }} /><span>{item.text}</span></label>
+        <label><input type="checkbox" checked={item.done} onchange={($event) => { toggle(item.id); }} /><span>{rozieDisplay(item.text)}</span></label>
         <button aria-label="Remove" onclick={($event) => { removeItem(item.id); }}>×</button>
       {/if}
     </li>{/each}

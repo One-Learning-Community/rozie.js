@@ -89,11 +89,15 @@ describe('emitTemplate — behavior (Plan 05-02a Task 2)', () => {
     expect(template).toContain("$event.key !== 'Escape'");
   });
 
-  it('Test 6: Modal `:aria-label="$props.title || undefined"` emits aria-label={title || undefined}', () => {
+  it('Test 6: Modal `:aria-label="$props.title || undefined"` emits aria-label={rozieDisplay(title || undefined)}', () => {
     const { template, diagnostics } = emitTemplate(lowerExample('Modal'), REGISTRY);
     expect(diagnostics).toEqual([]);
-    // The Modal :aria-label binding rewrites $props.title → title.
-    expect(template).toMatch(/aria-label=\{title \|\| undefined\}/);
+    // The Modal :aria-label binding rewrites $props.title → title. Phase 26
+    // (D-06/SPEC-4): a LogicalExpression (`||`) attribute binding on an HTML
+    // host wraps in `rozieDisplay` (wrap-when-unsure — `||` returns an operand,
+    // Pitfall 5), so the bound value renders portable JSON rather than risking
+    // an `[object Object]` attribute. `rozieDisplay(undefined)` → '' (empty).
+    expect(template).toMatch(/aria-label=\{rozieDisplay\(title \|\| undefined\)\}/);
   });
 
   it('Test 7: TodoList `:class="{ done: item.done }"` emits class={...} (binding form)', () => {

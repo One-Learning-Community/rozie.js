@@ -61,6 +61,16 @@ function flattenInlineCode(code: string): string {
 export interface EmitAttrCtx {
   ir: IRComponent;
   collectors: { react: ReactImportCollector; runtime: RuntimeReactImportCollector };
+  /**
+   * Phase 26 — the host element's tagKind + tagName. The `rozieDisplay` wrap
+   * (SPEC-4) applies ONLY where a binding renders as attribute TEXT on an HTML
+   * host element. Component/self-tag prop bindings (`<Child node={x} />`) pass
+   * the value structurally and must NOT wrap, and `value`/`checked` on a form
+   * input are controlled-input properties (boolean/value), not display text —
+   * also exempt. Optional so legacy/test call sites default to "html"/no-wrap.
+   */
+  elementTagKind?: 'html' | 'component' | 'self';
+  tagName?: string;
 }
 
 /**
@@ -227,6 +237,36 @@ function renderExpr(
   ir: IRComponent,
 ): string {
   return rewriteTemplateExpression(expr, ir);
+}
+
+/** Form-input tags whose `value`/`checked` are controlled-input PROPERTIES. */
+const FORM_INPUT_TAGS = new Set(['input', 'textarea', 'select']);
+
+/**
+ * Phase 26 — does a `wrapForDisplay`-flagged attribute binding actually render
+ * as attribute TEXT (where `[object Object]` would surface)? The gate
+ * (`wrapForDisplay`) only says the value MIGHT be non-primitive; the position
+ * decides whether wrapping is correct:
+ *   - component/self-tag prop bindings pass the value structurally → NO wrap
+ *   - `value`/`checked` on a form input are controlled-input props → NO wrap
+ *   - everything else on an HTML host element renders as attribute text → wrap
+ */
+function shouldWrapAttrBinding(name: string, expr: t.Expression, ctx: EmitAttrCtx): boolean {
+  if (ctx.elementTagKind === 'component' || ctx.elementTagKind === 'self') return false;
+  if (
+    (name === 'value' || name === 'checked') &&
+    ctx.tagName !== undefined &&
+    FORM_INPUT_TAGS.has(ctx.tagName)
+  ) {
+    return false;
+  }
+  // `style` is a structural OBJECT prop in React (not attribute text) — wrapping
+  // it would JSON-stringify the style object and break React's style prop.
+  if (name === 'style') return false;
+  // An object-expression binding (e.g. `:style="{...}"`, `:class="{...}"`) is
+  // structural, not display text — never wrap.
+  if (t.isObjectExpression(expr)) return false;
+  return true;
 }
 
 /**
@@ -915,9 +955,11 @@ function emitNonClassAttribute(
       ctx.ir,
     );
     // Phase 26 (D-06/SPEC-4) — attribute-binding wrap. When the IR flags this
-    // binding `wrapForDisplay`, a non-primitive value renders portable JSON
-    // instead of `[object Object]` in the attribute text. Raw otherwise (SPEC-3).
-    if (attr.wrapForDisplay) {
+    // binding `wrapForDisplay` AND the position renders as attribute text on an
+    // HTML host (not a structural component prop / controlled-input property), a
+    // non-primitive value renders portable JSON instead of `[object Object]`.
+    // Raw otherwise (SPEC-3).
+    if (attr.wrapForDisplay && shouldWrapAttrBinding(attr.name, attr.expression, ctx)) {
       ctx.collectors.runtime.add('rozieDisplay');
       return { jsx: `${jsxName}={rozieDisplay(${exprCode})}`, diagnostics };
     }

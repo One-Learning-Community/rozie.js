@@ -1,5 +1,5 @@
 <script lang="ts">
-import { applyListeners } from '@rozie/runtime-svelte';
+import { applyListeners, rozieDisplay } from '@rozie/runtime-svelte';
 
 import type { Snippet } from 'svelte';
 
@@ -77,7 +77,7 @@ const remaining = $derived(items.filter((i: any) => !i.done).length);
   <header data-rozie-s-52bec3de>
     {#if header}{@render header({ remaining, total: items.length })}{:else}
       
-      <h3 data-rozie-s-52bec3de>{title} ({remaining} remaining)</h3>
+      <h3 data-rozie-s-52bec3de>{title} ({rozieDisplay(remaining)} remaining)</h3>
     {/if}
   </header>
 
@@ -90,7 +90,7 @@ const remaining = $derived(items.filter((i: any) => !i.done).length);
     {#each items as item (item.id)}<li class={{ done: item.done }} data-rozie-s-52bec3de>
       
       {#if children}{@render children({ item, toggle: () => toggle(item.id), remove: () => removeItem(item.id) })}{:else}
-        <label data-rozie-s-52bec3de><input type="checkbox" checked={item.done} onchange={($event) => { toggle(item.id); }} data-rozie-s-52bec3de /><span data-rozie-s-52bec3de>{item.text}</span></label>
+        <label data-rozie-s-52bec3de><input type="checkbox" checked={item.done} onchange={($event) => { toggle(item.id); }} data-rozie-s-52bec3de /><span data-rozie-s-52bec3de>{rozieDisplay(item.text)}</span></label>
         <button aria-label="Remove" onclick={($event) => { removeItem(item.id); }} data-rozie-s-52bec3de>×</button>
       {/if}
     </li>{/each}

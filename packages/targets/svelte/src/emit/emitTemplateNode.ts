@@ -112,6 +112,15 @@ function emitInterpolation(
   ctx: EmitNodeCtx,
 ): string {
   const expr = rewriteTemplateExpression(node.expression, ctx.ir);
+  // Phase 26 (D-06/D-07) — gate on the IR-precomputed wrap decision. A
+  // non-primitive value renders portable JSON (`[object Object]` divergence
+  // eliminated); raw when provably string|number|boolean or safeInterpolation
+  // is off (SPEC-3, byte-identical to pre-phase). Svelte 5 accepts any JS in
+  // `{}`; the `__rozie`-prefix on the helper avoids the `$`-name reservation.
+  if (node.wrapForDisplay) {
+    ctx.runtimeImports.add('rozieDisplay');
+    return `{rozieDisplay(${expr})}`;
+  }
   return `{${expr}}`;
 }
 
@@ -344,6 +353,9 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
   const attrText = emitAttributes(node.attributes, {
     ir: ctx.ir,
     elementTagKind: node.tagKind,
+    // Phase 26 — thread the runtime-import accumulator so attribute/class
+    // interpolations can register `rozieDisplay` when they wrap.
+    runtimeImports: ctx.runtimeImports,
     // Spread only when defined — `exactOptionalPropertyTypes` rejects an
     // explicit `inputType: undefined` against the optional `inputType?` field.
     ...(inputType !== undefined ? { inputType } : {}),

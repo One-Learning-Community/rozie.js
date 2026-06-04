@@ -1,6 +1,6 @@
 import type { JSX } from 'solid-js';
 import { createSignal, mergeProps, onMount, splitProps } from 'solid-js';
-import { __rozieInjectStyle } from '@rozie/runtime-solid';
+import { __rozieInjectStyle, rozieDisplay } from '@rozie/runtime-solid';
 
 __rozieInjectStyle('PropDefaultCoercion-109e595c', `.pdc[data-rozie-s-109e595c] {
   display: inline-flex;
@@ -43,10 +43,10 @@ export default function PropDefaultCoercion(_props: PropDefaultCoercionProps): J
   return (
     <>
     <div {...attrs} class={"pdc" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-109e595c="">
-      <pre data-rozie-pdc-output="" data-rozie-s-109e595c="">{JSON.stringify(observed())}</pre>
+      <pre data-rozie-pdc-output="" data-rozie-s-109e595c="">{rozieDisplay(JSON.stringify(observed()))}</pre>
       
-      <span data-rozie-pdc-e-identity="" data-rozie-s-109e595c="">{local.e === local.e ? 'true' : 'false'}</span>
-      <span data-rozie-pdc-f-identity="" data-rozie-s-109e595c="">{local.f === local.f ? 'true' : 'false'}</span>
+      <span data-rozie-pdc-e-identity="" data-rozie-s-109e595c="">{rozieDisplay(local.e === local.e ? 'true' : 'false')}</span>
+      <span data-rozie-pdc-f-identity="" data-rozie-s-109e595c="">{rozieDisplay(local.f === local.f ? 'true' : 'false')}</span>
     </div>
     </>
   );
