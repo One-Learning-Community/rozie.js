@@ -135,8 +135,27 @@ export function splitBlocksFallback(source: string, filename?: string): SplitBlo
     const tagOpenEnd = source.indexOf('>', tagStart) + 1;
     const closeIdx = source.lastIndexOf('</rozie>');
     const envelopeEnd = closeIdx >= 0 ? closeIdx + '</rozie>'.length : tagOpenEnd;
+    // Phase 26 (D-12): recover the `safe-interpolation` envelope attribute from
+    // the opening <rozie ...> tag so the fallback splitter stays shape-consistent
+    // with the primary path. The opening tag text is [tagStart, tagOpenEnd).
+    // Both forms are matched (bounded, no nested quantifiers — ReDoS-safe):
+    //   - valued: safe-interpolation="false" / 'true'  → captured group
+    //   - bare boolean: <rozie ... safe-interpolation>  → no value (force-ON)
+    // WR-05: case-insensitive `"false"` parse (mirrors splitBlocks.ts). Absent
+    // → omit the key (conditional spread) so it falls through to the global/
+    // default precedence in lower.ts.
+    const openTag = source.slice(tagStart, tagOpenEnd);
+    let safeInterpolation: boolean | undefined;
+    const siValued = openTag.match(/\bsafe-interpolation\s*=\s*["']([^"']*)["']/i);
+    if (siValued) {
+      safeInterpolation = (siValued[1] ?? '').trim().toLowerCase() !== 'false';
+    } else if (/\bsafe-interpolation\b/i.test(openTag)) {
+      // bare present-without-value boolean → force-ON
+      safeInterpolation = true;
+    }
     result.rozie = {
       name: rozieMatch[1] ?? 'Anonymous',
+      ...(safeInterpolation !== undefined ? { safeInterpolation } : {}),
       loc: { start: tagStart, end: envelopeEnd },
     };
   } else {

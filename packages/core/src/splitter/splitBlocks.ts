@@ -145,6 +145,13 @@ export function splitBlocks(source: string, filename?: string): SplitBlocksResul
   // tiny and stable; the parallel form keeps the onattribend/onopentagend
   // call-sites locally readable and matches the Phase 14 precedent).
   let savedInheritListenersChunks: string[] | null = null;
+  // Phase 26 (D-12): holds chunks for the `safe-interpolation` attr on the
+  // <rozie> tag. Same null-vs-empty discriminant as the inherit-* flags. Per
+  // the Phase 14/15 precedent this is a PARALLEL local variable — deliberately
+  // NOT genericized. CRITICAL difference from inherit-attrs: this attribute can
+  // force-ON as well as force-OFF (the envelope overrides the global option in
+  // BOTH directions), so the parse below treats present/`"true"` as true.
+  let savedSafeInterpolationChunks: string[] | null = null;
   let collectingAttribValue = false;
   let unknownTagStart = -1; // tracks <` position of an unknown top-level block, -1 = none
   // Opaque-block mode: true between the opening and closing tag of a block
@@ -205,6 +212,7 @@ export function splitBlocks(source: string, filename?: string): SplitBlocksResul
         savedLangChunks = [];
         savedInheritAttrsChunks = null;
         savedInheritListenersChunks = null;
+        savedSafeInterpolationChunks = null;
         collectingAttribValue = false;
       },
 
@@ -242,6 +250,15 @@ export function splitBlocks(source: string, filename?: string): SplitBlocksResul
           // parsing pattern as `inherit-attrs` (Phase 14). Per Pitfall 6 this
           // is a PARALLEL save, not a flags-record refactor.
           savedInheritListenersChunks = [...pendingAttribValueChunks];
+        }
+        if (inRozieOpenTag && pendingAttribName === 'safe-interpolation') {
+          // Phase 26 (D-12): save the `safe-interpolation` attribute chunks on
+          // the <rozie> tag. Same null-vs-empty discriminant + onopentagend
+          // parsing pattern as inherit-attrs (Phase 14). A present-without-value
+          // boolean attribute (`<rozie safe-interpolation>`) fired no
+          // onattribdata, so the snapshot is `[]` — distinct from `null`
+          // (attribute absent).
+          savedSafeInterpolationChunks = [...pendingAttribValueChunks];
         }
         if (inBlockOpenTag && pendingAttribName === 'lang') {
           // Phase 9: save the `lang` attribute chunks for the current block
@@ -311,10 +328,32 @@ export function splitBlocks(source: string, filename?: string): SplitBlocksResul
                 inheritListeners = raw !== 'false';
               }
               savedInheritListenersChunks = null;
+              // Phase 26 (D-12): parse the `safe-interpolation` attribute. Same
+              // null/empty discriminant + WR-05 case-insensitive parse as
+              // inherit-attrs: `null` chunks = attribute absent (omit the key —
+              // exactOptionalPropertyTypes conditional spread → resolves to
+              // undefined → falls through to the global option/default in
+              // lower.ts); `"false"` (case-insensitive, incl. `"False"`/`"FALSE"`)
+              // → `false` (force-OFF); everything else (present-without-value
+              // `[]`, `"true"`, or any other value) → `true` (force-ON).
+              //
+              // CRITICAL difference from inherit-attrs (D-12): because the
+              // envelope attr wins over the global option in BOTH directions,
+              // `true` here is a meaningful FORCE-ON (overrides a global
+              // safeInterpolation:false), not merely a redundant default. The
+              // precedence (`ast.blocks.rozie?.safeInterpolation ?? opts...`) is
+              // resolved in lower.ts (Plan 03); this task only populates the field.
+              let safeInterpolation: boolean | undefined;
+              if (savedSafeInterpolationChunks !== null) {
+                const raw = savedSafeInterpolationChunks.join('').trim().toLowerCase();
+                safeInterpolation = raw !== 'false';
+              }
+              savedSafeInterpolationChunks = null;
               result.rozie = {
                 name: nameValue,
                 ...(inheritAttrs !== undefined ? { inheritAttrs } : {}),
                 ...(inheritListeners !== undefined ? { inheritListeners } : {}),
+                ...(safeInterpolation !== undefined ? { safeInterpolation } : {}),
                 // loc start = '<' of <rozie>; loc end is patched at onclosetag time
                 // to include the </rozie> close tag. Use endIndex+1 here as a conservative
                 // initial value; we update it when </rozie> fires.
