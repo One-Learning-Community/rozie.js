@@ -12,6 +12,29 @@ targets. The limitations below are about *how a consumer authors against* a
 slot, or about a target framework's own runtime semantics — never about a
 component rendering wrong state or firing a broken event.
 
+## Text interpolation of non-primitives — unified
+
+Interpolating a non-primitive value (`{{ object }}`, `{{ array }}`) is a place the
+six targets historically diverged hard: Vue pretty-printed JSON, Svelte/Angular
+comma-joined `[object Object]`, Solid/Lit space-joined it, and **React threw
+`Objects are not valid as a React child` and crashed.** Rozie unifies this — a
+non-provably-primitive interpolation is wrapped in an internal `rozieDisplay`
+helper (Vue `toDisplayString` semantics, crash-safe on circular/BigInt structures)
+so the **same portable JSON renders on all six targets** and React no longer
+crashes. Provably-primitive interpolations (typed `String`/`Number`/`Boolean`
+props, `.length`, comparisons, concatenations, boolean HTML attributes, …) stay
+raw and byte-identical to per-target hand-written output. Vue is untouched (its
+native behavior already matches); Angular inlines the helper as a component method.
+
+This is on by default and reversible: `safeInterpolation: false` (compiler/plugin
+option), `--no-safe-interpolation` (CLI), or `<rozie safe-interpolation="false">`
+(per-component envelope attribute, precedence: envelope › global › default-on)
+restores the old raw per-target emit. Separately, a *bare* whole-object sigil
+(`{{ $data }}` rather than `{{ $data.columns }}`) has no portable v1 representation
+and is a uniform compile error (**ROZ978**), independent of `safeInterpolation`.
+See [Safe non-primitive interpolation](/guide/features#safe-non-primitive-interpolation-—-objects-render-as-portable-json-never-crash)
+for the full mechanics.
+
 ## Slot consumer ergonomics
 
 ### React — scoped slots are render-prop function props

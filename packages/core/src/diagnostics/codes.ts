@@ -489,13 +489,14 @@ export const RozieErrorCode = {
   // raw source to slice rule bodies). On the back-compat no-`source` emit path
   // the lowering would reference an unimported `styles`, so emitReact refuses
   // and reports this instead of producing a dangling reference.
-  CLASS_SELECTOR_REACT_NO_SOURCE: 'ROZ968', // error — $classSelector used in a React emit without opts.source (styles import unavailable)
+  CLASS_SELECTOR_REACT_NO_SOURCE: 'ROZ968', // retired (Phase 25) — formerly fired when $classSelector was used in a React emit without opts.source. React now emits plain attribute-scoped CSS with no `styles` import, so the guard no longer fires; the code is retained (never reused) for public-API stability.
 
   // ---- Phase 14 attribute fallthrough — ROZ969..ROZ971 ----
   // Cross-framework attribute fallthrough: the `r-bind="<expr>"` bare-spread
   // form, the `$attrs` magic accessor, and `<rozie inherit-attrs>` auto-
-  // fallthrough. `ROZ968` is the verified current highest (Phase 13
-  // $classSelector) — these do NOT collide.
+  // fallthrough. `ROZ968` (Phase 13 $classSelector) was the highest assigned
+  // code when this cluster was added — these do NOT collide. (The registry has
+  // since grown past it; e.g. ROZ978 for Phase 26 bare-sigil rejection.)
   R_BIND_COLON_FORM: 'ROZ969',             // error — R1: `r-bind:foo="x"` colon form is not supported (use the `:foo` shorthand or the bare-spread `r-bind="obj"`)
   ATTR_FALLTHROUGH_MULTI_ROOT: 'ROZ970',   // error — R8: a multi-root template with auto-fallthrough enabled has no single root to receive inherited attributes
   ATTR_DOUBLE_APPLY: 'ROZ971',             // warning — R9: `$attrs` referenced (e.g. via `r-bind="$attrs"`) while auto-fallthrough is still on — attributes would be applied twice

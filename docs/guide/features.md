@@ -677,6 +677,46 @@ Reach for `$snapshot()` **only** when you're handing a reactive value to library
 If you skip it where you do need it, you'll see the Svelte runtime error [`state_descriptors_fixed`](https://svelte.dev/e/state_descriptors_fixed) the first time the library tries to mutate the value.
 :::
 
+## Safe non-primitive interpolation — objects render as portable JSON, never crash
+
+Interpolate a non-primitive value — an array, a plain object, a reactive `$data` graph — and the six targets used to disagree wildly. Vue pretty-printed JSON (its native `toDisplayString`), Svelte and Angular showed comma-joined `[object Object]`, Solid and Lit showed space-joined `[object Object]`, and **React threw `Objects are not valid as a React child` and crashed the component.** Same source, six renderings, one hard crash.
+
+Rozie closes that gap. A non-provably-primitive interpolation is wrapped in an internal `rozieDisplay` helper that mirrors Vue's `toDisplayString` semantics, so <span v-pre>`{{ $data.columns }}`</span> renders the **same portable JSON on all six targets** and React no longer crashes:
+
+| Value | `rozieDisplay` result |
+| --- | --- |
+| `string` | as-is |
+| `null` / `undefined` | `''` (empty string) |
+| `Array` / plain `Object` | `JSON.stringify(value, null, 2)` |
+| anything else (number, boolean, …) | `String(value)` |
+
+The helper is **crash-safe**: a circular structure or a `BigInt`-bearing object (which would throw inside `JSON.stringify`) degrades to `String(value)` rather than re-introducing a render exception.
+
+### Only non-primitives are wrapped — primitives stay byte-identical
+
+The wrap is **gated**, decided once at compile time. An interpolation the compiler can *prove* is primitive emits exactly as it did before — raw, zero overhead, byte-for-byte identical output. Provably-primitive cases include: a prop declared `String` / `Number` / `Boolean`, a `$data` field initialized to a primitive literal, `.length`, `typeof x`, comparisons (`a > b`, `a === b`), `!x`, `String(...)` / `Number(...)`, string concatenations, and logical chains whose operands are all primitive (`$props.a && $props.b`). When the compiler can't prove primitiveness (a bare method call, an untyped prop, a member of an untyped object), it wraps — the safe default, since a false *raw* is the crash and a false *wrap* is merely a stringified primitive.
+
+**Boolean HTML attributes are never wrapped** on any target — `:disabled`, `:hidden`, `:open`, `:readonly`, etc. always emit raw, so a bound boolean value stays a boolean rather than becoming the always-truthy string `"false"`.
+
+Per-target mechanics:
+
+- **Vue** is untouched — its native `toDisplayString` already produces the same output, so wrapping would be redundant.
+- **React, Solid, Svelte, Lit** import `rozieDisplay` from their Rozie runtime package only when a wrap actually fires.
+- **Angular** can't call an imported free function (and its `json` pipe quotes strings), so it inlines the helper as a module-scope function plus a delegating component method — no runtime package required.
+
+### Turning it off — `safeInterpolation`
+
+The wrap is **on by default** and can be disabled globally or per component. Disabling reverts to the old raw per-target emit (re-exposing the `[object Object]` / React-crash behavior — your informed choice):
+
+- **Globally** via the compiler option / plugin option: `compile(src, { safeInterpolation: false })`, `rozie({ safeInterpolation: false })` (unplugin), or the CLI flag `--no-safe-interpolation`.
+- **Per component** via the SFC envelope attribute: `<rozie safe-interpolation="false">` (or `="true"` to force it on for one component when the global default is off).
+
+Precedence is **envelope attribute › global option › default (on)** — a single component can opt out while the rest of the project keeps the wrap, or opt back in when the project default is off.
+
+### Bare `$props` / `$data` / `$refs` / `$slots` is a compile error (ROZ978)
+
+A *bare, whole-object* sigil — <span v-pre>`{{ $data }}`</span> or `$props` used alone, as opposed to a member access like <span v-pre>`{{ $data.columns }}`</span> — has no portable representation in v1 and leaked the literal identifier into emitted output (rendering on Vue, empty on Angular, runtime "not defined" on React/Solid/Lit, a hard build error on Svelte). Rozie now rejects it uniformly with **ROZ978** in any template, `<script>`, or `<listeners>` expression, and the hint points you at a specific member (which now renders as JSON automatically). This diagnostic is **always on** — it is independent of `safeInterpolation`. Member access is unaffected, and `$attrs` / `$listeners` (legitimate whole-object fallthrough) are explicitly exempt.
+
 ## `$classSelector()` — handing a class name to a vanilla-JS engine
 
 `$classSelector('grip')` turns an authored class name into a CSS selector and **validates it against the component's `<style>` scope at compile time**. It is a convenience: a class that doesn't exist in the component's `<style>` is a compile error with a did-you-mean suggestion, so engine config like `handle: $classSelector('grip')` can't silently reference a class you never declared.

@@ -70,7 +70,7 @@ To see what each target's emitted code looks like, visit the [SortableList examp
 | --- | --- | --- | :---: | --- |
 | `items` | `Array` | `[]` | yes (via `r-model`) | The bound items array. `model: true` — reorders write back through the two-way path. |
 | `itemKey` | `String` | `null` | yes | Property name to use as the per-row key (e.g. `'id'`). Improves keyed-reconciler behavior on Vue / Svelte / React. |
-| `handle` | `String` | `null` | yes | CSS selector identifying the per-row drag handle. Use `$classSelector('grip')` to survive React's CSS-Modules class hashing — see [`$classSelector`](/guide/features#classselector-—-handing-a-class-name-to-a-vanilla-js-engine). |
+| `handle` | `String` | `null` | yes | CSS selector identifying the per-row drag handle. A plain `.grip` works on every target — authored class names render literally everywhere (React included). [`$classSelector('grip')`](/guide/features#classselector-—-handing-a-class-name-to-a-vanilla-js-engine) is an optional, typo-checked way to author it. |
 | `group` | `String \| Object` | `null` | yes | SortableJS group name (cross-list drag) or full object form. Use `cloneable: true` to flip a string group into clone-mode. |
 | `animation` | `Number` | `150` | yes | Animation duration in ms. `0` disables. |
 | `disabled` | `Boolean` | `false` | yes | Temporarily disable drag without unmounting. |
@@ -124,7 +124,7 @@ The default behavior is "grab anywhere in the row." To require a specific drag h
 </SortableList>
 ```
 
-`$classSelector` is load-bearing on React because of CSS Modules class hashing — see [the dedicated `$classSelector` doc](/guide/features#classselector-—-handing-a-class-name-to-a-vanilla-js-engine). On the other five targets it lowers to the bare literal selector.
+`$classSelector` lowers to the bare literal selector (`".grip"`) on all six targets — see [the dedicated `$classSelector` doc](/guide/features#classselector-—-handing-a-class-name-to-a-vanilla-js-engine). It isn't required for correctness (React keeps authored class names literal too, so a plain `".grip"` already matches); it's a compile-time typo-check so the engine can't reference a class you never declared.
 
 The canonical example is [`SortableListDemo`](https://github.com/One-Learning-Community/rozie.js/blob/main/examples/demos/SortableListDemo.rozie).
 
@@ -198,7 +198,7 @@ A clone-mode list with no group name has no peer that can join its cross-list fl
 
 `:filter="<selector>"` prevents drag initiation on matching rows. SortableJS checks the selector at `mousedown`/`touchstart` and aborts the drag if it matches.
 
-Prefer a `data-*` attribute selector over a class selector — `data-*` survives every target's class-hashing / scoping / shadow-DOM transformations identically:
+A `data-*` attribute selector is the most robust choice — it's independent of styling and crosses every target's scoping / shadow-DOM transformation identically:
 
 ```rozie
 <SortableList r-model:items="$data.items" filter="[data-locked]">
@@ -211,7 +211,7 @@ Prefer a `data-*` attribute selector over a class selector — `data-*` survives
 </SortableList>
 ```
 
-A class-selector filter (`filter=".item-locked"`) does work on five of six targets, but on React the consumer's class name is CSS-Modules-hashed and SortableJS's literal-string match fails. There is no `$classSelector`-shaped runtime helper for `filter` because SortableJS does not expose a programmatic selector-rewrite path for this option.
+A class-selector filter (`filter=".item-locked"`) also works on all six targets now — authored class names render literally everywhere (React scopes via `[data-rozie-s-<hash>]`, it no longer hashes the class name), so SortableJS's literal-string match resolves. The `data-*` form is still recommended only because it's independent of styling. (`filter` has no `$classSelector`-style typo-check the way `handle` does — SortableJS doesn't expose a programmatic selector-rewrite path for this option — so a `data-*` selector keeps it simple.)
 
 The canonical example is [`SortableListFilterDemo`](https://github.com/One-Learning-Community/rozie.js/blob/main/examples/demos/SortableListFilterDemo.rozie).
 
@@ -236,7 +236,7 @@ The canonical example is [`SortableListFilterDemo`](https://github.com/One-Learn
 </style>
 ```
 
-Same React CSS-Modules caveat as `filter` above: SortableJS calls `el.classList.add('ghost-highlight')` with the literal name, so the React target's hashed class never resolves at runtime. For React-on-CSS-Modules consumers, declare these classes in a `:global { … }` block in the consumer's `<style>` to opt them out of hashing. The other five targets work natively.
+SortableJS calls `el.classList.add('ghost-highlight')` with the literal name, and because authored class names render literally on every target — React included — the rule matches at runtime everywhere. No `:global { … }` opt-out or other per-target workaround is needed.
 
 ### Force fallback for touch and consistent behavior
 
@@ -288,14 +288,14 @@ When any of those values change, the framework reconciler unmounts the old `<Sor
 
 SortableJS physically moves DOM nodes on drop. Five of six target reconcilers cope with this natively (their diff-against-`parent.children` patch path tolerates the engine's mutations); Lit's `lit-html` `repeat` directive keys its parts cache by sentinel-comment node identity and needs an explicit reconcile signal. The wrapper handles this for you via the [`r-external` + `$reconcileAfterDomMutation()`](/guide/features#r-external-and-reconcileafterdommutation-—-dom-the-framework-doesn-t-own) pair — you don't need to wire these yourself unless you fork the wrapper.
 
-### React CSS Modules and class-name props
+### Class-name props are literal on every target
 
-SortableJS reads `handle`, `filter`, `ghostClass`, `chosenClass`, and `dragClass` as literal strings. React's CSS Modules pipeline hashes class names in your `<style>` block, so a literal `'.grip'` selector won't match the rendered `class="_grip_17x98_26"`.
+SortableJS reads `handle`, `filter`, `ghostClass`, `chosenClass`, and `dragClass` as literal strings. Authored class names render literally on all six targets — React scopes styles via a `[data-rozie-s-<hash>]` attribute rather than hashing the class name (the same model as Vue's `<style scoped>`), so a literal `'.grip'` selector matches the rendered `class="grip"` and `classList.add('ghost-highlight')` lands on a class your `<style>` rule targets.
 
-The fix depends on whether the prop is a *selector* or a *class name to add*:
+That means none of these props need a per-target workaround:
 
-- **Selectors** (`handle`, `filter`): use [`$classSelector('grip')`](/guide/features#classselector-—-handing-a-class-name-to-a-vanilla-js-engine) on `handle` (per-target lowering; React resolves the hash at runtime). `filter` has no equivalent — prefer a `data-*` attribute selector.
-- **Class names to add** (`ghostClass`, `chosenClass`, `dragClass`): on React, declare the class in a `:global { … }` block in the consumer's `<style>` to opt it out of CSS-Modules hashing. SortableJS then attaches the unhashed class name to the live ghost/chosen/drag element, and the global rule matches.
+- **Selectors** (`handle`, `filter`): a plain `'.grip'` / `'.item-locked'` resolves on every target. On `handle` you can optionally author it as [`$classSelector('grip')`](/guide/features#classselector-—-handing-a-class-name-to-a-vanilla-js-engine) to get a compile-time typo-check; `filter` has no such helper, so a plain class or `data-*` selector is the way.
+- **Class names to add** (`ghostClass`, `chosenClass`, `dragClass`): pass the bare class name; SortableJS attaches it to the live ghost/chosen/drag element and the matching `<style>` rule applies on every target. (No `:global { … }` opt-out is required — that was only relevant while React hashed class names, which it no longer does.)
 
 ### Lit shadow-DOM cross-component styling
 

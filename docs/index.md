@@ -31,5 +31,5 @@ features:
   - title: Stuck on one framework? Use Rozie for ONE new component this week
     details: Drop a single .rozie file into your existing Next.js / Nuxt / Angular CLI / SvelteKit / Astro app. Get Vue-flavored SFC authoring, scoped CSS without runtime tax, automatic attribute fallthrough, and engine-wrapper escape hatches that fix pain your stack can't fix for you.
   - title: Quietly fixes cross-framework grit
-    details: Scoped CSS that survives composition on every target. $reconcileAfterDomMutation() for engines that mutate DOM under the reconciler's feet. $classSelector() for React's CSS-Modules class hashing. The creature-comforts matrix flips the compatibility table on its head.
+    details: Scoped CSS that survives composition on every target — with literal class names everywhere (React included), so querySelector('.x') and engine selectors just work. Non-primitive {{ }} renders portable JSON on all six targets instead of crashing React. $reconcileAfterDomMutation() for engines that mutate DOM under the reconciler's feet. The creature-comforts matrix flips the compatibility table on its head.
 ---

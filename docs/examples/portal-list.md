@@ -30,7 +30,7 @@ Portal slots are NOT reactive after mount in v1. They re-render only when the wr
 :::
 
 ::: tip Styling engine-owned DOM
-The `MiniListEngine` styles its row containers and `<ul>` via inline `el.style.foo = …` assignments rather than referencing classes from the wrapper's `<style>` block. The reason: every target scopes the wrapper's CSS — React/Solid via CSS Modules hashed class names, Vue/Svelte/Angular via attribute-selector rewrites bound to declared template elements. Engine-created elements are NOT in the static template, so the scoped class names / attribute selectors never reach them. Inline styles bypass scoping uniformly across all 6 targets, which is the portable contract for engines that own their own DOM. The consumer's `<template #item>` content still flows through normal scoped CSS — that's the slot author's surface.
+The `MiniListEngine` styles its row containers and `<ul>` via inline `el.style.foo = …` assignments rather than referencing classes from the wrapper's `<style>` block. The reason: every target scopes the wrapper's CSS via a `[data-rozie-s-<hash>]` attribute-selector rewrite bound to the declared template elements (React included — it emits a plain `.css` file scoped by that attribute, not CSS-Modules-hashed class names; Solid injects the same scoped CSS at runtime). Engine-created elements are NOT in the static template, so the scope attribute never reaches them. Inline styles bypass scoping uniformly across all 6 targets, which is the portable contract for engines that own their own DOM. The consumer's `<template #item>` content still flows through normal scoped CSS — that's the slot author's surface.
 :::
 
 ## Authoring surface

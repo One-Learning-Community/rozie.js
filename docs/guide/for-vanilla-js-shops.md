@@ -184,8 +184,10 @@ can rely on them:
 - **`$reconcileAfterDomMutation()`** is the escape hatch when the engine
   mutates DOM under the framework's feet — no-op on five targets,
   active on Lit where lit-html's `repeat` cache needs the nudge.
-- **`$classSelector('grip')`** survives React's CSS-Modules class hashing.
-  Engines that take a `handle: '.grip'` option Just Work everywhere.
+- **`$classSelector('grip')`** is a typo-checked convenience: authored class
+  names render literally on every target (React included — no class hashing), so
+  engines that take a `handle: '.grip'` option Just Work everywhere; `$classSelector`
+  additionally verifies the class exists in your `<style>` at compile time.
 - **Round-trip guards on two-way bound engine state.** When the engine
   fires its change event you write `$model.x = newValue`; the wrapper's
   own `$watch` then sees the change and would push it back. Common

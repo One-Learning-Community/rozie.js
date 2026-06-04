@@ -449,9 +449,9 @@ The handle method is `selectDate`, not flatpickr's own `setDate`. The `date` pro
 
 The handle methods are `openPicker` / `closePicker`, not `open` / `close`. This component emits `open` and `close` **events**; on targets that materialize events as named members (Angular `output()`), a method named `open`/`close` would collide with the event member (a ROZ121 follow-up class). Prefixing sidesteps it.
 
-### React class-hashing and selector-style options
+### Selector-style options
 
-React's CSS-Modules pipeline hashes class names in your `<style>` block, so any flatpickr option that takes a class **selector** string won't match the rendered hashed class. Use [`$classSelector`](/guide/features#classselector-—-handing-a-class-name-to-a-vanilla-js-engine) when authoring such a selector, or prefer a `data-*` attribute selector that survives hashing.
+Authored class names render **literally** on every target — React included (it scopes via a `[data-rozie-s-<hash>]` attribute, not by hashing the class name), so any flatpickr option that takes a class **selector** string matches the rendered class directly. [`$classSelector('cls')`](/guide/features#classselector-—-handing-a-class-name-to-a-vanilla-js-engine) is an optional, typo-checked way to author such a selector (it validates the class against the component's `<style>` at compile time and lowers to the literal `".cls"` on all six targets). A `data-*` attribute selector remains a good choice when you want a selector that is independent of styling.
 
 ## Cross-references
 

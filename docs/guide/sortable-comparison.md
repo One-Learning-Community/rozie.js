@@ -54,11 +54,13 @@ column.
   `onAdd` / `onRemove` engine callbacks plus a module-level transfer slot —
   dragging an item from list A to list B updates BOTH bound arrays atomically.
   No per-framework state-management glue.
-- **Custom drag handles.** `:handle="$classSelector('grip')"` survives React's
-  CSS-Modules class hashing on its own — `$classSelector` lowers per-target so
-  the SortableJS engine handle selector resolves on every target, including
-  React. Most React-side libraries either skip CSS-Modules support or require
-  consumers to bypass class hashing manually.
+- **Custom drag handles.** `:handle="$classSelector('grip')"` resolves on every
+  target, including React — authored class names render literally everywhere
+  (React scopes via `[data-rozie-s-<hash>]`, it doesn't hash the class name), and
+  `$classSelector` lowers to the literal `".grip"` per target while typo-checking
+  it against your `<style>` at compile time. Most React-side libraries either
+  skip scoped-CSS support or require consumers to wire selectors around a class
+  mangler manually.
 
 ## Caveats
 
