@@ -2,9 +2,10 @@
  * Quick-task 260520-8iu Task 1 — parseInlineStyle unit tests (React runtime).
  *
  * Covers the Spike 004 string-form `:style` runtime-helper behavior:
- * PostCSS-driven declaration parse, kebab→camel key conversion,
+ * style-to-js-driven declaration parse, kebab→camel key conversion,
  * `!important` preservation, custom-property / vendor-prefix handling,
  * quoted-semicolon resilience, empty/whitespace + malformed guards.
+ * (See parseInlineStyle.parity.test.ts for the postcss differential.)
  */
 import { describe, it, expect } from 'vitest';
 import { parseInlineStyle, toStyleObjectKey } from '../parseInlineStyle.js';
@@ -41,14 +42,14 @@ describe('parseInlineStyle (Plan 260520-8iu Task 1)', () => {
     expect(parseInlineStyle('   ')).toEqual({});
   });
 
-  it('quoted semicolons inside values survive (PostCSS, not naive split)', () => {
+  it('quoted semicolons inside values survive (style-to-js, not naive split)', () => {
     expect(parseInlineStyle('content: "a;b"')).toEqual({ content: '"a;b"' });
   });
 
   it('malformed style string does NOT throw — returns {} or partial object', () => {
     // The runtime path has no diagnostic stream; a parse failure must not
-    // escape as an exception. PostCSS is tolerant of much malformed input,
-    // so the contract is "no throw", not "necessarily empty".
+    // escape as an exception. style-to-js is wrapped to degrade to {}, so
+    // the contract is "no throw", not "necessarily empty".
     expect(() => parseInlineStyle('color: ;;; }{[[')).not.toThrow();
   });
 });

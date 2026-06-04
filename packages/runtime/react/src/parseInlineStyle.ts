@@ -1,30 +1,41 @@
 /**
- * parseInlineStyle — Spike 004 runtime helper for dynamic :style string exprs.
+ * parseInlineStyle — runtime helper for dynamic `:style` string expressions.
  *
  * Compile-time path (preferred — zero runtime cost):
  *   :style="'background: red'"  is a string LITERAL — the compiler
- *   pre-parses with postcss and emits the object form directly:
+ *   pre-parses it and emits the object form directly:
  *     style={{ background: 'red' }}
  *
- * Runtime path (this helper — used only when compile-time pre-parse
+ * Runtime path (this helper — used only when the compile-time pre-parse
  * can't apply, i.e. the expression isn't a string literal):
  *   :style="'opacity: ' + (cond ? '0.5' : '1') + '; ...'"
  *   :style="someStringProp"
  *
- * PostCSS handles all the gotchas naive split-on-`;` misses:
- *   - quoted strings containing semicolons (`content: 'foo;bar'`)
- *   - url(...) and other functions with internal punctuation
- *   - inline comments
- *   - !important flag extraction
+ * Delegates to `style-to-js` (a ~1 KB inline-style parser built on
+ * `inline-style-parser`) invoked with `{ reactCompat: true }`. That single
+ * call subsumes both the declaration parse and the kebab→camel key
+ * conversion this helper used to perform by hand:
+ *   - parses the gotchas a naive split-on-`;` misses — quoted strings with
+ *     semicolons (`content: 'foo;bar'`), `url(data:…;base64,…)` data URIs,
+ *     inline comments, `!important`;
+ *   - camelCases keys, capitalizing vendor prefixes the way React/Solid
+ *     style objects expect (`-webkit-mask` → `WebkitMask`) and passing CSS
+ *     custom properties (`--foo`) through verbatim.
  *
- * Why postcss and not a hand-rolled scanner: postcss is already a
- * project dep (see CLAUDE.md tech stack), and a hand-rolled scanner
- * would re-implement quoted-string + paren-balance state machines
- * that postcss already battle-tests.
+ * Replaced postcss (2026-06-04). postcss was the ONLY dependency these
+ * runtime packages leaked into a consumer bundle (~24 KB gzip) and it was
+ * reachable solely through this helper; style-to-js is ~1.5 KB gzip and
+ * produces byte-identical output for the inline-declaration subset. A
+ * differential test (`parseInlineStyle.parity.test.ts`) pins the new output
+ * to the prior postcss implementation, kept as the oracle in devDependencies.
+ *
+ * Crash-safety (SPEC-1): the runtime path has no diagnostic stream, so a
+ * parse failure must never escape as an exception — `style-to-js` throws on
+ * some malformed input, so the call is wrapped to degrade to `{}`.
  *
  * @public — runtime API consumed by emitted .tsx files.
  */
-import postcss from 'postcss';
+import styleToJS from 'style-to-js';
 
 const KEBAB_TO_CAMEL_CACHE = new Map<string, string>();
 
@@ -35,6 +46,10 @@ const KEBAB_TO_CAMEL_CACHE = new Map<string, string>();
  *   -moz-foo           →  MozFoo
  *   --custom-prop      →  --custom-prop   (CSS custom properties pass through)
  *   font-size          →  fontSize
+ *
+ * Retained as a public export (and used by the differential parity test's
+ * oracle); the main `parseInlineStyle` path now gets key conversion from
+ * `style-to-js` directly.
  */
 export function toStyleObjectKey(prop: string): string {
   const cached = KEBAB_TO_CAMEL_CACHE.get(prop);
@@ -61,32 +76,14 @@ export function toStyleObjectKey(prop: string): string {
 
 /**
  * Parse an inline-style string into a style-object suitable for React /
- * Vue / Solid `style` props. PostCSS does the heavy lifting; we walk
- * the declarations and produce the object.
- *
- * `!important` is preserved by appending it to the value, BUT React's
- * style-object form silently drops it. The compile-time path emits a
- * ROZ083 warning when this is detected in a string-LITERAL fragment;
- * the runtime path can't warn (no diagnostic stream), so it just
- * preserves whatever postcss produced.
+ * Solid `style` props. Returns `{}` for empty, whitespace-only, or
+ * unparseable input — never throws (see crash-safety note above).
  */
 export function parseInlineStyle(text: string): Record<string, string> {
-  // PostCSS parses bare declaration lists by default. Empty / whitespace
-  // input yields a root with no decls — return empty object.
   if (text.length === 0 || /^\s*$/.test(text)) return {};
-
-  const obj: Record<string, string> = {};
   try {
-    const root = postcss.parse(text);
-    root.walkDecls((decl) => {
-      const key = toStyleObjectKey(decl.prop);
-      obj[key] = decl.important ? `${decl.value} !important` : decl.value;
-    });
-  } catch (_err) {
-    // Parse failure at runtime — return empty object rather than throw.
-    // The compile-time path catches malformed style strings via ROZ08x;
-    // the runtime path only ever sees expressions that produced valid
-    // CSS at authoring time (or the author is responsible).
+    return styleToJS(text, { reactCompat: true });
+  } catch {
+    return {};
   }
-  return obj;
 }

@@ -2,7 +2,7 @@
  * Quick-task 260520-8iu Task 1 — parseInlineStyle unit tests (Solid runtime).
  *
  * Covers the Spike 004 string-form `:style` runtime-helper behavior:
- * PostCSS-driven declaration parse, kebab→camel key conversion,
+ * style-to-js-driven declaration parse, kebab→camel key conversion,
  * `!important` preservation, custom-property / vendor-prefix handling,
  * quoted-semicolon resilience, empty/whitespace + malformed guards.
  *
@@ -44,7 +44,7 @@ describe('parseInlineStyle (Plan 260520-8iu Task 1)', () => {
     expect(parseInlineStyle('   ')).toEqual({});
   });
 
-  it('quoted semicolons inside values survive (PostCSS, not naive split)', () => {
+  it('quoted semicolons inside values survive (style-to-js, not naive split)', () => {
     expect(parseInlineStyle('content: "a;b"')).toEqual({ content: '"a;b"' });
   });
 
