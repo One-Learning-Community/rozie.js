@@ -253,6 +253,10 @@ const FORM_INPUT_TAGS = new Set(['input', 'textarea', 'select']);
  */
 function shouldWrapAttrBinding(name: string, expr: t.Expression, ctx: EmitAttrCtx): boolean {
   if (ctx.elementTagKind === 'component' || ctx.elementTagKind === 'self') return false;
+  // CR-02 — Boolean HTML attrs are not display text; wrapping feeds a string
+  // into a boolean prop (TS2322 + "false"-is-truthy flip) and diverges from
+  // Lit/Angular which keep boolean-attr bindings raw. Always raw, matching them.
+  if (BOOLEAN_HTML_ATTRS.has(name.toLowerCase())) return false;
   if (
     (name === 'value' || name === 'checked') &&
     ctx.tagName !== undefined &&

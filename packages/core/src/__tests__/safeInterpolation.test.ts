@@ -146,3 +146,44 @@ describe('safe-interpolation envelope precedence (D-12)', () => {
     });
   }
 });
+
+// ---------------------------------------------------------------------------
+// CR-02 — boolean HTML attrs are NEVER wrapped, even when the bound expression
+// is not provably primitive (untyped <props> entry). Wrapping a boolean attr
+// feeds a string into a boolean prop (TS2322 + "false"-is-truthy flip) and
+// diverged React/Svelte from Lit/Angular. All five non-Vue targets must emit
+// the boolean-attr binding RAW (no rozieDisplay), while a sibling text
+// interpolation of the SAME untyped value still WRAPs (proving the exemption
+// is attribute-specific, not "safeInterpolation accidentally off").
+// ---------------------------------------------------------------------------
+const BOOL_ATTR_SRC = `<rozie name="BoolAttrWrap">
+<props>
+{
+  flag: {},
+}
+</props>
+<template>
+<button :disabled="$props.flag">{{ $props.flag }}</button>
+</template>
+</rozie>`;
+
+describe('CR-02 — boolean HTML attrs are never display-wrapped', () => {
+  for (const target of NON_VUE_TARGETS) {
+    it(`${target}: :disabled bound to an untyped prop emits RAW (no rozieDisplay near disabled)`, () => {
+      const code = compileFor(BOOL_ATTR_SRC, target);
+      // The sibling text interpolation of the same untyped value DOES wrap,
+      // proving safeInterpolation is on and the gate flagged this value.
+      expect(code).toMatch(WRAP_RE);
+      // But the boolean-attr binding must NOT be wrapped. Locate the emitted
+      // `disabled` binding token (any of the per-target forms: `disabled={...}`,
+      // `[disabled]="..."`, `?disabled=${...}`) and assert its RHS up to the next
+      // attribute / tag boundary contains NO `rozieDisplay`. The text-node wrap
+      // lives outside this slice, so the page-wide WRAP_RE above still holds.
+      const m = code.match(
+        /(\??disabled|\[disabled\])\s*=\s*(\{[^}]*\}|"[^"]*"|\$\{[^}]*\})/i,
+      );
+      expect(m, `${target}: expected a disabled binding in:\n${code}`).not.toBeNull();
+      expect(m![0]).not.toMatch(/rozieDisplay/);
+    });
+  }
+});

@@ -53,11 +53,38 @@ export interface EmitAttrCtx {
 const FORM_INPUT_TAGS = new Set(['input', 'textarea', 'select']);
 
 /**
+ * CR-02 — HTML attributes whose value is a `boolean` (mirror of the React/Svelte
+ * sets). A boolean-attr binding is never display TEXT; wrapping it feeds a
+ * string into a boolean prop ("false"-is-truthy flip) and diverges from Lit. */
+const BOOLEAN_HTML_ATTRS: ReadonlySet<string> = new Set([
+  'multiple',
+  'disabled',
+  'readonly',
+  'required',
+  'checked',
+  'selected',
+  'hidden',
+  'autofocus',
+  'autoplay',
+  'controls',
+  'loop',
+  'muted',
+  'default',
+  'open',
+  'novalidate',
+  'formnovalidate',
+  'itemscope',
+  'reversed',
+]);
+
+/**
  * Phase 26 — does a `wrapForDisplay`-flagged attribute binding render as
  * attribute TEXT (where `[object Object]` would surface)? See the React twin.
  */
 function shouldWrapAttrBinding(name: string, expr: t.Expression, ctx: EmitAttrCtx): boolean {
   if (ctx.elementTagKind === 'component' || ctx.elementTagKind === 'self') return false;
+  // CR-02 — Boolean HTML attrs are not display text; always raw (matches Lit).
+  if (BOOLEAN_HTML_ATTRS.has(name.toLowerCase())) return false;
   if (
     (name === 'value' || name === 'checked') &&
     ctx.tagName !== undefined &&

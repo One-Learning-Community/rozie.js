@@ -427,6 +427,33 @@ function lowerBoundAttrExpression(
 const FORM_INPUT_TAGS: ReadonlySet<string> = new Set(['input', 'textarea', 'select']);
 
 /**
+ * CR-02 — HTML attributes whose value is a `boolean` (mirror of the React/Svelte/
+ * Solid sets). A boolean-attr binding is never display TEXT; wrapping it routes
+ * a string through `[disabled]="rozieDisplay(...)"` ("false"-is-truthy flip) and
+ * diverges from Lit's correctly-raw `?disabled=${...}`.
+ */
+const BOOLEAN_HTML_ATTRS: ReadonlySet<string> = new Set([
+  'multiple',
+  'disabled',
+  'readonly',
+  'required',
+  'checked',
+  'selected',
+  'hidden',
+  'autofocus',
+  'autoplay',
+  'controls',
+  'loop',
+  'muted',
+  'default',
+  'open',
+  'novalidate',
+  'formnovalidate',
+  'itemscope',
+  'reversed',
+]);
+
+/**
  * Phase 26 (SPEC-4, D-06/D-07) — position-aware refinement of the IR's
  * `wrapForDisplay` gate for ATTRIBUTE positions. `wrapForDisplay` only says the
  * value MIGHT be non-primitive; the binding POSITION decides whether
@@ -450,6 +477,8 @@ function shouldWrapAttrBinding(
   if (ctx.elementTagKind === 'component' || ctx.elementTagKind === 'self') {
     return false;
   }
+  // CR-02 — Boolean HTML attrs are not display text; always raw (matches Lit).
+  if (BOOLEAN_HTML_ATTRS.has(name.toLowerCase())) return false;
   if (
     (name === 'value' || name === 'checked') &&
     FORM_INPUT_TAGS.has(elementTagName.toLowerCase())
