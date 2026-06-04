@@ -50,7 +50,7 @@ export default defineConfig({
     environmentMatchGlobs: [
       ['**/*.test.tsx', 'happy-dom'],
     ],
-    include: ['regressions.test.ts', '**/*.test.tsx'],
+    include: ['regressions.test.ts', 'runtime-side-effects.test.ts', '**/*.test.tsx'],
     testTimeout: 30000,
   },
 });
