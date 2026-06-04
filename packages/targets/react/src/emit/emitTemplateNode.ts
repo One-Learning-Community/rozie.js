@@ -103,6 +103,16 @@ function emitStaticText(node: TemplateStaticTextIR, _ctx: EmitNodeCtx): string {
 
 function emitInterpolation(node: TemplateInterpolationIR, ctx: EmitNodeCtx): string {
   const code = rewriteTemplateExpression(node.expression, ctx.ir);
+  // Phase 26 (D-06/D-07) — gate on the IR-precomputed wrap decision. When
+  // `wrapForDisplay` is true the value may be a non-primitive (object/array/
+  // unknown) which React cannot render directly ("Objects are not valid as a
+  // React child"); `rozieDisplay` pretty-prints it as portable JSON. When
+  // false the expression is provably string|number|boolean (or
+  // safeInterpolation is off) → emit raw, byte-identical to pre-phase (SPEC-3).
+  if (node.wrapForDisplay) {
+    ctx.collectors.runtime.add('rozieDisplay');
+    return `{rozieDisplay(${code})}`;
+  }
   return `{${code}}`;
 }
 

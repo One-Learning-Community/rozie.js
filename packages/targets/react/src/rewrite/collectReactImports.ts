@@ -76,6 +76,11 @@ export type RuntimeReactImport =
   | 'useDebouncedCallback'
   | 'useThrottledCallback'
   | 'clsx'
+  // Phase 26 (D-01/D-06) — portable display helper. Added by the template
+  // emitters ONLY when a `wrapForDisplay` interpolation actually wraps, so a
+  // primitive-only component's `@rozie/runtime-react` import line stays
+  // byte-identical to pre-phase (SPEC-3).
+  | 'rozieDisplay'
   | 'parseInlineStyle'
   | 'normalizeAttrs'
   | 'normalizeListeners'

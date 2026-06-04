@@ -97,6 +97,14 @@ function emitInterpolation(node: TemplateInterpolationIR, ctx: EmitNodeCtx): str
   const code = rewriteTemplateExpression(node.expression, ctx.ir, {
     invokeAccessors: ctx.invokeAccessors,
   });
+  // Phase 26 (D-06/D-07/A4) — the wrap sits INSIDE the JSX `{}` so Solid still
+  // tracks the reactive accessor read (the accessor invocation lives in `code`).
+  // Non-primitive values render portable JSON; raw when provably primitive or
+  // safeInterpolation is off (SPEC-3, byte-identical to pre-phase).
+  if (node.wrapForDisplay) {
+    ctx.collectors.runtime.add('rozieDisplay');
+    return `{rozieDisplay(${code})}`;
+  }
   return `{${code}}`;
 }
 

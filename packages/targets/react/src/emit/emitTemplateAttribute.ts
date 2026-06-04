@@ -451,9 +451,11 @@ function composeClassName(
 
   // Inline interpolated-segment shape (matches AttributeBinding's
   // 'interpolated' kind body without recreating the discriminator).
+  // Phase 26 — carry the per-segment `wrapForDisplay` gate through so the
+  // class-token renderer can wrap non-primitive class interpolations (SPEC-4).
   type InterpolatedSeg =
     | { kind: 'static'; text: string }
-    | { kind: 'binding'; expression: t.Expression; deps: unknown };
+    | { kind: 'binding'; expression: t.Expression; deps: unknown; wrapForDisplay?: boolean };
 
   // Categorize each attribute
   const segments: Array<
@@ -523,7 +525,7 @@ function composeClassName(
     // as-is — a documented v1 limitation.
     const staticSegs = decomposeStaticClassExpr(seg.expr);
     if (staticSegs) {
-      return renderInterpolatedClass(staticSegs, ir);
+      return renderInterpolatedClass(staticSegs, ctx);
     }
     return renderExpr(seg.expr, ir);
   }
@@ -534,10 +536,10 @@ function composeClassName(
       kind: 'interpolated';
       segments: Array<
         | { kind: 'static'; text: string }
-        | { kind: 'binding'; expression: t.Expression; deps: unknown }
+        | { kind: 'binding'; expression: t.Expression; deps: unknown; wrapForDisplay?: boolean }
       >;
     };
-    return renderInterpolatedClass(seg.segments, ir);
+    return renderInterpolatedClass(seg.segments, ctx);
   }
 
   // CASE E: Multi-source (mixed) — use clsx aggregator
@@ -558,10 +560,10 @@ function composeClassName(
       const interpSegs = (s as unknown as {
         segments: Array<
           | { kind: 'static'; text: string }
-          | { kind: 'binding'; expression: t.Expression; deps: unknown }
+          | { kind: 'binding'; expression: t.Expression; deps: unknown; wrapForDisplay?: boolean }
         >;
       }).segments;
-      clsxArgs.push(renderInterpolatedClass(interpSegs, ir));
+      clsxArgs.push(renderInterpolatedClass(interpSegs, ctx));
     }
   }
   return `clsx(${clsxArgs.join(', ')})`;
@@ -627,10 +629,11 @@ function decomposeStaticClassExpr(
 function renderInterpolatedClass(
   segments: Array<
     | { kind: 'static'; text: string }
-    | { kind: 'binding'; expression: t.Expression; deps: unknown }
+    | { kind: 'binding'; expression: t.Expression; deps: unknown; wrapForDisplay?: boolean }
   >,
-  ir: IRComponent,
+  ctx: EmitAttrCtx,
 ): string {
+  const ir = ctx.ir;
   // Build a token-stream where each token is either:
   //   { kind: 'static'; text: string }                  // a complete class token
   //   { kind: 'composite'; parts: Array<...> }          // a token spanning binding+static
@@ -666,7 +669,15 @@ function renderInterpolatedClass(
     if (seg.kind === 'static') {
       pushTextRun(seg.text);
     } else {
-      const code = renderExpr(seg.expression, ir);
+      // Phase 26 (D-06/SPEC-4) — wrap a non-primitive class interpolation so it
+      // renders portable JSON rather than `[object Object]` in the class token.
+      // Raw when provably primitive (SPEC-3, byte-identical to pre-phase).
+      const rawCode = renderExpr(seg.expression, ir);
+      let code = rawCode;
+      if (seg.wrapForDisplay) {
+        ctx.collectors.runtime.add('rozieDisplay');
+        code = `rozieDisplay(${rawCode})`;
+      }
       if (!current) current = { parts: [] };
       current.parts.push({ kind: 'binding', code });
     }
@@ -903,6 +914,13 @@ function emitNonClassAttribute(
       normalizeNullAttrBinding(attr.expression),
       ctx.ir,
     );
+    // Phase 26 (D-06/SPEC-4) — attribute-binding wrap. When the IR flags this
+    // binding `wrapForDisplay`, a non-primitive value renders portable JSON
+    // instead of `[object Object]` in the attribute text. Raw otherwise (SPEC-3).
+    if (attr.wrapForDisplay) {
+      ctx.collectors.runtime.add('rozieDisplay');
+      return { jsx: `${jsxName}={rozieDisplay(${exprCode})}`, diagnostics };
+    }
     return { jsx: `${jsxName}={${exprCode}}`, diagnostics };
   }
 
@@ -939,7 +957,16 @@ function emitNonClassAttribute(
         .replace(/`/g, '\\`')
         .replace(/\$\{/g, '\\${');
     } else {
-      lit += '${' + renderExpr(seg.expression, ctx.ir) + '}';
+      // Phase 26 (D-06/SPEC-4) — per-segment wrap. A non-primitive interpolated
+      // into an attribute string renders portable JSON instead of `[object
+      // Object]`. Raw when the segment is provably primitive (SPEC-3).
+      const segCode = renderExpr(seg.expression, ctx.ir);
+      if (seg.wrapForDisplay) {
+        ctx.collectors.runtime.add('rozieDisplay');
+        lit += '${rozieDisplay(' + segCode + ')}';
+      } else {
+        lit += '${' + segCode + '}';
+      }
     }
   }
   return { jsx: `${jsxName}={\`${lit}\`}`, diagnostics };

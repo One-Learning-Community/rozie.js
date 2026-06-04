@@ -298,6 +298,9 @@ function composeClassValue(
   attrs: AttributeBinding[],
   ir: IRComponent,
   invokeAccessors?: ReadonlySet<string> | undefined,
+  // Phase 26 — runtime collector so a non-primitive class interpolation can
+  // register the `rozieDisplay` import when it wraps (SPEC-4).
+  runtime?: RuntimeSolidImportCollector,
 ): string {
   // Single static → plain string
   if (attrs.length === 1 && attrs[0]!.kind === 'static') {
@@ -325,7 +328,14 @@ function composeClassValue(
           .replace(/`/g, '\\`')
           .replace(/\$\{/g, '\\${');
       } else {
-        lit += '${' + renderExpr(seg.expression, ir, invokeAccessors) + '}';
+        // Phase 26 (D-06/SPEC-4) — wrap a non-primitive class interpolation.
+        const segCode = renderExpr(seg.expression, ir, invokeAccessors);
+        if (seg.wrapForDisplay) {
+          runtime?.add('rozieDisplay');
+          lit += '${rozieDisplay(' + segCode + ')}';
+        } else {
+          lit += '${' + segCode + '}';
+        }
       }
     }
     return '`' + lit + '`';
@@ -359,7 +369,14 @@ function composeClassValue(
             .replace(/`/g, '\\`')
             .replace(/\$\{/g, '\\${');
         } else {
-          lit += '${' + renderExpr(seg.expression, ir, invokeAccessors) + '}';
+          // Phase 26 (D-06/SPEC-4) — wrap a non-primitive class interpolation.
+          const segCode = renderExpr(seg.expression, ir, invokeAccessors);
+          if (seg.wrapForDisplay) {
+            runtime?.add('rozieDisplay');
+            lit += '${rozieDisplay(' + segCode + ')}';
+          } else {
+            lit += '${' + segCode + '}';
+          }
         }
       }
       parts.push('`' + lit + '`');
@@ -522,6 +539,13 @@ function emitNonClassAttribute(
     }
     const jsxName = colonPropToSolidName(attr.name);
     const exprCode = renderExpr(attr.expression, ctx.ir, ctx.invokeAccessors);
+    // Phase 26 (D-06/SPEC-4) — attribute-binding wrap. A non-primitive value
+    // renders portable JSON instead of `[object Object]`. Raw otherwise (SPEC-3).
+    // The wrap sits inside the JSX `{}` so the accessor read stays tracked (A4).
+    if (attr.wrapForDisplay) {
+      ctx.collectors.runtime.add('rozieDisplay');
+      return { jsx: `${jsxName}={rozieDisplay(${exprCode})}`, diagnostics };
+    }
     return { jsx: `${jsxName}={${exprCode}}`, diagnostics };
   }
 
@@ -579,7 +603,14 @@ function emitNonClassAttribute(
         .replace(/`/g, '\\`')
         .replace(/\$\{/g, '\\${');
     } else {
-      lit += '${' + renderExpr(seg.expression, ctx.ir, ctx.invokeAccessors) + '}';
+      // Phase 26 (D-06/SPEC-4) — per-segment wrap for attribute interpolation.
+      const segCode = renderExpr(seg.expression, ctx.ir, ctx.invokeAccessors);
+      if (seg.wrapForDisplay) {
+        ctx.collectors.runtime.add('rozieDisplay');
+        lit += '${rozieDisplay(' + segCode + ')}';
+      } else {
+        lit += '${' + segCode + '}';
+      }
     }
   }
   return { jsx: `${jsxName}={\`${lit}\`}`, diagnostics };
@@ -857,7 +888,7 @@ export function emitAttributes(
       }
       // Emit `class=` for string/interpolated attrs.
       if (classStrAttrs.length > 0) {
-        let classValue = composeClassValue(classStrAttrs, ctx.ir, ctx.invokeAccessors);
+        let classValue = composeClassValue(classStrAttrs, ctx.ir, ctx.invokeAccessors, ctx.collectors.runtime);
         if (needsPostSpreadClass) {
           // R6 opaque-spread merge: append each opaque spread's class at the
           // tail of the value so an `extra-variant` from `$attrs` joins our
