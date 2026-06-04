@@ -53,55 +53,64 @@ test.describe('Solid dev-mode double-mount (QA-03)', () => {
     const backdrop = page.locator('.modal-backdrop');
 
     // QA-03 contract for Solid: the lifecycle-pairing — $onMount(lockScroll) /
-    // $onUnmount(unlockScroll) — is wired to COMPONENT mount/dispose (not to the
-    // `open` prop). The dev-mode stress assertion is therefore: a mount LOCKS
-    // body scroll, the matching dispose UNLOCKS it exactly once (symmetric
-    // cleanup), and repeated mount/dispose cycles never leak or double the lock.
+    // $onUnmount(unlockScroll) plus the $watch(() => $props.open) driver — is the
+    // dev-mode double-mount cleanup surface. Per canonical Modal.rozie the
+    // body-scroll-lock is OPEN-coupled: $onMount(lockScroll) is a guarded no-op
+    // while closed, the lock arms when `open` flips true ($watch), and the
+    // $onUnmount(unlockScroll) restore runs exactly once per dispose. The
+    // stress assertion is therefore: each mount→open LOCKS body scroll, the
+    // matching dispose UNLOCKS it exactly once (symmetric cleanup), and repeated
+    // mount/open/dispose cycles never leak or double the lock.
     //
-    // NOTE — D-SH-01 (07-DIVERGENCES.md): the React reference target's
-    // strictmode-matrix Modal cell asserts a stricter open→'hidden'/close→''
-    // body-lock cycle that holds for React but NOT for Solid (closing the modal
-    // via the × button while the component stays mounted leaves
-    // body.style.overflow at 'hidden' under Solid). That open/close-coupled
-    // contract divergence is carried forward to Plan 07-05; this spec asserts
-    // the mount/dispose-coupled contract that IS the Solid Modal's actual
-    // lifecycle wiring.
+    // D-SH-01 reconciled (Plan 25-03 / f23f6a2e): the Solid Modal scroll-lock is
+    // now open-coupled, matching the React reference target's strictmode-matrix
+    // contract. The former mount/dispose-coupled divergence is retired.
+    //
+    // Overflow assertions use page.waitForFunction (not expect.poll): the cycle
+    // drives hash-route navigations (mountRoute / disposeRoute), and an
+    // expect.poll probe in flight when the next navigation fires surfaces a
+    // transient "execution context destroyed" error. waitForFunction polls
+    // in-page and re-binds to the new context, so it asserts the same
+    // lock/release contract without binding to navigation/flush timing.
+    const waitOverflow = (value: string) =>
+      page.waitForFunction(
+        (v) => document.body.style.overflow === v,
+        value,
+      );
 
-    // Cycle 1 — mount. $onMount(lockScroll) runs at component mount → 'hidden'.
+    // Cycle 1 — mount (closed): $onMount(lockScroll) is a guarded no-op → ''.
     await mountRoute(page, '/modal', 'Modal');
-    expect(await page.evaluate(() => document.body.style.overflow)).toBe(
-      'hidden',
-    );
-    // Opening the modal surfaces the backdrop; scroll is already locked.
+    await waitOverflow('');
+    // Open the modal → backdrop visible → $watch fires → lockScroll → 'hidden'.
     await page.getByTestId('open-modal').click();
     await expect(backdrop).toBeVisible();
-    expect(await page.evaluate(() => document.body.style.overflow)).toBe(
-      'hidden',
-    );
+    await waitOverflow('hidden');
 
     // Dispose mid-open — navigating away disposes the Modal's reactive owner.
     // $onUnmount(unlockScroll) must run exactly once: body.style.overflow back
     // to '' (not left 'hidden', not double-cleared into a corrupt state).
     await disposeRoute(page);
-    expect(await page.evaluate(() => document.body.style.overflow)).toBe('');
+    await waitOverflow('');
 
-    // Cycle 2 — re-mount. A fresh owner; lockScroll runs again exactly once
-    // (not doubled): 'hidden'. Then dispose while closed → unlockScroll once.
+    // Cycle 2 — re-mount. A fresh owner; closed → ''; open → lock arms again
+    // exactly once (not doubled) → 'hidden'; dispose mid-open → unlock once → ''.
     await mountRoute(page, '/modal', 'Modal');
-    expect(await page.evaluate(() => document.body.style.overflow)).toBe(
-      'hidden',
-    );
+    await waitOverflow('');
+    await page.getByTestId('open-modal').click();
+    await expect(backdrop).toBeVisible();
+    await waitOverflow('hidden');
     await disposeRoute(page);
-    expect(await page.evaluate(() => document.body.style.overflow)).toBe('');
+    await waitOverflow('');
 
-    // Cycle 3 — one more mount/dispose to shake out accumulation; the lock must
-    // still be exactly-once-per-mount with a clean '' after dispose.
+    // Cycle 3 — one more mount/open/dispose to shake out accumulation; the lock
+    // must still be exactly-once-per-open with a clean '' after dispose.
     await mountRoute(page, '/modal', 'Modal');
-    expect(await page.evaluate(() => document.body.style.overflow)).toBe(
-      'hidden',
-    );
+    await waitOverflow('');
+    await page.getByTestId('open-modal').click();
+    await expect(backdrop).toBeVisible();
+    await waitOverflow('hidden');
     await disposeRoute(page);
-    expect(await page.evaluate(() => document.body.style.overflow)).toBe('');
+    await waitOverflow('');
 
     expect(pageErrors).toEqual([]);
   });

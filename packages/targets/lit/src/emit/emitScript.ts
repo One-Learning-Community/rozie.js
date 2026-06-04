@@ -490,12 +490,32 @@ function partitionScript(program: t.File): PartitionedScript {
  */
 function classifyWatcherRoute(
   watcher: WatchHook,
+  modelPropNames: ReadonlySet<string>,
 ): { route: 'props' | 'effect'; propNames: string[] } {
   const propNames = new Set<string>();
   let nonPropsSeen = false;
   for (const dep of watcher.getterDeps) {
     if (dep.scope === 'props') {
-      if (dep.path.length > 0) propNames.add(dep.path[0]!);
+      const name = dep.path.length > 0 ? dep.path[0]! : undefined;
+      // A `model: true` prop is NOT a plain Lit `@property`: its value lives in
+      // a preact `signal()` behind `createLitControllableProperty`, and the
+      // public accessor (`get open()` / `set open()`) never populates
+      // `changedProperties` — the reactive `@property` is the attribute mirror
+      // `_<name>_attr`, while property-binding and imperative writes flow
+      // through `notifyPropertyWrite` → the signal, not the reactive-property
+      // setter. So `changedProperties.has('open')` is permanently false and the
+      // props-route branch is dead for a model prop. Route it through `effect()`
+      // instead: the getter's `this.open` read resolves to the preact-signal
+      // read, which `effect()` DOES subscribe to. (Mirror image of the
+      // fullcalendar-lit-watch-property fix — there, plain `@property` reads
+      // needed the changedProperties route because `effect()` can't see them;
+      // here, model-prop signal reads need the effect route because
+      // `changedProperties` can't see them.)
+      if (name !== undefined && modelPropNames.has(name)) {
+        nonPropsSeen = true;
+        continue;
+      }
+      if (name !== undefined) propNames.add(name);
       continue;
     }
     // 'data' | 'computed' | 'slots' | 'closure' — route through effect()
@@ -887,6 +907,12 @@ export function emitScript(
     // Set when any LAZY props-route watcher exists — those need the
     // __rozieFirstUpdateDone class-field gate (see the props-route comment).
     let needsFirstUpdateDoneFlag = false;
+    // Model props are signal-backed (createLitControllableProperty), so a
+    // $watch over one must take the effect() route, not the dead
+    // changedProperties route — see classifyWatcherRoute.
+    const modelPropNames = new Set(
+      ir.props.filter((p) => p.isModel).map((p) => p.name),
+    );
     const watcherCount = Math.min(
       partition.watcherHooks.length,
       ir.watchers.length,
@@ -894,7 +920,7 @@ export function emitScript(
     for (let i = 0; i < watcherCount; i++) {
       const w = partition.watcherHooks[i]!;
       const irWatcher = ir.watchers[i]!;
-      const classification = classifyWatcherRoute(irWatcher);
+      const classification = classifyWatcherRoute(irWatcher, modelPropNames);
 
       // Wrap each function expression in @babel/types in a Program so the
       // rewrite pass can lower $props.x → this.x, $data.x → this._x.value, etc.

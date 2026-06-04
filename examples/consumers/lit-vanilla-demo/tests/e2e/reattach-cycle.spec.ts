@@ -112,21 +112,31 @@ test.describe('Lit reattach-cycle (QA-03)', () => {
     const pageErrors: string[] = [];
     page.on('pageerror', (err) => pageErrors.push(err.message));
 
-    // The Lit Modal wires lockScroll into `firstUpdated()` (component
-    // connect/upgrade) and pushes `unlockScroll` onto `_disconnectCleanups`
-    // drained by `disconnectedCallback` — the body-scroll-lock is coupled to
-    // ELEMENT connect/disconnect, not to the `open` property. (Same lifecycle
-    // shape as the Solid Modal; see D-SH-01 in 07-DIVERGENCES.md for the
-    // open/close-coupled contract divergence vs. the React reference target.)
-    // The reattach-cycle contract under test: a disconnect drains the lock
-    // exactly once (overflow → ''), a reconnect re-arms it exactly once
-    // (overflow → 'hidden'), with no stale or doubled lock across cycles.
+    // Per canonical Modal.rozie the body-scroll-lock is OPEN-coupled: lockScroll
+    // is a guarded no-op while closed, the lock arms when the `open` property
+    // flips true (the $watch(() => $props.open) driver → Lit `updated()`), and
+    // `unlockScroll` is pushed onto `_disconnectCleanups` (drained by
+    // `disconnectedCallback`). D-SH-01 reconciled (Plan 25-03 / f23f6a2e): the
+    // Lit Modal scroll-lock now matches the React reference's open-coupled
+    // contract; the former mount/disconnect-coupled divergence is retired.
+    //
+    // The reattach-cycle contract under test: with the modal OPEN (lock armed),
+    // a disconnect drains the lock exactly once (overflow → ''), and reconnects
+    // leave no stale or doubled lock across cycles. Lit does not re-run
+    // firstUpdated on a re-append and `open` is unchanged across the reattach,
+    // so a bare reconnect does not re-arm — overflow stays ''.
     await page.goto('/src/pages/ModalPage.html');
 
-    // <rozie-modal> upgrades on page load → firstUpdated() runs lockScroll().
-    expect(await page.evaluate(() => document.body.style.overflow)).toBe(
-      'hidden',
-    );
+    const bodyOverflow = () =>
+      page.evaluate(() => document.body.style.overflow);
+
+    // Upgrade (closed): lockScroll is a guarded no-op → ''.
+    await expect.poll(bodyOverflow).toBe('');
+
+    // Open the modal (el.open = true via the page button) → $watch drives
+    // lockScroll in `updated()` → 'hidden'.
+    await page.locator('#open-modal').click();
+    await expect.poll(bodyOverflow).toBe('hidden');
 
     const reattach = () =>
       page.evaluate(() => {
@@ -138,21 +148,20 @@ test.describe('Lit reattach-cycle (QA-03)', () => {
       });
 
     // Reattach cycle 1: disconnect drains _disconnectCleanups → unlockScroll
-    // runs exactly once → overflow restored to ''. Then connectedCallback's
-    // firstUpdated already ran once at upgrade; Lit does NOT re-run
-    // firstUpdated on a re-append, so a bare reattach leaves overflow ''.
+    // runs exactly once → overflow restored to ''. Lit does NOT re-run
+    // firstUpdated on a re-append and `open` did not change, so a bare reattach
+    // leaves overflow '' (no re-arm).
     await reattach();
-    expect(await page.evaluate(() => document.body.style.overflow)).toBe('');
+    await expect.poll(bodyOverflow).toBe('');
 
     // Reattach cycle 2: a second disconnect must not double-unlock into a
     // corrupt state, and a second reconnect must not leave a stale lock.
     await reattach();
-    expect(await page.evaluate(() => document.body.style.overflow)).toBe('');
+    await expect.poll(bodyOverflow).toBe('');
 
-    // Opening/closing the modal via the `open` property after the reattach
-    // cycles must not throw — the listener wiring (keydown.escape, slotchange)
-    // re-armed cleanly and no cleanup ran against a detached shadow root.
-    await page.locator('#open-modal').click();
+    // Toggling the `open` property after the reattach cycles must not throw —
+    // the listener wiring (keydown.escape, slotchange) re-armed cleanly and no
+    // cleanup ran against a detached shadow root.
     await page.evaluate(() => {
       const el = document.getElementById('modal') as HTMLElement & {
         open: boolean;

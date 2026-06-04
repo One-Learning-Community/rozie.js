@@ -1,6 +1,6 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, property, query } from 'lit/decorators.js';
-import { SignalWatcher } from '@lit-labs/preact-signals';
+import { SignalWatcher, effect, untracked } from '@lit-labs/preact-signals';
 import { createLitControllableProperty, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 import flatpickr from 'flatpickr';
 
@@ -56,12 +56,18 @@ export default class Flatpickr extends SignalWatcher(LitElement) {
   @property({ type: Function }) formatDate: ((...args: unknown[]) => unknown) | null = null;
   @property({ type: Array }) plugins: any[] = [];
   @query('[data-rozie-ref="inputEl"]') private _refInputEl!: HTMLElement;
+private __rozieWatchInitial_0 = true;
 private __rozieFirstUpdateDone = false;
 
   private _disconnectCleanups: Array<() => void> = [];
 
   firstUpdated(): void {
     this._disconnectCleanups.push((() => this.instance?.destroy()));
+
+    this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this.date)(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } ((v: any) => {
+      if (!this.instance) return;
+      if (v !== this.instance.input.value) this.instance.setDate(v, false);
+    })(__watchVal); }); }));
 
     this.instance = flatpickr(this._refInputEl, {
       mode: this.mode,
@@ -197,10 +203,6 @@ private __rozieFirstUpdateDone = false;
   }
 
   updated(changedProperties: Map<string, unknown>): void {
-    if (this.__rozieFirstUpdateDone && (changedProperties.has('date'))) { const __watchVal = (() => this.date)(); ((v: any) => {
-      if (!this.instance) return;
-      if (v !== this.instance.input.value) this.instance.setDate(v, false);
-    })(__watchVal); }
     if (this.__rozieFirstUpdateDone && (changedProperties.has('mode'))) { const __watchVal = (() => this.mode)(); ((v: any) => this.instance?.set('mode', v))(__watchVal); }
     if (this.__rozieFirstUpdateDone && (changedProperties.has('minDate'))) { const __watchVal = (() => this.minDate)(); ((v: any) => this.instance?.set('minDate', v))(__watchVal); }
     if (this.__rozieFirstUpdateDone && (changedProperties.has('maxDate'))) { const __watchVal = (() => this.maxDate)(); ((v: any) => this.instance?.set('maxDate', v))(__watchVal); }

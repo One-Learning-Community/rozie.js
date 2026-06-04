@@ -1,6 +1,6 @@
 import { LitElement, css, html, nothing } from 'lit';
 import { customElement, property, query, queryAssignedElements, state } from 'lit/decorators.js';
-import { SignalWatcher } from '@lit-labs/preact-signals';
+import { SignalWatcher, effect, untracked } from '@lit-labs/preact-signals';
 import { attachOutsideClickListener, createLitControllableProperty, injectGlobalStyles, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 
 interface RozieTriggerSlotCtx {
@@ -28,7 +28,7 @@ export default class Dropdown extends SignalWatcher(LitElement) {
   @property({ type: Boolean, reflect: true }) closeOnEscape: boolean = true;
   @query('[data-rozie-ref="triggerEl"]') private _refTriggerEl!: HTMLElement;
   @query('[data-rozie-ref="panelEl"]') private _refPanelEl!: HTMLElement;
-private __rozieFirstUpdateDone = false;
+private __rozieWatchInitial_0 = true;
 
   @state() private _hasSlotTrigger = false;
   @queryAssignedElements({ slot: 'trigger', flatten: true }) private _slotTriggerElements!: Element[];
@@ -85,15 +85,12 @@ private __rozieFirstUpdateDone = false;
   firstUpdated(): void {
     this._armListeners();
 
+    this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this.open)(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } (() => {
+      if (this.open) this.reposition();
+    })(); }); }));
+
     // Initial reposition only if the panel is open at mount time.
     if (this.open) this.reposition();
-  }
-
-  updated(changedProperties: Map<string, unknown>): void {
-    if (this.__rozieFirstUpdateDone && (changedProperties.has('open'))) { const __watchVal = (() => this.open)(); (() => {
-      if (this.open) this.reposition();
-    })(); }
-    this.__rozieFirstUpdateDone = true;
   }
 
   disconnectedCallback(): void {

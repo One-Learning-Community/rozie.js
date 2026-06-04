@@ -1,6 +1,6 @@
 import { LitElement, css, html, nothing } from 'lit';
 import { customElement, property, query, queryAssignedElements, state } from 'lit/decorators.js';
-import { SignalWatcher } from '@lit-labs/preact-signals';
+import { SignalWatcher, effect, untracked } from '@lit-labs/preact-signals';
 import { createLitControllableProperty, injectGlobalStyles, rozieDisplay } from '@rozie/runtime-lit';
 
 @customElement('rozie-modal')
@@ -38,7 +38,7 @@ footer[data-rozie-s-fc45feb2] { border-top: 1px solid rgba(0, 0, 0, 0.08); justi
   @property({ type: String, reflect: true }) title: string = '';
   @query('[data-rozie-ref="backdropEl"]') private _refBackdropEl!: HTMLElement;
   @query('[data-rozie-ref="dialogEl"]') private _refDialogEl!: HTMLElement;
-private __rozieFirstUpdateDone = false;
+private __rozieWatchInitial_0 = true;
 
   @state() private _hasSlotHeader = false;
   @queryAssignedElements({ slot: 'header', flatten: true }) private _slotHeaderElements!: Element[];
@@ -105,16 +105,13 @@ private __rozieFirstUpdateDone = false;
 
     this._disconnectCleanups.push((this.unlockScroll));
 
+    this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this.open)(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } ((isOpen: any) => {
+      if (isOpen) this.lockScroll();else this.unlockScroll();
+    })(__watchVal); }); }));
+
     this.lockScroll();
 
     this._refDialogEl?.focus();
-  }
-
-  updated(changedProperties: Map<string, unknown>): void {
-    if (this.__rozieFirstUpdateDone && (changedProperties.has('open'))) { const __watchVal = (() => this.open)(); ((isOpen: any) => {
-      if (isOpen) this.lockScroll();else this.unlockScroll();
-    })(__watchVal); }
-    this.__rozieFirstUpdateDone = true;
   }
 
   disconnectedCallback(): void {
