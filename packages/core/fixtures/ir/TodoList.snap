@@ -3461,7 +3461,8 @@
                         "sourceLoc": {
                           "start": 1807,
                           "end": 1825
-                        }
+                        },
+                        "wrapForDisplay": true
                       },
                       {
                         "type": "TemplateStaticText",
@@ -3504,7 +3505,8 @@
                         "sourceLoc": {
                           "start": 1827,
                           "end": 1842
-                        }
+                        },
+                        "wrapForDisplay": true
                       },
                       {
                         "type": "TemplateStaticText",
@@ -4686,7 +4688,8 @@
                                             "sourceLoc": {
                                               "start": 2589,
                                               "end": 2604
-                                            }
+                                            },
+                                            "wrapForDisplay": true
                                           }
                                         ],
                                         "sourceLoc": {

@@ -1983,7 +1983,8 @@
                 "sourceLoc": {
                   "start": 1269,
                   "end": 1287
-                }
+                },
+                "wrapForDisplay": true
               }
             ],
             "sourceLoc": {

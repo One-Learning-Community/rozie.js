@@ -1975,7 +1975,8 @@
                         "sourceLoc": {
                           "start": 1885,
                           "end": 1907
-                        }
+                        },
+                        "wrapForDisplay": true
                       },
                       {
                         "type": "TemplateStaticText",

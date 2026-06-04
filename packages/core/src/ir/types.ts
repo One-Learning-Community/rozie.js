@@ -728,13 +728,32 @@ export type AttributeBinding =
        * bare `r-model` IR is byte-identical to pre-phase.
        */
       modifiers?: ResolvedModelModifier[];
+      /**
+       * Phase 26 (D-06/D-07) — the attribute-binding wrap/raw gate, mirroring
+       * `TemplateInterpolationIR.wrapForDisplay`. `true` → wrap the bound value
+       * in `rozieDisplay(...)` on the five non-Vue targets; `false` → provably
+       * primitive (raw) OR `safeInterpolation` off. Default `true`
+       * (wrap-when-unsure); set by the `annotateDisplayWrap` pass.
+       */
+      wrapForDisplay?: boolean;
     }
   | {
       kind: 'interpolated';
       name: string;
       segments: Array<
         | { kind: 'static'; text: string }
-        | { kind: 'binding'; expression: Expression; deps: SignalRef[] }
+        | {
+            kind: 'binding';
+            expression: Expression;
+            deps: SignalRef[];
+            /**
+             * Phase 26 (D-06/D-07) — class-interpolation segment wrap/raw gate
+             * (e.g. `class="card--{{ $data.x }}"`). Same semantics as
+             * `TemplateInterpolationIR.wrapForDisplay`. Default `true`
+             * (wrap-when-unsure); set by the `annotateDisplayWrap` pass.
+             */
+            wrapForDisplay?: boolean;
+          }
       >;
       sourceLoc: SourceLoc;
     }
@@ -936,6 +955,23 @@ export interface TemplateInterpolationIR {
   expression: Expression;
   deps: SignalRef[];
   sourceLoc: SourceLoc;
+  /**
+   * Phase 26 (D-06/D-07) — the wrap/raw gate for `{{ }}` text interpolation on
+   * the five non-Vue targets.
+   *
+   *   - `true`  → wrap in `rozieDisplay(...)` on React/Solid/Svelte/Lit/Angular
+   *               (a non-primitive value renders portable pretty-printed JSON
+   *               instead of crashing React / printing `[object Object]`).
+   *   - `false` → the expression provably resolves to `string|number|boolean`
+   *               (raw, byte-identical to pre-phase emit) OR the effective
+   *               `safeInterpolation` flag is off (no wrap on any interpolation).
+   *
+   * Default `true` (wrap-when-unsure). Set to `false` ONLY by the
+   * `annotateDisplayWrap` pass when the expression is provably primitive. The
+   * invariant: a false-wrap is behavior-neutral; a false-raw re-introduces the
+   * React object-child crash — so the gate defaults to wrap on ANY uncertainty.
+   */
+  wrapForDisplay: boolean;
 }
 
 /**

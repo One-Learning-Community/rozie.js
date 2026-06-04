@@ -211,7 +211,8 @@
                 "sourceLoc": {
                   "start": 199,
                   "end": 217
-                }
+                },
+                "wrapForDisplay": true
               }
             ],
             "sourceLoc": {

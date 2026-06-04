@@ -86,6 +86,7 @@ describe('emitTemplate — behavior tests (synthetic IR)', () => {
       expression: parseExpression('$data.hovering'),
       deps: [],
       sourceLoc: LOC,
+      wrapForDisplay: true,
     };
     ir.template = interp;
     const { template } = emitTemplate(ir, registry);

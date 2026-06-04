@@ -1192,6 +1192,11 @@ function lowerNodeList(
         expression: expr ?? t.identifier('undefined'),
         deps: expr ? computeExpressionDeps(expr, bindings) : [],
         sourceLoc: node.loc,
+        // Phase 26 (D-06/D-07) — default wrap-when-unsure; the
+        // annotateDisplayWrap pass in lowerToIR refines this to `false` for
+        // provably-primitive expressions (and forces all-false when
+        // safeInterpolation is off).
+        wrapForDisplay: true,
       };
       out.push(interp);
       continue;
