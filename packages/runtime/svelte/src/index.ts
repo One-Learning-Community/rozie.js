@@ -22,3 +22,4 @@
  */
 
 export { applyListeners } from './applyListeners.js';
+export { rozieDisplay } from './rozieDisplay.js';

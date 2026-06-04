@@ -36,3 +36,4 @@ export {
   __rozieReconcileAfterDomMutation,
   type ReconcilableHost,
 } from './reconcileAfterDomMutation.js';
+export { rozieDisplay } from './rozieDisplay.js';
