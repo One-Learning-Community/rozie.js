@@ -52,4 +52,27 @@ describe('rozieDisplay (SPEC-2 algorithm)', () => {
   it('renders a Map as JSON.stringify does — "{}" (accepted divergence from Vue)', () => {
     expect(rozieDisplay(new Map([['a', 1]]))).toBe('{}');
   });
+
+  // --- CR-01: non-serialisable objects must NOT throw (the "safe" contract) ---
+  // The wrap exists to stop a non-primitive interpolation from crashing the
+  // render. JSON.stringify throws on circular structures and on objects nesting
+  // a BigInt; the helper must degrade to a non-throwing String(v) instead.
+  it('does NOT throw on a circular object — degrades to a string (CR-01)', () => {
+    const circular: Record<string, unknown> = { a: 1 };
+    circular.self = circular;
+    let out: string;
+    expect(() => {
+      out = rozieDisplay(circular);
+    }).not.toThrow();
+    expect(typeof out!).toBe('string');
+  });
+
+  it('does NOT throw on an object nesting a BigInt — degrades to a string (CR-01)', () => {
+    const withBigInt = { big: BigInt(9007199254740993) };
+    let out: string;
+    expect(() => {
+      out = rozieDisplay(withBigInt);
+    }).not.toThrow();
+    expect(typeof out!).toBe('string');
+  });
 });
