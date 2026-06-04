@@ -4,22 +4,19 @@ The universal build-tool plugin for Rozie.js, authored once via `unplugin` v3 an
 
 ## Status
 
-Phase 3: shipped — the **Vite** entry (`@rozie/unplugin/vite`) is fully wired and CI-tested against the five reference examples in `examples/consumers/vue-vite/`. The other entries (`/rollup`, `/webpack`, `/esbuild`, `/rolldown`, `/rspack`) exist for symmetry but are not CI-tested until Phase 6 (DIST distribution hardening). Marked `@experimental` until v1.0.
-
-The plugin currently dispatches to `@rozie/target-vue` only; React/Svelte/Angular dispatch lands as their target emitters ship in Phases 4-5. Today, calling `Rozie({ target: 'react' })` (or `'svelte'`, `'angular'`) throws `ROZ402` synchronously at config-load.
+Shipped for all six targets — `vue`, `react`, `svelte`, `angular`, `solid`, and `lit`. **Vite** (`@rozie/unplugin/vite`) is the primary, end-to-end-tested host (the reference consumer apps under `examples/consumers/` build through it). The other adapters (`/rollup`, `/webpack`, `/esbuild`, `/rolldown`, `/rspack`) are produced from the same `unplugin` factory. Marked `@experimental` until v1.0.
 
 ## Install
 
-Internal-only, not yet published (version `0.0.0`). Inside the monorepo:
+Not yet published to npm (current version `0.1.0`; publishing is gated on the public release workflow). Inside the monorepo, depend on it plus the runtime package for your target:
 
 ```jsonc
 // package.json
 {
   "dependencies": {
     "@rozie/unplugin": "workspace:*",
-    "@rozie/runtime-vue": "workspace:*",
-    "@vitejs/plugin-vue": "^6",
-    "vue": "^3.4"
+    "@rozie/runtime-react": "workspace:*", // or -vue / -svelte / -solid / -lit
+    "react": "^18"
   }
 }
 ```
@@ -29,37 +26,54 @@ Internal-only, not yet published (version `0.0.0`). Inside the monorepo:
 ```ts
 // vite.config.ts
 import { defineConfig } from 'vite';
+import Rozie from '@rozie/unplugin/vite';
+
+export default defineConfig({
+  plugins: [Rozie({ target: 'react' })],
+});
+```
+
+For Vue, place `Rozie()` **before** `@vitejs/plugin-vue` — it rewrites `Foo.rozie` → a synthetic `Foo.rozie.vue` id via `resolveId` so `vite-plugin-vue` picks it up:
+
+```ts
 import vue from '@vitejs/plugin-vue';
 import Rozie from '@rozie/unplugin/vite';
 
 export default defineConfig({
-  // Rozie() MUST come BEFORE vue() — it rewrites Foo.rozie -> Foo.rozie.vue
-  // via resolveId so vite-plugin-vue can pick up the synthetic id naturally.
   plugins: [Rozie({ target: 'vue' }), vue()],
 });
 ```
 
-```vue
-<!-- Then anywhere in your app: -->
-<script setup lang="ts">
+Then anywhere in your app:
+
+```ts
 import Counter from './Counter.rozie';
-</script>
-<template><Counter /></template>
 ```
+
+## Options — `RozieOptions`
+
+| Option | Type | Default | Notes |
+| --- | --- | --- | --- |
+| `target` | `'vue' \| 'react' \| 'svelte' \| 'angular' \| 'solid' \| 'lit'` | — | **Required.** Validated synchronously at config-load (`ROZ400`/`ROZ401`/`ROZ402`). |
+| `safeInterpolation` | `boolean` | `true` | Phase 26. When `false`, non-primitive `{{ }}` interpolation reverts to raw per-target emit (re-exposes the React object-child crash). No-op for Vue. See [Safe non-primitive interpolation](../../docs/guide/features.md). |
+| `angular` | `{ cva?: boolean }` | `{ cva: true }` | Angular-only. `cva: false` suppresses the auto `ControlValueAccessor` emit on single-`model` components. No-op for other targets. |
+| `prebuildExtraRoots` | `readonly string[]` | — | Angular-only. Extra source roots to walk during the Angular disk-cache prebuild. No-op for other targets. |
+
+Invalid option shapes throw a code-bearing error **before** any build hook runs.
 
 ## Public exports
 
 From the package root (`@rozie/unplugin`):
 - `unplugin` — the `createUnplugin` v3 factory (default export + named)
-- `validateOptions` — synchronous `RozieOptions` validator (throws `ROZ400`/`ROZ401`/`ROZ402`)
-- Type: `RozieOptions` (`{ target: 'vue' | 'react' | 'svelte' | 'angular' }`)
+- `validateOptions` — synchronous `RozieOptions` validator
+- Type: `RozieOptions`
 
-From subpath entries:
-- `@rozie/unplugin/vite` — `vitePlugin` (default + named); CI-tested in Phase 3
-- `@rozie/unplugin/rollup`, `/webpack`, `/esbuild`, `/rolldown`, `/rspack` — present for symmetry, not CI-tested until Phase 6
+From subpath entries: `@rozie/unplugin/vite`, `/rollup`, `/webpack`, `/esbuild`, `/rolldown`, `/rspack`.
+
+For the codegen (no-build, pre-compiled output) path, see [`@rozie/cli`](../cli). For non-Vite Babel pipelines, see [`@rozie/babel-plugin`](../babel-plugin).
 
 ## Links
 
 - Project orientation: [`CLAUDE.md`](../../CLAUDE.md)
-- Project value + audience: [`.planning/PROJECT.md`](../../.planning/PROJECT.md)
+- Feature reference: [`docs/guide/features.md`](../../docs/guide/features.md)
 - Roadmap: [`.planning/ROADMAP.md`](../../.planning/ROADMAP.md)

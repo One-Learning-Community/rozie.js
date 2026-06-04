@@ -4,11 +4,11 @@ Vue 3.4+ SFC emitter for Rozie.js. Takes a framework-neutral `RozieIR` from `@ro
 
 ## Status
 
-Phase 3: shipped (2026-05-02). All five reference examples — Counter, SearchInput, Dropdown, TodoList, Modal — compile correctly to Vue and pass the Phase 3 Playwright e2e suite. Marked `@experimental` until v1.0.
+Shipped. The reference examples — Counter, SearchInput, Dropdown, TodoList, Modal — compile to idiomatic Vue and ship with snapshot + Playwright coverage. Marked `@experimental` until v1.0.
 
 ## Install
 
-Internal-only, not yet published (version `0.0.0`). Most consumers should not depend on this package directly — install [`@rozie/unplugin`](../../unplugin) instead, which wires the Vite/Rollup/Webpack/etc. transform that calls `emitVue` for you.
+Not yet published to npm (current version `0.1.0`; publishing is gated on the public release workflow). Most consumers should not depend on this package directly — install [`@rozie/unplugin`](../../unplugin) instead, which wires the Vite/Rollup/Webpack/etc. transform that calls `emitVue` for you.
 
 ```jsonc
 // package.json (only if you are calling emitVue directly)
@@ -38,7 +38,7 @@ const { code, map, diagnostics } = emitVue(ir!, {
 // `map` is a magic-string SourceMap referencing the original .rozie file.
 ```
 
-## Reference examples (Phase 3 success criteria)
+## Reference examples
 
 All five compile to idiomatic Vue and ship with snapshot + Playwright coverage:
 
@@ -57,4 +57,4 @@ All five compile to idiomatic Vue and ship with snapshot + Playwright coverage:
 
 - Project orientation: [`CLAUDE.md`](../../../CLAUDE.md)
 - Project value + audience: [`.planning/PROJECT.md`](../../../.planning/PROJECT.md)
-- Roadmap (Phase 3 details): [`.planning/ROADMAP.md`](../../../.planning/ROADMAP.md)
+- Roadmap: [`.planning/ROADMAP.md`](../../../.planning/ROADMAP.md)

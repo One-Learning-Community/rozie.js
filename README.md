@@ -150,4 +150,4 @@ This is a planned, phase-driven build under the [GSD workflow](https://github.co
 
 ## License
 
-Not yet declared. Will be MIT once v1.0 ships.
+[MIT](LICENSE) © 2026 Dan Krieger and Rozie.js contributors.

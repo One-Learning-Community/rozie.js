@@ -4,11 +4,11 @@ Tree-shakable runtime helpers consumed by Vue SFCs emitted by `@rozie/target-vue
 
 ## Status
 
-Phase 3: shipped. Used end-to-end by the Phase 3 reference examples (notably `Dropdown.rozie`'s `.outside($refs.triggerEl, $refs.panelEl)` and `SearchInput.rozie`'s `@input.debounce(300)`). Marked `@experimental` until v1.0.
+Shipped. Used end-to-end by the Vue reference examples (notably `Dropdown.rozie`'s `.outside($refs.triggerEl, $refs.panelEl)` and `SearchInput.rozie`'s `@input.debounce(300)`). Marked `@experimental` until v1.0.
 
 ## Install
 
-Internal-only, not yet published (version `0.0.0`). It is declared as a peer dependency of `@rozie/unplugin`, so projects using the unplugin must install both.
+Not yet published to npm (current version `0.1.0`; publishing is gated on the public release workflow). It is declared as a peer dependency of `@rozie/unplugin`, so projects using the unplugin must install both.
 
 ```jsonc
 // package.json

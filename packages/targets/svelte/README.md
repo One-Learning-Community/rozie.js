@@ -1,35 +1,37 @@
 # @rozie/target-svelte
 
-Svelte 5+ emitter for Rozie.js. Will turn a framework-neutral `RozieIR` from `@rozie/core` into a `.svelte` file using runes (`$state`, `$derived`, `$effect`, `$bindable`), `{#each}` blocks for `r-for`, and `{#snippet}` parameters for named slots consumed via `{@render trigger?.(ctx)}`.
+Svelte 5+ emitter for Rozie.js. Turns a framework-neutral `RozieIR` from `@rozie/core` into a `.svelte` file using runes (`$state`, `$derived`, `$effect`, `$bindable`), `{#each}` blocks for `r-for`, and `{#snippet}` parameters for named slots consumed via `{@render trigger?.(ctx)}`. Styles are scoped via Rozie's `[data-rozie-s-<hash>]` rewrite (with a `:global { … }` opt-out for cross-component rules).
 
 ## Status
 
-Phase 1: placeholder, no implementation yet. The package is scaffolded so the workspace topology is stable; the real emitter lands in **Phase 5** of the roadmap (in parallel with `@rozie/target-angular`).
-
-The current `src/index.ts` exports only a placeholder symbol (`__rozieTargetSveltePlaceholder`).
+Shipped. Marked `@experimental` until v1.0.
 
 ## Install
 
-Internal-only, not yet published (version `0.0.0`). There is nothing useful to install yet.
+Not yet published to npm (current version `0.1.0`; publishing is gated on the public release workflow). Most consumers should depend on [`@rozie/unplugin`](../../unplugin) (or [`@rozie/cli`](../../cli)) instead of calling this package directly.
 
 ## Usage
 
-Not yet implemented. Once Phase 5 ships, the public surface will mirror `@rozie/target-vue`:
+`@rozie/unplugin` handles the parse → lower → emit chain transparently when you `import Foo from './Foo.rozie'`. Call `emitSvelte` directly only if you are building a custom pipeline:
 
 ```ts
-// Anticipated Phase 5 shape — not yet available.
+import { parse, lowerToIR, createDefaultRegistry } from '@rozie/core';
 import { emitSvelte } from '@rozie/target-svelte';
-const { code, map, diagnostics } = emitSvelte(ir, { filename, source });
-```
 
-Consumers will typically use `@rozie/unplugin` rather than calling this package directly.
+const { ast } = parse(source, { filename: 'Counter.rozie' });
+const { ir } = lowerToIR(ast!, { modifierRegistry: createDefaultRegistry() });
+
+const { code, map, diagnostics } = emitSvelte(ir!, { filename: 'Counter.rozie', source });
+```
 
 ## Public exports
 
-- `__rozieTargetSveltePlaceholder` (placeholder constant; will be replaced in Phase 5)
+- `emitSvelte(ir, opts?) => { code, map, diagnostics }`
+- `emitSvelteTypes(...)` — declaration synthesis for the emitted component
+- Types: `EmitSvelteOptions`, `EmitSvelteResult`, `EmitSvelteTypesOptions`
 
 ## Links
 
 - Project orientation: [`CLAUDE.md`](../../../CLAUDE.md)
-- Project value + audience: [`.planning/PROJECT.md`](../../../.planning/PROJECT.md)
-- Roadmap (Phase 5 plan for this package): [`.planning/ROADMAP.md`](../../../.planning/ROADMAP.md)
+- Feature reference: [`docs/guide/features.md`](../../../docs/guide/features.md)
+- Roadmap: [`.planning/ROADMAP.md`](../../../.planning/ROADMAP.md)

@@ -1,35 +1,37 @@
 # @rozie/target-angular
 
-Angular 17+ emitter for Rozie.js. Will turn a framework-neutral `RozieIR` from `@rozie/core` into a standalone Angular component using signals (`signal()`, `computed()`, `effect()`), `<ng-template>` + `*ngTemplateOutlet` for slots (with `ngTemplateContextGuard`), and `Renderer2.listen` + `DestroyRef` for `<listeners>` cleanup.
+Angular 19+ emitter for Rozie.js. Turns a framework-neutral `RozieIR` from `@rozie/core` into a standalone Angular component using signals (`signal()`, `computed()`, `effect()`), `model()` inputs, `@for`/`@if` control flow, `<ng-template>` + `*ngTemplateOutlet` for slots (with `ngTemplateContextGuard`), and `DestroyRef`-paired cleanup for `<listeners>`. A single-`model` component additionally auto-implements `ControlValueAccessor`, so it binds with `[(ngModel)]` / `formControlName` like a native form control.
 
 ## Status
 
-Phase 1: placeholder, no implementation yet. The package is scaffolded so the workspace topology is stable; the real emitter lands in **Phase 5** of the roadmap (in parallel with `@rozie/target-svelte`). Phase 5 begins with a 1-2 day spike on Angular's Vite virtual-filesystem integration (open question OQ3) before any Angular emitter code is written.
-
-The current `src/index.ts` exports only a placeholder symbol (`__rozieTargetAngularPlaceholder`).
+Shipped. `$onMount` lowers to `ngAfterViewInit()`; the auto-`ControlValueAccessor` emit (Phase 23) is default-on and opt-out via `angular.cva: false` / `--no-cva`. Marked `@experimental` until v1.0.
 
 ## Install
 
-Internal-only, not yet published (version `0.0.0`). There is nothing useful to install yet.
+Not yet published to npm (current version `0.1.0`; publishing is gated on the public release workflow). Most consumers should depend on [`@rozie/unplugin`](../../unplugin) (or [`@rozie/cli`](../../cli)) instead of calling this package directly. The Vite host integrates via `@analogjs/vite-plugin-angular`.
 
 ## Usage
 
-Not yet implemented. Once Phase 5 ships, the public surface will mirror `@rozie/target-vue`:
+`@rozie/unplugin` handles the parse → lower → emit chain transparently when you `import Foo from './Foo.rozie'`. Call `emitAngular` directly only if you are building a custom pipeline:
 
 ```ts
-// Anticipated Phase 5 shape — not yet available.
+import { parse, lowerToIR, createDefaultRegistry } from '@rozie/core';
 import { emitAngular } from '@rozie/target-angular';
-const { code, map, diagnostics } = emitAngular(ir, { filename, source });
-```
 
-Consumers will typically use `@rozie/unplugin` rather than calling this package directly.
+const { ast } = parse(source, { filename: 'Counter.rozie' });
+const { ir } = lowerToIR(ast!, { modifierRegistry: createDefaultRegistry() });
+
+const { code, map, diagnostics } = emitAngular(ir!, { filename: 'Counter.rozie', source });
+```
 
 ## Public exports
 
-- `__rozieTargetAngularPlaceholder` (placeholder constant; will be replaced in Phase 5)
+- `emitAngular(ir, opts?) => { code, map, diagnostics }`
+- `emitAngularTypes(...)` — declaration synthesis for the emitted component
+- Types: `EmitAngularOptions`, `EmitAngularResult`, `EmitAngularTypesOptions`
 
 ## Links
 
 - Project orientation: [`CLAUDE.md`](../../../CLAUDE.md)
-- Project value + audience: [`.planning/PROJECT.md`](../../../.planning/PROJECT.md)
-- Roadmap (Phase 5 plan for this package): [`.planning/ROADMAP.md`](../../../.planning/ROADMAP.md)
+- Angular-shops guide: [`docs/guide/for-angular-shops.md`](../../../docs/guide/for-angular-shops.md)
+- Roadmap: [`.planning/ROADMAP.md`](../../../.planning/ROADMAP.md)

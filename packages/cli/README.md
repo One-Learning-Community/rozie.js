@@ -1,36 +1,51 @@
 # @rozie/cli
 
-The Rozie codegen CLI. Will let component-library authors run `rozie build src/components/ --target react,vue,svelte,angular --out dist/` to emit per-framework source artifacts (plus `.d.ts` and `.map` files) for libraries that prefer to ship pre-compiled per-framework npm packages rather than rely on consumer-side build plugins.
+The Rozie codegen CLI. Compiles `.rozie` files to per-framework source artifacts (plus `.d.ts` sidecars and optional `.map` files) for libraries that prefer to ship pre-compiled per-framework npm packages rather than rely on a consumer-side build plugin.
 
 ## Status
 
-Phase 1: placeholder, no implementation yet. The package is scaffolded so the workspace topology is stable; the real CLI lands in **Phase 6** of the roadmap, alongside the Babel plugin and `.d.ts` emission hardening. Phase 6 also finalizes `@rozie/core`'s public `compile()` API and a snapshot test gates byte-identical output across all three entrypoints (Vite plugin / Babel plugin / CLI).
-
-The current `src/index.ts` exports only a placeholder symbol (`__rozieCliPlaceholder`).
+Shipped. The `rozie` binary exposes `build` and `watch` commands across all six targets (`vue`, `react`, `svelte`, `angular`, `solid`, `lit`). Output is byte-identical to the `@rozie/unplugin` and `@rozie/babel-plugin` entrypoints (gated by the `dist-parity` suite). Marked `@experimental` until v1.0.
 
 ## Install
 
-Internal-only, not yet published (version `0.0.0`). There is nothing useful to install yet.
+Not yet published to npm (current version `0.1.0`; publishing is gated on the public release workflow). Inside the monorepo it is available as the `rozie` bin.
 
 ## Usage
 
-Not yet implemented. Once Phase 6 ships, the CLI will be invoked as:
-
 ```bash
-# Anticipated Phase 6 shape — not yet available.
-pnpm dlx @rozie/cli build src/components/ \
-  --target react,vue,svelte,angular \
+# Compile a directory to React + Vue, emitting to dist/
+rozie build src/components/ \
+  --target react,vue \
   --out dist/
+
+# Single file, single target (stdout when --out is omitted and only one of each)
+rozie build src/Counter.rozie --target svelte
+
+# Watch mode (long-running; --out is required)
+rozie watch src/components/ --target react --out dist/
 ```
 
-For the build-plugin path (which works today for Vue), see [`@rozie/unplugin`](../unplugin) instead.
+### Flags (`build` and `watch`)
+
+| Flag | Notes |
+| --- | --- |
+| `-t, --target <names>` | Comma-separated list of `vue\|react\|svelte\|angular\|solid\|lit` (default `vue`). |
+| `-o, --out <path>` | Output directory. Required when compiling multiple files or multiple targets (`ROZ852`); required for `target=react` because it emits sidecars (`ROZ855`); always required for `watch` (`ROZ856`). |
+| `--source-map` | Emit `.map` sidecars (off by default). |
+| `--no-types` | Skip `.d.ts` emission (React-only — inline-typed for Vue/Svelte/Angular). |
+| `--pretty` | Format emitted artefacts with Prettier before write (off by default). |
+| `--no-cva` | Angular-only: suppress the auto `ControlValueAccessor` emit on single-`model` components. No-op for other targets. |
+| `--no-safe-interpolation` | Suppress the safe-interpolation `rozieDisplay` wrap (raw per-target emit; re-exposes the React object-child crash on non-primitive interpolation). No-op for Vue. |
 
 ## Public exports
 
-- `__rozieCliPlaceholder` (placeholder constant; will be replaced in Phase 6)
+- `rozie` binary (`build`, `watch`)
+- Programmatic entry from the package root for embedding the CLI in another tool.
+
+For the build-plugin path (HMR, no pre-compile step), see [`@rozie/unplugin`](../unplugin). For Babel pipelines, see [`@rozie/babel-plugin`](../babel-plugin).
 
 ## Links
 
 - Project orientation: [`CLAUDE.md`](../../CLAUDE.md)
-- Project value + audience: [`.planning/PROJECT.md`](../../.planning/PROJECT.md)
-- Roadmap (Phase 6 plan for this package): [`.planning/ROADMAP.md`](../../.planning/ROADMAP.md)
+- Feature reference: [`docs/guide/features.md`](../../docs/guide/features.md)
+- Roadmap: [`.planning/ROADMAP.md`](../../.planning/ROADMAP.md)

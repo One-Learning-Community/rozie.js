@@ -1,38 +1,44 @@
 # @rozie/babel-plugin
 
-A Babel 7+ plugin that detects `.rozie` imports and replaces them with the compiled per-target module by calling into `@rozie/core`'s `compile()` function. Provides functional parity with `@rozie/unplugin` for non-Vite Babel pipelines (e.g., Babel-driven library builds, Metro / React Native, custom toolchains).
+A Babel 7+ plugin that detects `.rozie` imports and compiles them to a sibling per-target module by calling into `@rozie/core`'s `compile()`. Provides functional parity with `@rozie/unplugin` for non-Vite Babel pipelines (Babel-driven library builds, Metro / React Native, custom toolchains).
 
 ## Status
 
-Phase 1: placeholder, no implementation yet. The package is scaffolded so the workspace topology is stable; the real plugin lands in **Phase 6** of the roadmap. It is intentionally thin — the plan calls for ~50 LOC because the heavy lifting lives in `@rozie/core.compile()`. Phase 6 ships a snapshot test that gates byte-identical output across the Vite plugin, Babel plugin, and CLI entrypoints.
-
-The current `src/index.ts` exports only a placeholder symbol (`__rozieBabelPluginPlaceholder`).
+Shipped. The plugin visits each `import Foo from './Foo.rozie'`, resolves the absolute path from the importer, and writes a sibling `Foo.{ext}` (`.vue` / `.tsx` / `.svelte` / `.ts`, plus React `.d.ts` sidecars) before letting the rest of the Babel pipeline resolve the import. It is intentionally thin — the heavy lifting lives in `@rozie/core.compile()` — and its output is byte-identical to the `@rozie/unplugin` and `@rozie/cli` entrypoints (gated by the `dist-parity` suite). Marked `@experimental` until v1.0.
 
 ## Install
 
-Internal-only, not yet published (version `0.0.0`). There is nothing useful to install yet.
+Not yet published to npm (current version `0.1.0`; publishing is gated on the public release workflow).
 
 ## Usage
 
-Not yet implemented. Once Phase 6 ships, the typical Babel config will look like:
-
 ```jsonc
-// babel.config.json — anticipated Phase 6 shape, not yet available.
+// babel.config.json
 {
   "plugins": [
-    ["@rozie/babel-plugin", { "target": "vue" }]
+    ["@rozie/babel-plugin", { "target": "react" }]
   ]
 }
 ```
 
-For the Vite-plugin path (which works today for Vue), see [`@rozie/unplugin`](../unplugin) instead.
+Place it before `@babel/preset-typescript` / `@babel/preset-react` so the sibling file exists by the time they resolve `./Foo.rozie`.
+
+## Options — `RozieBabelPluginOptions`
+
+| Option | Type | Default | Notes |
+| --- | --- | --- | --- |
+| `target` | `'vue' \| 'react' \| 'svelte' \| 'angular' \| 'solid' \| 'lit'` | — | **Required.** Selects the emit branch and the sibling-file extension. |
+| `angular` | `{ cva?: boolean }` | `{ cva: true }` | Angular-only. `cva: false` suppresses the auto `ControlValueAccessor` emit. No-op for other targets. |
 
 ## Public exports
 
-- `__rozieBabelPluginPlaceholder` (placeholder constant; will be replaced in Phase 6)
+- `default` — the Babel plugin (a `declare(...)` factory)
+- Type: `RozieBabelPluginOptions`
+
+For the Vite/Rollup/Webpack path, see [`@rozie/unplugin`](../unplugin). For ahead-of-time codegen, see [`@rozie/cli`](../cli).
 
 ## Links
 
 - Project orientation: [`CLAUDE.md`](../../CLAUDE.md)
-- Project value + audience: [`.planning/PROJECT.md`](../../.planning/PROJECT.md)
-- Roadmap (Phase 6 plan for this package): [`.planning/ROADMAP.md`](../../.planning/ROADMAP.md)
+- Feature reference: [`docs/guide/features.md`](../../docs/guide/features.md)
+- Roadmap: [`.planning/ROADMAP.md`](../../.planning/ROADMAP.md)

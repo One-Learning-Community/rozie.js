@@ -4,11 +4,11 @@ The framework-neutral core of Rozie.js: parses `.rozie` source files into a type
 
 ## Status
 
-Phase 2: shipped. The parse pipeline (Phase 1) and IR lowering pipeline (Phase 2) are complete. The shape is marked `@experimental` until v1.0 — public surface may evolve while target emitters mature in Phases 4-5.
+Shipped. The full parse → semantic-analysis → reactivity → IR-lowering pipeline is complete and feeds all six target emitters (Vue, React, Svelte, Angular, Solid, Lit). The high-level one-shot `compile(source, { target })` API (used by `@rozie/unplugin`, `@rozie/cli`, and `@rozie/babel-plugin`) is also exported. Marked `@experimental` until v1.0.
 
 ## Install
 
-Internal-only, not yet published (version `0.0.0`). Inside the monorepo:
+Not yet published to npm (current version `0.1.0`; publishing is gated on the public release workflow). Inside the monorepo:
 
 ```jsonc
 // package.json
@@ -48,7 +48,7 @@ const { ir, diagnostics: irDiags, depGraph, bindings } = lowerToIR(ast, {
 
 ## Public exports
 
-- **Pipeline:** `parse`, `lowerToIR`
+- **Pipeline:** `parse`, `lowerToIR`, and the high-level `compile` (one-shot source → target output); types `CompileOptions`, `CompileResult`, `CompileTarget`
 - **Modifier registry:** `ModifierRegistry`, `registerModifier`, `registerBuiltins`, `createDefaultRegistry`
 - **Diagnostics:** `RozieErrorCode`, `renderDiagnostic`, types `Diagnostic`, `DiagnosticSeverity`
 - **AST types:** `RozieAST`, `PropsAST`, `DataAST`, `ScriptAST`, `ListenersAST`, `ListenerEntry`, `TemplateAST`, `TemplateNode`, `TemplateElement`, `TemplateAttr`, `TemplateText`, `TemplateInterpolation`, `StyleAST`, `StyleRule`, `BlockMap`, `BlockEntry`, `SourceLoc`, `ParseResult`
