@@ -201,7 +201,7 @@ private __rozieFirstUpdateDone = false;
   render() {
     return html`
 <div class="rozie-sortable-wrap" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-ref="__rozieRoot" data-rozie-s-0af24eae>
-  <div class="rozie-sortable-list" data-rozie-ref="listEl" data-rozie-s-0af24eae>${keyed(this._rozieReconcileSeq ?? 0, html`
+  <div class="rozie-sortable-list" part="list" data-rozie-ref="listEl" data-rozie-s-0af24eae>${keyed(this._rozieReconcileSeq ?? 0, html`
     ${repeat<any>(this.items, (item, index) => this.keyFor(item, index), (item, index) => html`<div class="${Object.entries({ "rozie-sortable-item": true, 'rozie-sortable-item-lifted': this._liftedIndex.value === index }).filter(([, v]) => v).map(([k]) => k).join(' ')}" key=${rozieDisplay(this.keyFor(item, index))} role="listitem" tabindex="0" @keydown=${($event: Event) => { this.onRowKeyDown($event, index); }} data-rozie-s-0af24eae>
       ${this.__rozieDefaultSlot__ !== undefined ? this.__rozieDefaultSlot__({item: item, index: index}) : html`<slot data-rozie-params=${(() => { try { return JSON.stringify({item: item, index: index}); } catch { return '{}'; } })()}></slot>`}
     </div>`)}

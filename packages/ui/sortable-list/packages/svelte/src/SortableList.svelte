@@ -259,7 +259,7 @@ $effect(() => { const __watchVal = (() => easing)(); untrack(() => { if (__rozie
 
 
 <div bind:this={__rozieRoot} {...__rozieAttrs} class={["rozie-sortable-wrap", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-0af24eae>
-  <div class="rozie-sortable-list" bind:this={listEl} data-rozie-s-0af24eae>
+  <div class="rozie-sortable-list" bind:this={listEl} part="list" data-rozie-s-0af24eae>
     {#each items as item, index (keyFor(item, index))}<div class={["rozie-sortable-item", { 'rozie-sortable-item-lifted': liftedIndex === index }]} role="listitem" tabindex="0" onkeydown={($event) => { onRowKeyDown($event, index); }} data-rozie-s-0af24eae>
       {@render children?.({ item, index })}
     </div>{/each}

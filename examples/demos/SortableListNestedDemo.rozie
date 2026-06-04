@@ -133,18 +133,28 @@ header code {
 }
 
 /* Reach into the producer SortableList to lay its outer list out as a
-   grid of columns. `:deep()` is the cross-component CSS escape hatch
-   (quick task 260526-mk4): the outer compound (`.board`) is scoped to
-   this demo, but `.rozie-sortable-list` is lifted OUT of the scope so
-   it matches the SortableList-rendered DOM directly. The inner
-   SortableList(s) inside each KanbanColumn keep their own
-   `display: block` cascade.
+   grid of columns. Two coexisting cross-component CSS escape hatches,
+   one per shadow model (Phase 17 Q1 "coexist"):
 
-   Lit consumers render columns stacked rather than gridded because
-   each <rozie-sortable-list> custom element lives in its own shadow
-   root, and `:deep()` does not cross shadow-DOM boundaries. Cross-
-   shadow styling is `::part()` territory (planned, not v1). */
+   - `:deep()` (quick task 260526-mk4) — the light-DOM path for the 5
+     non-Lit targets. The outer compound (`.board`) is scoped to this
+     demo, but `.rozie-sortable-list` is lifted OUT of the scope so it
+     matches the SortableList-rendered DOM directly.
+
+   - `SortableList::part(list)` (Phase 17) — the shadow-DOM path for Lit.
+     Each <rozie-sortable-list> lives in its own shadow root, so `:deep()`
+     (a descendant selector) cannot pierce it; the W3C `::part()` mechanism
+     can. The producer tags its list element with `part="list"`; this rule
+     compiles to `rozie-sortable-list[data-rozie-s-<hash>]::part(list)` on
+     Lit and is stripped as a no-op on the other 5 targets.
+
+   Both rules carry identical declarations, so all six targets render the
+   columns as a 3-up grid. Only the OUTER list is gridded: the consumer's
+   styles reach its direct-child <rozie-sortable-list> (the outer list);
+   the inner lists live in each KanbanColumn's own shadow root and keep
+   their `display: block` cascade. */
 .board :deep(.rozie-sortable-list) { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; }
+SortableList::part(list) { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; }
 
 .controls {
   display: flex;

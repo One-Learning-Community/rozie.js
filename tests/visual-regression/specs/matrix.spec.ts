@@ -100,6 +100,19 @@ const EXAMPLES = [
   'SortableListClone',
   'SortableListFilter',
   'SortableListShowcase',
+  // SortableListNested (Kanban) — nested two-level drag dogfood. Validates a
+  // dense bundle of features at once: outer-list column reorder + inner-list
+  // card drag (distinct SortableJS groups), slot scope params, cross-component
+  // `cards-change` two-way sync, AND the Lit cross-shadow `::part(list)` grid
+  // layout (the consumer grids the outer list via `SortableList::part(list)`,
+  // reaching the child's `part="list"` element across the shadow boundary; the
+  // other 5 targets grid it via the coexisting `:deep()` light-DOM rule). Per
+  // D-10 all 6 targets diff against the same shared `SortableListNested.png`
+  // baseline — with the ::part fix the Lit column grid now matches the other 5
+  // (previously Lit rendered stacked, the documented :deep cross-shadow gap).
+  // Baseline-gates to `test.fixme` via `baselineExists()` until the Linux-Docker
+  // baseline regen lands the PNG (`feedback_vr_linux_baselines`).
+  'SortableListNested',
   'Flatpickr',
   'Uppy',
   'TipTap',
@@ -276,6 +289,14 @@ async function settleExample(
   // Wait for the row count to settle before the screenshot clip.
   if (example === 'SortableListShowcase') {
     await expect(page.locator('[class*="rozie-sortable-item"]')).toHaveCount(8);
+  }
+  // SortableListNested (Kanban): reset() seeds 3 columns; the OUTER SortableList
+  // renders one `.rozie-sortable-item` per column (3) and each column's INNER
+  // SortableList renders one per card (3 + 2 + 1 = 6) → 9 total. Playwright's
+  // CSS locator pierces the nested shadow roots on Lit; `[class*=...]` survives
+  // React CSS-Modules hashing (same rationale as the SortableList branch above).
+  if (example === 'SortableListNested') {
+    await expect(page.locator('[class*="rozie-sortable-item"]')).toHaveCount(9);
   }
   // Flatpickr: the Flatpickr wrapper renders `<input class="rozie-flatpickr">`;
   // the flatpickr engine attaches to it on `$onMount`. Wait for the input to

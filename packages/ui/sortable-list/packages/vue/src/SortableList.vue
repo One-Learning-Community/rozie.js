@@ -1,7 +1,7 @@
 <template>
 
 <div class="rozie-sortable-wrap" ref="__rozieRootRef" v-bind="$attrs">
-  <div class="rozie-sortable-list" ref="listElRef">
+  <div class="rozie-sortable-list" ref="listElRef" part="list">
     <div v-for="(item, index) in items" :key="keyFor(item, index)" :class="['rozie-sortable-item', { 'rozie-sortable-item-lifted': liftedIndex === index }]" role="listitem" tabindex="0" @keydown="onRowKeyDown($event, index)">
       <slot :item="item" :index="index"></slot>
     </div>

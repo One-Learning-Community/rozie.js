@@ -269,7 +269,7 @@ export default function SortableList(_props: SortableListProps): JSX.Element {
   return (
     <>
     <div ref={__rozieRoot} {...attrs} className={clsx("rozie-sortable-wrap", (attrs.className as string | undefined))} data-rozie-s-0af24eae="">
-      <div className={"rozie-sortable-list"} ref={listEl} data-rozie-s-0af24eae="">
+      <div className={"rozie-sortable-list"} ref={listEl} part="list" data-rozie-s-0af24eae="">
         {items.map((item, index) => <div key={keyFor(item, index)} className={clsx("rozie-sortable-item", { "rozie-sortable-item-lifted": liftedIndex === index })} role="listitem" tabIndex={0} onKeyDown={($event) => { onRowKeyDown($event, index); }} data-rozie-s-0af24eae="">
           {typeof (props.children ?? props.slots?.['']) === 'function' ? ((props.children ?? props.slots?.['']) as Function)({ item, index }) : (props.children ?? props.slots?.[''])}
         </div>)}

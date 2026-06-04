@@ -232,7 +232,7 @@ export default function SortableList(_props: SortableListProps): JSX.Element {
   return (
     <>
     <div ref={(el) => { __rozieRootRef = el as HTMLElement; }} {...attrs} class={"rozie-sortable-wrap" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-0af24eae="">
-      <div class={"rozie-sortable-list"} ref={(el) => { listElRef = el as HTMLElement; }} data-rozie-s-0af24eae="">
+      <div class={"rozie-sortable-list"} ref={(el) => { listElRef = el as HTMLElement; }} part="list" data-rozie-s-0af24eae="">
         <For each={items()}>{(item, index) => <div role="listitem" class={"rozie-sortable-item"} classList={{ 'rozie-sortable-item-lifted': liftedIndex() === index() }} tabIndex={0} onKeyDown={($event) => { onRowKeyDown($event, index()); }} data-rozie-s-0af24eae="">
           {typeof local.children === 'function' ? (local.children as (s: any) => any)({ item, index: index() }) : resolved()}
         </div>}</For>

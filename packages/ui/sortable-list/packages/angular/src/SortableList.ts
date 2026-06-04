@@ -17,7 +17,7 @@ interface DefaultCtx {
   template: `
 
     <div class="rozie-sortable-wrap" #__rozieRoot #rozieSpread_0 #rozieListenersTarget_1>
-      <div class="rozie-sortable-list" #listEl>
+      <div class="rozie-sortable-list" #listEl part="list">
         @for (item of items(); track keyFor(item, index); let index = $index) {
     <div class="rozie-sortable-item" [ngClass]="{ 'rozie-sortable-item-lifted': liftedIndex() === index }" role="listitem" tabindex="0" (keydown)="onRowKeyDown($event, index)">
           <ng-container *ngTemplateOutlet="(defaultTpl ?? templates()?.['defaultSlot']); context: { $implicit: { item: item, index: index }, item: item, index: index }" />

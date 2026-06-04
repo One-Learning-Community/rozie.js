@@ -229,7 +229,7 @@ $watch(() => $props.easing,      (v) => instance?.option('easing',      v))
 
 <template>
 <div class="rozie-sortable-wrap">
-  <div class="rozie-sortable-list" ref="listEl" r-external>
+  <div class="rozie-sortable-list" ref="listEl" r-external part="list">
     <div
       r-for="item, index in $props.items"
       :key="keyFor(item, index)"
