@@ -121,6 +121,20 @@ export interface EmitNodeCtx {
    */
   needsDestroyRefField?: { value: boolean };
   /**
+   * Phase 26 (SPEC-1/SPEC-4, D-06/D-07) — set to `{ value: true }` when at
+   * least one text / attribute-binding / class-interpolation position emitted
+   * the `rozieDisplay(...)` wrap. emitAngular reads this off
+   * `EmitTemplateResult` to gate BOTH the inlined module-scope
+   * `function __rozieDisplay(v)` AND the synthesized delegating class method
+   * `rozieDisplay(v) { return __rozieDisplay(v); }`. When false, NEITHER is
+   * emitted so non-wrapping components stay byte-identical to pre-phase
+   * (SPEC-3). Mirrors the `hasSpreadBinding` boxed-flag plumbing pattern.
+   * NOTE: Angular cannot call a module-scope free function OR use the `json`
+   * pipe (it quotes strings) in a template — so the template calls the CLASS
+   * METHOD `rozieDisplay`, never the free `__rozieDisplay`.
+   */
+  hasDisplayWrap?: { value: boolean };
+  /**
    * Whether the template has produced at least one [(ngModel)] binding —
    * drives FormsModule conditional import in emitDecorator.
    */
@@ -195,6 +209,19 @@ function emitInterpolation(
     cvaModelProp: ctx.cvaModelProp,
     cvaMergeDisabled: ctx.cvaMergeDisabled,
   });
+  // Phase 26 (SPEC-1, D-06/D-07) — gate on the IR-precomputed wrap decision.
+  // When `wrapForDisplay` is true the value may be a non-primitive
+  // (object/array/unknown) which renders as `[object Object]` on Angular;
+  // `rozieDisplay` pretty-prints it as portable JSON identical to the other
+  // targets. Angular templates cannot call a module-scope free function, so we
+  // call the synthesized CLASS METHOD `rozieDisplay` (Task 2 emits both the
+  // inlined `function __rozieDisplay` and the delegating method, gated on the
+  // `hasDisplayWrap` flag we flip here). When false, emit byte-identical to
+  // pre-phase (SPEC-3).
+  if (node.wrapForDisplay) {
+    if (ctx.hasDisplayWrap) ctx.hasDisplayWrap.value = true;
+    return `{{ rozieDisplay(${expr}) }}`;
+  }
   return `{{ ${expr} }}`;
 }
 
@@ -434,6 +461,10 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
     // Plan 14-05 — flag that emitAngular reads to add inject/Renderer2/
     // ElementRef/effect/viewChild to the @angular/core import line.
     hasSpreadBinding: ctx.hasSpreadBinding,
+    // Phase 26 — thread the display-wrap flag so a wrapped attribute / class
+    // interpolation flips it (same flag the text path uses), gating Task 2's
+    // inline fn + class-method synthesis.
+    hasDisplayWrap: ctx.hasDisplayWrap,
     // Phase 23 — Task 2: thread the CVA gate so a bound `:disabled` read
     // OR-merges `this.__rozieCvaDisabled()`.
     cvaModelProp: ctx.cvaModelProp,

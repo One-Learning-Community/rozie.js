@@ -89,6 +89,16 @@ export interface EmitTemplateResult {
    */
   needsDestroyRefField: boolean;
   /**
+   * Phase 26 (SPEC-1/SPEC-4, D-06/D-07) — true when at least one text /
+   * attribute-binding / class-interpolation position emitted the
+   * `rozieDisplay(...)` wrap. emitAngular reads this to gate BOTH the inlined
+   * module-scope `function __rozieDisplay(v)` AND the synthesized delegating
+   * class method `rozieDisplay(v) { return __rozieDisplay(v); }`. When false,
+   * neither is emitted (non-wrapping components byte-identical to pre-phase,
+   * SPEC-3). Same boxed-flag plumbing as `hasSpreadBinding`.
+   */
+  hasDisplayWrap: boolean;
+  /**
    * Quick task 260520-w18 bug class 6(ii) — well-known JS global namespaces
    * (`Math`, `JSON`, …) referenced inside template expressions. Angular's
    * `strictTemplates` resolves bare template identifiers against the
@@ -144,6 +154,7 @@ export function emitTemplate(
   const hasSpreadBinding = { value: false };
   const hasListenerSpread = { value: false };
   const needsDestroyRefField = { value: false };
+  const hasDisplayWrap = { value: false };
 
   if (ir.template === null) {
     return {
@@ -154,6 +165,7 @@ export function emitTemplate(
       hasSpreadBinding: false,
       hasListenerSpread: false,
       needsDestroyRefField: false,
+      hasDisplayWrap: false,
       usedGlobals: [],
       diagnostics,
     };
@@ -170,6 +182,7 @@ export function emitTemplate(
     hasSpreadBinding,
     hasListenerSpread,
     needsDestroyRefField,
+    hasDisplayWrap,
     collisionRenames: opts.collisionRenames,
     loopBindings: new Set(),
     handlerArity: opts.handlerArity,
@@ -188,6 +201,7 @@ export function emitTemplate(
     hasSpreadBinding: hasSpreadBinding.value,
     hasListenerSpread: hasListenerSpread.value,
     needsDestroyRefField: needsDestroyRefField.value,
+    hasDisplayWrap: hasDisplayWrap.value,
     usedGlobals: detectUsedGlobals(template),
     diagnostics,
   };

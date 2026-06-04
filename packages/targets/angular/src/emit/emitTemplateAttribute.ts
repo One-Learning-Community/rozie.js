@@ -89,6 +89,15 @@ export interface EmitAttrCtx {
    */
   hasListenerSpread?: { value: boolean } | undefined;
   /**
+   * Phase 26 (SPEC-4, D-06/D-07) — set to `true` by the attribute-binding /
+   * class-interpolation arms when a `wrapForDisplay`-flagged value is wrapped
+   * in `rozieDisplay(...)`. emitAngular reads this off `EmitTemplateResult`
+   * (unioned with the text-position flag) to gate the inlined module-scope
+   * `function __rozieDisplay` + delegating class method `rozieDisplay`. Same
+   * boxed-flag plumbing as `hasSpreadBinding`.
+   */
+  hasDisplayWrap?: { value: boolean } | undefined;
+  /**
    * Plan 15-05 / Phase 13 coordination — set to `true` by the listener-spread
    * arm when the emitted dynamic-Renderer2 effect() needs to register a
    * `__rozieDestroyRef.onDestroy(...)` cleanup. emitScript reads this and
@@ -235,7 +244,7 @@ function resolveBindingName(name: string, ctx: EmitAttrCtx): string {
 function renderInterpolatedTemplateLiteral(
   segments: Array<
     | { kind: 'static'; text: string }
-    | { kind: 'binding'; expression: t.Expression; deps: unknown }
+    | { kind: 'binding'; expression: t.Expression; deps: unknown; wrapForDisplay?: boolean }
   >,
   ctx: EmitAttrCtx,
 ): string {
@@ -247,12 +256,23 @@ function renderInterpolatedTemplateLiteral(
         .replace(/`/g, '\\`')
         .replace(/\$\{/g, '\\${');
     } else {
-      out += '${' + rewriteTemplateExpression(seg.expression, ctx.ir, {
+      const code = rewriteTemplateExpression(seg.expression, ctx.ir, {
         collisionRenames: ctx.collisionRenames,
         loopBindings: ctx.loopBindings,
         cvaModelProp: ctx.cvaModelProp,
         cvaMergeDisabled: ctx.cvaMergeDisabled,
-      }) + '}';
+      });
+      // Phase 26 (SPEC-4) — a multi-segment interpolated attribute
+      // (`class="card--{{ $data.x }}"`) ALWAYS renders as attribute text (it is
+      // a string-concat template literal), so the position-aware exemptions do
+      // not apply — wrap purely on the IR gate. Calls the synthesized class
+      // method `rozieDisplay` (Task 2) and flips the gate flag.
+      if (seg.wrapForDisplay) {
+        if (ctx.hasDisplayWrap) ctx.hasDisplayWrap.value = true;
+        out += '${rozieDisplay(' + code + ')}';
+      } else {
+        out += '${' + code + '}';
+      }
     }
   }
   return out;
@@ -397,6 +417,47 @@ function lowerBoundAttrExpression(
     cvaModelProp: ctx.cvaModelProp,
     cvaMergeDisabled: ctx.cvaMergeDisabled,
   });
+}
+
+/**
+ * Form-input tags whose `value`/`checked` are controlled-input PROPERTIES on
+ * the host element rather than rendered attribute text. Phase 26 — used by
+ * `shouldWrapAttrBinding` (mirror of the React target's same-named set).
+ */
+const FORM_INPUT_TAGS: ReadonlySet<string> = new Set(['input', 'textarea', 'select']);
+
+/**
+ * Phase 26 (SPEC-4, D-06/D-07) — position-aware refinement of the IR's
+ * `wrapForDisplay` gate for ATTRIBUTE positions. `wrapForDisplay` only says the
+ * value MIGHT be non-primitive; the binding POSITION decides whether
+ * `rozieDisplay(...)` is the correct lowering (the wrap is only meaningful where
+ * a non-primitive would otherwise stringify to `[object Object]` as attribute
+ * TEXT). Exemptions, mirroring the React emitter's `shouldWrapAttrBinding`:
+ *   - component/self-tag prop bindings pass the value STRUCTURALLY (Angular
+ *     `[prop]="x"` hands the object through; JSON-stringifying it would corrupt
+ *     the consumer's prop) → NO wrap.
+ *   - `value`/`checked` on a form input are controlled-input properties → NO wrap.
+ *   - an object-literal expression (`:style="{...}"`, `:class="{...}"`) is
+ *     structural, never display text → NO wrap.
+ * Everything else on an HTML host element renders as attribute text → wrap.
+ */
+function shouldWrapAttrBinding(
+  name: string,
+  expr: t.Expression,
+  ctx: EmitAttrCtx,
+  elementTagName: string,
+): boolean {
+  if (ctx.elementTagKind === 'component' || ctx.elementTagKind === 'self') {
+    return false;
+  }
+  if (
+    (name === 'value' || name === 'checked') &&
+    FORM_INPUT_TAGS.has(elementTagName.toLowerCase())
+  ) {
+    return false;
+  }
+  if (t.isObjectExpression(expr)) return false;
+  return true;
 }
 
 /**
@@ -1167,14 +1228,39 @@ export function emitSingleAttr(
     }
     const bindingName = resolveBindingName(attr.name, ctx);
     const expr = lowerBoundAttrExpression(attr.expression, ctx, bindingName);
+    // Phase 26 (SPEC-4) — wrap when the IR gate says the value may be
+    // non-primitive AND the attribute position renders as text (not a
+    // component prop / form-control property / structural object). Calls the
+    // synthesized class method `rozieDisplay` (Task 2), flips the gate flag.
+    if (
+      attr.wrapForDisplay &&
+      shouldWrapAttrBinding(attr.name, attr.expression, ctx, elementTagName)
+    ) {
+      if (ctx.hasDisplayWrap) ctx.hasDisplayWrap.value = true;
+      return `[${bindingName}]="rozieDisplay(${expr})"`;
+    }
     return `[${bindingName}]="${expr}"`;
   }
 
   // interpolated: simplify single-binding-segment to direct property binding.
   if (attr.segments.length === 1 && attr.segments[0]!.kind === 'binding') {
-    const seg = attr.segments[0]! as { kind: 'binding'; expression: t.Expression; deps: unknown };
+    const seg = attr.segments[0]! as {
+      kind: 'binding';
+      expression: t.Expression;
+      deps: unknown;
+      wrapForDisplay?: boolean;
+    };
     const bindingName = resolveBindingName(attr.name, ctx);
     const expr = lowerBoundAttrExpression(seg.expression, ctx, bindingName);
+    // Phase 26 (SPEC-4) — class/attr interpolation reduced to a single binding
+    // segment (e.g. `class="{{ $data.x }}"`). Same position-aware wrap gate.
+    if (
+      seg.wrapForDisplay &&
+      shouldWrapAttrBinding(attr.name, seg.expression, ctx, elementTagName)
+    ) {
+      if (ctx.hasDisplayWrap) ctx.hasDisplayWrap.value = true;
+      return `[${bindingName}]="rozieDisplay(${expr})"`;
+    }
     return `[${bindingName}]="${expr}"`;
   }
 
