@@ -212,7 +212,7 @@
                   "start": 199,
                   "end": 217
                 },
-                "wrapForDisplay": true
+                "wrapForDisplay": false
               }
             ],
             "sourceLoc": {
@@ -294,7 +294,8 @@
                 "sourceLoc": {
                   "start": 239,
                   "end": 262
-                }
+                },
+                "wrapForDisplay": true
               }
             ],
             "events": [],

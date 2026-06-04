@@ -156,7 +156,7 @@
               "start": 107,
               "end": 125
             },
-            "wrapForDisplay": true
+            "wrapForDisplay": false
           }
         ],
         "sourceLoc": {

@@ -1649,7 +1649,8 @@
                 "sourceLoc": {
                   "start": 1586,
                   "end": 1619
-                }
+                },
+                "wrapForDisplay": false
               },
               {
                 "kind": "binding",
@@ -1712,7 +1713,8 @@
                 "sourceLoc": {
                   "start": 1624,
                   "end": 1645
-                }
+                },
+                "wrapForDisplay": false
               }
             ],
             "events": [
@@ -1976,7 +1978,7 @@
                           "start": 1885,
                           "end": 1907
                         },
-                        "wrapForDisplay": true
+                        "wrapForDisplay": false
                       },
                       {
                         "type": "TemplateStaticText",

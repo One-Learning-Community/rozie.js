@@ -1772,7 +1772,8 @@
             "sourceLoc": {
               "start": 1041,
               "end": 1078
-            }
+            },
+            "wrapForDisplay": true
           },
           {
             "kind": "spreadBinding",
@@ -1866,7 +1867,8 @@
                 "sourceLoc": {
                   "start": 1168,
                   "end": 1193
-                }
+                },
+                "wrapForDisplay": false
               },
               {
                 "kind": "static",
@@ -1984,7 +1986,7 @@
                   "start": 1269,
                   "end": 1287
                 },
-                "wrapForDisplay": true
+                "wrapForDisplay": false
               }
             ],
             "sourceLoc": {
@@ -2053,7 +2055,8 @@
                 "sourceLoc": {
                   "start": 1305,
                   "end": 1330
-                }
+                },
+                "wrapForDisplay": false
               },
               {
                 "kind": "static",

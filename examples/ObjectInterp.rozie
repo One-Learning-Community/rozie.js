@@ -1,0 +1,36 @@
+<!--
+  ObjectInterp.rozie — Phase 26 (D-08)
+
+  Dedicated object-interpolation parity fixture. A plain object/array value
+  ({ a: 1, b: [2, 3] }) is interpolated in three positions:
+
+    (1) a text node          {{ $data.obj }}
+    (2) a :data-x attribute   :data-x="$data.obj"
+    (3) a class interpolation class="card--{{ $data.obj }}"
+
+  The source is an untyped <data> object initializer, so the Phase 26
+  annotateDisplayWrap gate (D-06/D-07) WRAPs all three positions: on the five
+  non-Vue targets each renders identical 2-space pretty-printed JSON via
+  rozieDisplay (eliminating React's "Objects are not valid as a React child"
+  crash and the [object Object] divergence on Svelte/Angular/Solid/Lit). Vue
+  stays raw — its native toDisplayString already JSON-prints plain Array/Object.
+
+  Downstream: Plan 07 owns dist-parity registration + the cold-gate rebless;
+  this fixture is intentionally NOT registered there here.
+-->
+
+<rozie name="ObjectInterp">
+
+<data>
+{
+  obj: { a: 1, b: [2, 3] },
+}
+</data>
+
+<template>
+<div class="object-interp">
+  <p class="card--{{ $data.obj }}" :data-x="$data.obj">{{ $data.obj }}</p>
+</div>
+</template>
+
+</rozie>

@@ -46,6 +46,22 @@ export interface BlockMap {
      * `inherit-listeners` attribute — treated as `true` downstream.
      */
     inheritListeners?: boolean;
+    /**
+     * Phase 26 (D-12) — the `safe-interpolation` boolean attribute on the
+     * `<rozie>` tag. `false` opts the component out of the cross-target
+     * `rozieDisplay` wrap (raw per-target interpolation emit). The local
+     * envelope override: precedence is envelope attr > global
+     * `safeInterpolation` compiler option > default `true`.
+     *
+     * Forward-declared HERE so Plan 03's `annotateDisplayWrap` wiring in
+     * `lowerToIR` can read `ast.blocks.rozie?.safeInterpolation` and compile
+     * before Plan 06 (the splitter envelope-attribute capture) lands. Until
+     * Plan 06 populates it, the splitter never sets this key, so it resolves to
+     * `undefined` and the global/default precedence applies. Absent (key
+     * omitted under `exactOptionalPropertyTypes`) when the tag carried no
+     * `safe-interpolation` attribute.
+     */
+    safeInterpolation?: boolean;
     loc: SourceLoc;
   };
   props?: BlockEntry;

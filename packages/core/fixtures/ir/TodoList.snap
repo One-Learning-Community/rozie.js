@@ -3462,7 +3462,7 @@
                           "start": 1807,
                           "end": 1825
                         },
-                        "wrapForDisplay": true
+                        "wrapForDisplay": false
                       },
                       {
                         "type": "TemplateStaticText",
@@ -3639,7 +3639,8 @@
                     "sourceLoc": {
                       "start": 1926,
                       "end": 1947
-                    }
+                    },
+                    "wrapForDisplay": false
                   },
                   {
                     "kind": "static",
@@ -3796,7 +3797,8 @@
                     "sourceLoc": {
                       "start": 2009,
                       "end": 2040
-                    }
+                    },
+                    "wrapForDisplay": false
                   }
                 ],
                 "events": [],
@@ -4138,7 +4140,8 @@
                                 "sourceLoc": {
                                   "start": 2140,
                                   "end": 2154
-                                }
+                                },
+                                "wrapForDisplay": true
                               },
                               {
                                 "kind": "binding",
@@ -4247,7 +4250,8 @@
                                 "sourceLoc": {
                                   "start": 2155,
                                   "end": 2183
-                                }
+                                },
+                                "wrapForDisplay": true
                               }
                             ],
                             "events": [],
@@ -4609,7 +4613,8 @@
                                             "sourceLoc": {
                                               "start": 2534,
                                               "end": 2554
-                                            }
+                                            },
+                                            "wrapForDisplay": true
                                           }
                                         ],
                                         "events": [

@@ -45,6 +45,7 @@ import { lowerStyles } from './lowerers/lowerStyles.js';
 import { typeNeutralizeScript } from '../codegen/typeNeutralizeScript.js';
 import { lowerRootElementRef } from './lowerers/lowerRootElementRef.js';
 import { validateClassSelector } from './validateClassSelector.js';
+import { annotateDisplayWrap } from './annotateDisplayWrap.js';
 import { validateRestoreFocus } from './validateRestoreFocus.js';
 import { validateAttrFallthrough } from './validateAttrFallthrough.js';
 import { validateListenerFallthrough } from './validateListenerFallthrough.js';
@@ -55,6 +56,20 @@ import * as t from '@babel/types';
  */
 export interface LowerOptions {
   modifierRegistry: ModifierRegistry;
+  /**
+   * Phase 26 (D-11/D-12) — the GLOBAL `safeInterpolation` compiler option,
+   * threaded from `CompileOptions.safeInterpolation` (and each `@rozie/unplugin`
+   * pipeline). `annotateDisplayWrap` reads the EFFECTIVE flag, resolved in
+   * `lowerToIR` with precedence:
+   *
+   *   `ast.blocks.rozie?.safeInterpolation ?? opts.safeInterpolation ?? true`
+   *
+   * i.e. the per-component `<rozie safe-interpolation="…">` envelope attribute
+   * (Plan 06) wins over this global option, which wins over the `true` default.
+   * When the effective flag is `false`, every interpolation/binding is emitted
+   * raw (no `rozieDisplay` wrap). Absent here → falls through to the default.
+   */
+  safeInterpolation?: boolean;
 }
 
 /**
@@ -227,6 +242,25 @@ export function lowerToIR(ast: RozieAST, opts: LowerOptions): LowerResult {
   // Collected-not-thrown (D-08): pushes ROZ965/966/967 diagnostics; never
   // mutates `ir`.
   validateClassSelector(ir, diagnostics);
+
+  // Phase 26 (D-06/D-07) — resolve the wrap/raw `rozieDisplay` gate ONCE per
+  // interpolation + attribute/class binding. Runs HERE in lowerToIR (not
+  // compile()) for the same reason as typeNeutralizeScript / validateClassSelector
+  // above: `@rozie/unplugin` has its own `parse → lowerToIR → emit{Target}`
+  // pipeline that bypasses compile(), and lowering is the single chokepoint both
+  // paths share — so all five non-Vue emitters (Plans 04/05) read ONE
+  // pre-resolved `wrapForDisplay` boolean instead of re-deriving the type
+  // analysis five times. Mutates the IR in place; never throws (D-08).
+  //
+  // Precedence (D-12): the per-component `<rozie safe-interpolation="…">`
+  // envelope attribute (Plan 06) wins over the global `safeInterpolation`
+  // compiler option, which wins over the `true` default. `ast.blocks.rozie?.
+  // safeInterpolation` is read defensively via optional-chain — the splitter
+  // does not populate it until Plan 06 lands, so it resolves to `undefined`
+  // here and the global/default precedence applies.
+  const effectiveSafeInterpolation =
+    ast.blocks.rozie?.safeInterpolation ?? opts.safeInterpolation ?? true;
+  annotateDisplayWrap(ir, effectiveSafeInterpolation);
 
   // Phase 16 — validate every `$restoreFocus('.sel', idx)` call (SPEC R9/R10).
   // Same chokepoint covers compile() AND @rozie/unplugin entrypoints.

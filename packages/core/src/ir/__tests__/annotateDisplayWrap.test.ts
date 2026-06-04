@@ -376,7 +376,7 @@ describe('annotateDisplayWrap — attribute-binding + class-interpolation gate (
     } as unknown as IRComponent;
     annotateDisplayWrap(ir, true);
     const el = ir.template as { attributes: Array<{ wrapForDisplay: boolean }> };
-    expect(el.attributes[0].wrapForDisplay).toBe(false);
+    expect(el.attributes[0]?.wrapForDisplay).toBe(false);
   });
 });
 
