@@ -186,6 +186,48 @@ describe('annotateDisplayWrap — RAW cases (provably primitive → wrapForDispl
   it('$data.x with a literal-boolean initializer (OQ2)', () => {
     expect(gateOf('$data.flag', { state: [state('flag', t.booleanLiteral(false))] })).toBe(false);
   });
+
+  // Pitfall 5 (recursion arm): a &&/||/?? chain whose operands are ALL provably
+  // primitive resolves to a primitive operand → RAW. Wrapping these is NOT
+  // behavior-neutral — it feeds a `string` into a `boolean` DOM attribute
+  // (`:disabled="$props.disabled || $data.uploading"` in Uppy.rozie), breaking
+  // tsc (string≠boolean) AND runtime semantics (the string "false" is truthy).
+  it('|| LogicalExpression of two provable-Boolean operands (Uppy regression)', () => {
+    expect(
+      gateOf('$props.disabled || $data.uploading', {
+        props: [prop('disabled', { kind: 'identifier', name: 'Boolean' })],
+        state: [state('uploading', t.booleanLiteral(false))],
+      }),
+    ).toBe(false);
+  });
+
+  it('|| LogicalExpression mixing a Boolean and a !-negation (Uppy regression)', () => {
+    expect(
+      gateOf('$data.uploading || !$props.endpoint', {
+        props: [prop('endpoint', { kind: 'identifier', name: 'String' })],
+        state: [state('uploading', t.booleanLiteral(false))],
+      }),
+    ).toBe(false);
+  });
+
+  it('&& LogicalExpression of provable-primitive operands', () => {
+    expect(
+      gateOf('$props.a && $props.b', {
+        props: [
+          prop('a', { kind: 'identifier', name: 'Boolean' }),
+          prop('b', { kind: 'identifier', name: 'Number' }),
+        ],
+      }),
+    ).toBe(false);
+  });
+
+  it('?? LogicalExpression of provable-primitive operands', () => {
+    expect(
+      gateOf("$props.label ?? 'fallback'", {
+        props: [prop('label', { kind: 'identifier', name: 'String' })],
+      }),
+    ).toBe(false);
+  });
 });
 
 describe('annotateDisplayWrap — WRAP cases (uncertain/non-primitive → wrapForDisplay=true)', () => {
@@ -217,15 +259,18 @@ describe('annotateDisplayWrap — WRAP cases (uncertain/non-primitive → wrapFo
     expect(gateOf('remaining', { computed: [{ name: 'remaining' }] })).toBe(true);
   });
 
-  it('&& LogicalExpression (Pitfall 5)', () => {
+  // Pitfall 5: &&/||/?? return an OPERAND (not a coerced boolean), so the
+  // result WRAPs unless EVERY operand is provably primitive. Here both operands
+  // are untyped bare identifiers → at least one non-primitive → WRAP.
+  it('&& LogicalExpression with a non-primitive operand (Pitfall 5)', () => {
     expect(gateOf('a && obj')).toBe(true);
   });
 
-  it('|| LogicalExpression (Pitfall 5)', () => {
+  it('|| LogicalExpression with a non-primitive operand (Pitfall 5)', () => {
     expect(gateOf('a || obj')).toBe(true);
   });
 
-  it('?? LogicalExpression (Pitfall 5)', () => {
+  it('?? LogicalExpression with a non-primitive operand (Pitfall 5)', () => {
     expect(gateOf('a ?? obj')).toBe(true);
   });
 

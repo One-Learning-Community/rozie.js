@@ -142,9 +142,20 @@ function provablyPrimitive(
     return COMPARISON_OPERATORS.has(expr.operator);
   }
 
-  // --- LogicalExpression (&&/||/??) → WRAP (Pitfall 5: returns an operand) ---
+  // --- LogicalExpression (&&/||/??) → recurse into BOTH operands (Pitfall 5) ---
+  // `&&`/`||`/`??` return an OPERAND, not a coerced boolean, so the result is
+  // provably primitive IFF every operand is provably primitive. `a || obj`
+  // (obj non-primitive) still WRAPs — preserving the false-raw safety
+  // invariant — while an all-primitive chain like `$props.disabled ||
+  // $data.uploading` (both Boolean) correctly stays RAW. Wrapping the latter
+  // is NOT behavior-neutral: it feeds a `string` into a `boolean` DOM
+  // attribute (`:disabled`), which both breaks tsc (string≠boolean) AND flips
+  // runtime semantics (the string "false" is truthy). Recursing fixes both.
   if (t.isLogicalExpression(expr)) {
-    return false;
+    return (
+      provablyPrimitive(expr.left, props, state, computedNames) &&
+      provablyPrimitive(expr.right, props, state, computedNames)
+    );
   }
 
   // --- CallExpression: only String(...) / Number(...) coercions are primitive ---

@@ -198,8 +198,16 @@ function hoistDeep(
         // Splice the inner selector's child nodes in place of the `:deep(...)`
         // pseudo (clone so the moved nodes don't keep a stale parent pointer),
         // tagging each as deep-lifted so the scope-attr pass skips it.
+        // `selector.nodes` is the narrowed `Diff<Node, Selector>` union (a
+        // Selector cannot directly contain another Selector node). `clone()`
+        // is typed to return the base `Node`, so type `lifted` as the exact
+        // element type of the target array — the cloned nodes originate from
+        // `inner.nodes` (already that narrowed union), so this is sound and
+        // behavior-identical. Fixes the pre-existing TS2379 under
+        // exactOptionalPropertyTypes (Phase 25 React de-CSS-Modules debt).
+        type SelectorChild = (typeof selector.nodes)[number];
         const lifted = (inner as selectorParser.Selector).nodes.map((n) => {
-          const cloned = n.clone({}) as selectorParser.Node;
+          const cloned = n.clone({}) as SelectorChild;
           deepLifted.add(cloned);
           return cloned;
         });
