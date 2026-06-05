@@ -40,7 +40,7 @@ import { lowerClassSelectorCall } from './lowerClassSelectorCall.js';
  * rewriteScript ($emit lowering) and emitScript (Props interface emit) MUST
  * use this helper so the rewritten body's `oneventclick?.(x)` call site agrees
  * with the destructured prop `oneventclick`. Phase 07.7 fix — surfaced by
- * `examples/FullCalendar.rozie` which emits `event-click` / `date-click` /
+ * `packages/ui/fullcalendar/src/FullCalendar.rozie` which emits `event-click` / `date-click` /
  * `event-drop`. Re-exported so emitScript imports the same definition.
  */
 export function svelteCallbackPropName(eventName: string): string {

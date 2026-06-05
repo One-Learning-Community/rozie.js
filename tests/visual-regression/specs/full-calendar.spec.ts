@@ -9,7 +9,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 /**
  * Portal-slot primitive (Spike 003) — real-third-party-engine runtime smoke.
  *
- * `examples/FullCalendar.rozie` wraps the real `@fullcalendar/core` engine
+ * `packages/ui/fullcalendar/src/FullCalendar.rozie` wraps the real `@fullcalendar/core` engine
  * (v6.x). The wrapper declares `<slot name="event" portal :params="['arg']" />`
  * and routes every engine `eventContent` callback through
  * `$portals.event(node, { arg })`. Consumer's

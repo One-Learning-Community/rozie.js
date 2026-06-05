@@ -205,7 +205,7 @@ const BUNDLE_DECLS: readonly BundleDecl[] = [
     key: 'bundle/FullCalendarDemo',
     label: 'bundle/FullCalendarDemo',
     entryGlobPath: '../../demos/FullCalendarDemo.rozie',
-    dependencyGlobPaths: ['../../FullCalendar.rozie'],
+    dependencyGlobPaths: ['../../../packages/ui/fullcalendar/src/FullCalendar.rozie'],
   },
 ];
 

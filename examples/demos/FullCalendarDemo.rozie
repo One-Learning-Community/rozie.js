@@ -22,7 +22,7 @@
 
 <components>
 {
-  FullCalendar: '../FullCalendar.rozie',
+  FullCalendar: '../../packages/ui/fullcalendar/src/FullCalendar.rozie',
 }
 </components>
 
