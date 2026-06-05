@@ -45,6 +45,7 @@ import { lowerStyles } from './lowerers/lowerStyles.js';
 import { typeNeutralizeScript } from '../codegen/typeNeutralizeScript.js';
 import { lowerRootElementRef } from './lowerers/lowerRootElementRef.js';
 import { validateClassSelector } from './validateClassSelector.js';
+import { validateSlotPropCollision } from './validateSlotPropCollision.js';
 import { annotateDisplayWrap } from './annotateDisplayWrap.js';
 import { validateRestoreFocus } from './validateRestoreFocus.js';
 import { validateAttrFallthrough } from './validateAttrFallthrough.js';
@@ -242,6 +243,16 @@ export function lowerToIR(ast: RozieAST, opts: LowerOptions): LowerResult {
   // Collected-not-thrown (D-08): pushes ROZ965/966/967 diagnostics; never
   // mutates `ir`.
   validateClassSelector(ir, diagnostics);
+
+  // Phase 28 — a `<slot name="X">` whose `X` equals a declared `<props>` key is
+  // a HARD ERROR (ROZ127). Svelte 5 collapses snippets + props into one
+  // `$props` namespace, so such a component compiles to a poisoned Svelte leaf
+  // (duplicate `X` key) while the other 5 targets keep prop/slot in distinct
+  // namespaces — a silent 1-of-6 divergence. Wired into this SAME lowerToIR
+  // chokepoint (not compile()) so it fires for BOTH compile() AND
+  // @rozie/unplugin. Local-IR-only (ir.slots vs ir.props) — no resolver/cache.
+  // Collected-not-thrown (D-08): pushes ROZ127; never mutates `ir`.
+  validateSlotPropCollision(ir, diagnostics);
 
   // Phase 26 (D-06/D-07) — resolve the wrap/raw `rozieDisplay` gate ONCE per
   // interpolation + attribute/class binding. Runs HERE in lowerToIR (not

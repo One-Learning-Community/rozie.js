@@ -244,6 +244,23 @@ export const RozieErrorCode = {
   // severity; the component still integrates with Angular forms — it just
   // ignores the disabled state Angular forwards. Collected, never throws.
   CVA_NO_DISABLED_PROP: 'ROZ126', // single-model CVA component with no `disabled` prop — setDisabledState is a no-op on the Angular target
+  // Phase 28 (slot/prop same-name collision class) — a `<slot name="X">` whose
+  // `X` equals a declared `<props>` key. Unsupportable uniformly across targets
+  // because Svelte 5 unifies snippets and props into ONE `$props()` namespace:
+  // the regenerated Svelte leaf's `Props` interface would declare `X` TWICE
+  // (the prop's type AND a `Snippet`), both sourcing from the same
+  // `props.X` key, so setting the prop poisons the slot derivation. The other 5
+  // targets keep prop and slot in distinct consumer namespaces (React `slots={{}}`,
+  // Vue `#slot`, Angular contentChild, Solid `XSlot`, Lit `.XSlot`) and are
+  // immune — making this a silent cross-target divergence on 1 of 6. Conceptually
+  // adjacent to ROZ121 (EXPOSE_EVENT_NAME_COLLISION) / ROZ122 — a declaration-
+  // namespace collision. Detected by the IR-level `validateSlotPropCollision`
+  // validator (collected-not-thrown, D-08), wired into `lowerToIR` so it fires
+  // for BOTH `compile()` AND `@rozie/unplugin`. Error severity; case-sensitive;
+  // dual code-frame (primary at the slot decl, `related[]` at the colliding prop
+  // decl). Remediation: rename the slot (append `Content` / the engine hook name).
+  // ROZ127 is the next free code after ROZ126 in the 100 semantic-binding cluster.
+  SLOT_PROP_NAME_COLLISION: 'ROZ127', // error — <slot name="X"> where X equals a declared <props> key; Svelte 5 collapses snippets+props into one namespace, so the names cannot coexist
 
   // ---- Compile-time correctness errors (Phase 2 Plan 02) — ROZ200..ROZ299 ----
   WRITE_TO_NON_MODEL_PROP: 'ROZ200', // SEM-02: $props.foo = … where foo lacks model: true (Phase 2 success criterion 2)
