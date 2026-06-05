@@ -1,0 +1,73 @@
+{
+  "name": "@rozie-ui/fullcalendar-angular",
+  "version": "0.1.0",
+  "type": "module",
+  "private": false,
+  "license": "MIT",
+  "description": "Idiomatic Angular calendar/scheduler — one Rozie source compiled to Angular wrapping FullCalendar.",
+  "keywords": [
+    "rozie",
+    "rozie-ui",
+    "fullcalendar",
+    "calendar",
+    "scheduler",
+    "events",
+    "component",
+    "angular"
+  ],
+  "author": "One Learning Community (https://github.com/One-Learning-Community)",
+  "homepage": "https://github.com/One-Learning-Community/rozie.js#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/One-Learning-Community/rozie.js.git",
+    "directory": "packages/ui/fullcalendar/packages/angular"
+  },
+  "bugs": {
+    "url": "https://github.com/One-Learning-Community/rozie.js/issues"
+  },
+  "exports": {
+    ".": {
+      "types": "./src/FullCalendar.ts",
+      "import": "./src/FullCalendar.ts",
+      "default": "./src/FullCalendar.ts"
+    }
+  },
+  "files": [
+    "src"
+  ],
+  "peerDependencies": {
+    "@angular/core": "^19",
+    "@angular/common": "^19",
+    "@fullcalendar/core": "^6.1",
+    "@fullcalendar/daygrid": "^6.1",
+    "@fullcalendar/timegrid": "^6.1",
+    "@fullcalendar/interaction": "^6.1"
+  },
+  "peerDependenciesMeta": {
+    "@angular/core": {
+      "optional": false
+    },
+    "@angular/common": {
+      "optional": false
+    },
+    "@fullcalendar/core": {
+      "optional": false
+    },
+    "@fullcalendar/daygrid": {
+      "optional": false
+    },
+    "@fullcalendar/timegrid": {
+      "optional": false
+    },
+    "@fullcalendar/interaction": {
+      "optional": false
+    }
+  },
+  "scripts": {
+    "build": "echo 'ships source; no build'",
+    "typecheck": "echo 'source-only, no typecheck'"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

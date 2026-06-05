@@ -1,0 +1,73 @@
+{
+  "name": "@rozie-ui/fullcalendar-svelte",
+  "version": "0.1.0",
+  "type": "module",
+  "private": false,
+  "license": "MIT",
+  "description": "Idiomatic Svelte calendar/scheduler — one Rozie source compiled to Svelte wrapping FullCalendar.",
+  "keywords": [
+    "rozie",
+    "rozie-ui",
+    "fullcalendar",
+    "calendar",
+    "scheduler",
+    "events",
+    "component",
+    "svelte"
+  ],
+  "author": "One Learning Community (https://github.com/One-Learning-Community)",
+  "homepage": "https://github.com/One-Learning-Community/rozie.js#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/One-Learning-Community/rozie.js.git",
+    "directory": "packages/ui/fullcalendar/packages/svelte"
+  },
+  "bugs": {
+    "url": "https://github.com/One-Learning-Community/rozie.js/issues"
+  },
+  "exports": {
+    ".": {
+      "svelte": "./src/FullCalendar.svelte",
+      "types": "./src/FullCalendar.svelte",
+      "import": "./src/FullCalendar.svelte",
+      "default": "./src/FullCalendar.svelte"
+    }
+  },
+  "files": [
+    "src"
+  ],
+  "dependencies": {
+    "@rozie/runtime-svelte": "workspace:*"
+  },
+  "peerDependencies": {
+    "svelte": "^5",
+    "@fullcalendar/core": "^6.1",
+    "@fullcalendar/daygrid": "^6.1",
+    "@fullcalendar/timegrid": "^6.1",
+    "@fullcalendar/interaction": "^6.1"
+  },
+  "peerDependenciesMeta": {
+    "svelte": {
+      "optional": false
+    },
+    "@fullcalendar/core": {
+      "optional": false
+    },
+    "@fullcalendar/daygrid": {
+      "optional": false
+    },
+    "@fullcalendar/timegrid": {
+      "optional": false
+    },
+    "@fullcalendar/interaction": {
+      "optional": false
+    }
+  },
+  "scripts": {
+    "build": "echo 'ships source; no build'",
+    "typecheck": "echo 'source-only, no typecheck'"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
