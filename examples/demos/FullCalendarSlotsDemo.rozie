@@ -14,8 +14,13 @@
       28-SPEC REQ-28-4).
 
     - Is FULLY DETERMINISTIC so a stable Linux baseline can exist:
-        * the calendar is pinned to a FIXED date via the :options passthrough
-          (`initialDate: '2026-06-15'`) — never the live clock
+        * the calendar grid is pinned to a FIXED month via the :options
+          passthrough (`initialDate: '2026-06-15'`) — never the live clock
+        * the engine's notion of "now" is ALSO pinned (`now: '2026-06-15'`) so
+          the `.fc-day-today` highlight lands on a FIXED cell — without this the
+          today-highlight tracks the real system clock and the shared baseline
+          drifts every day (the exact reason the original FullCalendar cell was
+          pulled from the matrix on 2026-05-22; see matrix.spec.ts)
         * the view is pinned to 'dayGridMonth' (bound via r-model:view to a
           fixed initial value; the grid never floats)
         * every seed event uses a FIXED ISO date string (never a live timestamp)
@@ -70,7 +75,7 @@ $onMount(() => {
       r-model:view="$data.view"
       :events="$data.events"
       :height="420"
-      :options="{ initialDate: '2026-06-15', initialView: 'dayGridMonth' }"
+      :options="{ initialDate: '2026-06-15', now: '2026-06-15', initialView: 'dayGridMonth' }"
     >
       <!--
         event slot — every engine event cell routes through $portals.event; the
