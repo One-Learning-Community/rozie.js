@@ -2,7 +2,7 @@
 
 `FullCalendar` is Rozie's data-bound port of [FullCalendar](https://fullcalendar.io/) — the vanilla-JS calendar/scheduler engine. One `.rozie` source file ships idiomatic React, Vue, Svelte, Angular, Solid, and Lit consumers from a single wrapper. FullCalendar already publishes four official wrappers ([@fullcalendar/react](https://www.npmjs.com/package/@fullcalendar/react), [@fullcalendar/vue3](https://www.npmjs.com/package/@fullcalendar/vue3), [@fullcalendar/angular](https://www.npmjs.com/package/@fullcalendar/angular), [@fullcalendar/svelte](https://www.npmjs.com/package/@fullcalendar/svelte)) — each one wraps the same `Calendar` engine. Rozie collapses all of them (plus the Solid and Lit wrappers that **do not exist upstream**) into one source.
 
-This page is the **show-and-tell**: the API surface, per-framework quick starts, the imperative handle, and the per-target recipe for custom event content (the `event` portal slot).
+This page is the **show-and-tell**: the API surface, per-framework quick starts, the imperative handle, the `:options` long-tail passthrough, and the per-target recipe for the seven custom-content portal slots.
 
 The full source for `FullCalendar.rozie` lives in the [`@rozie-ui/fullcalendar` package](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/fullcalendar/src/FullCalendar.rozie).
 
@@ -156,6 +156,7 @@ el.addEventListener('event-click', (e) => {
 | `slotDuration` | `String` | `"00:30:00"` | | Time-grid slot length in `HH:mm:ss`. Runtime-updatable. |
 | `nowIndicator` | `Boolean` | `false` | | Render the current-time indicator line in time-grid views. Runtime-updatable. |
 | `headerToolbar` | `Object` | `{…}` | | The toolbar layout (`{ left, center, right }`). A consumer-passed object **fully replaces** the built-in default. Runtime-updatable. |
+| `options` | `Object` | `{}` | | Long-tail passthrough — an arbitrary bag of FullCalendar options/callbacks the curated surface doesn't special-case (`businessHours`, `dayMaxEvents`, `*DidMount` hooks, locale objects, …). Spread **first** into the engine config so the curated props/events/slots **win on key collision** — the curated surface stays primary; `:options` only fills gaps. Runtime-updatable per key via `setOption` (no key-removal reset — a removed key keeps its last applied value until remount; use `getApi()` for full imperative control). |
 
 ### Emits
 
@@ -167,6 +168,11 @@ el.addEventListener('event-click', (e) => {
 | `select` | A date/time range was selected. Payload: `{ start, end, startStr, endStr, allDay }`. |
 | `eventResize` | An event was resized. Payload: `{ event: { id, title, start, end }, startDelta, endDelta }`. |
 | `datesSet` | The visible date range changed (navigation or view switch). Payload: `{ start, end, view }`. |
+| `eventMouseEnter` | The pointer entered a calendar event. Payload: `{ event: { id, title, start, end }, jsEvent }` (mirrors `eventClick`). |
+| `eventMouseLeave` | The pointer left a calendar event. Payload: `{ event: { id, title, start, end }, jsEvent }` (mirrors `eventMouseEnter`). |
+| `unselect` | A previously selected date/time range was cleared. Payload: `{ jsEvent }`. |
+| `loading` | The calendar began or finished loading events (e.g. from an event source). Payload: `{ isLoading }` boolean. |
+| `eventsSet` | The set of rendered events changed. Payload: `{ events: [{ id, title, start, end }, …] }` — the normalized current event set, for persistence/sync consumers. |
 
 ### Imperative handle
 
@@ -195,9 +201,25 @@ cal.current?.next();
 const api = cal.current?.getApi();
 ```
 
-The handle method names are clear of all six event names and twelve prop names (the `$expose` collision discipline — ROZ121), so no `openPicker`-style renames are needed here.
+The handle method names are clear of all eleven event names and thirteen prop names (the `$expose` collision discipline — ROZ121), so no `openPicker`-style renames are needed here.
 
 ## Slots
+
+The wrapper surfaces **seven** of FullCalendar's `*Content` render hooks as portal slots — one authoring surface each that the per-target compiler routes through the framework's native imperative-render API (React/Solid render prop, Vue scoped slot, Svelte snippet, Angular content-child `<ng-template>`, Lit property bridge). Each slot is **guarded** in the wrapper: fill it and your fragment renders; leave it unfilled and FullCalendar's default rendering stands. Every slot receives one scope param, `arg` — FullCalendar's render argument for that hook.
+
+| Slot | FullCalendar option | Renders | Demo-verified |
+| --- | --- | --- | :---: |
+| `event` | `eventContent` | Per-event cell content (`arg.event.title`, `arg.event.start`, …) | ✓ |
+| `dayCell` | `dayCellContent` | Day-grid cell content (`arg.date`, `arg.dayNumberText`, …) | ✓ |
+| `dayHeader` | `dayHeaderContent` | Column-header content (`arg.text`, `arg.date`, …) | ✓ |
+| `slotLabel` | `slotLabelContent` | Time-grid axis slot labels (`arg.text`, `arg.date`, …) | |
+| `weekNumber` | `weekNumberContent` | Week-number cell content (`arg.num`, `arg.text`, …) | |
+| `nowIndicator` | `nowIndicatorContent` | Current-time indicator content (`arg.isAxis`, `arg.date`, …) | |
+| `moreLink` | `moreLinkContent` | "+N more" link content (`arg.num`, `arg.text`, …) | |
+
+All seven share the **identical** per-target authoring shape shown below — the only thing that changes is the slot name and the `arg` payload (per FullCalendar's hook for that surface). The three demo-verified slots (`event`, `dayCell`, `dayHeader`) are wired into the VR matrix; the four long-tail slots (`slotLabel`, `weekNumber`, `nowIndicator`, `moreLink`) use the same recipe with no extra ceremony.
+
+> The `nowIndicator` **slot** (`#nowIndicator`) and the boolean `nowIndicator` **prop** share a name but live in different namespaces — the slot emits FullCalendar's `nowIndicatorContent` option, the prop toggles the `nowIndicator` option. Filling the slot does not enable the indicator; set the prop too.
 
 ### Custom event content
 
@@ -263,6 +285,110 @@ el.event = ({ arg }) => html`<span class="fc-event-title">${arg.event.title}</sp
 ```
 
 On every target the wrapper's `$portals.event(node, { arg })` closure mounts the consumer's fragment into the engine-owned cell container and returns a dispose handle the engine calls on cell teardown.
+
+### Custom day-cell content
+
+The **`dayCell` portal slot** (FullCalendar's `dayCellContent`) replaces a day-grid cell's default content. Same authoring shape as `event` — only the slot name and `arg` payload differ (`arg.date`, `arg.dayNumberText`, …):
+
+**React / Solid** (render prop — `renderDayCell` on React, `dayCell` on Solid):
+
+```tsx
+// React
+<FullCalendar view={view} events={events}
+  renderDayCell={({ arg }) => <span className="my-day">{arg.dayNumberText}</span>} />
+
+// Solid
+<FullCalendar view={view()} events={events()}
+  dayCell={({ arg }) => <span class="my-day">{arg.dayNumberText}</span>} />
+```
+
+**Vue** (scoped slot):
+
+```vue
+<FullCalendar v-model:view="view" :events="events">
+  <template #dayCell="{ arg }">
+    <span class="my-day">{{ arg.dayNumberText }}</span>
+  </template>
+</FullCalendar>
+```
+
+**Svelte** (snippet):
+
+```svelte
+<FullCalendar bind:view {events}>
+  {#snippet dayCell({ arg })}
+    <span class="my-day">{arg.dayNumberText}</span>
+  {/snippet}
+</FullCalendar>
+```
+
+**Angular** (content child `<ng-template>`):
+
+```html
+<FullCalendar [(view)]="view" [events]="events">
+  <ng-template #dayCell let-arg="arg">
+    <span class="my-day">{{ arg.dayNumberText }}</span>
+  </ng-template>
+</FullCalendar>
+```
+
+**Lit** (property bridge):
+
+```ts
+el.dayCell = ({ arg }) => html`<span class="my-day">${arg.dayNumberText}</span>`;
+```
+
+### Custom day-header content
+
+The **`dayHeader` portal slot** (FullCalendar's `dayHeaderContent`) replaces a column header's default text. Identical recipe — substitute `dayHeader` for the slot name and read `arg.text` / `arg.date`:
+
+```vue
+<!-- Vue -->
+<FullCalendar v-model:view="view" :events="events">
+  <template #dayHeader="{ arg }">
+    <strong class="my-header">{{ arg.text }}</strong>
+  </template>
+</FullCalendar>
+```
+
+```tsx
+// React
+<FullCalendar view={view} events={events}
+  renderDayHeader={({ arg }) => <strong className="my-header">{arg.text}</strong>} />
+```
+
+The Solid (`dayHeader={…}`), Svelte (`{#snippet dayHeader(…)}`), Angular (`<ng-template #dayHeader>`), and Lit (`el.dayHeader = …`) forms follow the exact shapes shown for `event`/`dayCell` above.
+
+### The long-tail slots
+
+`slotLabel`, `weekNumber`, `nowIndicator`, and `moreLink` use the **same shared recipe** — fill the like-named slot and read its `arg`. Each maps one-to-one to a FullCalendar `*Content` option:
+
+| Slot | Option | Typical `arg` fields |
+| --- | --- | --- |
+| `slotLabel` | `slotLabelContent` | `arg.text`, `arg.date` |
+| `weekNumber` | `weekNumberContent` | `arg.num`, `arg.text` |
+| `nowIndicator` | `nowIndicatorContent` | `arg.isAxis`, `arg.date` |
+| `moreLink` | `moreLinkContent` | `arg.num`, `arg.text` |
+
+For example, a custom week-number badge in Vue:
+
+```vue
+<FullCalendar v-model:view="view" :events="events">
+  <template #weekNumber="{ arg }">
+    <span class="wk">W{{ arg.num }}</span>
+  </template>
+</FullCalendar>
+```
+
+### Slots the wrapper does not surface
+
+Three of FullCalendar's `*Content` hooks are **deliberately not** wrapped as named slots (documented exclusions, not gaps):
+
+- **`noEventsContent`** — list-view only; `@fullcalendar/list` is not a bundled engine peer.
+- **`slotLaneContent`** — background time-grid lane; no demand.
+- **`allDayContent`** — a trivial label.
+
+Need one of these? Reach for the **`:options` passthrough** (pass `{ noEventsContent: … }` etc. straight through) or grab the raw engine via `getApi()` and set the option imperatively.
 
 ## Recipes
 
