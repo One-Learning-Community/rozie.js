@@ -161,6 +161,23 @@ export const EXAMPLES = [
   // EXAMPLES. Distinct from the existing 'FullCalendar' wrapper cell
   // (FullCalendarDemo.rozie), which stays byte-untouched.
   'FullCalendarBehavior',
+  // Phase 28 (fullcalendar-parity-expansion) REQ-28-4 — FullCalendarSlots is
+  // the date-PINNED 3-slot SCREENSHOT demo. Loader resolves to
+  // examples/demos/FullCalendarSlotsDemo.rozie (which imports
+  // ../../packages/ui/fullcalendar/src/FullCalendar.rozie). Fills the three
+  // high-demand portal-slots (#event / #dayCell / #dayHeader) and pins the grid
+  // via :options initialDate ('2026-06-15') so a stable Linux baseline can
+  // exist — unlike the date-floating 'FullCalendar' cell. Registered in
+  // matrix.spec.ts (auto-fixme until 28-04 lands the Linux PNG).
+  'FullCalendarSlots',
+  // Phase 28 (fullcalendar-parity-expansion) REQ-28-4 — FullCalendarAllSlots is
+  // the behavioral-only "fill every slot" demo (all 7 portal-slots + the 5 new
+  // events + a passthrough :options). Loader resolves to
+  // examples/demos/FullCalendarAllSlotsDemo.rozie. Built for all 6 targets but
+  // NOT a screenshot cell — covered by full-calendar-slots.spec.ts
+  // (DOM-presence assertions), deliberately NOT in matrix.spec.ts EXAMPLES
+  // (D-03 / flatpickr precedent).
+  'FullCalendarAllSlots',
   // Phase 24 (security-self-test-battery) D-11 — base example; the loader
   // resolves directly to examples/RHtml.rozie (no demo sibling). Its String
   // `content` prop has a non-empty static-HTML default, so the cell renders raw
@@ -231,6 +248,11 @@ export const LIT_TAGS: Record<Example, string> = {
   // Phase 27 — the lit entry appends '-demo' → tag
   // 'rozie-full-calendar-behavior-demo' = kebab of FullCalendarBehaviorDemo.
   FullCalendarBehavior: 'rozie-full-calendar-behavior',
+  // Phase 28 — the lit entry appends '-demo' → tags
+  // 'rozie-full-calendar-slots-demo' / 'rozie-full-calendar-all-slots-demo' =
+  // kebab of FullCalendarSlotsDemo / FullCalendarAllSlotsDemo.
+  FullCalendarSlots: 'rozie-full-calendar-slots',
+  FullCalendarAllSlots: 'rozie-full-calendar-all-slots',
   // Phase 24 — kebab tag for the r-html fixture (matches the Lit-emitted
   // @customElement('rozie-r-html') in RHtml.lit.ts).
   RHtml: 'rozie-r-html',
@@ -337,6 +359,14 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // $onMount. The FullCalendar wrapper itself has props, but the demo consumer
   // is self-contained, so {}.
   FullCalendarBehavior: {},
+  // Phase 28 — both FullCalendar slot demos are self-contained: all reactive
+  // state lives in their <data> (view / events for Slots; view / events /
+  // calendarMounted / lastEvent for AllSlots), seeded/bound internally. The
+  // demos bind `view` via r-model internally (not parent-supplied), so no
+  // MODEL_PROPS entry — matching the existing FullCalendar/FullCalendarBehavior
+  // precedent (DEFAULT_PROPS-only, absent from MODEL_PROPS).
+  FullCalendarSlots: {},
+  FullCalendarAllSlots: {},
   // Phase 24 — RHtml is self-contained: its `content` String prop has a
   // non-empty static-HTML default ('<strong>safe</strong>'), so no parent props
   // are needed for the cell to render visible raw HTML.

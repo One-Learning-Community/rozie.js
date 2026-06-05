@@ -69,6 +69,24 @@ const EXAMPLES = [
   // is therefore impossible — the baseline was never generated and the 6 cells
   // sat permanently baseline-gated. FullCalendar keeps full behavioral coverage
   // in `full-calendar.spec.ts` (structural assertions, no screenshot).
+  //
+  // FullCalendarSlots (added 2026-06-05, Phase 28 Plan 03, REQ-28-4) — the
+  // date-PINNED 3-slot screenshot demo. CONTRAST with the still-excluded
+  // date-floating `FullCalendar` above: `FullCalendarSlotsDemo.rozie` pins the
+  // grid via :options `initialDate: '2026-06-15'` + a fixed `dayGridMonth`
+  // view AND seeds every event on FIXED ISO date strings (NO `new Date()`), so
+  // its render is fully deterministic and a stable `FullCalendarSlots.png`
+  // baseline CAN exist. It fills three portal-slots (#event / #dayCell /
+  // #dayHeader) so the screenshot proves the portal-mount path visually across
+  // all 6 targets. Per D-10 all 6 targets diff against the same shared
+  // `FullCalendarSlots.png`. The baseline is owned by Plan 28-04 (Linux-Docker
+  // regen); until it lands the cell baseline-gates to `test.fixme` via
+  // `baselineExists()` (never red) — no macOS-rendered PNG is committed here.
+  // The four long-tail slots (slotLabel / weekNumber / nowIndicator / moreLink)
+  // are behavioral-only (no pixel baseline) — covered by
+  // full-calendar-slots.spec.ts. FullCalendarAllSlots (the all-7-slot
+  // behavioral demo) is deliberately NOT in this list (behavioral cell only).
+  'FullCalendarSlots',
   // PortalListStyled (added 2026-05-20, quick-task 260520-8iu) — Spike 004
   // string-`:style` + `@portal` VR coverage. PortalListStyledDemo fills a
   // `<template #item>` whose rows carry an object-form `:style` (the swatch
