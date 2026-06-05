@@ -116,6 +116,12 @@ export default defineConfig({
             { text: 'Flatpickr example & output', link: '/examples/flatpickr' },
           ],
         },
+        {
+          text: '@rozie-ui/fullcalendar',
+          items: [
+            { text: 'FullCalendar — showcase & API', link: '/guide/fullcalendar' },
+          ],
+        },
       ],
       '/compatibility': [
         {
