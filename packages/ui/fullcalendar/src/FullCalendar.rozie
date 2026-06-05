@@ -17,10 +17,9 @@
       @dateClick="onDateClick"
     />
 
-  Consumers must import FullCalendar's CSS themselves — the .rozie
-  file's <style> is scoped so it can't ship the global .fc-* selectors.
-  Either `import '@fullcalendar/core/main.css'` at the app entry or
-  use the CDN copy.
+  FullCalendar v6 auto-injects its CSS — consumers do NOT need a manual
+  stylesheet import. The .rozie file's <style> is scoped so it carries
+  only the wrapper's layout box, not the global .fc-* selectors.
 
   Why this is a worthwhile demo:
     - NEW domain: calendar grids with Date objects (not strings)
@@ -32,19 +31,25 @@
       via separate default imports
     - Structured-payload $emit: eventClick forwards { event, jsEvent,
       view } — heavier payload shape than prior examples
+    - Rich $expose imperative handle: getApi + 7 navigation/mutation verbs
 -->
 
 <rozie name="FullCalendar" inherit-attrs="false" inherit-listeners="false">
 
 <props>
 {
-  events:       { type: Array,   default: () => [] },
-  view:         { type: String,  default: 'dayGridMonth', model: true },
-  weekends:     { type: Boolean, default: true },
-  editable:     { type: Boolean, default: true },
-  selectable:   { type: Boolean, default: true },
-  height:       { type: Number,  default: 480 },
-  defaultColor: { type: String,  default: '#3b82f6' },
+  events:        { type: Array,   default: () => [] },
+  view:          { type: String,  default: 'dayGridMonth', model: true },
+  weekends:      { type: Boolean, default: true },
+  editable:      { type: Boolean, default: true },
+  selectable:    { type: Boolean, default: true },
+  height:        { type: Number,  default: 480 },
+  defaultColor:  { type: String,  default: '#3b82f6' },
+  locale:        { type: String,  default: 'en' },
+  firstDay:      { type: Number,  default: 0 },
+  slotDuration:  { type: String,  default: '00:30:00' },
+  nowIndicator:  { type: Boolean, default: false },
+  headerToolbar: { type: Object,  default: () => ({ left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,timeGridDay' }) },
 }
 </props>
 
@@ -78,12 +83,14 @@ $onMount(() => {
     editable:      $props.editable,
     selectable:    $props.selectable,
     height:        $props.height,
+    locale:        $props.locale,
+    firstDay:      $props.firstDay,
+    slotDuration:  $props.slotDuration,
+    nowIndicator:  $props.nowIndicator,
     events:        $props.events.map(normalizeEvent),
-    headerToolbar: {
-      left:   'prev,next today',
-      center: 'title',
-      right:  'dayGridMonth,timeGridWeek,timeGridDay',
-    },
+    // D-02: a consumer-passed headerToolbar fully REPLACES the built-in
+    // toolbar; the built-in default lives in the `headerToolbar` prop default.
+    headerToolbar: $props.headerToolbar,
     eventClick: (info) => {
       $emit('eventClick', {
         event:   { id: info.event.id, title: info.event.title, start: info.event.start, end: info.event.end },
@@ -98,6 +105,19 @@ $onMount(() => {
         event: { id: info.event.id, title: info.event.title, start: info.event.start, end: info.event.end },
         delta: info.delta,
       })
+    },
+    select: (info) => {
+      $emit('select', { start: info.start, end: info.end, startStr: info.startStr, endStr: info.endStr, allDay: info.allDay })
+    },
+    eventResize: (info) => {
+      $emit('eventResize', {
+        event: { id: info.event.id, title: info.event.title, start: info.event.start, end: info.event.end },
+        startDelta: info.startDelta,
+        endDelta:   info.endDelta,
+      })
+    },
+    datesSet: (info) => {
+      $emit('datesSet', { start: info.start, end: info.end, view: info.view.type })
     },
     viewDidMount: (info) => {
       // viewDidMount fires both on initial mount AND on changeView calls.
@@ -147,6 +167,35 @@ $watch(() => $props.weekends,   (v) => instance?.setOption('weekends',   v))
 $watch(() => $props.editable,   (v) => instance?.setOption('editable',   v))
 $watch(() => $props.selectable, (v) => instance?.setOption('selectable', v))
 $watch(() => $props.height,     (v) => instance?.setOption('height',     v))
+$watch(() => $props.locale,        (v) => instance?.setOption('locale',        v))
+$watch(() => $props.firstDay,      (v) => instance?.setOption('firstDay',      v))
+$watch(() => $props.slotDuration,  (v) => instance?.setOption('slotDuration',  v))
+$watch(() => $props.nowIndicator,  (v) => instance?.setOption('nowIndicator',  v))
+$watch(() => $props.headerToolbar, (v) => instance?.setOption('headerToolbar', v))
+
+// Imperative handle (Phase 21 $expose). The 8 calendar verbs a consumer can't
+// drive through props alone — exposed uniformly to all 6 targets
+// (Vue defineExpose / React useImperativeHandle / Svelte instance export /
+// Angular+Lit public method / Solid callback ref). Each delegates to the
+// underlying Calendar instance, which is null before $onMount and after
+// destroy — callers handle the pre-mount null.
+//
+// Collision discipline (the load-bearing flatpickr lesson): no exposed name may
+// collide with an emitted event (eventClick/dateClick/eventDrop/select/
+// eventResize/datesSet) or a declared prop. The 8 verbs below are clear on both
+// axes — getApi/changeView/addEvent/removeEvent/today/prev/next/gotoDate are
+// none of the 6 events nor the 12 props. getApi returns the raw Calendar
+// instance per REQ-27-4 (NOT guard-nulled).
+function getApi() { return instance }
+function changeView(...a) { return instance?.changeView(...a) }
+function addEvent(...a)   { return instance?.addEvent(...a) }
+function removeEvent(id)  { instance?.getEventById(id)?.remove() }
+function today()          { instance?.today() }
+function prev()           { instance?.prev() }
+function next()           { instance?.next() }
+function gotoDate(...a)   { instance?.gotoDate(...a) }
+
+$expose({ getApi, changeView, addEvent, removeEvent, today, prev, next, gotoDate })
 </script>
 
 <template>
