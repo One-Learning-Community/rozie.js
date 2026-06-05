@@ -1441,6 +1441,30 @@ importers:
         specifier: ^3.4
         version: 3.5.33(typescript@5.9.3)
 
+  packages/ui/fullcalendar:
+    devDependencies:
+      '@fullcalendar/core':
+        specifier: ^6.1
+        version: 6.1.20
+      '@fullcalendar/daygrid':
+        specifier: ^6.1
+        version: 6.1.20(@fullcalendar/core@6.1.20)
+      '@fullcalendar/interaction':
+        specifier: ^6.1
+        version: 6.1.20(@fullcalendar/core@6.1.20)
+      '@fullcalendar/timegrid':
+        specifier: ^6.1
+        version: 6.1.20(@fullcalendar/core@6.1.20)
+      '@rozie/core':
+        specifier: workspace:*
+        version: link:../../core
+      typescript:
+        specifier: ~5.6.0
+        version: 5.6.3
+      vitest:
+        specifier: ^4.1.0
+        version: 4.1.5(@types/node@22.19.17)(@vitest/coverage-v8@4.1.5)(happy-dom@15.11.7)(jsdom@25.0.1)(vite@8.0.10(@types/node@22.19.17)(esbuild@0.28.0)(jiti@2.7.0)(less@4.4.2)(sass@1.97.3)(terser@5.46.2))
+
   packages/ui/sortable-list:
     devDependencies:
       '@rozie/core':
