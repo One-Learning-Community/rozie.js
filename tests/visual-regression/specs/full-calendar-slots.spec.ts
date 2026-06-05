@@ -7,9 +7,9 @@ import { fileURLToPath } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 /**
- * FullCalendar all-7-slot DOM-presence spec (Phase 28 Plan 03, REQ-28-4).
+ * FullCalendar all-9-slot DOM-presence spec (Phase 28 Plan 03, REQ-28-4).
  *
- * `examples/demos/FullCalendarAllSlotsDemo.rozie` fills ALL SEVEN FullCalendar
+ * `examples/demos/FullCalendarAllSlotsDemo.rozie` fills ALL NINE FullCalendar
  * portal-slots, binds the 5 new events, and passes a passthrough `:options`
  * value. This spec is the BEHAVIORAL tier of REQ-28-4: it proves every slot
  * MOUNTS and DISPOSES across all 6 targets WITHOUT a pixel baseline (the
@@ -21,12 +21,13 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  * The signal is DOM presence (`toHaveCount`/`toBeVisible` on the slot-<name>
  * markers), NOT pixels — macOS Chromium kerning drift is irrelevant here.
  *
- * The 7 slots are driven across the two views that surface them:
+ * The 9 slots are driven across the two views that surface them:
  *   - dayGridMonth (default): event, dayCell, dayHeader, weekNumber
  *     (weekNumbers:true), and moreLink (dayMaxEvents:2 overflow — the demo
  *     seeds 4 events on one day)
  *   - timeGridWeek (via the demo's `view-week` control): slotLabel,
- *     nowIndicatorContent
+ *     nowIndicatorContent, allDayContent (all-day axis), slotLaneContent
+ *     (time-slot lanes)
  *
  * DISPOSE: flipping the demo's `teardown` r-if gate must drop every slot marker
  * to count 0 — the portal dispose path firing across all 6 targets.
@@ -69,7 +70,7 @@ for (const target of TARGETS) {
     resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
   );
   const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
-  runner(`full-calendar-slots [${target}]: all 7 portal-slots mount + dispose`, async ({
+  runner(`full-calendar-slots [${target}]: all 9 portal-slots mount + dispose`, async ({
     page,
   }) => {
     const pageErrors: string[] = [];
@@ -90,7 +91,7 @@ for (const target of TARGETS) {
     });
 
     // ---- dayGridMonth slots: event / dayCell / dayHeader / weekNumber / moreLink ----
-    // The default view surfaces 5 of the 7 slots. Each filled slot renders its
+    // The default view surfaces 5 of the 9 slots. Each filled slot renders its
     // distinct slot-<name> marker into the engine-owned cell.
     await expect(mount.getByTestId('slot-event')).not.toHaveCount(0, {
       timeout: 10_000,
@@ -145,6 +146,16 @@ for (const target of TARGETS) {
     await expect(mount.getByTestId('slot-slotLabel')).not.toHaveCount(0, {
       timeout: 10_000,
     });
+    // allDayContent slot — FullCalendar's all-day axis label (timeGrid views).
+    // Renders once timeGridWeek mounts its all-day row.
+    await expect(mount.getByTestId('slot-allDayContent')).not.toHaveCount(0, {
+      timeout: 10_000,
+    });
+    // slotLaneContent slot — FullCalendar's time-slot lane content (timeGrid
+    // views). One lane per slotDuration step → renders many markers.
+    await expect(mount.getByTestId('slot-slotLaneContent')).not.toHaveCount(0, {
+      timeout: 10_000,
+    });
     // nowIndicatorContent slot — DOCUMENTED behavioral-coverage gap (logged, not
     // silently dropped, per 28-SPEC §4 "long-tail slots ... logged, not silently
     // dropped"). FullCalendar only fires `nowIndicatorContent` (the engine hook
@@ -196,6 +207,8 @@ for (const target of TARGETS) {
       'slot-weekNumber',
       'slot-nowIndicatorContent',
       'slot-moreLink',
+      'slot-allDayContent',
+      'slot-slotLaneContent',
     ]) {
       await expect(mount.getByTestId(slot)).toHaveCount(0, { timeout: 10_000 });
     }

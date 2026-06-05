@@ -7,11 +7,11 @@
   slots for the deterministic pixel tier, THIS demo proves the FULL slot +
   event surface MOUNTS and DISPOSES at runtime across all 6 targets:
 
-    - Fills ALL SEVEN portal-slots (event / dayCell / dayHeader / slotLabel /
-      weekNumber / nowIndicatorContent / moreLink), each rendering a queryable
-      marker node with a distinct per-slot test id (the slot-<name> family) so
-      full-calendar-slots.spec.ts can assert presence + dispose per slot, per
-      target.
+    - Fills ALL NINE portal-slots (event / dayCell / dayHeader / slotLabel /
+      weekNumber / nowIndicatorContent / moreLink / allDayContent /
+      slotLaneContent), each rendering a queryable marker node with a distinct
+      per-slot test id (the slot-<name> family) so full-calendar-slots.spec.ts
+      can assert presence + dispose per slot, per target.
 
     - Binds the 5 NEW events (eventMouseEnter / eventMouseLeave / unselect /
       loading / eventsSet) to handlers that record the last-fired type + a
@@ -25,8 +25,8 @@
       A single overflow day is seeded past dayMaxEvents so moreLink renders.
 
     - Provides view-switch controls (timeGridWeek makes slotLabel +
-      nowIndicatorContent render; dayGridMonth makes dayCell / dayHeader /
-      moreLink render) the spec
+      nowIndicatorContent + allDayContent + slotLaneContent render; dayGridMonth
+      makes dayCell / dayHeader / moreLink render) the spec
       drives, plus an r-if teardown control so the spec asserts the slot markers
       DISPOSE when the calendar unmounts (portal dispose path fires per target).
 
@@ -99,7 +99,7 @@ const remount  = () => { $data.calendarMounted = true }
 <div class="fc-all-slots-demo">
   <header>
     <h3>FullCalendar — every slot + every new event</h3>
-    <p class="hint">Behavioral cell: all 7 portal-slots filled, the 5 new events bound, and a passthrough <code>:options</code> (<code>weekNumbers</code> + <code>dayMaxEvents</code> + <code>businessHours</code>). Switch views to surface the long-tail slots; tear down to prove the slots dispose.</p>
+    <p class="hint">Behavioral cell: all 9 portal-slots filled, the 5 new events bound, and a passthrough <code>:options</code> (<code>weekNumbers</code> + <code>dayMaxEvents</code> + <code>businessHours</code>). Switch views to surface the long-tail slots; tear down to prove the slots dispose.</p>
   </header>
 
   <div class="control-row">
@@ -156,6 +156,14 @@ const remount  = () => { $data.calendarMounted = true }
       <!-- moreLink slot (dayMaxEvents overflow) -->
       <template #moreLink="{ arg }">
         <span class="fc-slot-marker" data-testid="slot-moreLink">+{{ arg.num }}</span>
+      </template>
+      <!-- allDayContent slot (timeGridWeek all-day axis) -->
+      <template #allDayContent="{ arg }">
+        <span class="fc-slot-marker" data-testid="slot-allDayContent">{{ arg.text }}</span>
+      </template>
+      <!-- slotLaneContent slot (timeGridWeek time-slot lane) -->
+      <template #slotLaneContent="{ arg }">
+        <span class="fc-slot-marker" data-testid="slot-slotLaneContent">lane</span>
       </template>
     </FullCalendar>
     <p r-else class="torn-down" data-testid="torn-down">Calendar torn down.</p>

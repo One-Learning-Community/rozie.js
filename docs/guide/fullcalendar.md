@@ -2,7 +2,7 @@
 
 `FullCalendar` is Rozie's data-bound port of [FullCalendar](https://fullcalendar.io/) — the vanilla-JS calendar/scheduler engine. One `.rozie` source file ships idiomatic React, Vue, Svelte, Angular, Solid, and Lit consumers from a single wrapper. FullCalendar already publishes four official wrappers ([@fullcalendar/react](https://www.npmjs.com/package/@fullcalendar/react), [@fullcalendar/vue3](https://www.npmjs.com/package/@fullcalendar/vue3), [@fullcalendar/angular](https://www.npmjs.com/package/@fullcalendar/angular), [@fullcalendar/svelte](https://www.npmjs.com/package/@fullcalendar/svelte)) — each one wraps the same `Calendar` engine. Rozie collapses all of them (plus the Solid and Lit wrappers that **do not exist upstream**) into one source.
 
-This page is the **show-and-tell**: the API surface, per-framework quick starts, the imperative handle, the `:options` long-tail passthrough, and the per-target recipe for the seven custom-content portal slots.
+This page is the **show-and-tell**: the API surface, per-framework quick starts, the imperative handle, the `:options` long-tail passthrough, and the per-target recipe for the nine custom-content portal slots.
 
 The full source for `FullCalendar.rozie` lives in the [`@rozie-ui/fullcalendar` package](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/fullcalendar/src/FullCalendar.rozie).
 
@@ -205,7 +205,7 @@ The handle method names are clear of all eleven event names and thirteen prop na
 
 ## Slots
 
-The wrapper surfaces **seven** of FullCalendar's `*Content` render hooks as portal slots — one authoring surface each that the per-target compiler routes through the framework's native imperative-render API (React/Solid render prop, Vue scoped slot, Svelte snippet, Angular content-child `<ng-template>`, Lit property bridge). Each slot is **guarded** in the wrapper: fill it and your fragment renders; leave it unfilled and FullCalendar's default rendering stands. Every slot receives one scope param, `arg` — FullCalendar's render argument for that hook.
+The wrapper surfaces **nine** of FullCalendar's `*Content` render hooks as portal slots — one authoring surface each that the per-target compiler routes through the framework's native imperative-render API (React/Solid render prop, Vue scoped slot, Svelte snippet, Angular content-child `<ng-template>`, Lit property bridge). Each slot is **guarded** in the wrapper: fill it and your fragment renders; leave it unfilled and FullCalendar's default rendering stands. Every slot receives one scope param, `arg` — FullCalendar's render argument for that hook.
 
 | Slot | FullCalendar option | Renders | Demo-verified |
 | --- | --- | --- | :---: |
@@ -216,8 +216,10 @@ The wrapper surfaces **seven** of FullCalendar's `*Content` render hooks as port
 | `weekNumber` | `weekNumberContent` | Week-number cell content (`arg.num`, `arg.text`, …) | |
 | `nowIndicatorContent` | `nowIndicatorContent` | Current-time indicator content (`arg.isAxis`, `arg.date`, …) | |
 | `moreLink` | `moreLinkContent` | "+N more" link content (`arg.num`, `arg.text`, …) | |
+| `allDayContent` | `allDayContent` | Time-grid all-day axis label content (`arg.text`, …) | |
+| `slotLaneContent` | `slotLaneContent` | Time-grid time-slot lane content (`arg.date`, `arg.time`, …) | |
 
-All seven share the **identical** per-target authoring shape shown below — the only thing that changes is the slot name and the `arg` payload (per FullCalendar's hook for that surface). The three demo-verified slots (`event`, `dayCell`, `dayHeader`) are wired into the VR matrix; the four long-tail slots (`slotLabel`, `weekNumber`, `nowIndicatorContent`, `moreLink`) use the same recipe with no extra ceremony.
+All nine share the **identical** per-target authoring shape shown below — the only thing that changes is the slot name and the `arg` payload (per FullCalendar's hook for that surface). The three demo-verified slots (`event`, `dayCell`, `dayHeader`) are wired into the VR matrix; the six long-tail slots (`slotLabel`, `weekNumber`, `nowIndicatorContent`, `moreLink`, `allDayContent`, `slotLaneContent`) use the same recipe with no extra ceremony.
 
 > The current-time-indicator **slot** is named `nowIndicatorContent` (after FullCalendar's `nowIndicatorContent` option) so it does **not** clash with the boolean `nowIndicator` **prop** — a slot whose name equals a declared prop name is a hard compile error in Rozie (Svelte 5 unifies snippets and props into one `$props` namespace). Fill `#nowIndicatorContent` to customize the indicator content, and set the `nowIndicator` prop to `true` to actually enable it.
 
@@ -361,7 +363,7 @@ The Solid (`dayHeader={…}`), Svelte (`{#snippet dayHeader(…)}`), Angular (`<
 
 ### The long-tail slots
 
-`slotLabel`, `weekNumber`, `nowIndicatorContent`, and `moreLink` use the **same shared recipe** — fill the like-named slot and read its `arg`. Each maps one-to-one to a FullCalendar `*Content` option:
+`slotLabel`, `weekNumber`, `nowIndicatorContent`, `moreLink`, `allDayContent`, and `slotLaneContent` use the **same shared recipe** — fill the like-named slot and read its `arg`. Each maps one-to-one to a FullCalendar `*Content` option:
 
 | Slot | Option | Typical `arg` fields |
 | --- | --- | --- |
@@ -369,6 +371,10 @@ The Solid (`dayHeader={…}`), Svelte (`{#snippet dayHeader(…)}`), Angular (`<
 | `weekNumber` | `weekNumberContent` | `arg.num`, `arg.text` |
 | `nowIndicatorContent` | `nowIndicatorContent` | `arg.isAxis`, `arg.date` |
 | `moreLink` | `moreLinkContent` | `arg.num`, `arg.text` |
+| `allDayContent` | `allDayContent` | `arg.text` |
+| `slotLaneContent` | `slotLaneContent` | `arg.date`, `arg.time` |
+
+`allDayContent` and `slotLaneContent` render in time-grid views (`timeGridWeek` / `timeGridDay`) — the all-day axis label and the per-slot lane content respectively. Both work with the bundled `@fullcalendar/timegrid` plugin, no extra peer required.
 
 For example, a custom week-number badge in Vue:
 
@@ -382,13 +388,11 @@ For example, a custom week-number badge in Vue:
 
 ### Slots the wrapper does not surface
 
-Three of FullCalendar's `*Content` hooks are **deliberately not** wrapped as named slots (documented exclusions, not gaps):
+One of FullCalendar's `*Content` hooks is **deliberately not** wrapped as a named slot (a documented exclusion, not a gap):
 
-- **`noEventsContent`** — list-view only; `@fullcalendar/list` is not a bundled engine peer.
-- **`slotLaneContent`** — background time-grid lane; no demand.
-- **`allDayContent`** — a trivial label.
+- **`noEventsContent`** — list-view only; `@fullcalendar/list` is not a bundled engine peer (pending a future list-plugin addition).
 
-Need one of these? Reach for the **`:options` passthrough** (pass `{ noEventsContent: … }` etc. straight through) or grab the raw engine via `getApi()` and set the option imperatively.
+Need it? Reach for the **`:options` passthrough** (pass `{ noEventsContent: … }` straight through) or grab the raw engine via `getApi()` and set the option imperatively.
 
 ## Recipes
 

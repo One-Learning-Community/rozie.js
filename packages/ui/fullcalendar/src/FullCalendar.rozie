@@ -175,10 +175,12 @@ $onMount(() => {
       return { domNodes: [node], dispose }
     }
   }
-  // The 6 remaining *Content portal-slots — wired identically to `event`, one
+  // The 8 remaining *Content portal-slots — wired identically to `event`, one
   // per FullCalendar per-cell content hook that fires with the bundled plugins
   // (core + daygrid + timegrid + interaction). Each guarded by its own slot so
-  // unfilled slots keep FullCalendar's default rendering.
+  // unfilled slots keep FullCalendar's default rendering. (9 portal-slots total
+  // counting `event` above; allDayContent + slotLaneContent are the two timeGrid
+  // axis/lane hooks added last.)
   //
   // NOTE the `nowIndicatorContent` slot is named for its FullCalendar engine
   // hook (`nowIndicatorContent`) so it does NOT clash with the boolean
@@ -227,10 +229,23 @@ $onMount(() => {
       return { domNodes: [node], dispose }
     }
   }
-  // Excluded *Content slots (documented, not gaps): noEventsContent (list-view
-  // only — @fullcalendar/list is not a bundled peer), slotLaneContent (background
-  // lane, no demand), allDayContent (trivial label). Consumers needing those use
-  // the :options passthrough + getApi().
+  if ($slots.allDayContent) {
+    opts.allDayContent = (arg) => {
+      const node = document.createElement('div')
+      const dispose = $portals.allDayContent(node, { arg })
+      return { domNodes: [node], dispose }
+    }
+  }
+  if ($slots.slotLaneContent) {
+    opts.slotLaneContent = (arg) => {
+      const node = document.createElement('div')
+      const dispose = $portals.slotLaneContent(node, { arg })
+      return { domNodes: [node], dispose }
+    }
+  }
+  // The one still-excluded *Content slot (documented, not a gap): noEventsContent
+  // — list-view only, and @fullcalendar/list is not a bundled engine peer. A
+  // consumer needing it uses the :options passthrough + getApi().
 
   instance = new Calendar($el, opts)
   instance.render()
@@ -315,6 +330,8 @@ $expose({ getApi, changeView, addEvent, removeEvent, today, prev, next, gotoDate
 <slot name="weekNumber" portal :params="['arg']" />
 <slot name="nowIndicatorContent" portal :params="['arg']" />
 <slot name="moreLink" portal :params="['arg']" />
+<slot name="allDayContent" portal :params="['arg']" />
+<slot name="slotLaneContent" portal :params="['arg']" />
 </template>
 
 <style>

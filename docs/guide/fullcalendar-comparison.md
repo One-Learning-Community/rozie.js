@@ -13,7 +13,7 @@ framework targets from a single source, each a pre-compiled
 `@rozie-ui/fullcalendar-*` package with no Rozie toolchain required. Where the
 ecosystem ships three official connectors plus scattered community coverage,
 Rozie ships the *same* 13-prop / 11-event surface, the *same* eight-verb
-imperative handle, the *same* seven custom-content portal slots, and the *same*
+imperative handle, the *same* nine custom-content portal slots, and the *same*
 `:options` long-tail passthrough on all six.
 
 Every wrapper on this page — including Rozie's — drives the **same
@@ -32,7 +32,7 @@ evidence of absence.)
 
 | Wrapper | Frameworks | Last published | Latest-framework support | Runtime option reconcile | Imperative handle | Custom event content |
 | ------- | ---------- | -------------- | ------------------------ | :----------------------: | :---------------: | :------------------: |
-| **[Rozie @rozie-ui/fullcalendar](/guide/fullcalendar)** | **6 — React + Vue + Svelte + Angular + Solid + Lit** | this repo (2026-06) | R18+ / V3.4+ / Sv5 / Ng19+ / Solid / Lit | ✓ managed `$watch`→`setOption` + `:options` long-tail | ✓ uniform `$expose` (8 verbs) | ✓ 7 portal-slots, all 6 |
+| **[Rozie @rozie-ui/fullcalendar](/guide/fullcalendar)** | **6 — React + Vue + Svelte + Angular + Solid + Lit** | this repo (2026-06) | R18+ / V3.4+ / Sv5 / Ng19+ / Solid / Lit | ✓ managed `$watch`→`setOption` + `:options` long-tail | ✓ uniform `$expose` (8 verbs) | ✓ 9 portal-slots, all 6 |
 | [@fullcalendar/react](https://www.npmjs.com/package/@fullcalendar/react) *(official)* | React | 6.1.20 · 2025-12 | **React ≤ 18** (peer `^16.7 \|\| ^17 \|\| ^18`) | ✓ diff → re-render | ✓ `ref` → `getApi()` | ✓ `eventContent` render-prop |
 | [@fullcalendar/vue3](https://www.npmjs.com/package/@fullcalendar/vue3) *(official)* | Vue 3 | 6.1.20 · 2025-12 | Vue 3.0.11+ (✓ 3.4+) | ✓ watches options | ✓ `ref` → `getApi()` | ✓ scoped slot |
 | [@fullcalendar/angular](https://www.npmjs.com/package/@fullcalendar/angular) *(official)* | Angular | 6.1.20 · 2025-12 | Angular **12 – 21** (✓ 19+) | ✓ diffs `[options]` | ✓ `getApi()` | ✓ `ng-template` |
@@ -84,9 +84,10 @@ registry, the GitHub API, and each project's README/`package.json` on
 - **The full `*Content` slot set as portal slots, everywhere.** FullCalendar's
   content hooks are exactly the kind of feature that fragments per framework —
   a render-prop in React, a slot in Vue, a template in Angular, and unsupported
-  in the wrappers that don't reach those frameworks. Rozie surfaces **seven** of
+  in the wrappers that don't reach those frameworks. Rozie surfaces **nine** of
   them — `event`, `dayCell`, `dayHeader`, `slotLabel`, `weekNumber`,
-  `nowIndicatorContent`, and `moreLink` — as portal slots, each emitting the
+  `nowIndicatorContent`, `moreLink`, `allDayContent`, and `slotLaneContent` — as
+  portal slots, each emitting the
   framework's idiomatic consumer surface (React / Solid render-prop, Vue
   scoped-slot, Svelte snippet, Angular content-child, Lit slot bridge),
   documented per-target in [Slots](/guide/fullcalendar#slots). Every slot is
@@ -98,8 +99,9 @@ registry, the GitHub API, and each project's README/`package.json` on
   [`options` prop](/guide/fullcalendar#props) is an arbitrary passthrough bag —
   spread *first* into the engine config so curated props/events/slots win on key
   collision — that forwards anything the curated surface doesn't special-case
-  (`businessHours`, `dayMaxEvents`, `*DidMount` hooks, object locales, the
-  excluded `noEventsContent` / `slotLaneContent` / `allDayContent` hooks, …)
+  (`businessHours`, `dayMaxEvents`, `*DidMount` hooks, object locales, the one
+  excluded `noEventsContent` hook — list-view only, pending a future
+  `@fullcalendar/list` plugin, …)
   identically on all six targets, with per-key `setOption` runtime reconcile.
   This closes the "but my app needs option X" gap without forking the wrapper.
 
