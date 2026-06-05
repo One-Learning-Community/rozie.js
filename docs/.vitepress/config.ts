@@ -120,6 +120,7 @@ export default defineConfig({
           text: '@rozie-ui/fullcalendar',
           items: [
             { text: 'FullCalendar — showcase & API', link: '/guide/fullcalendar' },
+            { text: 'FullCalendar libraries comparison', link: '/guide/fullcalendar-comparison' },
           ],
         },
       ],
