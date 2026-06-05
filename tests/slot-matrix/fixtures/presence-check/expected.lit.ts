@@ -49,8 +49,8 @@ export default class PresenceCheckFixture extends SignalWatcher(LitElement) {
 
   render() {
     return html`
-<div class="presence-check-fixture" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-s-65799b64>
-  ${this._hasSlotAside ? html`<aside data-rozie-s-65799b64>
+<div class="presence-check-fixture" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-s-313bf282>
+  ${this._hasSlotAside ? html`<aside data-rozie-s-313bf282>
     <slot name="aside"></slot>
   </aside>` : nothing}</div>
 `;

@@ -63,9 +63,9 @@ export default class NestedSlotsFixture extends SignalWatcher(LitElement) {
 
   render() {
     return html`
-<div class="nested-slots-fixture" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-s-9d78e229>
+<div class="nested-slots-fixture" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-s-4d5488e4>
   <slot name="wrapper">
-    <div class="wrapper-fallback" data-rozie-s-9d78e229>
+    <div class="wrapper-fallback" data-rozie-s-4d5488e4>
       <slot name="inner"></slot>
     </div>
   </slot>

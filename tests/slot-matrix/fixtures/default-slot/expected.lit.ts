@@ -49,7 +49,7 @@ export default class DefaultSlotFixture extends SignalWatcher(LitElement) {
 
   render() {
     return html`
-<div class="default-slot-fixture" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-s-9a40ef5a>
+<div class="default-slot-fixture" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-s-61728cb8>
   <slot></slot>
 </div>
 `;

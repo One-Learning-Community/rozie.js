@@ -11,6 +11,9 @@ export default class Wrapper extends SignalWatcher(LitElement) {
   @queryAssignedElements({ flatten: true }) private _slotDefaultElements!: Element[];
 
   private _disconnectCleanups: Array<() => void> = [];
+  // Re-parenting guard: set true once the deferred teardown has actually
+  // run (a genuine un-mount), so a subsequent reconnect knows to re-arm.
+  private _rozieTornDown = false;
 
   private _armListeners(): void {
     {
@@ -41,7 +44,7 @@ export default class Wrapper extends SignalWatcher(LitElement) {
     this._hasSlotTitle = Array.from(this.children).some((el) => el.getAttribute('slot') === 'title');
     this._hasSlotDefault = Array.from(this.children).some((el) => !el.hasAttribute('slot') && (el.nodeType !== 3 || (el.textContent?.trim().length ?? 0) > 0));
     super.connectedCallback();
-    if (this.hasUpdated) this._armListeners();
+    if (this.hasUpdated && this._rozieTornDown) { this._rozieTornDown = false; this._armListeners(); }
   }
 
   firstUpdated(): void {
@@ -50,8 +53,12 @@ export default class Wrapper extends SignalWatcher(LitElement) {
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
-    for (const fn of this._disconnectCleanups) fn();
-    this._disconnectCleanups = [];
+    queueMicrotask(() => {
+      if (this.isConnected || this._rozieTornDown) return;
+      this._rozieTornDown = true;
+      for (const fn of this._disconnectCleanups) fn();
+      this._disconnectCleanups = [];
+    });
   }
 
   render() {

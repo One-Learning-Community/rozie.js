@@ -15,6 +15,9 @@ export default class NestedSlotDeclared extends SignalWatcher(LitElement) {
   @queryAssignedElements({ slot: 'inner', flatten: true }) private _slotInnerElements!: Element[];
 
   private _disconnectCleanups: Array<() => void> = [];
+  // Re-parenting guard: set true once the deferred teardown has actually
+  // run (a genuine un-mount), so a subsequent reconnect knows to re-arm.
+  private _rozieTornDown = false;
 
   private _armListeners(): void {
     {
@@ -45,7 +48,7 @@ export default class NestedSlotDeclared extends SignalWatcher(LitElement) {
     this._hasSlotWrapper = Array.from(this.children).some((el) => el.getAttribute('slot') === 'wrapper');
     this._hasSlotInner = Array.from(this.children).some((el) => el.getAttribute('slot') === 'inner');
     super.connectedCallback();
-    if (this.hasUpdated) this._armListeners();
+    if (this.hasUpdated && this._rozieTornDown) { this._rozieTornDown = false; this._armListeners(); }
   }
 
   firstUpdated(): void {
@@ -54,8 +57,12 @@ export default class NestedSlotDeclared extends SignalWatcher(LitElement) {
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
-    for (const fn of this._disconnectCleanups) fn();
-    this._disconnectCleanups = [];
+    queueMicrotask(() => {
+      if (this.isConnected || this._rozieTornDown) return;
+      this._rozieTornDown = true;
+      for (const fn of this._disconnectCleanups) fn();
+      this._disconnectCleanups = [];
+    });
   }
 
   render() {
