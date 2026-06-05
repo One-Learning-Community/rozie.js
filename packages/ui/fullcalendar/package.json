@@ -1,0 +1,21 @@
+{
+  "name": "@rozie-ui/fullcalendar",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "build": "node scripts/codegen.mjs",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "echo 'no TS sources (the .rozie is codegen-compiled; leaves typecheck the emitted output)'"
+  },
+  "devDependencies": {
+    "@rozie/core": "workspace:*",
+    "@fullcalendar/core": "^6.1",
+    "@fullcalendar/daygrid": "^6.1",
+    "@fullcalendar/timegrid": "^6.1",
+    "@fullcalendar/interaction": "^6.1",
+    "typescript": "~5.6.0",
+    "vitest": "^4.1.0"
+  }
+}
