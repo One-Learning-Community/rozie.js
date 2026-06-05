@@ -278,6 +278,63 @@ describe('snippets-merge (Phase 07.3.1 D-SV-16)', () => {
     expect(match).not.toBeNull();
   });
 
+  it('slot name colliding with a declared prop → `$derived` merge identifier is `Slot`-suffixed (no duplicate declaration)', () => {
+    // Regression (Phase 28): FullCalendar declares BOTH a boolean prop
+    // `nowIndicator` AND a portal-slot `nowIndicator`. The props destructure
+    // binds `let { nowIndicator = false } = $props()`; a bare
+    // `const nowIndicator = $derived(...)` is a SECOND declaration of the same
+    // identifier in the same <script> scope → hard Svelte compile error
+    // "Identifier 'nowIndicator' has already been declared". The merge
+    // identifier is disambiguated to `nowIndicatorSlot`; the boolean prop keeps
+    // the bare name and the destructure temp / snippets key stay bare.
+    const src = `<rozie name="Collision">
+<props>
+{
+  nowIndicator: { type: Boolean, default: false }
+}
+</props>
+<template>
+  <div>
+    <slot name="nowIndicator" portal :params="['arg']" />
+  </div>
+</template>
+</rozie>`;
+    const scriptBlock = emitScriptFromSrc(src, 'Collision');
+    // Disambiguated merge lvalue.
+    expect(scriptBlock).toContain(
+      'const nowIndicatorSlot = $derived(__nowIndicatorProp ?? snippets?.nowIndicator);',
+    );
+    // The colliding bare merge MUST NOT be emitted (it would duplicate the prop
+    // binding).
+    expect(scriptBlock).not.toContain(
+      'const nowIndicator = $derived(__nowIndicatorProp ?? snippets?.nowIndicator);',
+    );
+    // The boolean prop keeps the bare name.
+    expect(scriptBlock).toContain('nowIndicator = false');
+    // Destructure temp + snippets map key stay bare.
+    expect(scriptBlock).toContain('nowIndicator: __nowIndicatorProp');
+  });
+
+  it('non-colliding slot keeps a bare `$derived` merge identifier (byte-identical)', () => {
+    const src = `<rozie name="NoCollision">
+<props>
+{
+  editable: { type: Boolean, default: false }
+}
+</props>
+<template>
+  <div>
+    <slot name="eventContent" portal :params="['arg']" />
+  </div>
+</template>
+</rozie>`;
+    const scriptBlock = emitScriptFromSrc(src, 'NoCollision');
+    expect(scriptBlock).toContain(
+      'const eventContent = $derived(__eventContentProp ?? snippets?.eventContent);',
+    );
+    expect(scriptBlock).not.toContain('eventContentSlot');
+  });
+
   it('default-slot lowers to `children` and gets the same merge treatment', () => {
     const src = `<rozie name="SlottedDefault">
 <template>

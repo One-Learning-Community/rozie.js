@@ -23,6 +23,7 @@
  */
 import type { IRComponent, SlotDecl } from '../../../../core/src/ir/types.js';
 import { portalAttrName } from '../../../../core/src/codegen/portalCss.js';
+import { portalSlotMergeName } from './portalSlotMergeName.js';
 
 /**
  * Spike 004 — portal-scope `setAttribute` line, or '' when no scopeHash.
@@ -40,8 +41,15 @@ function setAttrLine(slotName: string, scopeHash: string): string {
   );
 }
 
-function buildSlotMethod(slot: SlotDecl, scopeHash: string): string {
+function buildSlotMethod(slot: SlotDecl, scopeHash: string, ir: IRComponent): string {
   const slotName = slot.name;
+  // The closure object KEY stays the bare slot name: the script-side
+  // `$portals.<slotName>(...)` call is rewritten to `portals.<slotName>(...)`,
+  // so the key must match the slot name. Only the READS of the merged
+  // consumer-supplied snippet (`if (!<merge>)` guard + `snippet: <merge>`) use
+  // the collision-gated identifier — which differs from the slot name only when
+  // a same-named prop forced a `Slot` suffix on the `$derived` merge.
+  const mergeName = portalSlotMergeName(slotName, ir);
   const paramNames = slot.portalParamNames ?? [];
   const scopeType =
     paramNames.length > 0
@@ -49,11 +57,11 @@ function buildSlotMethod(slot: SlotDecl, scopeHash: string): string {
       : 'unknown';
   return (
     `  ${slotName}: (container: HTMLElement, scope: ${scopeType}): (() => void) => {\n` +
-    `    if (!${slotName}) return () => {};\n` +
+    `    if (!${mergeName}) return () => {};\n` +
     setAttrLine(slotName, scopeHash) +
     `    const inst = mount(PortalHost, {\n` +
     `      target: container,\n` +
-    `      props: { snippet: ${slotName}, scope },\n` +
+    `      props: { snippet: ${mergeName}, scope },\n` +
     `    });\n` +
     `    portalInstances.add(inst as Record<string, unknown>);\n` +
     `    return () => {\n` +
@@ -78,7 +86,7 @@ export function emitPortals(ir: IRComponent, scopeHash: string = ''): PortalsEmi
     return { hasPortals: false, setupLines: '', extraImports: '' };
   }
 
-  const methodLines = portals.map((slot) => buildSlotMethod(slot, scopeHash)).join('\n');
+  const methodLines = portals.map((slot) => buildSlotMethod(slot, scopeHash, ir)).join('\n');
   const lines = [
     'const portalInstances = new Set<Record<string, unknown>>();',
     `const portals = {\n${methodLines}\n};`,

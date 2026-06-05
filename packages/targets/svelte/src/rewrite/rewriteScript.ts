@@ -30,6 +30,7 @@ import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js'
 import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
 import { isInTypePosition } from '../../../../core/src/ast/typePosition.js';
 import { lowerClassSelectorCall } from './lowerClassSelectorCall.js';
+import { portalSlotMergeName } from '../emit/portalSlotMergeName.js';
 
 /**
  * Normalize an emit name to a Svelte 5 callback-prop identifier.
@@ -314,8 +315,13 @@ export function rewriteRozieIdentifiers(
         return;
       }
       if (obj.name === '$slots' && slotNames.has(prop.name)) {
-        // $slots.header → header (Snippet prop destructured from $props())
-        path.replaceWith(t.identifier(prop.name));
+        // $slots.header → header (Snippet prop destructured from $props()).
+        // Collision-gated `Slot` suffix: when the slot name equals a declared
+        // prop name, the `$derived` merge identifier was suffixed (emitScript's
+        // emitSlotDerivedMerges) to dodge a duplicate-declaration error, so the
+        // read must target that same identifier. Non-colliding slots stay bare
+        // (byte-identical). Lockstep with portalSlotMergeName.
+        path.replaceWith(t.identifier(portalSlotMergeName(prop.name, ir)));
         path.skip();
         return;
       }
@@ -384,7 +390,8 @@ export function rewriteRozieIdentifiers(
         return;
       }
       if (obj.name === '$slots' && slotNames.has(prop.name)) {
-        path.replaceWith(t.identifier(prop.name));
+        // Collision-gated `Slot` suffix (see MemberExpression twin above).
+        path.replaceWith(t.identifier(portalSlotMergeName(prop.name, ir)));
         path.skip();
         return;
       }

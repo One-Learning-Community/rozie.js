@@ -46,6 +46,7 @@ import { rewriteRozieIdentifiers, svelteCallbackPropName } from '../rewrite/rewr
 import { collectSvelteImports } from '../rewrite/collectSvelteImports.js';
 import { buildSlotTypeFields } from './refineSlotTypes.js';
 import { emitPortals } from './emitPortals.js';
+import { portalSlotMergeName } from './portalSlotMergeName.js';
 
 // CJS interop normalization for @babel/generator default export.
 type GenerateFn = typeof import('@babel/generator').default;
@@ -439,7 +440,16 @@ function emitSlotDerivedMerges(ir: IRComponent): string[] {
   const lines: string[] = [];
   for (const s of ir.slots) {
     const key = s.name === '' ? 'children' : s.name;
-    lines.push(`const ${key} = $derived(__${key}Prop ?? snippets?.${key});`);
+    // Collision-gated `Slot` suffix on the merge IDENTIFIER only: when the slot
+    // name equals a declared `<props>` name, the props destructure already binds
+    // `<key>`, so a bare `const <key> = $derived(...)` would be a duplicate
+    // declaration ("Identifier '<key>' has already been declared"). The
+    // destructure temp (`__<key>Prop`) and the `snippets?.<key>` map key stay
+    // bare — only the lvalue is disambiguated. Non-colliding slots are
+    // byte-identical. Lockstep with portalSlotMergeName usages in emitPortals /
+    // rewriteScript / rewriteTemplateExpression.
+    const ident = portalSlotMergeName(key, ir);
+    lines.push(`const ${ident} = $derived(__${key}Prop ?? snippets?.${key});`);
   }
   return lines;
 }

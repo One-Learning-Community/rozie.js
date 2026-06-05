@@ -25,6 +25,7 @@ import type { GeneratorOptions } from '@babel/generator';
 import type { IRComponent } from '../../../../core/src/ir/types.js';
 import { lowerClassSelectorCall } from './lowerClassSelectorCall.js';
 import { svelteCallbackPropName } from './rewriteScript.js';
+import { portalSlotMergeName } from '../emit/portalSlotMergeName.js';
 
 // CJS interop normalization (Phase 2 D-T-2-01-04 pattern).
 type GenerateFn = typeof import('@babel/generator').default;
@@ -160,7 +161,11 @@ export function rewriteTemplateExpression(
         return;
       }
       if (obj.name === '$slots' && slotNames.has(prop.name)) {
-        path.replaceWith(t.identifier(prop.name));
+        // Collision-gated `Slot` suffix: lockstep with the `$derived` merge
+        // identifier (portalSlotMergeName) so a `$slots.X` read in a template /
+        // listeners expression targets the suffixed merge when X collides with a
+        // declared prop. Non-colliding slots stay bare (byte-identical).
+        path.replaceWith(t.identifier(portalSlotMergeName(prop.name, ir)));
         path.skip();
         return;
       }
@@ -194,7 +199,8 @@ export function rewriteTemplateExpression(
         return;
       }
       if (obj.name === '$slots' && slotNames.has(prop.name)) {
-        path.replaceWith(t.identifier(prop.name));
+        // Collision-gated `Slot` suffix (see MemberExpression twin above).
+        path.replaceWith(t.identifier(portalSlotMergeName(prop.name, ir)));
         path.skip();
         return;
       }
