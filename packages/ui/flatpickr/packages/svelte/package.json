@@ -4,6 +4,27 @@
   "type": "module",
   "private": false,
   "license": "MIT",
+  "description": "Idiomatic Svelte date/time picker — one Rozie source compiled to Svelte wrapping flatpickr.",
+  "keywords": [
+    "rozie",
+    "rozie-ui",
+    "flatpickr",
+    "datepicker",
+    "date-picker",
+    "calendar",
+    "component",
+    "svelte"
+  ],
+  "author": "One Learning Community (https://github.com/One-Learning-Community)",
+  "homepage": "https://github.com/One-Learning-Community/rozie.js#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/One-Learning-Community/rozie.js.git",
+    "directory": "packages/ui/flatpickr/packages/svelte"
+  },
+  "bugs": {
+    "url": "https://github.com/One-Learning-Community/rozie.js/issues"
+  },
   "exports": {
     ".": {
       "svelte": "./src/Flatpickr.svelte",

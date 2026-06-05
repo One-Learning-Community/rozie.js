@@ -126,6 +126,12 @@ function main() {
     const readme = renderReadme(target, ir, eventManifest, pkgName);
     writeFileSync(resolve(ROOT, 'packages', cfg.dir, 'README.md'), readme);
 
+    // (5b) Vendor the repo LICENSE into each published leaf so the tarball
+    // carries its own MIT license text (npm best practice; the root LICENSE
+    // does not propagate into per-package tarballs). Copy-from-root keeps the
+    // 6 leaf copies from drifting.
+    cpSync(resolve(REPO_ROOT, 'LICENSE'), resolve(ROOT, 'packages', cfg.dir, 'LICENSE'));
+
     const sidecars = target === 'react' ? ' (+ .css + .d.ts)' : '';
     console.log(`codegen: ${target.padEnd(8)} → ${cfg.dir}/src/${cfg.file}${sidecars}  ✓`);
   }

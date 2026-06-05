@@ -286,7 +286,7 @@ export function renderReadme(target, ir, eventManifest, pkgName, handleManifest 
   lines.push('');
   lines.push(
     `Idiomatic **${target}** \`Flatpickr\` — a cross-framework date picker ` +
-      `compiled from one [Rozie](https://github.com/) source wrapping ` +
+      `compiled from one [Rozie](https://github.com/One-Learning-Community/rozie.js) source wrapping ` +
       `[flatpickr](https://flatpickr.js.org/). This package is generated; do ` +
       `not edit \`src/\` by hand.`,
   );

@@ -264,7 +264,7 @@ export function renderReadme(target, ir, eventManifest, pkgName) {
   lines.push('');
   lines.push(
     `Idiomatic **${target}** \`SortableList\` — a cross-framework drag-and-drop list ` +
-      `compiled from one [Rozie](https://github.com/) source via SortableJS. ` +
+      `compiled from one [Rozie](https://github.com/One-Learning-Community/rozie.js) source via SortableJS. ` +
       `This package is generated; do not edit \`src/\` by hand.`,
   );
   lines.push('');

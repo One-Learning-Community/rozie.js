@@ -4,6 +4,27 @@
   "type": "module",
   "private": false,
   "license": "MIT",
+  "description": "Idiomatic Vue drag-and-drop sortable list — one Rozie source compiled to Vue via SortableJS.",
+  "keywords": [
+    "rozie",
+    "rozie-ui",
+    "sortable",
+    "drag-and-drop",
+    "sortablejs",
+    "list",
+    "component",
+    "vue"
+  ],
+  "author": "One Learning Community (https://github.com/One-Learning-Community)",
+  "homepage": "https://github.com/One-Learning-Community/rozie.js#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/One-Learning-Community/rozie.js.git",
+    "directory": "packages/ui/sortable-list/packages/vue"
+  },
+  "bugs": {
+    "url": "https://github.com/One-Learning-Community/rozie.js/issues"
+  },
   "exports": {
     ".": {
       "import": "./src/SortableList.vue",

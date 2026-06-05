@@ -1,6 +1,6 @@
 # @rozie-ui/flatpickr-lit
 
-Idiomatic **lit** `Flatpickr` — a cross-framework date picker compiled from one [Rozie](https://github.com/) source wrapping [flatpickr](https://flatpickr.js.org/). This package is generated; do not edit `src/` by hand.
+Idiomatic **lit** `Flatpickr` — a cross-framework date picker compiled from one [Rozie](https://github.com/One-Learning-Community/rozie.js) source wrapping [flatpickr](https://flatpickr.js.org/). This package is generated; do not edit `src/` by hand.
 
 ## Install
 

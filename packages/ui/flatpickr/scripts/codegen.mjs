@@ -26,7 +26,7 @@
  *   5. (optional) ENFORCE validateDocsPropsTable IF a guide page with a
  *      "### Props" table exists (none ships for flatpickr today — skipped).
  */
-import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { cpSync, mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { compile, createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
 import { eventManifest } from './event-manifest.mjs';
@@ -129,6 +129,11 @@ function main() {
     const pkgName = leafPkgName(cfg.dir);
     const readme = renderReadme(target, ir, eventManifest, pkgName, handleManifest);
     writeFileSync(resolve(ROOT, 'packages', cfg.dir, 'README.md'), readme);
+
+    // Vendor the repo LICENSE into each published leaf so the tarball carries
+    // its own MIT license text (the root LICENSE does not propagate into
+    // per-package tarballs). Copy-from-root keeps the 6 copies from drifting.
+    cpSync(resolve(REPO_ROOT, 'LICENSE'), resolve(ROOT, 'packages', cfg.dir, 'LICENSE'));
 
     const sidecars = target === 'react' ? ' (+ .css + .d.ts)' : '';
     console.log(`codegen: ${target.padEnd(8)} → ${cfg.dir}/src/${cfg.file}${sidecars}  ✓`);

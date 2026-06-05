@@ -4,6 +4,27 @@
   "type": "module",
   "private": false,
   "license": "MIT",
+  "description": "Idiomatic Angular date/time picker — one Rozie source compiled to Angular wrapping flatpickr.",
+  "keywords": [
+    "rozie",
+    "rozie-ui",
+    "flatpickr",
+    "datepicker",
+    "date-picker",
+    "calendar",
+    "component",
+    "angular"
+  ],
+  "author": "One Learning Community (https://github.com/One-Learning-Community)",
+  "homepage": "https://github.com/One-Learning-Community/rozie.js#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/One-Learning-Community/rozie.js.git",
+    "directory": "packages/ui/flatpickr/packages/angular"
+  },
+  "bugs": {
+    "url": "https://github.com/One-Learning-Community/rozie.js/issues"
+  },
   "exports": {
     ".": {
       "types": "./src/Flatpickr.ts",

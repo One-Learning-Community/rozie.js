@@ -4,6 +4,27 @@
   "type": "module",
   "private": false,
   "license": "MIT",
+  "description": "Idiomatic Solid date/time picker — one Rozie source compiled to Solid wrapping flatpickr.",
+  "keywords": [
+    "rozie",
+    "rozie-ui",
+    "flatpickr",
+    "datepicker",
+    "date-picker",
+    "calendar",
+    "component",
+    "solid"
+  ],
+  "author": "One Learning Community (https://github.com/One-Learning-Community)",
+  "homepage": "https://github.com/One-Learning-Community/rozie.js#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/One-Learning-Community/rozie.js.git",
+    "directory": "packages/ui/flatpickr/packages/solid"
+  },
+  "bugs": {
+    "url": "https://github.com/One-Learning-Community/rozie.js/issues"
+  },
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.mts",

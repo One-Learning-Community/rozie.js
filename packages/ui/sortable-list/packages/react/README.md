@@ -1,6 +1,6 @@
 # @rozie-ui/sortable-list-react
 
-Idiomatic **react** `SortableList` — a cross-framework drag-and-drop list compiled from one [Rozie](https://github.com/) source via SortableJS. This package is generated; do not edit `src/` by hand.
+Idiomatic **react** `SortableList` — a cross-framework drag-and-drop list compiled from one [Rozie](https://github.com/One-Learning-Community/rozie.js) source via SortableJS. This package is generated; do not edit `src/` by hand.
 
 ## Install
 
