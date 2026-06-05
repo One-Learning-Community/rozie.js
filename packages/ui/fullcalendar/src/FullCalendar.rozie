@@ -50,6 +50,11 @@
   slotDuration:  { type: String,  default: '00:30:00' },
   nowIndicator:  { type: Boolean, default: false },
   headerToolbar: { type: Object,  default: () => ({ left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,timeGridDay' }) },
+  // :options passthrough — arbitrary FullCalendar options/callbacks the curated
+  // surface doesn't special-case (businessHours, dayMaxEvents, *DidMount hooks…).
+  // Spread FIRST in the opts object so explicit curated props/events/slots win
+  // on key collision (the curated surface is primary; :options fills gaps).
+  options:       { type: Object,  default: () => ({}) },
 }
 </props>
 
@@ -77,6 +82,10 @@ const normalizeEvent = (e) => {
 
 $onMount(() => {
   const opts = {
+    // :options passthrough spread FIRST — the curated keys below + the portal
+    // *Content handlers added after this object override any colliding key, so
+    // an explicitly-bound prop (e.g. :height) wins over options.height.
+    ...$props.options,
     plugins:       PLUGINS,
     initialView:   $props.view,
     weekends:      $props.weekends,
@@ -197,6 +206,15 @@ $watch(() => $props.firstDay,      (v) => instance?.setOption('firstDay',      v
 $watch(() => $props.slotDuration,  (v) => instance?.setOption('slotDuration',  v))
 $watch(() => $props.nowIndicator,  (v) => instance?.setOption('nowIndicator',  v))
 $watch(() => $props.headerToolbar, (v) => instance?.setOption('headerToolbar', v))
+
+// :options runtime reconcile — apply each passthrough key through setOption.
+// Documented limitation: removing a key from the object does NOT reset that
+// option (setOption-per-key has no "unset"); consumers needing full control
+// (including option removal) use getApi() and drive the Calendar directly.
+$watch(() => $props.options, (v) => {
+  if (!instance) return
+  for (const k in v) instance.setOption(k, v[k])
+})
 
 // Imperative handle (Phase 21 $expose). The 8 calendar verbs a consumer can't
 // drive through props alone — exposed uniformly to all 6 targets
