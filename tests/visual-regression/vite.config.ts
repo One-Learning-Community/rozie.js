@@ -1,5 +1,6 @@
 import { defineConfig, type Plugin } from 'vite';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
+import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import Rozie from '@rozie/unplugin/vite';
 
@@ -57,6 +58,30 @@ function resolveCrossTreeBareImports(extraRoots: readonly string[]): Plugin {
       // Only intercept when the importer lives under one of our extra roots.
       const inExtraRoot = extraRoots.some((root) => importer.startsWith(root));
       if (!inExtraRoot) return null;
+      // PREFER the ESM (`import`/`module`) entry over the CJS (`require`)
+      // entry. `createRequire().resolve()` walks package.json `exports` with
+      // the `require` condition first and so picks a package's `.cjs` build
+      // (e.g. `@fullcalendar/list` → `index.cjs`). For a *default* ES import
+      // (`import listPlugin from '@fullcalendar/list'`) the CJS module's
+      // esbuild interop yields `undefined` for the default binding — the
+      // engine then throws `Cannot read properties of undefined (reading
+      // 'name')` in `buildPluginHooks`. Resolving to the package's ESM `.`
+      // → `import` entry (or top-level `module` field) hands back the real
+      // default export, matching what Vite's own resolver does for the other
+      // (non-cross-tree) `@fullcalendar/*` imports.
+      try {
+        const pkgJsonPath = requireFromHere.resolve(`${source}/package.json`);
+        const pkg = JSON.parse(readFileSync(pkgJsonPath, 'utf8')) as {
+          exports?: { '.'?: { import?: string } };
+          module?: string;
+        };
+        const esmRel = pkg.exports?.['.']?.import ?? pkg.module;
+        if (esmRel) {
+          return resolve(dirname(pkgJsonPath), esmRel);
+        }
+      } catch {
+        // Fall through to the plain createRequire resolution below.
+      }
       try {
         const resolved = requireFromHere.resolve(source);
         return resolved;
@@ -152,9 +177,26 @@ export default defineConfig(async () => {
     'fullcalendar',
     'src',
   );
+  // @fullcalendar/list ESM-entry alias (see optimizeDeps note below). The
+  // package's CJS build does `exports["default"] = plugin` without
+  // `__esModule`, so a default ES import bundled through the CJS-interop path
+  // yields `{ default: plugin }` instead of the plugin — and the engine throws
+  // `Cannot read properties of undefined (reading 'name')` at mount. Pinning
+  // the bare specifier to the package's real ESM entry (`index.js`, a proper
+  // `export default plugin`) forces the correct default binding on every
+  // resolver in the chain — including Analog's Angular AOT pipeline, which
+  // pre-bundles the consumer-supplied import outside the cross-tree resolver's
+  // reach. Resolved at config time so the alias is the exact on-disk ESM file.
+  const requireFromHere = createRequire(import.meta.url);
+  const fullCalendarListEsm = requireFromHere.resolve('@fullcalendar/list/index.js');
   return {
   // Sub-builds are served from dist/<target>/; the host router lives at dist root.
   base: `/${TARGET}/`,
+  resolve: {
+    alias: [
+      { find: /^@fullcalendar\/list$/, replacement: fullCalendarListEsm },
+    ],
+  },
   // Quick task 260515-1y4 — angular only: the Angular sub-build's
   // `import.meta.glob('../../../examples/*.rozie')` pulls files from OUTSIDE
   // the Vite project root (`tests/visual-regression/`). The Angular target's
@@ -198,6 +240,29 @@ export default defineConfig(async () => {
     }),
     ...(await frameworkPlugins(TARGET)),
   ],
+  // FullCalendar plugin packages ship a CJS build whose interop shape is
+  // `exports["default"] = plugin` WITHOUT `__esModule`. When Vite's esbuild
+  // dep-optimizer pre-bundles them as CJS, a default ES import
+  // (`import listPlugin from '@fullcalendar/list'`) resolves to the whole
+  // `{ default: plugin }` wrapper object rather than the plugin itself — so
+  // `listPlugin.name` is `undefined` and FullCalendar's `buildPluginHooks`
+  // throws `Cannot read properties of undefined (reading 'name')` at mount.
+  // (This bites the *consumer-supplied* `@fullcalendar/list` import in the
+  // all-slots demo, which the dep-optimizer scans from the entry graph; the
+  // wrapper's own `@fullcalendar/*` imports dodge it because the cross-tree
+  // resolver intercepts them to their ESM entry first.) Excluding the family
+  // from pre-bundling makes Vite serve each package's `import`-condition ESM
+  // build (`index.js`, a real `export default plugin`) — correct on every
+  // target, with no CJS-interop guesswork.
+  optimizeDeps: {
+    exclude: [
+      '@fullcalendar/core',
+      '@fullcalendar/daygrid',
+      '@fullcalendar/timegrid',
+      '@fullcalendar/interaction',
+      '@fullcalendar/list',
+    ],
+  },
   // D-VR-01: the `@rozie/target-lit` emitter emits TC39-stage-3 *class-field*
   // decorators (`@property() foo;`). esbuild — Vite's transform pipeline — does
   // not read the workspace `tsconfig.json` for the `.rozie.ts` virtual modules

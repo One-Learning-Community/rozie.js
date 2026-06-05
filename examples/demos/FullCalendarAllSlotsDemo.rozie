@@ -7,11 +7,21 @@
   slots for the deterministic pixel tier, THIS demo proves the FULL slot +
   event surface MOUNTS and DISPOSES at runtime across all 6 targets:
 
-    - Fills ALL NINE portal-slots (event / dayCell / dayHeader / slotLabel /
+    - Fills ALL TEN portal-slots (event / dayCell / dayHeader / slotLabel /
       weekNumber / nowIndicatorContent / moreLink / allDayContent /
-      slotLaneContent), each rendering a queryable marker node with a distinct
-      per-slot test id (the slot-<name> family) so full-calendar-slots.spec.ts
-      can assert presence + dispose per slot, per target.
+      slotLaneContent / noEventsContent), each rendering a queryable marker node
+      with a distinct per-slot test id (the slot-<name> family) so
+      full-calendar-slots.spec.ts can assert presence + dispose per slot, per
+      target.
+
+    - Exercises the CONSUMER-EXTENSIBLE plugin merge: imports the free
+      @fullcalendar/list plugin (a DEMO/dev dependency — NOT a wrapper dep) and
+      passes it via the passthrough :options.plugins. The wrapper MERGES it with
+      the baked-in defaults (dayGrid/timeGrid/interaction), so a `listWeek` view
+      becomes available. Switching to listWeek with ZERO events surfaces the
+      noEventsContent slot — which transitively PROVES the merge: if the merge
+      were still clobbering, listPlugin would never register, listWeek wouldn't
+      render, and noEventsContent would never fire.
 
     - Binds the 5 NEW events (eventMouseEnter / eventMouseLeave / unselect /
       loading / eventsSet) to handlers that record the last-fired type + a
@@ -54,6 +64,26 @@
 </data>
 
 <script>
+// @fullcalendar/list is a DEMO/dev dependency only (declared in the VR host's
+// package.json) — NOT a dependency of the @rozie-ui/fullcalendar wrapper. The
+// consumer imports it and passes it through the wrapper's now-merged
+// :options.plugins, which is the exact opt-in plugin-extension mechanism this
+// demo exercises.
+import listPlugin from '@fullcalendar/list'
+
+// Build the passthrough :options object in the SCRIPT (not inline in the
+// template) so the `listPlugin` import is referenced from a <script> statement.
+// Angular's AOT pipeline tree-shakes a default import that is ONLY referenced
+// inside a template-binding object literal — leaving `listPlugin` undefined at
+// runtime and crashing FullCalendar's plugin-hook builder. Referencing it here
+// pins the import on every target (the other five are unaffected either way).
+const calendarOptions = {
+  weekNumbers: true,
+  dayMaxEvents: 2,
+  businessHours: { startTime: '09:00', endTime: '17:00' },
+  plugins: [listPlugin],
+}
+
 // All seed events land on a SINGLE pinned day (2026-06-15) so that — with the
 // passthrough dayMaxEvents: 2 — the day overflows past 2 and the engine renders
 // a `.fc-more-link` (which routes through the moreLink portal-slot). Fixed ISO
@@ -89,6 +119,13 @@ const onEventsSet       = (info) => record('eventsSet', `count=${info?.events?.l
 const showWeek  = () => { $data.view = 'timeGridWeek' }
 const showMonth = () => { $data.view = 'dayGridMonth' }
 
+// noEventsContent surfaces ONLY in a list view with ZERO events. This control
+// clears the events AND switches to `listWeek` (a view that exists only because
+// the consumer-supplied @fullcalendar/list plugin MERGED into the wrapper's
+// baked-in defaults via :options.plugins). The list view's empty state routes
+// through FullCalendar's noEventsContent hook → the noEventsContent portal-slot.
+const showEmptyList = () => { $data.events = []; $data.view = 'listWeek' }
+
 // Teardown control — flips the r-if gate so the spec can assert every slot
 // marker DISPOSES (the portal dispose path fires across all 6 targets).
 const teardown = () => { $data.calendarMounted = false }
@@ -99,13 +136,14 @@ const remount  = () => { $data.calendarMounted = true }
 <div class="fc-all-slots-demo">
   <header>
     <h3>FullCalendar — every slot + every new event</h3>
-    <p class="hint">Behavioral cell: all 9 portal-slots filled, the 5 new events bound, and a passthrough <code>:options</code> (<code>weekNumbers</code> + <code>dayMaxEvents</code> + <code>businessHours</code>). Switch views to surface the long-tail slots; tear down to prove the slots dispose.</p>
+    <p class="hint">Behavioral cell: all 10 portal-slots filled, the 5 new events bound, and a passthrough <code>:options</code> (<code>weekNumbers</code> + <code>dayMaxEvents</code> + <code>businessHours</code> + <code>plugins: [listPlugin]</code> — the consumer-extensible merge). Switch views to surface the long-tail slots; "Empty list" engages the merged list plugin to surface <code>noEventsContent</code>; tear down to prove the slots dispose.</p>
   </header>
 
   <div class="control-row">
     <span class="row-label">View</span>
     <button type="button" data-testid="view-week"  :class="{ active: $data.view === 'timeGridWeek' }"  @click="showWeek">Week (timeGridWeek)</button>
     <button type="button" data-testid="view-month" :class="{ active: $data.view === 'dayGridMonth' }"  @click="showMonth">Month (dayGridMonth)</button>
+    <button type="button" data-testid="view-empty-list" :class="{ active: $data.view === 'listWeek' }" @click="showEmptyList">Empty list (listWeek)</button>
   </div>
 
   <div class="control-row">
@@ -122,7 +160,7 @@ const remount  = () => { $data.calendarMounted = true }
       :height="480"
       :selectable="true"
       :editable="true"
-      :options="{ weekNumbers: true, dayMaxEvents: 2, businessHours: { startTime: '09:00', endTime: '17:00' } }"
+      :options="calendarOptions"
       @eventMouseEnter="onEventMouseEnter"
       @eventMouseLeave="onEventMouseLeave"
       @unselect="onUnselect"
@@ -164,6 +202,12 @@ const remount  = () => { $data.calendarMounted = true }
       <!-- slotLaneContent slot (timeGridWeek time-slot lane) -->
       <template #slotLaneContent="{ arg }">
         <span class="fc-slot-marker" data-testid="slot-slotLaneContent">lane</span>
+      </template>
+      <!-- noEventsContent slot (listWeek view + zero events) — surfaces ONLY
+           because the consumer-supplied @fullcalendar/list plugin merged into
+           the wrapper's baked-in defaults via :options.plugins -->
+      <template #noEventsContent="{ arg }">
+        <span class="fc-slot-marker" data-testid="slot-noEventsContent">nothing scheduled</span>
       </template>
     </FullCalendar>
     <p r-else class="torn-down" data-testid="torn-down">Calendar torn down.</p>

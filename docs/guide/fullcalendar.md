@@ -2,7 +2,7 @@
 
 `FullCalendar` is Rozie's data-bound port of [FullCalendar](https://fullcalendar.io/) — the vanilla-JS calendar/scheduler engine. One `.rozie` source file ships idiomatic React, Vue, Svelte, Angular, Solid, and Lit consumers from a single wrapper. FullCalendar already publishes four official wrappers ([@fullcalendar/react](https://www.npmjs.com/package/@fullcalendar/react), [@fullcalendar/vue3](https://www.npmjs.com/package/@fullcalendar/vue3), [@fullcalendar/angular](https://www.npmjs.com/package/@fullcalendar/angular), [@fullcalendar/svelte](https://www.npmjs.com/package/@fullcalendar/svelte)) — each one wraps the same `Calendar` engine. Rozie collapses all of them (plus the Solid and Lit wrappers that **do not exist upstream**) into one source.
 
-This page is the **show-and-tell**: the API surface, per-framework quick starts, the imperative handle, the `:options` long-tail passthrough, and the per-target recipe for the nine custom-content portal slots.
+This page is the **show-and-tell**: the API surface, per-framework quick starts, the imperative handle, the `:options` long-tail passthrough, the opt-in plugin-extension model, and the per-target recipe for the ten custom-content portal slots.
 
 The full source for `FullCalendar.rozie` lives in the [`@rozie-ui/fullcalendar` package](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/fullcalendar/src/FullCalendar.rozie).
 
@@ -205,7 +205,7 @@ The handle method names are clear of all eleven event names and thirteen prop na
 
 ## Slots
 
-The wrapper surfaces **nine** of FullCalendar's `*Content` render hooks as portal slots — one authoring surface each that the per-target compiler routes through the framework's native imperative-render API (React/Solid render prop, Vue scoped slot, Svelte snippet, Angular content-child `<ng-template>`, Lit property bridge). Each slot is **guarded** in the wrapper: fill it and your fragment renders; leave it unfilled and FullCalendar's default rendering stands. Every slot receives one scope param, `arg` — FullCalendar's render argument for that hook.
+The wrapper surfaces **ten** of FullCalendar's `*Content` render hooks as portal slots — one authoring surface each that the per-target compiler routes through the framework's native imperative-render API (React/Solid render prop, Vue scoped slot, Svelte snippet, Angular content-child `<ng-template>`, Lit property bridge). Each slot is **guarded** in the wrapper: fill it and your fragment renders; leave it unfilled and FullCalendar's default rendering stands. Every slot receives one scope param, `arg` — FullCalendar's render argument for that hook.
 
 | Slot | FullCalendar option | Renders | Demo-verified |
 | --- | --- | --- | :---: |
@@ -218,8 +218,9 @@ The wrapper surfaces **nine** of FullCalendar's `*Content` render hooks as porta
 | `moreLink` | `moreLinkContent` | "+N more" link content (`arg.num`, `arg.text`, …) | |
 | `allDayContent` | `allDayContent` | Time-grid all-day axis label content (`arg.text`, …) | |
 | `slotLaneContent` | `slotLaneContent` | Time-grid time-slot lane content (`arg.date`, `arg.time`, …) | |
+| `noEventsContent` | `noEventsContent` | List-view "no events to display" content (`arg.text`, …) — **inert** until you engage `@fullcalendar/list` via [`:options.plugins`](#adding-plugins) and show an empty list view | ✓ |
 
-All nine share the **identical** per-target authoring shape shown below — the only thing that changes is the slot name and the `arg` payload (per FullCalendar's hook for that surface). The three demo-verified slots (`event`, `dayCell`, `dayHeader`) are wired into the VR matrix; the six long-tail slots (`slotLabel`, `weekNumber`, `nowIndicatorContent`, `moreLink`, `allDayContent`, `slotLaneContent`) use the same recipe with no extra ceremony.
+All ten share the **identical** per-target authoring shape shown below — the only thing that changes is the slot name and the `arg` payload (per FullCalendar's hook for that surface). The three pixel-baselined slots (`event`, `dayCell`, `dayHeader`) are wired into the VR matrix; the seven long-tail slots (`slotLabel`, `weekNumber`, `nowIndicatorContent`, `moreLink`, `allDayContent`, `slotLaneContent`, `noEventsContent`) use the same recipe with no extra ceremony. The all-slots behavioral spec mounts all ten across all six targets — including `noEventsContent` via a consumer-supplied list plugin, which transitively proves the [plugin merge](#adding-plugins).
 
 > The current-time-indicator **slot** is named `nowIndicatorContent` (after FullCalendar's `nowIndicatorContent` option) so it does **not** clash with the boolean `nowIndicator` **prop** — a slot whose name equals a declared prop name is a hard compile error in Rozie (Svelte 5 unifies snippets and props into one `$props` namespace). Fill `#nowIndicatorContent` to customize the indicator content, and set the `nowIndicator` prop to `true` to actually enable it.
 
@@ -363,7 +364,7 @@ The Solid (`dayHeader={…}`), Svelte (`{#snippet dayHeader(…)}`), Angular (`<
 
 ### The long-tail slots
 
-`slotLabel`, `weekNumber`, `nowIndicatorContent`, `moreLink`, `allDayContent`, and `slotLaneContent` use the **same shared recipe** — fill the like-named slot and read its `arg`. Each maps one-to-one to a FullCalendar `*Content` option:
+`slotLabel`, `weekNumber`, `nowIndicatorContent`, `moreLink`, `allDayContent`, `slotLaneContent`, and `noEventsContent` use the **same shared recipe** — fill the like-named slot and read its `arg`. Each maps one-to-one to a FullCalendar `*Content` option:
 
 | Slot | Option | Typical `arg` fields |
 | --- | --- | --- |
@@ -373,8 +374,9 @@ The Solid (`dayHeader={…}`), Svelte (`{#snippet dayHeader(…)}`), Angular (`<
 | `moreLink` | `moreLinkContent` | `arg.num`, `arg.text` |
 | `allDayContent` | `allDayContent` | `arg.text` |
 | `slotLaneContent` | `slotLaneContent` | `arg.date`, `arg.time` |
+| `noEventsContent` | `noEventsContent` | `arg.text` |
 
-`allDayContent` and `slotLaneContent` render in time-grid views (`timeGridWeek` / `timeGridDay`) — the all-day axis label and the per-slot lane content respectively. Both work with the bundled `@fullcalendar/timegrid` plugin, no extra peer required.
+`allDayContent` and `slotLaneContent` render in time-grid views (`timeGridWeek` / `timeGridDay`) — the all-day axis label and the per-slot lane content respectively. Both work with the bundled `@fullcalendar/timegrid` plugin, no extra peer required. `noEventsContent` is **pre-declared but inert** with the bundled plugin set: it surfaces only in a list view (`listWeek` / `listDay` / `listMonth`) showing zero events, and list views exist only once you add the free `@fullcalendar/list` plugin — see [Adding plugins](#adding-plugins).
 
 For example, a custom week-number badge in Vue:
 
@@ -386,13 +388,44 @@ For example, a custom week-number badge in Vue:
 </FullCalendar>
 ```
 
-### Slots the wrapper does not surface
+### Adding plugins
 
-One of FullCalendar's `*Content` hooks is **deliberately not** wrapped as a named slot (a documented exclusion, not a gap):
+The wrapper ships **batteries-included, zero-config**: three FullCalendar plugins are baked in and always on — `@fullcalendar/daygrid`, `@fullcalendar/timegrid`, and `@fullcalendar/interaction`. Those cover month/week/day grids plus drag-select-resize out of the box, so the common case needs no plugin wiring at all.
 
-- **`noEventsContent`** — list-view only; `@fullcalendar/list` is not a bundled engine peer (pending a future list-plugin addition).
+When you need more, the wrapper is **consumer-extensible**: import any FullCalendar plugin and pass it through the `:options.plugins` passthrough. The wrapper **merges** your plugins with the baked-in defaults rather than replacing them (FullCalendar dedupes by identity, so re-passing a default is harmless). There is **no per-plugin wrapper code and no bundle cost** for plugins you don't engage — the extra plugin lives in *your* dependency tree, not the wrapper's.
 
-Need it? Reach for the **`:options` passthrough** (pass `{ noEventsContent: … }` straight through) or grab the raw engine via `getApi()` and set the option imperatively.
+The worked example is the list view + its `noEventsContent` slot. Add the free `@fullcalendar/list` plugin, pass it via `:options.plugins`, switch to a `listWeek`/`listDay`/`listMonth` view, and the `noEventsContent` portal slot becomes live (it renders when the list is empty):
+
+```bash
+npm i @fullcalendar/list
+```
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue';
+import FullCalendar from '@rozie-ui/fullcalendar-vue';
+import listPlugin from '@fullcalendar/list';
+
+const view = ref('listWeek');
+const events = ref([]); // empty → noEventsContent fires
+</script>
+
+<template>
+  <FullCalendar
+    v-model:view="view"
+    :events="events"
+    :options="{ plugins: [listPlugin] }"
+  >
+    <template #noEventsContent="{ arg }">
+      <span class="empty">Nothing scheduled — enjoy your day.</span>
+    </template>
+  </FullCalendar>
+</template>
+```
+
+The same opt-in mechanism engages every other FullCalendar plugin uniformly across all six targets — **`@fullcalendar/rrule`** (recurring events; recurring fields like `rrule` already pass through `:events` untouched), **`@fullcalendar/google-calendar`**, **`@fullcalendar/luxon3`** / time-zone plugins, and the bootstrap/theme plugins. The **premium** scheduler plugins (`@fullcalendar/resource-timeline`, `@fullcalendar/resource-timegrid`, …) work the same way — pass the plugin via `:options.plugins` and additionally supply your `schedulerLicenseKey` through `:options` (`:options="{ plugins: [resourceTimelinePlugin], schedulerLicenseKey: '…' }"`).
+
+If you'd rather drive a one-off option imperatively, the `:options` passthrough also forwards arbitrary non-plugin options, and `getApi()` returns the raw `Calendar` instance for full control.
 
 ## Recipes
 

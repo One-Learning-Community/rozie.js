@@ -7,14 +7,24 @@ import { fileURLToPath } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 /**
- * FullCalendar all-9-slot DOM-presence spec (Phase 28 Plan 03, REQ-28-4).
+ * FullCalendar all-10-slot DOM-presence spec (Phase 28 Plan 03, REQ-28-4;
+ * extended for the consumer-extensible plugin merge + noEventsContent slot).
  *
- * `examples/demos/FullCalendarAllSlotsDemo.rozie` fills ALL NINE FullCalendar
+ * `examples/demos/FullCalendarAllSlotsDemo.rozie` fills ALL TEN FullCalendar
  * portal-slots, binds the 5 new events, and passes a passthrough `:options`
  * value. This spec is the BEHAVIORAL tier of REQ-28-4: it proves every slot
  * MOUNTS and DISPOSES across all 6 targets WITHOUT a pixel baseline (the
  * pixel tier is FullCalendarSlotsDemo → the date-pinned FullCalendarSlots
  * matrix cell, which covers only event/dayCell/dayHeader visually).
+ *
+ * PLUGIN MERGE (NEW): the 10th slot, `noEventsContent`, surfaces ONLY in a list
+ * view with zero events — and a list view exists ONLY because the demo passes a
+ * consumer-supplied `@fullcalendar/list` plugin via `:options.plugins`, which
+ * the wrapper now MERGES with its baked-in defaults (dayGrid/timeGrid/
+ * interaction) instead of clobbering. Asserting `slot-noEventsContent` mounts
+ * therefore TRANSITIVELY PROVES the plugin-merge: were the merge still
+ * clobbering, `listPlugin` would never register, `listWeek` would not render,
+ * and `noEventsContent` would never fire.
  *
  * WHY DOM-PRESENCE, NO SCREENSHOT (per `feedback_vr_linux_baselines`): a
  * structural-only spec runs locally on macOS without any Docker baseline regen.
@@ -70,7 +80,7 @@ for (const target of TARGETS) {
     resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
   );
   const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
-  runner(`full-calendar-slots [${target}]: all 9 portal-slots mount + dispose`, async ({
+  runner(`full-calendar-slots [${target}]: all 10 portal-slots mount + dispose`, async ({
     page,
   }) => {
     const pageErrors: string[] = [];
@@ -196,6 +206,28 @@ for (const target of TARGETS) {
       });
     }
 
+    // ---- noEventsContent slot — list-view + zero events (the 10th slot) ----
+    // PROVES THE PLUGIN MERGE TRANSITIVELY: the demo passes a consumer-supplied
+    // @fullcalendar/list plugin via :options.plugins. The wrapper now MERGES it
+    // with its baked-in defaults rather than clobbering, so `listWeek` becomes a
+    // real view. The demo's `view-empty-list` control clears the events AND
+    // switches to listWeek; FullCalendar's empty-list state routes through the
+    // noEventsContent hook → the noEventsContent portal-slot. Were the merge
+    // still clobbering, listWeek would never render and this marker never mount.
+    // (Broad — all 6 targets; this is the singular check the plan calls for.)
+    await mount.getByTestId('view-empty-list').click();
+    await expect(mount.getByTestId('state-view')).toHaveText('listWeek', {
+      timeout: 10_000,
+    });
+    // The list-view engine root renders (proves listPlugin registered via the
+    // merge — a non-merged wrapper would silently stay on the prior view).
+    await expect(mount.locator('.fc-list').first()).toBeVisible({
+      timeout: 10_000,
+    });
+    await expect(mount.getByTestId('slot-noEventsContent')).not.toHaveCount(0, {
+      timeout: 10_000,
+    });
+
     // ---- DISPOSE — flip the teardown r-if gate; every slot marker drops to 0 ----
     await mount.getByTestId('teardown').click();
     await expect(mount.getByTestId('torn-down')).toBeVisible({ timeout: 10_000 });
@@ -209,6 +241,7 @@ for (const target of TARGETS) {
       'slot-moreLink',
       'slot-allDayContent',
       'slot-slotLaneContent',
+      'slot-noEventsContent',
     ]) {
       await expect(mount.getByTestId(slot)).toHaveCount(0, { timeout: 10_000 });
     }
