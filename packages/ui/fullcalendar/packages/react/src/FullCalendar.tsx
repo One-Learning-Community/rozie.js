@@ -19,7 +19,7 @@ interface SlotLabelCtx { arg: any; }
 
 interface WeekNumberCtx { arg: any; }
 
-interface NowIndicatorCtx { arg: any; }
+interface NowIndicatorContentCtx { arg: any; }
 
 interface MoreLinkCtx { arg: any; }
 
@@ -55,7 +55,7 @@ interface FullCalendarProps {
   renderDayHeader?: (ctx: DayHeaderCtx) => ReactNode;
   renderSlotLabel?: (ctx: SlotLabelCtx) => ReactNode;
   renderWeekNumber?: (ctx: WeekNumberCtx) => ReactNode;
-  renderNowIndicator?: (ctx: NowIndicatorCtx) => ReactNode;
+  renderNowIndicatorContent?: (ctx: NowIndicatorContentCtx) => ReactNode;
   renderMoreLink?: (ctx: MoreLinkCtx) => ReactNode;
   slots?: Record<string, () => import('react').ReactNode>;
 }
@@ -105,8 +105,8 @@ const FullCalendar = forwardRef<FullCalendarHandle, FullCalendarProps>(function 
   _renderSlotLabelRef.current = props.renderSlotLabel;
   const _renderWeekNumberRef = useRef(props.renderWeekNumber);
   _renderWeekNumberRef.current = props.renderWeekNumber;
-  const _renderNowIndicatorRef = useRef(props.renderNowIndicator);
-  _renderNowIndicatorRef.current = props.renderNowIndicator;
+  const _renderNowIndicatorContentRef = useRef(props.renderNowIndicatorContent);
+  _renderNowIndicatorContentRef.current = props.renderNowIndicatorContent;
   const _renderMoreLinkRef = useRef(props.renderMoreLink);
   _renderMoreLinkRef.current = props.renderMoreLink;
   const suppressViewSync = useRef(false);
@@ -280,13 +280,13 @@ const FullCalendar = forwardRef<FullCalendarHandle, FullCalendarProps>(function 
         portalRoots.current.delete(root);
       };
     },
-    nowIndicator: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
-      const slot = _renderNowIndicatorRef.current ?? props.slots?.['nowIndicator'];
+    nowIndicatorContent: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+      const slot = _renderNowIndicatorContentRef.current ?? props.slots?.['nowIndicatorContent'];
       if (typeof slot !== 'function') return () => {};
       // Spike 004: portal-scope attribute injection.
-      // Cascades the @portal nowIndicator { … } selectors from the
+      // Cascades the @portal nowIndicatorContent { … } selectors from the
       // component's .module.css into the engine-owned subtree.
-      container.setAttribute('data-rozie-portal-nowIndicator', '5589629a');
+      container.setAttribute('data-rozie-portal-nowIndicatorContent', '5589629a');
       const root = createRoot(container);
       flushSync(() => root.render(slot(scope)));
       portalRoots.current.add(root);
@@ -468,10 +468,11 @@ const FullCalendar = forwardRef<FullCalendarHandle, FullCalendarProps>(function 
     // (core + daygrid + timegrid + interaction). Each guarded by its own slot so
     // unfilled slots keep FullCalendar's default rendering.
     //
-    // NOTE the `nowIndicator` slot SET name ($slots.nowIndicator) shares a string
-    // with the boolean `nowIndicator` PROP — they live in different namespaces
-    // ($slots vs $props); the slot emits the `nowIndicatorContent` option while
-    // the prop reconciles the `nowIndicator` option. No ROZ collision.
+    // NOTE the `nowIndicatorContent` slot is named for its FullCalendar engine
+    // hook (`nowIndicatorContent`) so it does NOT clash with the boolean
+    // `nowIndicator` PROP — a slot name that equals a declared prop name is now a
+    // hard compile error (ROZ127 SLOT_PROP_NAME_COLLISION), because Svelte 5
+    // unifies snippets and props into one `$props` namespace.
     if ((props.renderDayCell ?? props.slots?.["dayCell"])) {
       opts.dayCellContent = (arg: any) => {
         const node = document.createElement('div');
@@ -520,10 +521,10 @@ const FullCalendar = forwardRef<FullCalendarHandle, FullCalendarProps>(function 
         };
       };
     }
-    if ((props.renderNowIndicator ?? props.slots?.["nowIndicator"])) {
+    if ((props.renderNowIndicatorContent ?? props.slots?.["nowIndicatorContent"])) {
       opts.nowIndicatorContent = (arg: any) => {
         const node = document.createElement('div');
-        const dispose = portals.nowIndicator(node, {
+        const dispose = portals.nowIndicatorContent(node, {
           arg
         });
         return {

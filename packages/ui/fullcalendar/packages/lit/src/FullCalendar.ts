@@ -27,7 +27,7 @@ interface RozieWeekNumberSlotCtx {
   arg: unknown;
 }
 
-interface RozieNowIndicatorSlotCtx {
+interface RozieNowIndicatorContentSlotCtx {
   arg: unknown;
 }
 
@@ -82,9 +82,9 @@ private _portalContainers = new Set<HTMLElement>();
   @state() private _hasSlotWeekNumber = false;
   @queryAssignedElements({ slot: 'weekNumber', flatten: true }) private _slotWeekNumberElements!: Element[];
   @property({ attribute: false }) weekNumber?: (scope: { arg: unknown }) => unknown;
-  @state() private _hasSlotNowIndicator = false;
-  @queryAssignedElements({ slot: 'nowIndicator', flatten: true }) private _slotNowIndicatorElements!: Element[];
-  @property({ attribute: false }) nowIndicatorSlot?: (scope: { arg: unknown }) => unknown;
+  @state() private _hasSlotNowIndicatorContent = false;
+  @queryAssignedElements({ slot: 'nowIndicatorContent', flatten: true }) private _slotNowIndicatorContentElements!: Element[];
+  @property({ attribute: false }) nowIndicatorContent?: (scope: { arg: unknown }) => unknown;
   @state() private _hasSlotMoreLink = false;
   @queryAssignedElements({ slot: 'moreLink', flatten: true }) private _slotMoreLinkElements!: Element[];
   @property({ attribute: false }) moreLink?: (scope: { arg: unknown }) => unknown;
@@ -151,9 +151,9 @@ private _portalContainers = new Set<HTMLElement>();
     }
 
     {
-      const slotEl = this.shadowRoot?.querySelector('slot[name="nowIndicator"]');
+      const slotEl = this.shadowRoot?.querySelector('slot[name="nowIndicatorContent"]');
       if (slotEl !== null && slotEl !== undefined) {
-        const update = () => { this._hasSlotNowIndicator = this._slotNowIndicatorElements.length > 0; };
+        const update = () => { this._hasSlotNowIndicatorContent = this._slotNowIndicatorContentElements.length > 0; };
         slotEl.addEventListener('slotchange', update);
         // CR-05 fix: push cleanup so the listener is removed on disconnectedCallback.
         this._disconnectCleanups.push(() => slotEl.removeEventListener('slotchange', update));
@@ -180,7 +180,7 @@ private _portalContainers = new Set<HTMLElement>();
     this._hasSlotDayHeader = Array.from(this.children).some((el) => el.getAttribute('slot') === 'dayHeader');
     this._hasSlotSlotLabel = Array.from(this.children).some((el) => el.getAttribute('slot') === 'slotLabel');
     this._hasSlotWeekNumber = Array.from(this.children).some((el) => el.getAttribute('slot') === 'weekNumber');
-    this._hasSlotNowIndicator = Array.from(this.children).some((el) => el.getAttribute('slot') === 'nowIndicator');
+    this._hasSlotNowIndicatorContent = Array.from(this.children).some((el) => el.getAttribute('slot') === 'nowIndicatorContent');
     this._hasSlotMoreLink = Array.from(this.children).some((el) => el.getAttribute('slot') === 'moreLink');
     super.connectedCallback();
     if (this.hasUpdated && this._rozieTornDown) { this._rozieTornDown = false; this._armListeners(); }
@@ -250,11 +250,11 @@ private _portalContainers = new Set<HTMLElement>();
           this._portalContainers.delete(container);
         };
       },
-      nowIndicator: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
-        const tpl = this.nowIndicatorSlot;
+      nowIndicatorContent: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+        const tpl = this.nowIndicatorContent;
         if (typeof tpl !== 'function') return () => {};
         // Spike 004: portal-scope attribute injection.
-        container.setAttribute('data-rozie-portal-nowIndicator', '5589629a');
+        container.setAttribute('data-rozie-portal-nowIndicatorContent', '5589629a');
         render(tpl(scope), container);
         this._portalContainers.add(container);
         return () => {
@@ -493,19 +493,21 @@ private _portalContainers = new Set<HTMLElement>();
     // (core + daygrid + timegrid + interaction). Each guarded by its own slot so
     // unfilled slots keep FullCalendar's default rendering.
     //
-    // NOTE the `nowIndicator` slot SET name ($slots.nowIndicator) shares a string
-    // with the boolean `nowIndicator` PROP — they live in different namespaces
-    // ($slots vs $props); the slot emits the `nowIndicatorContent` option while
-    // the prop reconciles the `nowIndicator` option. No ROZ collision.
+    // NOTE the `nowIndicatorContent` slot is named for its FullCalendar engine
+    // hook (`nowIndicatorContent`) so it does NOT clash with the boolean
+    // `nowIndicator` PROP — a slot name that equals a declared prop name is now a
+    // hard compile error (ROZ127 SLOT_PROP_NAME_COLLISION), because Svelte 5
+    // unifies snippets and props into one `$props` namespace.
     // The 6 remaining *Content portal-slots — wired identically to `event`, one
     // per FullCalendar per-cell content hook that fires with the bundled plugins
     // (core + daygrid + timegrid + interaction). Each guarded by its own slot so
     // unfilled slots keep FullCalendar's default rendering.
     //
-    // NOTE the `nowIndicator` slot SET name ($slots.nowIndicator) shares a string
-    // with the boolean `nowIndicator` PROP — they live in different namespaces
-    // ($slots vs $props); the slot emits the `nowIndicatorContent` option while
-    // the prop reconciles the `nowIndicator` option. No ROZ collision.
+    // NOTE the `nowIndicatorContent` slot is named for its FullCalendar engine
+    // hook (`nowIndicatorContent`) so it does NOT clash with the boolean
+    // `nowIndicator` PROP — a slot name that equals a declared prop name is now a
+    // hard compile error (ROZ127 SLOT_PROP_NAME_COLLISION), because Svelte 5
+    // unifies snippets and props into one `$props` namespace.
     if (this.dayCell !== undefined) {
       opts.dayCellContent = (arg: any) => {
         const node = document.createElement('div');
@@ -554,10 +556,10 @@ private _portalContainers = new Set<HTMLElement>();
         };
       };
     }
-    if (this.nowIndicator !== undefined) {
+    if (this.nowIndicatorContent !== undefined) {
       opts.nowIndicatorContent = (arg: any) => {
         const node = document.createElement('div');
-        const dispose = portals.nowIndicator(node, {
+        const dispose = portals.nowIndicatorContent(node, {
           arg
         });
         return {
@@ -639,7 +641,7 @@ private _portalContainers = new Set<HTMLElement>();
 <slot name="dayHeader"></slot>
 <slot name="slotLabel"></slot>
 <slot name="weekNumber"></slot>
-<slot name="nowIndicator"></slot>
+<slot name="nowIndicatorContent"></slot>
 <slot name="moreLink"></slot>
 `;
   }

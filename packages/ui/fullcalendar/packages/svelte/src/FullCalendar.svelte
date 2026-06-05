@@ -23,7 +23,7 @@ interface Props {
   dayHeader?: Snippet<[{ arg: any }]>;
   slotLabel?: Snippet<[{ arg: any }]>;
   weekNumber?: Snippet<[{ arg: any }]>;
-  nowIndicator?: Snippet<[{ arg: any }]>;
+  nowIndicatorContent?: Snippet<[{ arg: any }]>;
   moreLink?: Snippet<[{ arg: any }]>;
   snippets?: Record<string, any>;
   oneventclick?: (...args: unknown[]) => void;
@@ -66,7 +66,7 @@ let {
   dayHeader: __dayHeaderProp,
   slotLabel: __slotLabelProp,
   weekNumber: __weekNumberProp,
-  nowIndicator: __nowIndicatorProp,
+  nowIndicatorContent: __nowIndicatorContentProp,
   moreLink: __moreLinkProp,
   snippets,
   oneventclick,
@@ -87,7 +87,7 @@ const dayCell = $derived(__dayCellProp ?? snippets?.dayCell);
 const dayHeader = $derived(__dayHeaderProp ?? snippets?.dayHeader);
 const slotLabel = $derived(__slotLabelProp ?? snippets?.slotLabel);
 const weekNumber = $derived(__weekNumberProp ?? snippets?.weekNumber);
-const nowIndicatorSlot = $derived(__nowIndicatorProp ?? snippets?.nowIndicator);
+const nowIndicatorContent = $derived(__nowIndicatorContentProp ?? snippets?.nowIndicatorContent);
 const moreLink = $derived(__moreLinkProp ?? snippets?.moreLink);
 
 let __rozieRoot = $state<HTMLElement | undefined>(undefined);
@@ -219,13 +219,13 @@ const portals = {
       portalInstances.delete(inst as Record<string, unknown>);
     };
   },
-  nowIndicator: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
-    if (!nowIndicatorSlot) return () => {};
+  nowIndicatorContent: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+    if (!nowIndicatorContent) return () => {};
     // Spike 004: portal-scope attribute injection.
-    container.setAttribute('data-rozie-portal-nowIndicator', '5589629a');
+    container.setAttribute('data-rozie-portal-nowIndicatorContent', '5589629a');
     const inst = mount(PortalHost, {
       target: container,
-      props: { snippet: nowIndicatorSlot, scope },
+      props: { snippet: nowIndicatorContent, scope },
     });
     portalInstances.add(inst as Record<string, unknown>);
     return () => {
@@ -411,10 +411,11 @@ onMount(() => {
   // (core + daygrid + timegrid + interaction). Each guarded by its own slot so
   // unfilled slots keep FullCalendar's default rendering.
   //
-  // NOTE the `nowIndicator` slot SET name ($slots.nowIndicator) shares a string
-  // with the boolean `nowIndicator` PROP — they live in different namespaces
-  // ($slots vs $props); the slot emits the `nowIndicatorContent` option while
-  // the prop reconciles the `nowIndicator` option. No ROZ collision.
+  // NOTE the `nowIndicatorContent` slot is named for its FullCalendar engine
+  // hook (`nowIndicatorContent`) so it does NOT clash with the boolean
+  // `nowIndicator` PROP — a slot name that equals a declared prop name is now a
+  // hard compile error (ROZ127 SLOT_PROP_NAME_COLLISION), because Svelte 5
+  // unifies snippets and props into one `$props` namespace.
   if (dayCell) {
     opts.dayCellContent = (arg: any) => {
       const node = document.createElement('div');
@@ -463,10 +464,10 @@ onMount(() => {
       };
     };
   }
-  if (nowIndicatorSlot) {
+  if (nowIndicatorContent) {
     opts.nowIndicatorContent = (arg: any) => {
       const node = document.createElement('div');
-      const dispose = portals.nowIndicator(node, {
+      const dispose = portals.nowIndicatorContent(node, {
         arg
       });
       return {

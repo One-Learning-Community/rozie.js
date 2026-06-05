@@ -98,5 +98,5 @@ const api = cal.current?.getApi();
 | dayHeader | arg |
 | slotLabel | arg |
 | weekNumber | arg |
-| nowIndicator | arg |
+| nowIndicatorContent | arg |
 | moreLink | arg |

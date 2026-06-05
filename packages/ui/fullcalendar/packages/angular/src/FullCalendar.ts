@@ -32,7 +32,7 @@ interface WeekNumberCtx {
   arg: any;
 }
 
-interface NowIndicatorCtx {
+interface NowIndicatorContentCtx {
   $implicit: { arg: any };
   arg: any;
 }
@@ -109,7 +109,7 @@ export class FullCalendar {
   @ContentChild('dayHeader', { read: TemplateRef }) dayHeaderTpl?: TemplateRef<DayHeaderCtx>;
   @ContentChild('slotLabel', { read: TemplateRef }) slotLabelTpl?: TemplateRef<SlotLabelCtx>;
   @ContentChild('weekNumber', { read: TemplateRef }) weekNumberTpl?: TemplateRef<WeekNumberCtx>;
-  @ContentChild('nowIndicator', { read: TemplateRef }) nowIndicatorTpl?: TemplateRef<NowIndicatorCtx>;
+  @ContentChild('nowIndicatorContent', { read: TemplateRef }) nowIndicatorContentTpl?: TemplateRef<NowIndicatorContentCtx>;
   @ContentChild('moreLink', { read: TemplateRef }) moreLinkTpl?: TemplateRef<MoreLinkCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
   private _portalViews = new Set<EmbeddedViewRef<unknown>>();
@@ -119,7 +119,7 @@ export class FullCalendar {
   private _dayHeaderTpl = contentChild('dayHeader', { read: TemplateRef });
   private _slotLabelTpl = contentChild('slotLabel', { read: TemplateRef });
   private _weekNumberTpl = contentChild('weekNumber', { read: TemplateRef });
-  private _nowIndicatorTpl = contentChild('nowIndicator', { read: TemplateRef });
+  private _nowIndicatorContentTpl = contentChild('nowIndicatorContent', { read: TemplateRef });
   private _moreLinkTpl = contentChild('moreLink', { read: TemplateRef });
   private __rozieDestroyRef = inject(DestroyRef);
   private __rozieWatchInitial_0 = true;
@@ -239,12 +239,12 @@ export class FullCalendar {
           this._portalViews.delete(view as EmbeddedViewRef<unknown>);
         };
       },
-      nowIndicator: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
-        const tpl = this._nowIndicatorTpl();
+      nowIndicatorContent: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+        const tpl = this._nowIndicatorContentTpl();
         const vcr = this._portalAnchor();
         if (!tpl || !vcr) return () => {};
         // Spike 004: portal-scope attribute injection.
-        container.setAttribute('data-rozie-portal-nowIndicator', '5589629a');
+        container.setAttribute('data-rozie-portal-nowIndicatorContent', '5589629a');
         const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
         view.detectChanges();
         for (const node of view.rootNodes as Node[]) container.appendChild(node);
@@ -434,19 +434,21 @@ export class FullCalendar {
     // (core + daygrid + timegrid + interaction). Each guarded by its own slot so
     // unfilled slots keep FullCalendar's default rendering.
     //
-    // NOTE the `nowIndicator` slot SET name ($slots.nowIndicator) shares a string
-    // with the boolean `nowIndicator` PROP — they live in different namespaces
-    // ($slots vs $props); the slot emits the `nowIndicatorContent` option while
-    // the prop reconciles the `nowIndicator` option. No ROZ collision.
+    // NOTE the `nowIndicatorContent` slot is named for its FullCalendar engine
+    // hook (`nowIndicatorContent`) so it does NOT clash with the boolean
+    // `nowIndicator` PROP — a slot name that equals a declared prop name is now a
+    // hard compile error (ROZ127 SLOT_PROP_NAME_COLLISION), because Svelte 5
+    // unifies snippets and props into one `$props` namespace.
     // The 6 remaining *Content portal-slots — wired identically to `event`, one
     // per FullCalendar per-cell content hook that fires with the bundled plugins
     // (core + daygrid + timegrid + interaction). Each guarded by its own slot so
     // unfilled slots keep FullCalendar's default rendering.
     //
-    // NOTE the `nowIndicator` slot SET name ($slots.nowIndicator) shares a string
-    // with the boolean `nowIndicator` PROP — they live in different namespaces
-    // ($slots vs $props); the slot emits the `nowIndicatorContent` option while
-    // the prop reconciles the `nowIndicator` option. No ROZ collision.
+    // NOTE the `nowIndicatorContent` slot is named for its FullCalendar engine
+    // hook (`nowIndicatorContent`) so it does NOT clash with the boolean
+    // `nowIndicator` PROP — a slot name that equals a declared prop name is now a
+    // hard compile error (ROZ127 SLOT_PROP_NAME_COLLISION), because Svelte 5
+    // unifies snippets and props into one `$props` namespace.
     if ((this.dayCellTpl ?? this.templates()?.['dayCell'])) {
       opts.dayCellContent = (arg: any) => {
         const node = document.createElement('div');
@@ -495,10 +497,10 @@ export class FullCalendar {
         };
       };
     }
-    if ((this.nowIndicatorTpl ?? this.templates()?.['nowIndicator'])) {
+    if ((this.nowIndicatorContentTpl ?? this.templates()?.['nowIndicatorContent'])) {
       opts.nowIndicatorContent = (arg: any) => {
         const node = document.createElement('div');
-        const dispose = portals.nowIndicator(node, {
+        const dispose = portals.nowIndicatorContent(node, {
           arg
         });
         return {
@@ -598,7 +600,7 @@ export class FullCalendar {
   static ngTemplateContextGuard(
     _dir: FullCalendar,
     _ctx: unknown,
-  ): _ctx is EventCtx | DayCellCtx | DayHeaderCtx | SlotLabelCtx | WeekNumberCtx | NowIndicatorCtx | MoreLinkCtx {
+  ): _ctx is EventCtx | DayCellCtx | DayHeaderCtx | SlotLabelCtx | WeekNumberCtx | NowIndicatorContentCtx | MoreLinkCtx {
     return true;
   }
 }

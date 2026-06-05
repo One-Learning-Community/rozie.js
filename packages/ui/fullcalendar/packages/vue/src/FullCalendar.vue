@@ -46,7 +46,7 @@ defineSlots<{
   dayHeader(props: { arg: any }): any;
   slotLabel(props: { arg: any }): any;
   weekNumber(props: { arg: any }): any;
-  nowIndicator(props: { arg: any }): any;
+  nowIndicatorContent(props: { arg: any }): any;
   moreLink(props: { arg: any }): any;
 }>();
 
@@ -186,13 +186,13 @@ const portals = {
       portalContainers.delete(container);
     };
   },
-  nowIndicator: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
-    const slotFn = slots.nowIndicator;
+  nowIndicatorContent: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+    const slotFn = slots.nowIndicatorContent;
     if (!slotFn) return () => {};
     // Spike 004: portal-scope attribute injection. Cascades the @portal
-    // nowIndicator { … } selectors from the unscoped <style> block below into
+    // nowIndicatorContent { … } selectors from the unscoped <style> block below into
     // the engine-owned subtree.
-    container.setAttribute('data-rozie-portal-nowIndicator', '5589629a');
+    container.setAttribute('data-rozie-portal-nowIndicatorContent', '5589629a');
     const vnode = h(Fragment, null, slotFn(scope));
     render(vnode, container);
     portalContainers.add(container);
@@ -381,10 +381,11 @@ onMounted(() => {
   // (core + daygrid + timegrid + interaction). Each guarded by its own slot so
   // unfilled slots keep FullCalendar's default rendering.
   //
-  // NOTE the `nowIndicator` slot SET name ($slots.nowIndicator) shares a string
-  // with the boolean `nowIndicator` PROP — they live in different namespaces
-  // ($slots vs $props); the slot emits the `nowIndicatorContent` option while
-  // the prop reconciles the `nowIndicator` option. No ROZ collision.
+  // NOTE the `nowIndicatorContent` slot is named for its FullCalendar engine
+  // hook (`nowIndicatorContent`) so it does NOT clash with the boolean
+  // `nowIndicator` PROP — a slot name that equals a declared prop name is now a
+  // hard compile error (ROZ127 SLOT_PROP_NAME_COLLISION), because Svelte 5
+  // unifies snippets and props into one `$props` namespace.
   if (slots.dayCell) {
     opts.dayCellContent = (arg: any) => {
       const node = document.createElement('div');
@@ -433,10 +434,10 @@ onMounted(() => {
       };
     };
   }
-  if (slots.nowIndicator) {
+  if (slots.nowIndicatorContent) {
     opts.nowIndicatorContent = (arg: any) => {
       const node = document.createElement('div');
-      const dispose = portals.nowIndicator(node, {
+      const dispose = portals.nowIndicatorContent(node, {
         arg
       });
       return {

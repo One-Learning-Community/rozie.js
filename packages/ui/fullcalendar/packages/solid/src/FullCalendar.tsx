@@ -22,7 +22,7 @@ interface SlotLabelSlotCtx { arg: any; }
 
 interface WeekNumberSlotCtx { arg: any; }
 
-interface NowIndicatorSlotCtx { arg: any; }
+interface NowIndicatorContentSlotCtx { arg: any; }
 
 interface MoreLinkSlotCtx { arg: any; }
 
@@ -58,7 +58,7 @@ interface FullCalendarProps {
   dayHeaderSlot?: (ctx: DayHeaderSlotCtx) => JSX.Element;
   slotLabelSlot?: (ctx: SlotLabelSlotCtx) => JSX.Element;
   weekNumberSlot?: (ctx: WeekNumberSlotCtx) => JSX.Element;
-  nowIndicatorSlot?: (ctx: NowIndicatorSlotCtx) => JSX.Element;
+  nowIndicatorContentSlot?: (ctx: NowIndicatorContentSlotCtx) => JSX.Element;
   moreLinkSlot?: (ctx: MoreLinkSlotCtx) => JSX.Element;
   slots?: Record<string, (ctx: any) => JSX.Element>;
   ref?: (h: FullCalendarHandle) => void;
@@ -147,11 +147,11 @@ export default function FullCalendar(_props: FullCalendarProps): JSX.Element {
         portalDisposers.delete(dispose);
       };
     },
-    nowIndicator: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
-      const slot = _props.nowIndicatorSlot ?? _props.slots?.['nowIndicator'];
+    nowIndicatorContent: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+      const slot = _props.nowIndicatorContentSlot ?? _props.slots?.['nowIndicatorContent'];
       if (typeof slot !== 'function') return () => {};
       // Spike 004: portal-scope attribute injection.
-      container.setAttribute('data-rozie-portal-nowIndicator', '5589629a');
+      container.setAttribute('data-rozie-portal-nowIndicatorContent', '5589629a');
       const dispose = render(() => slot(scope), container);
       portalDisposers.add(dispose);
       return () => {
@@ -335,10 +335,11 @@ export default function FullCalendar(_props: FullCalendarProps): JSX.Element {
     // (core + daygrid + timegrid + interaction). Each guarded by its own slot so
     // unfilled slots keep FullCalendar's default rendering.
     //
-    // NOTE the `nowIndicator` slot SET name ($slots.nowIndicator) shares a string
-    // with the boolean `nowIndicator` PROP — they live in different namespaces
-    // ($slots vs $props); the slot emits the `nowIndicatorContent` option while
-    // the prop reconciles the `nowIndicator` option. No ROZ collision.
+    // NOTE the `nowIndicatorContent` slot is named for its FullCalendar engine
+    // hook (`nowIndicatorContent`) so it does NOT clash with the boolean
+    // `nowIndicator` PROP — a slot name that equals a declared prop name is now a
+    // hard compile error (ROZ127 SLOT_PROP_NAME_COLLISION), because Svelte 5
+    // unifies snippets and props into one `$props` namespace.
     if ((_props.dayCellSlot ?? _props.slots?.["dayCell"])) {
       opts.dayCellContent = (arg: any) => {
         const node = document.createElement('div');
@@ -387,10 +388,10 @@ export default function FullCalendar(_props: FullCalendarProps): JSX.Element {
         };
       };
     }
-    if ((_props.nowIndicatorSlot ?? _props.slots?.["nowIndicator"])) {
+    if ((_props.nowIndicatorContentSlot ?? _props.slots?.["nowIndicatorContent"])) {
       opts.nowIndicatorContent = (arg: any) => {
         const node = document.createElement('div');
-        const dispose = portals.nowIndicator(node, {
+        const dispose = portals.nowIndicatorContent(node, {
           arg
         });
         return {
