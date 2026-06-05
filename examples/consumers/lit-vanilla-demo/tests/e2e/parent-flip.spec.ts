@@ -8,7 +8,10 @@
 // In Lit-target output, value-change is fired by createLitControllableProperty
 // in BOTH controlled and uncontrolled modes. This spec verifies the EVENT
 // path — `(el as any).value = 20` fires the CustomEvent with detail=20,
-// bubbles=true, composed=true.
+// delivered AT_TARGET (a listener on the element itself, as the host page
+// installs below, receives it). The event is intentionally bubbles:false /
+// composed:false so a nested same-named model event cannot leak into an
+// ancestor consumer's handler (the nested-Kanban `items-change` collision).
 //
 // NOTE (2026-05-20): the shadow-DOM re-render path on property writes IS
 // wired. createLitControllableProperty is backed by a @preact/signals-core
@@ -20,7 +23,7 @@
 // is verified in counter.spec.ts's third test.
 import { test, expect } from '@playwright/test';
 
-test('SC2 — value-change CustomEvent on programmatic write (bubbles + composed)', async ({
+test('SC2 — value-change CustomEvent on programmatic write (AT_TARGET, no bubble/compose)', async ({
   page,
 }) => {
   await page.goto('/src/pages/CounterPage.html');
@@ -57,6 +60,6 @@ test('SC2 — value-change CustomEvent on programmatic write (bubbles + composed
     composed: boolean;
   };
   expect(first.detail).toBe(20);
-  expect(first.bubbles).toBe(true);
-  expect(first.composed).toBe(true);
+  expect(first.bubbles).toBe(false);
+  expect(first.composed).toBe(false);
 });

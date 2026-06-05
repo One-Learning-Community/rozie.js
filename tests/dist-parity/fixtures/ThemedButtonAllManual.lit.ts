@@ -29,11 +29,18 @@ export default class ThemedButtonAllManual extends SignalWatcher(LitElement) {
   @property({ type: String, reflect: true }) variant: string = 'primary';
 
   private _disconnectCleanups: Array<() => void> = [];
+  // Re-parenting guard: set true once the deferred teardown has actually
+  // run (a genuine un-mount), so a subsequent reconnect knows to re-arm.
+  private _rozieTornDown = false;
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
-    for (const fn of this._disconnectCleanups) fn();
-    this._disconnectCleanups = [];
+    queueMicrotask(() => {
+      if (this.isConnected || this._rozieTornDown) return;
+      this._rozieTornDown = true;
+      for (const fn of this._disconnectCleanups) fn();
+      this._disconnectCleanups = [];
+    });
   }
 
   render() {

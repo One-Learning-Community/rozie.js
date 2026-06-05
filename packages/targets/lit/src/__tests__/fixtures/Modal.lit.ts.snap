@@ -51,6 +51,9 @@ private __rozieWatchInitial_0 = true;
   @property({ attribute: false }) footer?: (scope: { close: unknown }) => unknown;
 
   private _disconnectCleanups: Array<() => void> = [];
+  // Re-parenting guard: set true once the deferred teardown has actually
+  // run (a genuine un-mount), so a subsequent reconnect knows to re-arm.
+  private _rozieTornDown = false;
 
   private _armListeners(): void {
     const _lh0 = ($event: KeyboardEvent) => { if (!(this.open && this.closeOnEscape)) return; if ($event.key !== 'Escape') return; ((this.close) as (...args: any[]) => any)($event); };
@@ -97,7 +100,7 @@ private __rozieWatchInitial_0 = true;
     this._hasSlotDefault = Array.from(this.children).some((el) => !el.hasAttribute('slot') && (el.nodeType !== 3 || (el.textContent?.trim().length ?? 0) > 0));
     this._hasSlotFooter = Array.from(this.children).some((el) => el.getAttribute('slot') === 'footer');
     super.connectedCallback();
-    if (this.hasUpdated) this._armListeners();
+    if (this.hasUpdated && this._rozieTornDown) { this._rozieTornDown = false; this._armListeners(); }
   }
 
   firstUpdated(): void {
@@ -116,8 +119,12 @@ private __rozieWatchInitial_0 = true;
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
-    for (const fn of this._disconnectCleanups) fn();
-    this._disconnectCleanups = [];
+    queueMicrotask(() => {
+      if (this.isConnected || this._rozieTornDown) return;
+      this._rozieTornDown = true;
+      for (const fn of this._disconnectCleanups) fn();
+      this._disconnectCleanups = [];
+    });
   }
 
   attributeChangedCallback(name: string, old: string | null, value: string | null): void {

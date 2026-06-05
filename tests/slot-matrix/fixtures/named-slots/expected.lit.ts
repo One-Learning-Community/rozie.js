@@ -11,6 +11,9 @@ export default class NamedSlotsFixture extends SignalWatcher(LitElement) {
   @queryAssignedElements({ slot: 'footer', flatten: true }) private _slotFooterElements!: Element[];
 
   private _disconnectCleanups: Array<() => void> = [];
+  // Re-parenting guard: set true once the deferred teardown has actually
+  // run (a genuine un-mount), so a subsequent reconnect knows to re-arm.
+  private _rozieTornDown = false;
 
   private _armListeners(): void {
     {
@@ -41,7 +44,7 @@ export default class NamedSlotsFixture extends SignalWatcher(LitElement) {
     this._hasSlotHeader = Array.from(this.children).some((el) => el.getAttribute('slot') === 'header');
     this._hasSlotFooter = Array.from(this.children).some((el) => el.getAttribute('slot') === 'footer');
     super.connectedCallback();
-    if (this.hasUpdated) this._armListeners();
+    if (this.hasUpdated && this._rozieTornDown) { this._rozieTornDown = false; this._armListeners(); }
   }
 
   firstUpdated(): void {
@@ -50,17 +53,21 @@ export default class NamedSlotsFixture extends SignalWatcher(LitElement) {
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
-    for (const fn of this._disconnectCleanups) fn();
-    this._disconnectCleanups = [];
+    queueMicrotask(() => {
+      if (this.isConnected || this._rozieTornDown) return;
+      this._rozieTornDown = true;
+      for (const fn of this._disconnectCleanups) fn();
+      this._disconnectCleanups = [];
+    });
   }
 
   render() {
     return html`
-<div class="named-slots-fixture" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-s-a30182bc>
-  <header data-rozie-s-a30182bc>
+<div class="named-slots-fixture" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-s-e2d83b2f>
+  <header data-rozie-s-e2d83b2f>
     <slot name="header"></slot>
   </header>
-  <footer data-rozie-s-a30182bc>
+  <footer data-rozie-s-e2d83b2f>
     <slot name="footer"></slot>
   </footer>
 </div>

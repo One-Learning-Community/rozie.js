@@ -36,7 +36,7 @@ describe('SC2 — parent-flip-mid-lifecycle event dispatch + attribute reflectio
     expect(code).toContain("attribute: 'value'");
   });
 
-  it('programmatic write dispatches value-change CustomEvent with detail + bubbles + composed', () => {
+  it('programmatic write dispatches value-change CustomEvent AT_TARGET (no bubble/compose)', () => {
     // Simulate a Lit element instance — just need dispatchEvent.
     const dispatched: CustomEvent[] = [];
     const host = {
@@ -62,8 +62,11 @@ describe('SC2 — parent-flip-mid-lifecycle event dispatch + attribute reflectio
     const ev = dispatched[0]!;
     expect(ev.type).toBe('value-change');
     expect(ev.detail).toBe(20);
-    expect(ev.bubbles).toBe(true);
-    expect(ev.composed).toBe(true);
+    // Model `<prop>-change` events fire AT_TARGET only (delivered to a direct
+    // `@<prop>-change` binding on the host); they must NOT bubble/compose, or a
+    // nested same-named child event leaks into an ancestor consumer's handler.
+    expect(ev.bubbles).toBe(false);
+    expect(ev.composed).toBe(false);
   });
 
   it('setAttribute path: notifyAttributeChange forwards into the controllable property', () => {

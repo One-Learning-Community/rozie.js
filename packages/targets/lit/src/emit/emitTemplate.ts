@@ -662,10 +662,51 @@ function applyValueTransformsString(
  *                    merge option-bearing listeners with plain ones because
  *                    the options-object form has different runtime semantics.
  */
+/**
+ * Native DOM event names. A `@event` whose name is in this set (and is not
+ * hyphenated — native DOM events never contain hyphens) is a real DOM event:
+ * its handler receives the raw `Event`, NOT a Rozie emit payload. Any other
+ * event name on a component tag is a Rozie component emit (`$emit('x', v)` /
+ * `model:true` → `<prop>-change`), whose value rides in `CustomEvent.detail`.
+ *
+ * Mirrors the React target's `EVENT_NAME_TO_JSX_PROP` key set — the same
+ * native-vs-custom split React relies on (native events become real DOM
+ * `onClick` props; component emits become payload-carrying callback props).
+ */
+const NATIVE_DOM_EVENTS: ReadonlySet<string> = new Set([
+  'click', 'dblclick', 'mousedown', 'mouseup', 'mousemove', 'mouseover',
+  'mouseout', 'mouseenter', 'mouseleave', 'contextmenu', 'wheel',
+  'keydown', 'keyup', 'keypress',
+  'change', 'input', 'invalid', 'reset', 'submit', 'beforeinput',
+  'focus', 'blur', 'focusin', 'focusout',
+  'compositionstart', 'compositionend', 'compositionupdate',
+  'select', 'copy', 'cut', 'paste',
+  'touchstart', 'touchend', 'touchmove', 'touchcancel',
+  'pointerdown', 'pointerup', 'pointermove', 'pointercancel', 'pointerover',
+  'pointerout', 'pointerenter', 'pointerleave', 'gotpointercapture',
+  'lostpointercapture',
+  'drag', 'dragend', 'dragenter', 'dragexit', 'dragleave', 'dragover',
+  'dragstart', 'drop',
+  'scroll', 'resize', 'load', 'error', 'abort',
+  'canplay', 'canplaythrough', 'durationchange', 'emptied', 'encrypted',
+  'ended', 'loadeddata', 'loadedmetadata', 'loadstart', 'pause', 'play',
+  'playing', 'progress', 'ratechange', 'seeked', 'seeking', 'stalled',
+  'suspend', 'timeupdate', 'volumechange', 'waiting',
+  'animationstart', 'animationend', 'animationiteration', 'transitionend',
+]);
+
+/** True when `name` is a real native DOM event (raw `Event` to the handler).
+ * Hyphenated names are never native — they are Rozie component emits. */
+function isNativeDomEvent(name: string): boolean {
+  if (name.includes('-')) return false;
+  return NATIVE_DOM_EVENTS.has(name.toLowerCase());
+}
+
 function buildEventParts(
   listener: Listener,
   ir: IRComponent,
   opts: EmitTemplateOpts,
+  tagKind: 'html' | 'component' | 'self' = 'html',
 ): { eventName: string; handlerBody: string; optionParts: string[] } {
   const eventName = listener.event;
   const handlerRaw = rewriteTemplateExpression(listener.handler, ir);
@@ -875,6 +916,17 @@ function buildEventParts(
   // but got 1". The cast keeps the emit shape identical at runtime while
   // letting tsc accept the synthetic event arg uniformly across `() => void`
   // and `($event: Event) => void` user methods.
+  // Component custom events ($emit / model `<prop>-change`) carry their
+  // payload in `CustomEvent.detail`. The cross-framework `$event` contract
+  // (React callback payload, Vue emit payload) is that the handler sees the
+  // EMITTED VALUE, not the DOM event — so on Lit we unwrap `.detail` here,
+  // mirroring the r-model (buildRModelParts) and scoped-slot-arg paths that
+  // already do. Native DOM events bubbling from a component tag (e.g. a real
+  // `@click`) keep the raw `Event`. Modifier-bearing handlers (inlineGuards /
+  // debounce / throttle) operate on the raw event and are left untouched —
+  // modifiers on a component emit are not a meaningful pattern.
+  const unwrapDetail = tagKind === 'component' && !isNativeDomEvent(eventName);
+
   const HANDLER_CAST = ' as (...args: any[]) => any';
   let body: string;
   if (inlineGuards.length > 0) {
@@ -882,6 +934,21 @@ function buildEventParts(
       body = `($event: ${evtType}) => { ${inlineGuards.join(' ')} ((${handler})${HANDLER_CAST})($event); }`;
     } else {
       body = `($event: ${evtType}) => { ${inlineGuards.join(' ')} ${handler}; }`;
+    }
+  } else if (unwrapDetail) {
+    if (isFunctionLike) {
+      // Bare ref / arrow / member — invoke with the unwrapped payload.
+      body = `($event: CustomEvent) => ((${handler})${HANDLER_CAST})($event.detail)`;
+    } else {
+      // Inline expression that may reference `$event` (e.g.
+      // `updateColumnCards(column.id, $event)`). Bind a local `$event` to the
+      // payload so the user's reference resolves to the emitted value. The
+      // `__rozieEv` param keeps its underscore prefix so an unused-param lint
+      // never fires when the handler ignores the event.
+      const bind = handler.includes('$event')
+        ? 'const $event = __rozieEv.detail; '
+        : '';
+      body = `(__rozieEv: CustomEvent) => { ${bind}${handler}; }`;
     }
   } else {
     body = isFunctionLike ? `${handler}` : `($event: Event) => { ${handler}; }`;
@@ -1133,7 +1200,7 @@ function emitElementOpenTag(
   const combinedEvents: Listener[] = [...node.events, ...syntheticListenerEvents];
 
   for (const event of combinedEvents) {
-    const parts1 = buildEventParts(event, ir, opts);
+    const parts1 = buildEventParts(event, ir, opts, node.tagKind);
     if (parts1.optionParts.length > 0) {
       optionEvents.push(parts1);
     } else {

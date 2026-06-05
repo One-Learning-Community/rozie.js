@@ -29,6 +29,9 @@ export default class ROnProbe extends SignalWatcher(LitElement) {
   private _tw0 = debounce(($event: Event) => ((this._onInput.value) as (...args: any[]) => any)($event), 300);
 
   private _disconnectCleanups: Array<() => void> = [];
+  // Re-parenting guard: set true once the deferred teardown has actually
+  // run (a genuine un-mount), so a subsequent reconnect knows to re-arm.
+  private _rozieTornDown = false;
 
   private _armListeners(): void {
     this._disconnectCleanups.push(() => this._tw0.cancel());
@@ -36,7 +39,7 @@ export default class ROnProbe extends SignalWatcher(LitElement) {
 
   connectedCallback(): void {
     super.connectedCallback();
-    if (this.hasUpdated) this._armListeners();
+    if (this.hasUpdated && this._rozieTornDown) { this._rozieTornDown = false; this._armListeners(); }
   }
 
   firstUpdated(): void {
@@ -45,8 +48,12 @@ export default class ROnProbe extends SignalWatcher(LitElement) {
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
-    for (const fn of this._disconnectCleanups) fn();
-    this._disconnectCleanups = [];
+    queueMicrotask(() => {
+      if (this.isConnected || this._rozieTornDown) return;
+      this._rozieTornDown = true;
+      for (const fn of this._disconnectCleanups) fn();
+      this._disconnectCleanups = [];
+    });
   }
 
   render() {

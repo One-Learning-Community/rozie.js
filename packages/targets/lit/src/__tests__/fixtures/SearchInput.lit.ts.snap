@@ -21,6 +21,9 @@ input[data-rozie-s-8bbc4a60] { padding: 0.25rem 0.5rem; }
   private _tw0 = debounce(($event: Event) => ((this.onSearch) as (...args: any[]) => any)($event), 300);
 
   private _disconnectCleanups: Array<() => void> = [];
+  // Re-parenting guard: set true once the deferred teardown has actually
+  // run (a genuine un-mount), so a subsequent reconnect knows to re-arm.
+  private _rozieTornDown = false;
 
   private _armListeners(): void {
     this._disconnectCleanups.push(() => this._tw0.cancel());
@@ -28,7 +31,7 @@ input[data-rozie-s-8bbc4a60] { padding: 0.25rem 0.5rem; }
 
   connectedCallback(): void {
     super.connectedCallback();
-    if (this.hasUpdated) this._armListeners();
+    if (this.hasUpdated && this._rozieTornDown) { this._rozieTornDown = false; this._armListeners(); }
   }
 
   firstUpdated(): void {
@@ -46,8 +49,12 @@ input[data-rozie-s-8bbc4a60] { padding: 0.25rem 0.5rem; }
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
-    for (const fn of this._disconnectCleanups) fn();
-    this._disconnectCleanups = [];
+    queueMicrotask(() => {
+      if (this.isConnected || this._rozieTornDown) return;
+      this._rozieTornDown = true;
+      for (const fn of this._disconnectCleanups) fn();
+      this._disconnectCleanups = [];
+    });
   }
 
   render() {

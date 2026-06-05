@@ -322,7 +322,11 @@ export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResu
       .map((f) => '  ' + f)
       .join('\n'),
     slotFields: slotResult.fields,
-    cleanupField: '  private _disconnectCleanups: Array<() => void> = [];',
+    cleanupField:
+      '  private _disconnectCleanups: Array<() => void> = [];\n' +
+      '  // Re-parenting guard: set true once the deferred teardown has actually\n' +
+      '  // run (a genuine un-mount), so a subsequent reconnect knows to re-arm.\n' +
+      '  private _rozieTornDown = false;',
     // `r-external` engine-wrapper marker — `_rozieReconcileSeq` is the
     // cache-invalidation counter consumed by `keyed(seq, …)` wrappers
     // emitted around marked-element children. Bumped by
@@ -561,7 +565,12 @@ function composeClassBody(parts: ComposeClassBodyParts): string {
     }
     ccParts.push('    super.connectedCallback();');
     if (hasListenerWiring) {
-      ccParts.push('    if (this.hasUpdated) this._armListeners();');
+      // Re-arm only after a genuine un-mount actually tore listeners down. A
+      // bare re-parent (DOM move) leaves them attached — the deferred teardown
+      // saw the reconnect and skipped — so re-arming there would double them.
+      ccParts.push(
+        '    if (this.hasUpdated && this._rozieTornDown) { this._rozieTornDown = false; this._armListeners(); }',
+      );
     }
     sections.push(
       ['  connectedCallback(): void {', ...ccParts, '  }'].join('\n'),
@@ -595,21 +604,41 @@ function composeClassBody(parts: ComposeClassBodyParts): string {
 
   // Always emit disconnectedCallback to drain cleanup pushes; even if no
   // user $onUnmount hooks exist, listeners often push cleanups.
-  const disconnectParts: string[] = [];
-  disconnectParts.push('super.disconnectedCallback();');
+  // Teardown body — the actual resource disposal. Deferred to a microtask
+  // (below) so a re-parent survives. `super.disconnectedCallback()` still runs
+  // synchronously (Lit's own reactive bookkeeping must see the disconnect; a
+  // synchronous reconnect re-establishes it via `super.connectedCallback()`).
+  const teardownParts: string[] = [];
+  teardownParts.push('this._rozieTornDown = true;');
   if (parts.disconnectedBody.trim().length > 0) {
-    disconnectParts.push(parts.disconnectedBody);
+    teardownParts.push(parts.disconnectedBody);
   }
-  disconnectParts.push('for (const fn of this._disconnectCleanups) fn();');
-  disconnectParts.push('this._disconnectCleanups = [];');
+  teardownParts.push('for (const fn of this._disconnectCleanups) fn();');
+  teardownParts.push('this._disconnectCleanups = [];');
   // Phase 07.3.1 Blocker #3 (D-03, Landmine 2) — reset per-filler
   // `_slotCtxWired_<name>` flags after cleanup drain so a re-mount cycle
   // re-attempts wiring. Without this, a re-mounted consumer carries the
   // stale `true` flag and skips both the microtask retry and the
   // `updated()` re-attempt forever.
   if (parts.slotFillerDisconnectReset.trim().length > 0) {
-    disconnectParts.push(parts.slotFillerDisconnectReset);
+    teardownParts.push(parts.slotFillerDisconnectReset);
   }
+  // Re-parenting survival: a DOM move (SortableJS reordering a nested list, a
+  // node hopping containers) fires disconnectedCallback THEN a synchronous
+  // connectedCallback. Draining teardown synchronously would destroy live
+  // resources the immediate reconnect relies on — event listeners, $watch
+  // effects, a wrapped SortableJS instance; tearing down a nested SortableJS
+  // mid-drag even nulls SortableJS's shared drag globals and crashes the
+  // ancestor drag. Defer the drain and skip it when the element has reconnected
+  // by then (it was only moved); a genuine un-mount stays disconnected and
+  // tears down one microtask later.
+  const disconnectParts: string[] = [
+    'super.disconnectedCallback();',
+    'queueMicrotask(() => {',
+    '  if (this.isConnected || this._rozieTornDown) return;',
+    indent(teardownParts.join('\n'), 2),
+    '});',
+  ];
   sections.push(
     [
       '  disconnectedCallback(): void {',

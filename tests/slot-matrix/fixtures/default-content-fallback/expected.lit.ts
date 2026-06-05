@@ -9,6 +9,9 @@ export default class DefaultContentFallbackFixture extends SignalWatcher(LitElem
   @queryAssignedElements({ slot: 'status', flatten: true }) private _slotStatusElements!: Element[];
 
   private _disconnectCleanups: Array<() => void> = [];
+  // Re-parenting guard: set true once the deferred teardown has actually
+  // run (a genuine un-mount), so a subsequent reconnect knows to re-arm.
+  private _rozieTornDown = false;
 
   private _armListeners(): void {
     {
@@ -27,7 +30,7 @@ export default class DefaultContentFallbackFixture extends SignalWatcher(LitElem
     // Phase 07.3.1 D-LIT-15 — pre-seed _hasSlot<X> from light DOM so first render isn't deadlocked.
     this._hasSlotStatus = Array.from(this.children).some((el) => el.getAttribute('slot') === 'status');
     super.connectedCallback();
-    if (this.hasUpdated) this._armListeners();
+    if (this.hasUpdated && this._rozieTornDown) { this._rozieTornDown = false; this._armListeners(); }
   }
 
   firstUpdated(): void {
@@ -36,15 +39,19 @@ export default class DefaultContentFallbackFixture extends SignalWatcher(LitElem
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
-    for (const fn of this._disconnectCleanups) fn();
-    this._disconnectCleanups = [];
+    queueMicrotask(() => {
+      if (this.isConnected || this._rozieTornDown) return;
+      this._rozieTornDown = true;
+      for (const fn of this._disconnectCleanups) fn();
+      this._disconnectCleanups = [];
+    });
   }
 
   render() {
     return html`
-<div class="default-content-fallback-fixture" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-s-62104151>
+<div class="default-content-fallback-fixture" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-s-318c6fcd>
   <slot name="status">
-    <span class="fallback" data-rozie-s-62104151>No status provided.</span>
+    <span class="fallback" data-rozie-s-318c6fcd>No status provided.</span>
   </slot>
 </div>
 `;

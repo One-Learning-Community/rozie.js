@@ -75,8 +75,33 @@ describe('createLitControllableProperty — uncontrolled mode', () => {
     expect(handler).toHaveBeenCalledTimes(1);
     const e = handler.mock.calls[0]![0] as CustomEvent;
     expect(e.detail).toBe(99);
-    expect(e.bubbles).toBe(true);
-    expect(e.composed).toBe(true);
+    // Model `<prop>-change` events fire AT_TARGET only — a direct listener on
+    // the host still receives them, but they do NOT bubble or cross shadow
+    // boundaries to same-named ancestor listeners (nested-component collision).
+    expect(e.bubbles).toBe(false);
+    expect(e.composed).toBe(false);
+  });
+
+  it('change event does NOT bubble to an ancestor listener (nested-component collision guard)', () => {
+    const ancestor = document.createElement('div');
+    const host = document.createElement('div');
+    ancestor.appendChild(host);
+    const direct = vi.fn();
+    const onAncestor = vi.fn();
+    host.addEventListener('value-change', direct);
+    ancestor.addEventListener('value-change', onAncestor);
+    const cp = createLitControllableProperty({
+      host,
+      eventName: 'value-change',
+      defaultValue: 0,
+      initialControlledValue: undefined,
+    });
+    cp.write(7);
+    // The element the value belongs to receives it; the ancestor must not —
+    // otherwise a same-named model event from a nested child would overwrite
+    // the ancestor's own model (the nested-Kanban `items-change` corruption).
+    expect(direct).toHaveBeenCalledTimes(1);
+    expect(onAncestor).not.toHaveBeenCalled();
   });
 });
 

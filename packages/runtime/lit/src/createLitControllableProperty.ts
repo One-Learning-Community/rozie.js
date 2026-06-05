@@ -154,11 +154,22 @@ export function createLitControllableProperty<T>(
     // same-value write — sees a cleared token and dispatches correctly.
     const token: { v: T } = { v: next };
     pendingRoundTripValue = token;
+    // `bubbles: false` / `composed: false` — a `<prop>-change` model event is
+    // delivered to whoever bound to THIS element. Both Rozie binding shapes —
+    // the r-model two-way `@<prop>-change` and a manual consumer `@<prop>-change`
+    // — attach the listener directly on the component host, so the event fires
+    // AT_TARGET without bubbling. Bubbling/composed previously let a model event
+    // cross every shadow boundary and be caught by a SAME-NAMED listener on an
+    // ANCESTOR — e.g. two nested `<SortableList>`s both emit `items-change`, so
+    // the inner list's event bubbled into the outer list's consumer handler and
+    // overwrote the outer model with the inner's array (nested-Kanban corruption).
+    // Scoping the event to its target element is the correct semantic and the
+    // standard web-component guidance for component-internal state-change events.
     host.dispatchEvent(
       new CustomEvent(eventName, {
         detail: next,
-        bubbles: true,
-        composed: true,
+        bubbles: false,
+        composed: false,
         cancelable: false,
       }),
     );
