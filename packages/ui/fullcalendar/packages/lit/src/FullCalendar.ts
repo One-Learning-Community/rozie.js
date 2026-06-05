@@ -47,6 +47,9 @@ private _portalContainers = new Set<HTMLElement>();
   @property({ attribute: false }) event?: (scope: { arg: unknown }) => unknown;
 
   private _disconnectCleanups: Array<() => void> = [];
+  // Re-parenting guard: set true once the deferred teardown has actually
+  // run (a genuine un-mount), so a subsequent reconnect knows to re-arm.
+  private _rozieTornDown = false;
 
   private _armListeners(): void {
     {
@@ -65,7 +68,7 @@ private _portalContainers = new Set<HTMLElement>();
     // Phase 07.3.1 D-LIT-15 — pre-seed _hasSlot<X> from light DOM so first render isn't deadlocked.
     this._hasSlotEvent = Array.from(this.children).some((el) => el.getAttribute('slot') === 'event');
     super.connectedCallback();
-    if (this.hasUpdated) this._armListeners();
+    if (this.hasUpdated && this._rozieTornDown) { this._rozieTornDown = false; this._armListeners(); }
   }
 
   firstUpdated(): void {
@@ -252,10 +255,14 @@ private _portalContainers = new Set<HTMLElement>();
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
-    for (const container of this._portalContainers) render(nothing, container);
-    this._portalContainers.clear();
-    for (const fn of this._disconnectCleanups) fn();
-    this._disconnectCleanups = [];
+    queueMicrotask(() => {
+      if (this.isConnected || this._rozieTornDown) return;
+      this._rozieTornDown = true;
+      for (const container of this._portalContainers) render(nothing, container);
+      this._portalContainers.clear();
+      for (const fn of this._disconnectCleanups) fn();
+      this._disconnectCleanups = [];
+    });
   }
 
   attributeChangedCallback(name: string, old: string | null, value: string | null): void {
