@@ -1,0 +1,267 @@
+<!--
+  FullCalendarAllSlotsDemo.rozie — "fill every slot" BEHAVIORAL consumer for
+  FullCalendar (Phase 28 Plan 03, REQ-28-4).
+
+  Behavioral cell ONLY (D-03 / flatpickr precedent) — host-registered but never
+  a screenshot cell. Where FullCalendarSlotsDemo fills the THREE high-demand
+  slots for the deterministic pixel tier, THIS demo proves the FULL slot +
+  event surface MOUNTS and DISPOSES at runtime across all 6 targets:
+
+    - Fills ALL SEVEN portal-slots (event / dayCell / dayHeader / slotLabel /
+      weekNumber / nowIndicator / moreLink), each rendering a queryable marker
+      node with a distinct per-slot test id (the slot-<name> family) so
+      full-calendar-slots.spec.ts can assert presence + dispose per slot, per
+      target.
+
+    - Binds the 5 NEW events (eventMouseEnter / eventMouseLeave / unselect /
+      loading / eventsSet) to handlers that record the last-fired type + a
+      compact REQ-28-3 payload summary into $data, surfaced in a state pane.
+
+    - Passes a passthrough :options value that BOTH enables the long-tail
+      slots' features AND proves the passthrough takes effect:
+        * weekNumbers: true  → makes the weekNumber slot render
+        * dayMaxEvents: 2    → forces a moreLink when a day overflows
+        * businessHours: …   → a visible passthrough proof
+      A single overflow day is seeded past dayMaxEvents so moreLink renders.
+
+    - Provides view-switch controls (timeGridWeek makes slotLabel + nowIndicator
+      render; dayGridMonth makes dayCell / dayHeader / moreLink render) the spec
+      drives, plus an r-if teardown control so the spec asserts the slot markers
+      DISPOSE when the calendar unmounts (portal dispose path fires per target).
+
+  Slot-rendering rule honored: $refs are only read inside $onMount — this demo
+  reads no $refs in slot bodies; slot markers are pure data-driven markup, so
+  Solid eager-memo TDZ + Lit null-$refs hazards do not apply.
+-->
+
+<rozie name="FullCalendarAllSlotsDemo">
+
+<components>
+{
+  FullCalendar: '../../packages/ui/fullcalendar/src/FullCalendar.rozie',
+}
+</components>
+
+<data>
+{
+  view: 'dayGridMonth',
+  events: [],
+  calendarMounted: true,
+  lastEvent: null,
+  lastDetail: '',
+}
+</data>
+
+<script>
+// All seed events land on a SINGLE pinned day (2026-06-15) so that — with the
+// passthrough dayMaxEvents: 2 — the day overflows past 2 and the engine renders
+// a `.fc-more-link` (which routes through the moreLink portal-slot). Fixed ISO
+// strings keep the behavioral run stable (no live clock).
+const sampleEvents = () => {
+  return [
+    { id: 'as-1', title: 'Standup',       start: '2026-06-15' },
+    { id: 'as-2', title: 'Demo',          start: '2026-06-15' },
+    { id: 'as-3', title: 'Sprint review', start: '2026-06-15' },
+    { id: 'as-4', title: 'Retro',         start: '2026-06-15' },
+  ]
+}
+
+$onMount(() => {
+  $data.events = sampleEvents()
+  return undefined
+})
+
+// NEW events — each captured with its REQ-28-3 payload shape keys. The state
+// pane renders the last type + a compact detail string the spec asserts against.
+const record = (type, detail) => {
+  $data.lastEvent = type
+  $data.lastDetail = detail
+}
+const onEventMouseEnter = (info) => record('eventMouseEnter', `${info?.event?.title ?? '?'} (id=${info?.event?.id ?? '?'})`)
+const onEventMouseLeave = (info) => record('eventMouseLeave', `${info?.event?.title ?? '?'}`)
+const onUnselect        = (info) => record('unselect', `jsEvent=${info?.jsEvent ? 'yes' : 'no'}`)
+const onLoading         = (info) => record('loading', `isLoading=${info?.isLoading}`)
+const onEventsSet       = (info) => record('eventsSet', `count=${info?.events?.length ?? 0}`)
+
+// View-switch controls the spec drives — timeGridWeek surfaces slotLabel +
+// nowIndicator; dayGridMonth surfaces dayCell / dayHeader / moreLink.
+const showWeek  = () => { $data.view = 'timeGridWeek' }
+const showMonth = () => { $data.view = 'dayGridMonth' }
+
+// Teardown control — flips the r-if gate so the spec can assert every slot
+// marker DISPOSES (the portal dispose path fires across all 6 targets).
+const teardown = () => { $data.calendarMounted = false }
+const remount  = () => { $data.calendarMounted = true }
+</script>
+
+<template>
+<div class="fc-all-slots-demo">
+  <header>
+    <h3>FullCalendar — every slot + every new event</h3>
+    <p class="hint">Behavioral cell: all 7 portal-slots filled, the 5 new events bound, and a passthrough <code>:options</code> (<code>weekNumbers</code> + <code>dayMaxEvents</code> + <code>businessHours</code>). Switch views to surface the long-tail slots; tear down to prove the slots dispose.</p>
+  </header>
+
+  <div class="control-row">
+    <span class="row-label">View</span>
+    <button type="button" data-testid="view-week"  :class="{ active: $data.view === 'timeGridWeek' }"  @click="showWeek">Week (timeGridWeek)</button>
+    <button type="button" data-testid="view-month" :class="{ active: $data.view === 'dayGridMonth' }"  @click="showMonth">Month (dayGridMonth)</button>
+  </div>
+
+  <div class="control-row">
+    <span class="row-label">Mount</span>
+    <button type="button" data-testid="teardown" @click="teardown">Tear down</button>
+    <button type="button" data-testid="remount"  @click="remount">Re-mount</button>
+  </div>
+
+  <div class="calendar-wrap">
+    <FullCalendar
+      r-if="$data.calendarMounted"
+      r-model:view="$data.view"
+      :events="$data.events"
+      :height="480"
+      :selectable="true"
+      :editable="true"
+      :options="{ weekNumbers: true, dayMaxEvents: 2, businessHours: { startTime: '09:00', endTime: '17:00' } }"
+      @eventMouseEnter="onEventMouseEnter"
+      @eventMouseLeave="onEventMouseLeave"
+      @unselect="onUnselect"
+      @loading="onLoading"
+      @eventsSet="onEventsSet"
+    >
+      <!-- event slot -->
+      <template #event="{ arg }">
+        <span class="fc-slot-marker" data-testid="slot-event">{{ arg.event.title }}</span>
+      </template>
+      <!-- dayCell slot -->
+      <template #dayCell="{ arg }">
+        <span class="fc-slot-marker" data-testid="slot-dayCell">{{ arg.dayNumberText }}</span>
+      </template>
+      <!-- dayHeader slot -->
+      <template #dayHeader="{ arg }">
+        <span class="fc-slot-marker" data-testid="slot-dayHeader">{{ arg.text }}</span>
+      </template>
+      <!-- slotLabel slot (timeGridWeek) -->
+      <template #slotLabel="{ arg }">
+        <span class="fc-slot-marker" data-testid="slot-slotLabel">{{ arg.text }}</span>
+      </template>
+      <!-- weekNumber slot (weekNumbers: true) -->
+      <template #weekNumber="{ arg }">
+        <span class="fc-slot-marker" data-testid="slot-weekNumber">W{{ arg.num }}</span>
+      </template>
+      <!-- nowIndicator slot (timeGridWeek) -->
+      <template #nowIndicator="{ arg }">
+        <span class="fc-slot-marker" data-testid="slot-nowIndicator">now</span>
+      </template>
+      <!-- moreLink slot (dayMaxEvents overflow) -->
+      <template #moreLink="{ arg }">
+        <span class="fc-slot-marker" data-testid="slot-moreLink">+{{ arg.num }}</span>
+      </template>
+    </FullCalendar>
+    <p r-else class="torn-down" data-testid="torn-down">Calendar torn down.</p>
+  </div>
+
+  <aside class="state-pane">
+    <h4>Bound state</h4>
+    <dl class="state">
+      <dt>view</dt>
+      <dd><code data-testid="state-view">{{ $data.view }}</code></dd>
+      <dt>last event</dt>
+      <dd><code data-testid="state-last-event">{{ $data.lastEvent || '(none)' }}</code></dd>
+      <dt>last detail</dt>
+      <dd><code data-testid="state-last-detail">{{ $data.lastDetail || '(none)' }}</code></dd>
+    </dl>
+  </aside>
+</div>
+</template>
+
+<style>
+.fc-all-slots-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  max-width: 900px;
+}
+
+header h3 { margin: 0 0 0.25rem; font-size: 1.125rem; }
+header .hint { margin: 0 0 0.75rem; color: rgba(0, 0, 0, 0.55); font-size: 0.875rem; }
+header code { background: rgba(0, 0, 0, 0.04); padding: 0.0625rem 0.25rem; border-radius: 2px; font-size: 0.85em; }
+
+.control-row {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin: 0 0 0.625rem;
+}
+.row-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: rgba(0, 0, 0, 0.55);
+  min-width: 4rem;
+}
+.control-row button {
+  padding: 0.375rem 0.75rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.875rem;
+}
+.control-row button.active {
+  background: #1a1a1a;
+  color: white;
+  border-color: #1a1a1a;
+}
+
+.calendar-wrap {
+  margin: 0.75rem 0 1rem;
+  padding: 0.5rem;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 6px;
+  background: white;
+}
+
+.fc-slot-marker {
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+
+.torn-down {
+  margin: 0;
+  padding: 1rem;
+  color: rgba(0, 0, 0, 0.4);
+  font-style: italic;
+  text-align: center;
+}
+
+.state-pane h4 {
+  margin: 0 0 0.5rem;
+  font-size: 0.875rem;
+  color: rgba(0, 0, 0, 0.55);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.state {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.375rem 0.75rem;
+  margin: 0;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 6px;
+  font-size: 0.875rem;
+}
+.state dt { color: rgba(0, 0, 0, 0.55); font-weight: 500; }
+.state dd { margin: 0; }
+.state code {
+  font-family: ui-monospace, monospace;
+  font-size: 0.85em;
+  background: rgba(0, 0, 0, 0.04);
+  padding: 0.0625rem 0.25rem;
+  border-radius: 2px;
+}
+</style>
+
+</rozie>

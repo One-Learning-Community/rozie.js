@@ -84,8 +84,9 @@ const EXAMPLES = [
   // `baselineExists()` (never red) — no macOS-rendered PNG is committed here.
   // The four long-tail slots (slotLabel / weekNumber / nowIndicator / moreLink)
   // are behavioral-only (no pixel baseline) — covered by
-  // full-calendar-slots.spec.ts. FullCalendarAllSlots (the all-7-slot
-  // behavioral demo) is deliberately NOT in this list (behavioral cell only).
+  // full-calendar-slots.spec.ts. The companion all-7-slot behavioral demo is
+  // deliberately NOT in this list (behavioral cell only — host-registered but
+  // never a screenshot cell).
   'FullCalendarSlots',
   // PortalListStyled (added 2026-05-20, quick-task 260520-8iu) — Spike 004
   // string-`:style` + `@portal` VR coverage. PortalListStyledDemo fills a
