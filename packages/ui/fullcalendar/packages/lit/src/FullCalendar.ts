@@ -84,7 +84,7 @@ private _portalContainers = new Set<HTMLElement>();
   @property({ attribute: false }) weekNumber?: (scope: { arg: unknown }) => unknown;
   @state() private _hasSlotNowIndicator = false;
   @queryAssignedElements({ slot: 'nowIndicator', flatten: true }) private _slotNowIndicatorElements!: Element[];
-  @property({ attribute: false }) nowIndicator?: (scope: { arg: unknown }) => unknown;
+  @property({ attribute: false }) nowIndicatorSlot?: (scope: { arg: unknown }) => unknown;
   @state() private _hasSlotMoreLink = false;
   @queryAssignedElements({ slot: 'moreLink', flatten: true }) private _slotMoreLinkElements!: Element[];
   @property({ attribute: false }) moreLink?: (scope: { arg: unknown }) => unknown;
@@ -251,7 +251,7 @@ private _portalContainers = new Set<HTMLElement>();
         };
       },
       nowIndicator: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
-        const tpl = this.nowIndicator;
+        const tpl = this.nowIndicatorSlot;
         if (typeof tpl !== 'function') return () => {};
         // Spike 004: portal-scope attribute injection.
         container.setAttribute('data-rozie-portal-nowIndicator', '5589629a');
