@@ -119,6 +119,31 @@ $onMount(() => {
     datesSet: (info) => {
       $emit('datesSet', { start: info.start, end: info.end, view: info.view.type })
     },
+    eventMouseEnter: (info) => {
+      $emit('eventMouseEnter', {
+        event:   { id: info.event.id, title: info.event.title, start: info.event.start, end: info.event.end },
+        jsEvent: info.jsEvent,
+      })
+    },
+    eventMouseLeave: (info) => {
+      $emit('eventMouseLeave', {
+        event:   { id: info.event.id, title: info.event.title, start: info.event.start, end: info.event.end },
+        jsEvent: info.jsEvent,
+      })
+    },
+    unselect: (info) => {
+      $emit('unselect', { jsEvent: info.jsEvent })
+    },
+    loading: (isLoading) => {
+      // FullCalendar's `loading` callback receives a bare boolean (not an info
+      // object) — normalize to the structured `{ isLoading }` payload shape.
+      $emit('loading', { isLoading })
+    },
+    eventsSet: (events) => {
+      // `eventsSet` receives the array of current EventApi objects — map each to
+      // the normalized floor shape for persistence/sync consumers.
+      $emit('eventsSet', { events: events.map((e) => ({ id: e.id, title: e.title, start: e.start, end: e.end })) })
+    },
     viewDidMount: (info) => {
       // viewDidMount fires both on initial mount AND on changeView calls.
       // Same round-trip guard pattern as Flatpickr / LeafletMap.
