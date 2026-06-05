@@ -47,6 +47,17 @@ const FLATPICKR_SRC = resolve(
   'flatpickr',
   'src',
 );
+// Same packaging move for @rozie-ui/fullcalendar: FullCalendar.rozie lives in
+// the package src; the Angular sub-build walks it via `prebuildExtraRoots` and
+// drops the same cross-tree `.rozie.ts` + `FullCalendar.ts` shim artefacts that
+// must be swept after the Angular build (see cleanupCrossTreeAngularArtifacts).
+const FULLCALENDAR_SRC = resolve(
+  REPO_ROOT,
+  'packages',
+  'ui',
+  'fullcalendar',
+  'src',
+);
 const REFERENCE_BASENAMES = [
   'Counter',
   'SearchInput',
@@ -177,6 +188,20 @@ function cleanupCrossTreeAngularArtifacts() {
     // flatpickr src always exists post-port — defensive only
   }
   rmSync(resolve(FLATPICKR_SRC, 'Flatpickr.ts'), { force: true });
+  // Same sweep for @rozie-ui/fullcalendar's package src (FullCalendarDemo
+  // composes FullCalendar via <components>, so the Angular sub-build emits
+  // FullCalendar.rozie.ts + the FullCalendar.ts shim here). Leftovers (the
+  // emitted .rozie.ts imports @angular/core) poison the later solid/lit builds.
+  try {
+    for (const entry of readdirSync(FULLCALENDAR_SRC)) {
+      if (entry.endsWith('.rozie.ts')) {
+        rmSync(resolve(FULLCALENDAR_SRC, entry), { force: true });
+      }
+    }
+  } catch {
+    // fullcalendar src always exists post-port — defensive only
+  }
+  rmSync(resolve(FULLCALENDAR_SRC, 'FullCalendar.ts'), { force: true });
 }
 
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'];

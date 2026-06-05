@@ -138,6 +138,20 @@ export default defineConfig(async () => {
     'flatpickr',
     'src',
   );
+  // Same move as sortable-list/flatpickr: FullCalendar.rozie lives in
+  // @rozie-ui/fullcalendar. The Angular sub-build must walk it too
+  // (FullCalendarDemo's `imports: [FullCalendar]` would otherwise collapse to
+  // `any[]` → empty mount). Lockstep with tsconfig.app.json `include` +
+  // build-cells.mjs `FULLCALENDAR_SRC` sweep.
+  const fullCalendarSrc = resolve(
+    __dirname,
+    '..',
+    '..',
+    'packages',
+    'ui',
+    'fullcalendar',
+    'src',
+  );
   return {
   // Sub-builds are served from dist/<target>/; the host router lives at dist root.
   base: `/${TARGET}/`,
@@ -177,10 +191,10 @@ export default defineConfig(async () => {
     // The other targets' `.rozie.ts/.tsx` virtual modules go through Vite's
     // own resolver, which honors `browser` via vite-plugin-solid's
     // `configEnvironment` hook (and the equivalent for other plugins).
-    ...(TARGET === 'angular' ? [resolveCrossTreeBareImports([examplesRoot, sortableListSrc, flatpickrSrc])] : []),
+    ...(TARGET === 'angular' ? [resolveCrossTreeBareImports([examplesRoot, sortableListSrc, flatpickrSrc, fullCalendarSrc])] : []),
     Rozie({
       target: TARGET,
-      ...(TARGET === 'angular' ? { prebuildExtraRoots: [examplesRoot, sortableListSrc, flatpickrSrc] } : {}),
+      ...(TARGET === 'angular' ? { prebuildExtraRoots: [examplesRoot, sortableListSrc, flatpickrSrc, fullCalendarSrc] } : {}),
     }),
     ...(await frameworkPlugins(TARGET)),
   ],
