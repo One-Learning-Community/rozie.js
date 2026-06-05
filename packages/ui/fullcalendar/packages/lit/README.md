@@ -96,3 +96,5 @@ const api = el.getApi();
 | weekNumber | arg |
 | nowIndicatorContent | arg |
 | moreLink | arg |
+| allDayContent | arg |
+| slotLaneContent | arg |

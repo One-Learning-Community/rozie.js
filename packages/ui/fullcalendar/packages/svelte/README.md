@@ -92,3 +92,5 @@ Beyond props/events, the component exposes imperative methods (declared once in 
 | weekNumber | arg |
 | nowIndicatorContent | arg |
 | moreLink | arg |
+| allDayContent | arg |
+| slotLaneContent | arg |

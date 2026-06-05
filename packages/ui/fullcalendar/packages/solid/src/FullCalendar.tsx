@@ -26,6 +26,10 @@ interface NowIndicatorContentSlotCtx { arg: any; }
 
 interface MoreLinkSlotCtx { arg: any; }
 
+interface AllDayContentSlotCtx { arg: any; }
+
+interface SlotLaneContentSlotCtx { arg: any; }
+
 interface FullCalendarProps {
   events?: any[];
   view?: string;
@@ -60,6 +64,8 @@ interface FullCalendarProps {
   weekNumberSlot?: (ctx: WeekNumberSlotCtx) => JSX.Element;
   nowIndicatorContentSlot?: (ctx: NowIndicatorContentSlotCtx) => JSX.Element;
   moreLinkSlot?: (ctx: MoreLinkSlotCtx) => JSX.Element;
+  allDayContentSlot?: (ctx: AllDayContentSlotCtx) => JSX.Element;
+  slotLaneContentSlot?: (ctx: SlotLaneContentSlotCtx) => JSX.Element;
   slots?: Record<string, (ctx: any) => JSX.Element>;
   ref?: (h: FullCalendarHandle) => void;
 }
@@ -164,6 +170,30 @@ export default function FullCalendar(_props: FullCalendarProps): JSX.Element {
       if (typeof slot !== 'function') return () => {};
       // Spike 004: portal-scope attribute injection.
       container.setAttribute('data-rozie-portal-moreLink', '5589629a');
+      const dispose = render(() => slot(scope), container);
+      portalDisposers.add(dispose);
+      return () => {
+        dispose();
+        portalDisposers.delete(dispose);
+      };
+    },
+    allDayContent: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+      const slot = _props.allDayContentSlot ?? _props.slots?.['allDayContent'];
+      if (typeof slot !== 'function') return () => {};
+      // Spike 004: portal-scope attribute injection.
+      container.setAttribute('data-rozie-portal-allDayContent', '5589629a');
+      const dispose = render(() => slot(scope), container);
+      portalDisposers.add(dispose);
+      return () => {
+        dispose();
+        portalDisposers.delete(dispose);
+      };
+    },
+    slotLaneContent: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+      const slot = _props.slotLaneContentSlot ?? _props.slots?.['slotLaneContent'];
+      if (typeof slot !== 'function') return () => {};
+      // Spike 004: portal-scope attribute injection.
+      container.setAttribute('data-rozie-portal-slotLaneContent', '5589629a');
       const dispose = render(() => slot(scope), container);
       portalDisposers.add(dispose);
       return () => {
@@ -330,10 +360,12 @@ export default function FullCalendar(_props: FullCalendarProps): JSX.Element {
         };
       };
     }
-    // The 6 remaining *Content portal-slots — wired identically to `event`, one
+    // The 8 remaining *Content portal-slots — wired identically to `event`, one
     // per FullCalendar per-cell content hook that fires with the bundled plugins
     // (core + daygrid + timegrid + interaction). Each guarded by its own slot so
-    // unfilled slots keep FullCalendar's default rendering.
+    // unfilled slots keep FullCalendar's default rendering. (9 portal-slots total
+    // counting `event` above; allDayContent + slotLaneContent are the two timeGrid
+    // axis/lane hooks added last.)
     //
     // NOTE the `nowIndicatorContent` slot is named for its FullCalendar engine
     // hook (`nowIndicatorContent`) so it does NOT clash with the boolean
@@ -412,10 +444,33 @@ export default function FullCalendar(_props: FullCalendarProps): JSX.Element {
         };
       };
     }
-    // Excluded *Content slots (documented, not gaps): noEventsContent (list-view
-    // only — @fullcalendar/list is not a bundled peer), slotLaneContent (background
-    // lane, no demand), allDayContent (trivial label). Consumers needing those use
-    // the :options passthrough + getApi().
+    if ((_props.allDayContentSlot ?? _props.slots?.["allDayContent"])) {
+      opts.allDayContent = (arg: any) => {
+        const node = document.createElement('div');
+        const dispose = portals.allDayContent(node, {
+          arg
+        });
+        return {
+          domNodes: [node],
+          dispose
+        };
+      };
+    }
+    if ((_props.slotLaneContentSlot ?? _props.slots?.["slotLaneContent"])) {
+      opts.slotLaneContent = (arg: any) => {
+        const node = document.createElement('div');
+        const dispose = portals.slotLaneContent(node, {
+          arg
+        });
+        return {
+          domNodes: [node],
+          dispose
+        };
+      };
+    }
+    // The one still-excluded *Content slot (documented, not a gap): noEventsContent
+    // — list-view only, and @fullcalendar/list is not a bundled engine peer. A
+    // consumer needing it uses the :options passthrough + getApi().
 
     instance = new Calendar(__rozieRootRef!, opts);
     instance.render();
@@ -503,6 +558,8 @@ export default function FullCalendar(_props: FullCalendarProps): JSX.Element {
   return (
     <>
     <div class={"rozie-fullcalendar"} ref={(el) => { __rozieRootRef = el as HTMLElement; }} data-rozie-s-5589629a="" />
+
+
 
 
 

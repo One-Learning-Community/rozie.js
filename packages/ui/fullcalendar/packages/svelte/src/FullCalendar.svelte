@@ -25,6 +25,8 @@ interface Props {
   weekNumber?: Snippet<[{ arg: any }]>;
   nowIndicatorContent?: Snippet<[{ arg: any }]>;
   moreLink?: Snippet<[{ arg: any }]>;
+  allDayContent?: Snippet<[{ arg: any }]>;
+  slotLaneContent?: Snippet<[{ arg: any }]>;
   snippets?: Record<string, any>;
   oneventclick?: (...args: unknown[]) => void;
   ondateclick?: (...args: unknown[]) => void;
@@ -68,6 +70,8 @@ let {
   weekNumber: __weekNumberProp,
   nowIndicatorContent: __nowIndicatorContentProp,
   moreLink: __moreLinkProp,
+  allDayContent: __allDayContentProp,
+  slotLaneContent: __slotLaneContentProp,
   snippets,
   oneventclick,
   ondateclick,
@@ -89,6 +93,8 @@ const slotLabel = $derived(__slotLabelProp ?? snippets?.slotLabel);
 const weekNumber = $derived(__weekNumberProp ?? snippets?.weekNumber);
 const nowIndicatorContent = $derived(__nowIndicatorContentProp ?? snippets?.nowIndicatorContent);
 const moreLink = $derived(__moreLinkProp ?? snippets?.moreLink);
+const allDayContent = $derived(__allDayContentProp ?? snippets?.allDayContent);
+const slotLaneContent = $derived(__slotLaneContentProp ?? snippets?.slotLaneContent);
 
 let __rozieRoot = $state<HTMLElement | undefined>(undefined);
 
@@ -240,6 +246,34 @@ const portals = {
     const inst = mount(PortalHost, {
       target: container,
       props: { snippet: moreLink, scope },
+    });
+    portalInstances.add(inst as Record<string, unknown>);
+    return () => {
+      unmount(inst);
+      portalInstances.delete(inst as Record<string, unknown>);
+    };
+  },
+  allDayContent: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+    if (!allDayContent) return () => {};
+    // Spike 004: portal-scope attribute injection.
+    container.setAttribute('data-rozie-portal-allDayContent', '5589629a');
+    const inst = mount(PortalHost, {
+      target: container,
+      props: { snippet: allDayContent, scope },
+    });
+    portalInstances.add(inst as Record<string, unknown>);
+    return () => {
+      unmount(inst);
+      portalInstances.delete(inst as Record<string, unknown>);
+    };
+  },
+  slotLaneContent: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+    if (!slotLaneContent) return () => {};
+    // Spike 004: portal-scope attribute injection.
+    container.setAttribute('data-rozie-portal-slotLaneContent', '5589629a');
+    const inst = mount(PortalHost, {
+      target: container,
+      props: { snippet: slotLaneContent, scope },
     });
     portalInstances.add(inst as Record<string, unknown>);
     return () => {
@@ -406,10 +440,12 @@ onMount(() => {
       };
     };
   }
-  // The 6 remaining *Content portal-slots — wired identically to `event`, one
+  // The 8 remaining *Content portal-slots — wired identically to `event`, one
   // per FullCalendar per-cell content hook that fires with the bundled plugins
   // (core + daygrid + timegrid + interaction). Each guarded by its own slot so
-  // unfilled slots keep FullCalendar's default rendering.
+  // unfilled slots keep FullCalendar's default rendering. (9 portal-slots total
+  // counting `event` above; allDayContent + slotLaneContent are the two timeGrid
+  // axis/lane hooks added last.)
   //
   // NOTE the `nowIndicatorContent` slot is named for its FullCalendar engine
   // hook (`nowIndicatorContent`) so it does NOT clash with the boolean
@@ -488,10 +524,33 @@ onMount(() => {
       };
     };
   }
-  // Excluded *Content slots (documented, not gaps): noEventsContent (list-view
-  // only — @fullcalendar/list is not a bundled peer), slotLaneContent (background
-  // lane, no demand), allDayContent (trivial label). Consumers needing those use
-  // the :options passthrough + getApi().
+  if (allDayContent) {
+    opts.allDayContent = (arg: any) => {
+      const node = document.createElement('div');
+      const dispose = portals.allDayContent(node, {
+        arg
+      });
+      return {
+        domNodes: [node],
+        dispose
+      };
+    };
+  }
+  if (slotLaneContent) {
+    opts.slotLaneContent = (arg: any) => {
+      const node = document.createElement('div');
+      const dispose = portals.slotLaneContent(node, {
+        arg
+      });
+      return {
+        domNodes: [node],
+        dispose
+      };
+    };
+  }
+  // The one still-excluded *Content slot (documented, not a gap): noEventsContent
+  // — list-view only, and @fullcalendar/list is not a bundled engine peer. A
+  // consumer needing it uses the :options passthrough + getApi().
 
   instance = new Calendar(__rozieRoot!, opts);
   instance.render();
@@ -538,6 +597,8 @@ $effect(() => { const __watchVal = (() => options)(); untrack(() => { if (__rozi
 
 
 <div class="rozie-fullcalendar" bind:this={__rozieRoot} data-rozie-s-5589629a></div>
+
+
 
 
 

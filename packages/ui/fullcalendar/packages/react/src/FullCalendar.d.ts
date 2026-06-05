@@ -36,6 +36,8 @@ export interface FullCalendarProps {
   renderWeekNumber?: (params: { arg: () => void }) => ReactNode;
   renderNowIndicatorContent?: (params: { arg: () => void }) => ReactNode;
   renderMoreLink?: (params: { arg: () => void }) => ReactNode;
+  renderAllDayContent?: (params: { arg: () => void }) => ReactNode;
+  renderSlotLaneContent?: (params: { arg: () => void }) => ReactNode;
   slots?: Record<string, () => ReactNode>;
 }
 

@@ -100,3 +100,5 @@ const api = cal.current?.getApi();
 | weekNumber | arg |
 | nowIndicatorContent | arg |
 | moreLink | arg |
+| allDayContent | arg |
+| slotLaneContent | arg |

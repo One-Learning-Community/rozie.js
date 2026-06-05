@@ -10,6 +10,8 @@
 
 
 
+
+
 </template>
 
 <script setup lang="ts">
@@ -48,6 +50,8 @@ defineSlots<{
   weekNumber(props: { arg: any }): any;
   nowIndicatorContent(props: { arg: any }): any;
   moreLink(props: { arg: any }): any;
+  allDayContent(props: { arg: any }): any;
+  slotLaneContent(props: { arg: any }): any;
 }>();
 
 const slots = useSlots();
@@ -216,6 +220,36 @@ const portals = {
       portalContainers.delete(container);
     };
   },
+  allDayContent: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+    const slotFn = slots.allDayContent;
+    if (!slotFn) return () => {};
+    // Spike 004: portal-scope attribute injection. Cascades the @portal
+    // allDayContent { … } selectors from the unscoped <style> block below into
+    // the engine-owned subtree.
+    container.setAttribute('data-rozie-portal-allDayContent', '5589629a');
+    const vnode = h(Fragment, null, slotFn(scope));
+    render(vnode, container);
+    portalContainers.add(container);
+    return () => {
+      render(null, container);
+      portalContainers.delete(container);
+    };
+  },
+  slotLaneContent: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+    const slotFn = slots.slotLaneContent;
+    if (!slotFn) return () => {};
+    // Spike 004: portal-scope attribute injection. Cascades the @portal
+    // slotLaneContent { … } selectors from the unscoped <style> block below into
+    // the engine-owned subtree.
+    container.setAttribute('data-rozie-portal-slotLaneContent', '5589629a');
+    const vnode = h(Fragment, null, slotFn(scope));
+    render(vnode, container);
+    portalContainers.add(container);
+    return () => {
+      render(null, container);
+      portalContainers.delete(container);
+    };
+  },
 };
 onBeforeUnmount(() => {
   for (const container of portalContainers) render(null, container);
@@ -376,10 +410,12 @@ onMounted(() => {
       };
     };
   }
-  // The 6 remaining *Content portal-slots — wired identically to `event`, one
+  // The 8 remaining *Content portal-slots — wired identically to `event`, one
   // per FullCalendar per-cell content hook that fires with the bundled plugins
   // (core + daygrid + timegrid + interaction). Each guarded by its own slot so
-  // unfilled slots keep FullCalendar's default rendering.
+  // unfilled slots keep FullCalendar's default rendering. (9 portal-slots total
+  // counting `event` above; allDayContent + slotLaneContent are the two timeGrid
+  // axis/lane hooks added last.)
   //
   // NOTE the `nowIndicatorContent` slot is named for its FullCalendar engine
   // hook (`nowIndicatorContent`) so it does NOT clash with the boolean
@@ -458,10 +494,33 @@ onMounted(() => {
       };
     };
   }
-  // Excluded *Content slots (documented, not gaps): noEventsContent (list-view
-  // only — @fullcalendar/list is not a bundled peer), slotLaneContent (background
-  // lane, no demand), allDayContent (trivial label). Consumers needing those use
-  // the :options passthrough + getApi().
+  if (slots.allDayContent) {
+    opts.allDayContent = (arg: any) => {
+      const node = document.createElement('div');
+      const dispose = portals.allDayContent(node, {
+        arg
+      });
+      return {
+        domNodes: [node],
+        dispose
+      };
+    };
+  }
+  if (slots.slotLaneContent) {
+    opts.slotLaneContent = (arg: any) => {
+      const node = document.createElement('div');
+      const dispose = portals.slotLaneContent(node, {
+        arg
+      });
+      return {
+        domNodes: [node],
+        dispose
+      };
+    };
+  }
+  // The one still-excluded *Content slot (documented, not a gap): noEventsContent
+  // — list-view only, and @fullcalendar/list is not a bundled engine peer. A
+  // consumer needing it uses the :options passthrough + getApi().
 
   instance = new Calendar(__rozieRootRef.value!, opts);
   instance.render();

@@ -98,3 +98,5 @@ const cal = ref();          // template ref
 | weekNumber | arg |
 | nowIndicatorContent | arg |
 | moreLink | arg |
+| allDayContent | arg |
+| slotLaneContent | arg |
