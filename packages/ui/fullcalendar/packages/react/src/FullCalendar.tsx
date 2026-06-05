@@ -11,6 +11,18 @@ import interactionPlugin from '@fullcalendar/interaction';
 
 interface EventCtx { arg: any; }
 
+interface DayCellCtx { arg: any; }
+
+interface DayHeaderCtx { arg: any; }
+
+interface SlotLabelCtx { arg: any; }
+
+interface WeekNumberCtx { arg: any; }
+
+interface NowIndicatorCtx { arg: any; }
+
+interface MoreLinkCtx { arg: any; }
+
 interface FullCalendarProps {
   events?: any[];
   view?: string;
@@ -26,13 +38,25 @@ interface FullCalendarProps {
   slotDuration?: string;
   nowIndicator?: boolean;
   headerToolbar?: Record<string, any>;
+  options?: Record<string, any>;
   onEventClick?: (...args: any[]) => void;
   onDateClick?: (...args: any[]) => void;
   onEventDrop?: (...args: any[]) => void;
   onSelect?: (...args: any[]) => void;
   onEventResize?: (...args: any[]) => void;
   onDatesSet?: (...args: any[]) => void;
+  onEventMouseEnter?: (...args: any[]) => void;
+  onEventMouseLeave?: (...args: any[]) => void;
+  onUnselect?: (...args: any[]) => void;
+  onLoading?: (...args: any[]) => void;
+  onEventsSet?: (...args: any[]) => void;
   renderEvent?: (ctx: EventCtx) => ReactNode;
+  renderDayCell?: (ctx: DayCellCtx) => ReactNode;
+  renderDayHeader?: (ctx: DayHeaderCtx) => ReactNode;
+  renderSlotLabel?: (ctx: SlotLabelCtx) => ReactNode;
+  renderWeekNumber?: (ctx: WeekNumberCtx) => ReactNode;
+  renderNowIndicator?: (ctx: NowIndicatorCtx) => ReactNode;
+  renderMoreLink?: (ctx: MoreLinkCtx) => ReactNode;
   slots?: Record<string, () => import('react').ReactNode>;
 }
 
@@ -55,7 +79,8 @@ const FullCalendar = forwardRef<FullCalendarHandle, FullCalendarProps>(function 
     center: 'title',
     right: 'dayGridMonth,timeGridWeek,timeGridDay'
   }))())[0];
-  const props: Omit<FullCalendarProps, 'events' | 'weekends' | 'editable' | 'selectable' | 'height' | 'defaultColor' | 'locale' | 'firstDay' | 'slotDuration' | 'nowIndicator' | 'headerToolbar'> & { events: any[]; weekends: boolean; editable: boolean; selectable: boolean; height: number; defaultColor: string; locale: string; firstDay: number; slotDuration: string; nowIndicator: boolean; headerToolbar: Record<string, any> } = {
+  const __defaultOptions = useState(() => (() => ({}))())[0];
+  const props: Omit<FullCalendarProps, 'events' | 'weekends' | 'editable' | 'selectable' | 'height' | 'defaultColor' | 'locale' | 'firstDay' | 'slotDuration' | 'nowIndicator' | 'headerToolbar' | 'options'> & { events: any[]; weekends: boolean; editable: boolean; selectable: boolean; height: number; defaultColor: string; locale: string; firstDay: number; slotDuration: string; nowIndicator: boolean; headerToolbar: Record<string, any>; options: Record<string, any> } = {
     ..._props,
     events: _props.events ?? __defaultEvents,
     weekends: _props.weekends ?? true,
@@ -68,9 +93,22 @@ const FullCalendar = forwardRef<FullCalendarHandle, FullCalendarProps>(function 
     slotDuration: _props.slotDuration ?? '00:30:00',
     nowIndicator: _props.nowIndicator ?? false,
     headerToolbar: _props.headerToolbar ?? __defaultHeaderToolbar,
+    options: _props.options ?? __defaultOptions,
   };
   const _renderEventRef = useRef(props.renderEvent);
   _renderEventRef.current = props.renderEvent;
+  const _renderDayCellRef = useRef(props.renderDayCell);
+  _renderDayCellRef.current = props.renderDayCell;
+  const _renderDayHeaderRef = useRef(props.renderDayHeader);
+  _renderDayHeaderRef.current = props.renderDayHeader;
+  const _renderSlotLabelRef = useRef(props.renderSlotLabel);
+  _renderSlotLabelRef.current = props.renderSlotLabel;
+  const _renderWeekNumberRef = useRef(props.renderWeekNumber);
+  _renderWeekNumberRef.current = props.renderWeekNumber;
+  const _renderNowIndicatorRef = useRef(props.renderNowIndicator);
+  _renderNowIndicatorRef.current = props.renderNowIndicator;
+  const _renderMoreLinkRef = useRef(props.renderMoreLink);
+  _renderMoreLinkRef.current = props.renderMoreLink;
   const suppressViewSync = useRef(false);
   const instance = useRef<any>(null);
   const [view, setView] = useControllableState({
@@ -92,6 +130,8 @@ const FullCalendar = forwardRef<FullCalendarHandle, FullCalendarProps>(function 
   _localeRef.current = props.locale;
   const _nowIndicatorRef = useRef(props.nowIndicator);
   _nowIndicatorRef.current = props.nowIndicator;
+  const _optionsRef = useRef(props.options);
+  _optionsRef.current = props.options;
   const _selectableRef = useRef(props.selectable);
   _selectableRef.current = props.selectable;
   const _slotDurationRef = useRef(props.slotDuration);
@@ -112,6 +152,7 @@ const FullCalendar = forwardRef<FullCalendarHandle, FullCalendarProps>(function 
   const _watch8First = useRef(true);
   const _watch9First = useRef(true);
   const _watch10First = useRef(true);
+  const _watch11First = useRef(true);
 
   const PLUGINS = useMemo(() => [dayGridPlugin, timeGridPlugin, interactionPlugin], []);
   const normalizeEvent = useCallback((e: any) => {
@@ -179,8 +220,102 @@ const FullCalendar = forwardRef<FullCalendarHandle, FullCalendarProps>(function 
         portalRoots.current.delete(root);
       };
     },
+    dayCell: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+      const slot = _renderDayCellRef.current ?? props.slots?.['dayCell'];
+      if (typeof slot !== 'function') return () => {};
+      // Spike 004: portal-scope attribute injection.
+      // Cascades the @portal dayCell { … } selectors from the
+      // component's .module.css into the engine-owned subtree.
+      container.setAttribute('data-rozie-portal-dayCell', '5589629a');
+      const root = createRoot(container);
+      flushSync(() => root.render(slot(scope)));
+      portalRoots.current.add(root);
+      return () => {
+        root.unmount();
+        portalRoots.current.delete(root);
+      };
+    },
+    dayHeader: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+      const slot = _renderDayHeaderRef.current ?? props.slots?.['dayHeader'];
+      if (typeof slot !== 'function') return () => {};
+      // Spike 004: portal-scope attribute injection.
+      // Cascades the @portal dayHeader { … } selectors from the
+      // component's .module.css into the engine-owned subtree.
+      container.setAttribute('data-rozie-portal-dayHeader', '5589629a');
+      const root = createRoot(container);
+      flushSync(() => root.render(slot(scope)));
+      portalRoots.current.add(root);
+      return () => {
+        root.unmount();
+        portalRoots.current.delete(root);
+      };
+    },
+    slotLabel: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+      const slot = _renderSlotLabelRef.current ?? props.slots?.['slotLabel'];
+      if (typeof slot !== 'function') return () => {};
+      // Spike 004: portal-scope attribute injection.
+      // Cascades the @portal slotLabel { … } selectors from the
+      // component's .module.css into the engine-owned subtree.
+      container.setAttribute('data-rozie-portal-slotLabel', '5589629a');
+      const root = createRoot(container);
+      flushSync(() => root.render(slot(scope)));
+      portalRoots.current.add(root);
+      return () => {
+        root.unmount();
+        portalRoots.current.delete(root);
+      };
+    },
+    weekNumber: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+      const slot = _renderWeekNumberRef.current ?? props.slots?.['weekNumber'];
+      if (typeof slot !== 'function') return () => {};
+      // Spike 004: portal-scope attribute injection.
+      // Cascades the @portal weekNumber { … } selectors from the
+      // component's .module.css into the engine-owned subtree.
+      container.setAttribute('data-rozie-portal-weekNumber', '5589629a');
+      const root = createRoot(container);
+      flushSync(() => root.render(slot(scope)));
+      portalRoots.current.add(root);
+      return () => {
+        root.unmount();
+        portalRoots.current.delete(root);
+      };
+    },
+    nowIndicator: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+      const slot = _renderNowIndicatorRef.current ?? props.slots?.['nowIndicator'];
+      if (typeof slot !== 'function') return () => {};
+      // Spike 004: portal-scope attribute injection.
+      // Cascades the @portal nowIndicator { … } selectors from the
+      // component's .module.css into the engine-owned subtree.
+      container.setAttribute('data-rozie-portal-nowIndicator', '5589629a');
+      const root = createRoot(container);
+      flushSync(() => root.render(slot(scope)));
+      portalRoots.current.add(root);
+      return () => {
+        root.unmount();
+        portalRoots.current.delete(root);
+      };
+    },
+    moreLink: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+      const slot = _renderMoreLinkRef.current ?? props.slots?.['moreLink'];
+      if (typeof slot !== 'function') return () => {};
+      // Spike 004: portal-scope attribute injection.
+      // Cascades the @portal moreLink { … } selectors from the
+      // component's .module.css into the engine-owned subtree.
+      container.setAttribute('data-rozie-portal-moreLink', '5589629a');
+      const root = createRoot(container);
+      flushSync(() => root.render(slot(scope)));
+      portalRoots.current.add(root);
+      return () => {
+        root.unmount();
+        portalRoots.current.delete(root);
+      };
+    },
   };
     const opts: Record<string, any> = {
+      // :options passthrough spread FIRST — the curated keys below + the portal
+      // *Content handlers added after this object override any colliding key, so
+      // an explicitly-bound prop (e.g. :height) wins over options.height.
+      ..._optionsRef.current,
       plugins: PLUGINS,
       initialView: _viewRef.current,
       weekends: _weekendsRef.current,
@@ -252,6 +387,52 @@ const FullCalendar = forwardRef<FullCalendarHandle, FullCalendarProps>(function 
           view: info.view.type
         });
       },
+      eventMouseEnter: (info: any) => {
+        props.onEventMouseEnter && props.onEventMouseEnter({
+          event: {
+            id: info.event.id,
+            title: info.event.title,
+            start: info.event.start,
+            end: info.event.end
+          },
+          jsEvent: info.jsEvent
+        });
+      },
+      eventMouseLeave: (info: any) => {
+        props.onEventMouseLeave && props.onEventMouseLeave({
+          event: {
+            id: info.event.id,
+            title: info.event.title,
+            start: info.event.start,
+            end: info.event.end
+          },
+          jsEvent: info.jsEvent
+        });
+      },
+      unselect: (info: any) => {
+        props.onUnselect && props.onUnselect({
+          jsEvent: info.jsEvent
+        });
+      },
+      loading: (isLoading: any) => {
+        // FullCalendar's `loading` callback receives a bare boolean (not an info
+        // object) — normalize to the structured `{ isLoading }` payload shape.
+        props.onLoading && props.onLoading({
+          isLoading
+        });
+      },
+      eventsSet: (events: any) => {
+        // `eventsSet` receives the array of current EventApi objects — map each to
+        // the normalized floor shape for persistence/sync consumers.
+        props.onEventsSet && props.onEventsSet({
+          events: events.map((e: any) => ({
+            id: e.id,
+            title: e.title,
+            start: e.start,
+            end: e.end
+          }))
+        });
+      },
       viewDidMount: (info: any) => {
         // viewDidMount fires both on initial mount AND on changeView calls.
         // Same round-trip guard pattern as Flatpickr / LeafletMap.
@@ -282,6 +463,92 @@ const FullCalendar = forwardRef<FullCalendarHandle, FullCalendarProps>(function 
         };
       };
     }
+    // The 6 remaining *Content portal-slots — wired identically to `event`, one
+    // per FullCalendar per-cell content hook that fires with the bundled plugins
+    // (core + daygrid + timegrid + interaction). Each guarded by its own slot so
+    // unfilled slots keep FullCalendar's default rendering.
+    //
+    // NOTE the `nowIndicator` slot SET name ($slots.nowIndicator) shares a string
+    // with the boolean `nowIndicator` PROP — they live in different namespaces
+    // ($slots vs $props); the slot emits the `nowIndicatorContent` option while
+    // the prop reconciles the `nowIndicator` option. No ROZ collision.
+    if ((props.renderDayCell ?? props.slots?.["dayCell"])) {
+      opts.dayCellContent = (arg: any) => {
+        const node = document.createElement('div');
+        const dispose = portals.dayCell(node, {
+          arg
+        });
+        return {
+          domNodes: [node],
+          dispose
+        };
+      };
+    }
+    if ((props.renderDayHeader ?? props.slots?.["dayHeader"])) {
+      opts.dayHeaderContent = (arg: any) => {
+        const node = document.createElement('div');
+        const dispose = portals.dayHeader(node, {
+          arg
+        });
+        return {
+          domNodes: [node],
+          dispose
+        };
+      };
+    }
+    if ((props.renderSlotLabel ?? props.slots?.["slotLabel"])) {
+      opts.slotLabelContent = (arg: any) => {
+        const node = document.createElement('div');
+        const dispose = portals.slotLabel(node, {
+          arg
+        });
+        return {
+          domNodes: [node],
+          dispose
+        };
+      };
+    }
+    if ((props.renderWeekNumber ?? props.slots?.["weekNumber"])) {
+      opts.weekNumberContent = (arg: any) => {
+        const node = document.createElement('div');
+        const dispose = portals.weekNumber(node, {
+          arg
+        });
+        return {
+          domNodes: [node],
+          dispose
+        };
+      };
+    }
+    if ((props.renderNowIndicator ?? props.slots?.["nowIndicator"])) {
+      opts.nowIndicatorContent = (arg: any) => {
+        const node = document.createElement('div');
+        const dispose = portals.nowIndicator(node, {
+          arg
+        });
+        return {
+          domNodes: [node],
+          dispose
+        };
+      };
+    }
+    if ((props.renderMoreLink ?? props.slots?.["moreLink"])) {
+      opts.moreLinkContent = (arg: any) => {
+        const node = document.createElement('div');
+        const dispose = portals.moreLink(node, {
+          arg
+        });
+        return {
+          domNodes: [node],
+          dispose
+        };
+      };
+    }
+    // Excluded *Content slots (documented, not gaps): noEventsContent (list-view
+    // only — @fullcalendar/list is not a bundled peer), slotLaneContent (background
+    // lane, no demand), allDayContent (trivial label). Consumers needing those use
+    // the :options passthrough + getApi().
+
     instance.current = new Calendar(__rozieRoot.current!, opts);
     instance.current.render();
     return () => {
@@ -350,12 +617,24 @@ const FullCalendar = forwardRef<FullCalendarHandle, FullCalendarProps>(function 
     const v = props.headerToolbar;
     instance.current?.setOption('headerToolbar', v);
   }, [props.headerToolbar]);
+  useEffect(() => {
+    if (_watch11First.current) { _watch11First.current = false; return; }
+    const v = props.options;
+    if (!instance.current) return;
+    for (const k in v) instance.current.setOption(k, v[k]);
+  }, [props.options]);
 
   useImperativeHandle(ref, () => ({ getApi, changeView, addEvent, removeEvent, today, prev, next, gotoDate }), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <>
     <div className={"rozie-fullcalendar"} ref={__rozieRoot} data-rozie-s-5589629a="" />
+
+
+
+
+
+
 
 
     </>

@@ -12,6 +12,36 @@ interface EventCtx {
   arg: any;
 }
 
+interface DayCellCtx {
+  $implicit: { arg: any };
+  arg: any;
+}
+
+interface DayHeaderCtx {
+  $implicit: { arg: any };
+  arg: any;
+}
+
+interface SlotLabelCtx {
+  $implicit: { arg: any };
+  arg: any;
+}
+
+interface WeekNumberCtx {
+  $implicit: { arg: any };
+  arg: any;
+}
+
+interface NowIndicatorCtx {
+  $implicit: { arg: any };
+  arg: any;
+}
+
+interface MoreLinkCtx {
+  $implicit: { arg: any };
+  arg: any;
+}
+
 @Component({
   selector: 'rozie-full-calendar',
   standalone: true,
@@ -19,6 +49,12 @@ interface EventCtx {
   template: `
 
     <div class="rozie-fullcalendar" #__rozieRoot></div>
+
+
+
+
+
+
 
 
     <ng-container #rozie_portalAnchor></ng-container>
@@ -55,6 +91,7 @@ export class FullCalendar {
     center: 'title',
     right: 'dayGridMonth,timeGridWeek,timeGridDay'
   }))());
+  options = input<Record<string, any>>((() => ({}))());
   __rozieRoot = viewChild<ElementRef<HTMLDivElement>>('__rozieRoot');
   eventClick = output<unknown>();
   dateClick = output<unknown>();
@@ -62,11 +99,28 @@ export class FullCalendar {
   select = output<unknown>();
   eventResize = output<unknown>();
   datesSet = output<unknown>();
+  eventMouseEnter = output<unknown>();
+  eventMouseLeave = output<unknown>();
+  unselect = output<unknown>();
+  loading = output<unknown>();
+  eventsSet = output<unknown>();
   @ContentChild('event', { read: TemplateRef }) eventTpl?: TemplateRef<EventCtx>;
+  @ContentChild('dayCell', { read: TemplateRef }) dayCellTpl?: TemplateRef<DayCellCtx>;
+  @ContentChild('dayHeader', { read: TemplateRef }) dayHeaderTpl?: TemplateRef<DayHeaderCtx>;
+  @ContentChild('slotLabel', { read: TemplateRef }) slotLabelTpl?: TemplateRef<SlotLabelCtx>;
+  @ContentChild('weekNumber', { read: TemplateRef }) weekNumberTpl?: TemplateRef<WeekNumberCtx>;
+  @ContentChild('nowIndicator', { read: TemplateRef }) nowIndicatorTpl?: TemplateRef<NowIndicatorCtx>;
+  @ContentChild('moreLink', { read: TemplateRef }) moreLinkTpl?: TemplateRef<MoreLinkCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
   private _portalViews = new Set<EmbeddedViewRef<unknown>>();
   private _portalAnchor = viewChild('rozie_portalAnchor', { read: ViewContainerRef });
   private _eventTpl = contentChild('event', { read: TemplateRef });
+  private _dayCellTpl = contentChild('dayCell', { read: TemplateRef });
+  private _dayHeaderTpl = contentChild('dayHeader', { read: TemplateRef });
+  private _slotLabelTpl = contentChild('slotLabel', { read: TemplateRef });
+  private _weekNumberTpl = contentChild('weekNumber', { read: TemplateRef });
+  private _nowIndicatorTpl = contentChild('nowIndicator', { read: TemplateRef });
+  private _moreLinkTpl = contentChild('moreLink', { read: TemplateRef });
   private __rozieDestroyRef = inject(DestroyRef);
   private __rozieWatchInitial_0 = true;
   private __rozieWatchInitial_1 = true;
@@ -79,6 +133,7 @@ export class FullCalendar {
   private __rozieWatchInitial_8 = true;
   private __rozieWatchInitial_9 = true;
   private __rozieWatchInitial_10 = true;
+  private __rozieWatchInitial_11 = true;
 
   constructor() {
     effect(() => { const __watchVal = (() => this.events())(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } ((v: any) => {
@@ -101,6 +156,10 @@ export class FullCalendar {
     effect(() => { const __watchVal = (() => this.slotDuration())(); untracked(() => { if (this.__rozieWatchInitial_8) { this.__rozieWatchInitial_8 = false; return; } ((v: any) => this.instance?.setOption('slotDuration', v))(__watchVal); }); });
     effect(() => { const __watchVal = (() => this.nowIndicator())(); untracked(() => { if (this.__rozieWatchInitial_9) { this.__rozieWatchInitial_9 = false; return; } ((v: any) => this.instance?.setOption('nowIndicator', v))(__watchVal); }); });
     effect(() => { const __watchVal = (() => this.headerToolbar())(); untracked(() => { if (this.__rozieWatchInitial_10) { this.__rozieWatchInitial_10 = false; return; } ((v: any) => this.instance?.setOption('headerToolbar', v))(__watchVal); }); });
+    effect(() => { const __watchVal = (() => this.options())(); untracked(() => { if (this.__rozieWatchInitial_11) { this.__rozieWatchInitial_11 = false; return; } ((v: any) => {
+      if (!this.instance) return;
+      for (const k in v) this.instance.setOption(k, v[k]);
+    })(__watchVal); }); });
   }
 
   ngAfterViewInit() {
@@ -120,8 +179,102 @@ export class FullCalendar {
           this._portalViews.delete(view as EmbeddedViewRef<unknown>);
         };
       },
+      dayCell: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+        const tpl = this._dayCellTpl();
+        const vcr = this._portalAnchor();
+        if (!tpl || !vcr) return () => {};
+        // Spike 004: portal-scope attribute injection.
+        container.setAttribute('data-rozie-portal-dayCell', '5589629a');
+        const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
+        view.detectChanges();
+        for (const node of view.rootNodes as Node[]) container.appendChild(node);
+        this._portalViews.add(view as EmbeddedViewRef<unknown>);
+        return () => {
+          view.destroy();
+          this._portalViews.delete(view as EmbeddedViewRef<unknown>);
+        };
+      },
+      dayHeader: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+        const tpl = this._dayHeaderTpl();
+        const vcr = this._portalAnchor();
+        if (!tpl || !vcr) return () => {};
+        // Spike 004: portal-scope attribute injection.
+        container.setAttribute('data-rozie-portal-dayHeader', '5589629a');
+        const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
+        view.detectChanges();
+        for (const node of view.rootNodes as Node[]) container.appendChild(node);
+        this._portalViews.add(view as EmbeddedViewRef<unknown>);
+        return () => {
+          view.destroy();
+          this._portalViews.delete(view as EmbeddedViewRef<unknown>);
+        };
+      },
+      slotLabel: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+        const tpl = this._slotLabelTpl();
+        const vcr = this._portalAnchor();
+        if (!tpl || !vcr) return () => {};
+        // Spike 004: portal-scope attribute injection.
+        container.setAttribute('data-rozie-portal-slotLabel', '5589629a');
+        const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
+        view.detectChanges();
+        for (const node of view.rootNodes as Node[]) container.appendChild(node);
+        this._portalViews.add(view as EmbeddedViewRef<unknown>);
+        return () => {
+          view.destroy();
+          this._portalViews.delete(view as EmbeddedViewRef<unknown>);
+        };
+      },
+      weekNumber: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+        const tpl = this._weekNumberTpl();
+        const vcr = this._portalAnchor();
+        if (!tpl || !vcr) return () => {};
+        // Spike 004: portal-scope attribute injection.
+        container.setAttribute('data-rozie-portal-weekNumber', '5589629a');
+        const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
+        view.detectChanges();
+        for (const node of view.rootNodes as Node[]) container.appendChild(node);
+        this._portalViews.add(view as EmbeddedViewRef<unknown>);
+        return () => {
+          view.destroy();
+          this._portalViews.delete(view as EmbeddedViewRef<unknown>);
+        };
+      },
+      nowIndicator: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+        const tpl = this._nowIndicatorTpl();
+        const vcr = this._portalAnchor();
+        if (!tpl || !vcr) return () => {};
+        // Spike 004: portal-scope attribute injection.
+        container.setAttribute('data-rozie-portal-nowIndicator', '5589629a');
+        const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
+        view.detectChanges();
+        for (const node of view.rootNodes as Node[]) container.appendChild(node);
+        this._portalViews.add(view as EmbeddedViewRef<unknown>);
+        return () => {
+          view.destroy();
+          this._portalViews.delete(view as EmbeddedViewRef<unknown>);
+        };
+      },
+      moreLink: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+        const tpl = this._moreLinkTpl();
+        const vcr = this._portalAnchor();
+        if (!tpl || !vcr) return () => {};
+        // Spike 004: portal-scope attribute injection.
+        container.setAttribute('data-rozie-portal-moreLink', '5589629a');
+        const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
+        view.detectChanges();
+        for (const node of view.rootNodes as Node[]) container.appendChild(node);
+        this._portalViews.add(view as EmbeddedViewRef<unknown>);
+        return () => {
+          view.destroy();
+          this._portalViews.delete(view as EmbeddedViewRef<unknown>);
+        };
+      },
     };
     const opts = {
+      // :options passthrough spread FIRST — the curated keys below + the portal
+      // *Content handlers added after this object override any colliding key, so
+      // an explicitly-bound prop (e.g. :height) wins over options.height.
+      ...this.options(),
       plugins: this.PLUGINS,
       initialView: this.view(),
       weekends: this.weekends(),
@@ -193,6 +346,52 @@ export class FullCalendar {
           view: info.view.type
         });
       },
+      eventMouseEnter: (info: any) => {
+        this.eventMouseEnter.emit({
+          event: {
+            id: info.event.id,
+            title: info.event.title,
+            start: info.event.start,
+            end: info.event.end
+          },
+          jsEvent: info.jsEvent
+        });
+      },
+      eventMouseLeave: (info: any) => {
+        this.eventMouseLeave.emit({
+          event: {
+            id: info.event.id,
+            title: info.event.title,
+            start: info.event.start,
+            end: info.event.end
+          },
+          jsEvent: info.jsEvent
+        });
+      },
+      unselect: (info: any) => {
+        this.unselect.emit({
+          jsEvent: info.jsEvent
+        });
+      },
+      loading: (isLoading: any) => {
+        // FullCalendar's `loading` callback receives a bare boolean (not an info
+        // object) — normalize to the structured `{ isLoading }` payload shape.
+        this.loading.emit({
+          isLoading
+        });
+      },
+      eventsSet: (events: any) => {
+        // `eventsSet` receives the array of current EventApi objects — map each to
+        // the normalized floor shape for persistence/sync consumers.
+        this.eventsSet.emit({
+          events: events.map((e: any) => ({
+            id: e.id,
+            title: e.title,
+            start: e.start,
+            end: e.end
+          }))
+        });
+      },
       viewDidMount: (info: any) => {
         // viewDidMount fires both on initial mount AND on changeView calls.
         // Same round-trip guard pattern as Flatpickr / LeafletMap.
@@ -230,6 +429,105 @@ export class FullCalendar {
         };
       };
     }
+    // The 6 remaining *Content portal-slots — wired identically to `event`, one
+    // per FullCalendar per-cell content hook that fires with the bundled plugins
+    // (core + daygrid + timegrid + interaction). Each guarded by its own slot so
+    // unfilled slots keep FullCalendar's default rendering.
+    //
+    // NOTE the `nowIndicator` slot SET name ($slots.nowIndicator) shares a string
+    // with the boolean `nowIndicator` PROP — they live in different namespaces
+    // ($slots vs $props); the slot emits the `nowIndicatorContent` option while
+    // the prop reconciles the `nowIndicator` option. No ROZ collision.
+    // The 6 remaining *Content portal-slots — wired identically to `event`, one
+    // per FullCalendar per-cell content hook that fires with the bundled plugins
+    // (core + daygrid + timegrid + interaction). Each guarded by its own slot so
+    // unfilled slots keep FullCalendar's default rendering.
+    //
+    // NOTE the `nowIndicator` slot SET name ($slots.nowIndicator) shares a string
+    // with the boolean `nowIndicator` PROP — they live in different namespaces
+    // ($slots vs $props); the slot emits the `nowIndicatorContent` option while
+    // the prop reconciles the `nowIndicator` option. No ROZ collision.
+    if ((this.dayCellTpl ?? this.templates()?.['dayCell'])) {
+      opts.dayCellContent = (arg: any) => {
+        const node = document.createElement('div');
+        const dispose = portals.dayCell(node, {
+          arg
+        });
+        return {
+          domNodes: [node],
+          dispose
+        };
+      };
+    }
+    if ((this.dayHeaderTpl ?? this.templates()?.['dayHeader'])) {
+      opts.dayHeaderContent = (arg: any) => {
+        const node = document.createElement('div');
+        const dispose = portals.dayHeader(node, {
+          arg
+        });
+        return {
+          domNodes: [node],
+          dispose
+        };
+      };
+    }
+    if ((this.slotLabelTpl ?? this.templates()?.['slotLabel'])) {
+      opts.slotLabelContent = (arg: any) => {
+        const node = document.createElement('div');
+        const dispose = portals.slotLabel(node, {
+          arg
+        });
+        return {
+          domNodes: [node],
+          dispose
+        };
+      };
+    }
+    if ((this.weekNumberTpl ?? this.templates()?.['weekNumber'])) {
+      opts.weekNumberContent = (arg: any) => {
+        const node = document.createElement('div');
+        const dispose = portals.weekNumber(node, {
+          arg
+        });
+        return {
+          domNodes: [node],
+          dispose
+        };
+      };
+    }
+    if ((this.nowIndicatorTpl ?? this.templates()?.['nowIndicator'])) {
+      opts.nowIndicatorContent = (arg: any) => {
+        const node = document.createElement('div');
+        const dispose = portals.nowIndicator(node, {
+          arg
+        });
+        return {
+          domNodes: [node],
+          dispose
+        };
+      };
+    }
+    if ((this.moreLinkTpl ?? this.templates()?.['moreLink'])) {
+      opts.moreLinkContent = (arg: any) => {
+        const node = document.createElement('div');
+        const dispose = portals.moreLink(node, {
+          arg
+        });
+        return {
+          domNodes: [node],
+          dispose
+        };
+      };
+    }
+    // Excluded *Content slots (documented, not gaps): noEventsContent (list-view
+    // only — @fullcalendar/list is not a bundled peer), slotLaneContent (background
+    // lane, no demand), allDayContent (trivial label). Consumers needing those use
+    // the :options passthrough + getApi().
+    // Excluded *Content slots (documented, not gaps): noEventsContent (list-view
+    // only — @fullcalendar/list is not a bundled peer), slotLaneContent (background
+    // lane, no demand), allDayContent (trivial label). Consumers needing those use
+    // the :options passthrough + getApi().
+
     this.instance = new Calendar(this.__rozieRoot()!.nativeElement, opts);
     this.instance.render();
     this.__rozieDestroyRef.onDestroy(() => this.instance?.destroy());
@@ -300,7 +598,7 @@ export class FullCalendar {
   static ngTemplateContextGuard(
     _dir: FullCalendar,
     _ctx: unknown,
-  ): _ctx is EventCtx {
+  ): _ctx is EventCtx | DayCellCtx | DayHeaderCtx | SlotLabelCtx | WeekNumberCtx | NowIndicatorCtx | MoreLinkCtx {
     return true;
   }
 }

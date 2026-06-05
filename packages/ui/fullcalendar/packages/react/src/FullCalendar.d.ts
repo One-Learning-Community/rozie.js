@@ -17,13 +17,25 @@ export interface FullCalendarProps {
   slotDuration?: string;
   nowIndicator?: boolean;
   headerToolbar?: Record<string, unknown>;
+  options?: Record<string, unknown>;
   onEventClick?: (...args: unknown[]) => void;
   onDateClick?: (...args: unknown[]) => void;
   onEventDrop?: (...args: unknown[]) => void;
   onSelect?: (...args: unknown[]) => void;
   onEventResize?: (...args: unknown[]) => void;
   onDatesSet?: (...args: unknown[]) => void;
+  onEventMouseEnter?: (...args: unknown[]) => void;
+  onEventMouseLeave?: (...args: unknown[]) => void;
+  onUnselect?: (...args: unknown[]) => void;
+  onLoading?: (...args: unknown[]) => void;
+  onEventsSet?: (...args: unknown[]) => void;
   renderEvent?: (params: { arg: () => void }) => ReactNode;
+  renderDayCell?: (params: { arg: () => void }) => ReactNode;
+  renderDayHeader?: (params: { arg: () => void }) => ReactNode;
+  renderSlotLabel?: (params: { arg: () => void }) => ReactNode;
+  renderWeekNumber?: (params: { arg: () => void }) => ReactNode;
+  renderNowIndicator?: (params: { arg: () => void }) => ReactNode;
+  renderMoreLink?: (params: { arg: () => void }) => ReactNode;
   slots?: Record<string, () => ReactNode>;
 }
 

@@ -17,7 +17,14 @@ interface Props {
   slotDuration?: string;
   nowIndicator?: boolean;
   headerToolbar?: any;
+  options?: any;
   event?: Snippet<[{ arg: any }]>;
+  dayCell?: Snippet<[{ arg: any }]>;
+  dayHeader?: Snippet<[{ arg: any }]>;
+  slotLabel?: Snippet<[{ arg: any }]>;
+  weekNumber?: Snippet<[{ arg: any }]>;
+  nowIndicator?: Snippet<[{ arg: any }]>;
+  moreLink?: Snippet<[{ arg: any }]>;
   snippets?: Record<string, any>;
   oneventclick?: (...args: unknown[]) => void;
   ondateclick?: (...args: unknown[]) => void;
@@ -25,6 +32,11 @@ interface Props {
   onselect?: (...args: unknown[]) => void;
   oneventresize?: (...args: unknown[]) => void;
   ondatesset?: (...args: unknown[]) => void;
+  oneventmouseenter?: (...args: unknown[]) => void;
+  oneventmouseleave?: (...args: unknown[]) => void;
+  onunselect?: (...args: unknown[]) => void;
+  onloading?: (...args: unknown[]) => void;
+  oneventsset?: (...args: unknown[]) => void;
 }
 
 let __defaultEvents = (() => [])();
@@ -33,6 +45,7 @@ let __defaultHeaderToolbar = (() => ({
   center: 'title',
   right: 'dayGridMonth,timeGridWeek,timeGridDay'
 }))();
+let __defaultOptions = (() => ({}))();
 
 let {
   events = __defaultEvents,
@@ -47,17 +60,35 @@ let {
   slotDuration = '00:30:00',
   nowIndicator = false,
   headerToolbar = __defaultHeaderToolbar,
+  options = __defaultOptions,
   event: __eventProp,
+  dayCell: __dayCellProp,
+  dayHeader: __dayHeaderProp,
+  slotLabel: __slotLabelProp,
+  weekNumber: __weekNumberProp,
+  nowIndicator: __nowIndicatorProp,
+  moreLink: __moreLinkProp,
   snippets,
   oneventclick,
   ondateclick,
   oneventdrop,
   onselect,
   oneventresize,
-  ondatesset
+  ondatesset,
+  oneventmouseenter,
+  oneventmouseleave,
+  onunselect,
+  onloading,
+  oneventsset
 }: Props = $props();
 
 const event = $derived(__eventProp ?? snippets?.event);
+const dayCell = $derived(__dayCellProp ?? snippets?.dayCell);
+const dayHeader = $derived(__dayHeaderProp ?? snippets?.dayHeader);
+const slotLabel = $derived(__slotLabelProp ?? snippets?.slotLabel);
+const weekNumber = $derived(__weekNumberProp ?? snippets?.weekNumber);
+const nowIndicator = $derived(__nowIndicatorProp ?? snippets?.nowIndicator);
+const moreLink = $derived(__moreLinkProp ?? snippets?.moreLink);
 
 let __rozieRoot = $state<HTMLElement | undefined>(undefined);
 
@@ -132,6 +163,90 @@ const portals = {
       portalInstances.delete(inst as Record<string, unknown>);
     };
   },
+  dayCell: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+    if (!dayCell) return () => {};
+    // Spike 004: portal-scope attribute injection.
+    container.setAttribute('data-rozie-portal-dayCell', '5589629a');
+    const inst = mount(PortalHost, {
+      target: container,
+      props: { snippet: dayCell, scope },
+    });
+    portalInstances.add(inst as Record<string, unknown>);
+    return () => {
+      unmount(inst);
+      portalInstances.delete(inst as Record<string, unknown>);
+    };
+  },
+  dayHeader: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+    if (!dayHeader) return () => {};
+    // Spike 004: portal-scope attribute injection.
+    container.setAttribute('data-rozie-portal-dayHeader', '5589629a');
+    const inst = mount(PortalHost, {
+      target: container,
+      props: { snippet: dayHeader, scope },
+    });
+    portalInstances.add(inst as Record<string, unknown>);
+    return () => {
+      unmount(inst);
+      portalInstances.delete(inst as Record<string, unknown>);
+    };
+  },
+  slotLabel: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+    if (!slotLabel) return () => {};
+    // Spike 004: portal-scope attribute injection.
+    container.setAttribute('data-rozie-portal-slotLabel', '5589629a');
+    const inst = mount(PortalHost, {
+      target: container,
+      props: { snippet: slotLabel, scope },
+    });
+    portalInstances.add(inst as Record<string, unknown>);
+    return () => {
+      unmount(inst);
+      portalInstances.delete(inst as Record<string, unknown>);
+    };
+  },
+  weekNumber: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+    if (!weekNumber) return () => {};
+    // Spike 004: portal-scope attribute injection.
+    container.setAttribute('data-rozie-portal-weekNumber', '5589629a');
+    const inst = mount(PortalHost, {
+      target: container,
+      props: { snippet: weekNumber, scope },
+    });
+    portalInstances.add(inst as Record<string, unknown>);
+    return () => {
+      unmount(inst);
+      portalInstances.delete(inst as Record<string, unknown>);
+    };
+  },
+  nowIndicator: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+    if (!nowIndicator) return () => {};
+    // Spike 004: portal-scope attribute injection.
+    container.setAttribute('data-rozie-portal-nowIndicator', '5589629a');
+    const inst = mount(PortalHost, {
+      target: container,
+      props: { snippet: nowIndicator, scope },
+    });
+    portalInstances.add(inst as Record<string, unknown>);
+    return () => {
+      unmount(inst);
+      portalInstances.delete(inst as Record<string, unknown>);
+    };
+  },
+  moreLink: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+    if (!moreLink) return () => {};
+    // Spike 004: portal-scope attribute injection.
+    container.setAttribute('data-rozie-portal-moreLink', '5589629a');
+    const inst = mount(PortalHost, {
+      target: container,
+      props: { snippet: moreLink, scope },
+    });
+    portalInstances.add(inst as Record<string, unknown>);
+    return () => {
+      unmount(inst);
+      portalInstances.delete(inst as Record<string, unknown>);
+    };
+  },
 };
 $effect(() => () => {
   for (const inst of portalInstances) unmount(inst as Parameters<typeof unmount>[0]);
@@ -140,6 +255,10 @@ $effect(() => () => {
 
 onMount(() => {
   const opts = {
+    // :options passthrough spread FIRST — the curated keys below + the portal
+    // *Content handlers added after this object override any colliding key, so
+    // an explicitly-bound prop (e.g. :height) wins over options.height.
+    ...options,
     plugins: PLUGINS,
     initialView: view,
     weekends: weekends,
@@ -211,6 +330,52 @@ onMount(() => {
         view: info.view.type
       });
     },
+    eventMouseEnter: (info: any) => {
+      oneventmouseenter?.({
+        event: {
+          id: info.event.id,
+          title: info.event.title,
+          start: info.event.start,
+          end: info.event.end
+        },
+        jsEvent: info.jsEvent
+      });
+    },
+    eventMouseLeave: (info: any) => {
+      oneventmouseleave?.({
+        event: {
+          id: info.event.id,
+          title: info.event.title,
+          start: info.event.start,
+          end: info.event.end
+        },
+        jsEvent: info.jsEvent
+      });
+    },
+    unselect: (info: any) => {
+      onunselect?.({
+        jsEvent: info.jsEvent
+      });
+    },
+    loading: (isLoading: any) => {
+      // FullCalendar's `loading` callback receives a bare boolean (not an info
+      // object) — normalize to the structured `{ isLoading }` payload shape.
+      onloading?.({
+        isLoading
+      });
+    },
+    eventsSet: (events: any) => {
+      // `eventsSet` receives the array of current EventApi objects — map each to
+      // the normalized floor shape for persistence/sync consumers.
+      oneventsset?.({
+        events: events.map((e: any) => ({
+          id: e.id,
+          title: e.title,
+          start: e.start,
+          end: e.end
+        }))
+      });
+    },
     viewDidMount: (info: any) => {
       // viewDidMount fires both on initial mount AND on changeView calls.
       // Same round-trip guard pattern as Flatpickr / LeafletMap.
@@ -241,6 +406,92 @@ onMount(() => {
       };
     };
   }
+  // The 6 remaining *Content portal-slots — wired identically to `event`, one
+  // per FullCalendar per-cell content hook that fires with the bundled plugins
+  // (core + daygrid + timegrid + interaction). Each guarded by its own slot so
+  // unfilled slots keep FullCalendar's default rendering.
+  //
+  // NOTE the `nowIndicator` slot SET name ($slots.nowIndicator) shares a string
+  // with the boolean `nowIndicator` PROP — they live in different namespaces
+  // ($slots vs $props); the slot emits the `nowIndicatorContent` option while
+  // the prop reconciles the `nowIndicator` option. No ROZ collision.
+  if (dayCell) {
+    opts.dayCellContent = (arg: any) => {
+      const node = document.createElement('div');
+      const dispose = portals.dayCell(node, {
+        arg
+      });
+      return {
+        domNodes: [node],
+        dispose
+      };
+    };
+  }
+  if (dayHeader) {
+    opts.dayHeaderContent = (arg: any) => {
+      const node = document.createElement('div');
+      const dispose = portals.dayHeader(node, {
+        arg
+      });
+      return {
+        domNodes: [node],
+        dispose
+      };
+    };
+  }
+  if (slotLabel) {
+    opts.slotLabelContent = (arg: any) => {
+      const node = document.createElement('div');
+      const dispose = portals.slotLabel(node, {
+        arg
+      });
+      return {
+        domNodes: [node],
+        dispose
+      };
+    };
+  }
+  if (weekNumber) {
+    opts.weekNumberContent = (arg: any) => {
+      const node = document.createElement('div');
+      const dispose = portals.weekNumber(node, {
+        arg
+      });
+      return {
+        domNodes: [node],
+        dispose
+      };
+    };
+  }
+  if (nowIndicator) {
+    opts.nowIndicatorContent = (arg: any) => {
+      const node = document.createElement('div');
+      const dispose = portals.nowIndicator(node, {
+        arg
+      });
+      return {
+        domNodes: [node],
+        dispose
+      };
+    };
+  }
+  if (moreLink) {
+    opts.moreLinkContent = (arg: any) => {
+      const node = document.createElement('div');
+      const dispose = portals.moreLink(node, {
+        arg
+      });
+      return {
+        domNodes: [node],
+        dispose
+      };
+    };
+  }
+  // Excluded *Content slots (documented, not gaps): noEventsContent (list-view
+  // only — @fullcalendar/list is not a bundled peer), slotLaneContent (background
+  // lane, no demand), allDayContent (trivial label). Consumers needing those use
+  // the :options passthrough + getApi().
+
   instance = new Calendar(__rozieRoot!, opts);
   instance.render();
   return () => instance?.destroy();
@@ -277,10 +528,21 @@ let __rozieWatchInitial_9 = true;
 $effect(() => { const __watchVal = (() => nowIndicator)(); untrack(() => { if (__rozieWatchInitial_9) { __rozieWatchInitial_9 = false; return; } ((v: any) => instance?.setOption('nowIndicator', v))(__watchVal); }); });
 let __rozieWatchInitial_10 = true;
 $effect(() => { const __watchVal = (() => headerToolbar)(); untrack(() => { if (__rozieWatchInitial_10) { __rozieWatchInitial_10 = false; return; } ((v: any) => instance?.setOption('headerToolbar', v))(__watchVal); }); });
+let __rozieWatchInitial_11 = true;
+$effect(() => { const __watchVal = (() => options)(); untrack(() => { if (__rozieWatchInitial_11) { __rozieWatchInitial_11 = false; return; } ((v: any) => {
+  if (!instance) return;
+  for (const k in v) instance.setOption(k, v[k]);
+})(__watchVal); }); });
 </script>
 
 
 <div class="rozie-fullcalendar" bind:this={__rozieRoot} data-rozie-s-5589629a></div>
+
+
+
+
+
+
 
 
 
