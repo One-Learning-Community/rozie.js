@@ -175,6 +175,61 @@ $onMount(() => {
       return { domNodes: [node], dispose }
     }
   }
+  // The 6 remaining *Content portal-slots — wired identically to `event`, one
+  // per FullCalendar per-cell content hook that fires with the bundled plugins
+  // (core + daygrid + timegrid + interaction). Each guarded by its own slot so
+  // unfilled slots keep FullCalendar's default rendering.
+  //
+  // NOTE the `nowIndicator` slot SET name ($slots.nowIndicator) shares a string
+  // with the boolean `nowIndicator` PROP — they live in different namespaces
+  // ($slots vs $props); the slot emits the `nowIndicatorContent` option while
+  // the prop reconciles the `nowIndicator` option. No ROZ collision.
+  if ($slots.dayCell) {
+    opts.dayCellContent = (arg) => {
+      const node = document.createElement('div')
+      const dispose = $portals.dayCell(node, { arg })
+      return { domNodes: [node], dispose }
+    }
+  }
+  if ($slots.dayHeader) {
+    opts.dayHeaderContent = (arg) => {
+      const node = document.createElement('div')
+      const dispose = $portals.dayHeader(node, { arg })
+      return { domNodes: [node], dispose }
+    }
+  }
+  if ($slots.slotLabel) {
+    opts.slotLabelContent = (arg) => {
+      const node = document.createElement('div')
+      const dispose = $portals.slotLabel(node, { arg })
+      return { domNodes: [node], dispose }
+    }
+  }
+  if ($slots.weekNumber) {
+    opts.weekNumberContent = (arg) => {
+      const node = document.createElement('div')
+      const dispose = $portals.weekNumber(node, { arg })
+      return { domNodes: [node], dispose }
+    }
+  }
+  if ($slots.nowIndicator) {
+    opts.nowIndicatorContent = (arg) => {
+      const node = document.createElement('div')
+      const dispose = $portals.nowIndicator(node, { arg })
+      return { domNodes: [node], dispose }
+    }
+  }
+  if ($slots.moreLink) {
+    opts.moreLinkContent = (arg) => {
+      const node = document.createElement('div')
+      const dispose = $portals.moreLink(node, { arg })
+      return { domNodes: [node], dispose }
+    }
+  }
+  // Excluded *Content slots (documented, not gaps): noEventsContent (list-view
+  // only — @fullcalendar/list is not a bundled peer), slotLaneContent (background
+  // lane, no demand), allDayContent (trivial label). Consumers needing those use
+  // the :options passthrough + getApi().
 
   instance = new Calendar($el, opts)
   instance.render()
@@ -253,6 +308,12 @@ $expose({ getApi, changeView, addEvent, removeEvent, today, prev, next, gotoDate
   and returns a dispose handle the engine calls on cell teardown.
 -->
 <slot name="event" portal :params="['arg']" />
+<slot name="dayCell" portal :params="['arg']" />
+<slot name="dayHeader" portal :params="['arg']" />
+<slot name="slotLabel" portal :params="['arg']" />
+<slot name="weekNumber" portal :params="['arg']" />
+<slot name="nowIndicator" portal :params="['arg']" />
+<slot name="moreLink" portal :params="['arg']" />
 </template>
 
 <style>
