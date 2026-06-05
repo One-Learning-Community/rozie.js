@@ -98,3 +98,4 @@ const api = el.getApi();
 | moreLink | arg |
 | allDayContent | arg |
 | slotLaneContent | arg |
+| noEventsContent | arg |

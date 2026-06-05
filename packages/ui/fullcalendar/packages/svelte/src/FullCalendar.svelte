@@ -27,6 +27,7 @@ interface Props {
   moreLink?: Snippet<[{ arg: any }]>;
   allDayContent?: Snippet<[{ arg: any }]>;
   slotLaneContent?: Snippet<[{ arg: any }]>;
+  noEventsContent?: Snippet<[{ arg: any }]>;
   snippets?: Record<string, any>;
   oneventclick?: (...args: unknown[]) => void;
   ondateclick?: (...args: unknown[]) => void;
@@ -72,6 +73,7 @@ let {
   moreLink: __moreLinkProp,
   allDayContent: __allDayContentProp,
   slotLaneContent: __slotLaneContentProp,
+  noEventsContent: __noEventsContentProp,
   snippets,
   oneventclick,
   ondateclick,
@@ -95,6 +97,7 @@ const nowIndicatorContent = $derived(__nowIndicatorContentProp ?? snippets?.nowI
 const moreLink = $derived(__moreLinkProp ?? snippets?.moreLink);
 const allDayContent = $derived(__allDayContentProp ?? snippets?.allDayContent);
 const slotLaneContent = $derived(__slotLaneContentProp ?? snippets?.slotLaneContent);
+const noEventsContent = $derived(__noEventsContentProp ?? snippets?.noEventsContent);
 
 let __rozieRoot = $state<HTMLElement | undefined>(undefined);
 
@@ -281,6 +284,20 @@ const portals = {
       portalInstances.delete(inst as Record<string, unknown>);
     };
   },
+  noEventsContent: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+    if (!noEventsContent) return () => {};
+    // Spike 004: portal-scope attribute injection.
+    container.setAttribute('data-rozie-portal-noEventsContent', '5589629a');
+    const inst = mount(PortalHost, {
+      target: container,
+      props: { snippet: noEventsContent, scope },
+    });
+    portalInstances.add(inst as Record<string, unknown>);
+    return () => {
+      unmount(inst);
+      portalInstances.delete(inst as Record<string, unknown>);
+    };
+  },
 };
 $effect(() => () => {
   for (const inst of portalInstances) unmount(inst as Parameters<typeof unmount>[0]);
@@ -292,8 +309,17 @@ onMount(() => {
     // :options passthrough spread FIRST — the curated keys below + the portal
     // *Content handlers added after this object override any colliding key, so
     // an explicitly-bound prop (e.g. :height) wins over options.height.
+    //
+    // EXCEPTION — `plugins` is the one curated key that AUGMENTS rather than
+    // overrides: instead of clobbering a consumer-supplied `:options.plugins`,
+    // it MERGES the always-on baked-in defaults (dayGrid + timeGrid +
+    // interaction) with any consumer-added plugins. This makes the wrapper
+    // consumer-extensible (opt-in) — a consumer can engage list/rrule/premium/
+    // etc. via `:options="{ plugins: [listPlugin] }"` with NO bundle cost and NO
+    // per-plugin wrapper code. FullCalendar dedupes plugins by identity, so a
+    // consumer re-passing a default is harmless.
     ...options,
-    plugins: PLUGINS,
+    plugins: [...PLUGINS, ...(options?.plugins ?? [])],
     initialView: view,
     weekends: weekends,
     editable: editable,
@@ -440,12 +466,12 @@ onMount(() => {
       };
     };
   }
-  // The 8 remaining *Content portal-slots — wired identically to `event`, one
-  // per FullCalendar per-cell content hook that fires with the bundled plugins
-  // (core + daygrid + timegrid + interaction). Each guarded by its own slot so
-  // unfilled slots keep FullCalendar's default rendering. (9 portal-slots total
+  // The 9 remaining *Content portal-slots — wired identically to `event`, one
+  // per FullCalendar per-cell content hook. Each guarded by its own slot so
+  // unfilled slots keep FullCalendar's default rendering. (10 portal-slots total
   // counting `event` above; allDayContent + slotLaneContent are the two timeGrid
-  // axis/lane hooks added last.)
+  // axis/lane hooks, and noEventsContent is the list-view "no events" hook —
+  // inert unless the consumer engages @fullcalendar/list via :options.plugins.)
   //
   // NOTE the `nowIndicatorContent` slot is named for its FullCalendar engine
   // hook (`nowIndicatorContent`) so it does NOT clash with the boolean
@@ -548,10 +574,24 @@ onMount(() => {
       };
     };
   }
-  // The one still-excluded *Content slot (documented, not a gap): noEventsContent
-  // — list-view only, and @fullcalendar/list is not a bundled engine peer. A
-  // consumer needing it uses the :options passthrough + getApi().
-
+  // noEventsContent — the list-view "no events to display" hook. Pre-declared
+  // and wired like the other 9 *Content slots, but INERT unless the consumer
+  // (a) engages @fullcalendar/list via the now-merged :options.plugins AND
+  // (b) shows a list view (listWeek/listDay/listMonth) with ZERO events. With
+  // the bundled-only plugin set there is no list view, so this hook never fires
+  // — by design, documented, zero bundle cost.
+  if (noEventsContent) {
+    opts.noEventsContent = (arg: any) => {
+      const node = document.createElement('div');
+      const dispose = portals.noEventsContent(node, {
+        arg
+      });
+      return {
+        domNodes: [node],
+        dispose
+      };
+    };
+  }
   instance = new Calendar(__rozieRoot!, opts);
   instance.render();
   return () => instance?.destroy();
@@ -597,6 +637,7 @@ $effect(() => { const __watchVal = (() => options)(); untrack(() => { if (__rozi
 
 
 <div class="rozie-fullcalendar" bind:this={__rozieRoot} data-rozie-s-5589629a></div>
+
 
 
 

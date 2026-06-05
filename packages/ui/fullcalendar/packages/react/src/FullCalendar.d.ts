@@ -38,6 +38,7 @@ export interface FullCalendarProps {
   renderMoreLink?: (params: { arg: () => void }) => ReactNode;
   renderAllDayContent?: (params: { arg: () => void }) => ReactNode;
   renderSlotLaneContent?: (params: { arg: () => void }) => ReactNode;
+  renderNoEventsContent?: (params: { arg: () => void }) => ReactNode;
   slots?: Record<string, () => ReactNode>;
 }
 

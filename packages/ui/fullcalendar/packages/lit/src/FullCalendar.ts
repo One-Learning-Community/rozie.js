@@ -43,6 +43,10 @@ interface RozieSlotLaneContentSlotCtx {
   arg: unknown;
 }
 
+interface RozieNoEventsContentSlotCtx {
+  arg: unknown;
+}
+
 @customElement('rozie-full-calendar')
 export default class FullCalendar extends SignalWatcher(LitElement) {
   static styles = css`
@@ -102,6 +106,9 @@ private _portalContainers = new Set<HTMLElement>();
   @state() private _hasSlotSlotLaneContent = false;
   @queryAssignedElements({ slot: 'slotLaneContent', flatten: true }) private _slotSlotLaneContentElements!: Element[];
   @property({ attribute: false }) slotLaneContent?: (scope: { arg: unknown }) => unknown;
+  @state() private _hasSlotNoEventsContent = false;
+  @queryAssignedElements({ slot: 'noEventsContent', flatten: true }) private _slotNoEventsContentElements!: Element[];
+  @property({ attribute: false }) noEventsContent?: (scope: { arg: unknown }) => unknown;
 
   private _disconnectCleanups: Array<() => void> = [];
   // Re-parenting guard: set true once the deferred teardown has actually
@@ -207,6 +214,17 @@ private _portalContainers = new Set<HTMLElement>();
         update();
       }
     }
+
+    {
+      const slotEl = this.shadowRoot?.querySelector('slot[name="noEventsContent"]');
+      if (slotEl !== null && slotEl !== undefined) {
+        const update = () => { this._hasSlotNoEventsContent = this._slotNoEventsContentElements.length > 0; };
+        slotEl.addEventListener('slotchange', update);
+        // CR-05 fix: push cleanup so the listener is removed on disconnectedCallback.
+        this._disconnectCleanups.push(() => slotEl.removeEventListener('slotchange', update));
+        update();
+      }
+    }
   }
 
   connectedCallback(): void {
@@ -220,6 +238,7 @@ private _portalContainers = new Set<HTMLElement>();
     this._hasSlotMoreLink = Array.from(this.children).some((el) => el.getAttribute('slot') === 'moreLink');
     this._hasSlotAllDayContent = Array.from(this.children).some((el) => el.getAttribute('slot') === 'allDayContent');
     this._hasSlotSlotLaneContent = Array.from(this.children).some((el) => el.getAttribute('slot') === 'slotLaneContent');
+    this._hasSlotNoEventsContent = Array.from(this.children).some((el) => el.getAttribute('slot') === 'noEventsContent');
     super.connectedCallback();
     if (this.hasUpdated && this._rozieTornDown) { this._rozieTornDown = false; this._armListeners(); }
   }
@@ -336,6 +355,18 @@ private _portalContainers = new Set<HTMLElement>();
           this._portalContainers.delete(container);
         };
       },
+      noEventsContent: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
+        const tpl = this.noEventsContent;
+        if (typeof tpl !== 'function') return () => {};
+        // Spike 004: portal-scope attribute injection.
+        container.setAttribute('data-rozie-portal-noEventsContent', '5589629a');
+        render(tpl(scope), container);
+        this._portalContainers.add(container);
+        return () => {
+          render(nothing, container);
+          this._portalContainers.delete(container);
+        };
+      },
     };
 
     this._disconnectCleanups.push((() => this.instance?.destroy()));
@@ -351,8 +382,17 @@ private _portalContainers = new Set<HTMLElement>();
       // :options passthrough spread FIRST — the curated keys below + the portal
       // *Content handlers added after this object override any colliding key, so
       // an explicitly-bound prop (e.g. :height) wins over options.height.
+      //
+      // EXCEPTION — `plugins` is the one curated key that AUGMENTS rather than
+      // overrides: instead of clobbering a consumer-supplied `:options.plugins`,
+      // it MERGES the always-on baked-in defaults (dayGrid + timeGrid +
+      // interaction) with any consumer-added plugins. This makes the wrapper
+      // consumer-extensible (opt-in) — a consumer can engage list/rrule/premium/
+      // etc. via `:options="{ plugins: [listPlugin] }"` with NO bundle cost and NO
+      // per-plugin wrapper code. FullCalendar dedupes plugins by identity, so a
+      // consumer re-passing a default is harmless.
       ...this.options,
-      plugins: this.PLUGINS,
+      plugins: [...this.PLUGINS, ...(this.options?.plugins ?? [])],
       initialView: this.view,
       weekends: this.weekends,
       editable: this.editable,
@@ -550,24 +590,24 @@ private _portalContainers = new Set<HTMLElement>();
         };
       };
     }
-    // The 8 remaining *Content portal-slots — wired identically to `event`, one
-    // per FullCalendar per-cell content hook that fires with the bundled plugins
-    // (core + daygrid + timegrid + interaction). Each guarded by its own slot so
-    // unfilled slots keep FullCalendar's default rendering. (9 portal-slots total
+    // The 9 remaining *Content portal-slots — wired identically to `event`, one
+    // per FullCalendar per-cell content hook. Each guarded by its own slot so
+    // unfilled slots keep FullCalendar's default rendering. (10 portal-slots total
     // counting `event` above; allDayContent + slotLaneContent are the two timeGrid
-    // axis/lane hooks added last.)
+    // axis/lane hooks, and noEventsContent is the list-view "no events" hook —
+    // inert unless the consumer engages @fullcalendar/list via :options.plugins.)
     //
     // NOTE the `nowIndicatorContent` slot is named for its FullCalendar engine
     // hook (`nowIndicatorContent`) so it does NOT clash with the boolean
     // `nowIndicator` PROP — a slot name that equals a declared prop name is now a
     // hard compile error (ROZ127 SLOT_PROP_NAME_COLLISION), because Svelte 5
     // unifies snippets and props into one `$props` namespace.
-    // The 8 remaining *Content portal-slots — wired identically to `event`, one
-    // per FullCalendar per-cell content hook that fires with the bundled plugins
-    // (core + daygrid + timegrid + interaction). Each guarded by its own slot so
-    // unfilled slots keep FullCalendar's default rendering. (9 portal-slots total
+    // The 9 remaining *Content portal-slots — wired identically to `event`, one
+    // per FullCalendar per-cell content hook. Each guarded by its own slot so
+    // unfilled slots keep FullCalendar's default rendering. (10 portal-slots total
     // counting `event` above; allDayContent + slotLaneContent are the two timeGrid
-    // axis/lane hooks added last.)
+    // axis/lane hooks, and noEventsContent is the list-view "no events" hook —
+    // inert unless the consumer engages @fullcalendar/list via :options.plugins.)
     //
     // NOTE the `nowIndicatorContent` slot is named for its FullCalendar engine
     // hook (`nowIndicatorContent`) so it does NOT clash with the boolean
@@ -670,13 +710,30 @@ private _portalContainers = new Set<HTMLElement>();
         };
       };
     }
-    // The one still-excluded *Content slot (documented, not a gap): noEventsContent
-    // — list-view only, and @fullcalendar/list is not a bundled engine peer. A
-    // consumer needing it uses the :options passthrough + getApi().
-    // The one still-excluded *Content slot (documented, not a gap): noEventsContent
-    // — list-view only, and @fullcalendar/list is not a bundled engine peer. A
-    // consumer needing it uses the :options passthrough + getApi().
-
+    // noEventsContent — the list-view "no events to display" hook. Pre-declared
+    // and wired like the other 9 *Content slots, but INERT unless the consumer
+    // (a) engages @fullcalendar/list via the now-merged :options.plugins AND
+    // (b) shows a list view (listWeek/listDay/listMonth) with ZERO events. With
+    // the bundled-only plugin set there is no list view, so this hook never fires
+    // — by design, documented, zero bundle cost.
+    // noEventsContent — the list-view "no events to display" hook. Pre-declared
+    // and wired like the other 9 *Content slots, but INERT unless the consumer
+    // (a) engages @fullcalendar/list via the now-merged :options.plugins AND
+    // (b) shows a list view (listWeek/listDay/listMonth) with ZERO events. With
+    // the bundled-only plugin set there is no list view, so this hook never fires
+    // — by design, documented, zero bundle cost.
+    if (this.noEventsContent !== undefined) {
+      opts.noEventsContent = (arg: any) => {
+        const node = document.createElement('div');
+        const dispose = portals.noEventsContent(node, {
+          arg
+        });
+        return {
+          domNodes: [node],
+          dispose
+        };
+      };
+    }
     this.instance = new Calendar(this._ref__rozieRoot, opts);
     this.instance.render();
   }
@@ -733,6 +790,7 @@ private _portalContainers = new Set<HTMLElement>();
 <slot name="moreLink"></slot>
 <slot name="allDayContent"></slot>
 <slot name="slotLaneContent"></slot>
+<slot name="noEventsContent"></slot>
 `;
   }
 

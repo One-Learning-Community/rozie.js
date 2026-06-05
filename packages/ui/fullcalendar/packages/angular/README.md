@@ -104,3 +104,4 @@ export class DemoComponent {
 | moreLink | arg |
 | allDayContent | arg |
 | slotLaneContent | arg |
+| noEventsContent | arg |

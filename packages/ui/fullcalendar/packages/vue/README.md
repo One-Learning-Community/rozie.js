@@ -100,3 +100,4 @@ const cal = ref();          // template ref
 | moreLink | arg |
 | allDayContent | arg |
 | slotLaneContent | arg |
+| noEventsContent | arg |

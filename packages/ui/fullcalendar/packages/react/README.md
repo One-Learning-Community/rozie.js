@@ -102,3 +102,4 @@ const api = cal.current?.getApi();
 | moreLink | arg |
 | allDayContent | arg |
 | slotLaneContent | arg |
+| noEventsContent | arg |
