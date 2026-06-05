@@ -96,7 +96,40 @@ function main() {
 
     const leafSrc = resolve(ROOT, 'packages', cfg.dir, 'src');
     mkdirSync(leafSrc, { recursive: true });
-    writeFileSync(resolve(leafSrc, cfg.file), r.code);
+
+    // Post-emit type-gate aid (bundled TS leaves only — react/solid/lit).
+    //
+    // FullCalendar.rozie's `$onMount` builds `const opts = { … }` and THEN
+    // conditionally adds `opts.eventContent = …` inside the `event` portal-slot
+    // guard. In plain JS that is fine; the engine accepts `eventContent` at
+    // runtime. But the bundled-leaf `tsc --noEmit` gate narrows the object
+    // literal to its initial keys, so the later property add trips
+    // `TS2339: Property 'eventContent' does not exist`. flatpickr never hit this
+    // (its emit passes the options literal straight into `flatpickr(input, {…})`
+    // with no intervening mutated `const`); this is a NEW emitter/strict-tsc
+    // intersection (engine-wrapper + post-literal conditional option add). The
+    // proper home for the fix is the emitter (emit a widened annotation for a
+    // later-mutated options object), which is OUT OF SCOPE for this plan
+    // (SCOPE FENCE). As the sanctioned in-scope per-leaf type aid, widen the
+    // generated options literal to `Record<string, any>` here in codegen GLUE
+    // — durable across regeneration, scoped to the single line, and a pure
+    // type annotation (zero runtime/behavioral change; vue/svelte/angular are
+    // type-neutral and never see it). Tracked as a RISK / emitter follow-up.
+    let code = r.code;
+    if (cfg.build === 'tsdown') {
+      const before = code;
+      code = code.replace('const opts = {', 'const opts: Record<string, any> = {');
+      if (code === before) {
+        // Fail loud if the emit shape drifts so this aid never silently no-ops
+        // and leaves the gate red.
+        throw new Error(
+          `codegen ${target}: expected to widen the engine-options literal (\`const opts = {\`) ` +
+            `for the strict bundled-leaf tsc gate, but the token was not found — the emit shape ` +
+            `changed. Re-derive the type-gate aid (SCOPE FENCE: do NOT edit the emitter).`,
+        );
+      }
+    }
+    writeFileSync(resolve(leafSrc, cfg.file), code);
 
     // Bundled leaves (tsdown) entry on src/index.ts. The emitted component is a
     // DEFAULT export, so the barrel re-exports the default under the named

@@ -1,0 +1,86 @@
+# @rozie-ui/fullcalendar-lit
+
+Idiomatic **lit** `FullCalendar` — a cross-framework calendar/scheduler compiled from one [Rozie](https://github.com/One-Learning-Community/rozie.js) source wrapping [FullCalendar](https://fullcalendar.io/). This package is generated; do not edit `src/` by hand.
+
+## Install
+
+```bash
+npm i @rozie-ui/fullcalendar-lit
+```
+
+Peer dependencies: the four `@fullcalendar/*` engine packages (`@fullcalendar/core`, `@fullcalendar/daygrid`, `@fullcalendar/timegrid`, `@fullcalendar/interaction`, all `^6.1`) + `lit`. Install them alongside this package. FullCalendar v6 auto-injects its own stylesheet — there is **no manual CSS import** to add.
+
+## Usage
+
+```ts
+import '@rozie-ui/fullcalendar-lit';
+
+// <rozie-full-calendar> is a custom element. Bind `view`/`events` as
+// properties and listen for the `event-click` event.
+const el = document.querySelector('rozie-full-calendar');
+el.view = 'dayGridMonth';
+el.events = [{ id: '1', title: 'Kickoff', start: '2026-06-04' }];
+el.addEventListener('view-change', (e) => {
+  el.view = e.detail;
+});
+el.addEventListener('event-click', (e) => {
+  console.log(e.detail.event, e.detail.view);
+});
+```
+
+## Props
+
+| Name | Type | Default | Two-way (model) | Required |
+| --- | --- | --- | :---: | :---: |
+| `events` | `Array` | `[]` |  |  |
+| `view` | `String` | `"dayGridMonth"` | ✓ |  |
+| `weekends` | `Boolean` | `true` |  |  |
+| `editable` | `Boolean` | `true` |  |  |
+| `selectable` | `Boolean` | `true` |  |  |
+| `height` | `Number` | `480` |  |  |
+| `defaultColor` | `String` | `"#3b82f6"` |  |  |
+| `locale` | `String` | `"en"` |  |  |
+| `firstDay` | `Number` | `0` |  |  |
+| `slotDuration` | `String` | `"00:30:00"` |  |  |
+| `nowIndicator` | `Boolean` | `false` |  |  |
+| `headerToolbar` | `Object` | `{…}` |  |  |
+
+## Events
+
+| Event | Description |
+| --- | --- |
+| `eventClick` | Fired when a calendar event is clicked. Payload `{ event: { id, title, start, end }, jsEvent, view }`. |
+| `dateClick` | Fired when an empty date/time cell is clicked. Payload `{ date, dateStr, allDay, view }`. |
+| `eventDrop` | Fired after an event is dragged to a new date/time. Payload `{ event: { id, title, start, end }, delta }`. |
+| `select` | Fired when a date/time range is selected by drag (requires `selectable`). Payload `{ start, end, startStr, endStr, allDay }`. |
+| `eventResize` | Fired after an event is resized by dragging its edge (requires `editable`). Payload `{ event: { id, title, start, end }, startDelta, endDelta }`. |
+| `datesSet` | Fired whenever the visible date range changes (navigation or view switch). Payload `{ start, end, view }` where `view` is the active view type string. |
+
+## Imperative handle
+
+Beyond props/events, the component exposes imperative methods (declared once in the Rozie source via `$expose`). Grab a handle with the native ref mechanism and call them directly:
+
+```ts
+// The custom element IS the handle — its exposed methods are public
+// element methods.
+const el = document.querySelector('rozie-full-calendar');
+el.next();
+const api = el.getApi();
+```
+
+| Method | Description |
+| --- | --- |
+| `getApi` | Return the underlying FullCalendar `Calendar` instance for direct API access. |
+| `changeView` | Switch the active view — `changeView(viewName, dateOrRange?)`. |
+| `addEvent` | Add an event — `addEvent(eventInput, source?)`. |
+| `removeEvent` | Remove an event by id — `removeEvent(id)`. |
+| `today` | Navigate to today. |
+| `prev` | Navigate to the previous date range. |
+| `next` | Navigate to the next date range. |
+| `gotoDate` | Navigate to a specific date — `gotoDate(date)`. |
+
+## Slots
+
+| Slot | Params |
+| --- | --- |
+| event | arg |
