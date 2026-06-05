@@ -29,6 +29,7 @@ import type { IRComponent, SlotDecl, ParamDecl } from '../../../../core/src/ir/t
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import type { LitDecoratorImportCollector } from '../rewrite/collectLitImports.js';
 import { collectMethodNamesFromIR } from './methodNames.js';
+import { portalSlotMemberName } from './portalSlotMemberName.js';
 
 export interface EmitSlotDeclOpts {
   decorators: LitDecoratorImportCollector;
@@ -88,6 +89,7 @@ function slotFieldSuffix(name: string): string {
 
 function emitOneSlot(
   slot: SlotDecl,
+  ir: IRComponent,
   ctxInterfaces: string[],
   hostListenerWiring: string[],
   slotChangeWiringLines: string[],
@@ -176,7 +178,13 @@ function emitOneSlot(
     // Single-underscore `_defaultSlotFn` was the prior name; it left a plausible
     // collision surface in v1 user slot names. Lockstep across emitSlotDecl /
     // emitSlotFiller / emitTemplate.
-    const propertyFieldName = slot.name === '' ? '__rozieDefaultSlot__' : slot.name;
+    // Collision-gated disambiguation (mirrors Solid's `Slot` suffix, but only
+    // when the bare slot name collides with a declared prop — keeps existing
+    // non-colliding fixtures byte-identical). The consumer-side emitSlotFiller
+    // applies the SAME helper against the producer's prop list so the
+    // `.<member>=` property assignment stays in lockstep.
+    const propertyFieldName =
+      slot.name === '' ? '__rozieDefaultSlot__' : portalSlotMemberName(slot.name, ir);
     const scopeType =
       slot.params.length > 0
         ? `{ ${slot.params.map((p) => `${p.name}: unknown`).join('; ')} }`
@@ -223,6 +231,7 @@ export function emitSlotDecl(
     .map((slot) =>
       emitOneSlot(
         slot,
+        ir,
         ctxInterfaces,
         hostListenerWiring,
         slotChangeWiringLines,

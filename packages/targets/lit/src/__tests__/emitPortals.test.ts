@@ -13,7 +13,7 @@ import * as t from '@babel/types';
 import { parse } from '../../../../core/src/parse.js';
 import { lowerToIR } from '../../../../core/src/ir/lower.js';
 import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
-import type { IRComponent, SlotDecl } from '../../../../core/src/ir/types.js';
+import type { IRComponent, PropDecl, SlotDecl } from '../../../../core/src/ir/types.js';
 import { emitPortals } from '../emit/emitPortals.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -71,6 +71,18 @@ function portalSlot(name: string, portalParamNames?: string[]): SlotDecl {
   };
 }
 
+function boolProp(name: string): PropDecl {
+  return {
+    type: 'PropDecl',
+    name,
+    typeAnnotation: { kind: 'literal', value: 'boolean' },
+    defaultValue: null,
+    isModel: false,
+    required: false,
+    sourceLoc: { start: 0, end: 0 },
+  };
+}
+
 describe('emitPortals — Lit', () => {
   it('no portal slots → early return with empty fields', () => {
     const ir = buildMinimalIR({ slots: [] });
@@ -109,6 +121,39 @@ describe('emitPortals — Lit', () => {
     const scoped = emitPortals(ir, 'abc123');
     expect(scoped.closureBlock).toContain('container.setAttribute(');
     expect(scoped.closureBlock).toContain('abc123');
+  });
+
+  it('portal-slot name colliding with a declared prop → collision-gated `Slot` suffix on the `this.<member>` read only', () => {
+    // Regression: FullCalendar declares BOTH a boolean prop `nowIndicator`
+    // AND a portal-slot `nowIndicator`. The prop emits its own `@property
+    // nowIndicator`; the slot bridge must NOT also emit `this.nowIndicator`
+    // (which would resolve to the boolean prop) — it reads the disambiguated
+    // `this.nowIndicatorSlot` member instead. The closure object KEY stays the
+    // bare slot name so the script-side `$portals.nowIndicator(...)` →
+    // `portals.nowIndicator(...)` lookup keeps working.
+    const ir = buildMinimalIR({
+      props: [boolProp('nowIndicator')],
+      slots: [portalSlot('nowIndicator', ['arg'])],
+    });
+    const result = emitPortals(ir);
+    expect(result.hasPortals).toBe(true);
+    // Closure key = bare slot name (script lookup contract).
+    expect(result.closureBlock).toContain('nowIndicator: (container');
+    // Member read = disambiguated.
+    expect(result.closureBlock).toContain('const tpl = this.nowIndicatorSlot;');
+    // The bare `this.nowIndicator` read (which would grab the boolean prop)
+    // MUST NOT appear.
+    expect(result.closureBlock).not.toContain('const tpl = this.nowIndicator;');
+  });
+
+  it('portal-slot name NOT colliding with any prop → bare member read (byte-identical, no suffix)', () => {
+    const ir = buildMinimalIR({
+      props: [boolProp('editable')],
+      slots: [portalSlot('eventContent', ['arg'])],
+    });
+    const result = emitPortals(ir);
+    expect(result.closureBlock).toContain('const tpl = this.eventContent;');
+    expect(result.closureBlock).not.toContain('eventContentSlot');
   });
 
   it('portalParamNames present vs absent → scopeType branch', () => {

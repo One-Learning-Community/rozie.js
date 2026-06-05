@@ -199,8 +199,10 @@ export function threadParamTypes(
     // 'self' tagKind references the outer-name component (recursion case) — the
     // producer is the consumer itself. Skip resolver+cache; use ir.slots.
     let producerSlots: readonly SlotDecl[];
+    let producerProps: readonly { name: string }[];
     if (node.tagKind === 'self') {
       producerSlots = ir.slots;
+      producerProps = ir.props;
     } else {
       const resolvedPath = resolver.resolveProducerPath(
         node.componentRef.importPath,
@@ -219,11 +221,13 @@ export function threadParamTypes(
       const producerIR = cache.getIRComponent(resolvedPath, consumerPath);
       if (producerIR === null) return; // cycle or parse failure — silent degrade
       producerSlots = producerIR.slots;
+      producerProps = producerIR.props;
     }
 
     const producerSlotsByName = new Map(
       producerSlots.map((s) => [s.name, s] as const),
     );
+    const producerPropNames = new Set(producerProps.map((p) => p.name));
 
     for (const filler of node.slotFillers) {
       // Dynamic-name fills cannot be statically matched against a producer
@@ -279,6 +283,12 @@ export function threadParamTypes(
       // upstream pass ever pre-seeded the filler.
       filler.isPortal = matchingSlot.isPortal === true;
       filler.producerSlotParamCount = matchingSlot.params.length;
+      // Lit-target member disambiguation: when the producer declares a same-named
+      // prop, its portal-slot @property bridge member is suffixed with `Slot`
+      // (collision-gated). The Lit consumer must emit `.<name>Slot=` to match.
+      // Symmetric overwrite (WR-05 rationale) — producer is source of truth.
+      filler.producerPropCollision =
+        filler.name !== '' && producerPropNames.has(filler.name);
 
       // R4 — thread producer paramTypes onto consumer.
       if (matchingSlot.paramTypes !== undefined) {

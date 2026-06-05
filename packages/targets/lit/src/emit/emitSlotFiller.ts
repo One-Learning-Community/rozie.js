@@ -593,7 +593,18 @@ export function emitSlotFiller(
     // (WR-02 (Phase 07.5 review): double-underscore + rozie-infix to dodge
     // user-slot-name collision). Named slots use the bare slot name. Both
     // sides MUST agree — keep the mapping in lockstep.
-    const propertyFieldName = filler.name === '' ? '__rozieDefaultSlot__' : filler.name;
+    // Collision-gated `Slot` suffix (lockstep with producer-side emitSlotDecl /
+    // portalSlotMemberName): when the producer declares a same-named prop, its
+    // portal-slot @property member was suffixed with `Slot` to dodge a
+    // duplicate-identifier error. The consumer must target that same member.
+    // `producerPropCollision` is threaded from the producer's prop list by
+    // threadParamTypes. Default slot ('') uses the sentinel and never collides.
+    const propertyFieldName =
+      filler.name === ''
+        ? '__rozieDefaultSlot__'
+        : filler.producerPropCollision === true
+          ? filler.name + 'Slot'
+          : filler.name;
 
     const propertyAttr =
       '.' + propertyFieldName + '=${(' + paramSig + ') => html`' + body + '`}';

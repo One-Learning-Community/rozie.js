@@ -70,6 +70,97 @@ describe('emitSlotDecl — D-LIT-14 correction', () => {
     expect(code).toMatch(/interface RozieDefaultSlotCtx/);
   });
 
+  it('emitSlotDecl() unit: portal-slot name colliding with a declared prop → `@property <name>Slot` (collision-gated suffix)', () => {
+    const result = emitSlotDecl(
+      {
+        type: 'IRComponent',
+        name: 'FullCalendar',
+        props: [
+          {
+            type: 'PropDecl',
+            name: 'nowIndicator',
+            typeAnnotation: { kind: 'literal', value: 'boolean' },
+            defaultValue: null,
+            isModel: false,
+            required: false,
+            sourceLoc: { start: 0, end: 0 },
+          },
+        ],
+        state: [],
+        computed: [],
+        refs: [],
+        slots: [
+          {
+            type: 'SlotDecl',
+            name: 'nowIndicator',
+            params: [],
+            presence: 'always',
+            defaultContent: null,
+            nestedSlots: [],
+            isPortal: true,
+            sourceLoc: { start: 0, end: 0 },
+          },
+        ],
+        emits: [],
+        lifecycle: [],
+        watchers: [],
+        listeners: [],
+        setupBody: { type: 'SetupBody', scriptProgram: null as never, annotations: [] },
+        template: null,
+        styles: { type: 'StyleSection', scopedRules: [], rootRules: [], portalRules: [], sourceLoc: { start: 0, end: 0 } },
+        components: [],
+        sourceLoc: { start: 0, end: 0 },
+      },
+      { decorators: new LitDecoratorImportCollector() },
+    );
+    // The slot-bridge @property member is suffixed to dodge the prop's own
+    // `@property nowIndicator`. Without this, two identical identifiers → hard
+    // rolldown "Identifier 'nowIndicator' has already been declared".
+    expect(result.fields).toContain('@property({ attribute: false }) nowIndicatorSlot?:');
+    // The bare-name slot-bridge @property MUST NOT be emitted (it would
+    // duplicate the boolean prop's @property).
+    expect(result.fields).not.toMatch(
+      /@property\(\{ attribute: false \}\) nowIndicator\?:/,
+    );
+  });
+
+  it('emitSlotDecl() unit: portal-slot name NOT colliding with a prop → bare `@property <name>` (byte-identical, no suffix)', () => {
+    const result = emitSlotDecl(
+      {
+        type: 'IRComponent',
+        name: 'FullCalendar',
+        props: [],
+        state: [],
+        computed: [],
+        refs: [],
+        slots: [
+          {
+            type: 'SlotDecl',
+            name: 'eventContent',
+            params: [],
+            presence: 'always',
+            defaultContent: null,
+            nestedSlots: [],
+            isPortal: true,
+            sourceLoc: { start: 0, end: 0 },
+          },
+        ],
+        emits: [],
+        lifecycle: [],
+        watchers: [],
+        listeners: [],
+        setupBody: { type: 'SetupBody', scriptProgram: null as never, annotations: [] },
+        template: null,
+        styles: { type: 'StyleSection', scopedRules: [], rootRules: [], portalRules: [], sourceLoc: { start: 0, end: 0 } },
+        components: [],
+        sourceLoc: { start: 0, end: 0 },
+      },
+      { decorators: new LitDecoratorImportCollector() },
+    );
+    expect(result.fields).toContain('@property({ attribute: false }) eventContent?:');
+    expect(result.fields).not.toContain('eventContentSlot');
+  });
+
   it('emitSlotDecl() unit: empty slots array returns empty result', () => {
     const result = emitSlotDecl(
       {

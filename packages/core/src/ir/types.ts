@@ -357,6 +357,18 @@ export interface SlotFillerDecl {
    * Undefined === 0 (back-compat).
    */
   producerSlotParamCount?: number;
+  /**
+   * Lit-target portal-slot member disambiguation. `true` iff the producer
+   * declares a `<props>` entry whose name equals this filler's slot name —
+   * which forces the Lit producer to suffix its portal-slot `@property` bridge
+   * member with `Slot` (collision-gated) to avoid a duplicate-identifier
+   * rolldown error. The Lit consumer-side emitSlotFiller must then emit the
+   * matching `.<slotName>Slot=${fn}` property assignment (instead of the bare
+   * `.<slotName>=`) so producer/consumer stay in lockstep. Threaded by
+   * threadParamTypes from the producer's prop list. Undefined === false
+   * (back-compat; non-Lit targets ignore it).
+   */
+  producerPropCollision?: boolean;
 }
 
 /**

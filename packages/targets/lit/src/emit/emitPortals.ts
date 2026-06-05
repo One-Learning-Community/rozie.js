@@ -18,6 +18,7 @@
  */
 import type { IRComponent, SlotDecl } from '../../../../core/src/ir/types.js';
 import { portalAttrName } from '../../../../core/src/codegen/portalCss.js';
+import { portalSlotMemberName } from './portalSlotMemberName.js';
 
 /**
  * Spike 004 — portal-scope `setAttribute` line, or '' when no scopeHash.
@@ -34,8 +35,14 @@ function setAttrLine(slotName: string, scopeHash: string): string {
   );
 }
 
-function buildSlotMethod(slot: SlotDecl, scopeHash: string): string {
+function buildSlotMethod(slot: SlotDecl, scopeHash: string, ir: IRComponent): string {
   const slotName = slot.name;
+  // The closure object KEY stays the bare slot name: the script-side
+  // `$portals.<slotName>(...)` call is rewritten to `portals.<slotName>(...)`,
+  // so the key must match the slot name. Only the `this.<member>` READ of the
+  // consumer-supplied callback uses the collision-gated member name (which may
+  // differ from the slot name when a same-named prop forced a `Slot` suffix).
+  const memberName = portalSlotMemberName(slotName, ir);
   const paramNames = slot.portalParamNames ?? [];
   const scopeType =
     paramNames.length > 0
@@ -43,7 +50,7 @@ function buildSlotMethod(slot: SlotDecl, scopeHash: string): string {
       : 'unknown';
   return (
     `  ${slotName}: (container: HTMLElement, scope: ${scopeType}): (() => void) => {\n` +
-    `    const tpl = this.${slotName};\n` +
+    `    const tpl = this.${memberName};\n` +
     `    if (typeof tpl !== 'function') return () => {};\n` +
     setAttrLine(slotName, scopeHash) +
     `    render(tpl(scope), container);\n` +
@@ -78,7 +85,7 @@ export function emitPortals(ir: IRComponent, scopeHash: string = ''): PortalsEmi
   }
 
   const fieldDecl = 'private _portalContainers = new Set<HTMLElement>();';
-  const methodLines = portals.map((slot) => buildSlotMethod(slot, scopeHash)).join('\n');
+  const methodLines = portals.map((slot) => buildSlotMethod(slot, scopeHash, ir)).join('\n');
   const closureBlock = `const portals = {\n${methodLines}\n};`;
   const disconnectedBlock =
     'for (const container of this._portalContainers) render(nothing, container);\n' +
