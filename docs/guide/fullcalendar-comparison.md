@@ -86,7 +86,7 @@ registry, the GitHub API, and each project's README/`package.json` on
   a render-prop in React, a slot in Vue, a template in Angular, and unsupported
   in the wrappers that don't reach those frameworks. Rozie surfaces **seven** of
   them — `event`, `dayCell`, `dayHeader`, `slotLabel`, `weekNumber`,
-  `nowIndicator`, and `moreLink` — as portal slots, each emitting the
+  `nowIndicatorContent`, and `moreLink` — as portal slots, each emitting the
   framework's idiomatic consumer surface (React / Solid render-prop, Vue
   scoped-slot, Svelte snippet, Angular content-child, Lit slot bridge),
   documented per-target in [Slots](/guide/fullcalendar#slots). Every slot is

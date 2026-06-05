@@ -8,8 +8,8 @@
   event surface MOUNTS and DISPOSES at runtime across all 6 targets:
 
     - Fills ALL SEVEN portal-slots (event / dayCell / dayHeader / slotLabel /
-      weekNumber / nowIndicator / moreLink), each rendering a queryable marker
-      node with a distinct per-slot test id (the slot-<name> family) so
+      weekNumber / nowIndicatorContent / moreLink), each rendering a queryable
+      marker node with a distinct per-slot test id (the slot-<name> family) so
       full-calendar-slots.spec.ts can assert presence + dispose per slot, per
       target.
 
@@ -24,8 +24,9 @@
         * businessHours: …   → a visible passthrough proof
       A single overflow day is seeded past dayMaxEvents so moreLink renders.
 
-    - Provides view-switch controls (timeGridWeek makes slotLabel + nowIndicator
-      render; dayGridMonth makes dayCell / dayHeader / moreLink render) the spec
+    - Provides view-switch controls (timeGridWeek makes slotLabel +
+      nowIndicatorContent render; dayGridMonth makes dayCell / dayHeader /
+      moreLink render) the spec
       drives, plus an r-if teardown control so the spec asserts the slot markers
       DISPOSE when the calendar unmounts (portal dispose path fires per target).
 
@@ -84,7 +85,7 @@ const onLoading         = (info) => record('loading', `isLoading=${info?.isLoadi
 const onEventsSet       = (info) => record('eventsSet', `count=${info?.events?.length ?? 0}`)
 
 // View-switch controls the spec drives — timeGridWeek surfaces slotLabel +
-// nowIndicator; dayGridMonth surfaces dayCell / dayHeader / moreLink.
+// nowIndicatorContent; dayGridMonth surfaces dayCell / dayHeader / moreLink.
 const showWeek  = () => { $data.view = 'timeGridWeek' }
 const showMonth = () => { $data.view = 'dayGridMonth' }
 
@@ -148,9 +149,9 @@ const remount  = () => { $data.calendarMounted = true }
       <template #weekNumber="{ arg }">
         <span class="fc-slot-marker" data-testid="slot-weekNumber">W{{ arg.num }}</span>
       </template>
-      <!-- nowIndicator slot (timeGridWeek) -->
-      <template #nowIndicator="{ arg }">
-        <span class="fc-slot-marker" data-testid="slot-nowIndicator">now</span>
+      <!-- nowIndicatorContent slot (timeGridWeek) -->
+      <template #nowIndicatorContent="{ arg }">
+        <span class="fc-slot-marker" data-testid="slot-nowIndicatorContent">now</span>
       </template>
       <!-- moreLink slot (dayMaxEvents overflow) -->
       <template #moreLink="{ arg }">

@@ -180,10 +180,11 @@ $onMount(() => {
   // (core + daygrid + timegrid + interaction). Each guarded by its own slot so
   // unfilled slots keep FullCalendar's default rendering.
   //
-  // NOTE the `nowIndicator` slot SET name ($slots.nowIndicator) shares a string
-  // with the boolean `nowIndicator` PROP — they live in different namespaces
-  // ($slots vs $props); the slot emits the `nowIndicatorContent` option while
-  // the prop reconciles the `nowIndicator` option. No ROZ collision.
+  // NOTE the `nowIndicatorContent` slot is named for its FullCalendar engine
+  // hook (`nowIndicatorContent`) so it does NOT clash with the boolean
+  // `nowIndicator` PROP — a slot name that equals a declared prop name is now a
+  // hard compile error (ROZ127 SLOT_PROP_NAME_COLLISION), because Svelte 5
+  // unifies snippets and props into one `$props` namespace.
   if ($slots.dayCell) {
     opts.dayCellContent = (arg) => {
       const node = document.createElement('div')
@@ -212,10 +213,10 @@ $onMount(() => {
       return { domNodes: [node], dispose }
     }
   }
-  if ($slots.nowIndicator) {
+  if ($slots.nowIndicatorContent) {
     opts.nowIndicatorContent = (arg) => {
       const node = document.createElement('div')
-      const dispose = $portals.nowIndicator(node, { arg })
+      const dispose = $portals.nowIndicatorContent(node, { arg })
       return { domNodes: [node], dispose }
     }
   }
@@ -312,7 +313,7 @@ $expose({ getApi, changeView, addEvent, removeEvent, today, prev, next, gotoDate
 <slot name="dayHeader" portal :params="['arg']" />
 <slot name="slotLabel" portal :params="['arg']" />
 <slot name="weekNumber" portal :params="['arg']" />
-<slot name="nowIndicator" portal :params="['arg']" />
+<slot name="nowIndicatorContent" portal :params="['arg']" />
 <slot name="moreLink" portal :params="['arg']" />
 </template>
 

@@ -214,12 +214,12 @@ The wrapper surfaces **seven** of FullCalendar's `*Content` render hooks as port
 | `dayHeader` | `dayHeaderContent` | Column-header content (`arg.text`, `arg.date`, …) | ✓ |
 | `slotLabel` | `slotLabelContent` | Time-grid axis slot labels (`arg.text`, `arg.date`, …) | |
 | `weekNumber` | `weekNumberContent` | Week-number cell content (`arg.num`, `arg.text`, …) | |
-| `nowIndicator` | `nowIndicatorContent` | Current-time indicator content (`arg.isAxis`, `arg.date`, …) | |
+| `nowIndicatorContent` | `nowIndicatorContent` | Current-time indicator content (`arg.isAxis`, `arg.date`, …) | |
 | `moreLink` | `moreLinkContent` | "+N more" link content (`arg.num`, `arg.text`, …) | |
 
-All seven share the **identical** per-target authoring shape shown below — the only thing that changes is the slot name and the `arg` payload (per FullCalendar's hook for that surface). The three demo-verified slots (`event`, `dayCell`, `dayHeader`) are wired into the VR matrix; the four long-tail slots (`slotLabel`, `weekNumber`, `nowIndicator`, `moreLink`) use the same recipe with no extra ceremony.
+All seven share the **identical** per-target authoring shape shown below — the only thing that changes is the slot name and the `arg` payload (per FullCalendar's hook for that surface). The three demo-verified slots (`event`, `dayCell`, `dayHeader`) are wired into the VR matrix; the four long-tail slots (`slotLabel`, `weekNumber`, `nowIndicatorContent`, `moreLink`) use the same recipe with no extra ceremony.
 
-> The `nowIndicator` **slot** (`#nowIndicator`) and the boolean `nowIndicator` **prop** share a name but live in different namespaces — the slot emits FullCalendar's `nowIndicatorContent` option, the prop toggles the `nowIndicator` option. Filling the slot does not enable the indicator; set the prop too.
+> The current-time-indicator **slot** is named `nowIndicatorContent` (after FullCalendar's `nowIndicatorContent` option) so it does **not** clash with the boolean `nowIndicator` **prop** — a slot whose name equals a declared prop name is a hard compile error in Rozie (Svelte 5 unifies snippets and props into one `$props` namespace). Fill `#nowIndicatorContent` to customize the indicator content, and set the `nowIndicator` prop to `true` to actually enable it.
 
 ### Custom event content
 
@@ -361,13 +361,13 @@ The Solid (`dayHeader={…}`), Svelte (`{#snippet dayHeader(…)}`), Angular (`<
 
 ### The long-tail slots
 
-`slotLabel`, `weekNumber`, `nowIndicator`, and `moreLink` use the **same shared recipe** — fill the like-named slot and read its `arg`. Each maps one-to-one to a FullCalendar `*Content` option:
+`slotLabel`, `weekNumber`, `nowIndicatorContent`, and `moreLink` use the **same shared recipe** — fill the like-named slot and read its `arg`. Each maps one-to-one to a FullCalendar `*Content` option:
 
 | Slot | Option | Typical `arg` fields |
 | --- | --- | --- |
 | `slotLabel` | `slotLabelContent` | `arg.text`, `arg.date` |
 | `weekNumber` | `weekNumberContent` | `arg.num`, `arg.text` |
-| `nowIndicator` | `nowIndicatorContent` | `arg.isAxis`, `arg.date` |
+| `nowIndicatorContent` | `nowIndicatorContent` | `arg.isAxis`, `arg.date` |
 | `moreLink` | `moreLinkContent` | `arg.num`, `arg.text` |
 
 For example, a custom week-number badge in Vue:

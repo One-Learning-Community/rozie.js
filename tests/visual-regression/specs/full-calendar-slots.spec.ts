@@ -25,7 +25,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  *   - dayGridMonth (default): event, dayCell, dayHeader, weekNumber
  *     (weekNumbers:true), and moreLink (dayMaxEvents:2 overflow — the demo
  *     seeds 4 events on one day)
- *   - timeGridWeek (via the demo's `view-week` control): slotLabel, nowIndicator
+ *   - timeGridWeek (via the demo's `view-week` control): slotLabel,
+ *     nowIndicatorContent
  *
  * DISPOSE: flipping the demo's `teardown` r-if gate must drop every slot marker
  * to count 0 — the portal dispose path firing across all 6 targets.
@@ -144,20 +145,20 @@ for (const target of TARGETS) {
     await expect(mount.getByTestId('slot-slotLabel')).not.toHaveCount(0, {
       timeout: 10_000,
     });
-    // nowIndicator slot — DOCUMENTED behavioral-coverage gap (logged, not
+    // nowIndicatorContent slot — DOCUMENTED behavioral-coverage gap (logged, not
     // silently dropped, per 28-SPEC §4 "long-tail slots ... logged, not silently
-    // dropped"). FullCalendar only fires `nowIndicatorContent` (the portal hook
-    // backing the nowIndicator slot) when (a) `nowIndicator: true` is enabled AND
-    // (b) the real "now" falls inside the displayed time-grid window. Enabling it
-    // is blocked by a genuine prop/slot collision: the curated `nowIndicator`
-    // boolean prop (default `false`) is spread AFTER `...$props.options` in the
-    // wrapper, so a passthrough `nowIndicator: true` is clobbered; and passing the
-    // curated `:nowIndicator="true"` prop ALONGSIDE a filled `#nowIndicator` slot
-    // shadows the Svelte consumer snippet (`snippet ... shadowing the prop
-    // nowIndicator`). Resolving it cleanly needs a wrapper/emitter change (the
-    // same nowIndicator prop/slot collision class 28-02 fixed for the producer
-    // member name) — out of scope for 28-04's verification spine. The slot is
-    // PROVEN to MOUNT (its `if ($slots.nowIndicator)` wiring + the producer
+    // dropped"). FullCalendar only fires `nowIndicatorContent` (the engine hook
+    // backing the nowIndicatorContent slot) when (a) `nowIndicator: true` is
+    // enabled AND (b) the real "now" falls inside the displayed time-grid window.
+    // The slot was RENAMED from `nowIndicator` → `nowIndicatorContent` (matching
+    // its FullCalendar engine hook) to clear the prop/slot name collision that the
+    // boolean `nowIndicator` prop created — a slot name equal to a declared prop
+    // name is now a hard compile error (ROZ127 SLOT_PROP_NAME_COLLISION), because
+    // Svelte 5 unifies snippets and props into one `$props` namespace. Enabling
+    // the engine render still depends on the passthrough `nowIndicator: true`
+    // landing AND the real "now" falling inside the window, so the engine-render
+    // gesture remains undeterminable in this deterministic spec. The slot is
+    // PROVEN to MOUNT (its `if ($slots.nowIndicatorContent)` wiring + the producer
     // disambiguation are emitter-tested); only the engine-render gesture is
     // undeterminable here. The other six slots are asserted live below + above.
 
@@ -193,7 +194,7 @@ for (const target of TARGETS) {
       'slot-dayHeader',
       'slot-slotLabel',
       'slot-weekNumber',
-      'slot-nowIndicator',
+      'slot-nowIndicatorContent',
       'slot-moreLink',
     ]) {
       await expect(mount.getByTestId(slot)).toHaveCount(0, { timeout: 10_000 });
