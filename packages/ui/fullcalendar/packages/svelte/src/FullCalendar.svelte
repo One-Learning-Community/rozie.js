@@ -87,7 +87,7 @@ const dayCell = $derived(__dayCellProp ?? snippets?.dayCell);
 const dayHeader = $derived(__dayHeaderProp ?? snippets?.dayHeader);
 const slotLabel = $derived(__slotLabelProp ?? snippets?.slotLabel);
 const weekNumber = $derived(__weekNumberProp ?? snippets?.weekNumber);
-const nowIndicator = $derived(__nowIndicatorProp ?? snippets?.nowIndicator);
+const nowIndicatorSlot = $derived(__nowIndicatorProp ?? snippets?.nowIndicator);
 const moreLink = $derived(__moreLinkProp ?? snippets?.moreLink);
 
 let __rozieRoot = $state<HTMLElement | undefined>(undefined);
@@ -220,12 +220,12 @@ const portals = {
     };
   },
   nowIndicator: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
-    if (!nowIndicator) return () => {};
+    if (!nowIndicatorSlot) return () => {};
     // Spike 004: portal-scope attribute injection.
     container.setAttribute('data-rozie-portal-nowIndicator', '5589629a');
     const inst = mount(PortalHost, {
       target: container,
-      props: { snippet: nowIndicator, scope },
+      props: { snippet: nowIndicatorSlot, scope },
     });
     portalInstances.add(inst as Record<string, unknown>);
     return () => {
@@ -463,7 +463,7 @@ onMount(() => {
       };
     };
   }
-  if (nowIndicator) {
+  if (nowIndicatorSlot) {
     opts.nowIndicatorContent = (arg: any) => {
       const node = document.createElement('div');
       const dispose = portals.nowIndicator(node, {
