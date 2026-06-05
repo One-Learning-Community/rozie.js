@@ -184,9 +184,9 @@ const readApiTitle = () => {
     <h4>Bound state</h4>
     <dl class="state">
       <dt>now-indicator</dt>
-      <dd><code data-testid="state-now-indicator">{{ $data.nowIndicator }}</code></dd>
+      <dd><code data-testid="state-now-indicator">{{ $data.nowIndicator ? 'true' : 'false' }}</code></dd>
       <dt>weekends</dt>
-      <dd><code data-testid="state-weekends">{{ $data.weekends }}</code></dd>
+      <dd><code data-testid="state-weekends">{{ $data.weekends ? 'true' : 'false' }}</code></dd>
       <dt>last event</dt>
       <dd><code data-testid="state-last-event">{{ $data.lastEvent ? $data.lastEvent.type : '(none)' }}</code></dd>
       <dt>last detail</dt>
