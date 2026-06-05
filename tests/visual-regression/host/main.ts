@@ -150,6 +150,17 @@ export const EXAMPLES = [
   // in matrix.spec.ts EXAMPLES. Distinct from the existing 'Flatpickr' wrapper
   // screenshot cell (FlatpickrDemo.rozie), which stays byte-untouched.
   'FlatpickrBehavior',
+  // Phase 27 (fullcalendar) D-03 — FullCalendarBehavior is the behavioral-only
+  // demo for the EXPANDED FullCalendar surface (the new runtime-updatable props
+  // nowIndicator/weekends, the new select/eventResize/datesSet events, and the
+  // $expose handle next()/getApi()). Loader resolves to
+  // examples/demos/FullCalendarBehaviorDemo.rozie (which imports
+  // ../../packages/ui/fullcalendar/src/FullCalendar.rozie). Built for all 6
+  // targets but NOT a screenshot cell — covered by full-calendar-behavior.spec.ts
+  // (structural/behavioral assertions), deliberately NOT in matrix.spec.ts
+  // EXAMPLES. Distinct from the existing 'FullCalendar' wrapper cell
+  // (FullCalendarDemo.rozie), which stays byte-untouched.
+  'FullCalendarBehavior',
   // Phase 24 (security-self-test-battery) D-11 — base example; the loader
   // resolves directly to examples/RHtml.rozie (no demo sibling). Its String
   // `content` prop has a non-empty static-HTML default, so the cell renders raw
@@ -217,6 +228,9 @@ export const LIT_TAGS: Record<Example, string> = {
   // Quick 260601-x2p — the lit entry appends '-demo' → tag
   // 'rozie-flatpickr-behavior-demo' = kebab of FlatpickrBehaviorDemo.
   FlatpickrBehavior: 'rozie-flatpickr-behavior',
+  // Phase 27 — the lit entry appends '-demo' → tag
+  // 'rozie-full-calendar-behavior-demo' = kebab of FullCalendarBehaviorDemo.
+  FullCalendarBehavior: 'rozie-full-calendar-behavior',
   // Phase 24 — kebab tag for the r-html fixture (matches the Lit-emitted
   // @customElement('rozie-r-html') in RHtml.lit.ts).
   RHtml: 'rozie-r-html',
@@ -318,6 +332,11 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // Quick 260601-x2p — self-contained; all reactive state lives in the demo's
   // <data> (picked / disableWeekends / lang / rangeValue / rangeEnabled).
   FlatpickrBehavior: {},
+  // Phase 27 — self-contained; all reactive state lives in the demo's <data>
+  // (view / events / nowIndicator / weekends / lastEvent / apiTitle), seeded in
+  // $onMount. The FullCalendar wrapper itself has props, but the demo consumer
+  // is self-contained, so {}.
+  FullCalendarBehavior: {},
   // Phase 24 — RHtml is self-contained: its `content` String prop has a
   // non-empty static-HTML default ('<strong>safe</strong>'), so no parent props
   // are needed for the cell to render visible raw HTML.

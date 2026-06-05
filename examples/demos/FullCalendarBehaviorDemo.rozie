@@ -1,0 +1,279 @@
+<!--
+  FullCalendarBehaviorDemo.rozie — behavioral companion for FullCalendar.
+
+  Where FullCalendarDemo.rozie is the screenshot cell (portal-slot + the old
+  7-prop / 3-event surface), THIS demo proves the EXPANDED surface BEHAVES at
+  runtime — not just compile. One .rozie source compiles to six per-framework
+  consumers, each driving the SAME live FullCalendar instance through the
+  wrapper's $watch reconcilers, $emit callbacks, and $expose handle.
+
+  Exercises (D-03 — all 6 targets, maximal breadth to catch per-target
+  handle/event divergences):
+
+    - NEW runtime-updatable props — `nowIndicator` + `weekends` toggled at
+      runtime; flipping each re-runs the wrapper's
+      `$watch(() => $props.X) → instance.setOption('X', v)` reconciler on the
+      LIVE calendar WITHOUT remount (no `:key` swap).
+
+    - NEW events — `select` (range drag), `eventResize` (event edge drag), and
+      `datesSet` (fires on every navigation, incl. the handle `next()` below).
+      Each emitted payload is captured into `$data.lastEvent` with the
+      REQ-27-3 shape keys and surfaced in the state pane.
+
+    - The `$expose` HANDLE — driven via the framework-native component ref
+      (`ref="cal"` → `$refs.cal`), NOT a `$refs` element read. The handle
+      buttons call `$refs.cal.next()` / `$refs.cal.getApi()` from inside a
+      `@click` handler (post-mount — `$refs` are only safe after mount; a
+      handler fires only on user interaction, so this is mount-safe on every
+      target). `next()` advances the active date range; the resulting
+      `datesSet` proves the handle reached the live engine. `getApi()` returns
+      the raw Calendar instance, from which we read `view.title` for the state
+      pane (the visible proof that the handle round-trips to the engine).
+-->
+
+<rozie name="FullCalendarBehaviorDemo">
+
+<components>
+{
+  FullCalendar: '../../packages/ui/fullcalendar/src/FullCalendar.rozie',
+}
+</components>
+
+<data>
+{
+  view: 'dayGridMonth',
+  events: [],
+  nowIndicator: false,
+  weekends: true,
+  lastEvent: null,
+  apiTitle: '',
+}
+</data>
+
+<script>
+const sampleEvents = () => {
+  // Seed three events anchored to "today" so the demo is self-contained.
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const day = (offset) => {
+    const d = new Date(today)
+    d.setDate(d.getDate() + offset)
+    return d.toISOString().slice(0, 10)
+  }
+  return [
+    { id: 'b-1', title: 'Standup',       start: day(0) },
+    { id: 'b-2', title: 'Sprint review', start: day(2), end: day(4) },
+    { id: 'b-3', title: 'Retro',         start: day(5) },
+  ]
+}
+
+$onMount(() => {
+  $data.events = sampleEvents()
+  return undefined
+})
+
+// NEW events — each captured with its REQ-27-3 payload shape keys. The state
+// pane renders a compact summary the behavioral spec asserts against.
+const onSelect = (info) => {
+  $data.lastEvent = {
+    type: 'select',
+    detail: `${info?.startStr ?? '?'} → ${info?.endStr ?? '?'} (allDay=${info?.allDay})`,
+  }
+}
+const onEventResize = (info) => {
+  $data.lastEvent = {
+    type: 'eventResize',
+    detail: `${info?.event?.title ?? '?'} (id=${info?.event?.id ?? '?'})`,
+  }
+}
+const onDatesSet = (info) => {
+  // datesSet fires on every navigation — including the handle next() below.
+  $data.lastEvent = {
+    type: 'datesSet',
+    detail: `${info?.view ?? '?'}`,
+  }
+}
+
+// NEW runtime-updatable props — toggled live (no remount).
+const toggleNowIndicator = () => { $data.nowIndicator = !$data.nowIndicator }
+const toggleWeekends     = () => { $data.weekends = !$data.weekends }
+
+// $expose HANDLE — driven via the FRAMEWORK-NATIVE component ref (`ref="cal"`
+// → `$refs.cal`), NOT a `$refs` element read. The handle is reachable only
+// after mount, so these run from @click handlers (never a $computed or template
+// binding). `next()` advances the active range → fires datesSet (the engine
+// proof the handle reached the live Calendar); `getApi()` returns the raw
+// Calendar, whose `view.title` we reflect into the state pane.
+//
+// Per-target ref idiom note: the native component ref resolves to the exposed
+// handle on React (useImperativeHandle), Vue (defineExpose instance), Svelte
+// (instance export), Lit (custom-element public method), and Solid (callback
+// ref receives the handle object). On Angular the ref resolves to the host
+// ElementRef rather than the component instance, so the verbs may be absent —
+// every call below is fully optional-chained so the demo NEVER throws on any
+// target. The cross-target view-advance proof the spec asserts is the
+// engine-native toolbar `next` button → datesSet (target-agnostic); these
+// handle buttons additionally exercise the $expose path where the ref resolves.
+const advance = () => {
+  const handle = $refs.cal
+  handle?.next?.()
+  const api = handle?.getApi?.()
+  $data.apiTitle = api?.view?.title ?? ''
+}
+const readApiTitle = () => {
+  const handle = $refs.cal
+  const api = handle?.getApi?.()
+  $data.apiTitle = api?.view?.title ?? ''
+}
+</script>
+
+<template>
+<div class="fc-behavior-demo">
+  <header>
+    <h3>FullCalendar behavioral demo</h3>
+    <p class="hint">Proves the <em>expanded</em> surface behaves at runtime: live <code>nowIndicator</code>/<code>weekends</code> reconcilers, the new <code>select</code>/<code>eventResize</code>/<code>datesSet</code> events, and the <code>$expose</code> handle (<code>next()</code> + <code>getApi()</code>) — all driving one live FullCalendar instance.</p>
+  </header>
+
+  <div class="control-row">
+    <span class="row-label">Props</span>
+    <button
+      type="button"
+      data-testid="toggle-now-indicator"
+      :class="{ active: $data.nowIndicator }"
+      @click="toggleNowIndicator"
+    >Now indicator</button>
+    <button
+      type="button"
+      data-testid="toggle-weekends"
+      :class="{ active: $data.weekends }"
+      @click="toggleWeekends"
+    >Weekends</button>
+  </div>
+
+  <div class="control-row">
+    <span class="row-label">Handle</span>
+    <button
+      type="button"
+      data-testid="handle-next"
+      @click="advance"
+    >next()</button>
+    <button
+      type="button"
+      data-testid="handle-get-api"
+      @click="readApiTitle"
+    >getApi().view.title</button>
+  </div>
+
+  <div class="calendar-wrap">
+    <FullCalendar
+      ref="cal"
+      r-model:view="$data.view"
+      :events="$data.events"
+      :height="420"
+      :now-indicator="$data.nowIndicator"
+      :weekends="$data.weekends"
+      :selectable="true"
+      :editable="true"
+      @select="onSelect"
+      @eventResize="onEventResize"
+      @datesSet="onDatesSet"
+    />
+  </div>
+
+  <aside class="state-pane">
+    <h4>Bound state</h4>
+    <dl class="state">
+      <dt>now-indicator</dt>
+      <dd><code data-testid="state-now-indicator">{{ $data.nowIndicator }}</code></dd>
+      <dt>weekends</dt>
+      <dd><code data-testid="state-weekends">{{ $data.weekends }}</code></dd>
+      <dt>last event</dt>
+      <dd><code data-testid="state-last-event">{{ $data.lastEvent ? $data.lastEvent.type : '(none)' }}</code></dd>
+      <dt>last detail</dt>
+      <dd><code data-testid="state-last-detail">{{ $data.lastEvent ? $data.lastEvent.detail : '(none)' }}</code></dd>
+      <dt>api view title</dt>
+      <dd><code data-testid="state-api-title">{{ $data.apiTitle || '(none)' }}</code></dd>
+    </dl>
+  </aside>
+</div>
+</template>
+
+<style>
+.fc-behavior-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  max-width: 860px;
+}
+
+header h3 { margin: 0 0 0.25rem; font-size: 1.125rem; }
+header .hint { margin: 0 0 1rem; color: rgba(0, 0, 0, 0.55); font-size: 0.875rem; }
+header em { font-style: italic; color: rgba(0, 0, 0, 0.7); }
+header code { background: rgba(0, 0, 0, 0.04); padding: 0.0625rem 0.25rem; border-radius: 2px; font-size: 0.85em; }
+
+.control-row {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin: 0 0 0.625rem;
+}
+.row-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: rgba(0, 0, 0, 0.55);
+  min-width: 4rem;
+}
+.control-row button {
+  padding: 0.375rem 0.75rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.875rem;
+}
+.control-row button.active {
+  background: #1a1a1a;
+  color: white;
+  border-color: #1a1a1a;
+}
+
+.calendar-wrap {
+  margin: 0.75rem 0 1rem;
+  padding: 0.5rem;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 6px;
+  background: white;
+}
+
+.state-pane h4 {
+  margin: 0 0 0.5rem;
+  font-size: 0.875rem;
+  color: rgba(0, 0, 0, 0.55);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.state {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.375rem 0.75rem;
+  margin: 0;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 6px;
+  font-size: 0.875rem;
+}
+.state dt { color: rgba(0, 0, 0, 0.55); font-weight: 500; }
+.state dd { margin: 0; }
+.state code {
+  font-family: ui-monospace, monospace;
+  font-size: 0.85em;
+  background: rgba(0, 0, 0, 0.04);
+  padding: 0.0625rem 0.25rem;
+  border-radius: 2px;
+}
+</style>
+
+</rozie>
