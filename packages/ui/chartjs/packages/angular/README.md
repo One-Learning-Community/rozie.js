@@ -43,6 +43,8 @@ export class DemoComponent {
 | `updateMode` | `String` | `undefined` |  |  |
 | `redraw` | `Boolean` | `false` |  |  |
 | `ariaLabel` | `String` | `undefined` |  |  |
+| `datasetIdKey` | `String` | `"label"` |  |  |
+| `destroyDelay` | `Number` | `0` |  |  |
 
 ## Events
 
@@ -80,4 +82,5 @@ export class DemoComponent {
 
 | Slot | Params |
 | --- | --- |
+| fallback |  |
 | tooltip | model |

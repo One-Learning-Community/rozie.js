@@ -1,7 +1,8 @@
 <template>
 
 <div class="rozie-chart" :style="{ height: props.height + 'px', width: props.width ? props.width + 'px' : undefined }">
-  <canvas ref="canvasElRef" role="img" :aria-label="props.ariaLabel"></canvas>
+  
+  <canvas ref="canvasElRef" role="img" :aria-label="props.ariaLabel"><slot name="fallback"></slot></canvas>
 </div>
 
 
@@ -12,11 +13,11 @@
 import { Fragment, h, onBeforeUnmount, onMounted, ref, render, useSlots, watch } from 'vue';
 
 const props = withDefaults(
-  defineProps<{ data?: Record<string, any>; options?: Record<string, any>; type?: string; height?: number; width?: number; plugins?: any[]; updateMode?: string; redraw?: boolean; ariaLabel?: string }>(),
+  defineProps<{ data?: Record<string, any>; options?: Record<string, any>; type?: string; height?: number; width?: number; plugins?: any[]; updateMode?: string; redraw?: boolean; ariaLabel?: string; datasetIdKey?: string; destroyDelay?: number }>(),
   { data: () => ({
   labels: [],
   datasets: []
-}), options: () => ({}), type: 'line', height: 240, width: undefined, plugins: () => [], updateMode: undefined, redraw: false, ariaLabel: undefined }
+}), options: () => ({}), type: 'line', height: 240, width: undefined, plugins: () => [], updateMode: undefined, redraw: false, ariaLabel: undefined, datasetIdKey: 'label', destroyDelay: 0 }
 );
 
 const emit = defineEmits<{
@@ -26,6 +27,7 @@ const emit = defineEmits<{
 }>();
 
 defineSlots<{
+  fallback(props: {  }): any;
   tooltip(props: { model: any }): any;
 }>();
 
@@ -271,7 +273,15 @@ onMounted(() => {
   _cleanup_0 = () => {
     tooltipDispose?.();
     tooltipEl?.remove();
-    instance?.destroy();
+    // destroyDelay (vue-chartjs parity): defer destroy() so any exit transition
+    // can finish. The captured `dying` instance is destroyed after the grace;
+    // 0 (default) destroys synchronously.
+    const dying = instance;
+    if (props.destroyDelay > 0) {
+      setTimeout(() => dying?.destroy(), props.destroyDelay);
+    } else {
+      dying?.destroy();
+    }
   };
 });
 onBeforeUnmount(() => { _cleanup_0?.(); });
@@ -293,12 +303,29 @@ watch(() => props.data, (v: any) => {
   live.labels ??= [];
   live.labels.length = 0;
   live.labels.push(...(next.labels ?? []));
+
+  // Datasets are matched by `ds[datasetIdKey]` (default 'label') so a stable
+  // keyed dataset reconciles onto its prior slot even if its array index moved —
+  // this guards the "first dataset copied over the others" hazard react-chartjs-2
+  // documents. Datasets without the key fall back to positional (index) matching.
   live.datasets ??= [];
   const nextSets = next.datasets ?? [];
-  nextSets.forEach((ds: any, i: any) => {
-    if (live.datasets[i]) Object.assign(live.datasets[i], ds);else live.datasets[i] = ds;
+  const key = props.datasetIdKey;
+  const prev = live.datasets.slice();
+  const byKey = new Map();
+  prev.forEach((ds: any, i: any) => {
+    if (ds && ds[key] != null) byKey.set(ds[key], ds);
   });
-  live.datasets.length = nextSets.length;
+  const merged = nextSets.map((ds: any, i: any) => {
+    const match = ds && ds[key] != null && byKey.get(ds[key]) || prev[i];
+    if (match) {
+      Object.assign(match, ds);
+      return match;
+    }
+    return ds;
+  });
+  live.datasets.length = 0;
+  live.datasets.push(...merged);
   instance.update(props.updateMode);
 }, { immediate: true });
 watch(() => props.options, () => {

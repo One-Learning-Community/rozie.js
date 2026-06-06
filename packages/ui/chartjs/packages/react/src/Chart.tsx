@@ -21,9 +21,12 @@ interface ChartProps {
   updateMode?: string;
   redraw?: boolean;
   ariaLabel?: string;
+  datasetIdKey?: string;
+  destroyDelay?: number;
   onClick?: (...args: any[]) => void;
   onDatasetClick?: (...args: any[]) => void;
   onHover?: (...args: any[]) => void;
+  renderFallback?: () => ReactNode;
   renderTooltip?: (ctx: TooltipCtx) => ReactNode;
   slots?: Record<string, () => import('react').ReactNode>;
 }
@@ -47,7 +50,7 @@ const Chart = forwardRef<ChartHandle, ChartProps>(function Chart(_props: ChartPr
   }))())[0];
   const __defaultOptions = useState(() => (() => ({}))())[0];
   const __defaultPlugins = useState(() => (() => [])())[0];
-  const props: Omit<ChartProps, 'data' | 'options' | 'type' | 'height' | 'width' | 'plugins' | 'updateMode' | 'redraw' | 'ariaLabel'> & { data: Record<string, any>; options: Record<string, any>; type: string; height: number; width: number; plugins: any[]; updateMode: string; redraw: boolean; ariaLabel: string } = {
+  const props: Omit<ChartProps, 'data' | 'options' | 'type' | 'height' | 'width' | 'plugins' | 'updateMode' | 'redraw' | 'ariaLabel' | 'datasetIdKey' | 'destroyDelay'> & { data: Record<string, any>; options: Record<string, any>; type: string; height: number; width: number; plugins: any[]; updateMode: string; redraw: boolean; ariaLabel: string; datasetIdKey: string; destroyDelay: number } = {
     ..._props,
     data: _props.data ?? __defaultData,
     options: _props.options ?? __defaultOptions,
@@ -58,6 +61,8 @@ const Chart = forwardRef<ChartHandle, ChartProps>(function Chart(_props: ChartPr
     updateMode: _props.updateMode ?? undefined,
     redraw: _props.redraw ?? false,
     ariaLabel: _props.ariaLabel ?? undefined,
+    datasetIdKey: _props.datasetIdKey ?? 'label',
+    destroyDelay: _props.destroyDelay ?? 0,
   };
   const _renderTooltipRef = useRef(props.renderTooltip);
   _renderTooltipRef.current = props.renderTooltip;
@@ -267,9 +272,17 @@ const Chart = forwardRef<ChartHandle, ChartProps>(function Chart(_props: ChartPr
   portalRoots.current.clear();
       tooltipDispose.current?.();
       tooltipEl.current?.remove();
-      instance.current?.destroy();
+      // destroyDelay (vue-chartjs parity): defer destroy() so any exit transition
+      // can finish. The captured `dying` instance is destroyed after the grace;
+      // 0 (default) destroys synchronously.
+      const dying = instance.current;
+      if (props.destroyDelay > 0) {
+        setTimeout(() => dying?.destroy(), props.destroyDelay);
+      } else {
+        dying?.destroy();
+      }
     };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     const v = props.data;
     if (!instance.current) return;
@@ -288,12 +301,29 @@ const Chart = forwardRef<ChartHandle, ChartProps>(function Chart(_props: ChartPr
     live.labels ??= [];
     live.labels.length = 0;
     live.labels.push(...(next.labels ?? []));
+
+    // Datasets are matched by `ds[datasetIdKey]` (default 'label') so a stable
+    // keyed dataset reconciles onto its prior slot even if its array index moved —
+    // this guards the "first dataset copied over the others" hazard react-chartjs-2
+    // documents. Datasets without the key fall back to positional (index) matching.
     live.datasets ??= [];
     const nextSets = next.datasets ?? [];
-    nextSets.forEach((ds: any, i: any) => {
-      if (live.datasets[i]) Object.assign(live.datasets[i], ds);else live.datasets[i] = ds;
+    const key = props.datasetIdKey;
+    const prev = live.datasets.slice();
+    const byKey = new Map();
+    prev.forEach((ds: any, i: any) => {
+      if (ds && ds[key] != null) byKey.set(ds[key], ds);
     });
-    live.datasets.length = nextSets.length;
+    const merged = nextSets.map((ds: any, i: any) => {
+      const match = ds && ds[key] != null && byKey.get(ds[key]) || prev[i];
+      if (match) {
+        Object.assign(match, ds);
+        return match;
+      }
+      return ds;
+    });
+    live.datasets.length = 0;
+    live.datasets.push(...merged);
     instance.current.update(props.updateMode);
   }, [props.data]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
@@ -316,7 +346,8 @@ const Chart = forwardRef<ChartHandle, ChartProps>(function Chart(_props: ChartPr
   return (
     <>
     <div className={"rozie-chart"} style={{ height: props.height + 'px', width: props.width ? props.width + 'px' : undefined }} data-rozie-s-2228fabc="">
-      <canvas ref={canvasEl} role="img" aria-label={props.ariaLabel} data-rozie-s-2228fabc="" />
+      
+      <canvas ref={canvasEl} role="img" aria-label={props.ariaLabel} data-rozie-s-2228fabc="">{(props.renderFallback ?? props.slots?.['fallback'])?.()}</canvas>
     </div>
 
 

@@ -12,9 +12,12 @@ export interface ChartProps {
   updateMode?: string;
   redraw?: boolean;
   ariaLabel?: string;
+  datasetIdKey?: string;
+  destroyDelay?: number;
   onClick?: (...args: unknown[]) => void;
   onDatasetClick?: (...args: unknown[]) => void;
   onHover?: (...args: unknown[]) => void;
+  renderFallback?: () => ReactNode;
   renderTooltip?: (params: { model: () => void }) => ReactNode;
   slots?: Record<string, () => ReactNode>;
 }

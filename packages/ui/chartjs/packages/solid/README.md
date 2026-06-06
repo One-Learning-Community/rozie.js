@@ -38,6 +38,8 @@ export function Demo() {
 | `updateMode` | `String` | `undefined` |  |  |
 | `redraw` | `Boolean` | `false` |  |  |
 | `ariaLabel` | `String` | `undefined` |  |  |
+| `datasetIdKey` | `String` | `"label"` |  |  |
+| `destroyDelay` | `Number` | `0` |  |  |
 
 ## Events
 
@@ -76,4 +78,5 @@ const png = handle?.toBase64Image();
 
 | Slot | Params |
 | --- | --- |
+| fallback |  |
 | tooltip | model |

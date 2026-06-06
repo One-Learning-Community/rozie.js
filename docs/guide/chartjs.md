@@ -148,7 +148,9 @@ el.addEventListener('click', (e) => console.log(e.detail.elements));
 | `plugins` | `Array` | `[]` | ✓ | Per-instance Chart.js `Plugin[]` — the consumer-extensibility passthrough. Merged into the config; changing the array **re-creates** the instance (Chart.js has no stable runtime plugin-swap). See [Extending with `:plugins`](#extending-with-plugins). |
 | `updateMode` | `String` | `undefined` | | The Chart.js [`update` mode](https://www.chartjs.org/docs/latest/developers/api.html#update-mode) string used by the in-place data reconcile (e.g. `"none"` to skip the animation on every data tick). |
 | `redraw` | `Boolean` | `false` | | When `true`, a `data` change **re-creates** the chart wholesale instead of reconciling in place — mirrors react-chartjs-2's `redraw` for charts whose plugins don't survive an in-place update. |
-| `ariaLabel` | `String` | `undefined` | | Accessible label applied to the `<canvas role="img">` (canvas charts are otherwise opaque to assistive tech). |
+| `ariaLabel` | `String` | `undefined` | | Accessible label applied to the `<canvas role="img">` (canvas charts are otherwise opaque to assistive tech). For richer fallback content, fill the [`fallback` slot](#slots). |
+| `datasetIdKey` | `String` | `"label"` | | The dataset-identity key. Across data updates, datasets are matched by `dataset[datasetIdKey]` (falling back to array index when absent), so a stable keyed dataset reconciles onto its prior slot even if its index moved — guarding the "first dataset copied over the others" hazard. |
+| `destroyDelay` | `Number` | `0` | | Milliseconds to defer `chart.destroy()` on unmount so an exit transition can finish. `0` destroys immediately. |
 
 ### Events
 
@@ -194,11 +196,12 @@ const live = chart.current?.getChart();        // the raw Chart.js instance
 
 ## Slots
 
-The wrapper surfaces **one** portal slot — `tooltip` — driven by Chart.js's [external tooltip handler](https://www.chartjs.org/docs/latest/configuration/tooltip.html#external-custom-tooltips). Chart.js paints the chart itself to a `<canvas>` the framework never touches, so the tooltip is the one place a consumer's framework-native fragment can render *over* the chart. The slot is **guarded** — fill it and your fragment renders as an HTML tooltip (the built-in canvas tooltip is disabled); leave it unfilled and Chart.js's default tooltip is used. The slot receives one scope param, `model` — the live tooltip model (`{ title, body, dataPoints, opacity }`).
+The wrapper surfaces a **portal** `tooltip` slot — driven by Chart.js's [external tooltip handler](https://www.chartjs.org/docs/latest/configuration/tooltip.html#external-custom-tooltips) — plus a non-portal `fallback` slot for canvas a11y content. Chart.js paints the chart itself to a `<canvas>` the framework never touches, so the tooltip is the one place a consumer's framework-native fragment can render *over* the chart. The tooltip slot is **guarded** — fill it and your fragment renders as an HTML tooltip (the built-in canvas tooltip is disabled); leave it unfilled and Chart.js's default tooltip is used. It receives one scope param, `model` — the live tooltip model (`{ title, body, dataPoints, opacity }`).
 
 | Slot | Mounts via | Renders | Scope param |
 | --- | --- | --- | --- |
 | `tooltip` | Chart.js `options.plugins.tooltip.external` | An HTML tooltip positioned over the canvas at the active point | `model` |
+| `fallback` | Inside the `<canvas>` element | Accessibility fallback content (read by assistive tech / shown when the canvas can't render); Chart.js paints over it | — |
 
 Each target fills `#tooltip` through its native imperative-render API:
 

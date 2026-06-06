@@ -14,6 +14,9 @@ interface Props {
   updateMode?: string;
   redraw?: boolean;
   ariaLabel?: string;
+  datasetIdKey?: string;
+  destroyDelay?: number;
+  fallback?: Snippet;
   tooltip?: Snippet<[{ model: any }]>;
   snippets?: Record<string, any>;
   onclick?: (...args: unknown[]) => void;
@@ -38,6 +41,9 @@ let {
   updateMode = undefined,
   redraw = false,
   ariaLabel = undefined,
+  datasetIdKey = 'label',
+  destroyDelay = 0,
+  fallback: __fallbackProp,
   tooltip: __tooltipProp,
   snippets,
   onclick,
@@ -45,6 +51,7 @@ let {
   onhover
 }: Props = $props();
 
+const fallback = $derived(__fallbackProp ?? snippets?.fallback);
 const tooltip = $derived(__tooltipProp ?? snippets?.tooltip);
 
 let canvasEl = $state<HTMLElement | undefined>(undefined);
@@ -285,7 +292,15 @@ onMount(() => {
   return () => {
     tooltipDispose?.();
     tooltipEl?.remove();
-    instance?.destroy();
+    // destroyDelay (vue-chartjs parity): defer destroy() so any exit transition
+    // can finish. The captured `dying` instance is destroyed after the grace;
+    // 0 (default) destroys synchronously.
+    const dying = instance;
+    if (destroyDelay > 0) {
+      setTimeout(() => dying?.destroy(), destroyDelay);
+    } else {
+      dying?.destroy();
+    }
   };
 });
 
@@ -306,12 +321,29 @@ $effect(() => { const __watchVal = (() => data)(); untrack(() => ((v: any) => {
   live.labels ??= [];
   live.labels.length = 0;
   live.labels.push(...(next.labels ?? []));
+
+  // Datasets are matched by `ds[datasetIdKey]` (default 'label') so a stable
+  // keyed dataset reconciles onto its prior slot even if its array index moved —
+  // this guards the "first dataset copied over the others" hazard react-chartjs-2
+  // documents. Datasets without the key fall back to positional (index) matching.
   live.datasets ??= [];
   const nextSets = next.datasets ?? [];
-  nextSets.forEach((ds: any, i: any) => {
-    if (live.datasets[i]) Object.assign(live.datasets[i], ds);else live.datasets[i] = ds;
+  const key = datasetIdKey;
+  const prev = live.datasets.slice();
+  const byKey = new Map();
+  prev.forEach((ds: any, i: any) => {
+    if (ds && ds[key] != null) byKey.set(ds[key], ds);
   });
-  live.datasets.length = nextSets.length;
+  const merged = nextSets.map((ds: any, i: any) => {
+    const match = ds && ds[key] != null && byKey.get(ds[key]) || prev[i];
+    if (match) {
+      Object.assign(match, ds);
+      return match;
+    }
+    return ds;
+  });
+  live.datasets.length = 0;
+  live.datasets.push(...merged);
   instance.update(updateMode);
 })(__watchVal)); });
 let __rozieWatchInitial_1 = true;
@@ -328,7 +360,8 @@ $effect(() => { (() => plugins)(); untrack(() => { if (__rozieWatchInitial_3) { 
 
 
 <div class="rozie-chart" style:height={height + 'px'} style:width={width ? width + 'px' : undefined} data-rozie-s-2228fabc>
-  <canvas bind:this={canvasEl} role="img" aria-label={ariaLabel} data-rozie-s-2228fabc></canvas>
+  
+  <canvas bind:this={canvasEl} role="img" aria-label={ariaLabel} data-rozie-s-2228fabc>{@render fallback?.()}</canvas>
 </div>
 
 

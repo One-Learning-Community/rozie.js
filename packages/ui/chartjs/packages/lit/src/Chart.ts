@@ -47,10 +47,14 @@ export default class Chart extends SignalWatcher(LitElement) {
   @property({ type: String, reflect: true }) updateMode: string = undefined;
   @property({ type: Boolean, reflect: true }) redraw: boolean = false;
   @property({ type: String, reflect: true }) ariaLabel: string = undefined;
+  @property({ type: String, reflect: true }) datasetIdKey: string = 'label';
+  @property({ type: Number, reflect: true }) destroyDelay: number = 0;
   @query('[data-rozie-ref="canvasEl"]') private _refCanvasEl!: HTMLElement;
 private __rozieFirstUpdateDone = false;
 private _portalContainers = new Set<HTMLElement>();
 
+  @state() private _hasSlotFallback = false;
+  @queryAssignedElements({ slot: 'fallback', flatten: true }) private _slotFallbackElements!: Element[];
   @state() private _hasSlotTooltip = false;
   @queryAssignedElements({ slot: 'tooltip', flatten: true }) private _slotTooltipElements!: Element[];
   @property({ attribute: false }) tooltip?: (scope: { model: unknown }) => unknown;
@@ -61,6 +65,17 @@ private _portalContainers = new Set<HTMLElement>();
   private _rozieTornDown = false;
 
   private _armListeners(): void {
+    {
+      const slotEl = this.shadowRoot?.querySelector('slot[name="fallback"]');
+      if (slotEl !== null && slotEl !== undefined) {
+        const update = () => { this._hasSlotFallback = this._slotFallbackElements.length > 0; };
+        slotEl.addEventListener('slotchange', update);
+        // CR-05 fix: push cleanup so the listener is removed on disconnectedCallback.
+        this._disconnectCleanups.push(() => slotEl.removeEventListener('slotchange', update));
+        update();
+      }
+    }
+
     {
       const slotEl = this.shadowRoot?.querySelector('slot[name="tooltip"]');
       if (slotEl !== null && slotEl !== undefined) {
@@ -75,6 +90,7 @@ private _portalContainers = new Set<HTMLElement>();
 
   connectedCallback(): void {
     // Phase 07.3.1 D-LIT-15 — pre-seed _hasSlot<X> from light DOM so first render isn't deadlocked.
+    this._hasSlotFallback = Array.from(this.children).some((el) => el.getAttribute('slot') === 'fallback');
     this._hasSlotTooltip = Array.from(this.children).some((el) => el.getAttribute('slot') === 'tooltip');
     super.connectedCallback();
     if (this.hasUpdated && this._rozieTornDown) { this._rozieTornDown = false; this._armListeners(); }
@@ -106,7 +122,15 @@ private _portalContainers = new Set<HTMLElement>();
     this._disconnectCleanups.push((() => {
       this.tooltipDispose?.();
       this.tooltipEl?.remove();
-      this.instance?.destroy();
+      // destroyDelay (vue-chartjs parity): defer destroy() so any exit transition
+      // can finish. The captured `dying` instance is destroyed after the grace;
+      // 0 (default) destroys synchronously.
+      const dying = this.instance;
+      if (this.destroyDelay > 0) {
+        setTimeout(() => dying?.destroy(), this.destroyDelay);
+      } else {
+        dying?.destroy();
+      }
     }));
 
     this.canvasNode = this._refCanvasEl;
@@ -280,12 +304,29 @@ private _portalContainers = new Set<HTMLElement>();
       live.labels ??= [];
       live.labels.length = 0;
       live.labels.push(...(next.labels ?? []));
+
+      // Datasets are matched by `ds[datasetIdKey]` (default 'label') so a stable
+      // keyed dataset reconciles onto its prior slot even if its array index moved —
+      // this guards the "first dataset copied over the others" hazard react-chartjs-2
+      // documents. Datasets without the key fall back to positional (index) matching.
       live.datasets ??= [];
       const nextSets = next.datasets ?? [];
-      nextSets.forEach((ds: any, i: any) => {
-        if (live.datasets[i]) Object.assign(live.datasets[i], ds);else live.datasets[i] = ds;
+      const key = this.datasetIdKey;
+      const prev = live.datasets.slice();
+      const byKey = new Map();
+      prev.forEach((ds: any, i: any) => {
+        if (ds && ds[key] != null) byKey.set(ds[key], ds);
       });
-      live.datasets.length = nextSets.length;
+      const merged = nextSets.map((ds: any, i: any) => {
+        const match = ds && ds[key] != null && byKey.get(ds[key]) || prev[i];
+        if (match) {
+          Object.assign(match, ds);
+          return match;
+        }
+        return ds;
+      });
+      live.datasets.length = 0;
+      live.datasets.push(...merged);
       this.instance.update(this.updateMode);
     })(__watchVal); }
     if (this.__rozieFirstUpdateDone && (changedProperties.has('options'))) { const __watchVal = (() => this.options)(); (() => {
@@ -313,7 +354,8 @@ private _portalContainers = new Set<HTMLElement>();
   render() {
     return html`
 <div class="rozie-chart" style=${styleMap({ height: this.height + 'px', width: this.width ? this.width + 'px' : undefined })} data-rozie-s-2228fabc>
-  <canvas role="img" aria-label=${this.ariaLabel} data-rozie-ref="canvasEl" data-rozie-s-2228fabc></canvas>
+  
+  <canvas role="img" aria-label=${this.ariaLabel} data-rozie-ref="canvasEl" data-rozie-s-2228fabc><slot name="fallback"></slot></canvas>
 </div>
 
 <slot name="tooltip"></slot>

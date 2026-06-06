@@ -38,6 +38,8 @@ Peer dependencies: the `chart.js` engine (`^4`) + `svelte`. Install them alongsi
 | `updateMode` | `String` | `undefined` |  |  |
 | `redraw` | `Boolean` | `false` |  |  |
 | `ariaLabel` | `String` | `undefined` |  |  |
+| `datasetIdKey` | `String` | `"label"` |  |  |
+| `destroyDelay` | `Number` | `0` |  |  |
 
 ## Events
 
@@ -75,4 +77,5 @@ Beyond props, the component exposes imperative methods (declared once in the Roz
 
 | Slot | Params |
 | --- | --- |
+| fallback |  |
 | tooltip | model |

@@ -7,6 +7,8 @@ import { Chart as ChartJS, registerables } from 'chart.js';
 // the consumer has to opt in. registerables is the "kitchen sink" bundle —
 // every controller, so the `type` prop can switch to any chart kind.
 
+interface FallbackCtx {}
+
 interface TooltipCtx {
   $implicit: { model: any };
   model: any;
@@ -19,7 +21,8 @@ interface TooltipCtx {
   template: `
 
     <div class="rozie-chart" [style]="__style">
-      <canvas #canvasEl role="img" [attr.aria-label]="ariaLabel()"></canvas>
+      
+      <canvas #canvasEl role="img" [attr.aria-label]="ariaLabel()"><ng-container *ngTemplateOutlet="(fallbackTpl ?? templates()?.['fallback'])" /></canvas>
     </div>
 
 
@@ -59,10 +62,13 @@ export class Chart {
   updateMode = input<string>(undefined);
   redraw = input<boolean>(false);
   ariaLabel = input<string>(undefined);
+  datasetIdKey = input<string>('label');
+  destroyDelay = input<number>(0);
   canvasEl = viewChild<ElementRef<HTMLElement>>('canvasEl');
   click = output<unknown>();
   datasetClick = output<unknown>();
   hover = output<unknown>();
+  @ContentChild('fallback', { read: TemplateRef }) fallbackTpl?: TemplateRef<FallbackCtx>;
   @ContentChild('tooltip', { read: TemplateRef }) tooltipTpl?: TemplateRef<TooltipCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
   private _portalViews = new Set<EmbeddedViewRef<unknown>>();
@@ -95,12 +101,29 @@ export class Chart {
       live.labels ??= [];
       live.labels.length = 0;
       live.labels.push(...(next.labels ?? []));
+
+      // Datasets are matched by `ds[datasetIdKey]` (default 'label') so a stable
+      // keyed dataset reconciles onto its prior slot even if its array index moved —
+      // this guards the "first dataset copied over the others" hazard react-chartjs-2
+      // documents. Datasets without the key fall back to positional (index) matching.
       live.datasets ??= [];
       const nextSets = next.datasets ?? [];
-      nextSets.forEach((ds: any, i: any) => {
-        if (live.datasets[i]) Object.assign(live.datasets[i], ds);else live.datasets[i] = ds;
+      const key = this.datasetIdKey();
+      const prev = live.datasets.slice();
+      const byKey = new Map();
+      prev.forEach((ds: any, i: any) => {
+        if (ds && ds[key] != null) byKey.set(ds[key], ds);
       });
-      live.datasets.length = nextSets.length;
+      const merged = nextSets.map((ds: any, i: any) => {
+        const match = ds && ds[key] != null && byKey.get(ds[key]) || prev[i];
+        if (match) {
+          Object.assign(match, ds);
+          return match;
+        }
+        return ds;
+      });
+      live.datasets.length = 0;
+      live.datasets.push(...merged);
       this.instance.update(this.updateMode());
     })(__watchVal)); });
     effect(() => { const __watchVal = (() => this.options())(); untracked(() => { if (this.__rozieWatchInitial_1) { this.__rozieWatchInitial_1 = false; return; } (() => {
@@ -270,9 +293,18 @@ export class Chart {
     };
     this.instance = new ChartJS(this.canvasNode, this.buildConfig());
     this.__rozieDestroyRef.onDestroy(() => {
+      const __destroyDelay = this.destroyDelay();
       this.tooltipDispose?.();
       this.tooltipEl?.remove();
-      this.instance?.destroy();
+      // destroyDelay (vue-chartjs parity): defer destroy() so any exit transition
+      // can finish. The captured `dying` instance is destroyed after the grace;
+      // 0 (default) destroys synchronously.
+      const dying = this.instance;
+      if (__destroyDelay > 0) {
+        setTimeout(() => dying?.destroy(), __destroyDelay);
+      } else {
+        dying?.destroy();
+      }
     });
     this.__rozieDestroyRef.onDestroy(() => {
       for (const view of this._portalViews) view.destroy();
@@ -318,7 +350,7 @@ export class Chart {
   static ngTemplateContextGuard(
     _dir: Chart,
     _ctx: unknown,
-  ): _ctx is TooltipCtx {
+  ): _ctx is FallbackCtx | TooltipCtx {
     return true;
   }
 

@@ -39,9 +39,12 @@ interface ChartProps {
   updateMode?: string;
   redraw?: boolean;
   ariaLabel?: string;
+  datasetIdKey?: string;
+  destroyDelay?: number;
   onClick?: (...args: unknown[]) => void;
   onDatasetClick?: (...args: unknown[]) => void;
   onHover?: (...args: unknown[]) => void;
+  fallbackSlot?: JSX.Element;
   tooltipSlot?: (ctx: TooltipSlotCtx) => JSX.Element;
   slots?: Record<string, (ctx: any) => JSX.Element>;
   ref?: (h: ChartHandle) => void;
@@ -62,8 +65,8 @@ export default function Chart(_props: ChartProps): JSX.Element {
   const _merged = mergeProps({ data: (() => ({
   labels: [],
   datasets: []
-}))(), options: (() => ({}))(), type: 'line', height: 240, width: undefined, plugins: (() => [])(), updateMode: undefined, redraw: false, ariaLabel: undefined }, _props);
-  const [local, attrs] = splitProps(_merged, ['data', 'options', 'type', 'height', 'width', 'plugins', 'updateMode', 'redraw', 'ariaLabel', 'ref']);
+}))(), options: (() => ({}))(), type: 'line', height: 240, width: undefined, plugins: (() => [])(), updateMode: undefined, redraw: false, ariaLabel: undefined, datasetIdKey: 'label', destroyDelay: 0 }, _props);
+  const [local, attrs] = splitProps(_merged, ['data', 'options', 'type', 'height', 'width', 'plugins', 'updateMode', 'redraw', 'ariaLabel', 'datasetIdKey', 'destroyDelay', 'ref']);
   onMount(() => { local.ref?.({ getChart, updateChart, resizeChart, resetChart, renderChart, stopChart, clearChart, toBase64Image }); });
 
   const portalDisposers = new Set<() => void>();
@@ -216,7 +219,15 @@ export default function Chart(_props: ChartProps): JSX.Element {
     onCleanup(() => {
     tooltipDispose?.();
     tooltipEl?.remove();
-    instance?.destroy();
+    // destroyDelay (vue-chartjs parity): defer destroy() so any exit transition
+    // can finish. The captured `dying` instance is destroyed after the grace;
+    // 0 (default) destroys synchronously.
+    const dying = instance;
+    if (local.destroyDelay > 0) {
+      setTimeout(() => dying?.destroy(), local.destroyDelay);
+    } else {
+      dying?.destroy();
+    }
   });
   });
   createEffect(() => { const __watchVal = (() => local.data)(); untrack(() => ((v: any) => {
@@ -236,12 +247,29 @@ export default function Chart(_props: ChartProps): JSX.Element {
     live.labels ??= [];
     live.labels.length = 0;
     live.labels.push(...(next.labels ?? []));
+
+    // Datasets are matched by `ds[datasetIdKey]` (default 'label') so a stable
+    // keyed dataset reconciles onto its prior slot even if its array index moved —
+    // this guards the "first dataset copied over the others" hazard react-chartjs-2
+    // documents. Datasets without the key fall back to positional (index) matching.
     live.datasets ??= [];
     const nextSets = next.datasets ?? [];
-    nextSets.forEach((ds: any, i: any) => {
-      if (live.datasets[i]) Object.assign(live.datasets[i], ds);else live.datasets[i] = ds;
+    const key = local.datasetIdKey;
+    const prev = live.datasets.slice();
+    const byKey = new Map();
+    prev.forEach((ds: any, i: any) => {
+      if (ds && ds[key] != null) byKey.set(ds[key], ds);
     });
-    live.datasets.length = nextSets.length;
+    const merged = nextSets.map((ds: any, i: any) => {
+      const match = ds && ds[key] != null && byKey.get(ds[key]) || prev[i];
+      if (match) {
+        Object.assign(match, ds);
+        return match;
+      }
+      return ds;
+    });
+    live.datasets.length = 0;
+    live.datasets.push(...merged);
     instance.update(local.updateMode);
   })(__watchVal)); });
   createEffect(on(() => (() => local.options)(), (v) => untrack(() => (() => {
@@ -324,7 +352,8 @@ export default function Chart(_props: ChartProps): JSX.Element {
   return (
     <>
     <div class={"rozie-chart"} style={{ height: local.height + 'px', width: local.width ? local.width + 'px' : undefined }} data-rozie-s-2228fabc="">
-      <canvas ref={(el) => { canvasElRef = el as HTMLElement; }} role="img" aria-label={local.ariaLabel} data-rozie-s-2228fabc="" />
+      
+      <canvas ref={(el) => { canvasElRef = el as HTMLElement; }} role="img" aria-label={local.ariaLabel} data-rozie-s-2228fabc="">{(_props.fallbackSlot ?? _props.slots?.['fallback']?.({}))}</canvas>
     </div>
 
 

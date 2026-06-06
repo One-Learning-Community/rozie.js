@@ -40,6 +40,8 @@ const data = {
 | `updateMode` | `String` | `undefined` |  |  |
 | `redraw` | `Boolean` | `false` |  |  |
 | `ariaLabel` | `String` | `undefined` |  |  |
+| `datasetIdKey` | `String` | `"label"` |  |  |
+| `destroyDelay` | `Number` | `0` |  |  |
 
 ## Events
 
@@ -80,4 +82,5 @@ const chart = ref();        // template ref
 
 | Slot | Params |
 | --- | --- |
+| fallback |  |
 | tooltip | model |
