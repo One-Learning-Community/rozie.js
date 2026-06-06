@@ -231,6 +231,18 @@ const EXAMPLES = [
   // macOS-rendered PNG is committed here. The BEHAVIORAL coverage (runtime
   // type-switching, @click, :plugins, tooltip slot) lives in chart.spec.ts and
   // is NOT baseline-gated.
+  //
+  // ⚠ FLAGGED (2026-06-05, owner to debug): the FIRST Linux-Docker baseline regen
+  // captured the line + bar cells with AXES drawn but the DATA SERIES not yet
+  // painted (the doughnut completed) — a per-target on-load render-timing
+  // discrepancy the owner confirms predates this port (the old LineChart demo had
+  // it too). The settle-poll below was hardened (shadow-DOM-piercing + a
+  // saturated/"colored" pixel gate so axes-only no longer satisfies it), which
+  // renders all three cells correctly LOCALLY, but the cross-target first-paint
+  // discrepancy is a separate engine-wrapper issue to resolve before a shared
+  // baseline is blessed. Deliberately left baseline-gated (no flaky PNG shipped,
+  // per feedback_vr_linux_baselines + the canvas-VR fallback clause). See
+  // .planning/todos/pending/chartjs-onload-render-discrepancy.md.
   'ChartScreenshot',
 ] as const;
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'] as const;
@@ -431,26 +443,50 @@ async function settleExample(
       .poll(
         async () =>
           page.evaluate(() => {
-            const canvases = Array.from(document.querySelectorAll('canvas'));
+            // Pierce shadow roots: the Lit target mounts its canvases inside a
+            // shadow DOM, where a plain `document.querySelectorAll('canvas')`
+            // can't see them. Recurse through every element's shadowRoot.
+            const collect = (root: Document | ShadowRoot, acc: HTMLCanvasElement[]) => {
+              for (const el of Array.from(root.querySelectorAll('*'))) {
+                if (el.tagName === 'CANVAS') acc.push(el as HTMLCanvasElement);
+                const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+                if (sr) collect(sr, acc);
+              }
+              return acc;
+            };
+            const canvases = collect(document, []);
             if (canvases.length < 3) return 0;
+            // Count COLORED (saturated) pixels, not just any painted pixel:
+            // axes / grid lines / labels are gray-to-black (low saturation) and
+            // paint FIRST, while the data series are saturated colors (blue line,
+            // green bars, colored doughnut segments). A plain "any painted pixel"
+            // gate is satisfied by the axes alone, so it can clip before the
+            // series draws (the line/bar empty-axes capture). Requiring a healthy
+            // count of saturated pixels per canvas ensures the DATA has rendered.
             return canvases.filter((c) => {
-              const ctx = (c as HTMLCanvasElement).getContext('2d');
+              const ctx = c.getContext('2d');
               if (!ctx) return false;
-              const { data } = ctx.getImageData(
-                0,
-                0,
-                (c as HTMLCanvasElement).width,
-                (c as HTMLCanvasElement).height,
-              );
-              let n = 0;
-              for (let i = 3; i < data.length; i += 4) if (data[i] > 0) n++;
-              return n > 100;
+              const { data } = ctx.getImageData(0, 0, c.width, c.height);
+              let colored = 0;
+              for (let i = 0; i < data.length; i += 4) {
+                if (data[i + 3] === 0) continue;
+                const r = data[i];
+                const g = data[i + 1];
+                const b = data[i + 2];
+                const max = Math.max(r, g, b);
+                const min = Math.min(r, g, b);
+                if (max - min > 30) colored++;
+              }
+              return colored > 200;
             }).length;
           }),
-        { timeout: 8_000, intervals: [200, 400, 800, 1600] },
+        { timeout: 10_000, intervals: [200, 400, 800, 1600] },
       )
-      .toBe(3);
-    await page.waitForTimeout(250);
+      .toBeGreaterThanOrEqual(3);
+    // Belt-and-suspenders: animation is off, so once every chart's series has
+    // drawn the frame is final. A short settle absorbs any ResizeObserver
+    // re-layout pass before the clip.
+    await page.waitForTimeout(400);
   }
 }
 
