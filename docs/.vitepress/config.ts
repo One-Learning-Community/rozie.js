@@ -128,6 +128,10 @@ export default defineConfig({
           text: '@rozie-ui/codemirror',
           items: [{ text: 'CodeMirror — showcase & API', link: '/guide/codemirror' }],
         },
+        {
+          text: '@rozie-ui/chartjs',
+          items: [{ text: 'Chart.js — showcase & API', link: '/guide/chartjs' }],
+        },
       ],
       '/compatibility': [
         {
