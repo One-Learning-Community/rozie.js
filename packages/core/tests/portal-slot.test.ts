@@ -67,6 +67,51 @@ describe('portal-slot primitive — Spike 003', () => {
     expect(portal!.params.map((p) => p.name)).toContain('arg');
   });
 
+  it('reactive+portal: <slot portal reactive /> lowers with isPortal=true AND isReactive=true', () => {
+    const withReactivePortal = SOURCE.replace(
+      '<div class="demo" />',
+      '<div class="demo"><slot name="event" portal reactive :params="[\'arg\']" /></div>',
+    );
+    const parseRes = parse(withReactivePortal);
+    expect(parseRes.ast).not.toBeNull();
+    const { ir } = lowerToIR(parseRes.ast!, { modifierRegistry: createDefaultRegistry() });
+    expect(ir).not.toBeNull();
+    const portal = ir!.slots.find((s) => s.name === 'event');
+    expect(portal).toBeDefined();
+    expect(portal!.isPortal).toBe(true);
+    expect(portal!.isReactive).toBe(true);
+  });
+
+  it('portal-only: <slot portal /> (no reactive) lowers with isReactive falsy — opt-in, zero churn', () => {
+    const withPortalOnly = SOURCE.replace(
+      '<div class="demo" />',
+      '<div class="demo"><slot name="event" portal :params="[\'arg\']" /></div>',
+    );
+    const parseRes = parse(withPortalOnly);
+    expect(parseRes.ast).not.toBeNull();
+    const { ir } = lowerToIR(parseRes.ast!, { modifierRegistry: createDefaultRegistry() });
+    expect(ir).not.toBeNull();
+    const portal = ir!.slots.find((s) => s.name === 'event');
+    expect(portal).toBeDefined();
+    expect(portal!.isPortal).toBe(true);
+    expect(portal!.isReactive).toBeFalsy();
+  });
+
+  it('reactive-without-portal: <slot reactive /> (no portal) leaves isReactive unset — reactive is gated on isPortal', () => {
+    const withReactiveOnly = SOURCE.replace(
+      '<div class="demo" />',
+      '<div class="demo"><slot name="event" reactive :title="$props.items" /></div>',
+    );
+    const parseRes = parse(withReactiveOnly);
+    expect(parseRes.ast).not.toBeNull();
+    const { ir } = lowerToIR(parseRes.ast!, { modifierRegistry: createDefaultRegistry() });
+    expect(ir).not.toBeNull();
+    const slot = ir!.slots.find((s) => s.name === 'event');
+    expect(slot).toBeDefined();
+    expect(slot!.isPortal).toBeUndefined();
+    expect(slot!.isReactive).toBeUndefined();
+  });
+
   it('non-portal slots are unaffected — isPortal is absent', () => {
     const withRegular = SOURCE.replace(
       '<div class="demo" />',
