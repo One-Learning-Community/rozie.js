@@ -990,6 +990,10 @@ The slot key on the producer (`item`) stays the binding point; `column` is the l
 Rozie's compatibility bar is "high percentage" parity, not 100%. Slots are the area with the largest documented divergence — React consumers see a render-prop-flavored API (`children?: (ctx) => ReactNode`, `renderHeader?: (ctx) => ReactNode`) rather than children-as-JSX. This is called out in [`docs/guide/why.md`](/guide/why) and is accepted as a v1 trade-off.
 :::
 
+### A slot name can't equal a prop name (ROZ127)
+
+A `<slot name="X">` whose `X` matches a declared `<props>` key is a compile error (**ROZ127**). The names live in distinct namespaces internally (`$slots` vs `$props`), but on **Svelte 5** they collapse onto one — snippets and props both arrive through a single `$props()` bag, so a same-named slot and prop would resolve to the same member and the snippet would shadow the prop value. Rather than silently diverge on one of six targets, Rozie blocks it loudly and you rename the slot — typically by appending the wrapped engine's hook name (e.g. a `nowIndicator` boolean prop alongside a `nowIndicatorContent` slot). This is the slot-side sibling of the `$expose`/event name-collision rule (`ROZ121`).
+
 ## `:root { }` — the global escape hatch in scoped styles
 
 `<style>` is scoped by default. Anything inside a `:root { }` selector is emitted globally — useful for CSS variables, font definitions, or anything else that legitimately belongs on the document:
