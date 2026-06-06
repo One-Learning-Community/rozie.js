@@ -3,11 +3,19 @@ import type { ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { flushSync } from 'react-dom';
 import './Chart.css';
-import { Chart as ChartJS, registerables } from 'chart.js';
+import { Chart as ChartJS } from 'chart.js';
 
-// Chart.js v3+ ships with no controllers/elements/scales pre-registered;
-// the consumer has to opt in. registerables is the "kitchen sink" bundle —
-// every controller, so the `type` prop can switch to any chart kind.
+// Chart.js v3+ ships with no controllers/elements/scales pre-registered. The
+// generic Chart does NOT auto-register — the consumer registers only what they
+// use (the tree-shakable Chart.js v3+ idiom every framework wrapper follows), so
+// an app that only renders line charts doesn't ship every controller. Two paths:
+//   - selective: `import { Chart, LineController, ... } from 'chart.js';
+//     Chart.register(LineController, ...)` once at app startup; OR
+//   - kitchen sink: import this package's `/auto` entry
+//     (`@rozie-ui/chartjs-<fw>/auto`), or `import 'chart.js/auto'`, which
+//     registers everything.
+// The per-type components (Line/Bar/…) register their own controller set, so
+// importing one is tree-shakable by construction.
 
 interface TooltipCtx { model: any; }
 
@@ -84,10 +92,6 @@ const Chart = forwardRef<ChartHandle, ChartProps>(function Chart(_props: ChartPr
   const _watch2First = useRef(true);
   const _watch3First = useRef(true);
 
-  // Chart.js v3+ ships with no controllers/elements/scales pre-registered;
-  // the consumer has to opt in. registerables is the "kitchen sink" bundle —
-  // every controller, so the `type` prop can switch to any chart kind.
-  ChartJS.register(...registerables);
   function recreate() {
     if (!buildConfig.current || !canvasNode.current) return;
     instance.current?.destroy();

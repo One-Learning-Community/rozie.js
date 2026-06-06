@@ -2,11 +2,19 @@ import { LitElement, css, html, nothing, render } from 'lit';
 import { customElement, property, query, queryAssignedElements, state } from 'lit/decorators.js';
 import { SignalWatcher } from '@lit-labs/preact-signals';
 import { styleMap } from 'lit/directives/style-map.js';
-import { Chart as ChartJS, registerables } from 'chart.js';
+import { Chart as ChartJS } from 'chart.js';
 
-// Chart.js v3+ ships with no controllers/elements/scales pre-registered;
-// the consumer has to opt in. registerables is the "kitchen sink" bundle —
-// every controller, so the `type` prop can switch to any chart kind.
+// Chart.js v3+ ships with no controllers/elements/scales pre-registered. The
+// generic Chart does NOT auto-register — the consumer registers only what they
+// use (the tree-shakable Chart.js v3+ idiom every framework wrapper follows), so
+// an app that only renders line charts doesn't ship every controller. Two paths:
+//   - selective: `import { Chart, LineController, ... } from 'chart.js';
+//     Chart.register(LineController, ...)` once at app startup; OR
+//   - kitchen sink: import this package's `/auto` entry
+//     (`@rozie-ui/chartjs-<fw>/auto`), or `import 'chart.js/auto'`, which
+//     registers everything.
+// The per-type components (Line/Bar/…) register their own controller set, so
+// importing one is tree-shakable by construction.
 
 interface RozieTooltipSlotCtx {
   model: unknown;
@@ -113,11 +121,6 @@ private _portalContainers = new Set<HTMLElement>();
         };
       },
     };
-
-    // Chart.js v3+ ships with no controllers/elements/scales pre-registered;
-    // the consumer has to opt in. registerables is the "kitchen sink" bundle —
-    // every controller, so the `type` prop can switch to any chart kind.
-    ChartJS.register(...registerables);
 
     this._disconnectCleanups.push((() => {
       this.tooltipDispose?.();

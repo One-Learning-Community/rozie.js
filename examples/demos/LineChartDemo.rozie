@@ -31,6 +31,11 @@
 </data>
 
 <script>
+// The generic Chart no longer auto-registers — consumers register what they use.
+// This demo renders line + bar, so register the kitchen sink (== chart.js/auto).
+import { Chart as ChartJS, registerables } from 'chart.js'
+ChartJS.register(...registerables)
+
 let timerId = null
 
 const chartData = $computed(() => {

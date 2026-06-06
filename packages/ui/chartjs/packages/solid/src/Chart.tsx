@@ -2,11 +2,19 @@ import type { JSX } from 'solid-js';
 import { createEffect, mergeProps, on, onCleanup, onMount, splitProps, untrack } from 'solid-js';
 import { render } from 'solid-js/web';
 import { __rozieInjectStyle } from '@rozie/runtime-solid';
-import { Chart as ChartJS, registerables } from 'chart.js';
+import { Chart as ChartJS } from 'chart.js';
 
-// Chart.js v3+ ships with no controllers/elements/scales pre-registered;
-// the consumer has to opt in. registerables is the "kitchen sink" bundle —
-// every controller, so the `type` prop can switch to any chart kind.
+// Chart.js v3+ ships with no controllers/elements/scales pre-registered. The
+// generic Chart does NOT auto-register — the consumer registers only what they
+// use (the tree-shakable Chart.js v3+ idiom every framework wrapper follows), so
+// an app that only renders line charts doesn't ship every controller. Two paths:
+//   - selective: `import { Chart, LineController, ... } from 'chart.js';
+//     Chart.register(LineController, ...)` once at app startup; OR
+//   - kitchen sink: import this package's `/auto` entry
+//     (`@rozie-ui/chartjs-<fw>/auto`), or `import 'chart.js/auto'`, which
+//     registers everything.
+// The per-type components (Line/Bar/…) register their own controller set, so
+// importing one is tree-shakable by construction.
 
 __rozieInjectStyle('Chart-2228fabc', `.rozie-chart[data-rozie-s-2228fabc] {
   position: relative;
@@ -281,10 +289,18 @@ export default function Chart(_props: ChartProps): JSX.Element {
   createEffect(on(() => (() => local.plugins)(), (v) => untrack(() => (() => recreate())()), { defer: true }));
   let canvasElRef: HTMLElement | null = null;
 
-  // Chart.js v3+ ships with no controllers/elements/scales pre-registered;
-  // the consumer has to opt in. registerables is the "kitchen sink" bundle —
-  // every controller, so the `type` prop can switch to any chart kind.
-  ChartJS.register(...registerables);
+  // Chart.js v3+ ships with no controllers/elements/scales pre-registered. The
+  // generic Chart does NOT auto-register — the consumer registers only what they
+  // use (the tree-shakable Chart.js v3+ idiom every framework wrapper follows), so
+  // an app that only renders line charts doesn't ship every controller. Two paths:
+  //   - selective: `import { Chart, LineController, ... } from 'chart.js';
+  //     Chart.register(LineController, ...)` once at app startup; OR
+  //   - kitchen sink: import this package's `/auto` entry
+  //     (`@rozie-ui/chartjs-<fw>/auto`), or `import 'chart.js/auto'`, which
+  //     registers everything.
+  // The per-type components (Line/Bar/…) register their own controller set, so
+  // importing one is tree-shakable by construction.
+
   let instance: any = null;
   // $refs.canvasEl is read ONLY inside $onMount (ROZ123); re-creates use this
   // captured node so no $refs read ever executes outside the mount hook. Named

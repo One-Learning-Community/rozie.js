@@ -41,7 +41,12 @@
 </components>
 
 <script>
-import { Chart as ChartJS } from 'chart.js'
+import { Chart as ChartJS, registerables } from 'chart.js'
+
+// The generic Chart no longer auto-registers — the consumer registers what they
+// use. This screenshot demo needs every controller (line + bar + doughnut), so
+// it registers the kitchen sink (equivalent to importing `chart.js/auto`).
+ChartJS.register(...registerables)
 
 // Pin a fixed web-safe font on the Chart.js defaults so text metrics don't
 // inherit the (cross-platform-drifting) system font. Global side effect — fine
