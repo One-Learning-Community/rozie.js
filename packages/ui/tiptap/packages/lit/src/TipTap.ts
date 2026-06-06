@@ -394,6 +394,37 @@ private _portalContainers = new Set<HTMLElement>();
   // Reactive handle — { update, dispose }. The fragment mounts ONCE; every
   // engine transaction re-invokes handle.update(scope) re-rendering IN PLACE.
   const handle = nv(dom, buildScope(node, false));
+
+  // contentDOM graft bridge (Spike 008 / REQ-23). For an EDITABLE node the
+  // consumer fragment renders chrome WRAPPING a `[data-rozie-hole]` placeholder;
+  // ProseMirror manages `contentDOM` and renders the node's editable children
+  // INTO it, so `contentDOM` must live inside the visible hole. The fragment is
+  // rendered into `dom` by the per-target reactive portal — synchronously on
+  // React/Solid/Lit (native-ref timing) but post-mount/async on Vue/Svelte/
+  // Angular (REQ-23). A query-after-render graft (retried across a microtask +
+  // a RAF) covers BOTH timing classes uniformly from the engine side: as soon as
+  // the hole exists, contentDOM is grafted in. ProseMirror then owns that subtree
+  // and the framework never reconciles it away (the hole carries no child binding).
+  const graftContentDOM = (attempt: any) => {
+    if (!contentDOM) return;
+    const hole = dom.querySelector('[data-rozie-hole]');
+    if (hole) {
+      if (contentDOM.parentNode !== hole) hole.appendChild(contentDOM);
+      return;
+    }
+    if (attempt < 5) {
+      if (attempt === 0) Promise.resolve().then(() => graftContentDOM(attempt + 1));else requestAnimationFrame(() => graftContentDOM(attempt + 1));
+    }
+  };
+  graftContentDOM(0);
+
+  // After a reactive re-render (chrome update), re-graft so a fragment that
+  // recreated its `[data-rozie-hole]` element does NOT leave contentDOM detached
+  // (REQ-24 — the editable subtree survives every chrome update).
+  const updateInPlace = (n: any, selected: any) => {
+    handle.update(buildScope(n, selected));
+    if (contentDOM) graftContentDOM(0);
+  };
   return {
     dom,
     ...(contentDOM ? {
@@ -404,16 +435,16 @@ private _portalContainers = new Set<HTMLElement>();
     // fragment reads fresh node.attrs (REQ-26).
     update(nextNode: any) {
       if (nextNode.type !== node.type) return false;
-      handle.update(buildScope(nextNode, false));
+      updateInPlace(nextNode, false);
       return true;
     },
     // NodeSelection enters/leaves the node → toggle `selected` in scope so the
     // chip's selected styling is pure engine-driven reactive `update`.
     selectNode() {
-      handle.update(buildScope(node, true));
+      updateInPlace(node, true);
     },
     deselectNode() {
-      handle.update(buildScope(node, false));
+      updateInPlace(node, false);
     },
     destroy() {
       handle.dispose();
@@ -440,12 +471,16 @@ private _portalContainers = new Set<HTMLElement>();
     parseHTML: () => [{
       tag: 'span[data-rozie-mention]'
     }],
+    // ATOM nodes are leaf nodes — their renderHTML must NOT include a `0` content
+    // hole (ProseMirror's DOMSerializer throws "Content hole not allowed in a leaf
+    // node spec"). The chip's visible content is supplied by the node view; the
+    // serialized form is just the marker span carrying the attrs.
     renderHTML: ({
       HTMLAttributes
     }: any) => ['span', {
       'data-rozie-mention': '',
       ...HTMLAttributes
-    }, 0],
+    }],
     addNodeView: () => this.makeNodeView(nv, false)
   });
 
