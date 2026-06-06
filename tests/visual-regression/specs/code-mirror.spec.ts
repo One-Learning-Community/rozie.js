@@ -60,10 +60,16 @@ for (const target of TARGETS) {
     const mount = page.getByTestId('rozie-mount');
     await expect(mount).toBeVisible();
 
+    // The round-trip pair (Editors A/B sharing $data.code) lives in the `.grid`
+    // container. The demo ALSO mounts the new-surface rig (Editors C/D/E) lower
+    // in the same demo; scoping to `.grid` keeps the count at the round-trip
+    // pair (2) regardless of how many surface editors exist below.
     // Substring-match guards against CSS Modules class-mangling on React
     // (see comment in line-chart.spec.ts). All 6 targets keep the
-    // `rozie-codemirror` class as a substring or literal.
-    const wrappers = mount.locator(
+    // `rozie-codemirror` class as a substring or literal; `.grid` is the
+    // consumer's plain layout div (carries its literal class on every target).
+    const grid = mount.locator('.grid, [class*="grid"]').first();
+    const wrappers = grid.locator(
       '.rozie-codemirror, [class*="rozie-codemirror"]',
     );
     await expect(wrappers).toHaveCount(2, { timeout: 10_000 });
@@ -71,7 +77,7 @@ for (const target of TARGETS) {
     // CodeMirror 6 mounts a `.cm-editor` root and a `.cm-content`
     // contenteditable inside each wrapper. Both editors must mount before
     // any round-trip assertion is meaningful.
-    const editors = mount.locator('.cm-editor');
+    const editors = grid.locator('.cm-editor');
     await expect(editors).toHaveCount(2, { timeout: 5_000 });
     const editorA = editors.first();
     const editorB = editors.last();
@@ -183,10 +189,11 @@ for (const target of TARGETS) {
     await expect(mount).toBeVisible();
 
     // The surface rig (Editor C) is the ref-bearing editor the $expose controls
-    // drive. Wait for it to mount its `.cm-content`.
-    const surfaceEditor = mount.getByTestId('surface-editor');
-    await expect(surfaceEditor).toBeVisible({ timeout: 10_000 });
-    const surfaceContent = surfaceEditor.locator('.cm-content');
+    // drive. The data-testid lives on the wrapping <div> (surface-cell); the
+    // editor `.cm-content` is located within it. Wait for it to mount.
+    const surfaceCell = mount.getByTestId('surface-cell');
+    await expect(surfaceCell).toBeVisible({ timeout: 10_000 });
+    const surfaceContent = surfaceCell.locator('.cm-content');
     await expect
       .poll(async () => (await surfaceContent.textContent()) ?? '', {
         timeout: 5_000,
@@ -197,9 +204,9 @@ for (const target of TARGETS) {
     // ---- D-04 placeholder ----
     // Editor D mounts an empty doc with a `placeholder` prop. CM6 renders the
     // placeholder text inside a `.cm-placeholder` node when the doc is empty.
-    const placeholderEditor = mount.getByTestId('placeholder-editor');
-    await expect(placeholderEditor).toBeVisible({ timeout: 10_000 });
-    await expect(placeholderEditor.locator('.cm-placeholder')).toContainText(
+    const placeholderCell = mount.getByTestId('placeholder-cell');
+    await expect(placeholderCell).toBeVisible({ timeout: 10_000 });
+    await expect(placeholderCell.locator('.cm-placeholder')).toContainText(
       'Type here',
       { timeout: 10_000 },
     );
@@ -234,34 +241,45 @@ for (const target of TARGETS) {
     await expect(surfaceContent).toContainText('answer');
 
     // ---- D-06 $expose verbs ($refs.cm handle, observable effects) ----
-    // getValue reads the live doc.
-    await mount.getByTestId('handle-get-value').click();
-    await expect(mount.getByTestId('state-handle-out')).toContainText('answer', {
-      timeout: 10_000,
-    });
-    // replaceValue routes through the suppress-echo guard; the doc + the
-    // getValue-read-back both reflect the replacement (no ping-pong).
-    await mount.getByTestId('handle-replace-value').click();
-    await expect(mount.getByTestId('state-handle-out')).toContainText(
-      'replaced via handle',
-      { timeout: 10_000 },
-    );
-    await expect(surfaceContent).toContainText('replaced via handle');
-    // insertText inserts at the selection; getSelection returns a range;
-    // getView returns the raw EditorView. Each writes an observable marker into
-    // the state pane.
-    await mount.getByTestId('handle-insert-text').click();
-    await expect(mount.getByTestId('state-handle-out')).toContainText('X', {
-      timeout: 10_000,
-    });
-    await mount.getByTestId('handle-get-selection').click();
-    await expect(mount.getByTestId('state-handle-out')).toContainText('sel ', {
-      timeout: 10_000,
-    });
-    await mount.getByTestId('handle-get-view').click();
-    await expect(mount.getByTestId('state-handle-out')).toHaveText('view ok', {
-      timeout: 10_000,
-    });
+    // Driven via the framework-native component ref. On Angular a component ref
+    // resolves to the host ElementRef rather than the exposed handle instance,
+    // so the verbs are absent there — the demo optional-chains every call and
+    // surfaces "(no handle)". This is the documented per-target ref idiom (same
+    // gate as full-calendar-behavior.spec.ts `if (target !== 'angular')`), NOT a
+    // bug: the $expose handle is asserted on the 5 targets whose ref resolves to
+    // the handle (react/vue/svelte/solid/lit). Angular's exposed surface is
+    // covered by the emitter-level $expose unit tests + ExposeProbe.
+    if (target !== 'angular') {
+      // getValue reads the live doc.
+      await mount.getByTestId('handle-get-value').click();
+      await expect(mount.getByTestId('state-handle-out')).toContainText(
+        'answer',
+        { timeout: 10_000 },
+      );
+      // replaceValue routes through the suppress-echo guard; the doc + the
+      // getValue-read-back both reflect the replacement (no ping-pong).
+      await mount.getByTestId('handle-replace-value').click();
+      await expect(mount.getByTestId('state-handle-out')).toContainText(
+        'replaced via handle',
+        { timeout: 10_000 },
+      );
+      await expect(surfaceContent).toContainText('replaced via handle');
+      // insertText inserts at the selection; getSelection returns a range;
+      // getView returns the raw EditorView. Each writes an observable marker
+      // into the state pane.
+      await mount.getByTestId('handle-insert-text').click();
+      await expect(mount.getByTestId('state-handle-out')).toContainText('X', {
+        timeout: 10_000,
+      });
+      await mount.getByTestId('handle-get-selection').click();
+      await expect(mount.getByTestId('state-handle-out')).toContainText('sel ', {
+        timeout: 10_000,
+      });
+      await mount.getByTestId('handle-get-view').click();
+      await expect(mount.getByTestId('state-handle-out')).toHaveText('view ok', {
+        timeout: 10_000,
+      });
+    }
 
     // ---- D-05 panel portal slot mount + dispose ----
     // Initially the panel-bearing editor is unmounted (r-else branch) → no

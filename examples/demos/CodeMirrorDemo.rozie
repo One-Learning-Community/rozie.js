@@ -153,11 +153,14 @@ const handleGetView = () => {
       <button type="button" data-testid="handle-get-view" @click="handleGetView">getView</button>
     </div>
 
-    <div class="editor-cell">
+    <!-- data-testid lives on the wrapping <div> (a plain element reliably
+         carries it across all 6 targets — a testid on a <CodeMirror> component
+         is NOT forwarded to the rendered DOM on every target). The spec scopes
+         its .cm-editor/.cm-content/.rozie-cm-panel locators within these. -->
+    <div class="editor-cell" data-testid="surface-cell">
       <span class="label">Editor C (extensions / language / handle)</span>
       <CodeMirror
         ref="cm"
-        data-testid="surface-editor"
         r-model:value="$data.surfaceCode"
         :height="160"
         theme="light"
@@ -167,14 +170,19 @@ const handleGetView = () => {
     </div>
 
     <!-- D-05 panel mount/dispose. The wrapper gates the panel on $slots.panel
-         truthiness at $onMount, so panel mount/dispose is exercised by mounting
-         (panelOn) vs unmounting (r-else) the panel-bearing editor — flipping the
-         control mounts the `.rozie-cm-panel` host node, then disposes it. -->
+         truthiness at $onMount, so the panel extension is decided ONCE at the
+         editor's mount lifecycle. Mount/dispose is therefore exercised by truly
+         mounting (panelOn) vs UNMOUNTING the panel-bearing editor — the r-else
+         branch is a plain <span> placeholder (NOT another <CodeMirror>) so keyed
+         reconcilers (React) cannot reuse the editor instance in place and skip
+         the panel-building mount effect; flipping the control unmounts the prior
+         editor and mounts a fresh one with the renderPanel prop present, which
+         builds the `.rozie-cm-panel` host. Toggling off unmounts it (the portal
+         dispose fires). -->
     <div class="editor-cell" data-testid="panel-cell">
       <span class="label">Editor E (panel portal slot)</span>
       <CodeMirror
         r-if="$data.panelOn"
-        data-testid="panel-editor"
         r-model:value="$data.surfaceCode"
         :height="120"
         theme="light"
@@ -183,19 +191,12 @@ const handleGetView = () => {
           <span class="cm-panel-fill" data-testid="panel-fill">panel filled</span>
         </template>
       </CodeMirror>
-      <CodeMirror
-        r-else
-        data-testid="panel-editor-off"
-        r-model:value="$data.surfaceCode"
-        :height="120"
-        theme="light"
-      />
+      <span r-else class="panel-placeholder" data-testid="panel-placeholder">panel off</span>
     </div>
 
-    <div class="editor-cell">
+    <div class="editor-cell" data-testid="placeholder-cell">
       <span class="label">Editor D (placeholder, empty doc)</span>
       <CodeMirror
-        data-testid="placeholder-editor"
         r-model:value="$data.emptyCode"
         :height="120"
         theme="light"
