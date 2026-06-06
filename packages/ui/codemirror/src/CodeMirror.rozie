@@ -1,0 +1,267 @@
+<!--
+  CodeMirror.rozie — data-bound port of CodeMirror 6.
+
+  CodeMirror 6 is the de-facto modular code editor for the web. Every
+  framework has a wrapper (react-codemirror2 / vue-codemirror / svelte-
+  codemirror / ngx-codemirror) that shuttles a `value` prop through the
+  EditorView/EditorState API and forwards change events out. Four
+  maintenance burdens, ONE Rozie source.
+
+  Why this is a worthwhile demo:
+    - Two-way binding (`r-model:value`) through a non-input
+      contenteditable engine. Most existing model:true examples in the
+      Rozie suite are form-shaped wrappers around `<input>`/`<select>`.
+      CodeMirror is the archetypal engine-mediated case: edits flow back
+      via an `updateListener` extension, not a DOM input event.
+    - Live reconfiguration via Compartments. language / theme / readOnly /
+      placeholder / extensions / panel changes `dispatch` reconfiguration
+      effects without re-mounting the editor, mirroring the Chart.js
+      `chart.update()` runtime path.
+    - Echo-loop guard. Model two-way bindings can ping-pong when the
+      consumer's $data signals back into the wrapper's $watch faster
+      than the wrapper's emit clears. Solve once here, every consumer
+      gets it.
+    - Consumer-extensible `extensions` passthrough. CodeMirror 6 has no
+      large "options bag" — everything is an Extension. The `extensions`
+      prop is composed LAST so consumer extensions win CM6's
+      last-registered-wins facets.
+    - One `panel` portal slot — proves CM6's extension-mounted injection
+      (a `showPanel` facet whose DOM element is the portal host).
+
+  Consumer example:
+
+    <CodeMirror r-model:value="$data.source" language="javascript" theme="dark" />
+-->
+
+<rozie name="CodeMirror" inherit-attrs="false" inherit-listeners="false">
+
+<props>
+{
+  value:       { type: String,  default: '',           model: true },
+  language:    { type: String,  default: 'javascript' },
+  theme:       { type: String,  default: 'light' },
+  readOnly:    { type: Boolean, default: false },
+  height:      { type: Number,  default: 240 },
+  placeholder: { type: String,  default: '' },
+  extensions:  { type: Array,   default: () => [] },
+}
+</props>
+
+<script>
+import { EditorState, Compartment, EditorSelection } from '@codemirror/state'
+import { EditorView, keymap, lineNumbers, showPanel, placeholder as placeholderExt } from '@codemirror/view'
+import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
+import { javascript } from '@codemirror/lang-javascript'
+import { oneDark } from '@codemirror/theme-one-dark'
+
+let view = null
+
+// CodeMirror's updateListener fires on EVERY transaction, including our own
+// $watch-driven dispatch when the consumer changes `value`. Without a guard
+// the wrapper would emit its own dispatch back through the model path on
+// the next tick — a slow ping-pong loop that doesn't crash but eats RAFs.
+let suppressEmit = false
+
+// Compartments let us swap individual extensions at runtime via
+// `view.dispatch({ effects: compartment.reconfigure(newExt) })` without
+// rebuilding the entire EditorState. Each runtime-updatable prop gets one so
+// prop changes don't lose cursor/history/scroll position.
+const langCompartment = new Compartment()
+const themeCompartment = new Compartment()
+const readOnlyCompartment = new Compartment()
+const placeholderCompartment = new Compartment()
+const extensionsCompartment = new Compartment()
+const panelCompartment = new Compartment()
+
+// language is a convenience prop mapping to the ONE bundled language
+// (@codemirror/lang-javascript). Any other value → [] (plain text, no syntax
+// highlighting); consumers add other languages via :extensions (D-03). This
+// FIXES the prior declared-but-ignored bug where buildState hard-coded
+// javascript() regardless of $props.language.
+const langExt = () => $props.language === 'javascript' ? javascript() : []
+
+const themeExt = () => $props.theme === 'dark' ? oneDark : []
+
+// placeholder ext only when a non-empty placeholder string is supplied.
+const phExt = () => $props.placeholder ? placeholderExt($props.placeholder) : []
+
+// One `panel` portal slot — mounted through CM6's `showPanel` facet. The Panel's
+// `dom` is the portal host node; $portals.panel(dom, scope) mounts the consumer's
+// framework-native fragment on Panel.mount() and the returned dispose runs in
+// Panel.destroy(). Empty extension ([]) when the consumer doesn't fill the slot.
+const panelExt = () => {
+  if (!$slots.panel) return []
+  return showPanel.of((view) => {
+    const dom = document.createElement('div')
+    dom.className = 'rozie-cm-panel'
+    let dispose = null
+    return {
+      dom,
+      top: false,
+      mount() { dispose = $portals.panel(dom, { view }) },
+      destroy() { dispose?.(); dispose = null },
+    }
+  })
+}
+
+const buildState = (doc) => EditorState.create({
+  doc,
+  extensions: [
+    lineNumbers(),
+    history(),
+    keymap.of([...defaultKeymap, ...historyKeymap]),
+    langCompartment.of(langExt()),
+    themeCompartment.of(themeExt()),
+    readOnlyCompartment.of(EditorState.readOnly.of($props.readOnly)),
+    placeholderCompartment.of(phExt()),
+    panelCompartment.of(panelExt()),
+    EditorView.updateListener.of((update) => {
+      if (!update.docChanged) return
+      if (suppressEmit) return
+      // Push the new doc out through the model:true emit path. Consumers
+      // bound via `r-model:value="$data.x"` receive the change.
+      $model.value = update.state.doc.toString()
+    }),
+    // Consumer extensions LAST so they win CM6's last-registered-wins facets.
+    extensionsCompartment.of($props.extensions),
+  ],
+})
+
+$onMount(() => {
+  view = new EditorView({
+    state: buildState($props.value),
+    parent: $refs.hostEl,
+  })
+  return () => view?.destroy()
+})
+
+// Shared suppress-echo write helper. Both the $watch(value) consumer-driven
+// reflect AND the $expose setValue verb route through this so a programmatic
+// or prop-driven set doesn't ping-pong back through the model path. When the
+// editor itself was the source of the change, the doc already matches `v`, so
+// dispatching another transaction would mint a duplicate undo-history entry
+// for no UI change.
+const writeDoc = (v) => {
+  if (!view) return
+  const current = view.state.doc.toString()
+  const next = v ?? ''
+  if (current === next) return
+  suppressEmit = true
+  try {
+    view.dispatch({
+      changes: { from: 0, to: current.length, insert: next },
+    })
+  } finally {
+    suppressEmit = false
+  }
+}
+
+// Consumer-driven value writes: reflect into the live editor (echo-guarded).
+$watch(() => $props.value, (v) => writeDoc(v))
+
+$watch(() => $props.language, () => {
+  if (!view) return
+  view.dispatch({ effects: langCompartment.reconfigure(langExt()) })
+})
+
+$watch(() => $props.theme, () => {
+  if (!view) return
+  view.dispatch({ effects: themeCompartment.reconfigure(themeExt()) })
+})
+
+$watch(() => $props.readOnly, (v) => {
+  if (!view) return
+  view.dispatch({
+    effects: readOnlyCompartment.reconfigure(EditorState.readOnly.of(v)),
+  })
+})
+
+$watch(() => $props.placeholder, () => {
+  if (!view) return
+  view.dispatch({ effects: placeholderCompartment.reconfigure(phExt()) })
+})
+
+$watch(() => $props.extensions, (v) => {
+  if (!view) return
+  view.dispatch({ effects: extensionsCompartment.reconfigure(v) })
+})
+
+// Imperative handle (Phase 21 $expose). The 8 editor verbs a consumer can't
+// drive through props alone — exposed uniformly to all 6 targets. Each guards
+// the pre-mount/destroyed `view = null`. Collision-clear: none of the 8 names
+// collide with the 7 props (value/language/theme/readOnly/height/placeholder/
+// extensions) and there are no events (D-08).
+function getView()        { return view }
+function focus()          { view?.focus() }
+function getValue()       { return view ? view.state.doc.toString() : '' }
+// replaceValue routes through the SAME suppress-echo guard as $watch(value).
+// NOTE: named `replaceValue` (not `setValue`) — a `value` model prop makes
+// React auto-generate a `setValue` state setter, so a `setValue` $expose verb
+// collides on the React target (ROZ524: "already declared" + recursive rewrite).
+// Renamed to preserve the value-setter semantics collision-free across all 6
+// targets. (Deviation from the locked D-06 name `setValue`.)
+function replaceValue(v)  { writeDoc(v) }
+function dispatch(tr)     { view?.dispatch(tr) }
+function insertText(text) {
+  if (!view) return
+  const { from, to } = view.state.selection.main
+  view.dispatch({ changes: { from, to, insert: text }, userEvent: 'input.type' })
+}
+function getSelection()   { return view ? view.state.selection.main : null }
+function setSelection(range) {
+  if (!view) return
+  const sel = typeof range === 'number'
+    ? EditorSelection.single(range)
+    : EditorSelection.single(range.anchor, range.head)
+  view.dispatch({ selection: sel })
+}
+
+$expose({ getView, focus, getValue, replaceValue, dispatch, insertText, getSelection, setSelection })
+</script>
+
+<template>
+<div class="rozie-codemirror" :style="{ height: $props.height + 'px' }">
+  <div class="cm-mount" ref="hostEl"></div>
+</div>
+<!--
+  Portal-slot primitive (Spike 003). The `panel` slot is declared but NOT
+  rendered in the template — per-target template emitters skip it. It exists
+  only to declare the consumer-facing render-prop / scoped-slot / contentChild
+  shape (per target). The wrapper invokes the slot from script via
+  $portals.panel(dom, { view }) inside CM6's `showPanel` Panel.mount() hook;
+  the portal helper mounts the consumer's fragment into the engine-owned panel
+  node and returns a dispose handle the engine calls on Panel.destroy().
+-->
+<slot name="panel" portal :params="['view']" />
+</template>
+
+<style>
+.rozie-codemirror {
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 4px;
+  overflow: hidden;
+  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Consolas, 'Liberation Mono', Menlo, monospace;
+}
+
+.cm-mount {
+  height: 100%;
+  width: 100%;
+}
+
+.rozie-codemirror :global(.cm-editor) {
+  height: 100%;
+  font-size: 13px;
+}
+
+.rozie-codemirror :global(.cm-scroller) {
+  height: 100%;
+}
+
+.rozie-codemirror :global(.rozie-cm-panel) {
+  padding: 2px 8px;
+  border-top: 1px solid rgba(0, 0, 0, 0.12);
+  font-size: 12px;
+}
+</style>
+
+</rozie>
