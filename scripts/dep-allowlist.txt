@@ -235,6 +235,7 @@
 @fullcalendar/core
 @fullcalendar/daygrid
 @fullcalendar/interaction
+@fullcalendar/list
 @fullcalendar/timegrid
 @harperfast/extended-iterable
 @humanfs/core
