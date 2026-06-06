@@ -29,6 +29,33 @@ npm i @rozie-ui/chartjs-react chart.js
 
 Anything the curated prop surface doesn't special-case (scales, legends, custom plugins, per-dataset styling) comes through the `data`/`options` props — Chart.js's own config shapes — and the first-class `:plugins` passthrough for per-instance plugins. The per-leaf READMEs and the **Props** table below are generated from the same IR parse of `Chart.rozie`, so they cannot drift from the compiled output — the package's `codegen.mjs` asserts the structural columns of this page against `ir.props` on every run.
 
+## Registration & per-type components
+
+Chart.js v3+ is **tree-shakable**: it ships with no controllers/elements/scales pre-registered. The generic `Chart` follows that model — it does **not** auto-register, so an app that only renders line charts doesn't bundle every controller. Register what you use once at startup:
+
+```ts
+import { Chart, LineController, LineElement, PointElement, LinearScale, CategoryScale } from 'chart.js';
+Chart.register(LineController, LineElement, PointElement, LinearScale, CategoryScale);
+```
+
+…or, for the kitchen sink, import the package's **`/auto`** entry (or Chart.js's own `chart.js/auto`), which registers everything:
+
+```ts
+import { Chart } from '@rozie-ui/chartjs-react/auto';   // registers ...registerables
+```
+
+### Per-type components
+
+Each package also exports **eight per-type components** — `Line`, `Bar`, `Pie`, `Doughnut`, `PolarArea`, `Radar`, `Scatter`, `Bubble` — so you can write `<Bar :data="…" />` instead of `<Chart type="bar" :data="…" />`. Each one pins its `type` and **registers only its own controller set**, so importing it needs no manual registration and is tree-shakable by construction (on the source-shipped Vue/Svelte/Angular packages, importing `Bar` pulls only the bar code). A per-type component carries the *same* surface as the generic `Chart` minus the `type` prop — the full props / 3 events / 8-verb handle / `tooltip` + `fallback` slots:
+
+```tsx
+import { Bar } from '@rozie-ui/chartjs-react';   // no manual register() needed
+
+<Bar data={data} options={options} onClick={(p) => console.log(p.elements)} />;
+```
+
+> **Bundle note:** on the bundled React/Solid/Lit packages the per-type components currently share one chunk, so importing one typed component pulls the others' registration too; the **generic `Chart` + selective registration** (above) is the recommended path when bundle size is critical there. The source-shipped Vue/Svelte/Angular packages tree-shake per-type imports natively. Per-variant chunking on the bundled packages is a tracked optimization.
+
 ## Quick start
 
 `data` and `options` are Chart.js's own shapes; `type` picks the chart kind. The chart reconciles `data` changes into the live instance (mutating `chart.data` in place and calling `chart.update()`) so series tween point-to-point without a remount.

@@ -1,0 +1,9 @@
+export { Chart } from './Chart';
+export { Line } from './Line';
+export { Bar } from './Bar';
+export { Pie } from './Pie';
+export { Doughnut } from './Doughnut';
+export { PolarArea } from './PolarArea';
+export { Radar } from './Radar';
+export { Scatter } from './Scatter';
+export { Bubble } from './Bubble';

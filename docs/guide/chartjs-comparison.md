@@ -30,7 +30,7 @@ of absence.)
 
 | Wrapper | Frameworks | Latest published | Framework support | Structured events | Imperative handle | HTML-tooltip slot | Per-type components | Selective (tree-shakable) registration |
 | --- | --- | --- | --- | :---: | :---: | :---: | :---: | :---: |
-| **[Rozie @rozie-ui/chartjs](/guide/chartjs)** | **6 — React + Vue + Svelte + Angular + Solid + Lit** | this repo (2026-06) | R18+ / V3.4+ / Sv5 / **Ng19+ signals** / Solid / Lit | ✓ **3 uniform** (`click`/`hover`/`datasetClick`, structured, composed) on all 6 | ✓ **uniform `$expose`** (8 verbs) on all 6 | ✓ **portal slot** on all 6 | ✗ generic `Chart` only *(deferred — see gaps)* | ✗ forces `registerables` *(gap — see below)* |
+| **[Rozie @rozie-ui/chartjs](/guide/chartjs)** | **6 — React + Vue + Svelte + Angular + Solid + Lit** | this repo (2026-06) | R18+ / V3.4+ / Sv5 / **Ng19+ signals** / Solid / Lit | ✓ **3 uniform** (`click`/`hover`/`datasetClick`, structured, composed) on all 6 | ✓ **uniform `$expose`** (8 verbs) on all 6 | ✓ **portal slot** on all 6 | ✓ **8 typed components** + generic `Chart`, all 6 | ✓ consumer-registers + `/auto` entry (per-type tree-shakes on source leaves) |
 | [react-chartjs-2](https://react-chartjs-2.js.org/) | React | **5.3.1** · 2025-10 | React 16.8 – **19** | ~ `options.onClick` + `getElement*AtEvent` helpers (no React events) | ✓ `ref` → Chart.js instance | ✗ external-handler only (no React slot) | ✓ 8 typed + generic `Chart` | ✓ typed components auto-register their controller |
 | [vue-chartjs](https://vue-chartjs.org/) | Vue 3 | **5.3.3** · 2025 | Vue 3 (3.x+) | ✗ emits no Vue events | ✓ `ref.chart` → instance | ✗ external-handler only (canvas-fallback slot only) | ✓ 8 typed + generic + `createTypedChart` | ✓ manual `ChartJS.register(...)` |
 | [ng2-charts](https://valor-software.com/ng2-charts) | Angular | **10.0.0** · 2026-03 *(v8 = Ng19)* | Angular 17 – **21** *(no signals — `@Input`/`OnChanges`)* | ✓ `chartClick` / `chartHover` (2, Angular only) | ✓ `ViewChild(BaseChartDirective).chart` | ✗ no `ng-template` tooltip | ~ one `canvas[baseChart]` directive (`type` input) | ✓ `provideCharts(...)` selective |
@@ -128,38 +128,24 @@ comparison credible, and it doubles as Rozie's own roadmap.
   leading it. Rozie's advantage on React/Vue/Angular/Svelte is the *uniform
   cross-framework surface* and one source, not "more current."
 
-- **Per-type components (`<Line>`, `<Bar>`, …) — react/vue/svelte/solid ship them;
-  Rozie does not (yet).** react-chartjs-2, vue-chartjs, svelte-chartjs, and
-  solid-chartjs all export eight typed convenience components, so a consumer writes
-  `<Bar data={…} />` rather than `<Chart type="bar" data={…} />`. Rozie v1 ships
-  only the generic `Chart` (the `type` prop covers the whole controller set). This
-  is a real ergonomic gap and a tracked follow-up — see the
-  [Chart.js showcase](/guide/chartjs) and the project's gap-closure plan.
+- **Per-type components and selective registration — now closed (one bundled-leaf
+  nuance remains).** Rozie's first cut shipped only the generic `Chart` and
+  force-registered every controller. Both are resolved: the generic `Chart` no
+  longer auto-registers (the consumer registers what they use, or imports the
+  `/auto` kitchen-sink entry), and each package now also exports the eight
+  [per-type components](/guide/chartjs#per-type-components) — `Line`/`Bar`/…/`Bubble`
+  — each registering only its own controller set. *Remaining nuance:* on the
+  bundled React/Solid/Lit packages the typed components currently share one chunk,
+  so importing one pulls the others' registration; the generic-`Chart`
+  consumer-registration path is the recommended one there, and per-variant chunking
+  on the bundled packages is a tracked optimization. The source-shipped
+  Vue/Svelte/Angular packages tree-shake per-type imports natively.
 
-- **Selective (tree-shakable) controller registration — the wrappers support it;
-  Rozie v1 does not.** Chart.js v3+ is tree-shakable: react-chartjs-2's typed
-  components register only their own controller, and vue/svelte/ng2 let the
-  consumer `register(...)` (or `provideCharts(...)`) exactly the controllers,
-  elements, scales, and plugins they use — keeping the bundle minimal. Rozie's
-  generic `Chart` calls `Chart.register(...registerables)` unconditionally (the
-  "kitchen sink") so the `type` prop can switch to any kind at runtime, which
-  means a consumer who only renders line charts still ships every controller.
-  Trading bundle size for runtime genericity is a deliberate v1 choice, and the
-  fix is coupled to per-type components (each could register only its controller)
-  — both are on the gap-closure plan.
-
-- **`datasetIdKey` dataset diffing — react/vue have it; Rozie matches by index.**
-  react-chartjs-2 and vue-chartjs expose a `datasetIdKey` prop so datasets are
-  diffed by a stable key across updates (guarding the "first dataset copied over
-  the others" hazard). Rozie reconciles datasets by array index, which is correct
-  for the common append/replace cases but does not yet offer a keyed-diff opt-in.
-  Tracked.
-
-- **`fallbackContent` a11y — react/vue/solid render fallback inside the canvas.**
-  Those wrappers let you render arbitrary fallback content inside the `<canvas>`
-  for assistive tech. Rozie surfaces an `ariaLabel` prop today but not a
-  fallback-content slot; a non-portal a11y fallback slot is a small tracked
-  addition.
+- **`datasetIdKey` and a11y `fallback` — now covered.** The `datasetIdKey` prop
+  (default `'label'`) matches datasets by a stable key across updates (with index
+  fallback), and a non-portal [`fallback` slot](/guide/chartjs#slots) renders a11y
+  content inside the `<canvas>` (alongside the `ariaLabel` prop) — closing the
+  react/vue parity gap on both.
 
 - **Single-framework ergonomics are not the contest.** The matrix scores
   out-of-the-box, cross-framework capability. For a single-React or single-Vue

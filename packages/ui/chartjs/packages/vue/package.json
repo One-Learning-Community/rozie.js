@@ -27,9 +27,14 @@
   },
   "exports": {
     ".": {
-      "import": "./src/Chart.vue",
-      "types": "./src/Chart.vue",
-      "default": "./src/Chart.vue"
+      "import": "./src/index.ts",
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./auto": {
+      "import": "./src/auto.ts",
+      "types": "./src/auto.ts",
+      "default": "./src/auto.ts"
     }
   },
   "files": [

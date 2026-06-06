@@ -1,2 +1,10 @@
 export { default as Chart } from './Chart';
 export { default } from './Chart';
+export { default as Line } from './Line';
+export { default as Bar } from './Bar';
+export { default as Pie } from './Pie';
+export { default as Doughnut } from './Doughnut';
+export { default as PolarArea } from './PolarArea';
+export { default as Radar } from './Radar';
+export { default as Scatter } from './Scatter';
+export { default as Bubble } from './Bubble';

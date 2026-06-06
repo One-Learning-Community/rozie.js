@@ -1,0 +1,370 @@
+import type { JSX } from 'solid-js';
+import { createEffect, mergeProps, on, onCleanup, onMount, splitProps, untrack } from 'solid-js';
+import { render } from 'solid-js/web';
+import { __rozieInjectStyle } from '@rozie/runtime-solid';
+import { Chart as ChartJS, BarController, BarElement, LinearScale, CategoryScale, Legend, Tooltip, Colors } from 'chart.js';
+// Bar registers only its own Chart.js controller/element/scale set
+// (tree-shakable — importing this component does not pull every controller).
+
+__rozieInjectStyle('Bar-ed04b5ca', `.rozie-chart[data-rozie-s-ed04b5ca] {
+  position: relative;
+  width: 100%;
+}
+.rozie-chart[data-rozie-s-ed04b5ca] canvas[data-rozie-s-ed04b5ca] {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+.rozie-chart[data-rozie-s-ed04b5ca] [data-rozie-s-ed04b5ca]:global(.rozie-chart-tooltip) {
+  background: rgba(0, 0, 0, 0.8);
+  color: #fff;
+  border-radius: 4px;
+  padding: 6px 8px;
+  font-size: 12px;
+  transform: translate(-50%, calc(-100% - 8px));
+  white-space: nowrap;
+}`);
+
+interface TooltipSlotCtx { model: any; }
+
+interface BarProps {
+  data?: Record<string, any>;
+  options?: Record<string, any>;
+  height?: number;
+  width?: number;
+  plugins?: any[];
+  updateMode?: string;
+  redraw?: boolean;
+  ariaLabel?: string;
+  datasetIdKey?: string;
+  destroyDelay?: number;
+  onClick?: (...args: unknown[]) => void;
+  onDatasetClick?: (...args: unknown[]) => void;
+  onHover?: (...args: unknown[]) => void;
+  fallbackSlot?: JSX.Element;
+  tooltipSlot?: (ctx: TooltipSlotCtx) => JSX.Element;
+  slots?: Record<string, (ctx: any) => JSX.Element>;
+  ref?: (h: BarHandle) => void;
+}
+
+export interface BarHandle {
+  getChart: (...args: any[]) => any;
+  updateChart: (...args: any[]) => any;
+  resizeChart: (...args: any[]) => any;
+  resetChart: (...args: any[]) => any;
+  renderChart: (...args: any[]) => any;
+  stopChart: (...args: any[]) => any;
+  clearChart: (...args: any[]) => any;
+  toBase64Image: (...args: any[]) => any;
+}
+
+export default function Bar(_props: BarProps): JSX.Element {
+  const _merged = mergeProps({ data: (() => ({
+  labels: [],
+  datasets: []
+}))(), options: (() => ({}))(), height: 240, width: undefined, plugins: (() => [])(), updateMode: undefined, redraw: false, ariaLabel: undefined, datasetIdKey: 'label', destroyDelay: 0 }, _props);
+  const [local, attrs] = splitProps(_merged, ['data', 'options', 'height', 'width', 'plugins', 'updateMode', 'redraw', 'ariaLabel', 'datasetIdKey', 'destroyDelay', 'ref']);
+  onMount(() => { local.ref?.({ getChart, updateChart, resizeChart, resetChart, renderChart, stopChart, clearChart, toBase64Image }); });
+
+  const portalDisposers = new Set<() => void>();
+  const portals = {
+    tooltip: (container: HTMLElement, scope: { model: unknown }): (() => void) => {
+      const slot = _props.tooltipSlot ?? _props.slots?.['tooltip'];
+      if (typeof slot !== 'function') return () => {};
+      // Spike 004: portal-scope attribute injection.
+      container.setAttribute('data-rozie-portal-tooltip', 'ed04b5ca');
+      const dispose = render(() => slot(scope), container);
+      portalDisposers.add(dispose);
+      return () => {
+        dispose();
+        portalDisposers.delete(dispose);
+      };
+    },
+  };
+  onCleanup(() => {
+    for (const dispose of portalDisposers) dispose();
+    portalDisposers.clear();
+  });
+  onMount(() => {
+    const _cleanup = (() => {
+    canvasNode = canvasElRef;
+
+    // ─── @click / @hover / @datasetClick — composed, never clobbering ──────────
+    // Chart.js calls onClick/onHover with (event, activeElements, chart). We call
+    // any consumer-supplied handler first (read off $props.options), then emit a
+    // structured payload resolving the hit element(s) via getElementsAtEventForMode.
+    const composedOnClick = (e: any, activeEls: any, chart: any) => {
+      const userOnClick = local.options?.onClick;
+      if (typeof userOnClick === 'function') userOnClick(e, activeEls, chart);
+      const nearest = chart.getElementsAtEventForMode(e, 'nearest', {
+        intersect: true
+      }, false);
+      _props.onClick?.({
+        event: e,
+        elements: nearest,
+        chart
+      });
+      const dataset = chart.getElementsAtEventForMode(e, 'dataset', {
+        intersect: true
+      }, false);
+      if (dataset.length) {
+        _props.onDatasetClick?.({
+          event: e,
+          elements: dataset,
+          datasetIndex: dataset[0].datasetIndex,
+          chart
+        });
+      }
+    };
+    const composedOnHover = (e: any, activeEls: any, chart: any) => {
+      const userOnHover = local.options?.onHover;
+      if (typeof userOnHover === 'function') userOnHover(e, activeEls, chart);
+      _props.onHover?.({
+        event: e,
+        elements: activeEls,
+        chart
+      });
+    };
+
+    // ─── external-HTML tooltip portal slot ─────────────────────────────────────
+    // Only active when the consumer fills <slot name="tooltip">. The external
+    // handler positions a container over the canvas and mounts the consumer's
+    // framework-native fragment through $portals.tooltip(dom, scope). The scope
+    // carries the live tooltip model (title/body/dataPoints/position). Chart.js
+    // throttles external calls to active-element changes, so the dispose+remount
+    // on body-change is cheap. enabled:false suppresses the built-in canvas
+    // tooltip when we take over.
+    let tooltipKey = '';
+    const tooltipExternal = (context: any) => {
+      const {
+        chart,
+        tooltip
+      } = context;
+      if (!tooltipEl) {
+        tooltipEl = document.createElement('div');
+        tooltipEl.className = 'rozie-chart-tooltip';
+        tooltipEl.style.position = 'absolute';
+        tooltipEl.style.pointerEvents = 'none';
+        tooltipEl.style.transition = 'opacity 0.1s ease';
+        chart.canvas.parentNode.appendChild(tooltipEl);
+      }
+      if (tooltip.opacity === 0) {
+        tooltipEl.style.opacity = '0';
+        return;
+      }
+      const title = (tooltip.title || []).join(' ');
+      const body = (tooltip.body || []).map((b: any) => b.lines.join(' ')).join(' | ');
+      const key = `${title}::${body}`;
+      if (key !== tooltipKey) {
+        tooltipKey = key;
+        tooltipDispose?.();
+        // The scope MUST match the slot's declared param (`model`): the consumer's
+        // <slot name="tooltip"> receives a single `model` scoped value.
+        const scope = {
+          model: {
+            title: tooltip.title || [],
+            body: (tooltip.body || []).map((b: any) => b.lines),
+            dataPoints: tooltip.dataPoints || [],
+            opacity: tooltip.opacity
+          }
+        };
+        tooltipDispose = portals.tooltip(tooltipEl, scope);
+      }
+      const {
+        offsetLeft,
+        offsetTop
+      } = chart.canvas;
+      tooltipEl.style.opacity = '1';
+      tooltipEl.style.left = `${offsetLeft + tooltip.caretX}px`;
+      tooltipEl.style.top = `${offsetTop + tooltip.caretY}px`;
+    };
+
+    // ─── config builder ────────────────────────────────────────────────────────
+    // $snapshot strips Svelte 5's $state proxy first; Chart.js redefines property
+    // descriptors on whatever object it is handed.
+    buildConfig = () => {
+      const userOpts = local.options || {};
+      const tooltipOpt = (_props.tooltipSlot ?? _props.slots?.["tooltip"]) ? {
+        ...(userOpts.plugins?.tooltip || {}),
+        enabled: false,
+        external: tooltipExternal
+      } : userOpts.plugins?.tooltip;
+      return {
+        type: 'bar',
+        data: local.data,
+        // per-instance plugins[] — the consumer-extensibility passthrough.
+        plugins: local.plugins,
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: {
+            duration: 250
+          },
+          ...userOpts,
+          onClick: composedOnClick,
+          onHover: composedOnHover,
+          plugins: {
+            ...(userOpts.plugins || {}),
+            tooltip: tooltipOpt
+          }
+        }
+      };
+    };
+    instance = new ChartJS(canvasNode, buildConfig());
+  })() as unknown;
+    if (_cleanup) onCleanup(_cleanup as () => void);
+    onCleanup(() => {
+    tooltipDispose?.();
+    tooltipEl?.remove();
+    // destroyDelay (vue-chartjs parity): defer destroy() so any exit transition
+    // can finish. The captured `dying` instance is destroyed after the grace;
+    // 0 (default) destroys synchronously.
+    const dying = instance;
+    if (local.destroyDelay > 0) {
+      setTimeout(() => dying?.destroy(), local.destroyDelay);
+    } else {
+      dying?.destroy();
+    }
+  });
+  });
+  createEffect(() => { const __watchVal = (() => local.data)(); untrack(() => ((v: any) => {
+    if (!instance) return;
+    if (local.redraw) {
+      recreate();
+      return;
+    }
+
+    // Reconcile a new data object into the LIVE chart instead of replacing
+    // instance.data. Chart.js matches dataset controllers and point elements by
+    // array index across an update(), so mutating the existing labels/datasets
+    // arrays lets it tween every point from old value to new. Assigning a fresh
+    // instance.data severs that identity.
+    const next = v;
+    const live = instance.data;
+    live.labels ??= [];
+    live.labels.length = 0;
+    live.labels.push(...(next.labels ?? []));
+
+    // Datasets are matched by `ds[datasetIdKey]` (default 'label') so a stable
+    // keyed dataset reconciles onto its prior slot even if its array index moved —
+    // this guards the "first dataset copied over the others" hazard react-chartjs-2
+    // documents. Datasets without the key fall back to positional (index) matching.
+    live.datasets ??= [];
+    const nextSets = next.datasets ?? [];
+    const key = local.datasetIdKey;
+    const prev = live.datasets.slice();
+    const byKey = new Map();
+    prev.forEach((ds: any, i: any) => {
+      if (ds && ds[key] != null) byKey.set(ds[key], ds);
+    });
+    const merged = nextSets.map((ds: any, i: any) => {
+      const match = ds && ds[key] != null && byKey.get(ds[key]) || prev[i];
+      if (match) {
+        Object.assign(match, ds);
+        return match;
+      }
+      return ds;
+    });
+    live.datasets.length = 0;
+    live.datasets.push(...merged);
+    instance.update(local.updateMode);
+  })(__watchVal)); });
+  createEffect(on(() => (() => local.options)(), (v) => untrack(() => (() => {
+    if (!instance || !buildConfig) return;
+    instance.options = buildConfig().options;
+    instance.update('none');
+  })()), { defer: true }));
+  createEffect(on(() => (() => local.plugins)(), (v) => untrack(() => (() => recreate())()), { defer: true }));
+  let canvasElRef: HTMLElement | null = null;
+
+  // Bar registers only its own Chart.js controller/element/scale set
+  // (tree-shakable — importing this component does not pull every controller).
+  ChartJS.register(BarController, BarElement, LinearScale, CategoryScale, Legend, Tooltip, Colors);
+
+  // Chart.js v3+ ships with no controllers/elements/scales pre-registered. The
+  // generic Chart does NOT auto-register — the consumer registers only what they
+  // use (the tree-shakable Chart.js v3+ idiom every framework wrapper follows), so
+  // an app that only renders line charts doesn't ship every controller. Two paths:
+  //   - selective: `import { Chart, LineController, ... } from 'chart.js';
+  //     Chart.register(LineController, ...)` once at app startup; OR
+  //   - kitchen sink: import this package's `/auto` entry
+  //     (`@rozie-ui/chartjs-<fw>/auto`), or `import 'chart.js/auto'`, which
+  //     registers everything.
+  // The per-type components (Line/Bar/…) register their own controller set, so
+  // importing one is tree-shakable by construction.
+
+  let instance: any = null;
+  // $refs.canvasEl is read ONLY inside $onMount (ROZ123); re-creates use this
+  // captured node so no $refs read ever executes outside the mount hook. Named
+  // `canvasNode` (NOT `canvasEl`) so it does not collide with the template
+  // `ref="canvasEl"` binding, which the per-target emitters lower to their own
+  // `canvasEl` ref declaration (a same-name script local double-declares it).
+  let canvasNode: any = null;
+  // Tooltip-portal teardown state at COMPONENT scope (not inside $onMount): the
+  // $onMount-returned cleanup references these, and the Solid emitter hoists that
+  // returned cleanup into a sibling onCleanup() OUTSIDE the mount-body IIFE — so a
+  // cleanup that closed over $onMount-locals would lose scope. Component-scope
+  // state (like `instance`) is in scope wherever the per-target cleanup lands.
+  let tooltipEl: any = null;
+  let tooltipDispose: any = null;
+  // buildConfig is DEFINED inside $onMount (so its $emit/$portals/$slots
+  // references are bound in the mount-lifecycle scope the per-target emitters
+  // provide — mirrors FullCalendar's mount-built opts + CodeMirror's panelExt
+  // note) and stored here so the top-level re-create $watches can call it.
+  let buildConfig: any = null;
+  // Re-create the live instance. Chart.js exposes no stable runtime type-swap or
+  // plugin-swap, so `type`/`plugins`/`redraw`-driven changes re-create. Uses the
+  // captured canvasNode (never re-reads $refs outside $onMount).
+  function recreate() {
+    if (!buildConfig || !canvasNode) return;
+    instance?.destroy();
+    instance = new ChartJS(canvasNode, buildConfig());
+  }
+
+  // Reconcile prop changes. Mutating chart.data in place and calling update() is
+  // the Chart.js-supported runtime path — re-creating on every data tick would
+  // flicker and leak. (When `redraw` is set, re-create wholesale instead.)
+
+  // Imperative handle (Phase 21 $expose). The verbs are SUFFIXED with `Chart`
+  // because bare `update`/`render` collide with LitElement's reactive-lifecycle
+  // methods (`update(changedProperties)` / `render()`) and would shadow them on
+  // the Lit leaf; `resize`/`reset`/`stop`/`clear` are suffixed too for a
+  // consistent, unambiguous handle. `getChart` returns the live instance for
+  // direct API access; `toBase64Image` is the marquee PNG-export capability.
+  // Collision-clear: none of the 8 names collide with the 9 props.
+  function getChart() {
+    return instance;
+  }
+  function updateChart(mode: any) {
+    instance?.update(mode);
+  }
+  function resizeChart(w: any, h: any) {
+    instance?.resize(w, h);
+  }
+  function resetChart() {
+    instance?.reset();
+  }
+  function renderChart() {
+    instance?.render();
+  }
+  function stopChart() {
+    return instance?.stop();
+  }
+  function clearChart() {
+    return instance?.clear();
+  }
+  function toBase64Image(type: any, quality: any) {
+    return instance ? instance.toBase64Image(type, quality) : null;
+  }
+
+  return (
+    <>
+    <div class={"rozie-chart"} style={{ height: local.height + 'px', width: local.width ? local.width + 'px' : undefined }} data-rozie-s-ed04b5ca="">
+      
+      <canvas ref={(el) => { canvasElRef = el as HTMLElement; }} role="img" aria-label={local.ariaLabel} data-rozie-s-ed04b5ca="">{(_props.fallbackSlot ?? _props.slots?.['fallback']?.({}))}</canvas>
+    </div>
+
+
+    </>
+  );
+}

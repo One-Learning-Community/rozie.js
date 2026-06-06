@@ -27,9 +27,14 @@
   },
   "exports": {
     ".": {
-      "types": "./src/Chart.ts",
-      "import": "./src/Chart.ts",
-      "default": "./src/Chart.ts"
+      "types": "./src/index.ts",
+      "import": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./auto": {
+      "types": "./src/auto.ts",
+      "import": "./src/auto.ts",
+      "default": "./src/auto.ts"
     }
   },
   "files": [

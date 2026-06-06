@@ -246,7 +246,7 @@ const png = el.toBase64Image();`,
 // README rendering.
 // ---------------------------------------------------------------------------
 
-export function renderReadme(target, ir, pkgName, handleManifest = {}) {
+export function renderReadme(target, ir, pkgName, handleManifest = {}, variantNames = []) {
   const usage = USAGE[target];
   if (!usage) throw new Error(`renderReadme: no usage snippet for target "${target}"`);
 
@@ -281,6 +281,34 @@ export function renderReadme(target, ir, pkgName, handleManifest = {}) {
   lines.push('```' + usage.lang);
   lines.push(usage.code);
   lines.push('```');
+  lines.push('');
+
+  // Registration model + per-type components.
+  lines.push('## Registration & per-type components');
+  lines.push('');
+  lines.push(
+    'Chart.js v3+ is tree-shakable: the generic `Chart` does **not** auto-register ' +
+      'controllers, so register what you use —',
+  );
+  lines.push('');
+  lines.push('```ts');
+  lines.push("import { Chart, LineController, LineElement, PointElement, LinearScale, CategoryScale } from 'chart.js';");
+  lines.push('Chart.register(LineController, LineElement, PointElement, LinearScale, CategoryScale);');
+  lines.push('```');
+  lines.push('');
+  lines.push(
+    '— or import the kitchen-sink `/auto` entry (`' + pkgName + "/auto`, or `import 'chart.js/auto'`) " +
+      'which registers everything.',
+  );
+  if (variantNames && variantNames.length > 0) {
+    lines.push('');
+    lines.push(
+      'Or use a **per-type component** — each pins its `type` and registers only its own ' +
+        'controller set (so importing one is tree-shakable), with the same props/events/handle ' +
+        'as the generic `Chart` (minus `type`): ' +
+        variantNames.map((n) => `\`${n}\``).join(', ') + '.',
+    );
+  }
   lines.push('');
 
   // Props

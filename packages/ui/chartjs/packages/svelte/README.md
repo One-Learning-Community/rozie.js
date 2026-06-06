@@ -25,6 +25,19 @@ Peer dependencies: the `chart.js` engine (`^4`) + `svelte`. Install them alongsi
 <Chart type="bar" {data} height={280} />
 ```
 
+## Registration & per-type components
+
+Chart.js v3+ is tree-shakable: the generic `Chart` does **not** auto-register controllers, so register what you use —
+
+```ts
+import { Chart, LineController, LineElement, PointElement, LinearScale, CategoryScale } from 'chart.js';
+Chart.register(LineController, LineElement, PointElement, LinearScale, CategoryScale);
+```
+
+— or import the kitchen-sink `/auto` entry (`@rozie-ui/chartjs-svelte/auto`, or `import 'chart.js/auto'`) which registers everything.
+
+Or use a **per-type component** — each pins its `type` and registers only its own controller set (so importing one is tree-shakable), with the same props/events/handle as the generic `Chart` (minus `type`): `Line`, `Bar`, `Pie`, `Doughnut`, `PolarArea`, `Radar`, `Scatter`, `Bubble`.
+
 ## Props
 
 | Name | Type | Default | Two-way (model) | Required |

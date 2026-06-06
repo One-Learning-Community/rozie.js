@@ -1,5 +1,19 @@
 export { default as Chart } from './Chart';
-export { default } from './Chart';
-
-/** The `$expose` imperative handle received via `ref` — { getChart, updateChart, resizeChart, resetChart, renderChart, stopChart, clearChart, toBase64Image }. */
 export type { ChartHandle } from './Chart';
+export { default } from './Chart';
+export { default as Line } from './Line';
+export type { LineHandle } from './Line';
+export { default as Bar } from './Bar';
+export type { BarHandle } from './Bar';
+export { default as Pie } from './Pie';
+export type { PieHandle } from './Pie';
+export { default as Doughnut } from './Doughnut';
+export type { DoughnutHandle } from './Doughnut';
+export { default as PolarArea } from './PolarArea';
+export type { PolarAreaHandle } from './PolarArea';
+export { default as Radar } from './Radar';
+export type { RadarHandle } from './Radar';
+export { default as Scatter } from './Scatter';
+export type { ScatterHandle } from './Scatter';
+export { default as Bubble } from './Bubble';
+export type { BubbleHandle } from './Bubble';
