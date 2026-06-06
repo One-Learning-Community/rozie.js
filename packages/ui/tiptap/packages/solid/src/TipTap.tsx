@@ -2,7 +2,7 @@ import type { JSX } from 'solid-js';
 import { Show, createEffect, createSignal, mergeProps, on, onCleanup, onMount, splitProps, untrack } from 'solid-js';
 import { render } from 'solid-js/web';
 import { __rozieInjectStyle, createControllableSignal } from '@rozie/runtime-solid';
-import { Editor } from '@tiptap/core';
+import { Editor, Node } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 
 // The live editor instance — null before mount / after destroy. Named `editor`
@@ -65,6 +65,8 @@ __rozieInjectStyle('TipTap-2aeee876', `.rozie-tiptap[data-rozie-s-2aeee876] {
 
 interface ToolbarSlotCtx { editor: any; }
 
+interface NodeViewSlotCtx { node: any; selected: any; updateAttributes: any; getPos: any; editor: any; contentDOM: any; }
+
 interface TipTapProps {
   html?: string;
   defaultHtml?: string;
@@ -81,6 +83,7 @@ interface TipTapProps {
   onFocus?: (...args: unknown[]) => void;
   onBlur?: (...args: unknown[]) => void;
   toolbarSlot?: (ctx: ToolbarSlotCtx) => JSX.Element;
+  nodeViewSlot?: (ctx: NodeViewSlotCtx) => JSX.Element;
   slots?: Record<string, (ctx: any) => JSX.Element>;
   ref?: (h: TipTapHandle) => void;
 }
@@ -115,6 +118,10 @@ export default function TipTap(_props: TipTapProps): JSX.Element {
     h2: false,
     bulletList: false
   });
+  interface ReactivePortalHandle {
+    update(scope: unknown): void;
+    dispose(): void;
+  }
   const portalDisposers = new Set<() => void>();
   const portals = {
     toolbar: (container: HTMLElement, scope: { editor: unknown }): (() => void) => {
@@ -129,6 +136,24 @@ export default function TipTap(_props: TipTapProps): JSX.Element {
         portalDisposers.delete(dispose);
       };
     },
+    nodeView: (container: HTMLElement, scope: { node: unknown; selected: unknown; updateAttributes: unknown; getPos: unknown; editor: unknown; contentDOM: unknown }): ReactivePortalHandle => {
+      const slot = _props.nodeViewSlot ?? _props.slots?.['nodeView'];
+      if (typeof slot !== 'function') return { update() {}, dispose() {} };
+      // Spike 004: portal-scope attribute injection.
+      container.setAttribute('data-rozie-portal-nodeView', '2aeee876');
+      const [scopeSig, setScopeSig] = createSignal<unknown>(scope, { equals: false });
+      const dispose = render(() => slot(scopeSig() as { node: unknown; selected: unknown; updateAttributes: unknown; getPos: unknown; editor: unknown; contentDOM: unknown }), container);
+      portalDisposers.add(dispose);
+      return {
+        update: (s: unknown): void => {
+          setScopeSig(s);
+        },
+        dispose: (): void => {
+          dispose();
+          portalDisposers.delete(dispose);
+        },
+      };
+    },
   };
   onCleanup(() => {
     for (const dispose of portalDisposers) dispose();
@@ -137,14 +162,22 @@ export default function TipTap(_props: TipTapProps): JSX.Element {
   onMount(() => {
     const _cleanup = (() => {
     lastHtml = html();
+
+    // Register the reactive node-view nodes ONLY when the consumer fills the
+    // `nodeView` slot — an unfilled slot adds no custom nodes (zero overhead, no
+    // unused $portals.nodeView reference fired). $portals.nodeView is captured
+    // here inside the mount body and passed into the node factory, keeping the
+    // reference scoped to the mount lifecycle (the toolbar-slot discipline).
+    const nodeViewExtensions = (_props.nodeViewSlot ?? _props.slots?.["nodeView"]) ? makeNodeViewExtensions(portals.nodeView) : [];
     editor = new Editor({
       element: editorElRef,
       content: html(),
       editable: local.editable,
       autofocus: local.autofocus,
-      // StarterKit first; consumer extensions LAST so they win (TipTap applies
-      // later-registered extensions over earlier ones for the same node/mark).
-      extensions: [StarterKit, ...local.extensions],
+      // StarterKit first; the reactive node-view nodes next; consumer extensions
+      // LAST so they win (TipTap applies later-registered extensions over earlier
+      // ones for the same node/mark).
+      extensions: [StarterKit, ...nodeViewExtensions, ...local.extensions],
       editorProps: {
         attributes: {
           'aria-label': local.ariaLabel,
@@ -247,6 +280,151 @@ export default function TipTap(_props: TipTapProps): JSX.Element {
       bulletList: editor.isActive('bulletList')
     });
   }
+
+  // ── Reactive node-view portal slot (Phase 33 — the FIRST shipped `reactive`
+  // portal slot, the marquee TipTap differentiator). When the consumer fills the
+  // `nodeView` slot, two custom ProseMirror nodes render the consumer fragment as
+  // a custom node *in-engine*, re-rendering it in place on every transaction via
+  // the reactive handle `$portals.nodeView(dom, scope) => { update, dispose }`
+  // (REQ-22). Both halves of the primitive are proven and shipped here:
+  //
+  //   1. `mention` — a NON-EDITABLE inline ATOM (selectable:true, no contentDOM,
+  //      Spike 009 / REQ-26). selectNode/deselectNode/update(node) → handle.update
+  //      so the chip re-renders in place (engine-driven; no Rozie reactive loop).
+  //
+  //   2. `callout` — an EDITABLE BLOCK (content:'inline*', so it HAS a contentDOM,
+  //      Spike 008 / REQ-23). ProseMirror owns the editable hole; the consumer
+  //      fragment renders chrome wrapping a [data-rozie-hole] placeholder and the
+  //      per-target portal bridge grafts contentDOM into that hole — native-ref on
+  //      React/Solid/Lit, querySelector-after-render on Vue/Svelte/Angular. The
+  //      .rozie source merely passes `contentDOM` in scope; the graft mechanism is
+  //      PER-TARGET and lives in the emitted portal bridge, not here.
+  //
+  // $portals.nodeView is referenced ONLY inside $onMount/the addNodeView closures
+  // (the $refs-only-in-onMount + bundled-leaf strict-typecheck discipline — the
+  // same constraint the toolbar slot follows). `makeNodeViewExtensions` is invoked
+  // from inside $onMount so the `nv` closure (capturing $portals.nodeView) is
+  // constructed within the mount lifecycle.
+  function makeNodeView(nv: any, editable: any) {
+    return (props: any) => {
+      const {
+        node,
+        getPos,
+        editor: ed
+      } = props;
+      // engine-owned outer host the consumer fragment mounts into.
+      const dom = document.createElement(editable ? 'div' : 'span');
+      dom.className = editable ? 'rozie-tiptap-nodeview rozie-tiptap-nodeview--block' : 'rozie-tiptap-nodeview rozie-tiptap-nodeview--inline';
+      // EDITABLE nodes own a ProseMirror-managed contentDOM; the bridge grafts it
+      // into the consumer fragment's [data-rozie-hole]. ATOM nodes have none.
+      const contentDOM = editable ? document.createElement(dom.tagName === 'DIV' ? 'div' : 'span') : null;
+      if (contentDOM) contentDOM.className = 'rozie-tiptap-nodeview-content';
+      const updateAttributes = (attrs: any) => {
+        if (typeof getPos !== 'function') return;
+        const pos = getPos();
+        if (pos == null) return;
+        ed.view.dispatch(ed.view.state.tr.setNodeMarkup(pos, undefined, {
+          ...node.attrs,
+          ...attrs
+        }));
+      };
+      const buildScope = (n: any, selected: any) => ({
+        node: n,
+        selected,
+        updateAttributes,
+        getPos,
+        editor: ed,
+        ...(contentDOM ? {
+          contentDOM
+        } : {})
+      });
+
+      // Reactive handle — { update, dispose }. The fragment mounts ONCE; every
+      // engine transaction re-invokes handle.update(scope) re-rendering IN PLACE.
+      const handle = nv(dom, buildScope(node, false));
+      return {
+        dom,
+        ...(contentDOM ? {
+          contentDOM
+        } : {}),
+        // attr / content change for THIS node → re-render the fragment in place,
+        // keep the view (return true). The new node identity is forwarded so the
+        // fragment reads fresh node.attrs (REQ-26).
+        update(nextNode: any) {
+          if (nextNode.type !== node.type) return false;
+          handle.update(buildScope(nextNode, false));
+          return true;
+        },
+        // NodeSelection enters/leaves the node → toggle `selected` in scope so the
+        // chip's selected styling is pure engine-driven reactive `update`.
+        selectNode() {
+          handle.update(buildScope(node, true));
+        },
+        deselectNode() {
+          handle.update(buildScope(node, false));
+        },
+        destroy() {
+          handle.dispose();
+        }
+      };
+    };
+  }
+
+  // Build the two custom Nodes bound to the reactive nodeView portal. Takes the
+  // per-target `$portals.nodeView` (captured here so the reference stays inside
+  // the mount lifecycle — never top-level, per the bundled-leaf typecheck rule).
+  function makeNodeViewExtensions(nv: any) {
+    // (1) NON-EDITABLE inline atom @mention chip (Spike 009 / REQ-26).
+    const Mention = Node.create({
+      name: 'rozieMention',
+      group: 'inline',
+      inline: true,
+      atom: true,
+      selectable: true,
+      addAttributes: () => ({
+        id: {
+          default: null
+        },
+        label: {
+          default: ''
+        }
+      }),
+      parseHTML: () => [{
+        tag: 'span[data-rozie-mention]'
+      }],
+      renderHTML: ({
+        HTMLAttributes
+      }: any) => ['span', {
+        'data-rozie-mention': '',
+        ...HTMLAttributes
+      }, 0],
+      addNodeView: () => makeNodeView(nv, false)
+    });
+
+    // (2) EDITABLE block callout with a contentDOM hole (Spike 008 / REQ-23).
+    const Callout = Node.create({
+      name: 'rozieCallout',
+      group: 'block',
+      content: 'inline*',
+      defining: true,
+      addAttributes: () => ({
+        tone: {
+          default: 'info'
+        }
+      }),
+      parseHTML: () => [{
+        tag: 'div[data-rozie-callout]'
+      }],
+      renderHTML: ({
+        HTMLAttributes
+      }: any) => ['div', {
+        'data-rozie-callout': '',
+        ...HTMLAttributes
+      }, 0],
+      addNodeView: () => makeNodeView(nv, true)
+    });
+    return [Mention, Callout];
+  }
   // ── Imperative handle (Phase 21 $expose) — TipTap is command-rich, so this is
   // the marquee surface: 14 verbs over the live Editor, uniform across all 6
   // targets. Each guards the pre-mount / destroyed `editor = null`.
@@ -347,6 +525,8 @@ export default function TipTap(_props: TipTapProps): JSX.Element {
         <button type="button" aria-label="Bullet list" classList={{ active: active().bulletList }} onClick={toggleBulletList} data-rozie-s-2aeee876="">• List</button>
       </div></Show>}{<Show when={local.editable && (_props.toolbarSlot ?? _props.slots?.['toolbar'])}><div class={"rozie-tiptap-toolbar rozie-tiptap-toolbar--slot"} ref={(el) => { toolbarElRef = el as HTMLElement; }} data-rozie-s-2aeee876="" /></Show>}<div ref={(el) => { editorElRef = el as HTMLElement; }} class={"rozie-tiptap-content"} data-placeholder={local.placeholder} data-rozie-s-2aeee876="" />
     </div>
+
+
 
 
     </>

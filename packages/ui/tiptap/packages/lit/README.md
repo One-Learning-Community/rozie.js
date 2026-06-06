@@ -84,3 +84,4 @@ When you fill the `toolbar` slot the internal toolbar is replaced by your own UI
 | Slot | Params |
 | --- | --- |
 | toolbar | editor |
+| nodeView | node, selected, updateAttributes, getPos, editor, contentDOM |

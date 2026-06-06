@@ -2,7 +2,7 @@ import { Component, ContentChild, DestroyRef, ElementRef, EmbeddedViewRef, Templ
 import { NgTemplateOutlet } from '@angular/common';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
 
-import { Editor } from '@tiptap/core';
+import { Editor, Node } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 
 // The live editor instance — null before mount / after destroy. Named `editor`
@@ -12,6 +12,16 @@ import StarterKit from '@tiptap/starter-kit';
 interface ToolbarCtx {
   $implicit: { editor: any };
   editor: any;
+}
+
+interface NodeViewCtx {
+  $implicit: { node: any; selected: any; updateAttributes: any; getPos: any; editor: any; contentDOM: any };
+  node: any;
+  selected: any;
+  updateAttributes: any;
+  getPos: any;
+  editor: any;
+  contentDOM: any;
 }
 
 @Component({
@@ -36,6 +46,8 @@ interface ToolbarCtx {
     <div class="rozie-tiptap-toolbar rozie-tiptap-toolbar--slot" #toolbarEl></div>
     }<div #editorEl class="rozie-tiptap-content" [attr.data-placeholder]="placeholder()"></div>
     </div>
+
+
 
 
     <ng-container #rozie_portalAnchor></ng-container>
@@ -127,10 +139,12 @@ export class TipTap {
   focus = output<void>();
   blur = output<void>();
   @ContentChild('toolbar', { read: TemplateRef }) toolbarTpl?: TemplateRef<ToolbarCtx>;
+  @ContentChild('nodeView', { read: TemplateRef }) nodeViewTpl?: TemplateRef<NodeViewCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
   private _portalViews = new Set<EmbeddedViewRef<unknown>>();
   private _portalAnchor = viewChild('rozie_portalAnchor', { read: ViewContainerRef });
   private _toolbarTpl = contentChild('toolbar', { read: TemplateRef });
+  private _nodeViewTpl = contentChild('nodeView', { read: TemplateRef });
   private __rozieDestroyRef = inject(DestroyRef);
   private __rozieWatchInitial_0 = true;
   private __rozieWatchInitial_1 = true;
@@ -149,6 +163,10 @@ export class TipTap {
   }
 
   ngAfterViewInit() {
+    interface ReactivePortalHandle {
+      update(scope: unknown): void;
+      dispose(): void;
+    }
     const portals = {
       toolbar: (container: HTMLElement, scope: { editor: unknown }): (() => void) => {
         const tpl = this._toolbarTpl();
@@ -165,18 +183,52 @@ export class TipTap {
           this._portalViews.delete(view as EmbeddedViewRef<unknown>);
         };
       },
+      nodeView: (container: HTMLElement, scope: { node: unknown; selected: unknown; updateAttributes: unknown; getPos: unknown; editor: unknown; contentDOM: unknown }): ReactivePortalHandle => {
+        const tpl = this._nodeViewTpl();
+        const vcr = this._portalAnchor();
+        if (!tpl || !vcr) return { update() {}, dispose() {} };
+        // Spike 004: portal-scope attribute injection.
+        container.setAttribute('data-rozie-portal-nodeView', '2aeee876');
+        const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
+        view.detectChanges();
+        for (const node of view.rootNodes as Node[]) container.appendChild(node);
+        this._portalViews.add(view as EmbeddedViewRef<unknown>);
+        return {
+          update: (s: unknown): void => {
+            Object.assign(view.context as object, s as object);
+            view.detectChanges();
+          },
+          dispose: (): void => {
+            view.destroy();
+            this._portalViews.delete(view as EmbeddedViewRef<unknown>);
+          },
+        };
+      },
     };
     const __editorClass = this.editorClass();
     const __placeholder = this.placeholder();
     this.lastHtml = this.html();
+
+    // Register the reactive node-view nodes ONLY when the consumer fills the
+    // `nodeView` slot — an unfilled slot adds no custom nodes (zero overhead, no
+    // unused $portals.nodeView reference fired). $portals.nodeView is captured
+    // here inside the mount body and passed into the node factory, keeping the
+    // reference scoped to the mount lifecycle (the toolbar-slot discipline).
+    // Register the reactive node-view nodes ONLY when the consumer fills the
+    // `nodeView` slot — an unfilled slot adds no custom nodes (zero overhead, no
+    // unused $portals.nodeView reference fired). $portals.nodeView is captured
+    // here inside the mount body and passed into the node factory, keeping the
+    // reference scoped to the mount lifecycle (the toolbar-slot discipline).
+    const nodeViewExtensions = (this.nodeViewTpl ?? this.templates()?.['nodeView']) ? this.makeNodeViewExtensions(portals.nodeView) : [];
     this.editor = new Editor({
       element: this.editorEl()!.nativeElement,
       content: this.html(),
       editable: this.editable(),
       autofocus: this.autofocus(),
-      // StarterKit first; consumer extensions LAST so they win (TipTap applies
-      // later-registered extensions over earlier ones for the same node/mark).
-      extensions: [StarterKit, ...this.extensions()],
+      // StarterKit first; the reactive node-view nodes next; consumer extensions
+      // LAST so they win (TipTap applies later-registered extensions over earlier
+      // ones for the same node/mark).
+      extensions: [StarterKit, ...nodeViewExtensions, ...this.extensions()],
       editorProps: {
         attributes: {
           'aria-label': this.ariaLabel(),
@@ -256,6 +308,120 @@ export class TipTap {
       }),
       bulletList: this.editor.isActive('bulletList')
     });
+  };
+  makeNodeView = (nv: any, editable: any) => (props: any) => {
+    const {
+      node,
+      getPos,
+      editor: ed
+    } = props;
+    // engine-owned outer host the consumer fragment mounts into.
+    const dom = document.createElement(editable ? 'div' : 'span');
+    dom.className = editable ? 'rozie-tiptap-nodeview rozie-tiptap-nodeview--block' : 'rozie-tiptap-nodeview rozie-tiptap-nodeview--inline';
+    // EDITABLE nodes own a ProseMirror-managed contentDOM; the bridge grafts it
+    // into the consumer fragment's [data-rozie-hole]. ATOM nodes have none.
+    const contentDOM = editable ? document.createElement(dom.tagName === 'DIV' ? 'div' : 'span') : null;
+    if (contentDOM) contentDOM.className = 'rozie-tiptap-nodeview-content';
+    const updateAttributes = (attrs: any) => {
+      if (typeof getPos !== 'function') return;
+      const pos = getPos();
+      if (pos == null) return;
+      ed.view.dispatch(ed.view.state.tr.setNodeMarkup(pos, undefined, {
+        ...node.attrs,
+        ...attrs
+      }));
+    };
+    const buildScope = (n: any, selected: any) => ({
+      node: n,
+      selected,
+      updateAttributes,
+      getPos,
+      editor: ed,
+      ...(contentDOM ? {
+        contentDOM
+      } : {})
+    });
+
+    // Reactive handle — { update, dispose }. The fragment mounts ONCE; every
+    // engine transaction re-invokes handle.update(scope) re-rendering IN PLACE.
+    const handle = nv(dom, buildScope(node, false));
+    return {
+      dom,
+      ...(contentDOM ? {
+        contentDOM
+      } : {}),
+      // attr / content change for THIS node → re-render the fragment in place,
+      // keep the view (return true). The new node identity is forwarded so the
+      // fragment reads fresh node.attrs (REQ-26).
+      update(nextNode: any) {
+        if (nextNode.type !== node.type) return false;
+        handle.update(buildScope(nextNode, false));
+        return true;
+      },
+      // NodeSelection enters/leaves the node → toggle `selected` in scope so the
+      // chip's selected styling is pure engine-driven reactive `update`.
+      selectNode() {
+        handle.update(buildScope(node, true));
+      },
+      deselectNode() {
+        handle.update(buildScope(node, false));
+      },
+      destroy() {
+        handle.dispose();
+      }
+    };
+  };
+  makeNodeViewExtensions = (nv: any) => {
+    // (1) NON-EDITABLE inline atom @mention chip (Spike 009 / REQ-26).
+    const Mention = Node.create({
+      name: 'rozieMention',
+      group: 'inline',
+      inline: true,
+      atom: true,
+      selectable: true,
+      addAttributes: () => ({
+        id: {
+          default: null
+        },
+        label: {
+          default: ''
+        }
+      }),
+      parseHTML: () => [{
+        tag: 'span[data-rozie-mention]'
+      }],
+      renderHTML: ({
+        HTMLAttributes
+      }: any) => ['span', {
+        'data-rozie-mention': '',
+        ...HTMLAttributes
+      }, 0],
+      addNodeView: () => this.makeNodeView(nv, false)
+    });
+
+    // (2) EDITABLE block callout with a contentDOM hole (Spike 008 / REQ-23).
+    const Callout = Node.create({
+      name: 'rozieCallout',
+      group: 'block',
+      content: 'inline*',
+      defining: true,
+      addAttributes: () => ({
+        tone: {
+          default: 'info'
+        }
+      }),
+      parseHTML: () => [{
+        tag: 'div[data-rozie-callout]'
+      }],
+      renderHTML: ({
+        HTMLAttributes
+      }: any) => ['div', {
+        'data-rozie-callout': '',
+        ...HTMLAttributes
+      }, 0],
+      addNodeView: () => this.makeNodeView(nv, true)
+    });
+    return [Mention, Callout];
   };
   getEditor = () => {
     return this.editor;
@@ -343,7 +509,7 @@ export class TipTap {
   static ngTemplateContextGuard(
     _dir: TipTap,
     _ctx: unknown,
-  ): _ctx is ToolbarCtx {
+  ): _ctx is ToolbarCtx | NodeViewCtx {
     return true;
   }
 }

@@ -2,7 +2,7 @@ import { LitElement, css, html, nothing, render } from 'lit';
 import { customElement, property, query, queryAssignedElements, state } from 'lit/decorators.js';
 import { SignalWatcher, effect, signal, untracked } from '@lit-labs/preact-signals';
 import { createLitControllableProperty } from '@rozie/runtime-lit';
-import { Editor } from '@tiptap/core';
+import { Editor, Node } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 
 // The live editor instance — null before mount / after destroy. Named `editor`
@@ -11,6 +11,15 @@ import StarterKit from '@tiptap/starter-kit';
 
 interface RozieToolbarSlotCtx {
   editor: unknown;
+}
+
+interface RozieNodeViewSlotCtx {
+  node: unknown;
+  selected: unknown;
+  updateAttributes: unknown;
+  getPos: unknown;
+  editor: unknown;
+  contentDOM: unknown;
 }
 
 @customElement('rozie-tip-tap')
@@ -96,6 +105,9 @@ private _portalContainers = new Set<HTMLElement>();
   @state() private _hasSlotToolbar = false;
   @queryAssignedElements({ slot: 'toolbar', flatten: true }) private _slotToolbarElements!: Element[];
   @property({ attribute: false }) toolbar?: (scope: { editor: unknown }) => unknown;
+  @state() private _hasSlotNodeView = false;
+  @queryAssignedElements({ slot: 'nodeView', flatten: true }) private _slotNodeViewElements!: Element[];
+  @property({ attribute: false }) nodeView?: (scope: { node: unknown; selected: unknown; updateAttributes: unknown; getPos: unknown; editor: unknown; contentDOM: unknown }) => unknown;
 
   private _disconnectCleanups: Array<() => void> = [];
   // Re-parenting guard: set true once the deferred teardown has actually
@@ -113,11 +125,23 @@ private _portalContainers = new Set<HTMLElement>();
         update();
       }
     }
+
+    {
+      const slotEl = this.shadowRoot?.querySelector('slot[name="nodeView"]');
+      if (slotEl !== null && slotEl !== undefined) {
+        const update = () => { this._hasSlotNodeView = this._slotNodeViewElements.length > 0; };
+        slotEl.addEventListener('slotchange', update);
+        // CR-05 fix: push cleanup so the listener is removed on disconnectedCallback.
+        this._disconnectCleanups.push(() => slotEl.removeEventListener('slotchange', update));
+        update();
+      }
+    }
   }
 
   connectedCallback(): void {
     // Phase 07.3.1 D-LIT-15 — pre-seed _hasSlot<X> from light DOM so first render isn't deadlocked.
     this._hasSlotToolbar = Array.from(this.children).some((el) => el.getAttribute('slot') === 'toolbar');
+    this._hasSlotNodeView = Array.from(this.children).some((el) => el.getAttribute('slot') === 'nodeView');
     super.connectedCallback();
     if (this.hasUpdated && this._rozieTornDown) { this._rozieTornDown = false; this._armListeners(); }
   }
@@ -125,6 +149,10 @@ private _portalContainers = new Set<HTMLElement>();
   firstUpdated(): void {
     this._armListeners();
 
+    interface ReactivePortalHandle {
+      update(scope: unknown): void;
+      dispose(): void;
+    }
     const portals = {
       toolbar: (container: HTMLElement, scope: { editor: unknown }): (() => void) => {
         const tpl = this.toolbar;
@@ -136,6 +164,24 @@ private _portalContainers = new Set<HTMLElement>();
         return () => {
           render(nothing, container);
           this._portalContainers.delete(container);
+        };
+      },
+      nodeView: (container: HTMLElement, scope: { node: unknown; selected: unknown; updateAttributes: unknown; getPos: unknown; editor: unknown; contentDOM: unknown }): ReactivePortalHandle => {
+        const tpl = this.nodeView;
+        if (typeof tpl !== 'function') return { update() {}, dispose() {} };
+        // Spike 004: portal-scope attribute injection.
+        container.setAttribute('data-rozie-portal-nodeView', '2aeee876');
+        const renderScope = (s: { node: unknown; selected: unknown; updateAttributes: unknown; getPos: unknown; editor: unknown; contentDOM: unknown }): void => {
+          render(tpl(s), container);
+        };
+        renderScope(scope);
+        this._portalContainers.add(container);
+        return {
+          update: (s: { node: unknown; selected: unknown; updateAttributes: unknown; getPos: unknown; editor: unknown; contentDOM: unknown }): void => renderScope(s),
+          dispose: (): void => {
+            render(nothing, container);
+            this._portalContainers.delete(container);
+          },
         };
       },
     };
@@ -157,14 +203,27 @@ private _portalContainers = new Set<HTMLElement>();
     })(__watchVal); }); }));
 
     this.lastHtml = this.html;
+
+    // Register the reactive node-view nodes ONLY when the consumer fills the
+    // `nodeView` slot — an unfilled slot adds no custom nodes (zero overhead, no
+    // unused $portals.nodeView reference fired). $portals.nodeView is captured
+    // here inside the mount body and passed into the node factory, keeping the
+    // reference scoped to the mount lifecycle (the toolbar-slot discipline).
+    // Register the reactive node-view nodes ONLY when the consumer fills the
+    // `nodeView` slot — an unfilled slot adds no custom nodes (zero overhead, no
+    // unused $portals.nodeView reference fired). $portals.nodeView is captured
+    // here inside the mount body and passed into the node factory, keeping the
+    // reference scoped to the mount lifecycle (the toolbar-slot discipline).
+    const nodeViewExtensions = this.nodeView !== undefined ? this.makeNodeViewExtensions(portals.nodeView) : [];
     this.editor = new Editor({
       element: this._refEditorEl,
       content: this.html,
       editable: this.editable,
       autofocus: this.autofocus,
-      // StarterKit first; consumer extensions LAST so they win (TipTap applies
-      // later-registered extensions over earlier ones for the same node/mark).
-      extensions: [StarterKit, ...this.extensions],
+      // StarterKit first; the reactive node-view nodes next; consumer extensions
+      // LAST so they win (TipTap applies later-registered extensions over earlier
+      // ones for the same node/mark).
+      extensions: [StarterKit, ...nodeViewExtensions, ...this.extensions],
       editorProps: {
         attributes: {
           'aria-label': this.ariaLabel,
@@ -273,6 +332,8 @@ private _portalContainers = new Set<HTMLElement>();
 </div>
 
 <slot name="toolbar"></slot>
+
+<slot name="nodeView"></slot>
 `;
   }
 
@@ -295,6 +356,122 @@ private _portalContainers = new Set<HTMLElement>();
     }),
     bulletList: this.editor.isActive('bulletList')
   };
+};
+
+  makeNodeView = (nv: any, editable: any) => (props: any) => {
+  const {
+    node,
+    getPos,
+    editor: ed
+  } = props;
+  // engine-owned outer host the consumer fragment mounts into.
+  const dom = document.createElement(editable ? 'div' : 'span');
+  dom.className = editable ? 'rozie-tiptap-nodeview rozie-tiptap-nodeview--block' : 'rozie-tiptap-nodeview rozie-tiptap-nodeview--inline';
+  // EDITABLE nodes own a ProseMirror-managed contentDOM; the bridge grafts it
+  // into the consumer fragment's [data-rozie-hole]. ATOM nodes have none.
+  const contentDOM = editable ? document.createElement(dom.tagName === 'DIV' ? 'div' : 'span') : null;
+  if (contentDOM) contentDOM.className = 'rozie-tiptap-nodeview-content';
+  const updateAttributes = (attrs: any) => {
+    if (typeof getPos !== 'function') return;
+    const pos = getPos();
+    if (pos == null) return;
+    ed.view.dispatch(ed.view.state.tr.setNodeMarkup(pos, undefined, {
+      ...node.attrs,
+      ...attrs
+    }));
+  };
+  const buildScope = (n: any, selected: any) => ({
+    node: n,
+    selected,
+    updateAttributes,
+    getPos,
+    editor: ed,
+    ...(contentDOM ? {
+      contentDOM
+    } : {})
+  });
+
+  // Reactive handle — { update, dispose }. The fragment mounts ONCE; every
+  // engine transaction re-invokes handle.update(scope) re-rendering IN PLACE.
+  const handle = nv(dom, buildScope(node, false));
+  return {
+    dom,
+    ...(contentDOM ? {
+      contentDOM
+    } : {}),
+    // attr / content change for THIS node → re-render the fragment in place,
+    // keep the view (return true). The new node identity is forwarded so the
+    // fragment reads fresh node.attrs (REQ-26).
+    update(nextNode: any) {
+      if (nextNode.type !== node.type) return false;
+      handle.update(buildScope(nextNode, false));
+      return true;
+    },
+    // NodeSelection enters/leaves the node → toggle `selected` in scope so the
+    // chip's selected styling is pure engine-driven reactive `update`.
+    selectNode() {
+      handle.update(buildScope(node, true));
+    },
+    deselectNode() {
+      handle.update(buildScope(node, false));
+    },
+    destroy() {
+      handle.dispose();
+    }
+  };
+};
+
+  makeNodeViewExtensions = (nv: any) => {
+  // (1) NON-EDITABLE inline atom @mention chip (Spike 009 / REQ-26).
+  const Mention = Node.create({
+    name: 'rozieMention',
+    group: 'inline',
+    inline: true,
+    atom: true,
+    selectable: true,
+    addAttributes: () => ({
+      id: {
+        default: null
+      },
+      label: {
+        default: ''
+      }
+    }),
+    parseHTML: () => [{
+      tag: 'span[data-rozie-mention]'
+    }],
+    renderHTML: ({
+      HTMLAttributes
+    }: any) => ['span', {
+      'data-rozie-mention': '',
+      ...HTMLAttributes
+    }, 0],
+    addNodeView: () => this.makeNodeView(nv, false)
+  });
+
+  // (2) EDITABLE block callout with a contentDOM hole (Spike 008 / REQ-23).
+  const Callout = Node.create({
+    name: 'rozieCallout',
+    group: 'block',
+    content: 'inline*',
+    defining: true,
+    addAttributes: () => ({
+      tone: {
+        default: 'info'
+      }
+    }),
+    parseHTML: () => [{
+      tag: 'div[data-rozie-callout]'
+    }],
+    renderHTML: ({
+      HTMLAttributes
+    }: any) => ['div', {
+      'data-rozie-callout': '',
+      ...HTMLAttributes
+    }, 0],
+    addNodeView: () => this.makeNodeView(nv, true)
+  });
+  return [Mention, Callout];
 };
 
   getEditor() {
