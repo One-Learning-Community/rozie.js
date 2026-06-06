@@ -794,6 +794,8 @@ function inferRefDomType(refName: string, refs: RefDecl[]): string {
       return 'HTMLButtonElement';
     case 'form':
       return 'HTMLFormElement';
+    case 'canvas':
+      return 'HTMLCanvasElement';
     case 'div':
       return 'HTMLDivElement';
   }

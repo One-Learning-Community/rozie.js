@@ -1988,6 +1988,9 @@ export function emitScript(
       case 'form':
         domType = 'HTMLFormElement';
         break;
+      case 'canvas':
+        domType = 'HTMLCanvasElement';
+        break;
       case 'div':
         domType = 'HTMLDivElement';
         break;
