@@ -18,8 +18,8 @@ export default function RBindProbe(_props: RBindProbeProps): JSX.Element {
   return (
     <>
     <div class={"rbind-probe"} {...attrs} data-rozie-s-8e2458d6="">
-      <span class={'a' + " " + 'b'} {...{ id: 'x' }} data-rozie-s-8e2458d6="">canonical</span>
-      <span {...{ id: 'y' }} class={'b' + " " + 'a'} data-rozie-s-8e2458d6="">reordered</span>
+      <span class={('a') + " " + ('b')} {...{ id: 'x' }} data-rozie-s-8e2458d6="">canonical</span>
+      <span {...{ id: 'y' }} class={('b') + " " + ('a')} data-rozie-s-8e2458d6="">reordered</span>
     </div>
     </>
   );

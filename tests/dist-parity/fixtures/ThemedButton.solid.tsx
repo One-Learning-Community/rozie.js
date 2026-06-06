@@ -30,7 +30,7 @@ export default function ThemedButton(_props: ThemedButtonProps): JSX.Element {
 
   return (
     <>
-    <button style={{ '--btn-bg': '#3b82f6', '--btn-fg': '#ffffff' }} {...attrs} class={"btn" + " " + local.variant + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-7914ecaa="">
+    <button style={{ '--btn-bg': '#3b82f6', '--btn-fg': '#ffffff' }} {...attrs} class={"btn" + " " + (local.variant) + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-7914ecaa="">
       {local.label}
     </button>
     </>

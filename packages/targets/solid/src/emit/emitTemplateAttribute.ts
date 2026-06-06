@@ -438,7 +438,16 @@ function composeClassValue(
     } else if (a.kind === 'static') {
       parts.push(renderStaticClassValue(a.value));
     } else if (a.kind === 'binding') {
-      parts.push(renderExpr(a.expression, ir, exprOpts));
+      // Parenthesize the binding expression before it joins the `+ " " +`
+      // string concat below. A bare `:class` expression can be any JS
+      // expression — a ternary (`x ? 'a' : 'b'`), a logical-or, etc. — whose
+      // operators bind LOOSER than `+`. Without the wrap,
+      // `"static" + " " + node.type.name === 'x' ? 'a' : 'b'` reparses (by JS
+      // precedence: + > == > ?:) as `(("static "+node.type.name)==='x') ? …`,
+      // silently dropping the static class and the intended branch. The wrap
+      // isolates the binding as one operand. (Single-source bindings emit via
+      // the early-return path above and are already self-delimited.)
+      parts.push(`(${renderExpr(a.expression, ir, exprOpts)})`);
     } else if (a.kind === 'spreadBinding') {
       // Phase 14 — `spreadBinding` is the name-less kind: it never reaches a
       // class merge (no name to coalesce on). Unreachable; mirrors the
