@@ -164,13 +164,18 @@ function buildReactiveSlotMethod(slot: SlotDecl, scopeHash: string): string {
     `    if (typeof slot !== 'function') return { update() {}, dispose() {} };\n` +
     setAttrLine(slotName, scopeHash) +
     `    const root = createRoot(container);\n` +
-    `    const renderScope = (s: unknown): void => {\n` +
+    // renderScope/update take the SAME `scopeType` the outer method does — the
+    // slot template fn is typed by its declared portal params, so a bare
+    // `unknown` here fails strict typecheck where the slot fn has a typed param
+    // (Phase 33 dogfood: the TipTap nodeView slot is the first typed-param
+    // reactive portal; `slot(s)` with `s: unknown` is not assignable to it).
+    `    const renderScope = (s: ${scopeType}): void => {\n` +
     `      flushSync(() => root.render(slot(s)));\n` +
     `    };\n` +
     `    renderScope(scope);\n` +
     `    portalRoots.current.add(root);\n` +
     `    return {\n` +
-    `      update: (s: unknown): void => renderScope(s),\n` +
+    `      update: (s: ${scopeType}): void => renderScope(s),\n` +
     `      dispose: (): void => {\n` +
     `        root.unmount();\n` +
     `        portalRoots.current.delete(root);\n` +

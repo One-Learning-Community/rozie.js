@@ -177,9 +177,18 @@ describe('emitPortals — Lit', () => {
     expect(result.closureBlock).toContain('interface ReactivePortalHandle');
     expect(result.closureBlock).toContain('nodeView: (container');
     expect(result.closureBlock).toContain('ReactivePortalHandle => {');
-    expect(result.closureBlock).toContain('const renderScope = (s: unknown): void =>');
+    // renderScope/update type their param as the slot's scopeType (NOT bare
+    // `unknown`) — the slot template fn is typed by its declared portal params,
+    // so a bare `unknown` fails strict typecheck where the slot fn has a typed
+    // param (Phase 33 dogfood: TipTap nodeView is the first typed-param reactive
+    // portal). Mirrors the mount-once path's typed `scope`.
+    expect(result.closureBlock).toContain(
+      'const renderScope = (s: { node: unknown; selected: unknown }): void =>',
+    );
     expect(result.closureBlock).toContain('render(tpl(s), container)');
-    expect(result.closureBlock).toContain('update: (s: unknown): void => renderScope(s)');
+    expect(result.closureBlock).toContain(
+      'update: (s: { node: unknown; selected: unknown }): void => renderScope(s)',
+    );
     expect(result.closureBlock).toContain('dispose: (): void => {');
   });
 
