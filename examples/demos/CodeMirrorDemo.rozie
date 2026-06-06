@@ -16,7 +16,7 @@
 
 <components>
 {
-  CodeMirror: '../CodeMirror.rozie',
+  CodeMirror: '../../packages/ui/codemirror/src/CodeMirror.rozie',
 }
 </components>
 

@@ -177,6 +177,21 @@ export default defineConfig(async () => {
     'fullcalendar',
     'src',
   );
+  // Same move as fullcalendar: CodeMirror.rozie lives in @rozie-ui/codemirror.
+  // The Angular sub-build must walk it too (CodeMirrorDemo's
+  // `imports: [CodeMirror]` would otherwise collapse to `any[]` → empty mount).
+  // Lockstep with tsconfig.app.json `include` + build-cells.mjs `CODEMIRROR_SRC`
+  // sweep. NO `@codemirror/*` ESM-interop alias needed (unlike @fullcalendar/list):
+  // CM6 packages ship clean ESM default/named exports.
+  const codeMirrorSrc = resolve(
+    __dirname,
+    '..',
+    '..',
+    'packages',
+    'ui',
+    'codemirror',
+    'src',
+  );
   // @fullcalendar/list ESM-entry alias (see optimizeDeps note below). The
   // package's CJS build does `exports["default"] = plugin` without
   // `__esModule`, so a default ES import bundled through the CJS-interop path
@@ -233,10 +248,10 @@ export default defineConfig(async () => {
     // The other targets' `.rozie.ts/.tsx` virtual modules go through Vite's
     // own resolver, which honors `browser` via vite-plugin-solid's
     // `configEnvironment` hook (and the equivalent for other plugins).
-    ...(TARGET === 'angular' ? [resolveCrossTreeBareImports([examplesRoot, sortableListSrc, flatpickrSrc, fullCalendarSrc])] : []),
+    ...(TARGET === 'angular' ? [resolveCrossTreeBareImports([examplesRoot, sortableListSrc, flatpickrSrc, fullCalendarSrc, codeMirrorSrc])] : []),
     Rozie({
       target: TARGET,
-      ...(TARGET === 'angular' ? { prebuildExtraRoots: [examplesRoot, sortableListSrc, flatpickrSrc, fullCalendarSrc] } : {}),
+      ...(TARGET === 'angular' ? { prebuildExtraRoots: [examplesRoot, sortableListSrc, flatpickrSrc, fullCalendarSrc, codeMirrorSrc] } : {}),
     }),
     ...(await frameworkPlugins(TARGET)),
   ],

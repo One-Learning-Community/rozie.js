@@ -58,6 +58,17 @@ const FULLCALENDAR_SRC = resolve(
   'fullcalendar',
   'src',
 );
+// Same packaging move for @rozie-ui/codemirror: CodeMirror.rozie lives in the
+// package src; the Angular sub-build walks it via `prebuildExtraRoots` and drops
+// the same cross-tree `.rozie.ts` + `CodeMirror.ts` shim artefacts that must be
+// swept after the Angular build (see cleanupCrossTreeAngularArtifacts).
+const CODEMIRROR_SRC = resolve(
+  REPO_ROOT,
+  'packages',
+  'ui',
+  'codemirror',
+  'src',
+);
 const REFERENCE_BASENAMES = [
   'Counter',
   'SearchInput',
@@ -202,6 +213,20 @@ function cleanupCrossTreeAngularArtifacts() {
     // fullcalendar src always exists post-port — defensive only
   }
   rmSync(resolve(FULLCALENDAR_SRC, 'FullCalendar.ts'), { force: true });
+  // Same sweep for @rozie-ui/codemirror's package src (CodeMirrorDemo composes
+  // CodeMirror via <components>, so the Angular sub-build emits CodeMirror.rozie.ts
+  // + the CodeMirror.ts shim here). Leftovers (the emitted .rozie.ts imports
+  // @angular/core) poison the later solid/lit builds.
+  try {
+    for (const entry of readdirSync(CODEMIRROR_SRC)) {
+      if (entry.endsWith('.rozie.ts')) {
+        rmSync(resolve(CODEMIRROR_SRC, entry), { force: true });
+      }
+    }
+  } catch {
+    // codemirror src always exists post-port — defensive only
+  }
+  rmSync(resolve(CODEMIRROR_SRC, 'CodeMirror.ts'), { force: true });
 }
 
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'];

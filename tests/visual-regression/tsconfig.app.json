@@ -18,5 +18,5 @@
       "tslib": ["node_modules/tslib"]
     }
   },
-  "include": ["host/**/*.ts", "../../examples/**/*.rozie.ts", "../../packages/ui/sortable-list/src/**/*.rozie.ts", "../../packages/ui/flatpickr/src/**/*.rozie.ts", "../../packages/ui/fullcalendar/src/**/*.rozie.ts"]
+  "include": ["host/**/*.ts", "../../examples/**/*.rozie.ts", "../../packages/ui/sortable-list/src/**/*.rozie.ts", "../../packages/ui/flatpickr/src/**/*.rozie.ts", "../../packages/ui/fullcalendar/src/**/*.rozie.ts", "../../packages/ui/codemirror/src/**/*.rozie.ts"]
 }

@@ -27,7 +27,7 @@ import {
 // compile gate (engine-examples.compile.test.ts) but NOT in the
 // visual-regression matrix. When BOTH globs match (demos/ vs base), the
 // demos/ entry wins per the loader below.
-const baseModules = import.meta.glob('../../../examples/{Counter,SearchInput,Dropdown,TodoList,Modal,TreeNode,Card,CardHeader,ModalConsumer,WrapperModal,PortalList,PortalListStyled,LineChart,CodeMirror,ThemedButton,ThemedButtonManual,ThemedButtonListenersManual,ThemedButtonAllManual,ThemedButtonConsumer,ROnProbe,PartCard,PartCardConsumer,ExposeProbe,RHtml}.rozie');
+const baseModules = import.meta.glob('../../../examples/{Counter,SearchInput,Dropdown,TodoList,Modal,TreeNode,Card,CardHeader,ModalConsumer,WrapperModal,PortalList,PortalListStyled,LineChart,ThemedButton,ThemedButtonManual,ThemedButtonListenersManual,ThemedButtonAllManual,ThemedButtonConsumer,ROnProbe,PartCard,PartCardConsumer,ExposeProbe,RHtml}.rozie');
 const demoModules = import.meta.glob('../../../examples/demos/*.rozie');
 
 async function main(): Promise<void> {
