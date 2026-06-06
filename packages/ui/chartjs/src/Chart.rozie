@@ -44,7 +44,7 @@
   other five targets. Every object handed to the engine is snapshotted first.
 
   $refs discipline: `$refs.canvasEl` is read ONCE inside `$onMount` and captured
-  into a plain `canvasEl` let; re-creates use the captured ref (never re-read
+  into a plain `canvasNode` let; re-creates use the captured node (never re-read
   $refs outside the mount hook — ROZ123 / project_refs_only_safe_in_onmount).
 -->
 
@@ -74,8 +74,18 @@ ChartJS.register(...registerables)
 
 let instance = null
 // $refs.canvasEl is read ONLY inside $onMount (ROZ123); re-creates use this
-// captured node so no $refs read ever executes outside the mount hook.
-let canvasEl = null
+// captured node so no $refs read ever executes outside the mount hook. Named
+// `canvasNode` (NOT `canvasEl`) so it does not collide with the template
+// `ref="canvasEl"` binding, which the per-target emitters lower to their own
+// `canvasEl` ref declaration (a same-name script local double-declares it).
+let canvasNode = null
+// Tooltip-portal teardown state at COMPONENT scope (not inside $onMount): the
+// $onMount-returned cleanup references these, and the Solid emitter hoists that
+// returned cleanup into a sibling onCleanup() OUTSIDE the mount-body IIFE — so a
+// cleanup that closed over $onMount-locals would lose scope. Component-scope
+// state (like `instance`) is in scope wherever the per-target cleanup lands.
+let tooltipEl = null
+let tooltipDispose = null
 // buildConfig is DEFINED inside $onMount (so its $emit/$portals/$slots
 // references are bound in the mount-lifecycle scope the per-target emitters
 // provide — mirrors FullCalendar's mount-built opts + CodeMirror's panelExt
@@ -83,7 +93,7 @@ let canvasEl = null
 let buildConfig = null
 
 $onMount(() => {
-  canvasEl = $refs.canvasEl
+  canvasNode = $refs.canvasEl
 
   // ─── @click / @hover / @datasetClick — composed, never clobbering ──────────
   // Chart.js calls onClick/onHover with (event, activeElements, chart). We call
@@ -113,8 +123,6 @@ $onMount(() => {
   // throttles external calls to active-element changes, so the dispose+remount
   // on body-change is cheap. enabled:false suppresses the built-in canvas
   // tooltip when we take over.
-  let tooltipEl = null
-  let tooltipDispose = null
   let tooltipKey = ''
   const tooltipExternal = (context) => {
     const { chart, tooltip } = context
@@ -136,11 +144,15 @@ $onMount(() => {
     if (key !== tooltipKey) {
       tooltipKey = key
       tooltipDispose?.()
+      // The scope MUST match the slot's declared param (`model`): the consumer's
+      // <slot name="tooltip"> receives a single `model` scoped value.
       const scope = {
-        title: tooltip.title || [],
-        body: (tooltip.body || []).map((b) => b.lines),
-        dataPoints: tooltip.dataPoints || [],
-        opacity: tooltip.opacity,
+        model: {
+          title: tooltip.title || [],
+          body: (tooltip.body || []).map((b) => b.lines),
+          dataPoints: tooltip.dataPoints || [],
+          opacity: tooltip.opacity,
+        },
       }
       tooltipDispose = $portals.tooltip(tooltipEl, scope)
     }
@@ -178,7 +190,7 @@ $onMount(() => {
     }
   }
 
-  instance = new ChartJS(canvasEl, buildConfig())
+  instance = new ChartJS(canvasNode, buildConfig())
   return () => {
     tooltipDispose?.()
     tooltipEl?.remove()
@@ -188,11 +200,11 @@ $onMount(() => {
 
 // Re-create the live instance. Chart.js exposes no stable runtime type-swap or
 // plugin-swap, so `type`/`plugins`/`redraw`-driven changes re-create. Uses the
-// captured canvasEl (never re-reads $refs outside $onMount).
+// captured canvasNode (never re-reads $refs outside $onMount).
 const recreate = () => {
-  if (!buildConfig || !canvasEl) return
+  if (!buildConfig || !canvasNode) return
   instance?.destroy()
-  instance = new ChartJS(canvasEl, buildConfig())
+  instance = new ChartJS(canvasNode, buildConfig())
 }
 
 // Reconcile prop changes. Mutating chart.data in place and calling update() is
