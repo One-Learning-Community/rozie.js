@@ -142,3 +142,205 @@ for (const target of TARGETS) {
     }
   });
 }
+
+/**
+ * Expanded-surface behavioral smoke — Phase 29 Plan 04 (D-01..D-06).
+ *
+ * The round-trip block above proves D-08 (the model path is the only change
+ * channel). THIS block proves the rest of the expanded surface BEHAVES at
+ * runtime across all 6 targets, driving the new-surface rig in
+ * `examples/demos/CodeMirrorDemo.rozie` (Editor C/D/E + the data-testid
+ * controls). Structural/behavioral assertions only — NO `toHaveScreenshot`
+ * (the pixel tier is the SEPARATE CodeMirrorScreenshot cell below).
+ *
+ *   - D-01/D-02 — toggle `:extensions` (an `EditorView.editable.of(false)`
+ *     extension). The wrapper reconfigures the extensionsCompartment WITHOUT
+ *     remount: the surface editor's `.cm-content` `contenteditable` flips to
+ *     "false" AND its doc text is preserved (no remount = no blank).
+ *   - D-03 — switch the `language` prop. The langCompartment reconfigures
+ *     without remount; the doc is preserved. (Plain-text vs javascript has no
+ *     reliable cross-target DOM signal, so the proof is "doc preserved + state
+ *     pane reflects the new language after the switch".)
+ *   - D-04 — the empty-doc placeholder editor shows `.cm-placeholder` text.
+ *   - D-05 — the panel portal slot mounts a `.rozie-cm-panel` host when filled
+ *     and disposes it when the panel-bearing editor unmounts.
+ *   - D-06 — the 8 `$expose` verbs are callable via the framework-native ref
+ *     with observable effects (getValue/replaceValue/insertText/getSelection/
+ *     getView/focus/setSelection/dispatch — the rig exercises the value-shaping
+ *     ones, replaceValue shares the suppress-echo guard so it does not
+ *     ping-pong).
+ */
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
+  runner(`code-mirror [${target}]: expanded surface (extensions/language/placeholder/panel/$expose) behaves`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=CodeMirror&target=${target}`);
+    const mount = page.getByTestId('rozie-mount');
+    await expect(mount).toBeVisible();
+
+    // The surface rig (Editor C) is the ref-bearing editor the $expose controls
+    // drive. Wait for it to mount its `.cm-content`.
+    const surfaceEditor = mount.getByTestId('surface-editor');
+    await expect(surfaceEditor).toBeVisible({ timeout: 10_000 });
+    const surfaceContent = surfaceEditor.locator('.cm-content');
+    await expect
+      .poll(async () => (await surfaceContent.textContent()) ?? '', {
+        timeout: 5_000,
+        intervals: [200, 400, 800],
+      })
+      .toContain('answer');
+
+    // ---- D-04 placeholder ----
+    // Editor D mounts an empty doc with a `placeholder` prop. CM6 renders the
+    // placeholder text inside a `.cm-placeholder` node when the doc is empty.
+    const placeholderEditor = mount.getByTestId('placeholder-editor');
+    await expect(placeholderEditor).toBeVisible({ timeout: 10_000 });
+    await expect(placeholderEditor.locator('.cm-placeholder')).toContainText(
+      'Type here',
+      { timeout: 10_000 },
+    );
+
+    // ---- D-01/D-02 extensions reconfigure (no remount, doc preserved) ----
+    // Toggle the consumer `:extensions`. The surface editor's `.cm-content`
+    // contenteditable flips to "false" and the doc text is preserved (the
+    // extensionsCompartment.reconfigure path — no remount).
+    const docBefore = (await surfaceContent.textContent()) ?? '';
+    await mount.getByTestId('toggle-extensions').click();
+    await expect(surfaceContent).toHaveAttribute('contenteditable', 'false', {
+      timeout: 10_000,
+    });
+    // Doc preserved across the reconfigure (proves no remount blanked it).
+    await expect(surfaceContent).toContainText('answer');
+    expect((await surfaceContent.textContent()) ?? '').toBe(docBefore);
+    // Toggle back — contenteditable returns to "true" (still no remount).
+    await mount.getByTestId('toggle-extensions').click();
+    await expect(surfaceContent).toHaveAttribute('contenteditable', 'true', {
+      timeout: 10_000,
+    });
+
+    // ---- D-03 language compartment switch (no remount, doc preserved) ----
+    await expect(mount.getByTestId('state-language')).toHaveText('javascript', {
+      timeout: 10_000,
+    });
+    await mount.getByTestId('toggle-language').click();
+    await expect(mount.getByTestId('state-language')).toHaveText('plaintext', {
+      timeout: 10_000,
+    });
+    // Doc preserved across the langCompartment reconfigure (no remount).
+    await expect(surfaceContent).toContainText('answer');
+
+    // ---- D-06 $expose verbs ($refs.cm handle, observable effects) ----
+    // getValue reads the live doc.
+    await mount.getByTestId('handle-get-value').click();
+    await expect(mount.getByTestId('state-handle-out')).toContainText('answer', {
+      timeout: 10_000,
+    });
+    // replaceValue routes through the suppress-echo guard; the doc + the
+    // getValue-read-back both reflect the replacement (no ping-pong).
+    await mount.getByTestId('handle-replace-value').click();
+    await expect(mount.getByTestId('state-handle-out')).toContainText(
+      'replaced via handle',
+      { timeout: 10_000 },
+    );
+    await expect(surfaceContent).toContainText('replaced via handle');
+    // insertText inserts at the selection; getSelection returns a range;
+    // getView returns the raw EditorView. Each writes an observable marker into
+    // the state pane.
+    await mount.getByTestId('handle-insert-text').click();
+    await expect(mount.getByTestId('state-handle-out')).toContainText('X', {
+      timeout: 10_000,
+    });
+    await mount.getByTestId('handle-get-selection').click();
+    await expect(mount.getByTestId('state-handle-out')).toContainText('sel ', {
+      timeout: 10_000,
+    });
+    await mount.getByTestId('handle-get-view').click();
+    await expect(mount.getByTestId('state-handle-out')).toHaveText('view ok', {
+      timeout: 10_000,
+    });
+
+    // ---- D-05 panel portal slot mount + dispose ----
+    // Initially the panel-bearing editor is unmounted (r-else branch) → no
+    // `.rozie-cm-panel` host. Toggle it on → the panel mounts; toggle off →
+    // the panel disposes (the editor unmounts, the portal dispose fires).
+    const panelCell = mount.getByTestId('panel-cell');
+    await expect(panelCell.locator('.rozie-cm-panel')).toHaveCount(0, {
+      timeout: 10_000,
+    });
+    await mount.getByTestId('toggle-panel').click();
+    await expect(panelCell.locator('.rozie-cm-panel')).toHaveCount(1, {
+      timeout: 10_000,
+    });
+    await expect(mount.getByTestId('panel-fill')).toContainText('panel filled', {
+      timeout: 10_000,
+    });
+    await mount.getByTestId('toggle-panel').click();
+    await expect(panelCell.locator('.rozie-cm-panel')).toHaveCount(0, {
+      timeout: 10_000,
+    });
+  });
+}
+
+/**
+ * Content-stable screenshot leg — Phase 29 Plan 04 (D-07 tier 2).
+ *
+ * A SEPARATE leg from the behavioral blocks above. It routes to the
+ * deterministic `CodeMirrorScreenshot` cell (CodeMirrorScreenshotDemo.rozie):
+ * a fixed doc + theme="light" + the `screenshotStable` EditorView.theme applied
+ * via `:extensions` (caret/selection/active-line neutralized), and NO editor
+ * focus. The capture polls `.cm-content` for the rendered fixed doc, then waits
+ * for CM6's async viewport measure to settle before `toHaveScreenshot`.
+ *
+ * Baselines are regenerated ONLY in pinned Linux Docker (feedback_vr_linux_
+ * baselines; feedback_vr_macos_text_node_kerning) — locally this leg
+ * baseline-gates to `test.fixme` until the Linux PNG exists.
+ */
+const SCREENSHOT_DIR = resolve(__dirname, '../__screenshots__');
+const screenshotBaselineExists = existsSync(
+  resolve(SCREENSHOT_DIR, 'CodeMirrorScreenshot.png'),
+);
+
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  // Gate on build availability, KNOWN_FAILING, AND the Linux baseline presence
+  // (matrix.spec.ts owns the matrix cell; this leg adds an explicit settle-then-
+  // capture guard and stays fixme until the Docker baseline lands).
+  const runner =
+    !built || KNOWN_FAILING.has(target) || !screenshotBaselineExists
+      ? test.fixme
+      : test;
+  runner(`code-mirror [${target}]: content-stable screenshot (caret/selection-neutralized)`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=CodeMirrorScreenshot&target=${target}`);
+    const mount = page.getByTestId('rozie-mount');
+    await expect(mount).toBeVisible();
+
+    // Poll the fixed doc into the rendered `.cm-content` — proves the editor
+    // mounted and CM6 painted its lines. Do NOT focus the editor.
+    const content = mount.locator('.cm-content').first();
+    await expect
+      .poll(async () => (await content.textContent()) ?? '', {
+        timeout: 5_000,
+        intervals: [200, 400, 800],
+      })
+      .toContain('greet');
+
+    // Let CM6's async viewport measure settle (one or two RAFs for the short
+    // fixed doc) before the clip. The screenshotStable theme already removes the
+    // caret-blink / selection / active-line variables, so this is the only
+    // remaining settle source.
+    await page.waitForTimeout(250);
+
+    await expect(mount).toHaveScreenshot('CodeMirrorScreenshot.png', {
+      maxDiffPixels: 2,
+      animations: 'disabled',
+    });
+  });
+}

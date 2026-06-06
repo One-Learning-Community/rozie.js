@@ -1,15 +1,32 @@
 <!--
-  CodeMirrorDemo.rozie — companion consumer for CodeMirror.
+  CodeMirrorDemo.rozie — BEHAVIORAL companion consumer for CodeMirror.
 
   Two editors bound to the same `$data.code` source via r-model:value.
   Typing in one updates the other through the model emit path, proving
   the two-way binding survives across a non-input contenteditable engine.
+
+  Editors A/B are the r-model round-trip (D-08 — the model path is the only
+  change channel). Editor C is the NEW-SURFACE behavioral rig the extended
+  code-mirror.spec.ts drives (D-01..D-06): a `:extensions` toggle (applies +
+  reconfigures without remount), a `language` switch (compartment reconfigure,
+  no remount), a `placeholder` editor (empty doc), a `panel` portal-slot fill
+  (mount + dispose), and the 8-verb `$expose` handle via a framework-native ref.
+
+  This is the BEHAVIORAL cell — do NOT add screenshot stabilization here. The
+  content-stable SCREENSHOT cell is the SEPARATE CodeMirrorScreenshotDemo.rozie
+  (never extend a screenshot-cell demo for behavior, and never bolt pixels onto
+  this one).
 
   Exercises:
     - r-model:value through a vanilla-JS editor (echo-guard must hold)
     - Two consumers sharing one $data signal (cross-component model sync)
     - Reset-to-seed exercises consumer → wrapper direction
     - Theme prop change exercises Compartment-reconfigure runtime path
+    - D-01/D-02 :extensions apply + reconfigure (no remount, doc preserved)
+    - D-03 language compartment switch (no remount, doc preserved)
+    - D-04 placeholder prop on an empty-doc editor
+    - D-05 panel portal slot mount/dispose
+    - D-06 the 8 $expose verbs via $refs.cm (post-mount @click)
 -->
 
 <rozie name="CodeMirrorDemo">
@@ -24,10 +41,18 @@
 {
   code: "function greet(name) {\n  return `Hello, ${name}!`\n}\n\ngreet('world')",
   theme: 'light',
+  surfaceCode: "const answer = 42",
+  emptyCode: "",
+  language: 'javascript',
+  readOnlyExt: false,
+  panelOn: false,
+  handleOut: '(none)',
 }
 </data>
 
 <script>
+import { EditorView } from '@codemirror/view'
+
 const SEED = "function greet(name) {\n  return `Hello, ${name}!`\n}\n\ngreet('world')"
 
 const reset = () => {
@@ -36,6 +61,53 @@ const reset = () => {
 
 const toggleTheme = () => {
   $data.theme = $data.theme === 'dark' ? 'light' : 'dark'
+}
+
+// D-01/D-02 — a VISIBLE consumer extension. EditorView.editable.of(false) flips
+// the `.cm-content` contenteditable attribute to "false" WITHOUT remounting (the
+// extensionsCompartment.reconfigure path) and leaves the doc intact. The spec
+// asserts the contenteditable flip applied AND the doc text is preserved.
+const readOnlyOnlyExt = [EditorView.editable.of(false)]
+const surfaceExtensions = () => $data.readOnlyExt ? readOnlyOnlyExt : []
+const toggleExtensions = () => { $data.readOnlyExt = !$data.readOnlyExt }
+
+// D-03 — switch the convenience `language` prop. 'javascript' → javascript();
+// anything else → [] (plain text). The langCompartment.reconfigure path runs
+// without remount; the doc is preserved either way.
+const toggleLanguage = () => {
+  $data.language = $data.language === 'javascript' ? 'plaintext' : 'javascript'
+}
+
+// D-05 — fill / drop the panel portal slot. The r-if gate on the <template #panel>
+// fill toggles $slots.panel presence; flipping it mounts/disposes the panel.
+const togglePanel = () => { $data.panelOn = !$data.panelOn }
+
+// D-06 — the 8 $expose verbs, driven via the FRAMEWORK-NATIVE component ref
+// (`ref="cm"` → $refs.cm), NOT a $refs element read. Each runs from an @click
+// handler (post-mount; $refs are only safe after mount, and a click fires only
+// on user interaction). Fully optional-chained so the demo never throws on a
+// target where the ref resolves to the host element rather than the handle.
+const handleGetValue = () => {
+  $data.handleOut = String($refs.cm?.getValue?.() ?? '(no handle)')
+}
+const handleReplaceValue = () => {
+  $refs.cm?.replaceValue?.('// replaced via handle')
+  $data.handleOut = String($refs.cm?.getValue?.() ?? '(no handle)')
+}
+const handleInsertText = () => {
+  $refs.cm?.focus?.()
+  $refs.cm?.setSelection?.(0)
+  $refs.cm?.insertText?.('X')
+  $data.handleOut = String($refs.cm?.getValue?.() ?? '(no handle)')
+}
+const handleGetSelection = () => {
+  $refs.cm?.setSelection?.({ anchor: 0, head: 3 })
+  const sel = $refs.cm?.getSelection?.()
+  $data.handleOut = sel ? `sel ${sel.from}-${sel.to}` : '(no handle)'
+}
+const handleGetView = () => {
+  const view = $refs.cm?.getView?.()
+  $data.handleOut = view ? 'view ok' : '(no handle)'
 }
 </script>
 
@@ -62,6 +134,80 @@ const toggleTheme = () => {
     <button type="button" @click="toggleTheme">Toggle Editor B theme</button>
     <span class="stats">{{ $data.code.length }} chars · {{ $data.code.split('\n').length }} lines</span>
   </div>
+
+  <!-- NEW-SURFACE behavioral rig (D-01..D-06). Editor C drives the expanded
+       surface; the controls + state pane are queried by data-testid. -->
+  <section class="surface" data-testid="surface">
+    <div class="control-row">
+      <span class="row-label">Surface</span>
+      <button type="button" data-testid="toggle-extensions" @click="toggleExtensions">extensions</button>
+      <button type="button" data-testid="toggle-language" @click="toggleLanguage">language</button>
+      <button type="button" data-testid="toggle-panel" @click="togglePanel">panel</button>
+    </div>
+    <div class="control-row">
+      <span class="row-label">Handle</span>
+      <button type="button" data-testid="handle-get-value" @click="handleGetValue">getValue</button>
+      <button type="button" data-testid="handle-replace-value" @click="handleReplaceValue">replaceValue</button>
+      <button type="button" data-testid="handle-insert-text" @click="handleInsertText">insertText</button>
+      <button type="button" data-testid="handle-get-selection" @click="handleGetSelection">getSelection</button>
+      <button type="button" data-testid="handle-get-view" @click="handleGetView">getView</button>
+    </div>
+
+    <div class="editor-cell">
+      <span class="label">Editor C (extensions / language / handle)</span>
+      <CodeMirror
+        ref="cm"
+        data-testid="surface-editor"
+        r-model:value="$data.surfaceCode"
+        :height="160"
+        theme="light"
+        :language="$data.language"
+        :extensions="surfaceExtensions()"
+      />
+    </div>
+
+    <!-- D-05 panel mount/dispose. The wrapper gates the panel on $slots.panel
+         truthiness at $onMount, so panel mount/dispose is exercised by mounting
+         (panelOn) vs unmounting (r-else) the panel-bearing editor — flipping the
+         control mounts the `.rozie-cm-panel` host node, then disposes it. -->
+    <div class="editor-cell" data-testid="panel-cell">
+      <span class="label">Editor E (panel portal slot)</span>
+      <CodeMirror
+        r-if="$data.panelOn"
+        data-testid="panel-editor"
+        r-model:value="$data.surfaceCode"
+        :height="120"
+        theme="light"
+      >
+        <template #panel="{ view }">
+          <span class="cm-panel-fill" data-testid="panel-fill">panel filled</span>
+        </template>
+      </CodeMirror>
+      <CodeMirror
+        r-else
+        data-testid="panel-editor-off"
+        r-model:value="$data.surfaceCode"
+        :height="120"
+        theme="light"
+      />
+    </div>
+
+    <div class="editor-cell">
+      <span class="label">Editor D (placeholder, empty doc)</span>
+      <CodeMirror
+        data-testid="placeholder-editor"
+        r-model:value="$data.emptyCode"
+        :height="120"
+        theme="light"
+        placeholder="Type here…"
+      />
+    </div>
+
+    <div class="state-pane">
+      <code data-testid="state-language">{{ $data.language }}</code>
+      <code data-testid="state-handle-out">{{ $data.handleOut }}</code>
+    </div>
+  </section>
 </div>
 </template>
 
@@ -71,6 +217,53 @@ const toggleTheme = () => {
   color: #1a1a1a;
   padding: 1rem;
   max-width: 920px;
+}
+
+.surface {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.control-row {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin: 0 0 0.625rem;
+}
+.row-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: rgba(0, 0, 0, 0.55);
+  min-width: 4rem;
+}
+.control-row button {
+  padding: 0.375rem 0.75rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.875rem;
+}
+
+.cm-panel-fill {
+  font-weight: 600;
+  font-size: 0.78rem;
+}
+
+.state-pane {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.625rem;
+}
+.state-pane code {
+  font-family: ui-monospace, monospace;
+  font-size: 0.8rem;
+  background: rgba(0, 0, 0, 0.04);
+  padding: 0.0625rem 0.375rem;
+  border-radius: 2px;
 }
 
 header h3 { margin: 0 0 0.25rem; font-size: 1.125rem; }

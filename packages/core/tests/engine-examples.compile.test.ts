@@ -72,6 +72,12 @@ const ENGINE_DEMOS = [
   'demos/UppyDemo.rozie',
   'demos/FullCalendarDemo.rozie',
   'demos/CodeMirrorDemo.rozie',
+  // Phase 29 Plan 04 — the content-stable screenshot demo (D-07 tier 2). A
+  // SEPARATE consumer from CodeMirrorDemo: fixed doc + theme=light + the
+  // screenshotStable EditorView.theme via :extensions. Compiled here so a
+  // per-target consumer-side regression surfaces in this fast gate, not just
+  // the Docker-backed VR pipeline.
+  'demos/CodeMirrorScreenshotDemo.rozie',
 ] as const;
 
 describe('engine-wrapper examples — cross-target compile gate', () => {
