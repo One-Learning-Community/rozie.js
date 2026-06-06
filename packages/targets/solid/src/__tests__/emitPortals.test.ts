@@ -71,6 +71,10 @@ function portalSlot(name: string, portalParamNames?: string[]): SlotDecl {
   };
 }
 
+function reactivePortalSlot(name: string, portalParamNames?: string[]): SlotDecl {
+  return { ...portalSlot(name, portalParamNames), isReactive: true };
+}
+
 describe('emitPortals — Solid', () => {
   it('no portal slots → early return with empty fields', () => {
     const ir = buildMinimalIR({ slots: [] });
@@ -119,5 +123,32 @@ describe('emitPortals — Solid', () => {
 
     const noParams = emitPortals(buildMinimalIR({ slots: [portalSlot('item')] }));
     expect(noParams.setupLines).toContain('scope: unknown');
+  });
+
+  // ── Phase 33 / REQ-20, REQ-22 — reactive portal branch ───────────────────
+  it('reactive portal slot → createSignal(equals:false) + setScope + { update, dispose }', () => {
+    const ir = buildMinimalIR({ slots: [reactivePortalSlot('nodeView', ['node', 'selected'])] });
+    const result = emitPortals(ir);
+    expect(result.setupLines).toContain('interface ReactivePortalHandle');
+    expect(result.setupLines).toContain('nodeView: (container');
+    expect(result.setupLines).toContain('ReactivePortalHandle => {');
+    // REQ-20: signal seeded with { equals: false }.
+    expect(result.setupLines).toContain('createSignal<unknown>(scope, { equals: false })');
+    expect(result.setupLines).toContain('render(() => slot(scopeSig()');
+    expect(result.setupLines).toContain('setScopeSig(s)');
+    expect(result.setupLines).toContain('dispose: (): void => {');
+    // emitScript must add createSignal to the solid-js import.
+    expect(result.needsCreateSignal).toBe(true);
+  });
+
+  it('non-reactive portal slot → mount-once () => void body verbatim; needsCreateSignal false', () => {
+    const ir = buildMinimalIR({ slots: [portalSlot('nodeView', ['node', 'selected'])] });
+    const result = emitPortals(ir);
+    expect(result.setupLines).not.toContain('ReactivePortalHandle');
+    expect(result.setupLines).not.toContain('createSignal');
+    expect(result.setupLines).toContain('): (() => void) => {');
+    expect(result.setupLines).toContain('const dispose = render(() => slot(scope), container);');
+    expect(result.setupLines).toContain('return () => {');
+    expect(result.needsCreateSignal).toBe(false);
   });
 });

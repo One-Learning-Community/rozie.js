@@ -105,6 +105,7 @@ function slotIdsFor(slot: SlotDecl): SlotIds {
  * conformance tests.
  */
 function buildSlotMethod(slot: SlotDecl, scopeHash: string): string {
+  if (slot.isReactive === true) return buildReactiveSlotMethod(slot, scopeHash);
   const { slotName, refIdent } = slotIdsFor(slot);
   const paramNames = slot.portalParamNames ?? [];
   // Scope type: `{ arg: unknown; ... }` from portalParamNames, or `unknown`
@@ -139,6 +140,56 @@ function buildSlotMethod(slot: SlotDecl, scopeHash: string): string {
     `  },`
   );
 }
+
+/**
+ * Phase 33 / REQ-22 — reactive portal-slot method body.
+ *
+ * Δ vs mount-once: returns `{ update, dispose }` (a {@link ReactivePortalHandle})
+ * instead of `() => void`. The `createRoot` root is RETAINED across updates;
+ * `update(s)` re-runs `flushSync(() => root.render(slot(s)))` into the same root
+ * so React reconciles in place — same-position/same-type host nodes keep DOM
+ * identity, no unmount/remount. dispose() unmounts the retained root (the
+ * mount-once teardown, unchanged). Mirrors spike 007 react.reactive-portal.tsx.
+ */
+function buildReactiveSlotMethod(slot: SlotDecl, scopeHash: string): string {
+  const { slotName, refIdent } = slotIdsFor(slot);
+  const paramNames = slot.portalParamNames ?? [];
+  const scopeType =
+    paramNames.length > 0
+      ? `{ ${paramNames.map((n) => `${n}: unknown`).join('; ')} }`
+      : 'unknown';
+  return (
+    `  ${slotName}: (container: HTMLElement, scope: ${scopeType}): ReactivePortalHandle => {\n` +
+    `    const slot = ${refIdent}.current ?? props.slots?.['${slotName}'];\n` +
+    `    if (typeof slot !== 'function') return { update() {}, dispose() {} };\n` +
+    setAttrLine(slotName, scopeHash) +
+    `    const root = createRoot(container);\n` +
+    `    const renderScope = (s: unknown): void => {\n` +
+    `      flushSync(() => root.render(slot(s)));\n` +
+    `    };\n` +
+    `    renderScope(scope);\n` +
+    `    portalRoots.current.add(root);\n` +
+    `    return {\n` +
+    `      update: (s: unknown): void => renderScope(s),\n` +
+    `      dispose: (): void => {\n` +
+    `        root.unmount();\n` +
+    `        portalRoots.current.delete(root);\n` +
+    `      },\n` +
+    `    };\n` +
+    `  },`
+  );
+}
+
+/**
+ * The `{ update, dispose }` interface a reactive portal slot's method returns.
+ * Emitted once into the component when any reactive portal slot is present
+ * (REQ-22). Non-reactive slots keep the `() => void` shape verbatim.
+ */
+const REACTIVE_HANDLE_INTERFACE_REACT =
+  'interface ReactivePortalHandle {\n' +
+  '  update(scope: unknown): void;\n' +
+  '  dispose(): void;\n' +
+  '}';
 
 export interface PortalsEmit {
   /** Empty when no portal slots — caller skips all portal injection. */
@@ -216,7 +267,13 @@ export function emitPortals(
     .join('\n');
 
   const methodLines = portals.map((slot) => buildSlotMethod(slot, scopeHash)).join('\n');
-  const closureBlock = `const portals = {\n${methodLines}\n};`;
+  // Reactive slots return `{ update, dispose }` — declare the handle interface
+  // once, immediately above the closure, when any reactive portal is present.
+  // Non-reactive components never emit it, so the mount-once shape (and the 3
+  // shipped slots' fixtures) stay byte-identical (REQ-22).
+  const hasReactive = portals.some((s) => s.isReactive === true);
+  const interfacePrefix = hasReactive ? REACTIVE_HANDLE_INTERFACE_REACT + '\n' : '';
+  const closureBlock = `${interfacePrefix}const portals = {\n${methodLines}\n};`;
 
   const bulkDisposeBlock =
     'for (const root of portalRoots.current) root.unmount();\n' +

@@ -83,6 +83,10 @@ function boolProp(name: string): PropDecl {
   };
 }
 
+function reactivePortalSlot(name: string, portalParamNames?: string[]): SlotDecl {
+  return { ...portalSlot(name, portalParamNames), isReactive: true };
+}
+
 describe('emitPortals — Lit', () => {
   it('no portal slots → early return with empty fields', () => {
     const ir = buildMinimalIR({ slots: [] });
@@ -164,5 +168,28 @@ describe('emitPortals — Lit', () => {
 
     const noParams = emitPortals(buildMinimalIR({ slots: [portalSlot('item')] }));
     expect(noParams.closureBlock).toContain('scope: unknown');
+  });
+
+  // ── Phase 33 / REQ-22 — reactive portal branch ───────────────────────────
+  it('reactive portal slot → returns { update, dispose } + ReactivePortalHandle', () => {
+    const ir = buildMinimalIR({ slots: [reactivePortalSlot('nodeView', ['node', 'selected'])] });
+    const result = emitPortals(ir);
+    expect(result.closureBlock).toContain('interface ReactivePortalHandle');
+    expect(result.closureBlock).toContain('nodeView: (container');
+    expect(result.closureBlock).toContain('ReactivePortalHandle => {');
+    expect(result.closureBlock).toContain('const renderScope = (s: unknown): void =>');
+    expect(result.closureBlock).toContain('render(tpl(s), container)');
+    expect(result.closureBlock).toContain('update: (s: unknown): void => renderScope(s)');
+    expect(result.closureBlock).toContain('dispose: (): void => {');
+  });
+
+  it('non-reactive portal slot → mount-once () => void body verbatim (byte-identical regression guard)', () => {
+    const ir = buildMinimalIR({ slots: [portalSlot('nodeView', ['node', 'selected'])] });
+    const result = emitPortals(ir);
+    expect(result.closureBlock).not.toContain('ReactivePortalHandle');
+    expect(result.closureBlock).not.toContain('renderScope');
+    expect(result.closureBlock).toContain('): (() => void) => {');
+    expect(result.closureBlock).toContain('render(tpl(scope), container);');
+    expect(result.closureBlock).toContain('return () => {');
   });
 });

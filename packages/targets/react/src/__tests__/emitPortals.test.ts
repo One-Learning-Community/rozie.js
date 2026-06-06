@@ -75,6 +75,10 @@ function portalSlot(name: string, portalParamNames?: string[]): SlotDecl {
   };
 }
 
+function reactivePortalSlot(name: string, portalParamNames?: string[]): SlotDecl {
+  return { ...portalSlot(name, portalParamNames), isReactive: true };
+}
+
 function newCollectors() {
   return {
     react: new ReactImportCollector(),
@@ -149,5 +153,33 @@ describe('emitPortals — React', () => {
     const ir = buildMinimalIR({ slots: [portalSlot('my-cell', ['x'])] });
     const result = emitPortals(ir, newCollectors());
     expect(result.rendererRefLines).toContain('_renderMyCellRef');
+  });
+
+  // ── Phase 33 / REQ-22 — reactive portal branch ───────────────────────────
+  it('reactive portal slot → returns { update, dispose } + ReactivePortalHandle', () => {
+    const ir = buildMinimalIR({ slots: [reactivePortalSlot('nodeView', ['node', 'selected'])] });
+    const result = emitPortals(ir, newCollectors());
+    expect(result.hasPortals).toBe(true);
+    expect(result.closureBlock).toContain('interface ReactivePortalHandle');
+    expect(result.closureBlock).toContain('nodeView: (container');
+    expect(result.closureBlock).toContain('ReactivePortalHandle => {');
+    expect(result.closureBlock).toContain('const renderScope = (s: unknown): void =>');
+    expect(result.closureBlock).toContain('flushSync(() => root.render(slot(s)))');
+    expect(result.closureBlock).toContain('update: (s: unknown): void => renderScope(s)');
+    expect(result.closureBlock).toContain('dispose: (): void => {');
+    // The root is RETAINED (created once), re-rendered on update.
+    expect(result.closureBlock).toContain('const root = createRoot(container);');
+  });
+
+  it('non-reactive portal slot → mount-once () => void body verbatim (byte-identical regression guard)', () => {
+    const ir = buildMinimalIR({ slots: [portalSlot('nodeView', ['node', 'selected'])] });
+    const result = emitPortals(ir, newCollectors());
+    // The mount-once shape is untouched by the reactive opt-in.
+    expect(result.closureBlock).not.toContain('ReactivePortalHandle');
+    expect(result.closureBlock).not.toContain('renderScope');
+    expect(result.closureBlock).toContain('): (() => void) => {');
+    expect(result.closureBlock).toContain('if (typeof slot !== \'function\') return () => {};');
+    expect(result.closureBlock).toContain('flushSync(() => root.render(slot(scope)));');
+    expect(result.closureBlock).toContain('return () => {');
   });
 });

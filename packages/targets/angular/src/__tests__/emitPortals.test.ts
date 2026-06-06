@@ -71,6 +71,10 @@ function portalSlot(name: string, portalParamNames?: string[]): SlotDecl {
   };
 }
 
+function reactivePortalSlot(name: string, portalParamNames?: string[]): SlotDecl {
+  return { ...portalSlot(name, portalParamNames), isReactive: true };
+}
+
 describe('emitPortals — Angular', () => {
   it('no portal slots → early return with empty fields', () => {
     const ir = buildMinimalIR({ slots: [] });
@@ -134,5 +138,32 @@ describe('emitPortals — Angular', () => {
 
     const noParams = emitPortals(buildMinimalIR({ slots: [portalSlot('item')] }));
     expect(noParams.closureBlock).toContain('scope: unknown');
+  });
+
+  // ── Phase 33 / REQ-21, REQ-22 — reactive portal branch ───────────────────
+  it('reactive portal slot → Object.assign(view.context)+detectChanges + { update, dispose }', () => {
+    const ir = buildMinimalIR({ slots: [reactivePortalSlot('nodeView', ['node', 'selected'])] });
+    const result = emitPortals(ir);
+    expect(result.closureBlock).toContain('interface ReactivePortalHandle');
+    expect(result.closureBlock).toContain('nodeView: (container');
+    expect(result.closureBlock).toContain('ReactivePortalHandle => {');
+    // REQ-21: mutate context IN PLACE + detectChanges; NEVER recreate the view.
+    expect(result.closureBlock).toContain('Object.assign(view.context as object, s as object)');
+    expect(result.closureBlock).toContain('view.detectChanges()');
+    expect(result.closureBlock).toContain('update: (s: unknown): void => {');
+    expect(result.closureBlock).toContain('dispose: (): void => {');
+    // create exactly once — the update path must not re-create the embedded view.
+    const createCount = (result.closureBlock.match(/createEmbeddedView/g) ?? []).length;
+    expect(createCount).toBe(1);
+  });
+
+  it('non-reactive portal slot → mount-once () => void body verbatim (byte-identical regression guard)', () => {
+    const ir = buildMinimalIR({ slots: [portalSlot('nodeView', ['node', 'selected'])] });
+    const result = emitPortals(ir);
+    expect(result.closureBlock).not.toContain('ReactivePortalHandle');
+    expect(result.closureBlock).not.toContain('Object.assign(view.context');
+    expect(result.closureBlock).toContain('): (() => void) => {');
+    expect(result.closureBlock).toContain('view.destroy();');
+    expect(result.closureBlock).toContain('return () => {');
   });
 });

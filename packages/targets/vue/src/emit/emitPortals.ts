@@ -48,8 +48,20 @@ function setAttrLine(slotName: string, scopeHash: string): string {
   );
 }
 
+/**
+ * The `{ update, dispose }` interface a reactive portal slot's method returns.
+ * Emitted once into script-setup when any reactive portal slot is present
+ * (REQ-22). Non-reactive slots keep the `() => void` shape verbatim.
+ */
+const REACTIVE_HANDLE_INTERFACE_VUE =
+  'interface ReactivePortalHandle {\n' +
+  '  update(scope: unknown): void;\n' +
+  '  dispose(): void;\n' +
+  '}';
+
 /** Build the per-slot method body for the portals closure. */
 function buildSlotMethod(slot: SlotDecl, scopeHash: string): string {
+  if (slot.isReactive === true) return buildReactiveSlotMethod(slot, scopeHash);
   const slotName = slot.name;
   const paramNames = slot.portalParamNames ?? [];
   // Scope type from portalParamNames; falls back to `unknown` when omitted.
@@ -81,6 +93,44 @@ function buildSlotMethod(slot: SlotDecl, scopeHash: string): string {
   );
 }
 
+/**
+ * Phase 33 / REQ-22 — reactive portal-slot method body.
+ *
+ * Δ vs mount-once: returns `{ update, dispose }`. The CONTAINER is retained;
+ * `update(s)` re-runs `render(h(Fragment, slotFn(s)), container)` — Vue's
+ * runtime diffs the new vnode against the container's `_vnode` and patches in
+ * place (same-type root keeps DOM identity, no remount). dispose() calls
+ * `render(null, container)` (mount-once teardown, unchanged). Mirrors spike
+ * 007 vue.reactive-portal.ts.
+ */
+function buildReactiveSlotMethod(slot: SlotDecl, scopeHash: string): string {
+  const slotName = slot.name;
+  const paramNames = slot.portalParamNames ?? [];
+  const scopeType =
+    paramNames.length > 0
+      ? `{ ${paramNames.map((n) => `${n}: unknown`).join('; ')} }`
+      : 'unknown';
+  return (
+    `  ${slotName}: (container: HTMLElement, scope: ${scopeType}): ReactivePortalHandle => {\n` +
+    `    const slotFn = slots.${slotName};\n` +
+    `    if (!slotFn) return { update() {}, dispose() {} };\n` +
+    setAttrLine(slotName, scopeHash) +
+    `    const renderScope = (s: unknown): void => {\n` +
+    `      render(h(Fragment, null, slotFn(s)), container);\n` +
+    `    };\n` +
+    `    renderScope(scope);\n` +
+    `    portalContainers.add(container);\n` +
+    `    return {\n` +
+    `      update: (s: unknown): void => renderScope(s),\n` +
+    `      dispose: (): void => {\n` +
+    `        render(null, container);\n` +
+    `        portalContainers.delete(container);\n` +
+    `      },\n` +
+    `    };\n` +
+    `  },`
+  );
+}
+
 export interface PortalsEmit {
   hasPortals: boolean;
   /** Lines to splice between residual and lifecycle sections. */
@@ -104,7 +154,9 @@ export function emitPortals(
   imports.use('onBeforeUnmount');
 
   const methodLines = portals.map((slot) => buildSlotMethod(slot, scopeHash)).join('\n');
+  const hasReactive = portals.some((s) => s.isReactive === true);
   const lines = [
+    ...(hasReactive ? [REACTIVE_HANDLE_INTERFACE_VUE] : []),
     'const portalContainers = new Set<HTMLElement>();',
     `const portals = {\n${methodLines}\n};`,
     'onBeforeUnmount(() => {',

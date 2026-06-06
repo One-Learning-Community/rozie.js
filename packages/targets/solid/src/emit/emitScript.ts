@@ -386,6 +386,8 @@ export function emitScript(
   const portalsEmit = emitPortals(ir, collectors.portalScopeHash ?? '');
   if (portalsEmit.hasPortals) {
     collectors.solidImports.add('onCleanup');
+    // Reactive portal slots hold scope in a createSignal (Phase 33 / REQ-20).
+    if (portalsEmit.needsCreateSignal) collectors.solidImports.add('createSignal');
     // The `render` named import lives on 'solid-js/web', not 'solid-js'.
     // SolidImportCollector currently only emits 'solid-js' — wire a separate
     // shell field through the script-emit result for the web import line.

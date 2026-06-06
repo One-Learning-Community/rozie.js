@@ -44,7 +44,19 @@ function setAttrLine(slotName: string, scopeHash: string): string {
   );
 }
 
+/**
+ * The `{ update, dispose }` interface a reactive portal slot's method returns.
+ * Emitted once into ngAfterViewInit's closure block when any reactive portal
+ * slot is present (REQ-22). Non-reactive slots keep the `() => void` shape.
+ */
+const REACTIVE_HANDLE_INTERFACE_ANGULAR =
+  'interface ReactivePortalHandle {\n' +
+  '  update(scope: unknown): void;\n' +
+  '  dispose(): void;\n' +
+  '}';
+
 function buildSlotMethod(slot: SlotDecl, scopeHash: string): string {
+  if (slot.isReactive === true) return buildReactiveSlotMethod(slot, scopeHash);
   const slotName = slot.name;
   const tplField = `_${slotName}Tpl`;
   const paramNames = slot.portalParamNames ?? [];
@@ -65,6 +77,49 @@ function buildSlotMethod(slot: SlotDecl, scopeHash: string): string {
     `    return () => {\n` +
     `      view.destroy();\n` +
     `      this._portalViews.delete(view as EmbeddedViewRef<unknown>);\n` +
+    `    };\n` +
+    `  },`
+  );
+}
+
+/**
+ * Phase 33 / REQ-21 — reactive portal-slot method body.
+ *
+ * Δ vs mount-once: returns `{ update, dispose }`. The EmbeddedViewRef is
+ * RETAINED; update() mutates `view.context` IN PLACE via `Object.assign`
+ * (keeping the object identity the template bindings captured) then calls
+ * `view.detectChanges()` — the view's DOM nodes persist, only changed
+ * bindings update. NEVER recreate the view (that would remount). dispose()
+ * calls `view.destroy()` (mount-once teardown, unchanged). Mirrors spike 007
+ * angular.reactive-portal.ts.
+ */
+function buildReactiveSlotMethod(slot: SlotDecl, scopeHash: string): string {
+  const slotName = slot.name;
+  const tplField = `_${slotName}Tpl`;
+  const paramNames = slot.portalParamNames ?? [];
+  const scopeType =
+    paramNames.length > 0
+      ? `{ ${paramNames.map((n) => `${n}: unknown`).join('; ')} }`
+      : 'unknown';
+  return (
+    `  ${slotName}: (container: HTMLElement, scope: ${scopeType}): ReactivePortalHandle => {\n` +
+    `    const tpl = this.${tplField}();\n` +
+    `    const vcr = this._portalAnchor();\n` +
+    `    if (!tpl || !vcr) return { update() {}, dispose() {} };\n` +
+    setAttrLine(slotName, scopeHash) +
+    `    const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);\n` +
+    `    view.detectChanges();\n` +
+    `    for (const node of view.rootNodes as Node[]) container.appendChild(node);\n` +
+    `    this._portalViews.add(view as EmbeddedViewRef<unknown>);\n` +
+    `    return {\n` +
+    `      update: (s: unknown): void => {\n` +
+    `        Object.assign(view.context as object, s as object);\n` +
+    `        view.detectChanges();\n` +
+    `      },\n` +
+    `      dispose: (): void => {\n` +
+    `        view.destroy();\n` +
+    `        this._portalViews.delete(view as EmbeddedViewRef<unknown>);\n` +
+    `      },\n` +
     `    };\n` +
     `  },`
   );
@@ -117,7 +172,9 @@ export function emitPortals(ir: IRComponent, scopeHash: string = ''): PortalsEmi
   }
 
   const methodLines = portals.map((slot) => buildSlotMethod(slot, scopeHash)).join('\n');
-  const closureBlock = `const portals = {\n${methodLines}\n};`;
+  const hasReactive = portals.some((s) => s.isReactive === true);
+  const interfacePrefix = hasReactive ? REACTIVE_HANDLE_INTERFACE_ANGULAR + '\n' : '';
+  const closureBlock = `${interfacePrefix}const portals = {\n${methodLines}\n};`;
 
   const destroyRegister =
     'this.__rozieDestroyRef.onDestroy(() => {\n' +

@@ -83,6 +83,10 @@ function portalSlot(name: string, portalParamNames?: string[]): SlotDecl {
   };
 }
 
+function reactivePortalSlot(name: string, portalParamNames?: string[]): SlotDecl {
+  return { ...portalSlot(name, portalParamNames), isReactive: true };
+}
+
 describe('emitPortals — Svelte', () => {
   it('no portal slots → early return with empty fields', () => {
     const ir = buildMinimalIR({ slots: [] });
@@ -169,5 +173,37 @@ describe('emitPortals — Svelte', () => {
 
     const noParams = emitPortals(buildMinimalIR({ slots: [portalSlot('item')] }));
     expect(noParams.setupLines).toContain('scope: unknown');
+  });
+
+  // ── Phase 33 / REQ-19, REQ-22 — reactive portal branch ───────────────────
+  it('reactive portal slot → mount(PortalHostReactive) + initialScope + inst.update', () => {
+    const ir = buildMinimalIR({ slots: [reactivePortalSlot('nodeView', ['node', 'selected'])] });
+    const result = emitPortals(ir);
+    expect(result.setupLines).toContain('interface ReactivePortalHandle');
+    expect(result.setupLines).toContain('nodeView: (container');
+    expect(result.setupLines).toContain('ReactivePortalHandle => {');
+    // REQ-19: reactive variant + initialScope (NOT scope) + inst.update handle.
+    expect(result.setupLines).toContain('mount(PortalHostReactive, {');
+    expect(result.setupLines).toContain('initialScope: scope');
+    expect(result.setupLines).not.toContain('snippet: nodeView, scope');
+    expect(result.setupLines).toContain('.update(s)');
+    expect(result.setupLines).toContain('dispose: (): void => {');
+    // Import is the reactive variant; the mount-once PortalHost is NOT imported
+    // when only a reactive slot is present.
+    expect(result.extraImports).toContain("PortalHostReactive.svelte");
+    expect(result.extraImports).not.toContain("import PortalHost from");
+  });
+
+  it('non-reactive portal slot → mount-once () => void body + PortalHost import verbatim', () => {
+    const ir = buildMinimalIR({ slots: [portalSlot('nodeView', ['node', 'selected'])] });
+    const result = emitPortals(ir);
+    expect(result.setupLines).not.toContain('ReactivePortalHandle');
+    expect(result.setupLines).not.toContain('PortalHostReactive');
+    expect(result.setupLines).not.toContain('initialScope');
+    expect(result.setupLines).toContain('): (() => void) => {');
+    expect(result.setupLines).toContain('mount(PortalHost, {');
+    expect(result.setupLines).toContain('props: { snippet: nodeView, scope }');
+    expect(result.extraImports).toContain("import PortalHost from '@rozie/runtime-svelte/PortalHost.svelte';");
+    expect(result.extraImports).not.toContain('PortalHostReactive');
   });
 });

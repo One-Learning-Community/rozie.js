@@ -72,6 +72,10 @@ function portalSlot(name: string, portalParamNames?: string[]): SlotDecl {
   };
 }
 
+function reactivePortalSlot(name: string, portalParamNames?: string[]): SlotDecl {
+  return { ...portalSlot(name, portalParamNames), isReactive: true };
+}
+
 describe('emitPortals — Vue', () => {
   it('no portal slots → early return with empty fields', () => {
     const ir = buildMinimalIR({ slots: [] });
@@ -123,5 +127,28 @@ describe('emitPortals — Vue', () => {
       new VueImportCollector(),
     );
     expect(noParams.setupLines).toContain('scope: unknown');
+  });
+
+  // ── Phase 33 / REQ-22 — reactive portal branch ───────────────────────────
+  it('reactive portal slot → returns { update, dispose } + ReactivePortalHandle', () => {
+    const ir = buildMinimalIR({ slots: [reactivePortalSlot('nodeView', ['node', 'selected'])] });
+    const result = emitPortals(ir, new VueImportCollector());
+    expect(result.setupLines).toContain('interface ReactivePortalHandle');
+    expect(result.setupLines).toContain('nodeView: (container');
+    expect(result.setupLines).toContain('ReactivePortalHandle => {');
+    expect(result.setupLines).toContain('const renderScope = (s: unknown): void =>');
+    expect(result.setupLines).toContain('render(h(Fragment, null, slotFn(s)), container)');
+    expect(result.setupLines).toContain('update: (s: unknown): void => renderScope(s)');
+    expect(result.setupLines).toContain('dispose: (): void => {');
+  });
+
+  it('non-reactive portal slot → mount-once () => void body verbatim (byte-identical regression guard)', () => {
+    const ir = buildMinimalIR({ slots: [portalSlot('nodeView', ['node', 'selected'])] });
+    const result = emitPortals(ir, new VueImportCollector());
+    expect(result.setupLines).not.toContain('ReactivePortalHandle');
+    expect(result.setupLines).not.toContain('renderScope');
+    expect(result.setupLines).toContain('): (() => void) => {');
+    expect(result.setupLines).toContain('const vnode = h(Fragment, null, slotFn(scope));');
+    expect(result.setupLines).toContain('return () => {');
   });
 });

@@ -35,7 +35,19 @@ function setAttrLine(slotName: string, scopeHash: string): string {
   );
 }
 
+/**
+ * The `{ update, dispose }` interface a reactive portal slot's method returns.
+ * Emitted once into firstUpdated's closure block when any reactive portal slot
+ * is present (REQ-22). Non-reactive slots keep the `() => void` shape verbatim.
+ */
+const REACTIVE_HANDLE_INTERFACE_LIT =
+  'interface ReactivePortalHandle {\n' +
+  '  update(scope: unknown): void;\n' +
+  '  dispose(): void;\n' +
+  '}';
+
 function buildSlotMethod(slot: SlotDecl, scopeHash: string, ir: IRComponent): string {
+  if (slot.isReactive === true) return buildReactiveSlotMethod(slot, scopeHash, ir);
   const slotName = slot.name;
   // The closure object KEY stays the bare slot name: the script-side
   // `$portals.<slotName>(...)` call is rewritten to `portals.<slotName>(...)`,
@@ -58,6 +70,45 @@ function buildSlotMethod(slot: SlotDecl, scopeHash: string, ir: IRComponent): st
     `    return () => {\n` +
     `      render(nothing, container);\n` +
     `      this._portalContainers.delete(container);\n` +
+    `    };\n` +
+    `  },`
+  );
+}
+
+/**
+ * Phase 33 / REQ-22 — reactive portal-slot method body.
+ *
+ * Δ vs mount-once: returns `{ update, dispose }`. The CONTAINER is retained;
+ * `update(s)` re-runs `render(tpl(s), container)` — lit-html keeps a ChildPart
+ * on the container and diffs/patches into the same host (DOM identity
+ * preserved, no remount; this is lit-html's defining repeat-render behavior).
+ * dispose() calls `render(nothing, container)` (mount-once teardown,
+ * unchanged). Mirrors spike 007 lit.reactive-portal.ts.
+ */
+function buildReactiveSlotMethod(slot: SlotDecl, scopeHash: string, ir: IRComponent): string {
+  const slotName = slot.name;
+  const memberName = portalSlotMemberName(slotName, ir);
+  const paramNames = slot.portalParamNames ?? [];
+  const scopeType =
+    paramNames.length > 0
+      ? `{ ${paramNames.map((n) => `${n}: unknown`).join('; ')} }`
+      : 'unknown';
+  return (
+    `  ${slotName}: (container: HTMLElement, scope: ${scopeType}): ReactivePortalHandle => {\n` +
+    `    const tpl = this.${memberName};\n` +
+    `    if (typeof tpl !== 'function') return { update() {}, dispose() {} };\n` +
+    setAttrLine(slotName, scopeHash) +
+    `    const renderScope = (s: unknown): void => {\n` +
+    `      render(tpl(s), container);\n` +
+    `    };\n` +
+    `    renderScope(scope);\n` +
+    `    this._portalContainers.add(container);\n` +
+    `    return {\n` +
+    `      update: (s: unknown): void => renderScope(s),\n` +
+    `      dispose: (): void => {\n` +
+    `        render(nothing, container);\n` +
+    `        this._portalContainers.delete(container);\n` +
+    `      },\n` +
     `    };\n` +
     `  },`
   );
@@ -86,7 +137,9 @@ export function emitPortals(ir: IRComponent, scopeHash: string = ''): PortalsEmi
 
   const fieldDecl = 'private _portalContainers = new Set<HTMLElement>();';
   const methodLines = portals.map((slot) => buildSlotMethod(slot, scopeHash, ir)).join('\n');
-  const closureBlock = `const portals = {\n${methodLines}\n};`;
+  const hasReactive = portals.some((s) => s.isReactive === true);
+  const interfacePrefix = hasReactive ? REACTIVE_HANDLE_INTERFACE_LIT + '\n' : '';
+  const closureBlock = `${interfacePrefix}const portals = {\n${methodLines}\n};`;
   const disconnectedBlock =
     'for (const container of this._portalContainers) render(nothing, container);\n' +
     'this._portalContainers.clear();';
