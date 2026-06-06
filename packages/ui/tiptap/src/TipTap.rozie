@@ -1,0 +1,328 @@
+<!--
+  TipTap.rozie — data-bound port of TipTap (ProseMirror-based rich-text editor).
+
+  TipTap's value isn't the editor logic — that's ProseMirror, framework-
+  agnostic. The value-add of the official wrappers (@tiptap/react,
+  @tiptap/vue-3, svelte-tiptap, ngx-tiptap, solid-tiptap …) is just gluing
+  onUpdate to component state, forwarding extensions, and bridging node
+  views. Six maintenance burdens, ONE Rozie source covers six frameworks —
+  and crucially gives Lit (no wrapper exists) and Solid (thin, no node
+  views) React/Vue-grade ergonomics from the same definition.
+
+  What the official wrappers DON'T give you that this does:
+    - True two-way content binding. Neither @tiptap/react nor @tiptap/vue-3
+      ships a controlled `value`/v-model contract — every consumer hand-rolls
+      the content/onUpdate/setContent sync loop. Here:  <TipTap r-model:html="…" />
+    - A batteries-included toolbar with live active-state, OR bring-your-own
+      via the `toolbar` portal slot (receives the live editor).
+    - A uniform imperative command handle across all six targets ($expose).
+
+  Surface (Phase 32, feature-rich expansion from the original 4 props):
+    - props (8):  html[model] / editable / placeholder / autofocus /
+                  editorClass / ariaLabel / editorProps / extensions
+    - events (4): update / selectionUpdate / focus / blur
+    - $expose (14): getEditor, focusEditor, blurEditor, getHTML, getJSON,
+                  setContent, clearContent, toggleBold, toggleItalic,
+                  toggleHeading, toggleBulletList, undo, redo, chain
+    - slots (1):  `toolbar` portal slot (consumer toolbar bound to the editor)
+
+  The `editorProps` (ProseMirror) and `extensions` (extra TipTap extensions
+  merged onto StarterKit) props are the consumer-extensibility passthroughs —
+  the analog of CodeMirror's `:extensions` and Chart.js's `:plugins`.
+
+  Node-view portal slots (rendering a framework component as a custom
+  ProseMirror node) are DEFERRED to a follow-up — see docs/guide/tiptap-comparison.md.
+-->
+
+<rozie name="TipTap" inherit-attrs="false" inherit-listeners="false">
+
+<props>
+{
+  html:        { type: String,  default: '<p>Start writing…</p>', model: true },
+  editable:    { type: Boolean, default: true },
+  placeholder: { type: String,  default: '' },
+  autofocus:   { type: Boolean, default: false },
+  editorClass: { type: String,  default: '' },
+  ariaLabel:   { type: String,  default: 'Rich text editor' },
+  editorProps: { type: Object,  default: () => ({}) },
+  extensions:  { type: Array,   default: () => [] },
+}
+</props>
+
+<data>
+{
+  active: {
+    bold:   false,
+    italic: false,
+    h1:     false,
+    h2:     false,
+    bulletList: false,
+  },
+}
+</data>
+
+<script>
+import { Editor } from '@tiptap/core'
+import StarterKit from '@tiptap/starter-kit'
+
+// The live editor instance — null before mount / after destroy. Named `editor`
+// (distinct from any template `ref="X"` name) so no capture-var-vs-ref double
+// declaration trap (the Chart.js canvasEl/canvasNode lesson).
+let editor = null
+
+// The raw HTML string the editor currently reflects. Compared against in the
+// $props.html reconciler so the watcher's mount-time fire is a no-op: the
+// editor is created with `content: $props.html`, so right after mount the bound
+// model already matches and setContent must NOT re-run (re-running it replaces
+// the whole ProseMirror document and resets the selection — the official
+// @tiptap/* wrappers guard the same way against the *raw* value, never against
+// the normalized `editor.getHTML()`). This is the CodeMirror suppress-echo
+// guard in HTML-string form (flatpickr lineage).
+let lastHtml = null
+
+// The `toolbar` portal slot's dispose handle. COMPONENT-scope (top-level let),
+// NOT a $onMount-local — the Solid emitter hoists the $onMount-returned cleanup
+// into a sibling onCleanup() OUTSIDE the mount-body IIFE, so a mount-local would
+// lose scope there (the Chart.js tooltipEl/tooltipDispose hoist lesson).
+let toolbarDispose = null
+
+// Recompute the internal toolbar's active-mark booleans from the live editor.
+const refreshActive = () => {
+  if (!editor) return
+  $data.active = {
+    bold:       editor.isActive('bold'),
+    italic:     editor.isActive('italic'),
+    h1:         editor.isActive('heading', { level: 1 }),
+    h2:         editor.isActive('heading', { level: 2 }),
+    bulletList: editor.isActive('bulletList'),
+  }
+}
+
+$onMount(() => {
+  lastHtml = $props.html
+
+  editor = new Editor({
+    element:    $refs.editorEl,
+    content:    $props.html,
+    editable:   $props.editable,
+    autofocus:  $props.autofocus,
+    // StarterKit first; consumer extensions LAST so they win (TipTap applies
+    // later-registered extensions over earlier ones for the same node/mark).
+    extensions: [StarterKit, ...$props.extensions],
+    editorProps: {
+      attributes: {
+        'aria-label': $props.ariaLabel,
+        ...($props.editorClass ? { class: $props.editorClass } : {}),
+        ...($props.placeholder ? { 'data-placeholder': $props.placeholder, 'aria-placeholder': $props.placeholder } : {}),
+      },
+      // Consumer editorProps spread LAST — full ProseMirror editorProps control
+      // (handleKeyDown, handlePaste, a custom `attributes`, …) wins.
+      ...$props.editorProps,
+    },
+    onUpdate: ({ editor }) => {
+      const next = editor.getHTML()
+      lastHtml = next
+      // Round-trip guard — see CodeMirror/Flatpickr for the same shape.
+      if (next !== $props.html) $model.html = next
+      $emit('update', next)
+    },
+    onSelectionUpdate: () => {
+      refreshActive()
+      $emit('selectionUpdate')
+    },
+    onFocus: () => $emit('focus'),
+    onBlur:  () => $emit('blur'),
+  })
+  refreshActive()
+
+  // `toolbar` portal slot — when the consumer fills it, mount their toolbar
+  // fragment into the engine-adjacent host node, handing them the live editor
+  // (their buttons call editor.chain().focus()…run()). $portals.toolbar is
+  // referenced ONLY here inside $onMount (the per-target portal helper is scoped
+  // to the mount lifecycle — a top-level reference would fail the bundled-leaf
+  // strict typecheck, the FullCalendar/CodeMirror pattern). The host div is
+  // r-if-gated on $slots.toolbar so $refs.toolbarEl exists exactly when filled.
+  if ($slots.toolbar && $refs.toolbarEl) {
+    toolbarDispose = $portals.toolbar($refs.toolbarEl, { editor })
+  }
+
+  return () => {
+    toolbarDispose?.()
+    toolbarDispose = null
+    editor?.destroy()
+  }
+})
+
+// Reconcile EXTERNAL prop changes back into the editor without bouncing through
+// onUpdate. The guard compares against `lastHtml` (the value the editor was last
+// set with) — NOT `editor.getHTML()` (ProseMirror's normalized serialization,
+// which never string-equals the author's raw HTML, so a getHTML() guard would
+// re-run setContent on every mount and reset the selection). setContent's
+// { emitUpdate: false } skips the change emission (TipTap v3 — the 2nd arg is an
+// options object, not a bare boolean as in v2).
+$watch(() => $props.html, (v) => {
+  if (!editor) return
+  if (v === lastHtml) return
+  lastHtml = v
+  editor.commands.setContent(v, { emitUpdate: false })
+  refreshActive()
+})
+
+// setEditable's 2nd arg is `emitUpdate` (defaults to true in TipTap v3). Pass
+// `false` — toggling editability is not a content change and must NOT emit an
+// `update`, which would round-trip ProseMirror's normalized HTML back into the
+// bound model.
+$watch(() => $props.editable, (v) => editor?.setEditable(v, false))
+
+// ── Imperative handle (Phase 21 $expose) — TipTap is command-rich, so this is
+// the marquee surface: 14 verbs over the live Editor, uniform across all 6
+// targets. Each guards the pre-mount / destroyed `editor = null`.
+//
+// Collision discipline:
+//   - The content setter is named `setContent`, NOT `setHtml` — an `html` model
+//     prop makes React auto-generate a `setHtml` state setter, so a `setHtml`
+//     $expose verb would collide on the React target (ROZ524). (CodeMirror's
+//     setValue→replaceValue lesson, html edition.)
+//   - None of the 14 names collide with LitElement reserved lifecycle methods
+//     (update/render/firstUpdated/updated/willUpdate/requestUpdate).
+//   - The focus/blur COMMANDS are named `focusEditor`/`blurEditor`, NOT
+//     `focus`/`blur` — the component emits `focus`/`blur` EVENTS, and on
+//     class-based targets (Angular) an output field and a method cannot share a
+//     name (ROZ121). The diagnostic's own guidance: rename the method, keep the
+//     event's public name. (The expose-verb-vs-event-name collision lesson.)
+//   - None equals a prop name (html/editable/placeholder/autofocus/editorClass/
+//     ariaLabel/editorProps/extensions).
+function getEditor()        { return editor }
+function focusEditor()      { editor?.commands.focus() }
+function blurEditor()       { editor?.commands.blur() }
+function getHTML()          { return editor ? editor.getHTML() : '' }
+function getJSON()          { return editor ? editor.getJSON() : null }
+// setContent routes through the SAME suppress-echo bookkeeping as $watch(html):
+// update lastHtml first, set with emitUpdate:false (no onUpdate bounce), then
+// reflect into the model so a programmatic set keeps the bound state in sync.
+function setContent(next) {
+  if (!editor) return
+  const v = next ?? ''
+  if (v === lastHtml) return
+  lastHtml = v
+  editor.commands.setContent(v, { emitUpdate: false })
+  $model.html = v
+  refreshActive()
+}
+function clearContent() {
+  if (!editor) return
+  editor.commands.clearContent()
+  lastHtml = editor.getHTML()
+  $model.html = lastHtml
+  refreshActive()
+}
+function toggleBold()       { editor?.chain().focus().toggleBold().run();   refreshActive() }
+function toggleItalic()     { editor?.chain().focus().toggleItalic().run(); refreshActive() }
+function toggleHeading(level) {
+  editor?.chain().focus().toggleHeading({ level: level ?? 1 }).run()
+  refreshActive()
+}
+function toggleBulletList() { editor?.chain().focus().toggleBulletList().run(); refreshActive() }
+function undo()             { editor?.chain().focus().undo().run(); refreshActive() }
+function redo()             { editor?.chain().focus().redo().run(); refreshActive() }
+// Power-user escape hatch — returns a pre-focused command chain (TipTap idiom:
+// chain().focus().toggleBold().setColor('#f00').run()). null before mount.
+function chain()            { return editor ? editor.chain().focus() : null }
+
+$expose({
+  getEditor, focusEditor, blurEditor, getHTML, getJSON, setContent, clearContent,
+  toggleBold, toggleItalic, toggleHeading, toggleBulletList, undo, redo, chain,
+})
+</script>
+
+<template>
+<div class="rozie-tiptap" :class="{ 'is-readonly': !$props.editable }">
+  <!-- Internal batteries-included toolbar — rendered when editable AND the
+       consumer has NOT supplied a `toolbar` slot. Buttons drive the $expose
+       command verbs directly; active state tracks editor.isActive() live. -->
+  <div class="rozie-tiptap-toolbar" r-if="$props.editable && !$slots.toolbar">
+    <button type="button" :class="{ active: $data.active.bold }"       @click="toggleBold"        aria-label="Bold"><strong>B</strong></button>
+    <button type="button" :class="{ active: $data.active.italic }"     @click="toggleItalic"      aria-label="Italic"><em>I</em></button>
+    <span class="sep" />
+    <button type="button" :class="{ active: $data.active.h1 }"         @click="toggleHeading(1)"  aria-label="Heading 1">H1</button>
+    <button type="button" :class="{ active: $data.active.h2 }"         @click="toggleHeading(2)"  aria-label="Heading 2">H2</button>
+    <span class="sep" />
+    <button type="button" :class="{ active: $data.active.bulletList }" @click="toggleBulletList"  aria-label="Bullet list">• List</button>
+  </div>
+  <!-- Consumer toolbar portal host — rendered when editable AND the `toolbar`
+       slot is filled. $portals.toolbar (in $onMount) mounts the consumer's
+       fragment here with the live editor in scope. -->
+  <div class="rozie-tiptap-toolbar rozie-tiptap-toolbar--slot" ref="toolbarEl" r-if="$props.editable && $slots.toolbar"></div>
+  <div ref="editorEl" class="rozie-tiptap-content" :data-placeholder="$props.placeholder" />
+</div>
+<!--
+  Portal-slot primitive (Spike 003). The `toolbar` slot is declared but NOT
+  rendered inline — per-target template emitters skip it; it exists only to
+  declare the consumer-facing render-prop / scoped-slot / contentChild shape
+  (per target). The wrapper invokes it from script via
+  $portals.toolbar($refs.toolbarEl, { editor }) inside $onMount; the portal
+  helper mounts the consumer's fragment into the toolbar host node and returns a
+  dispose handle the wrapper calls on unmount. ROZ127-clean: `toolbar` ≠ any prop.
+-->
+<slot name="toolbar" portal :params="['editor']" />
+</template>
+
+<style>
+.rozie-tiptap {
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 6px;
+  overflow: hidden;
+  background: white;
+}
+.rozie-tiptap.is-readonly {
+  background: #fafafa;
+}
+
+.rozie-tiptap-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.125rem;
+  padding: 0.25rem 0.375rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  background: #f5f5f7;
+}
+.rozie-tiptap-toolbar button {
+  padding: 0.25rem 0.5rem;
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: 3px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8125rem;
+  min-width: 1.75rem;
+  color: rgba(0, 0, 0, 0.65);
+}
+.rozie-tiptap-toolbar button:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+.rozie-tiptap-toolbar button.active {
+  background: #1a1a1a;
+  color: white;
+  border-color: #1a1a1a;
+}
+.rozie-tiptap-toolbar .sep {
+  width: 1px;
+  height: 1rem;
+  background: rgba(0, 0, 0, 0.1);
+  margin: 0 0.25rem;
+}
+
+.rozie-tiptap-content {
+  padding: 0.625rem 0.875rem;
+  min-height: 6rem;
+  font: inherit;
+  outline: none;
+}
+.rozie-tiptap-content p { margin: 0 0 0.5rem; }
+.rozie-tiptap-content p:last-child { margin-bottom: 0; }
+.rozie-tiptap-content h1 { font-size: 1.5rem; margin: 0.5rem 0 0.375rem; }
+.rozie-tiptap-content h2 { font-size: 1.25rem; margin: 0.5rem 0 0.375rem; }
+.rozie-tiptap-content ul { margin: 0 0 0.5rem; padding-left: 1.5rem; }
+</style>
+
+</rozie>

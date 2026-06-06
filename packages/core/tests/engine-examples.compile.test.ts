@@ -34,6 +34,9 @@ const PKG_WRAPPER_SRC: Record<string, string> = {
   // Phase 30 — LineChart.rozie generalized to the generic Chart.rozie (full
   // controller set) and moved into @rozie-ui/chartjs.
   'Chart.rozie': 'packages/ui/chartjs/src/Chart.rozie',
+  // Phase 32 — TipTap.rozie moved into @rozie-ui/tiptap and expanded feature-rich
+  // (8 props / 4 events / 14 $expose / 1 toolbar portal slot).
+  'TipTap.rozie': 'packages/ui/tiptap/src/TipTap.rozie',
 };
 function resolveEngineWrapper(file: string): string {
   const pkg = PKG_WRAPPER_SRC[file];
