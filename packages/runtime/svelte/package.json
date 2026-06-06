@@ -14,6 +14,7 @@
       "default": "./src/index.ts"
     },
     "./PortalHost.svelte": "./src/PortalHost.svelte",
+    "./PortalHostReactive.svelte": "./src/PortalHostReactive.svelte",
     "./applyListeners": {
       "svelte": "./src/applyListeners.ts",
       "types": "./src/applyListeners.ts",
