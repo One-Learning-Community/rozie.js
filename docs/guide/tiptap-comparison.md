@@ -14,7 +14,7 @@ How `@rozie-ui/tiptap` compares to the existing per-framework TipTap wrappers. T
 | **Svelte** (community) | `svelte-tiptap` | 3.0.1 | ~20.5k | sibiraj-s | ✅ `SvelteNodeViewRenderer` |
 | **Solid** (community) | `solid-tiptap` | 0.8.0 | ~3.9k | lxsmnsyc | ❌ none |
 | **Lit** | — | — | — | — | ❌ no wrapper exists |
-| **Rozie** | `@rozie-ui/tiptap-*` | 0.1.0 | — | One Learning Community | ⏳ deferred (Phase 33) |
+| **Rozie** | `@rozie-ui/tiptap-*` | 0.1.0 | — | One Learning Community | ✅ `nodeView` reactive portal slot (all 6) |
 
 The wedge is real and strongest for **Lit (no wrapper at all)** and **Solid (thin, no node views, three fragmented forks, the most-used one ~10 months stale)**. Svelte is the partial exception — `svelte-tiptap` is genuinely capable — but it's a single-maintainer package TipTap's own docs don't endorse (the official Svelte guide just says "hand-instantiate the `Editor` class").
 
@@ -29,8 +29,8 @@ The wedge is real and strongest for **Lit (no wrapper at all)** and **Solid (thi
 | Consumer toolbar slot (bound to editor) | build it yourself | build it yourself | build it yourself | build it yourself | build it yourself | hand-roll | ✅ `toolbar` portal slot |
 | `extensions` passthrough | ✅ | ✅ | ✅ | ✅ | ✅ | hand-roll | ✅ |
 | `editorProps` passthrough | ✅ | ✅ | ✅ | ✅ | ✅ | hand-roll | ✅ |
-| **Node-view component renderer** | ✅ | ✅ | ✅ | ✅ | ❌ | hand-roll | ⏳ Phase 33 |
-| Bubble / floating menu | ✅ `/menus` | ✅ `/menus` | ✅ directives | ✅ | ❌ | hand-roll | ⏳ Phase 33 |
+| **Node-view component renderer** | ✅ | ✅ | ✅ | ✅ | ❌ | hand-roll | ✅ `nodeView` reactive slot (all 6) |
+| Bubble / floating menu | ✅ `/menus` | ✅ `/menus` | ✅ directives | ✅ | ❌ | hand-roll | ⏳ deferred (follow-up) |
 | Placeholder (empty-state) | via core ext | via core ext | via core ext | via core ext | via core ext | hand-roll | via `:extensions` (bundling = Phase 33) |
 | SSR | ✅² | ✅² | ⚠️ client-only | ✅² | ✅² | — | ✅ by construction³ |
 | One source → all 6 frameworks | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
@@ -45,55 +45,64 @@ The wedge is real and strongest for **Lit (no wrapper at all)** and **Solid (thi
 - **Controlled two-way `html`** out of the box on all six, with a shared echo-guard — the thing every React/Vue/Svelte consumer reimplements by hand.
 - **A batteries-included toolbar** (Bold/Italic/H1/H2/Bullet with live active-state) *and* a **`toolbar` portal slot** that hands the consumer the live editor — neither official wrapper ships any toolbar.
 - **A uniform 14-verb imperative command handle** (`$expose`) with the same shape on every target — versus "hold the `Editor` you happened to construct" (which differs per framework: hook return, ref, store, or a directive input).
+- **Node views on all six** — a single `nodeView` **reactive** portal slot renders a framework fragment as a custom ProseMirror node (mention chips, embeds, editable callouts) and re-renders it **in place** on each transaction. This is the marquee TipTap feature, and Rozie ships it where the ecosystem has gaps: **Solid (`solid-tiptap` has no node-view renderer)** and **Lit (no wrapper at all)** get it for free from the same source.
 
-## Where the official wrappers still win — the gap table
+## Gap status — what shipped, what's still deferred
 
-| Gap | Who has it | Severity | Rozie plan |
+| Gap | Who has it | Severity | Rozie status |
 | --- | --- | --- | --- |
-| **G1 — Node-view component renderer** | React, Vue, Angular, Svelte | **High** (TipTap's marquee feature) | **Phase 33** — uniform `<slot name="nodeView" portal>` driven by `addNodeView`. Design sketch below. |
-| G2 — Bubble / Floating menu | React, Vue, Angular, Svelte | Medium | **Phase 33** — a `bubbleMenu` / `floatingMenu` portal slot over `@tiptap/extension-bubble-menu` (Floating UI). |
-| G3 — Bundled Placeholder | all (via core ext) | Low | **Phase 33 (cheap)** — bundle `@tiptap/extension-placeholder` + wire the `placeholder` prop to it. Deferred only to avoid a mid-port dependency add; works today via `:extensions`. |
-| G4 — `outputFormat: 'json'` two-way | `ngx-tiptap` | Low | **Phase 33** — a `format` prop (`'html' | 'json'`) switching the two-way payload; `getJSON()` already exists on the handle. |
+| **G1 — Node-view component renderer** | React, Vue, Angular, Svelte | **High** (TipTap's marquee feature) | **✅ SHIPPED (Phase 33)** — a uniform `nodeView` **reactive** portal slot driven by `addNodeView`, proven 6/6. See the [shipped design below](#node-view-portal-slots-g1-shipped). |
+| G2 — Bubble / Floating menu | React, Vue, Angular, Svelte | Medium | **⏳ Deferred (follow-up)** — a `bubbleMenu` / `floatingMenu` portal slot over `@tiptap/extension-bubble-menu` (Floating UI). Out of Phase 33 scope. |
+| G3 — Bundled Placeholder | all (via core ext) | Low | **⏳ Deferred (follow-up)** — bundle `@tiptap/extension-placeholder` + wire the `placeholder` prop to it. Works today via `:extensions`. |
+| G4 — `outputFormat: 'json'` two-way | `ngx-tiptap` | Low | **⏳ Deferred (follow-up)** — a `format` prop (`'html' | 'json'`) switching the two-way payload; `getJSON()` already exists on the handle. |
 | G5 — Reactive-forms / CVA | `ngx-tiptap` (Angular) | Low | Angular-only; Rozie's `[(html)]` covers template-driven forms. CVA is a niche Angular add. |
 
-## Phase 33 gap-closure proposal
+## Node-view portal slots (G1 — shipped) {#node-view-portal-slots-g1-shipped}
 
-Recommended order (highest value first). Each is **codegen/source/config only — no emitter touch** unless a genuine compiler gap surfaces, matching the Chart.js Phase 31 discipline.
+The strongest differentiator now ships: render a **framework component as a custom ProseMirror node** uniformly across all six targets — where React/Vue/Angular/Svelte each ship their own renderer, Solid has none, and Lit has nothing. Phase 33 delivered it as the **first reactive portal slot**, proven 6/6 (behavioral + pixel).
 
-### 1. Node-view portal slots (G1 — the marquee wedge)
+**How it works.** A custom TipTap Node whose `addNodeView()` returns a ProseMirror `NodeView` that:
 
-The strongest differentiator: render a **framework component as a custom ProseMirror node** uniformly across all six targets — where React/Vue/Angular/Svelte each ship their own renderer, Solid has none, and Lit has nothing.
-
-**Design sketch.** A custom TipTap Node whose `addNodeView()` returns a ProseMirror `NodeView` that:
-1. creates a host `dom` (and optionally a `contentDOM` for editable holes),
-2. on construction calls `$portals.nodeView(dom, { node, updateAttributes, getPos, selected, editor })` — mounting the consumer's framework fragment into the engine-owned node DOM,
-3. implements `update(node)` to re-invoke the portal with fresh scope (the reactive-portal-slot variant — today's `$portals` is mount-once, so this needs the post-v1 reactive-portal evolution already noted in the portal-slot spike), and
+1. creates a host `dom` (and, for editable nodes, a `contentDOM` editable hole),
+2. on construction calls `$portals.nodeView(dom, { node, selected, updateAttributes, getPos, editor, contentDOM })` — mounting the consumer's framework fragment into the engine-owned node DOM,
+3. implements `update(node)` to re-invoke the portal's **reactive** handle (`{ update(scope), dispose() }`) with fresh scope — re-rendering the fragment **in place, no remount**, and
 4. `destroy()` calls the portal dispose handle.
 
-**Why it's deferred, not shipped now.** This is the **3-strikes-risk primitive** (per the port brief). Two hard parts: (a) `$portals` is mount-once today — node views need per-transaction re-render, so this rides on the planned reactive-portal-slot upgrade; (b) the `contentDOM` editable-hole bridge across the weaker Lit/Solid emitters is unproven. It is a multi-wave spike, not a single wave — shipping the editor + `toolbar` slot now and deferring node views (with this design recorded) is the disciplined call.
+**The reactive primitive.** Node views need per-transaction re-render (selection / attribute changes), so they ride on the **reactive portal-slot primitive** shipped in this phase: `<slot name="nodeView" portal reactive />` whose closure returns `{ update(scope), dispose() }`. The driver is **engine-driven** — ProseMirror's `NodeView.update`/`selectNode`/`deselectNode` lifecycle maps 1:1 onto `update(scope)`; Rozie owns no reactive loop. The 3 pre-existing mount-once slots (CM6 `panel`, Chart `tooltip`, TipTap `toolbar`) keep the verbatim `() => void` shape — zero churn.
 
-**Decision needed from the owner:** confirm the reactive-portal-slot upgrade is in scope for Phase 33 (it's the prerequisite), or scope node views to a **static** (mount-once) variant first (renders once, no per-transaction attribute reactivity — useful for non-interactive embeds, ships sooner).
+**The contentDOM editable-hole bridge (REQ-23).** An editable node exposes both a chrome `dom` and a ProseMirror-managed `contentDOM`. The consumer fragment renders chrome wrapping a `[data-rozie-hole]` placeholder; the per-target bridge grafts `contentDOM` into that hole, after which ProseMirror owns that subtree. The graft splits the six targets by **ref-timing**:
 
-### 2. Bubble / Floating menu slots (G2)
+- **React / Solid / Lit** — graft via the native `ref` idiom (synchronous-within-render).
+- **Vue / Svelte / Angular** — graft via **query-after-render** (`dom.querySelector('[data-rozie-hole]')` after the synchronous mount), because their function-ref / action / template-query timing is post-mount.
+
+**Cross-framework reach.** The same `TipTap.rozie` source ships node views into **Solid** (where `solid-tiptap` has none) and **Lit** (where no wrapper exists) — the two frameworks the official ecosystem leaves to hand-rolling. The reactive-chrome-around-editable-hole composition was verified once in a real TipTap document (REQ-24), with **Angular as the first-class live-browser proof target (REQ-25)**.
+
+See the [TipTap guide's Node-view slots section](/guide/tiptap#node-view-slots) for the per-target consumer shapes and the editable-hole recipe.
+
+## Deferred follow-ups (G2 / G3 / G4)
+
+These remain out of Phase 33 scope and are tracked for a follow-up phase.
+
+### Bubble / Floating menu slots (G2)
 
 A `bubbleMenu` and `floatingMenu` portal slot over `@tiptap/extension-bubble-menu` / `@tiptap/extension-floating-menu` (both Floating-UI-based in v3). Lower risk than node views — the menu's DOM is a single positioned element, a natural portal host (the same shape as the shipped `toolbar` slot, plus a selection-driven `shouldShow`). Adds the two extension peers.
 
-### 3. Bundle Placeholder (G3 — cheap, high-value)
+### Bundle Placeholder (G3 — cheap, high-value)
 
-Add `@tiptap/extension-placeholder` (or `@tiptap/extensions`, which ships Placeholder in v3) as a peer, and wire the existing `placeholder` prop to `Placeholder.configure({ placeholder })` so empty-state placeholder rendering works without the consumer adding it via `:extensions`. **Recommended to do first** — it's a one-extension add that closes a paper-cut every consumer hits.
+Add `@tiptap/extension-placeholder` (or `@tiptap/extensions`, which ships Placeholder in v3) as a peer, and wire the existing `placeholder` prop to `Placeholder.configure({ placeholder })` so empty-state placeholder rendering works without the consumer adding it via `:extensions`. A one-extension add that closes a paper-cut every consumer hits; works today via `:extensions`.
 
-### 4. JSON content format (G4)
+### JSON content format (G4)
 
 A `format` prop (`'html'` default | `'json'`) that switches the two-way `html`/`json` model payload and the `update` event shape — matching `ngx-tiptap`'s `outputFormat`. `getJSON()` already exists on the handle, so this is a small source change.
 
 ## Honest caveats
 
-- **Node views and menus are not shipped yet** — if your use case centres on custom node views (mentions, embeds, interactive widgets), the official React/Vue wrappers (or `ngx-tiptap` / `svelte-tiptap`) are more complete *today*. Rozie's wedge is the **uniform cross-framework editor + toolbar + command handle + two-way binding**, and especially **reach into Solid and Lit** where the ecosystem is thin-to-absent.
-- **`@rozie-ui/tiptap` is `0.1.0`** — the surface (8 props / 4 events / 14-verb handle / `toolbar` slot) is stable and gate-verified, but it is younger than the multi-year official wrappers.
+- **Node views ship; bubble/floating menus do not yet** — as of Phase 33 the `nodeView` reactive portal slot is shipped 6/6 (mention chips, embeds, editable callouts). The remaining gap is **bubble / floating menus** (G2): if your use case needs selection-anchored menu UI, the official React/Vue wrappers (or `ngx-tiptap` / `svelte-tiptap`) are more complete *today*. Rozie's wedge is the **uniform cross-framework editor + toolbar + node views + command handle + two-way binding**, and especially **reach into Solid and Lit** where the ecosystem is thin-to-absent.
+- **`@rozie-ui/tiptap` is `0.1.0`** — the surface (8 props / 4 events / 14-verb handle / `toolbar` slot + `nodeView` reactive slot) is stable and gate-verified, but it is younger than the multi-year official wrappers.
 - **Single StarterKit baseline** — the bundled extension set is StarterKit; everything else comes through `:extensions`. That is by design (the consumer-extensibility passthrough), but it means richer setups carry more consumer wiring than a batteries-everything wrapper would.
 
 ## Cross-references
 
 - [TipTap — showcase & API](/guide/tiptap) — the full `@rozie-ui/tiptap` surface, quick starts, and recipes.
 - [`TipTap.rozie` source](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/tiptap/src/TipTap.rozie)
-- [The portal-slot primitive](/examples/portal-list) — the mechanism node-view slots will build on.
+- [The portal-slot primitive](/examples/portal-list) — the mechanism the `nodeView` reactive slot builds on.
