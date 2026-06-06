@@ -1,0 +1,87 @@
+{
+  "name": "@rozie-ui/codemirror-react",
+  "version": "0.1.0",
+  "type": "module",
+  "private": false,
+  "license": "MIT",
+  "description": "Idiomatic React code editor — one Rozie source compiled to React wrapping CodeMirror 6.",
+  "keywords": [
+    "rozie",
+    "rozie-ui",
+    "codemirror",
+    "editor",
+    "code-editor",
+    "component",
+    "react"
+  ],
+  "author": "One Learning Community (https://github.com/One-Learning-Community)",
+  "homepage": "https://github.com/One-Learning-Community/rozie.js#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/One-Learning-Community/rozie.js.git",
+    "directory": "packages/ui/codemirror/packages/react"
+  },
+  "bugs": {
+    "url": "https://github.com/One-Learning-Community/rozie.js/issues"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "dependencies": {
+    "@rozie/runtime-react": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": "^18.2 || ^19",
+    "react-dom": "^18.2 || ^19",
+    "@codemirror/state": "^6",
+    "@codemirror/view": "^6",
+    "@codemirror/commands": "^6",
+    "@codemirror/lang-javascript": "^6",
+    "@codemirror/theme-one-dark": "^6"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": false
+    },
+    "react-dom": {
+      "optional": false
+    },
+    "@codemirror/state": {
+      "optional": false
+    },
+    "@codemirror/view": {
+      "optional": false
+    },
+    "@codemirror/commands": {
+      "optional": false
+    },
+    "@codemirror/lang-javascript": {
+      "optional": false
+    },
+    "@codemirror/theme-one-dark": {
+      "optional": false
+    }
+  },
+  "devDependencies": {
+    "@types/react": "^18",
+    "@types/react-dom": "^18"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

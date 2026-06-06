@@ -1,0 +1,72 @@
+{
+  "name": "@rozie-ui/codemirror-vue",
+  "version": "0.1.0",
+  "type": "module",
+  "private": false,
+  "license": "MIT",
+  "description": "Idiomatic Vue code editor — one Rozie source compiled to Vue wrapping CodeMirror 6.",
+  "keywords": [
+    "rozie",
+    "rozie-ui",
+    "codemirror",
+    "editor",
+    "code-editor",
+    "component",
+    "vue"
+  ],
+  "author": "One Learning Community (https://github.com/One-Learning-Community)",
+  "homepage": "https://github.com/One-Learning-Community/rozie.js#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/One-Learning-Community/rozie.js.git",
+    "directory": "packages/ui/codemirror/packages/vue"
+  },
+  "bugs": {
+    "url": "https://github.com/One-Learning-Community/rozie.js/issues"
+  },
+  "exports": {
+    ".": {
+      "import": "./src/CodeMirror.vue",
+      "types": "./src/CodeMirror.vue",
+      "default": "./src/CodeMirror.vue"
+    }
+  },
+  "files": [
+    "src"
+  ],
+  "peerDependencies": {
+    "vue": "^3.4",
+    "@codemirror/state": "^6",
+    "@codemirror/view": "^6",
+    "@codemirror/commands": "^6",
+    "@codemirror/lang-javascript": "^6",
+    "@codemirror/theme-one-dark": "^6"
+  },
+  "peerDependenciesMeta": {
+    "vue": {
+      "optional": false
+    },
+    "@codemirror/state": {
+      "optional": false
+    },
+    "@codemirror/view": {
+      "optional": false
+    },
+    "@codemirror/commands": {
+      "optional": false
+    },
+    "@codemirror/lang-javascript": {
+      "optional": false
+    },
+    "@codemirror/theme-one-dark": {
+      "optional": false
+    }
+  },
+  "scripts": {
+    "build": "echo 'ships source; no build'",
+    "typecheck": "echo 'source-only, no typecheck'"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

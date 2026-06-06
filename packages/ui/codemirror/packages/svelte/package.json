@@ -1,0 +1,76 @@
+{
+  "name": "@rozie-ui/codemirror-svelte",
+  "version": "0.1.0",
+  "type": "module",
+  "private": false,
+  "license": "MIT",
+  "description": "Idiomatic Svelte code editor — one Rozie source compiled to Svelte wrapping CodeMirror 6.",
+  "keywords": [
+    "rozie",
+    "rozie-ui",
+    "codemirror",
+    "editor",
+    "code-editor",
+    "component",
+    "svelte"
+  ],
+  "author": "One Learning Community (https://github.com/One-Learning-Community)",
+  "homepage": "https://github.com/One-Learning-Community/rozie.js#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/One-Learning-Community/rozie.js.git",
+    "directory": "packages/ui/codemirror/packages/svelte"
+  },
+  "bugs": {
+    "url": "https://github.com/One-Learning-Community/rozie.js/issues"
+  },
+  "exports": {
+    ".": {
+      "svelte": "./src/CodeMirror.svelte",
+      "types": "./src/CodeMirror.svelte",
+      "import": "./src/CodeMirror.svelte",
+      "default": "./src/CodeMirror.svelte"
+    }
+  },
+  "files": [
+    "src"
+  ],
+  "dependencies": {
+    "@rozie/runtime-svelte": "workspace:*"
+  },
+  "peerDependencies": {
+    "svelte": "^5",
+    "@codemirror/state": "^6",
+    "@codemirror/view": "^6",
+    "@codemirror/commands": "^6",
+    "@codemirror/lang-javascript": "^6",
+    "@codemirror/theme-one-dark": "^6"
+  },
+  "peerDependenciesMeta": {
+    "svelte": {
+      "optional": false
+    },
+    "@codemirror/state": {
+      "optional": false
+    },
+    "@codemirror/view": {
+      "optional": false
+    },
+    "@codemirror/commands": {
+      "optional": false
+    },
+    "@codemirror/lang-javascript": {
+      "optional": false
+    },
+    "@codemirror/theme-one-dark": {
+      "optional": false
+    }
+  },
+  "scripts": {
+    "build": "echo 'ships source; no build'",
+    "typecheck": "echo 'source-only, no typecheck'"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

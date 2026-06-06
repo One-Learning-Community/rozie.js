@@ -1,0 +1,76 @@
+{
+  "name": "@rozie-ui/codemirror-angular",
+  "version": "0.1.0",
+  "type": "module",
+  "private": false,
+  "license": "MIT",
+  "description": "Idiomatic Angular code editor — one Rozie source compiled to Angular wrapping CodeMirror 6.",
+  "keywords": [
+    "rozie",
+    "rozie-ui",
+    "codemirror",
+    "editor",
+    "code-editor",
+    "component",
+    "angular"
+  ],
+  "author": "One Learning Community (https://github.com/One-Learning-Community)",
+  "homepage": "https://github.com/One-Learning-Community/rozie.js#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/One-Learning-Community/rozie.js.git",
+    "directory": "packages/ui/codemirror/packages/angular"
+  },
+  "bugs": {
+    "url": "https://github.com/One-Learning-Community/rozie.js/issues"
+  },
+  "exports": {
+    ".": {
+      "types": "./src/CodeMirror.ts",
+      "import": "./src/CodeMirror.ts",
+      "default": "./src/CodeMirror.ts"
+    }
+  },
+  "files": [
+    "src"
+  ],
+  "peerDependencies": {
+    "@angular/core": "^19",
+    "@angular/common": "^19",
+    "@codemirror/state": "^6",
+    "@codemirror/view": "^6",
+    "@codemirror/commands": "^6",
+    "@codemirror/lang-javascript": "^6",
+    "@codemirror/theme-one-dark": "^6"
+  },
+  "peerDependenciesMeta": {
+    "@angular/core": {
+      "optional": false
+    },
+    "@angular/common": {
+      "optional": false
+    },
+    "@codemirror/state": {
+      "optional": false
+    },
+    "@codemirror/view": {
+      "optional": false
+    },
+    "@codemirror/commands": {
+      "optional": false
+    },
+    "@codemirror/lang-javascript": {
+      "optional": false
+    },
+    "@codemirror/theme-one-dark": {
+      "optional": false
+    }
+  },
+  "scripts": {
+    "build": "echo 'ships source; no build'",
+    "typecheck": "echo 'source-only, no typecheck'"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
