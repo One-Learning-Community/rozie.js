@@ -88,6 +88,20 @@ const EXAMPLES = [
   // deliberately NOT in this list (behavioral cell only — host-registered but
   // never a screenshot cell).
   'FullCalendarSlots',
+  // CodeMirrorScreenshot (added 2026-06-06, Phase 29 Plan 04, D-07 tier 2) — the
+  // content-STABLE CodeMirror screenshot demo. CONTRAST with the still-excluded
+  // date-floating/caret-flaky `CodeMirror` cell (behavioral-only, never in this
+  // matrix): `CodeMirrorScreenshotDemo.rozie` binds a FIXED doc + theme="light"
+  // and applies the `screenshotStable` EditorView.theme via :extensions — killing
+  // the `.cm-cursorLayer` blink animation, hiding the drawn/native caret, and
+  // suppressing the selection layer + active-line highlight — and never focuses
+  // the editor, so its render is deterministic and a stable
+  // `CodeMirrorScreenshot.png` baseline CAN exist. Per D-10 all 6 targets diff
+  // against the same shared `CodeMirrorScreenshot.png`. The baseline is owned by
+  // Plan 29-04 Task 3 (Linux-Docker regen); until it lands the cell baseline-gates
+  // to `test.fixme` via `baselineExists()` (never red) — no macOS-rendered PNG is
+  // committed here.
+  'CodeMirrorScreenshot',
   // PortalListStyled (added 2026-05-20, quick-task 260520-8iu) — Spike 004
   // string-`:style` + `@portal` VR coverage. PortalListStyledDemo fills a
   // `<template #item>` whose rows carry an object-form `:style` (the swatch
@@ -370,6 +384,27 @@ async function settleExample(
   // across all 6 targets.
   if (example === 'ExposeProbe') {
     await expect(page.locator('[data-testid="reset-via-handle"]')).toBeVisible();
+  }
+  // CodeMirrorScreenshot (Phase 29 D-07 tier 2): the CodeMirror wrapper mounts an
+  // EditorView into a host div on `$onMount`; CM6 lazily renders `.cm-line`
+  // children into `.cm-content` and measures its viewport ASYNCHRONOUSLY. Without
+  // an explicit wait the screenshot clips before the lines render. Wait for the
+  // FIXED seed doc to appear, then let CM's async measure settle before the clip.
+  // The demo applies the `screenshotStable` theme (caret/selection/active-line
+  // neutralized) + never focuses the editor, so once the content is present the
+  // capture is deterministic.
+  if (example === 'CodeMirrorScreenshot') {
+    await expect
+      .poll(
+        async () =>
+          (await page.locator('.cm-content').first().textContent()) ?? '',
+        { timeout: 5_000, intervals: [200, 400, 800] },
+      )
+      .toContain('greet');
+    // Let CM6's async viewport measure settle (one or two RAFs for a short
+    // fixed doc) before clipping. animations:'disabled' in toHaveScreenshot plus
+    // the screenshotStable blink-kill make this belt-and-suspenders.
+    await page.waitForTimeout(250);
   }
 }
 

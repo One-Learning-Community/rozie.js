@@ -64,6 +64,18 @@ export const EXAMPLES = [
   // editors to the same `$data.code` signal, so an edit in one round-
   // trips through the model emit path to the other.
   'CodeMirror',
+  // Phase 29 (codemirror) D-07 tier 2 — CodeMirrorScreenshot is the content-
+  // STABLE screenshot demo. Loader resolves to
+  // examples/demos/CodeMirrorScreenshotDemo.rozie (which imports
+  // ../../packages/ui/codemirror/src/CodeMirror.rozie). Where the date-floating
+  // `CodeMirror` cell above is BEHAVIORAL-only (registered as a host cell but NOT
+  // a matrix screenshot cell — CM6's blinking caret/selection/active-line +
+  // async measure make a raw capture flake), THIS demo binds a FIXED doc +
+  // theme="light" and applies the `screenshotStable` EditorView.theme via
+  // :extensions (caret/selection/active-line neutralized) and never focuses the
+  // editor, so a stable `CodeMirrorScreenshot.png` baseline CAN exist. Registered
+  // in matrix.spec.ts (auto-fixme until 29-04 Task 3 lands the Linux PNG).
+  'CodeMirrorScreenshot',
   // PortalListStyled (added 2026-05-20, quick-task 260520-8iu) — Spike 004
   // string-`:style` + `@portal` VR coverage. Loader resolves to
   // `examples/demos/PortalListStyledDemo.rozie` (which imports
@@ -215,6 +227,9 @@ export const LIT_TAGS: Record<Example, string> = {
   FullCalendar: 'rozie-full-calendar',
   LineChart: 'rozie-line-chart',
   CodeMirror: 'rozie-code-mirror',
+  // Phase 29 — the lit entry appends '-demo' → tag
+  // 'rozie-code-mirror-screenshot-demo' = kebab of CodeMirrorScreenshotDemo.
+  CodeMirrorScreenshot: 'rozie-code-mirror-screenshot',
   PortalListStyled: 'rozie-portal-list-styled',
   // Engine-wrapper demos — canonical kebab tag; the lit entry appends `-demo`.
   SortableList: 'rozie-sortable-list',
@@ -312,6 +327,9 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // CodeMirror wrapper itself takes `value` (model: true) / `theme` / etc.
   // but the demo wrapper is self-contained.
   CodeMirror: {},
+  // CodeMirrorScreenshotDemo seeds its own FIXED doc string + the screenshotStable
+  // theme (via :extensions) inside the demo's <script>; no parent props needed.
+  CodeMirrorScreenshot: {},
   // PortalListStyledDemo carries its 4-item array in <data>; no props needed.
   PortalListStyled: {},
   // Engine-wrapper demos — each <Name>Demo carries its reactive state in
