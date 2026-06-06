@@ -24,14 +24,22 @@
     - $expose (14): getEditor, focusEditor, blurEditor, getHTML, getJSON,
                   setContent, clearContent, toggleBold, toggleItalic,
                   toggleHeading, toggleBulletList, undo, redo, chain
-    - slots (1):  `toolbar` portal slot (consumer toolbar bound to the editor)
+    - slots (2):  `toolbar` portal slot (consumer toolbar bound to the editor) +
+                  `nodeView` REACTIVE portal slot (consumer fragment rendered as a
+                  custom ProseMirror node — both a non-editable @mention atom chip
+                  and an editable [data-rozie-hole] contentDOM callout)
 
   The `editorProps` (ProseMirror) and `extensions` (extra TipTap extensions
   merged onto StarterKit) props are the consumer-extensibility passthroughs —
   the analog of CodeMirror's `:extensions` and Chart.js's `:plugins`.
 
-  Node-view portal slots (rendering a framework component as a custom
-  ProseMirror node) are DEFERRED to a follow-up — see docs/guide/tiptap-comparison.md.
+  Node-view portal slots (Phase 33) render a framework component as a custom
+  ProseMirror node — the marquee TipTap differentiator. The `nodeView` slot is
+  the FIRST shipped REACTIVE portal slot: it re-renders the consumer fragment in
+  place on every transaction. Two node views ship, proving both halves of the
+  primitive — a non-editable @mention atom chip (Spike 009 / REQ-26) and an
+  editable contentDOM callout whose [data-rozie-hole] placeholder is grafted by
+  the per-target bridge (Spike 008 / REQ-23). See docs/guide/tiptap-comparison.md.
 -->
 
 <rozie name="TipTap" inherit-attrs="false" inherit-listeners="false">
@@ -62,7 +70,7 @@
 </data>
 
 <script>
-import { Editor } from '@tiptap/core'
+import { Editor, Node } from '@tiptap/core'
 import StarterKit from '@tiptap/starter-kit'
 
 // The live editor instance — null before mount / after destroy. Named `editor`
@@ -98,17 +106,141 @@ const refreshActive = () => {
   }
 }
 
+// ── Reactive node-view portal slot (Phase 33 — the FIRST shipped `reactive`
+// portal slot, the marquee TipTap differentiator). When the consumer fills the
+// `nodeView` slot, two custom ProseMirror nodes render the consumer fragment as
+// a custom node *in-engine*, re-rendering it in place on every transaction via
+// the reactive handle `$portals.nodeView(dom, scope) => { update, dispose }`
+// (REQ-22). Both halves of the primitive are proven and shipped here:
+//
+//   1. `mention` — a NON-EDITABLE inline ATOM (selectable:true, no contentDOM,
+//      Spike 009 / REQ-26). selectNode/deselectNode/update(node) → handle.update
+//      so the chip re-renders in place (engine-driven; no Rozie reactive loop).
+//
+//   2. `callout` — an EDITABLE BLOCK (content:'inline*', so it HAS a contentDOM,
+//      Spike 008 / REQ-23). ProseMirror owns the editable hole; the consumer
+//      fragment renders chrome wrapping a [data-rozie-hole] placeholder and the
+//      per-target portal bridge grafts contentDOM into that hole — native-ref on
+//      React/Solid/Lit, querySelector-after-render on Vue/Svelte/Angular. The
+//      .rozie source merely passes `contentDOM` in scope; the graft mechanism is
+//      PER-TARGET and lives in the emitted portal bridge, not here.
+//
+// $portals.nodeView is referenced ONLY inside $onMount/the addNodeView closures
+// (the $refs-only-in-onMount + bundled-leaf strict-typecheck discipline — the
+// same constraint the toolbar slot follows). `makeNodeViewExtensions` is invoked
+// from inside $onMount so the `nv` closure (capturing $portals.nodeView) is
+// constructed within the mount lifecycle.
+const makeNodeView = (nv, editable) => (props) => {
+  const { node, getPos, editor: ed } = props
+  // engine-owned outer host the consumer fragment mounts into.
+  const dom = document.createElement(editable ? 'div' : 'span')
+  dom.className = editable ? 'rozie-tiptap-nodeview rozie-tiptap-nodeview--block' : 'rozie-tiptap-nodeview rozie-tiptap-nodeview--inline'
+  // EDITABLE nodes own a ProseMirror-managed contentDOM; the bridge grafts it
+  // into the consumer fragment's [data-rozie-hole]. ATOM nodes have none.
+  const contentDOM = editable ? document.createElement(dom.tagName === 'DIV' ? 'div' : 'span') : null
+  if (contentDOM) contentDOM.className = 'rozie-tiptap-nodeview-content'
+
+  const updateAttributes = (attrs) => {
+    if (typeof getPos !== 'function') return
+    const pos = getPos()
+    if (pos == null) return
+    ed.view.dispatch(ed.view.state.tr.setNodeMarkup(pos, undefined, { ...node.attrs, ...attrs }))
+  }
+
+  const buildScope = (n, selected) => ({
+    node: n,
+    selected,
+    updateAttributes,
+    getPos,
+    editor: ed,
+    ...(contentDOM ? { contentDOM } : {}),
+  })
+
+  // Reactive handle — { update, dispose }. The fragment mounts ONCE; every
+  // engine transaction re-invokes handle.update(scope) re-rendering IN PLACE.
+  const handle = nv(dom, buildScope(node, false))
+
+  return {
+    dom,
+    ...(contentDOM ? { contentDOM } : {}),
+    // attr / content change for THIS node → re-render the fragment in place,
+    // keep the view (return true). The new node identity is forwarded so the
+    // fragment reads fresh node.attrs (REQ-26).
+    update(nextNode) {
+      if (nextNode.type !== node.type) return false
+      handle.update(buildScope(nextNode, false))
+      return true
+    },
+    // NodeSelection enters/leaves the node → toggle `selected` in scope so the
+    // chip's selected styling is pure engine-driven reactive `update`.
+    selectNode() {
+      handle.update(buildScope(node, true))
+    },
+    deselectNode() {
+      handle.update(buildScope(node, false))
+    },
+    destroy() {
+      handle.dispose()
+    },
+  }
+}
+
+// Build the two custom Nodes bound to the reactive nodeView portal. Takes the
+// per-target `$portals.nodeView` (captured here so the reference stays inside
+// the mount lifecycle — never top-level, per the bundled-leaf typecheck rule).
+const makeNodeViewExtensions = (nv) => {
+  // (1) NON-EDITABLE inline atom @mention chip (Spike 009 / REQ-26).
+  const Mention = Node.create({
+    name: 'rozieMention',
+    group: 'inline',
+    inline: true,
+    atom: true,
+    selectable: true,
+    addAttributes: () => ({
+      id:    { default: null },
+      label: { default: '' },
+    }),
+    parseHTML: () => [{ tag: 'span[data-rozie-mention]' }],
+    renderHTML: ({ HTMLAttributes }) => ['span', { 'data-rozie-mention': '', ...HTMLAttributes }, 0],
+    addNodeView: () => makeNodeView(nv, false),
+  })
+
+  // (2) EDITABLE block callout with a contentDOM hole (Spike 008 / REQ-23).
+  const Callout = Node.create({
+    name: 'rozieCallout',
+    group: 'block',
+    content: 'inline*',
+    defining: true,
+    addAttributes: () => ({
+      tone: { default: 'info' },
+    }),
+    parseHTML: () => [{ tag: 'div[data-rozie-callout]' }],
+    renderHTML: ({ HTMLAttributes }) => ['div', { 'data-rozie-callout': '', ...HTMLAttributes }, 0],
+    addNodeView: () => makeNodeView(nv, true),
+  })
+
+  return [Mention, Callout]
+}
+
 $onMount(() => {
   lastHtml = $props.html
+
+  // Register the reactive node-view nodes ONLY when the consumer fills the
+  // `nodeView` slot — an unfilled slot adds no custom nodes (zero overhead, no
+  // unused $portals.nodeView reference fired). $portals.nodeView is captured
+  // here inside the mount body and passed into the node factory, keeping the
+  // reference scoped to the mount lifecycle (the toolbar-slot discipline).
+  const nodeViewExtensions = $slots.nodeView ? makeNodeViewExtensions($portals.nodeView) : []
 
   editor = new Editor({
     element:    $refs.editorEl,
     content:    $props.html,
     editable:   $props.editable,
     autofocus:  $props.autofocus,
-    // StarterKit first; consumer extensions LAST so they win (TipTap applies
-    // later-registered extensions over earlier ones for the same node/mark).
-    extensions: [StarterKit, ...$props.extensions],
+    // StarterKit first; the reactive node-view nodes next; consumer extensions
+    // LAST so they win (TipTap applies later-registered extensions over earlier
+    // ones for the same node/mark).
+    extensions: [StarterKit, ...nodeViewExtensions, ...$props.extensions],
     editorProps: {
       attributes: {
         'aria-label': $props.ariaLabel,
@@ -265,6 +397,28 @@ $expose({
   dispose handle the wrapper calls on unmount. ROZ127-clean: `toolbar` ≠ any prop.
 -->
 <slot name="toolbar" portal :params="['editor']" />
+<!--
+  Reactive node-view portal slot (Phase 33 — the FIRST shipped `reactive` portal
+  slot). Declared but NOT rendered inline; per-target template emitters skip it.
+  It exists to declare the consumer-facing render-prop / scoped-slot / contentChild
+  shape (per target) for a CUSTOM ProseMirror NODE. Invoked from the addNodeView
+  closures via $portals.nodeView(dom, scope) where scope carries the live node
+  state; the per-target portal bridge mounts the consumer fragment into the
+  engine-owned node DOM and returns a { update, dispose } handle (the reactive
+  variant — re-renders IN PLACE on every transaction, no remount).
+
+  For an EDITABLE node (the `callout`), the consumer fragment renders chrome
+  WRAPPING a `[data-rozie-hole]` placeholder element; the per-target bridge grafts
+  the engine-owned `contentDOM` (in scope) into that hole — native ref on
+  React/Solid/Lit, querySelector-after-render on Vue/Svelte/Angular (REQ-23).
+  ProseMirror then owns + manages the editable subtree; the framework must never
+  reconcile it away. For the NON-EDITABLE `mention` atom, `contentDOM` is absent
+  and the chip is purely a reactive read of `node.attrs` + `selected` (REQ-26).
+
+  ROZ127-clean: `nodeView` ≠ any prop name (html/editable/placeholder/autofocus/
+  editorClass/ariaLabel/editorProps/extensions).
+-->
+<slot name="nodeView" portal reactive :params="['node', 'selected', 'updateAttributes', 'getPos', 'editor', 'contentDOM']" />
 </template>
 
 <style>
