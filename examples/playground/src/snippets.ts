@@ -195,7 +195,9 @@ const BUNDLE_DECLS: readonly BundleDecl[] = [
     key: 'bundle/TipTapDemo',
     label: 'bundle/TipTapDemo',
     entryGlobPath: '../../demos/TipTapDemo.rozie',
-    dependencyGlobPaths: ['../../TipTap.rozie'],
+    // Phase 32 — TipTap.rozie moved into @rozie-ui/tiptap (was ../../TipTap.rozie).
+    // KEEP-THE-URL: snippet key stays bundle/TipTapDemo.
+    dependencyGlobPaths: ['../../../packages/ui/tiptap/src/TipTap.rozie'],
   },
   {
     key: 'bundle/UppyDemo',

@@ -135,6 +135,13 @@ export default defineConfig({
             { text: 'Chart.js libraries comparison', link: '/guide/chartjs-comparison' },
           ],
         },
+        {
+          text: '@rozie-ui/tiptap',
+          items: [
+            { text: 'TipTap — showcase & API', link: '/guide/tiptap' },
+            { text: 'TipTap libraries comparison', link: '/guide/tiptap-comparison' },
+          ],
+        },
       ],
       '/compatibility': [
         {

@@ -81,6 +81,17 @@ const CHARTJS_SRC = resolve(
   'chartjs',
   'src',
 );
+// Same packaging move for @rozie-ui/tiptap (Phase 32): TipTap.rozie lives in the
+// package src; the Angular sub-build walks it via `prebuildExtraRoots` and drops
+// the same cross-tree `.rozie.ts` + `TipTap.ts` shim artefacts that must be swept
+// after the Angular build (see cleanupCrossTreeAngularArtifacts).
+const TIPTAP_SRC = resolve(
+  REPO_ROOT,
+  'packages',
+  'ui',
+  'tiptap',
+  'src',
+);
 const REFERENCE_BASENAMES = [
   'Counter',
   'SearchInput',
@@ -254,6 +265,20 @@ function cleanupCrossTreeAngularArtifacts() {
     // chartjs src always exists post-port — defensive only
   }
   rmSync(resolve(CHARTJS_SRC, 'Chart.ts'), { force: true });
+  // Same sweep for @rozie-ui/tiptap's package src (TipTapDemo composes TipTap via
+  // <components>, so the Angular sub-build emits TipTap.rozie.ts + the TipTap.ts
+  // shim here). Leftovers (the emitted .rozie.ts imports @angular/core) poison the
+  // later solid/lit builds.
+  try {
+    for (const entry of readdirSync(TIPTAP_SRC)) {
+      if (entry.endsWith('.rozie.ts')) {
+        rmSync(resolve(TIPTAP_SRC, entry), { force: true });
+      }
+    }
+  } catch {
+    // tiptap src always exists post-port — defensive only
+  }
+  rmSync(resolve(TIPTAP_SRC, 'TipTap.ts'), { force: true });
 }
 
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'];
