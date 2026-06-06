@@ -385,6 +385,24 @@ export interface SlotFillerDecl {
    * (back-compat; non-Lit targets ignore it).
    */
   producerPropCollision?: boolean;
+  /**
+   * Phase 33 / REQ-26 — threaded from producer SlotDecl.isReactive via
+   * threadParamTypes. True iff the matching producer slot is BOTH a portal AND
+   * carries the opt-in `reactive` flag (`<slot name="X" portal reactive />`).
+   *
+   * The Solid consumer-side emitSlotFiller is the ONLY target that reads this:
+   * a reactive portal slot's scope is passed to the consumer fill as a Solid
+   * `Accessor` (a `() => scope` getter backed by the producer's signal), NOT a
+   * pre-destructured value object. So the Solid filler must emit the arrow as
+   * `(scopeAcc) => …body…` and rewrite each scope-param read to
+   * `scopeAcc().<param>` so every read re-tracks on `setScopeSig` → the
+   * consumer fragment re-renders IN PLACE (no remount). Mount-once portal slots
+   * (isReactive falsy) keep the byte-identical destructured-value shape.
+   *
+   * Cross-target: every target other than Solid ignores this flag entirely;
+   * undefined === false (back-compat).
+   */
+  isReactive?: boolean;
 }
 
 /**

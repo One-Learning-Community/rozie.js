@@ -53,8 +53,18 @@ export function emitSlotDecl(ir: IRComponent): EmitSlotDeclResult {
       const ctxName = pascal + 'SlotCtx';
 
       if (hasCtx) {
+        // Phase 33 / REQ-26 — a REACTIVE portal slot passes its scope as a Solid
+        // Accessor (`() => ctx`), not a value: the producer's `slot(scopeSig)`
+        // hands the consumer the signal accessor so reads re-track on update →
+        // in-place re-render. So the slot prop type is `(ctx: () => CtxType)`.
+        // Mount-once portals + plain scoped slots keep the value form below
+        // (byte-identical — undefined isReactive === false).
+        const ctxParamType =
+          slot.isPortal === true && slot.isReactive === true
+            ? `() => ${ctxName}`
+            : ctxName;
         // Named slot WITH context → function-prop signature per D-132.
-        fields.push(`  ${slotFieldName}?: (ctx: ${ctxName}) => JSX.Element;`);
+        fields.push(`  ${slotFieldName}?: (ctx: ${ctxParamType}) => JSX.Element;`);
 
         // Emit a standalone interface for the ctx (deduplicated).
         if (!seenInterfaces.has(ctxName)) {

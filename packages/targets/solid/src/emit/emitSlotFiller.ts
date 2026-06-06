@@ -88,14 +88,59 @@ function paramsDestructure(filler: SlotFillerDecl): string {
 }
 
 /**
+ * Phase 33 / REQ-26 — internal accessor identifier the reactive-portal fill
+ * arrow binds the scope to. Chosen to never collide with author param names
+ * (the leading `_rozie` prefix is reserved emitter namespace).
+ */
+const REACTIVE_SCOPE_ACCESSOR_IDENT = '_rozieScope';
+
+/**
+ * Is this filler a REACTIVE portal slot fill with scope params? Only then does
+ * the Solid consumer switch to the accessor-scope arrow form (the producer's
+ * reactive portal passes scope as a `() => scope` accessor, not a value).
+ */
+function isReactivePortalFill(filler: SlotFillerDecl): boolean {
+  return (
+    filler.isPortal === true &&
+    filler.isReactive === true &&
+    filler.params.length > 0
+  );
+}
+
+/**
+ * Build the scope-accessor rewrite map for a reactive portal fill: each local
+ * binding name (bindAs when renamed, else the param name) → the scope PROPERTY
+ * it resolves to (always the param's declared `name`). Threaded onto the body
+ * emit ctx so bare param reads become `_rozieScope().<prop>` (in-place re-render).
+ */
+function buildScopeAccessorParams(
+  filler: SlotFillerDecl,
+): { accessorIdent: string; params: ReadonlyMap<string, string> } {
+  const params = new Map<string, string>();
+  for (const p of filler.params) {
+    const localName = p.bindAs ?? p.name;
+    params.set(localName, p.name);
+  }
+  return { accessorIdent: REACTIVE_SCOPE_ACCESSOR_IDENT, params };
+}
+
+/**
  * Render the body of one filler as a JSX fragment string. Wraps multi-node
  * bodies in `<>…</>`; single nodes pass through verbatim.
  *
  * The body is the SlotFillerDecl.body — already-lowered TemplateNode[].
+ *
+ * For a REACTIVE portal fill, the body emit ctx carries `scopeAccessorParams`
+ * so scope-param reads lower to `_rozieScope().<prop>` (lazy, tracked) instead
+ * of bare destructured-value reads (statically captured) — the in-place
+ * re-render fix (REQ-26). Every other fill renders with the unchanged ctx.
  */
 function renderFillerBody(filler: SlotFillerDecl, ctx: EmitNodeCtx): string {
   const emitNodeFn = _emitTemplateNodeModule.emitNode;
-  const parts = filler.body.map((c) => emitNodeFn(c, ctx));
+  const bodyCtx: EmitNodeCtx = isReactivePortalFill(filler)
+    ? { ...ctx, scopeAccessorParams: buildScopeAccessorParams(filler) }
+    : ctx;
+  const parts = filler.body.map((c) => emitNodeFn(c, bodyCtx));
   const inner = parts.join('');
   // Wrap in a fragment so the arrow returns a single JSX expression.
   return `<>${inner}</>`;
@@ -140,6 +185,20 @@ export function emitSlotFiller(
     // between <Producer> … </Producer>.
     const inner = bodyJsx.slice(2, -3); // strip leading `<>` and trailing `</>`
     return { kind: 'children', text: inner };
+  }
+
+  // Phase 33 / REQ-26 — REACTIVE portal fill: the producer passes scope as a
+  // Solid Accessor (`() => scope`), so the arrow takes ONE accessor param and
+  // the body reads `_rozieScope().<param>` (rewritten via scopeAccessorParams in
+  // renderFillerBody). This is the in-place re-render fix — every scope read
+  // re-tracks on `setScopeSig`, so the consumer fragment updates without remount
+  // (matches Spike 009's proven `scope().label` chip). Mount-once portal fills
+  // and every non-reactive scoped slot keep the destructured-value shape below.
+  if (isReactivePortalFill(filler)) {
+    return {
+      kind: 'prop',
+      text: `${fieldName}={${REACTIVE_SCOPE_ACCESSOR_IDENT} => (${bodyJsx})}`,
+    };
   }
 
   // Scoped default OR named fill: arrow wrapper that destructures scoped

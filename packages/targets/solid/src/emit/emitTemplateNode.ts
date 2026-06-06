@@ -87,6 +87,17 @@ export interface EmitNodeCtx {
    * usage and the value passed to user code is the accessor function itself.
    */
   invokeAccessors?: ReadonlySet<string> | undefined;
+  /**
+   * Phase 33 / REQ-26 — reactive-portal scope-accessor rewrite, threaded onto
+   * the child ctx used to render a reactive portal slot fill body (see
+   * emitSlotFiller). Maps each consumer scope-param local name to the scope
+   * property it resolves to; bare reads are rewritten to `<accessor>().<prop>`
+   * so the fragment re-renders in place on `setScopeSig`. Undefined everywhere
+   * except inside a reactive portal fill body (back-compat).
+   */
+  scopeAccessorParams?:
+    | { accessorIdent: string; params: ReadonlyMap<string, string> }
+    | undefined;
 }
 
 function emitStaticText(node: TemplateStaticTextIR, _ctx: EmitNodeCtx): string {
@@ -96,6 +107,7 @@ function emitStaticText(node: TemplateStaticTextIR, _ctx: EmitNodeCtx): string {
 function emitInterpolation(node: TemplateInterpolationIR, ctx: EmitNodeCtx): string {
   const code = rewriteTemplateExpression(node.expression, ctx.ir, {
     invokeAccessors: ctx.invokeAccessors,
+      scopeAccessorParams: ctx.scopeAccessorParams,
   });
   // Phase 26 (D-06/D-07/A4) — the wrap sits INSIDE the JSX `{}` so Solid still
   // tracks the reactive accessor read (the accessor invocation lives in `code`).
@@ -592,9 +604,10 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
     }
     const exprCode = rewriteTemplateExpression(rHtmlAttr.expression, ctx.ir, {
       invokeAccessors: ctx.invokeAccessors,
+      scopeAccessorParams: ctx.scopeAccessorParams,
     });
     workingAttrs = workingAttrs.filter((a) => a !== rHtmlAttr);
-    const attrsResult = emitAttributes(workingAttrs, { ir: ctx.ir, collectors: ctx.collectors, invokeAccessors: ctx.invokeAccessors, elementTagKind: node.tagKind, tagName: node.tagName });
+    const attrsResult = emitAttributes(workingAttrs, { ir: ctx.ir, collectors: ctx.collectors, invokeAccessors: ctx.invokeAccessors, scopeAccessorParams: ctx.scopeAccessorParams, elementTagKind: node.tagKind, tagName: node.tagName });
     for (const d of attrsResult.diagnostics) ctx.diagnostics.push(d);
     const listenerResult = emitElementListeners(node, ctx);
     const headParts = [
@@ -614,6 +627,7 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
   if (rTextAttr && rTextAttr.kind === 'binding') {
     const exprCode = rewriteTemplateExpression(rTextAttr.expression, ctx.ir, {
       invokeAccessors: ctx.invokeAccessors,
+      scopeAccessorParams: ctx.scopeAccessorParams,
     });
     rTextChildren = `{${exprCode}}`;
     workingAttrs = workingAttrs.filter((a) => a !== rTextAttr);
@@ -627,6 +641,7 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
   if (rShowAttr && rShowAttr.kind === 'binding') {
     const exprCode = rewriteTemplateExpression(rShowAttr.expression, ctx.ir, {
       invokeAccessors: ctx.invokeAccessors,
+      scopeAccessorParams: ctx.scopeAccessorParams,
     });
     rShowStyleAttr = `style={{ display: (${exprCode}) ? '' : 'none' }}`;
     workingAttrs = workingAttrs.filter((a) => a !== rShowAttr);
@@ -644,7 +659,7 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
   }
 
   // Standard attribute emission
-  const attrsResult = emitAttributes(workingAttrs, { ir: ctx.ir, collectors: ctx.collectors, invokeAccessors: ctx.invokeAccessors, elementTagKind: node.tagKind, tagName: node.tagName });
+  const attrsResult = emitAttributes(workingAttrs, { ir: ctx.ir, collectors: ctx.collectors, invokeAccessors: ctx.invokeAccessors, scopeAccessorParams: ctx.scopeAccessorParams, elementTagKind: node.tagKind, tagName: node.tagName });
   for (const d of attrsResult.diagnostics) ctx.diagnostics.push(d);
 
   const listenerResult = emitElementListeners(node, ctx);
@@ -788,6 +803,7 @@ function emitMatchNode(node: TemplateMatchIR, ctx: EmitNodeCtx): string {
       : ladder;
     const discriminantCode = rewriteTemplateExpression(node.discriminant, ctx.ir, {
       invokeAccessors: ctx.invokeAccessors,
+      scopeAccessorParams: ctx.scopeAccessorParams,
     });
     const hoisted = `{(() => { const ${node.tempName} = ${discriminantCode}; return ${inner}; })()}`;
     if (node.hostElement !== undefined) {

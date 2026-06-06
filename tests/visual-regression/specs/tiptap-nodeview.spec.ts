@@ -40,21 +40,16 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'] as const;
 
-// Solid's reactive nodeView portal does NOT re-render the consumer fragment in
-// place on handle.update(scope): the emitter's `render(() => slot(scopeSig()),
-// container)` clones the fragment ONCE and the destructured scope params
-// (`({ node, selected }) => …`) are captured statically, so a subsequent
-// setScopeSig() does not re-run the per-attribute bindings. This is the
-// documented "Solid foreign-slot accessor limitation" (memory
-// project_next_round_more_examples) surfaced in-engine for the FIRST time by this
-// reactive proving wave — Spike 009 ran Solid with a HAND-WRITTEN accessor-based
-// chip (scope().label), which the cross-framework slot emit does not produce.
-// The other 5 targets (incl. the blocking Angular REQ-25) runtime-prove the
-// reactive primitive. Gated to test.fixme pending a Solid reactive-portal emitter
-// fix (re-render must read scope params as accessors, not destructured statics).
+// Phase 33-04 follow-up — the Solid reactive-portal emitter now passes the scope
+// as a SIGNAL ACCESSOR and the Solid consumer fill reads `_rozieScope().<param>`
+// inside the render computation, so every read re-tracks on setScopeSig → the
+// consumer fragment re-renders IN PLACE (no remount). This fixes the former
+// "Solid foreign-slot accessor limitation" (destructured `({ node, selected }) =>`
+// captured statically) that gated Solid to test.fixme. Solid now runtime-proves
+// the reactive primitive alongside the other 5 targets — REQ-26 is 6/6.
 const KNOWN_FAILING: ReadonlySet<(typeof TARGETS)[number]> = new Set<
   (typeof TARGETS)[number]
->(['solid']);
+>([]);
 
 for (const target of TARGETS) {
   const built = existsSync(

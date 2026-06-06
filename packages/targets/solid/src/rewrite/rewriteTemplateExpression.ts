@@ -114,6 +114,22 @@ export interface RewriteTemplateOpts {
    * (and silently producing wrong values at runtime).
    */
   invokeAccessors?: ReadonlySet<string> | undefined;
+  /**
+   * Phase 33 / REQ-26 — reactive-portal scope-param accessor rewrite. Maps each
+   * in-scope local param name (the consumer's bindAs/local name) to the SCOPE
+   * PROPERTY it resolves to. A bare reference to one of these locals is rewritten
+   * to `<scopeAccessorIdent>().<scopeProp>` so the read happens lazily inside the
+   * tracking computation each render — making the consumer fragment re-render IN
+   * PLACE on `setScopeSig` (no remount).
+   *
+   * Only the Solid reactive-portal consumer filler (emitSlotFiller) passes this,
+   * and only when the matching producer slot is `<slot portal reactive>`. Empty/
+   * undefined is the universal back-compat path (mount-once portals + every
+   * non-portal scoped slot keep the destructured-value shape).
+   */
+  scopeAccessorParams?:
+    | { accessorIdent: string; params: ReadonlyMap<string, string> }
+    | undefined;
 }
 
 /**
@@ -134,6 +150,7 @@ export function rewriteTemplateExpression(
   const refNames = new Set(ir.refs.map((r) => r.name));
   const slotNames = new Set(ir.slots.map((s) => s.name));
   const invokeAccessors = opts.invokeAccessors;
+  const scopeAccessor = opts.scopeAccessorParams;
 
   const wrapper = t.file(t.program([t.expressionStatement(cloned)]));
 
@@ -312,6 +329,42 @@ export function rewriteTemplateExpression(
 
     Identifier(path) {
       const name = path.node.name;
+
+      // Phase 33 / REQ-26 — reactive-portal scope-param accessor rewrite. A bare
+      // reference to a reactive-portal scope param (`node`, `selected`, …) is
+      // rewritten to `<accessor>().<scopeProp>` so the read tracks the scope
+      // signal each render → in-place re-render on update(scope). Runs FIRST so
+      // these locals never fall through to the computed/invokeAccessor branches.
+      if (scopeAccessor) {
+        const scopeProp = scopeAccessor.params.get(name);
+        if (scopeProp !== undefined) {
+          const parentPath = path.parentPath;
+          /* v8 ignore next -- defensive: a traversed Identifier always has a parentPath */
+          if (parentPath) {
+            // Skip property keys / shorthand keys — only VALUE positions rewrite.
+            const parentNode = parentPath.node;
+            const isMemberProp =
+              (t.isMemberExpression(parentNode) ||
+                t.isOptionalMemberExpression(parentNode)) &&
+              parentNode.property === path.node &&
+              !parentNode.computed;
+            const isObjectKey =
+              t.isObjectProperty(parentNode) &&
+              parentNode.key === path.node &&
+              !parentNode.computed;
+            if (!isMemberProp && !isObjectKey) {
+              path.replaceWith(
+                t.memberExpression(
+                  t.callExpression(t.identifier(scopeAccessor.accessorIdent), []),
+                  t.identifier(scopeProp),
+                ),
+              );
+              path.skip();
+              return;
+            }
+          }
+        }
+      }
 
       // Phase 14 D-04 — the `$attrs` magic accessor lowers to the bare `attrs`
       // identifier. The spread emitter decides this is a `$attrs` case BEFORE

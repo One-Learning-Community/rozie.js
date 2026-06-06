@@ -83,7 +83,7 @@ interface TipTapProps {
   onFocus?: (...args: unknown[]) => void;
   onBlur?: (...args: unknown[]) => void;
   toolbarSlot?: (ctx: ToolbarSlotCtx) => JSX.Element;
-  nodeViewSlot?: (ctx: NodeViewSlotCtx) => JSX.Element;
+  nodeViewSlot?: (ctx: () => NodeViewSlotCtx) => JSX.Element;
   slots?: Record<string, (ctx: any) => JSX.Element>;
   ref?: (h: TipTapHandle) => void;
 }
@@ -142,7 +142,7 @@ export default function TipTap(_props: TipTapProps): JSX.Element {
       // Spike 004: portal-scope attribute injection.
       container.setAttribute('data-rozie-portal-nodeView', '2aeee876');
       const [scopeSig, setScopeSig] = createSignal<unknown>(scope, { equals: false });
-      const dispose = render(() => slot(scopeSig() as { node: unknown; selected: unknown; updateAttributes: unknown; getPos: unknown; editor: unknown; contentDOM: unknown }), container);
+      const dispose = render(() => slot(scopeSig as unknown as (() => { node: unknown; selected: unknown; updateAttributes: unknown; getPos: unknown; editor: unknown; contentDOM: unknown })), container);
       portalDisposers.add(dispose);
       return {
         update: (s: unknown): void => {

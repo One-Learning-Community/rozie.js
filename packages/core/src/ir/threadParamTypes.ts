@@ -283,6 +283,12 @@ export function threadParamTypes(
       // upstream pass ever pre-seeded the filler.
       filler.isPortal = matchingSlot.isPortal === true;
       filler.producerSlotParamCount = matchingSlot.params.length;
+      // Phase 33 / REQ-26 — thread the producer slot's opt-in `reactive` flag so
+      // the Solid consumer-side filler can switch to the accessor-scope form (the
+      // reactive portal passes scope as a `() => scope` accessor, not a
+      // pre-destructured value). Symmetric overwrite (WR-05 rationale) — the
+      // producer slot is the single source of truth. Non-Solid targets ignore it.
+      filler.isReactive = matchingSlot.isReactive === true;
       // Lit-target member disambiguation: when the producer declares a same-named
       // prop, its portal-slot @property bridge member is suffixed with `Slot`
       // (collision-gated). The Lit consumer must emit `.<name>Slot=` to match.

@@ -134,7 +134,14 @@ describe('emitPortals — Solid', () => {
     expect(result.setupLines).toContain('ReactivePortalHandle => {');
     // REQ-20: signal seeded with { equals: false }.
     expect(result.setupLines).toContain('createSignal<unknown>(scope, { equals: false })');
-    expect(result.setupLines).toContain('render(() => slot(scopeSig()');
+    // REQ-26: the consumer slot receives the scope SIGNAL ACCESSOR (`scopeSig`),
+    // NOT its current value (`scopeSig()`). The reactive consumer fill reads
+    // `_rozieScope().<param>` inside the render computation so each read re-tracks
+    // on setScopeSig → in-place re-render (no remount). Passing the value would
+    // statically capture the consumer's destructured params (the foreign-slot
+    // accessor limitation the fix removes).
+    expect(result.setupLines).toContain('render(() => slot(scopeSig as unknown as (() => ');
+    expect(result.setupLines).not.toContain('slot(scopeSig()');
     expect(result.setupLines).toContain('setScopeSig(s)');
     expect(result.setupLines).toContain('dispose: (): void => {');
     // emitScript must add createSignal to the solid-js import.

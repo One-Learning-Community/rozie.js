@@ -103,7 +103,16 @@ function buildReactiveSlotMethod(slot: SlotDecl, scopeHash: string): string {
     `    if (typeof slot !== 'function') return { update() {}, dispose() {} };\n` +
     setAttrLine(slotName, scopeHash) +
     `    const [scopeSig, setScopeSig] = createSignal<unknown>(scope, { equals: false });\n` +
-    `    const dispose = render(() => slot(scopeSig() as ${scopeType}), container);\n` +
+    // Phase 33 / REQ-26 — pass the scope SIGNAL ACCESSOR to the consumer slot,
+    // NOT its current value. The reactive consumer fill (emitSlotFiller) takes
+    // `(_rozieScope) => …` and reads `_rozieScope().<param>` inside the render
+    // computation, so every read re-tracks on `setScopeSig` → the fragment
+    // re-renders IN PLACE (no remount). Passing the value (`scopeSig()`) would
+    // statically capture the consumer's destructured params and never re-render
+    // (the foreign-slot accessor limitation). `slot` is typed `(s) => Element`;
+    // the accessor is the `s` the consumer invokes. Matches Spike 009's proven
+    // `mountSolidChip(dom, scope)` where the chip reads `scope().label`.
+    `    const dispose = render(() => slot(scopeSig as unknown as (() => ${scopeType})), container);\n` +
     `    portalDisposers.add(dispose);\n` +
     `    return {\n` +
     `      update: (s: unknown): void => {\n` +
