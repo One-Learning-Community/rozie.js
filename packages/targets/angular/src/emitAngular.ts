@@ -126,6 +126,192 @@ function buildHandlerArityMap(program: File): Map<string, number> {
   return arity;
 }
 
+/**
+ * Angular-only (template≠module scope alias). Of the `<script>` VALUE-import
+ * local names in `valueImportNames`, return those referenced as a BARE,
+ * FREE identifier inside any template-context expression — the IR template tree
+ * (attribute/property bindings, `@event` handler + `when` expressions,
+ * `r-on`/`r-bind` spreads, interpolations, `r-if`/`r-for`/`r-show`/`r-match`
+ * structural-directive expressions, `:key`, slot args) AND the `<listeners>`
+ * block (`when` + `handler`).
+ *
+ * The detection is AST-based (NOT a scan of the rendered template string): it
+ * harvests `t.Identifier` nodes in read position from each collected
+ * `t.Expression`, so an import name that merely appears inside a STRING literal
+ * — a CSS class (`class="rozie-flatpickr"`) or a static attribute value — never
+ * counts. A string scan would false-positive on those (the import is real but
+ * the reference is not), spuriously aliasing it and churning generated leaves.
+ *
+ * Excludes any name already declared as a component member (`classMembers`) —
+ * that is a pre-existing author-level name clash; aliasing it would emit a
+ * duplicate field.
+ *
+ * Returns names de-duplicated and sorted so the emitted alias block is
+ * deterministic.
+ */
+function detectTemplateReferencedImports(
+  valueImportNames: ReadonlySet<string>,
+  classMembers: ReadonlySet<string>,
+  ir: IRComponent,
+): string[] {
+  if (valueImportNames.size === 0) return [];
+
+  // Harvest every BARE identifier read-reference from a single Expression.
+  // Skips: member-property positions (`a.listPlugin` — the `.listPlugin` part),
+  // non-computed object keys (`{ listPlugin: 1 }`), and pattern-binding
+  // positions (a destructured param / loop var named after an import). String
+  // literals are not Identifier nodes, so they are inherently excluded.
+  const harvested = new Set<string>();
+  const collectFromExpression = (expr: t.Expression | null | undefined): void => {
+    if (!expr) return;
+    const visit = (node: t.Node, parent: t.Node | null, key: string | null): void => {
+      if (t.isIdentifier(node)) {
+        // Member property: `obj.NAME` (non-computed) — not a free reference.
+        if (
+          parent &&
+          (t.isMemberExpression(parent) || t.isOptionalMemberExpression(parent)) &&
+          parent.property === node &&
+          !parent.computed
+        ) {
+          return;
+        }
+        // Non-computed object key: `{ NAME: … }` / method key.
+        if (
+          parent &&
+          (t.isObjectProperty(parent) || t.isObjectMethod(parent)) &&
+          parent.key === node &&
+          !parent.computed
+        ) {
+          return;
+        }
+        // Binding position: a pattern subtree (destructured param, loop var).
+        if (
+          parent &&
+          (t.isObjectProperty(parent) ||
+            t.isArrayPattern(parent) ||
+            t.isObjectPattern(parent) ||
+            t.isRestElement(parent) ||
+            t.isAssignmentPattern(parent)) &&
+          // `key === 'value' | 'elements' | 'argument' | 'left'` are binding
+          // sides; only an AssignmentPattern's `right` is an expression side.
+          !(t.isAssignmentPattern(parent) && key === 'right')
+        ) {
+          return;
+        }
+        // Function param identifiers are bindings, not references.
+        if (parent && t.isFunction(parent) && key === 'params') return;
+        harvested.add(node.name);
+        return;
+      }
+      for (const k of t.VISITOR_KEYS[node.type] ?? []) {
+        const child = (node as unknown as Record<string, unknown>)[k];
+        if (Array.isArray(child)) {
+          for (const c of child) {
+            if (c && typeof c === 'object' && 'type' in c) {
+              visit(c as t.Node, node, k);
+            }
+          }
+        } else if (child && typeof child === 'object' && 'type' in child) {
+          visit(child as t.Node, node, k);
+        }
+      }
+    };
+    visit(expr, null, null);
+  };
+
+  // Walk the IR template tree, feeding every Expression-bearing field to the
+  // harvester. Mirrors the recursive TemplateNode union (lower.ts shapes).
+  const walkNode = (node: TemplateNode | null | undefined): void => {
+    if (!node) return;
+    switch (node.type) {
+      case 'TemplateElement': {
+        for (const attr of node.attributes) {
+          if (attr.kind === 'binding' || attr.kind === 'twoWayBinding') {
+            collectFromExpression(attr.expression);
+          } else if (attr.kind === 'spreadBinding') {
+            collectFromExpression(attr.expression);
+          } else if (attr.kind === 'interpolated') {
+            for (const seg of attr.segments) {
+              if (seg.kind === 'binding') collectFromExpression(seg.expression);
+            }
+          }
+        }
+        for (const ev of node.events) {
+          collectFromExpression(ev.when);
+          collectFromExpression(ev.handler);
+        }
+        for (const ls of node.listenerSpreads) {
+          collectFromExpression(ls.expression);
+        }
+        for (const filler of node.slotFillers ?? []) {
+          // `<template #[expr]>` dynamic-name expression.
+          collectFromExpression(filler.dynamicNameExpr);
+          // The filler body is a TemplateNode tree the consumer authored.
+          for (const child of filler.body) walkNode(child);
+        }
+        for (const child of node.children) walkNode(child);
+        return;
+      }
+      case 'TemplateConditional': {
+        for (const branch of node.branches) {
+          collectFromExpression(branch.test);
+          for (const child of branch.body) walkNode(child);
+        }
+        return;
+      }
+      case 'TemplateMatch': {
+        collectFromExpression(node.discriminant);
+        for (const branch of node.branches) {
+          collectFromExpression(branch.test);
+          for (const child of branch.body) walkNode(child);
+        }
+        if (node.hostElement) walkNode(node.hostElement);
+        return;
+      }
+      case 'TemplateLoop': {
+        collectFromExpression(node.iterableExpression);
+        collectFromExpression(node.keyExpression);
+        for (const child of node.body) walkNode(child);
+        return;
+      }
+      case 'TemplateSlotInvocation': {
+        for (const arg of node.args) collectFromExpression(arg.expression);
+        for (const child of node.fallback) walkNode(child);
+        return;
+      }
+      case 'TemplateFragment': {
+        for (const child of node.children) walkNode(child);
+        return;
+      }
+      case 'TemplateInterpolation': {
+        collectFromExpression(node.expression);
+        return;
+      }
+      case 'TemplateStaticText':
+        return;
+      default:
+        return;
+    }
+  };
+  walkNode(ir.template);
+
+  // `<listeners>`-block expressions (when + handler).
+  for (const l of ir.listeners) {
+    collectFromExpression(l.when);
+    collectFromExpression(l.handler);
+  }
+
+  const out: string[] = [];
+  for (const name of valueImportNames) {
+    // Collision guard: a prop / $data key / exposed method / existing member
+    // shadowing the import name is a pre-existing author clash — do NOT emit a
+    // duplicate field. (The import still works inside <script>.)
+    if (classMembers.has(name)) continue;
+    if (harvested.has(name)) out.push(name);
+  }
+  return out.sort();
+}
+
 export interface EmitAngularOptions {
   filename?: string | undefined;
   source?: string | undefined;
@@ -478,6 +664,29 @@ export function emitAngular(
   // Inject `const renderer = inject(Renderer2);` at the top of constructor
   // body when listener effect blocks are present. The fragment is spliced
   // right after `constructor() {\n` and before the existing body.
+  // Angular-only (template≠module scope) — alias every `<script>` VALUE-import
+  // whose local name is referenced inside a template-context expression (the
+  // emitted template OR the lowered `<listeners>` constructor body) to a
+  // `protected readonly <name> = <name>;` component field. Angular AOT resolves
+  // a bare template identifier against the component INSTANCE, but the import is
+  // hoisted to module scope and is not a class member — so without the alias the
+  // reference is `undefined` at runtime AND the import is tree-shaken (its only
+  // use lives in the separate template compilation context). The field name ===
+  // the import local name so the UNCHANGED bare template reference resolves
+  // against `this` (Angular templates reference members bare); `readonly` (not
+  // mutable) and `protected` (AOT template type-checking cannot see `private`).
+  // Imports used ONLY in `<script>` (not referenced in any template/listener
+  // expression) are NOT aliased — they already work via the module import; only
+  // template-referenced value imports need this. Collision-guarded against
+  // existing class members inside the detector. The other five targets emit
+  // NOTHING new (this whole block is Angular-only), so their output stays
+  // byte-identical.
+  const templateReferencedImports = detectTemplateReferencedImports(
+    scriptResult.valueImportNames,
+    classMembers,
+    ir,
+  );
+
   const allFieldInjections: string[] = [
     ...destroyRefSynthesised,
     ...listenersResult.fieldInitializers.map((fi) => fi.decl),
@@ -487,6 +696,9 @@ export function emitAngular(
     // as component members so Angular's `strictTemplates` resolves them
     // against the class instead of failing TS2339.
     ...tmplResult.usedGlobals.map((g) => `protected readonly ${g} = ${g};`),
+    // Angular-only — `<script>` value-imports referenced in template-context
+    // expressions, aliased to a `protected readonly` field (see block above).
+    ...templateReferencedImports.map((n) => `protected readonly ${n} = ${n};`),
     // Phase 26 (D-02) — the delegating `rozieDisplay` class method, synthesized
     // ONLY when an interpolation wrapped. The template calls it against `this`;
     // it forwards to the inlined module-scope `__rozieDisplay` (emitted below

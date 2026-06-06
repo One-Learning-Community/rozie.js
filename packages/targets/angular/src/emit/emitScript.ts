@@ -654,6 +654,17 @@ export interface EmitScriptResult {
    */
   userImports: string;
   /**
+   * Angular-only (template≠module scope alias) — local binding names of every
+   * VALUE `<script>` import specifier (type-only imports/specifiers excluded).
+   * emitAngular intersects this with the identifiers in the emitted template +
+   * listener expressions and emits a `protected readonly <name> = <name>;` alias
+   * field for each match, so a bare template reference to an imported symbol
+   * (`:options="{ plugins: [listPlugin] }"`) resolves against the component
+   * instance AND keeps the import live (Angular AOT tree-shakes a module-scope
+   * import whose only use lives in the separate template compilation context).
+   */
+  valueImportNames: Set<string>;
+  /**
    * Phase 06.1 P2 (D-100/D-101): per-expression child sourcemap produced by
    * generating the user-authored constructor-expression statements as a single
    * t.Program with sourceMaps:true. Maps generated positions back to .rozie
@@ -760,6 +771,7 @@ export function emitScript(
     userImports: userImportNodes,
     hoistedTypeDecls,
     bodyStmts,
+    valueImportNames,
   } = partitionUserImports(cloned);
   cloned.program.body = bodyStmts;
   const userImports =
@@ -1363,6 +1375,7 @@ export function emitScript(
     imports,
     interfaceDecls,
     userImports,
+    valueImportNames,
     scriptMap,
     preambleSectionLines,
     diagnostics,

@@ -51,6 +51,28 @@ export interface PartitionedUserImports {
   /** Top-level `ImportDeclaration` statements in source order. */
   userImports: t.ImportDeclaration[];
   /**
+   * Angular-only (template≠module scope alias). Local binding names of every
+   * VALUE import specifier (default, namespace, and named) across all
+   * `userImports`. EXCLUDES type-only imports (`import type …`, which TS erases)
+   * and type-only named specifiers (`import { type X }`).
+   *
+   * Angular AOT resolves a bare template-binding identifier against the
+   * COMPONENT INSTANCE, but these imports are hoisted to module scope and are
+   * not class members — so a `<script>` value-import referenced inside a
+   * template expression (`:options="{ plugins: [listPlugin] }"`) is `undefined`
+   * at runtime AND gets tree-shaken (its only reference lives in the separate
+   * template compilation context). The Angular emitter intersects this set with
+   * the identifiers appearing in the emitted template/listener expressions and
+   * emits a `protected readonly <name> = <name>;` alias field so the unchanged
+   * bare template reference resolves against `this` and the import stays live.
+   *
+   * The other five targets share one scope (React/Solid emit JSX in the import's
+   * module; Vue/Svelte are single-file; Lit's `html\`\`` is a class method in
+   * module scope), so they never read this — it is populated unconditionally but
+   * consumed Angular-only.
+   */
+  valueImportNames: Set<string>;
+  /**
    * Top-level `TSInterfaceDeclaration` / `TSTypeAliasDeclaration` statements
    * in source order. Class-based targets (Angular, Lit) emit these at module
    * scope — a type declaration inside a class body is a TS syntax error.
@@ -72,9 +94,24 @@ export function partitionUserImports(file: t.File): PartitionedUserImports {
     t.TSInterfaceDeclaration | t.TSTypeAliasDeclaration
   > = [];
   const bodyStmts: t.Statement[] = [];
+  const valueImportNames = new Set<string>();
   for (const stmt of file.program.body) {
     if (t.isImportDeclaration(stmt)) {
       userImports.push(stmt);
+      // A whole `import type … from …` declaration is type-only — TS erases it,
+      // so none of its locals can ever be a runtime value to alias.
+      if (stmt.importKind !== 'type') {
+        for (const spec of stmt.specifiers) {
+          // `import { type X }` named specifiers are also type-only.
+          if (
+            t.isImportSpecifier(spec) &&
+            spec.importKind === 'type'
+          ) {
+            continue;
+          }
+          valueImportNames.add(spec.local.name);
+        }
+      }
     } else if (
       t.isTSInterfaceDeclaration(stmt) ||
       t.isTSTypeAliasDeclaration(stmt)
@@ -84,5 +121,5 @@ export function partitionUserImports(file: t.File): PartitionedUserImports {
       bodyStmts.push(stmt);
     }
   }
-  return { userImports, hoistedTypeDecls, bodyStmts };
+  return { userImports, hoistedTypeDecls, bodyStmts, valueImportNames };
 }
