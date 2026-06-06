@@ -18,7 +18,7 @@
 
 <components>
 {
-  LineChart: '../LineChart.rozie',
+  Chart: '../../packages/ui/chartjs/src/Chart.rozie',
 }
 </components>
 
@@ -114,7 +114,7 @@ $watch(() => $data.liveFeed, (on) => {
   </header>
 
   <div class="chart-wrap">
-    <LineChart :data="chartData" :options="chartOpts" :type="$data.chartType" :height="280" update-mode="none" />
+    <Chart :data="chartData" :options="chartOpts" :type="$data.chartType" :height="280" update-mode="none" />
   </div>
 
   <div class="grid">

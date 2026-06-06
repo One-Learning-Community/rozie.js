@@ -187,7 +187,9 @@ const BUNDLE_DECLS: readonly BundleDecl[] = [
     key: 'bundle/LineChartDemo',
     label: 'bundle/LineChartDemo',
     entryGlobPath: '../../demos/LineChartDemo.rozie',
-    dependencyGlobPaths: ['../../LineChart.rozie'],
+    // Phase 30 — the generic Chart wrapper moved into @rozie-ui/chartjs (was
+    // ../../LineChart.rozie). KEEP-THE-URL: snippet key stays bundle/LineChartDemo.
+    dependencyGlobPaths: ['../../../packages/ui/chartjs/src/Chart.rozie'],
   },
   {
     key: 'bundle/TipTapDemo',

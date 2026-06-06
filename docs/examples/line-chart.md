@@ -22,39 +22,39 @@ It is the deepest-reactivity example in the set:
   </ClientOnly>
 </div>
 
-## Source — LineChart.rozie
+## Source — Chart.rozie (generic Chart.js wrapper)
 
-```rozie-src LineChart
+```rozie-src Chart
 ```
 
 ## Vue output
 
-```rozie-out LineChart vue
+```rozie-out Chart vue
 ```
 
 ## React output
 
-```rozie-out LineChart react
+```rozie-out Chart react
 ```
 
 ## Svelte output
 
-```rozie-out LineChart svelte
+```rozie-out Chart svelte
 ```
 
 ## Angular output
 
-```rozie-out LineChart angular
+```rozie-out Chart angular
 ```
 
 ## Solid output
 
-```rozie-out LineChart solid
+```rozie-out Chart solid
 ```
 
 ## Lit output
 
-```rozie-out LineChart lit
+```rozie-out Chart lit
 ```
 
 ## Demo source — LineChartDemo.rozie

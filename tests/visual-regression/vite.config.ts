@@ -192,6 +192,20 @@ export default defineConfig(async () => {
     'codemirror',
     'src',
   );
+  // Same move as codemirror (Phase 30): the generic Chart.rozie lives in
+  // @rozie-ui/chartjs. The Angular sub-build must walk it too (LineChartDemo's
+  // `imports: [Chart]` would otherwise collapse to `any[]` → empty mount).
+  // Lockstep with tsconfig.app.json `include` + build-cells.mjs `CHARTJS_SRC`
+  // sweep. NO `chart.js` ESM-interop alias needed (chart.js ships clean ESM).
+  const chartSrc = resolve(
+    __dirname,
+    '..',
+    '..',
+    'packages',
+    'ui',
+    'chartjs',
+    'src',
+  );
   // @fullcalendar/list ESM-entry alias (see optimizeDeps note below). The
   // package's CJS build does `exports["default"] = plugin` without
   // `__esModule`, so a default ES import bundled through the CJS-interop path
@@ -248,10 +262,10 @@ export default defineConfig(async () => {
     // The other targets' `.rozie.ts/.tsx` virtual modules go through Vite's
     // own resolver, which honors `browser` via vite-plugin-solid's
     // `configEnvironment` hook (and the equivalent for other plugins).
-    ...(TARGET === 'angular' ? [resolveCrossTreeBareImports([examplesRoot, sortableListSrc, flatpickrSrc, fullCalendarSrc, codeMirrorSrc])] : []),
+    ...(TARGET === 'angular' ? [resolveCrossTreeBareImports([examplesRoot, sortableListSrc, flatpickrSrc, fullCalendarSrc, codeMirrorSrc, chartSrc])] : []),
     Rozie({
       target: TARGET,
-      ...(TARGET === 'angular' ? { prebuildExtraRoots: [examplesRoot, sortableListSrc, flatpickrSrc, fullCalendarSrc, codeMirrorSrc] } : {}),
+      ...(TARGET === 'angular' ? { prebuildExtraRoots: [examplesRoot, sortableListSrc, flatpickrSrc, fullCalendarSrc, codeMirrorSrc, chartSrc] } : {}),
     }),
     ...(await frameworkPlugins(TARGET)),
   ],

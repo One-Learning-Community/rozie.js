@@ -78,7 +78,7 @@ const AUTO_START_TARGETS: readonly Target[] = ['vue', 'svelte'];
  * `_stats_a78f3_66` (the original class name survives as a substring per
  * Vite/PostCSS-Modules' `localIdentName` default). Vue / Svelte / Angular /
  * Solid / Lit keep the `stats` literal — the substring matcher subsumes both.
- * (`line-chart.spec.ts` uses the identical technique for `rozie-linechart`.)
+ * (`line-chart.spec.ts` uses the identical technique for `rozie-chart`.)
  *
  * A Playwright locator also auto-pierces shadow roots, so this works for the
  * Lit target whose whole demo renders inside the producer's shadow DOM

@@ -47,10 +47,11 @@ export const EXAMPLES = [
   'FullCalendar',
   // LineChart (added 2026-05-19) — non-portal engine-wrapper runtime
   // smoke. Loader resolves to `examples/demos/LineChartDemo.rozie`
-  // (which imports `../LineChart.rozie`). Validates that the compiler
-  // does NOT activate portal machinery when no `<slot portal />` is
-  // declared — Chart.js paints to a `<canvas>` the framework never
-  // touches. Also exercises the Lit updated() shim on
+  // (which since Phase 30 imports the generic Chart from
+  // `../../packages/ui/chartjs/src/Chart.rozie` with `type="line"`).
+  // Validates the array-prop reconcile path on the generic Chart. (The
+  // Chart wrapper DOES declare one `tooltip` portal slot now, but this
+  // line-typed demo doesn't fill it.) Also exercises the Lit updated() shim on
   // `$watch(() => $props.data, ...)` where data is a
   // `{ labels, datasets: [{ data: [] }] }` ChartData object — a richer
   // all-`$props` getterDep shape than FullCalendar's flat events array.

@@ -17,7 +17,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  *
  * ## The bug
  *
- * `examples/LineChart.rozie` creates its Chart.js instance ONCE in `$onMount`
+ * `packages/ui/chartjs/src/Chart.rozie` (the generic Chart.js wrapper, was
+ * `examples/LineChart.rozie`) creates its Chart.js instance ONCE in `$onMount`
  * and reconciles subsequent data changes via
  * `$watch(() => $props.data, ...) → instance.data = v; instance.update()`.
  *

@@ -83,15 +83,13 @@ for (const target of TARGETS) {
     const mount = page.getByTestId('rozie-mount');
     await expect(mount).toBeVisible();
 
-    // Substring-match `[class*="rozie-linechart"]` instead of literal
-    // `.rozie-linechart` because the React target applies CSS Modules to
-    // consumer styles, renaming the consumer-authored `rozie-linechart`
-    // class to a scoped name like `_rozie-linechart_nzury_51` (the original
-    // class name is preserved as a substring per Vite/PostCSS-Modules'
-    // localIdentName default). Vue / Svelte / Angular / Solid / Lit keep
-    // the class literal (their scoping uses attribute selectors or shadow
-    // DOM), so the substring matcher subsumes both forms cross-target.
-    const wrapper = mount.locator('.rozie-linechart, [class*="rozie-linechart"]').first();
+    // The wrapper root carries `rozie-chart` (Phase 30: LineChart generalized to
+    // the generic Chart, root class renamed `.rozie-linechart` -> `.rozie-chart`).
+    // Substring-match `[class*="rozie-chart"]` as well as the literal class so the
+    // locator is robust to any per-target class-scoping suffix; all 6 targets keep
+    // `rozie-chart` as a substring (attribute-scoped CSS on React post-Phase-25,
+    // attribute selectors / shadow DOM elsewhere).
+    const wrapper = mount.locator('.rozie-chart, [class*="rozie-chart"]').first();
     await expect(wrapper).toBeVisible({ timeout: 10_000 });
 
     // The Chart.js engine paints to a single `<canvas>` element inside the

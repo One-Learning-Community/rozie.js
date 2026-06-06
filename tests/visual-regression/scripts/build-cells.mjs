@@ -69,6 +69,18 @@ const CODEMIRROR_SRC = resolve(
   'codemirror',
   'src',
 );
+// Same packaging move for @rozie-ui/chartjs (Phase 30): the generic Chart.rozie
+// lives in the package src; the Angular sub-build walks it via
+// `prebuildExtraRoots` and drops the same cross-tree `.rozie.ts` + `Chart.ts`
+// shim artefacts that must be swept after the Angular build (see
+// cleanupCrossTreeAngularArtifacts).
+const CHARTJS_SRC = resolve(
+  REPO_ROOT,
+  'packages',
+  'ui',
+  'chartjs',
+  'src',
+);
 const REFERENCE_BASENAMES = [
   'Counter',
   'SearchInput',
@@ -87,12 +99,13 @@ const REFERENCE_BASENAMES = [
   // loaded by the VR rig; both write Angular `.rozie.ts` cache artefacts
   // that the directory-glob cleanup below sweeps.
   'PortalList',
-  // Chart.js wrapper (added 2026-05-19). LineChartDemo (in examples/demos/)
-  // is loaded by the VR rig; both write Angular `.rozie.ts` cache artefacts
-  // that the directory-glob cleanup below sweeps. There is a sibling
-  // `examples/LineChart.ts` cross-rozie composition shim — gitignored and
-  // regenerated each Angular sub-build — that the cleanup deletes too.
-  'LineChart',
+  // Chart.js wrapper. LineChartDemo (in examples/demos/) is loaded by the VR
+  // rig; it composes the generic Chart from @rozie-ui/chartjs (Phase 30 move).
+  // The Angular `.rozie.ts` cache artefacts land in the package src now and are
+  // swept by the CHARTJS_SRC glob below (REFERENCE_BASENAMES is vestigial —
+  // cleanup is glob-driven). LineChartDemo's own .rozie.ts is swept by the
+  // examples/demos/ glob.
+  'LineChartDemo',
   // CodeMirror wrapper (added 2026-05-19). CodeMirrorDemo (in examples/demos/)
   // is loaded by the VR rig; same Angular `.rozie.ts` + cross-rozie shim
   // cleanup pattern as LineChart.
@@ -227,6 +240,20 @@ function cleanupCrossTreeAngularArtifacts() {
     // codemirror src always exists post-port — defensive only
   }
   rmSync(resolve(CODEMIRROR_SRC, 'CodeMirror.ts'), { force: true });
+  // Same sweep for @rozie-ui/chartjs's package src (LineChartDemo composes the
+  // generic Chart via <components>, so the Angular sub-build emits Chart.rozie.ts
+  // + the Chart.ts shim here). Leftovers (the emitted .rozie.ts imports
+  // @angular/core) poison the later solid/lit builds.
+  try {
+    for (const entry of readdirSync(CHARTJS_SRC)) {
+      if (entry.endsWith('.rozie.ts')) {
+        rmSync(resolve(CHARTJS_SRC, entry), { force: true });
+      }
+    }
+  } catch {
+    // chartjs src always exists post-port — defensive only
+  }
+  rmSync(resolve(CHARTJS_SRC, 'Chart.ts'), { force: true });
 }
 
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'];
