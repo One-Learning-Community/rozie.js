@@ -1,5 +1,5 @@
 import { Component, ContentChild, DestroyRef, ElementRef, EmbeddedViewRef, TemplateRef, ViewContainerRef, ViewEncapsulation, contentChild, effect, forwardRef, inject, input, model, output, signal, untracked, viewChild } from '@angular/core';
-import { NgTemplateOutlet } from '@angular/common';
+import { NgClass, NgTemplateOutlet } from '@angular/common';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
 
 import { Editor, Node } from '@tiptap/core';
@@ -27,7 +27,7 @@ interface NodeViewCtx {
 @Component({
   selector: 'rozie-tip-tap',
   standalone: true,
-  imports: [NgTemplateOutlet],
+  imports: [NgTemplateOutlet, NgClass],
   template: `
 
     <div class="rozie-tiptap" [ngClass]="{ 'is-readonly': !editable() }">

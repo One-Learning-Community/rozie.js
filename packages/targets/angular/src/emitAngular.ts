@@ -548,6 +548,25 @@ export function emitAngular(
     imports.addCommon('NgTemplateOutlet');
   }
 
+  // Debug fix(33-04) (tiptap-nodeview): the multi-source class/style merge path
+  // emits `[ngClass]` / `[ngStyle]` bindings. These are NOT Angular built-ins
+  // (unlike `[class]`/`[style]`) — they require the `NgClass` / `NgStyle`
+  // directives from `@angular/common` to be in the standalone component's
+  // `imports: [...]`. Without them the binding is an inert DOM property
+  // assignment (`element.ngClass = ...`) that silently never applies the merged
+  // class — surfaced where a dynamic `:class` is load-bearing inside an embedded
+  // view (the TipTap reactive node-view portal slot's scoped `display:none`).
+  // Add to BOTH the @angular/common import line (collector) AND the decorator
+  // `imports: [...]` array (emitDecorator opts below). Gated on the emitted
+  // template actually containing the binding, so directive-free components stay
+  // byte-identical.
+  if (tmplResult.usesNgClass) {
+    imports.addCommon('NgClass');
+  }
+  if (tmplResult.usesNgStyle) {
+    imports.addCommon('NgStyle');
+  }
+
   // Plan 14-05 / D-01 — when the template lowered at least one `spreadBinding`
   // (`r-bind="<expr>"` or the synthesized `$attrs` auto-fallthrough), the
   // emitted component needs `inject` (for the shared `__rozieApplyAttrs`
@@ -605,6 +624,8 @@ export function emitAngular(
     hasSlots: ir.slots.length > 0,
     hasNgModel: tmplResult.hasNgModel,
     hasDynamicSlotFiller: tmplResult.hasDynamicSlotFiller,
+    usesNgClass: tmplResult.usesNgClass,
+    usesNgStyle: tmplResult.usesNgStyle,
     componentDecls: components,
     selfReferenced,
     // Phase 23 — gate providers: NG_VALUE_ACCESSOR + host: (focusout) on the

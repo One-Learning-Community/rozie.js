@@ -1,8 +1,10 @@
 import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, effect, inject, input, viewChild } from '@angular/core';
+import { NgClass } from '@angular/common';
 
 @Component({
   selector: 'rozie-themed-button',
   standalone: true,
+  imports: [NgClass],
   template: `
 
     <button class="btn" [ngClass]="variant()" [style]="{ '--btn-bg': '#3b82f6', '--btn-fg': '#ffffff' }" #rozieSpread_0 #rozieListenersTarget_1>

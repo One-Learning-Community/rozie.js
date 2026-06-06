@@ -1,8 +1,10 @@
 import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, effect, inject, viewChild } from '@angular/core';
+import { NgClass } from '@angular/common';
 
 @Component({
   selector: 'rozie-rbind-probe',
   standalone: true,
+  imports: [NgClass],
   template: `
 
     <div class="rbind-probe" #rozieListenersTarget_0>

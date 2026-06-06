@@ -1,9 +1,11 @@
 import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, computed, effect, forwardRef, inject, input, model, signal, viewChild } from '@angular/core';
+import { NgClass } from '@angular/common';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
 
 @Component({
   selector: 'rozie-counter',
   standalone: true,
+  imports: [NgClass],
   template: `
 
     <div class="counter" [ngClass]="{ hovering: hovering() }" #rozieSpread_0 (mouseenter)="hovering.set(true)" (mouseleave)="hovering.set(false)" #rozieListenersTarget_1>

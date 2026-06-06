@@ -1,5 +1,5 @@
 import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, effect, forwardRef, inject, input, model, output, signal, untracked, viewChild } from '@angular/core';
-import { NgTemplateOutlet } from '@angular/common';
+import { NgClass, NgTemplateOutlet } from '@angular/common';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
 
 import { useSortableJS } from './internal/useSortableJS';
@@ -13,7 +13,7 @@ interface DefaultCtx {
 @Component({
   selector: 'rozie-sortable-list',
   standalone: true,
-  imports: [NgTemplateOutlet],
+  imports: [NgTemplateOutlet, NgClass],
   template: `
 
     <div class="rozie-sortable-wrap" #__rozieRoot #rozieSpread_0 #rozieListenersTarget_1>

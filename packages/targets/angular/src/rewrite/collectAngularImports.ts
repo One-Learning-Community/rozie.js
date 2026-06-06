@@ -88,8 +88,24 @@ export type AngularCoreImport =
  */
 export type AngularFormsImport = 'FormsModule' | 'NG_VALUE_ACCESSOR';
 
-/** Common-module import kind — separate import line from `@angular/common`. */
-export type AngularCommonImport = 'NgTemplateOutlet';
+/**
+ * Common-module import kind — separate import line from `@angular/common`.
+ *
+ * Debug fix(33-04) (tiptap-nodeview): `NgClass` / `NgStyle` — the structural
+ * directives that back the emitter's multi-source class/style merge bindings
+ * (`[ngClass]="..."` / `[ngStyle]="..."`). These were NEVER registered before:
+ * `[ngClass]`/`[ngStyle]` are not Angular built-ins like `[class]`/`[style]`,
+ * they require the `NgClass`/`NgStyle` directives from `@angular/common` to be
+ * in the standalone component's `imports: [...]`. Without them the binding is
+ * an inert DOM property assignment (`element.ngClass = ...`) that silently does
+ * nothing — the merged class/style is never applied. Surfaced where a dynamic
+ * `:class` is load-bearing inside an embedded view (the TipTap reactive
+ * node-view portal slot, whose scoped `display:none` depends on the `is-X`
+ * class actually landing on the frag). Added by `emitAngular` when the emitted
+ * template string contains the corresponding binding (same emitted-template
+ * scan pattern as `usedGlobals`).
+ */
+export type AngularCommonImport = 'NgTemplateOutlet' | 'NgClass' | 'NgStyle';
 
 export class AngularImportCollector {
   private coreSymbols = new Set<AngularCoreImport>();

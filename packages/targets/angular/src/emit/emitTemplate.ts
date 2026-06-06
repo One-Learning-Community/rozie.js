@@ -107,7 +107,44 @@ export interface EmitTemplateResult {
    * `protected readonly Math = Math;` field for each entry here.
    */
   usedGlobals: string[];
+  /**
+   * Debug fix(33-04) (tiptap-nodeview) — true when the emitted template
+   * contains an `[ngClass]="..."` binding. `[ngClass]` is NOT an Angular
+   * built-in (unlike `[class]`); it requires the `NgClass` directive from
+   * `@angular/common` to be in the standalone component's `imports: [...]`.
+   * Without it the binding is an inert DOM property assignment and the merged
+   * class is silently never applied. `emitAngular` reads this to add `NgClass`
+   * to both the `@angular/common` import line AND the decorator `imports: [...]`
+   * array. Same emitted-template scan plumbing as `usedGlobals`.
+   */
+  usesNgClass: boolean;
+  /**
+   * Debug fix(33-04) — true when the emitted template contains an
+   * `[ngStyle]="..."` binding. Symmetric with `usesNgClass`: `[ngStyle]`
+   * requires the `NgStyle` directive from `@angular/common`. The emitter's
+   * multi-source style merge path emits `[ngStyle]`, so this guards the
+   * directive import the same way.
+   */
+  usesNgStyle: boolean;
   diagnostics: Diagnostic[];
+}
+
+/**
+ * Debug fix(33-04) — detect whether the emitted Angular template references the
+ * `[ngClass]` / `[ngStyle]` structural directives, which must be present in the
+ * component's `imports: [...]` to function. Plain substring scan of the emitted
+ * template — the emitter only ever writes those exact tokens for the
+ * multi-source merge path (`[ngClass]="..."`, `[ngStyle]="..."`); a literal
+ * `ngClass`/`ngStyle` cannot appear elsewhere in well-formed emitted markup.
+ */
+function detectNgDirectives(template: string): {
+  usesNgClass: boolean;
+  usesNgStyle: boolean;
+} {
+  return {
+    usesNgClass: template.includes('[ngClass]'),
+    usesNgStyle: template.includes('[ngStyle]'),
+  };
 }
 
 /**
@@ -167,6 +204,8 @@ export function emitTemplate(
       needsDestroyRefField: false,
       hasDisplayWrap: false,
       usedGlobals: [],
+      usesNgClass: false,
+      usesNgStyle: false,
       diagnostics,
     };
   }
@@ -203,6 +242,7 @@ export function emitTemplate(
     needsDestroyRefField: needsDestroyRefField.value,
     hasDisplayWrap: hasDisplayWrap.value,
     usedGlobals: detectUsedGlobals(template),
+    ...detectNgDirectives(template),
     diagnostics,
   };
 }

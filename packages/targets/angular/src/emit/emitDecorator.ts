@@ -58,6 +58,21 @@ export interface EmitDecoratorOpts {
    */
   hasDynamicSlotFiller?: boolean;
   /**
+   * Debug fix(33-04) (tiptap-nodeview): whether the emitted template contains
+   * an `[ngClass]="..."` binding — drives `NgClass` inclusion in the
+   * decorator's `imports: [...]` array. `[ngClass]` is NOT an Angular built-in;
+   * it requires the `NgClass` directive from `@angular/common`. Without it the
+   * merged class binding is inert (silently never applied). Caller (emitAngular)
+   * MUST also call `imports.addCommon('NgClass')`.
+   */
+  usesNgClass?: boolean;
+  /**
+   * Debug fix(33-04): whether the emitted template contains an `[ngStyle]="..."`
+   * binding — drives `NgStyle` inclusion in `imports: [...]`. Symmetric with
+   * `usesNgClass`.
+   */
+  usesNgStyle?: boolean;
+  /**
    * Phase 06.2 P2 (D-115/D-118): IR components table — non-self entries
    * are appended to `imports: [...]` as bare class names (e.g., `CardHeader`).
    * Self-entries (localName === componentName) are filtered here too —
@@ -122,6 +137,8 @@ function buildDecoratorImportsList(opts: {
   hasSlots: boolean;
   hasNgModel: boolean;
   hasDynamicSlotFiller?: boolean;
+  usesNgClass?: boolean;
+  usesNgStyle?: boolean;
   componentDecls: readonly ComponentDecl[];
   selfReferenced: boolean;
   componentName: string;
@@ -131,6 +148,12 @@ function buildDecoratorImportsList(opts: {
   // consumer-side dynamic-name dispatch via `*ngTemplateOutlet`. Folded
   // into the same item so duplicate registrations don't surface.
   if (opts.hasSlots || opts.hasDynamicSlotFiller) items.push('NgTemplateOutlet');
+  // Debug fix(33-04): the multi-source class/style merge emits `[ngClass]` /
+  // `[ngStyle]`, which require these directives in `imports: [...]`. Placed
+  // after NgTemplateOutlet so the @angular/common items group together and
+  // before FormsModule (stable, deterministic order).
+  if (opts.usesNgClass) items.push('NgClass');
+  if (opts.usesNgStyle) items.push('NgStyle');
   if (opts.hasNgModel) items.push('FormsModule');
   for (const decl of opts.componentDecls) {
     if (decl.localName === opts.componentName) continue; // self handled below
@@ -156,6 +179,8 @@ export function emitDecorator(
     hasSlots: opts.hasSlots,
     hasNgModel: opts.hasNgModel,
     hasDynamicSlotFiller: opts.hasDynamicSlotFiller ?? false,
+    usesNgClass: opts.usesNgClass ?? false,
+    usesNgStyle: opts.usesNgStyle ?? false,
     componentDecls: opts.componentDecls ?? [],
     selfReferenced: opts.selfReferenced ?? false,
     componentName: opts.componentName,
