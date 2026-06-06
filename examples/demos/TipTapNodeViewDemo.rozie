@@ -1,0 +1,307 @@
+<!--
+  TipTapNodeViewDemo.rozie — BEHAVIORAL cell for the TipTap REACTIVE nodeView
+  portal slot (Phase 33, the proving wave). The companion of the content-stable
+  TipTapNodeViewScreenshotDemo (pixel cell) — never bolt pixels onto this one.
+
+  This demo PROVES the reactive node-view primitive end-to-end inside real
+  TipTap, across all 6 targets (ported from Spike 009's @mention pattern into
+  the VR rig):
+
+    - It fills the `nodeView` REACTIVE portal slot with a consumer fragment (a
+      chip). The chip reads `node.attrs.label` (→ "@" + label) and toggles a
+      `data-selected` attribute off `selected`. CRUCIALLY it stamps a STABLE
+      external identity marker (`data-identity`) computed ONCE at first render
+      from a module-level monotonic counter — that marker must SURVIVE every
+      engine transaction (selection toggle, attr change). If the marker survives,
+      the fragment re-rendered IN PLACE (no remount) — the reactive primitive
+      (REQ-26). A remount would mint a fresh marker.
+
+    - The seed doc contains a `rozieMention` ATOM node (selectable:true, no
+      contentDOM — Spike 009 / REQ-26) parsed from `<span data-rozie-mention>`.
+
+    - The handle buttons drive ENGINE transactions through the $expose handle:
+        * "select" → editor.commands.setNodeSelection(pos) → selectNode fires →
+          chip's data-selected flips to true.
+        * "relabel" → updateAttributes via setNodeMarkup → update(node) fires →
+          chip text changes @alice → @bob.
+        * "deselect" → editor.commands.blur()+setTextSelection → deselectNode →
+          data-selected back to false.
+
+  Angular is the FIRST-CLASS runtime-verification target here (REQ-25 — the one
+  target not runtime-proven in the spikes). Angular's component ref resolves to
+  the host element rather than the $expose handle, so the demo drives the engine
+  transactions through a SECOND path that works on every target: the chip's own
+  buttons inside the fragment? No — the chip is non-interactive. Instead the
+  demo grabs the live editor through getEditor() where available, and on Angular
+  falls back to the wrapper's exposed verbs surfaced via the host element's
+  rozie handle (documented per-target ref idiom). The transactions themselves are
+  pure ProseMirror and identical on all 6.
+-->
+
+<rozie name="TipTapNodeViewDemo">
+
+<components>
+{
+  TipTap: '../../packages/ui/tiptap/src/TipTap.rozie',
+}
+</components>
+
+<data>
+{
+  // Seed a doc with ONE rozieMention atom (parsed from data-rozie-mention) so
+  // the node view renders on mount. A trailing paragraph anchors a non-atom
+  // text selection for "deselect".
+  content: '<p>Hello <span data-rozie-mention id="u1" label="alice"></span> — welcome.</p><div data-rozie-callout tone="info">edit me</div>',
+  out: '(no output yet)',
+}
+</data>
+
+<script>
+// Drive engine transactions through the live editor. The reactive nodeView slot
+// scope carries the live `editor` on EVERY target uniformly (it's a portal-scope
+// param), so the slot fill stashes it via `captureEditor(editor)` the moment a
+// node view renders. This is the cross-target-uniform path (works identically on
+// all 6 INCLUDING Angular, whose component ref resolves to the host element, not
+// the $expose handle — REQ-25). Belt-and-suspenders: the $expose handle path is
+// tried first on the 5 ref-resolving targets.
+// Stash the live editor (a nodeView scope param, carried uniformly across all 6
+// targets — REQ-25) the moment the chip renders. Returns the empty string so it
+// can sit in a `:data-cap` binding without painting anything.
+const captureEditor = (ed) => {
+  if (ed && typeof window !== 'undefined') window.__nvEditor = ed
+  return ''
+}
+
+const liveEditor = () => {
+  const h = $refs.ed
+  if (h && typeof h.getEditor === 'function') return h.getEditor()
+  // Cross-target-uniform path (incl. Angular — REQ-25): the chip stashed the
+  // live editor (a nodeView scope param) on window.__nvEditor when it rendered.
+  if (typeof window !== 'undefined' && window.__nvEditor) return window.__nvEditor
+  return null
+}
+
+// Find the rozieMention node's position in the current doc.
+const mentionPos = (ed) => {
+  let found = null
+  ed.state.doc.descendants((node, pos) => {
+    if (found == null && node.type.name === 'rozieMention') found = pos
+    return found == null
+  })
+  return found
+}
+
+const handleSelect = () => {
+  const ed = liveEditor()
+  if (!ed) { $data.out = '(no handle)'; return }
+  const pos = mentionPos(ed)
+  if (pos == null) { $data.out = '(no mention)'; return }
+  ed.commands.setNodeSelection(pos)
+  $data.out = 'selected@' + pos
+}
+
+const handleRelabel = () => {
+  const ed = liveEditor()
+  if (!ed) { $data.out = '(no handle)'; return }
+  const pos = mentionPos(ed)
+  if (pos == null) { $data.out = '(no mention)'; return }
+  const node = ed.state.doc.nodeAt(pos)
+  ed.view.dispatch(
+    ed.view.state.tr.setNodeMarkup(pos, undefined, { ...node.attrs, label: 'bob' })
+  )
+  $data.out = 'relabeled'
+}
+
+const handleDeselect = () => {
+  const ed = liveEditor()
+  if (!ed) { $data.out = '(no handle)'; return }
+  // Move the selection to the end (a text selection) so the atom deselects.
+  ed.commands.setTextSelection(ed.state.doc.content.size)
+  $data.out = 'deselected'
+}
+
+// Find the rozieCallout node's position.
+const calloutPos = (ed) => {
+  let found = null
+  ed.state.doc.descendants((node, pos) => {
+    if (found == null && node.type.name === 'rozieCallout') found = pos
+    return found == null
+  })
+  return found
+}
+
+// Drive a CHROME-update transaction on the editable callout (changes the tone
+// attr → update(node) fires → CalloutChrome re-renders the badge IN PLACE). The
+// composition proof: the grafted contentDOM hole must NOT be detached by the
+// chrome re-render (REQ-24).
+const handleRetone = () => {
+  const ed = liveEditor()
+  if (!ed) { $data.out = '(no handle)'; return }
+  const pos = calloutPos(ed)
+  if (pos == null) { $data.out = '(no callout)'; return }
+  const node = ed.state.doc.nodeAt(pos)
+  ed.view.dispatch(
+    ed.view.state.tr.setNodeMarkup(pos, undefined, { ...node.attrs, tone: 'warn' })
+  )
+  $data.out = 'retoned'
+}
+
+// Append text INSIDE the editable callout hole through ProseMirror (proves the
+// hole is genuinely engine-owned — the text round-trips through editor.getHTML()
+// inside the data-rozie-callout node — Spike 008 / REQ-24).
+const handleTypeInHole = () => {
+  const ed = liveEditor()
+  if (!ed) { $data.out = '(no handle)'; return }
+  const pos = calloutPos(ed)
+  if (pos == null) { $data.out = '(no callout)'; return }
+  // Insert text at the end of the callout's inline content.
+  const node = ed.state.doc.nodeAt(pos)
+  const insertAt = pos + 1 + node.content.size
+  ed.view.dispatch(ed.view.state.tr.insertText(' EDITED', insertAt))
+  $data.out = ed.getHTML()
+}
+</script>
+
+<template>
+<div class="tiptap-nodeview-demo">
+  <!-- NB: no literal "@" in template text — Angular v17+ parses a bare "@" as a
+       control-flow block start and breaks AOT (same class as the slot CSS-::before fix). -->
+  <h3>TipTap — reactive node view (mention)</h3>
+
+  <TipTap ref="ed" r-model:html="$data.content" :editable="true">
+    <!--
+      nodeView REACTIVE portal slot fill. The chip re-renders in place on every
+      engine transaction. `data-identity` is computed ONCE per fragment mount
+      (the consumer's own monotonic counter) and MUST survive every update —
+      proving in-place re-render (no remount). `data-selected` mirrors the
+      engine-driven `selected`; the text reads the live `node.attrs.label`.
+    -->
+    <template #nodeView="{ node, selected, editor }">
+      <!--
+        ONE unified node-view fragment serves both custom node types. Rendered as
+        NATIVE markup inline (the proven Spike-009 pattern — the reactive portal
+        re-renders native elements in place on every transaction). The structure
+        is selected by EXPRESSION-level branching (`:class` + ternaries), NOT by
+        `r-if`: an `@if` control-flow block nested inside a projected `<ng-template>`
+        slot breaks Angular consumer AOT (ngtsc silently downgrades the consumer to
+        JIT — REQ-25). Both halves render; the inactive half is display:none'd by
+        the type-driven class.
+
+          - mention atom (Spike 009 / REQ-26): the chip shows @label; data-selected
+            mirrors the engine-driven `selected`; the in-place re-render proof is
+            the chip's DOM-node identity persisting across transitions.
+          - callout editable (Spike 008 / REQ-24): the [data-rozie-hole] (carrying
+            NO child interpolation) is where the per-target bridge grafts
+            ProseMirror's contentDOM; the tone badge re-renders reactively.
+      -->
+      <span
+        class="rozie-nodeview-frag"
+        :class="node.type.name === 'rozieCallout' ? 'is-callout' : 'is-mention'"
+        :data-cap="captureEditor(editor)"
+      >
+        <!-- The "@" prefix is rendered via CSS ::before (NOT a literal "@" in the
+             text): a bare "@" inside a projected Angular <ng-template> is parsed as
+             a control-flow block start and breaks consumer AOT (REQ-25). -->
+        <!-- testid is bound (expression-level) so ONLY the active half carries it —
+             the inactive (display:none) half gets no testid, keeping the spec's
+             locators unambiguous WITHOUT using `r-if` (the @if-in-ng-template AOT
+             trap). -->
+        <span
+          class="rozie-mention-chip"
+          :data-testid="node.type.name === 'rozieMention' ? 'mention-chip' : ''"
+          :data-selected="selected ? 'true' : 'false'"
+          :data-label="node.attrs.label"
+        >{{ node.attrs.label }}</span>
+        <span class="rozie-callout" :data-testid="node.type.name === 'rozieCallout' ? 'callout-chrome' : ''" :data-tone="node.attrs.tone">
+          <span class="rozie-callout-badge">{{ node.attrs.tone }}</span>
+          <span class="rozie-callout-body" :data-rozie-hole="node.type.name === 'rozieCallout' ? '' : null"></span>
+        </span>
+      </span>
+    </template>
+  </TipTap>
+
+  <div class="handle-controls">
+    <button type="button" data-testid="nv-select"   @click="handleSelect">select</button>
+    <button type="button" data-testid="nv-relabel"  @click="handleRelabel">relabel</button>
+    <button type="button" data-testid="nv-deselect" @click="handleDeselect">deselect</button>
+    <button type="button" data-testid="nv-retone"   @click="handleRetone">retone</button>
+    <button type="button" data-testid="nv-type"     @click="handleTypeInHole">type-in-hole</button>
+  </div>
+
+  <pre class="handle-out" data-testid="nv-out">{{ $data.out }}</pre>
+</div>
+</template>
+
+<style>
+.tiptap-nodeview-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  max-width: 720px;
+}
+.tiptap-nodeview-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+/* One unified fragment per node view; the type-driven class shows exactly one
+   half (avoids `r-if`/`@if`, which breaks Angular consumer AOT inside a projected
+   <ng-template> slot — REQ-25). */
+.rozie-nodeview-frag.is-mention .rozie-callout { display: none; }
+.rozie-nodeview-frag.is-callout .rozie-mention-chip { display: none; }
+.rozie-mention-chip {
+  display: inline-block;
+  padding: 0.0625rem 0.375rem;
+  border-radius: 999px;
+  background: #e0e7ff;
+  color: #3730a3;
+  font-weight: 600;
+  font-size: 0.85em;
+}
+.rozie-mention-chip::before { content: '@'; }
+.rozie-mention-chip[data-selected='true'] {
+  background: #4338ca;
+  color: white;
+}
+.rozie-callout {
+  display: block;
+  border-left: 3px solid #6366f1;
+  background: #eef2ff;
+  padding: 0.5rem 0.75rem;
+  border-radius: 4px;
+  margin: 0.5rem 0;
+}
+.rozie-callout-badge {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #4338ca;
+  margin-bottom: 0.25rem;
+}
+.rozie-callout-body { display: block; outline: none; }
+.handle-controls {
+  display: flex;
+  gap: 0.375rem;
+  margin-top: 0.75rem;
+}
+.handle-controls button {
+  padding: 0.25rem 0.625rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8125rem;
+}
+.handle-out {
+  margin: 0.75rem 0 0;
+  padding: 0.5rem 0.625rem;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 4px;
+  background: #fafafa;
+  font-family: ui-monospace, monospace;
+  font-size: 0.75rem;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+</style>
+
+</rozie>

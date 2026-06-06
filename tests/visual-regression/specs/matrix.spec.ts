@@ -239,6 +239,20 @@ const EXAMPLES = [
   // type-switching, @click, :plugins, tooltip slot) lives in chart.spec.ts and
   // is NOT baseline-gated.
   //
+  // Phase 33 (reactive-portal-slots) — TipTapNodeViewScreenshot is the content-
+  // STABLE pixel cell for the REACTIVE nodeView portal slot. `TipTapNodeView
+  // ScreenshotDemo.rozie` renders a FIXED rich doc containing BOTH custom nodes
+  // (a `rozieMention` atom chip + a `rozieCallout` editable callout) via the
+  // nodeView slot fill, with the caret neutralized + never focused — so a stable
+  // `TipTapNodeViewScreenshot.png` baseline CAN exist. The node views are rendered
+  // identically across targets from ONE Rozie source, so per D-10 all 6 targets
+  // diff against the SAME shared baseline. Owned by Plan 33-04 (Linux-Docker
+  // regen); until it lands the cell baseline-gates to `test.fixme` via
+  // `baselineExists()` (never red). The BEHAVIORAL coverage (in-place re-render,
+  // contentDOM composition) lives in tiptap-nodeview.spec.ts and is NOT baseline-
+  // gated.
+  'TipTapNodeViewScreenshot',
+  //
   // ⚠ FLAGGED (2026-06-05, owner to debug): the FIRST Linux-Docker baseline regen
   // captured the line + bar cells with AXES drawn but the DATA SERIES not yet
   // painted (the doughnut completed) — a per-target on-load render-timing
@@ -386,6 +400,24 @@ async function settleExample(
   // is the deterministic post-mount signal that the editor engine booted.
   if (example === 'TipTap' || example === 'TipTapScreenshot') {
     await expect(page.locator('.ProseMirror')).toBeVisible();
+  }
+  // TipTapNodeViewScreenshot (Phase 33): the content-STABLE reactive-nodeView
+  // pixel cell. ProseMirror boots, then renders BOTH custom node views from the
+  // nodeView slot fill — a `rozieMention` atom chip + a `rozieCallout` editable
+  // callout. Wait for the editor AND both node views to paint before clipping so
+  // the capture is deterministic (the doc is fixed, the caret neutralized, the
+  // editor never focused — so once both node views are present the frame is final).
+  if (example === 'TipTapNodeViewScreenshot') {
+    await expect(page.locator('.ProseMirror')).toBeVisible();
+    await expect(page.getByTestId('mention-chip').first()).toBeVisible({
+      timeout: 10_000,
+    });
+    await expect(page.getByTestId('callout-chrome').first()).toBeVisible({
+      timeout: 10_000,
+    });
+    // Brief settle for layout; the editor is never focused and the caret is
+    // neutralized, so there is no blink/selection source to wait out.
+    await page.waitForTimeout(200);
   }
   // Table: TableDemo renders `<table class="rozie-table">`. The React target
   // applies CSS Modules to consumer styles, renaming `rozie-table` to a scoped

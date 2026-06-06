@@ -1,0 +1,114 @@
+<!--
+  TipTapNodeViewScreenshotDemo.rozie — content-STABLE screenshot consumer for
+  the TipTap REACTIVE nodeView portal slot (Phase 33). The SEPARATE deterministic
+  pixel cell — never extend it for behavior, never bolt pixels onto
+  TipTapNodeViewDemo.
+
+  Same caret-neutralization recipe as TipTapScreenshotDemo (Phase 32 precedent):
+    1. A FIXED rich doc that includes BOTH a `rozieMention` atom chip and a
+       `rozieCallout` editable node (rendered via the nodeView slot) so the
+       baseline exercises the reactive node-view rendering visually.
+    2. NEVER focus the editor (an unfocused contenteditable draws no caret).
+    3. A belt-and-suspenders editorProps override (caret-color: transparent).
+
+  The nodeView slot renders NATIVE markup inline (the proven Spike-009 pattern;
+  the reactive portal re-renders native elements in place across all 6 targets).
+
+  One .rozie source compiles to six per-framework screenshot consumers; the Linux
+  PNG baseline is generated in pinned Linux Docker (NOT here — macOS baselines are
+  forbidden, feedback_vr_linux_baselines). Until it lands the matrix cell
+  auto-fixmes on baselineExists().
+-->
+
+<rozie name="TipTapNodeViewScreenshotDemo">
+
+<components>
+{
+  TipTap: '../../packages/ui/tiptap/src/TipTap.rozie',
+}
+</components>
+
+<script>
+// A FIXED rich document containing both custom nodes — never a live timestamp.
+const FIXED_HTML = '<h2>Node views</h2><p>Mention <span data-rozie-mention id="u1" label="alice"></span> renders a reactive chip from one Rozie source across six frameworks.</p><div data-rozie-callout tone="info">An editable callout owns this hole.</div>'
+
+// Belt-and-suspenders caret neutralization — autofocus stays false; never clicked.
+const stableEditorProps = { attributes: { style: 'caret-color: transparent' } }
+</script>
+
+<template>
+<div class="tiptap-nodeview-screenshot-demo">
+  <TipTap
+    :html="FIXED_HTML"
+    :autofocus="false"
+    :editorProps="stableEditorProps"
+  >
+    <!--
+      ONE unified node-view fragment serves both custom node types, selected by
+      EXPRESSION-level branching (`:class`), NOT `r-if` — an `@if` block nested in a
+      projected <ng-template> slot breaks Angular consumer AOT (REQ-25). The
+      inactive half is display:none'd by the type class.
+    -->
+    <template #nodeView="{ node, selected }">
+      <span
+        class="rozie-nodeview-frag"
+        :class="node.type.name === 'rozieCallout' ? 'is-callout' : 'is-mention'"
+      >
+        <!-- "@" via CSS ::before — a literal "@" inside a projected Angular
+             <ng-template> breaks consumer AOT (REQ-25). -->
+        <span
+          class="rozie-mention-chip"
+          :data-testid="node.type.name === 'rozieMention' ? 'mention-chip' : ''"
+          :data-selected="selected ? 'true' : 'false'"
+          :data-label="node.attrs.label"
+        >{{ node.attrs.label }}</span>
+        <span class="rozie-callout" :data-testid="node.type.name === 'rozieCallout' ? 'callout-chrome' : ''" :data-tone="node.attrs.tone">
+          <span class="rozie-callout-badge">{{ node.attrs.tone }}</span>
+          <span class="rozie-callout-body" :data-rozie-hole="node.type.name === 'rozieCallout' ? '' : null"></span>
+        </span>
+      </span>
+    </template>
+  </TipTap>
+</div>
+</template>
+
+<style>
+.tiptap-nodeview-screenshot-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  max-width: 720px;
+}
+.rozie-nodeview-frag.is-mention .rozie-callout { display: none; }
+.rozie-nodeview-frag.is-callout .rozie-mention-chip { display: none; }
+.rozie-mention-chip {
+  display: inline-block;
+  padding: 0.0625rem 0.375rem;
+  border-radius: 999px;
+  background: #e0e7ff;
+  color: #3730a3;
+  font-weight: 600;
+  font-size: 0.85em;
+}
+.rozie-mention-chip::before { content: '@'; }
+.rozie-callout {
+  display: block;
+  border-left: 3px solid #6366f1;
+  background: #eef2ff;
+  padding: 0.5rem 0.75rem;
+  border-radius: 4px;
+  margin: 0.5rem 0;
+}
+.rozie-callout-badge {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #4338ca;
+  margin-bottom: 0.25rem;
+}
+.rozie-callout-body { display: block; outline: none; }
+</style>
+
+</rozie>

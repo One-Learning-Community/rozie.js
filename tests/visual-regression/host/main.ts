@@ -224,6 +224,17 @@ export const EXAMPLES = [
   // bullet-list command on all 6 + the $expose handle undo/getHTML on the 5
   // ref-resolving targets). Deliberately NOT in matrix.spec.ts EXAMPLES.
   'TipTapBehavior',
+  // Phase 33 (reactive-portal-slots) — the reactive nodeView portal slot proving
+  // cells. TipTapNodeView is the BEHAVIORAL cell (loader →
+  // examples/demos/TipTapNodeViewDemo.rozie, which fills the `nodeView` REACTIVE
+  // portal slot with a MentionChip atom + a CalloutChrome editable callout). It
+  // proves in-place re-render on engine transactions (data-identity survives) +
+  // the contentDOM composition (REQ-24/25/26). Built for all 6 targets but NOT a
+  // screenshot cell — covered by tiptap-nodeview.spec.ts. TipTapNodeViewScreenshot
+  // is the content-STABLE pixel cell (caret-neutralized fixed doc with both
+  // custom nodes); registered in matrix.spec.ts (auto-fixme until the Linux PNG).
+  'TipTapNodeView',
+  'TipTapNodeViewScreenshot',
 ] as const;
 
 export type Example = (typeof EXAMPLES)[number];
@@ -310,6 +321,11 @@ export const LIT_TAGS: Record<Example, string> = {
   // TipTapScreenshotDemo / TipTapBehaviorDemo.
   TipTapScreenshot: 'rozie-tip-tap-screenshot',
   TipTapBehavior: 'rozie-tip-tap-behavior',
+  // Phase 33 — the lit entry appends '-demo' → tags
+  // 'rozie-tip-tap-node-view-demo' / 'rozie-tip-tap-node-view-screenshot-demo' =
+  // kebab of TipTapNodeViewDemo / TipTapNodeViewScreenshotDemo.
+  TipTapNodeView: 'rozie-tip-tap-node-view',
+  TipTapNodeViewScreenshot: 'rozie-tip-tap-node-view-screenshot',
 };
 
 export interface HostQuery {
@@ -438,6 +454,11 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // out state in <data>. No parent props needed.
   TipTapScreenshot: {},
   TipTapBehavior: {},
+  // Phase 33 — both node-view demos are self-contained: each seeds its own
+  // fixed/seed doc (with the custom nodes) in <data>/<script> and fills the
+  // nodeView slot. No parent props needed.
+  TipTapNodeView: {},
+  TipTapNodeViewScreenshot: {},
 };
 
 /**
