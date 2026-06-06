@@ -124,6 +124,10 @@ export default defineConfig({
             { text: 'FullCalendar libraries comparison', link: '/guide/fullcalendar-comparison' },
           ],
         },
+        {
+          text: '@rozie-ui/codemirror',
+          items: [{ text: 'CodeMirror — showcase & API', link: '/guide/codemirror' }],
+        },
       ],
       '/compatibility': [
         {
