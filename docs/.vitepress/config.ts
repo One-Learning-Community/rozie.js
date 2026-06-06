@@ -130,7 +130,10 @@ export default defineConfig({
         },
         {
           text: '@rozie-ui/chartjs',
-          items: [{ text: 'Chart.js — showcase & API', link: '/guide/chartjs' }],
+          items: [
+            { text: 'Chart.js — showcase & API', link: '/guide/chartjs' },
+            { text: 'Chart.js libraries comparison', link: '/guide/chartjs-comparison' },
+          ],
         },
       ],
       '/compatibility': [
