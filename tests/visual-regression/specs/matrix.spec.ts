@@ -219,6 +219,19 @@ const EXAMPLES = [
   // lands the cell baseline-gates to `test.fixme` via `baselineExists()` (never
   // red) — no macOS-rendered PNG is committed here.
   'RHtml',
+  // Phase 30 (chartjs) — ChartScreenshot is the content-STABLE multi-type canvas
+  // SCREENSHOT cell. `ChartScreenshotDemo.rozie` renders a grid of THREE chart
+  // kinds (line + bar + doughnut) from the ONE generic Chart with animation:false
+  // + devicePixelRatio:1 + a pinned font + fixed data, so a stable
+  // `ChartScreenshot.png` baseline CAN exist (unlike a live/animated chart). The
+  // chart bitmap is Chart.js-engine-rendered identically across targets, so per
+  // D-10 all 6 targets diff against the SAME shared `ChartScreenshot.png`. The
+  // baseline is owned by Plan 30-04 (Linux-Docker regen); until it lands the cell
+  // baseline-gates to `test.fixme` via `baselineExists()` (never red) — no
+  // macOS-rendered PNG is committed here. The BEHAVIORAL coverage (runtime
+  // type-switching, @click, :plugins, tooltip slot) lives in chart.spec.ts and
+  // is NOT baseline-gated.
+  'ChartScreenshot',
 ] as const;
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'] as const;
 
@@ -404,6 +417,39 @@ async function settleExample(
     // Let CM6's async viewport measure settle (one or two RAFs for a short
     // fixed doc) before clipping. animations:'disabled' in toHaveScreenshot plus
     // the screenshotStable blink-kill make this belt-and-suspenders.
+    await page.waitForTimeout(250);
+  }
+  // ChartScreenshot (Phase 30): Chart.js paints the first frame inside a
+  // requestAnimationFrame after `$onMount`, so the canvas can be blank for 1-2
+  // RAFs after the wrapper mounts. The demo sets animation:false (no tweens, the
+  // first frame is final) + devicePixelRatio:1 + a pinned font. Wait until ALL
+  // THREE canvases (line + bar + doughnut) have painted nonzero-alpha pixels,
+  // then a short settle before the clip. Once painted the frame is final
+  // (animations off), so the capture is deterministic.
+  if (example === 'ChartScreenshot') {
+    await expect
+      .poll(
+        async () =>
+          page.evaluate(() => {
+            const canvases = Array.from(document.querySelectorAll('canvas'));
+            if (canvases.length < 3) return 0;
+            return canvases.filter((c) => {
+              const ctx = (c as HTMLCanvasElement).getContext('2d');
+              if (!ctx) return false;
+              const { data } = ctx.getImageData(
+                0,
+                0,
+                (c as HTMLCanvasElement).width,
+                (c as HTMLCanvasElement).height,
+              );
+              let n = 0;
+              for (let i = 3; i < data.length; i += 4) if (data[i] > 0) n++;
+              return n > 100;
+            }).length;
+          }),
+        { timeout: 8_000, intervals: [200, 400, 800, 1600] },
+      )
+      .toBe(3);
     await page.waitForTimeout(250);
   }
 }

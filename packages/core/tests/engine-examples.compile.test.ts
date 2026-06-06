@@ -83,6 +83,14 @@ const ENGINE_DEMOS = [
   // per-target consumer-side regression surfaces in this fast gate, not just
   // the Docker-backed VR pipeline.
   'demos/CodeMirrorScreenshotDemo.rozie',
+  // Phase 30 (chartjs) — the deterministic multi-type SCREENSHOT consumer
+  // (line+bar+doughnut grid, animation:false) and the behavioral type-switching
+  // consumer (line->bar->doughnut + @click + :plugins + the tooltip portal-slot
+  // consumer-fill). Both import ../../packages/ui/chartjs/src/Chart.rozie;
+  // compiled here so a per-target consumer-side regression (notably the tooltip
+  // slot fill across all 6 targets) surfaces in this fast gate.
+  'demos/ChartScreenshotDemo.rozie',
+  'demos/ChartBehaviorDemo.rozie',
 ] as const;
 
 describe('engine-wrapper examples — cross-target compile gate', () => {
