@@ -1,0 +1,70 @@
+{
+  "name": "@rozie-ui/chartjs-lit",
+  "version": "0.1.0",
+  "type": "module",
+  "private": false,
+  "license": "MIT",
+  "description": "Idiomatic Lit chart web component — one Rozie source compiled to a Lit custom element wrapping Chart.js.",
+  "keywords": [
+    "rozie",
+    "rozie-ui",
+    "chartjs",
+    "chart",
+    "charts",
+    "data-visualization",
+    "component",
+    "lit",
+    "web-components"
+  ],
+  "author": "One Learning Community (https://github.com/One-Learning-Community)",
+  "homepage": "https://github.com/One-Learning-Community/rozie.js#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/One-Learning-Community/rozie.js.git",
+    "directory": "packages/ui/chartjs/packages/lit"
+  },
+  "bugs": {
+    "url": "https://github.com/One-Learning-Community/rozie.js/issues"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "peerDependencies": {
+    "lit": "^3.2",
+    "@lit-labs/preact-signals": "^1.0.0",
+    "@preact/signals-core": "^1.3.0",
+    "chart.js": "^4"
+  },
+  "peerDependenciesMeta": {
+    "lit": {
+      "optional": false
+    },
+    "@lit-labs/preact-signals": {
+      "optional": false
+    },
+    "@preact/signals-core": {
+      "optional": false
+    },
+    "chart.js": {
+      "optional": false
+    }
+  },
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

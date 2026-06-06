@@ -1,0 +1,358 @@
+<script lang="ts">
+import type { Snippet } from 'svelte';
+import { mount, unmount } from 'svelte';
+import PortalHost from '@rozie/runtime-svelte/PortalHost.svelte';
+import { onMount, untrack } from 'svelte';
+
+interface Props {
+  data?: any;
+  options?: any;
+  type?: string;
+  height?: number;
+  width?: number;
+  plugins?: any[];
+  updateMode?: string;
+  redraw?: boolean;
+  ariaLabel?: string;
+  tooltip?: Snippet<[{ model: any }]>;
+  snippets?: Record<string, any>;
+  onclick?: (...args: unknown[]) => void;
+  ondatasetclick?: (...args: unknown[]) => void;
+  onhover?: (...args: unknown[]) => void;
+}
+
+let __defaultData = (() => ({
+  labels: [],
+  datasets: []
+}))();
+let __defaultOptions = (() => ({}))();
+let __defaultPlugins = (() => [])();
+
+let {
+  data = __defaultData,
+  options = __defaultOptions,
+  type = 'line',
+  height = 240,
+  width = undefined,
+  plugins = __defaultPlugins,
+  updateMode = undefined,
+  redraw = false,
+  ariaLabel = undefined,
+  tooltip: __tooltipProp,
+  snippets,
+  onclick,
+  ondatasetclick,
+  onhover
+}: Props = $props();
+
+const tooltip = $derived(__tooltipProp ?? snippets?.tooltip);
+
+let canvasEl = $state<HTMLElement | undefined>(undefined);
+
+import { Chart as ChartJS, registerables } from 'chart.js';
+
+// Chart.js v3+ ships with no controllers/elements/scales pre-registered;
+// the consumer has to opt in. registerables is the "kitchen sink" bundle —
+// every controller, so the `type` prop can switch to any chart kind.
+// Chart.js v3+ ships with no controllers/elements/scales pre-registered;
+// the consumer has to opt in. registerables is the "kitchen sink" bundle —
+// every controller, so the `type` prop can switch to any chart kind.
+ChartJS.register(...registerables);
+let instance: any = null;
+// $refs.canvasEl is read ONLY inside $onMount (ROZ123); re-creates use this
+// captured node so no $refs read ever executes outside the mount hook. Named
+// `canvasNode` (NOT `canvasEl`) so it does not collide with the template
+// `ref="canvasEl"` binding, which the per-target emitters lower to their own
+// `canvasEl` ref declaration (a same-name script local double-declares it).
+// $refs.canvasEl is read ONLY inside $onMount (ROZ123); re-creates use this
+// captured node so no $refs read ever executes outside the mount hook. Named
+// `canvasNode` (NOT `canvasEl`) so it does not collide with the template
+// `ref="canvasEl"` binding, which the per-target emitters lower to their own
+// `canvasEl` ref declaration (a same-name script local double-declares it).
+let canvasNode: any = null;
+// Tooltip-portal teardown state at COMPONENT scope (not inside $onMount): the
+// $onMount-returned cleanup references these, and the Solid emitter hoists that
+// returned cleanup into a sibling onCleanup() OUTSIDE the mount-body IIFE — so a
+// cleanup that closed over $onMount-locals would lose scope. Component-scope
+// state (like `instance`) is in scope wherever the per-target cleanup lands.
+// Tooltip-portal teardown state at COMPONENT scope (not inside $onMount): the
+// $onMount-returned cleanup references these, and the Solid emitter hoists that
+// returned cleanup into a sibling onCleanup() OUTSIDE the mount-body IIFE — so a
+// cleanup that closed over $onMount-locals would lose scope. Component-scope
+// state (like `instance`) is in scope wherever the per-target cleanup lands.
+let tooltipEl: any = null;
+let tooltipDispose: any = null;
+// buildConfig is DEFINED inside $onMount (so its $emit/$portals/$slots
+// references are bound in the mount-lifecycle scope the per-target emitters
+// provide — mirrors FullCalendar's mount-built opts + CodeMirror's panelExt
+// note) and stored here so the top-level re-create $watches can call it.
+// buildConfig is DEFINED inside $onMount (so its $emit/$portals/$slots
+// references are bound in the mount-lifecycle scope the per-target emitters
+// provide — mirrors FullCalendar's mount-built opts + CodeMirror's panelExt
+// note) and stored here so the top-level re-create $watches can call it.
+let buildConfig: any = null;
+// Re-create the live instance. Chart.js exposes no stable runtime type-swap or
+// plugin-swap, so `type`/`plugins`/`redraw`-driven changes re-create. Uses the
+// captured canvasNode (never re-reads $refs outside $onMount).
+const recreate = () => {
+  if (!buildConfig || !canvasNode) return;
+  instance?.destroy();
+  instance = new ChartJS(canvasNode, buildConfig());
+};
+
+// Reconcile prop changes. Mutating chart.data in place and calling update() is
+// the Chart.js-supported runtime path — re-creating on every data tick would
+// flicker and leak. (When `redraw` is set, re-create wholesale instead.)
+// Imperative handle (Phase 21 $expose). The verbs are SUFFIXED with `Chart`
+// because bare `update`/`render` collide with LitElement's reactive-lifecycle
+// methods (`update(changedProperties)` / `render()`) and would shadow them on
+// the Lit leaf; `resize`/`reset`/`stop`/`clear` are suffixed too for a
+// consistent, unambiguous handle. `getChart` returns the live instance for
+// direct API access; `toBase64Image` is the marquee PNG-export capability.
+// Collision-clear: none of the 8 names collide with the 9 props.
+export function getChart() {
+  return instance;
+}
+export function updateChart(mode: any) {
+  instance?.update(mode);
+}
+export function resizeChart(w: any, h: any) {
+  instance?.resize(w, h);
+}
+export function resetChart() {
+  instance?.reset();
+}
+export function renderChart() {
+  instance?.render();
+}
+export function stopChart() {
+  return instance?.stop();
+}
+export function clearChart() {
+  return instance?.clear();
+}
+export function toBase64Image(type: any, quality: any) {
+  return instance ? instance.toBase64Image(type, quality) : null;
+}
+
+const portalInstances = new Set<Record<string, unknown>>();
+const portals = {
+  tooltip: (container: HTMLElement, scope: { model: unknown }): (() => void) => {
+    if (!tooltip) return () => {};
+    // Spike 004: portal-scope attribute injection.
+    container.setAttribute('data-rozie-portal-tooltip', '2228fabc');
+    const inst = mount(PortalHost, {
+      target: container,
+      props: { snippet: tooltip, scope },
+    });
+    portalInstances.add(inst as Record<string, unknown>);
+    return () => {
+      unmount(inst);
+      portalInstances.delete(inst as Record<string, unknown>);
+    };
+  },
+};
+$effect(() => () => {
+  for (const inst of portalInstances) unmount(inst as Parameters<typeof unmount>[0]);
+  portalInstances.clear();
+});
+
+onMount(() => {
+  canvasNode = canvasEl;
+
+  // ─── @click / @hover / @datasetClick — composed, never clobbering ──────────
+  // Chart.js calls onClick/onHover with (event, activeElements, chart). We call
+  // any consumer-supplied handler first (read off $props.options), then emit a
+  // structured payload resolving the hit element(s) via getElementsAtEventForMode.
+  const composedOnClick = (e: any, activeEls: any, chart: any) => {
+    const userOnClick = options?.onClick;
+    if (typeof userOnClick === 'function') userOnClick(e, activeEls, chart);
+    const nearest = chart.getElementsAtEventForMode(e, 'nearest', {
+      intersect: true
+    }, false);
+    onclick?.({
+      event: e,
+      elements: nearest,
+      chart
+    });
+    const dataset = chart.getElementsAtEventForMode(e, 'dataset', {
+      intersect: true
+    }, false);
+    if (dataset.length) {
+      ondatasetclick?.({
+        event: e,
+        elements: dataset,
+        datasetIndex: dataset[0].datasetIndex,
+        chart
+      });
+    }
+  };
+  const composedOnHover = (e: any, activeEls: any, chart: any) => {
+    const userOnHover = options?.onHover;
+    if (typeof userOnHover === 'function') userOnHover(e, activeEls, chart);
+    onhover?.({
+      event: e,
+      elements: activeEls,
+      chart
+    });
+  };
+
+  // ─── external-HTML tooltip portal slot ─────────────────────────────────────
+  // Only active when the consumer fills <slot name="tooltip">. The external
+  // handler positions a container over the canvas and mounts the consumer's
+  // framework-native fragment through $portals.tooltip(dom, scope). The scope
+  // carries the live tooltip model (title/body/dataPoints/position). Chart.js
+  // throttles external calls to active-element changes, so the dispose+remount
+  // on body-change is cheap. enabled:false suppresses the built-in canvas
+  // tooltip when we take over.
+  let tooltipKey = '';
+  const tooltipExternal = (context: any) => {
+    const {
+      chart,
+      tooltip
+    } = context;
+    if (!tooltipEl) {
+      tooltipEl = document.createElement('div');
+      tooltipEl.className = 'rozie-chart-tooltip';
+      tooltipEl.style.position = 'absolute';
+      tooltipEl.style.pointerEvents = 'none';
+      tooltipEl.style.transition = 'opacity 0.1s ease';
+      chart.canvas.parentNode.appendChild(tooltipEl);
+    }
+    if (tooltip.opacity === 0) {
+      tooltipEl.style.opacity = '0';
+      return;
+    }
+    const title = (tooltip.title || []).join(' ');
+    const body = (tooltip.body || []).map((b: any) => b.lines.join(' ')).join(' | ');
+    const key = `${title}::${body}`;
+    if (key !== tooltipKey) {
+      tooltipKey = key;
+      tooltipDispose?.();
+      // The scope MUST match the slot's declared param (`model`): the consumer's
+      // <slot name="tooltip"> receives a single `model` scoped value.
+      const scope = {
+        model: {
+          title: tooltip.title || [],
+          body: (tooltip.body || []).map((b: any) => b.lines),
+          dataPoints: tooltip.dataPoints || [],
+          opacity: tooltip.opacity
+        }
+      };
+      tooltipDispose = portals.tooltip(tooltipEl, scope);
+    }
+    const {
+      offsetLeft,
+      offsetTop
+    } = chart.canvas;
+    tooltipEl.style.opacity = '1';
+    tooltipEl.style.left = `${offsetLeft + tooltip.caretX}px`;
+    tooltipEl.style.top = `${offsetTop + tooltip.caretY}px`;
+  };
+
+  // ─── config builder ────────────────────────────────────────────────────────
+  // $snapshot strips Svelte 5's $state proxy first; Chart.js redefines property
+  // descriptors on whatever object it is handed.
+  buildConfig = () => {
+    const userOpts = $state.snapshot(options) || {};
+    const tooltipOpt = tooltip ? {
+      ...(userOpts.plugins?.tooltip || {}),
+      enabled: false,
+      external: tooltipExternal
+    } : userOpts.plugins?.tooltip;
+    return {
+      type: type,
+      data: $state.snapshot(data),
+      // per-instance plugins[] — the consumer-extensibility passthrough.
+      plugins: $state.snapshot(plugins),
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: {
+          duration: 250
+        },
+        ...userOpts,
+        onClick: composedOnClick,
+        onHover: composedOnHover,
+        plugins: {
+          ...(userOpts.plugins || {}),
+          tooltip: tooltipOpt
+        }
+      }
+    };
+  };
+  instance = new ChartJS(canvasNode, buildConfig());
+  return () => {
+    tooltipDispose?.();
+    tooltipEl?.remove();
+    instance?.destroy();
+  };
+});
+
+$effect(() => { const __watchVal = (() => data)(); untrack(() => ((v: any) => {
+  if (!instance) return;
+  if (redraw) {
+    recreate();
+    return;
+  }
+
+  // Reconcile a new data object into the LIVE chart instead of replacing
+  // instance.data. Chart.js matches dataset controllers and point elements by
+  // array index across an update(), so mutating the existing labels/datasets
+  // arrays lets it tween every point from old value to new. Assigning a fresh
+  // instance.data severs that identity.
+  const next = $state.snapshot(v);
+  const live = instance.data;
+  live.labels ??= [];
+  live.labels.length = 0;
+  live.labels.push(...(next.labels ?? []));
+  live.datasets ??= [];
+  const nextSets = next.datasets ?? [];
+  nextSets.forEach((ds: any, i: any) => {
+    if (live.datasets[i]) Object.assign(live.datasets[i], ds);else live.datasets[i] = ds;
+  });
+  live.datasets.length = nextSets.length;
+  instance.update(updateMode);
+})(__watchVal)); });
+let __rozieWatchInitial_1 = true;
+$effect(() => { (() => options)(); untrack(() => { if (__rozieWatchInitial_1) { __rozieWatchInitial_1 = false; return; } (() => {
+  if (!instance || !buildConfig) return;
+  instance.options = buildConfig().options;
+  instance.update('none');
+})(); }); });
+let __rozieWatchInitial_2 = true;
+$effect(() => { (() => type)(); untrack(() => { if (__rozieWatchInitial_2) { __rozieWatchInitial_2 = false; return; } (() => recreate())(); }); });
+let __rozieWatchInitial_3 = true;
+$effect(() => { (() => plugins)(); untrack(() => { if (__rozieWatchInitial_3) { __rozieWatchInitial_3 = false; return; } (() => recreate())(); }); });
+</script>
+
+
+<div class="rozie-chart" style:height={height + 'px'} style:width={width ? width + 'px' : undefined} data-rozie-s-2228fabc>
+  <canvas bind:this={canvasEl} role="img" aria-label={ariaLabel} data-rozie-s-2228fabc></canvas>
+</div>
+
+
+
+
+<style>
+:global {
+  .rozie-chart[data-rozie-s-2228fabc] {
+    position: relative;
+    width: 100%;
+  }
+  .rozie-chart[data-rozie-s-2228fabc] canvas[data-rozie-s-2228fabc] {
+    display: block;
+    width: 100% !important;
+    height: 100% !important;
+  }
+  .rozie-chart[data-rozie-s-2228fabc] [data-rozie-s-2228fabc]:global(.rozie-chart-tooltip) {
+    background: rgba(0, 0, 0, 0.8);
+    color: #fff;
+    border-radius: 4px;
+    padding: 6px 8px;
+    font-size: 12px;
+    transform: translate(-50%, calc(-100% - 8px));
+    white-space: nowrap;
+  }
+}
+</style>
