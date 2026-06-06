@@ -298,6 +298,22 @@ export interface SlotDecl {
    * @experimental — added in Spike 003
    */
   portalParamNames?: string[];
+  /**
+   * Reactive portal-slot opt-in (Phase 33 / REQ-22). When `true`, the portal
+   * slot re-renders IN PLACE as the wrapper's scope changes (no remount) —
+   * the engine-driven `update(scope)` path, vs. the default mount-once portal
+   * whose scope is frozen after first render (REQ-5). Only meaningful when
+   * `isPortal === true`; the parser gates this flag on `isPortal`, so a bare
+   * `reactive` attribute without `portal` is inert and never sets it.
+   *
+   * Authored as `<slot name="event" portal reactive :params="['arg']" />`.
+   *
+   * Undefined === false (back-compat). Non-reactive slots keep the existing
+   * `() => void` portal emit shape — this is purely additive (REQ-22).
+   *
+   * @experimental — added in Phase 33
+   */
+  isReactive?: boolean;
 }
 
 /**

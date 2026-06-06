@@ -117,6 +117,20 @@ function detectPortal(slot: TemplateElement): boolean {
 }
 
 /**
+ * Detect the bare `reactive` static attribute on a `<slot>` element. The parser
+ * emits boolean attrs as `kind: 'static', value: null`. Phase 33 / REQ-22: only
+ * meaningful when the slot is ALSO a portal — the call site gates the resulting
+ * `decl.isReactive` assignment on `isPortal`, so a bare `reactive` with no
+ * `portal` is inert (never sets the flag).
+ */
+function detectReactive(slot: TemplateElement): boolean {
+  for (const a of slot.attributes) {
+    if (a.kind === 'static' && a.name === 'reactive' && a.value === null) return true;
+  }
+  return false;
+}
+
+/**
  * Extract the scope-key names from a portal slot's `:params="['a', 'b']"`
  * attribute. Returns [] when omitted or unparseable — emitters degrade to
  * an `unknown` scope.
@@ -239,6 +253,11 @@ function visit(
       if (isPortal) {
         decl.isPortal = true;
         decl.portalParamNames = portalParamNames;
+        // Phase 33 / REQ-22: reactive is gated on isPortal — only set it for a
+        // `portal reactive` slot; a bare `reactive` with no `portal` is inert.
+        if (detectReactive(node)) {
+          decl.isReactive = true;
+        }
       }
       out.push(decl);
       continue;
