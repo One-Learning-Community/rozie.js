@@ -11,13 +11,7 @@ let __defaultBadges = (() => [])();
 let { badges = __defaultBadges, ...__rozieAttrs }: Props = $props();
 </script>
 
-
-<div {...__rozieAttrs} class={["badge-grid", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-44801268>
-  {#each badges as badge (badge)}<span class="badge badge--neutral" data-rozie-s-44801268>
-    {rozieDisplay(badge)}
-  </span>{/each}
-</div>
-
+<div {...__rozieAttrs} class={["badge-grid", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-44801268>{#each badges as badge (badge)}<span class="badge badge--neutral" data-rozie-s-44801268>{rozieDisplay(badge)}</span>{/each}</div>
 
 <style>
 :global {

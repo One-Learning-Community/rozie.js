@@ -101,16 +101,7 @@ $effect(() => {
 });
 </script>
 
-
-<div {...__rozieAttrs} class={["dropdown", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-6d6bd882>
-  <div bind:this={triggerEl} onclick={toggle} data-rozie-s-6d6bd882>
-    {@render trigger?.({ open, toggle })}
-  </div>
-
-  {#if open}<div bind:this={panelEl} class="dropdown-panel" role="menu" data-rozie-s-6d6bd882>
-    {@render children?.({ close })}
-  </div>{/if}</div>
-
+<div {...__rozieAttrs} class={["dropdown", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-6d6bd882><div bind:this={triggerEl} onclick={toggle} data-rozie-s-6d6bd882>{@render trigger?.({ open, toggle })}</div>{#if open}<div bind:this={panelEl} class="dropdown-panel" role="menu" data-rozie-s-6d6bd882>{@render children?.({ close })}</div>{/if}</div>
 
 <style>
 :global {

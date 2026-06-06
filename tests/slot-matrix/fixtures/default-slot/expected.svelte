@@ -18,8 +18,4 @@ let {
 const children = $derived(__childrenProp ?? snippets?.children);
 </script>
 
-
-<div {...__rozieAttrs} class={["default-slot-fixture", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-61728cb8>
-  {@render children?.()}
-</div>
-
+<div {...__rozieAttrs} class={["default-slot-fixture", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-61728cb8>{@render children?.()}</div>

@@ -24,16 +24,7 @@ const decValue = () => {
 };
 </script>
 
-
-<div {...__rozieAttrs} class={["probe", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-0fceff7a>
-  <button aria-label="Decrement count" onclick={decCount} data-rozie-s-0fceff7a>−</button>
-  <span class="count" data-rozie-s-0fceff7a>{count}</span>
-  <button aria-label="Increment count" onclick={incCount} data-rozie-s-0fceff7a>+</button>
-  <button aria-label="Decrement value" onclick={decValue} data-rozie-s-0fceff7a>−</button>
-  <span class="value" data-rozie-s-0fceff7a>{value}</span>
-  <button aria-label="Increment value" onclick={incValue} data-rozie-s-0fceff7a>+</button>
-</div>
-
+<div {...__rozieAttrs} class={["probe", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-0fceff7a><button aria-label="Decrement count" onclick={decCount} data-rozie-s-0fceff7a>−</button><span class="count" data-rozie-s-0fceff7a>{count}</span><button aria-label="Increment count" onclick={incCount} data-rozie-s-0fceff7a>+</button><button aria-label="Decrement value" onclick={decValue} data-rozie-s-0fceff7a>−</button><span class="value" data-rozie-s-0fceff7a>{value}</span><button aria-label="Increment value" onclick={incValue} data-rozie-s-0fceff7a>+</button></div>
 
 <style>
 :global {

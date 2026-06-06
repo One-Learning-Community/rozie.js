@@ -8,6 +8,4 @@ interface Props {
 let { ...__rozieAttrs }: Props = $props();
 </script>
 
-
 <Producer title={'Hello'} data-rozie-s-bd0c3708>Body text</Producer>
-

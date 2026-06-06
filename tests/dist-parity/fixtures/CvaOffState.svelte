@@ -17,12 +17,7 @@ function onInput(e: any) {
 }
 </script>
 
-
-<div {...__rozieAttrs} class={["cva-off-state", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-a2873aa8>
-  <input type="text" value={value} placeholder="Type a value" oninput={onInput} data-rozie-s-a2873aa8 />
-  <span class="echo" data-rozie-s-a2873aa8>{value}</span>
-</div>
-
+<div {...__rozieAttrs} class={["cva-off-state", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-a2873aa8><input type="text" value={value} placeholder="Type a value" oninput={onInput} data-rozie-s-a2873aa8 /><span class="echo" data-rozie-s-a2873aa8>{value}</span></div>
 
 <style>
 :global {

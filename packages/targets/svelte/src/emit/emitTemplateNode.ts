@@ -107,6 +107,48 @@ function emitStaticText(node: TemplateStaticTextIR): string {
   return node.text;
 }
 
+/**
+ * Debug fix(33-04) (tiptap-nodeview svelte reflow) — drop insignificant
+ * inter-element whitespace, matching the JSX/Vue rule the other 5 targets
+ * already apply.
+ *
+ * Root cause: the `.rozie` source formats sibling elements across lines
+ * (`</span>\n        <span>`), producing whitespace-only `TemplateStaticText`
+ * IR nodes between them. React/Solid (JSX runtime) and Vue (compiler
+ * `whitespace: 'condense'`) collapse such nodes; Svelte renders them as real
+ * text nodes. Inside an `display:inline` fragment containing block children
+ * (the grafted TipTap node-view), each surviving whitespace node creates an
+ * extra inline line-box — the node-view rendered ~50px taller on Svelte only
+ * (callout 69px vs 51px on the other 5 targets), the sole remaining 6/6 pixel
+ * divergence.
+ *
+ * The rule is JSX-exact: a `TemplateStaticText` node is dropped iff it is
+ * whitespace-only AND contains a newline (i.e. it is layout-formatting
+ * whitespace between tags on separate source lines). Whitespace WITHOUT a
+ * newline — deliberate inline spacing such as `Hello <b>world</b>` written on
+ * one line, or a space between text and an interpolation — is preserved, so
+ * meaningful spacing is never lost. This mirrors React/Babel's JSX whitespace
+ * collapsing precisely.
+ */
+function isInsignificantWhitespaceText(node: TemplateNode): boolean {
+  if (node.type !== 'TemplateStaticText') return false;
+  const t = node.text;
+  return t.length > 0 && t.trim() === '' && t.includes('\n');
+}
+
+/**
+ * Emit a children array to a joined Svelte markup string, dropping
+ * insignificant inter-element whitespace (see `isInsignificantWhitespaceText`).
+ * Single shared path so every children-emit site collapses whitespace
+ * identically — matching the other 5 targets and keeping the rule in one place.
+ */
+function emitChildrenJoined(children: readonly TemplateNode[], ctx: EmitNodeCtx): string {
+  return children
+    .filter((c) => !isInsignificantWhitespaceText(c))
+    .map((c) => emitNode(c, ctx))
+    .join('');
+}
+
 function emitInterpolation(
   node: TemplateInterpolationIR,
   ctx: EmitNodeCtx,
@@ -128,7 +170,7 @@ function emitFragment(
   node: TemplateFragmentIR,
   ctx: EmitNodeCtx,
 ): string {
-  return node.children.map((c) => emitNode(c, ctx)).join('');
+  return emitChildrenJoined(node.children, ctx);
 }
 
 /**
@@ -142,7 +184,7 @@ function emitConditional(
   const parts: string[] = [];
   for (let i = 0; i < node.branches.length; i++) {
     const branch = node.branches[i]!;
-    const inner = branch.body.map((c) => emitNode(c, ctx)).join('');
+    const inner = emitChildrenJoined(branch.body, ctx);
     if (i === 0) {
       const test = branch.test
         ? rewriteTemplateExpression(branch.test, ctx.ir)
@@ -188,7 +230,7 @@ function emitLoop(node: TemplateLoopIR, ctx: EmitNodeCtx): string {
   };
 
   const innerNodes = node.body.map(stripKey);
-  const inner = innerNodes.map((c) => emitNode(c, ctx)).join('');
+  const inner = emitChildrenJoined(innerNodes, ctx);
 
   return `{#each ${iter} as ${itemDecl}${keySuffix}}${inner}{/each}`;
 }
@@ -450,7 +492,7 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
   // skip the children path below.
   if (node.slotFillers !== undefined && node.slotFillers.length > 0) {
     const emitChildren = (children: TemplateNode[]): string =>
-      children.map((c) => emitNode(c, ctx)).join('');
+      emitChildrenJoined(children, ctx);
     const fillerCtx = { ir: ctx.ir, emitChildren };
 
     const fillerParts: string[] = [];
@@ -486,7 +528,7 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
     return `<${node.tagName}${head}></${node.tagName}>`;
   }
 
-  const inner = node.children.map((c) => emitNode(c, ctx)).join('');
+  const inner = emitChildrenJoined(node.children, ctx);
   return `<${node.tagName}${head}>${inner}</${node.tagName}>`;
 }
 
@@ -630,7 +672,7 @@ export function emitNode(node: TemplateNode, ctx: EmitNodeCtx): string {
     case 'TemplateSlotInvocation':
       return emitSlotInvocation(node as TemplateSlotInvocationIR, {
         ir: ctx.ir,
-        emitChildren: (children) => children.map((c) => emitNode(c, ctx)).join(''),
+        emitChildren: (children) => emitChildrenJoined(children, ctx),
       });
     case 'TemplateElement':
       return emitElement(node, ctx);

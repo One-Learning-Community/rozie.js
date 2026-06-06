@@ -10,12 +10,7 @@ let { ...__rozieAttrs }: Props = $props();
 let draft = $state('');
 </script>
 
-
-<div {...__rozieAttrs} class={["rmodel-lazy", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-34fe9f5a>
-  <input type="text" value={draft} onchange={($event) => draft = $event.currentTarget.value} placeholder="Commit on blur" data-rozie-s-34fe9f5a />
-  <p class="echo" data-rozie-s-34fe9f5a>Committed: {draft}</p>
-</div>
-
+<div {...__rozieAttrs} class={["rmodel-lazy", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-34fe9f5a><input type="text" value={draft} onchange={($event) => draft = $event.currentTarget.value} placeholder="Commit on blur" data-rozie-s-34fe9f5a /><p class="echo" data-rozie-s-34fe9f5a>Committed: {draft}</p></div>
 
 <style>
 :global {

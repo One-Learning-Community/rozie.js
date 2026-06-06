@@ -635,20 +635,7 @@ $effect(() => { const __watchVal = (() => options)(); untrack(() => { if (__rozi
 })(__watchVal); }); });
 </script>
 
-
 <div class="rozie-fullcalendar" bind:this={__rozieRoot} data-rozie-s-5589629a></div>
-
-
-
-
-
-
-
-
-
-
-
-
 
 <style>
 :global {

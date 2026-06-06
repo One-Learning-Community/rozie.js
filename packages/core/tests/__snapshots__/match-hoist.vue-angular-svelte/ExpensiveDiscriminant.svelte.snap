@@ -15,13 +15,7 @@ const __rozieMatch_0 = $derived(classify());
 const __rozieMatch_1 = $derived(subClassify());
 </script>
 
-
-{#if __rozieMatch_0 === 'pass'}
-    <div class="passed" data-rozie-s-bb543ee0>
-      {#if __rozieMatch_1 === 'distinction'}<strong data-rozie-s-bb543ee0>passed with distinction</strong>{:else if __rozieMatch_1 === 'merit'}<span data-rozie-s-bb543ee0>passed with merit</span>{:else}<span data-rozie-s-bb543ee0>passed</span>{/if}
-    </div>
-  {:else if __rozieMatch_0 === 'fail'}<span class="failed" data-rozie-s-bb543ee0>did not pass</span>{:else}<span class="unknown" data-rozie-s-bb543ee0>ungraded</span>{/if}
-
+{#if __rozieMatch_0 === 'pass'}<div class="passed" data-rozie-s-bb543ee0>{#if __rozieMatch_1 === 'distinction'}<strong data-rozie-s-bb543ee0>passed with distinction</strong>{:else if __rozieMatch_1 === 'merit'}<span data-rozie-s-bb543ee0>passed with merit</span>{:else}<span data-rozie-s-bb543ee0>passed</span>{/if}</div>{:else if __rozieMatch_0 === 'fail'}<span class="failed" data-rozie-s-bb543ee0>did not pass</span>{:else}<span class="unknown" data-rozie-s-bb543ee0>ungraded</span>{/if}
 
 <style>
 :global {

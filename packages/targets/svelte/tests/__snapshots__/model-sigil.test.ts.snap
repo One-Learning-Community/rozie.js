@@ -33,8 +33,6 @@ $effect(() => {
 });
 </script>
 
-
-  <button {...__rozieAttrs} onclick={($event) => { value += 1; }} use:applyListeners={__rozieAttrs} data-rozie-s-78a54232>{value}</button>
-
+<button {...__rozieAttrs} onclick={($event) => { value += 1; }} use:applyListeners={__rozieAttrs} data-rozie-s-78a54232>{value}</button>
 "
 `;

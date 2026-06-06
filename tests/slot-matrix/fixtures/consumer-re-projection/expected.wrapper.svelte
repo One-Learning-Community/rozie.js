@@ -21,8 +21,4 @@ const title = $derived(__titleProp ?? snippets?.title);
 const children = $derived(__childrenProp ?? snippets?.children);
 </script>
 
-
-<Inner data-rozie-s-ac96baae>{#snippet header()}
-    {#if title}{@render title()}{:else}default title{/if}
-  {/snippet}{#if children}{@render children()}{:else}default body{/if}</Inner>
-
+<Inner data-rozie-s-ac96baae>{#snippet header()}{#if title}{@render title()}{:else}default title{/if}{/snippet}{#if children}{@render children()}{:else}default body{/if}</Inner>

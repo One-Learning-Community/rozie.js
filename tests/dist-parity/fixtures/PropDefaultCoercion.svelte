@@ -42,14 +42,7 @@ onMount(() => {
 });
 </script>
 
-
-<div {...__rozieAttrs} class={["pdc", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-109e595c>
-  <pre data-rozie-pdc-output="" data-rozie-s-109e595c>{rozieDisplay(JSON.stringify(observed))}</pre>
-  
-  <span data-rozie-pdc-e-identity="" data-rozie-s-109e595c>{rozieDisplay(e === e ? 'true' : 'false')}</span>
-  <span data-rozie-pdc-f-identity="" data-rozie-s-109e595c>{rozieDisplay(f === f ? 'true' : 'false')}</span>
-</div>
-
+<div {...__rozieAttrs} class={["pdc", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-109e595c><pre data-rozie-pdc-output="" data-rozie-s-109e595c>{rozieDisplay(JSON.stringify(observed))}</pre><span data-rozie-pdc-e-identity="" data-rozie-s-109e595c>{rozieDisplay(e === e ? 'true' : 'false')}</span><span data-rozie-pdc-f-identity="" data-rozie-s-109e595c>{rozieDisplay(f === f ? 'true' : 'false')}</span></div>
 
 <style>
 :global {

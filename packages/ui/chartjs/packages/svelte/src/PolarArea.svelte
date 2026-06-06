@@ -375,14 +375,7 @@ let __rozieWatchInitial_2 = true;
 $effect(() => { (() => plugins)(); untrack(() => { if (__rozieWatchInitial_2) { __rozieWatchInitial_2 = false; return; } (() => recreate())(); }); });
 </script>
 
-
-<div class="rozie-chart" style:height={height + 'px'} style:width={width ? width + 'px' : undefined} data-rozie-s-52afe0aa>
-  
-  <canvas bind:this={canvasEl} role="img" aria-label={ariaLabel} data-rozie-s-52afe0aa>{@render fallback?.()}</canvas>
-</div>
-
-
-
+<div class="rozie-chart" style:height={height + 'px'} style:width={width ? width + 'px' : undefined} data-rozie-s-52afe0aa><canvas bind:this={canvasEl} role="img" aria-label={ariaLabel} data-rozie-s-52afe0aa>{@render fallback?.()}</canvas></div>
 
 <style>
 :global {

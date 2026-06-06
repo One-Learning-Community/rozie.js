@@ -21,16 +21,7 @@ const wrapper = $derived(__wrapperProp ?? snippets?.wrapper);
 const inner = $derived(__innerProp ?? snippets?.inner);
 </script>
 
-
-<div {...__rozieAttrs} class={["outer", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-3bc5be6c>
-  
-  {#if wrapper}{@render wrapper()}{:else}
-    <div class="wrapper-fallback" data-rozie-s-3bc5be6c>
-      {@render inner?.()}
-    </div>
-  {/if}
-</div>
-
+<div {...__rozieAttrs} class={["outer", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-3bc5be6c>{#if wrapper}{@render wrapper()}{:else}<div class="wrapper-fallback" data-rozie-s-3bc5be6c>{@render inner?.()}</div>{/if}</div>
 
 <style>
 :global {

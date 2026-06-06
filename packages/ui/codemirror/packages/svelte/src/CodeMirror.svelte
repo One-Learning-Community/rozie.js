@@ -294,13 +294,7 @@ $effect(() => { const __watchVal = (() => extensions)(); untrack(() => { if (__r
 })(__watchVal); }); });
 </script>
 
-
-<div class="rozie-codemirror" style:height={height + 'px'} data-rozie-s-34cfda5a>
-  <div class="cm-mount" bind:this={hostEl} data-rozie-s-34cfda5a></div>
-</div>
-
-
-
+<div class="rozie-codemirror" style:height={height + 'px'} data-rozie-s-34cfda5a><div class="cm-mount" bind:this={hostEl} data-rozie-s-34cfda5a></div></div>
 
 <style>
 :global {

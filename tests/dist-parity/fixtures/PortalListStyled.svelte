@@ -99,11 +99,7 @@ onMount(() => {
 });
 </script>
 
-
-<div bind:this={__rozieRoot} {...__rozieAttrs} class={["rozie-portal-list", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-18e5aac6>
-  
-</div>
-
+<div bind:this={__rozieRoot} {...__rozieAttrs} class={["rozie-portal-list", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-18e5aac6></div>
 
 <style>
 :global {

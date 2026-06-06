@@ -31,13 +31,7 @@ const canIncrement = $derived(value + step <= max);
 const canDecrement = $derived(value - step >= min);
 </script>
 
-
-<div {...__rozieAttrs} class={["counter", { hovering: hovering }, (__rozieAttrs)?.class]} onmouseenter={($event) => { hovering = true; }} onmouseleave={($event) => { hovering = false; }} use:applyListeners={__rozieAttrs} data-rozie-s-c72e01d0>
-  <button disabled={!canDecrement} aria-label="Decrement" onclick={decrement} data-rozie-s-c72e01d0>−</button>
-  <span class="value" data-rozie-s-c72e01d0>{value}</span>
-  <button disabled={!canIncrement} aria-label="Increment" onclick={increment} data-rozie-s-c72e01d0>+</button>
-</div>
-
+<div {...__rozieAttrs} class={["counter", { hovering: hovering }, (__rozieAttrs)?.class]} onmouseenter={($event) => { hovering = true; }} onmouseleave={($event) => { hovering = false; }} use:applyListeners={__rozieAttrs} data-rozie-s-c72e01d0><button disabled={!canDecrement} aria-label="Decrement" onclick={decrement} data-rozie-s-c72e01d0>−</button><span class="value" data-rozie-s-c72e01d0>{value}</span><button disabled={!canIncrement} aria-label="Increment" onclick={increment} data-rozie-s-c72e01d0>+</button></div>
 
 <style>
 :global {

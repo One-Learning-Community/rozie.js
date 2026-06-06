@@ -18,9 +18,4 @@ let {
 const aside = $derived(__asideProp ?? snippets?.aside);
 </script>
 
-
-<div {...__rozieAttrs} class={["presence-check-fixture", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-313bf282>
-  {#if aside}<aside data-rozie-s-313bf282>
-    {#if aside}{@render aside()}{/if}
-  </aside>{/if}</div>
-
+<div {...__rozieAttrs} class={["presence-check-fixture", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-313bf282>{#if aside}<aside data-rozie-s-313bf282>{#if aside}{@render aside()}{/if}</aside>{/if}</div>

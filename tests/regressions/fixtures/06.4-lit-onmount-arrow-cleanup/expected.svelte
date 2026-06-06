@@ -28,9 +28,7 @@ onMount(() => {
 });
 </script>
 
-
 <div {...__rozieAttrs} class={["ticker", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-722b58d1>{ticks}</div>
-
 
 <style>
 :global {

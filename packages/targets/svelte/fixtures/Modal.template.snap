@@ -1,16 +1,1 @@
-
-{#if open}<div class="modal-backdrop" bind:this={backdropEl} onclick={($event) => { if ($event.target !== $event.currentTarget) return; closeOnBackdrop && close(); }}>
-  <div bind:this={dialogEl} class="modal-dialog" role="dialog" aria-modal="true" aria-label={rozieDisplay(title || undefined)} tabindex="-1">
-    {#if title || header}<header>
-      {#if header}{@render header({ close })}{:else}
-        <h2>{title}</h2>
-      {/if}
-      <button class="close-btn" aria-label="Close" onclick={close}>×</button>
-    </header>{/if}<div class="modal-body">
-      {@render children?.({ close })}
-    </div>
-
-    {#if footer}<footer>
-      {#if footer}{@render footer({ close })}{/if}
-    </footer>{/if}</div>
-</div>{/if}
+{#if open}<div class="modal-backdrop" bind:this={backdropEl} onclick={($event) => { if ($event.target !== $event.currentTarget) return; closeOnBackdrop && close(); }}><div bind:this={dialogEl} class="modal-dialog" role="dialog" aria-modal="true" aria-label={rozieDisplay(title || undefined)} tabindex="-1">{#if title || header}<header>{#if header}{@render header({ close })}{:else}<h2>{title}</h2>{/if}<button class="close-btn" aria-label="Close" onclick={close}>×</button></header>{/if}<div class="modal-body">{@render children?.({ close })}</div>{#if footer}<footer>{#if footer}{@render footer({ close })}{/if}</footer>{/if}</div></div>{/if}

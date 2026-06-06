@@ -8,9 +8,7 @@ let { ...__rozieAttrs }: Props = $props();
 let bound = $state('max');
 </script>
 
-
 {#if bound === 'max' || bound === 'min'}<span class="extremum" data-rozie-s-65af5512>at an extremum</span>{:else if bound === 'mid'}<span class="middle" data-rozie-s-65af5512>in the middle</span>{:else}<span class="other" data-rozie-s-65af5512>somewhere else</span>{/if}
-
 
 <style>
 :global {

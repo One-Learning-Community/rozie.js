@@ -9,9 +9,7 @@ interface Props {
 let { content = '<strong>safe</strong>', ...__rozieAttrs }: Props = $props();
 </script>
 
-
 <div {...__rozieAttrs} class={["rhtml", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-09a5f2a6>{@html content}</div>
-
 
 <style>
 :global {

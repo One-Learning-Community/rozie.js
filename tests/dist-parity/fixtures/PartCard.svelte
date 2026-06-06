@@ -20,12 +20,7 @@ let {
 const children = $derived(__childrenProp ?? snippets?.children);
 </script>
 
-
-<div part="body" {...__rozieAttrs} class={["card-body", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-1462f7ea>
-  <h3 class="card-title" data-rozie-s-1462f7ea>{title}</h3>
-  {@render children?.()}
-</div>
-
+<div part="body" {...__rozieAttrs} class={["card-body", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-1462f7ea><h3 class="card-title" data-rozie-s-1462f7ea>{title}</h3>{@render children?.()}</div>
 
 <style>
 :global {

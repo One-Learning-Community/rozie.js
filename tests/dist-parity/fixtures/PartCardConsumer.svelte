@@ -9,13 +9,9 @@ interface Props {
 let { ...__rozieAttrs }: Props = $props();
 </script>
 
-
-<div {...__rozieAttrs} class={["part-card-consumer", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-7f4fb92a>
-  <PartCard title={'Hello'} data-rozie-s-7f4fb92a>
+<div {...__rozieAttrs} class={["part-card-consumer", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-7f4fb92a><PartCard title={'Hello'} data-rozie-s-7f4fb92a>
     Cross-shadow styled body content.
-  </PartCard>
-</div>
-
+  </PartCard></div>
 
 <style>
 :global {

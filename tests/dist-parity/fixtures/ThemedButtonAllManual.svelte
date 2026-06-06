@@ -14,11 +14,7 @@ let {
 }: Props = $props();
 </script>
 
-
-<button style="--btn-bg: #3b82f6; --btn-fg: #ffffff" {...__rozieAttrs} class={["btn", variant, (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-de172510>
-  {label}
-</button>
-
+<button style="--btn-bg: #3b82f6; --btn-fg: #ffffff" {...__rozieAttrs} class={["btn", variant, (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-de172510>{label}</button>
 
 <style>
 :global {

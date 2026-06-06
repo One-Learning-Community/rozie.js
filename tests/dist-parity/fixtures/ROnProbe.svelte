@@ -19,13 +19,7 @@ const debouncedOnInput = (() => {
 })();
 </script>
 
-
-<div class="r-on-probe" data-rozie-s-c4bd99aa>
-  <span onclick={($event) => { $event.stopPropagation(); (fn as (...a: any[]) => any)($event); }} oninput={debouncedOnInput} data-rozie-s-c4bd99aa>literal modifier-bearing</span>
-  <span use:applyListeners={someObj} data-rozie-s-c4bd99aa>dynamic</span>
-  <span onclick={($event) => { (() => { (f1 as (...a: any[]) => any)($event); })(); (() => { (f2 as (...a: any[]) => any)($event); })(); }} data-rozie-s-c4bd99aa>R6 source-order merge</span>
-</div>
-
+<div class="r-on-probe" data-rozie-s-c4bd99aa><span onclick={($event) => { $event.stopPropagation(); (fn as (...a: any[]) => any)($event); }} oninput={debouncedOnInput} data-rozie-s-c4bd99aa>literal modifier-bearing</span><span use:applyListeners={someObj} data-rozie-s-c4bd99aa>dynamic</span><span onclick={($event) => { (() => { (f1 as (...a: any[]) => any)($event); })(); (() => { (f2 as (...a: any[]) => any)($event); })(); }} data-rozie-s-c4bd99aa>R6 source-order merge</span></div>
 
 <style>
 :global {

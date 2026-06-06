@@ -19,12 +19,7 @@ export function focus(): void {
 }
 </script>
 
-
-<div {...__rozieAttrs} class={["expose-probe", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-dd2b93b0>
-  <input bind:this={field} type="text" bind:value={value} placeholder="Type something" data-rozie-s-dd2b93b0 />
-  <span class="echo" data-rozie-s-dd2b93b0>{value}</span>
-</div>
-
+<div {...__rozieAttrs} class={["expose-probe", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-dd2b93b0><input bind:this={field} type="text" bind:value={value} placeholder="Type something" data-rozie-s-dd2b93b0 /><span class="echo" data-rozie-s-dd2b93b0>{value}</span></div>
 
 <style>
 :global {

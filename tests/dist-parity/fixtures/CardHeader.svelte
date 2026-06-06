@@ -14,11 +14,7 @@ let {
 }: Props = $props();
 </script>
 
-
-<header {...__rozieAttrs} class={["card-header", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-f3e60f5a>
-  <h3 class="card-header__title" data-rozie-s-f3e60f5a>{title}</h3>
-  {#if onClose}<button class="card-header__close" onclick={($event) => { (onClose)($event); }} data-rozie-s-f3e60f5a>×</button>{/if}</header>
-
+<header {...__rozieAttrs} class={["card-header", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-f3e60f5a><h3 class="card-header__title" data-rozie-s-f3e60f5a>{title}</h3>{#if onClose}<button class="card-header__close" onclick={($event) => { (onClose)($event); }} data-rozie-s-f3e60f5a>×</button>{/if}</header>
 
 <style>
 :global {

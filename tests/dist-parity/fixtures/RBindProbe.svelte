@@ -8,12 +8,7 @@ interface Props {
 let { ...__rozieAttrs }: Props = $props();
 </script>
 
-
-<div class="rbind-probe" use:applyListeners={__rozieAttrs} data-rozie-s-8e2458d6>
-  <span class={['a', 'b']} {...{ id: 'x' }} data-rozie-s-8e2458d6>canonical</span>
-  <span {...{ id: 'y' }} class={['b', 'a']} data-rozie-s-8e2458d6>reordered</span>
-</div>
-
+<div class="rbind-probe" use:applyListeners={__rozieAttrs} data-rozie-s-8e2458d6><span class={['a', 'b']} {...{ id: 'x' }} data-rozie-s-8e2458d6>canonical</span><span {...{ id: 'y' }} class={['b', 'a']} data-rozie-s-8e2458d6>reordered</span></div>
 
 <style>
 :global {

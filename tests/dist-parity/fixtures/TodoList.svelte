@@ -72,32 +72,7 @@ const removeItem = (id: any) => {
 const remaining = $derived(items.filter((i: any) => !i.done).length);
 </script>
 
-
-<div {...__rozieAttrs} class={["todo-list", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-52bec3de>
-  <header data-rozie-s-52bec3de>
-    {#if header}{@render header({ remaining, total: items.length })}{:else}
-      
-      <h3 data-rozie-s-52bec3de>{title} ({rozieDisplay(remaining)} remaining)</h3>
-    {/if}
-  </header>
-
-  <form onsubmit={($event) => { $event.preventDefault(); (add as (...a: any[]) => any)($event); }} data-rozie-s-52bec3de>
-    <input bind:value={draft} placeholder="What needs doing?" data-rozie-s-52bec3de />
-    <button type="submit" disabled={!draft.trim()} data-rozie-s-52bec3de>Add</button>
-  </form>
-
-  {#if items.length > 0}<ul data-rozie-s-52bec3de>
-    {#each items as item (item.id)}<li class={{ done: item.done }} data-rozie-s-52bec3de>
-      
-      {#if children}{@render children({ item, toggle: () => toggle(item.id), remove: () => removeItem(item.id) })}{:else}
-        <label data-rozie-s-52bec3de><input type="checkbox" checked={item.done} onchange={($event) => { toggle(item.id); }} data-rozie-s-52bec3de /><span data-rozie-s-52bec3de>{rozieDisplay(item.text)}</span></label>
-        <button aria-label="Remove" onclick={($event) => { removeItem(item.id); }} data-rozie-s-52bec3de>×</button>
-      {/if}
-    </li>{/each}
-  </ul>{:else}<p class="empty" data-rozie-s-52bec3de>
-    {#if empty}{@render empty()}{:else}Nothing to do. ✨{/if}
-  </p>{/if}</div>
-
+<div {...__rozieAttrs} class={["todo-list", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-52bec3de><header data-rozie-s-52bec3de>{#if header}{@render header({ remaining, total: items.length })}{:else}<h3 data-rozie-s-52bec3de>{title} ({rozieDisplay(remaining)} remaining)</h3>{/if}</header><form onsubmit={($event) => { $event.preventDefault(); (add as (...a: any[]) => any)($event); }} data-rozie-s-52bec3de><input bind:value={draft} placeholder="What needs doing?" data-rozie-s-52bec3de /><button type="submit" disabled={!draft.trim()} data-rozie-s-52bec3de>Add</button></form>{#if items.length > 0}<ul data-rozie-s-52bec3de>{#each items as item (item.id)}<li class={{ done: item.done }} data-rozie-s-52bec3de>{#if children}{@render children({ item, toggle: () => toggle(item.id), remove: () => removeItem(item.id) })}{:else}<label data-rozie-s-52bec3de><input type="checkbox" checked={item.done} onchange={($event) => { toggle(item.id); }} data-rozie-s-52bec3de /><span data-rozie-s-52bec3de>{rozieDisplay(item.text)}</span></label><button aria-label="Remove" onclick={($event) => { removeItem(item.id); }} data-rozie-s-52bec3de>×</button>{/if}</li>{/each}</ul>{:else}<p class="empty" data-rozie-s-52bec3de>{#if empty}{@render empty()}{:else}Nothing to do. ✨{/if}</p>{/if}</div>
 
 <style>
 :global {

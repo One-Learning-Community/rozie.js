@@ -54,15 +54,9 @@ const debouncedOnSearch = (() => {
 })();
 </script>
 
-
-<div {...__rozieAttrs} class={["search-input", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-8bbc4a60>
-  
-  <input bind:this={inputEl} type="search" placeholder={placeholder} bind:value={query} oninput={debouncedOnSearch} onkeydown={($event) => { (() => { (($event) => { if ($event.key !== 'Enter') return; (onSearch as (...a: any[]) => any)($event); })($event); })(); (() => { (($event) => { if ($event.key !== 'Escape') return; (clear as (...a: any[]) => any)($event); })($event); })(); }} data-rozie-s-8bbc4a60 />
-
-  {#if query.length > 0}<button class="clear-btn" aria-label="Clear" onclick={clear} data-rozie-s-8bbc4a60>
+<div {...__rozieAttrs} class={["search-input", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-8bbc4a60><input bind:this={inputEl} type="search" placeholder={placeholder} bind:value={query} oninput={debouncedOnSearch} onkeydown={($event) => { (() => { (($event) => { if ($event.key !== 'Enter') return; (onSearch as (...a: any[]) => any)($event); })($event); })(); (() => { (($event) => { if ($event.key !== 'Escape') return; (clear as (...a: any[]) => any)($event); })($event); })(); }} data-rozie-s-8bbc4a60 />{#if query.length > 0}<button class="clear-btn" aria-label="Clear" onclick={clear} data-rozie-s-8bbc4a60>
     ×
   </button>{:else}<span class="hint" data-rozie-s-8bbc4a60>{minLength}+ chars</span>{/if}</div>
-
 
 <style>
 :global {

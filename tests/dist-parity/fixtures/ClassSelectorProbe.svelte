@@ -21,11 +21,7 @@ onMount(() => {
 });
 </script>
 
-
-<div data-handle={rozieDisplay(".panel")} data-grip={rozieDisplay(gripSelector)} {...__rozieAttrs} class={["panel", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-899140be>
-  <span class="grip" aria-hidden="true" data-rozie-s-899140be>⋮⋮</span>
-  {#if ready}<span data-rozie-s-899140be>ready</span>{/if}</div>
-
+<div data-handle={rozieDisplay(".panel")} data-grip={rozieDisplay(gripSelector)} {...__rozieAttrs} class={["panel", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-899140be><span class="grip" aria-hidden="true" data-rozie-s-899140be>⋮⋮</span>{#if ready}<span data-rozie-s-899140be>ready</span>{/if}</div>
 
 <style>
 :global {

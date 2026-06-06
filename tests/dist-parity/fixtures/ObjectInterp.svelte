@@ -13,8 +13,4 @@ let obj = $state({
 });
 </script>
 
-
-<div {...__rozieAttrs} class={["object-interp", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-aca60b6e>
-  <p class={`card--${rozieDisplay(obj)}`} data-x={rozieDisplay(obj)} data-rozie-s-aca60b6e>{rozieDisplay(obj)}</p>
-</div>
-
+<div {...__rozieAttrs} class={["object-interp", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-aca60b6e><p class={`card--${rozieDisplay(obj)}`} data-x={rozieDisplay(obj)} data-rozie-s-aca60b6e>{rozieDisplay(obj)}</p></div>

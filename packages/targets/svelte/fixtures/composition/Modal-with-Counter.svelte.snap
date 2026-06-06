@@ -9,8 +9,4 @@ interface Props {
 let { ...__rozieAttrs }: Props = $props();
 </script>
 
-
-  <div {...__rozieAttrs} class={["modal", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-d24f9140>
-    <Counter data-rozie-s-d24f9140></Counter>
-  </div>
-
+<div {...__rozieAttrs} class={["modal", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-d24f9140><Counter data-rozie-s-d24f9140></Counter></div>

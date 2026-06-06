@@ -30,9 +30,7 @@ onMount(() => {
 });
 </script>
 
-
-  <button {...__rozieAttrs} onclick={($event) => { inc(1); }} use:applyListeners={__rozieAttrs} data-rozie-s-189ead9a>{rozieDisplay(label)}: {rozieDisplay(count)}</button>
-
+<button {...__rozieAttrs} onclick={($event) => { inc(1); }} use:applyListeners={__rozieAttrs} data-rozie-s-189ead9a>{rozieDisplay(label)}: {rozieDisplay(count)}</button>
 "
 `;
 
@@ -60,8 +58,6 @@ onMount(() => {
 });
 </script>
 
-
-  <button {...__rozieAttrs} onclick={($event) => { inc(1); }} use:applyListeners={__rozieAttrs} data-rozie-s-189ead9a>{rozieDisplay(label)}: {rozieDisplay(count)}</button>
-
+<button {...__rozieAttrs} onclick={($event) => { inc(1); }} use:applyListeners={__rozieAttrs} data-rozie-s-189ead9a>{rozieDisplay(label)}: {rozieDisplay(count)}</button>
 "
 `;

@@ -283,9 +283,7 @@ $effect(() => { const __watchVal = (() => firstDayOfWeek)(); untrack(() => { if 
 }))(__watchVal); }); });
 </script>
 
-
 <input bind:this={inputEl} type="text" name={name} placeholder={placeholder} {...__rozieAttrs} class={["rozie-flatpickr", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-159070d4 />
-
 
 <style>
 :global {
