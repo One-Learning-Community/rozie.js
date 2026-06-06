@@ -85,49 +85,70 @@ const themeExt = () => $props.theme === 'dark' ? oneDark : []
 // placeholder ext only when a non-empty placeholder string is supplied.
 const phExt = () => $props.placeholder ? placeholderExt($props.placeholder) : []
 
-// One `panel` portal slot — mounted through CM6's `showPanel` facet. The Panel's
-// `dom` is the portal host node; $portals.panel(dom, scope) mounts the consumer's
-// framework-native fragment on Panel.mount() and the returned dispose runs in
-// Panel.destroy(). Empty extension ([]) when the consumer doesn't fill the slot.
-const panelExt = () => {
-  if (!$slots.panel) return []
-  return showPanel.of((view) => {
-    const dom = document.createElement('div')
-    dom.className = 'rozie-cm-panel'
-    let dispose = null
-    return {
-      dom,
-      top: false,
-      mount() { dispose = $portals.panel(dom, { view }) },
-      destroy() { dispose?.(); dispose = null },
-    }
-  })
-}
-
-const buildState = (doc) => EditorState.create({
-  doc,
-  extensions: [
-    lineNumbers(),
-    history(),
-    keymap.of([...defaultKeymap, ...historyKeymap]),
-    langCompartment.of(langExt()),
-    themeCompartment.of(themeExt()),
-    readOnlyCompartment.of(EditorState.readOnly.of($props.readOnly)),
-    placeholderCompartment.of(phExt()),
-    panelCompartment.of(panelExt()),
-    EditorView.updateListener.of((update) => {
-      if (!update.docChanged) return
-      if (suppressEmit) return
-      // Push the new doc out through the model:true emit path. Consumers
-      // bound via `r-model:value="$data.x"` receive the change.
-      $model.value = update.state.doc.toString()
-    }),
-    // Consumer extensions LAST so they win CM6's last-registered-wins facets.
-    extensionsCompartment.of($props.extensions),
-  ],
-})
-
+// buildState + the panel-slot wiring live INSIDE $onMount so the $portals.panel
+// reference is bound in the mount scope. The per-target emitters scope the
+// concrete portal helper inside the mount lifecycle (React useEffect / Lit
+// firstUpdated / etc.); a top-level `panelExt` that references $portals would
+// land out-of-scope of that helper and fail the bundled-leaf strict typecheck
+// (TS2304 'portals' / TS2742). Keeping the $portals.panel use inside $onMount
+// mirrors FullCalendar's portal pattern (its eventContent callbacks reference
+// $portals only inside $onMount). buildState is only ever called here, so this
+// is a behavior-preserving relocation. Compartments + langExt/themeExt/phExt
+// stay top-level — the $watch reconfigures still reference them.
 $onMount(() => {
+  // One `panel` portal slot — mounted through CM6's `showPanel` facet. The
+  // Panel's `dom` is the portal host node; $portals.panel(dom, scope) mounts the
+  // consumer's framework-native fragment on Panel.mount() and the returned
+  // dispose runs in Panel.destroy(). Empty extension ([]) when the consumer
+  // doesn't fill the slot.
+  // NOTE: the Panel's mount/destroy are ARROW-FUNCTION properties (not object
+  // `mount() {}` methods) and the panel host element + view are captured in
+  // plain `const`s. The object-method form gives each method its own `this`
+  // scope, and the Lit emitter's component-field rewrite walks INTO that method
+  // body and rewrites a closure-captured `view` reference to `this.view`
+  // (TS2339 "Property 'view' does not exist on type 'Panel'"). Arrow-function
+  // properties share the enclosing lexical scope, so the captured `panelView`
+  // const resolves correctly on every target. CM6 calls `panel.mount()` /
+  // `panel.destroy()` either way.
+  const panelExt = () => {
+    if (!$slots.panel) return []
+    return showPanel.of((panelView) => {
+      const dom = document.createElement('div')
+      dom.className = 'rozie-cm-panel'
+      const scope = { view: panelView }
+      let dispose = null
+      return {
+        dom,
+        top: false,
+        mount: () => { dispose = $portals.panel(dom, scope) },
+        destroy: () => { dispose?.(); dispose = null },
+      }
+    })
+  }
+
+  const buildState = (doc) => EditorState.create({
+    doc,
+    extensions: [
+      lineNumbers(),
+      history(),
+      keymap.of([...defaultKeymap, ...historyKeymap]),
+      langCompartment.of(langExt()),
+      themeCompartment.of(themeExt()),
+      readOnlyCompartment.of(EditorState.readOnly.of($props.readOnly)),
+      placeholderCompartment.of(phExt()),
+      panelCompartment.of(panelExt()),
+      EditorView.updateListener.of((update) => {
+        if (!update.docChanged) return
+        if (suppressEmit) return
+        // Push the new doc out through the model:true emit path. Consumers
+        // bound via `r-model:value="$data.x"` receive the change.
+        $model.value = update.state.doc.toString()
+      }),
+      // Consumer extensions LAST so they win CM6's last-registered-wins facets.
+      extensionsCompartment.of($props.extensions),
+    ],
+  })
+
   view = new EditorView({
     state: buildState($props.value),
     parent: $refs.hostEl,

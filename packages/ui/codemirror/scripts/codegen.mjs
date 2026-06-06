@@ -101,9 +101,48 @@ function main() {
     // `EditorState.create({...})` with no intervening mutated options object, so
     // the FullCalendar options-literal → `Record<string, any>` widening hack does
     // NOT apply here (it would find no token and throw). Emit the compiled code
-    // verbatim. (If a real strict-tsc gap surfaces on a bundled leaf, re-derive a
-    // scoped per-leaf type aid then — SCOPE FENCE: do NOT edit the emitter.)
-    const code = r.code;
+    // (with the one sanctioned per-leaf type aid below for Lit).
+    let code = r.code;
+
+    // ─── Lit-only type aid: annotate the `*Ext` extension helpers ───────────
+    // The Lit emitter lowers the top-level `langExt`/`themeExt`/`phExt` const
+    // arrows to class-field arrow properties (`langExt = () => …;`). tsdown's
+    // isolated `.d.ts` emit then tries to NAME each one's inferred return type:
+    // `langExt`'s `javascript()` returns `LanguageSupport`, whose declaration
+    // lives in `@codemirror/language` — a TRANSITIVE dep of
+    // `@codemirror/lang-javascript`, NOT one of the five declared peers — so the
+    // dts emit fails with TS2742 ("inferred type cannot be named without a
+    // reference to '@codemirror/language' … a type annotation is necessary").
+    // The proper home for a return annotation is the emitter, which is OUT OF
+    // SCOPE (SCOPE FENCE). As the sanctioned in-scope per-leaf type aid (the CM
+    // analog of FullCalendar's `const opts` widening), annotate the three helper
+    // arrows with an explicit `: any` return here in codegen GLUE — durable
+    // across regeneration, a pure type annotation (zero runtime change), and
+    // scoped to the Lit leaf (react/solid emit these helpers in a form that does
+    // not trip TS2742; vue/svelte/angular are type-neutral and never see it).
+    // Tracked as an emitter follow-up (annotate hoisted engine-typed helpers).
+    if (cfg.dir === 'lit') {
+      let aided = 0;
+      for (const name of ['langExt', 'themeExt', 'phExt']) {
+        const token = `${name} = () =>`;
+        const annotated = `${name} = (): any =>`;
+        if (code.includes(token)) {
+          code = code.replace(token, annotated);
+          aided += 1;
+        }
+      }
+      if (aided === 0) {
+        // Fail loud if the Lit emit shape drifts so this aid never silently
+        // no-ops and leaves the dts gate red.
+        throw new Error(
+          `codegen lit: expected to annotate the engine-extension helper arrows ` +
+            `(\`langExt/themeExt/phExt = () =>\`) for the bundled-leaf dts gate, but none of the ` +
+            `tokens were found — the Lit emit shape changed. Re-derive the type-gate aid ` +
+            `(SCOPE FENCE: do NOT edit the emitter).`,
+        );
+      }
+    }
+
     writeFileSync(resolve(leafSrc, cfg.file), code);
 
     // Bundled leaves (tsdown) entry on src/index.ts. The emitted component is a
