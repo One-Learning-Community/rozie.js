@@ -1,0 +1,70 @@
+{
+  "name": "@rozie-ui/tiptap-angular",
+  "version": "0.1.0",
+  "type": "module",
+  "private": false,
+  "license": "MIT",
+  "description": "Idiomatic Angular rich-text editor — one Rozie source compiled to Angular wrapping TipTap.",
+  "keywords": [
+    "rozie",
+    "rozie-ui",
+    "tiptap",
+    "editor",
+    "rich-text-editor",
+    "prosemirror",
+    "wysiwyg",
+    "component",
+    "angular"
+  ],
+  "author": "One Learning Community (https://github.com/One-Learning-Community)",
+  "homepage": "https://github.com/One-Learning-Community/rozie.js#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/One-Learning-Community/rozie.js.git",
+    "directory": "packages/ui/tiptap/packages/angular"
+  },
+  "bugs": {
+    "url": "https://github.com/One-Learning-Community/rozie.js/issues"
+  },
+  "exports": {
+    ".": {
+      "types": "./src/TipTap.ts",
+      "import": "./src/TipTap.ts",
+      "default": "./src/TipTap.ts"
+    }
+  },
+  "files": [
+    "src"
+  ],
+  "peerDependencies": {
+    "@angular/core": "^19",
+    "@angular/common": "^19",
+    "@angular/forms": "^19",
+    "@tiptap/core": "^3",
+    "@tiptap/starter-kit": "^3"
+  },
+  "peerDependenciesMeta": {
+    "@angular/core": {
+      "optional": false
+    },
+    "@angular/common": {
+      "optional": false
+    },
+    "@angular/forms": {
+      "optional": false
+    },
+    "@tiptap/core": {
+      "optional": false
+    },
+    "@tiptap/starter-kit": {
+      "optional": false
+    }
+  },
+  "scripts": {
+    "build": "echo 'ships source; no build'",
+    "typecheck": "echo 'source-only, no typecheck'"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

@@ -1,0 +1,66 @@
+{
+  "name": "@rozie-ui/tiptap-svelte",
+  "version": "0.1.0",
+  "type": "module",
+  "private": false,
+  "license": "MIT",
+  "description": "Idiomatic Svelte rich-text editor — one Rozie source compiled to Svelte wrapping TipTap.",
+  "keywords": [
+    "rozie",
+    "rozie-ui",
+    "tiptap",
+    "editor",
+    "rich-text-editor",
+    "prosemirror",
+    "wysiwyg",
+    "component",
+    "svelte"
+  ],
+  "author": "One Learning Community (https://github.com/One-Learning-Community)",
+  "homepage": "https://github.com/One-Learning-Community/rozie.js#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/One-Learning-Community/rozie.js.git",
+    "directory": "packages/ui/tiptap/packages/svelte"
+  },
+  "bugs": {
+    "url": "https://github.com/One-Learning-Community/rozie.js/issues"
+  },
+  "exports": {
+    ".": {
+      "svelte": "./src/TipTap.svelte",
+      "types": "./src/TipTap.svelte",
+      "import": "./src/TipTap.svelte",
+      "default": "./src/TipTap.svelte"
+    }
+  },
+  "files": [
+    "src"
+  ],
+  "dependencies": {
+    "@rozie/runtime-svelte": "workspace:*"
+  },
+  "peerDependencies": {
+    "svelte": "^5",
+    "@tiptap/core": "^3",
+    "@tiptap/starter-kit": "^3"
+  },
+  "peerDependenciesMeta": {
+    "svelte": {
+      "optional": false
+    },
+    "@tiptap/core": {
+      "optional": false
+    },
+    "@tiptap/starter-kit": {
+      "optional": false
+    }
+  },
+  "scripts": {
+    "build": "echo 'ships source; no build'",
+    "typecheck": "echo 'source-only, no typecheck'"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
