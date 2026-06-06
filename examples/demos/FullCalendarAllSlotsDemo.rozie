@@ -69,20 +69,16 @@
 // consumer imports it and passes it through the wrapper's now-merged
 // :options.plugins, which is the exact opt-in plugin-extension mechanism this
 // demo exercises.
+//
+// `listPlugin` is referenced INLINE in the template's :options binding below —
+// the natural authoring form. This is now correct on all six targets: the
+// Angular emitter aliases a <script> value-import referenced in a template
+// expression to a `protected readonly listPlugin = listPlugin` component field,
+// so the bare template reference resolves against the instance AND the import
+// stays live (Angular AOT would otherwise tree-shake an import whose only use is
+// in the separate template compilation context). The other five targets share
+// one module scope and never needed the workaround.
 import listPlugin from '@fullcalendar/list'
-
-// Build the passthrough :options object in the SCRIPT (not inline in the
-// template) so the `listPlugin` import is referenced from a <script> statement.
-// Angular's AOT pipeline tree-shakes a default import that is ONLY referenced
-// inside a template-binding object literal — leaving `listPlugin` undefined at
-// runtime and crashing FullCalendar's plugin-hook builder. Referencing it here
-// pins the import on every target (the other five are unaffected either way).
-const calendarOptions = {
-  weekNumbers: true,
-  dayMaxEvents: 2,
-  businessHours: { startTime: '09:00', endTime: '17:00' },
-  plugins: [listPlugin],
-}
 
 // All seed events land on a SINGLE pinned day (2026-06-15) so that — with the
 // passthrough dayMaxEvents: 2 — the day overflows past 2 and the engine renders
@@ -160,7 +156,7 @@ const remount  = () => { $data.calendarMounted = true }
       :height="480"
       :selectable="true"
       :editable="true"
-      :options="calendarOptions"
+      :options="{ weekNumbers: true, dayMaxEvents: 2, businessHours: { startTime: '09:00', endTime: '17:00' }, plugins: [listPlugin] }"
       @eventMouseEnter="onEventMouseEnter"
       @eventMouseLeave="onEventMouseLeave"
       @unselect="onUnselect"
