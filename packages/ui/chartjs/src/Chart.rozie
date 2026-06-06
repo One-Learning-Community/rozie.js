@@ -1,0 +1,295 @@
+<!--
+  Chart.rozie — data-bound port of Chart.js (chartjs/Chart.js).
+
+  Chart.js has wrappers in every framework (react-chartjs-2, vue-chartjs,
+  ng2-charts/ng-charts, svelte-chartjs, …) — each one a 200-2000 LOC project
+  that mostly exists to shuttle props into a `new Chart()` call and forward
+  events out. Five maintenance burdens, ONE Rozie source.
+
+  This is the GENERIC chart: the public component is named `Chart` (the engine
+  class is aliased `ChartJS` on import so the name is free) and the `type` prop
+  switches the chart kind across the WHOLE Chart.js controller set — `line`,
+  `bar`, `pie`, `doughnut`, `radar`, `polarArea`, `scatter`, `bubble`, and any
+  registerable. `ChartJS.register(...registerables)` registers every controller,
+  so `type` genuinely switches kind. Chart.js has no stable runtime type-swap,
+  so a type change re-creates the instance (rare enough to be acceptable).
+
+  Usage:
+
+    <Chart :data="$data.chartData" :options="$data.chartOpts" type="bar" />
+
+  Where `data` matches Chart.js's
+  `{ labels: string[], datasets: [{ label, data, ... }] }` shape.
+
+  Feature-rich surface (Phase 30):
+    - 9 props: data / options / type / height / width / plugins / updateMode /
+      redraw / ariaLabel. `:plugins` is the consumer-extensibility passthrough
+      (per-instance Chart.js `Plugin[]`) — the Chart.js analog of CodeMirror's
+      `:extensions` and FullCalendar's merged `:options.plugins`.
+    - 3 events: @click / @hover / @datasetClick — composed onto Chart.js's
+      `options.onClick`/`onHover` WITHOUT clobbering a consumer-supplied handler.
+    - 8 $expose verbs over the live instance: getChart / updateChart /
+      resizeChart / resetChart / renderChart / stopChart / clearChart /
+      toBase64Image (the marquee PNG export). NOTE the verb names are SUFFIXED
+      (`updateChart`, not `update`) — bare `update`/`render` collide with
+      LitElement's reactive-lifecycle methods (`update()`/`render()`) and would
+      shadow them on the Lit leaf. This is the Chart.js analog of CodeMirror's
+      setValue→replaceValue ($expose-verb-vs-framework-reserved-method) lesson.
+    - 1 external-HTML `tooltip` portal slot — canvas owns its own paint, so the
+      external-tooltip handler is the single real slot showcase.
+
+  $snapshot discipline: Chart.js's internal `Object.defineProperty` on its data
+  config conflicts with Svelte 5's `$state` proxy (`state_descriptors_fixed`);
+  `$snapshot(x)` lowers to `$state.snapshot(x)` on Svelte and to identity on the
+  other five targets. Every object handed to the engine is snapshotted first.
+
+  $refs discipline: `$refs.canvasEl` is read ONCE inside `$onMount` and captured
+  into a plain `canvasEl` let; re-creates use the captured ref (never re-read
+  $refs outside the mount hook — ROZ123 / project_refs_only_safe_in_onmount).
+-->
+
+<rozie name="Chart" inherit-attrs="false" inherit-listeners="false">
+
+<props>
+{
+  data:       { type: Object,  default: () => ({ labels: [], datasets: [] }) },
+  options:    { type: Object,  default: () => ({}) },
+  type:       { type: String,  default: 'line' },
+  height:     { type: Number,  default: 240 },
+  width:      { type: Number,  default: undefined },
+  plugins:    { type: Array,   default: () => [] },
+  updateMode: { type: String,  default: undefined },
+  redraw:     { type: Boolean, default: false },
+  ariaLabel:  { type: String,  default: undefined },
+}
+</props>
+
+<script>
+import { Chart as ChartJS, registerables } from 'chart.js'
+
+// Chart.js v3+ ships with no controllers/elements/scales pre-registered;
+// the consumer has to opt in. registerables is the "kitchen sink" bundle —
+// every controller, so the `type` prop can switch to any chart kind.
+ChartJS.register(...registerables)
+
+let instance = null
+// $refs.canvasEl is read ONLY inside $onMount (ROZ123); re-creates use this
+// captured node so no $refs read ever executes outside the mount hook.
+let canvasEl = null
+// buildConfig is DEFINED inside $onMount (so its $emit/$portals/$slots
+// references are bound in the mount-lifecycle scope the per-target emitters
+// provide — mirrors FullCalendar's mount-built opts + CodeMirror's panelExt
+// note) and stored here so the top-level re-create $watches can call it.
+let buildConfig = null
+
+$onMount(() => {
+  canvasEl = $refs.canvasEl
+
+  // ─── @click / @hover / @datasetClick — composed, never clobbering ──────────
+  // Chart.js calls onClick/onHover with (event, activeElements, chart). We call
+  // any consumer-supplied handler first (read off $props.options), then emit a
+  // structured payload resolving the hit element(s) via getElementsAtEventForMode.
+  const composedOnClick = (e, activeEls, chart) => {
+    const userOnClick = $props.options?.onClick
+    if (typeof userOnClick === 'function') userOnClick(e, activeEls, chart)
+    const nearest = chart.getElementsAtEventForMode(e, 'nearest', { intersect: true }, false)
+    $emit('click', { event: e, elements: nearest, chart })
+    const dataset = chart.getElementsAtEventForMode(e, 'dataset', { intersect: true }, false)
+    if (dataset.length) {
+      $emit('datasetClick', { event: e, elements: dataset, datasetIndex: dataset[0].datasetIndex, chart })
+    }
+  }
+  const composedOnHover = (e, activeEls, chart) => {
+    const userOnHover = $props.options?.onHover
+    if (typeof userOnHover === 'function') userOnHover(e, activeEls, chart)
+    $emit('hover', { event: e, elements: activeEls, chart })
+  }
+
+  // ─── external-HTML tooltip portal slot ─────────────────────────────────────
+  // Only active when the consumer fills <slot name="tooltip">. The external
+  // handler positions a container over the canvas and mounts the consumer's
+  // framework-native fragment through $portals.tooltip(dom, scope). The scope
+  // carries the live tooltip model (title/body/dataPoints/position). Chart.js
+  // throttles external calls to active-element changes, so the dispose+remount
+  // on body-change is cheap. enabled:false suppresses the built-in canvas
+  // tooltip when we take over.
+  let tooltipEl = null
+  let tooltipDispose = null
+  let tooltipKey = ''
+  const tooltipExternal = (context) => {
+    const { chart, tooltip } = context
+    if (!tooltipEl) {
+      tooltipEl = document.createElement('div')
+      tooltipEl.className = 'rozie-chart-tooltip'
+      tooltipEl.style.position = 'absolute'
+      tooltipEl.style.pointerEvents = 'none'
+      tooltipEl.style.transition = 'opacity 0.1s ease'
+      chart.canvas.parentNode.appendChild(tooltipEl)
+    }
+    if (tooltip.opacity === 0) {
+      tooltipEl.style.opacity = '0'
+      return
+    }
+    const title = (tooltip.title || []).join(' ')
+    const body = (tooltip.body || []).map((b) => b.lines.join(' ')).join(' | ')
+    const key = `${title}::${body}`
+    if (key !== tooltipKey) {
+      tooltipKey = key
+      tooltipDispose?.()
+      const scope = {
+        title: tooltip.title || [],
+        body: (tooltip.body || []).map((b) => b.lines),
+        dataPoints: tooltip.dataPoints || [],
+        opacity: tooltip.opacity,
+      }
+      tooltipDispose = $portals.tooltip(tooltipEl, scope)
+    }
+    const { offsetLeft, offsetTop } = chart.canvas
+    tooltipEl.style.opacity = '1'
+    tooltipEl.style.left = `${offsetLeft + tooltip.caretX}px`
+    tooltipEl.style.top = `${offsetTop + tooltip.caretY}px`
+  }
+
+  // ─── config builder ────────────────────────────────────────────────────────
+  // $snapshot strips Svelte 5's $state proxy first; Chart.js redefines property
+  // descriptors on whatever object it is handed.
+  buildConfig = () => {
+    const userOpts = $snapshot($props.options) || {}
+    const tooltipOpt = $slots.tooltip
+      ? { ...(userOpts.plugins?.tooltip || {}), enabled: false, external: tooltipExternal }
+      : userOpts.plugins?.tooltip
+    return {
+      type: $props.type,
+      data: $snapshot($props.data),
+      // per-instance plugins[] — the consumer-extensibility passthrough.
+      plugins: $snapshot($props.plugins),
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { duration: 250 },
+        ...userOpts,
+        onClick: composedOnClick,
+        onHover: composedOnHover,
+        plugins: {
+          ...(userOpts.plugins || {}),
+          tooltip: tooltipOpt,
+        },
+      },
+    }
+  }
+
+  instance = new ChartJS(canvasEl, buildConfig())
+  return () => {
+    tooltipDispose?.()
+    tooltipEl?.remove()
+    instance?.destroy()
+  }
+})
+
+// Re-create the live instance. Chart.js exposes no stable runtime type-swap or
+// plugin-swap, so `type`/`plugins`/`redraw`-driven changes re-create. Uses the
+// captured canvasEl (never re-reads $refs outside $onMount).
+const recreate = () => {
+  if (!buildConfig || !canvasEl) return
+  instance?.destroy()
+  instance = new ChartJS(canvasEl, buildConfig())
+}
+
+// Reconcile prop changes. Mutating chart.data in place and calling update() is
+// the Chart.js-supported runtime path — re-creating on every data tick would
+// flicker and leak. (When `redraw` is set, re-create wholesale instead.)
+$watch(() => $props.data, (v) => {
+  if (!instance) return
+  if ($props.redraw) { recreate(); return }
+
+  // Reconcile a new data object into the LIVE chart instead of replacing
+  // instance.data. Chart.js matches dataset controllers and point elements by
+  // array index across an update(), so mutating the existing labels/datasets
+  // arrays lets it tween every point from old value to new. Assigning a fresh
+  // instance.data severs that identity.
+  const next = $snapshot(v)
+  const live = instance.data
+
+  live.labels ??= []
+  live.labels.length = 0
+  live.labels.push(...(next.labels ?? []))
+
+  live.datasets ??= []
+  const nextSets = next.datasets ?? []
+  nextSets.forEach((ds, i) => {
+    if (live.datasets[i]) Object.assign(live.datasets[i], ds)
+    else live.datasets[i] = ds
+  })
+  live.datasets.length = nextSets.length
+
+  instance.update($props.updateMode)
+}, { immediate: true })
+
+// Options aren't tweened point-to-point; rebuild the merged options object
+// (re-applying the composed onClick/onHover + tooltip external) and assign
+// wholesale. Skip the animation rather than rescale-flicker on every tick.
+$watch(() => $props.options, () => {
+  if (!instance || !buildConfig) return
+  instance.options = buildConfig().options
+  instance.update('none')
+})
+
+// No stable runtime type-swap / plugin-swap → re-create.
+$watch(() => $props.type, () => recreate())
+$watch(() => $props.plugins, () => recreate())
+
+// Imperative handle (Phase 21 $expose). The verbs are SUFFIXED with `Chart`
+// because bare `update`/`render` collide with LitElement's reactive-lifecycle
+// methods (`update(changedProperties)` / `render()`) and would shadow them on
+// the Lit leaf; `resize`/`reset`/`stop`/`clear` are suffixed too for a
+// consistent, unambiguous handle. `getChart` returns the live instance for
+// direct API access; `toBase64Image` is the marquee PNG-export capability.
+// Collision-clear: none of the 8 names collide with the 9 props.
+function getChart()                   { return instance }
+function updateChart(mode)            { instance?.update(mode) }
+function resizeChart(w, h)            { instance?.resize(w, h) }
+function resetChart()                 { instance?.reset() }
+function renderChart()                { instance?.render() }
+function stopChart()                  { return instance?.stop() }
+function clearChart()                 { return instance?.clear() }
+function toBase64Image(type, quality) { return instance ? instance.toBase64Image(type, quality) : null }
+
+$expose({ getChart, updateChart, resizeChart, resetChart, renderChart, stopChart, clearChart, toBase64Image })
+</script>
+
+<template>
+<div class="rozie-chart" :style="{ height: $props.height + 'px', width: $props.width ? $props.width + 'px' : undefined }">
+  <canvas ref="canvasEl" role="img" :aria-label="$props.ariaLabel" />
+</div>
+<!--
+  External-HTML tooltip portal slot. Declared but NOT rendered in the template —
+  per-target template emitters skip it. The wrapper invokes the slot from script
+  via $portals.tooltip(dom, scope) inside Chart.js's external tooltip handler;
+  the portal helper mounts the consumer's framework-native fragment into the
+  wrapper-owned tooltip node and returns a dispose handle.
+-->
+<slot name="tooltip" portal :params="['model']" />
+</template>
+
+<style>
+.rozie-chart {
+  position: relative;
+  width: 100%;
+}
+.rozie-chart canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+.rozie-chart :global(.rozie-chart-tooltip) {
+  background: rgba(0, 0, 0, 0.8);
+  color: #fff;
+  border-radius: 4px;
+  padding: 6px 8px;
+  font-size: 12px;
+  transform: translate(-50%, calc(-100% - 8px));
+  white-space: nowrap;
+}
+</style>
+
+</rozie>
