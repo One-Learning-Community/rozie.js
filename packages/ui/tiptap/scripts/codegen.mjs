@@ -26,9 +26,15 @@
  *         src/index.ts barrel)
  *   4. render each leaf README from the IR + the hand-kept handle manifest
  *   5. ENFORCE validateDocsPropsTable against docs/guide/tiptap.md (THROWS if the
- *      guide is absent AND on drift of name/type/default. ROZIE_TIPTAP_SKIP_GUIDE=1
- *      relaxes the absent-guide throw to a skip so Wave 02 can emit leaves before
- *      Wave 03 authors the guide.)
+ *      guide is absent AND on drift of name/type/default).
+ *
+ *      ROZIE_TIPTAP_SKIP_GUIDE=1 was the Wave-02 bootstrap escape hatch — it
+ *      relaxed the absent-guide throw to a skip so leaves could emit before Wave 03
+ *      authored the guide. As of Phase 33 (Wave 04, plan 33-05) docs/guide/tiptap.md
+ *      SHIPS, so the bootstrap window is CLOSED: normal runs are ENFORCING with no
+ *      flag, and even with the flag set the props-table validator still runs (the
+ *      flag only ever relaxed the *absent-guide* throw, never the drift check). The
+ *      branch is retained only as a guarded historical fallback; do not set the flag.
  */
 import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -127,14 +133,16 @@ function main() {
   }
 
   // (5) ENFORCE docs props-table validation against docs/guide/tiptap.md.
+  // The guide SHIPS as of Phase 33 — the Wave-02 bootstrap window is CLOSED. The
+  // skip flag is retained only as a guarded historical fallback (do not set it).
   const guideRelPath = 'docs/guide/tiptap.md';
   const guideExists = existsSync(resolve(REPO_ROOT, guideRelPath));
   const skipGuide = process.env.ROZIE_TIPTAP_SKIP_GUIDE === '1';
   if (!guideExists && !skipGuide) {
     throw new Error(
       `codegen: docs props-table validation FAILED — ${guideRelPath} not found (the docs page is the ` +
-        `single-source-of-truth surface and must exist). Wave 03 authors it; to emit the leaves ` +
-        `before then, run with ROZIE_TIPTAP_SKIP_GUIDE=1.`,
+        `single-source-of-truth surface and must exist). It shipped in Phase 33; if it is missing, ` +
+        `restore it — do NOT re-enable the retired ROZIE_TIPTAP_SKIP_GUIDE bootstrap.`,
     );
   }
   const guidePath = resolve(REPO_ROOT, guideRelPath);

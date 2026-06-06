@@ -2,7 +2,7 @@
 
 `TipTap` is Rozie's data-bound port of [TipTap](https://tiptap.dev/) — the headless, ProseMirror-based rich-text editor. One `.rozie` source file ships idiomatic React, Vue, Svelte, Angular, Solid, and Lit consumers from a single wrapper. The official ecosystem is uneven: [`@tiptap/react`](https://www.npmjs.com/package/@tiptap/react) and [`@tiptap/vue-3`](https://www.npmjs.com/package/@tiptap/vue-3) are first-party, [`svelte-tiptap`](https://www.npmjs.com/package/svelte-tiptap) and [`ngx-tiptap`](https://www.npmjs.com/package/ngx-tiptap) are healthy community packages, [`solid-tiptap`](https://www.npmjs.com/package/solid-tiptap) is thin and stalling, and **Lit has no wrapper at all**. Rozie collapses all six into one source — and notably, **neither official wrapper ships a controlled two-way content contract or a toolbar**; Rozie does. See the [TipTap libraries comparison](/guide/tiptap-comparison) for the full matrix.
 
-This page is the **show-and-tell**: the API surface, per-framework quick starts, the events, the 14-verb imperative command handle, the `editorProps`/`extensions` passthroughs, and the per-target recipe for the `toolbar` portal slot.
+This page is the **show-and-tell**: the API surface, per-framework quick starts, the events, the 14-verb imperative command handle, the `editorProps`/`extensions` passthroughs, the per-target recipe for the `toolbar` portal slot, and the **`nodeView` reactive portal slot** that renders a framework fragment as a custom ProseMirror node (mention chips, embeds, editable callouts) on all six targets.
 
 The full source for `TipTap.rozie` lives in the [`@rozie-ui/tiptap` package](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/tiptap/src/TipTap.rozie).
 
@@ -260,6 +260,106 @@ el.toolbar = ({ editor }) =>
 
 On every target the wrapper's `$portals.toolbar(node, { editor })` closure mounts the consumer's fragment into the toolbar host container and returns a dispose handle the wrapper calls on unmount.
 
+## Node-view slots
+
+TipTap's marquee feature is the **node view** — rendering a framework component as a custom ProseMirror node (a mention chip, an embed, an interactive widget, an editable callout). `@rozie-ui/tiptap` ships it as the `nodeView` slot, the **first reactive portal slot**: the consumer fragment re-renders **in place** (no remount) every time the engine reports a transaction — a selection change, an attribute update, the cursor entering or leaving the node.
+
+| Slot | Renders | Scope params |
+| --- | --- | --- |
+| `nodeView` | A framework fragment as a custom ProseMirror node (mention chip, embed, editable callout) | `node`, `selected`, `updateAttributes`, `getPos`, `editor`, `contentDOM` |
+
+The wrapper bundles two custom nodes that fill this slot:
+
+- **`rozieMention`** — a non-editable inline **atom** (a `@mention` chip). It has no editable children, so it ignores `contentDOM`. `selected` flips as the caret enters/leaves it and the fragment re-renders to reflect it.
+- **`rozieCallout`** — an editable **block**. It owns a ProseMirror-managed editable hole; its fragment renders chrome wrapping a `[data-rozie-hole]` placeholder, and the bridge grafts the engine-owned hole into it (see the recipe below).
+
+### Engine-driven re-render
+
+The slot is driven by ProseMirror's `NodeView` lifecycle, not a Rozie reactive loop. When a transaction touches the node — `update(node)`, `selectNode()`, `deselectNode()` — the wrapper calls the reactive portal's `update(scope)` with the fresh `node` / `selected` scope and the fragment re-renders **in place**. The grafted `contentDOM` is preserved across re-renders, so the editable subtree is never clobbered. (The three mount-once slots — this wrapper's `toolbar`, CodeMirror's `panel`, Chart.js's `tooltip` — keep their `() => void` shape; only `nodeView` is reactive.)
+
+### The contentDOM editable-hole recipe
+
+An editable node view splits its DOM in two: the **chrome** you render, and the **editable hole** ProseMirror owns. Your fragment renders the chrome and marks where the hole goes with a `[data-rozie-hole]` element; the per-target bridge grafts `contentDOM` into it. After the graft, ProseMirror manages that subtree — your framework must never render children into it.
+
+A single fragment can serve both node types by branching on `node.type.name` at the **expression** level (`:class`, `:data-*`) rather than with `r-if` — an `r-if` (or `@if`) block nested inside a projected Angular `<ng-template>` slot breaks consumer AOT, so the inactive half is hidden with CSS instead:
+
+```vue
+<template #nodeView="{ node, selected }">
+  <span :class="node.type.name === 'rozieCallout' ? 'is-callout' : 'is-mention'">
+    <!-- mention chip -->
+    <span class="chip" :data-selected="selected ? 'true' : 'false'">{{ node.attrs.label }}</span>
+    <!-- editable callout: the [data-rozie-hole] placeholder gets contentDOM grafted in -->
+    <span class="callout" :data-tone="node.attrs.tone">
+      <span class="badge">{{ node.attrs.tone }}</span>
+      <span :data-rozie-hole="node.type.name === 'rozieCallout' ? '' : null"></span>
+    </span>
+  </span>
+</template>
+```
+
+The graft is synchronous on every target, but the **idiom differs by ref-timing** (you don't write this — it's emitted per target — but it explains why the recipe is "render a placeholder, let the bridge fill it" rather than "ref the hole yourself"):
+
+| Target | Graft idiom |
+| --- | --- |
+| React / Solid / Lit | native `ref` (synchronous-within-render) |
+| Vue / Svelte / Angular | query-after-render (`dom.querySelector('[data-rozie-hole]')` post-mount) |
+
+### Per-target consumer shape
+
+The `nodeView` slot uses the same native imperative-render API as every other portal slot — `renderNodeView` render prop, `#nodeView` scoped slot / snippet / content-child, or a `nodeView` property on the Lit element:
+
+**React / Solid** (render prop):
+
+```tsx
+<TipTap
+  html={html}
+  onHtmlChange={setHtml}
+  renderNodeView={({ node, selected }) => (
+    <span data-selected={selected}>{node.attrs.label}</span>
+  )}
+/>
+```
+
+**Vue** (scoped slot):
+
+```vue
+<TipTap v-model:html="html">
+  <template #nodeView="{ node, selected }">
+    <span :data-selected="selected">{{ node.attrs.label }}</span>
+  </template>
+</TipTap>
+```
+
+**Svelte** (snippet):
+
+```svelte
+<TipTap bind:html>
+  {#snippet nodeView({ node, selected })}
+    <span data-selected={selected}>{node.attrs.label}</span>
+  {/snippet}
+</TipTap>
+```
+
+**Angular** (content child `<ng-template>`):
+
+```html
+<TipTap [(html)]="html">
+  <ng-template #nodeView let-node="node" let-selected="selected">
+    <span [attr.data-selected]="selected">{{ node.attrs.label }}</span>
+  </ng-template>
+</TipTap>
+```
+
+**Lit** (slot bridge — pass the render callback as a property):
+
+```ts
+const el = document.querySelector('rozie-tip-tap');
+el.nodeView = ({ node, selected }) =>
+  html`<span data-selected=${selected}>${node.attrs.label}</span>`;
+```
+
+The same `TipTap.rozie` source ships this into **Solid** (where `solid-tiptap` has no node-view renderer) and **Lit** (where no wrapper exists at all) — see the [comparison page](/guide/tiptap-comparison#node-view-portal-slots-g1-shipped) for the gap context.
+
 ## Recipes
 
 ### Driving the editor from the toolbar handle
@@ -331,14 +431,14 @@ A model two-way binding can ping-pong: the consumer's state signals back into th
 
 The `placeholder` prop forwards `data-placeholder` / `aria-placeholder` to the editor host, but full empty-state placeholder rendering (showing the text only when the document is empty, hiding it as you type) is TipTap's `@tiptap/extension-placeholder` (or `@tiptap/extensions`) — add it through `:extensions`. Bundling it by default is a tracked follow-up (see the [comparison page](/guide/tiptap-comparison)).
 
-### Node-view slots are deferred to a follow-up
+### Node views ship; bubble/floating menus are the remaining gap
 
-TipTap's marquee feature is **custom node views** — rendering a framework component inside a custom ProseMirror node (a mention chip, an embed, an interactive widget). `@tiptap/react` / `@tiptap/vue-3` / `ngx-tiptap` / `svelte-tiptap` ship node-view renderers; `solid-tiptap` and Lit do not. A uniform cross-target `<slot name="nodeView" portal>` driven by TipTap's `addNodeView` is the strongest wedge but the highest-risk primitive across the weaker Lit/Solid emitters — it is **deferred to a documented follow-up** (the editor + `toolbar` slot ship now). See the [comparison page](/guide/tiptap-comparison) for the design sketch and the gap-closure plan.
+TipTap's marquee feature — **custom node views** — ships via the [`nodeView` reactive slot](#node-view-slots), uniformly across all six targets (including Solid and Lit, where no upstream renderer exists). The remaining gap versus the official wrappers is **bubble / floating menu** slots (selection-anchored menu UI), which are deferred to a follow-up phase. See the [comparison page](/guide/tiptap-comparison#deferred-follow-ups-g2-g3-g4) for the deferred-feature plan.
 
 ## Cross-references
 
 - [`TipTap.rozie` source on GitHub](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/tiptap/src/TipTap.rozie) — the canonical wrapper.
 - [TipTap libraries comparison](/guide/tiptap-comparison) — the per-framework wrapper matrix + the node-view gap-closure plan.
-- [The portal-slot primitive](/examples/portal-list) — how `<slot name="X" portal />` routes a consumer fragment through each target's imperative-render API.
+- [The portal-slot primitive](/examples/portal-list) — how `<slot name="X" portal />` routes a consumer fragment through each target's imperative-render API. The `nodeView` slot adds the `reactive` flag for engine-driven in-place re-render.
 - [`$expose` and the imperative handle](/guide/features#expose-→-a-consumer-callable-imperative-handle-everywhere)
 - [`r-model` — two-way binding everywhere](/guide/features#model-true-→-idiomatic-two-way-binding-everywhere)
