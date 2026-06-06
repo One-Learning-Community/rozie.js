@@ -70,6 +70,7 @@ describe('VUE-TSC — vue-tsc --noEmit clean over emitted Vue SFCs', () => {
         const PKG_SRC: Record<string, string> = {
           SortableList: 'packages/ui/sortable-list/src/SortableList.rozie',
           Flatpickr: 'packages/ui/flatpickr/src/Flatpickr.rozie',
+          TipTap: 'packages/ui/tiptap/src/TipTap.rozie',
         };
         const srcPath = PKG_SRC[name]
           ? resolve(ROOT, PKG_SRC[name])

@@ -1,0 +1,64 @@
+<!--
+  TipTapScreenshotDemo.rozie — content-STABLE screenshot consumer for the TipTap
+  wrapper (Phase 32). The SEPARATE deterministic pixel cell — never extend it for
+  behavior, never bolt pixels onto TipTapBehaviorDemo.
+
+  A contenteditable editor is FAR easier to screenshot deterministically than a
+  canvas or CodeMirror: ProseMirror uses the NATIVE browser caret (no drawn
+  cursor layer, no blink animation it owns), and an UNFOCUSED editor shows no
+  caret at all. So the recipe is simply:
+
+    1. A FIXED constant rich-HTML doc bound one-way as `html` (never a live
+       timestamp / random content). A rich mix — heading, bold/italic marks,
+       a sub-heading, a bullet list — so the baseline exercises real rendering.
+    2. NEVER focus the editor (the cell exposes no interactive controls and the
+       spec never clicks into it) — an unfocused contenteditable draws no caret.
+    3. A belt-and-suspenders `editorProps` override that sets `caret-color:
+       transparent` on the contenteditable, so even an accidental focus can't
+       paint a blinking caret into the capture. (autofocus stays false.)
+
+  One .rozie source compiles to six per-framework screenshot consumers; the Linux
+  PNG baseline is generated in pinned Linux Docker (NOT here — macOS baselines are
+  forbidden, feedback_vr_linux_baselines). Until it lands the matrix cell
+  auto-fixmes on baselineExists().
+-->
+
+<rozie name="TipTapScreenshotDemo">
+
+<components>
+{
+  TipTap: '../../packages/ui/tiptap/src/TipTap.rozie',
+}
+</components>
+
+<script>
+// A FIXED, deterministic rich document — never a live timestamp or random
+// content. Heading + marks + sub-heading + bullet list = a representative spread.
+const FIXED_HTML = '<h1>Release notes</h1><p>This build ships <strong>rich text</strong> with <em>emphasis</em>, headings, and lists — rendered identically across six frameworks from one Rozie source.</p><h2>Highlights</h2><ul><li>Two-way <strong>html</strong> binding</li><li>A 14-verb command handle</li><li>A toolbar portal slot</li></ul>'
+
+// Belt-and-suspenders caret neutralization — even an accidental focus cannot
+// paint a blinking caret into the capture. autofocus stays false; the cell is
+// never clicked.
+const stableEditorProps = { attributes: { style: 'caret-color: transparent' } }
+</script>
+
+<template>
+<div class="tiptap-screenshot-demo">
+  <TipTap
+    :html="FIXED_HTML"
+    :autofocus="false"
+    :editorProps="stableEditorProps"
+  />
+</div>
+</template>
+
+<style>
+.tiptap-screenshot-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  max-width: 720px;
+}
+</style>
+
+</rozie>

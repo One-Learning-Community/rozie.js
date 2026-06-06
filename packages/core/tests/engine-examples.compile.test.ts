@@ -94,6 +94,13 @@ const ENGINE_DEMOS = [
   // slot fill across all 6 targets) surfaces in this fast gate.
   'demos/ChartScreenshotDemo.rozie',
   'demos/ChartBehaviorDemo.rozie',
+  // Phase 32 (tiptap) — the content-stable SCREENSHOT consumer (fixed rich doc +
+  // caret-neutralized editorProps, never focused) and the behavioral consumer
+  // (internal-toolbar bullet-list command + the $expose handle via ref). Both
+  // import ../../packages/ui/tiptap/src/TipTap.rozie; compiled here so a
+  // per-target consumer-side regression surfaces in this fast gate.
+  'demos/TipTapScreenshotDemo.rozie',
+  'demos/TipTapBehaviorDemo.rozie',
 ] as const;
 
 describe('engine-wrapper examples — cross-target compile gate', () => {

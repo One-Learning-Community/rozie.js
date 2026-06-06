@@ -30,8 +30,17 @@ import { emitLit } from '../emitLit.js';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, '../../../../..');
 
+// TipTap.rozie graduated into @rozie-ui/tiptap (Phase 32 git-mv); resolve it from
+// the package src. Other named examples still live under examples/.
+const PKG_SRC: Record<string, string> = {
+  TipTap: 'packages/ui/tiptap/src/TipTap.rozie',
+};
+
 function compile(name: string): string {
-  const source = readFileSync(resolve(ROOT, `examples/${name}.rozie`), 'utf8');
+  const source = readFileSync(
+    resolve(ROOT, PKG_SRC[name] ?? `examples/${name}.rozie`),
+    'utf8',
+  );
   const { ast } = parse(source, { filename: `${name}.rozie` });
   const registry = createDefaultRegistry();
   const { ir } = lowerToIR(ast!, { modifierRegistry: registry });
@@ -41,9 +50,16 @@ function compile(name: string): string {
 describe('Bug 1 (Lit) — scope-aware identifier rewrite', () => {
   it('TipTap.rozie emit contains no illegal `{ editor: this.editor }` binding pattern', () => {
     const code = compile('TipTap');
-    // The destructured param `({ editor }) => …` must stay a shorthand binding;
-    // rewriting it to `{ editor: this.editor }` is the illegal pattern.
-    expect(code).not.toMatch(/editor:\s*this\.editor/);
+    // The destructured PARAM `({ editor }) => …` must stay a shorthand binding;
+    // rewriting it to `({ editor: this.editor }) =>` is the illegal pattern (an
+    // object-PATTERN can't bind to a member expression). The regex is scoped to
+    // the arrow-PARAMETER form (object close `})` immediately before `=>`) so a
+    // legitimate value-position object LITERAL — e.g. the portal scope
+    // `$portals.toolbar(node, { editor })` → `{ editor: this.editor }`, correct
+    // codegen — does NOT trip the guard. The `parses cleanly via @babel/parser`
+    // test below is the strong backstop (the illegal arrow-param form is a syntax
+    // error).
+    expect(code).not.toMatch(/editor:\s*this\.editor\s*\}\s*\)\s*=>/);
   });
 
   it('TipTap.rozie emit parses cleanly via @babel/parser', () => {

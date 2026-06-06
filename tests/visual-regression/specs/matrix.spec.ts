@@ -149,6 +149,13 @@ const EXAMPLES = [
   'Flatpickr',
   'Uppy',
   'TipTap',
+  // Phase 32 (tiptap) — TipTapScreenshot is the content-STABLE pixel cell
+  // (TipTapScreenshotDemo: a fixed rich-HTML doc + caret-neutralized editorProps,
+  // never focused). Distinct from the live 'TipTap' (TipTapDemo) cell above.
+  // Baseline-gates to test.fixme via baselineExists() until the Linux-Docker
+  // TipTapScreenshot.png lands. TipTapBehavior is behavioral-only (tiptap.spec.ts)
+  // and deliberately NOT a matrix pixel cell.
+  'TipTapScreenshot',
   // Phase 14 — ThemedButtonConsumer attribute-fallthrough dogfood (D-05/D-06).
   // Auto-fallthrough renders consumer-passed attributes on the inner <button>;
   // the manual sibling with `inherit-attrs="false"` + explicit `r-bind="$attrs"`
@@ -377,7 +384,7 @@ async function settleExample(
   // ProseMirror adds the `.ProseMirror` class to its contenteditable root once
   // the editor finishes mounting. Wait for `.ProseMirror` to be visible — it
   // is the deterministic post-mount signal that the editor engine booted.
-  if (example === 'TipTap') {
+  if (example === 'TipTap' || example === 'TipTapScreenshot') {
     await expect(page.locator('.ProseMirror')).toBeVisible();
   }
   // Table: TableDemo renders `<table class="rozie-table">`. The React target

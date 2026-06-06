@@ -211,6 +211,19 @@ export const EXAMPLES = [
   // :plugins passthrough + tooltip portal-slot fill), deliberately NOT in
   // matrix.spec.ts EXAMPLES. Distinct from the line-typed 'LineChart' cell.
   'ChartBehavior',
+  // Phase 32 (tiptap) — TipTapScreenshot is the content-STABLE SCREENSHOT demo
+  // (loader → examples/demos/TipTapScreenshotDemo.rozie, which imports
+  // ../../packages/ui/tiptap/src/TipTap.rozie). A fixed rich-HTML doc with the
+  // caret neutralized + never focused, so a stable `TipTapScreenshot.png` baseline
+  // CAN exist (contenteditable, NOT canvas — no first-paint problem). Registered
+  // in matrix.spec.ts (auto-fixme until the Linux PNG lands).
+  'TipTapScreenshot',
+  // Phase 32 (tiptap) — TipTapBehavior is the behavioral-only command cell
+  // (loader → examples/demos/TipTapBehaviorDemo.rozie). Built for all 6 targets
+  // but NOT a screenshot cell — covered by tiptap.spec.ts (internal-toolbar
+  // bullet-list command on all 6 + the $expose handle undo/getHTML on the 5
+  // ref-resolving targets). Deliberately NOT in matrix.spec.ts EXAMPLES.
+  'TipTapBehavior',
 ] as const;
 
 export type Example = (typeof EXAMPLES)[number];
@@ -292,6 +305,11 @@ export const LIT_TAGS: Record<Example, string> = {
   // ChartScreenshotDemo / ChartBehaviorDemo.
   ChartScreenshot: 'rozie-chart-screenshot',
   ChartBehavior: 'rozie-chart-behavior',
+  // Phase 32 (tiptap) — the lit entry appends '-demo' → tags
+  // 'rozie-tip-tap-screenshot-demo' / 'rozie-tip-tap-behavior-demo' = kebab of
+  // TipTapScreenshotDemo / TipTapBehaviorDemo.
+  TipTapScreenshot: 'rozie-tip-tap-screenshot',
+  TipTapBehavior: 'rozie-tip-tap-behavior',
 };
 
 export interface HostQuery {
@@ -415,6 +433,11 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // clickCount in <data>. No parent-supplied props.
   ChartScreenshot: {},
   ChartBehavior: {},
+  // Phase 32 (tiptap) — both TipTap demos are self-contained: TipTapScreenshot
+  // hardcodes its fixed rich doc in <script>; TipTapBehavior seeds its content +
+  // out state in <data>. No parent props needed.
+  TipTapScreenshot: {},
+  TipTapBehavior: {},
 };
 
 /**
