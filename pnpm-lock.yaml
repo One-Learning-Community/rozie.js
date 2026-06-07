@@ -1458,6 +1458,9 @@ importers:
       '@rozie/core':
         specifier: workspace:*
         version: link:../../core
+      codemirror:
+        specifier: ^6
+        version: 6.0.2
       typescript:
         specifier: ~5.6.0
         version: 5.6.3
@@ -1488,6 +1491,9 @@ importers:
       '@codemirror/view':
         specifier: ^6
         version: 6.43.0
+      codemirror:
+        specifier: ^6
+        version: 6.0.2
 
   packages/ui/codemirror/packages/lit:
     dependencies:
@@ -1515,6 +1521,9 @@ importers:
       '@rozie/runtime-lit':
         specifier: workspace:*
         version: link:../../../../runtime/lit
+      codemirror:
+        specifier: ^6
+        version: 6.0.2
       lit:
         specifier: ^3.2
         version: 3.3.2
@@ -1539,6 +1548,9 @@ importers:
       '@rozie/runtime-react':
         specifier: workspace:*
         version: link:../../../../runtime/react
+      codemirror:
+        specifier: ^6
+        version: 6.0.2
       react:
         specifier: ^18.2 || ^19
         version: 19.2.6
@@ -1573,6 +1585,9 @@ importers:
       '@rozie/runtime-solid':
         specifier: workspace:*
         version: link:../../../../runtime/solid
+      codemirror:
+        specifier: ^6
+        version: 6.0.2
       solid-js:
         specifier: ^1.8
         version: 1.9.12
@@ -1597,6 +1612,9 @@ importers:
       '@rozie/runtime-svelte':
         specifier: workspace:*
         version: link:../../../../runtime/svelte
+      codemirror:
+        specifier: ^6
+        version: 6.0.2
       svelte:
         specifier: ^5
         version: 5.55.5(@typescript-eslint/types@8.59.2)
@@ -1618,6 +1636,9 @@ importers:
       '@codemirror/view':
         specifier: ^6
         version: 6.43.0
+      codemirror:
+        specifier: ^6
+        version: 6.0.2
       vue:
         specifier: ^3.4
         version: 3.5.33(typescript@5.9.3)
@@ -2959,6 +2980,9 @@ importers:
       chart.js:
         specifier: ^4.5.1
         version: 4.5.1
+      codemirror:
+        specifier: ^6.0.2
+        version: 6.0.2
       flatpickr:
         specifier: ^4.6.13
         version: 4.6.13
@@ -4362,6 +4386,9 @@ packages:
 
   '@codemirror/lint@6.9.6':
     resolution: {integrity: sha512-6Kp7r6XfCi/D/5sdXieMfg9pJU1bUEx96WITuLU6ESaKizCz0QHFMjY/TaFSbigDdEAIgi93itLBIUETP4oK+A==}
+
+  '@codemirror/search@6.7.0':
+    resolution: {integrity: sha512-ZvGm99wc/s2cITtMT15LFdn8aH/aS+V+DqyGq/N5ZlV5vWtH+nILvC2nw0zX7ByNoHHDZ2IxxdW38O0tc5nVHg==}
 
   '@codemirror/state@6.6.0':
     resolution: {integrity: sha512-4nbvra5R5EtiCzr9BTHiTLc+MLXK2QGiAVYMyi8PkQd3SR+6ixar/Q/01Fa21TBIDOZXgeWV4WppsQolSreAPQ==}
@@ -7965,6 +7992,9 @@ packages:
 
   code-block-writer@12.0.0:
     resolution: {integrity: sha512-q4dMFMlXtKR3XNBHyMHt/3pwYNA69EDk00lloMOaaUMKPUXBw6lpXtbu3MMVG6/uOihGnRDOlkyqsONEUj60+w==}
+
+  codemirror@6.0.2:
+    resolution: {integrity: sha512-VhydHotNW5w1UGK0Qj96BwSk/Zqbp9WbnyK2W/eVMv4QyF41INRGpjUhFJY7/uDNuudSc33a/PKr4iDqRduvHw==}
 
   color-convert@2.0.1:
     resolution: {integrity: sha512-RRECPsj7iu/xb5oKYcsFHSppFNnsj/52OVTRKb4zP5onXwVF3zVmmToNcOfGC+CRDpfK/U584fMg38ZHCaElKQ==}
@@ -14888,6 +14918,12 @@ snapshots:
       '@codemirror/view': 6.43.0
       crelt: 1.0.6
 
+  '@codemirror/search@6.7.0':
+    dependencies:
+      '@codemirror/state': 6.6.0
+      '@codemirror/view': 6.43.0
+      crelt: 1.0.6
+
   '@codemirror/state@6.6.0':
     dependencies:
       '@marijn/find-cluster-break': 1.0.2
@@ -18284,6 +18320,16 @@ snapshots:
   clsx@2.1.1: {}
 
   code-block-writer@12.0.0: {}
+
+  codemirror@6.0.2:
+    dependencies:
+      '@codemirror/autocomplete': 6.20.2
+      '@codemirror/commands': 6.10.3
+      '@codemirror/language': 6.12.3
+      '@codemirror/lint': 6.9.6
+      '@codemirror/search': 6.7.0
+      '@codemirror/state': 6.6.0
+      '@codemirror/view': 6.43.0
 
   color-convert@2.0.1:
     dependencies:

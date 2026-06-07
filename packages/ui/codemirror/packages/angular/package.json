@@ -41,7 +41,8 @@
     "@codemirror/view": "^6",
     "@codemirror/commands": "^6",
     "@codemirror/lang-javascript": "^6",
-    "@codemirror/theme-one-dark": "^6"
+    "@codemirror/theme-one-dark": "^6",
+    "codemirror": "^6"
   },
   "peerDependenciesMeta": {
     "@angular/core": {
@@ -63,6 +64,9 @@
       "optional": false
     },
     "@codemirror/theme-one-dark": {
+      "optional": false
+    },
+    "codemirror": {
       "optional": false
     }
   },

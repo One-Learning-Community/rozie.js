@@ -143,6 +143,32 @@ function main() {
       }
     }
 
+    // ─── React/Solid-only type aid: annotate `themeExt`'s return as `any` ────
+    // G3 widened the `theme` prop to accept a string OR a CM `Extension`, so its
+    // emitted prop type is `unknown` (the most permissive `<props>` form). The
+    // strict-tsc React/Solid leaves then infer `themeExt()`'s passthrough branch
+    // (`return t`) as `unknown`, which `Compartment.of`/`reconfigure` reject
+    // (TS2345: `unknown` is not assignable to `Extension`). The runtime value IS
+    // an Extension by that branch. The proper fix is an emitter-level return
+    // annotation, which is OUT OF SCOPE (SCOPE FENCE); as the sanctioned in-scope
+    // per-leaf aid (the analog of the Lit `*Ext` annotation above), annotate
+    // `themeExt`'s return `: any` here — a pure type annotation, zero runtime
+    // change. Vue/Svelte/Angular are type-neutral and never see it; Lit is
+    // already covered by the `themeExt = (): any =>` aid above.
+    if (cfg.dir === 'react' || cfg.dir === 'solid') {
+      const themeToken = cfg.dir === 'react' ? 'const themeExt = useCallback(() =>' : 'function themeExt()';
+      const themeAnnotated =
+        cfg.dir === 'react' ? 'const themeExt = useCallback((): any =>' : 'function themeExt(): any';
+      if (!code.includes(themeToken)) {
+        throw new Error(
+          `codegen ${cfg.dir}: expected to annotate \`themeExt\`'s return \`: any\` (G3 widened-theme ` +
+            `passthrough returns \`unknown\` under strict tsc) but the token \`${themeToken}\` was not found ` +
+            `— the ${cfg.dir} emit shape changed. Re-derive the type-gate aid (SCOPE FENCE: do NOT edit the emitter).`,
+        );
+      }
+      code = code.replace(themeToken, themeAnnotated);
+    }
+
     writeFileSync(resolve(leafSrc, cfg.file), code);
 
     // Bundled leaves (tsdown) entry on src/index.ts. The emitted component is a

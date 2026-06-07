@@ -298,7 +298,8 @@ export function renderReadme(target, ir, pkgName, handleManifest = {}) {
   lines.push(
     `Peer dependencies: the five \`@codemirror/*\` engine packages ` +
       '(`@codemirror/state`, `@codemirror/view`, `@codemirror/commands`, ' +
-      '`@codemirror/lang-javascript`, `@codemirror/theme-one-dark`, all `^6`) + ' +
+      '`@codemirror/lang-javascript`, `@codemirror/theme-one-dark`) plus the ' +
+      '`codemirror` meta-package (for the `basicSetup` bundle), all `^6`, + ' +
       `\`${FRAMEWORK_PEER_LABEL[target]}\`. Install them alongside this package.`,
   );
   lines.push('');
