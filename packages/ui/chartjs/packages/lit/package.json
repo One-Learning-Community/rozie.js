@@ -45,6 +45,9 @@
     "dist",
     "src"
   ],
+  "dependencies": {
+    "@rozie/runtime-lit": "workspace:*"
+  },
   "peerDependencies": {
     "lit": "^3.2",
     "@lit-labs/preact-signals": "^1.0.0",

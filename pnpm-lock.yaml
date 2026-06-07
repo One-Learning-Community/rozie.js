@@ -1376,6 +1376,9 @@ importers:
       '@preact/signals-core':
         specifier: ^1.3.0
         version: 1.14.2
+      '@rozie/runtime-lit':
+        specifier: workspace:*
+        version: link:../../../../runtime/lit
       chart.js:
         specifier: ^4
         version: 4.5.1
