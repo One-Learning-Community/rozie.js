@@ -37,6 +37,8 @@ const value = ref('const greeting = "hello";\n');
 | `placeholder` | `String` | `""` |  |  |
 | `extensions` | `Array` | `[]` |  |  |
 | `basicSetup` | `Boolean` | `false` |  |  |
+| `gutterLines` | `Array` | `[]` |  |  |
+| `decorations` | `Array` | `[]` |  |  |
 
 ## Imperative handle
 
@@ -72,3 +74,5 @@ const cm = ref();          // template ref
 | panel | view |
 | topPanel | view |
 | tooltip | view, pos |
+| gutter | line, view |
+| decoration | from, to, view |

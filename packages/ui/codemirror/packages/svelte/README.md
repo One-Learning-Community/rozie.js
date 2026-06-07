@@ -34,6 +34,8 @@ Peer dependencies: the five `@codemirror/*` engine packages (`@codemirror/state`
 | `placeholder` | `String` | `""` |  |  |
 | `extensions` | `Array` | `[]` |  |  |
 | `basicSetup` | `Boolean` | `false` |  |  |
+| `gutterLines` | `Array` | `[]` |  |  |
+| `decorations` | `Array` | `[]` |  |  |
 
 ## Imperative handle
 
@@ -66,3 +68,5 @@ Beyond props, the component exposes imperative methods (declared once in the Roz
 | panel | view |
 | topPanel | view |
 | tooltip | view, pos |
+| gutter | line, view |
+| decoration | from, to, view |

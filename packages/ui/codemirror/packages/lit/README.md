@@ -38,6 +38,8 @@ el.addEventListener('value-change', (e) => {
 | `placeholder` | `String` | `""` |  |  |
 | `extensions` | `Array` | `[]` |  |  |
 | `basicSetup` | `Boolean` | `false` |  |  |
+| `gutterLines` | `Array` | `[]` |  |  |
+| `decorations` | `Array` | `[]` |  |  |
 
 ## Imperative handle
 
@@ -69,3 +71,5 @@ const text = el.getValue();
 | panel | view |
 | topPanel | view |
 | tooltip | view, pos |
+| gutter | line, view |
+| decoration | from, to, view |

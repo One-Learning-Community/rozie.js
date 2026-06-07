@@ -13,9 +13,13 @@ export interface CodeMirrorProps {
   placeholder?: string;
   extensions?: unknown[];
   basicSetup?: boolean;
+  gutterLines?: unknown[];
+  decorations?: unknown[];
   renderPanel?: (params: { view: () => void }) => ReactNode;
   renderTopPanel?: (params: { view: () => void }) => ReactNode;
   renderTooltip?: (params: { view: () => void; pos: () => void }) => ReactNode;
+  renderGutter?: (params: { line: () => void; view: () => void }) => ReactNode;
+  renderDecoration?: (params: { from: () => void; to: () => void; view: () => void }) => ReactNode;
   slots?: Record<string, () => ReactNode>;
 }
 

@@ -23,3 +23,19 @@
     border-radius: 3px;
     white-space: nowrap;
   }
+.rozie-codemirror .rozie-cm-gutter {
+    min-width: 14px;
+  }
+.rozie-codemirror .rozie-cm-gutter-marker {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    font-size: 11px;
+    line-height: 1;
+  }
+.rozie-codemirror .rozie-cm-decoration {
+    display: inline-flex;
+    align-items: center;
+    vertical-align: text-bottom;
+  }

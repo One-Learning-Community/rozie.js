@@ -5,8 +5,20 @@ import { flushSync } from 'react-dom';
 import { useControllableState } from '@rozie/runtime-react';
 import './CodeMirror.css';
 import './CodeMirror.global.css';
-import { EditorState, Compartment, EditorSelection, StateField } from '@codemirror/state';
-import { EditorView, keymap, lineNumbers, showPanel, showTooltip, placeholder as placeholderExt } from '@codemirror/view';
+import { EditorState, Compartment, EditorSelection, StateField, RangeSet } from '@codemirror/state';
+// `gutter` is imported under an alias: the `gutter` SLOT (G5 wave 2) lowers into
+// a same-scope local on targets that bind slots as locals (Svelte snippet prop
+// `gutter`, etc.), so the bare CM6 `gutter` import would collide ("Identifier
+// 'gutter' has already been declared"). Same discipline as `basicSetup as
+// basicSetupBundle` below (a prop-vs-import collision). The `decoration` slot has
+// no matching import name, so `Decoration` (capitalized, distinct) needs no alias.
+// `gutter` is imported under an alias: the `gutter` SLOT (G5 wave 2) lowers into
+// a same-scope local on targets that bind slots as locals (Svelte snippet prop
+// `gutter`, etc.), so the bare CM6 `gutter` import would collide ("Identifier
+// 'gutter' has already been declared"). Same discipline as `basicSetup as
+// basicSetupBundle` below (a prop-vs-import collision). The `decoration` slot has
+// no matching import name, so `Decoration` (capitalized, distinct) needs no alias.
+import { EditorView, keymap, lineNumbers, showPanel, showTooltip, placeholder as placeholderExt, gutter as gutterExt, GutterMarker, Decoration, WidgetType } from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { javascript } from '@codemirror/lang-javascript';
 import { oneDark } from '@codemirror/theme-one-dark';
@@ -24,6 +36,10 @@ interface TopPanelCtx { view: any; }
 
 interface TooltipCtx { view: any; pos: any; }
 
+interface GutterCtx { line: any; view: any; }
+
+interface DecorationCtx { from: any; to: any; view: any; }
+
 interface CodeMirrorProps {
   value?: string;
   defaultValue?: string;
@@ -35,9 +51,13 @@ interface CodeMirrorProps {
   placeholder?: string;
   extensions?: any[];
   basicSetup?: boolean;
+  gutterLines?: any[];
+  decorations?: any[];
   renderPanel?: (ctx: PanelCtx) => ReactNode;
   renderTopPanel?: (ctx: TopPanelCtx) => ReactNode;
   renderTooltip?: (ctx: TooltipCtx) => ReactNode;
+  renderGutter?: (ctx: GutterCtx) => ReactNode;
+  renderDecoration?: (ctx: DecorationCtx) => ReactNode;
   slots?: Record<string, () => import('react').ReactNode>;
 }
 
@@ -55,7 +75,9 @@ export interface CodeMirrorHandle {
 const CodeMirror = forwardRef<CodeMirrorHandle, CodeMirrorProps>(function CodeMirror(_props: CodeMirrorProps, ref): JSX.Element {
   const portalRoots = useRef<Set<Root>>(new Set());
   const __defaultExtensions = useState(() => (() => [])())[0];
-  const props: Omit<CodeMirrorProps, 'language' | 'theme' | 'readOnly' | 'height' | 'placeholder' | 'extensions' | 'basicSetup'> & { language: string; theme: unknown; readOnly: boolean; height: number; placeholder: string; extensions: any[]; basicSetup: boolean } = {
+  const __defaultGutterLines = useState(() => (() => [])())[0];
+  const __defaultDecorations = useState(() => (() => [])())[0];
+  const props: Omit<CodeMirrorProps, 'language' | 'theme' | 'readOnly' | 'height' | 'placeholder' | 'extensions' | 'basicSetup' | 'gutterLines' | 'decorations'> & { language: string; theme: unknown; readOnly: boolean; height: number; placeholder: string; extensions: any[]; basicSetup: boolean; gutterLines: any[]; decorations: any[] } = {
     ..._props,
     language: _props.language ?? 'javascript',
     theme: _props.theme ?? 'light',
@@ -64,6 +86,8 @@ const CodeMirror = forwardRef<CodeMirrorHandle, CodeMirrorProps>(function CodeMi
     placeholder: _props.placeholder ?? '',
     extensions: _props.extensions ?? __defaultExtensions,
     basicSetup: _props.basicSetup ?? false,
+    gutterLines: _props.gutterLines ?? __defaultGutterLines,
+    decorations: _props.decorations ?? __defaultDecorations,
   };
   const _renderPanelRef = useRef(props.renderPanel);
   _renderPanelRef.current = props.renderPanel;
@@ -71,6 +95,12 @@ const CodeMirror = forwardRef<CodeMirrorHandle, CodeMirrorProps>(function CodeMi
   _renderTopPanelRef.current = props.renderTopPanel;
   const _renderTooltipRef = useRef(props.renderTooltip);
   _renderTooltipRef.current = props.renderTooltip;
+  const _renderGutterRef = useRef(props.renderGutter);
+  _renderGutterRef.current = props.renderGutter;
+  const _renderDecorationRef = useRef(props.renderDecoration);
+  _renderDecorationRef.current = props.renderDecoration;
+  const rebuildGutterExt = useRef<any>(null);
+  const rebuildDecorationExt = useRef<any>(null);
   const suppressEmit = useRef(false);
   const view = useRef<any>(null);
   const [value, setValue] = useControllableState({
@@ -78,8 +108,12 @@ const CodeMirror = forwardRef<CodeMirrorHandle, CodeMirrorProps>(function CodeMi
     defaultValue: props.defaultValue ?? '',
     onValueChange: props.onValueChange,
   });
+  const _decorationsRef = useRef(props.decorations);
+  _decorationsRef.current = props.decorations;
   const _extensionsRef = useRef(props.extensions);
   _extensionsRef.current = props.extensions;
+  const _gutterLinesRef = useRef(props.gutterLines);
+  _gutterLinesRef.current = props.gutterLines;
   const _readOnlyRef = useRef(props.readOnly);
   _readOnlyRef.current = props.readOnly;
   const _valueRef = useRef(value);
@@ -91,6 +125,8 @@ const CodeMirror = forwardRef<CodeMirrorHandle, CodeMirrorProps>(function CodeMi
   const _watch3First = useRef(true);
   const _watch4First = useRef(true);
   const _watch5First = useRef(true);
+  const _watch6First = useRef(true);
+  const _watch7First = useRef(true);
 
   const langCompartment = useMemo(() => new Compartment(), []);
   const themeCompartment = useMemo(() => new Compartment(), []);
@@ -99,6 +135,8 @@ const CodeMirror = forwardRef<CodeMirrorHandle, CodeMirrorProps>(function CodeMi
   const extensionsCompartment = useMemo(() => new Compartment(), []);
   const panelCompartment = useMemo(() => new Compartment(), []);
   const topPanelCompartment = useMemo(() => new Compartment(), []);
+  const gutterCompartment = useMemo(() => new Compartment(), []);
+  const decorationCompartment = useMemo(() => new Compartment(), []);
   const langExt = useCallback(() => props.language === 'javascript' ? javascript() : [], [props.language]);
   const themeExt = useCallback((): any => {
     const t = props.theme;
@@ -239,6 +277,48 @@ const CodeMirror = forwardRef<CodeMirrorHandle, CodeMirrorProps>(function CodeMi
       portalRoots.current.add(root);
       return {
         update: (s: { view: unknown; pos: unknown }): void => renderScope(s),
+        dispose: (): void => {
+          root.unmount();
+          portalRoots.current.delete(root);
+        },
+      };
+    },
+    gutter: (container: HTMLElement, scope: { line: unknown; view: unknown }): ReactivePortalHandle => {
+      const slot = _renderGutterRef.current ?? props.slots?.['gutter'];
+      if (typeof slot !== 'function') return { update() {}, dispose() {} };
+      // Spike 004: portal-scope attribute injection.
+      // Cascades the @portal gutter { … } selectors from the
+      // component's .module.css into the engine-owned subtree.
+      container.setAttribute('data-rozie-portal-gutter', '34cfda5a');
+      const root = createRoot(container);
+      const renderScope = (s: { line: unknown; view: unknown }): void => {
+        flushSync(() => root.render(slot(s)));
+      };
+      renderScope(scope);
+      portalRoots.current.add(root);
+      return {
+        update: (s: { line: unknown; view: unknown }): void => renderScope(s),
+        dispose: (): void => {
+          root.unmount();
+          portalRoots.current.delete(root);
+        },
+      };
+    },
+    decoration: (container: HTMLElement, scope: { from: unknown; to: unknown; view: unknown }): ReactivePortalHandle => {
+      const slot = _renderDecorationRef.current ?? props.slots?.['decoration'];
+      if (typeof slot !== 'function') return { update() {}, dispose() {} };
+      // Spike 004: portal-scope attribute injection.
+      // Cascades the @portal decoration { … } selectors from the
+      // component's .module.css into the engine-owned subtree.
+      container.setAttribute('data-rozie-portal-decoration', '34cfda5a');
+      const root = createRoot(container);
+      const renderScope = (s: { from: unknown; to: unknown; view: unknown }): void => {
+        flushSync(() => root.render(slot(s)));
+      };
+      renderScope(scope);
+      portalRoots.current.add(root);
+      return {
+        update: (s: { from: unknown; to: unknown; view: unknown }): void => renderScope(s),
         dispose: (): void => {
           root.unmount();
           portalRoots.current.delete(root);
@@ -400,9 +480,154 @@ const CodeMirror = forwardRef<CodeMirrorHandle, CodeMirrorProps>(function CodeMi
         provide: (f: any) => showTooltip.from(f)
       });
     };
+
+    // gutter — a custom-gutter REACTIVE MULTI-INSTANCE portal slot (G5 wave 2).
+    // Each line in `gutterLines` gets a `RozieGutterMarker` whose `toDOM` mounts
+    // the consumer fragment via $portals.gutter(dom, scope) — ONE live portal
+    // handle PER VISIBLE marker (CM calls toDOM when the line scrolls into view and
+    // destroy() when it scrolls out; the reactive handle disposes cleanly). This is
+    // the TipTap nodeView multi-instance template: the GutterMarker class captures
+    // $portals.gutter and is therefore defined inside this $onMount-invoked factory.
+    //
+    // The GutterMarker subclass is declared inline (GutterMarker REQUIRES
+    // subclassing), but its per-marker state (`line`, the live portal handle) lives
+    // in CLOSURE — `makeGutterMarker(line)` captures them — NOT in `this` fields.
+    // This is deliberate for the strict-tsc bundled leaves (react/solid/lit): ES
+    // class fields assigned only in the constructor (`this.line = …`) without a
+    // declaration trip TS2339 under those leaves' strict tsc, and the emitter passes
+    // the class through verbatim (a class-field type aid is an emitter concern, OUT
+    // OF SCOPE). Closure capture has zero `this`-field surface, so it typechecks
+    // cleanly across all six. The overriding CM methods (toDOM/destroy) cannot carry
+    // the TS-only `override` keyword — the `<script>` is plain JS (no `lang="ts"`),
+    // so `override` is unparseable — so the three bundled leaves relax
+    // `noImplicitOverride` in their tsconfig (the Lit leaf already did; react/solid
+    // now match). The `view` param is named `mView` — the Lit field-rewrite walks
+    // into a method body and rewrites a bare `view` token (matching the top-level
+    // `let view`) to `this.view`; `mView` is collision-free. (The panelExt lesson.)
+    const makeGutterExt = (gv: any) => {
+      if (!(props.renderGutter ?? props.slots?.["gutter"])) return [];
+      const makeGutterMarker = (line: any) => {
+        let handle: any = null;
+        return new class extends GutterMarker {
+          toDOM(mView: any) {
+            const dom = document.createElement('div');
+            dom.className = 'rozie-cm-gutter-marker';
+            handle = gv(dom, {
+              line,
+              view: mView
+            });
+            return dom;
+          }
+          destroy() {
+            handle?.dispose();
+            handle = null;
+          }
+        }();
+      };
+      // Recompute the marker RangeSet from `gutterLines` against the live doc —
+      // one marker at the START of each in-range line. RangeSet.of REQUIRES the
+      // ranges sorted by `from`, so sort the resolved positions.
+      const buildMarkers = (mView: any): any => {
+        const doc = mView.state.doc;
+        const ranges = [];
+        for (const n of _gutterLinesRef.current as any) {
+          if (typeof n !== 'number' || n < 1 || n > doc.lines) continue;
+          ranges.push(makeGutterMarker(n).range(doc.line(n).from));
+        }
+        ranges.sort((a: any, b: any) => a.from - b.from);
+        return RangeSet.of(ranges);
+      };
+      return gutterExt({
+        class: 'rozie-cm-gutter',
+        markers: (mView: any) => buildMarkers(mView)
+      });
+    };
+
+    // decoration — an inline-widget REACTIVE MULTI-INSTANCE portal slot (G5 wave
+    // 2). Each `{ from, to? }` in `decorations` gets a `RozieWidget` whose `toDOM`
+    // mounts the consumer fragment via $portals.decoration(dom, scope) — ONE live
+    // portal handle PER VISIBLE widget. The decoration set is provided through a
+    // compartment-wrapped facet so the `decorations` prop reconfigures it live.
+    // The WidgetType class captures $portals.decoration, so it is defined inside
+    // this $onMount-invoked factory (the bundled-leaf typecheck discipline).
+    const makeDecorationExt = (dv: any) => {
+      if (!(props.renderDecoration ?? props.slots?.["decoration"])) return Decoration.none;
+      // The WidgetType subclass is declared inline (WidgetType REQUIRES subclassing)
+      // but its per-widget state (`from`/`to`, the live portal handle) lives in
+      // CLOSURE — `makeWidget(from, to)` captures them — NOT in `this` fields, for
+      // the same strict-tsc-bundled-leaf reason as the gutter marker (undeclared
+      // `this` fields trip TS2339; the overriding methods can't carry the TS-only
+      // `override` keyword from plain-JS `<script>`, so the bundled leaves relax
+      // `noImplicitOverride`). No `eq` override is needed: the decoration set is
+      // rebuilt from the prop on every reconfigure, so default reference-`eq`
+      // (always "different") correctly remounts each widget instead of reusing stale
+      // DOM. The `view` param is `dView` (the Lit field-rewrite lesson).
+      const makeWidget = (from: any, to: any) => {
+        let handle: any = null;
+        return new class extends WidgetType {
+          toDOM(dView: any) {
+            const dom = document.createElement('span');
+            dom.className = 'rozie-cm-decoration';
+            handle = dv(dom, {
+              from,
+              to,
+              view: dView
+            });
+            return dom;
+          }
+          destroy() {
+            handle?.dispose();
+            handle = null;
+          }
+          // Inline widgets must not be considered editable content.
+          ignoreEvent() {
+            return false;
+          }
+        }();
+      };
+      // Build the DecorationSet from `decorations` against the live doc. Each entry
+      // is a point widget at `from` (side: 1 — after the position); out-of-range
+      // offsets are clamped to the doc length and skipped if `from` is invalid.
+      // Decoration.set REQUIRES the ranges sorted by `from`.
+      const buildSet = (state: any) => {
+        const len = state.doc.length;
+        const ranges = [];
+        for (const d of _decorationsRef.current as any) {
+          if (!d || typeof d.from !== 'number') continue;
+          const from = Math.max(0, Math.min(d.from, len));
+          const to = typeof d.to === 'number' ? Math.max(0, Math.min(d.to, len)) : from;
+          ranges.push(Decoration.widget({
+            widget: makeWidget(from, to),
+            side: 1
+          }).range(from));
+        }
+        ranges.sort((a: any, b: any) => a.from - b.from);
+        return Decoration.set(ranges);
+      };
+      // A StateField yields the DecorationSet and provides it to EditorView.
+      // decorations. The set is rebuilt on every prop-driven reconfigure (the
+      // $watch dispatches decorationCompartment.reconfigure(makeDecorationExt(…))),
+      // and tracked across local doc edits via mapping so widget positions follow.
+      return StateField.define({
+        create: (state: any) => buildSet(state),
+        update: (deco: any, tr: any) => tr.docChanged ? deco.map(tr.changes) : deco,
+        provide: (f: any) => EditorView.decorations.from(f)
+      });
+    };
+
+    // Bridge the mount-built factories to the top-level $watch reconfigures. Each
+    // closes over the captured $portals helper so a prop change can rebuild the
+    // extension without re-referencing $portals at top level.
+    rebuildGutterExt.current = () => makeGutterExt(portals.gutter);
+    rebuildDecorationExt.current = () => makeDecorationExt(portals.decoration);
     const buildState = (doc: any) => EditorState.create({
       doc,
       extensions: [...baselineExt(), langCompartment.of(langExt()), themeCompartment.of(themeExt()), readOnlyCompartment.of(EditorState.readOnly.of(_readOnlyRef.current)), placeholderCompartment.of(phExt()), panelCompartment.of(panelExt()), topPanelCompartment.of(topPanelExt()),
+      // gutter / decoration — the REACTIVE MULTI-INSTANCE portal slots (G5 wave
+      // 2). Each lives in a compartment so its driving prop (gutterLines /
+      // decorations) reconfigures live; the factory captures the per-target
+      // $portals helper (gutter / decoration) here in the mount scope.
+      gutterCompartment.of(rebuildGutterExt.current()), decorationCompartment.of(rebuildDecorationExt.current()),
       // tooltipField() returns a StateField extension (or [] when the slot is
       // unfilled); no compartment — it is a one-shot mount-time decision.
       tooltipField(), EditorView.updateListener.of((update: any) => {
@@ -467,6 +692,20 @@ const CodeMirror = forwardRef<CodeMirrorHandle, CodeMirrorProps>(function CodeMi
       effects: extensionsCompartment.reconfigure(v)
     });
   }, [props.extensions]);
+  useEffect(() => {
+    if (_watch6First.current) { _watch6First.current = false; return; }
+    if (!view.current || !rebuildGutterExt.current) return;
+    view.current.dispatch({
+      effects: gutterCompartment.reconfigure(rebuildGutterExt.current())
+    });
+  }, [props.gutterLines]);
+  useEffect(() => {
+    if (_watch7First.current) { _watch7First.current = false; return; }
+    if (!view.current || !rebuildDecorationExt.current) return;
+    view.current.dispatch({
+      effects: decorationCompartment.reconfigure(rebuildDecorationExt.current())
+    });
+  }, [props.decorations]);
 
   useImperativeHandle(ref, () => ({ getView, focus, getValue, replaceValue, dispatch, insertText, getSelection, setSelection }), []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -475,6 +714,10 @@ const CodeMirror = forwardRef<CodeMirrorHandle, CodeMirrorProps>(function CodeMi
     <div className={"rozie-codemirror"} style={{ height: props.height + 'px' }} data-rozie-s-34cfda5a="">
       <div className={"cm-mount"} ref={hostEl} data-rozie-s-34cfda5a="" />
     </div>
+
+
+
+
 
 
 

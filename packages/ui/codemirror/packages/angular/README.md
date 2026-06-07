@@ -69,6 +69,8 @@ The accessor contract: only real user interaction dirties the control — progra
 | `placeholder` | `String` | `""` |  |  |
 | `extensions` | `Array` | `[]` |  |  |
 | `basicSetup` | `Boolean` | `false` |  |  |
+| `gutterLines` | `Array` | `[]` |  |  |
+| `decorations` | `Array` | `[]` |  |  |
 
 ## Imperative handle
 
@@ -101,3 +103,5 @@ export class DemoComponent {
 | panel | view |
 | topPanel | view |
 | tooltip | view, pos |
+| gutter | line, view |
+| decoration | from, to, view |

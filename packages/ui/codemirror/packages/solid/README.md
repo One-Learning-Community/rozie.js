@@ -41,6 +41,8 @@ export function Demo() {
 | `placeholder` | `String` | `""` |  |  |
 | `extensions` | `Array` | `[]` |  |  |
 | `basicSetup` | `Boolean` | `false` |  |  |
+| `gutterLines` | `Array` | `[]` |  |  |
+| `decorations` | `Array` | `[]` |  |  |
 
 ## Imperative handle
 
@@ -74,3 +76,5 @@ const text = handle?.getValue();
 | panel | view |
 | topPanel | view |
 | tooltip | view, pos |
+| gutter | line, view |
+| decoration | from, to, view |
