@@ -90,7 +90,7 @@ const controlZoomIn = () => { $refs.map?.flyTo?.({ zoom: ($refs.map?.getZoom?.()
 
   <div class="controls">
     <button type="button" data-testid="zoom-in" @click="zoomIn">Zoom in</button>
-    <span class="readout" data-testid="readout-zoom">{{ String($data.zoom) }}</span>
+    <span class="readout" data-testid="readout-zoom">{{ $data.zoom }}</span>
   </div>
 
   <div class="map-wrap" style="height: 320px">
