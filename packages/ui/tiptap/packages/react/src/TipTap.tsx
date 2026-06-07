@@ -4,8 +4,10 @@ import { createRoot, type Root } from 'react-dom/client';
 import { flushSync } from 'react-dom';
 import { clsx, useControllableState } from '@rozie/runtime-react';
 import './TipTap.css';
+import './TipTap.global.css';
 import { Editor, Node } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
+import { Placeholder } from '@tiptap/extensions';
 
 // The live editor instance — null before mount / after destroy. Named `editor`
 // (distinct from any template `ref="X"` name) so no capture-var-vs-ref double
@@ -401,15 +403,25 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
     // here inside the mount body and passed into the node factory, keeping the
     // reference scoped to the mount lifecycle (the toolbar-slot discipline).
     const nodeViewExtensions = (props.renderNodeView ?? props.slots?.["nodeView"]) ? makeNodeViewExtensions(portals.nodeView) : [];
+
+    // Placeholder ghost-text (G3). Read $props.placeholder ONCE at construction
+    // (setup-once, like content/editable/autofocus — no reactivity required). The
+    // Placeholder extension (@tiptap/extensions, version-matched to StarterKit)
+    // adds class `is-editor-empty` + a `data-placeholder` attribute to the first
+    // empty node; the `::before` rule in the `:root { }` engine-DOM escape hatch
+    // (in the style block) paints the ghost text. Empty placeholder = no extension.
+    const placeholderExtensions = props.placeholder ? [Placeholder.configure({
+      placeholder: props.placeholder
+    })] : [];
     editor.current = new Editor({
       element: editorEl.current!,
       content: _htmlRef.current,
       editable: _editableRef.current,
       autofocus: props.autofocus,
-      // StarterKit first; the reactive node-view nodes next; consumer extensions
-      // LAST so they win (TipTap applies later-registered extensions over earlier
-      // ones for the same node/mark).
-      extensions: [StarterKit, ...nodeViewExtensions, ...props.extensions],
+      // StarterKit first; the Placeholder ext next; the reactive node-view nodes
+      // next; consumer extensions LAST so they win (TipTap applies later-registered
+      // extensions over earlier ones for the same node/mark).
+      extensions: [StarterKit, ...placeholderExtensions, ...nodeViewExtensions, ...props.extensions],
       editorProps: {
         attributes: {
           'aria-label': props.ariaLabel,

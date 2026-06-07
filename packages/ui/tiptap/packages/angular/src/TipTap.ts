@@ -4,6 +4,7 @@ import { NG_VALUE_ACCESSOR } from '@angular/forms';
 
 import { Editor, Node } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
+import { Placeholder } from '@tiptap/extensions';
 
 // The live editor instance — null before mount / after destroy. Named `editor`
 // (distinct from any template `ref="X"` name) so no capture-var-vs-ref double
@@ -106,6 +107,14 @@ interface NodeViewCtx {
     .rozie-tiptap-content h1 { font-size: 1.5rem; margin: 0.5rem 0 0.375rem; }
     .rozie-tiptap-content h2 { font-size: 1.25rem; margin: 0.5rem 0 0.375rem; }
     .rozie-tiptap-content ul { margin: 0 0 0.5rem; padding-left: 1.5rem; }
+
+    ::ng-deep .rozie-tiptap-content .is-editor-empty:first-child::before {
+        content: attr(data-placeholder);
+        color: rgba(0, 0, 0, 0.4);
+        float: left;
+        height: 0;
+        pointer-events: none;
+      }
   `],
   providers: [
     {
@@ -205,8 +214,8 @@ export class TipTap {
         };
       },
     };
-    const __editorClass = this.editorClass();
     const __placeholder = this.placeholder();
+    const __editorClass = this.editorClass();
     this.lastHtml = this.html();
 
     // Register the reactive node-view nodes ONLY when the consumer fills the
@@ -220,15 +229,31 @@ export class TipTap {
     // here inside the mount body and passed into the node factory, keeping the
     // reference scoped to the mount lifecycle (the toolbar-slot discipline).
     const nodeViewExtensions = (this.nodeViewTpl ?? this.templates()?.['nodeView']) ? this.makeNodeViewExtensions(portals.nodeView) : [];
+
+    // Placeholder ghost-text (G3). Read $props.placeholder ONCE at construction
+    // (setup-once, like content/editable/autofocus — no reactivity required). The
+    // Placeholder extension (@tiptap/extensions, version-matched to StarterKit)
+    // adds class `is-editor-empty` + a `data-placeholder` attribute to the first
+    // empty node; the `::before` rule in the `:root { }` engine-DOM escape hatch
+    // (in the style block) paints the ghost text. Empty placeholder = no extension.
+    // Placeholder ghost-text (G3). Read $props.placeholder ONCE at construction
+    // (setup-once, like content/editable/autofocus — no reactivity required). The
+    // Placeholder extension (@tiptap/extensions, version-matched to StarterKit)
+    // adds class `is-editor-empty` + a `data-placeholder` attribute to the first
+    // empty node; the `::before` rule in the `:root { }` engine-DOM escape hatch
+    // (in the style block) paints the ghost text. Empty placeholder = no extension.
+    const placeholderExtensions = __placeholder ? [Placeholder.configure({
+      placeholder: __placeholder
+    })] : [];
     this.editor = new Editor({
       element: this.editorEl()!.nativeElement,
       content: this.html(),
       editable: this.editable(),
       autofocus: this.autofocus(),
-      // StarterKit first; the reactive node-view nodes next; consumer extensions
-      // LAST so they win (TipTap applies later-registered extensions over earlier
-      // ones for the same node/mark).
-      extensions: [StarterKit, ...nodeViewExtensions, ...this.extensions()],
+      // StarterKit first; the Placeholder ext next; the reactive node-view nodes
+      // next; consumer extensions LAST so they win (TipTap applies later-registered
+      // extensions over earlier ones for the same node/mark).
+      extensions: [StarterKit, ...placeholderExtensions, ...nodeViewExtensions, ...this.extensions()],
       editorProps: {
         attributes: {
           'aria-label': this.ariaLabel(),

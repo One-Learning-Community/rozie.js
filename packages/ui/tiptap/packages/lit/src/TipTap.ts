@@ -1,9 +1,10 @@
 import { LitElement, css, html, nothing, render } from 'lit';
 import { customElement, property, query, queryAssignedElements, state } from 'lit/decorators.js';
 import { SignalWatcher, effect, signal, untracked } from '@lit-labs/preact-signals';
-import { createLitControllableProperty } from '@rozie/runtime-lit';
+import { createLitControllableProperty, injectGlobalStyles } from '@rozie/runtime-lit';
 import { Editor, Node } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
+import { Placeholder } from '@tiptap/extensions';
 
 // The live editor instance — null before mount / after destroy. Named `editor`
 // (distinct from any template `ref="X"` name) so no capture-var-vs-ref double
@@ -78,6 +79,13 @@ export default class TipTap extends SignalWatcher(LitElement) {
 .rozie-tiptap-content[data-rozie-s-2aeee876] h1[data-rozie-s-2aeee876] { font-size: 1.5rem; margin: 0.5rem 0 0.375rem; }
 .rozie-tiptap-content[data-rozie-s-2aeee876] h2[data-rozie-s-2aeee876] { font-size: 1.25rem; margin: 0.5rem 0 0.375rem; }
 .rozie-tiptap-content[data-rozie-s-2aeee876] ul[data-rozie-s-2aeee876] { margin: 0 0 0.5rem; padding-left: 1.5rem; }
+.rozie-tiptap-content .is-editor-empty:first-child::before {
+    content: attr(data-placeholder);
+    color: rgba(0, 0, 0, 0.4);
+    float: left;
+    height: 0;
+    pointer-events: none;
+  }
 `;
 
   @property({ type: String, attribute: 'html' }) _html_attr: string = '<p>Start writing…</p>';
@@ -215,15 +223,31 @@ private _portalContainers = new Set<HTMLElement>();
     // here inside the mount body and passed into the node factory, keeping the
     // reference scoped to the mount lifecycle (the toolbar-slot discipline).
     const nodeViewExtensions = this.nodeView !== undefined ? this.makeNodeViewExtensions(portals.nodeView) : [];
+
+    // Placeholder ghost-text (G3). Read $props.placeholder ONCE at construction
+    // (setup-once, like content/editable/autofocus — no reactivity required). The
+    // Placeholder extension (@tiptap/extensions, version-matched to StarterKit)
+    // adds class `is-editor-empty` + a `data-placeholder` attribute to the first
+    // empty node; the `::before` rule in the `:root { }` engine-DOM escape hatch
+    // (in the style block) paints the ghost text. Empty placeholder = no extension.
+    // Placeholder ghost-text (G3). Read $props.placeholder ONCE at construction
+    // (setup-once, like content/editable/autofocus — no reactivity required). The
+    // Placeholder extension (@tiptap/extensions, version-matched to StarterKit)
+    // adds class `is-editor-empty` + a `data-placeholder` attribute to the first
+    // empty node; the `::before` rule in the `:root { }` engine-DOM escape hatch
+    // (in the style block) paints the ghost text. Empty placeholder = no extension.
+    const placeholderExtensions = this.placeholder ? [Placeholder.configure({
+      placeholder: this.placeholder
+    })] : [];
     this.editor = new Editor({
       element: this._refEditorEl,
       content: this.html,
       editable: this.editable,
       autofocus: this.autofocus,
-      // StarterKit first; the reactive node-view nodes next; consumer extensions
-      // LAST so they win (TipTap applies later-registered extensions over earlier
-      // ones for the same node/mark).
-      extensions: [StarterKit, ...nodeViewExtensions, ...this.extensions],
+      // StarterKit first; the Placeholder ext next; the reactive node-view nodes
+      // next; consumer extensions LAST so they win (TipTap applies later-registered
+      // extensions over earlier ones for the same node/mark).
+      extensions: [StarterKit, ...placeholderExtensions, ...nodeViewExtensions, ...this.extensions],
       editorProps: {
         attributes: {
           'aria-label': this.ariaLabel,
@@ -588,3 +612,13 @@ private _portalContainers = new Set<HTMLElement>();
   get html(): string { return this._htmlControllable.read(); }
   set html(v: string) { this._htmlControllable.notifyPropertyWrite(v); }
 }
+
+injectGlobalStyles('rozie-tip-tap-global', `
+.rozie-tiptap-content .is-editor-empty:first-child::before {
+    content: attr(data-placeholder);
+    color: rgba(0, 0, 0, 0.4);
+    float: left;
+    height: 0;
+    pointer-events: none;
+  }
+`);
