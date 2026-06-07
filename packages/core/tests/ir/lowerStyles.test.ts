@@ -46,3 +46,34 @@ describe('lowerStyles (Spike 004 — portalRules bucket)', () => {
     expect(section.portalRules).toEqual([]);
   });
 });
+
+describe('lowerStyles (Phase 34 — engineRules bucket)', () => {
+  it('partitions a nested :root { .sel {} } block into engineRules, not scoped/root/portal', () => {
+    const css = ':root {\n  .sel { color: red; }\n}\n.box { color: blue; }';
+    const section = lower(css);
+    expect(section.engineRules.length).toBe(1);
+    expect(section.scopedRules.length).toBe(1);
+    expect(section.rootRules.length).toBe(0);
+    expect(section.portalRules.length).toBe(0);
+    const engineRule = section.engineRules[0] as {
+      kind: string;
+      children: { selector: string }[];
+    };
+    expect(engineRule.kind).toBe('root-block');
+    expect(engineRule.children.map(c => c.selector)).toEqual(['.sel']);
+  });
+
+  it('a co-present flat :root rule still routes to rootRules while the nested block routes to engineRules', () => {
+    const css = ':root { --x: 1; }\n:root {\n  .foo { color: red; }\n}';
+    const section = lower(css);
+    expect(section.rootRules.length).toBe(1);
+    expect(section.engineRules.length).toBe(1);
+    expect(section.scopedRules.length).toBe(0);
+  });
+
+  it('a nested-:root-free StyleAST yields an empty engineRules bucket', () => {
+    const css = '.box { color: red; }';
+    const section = lower(css);
+    expect(section.engineRules).toEqual([]);
+  });
+});

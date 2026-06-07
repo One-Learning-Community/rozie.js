@@ -81,6 +81,59 @@ describe('parseStyle (PARSE-06)', () => {
     expect(node!.rules[0]!.isRootEscape).toBe(false);
   });
 
+  it('nested :root { .sel {} } collects .sel exactly once as a flattened root-block child (no dead scoped copy)', () => {
+    const css = ':root {\n  .sel { color: red; }\n}';
+    const { node, diagnostics } = parseStyle(css, { start: 0, end: css.length }, css);
+    expect(diagnostics.filter(d => d.severity === 'error')).toEqual([]);
+    const rootBlocks = node!.rules.filter(r => r.kind === 'root-block');
+    expect(rootBlocks.length).toBe(1);
+    // The nested .sel selector is flattened bare — NO :root wrapper.
+    expect(rootBlocks[0]!.children!.map(c => c.selector)).toEqual(['.sel']);
+    expect(rootBlocks[0]!.children!.every(c => c.isRootEscape === false)).toBe(true);
+    // No dead scoped copy of .sel and no pure-:root rule produced for this block.
+    expect(node!.rules.some(r => r.kind !== 'root-block' && r.selector === '.sel')).toBe(false);
+    expect(node!.rules.some(r => r.isRootEscape)).toBe(false);
+    // Byte-accurate child loc: the slice begins with '.sel'.
+    const child = rootBlocks[0]!.children![0]!;
+    expect(css.slice(child.loc.start, child.loc.start + 4)).toBe('.sel');
+  });
+
+  it('flat :root { --custom-prop } stays isRootEscape with NO root-block (D-03 byte-identity canary)', () => {
+    const css = ':root {\n  --rozie-modal-z: 2000;\n}';
+    const { node, diagnostics } = parseStyle(css, { start: 0, end: css.length }, css);
+    expect(diagnostics.filter(d => d.severity === 'error')).toEqual([]);
+    expect(node!.rules.some(r => r.kind === 'root-block')).toBe(false);
+    const escapeRules = node!.rules.filter(r => r.isRootEscape);
+    expect(escapeRules.length).toBe(1);
+    expect(escapeRules[0]!.selector).toBe(':root');
+  });
+
+  it('mixed :root { --x: 1; .foo {} } splits — flat decls to isRootEscape, nested rule to a root-block', () => {
+    const css = ':root {\n  --x: 1;\n  .foo { color: blue; }\n}';
+    const { node, diagnostics } = parseStyle(css, { start: 0, end: css.length }, css);
+    expect(diagnostics.filter(d => d.severity === 'error')).toEqual([]);
+    // The pure-:root rule (carrying the flat --x decl) still flows through buildPlainRule.
+    const escapeRules = node!.rules.filter(r => r.isRootEscape);
+    expect(escapeRules.length).toBe(1);
+    expect(escapeRules[0]!.selector).toBe(':root');
+    // The nested .foo rule routes to a root-block, flattened bare.
+    const rootBlocks = node!.rules.filter(r => r.kind === 'root-block');
+    expect(rootBlocks.length).toBe(1);
+    expect(rootBlocks[0]!.children!.map(c => c.selector)).toEqual(['.foo']);
+    // No dead scoped copy of .foo.
+    expect(node!.rules.some(r => r.kind !== 'root-block' && r.selector === '.foo')).toBe(false);
+  });
+
+  it('descendant-combinator :root .foo {} is NOT a root-block — stays a scoped rule', () => {
+    const css = ':root .foo { color: green; }';
+    const { node, diagnostics } = parseStyle(css, { start: 0, end: css.length }, css);
+    expect(diagnostics.filter(d => d.severity === 'error')).toEqual([]);
+    expect(node!.rules.some(r => r.kind === 'root-block')).toBe(false);
+    expect(node!.rules.length).toBe(1);
+    expect(node!.rules[0]!.selector).toBe(':root .foo');
+    expect(node!.rules[0]!.isRootEscape).toBe(false);
+  });
+
   it('emits ROZ080 on PostCSS parse error', () => {
     const synthetic = '.foo { unbalanced';
     const { diagnostics } = parseStyle(

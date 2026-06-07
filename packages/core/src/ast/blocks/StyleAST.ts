@@ -14,8 +14,14 @@ export interface StyleRule {
    * `'portal-block'` for an `@portal NAME { ... }` at-rule block (Spike 004):
    * the block's inner selectors live in `children`, and `portalName` carries
    * the at-rule prelude argument.
+   * `'root-block'` (Phase 34) for the engine-DOM escape hatch — a
+   * `:root { .sel { ... } }` block whose NESTED selector rules live in
+   * `children`, flattened bare (NO `:root` wrapper, NO scope attr). The pure
+   * `:root` rule that carries any flat custom-property declarations is emitted
+   * SEPARATELY through the unchanged `isRootEscape` path; the `root-block`
+   * carries only the nested selector rules. Routed to `engineRules` at lowering.
    */
-  kind?: 'rule' | 'portal-block';
+  kind?: 'rule' | 'portal-block' | 'root-block';
   /**
    * Raw selector text. For a plain rule this is the postcss selector verbatim
    * (including commas/whitespace). For a `portal-block` this is the at-rule
@@ -29,9 +35,12 @@ export interface StyleRule {
   /** Set only when `kind === 'portal-block'` — the `@portal <NAME>` argument. */
   portalName?: string;
   /**
-   * Set only when `kind === 'portal-block'` — the inner selectors of the
-   * `@portal NAME { ... }` block, flattened to bottom-level rules. Each
-   * child's `loc` is the absolute span of its own `selector { body }`.
+   * Set when `kind === 'portal-block'` (Spike 004) OR `kind === 'root-block'`
+   * (Phase 34) — the inner selectors of the block, flattened to bottom-level
+   * rules. For `portal-block` these are the `@portal NAME { ... }` inner
+   * selectors; for `root-block` these are the `:root { ... }` NESTED selector
+   * rules flattened bare (NO `:root` wrapper). Each child's `loc` is the
+   * absolute span of its own `selector { body }`.
    */
   children?: StyleRule[];
 }

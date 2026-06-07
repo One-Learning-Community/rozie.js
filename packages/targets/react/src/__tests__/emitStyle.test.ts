@@ -99,6 +99,7 @@ describe('emitStyle (React target) — Wave 0 + reference example tests', () => 
       scopedRules: [],
       rootRules: [],
       portalRules: [],
+      engineRules: [],
       sourceLoc: { start: 0, end: 0 },
     };
     const result = emitStyle(empty, '');

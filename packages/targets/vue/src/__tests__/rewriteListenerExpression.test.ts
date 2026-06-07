@@ -47,6 +47,7 @@ function buildIR(overrides: Partial<IRComponent> = {}): IRComponent {
       scopedRules: [],
       rootRules: [],
       portalRules: [],
+      engineRules: [],
       sourceLoc: { start: 0, end: 0 },
     },
     components: [],

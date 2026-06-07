@@ -51,6 +51,7 @@ function emptyIR(name: string): IRComponent {
       scopedRules: [],
       rootRules: [],
       portalRules: [],
+      engineRules: [],
       sourceLoc: { start: 0, end: 0 },
     },
     sourceLoc: { start: 0, end: 0 },

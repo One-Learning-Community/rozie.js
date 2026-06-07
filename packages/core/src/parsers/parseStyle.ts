@@ -319,11 +319,53 @@ export function parseStyle(
     });
   });
 
+  // Phase 34 — the engine-DOM escape hatch. A `:root { .sel { ... } }` block
+  // (a pure-`:root` rule that CONTAINS nested `Rule` children) is collected
+  // into a single `root-block` StyleRule whose `children` carry the nested
+  // selectors flattened bare (NO `:root` wrapper, NO scope attr). This mirrors
+  // the `@portal` collect-once + skip-gate above: without it, `postcss`'s
+  // `root.walkRules` would descend into the `:root` body and double-collect each
+  // nested `.sel` as a dead scoped rule (D-02). The pure-`:root` rule itself
+  // still flows through `buildPlainRule` below IF it carries flat declarations
+  // (the mixed `:root { --x: 1; .foo {} }` case splits: flat decls →
+  // `isRootEscape`/`rootRules`, nested rules → this `root-block`/`engineRules`).
+  // A nested-ONLY `:root { .sel {} }` block produces NO `isRootEscape` rule.
+  root.walkRules((rule: Rule) => {
+    if (hasPortalAncestor(rule) || hasRootAncestor(rule)) return;
+    if (!isPureRootSelector(rule.selector)) return;
+    // Collect nested child Rule nodes (mirror the @portal child collection).
+    const children: StyleRule[] = [];
+    rule.each((child: ChildNode) => {
+      if (child.type === 'rule') {
+        children.push({
+          kind: 'rule',
+          selector: (child as Rule).selector,
+          loc: nodeLoc(child),
+          isRootEscape: false,
+        });
+      }
+    });
+    if (children.length === 0) return; // flat-only :root — buildPlainRule handles it
+    rules.push({
+      kind: 'root-block',
+      selector: ':root',
+      loc: nodeLoc(rule),
+      isRootEscape: false,
+      children,
+    });
+  });
+
   // Top-level plain rules. Skip any rule that descends from a `@portal`
   // at-rule — those are collected (as `children`) by the walkAtRules pass
   // above. Without this gate they would be double-counted as scopedRules.
+  // Also skip rules nested inside a `:root { }` block (Phase 34) — those are
+  // collected as a `root-block`'s `children` by the pass above.
   root.walkRules((rule: Rule) => {
-    if (hasPortalAncestor(rule)) return;
+    if (hasPortalAncestor(rule) || hasRootAncestor(rule)) return;
+    // A pure-`:root` rule that carries NO flat declarations produced a
+    // `root-block` above and must NOT also emit a dead empty `isRootEscape`
+    // rule. One that DOES carry flat decls still flows through (mixed split).
+    if (isPureRootSelector(rule.selector) && !ruleHasDeclarations(rule)) return;
     rules.push(buildPlainRule(rule));
   });
 
@@ -359,6 +401,41 @@ function hasPortalAncestor(rule: Rule): boolean {
     parent = parent.parent;
   }
   return false;
+}
+
+/**
+ * True when `rule` is nested (at any depth) inside a `:root { }` rule (Phase
+ * 34, the engine-DOM escape hatch). Clone of `hasPortalAncestor`, but `:root`
+ * is a Rule (NOT an at-rule) — so the ancestor test keys on `type === 'rule'`
+ * with a pure-`:root` selector, not `type === 'atrule'`. Gates the top-level
+ * `walkRules` pass so a nested-`:root` inner rule is never double-collected as
+ * a `scopedRule`; it is collected once as a `root-block` child instead.
+ */
+function hasRootAncestor(rule: Rule): boolean {
+  let parent: Node | undefined = rule.parent;
+  while (parent && parent.type !== 'root') {
+    if (parent.type === 'rule' && isPureRootSelector((parent as Rule).selector)) {
+      return true;
+    }
+    parent = parent.parent;
+  }
+  return false;
+}
+
+/**
+ * True when a selector list is exactly `:root` (a single `:root` part, the
+ * escape-hatch trigger). The descendant-combinator form `:root .foo` is a
+ * single multi-token selector — NOT pure `:root` — so it is NOT a trigger and
+ * stays a scoped rule. Mirrors `buildPlainRule`'s `isPureRoot` classification.
+ */
+function isPureRootSelector(selector: string): boolean {
+  const parts = selector.split(',').map(s => s.trim());
+  return parts.length === 1 && parts[0] === ':root';
+}
+
+/** True when a rule has at least one direct declaration node (e.g. `--x: 1`). */
+function ruleHasDeclarations(rule: Rule): boolean {
+  return rule.nodes.some(n => n.type === 'decl');
 }
 
 /**

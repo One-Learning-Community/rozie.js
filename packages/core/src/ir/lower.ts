@@ -106,6 +106,7 @@ function emptyStyles(): StyleSection {
     scopedRules: [],
     rootRules: [],
     portalRules: [],
+    engineRules: [],
     sourceLoc: { start: 0, end: 0 },
   };
 }

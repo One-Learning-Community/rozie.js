@@ -1050,6 +1050,17 @@ export interface StyleSection {
    * the erased-type convention used by `scopedRules`/`rootRules`.
    */
   portalRules: unknown[];
+  /**
+   * Phase 34 — the engine-DOM escape hatch: `:root { .sel { ... } }` blocks
+   * (StyleRule with `kind: 'root-block'`). Each carries flattened bare
+   * `children` (NO `:root` wrapper, NO scope attr). The Wave 2 emitters route
+   * these unscoped/global as-written so they reach runtime engine-rendered DOM
+   * (e.g. CodeMirror's `.cm-*`) across all six targets, replacing the
+   * cross-target-half-supported `:global()` (now ROZ128). `unknown[]` matches
+   * the erased-type convention used by `scopedRules`/`rootRules`/`portalRules`
+   * (emitters cast to `StyleRule[]`).
+   */
+  engineRules: unknown[];
   sourceLoc: SourceLoc;
 }
 

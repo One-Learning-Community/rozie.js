@@ -102,7 +102,7 @@ function makeIR(opts: {
     template: root,
     inheritAttrs: true,
     inheritListeners: true,
-    styles: { type: 'StyleSection', scopedRules: [], rootRules: [], portalRules: [], sourceLoc: LOC },
+    styles: { type: 'StyleSection', scopedRules: [], rootRules: [], portalRules: [], engineRules: [], sourceLoc: LOC },
     components: [],
     sourceLoc: LOC,
   } as unknown as IRComponent;

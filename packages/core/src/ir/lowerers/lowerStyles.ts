@@ -14,6 +14,13 @@
  * payload is preserved verbatim so target emitters can rewrite each inner
  * selector with the `[data-rozie-portal-<NAME>]` scope.
  *
+ * Phase 34 — a fourth bucket, `engineRules`, holds the engine-DOM escape hatch
+ * (`:root { .sel { ... } }`) — StyleRule with `kind: 'root-block'`. Its bare
+ * (un-prefixed) `children` are routed unscoped/global by the Wave 2 emitters so
+ * they reach runtime engine-rendered DOM across all six targets. The
+ * `root-block` arm is checked BEFORE `isRootEscape` so a co-present flat
+ * `:root { --custom-prop }` rule still lands in `rootRules` unchanged (D-03).
+ *
  * @experimental — shape may change before v1.0
  */
 import type { StyleAST } from '../../ast/blocks/StyleAST.js';
@@ -23,9 +30,12 @@ export function lowerStyles(style: StyleAST): StyleSection {
   const scopedRules: unknown[] = [];
   const rootRules: unknown[] = [];
   const portalRules: unknown[] = [];
+  const engineRules: unknown[] = [];
   for (const rule of style.rules) {
     if (rule.kind === 'portal-block') {
       portalRules.push(rule);
+    } else if (rule.kind === 'root-block') {
+      engineRules.push(rule);
     } else if (rule.isRootEscape) {
       rootRules.push(rule);
     } else {
@@ -37,6 +47,7 @@ export function lowerStyles(style: StyleAST): StyleSection {
     scopedRules,
     rootRules,
     portalRules,
+    engineRules,
     sourceLoc: style.loc,
   };
 }
