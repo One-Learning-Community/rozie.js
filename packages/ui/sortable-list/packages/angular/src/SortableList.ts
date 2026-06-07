@@ -10,6 +10,22 @@ interface DefaultCtx {
   index: any;
 }
 
+function __rozieDisplay(v: unknown): string {
+  if (v == null) return '';
+  if (typeof v === 'string') return v;
+  if (typeof v === 'object') {
+    try {
+      return JSON.stringify(v, null, 2);
+    } catch {
+      // Circular structure or a non-serialisable value (BigInt nested in an
+      // object). Degrade to a non-throwing form so the wrap never crashes the
+      // render — that is the entire point of "safe" interpolation (SPEC-1).
+      return String(v);
+    }
+  }
+  return String(v);
+}
+
 @Component({
   selector: 'rozie-sortable-list',
   standalone: true,
@@ -19,7 +35,7 @@ interface DefaultCtx {
     <div class="rozie-sortable-wrap" #__rozieRoot #rozieSpread_0 #rozieListenersTarget_1>
       <div class="rozie-sortable-list" #listEl part="list">
         @for (item of items(); track keyFor(item, index); let index = $index) {
-    <div class="rozie-sortable-item" [ngClass]="{ 'rozie-sortable-item-lifted': liftedIndex() === index }" role="listitem" tabindex="0" (keydown)="onRowKeyDown($event, index)">
+    <div class="rozie-sortable-item" [ngClass]="{ 'rozie-sortable-item-lifted': liftedIndex() === index }" [attr.data-id]="rozieDisplay(keyFor(item, index))" role="listitem" tabindex="0" (keydown)="onRowKeyDown($event, index)">
           <ng-container *ngTemplateOutlet="(defaultTpl ?? templates()?.['defaultSlot']); context: { $implicit: { item: item, index: index }, item: item, index: index }" />
         </div>
     }
@@ -239,6 +255,21 @@ export class SortableList {
       });
     }
   };
+  getInstance = () => {
+    return this.instance;
+  };
+  toArray = () => {
+    return this.instance ? this.instance.toArray() : [];
+  };
+  sort = (order: any, useAnimation: any = true) => {
+    this.instance?.sort(order, useAnimation);
+  };
+  option = (name: any, value: any) => {
+    if (!this.instance) return undefined;
+    if (value === undefined) return this.instance.option(name);
+    this.instance.option(name, value);
+    return value;
+  };
 
   private __rozieCvaOnChange: (v: any[]) => void = () => {};
   private __rozieCvaOnTouchedFn: () => void = () => {};
@@ -388,6 +419,8 @@ export class SortableList {
       });
     }
   });
+
+  rozieDisplay(v: unknown): string { return __rozieDisplay(v); }
 }
 
 export default SortableList;

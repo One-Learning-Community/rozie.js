@@ -2,7 +2,7 @@
 
 <div class="rozie-sortable-wrap" ref="__rozieRootRef" v-bind="$attrs">
   <div class="rozie-sortable-list" ref="listElRef" part="list">
-    <div v-for="(item, index) in items" :key="keyFor(item, index)" :class="['rozie-sortable-item', { 'rozie-sortable-item-lifted': liftedIndex === index }]" role="listitem" tabindex="0" @keydown="onRowKeyDown($event, index)">
+    <div v-for="(item, index) in items" :key="keyFor(item, index)" :class="['rozie-sortable-item', { 'rozie-sortable-item-lifted': liftedIndex === index }]" :data-id="keyFor(item, index)" role="listitem" tabindex="0" @keydown="onRowKeyDown($event, index)">
       <slot :item="item" :index="index"></slot>
     </div>
   </div>
@@ -143,6 +143,36 @@ const onRowKeyDown = ($event: any, index: any) => {
 // What stays here is purely declarative: which array to read, what to write
 // back, what to emit, and how to bridge `afterCommit` to the Lit-only
 // `$reconcileAfterDomMutation()` sigil.
+// Imperative handle (Phase 21 $expose). The SortableJS imperative surface a
+// consumer can't drive through props alone — exposed uniformly to all 6 targets.
+// Each guards the pre-mount/destroyed `instance = null`. Collision-clear: none of
+// the 4 verb names collide with the 16 props or the 5 events — `option` is a
+// distinct identifier from the `options` prop, so ROZ121 is clear.
+function getInstance() {
+  return instance;
+}
+// toArray()/sort() operate on SortableJS's data-id ordering — every row carries
+// :data-id="keyFor(item, index)", so toArray() returns the current key order and
+// sort(order) reorders by those keys (set itemKey for stable object-list keys).
+// toArray()/sort() operate on SortableJS's data-id ordering — every row carries
+// :data-id="keyFor(item, index)", so toArray() returns the current key order and
+// sort(order) reorders by those keys (set itemKey for stable object-list keys).
+function toArray() {
+  return instance ? instance.toArray() : [];
+}
+function sort(order: any, useAnimation = true) {
+  instance?.sort(order, useAnimation);
+}
+// option(name) reads a live SortableJS option; option(name, value) sets one — the
+// runtime escape hatch for any SortableJS option beyond the curated props.
+// option(name) reads a live SortableJS option; option(name, value) sets one — the
+// runtime escape hatch for any SortableJS option beyond the curated props.
+function option(name: any, value: any) {
+  if (!instance) return undefined;
+  if (value === undefined) return instance.option(name);
+  instance.option(name, value);
+  return value;
+}
 
 let _cleanup_0: (() => void) | undefined;
 onMounted(() => {
@@ -220,6 +250,8 @@ watch(() => props.chosenClass, (v: any) => instance?.option('chosenClass', v));
 watch(() => props.dragClass, (v: any) => instance?.option('dragClass', v));
 watch(() => props.filter, (v: any) => instance?.option('filter', v));
 watch(() => props.easing, (v: any) => instance?.option('easing', v));
+
+defineExpose({ getInstance, toArray, sort, option });
 </script>
 
 <style scoped>

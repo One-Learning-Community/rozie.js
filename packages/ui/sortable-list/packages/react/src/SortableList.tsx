@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { clsx, useControllableState } from '@rozie/runtime-react';
+import { clsx, rozieDisplay, useControllableState } from '@rozie/runtime-react';
 import './SortableList.css';
 import { useSortableJS } from './internal/useSortableJS';
 
@@ -34,7 +34,14 @@ interface SortableListProps {
   slots?: Record<string, () => import('react').ReactNode>;
 }
 
-export default function SortableList(_props: SortableListProps): JSX.Element {
+export interface SortableListHandle {
+  getInstance: (...args: any[]) => any;
+  toArray: (...args: any[]) => any;
+  sort: (...args: any[]) => any;
+  option: (...args: any[]) => any;
+}
+
+const SortableList = forwardRef<SortableListHandle, SortableListProps>(function SortableList(_props: SortableListProps, ref): JSX.Element {
   const __defaultOptions = useState(() => (() => ({}))())[0];
   const props: Omit<SortableListProps, 'itemKey' | 'handle' | 'group' | 'animation' | 'disabled' | 'options' | 'labelFor' | 'ghostClass' | 'chosenClass' | 'dragClass' | 'filter' | 'easing' | 'forceFallback' | 'swapThreshold' | 'cloneable'> & { itemKey: (string) | null; handle: (string) | null; group: (string) | null; animation: number; disabled: boolean; options: Record<string, any>; labelFor: ((...args: any[]) => any) | null; ghostClass: (string) | null; chosenClass: (string) | null; dragClass: (string) | null; filter: (string) | null; easing: (string) | null; forceFallback: boolean; swapThreshold: number; cloneable: boolean } = {
     ..._props,
@@ -159,6 +166,36 @@ export default function SortableList(_props: SortableListProps): JSX.Element {
       });
     }
   }, [_rozieProp_onChange, getLabel, items, liftedIndex, setItems]);
+  // Imperative handle (Phase 21 $expose). The SortableJS imperative surface a
+  // consumer can't drive through props alone — exposed uniformly to all 6 targets.
+  // Each guards the pre-mount/destroyed `instance = null`. Collision-clear: none of
+  // the 4 verb names collide with the 16 props or the 5 events — `option` is a
+  // distinct identifier from the `options` prop, so ROZ121 is clear.
+  function getInstance() {
+    return instance.current;
+  }
+  // toArray()/sort() operate on SortableJS's data-id ordering — every row carries
+  // :data-id="keyFor(item, index)", so toArray() returns the current key order and
+  // sort(order) reorders by those keys (set itemKey for stable object-list keys).
+  // toArray()/sort() operate on SortableJS's data-id ordering — every row carries
+  // :data-id="keyFor(item, index)", so toArray() returns the current key order and
+  // sort(order) reorders by those keys (set itemKey for stable object-list keys).
+  function toArray() {
+    return instance.current ? instance.current.toArray() : [];
+  }
+  function sort(order: any, useAnimation = true) {
+    instance.current?.sort(order, useAnimation);
+  }
+  // option(name) reads a live SortableJS option; option(name, value) sets one — the
+  // runtime escape hatch for any SortableJS option beyond the curated props.
+  // option(name) reads a live SortableJS option; option(name, value) sets one — the
+  // runtime escape hatch for any SortableJS option beyond the curated props.
+  function option(name: any, value: any) {
+    if (!instance.current) return undefined;
+    if (value === undefined) return instance.current.option(name);
+    instance.current.option(name, value);
+    return value;
+  }
 
   useEffect(() => {
     // Named `sortable` (not `handle`) to avoid shadowing `$props.handle`
@@ -266,11 +303,13 @@ export default function SortableList(_props: SortableListProps): JSX.Element {
     instance.current?.option('easing', v);
   }, [props.easing]);
 
+  useImperativeHandle(ref, () => ({ getInstance, toArray, sort, option }), []); // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <>
     <div ref={__rozieRoot} {...attrs} className={clsx("rozie-sortable-wrap", (attrs.className as string | undefined))} data-rozie-s-0af24eae="">
       <div className={"rozie-sortable-list"} ref={listEl} part="list" data-rozie-s-0af24eae="">
-        {items.map((item, index) => <div key={keyFor(item, index)} className={clsx("rozie-sortable-item", { "rozie-sortable-item-lifted": liftedIndex === index })} role="listitem" tabIndex={0} onKeyDown={($event) => { onRowKeyDown($event, index); }} data-rozie-s-0af24eae="">
+        {items.map((item, index) => <div key={keyFor(item, index)} className={clsx("rozie-sortable-item", { "rozie-sortable-item-lifted": liftedIndex === index })} data-id={rozieDisplay(keyFor(item, index))} role="listitem" tabIndex={0} onKeyDown={($event) => { onRowKeyDown($event, index); }} data-rozie-s-0af24eae="">
           {typeof (props.children ?? props.slots?.['']) === 'function' ? ((props.children ?? props.slots?.['']) as Function)({ item, index }) : (props.children ?? props.slots?.[''])}
         </div>)}
       </div>
@@ -278,4 +317,5 @@ export default function SortableList(_props: SortableListProps): JSX.Element {
     </div>
     </>
   );
-}
+});
+export default SortableList;

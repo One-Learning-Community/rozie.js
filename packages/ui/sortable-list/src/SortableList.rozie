@@ -225,6 +225,28 @@ $watch(() => $props.chosenClass, (v) => instance?.option('chosenClass', v))
 $watch(() => $props.dragClass,   (v) => instance?.option('dragClass',   v))
 $watch(() => $props.filter,      (v) => instance?.option('filter',      v))
 $watch(() => $props.easing,      (v) => instance?.option('easing',      v))
+
+// Imperative handle (Phase 21 $expose). The SortableJS imperative surface a
+// consumer can't drive through props alone — exposed uniformly to all 6 targets.
+// Each guards the pre-mount/destroyed `instance = null`. Collision-clear: none of
+// the 4 verb names collide with the 16 props or the 5 events — `option` is a
+// distinct identifier from the `options` prop, so ROZ121 is clear.
+function getInstance() { return instance }
+// toArray()/sort() operate on SortableJS's data-id ordering — every row carries
+// :data-id="keyFor(item, index)", so toArray() returns the current key order and
+// sort(order) reorders by those keys (set itemKey for stable object-list keys).
+function toArray() { return instance ? instance.toArray() : [] }
+function sort(order, useAnimation = true) { instance?.sort(order, useAnimation) }
+// option(name) reads a live SortableJS option; option(name, value) sets one — the
+// runtime escape hatch for any SortableJS option beyond the curated props.
+function option(name, value) {
+  if (!instance) return undefined
+  if (value === undefined) return instance.option(name)
+  instance.option(name, value)
+  return value
+}
+
+$expose({ getInstance, toArray, sort, option })
 </script>
 
 <template>
@@ -235,6 +257,7 @@ $watch(() => $props.easing,      (v) => instance?.option('easing',      v))
       :key="keyFor(item, index)"
       class="rozie-sortable-item"
       :class="{ 'rozie-sortable-item-lifted': $data.liftedIndex === index }"
+      :data-id="keyFor(item, index)"
       role="listitem"
       tabindex="0"
       @keydown="onRowKeyDown($event, index)"

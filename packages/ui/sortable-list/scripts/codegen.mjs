@@ -15,7 +15,7 @@
  *
  * Steps:
  *   1. read src/SortableList.rozie
- *   2. parse() + lowerToIR() ONCE → ir (props/slots/emits) for docs tables
+ *   2. parse() + lowerToIR() ONCE → ir (props/slots/emits/expose) for docs tables
  *   3. for each of the 6 targets: compile() → write leaf src/<file>
  *        (React only: also write SortableList.css + SortableList.d.ts)
  *   4. copy src/internal/ → each leaf src/internal/ (excluding *.test.ts)
@@ -35,6 +35,7 @@ import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { compile, createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
 import { eventManifest } from './event-manifest.mjs';
+import { handleManifest } from './handle-manifest.mjs';
 import { renderReadme, validateDocsPropsTable } from './readme.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..'); // packages/ui/sortable-list
@@ -84,6 +85,15 @@ function main() {
     }
   }
 
+  // Keep the hand-kept handle manifest in lockstep with ir.expose (Phase 21).
+  for (const m of ir.expose) {
+    if (!handleManifest[m.name]) {
+      throw new Error(
+        `codegen: method "${m.name}" is exposed by the source but has no entry in handle-manifest.mjs`,
+      );
+    }
+  }
+
   // (3)(4)(5) per-target emit + vendor + README.
   for (const [target, cfg] of Object.entries(TARGETS)) {
     const r = compile(source, { target, filename: FILENAME });
@@ -106,10 +116,20 @@ function main() {
     // is why the 20-01 stub barrel produced an empty bundle. Regenerating the
     // barrel here keeps it in lockstep with the emitted export shape.
     if (cfg.build === 'tsdown') {
-      writeFileSync(
-        resolve(leafSrc, 'index.ts'),
-        `export { default as SortableList } from './SortableList';\nexport { default } from './SortableList';\n`,
-      );
+      // React/Solid emit a named `SortableListHandle` interface in the leaf
+      // itself (Phase 21 $expose), so the barrel forwards it verbatim for
+      // `import type { SortableListHandle }`. Lit gets no named type — its handle
+      // is the custom element itself — so the plain barrel is correct there.
+      const barrel =
+        (target === 'react' || target === 'solid') && ir.expose.length > 0
+          ? `export { default as SortableList } from './SortableList';\n` +
+            `export { default } from './SortableList';\n\n` +
+            `/** The \`$expose\` imperative handle received via \`ref\` — { ${ir.expose
+              .map((m) => m.name)
+              .join(', ')} }. */\n` +
+            `export type { SortableListHandle } from './SortableList';\n`
+          : `export { default as SortableList } from './SortableList';\nexport { default } from './SortableList';\n`;
+      writeFileSync(resolve(leafSrc, 'index.ts'), barrel);
     }
 
     // React-only sidecars.
@@ -123,7 +143,7 @@ function main() {
 
     // (5) README from the single IR parse.
     const pkgName = leafPkgName(cfg.dir);
-    const readme = renderReadme(target, ir, eventManifest, pkgName);
+    const readme = renderReadme(target, ir, eventManifest, pkgName, handleManifest);
     writeFileSync(resolve(ROOT, 'packages', cfg.dir, 'README.md'), readme);
 
     // (5b) Vendor the repo LICENSE into each published leaf so the tarball

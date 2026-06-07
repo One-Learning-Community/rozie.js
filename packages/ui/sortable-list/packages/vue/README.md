@@ -63,6 +63,29 @@ const items = ref([
 | `start` | Fired when dragging starts. |
 | `end` | Fired when dragging ends (source side). |
 
+## Imperative handle
+
+Beyond props, the component exposes imperative methods (declared once in the Rozie source via `$expose`). Grab a handle with the native ref mechanism and call them directly:
+
+| Method | Description |
+| --- | --- |
+| `getInstance` | Return the underlying SortableJS instance for direct API access (the raw-engine escape hatch — `save`, `closest`, etc. are one hop away). `null` before mount and after destroy. |
+| `toArray` | Return the current order as an array of `data-id` strings (each row carries `data-id="<key>"`). `[]` before mount. |
+| `sort` | Reorder the list by an array of `data-id` strings — `sort(order, useAnimation = true)`. |
+| `option` | Read or set a live SortableJS option — `option(name)` gets, `option(name, value)` sets. The runtime escape hatch for options beyond the curated props. |
+
+```vue
+<script setup>
+import { ref } from 'vue';
+const sl = ref();          // template ref
+</script>
+
+<template>
+  <SortableList ref="sl" />
+  <button @click="console.log(sl.toArray())">Log order</button>
+</template>
+```
+
 ## Slots
 
 | Slot | Params |

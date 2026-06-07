@@ -1,6 +1,6 @@
 import type { JSX } from 'solid-js';
 import { For, children, createEffect, createSignal, mergeProps, on, onCleanup, onMount, splitProps, untrack } from 'solid-js';
-import { __rozieInjectStyle, createControllableSignal } from '@rozie/runtime-solid';
+import { __rozieInjectStyle, createControllableSignal, rozieDisplay } from '@rozie/runtime-solid';
 import { useSortableJS } from './internal/useSortableJS';
 
 __rozieInjectStyle('SortableList-0af24eae', `.rozie-sortable-wrap[data-rozie-s-0af24eae] { display: block; }
@@ -50,12 +50,21 @@ interface SortableListProps {
   // D-131: default slot resolved via children() at body top
   children?: JSX.Element;
   slots?: Record<string, (ctx: any) => JSX.Element>;
+  ref?: (h: SortableListHandle) => void;
+}
+
+export interface SortableListHandle {
+  getInstance: (...args: any[]) => any;
+  toArray: (...args: any[]) => any;
+  sort: (...args: any[]) => any;
+  option: (...args: any[]) => any;
 }
 
 export default function SortableList(_props: SortableListProps): JSX.Element {
   const _merged = mergeProps({ itemKey: null, handle: null, group: null, animation: 150, disabled: false, options: (() => ({}))(), labelFor: null, ghostClass: null, chosenClass: null, dragClass: null, filter: null, easing: null, forceFallback: false, swapThreshold: 1, cloneable: false }, _props);
-  const [local, attrs] = splitProps(_merged, ['items', 'itemKey', 'handle', 'group', 'animation', 'disabled', 'options', 'labelFor', 'ghostClass', 'chosenClass', 'dragClass', 'filter', 'easing', 'forceFallback', 'swapThreshold', 'cloneable', 'children']);
+  const [local, attrs] = splitProps(_merged, ['items', 'itemKey', 'handle', 'group', 'animation', 'disabled', 'options', 'labelFor', 'ghostClass', 'chosenClass', 'dragClass', 'filter', 'easing', 'forceFallback', 'swapThreshold', 'cloneable', 'children', 'ref']);
   const resolved = children(() => local.children);
+  onMount(() => { local.ref?.({ getInstance, toArray, sort, option }); });
 
   const [items, setItems] = createControllableSignal<any[]>(_props as unknown as Record<string, unknown>, 'items', (() => [])());
   const [liftedIndex, setLiftedIndex] = createSignal(null);
@@ -229,11 +238,37 @@ export default function SortableList(_props: SortableListProps): JSX.Element {
   // back, what to emit, and how to bridge `afterCommit` to the Lit-only
   // `$reconcileAfterDomMutation()` sigil.
 
+  // Imperative handle (Phase 21 $expose). The SortableJS imperative surface a
+  // consumer can't drive through props alone — exposed uniformly to all 6 targets.
+  // Each guards the pre-mount/destroyed `instance = null`. Collision-clear: none of
+  // the 4 verb names collide with the 16 props or the 5 events — `option` is a
+  // distinct identifier from the `options` prop, so ROZ121 is clear.
+  function getInstance() {
+    return instance;
+  }
+  // toArray()/sort() operate on SortableJS's data-id ordering — every row carries
+  // :data-id="keyFor(item, index)", so toArray() returns the current key order and
+  // sort(order) reorders by those keys (set itemKey for stable object-list keys).
+  function toArray() {
+    return instance ? instance.toArray() : [];
+  }
+  function sort(order: any, useAnimation = true) {
+    instance?.sort(order, useAnimation);
+  }
+  // option(name) reads a live SortableJS option; option(name, value) sets one — the
+  // runtime escape hatch for any SortableJS option beyond the curated props.
+  function option(name: any, value: any) {
+    if (!instance) return undefined;
+    if (value === undefined) return instance.option(name);
+    instance.option(name, value);
+    return value;
+  }
+
   return (
     <>
     <div ref={(el) => { __rozieRootRef = el as HTMLElement; }} {...attrs} class={"rozie-sortable-wrap" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-0af24eae="">
       <div class={"rozie-sortable-list"} ref={(el) => { listElRef = el as HTMLElement; }} part="list" data-rozie-s-0af24eae="">
-        <For each={items()}>{(item, index) => <div role="listitem" class={"rozie-sortable-item"} classList={{ 'rozie-sortable-item-lifted': liftedIndex() === index() }} tabIndex={0} onKeyDown={($event) => { onRowKeyDown($event, index()); }} data-rozie-s-0af24eae="">
+        <For each={items()}>{(item, index) => <div data-id={rozieDisplay(keyFor(item, index()))} role="listitem" class={"rozie-sortable-item"} classList={{ 'rozie-sortable-item-lifted': liftedIndex() === index() }} tabIndex={0} onKeyDown={($event) => { onRowKeyDown($event, index()); }} data-rozie-s-0af24eae="">
           {typeof local.children === 'function' ? (local.children as (s: any) => any)({ item, index: index() }) : resolved()}
         </div>}</For>
       </div>

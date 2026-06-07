@@ -243,19 +243,86 @@ export class RankingFormComponent {
 };
 
 // ---------------------------------------------------------------------------
+// Per-framework "how to obtain the imperative handle" snippets (Phase 21
+// `$expose`). Each shows the framework's NATIVE ref mechanism — there is no
+// Rozie-level consumer directive for calling a child's method.
+// ---------------------------------------------------------------------------
+
+const HANDLE_USAGE = {
+  react: {
+    lang: 'tsx',
+    code: `import { useRef } from 'react';
+import { SortableList, type SortableListHandle } from '@rozie-ui/sortable-list-react';
+
+const sl = useRef<SortableListHandle>(null);
+// <SortableList ref={sl} ... />
+const order = sl.current?.toArray();
+sl.current?.option('disabled', true);`,
+  },
+  vue: {
+    lang: 'vue',
+    code: `<script setup>
+import { ref } from 'vue';
+const sl = ref();          // template ref
+</script>
+
+<template>
+  <SortableList ref="sl" />
+  <button @click="console.log(sl.toArray())">Log order</button>
+</template>`,
+  },
+  svelte: {
+    lang: 'svelte',
+    code: `<script>
+  let sl;                  // component instance via bind:this
+</script>
+
+<SortableList bind:this={sl} />
+<button onclick={() => console.log(sl.toArray())}>Log order</button>`,
+  },
+  angular: {
+    lang: 'ts',
+    code: `@Component({ /* ... */ })
+export class DemoComponent {
+  @ViewChild(SortableList) sl!: SortableList;  // or the viewChild() signal
+  logOrder() { console.log(this.sl.toArray()); }
+  disable() { this.sl.option('disabled', true); }
+}`,
+  },
+  solid: {
+    lang: 'tsx',
+    code: `import { SortableList, type SortableListHandle } from '@rozie-ui/sortable-list-solid';
+
+let handle: SortableListHandle | undefined;
+// The ref callback receives the HANDLE object (not the DOM node).
+<SortableList ref={(h) => (handle = h)} />;
+const order = handle?.toArray();`,
+  },
+  lit: {
+    lang: 'ts',
+    code: `// The custom element IS the handle — its exposed methods are public
+// element methods.
+const el = document.querySelector('rozie-sortable-list');
+const order = el.toArray();
+el.option('disabled', true);`,
+  },
+};
+
+// ---------------------------------------------------------------------------
 // README rendering.
 // ---------------------------------------------------------------------------
 
 /**
- * Render a leaf package's README from the shared IR + the event manifest.
+ * Render a leaf package's README from the shared IR + the manifests.
  *
  * @param {string} target  one of react|vue|svelte|angular|solid|lit
- * @param {object} ir      the once-parsed IR (props/slots/emits)
+ * @param {object} ir      the once-parsed IR (props/slots/emits/expose)
  * @param {object} eventManifest  { [eventName]: description }
  * @param {string} pkgName the leaf's own package name (from its package.json)
+ * @param {object} handleManifest  { [methodName]: description } for `$expose`
  * @returns {string} markdown
  */
-export function renderReadme(target, ir, eventManifest, pkgName) {
+export function renderReadme(target, ir, eventManifest, pkgName, handleManifest = {}) {
   const usage = USAGE[target];
   if (!usage) throw new Error(`renderReadme: no usage snippet for target "${target}"`);
 
@@ -347,6 +414,37 @@ export function renderReadme(target, ir, eventManifest, pkgName) {
     lines.push(`| \`${ev}\` | ${desc} |`);
   }
   lines.push('');
+
+  // Imperative handle — driven by ir.expose (Phase 21 `$expose`); emit the
+  // section only if the source exposes methods.
+  if (ir.expose && ir.expose.length > 0) {
+    const handleUsage = HANDLE_USAGE[target];
+    if (!handleUsage) {
+      throw new Error(`renderReadme: no handle-usage snippet for target "${target}"`);
+    }
+    lines.push('## Imperative handle');
+    lines.push('');
+    lines.push(
+      'Beyond props, the component exposes imperative methods (declared once in the ' +
+        'Rozie source via `$expose`). Grab a handle with the native ref mechanism and call ' +
+        'them directly:',
+    );
+    lines.push('');
+    lines.push('| Method | Description |');
+    lines.push('| --- | --- |');
+    for (const m of ir.expose) {
+      const desc = handleManifest[m.name];
+      if (!desc) {
+        throw new Error(`renderReadme: exposed method "${m.name}" missing from handle-manifest`);
+      }
+      lines.push(`| \`${m.name}\` | ${desc} |`);
+    }
+    lines.push('');
+    lines.push('```' + handleUsage.lang);
+    lines.push(handleUsage.code);
+    lines.push('```');
+    lines.push('');
+  }
 
   // Slots
   lines.push('## Slots');

@@ -1,5 +1,5 @@
 <script lang="ts">
-import { applyListeners } from '@rozie/runtime-svelte';
+import { applyListeners, rozieDisplay } from '@rozie/runtime-svelte';
 
 import type { Snippet } from 'svelte';
 import { onMount, untrack } from 'svelte';
@@ -172,6 +172,36 @@ const onRowKeyDown = ($event: any, index: any) => {
 // What stays here is purely declarative: which array to read, what to write
 // back, what to emit, and how to bridge `afterCommit` to the Lit-only
 // `$reconcileAfterDomMutation()` sigil.
+// Imperative handle (Phase 21 $expose). The SortableJS imperative surface a
+// consumer can't drive through props alone — exposed uniformly to all 6 targets.
+// Each guards the pre-mount/destroyed `instance = null`. Collision-clear: none of
+// the 4 verb names collide with the 16 props or the 5 events — `option` is a
+// distinct identifier from the `options` prop, so ROZ121 is clear.
+export function getInstance() {
+  return instance;
+}
+// toArray()/sort() operate on SortableJS's data-id ordering — every row carries
+// :data-id="keyFor(item, index)", so toArray() returns the current key order and
+// sort(order) reorders by those keys (set itemKey for stable object-list keys).
+// toArray()/sort() operate on SortableJS's data-id ordering — every row carries
+// :data-id="keyFor(item, index)", so toArray() returns the current key order and
+// sort(order) reorders by those keys (set itemKey for stable object-list keys).
+export function toArray() {
+  return instance ? instance.toArray() : [];
+}
+export function sort(order: any, useAnimation = true) {
+  instance?.sort(order, useAnimation);
+}
+// option(name) reads a live SortableJS option; option(name, value) sets one — the
+// runtime escape hatch for any SortableJS option beyond the curated props.
+// option(name) reads a live SortableJS option; option(name, value) sets one — the
+// runtime escape hatch for any SortableJS option beyond the curated props.
+export function option(name: any, value: any) {
+  if (!instance) return undefined;
+  if (value === undefined) return instance.option(name);
+  instance.option(name, value);
+  return value;
+}
 
 onMount(() => {
   // Named `sortable` (not `handle`) to avoid shadowing `$props.handle`
@@ -257,7 +287,7 @@ let __rozieWatchInitial_7 = true;
 $effect(() => { const __watchVal = (() => easing)(); untrack(() => { if (__rozieWatchInitial_7) { __rozieWatchInitial_7 = false; return; } ((v: any) => instance?.option('easing', v))(__watchVal); }); });
 </script>
 
-<div bind:this={__rozieRoot} {...__rozieAttrs} class={["rozie-sortable-wrap", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-0af24eae><div class="rozie-sortable-list" bind:this={listEl} part="list" data-rozie-s-0af24eae>{#each items as item, index (keyFor(item, index))}<div class={["rozie-sortable-item", { 'rozie-sortable-item-lifted': liftedIndex === index }]} role="listitem" tabindex="0" onkeydown={($event) => { onRowKeyDown($event, index); }} data-rozie-s-0af24eae>{@render children?.({ item, index })}</div>{/each}</div><div class="rozie-sortable-aria-live" data-rozie-sortable-aria-live="" aria-live="polite" aria-atomic="true" data-rozie-s-0af24eae>{ariaLiveText}</div></div>
+<div bind:this={__rozieRoot} {...__rozieAttrs} class={["rozie-sortable-wrap", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-0af24eae><div class="rozie-sortable-list" bind:this={listEl} part="list" data-rozie-s-0af24eae>{#each items as item, index (keyFor(item, index))}<div class={["rozie-sortable-item", { 'rozie-sortable-item-lifted': liftedIndex === index }]} data-id={rozieDisplay(keyFor(item, index))} role="listitem" tabindex="0" onkeydown={($event) => { onRowKeyDown($event, index); }} data-rozie-s-0af24eae>{@render children?.({ item, index })}</div>{/each}</div><div class="rozie-sortable-aria-live" data-rozie-sortable-aria-live="" aria-live="polite" aria-atomic="true" data-rozie-s-0af24eae>{ariaLiveText}</div></div>
 
 <style>
 :global {

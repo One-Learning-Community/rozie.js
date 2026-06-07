@@ -1,4 +1,6 @@
 import type { ReactNode } from 'react';
+import type { ForwardRefExoticComponent, RefAttributes } from 'react';
+import type * as React from 'react';
 
 export interface SortableListProps {
   items?: unknown[];
@@ -28,5 +30,12 @@ export interface SortableListProps {
   slots?: Record<string, () => ReactNode>;
 }
 
-declare function SortableList(props: SortableListProps): JSX.Element;
+export interface SortableListHandle {
+  getInstance: (...args: any[]) => any;
+  toArray: (...args: any[]) => any;
+  sort: (...args: any[]) => any;
+  option: (...args: any[]) => any;
+}
+
+declare const SortableList: React.ForwardRefExoticComponent<SortableListProps & React.RefAttributes<SortableListHandle>>;
 export default SortableList;
