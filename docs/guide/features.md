@@ -996,7 +996,12 @@ A `<slot name="X">` whose `X` matches a declared `<props>` key is a compile erro
 
 ## `:root { }` — the global escape hatch in scoped styles
 
-`<style>` is scoped by default. Anything inside a `:root { }` selector is emitted globally — useful for CSS variables, font definitions, or anything else that legitimately belongs on the document:
+`<style>` is scoped by default. The `:root { }` selector is the escape hatch, and it carries **two distinct capabilities** depending on what you put inside it:
+
+1. **Flat custom-property declarations** (`:root { --var: … }`) → emitted globally as a top-level `:root` rule — for CSS variables, font definitions, or anything else that legitimately belongs on the document.
+2. **Nested selector rules** (`:root { .selector { … } }`) → the inner rules are emitted **bare/unscoped** (without Rozie's `[data-rozie-s-*]` scope attribute) so they can reach **engine-rendered runtime DOM** — the **engine-DOM escape hatch** (Phase 34).
+
+### Flat custom properties — the global document layer
 
 ```rozie
 <style>
@@ -1015,6 +1020,62 @@ A `<slot name="X">` whose `X` matches a declared `<props>` key is a compile erro
 ```
 
 Each target picks the right escape hatch: Vue gets a sibling unscoped `<style>` block, Svelte gets `:global(:root)`, Angular gets `::ng-deep :root`, React/Solid get a separate `.global.css` file imported next to the module CSS, and Lit — whose `static styles` are shadow-DOM-scoped by default — gets the `:root` rules injected into the document via an `injectGlobalStyles` runtime call.
+
+### Nested selectors — the engine-DOM escape hatch
+
+When you wrap a **selector rule** inside `:root { }` (rather than a flat custom property), Rozie emits that inner rule **bare and unscoped** — it does *not* get the component's `[data-rozie-s-<hash>]` scope attribute. This is the mechanism a wrapped vanilla-JS engine component needs to style the DOM the engine creates **at runtime**.
+
+The problem it solves: when Rozie wraps an engine like CodeMirror, ProseMirror/TipTap, or flatpickr, that engine renders its own DOM nodes (`.cm-editor`/`.cm-scroller`, TipTap's `is-editor-empty` placeholder node, flatpickr's body-appended calendar). Those nodes are created by the engine *after* mount and **never carry Rozie's scope attribute** — so an ordinary scoped rule like `.cm-editor { … }` silently fails to match them on React/Solid/Lit (and is shadow-DOM-isolated on Lit). The nested-`:root` form lifts the rule out of scoping so it reaches engine DOM on **all six targets**, including through Lit's shadow boundary:
+
+```rozie
+<style>
+/* Scoped to this component's own template elements. */
+.editor-shell { border: 1px solid #d1d5db; border-radius: 8px; }
+
+/* Engine-DOM escape hatch — these reach CodeMirror's runtime nodes,
+   which never carry Rozie's [data-rozie-s-*] scope attribute. */
+:root {
+  .cm-editor { height: 100%; }
+  .cm-scroller { font-family: ui-monospace, monospace; }
+}
+</style>
+```
+
+A real example from the TipTap wrapper styles the Placeholder extension's ghost text — the `is-editor-empty` node ProseMirror injects into an empty document:
+
+```rozie
+<style>
+:root {
+  .ProseMirror .is-editor-empty:first-child::before {
+    content: attr(data-placeholder);
+    color: #9ca3af;
+    pointer-events: none;
+    height: 0;
+    float: left;
+  }
+}
+</style>
+```
+
+Per-target emission of the nested rules mirrors the flat case but for selector rules rather than custom properties: React emits a `.global.css` sidecar, Vue an unscoped second `<style>` block, Svelte a `:global { … }` wrapper, Angular bare `::ng-deep`, Solid a `__rozieInjectStyle` head-inject, and Lit a **dual-sink** — the rules land in both `static styles` (for the shadow root) and `injectGlobalStyles` (for engine DOM that escapes the shadow boundary, e.g. a body-appended calendar).
+
+This injection is intentionally **page-wide** — the rules go in as authored, with no anchoring or containment enforcement. If you want containment, scope the inner selectors under a wrapper class yourself (e.g. `:root { .my-editor .cm-editor { … } }`).
+
+### `:global()` is forbidden (ROZ128)
+
+You might reach for `:global(.cm-editor)` out of Vue/Svelte habit. **Don't** — it's a hard compile error (**ROZ128**). The `:global()` pseudo works natively *only* on Vue and Svelte (whose compilers understand it); on React, Solid, and Lit the browser sees an unknown pseudo and silently discards the entire rule. Rather than ship a selector that works on two of six targets and dies invisibly on three, Rozie blocks `:global()` in `<style>` selectors loudly and points you at the `:root { … }` engine-DOM escape hatch, which lowers to the same unscoped output on every target:
+
+```rozie
+<style>
+/* ❌ ROZ128 — works on Vue/Svelte, silently dead on React/Solid/Lit. */
+:global(.cm-editor) { height: 100%; }
+
+/* ✅ Canonical — bare/unscoped on all six targets. */
+:root {
+  .cm-editor { height: 100%; }
+}
+</style>
+```
 
 ## `:deep()` — reaching into child components from scoped styles
 
