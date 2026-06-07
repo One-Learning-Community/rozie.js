@@ -1,6 +1,5 @@
-import { Component, ContentChild, DestroyRef, ElementRef, EmbeddedViewRef, TemplateRef, ViewContainerRef, ViewEncapsulation, contentChild, effect, forwardRef, inject, input, model, output, signal, untracked, viewChild } from '@angular/core';
+import { Component, ContentChild, DestroyRef, ElementRef, EmbeddedViewRef, TemplateRef, ViewContainerRef, ViewEncapsulation, contentChild, effect, inject, input, model, output, untracked, viewChild } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
-import { NG_VALUE_ACCESSOR } from '@angular/forms';
 
 import { Calendar } from '@fullcalendar/core';
 import dayGridPlugin from '@fullcalendar/daygrid';
@@ -83,14 +82,6 @@ interface NoEventsContentCtx {
       font-size: 0.875rem;
     }
   `],
-  providers: [
-    {
-      provide: NG_VALUE_ACCESSOR,
-      useExisting: forwardRef(() => FullCalendar),
-      multi: true,
-    },
-  ],
-  host: { '(focusout)': '__rozieCvaOnTouched()' },
 })
 export class FullCalendar {
   events = input<any[]>((() => [])());
@@ -478,7 +469,7 @@ export class FullCalendar {
           this.suppressViewSync = false;
           return;
         }
-        if (info.view.type !== this.view()) this.view.set(info.view.type), this.__rozieCvaOnChange(info.view.type);
+        if (info.view.type !== this.view()) this.view.set(info.view.type);
       }
     };
 
@@ -698,26 +689,6 @@ export class FullCalendar {
   gotoDate = (...a: any[]) => {
     this.instance?.gotoDate(...a);
   };
-
-  private __rozieCvaOnChange: (v: string) => void = () => {};
-  private __rozieCvaOnTouchedFn: () => void = () => {};
-  private __rozieCvaDisabled = signal(false);
-
-  writeValue(v: string | null): void {
-    this.view.set(v ?? 'dayGridMonth');
-  }
-  registerOnChange(fn: (v: string) => void): void {
-    this.__rozieCvaOnChange = fn;
-  }
-  registerOnTouched(fn: () => void): void {
-    this.__rozieCvaOnTouchedFn = fn;
-  }
-  setDisabledState(isDisabled: boolean): void {
-    this.__rozieCvaDisabled.set(isDisabled);
-  }
-  __rozieCvaOnTouched(): void {
-    this.__rozieCvaOnTouchedFn();
-  }
 
   static ngTemplateContextGuard(
     _dir: FullCalendar,

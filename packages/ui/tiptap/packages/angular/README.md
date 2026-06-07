@@ -28,6 +28,34 @@ export class DemoComponent {
 }
 ```
 
+## Angular forms
+
+The generated class implements `ControlValueAccessor` — the `html` model prop is the control value — so it binds to template-driven and reactive forms directives directly, with no wrapper directive:
+
+```ts
+import { Component } from '@angular/core';
+import { ReactiveFormsModule, FormControl } from '@angular/forms';
+import { TipTap } from '@rozie-ui/tiptap-angular';
+
+@Component({
+  selector: 'app-editor-form',
+  standalone: true,
+  imports: [TipTap, ReactiveFormsModule],
+  template: `
+    <!-- Reactive forms — [formControl] / formControlName bind directly -->
+    <TipTap [formControl]="body" />
+  `,
+})
+export class EditorFormComponent {
+  body = new FormControl('<p>Start writing…</p>');
+}
+
+// Template-driven forms work the same way:
+//   <TipTap [(ngModel)]="body" name="body" />
+```
+
+The accessor contract: only real user interaction dirties the control — programmatic writes (form `setValue` / `reset`, or the `[(html)]` two-way binding) update the view without echoing back into the form; `writeValue(null)` resets to the prop default (`"<p>Start writing…</p>"`); the control is marked touched on focusout.
+
 ## Props
 
 | Name | Type | Default | Two-way (model) |

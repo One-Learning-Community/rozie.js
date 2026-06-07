@@ -168,6 +168,31 @@ el.addEventListener('value-change', (e) => {
   },
 };
 
+// Angular reactive-forms snippet — emitted only on the Angular target, which
+// auto-implements ControlValueAccessor for the single `model: true` prop (Phase 23).
+const ANGULAR_FORMS_USAGE = {
+  lang: 'ts',
+  code: `import { Component } from '@angular/core';
+import { ReactiveFormsModule, FormControl } from '@angular/forms';
+import { CodeMirror } from '@rozie-ui/codemirror-angular';
+
+@Component({
+  selector: 'app-code-form',
+  standalone: true,
+  imports: [CodeMirror, ReactiveFormsModule],
+  template: \`
+    <!-- Reactive forms — [formControl] / formControlName bind directly -->
+    <CodeMirror [formControl]="source" />
+  \`,
+})
+export class CodeFormComponent {
+  source = new FormControl('');
+}
+
+// Template-driven forms work the same way:
+//   <CodeMirror [(ngModel)]="source" name="source" />`,
+};
+
 const FRAMEWORK_PEER_LABEL = {
   react: 'react + react-dom',
   vue: 'vue',
@@ -286,9 +311,37 @@ export function renderReadme(target, ir, pkgName, handleManifest = {}) {
   lines.push('```');
   lines.push('');
 
-  // NOTE: no Angular forms-accessor (CVA) section — consistent with the
-  // FullCalendar analog's gating. The lone model prop is `value` (the document
-  // text); the two-way `value` binding is the change channel.
+  // Angular forms integration — the generated class implements
+  // ControlValueAccessor when the source has exactly one `model: true` prop
+  // (Phase 23; mirrors the emitter's CVA gate). Angular-only section.
+  const modelProps = ir.props.filter((p) => p.isModel);
+  if (target === 'angular' && modelProps.length === 1) {
+    const modelProp = modelProps[0];
+    const hasBooleanDisabled = ir.props.some((p) => p.name === 'disabled');
+    lines.push('## Angular forms');
+    lines.push('');
+    lines.push(
+      `The generated class implements \`ControlValueAccessor\` — the \`${modelProp.name}\` ` +
+        'model prop is the control value — so it binds to template-driven and reactive ' +
+        'forms directives directly, with no wrapper directive:',
+    );
+    lines.push('');
+    lines.push('```' + ANGULAR_FORMS_USAGE.lang);
+    lines.push(ANGULAR_FORMS_USAGE.code);
+    lines.push('```');
+    lines.push('');
+    lines.push(
+      'The accessor contract: only real user interaction dirties the control — programmatic ' +
+        `writes (form \`setValue\` / \`reset\`, or the \`[(${modelProp.name})]\` two-way binding) ` +
+        'update the view without echoing back into the form; `writeValue(null)` resets to the ' +
+        `prop default (\`${renderPropDefault(modelProp.defaultValue)}\`); the control is marked ` +
+        'touched on focusout' +
+        (hasBooleanDisabled
+          ? '; and `setDisabledState` OR-merges with the `disabled` prop, so either source disables the component.'
+          : '.'),
+    );
+    lines.push('');
+  }
 
   // Props
   lines.push('## Props');

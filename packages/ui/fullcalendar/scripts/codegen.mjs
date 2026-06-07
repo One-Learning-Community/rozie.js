@@ -85,7 +85,20 @@ function main() {
 
   // (3)(4) per-target emit + README.
   for (const [target, cfg] of Object.entries(TARGETS)) {
-    const r = compile(source, { target, filename: FILENAME });
+    // FullCalendar's lone `model: true` prop is `view` (the active view NAME,
+    // e.g. 'dayGridMonth') — not a form value. The emitter's CVA gate fires on
+    // any single-model component, but a calendar view name binding to a form
+    // control is nonsensical here, so suppress the auto-`ControlValueAccessor`
+    // on the Angular target via the public `angular.cva` config knob (the same
+    // mechanism the CvaOffState dist-parity fixture proves byte-equal-when-off).
+    // The two-way `[(view)]` model binding is unaffected — only the forms-
+    // directive bridge drops. readme.mjs already gates the "Angular forms"
+    // section out for FullCalendar, so docs + emit stay consistent.
+    const r = compile(source, {
+      target,
+      filename: FILENAME,
+      ...(target === 'angular' ? { angular: { cva: false } } : {}),
+    });
     const errs = r.diagnostics.filter((d) => d.severity === 'error');
     if (errs.length) {
       throw new Error(

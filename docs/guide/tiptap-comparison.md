@@ -23,7 +23,7 @@ The wedge is real and strongest for **Lit (no wrapper at all)** and **Solid (thi
 | Capability | `@tiptap/react` | `@tiptap/vue-3` | `ngx-tiptap` | `svelte-tiptap` | `solid-tiptap` | Lit (none) | **`@rozie-ui/tiptap`** |
 | --- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | Mount editor | ✅ | ✅ | ✅ | ✅ | ✅ | hand-roll | ✅ |
-| **Controlled two-way content** | ❌¹ | ❌¹ | ✅ (CVA / `ngModel`) | ❌¹ | ❌¹ | hand-roll | ✅ `r-model:html` |
+| **Controlled two-way content** | ❌¹ | ❌¹ | ✅ (CVA / `ngModel`) | ❌¹ | ❌¹ | hand-roll | ✅ `r-model:html` (+ Angular CVA) |
 | Imperative command handle | ✅ (the `Editor`) | ✅ (the `Editor`) | ✅ (you own `Editor`) | ✅ (store) | ✅ (read hooks) | hand-roll | ✅ 14-verb `$expose` |
 | Batteries-included toolbar | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ internal toolbar |
 | Consumer toolbar slot (bound to editor) | build it yourself | build it yourself | build it yourself | build it yourself | build it yourself | hand-roll | ✅ `toolbar` portal slot |
@@ -35,7 +35,7 @@ The wedge is real and strongest for **Lit (no wrapper at all)** and **Solid (thi
 | SSR | ✅² | ✅² | ⚠️ client-only | ✅² | ✅² | — | ✅ by construction³ |
 | One source → all 6 frameworks | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
 
-¹ **No controlled/`v-model` content contract.** Neither official wrapper ships two-way content binding — you get `content` in + an `onUpdate` callback out, and must hand-roll the `setContent` loop (the Vue `v-model` story is a documented manual `modelValue` + `watch`→`setContent` pattern, the single most-asked Vue question). `ngx-tiptap` is the exception: it implements `ControlValueAccessor`, so `[(ngModel)]` and reactive forms work. **Rozie gives every target a controlled `html` two-way binding with a built-in echo-guard.**
+¹ **No controlled/`v-model` content contract.** Neither official wrapper ships two-way content binding — you get `content` in + an `onUpdate` callback out, and must hand-roll the `setContent` loop (the Vue `v-model` story is a documented manual `modelValue` + `watch`→`setContent` pattern, the single most-asked Vue question). `ngx-tiptap` is the exception: it implements `ControlValueAccessor`, so `[(ngModel)]` and reactive forms work. **Rozie gives every target a controlled `html` two-way binding with a built-in echo-guard — and because `html` is the single `model` prop, the Angular target *also* auto-implements `ControlValueAccessor` (provider + the four accessor methods + focusout-touched), so `[(ngModel)]`, `[formControl]`, and `formControlName` all bind directly — matching `ngx-tiptap`'s forms story with no extra wiring.**
 
 ² SSR supported but requires the `immediatelyRender: false` ritual (+ `'use client'` on Next.js / the Nuxt guide). ³ Rozie's wrapper instantiates the engine inside the mount hook only (no top-level DOM), so it is SSR-safe by construction.
 
@@ -55,7 +55,7 @@ The wedge is real and strongest for **Lit (no wrapper at all)** and **Solid (thi
 | G2 — Bubble / Floating menu | React, Vue, Angular, Svelte | Medium | **⏳ Deferred (follow-up)** — a `bubbleMenu` / `floatingMenu` portal slot over `@tiptap/extension-bubble-menu` (Floating UI). Out of Phase 33 scope. |
 | G3 — Bundled Placeholder | all (via core ext) | Low | **⏳ Deferred (follow-up)** — bundle `@tiptap/extension-placeholder` + wire the `placeholder` prop to it. Works today via `:extensions`. |
 | G4 — `outputFormat: 'json'` two-way | `ngx-tiptap` | Low | **⏳ Deferred (follow-up)** — a `format` prop (`'html' | 'json'`) switching the two-way payload; `getJSON()` already exists on the handle. |
-| G5 — Reactive-forms / CVA | `ngx-tiptap` (Angular) | Low | Angular-only; Rozie's `[(html)]` covers template-driven forms. CVA is a niche Angular add. |
+| G5 — Reactive-forms / CVA | `ngx-tiptap` (Angular) | Low | **✅ SHIPPED** — `html` is the single `model` prop, so the Angular target auto-emits `ControlValueAccessor` (Phase 23). `[(ngModel)]`, `[formControl]`, and `formControlName` bind directly, no wrapper directive. |
 
 ## Node-view portal slots (G1 — shipped) {#node-view-portal-slots-g1-shipped}
 

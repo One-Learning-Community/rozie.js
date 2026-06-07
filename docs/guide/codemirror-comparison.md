@@ -26,7 +26,7 @@ The wedge here is narrower than the TipTap or FullCalendar story — most framew
 | --- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | Mount editor | ✅ | ✅ | ✅ | ✅ | ✅ | hand-roll | ✅ |
 | **CodeMirror 6 engine** (not CM5) | ✅ | ✅ | ❌¹ | ✅ | ✅ | hand-roll | ✅ |
-| **Controlled two-way value** | ✅ (`value`/`onChange`) | ✅ (`v-model`) | ✅ (CVA / `ngModel`) | ✅ (`bind:value`) | ~² | hand-roll | ✅ `r-model:value` |
+| **Controlled two-way value** | ✅ (`value`/`onChange`) | ✅ (`v-model`) | ✅ (CVA / `ngModel`) | ✅ (`bind:value`) | ~² | hand-roll | ✅ `r-model:value` (+ Angular CVA) |
 | `extensions` passthrough | ✅ | ✅ | ~ (CM5 options) | ✅ | ✅ | hand-roll | ✅ (composed last) |
 | Imperative `EditorView` handle | ✅ (ref) | ✅ (ref) | ~ (directive) | ~ | ~³ | hand-roll | ✅ 8-verb `$expose` |
 | Per-prop runtime reconfigure (Compartments, no remount) | ~⁴ | ~⁴ | ~⁴ | ~⁴ | ~⁴ | hand-roll | ✅ |

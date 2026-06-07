@@ -29,6 +29,34 @@ export class DemoComponent {
 }
 ```
 
+## Angular forms
+
+The generated class implements `ControlValueAccessor` — the `value` model prop is the control value — so it binds to template-driven and reactive forms directives directly, with no wrapper directive:
+
+```ts
+import { Component } from '@angular/core';
+import { ReactiveFormsModule, FormControl } from '@angular/forms';
+import { CodeMirror } from '@rozie-ui/codemirror-angular';
+
+@Component({
+  selector: 'app-code-form',
+  standalone: true,
+  imports: [CodeMirror, ReactiveFormsModule],
+  template: `
+    <!-- Reactive forms — [formControl] / formControlName bind directly -->
+    <CodeMirror [formControl]="source" />
+  `,
+})
+export class CodeFormComponent {
+  source = new FormControl('');
+}
+
+// Template-driven forms work the same way:
+//   <CodeMirror [(ngModel)]="source" name="source" />
+```
+
+The accessor contract: only real user interaction dirties the control — programmatic writes (form `setValue` / `reset`, or the `[(value)]` two-way binding) update the view without echoing back into the form; `writeValue(null)` resets to the prop default (`""`); the control is marked touched on focusout.
+
 ## Props
 
 | Name | Type | Default | Two-way (model) | Required |
