@@ -30,7 +30,7 @@ The wedge is real and strongest for **Lit (no wrapper at all)** and **Solid (thi
 | `extensions` passthrough | ✅ | ✅ | ✅ | ✅ | ✅ | hand-roll | ✅ |
 | `editorProps` passthrough | ✅ | ✅ | ✅ | ✅ | ✅ | hand-roll | ✅ |
 | **Node-view component renderer** | ✅ | ✅ | ✅ | ✅ | ❌ | hand-roll | ✅ `nodeView` reactive slot (all 6) |
-| Bubble / floating menu | ✅ `/menus` | ✅ `/menus` | ✅ directives | ✅ | ❌ | hand-roll | ⏳ deferred (follow-up) |
+| Bubble / floating menu | ✅ `/menus` | ✅ `/menus` | ✅ directives | ✅ | ❌ | hand-roll | ✅ `bubbleMenu` + `floatingMenu` portal slots (all 6) |
 | Placeholder (empty-state) | via core ext | via core ext | via core ext | via core ext | via core ext | hand-roll | via `:extensions` (bundling = Phase 33) |
 | SSR | ✅² | ✅² | ⚠️ client-only | ✅² | ✅² | — | ✅ by construction³ |
 | One source → all 6 frameworks | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
@@ -44,6 +44,7 @@ The wedge is real and strongest for **Lit (no wrapper at all)** and **Solid (thi
 - **One definition, six idiomatic packages** — including the two frameworks the ecosystem underserves: **Lit (zero existing wrapper)** and **Solid (thin, no node views, stalling)**. A Solid dev today hand-rolls node views and all menu UI; a Lit dev hand-rolls *everything*.
 - **Controlled two-way `html`** out of the box on all six, with a shared echo-guard — the thing every React/Vue/Svelte consumer reimplements by hand.
 - **A batteries-included toolbar** (Bold/Italic/H1/H2/Bullet with live active-state) *and* a **`toolbar` portal slot** that hands the consumer the live editor — neither official wrapper ships any toolbar.
+- **Selection-anchored `bubbleMenu` / `floatingMenu` portal slots** over the Floating-UI menu extensions — bring-your-own menu fragment, handed the live editor, uniform across all six targets (including Solid and Lit, where a consumer would otherwise hand-roll all menu UI).
 - **A uniform 14-verb imperative command handle** (`$expose`) with the same shape on every target — versus "hold the `Editor` you happened to construct" (which differs per framework: hook return, ref, store, or a directive input).
 - **Node views on all six** — a single `nodeView` **reactive** portal slot renders a framework fragment as a custom ProseMirror node (mention chips, embeds, editable callouts) and re-renders it **in place** on each transaction. This is the marquee TipTap feature, and Rozie ships it where the ecosystem has gaps: **Solid (`solid-tiptap` has no node-view renderer)** and **Lit (no wrapper at all)** get it for free from the same source.
 
@@ -52,7 +53,7 @@ The wedge is real and strongest for **Lit (no wrapper at all)** and **Solid (thi
 | Gap | Who has it | Severity | Rozie status |
 | --- | --- | --- | --- |
 | **G1 — Node-view component renderer** | React, Vue, Angular, Svelte | **High** (TipTap's marquee feature) | **✅ SHIPPED (Phase 33)** — a uniform `nodeView` **reactive** portal slot driven by `addNodeView`, proven 6/6. See the [shipped design below](#node-view-portal-slots-g1-shipped). |
-| G2 — Bubble / Floating menu | React, Vue, Angular, Svelte | Medium | **⏳ Deferred (follow-up)** — a `bubbleMenu` / `floatingMenu` portal slot over `@tiptap/extension-bubble-menu` (Floating UI). Out of Phase 33 scope. |
+| **G2 — Bubble / Floating menu** | React, Vue, Angular, Svelte | Medium | **✅ SHIPPED** — `bubbleMenu` + `floatingMenu` mount-once portal slots over `@tiptap/extension-bubble-menu` / `@tiptap/extension-floating-menu` (Floating UI), each handed the live `{ editor }`. See the [shipped design below](#bubble-floating-menu-slots-g2-shipped). |
 | **G3 — Bundled Placeholder** | all (via core ext) | Low | **✅ SHIPPED** — bundles `@tiptap/extensions` (ships `Placeholder` in v3) and wires the `placeholder` prop to `Placeholder.configure({ placeholder })`; ghost-text renders on the empty editor across all six targets via the `:root { }` engine-DOM escape hatch (Phase 34). See [shipped below](#bundle-placeholder-g3-shipped). |
 | G4 — `outputFormat: 'json'` two-way | `ngx-tiptap` | Low | **✅ Covered via the handle / model-format switch deferred (by design)** — JSON output is available today: `getJSON()` is on the `$expose` handle, so consumers read JSON whenever they need it. The only unmatched piece is making the *two-way model payload itself* JSON via a `format` prop — an `ngx-tiptap`-only (Angular) nicety that would race the canonical `html` model channel. Read JSON off the handle instead. |
 | G5 — Reactive-forms / CVA | `ngx-tiptap` (Angular) | Low | **✅ SHIPPED** — `html` is the single `model` prop, so the Angular target auto-emits `ControlValueAccessor` (Phase 23). `[(ngModel)]`, `[formControl]`, and `formControlName` bind directly, no wrapper directive. |
@@ -93,22 +94,26 @@ extensions: [StarterKit, ...placeholderExtensions, ...nodeViewExtensions, ...$pr
 
 The Placeholder extension adds the class `is-editor-empty` and a `data-placeholder` attribute to the first empty ProseMirror node — an **engine-rendered node that never carries Rozie's `[data-rozie-s-*]` scope attribute**, so a plain scoped CSS rule would silently fail to match on React/Solid/Lit. The ghost-text `::before` rule is therefore emitted through the **`:root { … }` engine-DOM escape hatch** (Phase 34): bare/unscoped on every target — React `.global.css` sidecar, Vue unscoped second `<style>`, Svelte `:global { }`, Angular `::ng-deep`, Solid `__rozieInjectStyle`, Lit dual-sink (`static styles` + `injectGlobalStyles`). (Not `:global()` — that is a ROZ128 hard error; the `:root { nested }` form is canonical.) The ghost text renders **only** while the editor is empty, so it has zero effect on non-empty documents.
 
-## Deferred follow-up (G2)
+## Bubble / Floating menu slots (G2 — shipped) {#bubble-floating-menu-slots-g2-shipped}
 
-This remains out of scope and is tracked for a follow-up phase.
+Selection-anchored menu UI now ships as two **mount-once portal slots** — `bubbleMenu` and `floatingMenu` — over the Floating-UI menu extensions (`@tiptap/extension-bubble-menu` / `@tiptap/extension-floating-menu`, both Floating-UI-based in v3). They follow the same shape as the shipped `toolbar` slot — `<slot name="bubbleMenu" portal :params="['editor']" />`, no `reactive` — with one twist borrowed from the `nodeView` slot: the menu's host element is **created imperatively** in the mount hook and handed to the menu extension at construction (`BubbleMenu.configure({ element })`), because the extension needs its positioned element before `new Editor`. The consumer's menu fragment is then portalled into that host **after** mount with the live `{ editor }` in scope (their buttons call `editor.chain().focus()…run()`), and disposed on unmount.
 
-### Bubble / Floating menu slots (G2)
+**Zero overhead when unfilled.** Each menu extension is added to the editor **only when its slot is filled** (`if ($slots.bubbleMenu) { … }`) — an unfilled slot creates no host element, adds no extension, and fires no portal. This is the same discipline as the `nodeView` slot.
 
-A `bubbleMenu` and `floatingMenu` portal slot over `@tiptap/extension-bubble-menu` / `@tiptap/extension-floating-menu` (both Floating-UI-based in v3). Lower risk than node views — the menu's DOM is a single positioned element, a natural portal host (the same shape as the shipped `toolbar` slot, plus a selection-driven `shouldShow`). Adds the two extension peers.
+**Selection-driven `shouldShow`.** The extensions own positioning (Floating UI) and append the host to the editor's parent automatically — no manual document insertion. The default `shouldShow` reveals the bubble menu on a non-empty text selection and the floating menu on an empty line. Both extension peers are added (optional) to all six leaf packages.
 
-### JSON content format (G4) — covered via the handle
+**Cross-framework reach.** As with everything else here, the same `TipTap.rozie` source ships these menus into **Solid** and **Lit**, where a consumer would otherwise hand-roll all menu UI from scratch.
+
+## By-design non-goal — JSON content format (G4)
+
+With G2 shipped, there are no deferred TipTap follow-ups left. The one remaining unmatched item is intentional, not deferred:
 
 JSON output is **available today** through `getJSON()` on the `$expose` handle — consumers read the editor's JSON whenever they need it. The only piece intentionally *not* matched is switching the **two-way model payload itself** to JSON via a `format` prop (`ngx-tiptap`'s `outputFormat`): that is an Angular-ecosystem nicety, and a second JSON model channel would race the canonical `html` two-way path. Read JSON off the handle instead.
 
 ## Honest caveats
 
-- **Node views ship; bubble/floating menus do not yet** — as of Phase 33 the `nodeView` reactive portal slot is shipped 6/6 (mention chips, embeds, editable callouts). The remaining gap is **bubble / floating menus** (G2): if your use case needs selection-anchored menu UI, the official React/Vue wrappers (or `ngx-tiptap` / `svelte-tiptap`) are more complete *today*. Rozie's wedge is the **uniform cross-framework editor + toolbar + node views + command handle + two-way binding**, and especially **reach into Solid and Lit** where the ecosystem is thin-to-absent.
-- **`@rozie-ui/tiptap` is `0.1.0`** — the surface (8 props / 4 events / 14-verb handle / `toolbar` slot + `nodeView` reactive slot) is stable and gate-verified, but it is younger than the multi-year official wrappers.
+- **Feature-complete vs the official wrappers, on six targets** — node views (G1), bubble / floating menus (G2), bundled Placeholder (G3), and reactive-forms / CVA (G5) all ship. The only intentionally-unmatched item is the JSON two-way model payload (G4), covered by `getJSON()` on the handle (above). Rozie's wedge is the **uniform cross-framework editor + toolbar + node views + selection menus + command handle + two-way binding**, and especially **reach into Solid and Lit** where the ecosystem is thin-to-absent.
+- **`@rozie-ui/tiptap` is `0.1.0`** — the surface (8 props / 4 events / 14-verb handle / `toolbar` + `bubbleMenu` + `floatingMenu` mount-once slots + `nodeView` reactive slot) is stable and gate-verified, but it is younger than the multi-year official wrappers.
 - **Single StarterKit baseline** — the bundled extension set is StarterKit; everything else comes through `:extensions`. That is by design (the consumer-extensibility passthrough), but it means richer setups carry more consumer wiring than a batteries-everything wrapper would.
 
 ## Cross-references

@@ -2,7 +2,7 @@
 
 `TipTap` is Rozie's data-bound port of [TipTap](https://tiptap.dev/) — the headless, ProseMirror-based rich-text editor. One `.rozie` source file ships idiomatic React, Vue, Svelte, Angular, Solid, and Lit consumers from a single wrapper. The official ecosystem is uneven: [`@tiptap/react`](https://www.npmjs.com/package/@tiptap/react) and [`@tiptap/vue-3`](https://www.npmjs.com/package/@tiptap/vue-3) are first-party, [`svelte-tiptap`](https://www.npmjs.com/package/svelte-tiptap) and [`ngx-tiptap`](https://www.npmjs.com/package/ngx-tiptap) are healthy community packages, [`solid-tiptap`](https://www.npmjs.com/package/solid-tiptap) is thin and stalling, and **Lit has no wrapper at all**. Rozie collapses all six into one source — and notably, **neither official wrapper ships a controlled two-way content contract or a toolbar**; Rozie does. See the [TipTap libraries comparison](/guide/tiptap-comparison) for the full matrix.
 
-This page is the **show-and-tell**: the API surface, per-framework quick starts, the events, the 14-verb imperative command handle, the `editorProps`/`extensions` passthroughs, the per-target recipe for the `toolbar` portal slot, and the **`nodeView` reactive portal slot** that renders a framework fragment as a custom ProseMirror node (mention chips, embeds, editable callouts) on all six targets.
+This page is the **show-and-tell**: the API surface, per-framework quick starts, the events, the 14-verb imperative command handle, the `editorProps`/`extensions` passthroughs, the per-target recipe for the `toolbar` / `bubbleMenu` / `floatingMenu` portal slots, and the **`nodeView` reactive portal slot** that renders a framework fragment as a custom ProseMirror node (mention chips, embeds, editable callouts) on all six targets.
 
 The full source for `TipTap.rozie` lives in the [`@rozie-ui/tiptap` package](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/tiptap/src/TipTap.rozie).
 
@@ -188,11 +188,13 @@ editor.current?.chain()?.toggleItalic().toggleBulletList().run();
 
 ## Slots
 
-The wrapper surfaces **one** portal slot — `toolbar`. Fill it and your toolbar UI replaces the internal one, receiving the live `editor` so its buttons can drive `editor.chain().focus()…run()`. Leave it unfilled and the **batteries-included internal toolbar** (Bold / Italic / H1 / H2 / Bullet list, with live active-state highlighting) renders.
+The wrapper surfaces **four** portal slots. Three are **mount-once** — `toolbar`, `bubbleMenu`, `floatingMenu` — each handed the live `editor` so its buttons can drive `editor.chain().focus()…run()`. The fourth, `nodeView`, is a **reactive** slot covered in [Node-view slots](#node-view-slots) below. Fill `toolbar` and your toolbar UI replaces the internal one; leave it unfilled and the **batteries-included internal toolbar** (Bold / Italic / H1 / H2 / Bullet list, with live active-state highlighting) renders.
 
 | Slot | Renders | Scope param |
 | --- | --- | --- |
 | `toolbar` | A consumer toolbar above the editor (replaces the internal one) | `editor` |
+| `bubbleMenu` | A consumer menu shown on a non-empty text selection (over `@tiptap/extension-bubble-menu`) | `editor` |
+| `floatingMenu` | A consumer menu shown on an empty line (over `@tiptap/extension-floating-menu`) | `editor` |
 
 Each target fills `#toolbar` through its native imperative-render API:
 
@@ -259,6 +261,43 @@ el.toolbar = ({ editor }) =>
 ```
 
 On every target the wrapper's `$portals.toolbar(node, { editor })` closure mounts the consumer's fragment into the toolbar host container and returns a dispose handle the wrapper calls on unmount.
+
+### Bubble & floating menu slots
+
+The `bubbleMenu` and `floatingMenu` slots are **selection-anchored menus** over TipTap's Floating-UI menu extensions (`@tiptap/extension-bubble-menu` / `@tiptap/extension-floating-menu`). They use the **same mount-once portal shape** as `toolbar` and receive the live `editor` — but the menu's host element is created by the wrapper and positioned by Floating UI, so you only supply the menu fragment. By default the **bubble menu** appears on a non-empty text selection and the **floating menu** on an empty line. Each menu extension is added **only when its slot is filled** (zero overhead otherwise), and the two extension peers are declared optional on every leaf package — install them only if you use the slots.
+
+The fill API mirrors `toolbar` exactly — `renderBubbleMenu` / `renderFloatingMenu` render props (React/Solid), `#bubbleMenu` / `#floatingMenu` scoped slots (Vue) / snippets (Svelte) / `<ng-template>` content children (Angular), or `bubbleMenu` / `floatingMenu` properties on the Lit element:
+
+**Vue:**
+
+```vue
+<TipTap v-model:html="html">
+  <template #bubbleMenu="{ editor }">
+    <button @click="editor.chain().focus().toggleBold().run()">Bold</button>
+    <button @click="editor.chain().focus().toggleItalic().run()">Italic</button>
+  </template>
+  <template #floatingMenu="{ editor }">
+    <button @click="editor.chain().focus().toggleHeading({ level: 1 }).run()">H1</button>
+  </template>
+</TipTap>
+```
+
+**React:**
+
+```tsx
+<TipTap
+  html={html}
+  onHtmlChange={setHtml}
+  renderBubbleMenu={({ editor }) => (
+    <button onClick={() => editor.chain().focus().toggleBold().run()}>Bold</button>
+  )}
+  renderFloatingMenu={({ editor }) => (
+    <button onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}>H1</button>
+  )}
+/>
+```
+
+On every target the wrapper's `$portals.bubbleMenu(node, { editor })` / `$portals.floatingMenu(node, { editor })` closures mount the consumer's menu fragment into the engine-owned (imperatively created) menu host and return a dispose handle called on unmount.
 
 ## Node-view slots
 
@@ -431,14 +470,14 @@ A model two-way binding can ping-pong: the consumer's state signals back into th
 
 The `placeholder` prop renders empty-state ghost text out of the box — the text shows only while the document is empty and hides as you type. `@rozie-ui/tiptap` bundles `@tiptap/extensions` (ships `Placeholder` in v3) and wires the prop to `Placeholder.configure({ placeholder })` at editor construction, so no consumer `:extensions` wiring is needed. The ghost-text CSS reaches the engine-rendered `.is-editor-empty` node (which carries no Rozie scope attribute) via the `:root { }` engine-DOM escape hatch on all six targets. The prop still also forwards `aria-placeholder` for assistive tech. See the [comparison page](/guide/tiptap-comparison#bundle-placeholder-g3-shipped) for details.
 
-### Node views ship; bubble/floating menus are the remaining gap
+### Feature-complete versus the official wrappers
 
-TipTap's marquee feature — **custom node views** — ships via the [`nodeView` reactive slot](#node-view-slots), uniformly across all six targets (including Solid and Lit, where no upstream renderer exists). The remaining gap versus the official wrappers is **bubble / floating menu** slots (selection-anchored menu UI), which are deferred to a follow-up phase. See the [comparison page](/guide/tiptap-comparison#deferred-follow-up-g2) for the deferred-feature plan.
+TipTap's marquee feature — **custom node views** — ships via the [`nodeView` reactive slot](#node-view-slots), and selection-anchored **bubble / floating menus** ship via the [`bubbleMenu` / `floatingMenu` slots](#bubble-floating-menu-slots), both uniformly across all six targets (including Solid and Lit, where no upstream renderer exists). Together with the bundled Placeholder and the auto-emitted Angular `ControlValueAccessor`, that closes every meaningful gap versus the official wrappers. The one intentionally-unmatched item is switching the *two-way model payload itself* to JSON (`ngx-tiptap`'s `outputFormat`) — read JSON off the `getJSON()` handle instead. See the [comparison page](/guide/tiptap-comparison#bubble-floating-menu-slots-g2-shipped) for the full matrix.
 
 ## Cross-references
 
 - [`TipTap.rozie` source on GitHub](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/tiptap/src/TipTap.rozie) — the canonical wrapper.
-- [TipTap libraries comparison](/guide/tiptap-comparison) — the per-framework wrapper matrix + the node-view gap-closure plan.
+- [TipTap libraries comparison](/guide/tiptap-comparison) — the per-framework wrapper matrix + the gap-closure status.
 - [The portal-slot primitive](/examples/portal-list) — how `<slot name="X" portal />` routes a consumer fragment through each target's imperative-render API. The `nodeView` slot adds the `reactive` flag for engine-driven in-place re-render.
 - [`$expose` and the imperative handle](/guide/features#expose-→-a-consumer-callable-imperative-handle-everywhere)
 - [`r-model` — two-way binding everywhere](/guide/features#model-true-→-idiomatic-two-way-binding-everywhere)
