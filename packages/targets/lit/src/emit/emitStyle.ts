@@ -104,12 +104,28 @@ export function emitStyle(
   const scopedRules = styles.scopedRules as StyleRule[];
   const rootRules = styles.rootRules as StyleRule[];
   const portalRules = (styles.portalRules ?? []) as StyleRule[];
+  // Phase 34 — engine-DOM escape hatch, DUAL SINK (D-04). Each `root-block`
+  // engineRule carries `children` flattened bare. Lit is the only shadow target,
+  // so engine DOM lives in TWO disjoint places: in-shadow content (TipTap
+  // placeholder, in-template menu host) reached by `static styles`, AND
+  // body-injected content (flatpickr calendar) reached by `injectGlobalStyles`.
+  // The bare rules go into BOTH sinks. One duplicated rule is expected and
+  // harmless (disjoint DOM scopes). The bare rules carry NO `[data-rozie-s-*]`
+  // attr — engine DOM lacks it, so they must stay bare even inside the shadow
+  // sheet. CRITICAL D-03: the FLAT `:root { --custom-prop }` (rootRules) path
+  // stays single-sink → injectGlobalStyles ONLY (byte-identity preserved).
+  const engineRules = (styles.engineRules ?? []) as StyleRule[];
+  const engineChildren = engineRules.flatMap((r) => r.children ?? []);
+  const engineCss = stringifyRules(engineChildren, source);
 
   const rawScopedCss = stringifyRules(scopedRules, source);
   const scopedCss = opts.scopeHash
     ? scopeCss(rawScopedCss, opts.scopeHash)
     : rawScopedCss;
-  const globalCss = rootRules.length > 0 ? stringifyRules(rootRules, source) : '';
+  const rootCss = rootRules.length > 0 ? stringifyRules(rootRules, source) : '';
+  // injectGlobalStyles sink gets flat :root (D-03) PLUS engine rules (D-04).
+  const globalParts = [rootCss, engineCss].filter((s) => s.length > 0);
+  const globalCss = globalParts.join('\n');
 
   // Spike 004 — @portal rules emit INTO the same `static styles` css block.
   // Lit's shadow-DOM CSS encapsulation already isolates these selectors to
@@ -117,9 +133,13 @@ export function emitStyle(
   // (via the shadow-DOM-rooted `_ref__rozieRoot` query). The
   // [data-rozie-portal-<NAME>="<hash>"] attribute reaches the engine subtree.
   const portalCss = rewriteAllPortalBlocks(portalRules, source, opts.scopeHash ?? '', PORTAL_SCOPE_REPEAT);
-  const combinedScoped = portalCss.length > 0
-    ? (scopedCss.length > 0 ? `${scopedCss}\n${portalCss}` : portalCss)
-    : scopedCss;
+  // The `static styles` sink folds scoped + portal + bare engine rules. The
+  // engine rules go in UNSCOPED/bare (NO scopeCss rewrite) — engine DOM inside
+  // the shadow tree (e.g. TipTap placeholder) carries no `[data-rozie-s-*]`
+  // attr, so the rule must be bare to match (D-04 in-shadow arm).
+  const combinedScoped = [scopedCss, portalCss, engineCss]
+    .filter((s) => s.length > 0)
+    .join('\n');
 
   let staticStylesField = '';
   let globalStyleCall = '';
