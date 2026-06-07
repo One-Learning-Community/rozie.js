@@ -303,14 +303,14 @@ Portal slots unlock the "foreign-engine cell rendering" pattern: MapLibre owns t
 />
 ```
 
-**Solid** (render prop):
+**Solid** (render prop — note the scope is an **accessor**, `ctx()`, for fine-grained reactivity):
 
 ```tsx
 <MapLibre
   center={center()}
   onCenterChange={setCenter}
   markers={[{ id: 'a', lng: -74.5, lat: 40, label: 'NYC' }]}
-  marker={({ marker }) => <span class="pin" title={marker.label}>📍</span>}
+  markerSlot={(ctx) => <span class="pin" title={ctx().marker.label}>📍</span>}
 />
 ```
 
@@ -352,7 +352,7 @@ el.markers = [{ id: 'a', lng: -74.5, lat: 40, label: 'NYC' }];
 el.marker = ({ marker }) => html`<span class="pin" title=${marker.label}>📍</span>`;
 ```
 
-On every target the wrapper's `$portals.marker(node, { marker, index })` closure mounts the consumer's fragment into the engine-owned `Marker` element and returns the reactive `{ update, dispose }` handle the wrapper calls as the marker data changes or the marker is removed. The `popup` slot mirrors it exactly (`renderPopup` / `#popup` / `popup` property, scope `{ popup, index }`), and `control` uses the same shape with a `{ map }` scope.
+On every target the wrapper's `$portals.marker(node, { marker, index })` closure mounts the consumer's fragment into the engine-owned `Marker` element and returns the reactive `{ update, dispose }` handle the wrapper calls as the marker data changes or the marker is removed. The `popup` and `control` slots mirror it exactly, with the same per-target fill API: a render prop on **React** (`renderMarker` / `renderPopup` / `renderControl`) and **Solid** (`markerSlot` / `popupSlot` / `controlSlot` — scope passed as an accessor), a scoped slot on **Vue** (`#marker` / `#popup` / `#control`), a snippet on **Svelte**, an `<ng-template #…>` content child on **Angular**, and an `attribute: false` property on **Lit** (`.marker` / `.popup` / `.control`). The `popup` scope is `{ popup, index }`; the `control` scope is `{ map }`.
 
 ## Recipes
 
