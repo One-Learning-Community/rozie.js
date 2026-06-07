@@ -2,7 +2,7 @@
 
 `CodeMirror` is Rozie's data-bound port of [CodeMirror 6](https://codemirror.net/) — the de-facto modular code editor for the web. One `.rozie` source file ships idiomatic React, Vue, Svelte, Angular, Solid, and Lit consumers from a single wrapper. Every framework today carries its own hand-maintained CodeMirror binding ([react-codemirror](https://www.npmjs.com/package/@uiw/react-codemirror), [vue-codemirror](https://www.npmjs.com/package/vue-codemirror), [svelte-codemirror](https://www.npmjs.com/package/svelte-codemirror-editor), [ngx-codemirror](https://www.npmjs.com/package/@ctrl/ngx-codemirror)) — each shuttles a `value` through the `EditorView`/`EditorState` API and forwards changes back out. Rozie collapses all of them (plus the Solid and Lit wrappers that **do not exist upstream**) into one source. See the [CodeMirror libraries comparison](/guide/codemirror-comparison) for the full per-framework matrix — including the Angular wrapper that's still on CodeMirror 5.
 
-This page is the **show-and-tell**: the API surface, per-framework quick starts, the imperative handle, the consumer-extensible `:extensions` passthrough, and the per-target recipe for the `panel` / `topPanel` / `tooltip` portal slots.
+This page is the **show-and-tell**: the API surface, per-framework quick starts, the imperative handle, the consumer-extensible `:extensions` passthrough, and the per-target recipe for the five `panel` / `topPanel` / `tooltip` / `gutter` / `decoration` portal slots.
 
 The full source for `CodeMirror.rozie` lives in the [`@rozie-ui/codemirror` package](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/codemirror/src/CodeMirror.rozie).
 
@@ -179,6 +179,8 @@ el.addEventListener('value-change', (e) => {
 | `placeholder` | `String` | `""` | | Placeholder text shown when the document is empty (the bundled `@codemirror/view` `placeholder` extension). Empty string ⇒ no placeholder. Runtime-updatable via a `placeholderCompartment` reconfigure. |
 | `extensions` | `Array` | `[]` | | Consumer-extensible passthrough — an arbitrary `Extension[]` composed **last** so it wins CodeMirror's last-registered-wins facets (theme/keymap/language overrides). The CodeMirror 6 analog of an options bag: line-wrapping, autocomplete, linting, custom key-bindings, additional languages/themes — anything the curated props don't special-case. Runtime-reconfigurable via an `extensionsCompartment` (no remount when the array changes). |
 | `basicSetup` | `Boolean` | `false` | | When `true`, swap the thin manual baseline (line numbers + history + default/history keymaps) for CodeMirror 6's batteries-included [`basicSetup`](https://codemirror.net/docs/ref/#codemirror.basicSetup) bundle — autocomplete, search, bracket matching, code folding, lint gutter, and richer keymaps (G1). The curated `language` / `theme` / `readOnly` / `placeholder` / `extensions` props and the consumer `:extensions` still compose **after** it, so they continue to win. **Construction-time only:** `basicSetup` is read once when the editor is built (it is a large bundle, intentionally with no compartment), so **toggling it at runtime requires a re-mount** — set it as a fixed prop, don't flip it live. |
+| `gutterLines` | `Array` | `[]` | | The 1-based line numbers that each get a custom gutter marker rendered by the `gutter` slot (G5). One portal handle mounts per visible marker (see [Slots](#slots)). Out-of-range lines are ignored. Runtime-updatable via a `gutterCompartment` reconfigure — changing the array re-marks the lines with no remount. Only meaningful when the `gutter` slot is filled. |
+| `decorations` | `Array` | `[]` | | An array of `{ from, to? }` **0-based document offsets** that each get an inline widget rendered by the `decoration` slot (G5). A point widget is placed at `from`; `to` is passed through in scope for the consumer's awareness. Compute an offset from a line via `view.state.doc.line(n).from`. One portal handle mounts per visible widget. Runtime-updatable via a `decorationCompartment` reconfigure. Only meaningful when the `decoration` slot is filled. |
 
 There is **no Emits section.** CodeMirror's `updateListener` → two-way `value` path is the only change channel (consumers bind `r-model:value`). See [Why there is no `@change` event](#why-there-is-no-change-event).
 
@@ -214,19 +216,23 @@ const text = cm.current?.getValue();
 cm.current?.insertText('// inserted at the cursor\n');
 ```
 
-The eight handle method names are clear of all seven prop names (and there are no events), so the `$expose` collision discipline (ROZ121) passes with no renames beyond the React-specific `replaceValue` adjustment above.
+The eight handle method names are clear of all ten prop names (and there are no events), so the `$expose` collision discipline (ROZ121) passes with no renames beyond the React-specific `replaceValue` adjustment above.
 
 ## Slots
 
-The wrapper surfaces **three** portal slots — two bottom/top status panels mounted through CodeMirror 6's [`showPanel`](https://codemirror.net/docs/ref/#view.showPanel) facet, plus a cursor-anchored tooltip through the [`showTooltip`](https://codemirror.net/docs/ref/#view.showTooltip) facet. Each is **guarded** — fill it and your fragment renders; leave it unfilled and the surface stays absent.
+The wrapper surfaces **five** portal slots — two bottom/top status panels mounted through CodeMirror 6's [`showPanel`](https://codemirror.net/docs/ref/#view.showPanel) facet, a cursor-anchored tooltip through the [`showTooltip`](https://codemirror.net/docs/ref/#view.showTooltip) facet, per-line gutter markers through a custom [`gutter()`](https://codemirror.net/docs/ref/#view.gutter), and inline widget decorations through [`Decoration.widget`](https://codemirror.net/docs/ref/#view.Decoration^widget). Each is **guarded** — fill it and your fragment renders; leave it unfilled and the surface stays absent.
 
-| Slot | Mounts via | Renders | Scope param | Kind |
-| --- | --- | --- | --- | --- |
-| `panel` | CodeMirror's `showPanel` facet (`top: false`) | A status-bar / toolbar strip beneath the editor | `view` | mount-once |
-| `topPanel` | CodeMirror's `showPanel` facet (`top: true`) | A status strip above the editor | `view` | mount-once |
-| `tooltip` | CodeMirror's `showTooltip` facet (caret head) | A cursor-anchored tooltip | `view`, `pos` | **reactive** |
+| Slot | Mounts via | Renders | Scope param | Kind | Driven by |
+| --- | --- | --- | --- | --- | --- |
+| `panel` | CodeMirror's `showPanel` facet (`top: false`) | A status-bar / toolbar strip beneath the editor | `view` | mount-once | — |
+| `topPanel` | CodeMirror's `showPanel` facet (`top: true`) | A status strip above the editor | `view` | mount-once | — |
+| `tooltip` | CodeMirror's `showTooltip` facet (caret head) | A cursor-anchored tooltip | `view`, `pos` | **reactive** | — |
+| `gutter` | A custom `gutter()` (`GutterMarker.toDOM`) | A per-line marker in a dedicated gutter lane | `line`, `view` | **reactive multi-instance** | `gutterLines` prop |
+| `decoration` | A `Decoration.widget` set (`WidgetType.toDOM`) | An inline widget at a document position | `from`, `to`, `view` | **reactive multi-instance** | `decorations` prop |
 
 `tooltip` is CodeMirror's first **reactive** portal slot: its fragment mounts **once** and re-renders **in place** as the caret moves (the engine-driven `{ update, dispose }` handle), rather than remounting per keystroke. Its scope carries the live `EditorView` plus `pos` (the caret head).
+
+`gutter` and `decoration` are **reactive multi-instance** slots: the wrapper mounts **one portal handle per visible marker / widget**, so a single slot fill renders an unbounded number of live fragments — one for each line in `gutterLines` (scope: the 1-based `line` + the `view`) or each range in `decorations` (scope: the `from`/`to` offsets + the `view`). CodeMirror mounts a marker/widget's fragment when it scrolls into view and disposes it when it scrolls out, and changing the driving prop reconfigures the marked lines / decorated ranges live with no remount.
 
 Portal slots unlock the "foreign-engine cell rendering" pattern: CodeMirror owns the panel `<div>`, but the consumer's framework-native fragment is mounted inside it (on the panel's `mount()`) and disposed when the panel is torn down (`destroy()`). See [the portal-slot primitive](/examples/portal-list) for the underlying mechanism. Each target fills `#panel` through its native imperative-render API:
 
@@ -414,7 +420,78 @@ const cm = useRef<CodeMirrorHandle>(null);
 
 ### Adding a status bar with the `panel` slot
 
-Fill the `panel` slot to mount a status strip at the bottom of the editor — a line/column counter, a dirty indicator, a language picker. The slot's `view` scope param is the live `EditorView`, so the panel can read editor state directly (see [Slots](#slots) for the per-target shapes).
+Fill the `panel` slot to mount a status strip at the bottom of the editor — a line/column counter, a dirty indicator, a language picker. The slot's `view` scope param is the live `EditorView`, so the panel can read editor state directly (see [Slots](#slots) for the per-target shapes). The `topPanel` slot is the top-docked sibling (same `view` scope), and `tooltip` mounts a caret-anchored fragment that re-renders in place as the cursor moves (`view` + `pos` scope).
+
+### Per-line gutter markers with the `gutter` slot
+
+The `gutter` slot mounts a custom marker in a dedicated gutter lane on each line listed in the `gutterLines` prop (1-based line numbers; out-of-range lines are ignored). It is a **reactive multi-instance** slot — one portal handle mounts per visible marker — so a single fill renders a marker for every listed line, each handed its own `line` (the 1-based line number) and the live `view`. Changing `gutterLines` re-marks the lines with no remount.
+
+**Vue** (scoped slot):
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue';
+import CodeMirror from '@rozie-ui/codemirror-vue';
+
+const value = ref('line one\nline two\nline three\n');
+const gutterLines = ref([1, 3]); // mark lines 1 and 3
+</script>
+
+<template>
+  <CodeMirror v-model:value="value" :gutterLines="gutterLines">
+    <template #gutter="{ line }">
+      <span class="cm-breakpoint" :title="`line ${line}`">●</span>
+    </template>
+  </CodeMirror>
+</template>
+```
+
+**React** (render prop):
+
+```tsx
+<CodeMirror
+  value={value}
+  onValueChange={setValue}
+  gutterLines={[1, 3]}
+  renderGutter={({ line }) => <span className="cm-breakpoint" title={`line ${line}`}>●</span>}
+/>
+```
+
+### Inline widget decorations with the `decoration` slot
+
+The `decoration` slot mounts an inline widget at each document position listed in the `decorations` prop — an array of `{ from, to? }` **0-based document offsets** (a point widget is placed at `from`; `to` is passed through in scope for the consumer's awareness). Compute an offset from a line number with `view.state.doc.line(n).from`. Like `gutter`, it is **reactive multi-instance** — one portal handle per visible widget — each handed its `from` / `to` offsets and the live `view`. Changing `decorations` reconfigures the decorated ranges with no remount.
+
+**Vue** (scoped slot):
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue';
+import CodeMirror from '@rozie-ui/codemirror-vue';
+
+const value = ref('const answer = 42;\n');
+// A widget after `const` (offset 5) and after `answer` (offset 12).
+const decorations = ref([{ from: 5 }, { from: 12 }]);
+</script>
+
+<template>
+  <CodeMirror v-model:value="value" :decorations="decorations">
+    <template #decoration="{ from }">
+      <span class="cm-pin" :data-at="from">📌</span>
+    </template>
+  </CodeMirror>
+</template>
+```
+
+**React** (render prop):
+
+```tsx
+<CodeMirror
+  value={value}
+  onValueChange={setValue}
+  decorations={[{ from: 5 }, { from: 12 }]}
+  renderDecoration={({ from }) => <span className="cm-pin" data-at={from}>📌</span>}
+/>
+```
 
 ## Gotchas
 
@@ -432,7 +509,7 @@ A model two-way binding can ping-pong: the consumer's state signals back into th
 
 ### Injection-surface coverage
 
-CodeMirror 6 has many extension-mounted injection points. The wrapper ships portal slots for the panel (`panel` / `topPanel`, via `showPanel`) and the cursor tooltip (`tooltip`, via `showTooltip` — the first **reactive** slot). Gutter markers and line/widget/replace decorations are a future parity expansion; until then, reach them through a custom extension passed via `:extensions`.
+CodeMirror 6 has many extension-mounted injection points. The wrapper ships five portal slots: the panels (`panel` / `topPanel`, via `showPanel`), the cursor tooltip (`tooltip`, via `showTooltip` — the first **reactive** slot), per-line gutter markers (`gutter`, via a custom `gutter()`), and inline widget decorations (`decoration`, via `Decoration.widget`). The `gutter` and `decoration` slots are **reactive multi-instance** — one portal handle per visible marker / widget. Other CM6 injection points (block widgets, replace/line decorations, atomic ranges) remain a future parity expansion; until then, reach them through a custom extension passed via `:extensions`.
 
 ## Cross-references
 
