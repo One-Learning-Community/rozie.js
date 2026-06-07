@@ -36,7 +36,7 @@
  *      flag only ever relaxed the *absent-guide* throw, never the drift check). The
  *      branch is retained only as a guarded historical fallback; do not set the flag.
  */
-import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { compile, createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
 import { handleManifest } from './handle-manifest.mjs';
@@ -116,6 +116,21 @@ function main() {
     // React-only sidecars.
     if (target === 'react') {
       if (r.css) writeFileSync(resolve(leafSrc, 'TipTap.css'), r.css);
+      // The React emitter routes nested-`:root` engine rules (the placeholder
+      // ghost-text escape-hatch CSS, G3 / Phase 34) into `r.globalCss` and emits
+      // a sibling `import './TipTap.global.css';` side effect in the `.tsx`. Write
+      // the sidecar whenever it is present so that import resolves; without it the
+      // regenerated leaf imports a non-existent file. Keep it in lockstep with the
+      // emit (the CodeMirror/Chart.js WR-03 discipline): if a future .rozie edit
+      // removes all nested-:root engine rules, r.globalCss becomes null and the
+      // emitted .tsx drops the import — clean up the stale sidecar so it does not
+      // linger unreferenced in the tarball.
+      const globalCssPath = resolve(leafSrc, 'TipTap.global.css');
+      if (r.globalCss) {
+        writeFileSync(globalCssPath, r.globalCss);
+      } else if (existsSync(globalCssPath)) {
+        rmSync(globalCssPath);
+      }
       if (r.types) writeFileSync(resolve(leafSrc, 'TipTap.d.ts'), r.types);
     }
 

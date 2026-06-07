@@ -8,6 +8,7 @@
 // install @tiptap/core, … into every per-target typecheck workspace just to
 // exercise the engine-wrapper emit path.
 declare module '@tiptap/core';
+declare module '@tiptap/extensions';
 declare module '@tiptap/starter-kit';
 declare module 'flatpickr';
 declare module '@uppy/core';

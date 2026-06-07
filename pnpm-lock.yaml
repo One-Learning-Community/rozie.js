@@ -2002,6 +2002,9 @@ importers:
       '@tiptap/core':
         specifier: ^3.23.5
         version: 3.23.5(@tiptap/pm@3.23.5)
+      '@tiptap/extensions':
+        specifier: ^3.23.5
+        version: 3.23.5(@tiptap/core@3.23.5(@tiptap/pm@3.23.5))(@tiptap/pm@3.23.5)
       '@tiptap/starter-kit':
         specifier: ^3.23.5
         version: 3.23.5
@@ -2026,6 +2029,9 @@ importers:
       '@tiptap/core':
         specifier: ^3
         version: 3.23.5(@tiptap/pm@3.23.5)
+      '@tiptap/extensions':
+        specifier: ^3
+        version: 3.23.5(@tiptap/core@3.23.5(@tiptap/pm@3.23.5))(@tiptap/pm@3.23.5)
       '@tiptap/starter-kit':
         specifier: ^3
         version: 3.23.5
@@ -2044,6 +2050,9 @@ importers:
       '@tiptap/core':
         specifier: ^3
         version: 3.23.5(@tiptap/pm@3.23.5)
+      '@tiptap/extensions':
+        specifier: ^3
+        version: 3.23.5(@tiptap/core@3.23.5(@tiptap/pm@3.23.5))(@tiptap/pm@3.23.5)
       '@tiptap/starter-kit':
         specifier: ^3
         version: 3.23.5
@@ -2059,6 +2068,9 @@ importers:
       '@tiptap/core':
         specifier: ^3
         version: 3.23.5(@tiptap/pm@3.23.5)
+      '@tiptap/extensions':
+        specifier: ^3
+        version: 3.23.5(@tiptap/core@3.23.5(@tiptap/pm@3.23.5))(@tiptap/pm@3.23.5)
       '@tiptap/starter-kit':
         specifier: ^3
         version: 3.23.5
@@ -2084,6 +2096,9 @@ importers:
       '@tiptap/core':
         specifier: ^3
         version: 3.23.5(@tiptap/pm@3.23.5)
+      '@tiptap/extensions':
+        specifier: ^3
+        version: 3.23.5(@tiptap/core@3.23.5(@tiptap/pm@3.23.5))(@tiptap/pm@3.23.5)
       '@tiptap/starter-kit':
         specifier: ^3
         version: 3.23.5
@@ -2099,6 +2114,9 @@ importers:
       '@tiptap/core':
         specifier: ^3
         version: 3.23.5(@tiptap/pm@3.23.5)
+      '@tiptap/extensions':
+        specifier: ^3
+        version: 3.23.5(@tiptap/core@3.23.5(@tiptap/pm@3.23.5))(@tiptap/pm@3.23.5)
       '@tiptap/starter-kit':
         specifier: ^3
         version: 3.23.5
@@ -2111,6 +2129,9 @@ importers:
       '@tiptap/core':
         specifier: ^3
         version: 3.23.5(@tiptap/pm@3.23.5)
+      '@tiptap/extensions':
+        specifier: ^3
+        version: 3.23.5(@tiptap/core@3.23.5(@tiptap/pm@3.23.5))(@tiptap/pm@3.23.5)
       '@tiptap/starter-kit':
         specifier: ^3
         version: 3.23.5
@@ -2923,6 +2944,9 @@ importers:
       '@tiptap/core':
         specifier: ^3.23.5
         version: 3.23.5(@tiptap/pm@3.23.5)
+      '@tiptap/extensions':
+        specifier: ^3.23.5
+        version: 3.23.5(@tiptap/core@3.23.5(@tiptap/pm@3.23.5))(@tiptap/pm@3.23.5)
       '@tiptap/starter-kit':
         specifier: ^3.23.5
         version: 3.23.5

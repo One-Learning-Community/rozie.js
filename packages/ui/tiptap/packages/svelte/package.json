@@ -43,6 +43,7 @@
   "peerDependencies": {
     "svelte": "^5",
     "@tiptap/core": "^3",
+    "@tiptap/extensions": "^3",
     "@tiptap/starter-kit": "^3"
   },
   "peerDependenciesMeta": {
@@ -50,6 +51,9 @@
       "optional": false
     },
     "@tiptap/core": {
+      "optional": false
+    },
+    "@tiptap/extensions": {
       "optional": false
     },
     "@tiptap/starter-kit": {

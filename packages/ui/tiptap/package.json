@@ -12,6 +12,7 @@
   "devDependencies": {
     "@rozie/core": "workspace:*",
     "@tiptap/core": "^3.23.5",
+    "@tiptap/extensions": "^3.23.5",
     "@tiptap/starter-kit": "^3.23.5",
     "typescript": "~5.6.0",
     "vitest": "^4.1.0"
