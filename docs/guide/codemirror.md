@@ -19,12 +19,12 @@ The full source for `CodeMirror.rozie` lives in the [`@rozie-ui/codemirror` pack
 | `@rozie-ui/codemirror-solid` | `npm i @rozie-ui/codemirror-solid` | [solid/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/codemirror/packages/solid/README.md) |
 | `@rozie-ui/codemirror-lit` | `npm i @rozie-ui/codemirror-lit` | [lit/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/codemirror/packages/lit/README.md) |
 
-Each package carries the **five `@codemirror/*` engine peers** — `@codemirror/state`, `@codemirror/view`, `@codemirror/commands`, `@codemirror/lang-javascript`, and `@codemirror/theme-one-dark` (all `^6`) — plus its framework peer (`react + react-dom`, `vue`, `svelte`, `@angular/core + @angular/common`, `solid-js`, or `lit`). Install the engine peers alongside the framework package:
+Each package carries the **five `@codemirror/*` engine peers** — `@codemirror/state`, `@codemirror/view`, `@codemirror/commands`, `@codemirror/lang-javascript`, and `@codemirror/theme-one-dark` — plus the **`codemirror` meta-package** (it supplies the `basicSetup` bundle; all `^6`) — plus its framework peer (`react + react-dom`, `vue`, `svelte`, `@angular/core + @angular/common`, `solid-js`, or `lit`). Install the engine peers alongside the framework package:
 
 ```bash
 npm i @rozie-ui/codemirror-react \
   @codemirror/state @codemirror/view @codemirror/commands \
-  @codemirror/lang-javascript @codemirror/theme-one-dark
+  @codemirror/lang-javascript @codemirror/theme-one-dark codemirror
 ```
 
 CodeMirror 6 has **no large "options bag"** — everything is an `Extension`. Anything the curated prop surface doesn't special-case (other languages, custom themes, line-wrapping, autocomplete, linting, key-bindings) comes through the first-class `:extensions` passthrough, which the wrapper composes **last** so consumer extensions win CodeMirror's last-registered-wins facets. The per-leaf READMEs and the **Props** table below are generated from the same IR parse of `CodeMirror.rozie`, so they cannot drift from the compiled output — the package's `codegen.mjs` asserts the structural columns of this page against `ir.props` on every run.
@@ -173,11 +173,12 @@ el.addEventListener('value-change', (e) => {
 | --- | --- | --- | :---: | --- |
 | `value` | `String` | `""` | ✓ | The two-way document text. Typing in the editor writes back through the model path; a consumer write reflects into the live document (echo-guarded so a programmatic set doesn't ping-pong). This is the **only** change channel — there are no events. |
 | `language` | `String` | `"javascript"` | | Convenience language. `"javascript"` loads the bundled `@codemirror/lang-javascript`; any other value falls back to plain text (no syntax highlighting, no throw). Add other languages through `:extensions`. Runtime-updatable via a `langCompartment` reconfigure — switching the prop re-highlights without a remount. |
-| `theme` | `String` | `"light"` | | `"light"` (the editor default) or `"dark"` (the bundled `@codemirror/theme-one-dark`). Runtime-updatable via a `themeCompartment` reconfigure. Custom themes come through `:extensions`. |
+| `theme` | `String \| unknown` | `"light"` | | The built-in strings `"light"` (the editor default) or `"dark"` (the bundled `@codemirror/theme-one-dark`) **or** a CodeMirror `Extension` / `Extension[]` passed straight through (G3) — drop in `@uiw/codemirror-themes`, a `EditorView.theme({…})`, or any theme extension. A non-string `theme` is composed via the `themeCompartment`, so it reconfigures live with no remount, same as the strings. Custom themes also still work through `:extensions` (composed last). |
 | `readOnly` | `Boolean` | `false` | | Make the document read-only. Runtime-updatable via a `readOnlyCompartment` reconfigure. |
 | `height` | `Number` | `240` | | Editor height in pixels (applied to the wrapper's host box). |
 | `placeholder` | `String` | `""` | | Placeholder text shown when the document is empty (the bundled `@codemirror/view` `placeholder` extension). Empty string ⇒ no placeholder. Runtime-updatable via a `placeholderCompartment` reconfigure. |
 | `extensions` | `Array` | `[]` | | Consumer-extensible passthrough — an arbitrary `Extension[]` composed **last** so it wins CodeMirror's last-registered-wins facets (theme/keymap/language overrides). The CodeMirror 6 analog of an options bag: line-wrapping, autocomplete, linting, custom key-bindings, additional languages/themes — anything the curated props don't special-case. Runtime-reconfigurable via an `extensionsCompartment` (no remount when the array changes). |
+| `basicSetup` | `Boolean` | `false` | | When `true`, swap the thin manual baseline (line numbers + history + default/history keymaps) for CodeMirror 6's batteries-included [`basicSetup`](https://codemirror.net/docs/ref/#codemirror.basicSetup) bundle — autocomplete, search, bracket matching, code folding, lint gutter, and richer keymaps (G1). The curated `language` / `theme` / `readOnly` / `placeholder` / `extensions` props and the consumer `:extensions` still compose **after** it, so they continue to win. **Construction-time only:** `basicSetup` is read once when the editor is built (it is a large bundle, intentionally with no compartment), so **toggling it at runtime requires a re-mount** — set it as a fixed prop, don't flip it live. |
 
 There is **no Emits section.** CodeMirror's `updateListener` → two-way `value` path is the only change channel (consumers bind `r-model:value`). See [Why there is no `@change` event](#why-there-is-no-change-event).
 
