@@ -107,6 +107,36 @@ The default slot receives `{ item, index }`:
 
 To rename a slot param to a more readable local name in nested-template contexts, use the slot-param rename form `{ item: column }` — see [scoped slot params](/guide/features#slots-with-scoped-params).
 
+### Imperative handle
+
+Beyond props and the two-way `items` array, the component exposes imperative methods declared once in the Rozie source via `$expose`. Grab a handle with your framework's native ref mechanism (React `useRef` / Vue template ref / Svelte `bind:this` / Angular `viewChild` / Solid callback ref / the Lit custom element itself) and call them directly:
+
+| Method | Description |
+| --- | --- |
+| `getInstance` | Return the underlying SortableJS instance for direct API access — the raw-engine escape hatch (`save`, `closest`, … are one hop away). `null` before mount and after destroy. |
+| `toArray` | Return the current order as an array of `data-id` strings. Each row carries `data-id="<key>"` (the same [`itemKey`](#api)-derived key as the reconciler), so the array reflects the live key order. `[]` before mount. |
+| `sort` | Reorder the list by an array of `data-id` strings — `sort(order, useAnimation = true)`. |
+| `option` | Read or set a live SortableJS option — `option(name)` gets, `option(name, value)` sets. The runtime escape hatch for any SortableJS option beyond the curated props (and the construction-time-only ones, within SortableJS's own limits). |
+
+**React example:**
+
+```tsx
+import { useRef } from 'react';
+import { SortableList, type SortableListHandle } from '@rozie-ui/sortable-list-react';
+
+const sl = useRef<SortableListHandle>(null);
+// <SortableList ref={sl} itemKey="id" ... />
+const order = sl.current?.toArray();      // current key order
+sl.current?.option('disabled', true);     // disable at runtime
+const instance = sl.current?.getInstance(); // raw SortableJS instance
+```
+
+The four verb names are clear of all sixteen prop names and the five events (`option` is a distinct identifier from the `options` prop), so the `$expose` collision discipline (ROZ121) passes with no renames.
+
+::: tip `toArray` / `sort` rely on `data-id`
+Each rendered row carries `data-id="<key>"`, derived from [`itemKey`](#api) (falling back to the item value, then the index). Set `itemKey` for object lists so `toArray()` / `sort()` operate on stable keys rather than `"[object Object]"`.
+:::
+
 ## Recipes
 
 ### Drag handle

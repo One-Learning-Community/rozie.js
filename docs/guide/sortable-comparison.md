@@ -35,7 +35,7 @@ Per-framework column = the de-facto leader for that framework (React = `@dnd-kit
 | **Two-way bound data array** | ❌⁵ | ✅ (`v-model`) | ~ (consider/finalize) | ❌⁵ | ❌⁵ | hand-roll | ✅ `r-model:items` |
 | Custom drag handle | ✅ | ✅ | ✅ | ✅ | ~ | hand-roll | ✅ `$classSelector` |
 | Framework-native per-row slot/render | ✅ | ✅ | ✅ | ✅ | ✅ | hand-roll | ✅ scoped slot |
-| Imperative handle | ~ (context/sensors) | ~ (instance) | ~ | ~ (`CdkDropList`) | ~ | hand-roll | ❌⁶ |
+| Imperative handle | ~ (context/sensors) | ~ (instance) | ~ | ~ (`CdkDropList`) | ~ | hand-roll | ✅⁶ 4-verb `$expose` |
 | Latest-framework support | React 19 | Vue 3 | **Svelte 5** | Angular 21 | Solid 1.x (stale) | — | R18+/V3.4+/Sv5/Ng19+/Solid/Lit |
 | Actively maintained | ✅ (~2 yr cadence) | ~ | ✅ | ✅ | ❌ | — | ✅ |
 | One source → all 6 frameworks | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
@@ -48,7 +48,7 @@ Per-framework column = the de-facto leader for that framework (React = `@dnd-kit
 
 ⁵ **No two-way data binding.** `@dnd-kit`, `@angular/cdk`, and `@thisbeyond/solid-dnd` hand you a drag-end event (`onDragEnd` / `cdkDropListDropped` / drag store) and you mutate state yourself (CDK ships a `moveItemInArray` helper, but you call it). `vuedraggable` is the exception with real `v-model`. Rozie gives every target a two-way `items` array — pass an array, get a reordered array back, no manual `onChange → setState` wiring.
 
-⁶ **Rozie's `SortableList` has no `$expose` imperative handle** — it predates the Phase-21 `$expose` capability that every other `@rozie-ui` port ships. See [G1](#gap-status-what-shipped-what-s-still-deferred).
+⁶ **Rozie's `SortableList` now ships a uniform `$expose` imperative handle** — `getInstance` (raw SortableJS instance escape hatch) / `toArray` / `sort` / `option` — the *same* four verbs on all six targets, grabbed with each framework's native ref mechanism. The competitors all expose *something* (the dnd-kit context, the SortableJS instance, `CdkDropList`), but each its own way and per-framework; Rozie's is one shape everywhere. See [G1](#gap-status-what-shipped-what-s-still-deferred).
 
 ## Where Rozie wins today
 
@@ -57,6 +57,7 @@ Per-framework column = the de-facto leader for that framework (React = `@dnd-kit
 - **Two-way bound `items` array** (`r-model:items`) on all six — the thing every dnd-kit / CDK / solid-dnd consumer wires by hand. Pass an array, render rows through the scoped default slot, get the reordered array back.
 - **Cross-list sync + nesting from one source** — `SortableListPair` (atomic transfer across two bound arrays) and `SortableListNested` / `KanbanColumn` (reorderable columns of reorderable cards), the same `.rozie` compiled to all six targets.
 - **Custom drag handles via `$classSelector`** — resolves on every target including React's scoped-CSS (authored class names render literally; `$classSelector` lowers to the literal `".grip"` per target and typo-checks it against your `<style>` at compile time).
+- **A uniform imperative handle** (`$expose`) — `getInstance` / `toArray` / `sort` / `option`, the *same* four verbs on all six targets, grabbed with each framework's native ref. `getInstance()` is the raw-SortableJS escape hatch, so the full engine API is one hop away. The competitors all expose *something* (the dnd-kit context, the SortableJS instance, `CdkDropList`) — but each its own way, per framework. See the [showcase Imperative handle section](/guide/sortable-list#imperative-handle).
 - **The hard part solved once** — the SortableJS-direct-DOM-mutation-vs-framework-reconciler dance (the reason these wrappers exist at all) is encapsulated in `useSortableJS()` plus the [`$reconcileAfterDomMutation()`](/guide/features#r-external-and-reconcileafterdommutation-—-dom-the-framework-doesn-t-own) sigil, hardened against SortableJS's fragile fallback-mode event shapes, across all six keyed reconcilers.
 
 The ✅ cells in Rozie's row are pinned per target by the [sortable-drag VR spec](https://github.com/One-Learning-Community/rozie.js/blob/main/tests/visual-regression/specs/sortable-drag.spec.ts) — which measures *Rozie's* behavior across targets and says nothing measured about the competitors' behavior.
@@ -67,7 +68,7 @@ This page concedes where the standalone libraries are genuinely ahead — that's
 
 | Gap | Who has it | Severity | Rozie status |
 | --- | --- | --- | --- |
-| **G1 — Imperative `$expose` handle** | `@dnd-kit` (sensors/context), CDK (`CdkDropList`) | **Medium** | **⏳ Deferred** — `SortableList` predates the Phase-21 `$expose` capability, so there is no uniform handle to reach the SortableJS instance or trigger a programmatic sort. Every other `@rozie-ui` port ships `$expose`; this is the holdout. |
+| **G1 — Imperative `$expose` handle** | `@dnd-kit` (sensors/context), CDK (`CdkDropList`) | **Medium** | **✅ SHIPPED** — a uniform 4-verb handle (`getInstance` / `toArray` / `sort` / `option`) on all six targets, the same shape everywhere, grabbed with each framework's native ref. `getInstance()` is the raw-SortableJS escape hatch; rows now carry `data-id` so `toArray()` / `sort()` operate on the rendered key order. See the [showcase Imperative handle section](/guide/sortable-list#imperative-handle). |
 | G2 — Live reconcile of construction-time knobs | (engine-level) | Low | **⏳ Deferred (by design)** — `forceFallback` / `swapThreshold` / `cloneable` are construction-time-only SortableJS knobs; changing them at runtime requires re-keying the component (the [documented re-mount pattern](/guide/sortable-list#remount-on-construction-time-only-changes)). The runtime-updatable props *are* live-reconciled via `instance.option()`. |
 | G3 — List virtualization for large datasets | `@dnd-kit` (+ virtualizers) | Medium | **⏳ Deferred** — SortableJS renders all rows; very large lists want windowing. dnd-kit composes with `@tanstack/virtual`; Rozie has no virtualization story yet. |
 | G4 — Multi-select / multi-drag | `@dnd-kit`, SortableJS MultiDrag plugin | Low | **⏳ Deferred** — SortableJS's `MultiDrag` plugin is not mounted, so dragging multiple rows at once isn't wired. (Plain SortableJS options pass through via `:options`; plugins need a mount Rozie doesn't yet bridge.) |
@@ -76,7 +77,6 @@ This page concedes where the standalone libraries are genuinely ahead — that's
 ## Honest caveats
 
 - **Modern React leans dnd-kit, not SortableJS.** `@dnd-kit` (~17.0M/wk) is the React drag-and-drop standard in 2026 — sensors, virtualization, a rich ecosystem — and `react-beautiful-dnd` (~2.32M/wk), though deprecated/archived, is still everywhere. Rozie wraps **SortableJS**, a different engine with a simpler DOM-mutation model and its own tradeoffs. For a single-React app that needs virtualization or dnd-kit's sensor model, dnd-kit is the better pick. Rozie's value is cross-framework reach plus the keyboard / a11y / two-way contract from one source — not "better than dnd-kit on React."
-- **No imperative handle yet (G1).** This is the one place `@rozie-ui/sortable-list` is behind its own sibling ports; it's the top roadmap item for this component.
 - **Angular CDK and svelte-dnd-action are first-rate native toolkits.** CDK (first-party, connected lists, keyboard) and svelte-dnd-action (FLIP animations, Svelte 5, actively maintained) are excellent *single-framework* choices. The matrix scores cross-framework reach, not single-framework ergonomics.
 - **`@rozie-ui/sortable-list` is `0.1.0`.** The surface (17 props / 5 events / scoped row slot) is stable and VR-pinned, but younger than the established libraries — and it inherits SortableJS's engine-level limitations (touch-fallback fragility, no windowing) along with its strengths.
 
