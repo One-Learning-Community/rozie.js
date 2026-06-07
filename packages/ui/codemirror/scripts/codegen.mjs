@@ -40,7 +40,7 @@
  *      ROZIE_CODEMIRROR_SKIP_GUIDE escape hatch relaxes the throw to a skip
  *      — see the step-(5) block.)
  */
-import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { compile, createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
 import { handleManifest } from './handle-manifest.mjs';
@@ -179,7 +179,17 @@ function main() {
       // sidecar whenever it is present so that import resolves; without it the
       // regenerated leaf imports a non-existent file (the cm-* engine rules went
       // dead→live in Phase 34-03, so this path activated for the first time).
-      if (r.globalCss) writeFileSync(resolve(leafSrc, 'CodeMirror.global.css'), r.globalCss);
+      // WR-03 — keep the sidecar in lockstep with the emit. If a future
+      // .rozie edit removes all nested-:root engine rules, r.globalCss becomes
+      // null and the emitted .tsx drops its `import './CodeMirror.global.css'`.
+      // Without this cleanup the previously-written (committed) sidecar would
+      // linger on disk — a stale, unreferenced CSS file shipped in the tarball.
+      const globalCssPath = resolve(leafSrc, 'CodeMirror.global.css');
+      if (r.globalCss) {
+        writeFileSync(globalCssPath, r.globalCss);
+      } else if (existsSync(globalCssPath)) {
+        rmSync(globalCssPath);
+      }
       if (r.types) writeFileSync(resolve(leafSrc, 'CodeMirror.d.ts'), r.types);
     }
 
