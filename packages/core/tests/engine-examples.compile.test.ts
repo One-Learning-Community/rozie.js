@@ -37,6 +37,10 @@ const PKG_WRAPPER_SRC: Record<string, string> = {
   // Phase 32 — TipTap.rozie moved into @rozie-ui/tiptap and expanded feature-rich
   // (8 props / 4 events / 14 $expose / 1 toolbar portal slot).
   'TipTap.rozie': 'packages/ui/tiptap/src/TipTap.rozie',
+  // Phase 35 — MapLibre.rozie lives in @rozie-ui/maplibre (25 props / 22 emits /
+  // 3 slots [marker + popup reactive multi-instance portals, control mount-once]
+  // / 8 $expose). The WebGL-map two-way-camera + reactive-portal-slot archetype.
+  'MapLibre.rozie': 'packages/ui/maplibre/src/MapLibre.rozie',
 };
 function resolveEngineWrapper(file: string): string {
   const pkg = PKG_WRAPPER_SRC[file];
@@ -66,6 +70,12 @@ const ENGINE_WRAPPERS = [
   // value flows; consumer edits flow back via an `updateListener` extension,
   // not a DOM input event.
   'CodeMirror.rozie',
+  // MapLibre (Phase 35) — r-model:center/zoom two-way camera through a WebGL map
+  // engine. The [lng, lat]-ordered two-way-binding archetype; camera moves flow
+  // back via the engine's moveend/zoomend (echo-guarded), and the marker/popup
+  // reactive multi-instance portal slots + the control mount-once portal exercise
+  // all three portal-slot shapes in one wrapper.
+  'MapLibre.rozie',
 ] as const;
 
 // Multi-file consumer demos. Each imports its sibling engine wrapper via
@@ -108,6 +118,16 @@ const ENGINE_DEMOS = [
   // surfaces in this fast gate. Behavioral-only (selection-driven menus are
   // capture-unstable), so it is NOT a VR screenshot cell.
   'demos/TipTapBubbleMenuDemo.rozie',
+  // Phase 35 (maplibre) — the content-stable SCREENSHOT consumer (OFFLINE style
+  // object + fixed center/zoom + fadeDuration:0/attributionControl:false/
+  // interactive:false, NO controls/markers/interaction) and the BEHAVIORAL
+  // consumer (r-model:center/zoom two-way camera + :controls navigation + the
+  // reactive `marker` portal-slot fill + the mount-once `control` portal-slot
+  // fill). Both import ../../packages/ui/maplibre/src/MapLibre.rozie; compiled
+  // here so a per-target consumer-side regression (notably the marker + control
+  // slot fills across all 6 targets) surfaces in this fast gate.
+  'demos/MapLibreScreenshotDemo.rozie',
+  'demos/MapLibreDemo.rozie',
 ] as const;
 
 describe('engine-wrapper examples — cross-target compile gate', () => {

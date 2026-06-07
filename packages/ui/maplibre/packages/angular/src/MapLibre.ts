@@ -59,12 +59,12 @@ export class MapLibre {
   zoom = model<number>(1);
   bearing = model<number>(0);
   pitch = model<number>(0);
-  mapStyle = input<unknown>('https://demotiles.maplibre.org/style.json');
-  minZoom = input<number>(undefined);
-  maxZoom = input<number>(undefined);
+  mapStyle = input<unknown>(undefined);
+  minZoom = input<number>(0);
+  maxZoom = input<number>(22);
   maxBounds = input<unknown>(undefined);
   bounds = input<unknown>(undefined);
-  fitBoundsOptions = input<Record<string, any>>(undefined);
+  fitBoundsOptions = input<Record<string, any>>((() => ({}))());
   dragPan = input<boolean>(true);
   dragRotate = input<boolean>(true);
   scrollZoom = input<boolean>(true);
@@ -84,9 +84,7 @@ export class MapLibre {
   load = output<unknown>();
   idle = output<unknown>();
   move = output<unknown>();
-  zoom = output<unknown>();
   rotate = output<unknown>();
-  pitch = output<unknown>();
   dragstart = output<unknown>();
   drag = output<unknown>();
   dragend = output<unknown>();
@@ -173,7 +171,7 @@ export class MapLibre {
       // tracking and re-apply once the new style loads.
       this.appliedLayerIds = [];
       this.appliedSourceIds = [];
-      this.instance.setStyle(v);
+      this.instance.setStyle(v ?? this.DEFAULT_STYLE);
       this.instance.once('styledata', () => this.applyLayers());
     })(__watchVal); }); });
     effect(() => { const __watchVal = (() => this.minZoom())(); untracked(() => { if (this.__rozieWatchInitial_5) { this.__rozieWatchInitial_5 = false; return; } ((v: any) => {
@@ -273,6 +271,14 @@ export class MapLibre {
     };
     const el = this.containerEl()?.nativeElement;
 
+    // seed the null-let tracking arrays (declared null so typeNeutralize types them
+    // `any`; the reconcile/teardown code only runs after this mount init).
+    // seed the null-let tracking arrays (declared null so typeNeutralize types them
+    // `any`; the reconcile/teardown code only runs after this mount init).
+    this.controlInstances = [];
+    this.appliedLayerIds = [];
+    this.appliedSourceIds = [];
+
     // mapOptions is a null-let so the bundled-leaf typeNeutralize pass annotates it
     // `any` — MapLibre's MapOptions strict-types center (LngLatLike tuple), style
     // (string|StyleSpecification) and maxBounds/bounds (LngLatBoundsLike), which the
@@ -291,7 +297,7 @@ export class MapLibre {
     mapOptions = {
       container: el,
       ...this.options(),
-      style: this.mapStyle(),
+      style: this.mapStyle() ?? this.DEFAULT_STYLE,
       center: this.center(),
       zoom: this.zoom(),
       bearing: this.bearing(),
@@ -313,13 +319,25 @@ export class MapLibre {
     this.instance = new maplibregl.Map(mapOptions);
 
     // ─── forward map events ─────────────────────────────────────────────────
+    // NOTE: the CONTINUOUS `zoom` and `pitch` events are deliberately NOT forwarded
+    // — `zoom` and `pitch` are also two-way `model: true` camera props, and a same-
+    // named emit collides with the model on Vue (defineModel vs defineEmits) and
+    // Angular (ModelSignal vs OutputEmitterRef). The two-way binding already conveys
+    // zoom/pitch changes; consumers wanting an event get the terminal `zoomend` /
+    // `pitchend` below. `move`/`rotate` have no such clash (the models are `center`
+    // and `bearing`, not `move`/`rotate`), so those continuous events stay.
     // ─── forward map events ─────────────────────────────────────────────────
+    // NOTE: the CONTINUOUS `zoom` and `pitch` events are deliberately NOT forwarded
+    // — `zoom` and `pitch` are also two-way `model: true` camera props, and a same-
+    // named emit collides with the model on Vue (defineModel vs defineEmits) and
+    // Angular (ModelSignal vs OutputEmitterRef). The two-way binding already conveys
+    // zoom/pitch changes; consumers wanting an event get the terminal `zoomend` /
+    // `pitchend` below. `move`/`rotate` have no such clash (the models are `center`
+    // and `bearing`, not `move`/`rotate`), so those continuous events stay.
     this.instance.on('load', (e: any) => this.load.emit(e));
     this.instance.on('idle', (e: any) => this.idle.emit(e));
     this.instance.on('move', (e: any) => this.move.emit(e));
-    this.instance.on('zoom', (e: any) => this.zoom.emit(e));
     this.instance.on('rotate', (e: any) => this.rotate.emit(e));
-    this.instance.on('pitch', (e: any) => this.pitch.emit(e));
     this.instance.on('dragstart', (e: any) => this.dragstart.emit(e));
     this.instance.on('drag', (e: any) => this.drag.emit(e));
     this.instance.on('dragend', (e: any) => this.dragend.emit(e));
@@ -533,17 +551,18 @@ export class MapLibre {
   }
 
   instance: any = null;
+  DEFAULT_STYLE = 'https://demotiles.maplibre.org/style.json';
   PROGRAMMATIC = {
     rozieProgrammatic: true
   };
   markerEntries = new Map();
   popupEntries = new Map();
-  controlInstances = [];
+  controlInstances: any = null;
   controlDispose: any = null;
   customControl: any = null;
   featureListeners = new Map();
-  appliedLayerIds = [];
-  appliedSourceIds = [];
+  appliedLayerIds: any = null;
+  appliedSourceIds: any = null;
   reconcileMarkers: any = null;
   reconcilePopups: any = null;
   reconcileInteractive: any = null;

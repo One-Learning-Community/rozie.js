@@ -40,12 +40,12 @@ el.addEventListener('click', (e) => console.log(e.detail.lngLat));
 | `zoom` | `Number` | `1` | ✓ |  |
 | `bearing` | `Number` | `0` | ✓ |  |
 | `pitch` | `Number` | `0` | ✓ |  |
-| `mapStyle` | `unknown` | `"https://demotiles.maplibre.org/style.json"` |  |  |
-| `minZoom` | `Number` | `undefined` |  |  |
-| `maxZoom` | `Number` | `undefined` |  |  |
+| `mapStyle` | `unknown` | `undefined` |  |  |
+| `minZoom` | `Number` | `0` |  |  |
+| `maxZoom` | `Number` | `22` |  |  |
 | `maxBounds` | `unknown` | `undefined` |  |  |
 | `bounds` | `unknown` | `undefined` |  |  |
-| `fitBoundsOptions` | `Object` | `undefined` |  |  |
+| `fitBoundsOptions` | `Object` | `{}` |  |  |
 | `dragPan` | `Boolean` | `true` |  |  |
 | `dragRotate` | `Boolean` | `true` |  |  |
 | `scrollZoom` | `Boolean` | `true` |  |  |
@@ -69,9 +69,7 @@ el.addEventListener('click', (e) => console.log(e.detail.lngLat));
 | `load` | |
 | `idle` | |
 | `move` | |
-| `zoom` | |
 | `rotate` | |
-| `pitch` | |
 | `dragstart` | |
 | `drag` | |
 | `dragend` | |

@@ -235,6 +235,23 @@ export const EXAMPLES = [
   // custom nodes); registered in matrix.spec.ts (auto-fixme until the Linux PNG).
   'TipTapNodeView',
   'TipTapNodeViewScreenshot',
+  // Phase 35 (maplibre) — the WebGL-map two-way-camera + portal-slot proving
+  // cells. MapLibre is the BEHAVIORAL cell (loader →
+  // examples/demos/MapLibreDemo.rozie, which imports
+  // ../../packages/ui/maplibre/src/MapLibre.rozie). It binds r-model:center/zoom
+  // to $data (live readout), passes an OFFLINE style object (network-free — CI
+  // has no network), renders a navigation control, fills the REACTIVE
+  // multi-instance `marker` portal slot (3 pins) and the MOUNT-ONCE `control`
+  // portal slot. Built for all 6 targets but NOT a screenshot cell — covered by
+  // maplibre-map.spec.ts (structural/behavioral assertions, no screenshot — like
+  // leaflet-map.spec.ts), deliberately NOT in matrix.spec.ts EXAMPLES.
+  // MapLibreScreenshot is the content-STABLE pixel cell (loader →
+  // examples/demos/MapLibreScreenshotDemo.rozie): the OFFLINE colored-polygon
+  // style + fixed center/zoom + fadeDuration:0/attributionControl:false/
+  // interactive:false, NO controls/markers/interaction — registered in
+  // matrix.spec.ts (auto-fixme until the Linux PNG lands).
+  'MapLibre',
+  'MapLibreScreenshot',
 ] as const;
 
 export type Example = (typeof EXAMPLES)[number];
@@ -326,6 +343,11 @@ export const LIT_TAGS: Record<Example, string> = {
   // kebab of TipTapNodeViewDemo / TipTapNodeViewScreenshotDemo.
   TipTapNodeView: 'rozie-tip-tap-node-view',
   TipTapNodeViewScreenshot: 'rozie-tip-tap-node-view-screenshot',
+  // Phase 35 (maplibre) — the lit entry appends '-demo' → tags
+  // 'rozie-map-libre-demo' / 'rozie-map-libre-screenshot-demo' = kebab of
+  // MapLibreDemo / MapLibreScreenshotDemo.
+  MapLibre: 'rozie-map-libre',
+  MapLibreScreenshot: 'rozie-map-libre-screenshot',
 };
 
 export interface HostQuery {
@@ -459,6 +481,14 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // nodeView slot. No parent props needed.
   TipTapNodeView: {},
   TipTapNodeViewScreenshot: {},
+  // Phase 35 — both MapLibre demos are self-contained: MapLibreDemo seeds its
+  // center/zoom/markers in <data> and the OFFLINE_STYLE in <script>;
+  // MapLibreScreenshotDemo hardcodes the OFFLINE_STYLE + fixed center/zoom in
+  // <script>. The demos bind center/zoom via r-model internally (not
+  // parent-supplied), so no MODEL_PROPS entry — matching the FullCalendar/
+  // CodeMirror precedent. No parent props needed.
+  MapLibre: {},
+  MapLibreScreenshot: {},
 };
 
 /**

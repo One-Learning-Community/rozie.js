@@ -68,17 +68,24 @@
   bearing:         { type: Number,  default: 0,            model: true },
   pitch:           { type: Number,  default: 0,            model: true },
   // mapStyle (NOT `style` — reserved attr across targets). StyleSpecification
-  // object OR a style URL. Default = MapLibre's official no-token demo tiles so
-  // the component "just works" with zero config; pass an offline style object for
-  // network-free / deterministic rendering. No `type:` so it accepts string|object.
-  mapStyle:        { default: 'https://demotiles.maplibre.org/style.json' },
-  minZoom:         { type: Number,  default: undefined },
-  maxZoom:         { type: Number,  default: undefined },
-  // LngLatBoundsLike — no `type:` (array-of-arrays or LngLatBounds).
+  // object OR a style URL. No `type:` so it accepts string|object → emits as
+  // `unknown`; the default is therefore `undefined` (Vue's withDefaults rejects a
+  // raw string default on an `unknown`-typed prop) and the actual demo-tiles
+  // fallback (so the component "just works" with zero config) is applied in-script
+  // via DEFAULT_STYLE. Pass an offline style object for network-free rendering.
+  mapStyle:        { default: undefined },
+  // 0 / 22 are MapLibre's own min/maxZoom defaults — concrete (not `undefined`)
+  // so the strict-tsc props-merge stays `number` (a `default: undefined` on a
+  // typed prop emits a `number | undefined` that fails the framework-typecheck
+  // harness; passing the engine's own defaults is behavior-preserving).
+  minZoom:         { type: Number,  default: 0 },
+  maxZoom:         { type: Number,  default: 22 },
+  // LngLatBoundsLike — no `type:` (array-of-arrays or LngLatBounds). Untyped →
+  // `unknown`, so `default: undefined` merges cleanly (no number-vs-undefined clash).
   maxBounds:       { default: undefined },
   // construction-only initial fit (overrides center/zoom when set).
   bounds:          { default: undefined },
-  fitBoundsOptions:{ type: Object,  default: undefined },
+  fitBoundsOptions:{ type: Object,  default: () => ({}) },
   // interaction toggles — applied at construction + reconciled at runtime via
   // map.<handler>.enable()/disable().
   dragPan:         { type: Boolean, default: true },
@@ -113,6 +120,10 @@ import maplibregl from 'maplibre-gl'
 
 let instance = null
 
+// MapLibre's official no-token demo tiles — the zero-config `mapStyle` fallback
+// (the prop default is `undefined`; see the prop note).
+const DEFAULT_STYLE = 'https://demotiles.maplibre.org/style.json'
+
 // The eventData merged onto programmatic camera ops so the camera-lifecycle echo
 // handlers can ignore our own moves (the documented MapLibre echo-guard — robust
 // across batched ops where Leaflet's single boolean would race).
@@ -125,17 +136,21 @@ const PROGRAMMATIC = { rozieProgrammatic: true }
 const markerEntries = new Map()
 const popupEntries = new Map()
 // standard-control instances (so a controls-prop change can remove + re-add) and
-// the mount-once custom-control portal dispose.
-let controlInstances = []
+// the mount-once custom-control portal dispose. controlInstances is a null-let
+// (→ typeNeutralize `any`) initialized to [] in $onMount: a bare `let x = []`
+// infers `never[]` under the strict framework-typecheck harness and rejects the
+// `any` control instances pushed into it.
+let controlInstances = null
 let controlDispose = null
 let customControl = null
 // layer-scoped feature listeners, registered per interactiveLayerId so they can
 // be unregistered on change. id → { enter, leave }.
 const featureListeners = new Map()
-// previously-applied source/layer ids, so a sources/layers prop change can remove
+// previously-applied source/layer ids (null-lets → `any`, [] in $onMount; same
+// never[] reason as controlInstances) so a sources/layers prop change can remove
 // the dropped ones.
-let appliedLayerIds = []
-let appliedSourceIds = []
+let appliedLayerIds = null
+let appliedSourceIds = null
 
 // The $portals/$emit-capturing reconcilers are built INSIDE $onMount (a top-level
 // $portals reference fails the bundled-leaf strict typecheck — the CM/TipTap
@@ -243,6 +258,12 @@ const applyLayers = () => {
 $onMount(() => {
   const el = $refs.containerEl
 
+  // seed the null-let tracking arrays (declared null so typeNeutralize types them
+  // `any`; the reconcile/teardown code only runs after this mount init).
+  controlInstances = []
+  appliedLayerIds = []
+  appliedSourceIds = []
+
   // mapOptions is a null-let so the bundled-leaf typeNeutralize pass annotates it
   // `any` — MapLibre's MapOptions strict-types center (LngLatLike tuple), style
   // (string|StyleSpecification) and maxBounds/bounds (LngLatBoundsLike), which the
@@ -254,7 +275,7 @@ $onMount(() => {
   mapOptions = {
     container: el,
     ...$snapshot($props.options),
-    style: $snapshot($props.mapStyle),
+    style: $snapshot($props.mapStyle) ?? DEFAULT_STYLE,
     center: $props.center,
     zoom: $props.zoom,
     bearing: $props.bearing,
@@ -276,12 +297,17 @@ $onMount(() => {
   instance = new maplibregl.Map(mapOptions)
 
   // ─── forward map events ─────────────────────────────────────────────────
+  // NOTE: the CONTINUOUS `zoom` and `pitch` events are deliberately NOT forwarded
+  // — `zoom` and `pitch` are also two-way `model: true` camera props, and a same-
+  // named emit collides with the model on Vue (defineModel vs defineEmits) and
+  // Angular (ModelSignal vs OutputEmitterRef). The two-way binding already conveys
+  // zoom/pitch changes; consumers wanting an event get the terminal `zoomend` /
+  // `pitchend` below. `move`/`rotate` have no such clash (the models are `center`
+  // and `bearing`, not `move`/`rotate`), so those continuous events stay.
   instance.on('load',       (e) => $emit('load', e))
   instance.on('idle',       (e) => $emit('idle', e))
   instance.on('move',       (e) => $emit('move', e))
-  instance.on('zoom',       (e) => $emit('zoom', e))
   instance.on('rotate',     (e) => $emit('rotate', e))
-  instance.on('pitch',      (e) => $emit('pitch', e))
   instance.on('dragstart',  (e) => $emit('dragstart', e))
   instance.on('drag',       (e) => $emit('drag', e))
   instance.on('dragend',    (e) => $emit('dragend', e))
@@ -480,7 +506,7 @@ $watch(() => $props.mapStyle, (v) => {
   // tracking and re-apply once the new style loads.
   appliedLayerIds = []
   appliedSourceIds = []
-  instance.setStyle($snapshot(v))
+  instance.setStyle($snapshot(v) ?? DEFAULT_STYLE)
   instance.once('styledata', () => applyLayers())
 })
 $watch(() => $props.minZoom, (v) => { if (instance && typeof v === 'number') instance.setMinZoom(v) })

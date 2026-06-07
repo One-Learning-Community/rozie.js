@@ -2,7 +2,7 @@
 
 `MapLibre` is Rozie's data-bound port of [MapLibre GL JS](https://maplibre.org/maplibre-gl-js/docs/) — the open-source (BSD-3) WebGL map engine, the community fork of Mapbox GL JS v1. One `.rozie` source file ships idiomatic React, Vue, Svelte, Angular, Solid, and Lit consumers from a single wrapper. The per-framework ecosystem is **uneven**: [react-map-gl / @vis.gl/react-maplibre](https://visgl.github.io/react-map-gl/) is deep, [@indoorequal/vue-maplibre-gl](https://indoorequal.github.io/vue-maplibre-gl/), [svelte-maplibre-gl](https://svelte-maplibre-gl.mierune.dev/) and [@maplibre/ngx-maplibre-gl](https://maplibre.org/ngx-maplibre-gl/) are solid — but **Solid has only a stale/Mapbox-first option and Lit has no real wrapper at all**. Rozie collapses all six into one source, and Solid + Lit get a category-leading wrapper for free. See the [MapLibre libraries comparison](/guide/maplibre-comparison) for the full per-framework matrix.
 
-This page is the **show-and-tell**: the API surface, per-framework quick starts, the 22 map events, the four two-way camera bindings, the imperative handle, the consumer-extensible `:sources` / `:layers` / `:options` passthroughs, and the per-target recipe for the reactive `marker` / `popup` portal slots and the mount-once `control` slot.
+This page is the **show-and-tell**: the API surface, per-framework quick starts, the 20 map events, the four two-way camera bindings, the imperative handle, the consumer-extensible `:sources` / `:layers` / `:options` passthroughs, and the per-target recipe for the reactive `marker` / `popup` portal slots and the mount-once `control` slot.
 
 The full source for `MapLibre.rozie` lives in the [`@rozie-ui/maplibre` package](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/maplibre/src/MapLibre.rozie).
 
@@ -189,12 +189,12 @@ The four camera props (`center` / `zoom` / `bearing` / `pitch`) are **two-way** 
 | `zoom` | `Number` | `1` | ✓ | The zoom level. Two-way: scroll / pinch writes the new zoom back; a consumer write `easeTo`s the camera. Echo-guarded against the wrapper's own programmatic moves. |
 | `bearing` | `Number` | `0` | ✓ | The map rotation (bearing) in degrees. Two-way via the `rotateend` echo / `easeTo` reconcile. |
 | `pitch` | `Number` | `0` | ✓ | The map tilt (pitch) in degrees. Two-way via the `pitchend` echo / `easeTo` reconcile. |
-| `mapStyle` | `unknown` | `"https://demotiles.maplibre.org/style.json"` | | The map style — a [StyleSpecification](https://maplibre.org/maplibre-style-spec/) object **or** a style-URL string. Named `mapStyle` (not `style`) because `style` is a reserved attribute across the targets — `react-map-gl` and `vue-maplibre-gl` use the same name for the same reason. Defaults to MapLibre's official no-token demo tiles, so the component "just works" with zero config. Changing it calls `setStyle` and re-applies your `:sources` / `:layers` once the new style loads. |
-| `minZoom` | `Number` | `undefined` | | Minimum zoom level. Applied at construction and via `setMinZoom` on change. |
-| `maxZoom` | `Number` | `undefined` | | Maximum zoom level. Applied at construction and via `setMaxZoom` on change. |
+| `mapStyle` | `unknown` | `undefined` | | The map style — a [StyleSpecification](https://maplibre.org/maplibre-style-spec/) object **or** a style-URL string. Named `mapStyle` (not `style`) because `style` is a reserved attribute across the targets — `react-map-gl` and `vue-maplibre-gl` use the same name for the same reason. Defaults to MapLibre's official no-token demo tiles, so the component "just works" with zero config. Changing it calls `setStyle` and re-applies your `:sources` / `:layers` once the new style loads. |
+| `minZoom` | `Number` | `0` | | Minimum zoom level. Applied at construction and via `setMinZoom` on change. |
+| `maxZoom` | `Number` | `22` | | Maximum zoom level. Applied at construction and via `setMaxZoom` on change. |
 | `maxBounds` | `unknown` | `undefined` | | A [`LngLatBoundsLike`](https://maplibre.org/maplibre-gl-js/docs/API/types/LngLatBoundsLike/) the camera is constrained to. Applied via `setMaxBounds` on change (pass `undefined` to clear). |
 | `bounds` | `unknown` | `undefined` | | **Construction-only** initial fit — a `LngLatBoundsLike` the map fits to on mount (overrides `center` / `zoom` when set). Pair with `fitBoundsOptions`. |
-| `fitBoundsOptions` | `Object` | `undefined` | | **Construction-only** options for the initial `bounds` fit (padding, max-zoom, etc.). |
+| `fitBoundsOptions` | `Object` | `{}` | | **Construction-only** options for the initial `bounds` fit (padding, max-zoom, etc.). |
 | `dragPan` | `Boolean` | `true` | | Toggle drag-to-pan. Applied at construction and reconciled live via the handler's `enable()` / `disable()`. |
 | `dragRotate` | `Boolean` | `true` | | Toggle right-drag / ctrl-drag rotation. Live-reconciled. |
 | `scrollZoom` | `Boolean` | `true` | | Toggle scroll-wheel zoom. Live-reconciled. |
@@ -213,19 +213,17 @@ The four camera props (`center` / `zoom` / `bearing` / `pitch`) are **two-way** 
 
 ### Events
 
-MapLibre is event-ful, and the wrapper forwards **22** structured events. The four camera-lifecycle events (`moveend` / `zoomend` / `rotateend` / `pitchend`) also drive the two-way camera model; the pointer events (`click` / `dblclick` / `contextmenu` / `mousemove` / `mouseenter` / `mouseleave`) carry a structured payload (`{ lngLat, point, features, originalEvent }`) so the raw engine event (with its circular `target: Map`) is never handed to consumers.
+MapLibre is event-ful, and the wrapper forwards **20** structured events. The four camera-lifecycle events (`moveend` / `zoomend` / `rotateend` / `pitchend`) also drive the two-way camera model; the pointer events (`click` / `dblclick` / `contextmenu` / `mousemove` / `mouseenter` / `mouseleave`) carry a structured payload (`{ lngLat, point, features, originalEvent }`) so the raw engine event (with its circular `target: Map`) is never handed to consumers.
 
 | Event | Payload | Fires when |
 | --- | --- | --- |
 | `load` | engine event | The map's style and initial resources finish loading. |
 | `move` | engine event | The camera is moving (fires continuously during pan / zoom). |
 | `moveend` | engine event | A camera move ends. Also drives the two-way `center` / `zoom` model (echo-guarded). |
-| `zoom` | engine event | The zoom level is changing. |
-| `zoomend` | engine event | A zoom change ends. Drives the two-way `zoom` model. |
+| `zoomend` | engine event | A zoom change ends. Drives the two-way `zoom` model. (The continuous `zoom` event is **not** emitted — it would collide with the `zoom` model prop on Vue/Angular; track zoom via `r-model:zoom` or `zoomend`.) |
 | `rotate` | engine event | The bearing is changing. |
 | `rotateend` | engine event | A rotation ends. Drives the two-way `bearing` model. |
-| `pitch` | engine event | The pitch is changing. |
-| `pitchend` | engine event | A pitch change ends. Drives the two-way `pitch` model. |
+| `pitchend` | engine event | A pitch change ends. Drives the two-way `pitch` model. (The continuous `pitch` event is **not** emitted — same `pitch`-model collision; track pitch via `r-model:pitch` or `pitchend`.) |
 | `dragstart` | engine event | A drag-pan starts. |
 | `drag` | engine event | The map is being dragged. |
 | `dragend` | engine event | A drag-pan ends. |

@@ -220,6 +220,20 @@ export default defineConfig(async () => {
     'tiptap',
     'src',
   );
+  // Same move as tiptap (Phase 35): MapLibre.rozie lives in @rozie-ui/maplibre.
+  // The Angular sub-build must walk it too (MapLibreDemo's `imports: [MapLibre]`
+  // would otherwise collapse to `any[]` → empty mount). Lockstep with
+  // tsconfig.app.json `include` + build-cells.mjs `MAPLIBRE_SRC` sweep. NO
+  // `maplibre-gl` ESM-interop alias needed (maplibre-gl ships clean ESM).
+  const mapLibreSrc = resolve(
+    __dirname,
+    '..',
+    '..',
+    'packages',
+    'ui',
+    'maplibre',
+    'src',
+  );
   // @fullcalendar/list ESM-entry alias (see optimizeDeps note below). The
   // package's CJS build does `exports["default"] = plugin` without
   // `__esModule`, so a default ES import bundled through the CJS-interop path
@@ -276,10 +290,10 @@ export default defineConfig(async () => {
     // The other targets' `.rozie.ts/.tsx` virtual modules go through Vite's
     // own resolver, which honors `browser` via vite-plugin-solid's
     // `configEnvironment` hook (and the equivalent for other plugins).
-    ...(TARGET === 'angular' ? [resolveCrossTreeBareImports([examplesRoot, sortableListSrc, flatpickrSrc, fullCalendarSrc, codeMirrorSrc, chartSrc, tipTapSrc])] : []),
+    ...(TARGET === 'angular' ? [resolveCrossTreeBareImports([examplesRoot, sortableListSrc, flatpickrSrc, fullCalendarSrc, codeMirrorSrc, chartSrc, tipTapSrc, mapLibreSrc])] : []),
     Rozie({
       target: TARGET,
-      ...(TARGET === 'angular' ? { prebuildExtraRoots: [examplesRoot, sortableListSrc, flatpickrSrc, fullCalendarSrc, codeMirrorSrc, chartSrc, tipTapSrc] } : {}),
+      ...(TARGET === 'angular' ? { prebuildExtraRoots: [examplesRoot, sortableListSrc, flatpickrSrc, fullCalendarSrc, codeMirrorSrc, chartSrc, tipTapSrc, mapLibreSrc] } : {}),
     }),
     ...(await frameworkPlugins(TARGET)),
   ],

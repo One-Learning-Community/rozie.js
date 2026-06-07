@@ -15,6 +15,13 @@ declare module '@tiptap/starter-kit';
 declare module 'flatpickr';
 declare module '@uppy/core';
 declare module '@uppy/xhr-upload';
+// MapLibre (Phase 35). The MapLibre.rozie wrapper does `import maplibregl from
+// 'maplibre-gl'` and constructs `new maplibregl.Map(...)` / `.Marker(...)` /
+// `.Popup(...)` / `.NavigationControl(...)` etc. This gate verifies the emitted
+// scaffolding type-checks, not that maplibre-gl is correctly typed, so the
+// default export resolves to `any`. (The REAL maplibre type validation is the
+// leaf strict typecheck over the emitted per-target output.)
+declare module 'maplibre-gl';
 
 // `sortablejs` is declared with a minimal REAL shape (not bare `any`) because
 // the typed engine-wrapper fixture `examples/typed/SortableList.rozie` annotates

@@ -26,7 +26,7 @@ Cell legend: **✅** = documented out-of-the-box · **❌** = not supported / no
 | --- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | Mount map | ✅ | ✅ | ✅ | ✅ | ⚠️ | hand-roll | ✅ |
 | **Two-way camera** (center / zoom / bearing / pitch) | ✅ controlled `viewState` | ✅ `v-model` (4) | ✅ inputs + outputs | ✅ `bind:` (4) | ⚠️ | hand-roll | ✅ 4 `r-model` props (echo-guarded) |
-| Full event set | ✅ | ✅ | ✅ | ✅ | ⚠️ | hand-roll | ✅ 22 structured events |
+| Full event set | ✅ | ✅ | ✅ | ✅ | ⚠️ | hand-roll | ✅ 20 structured events |
 | **Markers** (framework component) | ✅ `<Marker>` | ✅ `MglMarker` | ✅ `mgl-marker` | ✅ `<Marker>` | ⚠️ | ❌ | ✅ `marker` reactive portal slot (all 6) |
 | **Popups** (framework component) | ✅ `<Popup>` | ✅ `MglPopup` | ✅ `mgl-popup` | ✅ `<Popup>` | ⚠️ | ❌ | ✅ `popup` reactive portal slot (all 6) |
 | Custom control (framework component) | ✅ `useControl` | ✅ `MglCustomControl` | ✅ control directives | ✅ | ⚠️ | ❌ | ✅ `control` mount-once portal slot (all 6) |
@@ -42,7 +42,7 @@ Cell legend: **✅** = documented out-of-the-box · **❌** = not supported / no
 - **One definition, six idiomatic packages** — including the two frameworks the ecosystem underserves: **Solid (thin / stale `solid-maplibre`, or the Mapbox-first `solid-map-gl`)** and **Lit (no real wrapper)**. A Solid dev today fights a sparsely-documented, low-adoption package; a Lit dev hand-rolls everything around a bare `<map-libre>` element.
 - **Framework-native markers & popups on all six** — the `marker` / `popup` **reactive multi-instance portal slots** render a real framework fragment (any component, any reactivity) as a map marker / popup, reconciled keep / update / dispose off the `markers` / `popups` data arrays. This is exactly the capability `solid-maplibre` is thin on and Lit lacks entirely: **Solid and Lit consumers get real, reactive marker / popup content they otherwise can't have**, from the same source.
 - **Two-way camera out of the box on all six** — four `r-model` props (`center` / `zoom` / `bearing` / `pitch`) with a built-in echo-guard (the `eventData` marker that survives batched camera ops). `center` is `[lng, lat]`, MapLibre's convention.
-- **A uniform 22-event surface** with structured pointer payloads (`{ lngLat, point, features, originalEvent }`) — identical on every target, instead of each wrapper's own event idiom.
+- **A uniform 20-event surface** with structured pointer payloads (`{ lngLat, point, features, originalEvent }`) — identical on every target, instead of each wrapper's own event idiom.
 - **A uniform 8-verb imperative handle** (`getMap` / `flyTo` / `easeTo` / `jumpTo` / `fitBounds` / `getCenter` / `getZoom` / `resize`) grabbed with each framework's native ref — versus "however this wrapper happens to expose the `Map`" (a hook, a service, a ref, a directive input).
 - **`getMap()` is always one hop from the raw engine**, so the full MapLibre API is reachable on any target when the curated surface doesn't cover something.
 
@@ -54,11 +54,11 @@ This page concedes where the standalone wrappers are genuinely ahead — that's 
 
 - **Big-framework depth on the home framework.** `react-map-gl` (vis.gl, OpenJS-foundation-backed), `vue-maplibre-gl`, `svelte-maplibre-gl` (MIERUNE), and the official `ngx-maplibre-gl` are mature, multi-year libraries with deep component catalogs (terrain, globe / projection, geocoding integrations, draw plugins, and the full declarative children model). On their own framework, they expose more surface than Rozie's curated prop set. Rozie's value is **not** "more than react-map-gl on React" — it's the **same idiomatic component on all six frameworks from one source**, with the underserved **Solid and Lit** getting a first-class wrapper they otherwise lack. For anything outside the curated surface, `getMap()` hands you the raw engine on every target.
 
-- **`@rozie-ui/maplibre` is `0.1.0`.** The surface (25 props / 22 events / 8-verb handle / `marker` + `popup` reactive slots + `control` mount-once slot) is stable and gate-verified, but it is younger than the multi-year incumbents.
+- **`@rozie-ui/maplibre` is `0.1.0`.** The surface (25 props / 20 events / 8-verb handle / `marker` + `popup` reactive slots + `control` mount-once slot) is stable and gate-verified, but it is younger than the multi-year incumbents.
 
 ## Try it
 
-The [`@rozie-ui/maplibre` showcase + API reference](/guide/maplibre) documents the `@rozie-ui/maplibre-*` packages — one pre-compiled, per-framework install (`npm i @rozie-ui/maplibre-react maplibre-gl`, etc.), plus the `import 'maplibre-gl/dist/maplibre-gl.css'` the engine DOM needs. The showcase walks the four two-way camera bindings, the 22-event surface, the imperative handle, the `:sources` / `:layers` passthroughs, and the per-target recipe for the `marker` / `popup` / `control` portal slots.
+The [`@rozie-ui/maplibre` showcase + API reference](/guide/maplibre) documents the `@rozie-ui/maplibre-*` packages — one pre-compiled, per-framework install (`npm i @rozie-ui/maplibre-react maplibre-gl`, etc.), plus the `import 'maplibre-gl/dist/maplibre-gl.css'` the engine DOM needs. The showcase walks the four two-way camera bindings, the 20-event surface, the imperative handle, the `:sources` / `:layers` passthroughs, and the per-target recipe for the `marker` / `popup` / `control` portal slots.
 
 ## Cross-references
 

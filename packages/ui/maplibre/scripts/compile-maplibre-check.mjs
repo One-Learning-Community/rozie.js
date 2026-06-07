@@ -28,8 +28,12 @@ const EXPECT = {
     'controls', 'options',
   ],
   models: ['center', 'zoom', 'bearing', 'pitch'],
+  // 20 emits. NOTE: continuous `zoom`/`pitch` are intentionally absent — they
+  // would collide with the `zoom`/`pitch` model:true camera props (Vue defineModel
+  // vs defineEmits, Angular ModelSignal vs OutputEmitterRef). The terminal
+  // `zoomend`/`pitchend` carry the event need; `move`/`rotate` stay (no clash).
   emits: [
-    'load', 'idle', 'move', 'zoom', 'rotate', 'pitch', 'dragstart', 'drag',
+    'load', 'idle', 'move', 'rotate', 'dragstart', 'drag',
     'dragend', 'click', 'dblclick', 'contextmenu', 'mousemove', 'error',
     'styledata', 'sourcedata', 'moveend', 'zoomend', 'rotateend', 'pitchend',
     'mouseenter', 'mouseleave',
@@ -72,6 +76,13 @@ if (slotByName.control?.isReactive) fail(`slot control should be MOUNT-ONCE (not
 
 const exposeNames = ir.expose.map((e) => e.name);
 if (!setEq(exposeNames, EXPECT.expose)) fail(`expose mismatch: got [${exposeNames.sort()}], want [${[...EXPECT.expose].sort()}]`);
+
+// model-prop == emit-name collision guard (Vue defineModel vs defineEmits,
+// Angular ModelSignal vs OutputEmitterRef). compile()'s ROZ diagnostics don't
+// flag this class today, so assert it here.
+const modelSet = new Set(modelNames);
+const modelEmitClash = ir.emits.filter((e) => modelSet.has(e));
+if (modelEmitClash.length) fail(`model-prop == emit collision (Vue/Angular two-way clash): [${modelEmitClash.join(', ')}]`);
 
 // ── 2. compile()×6 — collision gates surface here as error diagnostics ──────
 const TARGETS = ['react', 'vue', 'svelte', 'angular', 'solid', 'lit'];

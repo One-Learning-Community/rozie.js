@@ -265,6 +265,24 @@ const EXAMPLES = [
   // per feedback_vr_linux_baselines + the canvas-VR fallback clause). See
   // .planning/todos/pending/chartjs-onload-render-discrepancy.md.
   'ChartScreenshot',
+  // Phase 35 (maplibre) — MapLibreScreenshot is the content-STABLE WebGL-map
+  // SCREENSHOT cell. `MapLibreScreenshotDemo.rozie` renders a single map painted
+  // by the OFFLINE style object (a solid background + a colored GeoJSON polygon —
+  // network-free, so it renders identically in Docker with NO tile server) at a
+  // FIXED center/zoom with NO controls/markers/interaction and
+  // :options { fadeDuration: 0, attributionControl: false, interactive: false }
+  // for determinism (no symbol fade, no attribution text drift, no interaction
+  // state). The WebGL canvas is engine-rendered identically across targets from
+  // ONE Rozie source, so per D-10 all 6 targets diff against the SAME shared
+  // `MapLibreScreenshot.png`. The settle-poll (settleExample below) waits for
+  // SATURATED canvas pixels (the colored polygon), not just any painted pixel —
+  // the chartjs canvas-VR lesson (axes-only would clip early). The baseline is
+  // owned by the orchestrator (Linux-Docker regen); until it lands the cell
+  // baseline-gates to `test.fixme` via `baselineExists()` (never red) — no
+  // macOS-rendered PNG is committed here. The BEHAVIORAL coverage (two-way
+  // camera, control + marker portal slots) lives in maplibre-map.spec.ts and is
+  // NOT baseline-gated.
+  'MapLibreScreenshot',
 ] as const;
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'] as const;
 
@@ -526,6 +544,30 @@ async function settleExample(
     // drawn the frame is final. A short settle absorbs any ResizeObserver
     // re-layout pass before the clip.
     await page.waitForTimeout(400);
+  }
+  // MapLibreScreenshot (Phase 35): MapLibre mounts a WebGL map into a host div
+  // on `$onMount`; the engine adds `.maplibregl-map` (the root) and
+  // `.maplibregl-canvas` (the WebGL canvas), then paints the OFFLINE style's
+  // colored polygon asynchronously after the style "load" event. Wait for the
+  // canvas to be present, then a short fixed settle so the colored polygon has
+  // painted before the clip. The demo sets fadeDuration:0 (no symbol fade) +
+  // interactive:false + attributionControl:false, so once the style loads the
+  // frame is deterministic. Unlike the chartjs colored-pixel poll, a WebGL
+  // backing store cannot be read via a 2D `getImageData` (the canvas reports a
+  // WebGL context, not 2D, and preserveDrawingBuffer is off), so the settle is a
+  // fixed timeout rather than a pixel-saturation poll. The CSS locators pierce
+  // Lit's shadow root.
+  if (example === 'MapLibreScreenshot') {
+    await expect(page.locator('.maplibregl-map').first()).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(page.locator('.maplibregl-canvas').first()).toBeVisible({
+      timeout: 15_000,
+    });
+    // Let the style "load" → polygon paint settle. fadeDuration:0 means no
+    // symbol tween, so a short fixed settle absorbs the async style-load render
+    // pass before the clip.
+    await page.waitForTimeout(600);
   }
 }
 

@@ -1,0 +1,171 @@
+<!--
+  MapLibreDemo.rozie — BEHAVIORAL consumer for the MapLibre wrapper (Phase 35).
+
+  The companion of MapLibreScreenshotDemo (the content-stable pixel cell). THIS
+  demo drives the two-way camera + the portal slots and asserts the DOM reflects
+  them, across all 6 targets (maplibre-map.spec.ts):
+
+    - r-model:center + r-model:zoom two-way bind to $data; the live center/zoom
+      readout proves the camera round-trips (consumer write → easeTo → moveend
+      echo-guard → no loop). A "zoom in" button mutates $data.zoom to drive the
+      consumer → wrapper → easeTo → readout-update assertion.
+    - :map-style passes the OFFLINE_STYLE object (network-free — Docker/CI has NO
+      network; the default demotiles URL would fail to load). The offline style
+      paints a solid background + a colored GeoJSON polygon so the WebGL canvas
+      has deterministic colored content.
+    - :controls="['navigation']" so a .maplibregl-ctrl renders (spec asserts it).
+    - :markers drives the REACTIVE MULTI-INSTANCE `marker` portal slot — the
+      <template #marker> fill mounts framework-native pin content per entry
+      (.rozie-demo-pin), proving the reactive multi-instance portal mounts.
+    - <template #control> fills the MOUNT-ONCE custom-control portal with a
+      framework-native button (a zoom-in via the $expose handle), proving the
+      mount-once control portal.
+
+  Container needs explicit height (the wrapper's host fills it).
+
+  This is the BEHAVIORAL cell — do NOT add screenshot stabilization here. The
+  content-stable SCREENSHOT cell is the SEPARATE MapLibreScreenshotDemo.rozie.
+-->
+
+<rozie name="MapLibreDemo">
+
+<components>
+{
+  MapLibre: '../../packages/ui/maplibre/src/MapLibre.rozie',
+}
+</components>
+
+<data>
+{
+  center: [-77, 38.5],
+  zoom: 4,
+  markers: [
+    { id: 1, lng: -77, lat: 38.9, label: 'A' },
+    { id: 2, lng: -75, lat: 38.0, label: 'B' },
+    { id: 3, lng: -79, lat: 37.5, label: 'C' },
+  ],
+}
+</data>
+
+<script>
+import 'maplibre-gl/dist/maplibre-gl.css'
+
+// Network-free style — Docker/CI has NO network, so the wrapper's default
+// demotiles URL would fail. A solid background + a colored GeoJSON polygon
+// (fill + line) gives the WebGL canvas deterministic colored content.
+const OFFLINE_STYLE = {
+  version: 8,
+  sources: {
+    demo: {
+      type: 'geojson',
+      data: {
+        type: 'FeatureCollection',
+        features: [{
+          type: 'Feature', properties: {},
+          geometry: { type: 'Polygon', coordinates: [[[-80, 40], [-74, 40], [-74, 35], [-80, 35], [-80, 40]]] },
+        }],
+      },
+    },
+  },
+  layers: [
+    { id: 'bg',   type: 'background', paint: { 'background-color': '#e5e3df' } },
+    { id: 'fill', type: 'fill', source: 'demo', paint: { 'fill-color': '#0a84ff', 'fill-opacity': 0.6 } },
+    { id: 'line', type: 'line', source: 'demo', paint: { 'line-color': '#0050a0', 'line-width': 2 } },
+  ],
+}
+
+// Drive $data.zoom up — the two-way bind reconciles into the live map via the
+// wrapper's $watch → easeTo, then the camera echoes back into the readout.
+const zoomIn = () => { $data.zoom = Math.min($data.zoom + 1, 18) }
+
+// The custom-control slot button drives the $expose handle (grabbed via
+// ref="map"). On the 5 ref-resolving targets it calls through; Angular's
+// component ref is the host element, so the optional chain no-ops.
+const controlZoomIn = () => { $refs.map?.flyTo?.({ zoom: ($refs.map?.getZoom?.() ?? $data.zoom) + 1 }) }
+</script>
+
+<template>
+<div class="maplibre-demo">
+  <h3>MapLibre — behavioral</h3>
+
+  <div class="controls">
+    <button type="button" data-testid="zoom-in" @click="zoomIn">Zoom in</button>
+    <span class="readout" data-testid="readout-zoom">{{ String($data.zoom) }}</span>
+  </div>
+
+  <div class="map-wrap" style="height: 320px">
+    <MapLibre
+      ref="map"
+      r-model:center="$data.center"
+      r-model:zoom="$data.zoom"
+      :map-style="OFFLINE_STYLE"
+      :controls="['navigation']"
+      :markers="$data.markers"
+    >
+      <template #marker="{ marker }">
+        <div class="rozie-demo-pin">{{ marker.label }}</div>
+      </template>
+      <template #control="{ map }">
+        <button type="button" class="demo-ctrl-btn" data-testid="demo-ctrl-btn" @click="controlZoomIn">+</button>
+      </template>
+    </MapLibre>
+  </div>
+</div>
+</template>
+
+<style>
+.maplibre-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  max-width: 720px;
+}
+.maplibre-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+.controls button {
+  padding: 0.25rem 0.625rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8125rem;
+}
+.controls .readout {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.875rem;
+  min-width: 2ch;
+}
+.rozie-demo-pin {
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #dc2626;
+  color: white;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  font-size: 0.7rem;
+  font-weight: 700;
+  border: 2px solid white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+.demo-ctrl-btn {
+  width: 29px;
+  height: 29px;
+  border: none;
+  background: white;
+  cursor: pointer;
+  font-size: 1.1rem;
+  font-weight: 700;
+  line-height: 1;
+}
+</style>
+
+</rozie>

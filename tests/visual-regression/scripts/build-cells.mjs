@@ -92,6 +92,17 @@ const TIPTAP_SRC = resolve(
   'tiptap',
   'src',
 );
+// Same packaging move for @rozie-ui/maplibre (Phase 35): MapLibre.rozie lives in
+// the package src; the Angular sub-build walks it via `prebuildExtraRoots` and
+// drops the same cross-tree `.rozie.ts` + `MapLibre.ts` shim artefacts that must
+// be swept after the Angular build (see cleanupCrossTreeAngularArtifacts).
+const MAPLIBRE_SRC = resolve(
+  REPO_ROOT,
+  'packages',
+  'ui',
+  'maplibre',
+  'src',
+);
 const REFERENCE_BASENAMES = [
   'Counter',
   'SearchInput',
@@ -279,6 +290,21 @@ function cleanupCrossTreeAngularArtifacts() {
     // tiptap src always exists post-port — defensive only
   }
   rmSync(resolve(TIPTAP_SRC, 'TipTap.ts'), { force: true });
+  // Same sweep for @rozie-ui/maplibre's package src (MapLibreDemo +
+  // MapLibreScreenshotDemo compose MapLibre via <components>, so the Angular
+  // sub-build emits MapLibre.rozie.ts + the MapLibre.ts shim here). Leftovers
+  // (the emitted .rozie.ts imports @angular/core) poison the later solid/lit
+  // builds.
+  try {
+    for (const entry of readdirSync(MAPLIBRE_SRC)) {
+      if (entry.endsWith('.rozie.ts')) {
+        rmSync(resolve(MAPLIBRE_SRC, entry), { force: true });
+      }
+    }
+  } catch {
+    // maplibre src always exists post-port — defensive only
+  }
+  rmSync(resolve(MAPLIBRE_SRC, 'MapLibre.ts'), { force: true });
 }
 
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'];

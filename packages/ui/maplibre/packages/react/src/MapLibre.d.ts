@@ -39,9 +39,7 @@ export interface MapLibreProps {
   onLoad?: (...args: unknown[]) => void;
   onIdle?: (...args: unknown[]) => void;
   onMove?: (...args: unknown[]) => void;
-  onZoom?: (...args: unknown[]) => void;
   onRotate?: (...args: unknown[]) => void;
-  onPitch?: (...args: unknown[]) => void;
   onDragstart?: (...args: unknown[]) => void;
   onDrag?: (...args: unknown[]) => void;
   onDragend?: (...args: unknown[]) => void;

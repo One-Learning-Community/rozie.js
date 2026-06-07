@@ -38,9 +38,7 @@ interface Props {
   onload?: (...args: unknown[]) => void;
   onidle?: (...args: unknown[]) => void;
   onmove?: (...args: unknown[]) => void;
-  onzoom?: (...args: unknown[]) => void;
   onrotate?: (...args: unknown[]) => void;
-  onpitch?: (...args: unknown[]) => void;
   ondragstart?: (...args: unknown[]) => void;
   ondrag?: (...args: unknown[]) => void;
   ondragend?: (...args: unknown[]) => void;
@@ -59,6 +57,7 @@ interface Props {
   onmouseleave?: (...args: unknown[]) => void;
 }
 
+let __defaultFitBoundsOptions = (() => ({}))();
 let __defaultMarkers = (() => [])();
 let __defaultPopups = (() => [])();
 let __defaultSources = (() => [])();
@@ -72,12 +71,12 @@ let {
   zoom = $bindable(1),
   bearing = $bindable(0),
   pitch = $bindable(0),
-  mapStyle = 'https://demotiles.maplibre.org/style.json',
-  minZoom = undefined,
-  maxZoom = undefined,
+  mapStyle = undefined,
+  minZoom = 0,
+  maxZoom = 22,
   maxBounds = undefined,
   bounds = undefined,
-  fitBoundsOptions = undefined,
+  fitBoundsOptions = __defaultFitBoundsOptions,
   dragPan = true,
   dragRotate = true,
   scrollZoom = true,
@@ -100,9 +99,7 @@ let {
   onload,
   onidle,
   onmove,
-  onzoom,
   onrotate,
-  onpitch,
   ondragstart,
   ondrag,
   ondragend,
@@ -130,6 +127,12 @@ let containerEl = $state<HTMLElement | undefined>(undefined);
 import maplibregl from 'maplibre-gl';
 let instance: any = null;
 
+// MapLibre's official no-token demo tiles — the zero-config `mapStyle` fallback
+// (the prop default is `undefined`; see the prop note).
+// MapLibre's official no-token demo tiles — the zero-config `mapStyle` fallback
+// (the prop default is `undefined`; see the prop note).
+const DEFAULT_STYLE = 'https://demotiles.maplibre.org/style.json';
+
 // The eventData merged onto programmatic camera ops so the camera-lifecycle echo
 // handlers can ignore our own moves (the documented MapLibre echo-guard — robust
 // across batched ops where Leaflet's single boolean would race).
@@ -151,10 +154,16 @@ const PROGRAMMATIC = {
 const markerEntries = new Map();
 const popupEntries = new Map();
 // standard-control instances (so a controls-prop change can remove + re-add) and
-// the mount-once custom-control portal dispose.
+// the mount-once custom-control portal dispose. controlInstances is a null-let
+// (→ typeNeutralize `any`) initialized to [] in $onMount: a bare `let x = []`
+// infers `never[]` under the strict framework-typecheck harness and rejects the
+// `any` control instances pushed into it.
 // standard-control instances (so a controls-prop change can remove + re-add) and
-// the mount-once custom-control portal dispose.
-let controlInstances = [];
+// the mount-once custom-control portal dispose. controlInstances is a null-let
+// (→ typeNeutralize `any`) initialized to [] in $onMount: a bare `let x = []`
+// infers `never[]` under the strict framework-typecheck harness and rejects the
+// `any` control instances pushed into it.
+let controlInstances: any = null;
 let controlDispose: any = null;
 let customControl: any = null;
 // layer-scoped feature listeners, registered per interactiveLayerId so they can
@@ -162,12 +171,14 @@ let customControl: any = null;
 // layer-scoped feature listeners, registered per interactiveLayerId so they can
 // be unregistered on change. id → { enter, leave }.
 const featureListeners = new Map();
-// previously-applied source/layer ids, so a sources/layers prop change can remove
+// previously-applied source/layer ids (null-lets → `any`, [] in $onMount; same
+// never[] reason as controlInstances) so a sources/layers prop change can remove
 // the dropped ones.
-// previously-applied source/layer ids, so a sources/layers prop change can remove
+// previously-applied source/layer ids (null-lets → `any`, [] in $onMount; same
+// never[] reason as controlInstances) so a sources/layers prop change can remove
 // the dropped ones.
-let appliedLayerIds = [];
-let appliedSourceIds = [];
+let appliedLayerIds: any = null;
+let appliedSourceIds: any = null;
 
 // The $portals/$emit-capturing reconcilers are built INSIDE $onMount (a top-level
 // $portals reference fails the bundled-leaf strict typecheck — the CM/TipTap
@@ -387,6 +398,12 @@ $effect(() => () => {
 onMount(() => {
   const el = containerEl;
 
+  // seed the null-let tracking arrays (declared null so typeNeutralize types them
+  // `any`; the reconcile/teardown code only runs after this mount init).
+  controlInstances = [];
+  appliedLayerIds = [];
+  appliedSourceIds = [];
+
   // mapOptions is a null-let so the bundled-leaf typeNeutralize pass annotates it
   // `any` — MapLibre's MapOptions strict-types center (LngLatLike tuple), style
   // (string|StyleSpecification) and maxBounds/bounds (LngLatBoundsLike), which the
@@ -398,7 +415,7 @@ onMount(() => {
   mapOptions = {
     container: el,
     ...$state.snapshot(options),
-    style: $state.snapshot(mapStyle),
+    style: $state.snapshot(mapStyle) ?? DEFAULT_STYLE,
     center: center,
     zoom: zoom,
     bearing: bearing,
@@ -420,12 +437,17 @@ onMount(() => {
   instance = new maplibregl.Map(mapOptions);
 
   // ─── forward map events ─────────────────────────────────────────────────
+  // NOTE: the CONTINUOUS `zoom` and `pitch` events are deliberately NOT forwarded
+  // — `zoom` and `pitch` are also two-way `model: true` camera props, and a same-
+  // named emit collides with the model on Vue (defineModel vs defineEmits) and
+  // Angular (ModelSignal vs OutputEmitterRef). The two-way binding already conveys
+  // zoom/pitch changes; consumers wanting an event get the terminal `zoomend` /
+  // `pitchend` below. `move`/`rotate` have no such clash (the models are `center`
+  // and `bearing`, not `move`/`rotate`), so those continuous events stay.
   instance.on('load', (e: any) => onload?.(e));
   instance.on('idle', (e: any) => onidle?.(e));
   instance.on('move', (e: any) => onmove?.(e));
-  instance.on('zoom', (e: any) => onzoom?.(e));
   instance.on('rotate', (e: any) => onrotate?.(e));
-  instance.on('pitch', (e: any) => onpitch?.(e));
   instance.on('dragstart', (e: any) => ondragstart?.(e));
   instance.on('drag', (e: any) => ondrag?.(e));
   instance.on('dragend', (e: any) => ondragend?.(e));
@@ -664,7 +686,7 @@ $effect(() => { const __watchVal = (() => mapStyle)(); untrack(() => { if (__roz
   // tracking and re-apply once the new style loads.
   appliedLayerIds = [];
   appliedSourceIds = [];
-  instance.setStyle($state.snapshot(v));
+  instance.setStyle($state.snapshot(v) ?? DEFAULT_STYLE);
   instance.once('styledata', () => applyLayers());
 })(__watchVal); }); });
 let __rozieWatchInitial_5 = true;

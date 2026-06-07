@@ -46,12 +46,12 @@ export default class MapLibre extends SignalWatcher(LitElement) {
   private _bearingControllable = createLitControllableProperty<number>({ host: this, eventName: 'bearing-change', defaultValue: 0, initialControlledValue: undefined });
   @property({ type: Number, attribute: 'pitch' }) _pitch_attr: number = 0;
   private _pitchControllable = createLitControllableProperty<number>({ host: this, eventName: 'pitch-change', defaultValue: 0, initialControlledValue: undefined });
-  @property({ type: Object }) mapStyle: unknown = 'https://demotiles.maplibre.org/style.json';
-  @property({ type: Number, reflect: true }) minZoom: number = undefined;
-  @property({ type: Number, reflect: true }) maxZoom: number = undefined;
+  @property({ type: Object }) mapStyle: unknown = undefined;
+  @property({ type: Number, reflect: true }) minZoom: number = 0;
+  @property({ type: Number, reflect: true }) maxZoom: number = 22;
   @property({ type: Object }) maxBounds: unknown = undefined;
   @property({ type: Object }) bounds: unknown = undefined;
-  @property({ type: Object }) fitBoundsOptions: any = undefined;
+  @property({ type: Object }) fitBoundsOptions: any = {};
   @property({ type: Boolean, reflect: true }) dragPan: boolean = true;
   @property({ type: Boolean, reflect: true }) dragRotate: boolean = true;
   @property({ type: Boolean, reflect: true }) scrollZoom: boolean = true;
@@ -240,6 +240,14 @@ private _portalContainers = new Set<HTMLElement>();
 
     const el = this._refContainerEl;
 
+    // seed the null-let tracking arrays (declared null so typeNeutralize types them
+    // `any`; the reconcile/teardown code only runs after this mount init).
+    // seed the null-let tracking arrays (declared null so typeNeutralize types them
+    // `any`; the reconcile/teardown code only runs after this mount init).
+    this.controlInstances = [];
+    this.appliedLayerIds = [];
+    this.appliedSourceIds = [];
+
     // mapOptions is a null-let so the bundled-leaf typeNeutralize pass annotates it
     // `any` — MapLibre's MapOptions strict-types center (LngLatLike tuple), style
     // (string|StyleSpecification) and maxBounds/bounds (LngLatBoundsLike), which the
@@ -258,7 +266,7 @@ private _portalContainers = new Set<HTMLElement>();
     mapOptions = {
       container: el,
       ...this.options,
-      style: this.mapStyle,
+      style: this.mapStyle ?? this.DEFAULT_STYLE,
       center: this.center,
       zoom: this.zoom,
       bearing: this.bearing,
@@ -280,7 +288,21 @@ private _portalContainers = new Set<HTMLElement>();
     this.instance = new maplibregl.Map(mapOptions);
 
     // ─── forward map events ─────────────────────────────────────────────────
+    // NOTE: the CONTINUOUS `zoom` and `pitch` events are deliberately NOT forwarded
+    // — `zoom` and `pitch` are also two-way `model: true` camera props, and a same-
+    // named emit collides with the model on Vue (defineModel vs defineEmits) and
+    // Angular (ModelSignal vs OutputEmitterRef). The two-way binding already conveys
+    // zoom/pitch changes; consumers wanting an event get the terminal `zoomend` /
+    // `pitchend` below. `move`/`rotate` have no such clash (the models are `center`
+    // and `bearing`, not `move`/`rotate`), so those continuous events stay.
     // ─── forward map events ─────────────────────────────────────────────────
+    // NOTE: the CONTINUOUS `zoom` and `pitch` events are deliberately NOT forwarded
+    // — `zoom` and `pitch` are also two-way `model: true` camera props, and a same-
+    // named emit collides with the model on Vue (defineModel vs defineEmits) and
+    // Angular (ModelSignal vs OutputEmitterRef). The two-way binding already conveys
+    // zoom/pitch changes; consumers wanting an event get the terminal `zoomend` /
+    // `pitchend` below. `move`/`rotate` have no such clash (the models are `center`
+    // and `bearing`, not `move`/`rotate`), so those continuous events stay.
     this.instance.on('load', (e: any) => this.dispatchEvent(new CustomEvent("load", {
       detail: e,
       bubbles: true,
@@ -296,17 +318,7 @@ private _portalContainers = new Set<HTMLElement>();
       bubbles: true,
       composed: true
     })));
-    this.instance.on('zoom', (e: any) => this.dispatchEvent(new CustomEvent("zoom", {
-      detail: e,
-      bubbles: true,
-      composed: true
-    })));
     this.instance.on('rotate', (e: any) => this.dispatchEvent(new CustomEvent("rotate", {
-      detail: e,
-      bubbles: true,
-      composed: true
-    })));
-    this.instance.on('pitch', (e: any) => this.dispatchEvent(new CustomEvent("pitch", {
       detail: e,
       bubbles: true,
       composed: true
@@ -576,7 +588,7 @@ private _portalContainers = new Set<HTMLElement>();
       // tracking and re-apply once the new style loads.
       this.appliedLayerIds = [];
       this.appliedSourceIds = [];
-      this.instance.setStyle(v);
+      this.instance.setStyle(v ?? this.DEFAULT_STYLE);
       this.instance.once('styledata', () => this.applyLayers());
     })(__watchVal); }
     if (this.__rozieFirstUpdateDone && (changedProperties.has('minZoom'))) { const __watchVal = (() => this.minZoom)(); ((v: any) => {
@@ -645,6 +657,8 @@ private _portalContainers = new Set<HTMLElement>();
 
   instance: any = null;
 
+  DEFAULT_STYLE = 'https://demotiles.maplibre.org/style.json';
+
   PROGRAMMATIC = {
   rozieProgrammatic: true
 };
@@ -653,7 +667,7 @@ private _portalContainers = new Set<HTMLElement>();
 
   popupEntries = new Map();
 
-  controlInstances = [];
+  controlInstances: any = null;
 
   controlDispose: any = null;
 
@@ -661,9 +675,9 @@ private _portalContainers = new Set<HTMLElement>();
 
   featureListeners = new Map();
 
-  appliedLayerIds = [];
+  appliedLayerIds: any = null;
 
-  appliedSourceIds = [];
+  appliedSourceIds: any = null;
 
   reconcileMarkers: any = null;
 

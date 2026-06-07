@@ -50,6 +50,13 @@ const EXAMPLES = [
   'Uppy',
   'SortableList',
   'Flatpickr',
+  // Phase 35 — MapLibre wraps maplibre-gl (default import, untyped engine
+  // instance held in `let instance = null`, many untyped callback params). The
+  // null-let mapOptions routing + the reactive marker/popup portal reconcilers
+  // are the shape the untyped-`<script>` type-broken-emit bug regresses;
+  // covering it here exercises the emit path. `maplibre-gl` resolves against the
+  // ambient `engine-modules.d.ts` stub.
+  'MapLibre',
 ];
 
 // TYPED_EXAMPLES — the `examples/typed/*` fixture set (Phase 9
@@ -60,7 +67,7 @@ const EXAMPLES = [
 const TYPED_EXAMPLES = ['Counter', 'Dropdown', 'SortableList', 'TypedCard', 'MatchUnion', 'DataCast', 'PropsCustomType', 'PropsRequired'];
 
 describe('VUE-TSC — vue-tsc --noEmit clean over emitted Vue SFCs', () => {
-  it('all 12 emitted Vue SFC files (8 reference + 4 engine-wrapper) typecheck clean', () => {
+  it('all 13 emitted Vue SFC files (8 reference + 5 engine-wrapper) typecheck clean', () => {
     const tmpDir = mkdtempSync(join(tmpdir(), 'rozie-vue-tsc-'));
     try {
       for (const name of EXAMPLES) {
@@ -71,6 +78,7 @@ describe('VUE-TSC — vue-tsc --noEmit clean over emitted Vue SFCs', () => {
           SortableList: 'packages/ui/sortable-list/src/SortableList.rozie',
           Flatpickr: 'packages/ui/flatpickr/src/Flatpickr.rozie',
           TipTap: 'packages/ui/tiptap/src/TipTap.rozie',
+          MapLibre: 'packages/ui/maplibre/src/MapLibre.rozie',
         };
         const srcPath = PKG_SRC[name]
           ? resolve(ROOT, PKG_SRC[name])

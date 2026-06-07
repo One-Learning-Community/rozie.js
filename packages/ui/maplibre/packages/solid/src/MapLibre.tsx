@@ -63,9 +63,7 @@ interface MapLibreProps {
   onLoad?: (...args: unknown[]) => void;
   onIdle?: (...args: unknown[]) => void;
   onMove?: (...args: unknown[]) => void;
-  onZoom?: (...args: unknown[]) => void;
   onRotate?: (...args: unknown[]) => void;
-  onPitch?: (...args: unknown[]) => void;
   onDragstart?: (...args: unknown[]) => void;
   onDrag?: (...args: unknown[]) => void;
   onDragend?: (...args: unknown[]) => void;
@@ -101,7 +99,7 @@ export interface MapLibreHandle {
 }
 
 export default function MapLibre(_props: MapLibreProps): JSX.Element {
-  const _merged = mergeProps({ mapStyle: 'https://demotiles.maplibre.org/style.json', minZoom: undefined, maxZoom: undefined, maxBounds: undefined, bounds: undefined, fitBoundsOptions: undefined, dragPan: true, dragRotate: true, scrollZoom: true, doubleClickZoom: true, boxZoom: true, keyboard: true, touchZoomRotate: true, touchPitch: true, markers: (() => [])(), popups: (() => [])(), sources: (() => [])(), layers: (() => [])(), interactiveLayerIds: (() => [])(), controls: (() => [])(), options: (() => ({}))() }, _props);
+  const _merged = mergeProps({ mapStyle: undefined, minZoom: 0, maxZoom: 22, maxBounds: undefined, bounds: undefined, fitBoundsOptions: (() => ({}))(), dragPan: true, dragRotate: true, scrollZoom: true, doubleClickZoom: true, boxZoom: true, keyboard: true, touchZoomRotate: true, touchPitch: true, markers: (() => [])(), popups: (() => [])(), sources: (() => [])(), layers: (() => [])(), interactiveLayerIds: (() => [])(), controls: (() => [])(), options: (() => ({}))() }, _props);
   const [local, attrs] = splitProps(_merged, ['center', 'zoom', 'bearing', 'pitch', 'mapStyle', 'minZoom', 'maxZoom', 'maxBounds', 'bounds', 'fitBoundsOptions', 'dragPan', 'dragRotate', 'scrollZoom', 'doubleClickZoom', 'boxZoom', 'keyboard', 'touchZoomRotate', 'touchPitch', 'markers', 'popups', 'sources', 'layers', 'interactiveLayerIds', 'controls', 'options', 'ref']);
   onMount(() => { local.ref?.({ getMap, flyTo, easeTo, jumpTo, fitBounds, getCenter, getZoom, resize }); });
 
@@ -172,6 +170,12 @@ export default function MapLibre(_props: MapLibreProps): JSX.Element {
     const _cleanup = (() => {
     const el = containerElRef;
 
+    // seed the null-let tracking arrays (declared null so typeNeutralize types them
+    // `any`; the reconcile/teardown code only runs after this mount init).
+    controlInstances = [];
+    appliedLayerIds = [];
+    appliedSourceIds = [];
+
     // mapOptions is a null-let so the bundled-leaf typeNeutralize pass annotates it
     // `any` — MapLibre's MapOptions strict-types center (LngLatLike tuple), style
     // (string|StyleSpecification) and maxBounds/bounds (LngLatBoundsLike), which the
@@ -183,7 +187,7 @@ export default function MapLibre(_props: MapLibreProps): JSX.Element {
     mapOptions = {
       container: el,
       ...local.options,
-      style: local.mapStyle,
+      style: local.mapStyle ?? DEFAULT_STYLE,
       center: center(),
       zoom: zoom(),
       bearing: bearing(),
@@ -205,12 +209,17 @@ export default function MapLibre(_props: MapLibreProps): JSX.Element {
     instance = new maplibregl.Map(mapOptions);
 
     // ─── forward map events ─────────────────────────────────────────────────
+    // NOTE: the CONTINUOUS `zoom` and `pitch` events are deliberately NOT forwarded
+    // — `zoom` and `pitch` are also two-way `model: true` camera props, and a same-
+    // named emit collides with the model on Vue (defineModel vs defineEmits) and
+    // Angular (ModelSignal vs OutputEmitterRef). The two-way binding already conveys
+    // zoom/pitch changes; consumers wanting an event get the terminal `zoomend` /
+    // `pitchend` below. `move`/`rotate` have no such clash (the models are `center`
+    // and `bearing`, not `move`/`rotate`), so those continuous events stay.
     instance.on('load', (e: any) => _props.onLoad?.(e));
     instance.on('idle', (e: any) => _props.onIdle?.(e));
     instance.on('move', (e: any) => _props.onMove?.(e));
-    instance.on('zoom', (e: any) => _props.onZoom?.(e));
     instance.on('rotate', (e: any) => _props.onRotate?.(e));
-    instance.on('pitch', (e: any) => _props.onPitch?.(e));
     instance.on('dragstart', (e: any) => _props.onDragstart?.(e));
     instance.on('drag', (e: any) => _props.onDrag?.(e));
     instance.on('dragend', (e: any) => _props.onDragend?.(e));
@@ -445,7 +454,7 @@ export default function MapLibre(_props: MapLibreProps): JSX.Element {
     // tracking and re-apply once the new style loads.
     appliedLayerIds = [];
     appliedSourceIds = [];
-    instance.setStyle(v);
+    instance.setStyle(v ?? DEFAULT_STYLE);
     instance.once('styledata', () => applyLayers());
   })(v)), { defer: true }));
   createEffect(on(() => (() => local.minZoom)(), (v) => untrack(() => ((v: any) => {
@@ -481,6 +490,10 @@ export default function MapLibre(_props: MapLibreProps): JSX.Element {
 
   let instance: any = null;
 
+  // MapLibre's official no-token demo tiles — the zero-config `mapStyle` fallback
+  // (the prop default is `undefined`; see the prop note).
+  const DEFAULT_STYLE = 'https://demotiles.maplibre.org/style.json';
+
   // The eventData merged onto programmatic camera ops so the camera-lifecycle echo
   // handlers can ignore our own moves (the documented MapLibre echo-guard — robust
   // across batched ops where Leaflet's single boolean would race).
@@ -495,17 +508,21 @@ export default function MapLibre(_props: MapLibreProps): JSX.Element {
   const markerEntries = new Map();
   const popupEntries = new Map();
   // standard-control instances (so a controls-prop change can remove + re-add) and
-  // the mount-once custom-control portal dispose.
-  let controlInstances = [];
+  // the mount-once custom-control portal dispose. controlInstances is a null-let
+  // (→ typeNeutralize `any`) initialized to [] in $onMount: a bare `let x = []`
+  // infers `never[]` under the strict framework-typecheck harness and rejects the
+  // `any` control instances pushed into it.
+  let controlInstances: any = null;
   let controlDispose: any = null;
   let customControl: any = null;
   // layer-scoped feature listeners, registered per interactiveLayerId so they can
   // be unregistered on change. id → { enter, leave }.
   const featureListeners = new Map();
-  // previously-applied source/layer ids, so a sources/layers prop change can remove
+  // previously-applied source/layer ids (null-lets → `any`, [] in $onMount; same
+  // never[] reason as controlInstances) so a sources/layers prop change can remove
   // the dropped ones.
-  let appliedLayerIds = [];
-  let appliedSourceIds = [];
+  let appliedLayerIds: any = null;
+  let appliedSourceIds: any = null;
 
   // The $portals/$emit-capturing reconcilers are built INSIDE $onMount (a top-level
   // $portals reference fails the bundled-leaf strict typecheck — the CM/TipTap

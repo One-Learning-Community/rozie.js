@@ -50,9 +50,7 @@ interface MapLibreProps {
   onLoad?: (...args: any[]) => void;
   onIdle?: (...args: any[]) => void;
   onMove?: (...args: any[]) => void;
-  onZoom?: (...args: any[]) => void;
   onRotate?: (...args: any[]) => void;
-  onPitch?: (...args: any[]) => void;
   onDragstart?: (...args: any[]) => void;
   onDrag?: (...args: any[]) => void;
   onDragend?: (...args: any[]) => void;
@@ -88,6 +86,7 @@ export interface MapLibreHandle {
 
 const MapLibre = forwardRef<MapLibreHandle, MapLibreProps>(function MapLibre(_props: MapLibreProps, ref): JSX.Element {
   const portalRoots = useRef<Set<Root>>(new Set());
+  const __defaultFitBoundsOptions = useState(() => (() => ({}))())[0];
   const __defaultMarkers = useState(() => (() => [])())[0];
   const __defaultPopups = useState(() => (() => [])())[0];
   const __defaultSources = useState(() => (() => [])())[0];
@@ -97,12 +96,12 @@ const MapLibre = forwardRef<MapLibreHandle, MapLibreProps>(function MapLibre(_pr
   const __defaultOptions = useState(() => (() => ({}))())[0];
   const props: Omit<MapLibreProps, 'mapStyle' | 'minZoom' | 'maxZoom' | 'maxBounds' | 'bounds' | 'fitBoundsOptions' | 'dragPan' | 'dragRotate' | 'scrollZoom' | 'doubleClickZoom' | 'boxZoom' | 'keyboard' | 'touchZoomRotate' | 'touchPitch' | 'markers' | 'popups' | 'sources' | 'layers' | 'interactiveLayerIds' | 'controls' | 'options'> & { mapStyle: unknown; minZoom: number; maxZoom: number; maxBounds: unknown; bounds: unknown; fitBoundsOptions: Record<string, any>; dragPan: boolean; dragRotate: boolean; scrollZoom: boolean; doubleClickZoom: boolean; boxZoom: boolean; keyboard: boolean; touchZoomRotate: boolean; touchPitch: boolean; markers: any[]; popups: any[]; sources: any[]; layers: any[]; interactiveLayerIds: any[]; controls: any[]; options: Record<string, any> } = {
     ..._props,
-    mapStyle: _props.mapStyle ?? 'https://demotiles.maplibre.org/style.json',
-    minZoom: _props.minZoom ?? undefined,
-    maxZoom: _props.maxZoom ?? undefined,
+    mapStyle: _props.mapStyle ?? undefined,
+    minZoom: _props.minZoom ?? 0,
+    maxZoom: _props.maxZoom ?? 22,
     maxBounds: _props.maxBounds ?? undefined,
     bounds: _props.bounds ?? undefined,
-    fitBoundsOptions: _props.fitBoundsOptions ?? undefined,
+    fitBoundsOptions: _props.fitBoundsOptions ?? __defaultFitBoundsOptions,
     dragPan: _props.dragPan ?? true,
     dragRotate: _props.dragRotate ?? true,
     scrollZoom: _props.scrollZoom ?? true,
@@ -125,14 +124,15 @@ const MapLibre = forwardRef<MapLibreHandle, MapLibreProps>(function MapLibre(_pr
   _renderPopupRef.current = props.renderPopup;
   const _renderControlRef = useRef(props.renderControl);
   _renderControlRef.current = props.renderControl;
+  const controlInstances = useRef<any>(null);
+  const appliedLayerIds = useRef<any>(null);
+  const appliedSourceIds = useRef<any>(null);
   const instance = useRef<any>(null);
   const reconcileMarkers = useRef<any>(null);
   const reconcilePopups = useRef<any>(null);
   const reconcileInteractive = useRef<any>(null);
   const customControl = useRef<any>(null);
   const controlDispose = useRef<any>(null);
-  const appliedLayerIds = useRef([]);
-  const appliedSourceIds = useRef([]);
   const [center, setCenter] = useControllableState({
     value: props.center,
     defaultValue: props.defaultCenter ?? (() => [0, 0])(),
@@ -215,6 +215,7 @@ const MapLibre = forwardRef<MapLibreHandle, MapLibreProps>(function MapLibre(_pr
   const _watch20First = useRef(true);
   const _watch21First = useRef(true);
 
+  const DEFAULT_STYLE = useMemo(() => 'https://demotiles.maplibre.org/style.json', []);
   // The eventData merged onto programmatic camera ops so the camera-lifecycle echo
   // handlers can ignore our own moves (the documented MapLibre echo-guard — robust
   // across batched ops where Leaflet's single boolean would race).
@@ -228,9 +229,6 @@ const MapLibre = forwardRef<MapLibreHandle, MapLibreProps>(function MapLibre(_pr
   // hoists into a sibling onCleanup() OUTSIDE the mount IIFE — keeps them in scope.
   const markerEntries = useMemo(() => new Map(), []);
   const popupEntries = useMemo(() => new Map(), []);
-  // standard-control instances (so a controls-prop change can remove + re-add) and
-  // the mount-once custom-control portal dispose.
-  let controlInstances = [];
   const featureListeners = useMemo(() => new Map(), []);
   const sameCenter = useCallback((a: any, b: any) => Array.isArray(a) && Array.isArray(b) && a[0] === b[0] && a[1] === b[1], []);
   const payload = useCallback((e: any) => ({
@@ -257,15 +255,15 @@ const MapLibre = forwardRef<MapLibreHandle, MapLibreProps>(function MapLibre(_pr
   }
   const applyControls = useCallback(() => {
     if (!instance.current) return;
-    for (const c of controlInstances as any) instance.current.removeControl(c);
-    controlInstances = [];
+    for (const c of controlInstances.current as any) instance.current.removeControl(c);
+    controlInstances.current = [];
     for (const spec of props.controls as any) {
       if (!spec) continue;
       const ctrl = buildControl(spec);
       if (!ctrl) continue;
       const position = typeof spec === 'object' && spec.position || undefined;
       instance.current.addControl(ctrl, position);
-      controlInstances.push(ctrl);
+      controlInstances.current.push(ctrl);
     }
   }, [buildControl, props.controls]);
   const applyInteractionToggles = useCallback(() => {
@@ -417,6 +415,12 @@ const MapLibre = forwardRef<MapLibreHandle, MapLibreProps>(function MapLibre(_pr
   };
     const el = containerEl.current;
 
+    // seed the null-let tracking arrays (declared null so typeNeutralize types them
+    // `any`; the reconcile/teardown code only runs after this mount init).
+    controlInstances.current = [];
+    appliedLayerIds.current = [];
+    appliedSourceIds.current = [];
+
     // mapOptions is a null-let so the bundled-leaf typeNeutralize pass annotates it
     // `any` — MapLibre's MapOptions strict-types center (LngLatLike tuple), style
     // (string|StyleSpecification) and maxBounds/bounds (LngLatBoundsLike), which the
@@ -428,7 +432,7 @@ const MapLibre = forwardRef<MapLibreHandle, MapLibreProps>(function MapLibre(_pr
     mapOptions = {
       container: el,
       ...props.options,
-      style: _mapStyleRef.current,
+      style: _mapStyleRef.current ?? DEFAULT_STYLE,
       center: _centerRef.current,
       zoom: _zoomRef.current,
       bearing: _bearingRef.current,
@@ -450,12 +454,17 @@ const MapLibre = forwardRef<MapLibreHandle, MapLibreProps>(function MapLibre(_pr
     instance.current = new maplibregl.Map(mapOptions);
 
     // ─── forward map events ─────────────────────────────────────────────────
+    // NOTE: the CONTINUOUS `zoom` and `pitch` events are deliberately NOT forwarded
+    // — `zoom` and `pitch` are also two-way `model: true` camera props, and a same-
+    // named emit collides with the model on Vue (defineModel vs defineEmits) and
+    // Angular (ModelSignal vs OutputEmitterRef). The two-way binding already conveys
+    // zoom/pitch changes; consumers wanting an event get the terminal `zoomend` /
+    // `pitchend` below. `move`/`rotate` have no such clash (the models are `center`
+    // and `bearing`, not `move`/`rotate`), so those continuous events stay.
     instance.current.on('load', (e: any) => props.onLoad && props.onLoad(e));
     instance.current.on('idle', (e: any) => props.onIdle && props.onIdle(e));
     instance.current.on('move', (e: any) => props.onMove && props.onMove(e));
-    instance.current.on('zoom', (e: any) => props.onZoom && props.onZoom(e));
     instance.current.on('rotate', (e: any) => props.onRotate && props.onRotate(e));
-    instance.current.on('pitch', (e: any) => props.onPitch && props.onPitch(e));
     instance.current.on('dragstart', (e: any) => props.onDragstart && props.onDragstart(e));
     instance.current.on('drag', (e: any) => props.onDrag && props.onDrag(e));
     instance.current.on('dragend', (e: any) => props.onDragend && props.onDragend(e));
@@ -700,7 +709,7 @@ const MapLibre = forwardRef<MapLibreHandle, MapLibreProps>(function MapLibre(_pr
     // tracking and re-apply once the new style loads.
     appliedLayerIds.current = [];
     appliedSourceIds.current = [];
-    instance.current.setStyle(v);
+    instance.current.setStyle(v ?? DEFAULT_STYLE);
     instance.current.once('styledata', () => applyLayers());
   }, [props.mapStyle]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
