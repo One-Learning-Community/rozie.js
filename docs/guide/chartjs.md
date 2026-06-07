@@ -54,7 +54,17 @@ import { Bar } from '@rozie-ui/chartjs-react';   // no manual register() needed
 <Bar data={data} options={options} onClick={(p) => console.log(p.elements)} />;
 ```
 
-> **Bundle note:** on the bundled React/Solid/Lit packages the per-type components currently share one chunk, so importing one typed component pulls the others' registration too; the **generic `Chart` + selective registration** (above) is the recommended path when bundle size is critical there. The source-shipped Vue/Svelte/Angular packages tree-shake per-type imports natively. Per-variant chunking on the bundled packages is a tracked optimization.
+#### Per-variant subpath imports (selective registration)
+
+The bundled React/Solid/Lit packages additionally expose a **per-variant subpath** for each typed component — `/line`, `/bar`, `/pie`, `/doughnut`, `/polar-area`, `/radar`, `/scatter`, `/bubble`. Each subpath resolves to its own isolated chunk that registers **only that one controller set**, so importing it ships none of the other seven:
+
+```tsx
+import Line from '@rozie-ui/chartjs-react/line';   // pulls ONLY LineController's set
+
+<Line data={data} options={options} />;
+```
+
+The barrel import (`import { Bar } from '@rozie-ui/chartjs-react'`, above) stays the convenient all-variants path; the per-variant subpath is the guaranteed-isolated path when bundle size is critical. The source-shipped Vue/Svelte/Angular packages tree-shake per-type imports natively from `src`, so the barrel import already isolates there — they need no subpath.
 
 ## Quick start
 

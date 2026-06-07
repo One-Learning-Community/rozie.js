@@ -128,18 +128,21 @@ comparison credible, and it doubles as Rozie's own roadmap.
   leading it. Rozie's advantage on React/Vue/Angular/Svelte is the *uniform
   cross-framework surface* and one source, not "more current."
 
-- **Per-type components and selective registration — now closed (one bundled-leaf
-  nuance remains).** Rozie's first cut shipped only the generic `Chart` and
-  force-registered every controller. Both are resolved: the generic `Chart` no
-  longer auto-registers (the consumer registers what they use, or imports the
-  `/auto` kitchen-sink entry), and each package now also exports the eight
+- **Per-type components and selective registration — fully closed.** Rozie's
+  first cut shipped only the generic `Chart` and force-registered every
+  controller. Both are resolved: the generic `Chart` no longer auto-registers
+  (the consumer registers what they use, or imports the `/auto` kitchen-sink
+  entry), and each package now also exports the eight
   [per-type components](/guide/chartjs#per-type-components) — `Line`/`Bar`/…/`Bubble`
-  — each registering only its own controller set. *Remaining nuance:* on the
-  bundled React/Solid/Lit packages the typed components currently share one chunk,
-  so importing one pulls the others' registration; the generic-`Chart`
-  consumer-registration path is the recommended one there, and per-variant chunking
-  on the bundled packages is a tracked optimization. The source-shipped
-  Vue/Svelte/Angular packages tree-shake per-type imports natively.
+  — each registering only its own controller set. The bundled React/Solid/Lit
+  packages now expose a **per-variant subpath** for each typed component
+  (`@rozie-ui/chartjs-react/line`, `…/bar`, …, `…/bubble`), and each subpath
+  resolves to its own isolated chunk that pulls only that one controller set —
+  so a consumer importing `/line` ships only Line's registration, never the
+  other seven. The barrel `.` import stays the convenient all-variants path. The
+  source-shipped Vue/Svelte/Angular packages tree-shake per-type imports
+  natively from `src`. This reaches parity with `react-chartjs-2`'s
+  selective-registration story across all six frameworks.
 
 - **`datasetIdKey` and a11y `fallback` — now covered.** The `datasetIdKey` prop
   (default `'label'`) matches datasets by a stable key across updates (with index
