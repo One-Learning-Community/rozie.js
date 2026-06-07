@@ -1,0 +1,12 @@
+:root {
+  --rozie-engine-accent: #4f46e5;
+}
+.rozie-engine-host .cm-editor {
+    height: 100%;
+    font-size: 13px;
+    color: var(--rozie-engine-accent);
+  }
+.rozie-engine-host .cm-scroller {
+    height: 100%;
+    overflow: auto;
+  }

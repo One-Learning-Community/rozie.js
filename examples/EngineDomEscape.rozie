@@ -1,0 +1,80 @@
+<rozie name="EngineDomEscape">
+
+<!--
+  Phase 34 — the engine-DOM escape hatch proving fixture.
+
+  Exercises BOTH halves of the :root { } mechanism in ONE component so the
+  dist-parity corpus locks the split byte-exactly across all six targets:
+
+    1. A FLAT `:root { --custom-prop }` block (the D-03 canary) — must route
+       through each target's UNCHANGED rootRules path (React .global.css,
+       Vue second <style>, Svelte :global(:root), Angular ::ng-deep :root,
+       Solid/Lit injectGlobalStyles). Byte-identical to the pre-Phase-34 shape.
+
+    2. A NESTED `:root { .sel { ... } }` engine block (D-01/D-04/D-06) — its
+       bare children emit UNSCOPED/global on every target (NO [data-rozie-s-*]
+       scope attr), reaching runtime engine-rendered DOM. On Lit they emit
+       into BOTH the shadow `static styles` AND `injectGlobalStyles` (dual sink).
+       The author's `.rozie-engine-host` anchor survives verbatim (D-06 — no
+       anchoring enforcement; page-wide leak is the author's choice).
+-->
+
+<script>
+// Tiny inline "engine" that appends a `.cm-editor` element the author cannot
+// reach with scoped CSS (no Rozie scope attribute is stamped onto it). The
+// :root { } engine rule is the only mechanism that styles it across targets.
+class MiniEngine {
+  constructor(rootEl) {
+    this.rootEl = rootEl
+    const editor = document.createElement('div')
+    editor.className = 'cm-editor'
+    const scroller = document.createElement('div')
+    scroller.className = 'cm-scroller'
+    editor.appendChild(scroller)
+    rootEl.appendChild(editor)
+    this.editor = editor
+  }
+  destroy() {
+    if (this.editor) this.editor.remove()
+    this.editor = null
+  }
+}
+
+let instance = null
+
+$onMount(() => {
+  instance = new MiniEngine($el)
+  return () => instance?.destroy()
+})
+</script>
+
+<template>
+<div class="rozie-engine-host"></div>
+</template>
+
+<style>
+.rozie-engine-host {
+  display: block;
+  position: relative;
+}
+
+/* Flat :root custom-prop block — the D-03 byte-identity canary. */
+:root {
+  --rozie-engine-accent: #4f46e5;
+}
+
+/* Nested :root engine block — the escape hatch. Bare children emit global. */
+:root {
+  .rozie-engine-host .cm-editor {
+    height: 100%;
+    font-size: 13px;
+    color: var(--rozie-engine-accent);
+  }
+  .rozie-engine-host .cm-scroller {
+    height: 100%;
+    overflow: auto;
+  }
+}
+</style>
+
+</rozie>

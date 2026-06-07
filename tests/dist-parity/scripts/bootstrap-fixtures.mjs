@@ -190,6 +190,18 @@ const EXAMPLES = [
   // byte-exact cross-target JSON-parity proof across all four entrypoints.
   // Single-file; no sibling .rozie producers — stays OUT of RESOLVER_ROOT.
   'ObjectInterp',
+  // Phase 34 (css-engine-dom-escape-hatch) — the engine-DOM escape hatch
+  // proving fixture. Exercises BOTH a flat `:root { --custom-prop }` block
+  // (D-03 byte-identity canary, routes through the unchanged rootRules path)
+  // AND a nested `:root { .sel { ... } }` engine block (D-01/D-04/D-06, bare
+  // children emit UNSCOPED/global on all six targets, NO [data-rozie-s-*] scope
+  // attr). Registering it here makes the bootstrap compile() it across all six
+  // targets — the dist-parity proof that the Wave 2 engineRules emit arms lower
+  // byte-identically across all four entrypoints: React emits a NON-EMPTY
+  // .global.css containing `.cm-editor`; Lit emits `.cm-editor` in BOTH static
+  // styles AND injectGlobalStyles; no target carries a scoped copy. Single-file;
+  // no sibling .rozie producers — stays OUT of RESOLVER_ROOT.
+  'EngineDomEscape',
 ];
 
 // Phase 23 (angular-cva-forms-integration) — per-fixture Angular CVA opt-out.
