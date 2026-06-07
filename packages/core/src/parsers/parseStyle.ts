@@ -211,27 +211,38 @@ export function parseStyle(
     };
   };
 
+  // Phase 34 (D-08) — ROZ128: `:global(...)` in a selector. postcss already
+  // hands us the selector portion ONLY (declaration values + comments live in
+  // the rule body, not `rule.selector`), so this substring scan cannot
+  // false-trip on a `:global(` inside a declaration value or comment. Works
+  // only on Vue/Svelte; silently dropped on React/Solid/Lit — a hard error.
+  // Collected, never thrown (D-08 contract). The `:root { .sel { ... } }`
+  // engine-DOM escape hatch is the cross-target replacement.
+  //
+  // CR-03 — factored out of `buildPlainRule` so BOTH the plain-rule path AND
+  // the engine-block child path (`:root { .sel:global(.foo) {} }`) fire it.
+  // Engine-block children never flow through `buildPlainRule` (they are
+  // collected by the dedicated `walkRules` pass and the top-level pass skips
+  // them via `hasRootAncestor`), so without this helper a `:global()` nested
+  // inside the escape hatch was silently kept and then silently dropped on
+  // React/Solid/Lit — the exact divergence ROZ128 exists to make impossible.
+  const checkGlobalPseudo = (selector: string, ruleLoc: SourceLoc): void => {
+    if (!selector.includes(':global(')) return;
+    diagnostics.push({
+      code: RozieErrorCode.STYLE_GLOBAL_PSEUDO_FORBIDDEN,
+      severity: 'error',
+      message:
+        ':global() is not supported in <style> — it works only on Vue/Svelte and is silently dropped on React, Solid, and Lit.',
+      loc: isScss ? contentLoc : ruleLoc,
+      ...(filename !== undefined ? { filename } : {}),
+      hint: 'Use a :root { .selector { ... } } block to style engine-rendered runtime DOM across all six targets.',
+    });
+  };
+
   /** Build a plain (non-portal) StyleRule, emitting ROZ081 on mixed :root. */
   const buildPlainRule = (rule: Rule): StyleRule => {
     const ruleLoc = nodeLoc(rule);
-    // Phase 34 (D-08) — ROZ128: `:global(...)` in a selector. postcss already
-    // hands us the selector portion ONLY (declaration values + comments live in
-    // the rule body, not `rule.selector`), so this substring scan cannot
-    // false-trip on a `:global(` inside a declaration value or comment. Works
-    // only on Vue/Svelte; silently dropped on React/Solid/Lit — a hard error.
-    // Collected, never thrown (D-08 contract). The `:root { .sel { ... } }`
-    // engine-DOM escape hatch is the cross-target replacement.
-    if (rule.selector.includes(':global(')) {
-      diagnostics.push({
-        code: RozieErrorCode.STYLE_GLOBAL_PSEUDO_FORBIDDEN,
-        severity: 'error',
-        message:
-          ':global() is not supported in <style> — it works only on Vue/Svelte and is silently dropped on React, Solid, and Lit.',
-        loc: isScss ? contentLoc : ruleLoc,
-        ...(filename !== undefined ? { filename } : {}),
-        hint: 'Use a :root { .selector { ... } } block to style engine-rendered runtime DOM across all six targets.',
-      });
-    }
+    checkGlobalPseudo(rule.selector, ruleLoc);
     // Selector classification (Pitfall 6 — mixed-:root rejection).
     const parts = rule.selector.split(',').map(s => s.trim());
     const hasRoot = parts.includes(':root');
@@ -351,14 +362,38 @@ export function parseStyle(
   root.walkRules((rule: Rule) => {
     if (hasPortalAncestor(rule) || hasRootAncestor(rule)) return;
     if (!isPureRootSelector(rule.selector)) return;
-    // Collect nested child Rule nodes (mirror the @portal child collection).
+    // Collect nested child nodes. CR-01 — also collect at-rule children
+    // (`@media`, `@supports`, `@container`, keyframes) sliced verbatim, so a
+    // responsive engine block (`:root { .cm { } @media (...) { .cm { } } }`)
+    // survives instead of being silently dropped: the at-rule descends from a
+    // pure-`:root` rule, so the top-level `walkRules` pass skips it via
+    // `hasRootAncestor` and nothing else would emit it. The emitters byte-slice
+    // by `loc`, so an at-rule child slices its full `@media (...) { ... }` text
+    // unchanged. An at-rule child carries an empty `selector` (the prelude lives
+    // in the slice); CR-03 fires ROZ128 on the at-rule's INNER rule selectors
+    // too via `walkRules`.
     const children: StyleRule[] = [];
     rule.each((child: ChildNode) => {
       if (child.type === 'rule') {
+        const childRule = child as Rule;
+        checkGlobalPseudo(childRule.selector, nodeLoc(childRule));
         children.push({
           kind: 'rule',
-          selector: (child as Rule).selector,
-          loc: nodeLoc(child),
+          selector: childRule.selector,
+          loc: nodeLoc(childRule),
+          isRootEscape: false,
+        });
+      } else if (child.type === 'atrule') {
+        const atChild = child as AtRule;
+        // ROZ128 must still fire for a `:global()` nested inside the at-rule
+        // (`@media (...) { .cm:global(.foo) {} }`).
+        atChild.walkRules((inner: Rule) => {
+          checkGlobalPseudo(inner.selector, nodeLoc(inner));
+        });
+        children.push({
+          kind: 'rule',
+          selector: '',
+          loc: nodeLoc(atChild),
           isRootEscape: false,
         });
       }
