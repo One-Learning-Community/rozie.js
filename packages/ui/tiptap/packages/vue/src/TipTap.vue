@@ -17,6 +17,9 @@
 
 
 
+
+
+
 </template>
 
 <script setup lang="ts">
@@ -38,6 +41,8 @@ const emit = defineEmits<{
 
 defineSlots<{
   toolbar(props: { editor: any }): any;
+  bubbleMenu(props: { editor: any }): any;
+  floatingMenu(props: { editor: any }): any;
   nodeView(props: { node: any; selected: any; updateAttributes: any; getPos: any; editor: any; contentDOM: any }): any;
 }>();
 
@@ -57,6 +62,20 @@ const editorElRef = ref<HTMLElement>();
 import { Editor, Node } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import { Placeholder } from '@tiptap/extensions';
+// Selection-anchored menu extensions (G2). SEPARATE packages (NOT in
+// @tiptap/extensions), version-pinned in lockstep with @tiptap/core (3.23.5).
+// Both export their extension as a NAMED export (`BubbleMenu` / `FloatingMenu`)
+// — verified against the installed dist .d.ts — and are `.configure({ element })`
+// Extensions that own Floating-UI positioning and append the host element to the
+// editor's parent automatically (no manual document insertion needed).
+// Selection-anchored menu extensions (G2). SEPARATE packages (NOT in
+// @tiptap/extensions), version-pinned in lockstep with @tiptap/core (3.23.5).
+// Both export their extension as a NAMED export (`BubbleMenu` / `FloatingMenu`)
+// — verified against the installed dist .d.ts — and are `.configure({ element })`
+// Extensions that own Floating-UI positioning and append the host element to the
+// editor's parent automatically (no manual document insertion needed).
+import { BubbleMenu } from '@tiptap/extension-bubble-menu';
+import { FloatingMenu } from '@tiptap/extension-floating-menu';
 
 // The live editor instance — null before mount / after destroy. Named `editor`
 // (distinct from any template `ref="X"` name) so no capture-var-vs-ref double
@@ -93,6 +112,25 @@ let lastHtml: any = null;
 // into a sibling onCleanup() OUTSIDE the mount-body IIFE, so a mount-local would
 // lose scope there (the Chart.js tooltipEl/tooltipDispose hoist lesson).
 let toolbarDispose: any = null;
+
+// The `bubbleMenu` / `floatingMenu` portal-slot dispose handles + the imperatively
+// created menu host elements. COMPONENT-scope for the same hoist reason as
+// toolbarDispose — and the host els must be reachable from BOTH the pre-`new
+// Editor` extension build (the menu extension needs its `element` at construction)
+// AND the post-construction portal mount, so they live here too (not $onMount
+// locals). Each stays null when its slot is unfilled (zero overhead, no $portals
+// reference fired — the nodeView discipline).
+// The `bubbleMenu` / `floatingMenu` portal-slot dispose handles + the imperatively
+// created menu host elements. COMPONENT-scope for the same hoist reason as
+// toolbarDispose — and the host els must be reachable from BOTH the pre-`new
+// Editor` extension build (the menu extension needs its `element` at construction)
+// AND the post-construction portal mount, so they live here too (not $onMount
+// locals). Each stays null when its slot is unfilled (zero overhead, no $portals
+// reference fired — the nodeView discipline).
+let bubbleMenuEl: any = null;
+let bubbleMenuDispose: any = null;
+let floatingMenuEl: any = null;
+let floatingMenuDispose: any = null;
 
 // Recompute the internal toolbar's active-mark booleans from the live editor.
 // Recompute the internal toolbar's active-mark booleans from the live editor.
@@ -427,6 +465,36 @@ const portals = {
       portalContainers.delete(container);
     };
   },
+  bubbleMenu: (container: HTMLElement, scope: { editor: unknown }): (() => void) => {
+    const slotFn = slots.bubbleMenu;
+    if (!slotFn) return () => {};
+    // Spike 004: portal-scope attribute injection. Cascades the @portal
+    // bubbleMenu { … } selectors from the unscoped <style> block below into
+    // the engine-owned subtree.
+    container.setAttribute('data-rozie-portal-bubbleMenu', '2aeee876');
+    const vnode = h(Fragment, null, slotFn(scope));
+    render(vnode, container);
+    portalContainers.add(container);
+    return () => {
+      render(null, container);
+      portalContainers.delete(container);
+    };
+  },
+  floatingMenu: (container: HTMLElement, scope: { editor: unknown }): (() => void) => {
+    const slotFn = slots.floatingMenu;
+    if (!slotFn) return () => {};
+    // Spike 004: portal-scope attribute injection. Cascades the @portal
+    // floatingMenu { … } selectors from the unscoped <style> block below into
+    // the engine-owned subtree.
+    container.setAttribute('data-rozie-portal-floatingMenu', '2aeee876');
+    const vnode = h(Fragment, null, slotFn(scope));
+    render(vnode, container);
+    portalContainers.add(container);
+    return () => {
+      render(null, container);
+      portalContainers.delete(container);
+    };
+  },
   nodeView: (container: HTMLElement, scope: { node: unknown; selected: unknown; updateAttributes: unknown; getPos: unknown; editor: unknown; contentDOM: unknown }): ReactivePortalHandle => {
     const slotFn = slots.nodeView;
     if (!slotFn) return { update() {}, dispose() {} };
@@ -473,6 +541,32 @@ onMounted(() => {
   const placeholderExtensions = props.placeholder ? [Placeholder.configure({
     placeholder: props.placeholder
   })] : [];
+
+  // Selection-anchored menu extensions (G2). Built BEFORE `new Editor` because the
+  // Floating-UI menu extension needs its host `element` at construction time. Each
+  // menu's host element is created imperatively (the nodeView discipline — the
+  // engine owns positioning; the consumer fragment is portalled in AFTER mount).
+  // An unfilled slot adds NOTHING (zero overhead, no $portals reference fired).
+  //
+  // The host elements are created up front (when filled) so they're captured into
+  // the component-scope `bubbleMenuEl`/`floatingMenuEl` for the post-construction
+  // portal mount; the extension list is then assembled by conditional SPREAD (NOT
+  // `const x = []; x.push(…)`), which under the strict-typecheck'd bundled leaves
+  // infers `any[]` — a bare `const x = []` would infer `never[]` and reject
+  // `.push(Extension)` (the placeholderExtensions/nodeViewExtensions discipline).
+  if (slots.bubbleMenu) {
+    bubbleMenuEl = document.createElement('div');
+    bubbleMenuEl.className = 'rozie-tiptap-bubble-menu';
+  }
+  if (slots.floatingMenu) {
+    floatingMenuEl = document.createElement('div');
+    floatingMenuEl.className = 'rozie-tiptap-floating-menu';
+  }
+  const menuExtensions = [...(bubbleMenuEl ? [BubbleMenu.configure({
+    element: bubbleMenuEl
+  })] : []), ...(floatingMenuEl ? [FloatingMenu.configure({
+    element: floatingMenuEl
+  })] : [])];
   editor = new Editor({
     element: editorElRef.value!,
     content: html.value,
@@ -481,7 +575,7 @@ onMounted(() => {
     // StarterKit first; the Placeholder ext next; the reactive node-view nodes
     // next; consumer extensions LAST so they win (TipTap applies later-registered
     // extensions over earlier ones for the same node/mark).
-    extensions: [StarterKit, ...placeholderExtensions, ...nodeViewExtensions, ...props.extensions],
+    extensions: [StarterKit, ...placeholderExtensions, ...nodeViewExtensions, ...menuExtensions, ...props.extensions],
     editorProps: {
       attributes: {
         'aria-label': props.ariaLabel,
@@ -527,9 +621,31 @@ onMounted(() => {
       editor
     });
   }
+
+  // `bubbleMenu` / `floatingMenu` portal slots — mount the consumer's menu
+  // fragment into the engine-owned (imperatively-created) host element handed to
+  // the Floating-UI menu extension, with the live editor in scope (their buttons
+  // call editor.chain().focus()…run()). Like toolbar/nodeView, $portals.bubbleMenu
+  // / $portals.floatingMenu are referenced ONLY inside $onMount (the bundled-leaf
+  // strict-typecheck discipline). The element is created above only when the slot
+  // is filled, so each portal fires exactly when its slot exists.
+  if (bubbleMenuEl) {
+    bubbleMenuDispose = portals.bubbleMenu(bubbleMenuEl, {
+      editor
+    });
+  }
+  if (floatingMenuEl) {
+    floatingMenuDispose = portals.floatingMenu(floatingMenuEl, {
+      editor
+    });
+  }
   _cleanup_0 = () => {
     toolbarDispose?.();
     toolbarDispose = null;
+    bubbleMenuDispose?.();
+    bubbleMenuDispose = null;
+    floatingMenuDispose?.();
+    floatingMenuDispose = null;
     editor?.destroy();
   };
 });

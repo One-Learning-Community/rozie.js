@@ -86,4 +86,6 @@ renderToolbar={({ editor }) => <MyToolbar editor={editor} />}
 | Slot | Params |
 | --- | --- |
 | toolbar | editor |
+| bubbleMenu | editor |
+| floatingMenu | editor |
 | nodeView | node, selected, updateAttributes, getPos, editor, contentDOM |

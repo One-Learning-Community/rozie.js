@@ -5,12 +5,34 @@ import { createLitControllableProperty, injectGlobalStyles } from '@rozie/runtim
 import { Editor, Node } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import { Placeholder } from '@tiptap/extensions';
+// Selection-anchored menu extensions (G2). SEPARATE packages (NOT in
+// @tiptap/extensions), version-pinned in lockstep with @tiptap/core (3.23.5).
+// Both export their extension as a NAMED export (`BubbleMenu` / `FloatingMenu`)
+// — verified against the installed dist .d.ts — and are `.configure({ element })`
+// Extensions that own Floating-UI positioning and append the host element to the
+// editor's parent automatically (no manual document insertion needed).
+// Selection-anchored menu extensions (G2). SEPARATE packages (NOT in
+// @tiptap/extensions), version-pinned in lockstep with @tiptap/core (3.23.5).
+// Both export their extension as a NAMED export (`BubbleMenu` / `FloatingMenu`)
+// — verified against the installed dist .d.ts — and are `.configure({ element })`
+// Extensions that own Floating-UI positioning and append the host element to the
+// editor's parent automatically (no manual document insertion needed).
+import { BubbleMenu } from '@tiptap/extension-bubble-menu';
+import { FloatingMenu } from '@tiptap/extension-floating-menu';
 
 // The live editor instance — null before mount / after destroy. Named `editor`
 // (distinct from any template `ref="X"` name) so no capture-var-vs-ref double
 // declaration trap (the Chart.js canvasEl/canvasNode lesson).
 
 interface RozieToolbarSlotCtx {
+  editor: unknown;
+}
+
+interface RozieBubbleMenuSlotCtx {
+  editor: unknown;
+}
+
+interface RozieFloatingMenuSlotCtx {
   editor: unknown;
 }
 
@@ -113,6 +135,12 @@ private _portalContainers = new Set<HTMLElement>();
   @state() private _hasSlotToolbar = false;
   @queryAssignedElements({ slot: 'toolbar', flatten: true }) private _slotToolbarElements!: Element[];
   @property({ attribute: false }) toolbar?: (scope: { editor: unknown }) => unknown;
+  @state() private _hasSlotBubbleMenu = false;
+  @queryAssignedElements({ slot: 'bubbleMenu', flatten: true }) private _slotBubbleMenuElements!: Element[];
+  @property({ attribute: false }) bubbleMenu?: (scope: { editor: unknown }) => unknown;
+  @state() private _hasSlotFloatingMenu = false;
+  @queryAssignedElements({ slot: 'floatingMenu', flatten: true }) private _slotFloatingMenuElements!: Element[];
+  @property({ attribute: false }) floatingMenu?: (scope: { editor: unknown }) => unknown;
   @state() private _hasSlotNodeView = false;
   @queryAssignedElements({ slot: 'nodeView', flatten: true }) private _slotNodeViewElements!: Element[];
   @property({ attribute: false }) nodeView?: (scope: { node: unknown; selected: unknown; updateAttributes: unknown; getPos: unknown; editor: unknown; contentDOM: unknown }) => unknown;
@@ -135,6 +163,28 @@ private _portalContainers = new Set<HTMLElement>();
     }
 
     {
+      const slotEl = this.shadowRoot?.querySelector('slot[name="bubbleMenu"]');
+      if (slotEl !== null && slotEl !== undefined) {
+        const update = () => { this._hasSlotBubbleMenu = this._slotBubbleMenuElements.length > 0; };
+        slotEl.addEventListener('slotchange', update);
+        // CR-05 fix: push cleanup so the listener is removed on disconnectedCallback.
+        this._disconnectCleanups.push(() => slotEl.removeEventListener('slotchange', update));
+        update();
+      }
+    }
+
+    {
+      const slotEl = this.shadowRoot?.querySelector('slot[name="floatingMenu"]');
+      if (slotEl !== null && slotEl !== undefined) {
+        const update = () => { this._hasSlotFloatingMenu = this._slotFloatingMenuElements.length > 0; };
+        slotEl.addEventListener('slotchange', update);
+        // CR-05 fix: push cleanup so the listener is removed on disconnectedCallback.
+        this._disconnectCleanups.push(() => slotEl.removeEventListener('slotchange', update));
+        update();
+      }
+    }
+
+    {
       const slotEl = this.shadowRoot?.querySelector('slot[name="nodeView"]');
       if (slotEl !== null && slotEl !== undefined) {
         const update = () => { this._hasSlotNodeView = this._slotNodeViewElements.length > 0; };
@@ -149,6 +199,8 @@ private _portalContainers = new Set<HTMLElement>();
   connectedCallback(): void {
     // Phase 07.3.1 D-LIT-15 — pre-seed _hasSlot<X> from light DOM so first render isn't deadlocked.
     this._hasSlotToolbar = Array.from(this.children).some((el) => el.getAttribute('slot') === 'toolbar');
+    this._hasSlotBubbleMenu = Array.from(this.children).some((el) => el.getAttribute('slot') === 'bubbleMenu');
+    this._hasSlotFloatingMenu = Array.from(this.children).some((el) => el.getAttribute('slot') === 'floatingMenu');
     this._hasSlotNodeView = Array.from(this.children).some((el) => el.getAttribute('slot') === 'nodeView');
     super.connectedCallback();
     if (this.hasUpdated && this._rozieTornDown) { this._rozieTornDown = false; this._armListeners(); }
@@ -167,6 +219,30 @@ private _portalContainers = new Set<HTMLElement>();
         if (typeof tpl !== 'function') return () => {};
         // Spike 004: portal-scope attribute injection.
         container.setAttribute('data-rozie-portal-toolbar', '2aeee876');
+        render(tpl(scope), container);
+        this._portalContainers.add(container);
+        return () => {
+          render(nothing, container);
+          this._portalContainers.delete(container);
+        };
+      },
+      bubbleMenu: (container: HTMLElement, scope: { editor: unknown }): (() => void) => {
+        const tpl = this.bubbleMenu;
+        if (typeof tpl !== 'function') return () => {};
+        // Spike 004: portal-scope attribute injection.
+        container.setAttribute('data-rozie-portal-bubbleMenu', '2aeee876');
+        render(tpl(scope), container);
+        this._portalContainers.add(container);
+        return () => {
+          render(nothing, container);
+          this._portalContainers.delete(container);
+        };
+      },
+      floatingMenu: (container: HTMLElement, scope: { editor: unknown }): (() => void) => {
+        const tpl = this.floatingMenu;
+        if (typeof tpl !== 'function') return () => {};
+        // Spike 004: portal-scope attribute injection.
+        container.setAttribute('data-rozie-portal-floatingMenu', '2aeee876');
         render(tpl(scope), container);
         this._portalContainers.add(container);
         return () => {
@@ -197,6 +273,10 @@ private _portalContainers = new Set<HTMLElement>();
     this._disconnectCleanups.push((() => {
       this.toolbarDispose?.();
       this.toolbarDispose = null;
+      this.bubbleMenuDispose?.();
+      this.bubbleMenuDispose = null;
+      this.floatingMenuDispose?.();
+      this.floatingMenuDispose = null;
       this.editor?.destroy();
     }));
 
@@ -239,6 +319,44 @@ private _portalContainers = new Set<HTMLElement>();
     const placeholderExtensions = this.placeholder ? [Placeholder.configure({
       placeholder: this.placeholder
     })] : [];
+
+    // Selection-anchored menu extensions (G2). Built BEFORE `new Editor` because the
+    // Floating-UI menu extension needs its host `element` at construction time. Each
+    // menu's host element is created imperatively (the nodeView discipline — the
+    // engine owns positioning; the consumer fragment is portalled in AFTER mount).
+    // An unfilled slot adds NOTHING (zero overhead, no $portals reference fired).
+    //
+    // The host elements are created up front (when filled) so they're captured into
+    // the component-scope `bubbleMenuEl`/`floatingMenuEl` for the post-construction
+    // portal mount; the extension list is then assembled by conditional SPREAD (NOT
+    // `const x = []; x.push(…)`), which under the strict-typecheck'd bundled leaves
+    // infers `any[]` — a bare `const x = []` would infer `never[]` and reject
+    // `.push(Extension)` (the placeholderExtensions/nodeViewExtensions discipline).
+    // Selection-anchored menu extensions (G2). Built BEFORE `new Editor` because the
+    // Floating-UI menu extension needs its host `element` at construction time. Each
+    // menu's host element is created imperatively (the nodeView discipline — the
+    // engine owns positioning; the consumer fragment is portalled in AFTER mount).
+    // An unfilled slot adds NOTHING (zero overhead, no $portals reference fired).
+    //
+    // The host elements are created up front (when filled) so they're captured into
+    // the component-scope `bubbleMenuEl`/`floatingMenuEl` for the post-construction
+    // portal mount; the extension list is then assembled by conditional SPREAD (NOT
+    // `const x = []; x.push(…)`), which under the strict-typecheck'd bundled leaves
+    // infers `any[]` — a bare `const x = []` would infer `never[]` and reject
+    // `.push(Extension)` (the placeholderExtensions/nodeViewExtensions discipline).
+    if (this.bubbleMenu !== undefined) {
+      this.bubbleMenuEl = document.createElement('div');
+      this.bubbleMenuEl.className = 'rozie-tiptap-bubble-menu';
+    }
+    if (this.floatingMenu !== undefined) {
+      this.floatingMenuEl = document.createElement('div');
+      this.floatingMenuEl.className = 'rozie-tiptap-floating-menu';
+    }
+    const menuExtensions = [...(this.bubbleMenuEl ? [BubbleMenu.configure({
+      element: this.bubbleMenuEl
+    })] : []), ...(this.floatingMenuEl ? [FloatingMenu.configure({
+      element: this.floatingMenuEl
+    })] : [])];
     this.editor = new Editor({
       element: this._refEditorEl,
       content: this.html,
@@ -247,7 +365,7 @@ private _portalContainers = new Set<HTMLElement>();
       // StarterKit first; the Placeholder ext next; the reactive node-view nodes
       // next; consumer extensions LAST so they win (TipTap applies later-registered
       // extensions over earlier ones for the same node/mark).
-      extensions: [StarterKit, ...placeholderExtensions, ...nodeViewExtensions, ...this.extensions],
+      extensions: [StarterKit, ...placeholderExtensions, ...nodeViewExtensions, ...menuExtensions, ...this.extensions],
       editorProps: {
         attributes: {
           'aria-label': this.ariaLabel,
@@ -316,6 +434,31 @@ private _portalContainers = new Set<HTMLElement>();
         editor: this.editor
       });
     }
+
+    // `bubbleMenu` / `floatingMenu` portal slots — mount the consumer's menu
+    // fragment into the engine-owned (imperatively-created) host element handed to
+    // the Floating-UI menu extension, with the live editor in scope (their buttons
+    // call editor.chain().focus()…run()). Like toolbar/nodeView, $portals.bubbleMenu
+    // / $portals.floatingMenu are referenced ONLY inside $onMount (the bundled-leaf
+    // strict-typecheck discipline). The element is created above only when the slot
+    // is filled, so each portal fires exactly when its slot exists.
+    // `bubbleMenu` / `floatingMenu` portal slots — mount the consumer's menu
+    // fragment into the engine-owned (imperatively-created) host element handed to
+    // the Floating-UI menu extension, with the live editor in scope (their buttons
+    // call editor.chain().focus()…run()). Like toolbar/nodeView, $portals.bubbleMenu
+    // / $portals.floatingMenu are referenced ONLY inside $onMount (the bundled-leaf
+    // strict-typecheck discipline). The element is created above only when the slot
+    // is filled, so each portal fires exactly when its slot exists.
+    if (this.bubbleMenuEl) {
+      this.bubbleMenuDispose = portals.bubbleMenu(this.bubbleMenuEl, {
+        editor: this.editor
+      });
+    }
+    if (this.floatingMenuEl) {
+      this.floatingMenuDispose = portals.floatingMenu(this.floatingMenuEl, {
+        editor: this.editor
+      });
+    }
   }
 
   updated(changedProperties: Map<string, unknown>): void {
@@ -357,6 +500,9 @@ private _portalContainers = new Set<HTMLElement>();
 
 <slot name="toolbar"></slot>
 
+<slot name="bubbleMenu"></slot>
+<slot name="floatingMenu"></slot>
+
 <slot name="nodeView"></slot>
 `;
   }
@@ -366,6 +512,14 @@ private _portalContainers = new Set<HTMLElement>();
   lastHtml: any = null;
 
   toolbarDispose: any = null;
+
+  bubbleMenuEl: any = null;
+
+  bubbleMenuDispose: any = null;
+
+  floatingMenuEl: any = null;
+
+  floatingMenuDispose: any = null;
 
   refreshActive = () => {
   if (!this.editor) return;

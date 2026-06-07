@@ -5,12 +5,36 @@ import { NG_VALUE_ACCESSOR } from '@angular/forms';
 import { Editor, Node } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import { Placeholder } from '@tiptap/extensions';
+// Selection-anchored menu extensions (G2). SEPARATE packages (NOT in
+// @tiptap/extensions), version-pinned in lockstep with @tiptap/core (3.23.5).
+// Both export their extension as a NAMED export (`BubbleMenu` / `FloatingMenu`)
+// — verified against the installed dist .d.ts — and are `.configure({ element })`
+// Extensions that own Floating-UI positioning and append the host element to the
+// editor's parent automatically (no manual document insertion needed).
+// Selection-anchored menu extensions (G2). SEPARATE packages (NOT in
+// @tiptap/extensions), version-pinned in lockstep with @tiptap/core (3.23.5).
+// Both export their extension as a NAMED export (`BubbleMenu` / `FloatingMenu`)
+// — verified against the installed dist .d.ts — and are `.configure({ element })`
+// Extensions that own Floating-UI positioning and append the host element to the
+// editor's parent automatically (no manual document insertion needed).
+import { BubbleMenu } from '@tiptap/extension-bubble-menu';
+import { FloatingMenu } from '@tiptap/extension-floating-menu';
 
 // The live editor instance — null before mount / after destroy. Named `editor`
 // (distinct from any template `ref="X"` name) so no capture-var-vs-ref double
 // declaration trap (the Chart.js canvasEl/canvasNode lesson).
 
 interface ToolbarCtx {
+  $implicit: { editor: any };
+  editor: any;
+}
+
+interface BubbleMenuCtx {
+  $implicit: { editor: any };
+  editor: any;
+}
+
+interface FloatingMenuCtx {
   $implicit: { editor: any };
   editor: any;
 }
@@ -47,6 +71,9 @@ interface NodeViewCtx {
     <div class="rozie-tiptap-toolbar rozie-tiptap-toolbar--slot" #toolbarEl></div>
     }<div #editorEl class="rozie-tiptap-content" [attr.data-placeholder]="placeholder()"></div>
     </div>
+
+
+
 
 
 
@@ -148,11 +175,15 @@ export class TipTap {
   focus = output<void>();
   blur = output<void>();
   @ContentChild('toolbar', { read: TemplateRef }) toolbarTpl?: TemplateRef<ToolbarCtx>;
+  @ContentChild('bubbleMenu', { read: TemplateRef }) bubbleMenuTpl?: TemplateRef<BubbleMenuCtx>;
+  @ContentChild('floatingMenu', { read: TemplateRef }) floatingMenuTpl?: TemplateRef<FloatingMenuCtx>;
   @ContentChild('nodeView', { read: TemplateRef }) nodeViewTpl?: TemplateRef<NodeViewCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
   private _portalViews = new Set<EmbeddedViewRef<unknown>>();
   private _portalAnchor = viewChild('rozie_portalAnchor', { read: ViewContainerRef });
   private _toolbarTpl = contentChild('toolbar', { read: TemplateRef });
+  private _bubbleMenuTpl = contentChild('bubbleMenu', { read: TemplateRef });
+  private _floatingMenuTpl = contentChild('floatingMenu', { read: TemplateRef });
   private _nodeViewTpl = contentChild('nodeView', { read: TemplateRef });
   private __rozieDestroyRef = inject(DestroyRef);
   private __rozieWatchInitial_0 = true;
@@ -183,6 +214,36 @@ export class TipTap {
         if (!tpl || !vcr) return () => {};
         // Spike 004: portal-scope attribute injection.
         container.setAttribute('data-rozie-portal-toolbar', '2aeee876');
+        const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
+        view.detectChanges();
+        for (const node of view.rootNodes as Node[]) container.appendChild(node);
+        this._portalViews.add(view as EmbeddedViewRef<unknown>);
+        return () => {
+          view.destroy();
+          this._portalViews.delete(view as EmbeddedViewRef<unknown>);
+        };
+      },
+      bubbleMenu: (container: HTMLElement, scope: { editor: unknown }): (() => void) => {
+        const tpl = this._bubbleMenuTpl();
+        const vcr = this._portalAnchor();
+        if (!tpl || !vcr) return () => {};
+        // Spike 004: portal-scope attribute injection.
+        container.setAttribute('data-rozie-portal-bubbleMenu', '2aeee876');
+        const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
+        view.detectChanges();
+        for (const node of view.rootNodes as Node[]) container.appendChild(node);
+        this._portalViews.add(view as EmbeddedViewRef<unknown>);
+        return () => {
+          view.destroy();
+          this._portalViews.delete(view as EmbeddedViewRef<unknown>);
+        };
+      },
+      floatingMenu: (container: HTMLElement, scope: { editor: unknown }): (() => void) => {
+        const tpl = this._floatingMenuTpl();
+        const vcr = this._portalAnchor();
+        if (!tpl || !vcr) return () => {};
+        // Spike 004: portal-scope attribute injection.
+        container.setAttribute('data-rozie-portal-floatingMenu', '2aeee876');
         const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
         view.detectChanges();
         for (const node of view.rootNodes as Node[]) container.appendChild(node);
@@ -245,6 +306,44 @@ export class TipTap {
     const placeholderExtensions = __placeholder ? [Placeholder.configure({
       placeholder: __placeholder
     })] : [];
+
+    // Selection-anchored menu extensions (G2). Built BEFORE `new Editor` because the
+    // Floating-UI menu extension needs its host `element` at construction time. Each
+    // menu's host element is created imperatively (the nodeView discipline — the
+    // engine owns positioning; the consumer fragment is portalled in AFTER mount).
+    // An unfilled slot adds NOTHING (zero overhead, no $portals reference fired).
+    //
+    // The host elements are created up front (when filled) so they're captured into
+    // the component-scope `bubbleMenuEl`/`floatingMenuEl` for the post-construction
+    // portal mount; the extension list is then assembled by conditional SPREAD (NOT
+    // `const x = []; x.push(…)`), which under the strict-typecheck'd bundled leaves
+    // infers `any[]` — a bare `const x = []` would infer `never[]` and reject
+    // `.push(Extension)` (the placeholderExtensions/nodeViewExtensions discipline).
+    // Selection-anchored menu extensions (G2). Built BEFORE `new Editor` because the
+    // Floating-UI menu extension needs its host `element` at construction time. Each
+    // menu's host element is created imperatively (the nodeView discipline — the
+    // engine owns positioning; the consumer fragment is portalled in AFTER mount).
+    // An unfilled slot adds NOTHING (zero overhead, no $portals reference fired).
+    //
+    // The host elements are created up front (when filled) so they're captured into
+    // the component-scope `bubbleMenuEl`/`floatingMenuEl` for the post-construction
+    // portal mount; the extension list is then assembled by conditional SPREAD (NOT
+    // `const x = []; x.push(…)`), which under the strict-typecheck'd bundled leaves
+    // infers `any[]` — a bare `const x = []` would infer `never[]` and reject
+    // `.push(Extension)` (the placeholderExtensions/nodeViewExtensions discipline).
+    if ((this.bubbleMenuTpl ?? this.templates()?.['bubbleMenu'])) {
+      this.bubbleMenuEl = document.createElement('div');
+      this.bubbleMenuEl.className = 'rozie-tiptap-bubble-menu';
+    }
+    if ((this.floatingMenuTpl ?? this.templates()?.['floatingMenu'])) {
+      this.floatingMenuEl = document.createElement('div');
+      this.floatingMenuEl.className = 'rozie-tiptap-floating-menu';
+    }
+    const menuExtensions = [...(this.bubbleMenuEl ? [BubbleMenu.configure({
+      element: this.bubbleMenuEl
+    })] : []), ...(this.floatingMenuEl ? [FloatingMenu.configure({
+      element: this.floatingMenuEl
+    })] : [])];
     this.editor = new Editor({
       element: this.editorEl()!.nativeElement,
       content: this.html(),
@@ -253,7 +352,7 @@ export class TipTap {
       // StarterKit first; the Placeholder ext next; the reactive node-view nodes
       // next; consumer extensions LAST so they win (TipTap applies later-registered
       // extensions over earlier ones for the same node/mark).
-      extensions: [StarterKit, ...placeholderExtensions, ...nodeViewExtensions, ...this.extensions()],
+      extensions: [StarterKit, ...placeholderExtensions, ...nodeViewExtensions, ...menuExtensions, ...this.extensions()],
       editorProps: {
         attributes: {
           'aria-label': this.ariaLabel(),
@@ -306,9 +405,38 @@ export class TipTap {
         editor: this.editor
       });
     }
+
+    // `bubbleMenu` / `floatingMenu` portal slots — mount the consumer's menu
+    // fragment into the engine-owned (imperatively-created) host element handed to
+    // the Floating-UI menu extension, with the live editor in scope (their buttons
+    // call editor.chain().focus()…run()). Like toolbar/nodeView, $portals.bubbleMenu
+    // / $portals.floatingMenu are referenced ONLY inside $onMount (the bundled-leaf
+    // strict-typecheck discipline). The element is created above only when the slot
+    // is filled, so each portal fires exactly when its slot exists.
+    // `bubbleMenu` / `floatingMenu` portal slots — mount the consumer's menu
+    // fragment into the engine-owned (imperatively-created) host element handed to
+    // the Floating-UI menu extension, with the live editor in scope (their buttons
+    // call editor.chain().focus()…run()). Like toolbar/nodeView, $portals.bubbleMenu
+    // / $portals.floatingMenu are referenced ONLY inside $onMount (the bundled-leaf
+    // strict-typecheck discipline). The element is created above only when the slot
+    // is filled, so each portal fires exactly when its slot exists.
+    if (this.bubbleMenuEl) {
+      this.bubbleMenuDispose = portals.bubbleMenu(this.bubbleMenuEl, {
+        editor: this.editor
+      });
+    }
+    if (this.floatingMenuEl) {
+      this.floatingMenuDispose = portals.floatingMenu(this.floatingMenuEl, {
+        editor: this.editor
+      });
+    }
     this.__rozieDestroyRef.onDestroy(() => {
       this.toolbarDispose?.();
       this.toolbarDispose = null;
+      this.bubbleMenuDispose?.();
+      this.bubbleMenuDispose = null;
+      this.floatingMenuDispose?.();
+      this.floatingMenuDispose = null;
       this.editor?.destroy();
     });
     this.__rozieDestroyRef.onDestroy(() => {
@@ -320,6 +448,10 @@ export class TipTap {
   editor: any = null;
   lastHtml: any = null;
   toolbarDispose: any = null;
+  bubbleMenuEl: any = null;
+  bubbleMenuDispose: any = null;
+  floatingMenuEl: any = null;
+  floatingMenuDispose: any = null;
   refreshActive = () => {
     if (!this.editor) return;
     this.active.set({
@@ -569,7 +701,7 @@ export class TipTap {
   static ngTemplateContextGuard(
     _dir: TipTap,
     _ctx: unknown,
-  ): _ctx is ToolbarCtx | NodeViewCtx {
+  ): _ctx is ToolbarCtx | BubbleMenuCtx | FloatingMenuCtx | NodeViewCtx {
     return true;
   }
 }

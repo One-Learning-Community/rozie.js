@@ -18,6 +18,8 @@ export interface TipTapProps {
   onFocus?: (...args: unknown[]) => void;
   onBlur?: (...args: unknown[]) => void;
   renderToolbar?: (params: { editor: () => void }) => ReactNode;
+  renderBubbleMenu?: (params: { editor: () => void }) => ReactNode;
+  renderFloatingMenu?: (params: { editor: () => void }) => ReactNode;
   renderNodeView?: (params: { node: () => void; selected: () => void; updateAttributes: () => void; getPos: () => void; editor: () => void; contentDOM: () => void }) => ReactNode;
   slots?: Record<string, () => ReactNode>;
 }
