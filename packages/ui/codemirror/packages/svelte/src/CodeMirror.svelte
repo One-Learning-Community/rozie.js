@@ -308,17 +308,20 @@ $effect(() => { const __watchVal = (() => extensions)(); untrack(() => { if (__r
     height: 100%;
     width: 100%;
   }
-  .rozie-codemirror[data-rozie-s-34cfda5a] [data-rozie-s-34cfda5a]:global(.cm-editor) {
-    height: 100%;
-    font-size: 13px;
-  }
-  .rozie-codemirror[data-rozie-s-34cfda5a] [data-rozie-s-34cfda5a]:global(.cm-scroller) {
-    height: 100%;
-  }
-  .rozie-codemirror[data-rozie-s-34cfda5a] [data-rozie-s-34cfda5a]:global(.rozie-cm-panel) {
-    padding: 2px 8px;
-    border-top: 1px solid rgba(0, 0, 0, 0.12);
-    font-size: 12px;
-  }
+}
+
+:global {
+  .rozie-codemirror .cm-editor {
+      height: 100%;
+      font-size: 13px;
+    }
+  .rozie-codemirror .cm-scroller {
+      height: 100%;
+    }
+  .rozie-codemirror .rozie-cm-panel {
+      padding: 2px 8px;
+      border-top: 1px solid rgba(0, 0, 0, 0.12);
+      font-size: 12px;
+    }
 }
 </style>

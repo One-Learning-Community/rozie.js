@@ -296,16 +296,19 @@ defineExpose({ getView, focus, getValue, replaceValue, dispatch, insertText, get
   height: 100%;
   width: 100%;
 }
-.rozie-codemirror :global(.cm-editor) {
-  height: 100%;
-  font-size: 13px;
-}
-.rozie-codemirror :global(.cm-scroller) {
-  height: 100%;
-}
-.rozie-codemirror :global(.rozie-cm-panel) {
-  padding: 2px 8px;
-  border-top: 1px solid rgba(0, 0, 0, 0.12);
-  font-size: 12px;
-}
+</style>
+
+<style>
+.rozie-codemirror .cm-editor {
+    height: 100%;
+    font-size: 13px;
+  }
+.rozie-codemirror .cm-scroller {
+    height: 100%;
+  }
+.rozie-codemirror .rozie-cm-panel {
+    padding: 2px 8px;
+    border-top: 1px solid rgba(0, 0, 0, 0.12);
+    font-size: 12px;
+  }
 </style>

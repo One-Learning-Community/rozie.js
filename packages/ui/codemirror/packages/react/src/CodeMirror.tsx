@@ -4,6 +4,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { flushSync } from 'react-dom';
 import { useControllableState } from '@rozie/runtime-react';
 import './CodeMirror.css';
+import './CodeMirror.global.css';
 import { EditorState, Compartment, EditorSelection } from '@codemirror/state';
 import { EditorView, keymap, lineNumbers, showPanel, placeholder as placeholderExt } from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';

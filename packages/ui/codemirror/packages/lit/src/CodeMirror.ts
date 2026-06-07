@@ -1,7 +1,7 @@
 import { LitElement, css, html, nothing, render } from 'lit';
 import { customElement, property, query, queryAssignedElements, state } from 'lit/decorators.js';
 import { SignalWatcher, effect, untracked } from '@lit-labs/preact-signals';
-import { createLitControllableProperty } from '@rozie/runtime-lit';
+import { createLitControllableProperty, injectGlobalStyles } from '@rozie/runtime-lit';
 import { styleMap } from 'lit/directives/style-map.js';
 import { EditorState, Compartment, EditorSelection } from '@codemirror/state';
 import { EditorView, keymap, lineNumbers, showPanel, placeholder as placeholderExt } from '@codemirror/view';
@@ -26,18 +26,18 @@ export default class CodeMirror extends SignalWatcher(LitElement) {
   height: 100%;
   width: 100%;
 }
-.rozie-codemirror[data-rozie-s-34cfda5a] [data-rozie-s-34cfda5a]:global(.cm-editor) {
-  height: 100%;
-  font-size: 13px;
-}
-.rozie-codemirror[data-rozie-s-34cfda5a] [data-rozie-s-34cfda5a]:global(.cm-scroller) {
-  height: 100%;
-}
-.rozie-codemirror[data-rozie-s-34cfda5a] [data-rozie-s-34cfda5a]:global(.rozie-cm-panel) {
-  padding: 2px 8px;
-  border-top: 1px solid rgba(0, 0, 0, 0.12);
-  font-size: 12px;
-}
+.rozie-codemirror .cm-editor {
+    height: 100%;
+    font-size: 13px;
+  }
+.rozie-codemirror .cm-scroller {
+    height: 100%;
+  }
+.rozie-codemirror .rozie-cm-panel {
+    padding: 2px 8px;
+    border-top: 1px solid rgba(0, 0, 0, 0.12);
+    font-size: 12px;
+  }
 `;
 
   @property({ type: String, attribute: 'value' }) _value_attr: string = '';
@@ -311,3 +311,18 @@ private _portalContainers = new Set<HTMLElement>();
   get value(): string { return this._valueControllable.read(); }
   set value(v: string) { this._valueControllable.notifyPropertyWrite(v); }
 }
+
+injectGlobalStyles('rozie-code-mirror-global', `
+.rozie-codemirror .cm-editor {
+    height: 100%;
+    font-size: 13px;
+  }
+.rozie-codemirror .cm-scroller {
+    height: 100%;
+  }
+.rozie-codemirror .rozie-cm-panel {
+    padding: 2px 8px;
+    border-top: 1px solid rgba(0, 0, 0, 0.12);
+    font-size: 12px;
+  }
+`);

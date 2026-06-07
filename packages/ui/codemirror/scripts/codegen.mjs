@@ -173,6 +173,13 @@ function main() {
     // React-only sidecars.
     if (target === 'react') {
       if (r.css) writeFileSync(resolve(leafSrc, 'CodeMirror.css'), r.css);
+      // The React emitter routes nested-`:root` engine rules (the `.cm-*`
+      // escape-hatch styles, Phase 34) into `r.globalCss` and emits a sibling
+      // `import './CodeMirror.global.css';` side effect in the `.tsx`. Write the
+      // sidecar whenever it is present so that import resolves; without it the
+      // regenerated leaf imports a non-existent file (the cm-* engine rules went
+      // dead→live in Phase 34-03, so this path activated for the first time).
+      if (r.globalCss) writeFileSync(resolve(leafSrc, 'CodeMirror.global.css'), r.globalCss);
       if (r.types) writeFileSync(resolve(leafSrc, 'CodeMirror.d.ts'), r.types);
     }
 

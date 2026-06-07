@@ -37,18 +37,19 @@ interface PanelCtx {
       height: 100%;
       width: 100%;
     }
-    .rozie-codemirror :global(.cm-editor) {
-      height: 100%;
-      font-size: 13px;
-    }
-    .rozie-codemirror :global(.cm-scroller) {
-      height: 100%;
-    }
-    .rozie-codemirror :global(.rozie-cm-panel) {
-      padding: 2px 8px;
-      border-top: 1px solid rgba(0, 0, 0, 0.12);
-      font-size: 12px;
-    }
+
+    ::ng-deep .rozie-codemirror .cm-editor {
+        height: 100%;
+        font-size: 13px;
+      }
+    ::ng-deep .rozie-codemirror .cm-scroller {
+        height: 100%;
+      }
+    ::ng-deep .rozie-codemirror .rozie-cm-panel {
+        padding: 2px 8px;
+        border-top: 1px solid rgba(0, 0, 0, 0.12);
+        font-size: 12px;
+      }
   `],
   providers: [
     {
