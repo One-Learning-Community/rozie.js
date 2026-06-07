@@ -54,7 +54,7 @@ The wedge is real and strongest for **Lit (no wrapper at all)** and **Solid (thi
 | **G1 — Node-view component renderer** | React, Vue, Angular, Svelte | **High** (TipTap's marquee feature) | **✅ SHIPPED (Phase 33)** — a uniform `nodeView` **reactive** portal slot driven by `addNodeView`, proven 6/6. See the [shipped design below](#node-view-portal-slots-g1-shipped). |
 | G2 — Bubble / Floating menu | React, Vue, Angular, Svelte | Medium | **⏳ Deferred (follow-up)** — a `bubbleMenu` / `floatingMenu` portal slot over `@tiptap/extension-bubble-menu` (Floating UI). Out of Phase 33 scope. |
 | **G3 — Bundled Placeholder** | all (via core ext) | Low | **✅ SHIPPED** — bundles `@tiptap/extensions` (ships `Placeholder` in v3) and wires the `placeholder` prop to `Placeholder.configure({ placeholder })`; ghost-text renders on the empty editor across all six targets via the `:root { }` engine-DOM escape hatch (Phase 34). See [shipped below](#bundle-placeholder-g3-shipped). |
-| G4 — `outputFormat: 'json'` two-way | `ngx-tiptap` | Low | **⏳ Deferred (follow-up)** — a `format` prop (`'html' | 'json'`) switching the two-way payload; `getJSON()` already exists on the handle. |
+| G4 — `outputFormat: 'json'` two-way | `ngx-tiptap` | Low | **✅ Covered via the handle / model-format switch deferred (by design)** — JSON output is available today: `getJSON()` is on the `$expose` handle, so consumers read JSON whenever they need it. The only unmatched piece is making the *two-way model payload itself* JSON via a `format` prop — an `ngx-tiptap`-only (Angular) nicety that would race the canonical `html` model channel. Read JSON off the handle instead. |
 | G5 — Reactive-forms / CVA | `ngx-tiptap` (Angular) | Low | **✅ SHIPPED** — `html` is the single `model` prop, so the Angular target auto-emits `ControlValueAccessor` (Phase 23). `[(ngModel)]`, `[formControl]`, and `formControlName` bind directly, no wrapper directive. |
 
 ## Node-view portal slots (G1 — shipped) {#node-view-portal-slots-g1-shipped}
@@ -93,17 +93,17 @@ extensions: [StarterKit, ...placeholderExtensions, ...nodeViewExtensions, ...$pr
 
 The Placeholder extension adds the class `is-editor-empty` and a `data-placeholder` attribute to the first empty ProseMirror node — an **engine-rendered node that never carries Rozie's `[data-rozie-s-*]` scope attribute**, so a plain scoped CSS rule would silently fail to match on React/Solid/Lit. The ghost-text `::before` rule is therefore emitted through the **`:root { … }` engine-DOM escape hatch** (Phase 34): bare/unscoped on every target — React `.global.css` sidecar, Vue unscoped second `<style>`, Svelte `:global { }`, Angular `::ng-deep`, Solid `__rozieInjectStyle`, Lit dual-sink (`static styles` + `injectGlobalStyles`). (Not `:global()` — that is a ROZ128 hard error; the `:root { nested }` form is canonical.) The ghost text renders **only** while the editor is empty, so it has zero effect on non-empty documents.
 
-## Deferred follow-ups (G2 / G4)
+## Deferred follow-up (G2)
 
-These remain out of scope and are tracked for a follow-up phase.
+This remains out of scope and is tracked for a follow-up phase.
 
 ### Bubble / Floating menu slots (G2)
 
 A `bubbleMenu` and `floatingMenu` portal slot over `@tiptap/extension-bubble-menu` / `@tiptap/extension-floating-menu` (both Floating-UI-based in v3). Lower risk than node views — the menu's DOM is a single positioned element, a natural portal host (the same shape as the shipped `toolbar` slot, plus a selection-driven `shouldShow`). Adds the two extension peers.
 
-### JSON content format (G4)
+### JSON content format (G4) — covered via the handle
 
-A `format` prop (`'html'` default | `'json'`) that switches the two-way `html`/`json` model payload and the `update` event shape — matching `ngx-tiptap`'s `outputFormat`. `getJSON()` already exists on the handle, so this is a small source change.
+JSON output is **available today** through `getJSON()` on the `$expose` handle — consumers read the editor's JSON whenever they need it. The only piece intentionally *not* matched is switching the **two-way model payload itself** to JSON via a `format` prop (`ngx-tiptap`'s `outputFormat`): that is an Angular-ecosystem nicety, and a second JSON model channel would race the canonical `html` two-way path. Read JSON off the handle instead.
 
 ## Honest caveats
 

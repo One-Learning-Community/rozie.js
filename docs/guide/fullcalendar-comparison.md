@@ -146,11 +146,17 @@ keeps the comparison credible.
   those columns is consistency — the *identical* API on all six targets — rather
   than a capability the official connectors lack.
 
-- **Premium / scheduler views are out of scope.** `@rozie-ui/fullcalendar` wraps
-  the four free plugins (`core` + `daygrid` + `timegrid` + `interaction`). The
-  premium resource-timeline / resource-timegrid views, the `rrule`
-  recurring-event plugin, and the `list` view are not wrapped — they sit behind
-  FullCalendar's own premium license and a separate plugin surface.
+- **Only the *premium* resource views are out of scope.** `@rozie-ui/fullcalendar`
+  bundles the four free plugins (`core` + `daygrid` + `timegrid` + `interaction`)
+  by default. The free `@fullcalendar/list` view and the `rrule` recurring-event
+  plugin are **not bundled but fully engageable today** — `:options.plugins` merges
+  consumer plugins with the baked-in defaults, so `:options="{ plugins: [listPlugin] }"`
+  (or `rrulePlugin`) lights them up across all six targets with zero per-plugin
+  wrapper code and zero bundle cost when unused; the `noEventsContent` slot hook is
+  already pre-declared for the list view's empty state. rrule needs no special
+  wiring (events carry an `rrule` field once the plugin is engaged). Only the
+  **premium** resource-timeline / resource-timegrid views sit behind FullCalendar's
+  own license — those are genuinely out of scope.
 
 - **Single-framework ergonomics are not the contest.** The matrix scores
   out-of-the-box, cross-framework capability. The comparison is about reaching

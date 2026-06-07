@@ -433,7 +433,7 @@ The `placeholder` prop renders empty-state ghost text out of the box — the tex
 
 ### Node views ship; bubble/floating menus are the remaining gap
 
-TipTap's marquee feature — **custom node views** — ships via the [`nodeView` reactive slot](#node-view-slots), uniformly across all six targets (including Solid and Lit, where no upstream renderer exists). The remaining gap versus the official wrappers is **bubble / floating menu** slots (selection-anchored menu UI), which are deferred to a follow-up phase. See the [comparison page](/guide/tiptap-comparison#deferred-follow-ups-g2-g4) for the deferred-feature plan.
+TipTap's marquee feature — **custom node views** — ships via the [`nodeView` reactive slot](#node-view-slots), uniformly across all six targets (including Solid and Lit, where no upstream renderer exists). The remaining gap versus the official wrappers is **bubble / floating menu** slots (selection-anchored menu UI), which are deferred to a follow-up phase. See the [comparison page](/guide/tiptap-comparison#deferred-follow-up-g2) for the deferred-feature plan.
 
 ## Cross-references
 
