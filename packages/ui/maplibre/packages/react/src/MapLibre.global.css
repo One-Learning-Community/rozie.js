@@ -1,0 +1,7 @@
+.rozie-maplibre .rozie-maplibre-marker {
+    cursor: pointer;
+  }
+.rozie-maplibre .rozie-maplibre-control {
+    display: flex;
+    flex-direction: column;
+  }

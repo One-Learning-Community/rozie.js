@@ -1,0 +1,79 @@
+import type { ReactNode } from 'react';
+import type { ForwardRefExoticComponent, RefAttributes } from 'react';
+import type * as React from 'react';
+
+export interface MapLibreProps {
+  center?: unknown[];
+  defaultCenter?: unknown[];
+  onCenterChange?: (next: unknown[]) => void;
+  zoom?: number;
+  defaultZoom?: number;
+  onZoomChange?: (next: number) => void;
+  bearing?: number;
+  defaultBearing?: number;
+  onBearingChange?: (next: number) => void;
+  pitch?: number;
+  defaultPitch?: number;
+  onPitchChange?: (next: number) => void;
+  mapStyle?: unknown;
+  minZoom?: number;
+  maxZoom?: number;
+  maxBounds?: unknown;
+  bounds?: unknown;
+  fitBoundsOptions?: Record<string, unknown>;
+  dragPan?: boolean;
+  dragRotate?: boolean;
+  scrollZoom?: boolean;
+  doubleClickZoom?: boolean;
+  boxZoom?: boolean;
+  keyboard?: boolean;
+  touchZoomRotate?: boolean;
+  touchPitch?: boolean;
+  markers?: unknown[];
+  popups?: unknown[];
+  sources?: unknown[];
+  layers?: unknown[];
+  interactiveLayerIds?: unknown[];
+  controls?: unknown[];
+  options?: Record<string, unknown>;
+  onLoad?: (...args: unknown[]) => void;
+  onIdle?: (...args: unknown[]) => void;
+  onMove?: (...args: unknown[]) => void;
+  onZoom?: (...args: unknown[]) => void;
+  onRotate?: (...args: unknown[]) => void;
+  onPitch?: (...args: unknown[]) => void;
+  onDragstart?: (...args: unknown[]) => void;
+  onDrag?: (...args: unknown[]) => void;
+  onDragend?: (...args: unknown[]) => void;
+  onClick?: (...args: unknown[]) => void;
+  onDblclick?: (...args: unknown[]) => void;
+  onContextmenu?: (...args: unknown[]) => void;
+  onMousemove?: (...args: unknown[]) => void;
+  onError?: (...args: unknown[]) => void;
+  onStyledata?: (...args: unknown[]) => void;
+  onSourcedata?: (...args: unknown[]) => void;
+  onMoveend?: (...args: unknown[]) => void;
+  onZoomend?: (...args: unknown[]) => void;
+  onRotateend?: (...args: unknown[]) => void;
+  onPitchend?: (...args: unknown[]) => void;
+  onMouseenter?: (...args: unknown[]) => void;
+  onMouseleave?: (...args: unknown[]) => void;
+  renderMarker?: (params: { marker: () => void; index: () => void }) => ReactNode;
+  renderPopup?: (params: { popup: () => void; index: () => void }) => ReactNode;
+  renderControl?: (params: { map: () => void }) => ReactNode;
+  slots?: Record<string, () => ReactNode>;
+}
+
+export interface MapLibreHandle {
+  getMap: (...args: any[]) => any;
+  flyTo: (...args: any[]) => any;
+  easeTo: (...args: any[]) => any;
+  jumpTo: (...args: any[]) => any;
+  fitBounds: (...args: any[]) => any;
+  getCenter: (...args: any[]) => any;
+  getZoom: (...args: any[]) => any;
+  resize: (...args: any[]) => any;
+}
+
+declare const MapLibre: React.ForwardRefExoticComponent<MapLibreProps & React.RefAttributes<MapLibreHandle>>;
+export default MapLibre;

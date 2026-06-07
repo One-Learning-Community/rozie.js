@@ -1,0 +1,65 @@
+{
+  "name": "@rozie-ui/maplibre-svelte",
+  "version": "0.1.0",
+  "type": "module",
+  "private": false,
+  "license": "MIT",
+  "description": "Idiomatic Svelte map component wrapping MapLibre GL JS — one Rozie source compiled to Svelte.",
+  "keywords": [
+    "rozie",
+    "rozie-ui",
+    "maplibre",
+    "maplibre-gl",
+    "map",
+    "maps",
+    "gl",
+    "webgl",
+    "geospatial",
+    "component",
+    "svelte"
+  ],
+  "author": "One Learning Community (https://github.com/One-Learning-Community)",
+  "homepage": "https://github.com/One-Learning-Community/rozie.js#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/One-Learning-Community/rozie.js.git",
+    "directory": "packages/ui/maplibre/packages/svelte"
+  },
+  "bugs": {
+    "url": "https://github.com/One-Learning-Community/rozie.js/issues"
+  },
+  "exports": {
+    ".": {
+      "svelte": "./src/MapLibre.svelte",
+      "types": "./src/MapLibre.svelte",
+      "import": "./src/MapLibre.svelte",
+      "default": "./src/MapLibre.svelte"
+    }
+  },
+  "files": [
+    "src"
+  ],
+  "dependencies": {
+    "@rozie/runtime-svelte": "workspace:*"
+  },
+  "peerDependencies": {
+    "svelte": "^5",
+    "maplibre-gl": "^5"
+  },
+  "peerDependenciesMeta": {
+    "svelte": {
+      "optional": false
+    },
+    "maplibre-gl": {
+      "optional": false
+    }
+  },
+  "scripts": {
+    "build": "echo 'ships source; no build'",
+    "typecheck": "echo 'source-only, no typecheck'"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "sideEffects": false
+}

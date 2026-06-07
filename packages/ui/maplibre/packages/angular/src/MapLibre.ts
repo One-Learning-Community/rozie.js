@@ -1,0 +1,671 @@
+import { Component, ContentChild, DestroyRef, ElementRef, EmbeddedViewRef, TemplateRef, ViewContainerRef, ViewEncapsulation, contentChild, effect, inject, input, model, output, untracked, viewChild } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
+
+import maplibregl from 'maplibre-gl';
+
+interface MarkerCtx {
+  $implicit: { marker: any; index: any };
+  marker: any;
+  index: any;
+}
+
+interface PopupCtx {
+  $implicit: { popup: any; index: any };
+  popup: any;
+  index: any;
+}
+
+interface ControlCtx {
+  $implicit: { map: any };
+  map: any;
+}
+
+@Component({
+  selector: 'rozie-map-libre',
+  standalone: true,
+  imports: [NgTemplateOutlet],
+  template: `
+
+    <div class="rozie-maplibre" #containerEl></div>
+
+
+
+
+
+
+    <ng-container #rozie_portalAnchor></ng-container>
+  `,
+  styles: [`
+    .rozie-maplibre {
+      width: 100%;
+      height: 100%;
+      min-height: 300px;
+      position: relative;
+      overflow: hidden;
+      border-radius: 6px;
+    }
+
+    ::ng-deep .rozie-maplibre .rozie-maplibre-marker {
+        cursor: pointer;
+      }
+    ::ng-deep .rozie-maplibre .rozie-maplibre-control {
+        display: flex;
+        flex-direction: column;
+      }
+  `],
+})
+export class MapLibre {
+  center = model<any[]>((() => [0, 0])());
+  zoom = model<number>(1);
+  bearing = model<number>(0);
+  pitch = model<number>(0);
+  mapStyle = input<unknown>('https://demotiles.maplibre.org/style.json');
+  minZoom = input<number>(undefined);
+  maxZoom = input<number>(undefined);
+  maxBounds = input<unknown>(undefined);
+  bounds = input<unknown>(undefined);
+  fitBoundsOptions = input<Record<string, any>>(undefined);
+  dragPan = input<boolean>(true);
+  dragRotate = input<boolean>(true);
+  scrollZoom = input<boolean>(true);
+  doubleClickZoom = input<boolean>(true);
+  boxZoom = input<boolean>(true);
+  keyboard = input<boolean>(true);
+  touchZoomRotate = input<boolean>(true);
+  touchPitch = input<boolean>(true);
+  markers = input<any[]>((() => [])());
+  popups = input<any[]>((() => [])());
+  sources = input<any[]>((() => [])());
+  layers = input<any[]>((() => [])());
+  interactiveLayerIds = input<any[]>((() => [])());
+  controls = input<any[]>((() => [])());
+  options = input<Record<string, any>>((() => ({}))());
+  containerEl = viewChild<ElementRef<HTMLDivElement>>('containerEl');
+  load = output<unknown>();
+  idle = output<unknown>();
+  move = output<unknown>();
+  zoom = output<unknown>();
+  rotate = output<unknown>();
+  pitch = output<unknown>();
+  dragstart = output<unknown>();
+  drag = output<unknown>();
+  dragend = output<unknown>();
+  click = output<unknown>();
+  dblclick = output<unknown>();
+  contextmenu = output<unknown>();
+  mousemove = output<unknown>();
+  error = output<unknown>();
+  styledata = output<unknown>();
+  sourcedata = output<unknown>();
+  moveend = output<unknown>();
+  zoomend = output<unknown>();
+  rotateend = output<unknown>();
+  pitchend = output<unknown>();
+  mouseenter = output<unknown>();
+  mouseleave = output<unknown>();
+  @ContentChild('marker', { read: TemplateRef }) markerTpl?: TemplateRef<MarkerCtx>;
+  @ContentChild('popup', { read: TemplateRef }) popupTpl?: TemplateRef<PopupCtx>;
+  @ContentChild('control', { read: TemplateRef }) controlTpl?: TemplateRef<ControlCtx>;
+  templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
+  private _portalViews = new Set<EmbeddedViewRef<unknown>>();
+  private _portalAnchor = viewChild('rozie_portalAnchor', { read: ViewContainerRef });
+  private _markerTpl = contentChild('marker', { read: TemplateRef });
+  private _popupTpl = contentChild('popup', { read: TemplateRef });
+  private _controlTpl = contentChild('control', { read: TemplateRef });
+  private __rozieDestroyRef = inject(DestroyRef);
+  private __rozieWatchInitial_0 = true;
+  private __rozieWatchInitial_1 = true;
+  private __rozieWatchInitial_2 = true;
+  private __rozieWatchInitial_3 = true;
+  private __rozieWatchInitial_4 = true;
+  private __rozieWatchInitial_5 = true;
+  private __rozieWatchInitial_6 = true;
+  private __rozieWatchInitial_7 = true;
+  private __rozieWatchInitial_8 = true;
+  private __rozieWatchInitial_9 = true;
+  private __rozieWatchInitial_10 = true;
+  private __rozieWatchInitial_11 = true;
+  private __rozieWatchInitial_12 = true;
+  private __rozieWatchInitial_13 = true;
+  private __rozieWatchInitial_14 = true;
+  private __rozieWatchInitial_15 = true;
+  private __rozieWatchInitial_16 = true;
+  private __rozieWatchInitial_17 = true;
+  private __rozieWatchInitial_18 = true;
+  private __rozieWatchInitial_19 = true;
+  private __rozieWatchInitial_20 = true;
+  private __rozieWatchInitial_21 = true;
+
+  constructor() {
+    effect(() => { const __watchVal = (() => this.center())(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } ((v: any) => {
+      if (!this.instance || !Array.isArray(v) || v.length !== 2) return;
+      const c = this.instance.getCenter();
+      if (v[0] === c.lng && v[1] === c.lat) return;
+      this.instance.easeTo({
+        center: v,
+        animate: false
+      }, this.PROGRAMMATIC);
+    })(__watchVal); }); });
+    effect(() => { const __watchVal = (() => this.zoom())(); untracked(() => { if (this.__rozieWatchInitial_1) { this.__rozieWatchInitial_1 = false; return; } ((v: any) => {
+      if (!this.instance || typeof v !== 'number' || v === this.instance.getZoom()) return;
+      this.instance.easeTo({
+        zoom: v,
+        animate: false
+      }, this.PROGRAMMATIC);
+    })(__watchVal); }); });
+    effect(() => { const __watchVal = (() => this.bearing())(); untracked(() => { if (this.__rozieWatchInitial_2) { this.__rozieWatchInitial_2 = false; return; } ((v: any) => {
+      if (!this.instance || typeof v !== 'number' || v === this.instance.getBearing()) return;
+      this.instance.easeTo({
+        bearing: v,
+        animate: false
+      }, this.PROGRAMMATIC);
+    })(__watchVal); }); });
+    effect(() => { const __watchVal = (() => this.pitch())(); untracked(() => { if (this.__rozieWatchInitial_3) { this.__rozieWatchInitial_3 = false; return; } ((v: any) => {
+      if (!this.instance || typeof v !== 'number' || v === this.instance.getPitch()) return;
+      this.instance.easeTo({
+        pitch: v,
+        animate: false
+      }, this.PROGRAMMATIC);
+    })(__watchVal); }); });
+    effect(() => { const __watchVal = (() => this.mapStyle())(); untracked(() => { if (this.__rozieWatchInitial_4) { this.__rozieWatchInitial_4 = false; return; } ((v: any) => {
+      if (!this.instance) return;
+      // a new style wipes imperatively-added sources/layers — reset the applied
+      // tracking and re-apply once the new style loads.
+      this.appliedLayerIds = [];
+      this.appliedSourceIds = [];
+      this.instance.setStyle(v);
+      this.instance.once('styledata', () => this.applyLayers());
+    })(__watchVal); }); });
+    effect(() => { const __watchVal = (() => this.minZoom())(); untracked(() => { if (this.__rozieWatchInitial_5) { this.__rozieWatchInitial_5 = false; return; } ((v: any) => {
+      if (this.instance && typeof v === 'number') this.instance.setMinZoom(v);
+    })(__watchVal); }); });
+    effect(() => { const __watchVal = (() => this.maxZoom())(); untracked(() => { if (this.__rozieWatchInitial_6) { this.__rozieWatchInitial_6 = false; return; } ((v: any) => {
+      if (this.instance && typeof v === 'number') this.instance.setMaxZoom(v);
+    })(__watchVal); }); });
+    effect(() => { const __watchVal = (() => this.maxBounds())(); untracked(() => { if (this.__rozieWatchInitial_7) { this.__rozieWatchInitial_7 = false; return; } ((v: any) => {
+      if (this.instance) this.instance.setMaxBounds(v || null);
+    })(__watchVal); }); });
+    effect(() => { const __watchVal = (() => this.markers())(); untracked(() => { if (this.__rozieWatchInitial_8) { this.__rozieWatchInitial_8 = false; return; } ((v: any) => {
+      if (this.reconcileMarkers) this.reconcileMarkers(v);
+    })(__watchVal); }); });
+    effect(() => { const __watchVal = (() => this.popups())(); untracked(() => { if (this.__rozieWatchInitial_9) { this.__rozieWatchInitial_9 = false; return; } ((v: any) => {
+      if (this.reconcilePopups) this.reconcilePopups(v);
+    })(__watchVal); }); });
+    effect(() => { const __watchVal = (() => this.sources())(); untracked(() => { if (this.__rozieWatchInitial_10) { this.__rozieWatchInitial_10 = false; return; } (() => this.applyLayers())(); }); });
+    effect(() => { const __watchVal = (() => this.layers())(); untracked(() => { if (this.__rozieWatchInitial_11) { this.__rozieWatchInitial_11 = false; return; } (() => this.applyLayers())(); }); });
+    effect(() => { const __watchVal = (() => this.interactiveLayerIds())(); untracked(() => { if (this.__rozieWatchInitial_12) { this.__rozieWatchInitial_12 = false; return; } ((v: any) => {
+      if (this.reconcileInteractive) this.reconcileInteractive(v);
+    })(__watchVal); }); });
+    effect(() => { const __watchVal = (() => this.controls())(); untracked(() => { if (this.__rozieWatchInitial_13) { this.__rozieWatchInitial_13 = false; return; } (() => this.applyControls())(); }); });
+    effect(() => { const __watchVal = (() => this.dragPan())(); untracked(() => { if (this.__rozieWatchInitial_14) { this.__rozieWatchInitial_14 = false; return; } (() => this.applyInteractionToggles())(); }); });
+    effect(() => { const __watchVal = (() => this.dragRotate())(); untracked(() => { if (this.__rozieWatchInitial_15) { this.__rozieWatchInitial_15 = false; return; } (() => this.applyInteractionToggles())(); }); });
+    effect(() => { const __watchVal = (() => this.scrollZoom())(); untracked(() => { if (this.__rozieWatchInitial_16) { this.__rozieWatchInitial_16 = false; return; } (() => this.applyInteractionToggles())(); }); });
+    effect(() => { const __watchVal = (() => this.doubleClickZoom())(); untracked(() => { if (this.__rozieWatchInitial_17) { this.__rozieWatchInitial_17 = false; return; } (() => this.applyInteractionToggles())(); }); });
+    effect(() => { const __watchVal = (() => this.boxZoom())(); untracked(() => { if (this.__rozieWatchInitial_18) { this.__rozieWatchInitial_18 = false; return; } (() => this.applyInteractionToggles())(); }); });
+    effect(() => { const __watchVal = (() => this.keyboard())(); untracked(() => { if (this.__rozieWatchInitial_19) { this.__rozieWatchInitial_19 = false; return; } (() => this.applyInteractionToggles())(); }); });
+    effect(() => { const __watchVal = (() => this.touchZoomRotate())(); untracked(() => { if (this.__rozieWatchInitial_20) { this.__rozieWatchInitial_20 = false; return; } (() => this.applyInteractionToggles())(); }); });
+    effect(() => { const __watchVal = (() => this.touchPitch())(); untracked(() => { if (this.__rozieWatchInitial_21) { this.__rozieWatchInitial_21 = false; return; } (() => this.applyInteractionToggles())(); }); });
+  }
+
+  ngAfterViewInit() {
+    interface ReactivePortalHandle {
+      update(scope: unknown): void;
+      dispose(): void;
+    }
+    const portals = {
+      marker: (container: HTMLElement, scope: { marker: unknown; index: unknown }): ReactivePortalHandle => {
+        const tpl = this._markerTpl();
+        const vcr = this._portalAnchor();
+        if (!tpl || !vcr) return { update() {}, dispose() {} };
+        // Spike 004: portal-scope attribute injection.
+        container.setAttribute('data-rozie-portal-marker', 'f1ee1082');
+        const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
+        view.detectChanges();
+        for (const node of view.rootNodes as Node[]) container.appendChild(node);
+        this._portalViews.add(view as EmbeddedViewRef<unknown>);
+        return {
+          update: (s: unknown): void => {
+            Object.assign(view.context as object, s as object);
+            view.detectChanges();
+          },
+          dispose: (): void => {
+            view.destroy();
+            this._portalViews.delete(view as EmbeddedViewRef<unknown>);
+          },
+        };
+      },
+      popup: (container: HTMLElement, scope: { popup: unknown; index: unknown }): ReactivePortalHandle => {
+        const tpl = this._popupTpl();
+        const vcr = this._portalAnchor();
+        if (!tpl || !vcr) return { update() {}, dispose() {} };
+        // Spike 004: portal-scope attribute injection.
+        container.setAttribute('data-rozie-portal-popup', 'f1ee1082');
+        const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
+        view.detectChanges();
+        for (const node of view.rootNodes as Node[]) container.appendChild(node);
+        this._portalViews.add(view as EmbeddedViewRef<unknown>);
+        return {
+          update: (s: unknown): void => {
+            Object.assign(view.context as object, s as object);
+            view.detectChanges();
+          },
+          dispose: (): void => {
+            view.destroy();
+            this._portalViews.delete(view as EmbeddedViewRef<unknown>);
+          },
+        };
+      },
+      control: (container: HTMLElement, scope: { map: unknown }): (() => void) => {
+        const tpl = this._controlTpl();
+        const vcr = this._portalAnchor();
+        if (!tpl || !vcr) return () => {};
+        // Spike 004: portal-scope attribute injection.
+        container.setAttribute('data-rozie-portal-control', 'f1ee1082');
+        const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
+        view.detectChanges();
+        for (const node of view.rootNodes as Node[]) container.appendChild(node);
+        this._portalViews.add(view as EmbeddedViewRef<unknown>);
+        return () => {
+          view.destroy();
+          this._portalViews.delete(view as EmbeddedViewRef<unknown>);
+        };
+      },
+    };
+    const el = this.containerEl()?.nativeElement;
+
+    // mapOptions is a null-let so the bundled-leaf typeNeutralize pass annotates it
+    // `any` — MapLibre's MapOptions strict-types center (LngLatLike tuple), style
+    // (string|StyleSpecification) and maxBounds/bounds (LngLatBoundsLike), which the
+    // loosely-typed .rozie props (any[] / unknown) don't satisfy under the strict
+    // react/solid/lit tsc. Routing the construction through an `any` options object
+    // is the .rozie-native fix (no codegen type-aid, no lang="ts") — the same
+    // null-let idiom `let instance = null` already relies on.
+    // mapOptions is a null-let so the bundled-leaf typeNeutralize pass annotates it
+    // `any` — MapLibre's MapOptions strict-types center (LngLatLike tuple), style
+    // (string|StyleSpecification) and maxBounds/bounds (LngLatBoundsLike), which the
+    // loosely-typed .rozie props (any[] / unknown) don't satisfy under the strict
+    // react/solid/lit tsc. Routing the construction through an `any` options object
+    // is the .rozie-native fix (no codegen type-aid, no lang="ts") — the same
+    // null-let idiom `let instance = null` already relies on.
+    let mapOptions: any = null;
+    mapOptions = {
+      container: el,
+      ...this.options(),
+      style: this.mapStyle(),
+      center: this.center(),
+      zoom: this.zoom(),
+      bearing: this.bearing(),
+      pitch: this.pitch(),
+      minZoom: this.minZoom(),
+      maxZoom: this.maxZoom(),
+      maxBounds: this.maxBounds(),
+      bounds: this.bounds(),
+      fitBoundsOptions: this.fitBoundsOptions(),
+      dragPan: this.dragPan(),
+      dragRotate: this.dragRotate(),
+      scrollZoom: this.scrollZoom(),
+      doubleClickZoom: this.doubleClickZoom(),
+      boxZoom: this.boxZoom(),
+      keyboard: this.keyboard(),
+      touchZoomRotate: this.touchZoomRotate(),
+      touchPitch: this.touchPitch()
+    };
+    this.instance = new maplibregl.Map(mapOptions);
+
+    // ─── forward map events ─────────────────────────────────────────────────
+    // ─── forward map events ─────────────────────────────────────────────────
+    this.instance.on('load', (e: any) => this.load.emit(e));
+    this.instance.on('idle', (e: any) => this.idle.emit(e));
+    this.instance.on('move', (e: any) => this.move.emit(e));
+    this.instance.on('zoom', (e: any) => this.zoom.emit(e));
+    this.instance.on('rotate', (e: any) => this.rotate.emit(e));
+    this.instance.on('pitch', (e: any) => this.pitch.emit(e));
+    this.instance.on('dragstart', (e: any) => this.dragstart.emit(e));
+    this.instance.on('drag', (e: any) => this.drag.emit(e));
+    this.instance.on('dragend', (e: any) => this.dragend.emit(e));
+    this.instance.on('click', (e: any) => this.click.emit(this.payload(e)));
+    this.instance.on('dblclick', (e: any) => this.dblclick.emit(this.payload(e)));
+    this.instance.on('contextmenu', (e: any) => this.contextmenu.emit(this.payload(e)));
+    this.instance.on('mousemove', (e: any) => this.mousemove.emit(this.payload(e)));
+    this.instance.on('error', (e: any) => this.error.emit(e));
+    this.instance.on('styledata', (e: any) => this.styledata.emit(e));
+    this.instance.on('sourcedata', (e: any) => this.sourcedata.emit(e));
+
+    // ─── camera-lifecycle + two-way echo (echo-guarded) ─────────────────────
+    // ─── camera-lifecycle + two-way echo (echo-guarded) ─────────────────────
+    this.instance.on('moveend', (e: any) => {
+      this.moveend.emit(e);
+      if (e.rozieProgrammatic) return;
+      const c = this.instance.getCenter();
+      const next = [c.lng, c.lat];
+      if (!this.sameCenter(next, this.center())) this.center.set(next);
+      const z = this.instance.getZoom();
+      if (z !== this.zoom()) this.zoom.set(z);
+    });
+    this.instance.on('zoomend', (e: any) => {
+      this.zoomend.emit(e);
+      if (e.rozieProgrammatic) return;
+      const z = this.instance.getZoom();
+      if (z !== this.zoom()) this.zoom.set(z);
+    });
+    this.instance.on('rotateend', (e: any) => {
+      this.rotateend.emit(e);
+      if (e.rozieProgrammatic) return;
+      const b = this.instance.getBearing();
+      if (b !== this.bearing()) this.bearing.set(b);
+    });
+    this.instance.on('pitchend', (e: any) => {
+      this.pitchend.emit(e);
+      if (e.rozieProgrammatic) return;
+      const p = this.instance.getPitch();
+      if (p !== this.pitch()) this.pitch.set(p);
+    });
+
+    // ─── REACTIVE MULTI-INSTANCE marker portal slot ─────────────────────────
+    // One reactive portal handle per markers[] entry, reconciled keep/update/dispose
+    // on prop change. Built here so $portals.marker is in the mount scope; bridged
+    // to the top-level $watch via reconcileMarkers (CM rebuildGutterExt discipline).
+    // ─── REACTIVE MULTI-INSTANCE marker portal slot ─────────────────────────
+    // One reactive portal handle per markers[] entry, reconciled keep/update/dispose
+    // on prop change. Built here so $portals.marker is in the mount scope; bridged
+    // to the top-level $watch via reconcileMarkers (CM rebuildGutterExt discipline).
+    this.reconcileMarkers = (list: any) => {
+      if (!(this.markerTpl ?? this.templates()?.['marker'])) return;
+      const arr = Array.isArray(list) ? list : [];
+      const seen = new Set();
+      arr.forEach((m: any, index: any) => {
+        if (!m || typeof m.lng !== 'number' || typeof m.lat !== 'number') return;
+        const key = m.id != null ? m.id : index;
+        seen.add(key);
+        const scope = {
+          marker: m,
+          index
+        };
+        const entry = this.markerEntries.get(key);
+        if (entry) {
+          entry.engine.setLngLat([m.lng, m.lat]);
+          entry.handle.update(scope);
+        } else {
+          const node = document.createElement('div');
+          node.className = 'rozie-maplibre-marker';
+          const handle = portals.marker(node, scope);
+          const engine = new maplibregl.Marker({
+            element: node,
+            anchor: m.anchor,
+            offset: m.offset,
+            draggable: m.draggable
+          }).setLngLat([m.lng, m.lat]).addTo(this.instance);
+          this.markerEntries.set(key, {
+            engine,
+            handle,
+            el: node
+          });
+        }
+      });
+      for (const [key, entry] of this.markerEntries as any) {
+        if (!seen.has(key)) {
+          entry.handle.dispose();
+          entry.engine.remove();
+          this.markerEntries.delete(key);
+        }
+      }
+    };
+
+    // ─── REACTIVE MULTI-INSTANCE popup portal slot ──────────────────────────
+    // ─── REACTIVE MULTI-INSTANCE popup portal slot ──────────────────────────
+    this.reconcilePopups = (list: any) => {
+      if (!(this.popupTpl ?? this.templates()?.['popup'])) return;
+      const arr = Array.isArray(list) ? list : [];
+      const seen = new Set();
+      arr.forEach((p: any, index: any) => {
+        if (!p || typeof p.lng !== 'number' || typeof p.lat !== 'number') return;
+        const key = p.id != null ? p.id : index;
+        seen.add(key);
+        const scope = {
+          popup: p,
+          index
+        };
+        const entry = this.popupEntries.get(key);
+        if (entry) {
+          entry.engine.setLngLat([p.lng, p.lat]);
+          entry.handle.update(scope);
+        } else {
+          const node = document.createElement('div');
+          node.className = 'rozie-maplibre-popup-body';
+          const handle = portals.popup(node, scope);
+          const engine = new maplibregl.Popup({
+            closeButton: p.closeButton !== undefined ? p.closeButton : true,
+            closeOnClick: p.closeOnClick !== undefined ? p.closeOnClick : false,
+            anchor: p.anchor,
+            offset: p.offset
+          }).setLngLat([p.lng, p.lat]).setDOMContent(node).addTo(this.instance);
+          this.popupEntries.set(key, {
+            engine,
+            handle,
+            el: node
+          });
+        }
+      });
+      for (const [key, entry] of this.popupEntries as any) {
+        if (!seen.has(key)) {
+          entry.handle.dispose();
+          entry.engine.remove();
+          this.popupEntries.delete(key);
+        }
+      }
+    };
+
+    // ─── layer-scoped feature mouseenter/mouseleave (needs a layer id) ───────
+    // ─── layer-scoped feature mouseenter/mouseleave (needs a layer id) ───────
+    this.reconcileInteractive = (ids: any) => {
+      const want = (Array.isArray(ids) ? ids : []).filter(Boolean);
+      for (const [id, l] of this.featureListeners as any) {
+        if (!want.includes(id)) {
+          this.instance.off('mouseenter', id, l.enter);
+          this.instance.off('mouseleave', id, l.leave);
+          this.featureListeners.delete(id);
+        }
+      }
+      for (const id of want as any) {
+        if (this.featureListeners.has(id)) continue;
+        const enter = (e: any) => this.mouseenter.emit(this.payload(e));
+        const leave = (e: any) => this.mouseleave.emit(this.payload(e));
+        this.instance.on('mouseenter', id, enter);
+        this.instance.on('mouseleave', id, leave);
+        this.featureListeners.set(id, {
+          enter,
+          leave
+        });
+      }
+    };
+
+    // ─── mount-once custom CONTROL portal slot ──────────────────────────────
+    // ─── mount-once custom CONTROL portal slot ──────────────────────────────
+    if ((this.controlTpl ?? this.templates()?.['control'])) {
+      const host = document.createElement('div');
+      host.className = 'maplibregl-ctrl rozie-maplibre-control';
+      this.customControl = {
+        onAdd() {
+          return host;
+        },
+        onRemove() {
+          if (host.parentNode) host.parentNode.removeChild(host);
+        }
+      };
+      this.instance.addControl(this.customControl, 'top-right');
+      this.controlDispose = portals.control(host, {
+        map: this.instance
+      });
+    }
+
+    // standard controls + interaction toggles don't need style load.
+    // standard controls + interaction toggles don't need style load.
+    this.applyControls();
+    this.applyInteractionToggles();
+
+    // markers/popups/interactive are DOM/event overlays — no style-load gate.
+    // markers/popups/interactive are DOM/event overlays — no style-load gate.
+    this.reconcileMarkers(this.markers());
+    this.reconcilePopups(this.popups());
+    this.reconcileInteractive(this.interactiveLayerIds());
+
+    // sources/layers need the style loaded.
+    // sources/layers need the style loaded.
+    if (this.instance.isStyleLoaded()) this.applyLayers();else this.instance.on('load', this.applyLayers);
+    this.__rozieDestroyRef.onDestroy(() => {
+      for (const [, entry] of this.markerEntries as any) {
+        entry.handle.dispose();
+        entry.engine.remove();
+      }
+      this.markerEntries.clear();
+      for (const [, entry] of this.popupEntries as any) {
+        entry.handle.dispose();
+        entry.engine.remove();
+      }
+      this.popupEntries.clear();
+      if (this.controlDispose) this.controlDispose();
+      if (this.instance) this.instance.remove();
+    });
+    this.__rozieDestroyRef.onDestroy(() => {
+      for (const view of this._portalViews) view.destroy();
+      this._portalViews.clear();
+    });
+  }
+
+  instance: any = null;
+  PROGRAMMATIC = {
+    rozieProgrammatic: true
+  };
+  markerEntries = new Map();
+  popupEntries = new Map();
+  controlInstances = [];
+  controlDispose: any = null;
+  customControl: any = null;
+  featureListeners = new Map();
+  appliedLayerIds = [];
+  appliedSourceIds = [];
+  reconcileMarkers: any = null;
+  reconcilePopups: any = null;
+  reconcileInteractive: any = null;
+  sameCenter = (a: any, b: any) => Array.isArray(a) && Array.isArray(b) && a[0] === b[0] && a[1] === b[1];
+  payload = (e: any) => ({
+    lngLat: e.lngLat ? {
+      lng: e.lngLat.lng,
+      lat: e.lngLat.lat
+    } : null,
+    point: e.point ? {
+      x: e.point.x,
+      y: e.point.y
+    } : null,
+    features: e.features || [],
+    originalEvent: e.originalEvent
+  });
+  buildControl = (spec: any) => {
+    const type = typeof spec === 'string' ? spec : spec.type;
+    const opts = typeof spec === 'object' && spec.options || {};
+    if (type === 'navigation') return new maplibregl.NavigationControl(opts);
+    if (type === 'geolocate') return new maplibregl.GeolocateControl(opts);
+    if (type === 'scale') return new maplibregl.ScaleControl(opts);
+    if (type === 'fullscreen') return new maplibregl.FullscreenControl(opts);
+    if (type === 'attribution') return new maplibregl.AttributionControl(opts);
+    return null;
+  };
+  applyControls = () => {
+    if (!this.instance) return;
+    for (const c of this.controlInstances as any) this.instance.removeControl(c);
+    this.controlInstances = [];
+    for (const spec of this.controls() as any) {
+      if (!spec) continue;
+      const ctrl = this.buildControl(spec);
+      if (!ctrl) continue;
+      const position = typeof spec === 'object' && spec.position || undefined;
+      this.instance.addControl(ctrl, position);
+      this.controlInstances.push(ctrl);
+    }
+  };
+  applyInteractionToggles = () => {
+    if (!this.instance) return;
+    const set = (name: any, on: any) => {
+      const handler = this.instance[name];
+      if (handler) on ? handler.enable() : handler.disable();
+    };
+    set('dragPan', this.dragPan());
+    set('dragRotate', this.dragRotate());
+    set('scrollZoom', this.scrollZoom());
+    set('doubleClickZoom', this.doubleClickZoom());
+    set('boxZoom', this.boxZoom());
+    set('keyboard', this.keyboard());
+    set('touchZoomRotate', this.touchZoomRotate());
+    set('touchPitch', this.touchPitch());
+  };
+  applyLayers = () => {
+    const __layers = this.layers();
+    const __sources = this.sources();
+    if (!this.instance || !this.instance.isStyleLoaded()) return;
+    const wantLayerIds = __layers.map((l: any) => l && l.id).filter(Boolean);
+    const wantSourceIds = __sources.map((s: any) => s && s.id).filter(Boolean);
+
+    // 1. drop removed layers
+    for (const id of this.appliedLayerIds as any) {
+      if (!wantLayerIds.includes(id) && this.instance.getLayer(id)) this.instance.removeLayer(id);
+    }
+    // 2. add/update sources
+    for (const s of __sources as any) {
+      if (!s || !s.id) continue;
+      const spec = s.spec || s;
+      const existing = this.instance.getSource(s.id);
+      if (!existing) this.instance.addSource(s.id, spec);else if (spec.type === 'geojson' && spec.data) existing.setData(spec.data);
+    }
+    // 3. add/update layers
+    for (const l of __layers as any) {
+      if (!l || !l.id) continue;
+      if (!this.instance.getLayer(l.id)) {
+        this.instance.addLayer(l, l.beforeId);
+      } else {
+        if (l.paint) for (const k in l.paint) this.instance.setPaintProperty(l.id, k, l.paint[k]);
+        if (l.layout) for (const k in l.layout) this.instance.setLayoutProperty(l.id, k, l.layout[k]);
+      }
+    }
+    // 4. drop removed sources (their layers are gone)
+    for (const id of this.appliedSourceIds as any) {
+      if (!wantSourceIds.includes(id) && this.instance.getSource(id)) this.instance.removeSource(id);
+    }
+    this.appliedLayerIds = wantLayerIds;
+    this.appliedSourceIds = wantSourceIds;
+  };
+  getMap = () => {
+    return this.instance;
+  };
+  flyTo = (opts: any) => {
+    if (this.instance) this.instance.flyTo(opts);
+  };
+  easeTo = (opts: any) => {
+    if (this.instance) this.instance.easeTo(opts);
+  };
+  jumpTo = (opts: any) => {
+    if (this.instance) this.instance.jumpTo(opts);
+  };
+  fitBounds = (bounds: any, opts: any) => {
+    if (this.instance) this.instance.fitBounds(bounds, opts);
+  };
+  getCenter = () => {
+    if (!this.instance) return null;
+    const c = this.instance.getCenter();
+    return [c.lng, c.lat];
+  };
+  getZoom = () => {
+    return this.instance ? this.instance.getZoom() : null;
+  };
+  resize = () => {
+    if (this.instance) this.instance.resize();
+  };
+
+  static ngTemplateContextGuard(
+    _dir: MapLibre,
+    _ctx: unknown,
+  ): _ctx is MarkerCtx | PopupCtx | ControlCtx {
+    return true;
+  }
+}
+
+export default MapLibre;

@@ -1,0 +1,653 @@
+<template>
+
+<div class="rozie-maplibre" ref="containerElRef"></div>
+
+
+
+
+
+
+
+</template>
+
+<script setup lang="ts">
+import { Fragment, h, onBeforeUnmount, onMounted, ref, render, useSlots, watch } from 'vue';
+
+const props = withDefaults(
+  defineProps<{ mapStyle?: unknown; minZoom?: number; maxZoom?: number; maxBounds?: unknown; bounds?: unknown; fitBoundsOptions?: Record<string, any>; dragPan?: boolean; dragRotate?: boolean; scrollZoom?: boolean; doubleClickZoom?: boolean; boxZoom?: boolean; keyboard?: boolean; touchZoomRotate?: boolean; touchPitch?: boolean; markers?: any[]; popups?: any[]; sources?: any[]; layers?: any[]; interactiveLayerIds?: any[]; controls?: any[]; options?: Record<string, any> }>(),
+  { mapStyle: 'https://demotiles.maplibre.org/style.json', minZoom: undefined, maxZoom: undefined, maxBounds: undefined, bounds: undefined, fitBoundsOptions: undefined, dragPan: true, dragRotate: true, scrollZoom: true, doubleClickZoom: true, boxZoom: true, keyboard: true, touchZoomRotate: true, touchPitch: true, markers: () => [], popups: () => [], sources: () => [], layers: () => [], interactiveLayerIds: () => [], controls: () => [], options: () => ({}) }
+);
+
+const center = defineModel<any[]>('center', { default: () => [0, 0] });
+const zoom = defineModel<number>('zoom', { default: 1 });
+const bearing = defineModel<number>('bearing', { default: 0 });
+const pitch = defineModel<number>('pitch', { default: 0 });
+
+const emit = defineEmits<{
+  load: [...args: any[]];
+  idle: [...args: any[]];
+  move: [...args: any[]];
+  zoom: [...args: any[]];
+  rotate: [...args: any[]];
+  pitch: [...args: any[]];
+  dragstart: [...args: any[]];
+  drag: [...args: any[]];
+  dragend: [...args: any[]];
+  click: [...args: any[]];
+  dblclick: [...args: any[]];
+  contextmenu: [...args: any[]];
+  mousemove: [...args: any[]];
+  error: [...args: any[]];
+  styledata: [...args: any[]];
+  sourcedata: [...args: any[]];
+  moveend: [...args: any[]];
+  zoomend: [...args: any[]];
+  rotateend: [...args: any[]];
+  pitchend: [...args: any[]];
+  mouseenter: [...args: any[]];
+  mouseleave: [...args: any[]];
+}>();
+
+defineSlots<{
+  marker(props: { marker: any; index: any }): any;
+  popup(props: { popup: any; index: any }): any;
+  control(props: { map: any }): any;
+}>();
+
+const slots = useSlots();
+
+const containerElRef = ref<HTMLElement>();
+
+import maplibregl from 'maplibre-gl';
+let instance: any = null;
+
+// The eventData merged onto programmatic camera ops so the camera-lifecycle echo
+// handlers can ignore our own moves (the documented MapLibre echo-guard — robust
+// across batched ops where Leaflet's single boolean would race).
+// The eventData merged onto programmatic camera ops so the camera-lifecycle echo
+// handlers can ignore our own moves (the documented MapLibre echo-guard — robust
+// across batched ops where Leaflet's single boolean would race).
+const PROGRAMMATIC = {
+  rozieProgrammatic: true
+};
+
+// Live entry maps for the REACTIVE MULTI-INSTANCE portal slots — keyed by
+// entry.id ?? index. Each value: { engine, handle, el }. COMPONENT-scope (not
+// $onMount-local) so the $onMount-returned teardown — which the Solid emitter
+// hoists into a sibling onCleanup() OUTSIDE the mount IIFE — keeps them in scope.
+// Live entry maps for the REACTIVE MULTI-INSTANCE portal slots — keyed by
+// entry.id ?? index. Each value: { engine, handle, el }. COMPONENT-scope (not
+// $onMount-local) so the $onMount-returned teardown — which the Solid emitter
+// hoists into a sibling onCleanup() OUTSIDE the mount IIFE — keeps them in scope.
+const markerEntries = new Map();
+const popupEntries = new Map();
+// standard-control instances (so a controls-prop change can remove + re-add) and
+// the mount-once custom-control portal dispose.
+// standard-control instances (so a controls-prop change can remove + re-add) and
+// the mount-once custom-control portal dispose.
+let controlInstances = [];
+let controlDispose: any = null;
+let customControl: any = null;
+// layer-scoped feature listeners, registered per interactiveLayerId so they can
+// be unregistered on change. id → { enter, leave }.
+// layer-scoped feature listeners, registered per interactiveLayerId so they can
+// be unregistered on change. id → { enter, leave }.
+const featureListeners = new Map();
+// previously-applied source/layer ids, so a sources/layers prop change can remove
+// the dropped ones.
+// previously-applied source/layer ids, so a sources/layers prop change can remove
+// the dropped ones.
+let appliedLayerIds = [];
+let appliedSourceIds = [];
+
+// The $portals/$emit-capturing reconcilers are built INSIDE $onMount (a top-level
+// $portals reference fails the bundled-leaf strict typecheck — the CM/TipTap
+// portal discipline) and bridged here so the top-level $watch can call them.
+// The $portals/$emit-capturing reconcilers are built INSIDE $onMount (a top-level
+// $portals reference fails the bundled-leaf strict typecheck — the CM/TipTap
+// portal discipline) and bridged here so the top-level $watch can call them.
+let reconcileMarkers: any = null;
+let reconcilePopups: any = null;
+let reconcileInteractive: any = null;
+
+// ─── pure helpers (no sigils → safe at top level) ───────────────────────────
+// ─── pure helpers (no sigils → safe at top level) ───────────────────────────
+const sameCenter = (a: any, b: any) => Array.isArray(a) && Array.isArray(b) && a[0] === b[0] && a[1] === b[1];
+
+// structured pointer-event payload — stable across targets, avoids handing the
+// raw engine event (with its circular `target: Map`) to consumers.
+// structured pointer-event payload — stable across targets, avoids handing the
+// raw engine event (with its circular `target: Map`) to consumers.
+const payload = (e: any) => ({
+  lngLat: e.lngLat ? {
+    lng: e.lngLat.lng,
+    lat: e.lngLat.lat
+  } : null,
+  point: e.point ? {
+    x: e.point.x,
+    y: e.point.y
+  } : null,
+  features: e.features || [],
+  originalEvent: e.originalEvent
+});
+const buildControl = (spec: any) => {
+  const type = typeof spec === 'string' ? spec : spec.type;
+  const opts = typeof spec === 'object' && spec.options || {};
+  if (type === 'navigation') return new maplibregl.NavigationControl(opts);
+  if (type === 'geolocate') return new maplibregl.GeolocateControl(opts);
+  if (type === 'scale') return new maplibregl.ScaleControl(opts);
+  if (type === 'fullscreen') return new maplibregl.FullscreenControl(opts);
+  if (type === 'attribution') return new maplibregl.AttributionControl(opts);
+  return null;
+};
+
+// Standard controls reconcile — no $portals/$emit, so top-level. Remove-all +
+// re-add from the config (controls rarely change; cheap and order-correct).
+// Standard controls reconcile — no $portals/$emit, so top-level. Remove-all +
+// re-add from the config (controls rarely change; cheap and order-correct).
+const applyControls = () => {
+  if (!instance) return;
+  for (const c of controlInstances as any) instance.removeControl(c);
+  controlInstances = [];
+  for (const spec of props.controls as any) {
+    if (!spec) continue;
+    const ctrl = buildControl(spec);
+    if (!ctrl) continue;
+    const position = typeof spec === 'object' && spec.position || undefined;
+    instance.addControl(ctrl, position);
+    controlInstances.push(ctrl);
+  }
+};
+
+// Interaction-toggle reconcile — each toggle maps to a runtime handler object.
+// Interaction-toggle reconcile — each toggle maps to a runtime handler object.
+const applyInteractionToggles = () => {
+  if (!instance) return;
+  const set = (name: any, on: any) => {
+    const handler = instance[name];
+    if (handler) on ? handler.enable() : handler.disable();
+  };
+  set('dragPan', props.dragPan);
+  set('dragRotate', props.dragRotate);
+  set('scrollZoom', props.scrollZoom);
+  set('doubleClickZoom', props.doubleClickZoom);
+  set('boxZoom', props.boxZoom);
+  set('keyboard', props.keyboard);
+  set('touchZoomRotate', props.touchZoomRotate);
+  set('touchPitch', props.touchPitch);
+};
+
+// Style-load-gated source/layer reconcile. Order matters: drop removed layers
+// FIRST, then add/update sources, then add/update layers, then drop removed
+// sources (after their layers are gone).
+// Style-load-gated source/layer reconcile. Order matters: drop removed layers
+// FIRST, then add/update sources, then add/update layers, then drop removed
+// sources (after their layers are gone).
+const applyLayers = () => {
+  if (!instance || !instance.isStyleLoaded()) return;
+  const wantLayerIds = props.layers.map((l: any) => l && l.id).filter(Boolean);
+  const wantSourceIds = props.sources.map((s: any) => s && s.id).filter(Boolean);
+
+  // 1. drop removed layers
+  for (const id of appliedLayerIds as any) {
+    if (!wantLayerIds.includes(id) && instance.getLayer(id)) instance.removeLayer(id);
+  }
+  // 2. add/update sources
+  for (const s of props.sources as any) {
+    if (!s || !s.id) continue;
+    const spec = s.spec || s;
+    const existing = instance.getSource(s.id);
+    if (!existing) instance.addSource(s.id, spec);else if (spec.type === 'geojson' && spec.data) existing.setData(spec.data);
+  }
+  // 3. add/update layers
+  for (const l of props.layers as any) {
+    if (!l || !l.id) continue;
+    if (!instance.getLayer(l.id)) {
+      instance.addLayer(l, l.beforeId);
+    } else {
+      if (l.paint) for (const k in l.paint) instance.setPaintProperty(l.id, k, l.paint[k]);
+      if (l.layout) for (const k in l.layout) instance.setLayoutProperty(l.id, k, l.layout[k]);
+    }
+  }
+  // 4. drop removed sources (their layers are gone)
+  for (const id of appliedSourceIds as any) {
+    if (!wantSourceIds.includes(id) && instance.getSource(id)) instance.removeSource(id);
+  }
+  appliedLayerIds = wantLayerIds;
+  appliedSourceIds = wantSourceIds;
+};
+// ─── imperative handle (Phase 21 $expose) ───────────────────────────────────
+// 8 verbs. Collision-clear across all 3 classes: NOT a React model-setter
+// (setCenter/setZoom/setBearing/setPitch are the auto-gen'd ones — none here);
+// NOT a Lit lifecycle name (update/render/firstUpdated/updated/willUpdate/
+// requestUpdate); NOT an emitted event name (move/zoom/rotate/pitch/drag/click/
+// idle/error — getCenter/getZoom/resize/flyTo/easeTo/jumpTo/fitBounds/getMap all
+// differ). The camera verbs deliberately omit PROGRAMMATIC so an imperative move
+// echoes into $model (the prop $watch then no-ops, getCenter already matching).
+function getMap() {
+  return instance;
+}
+function flyTo(opts: any) {
+  if (instance) instance.flyTo(opts);
+}
+function easeTo(opts: any) {
+  if (instance) instance.easeTo(opts);
+}
+function jumpTo(opts: any) {
+  if (instance) instance.jumpTo(opts);
+}
+function fitBounds(bounds: any, opts: any) {
+  if (instance) instance.fitBounds(bounds, opts);
+}
+function getCenter() {
+  if (!instance) return null;
+  const c = instance.getCenter();
+  return [c.lng, c.lat];
+}
+function getZoom() {
+  return instance ? instance.getZoom() : null;
+}
+function resize() {
+  if (instance) instance.resize();
+}
+
+interface ReactivePortalHandle {
+  update(scope: unknown): void;
+  dispose(): void;
+}
+const portalContainers = new Set<HTMLElement>();
+const portals = {
+  marker: (container: HTMLElement, scope: { marker: unknown; index: unknown }): ReactivePortalHandle => {
+    const slotFn = slots.marker;
+    if (!slotFn) return { update() {}, dispose() {} };
+    // Spike 004: portal-scope attribute injection. Cascades the @portal
+    // marker { … } selectors from the unscoped <style> block below into
+    // the engine-owned subtree.
+    container.setAttribute('data-rozie-portal-marker', 'f1ee1082');
+    const renderScope = (s: unknown): void => {
+      render(h(Fragment, null, slotFn(s)), container);
+    };
+    renderScope(scope);
+    portalContainers.add(container);
+    return {
+      update: (s: unknown): void => renderScope(s),
+      dispose: (): void => {
+        render(null, container);
+        portalContainers.delete(container);
+      },
+    };
+  },
+  popup: (container: HTMLElement, scope: { popup: unknown; index: unknown }): ReactivePortalHandle => {
+    const slotFn = slots.popup;
+    if (!slotFn) return { update() {}, dispose() {} };
+    // Spike 004: portal-scope attribute injection. Cascades the @portal
+    // popup { … } selectors from the unscoped <style> block below into
+    // the engine-owned subtree.
+    container.setAttribute('data-rozie-portal-popup', 'f1ee1082');
+    const renderScope = (s: unknown): void => {
+      render(h(Fragment, null, slotFn(s)), container);
+    };
+    renderScope(scope);
+    portalContainers.add(container);
+    return {
+      update: (s: unknown): void => renderScope(s),
+      dispose: (): void => {
+        render(null, container);
+        portalContainers.delete(container);
+      },
+    };
+  },
+  control: (container: HTMLElement, scope: { map: unknown }): (() => void) => {
+    const slotFn = slots.control;
+    if (!slotFn) return () => {};
+    // Spike 004: portal-scope attribute injection. Cascades the @portal
+    // control { … } selectors from the unscoped <style> block below into
+    // the engine-owned subtree.
+    container.setAttribute('data-rozie-portal-control', 'f1ee1082');
+    const vnode = h(Fragment, null, slotFn(scope));
+    render(vnode, container);
+    portalContainers.add(container);
+    return () => {
+      render(null, container);
+      portalContainers.delete(container);
+    };
+  },
+};
+onBeforeUnmount(() => {
+  for (const container of portalContainers) render(null, container);
+  portalContainers.clear();
+});
+
+let _cleanup_0: (() => void) | undefined;
+onMounted(() => {
+  const el = containerElRef.value;
+
+  // mapOptions is a null-let so the bundled-leaf typeNeutralize pass annotates it
+  // `any` — MapLibre's MapOptions strict-types center (LngLatLike tuple), style
+  // (string|StyleSpecification) and maxBounds/bounds (LngLatBoundsLike), which the
+  // loosely-typed .rozie props (any[] / unknown) don't satisfy under the strict
+  // react/solid/lit tsc. Routing the construction through an `any` options object
+  // is the .rozie-native fix (no codegen type-aid, no lang="ts") — the same
+  // null-let idiom `let instance = null` already relies on.
+  let mapOptions: any = null;
+  mapOptions = {
+    container: el,
+    ...props.options,
+    style: props.mapStyle,
+    center: center.value,
+    zoom: zoom.value,
+    bearing: bearing.value,
+    pitch: pitch.value,
+    minZoom: props.minZoom,
+    maxZoom: props.maxZoom,
+    maxBounds: props.maxBounds,
+    bounds: props.bounds,
+    fitBoundsOptions: props.fitBoundsOptions,
+    dragPan: props.dragPan,
+    dragRotate: props.dragRotate,
+    scrollZoom: props.scrollZoom,
+    doubleClickZoom: props.doubleClickZoom,
+    boxZoom: props.boxZoom,
+    keyboard: props.keyboard,
+    touchZoomRotate: props.touchZoomRotate,
+    touchPitch: props.touchPitch
+  };
+  instance = new maplibregl.Map(mapOptions);
+
+  // ─── forward map events ─────────────────────────────────────────────────
+  instance.on('load', (e: any) => emit('load', e));
+  instance.on('idle', (e: any) => emit('idle', e));
+  instance.on('move', (e: any) => emit('move', e));
+  instance.on('zoom', (e: any) => emit('zoom', e));
+  instance.on('rotate', (e: any) => emit('rotate', e));
+  instance.on('pitch', (e: any) => emit('pitch', e));
+  instance.on('dragstart', (e: any) => emit('dragstart', e));
+  instance.on('drag', (e: any) => emit('drag', e));
+  instance.on('dragend', (e: any) => emit('dragend', e));
+  instance.on('click', (e: any) => emit('click', payload(e)));
+  instance.on('dblclick', (e: any) => emit('dblclick', payload(e)));
+  instance.on('contextmenu', (e: any) => emit('contextmenu', payload(e)));
+  instance.on('mousemove', (e: any) => emit('mousemove', payload(e)));
+  instance.on('error', (e: any) => emit('error', e));
+  instance.on('styledata', (e: any) => emit('styledata', e));
+  instance.on('sourcedata', (e: any) => emit('sourcedata', e));
+
+  // ─── camera-lifecycle + two-way echo (echo-guarded) ─────────────────────
+  instance.on('moveend', (e: any) => {
+    emit('moveend', e);
+    if (e.rozieProgrammatic) return;
+    const c = instance.getCenter();
+    const next = [c.lng, c.lat];
+    if (!sameCenter(next, center.value)) center.value = next;
+    const z = instance.getZoom();
+    if (z !== zoom.value) zoom.value = z;
+  });
+  instance.on('zoomend', (e: any) => {
+    emit('zoomend', e);
+    if (e.rozieProgrammatic) return;
+    const z = instance.getZoom();
+    if (z !== zoom.value) zoom.value = z;
+  });
+  instance.on('rotateend', (e: any) => {
+    emit('rotateend', e);
+    if (e.rozieProgrammatic) return;
+    const b = instance.getBearing();
+    if (b !== bearing.value) bearing.value = b;
+  });
+  instance.on('pitchend', (e: any) => {
+    emit('pitchend', e);
+    if (e.rozieProgrammatic) return;
+    const p = instance.getPitch();
+    if (p !== pitch.value) pitch.value = p;
+  });
+
+  // ─── REACTIVE MULTI-INSTANCE marker portal slot ─────────────────────────
+  // One reactive portal handle per markers[] entry, reconciled keep/update/dispose
+  // on prop change. Built here so $portals.marker is in the mount scope; bridged
+  // to the top-level $watch via reconcileMarkers (CM rebuildGutterExt discipline).
+  reconcileMarkers = (list: any) => {
+    if (!slots.marker) return;
+    const arr = Array.isArray(list) ? list : [];
+    const seen = new Set();
+    arr.forEach((m: any, index: any) => {
+      if (!m || typeof m.lng !== 'number' || typeof m.lat !== 'number') return;
+      const key = m.id != null ? m.id : index;
+      seen.add(key);
+      const scope = {
+        marker: m,
+        index
+      };
+      const entry = markerEntries.get(key);
+      if (entry) {
+        entry.engine.setLngLat([m.lng, m.lat]);
+        entry.handle.update(scope);
+      } else {
+        const node = document.createElement('div');
+        node.className = 'rozie-maplibre-marker';
+        const handle = portals.marker(node, scope);
+        const engine = new maplibregl.Marker({
+          element: node,
+          anchor: m.anchor,
+          offset: m.offset,
+          draggable: m.draggable
+        }).setLngLat([m.lng, m.lat]).addTo(instance);
+        markerEntries.set(key, {
+          engine,
+          handle,
+          el: node
+        });
+      }
+    });
+    for (const [key, entry] of markerEntries as any) {
+      if (!seen.has(key)) {
+        entry.handle.dispose();
+        entry.engine.remove();
+        markerEntries.delete(key);
+      }
+    }
+  };
+
+  // ─── REACTIVE MULTI-INSTANCE popup portal slot ──────────────────────────
+  reconcilePopups = (list: any) => {
+    if (!slots.popup) return;
+    const arr = Array.isArray(list) ? list : [];
+    const seen = new Set();
+    arr.forEach((p: any, index: any) => {
+      if (!p || typeof p.lng !== 'number' || typeof p.lat !== 'number') return;
+      const key = p.id != null ? p.id : index;
+      seen.add(key);
+      const scope = {
+        popup: p,
+        index
+      };
+      const entry = popupEntries.get(key);
+      if (entry) {
+        entry.engine.setLngLat([p.lng, p.lat]);
+        entry.handle.update(scope);
+      } else {
+        const node = document.createElement('div');
+        node.className = 'rozie-maplibre-popup-body';
+        const handle = portals.popup(node, scope);
+        const engine = new maplibregl.Popup({
+          closeButton: p.closeButton !== undefined ? p.closeButton : true,
+          closeOnClick: p.closeOnClick !== undefined ? p.closeOnClick : false,
+          anchor: p.anchor,
+          offset: p.offset
+        }).setLngLat([p.lng, p.lat]).setDOMContent(node).addTo(instance);
+        popupEntries.set(key, {
+          engine,
+          handle,
+          el: node
+        });
+      }
+    });
+    for (const [key, entry] of popupEntries as any) {
+      if (!seen.has(key)) {
+        entry.handle.dispose();
+        entry.engine.remove();
+        popupEntries.delete(key);
+      }
+    }
+  };
+
+  // ─── layer-scoped feature mouseenter/mouseleave (needs a layer id) ───────
+  reconcileInteractive = (ids: any) => {
+    const want = (Array.isArray(ids) ? ids : []).filter(Boolean);
+    for (const [id, l] of featureListeners as any) {
+      if (!want.includes(id)) {
+        instance.off('mouseenter', id, l.enter);
+        instance.off('mouseleave', id, l.leave);
+        featureListeners.delete(id);
+      }
+    }
+    for (const id of want as any) {
+      if (featureListeners.has(id)) continue;
+      const enter = (e: any) => emit('mouseenter', payload(e));
+      const leave = (e: any) => emit('mouseleave', payload(e));
+      instance.on('mouseenter', id, enter);
+      instance.on('mouseleave', id, leave);
+      featureListeners.set(id, {
+        enter,
+        leave
+      });
+    }
+  };
+
+  // ─── mount-once custom CONTROL portal slot ──────────────────────────────
+  if (slots.control) {
+    const host = document.createElement('div');
+    host.className = 'maplibregl-ctrl rozie-maplibre-control';
+    customControl = {
+      onAdd() {
+        return host;
+      },
+      onRemove() {
+        if (host.parentNode) host.parentNode.removeChild(host);
+      }
+    };
+    instance.addControl(customControl, 'top-right');
+    controlDispose = portals.control(host, {
+      map: instance
+    });
+  }
+
+  // standard controls + interaction toggles don't need style load.
+  applyControls();
+  applyInteractionToggles();
+
+  // markers/popups/interactive are DOM/event overlays — no style-load gate.
+  reconcileMarkers(props.markers);
+  reconcilePopups(props.popups);
+  reconcileInteractive(props.interactiveLayerIds);
+
+  // sources/layers need the style loaded.
+  if (instance.isStyleLoaded()) applyLayers();else instance.on('load', applyLayers);
+  _cleanup_0 = () => {
+    for (const [, entry] of markerEntries as any) {
+      entry.handle.dispose();
+      entry.engine.remove();
+    }
+    markerEntries.clear();
+    for (const [, entry] of popupEntries as any) {
+      entry.handle.dispose();
+      entry.engine.remove();
+    }
+    popupEntries.clear();
+    if (controlDispose) controlDispose();
+    if (instance) instance.remove();
+  };
+});
+onBeforeUnmount(() => { _cleanup_0?.(); });
+
+watch(() => center.value, (v: any) => {
+  if (!instance || !Array.isArray(v) || v.length !== 2) return;
+  const c = instance.getCenter();
+  if (v[0] === c.lng && v[1] === c.lat) return;
+  instance.easeTo({
+    center: v,
+    animate: false
+  }, PROGRAMMATIC);
+});
+watch(() => zoom.value, (v: any) => {
+  if (!instance || typeof v !== 'number' || v === instance.getZoom()) return;
+  instance.easeTo({
+    zoom: v,
+    animate: false
+  }, PROGRAMMATIC);
+});
+watch(() => bearing.value, (v: any) => {
+  if (!instance || typeof v !== 'number' || v === instance.getBearing()) return;
+  instance.easeTo({
+    bearing: v,
+    animate: false
+  }, PROGRAMMATIC);
+});
+watch(() => pitch.value, (v: any) => {
+  if (!instance || typeof v !== 'number' || v === instance.getPitch()) return;
+  instance.easeTo({
+    pitch: v,
+    animate: false
+  }, PROGRAMMATIC);
+});
+watch(() => props.mapStyle, (v: any) => {
+  if (!instance) return;
+  // a new style wipes imperatively-added sources/layers — reset the applied
+  // tracking and re-apply once the new style loads.
+  appliedLayerIds = [];
+  appliedSourceIds = [];
+  instance.setStyle(v);
+  instance.once('styledata', () => applyLayers());
+});
+watch(() => props.minZoom, (v: any) => {
+  if (instance && typeof v === 'number') instance.setMinZoom(v);
+});
+watch(() => props.maxZoom, (v: any) => {
+  if (instance && typeof v === 'number') instance.setMaxZoom(v);
+});
+watch(() => props.maxBounds, (v: any) => {
+  if (instance) instance.setMaxBounds(v || null);
+});
+watch(() => props.markers, (v: any) => {
+  if (reconcileMarkers) reconcileMarkers(v);
+});
+watch(() => props.popups, (v: any) => {
+  if (reconcilePopups) reconcilePopups(v);
+});
+watch(() => props.sources, () => applyLayers());
+watch(() => props.layers, () => applyLayers());
+watch(() => props.interactiveLayerIds, (v: any) => {
+  if (reconcileInteractive) reconcileInteractive(v);
+});
+watch(() => props.controls, () => applyControls());
+watch(() => props.dragPan, () => applyInteractionToggles());
+watch(() => props.dragRotate, () => applyInteractionToggles());
+watch(() => props.scrollZoom, () => applyInteractionToggles());
+watch(() => props.doubleClickZoom, () => applyInteractionToggles());
+watch(() => props.boxZoom, () => applyInteractionToggles());
+watch(() => props.keyboard, () => applyInteractionToggles());
+watch(() => props.touchZoomRotate, () => applyInteractionToggles());
+watch(() => props.touchPitch, () => applyInteractionToggles());
+
+defineExpose({ getMap, flyTo, easeTo, jumpTo, fitBounds, getCenter, getZoom, resize });
+</script>
+
+<style scoped>
+.rozie-maplibre {
+  width: 100%;
+  height: 100%;
+  min-height: 300px;
+  position: relative;
+  overflow: hidden;
+  border-radius: 6px;
+}
+</style>
+
+<style>
+.rozie-maplibre .rozie-maplibre-marker {
+    cursor: pointer;
+  }
+.rozie-maplibre .rozie-maplibre-control {
+    display: flex;
+    flex-direction: column;
+  }
+</style>

@@ -1,0 +1,30 @@
+{
+  // strictNullChecks/exactOptionalPropertyTypes/noImplicitAny relaxed: the
+  // emitted React output is bundler-built (tsdown/oxc), not strict-tsc-authored.
+  // Emitted DOM/engine refs (typed string|null) are proven-correct via
+  // dist-parity but are not author-strictness-clean. This gate typechecks
+  // generated code, so it opts out of the author-strictness flags the codegen
+  // does not satisfy while keeping the rest of strict mode.
+  //
+  // No `paths` alias for `maplibre-gl`: the published maplibre-gl package ships
+  // real types.
+  "extends": "../../../../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "noImplicitOverride": false,
+    "module": "ESNext",
+    "target": "ES2022",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "verbatimModuleSyntax": true,
+    "jsx": "react-jsx",
+    "skipLibCheck": true,
+    "strictNullChecks": false,
+    "exactOptionalPropertyTypes": false,
+    "noImplicitAny": false,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["react"]
+  },
+  "include": ["src"],
+  "exclude": ["dist", "node_modules"]
+}

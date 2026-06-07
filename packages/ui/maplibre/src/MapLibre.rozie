@@ -243,7 +243,15 @@ const applyLayers = () => {
 $onMount(() => {
   const el = $refs.containerEl
 
-  instance = new maplibregl.Map({
+  // mapOptions is a null-let so the bundled-leaf typeNeutralize pass annotates it
+  // `any` — MapLibre's MapOptions strict-types center (LngLatLike tuple), style
+  // (string|StyleSpecification) and maxBounds/bounds (LngLatBoundsLike), which the
+  // loosely-typed .rozie props (any[] / unknown) don't satisfy under the strict
+  // react/solid/lit tsc. Routing the construction through an `any` options object
+  // is the .rozie-native fix (no codegen type-aid, no lang="ts") — the same
+  // null-let idiom `let instance = null` already relies on.
+  let mapOptions = null
+  mapOptions = {
     container: el,
     ...$snapshot($props.options),
     style: $snapshot($props.mapStyle),
@@ -264,7 +272,8 @@ $onMount(() => {
     keyboard: $props.keyboard,
     touchZoomRotate: $props.touchZoomRotate,
     touchPitch: $props.touchPitch,
-  })
+  }
+  instance = new maplibregl.Map(mapOptions)
 
   // ─── forward map events ─────────────────────────────────────────────────
   instance.on('load',       (e) => $emit('load', e))
