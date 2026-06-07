@@ -134,6 +134,30 @@ describe('parseStyle (PARSE-06)', () => {
     expect(node!.rules[0]!.isRootEscape).toBe(false);
   });
 
+  it('emits ROZ128 when a selector contains :global() (D-08) — collected, not thrown', () => {
+    const css = '.x :global(.cm-editor) { color: red; }';
+    let threw = false;
+    let result: ReturnType<typeof parseStyle> | undefined;
+    try {
+      result = parseStyle(css, { start: 0, end: css.length }, css);
+    } catch {
+      threw = true;
+    }
+    expect(threw).toBe(false);
+    const roz128 = result!.diagnostics.filter(d => d.code === 'ROZ128');
+    expect(roz128.length).toBe(1);
+    expect(roz128[0]!.severity).toBe('error');
+    // The StyleAST is still returned (parse continues) — D-08 collected-not-thrown.
+    expect(result!.node).not.toBeNull();
+  });
+
+  it('does NOT emit ROZ128 for a :global( substring inside a declaration value or comment (selector-only)', () => {
+    // `:global(` appears only in a declaration value and a comment — never a selector.
+    const css = '.x {\n  /* :global(.foo) is fine in a comment */\n  content: ":global(.bar)";\n}';
+    const { diagnostics } = parseStyle(css, { start: 0, end: css.length }, css);
+    expect(diagnostics.some(d => d.code === 'ROZ128')).toBe(false);
+  });
+
   it('emits ROZ080 on PostCSS parse error', () => {
     const synthetic = '.foo { unbalanced';
     const { diagnostics } = parseStyle(
