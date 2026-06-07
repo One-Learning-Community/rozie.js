@@ -155,37 +155,35 @@ function wrapPortalSelectors(css: string): string {
 }
 
 /**
- * Phase 34 — prefix every SELECTOR line of an engine-rule CSS string with a
+ * Phase 34 — prefix every rule SELECTOR in an engine-rule CSS string with a
  * BARE `::ng-deep ` (NOT `:host ::ng-deep`). Engine-rendered DOM can be
  * body-injected OUTSIDE the host element (flatpickr calendar, body-appended
  * menus), so the `:host` anchor of `wrapPortalSelectors` would wrongly confine
  * it. Bare `::ng-deep` pierces emulated view encapsulation page-wide (D-06 —
- * page-wide leak is intended). Selector-line detection mirrors
- * `wrapPortalSelectors`: a line ending in `{` opens a rule, a line ending in
- * `,` is a selector-list continuation; declaration lines and `}` are verbatim.
+ * page-wide leak is intended).
+ *
+ * CR-02/WR-02 — postcss-walk the rules instead of a brittle line-string scan.
+ * The previous version classified a "selector line" purely by
+ * `trimmed.endsWith('{')`, so:
+ *   - a COMPACT single-line rule (`.cm-editor { color: red; }`) trims to text
+ *     ending in `}` and was emitted WITHOUT `::ng-deep` — the escape hatch
+ *     silently failed on Angular for any author who writes compact CSS (CR-02);
+ *   - an at-rule-wrapped engine child (now reachable after CR-01) would prefix
+ *     the `@media (...) {` prelude with `::ng-deep` (invalid CSS) and leave the
+ *     inner selectors unprefixed (WR-02).
+ * Walking the postcss rule AST sidesteps both: every `rule.selector` (at any
+ * depth, including inside `@media`) gets `::ng-deep ` prepended to each
+ * comma-separated part; at-rule preludes are left untouched.
  */
 function wrapBareNgDeep(css: string): string {
-  const lines = css.split('\n');
-  const out: string[] = [];
-  let selectorBuf: string[] = [];
-  for (const line of lines) {
-    const trimmed = line.trim();
-    const isOpening = trimmed.endsWith('{');
-    const isSelectorPart = !isOpening && trimmed.endsWith(',');
-    if (isSelectorPart) {
-      selectorBuf.push(`::ng-deep ${trimmed}`);
-      continue;
-    }
-    if (isOpening) {
-      selectorBuf.push(`::ng-deep ${trimmed}`);
-      out.push(...selectorBuf);
-      selectorBuf = [];
-      continue;
-    }
-    out.push(line);
-  }
-  out.push(...selectorBuf);
-  return out.join('\n');
+  const root = postcss.parse(css);
+  root.walkRules((rule) => {
+    rule.selector = rule.selector
+      .split(',')
+      .map((part) => `::ng-deep ${part.trim()}`)
+      .join(',\n');
+  });
+  return root.toString();
 }
 
 function stringifyRules(rules: StyleRule[], source: string): string {
