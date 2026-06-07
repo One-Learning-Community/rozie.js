@@ -81,13 +81,24 @@ export function emitStyle(
   const scopedRules = styles.scopedRules as StyleRule[];
   const rootRules = styles.rootRules as StyleRule[];
   const portalRules = (styles.portalRules ?? []) as StyleRule[];
+  // Phase 34 — engine-DOM escape hatch. Bare `root-block` children wrap with a
+  // BARE `::ng-deep` (NOT `:host ::ng-deep`) so the rule pierces emulated view
+  // encapsulation AND reaches body-injected engine DOM outside the host (e.g.
+  // flatpickr's calendar appended to <body>). D-04/D-06: emitted verbatim.
+  const engineRules = (styles.engineRules ?? []) as StyleRule[];
+  const engineChildren = engineRules.flatMap((r) => r.children ?? []);
 
   // Spike 004 — @portal rules go in a SEPARATE styles entry, each selector
   // wrapped `:host ::ng-deep` to pierce Angular's view encapsulation.
   const portalCss = rewriteAllPortalBlocks(portalRules, source, scopeHash, PORTAL_SCOPE_REPEAT);
   const portalStylesEntry = portalCss.length > 0 ? wrapPortalSelectors(portalCss) : '';
 
-  if (scopedRules.length === 0 && rootRules.length === 0 && portalStylesEntry.length === 0) {
+  if (
+    scopedRules.length === 0 &&
+    rootRules.length === 0 &&
+    portalStylesEntry.length === 0 &&
+    engineChildren.length === 0
+  ) {
     return { stylesArrayBody: '', portalStylesEntry: '', diagnostics };
   }
 
@@ -98,6 +109,10 @@ export function emitStyle(
   if (rootRules.length > 0) {
     const rootBodies = rootRules.map((r) => sliceRuleBody(r, source));
     parts.push(`::ng-deep :root {\n${rootBodies.join('\n')}\n}`);
+  }
+  if (engineChildren.length > 0) {
+    const engineCss = stringifyRules(engineChildren, source);
+    parts.push(wrapBareNgDeep(engineCss));
   }
 
   return {
@@ -133,6 +148,40 @@ function wrapPortalSelectors(css: string): string {
       continue;
     }
     // declaration line or closing brace — emit verbatim.
+    out.push(line);
+  }
+  out.push(...selectorBuf);
+  return out.join('\n');
+}
+
+/**
+ * Phase 34 — prefix every SELECTOR line of an engine-rule CSS string with a
+ * BARE `::ng-deep ` (NOT `:host ::ng-deep`). Engine-rendered DOM can be
+ * body-injected OUTSIDE the host element (flatpickr calendar, body-appended
+ * menus), so the `:host` anchor of `wrapPortalSelectors` would wrongly confine
+ * it. Bare `::ng-deep` pierces emulated view encapsulation page-wide (D-06 —
+ * page-wide leak is intended). Selector-line detection mirrors
+ * `wrapPortalSelectors`: a line ending in `{` opens a rule, a line ending in
+ * `,` is a selector-list continuation; declaration lines and `}` are verbatim.
+ */
+function wrapBareNgDeep(css: string): string {
+  const lines = css.split('\n');
+  const out: string[] = [];
+  let selectorBuf: string[] = [];
+  for (const line of lines) {
+    const trimmed = line.trim();
+    const isOpening = trimmed.endsWith('{');
+    const isSelectorPart = !isOpening && trimmed.endsWith(',');
+    if (isSelectorPart) {
+      selectorBuf.push(`::ng-deep ${trimmed}`);
+      continue;
+    }
+    if (isOpening) {
+      selectorBuf.push(`::ng-deep ${trimmed}`);
+      out.push(...selectorBuf);
+      selectorBuf = [];
+      continue;
+    }
     out.push(line);
   }
   out.push(...selectorBuf);

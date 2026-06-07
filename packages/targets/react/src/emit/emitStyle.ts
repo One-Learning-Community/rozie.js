@@ -98,6 +98,14 @@ export function emitStyle(
   const scopedRules = styles.scopedRules as StyleRule[];
   const rootRules = styles.rootRules as StyleRule[];
   const portalRules = (styles.portalRules ?? []) as StyleRule[];
+  // Phase 34 — engine-DOM escape hatch. Each `root-block` engineRule carries
+  // `children` flattened bare (no `:root` wrapper, no scope attr). They emit
+  // UNSCOPED/global — concatenated into `globalCss` alongside any flat `:root`
+  // custom-prop block — NEVER through `scopeCss`. Reaches both in-component
+  // engine DOM and body-injected engine DOM (flatpickr, TipTap). D-04/D-06:
+  // emitted verbatim, no anchoring enforcement, page-wide leak is intended.
+  const engineRules = (styles.engineRules ?? []) as StyleRule[];
+  const engineChildren = engineRules.flatMap((r) => r.children ?? []);
 
   const rawScopedCss = stringifyRules(scopedRules, source);
   const scopedModuleCss = scopeHash.length > 0 && rawScopedCss.length > 0
@@ -114,7 +122,10 @@ export function emitStyle(
     ? (scopedModuleCss.length > 0 ? `${scopedModuleCss}\n${portalCss}` : portalCss)
     : scopedModuleCss;
 
-  const globalCss = rootRules.length > 0 ? stringifyRules(rootRules, source) : null;
+  const rootCss = rootRules.length > 0 ? stringifyRules(rootRules, source) : '';
+  const engineCss = stringifyRules(engineChildren, source);
+  const globalParts = [rootCss, engineCss].filter((s) => s.length > 0);
+  const globalCss = globalParts.length > 0 ? globalParts.join('\n') : null;
 
   return { moduleCss, globalCss, diagnostics };
 }

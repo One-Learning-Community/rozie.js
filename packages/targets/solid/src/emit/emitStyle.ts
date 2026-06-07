@@ -132,12 +132,20 @@ export function emitStyle(
   const scopedRules = styles.scopedRules as StyleRule[];
   const rootRules = styles.rootRules as StyleRule[];
   const portalRules = (styles.portalRules ?? []) as StyleRule[];
+  // Phase 34 — engine-DOM escape hatch. Bare `root-block` children append into
+  // `globalCss` (verbatim, unscoped) so they ride the SAME `__rozieInjectStyle`
+  // document.head injection — reaching engine-rendered DOM page-wide. D-04/D-06.
+  const engineRules = (styles.engineRules ?? []) as StyleRule[];
+  const engineChildren = engineRules.flatMap((r) => r.children ?? []);
 
   const rawScopedCss = stringifyRules(scopedRules, source);
   const scopedCss = scopeHash.length > 0 && rawScopedCss.length > 0
     ? scopeCss(rawScopedCss, scopeHash)
     : rawScopedCss;
-  const globalCss = rootRules.length > 0 ? stringifyRules(rootRules, source) : '';
+  const rootCss = rootRules.length > 0 ? stringifyRules(rootRules, source) : '';
+  const engineCss = stringifyRules(engineChildren, source);
+  const globalParts = [rootCss, engineCss].filter((s) => s.length > 0);
+  const globalCss = globalParts.join('\n');
 
   // Spike 004 — @portal rules slot in alongside scoped rules. Solid's CSS
   // pipeline is unscoped-by-default (no class hashing), so the

@@ -82,9 +82,17 @@ export function emitStyle(
   const scopedRules = styles.scopedRules as StyleRule[];
   const rootRules = styles.rootRules as StyleRule[];
   const portalRules = (styles.portalRules ?? []) as StyleRule[];
+  // Phase 34 — engine-DOM escape hatch. Bare `root-block` children append into
+  // the unscoped second `<style>` block (no `scoped` attr) verbatim — never
+  // through a scope rewrite. D-04/D-06.
+  const engineRules = (styles.engineRules ?? []) as StyleRule[];
+  const engineChildren = engineRules.flatMap((r) => r.children ?? []);
 
   const scoped = stringifyRules(scopedRules, source);
-  const global = rootRules.length > 0 ? stringifyRules(rootRules, source) : null;
+  const rootCss = rootRules.length > 0 ? stringifyRules(rootRules, source) : '';
+  const engineCss = stringifyRules(engineChildren, source);
+  const globalParts = [rootCss, engineCss].filter((s) => s.length > 0);
+  const global = globalParts.length > 0 ? globalParts.join('\n') : null;
 
   const portalCss = rewriteAllPortalBlocks(portalRules, source, scopeHash, PORTAL_SCOPE_REPEAT);
   const portal = portalCss.length > 0 ? portalCss : null;

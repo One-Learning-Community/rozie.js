@@ -100,10 +100,21 @@ export function emitStyle(
   const scopedRules = styles.scopedRules as StyleRule[];
   const rootRules = styles.rootRules as StyleRule[];
   const portalRules = (styles.portalRules ?? []) as StyleRule[];
+  // Phase 34 — engine-DOM escape hatch. Bare `root-block` children wrap in a
+  // Svelte 5 `:global { ... }` block (the established opt-out pattern) so the
+  // Svelte compiler does NOT class-hash them — they must stay bare to match
+  // engine-rendered DOM (no `.svelte-<hash>` class). D-04/D-06.
+  const engineRules = (styles.engineRules ?? []) as StyleRule[];
+  const engineChildren = engineRules.flatMap((r) => r.children ?? []);
 
   const portalCss = rewriteAllPortalBlocks(portalRules, source, scopeHash, PORTAL_SCOPE_REPEAT);
 
-  if (scopedRules.length === 0 && rootRules.length === 0 && portalCss.length === 0) {
+  if (
+    scopedRules.length === 0 &&
+    rootRules.length === 0 &&
+    portalCss.length === 0 &&
+    engineChildren.length === 0
+  ) {
     return { block: '', diagnostics };
   }
 
@@ -133,6 +144,18 @@ export function emitStyle(
   if (rootRules.length > 0) {
     const rootBodies = rootRules.map((r) => sliceRuleBody(r, source));
     parts.push(`:global(:root) {\n${rootBodies.join('\n')}\n}`);
+  }
+
+  // Phase 34 — bare engine rules wrap in a `:global { ... }` block so Svelte's
+  // compiler leaves the selectors un-hashed (they must match engine-rendered
+  // DOM that carries no `.svelte-<hash>` class).
+  if (engineChildren.length > 0) {
+    const engineCss = stringifyRules(engineChildren, source);
+    const indented = engineCss
+      .split('\n')
+      .map((l) => (l.length > 0 ? `  ${l}` : l))
+      .join('\n');
+    parts.push(`:global {\n${indented}\n}`);
   }
 
   // Spike 004 — @portal rules wrap inside a Svelte 5 `:global { ... }` block.
