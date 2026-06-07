@@ -261,6 +261,18 @@ export const RozieErrorCode = {
   // decl). Remediation: rename the slot (append `Content` / the engine hook name).
   // ROZ127 is the next free code after ROZ126 in the 100 semantic-binding cluster.
   SLOT_PROP_NAME_COLLISION: 'ROZ127', // error — <slot name="X"> where X equals a declared <props> key; Svelte 5 collapses snippets+props into one namespace, so the names cannot coexist
+  // Phase 34 (CSS engine-DOM escape hatch) — a `:global(...)` pseudo used in a
+  // `<style>` selector. It "works" only on Vue and Svelte (whose compilers
+  // understand `:global()`) and is SILENTLY DROPPED on React, Solid, and Lit
+  // (in a non-CSS-Modules / runtime-injected / shadow-DOM pipeline the browser
+  // sees `:global(...)` as an unknown pseudo and discards the whole rule). That
+  // makes it a cross-target-half-supported footgun in the exact same class as
+  // ROZ127 / ROZ125. Detected selector-only in parseStyle (collected-not-thrown,
+  // D-08) so it fires through lowerToIR for BOTH compile() AND @rozie/unplugin.
+  // Remediation: use the `:root { .selector { ... } }` engine-DOM escape hatch,
+  // which lowers to the engineRules bucket and emits unscoped/global across all
+  // six targets. ROZ128 is the next free code after ROZ127 in the 100 cluster.
+  STYLE_GLOBAL_PSEUDO_FORBIDDEN: 'ROZ128', // error — :global(...) used in <style>; works only on Vue/Svelte, silently dead on React/Solid/Lit. Use :root { ... } for the engine-DOM escape hatch.
 
   // ---- Compile-time correctness errors (Phase 2 Plan 02) — ROZ200..ROZ299 ----
   WRITE_TO_NON_MODEL_PROP: 'ROZ200', // SEM-02: $props.foo = … where foo lacks model: true (Phase 2 success criterion 2)

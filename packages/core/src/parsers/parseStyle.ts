@@ -214,6 +214,24 @@ export function parseStyle(
   /** Build a plain (non-portal) StyleRule, emitting ROZ081 on mixed :root. */
   const buildPlainRule = (rule: Rule): StyleRule => {
     const ruleLoc = nodeLoc(rule);
+    // Phase 34 (D-08) — ROZ128: `:global(...)` in a selector. postcss already
+    // hands us the selector portion ONLY (declaration values + comments live in
+    // the rule body, not `rule.selector`), so this substring scan cannot
+    // false-trip on a `:global(` inside a declaration value or comment. Works
+    // only on Vue/Svelte; silently dropped on React/Solid/Lit — a hard error.
+    // Collected, never thrown (D-08 contract). The `:root { .sel { ... } }`
+    // engine-DOM escape hatch is the cross-target replacement.
+    if (rule.selector.includes(':global(')) {
+      diagnostics.push({
+        code: RozieErrorCode.STYLE_GLOBAL_PSEUDO_FORBIDDEN,
+        severity: 'error',
+        message:
+          ':global() is not supported in <style> — it works only on Vue/Svelte and is silently dropped on React, Solid, and Lit.',
+        loc: isScss ? contentLoc : ruleLoc,
+        ...(filename !== undefined ? { filename } : {}),
+        hint: 'Use a :root { .selector { ... } } block to style engine-rendered runtime DOM across all six targets.',
+      });
+    }
     // Selector classification (Pitfall 6 — mixed-:root rejection).
     const parts = rule.selector.split(',').map(s => s.trim());
     const hasRoot = parts.includes(':root');
