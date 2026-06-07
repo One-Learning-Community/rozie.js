@@ -2,7 +2,7 @@
 
 `CodeMirror` is Rozie's data-bound port of [CodeMirror 6](https://codemirror.net/) — the de-facto modular code editor for the web. One `.rozie` source file ships idiomatic React, Vue, Svelte, Angular, Solid, and Lit consumers from a single wrapper. Every framework today carries its own hand-maintained CodeMirror binding ([react-codemirror](https://www.npmjs.com/package/@uiw/react-codemirror), [vue-codemirror](https://www.npmjs.com/package/vue-codemirror), [svelte-codemirror](https://www.npmjs.com/package/svelte-codemirror-editor), [ngx-codemirror](https://www.npmjs.com/package/@ctrl/ngx-codemirror)) — each shuttles a `value` through the `EditorView`/`EditorState` API and forwards changes back out. Rozie collapses all of them (plus the Solid and Lit wrappers that **do not exist upstream**) into one source. See the [CodeMirror libraries comparison](/guide/codemirror-comparison) for the full per-framework matrix — including the Angular wrapper that's still on CodeMirror 5.
 
-This page is the **show-and-tell**: the API surface, per-framework quick starts, the imperative handle, the consumer-extensible `:extensions` passthrough, and the per-target recipe for the one `panel` portal slot.
+This page is the **show-and-tell**: the API surface, per-framework quick starts, the imperative handle, the consumer-extensible `:extensions` passthrough, and the per-target recipe for the `panel` / `topPanel` / `tooltip` portal slots.
 
 The full source for `CodeMirror.rozie` lives in the [`@rozie-ui/codemirror` package](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/codemirror/src/CodeMirror.rozie).
 
@@ -218,11 +218,15 @@ The eight handle method names are clear of all seven prop names (and there are n
 
 ## Slots
 
-The wrapper surfaces **one** portal slot — `panel` — mounted through CodeMirror 6's [`showPanel`](https://codemirror.net/docs/ref/#view.showPanel) facet (a panel extension whose DOM element is the portal host). It is the status-bar idiom: a strip mounted at the **bottom** of the editor (`top: false`). The slot is **guarded** — fill it and your fragment renders in the panel; leave it unfilled and the editor shows no panel. The slot receives one scope param, `view` — the live `EditorView`.
+The wrapper surfaces **three** portal slots — two bottom/top status panels mounted through CodeMirror 6's [`showPanel`](https://codemirror.net/docs/ref/#view.showPanel) facet, plus a cursor-anchored tooltip through the [`showTooltip`](https://codemirror.net/docs/ref/#view.showTooltip) facet. Each is **guarded** — fill it and your fragment renders; leave it unfilled and the surface stays absent.
 
-| Slot | Mounts via | Renders | Scope param |
-| --- | --- | --- | --- |
-| `panel` | CodeMirror's `showPanel` facet (bottom) | A status-bar / toolbar strip beneath the editor | `view` |
+| Slot | Mounts via | Renders | Scope param | Kind |
+| --- | --- | --- | --- | --- |
+| `panel` | CodeMirror's `showPanel` facet (`top: false`) | A status-bar / toolbar strip beneath the editor | `view` | mount-once |
+| `topPanel` | CodeMirror's `showPanel` facet (`top: true`) | A status strip above the editor | `view` | mount-once |
+| `tooltip` | CodeMirror's `showTooltip` facet (caret head) | A cursor-anchored tooltip | `view`, `pos` | **reactive** |
+
+`tooltip` is CodeMirror's first **reactive** portal slot: its fragment mounts **once** and re-renders **in place** as the caret moves (the engine-driven `{ update, dispose }` handle), rather than remounting per keystroke. Its scope carries the live `EditorView` plus `pos` (the caret head).
 
 Portal slots unlock the "foreign-engine cell rendering" pattern: CodeMirror owns the panel `<div>`, but the consumer's framework-native fragment is mounted inside it (on the panel's `mount()`) and disposed when the panel is torn down (`destroy()`). See [the portal-slot primitive](/examples/portal-list) for the underlying mechanism. Each target fills `#panel` through its native imperative-render API:
 
@@ -426,9 +430,9 @@ A model two-way binding can ping-pong: the consumer's state signals back into th
 
 `:extensions` is an arbitrary `Extension[]` that the wrapper composes into the live `EditorState`. Those extensions execute inside the editor by design — that is the entire point of the passthrough (CodeMirror 6 *is* an extension array). Pass only extensions you trust, exactly as you would when building a CodeMirror editor by hand.
 
-### The `panel` slot is the only injection surface in v1
+### Injection-surface coverage
 
-CodeMirror 6 has many extension-mounted injection points (tooltips, gutter markers, line/widget/replace decorations). v1 ships exactly one portal slot — `panel` — proving the `showPanel`-mounted injection pattern. Broader injection surfaces are a future parity expansion; until then, reach them through a custom extension passed via `:extensions`.
+CodeMirror 6 has many extension-mounted injection points. The wrapper ships portal slots for the panel (`panel` / `topPanel`, via `showPanel`) and the cursor tooltip (`tooltip`, via `showTooltip` — the first **reactive** slot). Gutter markers and line/widget/replace decorations are a future parity expansion; until then, reach them through a custom extension passed via `:extensions`.
 
 ## Cross-references
 

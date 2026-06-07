@@ -25,8 +25,13 @@
       large "options bag" — everything is an Extension. The `extensions`
       prop is composed LAST so consumer extensions win CM6's
       last-registered-wins facets.
-    - One `panel` portal slot — proves CM6's extension-mounted injection
-      (a `showPanel` facet whose DOM element is the portal host).
+    - Three injection portal slots — proving CM6's extension-mounted
+      injection across both the mount-once AND reactive portal primitives:
+        · `panel`    — bottom-docked `showPanel` facet (mount-once).
+        · `topPanel` — top-docked `showPanel` facet (mount-once, G5 wave 1).
+        · `tooltip`  — cursor-anchored `showTooltip` facet (REACTIVE, G5
+          wave 1; CodeMirror's first reactive slot — the consumer fragment
+          mounts once and re-renders in place as the caret moves).
 
   Consumer example:
 
@@ -61,8 +66,8 @@
 </props>
 
 <script>
-import { EditorState, Compartment, EditorSelection } from '@codemirror/state'
-import { EditorView, keymap, lineNumbers, showPanel, placeholder as placeholderExt } from '@codemirror/view'
+import { EditorState, Compartment, EditorSelection, StateField } from '@codemirror/state'
+import { EditorView, keymap, lineNumbers, showPanel, showTooltip, placeholder as placeholderExt } from '@codemirror/view'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { javascript } from '@codemirror/lang-javascript'
 import { oneDark } from '@codemirror/theme-one-dark'
@@ -89,6 +94,16 @@ const readOnlyCompartment = new Compartment()
 const placeholderCompartment = new Compartment()
 const extensionsCompartment = new Compartment()
 const panelCompartment = new Compartment()
+// topPanel is the top-docked sibling of `panel` — a SECOND mount-once portal
+// slot (G5 wave 1) wired through the same `showPanel` facet with `top: true`.
+const topPanelCompartment = new Compartment()
+// tooltip is CodeMirror's FIRST REACTIVE portal slot (G5 wave 1) — a
+// cursor-anchored tooltip via the `showTooltip` facet. Driven by a StateField
+// (`tooltipField`, built inside $onMount) so it tracks the caret; the reactive
+// portal handle re-renders the consumer fragment IN PLACE on caret move rather
+// than remounting it each keystroke. NO compartment — a StateField is the
+// idiomatic showTooltip source and there is no runtime prop to reconfigure it
+// against (slot presence is decided once at mount).
 
 // language is a convenience prop mapping to the ONE bundled language
 // (@codemirror/lang-javascript). Any other value → [] (plain text, no syntax
@@ -167,6 +182,105 @@ $onMount(() => {
     })
   }
 
+  // topPanel — the TOP-docked mount-once sibling of `panel` (G5 wave 1). Same
+  // `showPanel` facet, same arrow-function-property mount/destroy form (NOT
+  // object-method `mount() {}` — the Lit field-rewrite caveat documented on
+  // panelExt above applies identically), differing ONLY in `top: true` and the
+  // `.rozie-cm-panel-top` host class. Empty ([]) when the slot is unfilled.
+  const topPanelExt = () => {
+    if (!$slots.topPanel) return []
+    return showPanel.of((panelView) => {
+      const dom = document.createElement('div')
+      dom.className = 'rozie-cm-panel-top'
+      const scope = { view: panelView }
+      let dispose = null
+      return {
+        dom,
+        top: true,
+        mount: () => { dispose = $portals.topPanel(dom, scope) },
+        destroy: () => { dispose?.(); dispose = null },
+      }
+    })
+  }
+
+  // tooltip — CodeMirror's FIRST REACTIVE portal slot (G5 wave 1). A
+  // cursor-anchored tooltip provided through the `showTooltip` facet via a
+  // StateField that yields ONE Tooltip at the main selection head whenever the
+  // `tooltip` slot is filled.
+  //
+  // UPDATE-IN-PLACE reconciliation (verified against the installed
+  // @codemirror/view@6.43 tooltip source, TooltipViewManager.update): CM reuses
+  // an existing TooltipView — calling TooltipView.update(viewUpdate) instead of
+  // destroy+create — when the new Tooltip's `create` is REFERENCE-EQUAL to the
+  // old one's (`other.create == tip.create`); and when the whole showTooltip
+  // facet INPUT is unchanged it skips matching entirely and calls update() on
+  // every live view. We satisfy BOTH by holding ONE module-stable Tooltip object
+  // (`stableTooltip`, stable `create`) and returning that SAME object from the
+  // field's `update` while the head only moved. So the consumer fragment mounts
+  // ONCE (TooltipView.mount → $portals.tooltip → reactive {update,dispose}) and
+  // every caret move flows through TooltipView.update → handle.update(scope) —
+  // re-rendering the fragment IN PLACE, never remounting it.
+  const tooltipField = () => {
+    if (!$slots.tooltip) return []
+    // The reactive portal handle for the SINGLE live tooltip view. Hoisted to
+    // the field's closure so create()/update()/destroy() share it across the
+    // tooltip's lifetime.
+    let handle = null
+    // Stable Tooltip object — its `create` reference never changes, so CM
+    // reuses the TooltipView across caret moves (update-in-place, no remount).
+    // NOTE: `create` is an ARROW-FUNCTION property and its param is named
+    // `tipView` (NOT `view`) — both for the SAME Lit reason documented on
+    // panelExt: an object-method `create(view) {}` would get its own `this`,
+    // and the Lit emitter's component-field rewrite walks into the body and
+    // rewrites a `view`-named token (matching the top-level `let view`) to
+    // `this.view`. An arrow property shares the enclosing scope, and the
+    // non-colliding param name keeps the caret-view reference correct on every
+    // target. CM calls `tooltip.create(view)` either way.
+    const stableTooltip = {
+      pos: 0,
+      above: true,
+      create: (tipView) => {
+        const dom = document.createElement('div')
+        dom.className = 'rozie-cm-tooltip'
+        return {
+          dom,
+          mount: () => {
+            handle = $portals.tooltip(dom, { view: tipView, pos: tipView.state.selection.main.head })
+          },
+          // Reactive in-place update — fired by CM on every ViewUpdate while the
+          // tooltip view is reused. Re-renders the consumer fragment with the
+          // fresh caret position; the fragment is NOT remounted (REQ — verified
+          // empirically via the demo's mount/update counters).
+          update: (u) => {
+            handle?.update({ view: u.view, pos: u.state.selection.main.head })
+          },
+          destroy: () => {
+            handle?.dispose()
+            handle = null
+          },
+        }
+      },
+    }
+    // NOTE: the StateField.update callback's first param is named `cur` (NOT the
+    // idiomatic `value`): a `value` model prop makes the React emitter rewrite a
+    // local `value` binding into the prop-state ref (`_valueRef.current`) — it
+    // walks into this callback and corrupts the field's accumulator
+    // (TS2339 "Property 'pos' does not exist on type 'string'"). Same collision
+    // class as the setValue→replaceValue $expose rename (ROZ524). `cur` is
+    // collision-free across all 6 targets.
+    return StateField.define({
+      create: (state) => ({ ...stableTooltip, pos: state.selection.main.head }),
+      update: (cur, tr) => {
+        // Keep the SAME stable `create`; only the head moves. Reuse the existing
+        // object when the head is unchanged so the facet input is identity-stable.
+        const head = tr.state.selection.main.head
+        if (cur && cur.pos === head) return cur
+        return { ...stableTooltip, pos: head }
+      },
+      provide: (f) => showTooltip.from(f),
+    })
+  }
+
   const buildState = (doc) => EditorState.create({
     doc,
     extensions: [
@@ -176,6 +290,10 @@ $onMount(() => {
       readOnlyCompartment.of(EditorState.readOnly.of($props.readOnly)),
       placeholderCompartment.of(phExt()),
       panelCompartment.of(panelExt()),
+      topPanelCompartment.of(topPanelExt()),
+      // tooltipField() returns a StateField extension (or [] when the slot is
+      // unfilled); no compartment — it is a one-shot mount-time decision.
+      tooltipField(),
       EditorView.updateListener.of((update) => {
         if (!update.docChanged) return
         if (suppressEmit) return
@@ -293,6 +411,24 @@ $expose({ getView, focus, getValue, replaceValue, dispatch, insertText, getSelec
   node and returns a dispose handle the engine calls on Panel.destroy().
 -->
 <slot name="panel" portal :params="['view']" />
+<!--
+  topPanel — the TOP-docked mount-once portal sibling of `panel` (G5 wave 1).
+  Declared but NOT rendered inline (per-target emitters skip it). The wrapper
+  invokes it from script via $portals.topPanel(dom, { view }) inside CM6's
+  `showPanel` Panel.mount() hook (with `top: true`). ROZ127-clean: `topPanel` ≠
+  any prop (value/language/theme/readOnly/height/placeholder/extensions/basicSetup).
+-->
+<slot name="topPanel" portal :params="['view']" />
+<!--
+  tooltip — CodeMirror's FIRST REACTIVE portal slot (Phase 33 `reactive`
+  primitive; G5 wave 1). Declared but NOT rendered inline. The wrapper invokes
+  it from script via $portals.tooltip(dom, { view, pos }) inside the
+  `showTooltip` StateField's TooltipView.mount() hook; the reactive handle
+  ({ update, dispose }) re-renders the consumer fragment IN PLACE as the caret
+  moves (TooltipView.update → handle.update(scope)) rather than remounting it.
+  ROZ127-clean: `tooltip` ≠ any prop name.
+-->
+<slot name="tooltip" portal reactive :params="['view', 'pos']" />
 </template>
 
 <style>
@@ -322,6 +458,25 @@ $expose({ getView, focus, getValue, replaceValue, dispatch, insertText, getSelec
     padding: 2px 8px;
     border-top: 1px solid rgba(0, 0, 0, 0.12);
     font-size: 12px;
+  }
+
+  /* topPanel docks at the TOP, so its divider border sits on the BOTTOM edge
+     (mirror of .rozie-cm-panel's top border). */
+  .rozie-codemirror .rozie-cm-panel-top {
+    padding: 2px 8px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+    font-size: 12px;
+  }
+
+  /* tooltip — minimal chrome so a filled consumer fragment is visible; the
+     consumer styles its own content. */
+  .rozie-codemirror .rozie-cm-tooltip {
+    padding: 2px 6px;
+    font-size: 11px;
+    background: #1a1a1a;
+    color: #fff;
+    border-radius: 3px;
+    white-space: nowrap;
   }
 }
 </style>

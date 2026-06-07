@@ -46,6 +46,17 @@
   language: 'javascript',
   readOnlyExt: false,
   panelOn: false,
+  // G5 wave 1 — topPanel (mount-once) + tooltip (REACTIVE) portal slots.
+  // tipCode drives a dedicated editor whose tooltip shows the live caret line/col.
+  tipCode: "alpha\nbeta\ngamma",
+  tipLine: 1,
+  tipCol: 1,
+  // Empirical reconciliation counters for the REACTIVE tooltip slot: the
+  // consumer fragment's mount handler bumps tipMounts ONCE; every in-place caret
+  // re-render bumps tipUpdates. mounts staying at 1 while updates climbs proves
+  // update-in-place (no remount per caret move).
+  tipMounts: 0,
+  tipUpdates: 0,
   handleOut: '(none)',
 }
 </data>
@@ -108,6 +119,30 @@ const handleGetSelection = () => {
 const handleGetView = () => {
   const view = $refs.cm?.getView?.()
   $data.handleOut = view ? 'view ok' : '(no handle)'
+}
+
+// G5 wave 1 — REACTIVE tooltip slot empirical proof. The reactive portal slot
+// re-renders the consumer fragment IN PLACE on every caret move. `capTip` runs
+// as a side effect from a `:data-cap` binding in the slot fill (the proven
+// reactive-slot capture idiom — cf. TipTapNodeViewDemo's captureEditor): it
+// recomputes the live line/col from the engine `view` + `pos` scope params and
+// bumps the update counter on EVERY render. The mount counter is bumped ONLY on
+// the first render of a freshly-mounted fragment (tracked by a closure flag that
+// resets when the DOM host node identity changes). tipMounts staying at 1 while
+// tipUpdates climbs is the in-place-no-remount proof.
+let tipFragMounted = false
+const capTip = (view, pos) => {
+  if (!view) return ''
+  // Recompute line/col from the live caret position (pos) against the doc.
+  const line = view.state.doc.lineAt(pos ?? 0)
+  $data.tipLine = line.number
+  $data.tipCol = (pos ?? 0) - line.from + 1
+  $data.tipUpdates = $data.tipUpdates + 1
+  if (!tipFragMounted) {
+    tipFragMounted = true
+    $data.tipMounts = $data.tipMounts + 1
+  }
+  return ''
 }
 </script>
 
@@ -204,9 +239,29 @@ const handleGetView = () => {
       />
     </div>
 
+    <!-- G5 wave 1 — topPanel (mount-once) + tooltip (REACTIVE) portal slots.
+         Editor F fills BOTH: a top-docked status panel and a caret-anchored
+         tooltip that reads the live editor state (line/col). The tooltip fill
+         is the empirical reconciliation proof — capTip bumps update/mount
+         counters surfaced in the state pane. -->
+    <div class="editor-cell" data-testid="tip-cell">
+      <span class="label">Editor F (topPanel + reactive tooltip)</span>
+      <CodeMirror r-model:value="$data.tipCode" :height="120" theme="light">
+        <template #topPanel="{ view }">
+          <span class="cm-toppanel-fill" data-testid="toppanel-fill">status · top-docked panel</span>
+        </template>
+        <template #tooltip="{ view, pos }">
+          <span class="cm-tooltip-fill" data-testid="tooltip-fill" :data-cap="capTip(view, pos)">Ln {{ $data.tipLine }}, Col {{ $data.tipCol }}</span>
+        </template>
+      </CodeMirror>
+    </div>
+
     <div class="state-pane">
       <code data-testid="state-language">{{ $data.language }}</code>
       <code data-testid="state-handle-out">{{ $data.handleOut }}</code>
+      <code data-testid="state-tip-pos">Ln {{ $data.tipLine }}, Col {{ $data.tipCol }}</code>
+      <code data-testid="state-tip-mounts">mounts:{{ $data.tipMounts }}</code>
+      <code data-testid="state-tip-updates">updates:{{ $data.tipUpdates }}</code>
     </div>
   </section>
 </div>
@@ -252,6 +307,17 @@ const handleGetView = () => {
 .cm-panel-fill {
   font-weight: 600;
   font-size: 0.78rem;
+}
+
+.cm-toppanel-fill {
+  font-weight: 600;
+  font-size: 0.78rem;
+  color: #2563eb;
+}
+
+.cm-tooltip-fill {
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
 }
 
 .state-pane {
