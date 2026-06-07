@@ -598,7 +598,12 @@ export class CodeMirror {
     // The WidgetType class captures $portals.decoration, so it is defined inside
     // this $onMount-invoked factory (the bundled-leaf typecheck discipline).
     const makeDecorationExt = (dv: any) => {
-      if (!(this.decorationTpl ?? this.templates()?.['decoration'])) return Decoration.none;
+      // Unfilled slot → EMPTY EXTENSION (`[]`), NOT `Decoration.none`. The latter
+      // is a DecorationSet (a RangeSet), which is NOT a valid Extension; placing it
+      // in the extensions array (via `decorationCompartment.of(...)`) makes
+      // EditorState.create throw at runtime — the editor never mounts. Only the
+      // browser surfaces this (CM's facet types are loose, so build/typecheck pass).
+      if (!(this.decorationTpl ?? this.templates()?.['decoration'])) return [];
       // The WidgetType subclass is declared inline (WidgetType REQUIRES subclassing)
       // but its per-widget state (`from`/`to`, the live portal handle) lives in
       // CLOSURE — `makeWidget(from, to)` captures them — NOT in `this` fields, for
