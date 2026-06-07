@@ -7,11 +7,12 @@ export interface CodeMirrorProps {
   defaultValue?: string;
   onValueChange?: (next: string) => void;
   language?: string;
-  theme?: string;
+  theme?: unknown;
   readOnly?: boolean;
   height?: number;
   placeholder?: string;
   extensions?: unknown[];
+  basicSetup?: boolean;
   renderPanel?: (params: { view: () => void }) => ReactNode;
   slots?: Record<string, () => ReactNode>;
 }

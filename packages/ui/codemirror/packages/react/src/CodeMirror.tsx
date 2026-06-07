@@ -10,6 +10,13 @@ import { EditorView, keymap, lineNumbers, showPanel, placeholder as placeholderE
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { javascript } from '@codemirror/lang-javascript';
 import { oneDark } from '@codemirror/theme-one-dark';
+// Imported under an alias: the `basicSetup` PROP (G1) would otherwise collide
+// with this binding on targets that lower props into same-scope locals (Svelte
+// `let basicSetup`, Solid/React destructured `props.basicSetup`).
+// Imported under an alias: the `basicSetup` PROP (G1) would otherwise collide
+// with this binding on targets that lower props into same-scope locals (Svelte
+// `let basicSetup`, Solid/React destructured `props.basicSetup`).
+import { basicSetup as basicSetupBundle } from 'codemirror';
 
 interface PanelCtx { view: any; }
 
@@ -18,11 +25,12 @@ interface CodeMirrorProps {
   defaultValue?: string;
   onValueChange?: (value: string) => void;
   language?: string;
-  theme?: string;
+  theme?: unknown;
   readOnly?: boolean;
   height?: number;
   placeholder?: string;
   extensions?: any[];
+  basicSetup?: boolean;
   renderPanel?: (ctx: PanelCtx) => ReactNode;
   slots?: Record<string, () => import('react').ReactNode>;
 }
@@ -41,7 +49,7 @@ export interface CodeMirrorHandle {
 const CodeMirror = forwardRef<CodeMirrorHandle, CodeMirrorProps>(function CodeMirror(_props: CodeMirrorProps, ref): JSX.Element {
   const portalRoots = useRef<Set<Root>>(new Set());
   const __defaultExtensions = useState(() => (() => [])())[0];
-  const props: Omit<CodeMirrorProps, 'language' | 'theme' | 'readOnly' | 'height' | 'placeholder' | 'extensions'> & { language: string; theme: string; readOnly: boolean; height: number; placeholder: string; extensions: any[] } = {
+  const props: Omit<CodeMirrorProps, 'language' | 'theme' | 'readOnly' | 'height' | 'placeholder' | 'extensions' | 'basicSetup'> & { language: string; theme: unknown; readOnly: boolean; height: number; placeholder: string; extensions: any[]; basicSetup: boolean } = {
     ..._props,
     language: _props.language ?? 'javascript',
     theme: _props.theme ?? 'light',
@@ -49,6 +57,7 @@ const CodeMirror = forwardRef<CodeMirrorHandle, CodeMirrorProps>(function CodeMi
     height: _props.height ?? 240,
     placeholder: _props.placeholder ?? '',
     extensions: _props.extensions ?? __defaultExtensions,
+    basicSetup: _props.basicSetup ?? false,
   };
   const _renderPanelRef = useRef(props.renderPanel);
   _renderPanelRef.current = props.renderPanel;
@@ -80,8 +89,18 @@ const CodeMirror = forwardRef<CodeMirrorHandle, CodeMirrorProps>(function CodeMi
   const extensionsCompartment = useMemo(() => new Compartment(), []);
   const panelCompartment = useMemo(() => new Compartment(), []);
   const langExt = useCallback(() => props.language === 'javascript' ? javascript() : [], [props.language]);
-  const themeExt = useCallback(() => props.theme === 'dark' ? oneDark : [], [props.theme]);
+  const themeExt = useCallback((): any => {
+    const t = props.theme;
+    if (t === 'dark') return oneDark;
+    if (t === 'light' || t === '' || t == null) return [];
+    // t is a CM Extension / Extension[] passthrough by this branch (the widened
+    // `theme` prop accepts a string OR an Extension). The strict-tsc leaves get a
+    // codegen return-type aid (`themeExt(): any`) so `Compartment.of`/`reconfigure`
+    // accept it; the type-neutral targets strip types entirely.
+    return t;
+  }, [props.theme]);
   const phExt = useCallback(() => props.placeholder ? placeholderExt(props.placeholder) : [], [props.placeholder]);
+  const baselineExt = useCallback(() => props.basicSetup ? [basicSetupBundle] : [lineNumbers(), history(), keymap.of([...defaultKeymap, ...historyKeymap])], [props.basicSetup]);
   function writeDoc(v: any) {
     if (!view.current) return;
     const current = view.current.state.doc.toString();
@@ -103,8 +122,8 @@ const CodeMirror = forwardRef<CodeMirrorHandle, CodeMirrorProps>(function CodeMi
   // Imperative handle (Phase 21 $expose). The 8 editor verbs a consumer can't
   // drive through props alone — exposed uniformly to all 6 targets. Each guards
   // the pre-mount/destroyed `view = null`. Collision-clear: none of the 8 names
-  // collide with the 7 props (value/language/theme/readOnly/height/placeholder/
-  // extensions) and there are no events (D-08).
+  // collide with the 8 props (value/language/theme/readOnly/height/placeholder/
+  // extensions/basicSetup) and there are no events (D-08).
   function getView() {
     return view.current;
   }
@@ -214,7 +233,7 @@ const CodeMirror = forwardRef<CodeMirrorHandle, CodeMirrorProps>(function CodeMi
     };
     const buildState = (doc: any) => EditorState.create({
       doc,
-      extensions: [lineNumbers(), history(), keymap.of([...defaultKeymap, ...historyKeymap]), langCompartment.of(langExt()), themeCompartment.of(themeExt()), readOnlyCompartment.of(EditorState.readOnly.of(_readOnlyRef.current)), placeholderCompartment.of(phExt()), panelCompartment.of(panelExt()), EditorView.updateListener.of((update: any) => {
+      extensions: [...baselineExt(), langCompartment.of(langExt()), themeCompartment.of(themeExt()), readOnlyCompartment.of(EditorState.readOnly.of(_readOnlyRef.current)), placeholderCompartment.of(phExt()), panelCompartment.of(panelExt()), EditorView.updateListener.of((update: any) => {
         if (!update.docChanged) return;
         if (suppressEmit.current) return;
         // Push the new doc out through the model:true emit path. Consumers

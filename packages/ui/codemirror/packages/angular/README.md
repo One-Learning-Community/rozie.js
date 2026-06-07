@@ -8,7 +8,7 @@ Idiomatic **angular** `CodeMirror` — a cross-framework code editor compiled fr
 npm i @rozie-ui/codemirror-angular
 ```
 
-Peer dependencies: the five `@codemirror/*` engine packages (`@codemirror/state`, `@codemirror/view`, `@codemirror/commands`, `@codemirror/lang-javascript`, `@codemirror/theme-one-dark`, all `^6`) + `@angular/core + @angular/common`. Install them alongside this package.
+Peer dependencies: the five `@codemirror/*` engine packages (`@codemirror/state`, `@codemirror/view`, `@codemirror/commands`, `@codemirror/lang-javascript`, `@codemirror/theme-one-dark`) plus the `codemirror` meta-package (for the `basicSetup` bundle), all `^6`, + `@angular/core + @angular/common`. Install them alongside this package.
 
 ## Usage
 
@@ -63,11 +63,12 @@ The accessor contract: only real user interaction dirties the control — progra
 | --- | --- | --- | :---: | :---: |
 | `value` | `String` | `""` | ✓ |  |
 | `language` | `String` | `"javascript"` |  |  |
-| `theme` | `String` | `"light"` |  |  |
+| `theme` | `unknown` | `"light"` |  |  |
 | `readOnly` | `Boolean` | `false` |  |  |
 | `height` | `Number` | `240` |  |  |
 | `placeholder` | `String` | `""` |  |  |
 | `extensions` | `Array` | `[]` |  |  |
+| `basicSetup` | `Boolean` | `false` |  |  |
 
 ## Imperative handle
 

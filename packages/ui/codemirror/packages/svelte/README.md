@@ -8,7 +8,7 @@ Idiomatic **svelte** `CodeMirror` — a cross-framework code editor compiled fro
 npm i @rozie-ui/codemirror-svelte
 ```
 
-Peer dependencies: the five `@codemirror/*` engine packages (`@codemirror/state`, `@codemirror/view`, `@codemirror/commands`, `@codemirror/lang-javascript`, `@codemirror/theme-one-dark`, all `^6`) + `svelte`. Install them alongside this package.
+Peer dependencies: the five `@codemirror/*` engine packages (`@codemirror/state`, `@codemirror/view`, `@codemirror/commands`, `@codemirror/lang-javascript`, `@codemirror/theme-one-dark`) plus the `codemirror` meta-package (for the `basicSetup` bundle), all `^6`, + `svelte`. Install them alongside this package.
 
 ## Usage
 
@@ -28,11 +28,12 @@ Peer dependencies: the five `@codemirror/*` engine packages (`@codemirror/state`
 | --- | --- | --- | :---: | :---: |
 | `value` | `String` | `""` | ✓ |  |
 | `language` | `String` | `"javascript"` |  |  |
-| `theme` | `String` | `"light"` |  |  |
+| `theme` | `unknown` | `"light"` |  |  |
 | `readOnly` | `Boolean` | `false` |  |  |
 | `height` | `Number` | `240` |  |  |
 | `placeholder` | `String` | `""` |  |  |
 | `extensions` | `Array` | `[]` |  |  |
+| `basicSetup` | `Boolean` | `false` |  |  |
 
 ## Imperative handle
 

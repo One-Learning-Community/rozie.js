@@ -7,11 +7,12 @@ import { onMount, untrack } from 'svelte';
 interface Props {
   value?: string;
   language?: string;
-  theme?: string;
+  theme?: unknown;
   readOnly?: boolean;
   height?: number;
   placeholder?: string;
   extensions?: any[];
+  basicSetup?: boolean;
   panel?: Snippet<[{ view: any }]>;
   snippets?: Record<string, any>;
 }
@@ -26,6 +27,7 @@ let {
   height = 240,
   placeholder = '',
   extensions = __defaultExtensions,
+  basicSetup = false,
   panel: __panelProp,
   snippets
 }: Props = $props();
@@ -39,6 +41,13 @@ import { EditorView, keymap, lineNumbers, showPanel, placeholder as placeholderE
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { javascript } from '@codemirror/lang-javascript';
 import { oneDark } from '@codemirror/theme-one-dark';
+// Imported under an alias: the `basicSetup` PROP (G1) would otherwise collide
+// with this binding on targets that lower props into same-scope locals (Svelte
+// `let basicSetup`, Solid/React destructured `props.basicSetup`).
+// Imported under an alias: the `basicSetup` PROP (G1) would otherwise collide
+// with this binding on targets that lower props into same-scope locals (Svelte
+// `let basicSetup`, Solid/React destructured `props.basicSetup`).
+import { basicSetup as basicSetupBundle } from 'codemirror';
 let view: any = null;
 
 // CodeMirror's updateListener fires on EVERY transaction, including our own
@@ -77,11 +86,45 @@ const panelCompartment = new Compartment();
 // FIXES the prior declared-but-ignored bug where buildState hard-coded
 // javascript() regardless of $props.language.
 const langExt = () => language === 'javascript' ? javascript() : [];
-const themeExt = () => theme === 'dark' ? oneDark : [];
+
+// theme resolution (G3): the two built-in strings map to oneDark / [];
+// anything else is treated as a CM Extension (or Extension[]) and passed
+// straight through the themeCompartment. The $watch(theme) reconfigure below
+// covers extension themes live, identical to the string forms.
+// theme resolution (G3): the two built-in strings map to oneDark / [];
+// anything else is treated as a CM Extension (or Extension[]) and passed
+// straight through the themeCompartment. The $watch(theme) reconfigure below
+// covers extension themes live, identical to the string forms.
+const themeExt = () => {
+  const t = theme;
+  if (t === 'dark') return oneDark;
+  if (t === 'light' || t === '' || t == null) return [];
+  // t is a CM Extension / Extension[] passthrough by this branch (the widened
+  // `theme` prop accepts a string OR an Extension). The strict-tsc leaves get a
+  // codegen return-type aid (`themeExt(): any`) so `Compartment.of`/`reconfigure`
+  // accept it; the type-neutral targets strip types entirely.
+  return t;
+};
 
 // placeholder ext only when a non-empty placeholder string is supplied.
 // placeholder ext only when a non-empty placeholder string is supplied.
 const phExt = () => placeholder ? placeholderExt(placeholder) : [];
+
+// baseline keymap/gutter set (G1). When `basicSetup` is on, use CM6's
+// `basicSetup` bundle (autocomplete, search, bracket matching, code folding,
+// lint gutter, richer keymaps — it ALREADY includes line numbers + history, so
+// the manual trio would double those up). When off, keep the exact thin
+// baseline the wrapper shipped before G1 (line numbers + history + default/
+// history keymaps) → existing consumers stay byte-stable. Read at buildState
+// time only — no compartment (see the basicSetup prop note).
+// baseline keymap/gutter set (G1). When `basicSetup` is on, use CM6's
+// `basicSetup` bundle (autocomplete, search, bracket matching, code folding,
+// lint gutter, richer keymaps — it ALREADY includes line numbers + history, so
+// the manual trio would double those up). When off, keep the exact thin
+// baseline the wrapper shipped before G1 (line numbers + history + default/
+// history keymaps) → existing consumers stay byte-stable. Read at buildState
+// time only — no compartment (see the basicSetup prop note).
+const baselineExt = () => basicSetup ? [basicSetupBundle] : [lineNumbers(), history(), keymap.of([...defaultKeymap, ...historyKeymap])];
 
 // buildState + the panel-slot wiring live INSIDE $onMount so the $portals.panel
 // reference is bound in the mount scope. The per-target emitters scope the
@@ -122,8 +165,8 @@ const writeDoc = (v: any) => {
 // Imperative handle (Phase 21 $expose). The 8 editor verbs a consumer can't
 // drive through props alone — exposed uniformly to all 6 targets. Each guards
 // the pre-mount/destroyed `view = null`. Collision-clear: none of the 8 names
-// collide with the 7 props (value/language/theme/readOnly/height/placeholder/
-// extensions) and there are no events (D-08).
+// collide with the 8 props (value/language/theme/readOnly/height/placeholder/
+// extensions/basicSetup) and there are no events (D-08).
 export function getView() {
   return view;
 }
@@ -238,7 +281,7 @@ onMount(() => {
   };
   const buildState = (doc: any) => EditorState.create({
     doc,
-    extensions: [lineNumbers(), history(), keymap.of([...defaultKeymap, ...historyKeymap]), langCompartment.of(langExt()), themeCompartment.of(themeExt()), readOnlyCompartment.of(EditorState.readOnly.of(readOnly)), placeholderCompartment.of(phExt()), panelCompartment.of(panelExt()), EditorView.updateListener.of((update: any) => {
+    extensions: [...baselineExt(), langCompartment.of(langExt()), themeCompartment.of(themeExt()), readOnlyCompartment.of(EditorState.readOnly.of(readOnly)), placeholderCompartment.of(phExt()), panelCompartment.of(panelExt()), EditorView.updateListener.of((update: any) => {
       if (!update.docChanged) return;
       if (suppressEmit) return;
       // Push the new doc out through the model:true emit path. Consumers

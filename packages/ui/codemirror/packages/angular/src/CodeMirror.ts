@@ -7,6 +7,13 @@ import { EditorView, keymap, lineNumbers, showPanel, placeholder as placeholderE
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { javascript } from '@codemirror/lang-javascript';
 import { oneDark } from '@codemirror/theme-one-dark';
+// Imported under an alias: the `basicSetup` PROP (G1) would otherwise collide
+// with this binding on targets that lower props into same-scope locals (Svelte
+// `let basicSetup`, Solid/React destructured `props.basicSetup`).
+// Imported under an alias: the `basicSetup` PROP (G1) would otherwise collide
+// with this binding on targets that lower props into same-scope locals (Svelte
+// `let basicSetup`, Solid/React destructured `props.basicSetup`).
+import { basicSetup as basicSetupBundle } from 'codemirror';
 
 interface PanelCtx {
   $implicit: { view: any };
@@ -63,11 +70,12 @@ interface PanelCtx {
 export class CodeMirror {
   value = model<string>('');
   language = input<string>('javascript');
-  theme = input<string>('light');
+  theme = input<unknown>('light');
   readOnly = input<boolean>(false);
   height = input<number>(240);
   placeholder = input<string>('');
   extensions = input<any[]>((() => [])());
+  basicSetup = input<boolean>(false);
   hostEl = viewChild<ElementRef<HTMLDivElement>>('hostEl');
   @ContentChild('panel', { read: TemplateRef }) panelTpl?: TemplateRef<PanelCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
@@ -172,7 +180,7 @@ export class CodeMirror {
     };
     const buildState = (doc: any) => EditorState.create({
       doc,
-      extensions: [lineNumbers(), history(), keymap.of([...defaultKeymap, ...historyKeymap]), this.langCompartment.of(this.langExt()), this.themeCompartment.of(this.themeExt()), this.readOnlyCompartment.of(EditorState.readOnly.of(this.readOnly())), this.placeholderCompartment.of(this.phExt()), this.panelCompartment.of(panelExt()), EditorView.updateListener.of((update: any) => {
+      extensions: [...this.baselineExt(), this.langCompartment.of(this.langExt()), this.themeCompartment.of(this.themeExt()), this.readOnlyCompartment.of(EditorState.readOnly.of(this.readOnly())), this.placeholderCompartment.of(this.phExt()), this.panelCompartment.of(panelExt()), EditorView.updateListener.of((update: any) => {
         if (!update.docChanged) return;
         if (this.suppressEmit) return;
         // Push the new doc out through the model:true emit path. Consumers
@@ -202,8 +210,18 @@ export class CodeMirror {
   extensionsCompartment = new Compartment();
   panelCompartment = new Compartment();
   langExt = () => this.language() === 'javascript' ? javascript() : [];
-  themeExt = () => this.theme() === 'dark' ? oneDark : [];
+  themeExt = () => {
+    const t = this.theme();
+    if (t === 'dark') return oneDark;
+    if (t === 'light' || t === '' || t == null) return [];
+    // t is a CM Extension / Extension[] passthrough by this branch (the widened
+    // `theme` prop accepts a string OR an Extension). The strict-tsc leaves get a
+    // codegen return-type aid (`themeExt(): any`) so `Compartment.of`/`reconfigure`
+    // accept it; the type-neutral targets strip types entirely.
+    return t;
+  };
   phExt = () => this.placeholder() ? placeholderExt(this.placeholder()) : [];
+  baselineExt = () => this.basicSetup() ? [basicSetupBundle] : [lineNumbers(), history(), keymap.of([...defaultKeymap, ...historyKeymap])];
   writeDoc = (v: any) => {
     if (!this.view) return;
     const current = this.view.state.doc.toString();

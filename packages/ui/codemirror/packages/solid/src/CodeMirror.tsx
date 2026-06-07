@@ -7,6 +7,13 @@ import { EditorView, keymap, lineNumbers, showPanel, placeholder as placeholderE
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { javascript } from '@codemirror/lang-javascript';
 import { oneDark } from '@codemirror/theme-one-dark';
+// Imported under an alias: the `basicSetup` PROP (G1) would otherwise collide
+// with this binding on targets that lower props into same-scope locals (Svelte
+// `let basicSetup`, Solid/React destructured `props.basicSetup`).
+// Imported under an alias: the `basicSetup` PROP (G1) would otherwise collide
+// with this binding on targets that lower props into same-scope locals (Svelte
+// `let basicSetup`, Solid/React destructured `props.basicSetup`).
+import { basicSetup as basicSetupBundle } from 'codemirror';
 
 __rozieInjectStyle('CodeMirror-34cfda5a', `.rozie-codemirror[data-rozie-s-34cfda5a] {
   border: 1px solid rgba(0, 0, 0, 0.12);
@@ -38,11 +45,12 @@ interface CodeMirrorProps {
   defaultValue?: string;
   onValueChange?: (value: string) => void;
   language?: string;
-  theme?: string;
+  theme?: unknown;
   readOnly?: boolean;
   height?: number;
   placeholder?: string;
   extensions?: any[];
+  basicSetup?: boolean;
   panelSlot?: (ctx: PanelSlotCtx) => JSX.Element;
   slots?: Record<string, (ctx: any) => JSX.Element>;
   ref?: (h: CodeMirrorHandle) => void;
@@ -60,8 +68,8 @@ export interface CodeMirrorHandle {
 }
 
 export default function CodeMirror(_props: CodeMirrorProps): JSX.Element {
-  const _merged = mergeProps({ language: 'javascript', theme: 'light', readOnly: false, height: 240, placeholder: '', extensions: (() => [])() }, _props);
-  const [local, attrs] = splitProps(_merged, ['value', 'language', 'theme', 'readOnly', 'height', 'placeholder', 'extensions', 'ref']);
+  const _merged = mergeProps({ language: 'javascript', theme: 'light', readOnly: false, height: 240, placeholder: '', extensions: (() => [])(), basicSetup: false }, _props);
+  const [local, attrs] = splitProps(_merged, ['value', 'language', 'theme', 'readOnly', 'height', 'placeholder', 'extensions', 'basicSetup', 'ref']);
   onMount(() => { local.ref?.({ getView, focus, getValue, replaceValue, dispatch, insertText, getSelection, setSelection }); });
 
   const [value, setValue] = createControllableSignal<string>(_props as unknown as Record<string, unknown>, 'value', '');
@@ -124,7 +132,7 @@ export default function CodeMirror(_props: CodeMirrorProps): JSX.Element {
     };
     const buildState = (doc: any) => EditorState.create({
       doc,
-      extensions: [lineNumbers(), history(), keymap.of([...defaultKeymap, ...historyKeymap]), langCompartment.of(langExt()), themeCompartment.of(themeExt()), readOnlyCompartment.of(EditorState.readOnly.of(local.readOnly)), placeholderCompartment.of(phExt()), panelCompartment.of(panelExt()), EditorView.updateListener.of((update: any) => {
+      extensions: [...baselineExt(), langCompartment.of(langExt()), themeCompartment.of(themeExt()), readOnlyCompartment.of(EditorState.readOnly.of(local.readOnly)), placeholderCompartment.of(phExt()), panelCompartment.of(panelExt()), EditorView.updateListener.of((update: any) => {
         if (!update.docChanged) return;
         if (suppressEmit) return;
         // Push the new doc out through the model:true emit path. Consumers
@@ -202,13 +210,36 @@ export default function CodeMirror(_props: CodeMirrorProps): JSX.Element {
   function langExt() {
     return local.language === 'javascript' ? javascript() : [];
   }
-  function themeExt() {
-    return local.theme === 'dark' ? oneDark : [];
+
+  // theme resolution (G3): the two built-in strings map to oneDark / [];
+  // anything else is treated as a CM Extension (or Extension[]) and passed
+  // straight through the themeCompartment. The $watch(theme) reconfigure below
+  // covers extension themes live, identical to the string forms.
+  function themeExt(): any {
+    const t = local.theme;
+    if (t === 'dark') return oneDark;
+    if (t === 'light' || t === '' || t == null) return [];
+    // t is a CM Extension / Extension[] passthrough by this branch (the widened
+    // `theme` prop accepts a string OR an Extension). The strict-tsc leaves get a
+    // codegen return-type aid (`themeExt(): any`) so `Compartment.of`/`reconfigure`
+    // accept it; the type-neutral targets strip types entirely.
+    return t;
   }
 
   // placeholder ext only when a non-empty placeholder string is supplied.
   function phExt() {
     return local.placeholder ? placeholderExt(local.placeholder) : [];
+  }
+
+  // baseline keymap/gutter set (G1). When `basicSetup` is on, use CM6's
+  // `basicSetup` bundle (autocomplete, search, bracket matching, code folding,
+  // lint gutter, richer keymaps — it ALREADY includes line numbers + history, so
+  // the manual trio would double those up). When off, keep the exact thin
+  // baseline the wrapper shipped before G1 (line numbers + history + default/
+  // history keymaps) → existing consumers stay byte-stable. Read at buildState
+  // time only — no compartment (see the basicSetup prop note).
+  function baselineExt() {
+    return local.basicSetup ? [basicSetupBundle] : [lineNumbers(), history(), keymap.of([...defaultKeymap, ...historyKeymap])];
   }
 
   // buildState + the panel-slot wiring live INSIDE $onMount so the $portals.panel
@@ -252,8 +283,8 @@ export default function CodeMirror(_props: CodeMirrorProps): JSX.Element {
   // Imperative handle (Phase 21 $expose). The 8 editor verbs a consumer can't
   // drive through props alone — exposed uniformly to all 6 targets. Each guards
   // the pre-mount/destroyed `view = null`. Collision-clear: none of the 8 names
-  // collide with the 7 props (value/language/theme/readOnly/height/placeholder/
-  // extensions) and there are no events (D-08).
+  // collide with the 8 props (value/language/theme/readOnly/height/placeholder/
+  // extensions/basicSetup) and there are no events (D-08).
   function getView() {
     return view;
   }

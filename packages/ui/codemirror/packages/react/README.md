@@ -8,7 +8,7 @@ Idiomatic **react** `CodeMirror` — a cross-framework code editor compiled from
 npm i @rozie-ui/codemirror-react
 ```
 
-Peer dependencies: the five `@codemirror/*` engine packages (`@codemirror/state`, `@codemirror/view`, `@codemirror/commands`, `@codemirror/lang-javascript`, `@codemirror/theme-one-dark`, all `^6`) + `react + react-dom`. Install them alongside this package.
+Peer dependencies: the five `@codemirror/*` engine packages (`@codemirror/state`, `@codemirror/view`, `@codemirror/commands`, `@codemirror/lang-javascript`, `@codemirror/theme-one-dark`) plus the `codemirror` meta-package (for the `basicSetup` bundle), all `^6`, + `react + react-dom`. Install them alongside this package.
 
 ## Usage
 
@@ -35,11 +35,12 @@ export function Demo() {
 | --- | --- | --- | :---: | :---: |
 | `value` | `String` | `""` | ✓ |  |
 | `language` | `String` | `"javascript"` |  |  |
-| `theme` | `String` | `"light"` |  |  |
+| `theme` | `unknown` | `"light"` |  |  |
 | `readOnly` | `Boolean` | `false` |  |  |
 | `height` | `Number` | `240` |  |  |
 | `placeholder` | `String` | `""` |  |  |
 | `extensions` | `Array` | `[]` |  |  |
+| `basicSetup` | `Boolean` | `false` |  |  |
 
 ## Imperative handle
 
