@@ -25,13 +25,20 @@
       large "options bag" — everything is an Extension. The `extensions`
       prop is composed LAST so consumer extensions win CM6's
       last-registered-wins facets.
-    - Three injection portal slots — proving CM6's extension-mounted
-      injection across both the mount-once AND reactive portal primitives:
+    - Five injection portal slots — proving CM6's extension-mounted
+      injection across the mount-once, reactive, AND reactive-multi-instance
+      portal primitives:
         · `panel`    — bottom-docked `showPanel` facet (mount-once).
         · `topPanel` — top-docked `showPanel` facet (mount-once, G5 wave 1).
         · `tooltip`  — cursor-anchored `showTooltip` facet (REACTIVE, G5
           wave 1; CodeMirror's first reactive slot — the consumer fragment
           mounts once and re-renders in place as the caret moves).
+        · `gutter`   — per-line markers via a custom `gutter()` (REACTIVE
+          MULTI-INSTANCE, G5 wave 2; ONE portal handle per visible marker —
+          the TipTap nodeView template). Driven by the `gutterLines` prop.
+        · `decoration` — inline widgets at document positions via a
+          `Decoration.widget` set (REACTIVE MULTI-INSTANCE, G5 wave 2; one
+          portal handle per visible widget). Driven by the `decorations` prop.
 
   Consumer example:
 
@@ -62,12 +69,31 @@
   // extension bundle with NO compartment, so toggling it at runtime requires a
   // re-mount (mirrors the SortableJS construction-time-knob remount note).
   basicSetup:  { type: Boolean, default: false },
+  // gutterLines (G5 wave 2) — 1-based line numbers that each get a custom
+  // gutter marker rendered by the `gutter` REACTIVE MULTI-INSTANCE portal slot
+  // (one portal handle per visible marker). Out-of-range lines are ignored.
+  // Runtime-updatable via a `gutterCompartment` reconfigure (no remount).
+  gutterLines: { type: Array, default: () => [] },
+  // decorations (G5 wave 2) — array of `{ from, to? }` 0-based document offsets
+  // that each get an inline widget rendered by the `decoration` REACTIVE
+  // MULTI-INSTANCE portal slot (one portal handle per visible widget). A point
+  // widget is placed at `from`; `to` is passed through in scope for the
+  // consumer's awareness. Consumers can compute an offset from a line via
+  // `view.state.doc.line(n).from`. Runtime-updatable via a `decorationCompartment`
+  // reconfigure (no remount).
+  decorations: { type: Array,   default: () => [] },
 }
 </props>
 
 <script>
-import { EditorState, Compartment, EditorSelection, StateField } from '@codemirror/state'
-import { EditorView, keymap, lineNumbers, showPanel, showTooltip, placeholder as placeholderExt } from '@codemirror/view'
+import { EditorState, Compartment, EditorSelection, StateField, RangeSet } from '@codemirror/state'
+// `gutter` is imported under an alias: the `gutter` SLOT (G5 wave 2) lowers into
+// a same-scope local on targets that bind slots as locals (Svelte snippet prop
+// `gutter`, etc.), so the bare CM6 `gutter` import would collide ("Identifier
+// 'gutter' has already been declared"). Same discipline as `basicSetup as
+// basicSetupBundle` below (a prop-vs-import collision). The `decoration` slot has
+// no matching import name, so `Decoration` (capitalized, distinct) needs no alias.
+import { EditorView, keymap, lineNumbers, showPanel, showTooltip, placeholder as placeholderExt, gutter as gutterExt, GutterMarker, Decoration, WidgetType } from '@codemirror/view'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { javascript } from '@codemirror/lang-javascript'
 import { oneDark } from '@codemirror/theme-one-dark'
@@ -97,6 +123,28 @@ const panelCompartment = new Compartment()
 // topPanel is the top-docked sibling of `panel` — a SECOND mount-once portal
 // slot (G5 wave 1) wired through the same `showPanel` facet with `top: true`.
 const topPanelCompartment = new Compartment()
+// gutter / decoration are the REACTIVE MULTI-INSTANCE portal slots (G5 wave 2) —
+// one portal handle per visible marker/widget (the TipTap nodeView template).
+// Each owns a compartment so its driving prop (`gutterLines` / `decorations`)
+// reconfigures the marked lines / decorated ranges LIVE with no remount, like
+// every other runtime-updatable prop. The GutterMarker/WidgetType classes that
+// capture $portals.gutter / $portals.decoration are built INSIDE $onMount (a
+// top-level $portals reference fails the bundled-leaf strict typecheck — the
+// panel/tooltip/nodeView discipline), so these compartments are filled from
+// factories invoked in the mount body.
+const gutterCompartment = new Compartment()
+const decorationCompartment = new Compartment()
+// The gutter / decoration extension FACTORIES capture the per-target $portals
+// helper, so they MUST be built inside $onMount (a top-level $portals reference
+// fails the bundled-leaf strict typecheck). But the gutterLines / decorations
+// $watch reconfigures are top-level and need to rebuild the extension on prop
+// change. Bridge with these component-scope `let`s: $onMount assigns each to its
+// mount-built factory; the $watch closures call through them (no-op before mount
+// or when the slot is unfilled). COMPONENT-scope (not $onMount-local) so the
+// top-level $watch can reach them — the same hoist the TipTap toolbarDispose
+// uses for a mount-built handle referenced from outside the mount body.
+let rebuildGutterExt = null
+let rebuildDecorationExt = null
 // tooltip is CodeMirror's FIRST REACTIVE portal slot (G5 wave 1) — a
 // cursor-anchored tooltip via the `showTooltip` facet. Driven by a StateField
 // (`tooltipField`, built inside $onMount) so it tracks the caret; the reactive
@@ -281,6 +329,136 @@ $onMount(() => {
     })
   }
 
+  // gutter — a custom-gutter REACTIVE MULTI-INSTANCE portal slot (G5 wave 2).
+  // Each line in `gutterLines` gets a `RozieGutterMarker` whose `toDOM` mounts
+  // the consumer fragment via $portals.gutter(dom, scope) — ONE live portal
+  // handle PER VISIBLE marker (CM calls toDOM when the line scrolls into view and
+  // destroy() when it scrolls out; the reactive handle disposes cleanly). This is
+  // the TipTap nodeView multi-instance template: the GutterMarker class captures
+  // $portals.gutter and is therefore defined inside this $onMount-invoked factory.
+  //
+  // The GutterMarker subclass is declared inline (GutterMarker REQUIRES
+  // subclassing), but its per-marker state (`line`, the live portal handle) lives
+  // in CLOSURE — `makeGutterMarker(line)` captures them — NOT in `this` fields.
+  // This is deliberate for the strict-tsc bundled leaves (react/solid/lit): ES
+  // class fields assigned only in the constructor (`this.line = …`) without a
+  // declaration trip TS2339 under those leaves' strict tsc, and the emitter passes
+  // the class through verbatim (a class-field type aid is an emitter concern, OUT
+  // OF SCOPE). Closure capture has zero `this`-field surface, so it typechecks
+  // cleanly across all six. The overriding CM methods (toDOM/destroy) cannot carry
+  // the TS-only `override` keyword — the `<script>` is plain JS (no `lang="ts"`),
+  // so `override` is unparseable — so the three bundled leaves relax
+  // `noImplicitOverride` in their tsconfig (the Lit leaf already did; react/solid
+  // now match). The `view` param is named `mView` — the Lit field-rewrite walks
+  // into a method body and rewrites a bare `view` token (matching the top-level
+  // `let view`) to `this.view`; `mView` is collision-free. (The panelExt lesson.)
+  const makeGutterExt = (gv) => {
+    if (!$slots.gutter) return []
+    const makeGutterMarker = (line) => {
+      let handle = null
+      return new (class extends GutterMarker {
+        toDOM(mView) {
+          const dom = document.createElement('div')
+          dom.className = 'rozie-cm-gutter-marker'
+          handle = gv(dom, { line, view: mView })
+          return dom
+        }
+        destroy() {
+          handle?.dispose()
+          handle = null
+        }
+      })()
+    }
+    // Recompute the marker RangeSet from `gutterLines` against the live doc —
+    // one marker at the START of each in-range line. RangeSet.of REQUIRES the
+    // ranges sorted by `from`, so sort the resolved positions.
+    const buildMarkers = (mView) => {
+      const doc = mView.state.doc
+      const ranges = []
+      for (const n of $props.gutterLines) {
+        if (typeof n !== 'number' || n < 1 || n > doc.lines) continue
+        ranges.push(makeGutterMarker(n).range(doc.line(n).from))
+      }
+      ranges.sort((a, b) => a.from - b.from)
+      return RangeSet.of(ranges)
+    }
+    return gutterExt({
+      class: 'rozie-cm-gutter',
+      markers: (mView) => buildMarkers(mView),
+    })
+  }
+
+  // decoration — an inline-widget REACTIVE MULTI-INSTANCE portal slot (G5 wave
+  // 2). Each `{ from, to? }` in `decorations` gets a `RozieWidget` whose `toDOM`
+  // mounts the consumer fragment via $portals.decoration(dom, scope) — ONE live
+  // portal handle PER VISIBLE widget. The decoration set is provided through a
+  // compartment-wrapped facet so the `decorations` prop reconfigures it live.
+  // The WidgetType class captures $portals.decoration, so it is defined inside
+  // this $onMount-invoked factory (the bundled-leaf typecheck discipline).
+  const makeDecorationExt = (dv) => {
+    if (!$slots.decoration) return Decoration.none
+    // The WidgetType subclass is declared inline (WidgetType REQUIRES subclassing)
+    // but its per-widget state (`from`/`to`, the live portal handle) lives in
+    // CLOSURE — `makeWidget(from, to)` captures them — NOT in `this` fields, for
+    // the same strict-tsc-bundled-leaf reason as the gutter marker (undeclared
+    // `this` fields trip TS2339; the overriding methods can't carry the TS-only
+    // `override` keyword from plain-JS `<script>`, so the bundled leaves relax
+    // `noImplicitOverride`). No `eq` override is needed: the decoration set is
+    // rebuilt from the prop on every reconfigure, so default reference-`eq`
+    // (always "different") correctly remounts each widget instead of reusing stale
+    // DOM. The `view` param is `dView` (the Lit field-rewrite lesson).
+    const makeWidget = (from, to) => {
+      let handle = null
+      return new (class extends WidgetType {
+        toDOM(dView) {
+          const dom = document.createElement('span')
+          dom.className = 'rozie-cm-decoration'
+          handle = dv(dom, { from, to, view: dView })
+          return dom
+        }
+        destroy() {
+          handle?.dispose()
+          handle = null
+        }
+        // Inline widgets must not be considered editable content.
+        ignoreEvent() {
+          return false
+        }
+      })()
+    }
+    // Build the DecorationSet from `decorations` against the live doc. Each entry
+    // is a point widget at `from` (side: 1 — after the position); out-of-range
+    // offsets are clamped to the doc length and skipped if `from` is invalid.
+    // Decoration.set REQUIRES the ranges sorted by `from`.
+    const buildSet = (state) => {
+      const len = state.doc.length
+      const ranges = []
+      for (const d of $props.decorations) {
+        if (!d || typeof d.from !== 'number') continue
+        const from = Math.max(0, Math.min(d.from, len))
+        const to = typeof d.to === 'number' ? Math.max(0, Math.min(d.to, len)) : from
+        ranges.push(Decoration.widget({ widget: makeWidget(from, to), side: 1 }).range(from))
+      }
+      ranges.sort((a, b) => a.from - b.from)
+      return Decoration.set(ranges)
+    }
+    // A StateField yields the DecorationSet and provides it to EditorView.
+    // decorations. The set is rebuilt on every prop-driven reconfigure (the
+    // $watch dispatches decorationCompartment.reconfigure(makeDecorationExt(…))),
+    // and tracked across local doc edits via mapping so widget positions follow.
+    return StateField.define({
+      create: (state) => buildSet(state),
+      update: (deco, tr) => (tr.docChanged ? deco.map(tr.changes) : deco),
+      provide: (f) => EditorView.decorations.from(f),
+    })
+  }
+
+  // Bridge the mount-built factories to the top-level $watch reconfigures. Each
+  // closes over the captured $portals helper so a prop change can rebuild the
+  // extension without re-referencing $portals at top level.
+  rebuildGutterExt = () => makeGutterExt($portals.gutter)
+  rebuildDecorationExt = () => makeDecorationExt($portals.decoration)
+
   const buildState = (doc) => EditorState.create({
     doc,
     extensions: [
@@ -291,6 +469,12 @@ $onMount(() => {
       placeholderCompartment.of(phExt()),
       panelCompartment.of(panelExt()),
       topPanelCompartment.of(topPanelExt()),
+      // gutter / decoration — the REACTIVE MULTI-INSTANCE portal slots (G5 wave
+      // 2). Each lives in a compartment so its driving prop (gutterLines /
+      // decorations) reconfigures live; the factory captures the per-target
+      // $portals helper (gutter / decoration) here in the mount scope.
+      gutterCompartment.of(rebuildGutterExt()),
+      decorationCompartment.of(rebuildDecorationExt()),
       // tooltipField() returns a StateField extension (or [] when the slot is
       // unfilled); no compartment — it is a one-shot mount-time decision.
       tooltipField(),
@@ -364,6 +548,20 @@ $watch(() => $props.extensions, (v) => {
   view.dispatch({ effects: extensionsCompartment.reconfigure(v) })
 })
 
+// gutterLines / decorations (G5 wave 2) — rebuild the REACTIVE MULTI-INSTANCE
+// portal extension from the new prop and reconfigure its compartment LIVE (no
+// remount). The factory is mount-built (it captures $portals), bridged here via
+// the component-scope rebuild* closures; both are null before mount.
+$watch(() => $props.gutterLines, () => {
+  if (!view || !rebuildGutterExt) return
+  view.dispatch({ effects: gutterCompartment.reconfigure(rebuildGutterExt()) })
+})
+
+$watch(() => $props.decorations, () => {
+  if (!view || !rebuildDecorationExt) return
+  view.dispatch({ effects: decorationCompartment.reconfigure(rebuildDecorationExt()) })
+})
+
 // Imperative handle (Phase 21 $expose). The 8 editor verbs a consumer can't
 // drive through props alone — exposed uniformly to all 6 targets. Each guards
 // the pre-mount/destroyed `view = null`. Collision-clear: none of the 8 names
@@ -429,6 +627,30 @@ $expose({ getView, focus, getValue, replaceValue, dispatch, insertText, getSelec
   ROZ127-clean: `tooltip` ≠ any prop name.
 -->
 <slot name="tooltip" portal reactive :params="['view', 'pos']" />
+<!--
+  gutter — a REACTIVE MULTI-INSTANCE portal slot (Phase 33 `reactive` primitive;
+  G5 wave 2). Declared but NOT rendered inline. The wrapper invokes it from script
+  via $portals.gutter(dom, { line, view }) inside a custom CM6 `gutter()`'s
+  GutterMarker.toDOM hook — ONE portal handle PER VISIBLE marker (the TipTap
+  nodeView multi-instance template). Which lines get a marker is driven by the
+  `gutterLines` prop; CM mounts a marker's fragment when its line scrolls into
+  view and disposes it when it scrolls out. ROZ127-clean: `gutter` ≠ any prop
+  name (value/language/theme/readOnly/height/placeholder/extensions/basicSetup/
+  gutterLines/decorations).
+-->
+<slot name="gutter" portal reactive :params="['line', 'view']" />
+<!--
+  decoration — a REACTIVE MULTI-INSTANCE portal slot (Phase 33 `reactive`
+  primitive; G5 wave 2). Declared but NOT rendered inline. The wrapper invokes it
+  from script via $portals.decoration(dom, { from, to, view }) inside a
+  `Decoration.widget` WidgetType.toDOM hook — ONE portal handle PER VISIBLE
+  widget. Which document ranges get a widget is driven by the `decorations` prop
+  ({ from, to? } 0-based offsets); CM mounts a widget's fragment when it scrolls
+  into view and disposes it when it scrolls out. NOTE: the slot is `decoration`
+  (singular) and the prop is `decorations` (plural) — distinct names, ROZ127-clean
+  against each other AND every other prop/slot.
+-->
+<slot name="decoration" portal reactive :params="['from', 'to', 'view']" />
 </template>
 
 <style>
@@ -477,6 +699,28 @@ $expose({ getView, focus, getValue, replaceValue, dispatch, insertText, getSelec
     color: #fff;
     border-radius: 3px;
     white-space: nowrap;
+  }
+
+  /* gutter (G5 wave 2) — the custom gutter lane + its per-line marker host.
+     Minimal chrome; the consumer styles its own marker content. */
+  .rozie-codemirror .rozie-cm-gutter {
+    min-width: 14px;
+  }
+  .rozie-codemirror .rozie-cm-gutter-marker {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    font-size: 11px;
+    line-height: 1;
+  }
+
+  /* decoration (G5 wave 2) — the inline-widget host. Minimal; the consumer
+     styles its own widget content. */
+  .rozie-codemirror .rozie-cm-decoration {
+    display: inline-flex;
+    align-items: center;
+    vertical-align: text-bottom;
   }
 }
 </style>

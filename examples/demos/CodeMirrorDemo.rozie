@@ -27,6 +27,9 @@
     - D-04 placeholder prop on an empty-doc editor
     - D-05 panel portal slot mount/dispose
     - D-06 the 8 $expose verbs via $refs.cm (post-mount @click)
+    - G5 wave 1 topPanel (mount-once) + tooltip (REACTIVE) portal slots
+    - G5 wave 2 gutter + decoration REACTIVE MULTI-INSTANCE portal slots
+      (multiple marker/widget instances per slot fill; live mount/dispose)
 -->
 
 <rozie name="CodeMirrorDemo">
@@ -58,6 +61,21 @@
   tipMounts: 0,
   tipUpdates: 0,
   handleOut: '(none)',
+  // G5 wave 2 — gutter + decoration REACTIVE MULTI-INSTANCE portal slots.
+  // markCode drives a dedicated editor whose lines 1 + 3 get a gutter marker and
+  // whose two fixed offsets get an inline widget — proving MULTIPLE marker/widget
+  // instances mount from ONE slot fill. The prop toggle (markOn) flips the driving
+  // props between filled + empty arrays, exercising mount AND dispose live.
+  markCode: "line one\nline two\nline three\nline four",
+  markOn: true,
+  // Empirical multi-instance proof for the gutter + decoration slots: each
+  // marker/widget fragment bumps its mount counter the first time it appears.
+  // With 2 markers + 2 widgets filled, gutterMounts climbs to 2 and decoMounts
+  // to 2 — proving MULTIPLE instances mount from ONE slot fill. Toggling the
+  // driving props to empty arrays disposes all four handles live (the editor
+  // stays responsive — no leak); toggling back mounts a fresh set.
+  gutterMounts: 0,
+  decoMounts: 0,
 }
 </data>
 
@@ -141,6 +159,40 @@ const capTip = (view, pos) => {
   if (!tipFragMounted) {
     tipFragMounted = true
     $data.tipMounts = $data.tipMounts + 1
+  }
+  return ''
+}
+
+// G5 wave 2 — gutter + decoration MULTI-INSTANCE proof. The driving props are
+// computed (empty arrays when markOn is off, exercising live mount/dispose).
+const gutterLinesValue = () => $data.markOn ? [1, 3] : []
+const decorationsValue = () => $data.markOn ? [{ from: 0 }, { from: 9 }] : []
+const toggleMarks = () => { $data.markOn = !$data.markOn }
+
+// Per-instance mount/dispose tracking. The slot fragment renders ONCE per marker/
+// widget instance (the reactive multi-instance portal mounts one handle each). A
+// `:data-cap` side-effect binding fires `markGutterMount(line)` on the fragment's
+// render; a per-line/per-offset flag set bumps the mount counter the first time
+// each instance appears. There is no consumer-visible dispose hook in a fragment,
+// so disposes are inferred from the live count: when markOn flips off the wrapper
+// disposes every handle, so the next markOn=on cycle sees fresh mounts. The state
+// pane surfaces mounts; a "2 markers + 2 widgets" fill proving mounts climbed by 4
+// (and the editor staying responsive after a toggle cycle) is the leak-free proof.
+const gutterSeen = new Set()
+const markGutterMount = (line) => {
+  const key = String(line)
+  if (!gutterSeen.has(key)) {
+    gutterSeen.add(key)
+    $data.gutterMounts = $data.gutterMounts + 1
+  }
+  return ''
+}
+const decoSeen = new Set()
+const markDecoMount = (from) => {
+  const key = String(from)
+  if (!decoSeen.has(key)) {
+    decoSeen.add(key)
+    $data.decoMounts = $data.decoMounts + 1
   }
   return ''
 }
@@ -256,12 +308,43 @@ const capTip = (view, pos) => {
       </CodeMirror>
     </div>
 
+    <!-- G5 wave 2 — gutter + decoration REACTIVE MULTI-INSTANCE portal slots.
+         Editor G fills BOTH: a custom gutter marking lines 1 + 3 (TWO marker
+         instances) and inline widgets at offsets 0 + 9 (TWO widget instances) —
+         one portal handle each. The markOn toggle flips the driving props between
+         filled + empty arrays, exercising live mount + dispose of all four
+         instances. The mount counters in the state pane prove multi-instance
+         mount (gutterMounts → 2, decoMounts → 2). -->
+    <div class="control-row">
+      <span class="row-label">Marks</span>
+      <button type="button" data-testid="toggle-marks" @click="toggleMarks">gutter + decoration</button>
+    </div>
+    <div class="editor-cell" data-testid="mark-cell">
+      <span class="label">Editor G (gutter markers + inline widget decorations)</span>
+      <CodeMirror
+        r-model:value="$data.markCode"
+        :height="120"
+        theme="light"
+        :gutterLines="gutterLinesValue()"
+        :decorations="decorationsValue()"
+      >
+        <template #gutter="{ line, view }">
+          <span class="cm-gutter-fill" data-testid="gutter-fill" :data-cap="markGutterMount(line)">●</span>
+        </template>
+        <template #decoration="{ from, to, view }">
+          <span class="cm-deco-fill" data-testid="deco-fill" :data-cap="markDecoMount(from)">✦</span>
+        </template>
+      </CodeMirror>
+    </div>
+
     <div class="state-pane">
       <code data-testid="state-language">{{ $data.language }}</code>
       <code data-testid="state-handle-out">{{ $data.handleOut }}</code>
       <code data-testid="state-tip-pos">Ln {{ $data.tipLine }}, Col {{ $data.tipCol }}</code>
       <code data-testid="state-tip-mounts">mounts:{{ $data.tipMounts }}</code>
       <code data-testid="state-tip-updates">updates:{{ $data.tipUpdates }}</code>
+      <code data-testid="state-gutter-mounts">gutter:{{ $data.gutterMounts }}</code>
+      <code data-testid="state-deco-mounts">deco:{{ $data.decoMounts }}</code>
     </div>
   </section>
 </div>
@@ -318,6 +401,16 @@ const capTip = (view, pos) => {
 .cm-tooltip-fill {
   font-size: 0.7rem;
   font-variant-numeric: tabular-nums;
+}
+
+.cm-gutter-fill {
+  color: #dc2626;
+  font-size: 0.7rem;
+}
+
+.cm-deco-fill {
+  color: #7c3aed;
+  font-size: 0.7rem;
 }
 
 .state-pane {

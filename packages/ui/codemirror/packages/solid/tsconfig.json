@@ -6,11 +6,18 @@
   // gate typechecks generated code, so it opts out of the author-strictness
   // flags the codegen does not satisfy while keeping the rest of strict mode.
   //
+  // noImplicitOverride relaxed (G5 wave 2): the `gutter`/`decoration` portal
+  // slots subclass CodeMirror's `GutterMarker`/`WidgetType` to override `toDOM`/
+  // `destroy`/`ignoreEvent`. The `.rozie` `<script>` is plain JS (no `lang="ts"`),
+  // so the TS-only `override` keyword cannot be authored in source — same opt-out
+  // the Lit leaf already documents for its generated class code.
+  //
   // No `paths` alias for `@codemirror/*`: the published @codemirror packages
   // ship real types.
   "extends": "../../../../../tsconfig.base.json",
   "compilerOptions": {
     "noEmit": true,
+    "noImplicitOverride": false,
     "module": "ESNext",
     "target": "ES2022",
     "moduleResolution": "bundler",

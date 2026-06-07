@@ -411,6 +411,34 @@ function main() {
       code = code.replace(themeToken, themeAnnotated);
     }
 
+    // ─── Bundled-leaf type aid (react/solid/lit): annotate `buildMarkers`'s ──
+    // return `: any` for the `gutter` slot (G5 wave 2). The custom-gutter
+    // `markers` callback must return `RangeSet<GutterMarker>`, but `buildMarkers`
+    // builds the set from a `ranges` array of anonymous-`GutterMarker`-subclass
+    // ranges that the strict-tsc leaves infer as `RangeSet<RangeValue>` (the
+    // `noImplicitAny:false` `ranges: any[]` widens the marker element type), so
+    // `gutterExt({ markers })` rejects it (TS2322). The runtime value IS a
+    // `RangeSet<GutterMarker>`. The proper fix is an emitter-level annotation
+    // (OUT OF SCOPE — SCOPE FENCE); as the sanctioned in-scope per-leaf aid (the
+    // analog of the `themeExt`/`*Ext` annotations above), annotate `buildMarkers`'s
+    // return `: any` here — a pure type annotation, zero runtime change. The emit
+    // shape is identical across the three bundled leaves; vue/svelte/angular are
+    // type-neutral and never see it. Only present when the `gutter` slot wires the
+    // marker builder, so this aid is gated on the token's presence.
+    if (cfg.dir === 'react' || cfg.dir === 'solid' || cfg.dir === 'lit') {
+      const markersToken = 'const buildMarkers = (mView: any) =>';
+      const markersAnnotated = 'const buildMarkers = (mView: any): any =>';
+      if (!code.includes(markersToken)) {
+        throw new Error(
+          `codegen ${cfg.dir}: expected to annotate \`buildMarkers\`'s return \`: any\` (the gutter slot's ` +
+            `\`markers\` callback returns a RangeSet of anonymous GutterMarker subclasses that strict tsc ` +
+            `widens to RangeSet<RangeValue>, TS2322) but the token \`${markersToken}\` was not found — the ` +
+            `${cfg.dir} emit shape changed. Re-derive the type-gate aid (SCOPE FENCE: do NOT edit the emitter).`,
+        );
+      }
+      code = code.replace(markersToken, markersAnnotated);
+    }
+
     writeFileSync(resolve(leafSrc, cfg.file), code);
 
     // ─── G2: emit the framework-agnostic language-preset module ─────────────
