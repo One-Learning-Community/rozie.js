@@ -179,9 +179,20 @@
 @changesets/write
 @codemirror/autocomplete
 @codemirror/commands
+@codemirror/lang-css
+@codemirror/lang-html
 @codemirror/lang-javascript
+@codemirror/lang-json
+@codemirror/lang-markdown
+@codemirror/lang-python
+@codemirror/lang-sass
+@codemirror/lang-sql
+@codemirror/lang-vue
+@codemirror/lang-xml
+@codemirror/lang-yaml
 @codemirror/language
 @codemirror/lint
+@codemirror/search
 @codemirror/state
 @codemirror/theme-one-dark
 @codemirror/view
@@ -232,6 +243,9 @@
 @eslint/js
 @eslint/object-schema
 @eslint/plugin-kit
+@floating-ui/core
+@floating-ui/dom
+@floating-ui/utils
 @fullcalendar/core
 @fullcalendar/daygrid
 @fullcalendar/interaction
@@ -301,9 +315,17 @@
 @kurkle/color
 @leichtgewicht/ip-codec
 @lezer/common
+@lezer/css
 @lezer/highlight
+@lezer/html
 @lezer/javascript
+@lezer/json
 @lezer/lr
+@lezer/markdown
+@lezer/python
+@lezer/sass
+@lezer/xml
+@lezer/yaml
 @lit-labs/preact-signals
 @lit-labs/ssr-dom-shim
 @lit/reactive-element
@@ -316,6 +338,16 @@
 @lmdb/lmdb-win32-x64
 @manypkg/find-root
 @manypkg/get-packages
+@mapbox/jsonlint-lines-primitives
+@mapbox/point-geometry
+@mapbox/tiny-sdf
+@mapbox/unitbezier
+@mapbox/vector-tile
+@mapbox/whoots-js
+@maplibre/geojson-vt
+@maplibre/maplibre-gl-style-spec
+@maplibre/mlt
+@maplibre/vt-pbf
 @marijn/find-cluster-break
 @msgpackr-extract/msgpackr-extract-darwin-arm64
 @msgpackr-extract/msgpackr-extract-darwin-x64
@@ -489,11 +521,13 @@
 @tiptap/core
 @tiptap/extension-blockquote
 @tiptap/extension-bold
+@tiptap/extension-bubble-menu
 @tiptap/extension-bullet-list
 @tiptap/extension-code
 @tiptap/extension-code-block
 @tiptap/extension-document
 @tiptap/extension-dropcursor
+@tiptap/extension-floating-menu
 @tiptap/extension-gapcursor
 @tiptap/extension-hard-break
 @tiptap/extension-heading
@@ -540,6 +574,7 @@
 @types/estree
 @types/express
 @types/express-serve-static-core
+@types/geojson
 @types/hast
 @types/http-errors
 @types/http-proxy
@@ -730,6 +765,7 @@ clone
 clone-deep
 clsx
 code-block-writer
+codemirror
 color-convert
 color-name
 colorette
@@ -802,6 +838,7 @@ domutils
 dset
 dts-resolver
 dunder-proto
+earcut
 eastasianwidth
 editorconfig
 ee-first
@@ -892,6 +929,7 @@ get-proto
 get-stream
 get-tsconfig
 github-slugger
+gl-matrix
 glob
 glob-parent
 glob-to-regex.js
@@ -998,10 +1036,12 @@ json-buffer
 json-parse-even-better-errors
 json-schema-traverse
 json-stable-stringify-without-jsonify
+json-stringify-pretty-compact
 json5
 jsonc-parser
 jsonfile
 karma-source-map-support
+kdbush
 kebab-case
 keyv
 kind-of
@@ -1050,6 +1090,7 @@ lz-string
 magic-string
 magicast
 make-dir
+maplibre-gl
 mark.js
 markdown-table
 math-intrinsics
@@ -1113,6 +1154,7 @@ min-indent
 mini-css-extract-plugin
 minimalistic-assert
 minimatch
+minimist
 minipass
 minisearch
 mitt
@@ -1125,6 +1167,7 @@ msgpackr
 msgpackr-extract
 muggle-string
 multicast-dns
+murmurhash-js
 mute-stream
 namespace-emitter
 nanoid
@@ -1192,6 +1235,7 @@ path-scurry
 path-to-regexp
 path-type
 pathe
+pbf
 peggy
 perfect-debounce
 piccolore
@@ -1213,6 +1257,7 @@ postcss-modules-values
 postcss-safe-parser
 postcss-selector-parser
 postcss-value-parser
+potpack
 powershell-utils
 preact
 prelude-ls
@@ -1237,6 +1282,7 @@ prosemirror-tables
 prosemirror-transform
 prosemirror-view
 proto-list
+protocol-buffers-schema
 proxy-addr
 prr
 punycode
@@ -1245,6 +1291,7 @@ pvutils
 qs
 quansync
 queue-microtask
+quickselect
 radix3
 randombytes
 range-parser
@@ -1284,6 +1331,7 @@ requires-port
 resolve
 resolve-from
 resolve-pkg-maps
+resolve-protobuf-schema
 resolve-url-loader
 restore-cursor
 retext
@@ -1389,6 +1437,7 @@ tiny-inflate
 tinybench
 tinyexec
 tinyglobby
+tinyqueue
 tinyrainbow
 tldts
 tldts-core
