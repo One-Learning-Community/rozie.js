@@ -267,8 +267,11 @@ export const RozieErrorCode = {
   // (in a non-CSS-Modules / runtime-injected / shadow-DOM pipeline the browser
   // sees `:global(...)` as an unknown pseudo and discards the whole rule). That
   // makes it a cross-target-half-supported footgun in the exact same class as
-  // ROZ127 / ROZ125. Detected selector-only in parseStyle (collected-not-thrown,
-  // D-08) so it fires through lowerToIR for BOTH compile() AND @rozie/unplugin.
+  // ROZ127 / ROZ125. Detected selector-only in parseStyle (the PARSE phase,
+  // collected-not-thrown, D-08); compile() merges parse diagnostics, and
+  // @rozie/unplugin throws on parse-phase error diagnostics (transform.ts) — so
+  // it surfaces on BOTH paths. (Unlike ROZ127, which IS a lowerToIR validator;
+  // ROZ128 never touches a lowerToIR validator.)
   // Remediation: use the `:root { .selector { ... } }` engine-DOM escape hatch,
   // which lowers to the engineRules bucket and emits unscoped/global across all
   // six targets. ROZ128 is the next free code after ROZ127 in the 100 cluster.
