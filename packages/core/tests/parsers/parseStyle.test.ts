@@ -158,6 +158,57 @@ describe('parseStyle (PARSE-06)', () => {
     expect(diagnostics.some(d => d.code === 'ROZ128')).toBe(false);
   });
 
+  // CR-01 (34-REVIEW) — an at-rule nested inside a :root {} engine block must be
+  // collected as a child (sliced verbatim) instead of being silently dropped.
+  it('CR-01: @media nested in a :root {} engine block is collected as a child (not dropped)', () => {
+    const css =
+      ':root {\n  .cm-editor { color: red; }\n  @media (min-width: 600px) {\n    .cm-editor { color: blue; }\n  }\n}';
+    const { node, diagnostics } = parseStyle(css, { start: 0, end: css.length }, css);
+    expect(diagnostics.filter(d => d.severity === 'error')).toEqual([]);
+    const rootBlocks = node!.rules.filter(r => r.kind === 'root-block');
+    expect(rootBlocks.length).toBe(1);
+    // TWO children: the plain `.cm-editor` rule + the `@media` at-rule block.
+    const children = rootBlocks[0]!.children!;
+    expect(children.length).toBe(2);
+    // The at-rule child carries an empty selector (its prelude lives in the slice)
+    // and slices its FULL `@media (...) { ... }` text verbatim — the responsive
+    // rule survives instead of vanishing with no diagnostic.
+    const atChild = children.find(c => c.selector === '')!;
+    expect(atChild).toBeDefined();
+    const slice = css.slice(atChild.loc.start, atChild.loc.end);
+    expect(slice.startsWith('@media')).toBe(true);
+    expect(slice).toContain('color: blue;');
+  });
+
+  // CR-03 (34-REVIEW) — ROZ128 must fire for a :global() nested INSIDE the
+  // :root {} engine block (the exact place the validator's own hint sends authors).
+  it('CR-03: :global() nested in a :root {} engine block fires ROZ128', () => {
+    const css = ':root {\n  .cm-editor:global(.foo) { color: red; }\n}';
+    let threw = false;
+    let result: ReturnType<typeof parseStyle> | undefined;
+    try {
+      result = parseStyle(css, { start: 0, end: css.length }, css);
+    } catch {
+      threw = true;
+    }
+    expect(threw).toBe(false);
+    const roz128 = result!.diagnostics.filter(d => d.code === 'ROZ128');
+    expect(roz128.length).toBe(1);
+    expect(roz128[0]!.severity).toBe('error');
+    expect(result!.node).not.toBeNull();
+  });
+
+  // CR-03 — :global() inside an at-rule nested in a :root {} block also fires ROZ128.
+  it('CR-03: :global() inside an @media nested in a :root {} block fires ROZ128', () => {
+    const css =
+      ':root {\n  @media (min-width: 600px) {\n    .cm-editor:global(.foo) { color: red; }\n  }\n}';
+    const { node, diagnostics } = parseStyle(css, { start: 0, end: css.length }, css);
+    const roz128 = diagnostics.filter(d => d.code === 'ROZ128');
+    expect(roz128.length).toBe(1);
+    expect(roz128[0]!.severity).toBe('error');
+    expect(node).not.toBeNull();
+  });
+
   it('emits ROZ080 on PostCSS parse error', () => {
     const synthetic = '.foo { unbalanced';
     const { diagnostics } = parseStyle(

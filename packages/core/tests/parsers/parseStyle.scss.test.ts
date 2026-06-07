@@ -149,6 +149,51 @@ describe('parseStyle — <style lang="scss"> SCSS pre-pass (Phase 10)', () => {
     expect(node!.rules.map(r => r.selector)).toContain('.a .b');
   });
 
+  // WR-01 (34-REVIEW) — pin the SCSS engine-rule byte-slice behavior. NOTE the
+  // load-bearing subtlety: SCSS *nesting* `:root { .cm-editor { ... } }` does
+  // NOT reach the engine-DOM escape hatch — dart-sass flattens it to a
+  // DESCENDANT combinator `:root .cm-editor { ... }` BEFORE postcss.parse runs,
+  // which `isPureRootSelector` correctly rejects (it is a single multi-token
+  // selector, not pure `:root`). So a SCSS author must write the engine block
+  // with an EXPLICIT bare-:root rule (no nesting) to opt in. This test pins
+  // BOTH facts: (a) SCSS nesting flattens to a scoped rule (no root-block), and
+  // (b) the rule's `loc` indexes the COMPILED CSS (cssText), NOT opts.source —
+  // the pre-existing SCSS byte-slice limitation the emitters inherit (slicing
+  // from opts.source for an SCSS block yields a mis-aligned slice; the WR-01
+  // follow-up is to slice from cssText for SCSS). Regression anchor for both.
+  it('WR-01: SCSS nesting `:root { .sel {} }` flattens to a scoped `:root .sel` rule (NOT a root-block); loc indexes compiled CSS', () => {
+    const scss = [
+      '$accent: #4f46e5;',
+      ':root {',
+      '  .cm-editor {',
+      '    color: $accent;',
+      '  }',
+      '}',
+    ].join('\n');
+    const { node, diagnostics } = parseStyle(
+      scss,
+      { start: 0, end: scss.length },
+      scss,
+      undefined,
+      'scss',
+    );
+    expect(diagnostics.filter(d => d.severity === 'error')).toEqual([]);
+    // dart-sass flattened the nesting to `:root .cm-editor` — a scoped rule,
+    // NOT a root-block engine escape hatch.
+    expect(node!.rules.some(r => r.kind === 'root-block')).toBe(false);
+    const flattened = node!.rules.find(r => r.selector === ':root .cm-editor');
+    expect(flattened).toBeDefined();
+    expect(flattened!.isRootEscape).toBe(false);
+    // The rule loc indexes the COMPILED CSS (cssText), which carries the
+    // resolved `#4f46e5` (not `$accent`). Slicing cssText at the loc recovers
+    // the compiled rule; slicing the raw SCSS `source` at the same offsets
+    // would be mis-aligned (the WR-01 limitation).
+    const compiledSlice = node!.cssText.slice(flattened!.loc.start, flattened!.loc.end);
+    expect(compiledSlice).toContain('.cm-editor');
+    expect(compiledSlice).toContain('#4f46e5');
+    expect(compiledSlice).not.toContain('$accent');
+  });
+
   it('plain-CSS unregressed: lang="css" parses byte-identically to a plain <style>', () => {
     const css = '.counter { color: red; }\nbutton:disabled { opacity: 0.5; }';
     const plain = parseStyle(css, { start: 0, end: css.length }, css);

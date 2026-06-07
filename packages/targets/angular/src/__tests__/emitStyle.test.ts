@@ -87,3 +87,42 @@ describe('emitStyle (angular) — ::part() cross-shadow no-op strip (SPEC-R4a)',
     expect(out.diagnostics).toEqual([]);
   });
 });
+
+describe('emitStyle (angular) — engine-DOM escape hatch ::ng-deep (Phase 34, CR-02/WR-02)', () => {
+  // CR-02 (34-REVIEW) — a COMPACT single-line engine rule must still receive
+  // `::ng-deep`. The old line-string scan only prefixed lines ending in `{`, so
+  // a `.cm-editor { color: red; }` (ending in `}`) was emitted WITHOUT
+  // ::ng-deep — silently failing the escape hatch under emulated encapsulation.
+  it('CR-02: a compact single-line engine rule gets ::ng-deep', () => {
+    const out = compileStyle(':root { .cm-editor { color: red; } }');
+    expect(out.diagnostics).toEqual([]);
+    // The engine selector is prefixed with a BARE ::ng-deep (not :host ::ng-deep).
+    expect(out.stylesArrayBody).toMatch(/::ng-deep\s+\.cm-editor/);
+    expect(out.stylesArrayBody).toContain('color: red');
+    // Bare ::ng-deep, never :host-anchored for engine rules.
+    expect(out.stylesArrayBody).not.toContain(':host ::ng-deep .cm-editor');
+  });
+
+  it('CR-02: a multi-line engine rule also gets ::ng-deep (regression parity)', () => {
+    const out = compileStyle(':root {\n  .cm-editor {\n    color: red;\n  }\n}');
+    expect(out.diagnostics).toEqual([]);
+    expect(out.stylesArrayBody).toMatch(/::ng-deep\s+\.cm-editor/);
+  });
+
+  // WR-02 (34-REVIEW) — with CR-01 carrying @media-wrapped engine children, the
+  // postcss walk must prefix the INNER selectors with ::ng-deep and leave the
+  // @media prelude untouched (the old line-scan would have prefixed the prelude
+  // → invalid `::ng-deep @media (...)`).
+  it('WR-02: an @media-wrapped engine rule keeps a clean @media prelude and ::ng-deep inner selector', () => {
+    const out = compileStyle(
+      ':root {\n  @media (min-width: 600px) {\n    .cm-editor { color: blue; }\n  }\n}',
+    );
+    expect(out.diagnostics).toEqual([]);
+    // The @media prelude is NOT prefixed with ::ng-deep (would be invalid CSS).
+    expect(out.stylesArrayBody).toContain('@media');
+    expect(out.stylesArrayBody).not.toMatch(/::ng-deep\s+@media/);
+    // The inner selector IS prefixed.
+    expect(out.stylesArrayBody).toMatch(/::ng-deep\s+\.cm-editor/);
+    expect(out.stylesArrayBody).toContain('color: blue');
+  });
+});
