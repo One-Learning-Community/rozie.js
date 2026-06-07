@@ -15,6 +15,8 @@
       the content/onUpdate/setContent sync loop. Here:  <TipTap r-model:html="…" />
     - A batteries-included toolbar with live active-state, OR bring-your-own
       via the `toolbar` portal slot (receives the live editor).
+    - Selection-anchored `bubbleMenu` / `floatingMenu` portal slots over the
+      Floating-UI menu extensions (receive the live editor).
     - A uniform imperative command handle across all six targets ($expose).
 
   Surface (Phase 32, feature-rich expansion from the original 4 props):
@@ -24,10 +26,13 @@
     - $expose (14): getEditor, focusEditor, blurEditor, getHTML, getJSON,
                   setContent, clearContent, toggleBold, toggleItalic,
                   toggleHeading, toggleBulletList, undo, redo, chain
-    - slots (2):  `toolbar` portal slot (consumer toolbar bound to the editor) +
-                  `nodeView` REACTIVE portal slot (consumer fragment rendered as a
-                  custom ProseMirror node — both a non-editable @mention atom chip
-                  and an editable [data-rozie-hole] contentDOM callout)
+    - slots (4):  3 mount-once portal slots — `toolbar` (consumer toolbar bound
+                  to the editor), `bubbleMenu` + `floatingMenu` (selection-anchored
+                  menus over @tiptap/extension-bubble-menu / -floating-menu, each
+                  handed the live editor) — plus `nodeView`, a REACTIVE portal slot
+                  (consumer fragment rendered as a custom ProseMirror node — both a
+                  non-editable @mention atom chip and an editable [data-rozie-hole]
+                  contentDOM callout)
 
   The `editorProps` (ProseMirror) and `extensions` (extra TipTap extensions
   merged onto StarterKit) props are the consumer-extensibility passthroughs —
@@ -73,6 +78,14 @@
 import { Editor, Node } from '@tiptap/core'
 import StarterKit from '@tiptap/starter-kit'
 import { Placeholder } from '@tiptap/extensions'
+// Selection-anchored menu extensions (G2). SEPARATE packages (NOT in
+// @tiptap/extensions), version-pinned in lockstep with @tiptap/core (3.23.5).
+// Both export their extension as a NAMED export (`BubbleMenu` / `FloatingMenu`)
+// — verified against the installed dist .d.ts — and are `.configure({ element })`
+// Extensions that own Floating-UI positioning and append the host element to the
+// editor's parent automatically (no manual document insertion needed).
+import { BubbleMenu } from '@tiptap/extension-bubble-menu'
+import { FloatingMenu } from '@tiptap/extension-floating-menu'
 
 // The live editor instance — null before mount / after destroy. Named `editor`
 // (distinct from any template `ref="X"` name) so no capture-var-vs-ref double
@@ -94,6 +107,18 @@ let lastHtml = null
 // into a sibling onCleanup() OUTSIDE the mount-body IIFE, so a mount-local would
 // lose scope there (the Chart.js tooltipEl/tooltipDispose hoist lesson).
 let toolbarDispose = null
+
+// The `bubbleMenu` / `floatingMenu` portal-slot dispose handles + the imperatively
+// created menu host elements. COMPONENT-scope for the same hoist reason as
+// toolbarDispose — and the host els must be reachable from BOTH the pre-`new
+// Editor` extension build (the menu extension needs its `element` at construction)
+// AND the post-construction portal mount, so they live here too (not $onMount
+// locals). Each stays null when its slot is unfilled (zero overhead, no $portals
+// reference fired — the nodeView discipline).
+let bubbleMenuEl = null
+let bubbleMenuDispose = null
+let floatingMenuEl = null
+let floatingMenuDispose = null
 
 // Recompute the internal toolbar's active-mark booleans from the live editor.
 const refreshActive = () => {
@@ -277,6 +302,31 @@ $onMount(() => {
   // (in the style block) paints the ghost text. Empty placeholder = no extension.
   const placeholderExtensions = $props.placeholder ? [Placeholder.configure({ placeholder: $props.placeholder })] : []
 
+  // Selection-anchored menu extensions (G2). Built BEFORE `new Editor` because the
+  // Floating-UI menu extension needs its host `element` at construction time. Each
+  // menu's host element is created imperatively (the nodeView discipline — the
+  // engine owns positioning; the consumer fragment is portalled in AFTER mount).
+  // An unfilled slot adds NOTHING (zero overhead, no $portals reference fired).
+  //
+  // The host elements are created up front (when filled) so they're captured into
+  // the component-scope `bubbleMenuEl`/`floatingMenuEl` for the post-construction
+  // portal mount; the extension list is then assembled by conditional SPREAD (NOT
+  // `const x = []; x.push(…)`), which under the strict-typecheck'd bundled leaves
+  // infers `any[]` — a bare `const x = []` would infer `never[]` and reject
+  // `.push(Extension)` (the placeholderExtensions/nodeViewExtensions discipline).
+  if ($slots.bubbleMenu) {
+    bubbleMenuEl = document.createElement('div')
+    bubbleMenuEl.className = 'rozie-tiptap-bubble-menu'
+  }
+  if ($slots.floatingMenu) {
+    floatingMenuEl = document.createElement('div')
+    floatingMenuEl.className = 'rozie-tiptap-floating-menu'
+  }
+  const menuExtensions = [
+    ...(bubbleMenuEl ? [BubbleMenu.configure({ element: bubbleMenuEl })] : []),
+    ...(floatingMenuEl ? [FloatingMenu.configure({ element: floatingMenuEl })] : []),
+  ]
+
   editor = new Editor({
     element:    $refs.editorEl,
     content:    $props.html,
@@ -285,7 +335,7 @@ $onMount(() => {
     // StarterKit first; the Placeholder ext next; the reactive node-view nodes
     // next; consumer extensions LAST so they win (TipTap applies later-registered
     // extensions over earlier ones for the same node/mark).
-    extensions: [StarterKit, ...placeholderExtensions, ...nodeViewExtensions, ...$props.extensions],
+    extensions: [StarterKit, ...placeholderExtensions, ...nodeViewExtensions, ...menuExtensions, ...$props.extensions],
     editorProps: {
       attributes: {
         'aria-label': $props.ariaLabel,
@@ -323,9 +373,27 @@ $onMount(() => {
     toolbarDispose = $portals.toolbar($refs.toolbarEl, { editor })
   }
 
+  // `bubbleMenu` / `floatingMenu` portal slots — mount the consumer's menu
+  // fragment into the engine-owned (imperatively-created) host element handed to
+  // the Floating-UI menu extension, with the live editor in scope (their buttons
+  // call editor.chain().focus()…run()). Like toolbar/nodeView, $portals.bubbleMenu
+  // / $portals.floatingMenu are referenced ONLY inside $onMount (the bundled-leaf
+  // strict-typecheck discipline). The element is created above only when the slot
+  // is filled, so each portal fires exactly when its slot exists.
+  if (bubbleMenuEl) {
+    bubbleMenuDispose = $portals.bubbleMenu(bubbleMenuEl, { editor })
+  }
+  if (floatingMenuEl) {
+    floatingMenuDispose = $portals.floatingMenu(floatingMenuEl, { editor })
+  }
+
   return () => {
     toolbarDispose?.()
     toolbarDispose = null
+    bubbleMenuDispose?.()
+    bubbleMenuDispose = null
+    floatingMenuDispose?.()
+    floatingMenuDispose = null
     editor?.destroy()
   }
 })
@@ -442,6 +510,22 @@ $expose({
   dispose handle the wrapper calls on unmount. ROZ127-clean: `toolbar` ≠ any prop.
 -->
 <slot name="toolbar" portal :params="['editor']" />
+<!--
+  Selection-anchored menu portal slots (G2). Same mount-once portal shape as
+  `toolbar` (NO `reactive`) — but with NO template host div: the host element is
+  created imperatively in $onMount and handed to the Floating-UI menu extension
+  (@tiptap/extension-bubble-menu / -floating-menu), which owns the element's
+  positioning and appends it to the editor's parent. The wrapper invokes
+  $portals.bubbleMenu / $portals.floatingMenu(menuEl, { editor }) inside $onMount,
+  mounting the consumer's menu fragment into that host node, and returns a dispose
+  handle called on unmount. The default `shouldShow` shows the bubble menu on a
+  non-empty text selection and the floating menu on an empty line.
+
+  ROZ127-clean: `bubbleMenu` / `floatingMenu` ≠ any prop name (html/editable/
+  placeholder/autofocus/editorClass/ariaLabel/editorProps/extensions).
+-->
+<slot name="bubbleMenu" portal :params="['editor']" />
+<slot name="floatingMenu" portal :params="['editor']" />
 <!--
   Reactive node-view portal slot (Phase 33 — the FIRST shipped `reactive` portal
   slot). Declared but NOT rendered inline; per-target template emitters skip it.

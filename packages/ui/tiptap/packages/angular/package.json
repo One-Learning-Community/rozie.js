@@ -4,7 +4,7 @@
   "type": "module",
   "private": false,
   "license": "MIT",
-  "description": "Idiomatic Angular rich-text editor — one Rozie source compiled to Angular wrapping TipTap.",
+  "description": "Idiomatic Angular rich-text editor \u2014 one Rozie source compiled to Angular wrapping TipTap.",
   "keywords": [
     "rozie",
     "rozie-ui",
@@ -42,6 +42,8 @@
     "@angular/forms": "^19",
     "@tiptap/core": "^3",
     "@tiptap/extensions": "^3",
+    "@tiptap/extension-bubble-menu": "^3",
+    "@tiptap/extension-floating-menu": "^3",
     "@tiptap/starter-kit": "^3"
   },
   "peerDependenciesMeta": {
@@ -59,6 +61,12 @@
     },
     "@tiptap/extensions": {
       "optional": false
+    },
+    "@tiptap/extension-bubble-menu": {
+      "optional": true
+    },
+    "@tiptap/extension-floating-menu": {
+      "optional": true
     },
     "@tiptap/starter-kit": {
       "optional": false

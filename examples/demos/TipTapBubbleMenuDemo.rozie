@@ -1,0 +1,112 @@
+<!--
+  TipTapBubbleMenuDemo.rozie — BEHAVIORAL cell for the TipTap `bubbleMenu` /
+  `floatingMenu` portal slots (G2). Proves, across all 6 targets, that the two
+  mount-once portal slots over the Floating-UI menu extensions
+  (@tiptap/extension-bubble-menu / -floating-menu) mount the consumer fragment
+  into the engine-owned menu host and hand it the live editor.
+
+  This is a slot-fill demo (like TipTapDemo's toolbar / TipTapNodeViewDemo's
+  nodeView), NOT a screenshot cell — bubble / floating menus are selection-driven
+  (the bubble menu shows on a non-empty text selection, the floating menu on an
+  empty line), so the rendered menu is capture-unstable. The proof here is that
+  the fragment MOUNTS and its editor-bound buttons drive ProseMirror commands.
+
+    - The `bubbleMenu` slot fill renders Bold / Italic buttons bound to the live
+      editor — clicking them runs editor.chain().focus().toggleBold().run() etc.
+      The menu shows when the user selects text.
+    - The `floatingMenu` slot fill renders an "H1" button — it shows on an empty
+      line and inserts a heading.
+
+  The seed is a single <p> with a couple of words so a text selection (→ bubble
+  menu) and an empty trailing line (→ floating menu) are both reachable.
+-->
+
+<rozie name="TipTapBubbleMenuDemo">
+
+<components>
+{
+  TipTap: '../../packages/ui/tiptap/src/TipTap.rozie',
+}
+</components>
+
+<data>
+{
+  content: '<p>Select this text to reveal the bubble menu.</p><p></p>',
+}
+</data>
+
+<template>
+<div class="tiptap-bubble-demo">
+  <h3>TipTap — bubble / floating menu slots</h3>
+  <p class="hint">Select text to reveal the <strong>bubble menu</strong>; click into the empty line for the <strong>floating menu</strong>. Both are consumer fragments bound to the live editor.</p>
+
+  <TipTap r-model:html="$data.content" placeholder="Type here…">
+    <!--
+      bubbleMenu portal slot fill — Bold / Italic bound to the live editor. The
+      menu host element is engine-created and positioned by Floating UI; this
+      fragment is portalled into it on mount.
+    -->
+    <template #bubbleMenu="{ editor }">
+      <div class="rozie-menu" data-testid="bubble-menu">
+        <button type="button" data-testid="bubble-bold" @click="editor.chain().focus().toggleBold().run()"><strong>B</strong></button>
+        <button type="button" data-testid="bubble-italic" @click="editor.chain().focus().toggleItalic().run()"><em>I</em></button>
+      </div>
+    </template>
+
+    <!--
+      floatingMenu portal slot fill — insert an H1 on an empty line.
+    -->
+    <template #floatingMenu="{ editor }">
+      <div class="rozie-menu" data-testid="floating-menu">
+        <button type="button" data-testid="floating-h1" @click="editor.chain().focus().toggleHeading({ level: 1 }).run()">H1</button>
+      </div>
+    </template>
+  </TipTap>
+
+  <pre class="bound-html" data-testid="bound-html">{{ $data.content }}</pre>
+</div>
+</template>
+
+<style>
+.tiptap-bubble-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  max-width: 720px;
+}
+.tiptap-bubble-demo h3 { margin: 0 0 0.5rem; font-size: 1rem; }
+.tiptap-bubble-demo .hint { margin: 0 0 0.75rem; color: rgba(0, 0, 0, 0.55); font-size: 0.8125rem; }
+.rozie-menu {
+  display: inline-flex;
+  gap: 0.125rem;
+  padding: 0.1875rem;
+  background: #1a1a1a;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+.rozie-menu button {
+  padding: 0.25rem 0.5rem;
+  border: none;
+  background: transparent;
+  color: white;
+  border-radius: 3px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8125rem;
+  min-width: 1.75rem;
+}
+.rozie-menu button:hover { background: rgba(255, 255, 255, 0.15); }
+.bound-html {
+  margin: 0.75rem 0 0;
+  padding: 0.5rem 0.625rem;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 4px;
+  background: #fafafa;
+  font-family: ui-monospace, monospace;
+  font-size: 0.75rem;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+</style>
+
+</rozie>

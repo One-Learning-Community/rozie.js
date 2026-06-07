@@ -101,6 +101,13 @@ const ENGINE_DEMOS = [
   // per-target consumer-side regression surfaces in this fast gate.
   'demos/TipTapScreenshotDemo.rozie',
   'demos/TipTapBehaviorDemo.rozie',
+  // G2 (tiptap) — the behavioral consumer for the `bubbleMenu` / `floatingMenu`
+  // mount-once portal slots over the Floating-UI menu extensions. Fills both
+  // slots with editor-bound fragments; compiled here so a per-target
+  // consumer-side regression (the two menu slot fills across all 6 targets)
+  // surfaces in this fast gate. Behavioral-only (selection-driven menus are
+  // capture-unstable), so it is NOT a VR screenshot cell.
+  'demos/TipTapBubbleMenuDemo.rozie',
 ] as const;
 
 describe('engine-wrapper examples — cross-target compile gate', () => {
