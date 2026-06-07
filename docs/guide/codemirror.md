@@ -1,6 +1,6 @@
 # CodeMirror — the cross-framework code editor
 
-`CodeMirror` is Rozie's data-bound port of [CodeMirror 6](https://codemirror.net/) — the de-facto modular code editor for the web. One `.rozie` source file ships idiomatic React, Vue, Svelte, Angular, Solid, and Lit consumers from a single wrapper. Every framework today carries its own hand-maintained CodeMirror binding ([react-codemirror](https://www.npmjs.com/package/@uiw/react-codemirror), [vue-codemirror](https://www.npmjs.com/package/vue-codemirror), [svelte-codemirror](https://www.npmjs.com/package/svelte-codemirror-editor), [ngx-codemirror](https://www.npmjs.com/package/@ctrl/ngx-codemirror)) — each shuttles a `value` through the `EditorView`/`EditorState` API and forwards changes back out. Rozie collapses all of them (plus the Solid and Lit wrappers that **do not exist upstream**) into one source.
+`CodeMirror` is Rozie's data-bound port of [CodeMirror 6](https://codemirror.net/) — the de-facto modular code editor for the web. One `.rozie` source file ships idiomatic React, Vue, Svelte, Angular, Solid, and Lit consumers from a single wrapper. Every framework today carries its own hand-maintained CodeMirror binding ([react-codemirror](https://www.npmjs.com/package/@uiw/react-codemirror), [vue-codemirror](https://www.npmjs.com/package/vue-codemirror), [svelte-codemirror](https://www.npmjs.com/package/svelte-codemirror-editor), [ngx-codemirror](https://www.npmjs.com/package/@ctrl/ngx-codemirror)) — each shuttles a `value` through the `EditorView`/`EditorState` API and forwards changes back out. Rozie collapses all of them (plus the Solid and Lit wrappers that **do not exist upstream**) into one source. See the [CodeMirror libraries comparison](/guide/codemirror-comparison) for the full per-framework matrix — including the Angular wrapper that's still on CodeMirror 5.
 
 This page is the **show-and-tell**: the API surface, per-framework quick starts, the imperative handle, the consumer-extensible `:extensions` passthrough, and the per-target recipe for the one `panel` portal slot.
 
@@ -378,6 +378,7 @@ CodeMirror 6 has many extension-mounted injection points (tooltips, gutter marke
 
 ## Cross-references
 
+- [CodeMirror libraries comparison](/guide/codemirror-comparison) — the per-framework wrapper matrix, the CM5-vs-CM6 Angular split, and Rozie's own gap status.
 - [`CodeMirror.rozie` source on GitHub](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/codemirror/src/CodeMirror.rozie) — the canonical wrapper.
 - [The portal-slot primitive](/examples/portal-list) — how `<slot name="X" portal />` routes a consumer fragment through each target's imperative-render API.
 - [`$expose` and the imperative handle](/guide/features#expose-→-a-consumer-callable-imperative-handle-everywhere)
