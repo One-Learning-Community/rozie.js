@@ -64,3 +64,5 @@ Beyond props, the component exposes imperative methods (declared once in the Roz
 | Slot | Params |
 | --- | --- |
 | panel | view |
+| topPanel | view |
+| tooltip | view, pos |

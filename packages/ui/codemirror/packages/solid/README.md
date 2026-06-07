@@ -72,3 +72,5 @@ const text = handle?.getValue();
 | Slot | Params |
 | --- | --- |
 | panel | view |
+| topPanel | view |
+| tooltip | view, pos |

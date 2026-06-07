@@ -70,3 +70,5 @@ const cm = ref();          // template ref
 | Slot | Params |
 | --- | --- |
 | panel | view |
+| topPanel | view |
+| tooltip | view, pos |

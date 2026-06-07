@@ -3,8 +3,8 @@ import { customElement, property, query, queryAssignedElements, state } from 'li
 import { SignalWatcher, effect, untracked } from '@lit-labs/preact-signals';
 import { createLitControllableProperty, injectGlobalStyles } from '@rozie/runtime-lit';
 import { styleMap } from 'lit/directives/style-map.js';
-import { EditorState, Compartment, EditorSelection } from '@codemirror/state';
-import { EditorView, keymap, lineNumbers, showPanel, placeholder as placeholderExt } from '@codemirror/view';
+import { EditorState, Compartment, EditorSelection, StateField } from '@codemirror/state';
+import { EditorView, keymap, lineNumbers, showPanel, showTooltip, placeholder as placeholderExt } from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { javascript } from '@codemirror/lang-javascript';
 import { oneDark } from '@codemirror/theme-one-dark';
@@ -18,6 +18,15 @@ import { basicSetup as basicSetupBundle } from 'codemirror';
 
 interface RoziePanelSlotCtx {
   view: unknown;
+}
+
+interface RozieTopPanelSlotCtx {
+  view: unknown;
+}
+
+interface RozieTooltipSlotCtx {
+  view: unknown;
+  pos: unknown;
 }
 
 @customElement('rozie-code-mirror')
@@ -45,6 +54,19 @@ export default class CodeMirror extends SignalWatcher(LitElement) {
     border-top: 1px solid rgba(0, 0, 0, 0.12);
     font-size: 12px;
   }
+.rozie-codemirror .rozie-cm-panel-top {
+    padding: 2px 8px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+    font-size: 12px;
+  }
+.rozie-codemirror .rozie-cm-tooltip {
+    padding: 2px 6px;
+    font-size: 11px;
+    background: #1a1a1a;
+    color: #fff;
+    border-radius: 3px;
+    white-space: nowrap;
+  }
 `;
 
   @property({ type: String, attribute: 'value' }) _value_attr: string = '';
@@ -64,6 +86,12 @@ private _portalContainers = new Set<HTMLElement>();
   @state() private _hasSlotPanel = false;
   @queryAssignedElements({ slot: 'panel', flatten: true }) private _slotPanelElements!: Element[];
   @property({ attribute: false }) panel?: (scope: { view: unknown }) => unknown;
+  @state() private _hasSlotTopPanel = false;
+  @queryAssignedElements({ slot: 'topPanel', flatten: true }) private _slotTopPanelElements!: Element[];
+  @property({ attribute: false }) topPanel?: (scope: { view: unknown }) => unknown;
+  @state() private _hasSlotTooltip = false;
+  @queryAssignedElements({ slot: 'tooltip', flatten: true }) private _slotTooltipElements!: Element[];
+  @property({ attribute: false }) tooltip?: (scope: { view: unknown; pos: unknown }) => unknown;
 
   private _disconnectCleanups: Array<() => void> = [];
   // Re-parenting guard: set true once the deferred teardown has actually
@@ -81,11 +109,35 @@ private _portalContainers = new Set<HTMLElement>();
         update();
       }
     }
+
+    {
+      const slotEl = this.shadowRoot?.querySelector('slot[name="topPanel"]');
+      if (slotEl !== null && slotEl !== undefined) {
+        const update = () => { this._hasSlotTopPanel = this._slotTopPanelElements.length > 0; };
+        slotEl.addEventListener('slotchange', update);
+        // CR-05 fix: push cleanup so the listener is removed on disconnectedCallback.
+        this._disconnectCleanups.push(() => slotEl.removeEventListener('slotchange', update));
+        update();
+      }
+    }
+
+    {
+      const slotEl = this.shadowRoot?.querySelector('slot[name="tooltip"]');
+      if (slotEl !== null && slotEl !== undefined) {
+        const update = () => { this._hasSlotTooltip = this._slotTooltipElements.length > 0; };
+        slotEl.addEventListener('slotchange', update);
+        // CR-05 fix: push cleanup so the listener is removed on disconnectedCallback.
+        this._disconnectCleanups.push(() => slotEl.removeEventListener('slotchange', update));
+        update();
+      }
+    }
   }
 
   connectedCallback(): void {
     // Phase 07.3.1 D-LIT-15 — pre-seed _hasSlot<X> from light DOM so first render isn't deadlocked.
     this._hasSlotPanel = Array.from(this.children).some((el) => el.getAttribute('slot') === 'panel');
+    this._hasSlotTopPanel = Array.from(this.children).some((el) => el.getAttribute('slot') === 'topPanel');
+    this._hasSlotTooltip = Array.from(this.children).some((el) => el.getAttribute('slot') === 'tooltip');
     super.connectedCallback();
     if (this.hasUpdated && this._rozieTornDown) { this._rozieTornDown = false; this._armListeners(); }
   }
@@ -93,6 +145,10 @@ private _portalContainers = new Set<HTMLElement>();
   firstUpdated(): void {
     this._armListeners();
 
+    interface ReactivePortalHandle {
+      update(scope: unknown): void;
+      dispose(): void;
+    }
     const portals = {
       panel: (container: HTMLElement, scope: { view: unknown }): (() => void) => {
         const tpl = this.panel;
@@ -104,6 +160,36 @@ private _portalContainers = new Set<HTMLElement>();
         return () => {
           render(nothing, container);
           this._portalContainers.delete(container);
+        };
+      },
+      topPanel: (container: HTMLElement, scope: { view: unknown }): (() => void) => {
+        const tpl = this.topPanel;
+        if (typeof tpl !== 'function') return () => {};
+        // Spike 004: portal-scope attribute injection.
+        container.setAttribute('data-rozie-portal-topPanel', '34cfda5a');
+        render(tpl(scope), container);
+        this._portalContainers.add(container);
+        return () => {
+          render(nothing, container);
+          this._portalContainers.delete(container);
+        };
+      },
+      tooltip: (container: HTMLElement, scope: { view: unknown; pos: unknown }): ReactivePortalHandle => {
+        const tpl = this.tooltip;
+        if (typeof tpl !== 'function') return { update() {}, dispose() {} };
+        // Spike 004: portal-scope attribute injection.
+        container.setAttribute('data-rozie-portal-tooltip', '34cfda5a');
+        const renderScope = (s: { view: unknown; pos: unknown }): void => {
+          render(tpl(s), container);
+        };
+        renderScope(scope);
+        this._portalContainers.add(container);
+        return {
+          update: (s: { view: unknown; pos: unknown }): void => renderScope(s),
+          dispose: (): void => {
+            render(nothing, container);
+            this._portalContainers.delete(container);
+          },
         };
       },
     };
@@ -148,9 +234,152 @@ private _portalContainers = new Set<HTMLElement>();
         };
       });
     };
+
+    // topPanel — the TOP-docked mount-once sibling of `panel` (G5 wave 1). Same
+    // `showPanel` facet, same arrow-function-property mount/destroy form (NOT
+    // object-method `mount() {}` — the Lit field-rewrite caveat documented on
+    // panelExt above applies identically), differing ONLY in `top: true` and the
+    // `.rozie-cm-panel-top` host class. Empty ([]) when the slot is unfilled.
+    // topPanel — the TOP-docked mount-once sibling of `panel` (G5 wave 1). Same
+    // `showPanel` facet, same arrow-function-property mount/destroy form (NOT
+    // object-method `mount() {}` — the Lit field-rewrite caveat documented on
+    // panelExt above applies identically), differing ONLY in `top: true` and the
+    // `.rozie-cm-panel-top` host class. Empty ([]) when the slot is unfilled.
+    const topPanelExt = () => {
+      if (!(this.topPanel !== undefined)) return [];
+      return showPanel.of((panelView: any) => {
+        const dom = document.createElement('div');
+        dom.className = 'rozie-cm-panel-top';
+        const scope = {
+          view: panelView
+        };
+        let dispose: any = null;
+        return {
+          dom,
+          top: true,
+          mount: () => {
+            dispose = portals.topPanel(dom, scope);
+          },
+          destroy: () => {
+            dispose?.();
+            dispose = null;
+          }
+        };
+      });
+    };
+
+    // tooltip — CodeMirror's FIRST REACTIVE portal slot (G5 wave 1). A
+    // cursor-anchored tooltip provided through the `showTooltip` facet via a
+    // StateField that yields ONE Tooltip at the main selection head whenever the
+    // `tooltip` slot is filled.
+    //
+    // UPDATE-IN-PLACE reconciliation (verified against the installed
+    // @codemirror/view@6.43 tooltip source, TooltipViewManager.update): CM reuses
+    // an existing TooltipView — calling TooltipView.update(viewUpdate) instead of
+    // destroy+create — when the new Tooltip's `create` is REFERENCE-EQUAL to the
+    // old one's (`other.create == tip.create`); and when the whole showTooltip
+    // facet INPUT is unchanged it skips matching entirely and calls update() on
+    // every live view. We satisfy BOTH by holding ONE module-stable Tooltip object
+    // (`stableTooltip`, stable `create`) and returning that SAME object from the
+    // field's `update` while the head only moved. So the consumer fragment mounts
+    // ONCE (TooltipView.mount → $portals.tooltip → reactive {update,dispose}) and
+    // every caret move flows through TooltipView.update → handle.update(scope) —
+    // re-rendering the fragment IN PLACE, never remounting it.
+    // tooltip — CodeMirror's FIRST REACTIVE portal slot (G5 wave 1). A
+    // cursor-anchored tooltip provided through the `showTooltip` facet via a
+    // StateField that yields ONE Tooltip at the main selection head whenever the
+    // `tooltip` slot is filled.
+    //
+    // UPDATE-IN-PLACE reconciliation (verified against the installed
+    // @codemirror/view@6.43 tooltip source, TooltipViewManager.update): CM reuses
+    // an existing TooltipView — calling TooltipView.update(viewUpdate) instead of
+    // destroy+create — when the new Tooltip's `create` is REFERENCE-EQUAL to the
+    // old one's (`other.create == tip.create`); and when the whole showTooltip
+    // facet INPUT is unchanged it skips matching entirely and calls update() on
+    // every live view. We satisfy BOTH by holding ONE module-stable Tooltip object
+    // (`stableTooltip`, stable `create`) and returning that SAME object from the
+    // field's `update` while the head only moved. So the consumer fragment mounts
+    // ONCE (TooltipView.mount → $portals.tooltip → reactive {update,dispose}) and
+    // every caret move flows through TooltipView.update → handle.update(scope) —
+    // re-rendering the fragment IN PLACE, never remounting it.
+    const tooltipField = () => {
+      if (!(this.tooltip !== undefined)) return [];
+      // The reactive portal handle for the SINGLE live tooltip view. Hoisted to
+      // the field's closure so create()/update()/destroy() share it across the
+      // tooltip's lifetime.
+      let handle: any = null;
+      // Stable Tooltip object — its `create` reference never changes, so CM
+      // reuses the TooltipView across caret moves (update-in-place, no remount).
+      // NOTE: `create` is an ARROW-FUNCTION property and its param is named
+      // `tipView` (NOT `view`) — both for the SAME Lit reason documented on
+      // panelExt: an object-method `create(view) {}` would get its own `this`,
+      // and the Lit emitter's component-field rewrite walks into the body and
+      // rewrites a `view`-named token (matching the top-level `let view`) to
+      // `this.view`. An arrow property shares the enclosing scope, and the
+      // non-colliding param name keeps the caret-view reference correct on every
+      // target. CM calls `tooltip.create(view)` either way.
+      const stableTooltip = {
+        pos: 0,
+        above: true,
+        create: (tipView: any) => {
+          const dom = document.createElement('div');
+          dom.className = 'rozie-cm-tooltip';
+          return {
+            dom,
+            mount: () => {
+              handle = portals.tooltip(dom, {
+                view: tipView,
+                pos: tipView.state.selection.main.head
+              });
+            },
+            // Reactive in-place update — fired by CM on every ViewUpdate while the
+            // tooltip view is reused. Re-renders the consumer fragment with the
+            // fresh caret position; the fragment is NOT remounted (REQ — verified
+            // empirically via the demo's mount/update counters).
+            update: (u: any) => {
+              handle?.update({
+                view: u.view,
+                pos: u.state.selection.main.head
+              });
+            },
+            destroy: () => {
+              handle?.dispose();
+              handle = null;
+            }
+          };
+        }
+      };
+      // NOTE: the StateField.update callback's first param is named `cur` (NOT the
+      // idiomatic `value`): a `value` model prop makes the React emitter rewrite a
+      // local `value` binding into the prop-state ref (`_valueRef.current`) — it
+      // walks into this callback and corrupts the field's accumulator
+      // (TS2339 "Property 'pos' does not exist on type 'string'"). Same collision
+      // class as the setValue→replaceValue $expose rename (ROZ524). `cur` is
+      // collision-free across all 6 targets.
+      return StateField.define({
+        create: (state: any) => ({
+          ...stableTooltip,
+          pos: state.selection.main.head
+        }),
+        update: (cur: any, tr: any) => {
+          // Keep the SAME stable `create`; only the head moves. Reuse the existing
+          // object when the head is unchanged so the facet input is identity-stable.
+          const head = tr.state.selection.main.head;
+          if (cur && cur.pos === head) return cur;
+          return {
+            ...stableTooltip,
+            pos: head
+          };
+        },
+        provide: (f: any) => showTooltip.from(f)
+      });
+    };
     const buildState = (doc: any) => EditorState.create({
       doc,
-      extensions: [...this.baselineExt(), this.langCompartment.of(this.langExt()), this.themeCompartment.of(this.themeExt()), this.readOnlyCompartment.of(EditorState.readOnly.of(this.readOnly)), this.placeholderCompartment.of(this.phExt()), this.panelCompartment.of(panelExt()), EditorView.updateListener.of((update: any) => {
+      extensions: [...this.baselineExt(), this.langCompartment.of(this.langExt()), this.themeCompartment.of(this.themeExt()), this.readOnlyCompartment.of(EditorState.readOnly.of(this.readOnly)), this.placeholderCompartment.of(this.phExt()), this.panelCompartment.of(panelExt()), this.topPanelCompartment.of(topPanelExt()),
+      // tooltipField() returns a StateField extension (or [] when the slot is
+      // unfilled); no compartment — it is a one-shot mount-time decision.
+      tooltipField(), EditorView.updateListener.of((update: any) => {
         if (!update.docChanged) return;
         if (this.suppressEmit) return;
         // Push the new doc out through the model:true emit path. Consumers
@@ -224,6 +453,10 @@ private _portalContainers = new Set<HTMLElement>();
 </div>
 
 <slot name="panel"></slot>
+
+<slot name="topPanel"></slot>
+
+<slot name="tooltip"></slot>
 `;
   }
 
@@ -242,6 +475,8 @@ private _portalContainers = new Set<HTMLElement>();
   extensionsCompartment = new Compartment();
 
   panelCompartment = new Compartment();
+
+  topPanelCompartment = new Compartment();
 
   langExt = (): any => this.language === 'javascript' ? javascript() : [];
 
@@ -343,5 +578,18 @@ injectGlobalStyles('rozie-code-mirror-global', `
     padding: 2px 8px;
     border-top: 1px solid rgba(0, 0, 0, 0.12);
     font-size: 12px;
+  }
+.rozie-codemirror .rozie-cm-panel-top {
+    padding: 2px 8px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+    font-size: 12px;
+  }
+.rozie-codemirror .rozie-cm-tooltip {
+    padding: 2px 6px;
+    font-size: 11px;
+    background: #1a1a1a;
+    color: #fff;
+    border-radius: 3px;
+    white-space: nowrap;
   }
 `);

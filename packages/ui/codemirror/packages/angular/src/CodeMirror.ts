@@ -2,8 +2,8 @@ import { Component, ContentChild, DestroyRef, ElementRef, EmbeddedViewRef, Templ
 import { NgTemplateOutlet } from '@angular/common';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
 
-import { EditorState, Compartment, EditorSelection } from '@codemirror/state';
-import { EditorView, keymap, lineNumbers, showPanel, placeholder as placeholderExt } from '@codemirror/view';
+import { EditorState, Compartment, EditorSelection, StateField } from '@codemirror/state';
+import { EditorView, keymap, lineNumbers, showPanel, showTooltip, placeholder as placeholderExt } from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { javascript } from '@codemirror/lang-javascript';
 import { oneDark } from '@codemirror/theme-one-dark';
@@ -20,6 +20,17 @@ interface PanelCtx {
   view: any;
 }
 
+interface TopPanelCtx {
+  $implicit: { view: any };
+  view: any;
+}
+
+interface TooltipCtx {
+  $implicit: { view: any; pos: any };
+  view: any;
+  pos: any;
+}
+
 @Component({
   selector: 'rozie-code-mirror',
   standalone: true,
@@ -29,6 +40,10 @@ interface PanelCtx {
     <div class="rozie-codemirror" [style]="{ height: height() + 'px' }">
       <div class="cm-mount" #hostEl></div>
     </div>
+
+
+
+
 
 
     <ng-container #rozie_portalAnchor></ng-container>
@@ -57,6 +72,19 @@ interface PanelCtx {
         border-top: 1px solid rgba(0, 0, 0, 0.12);
         font-size: 12px;
       }
+    ::ng-deep .rozie-codemirror .rozie-cm-panel-top {
+        padding: 2px 8px;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+        font-size: 12px;
+      }
+    ::ng-deep .rozie-codemirror .rozie-cm-tooltip {
+        padding: 2px 6px;
+        font-size: 11px;
+        background: #1a1a1a;
+        color: #fff;
+        border-radius: 3px;
+        white-space: nowrap;
+      }
   `],
   providers: [
     {
@@ -78,10 +106,14 @@ export class CodeMirror {
   basicSetup = input<boolean>(false);
   hostEl = viewChild<ElementRef<HTMLDivElement>>('hostEl');
   @ContentChild('panel', { read: TemplateRef }) panelTpl?: TemplateRef<PanelCtx>;
+  @ContentChild('topPanel', { read: TemplateRef }) topPanelTpl?: TemplateRef<TopPanelCtx>;
+  @ContentChild('tooltip', { read: TemplateRef }) tooltipTpl?: TemplateRef<TooltipCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
   private _portalViews = new Set<EmbeddedViewRef<unknown>>();
   private _portalAnchor = viewChild('rozie_portalAnchor', { read: ViewContainerRef });
   private _panelTpl = contentChild('panel', { read: TemplateRef });
+  private _topPanelTpl = contentChild('topPanel', { read: TemplateRef });
+  private _tooltipTpl = contentChild('tooltip', { read: TemplateRef });
   private __rozieDestroyRef = inject(DestroyRef);
   private __rozieWatchInitial_0 = true;
   private __rozieWatchInitial_1 = true;
@@ -125,6 +157,10 @@ export class CodeMirror {
   }
 
   ngAfterViewInit() {
+    interface ReactivePortalHandle {
+      update(scope: unknown): void;
+      dispose(): void;
+    }
     const portals = {
       panel: (container: HTMLElement, scope: { view: unknown }): (() => void) => {
         const tpl = this._panelTpl();
@@ -139,6 +175,42 @@ export class CodeMirror {
         return () => {
           view.destroy();
           this._portalViews.delete(view as EmbeddedViewRef<unknown>);
+        };
+      },
+      topPanel: (container: HTMLElement, scope: { view: unknown }): (() => void) => {
+        const tpl = this._topPanelTpl();
+        const vcr = this._portalAnchor();
+        if (!tpl || !vcr) return () => {};
+        // Spike 004: portal-scope attribute injection.
+        container.setAttribute('data-rozie-portal-topPanel', '34cfda5a');
+        const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
+        view.detectChanges();
+        for (const node of view.rootNodes as Node[]) container.appendChild(node);
+        this._portalViews.add(view as EmbeddedViewRef<unknown>);
+        return () => {
+          view.destroy();
+          this._portalViews.delete(view as EmbeddedViewRef<unknown>);
+        };
+      },
+      tooltip: (container: HTMLElement, scope: { view: unknown; pos: unknown }): ReactivePortalHandle => {
+        const tpl = this._tooltipTpl();
+        const vcr = this._portalAnchor();
+        if (!tpl || !vcr) return { update() {}, dispose() {} };
+        // Spike 004: portal-scope attribute injection.
+        container.setAttribute('data-rozie-portal-tooltip', '34cfda5a');
+        const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
+        view.detectChanges();
+        for (const node of view.rootNodes as Node[]) container.appendChild(node);
+        this._portalViews.add(view as EmbeddedViewRef<unknown>);
+        return {
+          update: (s: unknown): void => {
+            Object.assign(view.context as object, s as object);
+            view.detectChanges();
+          },
+          dispose: (): void => {
+            view.destroy();
+            this._portalViews.delete(view as EmbeddedViewRef<unknown>);
+          },
         };
       },
     };
@@ -178,9 +250,152 @@ export class CodeMirror {
         };
       });
     };
+
+    // topPanel — the TOP-docked mount-once sibling of `panel` (G5 wave 1). Same
+    // `showPanel` facet, same arrow-function-property mount/destroy form (NOT
+    // object-method `mount() {}` — the Lit field-rewrite caveat documented on
+    // panelExt above applies identically), differing ONLY in `top: true` and the
+    // `.rozie-cm-panel-top` host class. Empty ([]) when the slot is unfilled.
+    // topPanel — the TOP-docked mount-once sibling of `panel` (G5 wave 1). Same
+    // `showPanel` facet, same arrow-function-property mount/destroy form (NOT
+    // object-method `mount() {}` — the Lit field-rewrite caveat documented on
+    // panelExt above applies identically), differing ONLY in `top: true` and the
+    // `.rozie-cm-panel-top` host class. Empty ([]) when the slot is unfilled.
+    const topPanelExt = () => {
+      if (!(this.topPanelTpl ?? this.templates()?.['topPanel'])) return [];
+      return showPanel.of((panelView: any) => {
+        const dom = document.createElement('div');
+        dom.className = 'rozie-cm-panel-top';
+        const scope = {
+          view: panelView
+        };
+        let dispose: any = null;
+        return {
+          dom,
+          top: true,
+          mount: () => {
+            dispose = portals.topPanel(dom, scope);
+          },
+          destroy: () => {
+            dispose?.();
+            dispose = null;
+          }
+        };
+      });
+    };
+
+    // tooltip — CodeMirror's FIRST REACTIVE portal slot (G5 wave 1). A
+    // cursor-anchored tooltip provided through the `showTooltip` facet via a
+    // StateField that yields ONE Tooltip at the main selection head whenever the
+    // `tooltip` slot is filled.
+    //
+    // UPDATE-IN-PLACE reconciliation (verified against the installed
+    // @codemirror/view@6.43 tooltip source, TooltipViewManager.update): CM reuses
+    // an existing TooltipView — calling TooltipView.update(viewUpdate) instead of
+    // destroy+create — when the new Tooltip's `create` is REFERENCE-EQUAL to the
+    // old one's (`other.create == tip.create`); and when the whole showTooltip
+    // facet INPUT is unchanged it skips matching entirely and calls update() on
+    // every live view. We satisfy BOTH by holding ONE module-stable Tooltip object
+    // (`stableTooltip`, stable `create`) and returning that SAME object from the
+    // field's `update` while the head only moved. So the consumer fragment mounts
+    // ONCE (TooltipView.mount → $portals.tooltip → reactive {update,dispose}) and
+    // every caret move flows through TooltipView.update → handle.update(scope) —
+    // re-rendering the fragment IN PLACE, never remounting it.
+    // tooltip — CodeMirror's FIRST REACTIVE portal slot (G5 wave 1). A
+    // cursor-anchored tooltip provided through the `showTooltip` facet via a
+    // StateField that yields ONE Tooltip at the main selection head whenever the
+    // `tooltip` slot is filled.
+    //
+    // UPDATE-IN-PLACE reconciliation (verified against the installed
+    // @codemirror/view@6.43 tooltip source, TooltipViewManager.update): CM reuses
+    // an existing TooltipView — calling TooltipView.update(viewUpdate) instead of
+    // destroy+create — when the new Tooltip's `create` is REFERENCE-EQUAL to the
+    // old one's (`other.create == tip.create`); and when the whole showTooltip
+    // facet INPUT is unchanged it skips matching entirely and calls update() on
+    // every live view. We satisfy BOTH by holding ONE module-stable Tooltip object
+    // (`stableTooltip`, stable `create`) and returning that SAME object from the
+    // field's `update` while the head only moved. So the consumer fragment mounts
+    // ONCE (TooltipView.mount → $portals.tooltip → reactive {update,dispose}) and
+    // every caret move flows through TooltipView.update → handle.update(scope) —
+    // re-rendering the fragment IN PLACE, never remounting it.
+    const tooltipField = () => {
+      if (!(this.tooltipTpl ?? this.templates()?.['tooltip'])) return [];
+      // The reactive portal handle for the SINGLE live tooltip view. Hoisted to
+      // the field's closure so create()/update()/destroy() share it across the
+      // tooltip's lifetime.
+      let handle: any = null;
+      // Stable Tooltip object — its `create` reference never changes, so CM
+      // reuses the TooltipView across caret moves (update-in-place, no remount).
+      // NOTE: `create` is an ARROW-FUNCTION property and its param is named
+      // `tipView` (NOT `view`) — both for the SAME Lit reason documented on
+      // panelExt: an object-method `create(view) {}` would get its own `this`,
+      // and the Lit emitter's component-field rewrite walks into the body and
+      // rewrites a `view`-named token (matching the top-level `let view`) to
+      // `this.view`. An arrow property shares the enclosing scope, and the
+      // non-colliding param name keeps the caret-view reference correct on every
+      // target. CM calls `tooltip.create(view)` either way.
+      const stableTooltip = {
+        pos: 0,
+        above: true,
+        create: (tipView: any) => {
+          const dom = document.createElement('div');
+          dom.className = 'rozie-cm-tooltip';
+          return {
+            dom,
+            mount: () => {
+              handle = portals.tooltip(dom, {
+                view: tipView,
+                pos: tipView.state.selection.main.head
+              });
+            },
+            // Reactive in-place update — fired by CM on every ViewUpdate while the
+            // tooltip view is reused. Re-renders the consumer fragment with the
+            // fresh caret position; the fragment is NOT remounted (REQ — verified
+            // empirically via the demo's mount/update counters).
+            update: (u: any) => {
+              handle?.update({
+                view: u.view,
+                pos: u.state.selection.main.head
+              });
+            },
+            destroy: () => {
+              handle?.dispose();
+              handle = null;
+            }
+          };
+        }
+      };
+      // NOTE: the StateField.update callback's first param is named `cur` (NOT the
+      // idiomatic `value`): a `value` model prop makes the React emitter rewrite a
+      // local `value` binding into the prop-state ref (`_valueRef.current`) — it
+      // walks into this callback and corrupts the field's accumulator
+      // (TS2339 "Property 'pos' does not exist on type 'string'"). Same collision
+      // class as the setValue→replaceValue $expose rename (ROZ524). `cur` is
+      // collision-free across all 6 targets.
+      return StateField.define({
+        create: (state: any) => ({
+          ...stableTooltip,
+          pos: state.selection.main.head
+        }),
+        update: (cur: any, tr: any) => {
+          // Keep the SAME stable `create`; only the head moves. Reuse the existing
+          // object when the head is unchanged so the facet input is identity-stable.
+          const head = tr.state.selection.main.head;
+          if (cur && cur.pos === head) return cur;
+          return {
+            ...stableTooltip,
+            pos: head
+          };
+        },
+        provide: (f: any) => showTooltip.from(f)
+      });
+    };
     const buildState = (doc: any) => EditorState.create({
       doc,
-      extensions: [...this.baselineExt(), this.langCompartment.of(this.langExt()), this.themeCompartment.of(this.themeExt()), this.readOnlyCompartment.of(EditorState.readOnly.of(this.readOnly())), this.placeholderCompartment.of(this.phExt()), this.panelCompartment.of(panelExt()), EditorView.updateListener.of((update: any) => {
+      extensions: [...this.baselineExt(), this.langCompartment.of(this.langExt()), this.themeCompartment.of(this.themeExt()), this.readOnlyCompartment.of(EditorState.readOnly.of(this.readOnly())), this.placeholderCompartment.of(this.phExt()), this.panelCompartment.of(panelExt()), this.topPanelCompartment.of(topPanelExt()),
+      // tooltipField() returns a StateField extension (or [] when the slot is
+      // unfilled); no compartment — it is a one-shot mount-time decision.
+      tooltipField(), EditorView.updateListener.of((update: any) => {
         if (!update.docChanged) return;
         if (this.suppressEmit) return;
         // Push the new doc out through the model:true emit path. Consumers
@@ -209,6 +424,7 @@ export class CodeMirror {
   placeholderCompartment = new Compartment();
   extensionsCompartment = new Compartment();
   panelCompartment = new Compartment();
+  topPanelCompartment = new Compartment();
   langExt = () => this.language() === 'javascript' ? javascript() : [];
   themeExt = () => {
     const t = this.theme();
@@ -304,7 +520,7 @@ export class CodeMirror {
   static ngTemplateContextGuard(
     _dir: CodeMirror,
     _ctx: unknown,
-  ): _ctx is PanelCtx {
+  ): _ctx is PanelCtx | TopPanelCtx | TooltipCtx {
     return true;
   }
 }

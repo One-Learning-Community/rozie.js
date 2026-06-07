@@ -14,6 +14,8 @@ export interface CodeMirrorProps {
   extensions?: unknown[];
   basicSetup?: boolean;
   renderPanel?: (params: { view: () => void }) => ReactNode;
+  renderTopPanel?: (params: { view: () => void }) => ReactNode;
+  renderTooltip?: (params: { view: () => void; pos: () => void }) => ReactNode;
   slots?: Record<string, () => ReactNode>;
 }
 

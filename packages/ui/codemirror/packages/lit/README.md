@@ -67,3 +67,5 @@ const text = el.getValue();
 | Slot | Params |
 | --- | --- |
 | panel | view |
+| topPanel | view |
+| tooltip | view, pos |

@@ -99,3 +99,5 @@ export class DemoComponent {
 | Slot | Params |
 | --- | --- |
 | panel | view |
+| topPanel | view |
+| tooltip | view, pos |
