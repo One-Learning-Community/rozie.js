@@ -1,6 +1,7 @@
 import { LitElement, css, html, nothing, render } from 'lit';
 import { customElement, property, query, queryAssignedElements, state } from 'lit/decorators.js';
 import { SignalWatcher } from '@lit-labs/preact-signals';
+import { injectGlobalStyles } from '@rozie/runtime-lit';
 import { styleMap } from 'lit/directives/style-map.js';
 import { Chart as ChartJS, BarController, BarElement, LinearScale, CategoryScale, Legend, Tooltip, Colors } from 'chart.js';
 // Bar registers only its own Chart.js controller/element/scale set
@@ -22,15 +23,15 @@ export default class Bar extends SignalWatcher(LitElement) {
   width: 100% !important;
   height: 100% !important;
 }
-.rozie-chart[data-rozie-s-ed04b5ca] [data-rozie-s-ed04b5ca]:global(.rozie-chart-tooltip) {
-  background: rgba(0, 0, 0, 0.8);
-  color: #fff;
-  border-radius: 4px;
-  padding: 6px 8px;
-  font-size: 12px;
-  transform: translate(-50%, calc(-100% - 8px));
-  white-space: nowrap;
-}
+.rozie-chart .rozie-chart-tooltip {
+    background: rgba(0, 0, 0, 0.8);
+    color: #fff;
+    border-radius: 4px;
+    padding: 6px 8px;
+    font-size: 12px;
+    transform: translate(-50%, calc(-100% - 8px));
+    white-space: nowrap;
+  }
 `;
 
   @property({ type: Object }) data: any = {
@@ -417,3 +418,15 @@ private _portalContainers = new Set<HTMLElement>();
     return this.instance ? this.instance.toBase64Image(type, quality) : null;
   }
 }
+
+injectGlobalStyles('rozie-bar-global', `
+.rozie-chart .rozie-chart-tooltip {
+    background: rgba(0, 0, 0, 0.8);
+    color: #fff;
+    border-radius: 4px;
+    padding: 6px 8px;
+    font-size: 12px;
+    transform: translate(-50%, calc(-100% - 8px));
+    white-space: nowrap;
+  }
+`);

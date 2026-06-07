@@ -46,15 +46,16 @@ interface TooltipCtx {
       width: 100% !important;
       height: 100% !important;
     }
-    .rozie-chart :global(.rozie-chart-tooltip) {
-      background: rgba(0, 0, 0, 0.8);
-      color: #fff;
-      border-radius: 4px;
-      padding: 6px 8px;
-      font-size: 12px;
-      transform: translate(-50%, calc(-100% - 8px));
-      white-space: nowrap;
-    }
+
+    ::ng-deep .rozie-chart .rozie-chart-tooltip {
+        background: rgba(0, 0, 0, 0.8);
+        color: #fff;
+        border-radius: 4px;
+        padding: 6px 8px;
+        font-size: 12px;
+        transform: translate(-50%, calc(-100% - 8px));
+        white-space: nowrap;
+      }
   `],
 })
 export class Chart {

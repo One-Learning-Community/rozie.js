@@ -27,7 +27,7 @@
  * BUILD-ORDER CONTRACT: this writes each leaf's src/*, so it MUST run before the
  * bundled-leaf tsdown builds.
  */
-import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { compile, createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
 import { handleManifest } from './handle-manifest.mjs';
@@ -172,6 +172,19 @@ function main() {
     writeFileSync(resolve(leafSrc, cfg.file), r.code);
     if (target === 'react') {
       if (r.css) writeFileSync(resolve(leafSrc, 'Chart.css'), r.css);
+      // Chart.rozie's `:root { .rozie-chart .rozie-chart-tooltip { ... } }`
+      // engine block (Phase 34 escape hatch) routes to r.globalCss and the
+      // emitted .tsx carries an `import './Chart.global.css'` side effect. Write
+      // the single shared sidecar whenever present so that import resolves; when
+      // absent, rmSync any stale copy (the WR-03 sidecar-drift guard). The 8
+      // per-type variants share the same style block, so they all rewrite their
+      // own `<Name>.global.css` import to this one shared file below.
+      const globalCssPath = resolve(leafSrc, 'Chart.global.css');
+      if (r.globalCss) {
+        writeFileSync(globalCssPath, r.globalCss);
+      } else if (existsSync(globalCssPath)) {
+        rmSync(globalCssPath);
+      }
       if (r.types) writeFileSync(resolve(leafSrc, 'Chart.d.ts'), r.types);
     }
 
@@ -183,6 +196,13 @@ function main() {
       // shared `Chart.css` (the styles are identical) so we ship one stylesheet,
       // not nine. The tsdown css-external + copy handles `Chart.css` already.
       if (target === 'react') {
+        // Rewrite both the scoped `<Name>.css` and the engine-DOM
+        // `<Name>.global.css` (Phase 34 escape hatch) sidecar imports to the
+        // single shared `Chart.css` / `Chart.global.css`. The `.global.css`
+        // rewrite runs first so the more specific token is consumed before the
+        // generic `.css` pass (the two forms don't overlap as substrings, but
+        // keeping the specific-first order is the robust convention).
+        code = code.replaceAll(`${v.name}.global.css`, 'Chart.global.css');
         code = code.replaceAll(`${v.name}.css`, 'Chart.css');
       }
       writeFileSync(resolve(leafSrc, cfg.vfile(v.name)), code);

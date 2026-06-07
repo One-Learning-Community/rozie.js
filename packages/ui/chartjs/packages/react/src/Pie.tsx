@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { flushSync } from 'react-dom';
 import './Chart.css';
+import './Chart.global.css';
 import { Chart as ChartJS, PieController, ArcElement, Legend, Tooltip, Colors } from 'chart.js';
 // Pie registers only its own Chart.js controller/element/scale set
 // (tree-shakable — importing this component does not pull every controller).

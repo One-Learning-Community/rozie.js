@@ -387,14 +387,17 @@ $effect(() => { (() => plugins)(); untrack(() => { if (__rozieWatchInitial_3) { 
     width: 100% !important;
     height: 100% !important;
   }
-  .rozie-chart[data-rozie-s-2228fabc] [data-rozie-s-2228fabc]:global(.rozie-chart-tooltip) {
-    background: rgba(0, 0, 0, 0.8);
-    color: #fff;
-    border-radius: 4px;
-    padding: 6px 8px;
-    font-size: 12px;
-    transform: translate(-50%, calc(-100% - 8px));
-    white-space: nowrap;
-  }
+}
+
+:global {
+  .rozie-chart .rozie-chart-tooltip {
+      background: rgba(0, 0, 0, 0.8);
+      color: #fff;
+      border-radius: 4px;
+      padding: 6px 8px;
+      font-size: 12px;
+      transform: translate(-50%, calc(-100% - 8px));
+      white-space: nowrap;
+    }
 }
 </style>

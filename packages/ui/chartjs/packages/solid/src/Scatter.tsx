@@ -15,15 +15,15 @@ __rozieInjectStyle('Scatter-e7b1d9e8', `.rozie-chart[data-rozie-s-e7b1d9e8] {
   width: 100% !important;
   height: 100% !important;
 }
-.rozie-chart[data-rozie-s-e7b1d9e8] [data-rozie-s-e7b1d9e8]:global(.rozie-chart-tooltip) {
-  background: rgba(0, 0, 0, 0.8);
-  color: #fff;
-  border-radius: 4px;
-  padding: 6px 8px;
-  font-size: 12px;
-  transform: translate(-50%, calc(-100% - 8px));
-  white-space: nowrap;
-}`);
+.rozie-chart .rozie-chart-tooltip {
+    background: rgba(0, 0, 0, 0.8);
+    color: #fff;
+    border-radius: 4px;
+    padding: 6px 8px;
+    font-size: 12px;
+    transform: translate(-50%, calc(-100% - 8px));
+    white-space: nowrap;
+  }`);
 
 interface TooltipSlotCtx { model: any; }
 

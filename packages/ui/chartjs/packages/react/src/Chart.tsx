@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { flushSync } from 'react-dom';
 import './Chart.css';
+import './Chart.global.css';
 import { Chart as ChartJS } from 'chart.js';
 
 // Chart.js v3+ ships with no controllers/elements/scales pre-registered. The
