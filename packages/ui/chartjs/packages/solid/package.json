@@ -38,6 +38,46 @@
       "types": "./dist/auto.d.mts",
       "import": "./dist/auto.mjs",
       "require": "./dist/auto.cjs"
+    },
+    "./line": {
+      "types": "./dist/Line.d.mts",
+      "import": "./dist/Line.mjs",
+      "require": "./dist/Line.cjs"
+    },
+    "./bar": {
+      "types": "./dist/Bar.d.mts",
+      "import": "./dist/Bar.mjs",
+      "require": "./dist/Bar.cjs"
+    },
+    "./pie": {
+      "types": "./dist/Pie.d.mts",
+      "import": "./dist/Pie.mjs",
+      "require": "./dist/Pie.cjs"
+    },
+    "./doughnut": {
+      "types": "./dist/Doughnut.d.mts",
+      "import": "./dist/Doughnut.mjs",
+      "require": "./dist/Doughnut.cjs"
+    },
+    "./polar-area": {
+      "types": "./dist/PolarArea.d.mts",
+      "import": "./dist/PolarArea.mjs",
+      "require": "./dist/PolarArea.cjs"
+    },
+    "./radar": {
+      "types": "./dist/Radar.d.mts",
+      "import": "./dist/Radar.mjs",
+      "require": "./dist/Radar.cjs"
+    },
+    "./scatter": {
+      "types": "./dist/Scatter.d.mts",
+      "import": "./dist/Scatter.mjs",
+      "require": "./dist/Scatter.cjs"
+    },
+    "./bubble": {
+      "types": "./dist/Bubble.d.mts",
+      "import": "./dist/Bubble.mjs",
+      "require": "./dist/Bubble.cjs"
     }
   },
   "files": [

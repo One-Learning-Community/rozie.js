@@ -1,7 +1,7 @@
 import { defineConfig } from 'tsdown';
 
 export default defineConfig({
-  entry: ['src/index.ts', 'src/auto.ts'],
+  entry: ['src/index.ts', 'src/auto.ts', 'src/Chart.ts', 'src/Line.ts', 'src/Bar.ts', 'src/Pie.ts', 'src/Doughnut.ts', 'src/PolarArea.ts', 'src/Radar.ts', 'src/Scatter.ts', 'src/Bubble.ts'],
   format: ['esm', 'cjs'],
   dts: true,
   clean: true,

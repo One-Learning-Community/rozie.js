@@ -125,6 +125,76 @@ function leafPkgName(dir) {
   return pkg.name;
 }
 
+/** PascalCase variant name → kebab-case subpath token (PolarArea → polar-area). */
+function kebab(name) {
+  return name.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase();
+}
+
+/**
+ * BUNDLED-LEAF PACKAGING (react/solid/lit only): keep `tsdown.config.ts`
+ * `entry` and `package.json` `exports` in lockstep with the VARIANTS list so a
+ * consumer can `import Line from '@rozie-ui/chartjs-<fw>/line'` and pull ONLY
+ * Line's controller registration. Source-shipped leaves (vue/svelte/angular)
+ * already tree-shake per-file and are NOT touched.
+ *
+ * These two config files are committed (not fully codegen-owned), so we PATCH
+ * the two generated regions surgically and fail loud if their anchors drift —
+ * the per-leaf `external`/deps stay author-owned.
+ *
+ * `sideEffects` is deliberately left UNDEFINED (status quo). Each variant
+ * module has a real side effect (`ChartJS.register(...)`) and the react/solid
+ * variants also `import './Chart.css'` / `'./Chart.global.css'`; the robust,
+ * bundler-agnostic isolation guarantee is the per-variant SUBPATH (a consumer
+ * importing `/line` only ever loads Line's chunk), not tree-shaking heuristics.
+ */
+function patchBundledLeafPackaging(dir) {
+  const variantNames = VARIANTS.map((v) => v.name);
+  const entryNames = ['Chart', ...variantNames]; // generic Chart + 8 typed variants
+
+  // ── tsdown.config.ts: rewrite the `entry: [...]` array ────────────────────
+  const tsdownPath = resolve(ROOT, 'packages', dir, 'tsdown.config.ts');
+  const tsdown = readFileSync(tsdownPath, 'utf8');
+  const ext = dir === 'lit' ? '.ts' : '.tsx'; // react/solid emit .tsx, lit .ts
+  const entryRe = /entry:\s*\[[^\]]*\],/;
+  if (!entryRe.test(tsdown)) {
+    throw new Error(`codegen bundled-leaf ${dir}: tsdown.config.ts has no \`entry: [...]\` array to patch (config shape changed)`);
+  }
+  // Per-variant + Chart files emit as their own chunks; barrel (index) + auto
+  // stay entries so `.` and `/auto` keep working unchanged.
+  const entryItems = [
+    "'src/index.ts'",
+    "'src/auto.ts'",
+    ...entryNames.map((n) => `'src/${n}${ext}'`),
+  ];
+  const newTsdown = tsdown.replace(entryRe, `entry: [${entryItems.join(', ')}],`);
+  if (newTsdown !== tsdown) writeFileSync(tsdownPath, newTsdown);
+
+  // ── package.json: rebuild the `exports` map (., ./auto, + per-variant) ─────
+  const pkgPath = resolve(ROOT, 'packages', dir, 'package.json');
+  const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
+  const exp = {
+    '.': {
+      types: './dist/index.d.mts',
+      import: './dist/index.mjs',
+      require: './dist/index.cjs',
+    },
+    './auto': {
+      types: './dist/auto.d.mts',
+      import: './dist/auto.mjs',
+      require: './dist/auto.cjs',
+    },
+  };
+  for (const name of variantNames) {
+    exp[`./${kebab(name)}`] = {
+      types: `./dist/${name}.d.mts`,
+      import: `./dist/${name}.mjs`,
+      require: `./dist/${name}.cjs`,
+    };
+  }
+  pkg.exports = exp;
+  writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
+}
+
 /** One barrel line re-exporting a component (generic Chart or a variant). */
 function barrelLine(name, cfg) {
   const path = `./${name}${cfg.ext}`;
@@ -230,6 +300,11 @@ function main() {
     writeFileSync(resolve(ROOT, 'packages', cfg.dir, 'README.md'), readme);
 
     cpSync(resolve(REPO_ROOT, 'LICENSE'), resolve(ROOT, 'packages', cfg.dir, 'LICENSE'));
+
+    // BUNDLED leaves (tsdown → dist/) get multi-entry chunking + per-variant
+    // subpath exports so each typed component is an isolated, selectively-
+    // importable chunk. Source-shipped leaves already tree-shake per-file.
+    if (cfg.build === 'tsdown') patchBundledLeafPackaging(cfg.dir);
 
     const sidecars = target === 'react' ? ' (+ .css + .d.ts)' : '';
     console.log(`codegen: ${target.padEnd(8)} → Chart + ${VARIANTS.length} variants + barrel + auto${sidecars}  ✓`);
