@@ -427,13 +427,13 @@ A model two-way binding can ping-pong: the consumer's state signals back into th
 
 `focus` and `blur` are emitted as events (so consumers can wire save-on-blur or toolbar show/hide). Because an Angular output field and a method cannot share a name (ROZ121), the imperative commands are `focusEditor` / `blurEditor`. This keeps **both** capabilities — the focus/blur notifications *and* the imperative focus/blur control — alive across all six targets.
 
-### Placeholder rendering needs the Placeholder extension
+### Placeholder rendering is bundled
 
-The `placeholder` prop forwards `data-placeholder` / `aria-placeholder` to the editor host, but full empty-state placeholder rendering (showing the text only when the document is empty, hiding it as you type) is TipTap's `@tiptap/extension-placeholder` (or `@tiptap/extensions`) — add it through `:extensions`. Bundling it by default is a tracked follow-up (see the [comparison page](/guide/tiptap-comparison)).
+The `placeholder` prop renders empty-state ghost text out of the box — the text shows only while the document is empty and hides as you type. `@rozie-ui/tiptap` bundles `@tiptap/extensions` (ships `Placeholder` in v3) and wires the prop to `Placeholder.configure({ placeholder })` at editor construction, so no consumer `:extensions` wiring is needed. The ghost-text CSS reaches the engine-rendered `.is-editor-empty` node (which carries no Rozie scope attribute) via the `:root { }` engine-DOM escape hatch on all six targets. The prop still also forwards `aria-placeholder` for assistive tech. See the [comparison page](/guide/tiptap-comparison#bundle-placeholder-g3-shipped) for details.
 
 ### Node views ship; bubble/floating menus are the remaining gap
 
-TipTap's marquee feature — **custom node views** — ships via the [`nodeView` reactive slot](#node-view-slots), uniformly across all six targets (including Solid and Lit, where no upstream renderer exists). The remaining gap versus the official wrappers is **bubble / floating menu** slots (selection-anchored menu UI), which are deferred to a follow-up phase. See the [comparison page](/guide/tiptap-comparison#deferred-follow-ups-g2-g3-g4) for the deferred-feature plan.
+TipTap's marquee feature — **custom node views** — ships via the [`nodeView` reactive slot](#node-view-slots), uniformly across all six targets (including Solid and Lit, where no upstream renderer exists). The remaining gap versus the official wrappers is **bubble / floating menu** slots (selection-anchored menu UI), which are deferred to a follow-up phase. See the [comparison page](/guide/tiptap-comparison#deferred-follow-ups-g2-g4) for the deferred-feature plan.
 
 ## Cross-references
 

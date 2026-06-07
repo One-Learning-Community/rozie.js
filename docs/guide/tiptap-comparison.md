@@ -53,7 +53,7 @@ The wedge is real and strongest for **Lit (no wrapper at all)** and **Solid (thi
 | --- | --- | --- | --- |
 | **G1 — Node-view component renderer** | React, Vue, Angular, Svelte | **High** (TipTap's marquee feature) | **✅ SHIPPED (Phase 33)** — a uniform `nodeView` **reactive** portal slot driven by `addNodeView`, proven 6/6. See the [shipped design below](#node-view-portal-slots-g1-shipped). |
 | G2 — Bubble / Floating menu | React, Vue, Angular, Svelte | Medium | **⏳ Deferred (follow-up)** — a `bubbleMenu` / `floatingMenu` portal slot over `@tiptap/extension-bubble-menu` (Floating UI). Out of Phase 33 scope. |
-| G3 — Bundled Placeholder | all (via core ext) | Low | **⏳ Deferred (follow-up)** — bundle `@tiptap/extension-placeholder` + wire the `placeholder` prop to it. Works today via `:extensions`. |
+| **G3 — Bundled Placeholder** | all (via core ext) | Low | **✅ SHIPPED** — bundles `@tiptap/extensions` (ships `Placeholder` in v3) and wires the `placeholder` prop to `Placeholder.configure({ placeholder })`; ghost-text renders on the empty editor across all six targets via the `:root { }` engine-DOM escape hatch (Phase 34). See [shipped below](#bundle-placeholder-g3-shipped). |
 | G4 — `outputFormat: 'json'` two-way | `ngx-tiptap` | Low | **⏳ Deferred (follow-up)** — a `format` prop (`'html' | 'json'`) switching the two-way payload; `getJSON()` already exists on the handle. |
 | G5 — Reactive-forms / CVA | `ngx-tiptap` (Angular) | Low | **✅ SHIPPED** — `html` is the single `model` prop, so the Angular target auto-emits `ControlValueAccessor` (Phase 23). `[(ngModel)]`, `[formControl]`, and `formControlName` bind directly, no wrapper directive. |
 
@@ -79,17 +79,27 @@ The strongest differentiator now ships: render a **framework component as a cust
 
 See the [TipTap guide's Node-view slots section](/guide/tiptap#node-view-slots) for the per-target consumer shapes and the editable-hole recipe.
 
-## Deferred follow-ups (G2 / G3 / G4)
+## Bundle Placeholder (G3 — shipped) {#bundle-placeholder-g3-shipped}
 
-These remain out of Phase 33 scope and are tracked for a follow-up phase.
+The `placeholder` prop now renders empty-state ghost text out of the box — no consumer `:extensions` wiring. `@rozie-ui/tiptap` bundles **`@tiptap/extensions`** (version-matched to `@tiptap/core` / `@tiptap/starter-kit`; ships `Placeholder` in TipTap v3), and the source wires the prop conditionally at editor construction:
+
+```js
+const placeholderExtensions = $props.placeholder
+  ? [Placeholder.configure({ placeholder: $props.placeholder })]
+  : []
+// consumer $props.extensions stay LAST so they still win
+extensions: [StarterKit, ...placeholderExtensions, ...nodeViewExtensions, ...$props.extensions]
+```
+
+The Placeholder extension adds the class `is-editor-empty` and a `data-placeholder` attribute to the first empty ProseMirror node — an **engine-rendered node that never carries Rozie's `[data-rozie-s-*]` scope attribute**, so a plain scoped CSS rule would silently fail to match on React/Solid/Lit. The ghost-text `::before` rule is therefore emitted through the **`:root { … }` engine-DOM escape hatch** (Phase 34): bare/unscoped on every target — React `.global.css` sidecar, Vue unscoped second `<style>`, Svelte `:global { }`, Angular `::ng-deep`, Solid `__rozieInjectStyle`, Lit dual-sink (`static styles` + `injectGlobalStyles`). (Not `:global()` — that is a ROZ128 hard error; the `:root { nested }` form is canonical.) The ghost text renders **only** while the editor is empty, so it has zero effect on non-empty documents.
+
+## Deferred follow-ups (G2 / G4)
+
+These remain out of scope and are tracked for a follow-up phase.
 
 ### Bubble / Floating menu slots (G2)
 
 A `bubbleMenu` and `floatingMenu` portal slot over `@tiptap/extension-bubble-menu` / `@tiptap/extension-floating-menu` (both Floating-UI-based in v3). Lower risk than node views — the menu's DOM is a single positioned element, a natural portal host (the same shape as the shipped `toolbar` slot, plus a selection-driven `shouldShow`). Adds the two extension peers.
-
-### Bundle Placeholder (G3 — cheap, high-value)
-
-Add `@tiptap/extension-placeholder` (or `@tiptap/extensions`, which ships Placeholder in v3) as a peer, and wire the existing `placeholder` prop to `Placeholder.configure({ placeholder })` so empty-state placeholder rendering works without the consumer adding it via `:extensions`. A one-extension add that closes a paper-cut every consumer hits; works today via `:extensions`.
 
 ### JSON content format (G4)
 
