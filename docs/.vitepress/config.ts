@@ -145,6 +145,13 @@ export default defineConfig({
             { text: 'TipTap libraries comparison', link: '/guide/tiptap-comparison' },
           ],
         },
+        {
+          text: '@rozie-ui/maplibre',
+          items: [
+            { text: 'MapLibre — showcase & API', link: '/guide/maplibre' },
+            { text: 'MapLibre libraries comparison', link: '/guide/maplibre-comparison' },
+          ],
+        },
       ],
       '/compatibility': [
         {

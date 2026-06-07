@@ -211,6 +211,18 @@ const BUNDLE_DECLS: readonly BundleDecl[] = [
     entryGlobPath: '../../demos/FullCalendarDemo.rozie',
     dependencyGlobPaths: ['../../../packages/ui/fullcalendar/src/FullCalendar.rozie'],
   },
+  {
+    // Phase 35 — the MapLibre wrapper lives in @rozie-ui/maplibre
+    // (packages/ui/maplibre/src/MapLibre.rozie). The demo entry
+    // (demos/MapLibreDemo.rozie) is a minimal consumer:
+    // <MapLibre r-model:center r-model:zoom :map-style :controls> with a marker
+    // slot. KEEP-THE-URL: snippet key stays bundle/MapLibreDemo. The decl
+    // gracefully no-ops (the bundle is skipped) until the demo entry exists.
+    key: 'bundle/MapLibreDemo',
+    label: 'bundle/MapLibreDemo',
+    entryGlobPath: '../../demos/MapLibreDemo.rozie',
+    dependencyGlobPaths: ['../../../packages/ui/maplibre/src/MapLibre.rozie'],
+  },
 ];
 
 // Bundle entry/dep paths can resolve against either glob root: top-level

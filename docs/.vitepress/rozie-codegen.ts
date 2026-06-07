@@ -61,7 +61,7 @@ export function rozieCodegen(
     // `SortableList` moved there in Phase 20-01 and `Flatpickr` in the
     // flatpickr port, so docs resolve their canonical producer from the
     // package source rather than the (now-removed) `examples/<Name>.rozie`.
-    for (const product of ['sortable-list', 'flatpickr', 'fullcalendar', 'codemirror', 'chartjs', 'tiptap']) {
+    for (const product of ['sortable-list', 'flatpickr', 'fullcalendar', 'codemirror', 'chartjs', 'tiptap', 'maplibre']) {
       const pkgSrc = resolve(
         opts.examplesDir,
         '..',
