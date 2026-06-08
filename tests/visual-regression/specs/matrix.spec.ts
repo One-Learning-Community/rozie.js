@@ -288,19 +288,25 @@ const EXAMPLES = [
   // `.cropper-canvas` image to load AND for cropper.css (an async code-split chunk)
   // to apply, so the dark modal + crop-box chrome are present at clip time.
   //
-  // TRACKED DEFERRAL (no committed baseline → `baselineExists()` auto-fixmes the
-  // cell; never red). Unlike maplibre's WebGL canvas — which fills the container
-  // edge-to-edge and renders byte-identically across 5 targets — Cropper draws an
-  // OUTLINED crop box + guide lines, and the box origin shifts ~1-3px between the
-  // template-emit family (vue/svelte) and the JSX-emit family (react/solid). A
-  // 1px shift of a 1px-wide outline mismatches the entire box perimeter →
-  // thousands of differing pixels, far past `maxDiffPixels: 2`, and not closeable
-  // by a sane tolerance. This is the documented engine-demo cross-emit pixel
-  // divergence (same root class as the text-node kerning split), here amplified by
-  // outlined chrome. The full cross-target CORRECTNESS proof (mount, crop box,
-  // two-way `data` round-trip) lives in cropper.spec.ts and is green 6/6; the
-  // screenshot cell stays registered (demo + settle ready) for a future per-emit-
-  // family or canvas-rasterized approach to byte-identity.
+  // RESOLVED 2026-06-08 to 5/6 + a tracked Lit gap (the earlier "~1-3px cross-emit
+  // outline shift / accepted determinism divergence" was a MISDIAGNOSIS). A Docker
+  // geometry diagnostic showed the crop box landed in THREE different places with a
+  // fixed `:data={x:60,y:40,w:180,h:160}`: react/solid correct (60,40,180,160);
+  // vue/svelte/angular at the DEFAULT 80%-centered box (the initial `:data` was
+  // silently dropped); lit at the right X/size but wrong Y. Two distinct real bugs:
+  //   (1) The initial-:data drop on vue/svelte/angular — Cropper's setup-time `crop`
+  //       event (default box, fired before `ready`) wrote `$model.data`, which on
+  //       unified-model targets clobbered the `$props.data` that `ready` then reads.
+  //       FIXED in Cropper.rozie (a `cropReady` gate). All of vue/svelte/angular/
+  //       react/solid now place the box identically → a shared D-10 baseline holds
+  //       for those 5.
+  //   (2) Lit mispositions the box because the consumer-imported global
+  //       `cropperjs/dist/cropper.css` does not pierce the wrapper's shadow root, so
+  //       the absolutely-positioned cropper chrome is unstyled (the SAME engine-CSS-
+  //       in-Lit-shadow gap maplibre's overlay hit). Needs an engine-CSS-shadow
+  //       bridge — tracked, gated below (CROPPER_LIT_SCREENSHOT_TODO).
+  // Behavioral CORRECTNESS (mount, crop box, two-way `data`) is green 6/6 in
+  // cropper.spec.ts. The screenshot cell is now blessed for the 5 non-Lit targets.
   'CropperScreenshot',
 ] as const;
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'] as const;
@@ -813,6 +819,19 @@ const PHASE_14_1_FOLLOWUP = new Set<string>([]);
 // .planning/todos/pending/lit-emitter-hoist-pure-literal-component-props.md.
 const MAPLIBRE_LIT_SCREENSHOT_TODO = new Set<string>([]);
 
+// Cropper (cropperjs v1) — the Lit CropperScreenshot cell ONLY. The crop box
+// mispositions on Lit because the consumer-imported global `cropperjs/dist/cropper.css`
+// does not pierce the wrapper's shadow root, so the absolutely-positioned cropper
+// chrome (.cropper-container / .cropper-canvas / .cropper-crop-box) is unstyled and the
+// box lands at the wrong Y (verified: container/canvas/img at y≈252 but the crop box at
+// y≈532). This is the SAME engine-global-CSS-doesn't-reach-the-Lit-shadow gap maplibre's
+// overlay DOM hit; it needs an engine-CSS-shadow bridge (adoptedStyleSheets), not a
+// per-cell fix. The other 5 targets render the crop box identically (post the cropReady
+// model fix) and bless a shared D-10 `CropperScreenshot.png`. Behavioral coverage is
+// green 6/6 in cropper.spec.ts. Tracked:
+// .planning/todos/pending/lit-engine-global-css-shadow-bridge.md
+const CROPPER_LIT_SCREENSHOT_TODO = new Set<string>(['CropperScreenshot::lit']);
+
 for (const example of EXAMPLES) {
   const hasBaseline = baselineExists(example);
   for (const target of TARGETS) {
@@ -832,12 +851,16 @@ for (const example of EXAMPLES) {
     const maplibreLitScreenshotTodo = MAPLIBRE_LIT_SCREENSHOT_TODO.has(
       `${example}::${target}`,
     );
+    const cropperLitScreenshotTodo = CROPPER_LIT_SCREENSHOT_TODO.has(
+      `${example}::${target}`,
+    );
     const runner =
       (target === 'angular' && !angularBuilt) ||
       !hasBaseline ||
       crossTargetDivergent ||
       phase14_1Followup ||
-      maplibreLitScreenshotTodo
+      maplibreLitScreenshotTodo ||
+      cropperLitScreenshotTodo
         ? test.fixme
         : test;
     runner(`${example} · ${target}`, async ({ page }) => {
