@@ -167,6 +167,14 @@ export default defineConfig({
             { text: 'Cropper — live demo', link: '/guide/cropper-demo' },
           ],
         },
+        {
+          text: '@rozie-ui/pdf',
+          items: [
+            { text: 'PdfViewer — showcase & API', link: '/guide/pdf' },
+            { text: 'PDF libraries comparison', link: '/guide/pdf-comparison' },
+            { text: 'PdfViewer — live demo', link: '/guide/pdf-demo' },
+          ],
+        },
       ],
       '/compatibility': [
         {

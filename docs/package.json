@@ -34,6 +34,7 @@
     "@rozie-ui/flatpickr-vue": "workspace:*",
     "@rozie-ui/fullcalendar-vue": "workspace:*",
     "@rozie-ui/maplibre-vue": "workspace:*",
+    "@rozie-ui/pdf-vue": "workspace:*",
     "@rozie-ui/sortable-list-vue": "workspace:*",
     "@rozie-ui/tiptap-vue": "workspace:*",
     "@rozie/core": "workspace:*",
@@ -49,6 +50,7 @@
     "cropperjs": "^1.6.2",
     "flatpickr": "^4.6.13",
     "maplibre-gl": "^5.24.0",
+    "pdfjs-dist": "^6.0.227",
     "sortablejs": "^1.15.7",
     "vitepress": "^1.5.0",
     "vue": "^3.5.0"

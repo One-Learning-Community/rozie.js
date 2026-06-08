@@ -112,6 +112,9 @@ importers:
       '@rozie-ui/maplibre-vue':
         specifier: workspace:*
         version: link:../packages/ui/maplibre/packages/vue
+      '@rozie-ui/pdf-vue':
+        specifier: workspace:*
+        version: link:../packages/ui/pdf/packages/vue
       '@rozie-ui/sortable-list-vue':
         specifier: workspace:*
         version: link:../packages/ui/sortable-list/packages/vue
@@ -157,6 +160,9 @@ importers:
       maplibre-gl:
         specifier: ^5.24.0
         version: 5.24.0
+      pdfjs-dist:
+        specifier: ^6.0.227
+        version: 6.0.227
       sortablejs:
         specifier: ^1.15.7
         version: 1.15.7
